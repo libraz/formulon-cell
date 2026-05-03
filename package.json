@@ -1,0 +1,30 @@
+{
+  "name": "formulon-cell",
+  "private": true,
+  "description": "Spreadsheet UI library for the formulon WASM calc engine.",
+  "license": "Apache-2.0",
+  "packageManager": "yarn@4.5.0",
+  "volta": {
+    "node": "22.11.0",
+    "yarn": "4.5.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "yarn workspace @formulon-cell/playground dev",
+    "build": "yarn workspaces foreach -A --topological-dev --exclude formulon-cell run build",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "yarn workspaces foreach -A --exclude formulon-cell run typecheck",
+    "test": "yarn workspace @formulon-cell/core test",
+    "sync-formulon": "yarn workspace @formulon-cell/core sync-formulon"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "typescript": "5.7.2",
+    "vite": "6.0.5",
+    "vite-plugin-dts": "4.4.0"
+  }
+}

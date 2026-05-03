@@ -1,0 +1,37 @@
+/* Dark theme — flat, modern, near-black sheet with cool cobalt accent. */
+
+@layer fc.theme {
+  .fc-host[data-fc-theme='ink'] {
+    --fc-bg: #1a1c21;
+    --fc-bg-elev: #20232a;
+    --fc-bg-rail: #16181d;
+    --fc-bg-header: #262932;
+
+    --fc-fg: #e7eaf0;
+    --fc-fg-strong: #f5f7fa;
+    --fc-fg-mute: #9aa0a8;
+    --fc-fg-faint: #6b7079;
+
+    --fc-rule: #2b2e35;
+    --fc-rule-strong: #3a3d44;
+
+    --fc-accent: #6f86ff;
+    --fc-accent-strong: #8a9cff;
+    --fc-accent-soft: rgba(111, 134, 255, 0.18);
+    --fc-accent-fg: #0f1014;
+
+    --fc-cell-error-fg: #ff6f6f;
+    --fc-cell-formula-fg: #e7eaf0;
+    --fc-cell-bool-fg: #6cd28a;
+    --fc-cell-num-fg: var(--fc-fg-strong);
+
+    --fc-header-fg: #9aa0a8;
+    --fc-header-fg-active: #f5f7fa;
+    --fc-header-bg: var(--fc-bg-rail);
+    --fc-header-rule: var(--fc-rule);
+
+    --fc-hover-stripe: rgba(231, 234, 240, 0.028);
+
+    color-scheme: dark;
+  }
+}

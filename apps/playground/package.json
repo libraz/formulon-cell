@@ -1,0 +1,26 @@
+{
+  "name": "@formulon-cell/playground",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install --with-deps chromium"
+  },
+  "dependencies": {
+    "@fontsource-variable/fraunces": "5.1.1",
+    "@fontsource/ibm-plex-mono": "5.1.1",
+    "@fontsource/ibm-plex-sans": "5.1.1",
+    "@formulon-cell/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
+    "@playwright/test": "^1.59.1",
+    "typescript": "5.7.2",
+    "vite": "6.0.5"
+  }
+}

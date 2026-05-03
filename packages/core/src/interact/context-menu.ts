@@ -1,0 +1,521 @@
+import { copy } from '../commands/clipboard/copy.js';
+import { cut } from '../commands/clipboard/cut.js';
+import { pasteTSV } from '../commands/clipboard/paste.js';
+import { clearComment, commentAt, setComment } from '../commands/comment.js';
+import {
+  clearFormat,
+  cycleBorders,
+  setAlign,
+  toggleBold,
+  toggleItalic,
+  toggleUnderline,
+} from '../commands/format.js';
+import { type History, recordFormatChange } from '../commands/history.js';
+import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
+import {
+  deleteCols,
+  deleteRows,
+  hiddenInSelection,
+  hideCols,
+  hideRows,
+  insertCols,
+  insertRows,
+  showCols,
+  showRows,
+} from '../commands/structure.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { type Strings, defaultStrings } from '../i18n/strings.js';
+import { hitZone } from '../render/geometry.js';
+import { type SpreadsheetStore, mutators } from '../store/store.js';
+
+export interface ContextMenuDeps {
+  host: HTMLElement;
+  store: SpreadsheetStore;
+  wb: WorkbookHandle;
+  /** UI string dictionary. Falls back to the package default (ja) if omitted. */
+  strings?: Strings;
+  /** Shared history. When provided, format-mutating menu actions push entries
+   *  so Cmd+Z reverts them. */
+  history?: History | null;
+  /** Called after cut/paste/clear so caller can refresh cached cells from engine. */
+  onAfterCommit?: () => void;
+  /** Called when the user clicks the "Format Cells…" menu entry. */
+  onFormatDialog?: () => void;
+  /** Called when the user clicks "Paste Special…". */
+  onPasteSpecial?: () => void;
+  /** Called when the user clicks "Edit comment…". When omitted, falls back
+   *  to a synchronous `window.prompt`. */
+  onEditComment?: (addr: import('../engine/types.js').Addr) => void;
+}
+
+type ItemId =
+  | 'copy'
+  | 'cut'
+  | 'paste'
+  | 'pasteSpecial'
+  | 'clear'
+  | 'bold'
+  | 'italic'
+  | 'underline'
+  | 'alignLeft'
+  | 'alignCenter'
+  | 'alignRight'
+  | 'borders'
+  | 'clearFormat'
+  | 'formatCells'
+  | 'selectAll'
+  | 'rowInsertAbove'
+  | 'rowInsertBelow'
+  | 'rowDelete'
+  | 'rowHide'
+  | 'rowUnhide'
+  | 'colInsertLeft'
+  | 'colInsertRight'
+  | 'colDelete'
+  | 'colHide'
+  | 'colUnhide'
+  | 'rowGroup'
+  | 'rowUngroup'
+  | 'colGroup'
+  | 'colUngroup'
+  | 'insertComment'
+  | 'deleteComment';
+
+type MenuKind = 'cell' | 'row' | 'col';
+
+type MenuEntry =
+  | { kind: 'item'; id: ItemId; label: string; hint?: string }
+  | { kind: 'sep'; id: string };
+
+function buildCellEntries(s: Strings): MenuEntry[] {
+  const t = s.contextMenu;
+  return [
+    { kind: 'item', id: 'copy', label: t.copy, hint: '⌘C' },
+    { kind: 'item', id: 'cut', label: t.cut, hint: '⌘X' },
+    { kind: 'item', id: 'paste', label: t.paste, hint: '⌘V' },
+    { kind: 'item', id: 'pasteSpecial', label: t.pasteSpecial, hint: '⌘⇧V' },
+    { kind: 'item', id: 'clear', label: t.clear, hint: 'Del' },
+    { kind: 'sep', id: 'sep1' },
+    { kind: 'item', id: 'bold', label: t.bold, hint: '⌘B' },
+    { kind: 'item', id: 'italic', label: t.italic, hint: '⌘I' },
+    { kind: 'item', id: 'underline', label: t.underline, hint: '⌘U' },
+    { kind: 'sep', id: 'sep2' },
+    { kind: 'item', id: 'alignLeft', label: t.alignLeft },
+    { kind: 'item', id: 'alignCenter', label: t.alignCenter },
+    { kind: 'item', id: 'alignRight', label: t.alignRight },
+    { kind: 'sep', id: 'sep3' },
+    { kind: 'item', id: 'borders', label: t.borders },
+    { kind: 'item', id: 'clearFormat', label: t.clearFormat },
+    { kind: 'sep', id: 'sep4' },
+    { kind: 'item', id: 'formatCells', label: t.formatCells, hint: '⌘1' },
+    { kind: 'sep', id: 'sep5' },
+    { kind: 'item', id: 'insertComment', label: t.insertComment, hint: '⇧F2' },
+    { kind: 'item', id: 'deleteComment', label: t.deleteComment },
+    { kind: 'sep', id: 'sep6' },
+    { kind: 'item', id: 'selectAll', label: t.selectAll, hint: '⌘A' },
+  ];
+}
+
+function buildRowEntries(s: Strings): MenuEntry[] {
+  const t = s.contextMenu;
+  return [
+    { kind: 'item', id: 'copy', label: t.copy, hint: '⌘C' },
+    { kind: 'item', id: 'cut', label: t.cut, hint: '⌘X' },
+    { kind: 'item', id: 'paste', label: t.paste, hint: '⌘V' },
+    { kind: 'sep', id: 'sepR1' },
+    { kind: 'item', id: 'rowInsertAbove', label: t.rowInsertAbove },
+    { kind: 'item', id: 'rowInsertBelow', label: t.rowInsertBelow },
+    { kind: 'item', id: 'rowDelete', label: t.rowDelete },
+    { kind: 'sep', id: 'sepR2' },
+    { kind: 'item', id: 'rowHide', label: t.rowHide },
+    { kind: 'item', id: 'rowUnhide', label: t.rowUnhide },
+    { kind: 'sep', id: 'sepR3' },
+    { kind: 'item', id: 'rowGroup', label: t.rowGroup, hint: '⌥⇧→' },
+    { kind: 'item', id: 'rowUngroup', label: t.rowUngroup, hint: '⌥⇧←' },
+    { kind: 'sep', id: 'sepR4' },
+    { kind: 'item', id: 'clear', label: t.clear, hint: 'Del' },
+  ];
+}
+
+function buildColEntries(s: Strings): MenuEntry[] {
+  const t = s.contextMenu;
+  return [
+    { kind: 'item', id: 'copy', label: t.copy, hint: '⌘C' },
+    { kind: 'item', id: 'cut', label: t.cut, hint: '⌘X' },
+    { kind: 'item', id: 'paste', label: t.paste, hint: '⌘V' },
+    { kind: 'sep', id: 'sepC1' },
+    { kind: 'item', id: 'colInsertLeft', label: t.colInsertLeft },
+    { kind: 'item', id: 'colInsertRight', label: t.colInsertRight },
+    { kind: 'item', id: 'colDelete', label: t.colDelete },
+    { kind: 'sep', id: 'sepC2' },
+    { kind: 'item', id: 'colHide', label: t.colHide },
+    { kind: 'item', id: 'colUnhide', label: t.colUnhide },
+    { kind: 'sep', id: 'sepC3' },
+    { kind: 'item', id: 'colGroup', label: t.colGroup, hint: '⌥⇧→' },
+    { kind: 'item', id: 'colUngroup', label: t.colUngroup, hint: '⌥⇧←' },
+    { kind: 'sep', id: 'sepC4' },
+    { kind: 'item', id: 'clear', label: t.clear, hint: 'Del' },
+  ];
+}
+
+const VIEWPORT_PAD = 4;
+
+export function attachContextMenu(deps: ContextMenuDeps): () => void {
+  const { host, store, wb } = deps;
+  const history = deps.history ?? null;
+  const strings = deps.strings ?? defaultStrings;
+  const wrapFmt = (fn: () => void): void => recordFormatChange(history, store, fn);
+
+  const root = document.createElement('div');
+  root.className = 'fc-ctxmenu';
+  root.setAttribute('role', 'menu');
+  root.style.display = 'none';
+  root.tabIndex = -1;
+  document.body.appendChild(root);
+
+  let visible = false;
+  let pasteBtnRef: HTMLButtonElement | null = null;
+
+  const hide = (): void => {
+    if (!visible) return;
+    visible = false;
+    root.style.display = 'none';
+  };
+
+  const buildMenu = (kind: MenuKind): void => {
+    root.replaceChildren();
+    pasteBtnRef = null;
+    const entries =
+      kind === 'row'
+        ? buildRowEntries(strings)
+        : kind === 'col'
+          ? buildColEntries(strings)
+          : buildCellEntries(strings);
+    for (const entry of entries) {
+      if (entry.kind === 'sep') {
+        const sep = document.createElement('hr');
+        sep.className = 'fc-ctxmenu__sep';
+        root.appendChild(sep);
+        continue;
+      }
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'fc-ctxmenu__item';
+      btn.dataset.fcAction = entry.id;
+      btn.setAttribute('role', 'menuitem');
+      const label = document.createElement('span');
+      label.textContent = entry.label;
+      const hint = document.createElement('span');
+      hint.className = 'fc-ctxmenu__hint';
+      hint.textContent = entry.hint ?? '';
+      btn.append(label, hint);
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (btn.disabled) return;
+        run(entry.id);
+        hide();
+      });
+      root.appendChild(btn);
+      if (entry.id === 'paste') pasteBtnRef = btn;
+    }
+  };
+
+  const clampToViewport = (x: number, y: number): { x: number; y: number } => {
+    const w = root.offsetWidth;
+    const h = root.offsetHeight;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const cx = Math.max(VIEWPORT_PAD, Math.min(x, vw - w - VIEWPORT_PAD));
+    const cy = Math.max(VIEWPORT_PAD, Math.min(y, vh - h - VIEWPORT_PAD));
+    return { x: cx, y: cy };
+  };
+
+  const show = (clientX: number, clientY: number, kind: MenuKind): void => {
+    buildMenu(kind);
+    if (pasteBtnRef) {
+      const canPaste = canReadClipboard();
+      pasteBtnRef.disabled = !canPaste;
+      if (!canPaste) pasteBtnRef.setAttribute('aria-disabled', 'true');
+      else pasteBtnRef.removeAttribute('aria-disabled');
+    }
+    root.style.display = 'block';
+    root.style.left = '-9999px';
+    root.style.top = '-9999px';
+    visible = true;
+    const { x, y } = clampToViewport(clientX, clientY);
+    root.style.left = `${x}px`;
+    root.style.top = `${y}px`;
+  };
+
+  /** Resolve which menu flavour to show based on the click target. Header
+   *  clicks promote the selection to the whole row/column so the action
+   *  inherits a sensible band. */
+  const resolveMenuKind = (e: MouseEvent): MenuKind => {
+    const rect = host.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const s = store.getState();
+    const zone = hitZone(s.layout, s.viewport, x, y);
+    if (!zone) return 'cell';
+    if (zone.kind === 'row-header' || zone.kind === 'row-resize') {
+      // Promote selection to the row (preserving multi-row drags).
+      const sel = s.selection.range;
+      const inSel = zone.row >= sel.r0 && zone.row <= sel.r1 && sel.c0 === 0 && sel.c1 >= 16383;
+      if (!inSel) mutators.selectRow(store, zone.row);
+      return 'row';
+    }
+    if (zone.kind === 'col-header' || zone.kind === 'col-resize') {
+      const sel = s.selection.range;
+      const inSel = zone.col >= sel.c0 && zone.col <= sel.c1 && sel.r0 === 0 && sel.r1 >= 1048575;
+      if (!inSel) mutators.selectCol(store, zone.col);
+      return 'col';
+    }
+    return 'cell';
+  };
+
+  const onContextMenu = (e: MouseEvent): void => {
+    const target = e.target;
+    if (target instanceof Element && target.closest('.fc-host__formulabar')) return;
+    e.preventDefault();
+    const kind = resolveMenuKind(e);
+    show(e.clientX, e.clientY, kind);
+  };
+
+  const onDocPointerDown = (e: MouseEvent): void => {
+    if (!visible) return;
+    if (e.target instanceof Node && root.contains(e.target)) return;
+    hide();
+  };
+
+  const onDocKey = (e: KeyboardEvent): void => {
+    if (!visible) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      hide();
+    }
+  };
+
+  const onScroll = (): void => hide();
+
+  function run(id: ItemId): void {
+    const state = store.getState();
+    switch (id) {
+      case 'copy': {
+        const r = copy(state);
+        if (r) void writeClipboard(r.tsv);
+        return;
+      }
+      case 'cut': {
+        const r = cut(state, wb);
+        if (r) void writeClipboard(r.tsv);
+        deps.onAfterCommit?.();
+        return;
+      }
+      case 'paste': {
+        void readClipboard().then((text) => {
+          if (!text) return;
+          pasteTSV(store.getState(), wb, text);
+          deps.onAfterCommit?.();
+        });
+        return;
+      }
+      case 'pasteSpecial': {
+        deps.onPasteSpecial?.();
+        return;
+      }
+      case 'clear': {
+        const range = state.selection.range;
+        const sheet = range.sheet;
+        for (const key of state.data.cells.keys()) {
+          const parts = key.split(':');
+          if (parts.length !== 3) continue;
+          if (Number(parts[0]) !== sheet) continue;
+          const row = Number(parts[1]);
+          const col = Number(parts[2]);
+          if (row < range.r0 || row > range.r1) continue;
+          if (col < range.c0 || col > range.c1) continue;
+          wb.setBlank({ sheet, row, col });
+        }
+        deps.onAfterCommit?.();
+        return;
+      }
+      case 'bold': {
+        wrapFmt(() => toggleBold(state, store));
+        return;
+      }
+      case 'italic': {
+        wrapFmt(() => toggleItalic(state, store));
+        return;
+      }
+      case 'underline': {
+        wrapFmt(() => toggleUnderline(state, store));
+        return;
+      }
+      case 'alignLeft': {
+        wrapFmt(() => setAlign(state, store, 'left'));
+        return;
+      }
+      case 'alignCenter': {
+        wrapFmt(() => setAlign(state, store, 'center'));
+        return;
+      }
+      case 'alignRight': {
+        wrapFmt(() => setAlign(state, store, 'right'));
+        return;
+      }
+      case 'borders': {
+        wrapFmt(() => cycleBorders(state, store));
+        return;
+      }
+      case 'clearFormat': {
+        wrapFmt(() => clearFormat(state, store));
+        return;
+      }
+      case 'formatCells': {
+        deps.onFormatDialog?.();
+        return;
+      }
+      case 'selectAll': {
+        mutators.selectAll(store);
+        return;
+      }
+      case 'rowInsertAbove': {
+        const r = state.selection.range;
+        insertRows(store, wb, history, r.r0, r.r1 - r.r0 + 1);
+        deps.onAfterCommit?.();
+        return;
+      }
+      case 'rowInsertBelow': {
+        const r = state.selection.range;
+        insertRows(store, wb, history, r.r1 + 1, r.r1 - r.r0 + 1);
+        deps.onAfterCommit?.();
+        return;
+      }
+      case 'rowDelete': {
+        const r = state.selection.range;
+        deleteRows(store, wb, history, r.r0, r.r1 - r.r0 + 1);
+        deps.onAfterCommit?.();
+        return;
+      }
+      case 'rowHide': {
+        const r = state.selection.range;
+        hideRows(store, history, r.r0, r.r1);
+        return;
+      }
+      case 'rowUnhide': {
+        const r = state.selection.range;
+        // Excel: select rows flanking a hidden band, then unhide. We just
+        // unhide every hidden row inside the active selection.
+        const targets = hiddenInSelection(state.layout, 'row', r.r0, r.r1);
+        if (targets.length === 0) return;
+        showRows(store, history, targets[0]!, targets[targets.length - 1]!);
+        return;
+      }
+      case 'rowGroup': {
+        const r = state.selection.range;
+        groupRows(store, history, r.r0, r.r1);
+        return;
+      }
+      case 'rowUngroup': {
+        const r = state.selection.range;
+        ungroupRows(store, history, r.r0, r.r1);
+        return;
+      }
+      case 'colInsertLeft': {
+        const r = state.selection.range;
+        insertCols(store, wb, history, r.c0, r.c1 - r.c0 + 1);
+        deps.onAfterCommit?.();
+        return;
+      }
+      case 'colInsertRight': {
+        const r = state.selection.range;
+        insertCols(store, wb, history, r.c1 + 1, r.c1 - r.c0 + 1);
+        deps.onAfterCommit?.();
+        return;
+      }
+      case 'colDelete': {
+        const r = state.selection.range;
+        deleteCols(store, wb, history, r.c0, r.c1 - r.c0 + 1);
+        deps.onAfterCommit?.();
+        return;
+      }
+      case 'colHide': {
+        const r = state.selection.range;
+        hideCols(store, history, r.c0, r.c1);
+        return;
+      }
+      case 'colUnhide': {
+        const r = state.selection.range;
+        const targets = hiddenInSelection(state.layout, 'col', r.c0, r.c1);
+        if (targets.length === 0) return;
+        showCols(store, history, targets[0]!, targets[targets.length - 1]!);
+        return;
+      }
+      case 'colGroup': {
+        const r = state.selection.range;
+        groupCols(store, history, r.c0, r.c1);
+        return;
+      }
+      case 'colUngroup': {
+        const r = state.selection.range;
+        ungroupCols(store, history, r.c0, r.c1);
+        return;
+      }
+      case 'insertComment': {
+        const addr = state.selection.active;
+        const cur = commentAt(state, addr) ?? '';
+        if (deps.onEditComment) {
+          deps.onEditComment(addr);
+        } else if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+          const next = window.prompt('Comment:', cur);
+          if (next != null) wrapFmt(() => setComment(store, addr, next, wb));
+        }
+        return;
+      }
+      case 'deleteComment': {
+        const addr = state.selection.active;
+        wrapFmt(() => clearComment(store, addr, wb));
+        return;
+      }
+    }
+  }
+
+  host.addEventListener('contextmenu', onContextMenu);
+  document.addEventListener('mousedown', onDocPointerDown, true);
+  document.addEventListener('keydown', onDocKey, true);
+  window.addEventListener('scroll', onScroll, true);
+
+  return () => {
+    host.removeEventListener('contextmenu', onContextMenu);
+    document.removeEventListener('mousedown', onDocPointerDown, true);
+    document.removeEventListener('keydown', onDocKey, true);
+    window.removeEventListener('scroll', onScroll, true);
+    root.remove();
+  };
+}
+
+function canReadClipboard(): boolean {
+  return typeof navigator !== 'undefined' && typeof navigator.clipboard?.readText === 'function';
+}
+
+async function writeClipboard(text: string): Promise<void> {
+  if (typeof navigator === 'undefined' || typeof navigator.clipboard?.writeText !== 'function') {
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (err) {
+    console.warn('formulon-cell: clipboard write failed', err);
+  }
+}
+
+async function readClipboard(): Promise<string> {
+  if (!canReadClipboard()) return '';
+  try {
+    return await navigator.clipboard.readText();
+  } catch (err) {
+    console.warn('formulon-cell: clipboard read failed', err);
+    return '';
+  }
+}

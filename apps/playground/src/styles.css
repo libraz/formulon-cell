@@ -1,0 +1,620 @@
+/* ----------------------------------------------------------------------- */
+/*  formulon-cell — playground stylesheet                                   */
+/*  Flat modern, Excel-compatible chrome. Cobalt accent, neutral grays.     */
+/* ----------------------------------------------------------------------- */
+
+@import url("@fontsource/ibm-plex-sans/400.css");
+@import url("@fontsource/ibm-plex-sans/500.css");
+@import url("@fontsource/ibm-plex-sans/600.css");
+@import url("@fontsource/ibm-plex-mono/400.css");
+@import url("@fontsource/ibm-plex-mono/500.css");
+@import url("@fontsource/ibm-plex-mono/600.css");
+
+@import url("@formulon-cell/core/styles.css");
+
+:root {
+  /* App chrome — light theme */
+  --shell-bg: #f4f5f7;
+  --shell-bg-2: #eceef1;
+  --shell-surface: #ffffff;
+  --shell-surface-2: #f8f9fb;
+  --shell-rule: #e3e5ea;
+  --shell-rule-2: #d3d6dc;
+  --shell-fg: #1a1c20;
+  --shell-fg-mute: #57606a;
+  /* Bumped from #8b929c so 11px chrome text clears WCAG AA 4.5:1 against
+     the white surface (status engine, "Saved" crumb, etc.). */
+  --shell-fg-faint: #6c717a;
+  --shell-accent: #3859ff;
+  --shell-accent-strong: #2742d6;
+  --shell-accent-soft: rgba(56, 89, 255, 0.1);
+  --shell-accent-fg: #ffffff;
+  --shell-hover: rgba(26, 28, 32, 0.05);
+  --shell-active: rgba(26, 28, 32, 0.09);
+  --shell-shadow: 0 1px 0 rgba(26, 28, 32, 0.04);
+
+  --shell-font-ui: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --shell-font-mono: "IBM Plex Mono", ui-monospace, "JetBrains Mono", monospace;
+}
+
+[data-theme="dark"] {
+  --shell-bg: #0f1014;
+  --shell-bg-2: #16181d;
+  --shell-surface: #1a1c21;
+  --shell-surface-2: #1e2026;
+  --shell-rule: #2b2e35;
+  --shell-rule-2: #3a3d44;
+  --shell-fg: #e7eaf0;
+  --shell-fg-mute: #9aa0a8;
+  --shell-fg-faint: #6b7079;
+  --shell-accent: #6f86ff;
+  --shell-accent-strong: #8a9cff;
+  --shell-accent-soft: rgba(111, 134, 255, 0.18);
+  --shell-accent-fg: #0f1014;
+  --shell-hover: rgba(231, 234, 240, 0.06);
+  --shell-active: rgba(231, 234, 240, 0.1);
+  --shell-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--shell-bg);
+  color: var(--shell-fg);
+  font-family: var(--shell-font-ui);
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
+  font-feature-settings: "cv02" 1, "cv03" 1, "cv04" 1, "ss01" 1;
+}
+
+/* ── App shell ─────────────────────────────────────────────────────── */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background: var(--shell-bg);
+  color: var(--shell-fg);
+}
+
+/* ── Title bar ─────────────────────────────────────────────────────── */
+
+.app__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 38px;
+  padding: 0 14px;
+  background: var(--shell-surface);
+  border-bottom: 1px solid var(--shell-rule);
+  flex: 0 0 auto;
+}
+
+.app__title-left,
+.app__title-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  letter-spacing: -0.005em;
+}
+.app__brand-mark {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  background: var(--shell-accent);
+  color: var(--shell-accent-fg);
+  border-radius: 5px;
+}
+.app__brand-name {
+  font-weight: 600;
+  color: var(--shell-fg);
+  letter-spacing: -0.01em;
+}
+.app__brand-sep {
+  color: var(--shell-fg-faint);
+  font-weight: 400;
+  margin: 0 2px;
+}
+.app__brand-doc {
+  color: var(--shell-fg-mute);
+  font-weight: 500;
+}
+
+.app__crumb {
+  font-family: var(--shell-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--shell-fg-faint);
+  padding: 2px 7px;
+  border: 1px solid var(--shell-rule);
+  border-radius: 999px;
+}
+
+.app__pill {
+  font-family: var(--shell-font-mono);
+  font-size: 11px;
+  color: var(--shell-fg-mute);
+  padding: 3px 9px;
+  background: var(--shell-bg-2);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.app__theme {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  background: transparent;
+  border: 1px solid var(--shell-rule);
+  border-radius: 6px;
+  color: var(--shell-fg);
+  font-family: var(--shell-font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.app__theme:hover {
+  background: var(--shell-hover);
+  border-color: var(--shell-rule-2);
+}
+.app__theme-ic {
+  color: var(--shell-fg-mute);
+}
+
+/* ── Menu strip ────────────────────────────────────────────────────── */
+
+.app__menu {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 30px;
+  padding: 0 8px;
+  background: var(--shell-surface);
+  border-bottom: 1px solid var(--shell-rule);
+  flex: 0 0 auto;
+}
+.app__menu-item {
+  height: 24px;
+  padding: 0 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: var(--shell-fg);
+  font-family: var(--shell-font-ui);
+  font-size: 12.5px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+.app__menu-item:hover {
+  background: var(--shell-hover);
+}
+.app__menu-item:focus-visible {
+  outline: 2px solid var(--shell-accent);
+  outline-offset: -2px;
+}
+
+/* ── Toolbar ribbon ────────────────────────────────────────────────── */
+
+.app__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 42px;
+  padding: 0 10px;
+  background: var(--shell-surface);
+  border-bottom: 1px solid var(--shell-rule);
+  flex: 0 0 auto;
+}
+.app__tool-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+.app__tool-sep {
+  display: inline-block;
+  width: 1px;
+  height: 18px;
+  background: var(--shell-rule);
+  margin: 0 6px;
+}
+.app__tool-spacer {
+  flex: 1 1 auto;
+}
+
+/* Freeze panes dropdown — anchored under the trigger button. */
+.app__freeze {
+  position: relative;
+}
+.app__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 180px;
+  padding: 6px;
+  background: var(--shell-surface);
+  border: 1px solid var(--shell-rule);
+  border-radius: 8px;
+  box-shadow: 0 18px 40px -16px rgba(15, 18, 24, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  z-index: 60;
+  font-size: 13px;
+}
+.app__menu[hidden] {
+  display: none;
+}
+.app__menu-item {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 7px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.app__menu-item:hover,
+.app__menu-item:focus-visible {
+  background: var(--shell-hover, rgba(15, 18, 24, 0.06));
+  outline: none;
+}
+.app__menu-sep {
+  height: 1px;
+  background: var(--shell-rule);
+  margin: 4px 2px;
+}
+
+/* File / Edit / View… top-bar dropdowns. */
+.app__menu-anchor {
+  position: relative;
+  display: inline-flex;
+}
+.app__dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 220px;
+  padding: 6px;
+  background: var(--shell-surface);
+  border: 1px solid var(--shell-rule);
+  border-radius: 8px;
+  box-shadow: 0 18px 40px -16px rgba(15, 18, 24, 0.22);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  z-index: 80;
+  font-size: 13px;
+}
+.app__dropdown[hidden] {
+  display: none;
+}
+
+.app__tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  color: var(--shell-fg);
+  font-family: var(--shell-font-ui);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+.app__tool:hover {
+  background: var(--shell-hover);
+}
+.app__tool:active {
+  background: var(--shell-active);
+}
+.app__tool:focus-visible {
+  outline: 2px solid var(--shell-accent);
+  outline-offset: -2px;
+}
+.app__tool--active {
+  background: var(--shell-active);
+  color: var(--shell-fg);
+}
+.app__tool--mono {
+  font-family: var(--shell-font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--shell-fg-mute);
+  width: auto;
+  min-width: 28px;
+  padding: 0 6px;
+}
+.app__tool--bold {
+  font-weight: 700;
+}
+.app__tool--italic {
+  font-style: italic;
+  font-family: var(--shell-font-ui);
+}
+.app__tool--underline {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.app__tool--strike {
+  text-decoration: line-through;
+}
+
+.app__zoom {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  background: var(--shell-bg-2);
+  border-radius: 5px;
+  font-family: var(--shell-font-mono);
+  font-size: 11.5px;
+  font-feature-settings: "tnum" 1;
+  color: var(--shell-fg-mute);
+  cursor: default;
+  user-select: none;
+}
+
+/* ── Sheet host (core mounts inside) ───────────────────────────────── */
+
+.app__sheet {
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--shell-surface);
+  position: relative;
+  /* Pipe playground tokens into the core's font fallbacks. */
+  --fc-font-ui-fallback: var(--shell-font-ui);
+  --fc-font-mono-fallback: var(--shell-font-mono);
+  --fc-font-display-fallback: var(--shell-font-ui);
+}
+
+/* The core ships its own status bar; we replace it with our bottom row. */
+.app__sheet .fc-host__statusbar {
+  display: none;
+}
+
+/* Soften the formulabar to match the modern chrome. */
+.app__sheet .fc-host__formulabar {
+  height: 32px;
+  padding: 0 10px;
+  gap: 8px;
+}
+.app__sheet .fc-host__formulabar-tag {
+  min-width: 72px;
+  height: 22px;
+  padding: 0 10px;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  font-feature-settings: "tnum" 1;
+  border-radius: 4px;
+  background: var(--shell-surface);
+  border-color: var(--shell-rule);
+  color: var(--shell-fg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.app__sheet .fc-host__formulabar-fx {
+  font-family: var(--shell-font-mono);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--shell-fg-mute);
+  padding-left: 4px;
+  border-left: 1px solid var(--shell-rule);
+}
+.app__sheet .fc-host__formulabar-input {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  font-family: var(--shell-font-mono);
+  font-size: 12.5px;
+  color: var(--shell-fg);
+  caret-color: var(--shell-accent);
+  background: transparent;
+  cursor: text;
+  transition: border-color 100ms ease, background 100ms ease;
+}
+.app__sheet .fc-host__formulabar-input:hover {
+  border-color: var(--shell-rule);
+}
+.app__sheet .fc-host__formulabar-input:focus {
+  border-color: var(--shell-accent);
+  background: var(--shell-surface);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--shell-accent-soft);
+}
+
+/* ── Bottom bar: sheet tabs + status ───────────────────────────────── */
+
+.app__bottombar {
+  display: flex;
+  align-items: stretch;
+  height: 30px;
+  background: var(--shell-surface);
+  border-top: 1px solid var(--shell-rule);
+  flex: 0 0 auto;
+}
+
+.app__tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px 0 4px;
+  border-right: 1px solid var(--shell-rule);
+  min-width: 0;
+}
+.app__tabs-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: var(--shell-fg-mute);
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+.app__tabs-nav:hover {
+  background: var(--shell-hover);
+  color: var(--shell-fg);
+}
+
+.app__tabs-list {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-left: 4px;
+  height: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.app__tabs-list::-webkit-scrollbar {
+  display: none;
+}
+
+.app__tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 14px;
+  background: transparent;
+  border: 0;
+  color: var(--shell-fg-mute);
+  font-family: var(--shell-font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 100ms ease, background 100ms ease;
+}
+.app__tab:hover {
+  color: var(--shell-fg);
+  background: var(--shell-hover);
+}
+.app__tab--active {
+  color: var(--shell-fg);
+  background: transparent;
+}
+.app__tab--active::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  height: 2px;
+  background: var(--shell-accent);
+  border-radius: 1px 1px 0 0;
+}
+.app__tab-label {
+  display: inline-block;
+}
+
+.app__tab-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 22px;
+  margin-left: 4px;
+  align-self: center;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: var(--shell-fg-mute);
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+.app__tab-add:hover {
+  background: var(--shell-hover);
+  color: var(--shell-fg);
+}
+
+.app__status {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-left: auto;
+  font-family: var(--shell-font-mono);
+  font-size: 11px;
+  font-feature-settings: "tnum" 1, "zero" 1;
+  color: var(--shell-fg-mute);
+  padding-right: 6px;
+}
+.app__status-block {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 12px;
+  border-left: 1px solid var(--shell-rule);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.app__status-block--state {
+  border-left: 0;
+  color: var(--shell-fg);
+}
+.app__status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--shell-accent);
+  margin-right: 8px;
+  box-shadow: 0 0 0 3px var(--shell-accent-soft);
+}
+.app__status-block--metric:empty {
+  display: none;
+}
+.app__status-block--engine {
+  color: var(--shell-fg-faint);
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

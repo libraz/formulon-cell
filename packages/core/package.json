@@ -1,0 +1,45 @@
+{
+  "name": "@formulon-cell/core",
+  "version": "0.0.0",
+  "description": "Headless spreadsheet UI core for the formulon WASM engine.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": [
+    "./src/styles/*.css",
+    "./dist/*.css"
+  ],
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./styles.css": "./src/styles/index.css",
+    "./styles/paper.css": "./src/styles/theme-paper.css",
+    "./styles/ink.css": "./src/styles/theme-ink.css",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "vendor"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "sync-formulon": "node scripts/sync-formulon.mjs"
+  },
+  "dependencies": {
+    "zustand": "5.0.2"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2",
+    "happy-dom": "^15",
+    "typescript": "5.7.2",
+    "vitest": "^2"
+  }
+}

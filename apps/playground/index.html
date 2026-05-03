@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>formulon-cell</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <!-- ── Title bar ─────────────────────────────────────────────── -->
+      <header class="app__title">
+        <div class="app__title-left">
+          <span class="app__brand">
+            <span class="app__brand-mark" aria-hidden="true">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4">
+                <path d="M2 6h12M2 10h12M6 2v12M10 2v12" stroke-linecap="square" />
+              </svg>
+            </span>
+            <span class="app__brand-name">formulon</span>
+            <span class="app__brand-sep" aria-hidden="true">/</span>
+            <span class="app__brand-doc" id="doc-name">Untitled workbook</span>
+          </span>
+          <span class="app__crumb" id="doc-state">Saved</span>
+        </div>
+        <div class="app__title-right">
+          <span class="app__pill" id="engine-pill">engine&nbsp;·&nbsp;loading</span>
+          <button class="app__theme" id="theme-toggle" type="button" aria-pressed="false" title="Toggle theme">
+            <svg class="app__theme-ic" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+              <circle cx="8" cy="8" r="3" fill="currentColor" />
+              <g stroke="currentColor" stroke-width="1.3" stroke-linecap="round">
+                <path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4" />
+              </g>
+            </svg>
+            <span class="app__theme-label" id="theme-label">Light</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- ── Menu strip ────────────────────────────────────────────── -->
+      <nav class="app__menu" aria-label="Application menus">
+        <div class="app__menu-anchor">
+          <button class="app__menu-item" type="button" id="menu-file" aria-haspopup="menu" aria-expanded="false">File</button>
+          <div class="app__dropdown" id="menu-file-dropdown" role="menu" hidden>
+            <button class="app__menu-item" type="button" role="menuitem" data-file="new">New (Ctrl+N)</button>
+            <button class="app__menu-item" type="button" role="menuitem" data-file="open">Open… (Ctrl+O)</button>
+            <button class="app__menu-item" type="button" role="menuitem" data-file="save">Save (Ctrl+S)</button>
+            <button class="app__menu-item" type="button" role="menuitem" data-file="save-as">Save As…</button>
+          </div>
+        </div>
+        <button class="app__menu-item" type="button">Edit</button>
+        <button class="app__menu-item" type="button">View</button>
+        <button class="app__menu-item" type="button">Insert</button>
+        <button class="app__menu-item" type="button">Format</button>
+        <button class="app__menu-item" type="button">Data</button>
+        <button class="app__menu-item" type="button">Tools</button>
+        <button class="app__menu-item" type="button">Help</button>
+      </nav>
+      <input type="file" id="file-input" accept=".xlsx,.xlsm" hidden />
+
+      <!-- ── Toolbar ribbon ────────────────────────────────────────── -->
+      <div class="app__toolbar" role="toolbar" aria-label="Spreadsheet toolbar">
+        <div class="app__tool-group">
+          <button class="app__tool" type="button" id="btn-undo" title="Undo (⌘Z)" aria-label="Undo">
+            <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l3-3M3 7l3 3M3 7h7a3 3 0 0 1 3 3v1" /></svg>
+          </button>
+          <button class="app__tool" type="button" id="btn-redo" title="Redo (⌘⇧Z)" aria-label="Redo">
+            <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 7l-3-3M13 7l-3 3M13 7H6a3 3 0 0 0-3 3v1" /></svg>
+          </button>
+          <button class="app__tool" type="button" id="btn-format-painter" title="Format Painter (⌘⇧C — double-click for sticky)" aria-label="Format painter">
+            <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 3h7v3H3z" fill="currentColor" stroke="none" />
+              <path d="M10 4.5h2.5v2.5H10" />
+              <path d="M6.5 6v3h2v3.5a1.5 1.5 0 0 1-3 0V9h2" />
+            </svg>
+          </button>
+        </div>
+
+        <span class="app__tool-sep" aria-hidden="true"></span>
+
+        <div class="app__tool-group">
+          <span class="app__zoom" id="zoom-display" title="Zoom">100%</span>
+        </div>
+
+        <span class="app__tool-sep" aria-hidden="true"></span>
+
+        <div class="app__tool-group">
+          <button class="app__tool app__tool--mono" type="button" id="btn-currency" title="Format as currency">$</button>
+          <button class="app__tool app__tool--mono" type="button" id="btn-percent" title="Format as percent">%</button>
+          <button class="app__tool app__tool--mono" type="button" id="btn-decimals-down" title="Decrease decimals">.0</button>
+          <button class="app__tool app__tool--mono" type="button" id="btn-decimals-up" title="Increase decimals">.00</button>
+          <button class="app__tool app__tool--mono" type="button" id="btn-autosum" title="AutoSum (Σ)" aria-label="AutoSum">Σ</button>
+        </div>
+
+        <span class="app__tool-sep" aria-hidden="true"></span>
+
+        <div class="app__tool-group">
+          <button class="app__tool app__tool--bold" type="button" id="btn-bold" title="Bold (⌘B)">B</button>
+          <button class="app__tool app__tool--italic" type="button" id="btn-italic" title="Italic (⌘I)">I</button>
+          <button class="app__tool app__tool--underline" type="button" id="btn-underline" title="Underline (⌘U)">U</button>
+          <button class="app__tool app__tool--strike" type="button" id="btn-strike" title="Strikethrough">S</button>
+        </div>
+
+        <span class="app__tool-sep" aria-hidden="true"></span>
+
+        <div class="app__tool-group">
+          <button class="app__tool" type="button" id="btn-align-left" title="Align left" aria-label="Align left">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2 4h12M2 8h8M2 12h12" /></svg>
+          </button>
+          <button class="app__tool" type="button" id="btn-align-center" title="Align center" aria-label="Align center">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2 4h12M4 8h8M2 12h12" /></svg>
+          </button>
+          <button class="app__tool" type="button" id="btn-align-right" title="Align right" aria-label="Align right">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2 4h12M6 8h8M2 12h12" /></svg>
+          </button>
+        </div>
+
+        <span class="app__tool-sep" aria-hidden="true"></span>
+
+        <div class="app__tool-group">
+          <button class="app__tool" type="button" id="btn-borders" title="Borders" aria-label="Borders">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2.5" y="2.5" width="11" height="11" /><path d="M8 2.5v11M2.5 8h11" /></svg>
+          </button>
+          <button class="app__tool" type="button" id="btn-merge" title="Merge cells" aria-label="Merge cells">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2.5" y="3.5" width="11" height="9" /><path d="M5 6.5h2M9 6.5h2M5 9.5h2M9 9.5h2" stroke-dasharray="0" /></svg>
+          </button>
+          <button class="app__tool" type="button" id="btn-wrap" title="Wrap text" aria-label="Wrap text">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h12M2 12h6M2 8h8a2.5 2.5 0 0 1 0 5h-2M9 11l-2 2 2 2" /></svg>
+          </button>
+        </div>
+
+        <span class="app__tool-spacer"></span>
+
+        <div class="app__tool-group app__freeze">
+          <button
+            class="app__tool"
+            type="button"
+            id="btn-freeze"
+            title="ウィンドウ枠の固定"
+            aria-label="Freeze panes"
+            aria-haspopup="menu"
+            aria-expanded="false"
+          >
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="11" height="11"/><path d="M2.5 6h11M6 2.5v11"/></svg>
+          </button>
+          <div class="app__menu" id="menu-freeze" role="menu" hidden>
+            <button class="app__menu-item" type="button" role="menuitem" data-freeze="row">先頭行の固定</button>
+            <button class="app__menu-item" type="button" role="menuitem" data-freeze="col">先頭列の固定</button>
+            <button class="app__menu-item" type="button" role="menuitem" data-freeze="selection">選択範囲で固定</button>
+            <div class="app__menu-sep" role="separator"></div>
+            <button class="app__menu-item" type="button" role="menuitem" data-freeze="off">固定解除</button>
+          </div>
+        </div>
+
+        <div class="app__tool-group app__freeze">
+          <button class="app__tool" type="button" id="btn-sort" title="Sort & filter" aria-label="Sort and filter" aria-haspopup="menu" aria-expanded="false">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h10l-4 5v5l-2-1V8L3 3z" /></svg>
+          </button>
+          <div class="app__menu app__sort-menu" id="menu-sort" role="menu" hidden>
+            <button class="app__menu-item" type="button" role="menuitem" data-sort="asc">Sort A → Z</button>
+            <button class="app__menu-item" type="button" role="menuitem" data-sort="desc">Sort Z → A</button>
+            <div class="app__menu-sep" role="separator"></div>
+            <button class="app__menu-item" type="button" role="menuitem" data-sort="filter">Filter…</button>
+            <button class="app__menu-item" type="button" role="menuitem" data-sort="filter-clear">Clear filter</button>
+            <div class="app__menu-sep" role="separator"></div>
+            <button class="app__menu-item" type="button" role="menuitem" data-sort="dedupe">Remove duplicates</button>
+            <div class="app__menu-sep" role="separator"></div>
+            <button class="app__menu-item" type="button" role="menuitem" data-sort="conditional">条件付き書式…</button>
+            <button class="app__menu-item" type="button" role="menuitem" data-sort="named">名前の管理…</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Sheet host (core mounts formulabar + grid here) ───────── -->
+      <div id="sheet" class="app__sheet"></div>
+
+      <!-- ── Bottom: sheet tabs + status ───────────────────────────── -->
+      <footer class="app__bottombar">
+        <div class="app__tabs" aria-label="Sheets">
+          <button class="app__tabs-nav" type="button" id="btn-sheet-prev" title="Previous sheet" aria-label="Previous sheet">
+            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3l-5 5 5 5" /></svg>
+          </button>
+          <button class="app__tabs-nav" type="button" id="btn-sheet-next" title="Next sheet" aria-label="Next sheet">
+            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l5 5-5 5" /></svg>
+          </button>
+          <div class="app__tabs-list" id="sheet-tabs" role="tablist" aria-label="Sheets"></div>
+          <button class="app__tab-add" type="button" id="btn-sheet-add" title="Add sheet" aria-label="Add sheet">
+            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M8 3v10M3 8h10" /></svg>
+          </button>
+        </div>
+
+        <div class="app__status" aria-live="polite">
+          <span class="app__status-block app__status-block--state">
+            <span class="app__status-dot" aria-hidden="true"></span>
+            <span id="status-state">Ready</span>
+          </span>
+          <span class="app__status-block" id="status-selection">A1</span>
+          <span class="app__status-block app__status-block--metric" id="status-metric"></span>
+          <span class="app__status-block app__status-block--engine" id="status-engine">—</span>
+        </div>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

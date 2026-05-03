@@ -1,0 +1,343 @@
+/**
+ * F4 reference rotation: cycles between A1, $A$1, A$1, $A1, then back to A1.
+ * Operates on the cell reference at `caret` in `text`. Returns the new text
+ * + new caret position. If no reference is found, returns the input unchanged.
+ */
+const REF_RE = /(\$?)([A-Za-z]+)(\$?)([0-9]+)/;
+
+/** A1-style cell ref or A1:B5 range surfaced in a formula text. */
+export interface FormulaRef {
+  /** 0-indexed inclusive bounds. */
+  r0: number;
+  c0: number;
+  r1: number;
+  c1: number;
+  /** Character offsets in the source text (start inclusive, end exclusive). */
+  start: number;
+  end: number;
+  /** Color index 0..N for distinct highlighting. */
+  colorIndex: number;
+}
+
+const lettersToCol = (letters: string): number => {
+  let col = 0;
+  for (let i = 0; i < letters.length; i += 1) {
+    col = col * 26 + (letters.toUpperCase().charCodeAt(i) - 64);
+  }
+  return col - 1;
+};
+
+/** Extract every cell or range reference from a formula text. The returned
+ *  list is in source order with a stable per-target color index so callers
+ *  can paint distinct highlights for each ref, the same way Excel does
+ *  while editing a formula. */
+export function extractRefs(text: string): FormulaRef[] {
+  if (!text.startsWith('=')) return [];
+  // Match: optional sheet prefix (Sheet1!), then A1 or A1:B5.
+  const re =
+    /(?:'([^']+)'|([A-Za-z_][A-Za-z0-9_]*))?!?(\$?[A-Za-z]+\$?\d+)(?::(\$?[A-Za-z]+\$?\d+))?/g;
+  const out: FormulaRef[] = [];
+  const colorMap = new Map<string, number>();
+  let m: RegExpExecArray | null;
+  re.lastIndex = 0;
+  while ((m = re.exec(text)) !== null) {
+    const headM = m[3] ?? '';
+    const tailM = m[4];
+    const head = parseAtomRef(headM);
+    const tail = tailM ? parseAtomRef(tailM) : head;
+    if (!head || !tail) continue;
+    // Skip false positives — function names like SIN1 don't have a digit-letter
+    //  shape in the head capture, so the regex naturally rejects them. But
+    //  we still need to skip when the ref start is inside a quoted string.
+    const before = text.slice(0, m.index);
+    const quoteCount = (before.match(/"/g) ?? []).length;
+    if (quoteCount % 2 === 1) continue;
+    const r0 = Math.min(head.row, tail.row);
+    const r1 = Math.max(head.row, tail.row);
+    const c0 = Math.min(head.col, tail.col);
+    const c1 = Math.max(head.col, tail.col);
+    const key = `${r0}:${c0}:${r1}:${c1}`;
+    let colorIndex = colorMap.get(key);
+    if (colorIndex === undefined) {
+      colorIndex = colorMap.size;
+      colorMap.set(key, colorIndex);
+    }
+    out.push({
+      r0,
+      c0,
+      r1,
+      c1,
+      start: m.index,
+      end: m.index + m[0].length,
+      colorIndex,
+    });
+  }
+  return out;
+}
+
+function parseAtomRef(raw: string): { row: number; col: number } | null {
+  const m = raw.match(/^\$?([A-Za-z]+)\$?(\d+)$/);
+  if (!m) return null;
+  const col = lettersToCol(m[1] ?? '');
+  const row = Number.parseInt(m[2] ?? '', 10) - 1;
+  if (col < 0 || row < 0) return null;
+  if (col > 16383 || row > 1048575) return null;
+  return { row, col };
+}
+
+/** Distinct accent colors used for formula-edit reference highlighting. They
+ *  loop after this list is exhausted (Excel uses ~8). */
+export const REF_HIGHLIGHT_COLORS: readonly string[] = [
+  '#1f7ae0',
+  '#d96f2c',
+  '#3aa757',
+  '#a83cb2',
+  '#cf3a4c',
+  '#1f998c',
+  '#946a00',
+  '#3953c4',
+];
+
+export interface F4Result {
+  text: string;
+  caret: number;
+}
+
+export function rotateRefAt(text: string, caret: number): F4Result {
+  // Walk left from caret to find a candidate ref start.
+  // We bound the search to ~16 chars left.
+  const start = Math.max(0, caret - 16);
+  const window = text.slice(start, caret + 16);
+  const offset = start;
+  const re = new RegExp(REF_RE, 'g');
+  let m: RegExpExecArray | null;
+  let chosen: { match: RegExpExecArray; absoluteStart: number } | null = null;
+  re.lastIndex = 0;
+  while ((m = re.exec(window)) !== null) {
+    const matchStart = offset + m.index;
+    const matchEnd = matchStart + m[0].length;
+    if (caret >= matchStart && caret <= matchEnd) {
+      chosen = { match: m, absoluteStart: matchStart };
+      break;
+    }
+  }
+  if (!chosen) return { text, caret };
+  const [whole, dCol, letters, dRow, digits] = chosen.match;
+  const next = nextStep(dCol === '$', dRow === '$');
+  const replacement = `${next.col ? '$' : ''}${letters}${next.row ? '$' : ''}${digits}`;
+  const before = text.slice(0, chosen.absoluteStart);
+  const after = text.slice(chosen.absoluteStart + whole.length);
+  return {
+    text: before + replacement + after,
+    caret: chosen.absoluteStart + replacement.length,
+  };
+}
+
+function nextStep(absCol: boolean, absRow: boolean): { col: boolean; row: boolean } {
+  // Excel order: A1 -> $A$1 -> A$1 -> $A1 -> A1
+  if (!absCol && !absRow) return { col: true, row: true };
+  if (absCol && absRow) return { col: false, row: true };
+  if (!absCol && absRow) return { col: true, row: false };
+  return { col: false, row: false };
+}
+
+const colToLetters = (col: number): string => {
+  let n = col + 1;
+  let s = '';
+  while (n > 0) {
+    const r = (n - 1) % 26;
+    s = String.fromCharCode(65 + r) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+};
+
+/**
+ * Shift every relative cell reference in `formula` by (dRow, dCol). Refs
+ * locked with `$` on either axis stay put on that axis. Sheet-qualified refs
+ * (e.g. `Sheet1!A1`) and ranges are handled atom-by-atom.
+ *
+ * Skips matches inside string literals (text bracketed by `"`). Returns the
+ * input verbatim when the result would point outside the grid (Excel parity:
+ * those refs become `#REF!` — we leave that to the engine).
+ */
+export function shiftFormulaRefs(formula: string, dRow: number, dCol: number): string {
+  if (!formula.startsWith('=') || (dRow === 0 && dCol === 0)) return formula;
+
+  let out = '';
+  let i = 0;
+  let inString = false;
+  // Atom = optional $ + letters + optional $ + digits.
+  const atomRe = /\$?[A-Za-z]+\$?\d+/y;
+  while (i < formula.length) {
+    const ch = formula[i] ?? '';
+    if (ch === '"') {
+      inString = !inString;
+      out += ch;
+      i += 1;
+      continue;
+    }
+    if (inString) {
+      out += ch;
+      i += 1;
+      continue;
+    }
+    // Only attempt a ref match when the previous char isn't an identifier
+    // continuation (so we skip function names like SIN1).
+    const prev = i > 0 ? (formula[i - 1] ?? '') : '';
+    const prevIsIdent = /[A-Za-z0-9_]/.test(prev);
+    if (!prevIsIdent) {
+      atomRe.lastIndex = i;
+      const m = atomRe.exec(formula);
+      if (m && m.index === i) {
+        const raw = m[0];
+        const parsed = /^(\$?)([A-Za-z]+)(\$?)(\d+)$/.exec(raw);
+        if (parsed) {
+          const colAbs = parsed[1] === '$';
+          const letters = parsed[2] ?? '';
+          const rowAbs = parsed[3] === '$';
+          const digits = parsed[4] ?? '';
+          const col = lettersToCol(letters);
+          const row = Number.parseInt(digits, 10) - 1;
+          const newCol = colAbs ? col : col + dCol;
+          const newRow = rowAbs ? row : row + dRow;
+          if (newCol < 0 || newRow < 0 || newCol > 16383 || newRow > 1048575) {
+            // Out-of-range ref — leave the original text in place; engine will
+            // surface #REF! when it parses.
+            out += raw;
+          } else {
+            out += `${colAbs ? '$' : ''}${colToLetters(newCol)}${rowAbs ? '$' : ''}${newRow + 1}`;
+          }
+          i += raw.length;
+          continue;
+        }
+      }
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
+
+/** Common Excel function names — used for editor autocomplete. */
+export const FUNCTION_NAMES: readonly string[] = [
+  'SUM',
+  'AVERAGE',
+  'COUNT',
+  'COUNTA',
+  'COUNTIF',
+  'COUNTIFS',
+  'SUMIF',
+  'SUMIFS',
+  'AVERAGEIF',
+  'AVERAGEIFS',
+  'MIN',
+  'MAX',
+  'MEDIAN',
+  'IF',
+  'IFS',
+  'IFERROR',
+  'IFNA',
+  'AND',
+  'OR',
+  'NOT',
+  'XOR',
+  'TRUE',
+  'FALSE',
+  'VLOOKUP',
+  'HLOOKUP',
+  'XLOOKUP',
+  'INDEX',
+  'MATCH',
+  'OFFSET',
+  'INDIRECT',
+  'CHOOSE',
+  'ROUND',
+  'ROUNDUP',
+  'ROUNDDOWN',
+  'CEILING',
+  'FLOOR',
+  'INT',
+  'MOD',
+  'ABS',
+  'POWER',
+  'SQRT',
+  'EXP',
+  'LN',
+  'LOG',
+  'LOG10',
+  'CONCATENATE',
+  'CONCAT',
+  'TEXTJOIN',
+  'LEFT',
+  'RIGHT',
+  'MID',
+  'LEN',
+  'UPPER',
+  'LOWER',
+  'PROPER',
+  'TRIM',
+  'SUBSTITUTE',
+  'REPLACE',
+  'FIND',
+  'SEARCH',
+  'TEXT',
+  'VALUE',
+  'NUMBERVALUE',
+  'TODAY',
+  'NOW',
+  'DATE',
+  'YEAR',
+  'MONTH',
+  'DAY',
+  'HOUR',
+  'MINUTE',
+  'SECOND',
+  'WEEKDAY',
+  'EOMONTH',
+  'DATEDIF',
+  'NETWORKDAYS',
+  'WORKDAY',
+  'PMT',
+  'PV',
+  'FV',
+  'NPV',
+  'IRR',
+  'RATE',
+  'NPER',
+  'ROW',
+  'COLUMN',
+  'ROWS',
+  'COLUMNS',
+  'TRANSPOSE',
+  'UNIQUE',
+  'SORT',
+  'FILTER',
+];
+
+/** Find the partial function-name token immediately before `caret` and
+ *  return matching candidates. Returns `null` when the caret is not in a
+ *  position that warrants a function suggestion (e.g. inside a string). */
+export function suggestFunctions(
+  text: string,
+  caret: number,
+  max = 8,
+): { token: string; tokenStart: number; matches: string[] } | null {
+  // Only suggest when we're inside a formula (text starts with '=').
+  if (!text.startsWith('=')) return null;
+  // Token = trailing run of letters or digits, must start with a letter.
+  let i = caret - 1;
+  while (i >= 0) {
+    const ch = text[i] ?? '';
+    if (/[A-Za-z0-9_]/.test(ch)) i -= 1;
+    else break;
+  }
+  const tokenStart = i + 1;
+  const token = text.slice(tokenStart, caret);
+  if (token.length < 1) return null;
+  if (!/^[A-Za-z]/.test(token)) return null;
+  const upper = token.toUpperCase();
+  const matches = FUNCTION_NAMES.filter((n) => n.startsWith(upper)).slice(0, max);
+  if (matches.length === 0) return null;
+  return { token, tokenStart, matches };
+}
