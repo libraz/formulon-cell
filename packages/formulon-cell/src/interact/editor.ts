@@ -129,6 +129,7 @@ export class InlineEditor {
       getTables: () => this.deps.wb.getTables(),
       editingAddr: a,
       getColumnValues: (sheet, col, beforeRow) => this.collectColumnHistory(sheet, col, beforeRow),
+      getFunctionNames: () => this.deps.wb.functionNames(),
     });
     this.argHelper = attachArgHelper({ input });
     this.argHelper.refresh();

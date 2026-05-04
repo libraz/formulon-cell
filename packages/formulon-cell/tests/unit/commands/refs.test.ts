@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { findActiveSignature, shiftFormulaRefs } from '../../../src/commands/refs.js';
+import {
+  findActiveSignature,
+  shiftFormulaRefs,
+  suggestFunctions,
+} from '../../../src/commands/refs.js';
 
 describe('shiftFormulaRefs', () => {
   it('returns the input verbatim when delta is zero', () => {
@@ -107,5 +111,27 @@ describe('findActiveSignature', () => {
 
   it('returns null for unknown function names', () => {
     expect(findActiveSignature('=NOTAFUNC(', 10)).toBeNull();
+  });
+});
+
+describe('suggestFunctions', () => {
+  it('returns built-in matches by default', () => {
+    const r = suggestFunctions('=SU', 3);
+    expect(r?.token).toBe('SU');
+    expect(r?.matches).toContain('SUM');
+  });
+
+  it('returns null when not in a formula', () => {
+    expect(suggestFunctions('SUM', 3)).toBeNull();
+  });
+
+  it('uses opts.names when supplied (engine catalog override)', () => {
+    const engineNames = ['CUSTOM_FN', 'CUSTOM_OTHER', 'OTHER'];
+    const r = suggestFunctions('=CUS', 4, 8, { names: engineNames });
+    expect(r?.matches).toEqual(['CUSTOM_FN', 'CUSTOM_OTHER']);
+  });
+
+  it('does not fall back to built-ins when opts.names is empty', () => {
+    expect(suggestFunctions('=SU', 3, 8, { names: [] })).toBeNull();
   });
 });

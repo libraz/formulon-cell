@@ -964,6 +964,68 @@ export class WorkbookHandle {
     return arr.map((n) => ({ sheet: n.sheet, row: n.row, col: n.col }));
   }
 
+  /** Every registered function's canonical name in ascending sort order.
+   *  Returns `null` when the engine doesn't expose `functionNames`; the
+   *  static `FUNCTION_NAMES` list in `commands/refs.ts` is the fallback
+   *  catalog under stub mode. */
+  functionNames(): readonly string[] | null {
+    this.assertAlive();
+    if (!this.capabilities.functionMetadata) return null;
+    return this.wb.functionNames();
+  }
+
+  /** Engine metadata for `name` (case-insensitive). `locale`: 0 = en-US,
+   *  1 = ja-JP. The engine guarantees `minArity` / `maxArity` whenever
+   *  the function is known; `signatureTemplate` and `description` come
+   *  from the per-locale metadata table and are absent until that table
+   *  is populated upstream. Returns `null` when the engine doesn't
+   *  expose `functionMetadata` or the function is unknown. `maxArity`
+   *  may be `0xFFFFFFFF` to denote unbounded variadic. */
+  functionMetadata(
+    name: string,
+    locale = 0,
+  ): {
+    name: string;
+    minArity: number;
+    maxArity: number;
+    signatureTemplate?: string;
+    description?: string;
+  } | null {
+    this.assertAlive();
+    if (!this.capabilities.functionMetadata) return null;
+    const m = this.wb.functionMetadata(name, locale);
+    if (!m.ok) return null;
+    return {
+      name: m.name ?? name,
+      minArity: m.minArity ?? 0,
+      maxArity: m.maxArity ?? 0,
+      ...(m.signatureTemplate ? { signatureTemplate: m.signatureTemplate } : {}),
+      ...(m.description ? { description: m.description } : {}),
+    };
+  }
+
+  /** Canonical → localized function-name lookup. `locale`: 0 = en-US,
+   *  1 = ja-JP. Returns the canonical name unchanged when no alias is
+   *  registered for `locale` (currently the case for every locale except
+   *  en-US). Returns `null` when the engine doesn't expose
+   *  `localizeFunctionName`. */
+  localizeFunctionName(canonicalName: string, locale = 0): string | null {
+    this.assertAlive();
+    if (!this.capabilities.functionLocale) return null;
+    return this.wb.localizeFunctionName(canonicalName, locale);
+  }
+
+  /** Localized → canonical function-name lookup. Falls through to a
+   *  case-insensitive match on the canonical name when no alias is
+   *  registered. Returns the empty string when the engine reports no
+   *  matching function. Returns `null` when the engine doesn't expose
+   *  `canonicalizeFunctionName`. */
+  canonicalizeFunctionName(localizedName: string, locale = 0): string | null {
+    this.assertAlive();
+    if (!this.capabilities.functionLocale) return null;
+    return this.wb.canonicalizeFunctionName(localizedName, locale);
+  }
+
   /** Snapshot of every validation entry on `sheet`. Each entry can apply to
    *  multiple ranges (`ranges`) and carries an Excel-style descriptor: numeric
    *  `type` ordinal (0 none, 1 whole, 2 decimal, 3 list, 4 date, 5 time,

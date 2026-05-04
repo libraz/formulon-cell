@@ -315,11 +315,16 @@ export const FUNCTION_NAMES: readonly string[] = [
 
 /** Find the partial function-name token immediately before `caret` and
  *  return matching candidates. Returns `null` when the caret is not in a
- *  position that warrants a function suggestion (e.g. inside a string). */
+ *  position that warrants a function suggestion (e.g. inside a string).
+ *
+ *  When `opts.names` is supplied (e.g. from `wb.functionNames()`), it
+ *  is preferred over `FUNCTION_NAMES` so engine-registered functions
+ *  beyond our hand-curated 98-entry list show up in autocomplete. */
 export function suggestFunctions(
   text: string,
   caret: number,
   max = 8,
+  opts: { names?: readonly string[] } = {},
 ): { token: string; tokenStart: number; matches: string[] } | null {
   // Only suggest when we're inside a formula (text starts with '=').
   if (!text.startsWith('=')) return null;
@@ -335,7 +340,8 @@ export function suggestFunctions(
   if (token.length < 1) return null;
   if (!/^[A-Za-z]/.test(token)) return null;
   const upper = token.toUpperCase();
-  const matches = FUNCTION_NAMES.filter((n) => n.startsWith(upper)).slice(0, max);
+  const source = opts.names ?? FUNCTION_NAMES;
+  const matches = source.filter((n) => n.startsWith(upper)).slice(0, max);
   if (matches.length === 0) return null;
   return { token, tokenStart, matches };
 }

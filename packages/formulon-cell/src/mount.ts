@@ -685,6 +685,7 @@ export const Spreadsheet = {
             onAfterInsert: () => syncFxRefs(),
             getTables: () => wb.getTables(),
             getCustomFunctions: () => formulaRegistry.list(),
+            getFunctionNames: () => wb.functionNames(),
           });
           fxArgHelper = attachArgHelper({ input: fxInput });
           break;

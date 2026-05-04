@@ -48,6 +48,12 @@ export interface AutocompleteDeps {
    *  `getColumnValues` path so the popover knows which sheet/column/row to
    *  scan above. Omit when only function/structured-ref suggestion is needed. */
   editingAddr?: { sheet: number; row: number; col: number };
+  /** Engine-driven function catalog. When the workbook exposes
+   *  `functionNames()` (5/5 build), pass it through so autocomplete
+   *  surfaces the full registry — not just the 98-entry curated list in
+   *  `commands/refs.ts`. Falls back to the static catalog when omitted
+   *  or null. */
+  getFunctionNames?: () => readonly string[] | null;
 }
 
 interface SuggestionContext {
@@ -180,7 +186,8 @@ function computeContext(
   }
   const struct = suggestStructuredRef(text, caret, deps.getTables?.() ?? []);
   if (struct) return struct;
-  const fn = suggestFunctions(text, caret);
+  const engineNames = deps.getFunctionNames?.();
+  const fn = suggestFunctions(text, caret, 8, engineNames ? { names: engineNames } : undefined);
   const custom = suggestCustomFunctions(text, caret, deps.getCustomFunctions?.() ?? []);
   if (!fn && !custom) return null;
   // Merge custom names ahead of built-ins so user code surfaces first.
