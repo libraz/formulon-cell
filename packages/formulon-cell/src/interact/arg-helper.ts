@@ -1,4 +1,4 @@
-import { findActiveSignature } from '../commands/refs.js';
+import { caretInsideImplicitIntersection, findActiveSignature } from '../commands/refs.js';
 
 export interface ArgHelperHandle {
   /** Re-evaluate the tooltip against the current input value/caret. */
@@ -35,7 +35,12 @@ export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
     el.style.top = `${Math.max(0, rect.top - 26)}px`;
   };
 
-  const render = (name: string, args: readonly string[], active: number): void => {
+  const render = (
+    name: string,
+    args: readonly string[],
+    active: number,
+    implicit: boolean,
+  ): void => {
     let el = root;
     if (!el) {
       el = document.createElement('div');
@@ -44,7 +49,15 @@ export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
       document.body.appendChild(el);
       root = el;
     }
-    el.innerHTML = '';
+    el.replaceChildren();
+    if (implicit) {
+      const chip = document.createElement('span');
+      chip.className = 'fc-arghelper__chip';
+      chip.dataset.fcKind = 'implicit-intersection';
+      chip.textContent = '@';
+      chip.title = 'Implicit intersection';
+      el.appendChild(chip);
+    }
     const head = document.createElement('span');
     head.className = 'fc-arghelper__name';
     head.textContent = `${name}(`;
@@ -80,7 +93,8 @@ export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
       close();
       return;
     }
-    render(sig.name, sig.args, sig.activeArgIndex);
+    const implicit = caretInsideImplicitIntersection(text, caret);
+    render(sig.name, sig.args, sig.activeArgIndex, implicit);
   };
 
   return {

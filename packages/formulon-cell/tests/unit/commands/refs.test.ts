@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  FUNCTION_NAMES,
+  FUNCTION_SIGNATURES,
   findActiveSignature,
   shiftFormulaRefs,
   suggestFunctions,
@@ -133,5 +135,59 @@ describe('suggestFunctions', () => {
 
   it('does not fall back to built-ins when opts.names is empty', () => {
     expect(suggestFunctions('=SU', 3, 8, { names: [] })).toBeNull();
+  });
+});
+
+describe('365 dynamic-array function catalog', () => {
+  it('FUNCTION_NAMES includes the marquee 365 array functions', () => {
+    const expected = [
+      'GROUPBY',
+      'PIVOTBY',
+      'TEXTSPLIT',
+      'VSTACK',
+      'HSTACK',
+      'TOROW',
+      'TOCOL',
+      'CHOOSEROWS',
+      'CHOOSECOLS',
+      'TAKE',
+      'DROP',
+      'EXPAND',
+      'LAMBDA',
+      'LET',
+      'MAP',
+      'REDUCE',
+      'SCAN',
+      'BYROW',
+      'BYCOL',
+      'MAKEARRAY',
+      'XMATCH',
+      'SORTBY',
+      'SEQUENCE',
+      'RANDARRAY',
+      'IMAGE',
+    ];
+    for (const n of expected) expect(FUNCTION_NAMES).toContain(n);
+  });
+
+  it('FUNCTION_SIGNATURES exposes the same names with parameter lists', () => {
+    expect(FUNCTION_SIGNATURES.GROUPBY?.[0]).toBe('row_fields');
+    expect(FUNCTION_SIGNATURES.TEXTSPLIT?.[0]).toBe('text');
+    expect(FUNCTION_SIGNATURES.LAMBDA?.[0]).toBe('parameter');
+    expect(FUNCTION_SIGNATURES.LET?.length).toBeGreaterThanOrEqual(3);
+    // Signatures end with the calculation slot for LAMBDA / LET / MAP.
+    expect(FUNCTION_SIGNATURES.MAP?.at(-1)).toBe('lambda');
+  });
+
+  it('suggestFunctions surfaces a 365 function from a partial token', () => {
+    const r = suggestFunctions('=GRO', 4);
+    expect(r?.matches).toContain('GROUPBY');
+  });
+
+  it('findActiveSignature resolves TEXTSPLIT inside an open call', () => {
+    const text = '=TEXTSPLIT(';
+    const sig = findActiveSignature(text, text.length);
+    expect(sig?.name).toBe('TEXTSPLIT');
+    expect(sig?.activeArgIndex).toBe(0);
   });
 });

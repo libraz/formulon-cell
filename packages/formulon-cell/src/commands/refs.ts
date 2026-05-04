@@ -310,7 +310,37 @@ export const FUNCTION_NAMES: readonly string[] = [
   'TRANSPOSE',
   'UNIQUE',
   'SORT',
+  'SORTBY',
   'FILTER',
+  'SEQUENCE',
+  'RANDARRAY',
+  'XMATCH',
+  'TEXTSPLIT',
+  'TEXTBEFORE',
+  'TEXTAFTER',
+  'VSTACK',
+  'HSTACK',
+  'TOROW',
+  'TOCOL',
+  'WRAPROWS',
+  'WRAPCOLS',
+  'CHOOSEROWS',
+  'CHOOSECOLS',
+  'TAKE',
+  'DROP',
+  'EXPAND',
+  'LAMBDA',
+  'LET',
+  'MAP',
+  'REDUCE',
+  'SCAN',
+  'BYROW',
+  'BYCOL',
+  'MAKEARRAY',
+  'GROUPBY',
+  'PIVOTBY',
+  'PERCENTOF',
+  'IMAGE',
 ];
 
 /** Find the partial function-name token immediately before `caret` and
@@ -445,8 +475,136 @@ export const FUNCTION_SIGNATURES: Readonly<Record<string, readonly string[]>> = 
   TRANSPOSE: ['array'],
   UNIQUE: ['array', '[by_col]', '[exactly_once]'],
   SORT: ['array', '[sort_index]', '[sort_order]', '[by_col]'],
+  SORTBY: ['array', 'by_array1', '[sort_order1]', '...'],
   FILTER: ['array', 'include', '[if_empty]'],
+  SEQUENCE: ['rows', '[cols]', '[start]', '[step]'],
+  RANDARRAY: ['[rows]', '[cols]', '[min]', '[max]', '[whole_number]'],
+  XMATCH: ['lookup_value', 'lookup_array', '[match_mode]', '[search_mode]'],
+  TEXTSPLIT: [
+    'text',
+    'col_delimiter',
+    '[row_delimiter]',
+    '[ignore_empty]',
+    '[match_mode]',
+    '[pad_with]',
+  ],
+  TEXTBEFORE: [
+    'text',
+    'delimiter',
+    '[instance_num]',
+    '[match_mode]',
+    '[match_end]',
+    '[if_not_found]',
+  ],
+  TEXTAFTER: [
+    'text',
+    'delimiter',
+    '[instance_num]',
+    '[match_mode]',
+    '[match_end]',
+    '[if_not_found]',
+  ],
+  VSTACK: ['array1', '[array2]', '...'],
+  HSTACK: ['array1', '[array2]', '...'],
+  TOROW: ['array', '[ignore]', '[scan_by_column]'],
+  TOCOL: ['array', '[ignore]', '[scan_by_column]'],
+  WRAPROWS: ['vector', 'wrap_count', '[pad_with]'],
+  WRAPCOLS: ['vector', 'wrap_count', '[pad_with]'],
+  CHOOSEROWS: ['array', 'row_num1', '...'],
+  CHOOSECOLS: ['array', 'col_num1', '...'],
+  TAKE: ['array', 'rows', '[cols]'],
+  DROP: ['array', 'rows', '[cols]'],
+  EXPAND: ['array', 'rows', '[cols]', '[pad_with]'],
+  LAMBDA: ['parameter', '...', 'calculation'],
+  LET: ['name1', 'value1', '...', 'calculation'],
+  MAP: ['array1', '...', 'lambda'],
+  REDUCE: ['initial_value', 'array', 'lambda'],
+  SCAN: ['initial_value', 'array', 'lambda'],
+  BYROW: ['array', 'lambda'],
+  BYCOL: ['array', 'lambda'],
+  MAKEARRAY: ['rows', 'cols', 'lambda'],
+  GROUPBY: [
+    'row_fields',
+    'values',
+    'function',
+    '[field_headers]',
+    '[total_depth]',
+    '[sort_order]',
+    '[filter_array]',
+  ],
+  PIVOTBY: [
+    'row_fields',
+    'col_fields',
+    'values',
+    'function',
+    '[field_headers]',
+    '[row_total_depth]',
+    '[row_sort_order]',
+    '[col_total_depth]',
+    '[col_sort_order]',
+    '[filter_array]',
+    '[relative_to]',
+  ],
+  PERCENTOF: ['data_subset', 'data_all'],
+  IMAGE: ['source', '[alt_text]', '[sizing]', '[height]', '[width]'],
 };
+
+/** A single `@` implicit-intersection operator surfaced in a formula text.
+ *  Excel 365 prefixes existing pre-dynamic-array formulas with `@` to opt
+ *  individual references out of array spilling. The UI surfaces these as a
+ *  hint while editing so the operator's effect is visible. */
+export interface ImplicitIntersection {
+  /** Character offset of the `@` itself. */
+  at: number;
+  /** Source-order index, used for stable tooltip placement. */
+  index: number;
+}
+
+/** Find every top-level `@` implicit-intersection operator in `formula`. The
+ *  scanner skips `@` characters inside string literals and inside structured
+ *  refs (`Table[@col]` — there `@` is a ref operator, not the intersection
+ *  operator). Returns positions in source order. */
+export function findImplicitIntersections(formula: string): ImplicitIntersection[] {
+  if (!formula.startsWith('=')) return [];
+  const out: ImplicitIntersection[] = [];
+  let inString = false;
+  let bracketDepth = 0;
+  for (let i = 0; i < formula.length; i += 1) {
+    const ch = formula[i];
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === '[') {
+      bracketDepth += 1;
+      continue;
+    }
+    if (ch === ']') {
+      if (bracketDepth > 0) bracketDepth -= 1;
+      continue;
+    }
+    if (ch === '@' && bracketDepth === 0) {
+      // Excel's implicit-intersection `@` only attaches to ref-like targets:
+      // a name, a sheet-qualified ref, or an open paren (function call).
+      const next = formula[i + 1] ?? '';
+      if (!/[A-Za-z_(']/.test(next)) continue;
+      out.push({ at: i, index: out.length });
+    }
+  }
+  return out;
+}
+
+/** True when `caret` sits immediately after a recognised implicit-intersection
+ *  `@` operator (one character or more — handy for showing a hint while the
+ *  user is mid-typing the operand). */
+export function caretInsideImplicitIntersection(formula: string, caret: number): boolean {
+  const ops = findImplicitIntersections(formula);
+  for (const op of ops) {
+    if (caret > op.at && caret <= op.at + 16) return true;
+  }
+  return false;
+}
 
 /** Resolved signature for the function call enclosing `caret`, or null when
  *  the caret isn't inside a known function. `activeArgIndex` is 0-based and
