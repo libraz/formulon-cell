@@ -179,6 +179,8 @@ export {
 export { textToColumns } from './commands/text-to-columns.js';
 export type { ValidationOutcome } from './commands/validate.js';
 export { resolveListValues, validateAgainst } from './commands/validate.js';
+export type { LocaleOrdinal } from './engine/function-locale.js';
+export { canonicalizeFormula, localizeFormula } from './engine/function-locale.js';
 export type { LoadOptions } from './engine/loader.js';
 export { isUsingStub } from './engine/loader.js';
 export type { PassthroughSummary, TableSummary } from './engine/passthrough-sync.js';
