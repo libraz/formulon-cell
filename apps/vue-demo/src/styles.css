@@ -1,6 +1,6 @@
 :root {
-  --demo-font: ui-sans-serif, -apple-system, 'Segoe UI', 'Helvetica Neue', sans-serif;
-  --demo-mono: ui-monospace, SFMono-Regular, 'Menlo', 'Consolas', monospace;
+  --demo-font: ui-sans-serif, -apple-system, "Segoe UI", "Helvetica Neue", sans-serif;
+  --demo-mono: ui-monospace, SFMono-Regular, "Menlo", "Consolas", monospace;
   --demo-bg: #f4f4f1;
   --demo-card: #ffffff;
   --demo-fg: #111418;
@@ -10,7 +10,7 @@
   --demo-accent-soft: rgba(192, 73, 42, 0.08);
 }
 
-[data-theme='ink'] {
+[data-theme="ink"] {
   --demo-bg: #14171b;
   --demo-card: #1e2228;
   --demo-fg: #ecedef;
@@ -20,7 +20,7 @@
   --demo-accent-soft: rgba(244, 163, 108, 0.12);
 }
 
-[data-theme='contrast'] {
+[data-theme="contrast"] {
   --demo-bg: #ffffff;
   --demo-card: #ffffff;
   --demo-fg: #000000;
@@ -243,7 +243,7 @@ body {
   margin: 0;
   font-family: var(--demo-mono);
   font-size: 14px;
-  font-feature-settings: 'tnum';
+  font-feature-settings: "tnum";
 }
 
 /* ── Preset selector ────────────────────────────────────────────────── */

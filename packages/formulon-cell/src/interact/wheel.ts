@@ -1,5 +1,5 @@
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { type SpreadsheetStore, mutators } from '../store/store.js';
+import { mutators, type SpreadsheetStore } from '../store/store.js';
 
 export interface WheelDeps {
   /** Element to listen on — typically the grid canvas wrapper. */

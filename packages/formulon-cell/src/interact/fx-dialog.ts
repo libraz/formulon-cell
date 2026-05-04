@@ -1,5 +1,5 @@
 import { FUNCTION_SIGNATURES } from '../commands/refs.js';
-import { type Strings, defaultStrings, en as enStrings } from '../i18n/strings.js';
+import { defaultStrings, en as enStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 
 /** Heuristic locale detector — we don't get a `Locale` flag through deps so

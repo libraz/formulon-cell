@@ -34,4 +34,13 @@ export default defineConfig({
     // play well with esbuild's CJS interop.
     exclude: ['@libraz/formulon-cell'],
   },
+  // formulon's pthread bundle uses top-level await and spawns its workers
+  // as ES modules; both require an ES2022+ target on the main thread and
+  // the worker pipeline.
+  build: {
+    target: 'es2022',
+  },
+  worker: {
+    format: 'es',
+  },
 });

@@ -1,6 +1,6 @@
 import type { ConditionalCellOverlay } from '../render/conditional.js';
-import { addrKey } from './workbook-handle.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+import { addrKey } from './workbook-handle.js';
 
 /** CF match kind ordinals — mirror of `formulon::cf::CFMatchKind`. */
 const KIND_COLOR_SCALE = 1;

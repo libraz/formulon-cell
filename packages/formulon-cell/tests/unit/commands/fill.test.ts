@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { fillDestFor, fillRange } from '../../../src/commands/fill.js';
 import type { Range } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { type SpreadsheetStore, createSpreadsheetStore } from '../../../src/store/store.js';
+import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 

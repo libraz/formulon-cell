@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { attachConditionalDialog } from '../../../src/interact/conditional-dialog.js';
 import {
-  type SpreadsheetStore,
   createSpreadsheetStore,
   mutators,
+  type SpreadsheetStore,
 } from '../../../src/store/store.js';
 
 const setRange = (

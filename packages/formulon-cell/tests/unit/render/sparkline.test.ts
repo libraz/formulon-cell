@@ -1,17 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  History,
   applySparklineSnapshot,
   captureSparklineSnapshot,
+  History,
   recordSparklineChange,
 } from '../../../src/commands/history.js';
 import { resolveNumericRangeFromCells } from '../../../src/engine/range-resolver.js';
 import { paintSparkline } from '../../../src/render/painters.js';
 import {
-  type Sparkline,
-  type SpreadsheetStore,
   createSpreadsheetStore,
   mutators,
+  type Sparkline,
+  type SpreadsheetStore,
 } from '../../../src/store/store.js';
 
 const seedNumber = (

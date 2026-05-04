@@ -8,9 +8,9 @@ import {
 } from '../../../src/commands/sheet-mutate.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
-  type SpreadsheetStore,
   createSpreadsheetStore,
   mutators,
+  type SpreadsheetStore,
 } from '../../../src/store/store.js';
 
 interface FakeWb {

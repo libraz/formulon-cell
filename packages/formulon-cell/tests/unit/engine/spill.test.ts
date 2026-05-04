@@ -15,7 +15,7 @@ interface FakeCell {
   formula: string | null;
 }
 
-const fill = (entries: Array<[number, number, FakeCell]>, sheet = 0): Map<string, FakeCell> => {
+const fill = (entries: [number, number, FakeCell][], sheet = 0): Map<string, FakeCell> => {
   const m = new Map<string, FakeCell>();
   for (const [row, col, cell] of entries) {
     m.set(addrKey({ sheet, row, col }), cell);

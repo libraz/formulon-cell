@@ -1,7 +1,7 @@
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { addrKey } from '../engine/workbook-handle.js';
-import { type SpreadsheetStore, type State, mutators } from '../store/store.js';
+import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { type History, recordMergesChangeWithEngine } from './history.js';
 
 /** Look up the merge that covers `addr`, if any. Returns the full merge range

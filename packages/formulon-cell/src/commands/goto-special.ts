@@ -1,6 +1,6 @@
 import type { Addr, Range } from '../engine/types.js';
-import { addrKey } from '../engine/workbook-handle.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { addrKey } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore } from '../store/store.js';
 
 /** Excel "Go To Special" categories supported in v1. Mirrors the radio list

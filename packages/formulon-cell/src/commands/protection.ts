@@ -1,6 +1,6 @@
 import type { Addr, Range } from '../engine/types.js';
 import { addrKey } from '../engine/workbook-handle.js';
-import { type CellFormat, type SpreadsheetStore, type State, mutators } from '../store/store.js';
+import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 
 /** Whether `sheet` is currently flagged protected on the workbook. Mirrors
  *  the protection slice as a pure helper so call sites don't reach into the

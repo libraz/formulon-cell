@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
-import { WorkbookHandle, addrKey } from '../../../src/engine/workbook-handle.js';
+import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachPointer } from '../../../src/interact/pointer.js';
 import {
-  type SpreadsheetStore,
   createSpreadsheetStore,
   mutators,
+  type SpreadsheetStore,
 } from '../../../src/store/store.js';
 
 // We mock getFillHandleRect on the rendering module so tests can place a fake

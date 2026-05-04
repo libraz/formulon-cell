@@ -16,10 +16,10 @@ import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import {
   type CellFormat,
-  type PageSetup,
-  type SpreadsheetStore,
   defaultPageSetup,
   getPageSetup,
+  type PageSetup,
+  type SpreadsheetStore,
 } from '../store/store.js';
 
 /** Output of `buildPrintDocument`. `html` is a complete HTML document string

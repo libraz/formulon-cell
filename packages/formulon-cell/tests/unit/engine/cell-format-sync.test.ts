@@ -10,8 +10,8 @@ import type {
   FillRecord,
   FontRecord,
 } from '../../../src/engine/types.js';
-import { addrKey } from '../../../src/engine/workbook-handle.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { type CellFormat, createSpreadsheetStore } from '../../../src/store/store.js';
 
 interface FakeOpts {

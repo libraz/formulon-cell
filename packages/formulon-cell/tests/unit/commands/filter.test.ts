@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { applyFilter, clearFilter, setAutoFilter } from '../../../src/commands/filter.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
-import { type SpreadsheetStore, createSpreadsheetStore } from '../../../src/store/store.js';
+import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
 
 const seedNumber = (store: SpreadsheetStore, row: number, col: number, value: number): void => {
   store.setState((s) => {

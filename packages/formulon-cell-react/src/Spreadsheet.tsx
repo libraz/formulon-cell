@@ -12,9 +12,8 @@ import {
   type WorkbookChangeEvent,
   type WorkbookHandle,
 } from '@libraz/formulon-cell';
-import { useEffect, useImperativeHandle, useRef } from 'react';
 import type { CSSProperties, ForwardedRef, ReactNode } from 'react';
-import { forwardRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 
 export interface SpreadsheetProps {
   /** Optional pre-loaded workbook (e.g. from xlsx bytes). When omitted, a

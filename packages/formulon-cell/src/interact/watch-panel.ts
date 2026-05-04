@@ -1,8 +1,8 @@
 import type { Addr } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { type Strings, defaultStrings } from '../i18n/strings.js';
-import { type SpreadsheetStore, mutators } from '../store/store.js';
+import { defaultStrings, type Strings } from '../i18n/strings.js';
+import { mutators, type SpreadsheetStore } from '../store/store.js';
 
 export interface WatchPanelDeps {
   /** Element the panel docks under. The panel appends itself as a child of

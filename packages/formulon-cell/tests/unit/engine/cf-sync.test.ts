@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { evaluateCfFromEngine } from '../../../src/engine/cf-sync.js';
-import { addrKey } from '../../../src/engine/workbook-handle.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { addrKey } from '../../../src/engine/workbook-handle.js';
 
 const KIND_COLOR_SCALE = 1;
 const KIND_DATA_BAR = 2;

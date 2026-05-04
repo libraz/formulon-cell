@@ -2,7 +2,7 @@ import { type History, recordFormatChange } from '../commands/history.js';
 import type { Range } from '../engine/types.js';
 import { addrKey } from '../engine/workbook-handle.js';
 import { hitTest } from '../render/geometry.js';
-import { type CellFormat, type SpreadsheetStore, mutators } from '../store/store.js';
+import { type CellFormat, mutators, type SpreadsheetStore } from '../store/store.js';
 
 export interface FormatPainterDeps {
   host: HTMLElement;

@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import {
-  MAX_OUTLINE_LEVEL,
-  OUTLINE_GUTTER_PER_LEVEL,
   colGroupRangeAt,
   collapseColGroup,
   collapseRowGroup,
@@ -12,6 +10,8 @@ import {
   groupRows,
   isColGroupCollapsed,
   isRowGroupCollapsed,
+  MAX_OUTLINE_LEVEL,
+  OUTLINE_GUTTER_PER_LEVEL,
   rowGroupRangeAt,
   ungroupCols,
   ungroupRows,

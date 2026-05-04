@@ -1,7 +1,7 @@
 import type { Range } from '../engine/types.js';
-import { type CellFormat, type SpreadsheetStore, mutators } from '../store/store.js';
-import { recordFormatChange } from './history.js';
+import { type CellFormat, mutators, type SpreadsheetStore } from '../store/store.js';
 import type { History } from './history.js';
+import { recordFormatChange } from './history.js';
 
 /** Built-in named cell styles. Each style is a partial CellFormat that
  *  `applyCellStyle` merges into the active range via `setRangeFormat`. The

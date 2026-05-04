@@ -1,7 +1,7 @@
 import {
+  applySubstitution,
   type FindMatch,
   type FindOptions,
-  applySubstitution,
   findAll,
   findNext,
   replaceAll,
@@ -9,8 +9,8 @@ import {
 } from '../commands/find.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { type Strings, defaultStrings } from '../i18n/strings.js';
-import { type SpreadsheetStore, mutators } from '../store/store.js';
+import { defaultStrings, type Strings } from '../i18n/strings.js';
+import { mutators, type SpreadsheetStore } from '../store/store.js';
 
 export interface FindReplaceDeps {
   host: HTMLElement;

@@ -1,17 +1,16 @@
 import { coerceInput } from '../commands/coerce-input.js';
 import { validateAgainst } from '../commands/validate.js';
 import { evaluateCfFromEngine } from '../engine/cf-sync.js';
-import { type RangeResolver, makeRangeResolver } from '../engine/range-resolver.js';
+import { makeRangeResolver, type RangeResolver } from '../engine/range-resolver.js';
 import { findSpillRanges } from '../engine/spill.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
-import { addrKey } from '../engine/workbook-handle.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { addrKey } from '../engine/workbook-handle.js';
 import type { CellFormat, CellValidation, State } from '../store/store.js';
 import type { ResolvedTheme } from '../theme/resolve.js';
 import { evaluateConditional } from './conditional.js';
 import {
   type AxisLayout,
-  type Rect,
   buildColLayout,
   buildRowLayout,
   cellRectIn,
@@ -20,13 +19,12 @@ import {
   gridOriginY,
   isColVisible,
   isRowVisible,
+  type Rect,
   rangeRects,
 } from './geometry.js';
 import {
   CONDITIONAL_ICON_GUTTER,
   type OutlineToggleHit,
-  TRACE_DEPENDENT_COLOR,
-  TRACE_PRECEDENT_COLOR,
   paintActiveCellOutline,
   paintCellBackground,
   paintCellBorders,
@@ -45,6 +43,8 @@ import {
   paintTraceDot,
   paintValidationChevron,
   paintValidationTriangle,
+  TRACE_DEPENDENT_COLOR,
+  TRACE_PRECEDENT_COLOR,
 } from './painters.js';
 import { paintCellSparkline } from './sparkline.js';
 

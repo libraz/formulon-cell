@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { WorkbookHandle, addrKey } from '../../../src/engine/workbook-handle.js';
+import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachClipboard } from '../../../src/interact/clipboard.js';
-import { type SpreadsheetStore, createSpreadsheetStore } from '../../../src/store/store.js';
+import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 

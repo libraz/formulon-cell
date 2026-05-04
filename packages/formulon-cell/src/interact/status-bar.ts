@@ -1,6 +1,6 @@
 import { aggregateSelection } from '../commands/aggregate.js';
-import { type Strings, defaultStrings } from '../i18n/strings.js';
-import { type SpreadsheetStore, type StatusAggKey, mutators } from '../store/store.js';
+import { defaultStrings, type Strings } from '../i18n/strings.js';
+import { mutators, type SpreadsheetStore, type StatusAggKey } from '../store/store.js';
 
 export interface StatusBarDeps {
   /** The status bar element built by mount.ts. We take it over and lay

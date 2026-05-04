@@ -14,26 +14,26 @@
 
 :root {
   /* ── Fluent neutrals (light) ─────────────────────────────────────── */
-  --shell-bg: #faf9f8;            /* Fluent neutralLighterAlt — body */
-  --shell-bg-2: #f3f2f1;          /* Fluent neutralLighter — hover/header rail */
-  --shell-bg-3: #edebe9;          /* Fluent neutralLight — pressed */
+  --shell-bg: #faf9f8; /* Fluent neutralLighterAlt — body */
+  --shell-bg-2: #f3f2f1; /* Fluent neutralLighter — hover/header rail */
+  --shell-bg-3: #edebe9; /* Fluent neutralLight — pressed */
   --shell-surface: #ffffff;
   --shell-surface-2: #faf9f8;
-  --shell-rule: #e1dfdd;          /* Fluent neutralQuaternary — hairline */
-  --shell-rule-2: #d2d0ce;        /* Fluent neutralQuaternaryAlt — strong */
-  --shell-rule-3: #a19f9d;        /* Fluent neutralTertiary */
-  --shell-fg: #201f1e;            /* Fluent neutralPrimary */
+  --shell-rule: #e1dfdd; /* Fluent neutralQuaternary — hairline */
+  --shell-rule-2: #d2d0ce; /* Fluent neutralQuaternaryAlt — strong */
+  --shell-rule-3: #a19f9d; /* Fluent neutralTertiary */
+  --shell-fg: #201f1e; /* Fluent neutralPrimary */
   --shell-fg-strong: #11100f;
-  --shell-fg-mute: #605e5c;       /* Fluent neutralSecondary */
-  --shell-fg-faint: #8a8886;      /* Fluent neutralTertiaryAlt */
+  --shell-fg-mute: #605e5c; /* Fluent neutralSecondary */
+  --shell-fg-faint: #8a8886; /* Fluent neutralTertiaryAlt */
 
   /* ── Excel green ─────────────────────────────────────────────────── */
-  --shell-accent: #107c41;        /* Excel green — file tab, active cell */
+  --shell-accent: #107c41; /* Excel green — file tab, active cell */
   --shell-accent-strong: #0e6b39; /* Hover on accent */
   --shell-accent-darker: #0b5c30; /* Pressed on accent */
   --shell-accent-soft: rgba(16, 124, 65, 0.1);
-  --shell-accent-pale: #e6f4ec;   /* Toggle-on background */
-  --shell-accent-tint: #caead8;   /* Lifted tab fill */
+  --shell-accent-pale: #e6f4ec; /* Toggle-on background */
+  --shell-accent-tint: #caead8; /* Lifted tab fill */
   --shell-accent-fg: #ffffff;
 
   --shell-hover: rgba(0, 0, 0, 0.04);
@@ -41,23 +41,21 @@
 
   /* Fluent depth shadows. Microsoft uses two-stop ambient + key-light. */
   --shell-shadow-2: 0 0.3px 0.9px rgba(0, 0, 0, 0.07), 0 1.6px 3.6px rgba(0, 0, 0, 0.11);
-  --shell-shadow-4: 0 0.6px 1.8px rgba(0, 0, 0, 0.10), 0 3.2px 7.2px rgba(0, 0, 0, 0.13);
-  --shell-shadow-8: 0 1.2px 3.6px rgba(0, 0, 0, 0.10), 0 6.4px 14.4px rgba(0, 0, 0, 0.13);
+  --shell-shadow-4: 0 0.6px 1.8px rgba(0, 0, 0, 0.1), 0 3.2px 7.2px rgba(0, 0, 0, 0.13);
+  --shell-shadow-8: 0 1.2px 3.6px rgba(0, 0, 0, 0.1), 0 6.4px 14.4px rgba(0, 0, 0, 0.13);
 
   /* Type stack — Aptos / Segoe UI Variable on Windows; Apple system stack
      on macOS; IBM Plex Sans (bundled webfont) as the deterministic
      fallback for Linux + headless renderers. */
   --shell-font-ui:
-    "Aptos", "Segoe UI Variable Text", "Segoe UI",
-    -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui,
-    "IBM Plex Sans", "Helvetica Neue", sans-serif;
+    "Aptos", "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    system-ui, "IBM Plex Sans", "Helvetica Neue", sans-serif;
   --shell-font-display:
-    "Aptos Display", "Segoe UI Variable Display", "Segoe UI",
-    -apple-system, "SF Pro Display", system-ui,
-    "IBM Plex Sans", sans-serif;
+    "Aptos Display", "Segoe UI Variable Display", "Segoe UI", -apple-system, "SF Pro Display",
+    system-ui, "IBM Plex Sans", sans-serif;
   --shell-font-mono:
-    "Cascadia Mono", "Cascadia Code", "Consolas",
-    "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+    "Cascadia Mono", "Cascadia Code", "Consolas", "IBM Plex Mono", ui-monospace, "SF Mono",
+    monospace;
 }
 
 [data-theme="dark"] {
@@ -85,7 +83,7 @@
   --shell-hover: rgba(255, 255, 255, 0.06);
   --shell-active: rgba(255, 255, 255, 0.12);
   --shell-shadow-2: 0 0.3px 0.9px rgba(0, 0, 0, 0.45);
-  --shell-shadow-4: 0 0.6px 1.8px rgba(0, 0, 0, 0.50);
+  --shell-shadow-4: 0 0.6px 1.8px rgba(0, 0, 0, 0.5);
   --shell-shadow-8: 0 1.2px 3.6px rgba(0, 0, 0, 0.55);
   color-scheme: dark;
 }
@@ -184,7 +182,9 @@ body {
   padding: 2px 6px;
   border-radius: 3px;
   border: 1px solid transparent;
-  transition: background-color 100ms ease, border-color 100ms ease;
+  transition:
+    background-color 100ms ease,
+    border-color 100ms ease;
 }
 .app__brand-doc:hover {
   background: var(--shell-bg-2);
@@ -240,7 +240,9 @@ body {
   font-size: 12px;
   font-weight: 400;
   cursor: pointer;
-  transition: background 100ms ease, border-color 100ms ease;
+  transition:
+    background 100ms ease,
+    border-color 100ms ease;
 }
 .app__theme:hover {
   background: var(--shell-bg-2);
@@ -280,7 +282,9 @@ body {
   font-size: 12px;
   font-weight: 400;
   cursor: pointer;
-  transition: background 100ms ease, color 100ms ease;
+  transition:
+    background 100ms ease,
+    color 100ms ease;
 }
 .app__menubar-item:hover {
   background: var(--shell-bg-2);
@@ -469,7 +473,10 @@ body {
   font-family: var(--shell-font-ui);
   font-size: 13px;
   cursor: pointer;
-  transition: background 80ms ease, border-color 80ms ease, color 80ms ease;
+  transition:
+    background 80ms ease,
+    border-color 80ms ease,
+    color 80ms ease;
 }
 .app__tool + .app__tool {
   margin-left: 1px;
@@ -504,7 +511,9 @@ body {
   width: auto;
   min-width: 30px;
   padding: 0 7px;
-  font-feature-settings: "tnum" 1, "ss01" 1;
+  font-feature-settings:
+    "tnum" 1,
+    "ss01" 1;
 }
 .app__tool--bold {
   font-weight: 700;
@@ -536,7 +545,9 @@ body {
   color: var(--shell-fg-mute);
   cursor: pointer;
   user-select: none;
-  transition: background 80ms ease, border-color 80ms ease;
+  transition:
+    background 80ms ease,
+    border-color 80ms ease;
 }
 .app__zoom:hover {
   background: var(--shell-bg-2);
@@ -616,7 +627,9 @@ body {
   padding: 2px 6px;
   border-radius: 2px;
   cursor: pointer;
-  transition: background 80ms ease, color 80ms ease;
+  transition:
+    background 80ms ease,
+    color 80ms ease;
 }
 .app__sheet .fc-host__formulabar-fx:hover {
   background: var(--shell-bg-2);
@@ -634,7 +647,9 @@ body {
   caret-color: var(--shell-accent);
   background: transparent;
   cursor: text;
-  transition: border-color 100ms ease, background 100ms ease;
+  transition:
+    border-color 100ms ease,
+    background 100ms ease;
 }
 .app__sheet .fc-host__formulabar-input:hover {
   background: var(--shell-bg-2);
@@ -691,7 +706,9 @@ body {
   border-radius: 3px;
   color: var(--shell-fg-mute);
   cursor: pointer;
-  transition: background 80ms ease, color 80ms ease;
+  transition:
+    background 80ms ease,
+    color 80ms ease;
 }
 .app__tabs-nav:hover {
   background: var(--shell-bg);
@@ -731,7 +748,9 @@ body {
   font-weight: 400;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 80ms ease, color 80ms ease;
+  transition:
+    background 80ms ease,
+    color 80ms ease;
 }
 .app__tab + .app__tab::before {
   content: "";
@@ -788,7 +807,9 @@ body {
   border-radius: 3px;
   color: var(--shell-fg-mute);
   cursor: pointer;
-  transition: background 80ms ease, color 80ms ease;
+  transition:
+    background 80ms ease,
+    color 80ms ease;
 }
 .app__tab-add:hover {
   background: var(--shell-bg);
@@ -804,7 +825,9 @@ body {
   margin-left: auto;
   font-family: var(--shell-font-ui);
   font-size: 11px;
-  font-feature-settings: "tnum" 1, "zero" 1;
+  font-feature-settings:
+    "tnum" 1,
+    "zero" 1;
   color: var(--shell-fg-mute);
 }
 .app__status-block {
@@ -879,7 +902,9 @@ body {
   font-size: 13px;
   line-height: 1;
   cursor: pointer;
-  transition: background 80ms ease, color 80ms ease;
+  transition:
+    background 80ms ease,
+    color 80ms ease;
 }
 .app__zoom-step:hover {
   background: var(--shell-bg);

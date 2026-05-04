@@ -3,9 +3,9 @@ import { History } from '../../../src/commands/history.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { attachFormatPainter } from '../../../src/interact/format-painter.js';
 import {
-  type SpreadsheetStore,
   createSpreadsheetStore,
   mutators,
+  type SpreadsheetStore,
 } from '../../../src/store/store.js';
 
 const setRange = (

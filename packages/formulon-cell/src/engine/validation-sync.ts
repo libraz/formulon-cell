@@ -8,8 +8,8 @@ import type {
 } from '../store/store.js';
 import { parseRangeRef } from './range-resolver.js';
 import type { Range } from './types.js';
-import { addrKey } from './workbook-handle.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+import { addrKey } from './workbook-handle.js';
 
 /** OOXML validation `type` ordinal — 0 none, 1 whole, 2 decimal, 3 list,
  *  4 date, 5 time, 6 textLength, 7 custom. */

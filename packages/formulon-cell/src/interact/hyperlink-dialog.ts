@@ -2,8 +2,8 @@ import { type History, recordFormatChange } from '../commands/history.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { addrKey } from '../engine/workbook-handle.js';
-import { type Strings, defaultStrings } from '../i18n/strings.js';
-import { type SpreadsheetStore, mutators } from '../store/store.js';
+import { defaultStrings, type Strings } from '../i18n/strings.js';
+import { mutators, type SpreadsheetStore } from '../store/store.js';
 
 export interface HyperlinkDialogDeps {
   host: HTMLElement;

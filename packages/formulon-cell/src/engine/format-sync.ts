@@ -1,6 +1,6 @@
 import type { CellFormat, SpreadsheetStore } from '../store/store.js';
-import { addrKey } from './workbook-handle.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+import { addrKey } from './workbook-handle.js';
 
 /**
  * Seed cell-level comment and hyperlink fields from engine state for `sheet`.

@@ -1,14 +1,14 @@
 import type { Addr, CellValue } from '../engine/types.js';
-import { type WorkbookHandle, addrKey } from '../engine/workbook-handle.js';
+import { addrKey, type WorkbookHandle } from '../engine/workbook-handle.js';
 import {
   type CellFormat,
   type LayoutSlice,
-  type SpreadsheetStore,
   mutators,
+  type SpreadsheetStore,
 } from '../store/store.js';
 import {
-  type History,
   captureLayoutSnapshot,
+  type History,
   recordFormatChange,
   recordLayoutChange,
   recordLayoutChangeWithEngine,

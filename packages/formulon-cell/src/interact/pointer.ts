@@ -1,9 +1,9 @@
 import { fillDestFor, fillRange } from '../commands/fill.js';
 import {
-  type History,
-  type LayoutSnapshot,
   applyLayoutSnapshot,
   captureLayoutSnapshot,
+  type History,
+  type LayoutSnapshot,
 } from '../commands/history.js';
 import { applyUnmerge, expandRangeWithMerges, mergeAnchorOf } from '../commands/merge.js';
 import {
@@ -20,7 +20,7 @@ import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { hitTest, hitZone } from '../render/geometry.js';
 import { getFillHandleRect, getOutlineToggleHits } from '../render/grid.js';
-import { type SpreadsheetStore, type State, mutators } from '../store/store.js';
+import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 
 type DragMode =
   | { kind: 'none' }

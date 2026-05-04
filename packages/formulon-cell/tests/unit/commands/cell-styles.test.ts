@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CELL_STYLES, applyCellStyle, getCellStyle } from '../../../src/commands/cell-styles.js';
+import { applyCellStyle, CELL_STYLES, getCellStyle } from '../../../src/commands/cell-styles.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore } from '../../../src/index.js';
 

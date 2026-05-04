@@ -6,8 +6,8 @@ import {
   replaceAll,
   replaceOne,
 } from '../../../src/commands/find.js';
-import { WorkbookHandle, addrKey } from '../../../src/engine/workbook-handle.js';
-import { type SpreadsheetStore, createSpreadsheetStore } from '../../../src/store/store.js';
+import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 

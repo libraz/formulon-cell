@@ -5,7 +5,7 @@ import type { CellValue } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { CellFormat, ConditionalIconSet, Sparkline, State } from '../store/store.js';
 import type { ResolvedTheme } from '../theme/resolve.js';
-import { type AxisLayout, type Rect, gridOriginX, gridOriginY } from './geometry.js';
+import { type AxisLayout, gridOriginX, gridOriginY, type Rect } from './geometry.js';
 
 /** Trace-arrow accent colors. Excel paints precedents in blue and dependents
  *  in a slightly redder hue so the two relations are visually distinct even

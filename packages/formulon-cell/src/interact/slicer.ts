@@ -3,8 +3,8 @@ import { type History, recordSlicersChange } from '../commands/history.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { type Strings, defaultStrings } from '../i18n/strings.js';
-import { type SlicerSpec, type SpreadsheetStore, mutators } from '../store/store.js';
+import { defaultStrings, type Strings } from '../i18n/strings.js';
+import { mutators, type SlicerSpec, type SpreadsheetStore } from '../store/store.js';
 
 export interface SlicerDeps {
   /** Element the floating panels attach to. Each panel is appended as a

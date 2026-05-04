@@ -2,16 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CellValue } from '../../../src/engine/types.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import {
-  type ErrorTriangleHit,
-  ERROR_TRIANGLE_COLOR,
-  VALIDATION_TRIANGLE_COLOR,
   detectErrorKind,
   detectValidationViolation,
+  ERROR_TRIANGLE_COLOR,
+  type ErrorTriangleHit,
+  VALIDATION_TRIANGLE_COLOR,
 } from '../../../src/render/grid.js';
-import {
-  paintErrorTriangle,
-  paintValidationTriangle,
-} from '../../../src/render/painters.js';
+import { paintErrorTriangle, paintValidationTriangle } from '../../../src/render/painters.js';
 import type { CellValidation } from '../../../src/store/store.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
@@ -95,7 +92,9 @@ describe('detectValidationViolation', () => {
   });
 
   it('skips error-kind values — those surface as error triangles instead', () => {
-    expect(detectValidationViolation({ kind: 'error', code: 7, text: '#DIV/0!' }, wholeRange)).toBe(false);
+    expect(detectValidationViolation({ kind: 'error', code: 7, text: '#DIV/0!' }, wholeRange)).toBe(
+      false,
+    );
   });
 });
 

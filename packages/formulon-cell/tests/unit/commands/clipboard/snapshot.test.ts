@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { captureSnapshot } from '../../../../src/commands/clipboard/snapshot.js';
 import { addrKey } from '../../../../src/engine/workbook-handle.js';
 import {
-  type SpreadsheetStore,
   createSpreadsheetStore,
   mutators,
+  type SpreadsheetStore,
 } from '../../../../src/store/store.js';
 
 describe('captureSnapshot', () => {

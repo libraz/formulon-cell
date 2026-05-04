@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { captureSnapshot } from '../../../src/commands/clipboard/snapshot.js';
 import { History } from '../../../src/commands/history.js';
-import { WorkbookHandle, addrKey } from '../../../src/engine/workbook-handle.js';
+import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachPasteSpecial } from '../../../src/interact/paste-special.js';
 import {
-  type SpreadsheetStore,
   createSpreadsheetStore,
   mutators,
+  type SpreadsheetStore,
 } from '../../../src/store/store.js';
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });

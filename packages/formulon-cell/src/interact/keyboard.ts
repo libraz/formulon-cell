@@ -4,7 +4,7 @@ import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outl
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { addrKey } from '../engine/workbook-handle.js';
-import { type SpreadsheetStore, type State, mutators } from '../store/store.js';
+import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 
 const MAX_ROW = 1_048_575; // Excel limit; clamp navigation.
 const MAX_COL = 16_383;

@@ -1,4 +1,4 @@
-import { CELL_STYLES, type CellStyleId, applyCellStyle } from '../commands/cell-styles.js';
+import { applyCellStyle, CELL_STYLES, type CellStyleId } from '../commands/cell-styles.js';
 import type { History } from '../commands/history.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';

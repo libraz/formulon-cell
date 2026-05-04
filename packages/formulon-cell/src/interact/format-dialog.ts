@@ -3,7 +3,7 @@ import { type History, recordFormatChange } from '../commands/history.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { addrKey } from '../engine/workbook-handle.js';
-import { type Strings, defaultStrings } from '../i18n/strings.js';
+import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
   type CellAlign,
   type CellBorderSide,
@@ -11,11 +11,11 @@ import {
   type CellFormat,
   type CellVAlign,
   type CellValidation,
+  mutators,
   type NumFmt,
   type SpreadsheetStore,
   type ValidationErrorStyle,
   type ValidationOp,
-  mutators,
 } from '../store/store.js';
 
 /** Discriminator for the dialog's "kind" dropdown. `none` means clear the

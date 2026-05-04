@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { attachWheel } from '../../../src/interact/wheel.js';
-import { type SpreadsheetStore, createSpreadsheetStore } from '../../../src/store/store.js';
+import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
 
 // happy-dom's WheelEvent constructor only reads delta* from the init bag and
 // drops modifier keys, so we patch them on after construction.

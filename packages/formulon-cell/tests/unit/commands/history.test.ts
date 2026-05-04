@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  History,
   applyFormatSnapshot,
   applyLayoutSnapshot,
   captureFormatSnapshot,
   captureLayoutSnapshot,
+  History,
   recordFormatChange,
   recordLayoutChange,
 } from '../../../src/commands/history.js';
 import {
-  type SpreadsheetStore,
   createSpreadsheetStore,
   mutators,
+  type SpreadsheetStore,
 } from '../../../src/store/store.js';
 
 describe('History stack', () => {

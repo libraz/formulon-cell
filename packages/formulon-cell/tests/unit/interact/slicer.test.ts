@@ -5,10 +5,10 @@ import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { attachSlicer } from '../../../src/interact/slicer.js';
 import {
-  type SlicerSpec,
-  type SpreadsheetStore,
   createSpreadsheetStore,
   mutators,
+  type SlicerSpec,
+  type SpreadsheetStore,
 } from '../../../src/store/store.js';
 
 const seedCell = (

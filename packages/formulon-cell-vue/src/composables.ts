@@ -3,7 +3,7 @@ import type {
   SpreadsheetEventName,
   SpreadsheetInstance,
 } from '@libraz/formulon-cell';
-import { type Ref, onScopeDispose, ref, watchEffect } from 'vue';
+import { onScopeDispose, type Ref, ref, watchEffect } from 'vue';
 
 /** Composable: track the live selection from a `ref<SpreadsheetInstance | null>`. */
 export const useSelection = (

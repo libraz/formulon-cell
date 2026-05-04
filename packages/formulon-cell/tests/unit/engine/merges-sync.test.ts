@@ -4,7 +4,7 @@ import { applyMerge, applyUnmerge } from '../../../src/commands/merge.js';
 import { hydrateMergesFromEngine } from '../../../src/engine/merges-sync.js';
 import type { Range } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { type SpreadsheetStore, createSpreadsheetStore } from '../../../src/store/store.js';
+import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
 
 interface FakeMergeRange {
   firstRow: number;

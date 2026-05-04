@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { FUNCTION_DESCRIPTIONS, attachFxDialog } from '../../../src/interact/fx-dialog.js';
+import { attachFxDialog, FUNCTION_DESCRIPTIONS } from '../../../src/interact/fx-dialog.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 
 describe('attachFxDialog', () => {

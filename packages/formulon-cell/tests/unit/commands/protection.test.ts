@@ -11,11 +11,11 @@ import {
 } from '../../../src/commands/protection.js';
 import { deleteRows, insertRows } from '../../../src/commands/structure.js';
 import type { Addr, Range } from '../../../src/engine/types.js';
-import { WorkbookHandle, addrKey } from '../../../src/engine/workbook-handle.js';
+import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
-  type SpreadsheetStore,
   createSpreadsheetStore,
   mutators,
+  type SpreadsheetStore,
 } from '../../../src/store/store.js';
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });

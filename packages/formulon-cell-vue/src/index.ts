@@ -1,13 +1,3 @@
-export { Spreadsheet } from './Spreadsheet.js';
-export type { SpreadsheetExposed } from './Spreadsheet.js';
-
-export {
-  useI18n,
-  useSelection,
-  useSpreadsheet,
-  useSpreadsheetEvent,
-} from './composables.js';
-
 // Re-export the core types so consumers don't need a separate
 // `@libraz/formulon-cell` type-only dependency.
 export type {
@@ -35,3 +25,12 @@ export type {
   WorkbookHandle,
 } from '@libraz/formulon-cell';
 export { presets } from '@libraz/formulon-cell';
+
+export {
+  useI18n,
+  useSelection,
+  useSpreadsheet,
+  useSpreadsheetEvent,
+} from './composables.js';
+export type { SpreadsheetExposed } from './Spreadsheet.js';
+export { Spreadsheet } from './Spreadsheet.js';

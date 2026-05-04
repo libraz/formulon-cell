@@ -1,7 +1,7 @@
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { addrKey } from '../engine/workbook-handle.js';
-import { type SpreadsheetStore, type State, mutators } from '../store/store.js';
+import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 
 /** Read the comment text on a cell, or null when unset. */
 export function commentAt(state: State, addr: Addr): string | null {

@@ -4,8 +4,8 @@ import {
   hydrateValidationsFromEngine,
   syncValidationsToEngine,
 } from '../../../src/engine/validation-sync.js';
-import { addrKey } from '../../../src/engine/workbook-handle.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 
 const DV_TYPE_LIST = 3;

@@ -1,11 +1,11 @@
 import type { Range } from '../engine/types.js';
-import { type Strings, defaultStrings } from '../i18n/strings.js';
+import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
   type CellFormat,
   type ConditionalIconSet,
   type ConditionalRule,
-  type SpreadsheetStore,
   mutators,
+  type SpreadsheetStore,
 } from '../store/store.js';
 
 export interface ConditionalDialogDeps {

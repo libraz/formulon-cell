@@ -1,4 +1,4 @@
-import { type SpreadsheetStore, mutators } from '../store/store.js';
+import { mutators, type SpreadsheetStore } from '../store/store.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 /** Replace the store's merges for `sheet` with whatever the engine reports.

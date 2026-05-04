@@ -1,10 +1,10 @@
 import { writeInput } from '../commands/coerce-input.js';
 import { resolveListValues } from '../commands/validate.js';
 import { makeRangeResolver } from '../engine/range-resolver.js';
-import { addrKey } from '../engine/workbook-handle.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { addrKey } from '../engine/workbook-handle.js';
 import { getValidationChevron } from '../render/grid.js';
-import { type SpreadsheetStore, mutators } from '../store/store.js';
+import { mutators, type SpreadsheetStore } from '../store/store.js';
 
 export interface ValidationListDeps {
   /** The grid surface that paints the chevron and receives clicks. */

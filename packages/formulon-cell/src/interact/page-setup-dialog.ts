@@ -4,15 +4,15 @@
 // through `mutators.setPageSetup` wrapped in a single history entry so undo
 // reverts the whole apply atomically.
 import { type History, recordPageSetupChange } from '../commands/history.js';
-import { type Strings, defaultStrings } from '../i18n/strings.js';
+import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
+  defaultPageSetup,
+  getPageSetup,
+  mutators,
   type PageOrientation,
   type PageSetup,
   type PaperSize,
   type SpreadsheetStore,
-  defaultPageSetup,
-  getPageSetup,
-  mutators,
 } from '../store/store.js';
 
 export interface PageSetupDialogDeps {

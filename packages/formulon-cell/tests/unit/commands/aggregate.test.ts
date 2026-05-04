@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { aggregateSelection } from '../../../src/commands/aggregate.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
-import { type SpreadsheetStore, createSpreadsheetStore } from '../../../src/store/store.js';
+import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
 
 const seedNumbers = (
   store: SpreadsheetStore,

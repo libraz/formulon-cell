@@ -20,9 +20,9 @@ import {
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import {
   type CellFormat,
-  type SpreadsheetStore,
   createSpreadsheetStore,
   mutators,
+  type SpreadsheetStore,
 } from '../../../src/store/store.js';
 
 const setRange = (

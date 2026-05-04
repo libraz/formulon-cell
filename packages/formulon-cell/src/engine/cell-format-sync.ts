@@ -13,8 +13,8 @@ import {
   numFmtToFormatCode,
 } from './format-writeback.js';
 import { syncValidationsToEngine } from './validation-sync.js';
-import { addrKey } from './workbook-handle.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+import { addrKey } from './workbook-handle.js';
 
 /**
  * Push every format entry on `sheet` from FormatSlice into the engine's XF

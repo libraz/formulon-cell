@@ -7,7 +7,7 @@ import {
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import { type History, recordFormatChange } from '../commands/history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { type Strings, defaultStrings } from '../i18n/strings.js';
+import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 
 export interface PasteSpecialDeps {

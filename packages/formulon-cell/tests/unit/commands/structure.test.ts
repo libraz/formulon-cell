@@ -16,9 +16,9 @@ import {
 } from '../../../src/commands/structure.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
-  type SpreadsheetStore,
   createSpreadsheetStore,
   mutators,
+  type SpreadsheetStore,
 } from '../../../src/store/store.js';
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });

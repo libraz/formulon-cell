@@ -24,9 +24,9 @@ import {
   showRows,
 } from '../commands/structure.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { type Strings, defaultStrings } from '../i18n/strings.js';
+import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { hitZone } from '../render/geometry.js';
-import { type SpreadsheetStore, mutators } from '../store/store.js';
+import { mutators, type SpreadsheetStore } from '../store/store.js';
 
 export interface ContextMenuDeps {
   host: HTMLElement;

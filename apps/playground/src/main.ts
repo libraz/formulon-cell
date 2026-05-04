@@ -1,7 +1,4 @@
 import {
-  Spreadsheet,
-  type SpreadsheetInstance,
-  WorkbookHandle,
   aggregateSelection,
   applyMerge,
   applyUnmerge,
@@ -19,6 +16,8 @@ import {
   removeDuplicates,
   removeSheet,
   renameSheet,
+  Spreadsheet,
+  type SpreadsheetInstance,
   setAlign,
   setFreezePanes,
   setSheetHidden,
@@ -29,6 +28,7 @@ import {
   toggleStrike,
   toggleUnderline,
   toggleWrap,
+  WorkbookHandle,
 } from '@libraz/formulon-cell';
 
 const sheetEl = document.getElementById('sheet');

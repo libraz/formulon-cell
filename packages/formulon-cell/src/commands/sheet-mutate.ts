@@ -1,5 +1,5 @@
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { type LayoutSlice, type SpreadsheetStore, mutators } from '../store/store.js';
+import { type LayoutSlice, mutators, type SpreadsheetStore } from '../store/store.js';
 import { type History, recordLayoutChangeWithEngine } from './history.js';
 
 /** Rename the sheet at `idx`. Returns true on success. The store has no

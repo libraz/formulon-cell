@@ -5,10 +5,10 @@ import {
   type CellBorders,
   type CellFormat,
   type CellVAlign,
+  mutators,
   type NumFmt,
   type SpreadsheetStore,
   type State,
-  mutators,
 } from '../store/store.js';
 import { gateProtection, isCellWritable } from './protection.js';
 

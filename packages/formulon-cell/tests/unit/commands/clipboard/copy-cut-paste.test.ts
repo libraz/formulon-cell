@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { copy } from '../../../../src/commands/clipboard/copy.js';
 import { cut } from '../../../../src/commands/clipboard/cut.js';
 import { pasteTSV } from '../../../../src/commands/clipboard/paste.js';
-import { WorkbookHandle, addrKey } from '../../../../src/engine/workbook-handle.js';
-import { type SpreadsheetStore, createSpreadsheetStore } from '../../../../src/store/store.js';
+import { addrKey, WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
+import { createSpreadsheetStore, type SpreadsheetStore } from '../../../../src/store/store.js';
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 

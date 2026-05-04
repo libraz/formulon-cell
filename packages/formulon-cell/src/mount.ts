@@ -21,20 +21,20 @@ import {
   selectionEquals,
 } from './events.js';
 import {
+  dedupeById,
   type Extension,
   type ExtensionContext,
   type ExtensionHandle,
   type ExtensionInput,
   type FeatureFlags,
-  type ThemeName,
-  dedupeById,
   flattenExtensions,
   resolveFlags,
   sortByPriority,
+  type ThemeName,
 } from './extensions/index.js';
 import type { CustomFunction, CustomFunctionMeta } from './formula.js';
 import { FormulaRegistry } from './formula.js';
-import { type I18nController, createI18nController } from './i18n/controller.js';
+import { createI18nController, type I18nController } from './i18n/controller.js';
 import type { DeepPartial, Locale, Strings } from './i18n/strings.js';
 import { attachArgHelper } from './interact/arg-helper.js';
 import { attachAutocomplete } from './interact/autocomplete.js';
@@ -43,11 +43,11 @@ import { attachClipboard } from './interact/clipboard.js';
 import { attachConditionalDialog } from './interact/conditional-dialog.js';
 import { attachContextMenu } from './interact/context-menu.js';
 import { InlineEditor } from './interact/editor.js';
-import { type ErrorMenuHandle, attachErrorMenu } from './interact/error-menu.js';
+import { attachErrorMenu, type ErrorMenuHandle } from './interact/error-menu.js';
 import { attachFindReplace } from './interact/find-replace.js';
 import { attachFormatDialog } from './interact/format-dialog.js';
-import { type FormatPainterHandle, attachFormatPainter } from './interact/format-painter.js';
-import { type FxDialogHandle, attachFxDialog } from './interact/fx-dialog.js';
+import { attachFormatPainter, type FormatPainterHandle } from './interact/format-painter.js';
+import { attachFxDialog, type FxDialogHandle } from './interact/fx-dialog.js';
 import { attachGoToDialog } from './interact/goto-dialog.js';
 import { attachHover } from './interact/hover.js';
 import { attachHyperlinkDialog } from './interact/hyperlink-dialog.js';
@@ -57,17 +57,17 @@ import { attachNamedRangeDialog } from './interact/named-range-dialog.js';
 import { attachPageSetupDialog } from './interact/page-setup-dialog.js';
 import { attachPasteSpecial } from './interact/paste-special.js';
 import { attachPointer } from './interact/pointer.js';
-import { type SlicerHandle, attachSlicer } from './interact/slicer.js';
+import { attachSlicer, type SlicerHandle } from './interact/slicer.js';
 import { attachStatusBar } from './interact/status-bar.js';
 import { attachValidationList } from './interact/validation.js';
 import { attachWatchPanel } from './interact/watch-panel.js';
 import { attachWheel } from './interact/wheel.js';
 import { GridRenderer, getErrorTriangleHits } from './render/grid.js';
 import {
-  type SlicerSpec,
-  type SpreadsheetStore,
   createSpreadsheetStore,
   mutators,
+  type SlicerSpec,
+  type SpreadsheetStore,
 } from './store/store.js';
 import { resolveTheme } from './theme/resolve.js';
 

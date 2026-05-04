@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { attachStatusBar } from '../../../src/interact/status-bar.js';
 import {
-  type SpreadsheetStore,
   createSpreadsheetStore,
   mutators,
+  type SpreadsheetStore,
 } from '../../../src/store/store.js';
 
 const setRange = (

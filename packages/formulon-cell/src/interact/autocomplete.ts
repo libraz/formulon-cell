@@ -294,7 +294,7 @@ export function suggestStructuredRef(
   if (!table || table.columns.length === 0) return null;
   const partial = text.slice(bracket + 1, caret);
   // Reject when the partial already contains characters that close the ref.
-  if (/[\[\],]/.test(partial)) return null;
+  if (/[[\],]/.test(partial)) return null;
   const lower = partial.toLowerCase();
   const matches = table.columns.filter((c) => c.toLowerCase().startsWith(lower)).slice(0, 12);
   if (matches.length === 0) return null;

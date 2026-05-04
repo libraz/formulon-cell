@@ -7,11 +7,11 @@
 // be added at runtime, then activated by id.
 import {
   type DeepPartial,
-  type Locale,
-  type Strings,
   defaultStrings,
   dictionaries,
+  type Locale,
   mergeStrings,
+  type Strings,
 } from './strings.js';
 
 export interface I18nControllerInit {

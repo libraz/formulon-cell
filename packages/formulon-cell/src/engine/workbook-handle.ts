@@ -1,7 +1,7 @@
 import type { History } from '../commands/history.js';
 import { detectCapabilities } from './capabilities.js';
-import { isUsingStub, loadFormulon } from './loader.js';
 import type { LoadOptions } from './loader.js';
+import { isUsingStub, loadFormulon } from './loader.js';
 import { parseRangeRef as parseTableRef } from './range-resolver.js';
 import type {
   Addr,
@@ -370,8 +370,9 @@ export class WorkbookHandle {
    *  sweep. Returning `false` from the callback aborts the solve. Pass `null`
    *  to detach. No-op on engines without `setIterativeProgress`. */
   setIterativeProgress(
-    callback: // biome-ignore lint/suspicious/noConfusingVoidType: callback contract — `void` lets callers omit a return; `undefined` would force them to be explicit.
-    ((iteration: number, maxResidual: number, maxIterations: number) => boolean | void) | null,
+    callback:
+      | ((iteration: number, maxResidual: number, maxIterations: number) => boolean | void)
+      | null,
   ): boolean {
     this.assertAlive();
     if (!this.capabilities.iterativeProgress) return false;

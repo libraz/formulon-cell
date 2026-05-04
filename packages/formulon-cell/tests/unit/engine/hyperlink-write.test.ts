@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { syncHyperlinksToEngine } from '../../../src/engine/format-sync.js';
-import { addrKey } from '../../../src/engine/workbook-handle.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 
 interface AddCall {
