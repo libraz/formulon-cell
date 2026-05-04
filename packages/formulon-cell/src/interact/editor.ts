@@ -127,6 +127,8 @@ export class InlineEditor {
       input,
       onAfterInsert: () => syncEditorRefs(this.deps.store, input.value),
       getTables: () => this.deps.wb.getTables(),
+      editingAddr: a,
+      getColumnValues: (sheet, col, beforeRow) => this.collectColumnHistory(sheet, col, beforeRow),
     });
     this.argHelper = attachArgHelper({ input });
     this.argHelper.refresh();
@@ -350,6 +352,37 @@ export class InlineEditor {
     // Excel grows the editor downward; mirror that with a min-height bump.
     const baseRow = this.deps.store.getState().layout.defaultRowHeight;
     this.input.style.minHeight = `${baseRow * lines}px`;
+  }
+
+  /** Walk the column upward from `beforeRow - 1` collecting plain-text values
+   *  for the autocomplete popover. Mirrors Excel's "pick from list" rules:
+   *  text-only (formulas, numbers, blanks all skip), deduped, nearest-first.
+   *  Iterates the engine's populated-cells list once rather than probing each
+   *  row — we'd otherwise call `cellFormula` (O(n)) per row, blowing up at
+   *  every keystroke. */
+  private collectColumnHistory(sheet: number, col: number, beforeRow: number): string[] {
+    const hits: { row: number; text: string }[] = [];
+    for (const e of this.deps.wb.cells(sheet)) {
+      if (e.addr.col !== col) continue;
+      if (e.addr.row >= beforeRow) continue;
+      // Formulas don't contribute — Excel's pick-list is verbatim text only.
+      if (e.formula !== null) continue;
+      if (e.value.kind !== 'text') continue;
+      const text = e.value.value;
+      if (text.length === 0) continue;
+      hits.push({ row: e.addr.row, text });
+    }
+    // Nearest-first: highest row index wins.
+    hits.sort((a, b) => b.row - a.row);
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const h of hits) {
+      if (seen.has(h.text)) continue;
+      seen.add(h.text);
+      out.push(h.text);
+      if (out.length >= 10) break;
+    }
+    return out;
   }
 
   private position(a: Addr): void {

@@ -38,6 +38,16 @@ export interface AutocompleteDeps {
    *  list. Pulled from `inst.formula.list()` so consumer registrations
    *  appear alongside the engine's built-ins. */
   getCustomFunctions?: () => readonly string[];
+  /** Excel-style "pick from list" source. Called for plain-text edits to
+   *  surface previous text values entered above the active cell in the same
+   *  column. Implementations should return values in nearest-first order
+   *  (closest row first), already deduped, blanks excluded. The popover
+   *  filters by case-insensitive prefix on the typed token. Omit to disable. */
+  getColumnValues?: (sheet: number, col: number, beforeRow: number) => readonly string[];
+  /** Address of the cell currently being edited. Required for the
+   *  `getColumnValues` path so the popover knows which sheet/column/row to
+   *  scan above. Omit when only function/structured-ref suggestion is needed. */
+  editingAddr?: { sheet: number; row: number; col: number };
 }
 
 interface SuggestionContext {
@@ -110,7 +120,7 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
   const refresh = (): void => {
     const text = input.value;
     const caret = input.selectionStart ?? text.length;
-    const next = computeContext(text, caret, deps.getTables, deps.getCustomFunctions);
+    const next = computeContext(text, caret, deps);
     if (!next) {
       close();
       return;
@@ -154,19 +164,24 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
   };
 }
 
-/** Build a suggestion context for the caret position. Structured refs win
- *  when the caret is inside a `Table[…` token; otherwise we fall back to
- *  function-name suggestions. */
+/** Build a suggestion context for the caret position. Plain-text edits go
+ *  through the column-history source (Excel's "pick from list"). Formula edits
+ *  fall through to structured-ref → function/custom-name suggestions. */
 function computeContext(
   text: string,
   caret: number,
-  getTables?: () => readonly AutocompleteTable[],
-  getCustomFunctions?: () => readonly string[],
+  deps: AutocompleteDeps,
 ): SuggestionContext | null {
-  const struct = suggestStructuredRef(text, caret, getTables?.() ?? []);
+  if (!text.startsWith('=')) {
+    const addr = deps.editingAddr;
+    if (!addr || !deps.getColumnValues) return null;
+    const values = deps.getColumnValues(addr.sheet, addr.col, addr.row);
+    return suggestColumnHistory(text, caret, values);
+  }
+  const struct = suggestStructuredRef(text, caret, deps.getTables?.() ?? []);
   if (struct) return struct;
   const fn = suggestFunctions(text, caret);
-  const custom = suggestCustomFunctions(text, caret, getCustomFunctions?.() ?? []);
+  const custom = suggestCustomFunctions(text, caret, deps.getCustomFunctions?.() ?? []);
   if (!fn && !custom) return null;
   // Merge custom names ahead of built-ins so user code surfaces first.
   const seen = new Set<string>();
@@ -188,6 +203,39 @@ function computeContext(
     tokenEnd: caret,
     insertSuffix: '(',
     kind: 'function',
+  };
+}
+
+/** Excel's column-history autocomplete: when editing a plain-text cell, match
+ *  what the user has typed so far against the values already entered above in
+ *  the same column. `values` must already be deduped, blanks excluded, in
+ *  nearest-first order (caller's responsibility). The whole input acts as the
+ *  partial token — Excel replaces the entire cell text on accept, never just
+ *  a fragment. Returns null when the input is empty or no value prefix-matches. */
+export function suggestColumnHistory(
+  text: string,
+  caret: number,
+  values: readonly string[],
+): SuggestionContext | null {
+  // Only suggest when caret is at end and the input is a non-empty token. A
+  // shorter caret (mid-edit) means the user is correcting earlier characters,
+  // not extending the tail — Excel doesn't pop the list there either.
+  if (caret !== text.length) return null;
+  if (text.length === 0) return null;
+  const lower = text.toLowerCase();
+  const matches: string[] = [];
+  for (const v of values) {
+    if (v.length === text.length) continue; // skip exact-length (would be no-op)
+    if (v.toLowerCase().startsWith(lower)) matches.push(v);
+    if (matches.length >= 10) break;
+  }
+  if (matches.length === 0) return null;
+  return {
+    matches,
+    tokenStart: 0,
+    tokenEnd: text.length,
+    insertSuffix: '',
+    kind: 'column',
   };
 }
 
