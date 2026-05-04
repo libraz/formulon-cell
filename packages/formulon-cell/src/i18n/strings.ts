@@ -382,6 +382,23 @@ export interface Strings {
     cancel: string;
     ok: string;
   };
+  protection: {
+    /** Format-dialog tab label for the cell-lock section. */
+    tabProtection: string;
+    /** Checkbox label for the per-cell `locked` flag. */
+    locked: string;
+    /** Helper text under the locked checkbox explaining that the lock only
+     *  takes effect when the sheet is itself protected. */
+    lockedHint: string;
+    /** Toolbar / menu label that turns sheet protection on. */
+    protectSheet: string;
+    /** Same control's label when protection is already on. */
+    unprotectSheet: string;
+    /** Field label for the (currently un-enforced) password input. */
+    password: string;
+    /** Placeholder text for the password input. */
+    passwordPlaceholder: string;
+  };
   a11y: {
     nameBox: string;
     formulaBar: string;
@@ -730,6 +747,15 @@ export const ja: Strings = {
     cancel: 'キャンセル',
     ok: 'OK',
   },
+  protection: {
+    tabProtection: '保護',
+    locked: 'ロック',
+    lockedHint: 'シートが保護されている場合のみ、ロックされたセルへの書き込みがブロックされます。',
+    protectSheet: 'シートを保護',
+    unprotectSheet: 'シート保護を解除',
+    password: 'パスワード',
+    passwordPlaceholder: '任意 (現在は未検証)',
+  },
   a11y: {
     nameBox: '名前ボックス',
     formulaBar: '数式バー',
@@ -1077,6 +1103,15 @@ export const en: Strings = {
     noResults: 'No cells found',
     cancel: 'Cancel',
     ok: 'OK',
+  },
+  protection: {
+    tabProtection: 'Protection',
+    locked: 'Locked',
+    lockedHint: 'Locking cells only takes effect once the sheet is protected.',
+    protectSheet: 'Protect Sheet',
+    unprotectSheet: 'Unprotect Sheet',
+    password: 'Password',
+    passwordPlaceholder: 'Optional (not enforced yet)',
   },
   a11y: {
     nameBox: 'Name box',

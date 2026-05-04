@@ -2,6 +2,7 @@ import type { Addr, Range } from '../../engine/types.js';
 import { addrKey } from '../../engine/workbook-handle.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import { type CellFormat, type SpreadsheetStore, type State, mutators } from '../../store/store.js';
+import { isCellWritable } from '../protection.js';
 import type { ClipboardCell, ClipboardSnapshot } from './snapshot.js';
 
 export type PasteWhat =
@@ -97,6 +98,8 @@ export function pasteSpecial(
       const row = origin.row + dr;
       const col = origin.col + dc;
       const addr: Addr = { sheet, row, col };
+      // Sheet protection — silently skip locked destinations (Excel parity).
+      if (!isCellWritable(state, addr)) continue;
 
       // Layer 1: values / formulas
       if (wantsValues(opt.what) && !src.formula) {

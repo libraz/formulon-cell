@@ -162,6 +162,34 @@ export function paintValidationTriangle(
   return paintErrorTriangle(ctx, bounds, color);
 }
 
+/** Paint a small lock-icon overlay in the upper-right corner of a cell.
+ *  Used to flag cells that are still writable when the sheet is otherwise
+ *  protected (i.e. `format.locked === false` while the sheet is protected).
+ *  The shape is a 7×8 rounded body + arched shackle drawn in
+ *  `theme.accent` so it reads as an affordance, not an error. */
+export function paintLockMarker(
+  ctx: CanvasRenderingContext2D,
+  bounds: Rect,
+  theme: ResolvedTheme,
+): void {
+  const w = 8;
+  const h = 9;
+  const x = Math.round(bounds.x + bounds.w - w - 2);
+  const y = Math.round(bounds.y + 2);
+  const color = theme.accent || '#0078d4';
+  ctx.save();
+  // Shackle (top arch, drawn as a stroked half-circle).
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.25;
+  ctx.beginPath();
+  ctx.arc(x + w / 2, y + 3, 2.25, Math.PI, 0);
+  ctx.stroke();
+  // Body.
+  ctx.fillStyle = color;
+  ctx.fillRect(x + 1, y + 3, w - 2, h - 4);
+  ctx.restore();
+}
+
 /** Paint a small filled triangle in the upper-right of the cell to indicate
  *  an attached comment (Excel/Sheets convention). */
 export function paintCommentMarker(ctx: CanvasRenderingContext2D, bounds: Rect): void {

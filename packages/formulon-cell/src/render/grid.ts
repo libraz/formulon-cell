@@ -37,6 +37,7 @@ import {
   paintErrorTriangle,
   paintFillHandle,
   paintFillPreview,
+  paintLockMarker,
   paintOutlineGutters,
   paintRefHighlight,
   paintSpillOutline,
@@ -379,11 +380,16 @@ export class GridRenderer {
 
   private paintCells(state: State, theme: ResolvedTheme, cols: AxisLayout, rows: AxisLayout): void {
     const ctx = this.ctx;
-    const { layout, data, selection, format, merges, sparkline, errorIndicators } = state;
+    const { layout, data, selection, format, merges, sparkline, errorIndicators, protection } =
+      state;
     const active = selection.active;
     const conditional = evaluateConditional(state);
     const sparklines = sparkline.sparklines;
     const ignored = errorIndicators.ignoredErrors;
+    // Lock-icon overlay only fires when the active sheet is currently
+    // protected. Pre-compute the flag so the per-cell loop can skip the
+    // Map lookup on every iteration.
+    const sheetProtected = protection.protectedSheets.has(data.sheetIndex);
     // RangeResolver is only needed for list-validation re-resolution. We
     // build it lazily — most viewport repaints don't have a single DV cell,
     // so allocating the resolver up-front would be wasted work.
@@ -545,6 +551,10 @@ export class GridRenderer {
         }
         if (spark) paintCellSparkline(ctx, bounds, spark, state, this.getWb());
         if (fmt?.comment) paintCommentMarker(ctx, bounds);
+        // Lock-icon overlay — only when the sheet is protected AND the cell
+        // is explicitly unlocked, signalling which cells the user can still
+        // type into despite the protection flag.
+        if (sheetProtected && fmt?.locked === false) paintLockMarker(ctx, bounds, theme);
 
         // Error / validation triangles. Error wins over validation when both
         // would apply (an error-kind value already implies the data is bad —

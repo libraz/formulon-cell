@@ -80,6 +80,7 @@ export type {
   MergesSlice,
   NegativeStyle,
   NumFmt,
+  ProtectionSlice,
   SlicerSpec,
   SlicersSlice,
   Sparkline,
@@ -127,6 +128,15 @@ export {
   writeInput,
   writeInputValidated,
 } from './commands/coerce-input.js';
+export {
+  gateProtection,
+  isCellLocked,
+  isCellWritable,
+  isSheetProtected,
+  setCellLocked,
+  warnProtected,
+  writableAddrs,
+} from './commands/protection.js';
 export type { ValidationOutcome } from './commands/validate.js';
 export { resolveListValues, validateAgainst } from './commands/validate.js';
 export type { RangeResolver } from './engine/range-resolver.js';

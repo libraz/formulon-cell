@@ -182,6 +182,15 @@ export interface SpreadsheetInstance {
   }): SlicerSpec;
   /** Remove a slicer by id. No-op when the id isn't tracked. */
   removeSlicer(id: string): void;
+  /** Toggle sheet-protection on the currently active sheet. Equivalent to
+   *  Excel's Review → Protect Sheet button. Locked cells on protected
+   *  sheets gate writes through the command layer. */
+  toggleSheetProtection(): void;
+  /** Set sheet-protection explicitly. `password` is currently stored
+   *  verbatim and NOT enforced — v1 ships without password validation. */
+  setSheetProtected(on: boolean, password?: string): void;
+  /** True when the active sheet is currently protected. */
+  isSheetProtected(): boolean;
   /** Append precedent arrows for the active cell. Same-sheet only. Repeated
    *  calls deduplicate against existing arrows. */
   tracePrecedents(): void;
@@ -1564,6 +1573,26 @@ export const Spreadsheet = {
       },
       removeSlicer(id) {
         slicer?.removeSlicer(id);
+      },
+      toggleSheetProtection() {
+        const sheet = store.getState().data.sheetIndex;
+        const on = !store.getState().protection.protectedSheets.has(sheet);
+        mutators.setSheetProtected(store, sheet, on);
+        renderer.invalidate();
+      },
+      setSheetProtected(on: boolean, password?: string) {
+        const sheet = store.getState().data.sheetIndex;
+        mutators.setSheetProtected(
+          store,
+          sheet,
+          on,
+          password !== undefined ? { password } : undefined,
+        );
+        renderer.invalidate();
+      },
+      isSheetProtected() {
+        const sheet = store.getState().data.sheetIndex;
+        return store.getState().protection.protectedSheets.has(sheet);
       },
       tracePrecedents() {
         const a = store.getState().selection.active;

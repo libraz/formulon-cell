@@ -1,7 +1,8 @@
 import { makeRangeResolver } from '../engine/range-resolver.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { CellValidation } from '../store/store.js';
+import type { CellValidation, SpreadsheetStore } from '../store/store.js';
+import { isCellWritable, warnProtected } from './protection.js';
 import { type ValidationOutcome, validateAgainst } from './validate.js';
 
 export type CoercedInput =
@@ -56,8 +57,19 @@ export function writeCoerced(wb: WorkbookHandle, a: Addr, c: CoercedInput): void
   }
 }
 
-/** Convenience: coerce + write in one call for the common keyboard path. */
-export function writeInput(wb: WorkbookHandle, a: Addr, raw: string): void {
+/** Convenience: coerce + write in one call for the common keyboard path.
+ *  When `store` is supplied, sheet-protection is checked first — locked cells
+ *  on protected sheets emit a console warning and the write is skipped. */
+export function writeInput(
+  wb: WorkbookHandle,
+  a: Addr,
+  raw: string,
+  store?: SpreadsheetStore,
+): void {
+  if (store && !isCellWritable(store.getState(), a)) {
+    warnProtected(a);
+    return;
+  }
   writeCoerced(wb, a, coerceInput(raw));
 }
 
@@ -65,13 +77,20 @@ export function writeInput(wb: WorkbookHandle, a: Addr, raw: string): void {
  *  the write is skipped and the outcome is returned so the caller can surface
  *  the error. `warning` and `information` outcomes still write through but
  *  the message is returned for an inline toast. Range-backed list sources
- *  resolve against `wb` rooted at `a.sheet`. */
+ *  resolve against `wb` rooted at `a.sheet`. When `store` is supplied,
+ *  sheet-protection is gated first; gated cells return `{ ok: true }` and
+ *  emit a console warning rather than writing through. */
 export function writeInputValidated(
   wb: WorkbookHandle,
   a: Addr,
   raw: string,
   validation: CellValidation | undefined,
+  store?: SpreadsheetStore,
 ): ValidationOutcome {
+  if (store && !isCellWritable(store.getState(), a)) {
+    warnProtected(a);
+    return { ok: true };
+  }
   const coerced = coerceInput(raw);
   if (!validation) {
     writeCoerced(wb, a, coerced);

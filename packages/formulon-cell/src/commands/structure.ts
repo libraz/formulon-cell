@@ -13,6 +13,18 @@ import {
   recordLayoutChange,
   recordLayoutChangeWithEngine,
 } from './history.js';
+import { isSheetProtected } from './protection.js';
+
+/** Excel-parity gate for row/col structure changes. When `sheet` is
+ *  protected the operation is rejected (no-op + warning) regardless of
+ *  per-cell locks — Excel disables the insert/delete row/col commands
+ *  wholesale on protected sheets. */
+function blockedByProtection(store: SpreadsheetStore, sheet: number, op: string): boolean {
+  if (!isSheetProtected(store.getState(), sheet)) return false;
+  // eslint-disable-next-line no-console
+  console.warn(`formulon-cell: ${op} blocked — sheet ${sheet} is protected`);
+  return true;
+}
 
 interface CellRecord {
   addr: Addr;
@@ -416,6 +428,7 @@ export function insertRows(
 ): void {
   if (count <= 0) return;
   const sheet = store.getState().data.sheetIndex;
+  if (blockedByProtection(store, sheet, 'insertRows')) return;
 
   if (history) history.begin();
   try {
@@ -463,6 +476,7 @@ export function deleteRows(
 ): void {
   if (count <= 0) return;
   const sheet = store.getState().data.sheetIndex;
+  if (blockedByProtection(store, sheet, 'deleteRows')) return;
   // Cap count so we don't try to delete past MAX_ROW.
   const n = Math.min(count, MAX_ROW + 1 - atRow);
   if (n <= 0) return;
@@ -508,6 +522,7 @@ export function insertCols(
 ): void {
   if (count <= 0) return;
   const sheet = store.getState().data.sheetIndex;
+  if (blockedByProtection(store, sheet, 'insertCols')) return;
 
   if (history) history.begin();
   try {
@@ -549,6 +564,7 @@ export function deleteCols(
 ): void {
   if (count <= 0) return;
   const sheet = store.getState().data.sheetIndex;
+  if (blockedByProtection(store, sheet, 'deleteCols')) return;
   const n = Math.min(count, MAX_COL + 1 - atCol);
   if (n <= 0) return;
 

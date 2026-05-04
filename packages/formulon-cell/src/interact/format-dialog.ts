@@ -42,7 +42,7 @@ export interface FormatDialogHandle {
   detach(): void;
 }
 
-type TabId = 'number' | 'align' | 'font' | 'border' | 'fill' | 'more';
+type TabId = 'number' | 'align' | 'font' | 'border' | 'fill' | 'protection' | 'more';
 type NumberCategory =
   | 'general'
   | 'fixed'
@@ -97,6 +97,9 @@ interface DraftState {
   validationFormula: string;
   validationAllowBlank: boolean;
   validationErrorStyle: ValidationErrorStyle;
+  /** Sheet-protection lock flag. Excel default is `true` (locked); the
+   *  Protection tab exposes a single checkbox. */
+  locked: boolean;
 }
 
 const COMMON_FONTS = [
@@ -164,6 +167,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     { id: 'font', label: t.tabFont },
     { id: 'border', label: t.tabBorder },
     { id: 'fill', label: t.tabFill },
+    { id: 'protection', label: strings.protection.tabProtection },
     { id: 'more', label: t.tabMore },
   ];
   const tabButtons = new Map<TabId, HTMLButtonElement>();
@@ -535,6 +539,19 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   fillRow.append(fillLabel, fillInput, fillReset);
   fillPanel.appendChild(fillRow);
 
+  // ── Protection tab ─────────────────────────────────────────────────────
+  const protectionPanel = tabPanels.get('protection') as HTMLDivElement;
+  const lockedRow = document.createElement('div');
+  lockedRow.className = 'fc-fmtdlg__row';
+  const lockedCk = makeCheckbox(strings.protection.locked);
+  lockedCk.input.dataset.fcCheck = 'locked';
+  lockedRow.append(lockedCk.wrap);
+  protectionPanel.appendChild(lockedRow);
+  const lockedHint = document.createElement('div');
+  lockedHint.className = 'fc-fmtdlg__hint';
+  lockedHint.textContent = strings.protection.lockedHint;
+  protectionPanel.appendChild(lockedHint);
+
   // ── More tab (hyperlink / comment / validation) ────────────────────────
   const morePanel = tabPanels.get('more') as HTMLDivElement;
 
@@ -778,6 +795,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       validationFormula: '',
       validationAllowBlank: true,
       validationErrorStyle: 'stop',
+      locked: true,
     };
   }
 
@@ -961,6 +979,9 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       draft.validationErrorStyle = 'stop';
     }
 
+    // Excel default: cells are locked unless explicitly unlocked.
+    draft.locked = fmt.locked !== false;
+
     syncControlsFromDraft();
     renderPreview();
     setActiveTab('number');
@@ -1012,6 +1033,9 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
 
     // Fill
     fillInput.value = draft.fill && isHexColor(draft.fill) ? draft.fill : '#ffffff';
+
+    // Protection
+    lockedCk.input.checked = draft.locked;
 
     // More
     hlInput.value = draft.hyperlink;
@@ -1274,6 +1298,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       hyperlink: draft.hyperlink.trim() ? draft.hyperlink.trim() : undefined,
       comment: draft.comment ? draft.comment : undefined,
       validation,
+      locked: draft.locked,
     };
 
     recordFormatChange(history, store, () => {
@@ -1465,6 +1490,10 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     renderPreview();
   };
 
+  const onLockedChange = (): void => {
+    draft.locked = lockedCk.input.checked;
+  };
+
   // More tab events
   const onHlInput = (): void => {
     draft.hyperlink = hlInput.value;
@@ -1578,6 +1607,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   diagUpCk.input.addEventListener('change', onDiagUpChange);
   fillInput.addEventListener('input', onFillInput);
   fillReset.addEventListener('click', onFillReset);
+  lockedCk.input.addEventListener('change', onLockedChange);
   hlInput.addEventListener('input', onHlInput);
   hlClear.addEventListener('click', onHlClear);
   commentArea.addEventListener('input', onCommentInput);
@@ -1645,6 +1675,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       diagUpCk.input.removeEventListener('change', onDiagUpChange);
       fillInput.removeEventListener('input', onFillInput);
       fillReset.removeEventListener('click', onFillReset);
+      lockedCk.input.removeEventListener('change', onLockedChange);
       hlInput.removeEventListener('input', onHlInput);
       hlClear.removeEventListener('click', onHlClear);
       commentArea.removeEventListener('input', onCommentInput);

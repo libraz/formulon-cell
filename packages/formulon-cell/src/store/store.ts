@@ -103,6 +103,12 @@ export interface CellFormat {
    *  kinds (whole/decimal/date/time/textLength/custom) constrain typed input
    *  through `validateAgainst()` — the chevron is list-only. */
   validation?: CellValidation;
+  /** Sheet-protection lock flag. Excel default is `true` (locked) — `undefined`
+   *  is treated as locked. Set to `false` to opt the cell out of the
+   *  per-sheet protection gate via `setCellLocked(range, false)`. The flag
+   *  only takes effect when the containing sheet is also marked protected
+   *  via `setSheetProtected`. */
+  locked?: boolean;
 }
 
 /** Comparison ordinals match OOXML data-validation `op`:
@@ -428,6 +434,16 @@ export interface SlicersSlice {
   slicers: readonly SlicerSpec[];
 }
 
+/** Workbook-level sheet-protection state. Each protected sheet is keyed by
+ *  its index; the value records whether a password was supplied (currently
+ *  stored verbatim, not enforced — v1 ships without password validation).
+ *  NOT history-tracked: Excel exposes protection as a workbook-level
+ *  setting and toggling it doesn't appear in undo. Cell-level locks live
+ *  on `CellFormat.locked`; this slice only owns the sheet-side flag. */
+export interface ProtectionSlice {
+  protectedSheets: Map<number, { password?: string }>;
+}
+
 export interface State {
   viewport: ViewportSlice;
   selection: SelectionSlice;
@@ -442,6 +458,7 @@ export interface State {
   traces: TracesSlice;
   errorIndicators: ErrorIndicatorSlice;
   slicers: SlicersSlice;
+  protection: ProtectionSlice;
 }
 
 const initialAddr = (sheet = 0): Addr => ({ sheet, row: 0, col: 0 });
@@ -496,6 +513,7 @@ export const createSpreadsheetStore = () =>
     traces: { items: [] },
     errorIndicators: { ignoredErrors: new Set() },
     slicers: { slicers: [] },
+    protection: { protectedSheets: new Map() },
   }));
 
 export type SpreadsheetStore = ReturnType<typeof createSpreadsheetStore>;
@@ -1020,6 +1038,32 @@ export const mutators = {
       });
       if (!changed) return s;
       return { ...s, slicers: { slicers: next } };
+    });
+  },
+
+  /** Toggle sheet-level protection for `sheet`. When `on` is `true` the sheet
+   *  enters protected mode and the command layer gates writes against
+   *  per-cell `locked` flags. The optional `password` is stored verbatim —
+   *  v1 does NOT enforce it (no challenge dialog) but the value round-trips
+   *  through the slice so callers can persist it. NOT history-tracked. */
+  setSheetProtected(
+    store: SpreadsheetStore,
+    sheet: number,
+    on: boolean,
+    options?: { password?: string },
+  ): void {
+    store.setState((s) => {
+      const next = new Map(s.protection.protectedSheets);
+      if (on) {
+        const entry: { password?: string } = {};
+        if (options?.password !== undefined) entry.password = options.password;
+        next.set(sheet, entry);
+      } else if (next.has(sheet)) {
+        next.delete(sheet);
+      } else {
+        return s;
+      }
+      return { ...s, protection: { protectedSheets: next } };
     });
   },
 

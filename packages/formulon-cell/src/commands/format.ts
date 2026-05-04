@@ -10,6 +10,7 @@ import {
   type State,
   mutators,
 } from '../store/store.js';
+import { gateProtection, isCellWritable } from './protection.js';
 
 type ToggleKey = 'bold' | 'italic' | 'underline' | 'strike';
 
@@ -19,6 +20,42 @@ function eachKey(range: Range, fn: (key: string) => void): void {
       fn(addrKey({ sheet: range.sheet, row: r, col: c }));
     }
   }
+}
+
+/** Apply a partial format patch to every writable cell in `range`. When
+ *  the sheet is unprotected this falls back to the bulk
+ *  `mutators.setRangeFormat` path (one setState call); when protected it
+ *  walks the range cell-by-cell and only writes through the cells that
+ *  are explicitly unlocked. Returns false when the entire range is gated
+ *  so the caller can short-circuit (e.g. emit a single warning). */
+function applyRangePatch(
+  state: State,
+  store: SpreadsheetStore,
+  range: Range,
+  patch: Partial<CellFormat> | null,
+): boolean {
+  const allowed = gateProtection(state, range);
+  if (allowed === null) return false;
+  // Fast path: sheet unprotected, or entire range writable.
+  // We can still use the bulk mutator because per-cell-locked cells inside
+  // a partially-unlocked range need to be skipped — fall through to the
+  // per-cell loop in that case.
+  if (!state.protection.protectedSheets.has(range.sheet)) {
+    mutators.setRangeFormat(store, range, patch);
+    return true;
+  }
+  // Per-cell loop respecting individual lock flags.
+  const sheet = range.sheet;
+  let wroteAny = false;
+  for (let r = range.r0; r <= range.r1; r += 1) {
+    for (let c = range.c0; c <= range.c1; c += 1) {
+      const addr = { sheet, row: r, col: c };
+      if (!isCellWritable(state, addr)) continue;
+      mutators.setCellFormat(store, addr, patch);
+      wroteAny = true;
+    }
+  }
+  return wroteAny;
 }
 
 function allHave(
@@ -48,7 +85,7 @@ function anyHave(
 function toggleFlag(state: State, store: SpreadsheetStore, key: ToggleKey): void {
   const range = state.selection.range;
   const allOn = allHave(state, range, (f) => f?.[key] === true);
-  mutators.setRangeFormat(store, range, { [key]: !allOn } as Partial<CellFormat>);
+  applyRangePatch(state, store, range, { [key]: !allOn } as Partial<CellFormat>);
 }
 
 export function toggleBold(state: State, store: SpreadsheetStore): void {
@@ -68,25 +105,27 @@ export function toggleStrike(state: State, store: SpreadsheetStore): void {
 }
 
 export function setAlign(state: State, store: SpreadsheetStore, align: CellAlign): void {
-  mutators.setRangeFormat(store, state.selection.range, { align });
+  applyRangePatch(state, store, state.selection.range, { align });
 }
 
 export function setVAlign(state: State, store: SpreadsheetStore, vAlign: CellVAlign): void {
-  mutators.setRangeFormat(store, state.selection.range, { vAlign });
+  applyRangePatch(state, store, state.selection.range, { vAlign });
 }
 
 export function toggleWrap(state: State, store: SpreadsheetStore): void {
   const range = state.selection.range;
   const allOn = allHave(state, range, (f) => f?.wrap === true);
-  mutators.setRangeFormat(store, range, { wrap: !allOn });
+  applyRangePatch(state, store, range, { wrap: !allOn });
 }
 
 export function bumpIndent(state: State, store: SpreadsheetStore, delta: 1 | -1): void {
   const range = state.selection.range;
+  if (gateProtection(state, range) === null) return;
   const sheet = range.sheet;
   for (let r = range.r0; r <= range.r1; r += 1) {
     for (let c = range.c0; c <= range.c1; c += 1) {
       const addr = { sheet, row: r, col: c };
+      if (!isCellWritable(state, addr)) continue;
       const fmt = state.format.formats.get(addrKey(addr));
       const cur = fmt?.indent ?? 0;
       const next = Math.max(0, Math.min(15, cur + delta));
@@ -97,11 +136,11 @@ export function bumpIndent(state: State, store: SpreadsheetStore, delta: 1 | -1)
 
 export function setRotation(state: State, store: SpreadsheetStore, deg: number): void {
   const r = Math.max(-90, Math.min(90, Math.round(deg)));
-  mutators.setRangeFormat(store, state.selection.range, { rotation: r });
+  applyRangePatch(state, store, state.selection.range, { rotation: r });
 }
 
 export function setNumFmt(state: State, store: SpreadsheetStore, fmt: NumFmt): void {
-  mutators.setRangeFormat(store, state.selection.range, { numFmt: fmt });
+  applyRangePatch(state, store, state.selection.range, { numFmt: fmt });
 }
 
 export function cycleCurrency(state: State, store: SpreadsheetStore): void {
@@ -110,24 +149,26 @@ export function cycleCurrency(state: State, store: SpreadsheetStore): void {
   const next: NumFmt = hasCurrency
     ? { kind: 'general' }
     : { kind: 'currency', decimals: 2, symbol: '$' };
-  mutators.setRangeFormat(store, range, { numFmt: next });
+  applyRangePatch(state, store, range, { numFmt: next });
 }
 
 export function cyclePercent(state: State, store: SpreadsheetStore): void {
   const range = state.selection.range;
   const hasPercent = anyHave(state, range, (f) => f?.numFmt?.kind === 'percent');
   const next: NumFmt = hasPercent ? { kind: 'general' } : { kind: 'percent', decimals: 0 };
-  mutators.setRangeFormat(store, range, { numFmt: next });
+  applyRangePatch(state, store, range, { numFmt: next });
 }
 
 const clampDecimals = (n: number): number => Math.max(0, Math.min(10, n));
 
 export function bumpDecimals(state: State, store: SpreadsheetStore, delta: 1 | -1): void {
   const range = state.selection.range;
+  if (gateProtection(state, range) === null) return;
   const sheet = range.sheet;
   for (let r = range.r0; r <= range.r1; r += 1) {
     for (let c = range.c0; c <= range.c1; c += 1) {
       const addr = { sheet, row: r, col: c };
+      if (!isCellWritable(state, addr)) continue;
       const fmt = state.format.formats.get(addrKey(addr));
       const cur = fmt?.numFmt;
       let nextFmt: NumFmt | undefined;
@@ -150,13 +191,14 @@ export function bumpDecimals(state: State, store: SpreadsheetStore, delta: 1 | -
 }
 
 export function setBorders(state: State, store: SpreadsheetStore, sides: CellBorders): void {
-  mutators.setRangeFormat(store, state.selection.range, { borders: sides });
+  applyRangePatch(state, store, state.selection.range, { borders: sides });
 }
 
 /** Toolbar default: outline if missing, all-borders if outline present, else clear.
  *  Three-step cycle on repeated clicks. */
 export function cycleBorders(state: State, store: SpreadsheetStore): void {
   const range = state.selection.range;
+  if (gateProtection(state, range) === null) return;
   const hasAny = anyHave(state, range, (f) => {
     const b = f?.borders;
     return !!(b && (b.top || b.right || b.bottom || b.left));
@@ -166,13 +208,15 @@ export function cycleBorders(state: State, store: SpreadsheetStore): void {
     const sheet = range.sheet;
     for (let r = range.r0; r <= range.r1; r += 1) {
       for (let c = range.c0; c <= range.c1; c += 1) {
+        const addr = { sheet, row: r, col: c };
+        if (!isCellWritable(state, addr)) continue;
         const sides: CellBorders = {};
         if (r === range.r0) sides.top = true;
         if (r === range.r1) sides.bottom = true;
         if (c === range.c0) sides.left = true;
         if (c === range.c1) sides.right = true;
         if (sides.top || sides.right || sides.bottom || sides.left) {
-          mutators.setCellFormat(store, { sheet, row: r, col: c }, { borders: sides });
+          mutators.setCellFormat(store, addr, { borders: sides });
         }
       }
     }
@@ -184,36 +228,50 @@ export function cycleBorders(state: State, store: SpreadsheetStore): void {
     (f) => !!(f?.borders?.top && f.borders.right && f.borders.bottom && f.borders.left),
   );
   if (allFour) {
-    mutators.setRangeFormat(store, range, {
+    applyRangePatch(state, store, range, {
       borders: { top: false, right: false, bottom: false, left: false },
     });
     return;
   }
-  mutators.setRangeFormat(store, range, {
+  applyRangePatch(state, store, range, {
     borders: { top: true, right: true, bottom: true, left: true },
   });
 }
 
 export function clearFormat(state: State, store: SpreadsheetStore): void {
-  mutators.setRangeFormat(store, state.selection.range, null);
+  const range = state.selection.range;
+  if (gateProtection(state, range) === null) return;
+  if (!state.protection.protectedSheets.has(range.sheet)) {
+    mutators.setRangeFormat(store, range, null);
+    return;
+  }
+  // Per-cell loop respecting individual lock flags.
+  const sheet = range.sheet;
+  for (let r = range.r0; r <= range.r1; r += 1) {
+    for (let c = range.c0; c <= range.c1; c += 1) {
+      const addr = { sheet, row: r, col: c };
+      if (!isCellWritable(state, addr)) continue;
+      mutators.setCellFormat(store, addr, null);
+    }
+  }
 }
 
 /** Set or clear the font color across the selection. Pass `null` to clear. */
 export function setFontColor(state: State, store: SpreadsheetStore, color: string | null): void {
   if (color === null) {
-    mutators.setRangeFormat(store, state.selection.range, { color: undefined });
+    applyRangePatch(state, store, state.selection.range, { color: undefined });
     return;
   }
-  mutators.setRangeFormat(store, state.selection.range, { color });
+  applyRangePatch(state, store, state.selection.range, { color });
 }
 
 /** Set or clear the fill (background) color across the selection. */
 export function setFillColor(state: State, store: SpreadsheetStore, color: string | null): void {
   if (color === null) {
-    mutators.setRangeFormat(store, state.selection.range, { fill: undefined });
+    applyRangePatch(state, store, state.selection.range, { fill: undefined });
     return;
   }
-  mutators.setRangeFormat(store, state.selection.range, { fill: color });
+  applyRangePatch(state, store, state.selection.range, { fill: color });
 }
 
 /** Update font family and/or size across the selection. */
@@ -229,7 +287,7 @@ export function setFont(
   if (patch.fontSize !== undefined) {
     next.fontSize = patch.fontSize ?? undefined;
   }
-  mutators.setRangeFormat(store, state.selection.range, next);
+  applyRangePatch(state, store, state.selection.range, next);
 }
 
 export function formatNumber(value: number, fmt: NumFmt | undefined, locale = 'en-US'): string {

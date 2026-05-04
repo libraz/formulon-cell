@@ -2,6 +2,7 @@ import type { Addr, Range } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import type { State } from '../../store/store.js';
 import { coerceInput, writeCoerced } from '../coerce-input.js';
+import { isCellWritable } from '../protection.js';
 import { parseTSV } from './tsv.js';
 
 export interface PasteResult {
@@ -12,7 +13,8 @@ export interface PasteResult {
  * Paste a TSV payload at the current active cell. Each value is run through
  * `coerceInput` so leading-`=` strings become formulas, numerics become
  * numbers, etc. — matching Excel's behaviour when you paste values from a
- * different program.
+ * different program. Cells gated by sheet protection (locked + sheet
+ * protected) are silently skipped, mirroring Excel's paste behaviour.
  */
 export function pasteTSV(state: State, wb: WorkbookHandle, text: string): PasteResult | null {
   if (!text) return null;
@@ -28,6 +30,7 @@ export function pasteTSV(state: State, wb: WorkbookHandle, text: string): PasteR
     if (cells.length > maxCols) maxCols = cells.length;
     for (let c = 0; c < cells.length; c += 1) {
       const addr: Addr = { sheet, row: origin.row + r, col: origin.col + c };
+      if (!isCellWritable(state, addr)) continue;
       writeCoerced(wb, addr, coerceInput(cells[c] ?? ''));
     }
   }
