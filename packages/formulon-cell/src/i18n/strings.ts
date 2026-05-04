@@ -277,6 +277,24 @@ export interface Strings {
     cancel: string;
     ok: string;
   };
+  fxDialog: {
+    /** Modal title — appears in the header and the aria-label. */
+    title: string;
+    /** Search input placeholder on the function-picker step. */
+    searchPlaceholder: string;
+    /** Label above the live formula preview on the args step. */
+    preview: string;
+    /** Empty-state shown when the search yields zero matches. */
+    empty: string;
+    /** Hint shown when the function signature includes a `...` repeat marker. */
+    variadicHint: string;
+    /** "Back" button — returns to the picker from the args step. */
+    back: string;
+    cancel: string;
+    insert: string;
+    /** aria-label for the formula-bar fx button that opens this dialog. */
+    fxButtonLabel: string;
+  };
   a11y: {
     nameBox: string;
     formulaBar: string;
@@ -545,6 +563,17 @@ export const ja: Strings = {
     cancel: 'キャンセル',
     ok: 'OK',
   },
+  fxDialog: {
+    title: '関数の引数',
+    searchPlaceholder: '関数を検索…',
+    preview: '数式の結果',
+    empty: '一致する関数がありません',
+    variadicHint: 'この関数は追加の引数を受け取ります (任意)。',
+    back: '戻る',
+    cancel: 'キャンセル',
+    insert: '挿入',
+    fxButtonLabel: '関数の引数を挿入',
+  },
   a11y: {
     nameBox: '名前ボックス',
     formulaBar: '数式バー',
@@ -812,6 +841,17 @@ export const en: Strings = {
     unsupported: 'This engine does not support iterative calculation.',
     cancel: 'Cancel',
     ok: 'OK',
+  },
+  fxDialog: {
+    title: 'Function Arguments',
+    searchPlaceholder: 'Search functions…',
+    preview: 'Formula result',
+    empty: 'No matching functions',
+    variadicHint: 'This function accepts additional optional arguments.',
+    back: 'Back',
+    cancel: 'Cancel',
+    insert: 'Insert',
+    fxButtonLabel: 'Insert function arguments',
   },
   a11y: {
     nameBox: 'Name box',

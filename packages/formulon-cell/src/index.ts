@@ -225,6 +225,8 @@ export type { FormatDialogDeps, FormatDialogHandle } from './interact/format-dia
 export { attachFormatDialog } from './interact/format-dialog.js';
 export type { FormatPainterDeps, FormatPainterHandle } from './interact/format-painter.js';
 export { attachFormatPainter } from './interact/format-painter.js';
+export type { FxDialogDeps, FxDialogHandle } from './interact/fx-dialog.js';
+export { FUNCTION_DESCRIPTIONS, attachFxDialog } from './interact/fx-dialog.js';
 export type { HoverDeps, HoverHandle } from './interact/hover.js';
 export { attachHover } from './interact/hover.js';
 export type {

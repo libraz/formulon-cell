@@ -15,6 +15,7 @@ export const ALL_FEATURE_IDS = [
   'conditional',
   'namedRanges',
   'hyperlink',
+  'fxDialog',
   'pasteSpecial',
   'validation',
   'autocomplete',

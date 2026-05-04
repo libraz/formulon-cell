@@ -702,6 +702,138 @@
     margin-top: 6px;
   }
 
+  /* Function Arguments (fx) dialog — two-step modal: a searchable function
+     picker, then labeled inputs per argument. Reuses fc-fmtdlg chrome and
+     adds list-style row treatment. */
+  .fc-fxdialog__panel {
+    max-width: 520px;
+    width: 90vw;
+  }
+  .fc-fxdialog__body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .fc-fxdialog__picker {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .fc-fxdialog__search {
+    width: 100%;
+  }
+  .fc-fxdialog__list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 280px;
+    overflow-y: auto;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: var(--fc-radius-sm, 4px);
+    padding: 4px;
+  }
+  .fc-fxdialog__item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 8px;
+    border-radius: var(--fc-radius-sm, 4px);
+    cursor: pointer;
+  }
+  .fc-fxdialog__item:hover {
+    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 6%, transparent));
+  }
+  .fc-fxdialog__item--active {
+    background: var(--fc-accent, currentColor);
+    color: var(--fc-bg-elev, Canvas);
+  }
+  .fc-fxdialog__item-name {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .fc-fxdialog__item-desc {
+    font-size: 11.5px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+  }
+  .fc-fxdialog__item--active .fc-fxdialog__item-desc {
+    color: var(--fc-bg-elev, Canvas);
+    opacity: 0.85;
+  }
+  .fc-fxdialog__empty {
+    padding: 8px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+    font-style: italic;
+  }
+  .fc-fxdialog__args-header {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .fc-fxdialog__args-desc {
+    font-size: 12px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+    margin-bottom: 10px;
+  }
+  .fc-fxdialog__args-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .fc-fxdialog__arg-row {
+    align-items: center;
+    margin-bottom: 0;
+  }
+  .fc-fxdialog__arg-input {
+    flex: 1;
+  }
+  .fc-fxdialog__variadic-note {
+    font-size: 11px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+    font-style: italic;
+    padding: 2px 0;
+  }
+  .fc-fxdialog__preview-label {
+    margin-top: 12px;
+    font-size: 11px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .fc-fxdialog__preview {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12.5px;
+    padding: 6px 8px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: var(--fc-radius-sm, 4px);
+    background: var(--fc-bg, inherit);
+    margin-top: 4px;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  /* Formula-bar fx button — clickable affordance that opens the fx dialog.
+     Replaces the older read-only `span.fc-host__formulabar-fx` glyph. */
+  button.fc-host__formulabar-fx {
+    background: transparent;
+    border: var(--fc-hairline) solid transparent;
+    border-radius: var(--fc-radius-sm);
+    padding: 2px 6px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  button.fc-host__formulabar-fx:hover {
+    border-color: var(--fc-rule);
+    color: var(--fc-accent);
+  }
+  button.fc-host__formulabar-fx:focus-visible {
+    outline: 2px solid var(--fc-accent);
+    outline-offset: 1px;
+  }
+
   /* Paste Special — laid out as two side-by-side fieldsets, with a
      bottom row for the orthogonal options. Excel 365 uses a two-column
      grid; we mirror the structure with our own typographic palette. */

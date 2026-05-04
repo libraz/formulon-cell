@@ -44,6 +44,7 @@ import { InlineEditor } from './interact/editor.js';
 import { attachFindReplace } from './interact/find-replace.js';
 import { attachFormatDialog } from './interact/format-dialog.js';
 import { type FormatPainterHandle, attachFormatPainter } from './interact/format-painter.js';
+import { type FxDialogHandle, attachFxDialog } from './interact/fx-dialog.js';
 import { attachHover } from './interact/hover.js';
 import { attachHyperlinkDialog } from './interact/hyperlink-dialog.js';
 import { attachIterativeDialog } from './interact/iterative-dialog.js';
@@ -138,6 +139,10 @@ export interface SpreadsheetInstance {
   openIterativeDialog(): void;
   /** Open the named cell-styles gallery (Excel Home → Cell Styles). */
   openCellStylesGallery(): void;
+  /** Open the Function Arguments dialog. Pass `seedName` (case-insensitive)
+   *  to skip the picker and jump straight to argument entry for that
+   *  function. No-op when the `fxDialog` feature is disabled. */
+  openFunctionArguments(seedName?: string): void;
   setTheme(t: ThemeName): void;
   /** Pop the most recent undoable action and revert it. Returns false when
    *  the stack is empty. */
@@ -226,10 +231,15 @@ export const Spreadsheet = {
     tag.autocomplete = 'off';
     tag.setAttribute('aria-label', strings.a11y.nameBox);
     tag.value = 'A1';
-    const fx = document.createElement('span');
+    // The fx button opens the Function Arguments dialog. Falls back to a
+    // visually-identical decorative span when the feature is disabled so the
+    // chrome layout stays the same.
+    const fx = document.createElement('button');
+    fx.type = 'button';
     fx.className = 'fc-host__formulabar-fx';
     fx.textContent = 'ƒx';
-    fx.setAttribute('aria-hidden', 'true');
+    fx.tabIndex = -1;
+    fx.setAttribute('aria-label', strings.fxDialog?.fxButtonLabel ?? 'Insert function');
     const fxInput = document.createElement('textarea');
     fxInput.className = 'fc-host__formulabar-input';
     fxInput.spellcheck = false;
@@ -347,6 +357,29 @@ export const Spreadsheet = {
       history,
       getWb: () => wb,
     });
+    const fxDialog: FxDialogHandle | null = flags.fxDialog
+      ? attachFxDialog({
+          host,
+          store,
+          strings,
+          onInsert: (formula) => {
+            // Mirror manual entry: drop the formula into the formula bar and
+            // let the existing commitFx() pipeline handle validation, undo,
+            // and downstream recalc.
+            fxInput.value = formula;
+            fxInput.focus();
+            commitFx('none');
+          },
+        })
+      : null;
+    if (fxDialog) {
+      fx.addEventListener('click', () => fxDialog.open());
+    } else {
+      // Decorative-only fallback when the dialog feature is off — keep the
+      // chrome looking the same but make the button inert.
+      fx.disabled = true;
+      fx.style.cursor = 'default';
+    }
     const namedRangeDialog = flags.namedRanges
       ? attachNamedRangeDialog({ host, wb, strings })
       : null;
@@ -964,6 +997,7 @@ export const Spreadsheet = {
     if (namedRangeDialog) registerBuiltIn('namedRanges', namedRangeDialog, namedRangeDialog.detach);
     if (hyperlinkDialog) registerBuiltIn('hyperlink', hyperlinkDialog, hyperlinkDialog.detach);
     if (statusBar) registerBuiltIn('statusBar', statusBar, statusBar.detach);
+    if (fxDialog) registerBuiltIn('fxDialog', fxDialog, fxDialog.detach);
 
     // User extensions — additive on top of built-ins. Run after built-ins
     // and the engine binding so they can read other features via
@@ -1065,6 +1099,9 @@ export const Spreadsheet = {
       openCellStylesGallery() {
         cellStylesGallery.open();
       },
+      openFunctionArguments(seedName?: string) {
+        fxDialog?.open(seedName);
+      },
       openNamedRangeDialog() {
         namedRangeDialog?.open();
       },
@@ -1138,6 +1175,7 @@ export const Spreadsheet = {
         conditionalDialog?.detach();
         iterativeDialog.detach();
         cellStylesGallery.detach();
+        fxDialog?.detach();
         namedRangeDialog?.detach();
         hyperlinkDialog?.detach();
         statusBar?.detach();
