@@ -9,7 +9,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 const SRC = resolve(here, '../../../../formulon/packages/npm/dist');
 const DST = resolve(here, '../vendor/formulon');
 
-const files = ['formulon.js', 'formulon.wasm', 'formulon.d.ts'];
+// formulon.web.js is a browser-only variant: same factory but with the
+// node:* bridge tree-shaken out. Cell currently loads the universal
+// `formulon.js` (which warns harmlessly about node:* externals in
+// browser bundlers). Mirroring it as well lets consumers opt into the
+// thinner build via a custom alias if they want to silence those warnings.
+const files = ['formulon.js', 'formulon.web.js', 'formulon.wasm', 'formulon.d.ts'];
 
 if (!existsSync(SRC)) {
   console.error(`[sync-formulon] not found: ${SRC}`);

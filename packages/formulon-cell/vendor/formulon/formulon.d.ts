@@ -113,6 +113,22 @@ export enum CfMatchKind {
   IconSet = 3,
 }
 
+/**
+ * Workbook-level calc mode (`<calcPr calcMode>`).
+ *
+ * - `Auto` — recalc on every input change (Excel default).
+ * - `Manual` — only recalc when explicitly requested.
+ * - `AutoNoTable` — recalc on every change EXCEPT data-table cells.
+ *
+ * Round-trip metadata only — the engine recalcs all dirty cells
+ * regardless of which mode is set.
+ */
+export enum CalcMode {
+  Auto = 0,
+  Manual = 1,
+  AutoNoTable = 2,
+}
+
 /** RGBA colour. Channels are 0-255 (sRGB). */
 export interface CfColor {
   r: number;
@@ -187,6 +203,49 @@ export interface SheetView {
 export interface SheetViewResult {
   status: Status;
   view: SheetView;
+}
+
+/**
+ * Mirror of OOXML `<sheetProtection>` (ECMA-376 §18.3.1.85).
+ *
+ * Round-trip metadata only — the engine does not enforce locks at
+ * evaluation time. The host UI inspects these flags to mirror Excel's
+ * "Protect Sheet" dialog state. Booleans are encoded as `0`/`1` to
+ * match the embind wire shape.
+ *
+ * `enabled` controls whether the `<sheetProtection>` element is
+ * emitted at all; setting it to `0` clears the protection block on
+ * save.
+ */
+export interface SheetProtection {
+  enabled: number;
+  algorithmName: string;
+  hashValue: string;
+  saltValue: string;
+  spinCount: number;
+  legacyPassword: string;
+  sheet: number;
+  objects: number;
+  scenarios: number;
+  formatCells: number;
+  formatColumns: number;
+  formatRows: number;
+  insertColumns: number;
+  insertRows: number;
+  insertHyperlinks: number;
+  deleteColumns: number;
+  deleteRows: number;
+  selectLockedCells: number;
+  selectUnlockedCells: number;
+  sort: number;
+  autoFilter: number;
+  pivotTables: number;
+}
+
+/** Return type of `Workbook.getSheetProtection(sheet)`. */
+export interface SheetProtectionResult {
+  status: Status;
+  protection: SheetProtection;
 }
 
 /** Per-column-range layout override. Inclusive `[first, last]` columns
@@ -322,6 +381,119 @@ export interface DataValidationInput {
 /** @deprecated Use {@link DataValidationEntry} instead. */
 export type ValidationEntry = DataValidationEntry;
 
+/** Workbook-wide cell coordinate used by trace results. `sheet` is the
+ *  0-based sheet index. */
+export interface CellNode {
+  readonly sheet: number;
+  readonly row: number;
+  readonly col: number;
+}
+
+/** Result envelope for `functionMetadata(name, locale)`.
+ *
+ *  `ok` is `false` when no function matches `name`; the remaining
+ *  fields are absent. When `ok` is `true`, `name` / `minArity` /
+ *  `maxArity` are always populated; `signatureTemplate` and
+ *  `description` are populated only when the locale metadata table
+ *  has an entry for this function and locale. */
+export interface FunctionMetadataResult {
+  readonly ok: boolean;
+  readonly name?: string;
+  readonly minArity?: number;
+  /** `0xFFFFFFFF` (i.e. `4294967295`) denotes an unbounded variadic. */
+  readonly maxArity?: number;
+  readonly signatureTemplate?: string;
+  readonly description?: string;
+}
+
+/** Spill region info returned by `spillInfo(sheet, row, col)`. */
+export interface SpillInfo {
+  readonly engaged: boolean;
+  readonly anchorRow: number;
+  readonly anchorCol: number;
+  readonly rows: number;
+  readonly cols: number;
+}
+
+/** One inclusive cell-range entry inside a CF rule's `sqref` union. */
+export interface ConditionalFormatRange {
+  readonly firstRow: number;
+  readonly firstCol: number;
+  readonly lastRow: number;
+  readonly lastCol: number;
+}
+
+/** One CF rule as returned by `getConditionalFormats(sheet)`.
+ *
+ *  `type` ordinal mirrors `formulon::cf::RuleType`:
+ *    0 expression, 1 cellIs, 2 colorScale, 3 dataBar, 4 iconSet,
+ *    5 top10, 6 aboveAverage, 7 containsText, 8 notContainsText,
+ *    9 beginsWith, 10 endsWith, 11 containsBlanks, 12 notContainsBlanks,
+ *    13 containsErrors, 14 notContainsErrors, 15 timePeriod,
+ *    16 duplicateValues, 17 uniqueValues.
+ *
+ *  Visual rule kinds (`colorScale` / `dataBar` / `iconSet`) round-trip
+ *  through the OOXML reader / writer but their visual sub-spec fields
+ *  are not yet surfaced through this read API; only `id`, `type`,
+ *  `priority`, `stopIfTrue`, and `sqref` populate for those kinds.
+ */
+export interface ConditionalFormatEntry {
+  readonly id: string;
+  readonly type: number;
+  readonly priority: number;
+  readonly stopIfTrue: boolean;
+  readonly sqref: ReadonlyArray<ConditionalFormatRange>;
+  readonly dxfId?: number;
+  readonly formula1?: string;
+  readonly formula2?: string;
+  /** `formulon::cf::CellIsOperator` ordinal: 0 lt, 1 le, 2 eq, 3 ne,
+   *   4 ge, 5 gt, 6 between, 7 notBetween. Engaged for `cellIs` rules. */
+  readonly op?: number;
+  /** Engaged for `top10` rules. */
+  readonly rank?: number;
+  readonly percent?: boolean;
+  readonly bottom?: boolean;
+  /** Engaged for `aboveAverage` rules. */
+  readonly aboveAverage?: boolean;
+  readonly equalAverage?: boolean;
+  readonly stdDev?: number;
+  /** Engaged for `containsText` / `beginsWith` / `endsWith` /
+   *  `notContainsText` rules. */
+  readonly text?: string;
+  /** `formulon::cf::TimePeriod` ordinal. Engaged for `timePeriod` rules. */
+  readonly timePeriod?: number;
+}
+
+/** Argument shape accepted by `addConditionalFormat(sheet, rule)`.
+ *
+ *  Visual rule kinds (`colorScale` / `dataBar` / `iconSet`) are
+ *  rejected — their visual sub-specs are not yet creatable through this
+ *  API. The OOXML reader / writer continue to round-trip those rules
+ *  verbatim if they were authored elsewhere.
+ *
+ *  When `priority` is missing, zero, or negative, the engine assigns
+ *  `existing_max + 1`. When `id` is missing or empty, the engine
+ *  synthesises one. */
+export interface ConditionalFormatInput {
+  sqref: ReadonlyArray<ConditionalFormatRange>;
+  type: number;
+  priority?: number;
+  stopIfTrue?: boolean;
+  id?: string;
+  dxfId?: number;
+  formula1?: string;
+  formula2?: string;
+  op?: number;
+  rank?: number;
+  percent?: boolean;
+  bottom?: boolean;
+  aboveAverage?: boolean;
+  equalAverage?: boolean;
+  stdDev?: number;
+  text?: string;
+  timePeriod?: number;
+}
+
 /** Return type of `Workbook.getCellXfIndex(sheet, row, col)`. */
 export interface CellXfIndexResult {
   status: Status;
@@ -417,6 +589,69 @@ export interface NumFmtResult {
   formatCode: string;
 }
 
+/** Return type of `Workbook.getLambdaText(sheet, row, col)`. The
+ *  rendered text never carries a leading `=` and is suitable for
+ *  passing back through `setFormula`. `kInvalidArgument` surfaces when
+ *  the cell is absent or its cached value is not a lambda. */
+export interface LambdaTextResult {
+  status: Status;
+  /** Excel formula text in `LAMBDA(p1,p2,body)` form. Empty string
+   *  when `status` is non-OK. */
+  text: string;
+}
+
+/** External-link kinds. Mirrors
+ *  `formulon::io::ExternalLinkRecord::Kind`. */
+export const enum ExternalLinkKind {
+  Unknown = 0,
+  ExternalBook = 1,
+  Ole = 2,
+  Dde = 3,
+}
+
+/** Element type returned by `Workbook.getExternalLinks()`. Mirrors
+ *  `formulon::io::ExternalLinkRecord`. The body part itself is not
+ *  exposed (it round-trips through the OOXML passthrough mechanism);
+ *  this surface only enumerates the cross-workbook references and
+ *  their resolved target URLs. */
+export interface ExternalLinkRecord {
+  /** 1-based document order matching `<externalReferences>` in
+   *  `xl/workbook.xml`. */
+  index: number;
+  /** Workbook-rels Id ("rId3" etc.). */
+  relId: string;
+  /** Resolved package-relative path of the body part (e.g.
+   *  `xl/externalLinks/externalLink1.xml`). */
+  partPath: string;
+  /** Remote workbook URL (e.g. `file:///path/book.xlsx`,
+   *  `https://example/sheet.xlsx`). Empty when the per-link rels file
+   *  was missing or unparseable. */
+  target: string;
+  /** Whether the per-link rels relationship was emitted with
+   *  `TargetMode="External"` (the common case). */
+  targetExternal: boolean;
+  /** One of `ExternalLinkKind.*`. */
+  kind: number;
+}
+
+/** Return type of `Workbook.getCellStyle(index)`. Mirrors
+ *  `formulon::io::CellStyleRecord`. `xfId` indexes into the named-style
+ *  xf table reachable via `Workbook.getCellStyleXf(...)`. */
+export interface CellStyleResult {
+  status: Status;
+  /** Display name (e.g. "Normal", "Heading 1", or a user-defined label). */
+  name: string;
+  /** Index into the `<cellStyleXfs>` table. */
+  xfId: number;
+  /** OOXML built-in style ordinal (`0..47`), or `0xFFFFFFFF` for custom
+   *  entries that did not carry a `builtinId` attribute. */
+  builtinId: number;
+  /** Outline level for built-in heading styles (0 otherwise). */
+  iLevel: number;
+  hidden: boolean;
+  customBuiltin: boolean;
+}
+
 /** Return type of `Workbook.addFont/Fill/Border/Xf(...)`. The
  *  add-functions deduplicate against existing entries via linear
  *  search; `index` is either the matched index or the freshly-appended
@@ -485,6 +720,11 @@ export interface Workbook {
 
   getValue(sheet: number, row: number, col: number): CellResult;
 
+  /** Renders the lambda value stored at `(sheet, row, col)` as Excel
+   *  formula text. Returns `kInvalidArgument` when the cell is absent
+   *  or its cached value is not a lambda. */
+  getLambdaText(sheet: number, row: number, col: number): LambdaTextResult;
+
   recalc(): Status;
   /** Recalculates only cells touched by the supplied viewport. */
   partialRecalc(viewport: RecalcViewport): PartialRecalcResult;
@@ -494,6 +734,17 @@ export interface Workbook {
    *  after each Gauss-Seidel sweep. Only one callback can be active per
    *  WASM instance — installing a new one displaces the previous. */
   setIterativeProgress(callback: IterativeProgressCallback | null): Status;
+
+  /**
+   * Workbook-level calc mode (Excel `<calcPr calcMode>` policy).
+   *
+   * Returns one of `CalcMode` codes. The engine itself does NOT gate
+   * evaluation on this value — every `recalc()` call honours all dirty
+   * cells. The mode is preserved as round-trip metadata and surfaced
+   * here so the UI can mirror Excel's user-visible state.
+   */
+  calcMode(): CalcMode;
+  setCalcMode(mode: CalcMode): Status;
 
   /** Inserts `count` rows at `row` on `sheet` and rewrites cross-workbook
    *  references to follow the shift. */
@@ -541,6 +792,18 @@ export interface Workbook {
   setSheetFreeze(sheet: number, freezeRows: number, freezeCols: number): Status;
   /** Sets the sheet tab's hidden flag. */
   setSheetTabHidden(sheet: number, hidden: boolean): Status;
+
+  /**
+   * Reads the sheet's `<sheetProtection>` flags. Strings are
+   * deep-copied; the returned object is independent of the
+   * workbook's storage.
+   */
+  getSheetProtection(sheet: number): SheetProtectionResult;
+  /**
+   * Replaces the sheet's `<sheetProtection>` flags wholesale.
+   * Setting `enabled = 0` clears the protection block on save.
+   */
+  setSheetProtection(sheet: number, protection: SheetProtection): Status;
 
   /** Returns the column-layout overrides on `sheet` in storage order. */
   getSheetColumns(sheet: number): ColumnsResult;
@@ -601,6 +864,27 @@ export interface Workbook {
   /** Returns the number of `<xf>` records currently registered. */
   xfCount(): number;
 
+  /** Returns the number of named cell styles (`<cellStyle>` entries)
+   *  registered. Zero for workbooks that do not declare any named
+   *  styles. */
+  cellStyleCount(): number;
+  /** Returns the number of `<cellStyleXfs>` records — the named-style
+   *  xf table referenced by `CellStyleResult.xfId`. Independent of the
+   *  per-cell `cellXfs` table. */
+  cellStyleXfCount(): number;
+  /** Returns the named cell style at `index`. Out-of-range indices
+   *  surface `kInvalidArgument` via `status`. */
+  getCellStyle(index: number): CellStyleResult;
+  /** Returns the named-style xf record at `index`. Output shape mirrors
+   *  `getCellXf`. */
+  getCellStyleXf(index: number): CellXfResult;
+
+  /** Returns every external-link record carried by the workbook in
+   *  `<externalReferences>` document order. Empty for fresh workbooks
+   *  and any package whose source archive had no `<externalReferences>`
+   *  block. */
+  getExternalLinks(): ReadonlyArray<ExternalLinkRecord>;
+
   /** Adds a merge range to `sheet`. */
   addMerge(sheet: number, range: MergeRange): Status;
   /** Removes every merge that overlaps `range` (inclusive). No-op when nothing overlaps. */
@@ -643,6 +927,60 @@ export interface Workbook {
   removeValidationAt(sheet: number, index: number): Status;
   /** Drops every validation rule on `sheet`. */
   clearValidations(sheet: number): Status;
+
+  /** Returns every CF rule on `sheet` in flattened priority order. The
+   *  returned entries borrow rule ids from the engine's storage; treat
+   *  them as immutable view objects. */
+  getConditionalFormats(sheet: number): ReadonlyArray<ConditionalFormatEntry>;
+  /** Appends a new single-rule `<conditionalFormatting>` block to
+   *  `sheet`. Visual rule types (`colorScale` / `dataBar` / `iconSet`)
+   *  are rejected with `kInvalidArgument` — those payloads are
+   *  preserved on round-trip but not yet creatable here. */
+  addConditionalFormat(sheet: number, rule: ConditionalFormatInput): Status;
+  /** Removes the CF rule at `index` (flattened order). When the
+   *  containing block becomes empty it is removed too. */
+  removeConditionalFormatAt(sheet: number, index: number): Status;
+  /** Drops every CF block on `sheet`. */
+  clearConditionalFormats(sheet: number): Status;
+
+  /** Returns the cells that `(sheet, row, col)` directly reads
+   *  (1-step precedents) when `depth <= 1`, or every cell reached
+   *  within `depth` BFS steps otherwise. `depth` is capped at 32 to
+   *  avoid runaway expansion in cyclic graphs. */
+  precedents(sheet: number, row: number, col: number, depth: number): ReadonlyArray<CellNode>;
+  /** Returns the cells that read `(sheet, row, col)` directly
+   *  (1-step dependents). Same depth semantics as `precedents`. */
+  dependents(sheet: number, row: number, col: number, depth: number): ReadonlyArray<CellNode>;
+
+  /** Returns metadata for the function `name` (case-insensitive). When
+   *  the function is unknown, returns `{ok: false}`. `locale` selects
+   *  the catalog locale (`0` = `en-US`, `1` = `ja-JP`); description /
+   *  signature fields are populated only when the locale metadata table
+   *  has an entry. */
+  functionMetadata(name: string, locale: number): FunctionMetadataResult;
+  /** Returns every registered function's canonical name in ascending
+   *  sort order. */
+  functionNames(): ReadonlyArray<string>;
+
+  /** Returns the localized display name for the canonical function
+   *  `canonicalName` in `locale`. Returns the canonical name unchanged
+   *  when the locale's alias table is empty (currently always for
+   *  non-`en-US` locales). Returns the empty string when the canonical
+   *  name does not match a registered function. */
+  localizeFunctionName(canonicalName: string, locale: number): string;
+  /** Inverse of `localizeFunctionName`: returns the canonical English
+   *  name for the localized function `localizedName`. Falls through to
+   *  case-insensitive canonical-name matching when no alias is
+   *  registered. Returns the empty string when no function matches. */
+  canonicalizeFunctionName(localizedName: string, locale: number): string;
+
+  /** Returns dynamic-array spill info for `(sheet, row, col)`.
+   *  When the cell is part of a spill region (anchor or phantom),
+   *  `engaged` is `true` and `(anchorRow, anchorCol)` + `(rows, cols)`
+   *  describe the region; the per-cell values are read via `getValue`,
+   *  which is already spill-aware. When the cell is not part of any
+   *  region, `engaged` is `false` and the other fields are zero. */
+  spillInfo(sheet: number, row: number, col: number): SpillInfo;
 }
 
 /** Static factories on the Workbook class. */
