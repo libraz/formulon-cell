@@ -339,6 +339,33 @@ export interface Strings {
     traceError: string;
     ignore: string;
   };
+  goToDialog: {
+    /** Modal title — shown in the header bar and the aria-label. */
+    title: string;
+    /** Section legend above the scope radios. */
+    scopeLabel: string;
+    /** "Active sheet" radio — sweeps every cell on the current sheet. */
+    scopeSheet: string;
+    /** "Current selection" radio — sweeps only inside the active selection
+     *  rectangle. Auto-disabled when the selection is a single cell. */
+    scopeSelection: string;
+    /** Section legend above the category radios. */
+    kindLabel: string;
+    kindBlanks: string;
+    kindNonBlanks: string;
+    kindFormulas: string;
+    kindConstants: string;
+    kindNumbers: string;
+    kindText: string;
+    kindErrors: string;
+    kindDataValidation: string;
+    kindConditionalFormat: string;
+    /** Inline status when the predicate yields zero matches. The dialog
+     *  stays open so the user can adjust the kind. */
+    noResults: string;
+    cancel: string;
+    ok: string;
+  };
   a11y: {
     nameBox: string;
     formulaBar: string;
@@ -659,6 +686,25 @@ export const ja: Strings = {
     traceError: 'エラーの参照元',
     ignore: '無視',
   },
+  goToDialog: {
+    title: '選択オプション',
+    scopeLabel: '範囲',
+    scopeSheet: 'アクティブなシート',
+    scopeSelection: '現在の選択範囲',
+    kindLabel: '種類',
+    kindBlanks: '空白セル',
+    kindNonBlanks: '空白以外のセル',
+    kindFormulas: '数式',
+    kindConstants: '定数',
+    kindNumbers: '数値',
+    kindText: '文字列',
+    kindErrors: 'エラー',
+    kindDataValidation: '入力規則',
+    kindConditionalFormat: '条件付き書式',
+    noResults: '該当するセルが見つかりません',
+    cancel: 'キャンセル',
+    ok: 'OK',
+  },
   a11y: {
     nameBox: '名前ボックス',
     formulaBar: '数式バー',
@@ -978,6 +1024,25 @@ export const en: Strings = {
     editCell: 'Edit cell',
     traceError: 'Trace error',
     ignore: 'Ignore',
+  },
+  goToDialog: {
+    title: 'Go To Special',
+    scopeLabel: 'Scope',
+    scopeSheet: 'Active sheet',
+    scopeSelection: 'Current selection',
+    kindLabel: 'Select',
+    kindBlanks: 'Blanks',
+    kindNonBlanks: 'Non-blanks',
+    kindFormulas: 'Formulas',
+    kindConstants: 'Constants',
+    kindNumbers: 'Numbers',
+    kindText: 'Text',
+    kindErrors: 'Errors',
+    kindDataValidation: 'Data validation',
+    kindConditionalFormat: 'Conditional formats',
+    noResults: 'No cells found',
+    cancel: 'Cancel',
+    ok: 'OK',
   },
   a11y: {
     nameBox: 'Name box',

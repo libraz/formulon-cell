@@ -47,6 +47,7 @@ import { attachFindReplace } from './interact/find-replace.js';
 import { attachFormatDialog } from './interact/format-dialog.js';
 import { type FormatPainterHandle, attachFormatPainter } from './interact/format-painter.js';
 import { type FxDialogHandle, attachFxDialog } from './interact/fx-dialog.js';
+import { attachGoToDialog } from './interact/goto-dialog.js';
 import { attachHover } from './interact/hover.js';
 import { attachHyperlinkDialog } from './interact/hyperlink-dialog.js';
 import { attachIterativeDialog } from './interact/iterative-dialog.js';
@@ -145,6 +146,8 @@ export interface SpreadsheetInstance {
   openNamedRangeDialog(): void;
   /** Open the cell format dialog (Excel ⌘1). */
   openFormatDialog(): void;
+  /** Open the Go To Special (F5) dialog. No-op when the feature is disabled. */
+  openGoToSpecial(): void;
   /** Open the iterative-calculation settings dialog (Excel File → Options
    *  → Formulas). */
   openIterativeDialog(): void;
@@ -410,6 +413,7 @@ export const Spreadsheet = {
     let formatPainter: FormatPainterHandle | null = null;
     let hover: ReturnType<typeof attachHover> | null = null;
     let conditionalDialog: ReturnType<typeof attachConditionalDialog> | null = null;
+    let goToDialog: ReturnType<typeof attachGoToDialog> | null = null;
     let fxDialog: FxDialogHandle | null = null;
     let fxClickHandler: (() => void) | null = null;
     let namedRangeDialog: ReturnType<typeof attachNamedRangeDialog> | null = null;
@@ -455,6 +459,7 @@ export const Spreadsheet = {
       'formatPainter',
       'hoverComment',
       'conditional',
+      'gotoSpecial',
       'fxDialog',
       'namedRanges',
       'hyperlink',
@@ -510,6 +515,14 @@ export const Spreadsheet = {
           featureRegistry.set(
             'conditional',
             wrapHandle(conditionalDialog, () => conditionalDialog?.detach()),
+          );
+          break;
+        case 'gotoSpecial':
+          if (goToDialog) return;
+          goToDialog = attachGoToDialog({ host, store, strings, getWb: () => wb });
+          featureRegistry.set(
+            'gotoSpecial',
+            wrapHandle(goToDialog, () => goToDialog?.detach()),
           );
           break;
         case 'fxDialog':
@@ -653,6 +666,11 @@ export const Spreadsheet = {
           conditionalDialog = null;
           featureRegistry.delete('conditional');
           break;
+        case 'gotoSpecial':
+          goToDialog?.detach();
+          goToDialog = null;
+          featureRegistry.delete('gotoSpecial');
+          break;
         case 'fxDialog':
           if (fxClickHandler) fx.removeEventListener('click', fxClickHandler);
           fxClickHandler = null;
@@ -764,6 +782,13 @@ export const Spreadsheet = {
             onAfterHistory: () =>
               mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex)),
             onGoTo: () => {
+              // F5 / Ctrl+G — open Go To Special when the feature is on,
+              // otherwise fall back to focusing the Name Box for direct
+              // navigation typing.
+              if (goToDialog) {
+                goToDialog.open();
+                return;
+              }
               tag.focus();
               tag.select();
             },
@@ -1477,6 +1502,9 @@ export const Spreadsheet = {
       openFormatDialog() {
         formatDialog?.open();
       },
+      openGoToSpecial() {
+        goToDialog?.open();
+      },
       openWatchWindow() {
         watchPanel?.open();
       },
@@ -1569,6 +1597,7 @@ export const Spreadsheet = {
         formatPainter?.detach();
         hover?.detach();
         conditionalDialog?.detach();
+        goToDialog?.detach();
         iterativeDialog.detach();
         cellStylesGallery.detach();
         fxDialog?.detach();

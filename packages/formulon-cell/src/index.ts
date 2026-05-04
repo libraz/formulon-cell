@@ -216,6 +216,10 @@ export type {
   ConditionalDialogHandle,
 } from './interact/conditional-dialog.js';
 export { attachConditionalDialog } from './interact/conditional-dialog.js';
+export type { GoToScope, GoToSpecialKind } from './commands/goto-special.js';
+export { boundingRange, findMatchingCells } from './commands/goto-special.js';
+export type { GoToDialogDeps, GoToDialogHandle } from './interact/goto-dialog.js';
+export { attachGoToDialog } from './interact/goto-dialog.js';
 export type { ContextMenuDeps } from './interact/context-menu.js';
 export { attachContextMenu } from './interact/context-menu.js';
 export type {
