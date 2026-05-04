@@ -304,6 +304,20 @@ export interface Strings {
     cancel: string;
     ok: string;
   };
+  externalLinksDialog: {
+    /** Modal title — also used as aria-label. */
+    title: string;
+    /** Empty-state when the workbook has no `<externalReferences>` block. */
+    empty: string;
+    /** Column headers for the link table. */
+    headerIndex: string;
+    headerKind: string;
+    headerTarget: string;
+    headerPart: string;
+    /** Hint shown above the table — Excel parity for the Edit Links dialog. */
+    note: string;
+    close: string;
+  };
   fxDialog: {
     /** Modal title — appears in the header and the aria-label. */
     title: string;
@@ -734,6 +748,16 @@ export const ja: Strings = {
     cancel: 'キャンセル',
     ok: 'OK',
   },
+  externalLinksDialog: {
+    title: '外部参照',
+    empty: 'このブックには外部参照がありません。',
+    headerIndex: '#',
+    headerKind: '種類',
+    headerTarget: 'リンク先',
+    headerPart: 'パート',
+    note: '読み取り専用 — リンクの編集は対応していません。書式は保存時に保持されます。',
+    close: '閉じる',
+  },
   fxDialog: {
     title: '関数の引数',
     searchPlaceholder: '関数を検索…',
@@ -1123,6 +1147,16 @@ export const en: Strings = {
     unsupported: 'This engine does not support iterative calculation.',
     cancel: 'Cancel',
     ok: 'OK',
+  },
+  externalLinksDialog: {
+    title: 'External Links',
+    empty: 'This workbook has no external references.',
+    headerIndex: '#',
+    headerKind: 'Kind',
+    headerTarget: 'Target',
+    headerPart: 'Part',
+    note: 'Read-only — editing external links is not supported. Records are preserved on save.',
+    close: 'Close',
   },
   fxDialog: {
     title: 'Function Arguments',

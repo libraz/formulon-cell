@@ -44,6 +44,7 @@ import { attachConditionalDialog } from './interact/conditional-dialog.js';
 import { attachContextMenu } from './interact/context-menu.js';
 import { InlineEditor } from './interact/editor.js';
 import { attachErrorMenu, type ErrorMenuHandle } from './interact/error-menu.js';
+import { attachExternalLinksDialog } from './interact/external-links-dialog.js';
 import { attachFindReplace } from './interact/find-replace.js';
 import { attachFormatDialog } from './interact/format-dialog.js';
 import { attachFormatPainter, type FormatPainterHandle } from './interact/format-painter.js';
@@ -159,6 +160,11 @@ export interface SpreadsheetInstance {
   /** Open the iterative-calculation settings dialog (Excel File → Options
    *  → Formulas). */
   openIterativeDialog(): void;
+  /** Open the read-only "Edit Links" inspector listing every external
+   *  workbook reference carried by the active workbook. The list is empty
+   *  for fresh workbooks and any package that had no
+   *  `<externalReferences>` block. */
+  openExternalLinksDialog(): void;
   /** Open the named cell-styles gallery (Excel Home → Cell Styles). */
   openCellStylesGallery(): void;
   /** Open the Function Arguments dialog. Pass `seedName` (case-insensitive)
@@ -435,6 +441,11 @@ export const Spreadsheet = {
 
     // Always-on host features — not toggleable via `MountOptions.features`.
     const iterativeDialog = attachIterativeDialog({ host, getWb: () => wb, strings });
+    const externalLinksDialog = attachExternalLinksDialog({
+      host,
+      getWb: () => wb,
+      strings,
+    });
     const cellStylesGallery = attachCellStylesGallery({
       host,
       store,
@@ -1591,6 +1602,9 @@ export const Spreadsheet = {
       openIterativeDialog() {
         iterativeDialog.open();
       },
+      openExternalLinksDialog() {
+        externalLinksDialog.open();
+      },
       openCellStylesGallery() {
         cellStylesGallery.open();
       },
@@ -1739,6 +1753,7 @@ export const Spreadsheet = {
         conditionalDialog?.detach();
         goToDialog?.detach();
         iterativeDialog.detach();
+        externalLinksDialog.detach();
         cellStylesGallery.detach();
         fxDialog?.detach();
         namedRangeDialog?.detach();

@@ -1266,6 +1266,90 @@
     border-color: transparent;
   }
 
+  /* External-links inspector — read-only Excel "Edit Links" parity. */
+  .fc-extlinkdlg {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.32);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 60;
+  }
+  .fc-extlinkdlg[hidden] {
+    display: none;
+  }
+  .fc-extlinkdlg__panel {
+    width: 560px;
+    max-width: 92vw;
+    max-height: 80vh;
+    background: var(--fc-bg, #fff);
+    color: var(--fc-fg, #1f1f1f);
+    border-radius: 6px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .fc-extlinkdlg__header {
+    padding: 12px 16px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--fc-rule, #e0e0e0);
+  }
+  .fc-extlinkdlg__body {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow: auto;
+  }
+  .fc-extlinkdlg__note {
+    margin: 0;
+    font-size: 12px;
+    color: var(--fc-fg-soft, #555);
+  }
+  .fc-extlinkdlg__empty {
+    padding: 24px;
+    text-align: center;
+    color: var(--fc-fg-soft, #888);
+  }
+  .fc-extlinkdlg__tablewrap {
+    overflow: auto;
+  }
+  .fc-extlinkdlg__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .fc-extlinkdlg__table th,
+  .fc-extlinkdlg__table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--fc-rule, #eee);
+    text-align: left;
+    vertical-align: top;
+  }
+  .fc-extlinkdlg__table th {
+    font-weight: 600;
+    color: var(--fc-fg-soft, #555);
+  }
+  .fc-extlinkdlg__cell-target {
+    word-break: break-all;
+    max-width: 280px;
+  }
+  .fc-extlinkdlg__footer {
+    padding: 10px 16px;
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid var(--fc-rule, #e0e0e0);
+  }
+  .fc-extlinkdlg__close {
+    padding: 4px 14px;
+    border: 1px solid var(--fc-rule, #ccc);
+    border-radius: 3px;
+    background: #f5f5f5;
+    cursor: pointer;
+  }
+
   /* Named cell-styles gallery — Excel "Home → Cell Styles" preset chips. */
   .fc-stylegallery {
     position: fixed;

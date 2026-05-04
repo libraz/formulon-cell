@@ -31,6 +31,19 @@ export type ChangeEvent =
 
 const addrKey = (a: Addr): string => `${a.sheet}:${a.row}:${a.col}`;
 
+const kindLabel = (kind: number): 'unknown' | 'externalBook' | 'ole' | 'dde' => {
+  switch (kind) {
+    case 1:
+      return 'externalBook';
+    case 2:
+      return 'ole';
+    case 3:
+      return 'dde';
+    default:
+      return 'unknown';
+  }
+};
+
 /** Snapshot of one cell's full state — enough to restore it on undo. */
 interface CellSnapshot {
   addr: Addr;
@@ -1045,6 +1058,31 @@ export class WorkbookHandle {
     this.assertAlive();
     if (!this.capabilities.calcMode) return false;
     return this.wb.setCalcMode(mode).ok;
+  }
+
+  /** External-link records carried by the workbook in `<externalReferences>`
+   *  document order. Empty for fresh workbooks and packages whose source
+   *  archive had no `<externalReferences>` block. Returns `[]` when the
+   *  engine doesn't expose `getExternalLinks`. */
+  getExternalLinks(): ReadonlyArray<{
+    index: number;
+    relId: string;
+    partPath: string;
+    target: string;
+    targetExternal: boolean;
+    kind: 'unknown' | 'externalBook' | 'ole' | 'dde';
+  }> {
+    this.assertAlive();
+    if (!this.capabilities.externalLinks) return [];
+    const arr = this.wb.getExternalLinks();
+    return arr.map((r) => ({
+      index: r.index,
+      relId: r.relId,
+      partPath: r.partPath,
+      target: r.target,
+      targetExternal: r.targetExternal,
+      kind: kindLabel(r.kind),
+    }));
   }
 
   /** Snapshot of every validation entry on `sheet`. Each entry can apply to

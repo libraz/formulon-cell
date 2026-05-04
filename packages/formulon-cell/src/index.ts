@@ -271,6 +271,11 @@ export type {
   ErrorMenuKind,
 } from './interact/error-menu.js';
 export { attachErrorMenu } from './interact/error-menu.js';
+export type {
+  ExternalLinksDialogDeps,
+  ExternalLinksDialogHandle,
+} from './interact/external-links-dialog.js';
+export { attachExternalLinksDialog } from './interact/external-links-dialog.js';
 export type { FilterDropdownDeps, FilterDropdownHandle } from './interact/filter-dropdown.js';
 export { attachFilterDropdown } from './interact/filter-dropdown.js';
 export type { FindReplaceDeps, FindReplaceHandle } from './interact/find-replace.js';
