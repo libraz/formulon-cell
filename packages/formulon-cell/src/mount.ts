@@ -9,6 +9,7 @@ import { hydrateCommentsAndHyperlinksFromEngine } from './engine/format-sync.js'
 import { hydrateLayoutFromEngine } from './engine/layout-sync.js';
 import { hydrateMergesFromEngine } from './engine/merges-sync.js';
 import { summarizePassthroughs, summarizeTables } from './engine/passthrough-sync.js';
+import { findDependents, findPrecedents } from './engine/refs-graph.js';
 import type { CellValue } from './engine/types.js';
 import { hydrateValidationsFromEngine } from './engine/validation-sync.js';
 import { type ChangeEvent, WorkbookHandle } from './engine/workbook-handle.js';
@@ -150,6 +151,13 @@ export interface SpreadsheetInstance {
   closeWatchWindow(): void;
   /** Toggle Watch Window visibility. No-op when the feature is off. */
   toggleWatchWindow(): void;
+  /** Append precedent arrows for the active cell. Same-sheet only. Repeated
+   *  calls deduplicate against existing arrows. */
+  tracePrecedents(): void;
+  /** Append dependent arrows for the active cell. Same-sheet only. */
+  traceDependents(): void;
+  /** Remove all currently visible trace arrows. */
+  clearTraces(): void;
   setTheme(t: ThemeName): void;
   /** Pop the most recent undoable action and revert it. Returns false when
    *  the stack is empty. */
@@ -1168,6 +1176,24 @@ export const Spreadsheet = {
       },
       toggleWatchWindow() {
         watchPanel?.toggle();
+      },
+      tracePrecedents() {
+        const a = store.getState().selection.active;
+        for (const from of findPrecedents(wb, a)) {
+          mutators.addTrace(store, { kind: 'precedent', from, to: a });
+        }
+        renderer.invalidate();
+      },
+      traceDependents() {
+        const a = store.getState().selection.active;
+        for (const to of findDependents(wb, a)) {
+          mutators.addTrace(store, { kind: 'dependent', from: a, to });
+        }
+        renderer.invalidate();
+      },
+      clearTraces() {
+        mutators.clearTraces(store);
+        renderer.invalidate();
       },
       setTheme(t) {
         host.dataset.fcTheme = t;

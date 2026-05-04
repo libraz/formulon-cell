@@ -21,6 +21,8 @@ import {
 } from './geometry.js';
 import {
   type OutlineToggleHit,
+  TRACE_DEPENDENT_COLOR,
+  TRACE_PRECEDENT_COLOR,
   paintActiveCellOutline,
   paintCellBackground,
   paintCellBorders,
@@ -32,6 +34,8 @@ import {
   paintOutlineGutters,
   paintRefHighlight,
   paintSpillOutline,
+  paintTraceArrow,
+  paintTraceDot,
   paintValidationChevron,
 } from './painters.js';
 import { paintCellSparkline } from './sparkline.js';
@@ -185,6 +189,7 @@ export class GridRenderer {
     this.paintSpills(state, theme, cols, rows);
     this.paintActive(state, theme, cols, rows);
     this.paintEditorRefs(state);
+    this.paintTraces(state, cols, rows);
 
     // Hand the engine the inclusive rect of cells we just painted so the next
     //  setFormula can run a partialRecalc bounded to what the user sees.
@@ -667,6 +672,31 @@ export class GridRenderer {
     if (isRowVisible(layout, viewport, r.r1) && isColVisible(layout, viewport, r.c1)) {
       const cornerCell = cellRectIn(layout, cols, rows, r.r1, r.c1);
       setFillHandleRect(paintFillHandle(this.ctx, cornerCell, theme));
+    }
+  }
+
+  /** Top-layer trace-arrow overlay. Iterates `state.traces.items` and paints
+   *  one dot + arrow per entry. Same-sheet only; entries on a different sheet
+   *  than `data.sheetIndex` are silently skipped. Off-screen endpoints are
+   *  also skipped — partial visibility is not handled in v1 (Excel clips
+   *  arrows the same way against the freeze divider). */
+  private paintTraces(state: State, cols: AxisLayout, rows: AxisLayout): void {
+    const items = state.traces.items;
+    if (items.length === 0) return;
+    const sheet = state.data.sheetIndex;
+    const ctx = this.ctx;
+    const { layout, viewport } = state;
+    for (const item of items) {
+      if (item.from.sheet !== sheet || item.to.sheet !== sheet) continue;
+      if (!isRowVisible(layout, viewport, item.from.row)) continue;
+      if (!isColVisible(layout, viewport, item.from.col)) continue;
+      if (!isRowVisible(layout, viewport, item.to.row)) continue;
+      if (!isColVisible(layout, viewport, item.to.col)) continue;
+      const fromRect = cellRectIn(layout, cols, rows, item.from.row, item.from.col);
+      const toRect = cellRectIn(layout, cols, rows, item.to.row, item.to.col);
+      const color = item.kind === 'precedent' ? TRACE_PRECEDENT_COLOR : TRACE_DEPENDENT_COLOR;
+      paintTraceDot(ctx, fromRect, color);
+      paintTraceArrow(ctx, fromRect, toRect, color);
     }
   }
 }

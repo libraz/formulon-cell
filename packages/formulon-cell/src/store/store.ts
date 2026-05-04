@@ -331,6 +331,24 @@ export interface WatchSlice {
   watches: readonly Addr[];
 }
 
+/** A single trace arrow drawn from a precedent or to a dependent.
+ *  `kind: 'precedent'` arrows flow `from` (source cell) → `to` (active cell);
+ *  `kind: 'dependent'` arrows flow `from` (active cell) → `to` (cell that
+ *  reads from it). Painters distinguish the two visually. */
+export interface TraceArrow {
+  kind: 'precedent' | 'dependent';
+  from: Addr;
+  to: Addr;
+}
+
+/** Trace-precedents / trace-dependents arrows currently visible. Session-only;
+ *  not recorded in the undo stack — Excel keeps trace arrows out of the
+ *  history journal too. Each `tracePrecedents()` / `traceDependents()` call
+ *  appends to `items`; `clearTraces()` empties the list. */
+export interface TracesSlice {
+  items: readonly TraceArrow[];
+}
+
 export interface State {
   viewport: ViewportSlice;
   selection: SelectionSlice;
@@ -342,6 +360,7 @@ export interface State {
   conditional: ConditionalSlice;
   sparkline: SparklineSlice;
   watch: WatchSlice;
+  traces: TracesSlice;
 }
 
 const initialAddr = (sheet = 0): Addr => ({ sheet, row: 0, col: 0 });
@@ -393,6 +412,7 @@ export const createSpreadsheetStore = () =>
     conditional: { rules: [] },
     sparkline: { sparklines: new Map() },
     watch: { watches: [] },
+    traces: { items: [] },
   }));
 
 export type SpreadsheetStore = ReturnType<typeof createSpreadsheetStore>;
@@ -815,6 +835,34 @@ export const mutators = {
     store.setState((s) =>
       s.ui.watchPanelOpen === open ? s : { ...s, ui: { ...s.ui, watchPanelOpen: open } },
     );
+  },
+
+  /** Append a trace arrow to the visible set. Duplicates (same kind +
+   *  identical endpoints) are dropped so repeated `tracePrecedents()` calls
+   *  on the same active cell don't pile up overlapping arrows. */
+  addTrace(store: SpreadsheetStore, item: TraceArrow): void {
+    store.setState((s) => {
+      const exists = s.traces.items.some(
+        (t) =>
+          t.kind === item.kind &&
+          t.from.sheet === item.from.sheet &&
+          t.from.row === item.from.row &&
+          t.from.col === item.from.col &&
+          t.to.sheet === item.to.sheet &&
+          t.to.row === item.to.row &&
+          t.to.col === item.to.col,
+      );
+      if (exists) return s;
+      return {
+        ...s,
+        traces: { items: [...s.traces.items, { kind: item.kind, from: item.from, to: item.to }] },
+      };
+    });
+  },
+
+  /** Empty the trace-arrow set. */
+  clearTraces(store: SpreadsheetStore): void {
+    store.setState((s) => (s.traces.items.length === 0 ? s : { ...s, traces: { items: [] } }));
   },
 
   /** Remove any merges that intersect the range. */

@@ -84,6 +84,8 @@ export type {
   SpreadsheetStore,
   State,
   StatusAggKey,
+  TraceArrow,
+  TracesSlice,
   ValidationErrorStyle,
   ValidationListSource,
   ValidationMeta,
@@ -132,6 +134,7 @@ export {
   resolveNumericRangeFromCells,
   resolveRangeRef,
 } from './engine/range-resolver.js';
+export { findDependents, findPrecedents } from './engine/refs-graph.js';
 export type { SelectionStats } from './commands/aggregate.js';
 export { aggregateSelection } from './commands/aggregate.js';
 export { autoSum } from './commands/auto-sum.js';
