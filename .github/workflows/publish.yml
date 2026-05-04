@@ -1,0 +1,92 @@
+name: Publish and Create Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: corepack enable
+      - run: corepack prepare yarn@4.5.0 --activate
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .yarn/cache
+            node_modules
+          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - run: yarn install --immutable
+      - run: yarn lint
+      - run: yarn typecheck
+      - run: yarn build:all
+      - run: yarn test --run
+
+      - name: Prepare packages for publish
+        run: |
+          cp LICENSE packages/formulon-cell/
+          cp LICENSE packages/formulon-cell-react/ 2>/dev/null || true
+          cp LICENSE packages/formulon-cell-vue/ 2>/dev/null || true
+
+          CORE_VERSION=$(node -p "require('./packages/formulon-cell/package.json').version")
+          for pkg in packages/formulon-cell-react packages/formulon-cell-vue; do
+            if [ -f "${pkg}/package.json" ]; then
+              jq --arg v "^${CORE_VERSION}" '
+                (.dependencies, .peerDependencies) |= (
+                  with_entries(
+                    if .value == "workspace:*" then .value = $v else . end
+                  )
+                )
+              ' "${pkg}/package.json" > "${pkg}/package.json.tmp"
+              mv "${pkg}/package.json.tmp" "${pkg}/package.json"
+            fi
+          done
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        with:
+          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          body: |
+            Automated release.
+
+      - name: Publish core
+        working-directory: packages/formulon-cell
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Wait for registry propagation
+        run: sleep 15
+
+      - name: Publish react adapter
+        if: hashFiles('packages/formulon-cell-react/package.json') != ''
+        working-directory: packages/formulon-cell-react
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish vue adapter
+        if: hashFiles('packages/formulon-cell-vue/package.json') != ''
+        working-directory: packages/formulon-cell-vue
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

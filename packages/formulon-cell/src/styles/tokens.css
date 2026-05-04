@@ -1,0 +1,116 @@
+/* Public theme tokens — the documented override surface.
+ *
+ * Every variable below is settable on `.fc-host` (or anywhere up the
+ * tree if you wrap the host). Variables NOT listed here are internal
+ * and may be renamed without a major version bump.
+ *
+ * Usage:
+ *   .my-spreadsheet .fc-host {
+ *     --fc-accent: #d63384;
+ *     --fc-bg-rail: #fff8f0;
+ *   }
+ *
+ * Or scope to a custom theme name and toggle via `data-fc-theme`:
+ *   .fc-host[data-fc-theme="brand"] { --fc-accent: #d63384; … }
+ *
+ * This file is purely declarative; importing it has no styling effect
+ * on its own. It exists so editor tooling (VS Code IntelliSense via
+ * css-variables, custom-property hover hints) can discover the
+ * vocabulary. The base stylesheet (`@libraz/formulon-cell/styles.css`)
+ * already declares concrete values via `theme-paper.css` / `-ink.css`
+ * / `-contrast.css`.
+ *
+ * Tokens are grouped by surface; each block's comment names the user
+ * action that paints with it. */
+
+@layer fc.tokens {
+  .fc-host {
+    /* === SURFACES — sheet body, formula bar, status bar === */
+    /* Cell area background; what you see in an empty workbook. */
+    --fc-bg: initial;
+    /* Elevated chrome (formula bar, status bar). Usually equal to --fc-bg. */
+    --fc-bg-elev: initial;
+    /* Row/column header rail. */
+    --fc-bg-rail: initial;
+    /* Active row/column header tint. */
+    --fc-bg-header: initial;
+
+    /* === FOREGROUND — cell text scale === */
+    /* Default cell text. */
+    --fc-fg: initial;
+    /* Headings, bold text. */
+    --fc-fg-strong: initial;
+    /* Secondary labels (status bar metrics, hints). */
+    --fc-fg-mute: initial;
+    /* Tertiary (placeholder text, disabled labels). */
+    --fc-fg-faint: initial;
+
+    /* === RULES — gridlines, borders, separators === */
+    /* Standard gridline. */
+    --fc-rule: initial;
+    /* Strong rule (header divider, cell selection outline base). */
+    --fc-rule-strong: initial;
+
+    /* === ACCENT — active selection, focus ring, primary buttons === */
+    /* Primary accent — selection outline, focused cell border. */
+    --fc-accent: initial;
+    /* Pressed/hover state for accent surfaces. */
+    --fc-accent-strong: initial;
+    /* Translucent accent fill (hover row, active range). */
+    --fc-accent-soft: initial;
+    /* Foreground on accent surfaces (button text on accent button). */
+    --fc-accent-fg: initial;
+
+    /* === CELL VALUES — by kind === */
+    /* `#REF!`, `#DIV/0!`, validation rejection. */
+    --fc-cell-error-fg: initial;
+    /* Cells whose stored content is a formula (when `Show Formulas` on). */
+    --fc-cell-formula-fg: initial;
+    /* TRUE / FALSE rendering. */
+    --fc-cell-bool-fg: initial;
+    /* Right-aligned numbers. */
+    --fc-cell-num-fg: initial;
+
+    /* === HEADER RAIL === */
+    /* Idle column letter / row number text. */
+    --fc-header-fg: initial;
+    /* Active row/column letter — same hue as accent. */
+    --fc-header-fg-active: initial;
+    /* Header background — usually equal to --fc-bg-rail. */
+    --fc-header-bg: initial;
+    /* Header rule under the column letters. */
+    --fc-header-rule: initial;
+
+    /* === HOVER === */
+    /* Stripe painted across the hovered row + column. */
+    --fc-hover-stripe: initial;
+
+    /* === TYPOGRAPHY (set on the base layer, override here) === */
+    /* UI font — name box, formula bar, dialog text. */
+    --fc-font-ui: initial;
+    /* Cell content font (defaults to UI font; override for monospace
+     *  cells). */
+    --fc-font-mono: initial;
+    /* Display font (status bar version label, dialog headings). */
+    --fc-font-display: initial;
+
+    /* === SIZING === */
+    --fc-text-cell: initial;
+    --fc-text-header: initial;
+    --fc-text-formula: initial;
+    --fc-text-rail: initial;
+    --fc-leading-cell: initial;
+    --fc-tracking-tight: initial;
+    --fc-tracking-wide: initial;
+    --fc-radius-sm: initial;
+    --fc-radius-md: initial;
+    --fc-radius-lg: initial;
+
+    /* === MOTION === */
+    --fc-dur-fast: initial;
+    --fc-dur-base: initial;
+    --fc-dur-slow: initial;
+    --fc-ease-out: initial;
+    --fc-ease-in-out: initial;
+  }
+}

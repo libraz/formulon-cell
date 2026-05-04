@@ -1,0 +1,73 @@
+{
+  "name": "@libraz/formulon-cell",
+  "version": "0.1.0",
+  "description": "Spreadsheet UI for the formulon WASM calc engine — extension-based, i18n-aware, theme-tokenized, Excel 365-flavored.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "libraz",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/libraz/formulon-cell.git",
+    "directory": "packages/formulon-cell"
+  },
+  "homepage": "https://github.com/libraz/formulon-cell",
+  "bugs": "https://github.com/libraz/formulon-cell/issues",
+  "keywords": [
+    "spreadsheet",
+    "excel",
+    "xlsx",
+    "formula",
+    "canvas",
+    "headless-ui",
+    "datagrid",
+    "wasm",
+    "i18n"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./extensions": {
+      "types": "./dist/extensions/index.d.ts",
+      "import": "./dist/extensions/index.js"
+    },
+    "./extensions/*": {
+      "types": "./dist/extensions/*.d.ts",
+      "import": "./dist/extensions/*.js"
+    },
+    "./i18n/*": {
+      "types": "./dist/i18n/*.d.ts",
+      "import": "./dist/i18n/*.js"
+    },
+    "./styles.css": "./dist/styles/index.css",
+    "./styles/paper.css": "./dist/styles/theme-paper.css",
+    "./styles/ink.css": "./dist/styles/theme-ink.css",
+    "./styles/contrast.css": "./dist/styles/theme-contrast.css",
+    "./styles/tokens.css": "./dist/styles/tokens.css",
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "vendor", "LICENSE", "README.md", "CHANGELOG.md"],
+  "sideEffects": ["*.css"],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "vite build && node scripts/copy-styles.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "sync-formulon": "node scripts/sync-formulon.mjs"
+  },
+  "peerDependencies": {
+    "zustand": "^5"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2",
+    "happy-dom": "^15",
+    "typescript": "5.7.2",
+    "vitest": "^2",
+    "zustand": "^5"
+  }
+}

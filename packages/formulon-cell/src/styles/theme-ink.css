@@ -1,0 +1,40 @@
+/* Dark theme — Microsoft Fluent / Excel 365 (dark mode).
+ *
+ * Near-black sheet (Office "Black" theme), warm gray rail, brightened green
+ * accent for AA contrast against the dark background. */
+
+@layer fc.theme {
+  .fc-host[data-fc-theme="ink"] {
+    --fc-bg: #1b1a19;
+    --fc-bg-elev: #252423;
+    --fc-bg-rail: #201f1e;
+    --fc-bg-header: #1f3a2a;
+
+    --fc-fg: #f3f2f1;
+    --fc-fg-strong: #ffffff;
+    --fc-fg-mute: #c8c6c4;
+    --fc-fg-faint: #a19f9d;
+
+    --fc-rule: #3b3a39;
+    --fc-rule-strong: #605e5c;
+
+    --fc-accent: #4cc26b;
+    --fc-accent-strong: #6dd587;
+    --fc-accent-soft: rgba(76, 194, 107, 0.18);
+    --fc-accent-fg: #11100f;
+
+    --fc-cell-error-fg: #f1707b;
+    --fc-cell-formula-fg: #f3f2f1;
+    --fc-cell-bool-fg: #6dd587;
+    --fc-cell-num-fg: var(--fc-fg-strong);
+
+    --fc-header-fg: #c8c6c4;
+    --fc-header-fg-active: #6dd587;
+    --fc-header-bg: var(--fc-bg-rail);
+    --fc-header-rule: var(--fc-rule);
+
+    --fc-hover-stripe: rgba(76, 194, 107, 0.04);
+
+    color-scheme: dark;
+  }
+}

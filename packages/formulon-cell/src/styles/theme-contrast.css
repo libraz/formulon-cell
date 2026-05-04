@@ -1,0 +1,46 @@
+/* High-contrast theme — WCAG AAA-friendly defaults.
+ *
+ * Black-on-white surfaces, saturated accents, thicker rules. Activate by
+ * setting `[data-fc-theme="contrast"]` on the host (or anywhere up the
+ * tree) — same mechanism as `paper` / `ink`.
+ *
+ * This is shipped as a third built-in alongside the editorial paper
+ * theme and the dark ink theme. Consumers wanting their own palette can
+ * copy any of these files as a starting point — every override surface
+ * is just CSS variables on `.fc-host`. */
+
+@layer fc.theme {
+  .fc-host[data-fc-theme="contrast"] {
+    --fc-bg: #ffffff;
+    --fc-bg-elev: #ffffff;
+    --fc-bg-rail: #f3f3f3;
+    --fc-bg-header: #ffeb3b;
+
+    --fc-fg: #000000;
+    --fc-fg-strong: #000000;
+    --fc-fg-mute: #1a1a1a;
+    --fc-fg-faint: #333333;
+
+    --fc-rule: #000000;
+    --fc-rule-strong: #000000;
+
+    --fc-accent: #0033cc;
+    --fc-accent-strong: #001f80;
+    --fc-accent-soft: rgba(0, 51, 204, 0.18);
+    --fc-accent-fg: #ffffff;
+
+    --fc-cell-error-fg: #cc0000;
+    --fc-cell-formula-fg: #000000;
+    --fc-cell-bool-fg: #0033cc;
+    --fc-cell-num-fg: #000000;
+
+    --fc-header-fg: #000000;
+    --fc-header-fg-active: #0033cc;
+    --fc-header-bg: var(--fc-bg-rail);
+    --fc-header-rule: var(--fc-rule);
+
+    --fc-hover-stripe: rgba(0, 51, 204, 0.06);
+
+    color-scheme: light;
+  }
+}

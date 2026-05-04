@@ -29,7 +29,7 @@ import {
   toggleStrike,
   toggleUnderline,
   toggleWrap,
-} from '@formulon-cell/core';
+} from '@libraz/formulon-cell';
 
 const sheetEl = document.getElementById('sheet');
 const themeToggle = document.getElementById('theme-toggle') as HTMLButtonElement | null;
@@ -40,6 +40,7 @@ const statusState = document.getElementById('status-state');
 const statusSelection = document.getElementById('status-selection');
 const statusMetric = document.getElementById('status-metric');
 const statusEngine = document.getElementById('status-engine');
+const statusObjects = document.getElementById('status-objects');
 
 if (!sheetEl) throw new Error('#sheet missing');
 
@@ -118,6 +119,40 @@ const persistStats = (): void => {
     localStorage.setItem('fc-status-stats', JSON.stringify(Array.from(activeStats)));
   } catch {}
 };
+
+// Composite badge showing both passthrough OOXML parts and Excel Tables.
+// We accumulate the latest snapshot from each event and render together so
+// switching workbooks doesn't leak stale numbers from the previous one.
+const objectCounts = { passthroughs: 0, tables: 0, passByCat: {} as Record<string, number> };
+function refreshObjectsBadge(
+  source: 'passthroughs' | 'tables',
+  detail: { count: number; byCategory?: Record<string, number> },
+): void {
+  if (source === 'passthroughs') {
+    objectCounts.passthroughs = detail.count;
+    objectCounts.passByCat = detail.byCategory ?? {};
+  } else {
+    objectCounts.tables = detail.count;
+  }
+  if (!statusObjects) return;
+  const parts: string[] = [];
+  if (objectCounts.tables > 0)
+    parts.push(`${objectCounts.tables} table${objectCounts.tables === 1 ? '' : 's'}`);
+  const charts = objectCounts.passByCat.charts ?? 0;
+  const drawings = objectCounts.passByCat.drawings ?? 0;
+  const pivots = objectCounts.passByCat.pivotTables ?? 0;
+  if (charts > 0) parts.push(`${charts} chart${charts === 1 ? '' : 's'}`);
+  if (drawings > 0) parts.push(`${drawings} drawing${drawings === 1 ? '' : 's'}`);
+  if (pivots > 0) parts.push(`${pivots} pivot${pivots === 1 ? '' : 's'}`);
+  if (parts.length === 0) {
+    statusObjects.hidden = true;
+    statusObjects.textContent = '';
+    return;
+  }
+  statusObjects.hidden = false;
+  statusObjects.textContent = `objects · ${parts.join(', ')}`;
+  statusObjects.title = 'Read-only — loaded from .xlsx but not editable in formulon-cell';
+}
 
 function projectStatus(): void {
   if (!inst) return;
@@ -233,6 +268,17 @@ async function boot(): Promise<void> {
   (window as unknown as { __fcInst?: SpreadsheetInstance }).__fcInst = inst;
 
   filterDropdown = attachFilterDropdown({ store: inst.store });
+
+  // Read-only badge — chart/drawing/pivot counts and Excel-Tables. Hidden
+  //  until the loaded workbook actually carries any of these objects.
+  inst.host.addEventListener('fc:passthroughs', (ev) => {
+    const e = ev as CustomEvent<{ count: number; byCategory: Record<string, number> }>;
+    refreshObjectsBadge('passthroughs', e.detail);
+  });
+  inst.host.addEventListener('fc:tables', (ev) => {
+    const e = ev as CustomEvent<{ count: number }>;
+    refreshObjectsBadge('tables', e.detail);
+  });
   // Header chevron click → open the filter dropdown anchored under the header.
   inst.host.addEventListener('fc:openfilter', (ev) => {
     const e = ev as CustomEvent<{
@@ -267,7 +313,7 @@ async function boot(): Promise<void> {
 
   // Reflect Format Painter state on the toolbar button (any path can deactivate
   // it — Esc, post-paint, or programmatic).
-  inst.formatPainter.subscribe((active, sticky) => {
+  inst.formatPainter?.subscribe((active, sticky) => {
     formatPainterBtn?.classList.toggle(ACTIVE_CLASS, active);
     formatPainterBtn?.classList.toggle('app__tool--sticky', active && sticky);
   });
@@ -306,10 +352,12 @@ formatPainterBtn?.addEventListener('click', () => {
   painterStickyTimer = window.setTimeout(() => {
     painterStickyTimer = null;
     if (!inst) return;
-    if (inst.formatPainter.isActive()) inst.formatPainter.deactivate();
-    else inst.formatPainter.activate(false);
+    const fp = inst.formatPainter;
+    if (!fp) return;
+    if (fp.isActive()) fp.deactivate();
+    else fp.activate(false);
     (sheetEl as HTMLElement).focus();
-    formatPainterBtn?.classList.toggle(ACTIVE_CLASS, inst.formatPainter.isActive());
+    formatPainterBtn?.classList.toggle(ACTIVE_CLASS, fp.isActive());
   }, 220);
 });
 formatPainterBtn?.addEventListener('dblclick', () => {
@@ -318,9 +366,11 @@ formatPainterBtn?.addEventListener('dblclick', () => {
     clearTimeout(painterStickyTimer);
     painterStickyTimer = null;
   }
-  inst.formatPainter.activate(true);
+  const fp = inst.formatPainter;
+  if (!fp) return;
+  fp.activate(true);
   (sheetEl as HTMLElement).focus();
-  formatPainterBtn?.classList.toggle(ACTIVE_CLASS, inst.formatPainter.isActive());
+  formatPainterBtn?.classList.toggle(ACTIVE_CLASS, fp.isActive());
 });
 
 const wireFormat = (
@@ -607,6 +657,81 @@ const markDirty = (): void => {
 };
 // Subscribe once boot completes — see end of boot().
 
+// ── View menu (Show Formulas / R1C1 / Grid / Headers toggles) ────────────
+const viewBtn = document.getElementById('menu-view');
+const viewDrop = document.getElementById('menu-view-dropdown');
+const closeViewMenu = (): void => {
+  if (!viewDrop) return;
+  viewDrop.hidden = true;
+  viewBtn?.setAttribute('aria-expanded', 'false');
+};
+const refreshViewMenu = (): void => {
+  if (!inst || !viewDrop) return;
+  const ui = inst.store.getState().ui;
+  const update = (action: string, on: boolean): void => {
+    const item = viewDrop.querySelector<HTMLElement>(`[data-view="${action}"] [data-fc-check]`);
+    if (item) item.textContent = on ? '✓' : '';
+  };
+  update('show-formulas', !!ui.showFormulas);
+  update('r1c1', !!ui.r1c1);
+  update('grid', ui.showGridLines !== false);
+  update('headers', ui.showHeaders !== false);
+};
+viewBtn?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (!viewDrop) return;
+  refreshViewMenu();
+  viewDrop.hidden = !viewDrop.hidden;
+  viewBtn.setAttribute('aria-expanded', viewDrop.hidden ? 'false' : 'true');
+});
+document.addEventListener('mousedown', (e) => {
+  if (!viewDrop || viewDrop.hidden) return;
+  if (viewDrop.contains(e.target as Node) || viewBtn?.contains(e.target as Node)) return;
+  closeViewMenu();
+});
+viewDrop?.querySelectorAll<HTMLButtonElement>('[data-view]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (!inst) return;
+    const action = btn.dataset.view;
+    const ui = inst.store.getState().ui;
+    if (action === 'show-formulas') mutators.setShowFormulas(inst.store, !ui.showFormulas);
+    else if (action === 'r1c1') mutators.setR1C1(inst.store, !ui.r1c1);
+    else if (action === 'grid') mutators.setShowGridLines(inst.store, !ui.showGridLines);
+    else if (action === 'headers') mutators.setShowHeaders(inst.store, !ui.showHeaders);
+    refreshViewMenu();
+  });
+});
+
+// ── Tools menu (Iterative / Names / Conditional) ─────────────────────────
+const toolsBtn = document.getElementById('menu-tools');
+const toolsDrop = document.getElementById('menu-tools-dropdown');
+const closeToolsMenu = (): void => {
+  if (!toolsDrop) return;
+  toolsDrop.hidden = true;
+  toolsBtn?.setAttribute('aria-expanded', 'false');
+};
+toolsBtn?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (!toolsDrop) return;
+  toolsDrop.hidden = !toolsDrop.hidden;
+  toolsBtn.setAttribute('aria-expanded', toolsDrop.hidden ? 'false' : 'true');
+});
+document.addEventListener('mousedown', (e) => {
+  if (!toolsDrop || toolsDrop.hidden) return;
+  if (toolsDrop.contains(e.target as Node) || toolsBtn?.contains(e.target as Node)) return;
+  closeToolsMenu();
+});
+toolsDrop?.querySelectorAll<HTMLButtonElement>('[data-tools]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (!inst) return;
+    const action = btn.dataset.tools;
+    closeToolsMenu();
+    if (action === 'iterative') inst.openIterativeDialog();
+    else if (action === 'named') inst.openNamedRangeDialog();
+    else if (action === 'conditional') inst.openConditionalDialog();
+  });
+});
+
 // ── Sheet tabs ───────────────────────────────────────────────────────────
 const tabsList = document.getElementById('sheet-tabs');
 const tabAddBtn = document.getElementById('btn-sheet-add');
@@ -829,21 +954,40 @@ tabAddBtn?.addEventListener('click', () => {
   switchSheet(idx);
 });
 
-// Zoom display reflects viewport.zoom.
+// Zoom display + rail. Excel uses a 10–400% range; we clamp to 25–300% which
+// matches what the engine accepts comfortably.
 const zoomDisplay = document.getElementById('zoom-display');
+const zoomRailFill = document.getElementById('zoom-rail-fill');
+const zoomRailThumb = document.getElementById('zoom-rail-thumb');
+const Z_MIN = 0.25;
+const Z_MAX = 3.0;
 const refreshZoom = (): void => {
-  if (!inst || !zoomDisplay) return;
+  if (!inst) return;
   const z = inst.store.getState().viewport.zoom;
-  zoomDisplay.textContent = `${Math.round(z * 100)}%`;
+  if (zoomDisplay) zoomDisplay.textContent = `${Math.round(z * 100)}%`;
+  // Map [Z_MIN..Z_MAX] → [0..100%] on the rail. The thumb tracks the fill.
+  const pct = Math.max(0, Math.min(1, (z - Z_MIN) / (Z_MAX - Z_MIN))) * 100;
+  if (zoomRailFill) zoomRailFill.style.width = `${pct}%`;
+  if (zoomRailThumb) zoomRailThumb.style.left = `${pct}%`;
+};
+const stepZoom = (delta: number): void => {
+  if (!inst) return;
+  const z = inst.store.getState().viewport.zoom;
+  const next = Math.max(Z_MIN, Math.min(Z_MAX, Math.round((z + delta) * 100) / 100));
+  if (next === z) return;
+  setSheetZoom(inst.store, next, inst.workbook);
+  refreshZoom();
 };
 zoomDisplay?.addEventListener('click', () => {
   if (!inst) return;
-  // Cycle 75 → 100 → 125 → 150 → 75 ...
+  // Cycle 75 → 100 → 125 → 150 → 75 …
   const z = inst.store.getState().viewport.zoom;
   const next = z >= 1.5 ? 0.75 : Math.round((z + 0.25) * 100) / 100;
   setSheetZoom(inst.store, next, inst.workbook);
   refreshZoom();
 });
+document.getElementById('btn-zoom-out')?.addEventListener('click', () => stepZoom(-0.1));
+document.getElementById('btn-zoom-in')?.addEventListener('click', () => stepZoom(0.1));
 
 tabPrevBtn?.addEventListener('click', () => {
   if (!inst) return;

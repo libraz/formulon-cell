@@ -15,12 +15,14 @@
         <div class="app__title-left">
           <span class="app__brand">
             <span class="app__brand-mark" aria-hidden="true">
-              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4">
-                <path d="M2 6h12M2 10h12M6 2v12M10 2v12" stroke-linecap="square" />
+              <!-- Excel-evocative cross/grid mark, kept generic to avoid the
+                   Microsoft trademark. White strokes on the green chip. -->
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M7 7l10 10M17 7L7 17" />
               </svg>
             </span>
             <span class="app__brand-name">formulon</span>
-            <span class="app__brand-sep" aria-hidden="true">/</span>
+            <span class="app__brand-sep" aria-hidden="true">·</span>
             <span class="app__brand-doc" id="doc-name">Untitled workbook</span>
           </span>
           <span class="app__crumb" id="doc-state">Saved</span>
@@ -42,7 +44,7 @@
       <!-- ── Menu strip ────────────────────────────────────────────── -->
       <nav class="app__menubar" aria-label="Application menus">
         <div class="app__menu-anchor">
-          <button class="app__menubar-item" type="button" id="menu-file" aria-haspopup="menu" aria-expanded="false">File</button>
+          <button class="app__menubar-item app__menubar-item--file" type="button" id="menu-file" aria-haspopup="menu" aria-expanded="false">File</button>
           <div class="app__dropdown" id="menu-file-dropdown" role="menu" hidden>
             <button class="app__menu-item" type="button" role="menuitem" data-file="new">New (Ctrl+N)</button>
             <button class="app__menu-item" type="button" role="menuitem" data-file="open">Open… (Ctrl+O)</button>
@@ -50,12 +52,62 @@
             <button class="app__menu-item" type="button" role="menuitem" data-file="save-as">Save As…</button>
           </div>
         </div>
-        <button class="app__menubar-item" type="button">Edit</button>
-        <button class="app__menubar-item" type="button">View</button>
+        <button class="app__menubar-item app__menubar-item--current" type="button" aria-current="page">Home</button>
         <button class="app__menubar-item" type="button">Insert</button>
-        <button class="app__menubar-item" type="button">Format</button>
+        <button class="app__menubar-item" type="button">Formulas</button>
         <button class="app__menubar-item" type="button">Data</button>
-        <button class="app__menubar-item" type="button">Tools</button>
+        <button class="app__menubar-item" type="button">Review</button>
+        <div class="app__menubar-group">
+          <button
+            class="app__menubar-item"
+            type="button"
+            id="menu-view"
+            aria-haspopup="menu"
+            aria-expanded="false"
+          >
+            View
+          </button>
+          <div class="app__dropdown" id="menu-view-dropdown" role="menu" hidden>
+            <button class="app__menu-item" type="button" role="menuitem" data-view="show-formulas">
+              <span class="app__menu-check" data-fc-check></span>
+              Show Formulas
+            </button>
+            <button class="app__menu-item" type="button" role="menuitem" data-view="r1c1">
+              <span class="app__menu-check" data-fc-check></span>
+              R1C1 reference style
+            </button>
+            <button class="app__menu-item" type="button" role="menuitem" data-view="grid">
+              <span class="app__menu-check" data-fc-check></span>
+              Grid lines
+            </button>
+            <button class="app__menu-item" type="button" role="menuitem" data-view="headers">
+              <span class="app__menu-check" data-fc-check></span>
+              Headers
+            </button>
+          </div>
+        </div>
+        <div class="app__menubar-group">
+          <button
+            class="app__menubar-item"
+            type="button"
+            id="menu-tools"
+            aria-haspopup="menu"
+            aria-expanded="false"
+          >
+            Tools
+          </button>
+          <div class="app__dropdown" id="menu-tools-dropdown" role="menu" hidden>
+            <button class="app__menu-item" type="button" role="menuitem" data-tools="iterative">
+              Iterative calculation…
+            </button>
+            <button class="app__menu-item" type="button" role="menuitem" data-tools="named">
+              Name Manager…
+            </button>
+            <button class="app__menu-item" type="button" role="menuitem" data-tools="conditional">
+              Conditional Formatting…
+            </button>
+          </div>
+        </div>
         <button class="app__menubar-item" type="button">Help</button>
       </nav>
       <input type="file" id="file-input" accept=".xlsx,.xlsm" hidden />
@@ -76,12 +128,6 @@
               <path d="M6.5 6v3h2v3.5a1.5 1.5 0 0 1-3 0V9h2" />
             </svg>
           </button>
-        </div>
-
-        <span class="app__tool-sep" aria-hidden="true"></span>
-
-        <div class="app__tool-group">
-          <span class="app__zoom" id="zoom-display" title="Zoom">100%</span>
         </div>
 
         <span class="app__tool-sep" aria-hidden="true"></span>
@@ -196,9 +242,21 @@
             <span class="app__status-dot" aria-hidden="true"></span>
             <span id="status-state">Ready</span>
           </span>
-          <span class="app__status-block" id="status-selection">A1</span>
+          <span class="app__status-block app__status-block--selection" id="status-selection">A1</span>
           <span class="app__status-block app__status-block--metric" id="status-metric"></span>
+          <span class="app__status-block app__status-block--objects" id="status-objects" hidden></span>
           <span class="app__status-block app__status-block--engine" id="status-engine">—</span>
+
+          <!-- Excel-style zoom control: − [100%] + with a thin slider rail. -->
+          <span class="app__status-block app__zoomctl" aria-label="Zoom">
+            <button class="app__zoom-step" id="btn-zoom-out" type="button" title="Zoom out" aria-label="Zoom out">−</button>
+            <span class="app__zoom-rail" aria-hidden="true">
+              <span class="app__zoom-rail-fill" id="zoom-rail-fill"></span>
+              <span class="app__zoom-rail-thumb" id="zoom-rail-thumb"></span>
+            </span>
+            <button class="app__zoom-step" id="btn-zoom-in" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+            <span class="app__zoom" id="zoom-display" title="Cycle zoom">100%</span>
+          </span>
         </div>
       </footer>
     </div>

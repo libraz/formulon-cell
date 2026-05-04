@@ -1,7 +1,7 @@
 {
-  "name": "formulon-cell",
+  "name": "formulon-cell-monorepo",
   "private": true,
-  "description": "Spreadsheet UI library for the formulon WASM calc engine.",
+  "description": "Monorepo for @libraz/formulon-cell — a spreadsheet UI library for the formulon WASM calc engine.",
   "license": "Apache-2.0",
   "packageManager": "yarn@4.5.0",
   "volta": {
@@ -14,15 +14,22 @@
   ],
   "scripts": {
     "dev": "yarn workspace @formulon-cell/playground dev",
-    "build": "yarn workspaces foreach -A --topological-dev --exclude formulon-cell run build",
+    "dev:react": "yarn workspace @formulon-cell/react-demo dev",
+    "dev:vue": "yarn workspace @formulon-cell/vue-demo dev",
+    "build": "yarn workspaces foreach -A --topological-dev --exclude formulon-cell-monorepo --exclude '@formulon-cell/*' run build",
+    "build:all": "yarn workspaces foreach -A --topological-dev --exclude formulon-cell-monorepo run build",
     "lint": "biome check .",
     "format": "biome check --write .",
-    "typecheck": "yarn workspaces foreach -A --exclude formulon-cell run typecheck",
-    "test": "yarn workspace @formulon-cell/core test",
-    "sync-formulon": "yarn workspace @formulon-cell/core sync-formulon"
+    "typecheck": "yarn workspaces foreach -A --exclude formulon-cell-monorepo run typecheck",
+    "test": "yarn workspace @libraz/formulon-cell test",
+    "sync-formulon": "yarn workspace @libraz/formulon-cell sync-formulon",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "prepublish:libs": "cp LICENSE packages/formulon-cell/ && cp LICENSE packages/formulon-cell-react/ 2>/dev/null || true && cp LICENSE packages/formulon-cell-vue/ 2>/dev/null || true"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
+    "@changesets/cli": "^2.27.0",
     "typescript": "5.7.2",
     "vite": "6.0.5",
     "vite-plugin-dts": "4.4.0"

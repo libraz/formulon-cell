@@ -1,0 +1,48 @@
+/* Light theme — Microsoft Fluent / Excel 365.
+ *
+ * White sheet, neutral Fluent grays, Excel's signature green accent. Reserve
+ * the accent for selection and active state — never for ambient chrome. */
+
+@layer fc.theme {
+  .fc-host[data-fc-theme="paper"],
+  .fc-host:not([data-fc-theme]) {
+    /* Surfaces — Fluent neutralLighterAlt → neutralLight */
+    --fc-bg: #ffffff;
+    --fc-bg-elev: #ffffff;
+    --fc-bg-rail: #faf9f8;
+    --fc-bg-header: #eaf6ee; /* pale green chip when row/col is active */
+
+    /* Foreground — Fluent neutralPrimary scale */
+    --fc-fg: #201f1e;
+    --fc-fg-strong: #11100f;
+    --fc-fg-mute: #605e5c;
+    --fc-fg-faint: #8a8886;
+
+    /* Rules — Fluent neutralLighter → neutralTertiaryAlt */
+    --fc-rule: #d2d0ce;
+    --fc-rule-strong: #a19f9d;
+
+    /* Accent — Excel green (#107C41) */
+    --fc-accent: #107c41;
+    --fc-accent-strong: #0e6b39;
+    --fc-accent-soft: rgba(16, 124, 65, 0.1);
+    --fc-accent-fg: #ffffff;
+
+    /* Cell-state tints */
+    --fc-cell-error-fg: #a4262c;
+    --fc-cell-formula-fg: #201f1e;
+    --fc-cell-bool-fg: #107c41;
+    --fc-cell-num-fg: var(--fc-fg-strong);
+
+    /* Header — Excel uses cool gray rail with darker active text */
+    --fc-header-fg: #605e5c;
+    --fc-header-fg-active: #107c41;
+    --fc-header-bg: var(--fc-bg-rail);
+    --fc-header-rule: var(--fc-rule);
+
+    /* Hover row/column tints */
+    --fc-hover-stripe: rgba(16, 124, 65, 0.025);
+
+    color-scheme: light;
+  }
+}

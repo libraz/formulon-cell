@@ -1,0 +1,58 @@
+{
+  "name": "@libraz/formulon-cell-react",
+  "version": "0.1.0",
+  "description": "React 18+ component + hooks for @libraz/formulon-cell.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "libraz",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/libraz/formulon-cell.git",
+    "directory": "packages/formulon-cell-react"
+  },
+  "homepage": "https://github.com/libraz/formulon-cell",
+  "bugs": "https://github.com/libraz/formulon-cell/issues",
+  "keywords": [
+    "spreadsheet",
+    "react",
+    "excel",
+    "datagrid",
+    "formulon-cell"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@libraz/formulon-cell": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "react": "^19",
+    "react-dom": "^19",
+    "tsup": "^8",
+    "typescript": "5.7.2"
+  }
+}
