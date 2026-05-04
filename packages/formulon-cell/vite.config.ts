@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
+import dts from 'unplugin-dts/vite';
 import { defineConfig } from 'vite';
-import dts from 'vite-plugin-dts';
 
 // Library build for `@libraz/formulon-cell`.
 //

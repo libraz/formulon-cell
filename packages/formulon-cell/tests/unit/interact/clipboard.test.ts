@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachClipboard } from '../../../src/interact/clipboard.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
@@ -65,14 +65,14 @@ describe('attachClipboard', () => {
   let host: HTMLElement;
   let store: SpreadsheetStore;
   let wb: WorkbookHandle;
-  let onAfterCommit: ReturnType<typeof vi.fn>;
+  let onAfterCommit: Mock<() => void>;
 
   beforeEach(async () => {
     host = document.createElement('div');
     document.body.appendChild(host);
     store = createSpreadsheetStore();
     wb = await newWb();
-    onAfterCommit = vi.fn();
+    onAfterCommit = vi.fn<() => void>();
   });
 
   afterEach(() => {

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { captureSnapshot } from '../../../src/commands/clipboard/snapshot.js';
 import { History } from '../../../src/commands/history.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -57,7 +57,7 @@ describe('attachPasteSpecial', () => {
   let host: HTMLElement;
   let store: SpreadsheetStore;
   let wb: WorkbookHandle;
-  let onAfterCommit: ReturnType<typeof vi.fn>;
+  let onAfterCommit: Mock<() => void>;
 
   beforeEach(async () => {
     host = document.createElement('div');
@@ -65,7 +65,7 @@ describe('attachPasteSpecial', () => {
     document.body.appendChild(host);
     store = createSpreadsheetStore();
     wb = await newWb();
-    onAfterCommit = vi.fn();
+    onAfterCommit = vi.fn<() => void>();
   });
 
   afterEach(() => {

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachContextMenu } from '../../../src/interact/context-menu.js';
@@ -81,9 +81,9 @@ describe('attachContextMenu', () => {
   let store: SpreadsheetStore;
   let wb: WorkbookHandle;
   let detach: () => void;
-  let onAfterCommit: ReturnType<typeof vi.fn>;
-  let onFormatDialog: ReturnType<typeof vi.fn>;
-  let onPasteSpecial: ReturnType<typeof vi.fn>;
+  let onAfterCommit: Mock<() => void>;
+  let onFormatDialog: Mock<() => void>;
+  let onPasteSpecial: Mock<() => void>;
 
   beforeEach(async () => {
     host = document.createElement('div');
@@ -91,9 +91,9 @@ describe('attachContextMenu', () => {
     document.body.appendChild(host);
     store = createSpreadsheetStore();
     wb = await newWb();
-    onAfterCommit = vi.fn();
-    onFormatDialog = vi.fn();
-    onPasteSpecial = vi.fn();
+    onAfterCommit = vi.fn<() => void>();
+    onFormatDialog = vi.fn<() => void>();
+    onPasteSpecial = vi.fn<() => void>();
   });
 
   afterEach(() => {

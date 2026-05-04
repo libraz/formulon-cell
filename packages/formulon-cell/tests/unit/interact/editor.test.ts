@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { InlineEditor } from '../../../src/interact/editor.js';
 import {
@@ -19,7 +19,7 @@ describe('InlineEditor', () => {
   let grid: HTMLElement;
   let store: SpreadsheetStore;
   let wb: WorkbookHandle;
-  let onAfterCommit: ReturnType<typeof vi.fn>;
+  let onAfterCommit: Mock<() => void>;
   let editor: InlineEditor;
 
   beforeEach(async () => {
@@ -29,7 +29,7 @@ describe('InlineEditor', () => {
     document.body.appendChild(host);
     store = createSpreadsheetStore();
     wb = await newWb();
-    onAfterCommit = vi.fn();
+    onAfterCommit = vi.fn<() => void>();
     editor = new InlineEditor({ host, grid, store, wb, onAfterCommit });
   });
 

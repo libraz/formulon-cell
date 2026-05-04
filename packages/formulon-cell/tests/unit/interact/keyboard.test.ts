@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachKeyboard } from '../../../src/interact/keyboard.js';
@@ -65,10 +65,10 @@ describe('attachKeyboard', () => {
   let host: HTMLElement;
   let store: SpreadsheetStore;
   let wb: WorkbookHandle;
-  let onBeginEdit: ReturnType<typeof vi.fn>;
-  let onClearActive: ReturnType<typeof vi.fn>;
-  let onAfterHistory: ReturnType<typeof vi.fn>;
-  let onGoTo: ReturnType<typeof vi.fn>;
+  let onBeginEdit: Mock<(seed: string) => void>;
+  let onClearActive: Mock<() => void>;
+  let onAfterHistory: Mock<() => void>;
+  let onGoTo: Mock<() => void>;
   let detach: () => void;
 
   const setup = (history: History | null = null): void => {
@@ -89,10 +89,10 @@ describe('attachKeyboard', () => {
     document.body.appendChild(host);
     store = createSpreadsheetStore();
     wb = await newWb();
-    onBeginEdit = vi.fn();
-    onClearActive = vi.fn();
-    onAfterHistory = vi.fn();
-    onGoTo = vi.fn();
+    onBeginEdit = vi.fn<(seed: string) => void>();
+    onClearActive = vi.fn<() => void>();
+    onAfterHistory = vi.fn<() => void>();
+    onGoTo = vi.fn<() => void>();
   });
 
   afterEach(() => {
