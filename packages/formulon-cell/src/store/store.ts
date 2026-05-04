@@ -247,6 +247,9 @@ export interface UiSlice {
   /** Range with autofilter enabled. Header row inside this range paints a
    *  small filter button (▼). null = no autofilter. */
   filterRange: Range | null;
+  /** Visibility flag for the Watch Window panel. Session-only state — the
+   *  panel itself reads `watch.watches` for content. */
+  watchPanelOpen: boolean;
 }
 
 /** Aggregate readouts available in the status bar. Excel ships these six. */
@@ -321,6 +324,13 @@ export interface SparklineSlice {
   sparklines: Map<string, Sparkline>;
 }
 
+/** Cells the user has pinned in the Watch Window. Session-only — Excel
+ *  parity: watches don't survive workbook close, and they aren't recorded
+ *  in the undo stack. Order is insertion order. */
+export interface WatchSlice {
+  watches: readonly Addr[];
+}
+
 export interface State {
   viewport: ViewportSlice;
   selection: SelectionSlice;
@@ -331,6 +341,7 @@ export interface State {
   merges: MergesSlice;
   conditional: ConditionalSlice;
   sparkline: SparklineSlice;
+  watch: WatchSlice;
 }
 
 const initialAddr = (sheet = 0): Addr => ({ sheet, row: 0, col: 0 });
@@ -375,11 +386,13 @@ export const createSpreadsheetStore = () =>
       r1c1: false,
       statusAggs: ['sum', 'average', 'count'],
       filterRange: null,
+      watchPanelOpen: false,
     },
     format: { formats: new Map() },
     merges: { byAnchor: new Map(), byCell: new Map() },
     conditional: { rules: [] },
     sparkline: { sparklines: new Map() },
+    watch: { watches: [] },
   }));
 
 export type SpreadsheetStore = ReturnType<typeof createSpreadsheetStore>;
@@ -764,6 +777,44 @@ export const mutators = {
       sparklines.delete(addrKey(addr));
       return { ...s, sparkline: { sparklines } };
     });
+  },
+
+  /** Pin `addr` to the Watch Window. No-op when the same sheet/row/col is
+   *  already watched — duplicate entries would render redundant rows. */
+  addWatch(store: SpreadsheetStore, addr: Addr): void {
+    store.setState((s) => {
+      const exists = s.watch.watches.some(
+        (w) => w.sheet === addr.sheet && w.row === addr.row && w.col === addr.col,
+      );
+      if (exists) return s;
+      return {
+        ...s,
+        watch: { watches: [...s.watch.watches, { ...addr }] },
+      };
+    });
+  },
+
+  /** Unpin `addr` from the Watch Window. No-op when not present. */
+  removeWatch(store: SpreadsheetStore, addr: Addr): void {
+    store.setState((s) => {
+      const next = s.watch.watches.filter(
+        (w) => !(w.sheet === addr.sheet && w.row === addr.row && w.col === addr.col),
+      );
+      if (next.length === s.watch.watches.length) return s;
+      return { ...s, watch: { watches: next } };
+    });
+  },
+
+  /** Drop every watched cell. */
+  clearWatches(store: SpreadsheetStore): void {
+    store.setState((s) => (s.watch.watches.length === 0 ? s : { ...s, watch: { watches: [] } }));
+  },
+
+  /** Show or hide the Watch Window panel. */
+  setWatchPanelOpen(store: SpreadsheetStore, open: boolean): void {
+    store.setState((s) =>
+      s.ui.watchPanelOpen === open ? s : { ...s, ui: { ...s.ui, watchPanelOpen: open } },
+    );
   },
 
   /** Remove any merges that intersect the range. */

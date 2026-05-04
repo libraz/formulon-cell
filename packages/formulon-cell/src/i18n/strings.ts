@@ -43,6 +43,8 @@ export interface Strings {
     insertComment: string;
     deleteComment: string;
     insertHyperlink: string;
+    addWatch: string;
+    removeWatch: string;
   };
   formatDialog: {
     title: string;
@@ -295,6 +297,19 @@ export interface Strings {
     /** aria-label for the formula-bar fx button that opens this dialog. */
     fxButtonLabel: string;
   };
+  watchPanel: {
+    title: string;
+    sheetHeader: string;
+    cellHeader: string;
+    nameHeader: string;
+    valueHeader: string;
+    formulaHeader: string;
+    addWatch: string;
+    removeWatch: string;
+    clearAll: string;
+    empty: string;
+    close: string;
+  };
   a11y: {
     nameBox: string;
     formulaBar: string;
@@ -336,6 +351,8 @@ export const ja: Strings = {
     insertComment: 'コメントを編集…',
     deleteComment: 'コメントを削除',
     insertHyperlink: 'ハイパーリンクを挿入…',
+    addWatch: 'ウォッチを追加',
+    removeWatch: 'ウォッチを削除',
   },
   formatDialog: {
     title: 'セルの書式設定',
@@ -574,6 +591,19 @@ export const ja: Strings = {
     insert: '挿入',
     fxButtonLabel: '関数の引数を挿入',
   },
+  watchPanel: {
+    title: 'ウォッチ ウィンドウ',
+    sheetHeader: 'シート',
+    cellHeader: 'セル',
+    nameHeader: '名前',
+    valueHeader: '値',
+    formulaHeader: '数式',
+    addWatch: 'ウォッチを追加',
+    removeWatch: 'ウォッチを削除',
+    clearAll: 'すべて削除',
+    empty: 'ウォッチはまだありません',
+    close: '閉じる',
+  },
   a11y: {
     nameBox: '名前ボックス',
     formulaBar: '数式バー',
@@ -615,6 +645,8 @@ export const en: Strings = {
     insertComment: 'Edit comment…',
     deleteComment: 'Delete comment',
     insertHyperlink: 'Insert hyperlink…',
+    addWatch: 'Add Watch',
+    removeWatch: 'Remove Watch',
   },
   formatDialog: {
     title: 'Format Cells',
@@ -852,6 +884,19 @@ export const en: Strings = {
     cancel: 'Cancel',
     insert: 'Insert',
     fxButtonLabel: 'Insert function arguments',
+  },
+  watchPanel: {
+    title: 'Watch Window',
+    sheetHeader: 'Sheet',
+    cellHeader: 'Cell',
+    nameHeader: 'Name',
+    valueHeader: 'Value',
+    formulaHeader: 'Formula',
+    addWatch: 'Add Watch',
+    removeWatch: 'Remove Watch',
+    clearAll: 'Delete All',
+    empty: 'No watches',
+    close: 'Close',
   },
   a11y: {
     nameBox: 'Name box',

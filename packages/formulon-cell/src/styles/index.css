@@ -1247,4 +1247,137 @@
     max-width: 280px;
     white-space: pre-wrap;
   }
+
+  /* Watch Window — docks below the status bar. Doesn't share styles with
+     .fc-host__statusbar so the two surfaces stay independent. */
+  .fc-host__watchdock {
+    flex: 0 0 auto;
+  }
+  .fc-watch {
+    display: flex;
+    flex-direction: column;
+    border-top: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    background: var(--fc-bg-rail, color-mix(in srgb, Canvas 96%, CanvasText 4%));
+    color: var(--fc-fg, CanvasText);
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 12px;
+    max-height: 200px;
+  }
+  .fc-watch[hidden] {
+    display: none;
+  }
+  .fc-watch__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+    flex: 0 0 auto;
+  }
+  .fc-watch__title {
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: var(--fc-tracking-wide, 0.04em);
+    text-transform: uppercase;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+  }
+  .fc-watch__actions {
+    display: inline-flex;
+    gap: 4px;
+  }
+  .fc-watch__btn {
+    appearance: none;
+    background: transparent;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: var(--fc-radius-sm, 4px);
+    padding: 2px 8px;
+    font: inherit;
+    font-size: 11px;
+    color: inherit;
+    cursor: pointer;
+  }
+  .fc-watch__btn:hover {
+    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 6%, transparent));
+  }
+  .fc-watch__close {
+    padding: 2px 6px;
+    font-size: 14px;
+    line-height: 1;
+  }
+  .fc-watch__body {
+    flex: 1 1 auto;
+    overflow: auto;
+  }
+  .fc-watch__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--fc-font-mono, ui-monospace, monospace);
+    font-size: 12px;
+  }
+  .fc-watch__table th,
+  .fc-watch__table td {
+    text-align: left;
+    padding: 4px 8px;
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 8%, transparent));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+  }
+  .fc-watch__table th {
+    font-weight: 600;
+    font-size: 10.5px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+    letter-spacing: var(--fc-tracking-wide, 0.04em);
+    text-transform: uppercase;
+    background: var(--fc-bg-rail, color-mix(in srgb, Canvas 96%, CanvasText 4%));
+    position: sticky;
+    top: 0;
+  }
+  .fc-watch__row {
+    cursor: pointer;
+  }
+  .fc-watch__row:hover {
+    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 6%, transparent));
+  }
+  .fc-watch__row:focus-visible {
+    outline: 2px solid var(--fc-accent, #2b6cb0);
+    outline-offset: -2px;
+  }
+  .fc-watch__value {
+    font-feature-settings: "tnum" 1;
+  }
+  .fc-watch__formula {
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+  }
+  .fc-watch__remove-cell {
+    width: 24px;
+    text-align: center;
+    padding: 0;
+  }
+  .fc-watch__remove {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+    font: inherit;
+    font-size: 14px;
+    line-height: 1;
+    padding: 2px 6px;
+  }
+  .fc-watch__remove:hover {
+    color: var(--fc-fg, CanvasText);
+  }
+  .fc-watch__empty {
+    padding: 14px;
+    text-align: center;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+    font-style: italic;
+    font-size: 12px;
+  }
 }

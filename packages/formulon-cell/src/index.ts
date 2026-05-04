@@ -88,6 +88,7 @@ export type {
   ValidationListSource,
   ValidationMeta,
   ValidationOp,
+  WatchSlice,
 } from './store/store.js';
 export { createSpreadsheetStore, mutators } from './store/store.js';
 export { clearComment, commentAt, setComment } from './commands/comment.js';
@@ -245,6 +246,8 @@ export type { PasteSpecialDeps, PasteSpecialHandle } from './interact/paste-spec
 export { attachPasteSpecial } from './interact/paste-special.js';
 export type { StatusBarDeps, StatusBarHandle } from './interact/status-bar.js';
 export { attachStatusBar } from './interact/status-bar.js';
+export type { WatchPanelDeps, WatchPanelHandle } from './interact/watch-panel.js';
+export { attachWatchPanel } from './interact/watch-panel.js';
 export type { ValidationListDeps, ValidationListHandle } from './interact/validation.js';
 export { attachValidationList } from './interact/validation.js';
 export type {

@@ -54,6 +54,7 @@ import { attachPasteSpecial } from './interact/paste-special.js';
 import { attachPointer } from './interact/pointer.js';
 import { attachStatusBar } from './interact/status-bar.js';
 import { attachValidationList } from './interact/validation.js';
+import { attachWatchPanel } from './interact/watch-panel.js';
 import { attachWheel } from './interact/wheel.js';
 import { GridRenderer } from './render/grid.js';
 import { type SpreadsheetStore, createSpreadsheetStore, mutators } from './store/store.js';
@@ -143,6 +144,12 @@ export interface SpreadsheetInstance {
    *  to skip the picker and jump straight to argument entry for that
    *  function. No-op when the `fxDialog` feature is disabled. */
   openFunctionArguments(seedName?: string): void;
+  /** Show the Watch Window panel. No-op when `features.watchWindow` is off. */
+  openWatchWindow(): void;
+  /** Hide the Watch Window panel. No-op when the feature is off. */
+  closeWatchWindow(): void;
+  /** Toggle Watch Window visibility. No-op when the feature is off. */
+  toggleWatchWindow(): void;
   setTheme(t: ThemeName): void;
   /** Pop the most recent undoable action and revert it. Returns false when
    *  the stack is empty. */
@@ -285,7 +292,13 @@ export const Spreadsheet = {
 
     const statusbar = document.createElement('div');
     statusbar.className = 'fc-host__statusbar';
-    host.append(formulabar, grid, statusbar);
+    // Watch Window dock — sits below the status bar when the feature is on.
+    // Always present in the DOM so the panel-attach call has a parent; the
+    // panel itself toggles visibility via `[hidden]`.
+    const watchDock = document.createElement('div');
+    watchDock.dataset.fcWatch = 'dock';
+    watchDock.className = 'fc-host__watchdock';
+    host.append(formulabar, grid, statusbar, watchDock);
 
     let wb: WorkbookHandle = opts.workbook ?? (await WorkbookHandle.createDefault());
     if (opts.seed) opts.seed(wb);
@@ -394,6 +407,23 @@ export const Spreadsheet = {
           getEngineLabel: () => (wb.isStub ? 'stub' : `formulon ${wb.version}`),
         })
       : null;
+    const watchPanel = flags.watchWindow
+      ? attachWatchPanel({
+          host: watchDock,
+          store,
+          getWb: () => wb,
+          strings,
+        })
+      : null;
+    // Wire recalc emissions back to the watch panel so its values update
+    // even when the engine fires a recalc batch with no per-cell `value`
+    // events (rare, but keeps the panel honest).
+    const unsubWatchRecalc = watchPanel
+      ? emitter.on('recalc', () => watchPanel.refresh())
+      : (): void => {};
+    const unsubWatchWb = watchPanel
+      ? emitter.on('workbookChange', () => watchPanel.refresh())
+      : (): void => {};
 
     // wb-dependent layer — re-built whenever setWorkbook swaps the engine.
     interface EngineBinding {
@@ -482,6 +512,27 @@ export const Spreadsheet = {
             onFormatDialog: () => formatDialog?.open(),
             onPasteSpecial: () => pasteSpecialDialog?.open(),
             onInsertHyperlink: () => hyperlinkDialog?.open(),
+            onToggleWatch: flags.watchWindow
+              ? (addr) => {
+                  const watches = store.getState().watch.watches;
+                  const isOn = watches.some(
+                    (w) => w.sheet === addr.sheet && w.row === addr.row && w.col === addr.col,
+                  );
+                  if (isOn) mutators.removeWatch(store, addr);
+                  else {
+                    mutators.addWatch(store, addr);
+                    mutators.setWatchPanelOpen(store, true);
+                  }
+                }
+              : undefined,
+            isWatched: flags.watchWindow
+              ? (addr) =>
+                  store
+                    .getState()
+                    .watch.watches.some(
+                      (w) => w.sheet === addr.sheet && w.row === addr.row && w.col === addr.col,
+                    )
+              : undefined,
           })
         : (): void => {};
       const findReplace = flags.findReplace
@@ -998,6 +1049,7 @@ export const Spreadsheet = {
     if (hyperlinkDialog) registerBuiltIn('hyperlink', hyperlinkDialog, hyperlinkDialog.detach);
     if (statusBar) registerBuiltIn('statusBar', statusBar, statusBar.detach);
     if (fxDialog) registerBuiltIn('fxDialog', fxDialog, fxDialog.detach);
+    if (watchPanel) registerBuiltIn('watchWindow', watchPanel, watchPanel.detach);
 
     // User extensions — additive on top of built-ins. Run after built-ins
     // and the engine binding so they can read other features via
@@ -1108,6 +1160,15 @@ export const Spreadsheet = {
       openFormatDialog() {
         formatDialog?.open();
       },
+      openWatchWindow() {
+        watchPanel?.open();
+      },
+      closeWatchWindow() {
+        watchPanel?.close();
+      },
+      toggleWatchWindow() {
+        watchPanel?.toggle();
+      },
       setTheme(t) {
         host.dataset.fcTheme = t;
         mutators.setTheme(store, t);
@@ -1179,6 +1240,9 @@ export const Spreadsheet = {
         namedRangeDialog?.detach();
         hyperlinkDialog?.detach();
         statusBar?.detach();
+        watchPanel?.detach();
+        unsubWatchRecalc();
+        unsubWatchWb();
         host.removeEventListener('keydown', onHostKey);
         detachWheel();
         fxAutocomplete.detach();

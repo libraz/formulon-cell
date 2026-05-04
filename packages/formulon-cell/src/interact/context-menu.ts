@@ -50,6 +50,13 @@ export interface ContextMenuDeps {
    *  entry is hidden (the action is purely UX sugar — Format Cells > More
    *  also covers it). */
   onInsertHyperlink?: () => void;
+  /** Called when the user clicks the Add/Remove Watch entry. Receives the
+   *  active cell address; the host decides whether to add or remove based
+   *  on its own watch list. When omitted the menu entry is hidden. */
+  onToggleWatch?: (addr: import('../engine/types.js').Addr) => void;
+  /** Returns true when the active cell is currently watched. Used to flip
+   *  the menu label between "Add Watch" and "Remove Watch". */
+  isWatched?: (addr: import('../engine/types.js').Addr) => boolean;
 }
 
 type ItemId =
@@ -84,7 +91,8 @@ type ItemId =
   | 'colUngroup'
   | 'insertComment'
   | 'deleteComment'
-  | 'insertHyperlink';
+  | 'insertHyperlink'
+  | 'toggleWatch';
 
 type MenuKind = 'cell' | 'row' | 'col';
 
@@ -118,6 +126,8 @@ function buildCellEntries(s: Strings): MenuEntry[] {
     { kind: 'item', id: 'deleteComment', label: t.deleteComment },
     { kind: 'item', id: 'insertHyperlink', label: t.insertHyperlink, hint: '⌘K' },
     { kind: 'sep', id: 'sep6' },
+    { kind: 'item', id: 'toggleWatch', label: t.addWatch },
+    { kind: 'sep', id: 'sep7' },
     { kind: 'item', id: 'selectAll', label: t.selectAll, hint: '⌘A' },
   ];
 }
@@ -197,11 +207,22 @@ export function attachContextMenu(deps: ContextMenuDeps): () => void {
         : kind === 'col'
           ? buildColEntries(strings)
           : buildCellEntries(strings);
-    // Hide entries the host has not opted into (currently only the hyperlink
-    // dialog is optional — the rest are always available).
-    const entries = raw.filter(
-      (e) => !(e.kind === 'item' && e.id === 'insertHyperlink' && !deps.onInsertHyperlink),
-    );
+    // Hide entries the host has not opted into. `insertHyperlink` and
+    // `toggleWatch` are optional — the rest are always available.
+    const activeAddr = store.getState().selection.active;
+    const watched = !!deps.isWatched?.(activeAddr);
+    const entries = raw
+      .filter((e) => !(e.kind === 'item' && e.id === 'insertHyperlink' && !deps.onInsertHyperlink))
+      .filter((e) => !(e.kind === 'item' && e.id === 'toggleWatch' && !deps.onToggleWatch))
+      .map((e) => {
+        if (e.kind === 'item' && e.id === 'toggleWatch') {
+          return {
+            ...e,
+            label: watched ? strings.contextMenu.removeWatch : strings.contextMenu.addWatch,
+          };
+        }
+        return e;
+      });
     for (const entry of entries) {
       if (entry.kind === 'sep') {
         const sep = document.createElement('hr');
@@ -495,6 +516,10 @@ export function attachContextMenu(deps: ContextMenuDeps): () => void {
       }
       case 'insertHyperlink': {
         deps.onInsertHyperlink?.();
+        return;
+      }
+      case 'toggleWatch': {
+        deps.onToggleWatch?.(state.selection.active);
         return;
       }
     }
