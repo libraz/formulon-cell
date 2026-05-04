@@ -27,6 +27,7 @@ export const ALL_FEATURE_IDS = [
   'watchWindow',
   'errorIndicators',
   'gotoSpecial',
+  'pageSetup',
   'slicer',
 ] as const;
 

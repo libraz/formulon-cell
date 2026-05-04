@@ -3,6 +3,7 @@ import { writeInputValidated } from './commands/coerce-input.js';
 import { fillRange } from './commands/fill.js';
 import { toggleBold, toggleItalic, toggleStrike, toggleUnderline } from './commands/format.js';
 import { History, recordFormatChange } from './commands/history.js';
+import { printSheet } from './commands/print.js';
 import { extractRefs, rotateRefAt } from './commands/refs.js';
 import { flushFormatToEngine, hydrateCellFormatsFromEngine } from './engine/cell-format-sync.js';
 import { hydrateCommentsAndHyperlinksFromEngine } from './engine/format-sync.js';
@@ -53,6 +54,7 @@ import { attachHyperlinkDialog } from './interact/hyperlink-dialog.js';
 import { attachIterativeDialog } from './interact/iterative-dialog.js';
 import { attachKeyboard } from './interact/keyboard.js';
 import { attachNamedRangeDialog } from './interact/named-range-dialog.js';
+import { attachPageSetupDialog } from './interact/page-setup-dialog.js';
 import { attachPasteSpecial } from './interact/paste-special.js';
 import { attachPointer } from './interact/pointer.js';
 import { type SlicerHandle, attachSlicer } from './interact/slicer.js';
@@ -163,6 +165,13 @@ export interface SpreadsheetInstance {
    *  to skip the picker and jump straight to argument entry for that
    *  function. No-op when the `fxDialog` feature is disabled. */
   openFunctionArguments(seedName?: string): void;
+  /** Open the Page Setup dialog (orientation, paper size, margins,
+   *  header/footer, print titles). No-op when `features.pageSetup` is off. */
+  openPageSetup(): void;
+  /** Build a print document for the active sheet and open the browser's
+   *  native print dialog. Use the dialog's "Save as PDF" action to export.
+   *  No-op when `features.pageSetup` is off. */
+  print(): void;
   /** Show the Watch Window panel. No-op when `features.watchWindow` is off. */
   openWatchWindow(): void;
   /** Hide the Watch Window panel. No-op when the feature is off. */
@@ -445,6 +454,7 @@ export const Spreadsheet = {
     let fxDialog: FxDialogHandle | null = null;
     let fxClickHandler: (() => void) | null = null;
     let namedRangeDialog: ReturnType<typeof attachNamedRangeDialog> | null = null;
+    let pageSetupDialog: ReturnType<typeof attachPageSetupDialog> | null = null;
     let hyperlinkDialog: ReturnType<typeof attachHyperlinkDialog> | null = null;
     let statusBar: ReturnType<typeof attachStatusBar> | null = null;
     let watchPanel: ReturnType<typeof attachWatchPanel> | null = null;
@@ -493,6 +503,7 @@ export const Spreadsheet = {
       'gotoSpecial',
       'fxDialog',
       'namedRanges',
+      'pageSetup',
       'hyperlink',
       'statusBar',
       'watchWindow',
@@ -584,6 +595,14 @@ export const Spreadsheet = {
           featureRegistry.set(
             'namedRanges',
             wrapHandle(namedRangeDialog, () => namedRangeDialog?.detach()),
+          );
+          break;
+        case 'pageSetup':
+          if (pageSetupDialog) return;
+          pageSetupDialog = attachPageSetupDialog({ host, store, strings, history });
+          featureRegistry.set(
+            'pageSetup',
+            wrapHandle(pageSetupDialog, () => pageSetupDialog?.detach()),
           );
           break;
         case 'hyperlink':
@@ -726,6 +745,11 @@ export const Spreadsheet = {
           namedRangeDialog?.detach();
           namedRangeDialog = null;
           featureRegistry.delete('namedRanges');
+          break;
+        case 'pageSetup':
+          pageSetupDialog?.detach();
+          pageSetupDialog = null;
+          featureRegistry.delete('pageSetup');
           break;
         case 'hyperlink':
           hyperlinkDialog?.detach();
@@ -1550,6 +1574,16 @@ export const Spreadsheet = {
       openNamedRangeDialog() {
         namedRangeDialog?.open();
       },
+      openPageSetup() {
+        pageSetupDialog?.open();
+      },
+      print() {
+        // The print command is wired through the same flag as the dialog —
+        // when the feature is off, both call sites are no-ops. Skip if the
+        // dialog never attached so consumers can rely on the gate.
+        if (!pageSetupDialog) return;
+        printSheet(wb, store, store.getState().data.sheetIndex, host);
+      },
       openFormatDialog() {
         formatDialog?.open();
       },
@@ -1682,6 +1716,7 @@ export const Spreadsheet = {
         cellStylesGallery.detach();
         fxDialog?.detach();
         namedRangeDialog?.detach();
+        pageSetupDialog?.detach();
         hyperlinkDialog?.detach();
         statusBar?.detach();
         watchPanel?.detach();

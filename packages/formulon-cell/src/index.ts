@@ -80,6 +80,11 @@ export type {
   MergesSlice,
   NegativeStyle,
   NumFmt,
+  PageMargins,
+  PageOrientation,
+  PageSetup,
+  PageSetupSlice,
+  PaperSize,
   ProtectionSlice,
   SlicerSpec,
   SlicersSlice,
@@ -97,7 +102,7 @@ export type {
   ValidationOp,
   WatchSlice,
 } from './store/store.js';
-export { createSpreadsheetStore, mutators } from './store/store.js';
+export { createSpreadsheetStore, defaultPageSetup, getPageSetup, mutators } from './store/store.js';
 export { clearComment, commentAt, setComment } from './commands/comment.js';
 export {
   moveSheet,
@@ -168,6 +173,7 @@ export {
   applyFormatSnapshot,
   applyLayoutSnapshot,
   applyMergesSnapshot,
+  applyPageSetupSnapshot,
   applySlicersSnapshot,
   applySparklineSnapshot,
   canRedo,
@@ -175,11 +181,13 @@ export {
   captureFormatSnapshot,
   captureLayoutSnapshot,
   captureMergesSnapshot,
+  capturePageSetupSnapshot,
   captureSlicersSnapshot,
   captureSparklineSnapshot,
   recordFormatChange,
   recordLayoutChange,
   recordMergesChange,
+  recordPageSetupChange,
   recordSlicersChange,
   recordSparklineChange,
   redo,
@@ -256,6 +264,19 @@ export type {
   NamedRangeDialogHandle,
 } from './interact/named-range-dialog.js';
 export { attachNamedRangeDialog } from './interact/named-range-dialog.js';
+export type {
+  PageSetupDialogDeps,
+  PageSetupDialogHandle,
+} from './interact/page-setup-dialog.js';
+export { attachPageSetupDialog } from './interact/page-setup-dialog.js';
+export type { PrintDocument } from './commands/print.js';
+export {
+  buildPrintDocument,
+  colLetter,
+  parsePrintTitleCols,
+  parsePrintTitleRows,
+  printSheet,
+} from './commands/print.js';
 export type { FilterDropdownDeps, FilterDropdownHandle } from './interact/filter-dropdown.js';
 export { attachFilterDropdown } from './interact/filter-dropdown.js';
 export type { FindReplaceDeps, FindReplaceHandle } from './interact/find-replace.js';

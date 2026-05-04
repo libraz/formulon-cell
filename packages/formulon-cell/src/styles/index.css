@@ -1584,4 +1584,89 @@
     background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 8%, transparent));
     outline: none;
   }
+
+  /* Page Setup dialog — extends the .fc-fmtdlg surface with a denser body
+     layout (form-style two-column rows). The dialog reuses the existing
+     panel / header / footer / button styles. */
+  .fc-pgsetup__panel {
+    width: min(560px, 96vw);
+  }
+  .fc-pgsetup__row {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 16px;
+  }
+  .fc-pgsetup__triple {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 16px;
+  }
+  .fc-pgsetup__value {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .fc-pgsetup__num {
+    width: 76px;
+  }
+  .fc-pgsetup__text {
+    flex: 1 1 120px;
+    min-width: 80px;
+  }
+  .fc-pgsetup__select {
+    min-width: 140px;
+  }
+  .fc-pgsetup__margins {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    width: 100%;
+  }
+  .fc-pgsetup__margin {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 11px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+  }
+  .fc-pgsetup__margin > input {
+    width: 100%;
+  }
+}
+
+/* Print media — surfaces the print document built by `buildPrintDocument`.
+   These styles also help when consumers `window.print()` the host page
+   directly (debug path) — they hide the chrome and let the canvas grid
+   render at full extent. */
+@media print {
+  .fc-host__formulabar,
+  .fc-host__statusbar,
+  .fc-host__watchdock {
+    display: none !important;
+  }
+  .fc-fmtdlg,
+  .fc-fmtdlg[hidden] {
+    display: none !important;
+  }
+  .fc-host {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .fc-print__table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 10pt;
+  }
+  .fc-print__table td,
+  .fc-print__table th {
+    padding: 2px 6px;
+  }
+  .fc-print__table thead {
+    display: table-header-group;
+  }
 }

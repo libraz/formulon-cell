@@ -382,6 +382,41 @@ export interface Strings {
     cancel: string;
     ok: string;
   };
+  pageSetup: {
+    /** Modal title — shown in the header bar and the aria-label. */
+    title: string;
+    orientation: string;
+    orientPortrait: string;
+    orientLandscape: string;
+    paperSize: string;
+    margins: string;
+    marginTop: string;
+    marginRight: string;
+    marginBottom: string;
+    marginLeft: string;
+    headerLabel: string;
+    footerLabel: string;
+    /** Placeholder for the left header/footer slot. */
+    slotLeftPlaceholder: string;
+    /** Placeholder for the center header/footer slot. */
+    slotCenterPlaceholder: string;
+    /** Placeholder for the right header/footer slot. */
+    slotRightPlaceholder: string;
+    printTitleRows: string;
+    printTitleRowsPlaceholder: string;
+    printTitleCols: string;
+    printTitleColsPlaceholder: string;
+    /** Print scale (0.10 .. 4.00). */
+    scale: string;
+    /** Fit-to-N-pages-wide. */
+    fitWidth: string;
+    /** Fit-to-N-pages-tall. */
+    fitHeight: string;
+    showGridlines: string;
+    showHeadings: string;
+    cancel: string;
+    ok: string;
+  };
   protection: {
     /** Format-dialog tab label for the cell-lock section. */
     tabProtection: string;
@@ -747,6 +782,34 @@ export const ja: Strings = {
     cancel: 'キャンセル',
     ok: 'OK',
   },
+  pageSetup: {
+    title: 'ページ設定',
+    orientation: '印刷の向き',
+    orientPortrait: '縦',
+    orientLandscape: '横',
+    paperSize: '用紙サイズ',
+    margins: '余白 (インチ)',
+    marginTop: '上',
+    marginRight: '右',
+    marginBottom: '下',
+    marginLeft: '左',
+    headerLabel: 'ヘッダー',
+    footerLabel: 'フッター',
+    slotLeftPlaceholder: '左',
+    slotCenterPlaceholder: '中央',
+    slotRightPlaceholder: '右',
+    printTitleRows: '印刷タイトル (行)',
+    printTitleRowsPlaceholder: '例: 1:3',
+    printTitleCols: '印刷タイトル (列)',
+    printTitleColsPlaceholder: '例: A:B',
+    scale: '倍率',
+    fitWidth: '横方向のページ数',
+    fitHeight: '縦方向のページ数',
+    showGridlines: '枠線を印刷',
+    showHeadings: '行列番号を印刷',
+    cancel: 'キャンセル',
+    ok: 'OK',
+  },
   protection: {
     tabProtection: '保護',
     locked: 'ロック',
@@ -1101,6 +1164,34 @@ export const en: Strings = {
     kindDataValidation: 'Data validation',
     kindConditionalFormat: 'Conditional formats',
     noResults: 'No cells found',
+    cancel: 'Cancel',
+    ok: 'OK',
+  },
+  pageSetup: {
+    title: 'Page Setup',
+    orientation: 'Orientation',
+    orientPortrait: 'Portrait',
+    orientLandscape: 'Landscape',
+    paperSize: 'Paper size',
+    margins: 'Margins (inches)',
+    marginTop: 'Top',
+    marginRight: 'Right',
+    marginBottom: 'Bottom',
+    marginLeft: 'Left',
+    headerLabel: 'Header',
+    footerLabel: 'Footer',
+    slotLeftPlaceholder: 'Left',
+    slotCenterPlaceholder: 'Center',
+    slotRightPlaceholder: 'Right',
+    printTitleRows: 'Print title rows',
+    printTitleRowsPlaceholder: 'e.g. 1:3',
+    printTitleCols: 'Print title columns',
+    printTitleColsPlaceholder: 'e.g. A:B',
+    scale: 'Scale',
+    fitWidth: 'Fit to width (pages)',
+    fitHeight: 'Fit to height (pages)',
+    showGridlines: 'Print gridlines',
+    showHeadings: 'Print headings',
     cancel: 'Cancel',
     ok: 'OK',
   },

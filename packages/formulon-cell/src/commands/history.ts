@@ -4,6 +4,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type {
   CellFormat,
   LayoutSlice,
+  PageSetup,
   SlicerSpec,
   Sparkline,
   SpreadsheetStore,
@@ -370,6 +371,48 @@ export function recordSparklineChange(
   history.push({
     undo: () => applySparklineSnapshot(store, before),
     redo: () => applySparklineSnapshot(store, after),
+  });
+}
+
+export function capturePageSetupSnapshot(state: State): Map<number, PageSetup> {
+  // Deep-clone each entry — margins is the only nested object so shallow copy
+  // suffices but a fresh object guards against future field additions that
+  // might re-use the same reference.
+  const out = new Map<number, PageSetup>();
+  for (const [k, v] of state.pageSetup.setupBySheet) {
+    out.set(k, { ...v, margins: { ...v.margins } });
+  }
+  return out;
+}
+
+export function applyPageSetupSnapshot(
+  store: SpreadsheetStore,
+  snap: Map<number, PageSetup>,
+): void {
+  const next = new Map<number, PageSetup>();
+  for (const [k, v] of snap) {
+    next.set(k, { ...v, margins: { ...v.margins } });
+  }
+  store.setState((s) => ({ ...s, pageSetup: { setupBySheet: next } }));
+}
+
+/** Run `mutate`, capturing the page-setup slice before and after, pushing one
+ *  entry. No-op when `history` is null. */
+export function recordPageSetupChange(
+  history: History | null,
+  store: SpreadsheetStore,
+  mutate: () => void,
+): void {
+  if (!history || history.isReplaying()) {
+    mutate();
+    return;
+  }
+  const before = capturePageSetupSnapshot(store.getState());
+  mutate();
+  const after = capturePageSetupSnapshot(store.getState());
+  history.push({
+    undo: () => applyPageSetupSnapshot(store, before),
+    redo: () => applyPageSetupSnapshot(store, after),
   });
 }
 

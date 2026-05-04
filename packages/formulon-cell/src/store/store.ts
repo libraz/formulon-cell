@@ -409,6 +409,77 @@ export interface ErrorIndicatorSlice {
   ignoredErrors: Set<string>;
 }
 
+/** Page orientation for print / PDF export. */
+export type PageOrientation = 'portrait' | 'landscape';
+
+/** Paper size — covers the common ISO + ANSI sheets. The print document
+ *  emits `@page { size: <paperSize> <orientation> }` which all major browsers
+ *  honour for the print preview / PDF rendering. */
+export type PaperSize = 'A4' | 'A3' | 'A5' | 'letter' | 'legal' | 'tabloid';
+
+/** Margins in inches — Excel parity. The dialog renders text inputs in inches;
+ *  the print-CSS converts to `in` units verbatim. */
+export interface PageMargins {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+/** Per-sheet page-setup configuration. Drives both the Page Setup dialog and
+ *  the print document builder. Default values come from `defaultPageSetup()`;
+ *  unset fields fall back to that default — `getPageSetup` always returns a
+ *  fully-populated record. */
+export interface PageSetup {
+  orientation: PageOrientation;
+  paperSize: PaperSize;
+  margins: PageMargins;
+  /** Header / footer text — Excel splits the strip into three slots
+   *  (left / center / right). Empty / missing strings render as nothing. */
+  headerLeft?: string;
+  headerCenter?: string;
+  headerRight?: string;
+  footerLeft?: string;
+  footerCenter?: string;
+  footerRight?: string;
+  /** A1-style row range ("1:3" or "$1:$3") whose rows repeat at the top of
+   *  every printed page. Single-row form ("2") is allowed. */
+  printTitleRows?: string;
+  /** A1-style column range ("A:B"). Repeats those columns on the left of
+   *  every printed page. */
+  printTitleCols?: string;
+  /** Fit-to-N-pages-wide. 0 means no width constraint. */
+  fitWidth?: number;
+  /** Fit-to-N-pages-tall. 0 means no height constraint. */
+  fitHeight?: number;
+  /** Print scale, 0.10..4.00 (1 = 100%). When `fitWidth`/`fitHeight` is set
+   *  the browser ignores the explicit scale. */
+  scale?: number;
+  /** Paint inter-cell hairline gridlines on the print document. */
+  showGridlines?: boolean;
+  /** Paint row-numbers and column-letters on the print document. */
+  showHeadings?: boolean;
+}
+
+export interface PageSetupSlice {
+  /** Per-sheet page-setup map, keyed by sheet index. Sheets without an
+   *  entry fall back to `defaultPageSetup()`. History-tracked. */
+  setupBySheet: Map<number, PageSetup>;
+}
+
+/** Default page-setup record. Returned by `getPageSetup` when the sheet has
+ *  no explicit entry, and used as the baseline for partial-patch merges. */
+export function defaultPageSetup(): PageSetup {
+  return {
+    orientation: 'portrait',
+    paperSize: 'A4',
+    margins: { top: 0.7, right: 0.7, bottom: 0.7, left: 0.7 },
+    scale: 1,
+    showGridlines: false,
+    showHeadings: false,
+  };
+}
+
 /** A single Excel-style slicer attached to one column of one Excel Table.
  *  `selected` is the user's current chip selection — empty array means "all
  *  values pass" (no filter). The optional `x`/`y` coordinates anchor the
@@ -457,6 +528,7 @@ export interface State {
   watch: WatchSlice;
   traces: TracesSlice;
   errorIndicators: ErrorIndicatorSlice;
+  pageSetup: PageSetupSlice;
   slicers: SlicersSlice;
   protection: ProtectionSlice;
 }
@@ -512,6 +584,7 @@ export const createSpreadsheetStore = () =>
     watch: { watches: [] },
     traces: { items: [] },
     errorIndicators: { ignoredErrors: new Set() },
+    pageSetup: { setupBySheet: new Map() },
     slicers: { slicers: [] },
     protection: { protectedSheets: new Map() },
   }));
@@ -1067,6 +1140,27 @@ export const mutators = {
     });
   },
 
+  /** Merge a partial patch into the page-setup for `sheet`. Pass `null` to
+   *  reset that sheet back to defaults. The merge is shallow except for
+   *  `margins`, which is deep-merged — so a patch like `{ margins: { top: 1 } }`
+   *  preserves the other three sides. */
+  setPageSetup(store: SpreadsheetStore, sheet: number, patch: Partial<PageSetup> | null): void {
+    store.setState((s) => {
+      const setupBySheet = new Map(s.pageSetup.setupBySheet);
+      if (patch === null) {
+        setupBySheet.delete(sheet);
+      } else {
+        const prev = setupBySheet.get(sheet) ?? defaultPageSetup();
+        const next: PageSetup = { ...prev, ...patch };
+        if (patch.margins) {
+          next.margins = { ...prev.margins, ...patch.margins };
+        }
+        setupBySheet.set(sheet, next);
+      }
+      return { ...s, pageSetup: { setupBySheet } };
+    });
+  },
+
   /** Remove any merges that intersect the range. */
   unmergeRange(store: SpreadsheetStore, range: Range): void {
     store.setState((s) => {
@@ -1089,3 +1183,19 @@ export const mutators = {
     });
   },
 };
+
+/** Pure read-helper: return the page-setup for `sheet`, falling back to
+ *  `defaultPageSetup()` when no entry exists. Always returns a fully-populated
+ *  record so callers can read every field without optional-chaining. */
+export function getPageSetup(state: State, sheet: number): PageSetup {
+  const entry = state.pageSetup.setupBySheet.get(sheet);
+  if (!entry) return defaultPageSetup();
+  // Merge missing fields onto the default so callers always see a complete
+  // record even if `setPageSetup` was called with a sparse patch.
+  const def = defaultPageSetup();
+  return {
+    ...def,
+    ...entry,
+    margins: { ...def.margins, ...entry.margins },
+  };
+}
