@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  computeEngineSpillRanges,
   detectSpillRange,
   findSpillRanges,
   looksLikeArrayFormula,
+  type SpillEngineView,
 } from '../../../src/engine/spill.js';
-import type { CellValue } from '../../../src/engine/types.js';
+import type { Addr, CellValue } from '../../../src/engine/types.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 
 const num = (n: number): CellValue => ({ kind: 'number', value: n });
@@ -102,5 +104,81 @@ describe('findSpillRanges', () => {
       [1, 0, { value: num(2), formula: null }],
     ]);
     expect(findSpillRanges(cells, 1)).toEqual([]);
+  });
+});
+
+describe('computeEngineSpillRanges', () => {
+  type FormulaCell = { addr: Addr; formula: string | null };
+  type SpillEntry = {
+    anchorRow: number;
+    anchorCol: number;
+    rows: number;
+    cols: number;
+  };
+
+  const makeView = (
+    formulaCells: FormulaCell[],
+    spillBy: Map<string, SpillEntry | null>,
+  ): SpillEngineView => ({
+    *cells(_sheet: number) {
+      for (const c of formulaCells) yield c;
+    },
+    spillInfo(sheet, row, col) {
+      return spillBy.get(`${sheet}:${row}:${col}`) ?? null;
+    },
+  });
+
+  it('emits one rect per anchor when phantom cells share the spill region', () => {
+    const cells: FormulaCell[] = [
+      { addr: { sheet: 0, row: 0, col: 0 }, formula: '=SEQUENCE(3)' },
+      // Phantom cells in formulon expose engaged spillInfo too, but the
+      // engine surfaces them via `cells()` only when they carry a formula
+      // of their own. We model that here: only the anchor is iterated.
+    ];
+    const spill = new Map<string, SpillEntry>([
+      ['0:0:0', { anchorRow: 0, anchorCol: 0, rows: 3, cols: 1 }],
+    ]);
+    const ranges = computeEngineSpillRanges(makeView(cells, spill), 0);
+    expect(ranges).toEqual([{ sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 }]);
+  });
+
+  it('deduplicates when two formula cells report the same anchor', () => {
+    const cells: FormulaCell[] = [
+      { addr: { sheet: 0, row: 0, col: 0 }, formula: '=SEQUENCE(2,2)' },
+      { addr: { sheet: 0, row: 0, col: 1 }, formula: '=SEQUENCE(2,2)' },
+    ];
+    const spill = new Map<string, SpillEntry>([
+      ['0:0:0', { anchorRow: 0, anchorCol: 0, rows: 2, cols: 2 }],
+      ['0:0:1', { anchorRow: 0, anchorCol: 0, rows: 2, cols: 2 }],
+    ]);
+    const ranges = computeEngineSpillRanges(makeView(cells, spill), 0);
+    expect(ranges).toEqual([{ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 }]);
+  });
+
+  it('drops 1×1 spills (no outline to draw)', () => {
+    const cells: FormulaCell[] = [{ addr: { sheet: 0, row: 0, col: 0 }, formula: '=UNIQUE(A1)' }];
+    const spill = new Map<string, SpillEntry>([
+      ['0:0:0', { anchorRow: 0, anchorCol: 0, rows: 1, cols: 1 }],
+    ]);
+    expect(computeEngineSpillRanges(makeView(cells, spill), 0)).toEqual([]);
+  });
+
+  it('skips formula cells the engine reports as not spilled', () => {
+    const cells: FormulaCell[] = [
+      { addr: { sheet: 0, row: 0, col: 0 }, formula: '=SUM(A1:A3)' },
+      { addr: { sheet: 0, row: 1, col: 0 }, formula: '=SEQUENCE(2)' },
+    ];
+    const spill = new Map<string, SpillEntry | null>([
+      ['0:0:0', null],
+      ['0:1:0', { anchorRow: 1, anchorCol: 0, rows: 2, cols: 1 }],
+    ]);
+    const ranges = computeEngineSpillRanges(makeView(cells, spill), 0);
+    expect(ranges).toEqual([{ sheet: 0, r0: 1, c0: 0, r1: 2, c1: 0 }]);
+  });
+
+  it('ignores cells without a formula', () => {
+    const cells: FormulaCell[] = [{ addr: { sheet: 0, row: 0, col: 0 }, formula: null }];
+    const spill = new Map<string, SpillEntry>();
+    expect(computeEngineSpillRanges(makeView(cells, spill), 0)).toEqual([]);
   });
 });

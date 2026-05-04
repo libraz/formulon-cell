@@ -65,5 +65,41 @@ describe('detectCapabilities', () => {
     expect(caps.definedNameMutate).toBe(false);
     expect(caps.partialRecalc).toBe(false);
     expect(caps.iterativeProgress).toBe(false);
+    expect(caps.spillInfo).toBe(false);
+    expect(caps.traceArrows).toBe(false);
+    expect(caps.functionMetadata).toBe(false);
+    expect(caps.functionLocale).toBe(false);
+    expect(caps.calcMode).toBe(false);
+    expect(caps.sheetProtectionRoundtrip).toBe(false);
+    expect(caps.externalLinks).toBe(false);
+    expect(caps.lambdaText).toBe(false);
+    expect(caps.cellStyles).toBe(false);
+    expect(caps.conditionalFormatMutate).toBe(false);
+  });
+
+  it('traceArrows requires both precedents and dependents', () => {
+    const onlyPrec = makeWb(['precedents']);
+    expect(detectCapabilities(onlyPrec).traceArrows).toBe(false);
+    const both = makeWb(['precedents', 'dependents']);
+    expect(detectCapabilities(both).traceArrows).toBe(true);
+  });
+
+  it('cellStyles requires the full named-style surface', () => {
+    const partial = makeWb(['cellStyleCount', 'getCellStyle']);
+    expect(detectCapabilities(partial).cellStyles).toBe(false);
+    const full = makeWb(['cellStyleCount', 'cellStyleXfCount', 'getCellStyle', 'getCellStyleXf']);
+    expect(detectCapabilities(full).cellStyles).toBe(true);
+  });
+
+  it('conditionalFormatMutate requires read + write + remove + clear', () => {
+    const readOnly = makeWb(['getConditionalFormats']);
+    expect(detectCapabilities(readOnly).conditionalFormatMutate).toBe(false);
+    const full = makeWb([
+      'getConditionalFormats',
+      'addConditionalFormat',
+      'removeConditionalFormatAt',
+      'clearConditionalFormats',
+    ]);
+    expect(detectCapabilities(full).conditionalFormatMutate).toBe(true);
   });
 });

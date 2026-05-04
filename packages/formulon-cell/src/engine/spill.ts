@@ -1,4 +1,4 @@
-import type { CellValue, Range } from './types.js';
+import type { Addr, CellValue, Range } from './types.js';
 import { addrKey } from './workbook-handle.js';
 
 /** Functions whose result is expected to spill. Anchor-cell formulas starting
@@ -69,6 +69,44 @@ export function detectSpillRange(
     lastRow = r;
   }
   return { sheet, r0: row, c0: col, r1: lastRow, c1: lastCol };
+}
+
+/** Source shape for `computeEngineSpillRanges`. Mirrors the subset of
+ *  `WorkbookHandle` we need — a cell iterator and a `spillInfo` lookup —
+ *  so the function is pure and exercisable from unit tests without
+ *  spinning up the WASM module. */
+export interface SpillEngineView {
+  cells(sheet: number): Iterable<{ addr: Addr; formula: string | null }>;
+  spillInfo(
+    sheet: number,
+    row: number,
+    col: number,
+  ): { anchorRow: number; anchorCol: number; rows: number; cols: number } | null;
+}
+
+/** Engine-precise spill rects. Iterates formula cells on `sheet`, calls
+ *  `spillInfo`, and emits one rect per anchor (phantom cells are
+ *  deduplicated). Single-cell spills (1×1) are filtered out. */
+export function computeEngineSpillRanges(view: SpillEngineView, sheet: number): Range[] {
+  const out: Range[] = [];
+  const seen = new Set<string>();
+  for (const cell of view.cells(sheet)) {
+    if (!cell.formula) continue;
+    const info = view.spillInfo(sheet, cell.addr.row, cell.addr.col);
+    if (!info) continue;
+    if (info.rows <= 1 && info.cols <= 1) continue;
+    const key = `${info.anchorRow}:${info.anchorCol}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      sheet,
+      r0: info.anchorRow,
+      c0: info.anchorCol,
+      r1: info.anchorRow + info.rows - 1,
+      c1: info.anchorCol + info.cols - 1,
+    });
+  }
+  return out;
 }
 
 /** Scan every populated cell on `sheet` and return the spill rects whose

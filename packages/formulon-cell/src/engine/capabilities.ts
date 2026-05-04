@@ -45,5 +45,20 @@ export function detectCapabilities(wb: Workbook): EngineCapabilities {
     definedNameMutate: has('setDefinedName'),
     partialRecalc: has('partialRecalc'),
     iterativeProgress: has('setIterativeProgress'),
+    spillInfo: has('spillInfo'),
+    traceArrows: all('precedents', 'dependents'),
+    functionMetadata: all('functionNames', 'functionMetadata'),
+    functionLocale: all('localizeFunctionName', 'canonicalizeFunctionName'),
+    calcMode: all('calcMode', 'setCalcMode'),
+    sheetProtectionRoundtrip: all('getSheetProtection', 'setSheetProtection'),
+    externalLinks: has('getExternalLinks'),
+    lambdaText: has('getLambdaText'),
+    cellStyles: all('cellStyleCount', 'cellStyleXfCount', 'getCellStyle', 'getCellStyleXf'),
+    conditionalFormatMutate: all(
+      'getConditionalFormats',
+      'addConditionalFormat',
+      'removeConditionalFormatAt',
+      'clearConditionalFormats',
+    ),
   });
 }

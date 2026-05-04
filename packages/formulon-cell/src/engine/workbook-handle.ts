@@ -3,6 +3,7 @@ import { detectCapabilities } from './capabilities.js';
 import type { LoadOptions } from './loader.js';
 import { isUsingStub, loadFormulon } from './loader.js';
 import { parseRangeRef as parseTableRef } from './range-resolver.js';
+import { computeEngineSpillRanges } from './spill.js';
 import type {
   Addr,
   BorderRecord,
@@ -908,6 +909,36 @@ export class WorkbookHandle {
       cells.delete();
     }
     return out;
+  }
+
+  /** Returns the dynamic-array spill region engaged at `(sheet, row, col)`.
+   *  The same struct is returned for the anchor cell and every phantom
+   *  cell in the region. Returns `null` when the cell is not part of any
+   *  spill or when the engine doesn't expose `spillInfo`. */
+  spillInfo(
+    sheet: number,
+    row: number,
+    col: number,
+  ): { anchorRow: number; anchorCol: number; rows: number; cols: number } | null {
+    this.assertAlive();
+    if (!this.capabilities.spillInfo) return null;
+    const r = this.wb.spillInfo(sheet, row, col);
+    if (!r.engaged) return null;
+    return {
+      anchorRow: r.anchorRow,
+      anchorCol: r.anchorCol,
+      rows: r.rows,
+      cols: r.cols,
+    };
+  }
+
+  /** Returns every spill rect on `sheet` at engine precision. Returns
+   *  `null` when the engine doesn't expose `spillInfo`; callers should
+   *  fall back to the heuristic in `engine/spill.ts` in that case. */
+  spillRanges(sheet: number): Range[] | null {
+    this.assertAlive();
+    if (!this.capabilities.spillInfo) return null;
+    return computeEngineSpillRanges(this, sheet);
   }
 
   /** Snapshot of every validation entry on `sheet`. Each entry can apply to

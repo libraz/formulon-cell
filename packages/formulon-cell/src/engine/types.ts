@@ -107,4 +107,30 @@ export interface EngineCapabilities {
   readonly partialRecalc: boolean;
   /** `setIterativeProgress` callback for cancellable iterative solves. */
   readonly iterativeProgress: boolean;
+  /** `spillInfo` returns precise dynamic-array region info per cell. When
+   *  off, the renderer falls back to a heuristic that walks right/down
+   *  from likely anchor formulas. */
+  readonly spillInfo: boolean;
+  /** `precedents` + `dependents` graph traversal at the engine level.
+   *  Cross-sheet refs are surfaced when this flag is on. */
+  readonly traceArrows: boolean;
+  /** `functionNames` + `functionMetadata` enumerable function catalog. */
+  readonly functionMetadata: boolean;
+  /** `localizeFunctionName` + `canonicalizeFunctionName` round-trip. */
+  readonly functionLocale: boolean;
+  /** `calcMode` + `setCalcMode` round-trip metadata for `<calcPr>`. */
+  readonly calcMode: boolean;
+  /** `getSheetProtection` + `setSheetProtection` round-trip. */
+  readonly sheetProtectionRoundtrip: boolean;
+  /** `getExternalLinks` enumeration of `<externalReferences>` records. */
+  readonly externalLinks: boolean;
+  /** `getLambdaText` rendering of lambda values back to formula text. */
+  readonly lambdaText: boolean;
+  /** `cellStyleCount` + `getCellStyle` + `getCellStyleXf` named-style
+   *  enumeration. */
+  readonly cellStyles: boolean;
+  /** `getConditionalFormats` + `addConditionalFormat` (non-visual) +
+   *  `removeConditionalFormatAt` + `clearConditionalFormats` authoring
+   *  surface. Read-only `evaluateCfRange` is gated by `conditionalFormat`. */
+  readonly conditionalFormatMutate: boolean;
 }
