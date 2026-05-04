@@ -12,7 +12,7 @@ export function hydrateProtectionFromEngine(wb: WorkbookHandle, store: Spreadshe
   if (!wb.capabilities.sheetProtectionRoundtrip) return;
   for (let i = 0; i < wb.sheetCount; i += 1) {
     const p = wb.getSheetProtection(i);
-    if (!p || !p.enabled) continue;
+    if (!p?.enabled) continue;
     mutators.setSheetProtected(
       store,
       i,

@@ -1106,7 +1106,7 @@ export class WorkbookHandle {
    *  `cellStyleCount` + `getCellStyle` into one snapshot suitable for
    *  populating a "Cell Styles" UI. Empty under stub mode. Hidden
    *  built-ins are filtered out — Excel's gallery hides those by default. */
-  getNamedCellStyles(): ReadonlyArray<NamedCellStyle> {
+  getNamedCellStyles(): readonly NamedCellStyle[] {
     this.assertAlive();
     if (!this.capabilities.cellStyles) return [];
     return computeNamedCellStyles(this);

@@ -13,7 +13,6 @@ import { hydrateMergesFromEngine } from './engine/merges-sync.js';
 import { summarizePassthroughs, summarizeTables } from './engine/passthrough-sync.js';
 import { flushProtectionToEngine, hydrateProtectionFromEngine } from './engine/protection-sync.js';
 import { findDependents, findPrecedents } from './engine/refs-graph.js';
-import type { CellValue } from './engine/types.js';
 import { hydrateValidationsFromEngine } from './engine/validation-sync.js';
 import { type ChangeEvent, WorkbookHandle } from './engine/workbook-handle.js';
 import {
