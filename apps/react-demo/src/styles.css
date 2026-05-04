@@ -186,7 +186,7 @@ body {
 /* ── Body layout ────────────────────────────────────────────────────── */
 .demo__body {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 1fr 360px;
   min-height: 0;
 }
 
@@ -244,6 +244,95 @@ body {
   font-family: var(--demo-mono);
   font-size: 14px;
   font-feature-settings: 'tnum';
+}
+
+/* ── Preset selector ────────────────────────────────────────────────── */
+.demo__preset {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.demo__preset-btn {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  color: var(--demo-fg);
+  background: var(--demo-card);
+  border: 1px solid var(--demo-line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.demo__preset-btn:hover:not(:disabled) {
+  border-color: var(--demo-accent);
+}
+
+.demo__preset-btn:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.demo__preset-btn--active {
+  background: var(--demo-accent);
+  color: #fff;
+  border-color: var(--demo-accent);
+}
+
+.demo__preset-btn--active .demo__preset-hint {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.demo__preset-name {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.demo__preset-hint {
+  font-size: 11px;
+  color: var(--demo-fg-soft);
+}
+
+/* ── Feature toggles ───────────────────────────────────────────────── */
+.demo__feat-group + .demo__feat-group {
+  margin-top: 10px;
+}
+
+.demo__feat-title {
+  margin: 0 0 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--demo-fg-soft);
+}
+
+.demo__feat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+}
+
+.demo__feat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 12px;
+  color: var(--demo-fg-soft);
+  cursor: pointer;
+}
+
+.demo__feat input {
+  accent-color: var(--demo-accent);
+}
+
+.demo__feat--on {
+  color: var(--demo-fg);
 }
 
 /* ── Checkboxes ─────────────────────────────────────────────────────── */

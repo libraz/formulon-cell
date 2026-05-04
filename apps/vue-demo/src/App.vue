@@ -3,6 +3,9 @@ import {
   type CellChangeEvent,
   type CellRenderInput,
   type CellValue,
+  type FeatureFlags,
+  type FeatureId,
+  presets,
   type SpreadsheetInstance,
   type ThemeName,
   WorkbookHandle,
@@ -10,8 +13,6 @@ import {
 import { Spreadsheet, useSelection } from '@libraz/formulon-cell-vue';
 import { computed, onUnmounted, ref, shallowRef, watch } from 'vue';
 
-// `paper` / `ink` / `contrast` are core themes; we expose human labels
-// for the toggle bar.
 const THEMES: { value: ThemeName; label: string }[] = [
   { value: 'paper', label: 'Light' },
   { value: 'ink', label: 'Dark' },
@@ -20,6 +21,50 @@ const THEMES: { value: ThemeName; label: string }[] = [
 const LOCALES = [
   { value: 'en', label: 'EN' },
   { value: 'ja', label: 'JA' },
+];
+
+type PresetKey = 'minimal' | 'standard' | 'excel';
+const PRESETS: { value: PresetKey; label: string; hint: string }[] = [
+  { value: 'minimal', label: 'Minimal', hint: 'grid + formula bar only' },
+  { value: 'standard', label: 'Standard', hint: 'menus, find/replace, painter' },
+  { value: 'excel', label: 'Excel', hint: 'full Excel 365 chrome' },
+];
+
+const FEATURE_GROUPS: { title: string; features: { id: FeatureId; label: string }[] }[] = [
+  {
+    title: 'Chrome',
+    features: [
+      { id: 'formulaBar', label: 'Formula bar' },
+      { id: 'statusBar', label: 'Status bar' },
+      { id: 'contextMenu', label: 'Context menu' },
+      { id: 'watchWindow', label: 'Watch window' },
+    ],
+  },
+  {
+    title: 'Editing',
+    features: [
+      { id: 'clipboard', label: 'Clipboard' },
+      { id: 'pasteSpecial', label: 'Paste special' },
+      { id: 'formatPainter', label: 'Format painter' },
+      { id: 'autocomplete', label: 'Autocomplete' },
+      { id: 'shortcuts', label: 'Shortcuts' },
+      { id: 'wheel', label: 'Wheel scroll' },
+    ],
+  },
+  {
+    title: 'Dialogs & overlays',
+    features: [
+      { id: 'findReplace', label: 'Find & replace' },
+      { id: 'formatDialog', label: 'Format dialog' },
+      { id: 'fxDialog', label: 'Function dialog' },
+      { id: 'conditional', label: 'Conditional formatting' },
+      { id: 'namedRanges', label: 'Named ranges' },
+      { id: 'hyperlink', label: 'Hyperlink' },
+      { id: 'validation', label: 'Data validation' },
+      { id: 'hoverComment', label: 'Hover comment' },
+      { id: 'errorIndicators', label: 'Error indicators' },
+    ],
+  },
 ];
 
 const colLabel = (n: number): string => {
@@ -32,7 +77,6 @@ const colLabel = (n: number): string => {
   return out;
 };
 
-// Demo custom functions registered through the `functions` prop.
 const DEMO_FUNCTIONS = [
   {
     name: 'GREET',
@@ -58,8 +102,6 @@ const DEMO_FUNCTIONS = [
   },
 ];
 
-// Cell formatters are wired post-mount through the `cells` registry on
-// the live instance.
 const FORMATTERS = {
   uppercaseA: {
     id: 'demo:uppercaseA',
@@ -100,6 +142,8 @@ const previewValue = (e: CellChangeEvent): string => {
   }
 };
 
+// Demo seed — only runs once on the initial blank workbook (core gates
+// `seed` on `ownsWb`).
 const seed = (wb: WorkbookHandle): void => {
   wb.setText({ sheet: 0, row: 0, col: 0 }, 'item');
   wb.setText({ sheet: 0, row: 0, col: 1 }, 'celsius');
@@ -121,6 +165,11 @@ const seed = (wb: WorkbookHandle): void => {
   wb.recalc();
 };
 
+const composeFeatures = (preset: PresetKey, overrides: FeatureFlags): FeatureFlags => ({
+  ...presets[preset](),
+  ...overrides,
+});
+
 const theme = ref<ThemeName>('paper');
 const locale = ref<string>('en');
 const workbook = shallowRef<WorkbookHandle | null>(null);
@@ -131,13 +180,18 @@ const log = ref<ChangeLogEntry[]>([]);
 const formatters = ref({ uppercase: true, arrows: true });
 const probe = ref<{ name: string; result: string } | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
+const preset = ref<PresetKey>('excel');
+const overrides = ref<FeatureFlags>({});
+
+const features = computed<FeatureFlags>(() => composeFeatures(preset.value, overrides.value));
 
 void WorkbookHandle.createDefault().then((wb) => {
+  // Core only auto-seeds when it owns the workbook (no `workbook` prop).
+  // The demo passes a pre-built handle, so seed by hand here.
+  seed(wb);
   workbook.value = wb;
 });
 
-// Re-register formatters when the toggles flip. The cleanup runs before
-// the effect re-runs so old disposers fire first.
 watch(
   [instance, () => formatters.value.uppercase, () => formatters.value.arrows],
   (_n, _o, onCleanup) => {
@@ -224,6 +278,31 @@ const onOpenFiles = async (ev: Event): Promise<void> => {
   await inst.setWorkbook(next);
 };
 
+const onPresetChange = (next: PresetKey): void => {
+  if (next === preset.value) return;
+  preset.value = next;
+  overrides.value = {};
+};
+
+const onFeatureToggle = (id: FeatureId): void => {
+  const presetFlags = presets[preset.value]();
+  const presetDefault =
+    id === 'watchWindow' ? presetFlags[id] === true : presetFlags[id] !== false;
+  const currentVal = isFeatureOn(id);
+  const nextVal = !currentVal;
+  const nextOverrides: FeatureFlags = { ...overrides.value };
+  if (nextVal === presetDefault) {
+    delete nextOverrides[id];
+  } else {
+    nextOverrides[id] = nextVal;
+  }
+  overrides.value = nextOverrides;
+};
+
+// `watchWindow` ships default-off; everything else is opt-out.
+const isFeatureOn = (id: FeatureId): boolean =>
+  id === 'watchWindow' ? features.value[id] === true : features.value[id] !== false;
+
 onUnmounted(() => {
   // The Spreadsheet component disposes itself; nothing extra to clean up.
 });
@@ -280,12 +359,58 @@ onUnmounted(() => {
         :workbook="workbook"
         :theme="theme"
         :locale="locale"
+        :features="features"
         :functions="DEMO_FUNCTIONS"
-        :seed="seed"
         @ready="onReady"
         @cell-change="onCellChange"
       />
       <aside class="demo__panel" aria-label="Demo panel">
+        <section class="demo__card">
+          <h2>Preset</h2>
+          <p class="demo__hint">
+            Toggle entire feature bundles, or override individual flags below. Changes
+            flow through <code>inst.setFeatures()</code> live — edits survive.
+          </p>
+          <div class="demo__preset">
+            <button
+              v-for="p in PRESETS"
+              :key="p.value"
+              type="button"
+              :class="['demo__preset-btn', { 'demo__preset-btn--active': preset === p.value }]"
+              :aria-pressed="preset === p.value"
+              @click="onPresetChange(p.value)"
+            >
+              <span class="demo__preset-name">{{ p.label }}</span>
+              <span class="demo__preset-hint">{{ p.hint }}</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="demo__card">
+          <h2>Features</h2>
+          <p class="demo__hint">
+            Live-toggle individual <code>FeatureFlags</code>. Disabled flags skip their
+            <code>attach*</code> in <code>mount.ts</code>.
+          </p>
+          <div v-for="group in FEATURE_GROUPS" :key="group.title" class="demo__feat-group">
+            <h3 class="demo__feat-title">{{ group.title }}</h3>
+            <div class="demo__feat-grid">
+              <label
+                v-for="f in group.features"
+                :key="f.id"
+                :class="['demo__feat', { 'demo__feat--on': isFeatureOn(f.id) }]"
+              >
+                <input
+                  type="checkbox"
+                  :checked="isFeatureOn(f.id)"
+                  @change="onFeatureToggle(f.id)"
+                />
+                <span>{{ f.label }}</span>
+              </label>
+            </div>
+          </div>
+        </section>
+
         <section class="demo__card">
           <h2>Selection</h2>
           <p class="demo__mono">{{ selectionLabel }}</p>

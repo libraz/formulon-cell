@@ -84,8 +84,8 @@ export const Spreadsheet = defineComponent({
       emit('ready', inst);
     });
 
-    // Theme + locale are cheap to swap via the imperative API — react to
-    // prop changes without re-mounting.
+    // Theme / locale / workbook are all cheap to swap via the imperative
+    // API — react to prop changes without re-mounting.
     watch(
       () => props.theme,
       (next) => {
@@ -96,6 +96,27 @@ export const Spreadsheet = defineComponent({
       () => props.locale,
       (next) => {
         if (next && instance.value) instance.value.i18n.setLocale(next);
+      },
+    );
+    watch(
+      () => props.workbook,
+      (next) => {
+        if (next && instance.value && next !== instance.value.workbook) {
+          void instance.value.setWorkbook(next);
+        }
+      },
+    );
+    watch(
+      () => props.features,
+      (next) => {
+        if (instance.value) instance.value.setFeatures(next ?? {});
+      },
+      { deep: true },
+    );
+    watch(
+      () => props.extensions,
+      (next) => {
+        if (instance.value) instance.value.setExtensions(next);
       },
     );
 

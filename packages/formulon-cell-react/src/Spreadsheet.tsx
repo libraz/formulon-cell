@@ -132,7 +132,8 @@ const SpreadsheetComponent = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.workbook]);
 
-  // Forward reactive theme / locale prop changes to the running instance.
+  // Forward reactive theme / locale / features / extensions prop changes
+  // to the running instance via imperative APIs — avoids re-mounting.
   useEffect(() => {
     const inst = instanceRef.current;
     if (!inst || !props.theme) return;
@@ -144,6 +145,18 @@ const SpreadsheetComponent = (
     if (!inst || !props.locale) return;
     inst.i18n.setLocale(props.locale);
   }, [props.locale]);
+
+  useEffect(() => {
+    const inst = instanceRef.current;
+    if (!inst) return;
+    inst.setFeatures(props.features ?? {});
+  }, [props.features]);
+
+  useEffect(() => {
+    const inst = instanceRef.current;
+    if (!inst) return;
+    inst.setExtensions(props.extensions);
+  }, [props.extensions]);
 
   // Children are rendered outside the host element since the spreadsheet
   // owns the host's children (`replaceChildren` on mount). When children is
