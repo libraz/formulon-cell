@@ -390,25 +390,34 @@ export function paintActiveCellOutline(
   ctx.strokeRect(bounds.x, bounds.y, bounds.w, bounds.h);
 }
 
+/** Visible side length of the fill handle in CSS pixels. Excel 365 uses a
+ *  small accent-coloured square at the bottom-right of the active selection
+ *  range; the user grabs it to drag-fill into adjacent cells. */
+export const FILL_HANDLE_SIZE = 6;
+
 /** Excel-style fill handle. Drawn at the selection range's bottom-right
- *  corner (or active-cell corner when selection is a single cell). Returns
- *  the bounding rect so the pointer layer can hit-test it. */
+ *  corner (or active-cell corner when selection is a single cell). The square
+ *  is filled in `theme.accent` (resolves from `--fc-accent`, falls back to
+ *  `#0078d4` when unset) and surrounded by a 1px white border so it stands
+ *  proud against any cell fill. The returned rect spans the white border so
+ *  the pointer layer hit-tests against the visible area, not just the inner
+ *  filled square. */
 export function paintFillHandle(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
   theme: ResolvedTheme,
 ): Rect {
-  // Excel 365 uses a small filled square ~6px visible, with a white halo so
-  // it stands proud against any cell fill. We bias slightly outside the
-  // cell rect to keep the visual centred on the corner.
-  const hs = 7;
+  const hs = FILL_HANDLE_SIZE;
+  // Centre the visible square on the cell's bottom-right corner so half the
+  // handle bleeds outside the selection — matches Excel.
   const x = bounds.x + bounds.w - hs / 2;
   const y = bounds.y + bounds.h - hs / 2;
-  // White halo (so it's visible against accent-coloured cell fills).
-  ctx.fillStyle = theme.bgElev;
+  const accent = theme.accent || '#0078d4';
+  // 1px white border ring. Painted as a slightly larger white square first;
+  // the accent fill on top leaves a 1px ring exposed.
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(x - 1, y - 1, hs + 2, hs + 2);
-  // Filled square in accent.
-  ctx.fillStyle = theme.accent;
+  ctx.fillStyle = accent;
   ctx.fillRect(x, y, hs, hs);
   return { x: x - 1, y: y - 1, w: hs + 2, h: hs + 2 };
 }
