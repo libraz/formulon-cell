@@ -11,6 +11,7 @@ import { hydrateCommentsAndHyperlinksFromEngine } from './engine/format-sync.js'
 import { hydrateLayoutFromEngine } from './engine/layout-sync.js';
 import { hydrateMergesFromEngine } from './engine/merges-sync.js';
 import { summarizePassthroughs, summarizeTables } from './engine/passthrough-sync.js';
+import { flushProtectionToEngine, hydrateProtectionFromEngine } from './engine/protection-sync.js';
 import { findDependents, findPrecedents } from './engine/refs-graph.js';
 import type { CellValue } from './engine/types.js';
 import { hydrateValidationsFromEngine } from './engine/validation-sync.js';
@@ -414,6 +415,7 @@ export const Spreadsheet = {
     hydrateMergesFromEngine(wb, store, store.getState().data.sheetIndex);
     hydrateValidationsFromEngine(wb, store, store.getState().data.sheetIndex);
     hydrateCellFormatsFromEngine(wb, store, store.getState().data.sheetIndex);
+    hydrateProtectionFromEngine(wb, store);
     dispatchPassthroughSummary();
 
     function dispatchPassthroughSummary(): void {
@@ -1659,6 +1661,7 @@ export const Spreadsheet = {
         const sheet = store.getState().data.sheetIndex;
         const on = !store.getState().protection.protectedSheets.has(sheet);
         mutators.setSheetProtected(store, sheet, on);
+        flushProtectionToEngine(wb, sheet, on);
         renderer.invalidate();
       },
       setSheetProtected(on: boolean, password?: string) {
@@ -1669,6 +1672,7 @@ export const Spreadsheet = {
           on,
           password !== undefined ? { password } : undefined,
         );
+        flushProtectionToEngine(wb, sheet, on, password);
         renderer.invalidate();
       },
       isSheetProtected() {
