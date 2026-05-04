@@ -6,6 +6,7 @@ import { History, recordFormatChange } from './commands/history.js';
 import { printSheet } from './commands/print.js';
 import { extractRefs, rotateRefAt } from './commands/refs.js';
 import { flushFormatToEngine, hydrateCellFormatsFromEngine } from './engine/cell-format-sync.js';
+import { formatCellForEdit } from './engine/edit-seed.js';
 import { hydrateCommentsAndHyperlinksFromEngine } from './engine/format-sync.js';
 import { hydrateLayoutFromEngine } from './engine/layout-sync.js';
 import { hydrateMergesFromEngine } from './engine/merges-sync.js';
@@ -688,7 +689,7 @@ export const Spreadsheet = {
             onEditCell: (addr) => {
               mutators.setActive(store, addr);
               const cell = store.getState().data.cells.get(`${addr.sheet}:${addr.row}:${addr.col}`);
-              fxInput.value = formatCellForEdit(cell);
+              fxInput.value = formatCellForEdit(cell, wb, addr);
               fxInput.focus();
               fxInput.setSelectionRange(fxInput.value.length, fxInput.value.length);
             },
@@ -979,7 +980,7 @@ export const Spreadsheet = {
         const a = s.selection.active;
         const seed =
           currentWb.cellFormula(a) ??
-          formatCellForEdit(s.data.cells.get(`${a.sheet}:${a.row}:${a.col}`));
+          formatCellForEdit(s.data.cells.get(`${a.sheet}:${a.row}:${a.col}`), currentWb, a);
         editor.begin(seed);
         e.preventDefault();
       };
@@ -1445,8 +1446,14 @@ export const Spreadsheet = {
           case 'error':
             display = v.text;
             break;
-          default:
-            display = '';
+          default: {
+            // Lambda values fall through here (no `lambda` kind on
+            // CellValue yet) — render their body as `=LAMBDA(...)` so the
+            // formula bar shows something editable instead of blank.
+            const lambda = wb.getLambdaText(a);
+            display = lambda ? `=${lambda}` : '';
+            break;
+          }
         }
       }
       // Don't stomp on the user's in-progress formula bar typing.
@@ -1796,24 +1803,6 @@ export const Spreadsheet = {
     };
   },
 };
-
-function formatCellForEdit(cell: { value: CellValue; formula: string | null } | undefined): string {
-  if (!cell) return '';
-  if (cell.formula) return cell.formula;
-  const v = cell.value;
-  switch (v.kind) {
-    case 'number':
-      return String(v.value);
-    case 'bool':
-      return v.value ? 'TRUE' : 'FALSE';
-    case 'text':
-      return v.value;
-    case 'error':
-      return v.text;
-    default:
-      return '';
-  }
-}
 
 /** Case-insensitive defined-name lookup. Returns the formula text stripped
  *  of any leading `=`, sheet qualifier, and `$` anchors so it can be parsed

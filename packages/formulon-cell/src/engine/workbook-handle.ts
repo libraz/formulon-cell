@@ -1060,6 +1060,19 @@ export class WorkbookHandle {
     return this.wb.setCalcMode(mode).ok;
   }
 
+  /** Renders the lambda value stored at `addr` as Excel formula text. The
+   *  returned string never carries a leading `=` — callers prepending it
+   *  for the formula-bar edit seed should add the prefix themselves.
+   *  Returns `null` when the engine doesn't expose `getLambdaText` or
+   *  when the cell is absent / its cached value is not a lambda. */
+  getLambdaText(addr: Addr): string | null {
+    this.assertAlive();
+    if (!this.capabilities.lambdaText) return null;
+    const r = this.wb.getLambdaText(addr.sheet, addr.row, addr.col);
+    if (!r.status.ok) return null;
+    return r.text || null;
+  }
+
   /** External-link records carried by the workbook in `<externalReferences>`
    *  document order. Empty for fresh workbooks and packages whose source
    *  archive had no `<externalReferences>` block. Returns `[]` when the
