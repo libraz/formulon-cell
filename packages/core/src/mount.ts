@@ -3,6 +3,7 @@ import { fillRange } from './commands/fill.js';
 import { toggleBold, toggleItalic, toggleStrike, toggleUnderline } from './commands/format.js';
 import { History, recordFormatChange } from './commands/history.js';
 import { extractRefs, rotateRefAt } from './commands/refs.js';
+import { flushFormatToEngine, hydrateCellFormatsFromEngine } from './engine/cell-format-sync.js';
 import { hydrateCommentsAndHyperlinksFromEngine } from './engine/format-sync.js';
 import { hydrateLayoutFromEngine } from './engine/layout-sync.js';
 import { hydrateMergesFromEngine } from './engine/merges-sync.js';
@@ -26,6 +27,7 @@ import { attachFindReplace } from './interact/find-replace.js';
 import { attachFormatDialog } from './interact/format-dialog.js';
 import { type FormatPainterHandle, attachFormatPainter } from './interact/format-painter.js';
 import { attachHover } from './interact/hover.js';
+import { attachHyperlinkDialog } from './interact/hyperlink-dialog.js';
 import { attachKeyboard } from './interact/keyboard.js';
 import { attachNamedRangeDialog } from './interact/named-range-dialog.js';
 import { attachPasteSpecial } from './interact/paste-special.js';
@@ -188,6 +190,7 @@ export const Spreadsheet = {
     hydrateCommentsAndHyperlinksFromEngine(wb, store, store.getState().data.sheetIndex);
     hydrateMergesFromEngine(wb, store, store.getState().data.sheetIndex);
     hydrateValidationsFromEngine(wb, store, store.getState().data.sheetIndex);
+    hydrateCellFormatsFromEngine(wb, store, store.getState().data.sheetIndex);
 
     const renderer = new GridRenderer({
       host: grid,
@@ -198,12 +201,26 @@ export const Spreadsheet = {
     });
     renderer.resize();
 
-    // wb-independent dialogs (format painter / format dialog don't touch the engine).
-    const formatDialog = attachFormatDialog({ host, store, strings, history });
+    // The format dialog needs wb so it can flush data-validation entries to
+    // the engine on OK; pass a getter so setWorkbook swaps land transparently.
+    const formatDialog = attachFormatDialog({
+      host,
+      store,
+      strings,
+      history,
+      getWb: () => wb,
+    });
     const formatPainter = attachFormatPainter({ host, store, history });
     const hover = attachHover({ grid, store });
     const conditionalDialog = attachConditionalDialog({ host, store, strings });
     const namedRangeDialog = attachNamedRangeDialog({ host, wb, strings });
+    const hyperlinkDialog = attachHyperlinkDialog({
+      host,
+      store,
+      strings,
+      history,
+      getWb: () => wb,
+    });
     const statusBar = attachStatusBar({
       statusbar,
       store,
@@ -288,6 +305,7 @@ export const Spreadsheet = {
           mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex)),
         onFormatDialog: () => formatDialog.open(),
         onPasteSpecial: () => pasteSpecialDialog.open(),
+        onInsertHyperlink: () => hyperlinkDialog.open(),
       });
       const findReplace = attachFindReplace({
         host,
@@ -381,6 +399,10 @@ export const Spreadsheet = {
       if (k === 'f') {
         e.preventDefault();
         binding.findReplace.open();
+      } else if (k === 'k') {
+        // Ctrl/Cmd+K — Insert Hyperlink dialog (Excel/Sheets parity).
+        e.preventDefault();
+        hyperlinkDialog.open();
       } else if (k === 'a') {
         e.preventDefault();
         mutators.selectAll(store);
@@ -440,21 +462,25 @@ export const Spreadsheet = {
         recordFormatChange(history, store, () => {
           toggleBold(store.getState(), store);
         });
+        flushFormatToEngine(wb, store, store.getState().data.sheetIndex);
       } else if (k === 'i') {
         e.preventDefault();
         recordFormatChange(history, store, () => {
           toggleItalic(store.getState(), store);
         });
+        flushFormatToEngine(wb, store, store.getState().data.sheetIndex);
       } else if (k === 'u') {
         e.preventDefault();
         recordFormatChange(history, store, () => {
           toggleUnderline(store.getState(), store);
         });
+        flushFormatToEngine(wb, store, store.getState().data.sheetIndex);
       } else if (e.key === '5') {
         e.preventDefault();
         recordFormatChange(history, store, () => {
           toggleStrike(store.getState(), store);
         });
+        flushFormatToEngine(wb, store, store.getState().data.sheetIndex);
       }
     };
     host.addEventListener('keydown', onHostKey);
@@ -762,6 +788,7 @@ export const Spreadsheet = {
         hydrateCommentsAndHyperlinksFromEngine(wb, store, store.getState().data.sheetIndex);
         hydrateMergesFromEngine(wb, store, store.getState().data.sheetIndex);
         hydrateValidationsFromEngine(wb, store, store.getState().data.sheetIndex);
+        hydrateCellFormatsFromEngine(wb, store, store.getState().data.sheetIndex);
         binding = bindEngine(wb);
         namedRangeDialog.bindWorkbook(wb);
         statusBar.refresh();
@@ -778,6 +805,7 @@ export const Spreadsheet = {
         hover.detach();
         conditionalDialog.detach();
         namedRangeDialog.detach();
+        hyperlinkDialog.detach();
         statusBar.detach();
         host.removeEventListener('keydown', onHostKey);
         detachWheel();

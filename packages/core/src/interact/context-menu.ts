@@ -46,6 +46,10 @@ export interface ContextMenuDeps {
   /** Called when the user clicks "Edit comment…". When omitted, falls back
    *  to a synchronous `window.prompt`. */
   onEditComment?: (addr: import('../engine/types.js').Addr) => void;
+  /** Called when the user clicks "Insert hyperlink…". When omitted the menu
+   *  entry is hidden (the action is purely UX sugar — Format Cells > More
+   *  also covers it). */
+  onInsertHyperlink?: () => void;
 }
 
 type ItemId =
@@ -79,7 +83,8 @@ type ItemId =
   | 'colGroup'
   | 'colUngroup'
   | 'insertComment'
-  | 'deleteComment';
+  | 'deleteComment'
+  | 'insertHyperlink';
 
 type MenuKind = 'cell' | 'row' | 'col';
 
@@ -111,6 +116,7 @@ function buildCellEntries(s: Strings): MenuEntry[] {
     { kind: 'sep', id: 'sep5' },
     { kind: 'item', id: 'insertComment', label: t.insertComment, hint: '⇧F2' },
     { kind: 'item', id: 'deleteComment', label: t.deleteComment },
+    { kind: 'item', id: 'insertHyperlink', label: t.insertHyperlink, hint: '⌘K' },
     { kind: 'sep', id: 'sep6' },
     { kind: 'item', id: 'selectAll', label: t.selectAll, hint: '⌘A' },
   ];
@@ -185,12 +191,17 @@ export function attachContextMenu(deps: ContextMenuDeps): () => void {
   const buildMenu = (kind: MenuKind): void => {
     root.replaceChildren();
     pasteBtnRef = null;
-    const entries =
+    const raw =
       kind === 'row'
         ? buildRowEntries(strings)
         : kind === 'col'
           ? buildColEntries(strings)
           : buildCellEntries(strings);
+    // Hide entries the host has not opted into (currently only the hyperlink
+    // dialog is optional — the rest are always available).
+    const entries = raw.filter(
+      (e) => !(e.kind === 'item' && e.id === 'insertHyperlink' && !deps.onInsertHyperlink),
+    );
     for (const entry of entries) {
       if (entry.kind === 'sep') {
         const sep = document.createElement('hr');
@@ -408,8 +419,10 @@ export function attachContextMenu(deps: ContextMenuDeps): () => void {
         // Excel: select rows flanking a hidden band, then unhide. We just
         // unhide every hidden row inside the active selection.
         const targets = hiddenInSelection(state.layout, 'row', r.r0, r.r1);
-        if (targets.length === 0) return;
-        showRows(store, history, targets[0]!, targets[targets.length - 1]!);
+        const first = targets[0];
+        const last = targets[targets.length - 1];
+        if (first === undefined || last === undefined) return;
+        showRows(store, history, first, last);
         return;
       }
       case 'rowGroup': {
@@ -448,8 +461,10 @@ export function attachContextMenu(deps: ContextMenuDeps): () => void {
       case 'colUnhide': {
         const r = state.selection.range;
         const targets = hiddenInSelection(state.layout, 'col', r.c0, r.c1);
-        if (targets.length === 0) return;
-        showCols(store, history, targets[0]!, targets[targets.length - 1]!);
+        const first = targets[0];
+        const last = targets[targets.length - 1];
+        if (first === undefined || last === undefined) return;
+        showCols(store, history, first, last);
         return;
       }
       case 'colGroup': {
@@ -476,6 +491,10 @@ export function attachContextMenu(deps: ContextMenuDeps): () => void {
       case 'deleteComment': {
         const addr = state.selection.active;
         wrapFmt(() => clearComment(store, addr, wb));
+        return;
+      }
+      case 'insertHyperlink': {
+        deps.onInsertHyperlink?.();
         return;
       }
     }

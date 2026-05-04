@@ -42,6 +42,7 @@ export interface Strings {
     colUngroup: string;
     insertComment: string;
     deleteComment: string;
+    insertHyperlink: string;
   };
   formatDialog: {
     title: string;
@@ -108,6 +109,15 @@ export interface Strings {
     preview: string;
     cancel: string;
     ok: string;
+  };
+  hyperlinkDialog: {
+    title: string;
+    url: string;
+    urlPlaceholder: string;
+    remove: string;
+    cancel: string;
+    ok: string;
+    errorEmptyUrl: string;
   };
   pasteSpecialDialog: {
     title: string;
@@ -256,6 +266,7 @@ export const ja: Strings = {
     colUngroup: '列のグループ解除',
     insertComment: 'コメントを編集…',
     deleteComment: 'コメントを削除',
+    insertHyperlink: 'ハイパーリンクを挿入…',
   },
   formatDialog: {
     title: 'セルの書式設定',
@@ -322,6 +333,15 @@ export const ja: Strings = {
     preview: 'プレビュー',
     cancel: 'キャンセル',
     ok: 'OK',
+  },
+  hyperlinkDialog: {
+    title: 'ハイパーリンクの挿入',
+    url: 'URL',
+    urlPlaceholder: 'https://...',
+    remove: 'リンクを削除',
+    cancel: 'キャンセル',
+    ok: 'OK',
+    errorEmptyUrl: 'URL を入力してください',
   },
   pasteSpecialDialog: {
     title: '形式を選択して貼り付け',
@@ -463,6 +483,7 @@ export const en: Strings = {
     colUngroup: 'Ungroup columns',
     insertComment: 'Edit comment…',
     deleteComment: 'Delete comment',
+    insertHyperlink: 'Insert hyperlink…',
   },
   formatDialog: {
     title: 'Format Cells',
@@ -529,6 +550,15 @@ export const en: Strings = {
     preview: 'Preview',
     cancel: 'Cancel',
     ok: 'OK',
+  },
+  hyperlinkDialog: {
+    title: 'Insert hyperlink',
+    url: 'URL',
+    urlPlaceholder: 'https://...',
+    remove: 'Remove link',
+    cancel: 'Cancel',
+    ok: 'OK',
+    errorEmptyUrl: 'Enter a URL',
   },
   pasteSpecialDialog: {
     title: 'Paste Special',

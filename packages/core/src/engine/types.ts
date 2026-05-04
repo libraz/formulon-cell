@@ -1,9 +1,17 @@
 // Re-export of the formulon-typed surface plus our adapter shapes.
 // Vendored during pre-publish; once @libraz/formulon is on npm this points there.
 export type {
+  BorderRecord,
+  BorderSide,
   CellEntry,
   CellResult,
+  CellXf,
+  DataValidationEntry,
+  DataValidationInput,
+  DataValidationRange,
   EvalResult,
+  FillRecord,
+  FontRecord,
   FormulonModule,
   SaveResult,
   Status,
@@ -60,14 +68,16 @@ export interface EngineCapabilities {
   /** `addMerge` + `getMerges` + `removeMerge` + `clearMerges`. Round-trips
    *  through both the store and the engine, including unmerge. */
   readonly merges: boolean;
-  /** XF-table flow: `getCellXfIndex`, `setCellXfIndex`, `getCellXf`. The
-   *  `numFmtId` field on the XF record carries number-format ids, so a
-   *  separate `numberFormat` flag is unnecessary. */
+  /** Full XF-table round-trip: `getCellXfIndex`, `setCellXfIndex`, `getCellXf`,
+   *  plus the resolver/dedup writers (`getFont`/`getFill`/`getBorder`/`getNumFmt`,
+   *  `addFont`/`addFill`/`addBorder`/`addNumFmt`/`addXf`). The `numFmtId` field
+   *  on the XF record carries number-format ids, so a separate `numberFormat`
+   *  flag is unnecessary. */
   readonly cellFormatting: boolean;
   /** `evaluateCfRange` (read-only evaluation). */
   readonly conditionalFormat: boolean;
-  /** `getValidations` (read-only today; the writeable surface lands in
-   *  a follow-up engine bundle). */
+  /** Full data-validation round-trip: `getValidations` + `addValidation` +
+   *  `clearValidations` (plus the implicit `removeValidationAt`). */
   readonly dataValidation: boolean;
   /** `renameSheet` + `removeSheet` + `moveSheet`. */
   readonly sheetMutate: boolean;
@@ -87,7 +97,8 @@ export interface EngineCapabilities {
   readonly outlines: boolean;
   /** `getComment` + `setComment`. */
   readonly comments: boolean;
-  /** `getHyperlinks` (read-only today). */
+  /** Full hyperlink round-trip: `getHyperlinks`, `addHyperlink`, and
+   *  `clearHyperlinks`. */
   readonly hyperlinks: boolean;
   /** `setDefinedName` (no remove yet — pass empty formula to clear via
    *  the engine convention). */

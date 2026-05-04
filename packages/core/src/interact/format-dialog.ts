@@ -1,5 +1,7 @@
 import { formatNumber } from '../commands/format.js';
 import { type History, recordFormatChange } from '../commands/history.js';
+import { flushFormatToEngine } from '../engine/cell-format-sync.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { addrKey } from '../engine/workbook-handle.js';
 import { type Strings, defaultStrings } from '../i18n/strings.js';
 import {
@@ -20,6 +22,11 @@ export interface FormatDialogDeps {
   /** Shared history. When provided the OK click pushes one format-snapshot
    *  entry that reverts the entire dialog apply on undo. */
   history?: History | null;
+  /** Workbook getter. When provided, format mutations that affect engine
+   *  state (data validation rules, cell-XF entries, hyperlinks) are flushed
+   *  to the engine on OK so xlsx round-trip is complete. Lazy so the dialog
+   *  stays in lockstep with `setWorkbook` swaps. */
+  getWb?: () => WorkbookHandle | null;
 }
 
 export interface FormatDialogHandle {
@@ -75,6 +82,7 @@ const CURRENCY_SYMBOLS = ['$', '¥', '€', '£'];
 export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const { host, store } = deps;
   const history = deps.history ?? null;
+  const getWb = deps.getWb ?? ((): WorkbookHandle | null => null);
   const strings = deps.strings ?? defaultStrings;
   const t = strings.formatDialog;
 
@@ -815,6 +823,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     recordFormatChange(history, store, () => {
       mutators.setRangeFormat(store, range, patch);
     });
+    const liveWb = getWb();
+    if (liveWb) flushFormatToEngine(liveWb, store, range.sheet);
     api.close();
   };
 

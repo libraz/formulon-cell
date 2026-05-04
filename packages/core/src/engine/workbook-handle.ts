@@ -4,8 +4,13 @@ import { isUsingStub, loadFormulon } from './loader.js';
 import type { LoadOptions } from './loader.js';
 import type {
   Addr,
+  BorderRecord,
   CellValue,
+  CellXf,
+  DataValidationInput,
   EngineCapabilities,
+  FillRecord,
+  FontRecord,
   FormulonModule,
   Range,
   Workbook,
@@ -301,9 +306,8 @@ export class WorkbookHandle {
    *  sweep. Returning `false` from the callback aborts the solve. Pass `null`
    *  to detach. No-op on engines without `setIterativeProgress`. */
   setIterativeProgress(
-    callback:
-      | ((iteration: number, maxResidual: number, maxIterations: number) => boolean | void)
-      | null,
+    callback: // biome-ignore lint/suspicious/noConfusingVoidType: callback contract — `void` lets callers omit a return; `undefined` would force them to be explicit.
+    ((iteration: number, maxResidual: number, maxIterations: number) => boolean | void) | null,
   ): boolean {
     this.assertAlive();
     if (!this.capabilities.iterativeProgress) return false;
@@ -591,6 +595,103 @@ export class WorkbookHandle {
     };
   }
 
+  /** Resolve a font index to its plain-data record. Returns null on engine
+   *  failure or when `capabilities.cellFormatting` is off. */
+  getFontRecord(fontIndex: number): FontRecord | null {
+    this.assertAlive();
+    if (!this.capabilities.cellFormatting) return null;
+    const r = this.wb.getFont(fontIndex);
+    if (!r.status.ok) return null;
+    return {
+      name: r.name,
+      size: r.size,
+      bold: r.bold,
+      italic: r.italic,
+      strike: r.strike,
+      underline: r.underline,
+      colorArgb: r.colorArgb,
+    };
+  }
+
+  /** Resolve a fill index to its plain-data record. */
+  getFillRecord(fillIndex: number): FillRecord | null {
+    this.assertAlive();
+    if (!this.capabilities.cellFormatting) return null;
+    const r = this.wb.getFill(fillIndex);
+    if (!r.status.ok) return null;
+    return { pattern: r.pattern, fgArgb: r.fgArgb, bgArgb: r.bgArgb };
+  }
+
+  /** Resolve a border index to its plain-data record. */
+  getBorderRecord(borderIndex: number): BorderRecord | null {
+    this.assertAlive();
+    if (!this.capabilities.cellFormatting) return null;
+    const r = this.wb.getBorder(borderIndex);
+    if (!r.status.ok) return null;
+    return {
+      left: { style: r.left.style, colorArgb: r.left.colorArgb },
+      right: { style: r.right.style, colorArgb: r.right.colorArgb },
+      top: { style: r.top.style, colorArgb: r.top.colorArgb },
+      bottom: { style: r.bottom.style, colorArgb: r.bottom.colorArgb },
+      diagonal: { style: r.diagonal.style, colorArgb: r.diagonal.colorArgb },
+      diagonalUp: r.diagonalUp,
+      diagonalDown: r.diagonalDown,
+    };
+  }
+
+  /** Resolve a number-format id to its format-code string. */
+  getNumFmtCode(numFmtId: number): string | null {
+    this.assertAlive();
+    if (!this.capabilities.cellFormatting) return null;
+    const r = this.wb.getNumFmt(numFmtId);
+    if (!r.status.ok) return null;
+    return r.formatCode;
+  }
+
+  /** Add or dedup a font record. Returns the resolved font index, or -1 on
+   *  engine failure or when capability is off. */
+  addFontRecord(record: FontRecord): number {
+    this.assertAlive();
+    if (!this.capabilities.cellFormatting) return -1;
+    const r = this.wb.addFont(record);
+    return r.status.ok ? r.index : -1;
+  }
+
+  /** Add or dedup a fill record. */
+  addFillRecord(record: FillRecord): number {
+    this.assertAlive();
+    if (!this.capabilities.cellFormatting) return -1;
+    const r = this.wb.addFill(record);
+    return r.status.ok ? r.index : -1;
+  }
+
+  /** Add or dedup a border record. */
+  addBorderRecord(record: BorderRecord): number {
+    this.assertAlive();
+    if (!this.capabilities.cellFormatting) return -1;
+    const r = this.wb.addBorder(record);
+    return r.status.ok ? r.index : -1;
+  }
+
+  /** Register a number-format code. Built-in matches return the built-in id;
+   *  custom codes are appended starting at 164. Returns -1 on failure. */
+  addNumFmtCode(formatCode: string): number {
+    this.assertAlive();
+    if (!this.capabilities.cellFormatting) return -1;
+    const r = this.wb.addNumFmt(formatCode);
+    return r.status.ok ? r.numFmtId : -1;
+  }
+
+  /** Add or dedup an XF (eXtended Format) record built from existing
+   *  font/fill/border indices and a registered numFmtId. Returns the resolved
+   *  xf index, or -1 on failure. */
+  addXfRecord(record: CellXf): number {
+    this.assertAlive();
+    if (!this.capabilities.cellFormatting) return -1;
+    const r = this.wb.addXf(record);
+    return r.status.ok ? r.index : -1;
+  }
+
   /** Append `range` as a merge on `sheet`. Returns false on engine failure or
    *  when `capabilities.merges` is off. The cell content inside the range is
    *  the caller's responsibility (Excel keeps top-left, blanks the rest). */
@@ -745,37 +846,114 @@ export class WorkbookHandle {
   }
 
   /** Snapshot of every validation entry on `sheet`. Each entry can apply to
-   *  multiple ranges (`ranges`) and carries an Excel-style descriptor (type
-   *  + comparison op + formula1/2). The shape mirrors the upstream
-   *  `ValidationEntry`. Empty when `capabilities.dataValidation` is off, when
-   *  the engine returns an empty list, or when the writeable surface hasn't
-   *  landed yet (the read path always succeeds, even on engines that don't
-   *  yet populate it). */
+   *  multiple ranges (`ranges`) and carries an Excel-style descriptor: numeric
+   *  `type` ordinal (0 none, 1 whole, 2 decimal, 3 list, 4 date, 5 time,
+   *  6 textLength, 7 custom), numeric `op` ordinal (0 between … 7 lessThanOrEqual),
+   *  formula1/2 strings, and the surrounding error/prompt metadata. Empty
+   *  when `capabilities.dataValidation` is off or when the engine returns
+   *  no rules. */
   getValidationsForSheet(sheet: number): {
     ranges: Range[];
-    type: string;
-    op: string;
+    type: number;
+    op: number;
+    errorStyle: number;
+    allowBlank: boolean;
+    showInputMessage: boolean;
+    showErrorMessage: boolean;
     formula1: string;
     formula2: string;
+    errorTitle: string;
     errorMessage: string;
+    promptTitle: string;
+    promptMessage: string;
   }[] {
     this.assertAlive();
     if (!this.capabilities.dataValidation) return [];
     const arr = this.wb.getValidations(sheet);
     return arr.map((v) => ({
-      ranges: (v.ranges ?? []).map((m) => ({
+      ranges: v.ranges.map((m) => ({
         sheet,
         r0: m.firstRow,
         c0: m.firstCol,
         r1: m.lastRow,
         c1: m.lastCol,
       })),
-      type: v.type ?? '',
-      op: v.op ?? '',
-      formula1: v.formula1 ?? '',
-      formula2: v.formula2 ?? '',
-      errorMessage: v.errorMessage ?? '',
+      type: v.type,
+      op: v.op,
+      errorStyle: v.errorStyle,
+      allowBlank: v.allowBlank,
+      showInputMessage: v.showInputMessage,
+      showErrorMessage: v.showErrorMessage,
+      formula1: v.formula1,
+      formula2: v.formula2,
+      errorTitle: v.errorTitle,
+      errorMessage: v.errorMessage,
+      promptTitle: v.promptTitle,
+      promptMessage: v.promptMessage,
     }));
+  }
+
+  /** Append a data-validation rule to `sheet`. Ranges are inclusive `Range`
+   *  records; everything else mirrors the upstream `DataValidationInput` shape.
+   *  Returns false on engine failure or when capability is off. */
+  addValidationEntry(
+    sheet: number,
+    input: {
+      ranges: Range[];
+      type: number;
+      op?: number;
+      errorStyle?: number;
+      allowBlank?: boolean;
+      showInputMessage?: boolean;
+      showErrorMessage?: boolean;
+      formula1?: string;
+      formula2?: string;
+      errorTitle?: string;
+      errorMessage?: string;
+      promptTitle?: string;
+      promptMessage?: string;
+    },
+  ): boolean {
+    this.assertAlive();
+    if (!this.capabilities.dataValidation) return false;
+    const dv: DataValidationInput = {
+      type: input.type,
+      ranges: input.ranges.map((r) => ({
+        firstRow: r.r0,
+        firstCol: r.c0,
+        lastRow: r.r1,
+        lastCol: r.c1,
+      })),
+      ...(input.op !== undefined ? { op: input.op } : {}),
+      ...(input.errorStyle !== undefined ? { errorStyle: input.errorStyle } : {}),
+      ...(input.allowBlank !== undefined ? { allowBlank: input.allowBlank } : {}),
+      ...(input.showInputMessage !== undefined ? { showInputMessage: input.showInputMessage } : {}),
+      ...(input.showErrorMessage !== undefined ? { showErrorMessage: input.showErrorMessage } : {}),
+      ...(input.formula1 !== undefined ? { formula1: input.formula1 } : {}),
+      ...(input.formula2 !== undefined ? { formula2: input.formula2 } : {}),
+      ...(input.errorTitle !== undefined ? { errorTitle: input.errorTitle } : {}),
+      ...(input.errorMessage !== undefined ? { errorMessage: input.errorMessage } : {}),
+      ...(input.promptTitle !== undefined ? { promptTitle: input.promptTitle } : {}),
+      ...(input.promptMessage !== undefined ? { promptMessage: input.promptMessage } : {}),
+    };
+    const s = this.wb.addValidation(sheet, dv);
+    return s.ok;
+  }
+
+  /** Remove the validation rule at `index` on `sheet`. */
+  removeValidationAt(sheet: number, index: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.dataValidation) return false;
+    const s = this.wb.removeValidationAt(sheet, index);
+    return s.ok;
+  }
+
+  /** Drop every validation rule on `sheet`. */
+  clearValidations(sheet: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.dataValidation) return false;
+    const s = this.wb.clearValidations(sheet);
+    return s.ok;
   }
 
   /** Snapshot of every hyperlink on `sheet`. Empty array under the stub. */
@@ -792,6 +970,47 @@ export class WorkbookHandle {
       display: h.display,
       tooltip: h.tooltip,
     }));
+  }
+
+  /** Append a hyperlink at `(sheet, row, col)`. Empty `display` / `tooltip`
+   *  mean default. Returns false on engine failure or capability off. */
+  addHyperlink(
+    sheet: number,
+    row: number,
+    col: number,
+    target: string,
+    display = '',
+    tooltip = '',
+  ): boolean {
+    this.assertAlive();
+    if (!this.capabilities.hyperlinks) return false;
+    const s = this.wb.addHyperlink(sheet, row, col, target, display, tooltip);
+    return s.ok;
+  }
+
+  /** Remove every hyperlink anchored at `(sheet, row, col)`. No-op when none
+   *  match. Returns false on engine failure or capability off. */
+  removeHyperlink(sheet: number, row: number, col: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.hyperlinks) return false;
+    const s = this.wb.removeHyperlink(sheet, row, col);
+    return s.ok;
+  }
+
+  /** Remove the hyperlink at `index` on `sheet`. */
+  removeHyperlinkAt(sheet: number, index: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.hyperlinks) return false;
+    const s = this.wb.removeHyperlinkAt(sheet, index);
+    return s.ok;
+  }
+
+  /** Drop every hyperlink on `sheet`. */
+  clearHyperlinks(sheet: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.hyperlinks) return false;
+    const s = this.wb.clearHyperlinks(sheet);
+    return s.ok;
   }
 
   /** Snapshot of row overrides on `sheet`. See `getColumnLayouts`. */
@@ -834,7 +1053,7 @@ export class WorkbookHandle {
   }
 
   private emit(e: ChangeEvent): void {
-    this.listeners.forEach((fn) => fn(e));
+    for (const fn of this.listeners) fn(e);
   }
 
   private assertAlive(): void {

@@ -52,3 +52,29 @@ export function hydrateCommentsAndHyperlinksFromEngine(
     return { ...s, format: { formats } };
   });
 }
+
+/**
+ * Replace the engine's hyperlink set on `sheet` with whatever FormatSlice
+ * currently asserts. Each cell with a non-empty `.hyperlink` becomes a single
+ * engine hyperlink entry whose `target` carries the URL; `display` and
+ * `tooltip` stay default since the UI does not surface them yet. No-op when
+ * `capabilities.hyperlinks` is off.
+ */
+export function syncHyperlinksToEngine(
+  wb: WorkbookHandle,
+  store: SpreadsheetStore,
+  sheet: number,
+): void {
+  if (!wb.capabilities.hyperlinks) return;
+  wb.clearHyperlinks(sheet);
+  const formats = store.getState().format.formats;
+  for (const [key, fmt] of formats) {
+    if (!fmt.hyperlink) continue;
+    const [sStr, rStr, cStr] = key.split(':');
+    if (sStr === undefined || rStr === undefined || cStr === undefined) continue;
+    if (Number.parseInt(sStr, 10) !== sheet) continue;
+    const row = Number.parseInt(rStr, 10);
+    const col = Number.parseInt(cStr, 10);
+    wb.addHyperlink(sheet, row, col, fmt.hyperlink);
+  }
+}
