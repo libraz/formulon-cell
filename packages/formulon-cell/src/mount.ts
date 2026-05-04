@@ -24,6 +24,7 @@ import {
   type ExtensionHandle,
   type ExtensionInput,
   type FeatureFlags,
+  type ThemeName,
   dedupeById,
   flattenExtensions,
   resolveFlags,
@@ -62,7 +63,7 @@ export interface MountOptions {
    *  default workbook. */
   workbook?: WorkbookHandle;
   /** Theme to apply on mount. Switchable later via instance.setTheme. */
-  theme?: 'paper' | 'ink';
+  theme?: ThemeName;
   /** Optional initial-cell seeding. Useful for the playground & docs. */
   seed?: (wb: WorkbookHandle) => void;
   /** UI locale for built-in dialogs and menus. Defaults to 'ja'. Swap at
@@ -137,7 +138,7 @@ export interface SpreadsheetInstance {
   openIterativeDialog(): void;
   /** Open the named cell-styles gallery (Excel Home → Cell Styles). */
   openCellStylesGallery(): void;
-  setTheme(t: 'paper' | 'ink'): void;
+  setTheme(t: ThemeName): void;
   /** Pop the most recent undoable action and revert it. Returns false when
    *  the stack is empty. */
   undo(): boolean;
@@ -163,6 +164,11 @@ export interface SpreadsheetInstance {
   off<K extends SpreadsheetEventName>(name: K, fn: SpreadsheetEventHandler<K>): void;
   dispose(): void;
 }
+
+// Monotonic counter feeding `data-fc-inst-id` on each mount. Used by the
+// dispose path to detect that a later mount has commandeered the same
+// host (StrictMode double-mount, hot-reload, etc.).
+let MOUNT_COUNTER = 0;
 
 /**
  * Mount a spreadsheet onto a DOM host. Returns an instance with imperative
@@ -200,6 +206,13 @@ export const Spreadsheet = {
     host.setAttribute('aria-label', strings.a11y.spreadsheet);
     host.dataset.fcTheme = opts.theme ?? 'paper';
     host.replaceChildren();
+    // Stamp a per-mount instance id on the host. Used by `dispose()` so it
+    // only clears children if it still owns the host — guards against
+    // React 18+ StrictMode double-mount, where a previous instance's
+    // deferred dispose would otherwise wipe the host that a newer mount
+    // already populated.
+    const instanceId = `fc-${++MOUNT_COUNTER}`;
+    host.dataset.fcInstId = instanceId;
 
     // Build chrome: formulabar (top), grid surface, statusbar (bottom).
     const formulabar = document.createElement('div');
@@ -1145,8 +1158,13 @@ export const Spreadsheet = {
         i18n.dispose();
         renderer.dispose();
         if (ownsWb) wb.dispose();
-        host.replaceChildren();
-        host.classList.remove('fc-host');
+        // Only touch the host if a later mount hasn't claimed it. See
+        // `instanceId` stamp above for the StrictMode race this guards.
+        if (host.dataset.fcInstId === instanceId) {
+          host.replaceChildren();
+          host.classList.remove('fc-host');
+          delete host.dataset.fcInstId;
+        }
       },
     };
   },

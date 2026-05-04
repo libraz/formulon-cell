@@ -222,7 +222,10 @@ export interface EditorRefHighlight {
 export interface UiSlice {
   editor: EditorMode;
   hover: Addr | null;
-  theme: 'paper' | 'ink';
+  /** Theme id stamped on the host (`data-fc-theme`). Built-ins ship `paper`,
+   *  `ink`, and `contrast`; consumers can register additional themes via
+   *  custom CSS keyed off the same attribute. */
+  theme: 'paper' | 'ink' | (string & {});
   /** Live preview range while dragging the fill handle. Painted as a dashed
    *  marquee; cleared when the drag ends. Null at rest. */
   fillPreview: Range | null;
@@ -432,7 +435,7 @@ export const mutators = {
     store.setState((s) => ({ ...s, ui: { ...s.ui, hover: addr } }));
   },
 
-  setTheme(store: SpreadsheetStore, theme: 'paper' | 'ink'): void {
+  setTheme(store: SpreadsheetStore, theme: 'paper' | 'ink' | (string & {})): void {
     store.setState((s) => ({ ...s, ui: { ...s.ui, theme } }));
   },
 
