@@ -81,7 +81,8 @@ export function evaluateConditional(state: State): Map<string, ConditionalCellOv
   });
 
   for (let ri = 0; ri < rules.length; ri += 1) {
-    const rule = rules[ri]!;
+    const rule = rules[ri];
+    if (!rule) continue;
     if (rule.range.sheet !== sheet) continue;
     const stat = stats[ri];
     for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
@@ -154,10 +155,13 @@ function mergeApply(target: ConditionalCellOverlay, patch: Partial<CellFormat>):
 }
 
 function pickStop(stops: readonly string[], t: number): string {
-  if (stops.length === 2) return interpolate(stops[0]!, stops[1]!, t);
+  const s0 = stops[0] ?? '#000000';
+  const s1 = stops[1] ?? s0;
+  const s2 = stops[2] ?? s1;
+  if (stops.length === 2) return interpolate(s0, s1, t);
   // Three-stop: low, mid, high
-  if (t <= 0.5) return interpolate(stops[0]!, stops[1]!, t * 2);
-  return interpolate(stops[1]!, stops[2]!, (t - 0.5) * 2);
+  if (t <= 0.5) return interpolate(s0, s1, t * 2);
+  return interpolate(s1, s2, (t - 0.5) * 2);
 }
 
 function interpolate(a: string, b: string, t: number): string {
@@ -175,10 +179,13 @@ function parseColor(s: string): [number, number, number] | null {
   if (m) {
     const hex = m[1] ?? '';
     if (hex.length === 3) {
+      const h0 = hex[0] ?? '0';
+      const h1 = hex[1] ?? '0';
+      const h2 = hex[2] ?? '0';
       return [
-        Number.parseInt(hex[0]! + hex[0]!, 16),
-        Number.parseInt(hex[1]! + hex[1]!, 16),
-        Number.parseInt(hex[2]! + hex[2]!, 16),
+        Number.parseInt(h0 + h0, 16),
+        Number.parseInt(h1 + h1, 16),
+        Number.parseInt(h2 + h2, 16),
       ];
     }
     return [
@@ -190,9 +197,9 @@ function parseColor(s: string): [number, number, number] | null {
   const rgb = s.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
   if (rgb) {
     return [
-      Number.parseInt(rgb[1]!, 10),
-      Number.parseInt(rgb[2]!, 10),
-      Number.parseInt(rgb[3]!, 10),
+      Number.parseInt(rgb[1] ?? '0', 10),
+      Number.parseInt(rgb[2] ?? '0', 10),
+      Number.parseInt(rgb[3] ?? '0', 10),
     ];
   }
   return null;

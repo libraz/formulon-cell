@@ -513,7 +513,7 @@ describe('attachPointer', () => {
       fireUp(host, 145, 10);
       expect(evt.defaultPrevented).toBe(true);
       expect(events).toHaveLength(1);
-      const detail = events[0]!.detail as {
+      const detail = events[0]?.detail as {
         col: number;
         range: { c0: number; c1: number };
       };

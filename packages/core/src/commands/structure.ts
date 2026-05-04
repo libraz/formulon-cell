@@ -69,10 +69,10 @@ function applyAxisShiftToCells(
     if (inMovedBand) {
       // Cells in the moved band were blanked above; rewrite at new addr.
       writeCell(wb, newAddr, c.value, newFormula);
-    } else if (newFormula !== c.formula) {
+    } else if (newFormula !== c.formula && newFormula !== null) {
       // Stationary cell whose formula references the band — overwrite in place.
       // (writeCell would also work but `setFormula` is direct.)
-      wb.setFormula(c.addr, newFormula!);
+      wb.setFormula(c.addr, newFormula);
     }
   }
 }

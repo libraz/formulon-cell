@@ -24,7 +24,7 @@ export function setComment(
   } else {
     mutators.setCellFormat(store, addr, { comment: text });
   }
-  if (wb && wb.capabilities.comments) {
+  if (wb?.capabilities.comments) {
     wb.setCommentEntry(addr.sheet, addr.row, addr.col, '', text);
   }
 }
@@ -32,7 +32,7 @@ export function setComment(
 /** Drop the comment from a cell. No-op when there isn't one. */
 export function clearComment(store: SpreadsheetStore, addr: Addr, wb?: WorkbookHandle): void {
   mutators.setCellFormat(store, addr, { comment: undefined });
-  if (wb && wb.capabilities.comments) {
+  if (wb?.capabilities.comments) {
     wb.setCommentEntry(addr.sheet, addr.row, addr.col, '', '');
   }
 }

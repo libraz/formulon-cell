@@ -50,12 +50,13 @@ export class History {
     this.txnEntries = [];
     if (entries.length === 0) return;
     if (entries.length === 1) {
-      this.commit(entries[0]!);
+      const only = entries[0];
+      if (only) this.commit(only);
       return;
     }
     this.commit({
       undo: () => {
-        for (let i = entries.length - 1; i >= 0; i -= 1) entries[i]!.undo();
+        for (let i = entries.length - 1; i >= 0; i -= 1) entries[i]?.undo();
       },
       redo: () => {
         for (const e of entries) e.redo();

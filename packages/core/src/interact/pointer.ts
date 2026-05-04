@@ -116,7 +116,7 @@ export function attachPointer(
     //  textarea, which triggers commit + cancel and tears down the editor
     //  before our cell-zone branch could query it.
     const editor = getEditor();
-    const inFormula = editor != null && editor.isFormulaEdit();
+    const inFormula = editor?.isFormulaEdit();
 
     // setPointerCapture throws on synthetic events / certain pointer-id mismatches.
     // Wrap to avoid crashing the handler; the worst-case fallback is that move

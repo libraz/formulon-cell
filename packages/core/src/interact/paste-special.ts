@@ -138,8 +138,10 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
 
   // Initial defaults
   const setDefaults = (): void => {
-    whatRadios.get('all')!.checked = true;
-    opRadios.get('none')!.checked = true;
+    const allWhat = whatRadios.get('all');
+    const noneOp = opRadios.get('none');
+    if (allWhat) allWhat.checked = true;
+    if (noneOp) noneOp.checked = true;
     skipBlanks.input.checked = false;
     transpose.input.checked = false;
   };
@@ -165,7 +167,7 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
     setDefaults();
     overlay.hidden = false;
     // Focus first radio for keyboard nav.
-    whatRadios.get('all')!.focus();
+    whatRadios.get('all')?.focus();
   };
 
   const history = deps.history ?? null;

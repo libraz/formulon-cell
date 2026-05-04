@@ -38,9 +38,8 @@ export function extractRefs(text: string): FormulaRef[] {
     /(?:'([^']+)'|([A-Za-z_][A-Za-z0-9_]*))?!?(\$?[A-Za-z]+\$?\d+)(?::(\$?[A-Za-z]+\$?\d+))?/g;
   const out: FormulaRef[] = [];
   const colorMap = new Map<string, number>();
-  let m: RegExpExecArray | null;
   re.lastIndex = 0;
-  while ((m = re.exec(text)) !== null) {
+  for (let m = re.exec(text); m !== null; m = re.exec(text)) {
     const headM = m[3] ?? '';
     const tailM = m[4];
     const head = parseAtomRef(headM);
@@ -110,10 +109,9 @@ export function rotateRefAt(text: string, caret: number): F4Result {
   const window = text.slice(start, caret + 16);
   const offset = start;
   const re = new RegExp(REF_RE, 'g');
-  let m: RegExpExecArray | null;
   let chosen: { match: RegExpExecArray; absoluteStart: number } | null = null;
   re.lastIndex = 0;
-  while ((m = re.exec(window)) !== null) {
+  for (let m = re.exec(window); m !== null; m = re.exec(window)) {
     const matchStart = offset + m.index;
     const matchEnd = matchStart + m[0].length;
     if (caret >= matchStart && caret <= matchEnd) {

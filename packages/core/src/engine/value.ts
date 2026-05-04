@@ -25,10 +25,6 @@ export function fromEngineValue(v: Value): CellValue {
       return { kind: 'text', value: v.text };
     case ValueKind.Error:
       return { kind: 'error', code: v.errorCode, text: ERROR_NAME[v.errorCode] ?? '#ERR!' };
-    case ValueKind.Blank:
-    case ValueKind.Array:
-    case ValueKind.Ref:
-    case ValueKind.Lambda:
     default:
       return BLANK;
   }

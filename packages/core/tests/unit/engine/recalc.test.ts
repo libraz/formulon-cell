@@ -11,7 +11,7 @@ interface RecalcCalls {
     lastCol: number;
   }[];
   iterative: { enabled: boolean; maxIterations: number; maxChange: number }[];
-  progress: (((it: number, mx: number, max: number) => boolean | void) | null)[];
+  progress: (((it: number, mx: number, max: number) => boolean | undefined) | null)[];
 }
 
 /** Build a stand-in for `WorkbookHandle` that mirrors the real wrapper's
@@ -56,7 +56,7 @@ const makeFake = (opts: {
     },
     setIterativeProgress: (
       cb:
-        | ((iteration: number, maxResidual: number, maxIterations: number) => boolean | void)
+        | ((iteration: number, maxResidual: number, maxIterations: number) => boolean | undefined)
         | null,
     ): boolean => {
       if (!caps.iterativeProgress) return false;

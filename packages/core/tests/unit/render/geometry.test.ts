@@ -367,7 +367,8 @@ describe('rangeRects', () => {
     const viewport = makeViewport();
     const rects = rangeRects(layout, viewport, { r0: 1, r1: 2, c0: 1, c1: 2 });
     expect(rects).toHaveLength(1);
-    const r = rects[0]!;
+    const r = rects[0];
+    if (!r) throw new Error('expected one rect');
     expect(r.x).toBe(50 + 100);
     expect(r.y).toBe(30 + 20);
     expect(r.w).toBe(200);

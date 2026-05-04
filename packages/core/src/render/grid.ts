@@ -261,7 +261,7 @@ export class GridRenderer {
     // currently win per field for cells with overlap. Restricted to the
     // visible viewport rect so we don't pay for off-screen cells.
     const wb = this.getWb();
-    if (wb && wb.capabilities.conditionalFormat) {
+    if (wb?.capabilities.conditionalFormat) {
       const sheet = state.data.sheetIndex;
       const vp = state.viewport;
       const r0 = vp.rowStart;
