@@ -1,5 +1,6 @@
 import type { History } from '../commands/history.js';
 import { detectCapabilities } from './capabilities.js';
+import { computeNamedCellStyles, type NamedCellStyle } from './cell-styles-meta.js';
 import type { LoadOptions } from './loader.js';
 import { isUsingStub, loadFormulon } from './loader.js';
 import { parseRangeRef as parseTableRef } from './range-resolver.js';
@@ -1058,6 +1059,57 @@ export class WorkbookHandle {
     this.assertAlive();
     if (!this.capabilities.calcMode) return false;
     return this.wb.setCalcMode(mode).ok;
+  }
+
+  /** Number of `<cellStyle>` entries (named styles) registered on the
+   *  workbook. Returns `0` under stub mode and pre-5/5 vendored builds. */
+  cellStyleCount(): number {
+    this.assertAlive();
+    if (!this.capabilities.cellStyles) return 0;
+    return this.wb.cellStyleCount();
+  }
+
+  /** Number of `<cellStyleXfs>` records — the named-style xf table that
+   *  `CellStyleResult.xfId` indexes into. Returns `0` under stub mode and
+   *  pre-5/5 vendored builds. */
+  cellStyleXfCount(): number {
+    this.assertAlive();
+    if (!this.capabilities.cellStyles) return 0;
+    return this.wb.cellStyleXfCount();
+  }
+
+  /** Snapshot of the named cell style at `index`. Returns `null` when the
+   *  engine doesn't expose `getCellStyle` or the index is out of range. */
+  getCellStyle(index: number): {
+    name: string;
+    xfId: number;
+    builtinId: number;
+    iLevel: number;
+    hidden: boolean;
+    customBuiltin: boolean;
+  } | null {
+    this.assertAlive();
+    if (!this.capabilities.cellStyles) return null;
+    const r = this.wb.getCellStyle(index);
+    if (!r.status.ok) return null;
+    return {
+      name: r.name,
+      xfId: r.xfId,
+      builtinId: r.builtinId,
+      iLevel: r.iLevel,
+      hidden: r.hidden,
+      customBuiltin: r.customBuiltin,
+    };
+  }
+
+  /** Enumerate every named cell style on the workbook — combines
+   *  `cellStyleCount` + `getCellStyle` into one snapshot suitable for
+   *  populating a "Cell Styles" UI. Empty under stub mode. Hidden
+   *  built-ins are filtered out — Excel's gallery hides those by default. */
+  getNamedCellStyles(): ReadonlyArray<NamedCellStyle> {
+    this.assertAlive();
+    if (!this.capabilities.cellStyles) return [];
+    return computeNamedCellStyles(this);
   }
 
   /** Snapshot of every CF rule on `sheet`, in flattened priority order.

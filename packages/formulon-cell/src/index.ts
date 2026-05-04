@@ -179,6 +179,8 @@ export {
 export { textToColumns } from './commands/text-to-columns.js';
 export type { ValidationOutcome } from './commands/validate.js';
 export { resolveListValues, validateAgainst } from './commands/validate.js';
+export type { NamedCellStyle } from './engine/cell-styles-meta.js';
+export { computeNamedCellStyles } from './engine/cell-styles-meta.js';
 export type { LocaleOrdinal } from './engine/function-locale.js';
 export { canonicalizeFormula, localizeFormula } from './engine/function-locale.js';
 export type { LoadOptions } from './engine/loader.js';
