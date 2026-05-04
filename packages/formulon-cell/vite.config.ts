@@ -42,9 +42,11 @@ export default defineConfig({
   },
   plugins: [
     dts({
-      tsconfigPath: './tsconfig.json',
-      include: ['src/**/*'],
-      exclude: ['src/**/*.test.ts', 'src/**/*.spec.ts', 'src/vite-env.d.ts'],
+      // Use a build-only tsconfig that pins `rootDir: ./src` and excludes
+      // tests/. TS 6 made `rootDir` default to the tsconfig directory, so
+      // the regular tsconfig (which includes tests/) would otherwise emit
+      // .d.ts under dist/src/, breaking the package's exports map.
+      tsconfigPath: './tsconfig.build.json',
       // No rollupTypes — we want per-file .d.ts so subpath imports get
       // their own type declarations.
     }),

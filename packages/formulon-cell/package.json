@@ -74,7 +74,7 @@
   "devDependencies": {
     "@vitest/coverage-v8": "^2",
     "happy-dom": "^15",
-    "typescript": "5.7.2",
+    "typescript": "6.0.3",
     "vitest": "^2",
     "zustand": "^5"
   }

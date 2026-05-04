@@ -3,7 +3,10 @@
   "compilerOptions": {
     "outDir": "./dist",
     "jsx": "react-jsx",
-    "types": ["node"]
+    "types": ["node"],
+    // tsup 8.5.x injects a synthetic `baseUrl` for its DTS pass, which TS 6
+    // flags as deprecated. Silence until tsup ships a TS 6-aware release.
+    "ignoreDeprecations": "6.0"
   },
   "include": ["src/**/*"],
   "exclude": ["dist", "node_modules"]

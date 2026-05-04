@@ -53,6 +53,6 @@
     "react": "^19",
     "react-dom": "^19",
     "tsup": "^8",
-    "typescript": "5.7.2"
+    "typescript": "6.0.3"
   }
 }

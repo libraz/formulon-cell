@@ -30,7 +30,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.4.14",
     "@changesets/cli": "^2.31.0",
-    "typescript": "5.7.2",
+    "typescript": "6.0.3",
     "vite": "6.0.5",
     "vite-plugin-dts": "4.4.0"
   }
