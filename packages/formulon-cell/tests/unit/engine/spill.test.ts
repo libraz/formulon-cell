@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   computeEngineSpillRanges,
   detectSpillRange,
+  findSpillBlockers,
   findSpillRanges,
   looksLikeArrayFormula,
   type SpillEngineView,
@@ -180,5 +181,60 @@ describe('computeEngineSpillRanges', () => {
     const cells: FormulaCell[] = [{ addr: { sheet: 0, row: 0, col: 0 }, formula: null }];
     const spill = new Map<string, SpillEntry>();
     expect(computeEngineSpillRanges(makeView(cells, spill), 0)).toEqual([]);
+  });
+});
+
+describe('findSpillBlockers', () => {
+  const target = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 } as const;
+
+  it('flags non-blank value cells inside the rect (anchor excluded)', () => {
+    const cells = fill([
+      [0, 0, { value: num(1), formula: '=SEQUENCE(3)' }],
+      [1, 0, { value: num(99), formula: null }],
+      [2, 0, { value: blank(), formula: null }],
+    ]);
+    expect(findSpillBlockers(cells, 0, target)).toEqual([{ sheet: 0, row: 1, col: 0 }]);
+  });
+
+  it('flags formula-bearing cells inside the rect', () => {
+    const cells = fill([
+      [0, 0, { value: num(1), formula: '=SEQUENCE(3)' }],
+      [2, 0, { value: blank(), formula: '=10' }],
+    ]);
+    expect(findSpillBlockers(cells, 0, target)).toEqual([{ sheet: 0, row: 2, col: 0 }]);
+  });
+
+  it('returns [] when the rect is fully clear apart from the anchor', () => {
+    const cells = fill([[0, 0, { value: num(1), formula: '=SEQUENCE(3)' }]]);
+    expect(findSpillBlockers(cells, 0, target)).toEqual([]);
+  });
+
+  it('skips cells on a different sheet', () => {
+    const cells = fill(
+      [
+        [0, 0, { value: num(1), formula: '=SEQUENCE(3)' }],
+        [1, 0, { value: num(99), formula: null }],
+      ],
+      1,
+    );
+    // Querying sheet 0 — populated entries are on sheet 1.
+    expect(findSpillBlockers(cells, 0, target)).toEqual([]);
+  });
+
+  it('emits blockers in row-major order', () => {
+    const cells = fill([
+      [0, 0, { value: num(1), formula: '=SEQUENCE(3,2)' }],
+      [0, 1, { value: num(2), formula: null }],
+      [1, 0, { value: num(3), formula: null }],
+      [1, 1, { value: num(4), formula: null }],
+    ]);
+    const wide = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 } as const;
+    const blockers = findSpillBlockers(cells, 0, wide);
+    // Anchor (0,0) excluded; remaining three reported left-to-right, top-to-bottom.
+    expect(blockers).toEqual([
+      { sheet: 0, row: 0, col: 1 },
+      { sheet: 0, row: 1, col: 0 },
+      { sheet: 0, row: 1, col: 1 },
+    ]);
   });
 });

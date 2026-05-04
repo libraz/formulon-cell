@@ -109,6 +109,33 @@ export function computeEngineSpillRanges(view: SpillEngineView, sheet: number): 
   return out;
 }
 
+/** Cells that block a target spill rectangle. A blocker is any cell that is
+ *  inside the target rect (other than the anchor itself) and either holds a
+ *  non-blank value or owns a formula. Returned in row-major order so the
+ *  painter can iterate deterministically. */
+export function findSpillBlockers(
+  cells: ReadonlyMap<string, { value: CellValue; formula: string | null }>,
+  sheet: number,
+  target: Range,
+): Addr[] {
+  const out: Addr[] = [];
+  for (let r = target.r0; r <= target.r1; r += 1) {
+    for (let c = target.c0; c <= target.c1; c += 1) {
+      if (r === target.r0 && c === target.c0) continue;
+      const cell = cells.get(addrKey({ sheet, row: r, col: c }));
+      if (!cell) continue;
+      if (cell.formula !== null) {
+        out.push({ sheet, row: r, col: c });
+        continue;
+      }
+      if (cell.value.kind !== 'blank') {
+        out.push({ sheet, row: r, col: c });
+      }
+    }
+  }
+  return out;
+}
+
 /** Scan every populated cell on `sheet` and return the spill rects whose
  *  anchor formula looks like a dynamic-array call. Single-cell results
  *  (1×1) are filtered out — there's nothing to outline. */

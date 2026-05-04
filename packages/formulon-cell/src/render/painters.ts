@@ -703,6 +703,62 @@ export function paintSpillOutline(
   ctx.restore();
 }
 
+/** Highlight a cell that is blocking a #SPILL! result with a red dashed
+ *  outline. Mirrors Excel's "spill obstruction" indicator. */
+export function paintSpillBlocker(ctx: CanvasRenderingContext2D, bounds: Rect): void {
+  ctx.save();
+  ctx.strokeStyle = '#d83b3b';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([3, 3]);
+  ctx.strokeRect(bounds.x + 0.5, bounds.y + 0.5, bounds.w - 1, bounds.h - 1);
+  ctx.restore();
+}
+
+/** Hit rect for a painted checkbox glyph. Pointer code asks for this so a
+ *  click on the box can flip the underlying value without dispatching the
+ *  default "enter cell" action. */
+export interface CheckboxHit {
+  rect: Rect;
+}
+
+const CHECKBOX_SIZE = 14;
+
+/** Paint a centered checkbox glyph inside `bounds`. Returns the hit rect
+ *  for pointer routing. The checked state is rendered as a filled square
+ *  with a white check; unchecked is an outlined square. Theme accent
+ *  carries the active fill so the box matches the host palette. */
+export function paintCheckbox(
+  ctx: CanvasRenderingContext2D,
+  bounds: Rect,
+  checked: boolean,
+  theme: ResolvedTheme,
+): CheckboxHit {
+  const cx = bounds.x + bounds.w / 2;
+  const cy = bounds.y + bounds.h / 2;
+  const x = Math.round(cx - CHECKBOX_SIZE / 2);
+  const y = Math.round(cy - CHECKBOX_SIZE / 2);
+  ctx.save();
+  if (checked) {
+    ctx.fillStyle = theme.accent;
+    ctx.fillRect(x, y, CHECKBOX_SIZE, CHECKBOX_SIZE);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x + 3, y + CHECKBOX_SIZE / 2);
+    ctx.lineTo(x + CHECKBOX_SIZE / 2 - 1, y + CHECKBOX_SIZE - 4);
+    ctx.lineTo(x + CHECKBOX_SIZE - 3, y + 3);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = theme.bg;
+    ctx.fillRect(x, y, CHECKBOX_SIZE, CHECKBOX_SIZE);
+    ctx.strokeStyle = theme.ruleStrong;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, CHECKBOX_SIZE - 1, CHECKBOX_SIZE - 1);
+  }
+  ctx.restore();
+  return { rect: { x, y, w: CHECKBOX_SIZE, h: CHECKBOX_SIZE } };
+}
+
 /** One slot per outline level. The bracket spine sits at slot center. */
 export const OUTLINE_BRACKET_SLOT = 14;
 const TOGGLE_SIZE = 11;

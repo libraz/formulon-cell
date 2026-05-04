@@ -2,7 +2,7 @@ import { coerceInput } from '../commands/coerce-input.js';
 import { validateAgainst } from '../commands/validate.js';
 import { evaluateCfFromEngine } from '../engine/cf-sync.js';
 import { makeRangeResolver, type RangeResolver } from '../engine/range-resolver.js';
-import { findSpillRanges } from '../engine/spill.js';
+import { findSpillBlockers, findSpillRanges, looksLikeArrayFormula } from '../engine/spill.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { addrKey } from '../engine/workbook-handle.js';
@@ -38,6 +38,7 @@ import {
   paintLockMarker,
   paintOutlineGutters,
   paintRefHighlight,
+  paintSpillBlocker,
   paintSpillOutline,
   paintTraceArrow,
   paintTraceDot,
@@ -775,8 +776,8 @@ export class GridRenderer {
   private paintSpills(
     state: State,
     theme: ResolvedTheme,
-    _cols: AxisLayout,
-    _rows: AxisLayout,
+    cols: AxisLayout,
+    rows: AxisLayout,
   ): void {
     const { layout, viewport, data } = state;
     // Prefer the engine's authoritative spill list when available; fall back
@@ -786,6 +787,36 @@ export class GridRenderer {
     for (const r of ranges) {
       for (const rect of rangeRects(layout, viewport, r)) {
         paintSpillOutline(this.ctx, rect, theme);
+      }
+    }
+
+    // #SPILL! obstruction outline. The engine's `spillInfo` reports the
+    // attempted shape even when the result couldn't materialise; we use
+    // that to figure out which cells are blocking and ring them in red.
+    if (!wb?.spillInfo) return;
+    for (const [key, cell] of data.cells) {
+      if (!cell.formula || cell.value.kind !== 'error') continue;
+      if (!looksLikeArrayFormula(cell.formula)) continue;
+      const [sStr, rStr, cStr] = key.split(':');
+      if (sStr === undefined || rStr === undefined || cStr === undefined) continue;
+      if (Number.parseInt(sStr, 10) !== data.sheetIndex) continue;
+      const row = Number.parseInt(rStr, 10);
+      const col = Number.parseInt(cStr, 10);
+      const info = wb.spillInfo(data.sheetIndex, row, col);
+      if (!info) continue;
+      const target: Range = {
+        sheet: data.sheetIndex,
+        r0: info.anchorRow,
+        c0: info.anchorCol,
+        r1: info.anchorRow + info.rows - 1,
+        c1: info.anchorCol + info.cols - 1,
+      };
+      const blockers = findSpillBlockers(data.cells, data.sheetIndex, target);
+      for (const b of blockers) {
+        if (!isRowVisible(layout, viewport, b.row)) continue;
+        if (!isColVisible(layout, viewport, b.col)) continue;
+        const rect = cellRectIn(layout, cols, rows, b.row, b.col);
+        paintSpillBlocker(this.ctx, rect);
       }
     }
   }
