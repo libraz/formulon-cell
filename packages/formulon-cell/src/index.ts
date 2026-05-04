@@ -72,6 +72,7 @@ export type {
   CellFormat,
   CellValidation,
   CellVAlign,
+  ConditionalIconSet,
   ConditionalRule,
   ConditionalSlice,
   ErrorIndicatorSlice,

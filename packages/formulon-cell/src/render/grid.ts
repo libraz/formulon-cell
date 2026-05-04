@@ -23,6 +23,7 @@ import {
   rangeRects,
 } from './geometry.js';
 import {
+  CONDITIONAL_ICON_GUTTER,
   type OutlineToggleHit,
   TRACE_DEPENDENT_COLOR,
   TRACE_PRECEDENT_COLOR,
@@ -32,6 +33,7 @@ import {
   paintCellFill,
   paintCellText,
   paintCommentMarker,
+  paintConditionalIcon,
   paintErrorTriangle,
   paintFillHandle,
   paintFillPreview,
@@ -527,7 +529,20 @@ export class GridRenderer {
           ctx.fillRect(bounds.x, bounds.y + 1, w, bounds.h - 2);
           ctx.restore();
         }
-        paintCellText(paintCtx);
+        // Icon-set: paint glyph in left gutter and shift text right by the
+        // gutter width so the value reads cleanly next to the icon.
+        if (overlay?.iconKind && overlay.iconSlot !== undefined) {
+          paintConditionalIcon(ctx, bounds, overlay.iconKind, overlay.iconSlot);
+          const insetBounds = {
+            x: bounds.x + CONDITIONAL_ICON_GUTTER,
+            y: bounds.y,
+            w: bounds.w - CONDITIONAL_ICON_GUTTER,
+            h: bounds.h,
+          };
+          paintCellText({ ...paintCtx, bounds: insetBounds });
+        } else {
+          paintCellText(paintCtx);
+        }
         if (spark) paintCellSparkline(ctx, bounds, spark, state, this.getWb());
         if (fmt?.comment) paintCommentMarker(ctx, bounds);
 

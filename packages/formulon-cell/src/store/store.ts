@@ -269,8 +269,15 @@ export interface MergesSlice {
   byCell: Map<string, string>;
 }
 
-/** Conditional formatting rule. Evaluated by the renderer against numeric
- *  cell values; non-numeric cells are skipped. */
+/** Icon-set artwork name. `arrows3` / `traffic3` / `stars3` use 3 slots
+ *  classified by [0.33, 0.67]; `arrows5` uses 5 slots classified by
+ *  [0.20, 0.40, 0.60, 0.80]. */
+export type ConditionalIconSet = 'arrows3' | 'arrows5' | 'traffic3' | 'stars3';
+
+/** Conditional formatting rule. Evaluated by the renderer against cell
+ *  values; the predicate kinds (cell-value, top-bottom, formula, blanks,
+ *  duplicates, etc.) skip cells that don't satisfy their type-specific
+ *  filter. */
 export type ConditionalRule =
   | {
       kind: 'cell-value';
@@ -298,6 +305,45 @@ export type ConditionalRule =
       /** When true, paint the bar across the whole cell with the text on top
        *  (like Excel's "Show Bar Only" being false). */
       showValue?: boolean;
+    }
+  | {
+      kind: 'icon-set';
+      range: Range;
+      /** Icon family. 3-slot or 5-slot determined by the suffix. */
+      icons: ConditionalIconSet;
+      /** Invert slot index so the highest values get the "low" icon. */
+      reverseOrder?: boolean;
+    }
+  | {
+      kind: 'top-bottom';
+      range: Range;
+      /** `top` selects the N largest values, `bottom` the N smallest. */
+      mode: 'top' | 'bottom';
+      n: number;
+      /** When true, `n` is interpreted as a percentage (0..100) of the
+       *  range's numeric-cell count. */
+      percent?: boolean;
+      apply: Partial<CellFormat>;
+    }
+  | {
+      kind: 'formula';
+      range: Range;
+      /** Lightweight predicate. Supports comparator-prefix forms
+       *  (`>10`, `<>"foo"`, `<= 0`, `=42`) and an `=`-prefixed cell formula
+       *  evaluated through `wb.evaluateText` when the engine exposes one;
+       *  otherwise the rule is a no-op. */
+      formula: string;
+      apply: Partial<CellFormat>;
+    }
+  | {
+      kind: 'duplicates' | 'unique';
+      range: Range;
+      apply: Partial<CellFormat>;
+    }
+  | {
+      kind: 'blanks' | 'non-blanks' | 'errors' | 'no-errors';
+      range: Range;
+      apply: Partial<CellFormat>;
     };
 
 export interface ConditionalSlice {

@@ -2,6 +2,7 @@ import type { Range } from '../engine/types.js';
 import { type Strings, defaultStrings } from '../i18n/strings.js';
 import {
   type CellFormat,
+  type ConditionalIconSet,
   type ConditionalRule,
   type SpreadsheetStore,
   mutators,
@@ -138,6 +139,15 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     { id: 'cell-value', label: t.kindCellValue },
     { id: 'color-scale', label: t.kindColorScale },
     { id: 'data-bar', label: t.kindDataBar },
+    { id: 'icon-set', label: t.kindIconSet },
+    { id: 'top-bottom', label: t.kindTopBottom },
+    { id: 'formula', label: t.kindFormula },
+    { id: 'duplicates', label: t.kindDuplicates },
+    { id: 'unique', label: t.kindUnique },
+    { id: 'blanks', label: t.kindBlanks },
+    { id: 'non-blanks', label: t.kindNonBlanks },
+    { id: 'errors', label: t.kindErrors },
+    { id: 'no-errors', label: t.kindNoErrors },
   ];
   for (const o of kindOptions) {
     const opt = document.createElement('option');
@@ -314,6 +324,152 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   showValueRow.append(showValueCk, showValueText);
   dataBarGroup.appendChild(showValueRow);
 
+  // ── Icon-set subform ───────────────────────────────────────────────────
+  const iconSetGroup = document.createElement('div');
+  iconSetGroup.className = 'fc-conddlg__sub';
+  form.appendChild(iconSetGroup);
+
+  const iconSetRow = document.createElement('label');
+  iconSetRow.className = 'fc-fmtdlg__row';
+  const iconSetLabel = document.createElement('span');
+  iconSetLabel.textContent = t.kindIconSet;
+  const iconSetSelect = document.createElement('select');
+  const iconSetOptions: { id: ConditionalIconSet; label: string }[] = [
+    { id: 'arrows3', label: t.iconSetArrows3 },
+    { id: 'arrows5', label: t.iconSetArrows5 },
+    { id: 'traffic3', label: t.iconSetTraffic3 },
+    { id: 'stars3', label: t.iconSetStars3 },
+  ];
+  for (const o of iconSetOptions) {
+    const opt = document.createElement('option');
+    opt.value = o.id;
+    opt.textContent = o.label;
+    iconSetSelect.appendChild(opt);
+  }
+  iconSetRow.append(iconSetLabel, iconSetSelect);
+  iconSetGroup.appendChild(iconSetRow);
+
+  const iconReverseRow = document.createElement('label');
+  iconReverseRow.className = 'fc-fmtdlg__check';
+  const iconReverseCk = document.createElement('input');
+  iconReverseCk.type = 'checkbox';
+  const iconReverseText = document.createElement('span');
+  iconReverseText.textContent = t.reverseOrder;
+  iconReverseRow.append(iconReverseCk, iconReverseText);
+  iconSetGroup.appendChild(iconReverseRow);
+
+  // ── Top/Bottom subform ─────────────────────────────────────────────────
+  const topBottomGroup = document.createElement('div');
+  topBottomGroup.className = 'fc-conddlg__sub';
+  form.appendChild(topBottomGroup);
+
+  const tbModeRow = document.createElement('label');
+  tbModeRow.className = 'fc-fmtdlg__row';
+  const tbModeLabel = document.createElement('span');
+  tbModeLabel.textContent = t.topBottomMode;
+  const tbModeSelect = document.createElement('select');
+  for (const o of [
+    { id: 'top', label: `${t.kindTopBottom} ↑` },
+    { id: 'bottom', label: `${t.kindTopBottom} ↓` },
+  ] as const) {
+    const opt = document.createElement('option');
+    opt.value = o.id;
+    opt.textContent = o.label;
+    tbModeSelect.appendChild(opt);
+  }
+  tbModeRow.append(tbModeLabel, tbModeSelect);
+  topBottomGroup.appendChild(tbModeRow);
+
+  const tbNRow = document.createElement('label');
+  tbNRow.className = 'fc-fmtdlg__row';
+  const tbNLabel = document.createElement('span');
+  tbNLabel.textContent = t.topN;
+  const tbNInput = document.createElement('input');
+  tbNInput.type = 'number';
+  tbNInput.min = '1';
+  tbNInput.step = '1';
+  tbNInput.value = '10';
+  tbNRow.append(tbNLabel, tbNInput);
+  topBottomGroup.appendChild(tbNRow);
+
+  const tbPercentRow = document.createElement('label');
+  tbPercentRow.className = 'fc-fmtdlg__check';
+  const tbPercentCk = document.createElement('input');
+  tbPercentCk.type = 'checkbox';
+  const tbPercentText = document.createElement('span');
+  tbPercentText.textContent = t.usePercent;
+  tbPercentRow.append(tbPercentCk, tbPercentText);
+  topBottomGroup.appendChild(tbPercentRow);
+
+  // ── Formula subform ────────────────────────────────────────────────────
+  const formulaGroup = document.createElement('div');
+  formulaGroup.className = 'fc-conddlg__sub';
+  form.appendChild(formulaGroup);
+
+  const formulaRow = document.createElement('label');
+  formulaRow.className = 'fc-fmtdlg__row';
+  const formulaLabelEl = document.createElement('span');
+  formulaLabelEl.textContent = t.kindFormula;
+  const formulaInput = document.createElement('input');
+  formulaInput.type = 'text';
+  formulaInput.spellcheck = false;
+  formulaInput.autocomplete = 'off';
+  formulaInput.placeholder = t.formulaPlaceholder;
+  formulaRow.append(formulaLabelEl, formulaInput);
+  formulaGroup.appendChild(formulaRow);
+
+  // ── Apply-format shared by top-bottom / formula / dups / unique /
+  //    blanks / non-blanks / errors / no-errors. We re-use the same
+  //    fill/font/style controls from the cell-value subform so the
+  //    "apply when matched" surface stays consistent.
+  const applyGroup = document.createElement('div');
+  applyGroup.className = 'fc-conddlg__sub';
+  form.appendChild(applyGroup);
+
+  const applyFillRow = document.createElement('div');
+  applyFillRow.className = 'fc-fmtdlg__row';
+  applyGroup.appendChild(applyFillRow);
+  const applyFillToggle = document.createElement('input');
+  applyFillToggle.type = 'checkbox';
+  applyFillToggle.checked = true;
+  const applyFillLabel = document.createElement('span');
+  applyFillLabel.textContent = t.fillColor;
+  const applyFillInput = document.createElement('input');
+  applyFillInput.type = 'color';
+  applyFillInput.value = '#ffeb3b';
+  applyFillRow.append(applyFillToggle, applyFillLabel, applyFillInput);
+
+  const applyFontRow = document.createElement('div');
+  applyFontRow.className = 'fc-fmtdlg__row';
+  applyGroup.appendChild(applyFontRow);
+  const applyFontToggle = document.createElement('input');
+  applyFontToggle.type = 'checkbox';
+  const applyFontLabel = document.createElement('span');
+  applyFontLabel.textContent = t.fontColor;
+  const applyFontInput = document.createElement('input');
+  applyFontInput.type = 'color';
+  applyFontInput.value = '#000000';
+  applyFontRow.append(applyFontToggle, applyFontLabel, applyFontInput);
+
+  const applyStyleRow = document.createElement('div');
+  applyStyleRow.className = 'fc-fmtdlg__row';
+  applyGroup.appendChild(applyStyleRow);
+  const makeApplyCheckboxIn = (parent: HTMLElement, label: string): HTMLInputElement => {
+    const wrap = document.createElement('label');
+    wrap.className = 'fc-fmtdlg__check';
+    const ck = document.createElement('input');
+    ck.type = 'checkbox';
+    const span = document.createElement('span');
+    span.textContent = label;
+    wrap.append(ck, span);
+    parent.appendChild(wrap);
+    return ck;
+  };
+  const applyBoldCk = makeApplyCheckboxIn(applyStyleRow, t.bold);
+  const applyItalicCk = makeApplyCheckboxIn(applyStyleRow, t.italic);
+  const applyUnderlineCk = makeApplyCheckboxIn(applyStyleRow, t.underline);
+  const applyStrikeCk = makeApplyCheckboxIn(applyStyleRow, t.strike);
+
   // Add button
   const addRow = document.createElement('div');
   addRow.className = 'fc-fmtdlg__row fc-conddlg__addrow';
@@ -337,11 +493,28 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   host.appendChild(overlay);
 
   // ── Behaviour ──────────────────────────────────────────────────────────
+  /** Kinds that re-use the shared `applyGroup` (fill/font/style) controls
+   *  for their "apply when matched" format. cell-value carries its own
+   *  controls inside `cellValueGroup` and so is excluded here. */
+  const APPLY_KINDS: ReadonlySet<RuleKind> = new Set([
+    'top-bottom',
+    'formula',
+    'duplicates',
+    'unique',
+    'blanks',
+    'non-blanks',
+    'errors',
+    'no-errors',
+  ]);
   const syncSubforms = (): void => {
     const kind = kindSelect.value as RuleKind;
     cellValueGroup.hidden = kind !== 'cell-value';
     colorScaleGroup.hidden = kind !== 'color-scale';
     dataBarGroup.hidden = kind !== 'data-bar';
+    iconSetGroup.hidden = kind !== 'icon-set';
+    topBottomGroup.hidden = kind !== 'top-bottom';
+    formulaGroup.hidden = kind !== 'formula';
+    applyGroup.hidden = !APPLY_KINDS.has(kind);
   };
   const syncCellValueOp = (): void => {
     const op = opSelect.value as CellValueOp;
@@ -381,18 +554,51 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
 
   const describeRule = (rule: ConditionalRule): string => {
     const range = formatRange(rule.range);
-    if (rule.kind === 'cell-value') {
-      const opLabel = opOptions.find((o) => o.id === rule.op)?.label ?? rule.op;
-      const tail =
-        rule.op === 'between' || rule.op === 'not-between'
-          ? `${rule.a} – ${rule.b ?? rule.a}`
-          : `${rule.a}`;
-      return `${range} · ${t.kindCellValue} (${opLabel} ${tail})`;
+    switch (rule.kind) {
+      case 'cell-value': {
+        const opLabel = opOptions.find((o) => o.id === rule.op)?.label ?? rule.op;
+        const tail =
+          rule.op === 'between' || rule.op === 'not-between'
+            ? `${rule.a} – ${rule.b ?? rule.a}`
+            : `${rule.a}`;
+        return `${range} · ${t.kindCellValue} (${opLabel} ${tail})`;
+      }
+      case 'color-scale':
+        return `${range} · ${t.kindColorScale} (${rule.stops.length} stop)`;
+      case 'data-bar':
+        return `${range} · ${t.kindDataBar}`;
+      case 'icon-set':
+        return `${range} · ${t.kindIconSet} (${rule.icons})`;
+      case 'top-bottom': {
+        const pct = rule.percent ? '%' : '';
+        return `${range} · ${t.kindTopBottom} (${rule.mode} ${rule.n}${pct})`;
+      }
+      case 'formula':
+        return `${range} · ${t.kindFormula} (${rule.formula})`;
+      case 'duplicates':
+        return `${range} · ${t.kindDuplicates}`;
+      case 'unique':
+        return `${range} · ${t.kindUnique}`;
+      case 'blanks':
+        return `${range} · ${t.kindBlanks}`;
+      case 'non-blanks':
+        return `${range} · ${t.kindNonBlanks}`;
+      case 'errors':
+        return `${range} · ${t.kindErrors}`;
+      case 'no-errors':
+        return `${range} · ${t.kindNoErrors}`;
     }
-    if (rule.kind === 'color-scale') {
-      return `${range} · ${t.kindColorScale} (${rule.stops.length} stop)`;
-    }
-    return `${range} · ${t.kindDataBar}`;
+  };
+
+  const collectApplyPatch = (): Partial<CellFormat> => {
+    const apply: Partial<CellFormat> = {};
+    if (applyFillToggle.checked) apply.fill = applyFillInput.value;
+    if (applyFontToggle.checked) apply.color = applyFontInput.value;
+    if (applyBoldCk.checked) apply.bold = true;
+    if (applyItalicCk.checked) apply.italic = true;
+    if (applyUnderlineCk.checked) apply.underline = true;
+    if (applyStrikeCk.checked) apply.strike = true;
+    return apply;
   };
 
   const onAdd = (): void => {
@@ -425,12 +631,52 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
         ? [stopMinInput.value, stopMidInput.value, stopMaxInput.value]
         : [stopMinInput.value, stopMaxInput.value];
       mutators.addConditionalRule(store, { kind: 'color-scale', range, stops });
-    } else {
+    } else if (kind === 'data-bar') {
       mutators.addConditionalRule(store, {
         kind: 'data-bar',
         range,
         color: barColorInput.value,
         showValue: showValueCk.checked,
+      });
+    } else if (kind === 'icon-set') {
+      mutators.addConditionalRule(store, {
+        kind: 'icon-set',
+        range,
+        icons: iconSetSelect.value as ConditionalIconSet,
+        reverseOrder: iconReverseCk.checked,
+      });
+    } else if (kind === 'top-bottom') {
+      const n = Number.parseInt(tbNInput.value, 10);
+      if (!Number.isFinite(n) || n <= 0) return;
+      mutators.addConditionalRule(store, {
+        kind: 'top-bottom',
+        range,
+        mode: tbModeSelect.value as 'top' | 'bottom',
+        n,
+        percent: tbPercentCk.checked,
+        apply: collectApplyPatch(),
+      });
+    } else if (kind === 'formula') {
+      const f = formulaInput.value.trim();
+      if (f === '') return;
+      mutators.addConditionalRule(store, {
+        kind: 'formula',
+        range,
+        formula: f,
+        apply: collectApplyPatch(),
+      });
+    } else if (
+      kind === 'duplicates' ||
+      kind === 'unique' ||
+      kind === 'blanks' ||
+      kind === 'non-blanks' ||
+      kind === 'errors' ||
+      kind === 'no-errors'
+    ) {
+      mutators.addConditionalRule(store, {
+        kind,
+        range,
+        apply: collectApplyPatch(),
       });
     }
     renderRules();

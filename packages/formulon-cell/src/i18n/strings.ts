@@ -213,6 +213,15 @@ export interface Strings {
     kindCellValue: string;
     kindColorScale: string;
     kindDataBar: string;
+    kindIconSet: string;
+    kindTopBottom: string;
+    kindFormula: string;
+    kindDuplicates: string;
+    kindUnique: string;
+    kindBlanks: string;
+    kindNonBlanks: string;
+    kindErrors: string;
+    kindNoErrors: string;
     opLabel: string;
     opGt: string;
     opLt: string;
@@ -236,6 +245,15 @@ export interface Strings {
     useThreeStops: string;
     barColor: string;
     showValue: string;
+    topBottomMode: string;
+    topN: string;
+    usePercent: string;
+    iconSetArrows3: string;
+    iconSetArrows5: string;
+    iconSetTraffic3: string;
+    iconSetStars3: string;
+    formulaPlaceholder: string;
+    reverseOrder: string;
     empty: string;
     close: string;
   };
@@ -532,6 +550,15 @@ export const ja: Strings = {
     kindCellValue: 'セル値',
     kindColorScale: 'カラースケール',
     kindDataBar: 'データバー',
+    kindIconSet: 'アイコンセット',
+    kindTopBottom: '上位/下位',
+    kindFormula: '数式',
+    kindDuplicates: '重複する値',
+    kindUnique: '一意の値',
+    kindBlanks: '空白セル',
+    kindNonBlanks: '空白以外のセル',
+    kindErrors: 'エラー値',
+    kindNoErrors: 'エラーなし',
     opLabel: '条件',
     opGt: 'より大きい',
     opLt: 'より小さい',
@@ -555,6 +582,15 @@ export const ja: Strings = {
     useThreeStops: '3 段階',
     barColor: 'バーの色',
     showValue: '値も表示',
+    topBottomMode: '対象',
+    topN: '個数 (N)',
+    usePercent: 'パーセント指定',
+    iconSetArrows3: '3 矢印',
+    iconSetArrows5: '5 矢印',
+    iconSetTraffic3: '3 信号',
+    iconSetStars3: '3 つ星',
+    formulaPlaceholder: '例: >100 / <>"x" / =A1>0',
+    reverseOrder: '並び順を反転',
     empty: 'ルールはまだありません',
     close: '閉じる',
   },
@@ -834,6 +870,15 @@ export const en: Strings = {
     kindCellValue: 'Cell value',
     kindColorScale: 'Color scale',
     kindDataBar: 'Data bar',
+    kindIconSet: 'Icon set',
+    kindTopBottom: 'Top / Bottom',
+    kindFormula: 'Formula',
+    kindDuplicates: 'Duplicate values',
+    kindUnique: 'Unique values',
+    kindBlanks: 'Blank cells',
+    kindNonBlanks: 'Non-blank cells',
+    kindErrors: 'Errors',
+    kindNoErrors: 'No errors',
     opLabel: 'Condition',
     opGt: 'greater than',
     opLt: 'less than',
@@ -857,6 +902,15 @@ export const en: Strings = {
     useThreeStops: '3-stop',
     barColor: 'Bar color',
     showValue: 'Show value',
+    topBottomMode: 'Mode',
+    topN: 'N',
+    usePercent: 'Use percent',
+    iconSetArrows3: '3 arrows',
+    iconSetArrows5: '5 arrows',
+    iconSetTraffic3: '3 traffic lights',
+    iconSetStars3: '3 stars',
+    formulaPlaceholder: 'e.g. >100 / <>"x" / =A1>0',
+    reverseOrder: 'Reverse order',
     empty: 'No rules defined yet',
     close: 'Close',
   },

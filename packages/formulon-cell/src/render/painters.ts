@@ -3,7 +3,7 @@ import { isColGroupCollapsed, isRowGroupCollapsed } from '../commands/outline.js
 import { REF_HIGHLIGHT_COLORS } from '../commands/refs.js';
 import type { CellValue } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
-import type { CellFormat, Sparkline, State } from '../store/store.js';
+import type { CellFormat, ConditionalIconSet, Sparkline, State } from '../store/store.js';
 import type { ResolvedTheme } from '../theme/resolve.js';
 import { type AxisLayout, type Rect, gridOriginX, gridOriginY } from './geometry.js';
 
@@ -218,6 +218,118 @@ export function paintCellBackground({
     ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
   }
   // else: grid bg painted globally by paintGridSurface; do nothing.
+}
+
+/** Width of the left-gutter that hosts conditional-format icon-set glyphs.
+ *  Cell text is right-shifted by this amount when an icon overlay is
+ *  present so the artwork and value don't overlap. */
+export const CONDITIONAL_ICON_GUTTER = 16;
+
+/** Paint a small icon-set glyph at the left of a cell rect. The artwork is
+ *  drawn with primitive shapes — no SVG / image asset — so the renderer
+ *  stays self-contained. `slot` is 0-based; the family decides the count
+ *  (3 or 5) and how the slot maps to color/direction. */
+export function paintConditionalIcon(
+  ctx: CanvasRenderingContext2D,
+  rect: Rect,
+  kind: ConditionalIconSet,
+  slot: number,
+): void {
+  const cx = rect.x + CONDITIONAL_ICON_GUTTER / 2;
+  const cy = rect.y + rect.h / 2;
+  const r = Math.min(5, Math.floor(rect.h * 0.32));
+  ctx.save();
+  if (kind === 'arrows3' || kind === 'arrows5') {
+    // Map slot to a unit-vector direction. arrows3: [down, right, up];
+    // arrows5: [down, down-right, right, up-right, up]. Color tracks slot:
+    // low → red, mid → amber, high → green. arrows5 reuses the same ramp
+    // with finer steps.
+    const slots = kind === 'arrows5' ? 5 : 3;
+    const idx = Math.max(0, Math.min(slots - 1, slot));
+    const colors =
+      kind === 'arrows5'
+        ? ['#d24545', '#e07a4d', '#cfa64a', '#7fb352', '#3aa055']
+        : ['#d24545', '#cfa64a', '#3aa055'];
+    const color = colors[idx] ?? '#777';
+    // Direction angle in radians, 0 = right, -π/2 = up, π/2 = down.
+    const angles =
+      kind === 'arrows5'
+        ? [Math.PI / 2, Math.PI / 4, 0, -Math.PI / 4, -Math.PI / 2]
+        : [Math.PI / 2, 0, -Math.PI / 2];
+    const a = angles[idx] ?? 0;
+    const len = r + 2;
+    const dx = Math.cos(a) * len;
+    const dy = Math.sin(a) * len;
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx - dx, cy - dy);
+    ctx.lineTo(cx + dx, cy + dy);
+    ctx.stroke();
+    // Arrow head — small triangle perpendicular to the direction.
+    const px = -Math.sin(a);
+    const py = Math.cos(a);
+    const headLen = 3;
+    const headHalf = 2.5;
+    const baseX = cx + dx - Math.cos(a) * headLen;
+    const baseY = cy + dy - Math.sin(a) * headLen;
+    ctx.beginPath();
+    ctx.moveTo(cx + dx, cy + dy);
+    ctx.lineTo(baseX + px * headHalf, baseY + py * headHalf);
+    ctx.lineTo(baseX - px * headHalf, baseY - py * headHalf);
+    ctx.closePath();
+    ctx.fill();
+  } else if (kind === 'traffic3') {
+    // Three colored circles, only the slot's circle is filled solid; the
+    // other two are dim outlines so the icon reads as a single state.
+    const idx = Math.max(0, Math.min(2, slot));
+    const colors = ['#d24545', '#cfa64a', '#3aa055'];
+    const color = colors[idx] ?? '#777';
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // stars3 — outlined or filled 5-pointed star. slot 0 = empty,
+    // slot 1 = half (filled lower-half), slot 2 = full.
+    const idx = Math.max(0, Math.min(2, slot));
+    const star = (filled: boolean): void => {
+      ctx.beginPath();
+      const spikes = 5;
+      const outerR = r;
+      const innerR = r * 0.45;
+      for (let i = 0; i < spikes * 2; i += 1) {
+        const angle = (i * Math.PI) / spikes - Math.PI / 2;
+        const radius = i % 2 === 0 ? outerR : innerR;
+        const px = cx + Math.cos(angle) * radius;
+        const py = cy + Math.sin(angle) * radius;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      if (filled) ctx.fill();
+      else ctx.stroke();
+    };
+    ctx.strokeStyle = '#cfa64a';
+    ctx.fillStyle = '#cfa64a';
+    ctx.lineWidth = 1;
+    if (idx === 2) {
+      star(true);
+    } else if (idx === 1) {
+      // Half-fill — clip the right half then fill, then outline whole.
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(rect.x, cy - r - 1, cx - rect.x, (r + 1) * 2);
+      ctx.clip();
+      star(true);
+      ctx.restore();
+      star(false);
+    } else {
+      star(false);
+    }
+  }
+  ctx.restore();
 }
 
 /** User-set background fill — drawn above range tint and active highlight so
