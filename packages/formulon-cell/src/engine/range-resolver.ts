@@ -107,3 +107,62 @@ function sheetIndexByName(wb: WorkbookHandle, name: string): number {
 export function isRangeSource(source: string[] | { ref: string }): source is { ref: string } {
   return !Array.isArray(source);
 }
+
+/** Resolve a range ref to its numeric values in source order. Non-numeric
+ *  cells (blank, text, bool, error) are skipped — sparklines plot a numeric
+ *  series, mirroring Excel's behaviour. */
+export function resolveNumericRange(
+  wb: WorkbookHandle,
+  ref: string,
+  fallbackSheet: number,
+): number[] {
+  const parsed = parseRangeRef(ref);
+  if (!parsed) return [];
+  let sheet = fallbackSheet;
+  if (parsed.sheetName !== null) {
+    const idx = sheetIndexByName(wb, parsed.sheetName);
+    if (idx < 0) return [];
+    sheet = idx;
+  }
+  const out: number[] = [];
+  for (let row = parsed.r0; row <= parsed.r1; row += 1) {
+    for (let col = parsed.c0; col <= parsed.c1; col += 1) {
+      const value = wb.getValue({ sheet, row, col });
+      if (value.kind === 'number' && Number.isFinite(value.value)) out.push(value.value);
+    }
+  }
+  return out;
+}
+
+/** Engine-free numeric resolver — pulls from a `data.cells` map keyed by
+ *  `${sheet}:${row}:${col}`. Used by the renderer when no workbook handle is
+ *  attached and by tests that exercise the painter in isolation. Refs that
+ *  carry a sheet name are skipped unless `sheetByName` resolves them. */
+export function resolveNumericRangeFromCells(
+  cells: ReadonlyMap<string, { value: { kind: string; value?: unknown } }>,
+  ref: string,
+  fallbackSheet: number,
+  sheetByName?: (name: string) => number,
+): number[] {
+  const parsed = parseRangeRef(ref);
+  if (!parsed) return [];
+  let sheet = fallbackSheet;
+  if (parsed.sheetName !== null) {
+    if (!sheetByName) return [];
+    const idx = sheetByName(parsed.sheetName);
+    if (idx < 0) return [];
+    sheet = idx;
+  }
+  const out: number[] = [];
+  for (let row = parsed.r0; row <= parsed.r1; row += 1) {
+    for (let col = parsed.c0; col <= parsed.c1; col += 1) {
+      const cell = cells.get(`${sheet}:${row}:${col}`);
+      if (!cell) continue;
+      const v = cell.value;
+      if (v.kind === 'number' && typeof v.value === 'number' && Number.isFinite(v.value)) {
+        out.push(v.value);
+      }
+    }
+  }
+  return out;
+}

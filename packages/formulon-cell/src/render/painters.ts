@@ -3,7 +3,7 @@ import { isColGroupCollapsed, isRowGroupCollapsed } from '../commands/outline.js
 import { REF_HIGHLIGHT_COLORS } from '../commands/refs.js';
 import type { CellValue } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
-import type { CellFormat, State } from '../store/store.js';
+import type { CellFormat, Sparkline, State } from '../store/store.js';
 import type { ResolvedTheme } from '../theme/resolve.js';
 import { type AxisLayout, type Rect, gridOriginX, gridOriginY } from './geometry.js';
 
@@ -610,4 +610,100 @@ export function paintOutlineGutters(
   }
 
   return hits;
+}
+
+const DEFAULT_SPARKLINE_COLOR = '#0078d4';
+const DEFAULT_NEGATIVE_COLOR = '#d24545';
+
+/** Inline mini-chart drawn inside a single cell rect. `values` is the resolved
+ *  numeric series for `spec.source`; non-numeric source cells are filtered by
+ *  the caller before invoking. No-op when the series is empty. */
+export function paintSparkline(
+  ctx: CanvasRenderingContext2D,
+  rect: Rect,
+  spec: Sparkline,
+  values: readonly number[],
+): void {
+  if (values.length === 0) return;
+  const inset = 2;
+  const x = rect.x + inset;
+  const y = rect.y + inset;
+  const w = Math.max(0, rect.w - inset * 2);
+  const h = Math.max(0, rect.h - inset * 2);
+  if (w <= 0 || h <= 0) return;
+  const color = spec.color ?? DEFAULT_SPARKLINE_COLOR;
+  const negColor = spec.negativeColor ?? DEFAULT_NEGATIVE_COLOR;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  ctx.globalAlpha = 1;
+
+  if (spec.kind === 'line') {
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (const v of values) {
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    const span = max - min || 1;
+    const stepX = values.length > 1 ? w / (values.length - 1) : 0;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (let i = 0; i < values.length; i += 1) {
+      const v = values[i] ?? 0;
+      const px = x + (values.length > 1 ? i * stepX : w / 2);
+      const py = y + h - ((v - min) / span) * h;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  } else if (spec.kind === 'column') {
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (const v of values) {
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    // Anchor the baseline at zero when the range straddles it; otherwise rest
+    // bars on the value extreme closest to zero so all bars stay positive-side.
+    const baseline = min < 0 && max > 0 ? 0 : min >= 0 ? min : max;
+    const span = Math.max(Math.abs(max - baseline), Math.abs(min - baseline)) || 1;
+    const slot = w / values.length;
+    const gap = Math.min(1, slot * 0.2);
+    const barW = Math.max(1, slot - gap);
+    const baseY = y + h - ((baseline - min) / Math.max(max - min, 1e-9)) * h;
+    for (let i = 0; i < values.length; i += 1) {
+      const v = values[i] ?? 0;
+      const isNeg = v < 0;
+      const fill = spec.showNegative && isNeg ? negColor : color;
+      const px = x + i * slot;
+      const barH = (Math.abs(v - baseline) / span) * h;
+      const py = isNeg ? baseY : baseY - barH;
+      ctx.fillStyle = fill;
+      ctx.fillRect(px, py, barW, Math.max(1, barH));
+    }
+  } else {
+    // win-loss
+    const half = h / 2;
+    const slot = w / values.length;
+    const gap = Math.min(1, slot * 0.2);
+    const barW = Math.max(1, slot - gap);
+    const midY = y + half;
+    for (let i = 0; i < values.length; i += 1) {
+      const v = values[i] ?? 0;
+      if (v === 0) continue;
+      const isNeg = v < 0;
+      const fill = spec.showNegative && isNeg ? negColor : color;
+      ctx.fillStyle = fill;
+      const px = x + i * slot;
+      if (isNeg) ctx.fillRect(px, midY, barW, Math.max(1, half - 1));
+      else ctx.fillRect(px, midY - Math.max(1, half - 1), barW, Math.max(1, half - 1));
+    }
+  }
+
+  ctx.restore();
 }

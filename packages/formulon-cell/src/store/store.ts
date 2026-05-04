@@ -301,6 +301,26 @@ export interface ConditionalSlice {
   rules: ConditionalRule[];
 }
 
+/** Inline mini-chart attached to a single cell. The renderer paints `kind`
+ *  inside the cell rect using the resolved numeric series at `source`. */
+export type SparklineKind = 'line' | 'column' | 'win-loss';
+
+export interface Sparkline {
+  kind: SparklineKind;
+  /** A1-style range, e.g. `B2:B12` or `Sheet2!B2:B12`. */
+  source: string;
+  /** Stroke for line, fill for column. CSS color. Default: `#0078d4`. */
+  color?: string;
+  /** When true, paint negatives in `negativeColor` (column / win-loss). */
+  showNegative?: boolean;
+  negativeColor?: string;
+}
+
+export interface SparklineSlice {
+  /** Per-host-cell sparkline keyed by `addrKey`. */
+  sparklines: Map<string, Sparkline>;
+}
+
 export interface State {
   viewport: ViewportSlice;
   selection: SelectionSlice;
@@ -310,6 +330,7 @@ export interface State {
   format: FormatSlice;
   merges: MergesSlice;
   conditional: ConditionalSlice;
+  sparkline: SparklineSlice;
 }
 
 const initialAddr = (sheet = 0): Addr => ({ sheet, row: 0, col: 0 });
@@ -358,6 +379,7 @@ export const createSpreadsheetStore = () =>
     format: { formats: new Map() },
     merges: { byAnchor: new Map(), byCell: new Map() },
     conditional: { rules: [] },
+    sparkline: { sparklines: new Map() },
   }));
 
 export type SpreadsheetStore = ReturnType<typeof createSpreadsheetStore>;
@@ -723,6 +745,25 @@ export const mutators = {
 
   clearConditionalRules(store: SpreadsheetStore): void {
     store.setState((s) => ({ ...s, conditional: { rules: [] } }));
+  },
+
+  /** Attach a sparkline spec to `addr`. Pass `null` to remove. */
+  setSparkline(store: SpreadsheetStore, addr: Addr, spec: Sparkline | null): void {
+    store.setState((s) => {
+      const sparklines = new Map(s.sparkline.sparklines);
+      const key = addrKey(addr);
+      if (spec === null) sparklines.delete(key);
+      else sparklines.set(key, { ...spec });
+      return { ...s, sparkline: { sparklines } };
+    });
+  },
+
+  clearSparkline(store: SpreadsheetStore, addr: Addr): void {
+    store.setState((s) => {
+      const sparklines = new Map(s.sparkline.sparklines);
+      sparklines.delete(addrKey(addr));
+      return { ...s, sparkline: { sparklines } };
+    });
   },
 
   /** Remove any merges that intersect the range. */

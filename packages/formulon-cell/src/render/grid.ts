@@ -34,6 +34,7 @@ import {
   paintSpillOutline,
   paintValidationChevron,
 } from './painters.js';
+import { paintCellSparkline } from './sparkline.js';
 
 let cachedFillHandleRect: Rect | null = null;
 let cachedValidationChevron: { rect: Rect; row: number; col: number } | null = null;
@@ -284,9 +285,10 @@ export class GridRenderer {
 
   private paintCells(state: State, theme: ResolvedTheme, cols: AxisLayout, rows: AxisLayout): void {
     const ctx = this.ctx;
-    const { layout, data, selection, format, merges } = state;
+    const { layout, data, selection, format, merges, sparkline } = state;
     const active = selection.active;
     const conditional = evaluateConditional(state);
+    const sparklines = sparkline.sparklines;
     // Engine-side CF (rules loaded from .xlsx). Merged on top — engine rules
     // currently win per field for cells with overlap. Restricted to the
     // visible viewport rect so we don't pay for off-screen cells.
@@ -367,9 +369,10 @@ export class GridRenderer {
         const cell = data.cells.get(key);
         const fmt = format.formats.get(key);
         const isMergeAnchor = merges.byAnchor.has(key);
-        // Render-worthy when there's data, a merge anchor, or a static fill
-        // we still need to draw on a blank cell.
-        if (!cell && !isMergeAnchor && !fmt?.fill) continue;
+        const spark = sparklines.get(key);
+        // Render-worthy when there's data, a merge anchor, a static fill, or a
+        // sparkline host — all four reasons to paint into an otherwise blank cell.
+        if (!cell && !isMergeAnchor && !fmt?.fill && !spark) continue;
         const bounds = mergeBounds(r, c) ?? cellRectIn(layout, cols, rows, r, c);
         const isActive = r === active.row && c === active.col;
         const isInRange = inRange({ sheet: data.sheetIndex, row: r, col: c }, rng);
@@ -420,6 +423,7 @@ export class GridRenderer {
           ctx.restore();
         }
         paintCellText(paintCtx);
+        if (spark) paintCellSparkline(ctx, bounds, spark, state, this.getWb());
         if (fmt?.comment) paintCommentMarker(ctx, bounds);
       }
     }

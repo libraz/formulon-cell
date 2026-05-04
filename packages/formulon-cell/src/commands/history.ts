@@ -1,7 +1,13 @@
 import { syncLayoutToEngine } from '../engine/layout-sync.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { CellFormat, LayoutSlice, SpreadsheetStore, State } from '../store/store.js';
+import type {
+  CellFormat,
+  LayoutSlice,
+  Sparkline,
+  SpreadsheetStore,
+  State,
+} from '../store/store.js';
 
 const LIMIT = 200;
 
@@ -334,6 +340,35 @@ export function recordMergesChangeWithEngine(
       applyMergesSnapshot(store, after);
       sync(after);
     },
+  });
+}
+
+export function captureSparklineSnapshot(state: State): Map<string, Sparkline> {
+  return new Map(state.sparkline.sparklines);
+}
+
+export function applySparklineSnapshot(
+  store: SpreadsheetStore,
+  snap: Map<string, Sparkline>,
+): void {
+  store.setState((s) => ({ ...s, sparkline: { sparklines: new Map(snap) } }));
+}
+
+export function recordSparklineChange(
+  history: History | null,
+  store: SpreadsheetStore,
+  mutate: () => void,
+): void {
+  if (!history || history.isReplaying()) {
+    mutate();
+    return;
+  }
+  const before = captureSparklineSnapshot(store.getState());
+  mutate();
+  const after = captureSparklineSnapshot(store.getState());
+  history.push({
+    undo: () => applySparklineSnapshot(store, before),
+    redo: () => applySparklineSnapshot(store, after),
   });
 }
 
