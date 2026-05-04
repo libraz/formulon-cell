@@ -1,10 +1,11 @@
 // Built-in feature ids — the on/off keys consumers pass via
 // `MountOptions.features`. These map 1:1 to the attach* calls inside
-// mount.ts, gated at mount time.
+// mount.ts and the chrome elements appended to the host. Disabling a flag
+// removes both the behavior *and* the DOM nodes (e.g. an empty status bar
+// no longer reserves vertical space).
 //
-// `formulaBar`, `nameBox`, `editor`, `pointer`, `renderer`, and the host
-// keymap are non-toggleable — they are the spreadsheet itself, removing
-// them yields no UI. Everything else is opt-out.
+// `nameBox`, `editor`, `pointer`, and `renderer` are non-toggleable —
+// they are the spreadsheet itself, removing them yields no UI.
 export const ALL_FEATURE_IDS = [
   'formulaBar',
   'statusBar',

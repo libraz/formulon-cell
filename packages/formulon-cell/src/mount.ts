@@ -130,6 +130,14 @@ export interface SpreadsheetInstance {
   use(ext: ExtensionInput): void;
   /** Tear down a previously-mounted extension by id. */
   remove(id: string): boolean;
+  /** Live-toggle built-in features. Diffs against the current flag set
+   *  and only attaches/detaches what actually changed; keeps editor /
+   *  selection / undo state intact when wb-bound features don't flip. */
+  setFeatures(next: FeatureFlags): void;
+  /** Replace the entire user-extension list. Existing extensions are
+   *  disposed; the new list is mounted in priority order. Built-ins are
+   *  untouched — use `setFeatures` for those. */
+  setExtensions(next: ExtensionInput[] | undefined): void;
   /** Open the conditional-formatting rule manager dialog. No-op when the
    *  feature is disabled. */
   openConditionalDialog(): void;
@@ -206,7 +214,7 @@ export const Spreadsheet = {
     // wire setStrings hooks for live label updates.
     const i18n = createI18nController({ locale: opts.locale, overlay: opts.strings });
     let strings: Strings = i18n.strings;
-    const flags = resolveFlags(opts.features);
+    let flags = resolveFlags(opts.features);
     const emitter = new SpreadsheetEmitter();
     const formulaRegistry = new FormulaRegistry();
     if (opts.functions) {
@@ -301,17 +309,45 @@ export const Spreadsheet = {
 
     const statusbar = document.createElement('div');
     statusbar.className = 'fc-host__statusbar';
-    // Watch Window dock — sits below the status bar when the feature is on.
-    // Always present in the DOM so the panel-attach call has a parent; the
-    // panel itself toggles visibility via `[hidden]`.
+    // Watch Window dock — only attached when `features.watchWindow` is on.
     const watchDock = document.createElement('div');
     watchDock.dataset.fcWatch = 'dock';
     watchDock.className = 'fc-host__watchdock';
-    host.append(formulabar, grid, statusbar, watchDock);
 
-    let wb: WorkbookHandle = opts.workbook ?? (await WorkbookHandle.createDefault());
-    if (opts.seed) opts.seed(wb);
+    // Gate chrome elements on their flags. The grid is always present and
+    // anchors slot ordering; chrome slots come and go via `setChromeAttached`
+    // so disabled flags reclaim vertical space (no empty bars left behind).
+    const setChromeAttached = (
+      slot: 'formulabar' | 'statusbar' | 'watchDock',
+      on: boolean,
+    ): void => {
+      const el = slot === 'formulabar' ? formulabar : slot === 'statusbar' ? statusbar : watchDock;
+      if (on) {
+        if (el.parentElement === host) return;
+        if (slot === 'formulabar') {
+          host.insertBefore(el, grid);
+        } else if (slot === 'statusbar') {
+          if (watchDock.parentElement === host) host.insertBefore(el, watchDock);
+          else host.appendChild(el);
+        } else {
+          host.appendChild(el);
+        }
+      } else if (el.parentElement === host) {
+        host.removeChild(el);
+      }
+    };
+
+    host.appendChild(grid);
+    setChromeAttached('formulabar', flags.formulaBar);
+    setChromeAttached('statusbar', flags.statusBar);
+    setChromeAttached('watchDock', flags.watchWindow);
+
+    // Track ownership before seeding — only owned (default-created) workbooks
+    // should be touched by `seed`. Pre-loaded workbooks are the consumer's
+    // data and must not be overwritten by the demo helper.
     let ownsWb = !opts.workbook;
+    let wb: WorkbookHandle = opts.workbook ?? (await WorkbookHandle.createDefault());
+    if (opts.seed && ownsWb) opts.seed(wb);
 
     const store = createSpreadsheetStore();
     if (opts.theme) mutators.setTheme(store, opts.theme);
@@ -357,21 +393,7 @@ export const Spreadsheet = {
     cellRegistry.subscribe(() => renderer.invalidate());
     renderer.resize();
 
-    // Built-in feature instances. Each one is gated by `flags.<id>` — when
-    // disabled the binding is `null` and consumers / cross-feature
-    // references must use `?.` to no-op gracefully.
-    const formatDialog = flags.formatDialog
-      ? attachFormatDialog({ host, store, strings, history, getWb: () => wb })
-      : null;
-    const formatPainter = flags.formatPainter
-      ? attachFormatPainter({ host, store, history })
-      : null;
-    const hover = flags.hoverComment ? attachHover({ grid, store }) : null;
-    const conditionalDialog = flags.conditional
-      ? attachConditionalDialog({ host, store, strings })
-      : null;
-    // Iterative-calc settings dialog isn't on the feature menu yet — keep
-    // it always-on so the public openIterativeDialog() never returns silent.
+    // Always-on host features — not toggleable via `MountOptions.features`.
     const iterativeDialog = attachIterativeDialog({ host, getWb: () => wb, strings });
     const cellStylesGallery = attachCellStylesGallery({
       host,
@@ -379,80 +401,320 @@ export const Spreadsheet = {
       history,
       getWb: () => wb,
     });
-    const fxDialog: FxDialogHandle | null = flags.fxDialog
-      ? attachFxDialog({
-          host,
-          store,
-          strings,
-          onInsert: (formula) => {
-            // Mirror manual entry: drop the formula into the formula bar and
-            // let the existing commitFx() pipeline handle validation, undo,
-            // and downstream recalc.
-            fxInput.value = formula;
-            fxInput.focus();
-            commitFx('none');
-          },
-        })
-      : null;
-    if (fxDialog) {
-      fx.addEventListener('click', () => fxDialog.open());
-    } else {
-      // Decorative-only fallback when the dialog feature is off — keep the
-      // chrome looking the same but make the button inert.
-      fx.disabled = true;
-      fx.style.cursor = 'default';
-    }
-    const namedRangeDialog = flags.namedRanges
-      ? attachNamedRangeDialog({ host, wb, strings })
-      : null;
-    const hyperlinkDialog = flags.hyperlink
-      ? attachHyperlinkDialog({ host, store, strings, history, getWb: () => wb })
-      : null;
-    const statusBar = flags.statusBar
-      ? attachStatusBar({
-          statusbar,
-          store,
-          strings,
-          getEngineLabel: () => (wb.isStub ? 'stub' : `formulon ${wb.version}`),
-        })
-      : null;
-    const watchPanel = flags.watchWindow
-      ? attachWatchPanel({
-          host: watchDock,
-          store,
-          getWb: () => wb,
-          strings,
-        })
-      : null;
-    const errorMenu: ErrorMenuHandle | null = flags.errorIndicators
-      ? attachErrorMenu({
-          host,
-          store,
-          getWb: () => wb,
-          strings,
-          onEditCell: (addr) => {
-            // Mirror the formula-bar edit path: focus the active cell, drop
-            // the formula/value into fxInput, and let the existing commit
-            // pipeline take over on Enter/Tab/Blur.
-            mutators.setActive(store, addr);
-            const cell = store
-              .getState()
-              .data.cells.get(`${addr.sheet}:${addr.row}:${addr.col}`);
-            fxInput.value = formatCellForEdit(cell);
-            fxInput.focus();
-            fxInput.setSelectionRange(fxInput.value.length, fxInput.value.length);
-          },
-        })
-      : null;
-    // Wire recalc emissions back to the watch panel so its values update
-    // even when the engine fires a recalc batch with no per-cell `value`
-    // events (rare, but keeps the panel honest).
-    const unsubWatchRecalc = watchPanel
-      ? emitter.on('recalc', () => watchPanel.refresh())
-      : (): void => {};
-    const unsubWatchWb = watchPanel
-      ? emitter.on('workbookChange', () => watchPanel.refresh())
-      : (): void => {};
+
+    // Toggleable host-level features. Each binding starts `null` and is
+    // populated by its attacher when the corresponding flag is on. Cross-
+    // feature references (e.g. `onHostKey` checking `formatPainter`) read
+    // the let-bound vars directly so they always see the current value.
+    let formatDialog: ReturnType<typeof attachFormatDialog> | null = null;
+    let formatPainter: FormatPainterHandle | null = null;
+    let hover: ReturnType<typeof attachHover> | null = null;
+    let conditionalDialog: ReturnType<typeof attachConditionalDialog> | null = null;
+    let fxDialog: FxDialogHandle | null = null;
+    let fxClickHandler: (() => void) | null = null;
+    let namedRangeDialog: ReturnType<typeof attachNamedRangeDialog> | null = null;
+    let hyperlinkDialog: ReturnType<typeof attachHyperlinkDialog> | null = null;
+    let statusBar: ReturnType<typeof attachStatusBar> | null = null;
+    let watchPanel: ReturnType<typeof attachWatchPanel> | null = null;
+    let unsubWatchRecalc: () => void = (): void => {};
+    let unsubWatchWb: () => void = (): void => {};
+    let errorMenu: ErrorMenuHandle | null = null;
+    let detachWheel: () => void = (): void => {};
+    type AutocompleteHandle = ReturnType<typeof attachAutocomplete>;
+    const autocompleteStub: AutocompleteHandle = {
+      isOpen: () => false,
+      move: (_n: number) => {},
+      acceptHighlighted: () => false,
+      close: () => {},
+      refresh: () => {},
+      detach: () => {},
+    };
+    let fxAutocomplete: AutocompleteHandle = autocompleteStub;
+    let fxArgHelper: ReturnType<typeof attachArgHelper> | null = null;
+    let hostShortcutsAttached = false;
+    let canvasErrorClickAttached = false;
+
+    // Built-in feature registry — keyed by feature id, populated by
+    // attachers, drained by `dispose()`. Mirrored into `featuresView`
+    // below for the public `instance.features` surface.
+    const featureRegistry = new Map<string, ExtensionHandle>();
+    const wrapHandle = (raw: unknown, detach: () => void): ExtensionHandle => {
+      const h = (
+        raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
+      ) as ExtensionHandle;
+      h.dispose = detach;
+      return h;
+    };
+
+    // Host-level toggleable feature ids — `setFeatures(next)` walks this
+    // list and dispatches to the attach/detach helpers. `shortcuts` is
+    // listed for the host-level meta-key listener; the wb-side keyboard
+    // attach is rebuilt by `bindEngine` when shortcuts flip.
+    const HOST_TOGGLEABLE_IDS = [
+      'formatDialog',
+      'formatPainter',
+      'hoverComment',
+      'conditional',
+      'fxDialog',
+      'namedRanges',
+      'hyperlink',
+      'statusBar',
+      'watchWindow',
+      'errorIndicators',
+      'autocomplete',
+      'wheel',
+      'shortcuts',
+      'formulaBar',
+    ] as const;
+
+    // Wb-side toggleable feature ids — these live inside `bindEngine`.
+    // Toggling any of them triggers a binding rebuild from `setFeatures`.
+    const WB_TOGGLEABLE_IDS = [
+      'shortcuts',
+      'clipboard',
+      'pasteSpecial',
+      'contextMenu',
+      'findReplace',
+      'validation',
+    ] as const;
+
+    const attachHostFeature = (id: string): void => {
+      switch (id) {
+        case 'formatDialog':
+          if (formatDialog) return;
+          formatDialog = attachFormatDialog({ host, store, strings, history, getWb: () => wb });
+          featureRegistry.set(
+            'formatDialog',
+            wrapHandle(formatDialog, () => formatDialog?.detach()),
+          );
+          break;
+        case 'formatPainter':
+          if (formatPainter) return;
+          formatPainter = attachFormatPainter({ host, store, history });
+          featureRegistry.set(
+            'formatPainter',
+            wrapHandle(formatPainter, () => formatPainter?.detach()),
+          );
+          break;
+        case 'hoverComment':
+          if (hover) return;
+          hover = attachHover({ grid, store });
+          featureRegistry.set(
+            'hoverComment',
+            wrapHandle(hover, () => hover?.detach()),
+          );
+          break;
+        case 'conditional':
+          if (conditionalDialog) return;
+          conditionalDialog = attachConditionalDialog({ host, store, strings });
+          featureRegistry.set(
+            'conditional',
+            wrapHandle(conditionalDialog, () => conditionalDialog?.detach()),
+          );
+          break;
+        case 'fxDialog':
+          if (fxDialog) return;
+          fxDialog = attachFxDialog({
+            host,
+            store,
+            strings,
+            onInsert: (formula) => {
+              fxInput.value = formula;
+              fxInput.focus();
+              commitFx('none');
+            },
+          });
+          fxClickHandler = (): void => fxDialog?.open();
+          fx.addEventListener('click', fxClickHandler);
+          fx.disabled = false;
+          fx.style.cursor = '';
+          featureRegistry.set(
+            'fxDialog',
+            wrapHandle(fxDialog, () => fxDialog?.detach()),
+          );
+          break;
+        case 'namedRanges':
+          if (namedRangeDialog) return;
+          namedRangeDialog = attachNamedRangeDialog({ host, wb, strings });
+          featureRegistry.set(
+            'namedRanges',
+            wrapHandle(namedRangeDialog, () => namedRangeDialog?.detach()),
+          );
+          break;
+        case 'hyperlink':
+          if (hyperlinkDialog) return;
+          hyperlinkDialog = attachHyperlinkDialog({
+            host,
+            store,
+            strings,
+            history,
+            getWb: () => wb,
+          });
+          featureRegistry.set(
+            'hyperlink',
+            wrapHandle(hyperlinkDialog, () => hyperlinkDialog?.detach()),
+          );
+          break;
+        case 'statusBar':
+          if (statusBar) return;
+          setChromeAttached('statusbar', true);
+          statusBar = attachStatusBar({
+            statusbar,
+            store,
+            strings,
+            getEngineLabel: () => (wb.isStub ? 'stub' : `formulon ${wb.version}`),
+          });
+          featureRegistry.set(
+            'statusBar',
+            wrapHandle(statusBar, () => statusBar?.detach()),
+          );
+          break;
+        case 'watchWindow':
+          if (watchPanel) return;
+          setChromeAttached('watchDock', true);
+          watchPanel = attachWatchPanel({ host: watchDock, store, getWb: () => wb, strings });
+          featureRegistry.set(
+            'watchWindow',
+            wrapHandle(watchPanel, () => watchPanel?.detach()),
+          );
+          unsubWatchRecalc = emitter.on('recalc', () => watchPanel?.refresh());
+          unsubWatchWb = emitter.on('workbookChange', () => watchPanel?.refresh());
+          break;
+        case 'errorIndicators':
+          if (errorMenu) return;
+          errorMenu = attachErrorMenu({
+            host,
+            store,
+            getWb: () => wb,
+            strings,
+            onEditCell: (addr) => {
+              mutators.setActive(store, addr);
+              const cell = store.getState().data.cells.get(`${addr.sheet}:${addr.row}:${addr.col}`);
+              fxInput.value = formatCellForEdit(cell);
+              fxInput.focus();
+              fxInput.setSelectionRange(fxInput.value.length, fxInput.value.length);
+            },
+          });
+          if (!canvasErrorClickAttached) {
+            canvas.addEventListener('click', onCanvasClick);
+            canvasErrorClickAttached = true;
+          }
+          featureRegistry.set(
+            'errorIndicators',
+            wrapHandle(errorMenu, () => errorMenu?.detach()),
+          );
+          break;
+        case 'autocomplete':
+          if (fxAutocomplete !== autocompleteStub) return;
+          fxAutocomplete = attachAutocomplete({
+            input: fxInput,
+            onAfterInsert: () => syncFxRefs(),
+            getTables: () => wb.getTables(),
+            getCustomFunctions: () => formulaRegistry.list(),
+          });
+          fxArgHelper = attachArgHelper({ input: fxInput });
+          break;
+        case 'wheel':
+          // Idempotent — `detachWheel` is replaced wholesale.
+          detachWheel();
+          detachWheel = attachWheel({ grid, store, wb });
+          break;
+        case 'shortcuts':
+          if (hostShortcutsAttached) return;
+          host.addEventListener('keydown', onHostKey);
+          hostShortcutsAttached = true;
+          break;
+        case 'formulaBar':
+          setChromeAttached('formulabar', true);
+          break;
+      }
+      refreshFeaturesView();
+    };
+
+    const detachHostFeature = (id: string): void => {
+      switch (id) {
+        case 'formatDialog':
+          formatDialog?.detach();
+          formatDialog = null;
+          featureRegistry.delete('formatDialog');
+          break;
+        case 'formatPainter':
+          formatPainter?.detach();
+          formatPainter = null;
+          featureRegistry.delete('formatPainter');
+          break;
+        case 'hoverComment':
+          hover?.detach();
+          hover = null;
+          featureRegistry.delete('hoverComment');
+          break;
+        case 'conditional':
+          conditionalDialog?.detach();
+          conditionalDialog = null;
+          featureRegistry.delete('conditional');
+          break;
+        case 'fxDialog':
+          if (fxClickHandler) fx.removeEventListener('click', fxClickHandler);
+          fxClickHandler = null;
+          fxDialog?.detach();
+          fxDialog = null;
+          fx.disabled = true;
+          fx.style.cursor = 'default';
+          featureRegistry.delete('fxDialog');
+          break;
+        case 'namedRanges':
+          namedRangeDialog?.detach();
+          namedRangeDialog = null;
+          featureRegistry.delete('namedRanges');
+          break;
+        case 'hyperlink':
+          hyperlinkDialog?.detach();
+          hyperlinkDialog = null;
+          featureRegistry.delete('hyperlink');
+          break;
+        case 'statusBar':
+          statusBar?.detach();
+          statusBar = null;
+          featureRegistry.delete('statusBar');
+          setChromeAttached('statusbar', false);
+          break;
+        case 'watchWindow':
+          unsubWatchRecalc();
+          unsubWatchWb();
+          unsubWatchRecalc = (): void => {};
+          unsubWatchWb = (): void => {};
+          watchPanel?.detach();
+          watchPanel = null;
+          featureRegistry.delete('watchWindow');
+          setChromeAttached('watchDock', false);
+          break;
+        case 'errorIndicators':
+          if (canvasErrorClickAttached) canvas.removeEventListener('click', onCanvasClick);
+          canvasErrorClickAttached = false;
+          errorMenu?.detach();
+          errorMenu = null;
+          featureRegistry.delete('errorIndicators');
+          break;
+        case 'autocomplete':
+          fxAutocomplete.detach();
+          fxAutocomplete = autocompleteStub;
+          fxArgHelper?.detach();
+          fxArgHelper = null;
+          break;
+        case 'wheel':
+          detachWheel();
+          detachWheel = (): void => {};
+          break;
+        case 'shortcuts':
+          if (hostShortcutsAttached) host.removeEventListener('keydown', onHostKey);
+          hostShortcutsAttached = false;
+          break;
+        case 'formulaBar':
+          setChromeAttached('formulabar', false);
+          break;
+      }
+      refreshFeaturesView();
+    };
 
     // wb-dependent layer — re-built whenever setWorkbook swaps the engine.
     interface EngineBinding {
@@ -762,15 +1024,11 @@ export const Spreadsheet = {
         flushFormatToEngine(wb, store, store.getState().data.sheetIndex);
       }
     };
-    if (flags.shortcuts) host.addEventListener('keydown', onHostKey);
-
-    const detachWheel = flags.wheel ? attachWheel({ grid, store, wb }) : (): void => {};
-
-    // Error / validation triangle clicks. Bound on the canvas so it doesn't
-    // intercept clicks elsewhere in the host (formula bar, name box). We use
-    // `click` (not `pointerdown`) so the existing pointer handler still gets
-    // to set the active cell first — that way the menu and the cell select
-    // agree on the addr the user just clicked.
+    // Error / validation triangle clicks. Bound on the canvas by the
+    // `errorIndicators` attacher above. We use `click` (not `pointerdown`)
+    // so the existing pointer handler gets to set the active cell first —
+    // that way the menu and the cell select agree on the addr the user
+    // just clicked.
     const onCanvasClick = (e: MouseEvent): void => {
       if (!errorMenu) return;
       if (e.button !== 0) return;
@@ -782,12 +1040,7 @@ export const Spreadsheet = {
       const pad = 2;
       for (const hit of getErrorTriangleHits()) {
         const r = hit.rect;
-        if (
-          lx < r.x - pad ||
-          lx > r.x + r.w + pad ||
-          ly < r.y - pad ||
-          ly > r.y + r.h + pad
-        ) {
+        if (lx < r.x - pad || lx > r.x + r.w + pad || ly < r.y - pad || ly > r.y + r.h + pad) {
           continue;
         }
         e.stopPropagation();
@@ -796,7 +1049,6 @@ export const Spreadsheet = {
         return;
       }
     };
-    if (errorMenu) canvas.addEventListener('click', onCanvasClick);
 
     // Formula bar editing — typing in the formula bar edits the active cell.
     let fxEditing = false;
@@ -812,24 +1064,6 @@ export const Spreadsheet = {
       mutators.setEditorRefs(store, refs);
     };
     const clearFxRefs = (): void => mutators.setEditorRefs(store, []);
-    // Function autocomplete inside the formula bar. When disabled, hand back
-    // a stub so the rest of the fxKey handling can call its methods safely.
-    const fxAutocomplete = flags.autocomplete
-      ? attachAutocomplete({
-          input: fxInput,
-          onAfterInsert: () => syncFxRefs(),
-          getTables: () => wb.getTables(),
-          getCustomFunctions: () => formulaRegistry.list(),
-        })
-      : {
-          isOpen: () => false,
-          move: (_n: number) => {},
-          acceptHighlighted: () => false,
-          close: () => {},
-          refresh: () => {},
-          detach: () => {},
-        };
-    const fxArgHelper = flags.autocomplete ? attachArgHelper({ input: fxInput }) : null;
     const onFxFocus = (): void => {
       if (binding.editor.isActive()) binding.editor.cancel();
       fxEditing = true;
@@ -1090,29 +1324,6 @@ export const Spreadsheet = {
 
     let disposed = false;
 
-    // Built-in feature registry. Each entry exposes the `dispose` hook so
-    // `instance.remove(id)` can tear it down later. Order doesn't matter
-    // here — we use it for lookup, not iteration.
-    const featureRegistry = new Map<string, ExtensionHandle>();
-    const registerBuiltIn = (id: string, raw: unknown, detach: () => void): void => {
-      const handle = (
-        raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
-      ) as ExtensionHandle;
-      handle.dispose = detach;
-      featureRegistry.set(id, handle);
-    };
-    if (formatDialog) registerBuiltIn('formatDialog', formatDialog, formatDialog.detach);
-    if (formatPainter) registerBuiltIn('formatPainter', formatPainter, formatPainter.detach);
-    if (hover) registerBuiltIn('hoverComment', hover, hover.detach);
-    if (conditionalDialog)
-      registerBuiltIn('conditional', conditionalDialog, conditionalDialog.detach);
-    if (namedRangeDialog) registerBuiltIn('namedRanges', namedRangeDialog, namedRangeDialog.detach);
-    if (hyperlinkDialog) registerBuiltIn('hyperlink', hyperlinkDialog, hyperlinkDialog.detach);
-    if (statusBar) registerBuiltIn('statusBar', statusBar, statusBar.detach);
-    if (fxDialog) registerBuiltIn('fxDialog', fxDialog, fxDialog.detach);
-    if (watchPanel) registerBuiltIn('watchWindow', watchPanel, watchPanel.detach);
-    if (errorMenu) registerBuiltIn('errorIndicators', errorMenu, errorMenu.detach);
-
     // User extensions — additive on top of built-ins. Run after built-ins
     // and the engine binding so they can read other features via
     // `ctx.resolve()`.
@@ -1167,6 +1378,13 @@ export const Spreadsheet = {
     };
     refreshFeaturesView();
 
+    // Initial host-feature attach — runs after every helper closure
+    // (`onCanvasClick`, `onHostKey`, `syncFxRefs`, `commitFx`) is in
+    // scope so the attacher bodies can resolve them at call time.
+    for (const id of HOST_TOGGLEABLE_IDS) {
+      if (flags[id as keyof typeof flags]) attachHostFeature(id);
+    }
+
     // Locale change → snapshot strings into the local `let` so future
     // attaches see the latest. Built-in attaches in v0.1 capture strings at
     // attach time; full live updates land in v0.2 once each `attach*` ships
@@ -1188,7 +1406,9 @@ export const Spreadsheet = {
       history,
       i18n,
       features: featuresView,
-      formatPainter: formatPainter ?? undefined,
+      get formatPainter() {
+        return formatPainter ?? undefined;
+      },
       formula: formulaRegistry,
       cells: cellRegistry,
       use(input) {
@@ -1203,6 +1423,41 @@ export const Spreadsheet = {
         userHandles.delete(id);
         refreshFeaturesView();
         return true;
+      },
+      setFeatures(next) {
+        const nextFlags = resolveFlags(next);
+        // Diff host-level features and dispatch attach/detach.
+        for (const id of HOST_TOGGLEABLE_IDS) {
+          const k = id as keyof typeof flags;
+          const was = flags[k];
+          const now = nextFlags[k];
+          if (was === now) continue;
+          if (was && !now) detachHostFeature(id);
+          else if (!was && now) attachHostFeature(id);
+        }
+        // Wb-side rebuild only when a wb-bound feature flipped — keeps the
+        // editor / pointer / undo state intact when only host-level flags
+        // change.
+        const wbChanged = WB_TOGGLEABLE_IDS.some(
+          (id) => flags[id as keyof typeof flags] !== nextFlags[id as keyof typeof nextFlags],
+        );
+        flags = nextFlags;
+        if (wbChanged) {
+          binding.unbind();
+          binding = bindEngine(wb);
+        }
+        refreshFeaturesView();
+      },
+      setExtensions(next) {
+        // Dispose all currently-mounted user extensions, then re-mount the
+        // new list. Built-ins are untouched — use `setFeatures` for those.
+        for (const handle of userHandles.values()) handle.dispose();
+        userHandles.clear();
+        if (next && next.length) {
+          const sorted = sortByPriority(dedupeById(flattenExtensions(next)));
+          for (const ext of sorted) mountExtension(ext);
+        }
+        refreshFeaturesView();
       },
       openConditionalDialog() {
         conditionalDialog?.open();
