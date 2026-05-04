@@ -55,12 +55,18 @@ import { attachKeyboard } from './interact/keyboard.js';
 import { attachNamedRangeDialog } from './interact/named-range-dialog.js';
 import { attachPasteSpecial } from './interact/paste-special.js';
 import { attachPointer } from './interact/pointer.js';
+import { type SlicerHandle, attachSlicer } from './interact/slicer.js';
 import { attachStatusBar } from './interact/status-bar.js';
 import { attachValidationList } from './interact/validation.js';
 import { attachWatchPanel } from './interact/watch-panel.js';
 import { attachWheel } from './interact/wheel.js';
 import { GridRenderer, getErrorTriangleHits } from './render/grid.js';
-import { type SpreadsheetStore, createSpreadsheetStore, mutators } from './store/store.js';
+import {
+  type SlicerSpec,
+  type SpreadsheetStore,
+  createSpreadsheetStore,
+  mutators,
+} from './store/store.js';
 import { resolveTheme } from './theme/resolve.js';
 
 export interface MountOptions {
@@ -163,6 +169,19 @@ export interface SpreadsheetInstance {
   closeWatchWindow(): void;
   /** Toggle Watch Window visibility. No-op when the feature is off. */
   toggleWatchWindow(): void;
+  /** Open a floating slicer panel for the given table column. Returns the
+   *  freshly-built `SlicerSpec` (including its auto-assigned id). Throws
+   *  when the table or column can't be resolved against the workbook, or
+   *  when `features.slicer` is off. */
+  addSlicer(input: {
+    tableName: string;
+    column: string;
+    selected?: readonly string[];
+    x?: number;
+    y?: number;
+  }): SlicerSpec;
+  /** Remove a slicer by id. No-op when the id isn't tracked. */
+  removeSlicer(id: string): void;
   /** Append precedent arrows for the active cell. Same-sheet only. Repeated
    *  calls deduplicate against existing arrows. */
   tracePrecedents(): void;
@@ -422,6 +441,9 @@ export const Spreadsheet = {
     let watchPanel: ReturnType<typeof attachWatchPanel> | null = null;
     let unsubWatchRecalc: () => void = (): void => {};
     let unsubWatchWb: () => void = (): void => {};
+    let slicer: SlicerHandle | null = null;
+    let unsubSlicerRecalc: () => void = (): void => {};
+    let unsubSlicerWb: () => void = (): void => {};
     let errorMenu: ErrorMenuHandle | null = null;
     let detachWheel: () => void = (): void => {};
     type AutocompleteHandle = ReturnType<typeof attachAutocomplete>;
@@ -465,6 +487,7 @@ export const Spreadsheet = {
       'hyperlink',
       'statusBar',
       'watchWindow',
+      'slicer',
       'errorIndicators',
       'autocomplete',
       'wheel',
@@ -593,6 +616,16 @@ export const Spreadsheet = {
           unsubWatchRecalc = emitter.on('recalc', () => watchPanel?.refresh());
           unsubWatchWb = emitter.on('workbookChange', () => watchPanel?.refresh());
           break;
+        case 'slicer':
+          if (slicer) return;
+          slicer = attachSlicer({ host, store, getWb: () => wb, history, strings });
+          featureRegistry.set(
+            'slicer',
+            wrapHandle(slicer, () => slicer?.detach()),
+          );
+          unsubSlicerRecalc = emitter.on('recalc', () => slicer?.refresh());
+          unsubSlicerWb = emitter.on('workbookChange', () => slicer?.refresh());
+          break;
         case 'errorIndicators':
           if (errorMenu) return;
           errorMenu = attachErrorMenu({
@@ -705,6 +738,15 @@ export const Spreadsheet = {
           watchPanel = null;
           featureRegistry.delete('watchWindow');
           setChromeAttached('watchDock', false);
+          break;
+        case 'slicer':
+          unsubSlicerRecalc();
+          unsubSlicerWb();
+          unsubSlicerRecalc = (): void => {};
+          unsubSlicerWb = (): void => {};
+          slicer?.detach();
+          slicer = null;
+          featureRegistry.delete('slicer');
           break;
         case 'errorIndicators':
           if (canvasErrorClickAttached) canvas.removeEventListener('click', onCanvasClick);
@@ -1514,6 +1556,15 @@ export const Spreadsheet = {
       toggleWatchWindow() {
         watchPanel?.toggle();
       },
+      addSlicer(input) {
+        if (!slicer) {
+          throw new Error('addSlicer: features.slicer is disabled');
+        }
+        return slicer.addSlicer(input);
+      },
+      removeSlicer(id) {
+        slicer?.removeSlicer(id);
+      },
       tracePrecedents() {
         const a = store.getState().selection.active;
         for (const from of findPrecedents(wb, a)) {
@@ -1607,6 +1658,9 @@ export const Spreadsheet = {
         watchPanel?.detach();
         unsubWatchRecalc();
         unsubWatchWb();
+        slicer?.detach();
+        unsubSlicerRecalc();
+        unsubSlicerWb();
         errorMenu?.detach();
         if (errorMenu) canvas.removeEventListener('click', onCanvasClick);
         host.removeEventListener('keydown', onHostKey);

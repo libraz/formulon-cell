@@ -328,6 +328,22 @@ export interface Strings {
     empty: string;
     close: string;
   };
+  slicer: {
+    /** Default panel header used when no column is bound yet. */
+    title: string;
+    /** "Select all" affordance label — clears the chip selection. */
+    selectAll: string;
+    /** "Clear" — empties the chip selection (synonym for select-all in v1). */
+    clear: string;
+    /** aria-label on the per-panel close (×) button. */
+    close: string;
+    /** Imperative API surface label, surfaced in chrome menus. */
+    addSlicer: string;
+    /** Prompt shown when picking which column drives a new slicer. */
+    chooseColumn: string;
+    /** Placeholder text shown when a slicer references a missing table. */
+    tablePlaceholder: string;
+  };
   errorMenu: {
     /** Heading shown above the action list when the menu is for a formula
      *  error (e.g. "#DIV/0! — 0"). */
@@ -678,6 +694,15 @@ export const ja: Strings = {
     empty: 'ウォッチはまだありません',
     close: '閉じる',
   },
+  slicer: {
+    title: 'スライサー',
+    selectAll: 'すべて選択',
+    clear: 'クリア',
+    close: '閉じる',
+    addSlicer: 'スライサーの追加',
+    chooseColumn: '列を選択',
+    tablePlaceholder: '対象テーブルが見つかりません',
+  },
   errorMenu: {
     errorHeading: 'エラー',
     validationHeading: '入力規則違反',
@@ -1016,6 +1041,15 @@ export const en: Strings = {
     clearAll: 'Delete All',
     empty: 'No watches',
     close: 'Close',
+  },
+  slicer: {
+    title: 'Slicer',
+    selectAll: 'Select all',
+    clear: 'Clear',
+    close: 'Close',
+    addSlicer: 'Insert Slicer',
+    chooseColumn: 'Choose column',
+    tablePlaceholder: 'Table not found',
   },
   errorMenu: {
     errorHeading: 'Error',

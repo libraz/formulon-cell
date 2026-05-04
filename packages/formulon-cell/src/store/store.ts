@@ -403,6 +403,31 @@ export interface ErrorIndicatorSlice {
   ignoredErrors: Set<string>;
 }
 
+/** A single Excel-style slicer attached to one column of one Excel Table.
+ *  `selected` is the user's current chip selection — empty array means "all
+ *  values pass" (no filter). The optional `x`/`y` coordinates anchor the
+ *  floating panel relative to the host; absent = default offset. */
+export interface SlicerSpec {
+  /** Unique id within the workbook. Used as React-style key + state map key. */
+  id: string;
+  /** Engine-side `TableSummary.name`. */
+  tableName: string;
+  /** Column header text (matches one of `TableSummary.columns`). */
+  column: string;
+  /** Current chip selection. Empty array == include-all. */
+  selected: readonly string[];
+  /** Optional anchor x relative to the host. */
+  x?: number;
+  /** Optional anchor y relative to the host. */
+  y?: number;
+}
+
+/** History-tracked slice carrying every active slicer. The collection is
+ *  immutable — mutators rebuild the array. */
+export interface SlicersSlice {
+  slicers: readonly SlicerSpec[];
+}
+
 export interface State {
   viewport: ViewportSlice;
   selection: SelectionSlice;
@@ -416,6 +441,7 @@ export interface State {
   watch: WatchSlice;
   traces: TracesSlice;
   errorIndicators: ErrorIndicatorSlice;
+  slicers: SlicersSlice;
 }
 
 const initialAddr = (sheet = 0): Addr => ({ sheet, row: 0, col: 0 });
@@ -469,6 +495,7 @@ export const createSpreadsheetStore = () =>
     watch: { watches: [] },
     traces: { items: [] },
     errorIndicators: { ignoredErrors: new Set() },
+    slicers: { slicers: [] },
   }));
 
 export type SpreadsheetStore = ReturnType<typeof createSpreadsheetStore>;
@@ -940,6 +967,60 @@ export const mutators = {
         ? s
         : { ...s, errorIndicators: { ignoredErrors: new Set() } },
     );
+  },
+
+  /** Append a fresh slicer to the slice. Caller is responsible for picking a
+   *  unique `id` — duplicates are rejected (the older spec wins). */
+  addSlicer(store: SpreadsheetStore, spec: SlicerSpec): void {
+    store.setState((s) => {
+      if (s.slicers.slicers.some((sp) => sp.id === spec.id)) return s;
+      return {
+        ...s,
+        slicers: { slicers: [...s.slicers.slicers, { ...spec, selected: [...spec.selected] }] },
+      };
+    });
+  },
+
+  /** Remove the slicer with `id`. No-op when not present. */
+  removeSlicer(store: SpreadsheetStore, id: string): void {
+    store.setState((s) => {
+      const next = s.slicers.slicers.filter((sp) => sp.id !== id);
+      if (next.length === s.slicers.slicers.length) return s;
+      return { ...s, slicers: { slicers: next } };
+    });
+  },
+
+  /** Merge a partial patch onto the slicer with `id`. Skips the `id` field —
+   *  ids stay immutable. */
+  updateSlicer(store: SpreadsheetStore, id: string, patch: Partial<Omit<SlicerSpec, 'id'>>): void {
+    store.setState((s) => {
+      let changed = false;
+      const next = s.slicers.slicers.map((sp) => {
+        if (sp.id !== id) return sp;
+        changed = true;
+        return {
+          ...sp,
+          ...patch,
+          selected: patch.selected ? [...patch.selected] : sp.selected,
+        };
+      });
+      if (!changed) return s;
+      return { ...s, slicers: { slicers: next } };
+    });
+  },
+
+  /** Replace the chip selection for slicer `id`. Empty array = "include all". */
+  setSlicerSelected(store: SpreadsheetStore, id: string, values: readonly string[]): void {
+    store.setState((s) => {
+      let changed = false;
+      const next = s.slicers.slicers.map((sp) => {
+        if (sp.id !== id) return sp;
+        changed = true;
+        return { ...sp, selected: [...values] };
+      });
+      if (!changed) return s;
+      return { ...s, slicers: { slicers: next } };
+    });
   },
 
   /** Remove any merges that intersect the range. */

@@ -80,6 +80,8 @@ export type {
   MergesSlice,
   NegativeStyle,
   NumFmt,
+  SlicerSpec,
+  SlicersSlice,
   Sparkline,
   SparklineKind,
   SparklineSlice,
@@ -156,16 +158,19 @@ export {
   applyFormatSnapshot,
   applyLayoutSnapshot,
   applyMergesSnapshot,
+  applySlicersSnapshot,
   applySparklineSnapshot,
   canRedo,
   canUndo,
   captureFormatSnapshot,
   captureLayoutSnapshot,
   captureMergesSnapshot,
+  captureSlicersSnapshot,
   captureSparklineSnapshot,
   recordFormatChange,
   recordLayoutChange,
   recordMergesChange,
+  recordSlicersChange,
   recordSparklineChange,
   redo,
   undo,
@@ -271,6 +276,8 @@ export type { StatusBarDeps, StatusBarHandle } from './interact/status-bar.js';
 export { attachStatusBar } from './interact/status-bar.js';
 export type { WatchPanelDeps, WatchPanelHandle } from './interact/watch-panel.js';
 export { attachWatchPanel } from './interact/watch-panel.js';
+export type { SlicerDeps, SlicerHandle } from './interact/slicer.js';
+export { attachSlicer } from './interact/slicer.js';
 export type { ValidationListDeps, ValidationListHandle } from './interact/validation.js';
 export { attachValidationList } from './interact/validation.js';
 export type {

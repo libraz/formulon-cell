@@ -4,6 +4,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type {
   CellFormat,
   LayoutSlice,
+  SlicerSpec,
   Sparkline,
   SpreadsheetStore,
   State,
@@ -369,6 +370,41 @@ export function recordSparklineChange(
   history.push({
     undo: () => applySparklineSnapshot(store, before),
     redo: () => applySparklineSnapshot(store, after),
+  });
+}
+
+/** Capture a deep-cloned slicer list for undo replay. Each spec is freshly
+ *  cloned so future mutators that mutate the `selected` array can't
+ *  retroactively pollute a prior snapshot. */
+export function captureSlicersSnapshot(state: State): SlicerSpec[] {
+  return state.slicers.slicers.map((sp) => ({ ...sp, selected: [...sp.selected] }));
+}
+
+export function applySlicersSnapshot(store: SpreadsheetStore, snap: readonly SlicerSpec[]): void {
+  store.setState((s) => ({
+    ...s,
+    slicers: { slicers: snap.map((sp) => ({ ...sp, selected: [...sp.selected] })) },
+  }));
+}
+
+/** Run `mutate` and push one history entry capturing the slicer-slice
+ *  before/after. Use for any add/remove/update/setSelected call that should
+ *  be undoable. */
+export function recordSlicersChange(
+  history: History | null,
+  store: SpreadsheetStore,
+  mutate: () => void,
+): void {
+  if (!history || history.isReplaying()) {
+    mutate();
+    return;
+  }
+  const before = captureSlicersSnapshot(store.getState());
+  mutate();
+  const after = captureSlicersSnapshot(store.getState());
+  history.push({
+    undo: () => applySlicersSnapshot(store, before),
+    redo: () => applySlicersSnapshot(store, after),
   });
 }
 
