@@ -74,6 +74,7 @@ export type {
   CellVAlign,
   ConditionalRule,
   ConditionalSlice,
+  ErrorIndicatorSlice,
   FormatSlice,
   MergesSlice,
   NegativeStyle,
@@ -216,6 +217,20 @@ export type {
 export { attachConditionalDialog } from './interact/conditional-dialog.js';
 export type { ContextMenuDeps } from './interact/context-menu.js';
 export { attachContextMenu } from './interact/context-menu.js';
+export type {
+  ErrorMenuDeps,
+  ErrorMenuHandle,
+  ErrorMenuKind,
+} from './interact/error-menu.js';
+export { attachErrorMenu } from './interact/error-menu.js';
+export type { ErrorTriangleHit, ErrorTriangleKind } from './render/grid.js';
+export {
+  ERROR_TRIANGLE_COLOR,
+  VALIDATION_TRIANGLE_COLOR,
+  detectErrorKind,
+  detectValidationViolation,
+  getErrorTriangleHits,
+} from './render/grid.js';
 export type {
   NamedRangeDialogDeps,
   NamedRangeDialogHandle,

@@ -24,6 +24,7 @@ export const ALL_FEATURE_IDS = [
   'wheel',
   'shortcuts',
   'watchWindow',
+  'errorIndicators',
 ] as const;
 
 export type FeatureId = (typeof ALL_FEATURE_IDS)[number];

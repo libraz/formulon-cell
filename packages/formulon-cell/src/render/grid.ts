@@ -1,9 +1,12 @@
+import { coerceInput } from '../commands/coerce-input.js';
+import { validateAgainst } from '../commands/validate.js';
 import { evaluateCfFromEngine } from '../engine/cf-sync.js';
+import { type RangeResolver, makeRangeResolver } from '../engine/range-resolver.js';
 import { findSpillRanges } from '../engine/spill.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { addrKey } from '../engine/workbook-handle.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { CellFormat, State } from '../store/store.js';
+import type { CellFormat, CellValidation, State } from '../store/store.js';
 import type { ResolvedTheme } from '../theme/resolve.js';
 import { evaluateConditional } from './conditional.js';
 import {
@@ -29,6 +32,7 @@ import {
   paintCellFill,
   paintCellText,
   paintCommentMarker,
+  paintErrorTriangle,
   paintFillHandle,
   paintFillPreview,
   paintOutlineGutters,
@@ -37,12 +41,95 @@ import {
   paintTraceArrow,
   paintTraceDot,
   paintValidationChevron,
+  paintValidationTriangle,
 } from './painters.js';
 import { paintCellSparkline } from './sparkline.js';
+
+export type ErrorTriangleKind = 'error' | 'validation';
+
+/** Hot-zone of an error/validation triangle painted in this frame. The
+ *  click layer (mount.ts) hit-tests these to open the popover menu. */
+export interface ErrorTriangleHit {
+  rect: Rect;
+  addr: { sheet: number; row: number; col: number };
+  kind: ErrorTriangleKind;
+}
+
+/** Color used for formula-error triangles (Excel-style green). */
+export const ERROR_TRIANGLE_COLOR = '#2ea043';
+/** Color used for data-validation violation triangles (Excel-style red). */
+export const VALIDATION_TRIANGLE_COLOR = '#d24545';
 
 let cachedFillHandleRect: Rect | null = null;
 let cachedValidationChevron: { rect: Rect; row: number; col: number } | null = null;
 let cachedOutlineToggles: OutlineToggleHit[] = [];
+let cachedErrorTriangles: ErrorTriangleHit[] = [];
+
+/** Latest hit-rects of all error / validation triangles painted in this
+ *  frame. The mount-level click handler hit-tests these to open the
+ *  error-info popover. */
+export function getErrorTriangleHits(): ErrorTriangleHit[] {
+  return cachedErrorTriangles;
+}
+
+function setErrorTriangleHits(hits: ErrorTriangleHit[]): void {
+  cachedErrorTriangles = hits;
+}
+
+/** Excel error sentinels that the renderer surfaces with a green corner
+ *  triangle. Engine-typed errors take the `value.kind === 'error'` branch;
+ *  the string set covers cases where a custom formatter / passthrough
+ *  layer left a string sentinel in the cell. */
+const ERROR_SENTINELS: ReadonlySet<string> = new Set([
+  '#DIV/0!',
+  '#NAME?',
+  '#REF!',
+  '#VALUE!',
+  '#NUM!',
+  '#N/A',
+  '#NULL!',
+  '#CIRCULAR!',
+]);
+
+/** Detect whether `cell.value` should surface an error indicator. */
+export function detectErrorKind(value: CellValue): boolean {
+  if (value.kind === 'error') return true;
+  if (value.kind === 'text') return ERROR_SENTINELS.has(value.value);
+  return false;
+}
+
+/** Detect whether `cell.value` violates `validation`. Returns false when
+ *  validation is missing, when the cell is blank and `allowBlank` is set,
+ *  or when the value is itself an error (we surface that as an error
+ *  triangle, not a validation triangle). */
+export function detectValidationViolation(
+  value: CellValue,
+  validation: CellValidation | undefined,
+  resolveRange?: RangeResolver,
+): boolean {
+  if (!validation) return false;
+  if (value.kind === 'error') return false;
+  // Re-use coerceInput by stringifying the value first — same shape the
+  // keyboard / formula-bar paths feed validateAgainst.
+  let raw: string;
+  switch (value.kind) {
+    case 'blank':
+      raw = '';
+      break;
+    case 'number':
+      raw = String(value.value);
+      break;
+    case 'bool':
+      raw = value.value ? 'TRUE' : 'FALSE';
+      break;
+    case 'text':
+      raw = value.value;
+      break;
+  }
+  const coerced = coerceInput(raw);
+  const outcome = validateAgainst(validation, coerced, resolveRange);
+  return !outcome.ok;
+}
 
 /** Latest hit-rects of all outline +/- toggles painted in this frame. The
  *  pointer layer hit-tests these to route clicks to collapse/expand. */
@@ -290,10 +377,23 @@ export class GridRenderer {
 
   private paintCells(state: State, theme: ResolvedTheme, cols: AxisLayout, rows: AxisLayout): void {
     const ctx = this.ctx;
-    const { layout, data, selection, format, merges, sparkline } = state;
+    const { layout, data, selection, format, merges, sparkline, errorIndicators } = state;
     const active = selection.active;
     const conditional = evaluateConditional(state);
     const sparklines = sparkline.sparklines;
+    const ignored = errorIndicators.ignoredErrors;
+    // RangeResolver is only needed for list-validation re-resolution. We
+    // build it lazily — most viewport repaints don't have a single DV cell,
+    // so allocating the resolver up-front would be wasted work.
+    const wbForResolver = this.getWb();
+    let resolver: RangeResolver | undefined;
+    const getResolver = (): RangeResolver | undefined => {
+      if (resolver) return resolver;
+      if (!wbForResolver) return undefined;
+      resolver = makeRangeResolver(wbForResolver, data.sheetIndex);
+      return resolver;
+    };
+    const triangleHits: ErrorTriangleHit[] = [];
     // Engine-side CF (rules loaded from .xlsx). Merged on top — engine rules
     // currently win per field for cells with overlap. Restricted to the
     // visible viewport rect so we don't pay for off-screen cells.
@@ -430,8 +530,29 @@ export class GridRenderer {
         paintCellText(paintCtx);
         if (spark) paintCellSparkline(ctx, bounds, spark, state, this.getWb());
         if (fmt?.comment) paintCommentMarker(ctx, bounds);
+
+        // Error / validation triangles. Error wins over validation when both
+        // would apply (an error-kind value already implies the data is bad —
+        // the green triangle conveys that without piling on a red one). The
+        // ignoredErrors set suppresses both kinds for the cell once the user
+        // dismisses the popover via the "Ignore" action.
+        const cellAddr = { sheet: data.sheetIndex, row: r, col: c };
+        const cellKey = key;
+        if (!ignored.has(cellKey)) {
+          if (detectErrorKind(value)) {
+            const hit = paintErrorTriangle(ctx, bounds, ERROR_TRIANGLE_COLOR);
+            triangleHits.push({ rect: hit, addr: cellAddr, kind: 'error' });
+          } else if (
+            fmt?.validation &&
+            detectValidationViolation(value, fmt.validation, getResolver())
+          ) {
+            const hit = paintValidationTriangle(ctx, bounds, VALIDATION_TRIANGLE_COLOR);
+            triangleHits.push({ rect: hit, addr: cellAddr, kind: 'validation' });
+          }
+        }
       }
     }
+    setErrorTriangleHits(triangleHits);
   }
 
   private paintBorders(

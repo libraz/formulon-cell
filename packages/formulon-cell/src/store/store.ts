@@ -349,6 +349,14 @@ export interface TracesSlice {
   items: readonly TraceArrow[];
 }
 
+/** Per-cell triangle suppression for the error-indicator overlay. Key is
+ *  `addrKey` (`sheet:row:col`). Session-only, NOT history-tracked — Excel's
+ *  "Ignore Error" affordance only suppresses the marker for the current
+ *  session and doesn't survive a reload. */
+export interface ErrorIndicatorSlice {
+  ignoredErrors: Set<string>;
+}
+
 export interface State {
   viewport: ViewportSlice;
   selection: SelectionSlice;
@@ -361,6 +369,7 @@ export interface State {
   sparkline: SparklineSlice;
   watch: WatchSlice;
   traces: TracesSlice;
+  errorIndicators: ErrorIndicatorSlice;
 }
 
 const initialAddr = (sheet = 0): Addr => ({ sheet, row: 0, col: 0 });
@@ -413,6 +422,7 @@ export const createSpreadsheetStore = () =>
     sparkline: { sparklines: new Map() },
     watch: { watches: [] },
     traces: { items: [] },
+    errorIndicators: { ignoredErrors: new Set() },
   }));
 
 export type SpreadsheetStore = ReturnType<typeof createSpreadsheetStore>;
@@ -863,6 +873,27 @@ export const mutators = {
   /** Empty the trace-arrow set. */
   clearTraces(store: SpreadsheetStore): void {
     store.setState((s) => (s.traces.items.length === 0 ? s : { ...s, traces: { items: [] } }));
+  },
+
+  /** Suppress the error-indicator triangle for `addr` for the rest of the
+   *  session. Idempotent — re-ignoring a cell is a no-op. NOT history-tracked. */
+  ignoreError(store: SpreadsheetStore, addr: Addr): void {
+    store.setState((s) => {
+      const key = addrKey(addr);
+      if (s.errorIndicators.ignoredErrors.has(key)) return s;
+      const next = new Set(s.errorIndicators.ignoredErrors);
+      next.add(key);
+      return { ...s, errorIndicators: { ignoredErrors: next } };
+    });
+  },
+
+  /** Drop every ignored-error suppression. */
+  clearIgnoredErrors(store: SpreadsheetStore): void {
+    store.setState((s) =>
+      s.errorIndicators.ignoredErrors.size === 0
+        ? s
+        : { ...s, errorIndicators: { ignoredErrors: new Set() } },
+    );
   },
 
   /** Remove any merges that intersect the range. */

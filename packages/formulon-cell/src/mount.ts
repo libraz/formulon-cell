@@ -42,6 +42,7 @@ import { attachClipboard } from './interact/clipboard.js';
 import { attachConditionalDialog } from './interact/conditional-dialog.js';
 import { attachContextMenu } from './interact/context-menu.js';
 import { InlineEditor } from './interact/editor.js';
+import { type ErrorMenuHandle, attachErrorMenu } from './interact/error-menu.js';
 import { attachFindReplace } from './interact/find-replace.js';
 import { attachFormatDialog } from './interact/format-dialog.js';
 import { type FormatPainterHandle, attachFormatPainter } from './interact/format-painter.js';
@@ -57,7 +58,7 @@ import { attachStatusBar } from './interact/status-bar.js';
 import { attachValidationList } from './interact/validation.js';
 import { attachWatchPanel } from './interact/watch-panel.js';
 import { attachWheel } from './interact/wheel.js';
-import { GridRenderer } from './render/grid.js';
+import { GridRenderer, getErrorTriangleHits } from './render/grid.js';
 import { type SpreadsheetStore, createSpreadsheetStore, mutators } from './store/store.js';
 import { resolveTheme } from './theme/resolve.js';
 
@@ -423,6 +424,26 @@ export const Spreadsheet = {
           strings,
         })
       : null;
+    const errorMenu: ErrorMenuHandle | null = flags.errorIndicators
+      ? attachErrorMenu({
+          host,
+          store,
+          getWb: () => wb,
+          strings,
+          onEditCell: (addr) => {
+            // Mirror the formula-bar edit path: focus the active cell, drop
+            // the formula/value into fxInput, and let the existing commit
+            // pipeline take over on Enter/Tab/Blur.
+            mutators.setActive(store, addr);
+            const cell = store
+              .getState()
+              .data.cells.get(`${addr.sheet}:${addr.row}:${addr.col}`);
+            fxInput.value = formatCellForEdit(cell);
+            fxInput.focus();
+            fxInput.setSelectionRange(fxInput.value.length, fxInput.value.length);
+          },
+        })
+      : null;
     // Wire recalc emissions back to the watch panel so its values update
     // even when the engine fires a recalc batch with no per-cell `value`
     // events (rare, but keeps the panel honest).
@@ -745,6 +766,38 @@ export const Spreadsheet = {
 
     const detachWheel = flags.wheel ? attachWheel({ grid, store, wb }) : (): void => {};
 
+    // Error / validation triangle clicks. Bound on the canvas so it doesn't
+    // intercept clicks elsewhere in the host (formula bar, name box). We use
+    // `click` (not `pointerdown`) so the existing pointer handler still gets
+    // to set the active cell first — that way the menu and the cell select
+    // agree on the addr the user just clicked.
+    const onCanvasClick = (e: MouseEvent): void => {
+      if (!errorMenu) return;
+      if (e.button !== 0) return;
+      const rect = canvas.getBoundingClientRect();
+      const lx = e.clientX - rect.left;
+      const ly = e.clientY - rect.top;
+      // Pad by 2px on each side so the 6px corner triangle is comfortable to
+      // hit on touch / coarse-pointer devices.
+      const pad = 2;
+      for (const hit of getErrorTriangleHits()) {
+        const r = hit.rect;
+        if (
+          lx < r.x - pad ||
+          lx > r.x + r.w + pad ||
+          ly < r.y - pad ||
+          ly > r.y + r.h + pad
+        ) {
+          continue;
+        }
+        e.stopPropagation();
+        e.preventDefault();
+        errorMenu.open(hit.addr, e.clientX, e.clientY, hit.kind);
+        return;
+      }
+    };
+    if (errorMenu) canvas.addEventListener('click', onCanvasClick);
+
     // Formula bar editing — typing in the formula bar edits the active cell.
     let fxEditing = false;
     let fxBaseline = '';
@@ -1058,6 +1111,7 @@ export const Spreadsheet = {
     if (statusBar) registerBuiltIn('statusBar', statusBar, statusBar.detach);
     if (fxDialog) registerBuiltIn('fxDialog', fxDialog, fxDialog.detach);
     if (watchPanel) registerBuiltIn('watchWindow', watchPanel, watchPanel.detach);
+    if (errorMenu) registerBuiltIn('errorIndicators', errorMenu, errorMenu.detach);
 
     // User extensions — additive on top of built-ins. Run after built-ins
     // and the engine binding so they can read other features via
@@ -1269,6 +1323,8 @@ export const Spreadsheet = {
         watchPanel?.detach();
         unsubWatchRecalc();
         unsubWatchWb();
+        errorMenu?.detach();
+        if (errorMenu) canvas.removeEventListener('click', onCanvasClick);
         host.removeEventListener('keydown', onHostKey);
         detachWheel();
         fxAutocomplete.detach();

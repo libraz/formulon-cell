@@ -310,6 +310,17 @@ export interface Strings {
     empty: string;
     close: string;
   };
+  errorMenu: {
+    /** Heading shown above the action list when the menu is for a formula
+     *  error (e.g. "#DIV/0! — 0"). */
+    errorHeading: string;
+    /** Heading shown above the action list for data-validation violations. */
+    validationHeading: string;
+    showInfo: string;
+    editCell: string;
+    traceError: string;
+    ignore: string;
+  };
   a11y: {
     nameBox: string;
     formulaBar: string;
@@ -604,6 +615,14 @@ export const ja: Strings = {
     empty: 'ウォッチはまだありません',
     close: '閉じる',
   },
+  errorMenu: {
+    errorHeading: 'エラー',
+    validationHeading: '入力規則違反',
+    showInfo: 'エラーの詳細',
+    editCell: 'セルを編集',
+    traceError: 'エラーの参照元',
+    ignore: '無視',
+  },
   a11y: {
     nameBox: '名前ボックス',
     formulaBar: '数式バー',
@@ -897,6 +916,14 @@ export const en: Strings = {
     clearAll: 'Delete All',
     empty: 'No watches',
     close: 'Close',
+  },
+  errorMenu: {
+    errorHeading: 'Error',
+    validationHeading: 'Validation issue',
+    showInfo: 'Show error info',
+    editCell: 'Edit cell',
+    traceError: 'Trace error',
+    ignore: 'Ignore',
   },
   a11y: {
     nameBox: 'Name box',

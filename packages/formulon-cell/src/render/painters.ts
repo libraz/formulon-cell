@@ -121,6 +121,47 @@ export function paintValidationChevron(
   return { x, y, w, h };
 }
 
+/** Side of the triangle hot-zone painted by `paintErrorTriangle` /
+ *  `paintValidationTriangle`. Click hit-tests in `error-menu` use the same
+ *  constant so the visual and clickable areas line up. */
+export const ERROR_TRIANGLE_SIZE = 6;
+
+/** Paint a small filled triangle in the upper-LEFT of the cell. Used for
+ *  formula-error and data-validation indicators. The triangle sits flush
+ *  against the top and left cell edges and points down-right. Returned rect
+ *  is the click hit-area (slightly padded so the corner is comfortable to
+ *  hit). */
+export function paintErrorTriangle(
+  ctx: CanvasRenderingContext2D,
+  bounds: Rect,
+  color: string,
+): Rect {
+  const size = ERROR_TRIANGLE_SIZE;
+  const x = bounds.x;
+  const y = bounds.y;
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + size, y);
+  ctx.lineTo(x, y + size);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+  return { x, y, w: size, h: size };
+}
+
+/** Convenience alias — Excel paints DV violations the same shape as formula
+ *  errors but red. The grid wires both through `paintErrorTriangle`; this
+ *  thin wrapper keeps the call sites self-documenting. */
+export function paintValidationTriangle(
+  ctx: CanvasRenderingContext2D,
+  bounds: Rect,
+  color = '#d24545',
+): Rect {
+  return paintErrorTriangle(ctx, bounds, color);
+}
+
 /** Paint a small filled triangle in the upper-right of the cell to indicate
  *  an attached comment (Excel/Sheets convention). */
 export function paintCommentMarker(ctx: CanvasRenderingContext2D, bounds: Rect): void {
