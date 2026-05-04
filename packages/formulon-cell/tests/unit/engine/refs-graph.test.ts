@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { findDependents, findPrecedents } from '../../../src/engine/refs-graph.js';
+import type { Addr } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 
 interface Cell {
@@ -7,12 +8,36 @@ interface Cell {
   formula?: string;
 }
 
+/** Fake WorkbookHandle with the engine `precedents` / `dependents` methods
+ *  stubbed to `null` — so callers fall through to the same-sheet regex path
+ *  exercised by these tests. */
 const wb = (cells: readonly Cell[]): WorkbookHandle =>
   ({
+    precedents: () => null,
+    dependents: () => null,
     cellFormula: (a: { sheet: number; row: number; col: number }) =>
       cells.find((c) => c.addr.sheet === a.sheet && c.addr.row === a.row && c.addr.col === a.col)
         ?.formula ?? null,
     cells: (sheet: number) => cells.filter((c) => c.addr.sheet === sheet),
+  }) as unknown as WorkbookHandle;
+
+/** Fake handle that pretends the engine has `traceArrows` capability and
+ *  returns canned `Addr[]` slices — used to assert the engine path takes
+ *  precedence over the regex fallback when available. */
+const wbWithEngine = (
+  precedents: ReadonlyMap<string, Addr[]>,
+  dependents: ReadonlyMap<string, Addr[]>,
+): WorkbookHandle =>
+  ({
+    precedents: (a: Addr): Addr[] | null => precedents.get(`${a.sheet}:${a.row}:${a.col}`) ?? [],
+    dependents: (a: Addr): Addr[] | null => dependents.get(`${a.sheet}:${a.row}:${a.col}`) ?? [],
+    // These should not be called when the engine path is engaged.
+    cellFormula: () => {
+      throw new Error('cellFormula called — engine path should bypass fallback');
+    },
+    cells: () => {
+      throw new Error('cells called — engine path should bypass fallback');
+    },
   }) as unknown as WorkbookHandle;
 
 describe('findPrecedents', () => {
@@ -83,6 +108,54 @@ describe('findDependents', () => {
     ]);
     expect(findDependents(handle, { sheet: 0, row: 0, col: 0 })).toEqual([
       { sheet: 0, row: 2, col: 0 },
+    ]);
+  });
+});
+
+describe('findPrecedents (engine path)', () => {
+  it('returns the engine result without invoking the regex fallback', () => {
+    const handle = wbWithEngine(
+      new Map([
+        [
+          '0:0:0',
+          [
+            { sheet: 0, row: 1, col: 1 },
+            // Cross-sheet ref — engine surfaces it, regex path would have skipped it.
+            { sheet: 1, row: 0, col: 0 },
+          ],
+        ],
+      ]),
+      new Map(),
+    );
+    expect(findPrecedents(handle, { sheet: 0, row: 0, col: 0 })).toEqual([
+      { sheet: 0, row: 1, col: 1 },
+      { sheet: 1, row: 0, col: 0 },
+    ]);
+  });
+
+  it('returns an empty list when the engine reports no precedents', () => {
+    const handle = wbWithEngine(new Map(), new Map());
+    expect(findPrecedents(handle, { sheet: 0, row: 7, col: 7 })).toEqual([]);
+  });
+});
+
+describe('findDependents (engine path)', () => {
+  it('returns the engine result and includes cross-sheet dependents', () => {
+    const handle = wbWithEngine(
+      new Map(),
+      new Map([
+        [
+          '0:0:0',
+          [
+            { sheet: 0, row: 5, col: 5 },
+            { sheet: 2, row: 0, col: 0 },
+          ],
+        ],
+      ]),
+    );
+    expect(findDependents(handle, { sheet: 0, row: 0, col: 0 })).toEqual([
+      { sheet: 0, row: 5, col: 5 },
+      { sheet: 2, row: 0, col: 0 },
     ]);
   });
 });

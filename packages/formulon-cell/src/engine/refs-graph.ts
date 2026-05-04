@@ -3,10 +3,12 @@ import type { Addr } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 /**
- * Trace-precedents / trace-dependents helpers. Same-sheet only — cross-sheet
- * refs are out of scope for v1 trace arrows. Returned addrs always carry the
- * caller's sheet index; the regex used by `extractRefs` skips quoted-string
- * literals already, so SUM("A1:B2") is not mistaken for a real ref.
+ * Trace-precedents / trace-dependents helpers. When the engine exposes
+ * `precedents` / `dependents` (5/5 build onward), these wrappers delegate
+ * to the engine — that surfaces cross-sheet refs and reflects the live
+ * dep graph. Otherwise (stub engine, pre-5/5 vendored builds) we fall
+ * back to a same-sheet regex scan over `extractRefs`. The regex skips
+ * quoted-string literals so `SUM("A1:B2")` is not mistaken for a real ref.
  */
 
 /** True when the ref at `[start, end)` in `text` is sheet-qualified (e.g.
@@ -17,11 +19,28 @@ function isCrossSheetRef(text: string, start: number, end: number): boolean {
   return text.slice(start, end).includes('!');
 }
 
-/** Source cells referenced by the formula at `addr`. Returns an empty list
- *  when the cell is not a formula or the formula has no refs. Range refs
- *  (`A1:A5`) are expanded into individual addrs. Sheet-qualified refs are
- *  skipped — only same-sheet precedents are surfaced. */
+/** Source cells referenced by the formula at `addr`. Engine-backed when
+ *  available — returns the full graph including cross-sheet refs. Falls
+ *  back to a same-sheet regex scan when `capabilities.traceArrows` is off,
+ *  in which case range refs (`A1:A5`) are expanded into individual addrs
+ *  and sheet-qualified refs are skipped. */
 export function findPrecedents(wb: WorkbookHandle, addr: Addr): Addr[] {
+  const fromEngine = wb.precedents(addr);
+  if (fromEngine !== null) return fromEngine;
+  return scanPrecedents(wb, addr);
+}
+
+/** Cells whose formulas read from `addr`. Engine-backed when available;
+ *  same-sheet-only fallback otherwise. */
+export function findDependents(wb: WorkbookHandle, addr: Addr): Addr[] {
+  const fromEngine = wb.dependents(addr);
+  if (fromEngine !== null) return fromEngine;
+  return scanDependents(wb, addr);
+}
+
+/** Same-sheet regex fallback for `findPrecedents`. Exported for tests; the
+ *  engine path is preferred at runtime when available. */
+export function scanPrecedents(wb: WorkbookHandle, addr: Addr): Addr[] {
   const formula = wb.cellFormula(addr);
   if (!formula) return [];
   const refs = extractRefs(formula);
@@ -45,10 +64,8 @@ export function findPrecedents(wb: WorkbookHandle, addr: Addr): Addr[] {
   return out;
 }
 
-/** Cells whose formulas read from `addr`. Iterates every populated cell on
- *  the same sheet, parses each formula's refs, and pushes the cell when any
- *  ref's rectangle contains `(addr.row, addr.col)`. */
-export function findDependents(wb: WorkbookHandle, addr: Addr): Addr[] {
+/** Same-sheet regex fallback for `findDependents`. Exported for tests. */
+export function scanDependents(wb: WorkbookHandle, addr: Addr): Addr[] {
   const out: Addr[] = [];
   for (const cell of wb.cells(addr.sheet)) {
     if (!cell.formula) continue;

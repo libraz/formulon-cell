@@ -941,6 +941,29 @@ export class WorkbookHandle {
     return computeEngineSpillRanges(this, sheet);
   }
 
+  /** Cells that `addr` directly reads (1-step precedents) by default;
+   *  pass `depth > 1` for a BFS expansion (engine caps at 32 to avoid
+   *  runaway in cyclic graphs). Includes cross-sheet refs — callers that
+   *  only want same-sheet relations should filter on `sheet`. Returns
+   *  `null` when the engine doesn't expose `precedents`; the regex-based
+   *  same-sheet fallback in `engine/refs-graph.ts` covers stub mode. */
+  precedents(addr: Addr, depth = 1): Addr[] | null {
+    this.assertAlive();
+    if (!this.capabilities.traceArrows) return null;
+    const arr = this.wb.precedents(addr.sheet, addr.row, addr.col, depth);
+    return arr.map((n) => ({ sheet: n.sheet, row: n.row, col: n.col }));
+  }
+
+  /** Cells whose formulas read from `addr` (1-step dependents by default).
+   *  Same depth + cross-sheet semantics as `precedents`. Returns `null`
+   *  when the engine doesn't expose `dependents`. */
+  dependents(addr: Addr, depth = 1): Addr[] | null {
+    this.assertAlive();
+    if (!this.capabilities.traceArrows) return null;
+    const arr = this.wb.dependents(addr.sheet, addr.row, addr.col, depth);
+    return arr.map((n) => ({ sheet: n.sheet, row: n.row, col: n.col }));
+  }
+
   /** Snapshot of every validation entry on `sheet`. Each entry can apply to
    *  multiple ranges (`ranges`) and carries an Excel-style descriptor: numeric
    *  `type` ordinal (0 none, 1 whole, 2 decimal, 3 list, 4 date, 5 time,
