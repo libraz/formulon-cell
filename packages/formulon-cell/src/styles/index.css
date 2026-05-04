@@ -297,6 +297,31 @@
     flex: 0 0 auto;
   }
 
+  .fc-host__statusbar-calcmode {
+    flex: 0 0 auto;
+    appearance: none;
+    border: 1px solid var(--fc-border, rgba(0, 0, 0, 0.12));
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    padding: 1px 8px;
+    margin: 0 8px;
+    font: inherit;
+    font-size: 11px;
+    line-height: 1.4;
+    cursor: pointer;
+  }
+
+  .fc-host__statusbar-calcmode[data-calc-mode="1"] {
+    background: var(--fc-accent-soft, rgba(207, 58, 76, 0.12));
+    color: var(--fc-accent, #cf3a4c);
+    border-color: var(--fc-accent, #cf3a4c);
+  }
+
+  .fc-host__statusbar-calcmode:hover {
+    border-color: var(--fc-accent, currentColor);
+  }
+
   .fc-host__statusbar-dot {
     display: inline-block;
     width: 6px;

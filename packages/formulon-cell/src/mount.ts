@@ -627,6 +627,19 @@ export const Spreadsheet = {
             store,
             strings,
             getEngineLabel: () => (wb.isStub ? 'stub' : `formulon ${wb.version}`),
+            getCalcMode: () => wb.calcMode(),
+            onCycleCalcMode: () => {
+              const cur = wb.calcMode();
+              if (cur === null) return;
+              const next = ((cur + 1) % 3) as 0 | 1 | 2;
+              wb.setCalcMode(next);
+              statusBar?.refresh();
+            },
+            onRecalc: () => {
+              wb.recalc();
+              mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
+              renderer.invalidate();
+            },
           });
           featureRegistry.set(
             'statusBar',
@@ -1006,6 +1019,18 @@ export const Spreadsheet = {
     // Skipped entirely when `flags.shortcuts === false`.
     const onHostKey = (e: KeyboardEvent): void => {
       const meta = e.ctrlKey || e.metaKey;
+      // F9 / Ctrl+Alt+F9 — full recalc. Mirrors Excel: F9 alone in
+      // manual mode kicks a recalc, Ctrl+Alt+F9 forces re-evaluation
+      // even on cells the engine considers clean. The cell engine
+      // doesn't distinguish these — both call wb.recalc() — so the
+      // shortcut serves the same intent under either binding.
+      if (e.key === 'F9') {
+        e.preventDefault();
+        wb.recalc();
+        mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
+        renderer.invalidate();
+        return;
+      }
       if (!meta) return;
       const k = e.key.toLowerCase();
       if (e.shiftKey && k === 'c') {

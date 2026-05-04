@@ -11,6 +11,14 @@ export interface StatusBarDeps {
   /** Engine label rendered on the far right. Recomputed on every chrome
    *  update — pass a function rather than a string. */
   getEngineLabel: () => string;
+  /** Optional calc-mode badge driver. Returns `null` when the engine
+   *  doesn't expose `calcMode` — the badge is hidden in that case. The
+   *  badge is clickable: `onClickCalcMode` cycles the mode (Auto →
+   *  Manual → AutoNoTable → Auto) when present, otherwise the badge is
+   *  inert. `onRecalc` fires F9 / Ctrl+Alt+F9. */
+  getCalcMode?: () => 0 | 1 | 2 | null;
+  onCycleCalcMode?: () => void;
+  onRecalc?: () => void;
 }
 
 export interface StatusBarHandle {
@@ -47,11 +55,46 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   center.className = 'fc-host__statusbar-aggs';
   center.setAttribute('role', 'status');
 
+  const calcBadge = document.createElement('button');
+  calcBadge.type = 'button';
+  calcBadge.className = 'fc-host__statusbar-calcmode';
+  calcBadge.style.display = 'none';
+  calcBadge.addEventListener('click', () => {
+    // Click on the badge itself toggles the mode; double-click recalcs.
+    deps.onCycleCalcMode?.();
+  });
+  calcBadge.addEventListener('dblclick', () => {
+    deps.onRecalc?.();
+  });
+
   const right = document.createElement('span');
   right.className = 'fc-host__statusbar-right';
   right.textContent = '—';
 
-  statusbar.append(left, center, right);
+  statusbar.append(left, center, calcBadge, right);
+
+  const calcLabelFor = (mode: 0 | 1 | 2): string => {
+    switch (mode) {
+      case 0:
+        return t.calcAuto;
+      case 1:
+        return t.calcManual;
+      case 2:
+        return t.calcAutoNoTable;
+    }
+  };
+
+  const refreshCalcBadge = (): void => {
+    const mode = deps.getCalcMode?.();
+    if (mode === undefined || mode === null) {
+      calcBadge.style.display = 'none';
+      return;
+    }
+    calcBadge.style.display = '';
+    calcBadge.textContent = `${t.calcLabel}: ${calcLabelFor(mode)}`;
+    calcBadge.title = t.calcRecalcHint;
+    calcBadge.dataset.calcMode = String(mode);
+  };
 
   const labelFor = (key: StatusAggKey): string => {
     switch (key) {
@@ -106,6 +149,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     const cells = (sel.r1 - sel.r0 + 1) * (sel.c1 - sel.c0 + 1);
     const engine = getEngineLabel();
     right.textContent = cells === 1 ? `1 cell · ${engine}` : `${cells} cells · ${engine}`;
+    refreshCalcBadge();
   };
 
   // Chooser popover. Lives in document.body so it escapes any clipping

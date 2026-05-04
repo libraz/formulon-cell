@@ -286,6 +286,13 @@ export interface Strings {
     countNumbers: string;
     min: string;
     max: string;
+    /** Calc-mode badge label. */
+    calcLabel: string;
+    calcAuto: string;
+    calcManual: string;
+    calcAutoNoTable: string;
+    /** Tooltip on the badge — clarifies the F9 / Ctrl+Alt+F9 affordance. */
+    calcRecalcHint: string;
   };
   iterativeDialog: {
     title: string;
@@ -711,6 +718,11 @@ export const ja: Strings = {
     countNumbers: '数値の個数',
     min: '最小値',
     max: '最大値',
+    calcLabel: '計算',
+    calcAuto: '自動',
+    calcManual: '手動',
+    calcAutoNoTable: '自動 (テーブル除く)',
+    calcRecalcHint: 'クリックで再計算 (F9 / Ctrl+Alt+F9)',
   },
   iterativeDialog: {
     title: '反復計算',
@@ -1096,6 +1108,11 @@ export const en: Strings = {
     countNumbers: 'Numerical Count',
     min: 'Minimum',
     max: 'Maximum',
+    calcLabel: 'Calc',
+    calcAuto: 'Auto',
+    calcManual: 'Manual',
+    calcAutoNoTable: 'Auto (skip tables)',
+    calcRecalcHint: 'Click to recalc (F9 / Ctrl+Alt+F9)',
   },
   iterativeDialog: {
     title: 'Iterative calculation',

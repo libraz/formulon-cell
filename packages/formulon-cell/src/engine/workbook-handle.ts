@@ -1026,6 +1026,27 @@ export class WorkbookHandle {
     return this.wb.canonicalizeFunctionName(localizedName, locale);
   }
 
+  /** Workbook calc-mode metadata mirroring `<calcPr calcMode>`. The engine
+   *  itself does NOT gate evaluation on this value — every `recalc()` call
+   *  honours all dirty cells regardless of mode. The flag is preserved as
+   *  round-trip metadata and surfaced here so the UI can mirror Excel's
+   *  user-visible state. Returns `null` when the engine doesn't expose
+   *  `calcMode`. Codes: 0 = Auto, 1 = Manual, 2 = AutoNoTable. */
+  calcMode(): 0 | 1 | 2 | null {
+    this.assertAlive();
+    if (!this.capabilities.calcMode) return null;
+    const mode = this.wb.calcMode();
+    return (mode as 0 | 1 | 2) ?? null;
+  }
+
+  /** Sets the calc-mode metadata. Returns `false` (no-op) under stub or
+   *  pre-5/5 vendored builds. */
+  setCalcMode(mode: 0 | 1 | 2): boolean {
+    this.assertAlive();
+    if (!this.capabilities.calcMode) return false;
+    return this.wb.setCalcMode(mode).ok;
+  }
+
   /** Snapshot of every validation entry on `sheet`. Each entry can apply to
    *  multiple ranges (`ranges`) and carries an Excel-style descriptor: numeric
    *  `type` ordinal (0 none, 1 whole, 2 decimal, 3 list, 4 date, 5 time,

@@ -164,4 +164,57 @@ describe('attachStatusBar', () => {
     // Mutating state after detach should not crash.
     mutators.setActive(store, { sheet: 0, row: 5, col: 5 });
   });
+
+  it('hides the calc-mode badge when getCalcMode is omitted or returns null', () => {
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      getEngineLabel: () => 'stub',
+      getCalcMode: () => null,
+    });
+    const badge = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-calcmode');
+    expect(badge).not.toBeNull();
+    expect(badge?.style.display).toBe('none');
+    handle.detach();
+  });
+
+  it('renders the calc-mode badge with the active mode label', () => {
+    let mode: 0 | 1 | 2 = 1; // Manual
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      getEngineLabel: () => 'stub',
+      getCalcMode: () => mode,
+    });
+    const badge = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-calcmode');
+    expect(badge?.style.display).toBe('');
+    // defaultStrings is ja-JP; the test asserts the localized label.
+    expect(badge?.textContent).toContain('手動');
+    expect(badge?.dataset.calcMode).toBe('1');
+
+    mode = 0;
+    handle.refresh();
+    expect(badge?.textContent).toContain('自動');
+    expect(badge?.dataset.calcMode).toBe('0');
+    handle.detach();
+  });
+
+  it('badge click invokes onCycleCalcMode; double-click invokes onRecalc', () => {
+    const cycle: number[] = [];
+    const recalcs: number[] = [];
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      getEngineLabel: () => 'stub',
+      getCalcMode: () => 0,
+      onCycleCalcMode: () => cycle.push(1),
+      onRecalc: () => recalcs.push(1),
+    });
+    const badge = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-calcmode');
+    badge?.click();
+    badge?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+    expect(cycle.length).toBe(1);
+    expect(recalcs.length).toBe(1);
+    handle.detach();
+  });
 });
