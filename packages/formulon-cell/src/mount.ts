@@ -41,6 +41,7 @@ import type { DeepPartial, Locale, Strings } from './i18n/strings.js';
 import { attachArgHelper } from './interact/arg-helper.js';
 import { attachAutocomplete } from './interact/autocomplete.js';
 import { attachCellStylesGallery } from './interact/cell-styles-gallery.js';
+import { attachCfRulesDialog } from './interact/cf-rules-dialog.js';
 import { attachClipboard } from './interact/clipboard.js';
 import { attachConditionalDialog } from './interact/conditional-dialog.js';
 import { attachContextMenu } from './interact/context-menu.js';
@@ -167,6 +168,11 @@ export interface SpreadsheetInstance {
    *  for fresh workbooks and any package that had no
    *  `<externalReferences>` block. */
   openExternalLinksDialog(): void;
+  /** Open the conditional-formatting rule manager. Lists every CF rule on
+   *  the active sheet and supports per-rule remove + clear-all. Requires
+   *  the engine `conditionalFormatMutate` capability; under stub mode the
+   *  list is empty. */
+  openCfRulesDialog(): void;
   /** Open the named cell-styles gallery (Excel Home → Cell Styles). */
   openCellStylesGallery(): void;
   /** Open the Function Arguments dialog. Pass `seedName` (case-insensitive)
@@ -447,6 +453,13 @@ export const Spreadsheet = {
     const externalLinksDialog = attachExternalLinksDialog({
       host,
       getWb: () => wb,
+      strings,
+    });
+    const cfRulesDialog = attachCfRulesDialog({
+      host,
+      getWb: () => wb,
+      getActiveSheet: () => store.getState().data.sheetIndex,
+      onChanged: () => renderer.invalidate(),
       strings,
     });
     const cellStylesGallery = attachCellStylesGallery({
@@ -1614,6 +1627,9 @@ export const Spreadsheet = {
       openExternalLinksDialog() {
         externalLinksDialog.open();
       },
+      openCfRulesDialog() {
+        cfRulesDialog.open();
+      },
       openCellStylesGallery() {
         cellStylesGallery.open();
       },
@@ -1765,6 +1781,7 @@ export const Spreadsheet = {
         goToDialog?.detach();
         iterativeDialog.detach();
         externalLinksDialog.detach();
+        cfRulesDialog.detach();
         cellStylesGallery.detach();
         fxDialog?.detach();
         namedRangeDialog?.detach();

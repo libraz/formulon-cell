@@ -256,6 +256,8 @@ export type {
   CellStylesGalleryHandle,
 } from './interact/cell-styles-gallery.js';
 export { attachCellStylesGallery } from './interact/cell-styles-gallery.js';
+export type { CfRulesDialogDeps, CfRulesDialogHandle } from './interact/cf-rules-dialog.js';
+export { attachCfRulesDialog } from './interact/cf-rules-dialog.js';
 export type { ClipboardHandle } from './interact/clipboard.js';
 export { attachClipboard } from './interact/clipboard.js';
 export type {

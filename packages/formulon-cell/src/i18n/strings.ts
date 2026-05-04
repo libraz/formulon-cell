@@ -318,6 +318,25 @@ export interface Strings {
     note: string;
     close: string;
   };
+  cfRulesDialog: {
+    /** Modal title — Excel "Manage Rules" parity. */
+    title: string;
+    /** Empty-state when the engine reports no CF rules on the active sheet. */
+    empty: string;
+    headerPriority: string;
+    headerType: string;
+    headerRange: string;
+    headerActions: string;
+    /** Note above the table — flags the read-only fallback for visual rules. */
+    note: string;
+    /** Per-row action labels. */
+    remove: string;
+    /** Footer button — drops every rule on the sheet. */
+    clearAll: string;
+    /** Confirmation text shown before clearAll fires. Inline confirmation, not a separate prompt. */
+    clearAllConfirm: string;
+    close: string;
+  };
   fxDialog: {
     /** Modal title — appears in the header and the aria-label. */
     title: string;
@@ -758,6 +777,19 @@ export const ja: Strings = {
     note: '読み取り専用 — リンクの編集は対応していません。書式は保存時に保持されます。',
     close: '閉じる',
   },
+  cfRulesDialog: {
+    title: '条件付き書式ルールの管理',
+    empty: 'このシートには条件付き書式ルールがありません。',
+    headerPriority: '優先度',
+    headerType: '種類',
+    headerRange: '範囲',
+    headerActions: '操作',
+    note: 'ビジュアルルール (カラースケール / データバー / アイコン) は読み取り専用です。削除のみ可能です。',
+    remove: '削除',
+    clearAll: 'すべて削除',
+    clearAllConfirm: '本当にこのシートのすべてのルールを削除しますか？',
+    close: '閉じる',
+  },
   fxDialog: {
     title: '関数の引数',
     searchPlaceholder: '関数を検索…',
@@ -1156,6 +1188,19 @@ export const en: Strings = {
     headerTarget: 'Target',
     headerPart: 'Part',
     note: 'Read-only — editing external links is not supported. Records are preserved on save.',
+    close: 'Close',
+  },
+  cfRulesDialog: {
+    title: 'Conditional Formatting — Manage Rules',
+    empty: 'This sheet has no conditional formatting rules.',
+    headerPriority: 'Priority',
+    headerType: 'Type',
+    headerRange: 'Range',
+    headerActions: 'Actions',
+    note: 'Visual rules (color scale / data bar / icon set) are read-only. Removing them is supported.',
+    remove: 'Remove',
+    clearAll: 'Clear all',
+    clearAllConfirm: 'Are you sure you want to remove every rule on this sheet?',
     close: 'Close',
   },
   fxDialog: {

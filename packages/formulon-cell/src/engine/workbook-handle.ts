@@ -1060,6 +1060,75 @@ export class WorkbookHandle {
     return this.wb.setCalcMode(mode).ok;
   }
 
+  /** Snapshot of every CF rule on `sheet`, in flattened priority order.
+   *  Returns `[]` when the engine doesn't expose `getConditionalFormats`
+   *  or when there are no rules. The entries borrow rule ids from the
+   *  engine's storage; treat them as immutable view objects. */
+  getConditionalFormats(sheet: number): ReadonlyArray<{
+    id: string;
+    type: number;
+    priority: number;
+    stopIfTrue: boolean;
+    sqref: ReadonlyArray<{ firstRow: number; firstCol: number; lastRow: number; lastCol: number }>;
+    dxfId?: number;
+    formula1?: string;
+    formula2?: string;
+    op?: number;
+    rank?: number;
+    percent?: boolean;
+    bottom?: boolean;
+    aboveAverage?: boolean;
+    equalAverage?: boolean;
+    stdDev?: number;
+    text?: string;
+    timePeriod?: number;
+  }> {
+    this.assertAlive();
+    if (!this.capabilities.conditionalFormatMutate) return [];
+    const arr = this.wb.getConditionalFormats(sheet);
+    return arr.map((e) => ({
+      id: e.id,
+      type: e.type,
+      priority: e.priority,
+      stopIfTrue: e.stopIfTrue,
+      sqref: e.sqref.map((r) => ({
+        firstRow: r.firstRow,
+        firstCol: r.firstCol,
+        lastRow: r.lastRow,
+        lastCol: r.lastCol,
+      })),
+      ...(e.dxfId !== undefined ? { dxfId: e.dxfId } : {}),
+      ...(e.formula1 !== undefined ? { formula1: e.formula1 } : {}),
+      ...(e.formula2 !== undefined ? { formula2: e.formula2 } : {}),
+      ...(e.op !== undefined ? { op: e.op } : {}),
+      ...(e.rank !== undefined ? { rank: e.rank } : {}),
+      ...(e.percent !== undefined ? { percent: e.percent } : {}),
+      ...(e.bottom !== undefined ? { bottom: e.bottom } : {}),
+      ...(e.aboveAverage !== undefined ? { aboveAverage: e.aboveAverage } : {}),
+      ...(e.equalAverage !== undefined ? { equalAverage: e.equalAverage } : {}),
+      ...(e.stdDev !== undefined ? { stdDev: e.stdDev } : {}),
+      ...(e.text !== undefined ? { text: e.text } : {}),
+      ...(e.timePeriod !== undefined ? { timePeriod: e.timePeriod } : {}),
+    }));
+  }
+
+  /** Removes the CF rule at `index` (flattened priority order). When the
+   *  containing block becomes empty, the engine drops it too. Returns
+   *  `false` (no-op) under stub mode and pre-5/5 vendored builds. */
+  removeConditionalFormatAt(sheet: number, index: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.conditionalFormatMutate) return false;
+    return this.wb.removeConditionalFormatAt(sheet, index).ok;
+  }
+
+  /** Drops every `<conditionalFormatting>` block on `sheet`. Returns
+   *  `false` (no-op) under stub mode and pre-5/5 vendored builds. */
+  clearConditionalFormats(sheet: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.conditionalFormatMutate) return false;
+    return this.wb.clearConditionalFormats(sheet).ok;
+  }
+
   /** Reads the round-trip `<sheetProtection>` flags. Returns `null` when
    *  the engine doesn't expose `getSheetProtection`. The booleans are
    *  reported as JS booleans (the engine wires them as 0/1 numbers); the
