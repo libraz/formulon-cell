@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["vite/client", "node"],
+    "verbatimModuleSyntax": false,
+    "paths": {
+      "@libraz/formulon-cell": ["../../packages/formulon-cell/src/index.ts"],
+      "@libraz/formulon-cell/styles.css": ["../../packages/formulon-cell/src/styles/index.css"],
+      "@libraz/formulon-cell/styles/contrast.css": [
+        "../../packages/formulon-cell/src/styles/theme-contrast.css"
+      ],
+      "@libraz/formulon-cell-vue": ["../../packages/formulon-cell-vue/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*", "src/**/*.vue", "vite.config.ts"]
+}

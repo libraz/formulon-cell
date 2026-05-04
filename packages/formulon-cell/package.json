@@ -47,8 +47,16 @@
     "./styles/tokens.css": "./dist/styles/tokens.css",
     "./package.json": "./package.json"
   },
-  "files": ["dist", "vendor", "LICENSE", "README.md", "CHANGELOG.md"],
-  "sideEffects": ["*.css"],
+  "files": [
+    "dist",
+    "vendor",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "sideEffects": [
+    "*.css"
+  ],
   "engines": {
     "node": ">=18"
   },
