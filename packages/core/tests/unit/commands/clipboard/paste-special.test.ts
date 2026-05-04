@@ -57,6 +57,10 @@ const num = (wb: WorkbookHandle, row: number, col: number): number => {
   return v.kind === 'number' ? v.value : Number.NaN;
 };
 
+function assertSnap<T>(s: T | null): asserts s is T {
+  if (s === null) throw new Error('expected snapshot');
+}
+
 describe('pasteSpecial', () => {
   let store: SpreadsheetStore;
   let wb: WorkbookHandle;
@@ -74,7 +78,8 @@ describe('pasteSpecial', () => {
     const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
     expect(snap).not.toBeNull();
     setActive(store, 5, 5);
-    const got = pasteSpecial(store.getState(), store, wb, snap!, {
+    assertSnap(snap);
+    const got = pasteSpecial(store.getState(), store, wb, snap, {
       what: 'values',
       operation: 'none',
       skipBlanks: false,
@@ -90,7 +95,8 @@ describe('pasteSpecial', () => {
     seedAndMirror(store, wb, [{ row: 0, col: 0, value: 5, formula: '=2+3' }]);
     const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     setActive(store, 3, 3);
-    pasteSpecial(store.getState(), store, wb, snap!, {
+    assertSnap(snap);
+    pasteSpecial(store.getState(), store, wb, snap, {
       what: 'formulas',
       operation: 'none',
       skipBlanks: false,
@@ -107,7 +113,8 @@ describe('pasteSpecial', () => {
     ]);
     const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     setActive(store, 5, 5);
-    pasteSpecial(store.getState(), store, wb, snap!, {
+    assertSnap(snap);
+    pasteSpecial(store.getState(), store, wb, snap, {
       what: 'values',
       operation: 'add',
       skipBlanks: false,
@@ -124,7 +131,8 @@ describe('pasteSpecial', () => {
     ]);
     const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     setActive(store, 5, 5);
-    pasteSpecial(store.getState(), store, wb, snap!, {
+    assertSnap(snap);
+    pasteSpecial(store.getState(), store, wb, snap, {
       what: 'values',
       operation: 'divide',
       skipBlanks: false,
@@ -142,7 +150,8 @@ describe('pasteSpecial', () => {
     seedAndMirror(store, wb, [{ row: 5, col: 6, value: 99 }]);
     const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
     setActive(store, 5, 5);
-    pasteSpecial(store.getState(), store, wb, snap!, {
+    assertSnap(snap);
+    pasteSpecial(store.getState(), store, wb, snap, {
       what: 'values',
       operation: 'none',
       skipBlanks: true,
@@ -162,7 +171,8 @@ describe('pasteSpecial', () => {
     ]);
     const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 });
     setActive(store, 5, 5);
-    const got = pasteSpecial(store.getState(), store, wb, snap!, {
+    assertSnap(snap);
+    const got = pasteSpecial(store.getState(), store, wb, snap, {
       what: 'values',
       operation: 'none',
       skipBlanks: false,
@@ -181,7 +191,8 @@ describe('pasteSpecial', () => {
     seedAndMirror(store, wb, [{ row: 0, col: 0, value: 1 }]);
     const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     setActive(store, 5, 5);
-    pasteSpecial(store.getState(), store, wb, snap!, {
+    assertSnap(snap);
+    pasteSpecial(store.getState(), store, wb, snap, {
       what: 'formats',
       operation: 'none',
       skipBlanks: false,
@@ -204,7 +215,8 @@ describe('pasteSpecial', () => {
     seedAndMirror(store, wb, [{ row: 0, col: 0, value: 9 }]);
     const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     setActive(store, 4, 4);
-    pasteSpecial(store.getState(), store, wb, snap!, {
+    assertSnap(snap);
+    pasteSpecial(store.getState(), store, wb, snap, {
       what: 'values-and-numfmt',
       operation: 'none',
       skipBlanks: false,
@@ -222,7 +234,8 @@ describe('pasteSpecial', () => {
     ]);
     const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
     setActive(store, 7, 8);
-    pasteSpecial(store.getState(), store, wb, snap!, {
+    assertSnap(snap);
+    pasteSpecial(store.getState(), store, wb, snap, {
       what: 'values',
       operation: 'none',
       skipBlanks: false,

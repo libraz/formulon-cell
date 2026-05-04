@@ -476,8 +476,12 @@ export function paintOutlineGutters(
         const inRun = r != null && (layout.outlineRows.get(r) ?? 0) >= lvl;
         if (inRun && runStartIdx < 0) runStartIdx = i;
         if (!inRun && runStartIdx >= 0) {
-          const r0 = rows.visible[runStartIdx]!;
-          const r1 = rows.visible[i - 1]!;
+          const r0 = rows.visible[runStartIdx];
+          const r1 = rows.visible[i - 1];
+          if (r0 === undefined || r1 === undefined) {
+            runStartIdx = -1;
+            continue;
+          }
           const top = oy + (rows.positionAt.get(r0) ?? 0);
           const bottomRow = rows.positionAt.get(r1) ?? 0;
           const bottomH = rows.sizeAt.get(r1) ?? 0;
@@ -525,8 +529,12 @@ export function paintOutlineGutters(
         const inRun = c != null && (layout.outlineCols.get(c) ?? 0) >= lvl;
         if (inRun && runStartIdx < 0) runStartIdx = i;
         if (!inRun && runStartIdx >= 0) {
-          const c0 = cols.visible[runStartIdx]!;
-          const c1 = cols.visible[i - 1]!;
+          const c0 = cols.visible[runStartIdx];
+          const c1 = cols.visible[i - 1];
+          if (c0 === undefined || c1 === undefined) {
+            runStartIdx = -1;
+            continue;
+          }
           const left = ox + (cols.positionAt.get(c0) ?? 0);
           const rightCol = cols.positionAt.get(c1) ?? 0;
           const rightW = cols.sizeAt.get(c1) ?? 0;

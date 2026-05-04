@@ -219,31 +219,29 @@ export class GridRenderer {
     const firstRow = rows.visible[0] ?? 0;
     const firstCol = cols.visible[0] ?? 0;
 
-    for (let i = 0; i < cols.visible.length; i += 1) {
-      const c = cols.visible[i]!;
+    for (const c of cols.visible) {
       const rect = cellRectIn(layout, cols, rows, firstRow, c);
       const xx = Math.round(rect.x) + align;
       ctx.moveTo(xx, 0);
       ctx.lineTo(xx, this.cssHeight);
     }
-    if (cols.visible.length > 0) {
-      const last = cols.visible[cols.visible.length - 1]!;
-      const rect = cellRectIn(layout, cols, rows, firstRow, last);
+    const lastCol = cols.visible[cols.visible.length - 1];
+    if (lastCol !== undefined) {
+      const rect = cellRectIn(layout, cols, rows, firstRow, lastCol);
       const xx = Math.round(rect.x + rect.w) + align;
       ctx.moveTo(xx, 0);
       ctx.lineTo(xx, this.cssHeight);
     }
 
-    for (let i = 0; i < rows.visible.length; i += 1) {
-      const r = rows.visible[i]!;
+    for (const r of rows.visible) {
       const rect = cellRectIn(layout, cols, rows, r, firstCol);
       const yy = Math.round(rect.y) + align;
       ctx.moveTo(0, yy);
       ctx.lineTo(this.cssWidth, yy);
     }
-    if (rows.visible.length > 0) {
-      const last = rows.visible[rows.visible.length - 1]!;
-      const rect = cellRectIn(layout, cols, rows, last, firstCol);
+    const lastRow = rows.visible[rows.visible.length - 1];
+    if (lastRow !== undefined) {
+      const rect = cellRectIn(layout, cols, rows, lastRow, firstCol);
       const yy = Math.round(rect.y + rect.h) + align;
       ctx.moveTo(0, yy);
       ctx.lineTo(this.cssWidth, yy);
