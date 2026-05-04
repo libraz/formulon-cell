@@ -35,6 +35,70 @@ The WASM engine ships pthread-enabled and requires a
 require-corp`). Without it, formulon-cell falls back to an in-memory stub
 engine — the UI keeps working, formulas degrade gracefully.
 
+## Bundler integration (Vite, webpack, esbuild)
+
+formulon-cell re-uses `@libraz/formulon`'s pthread-enabled WASM module, so
+the bundler hygiene rules from the engine package apply here too. Four
+things matter:
+
+**1. Workers must ship as ES modules.** The recalc scheduler runs on Web
+Workers spawned by Emscripten with
+`new Worker(new URL(...), { type: 'module' })`. Bundlers default to
+classic (IIFE) workers and must be told otherwise:
+
+```ts
+// vite.config.ts
+export default defineConfig({
+  worker: { format: 'es' },
+});
+```
+
+webpack 5 picks up `{ type: 'module' }` automatically when
+`output.module: true`. esbuild needs `--format=esm` for the worker chunk.
+
+**2. Top-level await + dynamic node imports need an es2022 target.** The
+engine factory uses TLA and conditional `await import('node:...')`. Lift
+both the main and worker target:
+
+```ts
+// vite.config.ts
+export default defineConfig({
+  build: { target: 'es2022' },
+});
+```
+
+**3. Browser builds may warn about `node:*` imports.** The engine carries a
+Node bridge branch (`node:module`, `node:worker_threads`) so the same
+factory works in both runtimes. In a browser bundle the branch is dead
+code at runtime; if you want to silence "externalised module" warnings:
+
+```ts
+// vite.config.ts
+export default defineConfig({
+  optimizeDeps: { exclude: ['@libraz/formulon-cell', '@libraz/formulon'] },
+  build: {
+    rollupOptions: { external: [/^node:/] },
+  },
+});
+```
+
+**4. SharedArrayBuffer requires cross-origin isolation.** Serve your page
+with `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy:
+require-corp`. Without these headers, `SharedArrayBuffer` is undefined and
+formulon-cell drops to an in-memory **stub engine**: the canvas, formula
+bar, and editing affordances all keep working, but formula evaluation,
+recalc, and xlsx round-trip degrade to no-ops. Detect at runtime via
+`crossOriginIsolated` or via `isUsingStub()` after `WorkbookHandle.createDefault()`:
+
+```ts
+import { WorkbookHandle, isUsingStub } from '@libraz/formulon-cell';
+
+const wb = await WorkbookHandle.createDefault();
+if (isUsingStub()) {
+  console.warn('formulon-cell: running on stub engine — recalc disabled');
+}
+```
+
 ## Quick start
 
 ```ts
