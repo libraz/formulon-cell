@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <title>formulon-cell</title>
+    <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%234c6ef5'/%3E%3Cpath d='M2 6h12M2 10h12M6 2v12M10 2v12' stroke='white' stroke-width='1.4' stroke-linecap='square' fill='none'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
@@ -39,9 +40,9 @@
       </header>
 
       <!-- ── Menu strip ────────────────────────────────────────────── -->
-      <nav class="app__menu" aria-label="Application menus">
+      <nav class="app__menubar" aria-label="Application menus">
         <div class="app__menu-anchor">
-          <button class="app__menu-item" type="button" id="menu-file" aria-haspopup="menu" aria-expanded="false">File</button>
+          <button class="app__menubar-item" type="button" id="menu-file" aria-haspopup="menu" aria-expanded="false">File</button>
           <div class="app__dropdown" id="menu-file-dropdown" role="menu" hidden>
             <button class="app__menu-item" type="button" role="menuitem" data-file="new">New (Ctrl+N)</button>
             <button class="app__menu-item" type="button" role="menuitem" data-file="open">Open… (Ctrl+O)</button>
@@ -49,13 +50,13 @@
             <button class="app__menu-item" type="button" role="menuitem" data-file="save-as">Save As…</button>
           </div>
         </div>
-        <button class="app__menu-item" type="button">Edit</button>
-        <button class="app__menu-item" type="button">View</button>
-        <button class="app__menu-item" type="button">Insert</button>
-        <button class="app__menu-item" type="button">Format</button>
-        <button class="app__menu-item" type="button">Data</button>
-        <button class="app__menu-item" type="button">Tools</button>
-        <button class="app__menu-item" type="button">Help</button>
+        <button class="app__menubar-item" type="button">Edit</button>
+        <button class="app__menubar-item" type="button">View</button>
+        <button class="app__menubar-item" type="button">Insert</button>
+        <button class="app__menubar-item" type="button">Format</button>
+        <button class="app__menubar-item" type="button">Data</button>
+        <button class="app__menubar-item" type="button">Tools</button>
+        <button class="app__menubar-item" type="button">Help</button>
       </nav>
       <input type="file" id="file-input" accept=".xlsx,.xlsm" hidden />
 
@@ -137,7 +138,7 @@
             class="app__tool"
             type="button"
             id="btn-freeze"
-            title="ウィンドウ枠の固定"
+            title="Freeze panes"
             aria-label="Freeze panes"
             aria-haspopup="menu"
             aria-expanded="false"
@@ -145,11 +146,11 @@
             <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="11" height="11"/><path d="M2.5 6h11M6 2.5v11"/></svg>
           </button>
           <div class="app__menu" id="menu-freeze" role="menu" hidden>
-            <button class="app__menu-item" type="button" role="menuitem" data-freeze="row">先頭行の固定</button>
-            <button class="app__menu-item" type="button" role="menuitem" data-freeze="col">先頭列の固定</button>
-            <button class="app__menu-item" type="button" role="menuitem" data-freeze="selection">選択範囲で固定</button>
+            <button class="app__menu-item" type="button" role="menuitem" data-freeze="row">Freeze first row</button>
+            <button class="app__menu-item" type="button" role="menuitem" data-freeze="col">Freeze first column</button>
+            <button class="app__menu-item" type="button" role="menuitem" data-freeze="selection">Freeze up to selection</button>
             <div class="app__menu-sep" role="separator"></div>
-            <button class="app__menu-item" type="button" role="menuitem" data-freeze="off">固定解除</button>
+            <button class="app__menu-item" type="button" role="menuitem" data-freeze="off">Unfreeze</button>
           </div>
         </div>
 
@@ -166,8 +167,8 @@
             <div class="app__menu-sep" role="separator"></div>
             <button class="app__menu-item" type="button" role="menuitem" data-sort="dedupe">Remove duplicates</button>
             <div class="app__menu-sep" role="separator"></div>
-            <button class="app__menu-item" type="button" role="menuitem" data-sort="conditional">条件付き書式…</button>
-            <button class="app__menu-item" type="button" role="menuitem" data-sort="named">名前の管理…</button>
+            <button class="app__menu-item" type="button" role="menuitem" data-sort="conditional">Conditional formatting…</button>
+            <button class="app__menu-item" type="button" role="menuitem" data-sort="named">Named ranges…</button>
           </div>
         </div>
       </div>

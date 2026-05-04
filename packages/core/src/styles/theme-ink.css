@@ -1,7 +1,7 @@
 /* Dark theme — flat, modern, near-black sheet with cool cobalt accent. */
 
 @layer fc.theme {
-  .fc-host[data-fc-theme='ink'] {
+  .fc-host[data-fc-theme="ink"] {
     --fc-bg: #1a1c21;
     --fc-bg-elev: #20232a;
     --fc-bg-rail: #16181d;

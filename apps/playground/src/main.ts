@@ -226,6 +226,7 @@ async function boot(): Promise<void> {
     theme: toCore(uiTheme),
     seed,
     workbook: wb,
+    locale: 'en',
   });
   // Debug-only: expose for browser console / e2e poking. Safe to leave on the
   // playground build; the core package never references this global.
@@ -425,7 +426,10 @@ themeToggle?.addEventListener('click', () => {
   html.dataset.theme = uiTheme;
   if (themeLabel) themeLabel.textContent = uiTheme === 'light' ? 'Light' : 'Dark';
   themeToggle.setAttribute('aria-pressed', uiTheme === 'dark' ? 'true' : 'false');
+  // Theme is a UI-only preference; don't let the resulting store update mark the workbook as edited.
+  suppressDirty = true;
   inst?.setTheme(toCore(uiTheme));
+  suppressDirty = false;
 });
 
 // ── File menu (New / Open / Save / Save As) ───────────────────────────────
@@ -592,7 +596,9 @@ window.addEventListener('keydown', (e) => {
 
 // Mark the document dirty whenever any cell change flows through.
 let dirtyTimer: number | null = null;
+let suppressDirty = false;
 const markDirty = (): void => {
+  if (suppressDirty) return;
   if (dirtyTimer != null) return;
   dirtyTimer = window.setTimeout(() => {
     dirtyTimer = null;

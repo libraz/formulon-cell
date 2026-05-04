@@ -4,28 +4,28 @@
  * for selection and active state — never for ambient chrome. */
 
 @layer fc.theme {
-  .fc-host[data-fc-theme='paper'],
+  .fc-host[data-fc-theme="paper"],
   .fc-host:not([data-fc-theme]) {
     /* Surfaces */
-    --fc-bg: #ffffff;          /* sheet */
-    --fc-bg-elev: #ffffff;     /* active cell editor */
-    --fc-bg-rail: #f6f7f9;     /* formula bar / headers */
-    --fc-bg-header: #eceef2;   /* deeper header chip when active */
+    --fc-bg: #ffffff; /* sheet */
+    --fc-bg-elev: #ffffff; /* active cell editor */
+    --fc-bg-rail: #f6f7f9; /* formula bar / headers */
+    --fc-bg-header: #eceef2; /* deeper header chip when active */
 
     /* Foreground */
-    --fc-fg: #1a1c20;          /* near-black */
+    --fc-fg: #1a1c20; /* near-black */
     --fc-fg-strong: #0e1014;
-    --fc-fg-mute: #57606a;     /* neutral gray */
+    --fc-fg-mute: #57606a; /* neutral gray */
     --fc-fg-faint: #8b929c;
 
     /* Rules */
-    --fc-rule: #e3e5ea;        /* hairline borders */
+    --fc-rule: #e3e5ea; /* hairline borders */
     --fc-rule-strong: #c8ccd2; /* freeze / heavy rule */
 
     /* Accent — cobalt-violet */
-    --fc-accent: #3859ff;          /* selection outline */
-    --fc-accent-strong: #2742d6;   /* hover on accent */
-    --fc-accent-soft: rgba(56, 89, 255, 0.10); /* selection fill */
+    --fc-accent: #3859ff; /* selection outline */
+    --fc-accent-strong: #2742d6; /* hover on accent */
+    --fc-accent-soft: rgba(56, 89, 255, 0.1); /* selection fill */
     --fc-accent-fg: #ffffff;
 
     /* Cell-state tints */
