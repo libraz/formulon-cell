@@ -276,6 +276,9 @@ export interface Strings {
     close: string;
   };
   statusBar: {
+    ready: string;
+    cell: string;
+    cells: string;
     /** Right-click menu heading. */
     aggregatesHeading: string;
     sum: string;
@@ -293,6 +296,32 @@ export interface Strings {
     calcAutoNoTable: string;
     /** Tooltip on the badge — clarifies the F9 / Ctrl+Alt+F9 affordance. */
     calcRecalcHint: string;
+    zoom: string;
+    zoomIn: string;
+    zoomOut: string;
+  };
+  sheetTabs: {
+    workbookSheets: string;
+    previousSheet: string;
+    nextSheet: string;
+    addSheet: string;
+    rename: string;
+    renameSheet: string;
+    insertSheet: string;
+    moveLeft: string;
+    moveRight: string;
+    deleteSheet: string;
+    hideSheet: string;
+    unhideSheet: string;
+    unhideNamedSheet: string;
+  };
+  filterDropdown: {
+    title: string;
+    searchPlaceholder: string;
+    selectAll: string;
+    blanks: string;
+    apply: string;
+    clear: string;
   };
   iterativeDialog: {
     title: string;
@@ -477,6 +506,8 @@ export interface Strings {
   a11y: {
     nameBox: string;
     formulaBar: string;
+    expandFormulaBar: string;
+    collapseFormulaBar: string;
     spreadsheet: string;
   };
 }
@@ -755,7 +786,36 @@ export const ja: Strings = {
     calcAuto: '自動',
     calcManual: '手動',
     calcAutoNoTable: '自動 (テーブル除く)',
-    calcRecalcHint: 'クリックで再計算 (F9 / Ctrl+Alt+F9)',
+    calcRecalcHint: 'クリックで計算モードを切り替え、ダブルクリックで再計算 (F9 / Ctrl+Alt+F9)',
+    ready: '準備完了',
+    cell: 'セル',
+    cells: 'セル',
+    zoom: 'ズーム',
+    zoomIn: '拡大',
+    zoomOut: '縮小',
+  },
+  sheetTabs: {
+    workbookSheets: 'ブックのシート',
+    previousSheet: '前のシート',
+    nextSheet: '次のシート',
+    addSheet: 'シートの追加',
+    rename: '名前の変更',
+    renameSheet: '{name} の名前を変更',
+    insertSheet: 'シートの挿入',
+    moveLeft: '左へ移動',
+    moveRight: '右へ移動',
+    deleteSheet: '削除',
+    hideSheet: '非表示',
+    unhideSheet: 'シートの再表示',
+    unhideNamedSheet: '{name} を再表示',
+  },
+  filterDropdown: {
+    title: 'フィルター',
+    searchPlaceholder: '検索…',
+    selectAll: '(すべて選択)',
+    blanks: '(空白)',
+    apply: 'OK',
+    clear: 'クリア',
   },
   iterativeDialog: {
     title: '反復計算',
@@ -890,6 +950,8 @@ export const ja: Strings = {
   a11y: {
     nameBox: '名前ボックス',
     formulaBar: '数式バー',
+    expandFormulaBar: '数式バーを展開',
+    collapseFormulaBar: '数式バーを折りたたむ',
     spreadsheet: 'スプレッドシート',
   },
 };
@@ -1168,7 +1230,36 @@ export const en: Strings = {
     calcAuto: 'Auto',
     calcManual: 'Manual',
     calcAutoNoTable: 'Auto (skip tables)',
-    calcRecalcHint: 'Click to recalc (F9 / Ctrl+Alt+F9)',
+    calcRecalcHint: 'Click to cycle calculation mode; double-click to recalc (F9 / Ctrl+Alt+F9)',
+    ready: 'Ready',
+    cell: 'cell',
+    cells: 'cells',
+    zoom: 'Zoom',
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
+  },
+  sheetTabs: {
+    workbookSheets: 'Workbook sheets',
+    previousSheet: 'Previous sheet',
+    nextSheet: 'Next sheet',
+    addSheet: 'Add sheet',
+    rename: 'Rename',
+    renameSheet: 'Rename {name}',
+    insertSheet: 'Insert Sheet',
+    moveLeft: 'Move Left',
+    moveRight: 'Move Right',
+    deleteSheet: 'Delete',
+    hideSheet: 'Hide',
+    unhideSheet: 'Unhide Sheet',
+    unhideNamedSheet: 'Unhide {name}',
+  },
+  filterDropdown: {
+    title: 'Filter',
+    searchPlaceholder: 'Search…',
+    selectAll: '(Select all)',
+    blanks: '(Blanks)',
+    apply: 'Apply',
+    clear: 'Clear',
   },
   iterativeDialog: {
     title: 'Iterative calculation',
@@ -1303,6 +1394,8 @@ export const en: Strings = {
   a11y: {
     nameBox: 'Name box',
     formulaBar: 'Formula bar',
+    expandFormulaBar: 'Expand formula bar',
+    collapseFormulaBar: 'Collapse formula bar',
     spreadsheet: 'Spreadsheet',
   },
 };
