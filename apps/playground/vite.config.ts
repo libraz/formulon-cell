@@ -39,6 +39,9 @@ export default defineConfig({
   // the worker pipeline.
   build: {
     target: 'es2022',
+    // Playground bundles the full spreadsheet surface and the WASM loader;
+    // warn only when a future change grows materially beyond that baseline.
+    chunkSizeWarningLimit: 750,
   },
   worker: {
     format: 'es',

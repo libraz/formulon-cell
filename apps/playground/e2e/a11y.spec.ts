@@ -24,14 +24,17 @@ test.describe('accessibility (axe-core)', () => {
 
     if (results.violations.length > 0) {
       // Render a readable summary in the report instead of a raw blob.
-      console.log('\nA11y violations:\n');
+      const lines = ['A11y violations:', ''];
       for (const v of results.violations) {
-        console.log(`- [${v.impact}] ${v.id}: ${v.help}`);
-        console.log(`  ${v.helpUrl}`);
+        lines.push(`- [${v.impact}] ${v.id}: ${v.help}`, `  ${v.helpUrl}`);
         for (const node of v.nodes) {
-          console.log(`  · ${node.target.join(' ')}`);
+          lines.push(`  · ${node.target.join(' ')}`);
         }
       }
+      await test.info().attach('a11y-violations.txt', {
+        body: lines.join('\n'),
+        contentType: 'text/plain',
+      });
     }
 
     expect(results.violations).toEqual([]);

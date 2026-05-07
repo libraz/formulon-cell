@@ -7,7 +7,6 @@ import {
   bumpDecimals,
   clearFilter,
   clearFormat,
-  cycleBorders,
   cycleCurrency,
   cyclePercent,
   moveSheet,
@@ -19,6 +18,7 @@ import {
   Spreadsheet,
   type SpreadsheetInstance,
   setAlign,
+  setBorders,
   setFreezePanes,
   setSheetHidden,
   setSheetZoom,
@@ -397,7 +397,6 @@ wireFormat('btn-underline', toggleUnderline);
 wireFormat('btn-strike', toggleStrike);
 wireFormat('btn-currency', cycleCurrency);
 wireFormat('btn-percent', cyclePercent);
-wireFormat('btn-borders', cycleBorders);
 wireFormat('btn-align-left', (state, store) => setAlign(state, store, 'left'));
 wireFormat('btn-align-center', (state, store) => setAlign(state, store, 'center'));
 wireFormat('btn-align-right', (state, store) => setAlign(state, store, 'right'));
@@ -405,6 +404,92 @@ wireFormat('btn-decimals-up', (state, store) => bumpDecimals(state, store, 1));
 wireFormat('btn-decimals-down', (state, store) => bumpDecimals(state, store, -1));
 
 void clearFormat; // Reserved for a "Clear formatting" menu item; keep the import live.
+
+// ── Borders menu ─────────────────────────────────────────────────────────
+const borderBtn = document.getElementById('btn-borders');
+const borderMenu = document.getElementById('menu-borders');
+
+const closeBorderMenu = (): void => {
+  if (!borderMenu) return;
+  borderMenu.hidden = true;
+  borderBtn?.setAttribute('aria-expanded', 'false');
+};
+const refreshBorderMenu = (): void => {
+  if (!inst || !borderMenu) return;
+  const gridlinesOn = inst.store.getState().ui.showGridLines !== false;
+  const gridlinesItem = borderMenu.querySelector<HTMLElement>('[data-border="gridlines"]');
+  const check = gridlinesItem?.querySelector<HTMLElement>('[data-fc-check]');
+  if (check) check.textContent = gridlinesOn ? '✓' : '';
+  gridlinesItem?.setAttribute('aria-checked', gridlinesOn ? 'true' : 'false');
+};
+const openBorderMenu = (): void => {
+  if (!borderMenu) return;
+  refreshBorderMenu();
+  borderMenu.hidden = false;
+  borderBtn?.setAttribute('aria-expanded', 'true');
+  (borderMenu.querySelector('button') as HTMLButtonElement | null)?.focus();
+};
+
+borderBtn?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (!borderMenu) return;
+  if (borderMenu.hidden) openBorderMenu();
+  else closeBorderMenu();
+});
+
+document.addEventListener('mousedown', (e) => {
+  if (!borderMenu || borderMenu.hidden) return;
+  if (borderMenu.contains(e.target as Node)) return;
+  if (borderBtn?.contains(e.target as Node)) return;
+  closeBorderMenu();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !borderMenu?.hidden) closeBorderMenu();
+});
+
+borderMenu?.querySelectorAll<HTMLButtonElement>('[data-border]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const i = inst;
+    if (!i) return;
+    const action = btn.dataset.border;
+    closeBorderMenu();
+    if (action === 'format') {
+      i.openFormatDialog();
+      return;
+    }
+    if (action === 'gridlines') {
+      const ui = i.store.getState().ui;
+      mutators.setShowGridLines(i.store, !ui.showGridLines);
+      (sheetEl as HTMLElement).focus();
+      return;
+    }
+    recordFormatChange(i.history, i.store, () => {
+      const state = i.store.getState();
+      if (action === 'all') {
+        setBorders(state, i.store, { top: true, right: true, bottom: true, left: true });
+      } else if (action === 'top') {
+        setBorders(state, i.store, { top: true });
+      } else if (action === 'bottom') {
+        setBorders(state, i.store, { bottom: true });
+      } else if (action === 'left') {
+        setBorders(state, i.store, { left: true });
+      } else if (action === 'right') {
+        setBorders(state, i.store, { right: true });
+      } else if (action === 'clear') {
+        setBorders(state, i.store, {
+          top: false,
+          right: false,
+          bottom: false,
+          left: false,
+          diagonalDown: false,
+          diagonalUp: false,
+        });
+      }
+    });
+    (sheetEl as HTMLElement).focus();
+  });
+});
 
 // ── Freeze Panes menu ─────────────────────────────────────────────────────
 const freezeBtn = document.getElementById('btn-freeze');
@@ -1021,8 +1106,9 @@ document.getElementById('btn-merge')?.addEventListener('click', () => {
 
 document.getElementById('btn-wrap')?.addEventListener('click', () => {
   if (!inst) return;
+  const current = inst;
   recordFormatChange(inst.history, inst.store, () => {
-    toggleWrap(inst!.store.getState(), inst!.store);
+    toggleWrap(current.store.getState(), current.store);
   });
   (sheetEl as HTMLElement).focus();
 });
