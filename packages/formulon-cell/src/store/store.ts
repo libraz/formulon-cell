@@ -548,10 +548,10 @@ export const createSpreadsheetStore = () =>
     layout: {
       colWidths: new Map(),
       rowHeights: new Map(),
-      defaultColWidth: 104,
-      defaultRowHeight: 28,
-      headerColWidth: 52,
-      headerRowHeight: 30,
+      defaultColWidth: 64,
+      defaultRowHeight: 20,
+      headerColWidth: 46,
+      headerRowHeight: 22,
       freezeRows: 0,
       freezeCols: 0,
       hiddenRows: new Set(),
@@ -708,6 +708,28 @@ export const mutators = {
   setZoom(store: SpreadsheetStore, zoom: number): void {
     const z = Math.max(0.5, Math.min(4, zoom));
     store.setState((s) => ({ ...s, viewport: { ...s.viewport, zoom: z } }));
+  },
+
+  setViewportSize(store: SpreadsheetStore, rowCount: number, colCount: number): void {
+    const rows = Math.max(1, Math.floor(rowCount));
+    const cols = Math.max(1, Math.floor(colCount));
+    const MAX_ROW = 1_048_575;
+    const MAX_COL = 16_383;
+    store.setState((s) => {
+      if (s.viewport.rowCount === rows && s.viewport.colCount === cols) return s;
+      const maxRowStart = Math.max(s.layout.freezeRows, MAX_ROW + 1 - rows);
+      const maxColStart = Math.max(s.layout.freezeCols, MAX_COL + 1 - cols);
+      return {
+        ...s,
+        viewport: {
+          ...s.viewport,
+          rowCount: rows,
+          colCount: cols,
+          rowStart: Math.min(maxRowStart, Math.max(s.layout.freezeRows, s.viewport.rowStart)),
+          colStart: Math.min(maxColStart, Math.max(s.layout.freezeCols, s.viewport.colStart)),
+        },
+      };
+    });
   },
 
   setFillPreview(store: SpreadsheetStore, range: Range | null): void {
