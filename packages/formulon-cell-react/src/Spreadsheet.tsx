@@ -85,6 +85,8 @@ const SpreadsheetComponent = (
     [],
   );
 
+  const workbook = props.workbook;
+
   useEffect(() => {
     let disposed = false;
     const host = hostRef.current;
@@ -93,7 +95,7 @@ const SpreadsheetComponent = (
     void (async () => {
       const cur = propsRef.current;
       const inst = await SpreadsheetCore.mount(host, {
-        ...(cur.workbook ? { workbook: cur.workbook } : {}),
+        ...(workbook ? { workbook } : {}),
         ...(cur.theme ? { theme: cur.theme } : {}),
         ...(cur.locale ? { locale: cur.locale } : {}),
         ...(cur.strings ? { strings: cur.strings } : {}),
@@ -128,8 +130,7 @@ const SpreadsheetComponent = (
     // Only re-mount on workbook identity change — props mutations land via
     // imperative methods on `instance` (setTheme, i18n.setLocale, …) and
     // event handlers re-read from propsRef on each fire.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.workbook]);
+  }, [workbook]);
 
   // Forward reactive theme / locale / features / extensions prop changes
   // to the running instance via imperative APIs — avoids re-mounting.
@@ -161,7 +162,11 @@ const SpreadsheetComponent = (
   // owns the host's children (`replaceChildren` on mount). When children is
   // a render prop, defer execution until the instance is available.
   const children =
-    typeof props.children === 'function' ? props.children(instanceRef.current!) : props.children;
+    typeof props.children === 'function'
+      ? instanceRef.current
+        ? props.children(instanceRef.current)
+        : null
+      : props.children;
 
   return (
     <>
