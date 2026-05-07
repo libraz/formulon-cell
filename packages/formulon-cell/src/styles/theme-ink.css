@@ -33,6 +33,17 @@
     --fc-header-bg: var(--fc-bg-rail);
     --fc-header-rule: var(--fc-rule);
 
+    --fc-sheetbar-bg: #201f1e;
+    --fc-sheetbar-tab-hover: #2b2a29;
+    --fc-sheetbar-tab-active: #252423;
+    --fc-sheetbar-tab-rule: #3b3a39;
+
+    --fc-statusbar-bg: #201f1e;
+    --fc-statusbar-border: var(--fc-accent);
+    --fc-statusbar-fg: #c8c6c4;
+    --fc-statusbar-fg-strong: #ffffff;
+    --fc-statusbar-control: #605e5c;
+
     --fc-hover-stripe: rgba(76, 194, 107, 0.04);
 
     color-scheme: dark;

@@ -62,11 +62,15 @@ describe('toggle flags', () => {
   });
 
   it('toggleBold only changes the bold flag and preserves explicit font fields', () => {
-    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, {
-      fontFamily: 'Times New Roman',
-      fontSize: 16,
-      color: '#445566',
-    });
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        fontFamily: 'Times New Roman',
+        fontSize: 16,
+        color: '#445566',
+      },
+    );
     setRange(store, 0, 0, 0, 0);
 
     toggleBold(store.getState(), store);
@@ -299,5 +303,20 @@ describe('formatNumber', () => {
   it('renders percent values', () => {
     expect(formatNumber(0.25, { kind: 'percent', decimals: 0 })).toBe('25%');
     expect(formatNumber(0.1234, { kind: 'percent', decimals: 2 })).toBe('12.34%');
+  });
+
+  it('renders Excel locale-tagged currency custom formats', () => {
+    const fmt = { kind: 'custom' as const, pattern: '[$¥-411]#,##0;[Red]-[$¥-411]#,##0' };
+    expect(formatNumber(1234, fmt, 'ja-JP')).toBe('¥1,234');
+    expect(formatNumber(-1234, fmt, 'ja-JP')).toBe('-¥1,234');
+  });
+
+  it('hides Excel accounting spacing and fill directives in custom output', () => {
+    const fmt = {
+      kind: 'custom' as const,
+      pattern: '_-"$"* #,##0.00_-;-"$"* #,##0.00_-;_-"$"* "-"??_-;_-@_-',
+    };
+    expect(formatNumber(1234, fmt)).toBe('$1,234.00');
+    expect(formatNumber(-1234, fmt)).toBe('-$1,234.00');
   });
 });

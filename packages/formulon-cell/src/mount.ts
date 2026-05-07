@@ -814,6 +814,7 @@ export const Spreadsheet = {
       getTheme: () => resolveTheme(host),
       onViewportSize: (rowCount, colCount) => mutators.setViewportSize(store, rowCount, colCount),
       getWb: () => wb,
+      getLocale: () => i18n.locale,
       getDisplay: (addr, value, formula, format) =>
         cellRegistry.resolveDisplay({ addr, value, formula, format }),
     });
@@ -981,7 +982,14 @@ export const Spreadsheet = {
       switch (id) {
         case 'formatDialog':
           if (formatDialog) return;
-          formatDialog = attachFormatDialog({ host, store, strings, history, getWb: () => wb });
+          formatDialog = attachFormatDialog({
+            host,
+            store,
+            strings,
+            history,
+            getWb: () => wb,
+            getLocale: () => i18n.locale,
+          });
           featureRegistry.set(
             'formatDialog',
             wrapHandle(formatDialog, () => formatDialog?.detach()),
@@ -2027,6 +2035,7 @@ export const Spreadsheet = {
       fxInput.setAttribute('aria-label', strings.a11y.formulaBar);
       refreshFormulaBarLabels();
       updateSheetTabs();
+      renderer.invalidate();
 
       // Always-on dialogs: rebuild — none of these expose setStrings yet.
       iterativeDialog.detach();

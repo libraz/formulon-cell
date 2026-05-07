@@ -99,6 +99,12 @@ const ERROR_SENTINELS: ReadonlySet<string> = new Set([
   '#CIRCULAR!',
 ]);
 
+const normalizeFormatLocale = (locale: string): string => {
+  if (locale === 'ja') return 'ja-JP';
+  if (locale === 'en') return 'en-US';
+  return locale || 'en-US';
+};
+
 /** Detect whether `cell.value` should surface an error indicator. */
 export function detectErrorKind(value: CellValue): boolean {
   if (value.kind === 'error') return true;
@@ -200,6 +206,9 @@ export interface RendererDeps {
    *  .xlsx are evaluated alongside the JS-side rule set and overlaid on top
    *  of the rendered cells. */
   getWb?: () => WorkbookHandle | null;
+  /** UI/data-format locale. Short app ids like `ja` are accepted by Intl,
+   *  but callers may return full tags like `ja-JP`. */
+  getLocale?: () => string;
   /** Optional formatter pipeline — `inst.cells.resolveDisplay`. Returns
    *  the displayed string for matching cells, or null to fall through
    *  to the default text. */
@@ -229,6 +238,8 @@ export class GridRenderer {
 
   private readonly getWb: () => WorkbookHandle | null;
 
+  private readonly getLocale: () => string;
+
   private readonly getDisplay: RendererDeps['getDisplay'];
 
   private readonly onViewportSize: RendererDeps['onViewportSize'];
@@ -250,6 +261,7 @@ export class GridRenderer {
     this.getState = deps.getState;
     this.getTheme = deps.getTheme;
     this.getWb = deps.getWb ?? ((): WorkbookHandle | null => null);
+    this.getLocale = deps.getLocale ?? ((): string => 'en-US');
     this.getDisplay = deps.getDisplay;
     this.onViewportSize = deps.onViewportSize;
   }
@@ -271,25 +283,12 @@ export class GridRenderer {
     if (!this.onViewportSize) return;
     const state = this.getState();
     const { layout, viewport } = state;
-    const bodyH = Math.max(
-      0,
-      this.cssHeight - gridOriginY(layout) - frozenRowsHeight(layout),
-    );
+    const bodyH = Math.max(0, this.cssHeight - gridOriginY(layout) - frozenRowsHeight(layout));
     const bodyW = Math.max(0, this.cssWidth - gridOriginX(layout) - frozenColsWidth(layout));
     const firstRow = Math.max(viewport.rowStart, layout.freezeRows);
     const firstCol = Math.max(viewport.colStart, layout.freezeCols);
-    const rowCount = visibleCount(
-      bodyH,
-      firstRow,
-      1_048_576,
-      (idx) => rowHeight(layout, idx),
-    );
-    const colCount = visibleCount(
-      bodyW,
-      firstCol,
-      16_384,
-      (idx) => colWidth(layout, idx),
-    );
+    const rowCount = visibleCount(bodyH, firstRow, 1_048_576, (idx) => rowHeight(layout, idx));
+    const colCount = visibleCount(bodyW, firstCol, 16_384, (idx) => colWidth(layout, idx));
     this.onViewportSize(rowCount, colCount);
   }
 
@@ -327,9 +326,9 @@ export class GridRenderer {
 
     if (state.ui.showGridLines !== false) this.paintGridLines(state, theme, cols, rows);
     this.paintCells(state, theme, cols, rows);
-    this.paintBorders(state, theme, cols, rows);
     if (state.ui.showHeaders !== false) this.paintHeaders(state, theme, cols, rows);
     this.paintFreezeDividers(state, theme, cols, rows);
+    this.paintBorders(state, theme, cols, rows);
     this.paintSpills(state, theme, cols, rows);
     this.paintActive(state, theme, cols, rows);
     this.paintEditorRefs(state);
@@ -456,6 +455,7 @@ export class GridRenderer {
       return resolver;
     };
     const triangleHits: ErrorTriangleHit[] = [];
+    const locale = normalizeFormatLocale(this.getLocale());
     // Engine-side CF (rules loaded from .xlsx). Merged on top — engine rules
     // currently win per field for cells with overlap. Restricted to the
     // visible viewport rect so we don't pay for off-screen cells.
@@ -574,6 +574,7 @@ export class GridRenderer {
           format: effectiveFmt,
           showFormulas: state.ui.showFormulas === true,
           displayOverride,
+          locale,
         };
 
         // Static format fill OR overlay fill — both painted via paintCellFill,

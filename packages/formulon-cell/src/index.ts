@@ -52,6 +52,7 @@ export {
   replaceAll,
   replaceOne,
 } from './commands/find.js';
+export type { BorderPreset } from './commands/format.js';
 export {
   bumpDecimals,
   bumpIndent,
@@ -61,6 +62,7 @@ export {
   cyclePercent,
   formatNumber,
   setAlign,
+  setBorderPreset,
   setBorders,
   setFillColor,
   setFont,
@@ -334,6 +336,7 @@ export {
 export type {
   CellAlign,
   CellBorderSide,
+  CellBorderStyle,
   CellBorders,
   CellFormat,
   CellVAlign,

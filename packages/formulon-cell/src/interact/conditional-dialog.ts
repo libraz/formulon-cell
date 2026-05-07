@@ -89,7 +89,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   panel.appendChild(header);
 
   const body = document.createElement('div');
-  body.className = 'fc-fmtdlg__body';
+  body.className = 'fc-fmtdlg__body fc-conddlg__body';
   panel.appendChild(body);
 
   // ── Existing rules list ────────────────────────────────────────────────
@@ -103,13 +103,13 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
 
   const clearAllBtn = document.createElement('button');
   clearAllBtn.type = 'button';
-  clearAllBtn.className = 'fc-fmtdlg__btn';
+  clearAllBtn.className = 'fc-fmtdlg__btn fc-conddlg__clear';
   clearAllBtn.textContent = t.clearAll;
   body.appendChild(clearAllBtn);
 
   // ── Add-rule form ──────────────────────────────────────────────────────
   const formLegend = document.createElement('div');
-  formLegend.className = 'fc-conddlg__legend';
+  formLegend.className = 'fc-conddlg__legend fc-conddlg__form-legend';
   formLegend.textContent = t.addRule;
   body.appendChild(formLegend);
 

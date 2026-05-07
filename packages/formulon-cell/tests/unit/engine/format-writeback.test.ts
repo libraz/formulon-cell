@@ -187,6 +187,23 @@ describe('numFmtToFormatCode / formatCodeToNumFmt', () => {
     expect(formatCodeToNumFmt('yyyy-mm-dd')).toEqual({ kind: 'date', pattern: 'yyyy-mm-dd' });
   });
 
+  it('reads Excel locale-tagged currency formats', () => {
+    expect(formatCodeToNumFmt('[$¥-411]#,##0;[Red]-[$¥-411]#,##0')).toEqual({
+      kind: 'currency',
+      decimals: 0,
+      symbol: '¥',
+    });
+  });
+
+  it('reads Excel accounting formats with spacing/fill directives', () => {
+    const code = numFmtToFormatCode({ kind: 'accounting', decimals: 2, symbol: '$' });
+    expect(formatCodeToNumFmt(code ?? '')).toEqual({
+      kind: 'accounting',
+      decimals: 2,
+      symbol: '$',
+    });
+  });
+
   it('unknown patterns surface as custom', () => {
     expect(formatCodeToNumFmt('???xx???')).toEqual({ kind: 'custom', pattern: '???xx???' });
   });

@@ -2,6 +2,8 @@ import type { Range } from '../engine/types.js';
 import { addrKey } from '../engine/workbook-handle.js';
 import {
   type CellAlign,
+  type CellBorderSide,
+  type CellBorderStyle,
   type CellBorders,
   type CellFormat,
   type CellVAlign,
@@ -194,6 +196,67 @@ export function setBorders(state: State, store: SpreadsheetStore, sides: CellBor
   applyRangePatch(state, store, state.selection.range, { borders: sides });
 }
 
+export type BorderPreset =
+  | 'none'
+  | 'outline'
+  | 'all'
+  | 'top'
+  | 'bottom'
+  | 'left'
+  | 'right'
+  | 'doubleBottom';
+
+export function setBorderPreset(
+  state: State,
+  store: SpreadsheetStore,
+  preset: BorderPreset,
+  style: CellBorderStyle = 'thin',
+): void {
+  const range = state.selection.range;
+  if (gateProtection(state, range) === null) return;
+  const side: CellBorderSide = { style };
+  if (preset === 'all') {
+    applyRangePatch(state, store, range, {
+      borders: { top: side, right: side, bottom: side, left: side },
+    });
+    return;
+  }
+  if (preset === 'none') {
+    applyRangePatch(state, store, range, {
+      borders: {
+        top: false,
+        right: false,
+        bottom: false,
+        left: false,
+        diagonalDown: false,
+        diagonalUp: false,
+      },
+    });
+    return;
+  }
+  const sheet = range.sheet;
+  for (let r = range.r0; r <= range.r1; r += 1) {
+    for (let c = range.c0; c <= range.c1; c += 1) {
+      const addr = { sheet, row: r, col: c };
+      if (!isCellWritable(state, addr)) continue;
+      const borders: CellBorders = {};
+      if (preset === 'outline') {
+        if (r === range.r0) borders.top = side;
+        if (r === range.r1) borders.bottom = side;
+        if (c === range.c0) borders.left = side;
+        if (c === range.c1) borders.right = side;
+      } else if (preset === 'top' && r === range.r0) borders.top = side;
+      else if (preset === 'bottom' && r === range.r1) borders.bottom = side;
+      else if (preset === 'left' && c === range.c0) borders.left = side;
+      else if (preset === 'right' && c === range.c1) borders.right = side;
+      else if (preset === 'doubleBottom' && r === range.r1) borders.bottom = { style: 'double' };
+      if (borders.top || borders.right || borders.bottom || borders.left) {
+        mutators.setCellFormat(store, addr, { borders });
+      }
+    }
+  }
+}
+
 /** Toolbar default: outline if missing, all-borders if outline present, else clear.
  *  Three-step cycle on repeated clicks. */
 export function cycleBorders(state: State, store: SpreadsheetStore): void {
@@ -339,13 +402,13 @@ export function formatNumber(value: number, fmt: NumFmt | undefined, locale = 'e
     return value < 0 ? `(${symbol}${body})` : `${symbol}${body} `;
   }
   if (fmt.kind === 'date') {
-    return formatExcelDate(value, fmt.pattern);
+    return renderDateTimePattern(value, fmt.pattern, locale);
   }
   if (fmt.kind === 'time') {
-    return formatExcelTime(value, fmt.pattern);
+    return renderDateTimePattern(value, fmt.pattern, locale);
   }
   if (fmt.kind === 'datetime') {
-    return formatExcelDate(value, fmt.pattern);
+    return renderDateTimePattern(value, fmt.pattern, locale);
   }
   if (fmt.kind === 'custom') {
     return formatCustomPattern(value, fmt.pattern, locale);
@@ -381,45 +444,6 @@ function excelSerialToDate(serial: number): Date {
 }
 
 const pad2 = (n: number): string => (n < 10 ? `0${n}` : `${n}`);
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function formatExcelDate(serial: number, pattern: string): string {
-  const d = excelSerialToDate(serial);
-  // UTC because we don't want timezone surprises in spreadsheets.
-  const yyyy = d.getUTCFullYear();
-  const mm = d.getUTCMonth() + 1;
-  const dd = d.getUTCDate();
-  const hh = d.getUTCHours();
-  const mi = d.getUTCMinutes();
-  const ss = d.getUTCSeconds();
-  return pattern
-    .replace(/yyyy/g, String(yyyy))
-    .replace(/yy/g, String(yyyy).slice(-2))
-    .replace(/mmm/g, MONTHS[mm - 1] ?? '')
-    .replace(/mm/g, pad2(mm))
-    .replace(/dd/g, pad2(dd))
-    .replace(/m\b/g, String(mm))
-    .replace(/d\b/g, String(dd))
-    .replace(/HH/g, pad2(hh))
-    .replace(/MM/g, pad2(mi))
-    .replace(/SS/g, pad2(ss));
-}
-
-function formatExcelTime(serial: number, pattern: string): string {
-  // Time-only — fractional part of the day.
-  const frac = serial - Math.floor(serial);
-  const totalSec = Math.round(frac * 86400);
-  const hh = Math.floor(totalSec / 3600);
-  const mi = Math.floor((totalSec % 3600) / 60);
-  const ss = totalSec % 60;
-  return pattern
-    .replace(/HH/g, pad2(hh))
-    .replace(/MM/g, pad2(mi))
-    .replace(/SS/g, pad2(ss))
-    .replace(/h\b/g, String(hh))
-    .replace(/m\b/g, String(mi))
-    .replace(/s\b/g, String(ss));
-}
 
 /** Excel-style custom format mini-language. Supports section splitting
  *  (pos;neg;zero;text), `0`/`#`/`?` digit placeholders, `.` decimal, `,`
@@ -467,14 +491,30 @@ function formatCustomPattern(value: number, pattern: string, locale: string): st
   }
 
   // Strip color tags. Color application belongs to the painter, not here.
-  active = active.replace(/\[(?:Red|Green|Blue|Black|White|Yellow|Magenta|Cyan|Color\d+)\]/gi, '');
+  active = normalizeExcelFormatSection(active);
 
   // If the section contains date/time tokens, render as date.
   if (/y|m|d|h|s/.test(stripLiterals(active))) {
-    return renderDateTimePattern(value, active);
+    return renderDateTimePattern(value, active, locale);
   }
 
   return renderNumericPattern(useAbs ? Math.abs(value) : value, active, locale);
+}
+
+function normalizeExcelFormatSection(section: string): string {
+  return (
+    section
+      // Locale/currency tags: [$¥-411]#,##0 → ¥#,##0; [$-ja-JP] is locale-only.
+      .replace(/\[\$([^\]-]+)(?:-[^\]]+)?\]/g, '$1')
+      .replace(/\[\$-[^\]]+\]/g, '')
+      // Color tags are a style concern; the formatter returns text only.
+      .replace(/\[(?:Red|Green|Blue|Black|White|Yellow|Magenta|Cyan|Color\d+)\]/gi, '')
+      .replace(/"([^"]*)"/g, '$1')
+      // Excel alignment/fill directives. `_x` reserves one char width; `*x`
+      // repeats a fill char. Canvas text output should not show either.
+      .replace(/_.|\\ /g, '')
+      .replace(/\*./g, '')
+  );
 }
 
 /** Parse a leading condition tag like `[>100]"big"0` into its predicate and
@@ -549,7 +589,7 @@ function stripLiterals(s: string): string {
   return s.replace(/"[^"]*"/g, '').replace(/\\./g, '');
 }
 
-function renderDateTimePattern(serial: number, pattern: string): string {
+function renderDateTimePattern(serial: number, pattern: string, locale: string): string {
   const d = excelSerialToDate(serial);
   const yyyy = d.getUTCFullYear();
   const mm = d.getUTCMonth() + 1;
@@ -561,22 +601,26 @@ function renderDateTimePattern(serial: number, pattern: string): string {
   const has12h = /a\/?p|am\/pm/i.test(pattern);
   const hh12 = ((hh + 11) % 12) + 1;
   const ampm = hh < 12 ? 'AM' : 'PM';
-  const DAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const MONTHS_LONG = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-  ];
+  const DAYS_LONG = Array.from({ length: 7 }, (_, i) =>
+    new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone: 'UTC' }).format(
+      new Date(Date.UTC(2023, 0, i + 1)),
+    ),
+  );
+  const DAYS_SHORT = Array.from({ length: 7 }, (_, i) =>
+    new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(
+      new Date(Date.UTC(2023, 0, i + 1)),
+    ),
+  );
+  const MONTHS_LONG = Array.from({ length: 12 }, (_, i) =>
+    new Intl.DateTimeFormat(locale, { month: 'long', timeZone: 'UTC' }).format(
+      new Date(Date.UTC(2023, i, 1)),
+    ),
+  );
+  const MONTHS_SHORT = Array.from({ length: 12 }, (_, i) =>
+    new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' }).format(
+      new Date(Date.UTC(2023, i, 1)),
+    ),
+  );
   let out = '';
   let prevWasH = false;
   for (let i = 0; i < pattern.length; ) {
@@ -634,7 +678,7 @@ function renderDateTimePattern(serial: number, pattern: string): string {
         out += MONTHS_LONG[mm - 1] ?? '';
         break;
       case 'mmm':
-        out += MONTHS[mm - 1] ?? '';
+        out += MONTHS_SHORT[mm - 1] ?? '';
         break;
       case 'mm':
         out += prevWasH ? pad2(mi) : pad2(mm);
@@ -697,7 +741,7 @@ function renderNumericPattern(value: number, pattern: string, locale: string): s
   if (isPercent) scaled *= 100;
 
   // Find the digit-placeholder block surrounding (and including) the decimal.
-  const placeholderMatch = body.match(/[#0?](?:[#0?,]*\.[#0?]*)?|\.[#0?]+/);
+  const placeholderMatch = body.match(/[#0?][#0?,]*(?:\.[#0?]+)?|\.[#0?]+/);
   if (!placeholderMatch) return body;
 
   const block = placeholderMatch[0];

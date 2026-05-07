@@ -199,6 +199,7 @@ export const formatDialog = (): Extension => ({
         strings: s,
         history: ctx.history as History,
         getWb: ctx.getWb,
+        getLocale: () => ctx.i18n.locale,
       });
     let handle = buildHandle(ctx.i18n.strings);
     return {

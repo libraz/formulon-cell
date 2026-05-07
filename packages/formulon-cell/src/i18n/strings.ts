@@ -65,8 +65,20 @@ export interface Strings {
     catDateTime: string;
     catText: string;
     catCustom: string;
+    descGeneral: string;
+    descFixed: string;
+    descCurrency: string;
+    descAccounting: string;
+    descPercent: string;
+    descScientific: string;
+    descDate: string;
+    descTime: string;
+    descDateTime: string;
+    descText: string;
+    descCustom: string;
     decimals: string;
     symbol: string;
+    patternType: string;
     pattern: string;
     patternPlaceholder: string;
     alignDefault: string;
@@ -568,8 +580,20 @@ export const ja: Strings = {
     catDateTime: '日付と時刻',
     catText: '文字列',
     catCustom: 'ユーザー定義',
+    descGeneral: 'セルの値に応じて標準の表示形式を使用します。',
+    descFixed: '小数点以下の桁数を指定して数値を表示します。',
+    descCurrency: '通貨記号と桁区切りを付けて表示します。',
+    descAccounting: '通貨記号と負の数を会計形式で揃えて表示します。',
+    descPercent: '値をパーセンテージとして表示します。',
+    descScientific: '大きい数値や小さい数値を指数表記で表示します。',
+    descDate: '日付シリアル値を書式に従って表示します。',
+    descTime: '時刻値を書式に従って表示します。',
+    descDateTime: '日付と時刻を組み合わせて表示します。',
+    descText: 'セルの内容を文字列として扱います。',
+    descCustom: 'ユーザー定義の表示形式を使用します。',
     decimals: '小数点以下の桁数',
     symbol: '記号',
+    patternType: '種類',
     pattern: '書式',
     patternPlaceholder: '例: 0.00 / yyyy-mm-dd',
     alignDefault: '標準',
@@ -1012,8 +1036,20 @@ export const en: Strings = {
     catDateTime: 'Date & Time',
     catText: 'Text',
     catCustom: 'Custom',
+    descGeneral: 'Default spreadsheet formatting based on the cell value.',
+    descFixed: 'Numbers with a fixed decimal count.',
+    descCurrency: 'Currency values with a symbol and grouped thousands.',
+    descAccounting: 'Accounting layout with aligned currency symbols and negatives.',
+    descPercent: 'Percent values with configurable decimal places.',
+    descScientific: 'Scientific notation for very large or small numbers.',
+    descDate: 'Date serials rendered with a date pattern.',
+    descTime: 'Time fractions rendered with a time pattern.',
+    descDateTime: 'Combined date and time display.',
+    descText: 'Treat cell content as text.',
+    descCustom: 'Use a custom number format pattern.',
     decimals: 'Decimal places',
     symbol: 'Symbol',
+    patternType: 'Type',
     pattern: 'Format code',
     patternPlaceholder: 'e.g. 0.00 / yyyy-mm-dd',
     alignDefault: 'General',

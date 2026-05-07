@@ -40,6 +40,17 @@
     --fc-header-bg: var(--fc-bg-rail);
     --fc-header-rule: var(--fc-rule);
 
+    --fc-sheetbar-bg: #f3f2f1;
+    --fc-sheetbar-tab-hover: #faf9f8;
+    --fc-sheetbar-tab-active: var(--fc-bg);
+    --fc-sheetbar-tab-rule: #edebe9;
+
+    --fc-statusbar-bg: var(--fc-accent);
+    --fc-statusbar-border: var(--fc-accent-strong);
+    --fc-statusbar-fg: color-mix(in srgb, var(--fc-accent-fg) 76%, transparent);
+    --fc-statusbar-fg-strong: var(--fc-accent-fg);
+    --fc-statusbar-control: color-mix(in srgb, var(--fc-accent-fg) 36%, transparent);
+
     /* Hover row/column tints */
     --fc-hover-stripe: rgba(16, 124, 65, 0.025);
 

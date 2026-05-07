@@ -34,6 +34,8 @@ export interface FormatDialogDeps {
    *  to the engine on OK so xlsx round-trip is complete. Lazy so the dialog
    *  stays in lockstep with `setWorkbook` swaps. */
   getWb?: () => WorkbookHandle | null;
+  /** Locale used for number/date previews and locale-specific format presets. */
+  getLocale?: () => string;
 }
 
 export interface FormatDialogHandle {
@@ -127,10 +129,45 @@ const THEME_SWATCHES = [
   '#7030a0',
 ] as const;
 
+const normalizeFormatLocale = (locale: string): string => {
+  if (locale === 'ja') return 'ja-JP';
+  if (locale === 'en') return 'en-US';
+  return locale || 'en-US';
+};
+
+const defaultCurrencySymbolFor = (locale: string): string =>
+  normalizeFormatLocale(locale).startsWith('ja') ? '¥' : '$';
+
+const patternPresetsFor = (
+  locale: string,
+): Record<'date' | 'time' | 'datetime' | 'custom', string[]> => {
+  if (normalizeFormatLocale(locale).startsWith('ja')) {
+    return {
+      date: [
+        'yyyy"年"m"月"d"日"',
+        'yyyy/m/d',
+        'yyyy-mm-dd',
+        'm"月"d"日"',
+        'yyyy"年"m"月"d"日" ddd',
+      ],
+      time: ['HH:MM', 'HH:MM:SS', 'h:MM AM/PM', 'h:MM:SS AM/PM'],
+      datetime: ['yyyy"年"m"月"d"日" HH:MM', 'yyyy/m/d HH:MM', 'yyyy-mm-dd HH:MM'],
+      custom: ['#,##0', '#,##0.00', '0%', '0.00%', '¥#,##0;[Red]-¥#,##0', '0.00E+00'],
+    };
+  }
+  return {
+    date: ['m/d/yyyy', 'mmmm d, yyyy', 'd-mmm-yy', 'yyyy-mm-dd', 'dddd, mmmm d, yyyy'],
+    time: ['h:MM AM/PM', 'h:MM:SS AM/PM', 'HH:MM', 'HH:MM:SS'],
+    datetime: ['m/d/yyyy h:MM AM/PM', 'mmmm d, yyyy h:MM AM/PM', 'yyyy-mm-dd HH:MM'],
+    custom: ['0.00', '#,##0', '#,##0.00', '0%', '0.00%', '$#,##0;[Red]-$#,##0', '0.00E+00'],
+  };
+};
+
 export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const { host, store } = deps;
   const history = deps.history ?? null;
   const getWb = deps.getWb ?? ((): WorkbookHandle | null => null);
+  const getFormatLocale = (): string => normalizeFormatLocale(deps.getLocale?.() ?? 'en-US');
   const strings = deps.strings ?? defaultStrings;
   const t = strings.formatDialog;
 
@@ -156,7 +193,12 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   // Preview
   const preview = document.createElement('div');
   preview.className = 'fc-fmtdlg__preview';
-  panel.appendChild(preview);
+  const previewLabel = document.createElement('div');
+  previewLabel.className = 'fc-fmtdlg__preview-label';
+  previewLabel.textContent = t.preview;
+  const previewCell = document.createElement('div');
+  previewCell.className = 'fc-fmtdlg__preview-cell';
+  preview.append(previewLabel, previewCell);
 
   // Tabs strip
   const tabsStrip = document.createElement('div');
@@ -291,6 +333,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   numberSummaryDesc.className = 'fc-fmtdlg__number-desc';
   numberSummary.append(numberSummaryTitle, numberSummaryDesc);
   numberControls.appendChild(numberSummary);
+  numberControls.appendChild(preview);
 
   const decimalsRow = document.createElement('label');
   decimalsRow.className = 'fc-fmtdlg__row';
@@ -318,6 +361,14 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   symbolRow.append(symbolLabel, symbolSelect);
   numberControls.appendChild(symbolRow);
 
+  const patternPresetRow = document.createElement('label');
+  patternPresetRow.className = 'fc-fmtdlg__row';
+  const patternPresetLabel = document.createElement('span');
+  patternPresetLabel.textContent = t.patternType;
+  const patternPresetSelect = document.createElement('select');
+  patternPresetRow.append(patternPresetLabel, patternPresetSelect);
+  numberControls.appendChild(patternPresetRow);
+
   // Pattern row — visible for date/time/datetime/custom categories.
   const patternRow = document.createElement('label');
   patternRow.className = 'fc-fmtdlg__row';
@@ -331,18 +382,6 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   patternInput.placeholder = t.patternPlaceholder;
   patternRow.append(patternLabel, patternInput);
   numberControls.appendChild(patternRow);
-
-  // Live preview readout — shows the demo number after applying the active
-  //  category. Excel's number tab shows this in the "Sample" header.
-  const sampleBox = document.createElement('div');
-  sampleBox.className = 'fc-fmtdlg__sample';
-  const sampleLabel = document.createElement('span');
-  sampleLabel.className = 'fc-fmtdlg__sample-label';
-  sampleLabel.textContent = t.preview;
-  const samplePreview = document.createElement('span');
-  samplePreview.className = 'fc-fmtdlg__sample-value';
-  sampleBox.append(sampleLabel, samplePreview);
-  numberControls.appendChild(sampleBox);
 
   // ── Alignment tab ──────────────────────────────────────────────────────
   const alignPanel = tabPanels.get('align') as HTMLDivElement;
@@ -606,15 +645,21 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const borderVisualPreview = document.createElement('div');
   borderVisualPreview.className = 'fc-fmtdlg__border-preview';
   borderVisualPreview.textContent = 'Text';
-  const visualSideButtons = new Map<SideKey, HTMLButtonElement>();
-  const makeVisualSideButton = (key: SideKey, label: string): HTMLButtonElement => {
+  const visualSideButtons = new Map<SideKey, HTMLButtonElement[]>();
+  const makeVisualSideButton = (
+    key: SideKey,
+    label: string,
+    extraClass = '',
+  ): HTMLButtonElement => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = `fc-fmtdlg__border-hit fc-fmtdlg__border-hit--${key}`;
+    btn.className = `fc-fmtdlg__border-hit fc-fmtdlg__border-hit--${key}${extraClass}`;
     btn.dataset.borderSide = key;
     btn.setAttribute('aria-label', label);
     btn.setAttribute('aria-pressed', 'false');
-    visualSideButtons.set(key, btn);
+    const buttons = visualSideButtons.get(key) ?? [];
+    buttons.push(btn);
+    visualSideButtons.set(key, buttons);
     return btn;
   };
   borderVisualStage.append(
@@ -623,8 +668,14 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     makeVisualSideButton('right', t.borderRight),
     makeVisualSideButton('bottom', t.borderBottom),
     makeVisualSideButton('left', t.borderLeft),
-    makeVisualSideButton('diagonalDown', t.borderDiagonalDown),
-    makeVisualSideButton('diagonalUp', t.borderDiagonalUp),
+    makeVisualSideButton('diagonalDown', t.borderDiagonalDown, ' fc-fmtdlg__border-hit--left-diag'),
+    makeVisualSideButton(
+      'diagonalDown',
+      t.borderDiagonalDown,
+      ' fc-fmtdlg__border-hit--right-diag',
+    ),
+    makeVisualSideButton('diagonalUp', t.borderDiagonalUp, ' fc-fmtdlg__border-hit--left-diag'),
+    makeVisualSideButton('diagonalUp', t.borderDiagonalUp, ' fc-fmtdlg__border-hit--right-diag'),
   );
   borderVisual.append(borderVisualTitle, borderVisualStage);
   borderPanel.appendChild(borderVisual);
@@ -890,7 +941,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       numFmt: undefined,
       numberCategory: 'general',
       decimals: 2,
-      currencySymbol: '$',
+      currencySymbol: defaultCurrencySymbolFor(getFormatLocale()),
       pattern: '',
       align: undefined,
       vAlign: undefined,
@@ -1015,7 +1066,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       draft.numFmt = { kind: 'general' };
       draft.numberCategory = 'general';
       draft.decimals = 2;
-      draft.currencySymbol = '$';
+      draft.currencySymbol = defaultCurrencySymbolFor(getFormatLocale());
       draft.pattern = '';
     }
 
@@ -1125,6 +1176,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     } else {
       patternInput.placeholder = t.patternPlaceholder;
     }
+    syncPatternPresetOptions();
     syncNumberControlsVisibility();
 
     // Alignment
@@ -1214,6 +1266,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const patternCats = new Set<NumberCategory>(['date', 'time', 'datetime', 'custom']);
     decimalsRow.hidden = !decimalsCats.has(cat);
     symbolRow.hidden = !symbolCats.has(cat);
+    patternPresetRow.hidden = !patternCats.has(cat);
     patternRow.hidden = !patternCats.has(cat);
     const active = catDefs.find((c) => c.id === cat);
     numberSummaryTitle.textContent = active?.label ?? t.catGeneral;
@@ -1252,18 +1305,24 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const renderPreview = (): void => {
     preview.style.fontWeight = draft.bold ? 'bold' : 'normal';
     preview.style.fontStyle = draft.italic ? 'italic' : 'normal';
+    previewCell.style.fontWeight = draft.bold ? 'bold' : 'normal';
+    previewCell.style.fontStyle = draft.italic ? 'italic' : 'normal';
     const decos: string[] = [];
     if (draft.underline) decos.push('underline');
     if (draft.strike) decos.push('line-through');
     preview.style.textDecoration = decos.length > 0 ? decos.join(' ') : 'none';
     preview.style.textAlign = draft.align ?? 'left';
-    preview.style.fontFamily = draft.fontFamily || '';
-    preview.style.fontSize = draft.fontSize !== undefined ? `${draft.fontSize}px` : '';
-    preview.style.color = draft.color ?? '';
-    preview.style.backgroundColor = draft.fill ?? '';
-    preview.style.whiteSpace = draft.wrap ? 'pre-wrap' : 'nowrap';
+    previewCell.style.textDecoration = decos.length > 0 ? decos.join(' ') : 'none';
+    previewCell.style.textAlign = draft.align ?? 'left';
+    previewCell.style.fontFamily = draft.fontFamily || '';
+    previewCell.style.fontSize = draft.fontSize !== undefined ? `${draft.fontSize}px` : '';
+    previewCell.style.color = draft.color ?? '';
+    previewCell.style.backgroundColor = draft.fill ?? '';
+    previewCell.style.whiteSpace = draft.wrap ? 'pre-wrap' : 'nowrap';
+    previewCell.style.justifyContent =
+      draft.vAlign === 'top' ? 'flex-start' : draft.vAlign === 'bottom' ? 'flex-end' : 'center';
     const cssBorder = (s: CellBorderSide | undefined): string => {
-      if (!s) return '';
+      if (!s) return '0 solid transparent';
       const cfg = typeof s === 'object' ? s : { style: 'thin' as const };
       const widthPx = cfg.style === 'thick' ? 3 : cfg.style === 'medium' ? 2 : 1;
       const cssStyle =
@@ -1278,10 +1337,10 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       const w = cfg.style === 'double' ? Math.max(widthPx, 3) : widthPx;
       return `${w}px ${cssStyle} ${cssColor}`;
     };
-    preview.style.borderTop = cssBorder(draft.borders.top);
-    preview.style.borderRight = cssBorder(draft.borders.right);
-    preview.style.borderBottom = cssBorder(draft.borders.bottom);
-    preview.style.borderLeft = cssBorder(draft.borders.left);
+    previewCell.style.borderTop = cssBorder(draft.borders.top);
+    previewCell.style.borderRight = cssBorder(draft.borders.right);
+    previewCell.style.borderBottom = cssBorder(draft.borders.bottom);
+    previewCell.style.borderLeft = cssBorder(draft.borders.left);
     borderVisualPreview.style.borderTop = cssBorder(draft.borders.top);
     borderVisualPreview.style.borderRight = cssBorder(draft.borders.right);
     borderVisualPreview.style.borderBottom = cssBorder(draft.borders.bottom);
@@ -1300,8 +1359,10 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const diagWidth = diagCfg.style === 'thick' ? 3 : diagCfg.style === 'medium' ? 2 : 1;
     borderVisualPreview.style.setProperty('--fc-fmtdlg-border-diag-color', diagColor);
     borderVisualPreview.style.setProperty('--fc-fmtdlg-border-diag-width', `${diagWidth}px`);
-    for (const [key, btn] of visualSideButtons) {
-      btn.setAttribute('aria-pressed', draft.borders[key] ? 'true' : 'false');
+    for (const [key, buttons] of visualSideButtons) {
+      for (const btn of buttons) {
+        btn.setAttribute('aria-pressed', draft.borders[key] ? 'true' : 'false');
+      }
     }
 
     const numFmt = computeNumFmt();
@@ -1310,13 +1371,17 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const isDateLike =
       numFmt.kind === 'date' || numFmt.kind === 'time' || numFmt.kind === 'datetime';
     const sampleValue = isDateLike ? 45123.625 : 12345;
-    const numericText = formatNumber(sampleValue, numFmt);
-    preview.textContent = `${t.preview} ${numericText}`;
-    samplePreview.textContent = numericText;
+    const numericText = formatNumber(sampleValue, numFmt, getFormatLocale());
+    previewCell.textContent = numericText;
   };
 
   // ── Compute helpers ────────────────────────────────────────────────────
   const defaultPatternFor = (cat: NumberCategory): string => {
+    const presets =
+      cat === 'date' || cat === 'time' || cat === 'datetime' || cat === 'custom'
+        ? patternPresetsFor(getFormatLocale())[cat]
+        : [];
+    if (presets[0]) return presets[0];
     switch (cat) {
       case 'date':
         return 'yyyy-mm-dd';
@@ -1331,30 +1396,48 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     }
   };
 
+  const syncPatternPresetOptions = (): void => {
+    const cat = draft.numberCategory;
+    const patterns =
+      cat === 'date' || cat === 'time' || cat === 'datetime' || cat === 'custom'
+        ? [...patternPresetsFor(getFormatLocale())[cat]]
+        : [];
+    const current = draft.pattern || defaultPatternFor(cat);
+    if (current && !patterns.includes(current)) patterns.unshift(current);
+    patternPresetSelect.replaceChildren();
+    for (const pattern of patterns) {
+      const opt = document.createElement('option');
+      opt.value = pattern;
+      opt.textContent = pattern;
+      patternPresetSelect.appendChild(opt);
+    }
+    patternPresetSelect.value = current;
+  };
+
   const numberCategoryDescription = (cat: NumberCategory): string => {
     switch (cat) {
       case 'fixed':
-        return 'Numbers with a fixed decimal count.';
+        return t.descFixed;
       case 'currency':
-        return 'Currency values with a symbol and grouped thousands.';
+        return t.descCurrency;
       case 'accounting':
-        return 'Accounting layout with aligned currency symbols and negatives.';
+        return t.descAccounting;
       case 'percent':
-        return 'Percent values with configurable decimal places.';
+        return t.descPercent;
       case 'scientific':
-        return 'Scientific notation for very large or small numbers.';
+        return t.descScientific;
       case 'date':
-        return 'Date serials rendered with a date pattern.';
+        return t.descDate;
       case 'time':
-        return 'Time fractions rendered with a time pattern.';
+        return t.descTime;
       case 'datetime':
-        return 'Combined date and time display.';
+        return t.descDateTime;
       case 'text':
-        return 'Treat cell content as text.';
+        return t.descText;
       case 'custom':
-        return 'Use a custom number format pattern.';
+        return t.descCustom;
       default:
-        return 'Default spreadsheet formatting based on the cell value.';
+        return t.descGeneral;
     }
   };
   const computeNumFmt = (): NumFmt => {
@@ -1503,7 +1586,19 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     if (!btn) return;
     const id = btn.dataset.fcCat as NumberCategory | undefined;
     if (!id) return;
+    const previous = draft.numberCategory;
     draft.numberCategory = id;
+    if (previous !== id) {
+      const fallback = defaultPatternFor(id);
+      if (fallback) draft.pattern = fallback;
+      if (
+        (id === 'currency' || id === 'accounting') &&
+        previous !== 'currency' &&
+        previous !== 'accounting'
+      ) {
+        draft.currencySymbol = defaultCurrencySymbolFor(getFormatLocale());
+      }
+    }
     syncControlsFromDraft();
     renderPreview();
   };
@@ -1521,6 +1616,13 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
 
   const onPatternInput = (): void => {
     draft.pattern = patternInput.value;
+    syncPatternPresetOptions();
+    renderPreview();
+  };
+
+  const onPatternPresetChange = (): void => {
+    draft.pattern = patternPresetSelect.value;
+    patternInput.value = draft.pattern;
     renderPreview();
   };
 
@@ -1803,6 +1905,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   decimalsInput.addEventListener('input', onDecimalsInput);
   symbolSelect.addEventListener('change', onSymbolChange);
   patternInput.addEventListener('input', onPatternInput);
+  patternPresetSelect.addEventListener('change', onPatternPresetChange);
   for (const r of hAlignRadios.values()) r.addEventListener('change', onHAlignChange);
   for (const r of vAlignRadios.values()) r.addEventListener('change', onVAlignChange);
   wrapCk.input.addEventListener('change', onWrapChange);
@@ -1876,6 +1979,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       decimalsInput.removeEventListener('input', onDecimalsInput);
       symbolSelect.removeEventListener('change', onSymbolChange);
       patternInput.removeEventListener('input', onPatternInput);
+      patternPresetSelect.removeEventListener('change', onPatternPresetChange);
       for (const r of hAlignRadios.values()) r.removeEventListener('change', onHAlignChange);
       for (const r of vAlignRadios.values()) r.removeEventListener('change', onVAlignChange);
       wrapCk.input.removeEventListener('change', onWrapChange);

@@ -39,6 +39,17 @@
     --fc-header-bg: var(--fc-bg-rail);
     --fc-header-rule: var(--fc-rule);
 
+    --fc-sheetbar-bg: #ffffff;
+    --fc-sheetbar-tab-hover: #ffff00;
+    --fc-sheetbar-tab-active: #ffffff;
+    --fc-sheetbar-tab-rule: #000000;
+
+    --fc-statusbar-bg: #000000;
+    --fc-statusbar-border: #000000;
+    --fc-statusbar-fg: #ffffff;
+    --fc-statusbar-fg-strong: #ffffff;
+    --fc-statusbar-control: #ffffff;
+
     --fc-hover-stripe: rgba(0, 51, 204, 0.06);
 
     color-scheme: light;

@@ -1,4 +1,4 @@
-import { suggestFunctions } from '../commands/refs.js';
+import { FUNCTION_SIGNATURES, suggestFunctions } from '../commands/refs.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface AutocompleteHandle {
@@ -66,8 +66,8 @@ interface SuggestionContext {
   /** What gets inserted when the user accepts a match — defaults to `${match}`
    *  for refs and `${match}(` for functions. */
   insertSuffix: string;
-  /** The kind drives display labels (and would let us paint badges later). */
-  kind: 'function' | 'column';
+  /** The kind drives display labels and badges. */
+  kind: 'function' | 'tableColumn' | 'column' | 'history';
 }
 
 /**
@@ -108,12 +108,39 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
     inheritHostTokens(input, root);
     root.replaceChildren();
     for (let i = 0; i < ctx.matches.length; i += 1) {
-      const item = document.createElement('div');
+      const pick = ctx.matches[i] ?? '';
+      const item = document.createElement('button');
       item.className = 'fc-autocomplete__item';
       if (i === highlight) item.classList.add('fc-autocomplete__item--active');
       item.setAttribute('role', 'option');
       item.dataset.fcKind = ctx.kind;
-      item.textContent = ctx.matches[i] ?? '';
+      item.type = 'button';
+
+      const badge = document.createElement('span');
+      badge.className = 'fc-autocomplete__badge';
+      badge.textContent =
+        ctx.kind === 'function' ? 'fx' : ctx.kind === 'tableColumn' ? 'tbl' : 'list';
+
+      const main = document.createElement('span');
+      main.className = 'fc-autocomplete__main';
+
+      const name = document.createElement('span');
+      name.className = 'fc-autocomplete__name';
+      name.textContent = pick;
+
+      const detail = document.createElement('span');
+      detail.className = 'fc-autocomplete__detail';
+      if (ctx.kind === 'function') {
+        const sig = FUNCTION_SIGNATURES[pick.toUpperCase()];
+        detail.textContent = sig ? `${pick}(${sig.join(', ')})` : 'Custom function';
+      } else if (ctx.kind === 'tableColumn') {
+        detail.textContent = 'Structured table column';
+      } else {
+        detail.textContent = 'Pick from list';
+      }
+
+      main.append(name, detail);
+      item.append(badge, main);
       // Use mousedown (not click) so the input doesn't blur first.
       item.addEventListener('mousedown', (e) => {
         e.preventDefault();
@@ -312,6 +339,6 @@ export function suggestStructuredRef(
     tokenStart: bracket + 1,
     tokenEnd: caret,
     insertSuffix: ']',
-    kind: 'column',
+    kind: 'tableColumn',
   };
 }

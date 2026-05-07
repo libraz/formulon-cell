@@ -224,6 +224,8 @@ export interface CellPaintCtx {
    *  the formatter wins over numFmt + default `formatCell`. Empty string
    *  is honored — render-blank-cell-still-padded scenarios. */
   displayOverride?: string | null;
+  /** BCP 47 locale used for number/date formatting. */
+  locale?: string;
 }
 
 export type TextVAlign = 'top' | 'middle' | 'bottom';
@@ -425,6 +427,7 @@ export function paintCellText({
   format,
   showFormulas,
   displayOverride,
+  locale,
 }: CellPaintCtx): void {
   if (value.kind === 'blank' && !formula && displayOverride == null) return;
 
@@ -438,8 +441,8 @@ export function paintCellText({
   } else {
     text =
       value.kind === 'number' && format?.numFmt
-        ? formatNumber(value.value, format.numFmt)
-        : formatCell(value);
+        ? formatNumber(value.value, format.numFmt, locale)
+        : formatCell(value, locale);
   }
   if (!text) return;
 
@@ -596,6 +599,7 @@ export function paintCellBorders({ ctx, bounds, theme, format }: CellPaintCtx): 
     y0: number,
     x1: number,
     y1: number,
+    doubleInside: 1 | -1,
   ): void => {
     if (!side) return;
     const cfg = typeof side === 'object' ? side : { style: 'thin' as const };
@@ -636,15 +640,17 @@ export function paintCellBorders({ ctx, bounds, theme, format }: CellPaintCtx): 
     ctx.lineWidth = widthMap[cfg.style] ?? 1;
     ctx.setLineDash(dashMap[cfg.style] ?? []);
     if (cfg.style === 'double') {
-      // Two parallel lines, 2px apart.
-      const off = 1.5;
-      const dx = y0 === y1 ? 0 : 1;
-      const dy = y0 === y1 ? 1 : 0;
+      // Excel keeps double borders inside the owning cell. Drawing both
+      // strokes inward avoids clipping on viewport and sheet edges.
+      const gap = 3;
+      const horizontal = y0 === y1;
+      const dx = horizontal ? 0 : doubleInside * gap;
+      const dy = horizontal ? doubleInside * gap : 0;
       ctx.beginPath();
-      ctx.moveTo(x0 + dx * off, y0 + dy * off);
-      ctx.lineTo(x1 + dx * off, y1 + dy * off);
-      ctx.moveTo(x0 - dx * off, y0 - dy * off);
-      ctx.lineTo(x1 - dx * off, y1 - dy * off);
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.moveTo(x0 + dx, y0 + dy);
+      ctx.lineTo(x1 + dx, y1 + dy);
       ctx.stroke();
     } else {
       ctx.beginPath();
@@ -658,12 +664,14 @@ export function paintCellBorders({ ctx, bounds, theme, format }: CellPaintCtx): 
   const yb = Math.round(bounds.y + bounds.h) - 0.5;
   const xl = Math.round(bounds.x) + 0.5;
   const xr = Math.round(bounds.x + bounds.w) - 0.5;
-  drawSide(sides.top, bounds.x, yt, bounds.x + bounds.w, yt);
-  drawSide(sides.bottom, bounds.x, yb, bounds.x + bounds.w, yb);
-  drawSide(sides.left, xl, bounds.y, xl, bounds.y + bounds.h);
-  drawSide(sides.right, xr, bounds.y, xr, bounds.y + bounds.h);
-  drawSide(sides.diagonalDown, bounds.x, bounds.y, bounds.x + bounds.w, bounds.y + bounds.h);
-  drawSide(sides.diagonalUp, bounds.x, bounds.y + bounds.h, bounds.x + bounds.w, bounds.y);
+  // Keep user borders inside the cell rect. This is especially important for
+  // row/column 1 and viewport edges, where centered strokes can be clipped.
+  drawSide(sides.top, xl, yt, xr, yt, 1);
+  drawSide(sides.bottom, xl, yb, xr, yb, -1);
+  drawSide(sides.left, xl, yt, xl, yb, 1);
+  drawSide(sides.right, xr, yt, xr, yb, -1);
+  drawSide(sides.diagonalDown, xl, yt, xr, yb, 1);
+  drawSide(sides.diagonalUp, xl, yb, xr, yt, 1);
 }
 
 /** Active cell outline. Drawn in a separate pass after all cell text so the
