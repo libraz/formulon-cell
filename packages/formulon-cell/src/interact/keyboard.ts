@@ -106,6 +106,8 @@ export interface KeyboardDeps {
   /** Called for Shift+F2 — Excel's comment shortcut. Falls back to a window
    *  prompt when not provided. */
   onEditComment?: (addr: Addr) => void;
+  /** Called for Ctrl/Cmd+PageUp/PageDown — Excel sheet-tab navigation. */
+  onSwitchSheet?: (delta: 1 | -1) => void;
 }
 
 export function attachKeyboard(deps: KeyboardDeps): () => void {
@@ -124,6 +126,30 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     if (k === 'F5' || (meta && (k === 'g' || k === 'G'))) {
       e.preventDefault();
       deps.onGoTo?.();
+      return;
+    }
+
+    if (meta && (k === 'PageUp' || k === 'PageDown')) {
+      e.preventDefault();
+      deps.onSwitchSheet?.(k === 'PageDown' ? 1 : -1);
+      return;
+    }
+
+    if (meta && (k === 'a' || k === 'A')) {
+      e.preventDefault();
+      mutators.selectAll(store);
+      return;
+    }
+
+    if (meta && k === ' ') {
+      e.preventDefault();
+      mutators.selectCol(store, a.col);
+      return;
+    }
+
+    if (shift && k === ' ' && !meta && !e.altKey) {
+      e.preventDefault();
+      mutators.selectRow(store, a.row);
       return;
     }
 
@@ -179,8 +205,9 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     } else if (k === 'PageDown') target = move(a, Math.max(1, s.viewport.rowCount - 1), 0);
     else if (k === 'PageUp') target = move(a, -Math.max(1, s.viewport.rowCount - 1), 0);
     else if (k === 'Tab') target = stepWithMerge(s, a, 0, shift ? -1 : 1, MAX_ROW, MAX_COL);
-    else if (k === 'Enter' && !shift && !meta) {
-      // Enter without prior text -> begin edit
+    else if (k === 'Enter' && !meta) {
+      target = stepWithMerge(s, a, shift ? -1 : 1, 0, MAX_ROW, MAX_COL);
+    } else if (meta && k === 'Enter') {
       deps.onBeginEdit('');
       e.preventDefault();
       return;

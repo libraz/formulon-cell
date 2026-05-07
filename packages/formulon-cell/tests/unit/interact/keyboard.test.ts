@@ -69,6 +69,7 @@ describe('attachKeyboard', () => {
   let onClearActive: Mock<() => void>;
   let onAfterHistory: Mock<() => void>;
   let onGoTo: Mock<() => void>;
+  let onSwitchSheet: Mock<(delta: 1 | -1) => void>;
   let detach: () => void;
 
   const setup = (history: History | null = null): void => {
@@ -81,6 +82,7 @@ describe('attachKeyboard', () => {
       onClearActive,
       onAfterHistory,
       onGoTo,
+      onSwitchSheet,
     });
   };
 
@@ -93,6 +95,7 @@ describe('attachKeyboard', () => {
     onClearActive = vi.fn<() => void>();
     onAfterHistory = vi.fn<() => void>();
     onGoTo = vi.fn<() => void>();
+    onSwitchSheet = vi.fn<(delta: 1 | -1) => void>();
   });
 
   afterEach(() => {
@@ -177,6 +180,42 @@ describe('attachKeyboard', () => {
       fire(host, 'PageUp');
       expect(store.getState().selection.active.row).toBe(50);
     });
+
+    it('Ctrl+PageUp/PageDown switches sheets through the chrome callback', () => {
+      setup();
+      fire(host, 'PageDown', { ctrlKey: true });
+      fire(host, 'PageUp', { ctrlKey: true });
+      expect(onSwitchSheet).toHaveBeenNthCalledWith(1, 1);
+      expect(onSwitchSheet).toHaveBeenNthCalledWith(2, -1);
+    });
+
+    it('Ctrl+A, Ctrl+Space, and Shift+Space select all, column, and row', () => {
+      setup();
+      mutators.setActive(store, { sheet: 0, row: 3, col: 2 });
+      fire(host, 'a', { ctrlKey: true });
+      expect(store.getState().selection.range).toMatchObject({
+        r0: 0,
+        c0: 0,
+        r1: 1048575,
+        c1: 16383,
+      });
+      mutators.setActive(store, { sheet: 0, row: 3, col: 2 });
+      fire(host, ' ', { ctrlKey: true });
+      expect(store.getState().selection.range).toMatchObject({
+        r0: 0,
+        c0: 2,
+        r1: 1048575,
+        c1: 2,
+      });
+      mutators.setActive(store, { sheet: 0, row: 3, col: 2 });
+      fire(host, ' ', { shiftKey: true });
+      expect(store.getState().selection.range).toMatchObject({
+        r0: 3,
+        c0: 0,
+        r1: 3,
+        c1: 16383,
+      });
+    });
   });
 
   describe('Ctrl+Arrow jumpEdge', () => {
@@ -231,10 +270,19 @@ describe('attachKeyboard', () => {
   });
 
   describe('edit triggers', () => {
-    it('Enter calls onBeginEdit("")', () => {
+    it('Enter moves active down', () => {
       setup();
       const e = fire(host, 'Enter');
+      expect(onBeginEdit).not.toHaveBeenCalled();
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 0 });
+      expect(e.defaultPrevented).toBe(true);
+    });
+
+    it('Ctrl+Enter starts edit without moving', () => {
+      setup();
+      const e = fire(host, 'Enter', { ctrlKey: true });
       expect(onBeginEdit).toHaveBeenCalledWith('');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 0 });
       expect(e.defaultPrevented).toBe(true);
     });
 
