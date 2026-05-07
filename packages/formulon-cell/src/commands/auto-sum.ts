@@ -29,8 +29,9 @@ const isEmpty = (state: State, sheet: number, row: number, col: number): boolean
 
 /**
  * Excel's Σ button. Decides where a SUM formula belongs based on the current
- * selection and writes it. Returns the inserted location + formula or null
- * when nothing reasonable can be done.
+ * selection and writes it. Returns the inserted location + formula (when
+ * multiple cells are written, the first one) or null when nothing reasonable
+ * can be done.
  *
  * Single-cell selection:
  *   - Active cell is empty: SUM goes IN the active cell. Range = contiguous
@@ -40,8 +41,13 @@ const isEmpty = (state: State, sheet: number, row: number, col: number): boolean
  *     otherwise to the right of the row block. The active cell is never
  *     overwritten.
  *
- * Range selection: place `=SUM(<range>)` directly below the range, or to
- * its right when below is occupied.
+ * Range selection:
+ *   - If the user included empty trailing rows or columns inside the
+ *     selection, fill those with SUM formulas (per column for trailing
+ *     rows, per row for trailing columns) — the SUM range is the
+ *     contiguous numeric block right above/left of each target.
+ *   - Otherwise, place `=SUM(<range>)` directly below the range, or to
+ *     its right when below is occupied.
  */
 export function autoSum(state: State, wb: WorkbookHandle): { addr: Addr; formula: string } | null {
   const r = state.selection.range;
@@ -98,6 +104,56 @@ export function autoSum(state: State, wb: WorkbookHandle): { addr: Addr; formula
       }
     }
     return null;
+  }
+
+  // Column-direction: per column in the range, place SUM right below the
+  // last numeric cell in that column (when the slot is empty AND still
+  // inside the selection). This handles "select numbers + trailing empty
+  // rows, press Σ" — the formula lands inside the selection, not past it.
+  const colWrites: { addr: Addr; formula: string }[] = [];
+  for (let col = r.c0; col <= r.c1; col += 1) {
+    let lastNumRow = -1;
+    for (let row = r.r1; row >= r.r0; row -= 1) {
+      if (isNum(state, sheet, row, col)) {
+        lastNumRow = row;
+        break;
+      }
+    }
+    if (lastNumRow < 0 || lastNumRow >= r.r1) continue;
+    const target: Addr = { sheet, row: lastNumRow + 1, col };
+    if (!isEmpty(state, sheet, target.row, target.col)) continue;
+    let top = lastNumRow;
+    while (top - 1 >= r.r0 && isNum(state, sheet, top - 1, col)) top -= 1;
+    const formula = `=SUM(${colLetter(col)}${top + 1}:${colLetter(col)}${lastNumRow + 1})`;
+    colWrites.push({ addr: target, formula });
+  }
+  if (colWrites.length > 0) {
+    for (const w of colWrites) wb.setFormula(w.addr, w.formula);
+    return colWrites[0] ?? null;
+  }
+
+  // Row-direction: same idea horizontally — trailing empty columns inside
+  // the selection get SUM formulas.
+  const rowWrites: { addr: Addr; formula: string }[] = [];
+  for (let row = r.r0; row <= r.r1; row += 1) {
+    let lastNumCol = -1;
+    for (let col = r.c1; col >= r.c0; col -= 1) {
+      if (isNum(state, sheet, row, col)) {
+        lastNumCol = col;
+        break;
+      }
+    }
+    if (lastNumCol < 0 || lastNumCol >= r.c1) continue;
+    const target: Addr = { sheet, row, col: lastNumCol + 1 };
+    if (!isEmpty(state, sheet, target.row, target.col)) continue;
+    let left = lastNumCol;
+    while (left - 1 >= r.c0 && isNum(state, sheet, row, left - 1)) left -= 1;
+    const formula = `=SUM(${colLetter(left)}${row + 1}:${colLetter(lastNumCol)}${row + 1})`;
+    rowWrites.push({ addr: target, formula });
+  }
+  if (rowWrites.length > 0) {
+    for (const w of rowWrites) wb.setFormula(w.addr, w.formula);
+    return rowWrites[0] ?? null;
   }
 
   const ref = rangeRef(r);

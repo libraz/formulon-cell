@@ -321,7 +321,7 @@ export function recordMergesChangeWithEngine(
   mutate: () => void,
 ): void {
   const sync = (snap: MergesSnapshot): void => {
-    if (!wb || !wb.capabilities.merges) return;
+    if (!wb?.capabilities.merges) return;
     wb.engineClearMerges(sheet);
     for (const r of snap.byAnchor.values()) {
       if (r.sheet !== sheet) continue;

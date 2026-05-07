@@ -156,6 +156,50 @@ describe('autoSum', () => {
     expect(autoSum(store.getState(), wb)).toBeNull();
   });
 
+  it('drops SUM into the empty trailing cell when a single-column selection includes blank rows below', () => {
+    seedNumber(store, wb, 0, 0, 10);
+    seedNumber(store, wb, 1, 0, 20);
+    seedNumber(store, wb, 2, 0, 30);
+    // A4, A5 are intentionally empty — included in the selection.
+    setRangeOnly(store, 0, 0, 4, 0);
+
+    const got = autoSum(store.getState(), wb);
+    expect(got?.addr).toEqual({ sheet: 0, row: 3, col: 0 });
+    expect(got?.formula).toBe('=SUM(A1:A3)');
+    expect(wb.cellFormula({ sheet: 0, row: 3, col: 0 })).toBe('=SUM(A1:A3)');
+    // The other trailing empty cell stays empty.
+    expect(wb.cellFormula({ sheet: 0, row: 4, col: 0 })).toBe(null);
+  });
+
+  it('drops SUM into the empty trailing cell when a single-row selection includes blanks to the right', () => {
+    seedNumber(store, wb, 0, 0, 1);
+    seedNumber(store, wb, 0, 1, 2);
+    seedNumber(store, wb, 0, 2, 3);
+    setRangeOnly(store, 0, 0, 0, 4);
+
+    const got = autoSum(store.getState(), wb);
+    expect(got?.addr).toEqual({ sheet: 0, row: 0, col: 3 });
+    expect(got?.formula).toBe('=SUM(A1:C1)');
+  });
+
+  it('fills a trailing-empty totals row across each column of a 2D selection', () => {
+    // 3x3 numeric block plus an empty bottom row inside the selection.
+    seedNumber(store, wb, 0, 0, 1);
+    seedNumber(store, wb, 0, 1, 2);
+    seedNumber(store, wb, 0, 2, 3);
+    seedNumber(store, wb, 1, 0, 4);
+    seedNumber(store, wb, 1, 1, 5);
+    seedNumber(store, wb, 1, 2, 6);
+    setRangeOnly(store, 0, 0, 2, 2);
+
+    const got = autoSum(store.getState(), wb);
+    expect(got?.addr).toEqual({ sheet: 0, row: 2, col: 0 });
+    expect(got?.formula).toBe('=SUM(A1:A2)');
+    expect(wb.cellFormula({ sheet: 0, row: 2, col: 0 })).toBe('=SUM(A1:A2)');
+    expect(wb.cellFormula({ sheet: 0, row: 2, col: 1 })).toBe('=SUM(B1:B2)');
+    expect(wb.cellFormula({ sheet: 0, row: 2, col: 2 })).toBe('=SUM(C1:C2)');
+  });
+
   it('returns null for a multi-cell numeric range when both candidate targets are non-empty', () => {
     seedNumber(store, wb, 0, 0, 1);
     seedNumber(store, wb, 0, 1, 2);
