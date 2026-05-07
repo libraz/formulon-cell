@@ -4,16 +4,28 @@ import {
   applyUnmerge,
   autoSum,
   bumpDecimals,
+  clearFilter,
   cycleBorders,
   cycleCurrency,
   cyclePercent,
+  deleteCols,
+  deleteRows,
+  hiddenInSelection,
+  hideCols,
+  hideRows,
+  insertCols,
+  insertRows,
   mutators,
   recordFormatChange,
   setAlign,
+  setAutoFilter,
   setFillColor,
   setFreezePanes,
   setFont,
   setFontColor,
+  showCols,
+  showRows,
+  sortRange,
   type SpreadsheetInstance,
   toggleBold,
   toggleItalic,
@@ -40,6 +52,9 @@ interface ActiveState {
   currency: boolean;
   percent: boolean;
   frozen: boolean;
+  filterOn: boolean;
+  rowsHidden: boolean;
+  colsHidden: boolean;
   fontFamily: string;
   fontSize: number;
   fontColor: string;
@@ -57,6 +72,9 @@ const EMPTY: ActiveState = {
   currency: false,
   percent: false,
   frozen: false,
+  filterOn: false,
+  rowsHidden: false,
+  colsHidden: false,
   fontFamily: 'Aptos',
   fontSize: 11,
   fontColor: '#201f1e',
@@ -69,6 +87,7 @@ const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 36];
 const project = (inst: SpreadsheetInstance): ActiveState => {
   const s = inst.store.getState();
   const a = s.selection.active;
+  const r = s.selection.range;
   const f = s.format.formats.get(`${a.sheet}:${a.row}:${a.col}`);
   return {
     bold: !!f?.bold,
@@ -81,6 +100,9 @@ const project = (inst: SpreadsheetInstance): ActiveState => {
     currency: f?.numFmt?.kind === 'currency',
     percent: f?.numFmt?.kind === 'percent',
     frozen: s.layout.freezeRows > 0 || s.layout.freezeCols > 0,
+    filterOn: s.ui.filterRange != null,
+    rowsHidden: hiddenInSelection(s.layout, 'row', r.r0, r.r1).length > 0,
+    colsHidden: hiddenInSelection(s.layout, 'col', r.c0, r.c1).length > 0,
     fontFamily: f?.fontFamily ?? 'Aptos',
     fontSize: f?.fontSize ?? 11,
     fontColor: f?.color ?? '#201f1e',
@@ -181,6 +203,78 @@ const onFontColor = (value: string): void => {
 };
 const onFillColor = (value: string): void => {
   wrapFormat((s, st) => setFillColor(s, st, value));
+};
+
+const onInsertRows = (): void => {
+  const inst = props.instance;
+  if (!inst) return;
+  const r = inst.store.getState().selection.range;
+  insertRows(inst.store, inst.workbook, inst.history, r.r0, r.r1 - r.r0 + 1);
+};
+
+const onDeleteRows = (): void => {
+  const inst = props.instance;
+  if (!inst) return;
+  const r = inst.store.getState().selection.range;
+  deleteRows(inst.store, inst.workbook, inst.history, r.r0, r.r1 - r.r0 + 1);
+};
+
+const onInsertCols = (): void => {
+  const inst = props.instance;
+  if (!inst) return;
+  const r = inst.store.getState().selection.range;
+  insertCols(inst.store, inst.workbook, inst.history, r.c0, r.c1 - r.c0 + 1);
+};
+
+const onDeleteCols = (): void => {
+  const inst = props.instance;
+  if (!inst) return;
+  const r = inst.store.getState().selection.range;
+  deleteCols(inst.store, inst.workbook, inst.history, r.c0, r.c1 - r.c0 + 1);
+};
+
+const onToggleRowsHidden = (): void => {
+  const inst = props.instance;
+  if (!inst) return;
+  const s = inst.store.getState();
+  const r = s.selection.range;
+  if (hiddenInSelection(s.layout, 'row', r.r0, r.r1).length > 0) {
+    showRows(inst.store, inst.history, r.r0, r.r1, inst.workbook);
+  } else {
+    hideRows(inst.store, inst.history, r.r0, r.r1, inst.workbook);
+  }
+};
+
+const onToggleColsHidden = (): void => {
+  const inst = props.instance;
+  if (!inst) return;
+  const s = inst.store.getState();
+  const r = s.selection.range;
+  if (hiddenInSelection(s.layout, 'col', r.c0, r.c1).length > 0) {
+    showCols(inst.store, inst.history, r.c0, r.c1, inst.workbook);
+  } else {
+    hideCols(inst.store, inst.history, r.c0, r.c1, inst.workbook);
+  }
+};
+
+const onFilterToggle = (): void => {
+  const inst = props.instance;
+  if (!inst) return;
+  const s = inst.store.getState();
+  if (s.ui.filterRange) clearFilter(s, inst.store, s.ui.filterRange);
+  else setAutoFilter(inst.store, s.selection.range);
+};
+
+const onSort = (direction: 'asc' | 'desc'): void => {
+  const inst = props.instance;
+  if (!inst) return;
+  const s = inst.store.getState();
+  const ok = sortRange(s, inst.store, inst.workbook, s.selection.range, {
+    byCol: s.selection.active.col,
+    direction,
+    hasHeader: s.selection.range.r0 < s.selection.range.r1,
+  });
+  if (ok) mutators.replaceCells(inst.store, inst.workbook.cells(s.data.sheetIndex));
 };
 </script>
 
@@ -322,6 +416,79 @@ const onFillColor = (value: string): void => {
     </button>
         </div>
         <div class="demo__ribbon-label">Alignment</div>
+      </section>
+
+      <section class="demo__ribbon-group" aria-label="Cells">
+        <div class="demo__ribbon-tools">
+    <button class="demo__rb" type="button" :disabled="disabled" title="Insert selected rows" aria-label="Insert selected rows" @click="onInsertRows">
+      <svg class="demo__rb-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 5h12" />
+        <path d="M4 10h12" />
+        <path d="M4 15h12" />
+        <path d="M10 7.5v5" />
+        <path d="M7.5 10h5" />
+      </svg>
+    </button>
+    <button class="demo__rb" type="button" :disabled="disabled" title="Delete selected rows" aria-label="Delete selected rows" @click="onDeleteRows">
+      <svg class="demo__rb-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 5h12" />
+        <path d="M4 10h12" />
+        <path d="M4 15h12" />
+        <path d="M7.8 7.8l4.4 4.4" />
+        <path d="M12.2 7.8l-4.4 4.4" />
+      </svg>
+    </button>
+    <button class="demo__rb" type="button" :disabled="disabled" title="Insert selected columns" aria-label="Insert selected columns" @click="onInsertCols">
+      <svg class="demo__rb-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M5 4v12" />
+        <path d="M10 4v12" />
+        <path d="M15 4v12" />
+        <path d="M7.5 10h5" />
+        <path d="M10 7.5v5" />
+      </svg>
+    </button>
+    <button class="demo__rb" type="button" :disabled="disabled" title="Delete selected columns" aria-label="Delete selected columns" @click="onDeleteCols">
+      <svg class="demo__rb-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M5 4v12" />
+        <path d="M10 4v12" />
+        <path d="M15 4v12" />
+        <path d="M7.8 7.8l4.4 4.4" />
+        <path d="M12.2 7.8l-4.4 4.4" />
+      </svg>
+    </button>
+    <button class="demo__rb demo__rb--mono" :class="{ 'demo__rb--active': active.rowsHidden }" type="button" :disabled="disabled" :title="active.rowsHidden ? 'Show selected rows' : 'Hide selected rows'" :aria-label="active.rowsHidden ? 'Show selected rows' : 'Hide selected rows'" @click="onToggleRowsHidden">R</button>
+    <button class="demo__rb demo__rb--mono" :class="{ 'demo__rb--active': active.colsHidden }" type="button" :disabled="disabled" :title="active.colsHidden ? 'Show selected columns' : 'Hide selected columns'" :aria-label="active.colsHidden ? 'Show selected columns' : 'Hide selected columns'" @click="onToggleColsHidden">C</button>
+        </div>
+        <div class="demo__ribbon-label">Cells</div>
+      </section>
+
+      <section class="demo__ribbon-group" aria-label="Data">
+        <div class="demo__ribbon-tools">
+    <button class="demo__rb" :class="{ 'demo__rb--active': active.filterOn }" type="button" :disabled="disabled" title="Filter" aria-label="Filter" @click="onFilterToggle">
+      <svg class="demo__rb-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 5h12l-4.8 5.3v4.1L8.8 16v-5.7z" />
+      </svg>
+    </button>
+    <button class="demo__rb" type="button" :disabled="disabled" title="Sort ascending" aria-label="Sort ascending" @click="onSort('asc')">
+      <svg class="demo__rb-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M6 15V5" />
+        <path d="M3.8 7.2L6 5l2.2 2.2" />
+        <path d="M11 6h4" />
+        <path d="M11 10h3" />
+        <path d="M11 14h2" />
+      </svg>
+    </button>
+    <button class="demo__rb" type="button" :disabled="disabled" title="Sort descending" aria-label="Sort descending" @click="onSort('desc')">
+      <svg class="demo__rb-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M6 5v10" />
+        <path d="M3.8 12.8L6 15l2.2-2.2" />
+        <path d="M11 6h2" />
+        <path d="M11 10h3" />
+        <path d="M11 14h4" />
+      </svg>
+    </button>
+        </div>
+        <div class="demo__ribbon-label">Data</div>
       </section>
 
       <section class="demo__ribbon-group" aria-label="View">

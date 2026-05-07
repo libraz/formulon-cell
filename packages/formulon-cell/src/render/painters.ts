@@ -244,6 +244,11 @@ export const textMetricsBox = (metrics: TextMetrics, fontSize: number): TextMetr
       : fontSize * 0.22,
 });
 
+export const stableTextMetricsBox = (fontSize: number): TextMetricsBox => ({
+  ascent: fontSize * 0.72,
+  descent: fontSize * 0.22,
+});
+
 export const textBaselineY = (
   bounds: Rect,
   box: TextMetricsBox,
@@ -254,6 +259,19 @@ export const textBaselineY = (
   if (vAlign === 'middle') return bounds.y + (bounds.h - box.ascent - box.descent) / 2 + box.ascent;
   return bounds.y + bounds.h - padY - box.descent;
 };
+
+const fontCss = (family: string): string =>
+  family
+    .split(',')
+    .map((part) => {
+      const name = part.trim();
+      if (!name) return name;
+      if (name.startsWith('"') || name.startsWith("'")) return name;
+      if (/^[a-zA-Z-]+$/.test(name)) return name;
+      return `"${name.replaceAll('"', '\\"')}"`;
+    })
+    .filter(Boolean)
+    .join(', ');
 
 /* ---- Base painters wired in MS-A. Future slots (formatting, CF, DV,
  * comments, hyperlinks) live next to these, capability-gated. ---- */
@@ -430,12 +448,12 @@ export function paintCellText({
   const isBool = value.kind === 'bool';
   const isFormula = formula != null;
 
-  const weight = format?.bold ? 700 : isNumeric || isError || isBool ? 500 : 400;
+  const weight = format?.bold ? 700 : 400;
   const styleSlant = format?.italic ? 'italic ' : '';
   const fontSize = format?.fontSize ?? theme.textCell;
   const fontFamily =
     format?.fontFamily ?? (isNumeric || isError || isFormula ? theme.fontMono : theme.fontUi);
-  ctx.font = `${styleSlant}${weight} ${fontSize}px ${fontFamily}`;
+  ctx.font = `${styleSlant}${weight} ${fontSize}px ${fontCss(fontFamily)}`;
   const isHyperlink = !!format?.hyperlink;
   ctx.fillStyle = format?.color
     ? format.color
@@ -482,7 +500,7 @@ export function paintCellText({
     const lineH = Math.round(fontSize * 1.28);
     const totalH = lineH * lines.length;
     const vAlign = format?.vAlign ?? 'bottom';
-    const measured = textMetricsBox(ctx.measureText(lines[0] ?? text), fontSize);
+    const measured = stableTextMetricsBox(fontSize);
     let startY = textBaselineY(bounds, measured, vAlign, padY);
     if (vAlign === 'middle') startY -= (totalH - lineH) / 2;
     else if (vAlign === 'bottom') startY -= (lines.length - 1) * lineH;
@@ -509,7 +527,7 @@ export function paintCellText({
 
   const vAlign = format?.vAlign ?? 'bottom';
   const metrics = ctx.measureText(text);
-  const box = textMetricsBox(metrics, fontSize);
+  const box = stableTextMetricsBox(fontSize);
   const ty = textBaselineY(bounds, box, vAlign, padY);
 
   ctx.fillText(text, tx, ty);

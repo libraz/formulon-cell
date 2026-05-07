@@ -294,6 +294,7 @@ export class GridRenderer {
   }
 
   invalidate(): void {
+    if (this.cssWidth > 0 && this.cssHeight > 0) this.resizeViewport();
     if (this.rafId) return;
     this.rafId = requestAnimationFrame(() => {
       this.rafId = 0;

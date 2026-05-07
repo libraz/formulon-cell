@@ -61,6 +61,24 @@ describe('toggle flags', () => {
     }
   });
 
+  it('toggleBold only changes the bold flag and preserves explicit font fields', () => {
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, {
+      fontFamily: 'Times New Roman',
+      fontSize: 16,
+      color: '#445566',
+    });
+    setRange(store, 0, 0, 0, 0);
+
+    toggleBold(store.getState(), store);
+
+    expect(fmtAt(store, 0, 0)).toMatchObject({
+      bold: true,
+      fontFamily: 'Times New Roman',
+      fontSize: 16,
+      color: '#445566',
+    });
+  });
+
   it('turns the flag off only when every cell already has it', () => {
     // First call: enable on every cell.
     toggleBold(store.getState(), store);

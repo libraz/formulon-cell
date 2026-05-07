@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   FILL_HANDLE_SIZE,
   paintCellBorders,
+  paintCellText,
   paintFillHandle,
+  stableTextMetricsBox,
   textBaselineY,
 } from '../../../src/render/painters.js';
 import type { ResolvedTheme } from '../../../src/theme/resolve.js';
@@ -67,6 +69,45 @@ function makeStrokeSpy(): {
     },
   } as unknown as CanvasRenderingContext2D;
   return { ctx, strokes };
+}
+
+function makeTextSpy(): {
+  ctx: CanvasRenderingContext2D;
+  fonts: string[];
+  fills: Array<{ text: string; x: number; y: number; font: string }>;
+} {
+  const fonts: string[] = [];
+  const fills: Array<{ text: string; x: number; y: number; font: string }> = [];
+  let font = '';
+  const ctx = {
+    get font(): string {
+      return font;
+    },
+    set font(v: string) {
+      font = v;
+      fonts.push(v);
+    },
+    fillStyle: '',
+    textBaseline: 'alphabetic',
+    textAlign: 'left',
+    save(): void {},
+    restore(): void {},
+    beginPath(): void {},
+    rect(): void {},
+    clip(): void {},
+    measureText(): TextMetrics {
+      const bold = font.startsWith('700 ');
+      return {
+        width: 18,
+        actualBoundingBoxAscent: bold ? 15 : 9,
+        actualBoundingBoxDescent: bold ? 5 : 2,
+      } as TextMetrics;
+    },
+    fillText(text: string, x: number, y: number): void {
+      fills.push({ text, x, y, font });
+    },
+  } as unknown as CanvasRenderingContext2D;
+  return { ctx, fonts, fills };
 }
 
 const theme = (over: Partial<ResolvedTheme> = {}): ResolvedTheme =>
@@ -181,5 +222,43 @@ describe('textBaselineY', () => {
     const bounds = { x: 0, y: 0, w: 80, h: 24 };
     const box = { ascent: 10, descent: 4 };
     expect(textBaselineY(bounds, box, 'middle', 4)).toBe(15);
+  });
+});
+
+describe('paintCellText font strictness', () => {
+  it('keeps the same font size and baseline when only bold changes', () => {
+    const bounds = { x: 0, y: 0, w: 80, h: 20 };
+    const normal = makeTextSpy();
+    const bold = makeTextSpy();
+
+    paintCellText({
+      ctx: normal.ctx,
+      bounds,
+      theme: theme({ textCell: 13 }),
+      value: { kind: 'text', value: 'ABC' },
+      formula: null,
+      isActive: false,
+      isInRange: false,
+      format: { fontFamily: 'Times New Roman', fontSize: 13 },
+    });
+    paintCellText({
+      ctx: bold.ctx,
+      bounds,
+      theme: theme({ textCell: 13 }),
+      value: { kind: 'text', value: 'ABC' },
+      formula: null,
+      isActive: false,
+      isInRange: false,
+      format: { bold: true, fontFamily: 'Times New Roman', fontSize: 13 },
+    });
+
+    expect(normal.fonts.at(-1)).toBe('400 13px "Times New Roman"');
+    expect(bold.fonts.at(-1)).toBe('700 13px "Times New Roman"');
+    expect(bold.fills[0]?.y).toBe(normal.fills[0]?.y);
+  });
+
+  it('uses stable text metrics for vertical placement', () => {
+    expect(stableTextMetricsBox(13).ascent).toBeCloseTo(9.36);
+    expect(stableTextMetricsBox(13).descent).toBeCloseTo(2.86);
   });
 });

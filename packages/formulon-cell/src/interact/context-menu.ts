@@ -218,11 +218,25 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
 
   let visible = false;
   let pasteBtnRef: HTMLButtonElement | null = null;
+  let activeIndex = -1;
 
   const hide = (): void => {
     if (!visible) return;
     visible = false;
     root.style.display = 'none';
+    activeIndex = -1;
+  };
+
+  const menuItems = (): HTMLButtonElement[] =>
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.fc-ctxmenu__item')).filter(
+      (btn) => !btn.disabled && btn.getAttribute('aria-disabled') !== 'true',
+    );
+
+  const focusMenuItem = (idx: number): void => {
+    const items = menuItems();
+    if (items.length === 0) return;
+    activeIndex = (idx + items.length) % items.length;
+    items[activeIndex]?.focus();
   };
 
   const buildMenu = (kind: MenuKind): void => {
@@ -266,7 +280,9 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       btn.className = 'fc-ctxmenu__item';
       btn.dataset.fcAction = entry.id;
       btn.setAttribute('role', 'menuitem');
+      btn.tabIndex = -1;
       const label = document.createElement('span');
+      label.className = 'fc-ctxmenu__label';
       label.textContent = entry.label;
       const hint = document.createElement('span');
       hint.className = 'fc-ctxmenu__hint';
@@ -281,6 +297,22 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       });
       root.appendChild(btn);
       if (entry.id === 'paste') pasteBtnRef = btn;
+    }
+
+    const s = store.getState();
+    const rowHidden =
+      kind === 'row' && hiddenInSelection(s.layout, 'row', s.selection.range.r0, s.selection.range.r1).length > 0;
+    const colHidden =
+      kind === 'col' && hiddenInSelection(s.layout, 'col', s.selection.range.c0, s.selection.range.c1).length > 0;
+    const rowUnhide = root.querySelector<HTMLButtonElement>('[data-fc-action="rowUnhide"]');
+    const colUnhide = root.querySelector<HTMLButtonElement>('[data-fc-action="colUnhide"]');
+    if (rowUnhide) {
+      rowUnhide.disabled = !rowHidden;
+      rowUnhide.setAttribute('aria-disabled', rowHidden ? 'false' : 'true');
+    }
+    if (colUnhide) {
+      colUnhide.disabled = !colHidden;
+      colUnhide.setAttribute('aria-disabled', colHidden ? 'false' : 'true');
     }
   };
 
@@ -310,6 +342,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     const { x, y } = clampToViewport(clientX, clientY);
     root.style.left = `${x}px`;
     root.style.top = `${y}px`;
+    focusMenuItem(0);
   };
 
   /** Resolve which menu flavour to show based on the click target. Header
@@ -366,6 +399,24 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     if (e.key === 'Escape') {
       e.preventDefault();
       hide();
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusMenuItem(activeIndex + 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusMenuItem(activeIndex - 1);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      focusMenuItem(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      focusMenuItem(menuItems().length - 1);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      const target = document.activeElement;
+      if (target instanceof HTMLButtonElement && root.contains(target)) {
+        e.preventDefault();
+        target.click();
+      }
     }
   };
 

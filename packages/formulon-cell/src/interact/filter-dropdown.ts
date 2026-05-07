@@ -34,12 +34,14 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
   let root: HTMLDivElement | null = null;
   let activeRange: Range | null = null;
   let activeCol = 0;
+  let activeHidden = new Set<string>();
 
   const close = (): void => {
     if (!root) return;
     root.remove();
     root = null;
     activeRange = null;
+    activeHidden = new Set();
     document.removeEventListener('mousedown', onDocMouseDown, true);
     document.removeEventListener('keydown', onDocKey, true);
   };
@@ -53,7 +55,21 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     if (e.key === 'Escape') {
       e.preventDefault();
       close();
+    } else if (e.key === 'Enter' && root?.contains(e.target as Node)) {
+      e.preventDefault();
+      applyActiveFilter();
     }
+  };
+
+  const applyActiveFilter = (): void => {
+    if (!activeRange || !root) return;
+    clearFilter(deps.store.getState(), deps.store, activeRange);
+    const state2 = deps.store.getState();
+    applyFilter(state2, deps.store, activeRange, activeCol, (cell) => {
+      const key = cellToKey(cell?.value);
+      return !activeHidden.has(key);
+    });
+    close();
   };
 
   const open = (range: Range, col: number, anchor: { x: number; y: number; h: number }): void => {
@@ -64,6 +80,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     const state = deps.store.getState();
     const distinct = distinctValues(state, range, col);
     const hidden = new Set<string>();
+    activeHidden = hidden;
     // Pre-mark currently-hidden values as unchecked so the dropdown reflects
     //  the live filter state.
     for (let r = range.r0 + 1; r <= range.r1; r += 1) {
@@ -122,6 +139,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         row.className = 'fc-filter-dropdown__row';
         const cb = document.createElement('input');
         cb.type = 'checkbox';
+        cb.value = v;
         cb.checked = !hidden.has(v);
         cb.addEventListener('change', () => {
           if (cb.checked) hidden.delete(v);
@@ -145,18 +163,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     apply.type = 'button';
     apply.className = 'fc-filter-dropdown__apply';
     apply.textContent = t.apply;
-    apply.addEventListener('click', () => {
-      if (!activeRange) return;
-      // Reset hidden rows for THIS range first so a re-applied filter starts
-      //  from a clean slate, then add back rows whose value is in `hidden`.
-      clearFilter(deps.store.getState(), deps.store, activeRange);
-      const state2 = deps.store.getState();
-      applyFilter(state2, deps.store, activeRange, activeCol, (cell) => {
-        const key = cellToKey(cell?.value);
-        return !hidden.has(key);
-      });
-      close();
-    });
+    apply.addEventListener('click', () => applyActiveFilter());
     const clear = document.createElement('button');
     clear.type = 'button';
     clear.className = 'fc-filter-dropdown__clear';
@@ -175,6 +182,11 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     if (host) inheritHostTokens(host, r);
     document.body.appendChild(r);
     root = r;
+    const rect = r.getBoundingClientRect();
+    const left = Math.max(4, Math.min(anchor.x, window.innerWidth - rect.width - 4));
+    const top = Math.max(4, Math.min(anchor.y + anchor.h, window.innerHeight - rect.height - 4));
+    r.style.left = `${left}px`;
+    r.style.top = `${top}px`;
 
     requestAnimationFrame(() => search.focus());
 

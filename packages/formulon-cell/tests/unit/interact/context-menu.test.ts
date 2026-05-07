@@ -217,6 +217,22 @@ describe('attachContextMenu', () => {
       expect(visibleMenu()).toBeNull();
     });
 
+    it('Arrow keys move focus through enabled menu items and Enter invokes the focused item', () => {
+      detach = attachContextMenu({ host, store, wb, onAfterCommit, onFormatDialog });
+      fireContextMenu(host, 200, 70);
+
+      expect(document.activeElement).toBe(item('copy'));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', cancelable: true }));
+      expect(document.activeElement).toBe(item('selectAll'));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', cancelable: true }));
+      expect(document.activeElement).not.toBe(item('selectAll'));
+      item('formatCells')?.focus();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+
+      expect(onFormatDialog).toHaveBeenCalledTimes(1);
+      expect(visibleMenu()).toBeNull();
+    });
+
     it('scroll hides the menu', () => {
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
       fireContextMenu(host, 200, 70);
@@ -233,6 +249,27 @@ describe('attachContextMenu', () => {
         root.dispatchEvent(e);
       }
       expect(visibleMenu()).not.toBeNull();
+    });
+  });
+
+  describe('row and column action availability', () => {
+    it('disables row unhide when the selected row band has no hidden rows', () => {
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      fireContextMenu(host, 10, 40);
+
+      expect(item('rowUnhide')?.disabled).toBe(true);
+    });
+
+    it('enables row unhide when the selected row band contains hidden rows', () => {
+      setRange(store, 0, 0, 2, 16383);
+      store.setState((s) => ({
+        ...s,
+        layout: { ...s.layout, hiddenRows: new Set([1]) },
+      }));
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      fireContextMenu(host, 10, 40);
+
+      expect(item('rowUnhide')?.disabled).toBe(false);
     });
   });
 
