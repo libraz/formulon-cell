@@ -36,6 +36,9 @@ export default defineConfig({
   // the worker pipeline.
   build: {
     target: 'es2022',
+    // Vue demo intentionally bundles the spreadsheet UI + WASM loader in one
+    // app shell. Keep Vite's warning reserved for unexpected future growth.
+    chunkSizeWarningLimit: 750,
   },
   worker: {
     format: 'es',

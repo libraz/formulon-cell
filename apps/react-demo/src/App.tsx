@@ -11,6 +11,7 @@ import {
 } from '@libraz/formulon-cell';
 import { Spreadsheet, useSelection } from '@libraz/formulon-cell-react';
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Toolbar } from './Toolbar';
 
 const THEMES: { value: ThemeName; label: string }[] = [
   { value: 'paper', label: 'Light' },
@@ -36,6 +37,7 @@ const FEATURE_GROUPS: { title: string; features: { id: FeatureId; label: string 
     title: 'Chrome',
     features: [
       { id: 'formulaBar', label: 'Formula bar' },
+      { id: 'sheetTabs', label: 'Sheet tabs' },
       { id: 'statusBar', label: 'Status bar' },
       { id: 'contextMenu', label: 'Context menu' },
       { id: 'watchWindow', label: 'Watch window' },
@@ -184,6 +186,7 @@ export const App = (): ReactElement => {
   const [probe, setProbe] = useState<{ name: string; result: string } | null>(null);
   const [preset, setPreset] = useState<PresetKey>('excel');
   const [overrides, setOverrides] = useState<FeatureFlags>({});
+  const [showRibbon, setShowRibbon] = useState(true);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const features = useMemo(() => composeFeatures(preset, overrides), [preset, overrides]);
@@ -368,16 +371,19 @@ export const App = (): ReactElement => {
       </header>
 
       <main className="demo__body">
-        <Spreadsheet
-          className="demo__sheet"
-          workbook={workbook}
-          theme={theme}
-          locale={locale}
-          features={features}
-          functions={DEMO_FUNCTIONS}
-          onReady={setInstance}
-          onCellChange={onCellChange}
-        />
+        <div className="demo__sheet-col">
+          {showRibbon ? <Toolbar instance={instance} /> : null}
+          <Spreadsheet
+            className="demo__sheet"
+            workbook={workbook}
+            theme={theme}
+            locale={locale}
+            features={features}
+            functions={DEMO_FUNCTIONS}
+            onReady={setInstance}
+            onCellChange={onCellChange}
+          />
+        </div>
         <aside className="demo__panel" aria-label="Demo panel">
           <section className="demo__card">
             <h2>Preset</h2>
@@ -428,6 +434,16 @@ export const App = (): ReactElement => {
                       </label>
                     );
                   })}
+                  {group.title === 'Chrome' ? (
+                    <label className={`demo__feat${showRibbon ? ' demo__feat--on' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={showRibbon}
+                        onChange={(e) => setShowRibbon(e.target.checked)}
+                      />
+                      <span>Excel ribbon</span>
+                    </label>
+                  ) : null}
                 </div>
               </div>
             ))}

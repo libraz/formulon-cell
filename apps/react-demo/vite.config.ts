@@ -42,6 +42,10 @@ export default defineConfig({
   // the worker pipeline.
   build: {
     target: 'es2022',
+    // React demo intentionally bundles the spreadsheet UI + WASM loader in
+    // one app shell. Keep Vite's size warning meaningful for accidental
+    // growth beyond that expected baseline.
+    chunkSizeWarningLimit: 750,
   },
   worker: {
     format: 'es',

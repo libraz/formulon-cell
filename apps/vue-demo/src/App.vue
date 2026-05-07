@@ -12,6 +12,7 @@ import {
 } from '@libraz/formulon-cell';
 import { Spreadsheet, useSelection } from '@libraz/formulon-cell-vue';
 import { computed, onUnmounted, ref, shallowRef, watch } from 'vue';
+import Toolbar from './Toolbar.vue';
 
 const THEMES: { value: ThemeName; label: string }[] = [
   { value: 'paper', label: 'Light' },
@@ -35,6 +36,7 @@ const FEATURE_GROUPS: { title: string; features: { id: FeatureId; label: string 
     title: 'Chrome',
     features: [
       { id: 'formulaBar', label: 'Formula bar' },
+      { id: 'sheetTabs', label: 'Sheet tabs' },
       { id: 'statusBar', label: 'Status bar' },
       { id: 'contextMenu', label: 'Context menu' },
       { id: 'watchWindow', label: 'Watch window' },
@@ -182,6 +184,7 @@ const probe = ref<{ name: string; result: string } | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const preset = ref<PresetKey>('excel');
 const overrides = ref<FeatureFlags>({});
+const showRibbon = ref(true);
 
 const features = computed<FeatureFlags>(() => composeFeatures(preset.value, overrides.value));
 
@@ -354,16 +357,19 @@ onUnmounted(() => {
     </header>
 
     <main class="demo__body">
-      <Spreadsheet
-        class="demo__sheet"
-        :workbook="workbook"
-        :theme="theme"
-        :locale="locale"
-        :features="features"
-        :functions="DEMO_FUNCTIONS"
-        @ready="onReady"
-        @cell-change="onCellChange"
-      />
+      <div class="demo__sheet-col">
+        <Toolbar v-if="showRibbon" :instance="instance" />
+        <Spreadsheet
+          class="demo__sheet"
+          :workbook="workbook"
+          :theme="theme"
+          :locale="locale"
+          :features="features"
+          :functions="DEMO_FUNCTIONS"
+          @ready="onReady"
+          @cell-change="onCellChange"
+        />
+      </div>
       <aside class="demo__panel" aria-label="Demo panel">
         <section class="demo__card">
           <h2>Preset</h2>
@@ -406,6 +412,13 @@ onUnmounted(() => {
                   @change="onFeatureToggle(f.id)"
                 />
                 <span>{{ f.label }}</span>
+              </label>
+              <label
+                v-if="group.title === 'Chrome'"
+                :class="['demo__feat', { 'demo__feat--on': showRibbon }]"
+              >
+                <input type="checkbox" v-model="showRibbon" />
+                <span>Excel ribbon</span>
               </label>
             </div>
           </div>
