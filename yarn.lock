@@ -41,7 +41,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/runtime@npm:^7.5.5":
+"@babel/runtime@npm:^7.1.2, @babel/runtime@npm:^7.5.5":
   version: 7.29.2
   resolution: "@babel/runtime@npm:7.29.2"
   checksum: 10c0/30b80a0140d16467792e1bbeb06f655b0dab70407da38dfac7fedae9c859f9ae9d846ef14ad77bd3814c064295fe9b1bc551f1541ea14646ae9f22b71a8bc17a
@@ -417,6 +417,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@emotion/hash@npm:^0.9.0":
+  version: 0.9.2
+  resolution: "@emotion/hash@npm:0.9.2"
+  checksum: 10c0/0dc254561a3cc0a06a10bbce7f6a997883fd240c8c1928b93713f803a2e9153a257a488537012efe89dbe1246f2abfe2add62cdb3471a13d67137fcb808e81c2
+  languageName: node
+  linkType: hard
+
 "@esbuild/aix-ppc64@npm:0.27.7":
   version: 0.27.7
   resolution: "@esbuild/aix-ppc64@npm:0.27.7"
@@ -599,6 +606,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@fluentui/react-icons@npm:^2.0.325":
+  version: 2.0.325
+  resolution: "@fluentui/react-icons@npm:2.0.325"
+  dependencies:
+    "@griffel/react": "npm:^1.6.1"
+    tslib: "npm:^2.1.0"
+  peerDependencies:
+    react: ">=16.8.0 <20.0.0"
+  checksum: 10c0/b46fe4d6939b1d79c4ee3aba768beac217ef9525593d83d861b3a91eb9b7cad295a215a7fbedf16f60991e667cb049afb925b8ec0d9560c046d5c3a7e28895e1
+  languageName: node
+  linkType: hard
+
 "@fontsource-variable/fraunces@npm:5.1.1":
   version: 5.1.1
   resolution: "@fontsource-variable/fraunces@npm:5.1.1"
@@ -640,6 +659,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@formulon-cell/react-demo@workspace:apps/react-demo"
   dependencies:
+    "@fluentui/react-icons": "npm:^2.0.325"
     "@libraz/formulon-cell": "workspace:*"
     "@libraz/formulon-cell-react": "workspace:*"
     "@types/node": "npm:^22"
@@ -667,6 +687,41 @@ __metadata:
     vue-tsc: "npm:^3.2.8"
   languageName: unknown
   linkType: soft
+
+"@griffel/core@npm:^1.21.0":
+  version: 1.21.0
+  resolution: "@griffel/core@npm:1.21.0"
+  dependencies:
+    "@emotion/hash": "npm:^0.9.0"
+    "@griffel/style-types": "npm:^1.4.0"
+    csstype: "npm:^3.1.3"
+    rtl-css-js: "npm:^1.16.1"
+    stylis: "npm:^4.4.0"
+    tslib: "npm:^2.1.0"
+  checksum: 10c0/1d0ce716a89cbbe9074028bd6358b2d7b8a9d30ad860eba143c50de185a48cf77087e66500fb90b5b046b876913f918918a044d322ba2af63d6436b052fca296
+  languageName: node
+  linkType: hard
+
+"@griffel/react@npm:^1.6.1":
+  version: 1.7.2
+  resolution: "@griffel/react@npm:1.7.2"
+  dependencies:
+    "@griffel/core": "npm:^1.21.0"
+    tslib: "npm:^2.1.0"
+  peerDependencies:
+    react: ">=16.14.0 <20.0.0"
+  checksum: 10c0/a83b905949c8c30fa028f7f17b0bf51fddccff047fd120aca5277e47146e48433a6942bce203d84aa2484fccfe9317f455b1e9375ff55f0fd3e53252f2b633c5
+  languageName: node
+  linkType: hard
+
+"@griffel/style-types@npm:^1.4.0":
+  version: 1.4.0
+  resolution: "@griffel/style-types@npm:1.4.0"
+  dependencies:
+    csstype: "npm:^3.1.3"
+  checksum: 10c0/1e77939450fc868423caf041815519d3c3a973297e6d5617237d4ee05249a2aa191027be2870ca268012c7a94860db475c14b8ac0884b66c84e2fdb48599b7d5
+  languageName: node
+  linkType: hard
 
 "@inquirer/external-editor@npm:^1.0.2":
   version: 1.0.3
@@ -1774,7 +1829,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"csstype@npm:^3.2.2, csstype@npm:^3.2.3":
+"csstype@npm:^3.1.3, csstype@npm:^3.2.2, csstype@npm:^3.2.3":
   version: 3.2.3
   resolution: "csstype@npm:3.2.3"
   checksum: 10c0/cd29c51e70fa822f1cecd8641a1445bed7063697469d35633b516e60fe8c1bde04b08f6c5b6022136bb669b64c63d4173af54864510fbb4ee23281801841a3ce
@@ -3109,6 +3164,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"rtl-css-js@npm:^1.16.1":
+  version: 1.16.1
+  resolution: "rtl-css-js@npm:1.16.1"
+  dependencies:
+    "@babel/runtime": "npm:^7.1.2"
+  checksum: 10c0/4b81ef50e50c97455d61c9bb576e2892651c79bac5d0c52b4123ebb9d6a2c5144590a79c9db0a3212a81b4eb83bf317e03637220f20b387a37b96cbac324d3d2
+  languageName: node
+  linkType: hard
+
 "run-parallel@npm:^1.1.9":
   version: 1.2.0
   resolution: "run-parallel@npm:1.2.0"
@@ -3236,6 +3300,13 @@ __metadata:
   version: 3.0.0
   resolution: "strip-bom@npm:3.0.0"
   checksum: 10c0/51201f50e021ef16672593d7434ca239441b7b760e905d9f33df6e4f3954ff54ec0e0a06f100d028af0982d6f25c35cd5cda2ce34eaebccd0250b8befb90d8f1
+  languageName: node
+  linkType: hard
+
+"stylis@npm:^4.4.0":
+  version: 4.4.0
+  resolution: "stylis@npm:4.4.0"
+  checksum: 10c0/259be096d90dfbfe903c8656dcb7591e52a421e577e950ef42ebd9ca02f387623a1165dd08761492fb6e92a7a562d62a53a694a10b0a2f6dcd7a0db107b4bf55
   languageName: node
   linkType: hard
 
@@ -3367,7 +3438,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tslib@npm:^2.4.0":
+"tslib@npm:^2.1.0, tslib@npm:^2.4.0":
   version: 2.8.1
   resolution: "tslib@npm:2.8.1"
   checksum: 10c0/9c4759110a19c53f992d9aae23aac5ced636e99887b51b9e61def52611732872ff7668757d4e4c61f19691e36f4da981cd9485e869b4a7408d689f6bf1f14e62
@@ -3428,11 +3499,11 @@ __metadata:
 
 "typescript@patch:typescript@npm%3A6.0.3#optional!builtin<compat/typescript>":
   version: 6.0.3
-  resolution: "typescript@patch:typescript@npm%3A6.0.3#optional!builtin<compat/typescript>::version=6.0.3&hash=8c6c40"
+  resolution: "typescript@patch:typescript@npm%3A6.0.3#optional!builtin<compat/typescript>::version=6.0.3&hash=5786d5"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
-  checksum: 10c0/eed465bd04b344517bd91eb232fd0187d93e34625c65ec93777449e29157c6c2accae409474a68a867b90465224d4908f9bce78ad763c159cacd7263ae24b5fc
+  checksum: 10c0/2f25c74e65663c248fa1ade2b8459d9ce5372ff9dad07067310f132966ebec1d93f6c42f0baf77a6b6a7a91460463f708e6887013aaade22111037457c6b25df
   languageName: node
   linkType: hard
 

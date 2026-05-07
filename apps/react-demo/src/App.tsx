@@ -11,7 +11,7 @@ import {
 } from '@libraz/formulon-cell';
 import { Spreadsheet, useSelection } from '@libraz/formulon-cell-react';
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Toolbar } from './Toolbar';
+import { type RibbonTab, Toolbar } from './Toolbar';
 
 const THEMES: { value: ThemeName; label: string }[] = [
   { value: 'paper', label: 'Light' },
@@ -22,6 +22,63 @@ const LOCALES = [
   { value: 'en', label: 'EN' },
   { value: 'ja', label: 'JA' },
 ];
+
+const UI = {
+  en: {
+    saved: 'Saved to this device',
+    search: 'Search',
+    share: 'Share',
+    workbook: 'React workbook',
+    demoPane: 'Demo pane',
+    open: 'Open xlsx…',
+    save: 'Save',
+    file: 'File',
+    info: 'Info',
+    print: 'Print',
+    pageSetup: 'Page Setup',
+    close: 'Close',
+    backstageTitle: 'Book1',
+    backstageSub: 'React workbook · Excel 365 layout mode',
+    openTitle: 'Open',
+    openDesc: 'Load an .xlsx or .xlsm workbook from this device.',
+    saveCopy: 'Save a Copy',
+    saveDesc: 'Download the current workbook as an .xlsx file.',
+    printDesc: 'Use the browser print dialog or save as PDF.',
+    pageSetupDesc: 'Set orientation, margins, paper size, headers, and print titles.',
+    editLinks: 'Edit Links',
+    linksDesc: 'Inspect external workbook references carried by the file.',
+    options: 'Options',
+    optionsDesc: 'Show the demo integration panel and feature toggles.',
+    noCommands: 'No commands found',
+  },
+  ja: {
+    saved: 'このデバイスに保存済み',
+    search: '検索',
+    share: '共有',
+    workbook: 'React ブック',
+    demoPane: 'デモ ペイン',
+    open: 'xlsx を開く…',
+    save: '保存',
+    file: 'ファイル',
+    info: '情報',
+    print: '印刷',
+    pageSetup: 'ページ設定',
+    close: '閉じる',
+    backstageTitle: 'Book1',
+    backstageSub: 'React ブック · Excel 365 レイアウト',
+    openTitle: '開く',
+    openDesc: '.xlsx または .xlsm ブックをこのデバイスから読み込みます。',
+    saveCopy: 'コピーを保存',
+    saveDesc: '現在のブックを .xlsx ファイルとしてダウンロードします。',
+    printDesc: 'ブラウザーの印刷ダイアログ、または PDF 保存を使用します。',
+    pageSetupDesc: '用紙方向、余白、用紙サイズ、ヘッダー、印刷タイトルを設定します。',
+    editLinks: 'リンクの編集',
+    linksDesc: 'ファイルに含まれる外部ブック参照を確認します。',
+    options: 'オプション',
+    optionsDesc: 'デモ統合パネルと機能トグルを表示します。',
+    noCommands: 'コマンドが見つかりません',
+  },
+} as const;
 
 type PresetKey = 'minimal' | 'standard' | 'excel';
 const PRESETS: { value: PresetKey; label: string; hint: string }[] = [
@@ -125,6 +182,14 @@ interface ChangeLogEntry {
   readonly preview: string;
 }
 
+interface CommandItem {
+  readonly id: string;
+  readonly label: string;
+  readonly hint: string;
+  readonly tab?: RibbonTab;
+  readonly run: () => void;
+}
+
 let changeId = 0;
 
 const previewValue = (e: CellChangeEvent): string => {
@@ -187,9 +252,14 @@ export const App = (): ReactElement => {
   const [preset, setPreset] = useState<PresetKey>('excel');
   const [overrides, setOverrides] = useState<FeatureFlags>({});
   const [showRibbon, setShowRibbon] = useState(true);
+  const [showPanel, setShowPanel] = useState(false);
+  const [ribbonTab, setRibbonTab] = useState<RibbonTab>('home');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const features = useMemo(() => composeFeatures(preset, overrides), [preset, overrides]);
+  const ui = UI[locale === 'ja' ? 'ja' : 'en'];
 
   useEffect(() => {
     let alive = true;
@@ -218,6 +288,10 @@ export const App = (): ReactElement => {
       for (const d of disposers) d();
     };
   }, [instance, formatters.uppercase, formatters.arrows]);
+
+  useEffect(() => {
+    instance?.i18n.setLocale(locale);
+  }, [instance, locale]);
 
   const onCellChange = useCallback((e: CellChangeEvent) => {
     const cell = `${colLabel(e.addr.col)}${e.addr.row + 1}`;
@@ -310,6 +384,162 @@ export const App = (): ReactElement => {
     [features, overrides, preset],
   );
 
+  const commands = useMemo<CommandItem[]>(
+    () => [
+      {
+        id: 'open',
+        label: 'Open',
+        hint: 'Open an xlsx or xlsm workbook',
+        tab: 'file',
+        run: () => fileInputRef.current?.click(),
+      },
+      {
+        id: 'save',
+        label: 'Save',
+        hint: 'Download the workbook as xlsx',
+        tab: 'file',
+        run: onSave,
+      },
+      {
+        id: 'page-setup',
+        label: 'Page Setup',
+        hint: 'Open page setup',
+        tab: 'file',
+        run: () => instance?.openPageSetup(),
+      },
+      {
+        id: 'print',
+        label: 'Print',
+        hint: 'Open browser print dialog',
+        tab: 'file',
+        run: () => instance?.print(),
+      },
+      {
+        id: 'format-cells',
+        label: 'Format Cells',
+        hint: 'Open the format dialog',
+        tab: 'home',
+        run: () => instance?.openFormatDialog(),
+      },
+      {
+        id: 'conditional',
+        label: 'Conditional Formatting',
+        hint: 'Create or edit conditional formatting',
+        tab: 'insert',
+        run: () => instance?.openConditionalDialog(),
+      },
+      {
+        id: 'cell-styles',
+        label: 'Cell Styles',
+        hint: 'Open the style gallery',
+        tab: 'insert',
+        run: () => instance?.openCellStylesGallery(),
+      },
+      {
+        id: 'name-manager',
+        label: 'Name Manager',
+        hint: 'Inspect named ranges',
+        tab: 'insert',
+        run: () => instance?.openNamedRangeDialog(),
+      },
+      {
+        id: 'insert-function',
+        label: 'Insert Function',
+        hint: 'Open function arguments',
+        tab: 'formulas',
+        run: () => instance?.openFunctionArguments(),
+      },
+      {
+        id: 'trace-precedents',
+        label: 'Trace Precedents',
+        hint: 'Show precedent arrows',
+        tab: 'formulas',
+        run: () => instance?.tracePrecedents(),
+      },
+      {
+        id: 'watch-window',
+        label: 'Watch Window',
+        hint: 'Toggle Watch Window',
+        tab: 'formulas',
+        run: () => instance?.toggleWatchWindow(),
+      },
+      {
+        id: 'filter',
+        label: 'Filter',
+        hint: 'Show the Data tab filter tools',
+        tab: 'data',
+        run: () => setRibbonTab('data'),
+      },
+      {
+        id: 'sort',
+        label: 'Sort',
+        hint: 'Show sort buttons',
+        tab: 'data',
+        run: () => setRibbonTab('data'),
+      },
+      {
+        id: 'freeze-panes',
+        label: 'Freeze Panes',
+        hint: 'Show Freeze Panes',
+        tab: 'view',
+        run: () => setRibbonTab('view'),
+      },
+      {
+        id: 'protect-sheet',
+        label: 'Protect Sheet',
+        hint: 'Toggle sheet protection from View',
+        tab: 'view',
+        run: () => instance?.toggleSheetProtection(),
+      },
+      {
+        id: 'demo-pane',
+        label: 'Demo Pane',
+        hint: 'Show or hide the integration panel',
+        run: () => setShowPanel((v) => !v),
+      },
+      {
+        id: 'theme-light',
+        label: 'Light Theme',
+        hint: 'Switch to light workbook theme',
+        run: () => setTheme('paper'),
+      },
+      {
+        id: 'theme-dark',
+        label: 'Dark Theme',
+        hint: 'Switch to dark workbook theme',
+        run: () => setTheme('ink'),
+      },
+      {
+        id: 'locale-ja',
+        label: 'Japanese Locale',
+        hint: 'Switch labels to JA',
+        run: () => setLocale('ja'),
+      },
+      {
+        id: 'locale-en',
+        label: 'English Locale',
+        hint: 'Switch labels to EN',
+        run: () => setLocale('en'),
+      },
+    ],
+    [instance, onSave],
+  );
+
+  const filteredCommands = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return commands.slice(0, 8);
+    return commands
+      .filter((cmd) => `${cmd.label} ${cmd.hint}`.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [commands, searchQuery]);
+
+  const runCommand = useCallback((cmd: CommandItem) => {
+    if (cmd.tab) setRibbonTab(cmd.tab);
+    cmd.run();
+    setSearchQuery('');
+    setSearchOpen(false);
+  }, []);
+
   if (!workbook) {
     return <div className="demo demo--loading">Loading engine…</div>;
   }
@@ -317,62 +547,163 @@ export const App = (): ReactElement => {
   return (
     <div className="demo" data-theme={theme}>
       <header className="demo__head">
-        <div className="demo__brand">
-          <span className="demo__brand-mark">⊞</span>
-          <strong>formulon-cell</strong>
-          <span className="demo__brand-sep">·</span>
-          <span className="demo__brand-tag">react demo</span>
+        <div className="demo__titlebar">
+          <div className="demo__quick" role="toolbar" aria-label="Quick access toolbar">
+            <span className="demo__brand-mark">⊞</span>
+            <button type="button" className="demo__title-icon" aria-label="Save" onClick={onSave}>
+              💾
+            </button>
+            <button
+              type="button"
+              className="demo__title-icon"
+              aria-label="Undo"
+              onClick={() => instance?.undo()}
+            >
+              ↶
+            </button>
+            <button
+              type="button"
+              className="demo__title-icon"
+              aria-label="Redo"
+              onClick={() => instance?.redo()}
+            >
+              ↷
+            </button>
+          </div>
+          <div className="demo__title">
+            <strong>Book1</strong>
+            <span>{ui.saved}</span>
+          </div>
+          <div className="demo__search">
+            <span aria-hidden="true">⌕</span>
+            <input
+              type="search"
+              placeholder={ui.search}
+              aria-label="Search commands"
+              value={searchQuery}
+              onFocus={() => setSearchOpen(true)}
+              onChange={(e) => {
+                setSearchQuery(e.currentTarget.value);
+                setSearchOpen(true);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setSearchOpen(false);
+                  e.currentTarget.blur();
+                }
+                if (e.key === 'Enter' && filteredCommands[0]) {
+                  e.preventDefault();
+                  runCommand(filteredCommands[0]);
+                }
+              }}
+              onBlur={() => setSearchOpen(false)}
+            />
+            {searchOpen ? (
+              <div className="demo__command-menu">
+                {filteredCommands.length === 0 ? (
+                  <div className="demo__command-empty">{ui.noCommands}</div>
+                ) : (
+                  filteredCommands.map((cmd) => (
+                    <button
+                      key={cmd.id}
+                      type="button"
+                      className="demo__command-item"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => runCommand(cmd)}
+                    >
+                      <strong>{cmd.label}</strong>
+                      <span>{cmd.hint}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            ) : null}
+          </div>
+          <div className="demo__account">
+            <button type="button" className="demo__share">
+              {ui.share}
+            </button>
+            <span className="demo__avatar" role="img" aria-label="Signed in user">
+              FC
+            </span>
+          </div>
         </div>
-        <div className="demo__controls">
-          <div className="demo__seg" role="group" aria-label="Theme">
-            {THEMES.map((t) => (
-              <button
-                key={t.value}
-                type="button"
-                className={`demo__seg-btn${t.value === theme ? ' demo__seg-btn--active' : ''}`}
-                onClick={() => setTheme(t.value)}
-                aria-pressed={t.value === theme}
-              >
-                {t.label}
-              </button>
-            ))}
+        <div className="demo__commandbar">
+          <div className="demo__brand">
+            <strong>formulon-cell</strong>
+            <span className="demo__brand-sep">·</span>
+            <span className="demo__brand-tag">{ui.workbook}</span>
           </div>
-          <div className="demo__seg" role="group" aria-label="Locale">
-            {LOCALES.map((l) => (
-              <button
-                key={l.value}
-                type="button"
-                className={`demo__seg-btn${l.value === locale ? ' demo__seg-btn--active' : ''}`}
-                onClick={() => setLocale(l.value)}
-                aria-pressed={l.value === locale}
-              >
-                {l.label}
-              </button>
-            ))}
+          <div className="demo__controls">
+            <div className="demo__seg" role="group" aria-label="Theme">
+              {THEMES.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  className={`demo__seg-btn${t.value === theme ? ' demo__seg-btn--active' : ''}`}
+                  onClick={() => setTheme(t.value)}
+                  aria-pressed={t.value === theme}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div className="demo__seg" role="group" aria-label="Locale">
+              {LOCALES.map((l) => (
+                <button
+                  key={l.value}
+                  type="button"
+                  className={`demo__seg-btn${l.value === locale ? ' demo__seg-btn--active' : ''}`}
+                  onClick={() => setLocale(l.value)}
+                  aria-pressed={l.value === locale}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className={`demo__btn${showPanel ? ' demo__btn--active' : ''}`}
+              onClick={() => setShowPanel((v) => !v)}
+              aria-pressed={showPanel}
+            >
+              {ui.demoPane}
+            </button>
+            <button
+              type="button"
+              className="demo__btn"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {ui.open}
+            </button>
+            <button type="button" className="demo__btn" onClick={onSave} disabled={!instance}>
+              {ui.save}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xlsm"
+              hidden
+              onChange={(ev) => {
+                const f = ev.target.files?.[0];
+                if (f) void onOpen(f);
+                ev.target.value = '';
+              }}
+            />
           </div>
-          <button type="button" className="demo__btn" onClick={() => fileInputRef.current?.click()}>
-            Open xlsx…
-          </button>
-          <button type="button" className="demo__btn" onClick={onSave} disabled={!instance}>
-            Save
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xlsm"
-            hidden
-            onChange={(ev) => {
-              const f = ev.target.files?.[0];
-              if (f) void onOpen(f);
-              ev.target.value = '';
-            }}
-          />
         </div>
       </header>
 
-      <main className="demo__body">
+      <main className={`demo__body${showPanel ? ' demo__body--panel' : ''}`}>
         <div className="demo__sheet-col">
-          {showRibbon ? <Toolbar instance={instance} /> : null}
+          {showRibbon ? (
+            <Toolbar
+              instance={instance}
+              activeTab={ribbonTab}
+              onTabChange={setRibbonTab}
+              locale={locale}
+            />
+          ) : null}
           <Spreadsheet
             className="demo__sheet"
             workbook={workbook}
@@ -383,8 +714,112 @@ export const App = (): ReactElement => {
             onReady={setInstance}
             onCellChange={onCellChange}
           />
+          {ribbonTab === 'file' ? (
+            <div className="demo__backstage" role="dialog" aria-label={ui.file}>
+              <nav className="demo__backstage-nav" aria-label={ui.file}>
+                <strong>{ui.file}</strong>
+                <button
+                  type="button"
+                  className="demo__backstage-navitem demo__backstage-navitem--active"
+                >
+                  {ui.info}
+                </button>
+                <button
+                  type="button"
+                  className="demo__backstage-navitem"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {ui.openTitle}
+                </button>
+                <button type="button" className="demo__backstage-navitem" onClick={onSave}>
+                  {ui.save}
+                </button>
+                <button
+                  type="button"
+                  className="demo__backstage-navitem"
+                  onClick={() => instance?.print()}
+                  disabled={!instance}
+                >
+                  {ui.print}
+                </button>
+                <button
+                  type="button"
+                  className="demo__backstage-navitem"
+                  onClick={() => instance?.openPageSetup()}
+                  disabled={!instance}
+                >
+                  {ui.pageSetup}
+                </button>
+                <button
+                  type="button"
+                  className="demo__backstage-navitem"
+                  onClick={() => setRibbonTab('home')}
+                >
+                  {ui.close}
+                </button>
+              </nav>
+              <div className="demo__backstage-main">
+                <div className="demo__backstage-title">
+                  <span className="demo__backstage-xl">⊞</span>
+                  <div>
+                    <h1>Book1</h1>
+                    <p>{ui.backstageSub}</p>
+                  </div>
+                </div>
+                <div className="demo__backstage-grid">
+                  <button
+                    type="button"
+                    className="demo__backstage-card"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <strong>{ui.openTitle}</strong>
+                    <span>{ui.openDesc}</span>
+                  </button>
+                  <button type="button" className="demo__backstage-card" onClick={onSave}>
+                    <strong>{ui.saveCopy}</strong>
+                    <span>{ui.saveDesc}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="demo__backstage-card"
+                    onClick={() => instance?.print()}
+                    disabled={!instance}
+                  >
+                    <strong>{ui.print}</strong>
+                    <span>{ui.printDesc}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="demo__backstage-card"
+                    onClick={() => instance?.openPageSetup()}
+                    disabled={!instance}
+                  >
+                    <strong>{ui.pageSetup}</strong>
+                    <span>{ui.pageSetupDesc}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="demo__backstage-card"
+                    onClick={() => instance?.openExternalLinksDialog()}
+                    disabled={!instance}
+                  >
+                    <strong>{ui.editLinks}</strong>
+                    <span>{ui.linksDesc}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="demo__backstage-card"
+                    onClick={() => setShowPanel((v) => !v)}
+                  >
+                    <strong>{ui.options}</strong>
+                    <span>{ui.optionsDesc}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
-        <aside className="demo__panel" aria-label="Demo panel">
+        <aside className="demo__panel" aria-label="Demo panel" hidden={!showPanel}>
           <section className="demo__card">
             <h2>Preset</h2>
             <p className="demo__hint">

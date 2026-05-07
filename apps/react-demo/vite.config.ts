@@ -12,6 +12,7 @@ const reactPkg = resolve(__dirname, '../../packages/formulon-cell-react');
 export default defineConfig({
   plugins: [react()],
   resolve: {
+    dedupe: ['react', 'react-dom'],
     alias: {
       '@libraz/formulon-cell/styles.css': `${corePkg}/src/styles/index.css`,
       '@libraz/formulon-cell/styles/paper.css': `${corePkg}/src/styles/theme-paper.css`,
