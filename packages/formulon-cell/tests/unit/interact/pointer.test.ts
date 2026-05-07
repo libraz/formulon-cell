@@ -136,6 +136,19 @@ describe('attachPointer', () => {
     stubPointerCapture(host);
     document.body.appendChild(host);
     store = createSpreadsheetStore();
+    // Pin layout to the legacy roomy defaults so the hardcoded pixel
+    // coordinates in this file stay meaningful even when production
+    // defaults change.
+    store.setState((s) => ({
+      ...s,
+      layout: {
+        ...s.layout,
+        defaultColWidth: 104,
+        defaultRowHeight: 28,
+        headerColWidth: 52,
+        headerRowHeight: 30,
+      },
+    }));
     wb = await newWb();
   });
 

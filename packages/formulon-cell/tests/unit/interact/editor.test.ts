@@ -28,6 +28,18 @@ describe('InlineEditor', () => {
     host.appendChild(grid);
     document.body.appendChild(host);
     store = createSpreadsheetStore();
+    // Pin layout so hardcoded pixel coordinates below stay meaningful even
+    // when the production defaults shift.
+    store.setState((s) => ({
+      ...s,
+      layout: {
+        ...s.layout,
+        defaultColWidth: 104,
+        defaultRowHeight: 28,
+        headerColWidth: 52,
+        headerRowHeight: 30,
+      },
+    }));
     wb = await newWb();
     onAfterCommit = vi.fn<() => void>();
     editor = new InlineEditor({ host, grid, store, wb, onAfterCommit });
@@ -54,8 +66,9 @@ describe('InlineEditor', () => {
     mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
     editor.begin('');
     const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
-    // headerColWidth=52, headerRowHeight=30, defaultColWidth=104, defaultRowHeight=28.
-    // Cell (1, 1): x=52+104=156, y=30+28=58, w=104, h=28.
+    // Test fixture pins layout to (headerCol=52, headerRow=30,
+    // defaultColW=104, defaultRowH=28). Cell (1, 1): x=52+104=156,
+    // y=30+28=58, w=104, h=28.
     expect(input.style.left).toBe('156px');
     expect(input.style.top).toBe('58px');
     expect(input.style.width).toBe('104px');

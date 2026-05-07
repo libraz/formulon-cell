@@ -5,6 +5,8 @@ import { toggleBold, toggleItalic, toggleStrike, toggleUnderline } from './comma
 import { History, recordFormatChange } from './commands/history.js';
 import { printSheet } from './commands/print.js';
 import { extractRefs, rotateRefAt } from './commands/refs.js';
+import { moveSheet, removeSheet, setSheetHidden } from './commands/sheet-mutate.js';
+import { setSheetZoom } from './commands/structure.js';
 import { flushFormatToEngine, hydrateCellFormatsFromEngine } from './engine/cell-format-sync.js';
 import { formatCellForEdit } from './engine/edit-seed.js';
 import { hydrateCommentsAndHyperlinksFromEngine } from './engine/format-sync.js';
@@ -54,6 +56,7 @@ import { attachFxDialog, type FxDialogHandle } from './interact/fx-dialog.js';
 import { attachGoToDialog } from './interact/goto-dialog.js';
 import { attachHover } from './interact/hover.js';
 import { attachHyperlinkDialog } from './interact/hyperlink-dialog.js';
+import { inheritHostTokens } from './interact/inherit-host-tokens.js';
 import { attachIterativeDialog } from './interact/iterative-dialog.js';
 import { attachKeyboard } from './interact/keyboard.js';
 import { attachNamedRangeDialog } from './interact/named-range-dialog.js';
@@ -317,6 +320,20 @@ export const Spreadsheet = {
     fx.textContent = 'ƒx';
     fx.tabIndex = -1;
     fx.setAttribute('aria-label', strings.fxDialog?.fxButtonLabel ?? 'Insert function');
+    const fxCancel = document.createElement('button');
+    fxCancel.type = 'button';
+    fxCancel.className = 'fc-host__formulabar-action fc-host__formulabar-action--cancel';
+    fxCancel.textContent = '×';
+    fxCancel.tabIndex = -1;
+    fxCancel.disabled = true;
+    fxCancel.setAttribute('aria-label', 'Cancel formula edit');
+    const fxAccept = document.createElement('button');
+    fxAccept.type = 'button';
+    fxAccept.className = 'fc-host__formulabar-action fc-host__formulabar-action--accept';
+    fxAccept.textContent = '✓';
+    fxAccept.tabIndex = -1;
+    fxAccept.disabled = true;
+    fxAccept.setAttribute('aria-label', 'Enter formula');
     const fxInput = document.createElement('textarea');
     fxInput.className = 'fc-host__formulabar-input';
     fxInput.spellcheck = false;
@@ -329,10 +346,17 @@ export const Spreadsheet = {
     const fxExpand = document.createElement('button');
     fxExpand.type = 'button';
     fxExpand.className = 'fc-host__formulabar-expand';
-    fxExpand.setAttribute('aria-label', 'Expand formula bar');
     fxExpand.setAttribute('aria-expanded', 'false');
     fxExpand.tabIndex = -1;
     fxExpand.textContent = '⌄';
+    const refreshFormulaBarLabels = (): void => {
+      const expanded = fxExpand.getAttribute('aria-expanded') === 'true';
+      fxExpand.setAttribute(
+        'aria-label',
+        expanded ? strings.a11y.collapseFormulaBar : strings.a11y.expandFormulaBar,
+      );
+    };
+    refreshFormulaBarLabels();
     fxExpand.addEventListener('click', () => {
       const expanded = formulabar.dataset.fcExpanded === '1';
       if (expanded) {
@@ -340,14 +364,16 @@ export const Spreadsheet = {
         fxExpand.setAttribute('aria-expanded', 'false');
         fxExpand.textContent = '⌄';
         fxInput.rows = 1;
+        refreshFormulaBarLabels();
       } else {
         formulabar.dataset.fcExpanded = '1';
         fxExpand.setAttribute('aria-expanded', 'true');
         fxExpand.textContent = '⌃';
         fxInput.rows = 4;
+        refreshFormulaBarLabels();
       }
     });
-    formulabar.append(tag, fx, fxInput, fxExpand);
+    formulabar.append(tag, fxCancel, fxAccept, fx, fxInput, fxExpand);
 
     const grid = document.createElement('div');
     grid.className = 'fc-host__grid';
@@ -360,8 +386,76 @@ export const Spreadsheet = {
     a11y.setAttribute('aria-live', 'polite');
     grid.appendChild(a11y);
 
+    const appendSheetbarIcon = (
+      button: HTMLButtonElement,
+      paths: readonly string[],
+      viewBox = '0 0 20 20',
+    ): void => {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('class', 'fc-host__icon');
+      svg.setAttribute('viewBox', viewBox);
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '1.5');
+      svg.setAttribute('stroke-linecap', 'round');
+      svg.setAttribute('stroke-linejoin', 'round');
+      svg.setAttribute('aria-hidden', 'true');
+      for (const d of paths) {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', d);
+        svg.appendChild(path);
+      }
+      button.replaceChildren(svg);
+    };
+
     const statusbar = document.createElement('div');
     statusbar.className = 'fc-host__statusbar';
+    const sheetbar = document.createElement('div');
+    sheetbar.className = 'fc-host__sheetbar';
+    const sheetNav = document.createElement('div');
+    sheetNav.className = 'fc-host__sheetbar-nav';
+    const firstSheet = document.createElement('button');
+    firstSheet.type = 'button';
+    firstSheet.className = 'fc-host__sheetbar-navbtn';
+    appendSheetbarIcon(firstSheet, ['M12.5 4.5 7 10l5.5 5.5']);
+    const lastSheet = document.createElement('button');
+    lastSheet.type = 'button';
+    lastSheet.className = 'fc-host__sheetbar-navbtn';
+    appendSheetbarIcon(lastSheet, ['M7.5 4.5 13 10l-5.5 5.5']);
+    sheetNav.append(firstSheet, lastSheet);
+    const sheetTabs = document.createElement('div');
+    sheetTabs.className = 'fc-host__sheetbar-tabs';
+    sheetTabs.setAttribute('role', 'tablist');
+    const addSheetBtn = document.createElement('button');
+    addSheetBtn.type = 'button';
+    addSheetBtn.className = 'fc-host__sheetbar-add';
+    appendSheetbarIcon(addSheetBtn, ['M10 4.5v11', 'M4.5 10h11']);
+    sheetbar.append(sheetNav, sheetTabs, addSheetBtn);
+    const sheetMenu = document.createElement('div');
+    sheetMenu.className = 'fc-sheetmenu';
+    sheetMenu.hidden = true;
+    sheetMenu.setAttribute('role', 'menu');
+    document.body.appendChild(sheetMenu);
+    sheetbar.addEventListener(
+      'contextmenu',
+      (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const tab =
+          e.target instanceof Element
+            ? e.target.closest<HTMLButtonElement>('.fc-host__sheetbar-tab')
+            : null;
+        const idx = tab ? Number(tab.dataset.fcSheetIndex) : NaN;
+        if (!tab || !Number.isInteger(idx)) return;
+        switchSheet(idx);
+        showSheetMenu(idx, tab, e.clientX, e.clientY);
+      },
+      true,
+    );
+    sheetMenu.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
     // Watch Window dock — only attached when `features.watchWindow` is on.
     const watchDock = document.createElement('div');
     watchDock.dataset.fcWatch = 'dock';
@@ -371,14 +465,25 @@ export const Spreadsheet = {
     // anchors slot ordering; chrome slots come and go via `setChromeAttached`
     // so disabled flags reclaim vertical space (no empty bars left behind).
     const setChromeAttached = (
-      slot: 'formulabar' | 'statusbar' | 'watchDock',
+      slot: 'formulabar' | 'sheetbar' | 'statusbar' | 'watchDock',
       on: boolean,
     ): void => {
-      const el = slot === 'formulabar' ? formulabar : slot === 'statusbar' ? statusbar : watchDock;
+      const el =
+        slot === 'formulabar'
+          ? formulabar
+          : slot === 'sheetbar'
+            ? sheetbar
+            : slot === 'statusbar'
+              ? statusbar
+              : watchDock;
       if (on) {
         if (el.parentElement === host) return;
         if (slot === 'formulabar') {
           host.insertBefore(el, grid);
+        } else if (slot === 'sheetbar') {
+          if (statusbar.parentElement === host) host.insertBefore(el, statusbar);
+          else if (watchDock.parentElement === host) host.insertBefore(el, watchDock);
+          else host.appendChild(el);
         } else if (slot === 'statusbar') {
           if (watchDock.parentElement === host) host.insertBefore(el, watchDock);
           else host.appendChild(el);
@@ -392,6 +497,7 @@ export const Spreadsheet = {
 
     host.appendChild(grid);
     setChromeAttached('formulabar', flags.formulaBar);
+    setChromeAttached('sheetbar', flags.sheetTabs);
     setChromeAttached('statusbar', flags.statusBar);
     setChromeAttached('watchDock', flags.watchWindow);
 
@@ -434,27 +540,328 @@ export const Spreadsheet = {
       host.dispatchEvent(new CustomEvent('fc:tables', { detail: tables }));
     }
 
+    function hydrateActiveSheet(): void {
+      const sheet = store.getState().data.sheetIndex;
+      mutators.replaceCells(store, wb.cells(sheet));
+      hydrateLayoutFromEngine(wb, store, sheet);
+      hydrateCommentsAndHyperlinksFromEngine(wb, store, sheet);
+      hydrateMergesFromEngine(wb, store, sheet);
+      hydrateValidationsFromEngine(wb, store, sheet);
+      hydrateCellFormatsFromEngine(wb, store, sheet);
+    }
+
+    function switchSheet(idx: number): void {
+      if (idx < 0 || idx >= wb.sheetCount) return;
+      if (store.getState().layout.hiddenSheets.has(idx)) return;
+      if (idx === store.getState().data.sheetIndex) return;
+      wb.clearViewportHint();
+      mutators.setSheetIndex(store, idx);
+      hydrateActiveSheet();
+      updateSheetTabs();
+      statusBar?.refresh();
+      renderer.invalidate();
+    }
+
+    function visibleSheetIndexes(): number[] {
+      const hidden = store.getState().layout.hiddenSheets;
+      const out: number[] = [];
+      for (let i = 0; i < wb.sheetCount; i += 1) {
+        if (!hidden.has(i)) out.push(i);
+      }
+      return out;
+    }
+
+    function switchRelativeSheet(delta: 1 | -1): void {
+      const visible = visibleSheetIndexes();
+      const pos = visible.indexOf(store.getState().data.sheetIndex);
+      const next = visible[pos + delta];
+      if (next !== undefined) switchSheet(next);
+    }
+
+    function hiddenSheetIndexes(): number[] {
+      const hidden = store.getState().layout.hiddenSheets;
+      const out: number[] = [];
+      for (let i = 0; i < wb.sheetCount; i += 1) {
+        if (hidden.has(i)) out.push(i);
+      }
+      return out;
+    }
+
+    const formatSheetLabel = (template: string, name: string): string =>
+      template.replace('{name}', name);
+
+    function refreshSheetbarLabels(): void {
+      const t = strings.sheetTabs;
+      firstSheet.setAttribute('aria-label', t.previousSheet);
+      lastSheet.setAttribute('aria-label', t.nextSheet);
+      sheetTabs.setAttribute('aria-label', t.workbookSheets);
+      addSheetBtn.setAttribute('aria-label', t.addSheet);
+    }
+
+    function closeSheetMenu(): void {
+      sheetMenu.hidden = true;
+      sheetMenu.replaceChildren();
+    }
+
+    function menuButton(label: string, onClick: () => void, disabled = false): HTMLButtonElement {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'fc-sheetmenu__item';
+      button.textContent = label;
+      button.disabled = disabled;
+      button.setAttribute('role', 'menuitem');
+      button.addEventListener('click', () => {
+        if (disabled) return;
+        closeSheetMenu();
+        onClick();
+      });
+      return button;
+    }
+
+    function showSheetMenu(idx: number, tab: HTMLButtonElement, x: number, y: number): void {
+      const visible = visibleSheetIndexes();
+      const hidden = hiddenSheetIndexes();
+      const canMutate = wb.capabilities.sheetMutate;
+      const canHide = wb.capabilities.sheetTabHidden;
+      const moveAndRefresh = (from: number, to: number): void => {
+        if (!moveSheet(store, wb, from, to)) return;
+        hydrateActiveSheet();
+        updateSheetTabs();
+        statusBar?.refresh();
+        renderer.invalidate();
+      };
+      const sep = document.createElement('div');
+      sep.className = 'fc-sheetmenu__sep';
+      sep.setAttribute('role', 'separator');
+
+      sheetMenu.replaceChildren(
+        menuButton(strings.sheetTabs.rename, () => beginRenameSheet(idx, tab), !canMutate),
+        menuButton(strings.sheetTabs.insertSheet, () => {
+          const added = wb.addSheet();
+          if (added < 0) return;
+          switchSheet(added);
+          updateSheetTabs();
+        }),
+        menuButton(
+          strings.sheetTabs.moveLeft,
+          () => moveAndRefresh(idx, idx - 1),
+          !canMutate || idx <= 0,
+        ),
+        menuButton(
+          strings.sheetTabs.moveRight,
+          () => moveAndRefresh(idx, idx + 1),
+          !canMutate || idx >= wb.sheetCount - 1,
+        ),
+        sep,
+        menuButton(
+          strings.sheetTabs.deleteSheet,
+          () => {
+            if (!removeSheet(store, wb, idx)) return;
+            hydrateActiveSheet();
+            updateSheetTabs();
+            statusBar?.refresh();
+            renderer.invalidate();
+          },
+          !canMutate || wb.sheetCount <= 1,
+        ),
+        menuButton(
+          strings.sheetTabs.hideSheet,
+          () => {
+            if (!setSheetHidden(store, wb, history, idx, true)) return;
+            hydrateActiveSheet();
+            updateSheetTabs();
+            statusBar?.refresh();
+            renderer.invalidate();
+          },
+          !canHide || visible.length <= 1,
+        ),
+        menuButton(
+          hidden.length > 0
+            ? formatSheetLabel(strings.sheetTabs.unhideNamedSheet, wb.sheetName(hidden[0] ?? 0))
+            : strings.sheetTabs.unhideSheet,
+          () => {
+            const target = hidden[0];
+            if (target === undefined) return;
+            if (!setSheetHidden(store, wb, history, target, false)) return;
+            switchSheet(target);
+            updateSheetTabs();
+          },
+          !canHide || hidden.length === 0,
+        ),
+      );
+      inheritHostTokens(host, sheetMenu);
+      sheetMenu.hidden = false;
+      sheetMenu.style.left = '0px';
+      sheetMenu.style.top = '0px';
+      const rect = sheetMenu.getBoundingClientRect();
+      const width = Math.ceil(rect.width || sheetMenu.offsetWidth || 180);
+      const height = Math.ceil(rect.height || sheetMenu.offsetHeight || 160);
+      const pad = 8;
+      const maxX = Math.max(pad, window.innerWidth - width - pad);
+      const maxY = Math.max(pad, window.innerHeight - height - pad);
+      const left = Math.min(Math.max(pad, x), maxX);
+      const top = Math.min(Math.max(pad, y), maxY);
+      sheetMenu.style.left = `${left}px`;
+      sheetMenu.style.top = `${top}px`;
+      const first = sheetMenu.querySelector<HTMLButtonElement>(
+        '.fc-sheetmenu__item:not([disabled])',
+      );
+      first?.focus();
+    }
+
+    function beginRenameSheet(idx: number, tab: HTMLButtonElement): void {
+      const before = wb.sheetName(idx);
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'fc-host__sheetbar-rename';
+      input.value = before;
+      input.spellcheck = false;
+      input.autocomplete = 'off';
+      input.setAttribute('aria-label', formatSheetLabel(strings.sheetTabs.renameSheet, before));
+      tab.replaceWith(input);
+
+      let done = false;
+      const finish = (commit: boolean): void => {
+        if (done) return;
+        done = true;
+        const next = input.value.trim();
+        if (commit && next && next !== before) {
+          const ok = wb.renameSheet(idx, next);
+          if (!ok) {
+            input.setAttribute('aria-invalid', 'true');
+            done = false;
+            input.focus();
+            input.select();
+            return;
+          }
+        }
+        updateSheetTabs();
+      };
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          finish(true);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          finish(false);
+        }
+      });
+      input.addEventListener('blur', () => finish(true));
+      requestAnimationFrame(() => {
+        input.focus();
+        input.select();
+      });
+    }
+
+    function updateSheetTabs(): void {
+      const active = store.getState().data.sheetIndex;
+      const visible = visibleSheetIndexes();
+      refreshSheetbarLabels();
+      sheetTabs.replaceChildren();
+      for (const idx of visible) {
+        const tab = document.createElement('button');
+        tab.type = 'button';
+        tab.className = 'fc-host__sheetbar-tab';
+        tab.setAttribute('role', 'tab');
+        tab.dataset.fcSheetIndex = String(idx);
+        const selected = idx === active;
+        tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+        tab.tabIndex = selected ? 0 : -1;
+        tab.textContent = wb.sheetName(idx);
+        tab.addEventListener('click', () => switchSheet(idx));
+        tab.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          switchSheet(idx);
+          showSheetMenu(idx, tab, e.clientX, e.clientY);
+        });
+        tab.addEventListener('dblclick', () => beginRenameSheet(idx, tab));
+        tab.addEventListener('keydown', (e) => {
+          if (e.key === 'F2' || e.key === 'Enter') {
+            e.preventDefault();
+            beginRenameSheet(idx, tab);
+          } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+            e.preventDefault();
+            const r = tab.getBoundingClientRect();
+            showSheetMenu(idx, tab, r.left, r.bottom + 2);
+          } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            switchRelativeSheet(-1);
+          } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            switchRelativeSheet(1);
+          }
+        });
+        sheetTabs.appendChild(tab);
+        if (selected) {
+          requestAnimationFrame(() => {
+            if (tab.isConnected) tab.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+          });
+        }
+      }
+      const activePos = visible.indexOf(active);
+      firstSheet.disabled = activePos <= 0;
+      lastSheet.disabled = activePos < 0 || activePos >= visible.length - 1;
+      addSheetBtn.disabled = false;
+    }
+
     const cellRegistry = new CellRegistry();
     const renderer = new GridRenderer({
       host: grid,
       canvas,
       getState: () => store.getState(),
       getTheme: () => resolveTheme(host),
+      onViewportSize: (rowCount, colCount) => mutators.setViewportSize(store, rowCount, colCount),
       getWb: () => wb,
       getDisplay: (addr, value, formula, format) =>
         cellRegistry.resolveDisplay({ addr, value, formula, format }),
     });
     cellRegistry.subscribe(() => renderer.invalidate());
     renderer.resize();
+    updateSheetTabs();
+
+    firstSheet.addEventListener('click', () => {
+      const visible = visibleSheetIndexes();
+      const pos = visible.indexOf(store.getState().data.sheetIndex);
+      if (pos > 0) switchSheet(visible[pos - 1] ?? 0);
+    });
+    lastSheet.addEventListener('click', () => {
+      const visible = visibleSheetIndexes();
+      const pos = visible.indexOf(store.getState().data.sheetIndex);
+      const next = visible[pos + 1];
+      if (next !== undefined) switchSheet(next);
+    });
+    addSheetBtn.addEventListener('click', () => {
+      const idx = wb.addSheet();
+      if (idx < 0) return;
+      switchSheet(idx);
+      updateSheetTabs();
+    });
+    const onSheetMenuPointerDown = (e: PointerEvent): void => {
+      if (sheetMenu.hidden) return;
+      const target = e.target;
+      if (target instanceof Node && sheetMenu.contains(target)) return;
+      closeSheetMenu();
+    };
+    const onSheetMenuKeyDown = (e: KeyboardEvent): void => {
+      if (sheetMenu.hidden) return;
+      if (e.key === 'Escape') closeSheetMenu();
+    };
+    document.addEventListener('pointerdown', onSheetMenuPointerDown);
+    document.addEventListener('keydown', onSheetMenuKeyDown);
 
     // Always-on host features — not toggleable via `MountOptions.features`.
-    const iterativeDialog = attachIterativeDialog({ host, getWb: () => wb, strings });
-    const externalLinksDialog = attachExternalLinksDialog({
+    // Held in `let` so the locale-change subscription can rebuild them with
+    // fresh strings; detach+reattach is the v0.2 fallback for dialogs that
+    // don't expose a `setStrings` hook.
+    let iterativeDialog = attachIterativeDialog({ host, getWb: () => wb, strings });
+    let externalLinksDialog = attachExternalLinksDialog({
       host,
       getWb: () => wb,
       strings,
     });
-    const cfRulesDialog = attachCfRulesDialog({
+    let cfRulesDialog = attachCfRulesDialog({
       host,
       getWb: () => wb,
       getActiveSheet: () => store.getState().data.sheetIndex,
@@ -539,7 +946,25 @@ export const Spreadsheet = {
       'wheel',
       'shortcuts',
       'formulaBar',
+      'sheetTabs',
     ] as const;
+
+    // Subset of host-toggleable features whose attached handle reads UI
+    // strings. The locale-change handler rebuilds these by detach+reattach
+    // when their handle doesn't expose a `setStrings` hook of its own.
+    const HOST_FEATURE_USES_STRINGS: ReadonlySet<string> = new Set([
+      'formatDialog',
+      'conditional',
+      'gotoSpecial',
+      'fxDialog',
+      'namedRanges',
+      'pageSetup',
+      'hyperlink',
+      'statusBar',
+      'watchWindow',
+      'slicer',
+      'errorIndicators',
+    ]);
 
     // Wb-side toggleable feature ids — these live inside `bindEngine`.
     // Toggling any of them triggers a binding rebuild from `setFeatures`.
@@ -666,6 +1091,10 @@ export const Spreadsheet = {
               mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
               renderer.invalidate();
             },
+            onZoomChange: (zoom) => {
+              setSheetZoom(store, zoom, wb);
+              renderer.invalidate();
+            },
           });
           featureRegistry.set(
             'statusBar',
@@ -740,6 +1169,10 @@ export const Spreadsheet = {
           break;
         case 'formulaBar':
           setChromeAttached('formulabar', true);
+          break;
+        case 'sheetTabs':
+          setChromeAttached('sheetbar', true);
+          updateSheetTabs();
           break;
       }
       refreshFeaturesView();
@@ -845,6 +1278,9 @@ export const Spreadsheet = {
         case 'formulaBar':
           setChromeAttached('formulabar', false);
           break;
+        case 'sheetTabs':
+          setChromeAttached('sheetbar', false);
+          break;
       }
       refreshFeaturesView();
     };
@@ -907,6 +1343,7 @@ export const Spreadsheet = {
               tag.focus();
               tag.select();
             },
+            onSwitchSheet: (delta) => switchRelativeSheet(delta),
           })
         : (): void => {};
       const clipboardH = flags.clipboard
@@ -1012,6 +1449,13 @@ export const Spreadsheet = {
           emitter.emit('cellChange', { addr: e.addr, value: e.next, formula });
         } else if (e.kind === 'recalc') {
           emitter.emit('recalc', { dirty: e.dirty });
+        } else if (
+          e.kind === 'sheet-add' ||
+          e.kind === 'sheet-rename' ||
+          e.kind === 'sheet-remove' ||
+          e.kind === 'sheet-move'
+        ) {
+          updateSheetTabs();
         }
       });
 
@@ -1205,6 +1649,12 @@ export const Spreadsheet = {
     // Formula bar editing — typing in the formula bar edits the active cell.
     let fxEditing = false;
     let fxBaseline = '';
+    const refreshFxActions = (): void => {
+      const dirty = fxEditing && fxInput.value !== fxBaseline;
+      fxCancel.disabled = !fxEditing;
+      fxAccept.disabled = !dirty;
+      formulabar.dataset.fcEditing = fxEditing ? '1' : '0';
+    };
     const syncFxRefs = (): void => {
       const refs = extractRefs(fxInput.value).map((r) => ({
         r0: r.r0,
@@ -1220,9 +1670,11 @@ export const Spreadsheet = {
       if (binding.editor.isActive()) binding.editor.cancel();
       fxEditing = true;
       fxBaseline = fxInput.value;
+      refreshFxActions();
       syncFxRefs();
     };
     const onFxInput = (): void => {
+      refreshFxActions();
       if (fxEditing) syncFxRefs();
       fxAutocomplete.refresh();
       fxArgHelper?.refresh();
@@ -1281,6 +1733,7 @@ export const Spreadsheet = {
         e.stopPropagation();
         fxInput.value = fxBaseline;
         fxEditing = false;
+        refreshFxActions();
         host.focus();
         updateChrome();
       } else if (e.key === 'F4') {
@@ -1301,7 +1754,10 @@ export const Spreadsheet = {
       if (!fxEditing) return;
       // Only commit if value actually changed.
       if (fxInput.value !== fxBaseline) commitFx('none');
-      else fxEditing = false;
+      else {
+        fxEditing = false;
+        refreshFxActions();
+      }
     };
     function commitFx(advance: 'down' | 'right' | 'none'): void {
       const s = store.getState();
@@ -1322,6 +1778,8 @@ export const Spreadsheet = {
       }
       mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
       fxEditing = false;
+      fxBaseline = fxInput.value;
+      refreshFxActions();
       clearFxRefs();
       if (advance === 'down') {
         mutators.setActive(store, { ...a, row: a.row + 1 });
@@ -1330,11 +1788,29 @@ export const Spreadsheet = {
       }
       host.focus();
     }
+    function cancelFx(): void {
+      fxInput.value = fxBaseline;
+      fxEditing = false;
+      clearFxRefs();
+      fxAutocomplete.close();
+      refreshFxActions();
+      host.focus();
+      updateChrome();
+    }
+    function acceptFx(): void {
+      if (fxInput.value !== fxBaseline) commitFx('none');
+    }
     fxInput.addEventListener('focus', onFxFocus);
     fxInput.addEventListener('input', onFxInput);
     fxInput.addEventListener('keyup', onFxKeyUp);
     fxInput.addEventListener('keydown', onFxKey);
     fxInput.addEventListener('blur', onFxBlur);
+    const keepFxFocus = (e: MouseEvent): void => e.preventDefault();
+    fxCancel.addEventListener('mousedown', keepFxFocus);
+    fxAccept.addEventListener('mousedown', keepFxFocus);
+    fxCancel.addEventListener('click', cancelFx);
+    fxAccept.addEventListener('click', acceptFx);
+    refreshFxActions();
 
     // Name box — Enter jumps to a cell ref, Escape reverts.
     const onTagFocus = (): void => tag.select();
@@ -1407,12 +1883,18 @@ export const Spreadsheet = {
 
     // Re-paint and update chrome on every store change.
     let lastSheetIdx = store.getState().data.sheetIndex;
+    let lastHiddenSheets = store.getState().layout.hiddenSheets;
     let lastSelection = store.getState().selection;
     const unsub = store.subscribe(() => {
       const s = store.getState();
-      if (s.data.sheetIndex !== lastSheetIdx) {
+      const sheetChanged = s.data.sheetIndex !== lastSheetIdx;
+      if (sheetChanged) {
         wb.clearViewportHint();
         lastSheetIdx = s.data.sheetIndex;
+      }
+      if (sheetChanged || s.layout.hiddenSheets !== lastHiddenSheets) {
+        lastHiddenSheets = s.layout.hiddenSheets;
+        updateSheetTabs();
       }
       if (!selectionEquals(lastSelection, s.selection)) {
         lastSelection = s.selection;
@@ -1429,16 +1911,7 @@ export const Spreadsheet = {
     function updateChrome(): void {
       const s = store.getState();
       const a = s.selection.active;
-      const colLetter = ((): string => {
-        let n = a.col;
-        let out = '';
-        do {
-          out = String.fromCharCode(65 + (n % 26)) + out;
-          n = Math.floor(n / 26) - 1;
-        } while (n >= 0);
-        return out;
-      })();
-      const ref = s.ui.r1c1 ? `R${a.row + 1}C${a.col + 1}` : `${colLetter}${a.row + 1}`;
+      const ref = formatSelectionRef(s.selection.range, a, s.ui.r1c1 === true);
       // Don't stomp the user's in-progress name-box typing.
       if (document.activeElement !== tag) tag.value = ref;
       const cell = s.data.cells.get(`${a.sheet}:${a.row}:${a.col}`);
@@ -1543,15 +2016,53 @@ export const Spreadsheet = {
       if (flags[id as keyof typeof flags]) attachHostFeature(id);
     }
 
-    // Locale change → snapshot strings into the local `let` so future
-    // attaches see the latest. Built-in attaches in v0.1 capture strings at
-    // attach time; full live updates land in v0.2 once each `attach*` ships
-    // a `setStrings` hook.
+    // Locale change → push fresh strings everywhere. Built-ins that ship a
+    // `setStrings` hook live-update labels in place; the rest are rebuilt by
+    // detaching and re-attaching with the new dictionary in their closure.
     const unsubI18n = i18n.subscribe((next) => {
       strings = next;
-      // Notify user extensions that opt into live updates.
+      host.setAttribute('aria-label', strings.a11y.spreadsheet);
+      tag.setAttribute('aria-label', strings.a11y.nameBox);
+      fx.setAttribute('aria-label', strings.fxDialog?.fxButtonLabel ?? 'Insert function');
+      fxInput.setAttribute('aria-label', strings.a11y.formulaBar);
+      refreshFormulaBarLabels();
+      updateSheetTabs();
+
+      // Always-on dialogs: rebuild — none of these expose setStrings yet.
+      iterativeDialog.detach();
+      iterativeDialog = attachIterativeDialog({ host, getWb: () => wb, strings });
+      externalLinksDialog.detach();
+      externalLinksDialog = attachExternalLinksDialog({ host, getWb: () => wb, strings });
+      cfRulesDialog.detach();
+      cfRulesDialog = attachCfRulesDialog({
+        host,
+        getWb: () => wb,
+        getActiveSheet: () => store.getState().data.sheetIndex,
+        onChanged: () => renderer.invalidate(),
+        strings,
+      });
+
+      // Toggleable host features: prefer setStrings when the handle exposes
+      // it, otherwise fall back to detach+reattach.
+      for (const id of HOST_TOGGLEABLE_IDS) {
+        const handle = featureRegistry.get(id);
+        if (!handle) continue;
+        if (typeof handle.setStrings === 'function') {
+          handle.setStrings(next);
+        } else if (HOST_FEATURE_USES_STRINGS.has(id)) {
+          detachHostFeature(id);
+          attachHostFeature(id);
+        }
+      }
+
+      // Engine-bound attaches (clipboard, paste-special, context-menu,
+      // find-replace, validation) live inside `binding`. Rebuild it.
+      binding.unbind();
+      binding = bindEngine(wb);
+
+      // User extensions opt-in via setStrings.
       for (const handle of userHandles.values()) handle.setStrings?.(next);
-      for (const handle of featureRegistry.values()) handle.setStrings?.(next);
+
       emitter.emit('localeChange', { locale: i18n.locale, strings: next });
     });
 
@@ -1611,7 +2122,7 @@ export const Spreadsheet = {
         // new list. Built-ins are untouched — use `setFeatures` for those.
         for (const handle of userHandles.values()) handle.dispose();
         userHandles.clear();
-        if (next && next.length) {
+        if (next?.length) {
           const sorted = sortByPriority(dedupeById(flattenExtensions(next)));
           for (const ext of sorted) mountExtension(ext);
         }
@@ -1746,16 +2257,17 @@ export const Spreadsheet = {
         wb.attachHistory(history);
         wb.clearViewportHint();
         history.clear();
-        mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
-        hydrateLayoutFromEngine(wb, store, store.getState().data.sheetIndex);
-        hydrateCommentsAndHyperlinksFromEngine(wb, store, store.getState().data.sheetIndex);
-        hydrateMergesFromEngine(wb, store, store.getState().data.sheetIndex);
-        hydrateValidationsFromEngine(wb, store, store.getState().data.sheetIndex);
-        hydrateCellFormatsFromEngine(wb, store, store.getState().data.sheetIndex);
+        const nextSheet = Math.min(
+          store.getState().data.sheetIndex,
+          Math.max(0, wb.sheetCount - 1),
+        );
+        mutators.setSheetIndex(store, nextSheet);
+        hydrateActiveSheet();
         dispatchPassthroughSummary();
         binding = bindEngine(wb);
         namedRangeDialog?.bindWorkbook(wb);
         statusBar?.refresh();
+        updateSheetTabs();
         // Notify user extensions so they can rebind their wb references.
         for (const handle of userHandles.values()) handle.rebindWorkbook?.(wb);
         for (const fn of wbListeners) fn(wb);
@@ -1804,6 +2316,13 @@ export const Spreadsheet = {
         fxInput.removeEventListener('keyup', onFxKeyUp);
         fxInput.removeEventListener('keydown', onFxKey);
         fxInput.removeEventListener('blur', onFxBlur);
+        fxCancel.removeEventListener('mousedown', keepFxFocus);
+        fxAccept.removeEventListener('mousedown', keepFxFocus);
+        fxCancel.removeEventListener('click', cancelFx);
+        fxAccept.removeEventListener('click', acceptFx);
+        document.removeEventListener('pointerdown', onSheetMenuPointerDown);
+        document.removeEventListener('keydown', onSheetMenuKeyDown);
+        sheetMenu.remove();
         tag.removeEventListener('focus', onTagFocus);
         tag.removeEventListener('keydown', onTagKey);
         tag.removeEventListener('blur', onTagBlur);
@@ -1823,6 +2342,41 @@ export const Spreadsheet = {
     };
   },
 };
+
+function colName(col: number): string {
+  let n = col;
+  let out = '';
+  do {
+    out = String.fromCharCode(65 + (n % 26)) + out;
+    n = Math.floor(n / 26) - 1;
+  } while (n >= 0);
+  return out;
+}
+
+function cellRef(row: number, col: number, r1c1: boolean): string {
+  return r1c1 ? `R${row + 1}C${col + 1}` : `${colName(col)}${row + 1}`;
+}
+
+function formatSelectionRef(
+  range: { r0: number; c0: number; r1: number; c1: number },
+  active: { row: number; col: number },
+  r1c1: boolean,
+): string {
+  if (range.r0 === range.r1 && range.c0 === range.c1) {
+    return cellRef(active.row, active.col, r1c1);
+  }
+  if (!r1c1) {
+    if (range.r0 === 0 && range.r1 === 1048575) {
+      return range.c0 === range.c1
+        ? colName(range.c0)
+        : `${colName(range.c0)}:${colName(range.c1)}`;
+    }
+    if (range.c0 === 0 && range.c1 === 16383) {
+      return range.r0 === range.r1 ? `${range.r0 + 1}` : `${range.r0 + 1}:${range.r1 + 1}`;
+    }
+  }
+  return `${cellRef(range.r0, range.c0, r1c1)}:${cellRef(range.r1, range.c1, r1c1)}`;
+}
 
 /** Case-insensitive defined-name lookup. Returns the formula text stripped
  *  of any leading `=`, sheet qualifier, and `$` anchors so it can be parsed
@@ -1867,7 +2421,22 @@ function parseCellRef(raw: string): { row: number; col: number } | null {
 
 /** Parse A1:B5 style range. Returns null when the input doesn't match. */
 function parseRangeRef(raw: string): { r0: number; c0: number; r1: number; c1: number } | null {
-  const parts = raw.trim().toUpperCase().split(':');
+  const trimmed = raw.trim().toUpperCase();
+  const wholeCol = trimmed.match(/^\$?([A-Z]+)(?::\$?([A-Z]+))?$/);
+  if (wholeCol) {
+    const c0 = parseColRef(wholeCol[1] ?? '');
+    const c1 = parseColRef(wholeCol[2] ?? wholeCol[1] ?? '');
+    if (c0 == null || c1 == null) return null;
+    return { r0: 0, c0: Math.min(c0, c1), r1: 1048575, c1: Math.max(c0, c1) };
+  }
+  const wholeRow = trimmed.match(/^\$?([1-9][0-9]*)(?::\$?([1-9][0-9]*))?$/);
+  if (wholeRow) {
+    const r0 = Number.parseInt(wholeRow[1] ?? '', 10) - 1;
+    const r1 = Number.parseInt(wholeRow[2] ?? wholeRow[1] ?? '', 10) - 1;
+    if (r0 < 0 || r1 < 0 || r0 > 1048575 || r1 > 1048575) return null;
+    return { r0: Math.min(r0, r1), c0: 0, r1: Math.max(r0, r1), c1: 16383 };
+  }
+  const parts = trimmed.split(':');
   if (parts.length !== 2) return null;
   const a = parseCellRef(parts[0] ?? '');
   const b = parseCellRef(parts[1] ?? '');
@@ -1878,4 +2447,15 @@ function parseRangeRef(raw: string): { r0: number; c0: number; r1: number; c1: n
     r1: Math.max(a.row, b.row),
     c1: Math.max(a.col, b.col),
   };
+}
+
+function parseColRef(raw: string): number | null {
+  const letters = raw.trim().toUpperCase();
+  if (!/^[A-Z]+$/.test(letters)) return null;
+  let col = 0;
+  for (let i = 0; i < letters.length; i += 1) {
+    col = col * 26 + (letters.charCodeAt(i) - 64);
+  }
+  col -= 1;
+  return col >= 0 && col <= 16383 ? col : null;
 }

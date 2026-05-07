@@ -88,8 +88,11 @@ describe('attachFxDialog', () => {
     handle.open('SUM');
     const inputs = host.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input');
     expect(inputs.length).toBeGreaterThan(0);
-    inputs[0]!.value = 'A1:A5';
-    inputs[0]!.dispatchEvent(new Event('input'));
+    const input = inputs[0];
+    expect(input).toBeDefined();
+    if (!input) throw new Error('expected function argument input');
+    input.value = 'A1:A5';
+    input.dispatchEvent(new Event('input'));
     const insertBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     insertBtn?.click();
     expect(inserted).toEqual(['=SUM(A1:A5)']);

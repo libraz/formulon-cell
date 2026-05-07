@@ -89,6 +89,18 @@ describe('attachFormatPainter', () => {
     });
     document.body.appendChild(host);
     store = createSpreadsheetStore();
+    // Pin layout to legacy roomy defaults so hardcoded pixel coordinates
+    // in this file stay meaningful regardless of production defaults.
+    store.setState((s) => ({
+      ...s,
+      layout: {
+        ...s.layout,
+        defaultColWidth: 104,
+        defaultRowHeight: 28,
+        headerColWidth: 52,
+        headerRowHeight: 30,
+      },
+    }));
   });
 
   afterEach(() => {
