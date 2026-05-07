@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { FILL_HANDLE_SIZE, paintFillHandle } from '../../../src/render/painters.js';
+import {
+  FILL_HANDLE_SIZE,
+  paintCellBorders,
+  paintFillHandle,
+  textBaselineY,
+} from '../../../src/render/painters.js';
 import type { ResolvedTheme } from '../../../src/theme/resolve.js';
 
 /**
@@ -26,6 +31,42 @@ function makeCtxSpy(): {
     restore(): void {},
   } as unknown as CanvasRenderingContext2D;
   return { ctx, fills };
+}
+
+function makeStrokeSpy(): {
+  ctx: CanvasRenderingContext2D;
+  strokes: Array<{ style: string; width: number; dash: number[] }>;
+} {
+  const strokes: Array<{ style: string; width: number; dash: number[] }> = [];
+  let strokeStyle = '';
+  let lineWidth = 1;
+  let dash: number[] = [];
+  const ctx = {
+    get strokeStyle(): string {
+      return strokeStyle;
+    },
+    set strokeStyle(v: string) {
+      strokeStyle = v;
+    },
+    get lineWidth(): number {
+      return lineWidth;
+    },
+    set lineWidth(v: number) {
+      lineWidth = v;
+    },
+    save(): void {},
+    restore(): void {},
+    beginPath(): void {},
+    moveTo(): void {},
+    lineTo(): void {},
+    setLineDash(v: number[]): void {
+      dash = [...v];
+    },
+    stroke(): void {
+      strokes.push({ style: strokeStyle, width: lineWidth, dash: [...dash] });
+    },
+  } as unknown as CanvasRenderingContext2D;
+  return { ctx, strokes };
 }
 
 const theme = (over: Partial<ResolvedTheme> = {}): ResolvedTheme =>
@@ -91,5 +132,54 @@ describe('paintFillHandle', () => {
     paintFillHandle(ctx, { x: 0, y: 0, w: 50, h: 20 }, theme({ accent: '' }));
     const square = fills[1];
     expect(square?.style).toBe('#0078d4');
+  });
+});
+
+describe('paintCellBorders', () => {
+  it('uses the Excel-like automatic border color instead of the gridline color', () => {
+    const { ctx, strokes } = makeStrokeSpy();
+    paintCellBorders({
+      ctx,
+      bounds: { x: 0, y: 0, w: 80, h: 24 },
+      theme: theme({ fgStrong: '#111111', ruleStrong: '#999999' }),
+      value: { kind: 'blank' },
+      formula: null,
+      isActive: false,
+      isInRange: false,
+      format: { borders: { bottom: true } },
+    });
+
+    expect(strokes).toHaveLength(1);
+    expect(strokes[0]?.style).toBe('#111111');
+  });
+
+  it('honors explicit border colors from cell format', () => {
+    const { ctx, strokes } = makeStrokeSpy();
+    paintCellBorders({
+      ctx,
+      bounds: { x: 0, y: 0, w: 80, h: 24 },
+      theme: theme({ fgStrong: '#111111' }),
+      value: { kind: 'blank' },
+      formula: null,
+      isActive: false,
+      isInRange: false,
+      format: { borders: { bottom: { style: 'thin', color: '#c00000' } } },
+    });
+
+    expect(strokes[0]?.style).toBe('#c00000');
+  });
+});
+
+describe('textBaselineY', () => {
+  it('keeps bottom-aligned text visually inside the cell padding', () => {
+    const bounds = { x: 10, y: 20, w: 80, h: 20 };
+    const box = { ascent: 10, descent: 3 };
+    expect(textBaselineY(bounds, box, 'bottom', 4)).toBe(33);
+  });
+
+  it('centers the measured text box for middle alignment', () => {
+    const bounds = { x: 0, y: 0, w: 80, h: 24 };
+    const box = { ascent: 10, descent: 4 };
+    expect(textBaselineY(bounds, box, 'middle', 4)).toBe(15);
   });
 });

@@ -226,6 +226,35 @@ export interface CellPaintCtx {
   displayOverride?: string | null;
 }
 
+export type TextVAlign = 'top' | 'middle' | 'bottom';
+
+export interface TextMetricsBox {
+  ascent: number;
+  descent: number;
+}
+
+export const textMetricsBox = (metrics: TextMetrics, fontSize: number): TextMetricsBox => ({
+  ascent:
+    Number.isFinite(metrics.actualBoundingBoxAscent) && metrics.actualBoundingBoxAscent > 0
+      ? metrics.actualBoundingBoxAscent
+      : fontSize * 0.72,
+  descent:
+    Number.isFinite(metrics.actualBoundingBoxDescent) && metrics.actualBoundingBoxDescent > 0
+      ? metrics.actualBoundingBoxDescent
+      : fontSize * 0.22,
+});
+
+export const textBaselineY = (
+  bounds: Rect,
+  box: TextMetricsBox,
+  vAlign: TextVAlign,
+  padY: number,
+): number => {
+  if (vAlign === 'top') return bounds.y + padY + box.ascent;
+  if (vAlign === 'middle') return bounds.y + (bounds.h - box.ascent - box.descent) / 2 + box.ascent;
+  return bounds.y + bounds.h - padY - box.descent;
+};
+
 /* ---- Base painters wired in MS-A. Future slots (formatting, CF, DV,
  * comments, hyperlinks) live next to these, capability-gated. ---- */
 
@@ -450,14 +479,14 @@ export function paintCellText({
   // Word-wrap path — split into lines, paint each.
   if (wrap) {
     const lines = wrapText(ctx, text, bounds.w - padX * 2 - indentPx);
-    const lineH = Math.round(fontSize * 1.25);
+    const lineH = Math.round(fontSize * 1.28);
     const totalH = lineH * lines.length;
     const vAlign = format?.vAlign ?? 'bottom';
-    let startY: number;
-    if (vAlign === 'top') startY = bounds.y + padY + lineH * 0.5;
-    else if (vAlign === 'middle') startY = bounds.y + (bounds.h - totalH) / 2 + lineH * 0.5;
-    else startY = bounds.y + bounds.h - padY - totalH + lineH * 0.5;
-    ctx.textBaseline = 'middle';
+    const measured = textMetricsBox(ctx.measureText(lines[0] ?? text), fontSize);
+    let startY = textBaselineY(bounds, measured, vAlign, padY);
+    if (vAlign === 'middle') startY -= (totalH - lineH) / 2;
+    else if (vAlign === 'bottom') startY -= (lines.length - 1) * lineH;
+    ctx.textBaseline = 'alphabetic';
     ctx.textAlign = align;
     let tx: number;
     if (align === 'right') tx = bounds.x + bounds.w - padX;
@@ -471,7 +500,7 @@ export function paintCellText({
   }
 
   // Single-line path with vertical alignment.
-  ctx.textBaseline = 'middle';
+  ctx.textBaseline = 'alphabetic';
   ctx.textAlign = align;
   let tx: number;
   if (align === 'right') tx = bounds.x + bounds.w - padX;
@@ -479,15 +508,13 @@ export function paintCellText({
   else tx = bounds.x + padX + indentPx;
 
   const vAlign = format?.vAlign ?? 'bottom';
-  let ty: number;
-  if (vAlign === 'top') ty = bounds.y + padY + fontSize * 0.6;
-  else if (vAlign === 'bottom') ty = bounds.y + bounds.h - padY - fontSize * 0.45;
-  else ty = bounds.y + bounds.h / 2 + 0.5;
+  const metrics = ctx.measureText(text);
+  const box = textMetricsBox(metrics, fontSize);
+  const ty = textBaselineY(bounds, box, vAlign, padY);
 
   ctx.fillText(text, tx, ty);
 
   if (format?.underline || format?.strike || isHyperlink) {
-    const metrics = ctx.measureText(text);
     const w = metrics.width;
     let lineX0: number;
     if (align === 'right') lineX0 = tx - w;
@@ -496,14 +523,14 @@ export function paintCellText({
     ctx.strokeStyle = ctx.fillStyle as string;
     ctx.lineWidth = 1;
     if (format?.underline || isHyperlink) {
-      const uy = Math.round(ty + fontSize * 0.45) + 0.5;
+      const uy = Math.round(ty + Math.max(2, box.descent * 0.55)) + 0.5;
       ctx.beginPath();
       ctx.moveTo(lineX0, uy);
       ctx.lineTo(lineX0 + w, uy);
       ctx.stroke();
     }
     if (format?.strike) {
-      const sy = Math.round(ty) + 0.5;
+      const sy = Math.round(ty - box.ascent * 0.34) + 0.5;
       ctx.beginPath();
       ctx.moveTo(lineX0, sy);
       ctx.lineTo(lineX0 + w, sy);
@@ -554,7 +581,8 @@ export function paintCellBorders({ ctx, bounds, theme, format }: CellPaintCtx): 
   ): void => {
     if (!side) return;
     const cfg = typeof side === 'object' ? side : { style: 'thin' as const };
-    const color = (typeof side === 'object' && side.color) || theme.ruleStrong || theme.fg;
+    const color =
+      (typeof side === 'object' && side.color) || theme.fgStrong || theme.fg || '#000000';
     const widthMap: Record<string, number> = {
       thin: 1,
       medium: 1.6,
@@ -624,16 +652,12 @@ export function paintCellBorders({ ctx, bounds, theme, format }: CellPaintCtx): 
  *  outline never gets clipped by neighbouring cell rects.
  *
  *  Excel 365 paints the active cell with a crisp ~2px green border and no
- *  inner fill. We keep a faint outer halo (1px ring of accentSoft) so the
- *  outline reads cleanly against any cell background. */
+ *  inner fill or outer halo. */
 export function paintActiveCellOutline(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
   theme: ResolvedTheme,
 ): void {
-  ctx.fillStyle = theme.accentSoft;
-  ctx.fillRect(bounds.x - 2, bounds.y - 2, bounds.w + 4, bounds.h + 4);
-
   ctx.strokeStyle = theme.accent;
   ctx.lineWidth = 2;
   ctx.strokeRect(bounds.x, bounds.y, bounds.w, bounds.h);

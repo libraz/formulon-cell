@@ -15,12 +15,16 @@ import {
   buildRowLayout,
   cellRectIn,
   colLabel,
+  colWidth,
+  frozenColsWidth,
+  frozenRowsHeight,
   gridOriginX,
   gridOriginY,
   isColVisible,
   isRowVisible,
   type Rect,
   rangeRects,
+  rowHeight,
 } from './geometry.js';
 import {
   CONDITIONAL_ICON_GUTTER,
@@ -168,11 +172,29 @@ function setValidationChevron(v: { rect: Rect; row: number; col: number } | null
 const inRange = (a: Addr, r: Range): boolean =>
   a.row >= r.r0 && a.row <= r.r1 && a.col >= r.c0 && a.col <= r.c1;
 
+const visibleCount = (
+  pixels: number,
+  start: number,
+  max: number,
+  sizeOf: (idx: number) => number,
+): number => {
+  if (pixels <= 0 || start >= max) return 1;
+  let used = 0;
+  let count = 0;
+  const cap = Math.min(max - start, 2_000);
+  while (count < cap && used < pixels) {
+    used += Math.max(0, sizeOf(start + count));
+    count += 1;
+  }
+  return Math.max(1, count + 1);
+};
+
 export interface RendererDeps {
   host: HTMLElement;
   canvas: HTMLCanvasElement;
   getState: () => State;
   getTheme: () => ResolvedTheme;
+  onViewportSize?: (rowCount: number, colCount: number) => void;
   /** Optional accessor for the active workbook. When supplied and the engine
    *  exposes `evaluateCfRange`, conditional-format rules loaded from the
    *  .xlsx are evaluated alongside the JS-side rule set and overlaid on top
@@ -209,6 +231,8 @@ export class GridRenderer {
 
   private readonly getDisplay: RendererDeps['getDisplay'];
 
+  private readonly onViewportSize: RendererDeps['onViewportSize'];
+
   private dpr = 1;
 
   private cssWidth = 0;
@@ -227,6 +251,7 @@ export class GridRenderer {
     this.getTheme = deps.getTheme;
     this.getWb = deps.getWb ?? ((): WorkbookHandle | null => null);
     this.getDisplay = deps.getDisplay;
+    this.onViewportSize = deps.onViewportSize;
   }
 
   resize(): void {
@@ -238,7 +263,34 @@ export class GridRenderer {
     this.canvas.height = Math.round(this.cssHeight * this.dpr);
     this.canvas.style.width = `${this.cssWidth}px`;
     this.canvas.style.height = `${this.cssHeight}px`;
+    this.resizeViewport();
     this.invalidate();
+  }
+
+  private resizeViewport(): void {
+    if (!this.onViewportSize) return;
+    const state = this.getState();
+    const { layout, viewport } = state;
+    const bodyH = Math.max(
+      0,
+      this.cssHeight - gridOriginY(layout) - frozenRowsHeight(layout),
+    );
+    const bodyW = Math.max(0, this.cssWidth - gridOriginX(layout) - frozenColsWidth(layout));
+    const firstRow = Math.max(viewport.rowStart, layout.freezeRows);
+    const firstCol = Math.max(viewport.colStart, layout.freezeCols);
+    const rowCount = visibleCount(
+      bodyH,
+      firstRow,
+      1_048_576,
+      (idx) => rowHeight(layout, idx),
+    );
+    const colCount = visibleCount(
+      bodyW,
+      firstCol,
+      16_384,
+      (idx) => colWidth(layout, idx),
+    );
+    this.onViewportSize(rowCount, colCount);
   }
 
   invalidate(): void {
@@ -627,6 +679,16 @@ export class GridRenderer {
 
     ctx.fillStyle = theme.bgRail;
     ctx.fillRect(0, 0, ox, oy);
+    ctx.save();
+    ctx.fillStyle = theme.headerFg;
+    ctx.globalAlpha = 0.42;
+    ctx.beginPath();
+    ctx.moveTo(labelLeftX + 10, labelTopY + layout.headerRowHeight - 7);
+    ctx.lineTo(ox - 7, labelTopY + 7);
+    ctx.lineTo(ox - 7, labelTopY + layout.headerRowHeight - 7);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
 
     ctx.fillStyle = theme.bgRail;
     ctx.fillRect(ox, 0, this.cssWidth - ox, oy);
@@ -645,20 +707,39 @@ export class GridRenderer {
     const firstRow = rows.visible[0] ?? 0;
     const firstCol = cols.visible[0] ?? 0;
 
-    ctx.font = `500 ${theme.textHeader}px ${theme.fontMono}`;
+    ctx.font = `500 ${theme.textHeader}px ${theme.fontUi}`;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
     const r1c1 = state.ui.r1c1 === true;
     const fr = state.ui.filterRange;
+    const selectedRanges = [selection.range, ...(selection.extraRanges ?? [])];
+    const colSelected = (col: number): boolean =>
+      selectedRanges.some((r) => col >= r.c0 && col <= r.c1);
+    const rowSelected = (row: number): boolean =>
+      selectedRanges.some((r) => row >= r.r0 && row <= r.r1);
     for (const c of cols.visible) {
       const rect = cellRectIn(layout, cols, rows, firstRow, c);
       const w = cols.sizeAt.get(c) ?? 0;
       const isActiveCol = c === active.col;
+      const isSelectedCol = colSelected(c);
       if (isActiveCol) {
+        ctx.fillStyle = theme.accent;
+        ctx.fillRect(rect.x, labelTopY, w, layout.headerRowHeight);
+      } else if (isSelectedCol) {
         ctx.fillStyle = theme.bgHeader;
         ctx.fillRect(rect.x, labelTopY, w, layout.headerRowHeight);
       }
-      ctx.fillStyle = isActiveCol ? theme.headerFgActive : theme.headerFg;
+      ctx.strokeStyle = theme.rule;
+      ctx.lineWidth = 1 / this.dpr;
+      ctx.beginPath();
+      ctx.moveTo(Math.round(rect.x + w) + align, labelTopY);
+      ctx.lineTo(Math.round(rect.x + w) + align, oy);
+      ctx.stroke();
+      ctx.fillStyle = isActiveCol
+        ? theme.accentFg
+        : isSelectedCol
+          ? theme.headerFgActive
+          : theme.headerFg;
       const label = r1c1 ? `C${c + 1}` : colLabel(c);
       ctx.fillText(label, rect.x + w / 2, labelTopY + layout.headerRowHeight / 2 + 0.5);
 
@@ -711,11 +792,25 @@ export class GridRenderer {
       const rect = cellRectIn(layout, cols, rows, r, firstCol);
       const h = rows.sizeAt.get(r) ?? 0;
       const isActiveRow = r === active.row;
+      const isSelectedRow = rowSelected(r);
       if (isActiveRow) {
+        ctx.fillStyle = theme.accent;
+        ctx.fillRect(labelLeftX, rect.y, layout.headerColWidth, h);
+      } else if (isSelectedRow) {
         ctx.fillStyle = theme.bgHeader;
         ctx.fillRect(labelLeftX, rect.y, layout.headerColWidth, h);
       }
-      ctx.fillStyle = isActiveRow ? theme.headerFgActive : theme.headerFg;
+      ctx.strokeStyle = theme.rule;
+      ctx.lineWidth = 1 / this.dpr;
+      ctx.beginPath();
+      ctx.moveTo(labelLeftX, Math.round(rect.y + h) + align);
+      ctx.lineTo(ox, Math.round(rect.y + h) + align);
+      ctx.stroke();
+      ctx.fillStyle = isActiveRow
+        ? theme.accentFg
+        : isSelectedRow
+          ? theme.headerFgActive
+          : theme.headerFg;
       const rowLabel = r1c1 ? `R${r + 1}` : String(r + 1);
       ctx.fillText(rowLabel, ox - 8, rect.y + h / 2 + 0.5);
     }
@@ -829,6 +924,7 @@ export class GridRenderer {
   ): void {
     const { layout, viewport, selection, ui, format, data } = state;
     const a = selection.active;
+    const r = selection.range;
     setFillHandleRect(null);
     setValidationChevron(null);
 
@@ -842,13 +938,25 @@ export class GridRenderer {
       }
     }
 
+    if (r.r0 !== r.r1 || r.c0 !== r.c1) {
+      const rects = rangeRects(layout, viewport, r);
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.strokeStyle = theme.accent;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      for (const rect of rects) {
+        ctx.strokeRect(rect.x + 1, rect.y + 1, Math.max(0, rect.w - 2), Math.max(0, rect.h - 2));
+      }
+      ctx.restore();
+    }
+
     const preview = ui.fillPreview;
     if (preview) {
       const rects = rangeRects(layout, viewport, preview);
       for (const r of rects) paintFillPreview(this.ctx, r, theme);
     }
 
-    const r = selection.range;
     if (isRowVisible(layout, viewport, r.r1) && isColVisible(layout, viewport, r.c1)) {
       const cornerCell = cellRectIn(layout, cols, rows, r.r1, r.c1);
       setFillHandleRect(paintFillHandle(this.ctx, cornerCell, theme));
