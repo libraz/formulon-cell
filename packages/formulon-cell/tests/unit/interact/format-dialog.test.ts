@@ -597,31 +597,20 @@ describe('attachFormatDialog', () => {
     handle.detach();
   });
 
-  it('individual border checkboxes flip sides', () => {
+  it('visual line style picker sets the active border style', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const top = host.querySelector<HTMLInputElement>(
-      'input[data-fc-check="borderTop"]',
-    ) as HTMLInputElement;
-    const bottom = host.querySelector<HTMLInputElement>(
-      'input[data-fc-check="borderBottom"]',
-    ) as HTMLInputElement;
-    const left = host.querySelector<HTMLInputElement>(
-      'input[data-fc-check="borderLeft"]',
-    ) as HTMLInputElement;
-    const right = host.querySelector<HTMLInputElement>(
-      'input[data-fc-check="borderRight"]',
-    ) as HTMLInputElement;
+    const thick = host.querySelector<HTMLButtonElement>(
+      'button[data-border-style="thick"]',
+    ) as HTMLButtonElement;
+    const top = host.querySelector<HTMLButtonElement>(
+      'button[data-border-side="top"]',
+    ) as HTMLButtonElement;
+    thick.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    top.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    top.checked = true;
-    top.dispatchEvent(new Event('change', { bubbles: true }));
-    bottom.checked = true;
-    bottom.dispatchEvent(new Event('change', { bubbles: true }));
-    left.checked = true;
-    left.dispatchEvent(new Event('change', { bubbles: true }));
-    right.checked = true;
-    right.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(thick.getAttribute('aria-pressed')).toBe('true');
 
     const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -629,15 +618,59 @@ describe('attachFormatDialog', () => {
     const borders = store
       .getState()
       .format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.borders;
-    const thinSide = { style: 'thin' };
-    expect(borders).toEqual({
-      top: thinSide,
-      right: thinSide,
-      bottom: thinSide,
-      left: thinSide,
-      diagonalDown: false,
-      diagonalUp: false,
-    });
+    expect(borders?.top).toEqual({ style: 'thick' });
+    handle.detach();
+  });
+
+  it('visual border preview buttons toggle sides', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+
+    const top = host.querySelector<HTMLButtonElement>(
+      'button[data-border-side="top"]',
+    ) as HTMLButtonElement;
+    const left = host.querySelector<HTMLButtonElement>(
+      'button[data-border-side="left"]',
+    ) as HTMLButtonElement;
+    top.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    left.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(top.getAttribute('aria-pressed')).toBe('true');
+    expect(left.getAttribute('aria-pressed')).toBe('true');
+
+    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const borders = store
+      .getState()
+      .format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.borders;
+    expect(borders?.top).toEqual({ style: 'thin' });
+    expect(borders?.left).toEqual({ style: 'thin' });
+
+    handle.detach();
+  });
+
+  it('border color swatches set the active line color', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+
+    const borderSwatch = host.querySelector<HTMLButtonElement>(
+      '[data-swatches="border"] button[data-color="#c00000"]',
+    ) as HTMLButtonElement;
+    const bottom = host.querySelector<HTMLButtonElement>(
+      'button[data-border-side="bottom"]',
+    ) as HTMLButtonElement;
+    borderSwatch.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    bottom.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const borders = store
+      .getState()
+      .format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.borders;
+    expect(borders?.bottom).toEqual({ style: 'thin', color: '#c00000' });
+
     handle.detach();
   });
 
@@ -666,6 +699,29 @@ describe('attachFormatDialog', () => {
     expect(
       store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.fill,
     ).toBeUndefined();
+
+    handle.detach();
+  });
+
+  it('font and fill swatches apply colors', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+
+    const fontSwatch = host.querySelector<HTMLButtonElement>(
+      '[data-swatches="font"] button[data-color="#0070c0"]',
+    ) as HTMLButtonElement;
+    const fillSwatch = host.querySelector<HTMLButtonElement>(
+      '[data-swatches="fill"] button[data-color="#ffff00"]',
+    ) as HTMLButtonElement;
+    fontSwatch.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    fillSwatch.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
+    expect(fmt?.color).toBe('#0070c0');
+    expect(fmt?.fill).toBe('#ffff00');
 
     handle.detach();
   });

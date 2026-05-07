@@ -112,6 +112,20 @@ const COMMON_FONTS = [
   'monospace',
 ];
 const CURRENCY_SYMBOLS = ['$', '¥', '€', '£'];
+const THEME_SWATCHES = [
+  '#000000',
+  '#ffffff',
+  '#c00000',
+  '#ff0000',
+  '#ffc000',
+  '#ffff00',
+  '#92d050',
+  '#00b050',
+  '#00b0f0',
+  '#0070c0',
+  '#002060',
+  '#7030a0',
+] as const;
 
 export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const { host, store } = deps;
@@ -212,10 +226,27 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     return b;
   };
 
+  const makeSwatches = (kind: 'font' | 'border' | 'fill'): HTMLDivElement => {
+    const group = document.createElement('div');
+    group.className = 'fc-fmtdlg__swatches';
+    group.dataset.swatches = kind;
+    for (const color of THEME_SWATCHES) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'fc-fmtdlg__swatch';
+      btn.dataset.color = color;
+      btn.title = color;
+      btn.setAttribute('aria-label', color);
+      btn.style.backgroundColor = color;
+      group.appendChild(btn);
+    }
+    return group;
+  };
+
   // ── Number tab ─────────────────────────────────────────────────────────
   const numberPanel = tabPanels.get('number') as HTMLDivElement;
   const numberLayout = document.createElement('div');
-  numberLayout.className = 'fc-fmtdlg__row';
+  numberLayout.className = 'fc-fmtdlg__number-layout';
   numberPanel.appendChild(numberLayout);
 
   const catList = document.createElement('div');
@@ -251,6 +282,15 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const numberControls = document.createElement('div');
   numberControls.className = 'fc-fmtdlg__cat-controls';
   numberLayout.appendChild(numberControls);
+
+  const numberSummary = document.createElement('div');
+  numberSummary.className = 'fc-fmtdlg__number-summary';
+  const numberSummaryTitle = document.createElement('div');
+  numberSummaryTitle.className = 'fc-fmtdlg__number-title';
+  const numberSummaryDesc = document.createElement('p');
+  numberSummaryDesc.className = 'fc-fmtdlg__number-desc';
+  numberSummary.append(numberSummaryTitle, numberSummaryDesc);
+  numberControls.appendChild(numberSummary);
 
   const decimalsRow = document.createElement('label');
   decimalsRow.className = 'fc-fmtdlg__row';
@@ -294,9 +334,15 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
 
   // Live preview readout — shows the demo number after applying the active
   //  category. Excel's number tab shows this in the "Sample" header.
-  const samplePreview = document.createElement('div');
-  samplePreview.className = 'fc-fmtdlg__sample';
-  numberControls.appendChild(samplePreview);
+  const sampleBox = document.createElement('div');
+  sampleBox.className = 'fc-fmtdlg__sample';
+  const sampleLabel = document.createElement('span');
+  sampleLabel.className = 'fc-fmtdlg__sample-label';
+  sampleLabel.textContent = t.preview;
+  const samplePreview = document.createElement('span');
+  samplePreview.className = 'fc-fmtdlg__sample-value';
+  sampleBox.append(sampleLabel, samplePreview);
+  numberControls.appendChild(sampleBox);
 
   // ── Alignment tab ──────────────────────────────────────────────────────
   const alignPanel = tabPanels.get('align') as HTMLDivElement;
@@ -306,7 +352,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   hAlignLegend.textContent = t.horizontalAlign;
   alignPanel.appendChild(hAlignLegend);
   const hAlignFieldset = document.createElement('div');
-  hAlignFieldset.className = 'fc-fmtdlg__row';
+  hAlignFieldset.className = 'fc-fmtdlg__choice-grid';
   alignPanel.appendChild(hAlignFieldset);
 
   const hAlignName = `fc-fmtdlg-halign-${Math.random().toString(36).slice(2, 8)}`;
@@ -336,7 +382,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   vAlignLegend.textContent = t.verticalAlign;
   alignPanel.appendChild(vAlignLegend);
   const vAlignFieldset = document.createElement('div');
-  vAlignFieldset.className = 'fc-fmtdlg__row';
+  vAlignFieldset.className = 'fc-fmtdlg__choice-grid';
   alignPanel.appendChild(vAlignFieldset);
 
   const vAlignName = `fc-fmtdlg-valign-${Math.random().toString(36).slice(2, 8)}`;
@@ -363,7 +409,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
 
   // Wrap / Indent / Rotation
   const wrapRow = document.createElement('div');
-  wrapRow.className = 'fc-fmtdlg__row';
+  wrapRow.className = 'fc-fmtdlg__choice-grid';
   alignPanel.appendChild(wrapRow);
   const wrapCk = makeCheckbox(t.wrap);
   wrapCk.input.dataset.fcCheck = 'wrap';
@@ -397,7 +443,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const fontPanel = tabPanels.get('font') as HTMLDivElement;
 
   const styleRow = document.createElement('div');
-  styleRow.className = 'fc-fmtdlg__row';
+  styleRow.className = 'fc-fmtdlg__choice-grid';
   fontPanel.appendChild(styleRow);
 
   const boldCk = makeCheckbox(t.fontBold);
@@ -456,6 +502,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const colorReset = makeBtn(t.resetToDefault);
   colorRow.append(colorLabel, colorInput, colorReset);
   fontPanel.appendChild(colorRow);
+  const fontSwatches = makeSwatches('font');
+  fontPanel.appendChild(fontSwatches);
 
   // ── Border tab ─────────────────────────────────────────────────────────
   const borderPanel = tabPanels.get('border') as HTMLDivElement;
@@ -483,6 +531,26 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   borderStyleRow.append(borderStyleLabel, borderStyleSelect);
   borderPanel.appendChild(borderStyleRow);
 
+  const borderStyleGallery = document.createElement('div');
+  borderStyleGallery.className = 'fc-fmtdlg__line-gallery';
+  const borderStyleButtons = new Map<BorderStyleKey, HTMLButtonElement>();
+  for (const s of styleOptions) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `fc-fmtdlg__line-style fc-fmtdlg__line-style--${s.id}`;
+    btn.dataset.borderStyle = s.id;
+    btn.setAttribute('aria-label', s.label);
+    btn.setAttribute('aria-pressed', 'false');
+    const sample = document.createElement('span');
+    sample.className = 'fc-fmtdlg__line-sample';
+    const label = document.createElement('span');
+    label.textContent = s.label;
+    btn.append(sample, label);
+    borderStyleButtons.set(s.id, btn);
+    borderStyleGallery.appendChild(btn);
+  }
+  borderPanel.appendChild(borderStyleGallery);
+
   const borderColorRow = document.createElement('div');
   borderColorRow.className = 'fc-fmtdlg__row';
   const borderColorLabel = document.createElement('span');
@@ -493,6 +561,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const borderColorReset = makeBtn(t.resetToDefault);
   borderColorRow.append(borderColorLabel, borderColorInput, borderColorReset);
   borderPanel.appendChild(borderColorRow);
+  const borderSwatches = makeSwatches('border');
+  borderPanel.appendChild(borderSwatches);
 
   // Presets
   const presetRow = document.createElement('div');
@@ -505,7 +575,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
 
   // Per-side checkboxes
   const sideRow = document.createElement('div');
-  sideRow.className = 'fc-fmtdlg__row';
+  sideRow.className = 'fc-fmtdlg__row fc-fmtdlg__legacy-border-controls';
   borderPanel.appendChild(sideRow);
   const topCk = makeCheckbox(t.borderTop);
   topCk.input.dataset.fcCheck = 'borderTop';
@@ -518,7 +588,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   sideRow.append(topCk.wrap, bottomCk.wrap, leftCk.wrap, rightCk.wrap);
 
   const diagonalRow = document.createElement('div');
-  diagonalRow.className = 'fc-fmtdlg__row';
+  diagonalRow.className = 'fc-fmtdlg__row fc-fmtdlg__legacy-border-controls';
   borderPanel.appendChild(diagonalRow);
   const diagDownCk = makeCheckbox(t.borderDiagonalDown);
   diagDownCk.input.dataset.fcCheck = 'borderDiagonalDown';
@@ -526,8 +596,48 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   diagUpCk.input.dataset.fcCheck = 'borderDiagonalUp';
   diagonalRow.append(diagDownCk.wrap, diagUpCk.wrap);
 
+  const borderVisual = document.createElement('div');
+  borderVisual.className = 'fc-fmtdlg__border-visual';
+  const borderVisualTitle = document.createElement('div');
+  borderVisualTitle.className = 'fc-fmtdlg__border-title';
+  borderVisualTitle.textContent = t.preview;
+  const borderVisualStage = document.createElement('div');
+  borderVisualStage.className = 'fc-fmtdlg__border-stage';
+  const borderVisualPreview = document.createElement('div');
+  borderVisualPreview.className = 'fc-fmtdlg__border-preview';
+  borderVisualPreview.textContent = 'Text';
+  const visualSideButtons = new Map<SideKey, HTMLButtonElement>();
+  const makeVisualSideButton = (key: SideKey, label: string): HTMLButtonElement => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `fc-fmtdlg__border-hit fc-fmtdlg__border-hit--${key}`;
+    btn.dataset.borderSide = key;
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('aria-pressed', 'false');
+    visualSideButtons.set(key, btn);
+    return btn;
+  };
+  borderVisualStage.append(
+    borderVisualPreview,
+    makeVisualSideButton('top', t.borderTop),
+    makeVisualSideButton('right', t.borderRight),
+    makeVisualSideButton('bottom', t.borderBottom),
+    makeVisualSideButton('left', t.borderLeft),
+    makeVisualSideButton('diagonalDown', t.borderDiagonalDown),
+    makeVisualSideButton('diagonalUp', t.borderDiagonalUp),
+  );
+  borderVisual.append(borderVisualTitle, borderVisualStage);
+  borderPanel.appendChild(borderVisual);
+
   // ── Fill tab ───────────────────────────────────────────────────────────
   const fillPanel = tabPanels.get('fill') as HTMLDivElement;
+  const fillSection = document.createElement('div');
+  fillSection.className = 'fc-fmtdlg__section';
+  const fillSectionTitle = document.createElement('div');
+  fillSectionTitle.className = 'fc-fmtdlg__section-title';
+  fillSectionTitle.textContent = t.fill;
+  fillSection.appendChild(fillSectionTitle);
+  fillPanel.appendChild(fillSection);
   const fillRow = document.createElement('div');
   fillRow.className = 'fc-fmtdlg__row';
   const fillLabel = document.createElement('span');
@@ -537,27 +647,49 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   fillInput.dataset.fcColor = 'fill';
   const fillReset = makeBtn(t.fillNone);
   fillRow.append(fillLabel, fillInput, fillReset);
-  fillPanel.appendChild(fillRow);
+  fillSection.appendChild(fillRow);
+  const fillSwatches = makeSwatches('fill');
+  fillSection.appendChild(fillSwatches);
 
   // ── Protection tab ─────────────────────────────────────────────────────
   const protectionPanel = tabPanels.get('protection') as HTMLDivElement;
+  const protectionSection = document.createElement('div');
+  protectionSection.className = 'fc-fmtdlg__section';
+  const protectionSectionTitle = document.createElement('div');
+  protectionSectionTitle.className = 'fc-fmtdlg__section-title';
+  protectionSectionTitle.textContent = strings.protection.tabProtection;
+  protectionSection.appendChild(protectionSectionTitle);
+  protectionPanel.appendChild(protectionSection);
   const lockedRow = document.createElement('div');
   lockedRow.className = 'fc-fmtdlg__row';
   const lockedCk = makeCheckbox(strings.protection.locked);
   lockedCk.input.dataset.fcCheck = 'locked';
   lockedRow.append(lockedCk.wrap);
-  protectionPanel.appendChild(lockedRow);
+  protectionSection.appendChild(lockedRow);
   const lockedHint = document.createElement('div');
   lockedHint.className = 'fc-fmtdlg__hint';
   lockedHint.textContent = strings.protection.lockedHint;
-  protectionPanel.appendChild(lockedHint);
+  protectionSection.appendChild(lockedHint);
 
   // ── More tab (hyperlink / comment / validation) ────────────────────────
   const morePanel = tabPanels.get('more') as HTMLDivElement;
+  const makeSection = (title: string): HTMLDivElement => {
+    const section = document.createElement('div');
+    section.className = 'fc-fmtdlg__section';
+    const heading = document.createElement('div');
+    heading.className = 'fc-fmtdlg__section-title';
+    heading.textContent = title;
+    section.appendChild(heading);
+    return section;
+  };
+  const hyperlinkSection = makeSection(t.hyperlink);
+  const commentSection = makeSection(t.comment);
+  const validationSection = makeSection(t.validationLegend);
+  morePanel.append(hyperlinkSection, commentSection, validationSection);
 
   const hlRow = document.createElement('div');
   hlRow.className = 'fc-fmtdlg__row';
-  morePanel.appendChild(hlRow);
+  hyperlinkSection.appendChild(hlRow);
   const hlLabel = document.createElement('span');
   hlLabel.textContent = t.hyperlink;
   const hlInput = document.createElement('input');
@@ -568,22 +700,15 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const hlClear = makeBtn(t.clearField);
   hlRow.append(hlLabel, hlInput, hlClear);
 
-  const commentLegend = document.createElement('div');
-  commentLegend.textContent = t.comment;
-  morePanel.appendChild(commentLegend);
   const commentRow = document.createElement('div');
   commentRow.className = 'fc-fmtdlg__row fc-fmtdlg__row--block';
-  morePanel.appendChild(commentRow);
+  commentSection.appendChild(commentRow);
   const commentArea = document.createElement('textarea');
   commentArea.className = 'fc-fmtdlg__textarea';
   commentArea.rows = 3;
   commentArea.placeholder = t.commentPlaceholder;
   const commentClear = makeBtn(t.clearField);
   commentRow.append(commentArea, commentClear);
-
-  const validationLegend = document.createElement('div');
-  validationLegend.textContent = t.validationLegend;
-  morePanel.appendChild(validationLegend);
 
   // Kind selector — drives the visibility of the bound/formula/list rows.
   const validationKindRow = document.createElement('label');
@@ -608,7 +733,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     validationKindSelect.appendChild(opt);
   }
   validationKindRow.append(validationKindLabel, validationKindSelect);
-  morePanel.appendChild(validationKindRow);
+  validationSection.appendChild(validationKindRow);
 
   // Op selector — visible for whole/decimal/date/time/textLength.
   const validationOpRow = document.createElement('label');
@@ -633,7 +758,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     validationOpSelect.appendChild(opt);
   }
   validationOpRow.append(validationOpLabel, validationOpSelect);
-  morePanel.appendChild(validationOpRow);
+  validationSection.appendChild(validationOpRow);
 
   const validationARow = document.createElement('label');
   validationARow.className = 'fc-fmtdlg__row';
@@ -643,7 +768,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   validationAInput.type = 'number';
   validationAInput.step = 'any';
   validationARow.append(validationALabel, validationAInput);
-  morePanel.appendChild(validationARow);
+  validationSection.appendChild(validationARow);
 
   const validationBRow = document.createElement('label');
   validationBRow.className = 'fc-fmtdlg__row';
@@ -653,7 +778,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   validationBInput.type = 'number';
   validationBInput.step = 'any';
   validationBRow.append(validationBLabel, validationBInput);
-  morePanel.appendChild(validationBRow);
+  validationSection.appendChild(validationBRow);
 
   // Custom-kind formula.
   const validationFormulaRow = document.createElement('label');
@@ -666,7 +791,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   validationFormulaInput.autocomplete = 'off';
   validationFormulaInput.placeholder = t.validationFormulaPlaceholder;
   validationFormulaRow.append(validationFormulaLabel, validationFormulaInput);
-  morePanel.appendChild(validationFormulaRow);
+  validationSection.appendChild(validationFormulaRow);
 
   // List source — visible only when kind === 'list'. The radio toggles between
   // an inline value list (textarea) and a range reference (single-line input).
@@ -696,17 +821,17 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     validationListLiteralRadio.wrap,
     validationListRangeRadio.wrap,
   );
-  morePanel.appendChild(validationListSourceKindRow);
+  validationSection.appendChild(validationListSourceKindRow);
 
   const validationRow = document.createElement('div');
   validationRow.className = 'fc-fmtdlg__row fc-fmtdlg__row--block';
-  morePanel.appendChild(validationRow);
   const validationArea = document.createElement('textarea');
   validationArea.className = 'fc-fmtdlg__textarea';
   validationArea.rows = 4;
   validationArea.placeholder = t.validationListPlaceholder;
   const validationClear = makeBtn(t.clearField);
   validationRow.append(validationArea, validationClear);
+  validationSection.appendChild(validationRow);
 
   // Range-ref input. Hidden unless source kind === 'range'.
   const validationListRangeRow = document.createElement('label');
@@ -719,7 +844,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   validationListRangeInput.autocomplete = 'off';
   validationListRangeInput.placeholder = t.validationListRangePlaceholder;
   validationListRangeRow.append(validationListRangeLabel, validationListRangeInput);
-  morePanel.appendChild(validationListRangeRow);
+  validationSection.appendChild(validationListRangeRow);
 
   // Allow-blank checkbox + error-style selector.
   const validationAllowBlankRow = document.createElement('label');
@@ -729,7 +854,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const validationAllowBlankSpan = document.createElement('span');
   validationAllowBlankSpan.textContent = t.validationAllowBlank;
   validationAllowBlankRow.append(validationAllowBlankInput, validationAllowBlankSpan);
-  morePanel.appendChild(validationAllowBlankRow);
+  validationSection.appendChild(validationAllowBlankRow);
 
   const validationErrorStyleRow = document.createElement('label');
   validationErrorStyleRow.className = 'fc-fmtdlg__row';
@@ -747,7 +872,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     validationErrorStyleSelect.appendChild(opt);
   }
   validationErrorStyleRow.append(validationErrorStyleLabel, validationErrorStyleSelect);
-  morePanel.appendChild(validationErrorStyleRow);
+  validationSection.appendChild(validationErrorStyleRow);
 
   // ── Footer buttons ─────────────────────────────────────────────────────
   const cancelBtn = makeBtn(t.cancel);
@@ -1022,6 +1147,9 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
 
     // Borders
     borderStyleSelect.value = draft.borderStyle;
+    for (const [id, btn] of borderStyleButtons) {
+      btn.setAttribute('aria-pressed', id === draft.borderStyle ? 'true' : 'false');
+    }
     borderColorInput.value =
       draft.borderColor && isHexColor(draft.borderColor) ? draft.borderColor : '#000000';
     topCk.input.checked = !!draft.borders.top;
@@ -1087,6 +1215,9 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     decimalsRow.hidden = !decimalsCats.has(cat);
     symbolRow.hidden = !symbolCats.has(cat);
     patternRow.hidden = !patternCats.has(cat);
+    const active = catDefs.find((c) => c.id === cat);
+    numberSummaryTitle.textContent = active?.label ?? t.catGeneral;
+    numberSummaryDesc.textContent = numberCategoryDescription(cat);
   };
 
   // ── Border helpers ─────────────────────────────────────────────────────
@@ -1151,6 +1282,27 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     preview.style.borderRight = cssBorder(draft.borders.right);
     preview.style.borderBottom = cssBorder(draft.borders.bottom);
     preview.style.borderLeft = cssBorder(draft.borders.left);
+    borderVisualPreview.style.borderTop = cssBorder(draft.borders.top);
+    borderVisualPreview.style.borderRight = cssBorder(draft.borders.right);
+    borderVisualPreview.style.borderBottom = cssBorder(draft.borders.bottom);
+    borderVisualPreview.style.borderLeft = cssBorder(draft.borders.left);
+    borderVisualPreview.classList.toggle(
+      'fc-fmtdlg__border-preview--diag-down',
+      !!draft.borders.diagonalDown,
+    );
+    borderVisualPreview.classList.toggle(
+      'fc-fmtdlg__border-preview--diag-up',
+      !!draft.borders.diagonalUp,
+    );
+    const diagSide = draft.borders.diagonalDown || draft.borders.diagonalUp || activeSide();
+    const diagCfg = typeof diagSide === 'object' ? diagSide : { style: 'thin' as const };
+    const diagColor = (typeof diagSide === 'object' && diagSide.color) || 'currentColor';
+    const diagWidth = diagCfg.style === 'thick' ? 3 : diagCfg.style === 'medium' ? 2 : 1;
+    borderVisualPreview.style.setProperty('--fc-fmtdlg-border-diag-color', diagColor);
+    borderVisualPreview.style.setProperty('--fc-fmtdlg-border-diag-width', `${diagWidth}px`);
+    for (const [key, btn] of visualSideButtons) {
+      btn.setAttribute('aria-pressed', draft.borders[key] ? 'true' : 'false');
+    }
 
     const numFmt = computeNumFmt();
     // Pick a sample value that exercises the active category. Date/time
@@ -1176,6 +1328,33 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
         return '0.00';
       default:
         return '';
+    }
+  };
+
+  const numberCategoryDescription = (cat: NumberCategory): string => {
+    switch (cat) {
+      case 'fixed':
+        return 'Numbers with a fixed decimal count.';
+      case 'currency':
+        return 'Currency values with a symbol and grouped thousands.';
+      case 'accounting':
+        return 'Accounting layout with aligned currency symbols and negatives.';
+      case 'percent':
+        return 'Percent values with configurable decimal places.';
+      case 'scientific':
+        return 'Scientific notation for very large or small numbers.';
+      case 'date':
+        return 'Date serials rendered with a date pattern.';
+      case 'time':
+        return 'Time fractions rendered with a time pattern.';
+      case 'datetime':
+        return 'Combined date and time display.';
+      case 'text':
+        return 'Treat cell content as text.';
+      case 'custom':
+        return 'Use a custom number format pattern.';
+      default:
+        return 'Default spreadsheet formatting based on the cell value.';
     }
   };
   const computeNumFmt = (): NumFmt => {
@@ -1412,11 +1591,30 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     draft.color = undefined;
     renderPreview();
   };
+  const onFontSwatchClick = (e: Event): void => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-color]');
+    const color = btn?.dataset.color;
+    if (!color) return;
+    draft.color = color;
+    colorInput.value = color;
+    renderPreview();
+  };
 
   // Border events
   const onBorderStyleChange = (): void => {
     draft.borderStyle = borderStyleSelect.value as BorderStyleKey;
     restyleExistingSides();
+    syncControlsFromDraft();
+    renderPreview();
+  };
+  const onBorderStyleGalleryClick = (e: Event): void => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-border-style]');
+    const style = btn?.dataset.borderStyle as BorderStyleKey | undefined;
+    if (!style) return;
+    draft.borderStyle = style;
+    borderStyleSelect.value = style;
+    restyleExistingSides();
+    syncControlsFromDraft();
     renderPreview();
   };
   const onBorderColorInput = (): void => {
@@ -1426,6 +1624,15 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
   const onBorderColorReset = (): void => {
     draft.borderColor = undefined;
+    restyleExistingSides();
+    renderPreview();
+  };
+  const onBorderSwatchClick = (e: Event): void => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-color]');
+    const color = btn?.dataset.color;
+    if (!color) return;
+    draft.borderColor = color;
+    borderColorInput.value = color;
     restyleExistingSides();
     renderPreview();
   };
@@ -1480,6 +1687,14 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     setSide('diagonalUp', diagUpCk.input.checked);
     renderPreview();
   };
+  const onVisualSideClick = (e: Event): void => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-border-side]');
+    if (!btn) return;
+    const key = btn.dataset.borderSide as SideKey;
+    setSide(key, !draft.borders[key]);
+    syncControlsFromDraft();
+    renderPreview();
+  };
 
   const onFillInput = (): void => {
     draft.fill = fillInput.value;
@@ -1487,6 +1702,14 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
   const onFillReset = (): void => {
     draft.fill = undefined;
+    renderPreview();
+  };
+  const onFillSwatchClick = (e: Event): void => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-color]');
+    const color = btn?.dataset.color;
+    if (!color) return;
+    draft.fill = color;
+    fillInput.value = color;
     renderPreview();
   };
 
@@ -1593,9 +1816,12 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   sizeInput.addEventListener('input', onSizeInput);
   colorInput.addEventListener('input', onColorInput);
   colorReset.addEventListener('click', onColorReset);
+  fontSwatches.addEventListener('click', onFontSwatchClick);
   borderStyleSelect.addEventListener('change', onBorderStyleChange);
+  borderStyleGallery.addEventListener('click', onBorderStyleGalleryClick);
   borderColorInput.addEventListener('input', onBorderColorInput);
   borderColorReset.addEventListener('click', onBorderColorReset);
+  borderSwatches.addEventListener('click', onBorderSwatchClick);
   presetNone.addEventListener('click', onPresetNone);
   presetOutline.addEventListener('click', onPresetOutline);
   presetAll.addEventListener('click', onPresetAll);
@@ -1605,8 +1831,10 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   rightCk.input.addEventListener('change', onRightChange);
   diagDownCk.input.addEventListener('change', onDiagDownChange);
   diagUpCk.input.addEventListener('change', onDiagUpChange);
+  borderVisualStage.addEventListener('click', onVisualSideClick);
   fillInput.addEventListener('input', onFillInput);
   fillReset.addEventListener('click', onFillReset);
+  fillSwatches.addEventListener('click', onFillSwatchClick);
   lockedCk.input.addEventListener('change', onLockedChange);
   hlInput.addEventListener('input', onHlInput);
   hlClear.addEventListener('click', onHlClear);
@@ -1661,9 +1889,12 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       sizeInput.removeEventListener('input', onSizeInput);
       colorInput.removeEventListener('input', onColorInput);
       colorReset.removeEventListener('click', onColorReset);
+      fontSwatches.removeEventListener('click', onFontSwatchClick);
       borderStyleSelect.removeEventListener('change', onBorderStyleChange);
+      borderStyleGallery.removeEventListener('click', onBorderStyleGalleryClick);
       borderColorInput.removeEventListener('input', onBorderColorInput);
       borderColorReset.removeEventListener('click', onBorderColorReset);
+      borderSwatches.removeEventListener('click', onBorderSwatchClick);
       presetNone.removeEventListener('click', onPresetNone);
       presetOutline.removeEventListener('click', onPresetOutline);
       presetAll.removeEventListener('click', onPresetAll);
@@ -1673,8 +1904,10 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       rightCk.input.removeEventListener('change', onRightChange);
       diagDownCk.input.removeEventListener('change', onDiagDownChange);
       diagUpCk.input.removeEventListener('change', onDiagUpChange);
+      borderVisualStage.removeEventListener('click', onVisualSideClick);
       fillInput.removeEventListener('input', onFillInput);
       fillReset.removeEventListener('click', onFillReset);
+      fillSwatches.removeEventListener('click', onFillSwatchClick);
       lockedCk.input.removeEventListener('change', onLockedChange);
       hlInput.removeEventListener('input', onHlInput);
       hlClear.removeEventListener('click', onHlClear);
