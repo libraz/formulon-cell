@@ -67,18 +67,16 @@ export default defineConfig({
 });
 ```
 
-**3. Browser builds may warn about `node:*` imports.** The engine carries a
-Node bridge branch (`node:module`, `node:worker_threads`) so the same
-factory works in both runtimes. In a browser bundle the branch is dead
-code at runtime; if you want to silence "externalised module" warnings:
+**3. Browser builds use the web-safe engine entry.** formulon-cell imports
+the browser wrapper for the vendored engine, so Vite/webpack apps should not
+see `node:*` externalization warnings from the spreadsheet package. Keep the
+package out of dependency pre-bundling so the worker/WASM assets stay under
+the app bundler's control:
 
 ```ts
 // vite.config.ts
 export default defineConfig({
   optimizeDeps: { exclude: ['@libraz/formulon-cell', '@libraz/formulon'] },
-  build: {
-    rollupOptions: { external: [/^node:/] },
-  },
 });
 ```
 

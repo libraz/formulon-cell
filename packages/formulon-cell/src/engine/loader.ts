@@ -1,13 +1,13 @@
 // The vendored module is plain ESM and resolves the .wasm itself via its
 // own `import.meta.url` + `locateFile` mechanism, so we don't pass an
-// explicit wasm URL here — Emscripten finds the file next to formulon.js
+// explicit wasm URL here — Emscripten finds the file next to formulon.web.js
 // at the consumer's resolved path.
 //
 // formulon's WASM uses pthread/SharedArrayBuffer. Browsers without a
 // crossOriginIsolated context (missing COOP+COEP, ad-hoc demos, SSR shells)
 // will fail at instantiation; in that case we fall back to an in-memory
 // `stub` engine so the UI keeps working — formulas degrade gracefully.
-import createFormulon from '../../vendor/formulon/formulon.js';
+import createFormulon from '../../vendor/formulon/formulon.web.js';
 import { createStubModule } from './stub-engine.js';
 import type { FormulonModule } from './types.js';
 
@@ -35,13 +35,14 @@ export function loadFormulon(opts: LoadOptions = {}): Promise<FormulonModule> {
     return cached;
   }
 
-  cached = createFormulon().catch((reason) => {
+  const promise: Promise<FormulonModule> = createFormulon().catch((reason: unknown) => {
     usedStub = true;
     opts.onFallback?.(`WASM init failed: ${String(reason)}`);
     return createStubModule();
   });
+  cached = promise;
 
-  return cached;
+  return promise;
 }
 
 export function isUsingStub(): boolean {

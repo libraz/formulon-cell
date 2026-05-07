@@ -13,10 +13,10 @@ const SRC = resolve(here, '../src/styles');
 const DST = resolve(here, '../dist/styles');
 
 if (!existsSync(SRC)) {
-  console.error(`copy-styles: source missing: ${SRC}`);
+  process.stderr.write(`copy-styles: source missing: ${SRC}\n`);
   process.exit(1);
 }
 
 mkdirSync(DST, { recursive: true });
 cpSync(SRC, DST, { recursive: true });
-console.log(`copy-styles: ${SRC} → ${DST}`);
+process.stdout.write(`copy-styles: ${SRC} → ${DST}\n`);

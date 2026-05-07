@@ -25,14 +25,17 @@ export default defineConfig({
       formats: ['es'],
     },
     rollupOptions: {
-      // The Emscripten bundle uses TLA + node:worker_threads dynamic imports
-      // + new URL(...) for both the wasm and worker scripts. Vite's lib
-      // worker plugin tries to bundle those as iife workers, which breaks
-      // on TLA. Externalizing keeps the import alive — at consume time the
-      // user's bundler resolves `../../vendor/formulon/formulon.js`
-      // relative to our shipped `dist/engine/loader.js` and handles the
-      // Emscripten module on its own (Vite/webpack 5 both manage TLA).
-      external: ['zustand', 'zustand/vanilla', /\/vendor\/formulon\/formulon\.js$/],
+      // The browser Emscripten bundle uses TLA + new URL(...) for both the
+      // wasm and worker scripts. Vite's lib worker plugin tries to bundle
+      // those as iife workers, which breaks on TLA. Externalizing keeps the
+      // import alive — at consume time the user's bundler resolves
+      // `../../vendor/formulon/formulon.web.js` relative to our shipped
+      // `dist/engine/loader.js` and handles the Emscripten module on its own.
+      external: [
+        'zustand',
+        'zustand/vanilla',
+        /\/vendor\/formulon\/formulon(?:\.web)?\.js$/,
+      ],
       output: {
         preserveModules: true,
         preserveModulesRoot: 'src',
