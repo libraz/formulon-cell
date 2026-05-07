@@ -3,6 +3,7 @@ import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import { addrKey } from '../../engine/workbook-handle.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../../store/store.js';
 import { isCellWritable } from '../protection.js';
+import { shiftFormulaRefs } from '../refs.js';
 import type { ClipboardCell, ClipboardSnapshot } from './snapshot.js';
 
 export type PasteWhat =
@@ -28,8 +29,27 @@ export interface PasteSpecialResult {
 
 const numericValue = (cell: ClipboardCell | undefined): number | null => {
   if (!cell) return null;
-  if (cell.formula) return null; // formulas don't combine arithmetically here
   return cell.value.kind === 'number' ? cell.value.value : null;
+};
+
+const writeClipboardValue = (wb: WorkbookHandle, addr: Addr, src: ClipboardCell): void => {
+  switch (src.value.kind) {
+    case 'number':
+      wb.setNumber(addr, src.value.value);
+      break;
+    case 'text':
+      wb.setText(addr, src.value.value);
+      break;
+    case 'bool':
+      wb.setBool(addr, src.value.value);
+      break;
+    case 'blank':
+      wb.setBlank(addr);
+      break;
+    case 'error':
+      // No public way to write an error; skip — pasting errors is rare.
+      break;
+  }
 };
 
 const existingNumeric = (state: State, sheet: number, row: number, col: number): number => {
@@ -102,33 +122,23 @@ export function pasteSpecial(
       if (!isCellWritable(state, addr)) continue;
 
       // Layer 1: values / formulas
-      if (wantsValues(opt.what) && !src.formula) {
+      const shouldPasteFormula = Boolean(src.formula && wantsFormulas(opt.what));
+      if (wantsValues(opt.what) && !shouldPasteFormula) {
         const srcNum = numericValue(src);
         if (opt.operation !== 'none' && srcNum !== null) {
           const dest = existingNumeric(state, sheet, row, col);
           const result = combine(opt.operation, dest, srcNum);
           if (Number.isFinite(result)) wb.setNumber(addr, result);
+        } else if (opt.operation !== 'none') {
+          // Excel Paste Special arithmetic operations ignore non-numeric
+          // source cells instead of overwriting the destination with text.
         } else {
-          switch (src.value.kind) {
-            case 'number':
-              wb.setNumber(addr, src.value.value);
-              break;
-            case 'text':
-              wb.setText(addr, src.value.value);
-              break;
-            case 'bool':
-              wb.setBool(addr, src.value.value);
-              break;
-            case 'blank':
-              if (!isBlankSrc) wb.setBlank(addr);
-              break;
-            case 'error':
-              // No public way to write an error; skip — pasting errors is rare.
-              break;
-          }
+          if (src.value.kind !== 'blank' || !isBlankSrc) writeClipboardValue(wb, addr, src);
         }
-      } else if (wantsFormulas(opt.what) && src.formula) {
-        wb.setFormula(addr, src.formula);
+      } else if (shouldPasteFormula && src.formula) {
+        const sourceRow = snap.range.r0 + sr;
+        const sourceCol = snap.range.c0 + sc;
+        wb.setFormula(addr, shiftFormulaRefs(src.formula, row - sourceRow, col - sourceCol));
       }
 
       // Layer 2: formats

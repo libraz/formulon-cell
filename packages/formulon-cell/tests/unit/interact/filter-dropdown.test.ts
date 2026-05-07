@@ -62,9 +62,11 @@ describe('attachFilterDropdown', () => {
     const checkboxes = document.querySelectorAll<HTMLInputElement>(
       '.fc-filter-dropdown__row:not(.fc-filter-dropdown__row--all) input[type="checkbox"]',
     );
-    checkboxes[1]!.checked = false;
-    checkboxes[1]!.dispatchEvent(new Event('change', { bubbles: true }));
-    checkboxes[1]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    const second = checkboxes[1];
+    if (!second) throw new Error('expected second filter checkbox');
+    second.checked = false;
+    second.dispatchEvent(new Event('change', { bubbles: true }));
+    second.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 
     expect(handle.isOpen()).toBe(false);
     expect(store.getState().layout.hiddenRows.has(2)).toBe(true);

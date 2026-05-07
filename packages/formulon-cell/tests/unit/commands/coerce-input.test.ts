@@ -18,17 +18,54 @@ describe('coerceInput', () => {
     expect(coerceInput('  =SUM(A1:A3)  ')).toEqual({ kind: 'formula', text: '=SUM(A1:A3)' });
   });
 
-  it('returns booleans for canonical TRUE / FALSE only', () => {
+  it('returns booleans case-insensitively', () => {
     expect(coerceInput('TRUE')).toEqual({ kind: 'bool', value: true });
     expect(coerceInput('FALSE')).toEqual({ kind: 'bool', value: false });
-    // Lowercase is not coerced — Excel treats it as text.
-    expect(coerceInput('true')).toEqual({ kind: 'text', value: 'true' });
+    expect(coerceInput('true')).toEqual({ kind: 'bool', value: true });
+    expect(coerceInput('ｆａｌｓｅ')).toEqual({ kind: 'bool', value: false });
   });
 
   it('parses integers and decimals as numbers', () => {
     expect(coerceInput('42')).toEqual({ kind: 'number', value: 42 });
     expect(coerceInput('-3.5')).toEqual({ kind: 'number', value: -3.5 });
     expect(coerceInput('1e3')).toEqual({ kind: 'number', value: 1000 });
+  });
+
+  it('normalizes full-width numeric input like Excel 365', () => {
+    expect(coerceInput('１２３')).toEqual({ kind: 'number', value: 123 });
+    expect(coerceInput('－３．５')).toEqual({ kind: 'number', value: -3.5 });
+    expect(coerceInput('１，２３４')).toEqual({ kind: 'number', value: 1234 });
+    expect(coerceInput('①')).toEqual({ kind: 'text', value: '①' });
+  });
+
+  it('parses percent input as a numeric fraction', () => {
+    expect(coerceInput('12%')).toEqual({ kind: 'number', value: 0.12 });
+    expect(coerceInput('１２．５％')).toEqual({ kind: 'number', value: 0.125 });
+  });
+
+  it('parses common currency-prefixed numeric input', () => {
+    expect(coerceInput('$1,234.50')).toEqual({ kind: 'number', value: 1234.5 });
+    expect(coerceInput('￥１，２３４')).toEqual({ kind: 'number', value: 1234 });
+    expect(coerceInput('¥ 12%')).toEqual({ kind: 'number', value: 0.12 });
+  });
+
+  it('parses accounting-style parenthesized negatives', () => {
+    expect(coerceInput('(123)')).toEqual({ kind: 'number', value: -123 });
+    expect(coerceInput('(￥１，２３４)')).toEqual({ kind: 'number', value: -1234 });
+    expect(coerceInput('(12%)')).toEqual({ kind: 'number', value: -0.12 });
+  });
+
+  it('parses time input as an Excel serial-day fraction', () => {
+    expect(coerceInput('12:00')).toEqual({ kind: 'number', value: 0.5 });
+    expect(coerceInput('1:30:00')).toEqual({ kind: 'number', value: 1.5 / 24 });
+    expect(coerceInput('２５：００')).toEqual({ kind: 'number', value: 25 / 24 });
+    expect(coerceInput('1:30 PM')).toEqual({ kind: 'number', value: 13.5 / 24 });
+    expect(coerceInput('12:00 AM')).toEqual({ kind: 'number', value: 0 });
+  });
+
+  it('uses a leading apostrophe to force text input', () => {
+    expect(coerceInput("'123")).toEqual({ kind: 'text', value: '123' });
+    expect(coerceInput("'=A1")).toEqual({ kind: 'text', value: '=A1' });
   });
 
   it('preserves the original (non-trimmed) string for text values', () => {

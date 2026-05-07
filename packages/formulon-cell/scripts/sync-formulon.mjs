@@ -37,5 +37,8 @@ for (const f of files) {
 }
 
 const webTypes = resolve(DST, 'formulon.web.d.ts');
-writeFileSync(webTypes, "export { default } from './formulon.js';\nexport type * from './formulon.js';\n");
+writeFileSync(
+  webTypes,
+  "export { default } from './formulon.js';\nexport type * from './formulon.js';\n",
+);
 process.stdout.write('[sync-formulon] formulon.web.d.ts\n');

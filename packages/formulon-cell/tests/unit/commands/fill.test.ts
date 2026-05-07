@@ -124,6 +124,26 @@ describe('fillRange', () => {
     expect(text(wb, 0, 2, 0)).toBe('Item 3');
   });
 
+  it('increments full-width trailing digits in text labels', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: '項目１' }]);
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 };
+    fillRange(store.getState(), wb, src, dest);
+    wb.recalc();
+    expect(text(wb, 0, 1, 0)).toBe('項目２');
+    expect(text(wb, 0, 2, 0)).toBe('項目３');
+  });
+
+  it('preserves zero padding when incrementing text labels', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 'No. ００１' }]);
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 };
+    fillRange(store.getState(), wb, src, dest);
+    wb.recalc();
+    expect(text(wb, 0, 1, 0)).toBe('No. ００２');
+    expect(text(wb, 0, 2, 0)).toBe('No. ００３');
+  });
+
   it('extends right with a numeric series', () => {
     seedAndMirror(store, wb, [
       { row: 0, col: 0, value: 1 },
@@ -180,6 +200,29 @@ describe('fillRange', () => {
     expect(text(wb, 0, 4, 0)).toBe('May');
   });
 
+  it('preserves source casing for English custom lists', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 'jan' },
+      { row: 1, col: 0, value: 'feb' },
+    ]);
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 };
+    fillRange(store.getState(), wb, src, dest);
+    wb.recalc();
+    expect(text(wb, 0, 2, 0)).toBe('mar');
+    expect(text(wb, 0, 3, 0)).toBe('apr');
+  });
+
+  it('preserves uppercase source casing for English custom lists', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 'MON' }]);
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 };
+    fillRange(store.getState(), wb, src, dest);
+    wb.recalc();
+    expect(text(wb, 0, 1, 0)).toBe('TUE');
+    expect(text(wb, 0, 2, 0)).toBe('WED');
+  });
+
   it('cycles Japanese weekday characters (日 → 月 → ...)', () => {
     seedAndMirror(store, wb, [{ row: 0, col: 0, value: '日' }]);
     const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
@@ -189,6 +232,59 @@ describe('fillRange', () => {
     expect(text(wb, 0, 1, 0)).toBe('月');
     expect(text(wb, 0, 2, 0)).toBe('火');
     expect(text(wb, 0, 3, 0)).toBe('水');
+  });
+
+  it('cycles parenthesized Japanese weekday labels', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: '(土)' }]);
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 };
+    fillRange(store.getState(), wb, src, dest);
+    wb.recalc();
+    expect(text(wb, 0, 1, 0)).toBe('(日)');
+    expect(text(wb, 0, 2, 0)).toBe('(月)');
+  });
+
+  it('cycles roman quarter labels', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 'QIII' }]);
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 };
+    fillRange(store.getState(), wb, src, dest);
+    wb.recalc();
+    expect(text(wb, 0, 1, 0)).toBe('QIV');
+    expect(text(wb, 0, 2, 0)).toBe('QI');
+  });
+
+  it('cycles Japanese abbreviated weekday labels', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: '金曜' }]);
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 };
+    fillRange(store.getState(), wb, src, dest);
+    wb.recalc();
+    expect(text(wb, 0, 1, 0)).toBe('土曜');
+    expect(text(wb, 0, 2, 0)).toBe('日曜');
+    expect(text(wb, 0, 3, 0)).toBe('月曜');
+  });
+
+  it('preserves full-width minus signs when incrementing text labels', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: '項目－２' }]);
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 };
+    fillRange(store.getState(), wb, src, dest);
+    wb.recalc();
+    expect(text(wb, 0, 1, 0)).toBe('項目－１');
+    expect(text(wb, 0, 2, 0)).toBe('項目０');
+    expect(text(wb, 0, 3, 0)).toBe('項目１');
+  });
+
+  it('cycles Japanese month labels', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: '11月' }]);
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 };
+    fillRange(store.getState(), wb, src, dest);
+    wb.recalc();
+    expect(text(wb, 0, 1, 0)).toBe('12月');
+    expect(text(wb, 0, 2, 0)).toBe('1月');
+    expect(text(wb, 0, 3, 0)).toBe('2月');
   });
 
   it('cycles Q1/Q2/Q3/Q4 quarter labels', () => {
@@ -202,6 +298,16 @@ describe('fillRange', () => {
     expect(text(wb, 0, 3, 0)).toBe('Q4');
     // Wraps back to Q1.
     expect(text(wb, 0, 4, 0)).toBe('Q1');
+  });
+
+  it('cycles full-width quarter labels', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 'Q４' }]);
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 };
+    fillRange(store.getState(), wb, src, dest);
+    wb.recalc();
+    expect(text(wb, 0, 1, 0)).toBe('Q１');
+    expect(text(wb, 0, 2, 0)).toBe('Q２');
   });
 
   it('copyOnly suppresses series extrapolation and tiles the source', () => {

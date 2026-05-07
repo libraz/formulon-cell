@@ -21,13 +21,54 @@ interface SourceCell {
   blank: boolean;
 }
 
-const numericFromText = (s: string): { prefix: string; n: number } | null => {
-  const m = s.match(/^(.*?)(-?\d+)$/);
+const FULLWIDTH_ZERO = '０'.codePointAt(0) ?? 0xff10;
+
+const toAsciiDigits = (s: string): string =>
+  [...s]
+    .map((ch) => {
+      const cp = ch.codePointAt(0) ?? 0;
+      if (cp >= 0xff10 && cp <= 0xff19) return String(cp - FULLWIDTH_ZERO);
+      return ch;
+    })
+    .join('');
+
+const toFullwidthDigits = (s: string): string =>
+  [...s]
+    .map((ch) => (ch >= '0' && ch <= '9' ? String.fromCodePoint(FULLWIDTH_ZERO + Number(ch)) : ch))
+    .join('');
+
+const formatTrailingNumber = (
+  n: number,
+  width: number,
+  fullwidth: boolean,
+  minus: '-' | '－',
+): string => {
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(Math.trunc(n));
+  const ascii = `${sign}${String(abs).padStart(width, '0')}`;
+  const digits = fullwidth ? toFullwidthDigits(ascii) : ascii;
+  return minus === '－' ? digits.replace('-', '－') : digits;
+};
+
+const numericFromText = (
+  s: string,
+): { prefix: string; n: number; width: number; fullwidth: boolean; minus: '-' | '－' } | null => {
+  const m = s.match(/^(.*?)([-－]?[0-9０-９]+)$/);
   if (!m) return null;
   const prefix = m[1] ?? '';
-  const n = Number(m[2]);
+  const rawDigits = m[2] ?? '';
+  const minus = rawDigits.startsWith('－') ? '－' : '-';
+  const fullwidth = /[０-９]/.test(rawDigits) && !/[0-9]/.test(rawDigits);
+  const normalized = toAsciiDigits(rawDigits.replace('－', '-'));
+  const n = Number(normalized);
   if (!Number.isFinite(n)) return null;
-  return { prefix, n };
+  return {
+    prefix,
+    n,
+    width: normalized.startsWith('-') ? normalized.length - 1 : normalized.length,
+    fullwidth,
+    minus,
+  };
 };
 
 /** Custom-list series — Excel ships these by default. Each list represents
@@ -52,9 +93,29 @@ const CUSTOM_LISTS: readonly string[][] = [
     'December',
   ],
   ['日', '月', '火', '水', '木', '金', '土'],
+  ['(日)', '(月)', '(火)', '(水)', '(木)', '(金)', '(土)'],
+  ['日曜', '月曜', '火曜', '水曜', '木曜', '金曜', '土曜'],
   ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'],
+  ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+  [
+    '１月',
+    '２月',
+    '３月',
+    '４月',
+    '５月',
+    '６月',
+    '７月',
+    '８月',
+    '９月',
+    '１０月',
+    '１１月',
+    '１２月',
+  ],
   ['Q1', 'Q2', 'Q3', 'Q4'],
+  ['Q１', 'Q２', 'Q３', 'Q４'],
+  ['QI', 'QII', 'QIII', 'QIV'],
   ['第1四半期', '第2四半期', '第3四半期', '第4四半期'],
+  ['第１四半期', '第２四半期', '第３四半期', '第４四半期'],
 ];
 
 /** Find the custom list (if any) that contains every source value. Returns
@@ -76,6 +137,16 @@ function matchCustomList(values: string[]): { list: readonly string[]; indices: 
   }
   return null;
 }
+
+const alphaChars = (s: string): string[] => [...s].filter((ch) => /[A-Za-z]/.test(ch));
+
+const applyAlphaCase = (value: string, source: string): string => {
+  const letters = alphaChars(source);
+  if (letters.length === 0) return value;
+  if (letters.every((ch) => ch === ch.toUpperCase())) return value.toUpperCase();
+  if (letters.every((ch) => ch === ch.toLowerCase())) return value.toLowerCase();
+  return value;
+};
 
 function readSource(state: State, src: Range): SourceCell[][] {
   const sheet = src.sheet;
@@ -181,7 +252,8 @@ function buildProjection(line: SourceCell[]): SeriesProjection {
           const target = lastIdx + stepInt * i;
           const len = lm.list.length;
           const idx = ((target % len) + len) % len;
-          return { kind: 'text', value: lm.list[idx] ?? '' };
+          const value = lm.list[idx] ?? '';
+          return { kind: 'text', value: applyAlphaCase(value, values[values.length - 1] ?? value) };
         },
       };
     }
@@ -196,7 +268,15 @@ function buildProjection(line: SourceCell[]): SeriesProjection {
         if (line.length === 1) {
           // Single cell: increment by 1 each step.
           return {
-            at: (i) => ({ kind: 'text', value: `${first.prefix}${first.n + i}` }),
+            at: (i) => ({
+              kind: 'text',
+              value: `${first.prefix}${formatTrailingNumber(
+                first.n + i,
+                first.width,
+                first.fullwidth,
+                first.minus,
+              )}`,
+            }),
           };
         }
         let stepSum = 0;
@@ -205,8 +285,17 @@ function buildProjection(line: SourceCell[]): SeriesProjection {
         }
         const step = stepSum / (parsed.length - 1);
         const last = parsed[parsed.length - 1]?.n ?? 0;
+        const lastParsed = parsed[parsed.length - 1];
         return {
-          at: (i) => ({ kind: 'text', value: `${first.prefix}${Math.round(last + step * i)}` }),
+          at: (i) => ({
+            kind: 'text',
+            value: `${first.prefix}${formatTrailingNumber(
+              Math.round(last + step * i),
+              lastParsed?.width ?? first.width,
+              lastParsed?.fullwidth ?? first.fullwidth,
+              lastParsed?.minus ?? first.minus,
+            )}`,
+          }),
         };
       }
     }

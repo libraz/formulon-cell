@@ -31,11 +31,7 @@ export default defineConfig({
       // import alive — at consume time the user's bundler resolves
       // `../../vendor/formulon/formulon.web.js` relative to our shipped
       // `dist/engine/loader.js` and handles the Emscripten module on its own.
-      external: [
-        'zustand',
-        'zustand/vanilla',
-        /\/vendor\/formulon\/formulon(?:\.web)?\.js$/,
-      ],
+      external: ['zustand', 'zustand/vanilla', /\/vendor\/formulon\/formulon(?:\.web)?\.js$/],
       output: {
         preserveModules: true,
         preserveModulesRoot: 'src',

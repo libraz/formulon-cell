@@ -105,6 +105,36 @@ describe('pasteSpecial', () => {
     expect(wb.cellFormula({ sheet: 0, row: 3, col: 3 })).toBe('=2+3');
   });
 
+  it('"values" mode pastes a formula cell result instead of the formula', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 5, formula: '=2+3' }]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    setActive(store, 3, 3);
+    assertSnap(snap);
+    pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'values',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+    wb.recalc();
+    expect(wb.cellFormula({ sheet: 0, row: 3, col: 3 })).toBeNull();
+    expect(num(wb, 3, 3)).toBe(5);
+  });
+
+  it('"formulas" mode shifts relative references from source to destination', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 2, value: 5, formula: '=A1+B$1' }]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 });
+    setActive(store, 3, 4);
+    assertSnap(snap);
+    pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'formulas',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+    expect(wb.cellFormula({ sheet: 0, row: 3, col: 4 })).toBe('=C4+D$1');
+  });
+
   it('arithmetic operations combine src and dest numerics', () => {
     // Dest cell pre-existing value.
     seedAndMirror(store, wb, [
@@ -122,6 +152,42 @@ describe('pasteSpecial', () => {
     });
     wb.recalc();
     expect(num(wb, 5, 5)).toBe(107);
+  });
+
+  it('arithmetic operations use numeric results from formula cells', () => {
+    seedAndMirror(store, wb, [
+      { row: 5, col: 5, value: 100 },
+      { row: 0, col: 0, value: 7, formula: '=3+4' },
+    ]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    setActive(store, 5, 5);
+    assertSnap(snap);
+    pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'values',
+      operation: 'add',
+      skipBlanks: false,
+      transpose: false,
+    });
+    wb.recalc();
+    expect(num(wb, 5, 5)).toBe(107);
+  });
+
+  it('arithmetic operations ignore non-numeric source values', () => {
+    seedAndMirror(store, wb, [
+      { row: 5, col: 5, value: 100 },
+      { row: 0, col: 0, value: 'x' },
+    ]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    setActive(store, 5, 5);
+    assertSnap(snap);
+    pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'values',
+      operation: 'add',
+      skipBlanks: false,
+      transpose: false,
+    });
+    wb.recalc();
+    expect(num(wb, 5, 5)).toBe(100);
   });
 
   it('divide by zero produces NaN result, which is skipped', () => {
@@ -184,6 +250,24 @@ describe('pasteSpecial', () => {
     expect(num(wb, 5, 5)).toBe(1);
     expect(num(wb, 6, 5)).toBe(2);
     expect(num(wb, 7, 5)).toBe(3);
+  });
+
+  it('transpose shifts formula references from each original source cell', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 1, formula: '=A1' },
+      { row: 0, col: 1, value: 2, formula: '=B1' },
+    ]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
+    setActive(store, 5, 5);
+    assertSnap(snap);
+    pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'formulas',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: true,
+    });
+    expect(wb.cellFormula({ sheet: 0, row: 5, col: 5 })).toBe('=F6');
+    expect(wb.cellFormula({ sheet: 0, row: 6, col: 5 })).toBe('=F7');
   });
 
   it('"formats" mode copies cell format and skips values', () => {

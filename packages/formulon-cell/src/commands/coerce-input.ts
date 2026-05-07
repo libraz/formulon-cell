@@ -12,7 +12,53 @@ export type CoercedInput =
   | { kind: 'bool'; value: boolean }
   | { kind: 'text'; value: string };
 
-const NUMERIC = /^-?\d+(\.\d+)?(e[+-]?\d+)?$/i;
+const NUMERIC = /^[+-]?(?:(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
+const CURRENCY = /^[¥$€£]\s*/;
+const TIME = /^([+-]?)(\d+):([0-5]\d)(?::([0-5]\d))?(?:\s*([AP]M))?$/i;
+
+const normalizeNumericText = (raw: string): string =>
+  [...raw]
+    .map((ch) => {
+      const cp = ch.codePointAt(0) ?? 0;
+      if (cp >= 0xff01 && cp <= 0xff5e) return String.fromCodePoint(cp - 0xfee0);
+      if (cp === 0xffe5) return '¥';
+      if (cp === 0x3000) return ' ';
+      return ch;
+    })
+    .join('');
+
+const parseNumericValue = (raw: string): number | null => {
+  let text = raw.trim();
+  let negative = false;
+  if (text.startsWith('(') && text.endsWith(')')) {
+    negative = true;
+    text = text.slice(1, -1).trim();
+  }
+  text = text.replace(CURRENCY, '');
+  const isPercent = text.endsWith('%');
+  if (isPercent) text = text.slice(0, -1);
+  if (!NUMERIC.test(text)) return null;
+  const n = Number(text.replaceAll(',', ''));
+  if (Number.isNaN(n)) return null;
+  const signed = negative ? -Math.abs(n) : n;
+  return isPercent ? signed / 100 : signed;
+};
+
+const parseTimeValue = (raw: string): number | null => {
+  const m = TIME.exec(raw.trim());
+  if (!m) return null;
+  const sign = m[1] === '-' ? -1 : 1;
+  let hours = Number(m[2]);
+  const minutes = Number(m[3]);
+  const seconds = m[4] === undefined ? 0 : Number(m[4]);
+  const meridiem = m[5]?.toUpperCase();
+  if (meridiem) {
+    if (hours < 1 || hours > 12) return null;
+    if (meridiem === 'AM') hours = hours === 12 ? 0 : hours;
+    else hours = hours === 12 ? 12 : hours + 12;
+  }
+  return (sign * (hours * 3600 + minutes * 60 + seconds)) / 86_400;
+};
 
 /**
  * Map a user-typed string to the right primitive setter. Pure — depends on
@@ -21,15 +67,18 @@ const NUMERIC = /^-?\d+(\.\d+)?(e[+-]?\d+)?$/i;
  */
 export function coerceInput(raw: string): CoercedInput {
   const trimmed = raw.trim();
+  const numericTrimmed = normalizeNumericText(trimmed);
   if (trimmed === '') return { kind: 'blank' };
   if (trimmed.startsWith('=')) return { kind: 'formula', text: trimmed };
-  if (trimmed === 'TRUE' || trimmed === 'FALSE') {
-    return { kind: 'bool', value: trimmed === 'TRUE' };
+  if (trimmed.startsWith("'")) return { kind: 'text', value: trimmed.slice(1) };
+  const boolText = numericTrimmed.toUpperCase();
+  if (boolText === 'TRUE' || boolText === 'FALSE') {
+    return { kind: 'bool', value: boolText === 'TRUE' };
   }
-  if (NUMERIC.test(trimmed)) {
-    const n = Number(trimmed);
-    if (!Number.isNaN(n)) return { kind: 'number', value: n };
-  }
+  const time = parseTimeValue(numericTrimmed);
+  if (time !== null) return { kind: 'number', value: time };
+  const n = parseNumericValue(numericTrimmed);
+  if (n !== null) return { kind: 'number', value: n };
   return { kind: 'text', value: raw };
 }
 

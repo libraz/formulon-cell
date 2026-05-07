@@ -301,9 +301,11 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
 
     const s = store.getState();
     const rowHidden =
-      kind === 'row' && hiddenInSelection(s.layout, 'row', s.selection.range.r0, s.selection.range.r1).length > 0;
+      kind === 'row' &&
+      hiddenInSelection(s.layout, 'row', s.selection.range.r0, s.selection.range.r1).length > 0;
     const colHidden =
-      kind === 'col' && hiddenInSelection(s.layout, 'col', s.selection.range.c0, s.selection.range.c1).length > 0;
+      kind === 'col' &&
+      hiddenInSelection(s.layout, 'col', s.selection.range.c0, s.selection.range.c1).length > 0;
     const rowUnhide = root.querySelector<HTMLButtonElement>('[data-fc-action="rowUnhide"]');
     const colUnhide = root.querySelector<HTMLButtonElement>('[data-fc-action="colUnhide"]');
     if (rowUnhide) {
