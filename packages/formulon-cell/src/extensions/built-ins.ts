@@ -62,22 +62,20 @@ export const statusBar = (): Extension => ({
   id: 'statusBar',
   priority: 50,
   setup(ctx) {
-    let strings = ctx.i18n.strings;
     const handle = attachStatusBar({
       statusbar: ctx.statusbar,
       store: ctx.store,
-      strings,
+      strings: ctx.i18n.strings,
       getEngineLabel: () => {
         const wb = ctx.getWb();
         return wb.isStub ? 'stub' : `formulon ${wb.version}`;
       },
     });
     return {
-      ...handle,
-      setStrings: (next) => {
-        strings = next;
-        handle.refresh();
-      },
+      refresh: () => handle.refresh(),
+      // attachStatusBar's setStrings updates the closure var and re-renders
+      // labels in place — no detach/reattach needed.
+      setStrings: (next) => handle.setStrings(next),
       rebindWorkbook: () => handle.refresh(),
       dispose: handle.detach,
     };
@@ -99,12 +97,20 @@ export const conditionalDialog = (): Extension => ({
   id: 'conditional',
   priority: 50,
   setup(ctx) {
-    const handle = attachConditionalDialog({
+    let handle = attachConditionalDialog({
       host: ctx.host,
       store: ctx.store,
       strings: ctx.i18n.strings,
     });
-    return { ...handle, dispose: handle.detach };
+    return {
+      open: () => handle.open(),
+      close: () => handle.close(),
+      setStrings: (next) => {
+        handle.detach();
+        handle = attachConditionalDialog({ host: ctx.host, store: ctx.store, strings: next });
+      },
+      dispose: () => handle.detach(),
+    };
   },
 });
 
@@ -115,12 +121,20 @@ export const iterativeDialog = (): Extension => ({
   id: 'iterative',
   priority: 50,
   setup(ctx) {
-    const handle = attachIterativeDialog({
+    let handle = attachIterativeDialog({
       host: ctx.host,
       getWb: ctx.getWb,
       strings: ctx.i18n.strings,
     });
-    return { ...handle, dispose: handle.detach };
+    return {
+      open: () => handle.open(),
+      close: () => handle.close(),
+      setStrings: (next) => {
+        handle.detach();
+        handle = attachIterativeDialog({ host: ctx.host, getWb: ctx.getWb, strings: next });
+      },
+      dispose: () => handle.detach(),
+    };
   },
 });
 
@@ -129,15 +143,20 @@ export const namedRangeDialog = (): Extension => ({
   id: 'namedRanges',
   priority: 50,
   setup(ctx) {
-    const handle = attachNamedRangeDialog({
+    let handle = attachNamedRangeDialog({
       host: ctx.host,
       wb: ctx.getWb(),
       strings: ctx.i18n.strings,
     });
     return {
-      ...handle,
+      open: () => handle.open(),
+      close: () => handle.close(),
       rebindWorkbook: (wb) => handle.bindWorkbook(wb),
-      dispose: handle.detach,
+      setStrings: (next) => {
+        handle.detach();
+        handle = attachNamedRangeDialog({ host: ctx.host, wb: ctx.getWb(), strings: next });
+      },
+      dispose: () => handle.detach(),
     };
   },
 });
@@ -147,14 +166,24 @@ export const hyperlinkDialog = (): Extension => ({
   id: 'hyperlink',
   priority: 50,
   setup(ctx) {
-    const handle = attachHyperlinkDialog({
-      host: ctx.host,
-      store: ctx.store,
-      strings: ctx.i18n.strings,
-      history: ctx.history as History,
-      getWb: ctx.getWb,
-    });
-    return { ...handle, dispose: handle.detach };
+    const buildHandle = (s: typeof ctx.i18n.strings): ReturnType<typeof attachHyperlinkDialog> =>
+      attachHyperlinkDialog({
+        host: ctx.host,
+        store: ctx.store,
+        strings: s,
+        history: ctx.history as History,
+        getWb: ctx.getWb,
+      });
+    let handle = buildHandle(ctx.i18n.strings);
+    return {
+      open: () => handle.open(),
+      close: () => handle.close(),
+      setStrings: (next) => {
+        handle.detach();
+        handle = buildHandle(next);
+      },
+      dispose: () => handle.detach(),
+    };
   },
 });
 
@@ -163,14 +192,24 @@ export const formatDialog = (): Extension => ({
   id: 'formatDialog',
   priority: 50,
   setup(ctx) {
-    const handle = attachFormatDialog({
-      host: ctx.host,
-      store: ctx.store,
-      strings: ctx.i18n.strings,
-      history: ctx.history as History,
-      getWb: ctx.getWb,
-    });
-    return { ...handle, dispose: handle.detach };
+    const buildHandle = (s: typeof ctx.i18n.strings): ReturnType<typeof attachFormatDialog> =>
+      attachFormatDialog({
+        host: ctx.host,
+        store: ctx.store,
+        strings: s,
+        history: ctx.history as History,
+        getWb: ctx.getWb,
+      });
+    let handle = buildHandle(ctx.i18n.strings);
+    return {
+      open: () => handle.open(),
+      close: () => handle.close(),
+      setStrings: (next) => {
+        handle.detach();
+        handle = buildHandle(next);
+      },
+      dispose: () => handle.detach(),
+    };
   },
 });
 
@@ -200,6 +239,9 @@ export const findReplace = (): Extension => ({
           onAfterCommit: () => refreshCells(ctx),
         });
       },
+      // attachFindReplace's handle exposes setStrings directly — relabels in
+      // place without losing query state.
+      setStrings: (next) => handle.setStrings(next),
       dispose: () => handle.detach(),
     };
   },
@@ -265,6 +307,7 @@ export const pasteSpecial = (): Extension => ({
   id: 'pasteSpecial',
   priority: 60,
   setup(ctx) {
+    let activeStrings = ctx.i18n.strings;
     const buildHandle = (): ReturnType<typeof attachPasteSpecial> | null => {
       const cb = ctx.resolve<ExtensionHandle & { getSnapshot: () => unknown }>('clipboard');
       if (!cb) return null;
@@ -272,7 +315,7 @@ export const pasteSpecial = (): Extension => ({
         host: ctx.host,
         store: ctx.store,
         wb: ctx.getWb(),
-        strings: ctx.i18n.strings,
+        strings: activeStrings,
         history: ctx.history as History,
         getSnapshot: () =>
           cb.getSnapshot() as ReturnType<
@@ -288,6 +331,11 @@ export const pasteSpecial = (): Extension => ({
       open: () => handle?.open(),
       close: () => handle?.close(),
       rebindWorkbook: () => {
+        handle?.detach();
+        handle = buildHandle();
+      },
+      setStrings: (next) => {
+        activeStrings = next;
         handle?.detach();
         handle = buildHandle();
       },
@@ -334,6 +382,9 @@ export const contextMenu = (): Extension => ({
           onInsertHyperlink: () => callOpen('hyperlink'),
         });
       },
+      // attachContextMenu's detacher exposes setStrings; use it directly
+      // to update labels without re-attaching all listeners.
+      setStrings: (next) => detach.setStrings(next),
       dispose: () => detach(),
     };
   },

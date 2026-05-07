@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
+import { en } from '../../../src/i18n/strings.js';
 import { attachStatusBar } from '../../../src/interact/status-bar.js';
 import {
   createSpreadsheetStore,
@@ -58,6 +59,8 @@ describe('attachStatusBar', () => {
     expect(statusbar.querySelector('.fc-host__statusbar-left')).not.toBeNull();
     expect(statusbar.querySelector('.fc-host__statusbar-aggs')).not.toBeNull();
     const right = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-right');
+    expect(statusbar.querySelector('.fc-host__statusbar-left')?.textContent).toContain('準備完了');
+    expect(right?.textContent).toContain('セル');
     expect(right?.textContent).toContain('stub');
     handle.detach();
   });
@@ -215,6 +218,64 @@ describe('attachStatusBar', () => {
     badge?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
     expect(cycle.length).toBe(1);
     expect(recalcs.length).toBe(1);
+    handle.detach();
+  });
+
+  it('renders zoom controls and applies slider changes', () => {
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      getEngineLabel: () => 'stub',
+    });
+    const slider = statusbar.querySelector<HTMLInputElement>('.fc-host__statusbar-zoom-slider');
+    const label = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-zoom-label');
+    expect(slider).not.toBeNull();
+    expect(slider?.value).toBe('100');
+    expect(label?.textContent).toBe('100%');
+    expect(slider?.getAttribute('aria-label')).toBe('ズーム');
+
+    if (!slider) throw new Error('expected zoom slider');
+    slider.value = '150';
+    slider.dispatchEvent(new Event('input'));
+    expect(store.getState().viewport.zoom).toBe(1.5);
+    expect(label?.textContent).toBe('150%');
+    handle.detach();
+  });
+
+  it('setStrings relabels static status and zoom chrome', () => {
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      getEngineLabel: () => 'stub',
+    });
+    handle.setStrings(en);
+    expect(statusbar.querySelector('.fc-host__statusbar-left')?.textContent).toContain('Ready');
+    expect(statusbar.querySelector('.fc-host__statusbar-right')?.textContent).toContain('cell');
+    expect(
+      statusbar
+        .querySelector<HTMLInputElement>('.fc-host__statusbar-zoom-slider')
+        ?.getAttribute('aria-label'),
+    ).toBe('Zoom');
+    handle.detach();
+  });
+
+  it('delegates zoom changes when onZoomChange is provided', () => {
+    const calls: number[] = [];
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      getEngineLabel: () => 'stub',
+      onZoomChange: (z) => {
+        calls.push(z);
+        mutators.setZoom(store, z);
+      },
+    });
+    const plus = statusbar.querySelector<HTMLButtonElement>(
+      '.fc-host__statusbar-zoom-btn:last-of-type',
+    );
+    plus?.click();
+    expect(calls).toEqual([1.1]);
+    expect(store.getState().viewport.zoom).toBeCloseTo(1.1);
     handle.detach();
   });
 });

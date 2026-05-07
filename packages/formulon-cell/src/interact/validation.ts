@@ -5,6 +5,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { addrKey } from '../engine/workbook-handle.js';
 import { getValidationChevron } from '../render/grid.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface ValidationListDeps {
   /** The grid surface that paints the chevron and receives clicks. */
@@ -81,6 +82,7 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
       div.appendChild(item);
     }
 
+    inheritHostTokens(grid, div);
     document.body.appendChild(div);
     popover = div;
     document.addEventListener('mousedown', onDocMouseDown, true);

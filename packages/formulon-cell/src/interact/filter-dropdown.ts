@@ -1,10 +1,13 @@
 import { applyFilter, clearFilter, distinctValues } from '../commands/filter.js';
 import type { Range } from '../engine/types.js';
 import { addrKey } from '../engine/workbook-handle.js';
+import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface FilterDropdownDeps {
   store: SpreadsheetStore;
+  strings?: Strings;
   /** Where to anchor the popover. When omitted the popover is centred. */
   anchorRect?: { x: number; y: number; w: number; h: number };
 }
@@ -26,6 +29,8 @@ export interface FilterDropdownHandle {
  * and is positioned via fixed coordinates from the anchor rect.
  */
 export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHandle {
+  const strings = deps.strings ?? defaultStrings;
+  const t = strings.filterDropdown;
   let root: HTMLDivElement | null = null;
   let activeRange: Range | null = null;
   let activeCol = 0;
@@ -75,12 +80,12 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     r.style.top = `${anchor.y + anchor.h}px`;
     r.style.zIndex = '999';
     r.setAttribute('role', 'dialog');
-    r.setAttribute('aria-label', 'Filter');
+    r.setAttribute('aria-label', t.title);
 
     const search = document.createElement('input');
     search.className = 'fc-filter-dropdown__search';
     search.type = 'search';
-    search.placeholder = 'Search…';
+    search.placeholder = t.searchPlaceholder;
     search.spellcheck = false;
 
     const list = document.createElement('div');
@@ -106,12 +111,12 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         renderRows(search.value);
       });
       const allLabel = document.createElement('span');
-      allLabel.textContent = '(Select all)';
+      allLabel.textContent = t.selectAll;
       allRow.append(allCb, allLabel);
       list.appendChild(allRow);
 
       for (const v of distinct) {
-        const display = v === '' ? '(Blanks)' : v;
+        const display = v === '' ? t.blanks : v;
         if (f && !display.toLowerCase().includes(f)) continue;
         const row = document.createElement('label');
         row.className = 'fc-filter-dropdown__row';
@@ -139,7 +144,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     const apply = document.createElement('button');
     apply.type = 'button';
     apply.className = 'fc-filter-dropdown__apply';
-    apply.textContent = 'Apply';
+    apply.textContent = t.apply;
     apply.addEventListener('click', () => {
       if (!activeRange) return;
       // Reset hidden rows for THIS range first so a re-applied filter starts
@@ -155,7 +160,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     const clear = document.createElement('button');
     clear.type = 'button';
     clear.className = 'fc-filter-dropdown__clear';
-    clear.textContent = 'Clear';
+    clear.textContent = t.clear;
     clear.addEventListener('click', () => {
       if (!activeRange) return;
       clearFilter(deps.store.getState(), deps.store, activeRange);
@@ -164,6 +169,10 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     actions.append(clear, apply);
 
     r.append(search, list, actions);
+    // Borrow theme tokens from the first .fc-host on the page (filter is
+    // body-attached, so `[data-fc-theme]` doesn't cascade automatically).
+    const host = document.querySelector('.fc-host');
+    if (host) inheritHostTokens(host, r);
     document.body.appendChild(r);
     root = r;
 

@@ -1,4 +1,5 @@
 import { suggestFunctions } from '../commands/refs.js';
+import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface AutocompleteHandle {
   /** Re-evaluate the suggestion list against the current input value/caret.
@@ -104,7 +105,8 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
       root.setAttribute('role', 'listbox');
       document.body.appendChild(root);
     }
-    root.innerHTML = '';
+    inheritHostTokens(input, root);
+    root.replaceChildren();
     for (let i = 0; i < ctx.matches.length; i += 1) {
       const item = document.createElement('div');
       item.className = 'fc-autocomplete__item';

@@ -15,6 +15,7 @@ export interface ResolvedTheme {
   rule: string;
   ruleStrong: string;
   accent: string;
+  accentFg: string;
   accentSoft: string;
   cellErrorFg: string;
   cellFormulaFg: string;
@@ -54,6 +55,7 @@ export function resolveTheme(host: HTMLElement): ResolvedTheme {
     ruleStrong: v('--fc-rule-strong', '#cdc6b3'),
 
     accent: v('--fc-accent', '#d83a14'),
+    accentFg: v('--fc-accent-fg', '#ffffff'),
     accentSoft: v('--fc-accent-soft', 'rgba(216,58,20,0.10)'),
 
     cellErrorFg: v('--fc-cell-error-fg', '#b32413'),

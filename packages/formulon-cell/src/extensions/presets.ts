@@ -12,6 +12,7 @@ import type { FeatureFlags } from './features.js';
 /** Bare grid + formula bar + status bar + basic shortcuts. No menus, no
  *  dialogs, no hover comments. Useful for read-mostly views. */
 export const minimal = (): FeatureFlags => ({
+  sheetTabs: false,
   contextMenu: false,
   findReplace: false,
   formatDialog: false,

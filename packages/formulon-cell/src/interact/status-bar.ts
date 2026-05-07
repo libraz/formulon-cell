@@ -1,6 +1,7 @@
 import { aggregateSelection } from '../commands/aggregate.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore, type StatusAggKey } from '../store/store.js';
+import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface StatusBarDeps {
   /** The status bar element built by mount.ts. We take it over and lay
@@ -19,11 +20,17 @@ export interface StatusBarDeps {
   getCalcMode?: () => 0 | 1 | 2 | null;
   onCycleCalcMode?: () => void;
   onRecalc?: () => void;
+  /** Optional Excel-style zoom control driver. `zoom` is a multiplier
+   *  (1.0 = 100%). The status bar clamps UI input to the store's supported
+   *  [0.5, 4] range before calling this. */
+  onZoomChange?: (zoom: number) => void;
 }
 
 export interface StatusBarHandle {
   /** Force a re-render of the status bar (useful after engine swap). */
   refresh(): void;
+  /** Swap the active dictionary; live-updates labels in place. */
+  setStrings(next: Strings): void;
   detach(): void;
 }
 
@@ -37,10 +44,11 @@ const fmt = (n: number): string => {
   return n.toLocaleString('en-US', { maximumFractionDigits: 4 });
 };
 
+const clampZoom = (zoom: number): number => Math.max(0.5, Math.min(4, zoom));
+
 export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   const { statusbar, store, getEngineLabel } = deps;
-  const strings = deps.strings ?? defaultStrings;
-  const t = strings.statusBar;
+  let strings = deps.strings ?? defaultStrings;
 
   statusbar.replaceChildren();
 
@@ -49,7 +57,8 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   const dot = document.createElement('span');
   dot.className = 'fc-host__statusbar-dot';
   left.appendChild(dot);
-  left.appendChild(document.createTextNode('Ready'));
+  const readyText = document.createTextNode('');
+  left.appendChild(readyText);
 
   const center = document.createElement('span');
   center.className = 'fc-host__statusbar-aggs';
@@ -71,9 +80,30 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   right.className = 'fc-host__statusbar-right';
   right.textContent = '—';
 
-  statusbar.append(left, center, calcBadge, right);
+  const zoom = document.createElement('div');
+  zoom.className = 'fc-host__statusbar-zoom';
+  const zoomOut = document.createElement('button');
+  zoomOut.type = 'button';
+  zoomOut.className = 'fc-host__statusbar-zoom-btn';
+  zoomOut.textContent = '−';
+  const zoomSlider = document.createElement('input');
+  zoomSlider.type = 'range';
+  zoomSlider.className = 'fc-host__statusbar-zoom-slider';
+  zoomSlider.min = '50';
+  zoomSlider.max = '400';
+  zoomSlider.step = '10';
+  const zoomIn = document.createElement('button');
+  zoomIn.type = 'button';
+  zoomIn.className = 'fc-host__statusbar-zoom-btn';
+  zoomIn.textContent = '+';
+  const zoomLabel = document.createElement('span');
+  zoomLabel.className = 'fc-host__statusbar-zoom-label';
+  zoom.append(zoomOut, zoomSlider, zoomIn, zoomLabel);
+
+  statusbar.append(left, center, calcBadge, right, zoom);
 
   const calcLabelFor = (mode: 0 | 1 | 2): string => {
+    const t = strings.statusBar;
     switch (mode) {
       case 0:
         return t.calcAuto;
@@ -90,13 +120,24 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
       calcBadge.style.display = 'none';
       return;
     }
+    const t = strings.statusBar;
     calcBadge.style.display = '';
     calcBadge.textContent = `${t.calcLabel}: ${calcLabelFor(mode)}`;
     calcBadge.title = t.calcRecalcHint;
+    calcBadge.setAttribute('aria-label', `${calcBadge.textContent}. ${t.calcRecalcHint}`);
     calcBadge.dataset.calcMode = String(mode);
   };
 
+  const refreshStaticLabels = (): void => {
+    const t = strings.statusBar;
+    zoomOut.setAttribute('aria-label', t.zoomOut);
+    zoomSlider.setAttribute('aria-label', t.zoom);
+    zoomIn.setAttribute('aria-label', t.zoomIn);
+    readyText.nodeValue = t.ready;
+  };
+
   const labelFor = (key: StatusAggKey): string => {
+    const t = strings.statusBar;
     switch (key) {
       case 'sum':
         return t.sum;
@@ -136,6 +177,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
 
   const refresh = (): void => {
     const s = store.getState();
+    refreshStaticLabels();
     const stats = aggregateSelection(s);
     const keys = s.ui.statusAggs;
     const pieces: string[] = [];
@@ -148,9 +190,34 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     const sel = s.selection.range;
     const cells = (sel.r1 - sel.r0 + 1) * (sel.c1 - sel.c0 + 1);
     const engine = getEngineLabel();
-    right.textContent = cells === 1 ? `1 cell · ${engine}` : `${cells} cells · ${engine}`;
+    right.textContent =
+      cells === 1
+        ? `1 ${strings.statusBar.cell} · ${engine}`
+        : `${cells} ${strings.statusBar.cells} · ${engine}`;
+    const zoomPct = Math.round(s.viewport.zoom * 100);
+    zoomSlider.value = String(zoomPct);
+    zoomLabel.textContent = `${zoomPct}%`;
+    zoomOut.disabled = s.viewport.zoom <= 0.5;
+    zoomIn.disabled = s.viewport.zoom >= 4;
     refreshCalcBadge();
   };
+
+  const setZoom = (next: number): void => {
+    const z = clampZoom(next);
+    if (deps.onZoomChange) deps.onZoomChange(z);
+    else mutators.setZoom(store, z);
+    refresh();
+  };
+
+  zoomSlider.addEventListener('input', () => {
+    setZoom(Number(zoomSlider.value) / 100);
+  });
+  zoomOut.addEventListener('click', () => {
+    setZoom(store.getState().viewport.zoom - 0.1);
+  });
+  zoomIn.addEventListener('click', () => {
+    setZoom(store.getState().viewport.zoom + 0.1);
+  });
 
   // Chooser popover. Lives in document.body so it escapes any clipping
   // ancestor and survives statusbar layout changes.
@@ -166,7 +233,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     popover.replaceChildren();
     const heading = document.createElement('div');
     heading.className = 'fc-statusbar__chooser-heading';
-    heading.textContent = t.aggregatesHeading;
+    heading.textContent = strings.statusBar.aggregatesHeading;
     popover.appendChild(heading);
     const active = new Set(store.getState().ui.statusAggs);
     for (const key of ALL_KEYS) {
@@ -202,6 +269,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   };
 
   const showChooser = (clientX: number, clientY: number): void => {
+    inheritHostTokens(statusbar, popover);
     buildChooser();
     popover.style.display = 'block';
     popover.style.left = '-9999px';
@@ -251,6 +319,14 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
 
   return {
     refresh,
+    setStrings(next: Strings): void {
+      strings = next;
+      // Already-open popover rebuilds with fresh strings on next show; for
+      // already-rendered chooser repaint the heading label so an open menu
+      // doesn't keep stale text.
+      if (popoverVisible) buildChooser();
+      refresh();
+    },
     detach() {
       statusbar.removeEventListener('contextmenu', onContextMenu);
       center.removeEventListener('click', onCenterClick);

@@ -27,6 +27,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { hitZone } from '../render/geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface ContextMenuDeps {
   host: HTMLElement;
@@ -174,12 +175,36 @@ function buildColEntries(s: Strings): MenuEntry[] {
   ];
 }
 
+function compactMenuEntries(entries: MenuEntry[]): MenuEntry[] {
+  const out: MenuEntry[] = [];
+  for (const entry of entries) {
+    if (entry.kind === 'sep') {
+      const prev = out[out.length - 1];
+      if (!prev || prev.kind === 'sep') continue;
+      out.push(entry);
+      continue;
+    }
+    out.push(entry);
+  }
+  while (out[out.length - 1]?.kind === 'sep') out.pop();
+  return out;
+}
+
 const VIEWPORT_PAD = 4;
 
-export function attachContextMenu(deps: ContextMenuDeps): () => void {
+/** Detacher returned by `attachContextMenu`. Also exposes `setStrings` so the
+ *  active dictionary can be swapped after attach. The function form is kept
+ *  for backwards-compat with callers that just want `detach()`. */
+export interface ContextMenuHandle {
+  (): void;
+  /** Swap the active dictionary; takes effect on next open. */
+  setStrings(next: Strings): void;
+}
+
+export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   const { host, store, wb } = deps;
   const history = deps.history ?? null;
-  const strings = deps.strings ?? defaultStrings;
+  let strings = deps.strings ?? defaultStrings;
   const wrapFmt = (fn: () => void): void => recordFormatChange(history, store, fn);
 
   const root = document.createElement('div');
@@ -188,6 +213,8 @@ export function attachContextMenu(deps: ContextMenuDeps): () => void {
   root.style.display = 'none';
   root.tabIndex = -1;
   document.body.appendChild(root);
+
+  // Theme-token bridge — see ./inherit-host-tokens.ts.
 
   let visible = false;
   let pasteBtnRef: HTMLButtonElement | null = null;
@@ -211,18 +238,22 @@ export function attachContextMenu(deps: ContextMenuDeps): () => void {
     // `toggleWatch` are optional — the rest are always available.
     const activeAddr = store.getState().selection.active;
     const watched = !!deps.isWatched?.(activeAddr);
-    const entries = raw
-      .filter((e) => !(e.kind === 'item' && e.id === 'insertHyperlink' && !deps.onInsertHyperlink))
-      .filter((e) => !(e.kind === 'item' && e.id === 'toggleWatch' && !deps.onToggleWatch))
-      .map((e) => {
-        if (e.kind === 'item' && e.id === 'toggleWatch') {
-          return {
-            ...e,
-            label: watched ? strings.contextMenu.removeWatch : strings.contextMenu.addWatch,
-          };
-        }
-        return e;
-      });
+    const entries = compactMenuEntries(
+      raw
+        .filter(
+          (e) => !(e.kind === 'item' && e.id === 'insertHyperlink' && !deps.onInsertHyperlink),
+        )
+        .filter((e) => !(e.kind === 'item' && e.id === 'toggleWatch' && !deps.onToggleWatch))
+        .map((e) => {
+          if (e.kind === 'item' && e.id === 'toggleWatch') {
+            return {
+              ...e,
+              label: watched ? strings.contextMenu.removeWatch : strings.contextMenu.addWatch,
+            };
+          }
+          return e;
+        }),
+    );
     for (const entry of entries) {
       if (entry.kind === 'sep') {
         const sep = document.createElement('hr');
@@ -264,6 +295,7 @@ export function attachContextMenu(deps: ContextMenuDeps): () => void {
   };
 
   const show = (clientX: number, clientY: number, kind: MenuKind): void => {
+    inheritHostTokens(host, root);
     buildMenu(kind);
     if (pasteBtnRef) {
       const canPaste = canReadClipboard();
@@ -306,15 +338,24 @@ export function attachContextMenu(deps: ContextMenuDeps): () => void {
     return 'cell';
   };
 
+  const isOwnChromeContextTarget = (target: EventTarget | null): boolean =>
+    target instanceof Element &&
+    !!target.closest('.fc-host__formulabar, .fc-host__sheetbar, .fc-sheetmenu');
+
   const onContextMenu = (e: MouseEvent): void => {
-    const target = e.target;
-    if (target instanceof Element && target.closest('.fc-host__formulabar')) return;
+    if (isOwnChromeContextTarget(e.target)) return;
     e.preventDefault();
     const kind = resolveMenuKind(e);
     show(e.clientX, e.clientY, kind);
   };
 
   const onDocPointerDown = (e: MouseEvent): void => {
+    if (!visible) return;
+    if (e.target instanceof Node && root.contains(e.target)) return;
+    hide();
+  };
+
+  const onDocContextMenu = (e: MouseEvent): void => {
     if (!visible) return;
     if (e.target instanceof Node && root.contains(e.target)) return;
     hide();
@@ -526,17 +567,27 @@ export function attachContextMenu(deps: ContextMenuDeps): () => void {
   }
 
   host.addEventListener('contextmenu', onContextMenu);
+  document.addEventListener('contextmenu', onDocContextMenu, true);
   document.addEventListener('mousedown', onDocPointerDown, true);
   document.addEventListener('keydown', onDocKey, true);
   window.addEventListener('scroll', onScroll, true);
 
-  return () => {
+  const detach = ((): void => {
     host.removeEventListener('contextmenu', onContextMenu);
+    document.removeEventListener('contextmenu', onDocContextMenu, true);
     document.removeEventListener('mousedown', onDocPointerDown, true);
     document.removeEventListener('keydown', onDocKey, true);
     window.removeEventListener('scroll', onScroll, true);
     root.remove();
+  }) as ContextMenuHandle;
+  detach.setStrings = (next: Strings): void => {
+    strings = next;
+    // Menu is rebuilt on each show via buildMenu(kind), which reads
+    // `strings` lazily — closing here ensures any open menu doesn't
+    // keep stale labels.
+    hide();
   };
+  return detach;
 }
 
 function canReadClipboard(): boolean {

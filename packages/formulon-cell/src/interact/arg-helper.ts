@@ -1,4 +1,5 @@
 import { caretInsideImplicitIntersection, findActiveSignature } from '../commands/refs.js';
+import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface ArgHelperHandle {
   /** Re-evaluate the tooltip against the current input value/caret. */
@@ -49,6 +50,7 @@ export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
       document.body.appendChild(el);
       root = el;
     }
+    inheritHostTokens(input, el);
     el.replaceChildren();
     if (implicit) {
       const chip = document.createElement('span');

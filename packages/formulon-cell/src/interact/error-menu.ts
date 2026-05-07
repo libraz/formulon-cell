@@ -3,6 +3,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { addrKey } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export type ErrorMenuKind = 'error' | 'validation';
 
@@ -194,6 +195,7 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
       // Touch the workbook getter so consumers wiring Strict Mode can rely
       // on the same lazy resolution shape used elsewhere.
       void getWb();
+      inheritHostTokens(host, root);
       buildMenu(addr, kind);
       // Pre-position offscreen so we can measure offsetWidth/offsetHeight.
       root.style.display = 'block';

@@ -8,6 +8,7 @@
 // they are the spreadsheet itself, removing them yields no UI.
 export const ALL_FEATURE_IDS = [
   'formulaBar',
+  'sheetTabs',
   'statusBar',
   'contextMenu',
   'findReplace',

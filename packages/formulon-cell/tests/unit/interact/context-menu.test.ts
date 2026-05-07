@@ -116,6 +116,21 @@ describe('attachContextMenu', () => {
       expect(item('colInsertLeft')).toBeNull();
     });
 
+    it('does not leave adjacent or trailing separators when optional entries are hidden', () => {
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      fireContextMenu(host, 200, 70);
+      const menu = visibleMenu();
+      expect(menu).not.toBeNull();
+      const children = Array.from(menu?.children ?? []);
+      expect(children[0]?.classList.contains('fc-ctxmenu__sep')).toBe(false);
+      expect(children[children.length - 1]?.classList.contains('fc-ctxmenu__sep')).toBe(false);
+      for (let i = 1; i < children.length; i += 1) {
+        const prevSep = children[i - 1]?.classList.contains('fc-ctxmenu__sep');
+        const curSep = children[i]?.classList.contains('fc-ctxmenu__sep');
+        expect(prevSep && curSep).toBe(false);
+      }
+    });
+
     it('right-click on the row header opens the row menu and promotes selection', () => {
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
       fireContextMenu(host, 10, 40); // row 0 header
@@ -158,6 +173,22 @@ describe('attachContextMenu', () => {
       expect(visibleMenu()).toBeNull();
       expect(e.defaultPrevented).toBe(false);
     });
+
+    it('right-click on the sheet bar does not open the cell menu', () => {
+      const sheetBar = document.createElement('div');
+      sheetBar.className = 'fc-host__sheetbar';
+      host.appendChild(sheetBar);
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      const e = new MouseEvent('contextmenu', {
+        clientX: 50,
+        clientY: 50,
+        bubbles: true,
+        cancelable: true,
+      });
+      sheetBar.dispatchEvent(e);
+      expect(visibleMenu()).toBeNull();
+      expect(e.defaultPrevented).toBe(false);
+    });
   });
 
   describe('dismissal', () => {
@@ -166,6 +197,16 @@ describe('attachContextMenu', () => {
       fireContextMenu(host, 200, 70);
       expect(visibleMenu()).not.toBeNull();
       document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      expect(visibleMenu()).toBeNull();
+    });
+
+    it('right-clicking outside the menu hides it without opening another menu', () => {
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      fireContextMenu(host, 200, 70);
+      expect(visibleMenu()).not.toBeNull();
+      document.body.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true }),
+      );
       expect(visibleMenu()).toBeNull();
     });
 

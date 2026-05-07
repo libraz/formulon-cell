@@ -23,26 +23,24 @@ export interface FindReplaceDeps {
 export interface FindReplaceHandle {
   open(): void;
   close(): void;
+  /** Swap the active dictionary; live-updates labels in place. */
+  setStrings(next: Strings): void;
   detach(): void;
 }
 
 export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   const { host, store, wb } = deps;
-  const strings = deps.strings ?? defaultStrings;
-  const t = strings.findReplace;
+  let strings = deps.strings ?? defaultStrings;
 
   const overlay = document.createElement('div');
   overlay.className = 'fc-find';
   overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-label', t.title);
   overlay.hidden = true;
 
   const findRow = document.createElement('div');
   findRow.className = 'fc-find__row';
   const findInput = document.createElement('input');
   findInput.type = 'text';
-  findInput.placeholder = t.findLabel;
-  findInput.setAttribute('aria-label', t.findLabel);
   findInput.spellcheck = false;
   findInput.autocomplete = 'off';
   const pill = document.createElement('span');
@@ -54,31 +52,49 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   replaceRow.className = 'fc-find__row';
   const replaceInput = document.createElement('input');
   replaceInput.type = 'text';
-  replaceInput.placeholder = t.replaceLabel;
-  replaceInput.setAttribute('aria-label', t.replaceLabel);
   replaceInput.spellcheck = false;
   replaceInput.autocomplete = 'off';
   replaceRow.append(replaceInput);
 
   const buttonRow = document.createElement('div');
   buttonRow.className = 'fc-find__row';
-  const prevBtn = makeBtn(t.prev, t.prev);
-  const nextBtn = makeBtn(t.next, t.next);
-  const replaceBtn = makeBtn(t.replaceOne, t.replaceOne);
-  const replaceAllBtn = makeBtn(t.replaceAll, t.replaceAll);
+  const prevBtn = makeBtn();
+  const nextBtn = makeBtn();
+  const replaceBtn = makeBtn();
+  const replaceAllBtn = makeBtn();
   const caseLabel = document.createElement('label');
   caseLabel.className = 'fc-find__row';
   const caseToggle = document.createElement('input');
   caseToggle.type = 'checkbox';
   caseToggle.id = `fc-find-case-${Math.random().toString(36).slice(2, 8)}`;
   const caseText = document.createElement('span');
-  caseText.textContent = t.matchCase;
   caseLabel.append(caseToggle, caseText);
-  const closeBtn = makeBtn('×', t.close);
+  const closeBtn = makeBtn();
+  closeBtn.textContent = '×';
   buttonRow.append(prevBtn, nextBtn, replaceBtn, replaceAllBtn, caseLabel, closeBtn);
 
   overlay.append(findRow, replaceRow, buttonRow);
   host.appendChild(overlay);
+
+  const relabel = (): void => {
+    const t = strings.findReplace;
+    overlay.setAttribute('aria-label', t.title);
+    findInput.placeholder = t.findLabel;
+    findInput.setAttribute('aria-label', t.findLabel);
+    replaceInput.placeholder = t.replaceLabel;
+    replaceInput.setAttribute('aria-label', t.replaceLabel);
+    prevBtn.textContent = t.prev;
+    prevBtn.setAttribute('aria-label', t.prev);
+    nextBtn.textContent = t.next;
+    nextBtn.setAttribute('aria-label', t.next);
+    replaceBtn.textContent = t.replaceOne;
+    replaceBtn.setAttribute('aria-label', t.replaceOne);
+    replaceAllBtn.textContent = t.replaceAll;
+    replaceAllBtn.setAttribute('aria-label', t.replaceAll);
+    caseText.textContent = t.matchCase;
+    closeBtn.setAttribute('aria-label', t.close);
+  };
+  relabel();
 
   let lastQuery = '';
   let currentMatch: FindMatch | null = null;
@@ -230,6 +246,10 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
       currentMatch = null;
       host.focus();
     },
+    setStrings(next: Strings): void {
+      strings = next;
+      relabel();
+    },
     detach(): void {
       prevBtn.removeEventListener('click', onPrevClick);
       nextBtn.removeEventListener('click', onNextClick);
@@ -248,11 +268,9 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   return api;
 }
 
-function makeBtn(label: string, ariaLabel: string): HTMLButtonElement {
+function makeBtn(): HTMLButtonElement {
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'fc-find__btn';
-  b.textContent = label;
-  b.setAttribute('aria-label', ariaLabel);
   return b;
 }
