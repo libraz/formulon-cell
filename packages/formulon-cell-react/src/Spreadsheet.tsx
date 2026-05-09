@@ -63,6 +63,23 @@ export interface SpreadsheetRef {
   readonly instance: SpreadsheetInstance | null;
 }
 
+const applyRuntimeProps = async (
+  inst: SpreadsheetInstance,
+  props: SpreadsheetProps,
+  baseline: SpreadsheetProps = {},
+): Promise<void> => {
+  if (props.workbook && props.workbook !== baseline.workbook && props.workbook !== inst.workbook) {
+    await inst.setWorkbook(props.workbook);
+  }
+  if (props.theme && props.theme !== baseline.theme) inst.setTheme(props.theme);
+  if (props.locale && props.locale !== baseline.locale) inst.i18n.setLocale(props.locale);
+  if (props.strings && props.strings !== baseline.strings) {
+    inst.i18n.extend(inst.i18n.locale, props.strings);
+  }
+  if (props.features !== baseline.features) inst.setFeatures(props.features ?? {});
+  if (props.extensions !== baseline.extensions) inst.setExtensions(props.extensions);
+};
+
 const SpreadsheetComponent = (
   props: SpreadsheetProps,
   ref: ForwardedRef<SpreadsheetRef>,
@@ -85,8 +102,6 @@ const SpreadsheetComponent = (
     [],
   );
 
-  const workbook = props.workbook;
-
   useEffect(() => {
     let disposed = false;
     const host = hostRef.current;
@@ -95,7 +110,7 @@ const SpreadsheetComponent = (
     void (async () => {
       const cur = propsRef.current;
       const inst = await SpreadsheetCore.mount(host, {
-        ...(workbook ? { workbook } : {}),
+        ...(cur.workbook ? { workbook: cur.workbook } : {}),
         ...(cur.theme ? { theme: cur.theme } : {}),
         ...(cur.locale ? { locale: cur.locale } : {}),
         ...(cur.strings ? { strings: cur.strings } : {}),
@@ -119,7 +134,11 @@ const SpreadsheetComponent = (
         inst.on('themeChange', (e) => propsRef.current.onThemeChange?.(e)),
         inst.on('recalc', (e) => propsRef.current.onRecalc?.(e)),
       );
-      cur.onReady?.(inst);
+      if (propsRef.current !== cur) {
+        await applyRuntimeProps(inst, propsRef.current, cur);
+        if (disposed) return;
+      }
+      propsRef.current.onReady?.(inst);
     })();
     return () => {
       disposed = true;
@@ -127,13 +146,18 @@ const SpreadsheetComponent = (
       instanceRef.current?.dispose();
       instanceRef.current = null;
     };
-    // Only re-mount on workbook identity change — props mutations land via
-    // imperative methods on `instance` (setTheme, i18n.setLocale, …) and
-    // event handlers re-read from propsRef on each fire.
-  }, [workbook]);
+    // Mount once; prop mutations land via imperative methods on `instance`
+    // and event handlers re-read from propsRef on each fire.
+  }, []);
 
   // Forward reactive theme / locale / features / extensions prop changes
   // to the running instance via imperative APIs — avoids re-mounting.
+  useEffect(() => {
+    const inst = instanceRef.current;
+    if (!inst || !props.workbook || props.workbook === inst.workbook) return;
+    void inst.setWorkbook(props.workbook);
+  }, [props.workbook]);
+
   useEffect(() => {
     const inst = instanceRef.current;
     if (!inst || !props.theme) return;
@@ -145,6 +169,12 @@ const SpreadsheetComponent = (
     if (!inst || !props.locale) return;
     inst.i18n.setLocale(props.locale);
   }, [props.locale]);
+
+  useEffect(() => {
+    const inst = instanceRef.current;
+    if (!inst || !props.strings) return;
+    inst.i18n.extend(inst.i18n.locale, props.strings);
+  }, [props.strings]);
 
   useEffect(() => {
     const inst = instanceRef.current;

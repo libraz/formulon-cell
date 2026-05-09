@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { suggestColumnHistory, suggestStructuredRef } from '../../../src/interact/autocomplete.js';
+import {
+  attachAutocomplete,
+  suggestColumnHistory,
+  suggestStructuredRef,
+} from '../../../src/interact/autocomplete.js';
 
 const sales = {
   name: 'Sales',
@@ -78,5 +82,53 @@ describe('suggestColumnHistory', () => {
     // prefix-matches should still surface.
     const ctx = suggestColumnHistory('App', 3, ['App', 'Apple', 'Application']);
     expect(ctx?.matches).toEqual(['Apple', 'Application']);
+  });
+});
+
+describe('attachAutocomplete labels', () => {
+  it('renders localized labels for custom functions', () => {
+    const input = document.createElement('textarea');
+    input.value = '=CUS';
+    document.body.appendChild(input);
+    input.setSelectionRange(input.value.length, input.value.length);
+    const handle = attachAutocomplete({
+      input,
+      getCustomFunctions: () => ['CUSTOM_RATE'],
+      labels: {
+        customFunction: 'カスタム関数',
+        structuredTableColumn: '構造化テーブル列',
+        pickFromList: 'リストから選択',
+      },
+    });
+
+    handle.refresh();
+    expect(document.body.textContent).toContain('カスタム関数');
+
+    handle.detach();
+    input.remove();
+  });
+
+  it('updates visible labels in place', () => {
+    const input = document.createElement('textarea');
+    input.value = '=Sales[';
+    document.body.appendChild(input);
+    input.setSelectionRange(input.value.length, input.value.length);
+    const handle = attachAutocomplete({
+      input,
+      getTables: () => [sales],
+      labels: {
+        customFunction: 'カスタム関数',
+        structuredTableColumn: '構造化テーブル列',
+        pickFromList: 'リストから選択',
+      },
+    });
+
+    handle.refresh();
+    expect(document.body.textContent).toContain('構造化テーブル列');
+    handle.setLabels({ structuredTableColumn: 'テーブル列' });
+    expect(document.body.textContent).toContain('テーブル列');
+
+    handle.detach();
+    input.remove();
   });
 });

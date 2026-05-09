@@ -1,3 +1,4 @@
+import { listExternalLinks } from '../commands/external-links.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 
@@ -18,7 +19,7 @@ export interface ExternalLinksDialogHandle {
 }
 
 /**
- * Excel-parity "Edit Links" — read-only inventory of `<externalReferences>`
+ * Spreadsheet-style "Edit Links" — read-only inventory of external-reference
  * records carried by the workbook. Records that round-trip through formulon's
  * passthrough mechanism stay listed but are not editable through this UI.
  */
@@ -93,8 +94,7 @@ export function attachExternalLinksDialog(
 
   const renderTable = (): void => {
     tableWrap.replaceChildren();
-    const wb = getWb();
-    const links = wb?.getExternalLinks() ?? [];
+    const links = listExternalLinks(getWb());
     if (links.length === 0) {
       empty.hidden = false;
       return;

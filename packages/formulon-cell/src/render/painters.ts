@@ -121,6 +121,35 @@ export function paintValidationChevron(
   return { x, y, w, h };
 }
 
+/** Paint the Excel Table header filter/dropdown affordance. This is visual
+ *  only today; table filtering still routes through the normal filter model. */
+export function paintTableHeaderChevron(
+  ctx: CanvasRenderingContext2D,
+  bounds: Rect,
+  theme: ResolvedTheme,
+): Rect {
+  const size = 14;
+  const x = bounds.x + bounds.w - size - 3;
+  const y = bounds.y + Math.max(2, (bounds.h - size) / 2);
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.72)';
+  ctx.fillRect(x, y, size, size);
+  ctx.strokeStyle = theme.rule;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, size - 1, size - 1);
+  ctx.fillStyle = theme.fgMute || theme.fg;
+  ctx.beginPath();
+  const cx = x + size / 2;
+  const cy = y + size / 2 + 1;
+  ctx.moveTo(cx - 3.5, cy - 2);
+  ctx.lineTo(cx + 3.5, cy - 2);
+  ctx.lineTo(cx, cy + 2.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+  return { x, y, w: size, h: size };
+}
+
 /** Side of the triangle hot-zone painted by `paintErrorTriangle` /
  *  `paintValidationTriangle`. Click hit-tests in `error-menu` use the same
  *  constant so the visual and clickable areas line up. */
@@ -449,13 +478,11 @@ export function paintCellText({
   const isNumeric = value.kind === 'number';
   const isError = value.kind === 'error';
   const isBool = value.kind === 'bool';
-  const isFormula = formula != null;
-
+  const isFormulaDisplay = showFormulas && formula != null;
   const weight = format?.bold ? 700 : 400;
   const styleSlant = format?.italic ? 'italic ' : '';
   const fontSize = format?.fontSize ?? theme.textCell;
-  const fontFamily =
-    format?.fontFamily ?? (isNumeric || isError || isFormula ? theme.fontMono : theme.fontUi);
+  const fontFamily = format?.fontFamily ?? (isFormulaDisplay ? theme.fontMono : theme.fontUi);
   ctx.font = `${styleSlant}${weight} ${fontSize}px ${fontCss(fontFamily)}`;
   const isHyperlink = !!format?.hyperlink;
   ctx.fillStyle = format?.color
@@ -474,7 +501,7 @@ export function paintCellText({
   if (format?.align) {
     align = format.align;
   } else {
-    align = isNumeric || isBool || isError ? 'right' : 'left';
+    align = isFormulaDisplay ? 'left' : isNumeric ? 'right' : isBool || isError ? 'center' : 'left';
   }
   const indentPx = (format?.indent ?? 0) * 8;
   const rotation = format?.rotation ?? 0;
@@ -529,6 +556,11 @@ export function paintCellText({
   else tx = bounds.x + padX + indentPx;
 
   const vAlign = format?.vAlign ?? 'bottom';
+  const availableTextWidth = Math.max(0, bounds.w - padX * 2 - indentPx);
+  if (isNumeric && format?.numFmt && ctx.measureText(text).width > availableTextWidth) {
+    const hashWidth = Math.max(1, ctx.measureText('#').width || fontSize * 0.62);
+    text = '#'.repeat(Math.max(1, Math.floor(availableTextWidth / hashWidth)));
+  }
   const metrics = ctx.measureText(text);
   const box = stableTextMetricsBox(fontSize);
   const ty = textBaselineY(bounds, box, vAlign, padY);
@@ -684,9 +716,17 @@ export function paintActiveCellOutline(
   bounds: Rect,
   theme: ResolvedTheme,
 ): void {
+  ctx.save();
   ctx.strokeStyle = theme.accent;
   ctx.lineWidth = 2;
-  ctx.strokeRect(bounds.x, bounds.y, bounds.w, bounds.h);
+  ctx.setLineDash([]);
+  ctx.strokeRect(
+    Math.round(bounds.x) + 1,
+    Math.round(bounds.y) + 1,
+    Math.max(0, Math.round(bounds.w) - 2),
+    Math.max(0, Math.round(bounds.h) - 2),
+  );
+  ctx.restore();
 }
 
 /** Visible side length of the fill handle in CSS pixels. Excel 365 uses a
@@ -734,6 +774,29 @@ export function paintFillPreview(
   ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 3]);
   ctx.strokeRect(bounds.x + 0.5, bounds.y + 0.5, bounds.w - 1, bounds.h - 1);
+  ctx.restore();
+}
+
+/** Dashed copy-source marquee. Excel animates the dashes; this renderer keeps
+ *  it static but uses the same high-contrast black/white double stroke. */
+export function paintCopyMarquee(ctx: CanvasRenderingContext2D, bounds: Rect): void {
+  ctx.save();
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = '#ffffff';
+  ctx.strokeRect(
+    bounds.x + 1.5,
+    bounds.y + 1.5,
+    Math.max(0, bounds.w - 3),
+    Math.max(0, bounds.h - 3),
+  );
+  ctx.strokeStyle = '#111111';
+  ctx.strokeRect(
+    bounds.x + 0.5,
+    bounds.y + 0.5,
+    Math.max(0, bounds.w - 1),
+    Math.max(0, bounds.h - 1),
+  );
   ctx.restore();
 }
 

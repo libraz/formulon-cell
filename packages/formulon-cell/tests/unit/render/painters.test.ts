@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   FILL_HANDLE_SIZE,
+  paintActiveCellOutline,
   paintCellBorders,
   paintCellText,
+  paintCopyMarquee,
   paintFillHandle,
+  paintTableHeaderChevron,
   stableTextMetricsBox,
   textBaselineY,
 } from '../../../src/render/painters.js';
@@ -38,8 +41,10 @@ function makeCtxSpy(): {
 function makeStrokeSpy(): {
   ctx: CanvasRenderingContext2D;
   strokes: Array<{ style: string; width: number; dash: number[] }>;
+  rects: Array<{ x: number; y: number; w: number; h: number; width: number }>;
 } {
   const strokes: Array<{ style: string; width: number; dash: number[] }> = [];
+  const rects: Array<{ x: number; y: number; w: number; h: number; width: number }> = [];
   let strokeStyle = '';
   let lineWidth = 1;
   let dash: number[] = [];
@@ -67,8 +72,11 @@ function makeStrokeSpy(): {
     stroke(): void {
       strokes.push({ style: strokeStyle, width: lineWidth, dash: [...dash] });
     },
+    strokeRect(x: number, y: number, w: number, h: number): void {
+      rects.push({ x, y, w, h, width: lineWidth });
+    },
   } as unknown as CanvasRenderingContext2D;
-  return { ctx, strokes };
+  return { ctx, strokes, rects };
 }
 
 function makeTextSpy(): {
@@ -176,6 +184,42 @@ describe('paintFillHandle', () => {
   });
 });
 
+describe('paintTableHeaderChevron', () => {
+  it('paints a compact dropdown affordance inside the cell header', () => {
+    const fills: Array<{ style: string; rect?: [number, number, number, number] }> = [];
+    let fillStyle = '';
+    const ctx = {
+      get fillStyle(): string {
+        return fillStyle;
+      },
+      set fillStyle(v: string) {
+        fillStyle = v;
+      },
+      strokeStyle: '',
+      lineWidth: 1,
+      save(): void {},
+      restore(): void {},
+      fillRect(x: number, y: number, w: number, h: number): void {
+        fills.push({ style: fillStyle, rect: [x, y, w, h] });
+      },
+      strokeRect(): void {},
+      beginPath(): void {},
+      moveTo(): void {},
+      lineTo(): void {},
+      closePath(): void {},
+      fill(): void {
+        fills.push({ style: fillStyle });
+      },
+    } as unknown as CanvasRenderingContext2D;
+
+    const hit = paintTableHeaderChevron(ctx, { x: 10, y: 20, w: 120, h: 24 }, theme());
+
+    expect(hit).toEqual({ x: 113, y: 25, w: 14, h: 14 });
+    expect(fills[0]).toEqual({ style: 'rgba(255,255,255,0.72)', rect: [113, 25, 14, 14] });
+    expect(fills.at(-1)?.style).toBe(theme().fgMute);
+  });
+});
+
 describe('paintCellBorders', () => {
   it('uses the Excel-like automatic border color instead of the gridline color', () => {
     const { ctx, strokes } = makeStrokeSpy();
@@ -211,6 +255,31 @@ describe('paintCellBorders', () => {
   });
 });
 
+describe('paintActiveCellOutline', () => {
+  it('snaps the 2px active outline inside the cell bounds', () => {
+    const { ctx, rects } = makeStrokeSpy();
+    paintActiveCellOutline(
+      ctx,
+      { x: 10.2, y: 20.7, w: 80.4, h: 24.2 },
+      theme({ accent: '#107c41' }),
+    );
+
+    expect(rects).toEqual([{ x: 11, y: 22, w: 78, h: 22, width: 2 }]);
+  });
+});
+
+describe('paintCopyMarquee', () => {
+  it('paints a black and white dashed copy marquee', () => {
+    const { ctx, rects } = makeStrokeSpy();
+    paintCopyMarquee(ctx, { x: 10, y: 20, w: 80, h: 24 });
+
+    expect(rects).toEqual([
+      { x: 11.5, y: 21.5, w: 77, h: 21, width: 1 },
+      { x: 10.5, y: 20.5, w: 79, h: 23, width: 1 },
+    ]);
+  });
+});
+
 describe('textBaselineY', () => {
   it('keeps bottom-aligned text visually inside the cell padding', () => {
     const bounds = { x: 10, y: 20, w: 80, h: 20 };
@@ -226,6 +295,95 @@ describe('textBaselineY', () => {
 });
 
 describe('paintCellText font strictness', () => {
+  it('uses the grid UI font for ordinary numbers like Excel 365', () => {
+    const spy = makeTextSpy();
+    paintCellText({
+      ctx: spy.ctx,
+      bounds: { x: 0, y: 0, w: 80, h: 20 },
+      theme: theme({ fontUi: 'Aptos', fontMono: 'Menlo', textCell: 13 }),
+      value: { kind: 'number', value: 1234 },
+      formula: null,
+      isActive: false,
+      isInRange: false,
+    });
+
+    expect(spy.fonts.at(-1)).toBe('400 13px Aptos');
+  });
+
+  it('centers logical and error values by default', () => {
+    const boolSpy = makeTextSpy();
+    const errSpy = makeTextSpy();
+    const base = {
+      bounds: { x: 0, y: 0, w: 80, h: 20 },
+      theme: theme({ textCell: 13 }),
+      formula: null,
+      isActive: false,
+      isInRange: false,
+    };
+
+    paintCellText({ ...base, ctx: boolSpy.ctx, value: { kind: 'bool', value: true } });
+    paintCellText({
+      ...base,
+      ctx: errSpy.ctx,
+      value: { kind: 'error', code: 1, text: '#DIV/0!' },
+    });
+
+    expect(boolSpy.fills[0]?.x).toBe(40);
+    expect(errSpy.fills[0]?.x).toBe(40);
+  });
+
+  it('uses the monospace font only for formula-display mode', () => {
+    const spy = makeTextSpy();
+    paintCellText({
+      ctx: spy.ctx,
+      bounds: { x: 0, y: 0, w: 80, h: 20 },
+      theme: theme({ fontUi: 'Aptos', fontMono: 'Menlo', textCell: 13 }),
+      value: { kind: 'number', value: 2 },
+      formula: '=A1+1',
+      showFormulas: true,
+      isActive: false,
+      isInRange: false,
+    });
+
+    expect(spy.fonts.at(-1)).toBe('400 13px Menlo');
+    expect(spy.fills[0]?.text).toBe('=A1+1');
+    expect(spy.fills[0]?.x).toBe(7);
+  });
+
+  it('renders hashes for formatted numbers that do not fit the cell width', () => {
+    const fills: string[] = [];
+    const ctx = {
+      font: '',
+      fillStyle: '',
+      textBaseline: 'alphabetic',
+      textAlign: 'left',
+      save(): void {},
+      restore(): void {},
+      beginPath(): void {},
+      rect(): void {},
+      clip(): void {},
+      measureText(text: string): TextMetrics {
+        return { width: text.length * 6 } as TextMetrics;
+      },
+      fillText(text: string): void {
+        fills.push(text);
+      },
+    } as unknown as CanvasRenderingContext2D;
+
+    paintCellText({
+      ctx,
+      bounds: { x: 0, y: 0, w: 28, h: 20 },
+      theme: theme({ textCell: 13 }),
+      value: { kind: 'number', value: 123456 },
+      formula: null,
+      isActive: false,
+      isInRange: false,
+      format: { numFmt: { kind: 'fixed', decimals: 0, thousands: true } },
+    });
+
+    expect(fills).toEqual(['##']);
+  });
+
   it('keeps the same font size and baseline when only bold changes', () => {
     const bounds = { x: 0, y: 0, w: 80, h: 20 };
     const normal = makeTextSpy();

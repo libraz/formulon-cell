@@ -120,7 +120,7 @@ const persistStats = (): void => {
   } catch {}
 };
 
-// Composite badge showing both passthrough OOXML parts and Excel Tables.
+// Composite badge showing both passthrough OOXML parts and spreadsheet Tables.
 // We accumulate the latest snapshot from each event and render together so
 // switching workbooks doesn't leak stale numbers from the previous one.
 const objectCounts = { passthroughs: 0, tables: 0, passByCat: {} as Record<string, number> };
@@ -256,10 +256,13 @@ async function boot(): Promise<void> {
       console.info('[formulon-cell]', reason);
     },
   });
+  // mount.ts only runs `seed` on workbooks it owns. We construct `wb` here so
+  // we can read `isStub` / `version` for the engine pill before mounting,
+  // which means we have to seed the workbook ourselves.
+  seed(wb);
 
   inst = await Spreadsheet.mount(sheetEl as HTMLElement, {
     theme: toCore(uiTheme),
-    seed,
     workbook: wb,
     locale: 'en',
   });
@@ -269,7 +272,7 @@ async function boot(): Promise<void> {
 
   filterDropdown = attachFilterDropdown({ store: inst.store });
 
-  // Read-only badge — chart/drawing/pivot counts and Excel-Tables. Hidden
+  // Read-only badge — chart/drawing/pivot counts and spreadsheet Tables. Hidden
   //  until the loaded workbook actually carries any of these objects.
   inst.host.addEventListener('fc:passthroughs', (ev) => {
     const e = ev as CustomEvent<{ count: number; byCategory: Record<string, number> }>;
@@ -542,7 +545,7 @@ freezeMenu?.querySelectorAll<HTMLButtonElement>('[data-freeze]').forEach((btn) =
       rows = 0;
       cols = 1;
     } else if (action === 'selection') {
-      // Excel: freeze rows above and cols left of the active cell.
+      // Freeze rows above and columns left of the active cell.
       rows = s.selection.active.row;
       cols = s.selection.active.col;
     } else if (action === 'off') {
@@ -920,6 +923,206 @@ const closeTabMenu = (): void => {
   tabMenuEl.remove();
   tabMenuEl = null;
 };
+
+interface PromptOptions {
+  title: string;
+  label: string;
+  initial?: string;
+  placeholder?: string;
+  okLabel?: string;
+  cancelLabel?: string;
+  validate?: (value: string) => string | null;
+}
+
+/** Excel 365-styled modal prompt. Returns the entered value, or `null`
+ *  when the user cancels. Replaces native `window.prompt`. */
+const showPrompt = (opts: PromptOptions): Promise<string | null> => {
+  return new Promise<string | null>((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'fc-fmtdlg app__dlg';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', opts.title);
+
+    const panel = document.createElement('div');
+    panel.className = 'fc-fmtdlg__panel app__dlg__panel';
+    overlay.appendChild(panel);
+
+    const header = document.createElement('div');
+    header.className = 'fc-fmtdlg__header';
+    header.textContent = opts.title;
+    panel.appendChild(header);
+
+    const body = document.createElement('div');
+    body.className = 'fc-fmtdlg__body';
+    panel.appendChild(body);
+
+    const row = document.createElement('div');
+    row.className = 'fc-fmtdlg__row fc-fmtdlg__row--block';
+    const label = document.createElement('label');
+    label.className = 'app__dlg__label';
+    label.textContent = opts.label;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'app__dlg__input';
+    input.value = opts.initial ?? '';
+    if (opts.placeholder) input.placeholder = opts.placeholder;
+    label.appendChild(input);
+    row.appendChild(label);
+    body.appendChild(row);
+
+    const errorRow = document.createElement('div');
+    errorRow.className = 'app__dlg__error';
+    errorRow.setAttribute('role', 'alert');
+    errorRow.hidden = true;
+    body.appendChild(errorRow);
+
+    const footer = document.createElement('div');
+    footer.className = 'fc-fmtdlg__footer';
+    panel.appendChild(footer);
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'fc-fmtdlg__btn';
+    cancelBtn.textContent = opts.cancelLabel ?? 'Cancel';
+    footer.appendChild(cancelBtn);
+
+    const okBtn = document.createElement('button');
+    okBtn.type = 'button';
+    okBtn.className = 'fc-fmtdlg__btn fc-fmtdlg__btn--primary';
+    okBtn.textContent = opts.okLabel ?? 'OK';
+    footer.appendChild(okBtn);
+
+    let done = false;
+    const finish = (value: string | null): void => {
+      if (done) return;
+      done = true;
+      overlay.removeEventListener('keydown', onKey);
+      overlay.remove();
+      resolve(value);
+    };
+    const onOk = (): void => {
+      const v = input.value;
+      const err = opts.validate?.(v) ?? null;
+      if (err) {
+        errorRow.textContent = err;
+        errorRow.hidden = false;
+        input.focus();
+        input.select();
+        return;
+      }
+      finish(v);
+    };
+    const onCancel = (): void => finish(null);
+    const onKey = (e: KeyboardEvent): void => {
+      e.stopPropagation();
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onCancel();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        onOk();
+      }
+    };
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) onCancel();
+    });
+    overlay.addEventListener('keydown', onKey);
+
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => {
+      input.focus();
+      input.select();
+    });
+  });
+};
+
+interface ConfirmOptions {
+  title: string;
+  message: string;
+  okLabel?: string;
+  cancelLabel?: string;
+  destructive?: boolean;
+}
+
+/** Excel 365-styled modal confirm. Returns true on accept, false on
+ *  cancel/dismiss. Replaces native `window.confirm`. */
+const showConfirm = (opts: ConfirmOptions): Promise<boolean> => {
+  return new Promise<boolean>((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'fc-fmtdlg app__dlg';
+    overlay.setAttribute('role', 'alertdialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', opts.title);
+
+    const panel = document.createElement('div');
+    panel.className = 'fc-fmtdlg__panel app__dlg__panel';
+    overlay.appendChild(panel);
+
+    const header = document.createElement('div');
+    header.className = 'fc-fmtdlg__header';
+    header.textContent = opts.title;
+    panel.appendChild(header);
+
+    const body = document.createElement('div');
+    body.className = 'fc-fmtdlg__body app__dlg__body';
+    const msg = document.createElement('p');
+    msg.className = 'app__dlg__message';
+    msg.textContent = opts.message;
+    body.appendChild(msg);
+    panel.appendChild(body);
+
+    const footer = document.createElement('div');
+    footer.className = 'fc-fmtdlg__footer';
+    panel.appendChild(footer);
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'fc-fmtdlg__btn';
+    cancelBtn.textContent = opts.cancelLabel ?? 'Cancel';
+    footer.appendChild(cancelBtn);
+
+    const okBtn = document.createElement('button');
+    okBtn.type = 'button';
+    okBtn.className = `fc-fmtdlg__btn fc-fmtdlg__btn--primary${
+      opts.destructive ? ' app__dlg__btn--danger' : ''
+    }`;
+    okBtn.textContent = opts.okLabel ?? 'OK';
+    footer.appendChild(okBtn);
+
+    let done = false;
+    const finish = (value: boolean): void => {
+      if (done) return;
+      done = true;
+      overlay.removeEventListener('keydown', onKey);
+      overlay.remove();
+      resolve(value);
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      e.stopPropagation();
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        finish(false);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        finish(true);
+      }
+    };
+    okBtn.addEventListener('click', () => finish(true));
+    cancelBtn.addEventListener('click', () => finish(false));
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) finish(false);
+    });
+    overlay.addEventListener('keydown', onKey);
+
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => {
+      okBtn.focus();
+    });
+  });
+};
 const openTabMenu = (idx: number, x: number, y: number): void => {
   if (!inst) return;
   closeTabMenu();
@@ -953,18 +1156,41 @@ const openTabMenu = (idx: number, x: number, y: number): void => {
   addItem('Rename…', false, () => {
     if (!inst) return;
     const cur = wb.sheetName(idx);
-    const next = window.prompt('Sheet name:', cur);
-    if (next == null || next === cur || next.length === 0) return;
-    if (renameSheet(wb, idx, next)) renderSheetTabs();
+    void showPrompt({
+      title: 'Rename sheet',
+      label: 'Sheet name',
+      initial: cur,
+      placeholder: 'Sheet name',
+      okLabel: 'Rename',
+      validate: (v) => {
+        const trimmed = v.trim();
+        if (trimmed.length === 0) return 'Enter a sheet name.';
+        return null;
+      },
+    }).then((next) => {
+      if (next == null) return;
+      const trimmed = next.trim();
+      if (trimmed === cur) return;
+      if (!inst) return;
+      if (renameSheet(wb, idx, trimmed)) renderSheetTabs();
+    });
   });
   addItem('Delete', n <= 1, () => {
     if (!inst) return;
-    if (!window.confirm(`Delete "${wb.sheetName(idx)}"?`)) return;
-    if (removeSheet(store, wb, idx)) {
-      const newActive = store.getState().data.sheetIndex;
-      mutators.replaceCells(store, wb.cells(newActive));
-      renderSheetTabs();
-    }
+    const name = wb.sheetName(idx);
+    void showConfirm({
+      title: 'Delete sheet',
+      message: `Delete "${name}"? This action can't be undone.`,
+      okLabel: 'Delete',
+      destructive: true,
+    }).then((ok) => {
+      if (!ok || !inst) return;
+      if (removeSheet(store, wb, idx)) {
+        const newActive = store.getState().data.sheetIndex;
+        mutators.replaceCells(store, wb.cells(newActive));
+        renderSheetTabs();
+      }
+    });
   });
   // Hide tab — disabled when this is the last visible sheet and when the
   // engine doesn't expose `setSheetTabHidden`.
@@ -1039,8 +1265,8 @@ tabAddBtn?.addEventListener('click', () => {
   switchSheet(idx);
 });
 
-// Zoom display + rail. Excel uses a 10–400% range; we clamp to 25–300% which
-// matches what the engine accepts comfortably.
+// Zoom display + rail. The UI clamps to 25–300%, matching what the engine
+// accepts comfortably.
 const zoomDisplay = document.getElementById('zoom-display');
 const zoomRailFill = document.getElementById('zoom-rail-fill');
 const zoomRailThumb = document.getElementById('zoom-rail-thumb');

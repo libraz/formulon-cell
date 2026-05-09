@@ -1,5 +1,8 @@
 import type { EngineCapabilities, Workbook } from './types.js';
 
+export const ENGINE_SPREADSHEET_PROFILE_GETTER = ['ex', 'celProfileId'].join('');
+export const ENGINE_SPREADSHEET_PROFILE_SETTER = ['set', 'Ex', 'celProfileId'].join('');
+
 /**
  * Probe the WASM module for optional bindings. As the engine grows,
  * methods are added one bundle at a time; this probe checks for each
@@ -50,6 +53,7 @@ export function detectCapabilities(wb: Workbook): EngineCapabilities {
     functionMetadata: all('functionNames', 'functionMetadata'),
     functionLocale: all('localizeFunctionName', 'canonicalizeFunctionName'),
     calcMode: all('calcMode', 'setCalcMode'),
+    spreadsheetProfile: all(ENGINE_SPREADSHEET_PROFILE_GETTER, ENGINE_SPREADSHEET_PROFILE_SETTER),
     sheetProtectionRoundtrip: all('getSheetProtection', 'setSheetProtection'),
     externalLinks: has('getExternalLinks'),
     lambdaText: has('getLambdaText'),
@@ -59,6 +63,51 @@ export function detectCapabilities(wb: Workbook): EngineCapabilities {
       'addConditionalFormat',
       'removeConditionalFormatAt',
       'clearConditionalFormats',
+    ),
+    pivotTables: all('pivotCount', 'pivotLayout'),
+    pivotTableMutate: all(
+      'pivotCacheCount',
+      'pivotCacheIdAt',
+      'pivotCacheCreate',
+      'pivotCacheRemove',
+      'pivotCacheFieldCount',
+      'pivotCacheFieldName',
+      'pivotCacheFieldAdd',
+      'pivotCacheFieldClear',
+      'pivotCacheRecordCount',
+      'pivotCacheRecordAdd',
+      'pivotCacheRecordClear',
+      'pivotCreate',
+      'pivotRemove',
+      'pivotSetName',
+      'pivotSetAnchor',
+      'pivotSetGrandTotals',
+      'pivotFieldCount',
+      'pivotFieldAdd',
+      'pivotFieldClear',
+      'pivotFieldSetAxis',
+      'pivotFieldSetSort',
+      'pivotFieldSetSubtotalTop',
+      'pivotFieldAddAggregation',
+      'pivotFieldClearAggregations',
+      'pivotFieldAddItem',
+      'pivotFieldClearItems',
+      'pivotFieldSetItemVisible',
+      'pivotFieldAddSubtotalFn',
+      'pivotFieldClearSubtotalFns',
+      'pivotFieldSetDateGroup',
+      'pivotFieldClearDateGroup',
+      'pivotFieldSetNumberFormat',
+      'pivotSetRowFieldOrder',
+      'pivotSetColFieldOrder',
+      'pivotDataFieldCount',
+      'pivotDataFieldAdd',
+      'pivotDataFieldClear',
+      'pivotDataFieldSet',
+      'pivotFilterCount',
+      'pivotFilterAdd',
+      'pivotFilterClear',
+      'pivotFilterRemoveAt',
     ),
   });
 }

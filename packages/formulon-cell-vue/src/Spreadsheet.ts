@@ -30,12 +30,43 @@ export type SpreadsheetExposed = {
   readonly instance: Ref<SpreadsheetInstance | null>;
 };
 
+const applyRuntimeProps = async (
+  inst: SpreadsheetInstance,
+  props: {
+    workbook?: WorkbookHandle;
+    theme?: MountOptions['theme'];
+    locale?: MountOptions['locale'];
+    strings?: MountOptions['strings'];
+    features?: FeatureFlags;
+    extensions?: ExtensionInput[];
+  },
+  baseline: {
+    workbook?: WorkbookHandle;
+    theme?: MountOptions['theme'];
+    locale?: MountOptions['locale'];
+    strings?: MountOptions['strings'];
+    features?: FeatureFlags;
+    extensions?: ExtensionInput[];
+  } = {},
+): Promise<void> => {
+  if (props.workbook && props.workbook !== baseline.workbook && props.workbook !== inst.workbook) {
+    await inst.setWorkbook(props.workbook);
+  }
+  if (props.theme && props.theme !== baseline.theme) inst.setTheme(props.theme);
+  if (props.locale && props.locale !== baseline.locale) inst.i18n.setLocale(props.locale);
+  if (props.strings && props.strings !== baseline.strings) {
+    inst.i18n.extend(inst.i18n.locale, props.strings);
+  }
+  if (props.features !== baseline.features) inst.setFeatures(props.features ?? {});
+  if (props.extensions !== baseline.extensions) inst.setExtensions(props.extensions);
+};
+
 export const Spreadsheet = defineComponent({
   name: 'Spreadsheet',
   props: {
     workbook: { type: Object as PropType<WorkbookHandle>, default: undefined },
     theme: { type: String as PropType<MountOptions['theme']>, default: undefined },
-    locale: { type: String as PropType<string>, default: undefined },
+    locale: { type: String as PropType<MountOptions['locale']>, default: undefined },
     strings: { type: Object as PropType<MountOptions['strings']>, default: undefined },
     features: { type: Object as PropType<FeatureFlags>, default: undefined },
     extensions: { type: Array as PropType<ExtensionInput[]>, default: undefined },
@@ -58,6 +89,7 @@ export const Spreadsheet = defineComponent({
     // shallowRef so Vue doesn't deep-walk the spreadsheet's internal state.
     const instance = shallowRef<SpreadsheetInstance | null>(null);
     const eventDisposers: (() => void)[] = [];
+    let disposed = false;
 
     onMounted(async () => {
       const host = hostEl.value;
@@ -71,7 +103,19 @@ export const Spreadsheet = defineComponent({
       if (props.extensions) opts.extensions = props.extensions;
       if (props.functions) opts.functions = props.functions;
       if (props.seed) opts.seed = props.seed;
+      const mountedWith = {
+        workbook: opts.workbook,
+        theme: opts.theme,
+        locale: opts.locale,
+        strings: opts.strings,
+        features: opts.features,
+        extensions: opts.extensions,
+      };
       const inst = await SpreadsheetCore.mount(host, opts);
+      if (disposed) {
+        inst.dispose();
+        return;
+      }
       instance.value = inst;
       eventDisposers.push(
         inst.on('cellChange', (e) => emit('cellChange', e)),
@@ -81,6 +125,8 @@ export const Spreadsheet = defineComponent({
         inst.on('themeChange', (e) => emit('themeChange', e)),
         inst.on('recalc', (e) => emit('recalc', e)),
       );
+      await applyRuntimeProps(inst, props, mountedWith);
+      if (disposed) return;
       emit('ready', inst);
     });
 
@@ -97,6 +143,13 @@ export const Spreadsheet = defineComponent({
       (next) => {
         if (next && instance.value) instance.value.i18n.setLocale(next);
       },
+    );
+    watch(
+      () => props.strings,
+      (next) => {
+        if (next && instance.value) instance.value.i18n.extend(instance.value.i18n.locale, next);
+      },
+      { deep: true },
     );
     watch(
       () => props.workbook,
@@ -121,6 +174,7 @@ export const Spreadsheet = defineComponent({
     );
 
     onBeforeUnmount(() => {
+      disposed = true;
       for (const d of eventDisposers) d();
       instance.value?.dispose();
       instance.value = null;

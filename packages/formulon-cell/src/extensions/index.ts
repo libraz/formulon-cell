@@ -9,24 +9,34 @@
 // `MountOptions.features` and re-mounting their own through `extensions`.
 export {
   allBuiltIns,
+  charts,
   clipboard,
+  commentDialog,
   conditionalDialog,
   contextMenu,
   findReplace,
   formatDialog,
   formatPainter,
+  goToSpecialDialog,
   hoverComment,
   hyperlinkDialog,
   iterativeDialog,
   namedRangeDialog,
+  pageSetupDialog,
   pasteSpecial,
+  pivotTableDialog,
+  quickAnalysis,
+  slicer,
   statusBar,
   validationList,
+  viewToolbar,
+  watchWindow,
   wheel,
+  workbookObjects,
 } from './built-ins.js';
 export type { FeatureFlags, FeatureId } from './features.js';
 export { ALL_FEATURE_IDS, resolveFlags } from './features.js';
-export { excel, minimal, presets, standard } from './presets.js';
+export { full, minimal, presets, standard } from './presets.js';
 export type {
   Extension,
   ExtensionContext,

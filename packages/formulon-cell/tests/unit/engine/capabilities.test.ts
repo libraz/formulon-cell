@@ -70,11 +70,14 @@ describe('detectCapabilities', () => {
     expect(caps.functionMetadata).toBe(false);
     expect(caps.functionLocale).toBe(false);
     expect(caps.calcMode).toBe(false);
+    expect(caps.spreadsheetProfile).toBe(false);
     expect(caps.sheetProtectionRoundtrip).toBe(false);
     expect(caps.externalLinks).toBe(false);
     expect(caps.lambdaText).toBe(false);
     expect(caps.cellStyles).toBe(false);
     expect(caps.conditionalFormatMutate).toBe(false);
+    expect(caps.pivotTables).toBe(false);
+    expect(caps.pivotTableMutate).toBe(false);
   });
 
   it('traceArrows requires both precedents and dependents', () => {
@@ -101,5 +104,69 @@ describe('detectCapabilities', () => {
       'clearConditionalFormats',
     ]);
     expect(detectCapabilities(full).conditionalFormatMutate).toBe(true);
+  });
+
+  it('pivotTables requires count + layout projection', () => {
+    const countOnly = makeWb(['pivotCount']);
+    expect(detectCapabilities(countOnly).pivotTables).toBe(false);
+    const full = makeWb(['pivotCount', 'pivotLayout']);
+    expect(detectCapabilities(full).pivotTables).toBe(true);
+  });
+
+  it('pivotTableMutate requires the low-level cache, table, field, data-field, and filter surface', () => {
+    const partial = makeWb(['pivotCacheCount', 'pivotCreate']);
+    expect(detectCapabilities(partial).pivotTableMutate).toBe(false);
+    const full = makeWb([
+      'pivotCacheCount',
+      'pivotCacheIdAt',
+      'pivotCacheCreate',
+      'pivotCacheRemove',
+      'pivotCacheFieldCount',
+      'pivotCacheFieldName',
+      'pivotCacheFieldAdd',
+      'pivotCacheFieldClear',
+      'pivotCacheRecordCount',
+      'pivotCacheRecordAdd',
+      'pivotCacheRecordClear',
+      'pivotCreate',
+      'pivotRemove',
+      'pivotSetName',
+      'pivotSetAnchor',
+      'pivotSetGrandTotals',
+      'pivotFieldCount',
+      'pivotFieldAdd',
+      'pivotFieldClear',
+      'pivotFieldSetAxis',
+      'pivotFieldSetSort',
+      'pivotFieldSetSubtotalTop',
+      'pivotFieldAddAggregation',
+      'pivotFieldClearAggregations',
+      'pivotFieldAddItem',
+      'pivotFieldClearItems',
+      'pivotFieldSetItemVisible',
+      'pivotFieldAddSubtotalFn',
+      'pivotFieldClearSubtotalFns',
+      'pivotFieldSetDateGroup',
+      'pivotFieldClearDateGroup',
+      'pivotFieldSetNumberFormat',
+      'pivotSetRowFieldOrder',
+      'pivotSetColFieldOrder',
+      'pivotDataFieldCount',
+      'pivotDataFieldAdd',
+      'pivotDataFieldClear',
+      'pivotDataFieldSet',
+      'pivotFilterCount',
+      'pivotFilterAdd',
+      'pivotFilterClear',
+      'pivotFilterRemoveAt',
+    ]);
+    expect(detectCapabilities(full).pivotTableMutate).toBe(true);
+  });
+
+  it('spreadsheetProfile requires get + set profile ids', () => {
+    const getOnly = makeWb(['excelProfileId']);
+    expect(detectCapabilities(getOnly).spreadsheetProfile).toBe(false);
+    const full = makeWb(['excelProfileId', 'setExcelProfileId']);
+    expect(detectCapabilities(full).spreadsheetProfile).toBe(true);
   });
 });

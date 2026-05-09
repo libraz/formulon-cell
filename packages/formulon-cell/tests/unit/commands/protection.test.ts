@@ -7,7 +7,10 @@ import {
   isCellLocked,
   isCellWritable,
   isSheetProtected,
+  protectedSheetPassword,
   setCellLocked,
+  setProtectedSheet,
+  toggleProtectedSheet,
 } from '../../../src/commands/protection.js';
 import { deleteRows, insertRows } from '../../../src/commands/structure.js';
 import type { Addr, Range } from '../../../src/engine/types.js';
@@ -65,6 +68,36 @@ describe('protection helpers', () => {
     expect(isSheetProtected(store.getState(), 0)).toBe(true);
     mutators.setSheetProtected(store, 0, false);
     expect(isSheetProtected(store.getState(), 0)).toBe(false);
+  });
+
+  it('sets, toggles, and exposes sheet protection through command helpers', () => {
+    setProtectedSheet(store, 0, true, { password: 'pw' });
+    expect(isSheetProtected(store.getState(), 0)).toBe(true);
+    expect(protectedSheetPassword(store.getState(), 0)).toBe('pw');
+
+    expect(toggleProtectedSheet(store, 0)).toBe(false);
+    expect(isSheetProtected(store.getState(), 0)).toBe(false);
+
+    expect(toggleProtectedSheet(store, 0)).toBe(true);
+    expect(isSheetProtected(store.getState(), 0)).toBe(true);
+  });
+
+  it('can flush sheet protection through an engine handle when available', () => {
+    const setSheetProtection = vi.fn(() => ({ ok: true }));
+    const wb = {
+      capabilities: { sheetProtectionRoundtrip: true },
+      setSheetProtection,
+    } as unknown as WorkbookHandle;
+
+    setProtectedSheet(store, 1, true, { workbook: wb, password: 'pw' });
+    setProtectedSheet(store, 1, false, { workbook: wb });
+
+    expect(setSheetProtection).toHaveBeenNthCalledWith(1, 1, {
+      enabled: true,
+      sheet: true,
+      legacyPassword: 'pw',
+    });
+    expect(setSheetProtection).toHaveBeenNthCalledWith(2, 1, { enabled: false });
   });
 
   it('isCellLocked defaults to true (Excel default)', () => {

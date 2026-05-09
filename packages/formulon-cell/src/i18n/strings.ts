@@ -102,6 +102,7 @@ export interface Strings {
     fontStyle: string;
     color: string;
     resetToDefault: string;
+    previewText: string;
     borderTop: string;
     borderRight: string;
     borderBottom: string;
@@ -173,6 +174,14 @@ export interface Strings {
     cancel: string;
     ok: string;
     errorEmptyUrl: string;
+  };
+  commentDialog: {
+    title: string;
+    titleEdit: string;
+    placeholder: string;
+    remove: string;
+    cancel: string;
+    ok: string;
   };
   pasteSpecialDialog: {
     title: string;
@@ -283,9 +292,43 @@ export interface Strings {
     deleteButton: string;
     /** Inline error: empty or invalid name. */
     errorEmptyName: string;
+    /** Inline error: empty formula/ref. */
+    errorEmptyFormula: string;
     /** Inline error: engine refused the write. */
     errorEngineFailed: string;
     close: string;
+  };
+  pivotTableDialog: {
+    title: string;
+    source: string;
+    name: string;
+    namePlaceholder: string;
+    destination: string;
+    destinationPlaceholder: string;
+    rowField: string;
+    columnField: string;
+    valueField: string;
+    aggregation: string;
+    sum: string;
+    count: string;
+    rowSort: string;
+    columnSort: string;
+    sortNone: string;
+    sortAsc: string;
+    sortDesc: string;
+    rowSubtotalTop: string;
+    columnSubtotalTop: string;
+    numberFormat: string;
+    numberFormatPlaceholder: string;
+    rowGrandTotals: string;
+    columnGrandTotals: string;
+    none: string;
+    unsupported: string;
+    invalidRange: string;
+    invalidDestination: string;
+    engineFailed: string;
+    cancel: string;
+    ok: string;
   };
   statusBar: {
     ready: string;
@@ -295,9 +338,9 @@ export interface Strings {
     aggregatesHeading: string;
     sum: string;
     average: string;
-    /** Count of non-blank cells (Excel "Count"). */
+    /** Count of non-blank cells (spreadsheet "Count"). */
     count: string;
-    /** Count of numeric cells only (Excel "Numerical Count"). */
+    /** Count of numeric cells only (spreadsheet "Numerical Count"). */
     countNumbers: string;
     min: string;
     max: string;
@@ -311,6 +354,130 @@ export interface Strings {
     zoom: string;
     zoomIn: string;
     zoomOut: string;
+  };
+  viewToolbar: {
+    title: string;
+    gridlines: string;
+    headings: string;
+    formulas: string;
+    r1c1: string;
+    freezeNone: string;
+    freezeTopRow: string;
+    freezeFirstColumn: string;
+    freezePanes: string;
+    zoom: string;
+    zoom100: string;
+    views: string;
+    currentView: string;
+    saveView: string;
+    deleteView: string;
+    objects: string;
+  };
+  workbookObjects: {
+    title: string;
+    preservedParts: string;
+    tables: string;
+    pivotTables: string;
+    categories: string;
+    tableNames: string;
+    tableDetails: string;
+    pivotDetails: string;
+    sheet: string;
+    columnSingular: string;
+    columnPlural: string;
+    cells: string;
+    pivot: string;
+    kindLabels: {
+      charts: string;
+      drawings: string;
+      media: string;
+      embeddings: string;
+      comments: string;
+      threadedComments: string;
+      pivotTables: string;
+      pivotCaches: string;
+      queryTables: string;
+      slicers: string;
+      timelines: string;
+      connections: string;
+      externalLinks: string;
+      controls: string;
+      printerSettings: string;
+      customXml: string;
+      vbaProject: string;
+      other: string;
+    };
+    compatibilityLabels: {
+      cellFormatting: string;
+      conditionalFormatting: string;
+      dataValidation: string;
+      hyperlinks: string;
+      comments: string;
+      definedNames: string;
+      sheetProtection: string;
+      sheetViews: string;
+      loadedTables: string;
+      formatAsTable: string;
+      pivotLayouts: string;
+      pivotAuthoring: string;
+      sessionCharts: string;
+      chartsDrawings: string;
+      chartAuthoring: string;
+      externalLinks: string;
+    };
+    compatibility: string;
+    writable: string;
+    readOnly: string;
+    sessionOnly: string;
+    unsupported: string;
+    paths: string;
+    noteLabel: string;
+    readOnlyNote: string;
+    empty: string;
+    close: string;
+  };
+  sessionCharts: {
+    close: string;
+    resize: string;
+    columnChart: string;
+    lineChart: string;
+  };
+  autocomplete: {
+    customFunction: string;
+    structuredTableColumn: string;
+    pickFromList: string;
+  };
+  argHelper: {
+    implicitIntersection: string;
+  };
+  quickAnalysis: {
+    title: string;
+    groups: {
+      formatting: string;
+      charts: string;
+      totals: string;
+      tables: string;
+      sparklines: string;
+    };
+    actions: {
+      dataBar: string;
+      colorScale: string;
+      iconSet: string;
+      greaterThan: string;
+      top10: string;
+      clearFormat: string;
+      sumRow: string;
+      sumCol: string;
+      avgRow: string;
+      countRow: string;
+      formatAsTable: string;
+      pivotStub: string;
+      sparkLine: string;
+      sparkColumn: string;
+      sparkWinLoss: string;
+      chartColumn: string;
+      chartLine: string;
+    };
   };
   sheetTabs: {
     workbookSheets: string;
@@ -355,12 +522,12 @@ export interface Strings {
     headerKind: string;
     headerTarget: string;
     headerPart: string;
-    /** Hint shown above the table — Excel parity for the Edit Links dialog. */
+    /** Hint shown above the table — spreadsheet parity for the Edit Links dialog. */
     note: string;
     close: string;
   };
   cfRulesDialog: {
-    /** Modal title — Excel "Manage Rules" parity. */
+    /** Modal title — spreadsheet "Manage Rules" parity. */
     title: string;
     /** Empty-state when the engine reports no CF rules on the active sheet. */
     empty: string;
@@ -518,6 +685,8 @@ export interface Strings {
   a11y: {
     nameBox: string;
     formulaBar: string;
+    cancelFormulaEdit: string;
+    enterFormula: string;
     expandFormulaBar: string;
     collapseFormulaBar: string;
     spreadsheet: string;
@@ -617,6 +786,7 @@ export const ja: Strings = {
     fontStyle: 'スタイル',
     color: '色',
     resetToDefault: '標準に戻す',
+    previewText: '文字',
     borderTop: '上',
     borderRight: '右',
     borderBottom: '下',
@@ -688,6 +858,14 @@ export const ja: Strings = {
     cancel: 'キャンセル',
     ok: 'OK',
     errorEmptyUrl: 'URL を入力してください',
+  },
+  commentDialog: {
+    title: 'メモを挿入',
+    titleEdit: 'メモを編集',
+    placeholder: 'メモを入力',
+    remove: 'メモを削除',
+    cancel: 'キャンセル',
+    ok: 'OK',
   },
   pasteSpecialDialog: {
     title: '形式を選択して貼り付け',
@@ -795,8 +973,41 @@ export const ja: Strings = {
     addButton: '追加',
     deleteButton: '削除',
     errorEmptyName: '名前を入力してください',
+    errorEmptyFormula: '参照を入力してください',
     errorEngineFailed: '保存に失敗しました',
     close: '閉じる',
+  },
+  pivotTableDialog: {
+    title: 'ピボットテーブルの作成',
+    source: 'テーブル/範囲',
+    name: '名前',
+    namePlaceholder: 'PivotTable1',
+    destination: '配置場所',
+    destinationPlaceholder: '例: A10',
+    rowField: '行',
+    columnField: '列',
+    valueField: '値',
+    aggregation: '集計',
+    sum: '合計',
+    count: 'データの個数',
+    rowSort: '行の並べ替え',
+    columnSort: '列の並べ替え',
+    sortNone: 'なし',
+    sortAsc: '昇順',
+    sortDesc: '降順',
+    rowSubtotalTop: '行フィールドの小計を上に表示',
+    columnSubtotalTop: '列フィールドの小計を上に表示',
+    numberFormat: '値の表示形式',
+    numberFormatPlaceholder: '例: #,##0',
+    rowGrandTotals: '行の総計を表示',
+    columnGrandTotals: '列の総計を表示',
+    none: '(なし)',
+    unsupported: 'このエンジンではピボットテーブルの作成に対応していません。',
+    invalidRange: '見出し行を含む 2 列以上、2 行以上の範囲を選択してください。',
+    invalidDestination: '配置場所をセル番地で入力してください。',
+    engineFailed: 'ピボットテーブルの作成に失敗しました。',
+    cancel: 'キャンセル',
+    ok: 'OK',
   },
   statusBar: {
     aggregatesHeading: '集計表示',
@@ -817,6 +1028,130 @@ export const ja: Strings = {
     zoom: 'ズーム',
     zoomIn: '拡大',
     zoomOut: '縮小',
+  },
+  viewToolbar: {
+    title: '表示',
+    gridlines: '枠線',
+    headings: '見出し',
+    formulas: '数式',
+    r1c1: 'R1C1',
+    freezeNone: '固定解除',
+    freezeTopRow: '先頭行を固定',
+    freezeFirstColumn: '先頭列を固定',
+    freezePanes: 'ウィンドウ枠を固定',
+    zoom: 'ズーム',
+    zoom100: '100%',
+    views: 'ビュー',
+    currentView: '現在の表示',
+    saveView: '保存',
+    deleteView: '削除',
+    objects: 'オブジェクト',
+  },
+  workbookObjects: {
+    title: 'ブック オブジェクト',
+    preservedParts: '保持された OOXML 部品',
+    tables: 'テーブル',
+    pivotTables: 'ピボットテーブル',
+    categories: 'カテゴリ',
+    tableNames: 'テーブル名',
+    tableDetails: 'テーブル詳細',
+    pivotDetails: 'ピボットテーブル詳細',
+    sheet: 'シート',
+    columnSingular: '列',
+    columnPlural: '列',
+    cells: 'セル',
+    pivot: 'ピボット',
+    kindLabels: {
+      charts: 'グラフ',
+      drawings: '図形',
+      media: 'メディア',
+      embeddings: '埋め込みオブジェクト',
+      comments: 'コメント',
+      threadedComments: 'スレッド コメント',
+      pivotTables: 'ピボットテーブル',
+      pivotCaches: 'ピボット キャッシュ',
+      queryTables: 'クエリ テーブル',
+      slicers: 'スライサー',
+      timelines: 'タイムライン',
+      connections: '接続',
+      externalLinks: '外部リンク',
+      controls: 'コントロール',
+      printerSettings: '印刷設定',
+      customXml: 'カスタム XML',
+      vbaProject: 'マクロ プロジェクト',
+      other: 'その他',
+    },
+    compatibilityLabels: {
+      cellFormatting: 'セルの書式',
+      conditionalFormatting: '条件付き書式',
+      dataValidation: 'データの入力規則',
+      hyperlinks: 'ハイパーリンク',
+      comments: 'コメント',
+      definedNames: '名前定義',
+      sheetProtection: 'シート保護',
+      sheetViews: 'シート ビュー',
+      loadedTables: '読み込み済みテーブル',
+      formatAsTable: 'テーブルとして書式設定',
+      pivotLayouts: 'ピボットテーブル レイアウト',
+      pivotAuthoring: 'ピボットテーブル作成',
+      sessionCharts: 'セッション グラフ プレビュー',
+      chartsDrawings: 'グラフ、図形、画像',
+      chartAuthoring: 'グラフ作成',
+      externalLinks: '外部リンク',
+    },
+    compatibility: 'スプレッドシート互換',
+    writable: '書き込み可',
+    readOnly: '読み取り専用',
+    sessionOnly: 'セッションのみ',
+    unsupported: '未対応',
+    paths: '部品パス',
+    noteLabel: '状態',
+    readOnlyNote: '読み取り専用。保存時は保持されますが、この UI では編集しません。',
+    empty: '保持されたグラフ、図形、ピボット、テーブルはありません。',
+    close: '閉じる',
+  },
+  sessionCharts: {
+    close: '閉じる',
+    resize: 'グラフのサイズ変更',
+    columnChart: '縦棒グラフ',
+    lineChart: '折れ線グラフ',
+  },
+  autocomplete: {
+    customFunction: 'カスタム関数',
+    structuredTableColumn: '構造化テーブル列',
+    pickFromList: 'リストから選択',
+  },
+  argHelper: {
+    implicitIntersection: '暗黙的な交差',
+  },
+  quickAnalysis: {
+    title: 'クイック分析',
+    groups: {
+      formatting: '書式設定',
+      charts: 'グラフ',
+      totals: '合計',
+      tables: 'テーブル',
+      sparklines: 'スパークライン',
+    },
+    actions: {
+      dataBar: 'データ バー',
+      colorScale: 'カラー スケール',
+      iconSet: 'アイコン セット',
+      greaterThan: '平均より大きい',
+      top10: '上位 10 項目',
+      clearFormat: '書式のクリア',
+      sumRow: '行の合計',
+      sumCol: '列の合計',
+      avgRow: '平均',
+      countRow: 'データの個数',
+      formatAsTable: 'テーブルとして書式設定',
+      pivotStub: 'ピボットテーブル',
+      sparkLine: '折れ線',
+      sparkColumn: '縦棒',
+      sparkWinLoss: '勝敗',
+      chartColumn: '縦棒グラフ',
+      chartLine: '折れ線グラフ',
+    },
   },
   sheetTabs: {
     workbookSheets: 'ブックのシート',
@@ -974,6 +1309,8 @@ export const ja: Strings = {
   a11y: {
     nameBox: '名前ボックス',
     formulaBar: '数式バー',
+    cancelFormulaEdit: '数式の編集をキャンセル',
+    enterFormula: '数式を入力',
     expandFormulaBar: '数式バーを展開',
     collapseFormulaBar: '数式バーを折りたたむ',
     spreadsheet: 'スプレッドシート',
@@ -1073,6 +1410,7 @@ export const en: Strings = {
     fontStyle: 'Style',
     color: 'Color',
     resetToDefault: 'Reset to default',
+    previewText: 'Text',
     borderTop: 'Top',
     borderRight: 'Right',
     borderBottom: 'Bottom',
@@ -1144,6 +1482,14 @@ export const en: Strings = {
     cancel: 'Cancel',
     ok: 'OK',
     errorEmptyUrl: 'Enter a URL',
+  },
+  commentDialog: {
+    title: 'New note',
+    titleEdit: 'Edit note',
+    placeholder: 'Enter a note',
+    remove: 'Delete note',
+    cancel: 'Cancel',
+    ok: 'OK',
   },
   pasteSpecialDialog: {
     title: 'Paste Special',
@@ -1251,8 +1597,41 @@ export const en: Strings = {
     addButton: 'Add',
     deleteButton: 'Delete',
     errorEmptyName: 'Enter a name',
+    errorEmptyFormula: 'Enter a reference',
     errorEngineFailed: 'Failed to save',
     close: 'Close',
+  },
+  pivotTableDialog: {
+    title: 'Create PivotTable',
+    source: 'Table/Range',
+    name: 'Name',
+    namePlaceholder: 'PivotTable1',
+    destination: 'Location',
+    destinationPlaceholder: 'Example: A10',
+    rowField: 'Rows',
+    columnField: 'Columns',
+    valueField: 'Values',
+    aggregation: 'Summarize by',
+    sum: 'Sum',
+    count: 'Count',
+    rowSort: 'Row sort',
+    columnSort: 'Column sort',
+    sortNone: 'None',
+    sortAsc: 'Ascending',
+    sortDesc: 'Descending',
+    rowSubtotalTop: 'Show row-field subtotals at top',
+    columnSubtotalTop: 'Show column-field subtotals at top',
+    numberFormat: 'Value number format',
+    numberFormatPlaceholder: 'Example: #,##0',
+    rowGrandTotals: 'Show row grand totals',
+    columnGrandTotals: 'Show column grand totals',
+    none: '(none)',
+    unsupported: 'This engine does not support PivotTable creation.',
+    invalidRange: 'Select at least 2 rows and 2 columns including a header row.',
+    invalidDestination: 'Enter a cell reference for the location.',
+    engineFailed: 'Failed to create PivotTable.',
+    cancel: 'Cancel',
+    ok: 'OK',
   },
   statusBar: {
     aggregatesHeading: 'Customize Status Bar',
@@ -1273,6 +1652,130 @@ export const en: Strings = {
     zoom: 'Zoom',
     zoomIn: 'Zoom in',
     zoomOut: 'Zoom out',
+  },
+  viewToolbar: {
+    title: 'View',
+    gridlines: 'Gridlines',
+    headings: 'Headings',
+    formulas: 'Formulas',
+    r1c1: 'R1C1',
+    freezeNone: 'Unfreeze',
+    freezeTopRow: 'Freeze Top Row',
+    freezeFirstColumn: 'Freeze First Column',
+    freezePanes: 'Freeze Panes',
+    zoom: 'Zoom',
+    zoom100: '100%',
+    views: 'Views',
+    currentView: 'Current view',
+    saveView: 'Save',
+    deleteView: 'Delete',
+    objects: 'Objects',
+  },
+  workbookObjects: {
+    title: 'Workbook Objects',
+    preservedParts: 'Preserved OOXML parts',
+    tables: 'Tables',
+    pivotTables: 'PivotTables',
+    categories: 'Categories',
+    tableNames: 'Table names',
+    tableDetails: 'Table details',
+    pivotDetails: 'PivotTable details',
+    sheet: 'Sheet',
+    columnSingular: 'column',
+    columnPlural: 'columns',
+    cells: 'cells',
+    pivot: 'Pivot',
+    kindLabels: {
+      charts: 'Charts',
+      drawings: 'Drawings',
+      media: 'Media',
+      embeddings: 'Embedded objects',
+      comments: 'Comments',
+      threadedComments: 'Threaded comments',
+      pivotTables: 'PivotTables',
+      pivotCaches: 'Pivot caches',
+      queryTables: 'Query tables',
+      slicers: 'Slicers',
+      timelines: 'Timelines',
+      connections: 'Connections',
+      externalLinks: 'External links',
+      controls: 'Controls',
+      printerSettings: 'Printer settings',
+      customXml: 'Custom XML',
+      vbaProject: 'Macro project',
+      other: 'Other',
+    },
+    compatibilityLabels: {
+      cellFormatting: 'Cell formatting',
+      conditionalFormatting: 'Conditional formatting',
+      dataValidation: 'Data validation',
+      hyperlinks: 'Hyperlinks',
+      comments: 'Comments',
+      definedNames: 'Defined names',
+      sheetProtection: 'Sheet protection',
+      sheetViews: 'Sheet views',
+      loadedTables: 'Loaded tables',
+      formatAsTable: 'Format as Table',
+      pivotLayouts: 'PivotTable layouts',
+      pivotAuthoring: 'PivotTable authoring',
+      sessionCharts: 'Session chart previews',
+      chartsDrawings: 'Charts, drawings, and images',
+      chartAuthoring: 'Chart authoring',
+      externalLinks: 'External links',
+    },
+    compatibility: 'Spreadsheet compatibility',
+    writable: 'Writable',
+    readOnly: 'Read-only',
+    sessionOnly: 'Session only',
+    unsupported: 'Unsupported',
+    paths: 'Part paths',
+    noteLabel: 'State',
+    readOnlyNote: 'Read-only. These parts are preserved on save but are not edited by this UI.',
+    empty: 'No preserved charts, drawings, pivots, or tables were found.',
+    close: 'Close',
+  },
+  sessionCharts: {
+    close: 'Close',
+    resize: 'Resize chart',
+    columnChart: 'Column chart',
+    lineChart: 'Line chart',
+  },
+  autocomplete: {
+    customFunction: 'Custom function',
+    structuredTableColumn: 'Structured table column',
+    pickFromList: 'Pick from list',
+  },
+  argHelper: {
+    implicitIntersection: 'Implicit intersection',
+  },
+  quickAnalysis: {
+    title: 'Quick Analysis',
+    groups: {
+      formatting: 'Formatting',
+      charts: 'Charts',
+      totals: 'Totals',
+      tables: 'Tables',
+      sparklines: 'Sparklines',
+    },
+    actions: {
+      dataBar: 'Data Bars',
+      colorScale: 'Color Scale',
+      iconSet: 'Icon Set',
+      greaterThan: 'Greater Than Average',
+      top10: 'Top 10 Items',
+      clearFormat: 'Clear Format',
+      sumRow: 'Row Sum',
+      sumCol: 'Column Sum',
+      avgRow: 'Average',
+      countRow: 'Count',
+      formatAsTable: 'Format as Table',
+      pivotStub: 'PivotTable',
+      sparkLine: 'Line',
+      sparkColumn: 'Column',
+      sparkWinLoss: 'Win/Loss',
+      chartColumn: 'Column chart',
+      chartLine: 'Line chart',
+    },
   },
   sheetTabs: {
     workbookSheets: 'Workbook sheets',
@@ -1430,6 +1933,8 @@ export const en: Strings = {
   a11y: {
     nameBox: 'Name box',
     formulaBar: 'Formula bar',
+    cancelFormulaEdit: 'Cancel formula edit',
+    enterFormula: 'Enter formula',
     expandFormulaBar: 'Expand formula bar',
     collapseFormulaBar: 'Collapse formula bar',
     spreadsheet: 'Spreadsheet',

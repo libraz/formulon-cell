@@ -1,4 +1,5 @@
 import { fillDestFor, fillRange } from '../commands/fill.js';
+import { formatNumber } from '../commands/format.js';
 import {
   applyLayoutSnapshot,
   captureLayoutSnapshot,
@@ -20,7 +21,9 @@ import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { hitTest, hitZone } from '../render/geometry.js';
 import { getFillHandleRect, getOutlineToggleHits } from '../render/grid.js';
-import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
+
+type StoreCellEntry = State['data']['cells'] extends Map<string, infer Cell> ? Cell : never;
 
 type DragMode =
   | { kind: 'none' }
@@ -59,6 +62,7 @@ const rangeRefOf = (a: { row: number; col: number }, b: { row: number; col: numb
 
 const MAX_ROW = 1048575;
 const MAX_COL = 16383;
+const FILTER_DROPDOWN_RESERVED_WIDTH = 20;
 
 export interface PointerDeps {
   store: SpreadsheetStore;
@@ -485,7 +489,8 @@ export function attachPointer(
       e.preventDefault();
       e.stopPropagation();
       const before = captureLayoutSnapshot(s);
-      mutators.setRowHeight(store, zone.row, s.layout.defaultRowHeight);
+      const h = autofitRowHeight(store, zone.row, measureCtx);
+      mutators.setRowHeight(store, zone.row, h);
       pushLayoutDelta(history, store, wb, before);
       return;
     }
@@ -587,32 +592,165 @@ function autofitColWidth(
 ): number {
   const s = store.getState();
   const sheet = s.data.sheetIndex;
-  const rowEnd = s.viewport.rowStart + s.viewport.rowCount;
   const padding = 16;
   const minWidth = 48;
+  let max = 0;
 
-  if (ctx) {
-    ctx.font = '400 13px system-ui, sans-serif';
-    let max = 0;
-    for (let r = s.viewport.rowStart; r < rowEnd; r += 1) {
-      const cell = s.data.cells.get(`${sheet}:${r}:${col}`);
-      if (!cell) continue;
-      const text = cell.formula ?? formatCell(cell.value);
-      if (!text) continue;
-      const w = ctx.measureText(text).width;
-      if (w > max) max = w;
+  for (const [key, cell] of s.data.cells) {
+    const parsed = parseCellKey(key);
+    if (!parsed || parsed.sheet !== sheet || parsed.col !== col) continue;
+    const text = autofitDisplayText(s, key, cell);
+    if (!text) continue;
+    const fmt = s.format.formats.get(key);
+    const fontSize = fmt?.fontSize ?? 13;
+    const font = autofitFont(fmt);
+    if (ctx) ctx.font = font;
+    const width =
+      maxExplicitLineWidth(text, ctx, fontSize) +
+      (isFilterHeaderCell(s, parsed.sheet, parsed.row, parsed.col)
+        ? FILTER_DROPDOWN_RESERVED_WIDTH
+        : 0);
+    if (width > max) max = width;
+  }
+
+  return Math.max(minWidth, Math.ceil(max) + padding);
+}
+
+function parseCellKey(key: string): { sheet: number; row: number; col: number } | null {
+  const parts = key.split(':');
+  if (parts.length !== 3) return null;
+  const sheet = Number(parts[0]);
+  const row = Number(parts[1]);
+  const col = Number(parts[2]);
+  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
+  return { sheet, row, col };
+}
+
+function autofitDisplayText(state: State, key: string, cell: StoreCellEntry): string {
+  if (state.ui.showFormulas && cell.formula) return cell.formula;
+  const fmt = state.format.formats.get(key);
+  if (cell.value.kind === 'number' && fmt?.numFmt) {
+    return formatNumber(cell.value.value, fmt.numFmt);
+  }
+  return formatCell(cell.value);
+}
+
+function isFilterHeaderCell(state: State, sheet: number, row: number, col: number): boolean {
+  const fr = state.ui.filterRange;
+  return !!fr && fr.sheet === sheet && fr.r0 === row && col >= fr.c0 && col <= fr.c1;
+}
+
+function autofitRowHeight(
+  store: SpreadsheetStore,
+  row: number,
+  ctx: CanvasRenderingContext2D | null,
+): number {
+  const s = store.getState();
+  const sheet = s.data.sheetIndex;
+  let max = s.layout.defaultRowHeight;
+
+  for (const [key, cell] of s.data.cells) {
+    const parsed = parseCellKey(key);
+    if (!parsed || parsed.sheet !== sheet || parsed.row !== row) continue;
+    const text = autofitDisplayText(s, key, cell);
+    if (!text) continue;
+    const fmt = s.format.formats.get(key);
+    const fontSize = fmt?.fontSize ?? 13;
+    if (ctx) ctx.font = autofitFont(fmt);
+    const lineHeight = Math.round(fontSize * 1.28);
+    const colW = s.layout.colWidths.get(parsed.col) ?? s.layout.defaultColWidth;
+    const lines = autofitLineCount(text, fmt?.wrap === true, colW, ctx, fontSize);
+    const height = Math.ceil(lines * lineHeight + 8);
+    if (height > max) max = height;
+  }
+
+  return max;
+}
+
+function autofitFont(format: CellFormat | undefined): string {
+  const styleSlant = format?.italic ? 'italic ' : '';
+  const weight = format?.bold ? 700 : 400;
+  const size = format?.fontSize ?? 13;
+  const family = format?.fontFamily ?? 'system-ui, sans-serif';
+  return `${styleSlant}${weight} ${size}px ${fontFamilyCss(family)}`;
+}
+
+function fontFamilyCss(family: string): string {
+  return family
+    .split(',')
+    .map((part) => {
+      const trimmed = part.trim();
+      if (/^["'].*["']$/.test(trimmed) || /^[a-z-]+$/i.test(trimmed)) return trimmed;
+      return `"${trimmed.replace(/"/g, '\\"')}"`;
+    })
+    .join(', ');
+}
+
+function maxExplicitLineWidth(
+  text: string,
+  ctx: CanvasRenderingContext2D | null,
+  fontSize: number,
+): number {
+  let max = 0;
+  for (const line of text.split(/\r\n|\r|\n/)) {
+    const measured = ctx ? ctx.measureText(line).width : 0;
+    const width = measured > 0 ? measured : line.length * fontSize * 0.54;
+    if (width > max) max = width;
+  }
+  return max;
+}
+
+function autofitLineCount(
+  text: string,
+  wrap: boolean,
+  colWidth: number,
+  ctx: CanvasRenderingContext2D | null,
+  fontSize: number,
+): number {
+  const paragraphs = text.split(/\r\n|\r|\n/);
+  if (!wrap) return Math.max(1, paragraphs.length);
+
+  const available = Math.max(1, colWidth - 12);
+  let lines = 0;
+  for (const paragraph of paragraphs) {
+    if (paragraph.length === 0) {
+      lines += 1;
+      continue;
     }
-    return Math.max(minWidth, Math.ceil(max) + padding);
+    const wrapped = wrapAutofitParagraph(paragraph, available, ctx, fontSize);
+    lines += wrapped;
   }
+  return Math.max(1, lines);
+}
 
-  let maxChars = 0;
-  for (let r = s.viewport.rowStart; r < rowEnd; r += 1) {
-    const cell = s.data.cells.get(`${sheet}:${r}:${col}`);
-    if (!cell) continue;
-    const text = cell.formula ?? formatCell(cell.value);
-    if (text.length > maxChars) maxChars = text.length;
+function wrapAutofitParagraph(
+  paragraph: string,
+  maxWidth: number,
+  ctx: CanvasRenderingContext2D | null,
+  fontSize: number,
+): number {
+  const words = paragraph.split(/(\s+)/);
+  let line = '';
+  let count = 0;
+  for (const word of words) {
+    const candidate = line + word;
+    if (measureAutofitText(candidate, ctx, fontSize) <= maxWidth || line === '') {
+      line = candidate;
+    } else {
+      count += 1;
+      line = word.trimStart();
+    }
   }
-  return Math.max(minWidth, maxChars * 7 + padding);
+  return count + (line ? 1 : 0);
+}
+
+function measureAutofitText(
+  text: string,
+  ctx: CanvasRenderingContext2D | null,
+  fontSize: number,
+): number {
+  const measured = ctx ? ctx.measureText(text).width : 0;
+  return measured > 0 ? measured : text.length * fontSize * 0.54;
 }
 
 /**

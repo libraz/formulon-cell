@@ -21,6 +21,9 @@ export interface ErrorMenuDeps {
    *  When omitted, "Edit cell" is a no-op. The mount layer wires this to
    *  the formulabar input. */
   onEditCell?: (addr: Addr) => void;
+  /** Hook to draw trace arrows for the error cell. The mount layer wires
+   *  this to same-sheet precedent tracing. */
+  onTraceError?: (addr: Addr, kind: ErrorMenuKind) => void;
 }
 
 export interface ErrorMenuHandle {
@@ -173,9 +176,7 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
         return;
       }
       case 'traceError': {
-        // Placeholder for v1 — a separate trace-arrows feature handles this.
-        // We still emit a CustomEvent so a future feature (or consumer
-        // chrome) can wire trace UI without re-adding the menu entry.
+        deps.onTraceError?.(addr, kind);
         host.dispatchEvent(
           new CustomEvent('fc:traceerror', { bubbles: true, detail: { addr, kind } }),
         );

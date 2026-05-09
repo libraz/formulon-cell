@@ -12,9 +12,9 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   build: {
     target: 'es2022',
-    sourcemap: true,
+    sourcemap: false,
     assetsInlineLimit: 0,
-    minify: false, // tree-shaken consumers do their own minification
+    minify: 'oxc',
     lib: {
       entry: {
         index: resolve(__dirname, 'src/index.ts'),
@@ -25,19 +25,22 @@ export default defineConfig({
       formats: ['es'],
     },
     rollupOptions: {
-      // The browser Emscripten bundle uses TLA + new URL(...) for both the
-      // wasm and worker scripts. Vite's lib worker plugin tries to bundle
-      // those as iife workers, which breaks on TLA. Externalizing keeps the
-      // import alive — at consume time the user's bundler resolves
-      // `../../vendor/formulon/formulon.web.js` relative to our shipped
+      // The Emscripten bundle uses TLA + new URL(...) for both the wasm and
+      // worker scripts. Vite's lib worker plugin tries to bundle those as
+      // iife workers, which breaks on TLA. Externalizing keeps the import
+      // alive — at consume time the user's bundler resolves
+      // `../../vendor/formulon/formulon.js` relative to our shipped
       // `dist/engine/loader.js` and handles the Emscripten module on its own.
-      external: ['zustand', 'zustand/vanilla', /\/vendor\/formulon\/formulon(?:\.web)?\.js$/],
+      external: ['zustand', 'zustand/vanilla', /\/vendor\/formulon\/formulon\.js$/],
       output: {
         preserveModules: true,
         preserveModulesRoot: 'src',
         entryFileNames: '[name].js',
       },
     },
+  },
+  esbuild: {
+    legalComments: 'none',
   },
   plugins: [
     dts({

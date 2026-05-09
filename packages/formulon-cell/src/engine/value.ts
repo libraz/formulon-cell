@@ -15,6 +15,18 @@ const ERROR_NAME: Readonly<Record<number, string>> = {
 
 const BLANK: CellValue = { kind: 'blank' };
 
+export function formatGeneralNumber(value: number, locale = 'en-US'): string {
+  if (!Number.isFinite(value)) return String(value);
+  const abs = Math.abs(value);
+  if (abs > 0 && (abs >= 1e11 || abs < 1e-9)) {
+    return value.toExponential(5).replace(/e([+-]?)(\d+)$/i, (_m, sign: string, exp: string) => {
+      const normalizedSign = sign === '-' ? '-' : '+';
+      return `E${normalizedSign}${exp.padStart(2, '0')}`;
+    });
+  }
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 12 }).format(value);
+}
+
 export function fromEngineValue(v: Value): CellValue {
   switch (v.kind) {
     case ValueKind.Number:
@@ -37,9 +49,7 @@ export function formatCell(v: CellValue, locale = 'en-US'): string {
     case 'blank':
       return '';
     case 'number':
-      return Number.isFinite(v.value)
-        ? new Intl.NumberFormat(locale, { maximumFractionDigits: 12 }).format(v.value)
-        : String(v.value);
+      return formatGeneralNumber(v.value, locale);
     case 'bool':
       return v.value ? 'TRUE' : 'FALSE';
     case 'text':

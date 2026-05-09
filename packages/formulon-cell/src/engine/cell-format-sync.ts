@@ -16,6 +16,16 @@ import { syncValidationsToEngine } from './validation-sync.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 import { addrKey } from './workbook-handle.js';
 
+const PIVOT_KIND = {
+  Header: 0,
+  RowLabel: 1,
+  ColLabel: 2,
+  Data: 3,
+  RowSubtotal: 4,
+  ColSubtotal: 5,
+  GrandTotal: 6,
+} as const;
+
 /**
  * Push every format entry on `sheet` from FormatSlice into the engine's XF
  * table. For each cell the writeback ensures a font / fill / border / numFmt
@@ -71,7 +81,8 @@ export function hydrateCellFormatsFromEngine(
 ): void {
   if (!wb.capabilities.cellFormatting) return;
   const updates: Array<{ key: string; patch: Partial<CellFormat> }> = [];
-  for (const c of wb.cells(sheet)) {
+  const physicalCells = wb.physicalCells ? wb.physicalCells(sheet) : wb.cells(sheet);
+  for (const c of physicalCells) {
     const xfIndex = wb.getCellXfIndex(sheet, c.addr.row, c.addr.col);
     if (xfIndex === null || xfIndex <= 0) continue;
     const xf = wb.getCellXf(xfIndex);
@@ -101,6 +112,12 @@ export function hydrateCellFormatsFromEngine(
       updates.push({ key: addrKey(c.addr), patch });
     }
   }
+  if (wb.pivotCells) {
+    for (const c of wb.pivotCells(sheet)) {
+      const patch = pivotFormatPatch(c.kind, c.numberFormat);
+      if (Object.keys(patch).length > 0) updates.push({ key: addrKey(c.addr), patch });
+    }
+  }
   if (updates.length === 0) return;
   store.setState((s) => {
     const formats = new Map(s.format.formats);
@@ -110,6 +127,33 @@ export function hydrateCellFormatsFromEngine(
     }
     return { ...s, format: { formats } };
   });
+}
+
+function pivotFormatPatch(kind: number, numberFormat: string): Partial<CellFormat> {
+  const patch: Partial<CellFormat> = {};
+  const blueRule = { style: 'thin' as const, color: '#9dc3e6' };
+  const lightRule = { style: 'thin' as const, color: '#d9eaf7' };
+  const totalRule = { style: 'medium' as const, color: '#5b9bd5' };
+  if (numberFormat) {
+    const numFmt = formatCodeToNumFmt(numberFormat);
+    if (numFmt) patch.numFmt = numFmt;
+  }
+  if (kind === PIVOT_KIND.Header || kind === PIVOT_KIND.RowLabel || kind === PIVOT_KIND.ColLabel) {
+    patch.bold = true;
+    patch.fill = '#d9eaf7';
+    patch.color = '#1f4e79';
+    patch.borders = { top: blueRule, bottom: blueRule };
+  } else if (kind === PIVOT_KIND.RowSubtotal || kind === PIVOT_KIND.ColSubtotal) {
+    patch.bold = true;
+    patch.fill = '#eaf3f8';
+    patch.borders = { top: lightRule, bottom: blueRule };
+  } else if (kind === PIVOT_KIND.GrandTotal) {
+    patch.bold = true;
+    patch.fill = '#bdd7ee';
+    patch.color = '#1f4e79';
+    patch.borders = { top: totalRule, bottom: totalRule };
+  }
+  return patch;
 }
 
 /** Resolve a CellFormat to an engine xfIndex by ensuring every component

@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------- */
 /*  formulon-cell — playground stylesheet                                   */
-/*  Microsoft Fluent / Excel 365. Aptos display, Segoe UI, Excel green.     */
+/*  Fluent-inspired full spreadsheet shell. Aptos display, system UI, spreadsheet green. */
 /* ----------------------------------------------------------------------- */
 
 @import url("@fontsource/ibm-plex-sans/400.css");
@@ -27,8 +27,8 @@
   --shell-fg-mute: #605e5c; /* Fluent neutralSecondary */
   --shell-fg-faint: #8a8886; /* Fluent neutralTertiaryAlt */
 
-  /* ── Excel green ─────────────────────────────────────────────────── */
-  --shell-accent: #107c41; /* Excel green — file tab, active cell */
+  /* ── spreadsheet green ─────────────────────────────────────────────────── */
+  --shell-accent: #107c41; /* spreadsheet green — file tab, active cell */
   --shell-accent-strong: #0e6b39; /* Hover on accent */
   --shell-accent-darker: #0b5c30; /* Pressed on accent */
   --shell-accent-soft: rgba(16, 124, 65, 0.1);
@@ -39,7 +39,7 @@
   --shell-hover: rgba(0, 0, 0, 0.04);
   --shell-active: rgba(0, 0, 0, 0.08);
 
-  /* Fluent depth shadows. Microsoft uses two-stop ambient + key-light. */
+  /* Fluent-style depth shadows with ambient + key-light layers. */
   --shell-shadow-2: 0 0.3px 0.9px rgba(0, 0, 0, 0.07), 0 1.6px 3.6px rgba(0, 0, 0, 0.11);
   --shell-shadow-4: 0 0.6px 1.8px rgba(0, 0, 0, 0.1), 0 3.2px 7.2px rgba(0, 0, 0, 0.13);
   --shell-shadow-8: 0 1.2px 3.6px rgba(0, 0, 0, 0.1), 0 6.4px 14.4px rgba(0, 0, 0, 0.13);
@@ -108,7 +108,7 @@ body {
   text-rendering: geometricPrecision;
 }
 
-/* Default Excel-ish letter-spacing. Aptos/Segoe are humanist — give them air. */
+/* Default spreadsheet-ish letter-spacing. Aptos/Segoe are humanist — give them air. */
 .app {
   letter-spacing: -0.003em;
 }
@@ -124,7 +124,7 @@ body {
   color: var(--shell-fg);
 }
 
-/* ── Title bar (Excel 365 web header — 40px) ─────────────────────── */
+/* ── Title bar (full spreadsheet web header — 40px) ─────────────────────── */
 
 .app__title {
   display: flex;
@@ -160,7 +160,7 @@ body {
   color: var(--shell-accent-fg);
   border-radius: 4px;
   align-self: center;
-  /* Subtle inner highlight — Excel's icon has a faint top sheen. */
+  /* Subtle inner highlight — spreadsheet's icon has a faint top sheen. */
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 .app__brand-name {
@@ -255,7 +255,7 @@ body {
   color: var(--shell-fg-mute);
 }
 
-/* ── Menu strip (Excel 365 ribbon tabs — 32px) ─────────────────── */
+/* ── Menu strip (full spreadsheet ribbon tabs — 32px) ─────────────────── */
 
 .app__menubar {
   display: flex;
@@ -297,8 +297,7 @@ body {
   outline-offset: -3px;
   border-radius: 2px;
 }
-/* The current ribbon tab — green underline plus subtle bg, mirroring Excel
-   365's selected ribbon pivot. */
+/* The current ribbon tab — green underline plus subtle background. */
 .app__menubar-item--current {
   font-weight: 500;
   color: var(--shell-fg);
@@ -314,7 +313,7 @@ body {
   border-radius: 1px 1px 0 0;
 }
 
-/* "File" tab — Excel marks this in green. */
+/* "File" tab — spreadsheet marks this in green. */
 .app__menubar-item--file {
   margin-right: 4px;
   background: var(--shell-accent);
@@ -333,7 +332,7 @@ body {
   outline-color: var(--shell-accent-fg);
 }
 
-/* ── Toolbar ribbon (Excel simplified ribbon — 40px) ───────────── */
+/* ── Toolbar ribbon (spreadsheet simplified ribbon — 40px) ───────────── */
 
 .app__toolbar {
   display: flex;
@@ -605,7 +604,7 @@ body {
   display: none;
 }
 
-/* Formula bar — Excel layout: [Name Box ▾] [fx] [input] */
+/* Formula bar — spreadsheet layout: [Name Box ▾] [fx] [input] */
 .app__sheet .fc-host__formulabar {
   height: 28px;
   min-height: 28px;
@@ -615,7 +614,7 @@ body {
   border-bottom: 1px solid var(--shell-rule);
   align-items: center;
 }
-/* Excel-style Name Box — fixed-width input with a dropdown chevron baked in
+/* spreadsheet-style Name Box — fixed-width input with a dropdown chevron baked in
  * via background-image. The padding-right reserves space for the glyph. */
 .app__sheet .fc-host__formulabar-tag {
   width: 116px;
@@ -706,7 +705,7 @@ body {
   color: var(--shell-fg);
 }
 
-/* ── Bottom bar: sheet tabs + status (Excel — 28px) ──────────────── */
+/* ── Bottom bar: sheet tabs + status (spreadsheet — 28px) ──────────────── */
 
 .app__bottombar {
   display: flex;
@@ -763,7 +762,7 @@ body {
   display: none;
 }
 
-/* Excel sheet tab — inactive: bg-2 with subtle right-divider; active: lifts
+/* spreadsheet sheet tab — inactive: bg-2 with subtle right-divider; active: lifts
  * to the white sheet surface with a 2px green underline. */
 .app__tab {
   position: relative;
@@ -848,7 +847,7 @@ body {
   color: var(--shell-accent);
 }
 
-/* ── Status bar (Excel-style: state · selection · metric — engine ・ zoom) */
+/* ── Status bar (spreadsheet-style: state · selection · metric — engine ・ zoom) */
 
 .app__status {
   display: flex;
@@ -911,7 +910,7 @@ body {
   letter-spacing: 0.01em;
 }
 
-/* Excel-style zoom control — thin rail with percentage readout, plus stepper
+/* spreadsheet-style zoom control — thin rail with percentage readout, plus stepper
  * buttons on either side. The rail is purely decorative: it just reflects
  * the current zoom level. */
 .app__zoomctl {
@@ -981,7 +980,7 @@ body {
 /* ── Canvas-rendered chrome polish ──────────────────────────────── */
 
 /* Lift the canvas grid so it sits on the white sheet rather than fighting
- * the toolbar stripe — visually matches the "page" feel of Excel. */
+ * the toolbar stripe — visually matches the "page" feel of spreadsheet. */
 .app__sheet .fc-host__grid {
   background: var(--shell-surface);
 }
@@ -991,6 +990,113 @@ body {
   border-width: 2px;
   border-radius: 1px;
   box-shadow: 0 0 0 4px var(--shell-accent-soft);
+}
+
+/* ── Excel 365 modal dialogs (rename / delete / etc.) ──────────────
+   Reuses the core .fc-fmtdlg shell and themes it with the playground's
+   shell tokens so the surface stays cohesive across light/dark. */
+.app__dlg {
+  font-family: var(--shell-font);
+}
+.app__dlg .fc-fmtdlg__panel {
+  width: min(94vw, 420px);
+  max-height: min(80vh, 320px);
+  background: var(--shell-surface);
+  color: var(--shell-fg);
+  border: 1px solid var(--shell-rule);
+  box-shadow: var(--shell-shadow-8);
+}
+.app__dlg .fc-fmtdlg__header {
+  background: var(--shell-bg-2);
+  border-bottom: 1px solid var(--shell-rule);
+  color: var(--shell-fg);
+}
+.app__dlg .fc-fmtdlg__footer {
+  background: var(--shell-bg-2);
+  border-top: 1px solid var(--shell-rule);
+}
+.app__dlg__panel {
+  /* placeholder for future per-instance tweaks */
+}
+.app__dlg__label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--shell-fg-mute);
+}
+.app__dlg__input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--shell-rule-2);
+  border-radius: 2px;
+  background: var(--shell-surface);
+  color: var(--shell-fg);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  transition:
+    border-color 80ms ease,
+    box-shadow 80ms ease;
+}
+.app__dlg__input:hover {
+  border-color: var(--shell-rule-3);
+}
+.app__dlg__input:focus {
+  border-color: var(--shell-accent);
+  box-shadow: 0 0 0 2px var(--shell-accent-soft);
+}
+.app__dlg__error {
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: rgba(196, 49, 75, 0.08);
+  border: 1px solid rgba(196, 49, 75, 0.4);
+  border-radius: 2px;
+  color: #a4262c;
+  font-size: 12px;
+}
+.app__dlg__body--message {
+  padding-top: 4px;
+}
+.app__dlg__message {
+  margin: 0;
+  padding: 4px 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--shell-fg);
+}
+.app__dlg .fc-fmtdlg__btn {
+  background: var(--shell-surface);
+  border-color: var(--shell-rule-2);
+  color: var(--shell-fg);
+}
+.app__dlg .fc-fmtdlg__btn:hover {
+  background: var(--shell-bg-2);
+  border-color: var(--shell-rule-3);
+}
+.app__dlg .fc-fmtdlg__btn--primary {
+  background: var(--shell-accent);
+  border-color: var(--shell-accent);
+  color: var(--shell-accent-fg);
+}
+.app__dlg .fc-fmtdlg__btn--primary:hover {
+  background: var(--shell-accent-strong);
+  border-color: var(--shell-accent-strong);
+  filter: none;
+}
+.app__dlg__btn--danger {
+  background: #c4314b !important;
+  border-color: #c4314b !important;
+  color: #ffffff !important;
+}
+.app__dlg__btn--danger:hover {
+  background: #a4262c !important;
+  border-color: #a4262c !important;
 }
 
 /* ── Reduced motion ───────────────────────────────────────────────── */

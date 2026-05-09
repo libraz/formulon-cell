@@ -284,6 +284,48 @@ describe('attachPointer', () => {
       expect(w).toBeGreaterThanOrEqual(48);
     });
 
+    it('double-click col autofit includes cells outside the viewport', () => {
+      seed(store, wb, [
+        {
+          row: 100,
+          col: 0,
+          value: 'this offscreen value should still determine the autofit width',
+        },
+      ]);
+      detach = attachPointer(host, store, wb);
+      fireDblClick(host, 154, 10);
+      const w = store.getState().layout.colWidths.get(0) ?? 0;
+      expect(w).toBeGreaterThan(200);
+    });
+
+    it('double-click col autofit accounts for cell font size', () => {
+      seed(store, wb, [{ row: 0, col: 0, value: 'large font text' }]);
+      mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { fontSize: 30 });
+      detach = attachPointer(host, store, wb);
+      fireDblClick(host, 154, 10);
+      const w = store.getState().layout.colWidths.get(0) ?? 0;
+      expect(w).toBeGreaterThan(180);
+    });
+
+    it('double-click col autofit reserves room for filter header buttons', () => {
+      seed(store, wb, [{ row: 0, col: 0, value: 'HeaderName' }]);
+      detach = attachPointer(host, store, wb);
+      fireDblClick(host, 154, 10);
+      const plain = store.getState().layout.colWidths.get(0) ?? 0;
+      detach();
+
+      store.setState((s) => ({
+        ...s,
+        layout: { ...s.layout, colWidths: new Map() },
+        ui: { ...s.ui, filterRange: { sheet: 0, r0: 0, c0: 0, r1: 5, c1: 0 } },
+      }));
+      detach = attachPointer(host, store, wb);
+      fireDblClick(host, 154, 10);
+      const filtered = store.getState().layout.colWidths.get(0) ?? 0;
+
+      expect(filtered).toBeGreaterThanOrEqual(plain + 18);
+    });
+
     it('double-click on row-resize zone resets to defaultRowHeight', () => {
       // Pre-set a custom height so the reset is observable. With height=80,
       // row 0 occupies y∈[30, 110) — the resize edge sits near y=110 (slack 4).
@@ -292,6 +334,40 @@ describe('attachPointer', () => {
       const e = fireDblClick(host, 10, 108);
       expect(e.defaultPrevented).toBe(true);
       expect(store.getState().layout.rowHeights.get(0)).toBe(28); // defaultRowHeight
+    });
+
+    it('double-click row autofit grows for multiline content', () => {
+      seed(store, wb, [{ row: 0, col: 0, value: 'first line\nsecond line\nthird line' }]);
+      detach = attachPointer(host, store, wb);
+      const e = fireDblClick(host, 10, 56);
+      expect(e.defaultPrevented).toBe(true);
+      expect(store.getState().layout.rowHeights.get(0)).toBeGreaterThan(40);
+    });
+
+    it('double-click row autofit grows for wrapped text', () => {
+      seed(store, wb, [
+        { row: 0, col: 0, value: 'alpha beta gamma delta epsilon zeta eta theta iota kappa' },
+      ]);
+      mutators.setColWidth(store, 0, 70);
+      mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { wrap: true });
+      detach = attachPointer(host, store, wb);
+      const e = fireDblClick(host, 10, 56);
+      expect(e.defaultPrevented).toBe(true);
+      expect(store.getState().layout.rowHeights.get(0)).toBeGreaterThan(40);
+    });
+
+    it('double-click autofit size changes are undoable', () => {
+      const history = new History();
+      seed(store, wb, [{ row: 0, col: 0, value: 'wide enough for undo history' }]);
+      detach = attachPointer(host, store, wb, undefined, history);
+
+      fireDblClick(host, 154, 10);
+      const fitted = store.getState().layout.colWidths.get(0) ?? 0;
+      expect(fitted).toBeGreaterThan(104);
+      expect(history.undo()).toBe(true);
+      expect(store.getState().layout.colWidths.get(0)).toBeUndefined();
+      expect(history.redo()).toBe(true);
+      expect(store.getState().layout.colWidths.get(0)).toBe(fitted);
     });
 
     it('double-click outside resize zones is a no-op', () => {

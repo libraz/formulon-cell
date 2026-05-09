@@ -6,12 +6,18 @@ export interface ArgHelperHandle {
   refresh(): void;
   /** Hide the tooltip. */
   close(): void;
+  setLabels(labels: Partial<ArgHelperLabels>): void;
   detach(): void;
+}
+
+export interface ArgHelperLabels {
+  implicitIntersection: string;
 }
 
 export interface ArgHelperDeps {
   /** The textarea/input being edited. */
   input: HTMLInputElement | HTMLTextAreaElement;
+  labels?: Partial<ArgHelperLabels>;
 }
 
 /**
@@ -22,6 +28,10 @@ export interface ArgHelperDeps {
  */
 export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
   const { input } = deps;
+  let labels: ArgHelperLabels = {
+    implicitIntersection: 'Implicit intersection',
+    ...deps.labels,
+  };
   let root: HTMLDivElement | null = null;
 
   const close = (): void => {
@@ -57,7 +67,7 @@ export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
       chip.className = 'fc-arghelper__chip';
       chip.dataset.fcKind = 'implicit-intersection';
       chip.textContent = '@';
-      chip.title = 'Implicit intersection';
+      chip.title = labels.implicitIntersection;
       el.appendChild(chip);
     }
     const head = document.createElement('span');
@@ -102,6 +112,10 @@ export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
   return {
     refresh,
     close,
+    setLabels(next) {
+      labels = { ...labels, ...next };
+      refresh();
+    },
     detach() {
       close();
     },

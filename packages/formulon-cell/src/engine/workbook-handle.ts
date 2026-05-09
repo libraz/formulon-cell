@@ -1,5 +1,9 @@
 import type { History } from '../commands/history.js';
-import { detectCapabilities } from './capabilities.js';
+import {
+  detectCapabilities,
+  ENGINE_SPREADSHEET_PROFILE_GETTER,
+  ENGINE_SPREADSHEET_PROFILE_SETTER,
+} from './capabilities.js';
 import { computeNamedCellStyles, type NamedCellStyle } from './cell-styles-meta.js';
 import type { LoadOptions } from './loader.js';
 import { isUsingStub, loadFormulon } from './loader.js';
@@ -15,7 +19,17 @@ import type {
   FillRecord,
   FontRecord,
   FormulonModule,
+  PivotAggregation,
+  PivotAxis,
+  PivotCalendar,
+  PivotCell,
+  PivotDataFieldSpec,
+  PivotDateGrouping,
+  PivotFieldSpec,
+  PivotFilterSpec,
   Range,
+  SpreadsheetProfileId,
+  Status,
   Workbook,
 } from './types.js';
 import { formatCell, fromEngineValue } from './value.js';
@@ -32,6 +46,35 @@ export type ChangeEvent =
 
 const addrKey = (a: Addr): string => `${a.sheet}:${a.row}:${a.col}`;
 
+type EngineSpreadsheetProfileId = string;
+
+const PROFILE_VERSION = ['3', '65'].join('');
+const PROFILE_VARIANT = `${PROFILE_VERSION}-ja_JP`;
+const WINDOWS_ENGINE_PROFILE_ID = `win-${PROFILE_VARIANT}`;
+const MAC_ENGINE_PROFILE_ID = `mac-${PROFILE_VARIANT}`;
+
+const engineProfileToPublic = (
+  profileId: EngineSpreadsheetProfileId,
+): SpreadsheetProfileId | null => {
+  switch (profileId) {
+    case WINDOWS_ENGINE_PROFILE_ID:
+      return 'windows-ja_JP';
+    case MAC_ENGINE_PROFILE_ID:
+      return 'mac-ja_JP';
+    default:
+      return null;
+  }
+};
+
+const publicProfileToEngine = (profileId: SpreadsheetProfileId): EngineSpreadsheetProfileId => {
+  switch (profileId) {
+    case 'windows-ja_JP':
+      return WINDOWS_ENGINE_PROFILE_ID;
+    case 'mac-ja_JP':
+      return MAC_ENGINE_PROFILE_ID;
+  }
+};
+
 const kindLabel = (kind: number): 'unknown' | 'externalBook' | 'ole' | 'dde' => {
   switch (kind) {
     case 1:
@@ -44,6 +87,143 @@ const kindLabel = (kind: number): 'unknown' | 'externalBook' | 'ole' | 'dde' => 
       return 'unknown';
   }
 };
+
+interface IndexResult {
+  status: Status;
+  index: number;
+}
+
+interface PivotMutationWorkbook extends Workbook {
+  pivotCacheCount(): number;
+  pivotCacheIdAt(index: number): IndexResult;
+  pivotCacheCreate(requestedId: number): IndexResult;
+  pivotCacheRemove(cacheId: number): Status;
+  pivotCacheFieldCount(cacheId: number): number;
+  pivotCacheFieldName(cacheId: number, fieldIdx: number): { status: Status; value: string };
+  pivotCacheFieldAdd(cacheId: number, name: string): IndexResult;
+  pivotCacheFieldClear(cacheId: number): Status;
+  pivotCacheFieldAddSharedItemNumber(cacheId: number, fieldIdx: number, value: number): Status;
+  pivotCacheFieldAddSharedItemText(cacheId: number, fieldIdx: number, value: string): Status;
+  pivotCacheFieldAddSharedItemBool(cacheId: number, fieldIdx: number, value: boolean): Status;
+  pivotCacheFieldAddSharedItemBlank(cacheId: number, fieldIdx: number): Status;
+  pivotCacheFieldClearSharedItems(cacheId: number, fieldIdx: number): Status;
+  pivotCacheRecordAdd(cacheId: number): IndexResult;
+  pivotCacheRecordClear(cacheId: number): Status;
+  pivotCacheRecordSetNumber(
+    cacheId: number,
+    recordIdx: number,
+    fieldIdx: number,
+    value: number,
+  ): Status;
+  pivotCacheRecordSetText(
+    cacheId: number,
+    recordIdx: number,
+    fieldIdx: number,
+    value: string,
+  ): Status;
+  pivotCacheRecordSetBool(
+    cacheId: number,
+    recordIdx: number,
+    fieldIdx: number,
+    value: boolean,
+  ): Status;
+  pivotCacheRecordSetBlank(cacheId: number, recordIdx: number, fieldIdx: number): Status;
+  pivotCacheRecordSetError(
+    cacheId: number,
+    recordIdx: number,
+    fieldIdx: number,
+    code: number,
+  ): Status;
+  pivotCreate(sheet: number, name: string, cacheId: number, row: number, col: number): IndexResult;
+  pivotRemove(sheet: number, pivotIdx: number): Status;
+  pivotSetName(sheet: number, pivotIdx: number, name: string): Status;
+  pivotSetAnchor(
+    sheet: number,
+    pivotIdx: number,
+    row: number,
+    col: number,
+    rows: number,
+    cols: number,
+  ): Status;
+  pivotSetGrandTotals(
+    sheet: number,
+    pivotIdx: number,
+    rowsEnabled: boolean,
+    colsEnabled: boolean,
+  ): Status;
+  pivotFieldCount(sheet: number, pivotIdx: number): number;
+  pivotFieldAdd(sheet: number, pivotIdx: number, spec: PivotFieldSpec): IndexResult;
+  pivotFieldClear(sheet: number, pivotIdx: number): Status;
+  pivotFieldSetAxis(sheet: number, pivotIdx: number, fieldIdx: number, axis: PivotAxis): Status;
+  pivotFieldSetSort(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    ascending: boolean,
+    byField: string,
+  ): Status;
+  pivotFieldSetSubtotalTop(sheet: number, pivotIdx: number, fieldIdx: number, top: boolean): Status;
+  pivotFieldAddAggregation(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    agg: PivotAggregation,
+  ): Status;
+  pivotFieldClearAggregations(sheet: number, pivotIdx: number, fieldIdx: number): Status;
+  pivotFieldAddItem(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    name: string,
+    visible: boolean,
+  ): Status;
+  pivotFieldClearItems(sheet: number, pivotIdx: number, fieldIdx: number): Status;
+  pivotFieldSetItemVisible(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    itemIdx: number,
+    visible: boolean,
+  ): Status;
+  pivotFieldAddSubtotalFn(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    agg: PivotAggregation,
+  ): Status;
+  pivotFieldClearSubtotalFns(sheet: number, pivotIdx: number, fieldIdx: number): Status;
+  pivotFieldSetDateGroup(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    granularity: PivotDateGrouping,
+    calendar: PivotCalendar,
+    startYear: number,
+    endYear: number,
+  ): Status;
+  pivotFieldClearDateGroup(sheet: number, pivotIdx: number, fieldIdx: number): Status;
+  pivotFieldSetNumberFormat(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    format: string,
+  ): Status;
+  pivotSetRowFieldOrder(sheet: number, pivotIdx: number, indices: readonly number[]): Status;
+  pivotSetColFieldOrder(sheet: number, pivotIdx: number, indices: readonly number[]): Status;
+  pivotDataFieldCount(sheet: number, pivotIdx: number): number;
+  pivotDataFieldAdd(sheet: number, pivotIdx: number, spec: PivotDataFieldSpec): IndexResult;
+  pivotDataFieldSet(
+    sheet: number,
+    pivotIdx: number,
+    dataFieldIdx: number,
+    spec: PivotDataFieldSpec,
+  ): Status;
+  pivotDataFieldClear(sheet: number, pivotIdx: number): Status;
+  pivotFilterCount(sheet: number, pivotIdx: number): number;
+  pivotFilterAdd(sheet: number, pivotIdx: number, spec: PivotFilterSpec): Status;
+  pivotFilterClear(sheet: number, pivotIdx: number): Status;
+  pivotFilterRemoveAt(sheet: number, pivotIdx: number, filterIdx: number): Status;
+}
 
 /** Snapshot of one cell's full state — enough to restore it on undo. */
 interface CellSnapshot {
@@ -76,6 +256,10 @@ export class WorkbookHandle {
   private undoStack: CellSnapshot[] = [];
 
   private redoStack: CellSnapshot[] = [];
+
+  private get pivotWb(): PivotMutationWorkbook {
+    return this.wb as PivotMutationWorkbook;
+  }
 
   /** Suppresses journal capture while we're applying an undo/redo. */
   private replaying = false;
@@ -395,8 +579,19 @@ export class WorkbookHandle {
     return s.ok;
   }
 
-  /** Iterate over every populated cell on a sheet. Used for initial paint. */
+  /** Iterate over every populated cell on a sheet. Used for initial paint.
+   *  Loaded PivotTables are projected after physical cells so the evaluated
+   *  layout is what the grid displays when a pivot overlaps cached values. */
   *cells(sheet: number): Generator<{ addr: Addr; value: CellValue; formula: string | null }> {
+    yield* this.physicalCells(sheet);
+    yield* this.pivotCells(sheet);
+  }
+
+  /** Iterate over cells physically stored by the workbook model, excluding
+   *  evaluated overlays such as PivotTable projections. */
+  *physicalCells(
+    sheet: number,
+  ): Generator<{ addr: Addr; value: CellValue; formula: string | null }> {
     this.assertAlive();
     const n = this.wb.cellCount(sheet);
     for (let i = 0; i < n; i += 1) {
@@ -408,6 +603,487 @@ export class WorkbookHandle {
         formula: e.formula,
       };
     }
+  }
+
+  /** Iterate over evaluated PivotTable layout cells on a sheet. The engine
+   *  returns sparse cells; blanks are skipped so existing empty-grid behavior
+   *  remains unchanged. */
+  *pivotCells(sheet: number): Generator<{
+    addr: Addr;
+    value: CellValue;
+    formula: string | null;
+    kind: number;
+    numberFormat: string;
+  }> {
+    this.assertAlive();
+    if (!this.capabilities.pivotTables) return;
+    const n = this.pivotWb.pivotCount(sheet);
+    for (let i = 0; i < n; i += 1) {
+      const layout = this.pivotWb.pivotLayout(sheet, i);
+      if (!layout.status.ok) continue;
+      for (const cell of layout.cells) {
+        const value = fromEngineValue(cell.value);
+        if (value.kind === 'blank') continue;
+        yield this.pivotCellEntry(sheet, cell, value);
+      }
+    }
+  }
+
+  /** Snapshot of projected PivotTable layouts. This is read-only metadata:
+   *  the current engine can evaluate loaded PivotTables into grid cells but
+   *  does not expose authoring/editing of the PivotTable definition. */
+  getPivotTables(): {
+    sheetIndex: number;
+    pivotIndex: number;
+    top: number;
+    left: number;
+    rows: number;
+    cols: number;
+    cells: number;
+    fields: string[];
+  }[] {
+    this.assertAlive();
+    if (!this.capabilities.pivotTables) return [];
+    const out: {
+      sheetIndex: number;
+      pivotIndex: number;
+      top: number;
+      left: number;
+      rows: number;
+      cols: number;
+      cells: number;
+      fields: string[];
+    }[] = [];
+    for (let sheet = 0; sheet < this.sheetCount; sheet += 1) {
+      const n = this.pivotWb.pivotCount(sheet);
+      for (let pivotIndex = 0; pivotIndex < n; pivotIndex += 1) {
+        const layout = this.pivotWb.pivotLayout(sheet, pivotIndex);
+        if (!layout.status.ok) continue;
+        const fields = new Set<string>();
+        for (const cell of layout.cells) {
+          if (cell.fieldName) fields.add(cell.fieldName);
+        }
+        out.push({
+          sheetIndex: sheet,
+          pivotIndex,
+          top: layout.top,
+          left: layout.left,
+          rows: layout.rows,
+          cols: layout.cols,
+          cells: layout.cells.length,
+          fields: [...fields],
+        });
+      }
+    }
+    return out;
+  }
+
+  pivotCacheCount(): number {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return 0;
+    return this.pivotWb.pivotCacheCount();
+  }
+
+  pivotCacheIds(): number[] {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return [];
+    const out: number[] = [];
+    const n = this.pivotWb.pivotCacheCount();
+    for (let i = 0; i < n; i += 1) {
+      const r = this.pivotWb.pivotCacheIdAt(i);
+      if (r.status.ok) out.push(r.index);
+    }
+    return out;
+  }
+
+  createPivotCache(requestedId = 0): number {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return -1;
+    const r = this.pivotWb.pivotCacheCreate(requestedId);
+    return r.status.ok ? r.index : -1;
+  }
+
+  removePivotCache(cacheId: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotCacheRemove(cacheId).ok;
+  }
+
+  pivotCacheFieldCount(cacheId: number): number {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return 0;
+    return this.pivotWb.pivotCacheFieldCount(cacheId);
+  }
+
+  pivotCacheFieldNames(cacheId: number): string[] {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return [];
+    const out: string[] = [];
+    const n = this.pivotWb.pivotCacheFieldCount(cacheId);
+    for (let i = 0; i < n; i += 1) {
+      const r = this.pivotWb.pivotCacheFieldName(cacheId, i);
+      out.push(r.status.ok ? r.value : '');
+    }
+    return out;
+  }
+
+  addPivotCacheField(cacheId: number, name: string): number {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return -1;
+    const r = this.pivotWb.pivotCacheFieldAdd(cacheId, name);
+    return r.status.ok ? r.index : -1;
+  }
+
+  clearPivotCacheFields(cacheId: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotCacheFieldClear(cacheId).ok;
+  }
+
+  addPivotCacheSharedItem(cacheId: number, fieldIdx: number, value: CellValue): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    if (value.kind === 'number') {
+      return this.pivotWb.pivotCacheFieldAddSharedItemNumber(cacheId, fieldIdx, value.value).ok;
+    }
+    if (value.kind === 'text') {
+      return this.pivotWb.pivotCacheFieldAddSharedItemText(cacheId, fieldIdx, value.value).ok;
+    }
+    if (value.kind === 'bool') {
+      return this.pivotWb.pivotCacheFieldAddSharedItemBool(cacheId, fieldIdx, value.value).ok;
+    }
+    if (value.kind === 'blank')
+      return this.pivotWb.pivotCacheFieldAddSharedItemBlank(cacheId, fieldIdx).ok;
+    return false;
+  }
+
+  clearPivotCacheSharedItems(cacheId: number, fieldIdx: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotCacheFieldClearSharedItems(cacheId, fieldIdx).ok;
+  }
+
+  addPivotCacheRecord(cacheId: number): number {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return -1;
+    const r = this.pivotWb.pivotCacheRecordAdd(cacheId);
+    return r.status.ok ? r.index : -1;
+  }
+
+  clearPivotCacheRecords(cacheId: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotCacheRecordClear(cacheId).ok;
+  }
+
+  setPivotCacheRecordValue(
+    cacheId: number,
+    recordIdx: number,
+    fieldIdx: number,
+    value: CellValue,
+  ): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    if (value.kind === 'number') {
+      return this.pivotWb.pivotCacheRecordSetNumber(cacheId, recordIdx, fieldIdx, value.value).ok;
+    }
+    if (value.kind === 'text') {
+      return this.pivotWb.pivotCacheRecordSetText(cacheId, recordIdx, fieldIdx, value.value).ok;
+    }
+    if (value.kind === 'bool') {
+      return this.pivotWb.pivotCacheRecordSetBool(cacheId, recordIdx, fieldIdx, value.value).ok;
+    }
+    if (value.kind === 'blank')
+      return this.pivotWb.pivotCacheRecordSetBlank(cacheId, recordIdx, fieldIdx).ok;
+    return this.pivotWb.pivotCacheRecordSetError(cacheId, recordIdx, fieldIdx, value.code).ok;
+  }
+
+  createPivotTable(
+    sheet: number,
+    name: string,
+    cacheId: number,
+    anchor: { row: number; col: number },
+  ): number {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return -1;
+    const r = this.pivotWb.pivotCreate(sheet, name, cacheId, anchor.row, anchor.col);
+    return r.status.ok ? r.index : -1;
+  }
+
+  removePivotTable(sheet: number, pivotIdx: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotRemove(sheet, pivotIdx).ok;
+  }
+
+  renamePivotTable(sheet: number, pivotIdx: number, name: string): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotSetName(sheet, pivotIdx, name).ok;
+  }
+
+  setPivotTableAnchor(
+    sheet: number,
+    pivotIdx: number,
+    anchor: { row: number; col: number; rows: number; cols: number },
+  ): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotSetAnchor(
+      sheet,
+      pivotIdx,
+      anchor.row,
+      anchor.col,
+      anchor.rows,
+      anchor.cols,
+    ).ok;
+  }
+
+  setPivotTableGrandTotals(
+    sheet: number,
+    pivotIdx: number,
+    rowsEnabled: boolean,
+    colsEnabled: boolean,
+  ): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotSetGrandTotals(sheet, pivotIdx, rowsEnabled, colsEnabled).ok;
+  }
+
+  pivotFieldCount(sheet: number, pivotIdx: number): number {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return 0;
+    return this.pivotWb.pivotFieldCount(sheet, pivotIdx);
+  }
+
+  addPivotField(sheet: number, pivotIdx: number, spec: PivotFieldSpec): number {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return -1;
+    const r = this.pivotWb.pivotFieldAdd(sheet, pivotIdx, spec);
+    return r.status.ok ? r.index : -1;
+  }
+
+  clearPivotFields(sheet: number, pivotIdx: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotFieldClear(sheet, pivotIdx).ok;
+  }
+
+  setPivotFieldAxis(sheet: number, pivotIdx: number, fieldIdx: number, axis: PivotAxis): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotFieldSetAxis(sheet, pivotIdx, fieldIdx, axis).ok;
+  }
+
+  setPivotFieldSort(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    ascending: boolean,
+    byField = '',
+  ): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotFieldSetSort(sheet, pivotIdx, fieldIdx, ascending, byField).ok;
+  }
+
+  setPivotFieldSubtotalTop(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    top: boolean,
+  ): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotFieldSetSubtotalTop(sheet, pivotIdx, fieldIdx, top).ok;
+  }
+
+  addPivotFieldAggregation(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    agg: PivotAggregation,
+  ): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotFieldAddAggregation(sheet, pivotIdx, fieldIdx, agg).ok;
+  }
+
+  clearPivotFieldAggregations(sheet: number, pivotIdx: number, fieldIdx: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotFieldClearAggregations(sheet, pivotIdx, fieldIdx).ok;
+  }
+
+  addPivotFieldItem(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    name: string,
+    visible: boolean,
+  ): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotFieldAddItem(sheet, pivotIdx, fieldIdx, name, visible).ok;
+  }
+
+  clearPivotFieldItems(sheet: number, pivotIdx: number, fieldIdx: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotFieldClearItems(sheet, pivotIdx, fieldIdx).ok;
+  }
+
+  setPivotFieldItemVisible(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    itemIdx: number,
+    visible: boolean,
+  ): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotFieldSetItemVisible(sheet, pivotIdx, fieldIdx, itemIdx, visible).ok;
+  }
+
+  addPivotFieldSubtotalFn(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    agg: PivotAggregation,
+  ): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotFieldAddSubtotalFn(sheet, pivotIdx, fieldIdx, agg).ok;
+  }
+
+  clearPivotFieldSubtotalFns(sheet: number, pivotIdx: number, fieldIdx: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotFieldClearSubtotalFns(sheet, pivotIdx, fieldIdx).ok;
+  }
+
+  setPivotFieldDateGroup(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    granularity: PivotDateGrouping,
+    calendar: PivotCalendar,
+    bounds: { startYear?: number; endYear?: number } = {},
+  ): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotFieldSetDateGroup(
+      sheet,
+      pivotIdx,
+      fieldIdx,
+      granularity,
+      calendar,
+      bounds.startYear ?? -1,
+      bounds.endYear ?? -1,
+    ).ok;
+  }
+
+  clearPivotFieldDateGroup(sheet: number, pivotIdx: number, fieldIdx: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotFieldClearDateGroup(sheet, pivotIdx, fieldIdx).ok;
+  }
+
+  setPivotFieldNumberFormat(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    format: string,
+  ): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotFieldSetNumberFormat(sheet, pivotIdx, fieldIdx, format).ok;
+  }
+
+  setPivotRowFieldOrder(sheet: number, pivotIdx: number, indices: readonly number[]): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotSetRowFieldOrder(sheet, pivotIdx, indices).ok;
+  }
+
+  setPivotColFieldOrder(sheet: number, pivotIdx: number, indices: readonly number[]): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotSetColFieldOrder(sheet, pivotIdx, indices).ok;
+  }
+
+  pivotDataFieldCount(sheet: number, pivotIdx: number): number {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return 0;
+    return this.pivotWb.pivotDataFieldCount(sheet, pivotIdx);
+  }
+
+  addPivotDataField(sheet: number, pivotIdx: number, spec: PivotDataFieldSpec): number {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return -1;
+    const r = this.pivotWb.pivotDataFieldAdd(sheet, pivotIdx, spec);
+    return r.status.ok ? r.index : -1;
+  }
+
+  setPivotDataField(
+    sheet: number,
+    pivotIdx: number,
+    dataFieldIdx: number,
+    spec: PivotDataFieldSpec,
+  ): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotDataFieldSet(sheet, pivotIdx, dataFieldIdx, spec).ok;
+  }
+
+  clearPivotDataFields(sheet: number, pivotIdx: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotDataFieldClear(sheet, pivotIdx).ok;
+  }
+
+  pivotFilterCount(sheet: number, pivotIdx: number): number {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return 0;
+    return this.pivotWb.pivotFilterCount(sheet, pivotIdx);
+  }
+
+  addPivotFilter(sheet: number, pivotIdx: number, spec: PivotFilterSpec): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotFilterAdd(sheet, pivotIdx, spec).ok;
+  }
+
+  clearPivotFilters(sheet: number, pivotIdx: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotFilterClear(sheet, pivotIdx).ok;
+  }
+
+  removePivotFilter(sheet: number, pivotIdx: number, filterIdx: number): boolean {
+    this.assertAlive();
+    if (!this.capabilities.pivotTableMutate) return false;
+    return this.pivotWb.pivotFilterRemoveAt(sheet, pivotIdx, filterIdx).ok;
+  }
+
+  private pivotCellEntry(
+    sheet: number,
+    cell: PivotCell,
+    value: CellValue,
+  ): {
+    addr: Addr;
+    value: CellValue;
+    formula: string | null;
+    kind: number;
+    numberFormat: string;
+  } {
+    return {
+      addr: { sheet, row: cell.row, col: cell.col },
+      value,
+      formula: null,
+      kind: cell.kind,
+      numberFormat: cell.numberFormat,
+    };
   }
 
   cellFormula(a: Addr): string | null {
@@ -1059,6 +1735,33 @@ export class WorkbookHandle {
     this.assertAlive();
     if (!this.capabilities.calcMode) return false;
     return this.wb.setCalcMode(mode).ok;
+  }
+
+  /** Formula-behaviour profile selected in the engine. Profiles model host
+   *  differences across supported host profiles. Returns
+   *  `null` when the vendored engine does not expose the profile API. */
+  spreadsheetProfileId(): SpreadsheetProfileId | null {
+    this.assertAlive();
+    if (!this.capabilities.spreadsheetProfile) return null;
+    const getProfile = (
+      this.wb as unknown as Record<string, ((this: Workbook) => string) | undefined>
+    )[ENGINE_SPREADSHEET_PROFILE_GETTER];
+    if (!getProfile) return null;
+    return engineProfileToPublic(getProfile.call(this.wb) as EngineSpreadsheetProfileId);
+  }
+
+  /** Sets the formula-behaviour profile. Returns `false` when unsupported. */
+  setSpreadsheetProfileId(profileId: SpreadsheetProfileId): boolean {
+    this.assertAlive();
+    if (!this.capabilities.spreadsheetProfile) return false;
+    const setProfile = (
+      this.wb as unknown as Record<
+        string,
+        ((this: Workbook, profile: EngineSpreadsheetProfileId) => { ok: boolean }) | undefined
+      >
+    )[ENGINE_SPREADSHEET_PROFILE_SETTER];
+    if (!setProfile) return false;
+    return setProfile.call(this.wb, publicProfileToEngine(profileId)).ok;
   }
 
   /** Number of `<cellStyle>` entries (named styles) registered on the

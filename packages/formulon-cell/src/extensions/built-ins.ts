@@ -17,20 +17,31 @@
 // etc.) resolve through `ctx.resolve(id)` at call time, so a user
 // replacement registered under the same id participates correctly.
 import type { History } from '../commands/history.js';
+import { setSheetZoom } from '../commands/structure.js';
 import { attachClipboard } from '../interact/clipboard.js';
+import { attachCommentDialog } from '../interact/comment-dialog.js';
 import { attachConditionalDialog } from '../interact/conditional-dialog.js';
 import { attachContextMenu } from '../interact/context-menu.js';
 import { attachFindReplace } from '../interact/find-replace.js';
 import { attachFormatDialog } from '../interact/format-dialog.js';
 import { attachFormatPainter } from '../interact/format-painter.js';
+import { attachGoToDialog } from '../interact/goto-dialog.js';
 import { attachHover } from '../interact/hover.js';
 import { attachHyperlinkDialog } from '../interact/hyperlink-dialog.js';
 import { attachIterativeDialog } from '../interact/iterative-dialog.js';
 import { attachNamedRangeDialog } from '../interact/named-range-dialog.js';
+import { attachPageSetupDialog } from '../interact/page-setup-dialog.js';
 import { attachPasteSpecial } from '../interact/paste-special.js';
+import { attachPivotTableDialog } from '../interact/pivot-table-dialog.js';
+import { attachQuickAnalysis } from '../interact/quick-analysis.js';
+import { attachSessionCharts } from '../interact/session-charts.js';
+import { attachSlicer } from '../interact/slicer.js';
 import { attachStatusBar } from '../interact/status-bar.js';
 import { attachValidationList } from '../interact/validation.js';
+import { attachViewToolbar } from '../interact/view-toolbar.js';
+import { attachWatchPanel } from '../interact/watch-panel.js';
 import { attachWheel } from '../interact/wheel.js';
+import { attachWorkbookObjectsPanel } from '../interact/workbook-objects.js';
 import { mutators } from '../store/store.js';
 import type { Extension, ExtensionContext, ExtensionHandle } from './types.js';
 
@@ -62,13 +73,32 @@ export const statusBar = (): Extension => ({
   id: 'statusBar',
   priority: 50,
   setup(ctx) {
-    const handle = attachStatusBar({
+    let handle!: ReturnType<typeof attachStatusBar>;
+    handle = attachStatusBar({
       statusbar: ctx.statusbar,
       store: ctx.store,
       strings: ctx.i18n.strings,
       getEngineLabel: () => {
         const wb = ctx.getWb();
         return wb.isStub ? 'stub' : `formulon ${wb.version}`;
+      },
+      getCalcMode: () => ctx.getWb().calcMode(),
+      onCycleCalcMode: () => {
+        const wb = ctx.getWb();
+        const cur = wb.calcMode();
+        if (cur === null) return;
+        wb.setCalcMode(((cur + 1) % 3) as 0 | 1 | 2);
+        handle.refresh();
+      },
+      onRecalc: () => {
+        const wb = ctx.getWb();
+        wb.recalc();
+        refreshCells(ctx);
+        ctx.invalidate();
+      },
+      onZoomChange: (zoom) => {
+        setSheetZoom(ctx.store, zoom, ctx.getWb());
+        ctx.invalidate();
       },
     });
     return {
@@ -82,6 +112,133 @@ export const statusBar = (): Extension => ({
   },
 });
 
+/** Quick Analysis popover (Ctrl+Q) — id `'quickAnalysis'`. */
+export const quickAnalysis = (): Extension => ({
+  id: 'quickAnalysis',
+  priority: 50,
+  setup(ctx) {
+    const handle = attachQuickAnalysis({
+      host: ctx.host,
+      store: ctx.store,
+      wb: ctx.getWb(),
+      strings: ctx.i18n.strings,
+      onAfterCommit: () => refreshCells(ctx),
+      invalidate: () => ctx.invalidate(),
+      onOpenPivotTable: () =>
+        ctx.resolve<ExtensionHandle & { open: () => void }>('pivotTableDialog')?.open(),
+      canOpenPivotTable: () => !!ctx.resolve('pivotTableDialog'),
+      canCreateChart: () => !!ctx.resolve('charts'),
+    });
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'q') {
+        e.preventDefault();
+        handle.open();
+      }
+    };
+    ctx.host.addEventListener('keydown', onKey);
+    return {
+      open: () => handle.open(),
+      close: () => handle.close(),
+      rebindWorkbook: (wb) => handle.bindWorkbook(wb),
+      setStrings: (next) => handle.setStrings(next),
+      dispose: () => {
+        ctx.host.removeEventListener('keydown', onKey);
+        handle.detach();
+      },
+    };
+  },
+});
+
+/** Session chart overlays — id `'charts'`. */
+export const charts = (): Extension => ({
+  id: 'charts',
+  priority: 50,
+  setup(ctx) {
+    const handle = attachSessionCharts({
+      host: ctx.host,
+      store: ctx.store,
+      labels: ctx.i18n.strings.sessionCharts,
+    });
+    return {
+      refresh: () => handle.refresh(),
+      setStrings: (next) => handle.setLabels(next.sessionCharts),
+      dispose: () => handle.detach(),
+    };
+  },
+});
+
+/** PivotTable creation dialog — id `'pivotTableDialog'`. */
+export const pivotTableDialog = (): Extension => ({
+  id: 'pivotTableDialog',
+  priority: 50,
+  setup(ctx) {
+    const handle = attachPivotTableDialog({
+      host: ctx.host,
+      store: ctx.store,
+      wb: ctx.getWb(),
+      strings: ctx.i18n.strings,
+      onAfterCreate: () => refreshCells(ctx),
+      invalidate: () => ctx.invalidate(),
+    });
+    return {
+      open: () => handle.open(),
+      close: () => handle.close(),
+      rebindWorkbook: (wb) => handle.bindWorkbook(wb),
+      setStrings: (next) => handle.setStrings(next),
+      dispose: () => handle.detach(),
+    };
+  },
+});
+
+/** Workbook Objects side panel — id `'workbookObjects'`. */
+export const workbookObjects = (): Extension => ({
+  id: 'workbookObjects',
+  priority: 50,
+  setup(ctx) {
+    const handle = attachWorkbookObjectsPanel({
+      host: ctx.host,
+      wb: ctx.getWb(),
+      strings: ctx.i18n.strings,
+    });
+    return {
+      open: () => handle.open(),
+      close: () => handle.close(),
+      refresh: () => handle.refresh(),
+      rebindWorkbook: (wb) => handle.bindWorkbook(wb),
+      setStrings: (next) => handle.setStrings(next),
+      dispose: () => handle.detach(),
+    };
+  },
+});
+
+/** View toolbar — id `'viewToolbar'`. */
+export const viewToolbar = (): Extension => ({
+  id: 'viewToolbar',
+  priority: 50,
+  setup(ctx) {
+    const objects = ctx.resolve<ExtensionHandle & { open: () => void }>('workbookObjects');
+    if (ctx.viewbar.parentElement !== ctx.host) ctx.host.insertBefore(ctx.viewbar, ctx.grid);
+    const handle = attachViewToolbar({
+      toolbar: ctx.viewbar,
+      store: ctx.store,
+      wb: ctx.getWb(),
+      history: ctx.history as History,
+      strings: ctx.i18n.strings,
+      onOpenObjects: objects ? () => objects.open() : undefined,
+      onChanged: () => ctx.invalidate(),
+    });
+    return {
+      refresh: () => handle.refresh(),
+      rebindWorkbook: (wb) => handle.bindWorkbook(wb),
+      setStrings: (next) => handle.setStrings(next),
+      dispose: () => {
+        handle.detach();
+        if (ctx.viewbar.parentElement === ctx.host) ctx.host.removeChild(ctx.viewbar);
+      },
+    };
+  },
+});
+
 /** Hover-comment popover — id `'hoverComment'`. */
 export const hoverComment = (): Extension => ({
   id: 'hoverComment',
@@ -89,6 +246,34 @@ export const hoverComment = (): Extension => ({
   setup(ctx) {
     const handle = attachHover({ grid: ctx.grid, store: ctx.store });
     return { ...handle, dispose: handle.detach };
+  },
+});
+
+/** Go To Special dialog — id `'gotoSpecial'`. */
+export const goToSpecialDialog = (): Extension => ({
+  id: 'gotoSpecial',
+  priority: 50,
+  setup(ctx) {
+    let handle = attachGoToDialog({
+      host: ctx.host,
+      store: ctx.store,
+      getWb: ctx.getWb,
+      strings: ctx.i18n.strings,
+    });
+    return {
+      open: () => handle.open(),
+      close: () => handle.close(),
+      setStrings: (next) => {
+        handle.detach();
+        handle = attachGoToDialog({
+          host: ctx.host,
+          store: ctx.store,
+          getWb: ctx.getWb,
+          strings: next,
+        });
+      },
+      dispose: () => handle.detach(),
+    };
   },
 });
 
@@ -138,6 +323,34 @@ export const iterativeDialog = (): Extension => ({
   },
 });
 
+/** Page Setup dialog — id `'pageSetup'`. */
+export const pageSetupDialog = (): Extension => ({
+  id: 'pageSetup',
+  priority: 50,
+  setup(ctx) {
+    let handle = attachPageSetupDialog({
+      host: ctx.host,
+      store: ctx.store,
+      strings: ctx.i18n.strings,
+      history: ctx.history as History,
+    });
+    return {
+      open: () => handle.open(),
+      close: () => handle.close(),
+      setStrings: (next) => {
+        handle.detach();
+        handle = attachPageSetupDialog({
+          host: ctx.host,
+          store: ctx.store,
+          strings: next,
+          history: ctx.history as History,
+        });
+      },
+      dispose: () => handle.detach(),
+    };
+  },
+});
+
 /** Named-range listing dialog — id `'namedRanges'`. */
 export const namedRangeDialog = (): Extension => ({
   id: 'namedRanges',
@@ -168,6 +381,32 @@ export const hyperlinkDialog = (): Extension => ({
   setup(ctx) {
     const buildHandle = (s: typeof ctx.i18n.strings): ReturnType<typeof attachHyperlinkDialog> =>
       attachHyperlinkDialog({
+        host: ctx.host,
+        store: ctx.store,
+        strings: s,
+        history: ctx.history as History,
+        getWb: ctx.getWb,
+      });
+    let handle = buildHandle(ctx.i18n.strings);
+    return {
+      open: () => handle.open(),
+      close: () => handle.close(),
+      setStrings: (next) => {
+        handle.detach();
+        handle = buildHandle(next);
+      },
+      dispose: () => handle.detach(),
+    };
+  },
+});
+
+/** Comment edit (Shift+F2) dialog — id `'commentDialog'`. */
+export const commentDialog = (): Extension => ({
+  id: 'commentDialog',
+  priority: 50,
+  setup(ctx) {
+    const buildHandle = (s: typeof ctx.i18n.strings): ReturnType<typeof attachCommentDialog> =>
+      attachCommentDialog({
         host: ctx.host,
         store: ctx.store,
         strings: s,
@@ -367,6 +606,7 @@ export const contextMenu = (): Extension => ({
       onFormatDialog: () => callOpen('formatDialog'),
       onPasteSpecial: () => callOpen('pasteSpecial'),
       onInsertHyperlink: () => callOpen('hyperlink'),
+      onEditComment: () => callOpen('commentDialog'),
     });
     return {
       rebindWorkbook: (wb) => {
@@ -381,12 +621,73 @@ export const contextMenu = (): Extension => ({
           onFormatDialog: () => callOpen('formatDialog'),
           onPasteSpecial: () => callOpen('pasteSpecial'),
           onInsertHyperlink: () => callOpen('hyperlink'),
+          onEditComment: () => callOpen('commentDialog'),
         });
       },
       // attachContextMenu's detacher exposes setStrings; use it directly
       // to update labels without re-attaching all listeners.
       setStrings: (next) => detach.setStrings(next),
       dispose: () => detach(),
+    };
+  },
+});
+
+/** Watch Window dock — id `'watchWindow'`. Default-off in `resolveFlags`. */
+export const watchWindow = (): Extension => ({
+  id: 'watchWindow',
+  priority: 50,
+  setup(ctx) {
+    const dock = document.createElement('div');
+    dock.dataset.fcWatch = 'dock';
+    dock.className = 'fc-host__watchdock';
+    ctx.host.appendChild(dock);
+    const handle = attachWatchPanel({
+      host: dock,
+      store: ctx.store,
+      getWb: ctx.getWb,
+      strings: ctx.i18n.strings,
+    });
+    const unsubWb = ctx.onWorkbookChange(() => handle.refresh());
+    return {
+      open: () => handle.open(),
+      close: () => handle.close(),
+      toggle: () => handle.toggle(),
+      refresh: () => handle.refresh(),
+      setStrings: (next) => {
+        const live = handle as typeof handle & { setStrings?: (s: typeof next) => void };
+        live.setStrings?.(next);
+      },
+      dispose: () => {
+        unsubWb();
+        handle.detach();
+        dock.remove();
+      },
+    };
+  },
+});
+
+/** Slicer floating panels — id `'slicer'`. Default-off in `resolveFlags`. */
+export const slicer = (): Extension => ({
+  id: 'slicer',
+  priority: 50,
+  setup(ctx) {
+    const handle = attachSlicer({
+      host: ctx.host,
+      store: ctx.store,
+      getWb: ctx.getWb,
+      history: ctx.history as History,
+      strings: ctx.i18n.strings,
+    });
+    const unsubWb = ctx.onWorkbookChange(() => handle.refresh());
+    return {
+      addSlicer: (input: Parameters<typeof handle.addSlicer>[0]) => handle.addSlicer(input),
+      removeSlicer: (id: string) => handle.removeSlicer(id),
+      refresh: () => handle.refresh(),
+      setStrings: (next) => handle.setStrings(next),
+      dispose: () => {
+        unsubWb();
+        handle.detach();
+      },
     };
   },
 });
@@ -407,19 +708,27 @@ export const wheel = (): Extension => ({
   },
 });
 
-/** Convenience bundle — every replaceable built-in factory in one
- *  array. Pair with `features: presets.minimal()` (or pick-and-mix
+/** Convenience bundle — the default-on replaceable built-in factories in
+ *  one array. Pair with `features: presets.minimal()` (or pick-and-mix
  *  flags) to drop the inline built-ins, then pass this array to
- *  `extensions` for the equivalent surface composed from public
- *  factories. Mostly useful for documentation / smoke tests. */
+ *  `extensions` for the equivalent surface composed from public factories.
+ *  Default-off factories (`watchWindow`, `slicer`) stay opt-in. */
 export const allBuiltIns = (): Extension[] => [
   formatPainter(),
+  quickAnalysis(),
+  charts(),
+  pivotTableDialog(),
   statusBar(),
+  workbookObjects(),
+  viewToolbar(),
   hoverComment(),
+  goToSpecialDialog(),
   conditionalDialog(),
   iterativeDialog(),
+  pageSetupDialog(),
   namedRangeDialog(),
   hyperlinkDialog(),
+  commentDialog(),
   formatDialog(),
   findReplace(),
   validationList(),

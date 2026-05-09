@@ -1,4 +1,8 @@
-import { aggregateSelection } from '../commands/aggregate.js';
+import {
+  aggregateSelection,
+  STATUS_AGGREGATE_KEYS,
+  statusAggregateValue,
+} from '../commands/aggregate.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore, type StatusAggKey } from '../store/store.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';
@@ -34,7 +38,7 @@ export interface StatusBarHandle {
   detach(): void;
 }
 
-const ALL_KEYS: StatusAggKey[] = ['average', 'count', 'countNumbers', 'min', 'max', 'sum'];
+const ALL_KEYS: readonly StatusAggKey[] = STATUS_AGGREGATE_KEYS;
 const VIEWPORT_PAD = 4;
 
 const fmt = (n: number): string => {
@@ -154,27 +158,6 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     }
   };
 
-  const valueFor = (
-    key: StatusAggKey,
-    stats: ReturnType<typeof aggregateSelection>,
-  ): string | null => {
-    if (key === 'count') return stats.nonBlankCount > 0 ? String(stats.nonBlankCount) : null;
-    if (key === 'countNumbers') return stats.numericCount > 0 ? String(stats.numericCount) : null;
-    if (stats.numericCount === 0) return null;
-    switch (key) {
-      case 'sum':
-        return fmt(stats.sum);
-      case 'average':
-        return fmt(stats.avg);
-      case 'min':
-        return fmt(stats.min);
-      case 'max':
-        return fmt(stats.max);
-      default:
-        return null;
-    }
-  };
-
   const refresh = (): void => {
     const s = store.getState();
     refreshStaticLabels();
@@ -182,8 +165,8 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     const keys = s.ui.statusAggs;
     const pieces: string[] = [];
     for (const key of keys) {
-      const v = valueFor(key, stats);
-      if (v != null) pieces.push(`${labelFor(key)}: ${v}`);
+      const v = statusAggregateValue(key, stats);
+      if (v != null) pieces.push(`${labelFor(key)}: ${fmt(v)}`);
     }
     center.textContent = pieces.join(' · ');
 

@@ -1,4 +1,3 @@
-import { commentAt, setComment } from '../commands/comment.js';
 import { expandRangeWithMerges, mergeAnchorOf, stepWithMerge } from '../commands/merge.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
 import type { Addr } from '../engine/types.js';
@@ -103,8 +102,8 @@ export interface KeyboardDeps {
   /** Called for F5 / Ctrl+G — Excel's "Go To" shortcut. The chrome layer
    *  decides whether to focus the Name Box, open a dialog, etc. */
   onGoTo?: () => void;
-  /** Called for Shift+F2 — Excel's comment shortcut. Falls back to a window
-   *  prompt when not provided. */
+  /** Called for Shift+F2 — Excel's comment shortcut. The chrome layer is
+   *  expected to wire this to the comment dialog feature. */
   onEditComment?: (addr: Addr) => void;
   /** Called for Ctrl/Cmd+PageUp/PageDown — Excel sheet-tab navigation. */
   onSwitchSheet?: (delta: 1 | -1) => void;
@@ -175,14 +174,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     // Shift+F2 — edit comment on active cell (Excel parity).
     if (k === 'F2' && shift) {
       e.preventDefault();
-      const addr = a;
-      if (deps.onEditComment) {
-        deps.onEditComment(addr);
-      } else if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
-        const cur = commentAt(s, addr) ?? '';
-        const next = window.prompt('Comment:', cur);
-        if (next != null) setComment(store, addr, next, deps.wb);
-      }
+      deps.onEditComment?.(a);
       return;
     }
 

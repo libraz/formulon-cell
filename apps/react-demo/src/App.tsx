@@ -38,7 +38,7 @@ const UI = {
     pageSetup: 'Page Setup',
     close: 'Close',
     backstageTitle: 'Book1',
-    backstageSub: 'React workbook · Excel 365 layout mode',
+    backstageSub: 'React workbook · full spreadsheet layout',
     openTitle: 'Open',
     openDesc: 'Load an .xlsx or .xlsm workbook from this device.',
     saveCopy: 'Save a Copy',
@@ -65,7 +65,7 @@ const UI = {
     pageSetup: 'ページ設定',
     close: '閉じる',
     backstageTitle: 'Book1',
-    backstageSub: 'React ブック · Excel 365 レイアウト',
+    backstageSub: 'React ブック · スプレッドシート レイアウト',
     openTitle: '開く',
     openDesc: '.xlsx または .xlsm ブックをこのデバイスから読み込みます。',
     saveCopy: 'コピーを保存',
@@ -80,11 +80,11 @@ const UI = {
   },
 } as const;
 
-type PresetKey = 'minimal' | 'standard' | 'excel';
+type PresetKey = 'minimal' | 'standard' | 'full';
 const PRESETS: { value: PresetKey; label: string; hint: string }[] = [
-  { value: 'minimal', label: 'Minimal', hint: 'grid + formula bar only' },
-  { value: 'standard', label: 'Standard', hint: 'menus, find/replace, painter' },
-  { value: 'excel', label: 'Excel', hint: 'full Excel 365 chrome' },
+  { value: 'minimal', label: 'Minimal', hint: 'bare spreadsheet chrome' },
+  { value: 'standard', label: 'Standard', hint: 'lightweight editing chrome' },
+  { value: 'full', label: 'Full', hint: 'complete spreadsheet chrome' },
 ];
 
 // Feature flags grouped semantically for the panel. Order matches the
@@ -94,10 +94,14 @@ const FEATURE_GROUPS: { title: string; features: { id: FeatureId; label: string 
     title: 'Chrome',
     features: [
       { id: 'formulaBar', label: 'Formula bar' },
+      { id: 'viewToolbar', label: 'View toolbar' },
       { id: 'sheetTabs', label: 'Sheet tabs' },
       { id: 'statusBar', label: 'Status bar' },
+      { id: 'workbookObjects', label: 'Workbook objects' },
       { id: 'contextMenu', label: 'Context menu' },
+      { id: 'charts', label: 'Charts' },
       { id: 'watchWindow', label: 'Watch window' },
+      { id: 'slicer', label: 'Slicer' },
     ],
   },
   {
@@ -105,6 +109,7 @@ const FEATURE_GROUPS: { title: string; features: { id: FeatureId; label: string 
     features: [
       { id: 'clipboard', label: 'Clipboard' },
       { id: 'pasteSpecial', label: 'Paste special' },
+      { id: 'quickAnalysis', label: 'Quick Analysis' },
       { id: 'formatPainter', label: 'Format painter' },
       { id: 'autocomplete', label: 'Autocomplete' },
       { id: 'shortcuts', label: 'Shortcuts' },
@@ -115,8 +120,11 @@ const FEATURE_GROUPS: { title: string; features: { id: FeatureId; label: string 
     title: 'Dialogs & overlays',
     features: [
       { id: 'findReplace', label: 'Find & replace' },
+      { id: 'gotoSpecial', label: 'Go To Special' },
       { id: 'formatDialog', label: 'Format dialog' },
       { id: 'fxDialog', label: 'Function dialog' },
+      { id: 'pageSetup', label: 'Page setup' },
+      { id: 'iterative', label: 'Iterative calc' },
       { id: 'conditional', label: 'Conditional formatting' },
       { id: 'namedRanges', label: 'Named ranges' },
       { id: 'hyperlink', label: 'Hyperlink' },
@@ -234,7 +242,7 @@ const seed = (wb: WorkbookHandle): void => {
 };
 
 // Combine a preset's flags with explicit overrides. Overrides win — that
-// way the user can pick "Excel" then individually disable e.g. context
+// way the user can pick "Full" then individually disable e.g. context
 // menu without losing the rest of the preset.
 const composeFeatures = (preset: PresetKey, overrides: FeatureFlags): FeatureFlags => ({
   ...presets[preset](),
@@ -249,7 +257,7 @@ export const App = (): ReactElement => {
   const [log, setLog] = useState<ChangeLogEntry[]>([]);
   const [formatters, setFormatters] = useState({ uppercase: true, arrows: true });
   const [probe, setProbe] = useState<{ name: string; result: string } | null>(null);
-  const [preset, setPreset] = useState<PresetKey>('excel');
+  const [preset, setPreset] = useState<PresetKey>('full');
   const [overrides, setOverrides] = useState<FeatureFlags>({});
   const [showRibbon, setShowRibbon] = useState(true);
   const [showPanel, setShowPanel] = useState(false);
@@ -369,9 +377,9 @@ export const App = (): ReactElement => {
       // Compute the next override map. If toggling back to the preset's
       // default, drop the override so the preset's value wins.
       const presetFlags = presets[preset]();
-      const presetDefault =
-        id === 'watchWindow' ? presetFlags[id] === true : presetFlags[id] !== false;
-      const currentVal = id === 'watchWindow' ? features[id] === true : features[id] !== false;
+      const defaultOff = id === 'watchWindow' || id === 'slicer';
+      const presetDefault = defaultOff ? presetFlags[id] === true : presetFlags[id] !== false;
+      const currentVal = defaultOff ? features[id] === true : features[id] !== false;
       const nextVal = !currentVal;
       const nextOverrides = { ...overrides };
       if (nextVal === presetDefault) {
@@ -855,9 +863,9 @@ export const App = (): ReactElement => {
                 <h3 className="demo__feat-title">{group.title}</h3>
                 <div className="demo__feat-grid">
                   {group.features.map((f) => {
-                    // `watchWindow` ships default-off; everything else is opt-out.
-                    const enabled =
-                      f.id === 'watchWindow' ? features[f.id] === true : features[f.id] !== false;
+                    // `watchWindow` and `slicer` ship default-off; everything else is opt-out.
+                    const defaultOff = f.id === 'watchWindow' || f.id === 'slicer';
+                    const enabled = defaultOff ? features[f.id] === true : features[f.id] !== false;
                     return (
                       <label key={f.id} className={`demo__feat${enabled ? ' demo__feat--on' : ''}`}>
                         <input
@@ -876,7 +884,7 @@ export const App = (): ReactElement => {
                         checked={showRibbon}
                         onChange={(e) => setShowRibbon(e.target.checked)}
                       />
-                      <span>Excel ribbon</span>
+                      <span>Spreadsheet ribbon</span>
                     </label>
                   ) : null}
                 </div>

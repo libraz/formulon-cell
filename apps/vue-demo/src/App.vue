@@ -24,11 +24,11 @@ const LOCALES = [
   { value: 'ja', label: 'JA' },
 ];
 
-type PresetKey = 'minimal' | 'standard' | 'excel';
+type PresetKey = 'minimal' | 'standard' | 'full';
 const PRESETS: { value: PresetKey; label: string; hint: string }[] = [
-  { value: 'minimal', label: 'Minimal', hint: 'grid + formula bar only' },
-  { value: 'standard', label: 'Standard', hint: 'menus, find/replace, painter' },
-  { value: 'excel', label: 'Excel', hint: 'full Excel 365 chrome' },
+  { value: 'minimal', label: 'Minimal', hint: 'bare spreadsheet chrome' },
+  { value: 'standard', label: 'Standard', hint: 'lightweight editing chrome' },
+  { value: 'full', label: 'Full', hint: 'complete spreadsheet chrome' },
 ];
 
 const FEATURE_GROUPS: { title: string; features: { id: FeatureId; label: string }[] }[] = [
@@ -36,10 +36,14 @@ const FEATURE_GROUPS: { title: string; features: { id: FeatureId; label: string 
     title: 'Chrome',
     features: [
       { id: 'formulaBar', label: 'Formula bar' },
+      { id: 'viewToolbar', label: 'View toolbar' },
       { id: 'sheetTabs', label: 'Sheet tabs' },
       { id: 'statusBar', label: 'Status bar' },
+      { id: 'workbookObjects', label: 'Workbook objects' },
       { id: 'contextMenu', label: 'Context menu' },
+      { id: 'charts', label: 'Charts' },
       { id: 'watchWindow', label: 'Watch window' },
+      { id: 'slicer', label: 'Slicer' },
     ],
   },
   {
@@ -47,6 +51,7 @@ const FEATURE_GROUPS: { title: string; features: { id: FeatureId; label: string 
     features: [
       { id: 'clipboard', label: 'Clipboard' },
       { id: 'pasteSpecial', label: 'Paste special' },
+      { id: 'quickAnalysis', label: 'Quick Analysis' },
       { id: 'formatPainter', label: 'Format painter' },
       { id: 'autocomplete', label: 'Autocomplete' },
       { id: 'shortcuts', label: 'Shortcuts' },
@@ -57,8 +62,11 @@ const FEATURE_GROUPS: { title: string; features: { id: FeatureId; label: string 
     title: 'Dialogs & overlays',
     features: [
       { id: 'findReplace', label: 'Find & replace' },
+      { id: 'gotoSpecial', label: 'Go To Special' },
       { id: 'formatDialog', label: 'Format dialog' },
       { id: 'fxDialog', label: 'Function dialog' },
+      { id: 'pageSetup', label: 'Page setup' },
+      { id: 'iterative', label: 'Iterative calc' },
       { id: 'conditional', label: 'Conditional formatting' },
       { id: 'namedRanges', label: 'Named ranges' },
       { id: 'hyperlink', label: 'Hyperlink' },
@@ -182,7 +190,7 @@ const log = ref<ChangeLogEntry[]>([]);
 const formatters = ref({ uppercase: true, arrows: true });
 const probe = ref<{ name: string; result: string } | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
-const preset = ref<PresetKey>('excel');
+const preset = ref<PresetKey>('full');
 const overrides = ref<FeatureFlags>({});
 const showRibbon = ref(true);
 
@@ -289,8 +297,8 @@ const onPresetChange = (next: PresetKey): void => {
 
 const onFeatureToggle = (id: FeatureId): void => {
   const presetFlags = presets[preset.value]();
-  const presetDefault =
-    id === 'watchWindow' ? presetFlags[id] === true : presetFlags[id] !== false;
+  const defaultOff = id === 'watchWindow' || id === 'slicer';
+  const presetDefault = defaultOff ? presetFlags[id] === true : presetFlags[id] !== false;
   const currentVal = isFeatureOn(id);
   const nextVal = !currentVal;
   const nextOverrides: FeatureFlags = { ...overrides.value };
@@ -302,9 +310,11 @@ const onFeatureToggle = (id: FeatureId): void => {
   overrides.value = nextOverrides;
 };
 
-// `watchWindow` ships default-off; everything else is opt-out.
+// `watchWindow` and `slicer` ship default-off; everything else is opt-out.
 const isFeatureOn = (id: FeatureId): boolean =>
-  id === 'watchWindow' ? features.value[id] === true : features.value[id] !== false;
+  id === 'watchWindow' || id === 'slicer'
+    ? features.value[id] === true
+    : features.value[id] !== false;
 
 onUnmounted(() => {
   // The Spreadsheet component disposes itself; nothing extra to clean up.
@@ -418,7 +428,7 @@ onUnmounted(() => {
                 :class="['demo__feat', { 'demo__feat--on': showRibbon }]"
               >
                 <input type="checkbox" v-model="showRibbon" />
-                <span>Excel ribbon</span>
+                <span>Spreadsheet ribbon</span>
               </label>
             </div>
           </div>

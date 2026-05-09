@@ -18,6 +18,8 @@ interface FakeOpts {
   cellFormatting?: boolean;
   /** Pre-populated cells the engine reports via cells(). */
   cells?: Addr[];
+  /** Projected PivotTable cells reported separately from physical cells. */
+  pivotCells?: Array<{ addr: Addr; kind: number; numberFormat: string }>;
   /** XF index per cell, keyed by addrKey. */
   xfIndices?: Map<string, number>;
   /** XF table — index → record. */
@@ -66,6 +68,17 @@ const makeFake = (opts: FakeOpts = {}): { wb: WorkbookHandle; log: FakeLog } => 
     *cells(_sheet: number) {
       for (const a of opts.cells ?? []) {
         yield { addr: a, value: { kind: 'blank' as const }, formula: null };
+      }
+    },
+    *pivotCells(_sheet: number) {
+      for (const c of opts.pivotCells ?? []) {
+        yield {
+          addr: c.addr,
+          value: { kind: 'text' as const, value: 'pivot' },
+          formula: null,
+          kind: c.kind,
+          numberFormat: c.numberFormat,
+        };
       }
     },
     getCellXfIndex(_sheet: number, row: number, col: number): number | null {
@@ -302,5 +315,42 @@ describe('hydrateCellFormatsFromEngine', () => {
     const store = createSpreadsheetStore();
     hydrateCellFormatsFromEngine(wb, store, 0);
     expect(store.getState().format.formats.size).toBe(0);
+  });
+
+  it('hydrates PivotTable projection formats without probing physical xf rows', () => {
+    const { wb } = makeFake({
+      cells: [{ sheet: 0, row: 0, col: 0 }],
+      pivotCells: [
+        { addr: { sheet: 0, row: 2, col: 0 }, kind: 0, numberFormat: '' },
+        { addr: { sheet: 0, row: 3, col: 1 }, kind: 3, numberFormat: '0.00%' },
+        { addr: { sheet: 0, row: 4, col: 1 }, kind: 6, numberFormat: '#,##0' },
+      ],
+    });
+    const store = createSpreadsheetStore();
+    hydrateCellFormatsFromEngine(wb, store, 0);
+
+    const header = store.getState().format.formats.get(addrKey({ sheet: 0, row: 2, col: 0 }));
+    const data = store.getState().format.formats.get(addrKey({ sheet: 0, row: 3, col: 1 }));
+    const grandTotal = store.getState().format.formats.get(addrKey({ sheet: 0, row: 4, col: 1 }));
+    expect(header).toMatchObject({
+      bold: true,
+      color: '#1f4e79',
+      fill: '#d9eaf7',
+      borders: {
+        top: { style: 'thin', color: '#9dc3e6' },
+        bottom: { style: 'thin', color: '#9dc3e6' },
+      },
+    });
+    expect(data?.numFmt).toEqual({ kind: 'percent', decimals: 2 });
+    expect(grandTotal).toMatchObject({
+      bold: true,
+      color: '#1f4e79',
+      fill: '#bdd7ee',
+      borders: {
+        top: { style: 'medium', color: '#5b9bd5' },
+        bottom: { style: 'medium', color: '#5b9bd5' },
+      },
+      numFmt: { kind: 'fixed', decimals: 0, thousands: true },
+    });
   });
 });

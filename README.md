@@ -1,7 +1,7 @@
 # formulon-cell
 
 Spreadsheet UI library for the [formulon](https://github.com/libraz/formulon)
-WASM calc engine. Excel 365-flavored chrome, canvas-rendered grid,
+WASM calc engine. Desktop-spreadsheet-style chrome, canvas-rendered grid,
 extension-based feature composition, runtime i18n.
 
 ## Packages
@@ -16,7 +16,7 @@ extension-based feature composition, runtime i18n.
 
 | app | run | what it shows |
 |-----|-----|---------------|
-| `apps/playground`  | `yarn dev`        | Vanilla DOM playground (full Excel keymap) |
+| `apps/playground`  | `yarn dev`        | Vanilla DOM playground (spreadsheet keymap) |
 | `apps/react-demo`  | `yarn dev:react`  | Same surface as `<Spreadsheet>` React component |
 | `apps/vue-demo`    | `yarn dev:vue`    | Same surface as `<Spreadsheet>` Vue component |
 

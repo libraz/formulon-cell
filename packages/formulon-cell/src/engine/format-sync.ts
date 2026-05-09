@@ -23,7 +23,12 @@ export function hydrateCommentsAndHyperlinksFromEngine(
   const updates: Array<{ key: string; patch: Partial<CellFormat> }> = [];
 
   if (wb.capabilities.comments) {
-    for (const c of wb.cells(sheet)) {
+    const cells =
+      typeof (wb as WorkbookHandle & { physicalCells?: WorkbookHandle['cells'] }).physicalCells ===
+      'function'
+        ? wb.physicalCells(sheet)
+        : wb.cells(sheet);
+    for (const c of cells) {
       const e = wb.getComment(sheet, c.addr.row, c.addr.col);
       if (e && e.text.length > 0) {
         updates.push({ key: addrKey(c.addr), patch: { comment: e.text } });

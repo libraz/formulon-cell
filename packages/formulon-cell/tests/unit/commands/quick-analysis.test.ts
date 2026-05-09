@@ -2,9 +2,15 @@ import { describe, expect, it } from 'vitest';
 import type { SelectionStats } from '../../../src/commands/aggregate.js';
 import {
   buildQuickAnalysisActions,
+  enabledQuickAnalysisActions,
+  executeQuickAnalysisAction,
   groupQuickAnalysisActions,
+  isQuickAnalysisActionEnabled,
+  quickAnalysisActionById,
 } from '../../../src/commands/quick-analysis.js';
 import type { Range } from '../../../src/engine/types.js';
+import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const mkStats = (overrides: Partial<SelectionStats> = {}): SelectionStats => ({
   cells: 1,
@@ -100,13 +106,56 @@ describe('buildQuickAnalysisActions', () => {
     expect(findAction('tables-as-table', multi)?.disabled).toBe(false);
   });
 
-  it('keeps charts + pivot stubs disabled (engine integration pending)', () => {
+  it('enables session charts for multi-cell numeric ranges and pivot only when the host can open it', () => {
     const actions = buildQuickAnalysisActions({
       range: range(0, 0, 5, 5),
       stats: mkStats({ numericCount: 25 }),
+      chartAvailable: true,
     });
-    expect(findAction('charts-placeholder', actions)?.disabled).toBe(true);
+    expect(findAction('charts-column', actions)?.disabled).toBe(false);
+    expect(findAction('charts-line', actions)?.disabled).toBe(false);
     expect(findAction('tables-pivot', actions)?.disabled).toBe(true);
+
+    const withPivot = buildQuickAnalysisActions({
+      range: range(0, 0, 5, 5),
+      stats: mkStats({ numericCount: 25 }),
+      pivotTableAvailable: true,
+      chartAvailable: true,
+    });
+    expect(findAction('tables-pivot', withPivot)?.disabled).toBe(false);
+  });
+
+  it('disables chart actions when the host chart renderer is unavailable', () => {
+    const actions = buildQuickAnalysisActions({
+      range: range(0, 0, 5, 5),
+      stats: mkStats({ numericCount: 25 }),
+      chartAvailable: false,
+    });
+    expect(findAction('charts-column', actions)?.disabled).toBe(true);
+    expect(findAction('charts-line', actions)?.disabled).toBe(true);
+  });
+
+  it('exposes action lookup and enabled-state helpers for custom hosts', () => {
+    const input = {
+      range: range(0, 0, 3, 3),
+      stats: mkStats({ numericCount: 8 }),
+      chartAvailable: true,
+    };
+    const actions = buildQuickAnalysisActions(input);
+
+    expect(quickAnalysisActionById(actions, 'charts-column')).toMatchObject({
+      id: 'charts-column',
+      disabled: false,
+    });
+    expect(quickAnalysisActionById(actions, 'tables-pivot')?.disabled).toBe(true);
+    expect(isQuickAnalysisActionEnabled(input, 'charts-column')).toBe(true);
+    expect(isQuickAnalysisActionEnabled(input, 'tables-pivot')).toBe(false);
+    expect(enabledQuickAnalysisActions(input).some((action) => action.id === 'format-clear')).toBe(
+      true,
+    );
+    expect(enabledQuickAnalysisActions(input).some((action) => action.id === 'tables-pivot')).toBe(
+      false,
+    );
   });
 });
 
@@ -124,5 +173,221 @@ describe('groupQuickAnalysisActions', () => {
     expect(grouped.charts.length).toBeGreaterThan(0);
     // The first formatting action is data-bar (canonical order).
     expect(grouped.formatting[0]?.id).toBe('format-data-bar');
+  });
+});
+
+describe('executeQuickAnalysisAction', () => {
+  const makeWb = (): {
+    wb: WorkbookHandle;
+    formulas: Array<{ addr: { sheet: number; row: number; col: number }; formula: string }>;
+  } => {
+    const formulas: Array<{ addr: { sheet: number; row: number; col: number }; formula: string }> =
+      [];
+    return {
+      wb: {
+        setFormula(addr: { sheet: number; row: number; col: number }, formula: string) {
+          formulas.push({ addr, formula });
+          return true;
+        },
+      } as unknown as WorkbookHandle,
+      formulas,
+    };
+  };
+
+  it('adds conditional formatting rules for enabled formatting actions', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeWb();
+    const result = executeQuickAnalysisAction({
+      store,
+      wb,
+      actionId: 'format-data-bar',
+      range: range(0, 0, 4, 0),
+      stats: mkStats({ numericCount: 5 }),
+    });
+
+    expect(result).toEqual({ ok: true, kind: 'conditional-format', count: 1 });
+    expect(store.getState().conditional.rules).toEqual([
+      {
+        kind: 'data-bar',
+        range: range(0, 0, 4, 0),
+        color: '#5b9bd5',
+        showValue: true,
+      },
+    ]);
+  });
+
+  it('writes row total formulas below the selected range', () => {
+    const store = createSpreadsheetStore();
+    const { wb, formulas } = makeWb();
+    const result = executeQuickAnalysisAction({
+      store,
+      wb,
+      actionId: 'totals-sum-row',
+      range: range(1, 0, 3, 1),
+      stats: mkStats({ numericCount: 6 }),
+    });
+
+    expect(result).toEqual({ ok: true, kind: 'formula', count: 2 });
+    expect(formulas).toEqual([
+      { addr: { sheet: 0, row: 4, col: 0 }, formula: '=SUM(A2:A4)' },
+      { addr: { sheet: 0, row: 4, col: 1 }, formula: '=SUM(B2:B4)' },
+    ]);
+  });
+
+  it('writes column total formulas to the right of the selected range', () => {
+    const store = createSpreadsheetStore();
+    const { wb, formulas } = makeWb();
+    const result = executeQuickAnalysisAction({
+      store,
+      wb,
+      actionId: 'totals-sum-col',
+      range: range(0, 1, 1, 3),
+      stats: mkStats({ numericCount: 6 }),
+    });
+
+    expect(result).toEqual({ ok: true, kind: 'formula', count: 2 });
+    expect(formulas).toEqual([
+      { addr: { sheet: 0, row: 0, col: 4 }, formula: '=SUM(B1:D1)' },
+      { addr: { sheet: 0, row: 1, col: 4 }, formula: '=SUM(B2:D2)' },
+    ]);
+  });
+
+  it('adds a sparkline in the adjacent cell for horizontal ranges', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeWb();
+    const result = executeQuickAnalysisAction({
+      store,
+      wb,
+      actionId: 'sparkline-column',
+      range: range(2, 0, 2, 3),
+      stats: mkStats({ numericCount: 4 }),
+    });
+
+    expect(result).toEqual({ ok: true, kind: 'sparkline', count: 1 });
+    expect(store.getState().sparkline.sparklines.get('0:2:4')).toEqual({
+      kind: 'column',
+      source: 'A3:D3',
+      showNegative: true,
+    });
+  });
+
+  it('adds a session chart overlay for chart actions', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeWb();
+    const r = range(0, 0, 4, 2);
+    const result = executeQuickAnalysisAction({
+      store,
+      wb,
+      actionId: 'charts-line',
+      range: r,
+      stats: mkStats({ numericCount: 10 }),
+      chartAvailable: true,
+    });
+
+    expect(result).toEqual({ ok: true, kind: 'chart', count: 1 });
+    expect(store.getState().charts.charts).toEqual([
+      expect.objectContaining({
+        id: 'qa-chart-0-0-0-4-2-line',
+        kind: 'line',
+        source: r,
+      }),
+    ]);
+    expect(store.getState().charts.charts[0]?.title).toBeUndefined();
+  });
+
+  it('adds a session table overlay for Format As Table', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeWb();
+    const r = range(0, 0, 4, 2);
+    const result = executeQuickAnalysisAction({
+      store,
+      wb,
+      actionId: 'tables-as-table',
+      range: r,
+      stats: mkStats({ numericCount: 6 }),
+    });
+
+    expect(result).toEqual({ ok: true, kind: 'table', count: 1 });
+    expect(store.getState().tables.tables).toEqual([
+      {
+        id: 'qa-table-0-0-0-4-2',
+        source: 'session',
+        range: r,
+        style: 'medium',
+        showHeader: true,
+        showTotal: false,
+        banded: true,
+      },
+    ]);
+  });
+
+  it('clears static formats and Quick Analysis overlays in the selected range', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeWb();
+    const r = range(0, 0, 4, 2);
+    mutators.setRange(store, r);
+    mutators.setRangeFormat(store, r, { fill: '#ffff00' });
+    mutators.addConditionalRule(store, {
+      kind: 'data-bar',
+      range: r,
+      color: '#5b9bd5',
+      showValue: true,
+    });
+    mutators.setSparkline(store, { sheet: 0, row: 1, col: 1 }, { kind: 'line', source: 'A1:C1' });
+    mutators.upsertChart(store, {
+      id: 'chart',
+      kind: 'column',
+      source: r,
+      title: 'Column chart',
+    });
+    mutators.upsertTableOverlay(store, {
+      id: 'tbl',
+      source: 'session',
+      range: r,
+      style: 'medium',
+      showHeader: true,
+      showTotal: false,
+      banded: true,
+    });
+
+    const result = executeQuickAnalysisAction({
+      store,
+      wb,
+      actionId: 'format-clear',
+      range: r,
+      stats: mkStats({ numericCount: 6 }),
+    });
+
+    expect(result).toEqual({ ok: true, kind: 'clear-format', count: 1 });
+    expect(store.getState().format.formats.size).toBe(0);
+    expect(store.getState().conditional.rules).toHaveLength(0);
+    expect(store.getState().sparkline.sparklines.size).toBe(0);
+    expect(store.getState().charts.charts).toHaveLength(0);
+    expect(store.getState().tables.tables).toHaveLength(0);
+  });
+
+  it('does not execute disabled or unsupported actions', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeWb();
+
+    expect(
+      executeQuickAnalysisAction({
+        store,
+        wb,
+        actionId: 'sparkline-line',
+        range: range(0, 0, 3, 0),
+        stats: mkStats({ numericCount: 4 }),
+      }),
+    ).toEqual({ ok: false, reason: 'disabled' });
+    expect(
+      executeQuickAnalysisAction({
+        store,
+        wb,
+        actionId: 'charts-column',
+        range: range(0, 0, 0, 0),
+        stats: mkStats({ numericCount: 1 }),
+        chartAvailable: true,
+      }),
+    ).toEqual({ ok: false, reason: 'disabled' });
   });
 });

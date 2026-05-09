@@ -644,7 +644,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   borderVisualStage.className = 'fc-fmtdlg__border-stage';
   const borderVisualPreview = document.createElement('div');
   borderVisualPreview.className = 'fc-fmtdlg__border-preview';
-  borderVisualPreview.textContent = 'Text';
+  borderVisualPreview.textContent = t.previewText;
   const visualSideButtons = new Map<SideKey, HTMLButtonElement[]>();
   const makeVisualSideButton = (
     key: SideKey,

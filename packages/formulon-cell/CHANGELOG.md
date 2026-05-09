@@ -15,7 +15,7 @@ Initial public release.
   dialog, format painter, conditional formatting, named ranges, hyperlink
   dialog, paste-special, validation, autocomplete, hover comments,
   clipboard, wheel scroll, keymap.
-- `presets.minimal() / .standard() / .excel()` for one-line setups.
+- `presets.minimal() / .standard() / .full()` for one-line setups.
 - Runtime i18n via `instance.i18n.setLocale / extend / register`. `ja` and
   `en` ship in the box; new locales can be registered at runtime.
 - `paper` / `ink` themes wired through `data-fc-theme` attribute and CSS

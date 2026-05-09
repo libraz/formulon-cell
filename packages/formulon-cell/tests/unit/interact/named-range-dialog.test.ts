@@ -133,6 +133,19 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     handle.detach();
   });
 
+  it('rejects empty reference with inline error and no engine call', () => {
+    const { wb, calls } = makeMutableWb();
+    const handle = attachNamedRangeDialog({ host, wb });
+    handle.open();
+    const inputs = Array.from(host.querySelectorAll<HTMLInputElement>('.fc-namedlg__input'));
+    const [nameField] = inputs;
+    if (nameField) nameField.value = 'TaxRate';
+    host.querySelector<HTMLFormElement>('.fc-namedlg__form')?.requestSubmit();
+    expect(calls).toEqual([]);
+    expect(host.querySelector<HTMLElement>('.fc-namedlg__error')?.hidden).toBe(false);
+    handle.detach();
+  });
+
   it('Delete button passes empty formula (engine convention) and refreshes', () => {
     const { wb, calls, registry } = makeMutableWb();
     registry.set('TaxRate', '=Sheet1!$A$1');

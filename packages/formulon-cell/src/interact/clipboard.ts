@@ -6,7 +6,7 @@ import { type ClipboardSnapshot, captureSnapshot } from '../commands/clipboard/s
 import { parseTSV } from '../commands/clipboard/tsv.js';
 import { applyUnmerge } from '../commands/merge.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { SpreadsheetStore } from '../store/store.js';
+import { mutators, type SpreadsheetStore } from '../store/store.js';
 
 export interface ClipboardDeps {
   host: HTMLElement;
@@ -42,6 +42,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     e.clipboardData.setData('text/plain', r.tsv);
     e.clipboardData.setData('text/html', encodeHtml(s, r.range));
     snapshot = captureSnapshot(s, r.range);
+    mutators.setCopyRange(store, r.range);
     e.preventDefault();
   };
 
@@ -53,6 +54,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     if (!r || !e.clipboardData) return;
     e.clipboardData.setData('text/plain', r.tsv);
     e.clipboardData.setData('text/html', encodeHtml(s, r.range));
+    mutators.setCopyRange(store, r.range);
     e.preventDefault();
     deps.onAfterCommit();
   };
@@ -79,7 +81,10 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     }
     const r = pasteTSV(s, wb, text);
     e.preventDefault();
-    if (r) deps.onAfterCommit();
+    if (r) {
+      mutators.setCopyRange(store, null);
+      deps.onAfterCommit();
+    }
   };
 
   host.addEventListener('copy', onCopy);

@@ -93,6 +93,7 @@ describe('attachClipboard', () => {
     expect(handle.getSnapshot()).not.toBeNull();
     expect(handle.getSnapshot()?.rows).toBe(1);
     expect(handle.getSnapshot()?.cols).toBe(2);
+    expect(store.getState().ui.copyRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
     expect(onAfterCommit).not.toHaveBeenCalled();
     handle.detach();
   });
@@ -125,6 +126,7 @@ describe('attachClipboard', () => {
     expect(transfer.getData('text/plain')).toBe('5\t6');
     expect(event.defaultPrevented).toBe(true);
     expect(handle.getSnapshot()).not.toBeNull();
+    expect(store.getState().ui.copyRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
     wb.recalc();
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
     expect(wb.getValue({ sheet: 0, row: 0, col: 1 }).kind).toBe('blank');
@@ -156,6 +158,7 @@ describe('attachClipboard', () => {
     wb.recalc();
     expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'text', value: 'foo' });
     expect(wb.getValue({ sheet: 0, row: 1, col: 2 })).toEqual({ kind: 'number', value: 42 });
+    expect(store.getState().ui.copyRange).toBeNull();
     expect(onAfterCommit).toHaveBeenCalledTimes(1);
     handle.detach();
   });

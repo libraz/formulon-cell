@@ -26,6 +26,7 @@ export type ThemeName = 'paper' | 'ink' | (string & {});
 export interface ExtensionContext {
   readonly host: HTMLElement;
   readonly formulabar: HTMLElement;
+  readonly viewbar: HTMLElement;
   readonly grid: HTMLElement;
   readonly statusbar: HTMLElement;
   readonly canvas: HTMLCanvasElement;
@@ -68,7 +69,7 @@ export interface ExtensionHandle {
 }
 
 /** A composable feature unit. Returned from factory functions like
- *  `findReplace()`, `statusBar()`, `keymap.excel`, etc. */
+ *  `findReplace()`, `statusBar()`, keymap helpers, etc. */
 export interface Extension {
   /** Stable identifier — used as the registry key + `instance.features`
    *  property name. Each id should appear at most once in a mount. */
@@ -107,7 +108,7 @@ export const sortByPriority = (exts: Extension[]): Extension[] => {
 };
 
 /** Drop any extension whose id is later in the list — last-wins. Useful
- *  for `presets.excel().concat([myCustomFindReplace()])` overrides. */
+ *  for `presets.full().concat([myCustomFindReplace()])` overrides. */
 export const dedupeById = (exts: Extension[]): Extension[] => {
   const seen = new Set<string>();
   const out: Extension[] = [];

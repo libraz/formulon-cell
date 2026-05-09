@@ -23,7 +23,7 @@ const ready = (inst: SpreadsheetInstance) => {
 
 <template>
   <Spreadsheet
-    :features="presets.excel()"
+    :features="presets.full()"
     locale="ja"
     style="width: 100%; height: 100vh"
     @ready="ready"
@@ -34,13 +34,28 @@ const ready = (inst: SpreadsheetInstance) => {
 ## Composables
 
 ```ts
-import { ref } from 'vue';
-import { useI18n, useSelection } from '@libraz/formulon-cell-vue';
+import { computed, ref } from 'vue';
+import { type SpreadsheetExposed, useI18n, useSelection } from '@libraz/formulon-cell-vue';
 
-const sheetRef = ref<{ instance: any } | null>(null);
-const sel = useSelection(computed(() => sheetRef.value?.instance ?? null));
-const { locale, strings } = useI18n(computed(() => sheetRef.value?.instance ?? null));
+const sheetRef = ref<SpreadsheetExposed | null>(null);
+const instance = computed(() => sheetRef.value?.instance.value ?? null);
+const sel = useSelection(instance);
+const { locale, strings } = useI18n(instance);
 ```
+
+## Core helpers
+
+The package re-exports the core command helpers and types, including
+`createSessionChart`, `saveSheetView`, `activateSheetView`,
+`listDefinedNames`, and `upsertDefinedName`, so Vue apps can type their host
+chrome from one import.
+
+## Runtime prop updates
+
+`theme`, `locale`, `strings`, `workbook`, `features`, and `extensions` update
+the running spreadsheet through the core imperative API. The component does
+not re-mount the canvas when these props change, so selection, focus, and
+host event subscriptions stay intact.
 
 ## License
 

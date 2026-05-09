@@ -1,14 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import {
+  clearTable,
+  clearTablesInRange,
   defaultTableOverlay,
+  engineTableOverlays,
+  formatAsTable,
   isBandedRow,
   isHeaderRow,
   isTotalRow,
+  listTableOverlays,
   removeTable,
+  sessionTableOverlays,
   type TableOverlay,
   tableForCell,
+  tableOverlayAt,
+  tableOverlayById,
+  updateTableOverlay,
   upsertTable,
 } from '../../../src/commands/format-as-table.js';
+import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const range = (r0: number, c0: number, r1: number, c1: number) =>
   ({ sheet: 0, r0, c0, r1, c1 }) as const;
@@ -26,6 +36,7 @@ describe('defaultTableOverlay', () => {
 describe('row classification', () => {
   const t: TableOverlay = {
     id: 'tbl1',
+    source: 'session',
     range: range(0, 0, 5, 3),
     style: 'medium',
     showHeader: true,
@@ -72,6 +83,7 @@ describe('row classification', () => {
 describe('tableForCell', () => {
   const t1: TableOverlay = {
     id: 'tbl1',
+    source: 'session',
     range: range(0, 0, 5, 3),
     style: 'medium',
     showHeader: true,
@@ -80,6 +92,7 @@ describe('tableForCell', () => {
   };
   const t2: TableOverlay = {
     id: 'tbl2',
+    source: 'session',
     range: { sheet: 1, r0: 0, c0: 0, r1: 1, c1: 1 },
     style: 'light',
     showHeader: true,
@@ -108,6 +121,7 @@ describe('tableForCell', () => {
 describe('upsertTable / removeTable', () => {
   const a: TableOverlay = {
     id: 'a',
+    source: 'session',
     range: range(0, 0, 1, 1),
     style: 'light',
     showHeader: true,
@@ -133,5 +147,91 @@ describe('upsertTable / removeTable', () => {
 
   it('removeTable strips the matching id', () => {
     expect(removeTable([a], 'a')).toEqual([]);
+  });
+});
+
+describe('formatAsTable command helpers', () => {
+  it('adds a session overlay to the store and returns the stored shape', () => {
+    const store = createSpreadsheetStore();
+    const overlay = formatAsTable(store, range(0, 0, 3, 2), {
+      id: 'sales',
+      style: 'dark',
+      showTotal: true,
+    });
+
+    expect(overlay).toEqual({
+      id: 'sales',
+      source: 'session',
+      range: range(0, 0, 3, 2),
+      style: 'dark',
+      showHeader: true,
+      showTotal: true,
+      banded: true,
+    });
+    expect(store.getState().tables.tables).toEqual([overlay]);
+  });
+
+  it('clearTable removes by id', () => {
+    const store = createSpreadsheetStore();
+    formatAsTable(store, range(0, 0, 3, 2), { id: 'sales' });
+    clearTable(store, 'sales');
+    expect(store.getState().tables.tables).toEqual([]);
+  });
+
+  it('clearTablesInRange removes intersecting overlays only', () => {
+    const store = createSpreadsheetStore();
+    const a = formatAsTable(store, range(0, 0, 3, 2), { id: 'a' });
+    const b = formatAsTable(store, { sheet: 0, r0: 10, c0: 0, r1: 12, c1: 2 }, { id: 'b' });
+    clearTablesInRange(store, range(1, 1, 1, 1));
+    expect(store.getState().tables.tables).toEqual([b]);
+    expect(store.getState().tables.tables).not.toContain(a);
+  });
+
+  it('lists and resolves table overlays for host chrome', () => {
+    const store = createSpreadsheetStore();
+    const session = formatAsTable(store, range(0, 0, 3, 2), { id: 'session' });
+    const engine: TableOverlay = {
+      id: 'engine',
+      source: 'engine',
+      range: { sheet: 0, r0: 8, c0: 0, r1: 10, c1: 2 },
+      style: 'medium',
+      showHeader: true,
+      showTotal: false,
+      banded: true,
+    };
+    mutators.replaceEngineTableOverlays(store, [engine]);
+    const state = store.getState();
+
+    expect(listTableOverlays(state)).toEqual([engine, session]);
+    expect(engineTableOverlays(state)).toEqual([engine]);
+    expect(sessionTableOverlays(state)).toEqual([session]);
+    expect(tableOverlayById(state, 'session')).toEqual(session);
+    expect(tableOverlayById(state, 'missing')).toBeNull();
+    expect(tableOverlayAt(state, 0, 8, 1)).toEqual(engine);
+  });
+
+  it('updates session overlays without mutating read-only engine overlays', () => {
+    const store = createSpreadsheetStore();
+    const session = formatAsTable(store, range(0, 0, 3, 2), { id: 'session' });
+    mutators.replaceEngineTableOverlays(store, [
+      {
+        ...session,
+        id: 'engine',
+        source: 'engine',
+        style: 'dark',
+      },
+    ]);
+
+    expect(updateTableOverlay(store, 'engine', { banded: false })).toBeNull();
+    const updated = updateTableOverlay(store, 'session', { style: 'light', showTotal: true });
+
+    expect(updated).toMatchObject({
+      id: 'session',
+      source: 'session',
+      style: 'light',
+      showTotal: true,
+    });
+    expect(tableOverlayById(store.getState(), 'engine')?.banded).toBe(true);
+    expect(updateTableOverlay(store, 'missing', { style: 'dark' })).toBeNull();
   });
 });

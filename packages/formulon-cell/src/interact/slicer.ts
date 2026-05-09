@@ -1,10 +1,15 @@
-import { applyFilter, clearFilter, distinctValues } from '../commands/filter.js';
 import { type History, recordSlicersChange } from '../commands/history.js';
-import { parseRangeRef } from '../engine/range-resolver.js';
-import type { Range } from '../engine/types.js';
+import {
+  createSlicer,
+  listSlicerValues,
+  recomputeSlicerFilters,
+  removeSlicer,
+  resolveSlicerSpec,
+  setSlicerSelected,
+} from '../commands/slicers.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { mutators, type SlicerSpec, type SpreadsheetStore } from '../store/store.js';
+import type { SlicerSpec, SpreadsheetStore } from '../store/store.js';
 
 export interface SlicerDeps {
   /** Element the floating panels attach to. Each panel is appended as a
@@ -41,93 +46,6 @@ export interface SlicerHandle {
   setStrings(next: Strings): void;
 }
 
-/** Lookup an Excel Table on the workbook by case-insensitive name. Falls
- *  back to display-name match so callers can use either the tab label or
- *  the OOXML name. */
-function findTable(
-  wb: WorkbookHandle,
-  tableName: string,
-): {
-  name: string;
-  displayName: string;
-  ref: string;
-  sheetIndex: number;
-  columns: string[];
-} | null {
-  const target = tableName.toLowerCase();
-  for (const t of wb.getTables()) {
-    if (t.name.toLowerCase() === target || t.displayName.toLowerCase() === target) return t;
-  }
-  return null;
-}
-
-/** Resolve a SlicerSpec to its (range, byCol) tuple. Returns null when the
- *  table or column has gone away (e.g. workbook swap). */
-function resolveSpec(wb: WorkbookHandle, spec: SlicerSpec): { range: Range; byCol: number } | null {
-  const table = findTable(wb, spec.tableName);
-  if (!table) return null;
-  const parsed = parseRangeRef(table.ref);
-  if (!parsed) return null;
-  const colIdx = table.columns.indexOf(spec.column);
-  if (colIdx < 0) return null;
-  return {
-    range: {
-      sheet: table.sheetIndex,
-      r0: parsed.r0,
-      c0: parsed.c0,
-      r1: parsed.r1,
-      c1: parsed.c1,
-    },
-    byCol: parsed.c0 + colIdx,
-  };
-}
-
-/** Recompute the autoFilter state for every active slicer. Each slicer
- *  contributes a value-set predicate against its column; v1 applies them
- *  sequentially so the last one wins (Excel's slicer semantics with a
- *  single connected table). Empty selection on a slicer means
- *  "include all" — that slicer doesn't constrain the column. */
-function recomputeFilters(
-  wb: WorkbookHandle,
-  store: SpreadsheetStore,
-  slicers: readonly SlicerSpec[],
-): void {
-  // Group slicers by their resolved table range; clear that range first so
-  //  toggling a chip widens the visible rows when appropriate.
-  const ranges: { range: Range; byCol: number; selected: readonly string[] }[] = [];
-  for (const sp of slicers) {
-    const r = resolveSpec(wb, sp);
-    if (!r) continue;
-    ranges.push({ range: r.range, byCol: r.byCol, selected: sp.selected });
-  }
-  const cleared = new Set<string>();
-  for (const entry of ranges) {
-    const key = rangeKey(entry.range);
-    if (cleared.has(key)) continue;
-    clearFilter(store.getState(), store, entry.range);
-    cleared.add(key);
-  }
-  for (const entry of ranges) {
-    if (entry.selected.length === 0) continue;
-    const want = new Set(entry.selected);
-    applyFilter(store.getState(), store, entry.range, entry.byCol, (cell) => {
-      const key = cellToKey(cell?.value);
-      return want.has(key);
-    });
-  }
-}
-
-const rangeKey = (r: Range): string => `${r.sheet}:${r.r0}:${r.c0}:${r.r1}:${r.c1}`;
-
-const cellToKey = (v: unknown): string => {
-  if (!v || typeof v !== 'object') return '';
-  const cv = v as { kind: string; value?: unknown };
-  if (cv.kind === 'number') return String(cv.value);
-  if (cv.kind === 'text') return String(cv.value ?? '');
-  if (cv.kind === 'bool') return cv.value ? 'TRUE' : 'FALSE';
-  return '';
-};
-
 /** Default offset (px) for fresh panels, applied when the spec doesn't
  *  carry explicit `x`/`y` coordinates. Matches `.fc-watch` panel chrome. */
 const DEFAULT_OFFSET_X = 16;
@@ -153,14 +71,6 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
   const { host, store, getWb, history } = deps;
   let strings = deps.strings ?? defaultStrings;
   const panels = new Map<string, PanelEntry>();
-
-  let idCounter = 0;
-  const nextId = (): string => {
-    idCounter += 1;
-    // Combine a monotonic counter with a short random suffix so concurrent
-    //  attaches across mounts don't collide.
-    return `slicer-${idCounter}-${Math.random().toString(36).slice(2, 6)}`;
-  };
 
   const buildPanel = (spec: SlicerSpec): PanelEntry => {
     const root = document.createElement('div');
@@ -198,11 +108,11 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
     host.appendChild(root);
 
     const onClear = (): void => {
-      withHistory(() => mutators.setSlicerSelected(store, spec.id, []));
+      withHistory(() => setSlicerSelected(store, spec.id, []));
       recomputeAndRender();
     };
     const onClose = (): void => {
-      withHistory(() => mutators.removeSlicer(store, spec.id));
+      withHistory(() => removeSlicer(store, spec.id));
       recomputeAndRender();
     };
     clearBtn.addEventListener('click', onClear);
@@ -224,7 +134,7 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
   const renderChips = (entry: PanelEntry, spec: SlicerSpec): void => {
     entry.body.replaceChildren();
     const wb = getWb();
-    const resolved = resolveSpec(wb, spec);
+    const resolved = resolveSlicerSpec(wb, spec);
     if (!resolved) {
       const empty = document.createElement('div');
       empty.className = 'fc-slicer__empty';
@@ -232,7 +142,7 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
       entry.body.appendChild(empty);
       return;
     }
-    const distinct = distinctValues(store.getState(), resolved.range, resolved.byCol);
+    const distinct = listSlicerValues(store, wb, spec);
     const selected = new Set(spec.selected);
     for (const value of distinct) {
       const chip = document.createElement('button');
@@ -262,7 +172,7 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
         //  "all" so the next click can re-narrow without going through
         //  every chip.
         const next = current.size === distinct.length ? [] : Array.from(current).sort();
-        withHistory(() => mutators.setSlicerSelected(store, spec.id, next));
+        withHistory(() => setSlicerSelected(store, spec.id, next));
         recomputeAndRender();
       });
       entry.body.appendChild(chip);
@@ -270,9 +180,7 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
   };
 
   const recomputeAndRender = (): void => {
-    const wb = getWb();
-    const slicers = store.getState().slicers.slicers;
-    recomputeFilters(wb, store, slicers);
+    recomputeSlicerFilters(store, getWb());
     renderAll();
   };
 
@@ -329,28 +237,21 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
 
   const handle: SlicerHandle = {
     addSlicer(input): SlicerSpec {
-      const wb = getWb();
-      const table = findTable(wb, input.tableName);
-      if (!table) {
+      let result = undefined as unknown as ReturnType<typeof createSlicer>;
+      withHistory(() => {
+        result = createSlicer(store, getWb(), input);
+      });
+      if (!result.ok && result.reason === 'table-not-found') {
         throw new Error(`Slicer: table "${input.tableName}" not found`);
       }
-      if (!table.columns.includes(input.column)) {
+      if (!result.ok) {
         throw new Error(`Slicer: column "${input.column}" not in table "${input.tableName}"`);
       }
-      const spec: SlicerSpec = {
-        id: nextId(),
-        tableName: table.name,
-        column: input.column,
-        selected: input.selected ? [...input.selected] : [],
-        x: input.x,
-        y: input.y,
-      };
-      withHistory(() => mutators.addSlicer(store, spec));
       recomputeAndRender();
-      return spec;
+      return result.spec;
     },
     removeSlicer(id): void {
-      withHistory(() => mutators.removeSlicer(store, id));
+      withHistory(() => removeSlicer(store, id));
       recomputeAndRender();
     },
     refresh(): void {

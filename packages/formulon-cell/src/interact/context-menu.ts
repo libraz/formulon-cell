@@ -1,7 +1,7 @@
 import { copy } from '../commands/clipboard/copy.js';
 import { cut } from '../commands/clipboard/cut.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
-import { clearComment, commentAt, setComment } from '../commands/comment.js';
+import { clearComment } from '../commands/comment.js';
 import {
   clearFormat,
   cycleBorders,
@@ -44,8 +44,9 @@ export interface ContextMenuDeps {
   onFormatDialog?: () => void;
   /** Called when the user clicks "Paste Special…". */
   onPasteSpecial?: () => void;
-  /** Called when the user clicks "Edit comment…". When omitted, falls back
-   *  to a synchronous `window.prompt`. */
+  /** Called when the user clicks "Edit comment…". When omitted the menu
+   *  entry is hidden — the action requires the comment dialog feature to
+   *  be wired up. */
   onEditComment?: (addr: import('../engine/types.js').Addr) => void;
   /** Called when the user clicks "Insert hyperlink…". When omitted the menu
    *  entry is hidden (the action is purely UX sugar — Format Cells > More
@@ -257,6 +258,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         .filter(
           (e) => !(e.kind === 'item' && e.id === 'insertHyperlink' && !deps.onInsertHyperlink),
         )
+        .filter((e) => !(e.kind === 'item' && e.id === 'insertComment' && !deps.onEditComment))
         .filter((e) => !(e.kind === 'item' && e.id === 'toggleWatch' && !deps.onToggleWatch))
         .map((e) => {
           if (e.kind === 'item' && e.id === 'toggleWatch') {
@@ -593,14 +595,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         return;
       }
       case 'insertComment': {
-        const addr = state.selection.active;
-        const cur = commentAt(state, addr) ?? '';
-        if (deps.onEditComment) {
-          deps.onEditComment(addr);
-        } else if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
-          const next = window.prompt('Comment:', cur);
-          if (next != null) wrapFmt(() => setComment(store, addr, next, wb));
-        }
+        deps.onEditComment?.(state.selection.active);
         return;
       }
       case 'deleteComment': {

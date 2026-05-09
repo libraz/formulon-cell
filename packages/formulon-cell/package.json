@@ -1,7 +1,7 @@
 {
   "name": "@libraz/formulon-cell",
   "version": "0.1.0",
-  "description": "Spreadsheet UI for the formulon WASM calc engine — extension-based, i18n-aware, theme-tokenized, Excel 365-flavored.",
+  "description": "Spreadsheet UI for the formulon WASM calc engine — extension-based, i18n-aware, theme-tokenized, and desktop-spreadsheet-style.",
   "type": "module",
   "license": "Apache-2.0",
   "author": "libraz",
@@ -14,7 +14,7 @@
   "bugs": "https://github.com/libraz/formulon-cell/issues",
   "keywords": [
     "spreadsheet",
-    "excel",
+    "workbook",
     "xlsx",
     "formula",
     "canvas",

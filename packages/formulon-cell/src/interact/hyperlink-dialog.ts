@@ -1,9 +1,8 @@
 import { type History, recordFormatChange } from '../commands/history.js';
-import { flushFormatToEngine } from '../engine/cell-format-sync.js';
+import { clearHyperlink, hyperlinkAt, setHyperlink } from '../commands/hyperlinks.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { addrKey } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { mutators, type SpreadsheetStore } from '../store/store.js';
+import type { SpreadsheetStore } from '../store/store.js';
 
 export interface HyperlinkDialogDeps {
   host: HTMLElement;
@@ -23,9 +22,8 @@ export interface HyperlinkDialogHandle {
 }
 
 /**
- * Excel-style "Insert Hyperlink" dialog. Edits the hyperlink field on the
- * currently active cell only — multi-cell apply goes through the full Format
- * Cells dialog instead.
+ * Insert Hyperlink dialog. Edits the hyperlink field on the currently active
+ * cell only; multi-cell apply goes through the full Format Cells dialog.
  */
 export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialogHandle {
   const { host, store } = deps;
@@ -112,12 +110,11 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
   const writeHyperlink = (next: string | undefined): void => {
     const state = store.getState();
     const addr = state.selection.active;
-    const range = { sheet: addr.sheet, r0: addr.row, c0: addr.col, r1: addr.row, c1: addr.col };
+    const wb = getWb() ?? undefined;
     recordFormatChange(history, store, () => {
-      mutators.setRangeFormat(store, range, { hyperlink: next });
+      if (next) setHyperlink(store, addr, next, wb);
+      else clearHyperlink(store, addr, wb);
     });
-    const wb = getWb();
-    if (wb) flushFormatToEngine(wb, store, addr.sheet);
   };
 
   const onOk = (): void => {
@@ -167,8 +164,7 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
     open(): void {
       const state = store.getState();
       const addr = state.selection.active;
-      const fmt = state.format.formats.get(addrKey(addr));
-      const current = fmt?.hyperlink ?? '';
+      const current = hyperlinkAt(state, addr) ?? '';
       urlInput.value = current;
       // Hide Remove when there's nothing to remove.
       removeBtn.hidden = !current;

@@ -33,7 +33,7 @@ import {
   toggleUnderline,
   toggleWrap,
 } from '@libraz/formulon-cell';
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 interface Props {
   instance: SpreadsheetInstance | null;
@@ -195,9 +195,47 @@ const onBumpDecimals = (delta: 1 | -1): void => {
 const onFontFamily = (value: string): void => {
   wrapFormat((s, st) => setFont(s, st, { fontFamily: value }));
 };
-const onFontSize = (value: string): void => {
+const onFontSize = (value: string | number): void => {
   wrapFormat((s, st) => setFont(s, st, { fontSize: Number(value) }));
 };
+
+// Excel 365 ribbon dropdown — replaces the native <select> on font family
+// and font size. Open state is tracked per-name so two dropdowns can't be
+// open at once. Outside-click + Escape close them.
+type DropdownName = 'fontFamily' | 'fontSize';
+const openDropdown = ref<DropdownName | null>(null);
+const toggleDropdown = (name: DropdownName): void => {
+  openDropdown.value = openDropdown.value === name ? null : name;
+};
+const closeDropdown = (): void => {
+  openDropdown.value = null;
+};
+const onDropdownPick = (name: DropdownName, value: string | number): void => {
+  if (name === 'fontFamily') onFontFamily(String(value));
+  else onFontSize(value);
+  closeDropdown();
+};
+const onDocPointerDown = (e: MouseEvent): void => {
+  if (openDropdown.value == null) return;
+  const target = e.target;
+  if (!(target instanceof Element)) return;
+  if (target.closest('.demo__rb-dd')) return;
+  closeDropdown();
+};
+const onDocKey = (e: KeyboardEvent): void => {
+  if (e.key === 'Escape' && openDropdown.value != null) {
+    e.preventDefault();
+    closeDropdown();
+  }
+};
+onMounted(() => {
+  document.addEventListener('mousedown', onDocPointerDown, true);
+  document.addEventListener('keydown', onDocKey, true);
+});
+onUnmounted(() => {
+  document.removeEventListener('mousedown', onDocPointerDown, true);
+  document.removeEventListener('keydown', onDocKey, true);
+});
 const onFontColor = (value: string): void => {
   wrapFormat((s, st) => setFontColor(s, st, value));
 };
@@ -342,12 +380,84 @@ const onSort = (direction: 'asc' | 'desc'): void => {
 
       <section class="demo__ribbon-group" aria-label="Font">
         <div class="demo__ribbon-tools">
-    <select class="demo__rb-select demo__rb-select--font" :value="active.fontFamily" :disabled="disabled" title="Font" aria-label="Font" @change="onFontFamily(($event.target as HTMLSelectElement).value)">
-      <option v-for="font in FONT_FAMILIES" :key="font" :value="font">{{ font }}</option>
-    </select>
-    <select class="demo__rb-select" :value="active.fontSize" :disabled="disabled" title="Font size" aria-label="Font size" @change="onFontSize(($event.target as HTMLSelectElement).value)">
-      <option v-for="size in FONT_SIZES" :key="size" :value="size">{{ size }}</option>
-    </select>
+    <div
+      class="demo__rb-dd demo__rb-select--font"
+      :class="{ 'demo__rb-dd--open': openDropdown === 'fontFamily' }"
+    >
+      <button
+        type="button"
+        class="demo__rb-dd__btn"
+        :disabled="disabled"
+        title="Font"
+        aria-label="Font"
+        aria-haspopup="listbox"
+        :aria-expanded="openDropdown === 'fontFamily'"
+        @click="toggleDropdown('fontFamily')"
+      >
+        <span class="demo__rb-dd__value">{{ active.fontFamily }}</span>
+        <svg class="demo__rb-dd__chev" viewBox="0 0 12 12" aria-hidden="true">
+          <path d="M2.5 4.5l3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <div v-if="openDropdown === 'fontFamily'" class="demo__rb-dd__list" role="listbox" aria-label="Font" tabindex="-1">
+        <button
+          v-for="font in FONT_FAMILIES"
+          :key="font"
+          type="button"
+          role="option"
+          :aria-selected="active.fontFamily === font"
+          class="demo__rb-dd__opt"
+          :class="{ 'demo__rb-dd__opt--selected': active.fontFamily === font }"
+          @click="onDropdownPick('fontFamily', font)"
+        >
+          <span class="demo__rb-dd__check" aria-hidden="true">
+            <svg v-if="active.fontFamily === font" viewBox="0 0 16 16">
+              <path d="M3.5 8.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+          <span class="demo__rb-dd__label">{{ font }}</span>
+        </button>
+      </div>
+    </div>
+    <div
+      class="demo__rb-dd"
+      :class="{ 'demo__rb-dd--open': openDropdown === 'fontSize' }"
+    >
+      <button
+        type="button"
+        class="demo__rb-dd__btn"
+        :disabled="disabled"
+        title="Font size"
+        aria-label="Font size"
+        aria-haspopup="listbox"
+        :aria-expanded="openDropdown === 'fontSize'"
+        @click="toggleDropdown('fontSize')"
+      >
+        <span class="demo__rb-dd__value">{{ active.fontSize }}</span>
+        <svg class="demo__rb-dd__chev" viewBox="0 0 12 12" aria-hidden="true">
+          <path d="M2.5 4.5l3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <div v-if="openDropdown === 'fontSize'" class="demo__rb-dd__list" role="listbox" aria-label="Font size" tabindex="-1">
+        <button
+          v-for="size in FONT_SIZES"
+          :key="size"
+          type="button"
+          role="option"
+          :aria-selected="active.fontSize === size"
+          class="demo__rb-dd__opt"
+          :class="{ 'demo__rb-dd__opt--selected': active.fontSize === size }"
+          @click="onDropdownPick('fontSize', size)"
+        >
+          <span class="demo__rb-dd__check" aria-hidden="true">
+            <svg v-if="active.fontSize === size" viewBox="0 0 16 16">
+              <path d="M3.5 8.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+          <span class="demo__rb-dd__label">{{ size }}</span>
+        </button>
+      </div>
+    </div>
     <button class="demo__rb demo__rb--bold" :class="{ 'demo__rb--active': active.bold }" type="button" :disabled="disabled" title="Bold (⌘B)" aria-label="Bold (⌘B)" @click="wrapFormat(toggleBold)">B</button>
     <button class="demo__rb demo__rb--italic" :class="{ 'demo__rb--active': active.italic }" type="button" :disabled="disabled" title="Italic (⌘I)" aria-label="Italic (⌘I)" @click="wrapFormat(toggleItalic)">I</button>
     <button class="demo__rb demo__rb--underline" :class="{ 'demo__rb--active': active.underline }" type="button" :disabled="disabled" title="Underline (⌘U)" aria-label="Underline (⌘U)" @click="wrapFormat(toggleUnderline)">U</button>

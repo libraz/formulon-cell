@@ -242,6 +242,90 @@
     cursor: cell;
   }
 
+  .fc-viewbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 34px;
+    padding: 4px 8px;
+    border-bottom: var(--fc-hairline) solid var(--fc-rule);
+    background: var(--fc-bg-rail);
+    color: var(--fc-fg);
+    font-family: var(--fc-font-ui);
+    font-size: 12px;
+    flex: 0 0 auto;
+    overflow-x: auto;
+  }
+
+  .fc-viewbar__title {
+    flex: 0 0 auto;
+    padding-right: 2px;
+    color: var(--fc-fg-mute);
+    font-weight: 600;
+  }
+
+  .fc-viewbar__group {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding-left: 8px;
+    border-left: var(--fc-hairline) solid var(--fc-rule);
+    flex: 0 0 auto;
+  }
+
+  .fc-viewbar__group:first-of-type {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .fc-viewbar__toggle,
+  .fc-viewbar__button,
+  .fc-viewbar__select {
+    min-height: 24px;
+    border: var(--fc-hairline) solid var(--fc-rule);
+    border-radius: var(--fc-radius-sm);
+    background: var(--fc-bg);
+    color: var(--fc-fg);
+    font: inherit;
+  }
+
+  .fc-viewbar__toggle,
+  .fc-viewbar__button {
+    padding: 2px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .fc-viewbar__toggle[aria-pressed="true"],
+  .fc-viewbar__button[aria-pressed="true"] {
+    border-color: var(--fc-accent);
+    background: var(--fc-accent-soft, color-mix(in srgb, var(--fc-accent) 14%, var(--fc-bg)));
+    color: var(--fc-accent-strong, var(--fc-accent));
+  }
+
+  .fc-viewbar__toggle:hover,
+  .fc-viewbar__button:hover,
+  .fc-viewbar__select:hover {
+    border-color: var(--fc-accent);
+  }
+
+  .fc-viewbar__toggle:focus-visible,
+  .fc-viewbar__button:focus-visible,
+  .fc-viewbar__select:focus-visible {
+    outline: 2px solid var(--fc-accent);
+    outline-offset: 1px;
+  }
+
+  .fc-viewbar__label {
+    color: var(--fc-fg-mute);
+    white-space: nowrap;
+  }
+
+  .fc-viewbar__select {
+    height: 24px;
+    padding: 1px 22px 1px 6px;
+  }
+
   .fc-host__sheetbar {
     display: flex;
     align-items: stretch;
@@ -730,6 +814,304 @@
     --fc-menu-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 5h10v10H5zM8 5v10M5 8h10' fill='none' stroke='black' stroke-width='1.5'/%3E%3C/svg%3E");
   }
 
+  .fc-quick {
+    position: absolute;
+    z-index: 80;
+    width: min(320px, calc(100% - 16px));
+    max-height: min(420px, calc(100% - 16px));
+    overflow: auto;
+    padding: 8px;
+    background: var(--fc-bg-elev, Canvas);
+    color: var(--fc-fg, CanvasText);
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+    border-radius: var(--fc-radius-md, 6px);
+    box-shadow:
+      0 18px 40px rgba(0, 0, 0, 0.2),
+      0 1px 2px rgba(0, 0, 0, 0.12);
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 12px;
+    line-height: 1.35;
+    outline: none;
+  }
+
+  .fc-quick[hidden] {
+    display: none;
+  }
+
+  .fc-quick__title {
+    padding: 2px 4px 7px;
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+    color: var(--fc-fg, CanvasText);
+    font-weight: 600;
+  }
+
+  .fc-quick__section {
+    padding-top: 8px;
+  }
+
+  .fc-quick__heading {
+    margin-bottom: 4px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 66%, transparent));
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: var(--fc-tracking-wide, 0.04em);
+  }
+
+  .fc-quick__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .fc-quick__action {
+    min-height: 30px;
+    padding: 5px 8px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+    border-radius: var(--fc-radius-sm, 4px);
+    background: var(--fc-bg, Canvas);
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .fc-quick__action:hover:not(:disabled),
+  .fc-quick__action:focus-visible:not(:disabled) {
+    border-color: var(--fc-accent, Highlight);
+    background: var(--fc-accent-soft, color-mix(in srgb, Highlight 14%, Canvas));
+    outline: none;
+  }
+
+  .fc-quick__action:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+  }
+
+  .fc-charts {
+    position: absolute;
+    inset: 0;
+    z-index: 70;
+    pointer-events: none;
+  }
+
+  .fc-chart {
+    position: absolute;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-width: 240px;
+    min-height: 160px;
+    background: var(--fc-bg-elev, Canvas);
+    color: var(--fc-fg, CanvasText);
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+    border-radius: var(--fc-radius-md, 6px);
+    box-shadow:
+      0 16px 36px rgba(0, 0, 0, 0.18),
+      0 1px 2px rgba(0, 0, 0, 0.12);
+    font-family: var(--fc-font-ui, system-ui);
+    pointer-events: auto;
+  }
+
+  .fc-chart:focus-visible {
+    border-color: var(--fc-accent, Highlight);
+    box-shadow:
+      0 0 0 2px var(--fc-accent-soft, color-mix(in srgb, Highlight 24%, Canvas)),
+      0 16px 36px rgba(0, 0, 0, 0.18),
+      0 1px 2px rgba(0, 0, 0, 0.12);
+    outline: none;
+  }
+
+  .fc-chart--selected {
+    border-color: var(--fc-accent, Highlight);
+  }
+
+  .fc-chart--selected::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border: 1px dashed var(--fc-accent, Highlight);
+    border-radius: calc(var(--fc-radius-md, 6px) - 2px);
+    pointer-events: none;
+  }
+
+  .fc-chart__header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 34px;
+    padding: 0 8px 0 12px;
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 10%, transparent));
+    cursor: move;
+    user-select: none;
+  }
+
+  .fc-chart__title {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    font-size: 12px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fc-chart__close {
+    width: 24px;
+    height: 24px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .fc-chart__close:hover,
+  .fc-chart__close:focus-visible {
+    background: var(--fc-accent-soft, color-mix(in srgb, Highlight 14%, Canvas));
+    outline: none;
+  }
+
+  .fc-chart__plot {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    padding: 14px;
+    box-sizing: border-box;
+  }
+
+  .fc-chart__resize {
+    position: absolute;
+    right: 3px;
+    bottom: 3px;
+    width: 14px;
+    height: 14px;
+    cursor: nwse-resize;
+  }
+
+  .fc-chart__resize::before {
+    content: "";
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid var(--fc-fg-mute, color-mix(in srgb, CanvasText 55%, transparent));
+    border-bottom: 2px solid var(--fc-fg-mute, color-mix(in srgb, CanvasText 55%, transparent));
+  }
+
+  .fc-objects {
+    position: absolute;
+    inset: 48px 16px auto auto;
+    z-index: 85;
+    width: min(420px, calc(100% - 32px));
+    max-height: min(520px, calc(100% - 64px));
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--fc-bg-elev, Canvas);
+    color: var(--fc-fg, CanvasText);
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+    border-radius: var(--fc-radius-md, 6px);
+    box-shadow:
+      0 20px 44px rgba(0, 0, 0, 0.22),
+      0 1px 2px rgba(0, 0, 0, 0.12);
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 12px;
+    line-height: 1.4;
+    outline: none;
+  }
+
+  .fc-objects[hidden] {
+    display: none;
+  }
+
+  .fc-objects__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 34px;
+    padding: 6px 8px 6px 10px;
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+  }
+
+  .fc-objects__title {
+    font-weight: 600;
+  }
+
+  .fc-objects__close {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--fc-radius-sm, 4px);
+    background: transparent;
+    color: var(--fc-fg-mute, currentColor);
+    font: inherit;
+    font-size: 16px;
+    cursor: pointer;
+  }
+
+  .fc-objects__close:hover {
+    background: var(--fc-accent-soft, color-mix(in srgb, Highlight 14%, Canvas));
+    color: var(--fc-fg, CanvasText);
+  }
+
+  .fc-objects__body {
+    overflow: auto;
+    padding: 10px;
+  }
+
+  .fc-objects__section + .fc-objects__section {
+    margin-top: 12px;
+  }
+
+  .fc-objects__heading {
+    margin-bottom: 5px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 66%, transparent));
+    font-weight: 600;
+  }
+
+  .fc-objects__row {
+    display: grid;
+    grid-template-columns: minmax(120px, 0.7fr) minmax(0, 1fr);
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule-soft, color-mix(in srgb, CanvasText 8%, transparent));
+  }
+
+  .fc-objects__key {
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 66%, transparent));
+  }
+
+  .fc-objects__value,
+  .fc-objects__list,
+  .fc-objects__paths {
+    overflow-wrap: anywhere;
+  }
+
+  .fc-objects__paths {
+    margin: 0;
+    padding-left: 18px;
+    font-family: var(--fc-font-mono, monospace);
+    font-size: 11px;
+  }
+
+  .fc-objects__empty {
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 66%, transparent));
+  }
+
   .fc-sheetmenu {
     position: fixed;
     z-index: 70;
@@ -1010,6 +1392,48 @@
   .fc-fmtdlg__textarea:focus {
     border-color: var(--fc-accent, currentColor);
     box-shadow: 0 0 0 2px var(--fc-accent-soft, transparent);
+  }
+
+  /* Comment dialog — Excel 365 "New Note" yellow callout aesthetic.
+     Reuses the fmtdlg shell but narrows the panel and gives the textarea
+     the canonical sticky-note background. */
+  .fc-cmtdlg__panel {
+    width: min(94vw, 420px);
+    max-height: min(80vh, 360px);
+  }
+  .fc-cmtdlg__label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    color: var(--fc-fg-mute, inherit);
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .fc-cmtdlg__textarea {
+    min-height: 132px;
+    background: #fff8c4;
+    color: #2b2b2b;
+    border-color: #d4ba2a;
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 12.5px;
+    line-height: 1.5;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  }
+  .fc-cmtdlg__textarea::placeholder {
+    color: rgba(43, 43, 43, 0.5);
+    font-weight: 400;
+  }
+  .fc-cmtdlg__textarea:hover {
+    background: #fff8c4;
+    border-color: #c9aa1f;
+  }
+  .fc-cmtdlg__textarea:focus {
+    background: #fff8c4;
+    border-color: #c9aa1f;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
+      0 0 0 2px var(--fc-accent-soft, rgba(16, 124, 65, 0.2));
   }
   .fc-fmtdlg input[type="text"],
   .fc-fmtdlg input[type="number"],
@@ -1578,6 +2002,74 @@
     font-size: 11px;
     margin-top: 6px;
   }
+  .fc-pivotdlg__panel {
+    max-width: 520px;
+  }
+  .fc-pivotdlg__body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .fc-pivotdlg__source {
+    border: var(--fc-hairline, 1px) solid color-mix(in srgb, #5b9bd5 42%, transparent);
+    border-radius: 2px;
+    background: #eaf3f8;
+    color: #1f4e79;
+    padding: 7px 9px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .fc-pivotdlg__section {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 12px;
+    padding: 10px 0;
+    border-top: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+  }
+  .fc-pivotdlg__field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 4px;
+    font-size: 12px;
+    min-width: 0;
+  }
+  .fc-pivotdlg__field > span {
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 66%, transparent));
+    font-size: 11px;
+  }
+  .fc-pivotdlg__field > input,
+  .fc-pivotdlg__field > select {
+    width: 100%;
+    min-width: 0;
+  }
+  .fc-pivotdlg__checkgrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 4px 12px;
+    padding: 10px 0 2px;
+    border-top: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+  }
+  .fc-pivotdlg__check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 24px;
+    font-size: 12px;
+    color: var(--fc-fg, CanvasText);
+  }
+  .fc-pivotdlg__check input {
+    margin: 0;
+  }
+  @media (max-width: 540px) {
+    .fc-pivotdlg__section,
+    .fc-pivotdlg__checkgrid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
 
   /* Go To Special (F5) dialog — scope radios on top, kind radio list below.
      Mirrors fc-conddlg dialog chrome. */
@@ -1792,8 +2284,7 @@
   }
 
   /* Paste Special — laid out as two side-by-side fieldsets, with a
-     bottom row for the orthogonal options. Excel 365 uses a two-column
-     grid; we mirror the structure with our own typographic palette. */
+     bottom row for the orthogonal options. */
   .fc-pastesp__panel {
     max-width: 480px;
   }
@@ -1934,7 +2425,7 @@
   }
 
   /* Function autocomplete — popover under the active editor offering matching
-     function names. Excel-style monospace listing. */
+     function names in a compact monospace listing. */
   .fc-autocomplete {
     position: fixed;
     z-index: 1000;
@@ -2014,7 +2505,7 @@
     white-space: nowrap;
   }
 
-  /* Argument helper — Excel "ScreenTip" floating above the editor that shows
+  /* Argument helper — floating signature tip above the editor that shows
      the active function's signature with the current argument bolded. */
   .fc-arghelper {
     position: fixed;
@@ -2116,8 +2607,7 @@
     text-align: center;
   }
 
-  /* Iterative-calculation dialog — small modal mirroring Excel's File →
-     Options → Formulas → "Enable iterative calculation". */
+  /* Iterative-calculation dialog — small modal for formula convergence settings. */
   .fc-iterdlg {
     position: fixed;
     inset: 0;
@@ -2197,7 +2687,7 @@
     border-color: transparent;
   }
 
-  /* External-links inspector — read-only Excel "Edit Links" parity. */
+  /* External-links inspector — read-only workbook link inventory. */
   .fc-extlinkdlg {
     position: fixed;
     inset: 0;
@@ -2281,7 +2771,7 @@
     cursor: pointer;
   }
 
-  /* CF rules manager — Excel "Conditional Formatting → Manage Rules" parity. */
+  /* CF rules manager — conditional-formatting rule inventory and deletion. */
   .fc-cfrulesdlg {
     position: fixed;
     inset: 0;
@@ -2388,7 +2878,7 @@
     cursor: pointer;
   }
 
-  /* Named cell-styles gallery — Excel "Home → Cell Styles" preset chips. */
+  /* Named cell-styles gallery — preset style chips. */
   .fc-stylegallery {
     position: fixed;
     inset: 0;

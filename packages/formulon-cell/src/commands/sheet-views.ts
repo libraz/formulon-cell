@@ -1,4 +1,5 @@
 import type { Range } from '../engine/types.js';
+import type { SpreadsheetStore } from '../store/store.js';
 
 /**
  * Sheet Views — Excel 365's per-user filter / sort profiles. Each view
@@ -115,4 +116,74 @@ export function removeSheetView(views: readonly SheetView[], id: string): readon
   const filtered = views.filter((v) => v.id !== id);
   if (filtered.length === views.length) return views;
   return filtered;
+}
+
+export type SheetViewStoreResult =
+  | { ok: true; view: SheetView }
+  | { ok: false; reason: 'not-found' | 'different-sheet' };
+
+/** Capture the current store view settings and register them in the store. */
+export function saveSheetView(
+  store: SpreadsheetStore,
+  id: string,
+  name: string,
+  sort?: SheetViewSort,
+): SheetView {
+  const state = store.getState();
+  const view = captureSheetView(id, name, {
+    sheet: state.data.sheetIndex,
+    filterRange: state.ui.filterRange,
+    freezeRows: state.layout.freezeRows,
+    freezeCols: state.layout.freezeCols,
+    hiddenRows: state.layout.hiddenRows,
+    hiddenCols: state.layout.hiddenCols,
+    sort,
+  });
+  store.setState((s) => {
+    const next = s.sheetViews.views.filter((v) => v.id !== view.id);
+    return { ...s, sheetViews: { ...s.sheetViews, views: [...next, view] } };
+  });
+  return view;
+}
+
+/** Apply a previously captured sheet view to the current sheet. */
+export function activateSheetView(store: SpreadsheetStore, id: string): SheetViewStoreResult {
+  const state = store.getState();
+  const view = findSheetView(state.sheetViews.views, id);
+  if (!view) return { ok: false, reason: 'not-found' };
+  const patch = applySheetView(view);
+  if (patch.sheet !== state.data.sheetIndex) return { ok: false, reason: 'different-sheet' };
+  store.setState((s) => ({
+    ...s,
+    layout: {
+      ...s.layout,
+      freezeRows: Math.max(0, Math.floor(patch.freezeRows)),
+      freezeCols: Math.max(0, Math.floor(patch.freezeCols)),
+      hiddenRows: new Set(patch.hiddenRows),
+      hiddenCols: new Set(patch.hiddenCols),
+    },
+    viewport: {
+      ...s.viewport,
+      rowStart: Math.max(Math.max(0, Math.floor(patch.freezeRows)), s.viewport.rowStart),
+      colStart: Math.max(Math.max(0, Math.floor(patch.freezeCols)), s.viewport.colStart),
+    },
+    ui: { ...s.ui, filterRange: patch.filterRange },
+    sheetViews: { ...s.sheetViews, activeViewId: id },
+  }));
+  return { ok: true, view };
+}
+
+/** Remove a stored sheet view and clear the active marker when needed. */
+export function deleteSheetView(store: SpreadsheetStore, id: string): void {
+  store.setState((s) => {
+    const views = s.sheetViews.views.filter((v) => v.id !== id);
+    if (views.length === s.sheetViews.views.length) return s;
+    return {
+      ...s,
+      sheetViews: {
+        views,
+        activeViewId: s.sheetViews.activeViewId === id ? null : s.sheetViews.activeViewId,
+      },
+    };
+  });
 }

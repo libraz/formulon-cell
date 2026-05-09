@@ -18,7 +18,7 @@ export function MySheet() {
   return (
     <Spreadsheet
       style={{ width: '100%', height: '100vh' }}
-      features={presets.excel()}
+      features={presets.full()}
       locale="ja"
       onReady={(inst) => {
         console.log('mounted', inst.workbook.version);
@@ -53,6 +53,20 @@ import { useI18n, useSelection } from '@libraz/formulon-cell-react';
 const sel = useSelection(instance);
 const { locale, strings } = useI18n(instance);
 ```
+
+## Core helpers
+
+The package re-exports the core command helpers and types, including
+`createSessionChart`, `saveSheetView`, `activateSheetView`,
+`listDefinedNames`, and `upsertDefinedName`, so React apps can type their
+host chrome from one import.
+
+## Runtime prop updates
+
+`theme`, `locale`, `strings`, `workbook`, `features`, and `extensions` update
+the running spreadsheet through the core imperative API. The component does
+not re-mount the canvas when these props change, so selection, focus, and
+host event subscriptions stay intact.
 
 ## License
 

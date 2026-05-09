@@ -1,4 +1,11 @@
 import { coerceInput } from '../commands/coerce-input.js';
+import {
+  isBandedRow,
+  isHeaderRow,
+  isTotalRow,
+  type TableOverlay,
+  tableForCell,
+} from '../commands/format-as-table.js';
 import { validateAgainst } from '../commands/validate.js';
 import { evaluateCfFromEngine } from '../engine/cf-sync.js';
 import { makeRangeResolver, type RangeResolver } from '../engine/range-resolver.js';
@@ -36,6 +43,7 @@ import {
   paintCellText,
   paintCommentMarker,
   paintConditionalIcon,
+  paintCopyMarquee,
   paintErrorTriangle,
   paintFillHandle,
   paintFillPreview,
@@ -44,6 +52,7 @@ import {
   paintRefHighlight,
   paintSpillBlocker,
   paintSpillOutline,
+  paintTableHeaderChevron,
   paintTraceArrow,
   paintTraceDot,
   paintValidationChevron,
@@ -52,6 +61,46 @@ import {
   TRACE_PRECEDENT_COLOR,
 } from './painters.js';
 import { paintCellSparkline } from './sparkline.js';
+
+function tableCellFormat(table: TableOverlay, row: number, col: number): CellFormat | undefined {
+  if (isHeaderRow(table, row, col)) {
+    return {
+      fill: table.style === 'dark' ? '#1f4e78' : table.style === 'light' ? '#d9eaf7' : '#5b9bd5',
+      color: table.style === 'light' ? '#1f1f1f' : '#ffffff',
+      bold: true,
+    };
+  }
+  if (isTotalRow(table, row, col)) {
+    return {
+      fill: table.style === 'dark' ? '#385723' : table.style === 'light' ? '#e2f0d9' : '#a9d18e',
+      color: '#1f1f1f',
+      bold: true,
+    };
+  }
+  if (isBandedRow(table, row, col)) {
+    return {
+      fill: table.style === 'dark' ? '#d9e2f3' : table.style === 'light' ? '#f3f8fc' : '#ddebf7',
+    };
+  }
+  return undefined;
+}
+
+export function isPlainTextOverflowCandidate(input: {
+  value: CellValue;
+  formula: string | null;
+  format?: CellFormat;
+  showFormulas: boolean;
+  displayOverride: string | null;
+  tableHeader: boolean;
+  hasIcon: boolean;
+  isMergeAnchor: boolean;
+}): boolean {
+  if (input.tableHeader || input.hasIcon || input.isMergeAnchor) return false;
+  if (input.format?.wrap || input.format?.rotation || input.format?.align) return false;
+  if (input.showFormulas && input.formula) return false;
+  if (input.displayOverride != null) return input.value.kind === 'text';
+  return input.value.kind === 'text' && !input.formula;
+}
 
 export type ErrorTriangleKind = 'error' | 'validation';
 
@@ -433,8 +482,17 @@ export class GridRenderer {
 
   private paintCells(state: State, theme: ResolvedTheme, cols: AxisLayout, rows: AxisLayout): void {
     const ctx = this.ctx;
-    const { layout, data, selection, format, merges, sparkline, errorIndicators, protection } =
-      state;
+    const {
+      layout,
+      data,
+      selection,
+      format,
+      merges,
+      sparkline,
+      errorIndicators,
+      protection,
+      tables,
+    } = state;
     const active = selection.active;
     const conditional = evaluateConditional(state);
     const sparklines = sparkline.sparklines;
@@ -523,6 +581,27 @@ export class GridRenderer {
       }
       return { x, y, w, h };
     };
+    const overflowBounds = (row: number, col: number, base: Rect): Rect => {
+      let w = base.w;
+      for (let nextCol = col + 1; cols.positionAt.has(nextCol); nextCol += 1) {
+        const nextKey = addrKey({ sheet: data.sheetIndex, row, col: nextCol });
+        const nextCell = data.cells.get(nextKey);
+        const nextFmt = format.formats.get(nextKey);
+        const nextTable = tableForCell(tables.tables, data.sheetIndex, row, nextCol);
+        if (
+          merges.byCell.has(nextKey) ||
+          merges.byAnchor.has(nextKey) ||
+          nextTable ||
+          nextFmt?.fill ||
+          nextFmt?.borders ||
+          (nextCell && (nextCell.formula || nextCell.value.kind !== 'blank'))
+        ) {
+          break;
+        }
+        w += cols.sizeAt.get(nextCol) ?? 0;
+      }
+      return w === base.w ? base : { ...base, w };
+    };
 
     // Single visible-cells walk paints both static format fills (for blank
     // formatted cells too) and cell content. Iterating format.formats here
@@ -535,28 +614,38 @@ export class GridRenderer {
         if (merges.byCell.has(key)) continue;
         const cell = data.cells.get(key);
         const fmt = format.formats.get(key);
+        const table = tableForCell(tables.tables, data.sheetIndex, r, c);
+        const tableFmt = table ? tableCellFormat(table, r, c) : undefined;
         const isMergeAnchor = merges.byAnchor.has(key);
         const spark = sparklines.get(key);
-        // Render-worthy when there's data, a merge anchor, a static fill, or a
-        // sparkline host — all four reasons to paint into an otherwise blank cell.
-        if (!cell && !isMergeAnchor && !fmt?.fill && !spark) continue;
-        const bounds = mergeBounds(r, c) ?? cellRectIn(layout, cols, rows, r, c);
         const isActive = r === active.row && c === active.col;
+        // Render-worthy when there's data, a merge anchor, a static fill, or a
+        // sparkline/table host — all reasons to paint into an otherwise blank cell.
+        if (!cell && !isActive && !isMergeAnchor && !fmt?.fill && !tableFmt?.fill && !spark)
+          continue;
+        const bounds = mergeBounds(r, c) ?? cellRectIn(layout, cols, rows, r, c);
         const isInRange = inRange({ sheet: data.sheetIndex, row: r, col: c }, rng);
 
         const overlay = conditional.get(key);
+        const baseFmt: typeof fmt =
+          tableFmt || fmt
+            ? {
+                ...tableFmt,
+                ...fmt,
+              }
+            : undefined;
         const effectiveFmt: typeof fmt =
           overlay && (overlay.fill || overlay.color || overlay.bold || overlay.italic)
             ? {
-                ...fmt,
-                fill: overlay.fill ?? fmt?.fill,
-                color: overlay.color ?? fmt?.color,
-                bold: overlay.bold || fmt?.bold,
-                italic: overlay.italic || fmt?.italic,
-                underline: overlay.underline || fmt?.underline,
-                strike: overlay.strike || fmt?.strike,
+                ...baseFmt,
+                fill: overlay.fill ?? baseFmt?.fill,
+                color: overlay.color ?? baseFmt?.color,
+                bold: overlay.bold || baseFmt?.bold,
+                italic: overlay.italic || baseFmt?.italic,
+                underline: overlay.underline || baseFmt?.underline,
+                strike: overlay.strike || baseFmt?.strike,
               }
-            : fmt;
+            : baseFmt;
 
         const value: CellValue = cell?.value ?? { kind: 'blank' };
         const formula = cell?.formula ?? null;
@@ -592,6 +681,7 @@ export class GridRenderer {
         }
         // Icon-set: paint glyph in left gutter and shift text right by the
         // gutter width so the value reads cleanly next to the icon.
+        const tableHeader = table ? isHeaderRow(table, r, c) : false;
         if (overlay?.iconKind && overlay.iconSlot !== undefined) {
           paintConditionalIcon(ctx, bounds, overlay.iconKind, overlay.iconSlot);
           const insetBounds = {
@@ -601,9 +691,25 @@ export class GridRenderer {
             h: bounds.h,
           };
           paintCellText({ ...paintCtx, bounds: insetBounds });
+        } else if (tableHeader) {
+          paintCellText({ ...paintCtx, bounds: { ...bounds, w: Math.max(0, bounds.w - 20) } });
+        } else if (
+          isPlainTextOverflowCandidate({
+            value,
+            formula,
+            format: effectiveFmt,
+            showFormulas: state.ui.showFormulas === true,
+            displayOverride,
+            tableHeader,
+            hasIcon: false,
+            isMergeAnchor,
+          })
+        ) {
+          paintCellText({ ...paintCtx, bounds: overflowBounds(r, c, bounds) });
         } else {
           paintCellText(paintCtx);
         }
+        if (tableHeader) paintTableHeaderChevron(ctx, bounds, theme);
         if (spark) paintCellSparkline(ctx, bounds, spark, state, this.getWb());
         if (fmt?.comment) paintCommentMarker(ctx, bounds);
         // Lock-icon overlay — only when the sheet is protected AND the cell
@@ -725,7 +831,7 @@ export class GridRenderer {
       const isActiveCol = c === active.col;
       const isSelectedCol = colSelected(c);
       if (isActiveCol) {
-        ctx.fillStyle = theme.accent;
+        ctx.fillStyle = theme.bgHeader;
         ctx.fillRect(rect.x, labelTopY, w, layout.headerRowHeight);
       } else if (isSelectedCol) {
         ctx.fillStyle = theme.bgHeader;
@@ -738,12 +844,16 @@ export class GridRenderer {
       ctx.lineTo(Math.round(rect.x + w) + align, oy);
       ctx.stroke();
       ctx.fillStyle = isActiveCol
-        ? theme.accentFg
+        ? theme.headerFgActive
         : isSelectedCol
           ? theme.headerFgActive
           : theme.headerFg;
       const label = r1c1 ? `C${c + 1}` : colLabel(c);
       ctx.fillText(label, rect.x + w / 2, labelTopY + layout.headerRowHeight / 2 + 0.5);
+      if (isActiveCol) {
+        ctx.fillStyle = theme.accent;
+        ctx.fillRect(rect.x, oy - Math.max(2, 2 / this.dpr), w, Math.max(2, 2 / this.dpr));
+      }
 
       // Autofilter chevron — small ▼ in the right edge of the header for any
       // column inside the active filter range.
@@ -796,7 +906,7 @@ export class GridRenderer {
       const isActiveRow = r === active.row;
       const isSelectedRow = rowSelected(r);
       if (isActiveRow) {
-        ctx.fillStyle = theme.accent;
+        ctx.fillStyle = theme.bgHeader;
         ctx.fillRect(labelLeftX, rect.y, layout.headerColWidth, h);
       } else if (isSelectedRow) {
         ctx.fillStyle = theme.bgHeader;
@@ -809,12 +919,16 @@ export class GridRenderer {
       ctx.lineTo(ox, Math.round(rect.y + h) + align);
       ctx.stroke();
       ctx.fillStyle = isActiveRow
-        ? theme.accentFg
+        ? theme.headerFgActive
         : isSelectedRow
           ? theme.headerFgActive
           : theme.headerFg;
       const rowLabel = r1c1 ? `R${r + 1}` : String(r + 1);
       ctx.fillText(rowLabel, ox - 8, rect.y + h / 2 + 0.5);
+      if (isActiveRow) {
+        ctx.fillStyle = theme.accent;
+        ctx.fillRect(ox - Math.max(2, 2 / this.dpr), rect.y, Math.max(2, 2 / this.dpr), h);
+      }
     }
 
     if (cols.positionAt.has(active.col)) {
@@ -957,6 +1071,11 @@ export class GridRenderer {
     if (preview) {
       const rects = rangeRects(layout, viewport, preview);
       for (const r of rects) paintFillPreview(this.ctx, r, theme);
+    }
+    const copyRange = ui.copyRange;
+    if (copyRange) {
+      const rects = rangeRects(layout, viewport, copyRange);
+      for (const r of rects) paintCopyMarquee(this.ctx, r);
     }
 
     if (isRowVisible(layout, viewport, r.r1) && isColVisible(layout, viewport, r.c1)) {

@@ -1,4 +1,14 @@
-import type { State } from '../store/store.js';
+import type { Range } from '../engine/types.js';
+import type { State, StatusAggKey } from '../store/store.js';
+
+export const STATUS_AGGREGATE_KEYS: readonly StatusAggKey[] = [
+  'average',
+  'count',
+  'countNumbers',
+  'min',
+  'max',
+  'sum',
+];
 
 export interface SelectionStats {
   /** Total cells in selection, including blanks. */
@@ -12,6 +22,11 @@ export interface SelectionStats {
   avg: number;
   min: number;
   max: number;
+}
+
+export interface StatusAggregateEntry {
+  key: StatusAggKey;
+  value: number;
 }
 
 const EMPTY: SelectionStats = {
@@ -34,14 +49,12 @@ const EMPTY: SelectionStats = {
  * not twice — Excel parity.
  */
 export function aggregateSelection(state: State): SelectionStats {
-  const ranges = [state.selection.range, ...(state.selection.extraRanges ?? [])];
   const sheet = state.data.sheetIndex;
+  const ranges = [state.selection.range, ...(state.selection.extraRanges ?? [])].filter(
+    (range) => range.sheet === sheet,
+  );
 
-  let cells = 0;
-  for (const r of ranges) {
-    if (r.r1 < r.r0 || r.c1 < r.c0) continue;
-    cells += (r.r1 - r.r0 + 1) * (r.c1 - r.c0 + 1);
-  }
+  const cells = countUniqueRangeCells(ranges);
   if (cells <= 0) return EMPTY;
 
   let numericCount = 0;
@@ -84,3 +97,76 @@ export function aggregateSelection(state: State): SelectionStats {
   }
   return { cells, numericCount, nonBlankCount, sum, avg: sum / numericCount, min, max };
 }
+
+export function statusAggregateValue(key: StatusAggKey, stats: SelectionStats): number | null {
+  if (key === 'count') return stats.nonBlankCount > 0 ? stats.nonBlankCount : null;
+  if (key === 'countNumbers') return stats.numericCount > 0 ? stats.numericCount : null;
+  if (stats.numericCount === 0) return null;
+  switch (key) {
+    case 'sum':
+      return stats.sum;
+    case 'average':
+      return stats.avg;
+    case 'min':
+      return stats.min;
+    case 'max':
+      return stats.max;
+    default:
+      return null;
+  }
+}
+
+export function visibleStatusAggregates(state: State): readonly StatusAggregateEntry[] {
+  const stats = aggregateSelection(state);
+  const out: StatusAggregateEntry[] = [];
+  for (const key of state.ui.statusAggs) {
+    const value = statusAggregateValue(key, stats);
+    if (value != null) out.push({ key, value });
+  }
+  return out;
+}
+
+export function countUniqueRangeCells(ranges: readonly Range[]): number {
+  const normalized = ranges
+    .filter((r) => r.r1 >= r.r0 && r.c1 >= r.c0)
+    .map((r) => ({ r0: r.r0, r1: r.r1, c0: r.c0, c1: r.c1 }));
+  if (normalized.length === 0) return 0;
+
+  const boundaries = new Set<number>();
+  for (const r of normalized) {
+    boundaries.add(r.r0);
+    boundaries.add(r.r1 + 1);
+  }
+  const rows = [...boundaries].sort((a, b) => a - b);
+  let total = 0;
+  for (let i = 0; i < rows.length - 1; i += 1) {
+    const start = rows[i];
+    const end = rows[i + 1];
+    if (start === undefined || end === undefined || end <= start) continue;
+    const intervals: [number, number][] = [];
+    for (const r of normalized) {
+      if (r.r0 <= start && r.r1 + 1 >= end) intervals.push([r.c0, r.c1]);
+    }
+    total += (end - start) * countUniqueColumns(intervals);
+  }
+  return total;
+}
+
+const countUniqueColumns = (intervals: [number, number][]): number => {
+  if (intervals.length === 0) return 0;
+  intervals.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  let total = 0;
+  let [start, end] = intervals[0] ?? [0, -1];
+  for (let i = 1; i < intervals.length; i += 1) {
+    const next = intervals[i];
+    if (!next) continue;
+    if (next[0] <= end + 1) {
+      end = Math.max(end, next[1]);
+      continue;
+    }
+    total += end - start + 1;
+    [start, end] = next;
+  }
+  total += end - start + 1;
+  return total;
+};

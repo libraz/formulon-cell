@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { clearComment, commentAt, setComment } from '../../../src/commands/comment.js';
+import {
+  clearComment,
+  commentAt,
+  listComments,
+  setComment,
+} from '../../../src/commands/comment.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
@@ -21,6 +26,21 @@ describe('comment commands', () => {
     const store = createSpreadsheetStore();
     setComment(store, { sheet: 0, row: 0, col: 0 }, 'note');
     expect(commentAt(store.getState(), { sheet: 0, row: 0, col: 0 })).toBe('note');
+  });
+
+  it('lists comments on a sheet in row-major order', () => {
+    const store = createSpreadsheetStore();
+
+    setComment(store, { sheet: 0, row: 2, col: 1 }, 'C');
+    setComment(store, { sheet: 0, row: 0, col: 0 }, 'A');
+    setComment(store, { sheet: 0, row: 0, col: 2 }, 'B');
+    setComment(store, { sheet: 1, row: 0, col: 0 }, 'hidden');
+
+    expect(listComments(store.getState(), 0)).toEqual([
+      { addr: { sheet: 0, row: 0, col: 0 }, text: 'A' },
+      { addr: { sheet: 0, row: 0, col: 2 }, text: 'B' },
+      { addr: { sheet: 0, row: 2, col: 1 }, text: 'C' },
+    ]);
   });
 
   it('setComment with empty string clears the comment', () => {

@@ -1,12 +1,48 @@
+import { flushProtectionToEngine } from '../engine/protection-sync.js';
 import type { Addr, Range } from '../engine/types.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { addrKey } from '../engine/workbook-handle.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
+
+export interface SheetProtectionOptions {
+  password?: string;
+  workbook?: WorkbookHandle;
+}
 
 /** Whether `sheet` is currently flagged protected on the workbook. Mirrors
  *  the protection slice as a pure helper so call sites don't reach into the
  *  Map shape directly. */
 export function isSheetProtected(state: State, sheet: number): boolean {
   return state.protection.protectedSheets.has(sheet);
+}
+
+export function setProtectedSheet(
+  store: SpreadsheetStore,
+  sheet: number,
+  on: boolean,
+  options: SheetProtectionOptions = {},
+): void {
+  mutators.setSheetProtected(
+    store,
+    sheet,
+    on,
+    options.password !== undefined ? { password: options.password } : undefined,
+  );
+  if (options.workbook) flushProtectionToEngine(options.workbook, sheet, on, options.password);
+}
+
+export function toggleProtectedSheet(
+  store: SpreadsheetStore,
+  sheet: number,
+  options: SheetProtectionOptions = {},
+): boolean {
+  const on = !isSheetProtected(store.getState(), sheet);
+  setProtectedSheet(store, sheet, on, options);
+  return on;
+}
+
+export function protectedSheetPassword(state: State, sheet: number): string | undefined {
+  return state.protection.protectedSheets.get(sheet)?.password;
 }
 
 /** Whether the cell at `addr` is locked. Excel default is locked, so a

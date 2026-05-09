@@ -1,3 +1,4 @@
+import { deleteDefinedName, upsertDefinedName } from '../commands/named-ranges.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 
@@ -133,9 +134,8 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
         del.className = 'fc-namedlg__del';
         del.textContent = t.deleteButton;
         del.addEventListener('click', () => {
-          // Engine convention: empty formula deletes.
-          const ok = wb.setDefinedNameEntry(entry.name, '');
-          if (!ok) {
+          const result = deleteDefinedName(wb, entry.name);
+          if (!result.ok) {
             showError(t.errorEngineFailed);
             return;
           }
@@ -165,9 +165,9 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       nameInput.focus();
       return;
     }
-    const ok = wb.setDefinedNameEntry(name, formula);
-    if (!ok) {
-      showError(t.errorEngineFailed);
+    const result = upsertDefinedName(wb, name, formula);
+    if (!result.ok) {
+      showError(result.reason === 'empty-formula' ? t.errorEmptyFormula : t.errorEngineFailed);
       return;
     }
     clearError();

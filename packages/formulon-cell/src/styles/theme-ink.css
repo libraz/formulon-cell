@@ -1,6 +1,6 @@
-/* Dark theme — Microsoft Fluent / Excel 365 (dark mode).
+/* Dark theme — Fluent-inspired full spreadsheet (dark mode).
  *
- * Near-black sheet (Office "Black" theme), warm gray rail, brightened green
+ * Near-black sheet, warm gray rail, brightened green
  * accent for AA contrast against the dark background. */
 
 @layer fc.theme {

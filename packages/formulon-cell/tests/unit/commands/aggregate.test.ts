@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { aggregateSelection } from '../../../src/commands/aggregate.js';
+import {
+  aggregateSelection,
+  countUniqueRangeCells,
+  statusAggregateValue,
+  visibleStatusAggregates,
+} from '../../../src/commands/aggregate.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
 
@@ -176,7 +181,34 @@ describe('aggregateSelection', () => {
       },
     }));
     const stats = aggregateSelection(store.getState());
+    expect(stats.cells).toBe(9);
     expect(stats.numericCount).toBe(1);
     expect(stats.sum).toBe(7);
+  });
+
+  it('counts unique cells across partially overlapping ranges', () => {
+    expect(
+      countUniqueRangeCells([
+        { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 },
+        { sheet: 0, r0: 1, c0: 1, r1: 2, c1: 2 },
+      ]),
+    ).toBe(7);
+  });
+
+  it('builds visible status aggregate entries from the configured keys', () => {
+    seedNumbers(store, [
+      { row: 0, col: 0, value: 10 },
+      { row: 1, col: 0, value: 20 },
+    ]);
+    setRange(store, 0, 0, 1, 0);
+    store.setState((s) => ({ ...s, ui: { ...s.ui, statusAggs: ['sum', 'average', 'max'] } }));
+
+    const stats = aggregateSelection(store.getState());
+    expect(statusAggregateValue('count', stats)).toBe(2);
+    expect(visibleStatusAggregates(store.getState())).toEqual([
+      { key: 'sum', value: 30 },
+      { key: 'average', value: 15 },
+      { key: 'max', value: 20 },
+    ]);
   });
 });

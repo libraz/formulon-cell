@@ -6,6 +6,7 @@ import {
   detectValidationViolation,
   ERROR_TRIANGLE_COLOR,
   type ErrorTriangleHit,
+  isPlainTextOverflowCandidate,
   VALIDATION_TRIANGLE_COLOR,
 } from '../../../src/render/grid.js';
 import { paintErrorTriangle, paintValidationTriangle } from '../../../src/render/painters.js';
@@ -67,6 +68,44 @@ describe('detectErrorKind', () => {
     expect(detectErrorKind({ kind: 'text', value: 'hello' })).toBe(false);
     expect(detectErrorKind({ kind: 'number', value: 42 })).toBe(false);
     expect(detectErrorKind({ kind: 'blank' })).toBe(false);
+  });
+});
+
+describe('isPlainTextOverflowCandidate', () => {
+  const base = {
+    value: { kind: 'text' as const, value: 'long label' },
+    formula: null,
+    showFormulas: false,
+    displayOverride: null,
+    tableHeader: false,
+    hasIcon: false,
+    isMergeAnchor: false,
+  };
+
+  it('allows ordinary text to overflow into empty neighbors', () => {
+    expect(isPlainTextOverflowCandidate(base)).toBe(true);
+  });
+
+  it('keeps wrapped, aligned, formula-display, and table cells clipped', () => {
+    expect(isPlainTextOverflowCandidate({ ...base, format: { wrap: true } })).toBe(false);
+    expect(isPlainTextOverflowCandidate({ ...base, format: { align: 'center' } })).toBe(false);
+    expect(
+      isPlainTextOverflowCandidate({
+        ...base,
+        formula: '=A1',
+        showFormulas: true,
+      }),
+    ).toBe(false);
+    expect(isPlainTextOverflowCandidate({ ...base, tableHeader: true })).toBe(false);
+  });
+
+  it('does not overflow numbers', () => {
+    expect(
+      isPlainTextOverflowCandidate({
+        ...base,
+        value: { kind: 'number', value: 123 },
+      }),
+    ).toBe(false);
   });
 });
 

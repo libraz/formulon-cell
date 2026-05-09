@@ -4,17 +4,27 @@ import { fillRange } from './commands/fill.js';
 import { toggleBold, toggleItalic, toggleStrike, toggleUnderline } from './commands/format.js';
 import { History, recordFormatChange } from './commands/history.js';
 import { printSheet } from './commands/print.js';
+import {
+  isSheetProtected,
+  setProtectedSheet,
+  toggleProtectedSheet,
+} from './commands/protection.js';
 import { extractRefs, rotateRefAt } from './commands/refs.js';
 import { moveSheet, removeSheet, setSheetHidden } from './commands/sheet-mutate.js';
 import { setSheetZoom } from './commands/structure.js';
+import {
+  clearTraceArrows,
+  traceDependents as traceDependentArrows,
+  tracePrecedents as tracePrecedentArrows,
+} from './commands/traces.js';
 import { flushFormatToEngine, hydrateCellFormatsFromEngine } from './engine/cell-format-sync.js';
 import { formatCellForEdit } from './engine/edit-seed.js';
 import { hydrateCommentsAndHyperlinksFromEngine } from './engine/format-sync.js';
 import { hydrateLayoutFromEngine } from './engine/layout-sync.js';
 import { hydrateMergesFromEngine } from './engine/merges-sync.js';
 import { summarizePassthroughs, summarizeTables } from './engine/passthrough-sync.js';
-import { flushProtectionToEngine, hydrateProtectionFromEngine } from './engine/protection-sync.js';
-import { findDependents, findPrecedents } from './engine/refs-graph.js';
+import { hydrateProtectionFromEngine } from './engine/protection-sync.js';
+import { hydrateTableOverlaysFromEngine } from './engine/table-sync.js';
 import { hydrateValidationsFromEngine } from './engine/validation-sync.js';
 import { type ChangeEvent, WorkbookHandle } from './engine/workbook-handle.js';
 import {
@@ -44,6 +54,7 @@ import { attachAutocomplete } from './interact/autocomplete.js';
 import { attachCellStylesGallery } from './interact/cell-styles-gallery.js';
 import { attachCfRulesDialog } from './interact/cf-rules-dialog.js';
 import { attachClipboard } from './interact/clipboard.js';
+import { attachCommentDialog } from './interact/comment-dialog.js';
 import { attachConditionalDialog } from './interact/conditional-dialog.js';
 import { attachContextMenu } from './interact/context-menu.js';
 import { InlineEditor } from './interact/editor.js';
@@ -62,12 +73,20 @@ import { attachKeyboard } from './interact/keyboard.js';
 import { attachNamedRangeDialog } from './interact/named-range-dialog.js';
 import { attachPageSetupDialog } from './interact/page-setup-dialog.js';
 import { attachPasteSpecial } from './interact/paste-special.js';
+import { attachPivotTableDialog } from './interact/pivot-table-dialog.js';
 import { attachPointer } from './interact/pointer.js';
+import { attachQuickAnalysis } from './interact/quick-analysis.js';
+import { attachSessionCharts, type SessionChartsHandle } from './interact/session-charts.js';
 import { attachSlicer, type SlicerHandle } from './interact/slicer.js';
 import { attachStatusBar } from './interact/status-bar.js';
 import { attachValidationList } from './interact/validation.js';
+import { attachViewToolbar, type ViewToolbarHandle } from './interact/view-toolbar.js';
 import { attachWatchPanel } from './interact/watch-panel.js';
 import { attachWheel } from './interact/wheel.js';
+import {
+  attachWorkbookObjectsPanel,
+  type WorkbookObjectsPanelHandle,
+} from './interact/workbook-objects.js';
 import { GridRenderer, getErrorTriangleHits } from './render/grid.js';
 import {
   createSpreadsheetStore,
@@ -158,12 +177,11 @@ export interface SpreadsheetInstance {
   openConditionalDialog(): void;
   /** Open the read-only named-range listing dialog. */
   openNamedRangeDialog(): void;
-  /** Open the cell format dialog (Excel ⌘1). */
+  /** Open the cell format dialog. */
   openFormatDialog(): void;
   /** Open the Go To Special (F5) dialog. No-op when the feature is disabled. */
   openGoToSpecial(): void;
-  /** Open the iterative-calculation settings dialog (Excel File → Options
-   *  → Formulas). */
+  /** Open the iterative-calculation settings dialog. */
   openIterativeDialog(): void;
   /** Open the read-only "Edit Links" inspector listing every external
    *  workbook reference carried by the active workbook. The list is empty
@@ -175,7 +193,7 @@ export interface SpreadsheetInstance {
    *  the engine `conditionalFormatMutate` capability; under stub mode the
    *  list is empty. */
   openCfRulesDialog(): void;
-  /** Open the named cell-styles gallery (Excel Home → Cell Styles). */
+  /** Open the named cell-styles gallery. */
   openCellStylesGallery(): void;
   /** Open the Function Arguments dialog. Pass `seedName` (case-insensitive)
    *  to skip the picker and jump straight to argument entry for that
@@ -194,6 +212,15 @@ export interface SpreadsheetInstance {
   closeWatchWindow(): void;
   /** Toggle Watch Window visibility. No-op when the feature is off. */
   toggleWatchWindow(): void;
+  /** Open the Quick Analysis floating panel for the current selection. No-op
+   *  when `features.quickAnalysis` is off. */
+  openQuickAnalysis(): void;
+  /** Open the read-only workbook object inspector for preserved OOXML
+   *  charts/drawings/pivots and loaded worksheet tables. */
+  openWorkbookObjects(): void;
+  /** Open the PivotTable creation dialog for the current selection. No-op
+   *  when `features.pivotTableDialog` is off or the engine lacks mutation. */
+  openPivotTableDialog(): void;
   /** Open a floating slicer panel for the given table column. Returns the
    *  freshly-built `SlicerSpec` (including its auto-assigned id). Throws
    *  when the table or column can't be resolved against the workbook, or
@@ -207,9 +234,8 @@ export interface SpreadsheetInstance {
   }): SlicerSpec;
   /** Remove a slicer by id. No-op when the id isn't tracked. */
   removeSlicer(id: string): void;
-  /** Toggle sheet-protection on the currently active sheet. Equivalent to
-   *  Excel's Review → Protect Sheet button. Locked cells on protected
-   *  sheets gate writes through the command layer. */
+  /** Toggle sheet-protection on the currently active sheet. Locked cells on
+   *  protected sheets gate writes through the command layer. */
   toggleSheetProtection(): void;
   /** Set sheet-protection explicitly. `password` is currently stored
    *  verbatim and NOT enforced — v1 ships without password validation. */
@@ -299,7 +325,7 @@ export const Spreadsheet = {
     const instanceId = `fc-${++MOUNT_COUNTER}`;
     host.dataset.fcInstId = instanceId;
 
-    // Build chrome: formulabar (top), grid surface, statusbar (bottom).
+    // Build chrome: formulabar/view toolbar (top), grid surface, statusbar (bottom).
     const formulabar = document.createElement('div');
     formulabar.className = 'fc-host__formulabar';
     // Name box — typing "A1" / "B5" jumps the active cell. Doubles as the
@@ -319,21 +345,21 @@ export const Spreadsheet = {
     fx.className = 'fc-host__formulabar-fx';
     fx.textContent = 'ƒx';
     fx.tabIndex = -1;
-    fx.setAttribute('aria-label', strings.fxDialog?.fxButtonLabel ?? 'Insert function');
+    fx.setAttribute('aria-label', strings.fxDialog?.fxButtonLabel ?? strings.a11y.formulaBar);
     const fxCancel = document.createElement('button');
     fxCancel.type = 'button';
     fxCancel.className = 'fc-host__formulabar-action fc-host__formulabar-action--cancel';
     fxCancel.textContent = '×';
     fxCancel.tabIndex = -1;
     fxCancel.disabled = true;
-    fxCancel.setAttribute('aria-label', 'Cancel formula edit');
+    fxCancel.setAttribute('aria-label', strings.a11y.cancelFormulaEdit);
     const fxAccept = document.createElement('button');
     fxAccept.type = 'button';
     fxAccept.className = 'fc-host__formulabar-action fc-host__formulabar-action--accept';
     fxAccept.textContent = '✓';
     fxAccept.tabIndex = -1;
     fxAccept.disabled = true;
-    fxAccept.setAttribute('aria-label', 'Enter formula');
+    fxAccept.setAttribute('aria-label', strings.a11y.enterFormula);
     const fxInput = document.createElement('textarea');
     fxInput.className = 'fc-host__formulabar-input';
     fxInput.spellcheck = false;
@@ -350,6 +376,10 @@ export const Spreadsheet = {
     fxExpand.tabIndex = -1;
     fxExpand.textContent = '⌄';
     const refreshFormulaBarLabels = (): void => {
+      fx.setAttribute('aria-label', strings.fxDialog?.fxButtonLabel ?? strings.a11y.formulaBar);
+      fxCancel.setAttribute('aria-label', strings.a11y.cancelFormulaEdit);
+      fxAccept.setAttribute('aria-label', strings.a11y.enterFormula);
+      fxInput.setAttribute('aria-label', strings.a11y.formulaBar);
       const expanded = fxExpand.getAttribute('aria-expanded') === 'true';
       fxExpand.setAttribute(
         'aria-label',
@@ -374,6 +404,9 @@ export const Spreadsheet = {
       }
     });
     formulabar.append(tag, fxCancel, fxAccept, fx, fxInput, fxExpand);
+
+    const viewbar = document.createElement('div');
+    viewbar.className = 'fc-viewbar';
 
     const grid = document.createElement('div');
     grid.className = 'fc-host__grid';
@@ -465,20 +498,24 @@ export const Spreadsheet = {
     // anchors slot ordering; chrome slots come and go via `setChromeAttached`
     // so disabled flags reclaim vertical space (no empty bars left behind).
     const setChromeAttached = (
-      slot: 'formulabar' | 'sheetbar' | 'statusbar' | 'watchDock',
+      slot: 'formulabar' | 'viewbar' | 'sheetbar' | 'statusbar' | 'watchDock',
       on: boolean,
     ): void => {
       const el =
         slot === 'formulabar'
           ? formulabar
-          : slot === 'sheetbar'
-            ? sheetbar
-            : slot === 'statusbar'
-              ? statusbar
-              : watchDock;
+          : slot === 'viewbar'
+            ? viewbar
+            : slot === 'sheetbar'
+              ? sheetbar
+              : slot === 'statusbar'
+                ? statusbar
+                : watchDock;
       if (on) {
         if (el.parentElement === host) return;
         if (slot === 'formulabar') {
+          host.insertBefore(el, grid);
+        } else if (slot === 'viewbar') {
           host.insertBefore(el, grid);
         } else if (slot === 'sheetbar') {
           if (statusbar.parentElement === host) host.insertBefore(el, statusbar);
@@ -497,6 +534,7 @@ export const Spreadsheet = {
 
     host.appendChild(grid);
     setChromeAttached('formulabar', flags.formulaBar);
+    setChromeAttached('viewbar', flags.viewToolbar);
     setChromeAttached('sheetbar', flags.sheetTabs);
     setChromeAttached('statusbar', flags.statusBar);
     setChromeAttached('watchDock', flags.watchWindow);
@@ -527,13 +565,15 @@ export const Spreadsheet = {
     hydrateValidationsFromEngine(wb, store, store.getState().data.sheetIndex);
     hydrateCellFormatsFromEngine(wb, store, store.getState().data.sheetIndex);
     hydrateProtectionFromEngine(wb, store);
+    hydrateTableOverlaysFromEngine(wb, store);
     dispatchPassthroughSummary();
 
     function dispatchPassthroughSummary(): void {
-      // Surface non-rendered OOXML parts (charts/drawings/pivots) and Excel
-      //  Tables as host events so chrome (status bar, toast) can show a
-      //  read-only badge. The core itself does not paint these; users open
-      //  the .xlsx in Excel for full editing.
+      // Surface preserved OOXML objects (charts/drawings/pivot parts) and
+      // Excel Tables as host events so chrome (status bar, toast) can show a
+      // read-only/editing-limited badge. Pivot layouts are rendered when the
+      // engine exposes projection, but the object definition is still not
+      // authorable from the UI.
       const passthroughs = summarizePassthroughs(wb);
       const tables = summarizeTables(wb);
       host.dispatchEvent(new CustomEvent('fc:passthroughs', { detail: passthroughs }));
@@ -856,7 +896,6 @@ export const Spreadsheet = {
     // Held in `let` so the locale-change subscription can rebuild them with
     // fresh strings; detach+reattach is the v0.2 fallback for dialogs that
     // don't expose a `setStrings` hook.
-    let iterativeDialog = attachIterativeDialog({ host, getWb: () => wb, strings });
     let externalLinksDialog = attachExternalLinksDialog({
       host,
       getWb: () => wb,
@@ -884,17 +923,23 @@ export const Spreadsheet = {
     let formatPainter: FormatPainterHandle | null = null;
     let hover: ReturnType<typeof attachHover> | null = null;
     let conditionalDialog: ReturnType<typeof attachConditionalDialog> | null = null;
+    let iterativeDialog: ReturnType<typeof attachIterativeDialog> | null = null;
     let goToDialog: ReturnType<typeof attachGoToDialog> | null = null;
     let fxDialog: FxDialogHandle | null = null;
     let fxClickHandler: (() => void) | null = null;
     let namedRangeDialog: ReturnType<typeof attachNamedRangeDialog> | null = null;
     let pageSetupDialog: ReturnType<typeof attachPageSetupDialog> | null = null;
+    let pivotTableDialog: ReturnType<typeof attachPivotTableDialog> | null = null;
     let hyperlinkDialog: ReturnType<typeof attachHyperlinkDialog> | null = null;
+    let commentDialog: ReturnType<typeof attachCommentDialog> | null = null;
     let statusBar: ReturnType<typeof attachStatusBar> | null = null;
     let watchPanel: ReturnType<typeof attachWatchPanel> | null = null;
     let unsubWatchRecalc: () => void = (): void => {};
     let unsubWatchWb: () => void = (): void => {};
     let slicer: SlicerHandle | null = null;
+    let sessionCharts: SessionChartsHandle | null = null;
+    let viewToolbar: ViewToolbarHandle | null = null;
+    let workbookObjects: WorkbookObjectsPanelHandle | null = null;
     let unsubSlicerRecalc: () => void = (): void => {};
     let unsubSlicerWb: () => void = (): void => {};
     let errorMenu: ErrorMenuHandle | null = null;
@@ -906,6 +951,7 @@ export const Spreadsheet = {
       acceptHighlighted: () => false,
       close: () => {},
       refresh: () => {},
+      setLabels: () => {},
       detach: () => {},
     };
     let fxAutocomplete: AutocompleteHandle = autocompleteStub;
@@ -934,19 +980,25 @@ export const Spreadsheet = {
       'formatPainter',
       'hoverComment',
       'conditional',
+      'iterative',
       'gotoSpecial',
       'fxDialog',
       'namedRanges',
       'pageSetup',
+      'pivotTableDialog',
       'hyperlink',
+      'commentDialog',
       'statusBar',
+      'workbookObjects',
       'watchWindow',
       'slicer',
+      'charts',
       'errorIndicators',
       'autocomplete',
       'wheel',
       'shortcuts',
       'formulaBar',
+      'viewToolbar',
       'sheetTabs',
     ] as const;
 
@@ -956,14 +1008,20 @@ export const Spreadsheet = {
     const HOST_FEATURE_USES_STRINGS: ReadonlySet<string> = new Set([
       'formatDialog',
       'conditional',
+      'iterative',
       'gotoSpecial',
       'fxDialog',
       'namedRanges',
       'pageSetup',
+      'pivotTableDialog',
       'hyperlink',
+      'commentDialog',
       'statusBar',
+      'workbookObjects',
+      'viewToolbar',
       'watchWindow',
       'slicer',
+      'charts',
       'errorIndicators',
     ]);
 
@@ -973,6 +1031,7 @@ export const Spreadsheet = {
       'shortcuts',
       'clipboard',
       'pasteSpecial',
+      'quickAnalysis',
       'contextMenu',
       'findReplace',
       'validation',
@@ -1017,6 +1076,14 @@ export const Spreadsheet = {
           featureRegistry.set(
             'conditional',
             wrapHandle(conditionalDialog, () => conditionalDialog?.detach()),
+          );
+          break;
+        case 'iterative':
+          if (iterativeDialog) return;
+          iterativeDialog = attachIterativeDialog({ host, getWb: () => wb, strings });
+          featureRegistry.set(
+            'iterative',
+            wrapHandle(iterativeDialog, () => iterativeDialog?.detach()),
           );
           break;
         case 'gotoSpecial':
@@ -1064,6 +1131,23 @@ export const Spreadsheet = {
             wrapHandle(pageSetupDialog, () => pageSetupDialog?.detach()),
           );
           break;
+        case 'pivotTableDialog':
+          if (pivotTableDialog) return;
+          pivotTableDialog = attachPivotTableDialog({
+            host,
+            store,
+            wb,
+            strings,
+            onAfterCreate: () => {
+              mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
+            },
+            invalidate: () => renderer.invalidate(),
+          });
+          featureRegistry.set(
+            'pivotTableDialog',
+            wrapHandle(pivotTableDialog, () => pivotTableDialog?.detach()),
+          );
+          break;
         case 'hyperlink':
           if (hyperlinkDialog) return;
           hyperlinkDialog = attachHyperlinkDialog({
@@ -1076,6 +1160,20 @@ export const Spreadsheet = {
           featureRegistry.set(
             'hyperlink',
             wrapHandle(hyperlinkDialog, () => hyperlinkDialog?.detach()),
+          );
+          break;
+        case 'commentDialog':
+          if (commentDialog) return;
+          commentDialog = attachCommentDialog({
+            host,
+            store,
+            strings,
+            history,
+            getWb: () => wb,
+          });
+          featureRegistry.set(
+            'commentDialog',
+            wrapHandle(commentDialog, () => commentDialog?.detach()),
           );
           break;
         case 'statusBar':
@@ -1109,6 +1207,31 @@ export const Spreadsheet = {
             wrapHandle(statusBar, () => statusBar?.detach()),
           );
           break;
+        case 'workbookObjects':
+          if (workbookObjects) return;
+          workbookObjects = attachWorkbookObjectsPanel({ host, wb, strings });
+          featureRegistry.set(
+            'workbookObjects',
+            wrapHandle(workbookObjects, () => workbookObjects?.detach()),
+          );
+          break;
+        case 'viewToolbar':
+          if (viewToolbar) return;
+          setChromeAttached('viewbar', true);
+          viewToolbar = attachViewToolbar({
+            toolbar: viewbar,
+            store,
+            wb,
+            history,
+            strings,
+            onOpenObjects: flags.workbookObjects ? () => workbookObjects?.open() : undefined,
+            onChanged: () => renderer.invalidate(),
+          });
+          featureRegistry.set(
+            'viewToolbar',
+            wrapHandle(viewToolbar, () => viewToolbar?.detach()),
+          );
+          break;
         case 'watchWindow':
           if (watchPanel) return;
           setChromeAttached('watchDock', true);
@@ -1130,6 +1253,18 @@ export const Spreadsheet = {
           unsubSlicerRecalc = emitter.on('recalc', () => slicer?.refresh());
           unsubSlicerWb = emitter.on('workbookChange', () => slicer?.refresh());
           break;
+        case 'charts':
+          if (sessionCharts) return;
+          sessionCharts = attachSessionCharts({
+            host,
+            store,
+            labels: strings.sessionCharts,
+          });
+          featureRegistry.set(
+            'charts',
+            wrapHandle(sessionCharts, () => sessionCharts?.detach()),
+          );
+          break;
         case 'errorIndicators':
           if (errorMenu) return;
           errorMenu = attachErrorMenu({
@@ -1143,6 +1278,11 @@ export const Spreadsheet = {
               fxInput.value = formatCellForEdit(cell, wb, addr);
               fxInput.focus();
               fxInput.setSelectionRange(fxInput.value.length, fxInput.value.length);
+            },
+            onTraceError: (addr) => {
+              mutators.setActive(store, addr);
+              tracePrecedentArrows(store, wb, addr);
+              renderer.invalidate();
             },
           });
           if (!canvasErrorClickAttached) {
@@ -1162,8 +1302,9 @@ export const Spreadsheet = {
             getTables: () => wb.getTables(),
             getCustomFunctions: () => formulaRegistry.list(),
             getFunctionNames: () => wb.functionNames(),
+            labels: strings.autocomplete,
           });
-          fxArgHelper = attachArgHelper({ input: fxInput });
+          fxArgHelper = attachArgHelper({ input: fxInput, labels: strings.argHelper });
           break;
         case 'wheel':
           // Idempotent — `detachWheel` is replaced wholesale.
@@ -1208,6 +1349,11 @@ export const Spreadsheet = {
           conditionalDialog = null;
           featureRegistry.delete('conditional');
           break;
+        case 'iterative':
+          iterativeDialog?.detach();
+          iterativeDialog = null;
+          featureRegistry.delete('iterative');
+          break;
         case 'gotoSpecial':
           goToDialog?.detach();
           goToDialog = null;
@@ -1232,16 +1378,37 @@ export const Spreadsheet = {
           pageSetupDialog = null;
           featureRegistry.delete('pageSetup');
           break;
+        case 'pivotTableDialog':
+          pivotTableDialog?.detach();
+          pivotTableDialog = null;
+          featureRegistry.delete('pivotTableDialog');
+          break;
         case 'hyperlink':
           hyperlinkDialog?.detach();
           hyperlinkDialog = null;
           featureRegistry.delete('hyperlink');
+          break;
+        case 'commentDialog':
+          commentDialog?.detach();
+          commentDialog = null;
+          featureRegistry.delete('commentDialog');
           break;
         case 'statusBar':
           statusBar?.detach();
           statusBar = null;
           featureRegistry.delete('statusBar');
           setChromeAttached('statusbar', false);
+          break;
+        case 'workbookObjects':
+          workbookObjects?.detach();
+          workbookObjects = null;
+          featureRegistry.delete('workbookObjects');
+          break;
+        case 'viewToolbar':
+          viewToolbar?.detach();
+          viewToolbar = null;
+          featureRegistry.delete('viewToolbar');
+          setChromeAttached('viewbar', false);
           break;
         case 'watchWindow':
           unsubWatchRecalc();
@@ -1261,6 +1428,11 @@ export const Spreadsheet = {
           slicer?.detach();
           slicer = null;
           featureRegistry.delete('slicer');
+          break;
+        case 'charts':
+          sessionCharts?.detach();
+          sessionCharts = null;
+          featureRegistry.delete('charts');
           break;
         case 'errorIndicators':
           if (canvasErrorClickAttached) canvas.removeEventListener('click', onCanvasClick);
@@ -1299,9 +1471,55 @@ export const Spreadsheet = {
       pasteSpecialDialog: ReturnType<typeof attachPasteSpecial> | null;
       findReplace: ReturnType<typeof attachFindReplace> | null;
       validation: ReturnType<typeof attachValidationList> | null;
+      quickAnalysis: ReturnType<typeof attachQuickAnalysis> | null;
       clipboardH: ReturnType<typeof attachClipboard> | null;
+      contextMenu: ExtensionHandle | null;
       unbind: () => void;
     }
+
+    const WB_REGISTRY_IDS = [
+      'clipboard',
+      'pasteSpecial',
+      'quickAnalysis',
+      'contextMenu',
+      'findReplace',
+      'validation',
+    ] as const;
+
+    const syncBindingFeatures = (current: EngineBinding): void => {
+      for (const id of WB_REGISTRY_IDS) featureRegistry.delete(id);
+      if (current.clipboardH) {
+        featureRegistry.set(
+          'clipboard',
+          wrapHandle(current.clipboardH, () => current.clipboardH?.detach()),
+        );
+      }
+      if (current.pasteSpecialDialog) {
+        featureRegistry.set(
+          'pasteSpecial',
+          wrapHandle(current.pasteSpecialDialog, () => current.pasteSpecialDialog?.detach()),
+        );
+      }
+      if (current.quickAnalysis) {
+        featureRegistry.set(
+          'quickAnalysis',
+          wrapHandle(current.quickAnalysis, () => current.quickAnalysis?.detach()),
+        );
+      }
+      if (current.contextMenu) featureRegistry.set('contextMenu', current.contextMenu);
+      if (current.findReplace) {
+        featureRegistry.set(
+          'findReplace',
+          wrapHandle(current.findReplace, () => current.findReplace?.detach()),
+        );
+      }
+      if (current.validation) {
+        featureRegistry.set(
+          'validation',
+          wrapHandle(current.validation, () => current.validation?.detach()),
+        );
+      }
+    };
 
     const bindEngine = (currentWb: WorkbookHandle): EngineBinding => {
       const editor = new InlineEditor({
@@ -1309,6 +1527,10 @@ export const Spreadsheet = {
         grid,
         store,
         wb: currentWb,
+        getLabels: () => ({
+          autocomplete: strings.autocomplete,
+          argHelper: strings.argHelper,
+        }),
         onAfterCommit: () => {
           mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex));
         },
@@ -1352,6 +1574,7 @@ export const Spreadsheet = {
               tag.select();
             },
             onSwitchSheet: (delta) => switchRelativeSheet(delta),
+            onEditComment: () => commentDialog?.open(),
           })
         : (): void => {};
       const clipboardH = flags.clipboard
@@ -1388,6 +1611,7 @@ export const Spreadsheet = {
             onFormatDialog: () => formatDialog?.open(),
             onPasteSpecial: () => pasteSpecialDialog?.open(),
             onInsertHyperlink: () => hyperlinkDialog?.open(),
+            onEditComment: () => commentDialog?.open(),
             onToggleWatch: flags.watchWindow
               ? (addr) => {
                   const watches = store.getState().watch.watches;
@@ -1411,6 +1635,11 @@ export const Spreadsheet = {
               : undefined,
           })
         : (): void => {};
+      const contextMenu = flags.contextMenu
+        ? wrapHandle({}, () => {
+            detachContextMenu();
+          })
+        : null;
       const findReplace = flags.findReplace
         ? attachFindReplace({
             host,
@@ -1428,6 +1657,20 @@ export const Spreadsheet = {
             wb: currentWb,
             onAfterCommit: () =>
               mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex)),
+          })
+        : null;
+      const quickAnalysis = flags.quickAnalysis
+        ? attachQuickAnalysis({
+            host,
+            store,
+            wb: currentWb,
+            strings,
+            onAfterCommit: () =>
+              mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex)),
+            invalidate: () => renderer.invalidate(),
+            onOpenPivotTable: flags.pivotTableDialog ? () => pivotTableDialog?.open() : undefined,
+            canOpenPivotTable: () => !!pivotTableDialog,
+            canCreateChart: () => flags.charts && !!sessionCharts,
           })
         : null;
 
@@ -1472,7 +1715,9 @@ export const Spreadsheet = {
         pasteSpecialDialog,
         findReplace,
         validation,
+        quickAnalysis,
         clipboardH,
+        contextMenu,
         unbind: () => {
           detachPtr();
           detachKey();
@@ -1481,6 +1726,7 @@ export const Spreadsheet = {
           findReplace?.detach();
           pasteSpecialDialog?.detach();
           validation?.detach();
+          quickAnalysis?.detach();
           grid.removeEventListener('dblclick', onDblClick);
           unsubWb();
           if (editor.isActive()) editor.cancel();
@@ -1489,6 +1735,7 @@ export const Spreadsheet = {
     };
 
     let binding = bindEngine(wb);
+    syncBindingFeatures(binding);
 
     // Top-level shortcuts that need to beat the browser default — Cmd+F opens
     // Find/Replace, Cmd+A selects all cells, Cmd+1 opens Format Cells. Bound on
@@ -1530,6 +1777,12 @@ export const Spreadsheet = {
         if (!binding.pasteSpecialDialog) return;
         e.preventDefault();
         binding.pasteSpecialDialog.open();
+        return;
+      }
+      if (e.ctrlKey && !e.metaKey && k === 'q') {
+        if (!binding.quickAnalysis) return;
+        e.preventDefault();
+        binding.quickAnalysis.open();
         return;
       }
       if (k === 'f') {
@@ -1974,6 +2227,7 @@ export const Spreadsheet = {
     const ctx: ExtensionContext = {
       host,
       formulabar,
+      viewbar,
       grid,
       statusbar,
       canvas,
@@ -2003,11 +2257,6 @@ export const Spreadsheet = {
       const handle = ext.setup(ctx);
       if (handle) userHandles.set(ext.id, handle);
     };
-    if (opts.extensions) {
-      const sorted = sortByPriority(dedupeById(flattenExtensions(opts.extensions)));
-      for (const ext of sorted) mountExtension(ext);
-    }
-
     // Combined view exposed on `instance.features` — built-ins + user.
     const featuresView: Record<string, ExtensionHandle | undefined> = {};
     const refreshFeaturesView = (): void => {
@@ -2015,14 +2264,18 @@ export const Spreadsheet = {
       for (const [k, v] of featureRegistry) featuresView[k] = v;
       for (const [k, v] of userHandles) featuresView[k] = v;
     };
-    refreshFeaturesView();
-
     // Initial host-feature attach — runs after every helper closure
     // (`onCanvasClick`, `onHostKey`, `syncFxRefs`, `commitFx`) is in
     // scope so the attacher bodies can resolve them at call time.
     for (const id of HOST_TOGGLEABLE_IDS) {
       if (flags[id as keyof typeof flags]) attachHostFeature(id);
     }
+
+    if (opts.extensions) {
+      const sorted = sortByPriority(dedupeById(flattenExtensions(opts.extensions)));
+      for (const ext of sorted) mountExtension(ext);
+    }
+    refreshFeaturesView();
 
     // Locale change → push fresh strings everywhere. Built-ins that ship a
     // `setStrings` hook live-update labels in place; the rest are rebuilt by
@@ -2031,15 +2284,13 @@ export const Spreadsheet = {
       strings = next;
       host.setAttribute('aria-label', strings.a11y.spreadsheet);
       tag.setAttribute('aria-label', strings.a11y.nameBox);
-      fx.setAttribute('aria-label', strings.fxDialog?.fxButtonLabel ?? 'Insert function');
-      fxInput.setAttribute('aria-label', strings.a11y.formulaBar);
       refreshFormulaBarLabels();
+      fxAutocomplete.setLabels(next.autocomplete);
+      fxArgHelper?.setLabels(next.argHelper);
       updateSheetTabs();
       renderer.invalidate();
 
       // Always-on dialogs: rebuild — none of these expose setStrings yet.
-      iterativeDialog.detach();
-      iterativeDialog = attachIterativeDialog({ host, getWb: () => wb, strings });
       externalLinksDialog.detach();
       externalLinksDialog = attachExternalLinksDialog({ host, getWb: () => wb, strings });
       cfRulesDialog.detach();
@@ -2068,6 +2319,10 @@ export const Spreadsheet = {
       // find-replace, validation) live inside `binding`. Rebuild it.
       binding.unbind();
       binding = bindEngine(wb);
+      syncBindingFeatures(binding);
+      viewToolbar?.bindWorkbook(wb);
+      workbookObjects?.bindWorkbook(wb);
+      pivotTableDialog?.bindWorkbook(wb);
 
       // User extensions opt-in via setStrings.
       for (const handle of userHandles.values()) handle.setStrings?.(next);
@@ -2103,11 +2358,17 @@ export const Spreadsheet = {
         return true;
       },
       setFeatures(next) {
+        const prevFlags = flags;
         const nextFlags = resolveFlags(next);
+        const shouldRebuildViewToolbarObjects =
+          prevFlags.viewToolbar &&
+          nextFlags.viewToolbar &&
+          prevFlags.workbookObjects !== nextFlags.workbookObjects;
+        flags = nextFlags;
         // Diff host-level features and dispatch attach/detach.
         for (const id of HOST_TOGGLEABLE_IDS) {
-          const k = id as keyof typeof flags;
-          const was = flags[k];
+          const k = id as keyof typeof prevFlags;
+          const was = prevFlags[k];
           const now = nextFlags[k];
           if (was === now) continue;
           if (was && !now) detachHostFeature(id);
@@ -2117,12 +2378,19 @@ export const Spreadsheet = {
         // editor / pointer / undo state intact when only host-level flags
         // change.
         const wbChanged = WB_TOGGLEABLE_IDS.some(
-          (id) => flags[id as keyof typeof flags] !== nextFlags[id as keyof typeof nextFlags],
+          (id) =>
+            prevFlags[id as keyof typeof prevFlags] !== nextFlags[id as keyof typeof nextFlags],
         );
-        flags = nextFlags;
+        if (shouldRebuildViewToolbarObjects && viewToolbar) {
+          detachHostFeature('viewToolbar');
+          attachHostFeature('viewToolbar');
+        }
         if (wbChanged) {
           binding.unbind();
           binding = bindEngine(wb);
+          syncBindingFeatures(binding);
+          viewToolbar?.bindWorkbook(wb);
+          workbookObjects?.bindWorkbook(wb);
         }
         refreshFeaturesView();
       },
@@ -2141,7 +2409,7 @@ export const Spreadsheet = {
         conditionalDialog?.open();
       },
       openIterativeDialog() {
-        iterativeDialog.open();
+        iterativeDialog?.open();
       },
       openExternalLinksDialog() {
         externalLinksDialog.open();
@@ -2183,6 +2451,36 @@ export const Spreadsheet = {
       toggleWatchWindow() {
         watchPanel?.toggle();
       },
+      openQuickAnalysis() {
+        const userQuick = userHandles.get('quickAnalysis') as
+          | (ExtensionHandle & { open?: () => void })
+          | undefined;
+        if (userQuick?.open) {
+          userQuick.open();
+          return;
+        }
+        binding.quickAnalysis?.open();
+      },
+      openWorkbookObjects() {
+        const userObjects = userHandles.get('workbookObjects') as
+          | (ExtensionHandle & { open?: () => void })
+          | undefined;
+        if (userObjects?.open) {
+          userObjects.open();
+          return;
+        }
+        workbookObjects?.open();
+      },
+      openPivotTableDialog() {
+        const userPivot = userHandles.get('pivotTableDialog') as
+          | (ExtensionHandle & { open?: () => void })
+          | undefined;
+        if (userPivot?.open) {
+          userPivot.open();
+          return;
+        }
+        pivotTableDialog?.open();
+      },
       addSlicer(input) {
         if (!slicer) {
           throw new Error('addSlicer: features.slicer is disabled');
@@ -2193,43 +2491,26 @@ export const Spreadsheet = {
         slicer?.removeSlicer(id);
       },
       toggleSheetProtection() {
-        const sheet = store.getState().data.sheetIndex;
-        const on = !store.getState().protection.protectedSheets.has(sheet);
-        mutators.setSheetProtected(store, sheet, on);
-        flushProtectionToEngine(wb, sheet, on);
+        toggleProtectedSheet(store, store.getState().data.sheetIndex, { workbook: wb });
         renderer.invalidate();
       },
       setSheetProtected(on: boolean, password?: string) {
-        const sheet = store.getState().data.sheetIndex;
-        mutators.setSheetProtected(
-          store,
-          sheet,
-          on,
-          password !== undefined ? { password } : undefined,
-        );
-        flushProtectionToEngine(wb, sheet, on, password);
+        setProtectedSheet(store, store.getState().data.sheetIndex, on, { workbook: wb, password });
         renderer.invalidate();
       },
       isSheetProtected() {
-        const sheet = store.getState().data.sheetIndex;
-        return store.getState().protection.protectedSheets.has(sheet);
+        return isSheetProtected(store.getState(), store.getState().data.sheetIndex);
       },
       tracePrecedents() {
-        const a = store.getState().selection.active;
-        for (const from of findPrecedents(wb, a)) {
-          mutators.addTrace(store, { kind: 'precedent', from, to: a });
-        }
+        tracePrecedentArrows(store, wb);
         renderer.invalidate();
       },
       traceDependents() {
-        const a = store.getState().selection.active;
-        for (const to of findDependents(wb, a)) {
-          mutators.addTrace(store, { kind: 'dependent', from: a, to });
-        }
+        traceDependentArrows(store, wb);
         renderer.invalidate();
       },
       clearTraces() {
-        mutators.clearTraces(store);
+        clearTraceArrows(store);
         renderer.invalidate();
       },
       setTheme(t) {
@@ -2272,9 +2553,14 @@ export const Spreadsheet = {
         );
         mutators.setSheetIndex(store, nextSheet);
         hydrateActiveSheet();
+        hydrateTableOverlaysFromEngine(wb, store);
         dispatchPassthroughSummary();
         binding = bindEngine(wb);
+        syncBindingFeatures(binding);
+        viewToolbar?.bindWorkbook(wb);
+        workbookObjects?.bindWorkbook(wb);
         namedRangeDialog?.bindWorkbook(wb);
+        pivotTableDialog?.bindWorkbook(wb);
         statusBar?.refresh();
         updateSheetTabs();
         // Notify user extensions so they can rebind their wb references.
@@ -2299,14 +2585,16 @@ export const Spreadsheet = {
         hover?.detach();
         conditionalDialog?.detach();
         goToDialog?.detach();
-        iterativeDialog.detach();
+        iterativeDialog?.detach();
         externalLinksDialog.detach();
         cfRulesDialog.detach();
         cellStylesGallery.detach();
         fxDialog?.detach();
         namedRangeDialog?.detach();
         pageSetupDialog?.detach();
+        pivotTableDialog?.detach();
         hyperlinkDialog?.detach();
+        commentDialog?.detach();
         statusBar?.detach();
         watchPanel?.detach();
         unsubWatchRecalc();
@@ -2314,6 +2602,7 @@ export const Spreadsheet = {
         slicer?.detach();
         unsubSlicerRecalc();
         unsubSlicerWb();
+        sessionCharts?.detach();
         errorMenu?.detach();
         if (errorMenu) canvas.removeEventListener('click', onCanvasClick);
         host.removeEventListener('keydown', onHostKey);

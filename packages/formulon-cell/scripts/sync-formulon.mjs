@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Mirrors a local formulon dist into vendor/. Used during pre-publish development;
 // once @libraz/formulon is on npm, this script is replaced by the peer-dep import.
-import { copyFileSync, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,10 +9,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 const SRC = resolve(here, '../../../../formulon/packages/npm/dist');
 const DST = resolve(here, '../vendor/formulon');
 
-// formulon.web.js is the browser-only variant used by Cell's UI runtime.
-// It has the same embind surface as formulon.js, so the generated
-// formulon.d.ts is re-exported as formulon.web.d.ts after copying.
-const files = ['formulon.js', 'formulon.web.js', 'formulon.wasm', 'formulon.d.ts'];
+const files = ['formulon.js', 'formulon.wasm', 'formulon.d.ts'];
+// `formulon.web.js` and its types were a browser-only variant that has been
+// retired upstream. Sweep them out of vendor/ on every sync so stale copies
+// from older builds don't hang around and risk being imported by accident.
+const stale = ['formulon.web.js', 'formulon.web.d.ts'];
 
 if (!existsSync(SRC)) {
   process.stderr.write(`[sync-formulon] not found: ${SRC}\n`);
@@ -36,9 +37,10 @@ for (const f of files) {
   process.stdout.write(`[sync-formulon] ${f} (${(size / 1024).toFixed(1)} KB)\n`);
 }
 
-const webTypes = resolve(DST, 'formulon.web.d.ts');
-writeFileSync(
-  webTypes,
-  "export { default } from './formulon.js';\nexport type * from './formulon.js';\n",
-);
-process.stdout.write('[sync-formulon] formulon.web.d.ts\n');
+for (const f of stale) {
+  const d = resolve(DST, f);
+  if (existsSync(d)) {
+    rmSync(d);
+    process.stdout.write(`[sync-formulon] removed stale ${f}\n`);
+  }
+}

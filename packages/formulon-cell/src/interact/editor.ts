@@ -6,8 +6,12 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { addrKey } from '../engine/workbook-handle.js';
 import { cellRect } from '../render/geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
-import { type ArgHelperHandle, attachArgHelper } from './arg-helper.js';
-import { type AutocompleteHandle, attachAutocomplete } from './autocomplete.js';
+import { type ArgHelperHandle, type ArgHelperLabels, attachArgHelper } from './arg-helper.js';
+import {
+  type AutocompleteHandle,
+  type AutocompleteLabels,
+  attachAutocomplete,
+} from './autocomplete.js';
 
 const MAX_ROW = 1_048_575;
 const MAX_COL = 16_383;
@@ -38,6 +42,10 @@ export interface EditorDeps {
     severity: 'stop' | 'warning' | 'information';
     message: string;
   }) => void;
+  getLabels?: () => {
+    autocomplete?: Partial<AutocompleteLabels>;
+    argHelper?: Partial<ArgHelperLabels>;
+  };
 }
 
 /**
@@ -130,8 +138,9 @@ export class InlineEditor {
       editingAddr: a,
       getColumnValues: (sheet, col, beforeRow) => this.collectColumnHistory(sheet, col, beforeRow),
       getFunctionNames: () => this.deps.wb.functionNames(),
+      labels: this.deps.getLabels?.().autocomplete,
     });
-    this.argHelper = attachArgHelper({ input });
+    this.argHelper = attachArgHelper({ input, labels: this.deps.getLabels?.().argHelper });
     this.argHelper.refresh();
     syncEditorRefs(this.deps.store, seed);
   }

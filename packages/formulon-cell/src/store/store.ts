@@ -1,4 +1,6 @@
 import { createStore } from 'zustand/vanilla';
+import type { TableOverlay } from '../commands/format-as-table.js';
+import type { SheetView, SheetViewPatch } from '../commands/sheet-views.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { addrKey } from '../engine/workbook-handle.js';
 
@@ -33,8 +35,9 @@ export type CellVAlign = 'top' | 'middle' | 'bottom';
 
 /** Per-side border style. The renderer treats `false`/missing as "no border"
  *  and `true` as the legacy single-line border (back-compat). Object form
- *  carries an Excel-style style + optional color. The full OOXML repertoire
- *  is supported; Excel's 13 ordinals map to these names verbatim. */
+ *  carries a spreadsheet-style style + optional color. The full OOXML
+ *  repertoire is supported; common spreadsheet border ordinals map to these
+ *  names verbatim. */
 export type CellBorderStyle =
   | 'thin'
   | 'medium'
@@ -62,8 +65,8 @@ export interface CellBorders {
   right?: CellBorderSide;
   bottom?: CellBorderSide;
   left?: CellBorderSide;
-  /** Diagonal — Excel supports both directions; `\` runs top-left → bottom-right
-   *  and `/` runs bottom-left → top-right. */
+  /** Diagonal border directions: `\` runs top-left → bottom-right and `/`
+   *  runs bottom-left → top-right. */
   diagonalDown?: CellBorderSide;
   diagonalUp?: CellBorderSide;
 }
@@ -75,7 +78,7 @@ export interface CellFormat {
   underline?: boolean;
   strike?: boolean;
   align?: CellAlign;
-  /** Vertical alignment. Excel default is 'bottom'. */
+  /** Vertical alignment. Default is 'bottom'. */
   vAlign?: CellVAlign;
   /** Wrap text within the cell — paint multi-line with hard wrapping. */
   wrap?: boolean;
@@ -103,7 +106,7 @@ export interface CellFormat {
    *  kinds (whole/decimal/date/time/textLength/custom) constrain typed input
    *  through `validateAgainst()` — the chevron is list-only. */
   validation?: CellValidation;
-  /** Sheet-protection lock flag. Excel default is `true` (locked) — `undefined`
+  /** Sheet-protection lock flag. Default is `true` (locked) — `undefined`
    *  is treated as locked. Set to `false` to opt the cell out of the
    *  per-sheet protection gate via `setCellLocked(range, false)`. The flag
    *  only takes effect when the containing sheet is also marked protected
@@ -124,7 +127,7 @@ export type ValidationErrorStyle = 'stop' | 'warning' | 'information';
  *  upstream `DataValidationEntry` shape minus `type` / `op` / formulas which
  *  the discriminated cases own. */
 export interface ValidationMeta {
-  /** Allow empty input regardless of constraint. Default true (Excel parity). */
+  /** Allow empty input regardless of constraint. Default true. */
   allowBlank?: boolean;
   errorStyle?: ValidationErrorStyle;
   errorTitle?: string;
@@ -235,6 +238,9 @@ export interface UiSlice {
   /** Live preview range while dragging the fill handle. Painted as a dashed
    *  marquee; cleared when the drag ends. Null at rest. */
   fillPreview: Range | null;
+  /** Source range currently held by the internal clipboard. Painted as a
+   *  dashed copy marquee, similar to Excel's marching ants. */
+  copyRange: Range | null;
   /** When false, the renderer skips drawing inter-cell hairline gridlines. */
   showGridLines: boolean;
   /** When false, the renderer hides the row-number / column-letter strips. */
@@ -376,6 +382,27 @@ export interface SparklineSlice {
   sparklines: Map<string, Sparkline>;
 }
 
+export type SessionChartKind = 'column' | 'line';
+
+/** Session chart overlay. This is intentionally UI-owned until the engine
+ *  exposes chart authoring; the source range can later map to a persisted
+ *  chart definition without changing the public command shape. */
+export interface SessionChart {
+  id: string;
+  kind: SessionChartKind;
+  source: Range;
+  title?: string;
+  color?: string;
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+}
+
+export interface ChartsSlice {
+  charts: readonly SessionChart[];
+}
+
 /** Cells the user has pinned in the Watch Window. Session-only — Excel
  *  parity: watches don't survive workbook close, and they aren't recorded
  *  in the undo stack. Order is insertion order. */
@@ -505,6 +532,17 @@ export interface SlicersSlice {
   slicers: readonly SlicerSpec[];
 }
 
+/** Session-level Format-as-Table overlays. Full ListObject authoring is
+ *  engine-gated; this slice gives the UI Excel-style table visuals today. */
+export interface TablesSlice {
+  tables: readonly TableOverlay[];
+}
+
+export interface SheetViewsSlice {
+  views: readonly SheetView[];
+  activeViewId: string | null;
+}
+
 /** Workbook-level sheet-protection state. Each protected sheet is keyed by
  *  its index; the value records whether a password was supplied (currently
  *  stored verbatim, not enforced — v1 ships without password validation).
@@ -525,16 +563,36 @@ export interface State {
   merges: MergesSlice;
   conditional: ConditionalSlice;
   sparkline: SparklineSlice;
+  charts: ChartsSlice;
   watch: WatchSlice;
   traces: TracesSlice;
   errorIndicators: ErrorIndicatorSlice;
   pageSetup: PageSetupSlice;
   slicers: SlicersSlice;
+  tables: TablesSlice;
+  sheetViews: SheetViewsSlice;
   protection: ProtectionSlice;
 }
 
 const initialAddr = (sheet = 0): Addr => ({ sheet, row: 0, col: 0 });
 const initialRange = (sheet = 0): Range => ({ sheet, r0: 0, c0: 0, r1: 0, c1: 0 });
+
+function rangesIntersect(a: Range, b: Range): boolean {
+  return a.sheet === b.sheet && !(a.r1 < b.r0 || a.r0 > b.r1 || a.c1 < b.c0 || a.c0 > b.c1);
+}
+
+function keyInRange(key: string, range: Range): boolean {
+  const [sheet, row, col] = key.split(':').map(Number);
+  return (
+    sheet === range.sheet &&
+    row !== undefined &&
+    col !== undefined &&
+    row >= range.r0 &&
+    row <= range.r1 &&
+    col >= range.c0 &&
+    col <= range.c1
+  );
+}
 
 export const createSpreadsheetStore = () =>
   createStore<State>(() => ({
@@ -568,6 +626,7 @@ export const createSpreadsheetStore = () =>
       hover: null,
       theme: 'paper',
       fillPreview: null,
+      copyRange: null,
       showGridLines: true,
       showHeaders: true,
       showFormulas: false,
@@ -581,11 +640,14 @@ export const createSpreadsheetStore = () =>
     merges: { byAnchor: new Map(), byCell: new Map() },
     conditional: { rules: [] },
     sparkline: { sparklines: new Map() },
+    charts: { charts: [] },
     watch: { watches: [] },
     traces: { items: [] },
     errorIndicators: { ignoredErrors: new Set() },
     pageSetup: { setupBySheet: new Map() },
     slicers: { slicers: [] },
+    tables: { tables: [] },
+    sheetViews: { views: [], activeViewId: null },
     protection: { protectedSheets: new Map() },
   }));
 
@@ -734,6 +796,10 @@ export const mutators = {
 
   setFillPreview(store: SpreadsheetStore, range: Range | null): void {
     store.setState((s) => ({ ...s, ui: { ...s.ui, fillPreview: range } }));
+  },
+
+  setCopyRange(store: SpreadsheetStore, range: Range | null): void {
+    store.setState((s) => ({ ...s, ui: { ...s.ui, copyRange: range ? { ...range } : null } }));
   },
 
   setCell(
@@ -976,6 +1042,14 @@ export const mutators = {
     store.setState((s) => ({ ...s, conditional: { rules: [] } }));
   },
 
+  clearConditionalRulesInRange(store: SpreadsheetStore, range: Range): void {
+    store.setState((s) => {
+      const rules = s.conditional.rules.filter((rule) => !rangesIntersect(rule.range, range));
+      if (rules.length === s.conditional.rules.length) return s;
+      return { ...s, conditional: { rules } };
+    });
+  },
+
   /** Attach a sparkline spec to `addr`. Pass `null` to remove. */
   setSparkline(store: SpreadsheetStore, addr: Addr, spec: Sparkline | null): void {
     store.setState((s) => {
@@ -992,6 +1066,53 @@ export const mutators = {
       const sparklines = new Map(s.sparkline.sparklines);
       sparklines.delete(addrKey(addr));
       return { ...s, sparkline: { sparklines } };
+    });
+  },
+
+  clearSparklinesInRange(store: SpreadsheetStore, range: Range): void {
+    store.setState((s) => {
+      const sparklines = new Map(s.sparkline.sparklines);
+      for (const key of sparklines.keys()) {
+        if (keyInRange(key, range)) sparklines.delete(key);
+      }
+      if (sparklines.size === s.sparkline.sparklines.size) return s;
+      return { ...s, sparkline: { sparklines } };
+    });
+  },
+
+  upsertChart(store: SpreadsheetStore, chart: SessionChart): void {
+    store.setState((s) => {
+      const next = s.charts.charts.filter((c) => c.id !== chart.id);
+      return { ...s, charts: { charts: [...next, { ...chart, source: { ...chart.source } }] } };
+    });
+  },
+
+  removeChart(store: SpreadsheetStore, id: string): void {
+    store.setState((s) => {
+      const next = s.charts.charts.filter((c) => c.id !== id);
+      if (next.length === s.charts.charts.length) return s;
+      return { ...s, charts: { charts: next } };
+    });
+  },
+
+  updateChart(store: SpreadsheetStore, id: string, patch: Partial<Omit<SessionChart, 'id'>>): void {
+    store.setState((s) => {
+      let changed = false;
+      const next = s.charts.charts.map((chart) => {
+        if (chart.id !== id) return chart;
+        changed = true;
+        return { ...chart, ...patch, source: patch.source ? { ...patch.source } : chart.source };
+      });
+      if (!changed) return s;
+      return { ...s, charts: { charts: next } };
+    });
+  },
+
+  clearChartsInRange(store: SpreadsheetStore, range: Range): void {
+    store.setState((s) => {
+      const next = s.charts.charts.filter((chart) => !rangesIntersect(chart.source, range));
+      if (next.length === s.charts.charts.length) return s;
+      return { ...s, charts: { charts: next } };
     });
   },
 
@@ -1069,6 +1190,17 @@ export const mutators = {
       if (s.errorIndicators.ignoredErrors.has(key)) return s;
       const next = new Set(s.errorIndicators.ignoredErrors);
       next.add(key);
+      return { ...s, errorIndicators: { ignoredErrors: next } };
+    });
+  },
+
+  /** Re-enable the error-indicator triangle for `addr` when it was ignored. */
+  unignoreError(store: SpreadsheetStore, addr: Addr): void {
+    store.setState((s) => {
+      const key = addrKey(addr);
+      if (!s.errorIndicators.ignoredErrors.has(key)) return s;
+      const next = new Set(s.errorIndicators.ignoredErrors);
+      next.delete(key);
       return { ...s, errorIndicators: { ignoredErrors: next } };
     });
   },
@@ -1203,6 +1335,83 @@ export const mutators = {
       }
       return { ...s, merges: { byAnchor, byCell } };
     });
+  },
+
+  upsertTableOverlay(store: SpreadsheetStore, next: TableOverlay): void {
+    store.setState((s) => {
+      const filtered = s.tables.tables.filter((t) => t.id !== next.id);
+      return { ...s, tables: { tables: [...filtered, next] } };
+    });
+  },
+
+  removeTableOverlay(store: SpreadsheetStore, id: string): void {
+    store.setState((s) => {
+      const next = s.tables.tables.filter((t) => t.source === 'engine' || t.id !== id);
+      if (next.length === s.tables.tables.length) return s;
+      return { ...s, tables: { tables: next } };
+    });
+  },
+
+  clearTableOverlaysInRange(store: SpreadsheetStore, range: Range): void {
+    store.setState((s) => {
+      const next = s.tables.tables.filter(
+        (t) => t.source === 'engine' || !rangesIntersect(t.range, range),
+      );
+      if (next.length === s.tables.tables.length) return s;
+      return { ...s, tables: { tables: next } };
+    });
+  },
+
+  replaceEngineTableOverlays(store: SpreadsheetStore, tables: readonly TableOverlay[]): void {
+    store.setState((s) => {
+      const session = s.tables.tables.filter((t) => t.source !== 'engine');
+      return { ...s, tables: { tables: [...tables, ...session] } };
+    });
+  },
+
+  upsertSheetView(store: SpreadsheetStore, view: SheetView): void {
+    store.setState((s) => {
+      const next = s.sheetViews.views.filter((v) => v.id !== view.id);
+      return { ...s, sheetViews: { ...s.sheetViews, views: [...next, view] } };
+    });
+  },
+
+  removeSheetView(store: SpreadsheetStore, id: string): void {
+    store.setState((s) => {
+      const views = s.sheetViews.views.filter((v) => v.id !== id);
+      if (views.length === s.sheetViews.views.length) return s;
+      return {
+        ...s,
+        sheetViews: {
+          views,
+          activeViewId: s.sheetViews.activeViewId === id ? null : s.sheetViews.activeViewId,
+        },
+      };
+    });
+  },
+
+  applySheetViewPatch(
+    store: SpreadsheetStore,
+    patch: SheetViewPatch,
+    activeViewId: string | null = null,
+  ): void {
+    store.setState((s) => ({
+      ...s,
+      layout: {
+        ...s.layout,
+        freezeRows: Math.max(0, Math.floor(patch.freezeRows)),
+        freezeCols: Math.max(0, Math.floor(patch.freezeCols)),
+        hiddenRows: new Set(patch.hiddenRows),
+        hiddenCols: new Set(patch.hiddenCols),
+      },
+      viewport: {
+        ...s.viewport,
+        rowStart: Math.max(Math.max(0, Math.floor(patch.freezeRows)), s.viewport.rowStart),
+        colStart: Math.max(Math.max(0, Math.floor(patch.freezeCols)), s.viewport.colStart),
+      },
+      ui: { ...s.ui, filterRange: patch.filterRange },
+      sheetViews: { ...s.sheetViews, activeViewId },
+    }));
   },
 };
 

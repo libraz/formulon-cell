@@ -16,7 +16,14 @@ export interface AutocompleteHandle {
    *  position. Returns true when it actually inserted (so callers know to
    *  preventDefault on the originating key). */
   acceptHighlighted(): boolean;
+  setLabels(labels: Partial<AutocompleteLabels>): void;
   detach(): void;
+}
+
+export interface AutocompleteLabels {
+  customFunction: string;
+  structuredTableColumn: string;
+  pickFromList: string;
 }
 
 /** Subset of `WorkbookHandle.getTables()` consumed by the structured-ref
@@ -55,6 +62,7 @@ export interface AutocompleteDeps {
    *  `commands/refs.ts`. Falls back to the static catalog when omitted
    *  or null. */
   getFunctionNames?: () => readonly string[] | null;
+  labels?: Partial<AutocompleteLabels>;
 }
 
 interface SuggestionContext {
@@ -78,6 +86,12 @@ interface SuggestionContext {
  */
 export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
   const { input } = deps;
+  let labels: AutocompleteLabels = {
+    customFunction: 'Custom function',
+    structuredTableColumn: 'Structured table column',
+    pickFromList: 'Pick from list',
+    ...deps.labels,
+  };
   let root: HTMLDivElement | null = null;
   let ctx: SuggestionContext | null = null;
   let highlight = 0;
@@ -132,11 +146,11 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
       detail.className = 'fc-autocomplete__detail';
       if (ctx.kind === 'function') {
         const sig = FUNCTION_SIGNATURES[pick.toUpperCase()];
-        detail.textContent = sig ? `${pick}(${sig.join(', ')})` : 'Custom function';
+        detail.textContent = sig ? `${pick}(${sig.join(', ')})` : labels.customFunction;
       } else if (ctx.kind === 'tableColumn') {
-        detail.textContent = 'Structured table column';
+        detail.textContent = labels.structuredTableColumn;
       } else {
-        detail.textContent = 'Pick from list';
+        detail.textContent = labels.pickFromList;
       }
 
       main.append(name, detail);
@@ -193,6 +207,10 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
     isOpen: () => root != null,
     move,
     acceptHighlighted,
+    setLabels(next) {
+      labels = { ...labels, ...next };
+      render();
+    },
     detach() {
       close();
     },
