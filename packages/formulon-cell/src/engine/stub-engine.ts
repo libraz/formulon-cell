@@ -4,7 +4,7 @@
  * fails — typically because the host page is not crossOriginIsolated and
  * the pthreaded WASM cannot allocate SharedArrayBuffer.
  *
- * It stores values literally and evaluates a tiny Excel-formula subset:
+ * It stores values literally and evaluates a tiny spreadsheet-formula subset:
  *   numbers, +, -, *, /, parens, references (A1), ranges (A1:B3),
  *   SUM, AVERAGE, MIN, MAX, COUNT, IF, AND, OR, NOT.
  *

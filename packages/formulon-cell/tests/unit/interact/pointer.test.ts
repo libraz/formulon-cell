@@ -471,7 +471,7 @@ describe('attachPointer', () => {
       stub.mockReturnValue({ x: 256, y: 54, w: 6, h: 6 });
 
       // Left column (col 0) has data in rows 0..3; source at (0, 1) carries
-      // the value to be filled. Excel rule: extend until the left neighbour
+      // the value to be filled. spreadsheet rule: extend until the left neighbour
       // ends, i.e. through row 3.
       seed(store, wb, [
         { row: 0, col: 0, value: 'a' },

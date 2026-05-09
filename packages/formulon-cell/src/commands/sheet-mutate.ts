@@ -66,7 +66,7 @@ const firstVisibleSheet = (n: number, hidden: ReadonlySet<number>, skip: number)
 };
 
 /** Toggle the tab-hidden flag on `idx`. Refuses to hide the last visible
- *  sheet (Excel parity — leaving a workbook with no visible sheets is
+ *  sheet (spreadsheet parity — leaving a workbook with no visible sheets is
  *  invalid). When the active sheet becomes hidden, the active index advances
  *  to the next visible sheet. The mutation goes through
  *  `recordLayoutChangeWithEngine`, so it round-trips through engine save and

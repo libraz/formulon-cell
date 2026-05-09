@@ -556,7 +556,7 @@ export class WorkbookHandle {
   }
 
   /** Toggle the iterative-formula solver. `maxIterations` and `maxChange`
-   *  cap the Gauss-Seidel loop; matches Excel's File → Options → Formulas
+   *  cap the Gauss-Seidel loop; matches "File → Options → Formulas"
    *  knobs. No-op (returns false) on engines without the iterative surface. */
   setIterative(enabled: boolean, maxIterations: number, maxChange: number): boolean {
     this.assertAlive();
@@ -1450,7 +1450,7 @@ export class WorkbookHandle {
 
   /** Append `range` as a merge on `sheet`. Returns false on engine failure or
    *  when `capabilities.merges` is off. The cell content inside the range is
-   *  the caller's responsibility (Excel keeps top-left, blanks the rest). */
+   *  the caller's responsibility (spreadsheets keep top-left, blanks the rest). */
   engineAddMerge(sheet: number, range: Range): boolean {
     this.assertAlive();
     if (!this.capabilities.merges) return false;
@@ -1719,7 +1719,7 @@ export class WorkbookHandle {
   /** Workbook calc-mode metadata mirroring `<calcPr calcMode>`. The engine
    *  itself does NOT gate evaluation on this value — every `recalc()` call
    *  honours all dirty cells regardless of mode. The flag is preserved as
-   *  round-trip metadata and surfaced here so the UI can mirror Excel's
+   *  round-trip metadata and surfaced here so the UI can mirror the spreadsheet's
    *  user-visible state. Returns `null` when the engine doesn't expose
    *  `calcMode`. Codes: 0 = Auto, 1 = Manual, 2 = AutoNoTable. */
   calcMode(): 0 | 1 | 2 | null {
@@ -1808,7 +1808,7 @@ export class WorkbookHandle {
   /** Enumerate every named cell style on the workbook — combines
    *  `cellStyleCount` + `getCellStyle` into one snapshot suitable for
    *  populating a "Cell Styles" UI. Empty under stub mode. Hidden
-   *  built-ins are filtered out — Excel's gallery hides those by default. */
+   *  built-ins are filtered out — the gallery hides those by default. */
   getNamedCellStyles(): readonly NamedCellStyle[] {
     this.assertAlive();
     if (!this.capabilities.cellStyles) return [];
@@ -2004,7 +2004,7 @@ export class WorkbookHandle {
     return s.ok;
   }
 
-  /** Renders the lambda value stored at `addr` as Excel formula text. The
+  /** Renders the lambda value stored at `addr` as spreadsheet formula text. The
    *  returned string never carries a leading `=` — callers prepending it
    *  for the formula-bar edit seed should add the prefix themselves.
    *  Returns `null` when the engine doesn't expose `getLambdaText` or
@@ -2043,7 +2043,7 @@ export class WorkbookHandle {
   }
 
   /** Snapshot of every validation entry on `sheet`. Each entry can apply to
-   *  multiple ranges (`ranges`) and carries an Excel-style descriptor: numeric
+   *  multiple ranges (`ranges`) and carries an spreadsheet-style descriptor: numeric
    *  `type` ordinal (0 none, 1 whole, 2 decimal, 3 list, 4 date, 5 time,
    *  6 textLength, 7 custom), numeric `op` ordinal (0 between … 7 lessThanOrEqual),
    *  formula1/2 strings, and the surrounding error/prompt metadata. Empty
@@ -2237,7 +2237,7 @@ export class WorkbookHandle {
     return out;
   }
 
-  /** Snapshot of every Excel Table on the workbook. Read-only in the engine —
+  /** Snapshot of every spreadsheet Table on the workbook. Read-only in the engine —
    *  we surface it as a badge count + listing for the status bar. Empty array
    *  on the stub. */
   getTables(): {
@@ -2273,7 +2273,7 @@ export class WorkbookHandle {
 
   /** Derive column display names from the header row of a table's `ref`.
    *  Returns labels in source order; cells that read blank fall back to the
-   *  Excel-style `Column1` / `Column2` placeholder so the structured-ref
+   *  Spreadsheet-style `Column1` / `Column2` placeholder so the structured-ref
    *  autocomplete still has something to insert. */
   private tableColumnNames(sheet: number, ref: string): string[] {
     const parsed = parseTableRef(ref);

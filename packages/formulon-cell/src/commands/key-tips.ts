@@ -1,5 +1,5 @@
 /**
- * KeyTips — Excel's Alt-driven "press a letter to invoke a ribbon item"
+ * KeyTips — the spreadsheet's Alt-driven "press a letter to invoke a ribbon item"
  * affordance. The state machine here drives the *behavior*; the visual
  * overlay (badge labels appended to toolbar items) is wired by the host.
  *
@@ -61,7 +61,7 @@ export function reduceKeyTip(
   const nextChord = (state.chord + event.key).toUpperCase();
   const direct = bindings.find((b) => b.chord.toUpperCase() === nextChord);
   // A prefix-extension exists when at least one OTHER binding starts with
-  // `nextChord` but is longer. Excel's KeyTips: pressing `H` while both
+  // `nextChord` but is longer. the KeyTips: pressing `H` while both
   // `H` and `HC` are bound holds the chord open instead of firing `H` —
   // the user has to press a second letter (or release Alt) to commit.
   const extension = bindings.some((b) => {
@@ -78,7 +78,7 @@ export function reduceKeyTip(
     return { state: { kind: 'showing', chord: nextChord } };
   }
   // Dead end — unknown letter. Reset chord buffer to drop the bad input
-  // but stay in showing mode; Excel parity.
+  // but stay in showing mode; spreadsheet parity.
   return { state: { kind: 'showing', chord: '' } };
 }
 

@@ -51,7 +51,7 @@ export function scanPrecedents(wb: WorkbookHandle, addr: Addr): Addr[] {
     if (isCrossSheetRef(formula, ref.start, ref.end)) continue;
     for (let r = ref.r0; r <= ref.r1; r += 1) {
       for (let c = ref.c0; c <= ref.c1; c += 1) {
-        // Skip self-reference — Excel doesn't draw an arrow from a cell to
+        // Skip self-reference — spreadsheets don't draw an arrow from a cell to
         // itself when the formula is e.g. `=A1+A1` and A1 is the host.
         if (r === addr.row && c === addr.col) continue;
         const key = `${r}:${c}`;

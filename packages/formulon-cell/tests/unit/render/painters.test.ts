@@ -221,7 +221,7 @@ describe('paintTableHeaderChevron', () => {
 });
 
 describe('paintCellBorders', () => {
-  it('uses the Excel-like automatic border color instead of the gridline color', () => {
+  it('uses the spreadsheet-like automatic border color instead of the gridline color', () => {
     const { ctx, strokes } = makeStrokeSpy();
     paintCellBorders({
       ctx,
@@ -295,7 +295,7 @@ describe('textBaselineY', () => {
 });
 
 describe('paintCellText font strictness', () => {
-  it('uses the grid UI font for ordinary numbers like Excel 365', () => {
+  it('uses the grid UI font for ordinary numbers like desktop spreadsheets', () => {
     const spy = makeTextSpy();
     paintCellText({
       ctx: spy.ctx,

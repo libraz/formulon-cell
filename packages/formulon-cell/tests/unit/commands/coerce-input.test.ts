@@ -31,7 +31,7 @@ describe('coerceInput', () => {
     expect(coerceInput('1e3')).toEqual({ kind: 'number', value: 1000 });
   });
 
-  it('normalizes full-width numeric input like Excel 365', () => {
+  it('normalizes full-width numeric input like desktop spreadsheets', () => {
     expect(coerceInput('１２３')).toEqual({ kind: 'number', value: 123 });
     expect(coerceInput('－３．５')).toEqual({ kind: 'number', value: -3.5 });
     expect(coerceInput('１，２３４')).toEqual({ kind: 'number', value: 1234 });
@@ -55,7 +55,7 @@ describe('coerceInput', () => {
     expect(coerceInput('(12%)')).toEqual({ kind: 'number', value: -0.12 });
   });
 
-  it('parses time input as an Excel serial-day fraction', () => {
+  it('parses time input as an spreadsheet serial-day fraction', () => {
     expect(coerceInput('12:00')).toEqual({ kind: 'number', value: 0.5 });
     expect(coerceInput('1:30:00')).toEqual({ kind: 'number', value: 1.5 / 24 });
     expect(coerceInput('２５：００')).toEqual({ kind: 'number', value: 25 / 24 });

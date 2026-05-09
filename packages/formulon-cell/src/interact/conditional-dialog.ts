@@ -64,7 +64,7 @@ const parseRange = (raw: string, fallback: Range): Range => {
 
 /**
  * Manage conditional formatting rules: list / add / remove.
- * Excel parity is intentionally narrow — three rule kinds (cell-value,
+ * Spreadsheet parity is intentionally narrow — three rule kinds (cell-value,
  * color-scale, data-bar) and the renderer respects whichever fields apply.
  */
 export function attachConditionalDialog(deps: ConditionalDialogDeps): ConditionalDialogHandle {

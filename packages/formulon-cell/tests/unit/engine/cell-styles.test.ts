@@ -54,7 +54,7 @@ describe('computeNamedCellStyles', () => {
     ]);
   });
 
-  it("filters out hidden built-ins (Excel's gallery hides those)", () => {
+  it('filters out hidden built-ins (the gallery hides those)', () => {
     const names = computeNamedCellStyles(
       view([
         fullStyle({ name: 'Normal' }),

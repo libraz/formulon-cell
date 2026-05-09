@@ -15,9 +15,9 @@ import {
 } from './history.js';
 import { isSheetProtected } from './protection.js';
 
-/** Excel-parity gate for row/col structure changes. When `sheet` is
+/** Spreadsheet-parity gate for row/col structure changes. When `sheet` is
  *  protected the operation is rejected (no-op + warning) regardless of
- *  per-cell locks — Excel disables the insert/delete row/col commands
+ *  per-cell locks — spreadsheets disable the insert/delete row/col commands
  *  wholesale on protected sheets. */
 function blockedByProtection(store: SpreadsheetStore, sheet: number, op: string): boolean {
   if (!isSheetProtected(store.getState(), sheet)) return false;
@@ -132,7 +132,7 @@ function colIndexToLabel(col: number): string {
 /**
  * Rewrite cell references in `src` for a row or column shift on the active
  * sheet. Absolute references (`$A$1`, `A$1`, `$A1`) keep their pinned axis.
- * References that fall inside a deleted band become `#REF!` per Excel's
+ * References that fall inside a deleted band become `#REF!` per the spreadsheet's
  * convention.
  *
  * String literals (`"..."`) and `#REF!` tokens are left untouched. Sheet
@@ -149,7 +149,7 @@ function shiftFormulaRefs(src: string, axis: 'row' | 'col', split: number, delta
   while (i < src.length) {
     const ch = src[i] ?? '';
 
-    // Pass through string literals untouched. Excel uses `""` to escape a
+    // Pass through string literals untouched. Spreadsheets use `""` to escape a
     // double quote inside a string.
     if (ch === '"') {
       out += ch;
@@ -176,7 +176,7 @@ function shiftFormulaRefs(src: string, axis: 'row' | 'col', split: number, delta
     if (refMatch) {
       const { absCol, label, absRow, rowStr, end } = refMatch;
       // Skip if previous char makes this look like part of an identifier
-      // (e.g. function name "SIN10" — won't happen for valid Excel, but be
+      // (e.g. function name "SIN10" — won't happen for valid desktop spreadsheets, but be
       // defensive; underscores aren't allowed in refs).
       const prev = i > 0 ? src[i - 1] : '';
       if (prev && /[A-Za-z0-9_]/.test(prev)) {
@@ -255,7 +255,7 @@ function matchRef(src: string, start: number): RefMatch | null {
   }
   if (i === digitsStart) return null;
   // Reject if followed by `(` — that's a function call, not a reference.
-  // (`A1()` is invalid Excel anyway, but be safe.)
+  // (`A1()` is invalid desktop spreadsheets anyway, but be safe.)
   if (src[i] === '(') return null;
   return { absCol, label, absRow, rowStr: src.slice(digitsStart, i), end: i };
 }
@@ -668,7 +668,7 @@ export function showCols(
 }
 
 /** Resolve which row/col indices to show again from the current selection.
- *  Excel returns visible rows that flank a hidden band; we emulate by
+ *  Spreadsheets return visible rows that flank a hidden band; we emulate by
  *  reporting every hidden row inside the selection. */
 export function hiddenInSelection(
   layout: LayoutSlice,
@@ -704,7 +704,7 @@ export function setFreezePanes(
 /** Set the per-sheet zoom level. `zoom` is a multiplier (1.0 = 100%) and is
  *  clamped by the store mutator to [0.5, 4]. When `wb` is supplied the
  *  engine receives the equivalent percentage so the value round-trips
- *  through .xlsx. Not journaled — Excel treats zoom as a view setting
+ *  through .xlsx. Not journaled — spreadsheets treat zoom as a view setting
  *  outside the undo stack. */
 export function setSheetZoom(store: SpreadsheetStore, zoom: number, wb?: WorkbookHandle): void {
   mutators.setZoom(store, zoom);

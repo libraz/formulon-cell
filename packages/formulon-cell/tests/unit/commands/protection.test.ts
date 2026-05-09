@@ -100,7 +100,7 @@ describe('protection helpers', () => {
     expect(setSheetProtection).toHaveBeenNthCalledWith(2, 1, { enabled: false });
   });
 
-  it('isCellLocked defaults to true (Excel default)', () => {
+  it('isCellLocked defaults to true (desktop default)', () => {
     const a: Addr = { sheet: 0, row: 0, col: 0 };
     expect(isCellLocked(store.getState(), a)).toBe(true);
     setCellLocked(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, false);

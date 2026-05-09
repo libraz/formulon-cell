@@ -33,7 +33,7 @@ describe('attachViewToolbar', () => {
     history = new History();
   });
 
-  it('renders Excel-style view toggles and applies them to the store', () => {
+  it('renders spreadsheet-style view toggles and applies them to the store', () => {
     const wb = fakeWb();
     const invalidate = vi.fn();
     const handle = attachViewToolbar({

@@ -169,7 +169,7 @@ export interface Range {
   readonly c1: number;
 }
 
-/** Tagged value the UI displays. Mirrors Excel's six error sentinels. */
+/** Tagged value the UI displays. Mirrors the six error sentinels. */
 export type CellValue =
   | { readonly kind: 'blank' }
   | { readonly kind: 'number'; readonly value: number }

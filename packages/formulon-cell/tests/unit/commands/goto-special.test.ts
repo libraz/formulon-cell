@@ -65,7 +65,7 @@ describe('findMatchingCells', () => {
     sync(store, wb);
     const got = findMatchingCells(wb, store, 'sheet', 'numbers');
     const keys = got.map((a) => `${a.row}:${a.col}`).sort();
-    // Formula cell evaluates to a number — Excel includes it under "Numbers".
+    // Formula cell evaluates to a number — spreadsheets include it under "Numbers".
     expect(keys).toEqual(['0:0', '0:1', '1:0']);
   });
 

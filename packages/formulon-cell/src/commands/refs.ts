@@ -29,7 +29,7 @@ const lettersToCol = (letters: string): number => {
 
 /** Extract every cell or range reference from a formula text. The returned
  *  list is in source order with a stable per-target color index so callers
- *  can paint distinct highlights for each ref, the same way Excel does
+ *  can paint distinct highlights for each ref, the same way spreadsheets do
  *  while editing a formula. */
 export function extractRefs(text: string): FormulaRef[] {
   if (!text.startsWith('=')) return [];
@@ -85,7 +85,7 @@ function parseAtomRef(raw: string): { row: number; col: number } | null {
 }
 
 /** Distinct accent colors used for formula-edit reference highlighting. They
- *  loop after this list is exhausted (Excel uses ~8). */
+ *  loop after this list is exhausted (spreadsheets use ~8). */
 export const REF_HIGHLIGHT_COLORS: readonly string[] = [
   '#1f7ae0',
   '#d96f2c',
@@ -132,7 +132,7 @@ export function rotateRefAt(text: string, caret: number): F4Result {
 }
 
 function nextStep(absCol: boolean, absRow: boolean): { col: boolean; row: boolean } {
-  // Excel order: A1 -> $A$1 -> A$1 -> $A1 -> A1
+  // Spreadsheet order: A1 -> $A$1 -> A$1 -> $A1 -> A1
   if (!absCol && !absRow) return { col: true, row: true };
   if (absCol && absRow) return { col: false, row: true };
   if (!absCol && absRow) return { col: true, row: false };
@@ -156,7 +156,7 @@ const colToLetters = (col: number): string => {
  * (e.g. `Sheet1!A1`) and ranges are handled atom-by-atom.
  *
  * Skips matches inside string literals (text bracketed by `"`). Returns the
- * input verbatim when the result would point outside the grid (Excel parity:
+ * input verbatim when the result would point outside the grid (spreadsheet parity:
  * those refs become `#REF!` — we leave that to the engine).
  */
 export function shiftFormulaRefs(formula: string, dRow: number, dCol: number): string {
@@ -217,7 +217,7 @@ export function shiftFormulaRefs(formula: string, dRow: number, dCol: number): s
   return out;
 }
 
-/** Common Excel function names — used for editor autocomplete. */
+/** Common spreadsheet function names — used for editor autocomplete. */
 export const FUNCTION_NAMES: readonly string[] = [
   'SUM',
   'AVERAGE',
@@ -376,7 +376,7 @@ export function suggestFunctions(
   return { token, tokenStart, matches };
 }
 
-/** Hand-authored Excel-style argument lists keyed by upper-cased function
+/** Hand-authored spreadsheet-style argument lists keyed by upper-cased function
  *  name. `[name]` indicates an optional argument; `...` is repeat-marker. */
 export const FUNCTION_SIGNATURES: Readonly<Record<string, readonly string[]>> = {
   SUM: ['number1', '[number2]', '...'],
@@ -550,7 +550,7 @@ export const FUNCTION_SIGNATURES: Readonly<Record<string, readonly string[]>> = 
 };
 
 /** A single `@` implicit-intersection operator surfaced in a formula text.
- *  Excel 365 prefixes existing pre-dynamic-array formulas with `@` to opt
+ *  Desktop spreadsheets prefix existing pre-dynamic-array formulas with `@` to opt
  *  individual references out of array spilling. The UI surfaces these as a
  *  hint while editing so the operator's effect is visible. */
 export interface ImplicitIntersection {
@@ -585,7 +585,7 @@ export function findImplicitIntersections(formula: string): ImplicitIntersection
       continue;
     }
     if (ch === '@' && bracketDepth === 0) {
-      // Excel's implicit-intersection `@` only attaches to ref-like targets:
+      // the spreadsheet's implicit-intersection `@` only attaches to ref-like targets:
       // a name, a sheet-qualified ref, or an open paren (function call).
       const next = formula[i + 1] ?? '';
       if (!/[A-Za-z_(']/.test(next)) continue;

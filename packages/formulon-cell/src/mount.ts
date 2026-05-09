@@ -110,7 +110,7 @@ export interface MountOptions {
   /** Per-string overrides applied on top of the chosen locale. Deep-merged.
    *  For runtime overlays use `instance.i18n.extend`. */
   strings?: DeepPartial<Strings>;
-  /** Toggle individual built-in features. Defaults to "all on" (Excel-style
+  /** Toggle individual built-in features. Defaults to "all on" (spreadsheet-style
    *  full chrome). Pass a preset (`presets.minimal()` etc.) or your own
    *  `{ findReplace: false, ... }`. Cross-references between features are
    *  handled defensively — disabling format-dialog hides the menu item that
@@ -367,7 +367,7 @@ export const Spreadsheet = {
     fxInput.rows = 1;
     fxInput.wrap = 'soft';
     fxInput.setAttribute('aria-label', strings.a11y.formulaBar);
-    // Excel-style expand/collapse handle. Toggles `data-fc-expanded` on the
+    // Spreadsheet-style expand/collapse handle. Toggles `data-fc-expanded` on the
     // formulabar so CSS can switch the textarea between 1-row and multi-row.
     const fxExpand = document.createElement('button');
     fxExpand.type = 'button';
@@ -570,7 +570,7 @@ export const Spreadsheet = {
 
     function dispatchPassthroughSummary(): void {
       // Surface preserved OOXML objects (charts/drawings/pivot parts) and
-      // Excel Tables as host events so chrome (status bar, toast) can show a
+      // Spreadsheet Tables as host events so chrome (status bar, toast) can show a
       // read-only/editing-limited badge. Pivot layouts are rendered when the
       // engine exposes projection, but the object definition is still not
       // authorable from the UI.
@@ -1744,7 +1744,7 @@ export const Spreadsheet = {
     // Skipped entirely when `flags.shortcuts === false`.
     const onHostKey = (e: KeyboardEvent): void => {
       const meta = e.ctrlKey || e.metaKey;
-      // F9 / Ctrl+Alt+F9 — full recalc. Mirrors Excel: F9 alone in
+      // F9 / Ctrl+Alt+F9 — full recalc. Mirrors the spreadsheet convention: F9 alone in
       // manual mode kicks a recalc, Ctrl+Alt+F9 forces re-evaluation
       // even on cells the engine considers clean. The cell engine
       // doesn't distinguish these — both call wb.recalc() — so the
@@ -1773,7 +1773,7 @@ export const Spreadsheet = {
         return;
       }
       if (e.altKey && k === 'v') {
-        // Excel alt-binding: Ctrl+Alt+V (Win) / Cmd+Option+V (Mac).
+        // Alt binding: Ctrl+Alt+V (Win) / Cmd+Option+V (Mac).
         if (!binding.pasteSpecialDialog) return;
         e.preventDefault();
         binding.pasteSpecialDialog.open();
@@ -1790,7 +1790,7 @@ export const Spreadsheet = {
         e.preventDefault();
         binding.findReplace.open();
       } else if (k === 'k') {
-        // Ctrl/Cmd+K — Insert Hyperlink dialog (Excel/Sheets parity).
+        // Ctrl/Cmd+K — Insert Hyperlink dialog (spreadsheet parity).
         if (!hyperlinkDialog) return;
         e.preventDefault();
         hyperlinkDialog.open();
@@ -1806,13 +1806,13 @@ export const Spreadsheet = {
         e.preventDefault();
         mutators.setShowFormulas(store, !store.getState().ui.showFormulas);
       } else if (e.altKey && k === 'r') {
-        // Ctrl/Cmd+Alt+R — toggle R1C1 reference style. Mirrors Excel's
+        // Ctrl/Cmd+Alt+R — toggle R1C1 reference style. Mirrors the spreadsheet's
         //  File → Options → Formulas → "Use R1C1 reference style" checkbox
         //  but exposed as a shortcut for power users.
         e.preventDefault();
         mutators.setR1C1(store, !store.getState().ui.r1c1);
       } else if (e.key === ';') {
-        // Ctrl+; — insert today's date as Excel serial.
+        // Ctrl+; — insert today's date as spreadsheet serial.
         e.preventDefault();
         const now = new Date();
         const utcMs = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
@@ -1975,7 +1975,7 @@ export const Spreadsheet = {
         }
       }
       if (e.key === 'Enter') {
-        // Excel: Alt+Enter inserts a newline (multi-line cell content); plain
+        // Alt+Enter inserts a newline (multi-line cell content); plain
         // Enter commits and advances. Shift+Enter mirrors Alt+Enter for users
         // expecting browser-textarea behavior.
         if (e.altKey || e.shiftKey) {

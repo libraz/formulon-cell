@@ -8,7 +8,7 @@ import type { WorkbookHandle } from './workbook-handle.js';
  *   1. Cells with an explicit formula text — show it verbatim.
  *   2. Cells whose cached value is a lambda (no formula stored): pull the
  *      LAMBDA body via `getLambdaText` and prefix `=` so the editor sees
- *      something parseable. Excel does the same — formula bar shows the
+ *      something parseable. Desktop spreadsheets do the same — formula bar shows the
  *      lambda definition, not `#CALC!`.
  *   3. Plain values — render them as the editor would type them
  *      (numbers without thousand separators, booleans as TRUE/FALSE,

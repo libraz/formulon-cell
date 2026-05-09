@@ -1,20 +1,20 @@
 /**
- * Comma-separated parsing/encoding compatible with Excel and Google Sheets.
+ * Comma-separated parsing/encoding compatible with desktop spreadsheets.
  * RFC 4180 — fields containing commas, newlines or quotes are wrapped in
  * double quotes; embedded quotes are doubled.
  *
  * Mirrors `tsv.ts` with `,` as the delimiter. Kept as a sibling rather than a
  * shared parameterised parser because the encoding edge cases (locale-style
- * decimal commas in non-US Excel exports) are CSV-specific and we'd rather
+ * decimal commas in non-US desktop spreadsheets exports) are CSV-specific and we'd rather
  * iterate on them in one file.
  */
 
 const BOM = '﻿';
 
 export interface CSVEncodeOptions {
-  /** Use \n instead of \r\n. Excel writes \r\n; reading is robust to either. */
+  /** Use \n instead of \r\n. Spreadsheets write \r\n; reading is robust to either. */
   eol?: '\r\n' | '\n';
-  /** Prepend a UTF-8 BOM. Excel-on-Windows expects this for correct UTF-8
+  /** Prepend a UTF-8 BOM. Desktop spreadsheets on Windows expects this for correct UTF-8
    *  detection when opening a .csv via double-click. */
   bom?: boolean;
 }
@@ -30,7 +30,7 @@ export function encodeCSV(
 
 function escapeCell(cell: string): string {
   // Quote whenever the cell would be ambiguous — commas, line breaks, quote
-  // chars, or leading/trailing whitespace (Excel preserves whitespace inside
+  // chars, or leading/trailing whitespace (spreadsheets preserve whitespace inside
   // quoted fields but trims unquoted ones on read).
   if (/[,\r\n"]|^\s|\s$/.test(cell)) {
     return `"${cell.replace(/"/g, '""')}"`;

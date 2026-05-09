@@ -80,7 +80,7 @@ export interface WorkbookObjectRecord {
 }
 
 export interface TableSummary {
-  /** Total Excel Tables across all sheets. */
+  /** Total spreadsheet Tables across all sheets. */
   count: number;
   /** Per-sheet count keyed by sheet index. */
   bySheet: Record<number, number>;
@@ -211,7 +211,7 @@ const emptyObjectBuckets = (): Record<WorkbookObjectKind, WorkbookObjectRecord[]
     {} as Record<WorkbookObjectKind, WorkbookObjectRecord[]>,
   );
 
-/** Build an Excel-Tables summary off the workbook handle. */
+/** Build an spreadsheet-Tables summary off the workbook handle. */
 export function summarizeTables(wb: WorkbookHandle): TableSummary {
   const items = wb.getTables();
   const bySheet: Record<number, number> = {};

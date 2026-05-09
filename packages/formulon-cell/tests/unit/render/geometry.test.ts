@@ -70,7 +70,7 @@ describe('colLabel', () => {
 
   it('maps three-letter columns', () => {
     expect(colLabel(702)).toBe('AAA');
-    expect(colLabel(16383)).toBe('XFD'); // Excel's last column
+    expect(colLabel(16383)).toBe('XFD'); // the spreadsheet last column
   });
 });
 

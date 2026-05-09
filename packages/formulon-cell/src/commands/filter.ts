@@ -39,7 +39,7 @@ export function applyFilter(
 
 /** Mark `range` as the active autofilter region without applying any predicate.
  *  Headers in the range paint the chevron so the user can open the dropdown
- *  per column. Equivalent to Excel's "Filter" toggle (Ctrl+Shift+L). */
+ *  per column. Equivalent to the "Filter" toggle (Ctrl+Shift+L). */
 export function setAutoFilter(store: SpreadsheetStore, range: Range | null): void {
   store.setState((s) => ({ ...s, ui: { ...s.ui, filterRange: range ? { ...range } : null } }));
 }

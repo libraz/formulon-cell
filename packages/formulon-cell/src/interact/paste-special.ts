@@ -56,7 +56,7 @@ const buildOpOptions = (s: Strings): { id: PasteOperation; label: string }[] => 
 };
 
 /**
- * Excel 365-compatible "形式を選択して貼り付け" dialog. Operates on the
+ * desktop-spreadsheet-compatible "形式を選択して貼り付け" dialog. Operates on the
  * structured snapshot captured when the user copied within the workbook.
  * If no internal snapshot is available, the dialog refuses to open.
  */
@@ -160,7 +160,7 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
   const open = (): void => {
     if (!deps.getSnapshot()) {
       // Nothing on the internal clipboard — the dialog has nothing to paste.
-      // Excel falls back to a much older dialog here; we simply no-op so the
+      // Spreadsheets fall back to a much older dialog here; we simply no-op so the
       // standard ⌘V paste path can fill in.
       return;
     }

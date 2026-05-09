@@ -1,5 +1,5 @@
 /**
- * Tab-separated parsing/encoding compatible with Excel and Google Sheets.
+ * Tab-separated parsing/encoding compatible with desktop spreadsheets.
  * RFC 4180 — but with `\t` as the delimiter and `\r\n` / `\n` as the row
  * terminator. Cells containing tabs, newlines or quotes are wrapped in
  * double quotes; embedded quotes are doubled.

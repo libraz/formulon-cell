@@ -3,7 +3,7 @@ import type { WorkbookHandle } from './workbook-handle.js';
 
 /** Resolve a literal string-array list source, or evaluate a range reference
  *  against the workbook to produce one string per non-blank cell. The returned
- *  values are de-duplicated in source order — Excel's list dropdown does the
+ *  values are de-duplicated in source order — the spreadsheet's list dropdown does the
  *  same for range-backed lists. Returns `[]` when the ref can't be parsed or
  *  the engine reports no values. */
 export type RangeResolver = (ref: string) => string[];
@@ -110,7 +110,7 @@ export function isRangeSource(source: string[] | { ref: string }): source is { r
 
 /** Resolve a range ref to its numeric values in source order. Non-numeric
  *  cells (blank, text, bool, error) are skipped — sparklines plot a numeric
- *  series, mirroring Excel's behaviour. */
+ *  series, mirroring the spreadsheet behaviour. */
 export function resolveNumericRange(
   wb: WorkbookHandle,
   ref: string,

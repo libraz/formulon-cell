@@ -12,7 +12,7 @@ export interface CopyResult {
 /**
  * Snapshot the current selection into a TSV payload. Values come from the
  * store's cached cell map (no engine reads) — for formula cells this means
- * the last computed value, matching Excel's "values only" copy semantic.
+ * the last computed value, matching the spreadsheet's "values only" copy semantic.
  */
 export function copy(state: State): CopyResult | null {
   const r = state.selection.range;

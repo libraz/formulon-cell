@@ -312,7 +312,7 @@ export function buildPrintDocument(
   }
   const tbody = `<tbody>${bodyRows.join('')}</tbody>`;
 
-  // Header / footer strips — Excel paints up to three slots per strip. We
+  // Header / footer strips — spreadsheets paint up to three slots per strip. We
   // emit them as fixed-position rows above/below the table; the @page
   // margins reserve enough whitespace so the print preview doesn't overlap
   // the body content.

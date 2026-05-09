@@ -28,7 +28,7 @@ const isEmpty = (state: State, sheet: number, row: number, col: number): boolean
 };
 
 /**
- * Excel's Σ button. Decides where a SUM formula belongs based on the current
+ * the spreadsheet's Σ button. Decides where a SUM formula belongs based on the current
  * selection and writes it. Returns the inserted location + formula (when
  * multiple cells are written, the first one) or null when nothing reasonable
  * can be done.

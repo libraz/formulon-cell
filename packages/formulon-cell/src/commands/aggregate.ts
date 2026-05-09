@@ -15,7 +15,7 @@ export interface SelectionStats {
   cells: number;
   /** Cells whose value.kind === 'number'. */
   numericCount: number;
-  /** Cells with any non-blank value (Excel "Count"). */
+  /** Cells with any non-blank value (the "Count" aggregate). */
   nonBlankCount: number;
   sum: number;
   /** Only meaningful when numericCount > 0. */
@@ -46,7 +46,7 @@ const EMPTY: SelectionStats = {
  *
  * Multi-range selections (`selection.extraRanges`) are summed alongside the
  * primary range. Cells inside an overlap between two ranges are counted once,
- * not twice — Excel parity.
+ * not twice — spreadsheet parity.
  */
 export function aggregateSelection(state: State): SelectionStats {
   const sheet = state.data.sheetIndex;

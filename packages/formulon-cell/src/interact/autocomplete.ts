@@ -46,7 +46,7 @@ export interface AutocompleteDeps {
    *  list. Pulled from `inst.formula.list()` so consumer registrations
    *  appear alongside the engine's built-ins. */
   getCustomFunctions?: () => readonly string[];
-  /** Excel-style "pick from list" source. Called for plain-text edits to
+  /** Spreadsheet-style "pick from list" source. Called for plain-text edits to
    *  surface previous text values entered above the active cell in the same
    *  column. Implementations should return values in nearest-first order
    *  (closest row first), already deduped, blanks excluded. The popover
@@ -218,7 +218,7 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
 }
 
 /** Build a suggestion context for the caret position. Plain-text edits go
- *  through the column-history source (Excel's "pick from list"). Formula edits
+ *  through the column-history source (the "pick from list"). Formula edits
  *  fall through to structured-ref → function/custom-name suggestions. */
 function computeContext(
   text: string,
@@ -260,11 +260,11 @@ function computeContext(
   };
 }
 
-/** Excel's column-history autocomplete: when editing a plain-text cell, match
+/** column-history autocomplete: when editing a plain-text cell, match
  *  what the user has typed so far against the values already entered above in
  *  the same column. `values` must already be deduped, blanks excluded, in
  *  nearest-first order (caller's responsibility). The whole input acts as the
- *  partial token — Excel replaces the entire cell text on accept, never just
+ *  partial token — desktop spreadsheets replaces the entire cell text on accept, never just
  *  a fragment. Returns null when the input is empty or no value prefix-matches. */
 export function suggestColumnHistory(
   text: string,
@@ -273,7 +273,7 @@ export function suggestColumnHistory(
 ): SuggestionContext | null {
   // Only suggest when caret is at end and the input is a non-empty token. A
   // shorter caret (mid-edit) means the user is correcting earlier characters,
-  // not extending the tail — Excel doesn't pop the list there either.
+  // not extending the tail — spreadsheets don't pop the list there either.
   if (caret !== text.length) return null;
   if (text.length === 0) return null;
   const lower = text.toLowerCase();

@@ -21,7 +21,7 @@ export interface ArgHelperDeps {
 }
 
 /**
- * Floating tooltip that mirrors Excel's "ScreenTip" — when the caret sits
+ * Floating tooltip that mirrors the "ScreenTip" tooltip — when the caret sits
  * inside a known function call, it shows `NAME(arg1, **arg2**, [arg3])` with
  * the active argument bolded. Hangs off `document.body`; the caller calls
  * `refresh()` from input/keyup handlers.
@@ -84,7 +84,7 @@ export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
       const span = document.createElement('span');
       span.className = 'fc-arghelper__arg';
       // Anchor the highlight on the last arg when the caret has run past the
-      // declared count — Excel does the same so variadic tails stay visible.
+      // declared count — desktop spreadsheets do the same so variadic tails stay visible.
       const isActive = i === active || (i === args.length - 1 && active >= args.length);
       if (isActive) span.classList.add('fc-arghelper__arg--active');
       span.textContent = arg;

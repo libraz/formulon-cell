@@ -1,7 +1,7 @@
 /**
- * Excel/Sheets-compatible HTML clipboard encoder. The output is a `<table>`
+ * Desktop-spreadsheet-compatible HTML clipboard encoder. The output is a `<table>`
  * with inline styles for bold/italic/underline/strike/align/color/fill —
- * Excel parses these on paste.
+ * Spreadsheets parse these on paste.
  */
 
 import type { Range } from '../../engine/types.js';

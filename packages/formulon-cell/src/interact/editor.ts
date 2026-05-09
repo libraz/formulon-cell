@@ -203,7 +203,7 @@ export class InlineEditor {
     }
   }
 
-  /** Excel's Ctrl+Enter behavior: write the current editor content to every
+  /** the spreadsheet's Ctrl+Enter behavior: write the current editor content to every
    *  cell in `selection.range` (and `extraRanges`), shifting relative refs in
    *  formulas as if filled. The active cell is the anchor — the source for
    *  relative-ref deltas. After committing, the active cell stays put. */
@@ -285,7 +285,7 @@ export class InlineEditor {
     }
     if (e.key === 'Enter') {
       // Ctrl+Enter writes the same value/formula to every cell in the active
-      //  selection (Excel parity). On Mac Excel uses Control too, not Cmd, so
+      //  selection (spreadsheet parity). On Mac spreadsheets use Control too, not Cmd, so
       //  metaKey keeps the legacy "newline" behavior to avoid surprising Mac
       //  users typing ⌘⏎.
       if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
@@ -293,7 +293,7 @@ export class InlineEditor {
         this.commitMulti();
         return;
       }
-      // Alt+Enter / Shift+Enter / Cmd+Enter inserts a literal newline (Excel
+      // Alt+Enter / Shift+Enter / Cmd+Enter inserts a literal newline (desktop spreadsheets
       //  Alt+Enter behavior). Plain Enter commits and advances down.
       if (e.altKey || e.shiftKey || e.metaKey) {
         e.preventDefault();
@@ -359,13 +359,13 @@ export class InlineEditor {
       this.input.style.minHeight = '';
       return;
     }
-    // Excel grows the editor downward; mirror that with a min-height bump.
+    // Spreadsheets grow the editor downward; mirror that with a min-height bump.
     const baseRow = this.deps.store.getState().layout.defaultRowHeight;
     this.input.style.minHeight = `${baseRow * lines}px`;
   }
 
   /** Walk the column upward from `beforeRow - 1` collecting plain-text values
-   *  for the autocomplete popover. Mirrors Excel's "pick from list" rules:
+   *  for the autocomplete popover. Mirrors the "pick from list" rules:
    *  text-only (formulas, numbers, blanks all skip), deduped, nearest-first.
    *  Iterates the engine's populated-cells list once rather than probing each
    *  row — we'd otherwise call `cellFormula` (O(n)) per row, blowing up at
@@ -375,7 +375,7 @@ export class InlineEditor {
     for (const e of this.deps.wb.cells(sheet)) {
       if (e.addr.col !== col) continue;
       if (e.addr.row >= beforeRow) continue;
-      // Formulas don't contribute — Excel's pick-list is verbatim text only.
+      // Formulas don't contribute — the pick-list is verbatim text only.
       if (e.formula !== null) continue;
       if (e.value.kind !== 'text') continue;
       const text = e.value.value;

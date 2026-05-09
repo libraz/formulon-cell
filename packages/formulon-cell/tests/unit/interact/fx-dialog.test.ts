@@ -101,7 +101,7 @@ describe('attachFxDialog', () => {
     handle.detach();
   });
 
-  it('exposes Excel-style descriptions for the common functions', () => {
+  it('exposes spreadsheet-style descriptions for the common functions', () => {
     expect(FUNCTION_DESCRIPTIONS.SUM?.en).toMatch(/sum|add/i);
     expect(FUNCTION_DESCRIPTIONS.IF?.en).toMatch(/condition|true|false/i);
     expect(FUNCTION_DESCRIPTIONS.VLOOKUP?.en).toMatch(/lookup|column/i);

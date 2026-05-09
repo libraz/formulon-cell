@@ -5,7 +5,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { addrKey } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 
-const MAX_ROW = 1_048_575; // Excel limit; clamp navigation.
+const MAX_ROW = 1_048_575; // spreadsheet limit; clamp navigation.
 const MAX_COL = 16_383;
 
 const move = (a: Addr, dRow: number, dCol: number): Addr => ({
@@ -24,7 +24,7 @@ const isPopulated = (s: State, sheet: number, row: number, col: number): boolean
   s.data.cells.has(addrKey({ sheet, row, col }));
 
 /**
- * Excel-style Ctrl+Arrow jump. Three behaviors based on neighbor state:
+ * Spreadsheet-style Ctrl+Arrow jump. Three behaviors based on neighbor state:
  *  - empty origin            → jump to next populated cell (or sheet edge)
  *  - origin populated, adjacent populated → jump to last consecutive populated cell
  *  - origin populated, adjacent empty     → jump past the gap to next populated cell
@@ -99,13 +99,13 @@ export interface KeyboardDeps {
   /** Called after Cmd/Ctrl+Z or Cmd/Ctrl+Y reached the workbook. The host
    *  needs to refresh its cached cell map. */
   onAfterHistory?: () => void;
-  /** Called for F5 / Ctrl+G — Excel's "Go To" shortcut. The chrome layer
+  /** Called for F5 / Ctrl+G — "Go To" shortcut. The chrome layer
    *  decides whether to focus the Name Box, open a dialog, etc. */
   onGoTo?: () => void;
-  /** Called for Shift+F2 — Excel's comment shortcut. The chrome layer is
+  /** Called for Shift+F2 — the spreadsheet's comment shortcut. The chrome layer is
    *  expected to wire this to the comment dialog feature. */
   onEditComment?: (addr: Addr) => void;
-  /** Called for Ctrl/Cmd+PageUp/PageDown — Excel sheet-tab navigation. */
+  /** Called for Ctrl/Cmd+PageUp/PageDown — desktop spreadsheets sheet-tab navigation. */
   onSwitchSheet?: (delta: 1 | -1) => void;
 }
 
@@ -152,9 +152,9 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       return;
     }
 
-    // Alt+Shift+Right — group; Alt+Shift+Left — ungroup. Excel parity.
+    // Alt+Shift+Right — group; Alt+Shift+Left — ungroup. spreadsheet parity.
     // Axis pick: if the selection spans more rows than columns, group rows;
-    // otherwise group columns. Excel prompts for this; we infer from shape.
+    // otherwise group columns. Spreadsheets prompt for this; we infer from shape.
     if (e.altKey && shift && (k === 'ArrowRight' || k === 'ArrowLeft')) {
       e.preventDefault();
       const range = s.selection.range;
@@ -171,7 +171,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       return;
     }
 
-    // Shift+F2 — edit comment on active cell (Excel parity).
+    // Shift+F2 — edit comment on active cell (spreadsheet parity).
     if (k === 'F2' && shift) {
       e.preventDefault();
       deps.onEditComment?.(a);
@@ -210,7 +210,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       e.preventDefault();
       return;
     } else if (k === 'Backspace' || k === 'Delete') {
-      // Delete clears the entire selection range — Excel parity.
+      // Delete clears the entire selection range — spreadsheet parity.
       const range = s.selection.range;
       const sheet = range.sheet;
       // Iterate populated cells only; full-sheet selection would otherwise loop 17B times.

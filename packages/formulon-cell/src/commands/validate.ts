@@ -13,7 +13,7 @@ type ListValidation = Extract<CellValidation, { kind: 'list' }>;
 /** Materialize a list-validation's source to a flat string array. Inline
  *  literals pass through; range refs route through `resolveRange`. Returns
  *  `[]` when the resolver isn't supplied for a range-backed list — the
- *  validator then accepts any input (Excel parity: an unresolved DV list
+ *  validator then accepts any input (spreadsheet parity: an unresolved DV list
  *  doesn't reject; the dropdown is just empty). */
 export function resolveListValues(
   validation: ListValidation,
@@ -32,7 +32,7 @@ export function resolveListValues(
  * path rejects on `stop`, accepts but logs on `warning`/`information`).
  *
  * Blank input is always accepted when the rule has `allowBlank: true` (the
- * Excel default). Formula input bypasses validation entirely — Excel does
+ * desktop default). Formula input bypasses validation entirely — spreadsheets do
  * the same; the constraint is on the literal user-typed value, not on
  * downstream calculation results.
  */
@@ -50,7 +50,7 @@ export function validateAgainst(
       const text = inputAsText(input);
       const values = resolveListValues(validation, resolveRange);
       // Range-backed list with no resolver / empty resolution: accept anything
-      // (Excel parity — it just disables the constraint silently).
+      // (spreadsheet parity — it just disables the constraint silently).
       if (!Array.isArray(validation.source) && values.length === 0) return { ok: true };
       return values.includes(text) ? { ok: true } : reject(validation, listMessage(values));
     }

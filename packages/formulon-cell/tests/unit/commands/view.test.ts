@@ -12,7 +12,7 @@ import {
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 
 describe('view commands', () => {
-  it('toggles Excel-style view flags', () => {
+  it('toggles spreadsheet-style view flags', () => {
     const store = createSpreadsheetStore();
 
     setGridlinesVisible(store, false);
@@ -26,7 +26,7 @@ describe('view commands', () => {
     expect(store.getState().ui.r1c1).toBe(true);
   });
 
-  it('sets zoom by scale or Excel-style percent and uses store clamping', () => {
+  it('sets zoom by scale or spreadsheet-style percent and uses store clamping', () => {
     const store = createSpreadsheetStore();
 
     setZoomScale(store, 1.25);

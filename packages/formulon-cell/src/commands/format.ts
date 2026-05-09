@@ -436,25 +436,25 @@ function applyNegative(
   }
 }
 
-/** Excel serial date → JS Date. Excel epoch is 1899-12-30 (with Lotus 123
+/** Spreadsheet serial date → JS Date. spreadsheet epoch is 1899-12-30 (with Lotus 123
  *  1900-leap-year bug compensation already baked in for serials > 60). */
-function excelSerialToDate(serial: number): Date {
+function spreadsheetSerialToDate(serial: number): Date {
   const ms = (serial - 25569) * 86_400_000;
   return new Date(ms);
 }
 
 const pad2 = (n: number): string => (n < 10 ? `0${n}` : `${n}`);
 
-/** Excel-style custom format mini-language. Supports section splitting
+/** Spreadsheet-style custom format mini-language. Supports section splitting
  *  (pos;neg;zero;text), `0`/`#`/`?` digit placeholders, `.` decimal, `,`
  *  thousands & scaling, `%`, `\\X` escape, `"text"` literals, `[Red]`-style
  *  color tags (stripped — color is applied at paint time), and date tokens
  *  `yyyy`/`yy`/`mmmm`/`mmm`/`mm`/`m`/`dddd`/`ddd`/`dd`/`d`/`hh`/`h`/`ss`/`s`
- *  plus `am/pm`. Not exhaustive but covers the patterns Excel ships in its
+ *  plus `am/pm`. Not exhaustive but covers the patterns spreadsheets ship in its
  *  built-in format codes. */
 function formatCustomPattern(value: number, pattern: string, locale: string): string {
   // Split into up to four sections on ';' that aren't inside a quoted literal
-  //  or a bracketed tag. Excel allows: positive;negative;zero;text. When any
+  //  or a bracketed tag. Spreadsheets allow: positive;negative;zero;text. When any
   //  section carries a [>n]/[<n]/[=n] condition we evaluate those first and
   //  only fall back to the sign-based default when no condition matches.
   const sections = splitSections(pattern);
@@ -491,7 +491,7 @@ function formatCustomPattern(value: number, pattern: string, locale: string): st
   }
 
   // Strip color tags. Color application belongs to the painter, not here.
-  active = normalizeExcelFormatSection(active);
+  active = normalizeFormatSection(active);
 
   // If the section contains date/time tokens, render as date.
   if (/y|m|d|h|s/.test(stripLiterals(active))) {
@@ -501,7 +501,7 @@ function formatCustomPattern(value: number, pattern: string, locale: string): st
   return renderNumericPattern(useAbs ? Math.abs(value) : value, active, locale);
 }
 
-function normalizeExcelFormatSection(section: string): string {
+function normalizeFormatSection(section: string): string {
   return (
     section
       // Locale/currency tags: [$¥-411]#,##0 → ¥#,##0; [$-ja-JP] is locale-only.
@@ -510,7 +510,7 @@ function normalizeExcelFormatSection(section: string): string {
       // Color tags are a style concern; the formatter returns text only.
       .replace(/\[(?:Red|Green|Blue|Black|White|Yellow|Magenta|Cyan|Color\d+)\]/gi, '')
       .replace(/"([^"]*)"/g, '$1')
-      // Excel alignment/fill directives. `_x` reserves one char width; `*x`
+      // Alignment/fill directives. `_x` reserves one char width; `*x`
       // repeats a fill char. Canvas text output should not show either.
       .replace(/_.|\\ /g, '')
       .replace(/\*./g, '')
@@ -590,7 +590,7 @@ function stripLiterals(s: string): string {
 }
 
 function renderDateTimePattern(serial: number, pattern: string, locale: string): string {
-  const d = excelSerialToDate(serial);
+  const d = spreadsheetSerialToDate(serial);
   const yyyy = d.getUTCFullYear();
   const mm = d.getUTCMonth() + 1;
   const dd = d.getUTCDate();

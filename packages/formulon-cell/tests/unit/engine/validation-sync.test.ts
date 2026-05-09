@@ -172,7 +172,7 @@ describe('hydrateValidationsFromEngine', () => {
     expect(store.getState().format.formats.size).toBe(0);
   });
 
-  it('handles unquoted comma list (Excel allows both forms)', () => {
+  it('handles unquoted comma list (spreadsheets allow both forms)', () => {
     const wb = makeFake({
       entries: [
         partial({

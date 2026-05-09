@@ -1,4 +1,4 @@
-// Custom-function registry — host-side Excel-like functions consumers can
+// Custom-function registry — host-side spreadsheet-like functions consumers can
 // add at runtime. The formulon engine does not currently expose a
 // callback-based user-function surface, so v0.1 keeps the registry on the
 // JS side: the spreadsheet uses it for autocomplete suggestions and

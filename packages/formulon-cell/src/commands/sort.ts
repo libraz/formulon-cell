@@ -3,7 +3,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { addrKey } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 
-/** Excel parity: refuse to sort when the range intersects any merge —
+/** Spreadsheet parity: refuse to sort when the range intersects any merge —
  *  rearranging rows would tear the merged rectangle apart. */
 const rangeIntersectsMerges = (state: State, range: Range): boolean => {
   for (const m of state.merges.byAnchor.values()) {
@@ -27,7 +27,7 @@ export interface SortOptions {
 
 /** Sort the rows of `range` in place by the values in `byCol`. Writes the
  *  resulting cells back through `wb`. Numbers come first (ascending) then
- *  text, then blanks — same as Excel's default. */
+ *  text, then blanks — same as the spreadsheet's default. */
 export function sortRange(
   state: State,
   _store: SpreadsheetStore,
@@ -68,7 +68,7 @@ export function sortRange(
   snaps.sort((a, b) => {
     const ka = a.snap.sortKey;
     const kb = b.snap.sortKey;
-    // blanks sink to bottom regardless of dir (Excel)
+    // blanks sink to bottom regardless of dir (spreadsheet)
     if (ka.kind === 'blank' && kb.kind === 'blank') return 0;
     if (ka.kind === 'blank') return 1;
     if (kb.kind === 'blank') return -1;

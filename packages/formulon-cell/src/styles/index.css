@@ -1394,46 +1394,183 @@
     box-shadow: 0 0 0 2px var(--fc-accent-soft, transparent);
   }
 
-  /* Comment dialog — Excel 365 "New Note" yellow callout aesthetic.
-     Reuses the fmtdlg shell but narrows the panel and gives the textarea
-     the canonical sticky-note background. */
-  .fc-cmtdlg__panel {
-    width: min(94vw, 420px);
-    max-height: min(80vh, 360px);
-  }
-  .fc-cmtdlg__label {
+  /* Comment popover — desktop-spreadsheet "New Note" floating sticky-note callout.
+     Anchored to the active cell rather than a centered modal: no backdrop,
+     no formal dialog chrome, just a yellow note with a tail pointing at
+     the cell. Matches the visual language of the canvas hover-tip. */
+  .fc-cmtnote {
+    position: absolute;
+    z-index: 1000;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    width: 100%;
-    color: var(--fc-fg-mute, inherit);
-    font-size: 11px;
-    font-weight: 600;
-  }
-  .fc-cmtdlg__textarea {
-    min-height: 132px;
     background: #fff8c4;
     color: #2b2b2b;
-    border-color: #d4ba2a;
+    border: 1px solid #d4ba2a;
+    border-radius: 2px;
+    box-shadow:
+      0 0.6px 1.8px rgba(0, 0, 0, 0.16),
+      0 6.4px 14.4px rgba(0, 0, 0, 0.18);
     font-family: var(--fc-font-ui, system-ui);
     font-size: 12.5px;
+    line-height: 1.45;
+    overflow: visible;
+    animation: fc-cmtnote-pop 120ms cubic-bezier(0.1, 0.9, 0.2, 1);
+  }
+  .fc-cmtnote[hidden] {
+    display: none;
+  }
+  @keyframes fc-cmtnote-pop {
+    from {
+      opacity: 0;
+      transform: translateY(-2px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  /* Tail — small triangle pointing at the anchored cell. Drawn with two
+     stacked pseudo-borders so it sits cleanly on the note border. */
+  .fc-cmtnote__tail {
+    position: absolute;
+    top: 14px;
+    width: 8px;
+    height: 12px;
+    pointer-events: none;
+  }
+  .fc-cmtnote__tail::before,
+  .fc-cmtnote__tail::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    width: 0;
+    height: 0;
+    border-style: solid;
+  }
+  /* Default = note placed to the RIGHT of the cell, tail points left. */
+  .fc-cmtnote__tail::before {
+    left: 0;
+    border-width: 6px 7px 6px 0;
+    border-color: transparent #d4ba2a transparent transparent;
+  }
+  .fc-cmtnote__tail::after {
+    left: 1px;
+    border-width: 5px 6px 5px 0;
+    border-color: transparent #fff8c4 transparent transparent;
+  }
+  /* Modifier = note placed to the LEFT of the cell, tail points right. */
+  .fc-cmtnote__tail--right::before {
+    left: auto;
+    right: 0;
+    border-width: 6px 0 6px 7px;
+    border-color: transparent transparent transparent #d4ba2a;
+  }
+  .fc-cmtnote__tail--right::after {
+    left: auto;
+    right: 1px;
+    border-width: 5px 0 5px 6px;
+    border-color: transparent transparent transparent #fff8c4;
+  }
+
+  .fc-cmtnote__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px 4px;
+    border-bottom: 1px solid rgba(212, 186, 42, 0.45);
+  }
+  .fc-cmtnote__title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #5b4a00;
+  }
+  .fc-cmtnote__icon {
+    appearance: none;
+    -webkit-appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background: transparent;
+    color: #5b4a00;
+    cursor: pointer;
+    transition: background 80ms ease;
+  }
+  .fc-cmtnote__icon:hover {
+    background: rgba(0, 0, 0, 0.06);
+  }
+  .fc-cmtnote__icon:focus-visible {
+    outline: 2px solid var(--fc-accent, currentColor);
+    outline-offset: 1px;
+  }
+
+  .fc-cmtnote__textarea {
+    flex: 1 1 auto;
+    margin: 0;
+    padding: 8px 10px;
+    border: 0;
+    background: transparent;
+    color: #2b2b2b;
+    font: inherit;
     line-height: 1.5;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    resize: none;
+    outline: none;
+    min-height: 96px;
   }
-  .fc-cmtdlg__textarea::placeholder {
-    color: rgba(43, 43, 43, 0.5);
-    font-weight: 400;
+  .fc-cmtnote__textarea::placeholder {
+    color: rgba(43, 43, 43, 0.45);
   }
-  .fc-cmtdlg__textarea:hover {
-    background: #fff8c4;
-    border-color: #c9aa1f;
+  .fc-cmtnote__textarea:focus {
+    outline: none;
   }
-  .fc-cmtdlg__textarea:focus {
-    background: #fff8c4;
-    border-color: #c9aa1f;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.55),
-      0 0 0 2px var(--fc-accent-soft, rgba(16, 124, 65, 0.2));
+
+  .fc-cmtnote__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    padding: 4px 8px 8px;
+    border-top: 1px solid rgba(212, 186, 42, 0.45);
+  }
+  .fc-cmtnote__btn {
+    appearance: none;
+    -webkit-appearance: none;
+    min-height: 26px;
+    padding: 3px 12px;
+    border: 1px solid rgba(91, 74, 0, 0.32);
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.72);
+    color: #2b2b2b;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition:
+      background 80ms ease,
+      border-color 80ms ease;
+  }
+  .fc-cmtnote__btn:hover {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(91, 74, 0, 0.55);
+  }
+  .fc-cmtnote__btn:focus-visible {
+    outline: 2px solid var(--fc-accent, currentColor);
+    outline-offset: 1px;
+  }
+  .fc-cmtnote__btn--primary {
+    background: var(--fc-accent, #107c41);
+    border-color: var(--fc-accent, #107c41);
+    color: var(--fc-accent-fg, #ffffff);
+  }
+  .fc-cmtnote__btn--primary:hover {
+    background: var(--fc-accent, #107c41);
+    border-color: var(--fc-accent, #107c41);
+    filter: brightness(1.05);
   }
   .fc-fmtdlg input[type="text"],
   .fc-fmtdlg input[type="number"],

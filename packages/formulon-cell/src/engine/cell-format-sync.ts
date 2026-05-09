@@ -48,7 +48,7 @@ export function syncCellFormatsToEngine(
   // whose entry was removed since the last sync. We do not currently track
   // a high-water mark of previously-formatted cells, so on first sync after
   // a clear the store-side delete already drove the entry away — the engine
-  // keeps its old xfIndex unless the user re-formats. This matches Excel:
+  // keeps its old xfIndex unless the user re-formats. This matches the spreadsheet convention:
   // "Clear Formats" sets xf to 0; that path lives in the future.
   for (const [key, fmt] of formats) {
     const [sStr, rStr, cStr] = key.split(':');
@@ -106,7 +106,7 @@ export function hydrateCellFormatsFromEngine(
     else if (xf.horizontalAlign === 3) patch.align = 'right';
     if (xf.verticalAlign === 0) patch.vAlign = 'top';
     else if (xf.verticalAlign === 1) patch.vAlign = 'middle';
-    // Excel default vertical alignment is bottom; do not surface it.
+    // the desktop default vertical alignment is bottom; do not surface it.
     if (xf.wrapText) patch.wrap = true;
     if (Object.keys(patch).length > 0) {
       updates.push({ key: addrKey(c.addr), patch });

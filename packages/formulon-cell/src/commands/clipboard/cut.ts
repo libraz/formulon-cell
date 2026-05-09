@@ -3,7 +3,7 @@ import type { State } from '../../store/store.js';
 import { type CopyResult, copy } from './copy.js';
 
 /**
- * Copy the selection to the clipboard, then blank the source range. Excel
+ * Copy the selection to the clipboard, then blank the source range. Desktop spreadsheets
  * normally defers the blank until the next paste — we apply it eagerly
  * here for v1.0 to keep the wb state visibly in sync. The dotted-marquee
  * UX is a v1.x concern.

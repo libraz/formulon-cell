@@ -194,7 +194,7 @@ export function attachPointer(
       }
 
       case 'col-filter-btn': {
-        // Reflect Excel: clicking the chevron does not move the active cell.
+        // Reflect the spreadsheet convention: clicking the chevron does not move the active cell.
         // Bubble out a CustomEvent so the chrome layer (mount.ts) can open
         // the filter dropdown anchored under the chevron.
         e.preventDefault();
@@ -268,10 +268,10 @@ export function attachPointer(
 
       case 'cell': {
         const rawAddr = { sheet: s.data.sheetIndex, row: zone.row, col: zone.col };
-        // Click on a merged cell body — promote to the merge anchor (Excel parity).
+        // Click on a merged cell body — promote to the merge anchor (spreadsheet parity).
         const addr = mergeAnchorOf(s, rawAddr);
         const meta = (e.ctrlKey || e.metaKey) && !e.shiftKey;
-        // Ctrl/Cmd+click on a hyperlinked cell follows the link (Excel parity).
+        // Ctrl/Cmd+click on a hyperlinked cell follows the link (spreadsheet parity).
         // Falls through to multi-range selection when the cell has no link so
         // the modifier stays useful for non-link cells.
         if (meta) {
@@ -416,7 +416,7 @@ export function attachPointer(
       const dest = s.ui.fillPreview;
       mutators.setFillPreview(store, null);
       if (dest) {
-        // Excel parity: holding Ctrl/⌘ on release toggles series → tile copy.
+        // Spreadsheet parity: holding Ctrl/⌘ on release toggles series → tile copy.
         const copyOnly = e.ctrlKey || e.metaKey;
         // Bundle every per-cell write into a single undoable transaction.
         if (history) history.begin();
@@ -450,7 +450,7 @@ export function attachPointer(
     const { x, y } = localXY(e);
     const s = store.getState();
 
-    // Fill-handle takes precedence — Excel-style "double-click to flash-fill
+    // Fill-handle takes precedence — spreadsheet-style "double-click to flash-fill
     // down to match the neighbour column's contiguous run."
     if (isFillHandleHit(x, y)) {
       e.preventDefault();
@@ -754,14 +754,14 @@ function measureAutofitText(
 }
 
 /**
- * Excel "double-click the fill handle" rule: extend the source range downward
+ * Desktop spreadsheets "double-click the fill handle" rule: extend the source range downward
  * by the contiguous-data run of the immediate left-then-right neighbour
  * column. Returns null when neither neighbour has a usable run (so we don't
  * flash a no-op fill).
  *
  * The neighbour run starts at the row just below the source bottom edge
  * (src.r1 + 1) and ends at the last non-blank row in that column. We require
- * at least one non-blank cell at row src.r1 + 1 — without it, Excel doesn't
+ * at least one non-blank cell at row src.r1 + 1 — without it, spreadsheets don't
  * expand either, so a stray cell ten rows down won't trigger an unexpected
  * fill.
  */
@@ -770,7 +770,7 @@ function autoFillDownExtent(state: State, src: Range): Range | null {
   const start = src.r1 + 1;
   if (start > MAX_ROW) return null;
   const probeCols: number[] = [];
-  if (src.c0 > 0) probeCols.push(src.c0 - 1); // left first (Excel preference)
+  if (src.c0 > 0) probeCols.push(src.c0 - 1); // left first (desktop spreadsheets preference)
   if (src.c1 < MAX_COL) probeCols.push(src.c1 + 1);
 
   let endRow = -1;

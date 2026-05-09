@@ -5,7 +5,7 @@ import { recordFormatChange } from './history.js';
 
 /** Built-in named cell styles. Each style is a partial CellFormat that
  *  `applyCellStyle` merges into the active range via `setRangeFormat`. The
- *  IDs mirror Excel's "Cell Styles" gallery. */
+ *  IDs mirror the "Cell Styles" gallery. */
 export type CellStyleId =
   | 'normal'
   | 'title'
@@ -37,8 +37,8 @@ export interface CellStyleDef {
   format: Partial<CellFormat>;
 }
 
-/** Excel-flavored named cell style presets. The format payloads stay close to
- *  Excel's defaults so a workbook hopping between this UI and Excel feels
+/** Spreadsheet-flavored named cell style presets. The format payloads stay close to
+ *  desktop defaults so a workbook hopping between this UI and desktop spreadsheets feels
  *  consistent. Borders use the basic `'thin'`/`'medium'` styles; consumers
  *  can extend with their own gallery via `applyCellFormat` directly. */
 export const CELL_STYLES: readonly CellStyleDef[] = [
@@ -174,7 +174,7 @@ export function applyCellStyle(
     if (id === 'normal') {
       // Clear by overwriting every format field with undefined. setRangeFormat
       //  merges with `Object.assign`, so explicit `undefined`s win — matching
-      //  Excel's "Normal" reset behavior.
+      //  the spreadsheet's "Normal" reset behavior.
       mutators.setRangeFormat(store, range, {
         bold: undefined,
         italic: undefined,

@@ -5,7 +5,7 @@ import type { SpreadsheetStore } from '../store/store.js';
 /** Heuristic locale detector — we don't get a `Locale` flag through deps so
  *  we sniff the active dictionary's title against the canonical English one.
  *  Cheap, and correct for the two built-in locales. Custom locales fall back
- *  to English descriptions, which is the standard Excel behaviour for
+ *  to English descriptions, which is the standard desktop spreadsheets behaviour for
  *  unsupported tongues. */
 const detectLocale = (s: Strings): 'en' | 'ja' =>
   s.fxDialog.title === enStrings.fxDialog.title ? 'en' : 'ja';
@@ -28,7 +28,7 @@ export interface FxDialogHandle {
   detach(): void;
 }
 
-/** Concise "Excel-style" descriptions for the most common functions. The
+/** Concise "spreadsheet-style" descriptions for the most common functions. The
  *  catalog itself (FUNCTION_SIGNATURES) doesn't carry descriptions — anything
  *  not listed here renders without a description blurb. Keep the list small;
  *  exhaustive coverage isn't a goal. */
@@ -101,7 +101,7 @@ export const FUNCTION_DESCRIPTIONS: Readonly<Record<string, { en: string; ja: st
 };
 
 /**
- * Excel-style "Function Arguments" modal. Two steps:
+ * Spreadsheet-style "Function Arguments" modal. Two steps:
  *   1. Pick a function from a searchable list.
  *   2. Fill labeled inputs (one per declared arg in `FUNCTION_SIGNATURES`)
  *      with a live `= NAME(arg1, arg2, …)` preview and an Insert button.

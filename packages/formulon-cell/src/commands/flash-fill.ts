@@ -1,10 +1,10 @@
 /**
- * Flash Fill (Excel: Ctrl+E) — pattern inference from a small set of
+ * Flash Fill (Ctrl+E) — pattern inference from a small set of
  * (input, output) examples in adjacent columns. The user supplies one or
  * more examples in the target column; Flash Fill extends the pattern to
  * the rest of the column.
  *
- * Excel's full implementation uses a learned program-synthesis model
+ * the canonical implementation uses a learned program-synthesis model
  * (FlashFill / Prose). The algorithm here is a deliberately small
  * heuristic that covers the common cases users actually run Ctrl+E for:
  *

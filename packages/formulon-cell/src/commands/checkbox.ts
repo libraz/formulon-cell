@@ -1,7 +1,7 @@
 import type { CellValue } from '../engine/types.js';
 
 /**
- * Toggle helper for the checkbox cell type. Excel 365 ships an explicit
+ * Toggle helper for the checkbox cell type. Desktop spreadsheets ship an explicit
  * "Insert → Checkbox" cell type that:
  *   - Renders a checkbox glyph in place of TRUE/FALSE.
  *   - Flips the underlying boolean on click or when the user presses Space.
@@ -20,7 +20,7 @@ export function toggleCheckboxValue(v: CellValue | undefined): CellValue {
 }
 
 /** Reduce a CellValue to a checkbox boolean for paint purposes. Mirrors
- *  Excel's coercion: TRUE / non-zero / non-empty text → checked. */
+ *  the spreadsheet coercion: TRUE / non-zero / non-empty text → checked. */
 export function isCheckboxValueChecked(v: CellValue | undefined): boolean {
   if (!v) return false;
   if (v.kind === 'blank') return false;

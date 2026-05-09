@@ -36,7 +36,7 @@ const KINDS: readonly GoToSpecialKind[] = [
 ];
 
 /**
- * Excel-style "Go To Special" dialog. Lets the user pick a category (blanks,
+ * Spreadsheet-style "Go To Special" dialog. Lets the user pick a category (blanks,
  * formulas, errors, validation, …) and rewrites the selection to the
  * bounding range of every matching cell on the active sheet (or just inside
  * the current selection when one is provided).
@@ -140,7 +140,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
     kindList.appendChild(wrap);
     kindInputs.set(k, input);
   }
-  // Default selection — Excel opens with `constants` highlighted; we mirror that.
+  // Default selection — spreadsheets open with `constants` highlighted; we mirror that.
   (kindInputs.get('constants') as HTMLInputElement).checked = true;
 
   // Inline status (shown when a search returns zero results).
@@ -173,7 +173,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
 
   const syncScopeAvailability = (): void => {
     const multi = isSelectionMulti();
-    // Disable selection scope when only one cell is selected — matching Excel,
+    // Disable selection scope when only one cell is selected — matching the spreadsheet convention,
     // which silently widens to "active sheet" in that case.
     scopeSelection.disabled = !multi;
     if (!multi) {
@@ -222,7 +222,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
       e.preventDefault();
       api.close();
     } else if (e.key === 'Enter') {
-      // Enter on any control inside the modal commits — matches Excel.
+      // Enter on any control inside the modal commits — matches the spreadsheet convention.
       e.preventDefault();
       onOk();
     }

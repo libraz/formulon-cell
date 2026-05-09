@@ -24,7 +24,7 @@ export interface StatusBarDeps {
   getCalcMode?: () => 0 | 1 | 2 | null;
   onCycleCalcMode?: () => void;
   onRecalc?: () => void;
-  /** Optional Excel-style zoom control driver. `zoom` is a multiplier
+  /** Optional spreadsheet-style zoom control driver. `zoom` is a multiplier
    *  (1.0 = 100%). The status bar clamps UI input to the store's supported
    *  [0.5, 4] range before calling this. */
   onZoomChange?: (zoom: number) => void;

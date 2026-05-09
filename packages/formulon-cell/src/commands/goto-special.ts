@@ -3,7 +3,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { addrKey } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore } from '../store/store.js';
 
-/** Excel "Go To Special" categories supported in v1. Mirrors the radio list
+/** Desktop spreadsheets "Go To Special" categories supported in v1. Mirrors the radio list
  *  on the dialog. Future expansion can add `row-differences`,
  *  `column-differences`, `precedents`, `dependents`. */
 export type GoToSpecialKind =
@@ -18,15 +18,15 @@ export type GoToSpecialKind =
   | 'conditional-format';
 
 /** Whether the predicate runs across the active sheet or just the current
- *  selection rectangle. Excel uses the selection scope automatically when the
+ *  selection rectangle. Spreadsheets use the selection scope automatically when the
  *  current selection covers more than one cell. */
 export type GoToScope = 'sheet' | 'selection';
 
-/** Excel error sentinels — the strings that can appear in a `text` value via
+/** Spreadsheet error sentinels — the strings that can appear in a `text` value via
  *  user input or pasted data. The engine returns `kind: 'error'` for live
  *  formula errors, so we match both. Anything outside this list (e.g. a
  *  literal `#TODO!`) is treated as plain text. */
-const EXCEL_ERROR_SENTINELS: ReadonlySet<string> = new Set([
+const ERROR_SENTINELS: ReadonlySet<string> = new Set([
   '#NULL!',
   '#DIV/0!',
   '#VALUE!',
@@ -57,7 +57,7 @@ const inRange = (addr: Addr, range: Range): boolean =>
  *
  *  For `blanks` we additionally walk every cell inside the selection
  *  rectangle so an explicit blank in the middle of an empty range still
- *  surfaces — Excel's behavior. For other kinds we only iterate populated
+ *  surfaces — the spreadsheet behavior. For other kinds we only iterate populated
  *  cells; an empty cell can't satisfy a "formulas" predicate. */
 export function findMatchingCells(
   wb: WorkbookHandle,
@@ -113,12 +113,12 @@ const matchesKind = (
     case 'numbers':
       return value.kind === 'number';
     case 'text':
-      // Plain text cells, but not Excel error sentinels masquerading as text.
-      return value.kind === 'text' && !EXCEL_ERROR_SENTINELS.has(value.value);
+      // Plain text cells, but not spreadsheet error sentinels masquerading as text.
+      return value.kind === 'text' && !ERROR_SENTINELS.has(value.value);
     case 'errors':
       if (value.kind === 'error') return true;
       // Some engines surface error sentinels as text. Treat as error too.
-      if (value.kind === 'text' && EXCEL_ERROR_SENTINELS.has(value.value)) return true;
+      if (value.kind === 'text' && ERROR_SENTINELS.has(value.value)) return true;
       return false;
     case 'data-validation': {
       const fmt = store.getState().format.formats.get(addrKey(addr));

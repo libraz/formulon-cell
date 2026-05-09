@@ -87,7 +87,7 @@ const wantsNumFmt = (what: PasteWhat): boolean =>
 
 /**
  * Apply a clipboard snapshot to the destination starting at `state.selection.active`,
- * filtered by the Excel-style "Paste Special" options. Returns the range that was
+ * filtered by the spreadsheet-style "Paste Special" options. Returns the range that was
  * actually written. Caller is responsible for refreshing the cached cell map.
  */
 export function pasteSpecial(
@@ -118,7 +118,7 @@ export function pasteSpecial(
       const row = origin.row + dr;
       const col = origin.col + dc;
       const addr: Addr = { sheet, row, col };
-      // Sheet protection — silently skip locked destinations (Excel parity).
+      // Sheet protection — silently skip locked destinations (spreadsheet parity).
       if (!isCellWritable(state, addr)) continue;
 
       // Layer 1: values / formulas
@@ -130,7 +130,7 @@ export function pasteSpecial(
           const result = combine(opt.operation, dest, srcNum);
           if (Number.isFinite(result)) wb.setNumber(addr, result);
         } else if (opt.operation !== 'none') {
-          // Excel Paste Special arithmetic operations ignore non-numeric
+          // Desktop spreadsheets Paste Special arithmetic operations ignore non-numeric
           // source cells instead of overwriting the destination with text.
         } else {
           if (src.value.kind !== 'blank' || !isBlankSrc) writeClipboardValue(wb, addr, src);

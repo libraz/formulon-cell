@@ -3,7 +3,7 @@
 // The store has its own subscribe(), and the workbook handle has its own
 // subscribe() — both are still exposed for power users — but these are
 // low-level and tied to internal shapes. For the typical "wire the
-// spreadsheet to an outer state container" job, applications want a
+// Spreadsheet to an outer state container" job, applications want a
 // stable, event-named API. That is what this emitter provides.
 //
 // Adapter packages (`-react`, `-vue`) consume this through `inst.on()`.

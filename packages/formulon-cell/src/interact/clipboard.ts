@@ -64,7 +64,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     if (s.ui.editor.kind !== 'idle') return;
     const text = e.clipboardData?.getData('text/plain') ?? '';
     if (!text) return;
-    // Excel parity: any merge that intersects the destination range gets
+    // Spreadsheet parity: any merge that intersects the destination range gets
     // unmerged before the paste — a textual paste cannot tear merged cells.
     const rows = parseTSV(text);
     if (rows.length > 0) {

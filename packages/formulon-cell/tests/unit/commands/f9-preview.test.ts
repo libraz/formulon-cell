@@ -21,7 +21,7 @@ describe('renderCellValueForF9', () => {
     expect(renderCellValueForF9({ kind: 'text', value: 'hi' })).toBe('"hi"');
   });
 
-  it('uppercases booleans (Excel parity)', () => {
+  it('uppercases booleans (spreadsheet parity)', () => {
     expect(renderCellValueForF9({ kind: 'bool', value: true })).toBe('TRUE');
     expect(renderCellValueForF9({ kind: 'bool', value: false })).toBe('FALSE');
   });
@@ -30,7 +30,7 @@ describe('renderCellValueForF9', () => {
     expect(renderCellValueForF9({ kind: 'error', code: 7, text: '#DIV/0!' })).toBe('#DIV/0!');
   });
 
-  it('treats blank/undefined as 0 (Excel coerces blank to zero)', () => {
+  it('treats blank/undefined as 0 (spreadsheets coerce blank to zero)', () => {
     expect(renderCellValueForF9(undefined)).toBe('0');
     expect(renderCellValueForF9({ kind: 'blank' })).toBe('0');
   });
@@ -74,7 +74,7 @@ describe('computeF9Preview', () => {
     });
   });
 
-  it('returns 0 for an unpopulated cell ref (Excel blank → 0)', () => {
+  it('returns 0 for an unpopulated cell ref (spreadsheet convention: blank → 0)', () => {
     expect(computeF9Preview('=A1', 'A1', 0, new Map())).toEqual({
       display: '0',
       substitutable: true,

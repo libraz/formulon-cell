@@ -321,7 +321,7 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
       return;
     }
     if (e.key === 'Enter') {
-      // Enter inside a textbox triggers OK — Excel parity.
+      // Enter inside a textbox triggers OK — spreadsheet parity.
       e.preventDefault();
       onOk();
     }

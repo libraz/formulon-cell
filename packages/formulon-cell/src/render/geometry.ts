@@ -23,7 +23,7 @@ const RESIZE_SLACK = 4;
 export const FILTER_BTN_SIZE = 14;
 export const FILTER_BTN_INSET = 4;
 
-/** Excel-style column letter ("A", "Z", "AA", "AB", ...). */
+/** Spreadsheet-style column letter ("A", "Z", "AA", "AB", ...). */
 export function colLabel(idx: number): string {
   let n = idx;
   let out = '';

@@ -18,7 +18,7 @@ export interface HoverHandle {
  *  - Comment tooltip overlay — shown when hovering a cell with `format.comment`.
  *  - Hyperlink activation — Ctrl/Cmd-click opens `format.hyperlink` in a new tab.
  *  - Cursor adjustments — `pointer` cursor over hyperlink cells while modifier
- *    is held (Excel/Sheets convention).
+ *    is held (spreadsheet convention).
  */
 export function attachHover(deps: HoverDeps): HoverHandle {
   const { grid, store } = deps;

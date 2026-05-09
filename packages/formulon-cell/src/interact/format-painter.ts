@@ -30,7 +30,7 @@ interface Snapshot {
 }
 
 /**
- * Excel-style "Format Painter" interaction.
+ * Spreadsheet-style "Format Painter" interaction.
  *
  * Click to copy the current selection's formatting to a single destination
  * (single-cell click pastes the whole source pattern; drag-pastes onto a
@@ -38,7 +38,7 @@ interface Snapshot {
  * pattern repeats until Esc / deactivate.
  *
  * The source snapshot is captured at activation time, not at paint time,
- * which mirrors Excel: editing the source mid-paint does not affect the
+ * which mirrors the spreadsheet convention: editing the source mid-paint does not affect the
  * pattern about to be pasted.
  */
 export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandle {
@@ -67,7 +67,7 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
     const rows = r.r1 - r.r0 + 1;
     const cols = r.c1 - r.c0 + 1;
     if (rows <= 0 || cols <= 0) return null;
-    // Excel caps Format Painter source at the visible used range. We accept
+    // Spreadsheets cap Format Painter source at the visible used range. We accept
     // anything up to ~10000 cells; beyond that the snapshot grows too large.
     if (rows * cols > 100_000) return null;
     const pattern: (CellFormat | undefined)[][] = [];
@@ -138,7 +138,7 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
       });
     });
 
-    // Move selection to the painted range, matching Excel behavior.
+    // Move selection to the painted range, matching the spreadsheet behavior.
     mutators.setActive(store, { sheet, row: dest.r0, col: dest.c0 });
     if (dest.r0 !== dest.r1 || dest.c0 !== dest.c1) {
       mutators.extendRangeTo(store, { sheet, row: dest.r1, col: dest.c1 });

@@ -2,7 +2,7 @@ import type { CellValue } from '../engine/types.js';
 import { addrKey } from '../engine/workbook-handle.js';
 
 /**
- * Excel's F9 key, while editing a formula, replaces the highlighted
+ * the spreadsheet's F9 key, while editing a formula, replaces the highlighted
  * sub-expression with its evaluated value. We can't run a full engine
  * evaluation against an arbitrary text without writing into a scratch cell,
  * so this MVP handles the two cases that cover ~95% of real F9 use:
@@ -50,7 +50,7 @@ export function renderCellValueForF9(v: CellValue | undefined): string {
 /** Compute the F9 substitution for `selection` taken from `formula`. The
  *  selection is the substring the user has highlighted while editing. The
  *  `cells` map mirrors `DataSlice.cells` and `sheetByName` translates a
- *  sheet name (Excel-side) to its 0-based index — when omitted, sheet-
+ *  sheet name (spreadsheet-side) to its 0-based index — when omitted, sheet-
  *  qualified refs are unresolved. */
 export function computeF9Preview(
   _formula: string,

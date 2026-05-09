@@ -533,7 +533,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       }
       case 'rowUnhide': {
         const r = state.selection.range;
-        // Excel: select rows flanking a hidden band, then unhide. We just
+        // Desktop spreadsheets: select rows flanking a hidden band, then unhide. We just
         // unhide every hidden row inside the active selection.
         const targets = hiddenInSelection(state.layout, 'row', r.r0, r.r1);
         const first = targets[0];

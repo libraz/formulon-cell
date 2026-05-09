@@ -24,7 +24,7 @@ interface IterativeSettings {
 const DEFAULTS: IterativeSettings = { enabled: false, maxIterations: 100, maxChange: 0.001 };
 
 /**
- * Excel-style "Enable iterative calculation" controls. Mirrors File →
+ * Spreadsheet-style "Enable iterative calculation" controls. Mirrors File →
  * Options → Formulas → Calculation options. The dialog persists settings on
  * `wb.setIterative` and wires a progress callback that surfaces residual /
  * iteration counts to a status-bar span via the `fc:iterative-progress`

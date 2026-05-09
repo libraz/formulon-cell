@@ -18,7 +18,7 @@ export function mergeAt(state: State, addr: Addr): Range | null {
 }
 
 /** If `addr` is inside a merge, return the merge anchor; otherwise return `addr`
- *  unchanged. Used for click-to-select and keyboard-into-merge: Excel always
+ *  unchanged. Used for click-to-select and keyboard-into-merge: desktop spreadsheets always
  *  reports the anchor as the active cell when a merge is selected. */
 export function mergeAnchorOf(state: State, addr: Addr): Addr {
   const m = mergeAt(state, addr);
@@ -101,7 +101,7 @@ const hasContent = (
 };
 
 /**
- * Merge `range` into a single visual cell. Excel parity: the top-left value is
+ * Merge `range` into a single visual cell. spreadsheet parity: the top-left value is
  * preserved; non-anchor cells are cleared. The clearing writes go through `wb`
  * (so they get individual undo entries via WorkbookHandle), and the
  * merges-state mutation gets one undo entry via `recordMergesChange`. Both are
@@ -140,7 +140,7 @@ export function applyMerge(
 
 /**
  * Remove every merge that intersects `range`. The cells stay as they are —
- * Excel keeps the (single) anchor value visible in the top-left after split.
+ * Spreadsheets keep the (single) anchor value visible in the top-left after split.
  * `wb` may be null in entry points that don't have an engine handle (e.g. the
  * paste path runs before the engine has been attached) — engine sync is
  * skipped in that case.

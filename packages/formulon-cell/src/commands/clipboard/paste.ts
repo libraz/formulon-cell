@@ -12,9 +12,9 @@ export interface PasteResult {
 /**
  * Paste a TSV payload at the current active cell. Each value is run through
  * `coerceInput` so leading-`=` strings become formulas, numerics become
- * numbers, etc. — matching Excel's behaviour when you paste values from a
+ * numbers, etc. — matching the spreadsheet behaviour when you paste values from a
  * different program. Cells gated by sheet protection (locked + sheet
- * protected) are silently skipped, mirroring Excel's paste behaviour.
+ * protected) are silently skipped, mirroring the spreadsheet's paste behaviour.
  */
 export function pasteTSV(state: State, wb: WorkbookHandle, text: string): PasteResult | null {
   if (!text) return null;

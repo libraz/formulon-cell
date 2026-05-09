@@ -112,9 +112,9 @@ export interface ErrorTriangleHit {
   kind: ErrorTriangleKind;
 }
 
-/** Color used for formula-error triangles (Excel-style green). */
+/** Color used for formula-error triangles (spreadsheet-style green). */
 export const ERROR_TRIANGLE_COLOR = '#2ea043';
-/** Color used for data-validation violation triangles (Excel-style red). */
+/** Color used for data-validation violation triangles (spreadsheet-style red). */
 export const VALIDATION_TRIANGLE_COLOR = '#d24545';
 
 let cachedFillHandleRect: Rect | null = null;
@@ -133,7 +133,7 @@ function setErrorTriangleHits(hits: ErrorTriangleHit[]): void {
   cachedErrorTriangles = hits;
 }
 
-/** Excel error sentinels that the renderer surfaces with a green corner
+/** Spreadsheet error sentinels that the renderer surfaces with a green corner
  *  triangle. Engine-typed errors take the `value.kind === 'error'` branch;
  *  the string set covers cases where a custom formatter / passthrough
  *  layer left a string sentinel in the cell. */
@@ -1087,7 +1087,7 @@ export class GridRenderer {
   /** Top-layer trace-arrow overlay. Iterates `state.traces.items` and paints
    *  one dot + arrow per entry. Same-sheet only; entries on a different sheet
    *  than `data.sheetIndex` are silently skipped. Off-screen endpoints are
-   *  also skipped — partial visibility is not handled in v1 (Excel clips
+   *  also skipped — partial visibility is not handled in v1 (spreadsheets clip
    *  arrows the same way against the freeze divider). */
   private paintTraces(state: State, cols: AxisLayout, rows: AxisLayout): void {
     const items = state.traces.items;

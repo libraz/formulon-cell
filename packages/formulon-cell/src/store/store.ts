@@ -187,7 +187,7 @@ export interface LayoutSlice {
   defaultRowHeight: number;
   headerColWidth: number;
   headerRowHeight: number;
-  /** Number of rows pinned at the top (Excel "Freeze Panes"). 0 = none. */
+  /** Number of rows pinned at the top (the desktop-spreadsheet "Freeze Panes"). 0 = none. */
   freezeRows: number;
   /** Number of cols pinned at the left. 0 = none. */
   freezeCols: number;
@@ -196,7 +196,7 @@ export interface LayoutSlice {
   hiddenCols: Set<number>;
   /** Outline (group) level per row, 1..7. Absent or 0 means no group. The
    *  bracket gutter widens with the maximum level; collapse/expand toggle
-   *  hides/shows the rows in a contiguous group. Excel parity. */
+   *  hides/shows the rows in a contiguous group. spreadsheet parity. */
   outlineRows: Map<number, number>;
   outlineCols: Map<number, number>;
   /** Width of the row outline gutter in CSS px — derived from
@@ -204,7 +204,7 @@ export interface LayoutSlice {
    *  mutators; renderer treats this as authoritative. */
   outlineRowGutter: number;
   outlineColGutter: number;
-  /** Sheets whose tab is hidden (Excel "Hide Sheet"). Indexed by sheet
+  /** Sheets whose tab is hidden (the desktop-spreadsheet "Hide Sheet"). Indexed by sheet
    *  index. Hidden sheets keep their data; only the tab is suppressed. */
   hiddenSheets: Set<number>;
 }
@@ -239,19 +239,19 @@ export interface UiSlice {
    *  marquee; cleared when the drag ends. Null at rest. */
   fillPreview: Range | null;
   /** Source range currently held by the internal clipboard. Painted as a
-   *  dashed copy marquee, similar to Excel's marching ants. */
+   *  dashed copy marquee, similar to "marching ants". */
   copyRange: Range | null;
   /** When false, the renderer skips drawing inter-cell hairline gridlines. */
   showGridLines: boolean;
   /** When false, the renderer hides the row-number / column-letter strips. */
   showHeaders: boolean;
   /** When true, formula cells display the formula text instead of the
-   *  evaluated value. Equivalent to Excel "Show Formulas" (Ctrl+`). */
+   *  evaluated value. Equivalent to the desktop-spreadsheet "Show Formulas" (Ctrl+`). */
   showFormulas: boolean;
   /** Display refs in R1C1 form instead of A1 (headers, name box). Underlying
    *  storage stays A1 — only the rendered representation changes. */
   r1c1: boolean;
-  /** Live formula-reference highlights (Excel: colored borders on referenced
+  /** Live formula-reference highlights (desktop spreadsheets: colored borders on referenced
    *  cells while editing a formula). Empty when no formula edit is active. */
   editorRefs: EditorRefHighlight[];
   /** Which aggregate stats appear in the status bar for the active selection. */
@@ -264,7 +264,7 @@ export interface UiSlice {
   watchPanelOpen: boolean;
 }
 
-/** Aggregate readouts available in the status bar. Excel ships these six. */
+/** Aggregate readouts available in the status bar. Spreadsheets ship these six. */
 export type StatusAggKey = 'sum' | 'average' | 'count' | 'countNumbers' | 'min' | 'max';
 
 export interface FormatSlice {
@@ -315,7 +315,7 @@ export type ConditionalRule =
       range: Range;
       color: string;
       /** When true, paint the bar across the whole cell with the text on top
-       *  (like Excel's "Show Bar Only" being false). */
+       *  (like the spreadsheet's "Show Bar Only" being false). */
       showValue?: boolean;
     }
   | {
@@ -403,7 +403,7 @@ export interface ChartsSlice {
   charts: readonly SessionChart[];
 }
 
-/** Cells the user has pinned in the Watch Window. Session-only — Excel
+/** Cells the user has pinned in the Watch Window. Session-only — desktop spreadsheets
  *  parity: watches don't survive workbook close, and they aren't recorded
  *  in the undo stack. Order is insertion order. */
 export interface WatchSlice {
@@ -421,7 +421,7 @@ export interface TraceArrow {
 }
 
 /** Trace-precedents / trace-dependents arrows currently visible. Session-only;
- *  not recorded in the undo stack — Excel keeps trace arrows out of the
+ *  not recorded in the undo stack — spreadsheets keep trace arrows out of the
  *  history journal too. Each `tracePrecedents()` / `traceDependents()` call
  *  appends to `items`; `clearTraces()` empties the list. */
 export interface TracesSlice {
@@ -429,7 +429,7 @@ export interface TracesSlice {
 }
 
 /** Per-cell triangle suppression for the error-indicator overlay. Key is
- *  `addrKey` (`sheet:row:col`). Session-only, NOT history-tracked — Excel's
+ *  `addrKey` (`sheet:row:col`). Session-only, NOT history-tracked — the spreadsheet's
  *  "Ignore Error" affordance only suppresses the marker for the current
  *  session and doesn't survive a reload. */
 export interface ErrorIndicatorSlice {
@@ -444,7 +444,7 @@ export type PageOrientation = 'portrait' | 'landscape';
  *  honour for the print preview / PDF rendering. */
 export type PaperSize = 'A4' | 'A3' | 'A5' | 'letter' | 'legal' | 'tabloid';
 
-/** Margins in inches — Excel parity. The dialog renders text inputs in inches;
+/** Margins in inches — spreadsheet parity. The dialog renders text inputs in inches;
  *  the print-CSS converts to `in` units verbatim. */
 export interface PageMargins {
   top: number;
@@ -461,7 +461,7 @@ export interface PageSetup {
   orientation: PageOrientation;
   paperSize: PaperSize;
   margins: PageMargins;
-  /** Header / footer text — Excel splits the strip into three slots
+  /** Header / footer text — desktop spreadsheets splits the strip into three slots
    *  (left / center / right). Empty / missing strings render as nothing. */
   headerLeft?: string;
   headerCenter?: string;
@@ -507,7 +507,7 @@ export function defaultPageSetup(): PageSetup {
   };
 }
 
-/** A single Excel-style slicer attached to one column of one Excel Table.
+/** A single spreadsheet-style slicer attached to one column of one spreadsheet Table.
  *  `selected` is the user's current chip selection — empty array means "all
  *  values pass" (no filter). The optional `x`/`y` coordinates anchor the
  *  floating panel relative to the host; absent = default offset. */
@@ -533,7 +533,7 @@ export interface SlicersSlice {
 }
 
 /** Session-level Format-as-Table overlays. Full ListObject authoring is
- *  engine-gated; this slice gives the UI Excel-style table visuals today. */
+ *  engine-gated; this slice gives the UI spreadsheet-style table visuals today. */
 export interface TablesSlice {
   tables: readonly TableOverlay[];
 }
@@ -546,7 +546,7 @@ export interface SheetViewsSlice {
 /** Workbook-level sheet-protection state. Each protected sheet is keyed by
  *  its index; the value records whether a password was supplied (currently
  *  stored verbatim, not enforced — v1 ships without password validation).
- *  NOT history-tracked: Excel exposes protection as a workbook-level
+ *  NOT history-tracked: spreadsheets expose protection as a workbook-level
  *  setting and toggling it doesn't appear in undo. Cell-level locks live
  *  on `CellFormat.locked`; this slice only owns the sheet-side flag. */
 export interface ProtectionSlice {
@@ -949,7 +949,7 @@ export const mutators = {
   },
 
   scrollBy(store: SpreadsheetStore, dRow: number, dCol: number): void {
-    // Excel sheet bounds — keep at least one body row/col visible past the
+    // Desktop spreadsheets sheet bounds — keep at least one body row/col visible past the
     // freeze zone, otherwise the viewport disappears off the right/bottom.
     const MAX_ROW = 1_048_575;
     const MAX_COL = 16_383;

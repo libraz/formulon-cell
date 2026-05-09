@@ -2,7 +2,7 @@ import type { Range } from '../engine/types.js';
 import type { SpreadsheetStore } from '../store/store.js';
 
 /**
- * Sheet Views — Excel 365's per-user filter / sort profiles. Each view
+ * Sheet Views — the desktop spreadsheet's per-user filter / sort profiles. Each view
  * captures the current filter range, sort key, and frozen pane setup so
  * collaborators can switch perspectives without stepping on each other.
  *
@@ -29,7 +29,7 @@ export interface SheetView {
   filterRange?: Range;
   /** Frozen-pane configuration. Default = neither row nor col frozen. */
   freeze?: { rows: number; cols: number };
-  /** Active sort key (single-column, like Excel's basic sort UX). */
+  /** Active sort key (single-column, like the basic single-column sort UX). */
   sort?: SheetViewSort;
   /** Hidden rows / columns at capture time. Indices are 0-based. */
   hiddenRows?: readonly number[];

@@ -29,7 +29,7 @@ export interface WatchPanelHandle {
   detach(): void;
 }
 
-/** Excel column-letter conversion (0-indexed). */
+/** Spreadsheet column-letter conversion (0-indexed). */
 const colLetter = (col: number): string => {
   let n = col;
   let out = '';
@@ -43,7 +43,7 @@ const colLetter = (col: number): string => {
 const a1 = (addr: Addr): string => `${colLetter(addr.col)}${addr.row + 1}`;
 
 /**
- * Excel-style Watch Window. Lists pinned cells with live values; updates on
+ * Spreadsheet-style Watch Window. Lists pinned cells with live values; updates on
  * every store change (covers both direct cell mutation and the recalc-fed
  * value refresh path in mount.ts). Click a row to jump the active selection
  * to that cell, switching sheet if needed.

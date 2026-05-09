@@ -2,7 +2,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { LayoutSlice, SpreadsheetStore } from '../store/store.js';
 import { type History, recordLayoutChangeWithEngine } from './history.js';
 
-/** Excel caps outline depth at 7 — beyond that the gutter would be unreadable. */
+/** Spreadsheets cap outline depth at 7 — beyond that the gutter would be unreadable. */
 export const MAX_OUTLINE_LEVEL = 7;
 
 /** Width of one bracket slot in CSS pixels. The gutter widens by this amount

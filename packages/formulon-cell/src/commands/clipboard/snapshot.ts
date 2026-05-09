@@ -5,7 +5,7 @@ import type { CellFormat, State } from '../../store/store.js';
 /**
  * Structured snapshot of a range — values, formulas, AND formats. Captured
  * on copy/cut so a subsequent Paste Special can pick which of the three
- * layers to apply. Excel keeps this internal-clipboard separate from the
+ * layers to apply. Spreadsheets keep this internal-clipboard separate from the
  * system clipboard; we mirror that.
  */
 export interface ClipboardCell {

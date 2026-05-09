@@ -305,13 +305,13 @@ describe('formatNumber', () => {
     expect(formatNumber(0.1234, { kind: 'percent', decimals: 2 })).toBe('12.34%');
   });
 
-  it('renders Excel locale-tagged currency custom formats', () => {
+  it('renders spreadsheet locale-tagged currency custom formats', () => {
     const fmt = { kind: 'custom' as const, pattern: '[$¥-411]#,##0;[Red]-[$¥-411]#,##0' };
     expect(formatNumber(1234, fmt, 'ja-JP')).toBe('¥1,234');
     expect(formatNumber(-1234, fmt, 'ja-JP')).toBe('-¥1,234');
   });
 
-  it('hides Excel accounting spacing and fill directives in custom output', () => {
+  it('hides spreadsheet accounting spacing and fill directives in custom output', () => {
     const fmt = {
       kind: 'custom' as const,
       pattern: '_-"$"* #,##0.00_-;-"$"* #,##0.00_-;_-"$"* "-"??_-;_-@_-',

@@ -6,7 +6,7 @@ describe('formatGeneralNumber', () => {
     expect(formatGeneralNumber(1234.5, 'en-US')).toBe('1,234.5');
   });
 
-  it('uses Excel-like scientific notation for very large or tiny numbers', () => {
+  it('uses spreadsheet-like scientific notation for very large or tiny numbers', () => {
     expect(formatGeneralNumber(123456789012)).toBe('1.23457E+11');
     expect(formatGeneralNumber(0.0000000001234)).toBe('1.23400E-10');
   });

@@ -71,7 +71,7 @@ const numericFromText = (
   };
 };
 
-/** Custom-list series — Excel ships these by default. Each list represents
+/** Custom-list series — spreadsheets ship these by default. Each list represents
  *  a closed cycle that auto-fill steps through. Casing of the source is
  *  preserved by matching against the lowercased list. */
 const CUSTOM_LISTS: readonly string[][] = [
@@ -209,7 +209,7 @@ interface SeriesProjection {
 }
 
 /**
- * Inspect a 1D source line and produce a series projector. Excel's heuristic:
+ * Inspect a 1D source line and produce a series projector. the spreadsheet heuristic:
  *  - all-numeric, length >= 2 → linear extrapolation (step = avg consecutive diff)
  *  - all-numeric, length 1   → copy
  *  - "Item 1", "Item 2"      → increment trailing integer
@@ -329,7 +329,7 @@ const writeProjected = (
 };
 
 export interface FillOptions {
-  /** Bypass series detection and tile the source verbatim (Excel: Ctrl-drag). */
+  /** Bypass series detection and tile the source verbatim (Ctrl-drag). */
   copyOnly?: boolean;
 }
 
@@ -339,7 +339,7 @@ export interface FillOptions {
  *
  * Formula handling: when the source contains formulas we currently copy them
  * verbatim (no relative-reference translation yet). For pure values, the
- * series detector picks linear / increment / copy as Excel would.
+ * series detector picks linear / increment / copy as desktop spreadsheets would.
  */
 export function fillRange(
   state: State,
@@ -468,7 +468,7 @@ export function fillRange(
 }
 
 /** Compute the dest range for a drag from the source's bottom-right corner
- *  to a target cell (the cursor position). Excel locks the extension to
+ *  to a target cell (the cursor position). Spreadsheets lock the extension to
  *  whichever axis is most extended — diagonal drags don't extend both axes
  *  (unless the target is fully inside both). */
 export function fillDestFor(src: Range, target: { row: number; col: number }): Range {

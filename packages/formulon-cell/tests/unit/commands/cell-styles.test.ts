@@ -4,7 +4,7 @@ import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore } from '../../../src/index.js';
 
 describe('CELL_STYLES', () => {
-  it('contains the Excel-flavored presets', () => {
+  it('contains the spreadsheet-flavored presets', () => {
     const ids = CELL_STYLES.map((s) => s.id);
     expect(ids).toContain('normal');
     expect(ids).toContain('heading1');

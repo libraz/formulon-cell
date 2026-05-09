@@ -7,14 +7,14 @@ import type { CellFormat, ConditionalIconSet, Sparkline, State } from '../store/
 import type { ResolvedTheme } from '../theme/resolve.js';
 import { type AxisLayout, gridOriginX, gridOriginY, type Rect } from './geometry.js';
 
-/** Trace-arrow accent colors. Excel paints precedents in blue and dependents
+/** Trace-arrow accent colors. Spreadsheets paint precedents in blue and dependents
  *  in a slightly redder hue so the two relations are visually distinct even
  *  when both are active simultaneously. */
 export const TRACE_PRECEDENT_COLOR = '#1f7ae0';
 export const TRACE_DEPENDENT_COLOR = '#cf3a4c';
 
 /** Paint a small filled dot at the source cell of a trace arrow. The dot
- *  sits at the center of `rect`. Mirrors Excel's blue/red round endpoint. */
+ *  sits at the center of `rect`. Mirrors the blue/red round endpoint convention. */
 export function paintTraceDot(
   ctx: CanvasRenderingContext2D,
   rect: Rect,
@@ -121,7 +121,7 @@ export function paintValidationChevron(
   return { x, y, w, h };
 }
 
-/** Paint the Excel Table header filter/dropdown affordance. This is visual
+/** Paint the spreadsheet Table header filter/dropdown affordance. This is visual
  *  only today; table filtering still routes through the normal filter model. */
 export function paintTableHeaderChevron(
   ctx: CanvasRenderingContext2D,
@@ -180,7 +180,7 @@ export function paintErrorTriangle(
   return { x, y, w: size, h: size };
 }
 
-/** Convenience alias — Excel paints DV violations the same shape as formula
+/** Convenience alias — spreadsheets paint DV violations the same shape as formula
  *  errors but red. The grid wires both through `paintErrorTriangle`; this
  *  thin wrapper keeps the call sites self-documenting. */
 export function paintValidationTriangle(
@@ -220,7 +220,7 @@ export function paintLockMarker(
 }
 
 /** Paint a small filled triangle in the upper-right of the cell to indicate
- *  an attached comment (Excel/Sheets convention). */
+ *  an attached comment (spreadsheet convention). */
 export function paintCommentMarker(ctx: CanvasRenderingContext2D, bounds: Rect): void {
   const size = 5;
   const x = bounds.x + bounds.w - size;
@@ -246,7 +246,7 @@ export interface CellPaintCtx {
   isInRange: boolean;
   format?: CellFormat;
   /** When true and `formula` is non-null, paint the formula text instead of
-   *  the evaluated value (Excel "Show Formulas" mode). */
+   *  the evaluated value (the desktop-spreadsheet "Show Formulas" mode). */
   showFormulas?: boolean;
   /** Override the displayed string. Set by `paintCells` after consulting
    *  the cell registry (`inst.cells.registerFormatter`). When non-null
@@ -513,7 +513,7 @@ export function paintCellText({
   ctx.clip();
 
   // Rotated text — render around cell center, ignore wrap/indent for
-  // simplicity. (Excel is more elaborate but this covers ±90° common case.)
+  // simplicity. (Real desktop spreadsheets are more elaborate but this covers ±90° common case.)
   if (rotation !== 0) {
     ctx.translate(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2);
     ctx.rotate((rotation * Math.PI) / 180);
@@ -598,7 +598,7 @@ export function paintCellText({
  *  overflowing line rather than mid-word breaking. */
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   if (maxWidth <= 0) return [text];
-  // Honor explicit \n line breaks (Alt+Enter in Excel).
+  // Honor explicit \n line breaks (Alt+Enter in a desktop spreadsheet).
   const paragraphs = text.split('\n');
   const out: string[] = [];
   for (const para of paragraphs) {
@@ -672,7 +672,7 @@ export function paintCellBorders({ ctx, bounds, theme, format }: CellPaintCtx): 
     ctx.lineWidth = widthMap[cfg.style] ?? 1;
     ctx.setLineDash(dashMap[cfg.style] ?? []);
     if (cfg.style === 'double') {
-      // Excel keeps double borders inside the owning cell. Drawing both
+      // Spreadsheets keep double borders inside the owning cell. Drawing both
       // strokes inward avoids clipping on viewport and sheet edges.
       const gap = 3;
       const horizontal = y0 === y1;
@@ -709,7 +709,7 @@ export function paintCellBorders({ ctx, bounds, theme, format }: CellPaintCtx): 
 /** Active cell outline. Drawn in a separate pass after all cell text so the
  *  outline never gets clipped by neighbouring cell rects.
  *
- *  Excel 365 paints the active cell with a crisp ~2px green border and no
+ *  Desktop spreadsheets paint the active cell with a crisp ~2px green border and no
  *  inner fill or outer halo. */
 export function paintActiveCellOutline(
   ctx: CanvasRenderingContext2D,
@@ -729,12 +729,12 @@ export function paintActiveCellOutline(
   ctx.restore();
 }
 
-/** Visible side length of the fill handle in CSS pixels. Excel 365 uses a
+/** Visible side length of the fill handle in CSS pixels. Desktop spreadsheets use a
  *  small accent-coloured square at the bottom-right of the active selection
  *  range; the user grabs it to drag-fill into adjacent cells. */
 export const FILL_HANDLE_SIZE = 6;
 
-/** Excel-style fill handle. Drawn at the selection range's bottom-right
+/** Spreadsheet-style fill handle. Drawn at the selection range's bottom-right
  *  corner (or active-cell corner when selection is a single cell). The square
  *  is filled in `theme.accent` (resolves from `--fc-accent`, falls back to
  *  `#0078d4` when unset) and surrounded by a 1px white border so it stands
@@ -748,7 +748,7 @@ export function paintFillHandle(
 ): Rect {
   const hs = FILL_HANDLE_SIZE;
   // Centre the visible square on the cell's bottom-right corner so half the
-  // handle bleeds outside the selection — matches Excel.
+  // handle bleeds outside the selection — matches the spreadsheet convention.
   const x = bounds.x + bounds.w - hs / 2;
   const y = bounds.y + bounds.h - hs / 2;
   const accent = theme.accent || '#0078d4';
@@ -777,7 +777,7 @@ export function paintFillPreview(
   ctx.restore();
 }
 
-/** Dashed copy-source marquee. Excel animates the dashes; this renderer keeps
+/** Dashed copy-source marquee. Spreadsheets animate the dashes; this renderer keeps
  *  it static but uses the same high-contrast black/white double stroke. */
 export function paintCopyMarquee(ctx: CanvasRenderingContext2D, bounds: Rect): void {
   ctx.save();
@@ -800,7 +800,7 @@ export function paintCopyMarquee(ctx: CanvasRenderingContext2D, bounds: Rect): v
   ctx.restore();
 }
 
-/** Outline a dynamic-array spill range — Excel paints a 1px accent ring
+/** Outline a dynamic-array spill range — spreadsheets paint a 1px accent ring
  *  around the spilled rectangle so it reads as a single result. */
 export function paintSpillOutline(
   ctx: CanvasRenderingContext2D,
@@ -817,7 +817,7 @@ export function paintSpillOutline(
 }
 
 /** Highlight a cell that is blocking a #SPILL! result with a red dashed
- *  outline. Mirrors Excel's "spill obstruction" indicator. */
+ *  outline. Mirrors the "spill obstruction" indicator. */
 export function paintSpillBlocker(ctx: CanvasRenderingContext2D, bounds: Rect): void {
   ctx.save();
   ctx.strokeStyle = '#d83b3b';
@@ -971,7 +971,7 @@ export function paintOutlineGutters(
           ctx.stroke();
           const collapsed = isRowGroupCollapsed(layout, r0, r1);
           // Toggle sits on the row that should remain visible — typically the
-          // row just below the band on Excel default ("summary below"). If
+          // row just below the band on desktop default ("summary below"). If
           // there is no such row visible, render at the bottom edge of the run.
           const summaryRow = r1 + 1;
           const summaryY =

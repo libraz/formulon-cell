@@ -24,7 +24,7 @@ export function hydrateProtectionFromEngine(wb: WorkbookHandle, store: Spreadshe
 
 /**
  * Push the JS-side protection toggle to the engine. Mirrors the
- * `<sheetProtection enabled="1" sheet="1" password="…">` shape Excel
+ * `<sheetProtection enabled="1" sheet="1" password="…">` shape desktop spreadsheets
  * emits: when `on`, the sheet flag flips on and a legacy password is
  * stored if the caller provided one; when off, the protection block is
  * cleared (`enabled=0`). Future flag-rich UIs can call

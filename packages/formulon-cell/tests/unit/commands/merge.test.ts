@@ -66,7 +66,7 @@ describe('applyMerge', () => {
     );
   });
 
-  it('clears non-anchor cell values (Excel keeps only top-left)', () => {
+  it('clears non-anchor cell values (spreadsheets keep only top-left)', () => {
     seedAndMirror(store, wb, [
       { row: 0, col: 0, value: 'keep' },
       { row: 0, col: 1, value: 'drop1' },

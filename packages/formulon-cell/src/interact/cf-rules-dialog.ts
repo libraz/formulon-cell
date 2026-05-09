@@ -7,7 +7,7 @@ export interface CfRulesDialogDeps {
    *  swaps so it always reads the live engine. */
   getWb: () => WorkbookHandle | null;
   /** Reads the active sheet at open time. The dialog scopes its rule list
-   *  to a single sheet (Excel "Show formatting rules for: This Sheet"). */
+   *  to a single sheet (the desktop-spreadsheet "Show formatting rules for: This Sheet"). */
   getActiveSheet: () => number;
   /** Called after a remove / clearAll mutation so the host can repaint the
    *  CF overlay. */

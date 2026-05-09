@@ -73,7 +73,7 @@ describe('suggestColumnHistory', () => {
   it('returns null on empty input or mid-edit caret', () => {
     expect(suggestColumnHistory('', 0, ['Apple'])).toBeNull();
     // Caret at offset 1 of "apple" — user is correcting the middle, not
-    // appending; Excel doesn't pop the list there either.
+    // appending; spreadsheets don't pop the list there either.
     expect(suggestColumnHistory('apple', 1, ['Apricot'])).toBeNull();
   });
 

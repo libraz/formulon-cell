@@ -45,7 +45,7 @@ export function protectedSheetPassword(state: State, sheet: number): string | un
   return state.protection.protectedSheets.get(sheet)?.password;
 }
 
-/** Whether the cell at `addr` is locked. Excel default is locked, so a
+/** Whether the cell at `addr` is locked. desktop default is locked, so a
  *  missing format entry (or `locked === undefined`) returns `true`. Only
  *  an explicit `locked: false` opts the cell out. */
 export function isCellLocked(state: State, addr: Addr): boolean {
@@ -107,7 +107,7 @@ export function* writableAddrs(state: State, range: Range): IterableIterator<Add
 }
 
 /** Set the `locked` flag across a range. `locked === undefined` is the
- *  Excel default (treated as locked); pass `false` to opt cells out, or
+ *  desktop default (treated as locked); pass `false` to opt cells out, or
  *  `true` to make the lock explicit. NOT gated by sheet protection — the
  *  whole point of this mutator is to configure protection up front. */
 export function setCellLocked(store: SpreadsheetStore, range: Range, locked: boolean): void {

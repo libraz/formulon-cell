@@ -151,7 +151,7 @@ interface EngineValidationEntry {
 }
 
 function decodeValidation(v: EngineValidationEntry): CellValidation | null {
-  // Only surface fields that depart from Excel defaults so round-tripping a
+  // Only surface fields that depart from desktop defaults so round-tripping a
   // simple `{ kind: 'list', source: [...] }` stays minimal in the store.
   const errorStyle = ERROR_STYLE_FROM_ORDINAL[v.errorStyle] ?? 'stop';
   const meta: ValidationMeta = {
@@ -290,7 +290,7 @@ function ensureFormulaPrefix(formula: string): string {
   return t.startsWith('=') ? t : `=${t}`;
 }
 
-/** Parse Excel-style inline list literals. Returns null when the source
+/** Parse spreadsheet-style inline list literals. Returns null when the source
  *  string is empty, a range reference, or otherwise unparseable. */
 function parseInlineList(formula: string): string[] | null {
   const trimmed = formula.trim().replace(/^=/, '');
@@ -323,7 +323,7 @@ function parseNumberFormula(formula: string): number | null {
 }
 
 /** Encode either a literal string-array or a range-ref source to formula1.
- *  Inline literals always wrap in double quotes so Excel parses them back as
+ *  Inline literals always wrap in double quotes so spreadsheets parse them back as
  *  a list (rather than a function call); range refs pass through with a
  *  leading `=` to disambiguate from a single-token literal. */
 function encodeListSource(source: string[] | { ref: string }): string {

@@ -50,7 +50,7 @@ export function iconSetSlotCount(set: ConditionalIconSet): 3 | 5 {
 }
 
 /** Classify `t` (a 0..1 percentile) into a slot index for the icon family.
- *  Uses Excel's default thresholds — [0.33, 0.67] for 3-slot families and
+ *  Uses the spreadsheet's default thresholds — [0.33, 0.67] for 3-slot families and
  *  [0.20, 0.40, 0.60, 0.80] for 5-slot families. */
 export function iconSetSlotFor(set: ConditionalIconSet, t: number): number {
   if (set === 'arrows5') {
@@ -67,7 +67,7 @@ export function iconSetSlotFor(set: ConditionalIconSet, t: number): number {
 
 /** Pick the cells whose values land in the top-N (or bottom-N) of `values`.
  *  Ties at the threshold all qualify so the result count can exceed `n` when
- *  the input has duplicates — Excel parity. Returns the inclusive cutoff. */
+ *  the input has duplicates — spreadsheet parity. Returns the inclusive cutoff. */
 export function topBottomThreshold(
   values: readonly number[],
   mode: 'top' | 'bottom',

@@ -89,7 +89,7 @@ interface DraftState {
   comment: string;
   validationList: string;
   /** When kind === 'list', selects between inline string array and a range
-   *  reference (Excel-style `Sheet1!$A$1:$A$10`). */
+   *  reference (spreadsheet-style `Sheet1!$A$1:$A$10`). */
   validationListSourceKind: 'literal' | 'range';
   validationListRange: string;
   validationKind: ValidationKind;
@@ -99,7 +99,7 @@ interface DraftState {
   validationFormula: string;
   validationAllowBlank: boolean;
   validationErrorStyle: ValidationErrorStyle;
-  /** Sheet-protection lock flag. Excel default is `true` (locked); the
+  /** Sheet-protection lock flag. desktop default is `true` (locked); the
    *  Protection tab exposes a single checkbox. */
   locked: boolean;
 }
@@ -1155,7 +1155,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       draft.validationErrorStyle = 'stop';
     }
 
-    // Excel default: cells are locked unless explicitly unlocked.
+    // desktop default: cells are locked unless explicitly unlocked.
     draft.locked = fmt.locked !== false;
 
     syncControlsFromDraft();

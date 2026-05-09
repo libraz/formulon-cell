@@ -187,7 +187,7 @@ describe('numFmtToFormatCode / formatCodeToNumFmt', () => {
     expect(formatCodeToNumFmt('yyyy-mm-dd')).toEqual({ kind: 'date', pattern: 'yyyy-mm-dd' });
   });
 
-  it('reads Excel locale-tagged currency formats', () => {
+  it('reads spreadsheet locale-tagged currency formats', () => {
     expect(formatCodeToNumFmt('[$¥-411]#,##0;[Red]-[$¥-411]#,##0')).toEqual({
       kind: 'currency',
       decimals: 0,
@@ -195,7 +195,7 @@ describe('numFmtToFormatCode / formatCodeToNumFmt', () => {
     });
   });
 
-  it('reads Excel accounting formats with spacing/fill directives', () => {
+  it('reads spreadsheet accounting formats with spacing/fill directives', () => {
     const code = numFmtToFormatCode({ kind: 'accounting', decimals: 2, symbol: '$' });
     expect(formatCodeToNumFmt(code ?? '')).toEqual({
       kind: 'accounting',

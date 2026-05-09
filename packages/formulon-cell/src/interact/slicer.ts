@@ -61,7 +61,7 @@ interface PanelEntry {
 }
 
 /**
- * Excel-style table slicer manager. Renders one floating panel per
+ * Spreadsheet-style table slicer manager. Renders one floating panel per
  * `SlicerSpec` in `state.slicers.slicers`; chip clicks pipe through
  * `setSlicerSelected` and recompute the table's autoFilter from the union
  * of every slicer's selection. Subscribes to store changes so chips repaint

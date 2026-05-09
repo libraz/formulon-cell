@@ -3,7 +3,7 @@ import type { FeatureFlags } from './features.js';
 // Presets express common feature bundles as a `features` shorthand. The
 // names mirror Tiptap's "Kit" pattern: `minimal` is the headless surface,
 // `standard` is what most apps want, `full` mirrors a full desktop
-// spreadsheet surface.
+// Spreadsheet surface.
 //
 // In v0.1 every preset returns a `FeatureFlags` object. In v0.2 these will
 // also return an `Extension[]` for compositional users; the API is

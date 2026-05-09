@@ -28,7 +28,7 @@ export interface NamedCellStylesView {
 /** Walk every entry returned by `view.cellStyleCount()` and emit one
  *  NamedCellStyle per non-hidden record. Hidden built-ins (e.g. the
  *  legacy "Comma [0]" / "Currency [0]" entries) are filtered out to
- *  match Excel's "Cell Styles" gallery, which only surfaces user-visible
+ *  match the "Cell Styles" gallery, which only surfaces user-visible
  *  styles by default. */
 export function computeNamedCellStyles(view: NamedCellStylesView): NamedCellStyle[] {
   const n = view.cellStyleCount();
