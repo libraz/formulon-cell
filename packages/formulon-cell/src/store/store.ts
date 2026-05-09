@@ -495,12 +495,16 @@ export interface PageSetupSlice {
 }
 
 /** Default page-setup record. Returned by `getPageSetup` when the sheet has
- *  no explicit entry, and used as the baseline for partial-patch merges. */
+ *  no explicit entry, and used as the baseline for partial-patch merges.
+ *
+ *  Margins match the "Normal" preset surfaced by the Page Setup dialog
+ *  (`commands/page-setup.ts`) so the chrome can faithfully reflect the
+ *  active preset in its dropdown. */
 export function defaultPageSetup(): PageSetup {
   return {
     orientation: 'portrait',
     paperSize: 'A4',
-    margins: { top: 0.7, right: 0.7, bottom: 0.7, left: 0.7 },
+    margins: { top: 0.75, right: 0.7, bottom: 0.75, left: 0.7 },
     scale: 1,
     showGridlines: false,
     showHeadings: false,

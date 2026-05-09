@@ -15,18 +15,22 @@ import {
   Book24Regular,
   BorderAll24Regular,
   Calculator24Regular,
+  ChartMultiple24Regular,
   Checkmark16Regular,
   ChevronDown12Regular,
   ClipboardPaste24Regular,
   Code24Regular,
   Comma24Regular,
   Comment24Regular,
+  CommentAdd24Regular,
+  CommentMultiple24Regular,
   Copy24Regular,
   CurrencyDollarEuro24Regular,
   Cut24Regular,
   DecimalArrowLeft24Regular,
   DecimalArrowRight24Regular,
   Delete24Regular,
+  DocumentMargins24Regular,
   DocumentOnePage24Regular,
   DocumentPdf24Regular,
   Eraser24Regular,
@@ -37,14 +41,14 @@ import {
   Link24Regular,
   LockClosed24Regular,
   Merge24Regular,
-  PageFit24Regular,
+  Orientation24Regular,
   PaintBrush24Regular,
   Pen24Regular,
   Print24Regular,
   Search24Regular,
+  SearchSquare24Regular,
   Settings24Regular,
   Shield24Regular,
-  SlideSize24Regular,
   TableDeleteColumn24Regular,
   TableDeleteRow24Regular,
   TableDismiss24Regular,
@@ -60,9 +64,11 @@ import {
   TextBulletListSquare24Regular,
   TextColor24Regular,
   TextItalic24Regular,
+  TextProofingTools24Regular,
   TextStrikethrough24Regular,
   TextUnderline24Regular,
   TextWrap24Regular,
+  Translate24Regular,
   Window24Regular,
   ZoomFit24Regular,
 } from '@fluentui/react-icons';
@@ -74,18 +80,26 @@ import {
   type CellBorderStyle,
   clearFilter,
   clearFormat,
+  commentAt,
   cycleBorders,
   cycleCurrency,
   cyclePercent,
   deleteCols,
   deleteRows,
+  formatAsTable,
   hiddenInSelection,
   hideCols,
   hideRows,
   insertCols,
   insertRows,
+  type MarginPreset,
+  marginPresetOf,
   mutators,
+  type PageOrientation,
+  type PaperSize,
+  pageSetupForSheet,
   recordFormatChange,
+  recordPageSetupChange,
   removeDuplicates,
   type SpreadsheetInstance,
   setAlign,
@@ -95,7 +109,10 @@ import {
   setFont,
   setFontColor,
   setFreezePanes,
+  setMarginPreset,
   setNumFmt,
+  setPageOrientation,
+  setPaperSize,
   setSheetZoom,
   setVAlign,
   showCols,
@@ -289,6 +306,13 @@ interface ActiveState {
   fontSize: number;
   fontColor: string;
   fillColor: string;
+  formatPainterArmed: boolean;
+  hasComment: boolean;
+  pageOrientation: PageOrientation;
+  paperSize: PaperSize;
+  /** Closest named preset for the active sheet's margins, or `null` when
+   *  the user has set custom values via the Page Setup dialog. */
+  marginPreset: MarginPreset | null;
 }
 
 const EMPTY: ActiveState = {
@@ -311,6 +335,11 @@ const EMPTY: ActiveState = {
   fontSize: 11,
   fontColor: '#201f1e',
   fillColor: '#ffffff',
+  formatPainterArmed: false,
+  hasComment: false,
+  pageOrientation: 'portrait',
+  paperSize: 'A4',
+  marginPreset: 'normal',
 };
 
 const FONT_FAMILIES = ['Aptos', 'Calibri', 'Arial', 'Segoe UI', 'Times New Roman', 'Consolas'];
@@ -351,6 +380,7 @@ const project = (inst: SpreadsheetInstance): ActiveState => {
   const a = s.selection.active;
   const r = s.selection.range;
   const f = s.format.formats.get(`${a.sheet}:${a.row}:${a.col}`);
+  const setup = pageSetupForSheet(s, s.data.sheetIndex);
   return {
     bold: !!f?.bold,
     italic: !!f?.italic,
@@ -371,6 +401,11 @@ const project = (inst: SpreadsheetInstance): ActiveState => {
     fontSize: f?.fontSize ?? 11,
     fontColor: f?.color ?? '#201f1e',
     fillColor: f?.fill ?? '#ffffff',
+    formatPainterArmed: !!inst.formatPainter?.isActive(),
+    hasComment: commentAt(s, a) != null,
+    pageOrientation: setup.orientation,
+    paperSize: setup.paperSize,
+    marginPreset: marginPresetOf(setup.margins),
   };
 };
 
@@ -434,12 +469,19 @@ type IconName =
   | 'options'
   | 'watch'
   | 'comment'
+  | 'commentAdd'
+  | 'commentMultiple'
   | 'protect'
   | 'zoom'
   | 'script'
   | 'addIn'
   | 'pdf'
   | 'goTo'
+  | 'find'
+  | 'findSelect'
+  | 'translate'
+  | 'spelling'
+  | 'chart'
   | 'clear';
 
 const Icon = ({ name }: { name: IconName }): ReactElement => {
@@ -540,9 +582,9 @@ const Icon = ({ name }: { name: IconName }): ReactElement => {
     case 'page':
       return <DocumentOnePage24Regular {...common} />;
     case 'margins':
-      return <PageFit24Regular {...common} />;
+      return <DocumentMargins24Regular {...common} />;
     case 'orientation':
-      return <SlideSize24Regular {...common} />;
+      return <Orientation24Regular {...common} />;
     case 'scale':
       return <ZoomFit24Regular {...common} />;
     case 'print':
@@ -575,6 +617,20 @@ const Icon = ({ name }: { name: IconName }): ReactElement => {
       return <DocumentPdf24Regular {...common} />;
     case 'goTo':
       return <Search24Regular {...common} />;
+    case 'find':
+      return <Search24Regular {...common} />;
+    case 'findSelect':
+      return <SearchSquare24Regular {...common} />;
+    case 'translate':
+      return <Translate24Regular {...common} />;
+    case 'spelling':
+      return <TextProofingTools24Regular {...common} />;
+    case 'chart':
+      return <ChartMultiple24Regular {...common} />;
+    case 'commentAdd':
+      return <CommentAdd24Regular {...common} />;
+    case 'commentMultiple':
+      return <CommentMultiple24Regular {...common} />;
     case 'clear':
       return <Shield24Regular {...common} />;
   }
@@ -645,6 +701,28 @@ export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): Re
           hideCols: '列を表示しない',
           protect: '保護',
           unprotect: '保護解除',
+          findSelect: '検索と選択',
+          find: '検索',
+          replace: '置換',
+          gotoSpecial: 'セル選択',
+          newComment: 'メモを挿入',
+          editComment: 'メモを編集',
+          translate: '翻訳',
+          spelling: 'スペル チェック',
+          hyperlink: 'リンク',
+          pivotTable: 'ピボットテーブル',
+          formatTable: 'テーブルとして書式設定',
+          chart: 'グラフ',
+          pasteSpecial: 'クリップボード',
+          portrait: '縦',
+          landscape: '横',
+          paperA4: 'A4',
+          paperLetter: 'レター',
+          marginsNormal: '標準',
+          marginsWide: '広い',
+          marginsNarrow: '狭い',
+          marginsCustom: 'ユーザー設定',
+          recalc: '再計算',
         }
       : {
           workbook: 'Workbook',
@@ -705,6 +783,28 @@ export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): Re
           hideCols: 'Hide Cols',
           protect: 'Protect',
           unprotect: 'Unprotect',
+          findSelect: 'Find & Select',
+          find: 'Find',
+          replace: 'Replace',
+          gotoSpecial: 'Go To Special',
+          newComment: 'New Note',
+          editComment: 'Edit Note',
+          translate: 'Translate',
+          spelling: 'Spelling',
+          hyperlink: 'Link',
+          pivotTable: 'PivotTable',
+          formatTable: 'Format as Table',
+          chart: 'Chart',
+          pasteSpecial: 'Paste Special',
+          portrait: 'Portrait',
+          landscape: 'Landscape',
+          paperA4: 'A4',
+          paperLetter: 'Letter',
+          marginsNormal: 'Normal',
+          marginsWide: 'Wide',
+          marginsNarrow: 'Narrow',
+          marginsCustom: 'Custom',
+          recalc: 'Calculate Now',
         };
   const borderPresets =
     lang === 'ja'
@@ -760,15 +860,26 @@ export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): Re
 
   const onUndo = useCallback(() => instance?.undo(), [instance]);
   const onRedo = useCallback(() => instance?.redo(), [instance]);
-  const onCopy = useCallback(() => {
-    document.execCommand('copy');
-  }, []);
-  const onCut = useCallback(() => {
-    document.execCommand('cut');
-  }, []);
-  const onPaste = useCallback(() => {
-    document.execCommand('paste');
-  }, []);
+  // Re-focus the host (canvas region) before delegating to the system
+  // clipboard so the host-bound copy/cut/paste listeners run with a real
+  // selection. document.execCommand still works on Safari/Chrome for copy
+  // and cut; paste falls back to the same listener as Ctrl/⌘+V.
+  const dispatchClipboard = useCallback(
+    (kind: 'copy' | 'cut' | 'paste') => {
+      if (!instance) return;
+      instance.host.focus();
+      try {
+        document.execCommand(kind);
+      } catch {
+        // execCommand can throw on some browsers — swallow so the button
+        // still feels like a hint rather than blowing up the chrome.
+      }
+    },
+    [instance],
+  );
+  const onCopy = useCallback(() => dispatchClipboard('copy'), [dispatchClipboard]);
+  const onCut = useCallback(() => dispatchClipboard('cut'), [dispatchClipboard]);
+  const onPaste = useCallback(() => dispatchClipboard('paste'), [dispatchClipboard]);
   const onFormatPainter = useCallback(() => {
     instance?.formatPainter?.activate(false);
   }, [instance]);
@@ -903,6 +1014,49 @@ export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): Re
     [instance],
   );
 
+  const onPageOrientation = useCallback(
+    (next: PageOrientation) => {
+      if (!instance) return;
+      const sheet = instance.store.getState().data.sheetIndex;
+      recordPageSetupChange(instance.history, instance.store, () => {
+        setPageOrientation(instance.store, sheet, next);
+      });
+    },
+    [instance],
+  );
+
+  const onPaperSize = useCallback(
+    (next: PaperSize) => {
+      if (!instance) return;
+      const sheet = instance.store.getState().data.sheetIndex;
+      recordPageSetupChange(instance.history, instance.store, () => {
+        setPaperSize(instance.store, sheet, next);
+      });
+    },
+    [instance],
+  );
+
+  const onMarginPreset = useCallback(
+    (next: MarginPreset) => {
+      if (!instance) return;
+      const sheet = instance.store.getState().data.sheetIndex;
+      recordPageSetupChange(instance.history, instance.store, () => {
+        setMarginPreset(instance.store, sheet, next);
+      });
+    },
+    [instance],
+  );
+
+  // Insert tab > Format as Table — applies the default session table overlay
+  // to the active range. Excel opens a style picker first; ours ships a
+  // single default style today, so calling the command directly is honest
+  // and skips a one-option dropdown.
+  const onFormatAsTable = useCallback(() => {
+    if (!instance) return;
+    const r = instance.store.getState().selection.range;
+    formatAsTable(instance.store, r);
+  }, [instance]);
+
   const tool = (
     id: string,
     title: string,
@@ -910,6 +1064,7 @@ export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): Re
     onClick: () => void,
     isActive = false,
     extra = '',
+    disabled = false,
   ): ReactElement => (
     <button
       key={id}
@@ -918,7 +1073,7 @@ export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): Re
       title={title}
       aria-label={title}
       onClick={onClick}
-      disabled={!instance}
+      disabled={disabled || !instance}
     >
       {label}
     </button>
@@ -1067,7 +1222,13 @@ export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): Re
           ),
           tool('cut', tr.cut, <Icon name="cut" />, onCut),
           tool('copy', tr.copy, <Icon name="copy" />, onCopy),
-          tool('formatPainter', tr.formatPainter, <Icon name="paint" />, onFormatPainter),
+          tool(
+            'formatPainter',
+            tr.formatPainter,
+            <Icon name="paint" />,
+            onFormatPainter,
+            active.formatPainterArmed,
+          ),
           tool(
             'clearFormat',
             'Clear formats',
@@ -1307,9 +1468,17 @@ export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): Re
           tool('sortAscHome', 'Sort ascending', <Icon name="sortAsc" />, () => onSort('asc')),
           tool('filterHome', 'Filter', <Icon name="filter" />, onFilterToggle, active.filterOn),
           tool(
+            'findHome',
+            `${tr.find} (⌘F)`,
+            iconLabel('find', tr.find),
+            () => instance?.openFindReplace(),
+            false,
+            ' demo__rb--wide',
+          ),
+          tool(
             'gotoSpecialHome',
             'Go To Special',
-            iconLabel('goTo', tr.goTo),
+            iconLabel('goTo', tr.gotoSpecial),
             () => instance?.openGoToSpecial(),
             false,
             ' demo__rb--wide',
@@ -1322,6 +1491,22 @@ export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): Re
       group(
         tr.tables,
         [
+          tool(
+            'pivotTableInsert',
+            'PivotTable',
+            iconLabel('table', tr.pivotTable),
+            () => instance?.openPivotTableDialog(),
+            false,
+            ' demo__rb--wide',
+          ),
+          tool(
+            'formatTableInsert',
+            'Format as Table',
+            iconLabel('tableStyle', tr.formatTable),
+            onFormatAsTable,
+            false,
+            ' demo__rb--wide',
+          ),
           tool(
             'namedRangesInsert',
             'Name manager',
@@ -1342,13 +1527,66 @@ export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): Re
         'tiles',
       ),
       group(
+        lang === 'ja' ? 'グラフ' : 'Charts',
+        [
+          tool(
+            'chartInsert',
+            'Recommended chart',
+            iconLabel('chart', tr.chart),
+            () => instance?.openQuickAnalysis(),
+            false,
+            ' demo__rb--wide',
+          ),
+        ],
+        'tiles',
+      ),
+      group(
         tr.links,
         [
+          tool(
+            'hyperlinkInsert',
+            'Insert hyperlink (⌘K)',
+            iconLabel('link', tr.hyperlink),
+            () => instance?.openHyperlinkDialog(),
+            false,
+            ' demo__rb--wide',
+          ),
           tool(
             'linksInsert',
             'Edit links',
             iconLabel('link', tr.links),
             () => instance?.openExternalLinksDialog(),
+            false,
+            ' demo__rb--wide',
+          ),
+        ],
+        'tiles',
+      ),
+      group(
+        tr.comments,
+        [
+          tool(
+            'commentInsert',
+            active.hasComment ? 'Edit Note' : 'New Note',
+            iconLabel(
+              active.hasComment ? 'commentMultiple' : 'commentAdd',
+              active.hasComment ? tr.editComment : tr.newComment,
+            ),
+            () => instance?.openCommentDialog(),
+            active.hasComment,
+            ' demo__rb--wide',
+          ),
+        ],
+        'tiles',
+      ),
+      group(
+        lang === 'ja' ? '記号と特殊文字' : 'Symbols',
+        [
+          tool(
+            'fxInsert',
+            'Insert function (Σ)',
+            iconLabel('function', 'fx'),
+            () => instance?.openFunctionArguments(),
             false,
             ' demo__rb--wide',
           ),
@@ -1367,6 +1605,7 @@ export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): Re
             () => undefined,
             false,
             ' demo__rb--wide',
+            true,
           ),
           tool(
             'drawErase',
@@ -1375,6 +1614,7 @@ export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): Re
             () => undefined,
             false,
             ' demo__rb--wide',
+            true,
           ),
         ],
         'tiles',
@@ -1384,26 +1624,58 @@ export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): Re
       group(
         tr.pageSetup,
         [
-          tool(
-            'margins',
+          optionSelect<MarginPreset | 'custom'>(
+            'marginsPreset',
             tr.margins,
-            iconLabel('margins', tr.margins),
-            () => instance?.openPageSetup(),
-            false,
-            ' demo__rb--wide',
+            active.marginPreset ?? 'custom',
+            [
+              { value: 'normal', label: tr.marginsNormal },
+              { value: 'wide', label: tr.marginsWide },
+              { value: 'narrow', label: tr.marginsNarrow },
+              // "Custom" is read-only — selecting it would have to round-trip
+              // through Page Setup. We include it so the closed display can
+              // honestly say "Custom" when the user has bespoke margins.
+              { value: 'custom', label: tr.marginsCustom },
+            ],
+            (next) => {
+              if (next === 'custom') {
+                instance?.openPageSetup();
+                return;
+              }
+              onMarginPreset(next);
+            },
+            ' demo__rb-select--border',
           ),
-          tool(
-            'orientation',
+          optionSelect(
+            'orientationPreset',
             tr.orientation,
-            iconLabel('orientation', tr.orientation),
-            () => instance?.openPageSetup(),
-            false,
-            ' demo__rb--wide',
+            active.pageOrientation,
+            [
+              { value: 'portrait' as PageOrientation, label: tr.portrait },
+              { value: 'landscape' as PageOrientation, label: tr.landscape },
+            ],
+            onPageOrientation,
+            ' demo__rb-select--border',
+          ),
+          optionSelect(
+            'paperSizePreset',
+            'Paper size',
+            active.paperSize,
+            [
+              { value: 'A4' as PaperSize, label: 'A4' },
+              { value: 'A3' as PaperSize, label: 'A3' },
+              { value: 'A5' as PaperSize, label: 'A5' },
+              { value: 'letter' as PaperSize, label: tr.paperLetter },
+              { value: 'legal' as PaperSize, label: 'Legal' },
+              { value: 'tabloid' as PaperSize, label: 'Tabloid' },
+            ],
+            onPaperSize,
+            ' demo__rb-select--border',
           ),
           tool(
-            'scale',
-            tr.scale,
-            iconLabel('scale', tr.scale),
+            'pageSetupAdvanced',
+            'Advanced page setup',
+            iconLabel('options', tr.pageSetup),
             () => instance?.openPageSetup(),
             false,
             ' demo__rb--wide',
@@ -1514,6 +1786,14 @@ export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): Re
         tr.calculation,
         [
           tool(
+            'recalcNow',
+            'Calculate Now (F9)',
+            iconLabel('autosum', tr.recalc),
+            () => instance?.recalc(),
+            false,
+            ' demo__rb--wide',
+          ),
+          tool(
             'calcOptions',
             'Calculation options',
             iconLabel('options', tr.options),
@@ -1615,13 +1895,60 @@ export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): Re
     ],
     review: [
       group(
+        lang === 'ja' ? '文章校正' : 'Proofing',
+        [
+          tool(
+            'spellingReview',
+            tr.spelling,
+            iconLabel('spelling', tr.spelling),
+            () => undefined,
+            false,
+            ' demo__rb--wide',
+            true,
+          ),
+        ],
+        'tiles',
+      ),
+      group(
+        lang === 'ja' ? '言語' : 'Language',
+        [
+          tool(
+            'translateReview',
+            tr.translate,
+            iconLabel('translate', tr.translate),
+            () => undefined,
+            false,
+            ' demo__rb--wide',
+            true,
+          ),
+        ],
+        'tiles',
+      ),
+      group(
         tr.comments,
         [
           tool(
-            'commentReview',
-            tr.comments,
-            iconLabel('comment', tr.comments),
-            () => instance?.openFormatDialog(),
+            'newCommentReview',
+            active.hasComment ? 'Edit Note' : 'New Note',
+            iconLabel(
+              active.hasComment ? 'commentMultiple' : 'commentAdd',
+              active.hasComment ? tr.editComment : tr.newComment,
+            ),
+            () => instance?.openCommentDialog(),
+            active.hasComment,
+            ' demo__rb--wide',
+          ),
+        ],
+        'tiles',
+      ),
+      group(
+        lang === 'ja' ? '検索' : 'Find',
+        [
+          tool(
+            'findReview',
+            `${tr.find} (⌘F)`,
+            iconLabel('find', tr.find),
+            () => instance?.openFindReplace(),
             false,
             ' demo__rb--wide',
           ),
@@ -1652,6 +1979,7 @@ export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): Re
             () => undefined,
             false,
             ' demo__rb--wide',
+            true,
           ),
         ],
         'tiles',
@@ -1744,6 +2072,7 @@ export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): Re
             () => undefined,
             false,
             ' demo__rb--wide',
+            true,
           ),
         ],
         'tiles',
@@ -1760,6 +2089,7 @@ export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): Re
             () => undefined,
             false,
             ' demo__rb--wide',
+            true,
           ),
         ],
         'tiles',

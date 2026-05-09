@@ -128,6 +128,8 @@ const FEATURE_GROUPS: { title: string; features: { id: FeatureId; label: string 
       { id: 'conditional', label: 'Conditional formatting' },
       { id: 'namedRanges', label: 'Named ranges' },
       { id: 'hyperlink', label: 'Hyperlink' },
+      { id: 'commentDialog', label: 'Comment popover' },
+      { id: 'pivotTableDialog', label: 'PivotTable dialog' },
       { id: 'validation', label: 'Data validation' },
       { id: 'hoverComment', label: 'Hover comment' },
       { id: 'errorIndicators', label: 'Error indicators' },
@@ -264,6 +266,11 @@ export const App = (): ReactElement => {
   const [ribbonTab, setRibbonTab] = useState<RibbonTab>('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
+  // Workbook display name. Untitled until the user opens or saves a file —
+  // mirrors the spreadsheet titlebar convention. Stripping the extension
+  // keeps it tidy in the chrome while preserving the user's filename for
+  // re-saves.
+  const [bookName, setBookName] = useState('Book1');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const features = useMemo(() => composeFeatures(preset, overrides), [preset, overrides]);
@@ -346,12 +353,12 @@ export const App = (): ReactElement => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'react-demo.xlsx';
+    a.download = `${bookName}.xlsx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1_000);
-  }, [instance]);
+  }, [bookName, instance]);
 
   const onOpen = useCallback(
     async (file: File) => {
@@ -359,6 +366,7 @@ export const App = (): ReactElement => {
       const buf = await file.arrayBuffer();
       const next = await WorkbookHandle.loadBytes(new Uint8Array(buf));
       await instance.setWorkbook(next);
+      setBookName(file.name.replace(/\.(xlsx|xlsm)$/i, ''));
     },
     [instance],
   );
@@ -579,7 +587,7 @@ export const App = (): ReactElement => {
             </button>
           </div>
           <div className="demo__title">
-            <strong>Book1</strong>
+            <strong>{bookName}</strong>
             <span>{ui.saved}</span>
           </div>
           <div className="demo__search">
@@ -770,7 +778,7 @@ export const App = (): ReactElement => {
                 <div className="demo__backstage-title">
                   <span className="demo__backstage-xl">⊞</span>
                   <div>
-                    <h1>Book1</h1>
+                    <h1>{bookName}</h1>
                     <p>{ui.backstageSub}</p>
                   </div>
                 </div>

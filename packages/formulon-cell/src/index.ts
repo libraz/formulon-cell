@@ -200,15 +200,21 @@ export {
   ungroupCols,
   ungroupRows,
 } from './commands/outline.js';
-export type { PageSetupEntry, PageSetupPatch } from './commands/page-setup.js';
+export type { MarginPreset, PageSetupEntry, PageSetupPatch } from './commands/page-setup.js';
 export {
   clearPrintTitles,
   listPageSetups,
+  marginPresetOf,
+  marginPresetValues,
   pageSetupForSheet,
   resetPageSetup,
+  setMarginPreset,
+  setPageOrientation,
   setPageSetup,
+  setPaperSize,
   setPrintTitleCols,
   setPrintTitleRows,
+  togglePageOrientation,
 } from './commands/page-setup.js';
 export type {
   CreatePivotTableOptions,

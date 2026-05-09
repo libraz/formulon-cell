@@ -60,6 +60,7 @@ import { attachContextMenu } from './interact/context-menu.js';
 import { InlineEditor } from './interact/editor.js';
 import { attachErrorMenu, type ErrorMenuHandle } from './interact/error-menu.js';
 import { attachExternalLinksDialog } from './interact/external-links-dialog.js';
+import { attachFilterDropdown, type FilterDropdownHandle } from './interact/filter-dropdown.js';
 import { attachFindReplace } from './interact/find-replace.js';
 import { attachFormatDialog } from './interact/format-dialog.js';
 import { attachFormatPainter, type FormatPainterHandle } from './interact/format-painter.js';
@@ -199,6 +200,20 @@ export interface SpreadsheetInstance {
    *  to skip the picker and jump straight to argument entry for that
    *  function. No-op when the `fxDialog` feature is disabled. */
   openFunctionArguments(seedName?: string): void;
+  /** Open the Hyperlink dialog (Ctrl+K) seeded from the active cell. No-op
+   *  when `features.hyperlink` is off. */
+  openHyperlinkDialog(): void;
+  /** Open the Comment popover anchored on the active cell. No-op when
+   *  `features.commentDialog` is off. */
+  openCommentDialog(): void;
+  /** Open the Find & Replace dialog (Ctrl+F). No-op when
+   *  `features.findReplace` is off. */
+  openFindReplace(): void;
+  /** Close the Find & Replace dialog if it's open. */
+  closeFindReplace(): void;
+  /** Open the Paste Special dialog (Ctrl+Shift+V). No-op when
+   *  `features.pasteSpecial` is off or the clipboard has nothing. */
+  openPasteSpecial(): void;
   /** Open the Page Setup dialog (orientation, paper size, margins,
    *  header/footer, print titles). No-op when `features.pageSetup` is off. */
   openPageSetup(): void;
@@ -206,6 +221,9 @@ export interface SpreadsheetInstance {
    *  native print dialog. Use the dialog's "Save as PDF" action to export.
    *  No-op when `features.pageSetup` is off. */
   print(): void;
+  /** Trigger a full recalc and refresh the active sheet. Mirrors the F9
+   *  shortcut. */
+  recalc(): void;
   /** Show the Watch Window panel. No-op when `features.watchWindow` is off. */
   openWatchWindow(): void;
   /** Hide the Watch Window panel. No-op when the feature is off. */
@@ -914,6 +932,21 @@ export const Spreadsheet = {
       history,
       getWb: () => wb,
     });
+    // Filter dropdown — opens when the pointer dispatches `fc:openfilter`
+    // from a clicked column-filter chevron. Rebuilt on locale change so its
+    // captured strings stay fresh; no public toggle.
+    let filterDropdown: FilterDropdownHandle = attachFilterDropdown({ store, strings });
+    interface OpenFilterDetail {
+      range: import('./engine/types.js').Range;
+      col: number;
+      anchor: { x: number; y: number; h: number };
+    }
+    const onOpenFilter = (e: Event): void => {
+      const detail = (e as CustomEvent<OpenFilterDetail>).detail;
+      if (!detail) return;
+      filterDropdown.open(detail.range, detail.col, detail.anchor);
+    };
+    host.addEventListener('fc:openfilter', onOpenFilter);
 
     // Toggleable host-level features. Each binding starts `null` and is
     // populated by its attacher when the corresponding flag is on. Cross-
@@ -2301,6 +2334,8 @@ export const Spreadsheet = {
         onChanged: () => renderer.invalidate(),
         strings,
       });
+      filterDropdown.detach();
+      filterDropdown = attachFilterDropdown({ store, strings });
 
       // Toggleable host features: prefer setStrings when the handle exposes
       // it, otherwise fall back to detach+reattach.
@@ -2423,6 +2458,21 @@ export const Spreadsheet = {
       openFunctionArguments(seedName?: string) {
         fxDialog?.open(seedName);
       },
+      openHyperlinkDialog() {
+        hyperlinkDialog?.open();
+      },
+      openCommentDialog() {
+        commentDialog?.open();
+      },
+      openFindReplace() {
+        binding.findReplace?.open();
+      },
+      closeFindReplace() {
+        binding.findReplace?.close();
+      },
+      openPasteSpecial() {
+        binding.pasteSpecialDialog?.open();
+      },
       openNamedRangeDialog() {
         namedRangeDialog?.open();
       },
@@ -2435,6 +2485,11 @@ export const Spreadsheet = {
         // dialog never attached so consumers can rely on the gate.
         if (!pageSetupDialog) return;
         printSheet(wb, store, store.getState().data.sheetIndex, host);
+      },
+      recalc() {
+        wb.recalc();
+        mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
+        renderer.invalidate();
       },
       openFormatDialog() {
         formatDialog?.open();
@@ -2589,6 +2644,8 @@ export const Spreadsheet = {
         externalLinksDialog.detach();
         cfRulesDialog.detach();
         cellStylesGallery.detach();
+        filterDropdown.detach();
+        host.removeEventListener('fc:openfilter', onOpenFilter);
         fxDialog?.detach();
         namedRangeDialog?.detach();
         pageSetupDialog?.detach();
