@@ -24,8 +24,8 @@ extension-based feature composition, runtime i18n.
 | package | npm | what it is |
 |---------|-----|------------|
 | [`@libraz/formulon-cell`](./packages/formulon-cell)             | [![npm](https://img.shields.io/npm/v/@libraz/formulon-cell?label=)](https://www.npmjs.com/package/@libraz/formulon-cell)             | Vanilla TS / DOM core |
-| [`@libraz/formulon-cell-react`](./packages/formulon-cell-react) | [![npm](https://img.shields.io/npm/v/@libraz/formulon-cell-react?label=)](https://www.npmjs.com/package/@libraz/formulon-cell-react) | React 18+ component + hooks |
-| [`@libraz/formulon-cell-vue`](./packages/formulon-cell-vue)     | [![npm](https://img.shields.io/npm/v/@libraz/formulon-cell-vue?label=)](https://www.npmjs.com/package/@libraz/formulon-cell-vue)     | Vue 3 component + composables |
+| [`@libraz/formulon-cell-react`](./packages/formulon-cell-react) | [![npm](https://img.shields.io/npm/v/@libraz/formulon-cell-react?label=)](https://www.npmjs.com/package/@libraz/formulon-cell-react) | React 18+ component, hooks, and ribbon toolbar |
+| [`@libraz/formulon-cell-vue`](./packages/formulon-cell-vue)     | [![npm](https://img.shields.io/npm/v/@libraz/formulon-cell-vue?label=)](https://www.npmjs.com/package/@libraz/formulon-cell-vue)     | Vue 3 component, composables, and ribbon toolbar |
 
 ## Install
 
@@ -172,6 +172,25 @@ sheet.i18n.setLocale('fr');
 | `apps/playground`  | `yarn dev`        | Vanilla DOM playground (spreadsheet keymap) |
 | `apps/react-demo`  | `yarn dev:react`  | Same surface as `<Spreadsheet>` React component |
 | `apps/vue-demo`    | `yarn dev:vue`    | Same surface as `<Spreadsheet>` Vue component |
+
+## Framework Ribbon Toolbars
+
+The React and Vue packages publish the demo ribbon as reusable framework
+chrome. Both implementations expose the same ribbon tab model and command
+surface; import the matching toolbar CSS alongside the component.
+
+```tsx
+import { SpreadsheetToolbar, type RibbonTab } from '@libraz/formulon-cell-react';
+import '@libraz/formulon-cell-react/toolbar.css';
+```
+
+```vue
+<script setup lang="ts">
+import { type RibbonTab } from '@libraz/formulon-cell-vue';
+import SpreadsheetToolbar from '@libraz/formulon-cell-vue/toolbar.vue';
+import '@libraz/formulon-cell-vue/toolbar.css';
+</script>
+```
 
 ## Releasing
 

@@ -84,8 +84,25 @@ For the complete API reference, see the [project README](https://github.com/libr
 
 | Package | Description |
 |---------|-------------|
-| [`@libraz/formulon-cell-react`](https://www.npmjs.com/package/@libraz/formulon-cell-react) | `<Spreadsheet>` React component + hooks |
-| [`@libraz/formulon-cell-vue`](https://www.npmjs.com/package/@libraz/formulon-cell-vue) | `<Spreadsheet>` Vue component + composables |
+| [`@libraz/formulon-cell-react`](https://www.npmjs.com/package/@libraz/formulon-cell-react) | `<Spreadsheet>` React component + hooks + `SpreadsheetToolbar` ribbon |
+| [`@libraz/formulon-cell-vue`](https://www.npmjs.com/package/@libraz/formulon-cell-vue) | `<Spreadsheet>` Vue component + composables + `SpreadsheetToolbar` ribbon |
+
+React:
+
+```tsx
+import { SpreadsheetToolbar, type RibbonTab } from '@libraz/formulon-cell-react';
+import '@libraz/formulon-cell-react/toolbar.css';
+```
+
+Vue:
+
+```vue
+<script setup lang="ts">
+import { type RibbonTab } from '@libraz/formulon-cell-vue';
+import SpreadsheetToolbar from '@libraz/formulon-cell-vue/toolbar.vue';
+import '@libraz/formulon-cell-vue/toolbar.css';
+</script>
+```
 
 ## License
 

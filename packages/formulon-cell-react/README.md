@@ -52,6 +52,15 @@ ref.current?.instance?.undo();
 | `useSelection(instance)` | Subscribe to the active selection |
 | `useI18n(instance)` | Read current locale + strings, reactive to runtime swaps |
 
+## Toolbar
+
+`SpreadsheetToolbar` provides the ribbon chrome used by the React demo.
+
+```tsx
+import { SpreadsheetToolbar, type RibbonTab } from '@libraz/formulon-cell-react';
+import '@libraz/formulon-cell-react/toolbar.css';
+```
+
 ## Runtime prop updates
 
 `theme`, `locale`, `strings`, `workbook`, `features`, and `extensions`

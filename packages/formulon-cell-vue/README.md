@@ -54,6 +54,19 @@ const { locale, strings } = useI18n(instance);
 | `useSelection(instance)` | Subscribe to the active selection |
 | `useI18n(instance)` | Read current locale + strings, reactive to runtime swaps |
 
+## Toolbar
+
+`SpreadsheetToolbar` is published as an SFC subpath so Vue bundlers can
+compile it with the same pipeline as application components.
+
+```vue
+<script setup lang="ts">
+import { type RibbonTab } from '@libraz/formulon-cell-vue';
+import SpreadsheetToolbar from '@libraz/formulon-cell-vue/toolbar.vue';
+import '@libraz/formulon-cell-vue/toolbar.css';
+</script>
+```
+
 ## Runtime prop updates
 
 `theme`, `locale`, `strings`, `workbook`, `features`, and `extensions`
