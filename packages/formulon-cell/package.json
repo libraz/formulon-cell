@@ -1,6 +1,6 @@
 {
   "name": "@libraz/formulon-cell",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Spreadsheet UI for the formulon WASM calc engine — extension-based, i18n-aware, theme-tokenized, and desktop-spreadsheet-style.",
   "type": "module",
   "license": "Apache-2.0",
@@ -57,7 +57,8 @@
     "*.css"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "engines": {
     "node": ">=18"

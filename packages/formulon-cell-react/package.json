@@ -1,6 +1,6 @@
 {
   "name": "@libraz/formulon-cell-react",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "React 18+ component + hooks for @libraz/formulon-cell.",
   "type": "module",
   "license": "Apache-2.0",
@@ -33,7 +33,8 @@
   ],
   "sideEffects": false,
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "engines": {
     "node": ">=18"
