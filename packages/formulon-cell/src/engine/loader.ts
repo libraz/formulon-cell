@@ -1,4 +1,4 @@
-// The vendored module is plain ESM and resolves the .wasm itself via its
+// The formulon package is plain ESM and resolves the .wasm itself via its
 // own `import.meta.url` + `locateFile` mechanism, so we don't pass an
 // explicit wasm URL here — Emscripten finds the file next to formulon.js
 // at the consumer's resolved path.
@@ -7,7 +7,7 @@
 // crossOriginIsolated context (missing COOP+COEP, ad-hoc demos, SSR shells)
 // will fail at instantiation; in that case we fall back to an in-memory
 // `stub` engine so the UI keeps working — formulas degrade gracefully.
-import createFormulon from '../../vendor/formulon/formulon.js';
+import createFormulon from '@libraz/formulon';
 import { createStubModule } from './stub-engine.js';
 import type { FormulonModule } from './types.js';
 

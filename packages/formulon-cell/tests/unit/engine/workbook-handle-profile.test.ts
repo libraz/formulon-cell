@@ -31,7 +31,7 @@ describe('WorkbookHandle spreadsheet profile', () => {
     expect(setCalls).toEqual(['mac-365-ja_JP']);
   });
 
-  it('is a null/false no-op when the vendored engine is older', () => {
+  it('is a null/false no-op when the engine package is older', () => {
     const { wb, setCalls } = makeHandle(false);
 
     expect(wb.capabilities.spreadsheetProfile).toBe(false);

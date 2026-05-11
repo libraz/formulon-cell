@@ -36,7 +36,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ['@libraz/formulon-cell', '@libraz/formulon-cell-react'],
+    exclude: ['@libraz/formulon-cell', '@libraz/formulon-cell-react', '@libraz/formulon'],
   },
   // formulon's pthread bundle uses top-level await and spawns its workers
   // as ES modules; both require an ES2022+ target on the main thread and

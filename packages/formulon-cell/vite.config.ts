@@ -4,11 +4,8 @@ import { defineConfig } from 'vite';
 
 // Library build for `@libraz/formulon-cell`.
 //
-// Output uses `preserveModules` so dist/ mirrors src/. That matters because
-// `engine/loader.ts` references the WASM via `new URL('../../vendor/...',
-// import.meta.url)` — the same relative path has to resolve in both the
-// dev workspace layout and the published-package layout. Mirroring src
-// gives us that for free.
+// Output uses `preserveModules` so dist/ mirrors src/. That keeps subpath
+// declarations stable while the calc engine remains an external dependency.
 export default defineConfig({
   build: {
     target: 'es2022',
@@ -28,10 +25,8 @@ export default defineConfig({
       // The Emscripten bundle uses TLA + new URL(...) for both the wasm and
       // worker scripts. Vite's lib worker plugin tries to bundle those as
       // iife workers, which breaks on TLA. Externalizing keeps the import
-      // alive — at consume time the user's bundler resolves
-      // `../../vendor/formulon/formulon.js` relative to our shipped
-      // `dist/engine/loader.js` and handles the Emscripten module on its own.
-      external: ['zustand', 'zustand/vanilla', /\/vendor\/formulon\/formulon\.js$/],
+      // alive so the user's bundler handles the engine package assets.
+      external: ['zustand', 'zustand/vanilla', '@libraz/formulon'],
       output: {
         preserveModules: true,
         preserveModulesRoot: 'src',

@@ -992,7 +992,7 @@ export class GridRenderer {
   ): void {
     const { layout, viewport, data } = state;
     // Prefer the engine's authoritative spill list when available; fall back
-    // to the JS heuristic for stub mode or pre-5/5 vendored builds.
+    // to the JS heuristic for stub mode or older engine package builds.
     const wb = this.getWb();
     const ranges = wb?.spillRanges(data.sheetIndex) ?? findSpillRanges(data.cells, data.sheetIndex);
     for (const r of ranges) {

@@ -25,14 +25,14 @@ export default defineConfig({
       'Cross-Origin-Embedder-Policy': 'require-corp',
     },
     fs: {
-      // Allow serving the workspace's vendored WASM.
+      // Allow serving the workspace package and the engine package assets.
       allow: ['..', '../..'],
     },
   },
   optimizeDeps: {
     // Don't try to pre-bundle the formulon emscripten module — it doesn't
     // play well with esbuild's CJS interop.
-    exclude: ['@libraz/formulon-cell'],
+    exclude: ['@libraz/formulon-cell', '@libraz/formulon'],
   },
   // formulon's pthread bundle uses top-level await and spawns its workers
   // as ES modules; both require an ES2022+ target on the main thread and

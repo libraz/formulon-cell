@@ -49,7 +49,6 @@
   },
   "files": [
     "dist",
-    "vendor",
     "LICENSE",
     "README.md",
     "CHANGELOG.md"
@@ -65,8 +64,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "sync-formulon": "node scripts/sync-formulon.mjs"
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@libraz/formulon": "^0.8.0"
   },
   "peerDependencies": {
     "zustand": "^5"

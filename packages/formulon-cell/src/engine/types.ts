@@ -1,5 +1,4 @@
 // Re-export of the formulon-typed surface plus our adapter shapes.
-// Vendored during pre-publish; once @libraz/formulon is on npm this points there.
 export type {
   BorderRecord,
   BorderSide,
@@ -20,7 +19,7 @@ export type {
   StringResult,
   Value,
   Workbook,
-} from '../../vendor/formulon/formulon.js';
+} from '@libraz/formulon';
 
 export type SpreadsheetProfileId = 'windows-ja_JP' | 'mac-ja_JP';
 
@@ -127,16 +126,16 @@ export const PivotFilterValueKind = {
 export type PivotFilterValueKind = (typeof PivotFilterValueKind)[keyof typeof PivotFilterValueKind];
 
 export interface PivotFilterSpec {
-  readonly fieldIndex: number;
+  readonly axis: PivotAxis;
+  readonly fieldName: string;
   readonly type: PivotFilterType;
   readonly valueKind?: PivotFilterValueKind;
   readonly valueInt?: number;
   readonly valueDouble?: number;
   readonly valueText?: string;
-  readonly value2Kind?: PivotFilterValueKind;
-  readonly value2Int?: number;
-  readonly value2Double?: number;
-  readonly value2Text?: string;
+  readonly valueHighKind?: PivotFilterValueKind;
+  readonly valueHighInt?: number;
+  readonly valueHighDouble?: number;
 }
 
 /** Value kind ordinals — mirror of `fm_value_kind_t`. We redeclare here to

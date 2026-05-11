@@ -5,5 +5,5 @@
     "types": []
   },
   "include": ["src/**/*", "tests/**/*", "vitest.config.ts"],
-  "exclude": ["dist", "node_modules", "vendor"]
+  "exclude": ["dist", "node_modules"]
 }

@@ -6,7 +6,7 @@ import type { WorkbookHandle } from './workbook-handle.js';
  * Trace-precedents / trace-dependents helpers. When the engine exposes
  * `precedents` / `dependents` (5/5 build onward), these wrappers delegate
  * to the engine — that surfaces cross-sheet refs and reflects the live
- * dep graph. Otherwise (stub engine, pre-5/5 vendored builds) we fall
+ * dep graph. Otherwise (stub engine, older engine package builds) we fall
  * back to a same-sheet regex scan over `extractRefs`. The regex skips
  * quoted-string literals so `SUM("A1:B2")` is not mistaken for a real ref.
  */

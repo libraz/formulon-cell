@@ -68,11 +68,10 @@ export default defineConfig({
 });
 ```
 
-**3. Browser builds use the web-safe engine entry.** formulon-cell imports
-the browser wrapper for the vendored engine, so Vite/webpack apps should not
-see `node:*` externalization warnings from the spreadsheet package. Keep the
-package out of dependency pre-bundling so the worker/WASM assets stay under
-the app bundler's control:
+**3. Keep the engine out of dependency pre-bundling.** formulon-cell imports
+`@libraz/formulon`, whose Emscripten wrapper owns the worker/WASM asset
+resolution. Keep both packages out of dependency pre-bundling so those
+assets stay under the app bundler's control:
 
 ```ts
 // vite.config.ts

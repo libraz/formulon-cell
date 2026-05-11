@@ -1730,7 +1730,7 @@ export class WorkbookHandle {
   }
 
   /** Sets the calc-mode metadata. Returns `false` (no-op) under stub or
-   *  pre-5/5 vendored builds. */
+   *  older engine package builds. */
   setCalcMode(mode: 0 | 1 | 2): boolean {
     this.assertAlive();
     if (!this.capabilities.calcMode) return false;
@@ -1739,7 +1739,7 @@ export class WorkbookHandle {
 
   /** Formula-behaviour profile selected in the engine. Profiles model host
    *  differences across supported host profiles. Returns
-   *  `null` when the vendored engine does not expose the profile API. */
+   *  `null` when the engine package does not expose the profile API. */
   spreadsheetProfileId(): SpreadsheetProfileId | null {
     this.assertAlive();
     if (!this.capabilities.spreadsheetProfile) return null;
@@ -1765,7 +1765,7 @@ export class WorkbookHandle {
   }
 
   /** Number of `<cellStyle>` entries (named styles) registered on the
-   *  workbook. Returns `0` under stub mode and pre-5/5 vendored builds. */
+   *  workbook. Returns `0` under stub mode and older engine package builds. */
   cellStyleCount(): number {
     this.assertAlive();
     if (!this.capabilities.cellStyles) return 0;
@@ -1774,7 +1774,7 @@ export class WorkbookHandle {
 
   /** Number of `<cellStyleXfs>` records — the named-style xf table that
    *  `CellStyleResult.xfId` indexes into. Returns `0` under stub mode and
-   *  pre-5/5 vendored builds. */
+   *  older engine package builds. */
   cellStyleXfCount(): number {
     this.assertAlive();
     if (!this.capabilities.cellStyles) return 0;
@@ -1869,7 +1869,7 @@ export class WorkbookHandle {
 
   /** Removes the CF rule at `index` (flattened priority order). When the
    *  containing block becomes empty, the engine drops it too. Returns
-   *  `false` (no-op) under stub mode and pre-5/5 vendored builds. */
+   *  `false` (no-op) under stub mode and older engine package builds. */
   removeConditionalFormatAt(sheet: number, index: number): boolean {
     this.assertAlive();
     if (!this.capabilities.conditionalFormatMutate) return false;
@@ -1877,7 +1877,7 @@ export class WorkbookHandle {
   }
 
   /** Drops every `<conditionalFormatting>` block on `sheet`. Returns
-   *  `false` (no-op) under stub mode and pre-5/5 vendored builds. */
+   *  `false` (no-op) under stub mode and older engine package builds. */
   clearConditionalFormats(sheet: number): boolean {
     this.assertAlive();
     if (!this.capabilities.conditionalFormatMutate) return false;
@@ -1946,7 +1946,7 @@ export class WorkbookHandle {
 
   /** Replaces `<sheetProtection>` flags wholesale. Setting `enabled` to
    *  `false` clears the protection block on save. Returns `false` (no-op)
-   *  under stub mode and pre-5/5 vendored builds. */
+   *  under stub mode and older engine package builds. */
   setSheetProtection(
     sheet: number,
     protection: {

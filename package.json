@@ -22,7 +22,6 @@
     "format": "biome check --write .",
     "typecheck": "yarn workspaces foreach -A --exclude formulon-cell-monorepo run typecheck",
     "test": "yarn workspace @libraz/formulon-cell test",
-    "sync-formulon": "yarn workspace @libraz/formulon-cell sync-formulon",
     "changeset": "changeset",
     "version": "changeset version",
     "prepublish:libs": "cp LICENSE packages/formulon-cell/ && cp LICENSE packages/formulon-cell-react/ 2>/dev/null || true && cp LICENSE packages/formulon-cell-vue/ 2>/dev/null || true"
