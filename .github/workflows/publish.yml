@@ -20,6 +20,7 @@ jobs:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
+      - run: npm install -g npm@11.5.1
       - run: corepack enable
       - run: corepack prepare yarn@4.5.0 --activate
 
@@ -35,7 +36,7 @@ jobs:
       - run: yarn install --immutable
       - run: yarn lint
       - run: yarn typecheck
-      - run: yarn build:all
+      - run: yarn build
       - run: yarn test --run
 
       - name: Prepare packages for publish
@@ -60,33 +61,31 @@ jobs:
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
-        env:
-          REF_NAME: ${{ github.ref_name }}
         with:
           name: Release ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
           body: |
-            Automated release.
+            Automated release for ${{ github.ref_name }}.
 
-      - name: Publish core
+            See [`packages/formulon-cell/CHANGELOG.md`](https://github.com/libraz/formulon-cell/blob/${{ github.ref_name }}/packages/formulon-cell/CHANGELOG.md) for details.
+
+      - name: Publish @libraz/formulon-cell
         working-directory: packages/formulon-cell
-        run: npm publish --access public
+        run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Wait for registry propagation
         run: sleep 15
 
-      - name: Publish react adapter
-        if: hashFiles('packages/formulon-cell-react/package.json') != ''
+      - name: Publish @libraz/formulon-cell-react
         working-directory: packages/formulon-cell-react
-        run: npm publish --access public
+        run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish vue adapter
-        if: hashFiles('packages/formulon-cell-vue/package.json') != ''
+      - name: Publish @libraz/formulon-cell-vue
         working-directory: packages/formulon-cell-vue
-        run: npm publish --access public
+        run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
