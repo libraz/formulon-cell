@@ -1,5 +1,11 @@
 # @libraz/formulon-cell-vue
 
+[![CI](https://img.shields.io/github/actions/workflow/status/libraz/formulon-cell/ci.yml?branch=main&label=CI)](https://github.com/libraz/formulon-cell/actions)
+[![npm](https://img.shields.io/npm/v/@libraz/formulon-cell-vue)](https://www.npmjs.com/package/@libraz/formulon-cell-vue)
+[![npm downloads](https://img.shields.io/npm/dm/@libraz/formulon-cell-vue)](https://www.npmjs.com/package/@libraz/formulon-cell-vue)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-blue?logo=typescript)](https://www.typescriptlang.org/)
+
 Vue 3 component + composables for [`@libraz/formulon-cell`](../formulon-cell/README.md).
 
 ## Install
@@ -59,4 +65,4 @@ host event subscriptions stay intact.
 
 ## License
 
-[Apache-2.0](./LICENSE)
+[Apache-2.0](LICENSE)

@@ -1,5 +1,11 @@
 # @libraz/formulon-cell
 
+[![CI](https://img.shields.io/github/actions/workflow/status/libraz/formulon-cell/ci.yml?branch=main&label=CI)](https://github.com/libraz/formulon-cell/actions)
+[![npm](https://img.shields.io/npm/v/@libraz/formulon-cell)](https://www.npmjs.com/package/@libraz/formulon-cell)
+[![npm downloads](https://img.shields.io/npm/dm/@libraz/formulon-cell)](https://www.npmjs.com/package/@libraz/formulon-cell)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-blue?logo=typescript)](https://www.typescriptlang.org/)
+
 Spreadsheet UI for the [formulon](https://github.com/libraz/formulon) WASM
 calc engine.
 
@@ -335,4 +341,4 @@ See [`@libraz/formulon-cell-react`](../formulon-cell-react/README.md) and
 
 ## License
 
-[Apache-2.0](./LICENSE)
+[Apache-2.0](LICENSE)
