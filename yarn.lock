@@ -548,6 +548,7 @@ __metadata:
   resolution: "@libraz/formulon-cell-react@workspace:packages/formulon-cell-react"
   dependencies:
     "@libraz/formulon-cell": "workspace:*"
+    "@types/node": "npm:^22"
     "@types/react": "npm:^19"
     "@types/react-dom": "npm:^19"
     react: "npm:^19"
@@ -565,6 +566,7 @@ __metadata:
   resolution: "@libraz/formulon-cell-vue@workspace:packages/formulon-cell-vue"
   dependencies:
     "@libraz/formulon-cell": "workspace:*"
+    "@types/node": "npm:^22"
     tsup: "npm:^8"
     typescript: "npm:6.0.3"
     vue: "npm:^3.5"

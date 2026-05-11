@@ -51,6 +51,7 @@
     "vue": "^3.3"
   },
   "devDependencies": {
+    "@types/node": "^22",
     "tsup": "^8",
     "typescript": "6.0.3",
     "vue": "^3.5"
