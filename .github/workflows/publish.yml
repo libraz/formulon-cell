@@ -18,7 +18,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          registry-url: 'https://registry.npmjs.org'
 
       - run: npm install -g npm@11.5.1
       - run: corepack enable
@@ -42,21 +41,18 @@ jobs:
       - name: Prepare packages for publish
         run: |
           cp LICENSE packages/formulon-cell/
-          cp LICENSE packages/formulon-cell-react/ 2>/dev/null || true
-          cp LICENSE packages/formulon-cell-vue/ 2>/dev/null || true
+          cp LICENSE packages/formulon-cell-react/
+          cp LICENSE packages/formulon-cell-vue/
 
+          # Replace workspace:* dependencies with actual version
           CORE_VERSION=$(node -p "require('./packages/formulon-cell/package.json').version")
           for pkg in packages/formulon-cell-react packages/formulon-cell-vue; do
-            if [ -f "${pkg}/package.json" ]; then
-              jq --arg v "^${CORE_VERSION}" '
-                (.dependencies, .peerDependencies) |= (
-                  with_entries(
-                    if .value == "workspace:*" then .value = $v else . end
-                  )
-                )
-              ' "${pkg}/package.json" > "${pkg}/package.json.tmp"
-              mv "${pkg}/package.json.tmp" "${pkg}/package.json"
-            fi
+            jq --arg v "^${CORE_VERSION}" '
+              .dependencies |= with_entries(
+                if .value == "workspace:*" then .value = $v else . end
+              )
+            ' "${pkg}/package.json" > "${pkg}/package.json.tmp"
+            mv "${pkg}/package.json.tmp" "${pkg}/package.json"
           done
 
       - name: Create GitHub Release
@@ -66,26 +62,21 @@ jobs:
           tag_name: ${{ github.ref_name }}
           body: |
             Automated release for ${{ github.ref_name }}.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-            See [`packages/formulon-cell/CHANGELOG.md`](https://github.com/libraz/formulon-cell/blob/${{ github.ref_name }}/packages/formulon-cell/CHANGELOG.md) for details.
-
+      # Publish in dependency order: core first, then framework packages
       - name: Publish @libraz/formulon-cell
         working-directory: packages/formulon-cell
-        run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
 
       - name: Wait for registry propagation
         run: sleep 15
 
       - name: Publish @libraz/formulon-cell-react
         working-directory: packages/formulon-cell-react
-        run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
 
       - name: Publish @libraz/formulon-cell-vue
         working-directory: packages/formulon-cell-vue
-        run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
