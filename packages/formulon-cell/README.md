@@ -9,6 +9,13 @@
 Spreadsheet UI for the [formulon](https://github.com/libraz/formulon) WASM
 calc engine.
 
+> **β (beta).** This package is built primarily as a demonstration host
+> for [**formulon**](https://github.com/libraz/formulon) — a headless,
+> Excel-compatible calculation engine in C++17 that ships a single WASM /
+> Python / CLI core. Engine docs live at
+> [formulon.libraz.net](https://formulon.libraz.net). The UI surface is
+> still evolving; pin a version range you can upgrade on purpose.
+
 - **Desktop-spreadsheet-style** chrome out of the box (formula bar, status bar,
   context menu, sheet tabs).
 - **Canvas-rendered** grid with theme tokens — `paper` (light) and `ink`
@@ -21,10 +28,6 @@ calc engine.
   by default, register more at runtime.
 - **Headless option** — keep just the canvas + store and provide your own
   chrome.
-
-> **Status:** v0.1 — public API stabilizing. Until v1.0 minor bumps may
-> reshape extension contracts. Pin a version range you can update on
-> purpose.
 
 ## Install
 

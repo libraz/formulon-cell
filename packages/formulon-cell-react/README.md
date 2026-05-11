@@ -8,6 +8,15 @@
 
 React 18+ component + hooks for [`@libraz/formulon-cell`](../formulon-cell/README.md).
 
+> **β (beta).** Companion adapter for [`@libraz/formulon-cell`](../formulon-cell/README.md),
+> which is itself built as a demonstration host for
+> [**formulon**](https://github.com/libraz/formulon) — a headless,
+> Excel-compatible C++17 calc engine shipping a single WASM / Python /
+> CLI core. Engine docs live at
+> [formulon.libraz.net](https://formulon.libraz.net). The component
+> surface is still evolving; pin a version range you can upgrade on
+> purpose.
+
 ## Install
 
 ```sh

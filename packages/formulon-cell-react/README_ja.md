@@ -9,6 +9,16 @@
 [`@libraz/formulon-cell`](../formulon-cell/README_ja.md) の React 18+
 コンポーネント + フック。
 
+> **β（ベータ）。** [`@libraz/formulon-cell`](../formulon-cell/README_ja.md)
+> 用の React アダプタです。本体は WASM 計算エンジン
+> [**formulon**](https://github.com/libraz/formulon) のデモホストとして
+> 開発されています。formulon は C++17 製の Excel 互換ヘッドレス計算
+> エンジンで、ブラウザ (WASM) / Python / CLI に同一エンジンを配布します。
+> エンジン本体のドキュメントは
+> [formulon.libraz.net](https://formulon.libraz.net) を参照してください。
+> コンポーネント表層は安定化途上です。意図的にアップグレードできる
+> バージョンレンジで固定してください。
+
 ## インストール
 
 ```sh

@@ -11,6 +11,13 @@ Spreadsheet UI library for the [formulon](https://github.com/libraz/formulon)
 WASM calc engine. Desktop-spreadsheet-style chrome, canvas-rendered grid,
 extension-based feature composition, runtime i18n.
 
+> **β (beta).** `formulon-cell` is built primarily as a demonstration host
+> for [**formulon**](https://github.com/libraz/formulon) — a headless,
+> Excel-compatible calculation engine in C++17 that ships a single WASM /
+> Python / CLI core. Engine docs live at
+> [formulon.libraz.net](https://formulon.libraz.net). The UI surface is
+> still evolving; pin a version range you can upgrade on purpose.
+
 ## Packages
 
 | package | npm | what it is |
@@ -33,11 +40,6 @@ npm install @libraz/formulon-cell zustand
 | `apps/playground`  | `yarn dev`        | Vanilla DOM playground (spreadsheet keymap) |
 | `apps/react-demo`  | `yarn dev:react`  | Same surface as `<Spreadsheet>` React component |
 | `apps/vue-demo`    | `yarn dev:vue`    | Same surface as `<Spreadsheet>` Vue component |
-
-## Status
-
-`v0.1.x` — public API stabilizing. Until v1.0 minor bumps may reshape
-extension contracts. Pin a version range you can upgrade on purpose.
 
 ## License
 

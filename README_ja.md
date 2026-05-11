@@ -12,6 +12,15 @@
 Canvas レンダリングのグリッド、拡張ベースの機能構成、ランタイム i18n を
 提供します。
 
+> **β（ベータ）。** `formulon-cell` は WASM 計算エンジン
+> [**formulon**](https://github.com/libraz/formulon) のデモ用ホストとして
+> 開発されたパッケージです。formulon は C++17 製の Excel 互換ヘッドレス
+> 計算エンジンで、ブラウザ (WASM) / Python / CLI に同一エンジンを配布
+> します。エンジン本体のドキュメントは
+> [formulon.libraz.net](https://formulon.libraz.net) を参照してください。
+> 本パッケージの UI 表層は安定化途上です。意図的にアップグレードできる
+> バージョンレンジで固定してください。
+
 ## パッケージ
 
 | パッケージ | npm | 概要 |
@@ -34,12 +43,6 @@ npm install @libraz/formulon-cell zustand
 | `apps/playground`  | `yarn dev`        | Vanilla DOM プレイグラウンド（表計算キーマップ） |
 | `apps/react-demo`  | `yarn dev:react`  | React コンポーネント `<Spreadsheet>` と同じ機能面 |
 | `apps/vue-demo`    | `yarn dev:vue`    | Vue コンポーネント `<Spreadsheet>` と同じ機能面 |
-
-## ステータス
-
-`v0.1.x` — 公開 API は安定化途上です。v1.0 までは minor バンプで拡張
-コントラクトが変わる可能性があります。意図的にアップグレードできる
-バージョンレンジを固定してください。
 
 ## ライセンス
 
