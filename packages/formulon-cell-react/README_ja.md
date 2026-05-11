@@ -1,23 +1,12 @@
 # @libraz/formulon-cell-react
 
-[![CI](https://img.shields.io/github/actions/workflow/status/libraz/formulon-cell/ci.yml?branch=main&label=CI)](https://github.com/libraz/formulon-cell/actions)
-[![npm](https://img.shields.io/npm/v/@libraz/formulon-cell-react)](https://www.npmjs.com/package/@libraz/formulon-cell-react)
-[![npm downloads](https://img.shields.io/npm/dm/@libraz/formulon-cell-react)](https://www.npmjs.com/package/@libraz/formulon-cell-react)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-6-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![npm version](https://img.shields.io/npm/v/@libraz/formulon-cell-react.svg)](https://www.npmjs.com/package/@libraz/formulon-cell-react)
+[![license](https://img.shields.io/npm/l/@libraz/formulon-cell-react.svg)](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/@libraz/formulon-cell-react)](https://bundlephobia.com/package/@libraz/formulon-cell-react)
 
-[`@libraz/formulon-cell`](../formulon-cell/README_ja.md) の React 18+
-コンポーネント + フック。
-
-> **β（ベータ）。** [`@libraz/formulon-cell`](../formulon-cell/README_ja.md)
-> 用の React アダプタです。本体は WASM 計算エンジン
-> [**formulon**](https://github.com/libraz/formulon) のデモホストとして
-> 開発されています。formulon は C++17 製の Excel 互換ヘッドレス計算
-> エンジンで、ブラウザ (WASM) / Python / CLI に同一エンジンを配布します。
-> エンジン本体のドキュメントは
-> [formulon.libraz.net](https://formulon.libraz.net) を参照してください。
-> コンポーネント表層は安定化途上です。意図的にアップグレードできる
-> バージョンレンジで固定してください。
+[`@libraz/formulon-cell`](https://www.npmjs.com/package/@libraz/formulon-cell)
+の React 18+ コンポーネント + フック。[formulon](https://github.com/libraz/formulon)
+WASM 計算エンジン向けスプレッドシート UI です。
 
 ## インストール
 
@@ -51,40 +40,37 @@ export function MySheet() {
 import { useRef } from 'react';
 import { Spreadsheet, type SpreadsheetRef } from '@libraz/formulon-cell-react';
 
-function App() {
-  const ref = useRef<SpreadsheetRef>(null);
-  return (
-    <>
-      <button onClick={() => ref.current?.instance?.undo()}>元に戻す</button>
-      <Spreadsheet ref={ref} />
-    </>
-  );
-}
+const ref = useRef<SpreadsheetRef>(null);
+ref.current?.instance?.undo();
 ```
 
 ## フック
 
-```tsx
-import { useI18n, useSelection } from '@libraz/formulon-cell-react';
-
-const sel = useSelection(instance);
-const { locale, strings } = useI18n(instance);
-```
-
-## コアヘルパー
-
-このパッケージは `createSessionChart`、`saveSheetView`、`activateSheetView`、
-`listDefinedNames`、`upsertDefinedName` などコアのコマンドヘルパーと型を
-再 export しているため、React アプリのホストクロムを 1 つの import から
-型付けできます。
+| フック | 説明 |
+|------|------|
+| `useSelection(instance)` | アクティブな選択範囲を購読 |
+| `useI18n(instance)` | 現在のロケール + 文字列を取得 (ランタイム切替に追従) |
 
 ## ランタイム props 更新
 
 `theme`、`locale`、`strings`、`workbook`、`features`、`extensions` は
-コアの命令的 API 経由で動作中のスプレッドシートを更新します。これらの
-prop が変わってもキャンバスは再マウントされないため、選択・フォーカス・
-ホスト側のイベント購読が維持されます。
+コアの命令的 API 経由で動作中のスプレッドシートを更新します。コンポーネント
+は **再マウントしません** — 選択・フォーカス・ホスト側イベント購読は
+維持されます。
+
+## コアヘルパー
+
+このパッケージはコアのコマンドヘルパーと型 (`createSessionChart`、
+`saveSheetView`、`activateSheetView`、`listDefinedNames`、
+`upsertDefinedName` など) を再 export しています。React アプリの
+ホストクロムを 1 つの import から型付けできます。
+
+## ドキュメント
+
+完全な API リファレンスとバンドラ統合は
+[プロジェクト README](https://github.com/libraz/formulon-cell/blob/main/README_ja.md)
+を参照してください。
 
 ## ライセンス
 
-[Apache-2.0](LICENSE)
+[Apache License 2.0](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
