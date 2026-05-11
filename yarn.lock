@@ -579,7 +579,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@libraz/formulon-cell@workspace:packages/formulon-cell"
   dependencies:
-    "@libraz/formulon": "npm:^0.8.0"
+    "@libraz/formulon": "npm:0.9.0"
     "@vitest/coverage-v8": "npm:4.1.5"
     happy-dom: "npm:20.9.0"
     typescript: "npm:6.0.3"
@@ -592,10 +592,10 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@libraz/formulon@npm:^0.8.0":
-  version: 0.8.0
-  resolution: "@libraz/formulon@npm:0.8.0"
-  checksum: 10c0/1071b935b28198795a9a9584ca4347f12f03f843ab8c701460ac481685d89b01fecb7a108094f7405f1c421be2812f40ff37bce708c5926377a807a71420a4fc
+"@libraz/formulon@npm:0.9.0":
+  version: 0.9.0
+  resolution: "@libraz/formulon@npm:0.9.0"
+  checksum: 10c0/650c5633d6871e60158cf0b4fc9244f3bacbea1f83eaff9f41c4646384ab8af06302c37dcc1dfcca12a73e3908fca31f5158a3e3f9948d985ba1d293b659ec31
   languageName: node
   linkType: hard
 
@@ -2822,11 +2822,11 @@ __metadata:
 
 "typescript@patch:typescript@npm%3A6.0.3#optional!builtin<compat/typescript>":
   version: 6.0.3
-  resolution: "typescript@patch:typescript@npm%3A6.0.3#optional!builtin<compat/typescript>::version=6.0.3&hash=8c6c40"
+  resolution: "typescript@patch:typescript@npm%3A6.0.3#optional!builtin<compat/typescript>::version=6.0.3&hash=5786d5"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
-  checksum: 10c0/eed465bd04b344517bd91eb232fd0187d93e34625c65ec93777449e29157c6c2accae409474a68a867b90465224d4908f9bce78ad763c159cacd7263ae24b5fc
+  checksum: 10c0/2f25c74e65663c248fa1ade2b8459d9ce5372ff9dad07067310f132966ebec1d93f6c42f0baf77a6b6a7a91460463f708e6887013aaade22111037457c6b25df
   languageName: node
   linkType: hard
 

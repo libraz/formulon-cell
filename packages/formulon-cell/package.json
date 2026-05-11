@@ -71,7 +71,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@libraz/formulon": "^0.8.0"
+    "@libraz/formulon": "0.9.0"
   },
   "peerDependencies": {
     "zustand": "^5"
