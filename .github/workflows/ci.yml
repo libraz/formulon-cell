@@ -48,6 +48,6 @@ jobs:
 
       - run: yarn install --immutable
       - run: yarn lint
-      - run: yarn typecheck
       - run: yarn build:all
+      - run: yarn typecheck
       - run: yarn test --run
