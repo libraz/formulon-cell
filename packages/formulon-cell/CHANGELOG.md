@@ -4,7 +4,37 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
-## 0.1.0 — Unreleased
+## 0.2.0 — 2026-05-11
+
+### Added
+
+- Viewport zoom is now applied uniformly to geometry and hit-testing.
+  `colWidth`, `rowHeight`, `frozenColsWidth`, `frozenRowsHeight`,
+  `colX`, `rowY`, `cellRect`, `hitTest`, `buildColLayout`, and
+  `buildRowLayout` accept an optional `ViewportSlice` argument and
+  multiply visible dimensions by `viewport.zoom`. Default zoom is `1`,
+  so existing callers continue to work unchanged.
+- React and Vue companion packages now publish a `SpreadsheetToolbar`
+  ribbon component sharing the same tab model and command surface.
+
+### Fixed
+
+- General-format numbers that overflow their column shrink to fit
+  before falling back to `####` (released in 0.1.1, documented here).
+
+## 0.1.1 — 2026-05-11
+
+### Changed
+
+- Reinstated `publishConfig.provenance: true` after configuring npm
+  trusted-publisher (OIDC) bindings for the three packages.
+
+### Fixed
+
+- Render: shrink overflowing General-format numbers before falling
+  back to `####`.
+
+## 0.1.0 — 2026-05-11
 
 Initial public release.
 
@@ -24,4 +54,6 @@ Initial public release.
   so the package works under any modern bundler. Falls back to an
   in-memory stub when `crossOriginIsolated` is unavailable.
 
+[0.2.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.2.0
+[0.1.1]: https://github.com/libraz/formulon-cell/releases/tag/v0.1.1
 [0.1.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.1.0
