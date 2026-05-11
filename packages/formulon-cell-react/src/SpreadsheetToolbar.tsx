@@ -252,7 +252,7 @@ function Dropdown<V extends string | number>({
   );
 }
 
-interface Props {
+export interface SpreadsheetToolbarProps {
   instance: SpreadsheetInstance | null;
   activeTab: RibbonTab;
   onTabChange: (tab: RibbonTab) => void;
@@ -636,7 +636,12 @@ const Icon = ({ name }: { name: IconName }): ReactElement => {
   }
 };
 
-export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): ReactElement => {
+export const SpreadsheetToolbar = ({
+  instance,
+  activeTab,
+  onTabChange,
+  locale,
+}: SpreadsheetToolbarProps): ReactElement => {
   const [active, setActive] = useState<ActiveState>(EMPTY);
   const [borderStyle, setBorderStyle] = useState<CellBorderStyle>('thin');
   const lang = locale === 'ja' ? 'ja' : 'en';
@@ -2133,3 +2138,5 @@ export const Toolbar = ({ instance, activeTab, onTabChange, locale }: Props): Re
     </div>
   );
 };
+
+export const Toolbar = SpreadsheetToolbar;

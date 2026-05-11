@@ -24,14 +24,18 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./toolbar.css": "./src/spreadsheet-toolbar.css",
     "./package.json": "./package.json"
   },
   "files": [
     "dist",
+    "src/spreadsheet-toolbar.css",
     "LICENSE",
     "README.md"
   ],
-  "sideEffects": false,
+  "sideEffects": [
+    "*.css"
+  ],
   "publishConfig": {
     "access": "public",
     "provenance": true
@@ -45,6 +49,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fluentui/react-icons": "^2.0.325",
     "@libraz/formulon-cell": "workspace:*"
   },
   "peerDependencies": {

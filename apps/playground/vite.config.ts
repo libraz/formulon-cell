@@ -1,3 +1,4 @@
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 
@@ -7,21 +8,29 @@ import { defineConfig } from 'vite';
 // editing TS in `packages/formulon-cell/src/` shows up immediately.
 const corePkg = resolve(__dirname, '../../packages/formulon-cell');
 
-const patchFormulonWorkerOptions = () => ({
-  name: 'formulon-worker-options-vite-ignore',
-  enforce: 'pre' as const,
-  transform(code: string, id: string) {
-    if (!id.includes('@libraz/formulon/dist/formulon.js')) return null;
-    const next = code.replace(
+const patchFormulonWorkerOptions = () => {
+  const file = resolve(
+    __dirname,
+    '../../packages/formulon-cell/node_modules/@libraz/formulon/dist/formulon.js',
+  );
+  if (!existsSync(file)) return;
+  const before = readFileSync(file, 'utf8');
+  const after = before
+    .replaceAll('/* -ignore */', '/* @vite-ignore */')
+    .replaceAll(
       'new Worker(new URL("formulon.js",import.meta.url),workerOptions)',
       'new Worker(new URL("formulon.js",import.meta.url),/* @vite-ignore */ workerOptions)',
+    )
+    .replaceAll(
+      'new Worker(new URL("formulon.js",import.meta.url),{type:"module",workerData:"em-pthread",name:"em-pthread"})',
+      'new Worker(new URL("formulon.js",import.meta.url),/* @vite-ignore */ {type:"module",workerData:"em-pthread",name:"em-pthread"})',
     );
-    return next === code ? null : { code: next, map: null };
-  },
-});
+  if (after !== before) writeFileSync(file, after);
+};
+
+patchFormulonWorkerOptions();
 
 export default defineConfig({
-  plugins: [patchFormulonWorkerOptions()],
   resolve: {
     alias: {
       '@libraz/formulon-cell/styles.css': `${corePkg}/src/styles/index.css`,

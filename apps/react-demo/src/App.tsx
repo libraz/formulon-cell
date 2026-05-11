@@ -9,9 +9,13 @@ import {
   type ThemeName,
   WorkbookHandle,
 } from '@libraz/formulon-cell';
-import { Spreadsheet, useSelection } from '@libraz/formulon-cell-react';
+import {
+  type RibbonTab,
+  Spreadsheet,
+  SpreadsheetToolbar,
+  useSelection,
+} from '@libraz/formulon-cell-react';
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { type RibbonTab, Toolbar } from './Toolbar';
 
 const THEMES: { value: ThemeName; label: string }[] = [
   { value: 'paper', label: 'Light' },
@@ -29,7 +33,7 @@ const UI = {
     search: 'Search',
     share: 'Share',
     workbook: 'React workbook',
-    demoPane: 'Demo pane',
+    demoPane: 'Options',
     open: 'Open xlsx…',
     save: 'Save',
     file: 'File',
@@ -48,7 +52,7 @@ const UI = {
     editLinks: 'Edit Links',
     linksDesc: 'Inspect external workbook references carried by the file.',
     options: 'Options',
-    optionsDesc: 'Show the demo integration panel and feature toggles.',
+    optionsDesc: 'Show the integration panel and feature toggles.',
     noCommands: 'No commands found',
   },
   ja: {
@@ -56,7 +60,7 @@ const UI = {
     search: '検索',
     share: '共有',
     workbook: 'React ブック',
-    demoPane: 'デモ ペイン',
+    demoPane: 'オプション',
     open: 'xlsx を開く…',
     save: '保存',
     file: 'ファイル',
@@ -75,7 +79,7 @@ const UI = {
     editLinks: 'リンクの編集',
     linksDesc: 'ファイルに含まれる外部ブック参照を確認します。',
     options: 'オプション',
-    optionsDesc: 'デモ統合パネルと機能トグルを表示します。',
+    optionsDesc: '統合パネルと機能トグルを表示します。',
     noCommands: 'コマンドが見つかりません',
   },
 } as const;
@@ -508,8 +512,8 @@ export const App = (): ReactElement => {
         run: () => instance?.toggleSheetProtection(),
       },
       {
-        id: 'demo-pane',
-        label: 'Demo Pane',
+        id: 'options-pane',
+        label: 'Options',
         hint: 'Show or hide the integration panel',
         run: () => setShowPanel((v) => !v),
       },
@@ -713,7 +717,7 @@ export const App = (): ReactElement => {
       <main className={`demo__body${showPanel ? ' demo__body--panel' : ''}`}>
         <div className="demo__sheet-col">
           {showRibbon ? (
-            <Toolbar
+            <SpreadsheetToolbar
               instance={instance}
               activeTab={ribbonTab}
               onTabChange={setRibbonTab}
@@ -835,7 +839,7 @@ export const App = (): ReactElement => {
             </div>
           ) : null}
         </div>
-        <aside className="demo__panel" aria-label="Demo panel" hidden={!showPanel}>
+        <aside className="demo__panel" aria-label="Options panel" hidden={!showPanel}>
           <section className="demo__card">
             <h2>Preset</h2>
             <p className="demo__hint">

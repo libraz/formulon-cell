@@ -24,14 +24,25 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./toolbar.vue": {
+      "types": "./src/SpreadsheetToolbar.vue.d.ts",
+      "import": "./src/SpreadsheetToolbar.vue"
+    },
+    "./toolbar.css": "./src/spreadsheet-toolbar.css",
     "./package.json": "./package.json"
   },
   "files": [
     "dist",
+    "src/SpreadsheetToolbar.vue",
+    "src/SpreadsheetToolbar.vue.d.ts",
+    "src/spreadsheet-toolbar.css",
     "LICENSE",
     "README.md"
   ],
-  "sideEffects": false,
+  "sideEffects": [
+    "*.vue",
+    "*.css"
+  ],
   "publishConfig": {
     "access": "public",
     "provenance": true

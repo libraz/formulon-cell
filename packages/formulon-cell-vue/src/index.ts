@@ -235,3 +235,4 @@ export {
 } from './composables.js';
 export type { SpreadsheetExposed } from './Spreadsheet.js';
 export { Spreadsheet } from './Spreadsheet.js';
+export type { RibbonTab } from './toolbar.js';

@@ -6,5 +6,11 @@ export default defineConfig({
   dts: true,
   clean: true,
   target: 'es2022',
-  external: ['react', 'react/jsx-runtime', 'react-dom', '@libraz/formulon-cell'],
+  external: [
+    'react',
+    'react/jsx-runtime',
+    'react-dom',
+    '@fluentui/react-icons',
+    '@libraz/formulon-cell',
+  ],
 });

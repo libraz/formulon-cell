@@ -10,7 +10,10 @@
       "@libraz/formulon-cell/styles/contrast.css": [
         "../../packages/formulon-cell/src/styles/theme-contrast.css"
       ],
-      "@libraz/formulon-cell-vue": ["../../packages/formulon-cell-vue/src/index.ts"]
+      "@libraz/formulon-cell-vue": ["../../packages/formulon-cell-vue/src/index.ts"],
+      "@libraz/formulon-cell-vue/toolbar.vue": [
+        "../../packages/formulon-cell-vue/src/SpreadsheetToolbar.vue"
+      ]
     }
   },
   "include": ["src/**/*", "src/**/*.vue", "vite.config.ts"]

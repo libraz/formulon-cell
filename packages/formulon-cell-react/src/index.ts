@@ -230,3 +230,5 @@ export {
 export { useI18n, useSelection, useSpreadsheet, useSpreadsheetEvent } from './hooks.js';
 export type { SpreadsheetProps, SpreadsheetRef } from './Spreadsheet.js';
 export { Spreadsheet } from './Spreadsheet.js';
+export type { RibbonTab, SpreadsheetToolbarProps } from './SpreadsheetToolbar.js';
+export { SpreadsheetToolbar, Toolbar } from './SpreadsheetToolbar.js';

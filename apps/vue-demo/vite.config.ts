@@ -14,6 +14,8 @@ export default defineConfig({
       '@libraz/formulon-cell/styles/ink.css': `${corePkg}/src/styles/theme-ink.css`,
       '@libraz/formulon-cell/styles/contrast.css': `${corePkg}/src/styles/theme-contrast.css`,
       '@libraz/formulon-cell/styles/tokens.css': `${corePkg}/src/styles/tokens.css`,
+      '@libraz/formulon-cell-vue/toolbar.css': `${vuePkg}/src/spreadsheet-toolbar.css`,
+      '@libraz/formulon-cell-vue/toolbar.vue': `${vuePkg}/src/SpreadsheetToolbar.vue`,
       '@libraz/formulon-cell-vue': `${vuePkg}/src/index.ts`,
       '@libraz/formulon-cell': `${corePkg}/src/index.ts`,
     },
