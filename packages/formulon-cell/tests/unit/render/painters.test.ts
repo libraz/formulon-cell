@@ -350,6 +350,80 @@ describe('paintCellText font strictness', () => {
     expect(spy.fills[0]?.x).toBe(7);
   });
 
+  it('shrinks unformatted numbers to fit the cell width before falling back to ####', () => {
+    const fills: string[] = [];
+    const ctx = {
+      font: '',
+      fillStyle: '',
+      textBaseline: 'alphabetic',
+      textAlign: 'left',
+      save(): void {},
+      restore(): void {},
+      beginPath(): void {},
+      rect(): void {},
+      clip(): void {},
+      measureText(text: string): TextMetrics {
+        return { width: text.length * 6 } as TextMetrics;
+      },
+      fillText(text: string): void {
+        fills.push(text);
+      },
+    } as unknown as CanvasRenderingContext2D;
+
+    // 686.666666666667 at 6px/char ≈ 96px. A 60px-wide cell (~46px available
+    // after padding) can fit "686.667" (42px) but not the full string. The
+    // renderer must trim, not clip.
+    paintCellText({
+      ctx,
+      bounds: { x: 0, y: 0, w: 60, h: 20 },
+      theme: theme({ textCell: 13 }),
+      value: { kind: 'number', value: 686.6666666666667 },
+      formula: null,
+      isActive: false,
+      isInRange: false,
+    });
+
+    expect(fills).toHaveLength(1);
+    const rendered = fills[0] ?? '';
+    expect(rendered.startsWith('686')).toBe(true);
+    expect(rendered.length * 6).toBeLessThanOrEqual(60 - 14);
+    expect(rendered).not.toMatch(/^#+$/);
+  });
+
+  it('falls back to #### when the integer part itself is wider than the cell', () => {
+    const fills: string[] = [];
+    const ctx = {
+      font: '',
+      fillStyle: '',
+      textBaseline: 'alphabetic',
+      textAlign: 'left',
+      save(): void {},
+      restore(): void {},
+      beginPath(): void {},
+      rect(): void {},
+      clip(): void {},
+      measureText(text: string): TextMetrics {
+        return { width: text.length * 6 } as TextMetrics;
+      },
+      fillText(text: string): void {
+        fills.push(text);
+      },
+    } as unknown as CanvasRenderingContext2D;
+
+    paintCellText({
+      ctx,
+      bounds: { x: 0, y: 0, w: 24, h: 20 },
+      theme: theme({ textCell: 13 }),
+      value: { kind: 'number', value: 123456789.0123 },
+      formula: null,
+      isActive: false,
+      isInRange: false,
+    });
+
+    expect(fills).toHaveLength(1);
+    expect(fills[0]).toMatch(/^#+$/);
+  });
+
   it('renders hashes for formatted numbers that do not fit the cell width', () => {
     const fills: string[] = [];
     const ctx = {

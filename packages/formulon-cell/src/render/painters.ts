@@ -236,6 +236,45 @@ export function paintCommentMarker(ctx: CanvasRenderingContext2D, bounds: Rect):
   ctx.restore();
 }
 
+/** Excel-style "General" number rendering with overflow handling. Tries the
+ *  initial Intl.NumberFormat output first; if it doesn't fit, walks fractional
+ *  digits down to integer, then falls through to scientific notation, and
+ *  finally returns a #### filler sized to the cell. */
+function fitGeneralNumberToWidth(
+  ctx: CanvasRenderingContext2D,
+  value: number,
+  availableWidth: number,
+  locale: string,
+  fontSize: number,
+): string {
+  if (!Number.isFinite(value)) return String(value);
+  const toSci = (prec: number): string =>
+    value.toExponential(prec).replace(/e([+-]?)(\d+)$/i, (_m, sign: string, exp: string) => {
+      const s = sign === '-' ? '-' : '+';
+      return `E${s}${exp.padStart(2, '0')}`;
+    });
+  const abs = Math.abs(value);
+  // Already in scientific range (matches formatGeneralNumber's threshold) —
+  // only the exponent precision can be reduced.
+  if (abs > 0 && (abs >= 1e11 || abs < 1e-9)) {
+    for (let prec = 5; prec >= 0; prec -= 1) {
+      const t = toSci(prec);
+      if (ctx.measureText(t).width <= availableWidth) return t;
+    }
+  } else {
+    for (let digits = 12; digits >= 0; digits -= 1) {
+      const t = new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(value);
+      if (ctx.measureText(t).width <= availableWidth) return t;
+    }
+    for (let prec = 5; prec >= 0; prec -= 1) {
+      const t = toSci(prec);
+      if (ctx.measureText(t).width <= availableWidth) return t;
+    }
+  }
+  const hashWidth = Math.max(1, ctx.measureText('#').width || fontSize * 0.62);
+  return '#'.repeat(Math.max(1, Math.floor(availableWidth / hashWidth)));
+}
+
 export interface CellPaintCtx {
   ctx: CanvasRenderingContext2D;
   theme: ResolvedTheme;
@@ -557,9 +596,25 @@ export function paintCellText({
 
   const vAlign = format?.vAlign ?? 'bottom';
   const availableTextWidth = Math.max(0, bounds.w - padX * 2 - indentPx);
-  if (isNumeric && format?.numFmt && ctx.measureText(text).width > availableTextWidth) {
-    const hashWidth = Math.max(1, ctx.measureText('#').width || fontSize * 0.62);
-    text = '#'.repeat(Math.max(1, Math.floor(availableTextWidth / hashWidth)));
+  if (isNumeric && ctx.measureText(text).width > availableTextWidth) {
+    if (format?.numFmt) {
+      // Explicit number format: Excel shows #### when the formatted value
+      // can't shrink without losing the user's chosen presentation.
+      const hashWidth = Math.max(1, ctx.measureText('#').width || fontSize * 0.62);
+      text = '#'.repeat(Math.max(1, Math.floor(availableTextWidth / hashWidth)));
+    } else if (!isFormulaDisplay && value.kind === 'number') {
+      // General number: Excel progressively trims fractional digits before
+      // falling back to scientific notation and finally ####. Without this,
+      // right-aligned text just clips and the user sees only the trailing
+      // digits — making the result look corrupted.
+      text = fitGeneralNumberToWidth(
+        ctx,
+        value.value,
+        availableTextWidth,
+        locale ?? 'en-US',
+        fontSize,
+      );
+    }
   }
   const metrics = ctx.measureText(text);
   const box = stableTextMetricsBox(fontSize);
