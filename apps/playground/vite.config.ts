@@ -7,7 +7,21 @@ import { defineConfig } from 'vite';
 // editing TS in `packages/formulon-cell/src/` shows up immediately.
 const corePkg = resolve(__dirname, '../../packages/formulon-cell');
 
+const patchFormulonWorkerOptions = () => ({
+  name: 'formulon-worker-options-vite-ignore',
+  enforce: 'pre' as const,
+  transform(code: string, id: string) {
+    if (!id.includes('@libraz/formulon/dist/formulon.js')) return null;
+    const next = code.replace(
+      'new Worker(new URL("formulon.js",import.meta.url),workerOptions)',
+      'new Worker(new URL("formulon.js",import.meta.url),/* @vite-ignore */ workerOptions)',
+    );
+    return next === code ? null : { code: next, map: null };
+  },
+});
+
 export default defineConfig({
+  plugins: [patchFormulonWorkerOptions()],
   resolve: {
     alias: {
       '@libraz/formulon-cell/styles.css': `${corePkg}/src/styles/index.css`,
