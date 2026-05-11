@@ -98,6 +98,13 @@ describe('colWidth / rowHeight', () => {
     expect(colWidth(layout, 2)).toBe(0);
     expect(rowHeight(layout, 4)).toBe(0);
   });
+
+  it('scales visible dimensions by viewport zoom', () => {
+    const layout = makeLayout();
+    const viewport = makeViewport({ zoom: 1.5 });
+    expect(colWidth(layout, 5, viewport)).toBe(150);
+    expect(rowHeight(layout, 5, viewport)).toBe(30);
+  });
 });
 
 describe('frozenColsWidth / frozenRowsHeight', () => {
@@ -171,6 +178,16 @@ describe('cellRect', () => {
     // colStart is already at 10.
     const body = cellRect(layout, viewport, 0, 10);
     expect(body.x).toBe(50 + 200); // header + frozen band
+  });
+
+  it('applies zoom to cell positions and dimensions', () => {
+    const layout = makeLayout();
+    const viewport = makeViewport({ zoom: 1.25 });
+    const r = cellRect(layout, viewport, 2, 3);
+    expect(r.x).toBe(50 + 375);
+    expect(r.y).toBe(30 + 50);
+    expect(r.w).toBe(125);
+    expect(r.h).toBe(25);
   });
 });
 
@@ -439,6 +456,19 @@ describe('buildColLayout / buildRowLayout', () => {
     expect(cols.positionAt.get(3)).toBe(140 + 100);
     // sizeAt mirrors colWidth.
     expect(cols.sizeAt.get(3)).toBe(50);
+  });
+
+  it('records zoomed cumulative positions and sizes', () => {
+    const layout = makeLayout({
+      freezeCols: 1,
+      colWidths: new Map([[0, 80]]),
+    });
+    const viewport = makeViewport({ colStart: 1, colCount: 3, zoom: 1.5 });
+    const cols = buildColLayout(layout, viewport);
+    expect(cols.frozenTotal).toBe(120);
+    expect(cols.positionAt.get(1)).toBe(120);
+    expect(cols.positionAt.get(2)).toBe(270);
+    expect(cols.sizeAt.get(2)).toBe(150);
   });
 
   it('skips hidden indices and adds no pixel space', () => {

@@ -23,6 +23,10 @@ const RESIZE_SLACK = 4;
 export const FILTER_BTN_SIZE = 14;
 export const FILTER_BTN_INSET = 4;
 
+function viewportZoom(viewport?: ViewportSlice): number {
+  return viewport?.zoom && Number.isFinite(viewport.zoom) ? viewport.zoom : 1;
+}
+
 /** Spreadsheet-style column letter ("A", "Z", "AA", "AB", ...). */
 export function colLabel(idx: number): string {
   let n = idx;
@@ -34,14 +38,14 @@ export function colLabel(idx: number): string {
   return out;
 }
 
-export function colWidth(layout: LayoutSlice, col: number): number {
+export function colWidth(layout: LayoutSlice, col: number, viewport?: ViewportSlice): number {
   if (layout.hiddenCols.has(col)) return 0;
-  return layout.colWidths.get(col) ?? layout.defaultColWidth;
+  return (layout.colWidths.get(col) ?? layout.defaultColWidth) * viewportZoom(viewport);
 }
 
-export function rowHeight(layout: LayoutSlice, row: number): number {
+export function rowHeight(layout: LayoutSlice, row: number, viewport?: ViewportSlice): number {
   if (layout.hiddenRows.has(row)) return 0;
-  return layout.rowHeights.get(row) ?? layout.defaultRowHeight;
+  return (layout.rowHeights.get(row) ?? layout.defaultRowHeight) * viewportZoom(viewport);
 }
 
 /** Total left offset before the first data column. Includes the row-outline
@@ -57,16 +61,16 @@ export function gridOriginY(layout: LayoutSlice): number {
 }
 
 /** Total width occupied by frozen columns. Zero if no freeze. */
-export function frozenColsWidth(layout: LayoutSlice): number {
+export function frozenColsWidth(layout: LayoutSlice, viewport?: ViewportSlice): number {
   let w = 0;
-  for (let c = 0; c < layout.freezeCols; c += 1) w += colWidth(layout, c);
+  for (let c = 0; c < layout.freezeCols; c += 1) w += colWidth(layout, c, viewport);
   return w;
 }
 
 /** Total height occupied by frozen rows. Zero if no freeze. */
-export function frozenRowsHeight(layout: LayoutSlice): number {
+export function frozenRowsHeight(layout: LayoutSlice, viewport?: ViewportSlice): number {
   let h = 0;
-  for (let r = 0; r < layout.freezeRows; r += 1) h += rowHeight(layout, r);
+  for (let r = 0; r < layout.freezeRows; r += 1) h += rowHeight(layout, r, viewport);
   return h;
 }
 
@@ -77,12 +81,12 @@ export function colX(layout: LayoutSlice, viewport: ViewportSlice, col: number):
   const fc = layout.freezeCols;
   if (col < fc) {
     let x = 0;
-    for (let c = 0; c < col; c += 1) x += colWidth(layout, c);
+    for (let c = 0; c < col; c += 1) x += colWidth(layout, c, viewport);
     return x;
   }
-  let x = frozenColsWidth(layout);
+  let x = frozenColsWidth(layout, viewport);
   const start = Math.max(viewport.colStart, fc);
-  for (let c = start; c < col; c += 1) x += colWidth(layout, c);
+  for (let c = start; c < col; c += 1) x += colWidth(layout, c, viewport);
   return x;
 }
 
@@ -90,12 +94,12 @@ export function rowY(layout: LayoutSlice, viewport: ViewportSlice, row: number):
   const fr = layout.freezeRows;
   if (row < fr) {
     let y = 0;
-    for (let r = 0; r < row; r += 1) y += rowHeight(layout, r);
+    for (let r = 0; r < row; r += 1) y += rowHeight(layout, r, viewport);
     return y;
   }
-  let y = frozenRowsHeight(layout);
+  let y = frozenRowsHeight(layout, viewport);
   const start = Math.max(viewport.rowStart, fr);
-  for (let r = start; r < row; r += 1) y += rowHeight(layout, r);
+  for (let r = start; r < row; r += 1) y += rowHeight(layout, r, viewport);
   return y;
 }
 
@@ -107,7 +111,7 @@ export function cellRect(
 ): Rect {
   const x = gridOriginX(layout) + colX(layout, viewport, col);
   const y = gridOriginY(layout) + rowY(layout, viewport, row);
-  return { x, y, w: colWidth(layout, col), h: rowHeight(layout, row) };
+  return { x, y, w: colWidth(layout, col, viewport), h: rowHeight(layout, row, viewport) };
 }
 
 /** Hit-test a pointer position against the data area. Returns { row, col }
@@ -124,15 +128,15 @@ export function hitTest(
   if (x < ox || y < oy) return null;
   const fc = layout.freezeCols;
   const fr = layout.freezeRows;
-  const fcw = frozenColsWidth(layout);
-  const frh = frozenRowsHeight(layout);
+  const fcw = frozenColsWidth(layout, viewport);
+  const frh = frozenRowsHeight(layout, viewport);
 
   let col: number;
   let cx = ox;
   if (fc > 0 && x < ox + fcw) {
     col = 0;
     while (col < fc) {
-      const w = colWidth(layout, col);
+      const w = colWidth(layout, col, viewport);
       if (x < cx + w) break;
       cx += w;
       col += 1;
@@ -143,7 +147,7 @@ export function hitTest(
     col = Math.max(viewport.colStart, fc);
     const end = viewport.colStart + viewport.colCount;
     while (col < end) {
-      const w = colWidth(layout, col);
+      const w = colWidth(layout, col, viewport);
       if (x < cx + w) break;
       cx += w;
       col += 1;
@@ -156,7 +160,7 @@ export function hitTest(
   if (fr > 0 && y < oy + frh) {
     row = 0;
     while (row < fr) {
-      const h = rowHeight(layout, row);
+      const h = rowHeight(layout, row, viewport);
       if (y < cy + h) break;
       cy += h;
       row += 1;
@@ -167,7 +171,7 @@ export function hitTest(
     row = Math.max(viewport.rowStart, fr);
     const end = viewport.rowStart + viewport.rowCount;
     while (row < end) {
-      const h = rowHeight(layout, row);
+      const h = rowHeight(layout, row, viewport);
       if (y < cy + h) break;
       cy += h;
       row += 1;
@@ -187,12 +191,12 @@ function colAtX(
   x: number,
 ): { col: number; rightEdge: number; leftEdge: number } | null {
   const fc = layout.freezeCols;
-  const fcw = frozenColsWidth(layout);
+  const fcw = frozenColsWidth(layout, viewport);
   const ox = gridOriginX(layout);
   if (fc > 0 && x < ox + fcw) {
     let cx = ox;
     for (let col = 0; col < fc; col += 1) {
-      const w = colWidth(layout, col);
+      const w = colWidth(layout, col, viewport);
       if (x < cx + w) return { col, leftEdge: cx, rightEdge: cx + w };
       cx += w;
     }
@@ -202,7 +206,7 @@ function colAtX(
   let col = Math.max(viewport.colStart, fc);
   const end = viewport.colStart + viewport.colCount;
   while (col < end) {
-    const w = colWidth(layout, col);
+    const w = colWidth(layout, col, viewport);
     if (x < cx + w) return { col, leftEdge: cx, rightEdge: cx + w };
     cx += w;
     col += 1;
@@ -216,12 +220,12 @@ function rowAtY(
   y: number,
 ): { row: number; bottomEdge: number; topEdge: number } | null {
   const fr = layout.freezeRows;
-  const frh = frozenRowsHeight(layout);
+  const frh = frozenRowsHeight(layout, viewport);
   const oy = gridOriginY(layout);
   if (fr > 0 && y < oy + frh) {
     let cy = oy;
     for (let row = 0; row < fr; row += 1) {
-      const h = rowHeight(layout, row);
+      const h = rowHeight(layout, row, viewport);
       if (y < cy + h) return { row, topEdge: cy, bottomEdge: cy + h };
       cy += h;
     }
@@ -231,7 +235,7 @@ function rowAtY(
   let row = Math.max(viewport.rowStart, fr);
   const end = viewport.rowStart + viewport.rowCount;
   while (row < end) {
-    const h = rowHeight(layout, row);
+    const h = rowHeight(layout, row, viewport);
     if (y < cy + h) return { row, topEdge: cy, bottomEdge: cy + h };
     cy += h;
     row += 1;
@@ -365,7 +369,7 @@ export function buildColLayout(layout: LayoutSlice, viewport: ViewportSlice): Ax
 
   let x = 0;
   for (let c = 0; c < layout.freezeCols; c += 1) {
-    const w = colWidth(layout, c);
+    const w = colWidth(layout, c, viewport);
     if (w > 0) {
       visible.push(c);
       positionAt.set(c, x);
@@ -378,7 +382,7 @@ export function buildColLayout(layout: LayoutSlice, viewport: ViewportSlice): Ax
   const start = Math.max(viewport.colStart, layout.freezeCols);
   const end = viewport.colStart + viewport.colCount;
   for (let c = start; c < end; c += 1) {
-    const w = colWidth(layout, c);
+    const w = colWidth(layout, c, viewport);
     if (w > 0) {
       visible.push(c);
       positionAt.set(c, x);
@@ -397,7 +401,7 @@ export function buildRowLayout(layout: LayoutSlice, viewport: ViewportSlice): Ax
 
   let y = 0;
   for (let r = 0; r < layout.freezeRows; r += 1) {
-    const h = rowHeight(layout, r);
+    const h = rowHeight(layout, r, viewport);
     if (h > 0) {
       visible.push(r);
       positionAt.set(r, y);
@@ -410,7 +414,7 @@ export function buildRowLayout(layout: LayoutSlice, viewport: ViewportSlice): Ax
   const start = Math.max(viewport.rowStart, layout.freezeRows);
   const end = viewport.rowStart + viewport.rowCount;
   for (let r = start; r < end; r += 1) {
-    const h = rowHeight(layout, r);
+    const h = rowHeight(layout, r, viewport);
     if (h > 0) {
       visible.push(r);
       positionAt.set(r, y);

@@ -332,12 +332,22 @@ export class GridRenderer {
     if (!this.onViewportSize) return;
     const state = this.getState();
     const { layout, viewport } = state;
-    const bodyH = Math.max(0, this.cssHeight - gridOriginY(layout) - frozenRowsHeight(layout));
-    const bodyW = Math.max(0, this.cssWidth - gridOriginX(layout) - frozenColsWidth(layout));
+    const bodyH = Math.max(
+      0,
+      this.cssHeight - gridOriginY(layout) - frozenRowsHeight(layout, viewport),
+    );
+    const bodyW = Math.max(
+      0,
+      this.cssWidth - gridOriginX(layout) - frozenColsWidth(layout, viewport),
+    );
     const firstRow = Math.max(viewport.rowStart, layout.freezeRows);
     const firstCol = Math.max(viewport.colStart, layout.freezeCols);
-    const rowCount = visibleCount(bodyH, firstRow, 1_048_576, (idx) => rowHeight(layout, idx));
-    const colCount = visibleCount(bodyW, firstCol, 16_384, (idx) => colWidth(layout, idx));
+    const rowCount = visibleCount(bodyH, firstRow, 1_048_576, (idx) =>
+      rowHeight(layout, idx, viewport),
+    );
+    const colCount = visibleCount(bodyW, firstCol, 16_384, (idx) =>
+      colWidth(layout, idx, viewport),
+    );
     this.onViewportSize(rowCount, colCount);
   }
 
