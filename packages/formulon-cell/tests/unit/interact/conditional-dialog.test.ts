@@ -41,12 +41,14 @@ describe('attachConditionalDialog', () => {
   it('mounts a hidden overlay and pre-fills selection range on open', () => {
     setRange(store, 0, 0, 4, 2);
     const handle = attachConditionalDialog({ host, store });
-    const overlay = host.querySelector<HTMLElement>('.fc-conddlg');
+    const overlay = document.querySelector<HTMLElement>('.fc-conddlg');
     expect(overlay?.hidden).toBe(true);
 
     handle.open();
     expect(overlay?.hidden).toBe(false);
-    const rangeInput = host.querySelector<HTMLInputElement>('.fc-conddlg__form input[type="text"]');
+    const rangeInput = document.querySelector<HTMLInputElement>(
+      '.fc-conddlg__form input[type="text"]',
+    );
     expect(rangeInput?.value).toBe('A1:C5');
     handle.detach();
   });
@@ -56,13 +58,13 @@ describe('attachConditionalDialog', () => {
     const handle = attachConditionalDialog({ host, store });
     handle.open();
 
-    const valueA = host.querySelector<HTMLInputElement>(
+    const valueA = document.querySelector<HTMLInputElement>(
       '.fc-conddlg__sub input[type="number"]',
     ) as HTMLInputElement;
     valueA.value = '50';
     valueA.dispatchEvent(new Event('input', { bubbles: true }));
 
-    const addBtn = host.querySelector<HTMLButtonElement>(
+    const addBtn = document.querySelector<HTMLButtonElement>(
       '.fc-conddlg__addrow .fc-fmtdlg__btn--primary',
     );
     addBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -75,7 +77,9 @@ describe('attachConditionalDialog', () => {
       expect(rules[0].op).toBe('>');
     }
 
-    const removeBtn = host.querySelector<HTMLButtonElement>('.fc-conddlg__item .fc-fmtdlg__btn');
+    const removeBtn = document.querySelector<HTMLButtonElement>(
+      '.fc-conddlg__item .fc-fmtdlg__btn',
+    );
     removeBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(store.getState().conditional.rules).toHaveLength(0);
 
@@ -98,7 +102,7 @@ describe('attachConditionalDialog', () => {
     const handle = attachConditionalDialog({ host, store });
     handle.open();
 
-    const buttons = Array.from(host.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'));
+    const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'));
     const clearAll = buttons.find((b) => b.textContent === 'すべて削除') as HTMLButtonElement;
     clearAll.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
@@ -110,12 +114,12 @@ describe('attachConditionalDialog', () => {
     const handle = attachConditionalDialog({ host, store });
     handle.open();
 
-    const subs = host.querySelectorAll<HTMLDivElement>('.fc-conddlg__sub');
+    const subs = document.querySelectorAll<HTMLDivElement>('.fc-conddlg__sub');
     expect(subs[0]?.hidden).toBe(false); // cell-value visible by default
     expect(subs[1]?.hidden).toBe(true);
     expect(subs[2]?.hidden).toBe(true);
 
-    const kindSelect = host.querySelector<HTMLSelectElement>(
+    const kindSelect = document.querySelector<HTMLSelectElement>(
       '.fc-conddlg__form select',
     ) as HTMLSelectElement;
     kindSelect.value = 'data-bar';
@@ -129,7 +133,7 @@ describe('attachConditionalDialog', () => {
   it('Escape closes the overlay', () => {
     const handle = attachConditionalDialog({ host, store });
     handle.open();
-    const overlay = host.querySelector<HTMLElement>('.fc-conddlg') as HTMLElement;
+    const overlay = document.querySelector<HTMLElement>('.fc-conddlg') as HTMLElement;
     overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(overlay.hidden).toBe(true);
     handle.detach();

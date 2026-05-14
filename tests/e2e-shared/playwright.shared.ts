@@ -18,7 +18,10 @@ import type { DemoApp } from './types.js';
 export function defineDemoAppConfig(app: DemoApp) {
   const baseURL = `http://127.0.0.1:${app.port}`;
   return defineConfig({
-    testDir: '../e2e',
+    // Playwright resolves testDir relative to the consuming config file
+    // (apps/<id>/playwright.config.ts), so `./e2e` points at each demo's
+    // own spec directory.
+    testDir: './e2e',
     // Visual regression specs live under `e2e/visual/` and require a Linux
     // baseline. They're opt-in via `--grep @visual` (and run only on the
     // playground app — wrappers don't change canvas pixels). Normal e2e runs
@@ -34,10 +37,18 @@ export function defineDemoAppConfig(app: DemoApp) {
       trace: 'on-first-retry',
       // Stable viewport so canvas hit-tests / visual diffs don't shift.
       viewport: { width: 1280, height: 800 },
+      // Mod+C/X/V are routed through navigator.clipboard because the host is
+      // a non-editable, user-select:none div and browsers never fire native
+      // copy/paste events on it. WebKit doesn't honor the permission, so
+      // the project-level override below clears it for that engine.
+      permissions: ['clipboard-read', 'clipboard-write'],
     },
     projects: [
       { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-      { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+      {
+        name: 'webkit',
+        use: { ...devices['Desktop Safari'], permissions: [] },
+      },
     ],
     webServer: {
       command: `yarn workspace ${app.workspace} dev --host 127.0.0.1 --port ${app.port}`,

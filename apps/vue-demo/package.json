@@ -8,9 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
-    "test:e2e:install": "playwright install --with-deps chromium webkit"
+    "test:e2e": "../../node_modules/.bin/playwright test",
+    "test:e2e:ui": "../../node_modules/.bin/playwright test --ui",
+    "test:e2e:install": "../../node_modules/.bin/playwright install --with-deps chromium webkit"
   },
   "dependencies": {
     "@libraz/formulon-cell": "workspace:*",

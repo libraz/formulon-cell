@@ -12,15 +12,18 @@ export async function runFillDownScenario(page: Page): Promise<void> {
 
   await sp.typeIntoActiveCell('seed');
 
-  // After Enter the cursor is in A2. Step back, then extend to A3.
+  // After Enter the cursor is in A2. Step back, then extend to A3 so the
+  // selection covers A1:A3 with active at A3.
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('Shift+ArrowDown');
   await page.keyboard.press('Shift+ArrowDown');
   await sp.shortcut('d');
 
-  // Move to A3 and confirm it picked up "seed".
-  await page.keyboard.press('Escape');
-  await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('ArrowDown');
+  // Active cell is A3 after the extend; if the fill worked, the formula bar
+  // already reflects the seeded value.
+  expect(await sp.formulaBarValue()).toBe('seed');
+
+  // Verify A2 also picked it up (mid-range, not just the anchor copy).
+  await page.keyboard.press('ArrowUp');
   expect(await sp.formulaBarValue()).toBe('seed');
 }

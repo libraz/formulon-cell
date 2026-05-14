@@ -55,7 +55,10 @@
   color: var(--shell-accent);
 }
 .app__status-block--engine {
-  color: var(--shell-fg-faint);
+  /* --shell-fg-faint (#8a8886) only clears WCAG AA at large text sizes; this
+   * pill is 10.5px, so use the darker `--shell-fg-mute` to keep the 4.5:1
+   * minimum against `--shell-bg`. */
+  color: var(--shell-fg-mute);
   font-size: 10.5px;
   font-family: var(--shell-font-mono);
   letter-spacing: 0.01em;

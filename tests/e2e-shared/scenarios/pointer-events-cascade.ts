@@ -67,25 +67,57 @@ export async function runPointerEventsCascadeScenario(page: Page): Promise<void>
     'buttons inside the formulon dialog must inherit/re-enable pointer-events: auto',
   ).toBe('auto');
 
+  // Diagnostic: confirm the dialog still exists and has layout after the wrap.
+  const diag = await page.evaluate(() => {
+    const el = document.querySelector('[class="fc-fmtdlg"]') as HTMLElement | null;
+    if (!el) return { exists: false } as const;
+    const rect = el.getBoundingClientRect();
+    return {
+      exists: true,
+      hidden: el.hidden,
+      rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height },
+      parentTag: el.parentElement?.tagName,
+      parentClass: el.parentElement?.className,
+    } as const;
+  });
+  // Make the diagnostic part of the failure message so we know what state we're in.
+  if (!diag.exists) throw new Error('dialog disappeared after host wrap');
+
   // Functional probe: simulate a click on the dialog backdrop or a button
   // and assert it lands (elementFromPoint returns a dialog descendant rather
   // than the inert wrapper).
   const box = await dialog.boundingBox();
-  if (!box) throw new Error('dialog not measured');
+  if (!box) {
+    throw new Error(`dialog not measured; diag=${JSON.stringify(diag)}`);
+  }
   const probe = await page.evaluate(
     ({ x, y }) => {
       const el = document.elementFromPoint(x, y) as HTMLElement | null;
+      // Track the full ancestor chain + pointer-events at each level so a
+      // failure tells us which ancestor is intercepting (or being skipped).
+      const chain: { tag: string; cls: string; pe: string }[] = [];
+      let cur: HTMLElement | null = el;
+      while (cur) {
+        chain.push({
+          tag: cur.tagName,
+          cls: cur.className?.toString?.() ?? '',
+          pe: getComputedStyle(cur).pointerEvents,
+        });
+        cur = cur.parentElement;
+      }
       return {
         tag: el?.tagName ?? null,
+        cls: el?.className?.toString?.() ?? null,
         inDialog: el?.closest('[class~="fc-fmtdlg"]') !== null,
         pe: el ? getComputedStyle(el).pointerEvents : null,
+        chain,
       };
     },
     { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) },
   );
   expect(
     probe.inDialog,
-    'point inside the dialog must hit a dialog descendant (not the inert wrapper)',
+    `point inside the dialog must hit a dialog descendant (got ${probe.tag} class="${probe.cls}", pointer-events=${probe.pe}, chain=${JSON.stringify(probe.chain)}, diag=${JSON.stringify(diag)}, box=${JSON.stringify(box)})`,
   ).toBe(true);
 
   // Tear down. (Best-effort: if Escape doesn't fire because pointer-events

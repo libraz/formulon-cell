@@ -7,6 +7,7 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../store/store.js';
+import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface ConditionalDialogDeps {
   host: HTMLElement;
@@ -490,7 +491,9 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   closeBtn.textContent = t.close;
   footer.appendChild(closeBtn);
 
-  host.appendChild(overlay);
+  // Body-portal so the modal escapes `.fc-host`'s `contain: strict`.
+  inheritHostTokens(host, overlay);
+  document.body.appendChild(overlay);
 
   // ── Behaviour ──────────────────────────────────────────────────────────
   /** Kinds that re-use the shared `applyGroup` (fill/font/style) controls

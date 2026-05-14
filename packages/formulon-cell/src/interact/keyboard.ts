@@ -107,6 +107,12 @@ export interface KeyboardDeps {
   onEditComment?: (addr: Addr) => void;
   /** Called for Ctrl/Cmd+PageUp/PageDown — desktop spreadsheets sheet-tab navigation. */
   onSwitchSheet?: (delta: 1 | -1) => void;
+  /** Called for Ctrl/Cmd+C / X / V. Browsers only auto-dispatch `copy`/`cut`/
+   *  `paste` events when focus is on an editable element or there's a text
+   *  selection — neither holds for our canvas-backed grid (host is a div with
+   *  `user-select: none`). The host wires this to the clipboard module so the
+   *  shortcuts still work without an invisible focus-sink. */
+  onClipboardShortcut?: (kind: 'copy' | 'cut' | 'paste') => void;
 }
 
 export function attachKeyboard(deps: KeyboardDeps): () => void {
@@ -137,6 +143,28 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     if (meta && (k === 'a' || k === 'A')) {
       e.preventDefault();
       mutators.selectAll(store);
+      return;
+    }
+
+    if (meta && !e.altKey && (k === 'c' || k === 'C')) {
+      if (deps.onClipboardShortcut) {
+        e.preventDefault();
+        deps.onClipboardShortcut('copy');
+      }
+      return;
+    }
+    if (meta && !e.altKey && (k === 'x' || k === 'X')) {
+      if (deps.onClipboardShortcut) {
+        e.preventDefault();
+        deps.onClipboardShortcut('cut');
+      }
+      return;
+    }
+    if (meta && !e.altKey && (k === 'v' || k === 'V') && !shift) {
+      if (deps.onClipboardShortcut) {
+        e.preventDefault();
+        deps.onClipboardShortcut('paste');
+      }
       return;
     }
 

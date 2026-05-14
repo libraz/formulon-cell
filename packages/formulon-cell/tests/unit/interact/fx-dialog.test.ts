@@ -21,7 +21,7 @@ describe('attachFxDialog', () => {
       store: createSpreadsheetStore(),
       onInsert: () => {},
     });
-    const overlay = host.querySelector<HTMLElement>('.fc-fxdialog');
+    const overlay = document.querySelector<HTMLElement>('.fc-fxdialog');
     expect(overlay?.hidden).toBe(true);
     handle.open();
     expect(overlay?.hidden).toBe(false);
@@ -35,11 +35,11 @@ describe('attachFxDialog', () => {
       onInsert: () => {},
     });
     handle.open();
-    const picker = host.querySelector<HTMLElement>('.fc-fxdialog__picker');
-    const args = host.querySelector<HTMLElement>('.fc-fxdialog__args');
+    const picker = document.querySelector<HTMLElement>('.fc-fxdialog__picker');
+    const args = document.querySelector<HTMLElement>('.fc-fxdialog__args');
     expect(picker?.hidden).toBe(false);
     expect(args?.hidden).toBe(true);
-    expect(host.querySelectorAll('.fc-fxdialog__item').length).toBeGreaterThan(0);
+    expect(document.querySelectorAll('.fc-fxdialog__item').length).toBeGreaterThan(0);
     handle.detach();
   });
 
@@ -50,11 +50,11 @@ describe('attachFxDialog', () => {
       onInsert: () => {},
     });
     handle.open('SUM');
-    const picker = host.querySelector<HTMLElement>('.fc-fxdialog__picker');
-    const args = host.querySelector<HTMLElement>('.fc-fxdialog__args');
+    const picker = document.querySelector<HTMLElement>('.fc-fxdialog__picker');
+    const args = document.querySelector<HTMLElement>('.fc-fxdialog__args');
     expect(picker?.hidden).toBe(true);
     expect(args?.hidden).toBe(false);
-    const argName = host.querySelector<HTMLElement>('.fc-fxdialog__args-name');
+    const argName = document.querySelector<HTMLElement>('.fc-fxdialog__args-name');
     expect(argName?.textContent).toMatch(/^SUM\(/);
     handle.detach();
   });
@@ -66,12 +66,12 @@ describe('attachFxDialog', () => {
       onInsert: () => {},
     });
     handle.open();
-    const search = host.querySelector<HTMLInputElement>('.fc-fxdialog__search');
+    const search = document.querySelector<HTMLInputElement>('.fc-fxdialog__search');
     expect(search).toBeTruthy();
     if (!search) return;
     search.value = 'vlo';
     search.dispatchEvent(new Event('input'));
-    const items = host.querySelectorAll<HTMLElement>('.fc-fxdialog__item-name');
+    const items = document.querySelectorAll<HTMLElement>('.fc-fxdialog__item-name');
     const names = Array.from(items).map((i) => i.textContent ?? '');
     expect(names.every((n) => n.includes('VLO'))).toBe(true);
     expect(names).toContain('VLOOKUP');
@@ -86,17 +86,17 @@ describe('attachFxDialog', () => {
       onInsert: (f) => inserted.push(f),
     });
     handle.open('SUM');
-    const inputs = host.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input');
+    const inputs = document.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input');
     expect(inputs.length).toBeGreaterThan(0);
     const input = inputs[0];
     expect(input).toBeDefined();
     if (!input) throw new Error('expected function argument input');
     input.value = 'A1:A5';
     input.dispatchEvent(new Event('input'));
-    const insertBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    const insertBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     insertBtn?.click();
     expect(inserted).toEqual(['=SUM(A1:A5)']);
-    const overlay = host.querySelector<HTMLElement>('.fc-fxdialog');
+    const overlay = document.querySelector<HTMLElement>('.fc-fxdialog');
     expect(overlay?.hidden).toBe(true);
     handle.detach();
   });

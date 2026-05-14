@@ -1,5 +1,6 @@
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
+import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface IterativeDialogDeps {
   host: HTMLElement;
@@ -109,7 +110,9 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
   okBtn.textContent = t.ok;
   footer.append(cancelBtn, okBtn);
 
-  host.appendChild(overlay);
+  // Body-portal so the modal escapes `.fc-host`'s `contain: strict`.
+  inheritHostTokens(host, overlay);
+  document.body.appendChild(overlay);
 
   const draft: IterativeSettings = { ...DEFAULTS };
 

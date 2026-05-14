@@ -42,7 +42,7 @@ export function sortRange(
 
   // Snapshot the rows we'll move, including formula text so we can write it back.
   interface RowSnap {
-    cells: Array<{ value: unknown; formula: string | null; col: number } | null>;
+    cells: Array<{ value: unknown; formula: string | null; col: number }>;
     sortKey: { kind: 'number' | 'text' | 'blank'; n?: number; s?: string };
   }
   const snaps: { row: number; snap: RowSnap }[] = [];
@@ -51,7 +51,11 @@ export function sortRange(
     for (let c = range.c0; c <= range.c1; c += 1) {
       const key = addrKey({ sheet: range.sheet, row: r, col: c });
       const cell = state.data.cells.get(key);
-      cells.push(cell ? { value: cell.value, formula: cell.formula, col: c } : null);
+      cells.push({
+        value: cell?.value ?? { kind: 'blank' },
+        formula: cell?.formula ?? null,
+        col: c,
+      });
     }
     const keyCell = state.data.cells.get(addrKey({ sheet: range.sheet, row: r, col: opts.byCol }));
     let sortKey: RowSnap['sortKey'] = { kind: 'blank' };
@@ -85,10 +89,6 @@ export function sortRange(
     const snap = snaps[i]?.snap;
     if (!snap) continue;
     for (const cell of snap.cells) {
-      if (!cell) {
-        wb.setBlank({ sheet: range.sheet, row: dstRow, col: 0 });
-        continue;
-      }
       const addr = { sheet: range.sheet, row: dstRow, col: cell.col };
       if (cell.formula) wb.setFormula(addr, cell.formula);
       else {

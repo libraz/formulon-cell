@@ -21,11 +21,8 @@ export async function runCfRulesDialogScenario(page: Page): Promise<void> {
     w.__fcInst?.openCfRulesDialog();
   });
 
-  // The CF rules dialog uses an `fc-fmtdlg fc-cfrules` class compositon; we
-  // assert a dialog overlay surfaced.
-  await page.waitForTimeout(150);
-  const visibleDialogs = await page.locator('.fc-fmtdlg:not([hidden])').count();
-  expect(visibleDialogs).toBeGreaterThanOrEqual(1);
+  // The CF rules dialog uses its own `fc-cfrulesdlg` overlay class.
+  await expect(page.locator('.fc-cfrulesdlg')).toBeVisible({ timeout: 2_000 });
 
   await page.keyboard.press('Escape');
   expect(consoleErrors.read()).toEqual([]);

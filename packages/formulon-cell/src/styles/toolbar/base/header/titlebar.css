@@ -45,7 +45,10 @@
 }
 
 .demo__title span {
-  color: rgba(255, 255, 255, 0.72);
+  /* 0.72 alpha drops contrast against the green titlebar to ~3:1 (WCAG AA
+   * needs 4.5:1 for normal text). 0.92 reads as a secondary tone yet
+   * clears 4.5:1 in all three demo titlebar tints. */
+  color: rgba(255, 255, 255, 0.92);
   white-space: nowrap;
 }
 

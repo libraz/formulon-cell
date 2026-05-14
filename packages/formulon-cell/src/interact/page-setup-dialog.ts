@@ -14,6 +14,7 @@ import {
   type PaperSize,
   type SpreadsheetStore,
 } from '../store/store.js';
+import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface PageSetupDialogDeps {
   host: HTMLElement;
@@ -231,7 +232,9 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   footer.append(cancelBtn, okBtn);
   panel.appendChild(footer);
 
-  host.appendChild(overlay);
+  // Body-portal so the modal escapes `.fc-host`'s `contain: strict`.
+  inheritHostTokens(host, overlay);
+  document.body.appendChild(overlay);
 
   /** Snapshot of the dialog values when it opened. Used by Cancel to revert
    *  inline edits and (more importantly) by OK to push a single history entry

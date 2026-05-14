@@ -22,8 +22,9 @@ export async function runCopyPasteScenario(page: Page): Promise<void> {
   await page.keyboard.press('ArrowDown');
   await sp.shortcut('v');
 
-  // A3 should now hold "alpha".
-  expect(await sp.formulaBarValue()).toBe('alpha');
+  // Mod+V routes through navigator.clipboard.readText() which is async, so
+  // poll the formula bar instead of asserting immediately.
+  await expect.poll(() => sp.formulaBarValue(), { timeout: 2_000 }).toBe('alpha');
 }
 
 /** C02 — Mod+X cut → paste removes the source.
@@ -41,8 +42,8 @@ export async function runCutPasteScenario(page: Page): Promise<void> {
   await page.keyboard.press('ArrowDown');
   await sp.shortcut('v');
 
-  // Destination has the value...
-  expect(await sp.formulaBarValue()).toBe('beta');
+  // Destination has the value (paste is async — see C01).
+  await expect.poll(() => sp.formulaBarValue(), { timeout: 2_000 }).toBe('beta');
 
   // ...and the source (A1) is empty.
   await page.keyboard.press('ArrowUp');

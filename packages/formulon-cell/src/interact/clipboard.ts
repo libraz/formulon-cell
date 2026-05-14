@@ -21,6 +21,11 @@ export interface ClipboardHandle {
   /** Module-level structured snapshot — set by copy/cut, read by Paste Special.
    *  Cleared when the user copies from outside (system-clipboard-only events). */
   getSnapshot(): ClipboardSnapshot | null;
+  /** Shortcut-driven equivalents of the `copy`/`cut`/`paste` events. The
+   *  browser only dispatches those events when focus is on an editable
+   *  element or a real text selection is present; our canvas-backed grid
+   *  satisfies neither, so the keyboard router routes Mod+C/X/V here. */
+  runShortcut(kind: 'copy' | 'cut' | 'paste'): Promise<void>;
   detach(): void;
 }
 
@@ -91,8 +96,66 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
   host.addEventListener('cut', onCut);
   host.addEventListener('paste', onPaste);
 
+  const writeClipboardText = async (tsv: string): Promise<void> => {
+    try {
+      await navigator.clipboard?.writeText(tsv);
+    } catch (err) {
+      console.warn('formulon-cell: clipboard write failed', err);
+    }
+  };
+
+  const runShortcut = async (kind: 'copy' | 'cut' | 'paste'): Promise<void> => {
+    const s = store.getState();
+    if (s.ui.editor.kind !== 'idle') return;
+    if (kind === 'copy') {
+      const r = copy(s);
+      if (!r) return;
+      snapshot = captureSnapshot(s, r.range);
+      mutators.setCopyRange(store, r.range);
+      await writeClipboardText(r.tsv);
+      return;
+    }
+    if (kind === 'cut') {
+      snapshot = captureSnapshot(s, s.selection.range);
+      const r = cut(s, wb);
+      if (!r) return;
+      mutators.setCopyRange(store, r.range);
+      await writeClipboardText(r.tsv);
+      deps.onAfterCommit();
+      return;
+    }
+    // paste
+    let text = '';
+    try {
+      text = (await navigator.clipboard?.readText()) ?? '';
+    } catch (err) {
+      console.warn('formulon-cell: clipboard read failed', err);
+      return;
+    }
+    if (!text) return;
+    const rows = parseTSV(text);
+    if (rows.length > 0) {
+      const origin = s.selection.active;
+      let maxCols = 0;
+      for (const row of rows) if (row.length > maxCols) maxCols = row.length;
+      applyUnmerge(store, wb, null, {
+        sheet: origin.sheet,
+        r0: origin.row,
+        c0: origin.col,
+        r1: origin.row + rows.length - 1,
+        c1: origin.col + Math.max(0, maxCols - 1),
+      });
+    }
+    const r = pasteTSV(s, wb, text);
+    if (r) {
+      mutators.setCopyRange(store, null);
+      deps.onAfterCommit();
+    }
+  };
+
   return {
     getSnapshot: () => snapshot,
+    runShortcut,
     detach() {
       host.removeEventListener('copy', onCopy);
       host.removeEventListener('cut', onCut);

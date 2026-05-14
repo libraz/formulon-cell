@@ -1,6 +1,7 @@
 @layer fc.app {
   .fc-filter-dropdown {
     z-index: var(--fc-z-popover, 2147483040);
+    pointer-events: auto;
     background: var(--fc-bg-elev, Canvas);
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
@@ -96,6 +97,7 @@
   .fc-autocomplete {
     position: fixed;
     z-index: var(--fc-z-popover, 2147483040);
+    pointer-events: auto;
     background: var(--fc-bg-elev, Canvas);
     border: var(--fc-hairline, 1px) solid var(--fc-rule-strong, var(--fc-rule));
     border-radius: 3px;
@@ -210,6 +212,7 @@
     border-radius: var(--fc-radius-sm, 3px);
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
     z-index: var(--fc-z-popover, 2147483040);
+    pointer-events: auto;
     max-height: 220px;
     overflow-y: auto;
     min-width: 120px;
@@ -232,6 +235,7 @@
   .fc-statusbar__chooser {
     position: fixed;
     z-index: var(--fc-z-popover, 2147483040);
+    pointer-events: auto;
     min-width: 200px;
     padding: 4px;
     background: var(--fc-bg-elev, Canvas);

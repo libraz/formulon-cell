@@ -11,10 +11,15 @@ import {
   type WorkbookHandle,
 } from '@libraz/formulon-cell';
 
-export type FixtureName = 'basic' | 'cf' | 'sparkline' | 'selection' | 'frozen';
+export type FixtureName = 'basic' | 'cf' | 'sparkline' | 'selection' | 'frozen' | 'empty';
 
 export const isFixtureName = (s: string | null): s is FixtureName =>
-  s === 'basic' || s === 'cf' || s === 'sparkline' || s === 'selection' || s === 'frozen';
+  s === 'basic' ||
+  s === 'cf' ||
+  s === 'sparkline' ||
+  s === 'selection' ||
+  s === 'frozen' ||
+  s === 'empty';
 
 /** Seed for V05 — a conditional-format active state.
  *  A 1×6 column where values > 10 paint in red. */
@@ -87,6 +92,11 @@ export function applyFixture(
     case 'basic':
       // The basic fixture is whatever the default app seed already provides.
       return false;
+    case 'empty':
+      // E2E scenarios assume an empty workbook. The caller (main.ts) skips
+      // the default seed when any fixture is specified; we just need to
+      // signal that we handled it.
+      return true;
     case 'cf':
       seedFixtureCf(wb, inst);
       return true;

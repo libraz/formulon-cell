@@ -121,11 +121,13 @@ export class InlineEditor {
     this.deps.grid.appendChild(input);
     this.refreshHeight();
 
-    requestAnimationFrame(() => {
-      input.focus();
-      // Enter mode: caret at end. F2 / typed-letter keep at end too.
-      input.setSelectionRange(seed.length, seed.length);
-    });
+    // Focus synchronously so the *next* keystroke (post-seed) lands on the
+    // editor input, not on the host. Deferring this via requestAnimationFrame
+    // creates a race: rapid typing (Playwright, real-world fast typists) sends
+    // subsequent keystrokes before raf fires; the host's keydown handler then
+    // sees `editor.kind !== 'idle'` and silently drops them.
+    input.focus();
+    input.setSelectionRange(seed.length, seed.length);
 
     input.addEventListener('keydown', this.onKey);
     input.addEventListener('keyup', this.onKeyUp);
@@ -160,6 +162,10 @@ export class InlineEditor {
     this.editingAddr = null;
     mutators.setEditor(this.deps.store, { kind: 'idle' });
     mutators.setEditorRefs(this.deps.store, []);
+    // Removing the focused input drops focus to <body>; without this, the
+    // host's keydown listener stops receiving navigation keys until the
+    // user clicks back in.
+    this.deps.host.focus({ preventScroll: true });
   }
 
   commit(advance: 'down' | 'right' | 'none' = 'down'): void {
@@ -290,6 +296,9 @@ export class InlineEditor {
       //  users typing ⌘⏎.
       if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
         e.preventDefault();
+        // stopPropagation: once commitMulti() flips editor.kind back to idle,
+        // the same Enter would bubble to the host and start a new edit there.
+        e.stopPropagation();
         this.commitMulti();
         return;
       }
@@ -301,12 +310,18 @@ export class InlineEditor {
         return;
       }
       e.preventDefault();
+      // Same reason as commitMulti above — commit() returns the editor to
+      // idle, the host's keydown listener would then re-process Enter and
+      // double-step the cursor.
+      e.stopPropagation();
       this.commit('down');
     } else if (e.key === 'Escape') {
       e.preventDefault();
+      e.stopPropagation();
       this.cancel();
     } else if (e.key === 'Tab') {
       e.preventDefault();
+      e.stopPropagation();
       this.commit(e.shiftKey ? 'none' : 'right');
     } else if (e.key === 'F4' && this.input) {
       // Rotate the cell ref under the cursor: A1 → $A$1 → A$1 → $A1 → A1

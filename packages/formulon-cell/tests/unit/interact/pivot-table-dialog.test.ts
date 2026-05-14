@@ -62,12 +62,14 @@ describe('attachPivotTableDialog', () => {
     const handle = attachPivotTableDialog({ host, store, wb, strings: en });
 
     handle.open();
-    expect(host.textContent).toContain('Create PivotTable');
-    expect(host.textContent).toContain('A1:B3');
-    expect(host.querySelectorAll('.fc-pivotdlg__section')).toHaveLength(3);
-    expect(host.querySelectorAll('.fc-pivotdlg__checkgrid .fc-pivotdlg__check')).toHaveLength(4);
+    expect(document.body.textContent).toContain('Create PivotTable');
+    expect(document.body.textContent).toContain('A1:B3');
+    expect(document.querySelectorAll('.fc-pivotdlg__section')).toHaveLength(3);
+    expect(document.querySelectorAll('.fc-pivotdlg__checkgrid .fc-pivotdlg__check')).toHaveLength(
+      4,
+    );
 
-    const form = host.querySelector('form');
+    const form = document.querySelector('form');
     expect(form).toBeTruthy();
     if (!form) throw new Error('missing PivotTable form');
     form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
@@ -76,7 +78,7 @@ describe('attachPivotTableDialog', () => {
     expect(calls).toContain('field:Sales');
     expect(calls).toContain('pivot');
     expect(calls).toContain('grand:true:true');
-    expect(host.querySelector('.fc-pivotdlg')?.hasAttribute('hidden')).toBe(true);
+    expect(document.querySelector('.fc-pivotdlg')?.hasAttribute('hidden')).toBe(true);
     handle.detach();
   });
 
@@ -88,8 +90,8 @@ describe('attachPivotTableDialog', () => {
     const handle = attachPivotTableDialog({ host, store, wb, strings: en });
 
     handle.open();
-    expect(host.textContent).toContain('does not support PivotTable creation');
-    expect(host.querySelector('.fc-fmtdlg__btn--primary')?.hasAttribute('disabled')).toBe(true);
+    expect(document.body.textContent).toContain('does not support PivotTable creation');
+    expect(document.querySelector('.fc-fmtdlg__btn--primary')?.hasAttribute('disabled')).toBe(true);
     handle.detach();
   });
 });

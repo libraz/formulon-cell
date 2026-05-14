@@ -92,6 +92,34 @@ describe('integration: sort range', () => {
     );
     expect(ok).toBe(false);
   });
+
+  it('clears blank cells inside the sorted range without touching earlier columns', () => {
+    const { instance, workbook } = sheet;
+    workbook.setText({ sheet: 0, row: 1, col: 0 }, 'keep-left');
+    workbook.setText({ sheet: 0, row: 1, col: 2 }, 'filled');
+    workbook.setNumber({ sheet: 0, row: 1, col: 3 }, 2);
+    workbook.setNumber({ sheet: 0, row: 2, col: 3 }, 1);
+    workbook.recalc();
+    mutators.replaceCells(instance.store, workbook.cells(0));
+
+    const ok = sortRange(
+      instance.store.getState(),
+      instance.store,
+      workbook,
+      { sheet: 0, r0: 1, c0: 2, r1: 2, c1: 3 },
+      { byCol: 3, direction: 'asc' },
+    );
+
+    expect(ok).toBe(true);
+    expect(workbook.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({
+      kind: 'text',
+      value: 'keep-left',
+    });
+    expect(workbook.getValue({ sheet: 0, row: 2, col: 2 })).toEqual({
+      kind: 'text',
+      value: 'filled',
+    });
+  });
 });
 
 describe('integration: filter range', () => {

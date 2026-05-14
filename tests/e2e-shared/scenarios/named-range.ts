@@ -14,8 +14,8 @@ export async function runNamedRangeUndoScenario(page: Page): Promise<void> {
   type SpreadsheetGlobal = {
     __fcInst?: {
       workbook: {
-        addDefinedName(name: string, refersTo: string): boolean;
-        getDefinedNames(): { name: string; refersTo: string }[];
+        setDefinedNameEntry(name: string, formula: string): boolean;
+        definedNames(): Iterable<{ name: string; formula: string }>;
       };
       undo(): boolean;
     };
@@ -26,11 +26,16 @@ export async function runNamedRangeUndoScenario(page: Page): Promise<void> {
     const inst = w.__fcInst;
     if (!inst) return { ok: false as const };
 
-    const beforeNames = inst.workbook.getDefinedNames().map((n) => n.name);
-    inst.workbook.addDefinedName('myRange', 'Sheet1!$A$1:$A$5');
-    const afterAdd = inst.workbook.getDefinedNames().map((n) => n.name);
+    const listNames = (): string[] => {
+      const out: string[] = [];
+      for (const n of inst.workbook.definedNames()) out.push(n.name);
+      return out;
+    };
+    const beforeNames = listNames();
+    inst.workbook.setDefinedNameEntry('myRange', 'Sheet1!$A$1:$A$5');
+    const afterAdd = listNames();
     const undid = inst.undo();
-    const afterUndo = inst.workbook.getDefinedNames().map((n) => n.name);
+    const afterUndo = listNames();
     return { ok: true as const, beforeNames, afterAdd, afterUndo, undid };
   });
 

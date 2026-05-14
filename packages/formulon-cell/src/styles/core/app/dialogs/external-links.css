@@ -8,6 +8,7 @@
     align-items: center;
     justify-content: center;
     z-index: var(--fc-z-dialog, 2147483020);
+    pointer-events: auto;
   }
   .fc-extlinkdlg[hidden] {
     display: none;

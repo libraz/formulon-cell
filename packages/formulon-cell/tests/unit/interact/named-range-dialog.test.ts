@@ -22,12 +22,12 @@ describe('attachNamedRangeDialog', () => {
 
   it('mounts hidden, opens shows the empty-state', () => {
     const handle = attachNamedRangeDialog({ host, wb });
-    const overlay = host.querySelector<HTMLElement>('.fc-namedlg');
+    const overlay = document.querySelector<HTMLElement>('.fc-namedlg');
     expect(overlay?.hidden).toBe(true);
 
     handle.open();
     expect(overlay?.hidden).toBe(false);
-    const empty = host.querySelector<HTMLElement>('.fc-namedlg__empty');
+    const empty = document.querySelector<HTMLElement>('.fc-namedlg__empty');
     expect(empty?.textContent).toBeTruthy();
     handle.detach();
   });
@@ -35,7 +35,7 @@ describe('attachNamedRangeDialog', () => {
   it('Escape closes the overlay', () => {
     const handle = attachNamedRangeDialog({ host, wb });
     handle.open();
-    const overlay = host.querySelector<HTMLElement>('.fc-namedlg') as HTMLElement;
+    const overlay = document.querySelector<HTMLElement>('.fc-namedlg') as HTMLElement;
     overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(overlay.hidden).toBe(true);
     handle.detach();
@@ -49,15 +49,15 @@ describe('attachNamedRangeDialog', () => {
     // names, so we just confirm bindWorkbook + open don't throw.
     handle.bindWorkbook(wb);
     handle.open();
-    expect(host.querySelector<HTMLElement>('.fc-namedlg__empty')?.textContent).toBeTruthy();
+    expect(document.querySelector<HTMLElement>('.fc-namedlg__empty')?.textContent).toBeTruthy();
     handle.detach();
   });
 
   it('hides the add-form when capability is off (read-only fallback note shown)', () => {
     const handle = attachNamedRangeDialog({ host, wb });
     handle.open();
-    expect(host.querySelector<HTMLElement>('.fc-namedlg__form')).toBeNull();
-    expect(host.querySelector<HTMLElement>('.fc-namedlg__note')?.textContent).toBeTruthy();
+    expect(document.querySelector<HTMLElement>('.fc-namedlg__form')).toBeNull();
+    expect(document.querySelector<HTMLElement>('.fc-namedlg__note')?.textContent).toBeTruthy();
     handle.detach();
   });
 });
@@ -107,9 +107,9 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const { wb, calls } = makeMutableWb();
     const handle = attachNamedRangeDialog({ host, wb });
     handle.open();
-    const form = host.querySelector<HTMLFormElement>('.fc-namedlg__form');
+    const form = document.querySelector<HTMLFormElement>('.fc-namedlg__form');
     expect(form).not.toBeNull();
-    const inputs = Array.from(host.querySelectorAll<HTMLInputElement>('.fc-namedlg__input'));
+    const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('.fc-namedlg__input'));
     expect(inputs.length).toBe(2);
     const [nameField, formulaField] = inputs;
     if (nameField) nameField.value = 'TaxRate';
@@ -117,7 +117,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     form?.requestSubmit();
     expect(calls).toEqual([{ name: 'TaxRate', formula: '=Sheet1!$A$1' }]);
     // Listing re-renders to reflect the new entry.
-    const items = host.querySelectorAll('.fc-namedlg__item');
+    const items = document.querySelectorAll('.fc-namedlg__item');
     expect(items.length).toBe(1);
     handle.detach();
   });
@@ -126,10 +126,10 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const { wb, calls } = makeMutableWb();
     const handle = attachNamedRangeDialog({ host, wb });
     handle.open();
-    const form = host.querySelector<HTMLFormElement>('.fc-namedlg__form');
+    const form = document.querySelector<HTMLFormElement>('.fc-namedlg__form');
     form?.requestSubmit();
     expect(calls).toEqual([]);
-    expect(host.querySelector<HTMLElement>('.fc-namedlg__error')?.hidden).toBe(false);
+    expect(document.querySelector<HTMLElement>('.fc-namedlg__error')?.hidden).toBe(false);
     handle.detach();
   });
 
@@ -137,12 +137,12 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const { wb, calls } = makeMutableWb();
     const handle = attachNamedRangeDialog({ host, wb });
     handle.open();
-    const inputs = Array.from(host.querySelectorAll<HTMLInputElement>('.fc-namedlg__input'));
+    const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('.fc-namedlg__input'));
     const [nameField] = inputs;
     if (nameField) nameField.value = 'TaxRate';
-    host.querySelector<HTMLFormElement>('.fc-namedlg__form')?.requestSubmit();
+    document.querySelector<HTMLFormElement>('.fc-namedlg__form')?.requestSubmit();
     expect(calls).toEqual([]);
-    expect(host.querySelector<HTMLElement>('.fc-namedlg__error')?.hidden).toBe(false);
+    expect(document.querySelector<HTMLElement>('.fc-namedlg__error')?.hidden).toBe(false);
     handle.detach();
   });
 
@@ -151,12 +151,12 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     registry.set('TaxRate', '=Sheet1!$A$1');
     const handle = attachNamedRangeDialog({ host, wb });
     handle.open();
-    const del = host.querySelector<HTMLButtonElement>('.fc-namedlg__del');
+    const del = document.querySelector<HTMLButtonElement>('.fc-namedlg__del');
     expect(del).not.toBeNull();
     del?.click();
     expect(calls).toEqual([{ name: 'TaxRate', formula: '' }]);
     // List should now be empty.
-    expect(host.querySelector<HTMLElement>('.fc-namedlg__empty')?.textContent).toBeTruthy();
+    expect(document.querySelector<HTMLElement>('.fc-namedlg__empty')?.textContent).toBeTruthy();
     handle.detach();
   });
 });

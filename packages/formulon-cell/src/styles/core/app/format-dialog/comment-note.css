@@ -6,6 +6,7 @@
   .fc-cmtnote {
     position: absolute;
     z-index: var(--fc-z-callout, 2147483050);
+    pointer-events: auto;
     display: flex;
     flex-direction: column;
     background: #fff8c4;

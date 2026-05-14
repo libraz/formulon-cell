@@ -144,6 +144,13 @@ async function mount(page: Page): Promise<void> {
   );
 }
 
+async function closeDialog(page: Page): Promise<void> {
+  await page
+    .getByRole('button', { name: /^(Cancel|Close)$/ })
+    .last()
+    .click();
+}
+
 test('R01: ribbon tabs switch visible panels and render expected commands', async ({ page }) => {
   await mount(page);
 
@@ -211,4 +218,145 @@ test('R02: Home font controls render and apply formatting', async ({ page }) => 
   });
 
   expect(activeFormat).toMatchObject({ fontFamily: 'Arial', fontSize: 14 });
+});
+
+test('R03: routed ribbon commands open dialogs and mutate workbook state', async ({ page }) => {
+  await mount(page);
+
+  await page.getByRole('tab', { name: 'File', exact: true }).click();
+  await page.locator('[data-ribbon-command="pageSetup"]').click();
+  await expect(page.locator('.fc-pgsetup')).toBeVisible();
+  await closeDialog(page);
+
+  await page.locator('[data-ribbon-command="links"]').click();
+  await expect(page.locator('.fc-extlinkdlg')).toBeVisible();
+  await closeDialog(page);
+
+  await page.locator('[data-ribbon-command="gotoSpecial"]').click();
+  await expect(page.locator('.fc-goto')).toBeVisible();
+  await closeDialog(page);
+
+  await page.getByRole('tab', { name: 'Home', exact: true }).click();
+  await page.locator('[data-ribbon-command="rules"]').click();
+  await expect(page.locator('.fc-cfrulesdlg')).toBeVisible();
+  await closeDialog(page);
+
+  await page.getByRole('tab', { name: 'Draw', exact: true }).click();
+  await expect(page.locator('[data-ribbon-command="drawPen"]')).toBeEnabled();
+  await expect(page.locator('[data-ribbon-command="drawErase"]')).toBeEnabled();
+  await page.locator('[data-ribbon-command="drawPen"]').click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const inst = (window as Window & { __fcInst?: unknown }).__fcInst as
+          | {
+              store: {
+                getState: () => {
+                  selection: { active: { sheet: number; row: number; col: number } };
+                  format: { formats: Map<string, { borders?: Record<string, unknown> }> };
+                };
+              };
+            }
+          | undefined;
+        const state = inst?.store.getState();
+        const active = state?.selection.active;
+        return active
+          ? (state?.format.formats.get(`${active.sheet}:${active.row}:${active.col}`)?.borders ??
+              null)
+          : null;
+      }),
+    )
+    .toMatchObject({ top: { style: 'thin' }, right: { style: 'thin' } });
+  await page.locator('[data-ribbon-command="drawErase"]').click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const inst = (window as Window & { __fcInst?: unknown }).__fcInst as
+          | {
+              store: {
+                getState: () => {
+                  selection: { active: { sheet: number; row: number; col: number } };
+                  format: { formats: Map<string, { borders?: Record<string, unknown> }> };
+                };
+              };
+            }
+          | undefined;
+        const state = inst?.store.getState();
+        const active = state?.selection.active;
+        return active
+          ? (state?.format.formats.get(`${active.sheet}:${active.row}:${active.col}`)?.borders ??
+              null)
+          : null;
+      }),
+    )
+    .toMatchObject({ top: false, right: false, bottom: false, left: false });
+
+  await page.getByRole('tab', { name: 'Insert', exact: true }).click();
+  await page.locator('[data-ribbon-command="formatTableInsert"]').click();
+  await page.locator('[data-ribbon-command="chartInsert"]').click();
+  await expect(page.locator('.fc-chart')).toBeVisible();
+
+  const objectCounts = await page.evaluate(() => {
+    const inst = (window as Window & { __fcInst?: unknown }).__fcInst as
+      | {
+          store: {
+            getState: () => {
+              tables: { tables: unknown[] };
+              charts: { charts: unknown[] };
+            };
+          };
+        }
+      | undefined;
+    const state = inst?.store.getState();
+    return {
+      tables: state?.tables.tables.length ?? 0,
+      charts: state?.charts.charts.length ?? 0,
+    };
+  });
+  expect(objectCounts.tables).toBeGreaterThan(0);
+  expect(objectCounts.charts).toBeGreaterThan(0);
+
+  await page.getByRole('tab', { name: 'Formulas', exact: true }).click();
+  await page.locator('[data-ribbon-command="watch"]').click();
+  await expect(page.locator('.fc-host__watchdock')).toBeVisible();
+
+  await page.locator('[data-ribbon-command="fx"]').click();
+  await expect(page.locator('.fc-fxdialog')).toBeVisible();
+  await closeDialog(page);
+
+  await page.getByRole('tab', { name: 'Review', exact: true }).click();
+  for (const command of ['spellingReview', 'translateReview', 'accessibility']) {
+    await expect(page.locator(`[data-ribbon-command="${command}"]`)).toBeEnabled();
+    await page.locator(`[data-ribbon-command="${command}"]`).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await closeDialog(page);
+  }
+
+  await page.getByRole('tab', { name: 'Automate', exact: true }).click();
+  await expect(page.locator('[data-ribbon-command="script"]')).toBeEnabled();
+  await page.locator('[data-ribbon-command="script"]').click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await closeDialog(page);
+
+  await page.getByRole('tab', { name: 'Acrobat', exact: true }).click();
+  await expect(page.locator('[data-ribbon-command="addIn"]')).toBeEnabled();
+  await page.locator('[data-ribbon-command="addIn"]').click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await closeDialog(page);
+
+  await page.getByRole('tab', { name: 'View', exact: true }).click();
+  await page.locator('[data-ribbon-command="zoom125"]').click();
+  const zoom = await page.evaluate(() => {
+    const inst = (window as Window & { __fcInst?: unknown }).__fcInst as
+      | {
+          store: {
+            getState: () => {
+              viewport: { zoom: number };
+            };
+          };
+        }
+      | undefined;
+    return inst?.store.getState().viewport.zoom;
+  });
+  expect(zoom).toBe(1.25);
 });

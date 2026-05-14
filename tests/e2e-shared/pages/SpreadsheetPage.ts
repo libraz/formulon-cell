@@ -12,9 +12,14 @@ import { expect } from '@playwright/test';
 export class SpreadsheetPage {
   constructor(public readonly page: Page) {}
 
-  /** Open the app and wait for the engine to flip out of the "loading" state. */
-  async mount(opts: { fixture?: string } = {}): Promise<void> {
-    const url = opts.fixture ? `/?fixture=${encodeURIComponent(opts.fixture)}` : '/';
+  /** Open the app and wait for the engine to flip out of the "loading" state.
+   *  Defaults to `?fixture=empty` so scenarios can rely on a blank workbook —
+   *  the demo app's normal boot seed would otherwise leave cells under the
+   *  click target and bleed into edit / undo assertions. Pass `fixture: null`
+   *  to opt back into the default seed (e.g. for "with real data" scenarios). */
+  async mount(opts: { fixture?: string | null } = {}): Promise<void> {
+    const fixture = opts.fixture === undefined ? 'empty' : opts.fixture;
+    const url = fixture ? `/?fixture=${encodeURIComponent(fixture)}` : '/';
     await this.page.goto(url);
     await this.waitForReady();
   }
@@ -60,10 +65,16 @@ export class SpreadsheetPage {
   }
 
   async focusHost(): Promise<void> {
+    // Click in the grid area to give the host keyboard focus, then jump to A1
+    // so scenarios start from a deterministic cell. Without the Home step the
+    // click position would land on whatever cell happens to be under the
+    // pixel offset (varies with viewport width / column sizes / fixtures).
     await this.page
       .locator('.fc-host')
       .first()
       .click({ position: { x: 200, y: 200 } });
+    const isMac = await this.page.evaluate(() => navigator.platform.toLowerCase().includes('mac'));
+    await this.page.keyboard.press(`${isMac ? 'Meta' : 'Control'}+Home`);
   }
 
   /** Read the formula-bar textarea contents. */

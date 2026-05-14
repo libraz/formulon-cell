@@ -141,7 +141,9 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   okBtn.type = 'button';
   okBtn.className = 'fc-fmtdlg__btn fc-fmtdlg__btn--primary';
   footer.append(cancelBtn, okBtn);
-  host.appendChild(overlay);
+  // Body-portal so the dialog escapes `.fc-host`'s `contain: strict` /
+  // `isolation: isolate`. `inheritHostTokens` was called at construction.
+  document.body.appendChild(overlay);
 
   const showError = (msg: string): void => {
     error.textContent = msg;

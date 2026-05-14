@@ -7,6 +7,7 @@ import {
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface GoToDialogDeps {
   host: HTMLElement;
@@ -164,7 +165,9 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   okBtn.textContent = t.ok;
   footer.append(cancelBtn, okBtn);
 
-  host.appendChild(overlay);
+  // Body-portal so the modal escapes `.fc-host`'s `contain: strict`.
+  inheritHostTokens(host, overlay);
+  document.body.appendChild(overlay);
 
   const isSelectionMulti = (): boolean => {
     const r = store.getState().selection.range;

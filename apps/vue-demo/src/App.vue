@@ -279,8 +279,10 @@ const ui = computed(() => UI[locale.value === 'ja' ? 'ja' : 'en']);
 void WorkbookHandle.createDefault()
   .then((wb) => {
     // Core only auto-seeds when it owns the workbook (no `workbook` prop).
-    // The demo passes a pre-built handle, so seed by hand here.
-    seed(wb);
+    // The demo passes a pre-built handle, so seed by hand here. `?fixture=empty`
+    // (used by E2E specs that need a deterministic blank workbook) skips this.
+    const fx = new URLSearchParams(window.location.search).get('fixture');
+    if (fx !== 'empty') seed(wb);
     loadError.value = null;
     workbook.value = wb;
   })

@@ -3,6 +3,7 @@ import type { History } from '../commands/history.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface CellStylesGalleryDeps {
   host: HTMLElement;
@@ -65,7 +66,9 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
     grid.appendChild(chip);
   }
 
-  host.appendChild(overlay);
+  // Body-portal so the modal escapes `.fc-host`'s `contain: strict`.
+  inheritHostTokens(host, overlay);
+  document.body.appendChild(overlay);
 
   const close = (): void => {
     overlay.hidden = true;

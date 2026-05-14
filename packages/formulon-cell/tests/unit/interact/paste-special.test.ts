@@ -80,7 +80,7 @@ describe('attachPasteSpecial', () => {
       getSnapshot: () => null,
       onAfterCommit,
     });
-    const overlay = host.querySelector<HTMLElement>('.fc-pastesp');
+    const overlay = document.querySelector<HTMLElement>('.fc-pastesp');
     expect(overlay).not.toBeNull();
     expect(overlay?.hidden).toBe(true);
     handle.detach();
@@ -95,7 +95,7 @@ describe('attachPasteSpecial', () => {
       onAfterCommit,
     });
     handle.open();
-    const overlay = host.querySelector<HTMLElement>('.fc-pastesp');
+    const overlay = document.querySelector<HTMLElement>('.fc-pastesp');
     expect(overlay?.hidden).toBe(true);
     handle.detach();
   });
@@ -113,15 +113,15 @@ describe('attachPasteSpecial', () => {
     });
     handle.open();
 
-    const overlay = host.querySelector<HTMLElement>('.fc-pastesp');
+    const overlay = document.querySelector<HTMLElement>('.fc-pastesp');
     expect(overlay?.hidden).toBe(false);
 
     // Default: what='all', operation='none', no skipBlanks/transpose.
-    const allRadio = host.querySelector<HTMLInputElement>('input[type="radio"][value="all"]');
-    const noneRadio = host.querySelector<HTMLInputElement>('input[type="radio"][value="none"]');
+    const allRadio = document.querySelector<HTMLInputElement>('input[type="radio"][value="all"]');
+    const noneRadio = document.querySelector<HTMLInputElement>('input[type="radio"][value="none"]');
     expect(allRadio?.checked).toBe(true);
     expect(noneRadio?.checked).toBe(true);
-    const checks = host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
+    const checks = document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
     for (const c of checks) expect(c.checked).toBe(false);
 
     handle.detach();
@@ -142,12 +142,12 @@ describe('attachPasteSpecial', () => {
     handle.open();
 
     // Switch to "values" mode and submit.
-    host.querySelector<HTMLInputElement>('input[type="radio"][value="values"]')?.click();
-    host.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn--primary')[0]?.click();
+    document.querySelector<HTMLInputElement>('input[type="radio"][value="values"]')?.click();
+    document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn--primary')[0]?.click();
     wb.recalc();
     expect(wb.getValue({ sheet: 0, row: 5, col: 5 })).toEqual({ kind: 'number', value: 7 });
     expect(onAfterCommit).toHaveBeenCalled();
-    expect(host.querySelector<HTMLElement>('.fc-pastesp')?.hidden).toBe(true);
+    expect(document.querySelector<HTMLElement>('.fc-pastesp')?.hidden).toBe(true);
 
     handle.detach();
   });
@@ -168,9 +168,9 @@ describe('attachPasteSpecial', () => {
       onAfterCommit,
     });
     handle.open();
-    host.querySelector<HTMLInputElement>('input[type="radio"][value="values"]')?.click();
-    host.querySelector<HTMLInputElement>('input[type="radio"][value="add"]')?.click();
-    host.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn--primary')[0]?.click();
+    document.querySelector<HTMLInputElement>('input[type="radio"][value="values"]')?.click();
+    document.querySelector<HTMLInputElement>('input[type="radio"][value="add"]')?.click();
+    document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn--primary')[0]?.click();
     wb.recalc();
     expect(wb.getValue({ sheet: 0, row: 5, col: 5 })).toEqual({ kind: 'number', value: 107 });
     handle.detach();
@@ -193,7 +193,7 @@ describe('attachPasteSpecial', () => {
     });
     handle.open();
     // 'all' default: copies value + format.
-    host.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn--primary')[0]?.click();
+    document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn--primary')[0]?.click();
     wb.recalc();
     expect(wb.getValue({ sheet: 0, row: 4, col: 4 })).toEqual({ kind: 'number', value: 9 });
     expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 4, col: 4 }))?.bold).toBe(
@@ -223,12 +223,12 @@ describe('attachPasteSpecial', () => {
     handle.open();
 
     // Cancel is the first non-primary footer button.
-    const cancelBtn = host.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn')[0];
+    const cancelBtn = document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn')[0];
     cancelBtn?.click();
     wb.recalc();
     expect(wb.getValue({ sheet: 0, row: 5, col: 5 }).kind).toBe('blank');
     expect(onAfterCommit).not.toHaveBeenCalled();
-    expect(host.querySelector<HTMLElement>('.fc-pastesp')?.hidden).toBe(true);
+    expect(document.querySelector<HTMLElement>('.fc-pastesp')?.hidden).toBe(true);
 
     handle.detach();
   });
@@ -248,7 +248,7 @@ describe('attachPasteSpecial', () => {
 
     const e = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true, bubbles: true });
     document.dispatchEvent(e);
-    expect(host.querySelector<HTMLElement>('.fc-pastesp')?.hidden).toBe(true);
+    expect(document.querySelector<HTMLElement>('.fc-pastesp')?.hidden).toBe(true);
     handle.detach();
   });
 
@@ -302,7 +302,7 @@ describe('attachPasteSpecial', () => {
     });
     handle.open();
 
-    const overlay = host.querySelector<HTMLElement>('.fc-pastesp');
+    const overlay = document.querySelector<HTMLElement>('.fc-pastesp');
     overlay?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(overlay?.hidden).toBe(true);
     handle.detach();
@@ -321,9 +321,9 @@ describe('attachPasteSpecial', () => {
     });
     handle.open();
 
-    const panel = host.querySelector<HTMLElement>('.fc-pastesp__panel');
+    const panel = document.querySelector<HTMLElement>('.fc-pastesp__panel');
     panel?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    expect(host.querySelector<HTMLElement>('.fc-pastesp')?.hidden).toBe(false);
+    expect(document.querySelector<HTMLElement>('.fc-pastesp')?.hidden).toBe(false);
     handle.detach();
   });
 
@@ -335,9 +335,9 @@ describe('attachPasteSpecial', () => {
       getSnapshot: () => null,
       onAfterCommit,
     });
-    expect(host.querySelector('.fc-pastesp')).not.toBeNull();
+    expect(document.querySelector('.fc-pastesp')).not.toBeNull();
     handle.detach();
-    expect(host.querySelector('.fc-pastesp')).toBeNull();
+    expect(document.querySelector('.fc-pastesp')).toBeNull();
     // No leftover listener: pressing Escape after detach is harmless.
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
   });
@@ -362,9 +362,9 @@ describe('attachPasteSpecial', () => {
     });
     handle.open();
     snap = null; // The clipboard was wiped between open and apply.
-    host.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn--primary')[0]?.click();
+    document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn--primary')[0]?.click();
     expect(onAfterCommit).not.toHaveBeenCalled();
-    expect(host.querySelector<HTMLElement>('.fc-pastesp')?.hidden).toBe(true);
+    expect(document.querySelector<HTMLElement>('.fc-pastesp')?.hidden).toBe(true);
     handle.detach();
   });
 
@@ -385,14 +385,14 @@ describe('attachPasteSpecial', () => {
       onAfterCommit,
     });
     handle.open();
-    host.querySelector<HTMLInputElement>('input[type="radio"][value="values"]')?.click();
+    document.querySelector<HTMLInputElement>('input[type="radio"][value="values"]')?.click();
     // Toggle transpose.
-    const transpose = host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[1];
+    const transpose = document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[1];
     if (transpose) {
       transpose.checked = true;
       transpose.dispatchEvent(new Event('change', { bubbles: true }));
     }
-    host.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn--primary')[0]?.click();
+    document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn--primary')[0]?.click();
     wb.recalc();
     // 1×3 transposed to 3×1.
     expect(wb.getValue({ sheet: 0, row: 5, col: 5 })).toEqual({ kind: 'number', value: 1 });

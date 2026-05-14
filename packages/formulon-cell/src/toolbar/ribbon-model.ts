@@ -580,15 +580,8 @@ export function buildRibbonModel(lang: ToolbarLang = 'en'): RibbonTabModel[] {
     ]),
     tab('draw', [
       group(RIBBON_TAB_LABELS.draw[lang], [
-        cmd(
-          'drawPen',
-          lang === 'ja' ? 'ペン' : 'Pen',
-          RIBBON_TAB_LABELS.draw[lang],
-          'pen',
-          'wide',
-          true,
-        ),
-        cmd('drawErase', lang === 'ja' ? '消しゴム' : 'Eraser', 'Eraser', 'eraser', 'wide', true),
+        cmd('drawPen', lang === 'ja' ? 'ペン' : 'Pen', RIBBON_TAB_LABELS.draw[lang], 'pen', 'wide'),
+        cmd('drawErase', lang === 'ja' ? '消しゴム' : 'Eraser', 'Eraser', 'eraser', 'wide'),
       ]),
     ]),
     tab('pageLayout', [
@@ -675,10 +668,10 @@ export function buildRibbonModel(lang: ToolbarLang = 'en'): RibbonTabModel[] {
     ]),
     tab('review', [
       group(lang === 'ja' ? '文章校正' : 'Proofing', [
-        cmd('spellingReview', tr.spelling, tr.spelling, 'spelling', 'wide', true),
+        cmd('spellingReview', tr.spelling, tr.spelling, 'spelling', 'wide'),
       ]),
       group(lang === 'ja' ? '言語' : 'Language', [
-        cmd('translateReview', tr.translate, tr.translate, 'translate', 'wide', true),
+        cmd('translateReview', tr.translate, tr.translate, 'translate', 'wide'),
       ]),
       group(tr.comments, [
         cmd('newCommentReview', tr.newComment, 'New Note', 'commentAdd', 'wide'),
@@ -688,7 +681,7 @@ export function buildRibbonModel(lang: ToolbarLang = 'en'): RibbonTabModel[] {
       ]),
       group(tr.protection, [cmd('protectReview', tr.protect, 'Protect sheet', 'protect', 'wide')]),
       group(tr.accessibility, [
-        cmd('accessibility', tr.accessibility, tr.accessibility, 'accessibility', 'wide', true),
+        cmd('accessibility', tr.accessibility, tr.accessibility, 'accessibility', 'wide'),
       ]),
     ]),
     tab('view', [
@@ -705,11 +698,11 @@ export function buildRibbonModel(lang: ToolbarLang = 'en'): RibbonTabModel[] {
     ]),
     tab('automate', [
       group(RIBBON_TAB_LABELS.automate[lang], [
-        cmd('script', tr.script, tr.script, 'script', 'wide', true),
+        cmd('script', tr.script, tr.script, 'script', 'wide'),
       ]),
     ]),
     tab('acrobat', [
-      group(tr.addIn, [cmd('addIn', tr.addIn, tr.addIn, 'addIn', 'wide', true)]),
+      group(tr.addIn, [cmd('addIn', tr.addIn, tr.addIn, 'addIn', 'wide')]),
       group(tr.pdf, [cmd('pdf', tr.pdf, tr.pdf, 'pdf', 'wide')]),
     ]),
   ];

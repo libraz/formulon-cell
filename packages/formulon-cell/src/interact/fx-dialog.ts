@@ -1,6 +1,7 @@
 import { FUNCTION_SIGNATURES } from '../commands/refs.js';
 import { defaultStrings, en as enStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import { inheritHostTokens } from './inherit-host-tokens.js';
 
 /** Heuristic locale detector — we don't get a `Locale` flag through deps so
  *  we sniff the active dictionary's title against the canonical English one.
@@ -211,7 +212,9 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   insertBtn.disabled = true;
   footer.appendChild(insertBtn);
 
-  host.appendChild(overlay);
+  // Body-portal so the modal escapes `.fc-host`'s `contain: strict`.
+  inheritHostTokens(host, overlay);
+  document.body.appendChild(overlay);
 
   // ── State ───────────────────────────────────────────────────────────────
   // Sorted catalog of all known function names; rebuilt once and reused.

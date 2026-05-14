@@ -59,7 +59,7 @@ describe('attachFormatDialog', () => {
 
   it('mounts a hidden overlay on attach', () => {
     const handle = attachFormatDialog({ host, store });
-    const overlay = host.querySelector<HTMLElement>('.fc-fmtdlg');
+    const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg');
     expect(overlay).not.toBeNull();
     expect(overlay?.hidden).toBe(true);
     handle.detach();
@@ -68,11 +68,11 @@ describe('attachFormatDialog', () => {
   it('open() reveals the overlay and focuses the active tab button', async () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
-    const overlay = host.querySelector<HTMLElement>('.fc-fmtdlg');
+    const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg');
     expect(overlay?.hidden).toBe(false);
 
     await flushRaf();
-    const numberTab = host.querySelector<HTMLButtonElement>('button[data-fc-tab="number"]');
+    const numberTab = document.querySelector<HTMLButtonElement>('button[data-fc-tab="number"]');
     expect(document.activeElement).toBe(numberTab);
     handle.detach();
   });
@@ -81,7 +81,7 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
     handle.close();
-    const overlay = host.querySelector<HTMLElement>('.fc-fmtdlg');
+    const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg');
     expect(overlay?.hidden).toBe(true);
     expect(document.activeElement).toBe(host);
     handle.detach();
@@ -89,9 +89,9 @@ describe('attachFormatDialog', () => {
 
   it('detach() removes the overlay from DOM', () => {
     const handle = attachFormatDialog({ host, store });
-    expect(host.querySelector('.fc-fmtdlg')).not.toBeNull();
+    expect(document.querySelector('.fc-fmtdlg')).not.toBeNull();
     handle.detach();
-    expect(host.querySelector('.fc-fmtdlg')).toBeNull();
+    expect(document.querySelector('.fc-fmtdlg')).toBeNull();
   });
 
   it('hydrates draft from active cell format on open', () => {
@@ -115,23 +115,25 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const decimalsInput = host.querySelector<HTMLInputElement>(
+    const decimalsInput = document.querySelector<HTMLInputElement>(
       'input[type="number"][min="0"][max="10"]',
     );
     expect(decimalsInput?.value).toBe('4');
 
-    const boldInput = host.querySelector<HTMLInputElement>('input[data-fc-check="bold"]');
+    const boldInput = document.querySelector<HTMLInputElement>('input[data-fc-check="bold"]');
     expect(boldInput?.checked).toBe(true);
 
-    const familyInput = host.querySelector<HTMLInputElement>('input[data-fc-input="family"]');
+    const familyInput = document.querySelector<HTMLInputElement>('input[data-fc-input="family"]');
     expect(familyInput?.value).toBe('Georgia');
 
-    const sizeInput = host.querySelector<HTMLInputElement>(
+    const sizeInput = document.querySelector<HTMLInputElement>(
       'input[type="number"][min="8"][max="72"]',
     );
     expect(sizeInput?.value).toBe('14');
 
-    const rightAlign = host.querySelector<HTMLInputElement>('input[type="radio"][value="right"]');
+    const rightAlign = document.querySelector<HTMLInputElement>(
+      'input[type="radio"][value="right"]',
+    );
     expect(rightAlign?.checked).toBe(true);
 
     handle.detach();
@@ -146,11 +148,11 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const decimalsInput = host.querySelector<HTMLInputElement>(
+    const decimalsInput = document.querySelector<HTMLInputElement>(
       'input[type="number"][min="0"][max="10"]',
     );
     expect(decimalsInput?.value).toBe('3');
-    const symbolSelect = host.querySelector<HTMLSelectElement>('select');
+    const symbolSelect = document.querySelector<HTMLSelectElement>('select');
     expect(symbolSelect?.value).toBe('€');
     handle.detach();
   });
@@ -163,7 +165,7 @@ describe('attachFormatDialog', () => {
     );
     const handle = attachFormatDialog({ host, store });
     handle.open();
-    const decimalsInput = host.querySelector<HTMLInputElement>(
+    const decimalsInput = document.querySelector<HTMLInputElement>(
       'input[type="number"][min="0"][max="10"]',
     );
     expect(decimalsInput?.value).toBe('1');
@@ -173,11 +175,11 @@ describe('attachFormatDialog', () => {
   it('falls back to general/defaults when active cell has no format', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
-    const decimalsInput = host.querySelector<HTMLInputElement>(
+    const decimalsInput = document.querySelector<HTMLInputElement>(
       'input[type="number"][min="0"][max="10"]',
     );
     expect(decimalsInput?.value).toBe('2');
-    const symbolSelect = host.querySelector<HTMLSelectElement>('select');
+    const symbolSelect = document.querySelector<HTMLSelectElement>('select');
     expect(symbolSelect?.value).toBe('$');
     handle.detach();
   });
@@ -186,15 +188,15 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const fontTab = host.querySelector<HTMLButtonElement>('button[data-fc-tab="font"]');
+    const fontTab = document.querySelector<HTMLButtonElement>('button[data-fc-tab="font"]');
     fontTab?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(fontTab?.getAttribute('aria-selected')).toBe('true');
-    const numberTab = host.querySelector<HTMLButtonElement>('button[data-fc-tab="number"]');
+    const numberTab = document.querySelector<HTMLButtonElement>('button[data-fc-tab="number"]');
     expect(numberTab?.getAttribute('aria-selected')).toBe('false');
 
-    const fontPanel = host.querySelector<HTMLDivElement>('div[data-fc-tab="font"]');
-    const numberPanel = host.querySelector<HTMLDivElement>('div[data-fc-tab="number"]');
+    const fontPanel = document.querySelector<HTMLDivElement>('div[data-fc-tab="font"]');
+    const numberPanel = document.querySelector<HTMLDivElement>('div[data-fc-tab="number"]');
     expect(fontPanel?.hidden).toBe(false);
     expect(numberPanel?.hidden).toBe(true);
 
@@ -204,9 +206,9 @@ describe('attachFormatDialog', () => {
   it('clicking tab strip outside button does nothing', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
-    const tabsStrip = host.querySelector<HTMLElement>('.fc-fmtdlg__tabs');
+    const tabsStrip = document.querySelector<HTMLElement>('.fc-fmtdlg__tabs');
     tabsStrip?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    const numberTab = host.querySelector<HTMLButtonElement>('button[data-fc-tab="number"]');
+    const numberTab = document.querySelector<HTMLButtonElement>('button[data-fc-tab="number"]');
     expect(numberTab?.getAttribute('aria-selected')).toBe('true');
     handle.detach();
   });
@@ -215,26 +217,26 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const decimalsRow = host.querySelector<HTMLLabelElement>(
+    const decimalsRow = document.querySelector<HTMLLabelElement>(
       '.fc-fmtdlg__cat-controls .fc-fmtdlg__row',
     );
     expect(decimalsRow?.hidden).toBe(true); // general → hidden
 
-    const fixedBtn = host.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]');
+    const fixedBtn = document.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]');
     fixedBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(fixedBtn?.getAttribute('aria-selected')).toBe('true');
     expect(decimalsRow?.hidden).toBe(false);
 
-    const symbolRow = host.querySelectorAll<HTMLLabelElement>(
+    const symbolRow = document.querySelectorAll<HTMLLabelElement>(
       '.fc-fmtdlg__cat-controls .fc-fmtdlg__row',
     )[1];
     expect(symbolRow?.hidden).toBe(true);
 
-    const currencyBtn = host.querySelector<HTMLButtonElement>('button[data-fc-cat="currency"]');
+    const currencyBtn = document.querySelector<HTMLButtonElement>('button[data-fc-cat="currency"]');
     currencyBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(symbolRow?.hidden).toBe(false);
 
-    const percentBtn = host.querySelector<HTMLButtonElement>('button[data-fc-cat="percent"]');
+    const percentBtn = document.querySelector<HTMLButtonElement>('button[data-fc-cat="percent"]');
     percentBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(symbolRow?.hidden).toBe(true);
     expect(decimalsRow?.hidden).toBe(false);
@@ -245,9 +247,9 @@ describe('attachFormatDialog', () => {
   it('clicking on cat list outside button is a no-op', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
-    const catList = host.querySelector<HTMLElement>('.fc-fmtdlg__cat');
+    const catList = document.querySelector<HTMLElement>('.fc-fmtdlg__cat');
     catList?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    const generalBtn = host.querySelector<HTMLButtonElement>('button[data-fc-cat="general"]');
+    const generalBtn = document.querySelector<HTMLButtonElement>('button[data-fc-cat="general"]');
     expect(generalBtn?.getAttribute('aria-selected')).toBe('true');
     handle.detach();
   });
@@ -256,16 +258,16 @@ describe('attachFormatDialog', () => {
     const history = new History();
     const handle = attachFormatDialog({ host, store, history });
     handle.open();
-    const fixedBtn = host.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]');
+    const fixedBtn = document.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]');
     fixedBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    const decimalsInput = host.querySelector<HTMLInputElement>(
+    const decimalsInput = document.querySelector<HTMLInputElement>(
       'input[type="number"][min="0"][max="10"]',
     ) as HTMLInputElement;
     decimalsInput.value = '99';
     decimalsInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
@@ -276,16 +278,16 @@ describe('attachFormatDialog', () => {
   it('decimals input ignores non-numeric values', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
-    const fixedBtn = host.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]');
+    const fixedBtn = document.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]');
     fixedBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    const decimalsInput = host.querySelector<HTMLInputElement>(
+    const decimalsInput = document.querySelector<HTMLInputElement>(
       'input[type="number"][min="0"][max="10"]',
     ) as HTMLInputElement;
     decimalsInput.value = 'abc';
     decimalsInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
@@ -296,14 +298,14 @@ describe('attachFormatDialog', () => {
   it('symbol select updates currency symbol', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
-    const currencyBtn = host.querySelector<HTMLButtonElement>('button[data-fc-cat="currency"]');
+    const currencyBtn = document.querySelector<HTMLButtonElement>('button[data-fc-cat="currency"]');
     currencyBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    const symbolSelect = host.querySelector<HTMLSelectElement>('select') as HTMLSelectElement;
+    const symbolSelect = document.querySelector<HTMLSelectElement>('select') as HTMLSelectElement;
     symbolSelect.value = '¥';
     symbolSelect.dispatchEvent(new Event('change', { bubbles: true }));
 
-    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
@@ -315,13 +317,13 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const center = host.querySelector<HTMLInputElement>(
+    const center = document.querySelector<HTMLInputElement>(
       'input[type="radio"][value="center"]',
     ) as HTMLInputElement;
     center.checked = true;
     center.dispatchEvent(new Event('change', { bubbles: true }));
 
-    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.align).toBe(
@@ -335,13 +337,13 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const dflt = host.querySelector<HTMLInputElement>(
+    const dflt = document.querySelector<HTMLInputElement>(
       'input[type="radio"][value="default"]',
     ) as HTMLInputElement;
     dflt.checked = true;
     dflt.dispatchEvent(new Event('change', { bubbles: true }));
 
-    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(
@@ -353,7 +355,7 @@ describe('attachFormatDialog', () => {
   it('unchecked alignment radio change is ignored', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
-    const left = host.querySelector<HTMLInputElement>(
+    const left = document.querySelector<HTMLInputElement>(
       'input[type="radio"][value="left"]',
     ) as HTMLInputElement;
     left.checked = false;
@@ -365,16 +367,16 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const bold = host.querySelector<HTMLInputElement>(
+    const bold = document.querySelector<HTMLInputElement>(
       'input[data-fc-check="bold"]',
     ) as HTMLInputElement;
-    const italic = host.querySelector<HTMLInputElement>(
+    const italic = document.querySelector<HTMLInputElement>(
       'input[data-fc-check="italic"]',
     ) as HTMLInputElement;
-    const underline = host.querySelector<HTMLInputElement>(
+    const underline = document.querySelector<HTMLInputElement>(
       'input[data-fc-check="underline"]',
     ) as HTMLInputElement;
-    const strike = host.querySelector<HTMLInputElement>(
+    const strike = document.querySelector<HTMLInputElement>(
       'input[data-fc-check="strike"]',
     ) as HTMLInputElement;
     bold.checked = true;
@@ -386,7 +388,7 @@ describe('attachFormatDialog', () => {
     strike.checked = true;
     strike.dispatchEvent(new Event('change', { bubbles: true }));
 
-    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
@@ -401,13 +403,13 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const familyInput = host.querySelector<HTMLInputElement>(
+    const familyInput = document.querySelector<HTMLInputElement>(
       'input[data-fc-input="family"]',
     ) as HTMLInputElement;
     familyInput.value = 'Helvetica';
     familyInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(
@@ -421,13 +423,13 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const familyInput = host.querySelector<HTMLInputElement>(
+    const familyInput = document.querySelector<HTMLInputElement>(
       'input[data-fc-input="family"]',
     ) as HTMLInputElement;
     familyInput.value = '';
     familyInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(
@@ -440,13 +442,13 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const sizeInput = host.querySelector<HTMLInputElement>(
+    const sizeInput = document.querySelector<HTMLInputElement>(
       'input[type="number"][min="8"][max="72"]',
     ) as HTMLInputElement;
     sizeInput.value = '500';
     sizeInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(
@@ -460,13 +462,13 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const sizeInput = host.querySelector<HTMLInputElement>(
+    const sizeInput = document.querySelector<HTMLInputElement>(
       'input[type="number"][min="8"][max="72"]',
     ) as HTMLInputElement;
     sizeInput.value = '';
     sizeInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(
@@ -480,7 +482,7 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const sizeInput = host.querySelector<HTMLInputElement>(
+    const sizeInput = document.querySelector<HTMLInputElement>(
       'input[type="number"][min="8"][max="72"]',
     ) as HTMLInputElement;
     // Bypass happy-dom number-input value coercion by overriding the getter
@@ -492,7 +494,7 @@ describe('attachFormatDialog', () => {
     });
     sizeInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(
@@ -505,12 +507,12 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const colorInputs = host.querySelectorAll<HTMLInputElement>('input[type="color"]');
+    const colorInputs = document.querySelectorAll<HTMLInputElement>('input[type="color"]');
     const colorInput = colorInputs[0] as HTMLInputElement;
     colorInput.value = '#abcdef';
     colorInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-    let okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    let okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.color).toBe(
       '#abcdef',
@@ -518,11 +520,11 @@ describe('attachFormatDialog', () => {
 
     handle.open();
     // The first non-primary button in font panel is "reset to default" for color
-    const colorReset = host.querySelectorAll<HTMLButtonElement>(
+    const colorReset = document.querySelectorAll<HTMLButtonElement>(
       '.fc-fmtdlg__btn',
     )[0] as HTMLButtonElement;
     colorReset.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(
       store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.color,
@@ -535,7 +537,7 @@ describe('attachFormatDialog', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { color: 'rebeccapurple' });
     const handle = attachFormatDialog({ host, store });
     handle.open();
-    const colorInputs = host.querySelectorAll<HTMLInputElement>('input[type="color"]');
+    const colorInputs = document.querySelectorAll<HTMLInputElement>('input[type="color"]');
     expect(colorInputs[0]?.value).toBe('#000000');
     handle.detach();
   });
@@ -545,13 +547,13 @@ describe('attachFormatDialog', () => {
     handle.open();
 
     // The border tab buttons appear after the color reset button. Locate by label.
-    const buttons = Array.from(host.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'));
+    const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'));
     const presetOutline = buttons.find((b) => b.textContent === '外枠') as HTMLButtonElement;
     const presetNone = buttons.find((b) => b.textContent === 'なし') as HTMLButtonElement;
     const presetAll = buttons.find((b) => b.textContent === '格子') as HTMLButtonElement;
 
     presetOutline.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    let okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    let okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     let borders = store
       .getState()
@@ -568,7 +570,7 @@ describe('attachFormatDialog', () => {
 
     handle.open();
     presetNone.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     borders = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.borders;
     expect(borders).toEqual({
@@ -582,7 +584,7 @@ describe('attachFormatDialog', () => {
 
     handle.open();
     presetAll.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     borders = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.borders;
     expect(borders).toEqual({
@@ -601,10 +603,10 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const thick = host.querySelector<HTMLButtonElement>(
+    const thick = document.querySelector<HTMLButtonElement>(
       'button[data-border-style="thick"]',
     ) as HTMLButtonElement;
-    const top = host.querySelector<HTMLButtonElement>(
+    const top = document.querySelector<HTMLButtonElement>(
       'button[data-border-side="top"]',
     ) as HTMLButtonElement;
     thick.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -612,7 +614,7 @@ describe('attachFormatDialog', () => {
 
     expect(thick.getAttribute('aria-pressed')).toBe('true');
 
-    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     const borders = store
@@ -626,10 +628,10 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const top = host.querySelector<HTMLButtonElement>(
+    const top = document.querySelector<HTMLButtonElement>(
       'button[data-border-side="top"]',
     ) as HTMLButtonElement;
-    const left = host.querySelector<HTMLButtonElement>(
+    const left = document.querySelector<HTMLButtonElement>(
       'button[data-border-side="left"]',
     ) as HTMLButtonElement;
     top.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -638,7 +640,7 @@ describe('attachFormatDialog', () => {
     expect(top.getAttribute('aria-pressed')).toBe('true');
     expect(left.getAttribute('aria-pressed')).toBe('true');
 
-    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     const borders = store
@@ -654,16 +656,16 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const borderSwatch = host.querySelector<HTMLButtonElement>(
+    const borderSwatch = document.querySelector<HTMLButtonElement>(
       '[data-swatches="border"] button[data-color="#c00000"]',
     ) as HTMLButtonElement;
-    const bottom = host.querySelector<HTMLButtonElement>(
+    const bottom = document.querySelector<HTMLButtonElement>(
       'button[data-border-side="bottom"]',
     ) as HTMLButtonElement;
     borderSwatch.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     bottom.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     const borders = store
@@ -678,23 +680,23 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const fillInput = host.querySelector<HTMLInputElement>(
+    const fillInput = document.querySelector<HTMLInputElement>(
       'input[data-fc-color="fill"]',
     ) as HTMLInputElement;
     fillInput.value = '#123456';
     fillInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-    let okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    let okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.fill).toBe(
       '#123456',
     );
 
     handle.open();
-    const buttons = Array.from(host.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'));
+    const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'));
     const fillReset = buttons.find((b) => b.textContent === '塗りつぶしなし') as HTMLButtonElement;
     fillReset.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(
       store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.fill,
@@ -707,16 +709,16 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const fontSwatch = host.querySelector<HTMLButtonElement>(
+    const fontSwatch = document.querySelector<HTMLButtonElement>(
       '[data-swatches="font"] button[data-color="#0070c0"]',
     ) as HTMLButtonElement;
-    const fillSwatch = host.querySelector<HTMLButtonElement>(
+    const fillSwatch = document.querySelector<HTMLButtonElement>(
       '[data-swatches="fill"] button[data-color="#ffff00"]',
     ) as HTMLButtonElement;
     fontSwatch.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     fillSwatch.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
@@ -730,7 +732,7 @@ describe('attachFormatDialog', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { fill: 'red' });
     const handle = attachFormatDialog({ host, store });
     handle.open();
-    const fillInput = host.querySelector<HTMLInputElement>('input[data-fc-color="fill"]');
+    const fillInput = document.querySelector<HTMLInputElement>('input[data-fc-color="fill"]');
     expect(fillInput?.value).toBe('#ffffff');
     handle.detach();
   });
@@ -739,11 +741,11 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const buttons = Array.from(host.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'));
+    const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'));
     const cancelBtn = buttons.find((b) => b.textContent === 'キャンセル') as HTMLButtonElement;
     cancelBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    const overlay = host.querySelector<HTMLElement>('.fc-fmtdlg');
+    const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg');
     expect(overlay?.hidden).toBe(true);
     expect(
       store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 })),
@@ -755,8 +757,8 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const overlay = host.querySelector<HTMLElement>('.fc-fmtdlg') as HTMLElement;
-    const panel = host.querySelector<HTMLElement>('.fc-fmtdlg__panel') as HTMLElement;
+    const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg') as HTMLElement;
+    const panel = document.querySelector<HTMLElement>('.fc-fmtdlg__panel') as HTMLElement;
 
     panel.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(overlay.hidden).toBe(false);
@@ -771,7 +773,7 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const overlay = host.querySelector<HTMLElement>('.fc-fmtdlg') as HTMLElement;
+    const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg') as HTMLElement;
     const hostKey = vi.fn();
     host.addEventListener('keydown', hostKey);
 
@@ -787,11 +789,11 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const fixedBtn = host.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]');
+    const fixedBtn = document.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]');
     fixedBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    const overlay = host.querySelector<HTMLElement>('.fc-fmtdlg') as HTMLElement;
-    const decimalsInput = host.querySelector<HTMLInputElement>(
+    const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg') as HTMLElement;
+    const decimalsInput = document.querySelector<HTMLInputElement>(
       'input[type="number"][min="0"][max="10"]',
     ) as HTMLInputElement;
     decimalsInput.value = '5';
@@ -812,8 +814,8 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const overlay = host.querySelector<HTMLElement>('.fc-fmtdlg') as HTMLElement;
-    const someBtn = host.querySelector<HTMLButtonElement>(
+    const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg') as HTMLElement;
+    const someBtn = document.querySelector<HTMLButtonElement>(
       'button[data-fc-tab="font"]',
     ) as HTMLButtonElement;
 
@@ -830,19 +832,19 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store, history });
     handle.open();
 
-    const center = host.querySelector<HTMLInputElement>(
+    const center = document.querySelector<HTMLInputElement>(
       'input[type="radio"][value="center"]',
     ) as HTMLInputElement;
     center.checked = true;
     center.dispatchEvent(new Event('change', { bubbles: true }));
 
-    const bold = host.querySelector<HTMLInputElement>(
+    const bold = document.querySelector<HTMLInputElement>(
       'input[data-fc-check="bold"]',
     ) as HTMLInputElement;
     bold.checked = true;
     bold.dispatchEvent(new Event('change', { bubbles: true }));
 
-    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     let fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
@@ -867,13 +869,13 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const bold = host.querySelector<HTMLInputElement>(
+    const bold = document.querySelector<HTMLInputElement>(
       'input[data-fc-check="bold"]',
     ) as HTMLInputElement;
     bold.checked = true;
     bold.dispatchEvent(new Event('change', { bubbles: true }));
 
-    const okBtn = host.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
     okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     const formats = store.getState().format.formats;
@@ -888,22 +890,22 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
-    const preview = host.querySelector<HTMLElement>('.fc-fmtdlg__preview') as HTMLElement;
+    const preview = document.querySelector<HTMLElement>('.fc-fmtdlg__preview') as HTMLElement;
 
-    const fixedBtn = host.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]');
+    const fixedBtn = document.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]');
     fixedBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(preview.textContent).toMatch(/12,?345\.00/);
 
-    const bold = host.querySelector<HTMLInputElement>(
+    const bold = document.querySelector<HTMLInputElement>(
       'input[data-fc-check="bold"]',
     ) as HTMLInputElement;
-    const italic = host.querySelector<HTMLInputElement>(
+    const italic = document.querySelector<HTMLInputElement>(
       'input[data-fc-check="italic"]',
     ) as HTMLInputElement;
-    const underline = host.querySelector<HTMLInputElement>(
+    const underline = document.querySelector<HTMLInputElement>(
       'input[data-fc-check="underline"]',
     ) as HTMLInputElement;
-    const strike = host.querySelector<HTMLInputElement>(
+    const strike = document.querySelector<HTMLInputElement>(
       'input[data-fc-check="strike"]',
     ) as HTMLInputElement;
     bold.checked = true;
@@ -921,7 +923,7 @@ describe('attachFormatDialog', () => {
     expect(preview.style.textDecoration).toMatch(/underline/);
     expect(preview.style.textDecoration).toMatch(/line-through/);
 
-    const right = host.querySelector<HTMLInputElement>(
+    const right = document.querySelector<HTMLInputElement>(
       'input[type="radio"][value="right"]',
     ) as HTMLInputElement;
     right.checked = true;
@@ -935,6 +937,6 @@ describe('attachFormatDialog', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
     handle.detach();
-    expect(host.querySelector('.fc-fmtdlg')).toBeNull();
+    expect(document.querySelector('.fc-fmtdlg')).toBeNull();
   });
 });

@@ -8,13 +8,25 @@ import {
   bumpDecimals,
   type CellBorderStyle,
   clearFormat,
+  copy,
+  createSessionChart,
+  cut,
   cycleCurrency,
   cyclePercent,
+  deleteCols,
+  deleteRows,
   fluentIconPaths,
+  formatAsTable,
+  hideCols,
+  hideRows,
+  insertCols,
+  insertRows,
   mutators,
+  pasteTSV,
   type RibbonCommand,
   type RibbonTab,
   recordFormatChange,
+  removeDuplicates,
   Spreadsheet,
   type SpreadsheetInstance,
   setAlign,
@@ -26,7 +38,9 @@ import {
   setFreezePanes,
   setNumFmt,
   setSheetHidden,
+  setSheetZoom,
   setVAlign,
+  sortRange,
   toggleBold,
   toggleItalic,
   toggleStrike,
@@ -34,6 +48,7 @@ import {
   toggleWrap,
   WorkbookHandle,
 } from '@libraz/formulon-cell';
+import { showPrompt } from './dialogs.js';
 import { applyFixture, isFixtureName } from './fixtures.js';
 import { seedWorkbook } from './seed.js';
 import { openSheetTabMenu } from './sheet-tab-menu.js';
@@ -701,13 +716,19 @@ async function boot(): Promise<void> {
   });
   // mount.ts only runs `seed` on workbooks it owns. We construct `wb` here so
   // we can read `isStub` / `version` for the engine pill before mounting,
-  // which means we have to seed the workbook ourselves.
-  seed(wb);
+  // which means we have to seed the workbook ourselves. `?fixture=empty`
+  // (used by E2E specs that need a deterministic blank workbook) skips this.
+  if (bootParams.get('fixture') !== 'empty') {
+    seed(wb);
+  }
 
   inst = await Spreadsheet.mount(sheetEl as HTMLElement, {
     theme: toCore(uiTheme),
     workbook: wb,
     locale: localeParam === 'ja' ? 'ja' : 'en',
+    features: {
+      watchWindow: true,
+    },
   });
   // Debug-only: expose for browser console / e2e poking. Safe to leave on the
   // playground build; the core package never references this global.
@@ -1211,6 +1232,580 @@ const markDirty = (): void => {
 };
 // Subscribe once boot completes — see end of boot().
 
+const refreshWorkbookCells = (): void => {
+  if (!inst) return;
+  mutators.replaceCells(inst.store, inst.workbook.cells(inst.store.getState().data.sheetIndex));
+};
+
+const focusSheet = (): void => {
+  (sheetEl as HTMLElement).focus();
+};
+
+const selectedRowCount = (): number => {
+  if (!inst) return 1;
+  const r = inst.store.getState().selection.range;
+  return Math.max(1, r.r1 - r.r0 + 1);
+};
+
+const selectedColCount = (): number => {
+  if (!inst) return 1;
+  const r = inst.store.getState().selection.range;
+  return Math.max(1, r.c1 - r.c0 + 1);
+};
+
+const openFilterForSelection = (): void => {
+  if (!inst) return;
+  const r = inst.store.getState().selection.range;
+  mutators.setFilterRange(inst.store, r);
+  const sheetRect = (sheetEl as HTMLElement).getBoundingClientRect();
+  filterDropdown?.open(r, r.c0, { x: sheetRect.left + 80, y: sheetRect.top, h: 32 });
+  focusSheet();
+};
+
+const sortSelection = (direction: 'asc' | 'desc'): void => {
+  if (!inst) return;
+  const state = inst.store.getState();
+  const r = state.selection.range;
+  if (r.r0 === r.r1 && r.c0 === r.c1) return;
+  sortRange(state, inst.store, inst.workbook, r, { byCol: r.c0, direction });
+  refreshWorkbookCells();
+  focusSheet();
+};
+
+const removeDuplicateRows = (): void => {
+  if (!inst) return;
+  const state = inst.store.getState();
+  const removed = removeDuplicates(state, inst.store, inst.workbook, state.selection.range);
+  refreshWorkbookCells();
+  if (statusMetric)
+    statusMetric.textContent = `Removed ${removed} duplicate row${removed === 1 ? '' : 's'}`;
+  focusSheet();
+};
+
+const createTableFromSelection = (): void => {
+  if (!inst) return;
+  const r = inst.store.getState().selection.range;
+  formatAsTable(inst.store, r);
+  focusSheet();
+};
+
+const createChartFromSelection = (): void => {
+  if (!inst) return;
+  const r = inst.store.getState().selection.range;
+  const count = inst.store.getState().charts.charts.length;
+  createSessionChart(inst.store, r, {
+    id: `ribbon-chart-${r.sheet}-${r.r0}-${r.c0}-${r.r1}-${r.c1}-${count}`,
+    kind: 'column',
+    title: null,
+    x: 340 + (count % 3) * 24,
+    y: 96 + (count % 3) * 24,
+    w: 360,
+    h: 220,
+  });
+  focusSheet();
+};
+
+const copySelectionToClipboard = async (): Promise<void> => {
+  if (!inst) return;
+  const result = copy(inst.store.getState());
+  if (!result) return;
+  await navigator.clipboard?.writeText(result.tsv);
+  focusSheet();
+};
+
+const cutSelectionToClipboard = async (): Promise<void> => {
+  if (!inst) return;
+  const result = cut(inst.store.getState(), inst.workbook);
+  if (!result) return;
+  await navigator.clipboard?.writeText(result.tsv);
+  refreshWorkbookCells();
+  focusSheet();
+};
+
+const pasteClipboardIntoSelection = async (): Promise<void> => {
+  if (!inst) return;
+  const text = await navigator.clipboard?.readText();
+  if (!text) return;
+  pasteTSV(inst.store.getState(), inst.workbook, text);
+  refreshWorkbookCells();
+  focusSheet();
+};
+
+interface RibbonReportItem {
+  severity: 'info' | 'warning';
+  label: string;
+  detail: string;
+}
+
+const addrLabel = (row: number, col: number): string => `${colLabel(col)}${row + 1}`;
+
+const showRibbonReport = (title: string, items: readonly RibbonReportItem[]): void => {
+  const overlay = document.createElement('div');
+  overlay.className = 'fc-fmtdlg app__dlg';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', title);
+
+  const panel = document.createElement('div');
+  panel.className = 'fc-fmtdlg__panel app__dlg__panel';
+  overlay.appendChild(panel);
+
+  const header = document.createElement('div');
+  header.className = 'fc-fmtdlg__header';
+  header.textContent = title;
+  panel.appendChild(header);
+
+  const body = document.createElement('div');
+  body.className = 'fc-fmtdlg__body app__dlg__body';
+  panel.appendChild(body);
+
+  const list = document.createElement('div');
+  list.className = 'app__dlg__list';
+  if (items.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'app__dlg__note';
+    empty.textContent = 'No issues found.';
+    list.appendChild(empty);
+  } else {
+    for (const item of items) {
+      const row = document.createElement('div');
+      row.className = 'fc-fmtdlg__row fc-fmtdlg__row--block';
+      const label = document.createElement('strong');
+      label.textContent = `${item.severity === 'warning' ? 'Warning' : 'Info'} · ${item.label}`;
+      const detail = document.createElement('div');
+      detail.textContent = item.detail;
+      row.append(label, detail);
+      list.appendChild(row);
+    }
+  }
+  body.appendChild(list);
+
+  const footer = document.createElement('div');
+  footer.className = 'fc-fmtdlg__footer';
+  panel.appendChild(footer);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'fc-fmtdlg__btn fc-fmtdlg__btn--primary';
+  closeBtn.textContent = 'Close';
+  footer.appendChild(closeBtn);
+
+  const close = (): void => overlay.remove();
+  closeBtn.addEventListener('click', close);
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) close();
+  });
+  overlay.addEventListener('keydown', (event) => {
+    event.stopPropagation();
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      close();
+    }
+  });
+  document.body.appendChild(overlay);
+  closeBtn.focus();
+};
+
+const selectedPlainText = (): string => {
+  if (!inst) return '';
+  const state = inst.store.getState();
+  const range = state.selection.range;
+  const lines: string[] = [];
+  for (let row = range.r0; row <= range.r1; row += 1) {
+    const cells: string[] = [];
+    for (let col = range.c0; col <= range.c1; col += 1) {
+      const formula = inst.workbook.cellFormula({ sheet: range.sheet, row, col });
+      if (formula) {
+        cells.push(formula);
+        continue;
+      }
+      const value = inst.workbook.getValue({ sheet: range.sheet, row, col });
+      if (value.kind === 'text') cells.push(value.value);
+      else if (value.kind === 'number') cells.push(String(value.value));
+      else if (value.kind === 'bool') cells.push(value.value ? 'TRUE' : 'FALSE');
+      else if (value.kind === 'error') cells.push(value.text);
+      else cells.push('');
+    }
+    lines.push(cells.join('\t'));
+  }
+  return lines.join('\n').trim();
+};
+
+const runAccessibilityCheck = (): void => {
+  if (!inst) return;
+  const sheet = inst.store.getState().data.sheetIndex;
+  const entries = Array.from(inst.workbook.cells(sheet));
+  const items: RibbonReportItem[] = [];
+  const nonBlank = entries.filter((entry) => entry.value.kind !== 'blank' || !!entry.formula);
+  if (nonBlank.length === 0) {
+    items.push({
+      severity: 'info',
+      label: 'Empty sheet',
+      detail: 'The current sheet has no populated cells to review.',
+    });
+  }
+  for (const entry of nonBlank) {
+    const label = addrLabel(entry.addr.row, entry.addr.col);
+    if (entry.value.kind === 'error') {
+      items.push({
+        severity: 'warning',
+        label,
+        detail: `Cell evaluates to ${entry.value.text}. Resolve formula errors before sharing.`,
+      });
+    }
+    if (entry.formula?.includes('#REF!')) {
+      items.push({
+        severity: 'warning',
+        label,
+        detail: 'Formula contains #REF!, which is usually a broken reference.',
+      });
+    }
+    if (entry.value.kind === 'text') {
+      const text = entry.value.value.trim();
+      if (/^https?:\/\//i.test(text)) {
+        items.push({
+          severity: 'info',
+          label,
+          detail: 'URL text should have a descriptive label when used as a link.',
+        });
+      }
+      if (text.length > 120 && !/[.!?。！？]\s/.test(text)) {
+        items.push({
+          severity: 'info',
+          label,
+          detail: 'Long text may be hard to scan. Consider wrapping or shortening it.',
+        });
+      }
+    }
+  }
+  if (statusMetric)
+    statusMetric.textContent = `Accessibility · ${items.filter((i) => i.severity === 'warning').length} warnings`;
+  showRibbonReport('Accessibility Check', items);
+};
+
+const runSpellingReview = (): void => {
+  if (!inst) return;
+  const sheet = inst.store.getState().data.sheetIndex;
+  const typos: Readonly<Record<string, string>> = {
+    accomodate: 'accommodate',
+    adress: 'address',
+    recieve: 'receive',
+    seperate: 'separate',
+    teh: 'the',
+  };
+  const items: RibbonReportItem[] = [];
+  for (const entry of inst.workbook.cells(sheet)) {
+    if (entry.value.kind !== 'text') continue;
+    const text = entry.value.value;
+    const label = addrLabel(entry.addr.row, entry.addr.col);
+    const repeated = text.match(/\b([A-Za-z]+)\s+\1\b/i);
+    if (repeated) {
+      items.push({
+        severity: 'warning',
+        label,
+        detail: `Repeated word: "${repeated[0]}".`,
+      });
+    }
+    if (/\s{2,}/.test(text)) {
+      items.push({
+        severity: 'info',
+        label,
+        detail: 'Contains repeated spaces.',
+      });
+    }
+    for (const [wrong, suggestion] of Object.entries(typos)) {
+      if (new RegExp(`\\b${wrong}\\b`, 'i').test(text)) {
+        items.push({
+          severity: 'warning',
+          label,
+          detail: `Possible typo: "${wrong}". Suggested spelling: "${suggestion}".`,
+        });
+      }
+    }
+  }
+  if (statusMetric)
+    statusMetric.textContent = `Spelling · ${items.filter((i) => i.severity === 'warning').length} warnings`;
+  showRibbonReport('Spelling Review', items);
+};
+
+const openTranslateReview = (): void => {
+  const text = selectedPlainText();
+  showRibbonReport('Translate Selection', [
+    text
+      ? {
+          severity: 'info',
+          label: 'Selection text',
+          detail: text.length > 500 ? `${text.slice(0, 500)}...` : text,
+        }
+      : {
+          severity: 'info',
+          label: 'No text selected',
+          detail: 'Select cells containing text before using Translate.',
+        },
+    {
+      severity: 'info',
+      label: 'Privacy',
+      detail: 'No text is sent to an external translation service from the playground.',
+    },
+  ]);
+};
+
+const runPlaygroundScript = async (): Promise<void> => {
+  if (!inst) return;
+  const command = await showPrompt({
+    title: 'Run Script',
+    label: 'Command',
+    placeholder: 'uppercase, lowercase, trim, clear',
+    okLabel: 'Run',
+    validate: (value) =>
+      /^(uppercase|lowercase|trim|clear)$/i.test(value.trim())
+        ? null
+        : 'Use one of: uppercase, lowercase, trim, clear.',
+  });
+  if (!command || !inst) return;
+  const op = command.trim().toLowerCase();
+  const range = inst.store.getState().selection.range;
+  let changed = 0;
+  for (let row = range.r0; row <= range.r1; row += 1) {
+    for (let col = range.c0; col <= range.c1; col += 1) {
+      const addr = { sheet: range.sheet, row, col };
+      if (op === 'clear') {
+        inst.workbook.setBlank(addr);
+        changed += 1;
+        continue;
+      }
+      const value = inst.workbook.getValue(addr);
+      if (value.kind !== 'text') continue;
+      const next =
+        op === 'uppercase'
+          ? value.value.toUpperCase()
+          : op === 'lowercase'
+            ? value.value.toLowerCase()
+            : value.value.trim().replace(/\s+/g, ' ');
+      if (next !== value.value) {
+        inst.workbook.setText(addr, next);
+        changed += 1;
+      }
+    }
+  }
+  refreshWorkbookCells();
+  if (statusMetric)
+    statusMetric.textContent = `Script · ${changed} cell${changed === 1 ? '' : 's'}`;
+  focusSheet();
+};
+
+const openAddInManager = (): void => {
+  showRibbonReport('Add-ins', [
+    {
+      severity: 'info',
+      label: 'Built-in add-ins',
+      detail:
+        'Charts, PivotTable dialog, Watch Window, and PDF/Print are available in this playground.',
+    },
+    {
+      severity: 'info',
+      label: 'External add-ins',
+      detail: 'External add-in packages are not loaded automatically in the playground.',
+    },
+  ]);
+};
+
+const applyRibbonCommand = (id: string): boolean => {
+  const i = inst;
+  if (!i) return false;
+  const state = i.store.getState();
+  const range = state.selection.range;
+  switch (id) {
+    case 'pageSetup':
+    case 'pageSetupAdvanced':
+      i.openPageSetup();
+      return true;
+    case 'print':
+    case 'printPageLayout':
+    case 'pdf':
+      i.print();
+      return true;
+    case 'links':
+    case 'linksInsert':
+    case 'linksData':
+      i.openExternalLinksDialog();
+      return true;
+    case 'formatCells':
+    case 'formatCellsHome':
+      i.openFormatDialog();
+      return true;
+    case 'gotoSpecial':
+    case 'gotoSpecialHome':
+      i.openGoToSpecial();
+      return true;
+    case 'paste':
+      void pasteClipboardIntoSelection();
+      return true;
+    case 'cut':
+      void cutSelectionToClipboard();
+      return true;
+    case 'copy':
+      void copySelectionToClipboard();
+      return true;
+    case 'clearFormat':
+      applyRibbonFormat((s, store) => clearFormat(s, store));
+      return true;
+    case 'general':
+      applyRibbonFormat((s, store) => setNumFmt(s, store, { kind: 'general' }));
+      return true;
+    case 'conditional':
+      i.openConditionalDialog();
+      return true;
+    case 'cellStyles':
+      i.openCellStylesGallery();
+      return true;
+    case 'rules':
+      i.openCfRulesDialog();
+      return true;
+    case 'insertRows':
+      insertRows(i.store, i.workbook, i.history, range.r0, selectedRowCount());
+      refreshWorkbookCells();
+      focusSheet();
+      return true;
+    case 'deleteRows':
+      deleteRows(i.store, i.workbook, i.history, range.r0, selectedRowCount());
+      refreshWorkbookCells();
+      focusSheet();
+      return true;
+    case 'insertCols':
+      insertCols(i.store, i.workbook, i.history, range.c0, selectedColCount());
+      refreshWorkbookCells();
+      focusSheet();
+      return true;
+    case 'deleteCols':
+      deleteCols(i.store, i.workbook, i.history, range.c0, selectedColCount());
+      refreshWorkbookCells();
+      focusSheet();
+      return true;
+    case 'sortAscHome':
+    case 'sortAsc':
+      sortSelection('asc');
+      return true;
+    case 'sortDesc':
+      sortSelection('desc');
+      return true;
+    case 'filterHome':
+      openFilterForSelection();
+      return true;
+    case 'drawPen':
+      applyRibbonFormat((s, store) => setBorderPreset(s, store, 'all', selectedBorderStyle));
+      return true;
+    case 'drawErase':
+      applyRibbonFormat((s, store) => setBorderPreset(s, store, 'none', selectedBorderStyle));
+      return true;
+    case 'findHome':
+    case 'findReview':
+      i.openFindReplace();
+      return true;
+    case 'spellingReview':
+      runSpellingReview();
+      return true;
+    case 'translateReview':
+      openTranslateReview();
+      return true;
+    case 'accessibility':
+      runAccessibilityCheck();
+      return true;
+    case 'formatTableInsert':
+      createTableFromSelection();
+      return true;
+    case 'namedRangesInsert':
+    case 'namedRanges':
+      i.openNamedRangeDialog();
+      return true;
+    case 'removeDupesInsert':
+    case 'removeDupes':
+      removeDuplicateRows();
+      return true;
+    case 'chartInsert':
+      createChartFromSelection();
+      return true;
+    case 'fxInsert':
+    case 'fx':
+      i.openFunctionArguments();
+      return true;
+    case 'autosumFormula': {
+      const result = autoSum(i.store.getState(), i.workbook);
+      if (result) {
+        refreshWorkbookCells();
+        mutators.setActive(i.store, result.addr);
+      }
+      focusSheet();
+      return true;
+    }
+    case 'sum':
+      i.openFunctionArguments('SUM');
+      return true;
+    case 'avg':
+      i.openFunctionArguments('AVERAGE');
+      return true;
+    case 'precedents':
+      i.tracePrecedents();
+      return true;
+    case 'dependents':
+      i.traceDependents();
+      return true;
+    case 'clearArrows':
+      i.clearTraces();
+      return true;
+    case 'recalcNow':
+      i.recalc();
+      focusSheet();
+      return true;
+    case 'calcOptions':
+      i.openIterativeDialog();
+      return true;
+    case 'watch':
+    case 'watchView':
+      i.toggleWatchWindow();
+      return true;
+    case 'hideRows':
+      hideRows(i.store, i.history, range.r0, range.r1, i.workbook);
+      focusSheet();
+      return true;
+    case 'hideCols':
+      hideCols(i.store, i.history, range.c0, range.c1, i.workbook);
+      focusSheet();
+      return true;
+    case 'newCommentReview':
+      i.openCommentDialog();
+      return true;
+    case 'protectReview':
+    case 'protect':
+      i.toggleSheetProtection();
+      focusSheet();
+      return true;
+    case 'script':
+      void runPlaygroundScript();
+      return true;
+    case 'addIn':
+      openAddInManager();
+      return true;
+    case 'zoom75':
+      setSheetZoom(i.store, 0.75, i.workbook);
+      refreshZoom();
+      focusSheet();
+      return true;
+    case 'zoom100':
+      setSheetZoom(i.store, 1, i.workbook);
+      refreshZoom();
+      focusSheet();
+      return true;
+    case 'zoom125':
+      setSheetZoom(i.store, 1.25, i.workbook);
+      refreshZoom();
+      focusSheet();
+      return true;
+    default:
+      return false;
+  }
+};
+
 // ── Ribbon tab strip ────────────────────────────────────────────────────
 ribbonRoot?.addEventListener('click', (event) => {
   const tab = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-ribbon-tab]');
@@ -1223,6 +1818,20 @@ ribbonRoot?.addEventListener('click', (event) => {
   }
   for (const panel of ribbonRoot.querySelectorAll<HTMLElement>('[data-ribbon-panel]')) {
     panel.hidden = panel.dataset.ribbonPanel !== activeRibbonTab;
+  }
+});
+
+ribbonRoot?.addEventListener('click', (event) => {
+  const button = (event.target as Element | null)?.closest<HTMLButtonElement>(
+    'button[data-ribbon-command]',
+  );
+  if (!button || button.disabled) return;
+  const id = button.dataset.ribbonCommand;
+  if (!id) return;
+  if (legacyCommandIds[id]) return;
+  if (applyRibbonCommand(id)) {
+    event.preventDefault();
+    event.stopPropagation();
   }
 });
 

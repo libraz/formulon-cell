@@ -36,7 +36,7 @@ export async function runDialogMasksGridScenario(page: Page): Promise<void> {
       return {
         tag: el?.tagName ?? null,
         cls: el?.className ?? null,
-        closestHost: el?.closest('.fc-host') ? true : false,
+        closestHost: !!el?.closest('.fc-host'),
       };
     },
     { x: px, y: py },
@@ -67,7 +67,7 @@ export async function runDialogMasksGridScenario(page: Page): Promise<void> {
       const el = document.elementFromPoint(x, y) as HTMLElement | null;
       return {
         tag: el?.tagName ?? null,
-        underDialog: el?.closest('[class~="fc-fmtdlg"]') ? true : false,
+        underDialog: !!el?.closest('[class~="fc-fmtdlg"]'),
       };
     },
     { x: dpx, y: dpy },
@@ -86,7 +86,7 @@ export async function runDialogMasksGridScenario(page: Page): Promise<void> {
       const el = document.elementFromPoint(x, y) as HTMLElement | null;
       return {
         cls: el?.className ?? null,
-        closestHost: el?.closest('.fc-host') ? true : false,
+        closestHost: !!el?.closest('.fc-host'),
       };
     },
     { x: px, y: py },

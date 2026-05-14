@@ -108,6 +108,17 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         }
       : null,
   );
+  // Clipboard must be attached before the keyboard router so the router can
+  // forward Mod+C/X/V to the clipboard handle (browsers won't dispatch
+  // copy/paste events on our non-editable, user-select:none host).
+  const clipboardH = flags.clipboard
+    ? attachClipboard({
+        host,
+        store,
+        wb,
+        onAfterCommit: refreshCells,
+      })
+    : null;
   const detachKey = flags.shortcuts
     ? attachKeyboard({
         host,
@@ -131,16 +142,9 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         },
         onSwitchSheet: (delta) => getSheetTabs()?.switchRelative(delta),
         onEditComment: () => getCommentDialog()?.open(),
+        onClipboardShortcut: clipboardH ? (kind) => void clipboardH.runShortcut(kind) : undefined,
       })
     : (): void => {};
-  const clipboardH = flags.clipboard
-    ? attachClipboard({
-        host,
-        store,
-        wb,
-        onAfterCommit: refreshCells,
-      })
-    : null;
   const pasteSpecialDialog =
     flags.pasteSpecial && clipboardH
       ? attachPasteSpecial({

@@ -1,6 +1,7 @@
 import { deleteDefinedName, upsertDefinedName } from '../commands/named-ranges.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
+import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface NamedRangeDialogDeps {
   host: HTMLElement;
@@ -102,7 +103,9 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   closeBtn.textContent = t.close;
   footer.appendChild(closeBtn);
 
-  host.appendChild(overlay);
+  // Body-portal so the modal escapes `.fc-host`'s `contain: strict`.
+  inheritHostTokens(host, overlay);
+  document.body.appendChild(overlay);
 
   const showError = (msg: string): void => {
     errorRow.textContent = msg;

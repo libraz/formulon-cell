@@ -19,7 +19,7 @@ describe('attachHyperlinkDialog', () => {
   it('mounts hidden; open() reveals the dialog and focuses the URL input', async () => {
     const store = createSpreadsheetStore();
     const handle = attachHyperlinkDialog({ host, store });
-    const overlay = host.querySelector<HTMLElement>('.fc-hldlg');
+    const overlay = document.querySelector<HTMLElement>('.fc-hldlg');
     expect(overlay?.hidden).toBe(true);
 
     handle.open();
@@ -31,10 +31,10 @@ describe('attachHyperlinkDialog', () => {
     const store = createSpreadsheetStore();
     const handle = attachHyperlinkDialog({ host, store });
     handle.open();
-    const input = host.querySelector<HTMLInputElement>('.fc-hldlg input');
+    const input = document.querySelector<HTMLInputElement>('.fc-hldlg input');
     if (!input) throw new Error('expected url input');
     input.value = 'https://example.com';
-    const okBtn = host.querySelectorAll<HTMLButtonElement>('.fc-hldlg button')[2];
+    const okBtn = document.querySelectorAll<HTMLButtonElement>('.fc-hldlg button')[2];
     if (!okBtn) throw new Error('expected ok button');
     okBtn.click();
 
@@ -47,11 +47,11 @@ describe('attachHyperlinkDialog', () => {
     const store = createSpreadsheetStore();
     const handle = attachHyperlinkDialog({ host, store });
     handle.open();
-    const okBtn = host.querySelectorAll<HTMLButtonElement>('.fc-hldlg button')[2];
+    const okBtn = document.querySelectorAll<HTMLButtonElement>('.fc-hldlg button')[2];
     if (!okBtn) throw new Error('expected ok button');
     okBtn.click();
 
-    expect(host.querySelector<HTMLElement>('.fc-hldlg__error')?.hidden).toBe(false);
+    expect(document.querySelector<HTMLElement>('.fc-hldlg__error')?.hidden).toBe(false);
     expect(store.getState().format.formats.size).toBe(0);
     handle.detach();
   });
@@ -66,7 +66,7 @@ describe('attachHyperlinkDialog', () => {
     }));
     const handle = attachHyperlinkDialog({ host, store });
     handle.open();
-    const removeBtn = host.querySelectorAll<HTMLButtonElement>('.fc-hldlg button')[0];
+    const removeBtn = document.querySelectorAll<HTMLButtonElement>('.fc-hldlg button')[0];
     if (!removeBtn) throw new Error('expected remove button');
     removeBtn.click();
 
@@ -79,7 +79,7 @@ describe('attachHyperlinkDialog', () => {
     const store = createSpreadsheetStore();
     const handle = attachHyperlinkDialog({ host, store });
     handle.open();
-    const removeBtn = host.querySelectorAll<HTMLButtonElement>('.fc-hldlg button')[0];
+    const removeBtn = document.querySelectorAll<HTMLButtonElement>('.fc-hldlg button')[0];
     if (!removeBtn) throw new Error('expected remove button');
     expect(removeBtn.hidden).toBe(true);
     handle.detach();
@@ -89,7 +89,7 @@ describe('attachHyperlinkDialog', () => {
     const store = createSpreadsheetStore();
     const handle = attachHyperlinkDialog({ host, store });
     handle.open();
-    const overlay = host.querySelector<HTMLElement>('.fc-hldlg');
+    const overlay = document.querySelector<HTMLElement>('.fc-hldlg');
     if (!overlay) throw new Error('expected overlay');
     overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(overlay.hidden).toBe(true);

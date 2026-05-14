@@ -17,6 +17,7 @@ import {
   type TabId,
   type ValidationKind,
 } from './format-dialog-model.js';
+import { inheritHostTokens } from './inherit-host-tokens.js';
 
 interface CreateFormatDialogViewInput {
   host: HTMLElement;
@@ -113,6 +114,9 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   const catList = document.createElement('div');
   catList.className = 'fc-fmtdlg__cat';
   catList.setAttribute('role', 'listbox');
+  // axe `aria-input-field-name`: a listbox needs an accessible name. Reuse
+  // the Number tab label since this list IS the Number tab's category picker.
+  catList.setAttribute('aria-label', t.tabNumber);
   numberLayout.appendChild(catList);
 
   const catDefs: { id: NumberCategory; label: string }[] = [
@@ -725,7 +729,15 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   const okBtn = makeButton(t.ok, true);
   footer.append(cancelBtn, okBtn);
 
-  host.appendChild(overlay);
+  // Attach to document.body so the dialog escapes `.fc-host`'s `contain:
+  // strict` containing block and `isolation: isolate` stacking context.
+  // Without this, `position: fixed` resolves relative to the host (clipping
+  // the dialog to the host's bounds) and the host's stacking context buries
+  // the dialog behind any sibling with a higher z-index. inheritHostTokens
+  // copies theme/locale custom properties so the body-portaled overlay
+  // still resolves --fc-bg / --fc-fg / --fc-accent / etc.
+  inheritHostTokens(host, overlay);
+  document.body.appendChild(overlay);
 
   return {
     overlay,

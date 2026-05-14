@@ -36,7 +36,7 @@ describe('integration: format dialog flow', () => {
   });
 
   it('renders the dialog overlay hidden by default', () => {
-    const overlay = sheet.host.querySelector(FORMAT_OVERLAY_SELECTOR);
+    const overlay = document.querySelector(FORMAT_OVERLAY_SELECTOR);
     expect(overlay).not.toBeNull();
     expect((overlay as HTMLElement).hidden).toBe(true);
   });
@@ -44,7 +44,7 @@ describe('integration: format dialog flow', () => {
   it('open() flips the overlay visible and shows the panel', () => {
     const handle = formatDialogHandle(sheet);
     handle.open();
-    const overlay = sheet.host.querySelector(FORMAT_OVERLAY_SELECTOR) as HTMLElement;
+    const overlay = document.querySelector(FORMAT_OVERLAY_SELECTOR) as HTMLElement;
     expect(overlay.hidden).toBe(false);
     expect(overlay.querySelector('.fc-fmtdlg__panel')).not.toBeNull();
   });
@@ -53,7 +53,7 @@ describe('integration: format dialog flow', () => {
     const handle = formatDialogHandle(sheet);
     handle.open();
     handle.close();
-    const overlay = sheet.host.querySelector(FORMAT_OVERLAY_SELECTOR) as HTMLElement;
+    const overlay = document.querySelector(FORMAT_OVERLAY_SELECTOR) as HTMLElement;
     expect(overlay.hidden).toBe(true);
   });
 
@@ -65,7 +65,7 @@ describe('integration: format dialog flow', () => {
 
     const handle = formatDialogHandle(sheet);
     expect(() => handle.open()).not.toThrow();
-    const overlay = sheet.host.querySelector(FORMAT_OVERLAY_SELECTOR) as HTMLElement;
+    const overlay = document.querySelector(FORMAT_OVERLAY_SELECTOR) as HTMLElement;
     expect(overlay.hidden).toBe(false);
   });
 });
@@ -74,7 +74,7 @@ describe('integration: format dialog opt-out', () => {
   it('features.formatDialog is undefined when the flag is off', async () => {
     const opt = await mountStubSheet({ features: { formatDialog: false } });
     expect(opt.instance.features.formatDialog).toBeFalsy();
-    expect(opt.host.querySelector(FORMAT_OVERLAY_SELECTOR)).toBeNull();
+    expect(document.querySelector(FORMAT_OVERLAY_SELECTOR)).toBeNull();
     opt.dispose();
   });
 });

@@ -64,9 +64,10 @@ describe('interact/format-dialog-view', () => {
     expect(view.lockedCk.input.dataset.fcCheck).toBe('locked');
   });
 
-  it('appends the overlay to the supplied host (not document.body) so callers control mount point', () => {
+  it('appends the overlay to document.body so it escapes `.fc-host` contain:strict / isolation:isolate', () => {
     const view = createFormatDialogView({ host, strings: en, t: en.formatDialog });
-    expect(host.contains(view.overlay)).toBe(true);
+    expect(document.body.contains(view.overlay)).toBe(true);
+    expect(host.contains(view.overlay)).toBe(false);
   });
 
   it('renders 6 border-style buttons with the right data attribute', () => {

@@ -9,6 +9,7 @@ import { type History, recordFormatChange } from '../commands/history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface PasteSpecialDeps {
   host: HTMLElement;
@@ -147,10 +148,12 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
   };
   setDefaults();
 
-  // Mount once into the host so the dialog inherits the host's theme variables
-  // (--fc-accent, --fc-bg-elev, etc.). Mounting under document.body would lose
-  // those, leaving primary buttons unstyled.
-  host.appendChild(overlay);
+  // Body-portal so the modal escapes `.fc-host`'s `contain: strict` /
+  // `isolation: isolate`. inheritHostTokens copies theme custom properties
+  // (--fc-accent, --fc-bg-elev, etc.) so the body-portaled overlay still
+  // renders with the active theme.
+  inheritHostTokens(host, overlay);
+  document.body.appendChild(overlay);
 
   const close = (): void => {
     overlay.hidden = true;

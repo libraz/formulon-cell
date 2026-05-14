@@ -61,9 +61,9 @@ describe('attachCfRulesDialog', () => {
       getActiveSheet: () => 0,
     });
     handle.open();
-    const empty = host.querySelector<HTMLElement>('.fc-cfrulesdlg__empty');
+    const empty = document.querySelector<HTMLElement>('.fc-cfrulesdlg__empty');
     expect(empty?.hidden).toBe(false);
-    const clearAll = host.querySelector<HTMLButtonElement>('.fc-cfrulesdlg__clearall');
+    const clearAll = document.querySelector<HTMLButtonElement>('.fc-cfrulesdlg__clearall');
     expect(clearAll?.disabled).toBe(true);
     handle.detach();
   });
@@ -84,7 +84,7 @@ describe('attachCfRulesDialog', () => {
       getActiveSheet: () => 0,
     });
     handle.open();
-    const rows = host.querySelectorAll<HTMLTableRowElement>('.fc-cfrulesdlg__table tbody tr');
+    const rows = document.querySelectorAll<HTMLTableRowElement>('.fc-cfrulesdlg__table tbody tr');
     expect(rows.length).toBe(2);
     expect(rows[0]?.textContent).toContain('cellIs');
     expect(rows[0]?.textContent).toContain('A1:A5');
@@ -107,12 +107,12 @@ describe('attachCfRulesDialog', () => {
       },
     });
     handle.open();
-    const buttons = host.querySelectorAll<HTMLButtonElement>('.fc-cfrulesdlg__remove');
+    const buttons = document.querySelectorAll<HTMLButtonElement>('.fc-cfrulesdlg__remove');
     expect(buttons.length).toBe(2);
     buttons[0]?.click();
     expect(removed).toEqual([0]);
     expect(changed).toBe(1);
-    const after = host.querySelectorAll('.fc-cfrulesdlg__remove');
+    const after = document.querySelectorAll('.fc-cfrulesdlg__remove');
     expect(after.length).toBe(1);
     handle.detach();
   });
@@ -125,7 +125,7 @@ describe('attachCfRulesDialog', () => {
       getActiveSheet: () => 0,
     });
     handle.open();
-    const clearAll = host.querySelector<HTMLButtonElement>('.fc-cfrulesdlg__clearall');
+    const clearAll = document.querySelector<HTMLButtonElement>('.fc-cfrulesdlg__clearall');
     const initialLabel = clearAll?.textContent;
     clearAll?.click();
     expect(state.cleared).toBe(0);
@@ -144,10 +144,10 @@ describe('attachCfRulesDialog', () => {
       getActiveSheet: () => 0,
     });
     handle.open();
-    const clearAll = host.querySelector<HTMLButtonElement>('.fc-cfrulesdlg__clearall');
+    const clearAll = document.querySelector<HTMLButtonElement>('.fc-cfrulesdlg__clearall');
     clearAll?.click(); // arm
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    const dialog = host.querySelector<HTMLElement>('.fc-cfrulesdlg');
+    const dialog = document.querySelector<HTMLElement>('.fc-cfrulesdlg');
     expect(dialog?.hidden).toBe(true);
     expect(clearAll?.classList.contains('fc-cfrulesdlg__clearall--armed')).toBe(false);
     handle.detach();
@@ -161,6 +161,6 @@ describe('attachCfRulesDialog', () => {
       getActiveSheet: () => 0,
     });
     handle.detach();
-    expect(host.querySelector('.fc-cfrulesdlg')).toBeNull();
+    expect(document.querySelector('.fc-cfrulesdlg')).toBeNull();
   });
 });

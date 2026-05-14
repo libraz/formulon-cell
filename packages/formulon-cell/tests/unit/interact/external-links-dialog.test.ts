@@ -27,12 +27,12 @@ describe('attachExternalLinksDialog', () => {
       getWb: () => fakeWb([]),
     });
     handle.open();
-    const dialog = host.querySelector<HTMLElement>('.fc-extlinkdlg');
+    const dialog = document.querySelector<HTMLElement>('.fc-extlinkdlg');
     expect(dialog).not.toBeNull();
     expect(dialog?.hidden).toBe(false);
-    const empty = host.querySelector<HTMLElement>('.fc-extlinkdlg__empty');
+    const empty = document.querySelector<HTMLElement>('.fc-extlinkdlg__empty');
     expect(empty?.hidden).toBe(false);
-    expect(host.querySelector('.fc-extlinkdlg__table')).toBeNull();
+    expect(document.querySelector('.fc-extlinkdlg__table')).toBeNull();
     handle.detach();
   });
 
@@ -60,7 +60,7 @@ describe('attachExternalLinksDialog', () => {
         ]),
     });
     handle.open();
-    const rows = host.querySelectorAll<HTMLTableRowElement>('.fc-extlinkdlg__table tbody tr');
+    const rows = document.querySelectorAll<HTMLTableRowElement>('.fc-extlinkdlg__table tbody tr');
     expect(rows.length).toBe(2);
     expect(rows[0]?.textContent).toContain('1');
     expect(rows[0]?.textContent).toContain('externalBook');
@@ -77,7 +77,7 @@ describe('attachExternalLinksDialog', () => {
     });
     handle.open();
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    const dialog = host.querySelector<HTMLElement>('.fc-extlinkdlg');
+    const dialog = document.querySelector<HTMLElement>('.fc-extlinkdlg');
     expect(dialog?.hidden).toBe(true);
     handle.detach();
   });
@@ -88,7 +88,7 @@ describe('attachExternalLinksDialog', () => {
       getWb: () => fakeWb([]),
     });
     handle.open();
-    const dialog = host.querySelector<HTMLElement>('.fc-extlinkdlg');
+    const dialog = document.querySelector<HTMLElement>('.fc-extlinkdlg');
     dialog?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(dialog?.hidden).toBe(true);
     handle.detach();
@@ -100,6 +100,6 @@ describe('attachExternalLinksDialog', () => {
       getWb: () => fakeWb([]),
     });
     handle.detach();
-    expect(host.querySelector('.fc-extlinkdlg')).toBeNull();
+    expect(document.querySelector('.fc-extlinkdlg')).toBeNull();
   });
 });
