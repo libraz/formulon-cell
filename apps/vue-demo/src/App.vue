@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {
   type CellChangeEvent,
-  type CellRenderInput,
   type CellValue,
   type FeatureFlags,
   type FeatureId,
@@ -13,134 +12,21 @@ import {
 import { type RibbonTab, Spreadsheet, useSelection } from '@libraz/formulon-cell-vue';
 import SpreadsheetToolbar from '@libraz/formulon-cell-vue/toolbar.vue';
 import { computed, onUnmounted, ref, shallowRef, watch } from 'vue';
+import {
+  createDemoStrings,
+  DEMO_FUNCTIONS,
+  FEATURE_GROUPS,
+  formatLoadError,
+  FORMATTERS,
+  LOCALES,
+  type PresetKey,
+  PRESETS,
+  THEMES,
+} from '../../demo-shared/index.js';
 
-const THEMES: { value: ThemeName; label: string }[] = [
-  { value: 'paper', label: 'Light' },
-  { value: 'ink', label: 'Dark' },
-  { value: 'contrast', label: 'Contrast' },
-];
-const LOCALES = [
-  { value: 'en', label: 'EN' },
-  { value: 'ja', label: 'JA' },
-];
+const UI = createDemoStrings('Vue');
 
-const formatLoadError = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
-const UI = {
-  en: {
-    saved: 'Saved to this device',
-    search: 'Search',
-    share: 'Share',
-    workbook: 'Vue workbook',
-    demoPane: 'Options',
-    open: 'Open xlsx…',
-    save: 'Save',
-    file: 'File',
-    info: 'Info',
-    print: 'Print',
-    pageSetup: 'Page Setup',
-    close: 'Close',
-    backstageSub: 'Vue workbook · full spreadsheet layout',
-    openTitle: 'Open',
-    openDesc: 'Load an .xlsx or .xlsm workbook from this device.',
-    saveCopy: 'Save a Copy',
-    saveDesc: 'Download the current workbook as an .xlsx file.',
-    printDesc: 'Use the browser print dialog or save as PDF.',
-    pageSetupDesc: 'Set orientation, margins, paper size, headers, and print titles.',
-    editLinks: 'Edit Links',
-    linksDesc: 'Inspect external workbook references carried by the file.',
-    options: 'Options',
-    optionsDesc: 'Show the integration panel and feature toggles.',
-    noCommands: 'No commands found',
-    engineUnavailable: 'Spreadsheet engine unavailable',
-    engineSetup:
-      'Serve this demo with COOP: same-origin and COEP: require-corp so SharedArrayBuffer is available.',
-  },
-  ja: {
-    saved: 'このデバイスに保存済み',
-    search: '検索',
-    share: '共有',
-    workbook: 'Vue ブック',
-    demoPane: 'オプション',
-    open: 'xlsx を開く…',
-    save: '保存',
-    file: 'ファイル',
-    info: '情報',
-    print: '印刷',
-    pageSetup: 'ページ設定',
-    close: '閉じる',
-    backstageSub: 'Vue ブック · スプレッドシート レイアウト',
-    openTitle: '開く',
-    openDesc: '.xlsx または .xlsm ブックをこのデバイスから読み込みます。',
-    saveCopy: 'コピーを保存',
-    saveDesc: '現在のブックを .xlsx ファイルとしてダウンロードします。',
-    printDesc: 'ブラウザーの印刷ダイアログ、または PDF 保存を使用します。',
-    pageSetupDesc: '用紙方向、余白、用紙サイズ、ヘッダー、印刷タイトルを設定します。',
-    editLinks: 'リンクの編集',
-    linksDesc: 'ファイルに含まれる外部ブック参照を確認します。',
-    options: 'オプション',
-    optionsDesc: '統合パネルと機能トグルを表示します。',
-    noCommands: 'コマンドが見つかりません',
-    engineUnavailable: 'スプレッドシートエンジンを起動できません',
-    engineSetup:
-      'SharedArrayBuffer を有効にするため、COOP: same-origin と COEP: require-corp 付きで配信してください。',
-  },
-} as const;
-
-type PresetKey = 'minimal' | 'standard' | 'full';
-const PRESETS: { value: PresetKey; label: string; hint: string }[] = [
-  { value: 'minimal', label: 'Minimal', hint: 'bare spreadsheet chrome' },
-  { value: 'standard', label: 'Standard', hint: 'lightweight editing chrome' },
-  { value: 'full', label: 'Full', hint: 'complete spreadsheet chrome' },
-];
-
-const FEATURE_GROUPS: { title: string; features: { id: FeatureId; label: string }[] }[] = [
-  {
-    title: 'Chrome',
-    features: [
-      { id: 'formulaBar', label: 'Formula bar' },
-      { id: 'viewToolbar', label: 'View toolbar' },
-      { id: 'sheetTabs', label: 'Sheet tabs' },
-      { id: 'statusBar', label: 'Status bar' },
-      { id: 'workbookObjects', label: 'Workbook objects' },
-      { id: 'contextMenu', label: 'Context menu' },
-      { id: 'charts', label: 'Charts' },
-      { id: 'watchWindow', label: 'Watch window' },
-      { id: 'slicer', label: 'Slicer' },
-    ],
-  },
-  {
-    title: 'Editing',
-    features: [
-      { id: 'clipboard', label: 'Clipboard' },
-      { id: 'pasteSpecial', label: 'Paste special' },
-      { id: 'quickAnalysis', label: 'Quick Analysis' },
-      { id: 'formatPainter', label: 'Format painter' },
-      { id: 'autocomplete', label: 'Autocomplete' },
-      { id: 'shortcuts', label: 'Shortcuts' },
-      { id: 'wheel', label: 'Wheel scroll' },
-    ],
-  },
-  {
-    title: 'Dialogs & overlays',
-    features: [
-      { id: 'findReplace', label: 'Find & replace' },
-      { id: 'gotoSpecial', label: 'Go To Special' },
-      { id: 'formatDialog', label: 'Format dialog' },
-      { id: 'fxDialog', label: 'Function dialog' },
-      { id: 'pageSetup', label: 'Page setup' },
-      { id: 'iterative', label: 'Iterative calc' },
-      { id: 'conditional', label: 'Conditional formatting' },
-      { id: 'namedRanges', label: 'Named ranges' },
-      { id: 'hyperlink', label: 'Hyperlink' },
-      { id: 'commentDialog', label: 'Comment popover' },
-      { id: 'pivotTableDialog', label: 'PivotTable dialog' },
-      { id: 'validation', label: 'Data validation' },
-      { id: 'hoverComment', label: 'Hover comment' },
-      { id: 'errorIndicators', label: 'Error indicators' },
-    ],
-  },
-];
 
 const colLabel = (n: number): string => {
   let out = '';
@@ -152,44 +38,7 @@ const colLabel = (n: number): string => {
   return out;
 };
 
-const DEMO_FUNCTIONS = [
-  {
-    name: 'GREET',
-    impl: (...args: CellValue[]) => {
-      const v = args[0];
-      const who = v?.kind === 'text' ? v.value : 'World';
-      return `Hello, ${who}!`;
-    },
-    meta: { description: 'Friendly greeting', args: ['name'], returnType: 'text' as const },
-  },
-  {
-    name: 'FAHRENHEIT',
-    impl: (...args: CellValue[]) => {
-      const v = args[0];
-      const c = v?.kind === 'number' ? v.value : Number.NaN;
-      return Number.isFinite(c) ? c * 1.8 + 32 : null;
-    },
-    meta: {
-      description: 'Celsius to Fahrenheit',
-      args: ['celsius'],
-      returnType: 'number' as const,
-    },
-  },
-];
 
-const FORMATTERS = {
-  uppercaseA: {
-    id: 'demo:uppercaseA',
-    match: (i: CellRenderInput) => i.addr.col === 0 && i.value.kind === 'text',
-    format: (i: CellRenderInput) => (i.value.kind === 'text' ? i.value.value.toUpperCase() : null),
-  },
-  arrowNegatives: {
-    id: 'demo:arrowNegatives',
-    match: (i: CellRenderInput) => i.value.kind === 'number' && i.value.value < 0,
-    format: (i: CellRenderInput) =>
-      i.value.kind === 'number' ? `↓ ${Math.abs(i.value.value).toFixed(2)}` : null,
-  },
-};
 
 interface ChangeLogEntry {
   readonly id: number;

@@ -19,5 +19,5 @@
       ]
     }
   },
-  "include": ["src/**/*", "src/**/*.vue", "vite.config.ts"]
+  "include": ["src/**/*", "src/**/*.vue", "vite.config.ts", "../demo-shared/**/*"]
 }
