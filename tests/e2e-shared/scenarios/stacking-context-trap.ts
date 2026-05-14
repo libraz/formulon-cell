@@ -24,9 +24,16 @@ export async function runStackingContextTrapScenario(page: Page): Promise<void> 
   type Probe = { inFcDialog: boolean; inHostModal: boolean };
 
   const runOne = async (ancestorStyle: string): Promise<Probe> => {
-    // Wrap the .fc-host in a parent <div> with the given style, then add a
-    // sibling modal at body level. We restore the DOM at the end so each
-    // iteration starts clean.
+    // Open the format dialog FIRST. After it's mounted we re-parent the host
+    // into a stacking-context-creating wrapper — the dialog must survive
+    // that. Doing it the other way around blocks our own focusHost click.
+    await sp.focusHost();
+    await sp.shortcut('1');
+    const dialog = page.locator('[class="fc-fmtdlg"]');
+    await expect(dialog).toBeVisible({ timeout: 2_000 });
+
+    // Now inject the wrapper + body-level modal. The wrapper is what creates
+    // the new stacking context the dialog needs to escape.
     await page.evaluate((style) => {
       const host = document.querySelector('.fc-host') as HTMLElement | null;
       if (!host) throw new Error('no .fc-host');
@@ -44,12 +51,6 @@ export async function runStackingContextTrapScenario(page: Page): Promise<void> 
       );
       document.body.appendChild(modal);
     }, ancestorStyle);
-
-    // Open the format dialog.
-    await sp.focusHost();
-    await sp.shortcut('1');
-    const dialog = page.locator('[class="fc-fmtdlg"]');
-    await expect(dialog).toBeVisible({ timeout: 2_000 });
 
     const box = await dialog.boundingBox();
     if (!box) throw new Error('dialog not measured');

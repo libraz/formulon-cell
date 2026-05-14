@@ -3,6 +3,7 @@
     position: absolute;
     inset: 48px 16px auto auto;
     z-index: var(--fc-z-grid, 2147483010);
+    pointer-events: auto;
     width: min(420px, calc(100% - 32px));
     max-height: min(520px, calc(100% - 64px));
     overflow: hidden;

@@ -4,6 +4,7 @@
   .fc-errmenu {
     position: fixed;
     z-index: var(--fc-z-error, 2147483070);
+    pointer-events: auto;
     min-width: 200px;
     max-width: 260px;
     padding: 4px;

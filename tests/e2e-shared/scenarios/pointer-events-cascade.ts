@@ -19,6 +19,13 @@ export async function runPointerEventsCascadeScenario(page: Page): Promise<void>
   await sp.mount();
   await sp.expectNoStub();
 
+  // Focus + open the dialog FIRST. The host wrap disables pointer events,
+  // which would block our own focusHost click.
+  await sp.focusHost();
+  await sp.shortcut('1');
+  const dialog = page.locator('[class="fc-fmtdlg"]');
+  await expect(dialog).toBeVisible({ timeout: 2_000 });
+
   // Wrap the host in a div that disables pointer events on its entire
   // subtree. Real hosts hit this via transition libraries, modal trap
   // libraries, or accidental global resets.
@@ -31,14 +38,6 @@ export async function runPointerEventsCascadeScenario(page: Page): Promise<void>
     host.parentNode?.insertBefore(wrap, host);
     wrap.appendChild(host);
   });
-
-  // Open the format dialog. Keyboard shortcut works because focus + key
-  // events do not require pointer-events.
-  await sp.focusHost();
-  await sp.shortcut('1');
-
-  const dialog = page.locator('[class="fc-fmtdlg"]');
-  await expect(dialog).toBeVisible({ timeout: 2_000 });
 
   // Verify the dialog overlay declares pointer-events: auto (or its parent
   // tree somehow re-establishes interactivity). We check the *computed*

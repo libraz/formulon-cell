@@ -406,25 +406,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@formulon-cell/e2e-shared@workspace:tests/e2e-shared":
-  version: 0.0.0-use.local
-  resolution: "@formulon-cell/e2e-shared@workspace:tests/e2e-shared"
-  peerDependencies:
-    "@axe-core/playwright": "*"
-    "@playwright/test": "*"
-  languageName: unknown
-  linkType: soft
-
 "@formulon-cell/playground@workspace:apps/playground":
   version: 0.0.0-use.local
   resolution: "@formulon-cell/playground@workspace:apps/playground"
   dependencies:
-    "@axe-core/playwright": "npm:^4.11.3"
     "@fontsource-variable/fraunces": "npm:5.1.1"
     "@fontsource/ibm-plex-mono": "npm:5.1.1"
     "@fontsource/ibm-plex-sans": "npm:5.1.1"
     "@libraz/formulon-cell": "workspace:*"
-    "@playwright/test": "npm:^1.59.1"
     "@types/node": "npm:^22"
     typescript: "npm:6.0.3"
     vite: "npm:8.0.10"
@@ -435,11 +424,9 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@formulon-cell/react-demo@workspace:apps/react-demo"
   dependencies:
-    "@axe-core/playwright": "npm:^4.11.3"
     "@fluentui/react-icons": "npm:^2.0.325"
     "@libraz/formulon-cell": "workspace:*"
     "@libraz/formulon-cell-react": "workspace:*"
-    "@playwright/test": "npm:^1.59.1"
     "@types/node": "npm:^22"
     "@types/react": "npm:^19"
     "@types/react-dom": "npm:^19"
@@ -455,10 +442,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@formulon-cell/vue-demo@workspace:apps/vue-demo"
   dependencies:
-    "@axe-core/playwright": "npm:^4.11.3"
     "@libraz/formulon-cell": "workspace:*"
     "@libraz/formulon-cell-vue": "workspace:*"
-    "@playwright/test": "npm:^1.59.1"
     "@types/node": "npm:^22"
     "@vitejs/plugin-vue": "npm:6.0.6"
     typescript: "npm:6.0.3"
@@ -1795,7 +1780,9 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "formulon-cell-monorepo@workspace:."
   dependencies:
+    "@axe-core/playwright": "npm:^4.11.3"
     "@biomejs/biome": "npm:2.4.15"
+    "@playwright/test": "npm:^1.59.1"
     typescript: "npm:6.0.3"
     vite: "npm:8.0.11"
   languageName: unknown

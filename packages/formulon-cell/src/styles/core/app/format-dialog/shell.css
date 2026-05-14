@@ -3,6 +3,11 @@
     position: fixed;
     inset: 0;
     z-index: var(--fc-z-dialog, 2147483020);
+    /* Defensive: re-enable pointer events in case a host ancestor sets
+       pointer-events:none on its subtree. Without this, hosts running
+       transition libraries / global resets can leave the dialog visible
+       but un-clickable. */
+    pointer-events: auto;
     display: flex;
     align-items: center;
     justify-content: center;

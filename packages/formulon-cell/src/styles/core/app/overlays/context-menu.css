@@ -2,6 +2,7 @@
   .fc-ctxmenu {
     position: fixed;
     z-index: var(--fc-z-menu, 2147483060);
+    pointer-events: auto;
     min-width: 216px;
     max-width: min(320px, calc(100vw - 8px));
     max-height: calc(100vh - 8px);

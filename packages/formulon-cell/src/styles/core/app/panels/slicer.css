@@ -5,6 +5,7 @@
   .fc-slicer {
     position: absolute;
     z-index: var(--fc-z-grid, 2147483010);
+    pointer-events: auto;
     min-width: 160px;
     max-width: 240px;
     background: var(--fc-bg, Canvas);

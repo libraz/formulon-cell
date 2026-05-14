@@ -1,54 +1,40 @@
 import { resolve } from 'node:path';
 import vue from '@vitejs/plugin-vue';
-import { defineConfig } from 'vite';
+import { defineConfig, mergeConfig } from 'vite';
+import { baseConfig } from '../vite.base.js';
 
-const corePkg = resolve(__dirname, '../../packages/formulon-cell');
+// `baseConfig` aliases `@libraz/formulon-cell` to source; we layer the Vue
+// adapter aliases on top (including the .vue and toolbar.css subpaths that
+// the Vue package publishes alongside its main entry).
 const vuePkg = resolve(__dirname, '../../packages/formulon-cell-vue');
-const nodeShimDir = resolve(__dirname, '../vite-shims');
 
-export default defineConfig({
-  plugins: [vue()],
-  resolve: {
-    alias: {
-      module: `${nodeShimDir}/module.mjs`,
-      'node:module': `${nodeShimDir}/module.mjs`,
-      worker_threads: `${nodeShimDir}/worker_threads.mjs`,
-      'node:worker_threads': `${nodeShimDir}/worker_threads.mjs`,
-      '@libraz/formulon-cell/styles.css': `${corePkg}/src/styles/index.css`,
-      '@libraz/formulon-cell/styles/paper.css': `${corePkg}/src/styles/theme-paper.css`,
-      '@libraz/formulon-cell/styles/ink.css': `${corePkg}/src/styles/theme-ink.css`,
-      '@libraz/formulon-cell/styles/contrast.css': `${corePkg}/src/styles/theme-contrast.css`,
-      '@libraz/formulon-cell/styles/tokens.css': `${corePkg}/src/styles/tokens.css`,
-      '@libraz/formulon-cell/styles/toolbar.css': `${corePkg}/src/styles/toolbar.css`,
-      '@libraz/formulon-cell-vue/toolbar.css': `${vuePkg}/src/spreadsheet-toolbar.css`,
-      '@libraz/formulon-cell-vue/toolbar.vue': `${vuePkg}/src/SpreadsheetToolbar.vue`,
-      '@libraz/formulon-cell-vue': `${vuePkg}/src/index.ts`,
-      '@libraz/formulon-cell': `${corePkg}/src/index.ts`,
+export default defineConfig(
+  mergeConfig(baseConfig(__dirname), {
+    plugins: [vue()],
+    resolve: {
+      // Prepend Vue-specific subpath aliases so they win over the broad
+      // `@libraz/formulon-cell-vue` rewrite at the end of the list.
+      alias: [
+        {
+          find: '@libraz/formulon-cell-vue/toolbar.css',
+          replacement: `${vuePkg}/src/spreadsheet-toolbar.css`,
+        },
+        {
+          find: '@libraz/formulon-cell-vue/toolbar.vue',
+          replacement: `${vuePkg}/src/SpreadsheetToolbar.vue`,
+        },
+        { find: '@libraz/formulon-cell-vue', replacement: `${vuePkg}/src/index.ts` },
+      ],
     },
-  },
-  server: {
-    port: 5175,
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
+    server: { port: 5175 },
+    optimizeDeps: {
+      exclude: ['@libraz/formulon-cell-vue'],
     },
-    fs: {
-      allow: ['..', '../..'],
+    build: {
+      // Vue demo intentionally bundles the spreadsheet UI + WASM loader in
+      // one app shell. Keep Vite's warning reserved for unexpected future
+      // growth.
+      chunkSizeWarningLimit: 750,
     },
-  },
-  optimizeDeps: {
-    exclude: ['@libraz/formulon-cell', '@libraz/formulon-cell-vue', '@libraz/formulon'],
-  },
-  // formulon's pthread bundle uses top-level await and spawns its workers
-  // as ES modules; both require an ES2022+ target on the main thread and
-  // the worker pipeline.
-  build: {
-    target: 'es2022',
-    // Vue demo intentionally bundles the spreadsheet UI + WASM loader in one
-    // app shell. Keep Vite's warning reserved for unexpected future growth.
-    chunkSizeWarningLimit: 750,
-  },
-  worker: {
-    format: 'es',
-  },
-});
+  }),
+);

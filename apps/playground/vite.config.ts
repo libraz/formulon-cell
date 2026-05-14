@@ -1,15 +1,13 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { defineConfig } from 'vite';
+import { defineConfig, mergeConfig } from 'vite';
+import { baseConfig } from '../vite.base.js';
 
-// In monorepo dev we want `@libraz/formulon-cell` to resolve to its source,
-// not the built `dist/`. The published package.json `exports` map points at
-// dist for installed consumers; here we override that with an alias so
-// editing TS in `packages/formulon-cell/src/` shows up immediately.
-const corePkg = resolve(__dirname, '../../packages/formulon-cell');
-const nodeShimDir = resolve(__dirname, '../vite-shims');
+// The published `exports` map of `@libraz/formulon-cell` points at `dist/`;
+// `baseConfig` overrides that with a source alias so editing TS in
+// `packages/formulon-cell/src/` shows up immediately in the playground.
 
-const patchFormulonWorkerOptions = () => {
+const patchFormulonWorkerOptions = (): void => {
   const file = resolve(
     __dirname,
     '../../packages/formulon-cell/node_modules/@libraz/formulon/dist/formulon.js',
@@ -31,48 +29,13 @@ const patchFormulonWorkerOptions = () => {
 
 patchFormulonWorkerOptions();
 
-export default defineConfig({
-  resolve: {
-    alias: {
-      module: `${nodeShimDir}/module.mjs`,
-      'node:module': `${nodeShimDir}/module.mjs`,
-      worker_threads: `${nodeShimDir}/worker_threads.mjs`,
-      'node:worker_threads': `${nodeShimDir}/worker_threads.mjs`,
-      '@libraz/formulon-cell/styles.css': `${corePkg}/src/styles/index.css`,
-      '@libraz/formulon-cell/styles/paper.css': `${corePkg}/src/styles/theme-paper.css`,
-      '@libraz/formulon-cell/styles/ink.css': `${corePkg}/src/styles/theme-ink.css`,
-      '@libraz/formulon-cell/styles/toolbar.css': `${corePkg}/src/styles/toolbar.css`,
-      '@libraz/formulon-cell': `${corePkg}/src/index.ts`,
+export default defineConfig(
+  mergeConfig(baseConfig(__dirname), {
+    server: { port: 5173 },
+    build: {
+      // Playground bundles the full spreadsheet surface and the WASM loader;
+      // warn only when a future change grows materially beyond that baseline.
+      chunkSizeWarningLimit: 750,
     },
-  },
-  server: {
-    port: 5173,
-    // formulon ships a pthread-enabled WASM that uses SharedArrayBuffer.
-    // Browsers require crossOriginIsolated context (COOP+COEP) to allow it.
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-    },
-    fs: {
-      // Allow serving the workspace package and the engine package assets.
-      allow: ['..', '../..'],
-    },
-  },
-  optimizeDeps: {
-    // Don't try to pre-bundle the formulon emscripten module — it doesn't
-    // play well with esbuild's CJS interop.
-    exclude: ['@libraz/formulon-cell', '@libraz/formulon'],
-  },
-  // formulon's pthread bundle uses top-level await and spawns its workers
-  // as ES modules; both require an ES2022+ target on the main thread and
-  // the worker pipeline.
-  build: {
-    target: 'es2022',
-    // Playground bundles the full spreadsheet surface and the WASM loader;
-    // warn only when a future change grows materially beyond that baseline.
-    chunkSizeWarningLimit: 750,
-  },
-  worker: {
-    format: 'es',
-  },
-});
+  }),
+);

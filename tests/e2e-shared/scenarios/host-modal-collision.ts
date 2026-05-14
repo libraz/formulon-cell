@@ -15,6 +15,11 @@ export async function runHostModalCollisionScenario(page: Page): Promise<void> {
   await sp.mount();
   await sp.expectNoStub();
 
+  // Open the format dialog first (the host modal would intercept the click
+  // we use to focus the canvas).
+  await sp.focusHost();
+  await sp.shortcut('1');
+
   // Inject a fake host modal at z-index 9999 (the upper edge of the
   // "typical host" range). It sits at the centre of the viewport so it
   // overlaps anywhere a formulon dialog could plausibly render.
@@ -31,10 +36,6 @@ export async function runHostModalCollisionScenario(page: Page): Promise<void> {
     ].join(';');
     document.body.appendChild(overlay);
   });
-
-  // Open the format dialog (dialog tier) on top of the host modal.
-  await sp.focusHost();
-  await sp.shortcut('1');
   const fmtDialog = page.locator('[class="fc-fmtdlg"]');
   await expect(fmtDialog).toBeVisible({ timeout: 2_000 });
 

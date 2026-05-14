@@ -1,6 +1,7 @@
 {
   "name": "formulon-cell-monorepo",
   "private": true,
+  "type": "module",
   "description": "Monorepo for @libraz/formulon-cell — a spreadsheet UI library for the formulon WASM calc engine.",
   "license": "Apache-2.0",
   "packageManager": "yarn@4.5.0",
@@ -10,8 +11,7 @@
   },
   "workspaces": [
     "packages/*",
-    "apps/*",
-    "tests/e2e-shared"
+    "apps/*"
   ],
   "scripts": {
     "dev": "yarn workspace @formulon-cell/playground dev",
@@ -28,7 +28,9 @@
     "prepublish:libs": "cp LICENSE packages/formulon-cell/ && cp LICENSE packages/formulon-cell-react/ 2>/dev/null || true && cp LICENSE packages/formulon-cell-vue/ 2>/dev/null || true"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
     "@biomejs/biome": "2.4.15",
+    "@playwright/test": "^1.59.1",
     "typescript": "6.0.3",
     "vite": "8.0.11"
   }
