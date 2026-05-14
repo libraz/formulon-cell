@@ -95,7 +95,6 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     r.style.position = 'fixed';
     r.style.left = `${anchor.x}px`;
     r.style.top = `${anchor.y + anchor.h}px`;
-    r.style.zIndex = '999';
     r.setAttribute('role', 'dialog');
     r.setAttribute('aria-label', t.title);
 

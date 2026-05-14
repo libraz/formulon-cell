@@ -27,7 +27,6 @@ export function attachHover(deps: HoverDeps): HoverHandle {
   tip.className = 'fc-hover-tip';
   tip.style.position = 'fixed';
   tip.style.pointerEvents = 'none';
-  tip.style.zIndex = '900';
   tip.hidden = true;
   document.body.appendChild(tip);
 

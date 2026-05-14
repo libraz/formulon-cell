@@ -113,4 +113,44 @@
     --fc-ease-out: initial;
     --fc-ease-in-out: initial;
   }
+
+  /* === Z-INDEX TIERS — floating UI stacking floors ===
+   *
+   * UNLIKE the tokens above (which are settable on .fc-host), z-index
+   * tiers default at :where(html) so they reach body-portaled overlays
+   * (context menu, autocomplete, tooltips, …) that live OUTSIDE the
+   * .fc-host subtree. Override at :root / html, on `body`, or on a
+   * wrapping ancestor.
+   *
+   * Single-knob override:
+   *   :root { --fc-z-base: 5_000_000; }  // shift the whole stack
+   *
+   * Per-tier override:
+   *   :root { --fc-z-menu: 9_000_000; }  // retarget one layer
+   *
+   * Tiers (low → high), bottom-up:
+   *   --fc-z-base     baseline (defaults to 2147483000, well above
+   *                   typical host modal/backdrop z-index of 1000–9999).
+   *   --fc-z-grid     in-grid panels (find bar, slicer, charts, quick
+   *                   analysis, objects inspector).
+   *   --fc-z-dialog   modal-with-backdrop dialogs (Format Cells,
+   *                   Iterative Calc, External Links, CF Rules, Cell
+   *                   Styles gallery).
+   *   --fc-z-tooltip  passive hover tip.
+   *   --fc-z-popover  anchored popovers (autocomplete, arg helper,
+   *                   validation list, filter dropdown, sheet menu,
+   *                   status-bar aggregate chooser).
+   *   --fc-z-callout  cell-anchored sticky note (cmtnote).
+   *   --fc-z-menu     right-click context menu (preempts all).
+   *   --fc-z-error    error / data-validation indicator popup. */
+  :where(html) {
+    --fc-z-base: initial;
+    --fc-z-grid: initial;
+    --fc-z-dialog: initial;
+    --fc-z-tooltip: initial;
+    --fc-z-popover: initial;
+    --fc-z-callout: initial;
+    --fc-z-menu: initial;
+    --fc-z-error: initial;
+  }
 }

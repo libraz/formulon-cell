@@ -26,6 +26,46 @@
 }
 
 @layer fc.base {
+  /* z-index tiers — named floors for every floating UI surface.
+   *
+   * All tiers compute from --fc-z-base so the entire overlay stack
+   * shifts as a unit with a single knob. The default sits well above
+   * typical host modal/backdrop ranges (1000–9999), so floating UI
+   * stays reachable when .fc-host is embedded inside a host modal,
+   * drawer, or fullscreen overlay.
+   *
+   * Declared on :where(html) (not just .fc-host) so the cascade
+   * reaches body-portaled UI (context menu, autocomplete, hover tip,
+   * etc.) that lives outside the .fc-host subtree.
+   *
+   * Tiers, bottom → top:
+   *   --fc-z-grid     in-grid panels: find bar, slicer, charts,
+   *                   quick analysis, objects inspector
+   *   --fc-z-dialog   modal-with-backdrop dialogs (Format Cells,
+   *                   Iterative Calc, External Links, CF Rules,
+   *                   Cell Styles gallery)
+   *   --fc-z-tooltip  passive hover tip
+   *   --fc-z-popover  anchored popovers: autocomplete, arg helper,
+   *                   validation list, filter dropdown, sheet-tab
+   *                   menu, status-bar aggregate chooser
+   *   --fc-z-callout  cell-anchored sticky note (cmtnote)
+   *   --fc-z-menu     right-click context menu (preempts all)
+   *   --fc-z-error    error / data-validation indicator popup
+   *
+   * Override knobs, in priority order:
+   *   1. Bump --fc-z-base to shift the entire stack.
+   *   2. Override a single tier (e.g. --fc-z-menu) to retarget one layer.
+   *   3. Set z-index directly on a class for a single element override. */
+  :where(html) {
+    --fc-z-base: 2147483000;
+    --fc-z-grid: calc(var(--fc-z-base) + 10);
+    --fc-z-dialog: calc(var(--fc-z-base) + 20);
+    --fc-z-tooltip: calc(var(--fc-z-base) + 30);
+    --fc-z-popover: calc(var(--fc-z-base) + 40);
+    --fc-z-callout: calc(var(--fc-z-base) + 50);
+    --fc-z-menu: calc(var(--fc-z-base) + 60);
+    --fc-z-error: calc(var(--fc-z-base) + 70);
+  }
   .fc-host {
     /* Typography is consumer-overridable. We never bundle webfonts in core. */
     --fc-font-ui: var(
@@ -679,7 +719,7 @@
 @layer fc.app {
   .fc-ctxmenu {
     position: fixed;
-    z-index: 50;
+    z-index: var(--fc-z-menu, 2147483060);
     min-width: 216px;
     max-width: min(320px, calc(100vw - 8px));
     max-height: calc(100vh - 8px);
@@ -816,7 +856,7 @@
 
   .fc-quick {
     position: absolute;
-    z-index: 80;
+    z-index: var(--fc-z-grid, 2147483010);
     width: min(320px, calc(100% - 16px));
     max-height: min(420px, calc(100% - 16px));
     overflow: auto;
@@ -894,7 +934,7 @@
   .fc-charts {
     position: absolute;
     inset: 0;
-    z-index: 70;
+    z-index: var(--fc-z-grid, 2147483010);
     pointer-events: none;
   }
 
@@ -1010,7 +1050,7 @@
   .fc-objects {
     position: absolute;
     inset: 48px 16px auto auto;
-    z-index: 85;
+    z-index: var(--fc-z-grid, 2147483010);
     width: min(420px, calc(100% - 32px));
     max-height: min(520px, calc(100% - 64px));
     overflow: hidden;
@@ -1114,7 +1154,7 @@
 
   .fc-sheetmenu {
     position: fixed;
-    z-index: 70;
+    z-index: var(--fc-z-popover, 2147483040);
     min-width: 176px;
     padding: 4px;
     background: var(--fc-bg-elev, Canvas);
@@ -1168,7 +1208,7 @@
     position: absolute;
     top: 8px;
     right: 12px;
-    z-index: 30;
+    z-index: var(--fc-z-grid, 2147483010);
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -1231,7 +1271,7 @@
   .fc-fmtdlg {
     position: fixed;
     inset: 0;
-    z-index: 100;
+    z-index: var(--fc-z-dialog, 2147483020);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1400,7 +1440,7 @@
      the cell. Matches the visual language of the canvas hover-tip. */
   .fc-cmtnote {
     position: absolute;
-    z-index: 1000;
+    z-index: var(--fc-z-callout, 2147483050);
     display: flex;
     flex-direction: column;
     background: #fff8c4;
@@ -2471,6 +2511,7 @@
   /* Filter dropdown — column header popover with checkboxes for distinct
      values. Lives in document.body so it can escape clipping ancestors. */
   .fc-filter-dropdown {
+    z-index: var(--fc-z-popover, 2147483040);
     background: var(--fc-bg-elev, Canvas);
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
@@ -2565,7 +2606,7 @@
      function names in a compact monospace listing. */
   .fc-autocomplete {
     position: fixed;
-    z-index: 1000;
+    z-index: var(--fc-z-popover, 2147483040);
     background: var(--fc-bg-elev, Canvas);
     border: var(--fc-hairline, 1px) solid var(--fc-rule-strong, var(--fc-rule));
     border-radius: 3px;
@@ -2646,7 +2687,7 @@
      the active function's signature with the current argument bolded. */
   .fc-arghelper {
     position: fixed;
-    z-index: 1000;
+    z-index: var(--fc-z-popover, 2147483040);
     background: var(--fc-bg-elev, Canvas);
     border: var(--fc-hairline, 1px) solid var(--fc-rule);
     border-radius: var(--fc-radius-sm, 3px);
@@ -2679,7 +2720,7 @@
     border: var(--fc-hairline, 1px) solid var(--fc-rule);
     border-radius: var(--fc-radius-sm, 3px);
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
-    z-index: 998;
+    z-index: var(--fc-z-popover, 2147483040);
     max-height: 220px;
     overflow-y: auto;
     min-width: 120px;
@@ -2701,7 +2742,7 @@
      checkmark rows for each Sum/Avg/Count/Min/Max readout. */
   .fc-statusbar__chooser {
     position: fixed;
-    z-index: 60;
+    z-index: var(--fc-z-popover, 2147483040);
     min-width: 200px;
     padding: 4px;
     background: var(--fc-bg-elev, Canvas);
@@ -2752,7 +2793,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 60;
+    z-index: var(--fc-z-dialog, 2147483020);
   }
   .fc-iterdlg[hidden] {
     display: none;
@@ -2832,7 +2873,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 60;
+    z-index: var(--fc-z-dialog, 2147483020);
   }
   .fc-extlinkdlg[hidden] {
     display: none;
@@ -2916,7 +2957,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 60;
+    z-index: var(--fc-z-dialog, 2147483020);
   }
   .fc-cfrulesdlg[hidden] {
     display: none;
@@ -3023,7 +3064,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 60;
+    z-index: var(--fc-z-dialog, 2147483020);
   }
   .fc-stylegallery[hidden] {
     display: none;
@@ -3066,6 +3107,7 @@
 
   /* Cell hover tooltip — surfaces the `comment` field as a small popover. */
   .fc-hover-tip {
+    z-index: var(--fc-z-tooltip, 2147483030);
     background: #fff8c4;
     color: #2b2b2b;
     border: 1px solid #d4ba2a;
@@ -3217,7 +3259,7 @@
      multiple panels can coexist. */
   .fc-slicer {
     position: absolute;
-    z-index: 50;
+    z-index: var(--fc-z-grid, 2147483010);
     min-width: 160px;
     max-width: 240px;
     background: var(--fc-bg, Canvas);
@@ -3326,7 +3368,7 @@
    * by error-menu.ts (position: fixed); we only own the visual shell. */
   .fc-errmenu {
     position: fixed;
-    z-index: 1000;
+    z-index: var(--fc-z-error, 2147483070);
     min-width: 200px;
     max-width: 260px;
     padding: 4px;
