@@ -1,6 +1,9 @@
 import {
   aggregateSelection,
+  analyzeAccessibilityCells,
+  analyzeSpellingCells,
   applyMerge,
+  applyTextScript,
   applyUnmerge,
   attachFilterDropdown,
   autoSum,
@@ -22,8 +25,11 @@ import {
   insertCols,
   insertRows,
   mutators,
+  parseScriptCommand,
   pasteTSV,
+  type ReviewCell,
   type RibbonCommand,
+  type RibbonReportItem,
   type RibbonTab,
   recordFormatChange,
   removeDuplicates,
@@ -1331,13 +1337,25 @@ const pasteClipboardIntoSelection = async (): Promise<void> => {
   focusSheet();
 };
 
-interface RibbonReportItem {
-  severity: 'info' | 'warning';
-  label: string;
-  detail: string;
-}
-
 const addrLabel = (row: number, col: number): string => `${colLabel(col)}${row + 1}`;
+
+const reviewCellsForSheet = (sheet: number): ReviewCell[] => {
+  if (!inst) return [];
+  return Array.from(inst.workbook.cells(sheet), (entry) => ({
+    label: addrLabel(entry.addr.row, entry.addr.col),
+    value:
+      entry.value.kind === 'text'
+        ? { kind: 'text' as const, value: entry.value.value }
+        : entry.value.kind === 'error'
+          ? { kind: 'error' as const, text: entry.value.text }
+          : entry.value.kind === 'number'
+            ? { kind: 'number' as const }
+            : entry.value.kind === 'bool'
+              ? { kind: 'bool' as const }
+              : { kind: 'blank' as const },
+    formula: entry.formula,
+  }));
+};
 
 const showRibbonReport = (title: string, items: readonly RibbonReportItem[]): void => {
   const overlay = document.createElement('div');
@@ -1434,50 +1452,7 @@ const selectedPlainText = (): string => {
 const runAccessibilityCheck = (): void => {
   if (!inst) return;
   const sheet = inst.store.getState().data.sheetIndex;
-  const entries = Array.from(inst.workbook.cells(sheet));
-  const items: RibbonReportItem[] = [];
-  const nonBlank = entries.filter((entry) => entry.value.kind !== 'blank' || !!entry.formula);
-  if (nonBlank.length === 0) {
-    items.push({
-      severity: 'info',
-      label: 'Empty sheet',
-      detail: 'The current sheet has no populated cells to review.',
-    });
-  }
-  for (const entry of nonBlank) {
-    const label = addrLabel(entry.addr.row, entry.addr.col);
-    if (entry.value.kind === 'error') {
-      items.push({
-        severity: 'warning',
-        label,
-        detail: `Cell evaluates to ${entry.value.text}. Resolve formula errors before sharing.`,
-      });
-    }
-    if (entry.formula?.includes('#REF!')) {
-      items.push({
-        severity: 'warning',
-        label,
-        detail: 'Formula contains #REF!, which is usually a broken reference.',
-      });
-    }
-    if (entry.value.kind === 'text') {
-      const text = entry.value.value.trim();
-      if (/^https?:\/\//i.test(text)) {
-        items.push({
-          severity: 'info',
-          label,
-          detail: 'URL text should have a descriptive label when used as a link.',
-        });
-      }
-      if (text.length > 120 && !/[.!?。！？]\s/.test(text)) {
-        items.push({
-          severity: 'info',
-          label,
-          detail: 'Long text may be hard to scan. Consider wrapping or shortening it.',
-        });
-      }
-    }
-  }
+  const items = analyzeAccessibilityCells(reviewCellsForSheet(sheet));
   if (statusMetric)
     statusMetric.textContent = `Accessibility · ${items.filter((i) => i.severity === 'warning').length} warnings`;
   showRibbonReport('Accessibility Check', items);
@@ -1486,43 +1461,7 @@ const runAccessibilityCheck = (): void => {
 const runSpellingReview = (): void => {
   if (!inst) return;
   const sheet = inst.store.getState().data.sheetIndex;
-  const typos: Readonly<Record<string, string>> = {
-    accomodate: 'accommodate',
-    adress: 'address',
-    recieve: 'receive',
-    seperate: 'separate',
-    teh: 'the',
-  };
-  const items: RibbonReportItem[] = [];
-  for (const entry of inst.workbook.cells(sheet)) {
-    if (entry.value.kind !== 'text') continue;
-    const text = entry.value.value;
-    const label = addrLabel(entry.addr.row, entry.addr.col);
-    const repeated = text.match(/\b([A-Za-z]+)\s+\1\b/i);
-    if (repeated) {
-      items.push({
-        severity: 'warning',
-        label,
-        detail: `Repeated word: "${repeated[0]}".`,
-      });
-    }
-    if (/\s{2,}/.test(text)) {
-      items.push({
-        severity: 'info',
-        label,
-        detail: 'Contains repeated spaces.',
-      });
-    }
-    for (const [wrong, suggestion] of Object.entries(typos)) {
-      if (new RegExp(`\\b${wrong}\\b`, 'i').test(text)) {
-        items.push({
-          severity: 'warning',
-          label,
-          detail: `Possible typo: "${wrong}". Suggested spelling: "${suggestion}".`,
-        });
-      }
-    }
-  }
+  const items = analyzeSpellingCells(reviewCellsForSheet(sheet));
   if (statusMetric)
     statusMetric.textContent = `Spelling · ${items.filter((i) => i.severity === 'warning').length} warnings`;
   showRibbonReport('Spelling Review', items);
@@ -1558,35 +1497,36 @@ const runPlaygroundScript = async (): Promise<void> => {
     placeholder: 'uppercase, lowercase, trim, clear',
     okLabel: 'Run',
     validate: (value) =>
-      /^(uppercase|lowercase|trim|clear)$/i.test(value.trim())
-        ? null
-        : 'Use one of: uppercase, lowercase, trim, clear.',
+      parseScriptCommand(value) ? null : 'Use one of: uppercase, lowercase, trim, clear.',
   });
   if (!command || !inst) return;
-  const op = command.trim().toLowerCase();
+  const op = parseScriptCommand(command);
+  if (!op) return;
   const range = inst.store.getState().selection.range;
   let changed = 0;
-  for (let row = range.r0; row <= range.r1; row += 1) {
-    for (let col = range.c0; col <= range.c1; col += 1) {
-      const addr = { sheet: range.sheet, row, col };
-      if (op === 'clear') {
-        inst.workbook.setBlank(addr);
-        changed += 1;
-        continue;
-      }
-      const value = inst.workbook.getValue(addr);
-      if (value.kind !== 'text') continue;
-      const next =
-        op === 'uppercase'
-          ? value.value.toUpperCase()
-          : op === 'lowercase'
-            ? value.value.toLowerCase()
-            : value.value.trim().replace(/\s+/g, ' ');
-      if (next !== value.value) {
-        inst.workbook.setText(addr, next);
-        changed += 1;
+  inst.history.begin();
+  try {
+    for (let row = range.r0; row <= range.r1; row += 1) {
+      for (let col = range.c0; col <= range.c1; col += 1) {
+        const addr = { sheet: range.sheet, row, col };
+        const value = inst.workbook.getValue(addr);
+        if (op === 'clear') {
+          if (value.kind !== 'blank' || inst.workbook.cellFormula(addr)) {
+            inst.workbook.setBlank(addr);
+            changed += 1;
+          }
+          continue;
+        }
+        if (value.kind !== 'text') continue;
+        const next = applyTextScript(value.value, op);
+        if (next !== value.value) {
+          inst.workbook.setText(addr, next);
+          changed += 1;
+        }
       }
     }
+  } finally {
+    inst.history.end();
   }
   refreshWorkbookCells();
   if (statusMetric)

@@ -334,9 +334,120 @@ test('R03: routed ribbon commands open dialogs and mutate workbook state', async
 
   await page.getByRole('tab', { name: 'Automate', exact: true }).click();
   await expect(page.locator('[data-ribbon-command="script"]')).toBeEnabled();
+  await page.evaluate(() => {
+    const inst = (window as Window & { __fcInst?: unknown }).__fcInst as
+      | {
+          workbook: {
+            setText: (addr: { sheet: number; row: number; col: number }, value: string) => void;
+          };
+          store: {
+            getState: () => {
+              selection: { active: { sheet: number; row: number; col: number } };
+            };
+            setState: (
+              fn: (state: {
+                selection: {
+                  active: { sheet: number; row: number; col: number };
+                  anchor: { sheet: number; row: number; col: number };
+                  range: { sheet: number; r0: number; c0: number; r1: number; c1: number };
+                };
+              }) => unknown,
+            ) => void;
+          };
+        }
+      | undefined;
+    const active = inst?.store.getState().selection.active;
+    if (inst && active) {
+      inst.workbook.setText(active, 'script value');
+      inst.workbook.setText(
+        { sheet: active.sheet, row: active.row, col: active.col + 1 },
+        'second value',
+      );
+      inst.store.setState((state) => ({
+        ...state,
+        selection: {
+          ...state.selection,
+          active,
+          anchor: active,
+          range: {
+            sheet: active.sheet,
+            r0: active.row,
+            c0: active.col,
+            r1: active.row,
+            c1: active.col + 1,
+          },
+        },
+      }));
+    }
+  });
   await page.locator('[data-ribbon-command="script"]').click();
   await expect(page.getByRole('dialog')).toBeVisible();
-  await closeDialog(page);
+  await page.getByRole('textbox', { name: 'Command' }).fill('uppercase');
+  await page.getByRole('button', { name: 'Run' }).click();
+  const scriptResult = await page.evaluate(() => {
+    const inst = (window as Window & { __fcInst?: unknown }).__fcInst as
+      | {
+          workbook: {
+            getValue: (addr: { sheet: number; row: number; col: number }) => {
+              kind: string;
+              value?: string;
+            };
+          };
+          store: {
+            getState: () => {
+              selection: { active: { sheet: number; row: number; col: number } };
+            };
+          };
+        }
+      | undefined;
+    const active = inst?.store.getState().selection.active;
+    return inst && active
+      ? [
+          inst.workbook.getValue(active),
+          inst.workbook.getValue({ sheet: active.sheet, row: active.row, col: active.col + 1 }),
+        ]
+      : null;
+  });
+  expect(scriptResult).toMatchObject([
+    { kind: 'text', value: 'SCRIPT VALUE' },
+    { kind: 'text', value: 'SECOND VALUE' },
+  ]);
+  const undoResult = await page.evaluate(() => {
+    const inst = (window as Window & { __fcInst?: unknown }).__fcInst as
+      | {
+          undo: () => boolean;
+          workbook: {
+            getValue: (addr: { sheet: number; row: number; col: number }) => {
+              kind: string;
+              value?: string;
+            };
+          };
+          store: {
+            getState: () => {
+              selection: { active: { sheet: number; row: number; col: number } };
+            };
+          };
+        }
+      | undefined;
+    const active = inst?.store.getState().selection.active;
+    const ok = inst?.undo() ?? false;
+    return inst && active
+      ? {
+          ok,
+          values: [
+            inst.workbook.getValue(active),
+            inst.workbook.getValue({ sheet: active.sheet, row: active.row, col: active.col + 1 }),
+          ],
+        }
+      : null;
+  });
+  expect(undoResult).toMatchObject({
+    ok: true,
+    values: [
+      { kind: 'text', value: 'script value' },
+      { kind: 'text', value: 'second value' },
+    ],
+  });
 
   await page.getByRole('tab', { name: 'Acrobat', exact: true }).click();
   await expect(page.locator('[data-ribbon-command="addIn"]')).toBeEnabled();

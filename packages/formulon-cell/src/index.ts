@@ -659,6 +659,25 @@ export { resolveTheme } from './theme/resolve.js';
 export type { FluentIconName } from './toolbar/fluent-icons.js';
 export { FLUENT_ICON_PATHS, fluentIconPaths } from './toolbar/fluent-icons.js';
 export type {
+  ReviewCell,
+  ReviewCellValue,
+  RibbonReportItem,
+  ScriptCommand,
+} from './toolbar/review-tools.js';
+export {
+  analyzeAccessibilityCells,
+  analyzeSpellingCells,
+  applyTextScript,
+  parseScriptCommand,
+} from './toolbar/review-tools.js';
+export type { ActiveState } from './toolbar/ribbon-active-state.js';
+export {
+  BORDER_PRESETS,
+  BORDER_STYLES,
+  EMPTY_ACTIVE_STATE,
+  projectActiveState,
+} from './toolbar/ribbon-active-state.js';
+export type {
   RibbonCommand,
   RibbonGroupModel,
   RibbonOption,
