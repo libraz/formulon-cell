@@ -1,0 +1,147 @@
+@layer fc.surface {
+  .fc-host__sheetbar {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    min-height: 34px;
+    border-top: var(--fc-hairline) solid var(--fc-rule);
+    background: var(--fc-sheetbar-bg, var(--fc-bg-rail));
+    flex: 0 0 auto;
+  }
+
+  .fc-host__sheetbar-nav {
+    display: flex;
+    align-items: center;
+    padding: 3px 4px 3px 6px;
+    border-right: var(--fc-hairline) solid var(--fc-rule);
+  }
+
+  .fc-host__sheetbar-navbtn,
+  .fc-host__sheetbar-add,
+  .fc-host__sheetbar-tab {
+    font: inherit;
+    color: var(--fc-fg);
+  }
+
+  .fc-host__icon {
+    display: block;
+    width: 16px;
+    height: 16px;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .fc-host__sheetbar-navbtn,
+  .fc-host__sheetbar-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background: transparent;
+    color: var(--fc-fg-mute);
+    cursor: pointer;
+  }
+
+  .fc-host__sheetbar-navbtn:hover:not(:disabled),
+  .fc-host__sheetbar-add:hover:not(:disabled) {
+    background: var(--fc-accent-soft);
+    color: var(--fc-accent);
+  }
+
+  .fc-host__sheetbar-navbtn:disabled,
+  .fc-host__sheetbar-add:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .fc-host__sheetbar-tabs {
+    display: flex;
+    align-items: end;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+
+  .fc-host__sheetbar-tab {
+    position: relative;
+    flex: 0 0 auto;
+    min-width: 104px;
+    max-width: 220px;
+    height: 32px;
+    padding: 0 20px;
+    overflow: hidden;
+    border: 0;
+    border-right: var(--fc-hairline) solid var(--fc-sheetbar-tab-rule, var(--fc-rule));
+    background: transparent;
+    color: var(--fc-fg-mute);
+    cursor: pointer;
+    font-family: var(--fc-font-ui);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fc-host__sheetbar-rename {
+    flex: 0 0 auto;
+    width: 136px;
+    height: 27px;
+    align-self: end;
+    margin: 0 2px 2px;
+    padding: 0 10px;
+    border: 1px solid var(--fc-accent);
+    border-radius: 2px;
+    outline: 0;
+    background: var(--fc-bg);
+    color: var(--fc-fg);
+    font-family: var(--fc-font-ui);
+    font-size: 12px;
+    box-shadow: 0 0 0 2px var(--fc-accent-soft);
+  }
+
+  .fc-host__sheetbar-rename[aria-invalid="true"] {
+    border-color: var(--fc-cell-error-fg);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--fc-cell-error-fg) 18%, transparent);
+  }
+
+  .fc-host__sheetbar-tab:hover {
+    background: var(--fc-sheetbar-tab-hover, var(--fc-bg-rail));
+    color: var(--fc-fg);
+  }
+
+  .fc-host__sheetbar-tab[aria-selected="true"] {
+    background: var(--fc-sheetbar-tab-active, var(--fc-bg));
+    color: var(--fc-fg-strong);
+    font-weight: 500;
+  }
+
+  .fc-host__sheetbar-tab[aria-selected="true"]::before {
+    position: absolute;
+    right: 14px;
+    bottom: 0;
+    left: 14px;
+    height: 2px;
+    background: var(--fc-accent);
+    content: "";
+  }
+
+  .fc-host__sheetbar-tab:focus-visible,
+  .fc-host__sheetbar-add:focus-visible,
+  .fc-host__sheetbar-navbtn:focus-visible {
+    outline: 2px solid var(--fc-accent);
+    outline-offset: -2px;
+  }
+
+  .fc-host__sheetbar-add {
+    flex: 0 0 auto;
+    align-self: center;
+    margin: 4px 8px;
+    border: 0;
+    background: transparent;
+    line-height: 1;
+  }
+}

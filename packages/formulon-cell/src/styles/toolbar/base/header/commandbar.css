@@ -1,0 +1,123 @@
+.demo__commandbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 36px;
+  padding: 4px 12px;
+  background: var(--demo-ribbon-bg);
+  border-bottom: 1px solid var(--demo-line-soft);
+}
+
+.demo__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.demo__brand strong {
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.demo__brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 2px;
+  background: var(--demo-title-strong);
+  color: var(--demo-title-fg);
+  font-size: 14px;
+}
+
+.demo__brand-sep,
+.demo__brand-tag {
+  color: var(--demo-fg-soft);
+}
+
+.demo__brand-tag {
+  font-family: var(--demo-mono);
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.demo__controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.demo__seg {
+  display: inline-flex;
+  border: 1px solid var(--demo-line);
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--demo-card);
+}
+
+.demo__seg-btn {
+  padding: 5px 11px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--demo-fg-soft);
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--demo-line);
+  cursor: pointer;
+  letter-spacing: 0.02em;
+}
+
+.demo__seg-btn:first-child {
+  border-left: 0;
+}
+
+.demo__seg-btn:hover {
+  background: var(--demo-accent-soft);
+  color: var(--demo-fg);
+}
+
+.demo__seg-btn--active {
+  background: var(--demo-accent);
+  color: var(--demo-title-fg);
+}
+
+.demo__seg-btn--active:hover {
+  background: var(--demo-accent);
+  color: var(--demo-title-fg);
+}
+
+.demo__btn {
+  padding: 5px 11px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--demo-fg);
+  background: var(--demo-card);
+  border: 1px solid var(--demo-line);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.demo__btn:hover:not(:disabled) {
+  background: var(--demo-accent-soft);
+  border-color: var(--demo-accent);
+}
+
+.demo__btn--active {
+  background: var(--demo-accent);
+  border-color: var(--demo-accent);
+  color: var(--demo-title-fg);
+}
+
+.demo__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.demo__btn--ghost {
+  font-family: var(--demo-mono);
+  font-size: 11px;
+  padding: 5px 10px;
+}

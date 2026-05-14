@@ -1,9 +1,9 @@
 import { coerceInput, writeCoerced, writeInputValidated } from '../commands/coerce-input.js';
 import { stepWithMerge } from '../commands/merge.js';
 import { extractRefs, rotateRefAt, shiftFormulaRefs } from '../commands/refs.js';
+import { addrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { addrKey } from '../engine/workbook-handle.js';
 import { cellRect } from '../render/geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { type ArgHelperHandle, type ArgHelperLabels, attachArgHelper } from './arg-helper.js';

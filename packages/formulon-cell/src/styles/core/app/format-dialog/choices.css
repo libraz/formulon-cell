@@ -1,0 +1,55 @@
+@layer fc.app {
+  .fc-fmtdlg__radio,
+  .fc-fmtdlg__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    min-height: 26px;
+  }
+  .fc-fmtdlg__choice-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  .fc-fmtdlg__choice-grid .fc-fmtdlg__radio,
+  .fc-fmtdlg__choice-grid .fc-fmtdlg__check {
+    min-height: 30px;
+    padding: 5px 10px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: 2px;
+    background: var(--fc-bg, Canvas);
+  }
+  .fc-fmtdlg__choice-grid .fc-fmtdlg__radio:has(input:checked),
+  .fc-fmtdlg__choice-grid .fc-fmtdlg__check:has(input:checked) {
+    border-color: var(--fc-accent, currentColor);
+    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 8%, transparent));
+  }
+  .fc-fmtdlg input[type="checkbox"],
+  .fc-fmtdlg input[type="radio"] {
+    accent-color: var(--fc-accent, currentColor);
+  }
+  .fc-fmtdlg input[type="color"] {
+    width: 34px;
+    height: 28px;
+    padding: 2px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 18%, transparent));
+    border-radius: 2px;
+    background: var(--fc-bg, Canvas);
+    cursor: pointer;
+  }
+  .fc-fmtdlg__hint {
+    color: var(--fc-fg-mute, inherit);
+    font-size: 12px;
+  }
+  .fc-fmtdlg__panel-tab > div:not([class]),
+  .fc-fmtdlg__panel-tab > .fc-fmtdlg__hint {
+    color: var(--fc-fg-mute, inherit);
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+}

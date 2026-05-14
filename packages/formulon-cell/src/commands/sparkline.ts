@@ -1,5 +1,5 @@
+import { addrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
-import { addrKey } from '../engine/workbook-handle.js';
 import { mutators, type Sparkline, type SpreadsheetStore } from '../store/store.js';
 
 export interface SparklineEntry {

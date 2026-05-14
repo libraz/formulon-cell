@@ -1,0 +1,166 @@
+@layer fc.app {
+  /* Function Arguments (fx) dialog — two-step modal: a searchable function
+     picker, then labeled inputs per argument. Reuses fc-fmtdlg chrome and
+     adds list-style row treatment. */
+  .fc-fxdialog__panel {
+    max-width: 680px;
+    width: 90vw;
+  }
+  .fc-fxdialog__body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .fc-fxdialog__picker {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .fc-fxdialog__search {
+    width: 100%;
+    min-height: 30px;
+    padding: 5px 9px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 18%, transparent));
+    border-radius: 2px;
+    background: var(--fc-bg, Canvas);
+    color: inherit;
+    font: inherit;
+    outline: 0;
+  }
+  .fc-fxdialog__search:focus {
+    border-color: var(--fc-accent, currentColor);
+    box-shadow: 0 0 0 2px var(--fc-accent-soft, transparent);
+  }
+  .fc-fxdialog__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    max-height: 320px;
+    overflow-y: auto;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: 2px;
+    padding: 0;
+    background: #ffffff;
+  }
+  .fc-fxdialog__item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 7px 10px;
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 10%, transparent));
+    border-radius: 0;
+    cursor: pointer;
+  }
+  .fc-fxdialog__item:last-child {
+    border-bottom: 0;
+  }
+  .fc-fxdialog__item:hover {
+    background: #f3f2f1;
+  }
+  .fc-fxdialog__item--active {
+    background: #e7f6ed;
+    color: var(--fc-fg, CanvasText);
+  }
+  .fc-fxdialog__item-name {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .fc-fxdialog__item-desc {
+    font-size: 11.5px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+  }
+  .fc-fxdialog__item--active .fc-fxdialog__item-desc {
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+  }
+  .fc-fxdialog__empty {
+    padding: 8px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+    font-style: italic;
+  }
+  .fc-fxdialog__args-header {
+    padding: 10px 12px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: 4px 4px 0 0;
+    background: #f3f2f1;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 0;
+  }
+  .fc-fxdialog__args-desc {
+    padding: 10px 12px;
+    border-right: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-left: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    font-size: 12px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+    margin-bottom: 0;
+  }
+  .fc-fxdialog__args-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-top: 0;
+    border-radius: 0 0 4px 4px;
+  }
+  .fc-fxdialog__arg-row {
+    align-items: center;
+    margin-bottom: 0;
+  }
+  .fc-fxdialog__arg-input {
+    flex: 1;
+  }
+  .fc-fxdialog__variadic-note {
+    font-size: 11px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+    font-style: italic;
+    padding: 2px 0;
+  }
+  .fc-fxdialog__preview-label {
+    margin-top: 12px;
+    font-size: 11px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .fc-fxdialog__preview {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12.5px;
+    padding: 7px 9px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: var(--fc-radius-sm, 4px);
+    background: var(--fc-bg, inherit);
+    margin-top: 4px;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  /* Formula-bar fx button — clickable affordance that opens the fx dialog.
+     Replaces the older read-only `span.fc-host__formulabar-fx` glyph. */
+  button.fc-host__formulabar-fx {
+    background: transparent;
+    border: var(--fc-hairline) solid transparent;
+    border-radius: var(--fc-radius-sm);
+    padding: 2px 6px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  button.fc-host__formulabar-fx:hover {
+    border-color: var(--fc-rule);
+    color: var(--fc-accent);
+  }
+  button.fc-host__formulabar-fx:focus-visible {
+    outline: 2px solid var(--fc-accent);
+    outline-offset: 1px;
+  }
+}

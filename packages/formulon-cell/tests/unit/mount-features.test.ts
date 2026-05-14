@@ -128,4 +128,29 @@ describe('Spreadsheet feature registry', () => {
 
     instance.dispose();
   });
+
+  it('setTheme updates host theme state, store state, and emits themeChange', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    const instance = await Spreadsheet.mount(host, { workbook, theme: 'paper' });
+    const onThemeChange = vi.fn();
+    const unsubscribe = instance.on('themeChange', onThemeChange);
+
+    expect(host.dataset.fcTheme).toBe('paper');
+    expect(instance.store.getState().ui.theme).toBe('paper');
+
+    instance.setTheme('ink');
+
+    expect(host.dataset.fcTheme).toBe('ink');
+    expect(instance.store.getState().ui.theme).toBe('ink');
+    expect(onThemeChange).toHaveBeenCalledTimes(1);
+    expect(onThemeChange).toHaveBeenCalledWith({ theme: 'ink' });
+
+    unsubscribe();
+    instance.setTheme('contrast');
+    expect(onThemeChange).toHaveBeenCalledTimes(1);
+
+    instance.dispose();
+  });
 });

@@ -1,303 +1,67 @@
 import { CellRegistry } from './cells.js';
-import { writeInputValidated } from './commands/coerce-input.js';
-import { fillRange } from './commands/fill.js';
-import { toggleBold, toggleItalic, toggleStrike, toggleUnderline } from './commands/format.js';
-import { History, recordFormatChange } from './commands/history.js';
+import { History } from './commands/history.js';
 import { printSheet } from './commands/print.js';
 import {
   isSheetProtected,
   setProtectedSheet,
   toggleProtectedSheet,
 } from './commands/protection.js';
-import { extractRefs, rotateRefAt } from './commands/refs.js';
-import { moveSheet, removeSheet, setSheetHidden } from './commands/sheet-mutate.js';
-import { setSheetZoom } from './commands/structure.js';
 import {
   clearTraceArrows,
   traceDependents as traceDependentArrows,
   tracePrecedents as tracePrecedentArrows,
 } from './commands/traces.js';
-import { flushFormatToEngine, hydrateCellFormatsFromEngine } from './engine/cell-format-sync.js';
-import { formatCellForEdit } from './engine/edit-seed.js';
-import { hydrateCommentsAndHyperlinksFromEngine } from './engine/format-sync.js';
-import { hydrateLayoutFromEngine } from './engine/layout-sync.js';
-import { hydrateMergesFromEngine } from './engine/merges-sync.js';
-import { summarizePassthroughs, summarizeTables } from './engine/passthrough-sync.js';
-import { hydrateProtectionFromEngine } from './engine/protection-sync.js';
-import { hydrateTableOverlaysFromEngine } from './engine/table-sync.js';
-import { hydrateValidationsFromEngine } from './engine/validation-sync.js';
-import { type ChangeEvent, WorkbookHandle } from './engine/workbook-handle.js';
-import {
-  SpreadsheetEmitter,
-  type SpreadsheetEventHandler,
-  type SpreadsheetEventName,
-  selectionEquals,
-} from './events.js';
+import { WorkbookHandle } from './engine/workbook-handle.js';
+import { SpreadsheetEmitter } from './events.js';
 import {
   dedupeById,
   type Extension,
   type ExtensionContext,
   type ExtensionHandle,
-  type ExtensionInput,
-  type FeatureFlags,
   flattenExtensions,
   resolveFlags,
   sortByPriority,
-  type ThemeName,
 } from './extensions/index.js';
-import type { CustomFunction, CustomFunctionMeta } from './formula.js';
 import { FormulaRegistry } from './formula.js';
-import { createI18nController, type I18nController } from './i18n/controller.js';
-import type { DeepPartial, Locale, Strings } from './i18n/strings.js';
-import { attachArgHelper } from './interact/arg-helper.js';
-import { attachAutocomplete } from './interact/autocomplete.js';
+import { createI18nController } from './i18n/controller.js';
+import type { Strings } from './i18n/strings.js';
 import { attachCellStylesGallery } from './interact/cell-styles-gallery.js';
 import { attachCfRulesDialog } from './interact/cf-rules-dialog.js';
-import { attachClipboard } from './interact/clipboard.js';
-import { attachCommentDialog } from './interact/comment-dialog.js';
-import { attachConditionalDialog } from './interact/conditional-dialog.js';
-import { attachContextMenu } from './interact/context-menu.js';
-import { InlineEditor } from './interact/editor.js';
-import { attachErrorMenu, type ErrorMenuHandle } from './interact/error-menu.js';
 import { attachExternalLinksDialog } from './interact/external-links-dialog.js';
 import { attachFilterDropdown, type FilterDropdownHandle } from './interact/filter-dropdown.js';
-import { attachFindReplace } from './interact/find-replace.js';
-import { attachFormatDialog } from './interact/format-dialog.js';
-import { attachFormatPainter, type FormatPainterHandle } from './interact/format-painter.js';
-import { attachFxDialog, type FxDialogHandle } from './interact/fx-dialog.js';
-import { attachGoToDialog } from './interact/goto-dialog.js';
-import { attachHover } from './interact/hover.js';
-import { attachHyperlinkDialog } from './interact/hyperlink-dialog.js';
-import { inheritHostTokens } from './interact/inherit-host-tokens.js';
-import { attachIterativeDialog } from './interact/iterative-dialog.js';
-import { attachKeyboard } from './interact/keyboard.js';
-import { attachNamedRangeDialog } from './interact/named-range-dialog.js';
-import { attachPageSetupDialog } from './interact/page-setup-dialog.js';
-import { attachPasteSpecial } from './interact/paste-special.js';
-import { attachPivotTableDialog } from './interact/pivot-table-dialog.js';
-import { attachPointer } from './interact/pointer.js';
-import { attachQuickAnalysis } from './interact/quick-analysis.js';
-import { attachSessionCharts, type SessionChartsHandle } from './interact/session-charts.js';
-import { attachSlicer, type SlicerHandle } from './interact/slicer.js';
-import { attachStatusBar } from './interact/status-bar.js';
-import { attachValidationList } from './interact/validation.js';
-import { attachViewToolbar, type ViewToolbarHandle } from './interact/view-toolbar.js';
-import { attachWatchPanel } from './interact/watch-panel.js';
-import { attachWheel } from './interact/wheel.js';
+import { createMountChrome } from './mount/chrome.js';
+import { attachChromeSync, type ChromeSyncController } from './mount/chrome-sync.js';
 import {
-  attachWorkbookObjectsPanel,
-  type WorkbookObjectsPanelHandle,
-} from './interact/workbook-objects.js';
+  attachEngineBinding,
+  type EngineBinding,
+  WB_REGISTRY_IDS,
+} from './mount/engine-binding.js';
+import { attachFormulaBarController } from './mount/formula-bar.js';
+import { prepareMountHost, releaseMountHost } from './mount/host.js';
+import {
+  createAutocompleteStub,
+  createHostFeatureController,
+  createHostFeatureState,
+  HOST_FEATURE_USES_STRINGS,
+  HOST_TOGGLEABLE_IDS,
+  WB_TOGGLEABLE_IDS,
+} from './mount/host-features.js';
+import { createHostShortcutHandler } from './mount/host-shortcuts.js';
+import {
+  dispatchWorkbookObjectSummaries,
+  hydrateActiveSheetFromEngine,
+  hydrateWorkbookMetadataFromEngine,
+} from './mount/hydration.js';
+import {
+  attachSheetTabsController,
+  type SheetTabsController,
+} from './mount/sheet-tabs-controller.js';
+import type { MountOptions, SpreadsheetInstance } from './mount/types.js';
 import { GridRenderer, getErrorTriangleHits } from './render/grid.js';
-import {
-  createSpreadsheetStore,
-  mutators,
-  type SlicerSpec,
-  type SpreadsheetStore,
-} from './store/store.js';
+import { createSpreadsheetStore, mutators } from './store/store.js';
 import { resolveTheme } from './theme/resolve.js';
 
-export interface MountOptions {
-  /** Pre-loaded workbook (e.g. from xlsx bytes). If omitted, creates a fresh
-   *  default workbook. */
-  workbook?: WorkbookHandle;
-  /** Theme to apply on mount. Switchable later via instance.setTheme. */
-  theme?: ThemeName;
-  /** Optional initial-cell seeding. Useful for the playground & docs. */
-  seed?: (wb: WorkbookHandle) => void;
-  /** UI locale for built-in dialogs and menus. Defaults to 'ja'. Swap at
-   *  runtime via `instance.i18n.setLocale`. */
-  locale?: Locale | (string & {});
-  /** Per-string overrides applied on top of the chosen locale. Deep-merged.
-   *  For runtime overlays use `instance.i18n.extend`. */
-  strings?: DeepPartial<Strings>;
-  /** Toggle individual built-in features. Defaults to "all on" (spreadsheet-style
-   *  full chrome). Pass a preset (`presets.minimal()` etc.) or your own
-   *  `{ findReplace: false, ... }`. Cross-references between features are
-   *  handled defensively — disabling format-dialog hides the menu item that
-   *  would otherwise open it. */
-  features?: FeatureFlags;
-  /** Custom extensions added on top of the built-ins. Run after built-ins
-   *  in priority order. v0.1 extensions are *additive* — you cannot replace
-   *  a built-in via this slot; toggle the built-in via `features` and add
-   *  your replacement here. Nested arrays are flattened. */
-  extensions?: ExtensionInput[];
-  /** Optional initial set of custom functions registered against
-   *  `instance.formula`. Names are upper-cased; impls accept `CellValue`s
-   *  and return `CellValue | number | string | boolean | null`. */
-  functions?: readonly {
-    name: string;
-    impl: CustomFunction['impl'];
-    meta?: CustomFunctionMeta;
-  }[];
-}
-
-export interface SpreadsheetInstance {
-  readonly host: HTMLElement;
-  readonly workbook: WorkbookHandle;
-  readonly store: SpreadsheetStore;
-  /** Unified undo/redo for cell, format, and layout changes. Each user-level
-   *  action pushes one entry; transactions (paste, fill drag) are batched. */
-  readonly history: History;
-  /** Reactive locale + strings registry. `setLocale` swaps the active
-   *  dictionary in place; `extend` overlays partial overrides; `register`
-   *  adds a brand-new locale. */
-  readonly i18n: I18nController;
-  /** Snapshot of every loaded extension keyed by id. Built-in feature ids
-   *  match the keys on `MountOptions.features`. */
-  readonly features: Readonly<Record<string, ExtensionHandle | undefined>>;
-  /** Format Painter controls — surfaced so chrome (toolbar buttons) can
-   *  arm/disarm and reflect the active state. `undefined` if disabled via
-   *  `features.formatPainter: false`. */
-  readonly formatPainter: FormatPainterHandle | undefined;
-  /** Host-side custom function registry. `register(name, impl, meta?)`
-   *  surfaces a name in the autocomplete and exposes
-   *  `evaluate(name, args)` for app code that wires derived cells via
-   *  `inst.on('cellChange', …)`. Engine-level user-function support
-   *  ships when formulon exposes the embind callback hook. */
-  readonly formula: FormulaRegistry;
-  /** Cell renderer registry — `cells.registerFormatter({match, format})`
-   *  substitutes the displayed string for matching cells without
-   *  bypassing the canvas paint pipeline. The editor slot
-   *  (`registerEditor`) is reserved for v0.2. */
-  readonly cells: CellRegistry;
-  /** Mount a custom extension after the spreadsheet is already up. */
-  use(ext: ExtensionInput): void;
-  /** Tear down a previously-mounted extension by id. */
-  remove(id: string): boolean;
-  /** Live-toggle built-in features. Diffs against the current flag set
-   *  and only attaches/detaches what actually changed; keeps editor /
-   *  selection / undo state intact when wb-bound features don't flip. */
-  setFeatures(next: FeatureFlags): void;
-  /** Replace the entire user-extension list. Existing extensions are
-   *  disposed; the new list is mounted in priority order. Built-ins are
-   *  untouched — use `setFeatures` for those. */
-  setExtensions(next: ExtensionInput[] | undefined): void;
-  /** Open the conditional-formatting rule manager dialog. No-op when the
-   *  feature is disabled. */
-  openConditionalDialog(): void;
-  /** Open the read-only named-range listing dialog. */
-  openNamedRangeDialog(): void;
-  /** Open the cell format dialog. */
-  openFormatDialog(): void;
-  /** Open the Go To Special (F5) dialog. No-op when the feature is disabled. */
-  openGoToSpecial(): void;
-  /** Open the iterative-calculation settings dialog. */
-  openIterativeDialog(): void;
-  /** Open the read-only "Edit Links" inspector listing every external
-   *  workbook reference carried by the active workbook. The list is empty
-   *  for fresh workbooks and any package that had no
-   *  `<externalReferences>` block. */
-  openExternalLinksDialog(): void;
-  /** Open the conditional-formatting rule manager. Lists every CF rule on
-   *  the active sheet and supports per-rule remove + clear-all. Requires
-   *  the engine `conditionalFormatMutate` capability; under stub mode the
-   *  list is empty. */
-  openCfRulesDialog(): void;
-  /** Open the named cell-styles gallery. */
-  openCellStylesGallery(): void;
-  /** Open the Function Arguments dialog. Pass `seedName` (case-insensitive)
-   *  to skip the picker and jump straight to argument entry for that
-   *  function. No-op when the `fxDialog` feature is disabled. */
-  openFunctionArguments(seedName?: string): void;
-  /** Open the Hyperlink dialog (Ctrl+K) seeded from the active cell. No-op
-   *  when `features.hyperlink` is off. */
-  openHyperlinkDialog(): void;
-  /** Open the Comment popover anchored on the active cell. No-op when
-   *  `features.commentDialog` is off. */
-  openCommentDialog(): void;
-  /** Open the Find & Replace dialog (Ctrl+F). No-op when
-   *  `features.findReplace` is off. */
-  openFindReplace(): void;
-  /** Close the Find & Replace dialog if it's open. */
-  closeFindReplace(): void;
-  /** Open the Paste Special dialog (Ctrl+Shift+V). No-op when
-   *  `features.pasteSpecial` is off or the clipboard has nothing. */
-  openPasteSpecial(): void;
-  /** Open the Page Setup dialog (orientation, paper size, margins,
-   *  header/footer, print titles). No-op when `features.pageSetup` is off. */
-  openPageSetup(): void;
-  /** Build a print document for the active sheet and open the browser's
-   *  native print dialog. Use the dialog's "Save as PDF" action to export.
-   *  No-op when `features.pageSetup` is off. */
-  print(): void;
-  /** Trigger a full recalc and refresh the active sheet. Mirrors the F9
-   *  shortcut. */
-  recalc(): void;
-  /** Show the Watch Window panel. No-op when `features.watchWindow` is off. */
-  openWatchWindow(): void;
-  /** Hide the Watch Window panel. No-op when the feature is off. */
-  closeWatchWindow(): void;
-  /** Toggle Watch Window visibility. No-op when the feature is off. */
-  toggleWatchWindow(): void;
-  /** Open the Quick Analysis floating panel for the current selection. No-op
-   *  when `features.quickAnalysis` is off. */
-  openQuickAnalysis(): void;
-  /** Open the read-only workbook object inspector for preserved OOXML
-   *  charts/drawings/pivots and loaded worksheet tables. */
-  openWorkbookObjects(): void;
-  /** Open the PivotTable creation dialog for the current selection. No-op
-   *  when `features.pivotTableDialog` is off or the engine lacks mutation. */
-  openPivotTableDialog(): void;
-  /** Open a floating slicer panel for the given table column. Returns the
-   *  freshly-built `SlicerSpec` (including its auto-assigned id). Throws
-   *  when the table or column can't be resolved against the workbook, or
-   *  when `features.slicer` is off. */
-  addSlicer(input: {
-    tableName: string;
-    column: string;
-    selected?: readonly string[];
-    x?: number;
-    y?: number;
-  }): SlicerSpec;
-  /** Remove a slicer by id. No-op when the id isn't tracked. */
-  removeSlicer(id: string): void;
-  /** Toggle sheet-protection on the currently active sheet. Locked cells on
-   *  protected sheets gate writes through the command layer. */
-  toggleSheetProtection(): void;
-  /** Set sheet-protection explicitly. `password` is currently stored
-   *  verbatim and NOT enforced — v1 ships without password validation. */
-  setSheetProtected(on: boolean, password?: string): void;
-  /** True when the active sheet is currently protected. */
-  isSheetProtected(): boolean;
-  /** Append precedent arrows for the active cell. Same-sheet only. Repeated
-   *  calls deduplicate against existing arrows. */
-  tracePrecedents(): void;
-  /** Append dependent arrows for the active cell. Same-sheet only. */
-  traceDependents(): void;
-  /** Remove all currently visible trace arrows. */
-  clearTraces(): void;
-  setTheme(t: ThemeName): void;
-  /** Pop the most recent undoable action and revert it. Returns false when
-   *  the stack is empty. */
-  undo(): boolean;
-  /** Re-apply the most recently undone action. Returns false when nothing
-   *  to redo. */
-  redo(): boolean;
-  /** Apply a fresh workbook (e.g. after `loadBytes`). Disposes old one. */
-  setWorkbook(next: WorkbookHandle): Promise<void>;
-  /** Subscribe to a named lifecycle event. Returns an unsubscribe fn.
-   *  Events:
-   *  - `cellChange` — a cell value mutated (engine-side); fires once per
-   *    cell, after recalc has settled.
-   *  - `selectionChange` — active/anchor/range moved.
-   *  - `workbookChange` — `setWorkbook` swapped the engine.
-   *  - `localeChange` — `i18n.setLocale` switched active dictionary.
-   *  - `themeChange` — `setTheme` mutated the host theme.
-   *  - `recalc` — engine reported a recalc batch (with dirty-cell keys).
-   *  Handlers are isolated: thrown errors are caught and logged, not
-   *  propagated to siblings. */
-  on<K extends SpreadsheetEventName>(name: K, fn: SpreadsheetEventHandler<K>): () => void;
-  /** Imperative unsubscribe. Most code should use the disposer returned
-   *  from `on()` instead. */
-  off<K extends SpreadsheetEventName>(name: K, fn: SpreadsheetEventHandler<K>): void;
-  dispose(): void;
-}
-
-// Monotonic counter feeding `data-fc-inst-id` on each mount. Used by the
-// dispose path to detect that a later mount has commandeered the same
-// host (StrictMode double-mount, hot-reload, etc.).
-let MOUNT_COUNTER = 0;
+export type { MountOptions, SpreadsheetInstance } from './mount/types.js';
 
 /**
  * Mount a spreadsheet onto a DOM host. Returns an instance with imperative
@@ -323,239 +87,40 @@ export const Spreadsheet = {
       }
     }
 
-    host.classList.add('fc-host');
-    host.setAttribute('tabindex', '0');
-    // Canvas-rendered grids can't expose ARIA grid/row/cell descendants, so
-    // role="grid" would lie about the structure (axe flags it as
-    // aria-required-children). Use role="region" with a roledescription so
-    // screen readers still announce the surface as a spreadsheet, and let
-    // the aria-live mirror inside carry per-cell announcements.
-    host.setAttribute('role', 'region');
-    host.setAttribute('aria-roledescription', 'spreadsheet');
-    host.setAttribute('aria-label', strings.a11y.spreadsheet);
-    host.dataset.fcTheme = opts.theme ?? 'paper';
-    host.replaceChildren();
-    // Stamp a per-mount instance id on the host. Used by `dispose()` so it
-    // only clears children if it still owns the host — guards against
-    // React 18+ StrictMode double-mount, where a previous instance's
-    // deferred dispose would otherwise wipe the host that a newer mount
-    // already populated.
-    const instanceId = `fc-${++MOUNT_COUNTER}`;
-    host.dataset.fcInstId = instanceId;
+    const instanceId = prepareMountHost(host, strings, opts.theme);
+    host.dataset.fcEngineState = 'loading';
 
-    // Build chrome: formulabar/view toolbar (top), grid surface, statusbar (bottom).
-    const formulabar = document.createElement('div');
-    formulabar.className = 'fc-host__formulabar';
-    // Name box — typing "A1" / "B5" jumps the active cell. Doubles as the
-    // address indicator when not focused.
-    const tag = document.createElement('input');
-    tag.type = 'text';
-    tag.className = 'fc-host__formulabar-tag';
-    tag.spellcheck = false;
-    tag.autocomplete = 'off';
-    tag.setAttribute('aria-label', strings.a11y.nameBox);
-    tag.value = 'A1';
-    // The fx button opens the Function Arguments dialog. Falls back to a
-    // visually-identical decorative span when the feature is disabled so the
-    // chrome layout stays the same.
-    const fx = document.createElement('button');
-    fx.type = 'button';
-    fx.className = 'fc-host__formulabar-fx';
-    fx.textContent = 'ƒx';
-    fx.tabIndex = -1;
-    fx.setAttribute('aria-label', strings.fxDialog?.fxButtonLabel ?? strings.a11y.formulaBar);
-    const fxCancel = document.createElement('button');
-    fxCancel.type = 'button';
-    fxCancel.className = 'fc-host__formulabar-action fc-host__formulabar-action--cancel';
-    fxCancel.textContent = '×';
-    fxCancel.tabIndex = -1;
-    fxCancel.disabled = true;
-    fxCancel.setAttribute('aria-label', strings.a11y.cancelFormulaEdit);
-    const fxAccept = document.createElement('button');
-    fxAccept.type = 'button';
-    fxAccept.className = 'fc-host__formulabar-action fc-host__formulabar-action--accept';
-    fxAccept.textContent = '✓';
-    fxAccept.tabIndex = -1;
-    fxAccept.disabled = true;
-    fxAccept.setAttribute('aria-label', strings.a11y.enterFormula);
-    const fxInput = document.createElement('textarea');
-    fxInput.className = 'fc-host__formulabar-input';
-    fxInput.spellcheck = false;
-    fxInput.autocomplete = 'off';
-    fxInput.rows = 1;
-    fxInput.wrap = 'soft';
-    fxInput.setAttribute('aria-label', strings.a11y.formulaBar);
-    // Spreadsheet-style expand/collapse handle. Toggles `data-fc-expanded` on the
-    // formulabar so CSS can switch the textarea between 1-row and multi-row.
-    const fxExpand = document.createElement('button');
-    fxExpand.type = 'button';
-    fxExpand.className = 'fc-host__formulabar-expand';
-    fxExpand.setAttribute('aria-expanded', 'false');
-    fxExpand.tabIndex = -1;
-    fxExpand.textContent = '⌄';
-    const refreshFormulaBarLabels = (): void => {
-      fx.setAttribute('aria-label', strings.fxDialog?.fxButtonLabel ?? strings.a11y.formulaBar);
-      fxCancel.setAttribute('aria-label', strings.a11y.cancelFormulaEdit);
-      fxAccept.setAttribute('aria-label', strings.a11y.enterFormula);
-      fxInput.setAttribute('aria-label', strings.a11y.formulaBar);
-      const expanded = fxExpand.getAttribute('aria-expanded') === 'true';
-      fxExpand.setAttribute(
-        'aria-label',
-        expanded ? strings.a11y.collapseFormulaBar : strings.a11y.expandFormulaBar,
-      );
-    };
-    refreshFormulaBarLabels();
-    fxExpand.addEventListener('click', () => {
-      const expanded = formulabar.dataset.fcExpanded === '1';
-      if (expanded) {
-        delete formulabar.dataset.fcExpanded;
-        fxExpand.setAttribute('aria-expanded', 'false');
-        fxExpand.textContent = '⌄';
-        fxInput.rows = 1;
-        refreshFormulaBarLabels();
-      } else {
-        formulabar.dataset.fcExpanded = '1';
-        fxExpand.setAttribute('aria-expanded', 'true');
-        fxExpand.textContent = '⌃';
-        fxInput.rows = 4;
-        refreshFormulaBarLabels();
-      }
-    });
-    formulabar.append(tag, fxCancel, fxAccept, fx, fxInput, fxExpand);
+    let sheetTabsController: SheetTabsController | null = null;
 
-    const viewbar = document.createElement('div');
-    viewbar.className = 'fc-viewbar';
-
-    const grid = document.createElement('div');
-    grid.className = 'fc-host__grid';
-    const canvas = document.createElement('canvas');
-    canvas.className = 'fc-host__canvas';
-    grid.appendChild(canvas);
-
-    const a11y = document.createElement('div');
-    a11y.className = 'fc-host__a11y';
-    a11y.setAttribute('aria-live', 'polite');
-    grid.appendChild(a11y);
-
-    const appendSheetbarIcon = (
-      button: HTMLButtonElement,
-      paths: readonly string[],
-      viewBox = '0 0 20 20',
-    ): void => {
-      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      svg.setAttribute('class', 'fc-host__icon');
-      svg.setAttribute('viewBox', viewBox);
-      svg.setAttribute('fill', 'none');
-      svg.setAttribute('stroke', 'currentColor');
-      svg.setAttribute('stroke-width', '1.5');
-      svg.setAttribute('stroke-linecap', 'round');
-      svg.setAttribute('stroke-linejoin', 'round');
-      svg.setAttribute('aria-hidden', 'true');
-      for (const d of paths) {
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        path.setAttribute('d', d);
-        svg.appendChild(path);
-      }
-      button.replaceChildren(svg);
-    };
-
-    const statusbar = document.createElement('div');
-    statusbar.className = 'fc-host__statusbar';
-    const sheetbar = document.createElement('div');
-    sheetbar.className = 'fc-host__sheetbar';
-    const sheetNav = document.createElement('div');
-    sheetNav.className = 'fc-host__sheetbar-nav';
-    const firstSheet = document.createElement('button');
-    firstSheet.type = 'button';
-    firstSheet.className = 'fc-host__sheetbar-navbtn';
-    appendSheetbarIcon(firstSheet, ['M12.5 4.5 7 10l5.5 5.5']);
-    const lastSheet = document.createElement('button');
-    lastSheet.type = 'button';
-    lastSheet.className = 'fc-host__sheetbar-navbtn';
-    appendSheetbarIcon(lastSheet, ['M7.5 4.5 13 10l-5.5 5.5']);
-    sheetNav.append(firstSheet, lastSheet);
-    const sheetTabs = document.createElement('div');
-    sheetTabs.className = 'fc-host__sheetbar-tabs';
-    sheetTabs.setAttribute('role', 'tablist');
-    const addSheetBtn = document.createElement('button');
-    addSheetBtn.type = 'button';
-    addSheetBtn.className = 'fc-host__sheetbar-add';
-    appendSheetbarIcon(addSheetBtn, ['M10 4.5v11', 'M4.5 10h11']);
-    sheetbar.append(sheetNav, sheetTabs, addSheetBtn);
-    const sheetMenu = document.createElement('div');
-    sheetMenu.className = 'fc-sheetmenu';
-    sheetMenu.hidden = true;
-    sheetMenu.setAttribute('role', 'menu');
-    document.body.appendChild(sheetMenu);
-    sheetbar.addEventListener(
-      'contextmenu',
-      (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const tab =
-          e.target instanceof Element
-            ? e.target.closest<HTMLButtonElement>('.fc-host__sheetbar-tab')
-            : null;
-        const idx = tab ? Number(tab.dataset.fcSheetIndex) : NaN;
-        if (!tab || !Number.isInteger(idx)) return;
-        switchSheet(idx);
-        showSheetMenu(idx, tab, e.clientX, e.clientY);
+    const {
+      formulabar,
+      tag,
+      fx,
+      fxCancel,
+      fxAccept,
+      fxInput,
+      viewbar,
+      grid,
+      canvas,
+      a11y,
+      statusbar,
+      firstSheet,
+      lastSheet,
+      sheetTabs,
+      addSheetBtn,
+      sheetMenu,
+      watchDock,
+      refreshFormulaBarLabels,
+      setChromeAttached,
+    } = createMountChrome({
+      host,
+      getStrings: () => strings,
+      flags,
+      onSheetTabContextMenu: (idx, tab, x, y) => {
+        sheetTabsController?.switchSheet(idx);
+        sheetTabsController?.showMenu(idx, tab, x, y);
       },
-      true,
-    );
-    sheetMenu.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
     });
-    // Watch Window dock — only attached when `features.watchWindow` is on.
-    const watchDock = document.createElement('div');
-    watchDock.dataset.fcWatch = 'dock';
-    watchDock.className = 'fc-host__watchdock';
-
-    // Gate chrome elements on their flags. The grid is always present and
-    // anchors slot ordering; chrome slots come and go via `setChromeAttached`
-    // so disabled flags reclaim vertical space (no empty bars left behind).
-    const setChromeAttached = (
-      slot: 'formulabar' | 'viewbar' | 'sheetbar' | 'statusbar' | 'watchDock',
-      on: boolean,
-    ): void => {
-      const el =
-        slot === 'formulabar'
-          ? formulabar
-          : slot === 'viewbar'
-            ? viewbar
-            : slot === 'sheetbar'
-              ? sheetbar
-              : slot === 'statusbar'
-                ? statusbar
-                : watchDock;
-      if (on) {
-        if (el.parentElement === host) return;
-        if (slot === 'formulabar') {
-          host.insertBefore(el, grid);
-        } else if (slot === 'viewbar') {
-          host.insertBefore(el, grid);
-        } else if (slot === 'sheetbar') {
-          if (statusbar.parentElement === host) host.insertBefore(el, statusbar);
-          else if (watchDock.parentElement === host) host.insertBefore(el, watchDock);
-          else host.appendChild(el);
-        } else if (slot === 'statusbar') {
-          if (watchDock.parentElement === host) host.insertBefore(el, watchDock);
-          else host.appendChild(el);
-        } else {
-          host.appendChild(el);
-        }
-      } else if (el.parentElement === host) {
-        host.removeChild(el);
-      }
-    };
-
-    host.appendChild(grid);
-    setChromeAttached('formulabar', flags.formulaBar);
-    setChromeAttached('viewbar', flags.viewToolbar);
-    setChromeAttached('sheetbar', flags.sheetTabs);
-    setChromeAttached('statusbar', flags.statusBar);
-    setChromeAttached('watchDock', flags.watchWindow);
 
     // Track ownership before seeding — only owned (default-created) workbooks
     // should be touched by `seed`. Pre-loaded workbooks are the consumer's
@@ -575,15 +140,8 @@ export const Spreadsheet = {
     wb.attachHistory(history);
     history.clear();
 
-    // Hydrate cells from engine
-    mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
-    hydrateLayoutFromEngine(wb, store, store.getState().data.sheetIndex);
-    hydrateCommentsAndHyperlinksFromEngine(wb, store, store.getState().data.sheetIndex);
-    hydrateMergesFromEngine(wb, store, store.getState().data.sheetIndex);
-    hydrateValidationsFromEngine(wb, store, store.getState().data.sheetIndex);
-    hydrateCellFormatsFromEngine(wb, store, store.getState().data.sheetIndex);
-    hydrateProtectionFromEngine(wb, store);
-    hydrateTableOverlaysFromEngine(wb, store);
+    hydrateActiveSheetFromEngine(wb, store);
+    hydrateWorkbookMetadataFromEngine(wb, store);
     dispatchPassthroughSummary();
 
     function dispatchPassthroughSummary(): void {
@@ -592,276 +150,11 @@ export const Spreadsheet = {
       // read-only/editing-limited badge. Pivot layouts are rendered when the
       // engine exposes projection, but the object definition is still not
       // authorable from the UI.
-      const passthroughs = summarizePassthroughs(wb);
-      const tables = summarizeTables(wb);
-      host.dispatchEvent(new CustomEvent('fc:passthroughs', { detail: passthroughs }));
-      host.dispatchEvent(new CustomEvent('fc:tables', { detail: tables }));
+      dispatchWorkbookObjectSummaries(host, wb);
     }
 
     function hydrateActiveSheet(): void {
-      const sheet = store.getState().data.sheetIndex;
-      mutators.replaceCells(store, wb.cells(sheet));
-      hydrateLayoutFromEngine(wb, store, sheet);
-      hydrateCommentsAndHyperlinksFromEngine(wb, store, sheet);
-      hydrateMergesFromEngine(wb, store, sheet);
-      hydrateValidationsFromEngine(wb, store, sheet);
-      hydrateCellFormatsFromEngine(wb, store, sheet);
-    }
-
-    function switchSheet(idx: number): void {
-      if (idx < 0 || idx >= wb.sheetCount) return;
-      if (store.getState().layout.hiddenSheets.has(idx)) return;
-      if (idx === store.getState().data.sheetIndex) return;
-      wb.clearViewportHint();
-      mutators.setSheetIndex(store, idx);
-      hydrateActiveSheet();
-      updateSheetTabs();
-      statusBar?.refresh();
-      renderer.invalidate();
-    }
-
-    function visibleSheetIndexes(): number[] {
-      const hidden = store.getState().layout.hiddenSheets;
-      const out: number[] = [];
-      for (let i = 0; i < wb.sheetCount; i += 1) {
-        if (!hidden.has(i)) out.push(i);
-      }
-      return out;
-    }
-
-    function switchRelativeSheet(delta: 1 | -1): void {
-      const visible = visibleSheetIndexes();
-      const pos = visible.indexOf(store.getState().data.sheetIndex);
-      const next = visible[pos + delta];
-      if (next !== undefined) switchSheet(next);
-    }
-
-    function hiddenSheetIndexes(): number[] {
-      const hidden = store.getState().layout.hiddenSheets;
-      const out: number[] = [];
-      for (let i = 0; i < wb.sheetCount; i += 1) {
-        if (hidden.has(i)) out.push(i);
-      }
-      return out;
-    }
-
-    const formatSheetLabel = (template: string, name: string): string =>
-      template.replace('{name}', name);
-
-    function refreshSheetbarLabels(): void {
-      const t = strings.sheetTabs;
-      firstSheet.setAttribute('aria-label', t.previousSheet);
-      lastSheet.setAttribute('aria-label', t.nextSheet);
-      sheetTabs.setAttribute('aria-label', t.workbookSheets);
-      addSheetBtn.setAttribute('aria-label', t.addSheet);
-    }
-
-    function closeSheetMenu(): void {
-      sheetMenu.hidden = true;
-      sheetMenu.replaceChildren();
-    }
-
-    function menuButton(label: string, onClick: () => void, disabled = false): HTMLButtonElement {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'fc-sheetmenu__item';
-      button.textContent = label;
-      button.disabled = disabled;
-      button.setAttribute('role', 'menuitem');
-      button.addEventListener('click', () => {
-        if (disabled) return;
-        closeSheetMenu();
-        onClick();
-      });
-      return button;
-    }
-
-    function showSheetMenu(idx: number, tab: HTMLButtonElement, x: number, y: number): void {
-      const visible = visibleSheetIndexes();
-      const hidden = hiddenSheetIndexes();
-      const canMutate = wb.capabilities.sheetMutate;
-      const canHide = wb.capabilities.sheetTabHidden;
-      const moveAndRefresh = (from: number, to: number): void => {
-        if (!moveSheet(store, wb, from, to)) return;
-        hydrateActiveSheet();
-        updateSheetTabs();
-        statusBar?.refresh();
-        renderer.invalidate();
-      };
-      const sep = document.createElement('div');
-      sep.className = 'fc-sheetmenu__sep';
-      sep.setAttribute('role', 'separator');
-
-      sheetMenu.replaceChildren(
-        menuButton(strings.sheetTabs.rename, () => beginRenameSheet(idx, tab), !canMutate),
-        menuButton(strings.sheetTabs.insertSheet, () => {
-          const added = wb.addSheet();
-          if (added < 0) return;
-          switchSheet(added);
-          updateSheetTabs();
-        }),
-        menuButton(
-          strings.sheetTabs.moveLeft,
-          () => moveAndRefresh(idx, idx - 1),
-          !canMutate || idx <= 0,
-        ),
-        menuButton(
-          strings.sheetTabs.moveRight,
-          () => moveAndRefresh(idx, idx + 1),
-          !canMutate || idx >= wb.sheetCount - 1,
-        ),
-        sep,
-        menuButton(
-          strings.sheetTabs.deleteSheet,
-          () => {
-            if (!removeSheet(store, wb, idx)) return;
-            hydrateActiveSheet();
-            updateSheetTabs();
-            statusBar?.refresh();
-            renderer.invalidate();
-          },
-          !canMutate || wb.sheetCount <= 1,
-        ),
-        menuButton(
-          strings.sheetTabs.hideSheet,
-          () => {
-            if (!setSheetHidden(store, wb, history, idx, true)) return;
-            hydrateActiveSheet();
-            updateSheetTabs();
-            statusBar?.refresh();
-            renderer.invalidate();
-          },
-          !canHide || visible.length <= 1,
-        ),
-        menuButton(
-          hidden.length > 0
-            ? formatSheetLabel(strings.sheetTabs.unhideNamedSheet, wb.sheetName(hidden[0] ?? 0))
-            : strings.sheetTabs.unhideSheet,
-          () => {
-            const target = hidden[0];
-            if (target === undefined) return;
-            if (!setSheetHidden(store, wb, history, target, false)) return;
-            switchSheet(target);
-            updateSheetTabs();
-          },
-          !canHide || hidden.length === 0,
-        ),
-      );
-      inheritHostTokens(host, sheetMenu);
-      sheetMenu.hidden = false;
-      sheetMenu.style.left = '0px';
-      sheetMenu.style.top = '0px';
-      const rect = sheetMenu.getBoundingClientRect();
-      const width = Math.ceil(rect.width || sheetMenu.offsetWidth || 180);
-      const height = Math.ceil(rect.height || sheetMenu.offsetHeight || 160);
-      const pad = 8;
-      const maxX = Math.max(pad, window.innerWidth - width - pad);
-      const maxY = Math.max(pad, window.innerHeight - height - pad);
-      const left = Math.min(Math.max(pad, x), maxX);
-      const top = Math.min(Math.max(pad, y), maxY);
-      sheetMenu.style.left = `${left}px`;
-      sheetMenu.style.top = `${top}px`;
-      const first = sheetMenu.querySelector<HTMLButtonElement>(
-        '.fc-sheetmenu__item:not([disabled])',
-      );
-      first?.focus();
-    }
-
-    function beginRenameSheet(idx: number, tab: HTMLButtonElement): void {
-      const before = wb.sheetName(idx);
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.className = 'fc-host__sheetbar-rename';
-      input.value = before;
-      input.spellcheck = false;
-      input.autocomplete = 'off';
-      input.setAttribute('aria-label', formatSheetLabel(strings.sheetTabs.renameSheet, before));
-      tab.replaceWith(input);
-
-      let done = false;
-      const finish = (commit: boolean): void => {
-        if (done) return;
-        done = true;
-        const next = input.value.trim();
-        if (commit && next && next !== before) {
-          const ok = wb.renameSheet(idx, next);
-          if (!ok) {
-            input.setAttribute('aria-invalid', 'true');
-            done = false;
-            input.focus();
-            input.select();
-            return;
-          }
-        }
-        updateSheetTabs();
-      };
-
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          finish(true);
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          finish(false);
-        }
-      });
-      input.addEventListener('blur', () => finish(true));
-      requestAnimationFrame(() => {
-        input.focus();
-        input.select();
-      });
-    }
-
-    function updateSheetTabs(): void {
-      const active = store.getState().data.sheetIndex;
-      const visible = visibleSheetIndexes();
-      refreshSheetbarLabels();
-      sheetTabs.replaceChildren();
-      for (const idx of visible) {
-        const tab = document.createElement('button');
-        tab.type = 'button';
-        tab.className = 'fc-host__sheetbar-tab';
-        tab.setAttribute('role', 'tab');
-        tab.dataset.fcSheetIndex = String(idx);
-        const selected = idx === active;
-        tab.setAttribute('aria-selected', selected ? 'true' : 'false');
-        tab.tabIndex = selected ? 0 : -1;
-        tab.textContent = wb.sheetName(idx);
-        tab.addEventListener('click', () => switchSheet(idx));
-        tab.addEventListener('contextmenu', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          switchSheet(idx);
-          showSheetMenu(idx, tab, e.clientX, e.clientY);
-        });
-        tab.addEventListener('dblclick', () => beginRenameSheet(idx, tab));
-        tab.addEventListener('keydown', (e) => {
-          if (e.key === 'F2' || e.key === 'Enter') {
-            e.preventDefault();
-            beginRenameSheet(idx, tab);
-          } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
-            e.preventDefault();
-            const r = tab.getBoundingClientRect();
-            showSheetMenu(idx, tab, r.left, r.bottom + 2);
-          } else if (e.key === 'ArrowLeft') {
-            e.preventDefault();
-            switchRelativeSheet(-1);
-          } else if (e.key === 'ArrowRight') {
-            e.preventDefault();
-            switchRelativeSheet(1);
-          }
-        });
-        sheetTabs.appendChild(tab);
-        if (selected) {
-          requestAnimationFrame(() => {
-            if (tab.isConnected) tab.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-          });
-        }
-      }
-      const activePos = visible.indexOf(active);
-      firstSheet.disabled = activePos <= 0;
-      lastSheet.disabled = activePos < 0 || activePos >= visible.length - 1;
-      addSheetBtn.disabled = false;
+      hydrateActiveSheetFromEngine(wb, store);
     }
 
     const cellRegistry = new CellRegistry();
@@ -878,37 +171,22 @@ export const Spreadsheet = {
     });
     cellRegistry.subscribe(() => renderer.invalidate());
     renderer.resize();
-    updateSheetTabs();
-
-    firstSheet.addEventListener('click', () => {
-      const visible = visibleSheetIndexes();
-      const pos = visible.indexOf(store.getState().data.sheetIndex);
-      if (pos > 0) switchSheet(visible[pos - 1] ?? 0);
+    sheetTabsController = attachSheetTabsController({
+      addSheetBtn,
+      firstSheet,
+      getStrings: () => strings,
+      getWb: () => wb,
+      history,
+      host,
+      hydrateActiveSheet,
+      invalidate: () => renderer.invalidate(),
+      lastSheet,
+      refreshStatusBar: () => featureState.statusBar?.refresh(),
+      sheetMenu,
+      sheetTabs,
+      store,
     });
-    lastSheet.addEventListener('click', () => {
-      const visible = visibleSheetIndexes();
-      const pos = visible.indexOf(store.getState().data.sheetIndex);
-      const next = visible[pos + 1];
-      if (next !== undefined) switchSheet(next);
-    });
-    addSheetBtn.addEventListener('click', () => {
-      const idx = wb.addSheet();
-      if (idx < 0) return;
-      switchSheet(idx);
-      updateSheetTabs();
-    });
-    const onSheetMenuPointerDown = (e: PointerEvent): void => {
-      if (sheetMenu.hidden) return;
-      const target = e.target;
-      if (target instanceof Node && sheetMenu.contains(target)) return;
-      closeSheetMenu();
-    };
-    const onSheetMenuKeyDown = (e: KeyboardEvent): void => {
-      if (sheetMenu.hidden) return;
-      if (e.key === 'Escape') closeSheetMenu();
-    };
-    document.addEventListener('pointerdown', onSheetMenuPointerDown);
-    document.addEventListener('keydown', onSheetMenuKeyDown);
+    sheetTabsController.update();
 
     // Always-on host features — not toggleable via `MountOptions.features`.
     // Held in `let` so the locale-change subscription can rebuild them with
@@ -948,53 +226,6 @@ export const Spreadsheet = {
     };
     host.addEventListener('fc:openfilter', onOpenFilter);
 
-    // Toggleable host-level features. Each binding starts `null` and is
-    // populated by its attacher when the corresponding flag is on. Cross-
-    // feature references (e.g. `onHostKey` checking `formatPainter`) read
-    // the let-bound vars directly so they always see the current value.
-    let formatDialog: ReturnType<typeof attachFormatDialog> | null = null;
-    let formatPainter: FormatPainterHandle | null = null;
-    let hover: ReturnType<typeof attachHover> | null = null;
-    let conditionalDialog: ReturnType<typeof attachConditionalDialog> | null = null;
-    let iterativeDialog: ReturnType<typeof attachIterativeDialog> | null = null;
-    let goToDialog: ReturnType<typeof attachGoToDialog> | null = null;
-    let fxDialog: FxDialogHandle | null = null;
-    let fxClickHandler: (() => void) | null = null;
-    let namedRangeDialog: ReturnType<typeof attachNamedRangeDialog> | null = null;
-    let pageSetupDialog: ReturnType<typeof attachPageSetupDialog> | null = null;
-    let pivotTableDialog: ReturnType<typeof attachPivotTableDialog> | null = null;
-    let hyperlinkDialog: ReturnType<typeof attachHyperlinkDialog> | null = null;
-    let commentDialog: ReturnType<typeof attachCommentDialog> | null = null;
-    let statusBar: ReturnType<typeof attachStatusBar> | null = null;
-    let watchPanel: ReturnType<typeof attachWatchPanel> | null = null;
-    let unsubWatchRecalc: () => void = (): void => {};
-    let unsubWatchWb: () => void = (): void => {};
-    let slicer: SlicerHandle | null = null;
-    let sessionCharts: SessionChartsHandle | null = null;
-    let viewToolbar: ViewToolbarHandle | null = null;
-    let workbookObjects: WorkbookObjectsPanelHandle | null = null;
-    let unsubSlicerRecalc: () => void = (): void => {};
-    let unsubSlicerWb: () => void = (): void => {};
-    let errorMenu: ErrorMenuHandle | null = null;
-    let detachWheel: () => void = (): void => {};
-    type AutocompleteHandle = ReturnType<typeof attachAutocomplete>;
-    const autocompleteStub: AutocompleteHandle = {
-      isOpen: () => false,
-      move: (_n: number) => {},
-      acceptHighlighted: () => false,
-      close: () => {},
-      refresh: () => {},
-      setLabels: () => {},
-      detach: () => {},
-    };
-    let fxAutocomplete: AutocompleteHandle = autocompleteStub;
-    let fxArgHelper: ReturnType<typeof attachArgHelper> | null = null;
-    let hostShortcutsAttached = false;
-    let canvasErrorClickAttached = false;
-
-    // Built-in feature registry — keyed by feature id, populated by
-    // attachers, drained by `dispose()`. Mirrored into `featuresView`
-    // below for the public `instance.features` surface.
     const featureRegistry = new Map<string, ExtensionHandle>();
     const wrapHandle = (raw: unknown, detach: () => void): ExtensionHandle => {
       const h = (
@@ -1004,520 +235,8 @@ export const Spreadsheet = {
       return h;
     };
 
-    // Host-level toggleable feature ids — `setFeatures(next)` walks this
-    // list and dispatches to the attach/detach helpers. `shortcuts` is
-    // listed for the host-level meta-key listener; the wb-side keyboard
-    // attach is rebuilt by `bindEngine` when shortcuts flip.
-    const HOST_TOGGLEABLE_IDS = [
-      'formatDialog',
-      'formatPainter',
-      'hoverComment',
-      'conditional',
-      'iterative',
-      'gotoSpecial',
-      'fxDialog',
-      'namedRanges',
-      'pageSetup',
-      'pivotTableDialog',
-      'hyperlink',
-      'commentDialog',
-      'statusBar',
-      'workbookObjects',
-      'watchWindow',
-      'slicer',
-      'charts',
-      'errorIndicators',
-      'autocomplete',
-      'wheel',
-      'shortcuts',
-      'formulaBar',
-      'viewToolbar',
-      'sheetTabs',
-    ] as const;
-
-    // Subset of host-toggleable features whose attached handle reads UI
-    // strings. The locale-change handler rebuilds these by detach+reattach
-    // when their handle doesn't expose a `setStrings` hook of its own.
-    const HOST_FEATURE_USES_STRINGS: ReadonlySet<string> = new Set([
-      'formatDialog',
-      'conditional',
-      'iterative',
-      'gotoSpecial',
-      'fxDialog',
-      'namedRanges',
-      'pageSetup',
-      'pivotTableDialog',
-      'hyperlink',
-      'commentDialog',
-      'statusBar',
-      'workbookObjects',
-      'viewToolbar',
-      'watchWindow',
-      'slicer',
-      'charts',
-      'errorIndicators',
-    ]);
-
-    // Wb-side toggleable feature ids — these live inside `bindEngine`.
-    // Toggling any of them triggers a binding rebuild from `setFeatures`.
-    const WB_TOGGLEABLE_IDS = [
-      'shortcuts',
-      'clipboard',
-      'pasteSpecial',
-      'quickAnalysis',
-      'contextMenu',
-      'findReplace',
-      'validation',
-    ] as const;
-
-    const attachHostFeature = (id: string): void => {
-      switch (id) {
-        case 'formatDialog':
-          if (formatDialog) return;
-          formatDialog = attachFormatDialog({
-            host,
-            store,
-            strings,
-            history,
-            getWb: () => wb,
-            getLocale: () => i18n.locale,
-          });
-          featureRegistry.set(
-            'formatDialog',
-            wrapHandle(formatDialog, () => formatDialog?.detach()),
-          );
-          break;
-        case 'formatPainter':
-          if (formatPainter) return;
-          formatPainter = attachFormatPainter({ host, store, history });
-          featureRegistry.set(
-            'formatPainter',
-            wrapHandle(formatPainter, () => formatPainter?.detach()),
-          );
-          break;
-        case 'hoverComment':
-          if (hover) return;
-          hover = attachHover({ grid, store });
-          featureRegistry.set(
-            'hoverComment',
-            wrapHandle(hover, () => hover?.detach()),
-          );
-          break;
-        case 'conditional':
-          if (conditionalDialog) return;
-          conditionalDialog = attachConditionalDialog({ host, store, strings });
-          featureRegistry.set(
-            'conditional',
-            wrapHandle(conditionalDialog, () => conditionalDialog?.detach()),
-          );
-          break;
-        case 'iterative':
-          if (iterativeDialog) return;
-          iterativeDialog = attachIterativeDialog({ host, getWb: () => wb, strings });
-          featureRegistry.set(
-            'iterative',
-            wrapHandle(iterativeDialog, () => iterativeDialog?.detach()),
-          );
-          break;
-        case 'gotoSpecial':
-          if (goToDialog) return;
-          goToDialog = attachGoToDialog({ host, store, strings, getWb: () => wb });
-          featureRegistry.set(
-            'gotoSpecial',
-            wrapHandle(goToDialog, () => goToDialog?.detach()),
-          );
-          break;
-        case 'fxDialog':
-          if (fxDialog) return;
-          fxDialog = attachFxDialog({
-            host,
-            store,
-            strings,
-            onInsert: (formula) => {
-              fxInput.value = formula;
-              fxInput.focus();
-              commitFx('none');
-            },
-          });
-          fxClickHandler = (): void => fxDialog?.open();
-          fx.addEventListener('click', fxClickHandler);
-          fx.disabled = false;
-          fx.style.cursor = '';
-          featureRegistry.set(
-            'fxDialog',
-            wrapHandle(fxDialog, () => fxDialog?.detach()),
-          );
-          break;
-        case 'namedRanges':
-          if (namedRangeDialog) return;
-          namedRangeDialog = attachNamedRangeDialog({ host, wb, strings });
-          featureRegistry.set(
-            'namedRanges',
-            wrapHandle(namedRangeDialog, () => namedRangeDialog?.detach()),
-          );
-          break;
-        case 'pageSetup':
-          if (pageSetupDialog) return;
-          pageSetupDialog = attachPageSetupDialog({ host, store, strings, history });
-          featureRegistry.set(
-            'pageSetup',
-            wrapHandle(pageSetupDialog, () => pageSetupDialog?.detach()),
-          );
-          break;
-        case 'pivotTableDialog':
-          if (pivotTableDialog) return;
-          pivotTableDialog = attachPivotTableDialog({
-            host,
-            store,
-            wb,
-            strings,
-            onAfterCreate: () => {
-              mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
-            },
-            invalidate: () => renderer.invalidate(),
-          });
-          featureRegistry.set(
-            'pivotTableDialog',
-            wrapHandle(pivotTableDialog, () => pivotTableDialog?.detach()),
-          );
-          break;
-        case 'hyperlink':
-          if (hyperlinkDialog) return;
-          hyperlinkDialog = attachHyperlinkDialog({
-            host,
-            store,
-            strings,
-            history,
-            getWb: () => wb,
-          });
-          featureRegistry.set(
-            'hyperlink',
-            wrapHandle(hyperlinkDialog, () => hyperlinkDialog?.detach()),
-          );
-          break;
-        case 'commentDialog':
-          if (commentDialog) return;
-          commentDialog = attachCommentDialog({
-            host,
-            store,
-            strings,
-            history,
-            getWb: () => wb,
-          });
-          featureRegistry.set(
-            'commentDialog',
-            wrapHandle(commentDialog, () => commentDialog?.detach()),
-          );
-          break;
-        case 'statusBar':
-          if (statusBar) return;
-          setChromeAttached('statusbar', true);
-          statusBar = attachStatusBar({
-            statusbar,
-            store,
-            strings,
-            getEngineLabel: () => (wb.isStub ? 'stub' : `formulon ${wb.version}`),
-            getCalcMode: () => wb.calcMode(),
-            onCycleCalcMode: () => {
-              const cur = wb.calcMode();
-              if (cur === null) return;
-              const next = ((cur + 1) % 3) as 0 | 1 | 2;
-              wb.setCalcMode(next);
-              statusBar?.refresh();
-            },
-            onRecalc: () => {
-              wb.recalc();
-              mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
-              renderer.invalidate();
-            },
-            onZoomChange: (zoom) => {
-              setSheetZoom(store, zoom, wb);
-              renderer.invalidate();
-            },
-          });
-          featureRegistry.set(
-            'statusBar',
-            wrapHandle(statusBar, () => statusBar?.detach()),
-          );
-          break;
-        case 'workbookObjects':
-          if (workbookObjects) return;
-          workbookObjects = attachWorkbookObjectsPanel({ host, wb, strings });
-          featureRegistry.set(
-            'workbookObjects',
-            wrapHandle(workbookObjects, () => workbookObjects?.detach()),
-          );
-          break;
-        case 'viewToolbar':
-          if (viewToolbar) return;
-          setChromeAttached('viewbar', true);
-          viewToolbar = attachViewToolbar({
-            toolbar: viewbar,
-            store,
-            wb,
-            history,
-            strings,
-            onOpenObjects: flags.workbookObjects ? () => workbookObjects?.open() : undefined,
-            onChanged: () => renderer.invalidate(),
-          });
-          featureRegistry.set(
-            'viewToolbar',
-            wrapHandle(viewToolbar, () => viewToolbar?.detach()),
-          );
-          break;
-        case 'watchWindow':
-          if (watchPanel) return;
-          setChromeAttached('watchDock', true);
-          watchPanel = attachWatchPanel({ host: watchDock, store, getWb: () => wb, strings });
-          featureRegistry.set(
-            'watchWindow',
-            wrapHandle(watchPanel, () => watchPanel?.detach()),
-          );
-          unsubWatchRecalc = emitter.on('recalc', () => watchPanel?.refresh());
-          unsubWatchWb = emitter.on('workbookChange', () => watchPanel?.refresh());
-          break;
-        case 'slicer':
-          if (slicer) return;
-          slicer = attachSlicer({ host, store, getWb: () => wb, history, strings });
-          featureRegistry.set(
-            'slicer',
-            wrapHandle(slicer, () => slicer?.detach()),
-          );
-          unsubSlicerRecalc = emitter.on('recalc', () => slicer?.refresh());
-          unsubSlicerWb = emitter.on('workbookChange', () => slicer?.refresh());
-          break;
-        case 'charts':
-          if (sessionCharts) return;
-          sessionCharts = attachSessionCharts({
-            host,
-            store,
-            labels: strings.sessionCharts,
-          });
-          featureRegistry.set(
-            'charts',
-            wrapHandle(sessionCharts, () => sessionCharts?.detach()),
-          );
-          break;
-        case 'errorIndicators':
-          if (errorMenu) return;
-          errorMenu = attachErrorMenu({
-            host,
-            store,
-            getWb: () => wb,
-            strings,
-            onEditCell: (addr) => {
-              mutators.setActive(store, addr);
-              const cell = store.getState().data.cells.get(`${addr.sheet}:${addr.row}:${addr.col}`);
-              fxInput.value = formatCellForEdit(cell, wb, addr);
-              fxInput.focus();
-              fxInput.setSelectionRange(fxInput.value.length, fxInput.value.length);
-            },
-            onTraceError: (addr) => {
-              mutators.setActive(store, addr);
-              tracePrecedentArrows(store, wb, addr);
-              renderer.invalidate();
-            },
-          });
-          if (!canvasErrorClickAttached) {
-            canvas.addEventListener('click', onCanvasClick);
-            canvasErrorClickAttached = true;
-          }
-          featureRegistry.set(
-            'errorIndicators',
-            wrapHandle(errorMenu, () => errorMenu?.detach()),
-          );
-          break;
-        case 'autocomplete':
-          if (fxAutocomplete !== autocompleteStub) return;
-          fxAutocomplete = attachAutocomplete({
-            input: fxInput,
-            onAfterInsert: () => syncFxRefs(),
-            getTables: () => wb.getTables(),
-            getCustomFunctions: () => formulaRegistry.list(),
-            getFunctionNames: () => wb.functionNames(),
-            labels: strings.autocomplete,
-          });
-          fxArgHelper = attachArgHelper({ input: fxInput, labels: strings.argHelper });
-          break;
-        case 'wheel':
-          // Idempotent — `detachWheel` is replaced wholesale.
-          detachWheel();
-          detachWheel = attachWheel({ grid, store, wb });
-          break;
-        case 'shortcuts':
-          if (hostShortcutsAttached) return;
-          host.addEventListener('keydown', onHostKey);
-          hostShortcutsAttached = true;
-          break;
-        case 'formulaBar':
-          setChromeAttached('formulabar', true);
-          break;
-        case 'sheetTabs':
-          setChromeAttached('sheetbar', true);
-          updateSheetTabs();
-          break;
-      }
-      refreshFeaturesView();
-    };
-
-    const detachHostFeature = (id: string): void => {
-      switch (id) {
-        case 'formatDialog':
-          formatDialog?.detach();
-          formatDialog = null;
-          featureRegistry.delete('formatDialog');
-          break;
-        case 'formatPainter':
-          formatPainter?.detach();
-          formatPainter = null;
-          featureRegistry.delete('formatPainter');
-          break;
-        case 'hoverComment':
-          hover?.detach();
-          hover = null;
-          featureRegistry.delete('hoverComment');
-          break;
-        case 'conditional':
-          conditionalDialog?.detach();
-          conditionalDialog = null;
-          featureRegistry.delete('conditional');
-          break;
-        case 'iterative':
-          iterativeDialog?.detach();
-          iterativeDialog = null;
-          featureRegistry.delete('iterative');
-          break;
-        case 'gotoSpecial':
-          goToDialog?.detach();
-          goToDialog = null;
-          featureRegistry.delete('gotoSpecial');
-          break;
-        case 'fxDialog':
-          if (fxClickHandler) fx.removeEventListener('click', fxClickHandler);
-          fxClickHandler = null;
-          fxDialog?.detach();
-          fxDialog = null;
-          fx.disabled = true;
-          fx.style.cursor = 'default';
-          featureRegistry.delete('fxDialog');
-          break;
-        case 'namedRanges':
-          namedRangeDialog?.detach();
-          namedRangeDialog = null;
-          featureRegistry.delete('namedRanges');
-          break;
-        case 'pageSetup':
-          pageSetupDialog?.detach();
-          pageSetupDialog = null;
-          featureRegistry.delete('pageSetup');
-          break;
-        case 'pivotTableDialog':
-          pivotTableDialog?.detach();
-          pivotTableDialog = null;
-          featureRegistry.delete('pivotTableDialog');
-          break;
-        case 'hyperlink':
-          hyperlinkDialog?.detach();
-          hyperlinkDialog = null;
-          featureRegistry.delete('hyperlink');
-          break;
-        case 'commentDialog':
-          commentDialog?.detach();
-          commentDialog = null;
-          featureRegistry.delete('commentDialog');
-          break;
-        case 'statusBar':
-          statusBar?.detach();
-          statusBar = null;
-          featureRegistry.delete('statusBar');
-          setChromeAttached('statusbar', false);
-          break;
-        case 'workbookObjects':
-          workbookObjects?.detach();
-          workbookObjects = null;
-          featureRegistry.delete('workbookObjects');
-          break;
-        case 'viewToolbar':
-          viewToolbar?.detach();
-          viewToolbar = null;
-          featureRegistry.delete('viewToolbar');
-          setChromeAttached('viewbar', false);
-          break;
-        case 'watchWindow':
-          unsubWatchRecalc();
-          unsubWatchWb();
-          unsubWatchRecalc = (): void => {};
-          unsubWatchWb = (): void => {};
-          watchPanel?.detach();
-          watchPanel = null;
-          featureRegistry.delete('watchWindow');
-          setChromeAttached('watchDock', false);
-          break;
-        case 'slicer':
-          unsubSlicerRecalc();
-          unsubSlicerWb();
-          unsubSlicerRecalc = (): void => {};
-          unsubSlicerWb = (): void => {};
-          slicer?.detach();
-          slicer = null;
-          featureRegistry.delete('slicer');
-          break;
-        case 'charts':
-          sessionCharts?.detach();
-          sessionCharts = null;
-          featureRegistry.delete('charts');
-          break;
-        case 'errorIndicators':
-          if (canvasErrorClickAttached) canvas.removeEventListener('click', onCanvasClick);
-          canvasErrorClickAttached = false;
-          errorMenu?.detach();
-          errorMenu = null;
-          featureRegistry.delete('errorIndicators');
-          break;
-        case 'autocomplete':
-          fxAutocomplete.detach();
-          fxAutocomplete = autocompleteStub;
-          fxArgHelper?.detach();
-          fxArgHelper = null;
-          break;
-        case 'wheel':
-          detachWheel();
-          detachWheel = (): void => {};
-          break;
-        case 'shortcuts':
-          if (hostShortcutsAttached) host.removeEventListener('keydown', onHostKey);
-          hostShortcutsAttached = false;
-          break;
-        case 'formulaBar':
-          setChromeAttached('formulabar', false);
-          break;
-        case 'sheetTabs':
-          setChromeAttached('sheetbar', false);
-          break;
-      }
-      refreshFeaturesView();
-    };
-
-    // wb-dependent layer — re-built whenever setWorkbook swaps the engine.
-    interface EngineBinding {
-      editor: InlineEditor;
-      pasteSpecialDialog: ReturnType<typeof attachPasteSpecial> | null;
-      findReplace: ReturnType<typeof attachFindReplace> | null;
-      validation: ReturnType<typeof attachValidationList> | null;
-      quickAnalysis: ReturnType<typeof attachQuickAnalysis> | null;
-      clipboardH: ReturnType<typeof attachClipboard> | null;
-      contextMenu: ExtensionHandle | null;
-      unbind: () => void;
-    }
-
-    const WB_REGISTRY_IDS = [
-      'clipboard',
-      'pasteSpecial',
-      'quickAnalysis',
-      'contextMenu',
-      'findReplace',
-      'validation',
-    ] as const;
+    const autocompleteStub = createAutocompleteStub();
+    const featureState = createHostFeatureState(autocompleteStub);
 
     const syncBindingFeatures = (current: EngineBinding): void => {
       for (const id of WB_REGISTRY_IDS) featureRegistry.delete(id);
@@ -1554,373 +273,57 @@ export const Spreadsheet = {
       }
     };
 
-    const bindEngine = (currentWb: WorkbookHandle): EngineBinding => {
-      const editor = new InlineEditor({
-        host,
+    let chromeSync: ChromeSyncController | null = null;
+    const updateChrome = (): void => chromeSync?.updateChrome();
+
+    const bindEngine = (currentWb: WorkbookHandle): EngineBinding =>
+      attachEngineBinding({
+        emitter,
+        flags,
+        getCommentDialog: () => featureState.commentDialog,
+        getFormatDialog: () => featureState.formatDialog,
+        getFormatPainter: () => featureState.formatPainter,
+        getGoToDialog: () => featureState.goToDialog,
+        getHyperlinkDialog: () => featureState.hyperlinkDialog,
+        getPivotTableDialog: () => featureState.pivotTableDialog,
+        getSessionCharts: () => featureState.sessionCharts,
+        getSheetTabs: () => sheetTabsController,
         grid,
-        store,
-        wb: currentWb,
-        getLabels: () => ({
-          autocomplete: strings.autocomplete,
-          argHelper: strings.argHelper,
-        }),
-        onAfterCommit: () => {
-          mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex));
-        },
-      });
-      const detachPtr = attachPointer(
-        grid,
-        store,
-        currentWb,
-        () => mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex)),
         history,
-        () =>
-          editor.isActive() && editor.isFormulaEdit()
-            ? {
-                isFormulaEdit: () => editor.isFormulaEdit(),
-                insertRefAtCaret: (ref) => editor.insertRefAtCaret(ref),
-              }
-            : null,
-      );
-      const detachKey = flags.shortcuts
-        ? attachKeyboard({
-            host,
-            store,
-            wb: currentWb,
-            history,
-            onBeginEdit: (seed) => editor.begin(seed),
-            onClearActive: () => {
-              mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex));
-              updateChrome();
-            },
-            onAfterHistory: () =>
-              mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex)),
-            onGoTo: () => {
-              // F5 / Ctrl+G — open Go To Special when the feature is on,
-              // otherwise fall back to focusing the Name Box for direct
-              // navigation typing.
-              if (goToDialog) {
-                goToDialog.open();
-                return;
-              }
-              tag.focus();
-              tag.select();
-            },
-            onSwitchSheet: (delta) => switchRelativeSheet(delta),
-            onEditComment: () => commentDialog?.open(),
-          })
-        : (): void => {};
-      const clipboardH = flags.clipboard
-        ? attachClipboard({
-            host,
-            store,
-            wb: currentWb,
-            onAfterCommit: () =>
-              mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex)),
-          })
-        : null;
-      const pasteSpecialDialog =
-        flags.pasteSpecial && clipboardH
-          ? attachPasteSpecial({
-              host,
-              store,
-              wb: currentWb,
-              strings,
-              history,
-              getSnapshot: () => clipboardH.getSnapshot(),
-              onAfterCommit: () =>
-                mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex)),
-            })
-          : null;
-      const detachContextMenu = flags.contextMenu
-        ? attachContextMenu({
-            host,
-            store,
-            wb: currentWb,
-            strings,
-            history,
-            onAfterCommit: () =>
-              mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex)),
-            onFormatDialog: () => formatDialog?.open(),
-            onPasteSpecial: () => pasteSpecialDialog?.open(),
-            onInsertHyperlink: () => hyperlinkDialog?.open(),
-            onEditComment: () => commentDialog?.open(),
-            onToggleWatch: flags.watchWindow
-              ? (addr) => {
-                  const watches = store.getState().watch.watches;
-                  const isOn = watches.some(
-                    (w) => w.sheet === addr.sheet && w.row === addr.row && w.col === addr.col,
-                  );
-                  if (isOn) mutators.removeWatch(store, addr);
-                  else {
-                    mutators.addWatch(store, addr);
-                    mutators.setWatchPanelOpen(store, true);
-                  }
-                }
-              : undefined,
-            isWatched: flags.watchWindow
-              ? (addr) =>
-                  store
-                    .getState()
-                    .watch.watches.some(
-                      (w) => w.sheet === addr.sheet && w.row === addr.row && w.col === addr.col,
-                    )
-              : undefined,
-          })
-        : (): void => {};
-      const contextMenu = flags.contextMenu
-        ? wrapHandle({}, () => {
-            detachContextMenu();
-          })
-        : null;
-      const findReplace = flags.findReplace
-        ? attachFindReplace({
-            host,
-            store,
-            wb: currentWb,
-            strings,
-            onAfterCommit: () =>
-              mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex)),
-          })
-        : null;
-      const validation = flags.validation
-        ? attachValidationList({
-            grid,
-            store,
-            wb: currentWb,
-            onAfterCommit: () =>
-              mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex)),
-          })
-        : null;
-      const quickAnalysis = flags.quickAnalysis
-        ? attachQuickAnalysis({
-            host,
-            store,
-            wb: currentWb,
-            strings,
-            onAfterCommit: () =>
-              mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex)),
-            invalidate: () => renderer.invalidate(),
-            onOpenPivotTable: flags.pivotTableDialog ? () => pivotTableDialog?.open() : undefined,
-            canOpenPivotTable: () => !!pivotTableDialog,
-            canCreateChart: () => flags.charts && !!sessionCharts,
-          })
-        : null;
-
-      const onDblClick = (e: MouseEvent): void => {
-        if (e.button !== 0) return;
-        if (editor.isActive()) return;
-        if (formatPainter?.isActive()) return;
-        const s = store.getState();
-        const a = s.selection.active;
-        const seed =
-          currentWb.cellFormula(a) ??
-          formatCellForEdit(s.data.cells.get(`${a.sheet}:${a.row}:${a.col}`), currentWb, a);
-        editor.begin(seed);
-        e.preventDefault();
-      };
-      grid.addEventListener('dblclick', onDblClick);
-
-      const unsubWb = currentWb.subscribe((e: ChangeEvent) => {
-        if (e.kind === 'value') {
-          const formula = currentWb.cellFormula(e.addr);
-          const cell = { value: e.next, formula };
-          store.setState((s) => {
-            const cells = new Map(s.data.cells);
-            cells.set(`${e.addr.sheet}:${e.addr.row}:${e.addr.col}`, cell);
-            return { ...s, data: { ...s.data, cells } };
-          });
-          emitter.emit('cellChange', { addr: e.addr, value: e.next, formula });
-        } else if (e.kind === 'recalc') {
-          emitter.emit('recalc', { dirty: e.dirty });
-        } else if (
-          e.kind === 'sheet-add' ||
-          e.kind === 'sheet-rename' ||
-          e.kind === 'sheet-remove' ||
-          e.kind === 'sheet-move'
-        ) {
-          updateSheetTabs();
-        }
+        host,
+        renderer,
+        store,
+        strings,
+        tag,
+        updateChrome,
+        wb: currentWb,
       });
-
-      return {
-        editor,
-        pasteSpecialDialog,
-        findReplace,
-        validation,
-        quickAnalysis,
-        clipboardH,
-        contextMenu,
-        unbind: () => {
-          detachPtr();
-          detachKey();
-          clipboardH?.detach();
-          detachContextMenu();
-          findReplace?.detach();
-          pasteSpecialDialog?.detach();
-          validation?.detach();
-          quickAnalysis?.detach();
-          grid.removeEventListener('dblclick', onDblClick);
-          unsubWb();
-          if (editor.isActive()) editor.cancel();
-        },
-      };
-    };
 
     let binding = bindEngine(wb);
     syncBindingFeatures(binding);
 
-    // Top-level shortcuts that need to beat the browser default — Cmd+F opens
-    // Find/Replace, Cmd+A selects all cells, Cmd+1 opens Format Cells. Bound on
-    // the host so they only trigger while the spreadsheet has focus
-    // (formula-bar / find / dialog inputs keep their browser-native behavior).
-    // Skipped entirely when `flags.shortcuts === false`.
-    const onHostKey = (e: KeyboardEvent): void => {
-      const meta = e.ctrlKey || e.metaKey;
-      // F9 / Ctrl+Alt+F9 — full recalc. Mirrors the spreadsheet convention: F9 alone in
-      // manual mode kicks a recalc, Ctrl+Alt+F9 forces re-evaluation
-      // even on cells the engine considers clean. The cell engine
-      // doesn't distinguish these — both call wb.recalc() — so the
-      // shortcut serves the same intent under either binding.
-      if (e.key === 'F9') {
-        e.preventDefault();
-        wb.recalc();
-        mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
-        renderer.invalidate();
-        return;
-      }
-      if (!meta) return;
-      const k = e.key.toLowerCase();
-      if (e.shiftKey && k === 'c') {
-        // Cmd/Ctrl+Shift+C — copy formatting (one-shot).
-        if (!formatPainter) return;
-        e.preventDefault();
-        formatPainter.activate(false);
-        return;
-      }
-      if (e.shiftKey && k === 'v') {
-        // Cmd/Ctrl+Shift+V — open Paste Special.
-        if (!binding.pasteSpecialDialog) return;
-        e.preventDefault();
-        binding.pasteSpecialDialog.open();
-        return;
-      }
-      if (e.altKey && k === 'v') {
-        // Alt binding: Ctrl+Alt+V (Win) / Cmd+Option+V (Mac).
-        if (!binding.pasteSpecialDialog) return;
-        e.preventDefault();
-        binding.pasteSpecialDialog.open();
-        return;
-      }
-      if (e.ctrlKey && !e.metaKey && k === 'q') {
-        if (!binding.quickAnalysis) return;
-        e.preventDefault();
-        binding.quickAnalysis.open();
-        return;
-      }
-      if (k === 'f') {
-        if (!binding.findReplace) return;
-        e.preventDefault();
-        binding.findReplace.open();
-      } else if (k === 'k') {
-        // Ctrl/Cmd+K — Insert Hyperlink dialog (spreadsheet parity).
-        if (!hyperlinkDialog) return;
-        e.preventDefault();
-        hyperlinkDialog.open();
-      } else if (k === 'a') {
-        e.preventDefault();
-        mutators.selectAll(store);
-      } else if (e.key === '1') {
-        if (!formatDialog) return;
-        e.preventDefault();
-        formatDialog.open();
-      } else if (e.key === '`') {
-        // Ctrl+` — toggle show-formulas mode.
-        e.preventDefault();
-        mutators.setShowFormulas(store, !store.getState().ui.showFormulas);
-      } else if (e.altKey && k === 'r') {
-        // Ctrl/Cmd+Alt+R — toggle R1C1 reference style. Mirrors the spreadsheet's
-        //  File → Options → Formulas → "Use R1C1 reference style" checkbox
-        //  but exposed as a shortcut for power users.
-        e.preventDefault();
-        mutators.setR1C1(store, !store.getState().ui.r1c1);
-      } else if (e.key === ';') {
-        // Ctrl+; — insert today's date as spreadsheet serial.
-        e.preventDefault();
-        const now = new Date();
-        const utcMs = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-        const serial = utcMs / 86_400_000 + 25569;
-        const a = store.getState().selection.active;
-        wb.setNumber(a, Math.floor(serial));
-        mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
-      } else if (e.shiftKey && e.key === ':') {
-        // Ctrl+Shift+: — insert current time fraction.
-        e.preventDefault();
-        const now = new Date();
-        const frac =
-          (now.getUTCHours() * 3600 + now.getUTCMinutes() * 60 + now.getUTCSeconds()) / 86400;
-        const a = store.getState().selection.active;
-        wb.setNumber(a, frac);
-        mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
-      } else if (k === 'd') {
-        // Ctrl+D — fill down from the top row of the selection to the rest.
-        e.preventDefault();
-        const r = store.getState().selection.range;
-        if (r.r1 > r.r0) {
-          fillRange(
-            store.getState(),
-            wb,
-            { sheet: r.sheet, r0: r.r0, c0: r.c0, r1: r.r0, c1: r.c1 },
-            r,
-          );
-          mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
-        }
-      } else if (k === 'r') {
-        // Ctrl+R — fill right from the left column of the selection.
-        e.preventDefault();
-        const r = store.getState().selection.range;
-        if (r.c1 > r.c0) {
-          fillRange(
-            store.getState(),
-            wb,
-            { sheet: r.sheet, r0: r.r0, c0: r.c0, r1: r.r1, c1: r.c0 },
-            r,
-          );
-          mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
-        }
-      } else if (k === 'b') {
-        e.preventDefault();
-        recordFormatChange(history, store, () => {
-          toggleBold(store.getState(), store);
-        });
-        flushFormatToEngine(wb, store, store.getState().data.sheetIndex);
-      } else if (k === 'i') {
-        e.preventDefault();
-        recordFormatChange(history, store, () => {
-          toggleItalic(store.getState(), store);
-        });
-        flushFormatToEngine(wb, store, store.getState().data.sheetIndex);
-      } else if (k === 'u') {
-        e.preventDefault();
-        recordFormatChange(history, store, () => {
-          toggleUnderline(store.getState(), store);
-        });
-        flushFormatToEngine(wb, store, store.getState().data.sheetIndex);
-      } else if (e.key === '5') {
-        e.preventDefault();
-        recordFormatChange(history, store, () => {
-          toggleStrike(store.getState(), store);
-        });
-        flushFormatToEngine(wb, store, store.getState().data.sheetIndex);
-      }
-    };
+    const onHostKey = createHostShortcutHandler({
+      findReplace: () => binding.findReplace,
+      formatDialog: () => featureState.formatDialog,
+      formatPainter: () => featureState.formatPainter,
+      goToDialog: () => featureState.goToDialog,
+      history,
+      hostTag: tag,
+      hyperlinkDialog: () => featureState.hyperlinkDialog,
+      invalidate: () => renderer.invalidate(),
+      pasteSpecialDialog: () => binding.pasteSpecialDialog,
+      quickAnalysis: () => binding.quickAnalysis,
+      store,
+      wb: () => wb,
+    });
+
     // Error / validation triangle clicks. Bound on the canvas by the
     // `errorIndicators` attacher above. We use `click` (not `pointerdown`)
     // so the existing pointer handler gets to set the active cell first —
     // that way the menu and the cell select agree on the addr the user
     // just clicked.
     const onCanvasClick = (e: MouseEvent): void => {
-      if (!errorMenu) return;
+      if (!featureState.errorMenu) return;
       if (e.button !== 0) return;
       const rect = canvas.getBoundingClientRect();
       const lx = e.clientX - rect.left;
@@ -1935,313 +338,39 @@ export const Spreadsheet = {
         }
         e.stopPropagation();
         e.preventDefault();
-        errorMenu.open(hit.addr, e.clientX, e.clientY, hit.kind);
+        featureState.errorMenu.open(hit.addr, e.clientX, e.clientY, hit.kind);
         return;
       }
     };
 
-    // Formula bar editing — typing in the formula bar edits the active cell.
-    let fxEditing = false;
-    let fxBaseline = '';
-    const refreshFxActions = (): void => {
-      const dirty = fxEditing && fxInput.value !== fxBaseline;
-      fxCancel.disabled = !fxEditing;
-      fxAccept.disabled = !dirty;
-      formulabar.dataset.fcEditing = fxEditing ? '1' : '0';
-    };
-    const syncFxRefs = (): void => {
-      const refs = extractRefs(fxInput.value).map((r) => ({
-        r0: r.r0,
-        c0: r.c0,
-        r1: r.r1,
-        c1: r.c1,
-        colorIndex: r.colorIndex,
-      }));
-      mutators.setEditorRefs(store, refs);
-    };
-    const clearFxRefs = (): void => mutators.setEditorRefs(store, []);
-    const onFxFocus = (): void => {
-      if (binding.editor.isActive()) binding.editor.cancel();
-      fxEditing = true;
-      fxBaseline = fxInput.value;
-      refreshFxActions();
-      syncFxRefs();
-    };
-    const onFxInput = (): void => {
-      refreshFxActions();
-      if (fxEditing) syncFxRefs();
-      fxAutocomplete.refresh();
-      fxArgHelper?.refresh();
-    };
-    const onFxKeyUp = (): void => {
-      // Caret moves on arrow / Home / End / click — refresh the arg tooltip
-      //  alone (autocomplete already keys off `input`).
-      if (fxEditing) fxArgHelper?.refresh();
-    };
-    const onFxKey = (e: KeyboardEvent): void => {
-      // The formula bar lives inside `host`, so its key events bubble to the
-      // grid's keyboard handler. Stop propagation on the keys we handle so the
-      // grid handler doesn't interpret Enter/Tab as begin-edit / move-active.
-      if (fxAutocomplete.isOpen()) {
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          e.stopPropagation();
-          fxAutocomplete.move(1);
-          return;
-        }
-        if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          e.stopPropagation();
-          fxAutocomplete.move(-1);
-          return;
-        }
-        if ((e.key === 'Enter' || e.key === 'Tab') && fxAutocomplete.acceptHighlighted()) {
-          e.preventDefault();
-          e.stopPropagation();
-          return;
-        }
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          e.stopPropagation();
-          fxAutocomplete.close();
-          return;
-        }
-      }
-      if (e.key === 'Enter') {
-        // Alt+Enter inserts a newline (multi-line cell content); plain
-        // Enter commits and advances. Shift+Enter mirrors Alt+Enter for users
-        // expecting browser-textarea behavior.
-        if (e.altKey || e.shiftKey) {
-          e.stopPropagation();
-          return;
-        }
-        e.preventDefault();
-        e.stopPropagation();
-        commitFx('down');
-      } else if (e.key === 'Tab') {
-        e.preventDefault();
-        e.stopPropagation();
-        commitFx(e.shiftKey ? 'none' : 'right');
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        fxInput.value = fxBaseline;
-        fxEditing = false;
-        refreshFxActions();
-        host.focus();
-        updateChrome();
-      } else if (e.key === 'F4') {
-        e.preventDefault();
-        e.stopPropagation();
-        const caret = fxInput.selectionStart ?? fxInput.value.length;
-        const r = rotateRefAt(fxInput.value, caret);
-        if (r.text !== fxInput.value) {
-          fxInput.value = r.text;
-          fxInput.setSelectionRange(r.caret, r.caret);
-          syncFxRefs();
-        }
-      }
-    };
-    const onFxBlur = (): void => {
-      clearFxRefs();
-      fxAutocomplete.close();
-      if (!fxEditing) return;
-      // Only commit if value actually changed.
-      if (fxInput.value !== fxBaseline) commitFx('none');
-      else {
-        fxEditing = false;
-        refreshFxActions();
-      }
-    };
-    function commitFx(advance: 'down' | 'right' | 'none'): void {
-      const s = store.getState();
-      const a = s.selection.active;
-      try {
-        const fmt = s.format.formats.get(`${a.sheet}:${a.row}:${a.col}`);
-        const outcome = writeInputValidated(wb, a, fxInput.value, fmt?.validation);
-        if (!outcome.ok) {
-          console.warn(`formulon-cell: validation ${outcome.severity}: ${outcome.message}`);
-          if (outcome.severity === 'stop') {
-            // Keep editing — don't advance, don't commit baseline change.
-            fxInput.focus();
-            return;
-          }
-        }
-      } catch (err) {
-        console.warn('formulon-cell: writeInput failed', err);
-      }
-      mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
-      fxEditing = false;
-      fxBaseline = fxInput.value;
-      refreshFxActions();
-      clearFxRefs();
-      if (advance === 'down') {
-        mutators.setActive(store, { ...a, row: a.row + 1 });
-      } else if (advance === 'right') {
-        mutators.setActive(store, { ...a, col: a.col + 1 });
-      }
-      host.focus();
-    }
-    function cancelFx(): void {
-      fxInput.value = fxBaseline;
-      fxEditing = false;
-      clearFxRefs();
-      fxAutocomplete.close();
-      refreshFxActions();
-      host.focus();
-      updateChrome();
-    }
-    function acceptFx(): void {
-      if (fxInput.value !== fxBaseline) commitFx('none');
-    }
-    fxInput.addEventListener('focus', onFxFocus);
-    fxInput.addEventListener('input', onFxInput);
-    fxInput.addEventListener('keyup', onFxKeyUp);
-    fxInput.addEventListener('keydown', onFxKey);
-    fxInput.addEventListener('blur', onFxBlur);
-    const keepFxFocus = (e: MouseEvent): void => e.preventDefault();
-    fxCancel.addEventListener('mousedown', keepFxFocus);
-    fxAccept.addEventListener('mousedown', keepFxFocus);
-    fxCancel.addEventListener('click', cancelFx);
-    fxAccept.addEventListener('click', acceptFx);
-    refreshFxActions();
-
-    // Name box — Enter jumps to a cell ref, Escape reverts.
-    const onTagFocus = (): void => tag.select();
-    const onTagKey = (e: KeyboardEvent): void => {
-      // Same caveat as onFxKey — stop propagation so the grid's keyboard
-      // handler doesn't catch our Enter/Escape.
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        e.stopPropagation();
-        const sheetIdx = store.getState().data.sheetIndex;
-        // Try range first (A1:B5), fall back to single ref, then defined name.
-        const range = parseRangeRef(tag.value);
-        if (range) {
-          store.setState((s) => ({
-            ...s,
-            selection: {
-              active: { sheet: sheetIdx, row: range.r0, col: range.c0 },
-              anchor: { sheet: sheetIdx, row: range.r0, col: range.c0 },
-              range: { sheet: sheetIdx, ...range },
-            },
-          }));
-          host.focus();
-          return;
-        }
-        const parsed = parseCellRef(tag.value);
-        if (parsed) {
-          mutators.setActive(store, {
-            sheet: sheetIdx,
-            row: parsed.row,
-            col: parsed.col,
-          });
-          host.focus();
-          return;
-        }
-        // Defined-name lookup (engine-side, RO).
-        const dn = lookupDefinedName(wb, tag.value.trim());
-        if (dn) {
-          const sub = parseRangeRef(dn) ?? parseCellRef(dn);
-          if (sub) {
-            if ('r0' in sub) {
-              store.setState((s) => ({
-                ...s,
-                selection: {
-                  active: { sheet: sheetIdx, row: sub.r0, col: sub.c0 },
-                  anchor: { sheet: sheetIdx, row: sub.r0, col: sub.c0 },
-                  range: { sheet: sheetIdx, ...sub },
-                },
-              }));
-            } else {
-              mutators.setActive(store, { sheet: sheetIdx, row: sub.row, col: sub.col });
-            }
-            host.focus();
-            return;
-          }
-        }
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        host.focus();
-        updateChrome();
-      }
-    };
-    const onTagBlur = (): void => {
-      // Revert to current selection when leaving without committing.
-      updateChrome();
-    };
-    tag.addEventListener('focus', onTagFocus);
-    tag.addEventListener('keydown', onTagKey);
-    tag.addEventListener('blur', onTagBlur);
-
-    // Re-paint and update chrome on every store change.
-    let lastSheetIdx = store.getState().data.sheetIndex;
-    let lastHiddenSheets = store.getState().layout.hiddenSheets;
-    let lastSelection = store.getState().selection;
-    const unsub = store.subscribe(() => {
-      const s = store.getState();
-      const sheetChanged = s.data.sheetIndex !== lastSheetIdx;
-      if (sheetChanged) {
-        wb.clearViewportHint();
-        lastSheetIdx = s.data.sheetIndex;
-      }
-      if (sheetChanged || s.layout.hiddenSheets !== lastHiddenSheets) {
-        lastHiddenSheets = s.layout.hiddenSheets;
-        updateSheetTabs();
-      }
-      if (!selectionEquals(lastSelection, s.selection)) {
-        lastSelection = s.selection;
-        emitter.emit('selectionChange', {
-          active: s.selection.active,
-          anchor: s.selection.anchor,
-          range: s.selection.range,
-        });
-      }
-      renderer.invalidate();
-      updateChrome();
+    const formulaBar = attachFormulaBarController({
+      cancelBindingEditor: () => {
+        if (binding.editor.isActive()) binding.editor.cancel();
+      },
+      formulabar,
+      fxAccept,
+      fxCancel,
+      fxInput,
+      getArgHelper: () => featureState.fxArgHelper,
+      getAutocomplete: () => featureState.fxAutocomplete,
+      host,
+      store,
+      updateChrome,
+      wb: () => wb,
     });
 
-    function updateChrome(): void {
-      const s = store.getState();
-      const a = s.selection.active;
-      const ref = formatSelectionRef(s.selection.range, a, s.ui.r1c1 === true);
-      // Don't stomp the user's in-progress name-box typing.
-      if (document.activeElement !== tag) tag.value = ref;
-      const cell = s.data.cells.get(`${a.sheet}:${a.row}:${a.col}`);
-      const formula = cell?.formula ?? '';
-      let display = '';
-      if (formula) display = formula;
-      else if (cell) {
-        const v = cell.value;
-        switch (v.kind) {
-          case 'number':
-            display = String(v.value);
-            break;
-          case 'bool':
-            display = v.value ? 'TRUE' : 'FALSE';
-            break;
-          case 'text':
-            display = v.value;
-            break;
-          case 'error':
-            display = v.text;
-            break;
-          default: {
-            // Lambda values fall through here (no `lambda` kind on
-            // CellValue yet) — render their body as `=LAMBDA(...)` so the
-            // formula bar shows something editable instead of blank.
-            const lambda = wb.getLambdaText(a);
-            display = lambda ? `=${lambda}` : '';
-            break;
-          }
-        }
-      }
-      // Don't stomp on the user's in-progress formula bar typing.
-      if (!fxEditing) fxInput.value = display;
-      a11y.textContent = `${ref} ${display}`;
-    }
-    updateChrome();
+    chromeSync = attachChromeSync({
+      a11y,
+      emitter,
+      fxInput,
+      getFormulaEditing: () => formulaBar.isEditing(),
+      getSheetTabs: () => sheetTabsController,
+      getWb: () => wb,
+      host,
+      invalidate: () => renderer.invalidate(),
+      store,
+      tag,
+    });
 
     // Resize observer — we follow the host, not the window.
     const ro = new ResizeObserver(() => renderer.resize());
@@ -2297,6 +426,38 @@ export const Spreadsheet = {
       for (const [k, v] of featureRegistry) featuresView[k] = v;
       for (const [k, v] of userHandles) featuresView[k] = v;
     };
+    const hostFeatures = createHostFeatureController({
+      autocompleteStub,
+      canvas,
+      emitter,
+      featureRegistry,
+      flags: () => flags,
+      formulaRegistry,
+      fx,
+      fxInput,
+      getFormulaBar: () => formulaBar,
+      getOnCanvasClick: () => onCanvasClick,
+      getOnHostKey: () => onHostKey,
+      getSheetTabs: () => sheetTabsController,
+      grid,
+      history,
+      host,
+      i18nLocale: () => i18n.locale,
+      refreshFeaturesView,
+      renderer,
+      setChromeAttached,
+      state: featureState,
+      statusbar,
+      store,
+      strings: () => strings,
+      viewbar,
+      watchDock,
+      wb: () => wb,
+      wrapHandle,
+    });
+    const attachHostFeature = hostFeatures.attach;
+    const detachHostFeature = hostFeatures.detach;
+
     // Initial host-feature attach — runs after every helper closure
     // (`onCanvasClick`, `onHostKey`, `syncFxRefs`, `commitFx`) is in
     // scope so the attacher bodies can resolve them at call time.
@@ -2318,9 +479,9 @@ export const Spreadsheet = {
       host.setAttribute('aria-label', strings.a11y.spreadsheet);
       tag.setAttribute('aria-label', strings.a11y.nameBox);
       refreshFormulaBarLabels();
-      fxAutocomplete.setLabels(next.autocomplete);
-      fxArgHelper?.setLabels(next.argHelper);
-      updateSheetTabs();
+      featureState.fxAutocomplete.setLabels(next.autocomplete);
+      featureState.fxArgHelper?.setLabels(next.argHelper);
+      sheetTabsController?.update();
       renderer.invalidate();
 
       // Always-on dialogs: rebuild — none of these expose setStrings yet.
@@ -2355,15 +516,17 @@ export const Spreadsheet = {
       binding.unbind();
       binding = bindEngine(wb);
       syncBindingFeatures(binding);
-      viewToolbar?.bindWorkbook(wb);
-      workbookObjects?.bindWorkbook(wb);
-      pivotTableDialog?.bindWorkbook(wb);
+      featureState.viewToolbar?.bindWorkbook(wb);
+      featureState.workbookObjects?.bindWorkbook(wb);
+      featureState.pivotTableDialog?.bindWorkbook(wb);
 
       // User extensions opt-in via setStrings.
       for (const handle of userHandles.values()) handle.setStrings?.(next);
 
       emitter.emit('localeChange', { locale: i18n.locale, strings: next });
     });
+
+    host.dataset.fcEngineState = wb.isStub ? 'ready-stub' : 'ready';
 
     return {
       host,
@@ -2375,7 +538,7 @@ export const Spreadsheet = {
       i18n,
       features: featuresView,
       get formatPainter() {
-        return formatPainter ?? undefined;
+        return featureState.formatPainter ?? undefined;
       },
       formula: formulaRegistry,
       cells: cellRegistry,
@@ -2416,7 +579,7 @@ export const Spreadsheet = {
           (id) =>
             prevFlags[id as keyof typeof prevFlags] !== nextFlags[id as keyof typeof nextFlags],
         );
-        if (shouldRebuildViewToolbarObjects && viewToolbar) {
+        if (shouldRebuildViewToolbarObjects && featureState.viewToolbar) {
           detachHostFeature('viewToolbar');
           attachHostFeature('viewToolbar');
         }
@@ -2424,8 +587,8 @@ export const Spreadsheet = {
           binding.unbind();
           binding = bindEngine(wb);
           syncBindingFeatures(binding);
-          viewToolbar?.bindWorkbook(wb);
-          workbookObjects?.bindWorkbook(wb);
+          featureState.viewToolbar?.bindWorkbook(wb);
+          featureState.workbookObjects?.bindWorkbook(wb);
         }
         refreshFeaturesView();
       },
@@ -2441,10 +604,10 @@ export const Spreadsheet = {
         refreshFeaturesView();
       },
       openConditionalDialog() {
-        conditionalDialog?.open();
+        featureState.conditionalDialog?.open();
       },
       openIterativeDialog() {
-        iterativeDialog?.open();
+        featureState.iterativeDialog?.open();
       },
       openExternalLinksDialog() {
         externalLinksDialog.open();
@@ -2456,13 +619,13 @@ export const Spreadsheet = {
         cellStylesGallery.open();
       },
       openFunctionArguments(seedName?: string) {
-        fxDialog?.open(seedName);
+        featureState.fxDialog?.open(seedName);
       },
       openHyperlinkDialog() {
-        hyperlinkDialog?.open();
+        featureState.hyperlinkDialog?.open();
       },
       openCommentDialog() {
-        commentDialog?.open();
+        featureState.commentDialog?.open();
       },
       openFindReplace() {
         binding.findReplace?.open();
@@ -2474,16 +637,16 @@ export const Spreadsheet = {
         binding.pasteSpecialDialog?.open();
       },
       openNamedRangeDialog() {
-        namedRangeDialog?.open();
+        featureState.namedRangeDialog?.open();
       },
       openPageSetup() {
-        pageSetupDialog?.open();
+        featureState.pageSetupDialog?.open();
       },
       print() {
         // The print command is wired through the same flag as the dialog —
         // when the feature is off, both call sites are no-ops. Skip if the
         // dialog never attached so consumers can rely on the gate.
-        if (!pageSetupDialog) return;
+        if (!featureState.pageSetupDialog) return;
         printSheet(wb, store, store.getState().data.sheetIndex, host);
       },
       recalc() {
@@ -2492,19 +655,19 @@ export const Spreadsheet = {
         renderer.invalidate();
       },
       openFormatDialog() {
-        formatDialog?.open();
+        featureState.formatDialog?.open();
       },
       openGoToSpecial() {
-        goToDialog?.open();
+        featureState.goToDialog?.open();
       },
       openWatchWindow() {
-        watchPanel?.open();
+        featureState.watchPanel?.open();
       },
       closeWatchWindow() {
-        watchPanel?.close();
+        featureState.watchPanel?.close();
       },
       toggleWatchWindow() {
-        watchPanel?.toggle();
+        featureState.watchPanel?.toggle();
       },
       openQuickAnalysis() {
         const userQuick = userHandles.get('quickAnalysis') as
@@ -2524,7 +687,7 @@ export const Spreadsheet = {
           userObjects.open();
           return;
         }
-        workbookObjects?.open();
+        featureState.workbookObjects?.open();
       },
       openPivotTableDialog() {
         const userPivot = userHandles.get('pivotTableDialog') as
@@ -2534,16 +697,16 @@ export const Spreadsheet = {
           userPivot.open();
           return;
         }
-        pivotTableDialog?.open();
+        featureState.pivotTableDialog?.open();
       },
       addSlicer(input) {
-        if (!slicer) {
+        if (!featureState.slicer) {
           throw new Error('addSlicer: features.slicer is disabled');
         }
-        return slicer.addSlicer(input);
+        return featureState.slicer.addSlicer(input);
       },
       removeSlicer(id) {
-        slicer?.removeSlicer(id);
+        featureState.slicer?.removeSlicer(id);
       },
       toggleSheetProtection() {
         toggleProtectedSheet(store, store.getState().data.sheetIndex, { workbook: wb });
@@ -2608,16 +771,16 @@ export const Spreadsheet = {
         );
         mutators.setSheetIndex(store, nextSheet);
         hydrateActiveSheet();
-        hydrateTableOverlaysFromEngine(wb, store);
+        hydrateWorkbookMetadataFromEngine(wb, store);
         dispatchPassthroughSummary();
         binding = bindEngine(wb);
         syncBindingFeatures(binding);
-        viewToolbar?.bindWorkbook(wb);
-        workbookObjects?.bindWorkbook(wb);
-        namedRangeDialog?.bindWorkbook(wb);
-        pivotTableDialog?.bindWorkbook(wb);
-        statusBar?.refresh();
-        updateSheetTabs();
+        featureState.viewToolbar?.bindWorkbook(wb);
+        featureState.workbookObjects?.bindWorkbook(wb);
+        featureState.namedRangeDialog?.bindWorkbook(wb);
+        featureState.pivotTableDialog?.bindWorkbook(wb);
+        featureState.statusBar?.refresh();
+        sheetTabsController?.update();
         // Notify user extensions so they can rebind their wb references.
         for (const handle of userHandles.values()) handle.rebindWorkbook?.(wb);
         for (const fn of wbListeners) fn(wb);
@@ -2635,182 +798,16 @@ export const Spreadsheet = {
         binding.unbind();
         for (const handle of userHandles.values()) handle.dispose();
         userHandles.clear();
-        formatDialog?.detach();
-        formatPainter?.detach();
-        hover?.detach();
-        conditionalDialog?.detach();
-        goToDialog?.detach();
-        iterativeDialog?.detach();
-        externalLinksDialog.detach();
-        cfRulesDialog.detach();
-        cellStylesGallery.detach();
-        filterDropdown.detach();
-        host.removeEventListener('fc:openfilter', onOpenFilter);
-        fxDialog?.detach();
-        namedRangeDialog?.detach();
-        pageSetupDialog?.detach();
-        pivotTableDialog?.detach();
-        hyperlinkDialog?.detach();
-        commentDialog?.detach();
-        statusBar?.detach();
-        watchPanel?.detach();
-        unsubWatchRecalc();
-        unsubWatchWb();
-        slicer?.detach();
-        unsubSlicerRecalc();
-        unsubSlicerWb();
-        sessionCharts?.detach();
-        errorMenu?.detach();
-        if (errorMenu) canvas.removeEventListener('click', onCanvasClick);
-        host.removeEventListener('keydown', onHostKey);
-        detachWheel();
-        fxAutocomplete.detach();
-        fxArgHelper?.detach();
-        fxInput.removeEventListener('focus', onFxFocus);
-        fxInput.removeEventListener('input', onFxInput);
-        fxInput.removeEventListener('keyup', onFxKeyUp);
-        fxInput.removeEventListener('keydown', onFxKey);
-        fxInput.removeEventListener('blur', onFxBlur);
-        fxCancel.removeEventListener('mousedown', keepFxFocus);
-        fxAccept.removeEventListener('mousedown', keepFxFocus);
-        fxCancel.removeEventListener('click', cancelFx);
-        fxAccept.removeEventListener('click', acceptFx);
-        document.removeEventListener('pointerdown', onSheetMenuPointerDown);
-        document.removeEventListener('keydown', onSheetMenuKeyDown);
-        sheetMenu.remove();
-        tag.removeEventListener('focus', onTagFocus);
-        tag.removeEventListener('keydown', onTagKey);
-        tag.removeEventListener('blur', onTagBlur);
-        unsub();
+        for (const id of HOST_TOGGLEABLE_IDS) detachHostFeature(id);
+        formulaBar.detach();
+        sheetTabsController?.detach();
+        chromeSync?.detach();
         unsubI18n();
         i18n.dispose();
         renderer.dispose();
         if (ownsWb) wb.dispose();
-        // Only touch the host if a later mount hasn't claimed it. See
-        // `instanceId` stamp above for the StrictMode race this guards.
-        if (host.dataset.fcInstId === instanceId) {
-          host.replaceChildren();
-          host.classList.remove('fc-host');
-          delete host.dataset.fcInstId;
-        }
+        releaseMountHost(host, instanceId);
       },
     };
   },
 };
-
-function colName(col: number): string {
-  let n = col;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (n % 26)) + out;
-    n = Math.floor(n / 26) - 1;
-  } while (n >= 0);
-  return out;
-}
-
-function cellRef(row: number, col: number, r1c1: boolean): string {
-  return r1c1 ? `R${row + 1}C${col + 1}` : `${colName(col)}${row + 1}`;
-}
-
-function formatSelectionRef(
-  range: { r0: number; c0: number; r1: number; c1: number },
-  active: { row: number; col: number },
-  r1c1: boolean,
-): string {
-  if (range.r0 === range.r1 && range.c0 === range.c1) {
-    return cellRef(active.row, active.col, r1c1);
-  }
-  if (!r1c1) {
-    if (range.r0 === 0 && range.r1 === 1048575) {
-      return range.c0 === range.c1
-        ? colName(range.c0)
-        : `${colName(range.c0)}:${colName(range.c1)}`;
-    }
-    if (range.c0 === 0 && range.c1 === 16383) {
-      return range.r0 === range.r1 ? `${range.r0 + 1}` : `${range.r0 + 1}:${range.r1 + 1}`;
-    }
-  }
-  return `${cellRef(range.r0, range.c0, r1c1)}:${cellRef(range.r1, range.c1, r1c1)}`;
-}
-
-/** Case-insensitive defined-name lookup. Returns the formula text stripped
- *  of any leading `=`, sheet qualifier, and `$` anchors so it can be parsed
- *  by `parseRangeRef` / `parseCellRef`. */
-function lookupDefinedName(wb: WorkbookHandle, query: string): string | null {
-  if (!query) return null;
-  const q = query.toLowerCase();
-  for (const dn of wb.definedNames()) {
-    if (dn.name.toLowerCase() !== q) continue;
-    const eq = dn.formula.replace(/^=/, '');
-    const bang = eq.lastIndexOf('!');
-    return (bang >= 0 ? eq.slice(bang + 1) : eq).replace(/\$/g, '');
-  }
-  return null;
-}
-
-function parseCellRef(raw: string): { row: number; col: number } | null {
-  const trimmed = raw.trim().toUpperCase();
-  // R1C1 form: e.g. "R5C2"
-  const r1c1 = trimmed.match(/^R([1-9][0-9]*)C([1-9][0-9]*)$/);
-  if (r1c1) {
-    const row = Number.parseInt(r1c1[1] ?? '', 10) - 1;
-    const col = Number.parseInt(r1c1[2] ?? '', 10) - 1;
-    if (row < 0 || col < 0) return null;
-    if (col > 16383 || row > 1048575) return null;
-    return { row, col };
-  }
-  const m = trimmed.match(/^\$?([A-Z]+)\$?([1-9][0-9]*)$/);
-  if (!m) return null;
-  const letters = m[1] ?? '';
-  const rowStr = m[2] ?? '';
-  let col = 0;
-  for (let i = 0; i < letters.length; i += 1) {
-    col = col * 26 + (letters.charCodeAt(i) - 64);
-  }
-  col -= 1;
-  const row = Number.parseInt(rowStr, 10) - 1;
-  if (col < 0 || row < 0) return null;
-  if (col > 16383 || row > 1048575) return null;
-  return { row, col };
-}
-
-/** Parse A1:B5 style range. Returns null when the input doesn't match. */
-function parseRangeRef(raw: string): { r0: number; c0: number; r1: number; c1: number } | null {
-  const trimmed = raw.trim().toUpperCase();
-  const wholeCol = trimmed.match(/^\$?([A-Z]+)(?::\$?([A-Z]+))?$/);
-  if (wholeCol) {
-    const c0 = parseColRef(wholeCol[1] ?? '');
-    const c1 = parseColRef(wholeCol[2] ?? wholeCol[1] ?? '');
-    if (c0 == null || c1 == null) return null;
-    return { r0: 0, c0: Math.min(c0, c1), r1: 1048575, c1: Math.max(c0, c1) };
-  }
-  const wholeRow = trimmed.match(/^\$?([1-9][0-9]*)(?::\$?([1-9][0-9]*))?$/);
-  if (wholeRow) {
-    const r0 = Number.parseInt(wholeRow[1] ?? '', 10) - 1;
-    const r1 = Number.parseInt(wholeRow[2] ?? wholeRow[1] ?? '', 10) - 1;
-    if (r0 < 0 || r1 < 0 || r0 > 1048575 || r1 > 1048575) return null;
-    return { r0: Math.min(r0, r1), c0: 0, r1: Math.max(r0, r1), c1: 16383 };
-  }
-  const parts = trimmed.split(':');
-  if (parts.length !== 2) return null;
-  const a = parseCellRef(parts[0] ?? '');
-  const b = parseCellRef(parts[1] ?? '');
-  if (!a || !b) return null;
-  return {
-    r0: Math.min(a.row, b.row),
-    c0: Math.min(a.col, b.col),
-    r1: Math.max(a.row, b.row),
-    c1: Math.max(a.col, b.col),
-  };
-}
-
-function parseColRef(raw: string): number | null {
-  const letters = raw.trim().toUpperCase();
-  if (!/^[A-Z]+$/.test(letters)) return null;
-  let col = 0;
-  for (let i = 0; i < letters.length; i += 1) {
-    col = col * 26 + (letters.charCodeAt(i) - 64);
-  }
-  col -= 1;
-  return col >= 0 && col <= 16383 ? col : null;
-}

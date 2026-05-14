@@ -1,0 +1,152 @@
+@layer fc.app {
+  .fc-fmtdlg__legacy-border-controls {
+    display: none;
+  }
+  .fc-fmtdlg__border-visual {
+    display: grid;
+    grid-template-columns: 110px minmax(220px, 1fr);
+    gap: 8px;
+    align-items: center;
+    margin: 8px 0 10px;
+  }
+  .fc-fmtdlg__border-title {
+    color: var(--fc-fg-mute, inherit);
+  }
+  .fc-fmtdlg__border-stage {
+    position: relative;
+    width: 220px;
+    height: 132px;
+    background: var(--fc-bg, Canvas);
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 16%, transparent));
+    border-radius: 2px;
+  }
+  .fc-fmtdlg__border-preview {
+    position: absolute;
+    inset: 30px 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--fc-bg-elev, Canvas);
+    color: var(--fc-fg, CanvasText);
+    border: 1px dotted var(--fc-rule, #d9d9d9);
+    box-sizing: border-box;
+    overflow: hidden;
+    line-height: 1;
+    text-align: center;
+  }
+  .fc-fmtdlg__border-preview::before,
+  .fc-fmtdlg__border-preview::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .fc-fmtdlg__border-preview--diag-down::before {
+    opacity: 1;
+    background: linear-gradient(
+      to top right,
+      transparent calc(50% - var(--fc-fmtdlg-border-diag-width, 1px)),
+      var(--fc-fmtdlg-border-diag-color, currentColor) 50%,
+      transparent calc(50% + var(--fc-fmtdlg-border-diag-width, 1px))
+    );
+  }
+  .fc-fmtdlg__border-preview--diag-up::after {
+    opacity: 1;
+    background: linear-gradient(
+      to bottom right,
+      transparent calc(50% - var(--fc-fmtdlg-border-diag-width, 1px)),
+      var(--fc-fmtdlg-border-diag-color, currentColor) 50%,
+      transparent calc(50% + var(--fc-fmtdlg-border-diag-width, 1px))
+    );
+  }
+  .fc-fmtdlg__border-hit {
+    position: absolute;
+    width: 26px;
+    height: 24px;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    background: transparent;
+    color: var(--fc-fg, CanvasText);
+    cursor: pointer;
+  }
+  .fc-fmtdlg__border-hit:hover,
+  .fc-fmtdlg__border-hit:focus-visible {
+    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 6%, transparent));
+    border-color: var(--fc-rule, color-mix(in srgb, CanvasText 18%, transparent));
+    outline: none;
+  }
+  .fc-fmtdlg__border-hit[aria-pressed="true"] {
+    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 9%, transparent));
+    border-color: var(--fc-accent, currentColor);
+  }
+  .fc-fmtdlg__border-hit::before {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    border-color: currentColor;
+  }
+  .fc-fmtdlg__border-hit--top {
+    top: 8px;
+    left: 97px;
+  }
+  .fc-fmtdlg__border-hit--top::before {
+    border-top: 2px solid currentColor;
+  }
+  .fc-fmtdlg__border-hit--right {
+    top: 54px;
+    right: 14px;
+  }
+  .fc-fmtdlg__border-hit--right::before {
+    border-right: 2px solid currentColor;
+  }
+  .fc-fmtdlg__border-hit--bottom {
+    bottom: 8px;
+    left: 97px;
+  }
+  .fc-fmtdlg__border-hit--bottom::before {
+    border-bottom: 2px solid currentColor;
+  }
+  .fc-fmtdlg__border-hit--left {
+    top: 54px;
+    left: 14px;
+  }
+  .fc-fmtdlg__border-hit--left::before {
+    border-left: 2px solid currentColor;
+  }
+  .fc-fmtdlg__border-hit--diagonalDown {
+    bottom: 8px;
+  }
+  .fc-fmtdlg__border-hit--diagonalDown.fc-fmtdlg__border-hit--left-diag {
+    left: 14px;
+  }
+  .fc-fmtdlg__border-hit--diagonalDown.fc-fmtdlg__border-hit--right-diag {
+    right: 14px;
+  }
+  .fc-fmtdlg__border-hit--diagonalDown::before {
+    background: linear-gradient(
+      to top right,
+      transparent 45%,
+      currentColor 48% 52%,
+      transparent 55%
+    );
+  }
+  .fc-fmtdlg__border-hit--diagonalUp {
+    top: 8px;
+  }
+  .fc-fmtdlg__border-hit--diagonalUp.fc-fmtdlg__border-hit--left-diag {
+    left: 14px;
+  }
+  .fc-fmtdlg__border-hit--diagonalUp.fc-fmtdlg__border-hit--right-diag {
+    right: 14px;
+  }
+  .fc-fmtdlg__border-hit--diagonalUp::before {
+    background: linear-gradient(
+      to bottom right,
+      transparent 45%,
+      currentColor 48% 52%,
+      transparent 55%
+    );
+  }
+}

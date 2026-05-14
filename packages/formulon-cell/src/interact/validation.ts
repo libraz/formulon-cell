@@ -1,8 +1,8 @@
 import { writeInput } from '../commands/coerce-input.js';
 import { resolveListValues } from '../commands/validate.js';
+import { addrKey } from '../engine/address.js';
 import { makeRangeResolver } from '../engine/range-resolver.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { addrKey } from '../engine/workbook-handle.js';
 import { getValidationChevron } from '../render/grid.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';

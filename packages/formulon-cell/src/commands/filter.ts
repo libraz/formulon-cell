@@ -1,5 +1,5 @@
+import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
-import { addrKey } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 
 export type FilterPredicate = (

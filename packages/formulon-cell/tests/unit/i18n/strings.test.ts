@@ -1,6 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import { defaultStrings, dictionaries, en, ja, mergeStrings } from '../../../src/i18n/strings.js';
 
+type JsonRecord = Record<string, unknown>;
+
+const isRecord = (value: unknown): value is JsonRecord =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+function collectLeafPaths(value: unknown, prefix = ''): string[] {
+  if (!isRecord(value)) return [prefix];
+  return Object.keys(value)
+    .sort()
+    .flatMap((key) => collectLeafPaths(value[key], prefix ? `${prefix}.${key}` : key));
+}
+
+function collectStringLeaves(value: unknown, prefix = ''): [path: string, value: unknown][] {
+  if (!isRecord(value)) return [[prefix, value]];
+  return Object.keys(value)
+    .sort()
+    .flatMap((key) => collectStringLeaves(value[key], prefix ? `${prefix}.${key}` : key));
+}
+
 describe('dictionaries', () => {
   it('exposes ja and en under the dictionaries record', () => {
     expect(dictionaries.ja).toBe(ja);
@@ -23,6 +42,20 @@ describe('dictionaries', () => {
         (en as unknown as Record<string, Record<string, string>>)[section] ?? {},
       ).sort();
       expect(jaKeys).toEqual(enKeys);
+    }
+  });
+
+  it('keeps the same nested leaf keys for ja and en', () => {
+    expect(collectLeafPaths(ja)).toEqual(collectLeafPaths(en));
+  });
+
+  it('does not ship missing or empty dictionary leaves', () => {
+    for (const [locale, dict] of Object.entries(dictionaries)) {
+      const badLeaves = collectStringLeaves(dict)
+        .filter(([, value]) => typeof value !== 'string' || value.trim() === '')
+        .map(([path, value]) => `${locale}.${path}=${JSON.stringify(value)}`);
+
+      expect(badLeaves).toEqual([]);
     }
   });
 });

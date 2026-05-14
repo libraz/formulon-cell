@@ -1,0 +1,48 @@
+@layer fc.app {
+  /* Go To Special (F5) dialog — scope radios on top, kind radio list below.
+     Mirrors fc-conddlg dialog chrome. */
+  .fc-goto__panel {
+    max-width: 420px;
+  }
+  .fc-goto__legend {
+    font-weight: 600;
+    margin: 8px 0 4px;
+  }
+  .fc-goto__scope {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-bottom: 4px;
+  }
+  .fc-goto__kinds {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 12px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: var(--fc-radius-sm, 4px);
+    padding: 8px 10px;
+  }
+  .fc-goto__radio {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 4px;
+    border-radius: var(--fc-radius-sm, 4px);
+    cursor: pointer;
+  }
+  .fc-goto__radio:hover {
+    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 6%, transparent));
+  }
+  .fc-goto__status {
+    min-height: 18px;
+    margin-top: 6px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+    font-size: 12px;
+    font-style: italic;
+  }
+  .fc-goto__status:not(:empty) {
+    color: var(--fc-error, #c53030);
+    font-style: normal;
+  }
+}

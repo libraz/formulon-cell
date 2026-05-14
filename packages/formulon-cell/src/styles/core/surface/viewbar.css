@@ -1,0 +1,93 @@
+@layer fc.surface {
+  .fc-host__grid {
+    position: relative;
+    flex: 1 1 auto;
+    overflow: hidden;
+    background: var(--fc-bg);
+    cursor: cell;
+  }
+
+  .fc-viewbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 34px;
+    padding: 4px 8px;
+    border-bottom: var(--fc-hairline) solid var(--fc-rule);
+    background: var(--fc-bg-rail);
+    color: var(--fc-fg);
+    font-family: var(--fc-font-ui);
+    font-size: 12px;
+    flex: 0 0 auto;
+    overflow-x: auto;
+  }
+
+  .fc-viewbar__title {
+    flex: 0 0 auto;
+    padding-right: 2px;
+    color: var(--fc-fg-mute);
+    font-weight: 600;
+  }
+
+  .fc-viewbar__group {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding-left: 8px;
+    border-left: var(--fc-hairline) solid var(--fc-rule);
+    flex: 0 0 auto;
+  }
+
+  .fc-viewbar__group:first-of-type {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .fc-viewbar__toggle,
+  .fc-viewbar__button,
+  .fc-viewbar__select {
+    min-height: 24px;
+    border: var(--fc-hairline) solid var(--fc-rule);
+    border-radius: var(--fc-radius-sm);
+    background: var(--fc-bg);
+    color: var(--fc-fg);
+    font: inherit;
+  }
+
+  .fc-viewbar__toggle,
+  .fc-viewbar__button {
+    padding: 2px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .fc-viewbar__toggle[aria-pressed="true"],
+  .fc-viewbar__button[aria-pressed="true"] {
+    border-color: var(--fc-accent);
+    background: var(--fc-accent-soft, color-mix(in srgb, var(--fc-accent) 14%, var(--fc-bg)));
+    color: var(--fc-accent-strong, var(--fc-accent));
+  }
+
+  .fc-viewbar__toggle:hover,
+  .fc-viewbar__button:hover,
+  .fc-viewbar__select:hover {
+    border-color: var(--fc-accent);
+  }
+
+  .fc-viewbar__toggle:focus-visible,
+  .fc-viewbar__button:focus-visible,
+  .fc-viewbar__select:focus-visible {
+    outline: 2px solid var(--fc-accent);
+    outline-offset: 1px;
+  }
+
+  .fc-viewbar__label {
+    color: var(--fc-fg-mute);
+    white-space: nowrap;
+  }
+
+  .fc-viewbar__select {
+    height: 24px;
+    padding: 1px 22px 1px 6px;
+  }
+}

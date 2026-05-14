@@ -1,4 +1,4 @@
-import { addrKey } from '../engine/workbook-handle.js';
+import { addrKey } from '../engine/address.js';
 import { hitTest } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';

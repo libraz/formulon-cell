@@ -1,0 +1,8 @@
+@import "./format-dialog/shell.css";
+@import "./format-dialog/comment-note.css";
+@import "./format-dialog/controls.css";
+@import "./format-dialog/number.css";
+@import "./format-dialog/choices.css";
+@import "./format-dialog/swatches-and-lines.css";
+@import "./format-dialog/borders.css";
+@import "./format-dialog/footer.css";

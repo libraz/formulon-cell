@@ -1,0 +1,57 @@
+@layer fc.surface {
+  /* Format Painter cursor — small paintbrush over a crosshair, drawn as
+   * an inline SVG so we don't ship an external asset. */
+  .fc-host--paintbrush .fc-host__grid,
+  .fc-host--paintbrush .fc-host__grid * {
+    cursor:
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24'><path d='M3 21l3-3m0 0l-1-1 7-7 4 4-7 7-1-1m-2-2l-1 1m12-12a2.5 2.5 0 1 1 3.5 3.5L18 5l-3-3 1.5-1.5z' fill='%23ffd75e' stroke='%23222' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/></svg>")
+      4 20,
+      copy;
+  }
+
+  .fc-host__canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .fc-host__editor {
+    position: absolute;
+    z-index: 2;
+    box-sizing: border-box;
+    padding: 4px 7px;
+    margin: 0;
+    background: var(--fc-bg-elev);
+    color: var(--fc-fg);
+    border: 1.5px solid var(--fc-accent);
+    border-radius: 2px;
+    box-shadow:
+      0 0 0 1px var(--fc-bg),
+      0 0 0 3px var(--fc-accent-soft);
+    font: inherit;
+    font-family: var(--fc-font-ui);
+    font-size: var(--fc-text-cell);
+    line-height: 1.25;
+    outline: none;
+    overflow: hidden;
+    resize: none;
+    white-space: pre;
+    caret-color: var(--fc-accent);
+    transition: box-shadow var(--fc-dur-fast) var(--fc-ease-out);
+  }
+
+  /* a11y mirror — visually hidden but in the a11y tree */
+  .fc-host__a11y {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}

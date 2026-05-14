@@ -7,6 +7,7 @@ import { defineConfig } from 'vite';
 // dist for installed consumers; here we override that with an alias so
 // editing TS in `packages/formulon-cell/src/` shows up immediately.
 const corePkg = resolve(__dirname, '../../packages/formulon-cell');
+const nodeShimDir = resolve(__dirname, '../vite-shims');
 
 const patchFormulonWorkerOptions = () => {
   const file = resolve(
@@ -33,9 +34,14 @@ patchFormulonWorkerOptions();
 export default defineConfig({
   resolve: {
     alias: {
+      module: `${nodeShimDir}/module.mjs`,
+      'node:module': `${nodeShimDir}/module.mjs`,
+      worker_threads: `${nodeShimDir}/worker_threads.mjs`,
+      'node:worker_threads': `${nodeShimDir}/worker_threads.mjs`,
       '@libraz/formulon-cell/styles.css': `${corePkg}/src/styles/index.css`,
       '@libraz/formulon-cell/styles/paper.css': `${corePkg}/src/styles/theme-paper.css`,
       '@libraz/formulon-cell/styles/ink.css': `${corePkg}/src/styles/theme-ink.css`,
+      '@libraz/formulon-cell/styles/toolbar.css': `${corePkg}/src/styles/toolbar.css`,
       '@libraz/formulon-cell': `${corePkg}/src/index.ts`,
     },
   },

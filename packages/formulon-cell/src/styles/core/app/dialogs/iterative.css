@@ -1,0 +1,80 @@
+@layer fc.app {
+  .fc-iterdlg {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.32);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--fc-z-dialog, 2147483020);
+  }
+  .fc-iterdlg[hidden] {
+    display: none;
+  }
+  .fc-iterdlg__panel {
+    width: 360px;
+    max-width: 90vw;
+    background: var(--fc-bg, #fff);
+    color: var(--fc-fg, #1f1f1f);
+    border-radius: 6px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .fc-iterdlg__header {
+    padding: 12px 16px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--fc-rule, #e0e0e0);
+  }
+  .fc-iterdlg__body {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .fc-iterdlg__note {
+    margin: 0;
+    font-size: 12px;
+    color: var(--fc-fg-soft, #555);
+  }
+  .fc-iterdlg__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .fc-iterdlg__row > span {
+    flex: 1;
+  }
+  .fc-iterdlg__row input[type="number"],
+  .fc-iterdlg__row input[type="text"] {
+    width: 110px;
+    padding: 4px 6px;
+    border: 1px solid var(--fc-rule, #ccc);
+    border-radius: 3px;
+  }
+  .fc-iterdlg__status {
+    min-height: 16px;
+    font-size: 12px;
+    color: #c44;
+  }
+  .fc-iterdlg__footer {
+    padding: 10px 16px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    border-top: 1px solid var(--fc-rule, #e0e0e0);
+  }
+  .fc-iterdlg__btn {
+    padding: 4px 14px;
+    border: 1px solid var(--fc-rule, #ccc);
+    border-radius: 3px;
+    background: #f5f5f5;
+    cursor: pointer;
+  }
+  .fc-iterdlg__btn--primary {
+    background: var(--fc-accent, #2b6cb0);
+    color: #fff;
+    border-color: transparent;
+  }
+}

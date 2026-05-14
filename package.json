@@ -22,6 +22,8 @@
     "format": "biome check --write .",
     "typecheck": "yarn workspaces foreach -A --exclude formulon-cell-monorepo run typecheck",
     "test": "yarn workspace @libraz/formulon-cell test",
+    "test:e2e": "yarn workspaces foreach -A --include '@formulon-cell/*' run test:e2e",
+    "test:e2e:install": "yarn workspace @formulon-cell/playground test:e2e:install",
     "prepublish:libs": "cp LICENSE packages/formulon-cell/ && cp LICENSE packages/formulon-cell-react/ 2>/dev/null || true && cp LICENSE packages/formulon-cell-vue/ 2>/dev/null || true"
   },
   "devDependencies": {

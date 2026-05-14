@@ -1,5 +1,5 @@
+import { addrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
-import { addrKey } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 
 export function isCellErrorIgnored(store: SpreadsheetStore, addr: Addr): boolean {

@@ -1,0 +1,14 @@
+/* ── Canvas-rendered chrome polish ──────────────────────────────── */
+
+/* Lift the canvas grid so it sits on the white sheet rather than fighting
+ * the toolbar stripe — visually matches the "page" feel of spreadsheet. */
+.app__sheet .fc-host__grid {
+  background: var(--shell-surface);
+}
+
+/* Editor box — slightly bigger green halo to match the bumped 2px outline. */
+.app__sheet .fc-host__editor {
+  border-width: 2px;
+  border-radius: 1px;
+  box-shadow: 0 0 0 4px var(--shell-accent-soft);
+}

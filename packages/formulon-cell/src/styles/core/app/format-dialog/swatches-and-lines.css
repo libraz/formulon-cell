@@ -1,0 +1,90 @@
+@layer fc.app {
+  .fc-fmtdlg__section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: 2px;
+    background: var(--fc-bg, Canvas);
+  }
+  .fc-fmtdlg__section-title {
+    color: var(--fc-fg-strong, CanvasText);
+    font-weight: 600;
+  }
+  .fc-fmtdlg__section .fc-fmtdlg__swatches {
+    margin-left: 136px;
+  }
+  .fc-fmtdlg__swatches {
+    display: grid;
+    grid-template-columns: repeat(12, 18px);
+    gap: 4px;
+    min-height: 24px;
+    margin-left: 136px;
+  }
+  .fc-fmtdlg__swatch {
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 1px solid var(--fc-rule, color-mix(in srgb, CanvasText 18%, transparent));
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .fc-fmtdlg__swatch:hover,
+  .fc-fmtdlg__swatch:focus-visible {
+    outline: 2px solid var(--fc-accent, currentColor);
+    outline-offset: 1px;
+  }
+  .fc-fmtdlg__line-gallery {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+    gap: 6px;
+    margin-left: 136px;
+  }
+  .fc-fmtdlg__line-style {
+    display: grid;
+    grid-template-columns: 58px 1fr;
+    gap: 8px;
+    align-items: center;
+    min-height: 28px;
+    padding: 4px 8px;
+    border: 1px solid var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: 2px;
+    background: var(--fc-bg, Canvas);
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+  }
+  .fc-fmtdlg__line-style:hover,
+  .fc-fmtdlg__line-style:focus-visible {
+    border-color: var(--fc-accent, currentColor);
+    outline: none;
+  }
+  .fc-fmtdlg__line-style[aria-pressed="true"] {
+    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 9%, transparent));
+    border-color: var(--fc-accent, currentColor);
+  }
+  .fc-fmtdlg__line-sample {
+    display: block;
+    width: 54px;
+    border-top: 1px solid currentColor;
+  }
+  .fc-fmtdlg__line-style--medium .fc-fmtdlg__line-sample {
+    border-top-width: 2px;
+  }
+  .fc-fmtdlg__line-style--thick .fc-fmtdlg__line-sample {
+    border-top-width: 3px;
+  }
+  .fc-fmtdlg__line-style--dashed .fc-fmtdlg__line-sample {
+    border-top-style: dashed;
+  }
+  .fc-fmtdlg__line-style--dotted .fc-fmtdlg__line-sample {
+    border-top-style: dotted;
+  }
+  .fc-fmtdlg__line-style--double .fc-fmtdlg__line-sample {
+    border-top: 3px double currentColor;
+  }
+}

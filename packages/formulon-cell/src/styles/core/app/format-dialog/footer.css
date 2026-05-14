@@ -1,0 +1,41 @@
+@layer fc.app {
+  .fc-fmtdlg__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 10px 16px 12px;
+    border-top: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+    background: #f3f2f1;
+  }
+  .fc-fmtdlg__btn {
+    min-width: 78px;
+    min-height: 30px;
+    padding: 5px 13px;
+    background: #ffffff;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: 2px;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+  }
+  .fc-fmtdlg__btn:hover {
+    background: #faf9f8;
+    border-color: var(--fc-rule-strong, color-mix(in srgb, CanvasText 28%, transparent));
+  }
+  .fc-fmtdlg__btn:focus-visible {
+    outline: 2px solid var(--fc-accent, currentColor);
+    outline-offset: 1px;
+  }
+  .fc-fmtdlg__btn--primary {
+    background: var(--fc-accent, currentColor);
+    color: var(--fc-accent-fg, #fff);
+    border-color: var(--fc-accent, currentColor);
+  }
+  .fc-fmtdlg__btn--primary:hover {
+    background: var(--fc-accent, currentColor);
+    filter: brightness(1.05);
+  }
+}

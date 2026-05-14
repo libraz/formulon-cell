@@ -1,6 +1,6 @@
+import { addrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { addrKey } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 
 export interface CommentEntry {

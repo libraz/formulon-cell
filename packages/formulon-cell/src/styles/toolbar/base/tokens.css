@@ -1,0 +1,68 @@
+:root {
+  --demo-font: ui-sans-serif, -apple-system, "Segoe UI", "Helvetica Neue", sans-serif;
+  --demo-mono: ui-monospace, SFMono-Regular, "Menlo", "Consolas", monospace;
+  --demo-bg: #f4f4f1;
+  --demo-card: #ffffff;
+  --demo-fg: #111418;
+  --demo-fg-soft: #5a6068;
+  --demo-line: #d9dadd;
+  --demo-line-soft: #edebe9;
+  --demo-accent: #107c41;
+  --demo-accent-strong: #0e6b39;
+  --demo-accent-soft: rgba(16, 124, 65, 0.1);
+  --demo-title: #107c41;
+  --demo-title-strong: #0b5f31;
+  --demo-title-fg: #ffffff;
+  --demo-ribbon-bg: #ffffff;
+  --demo-ribbon-rail: #f3f2f1;
+  --demo-ribbon-hover: #edebe9;
+  --demo-ribbon-line: #c8c6c4;
+  --demo-input-bg: #ffffff;
+  --demo-input-fg: #201f1e;
+  --demo-backstage-bg: #ffffff;
+  --demo-backstage-rail: #f3f2f1;
+}
+
+[data-theme="ink"] {
+  --demo-bg: #14171b;
+  --demo-card: #1e2228;
+  --demo-fg: #ecedef;
+  --demo-fg-soft: #8d949c;
+  --demo-line: #2e333a;
+  --demo-line-soft: #323841;
+  --demo-accent: #f4a36c;
+  --demo-accent-soft: rgba(244, 163, 108, 0.12);
+  --demo-title: #0f6b3c;
+  --demo-title-strong: #0a4b2a;
+  --demo-title-fg: #ffffff;
+  --demo-ribbon-bg: #20242a;
+  --demo-ribbon-rail: #181c22;
+  --demo-ribbon-hover: #2b3038;
+  --demo-ribbon-line: #343a43;
+  --demo-input-bg: #252a31;
+  --demo-input-fg: #ecedef;
+  --demo-backstage-bg: #1e2228;
+  --demo-backstage-rail: #181c22;
+}
+
+[data-theme="contrast"] {
+  --demo-bg: #ffffff;
+  --demo-card: #ffffff;
+  --demo-fg: #000000;
+  --demo-fg-soft: #1a1a1a;
+  --demo-line: #000000;
+  --demo-line-soft: #000000;
+  --demo-accent: #0000ff;
+  --demo-accent-soft: #ffff00;
+  --demo-title: #000000;
+  --demo-title-strong: #000000;
+  --demo-title-fg: #ffffff;
+  --demo-ribbon-bg: #ffffff;
+  --demo-ribbon-rail: #ffffff;
+  --demo-ribbon-hover: #ffff00;
+  --demo-ribbon-line: #000000;
+  --demo-input-bg: #ffffff;
+  --demo-input-fg: #000000;
+  --demo-backstage-bg: #ffffff;
+  --demo-backstage-rail: #ffffff;
+}

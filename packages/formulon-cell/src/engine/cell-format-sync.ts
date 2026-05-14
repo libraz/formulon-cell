@@ -1,4 +1,5 @@
 import type { CellFormat, SpreadsheetStore } from '../store/store.js';
+import { addrKey } from './address.js';
 import { syncHyperlinksToEngine } from './format-sync.js';
 import {
   BUILTIN_NUM_FMT_GENERAL,
@@ -14,7 +15,6 @@ import {
 } from './format-writeback.js';
 import { syncValidationsToEngine } from './validation-sync.js';
 import type { WorkbookHandle } from './workbook-handle.js';
-import { addrKey } from './workbook-handle.js';
 
 const PIVOT_KIND = {
   Header: 0,

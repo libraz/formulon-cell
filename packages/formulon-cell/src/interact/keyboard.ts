@@ -1,8 +1,8 @@
 import { expandRangeWithMerges, mergeAnchorOf, stepWithMerge } from '../commands/merge.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
+import { addrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { addrKey } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 
 const MAX_ROW = 1_048_575; // spreadsheet limit; clamp navigation.

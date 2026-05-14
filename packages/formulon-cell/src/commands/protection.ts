@@ -1,7 +1,7 @@
+import { addrKey } from '../engine/address.js';
 import { flushProtectionToEngine } from '../engine/protection-sync.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { addrKey } from '../engine/workbook-handle.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 
 export interface SheetProtectionOptions {

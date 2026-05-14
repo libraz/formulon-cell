@@ -1,0 +1,141 @@
+@layer fc.surface {
+  .fc-host__formulabar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 3px 8px;
+    border-bottom: var(--fc-hairline) solid var(--fc-rule);
+    background: var(--fc-bg-rail);
+    font-family: var(--fc-font-ui);
+    font-size: var(--fc-text-formula);
+    color: var(--fc-fg-mute);
+    flex: 0 0 auto;
+  }
+
+  .fc-host__formulabar-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 88px;
+    height: 23px;
+    padding: 2px 8px;
+    border-radius: 2px;
+    background: var(--fc-bg);
+    border: var(--fc-hairline) solid var(--fc-rule);
+    color: var(--fc-fg);
+    font-family: var(--fc-font-ui);
+    font-feature-settings:
+      "tnum" 1,
+      "cv02" 1;
+    letter-spacing: 0;
+    font-size: 12px;
+    text-align: center;
+    outline: 0;
+    cursor: text;
+  }
+  .fc-host__formulabar-tag:focus {
+    border-color: var(--fc-accent);
+    box-shadow: 0 0 0 2px var(--fc-accent-soft, rgba(56, 89, 255, 0.15));
+  }
+
+  .fc-host__formulabar-fx {
+    color: var(--fc-fg-mute);
+    font-family: var(--fc-font-display);
+    font-style: italic;
+    font-size: 14px;
+    font-weight: 600;
+    user-select: none;
+    width: 26px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-right: var(--fc-hairline) solid var(--fc-rule);
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .fc-host__formulabar-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-right: var(--fc-hairline) solid var(--fc-rule);
+    background: transparent;
+    color: var(--fc-fg-faint);
+    font: inherit;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .fc-host__formulabar-action:disabled {
+    opacity: 0.28;
+    cursor: default;
+  }
+
+  .fc-host__formulabar-action--cancel:not(:disabled):hover {
+    color: var(--fc-cell-error-fg);
+  }
+
+  .fc-host__formulabar-action--accept:not(:disabled):hover {
+    color: var(--fc-accent);
+  }
+
+  .fc-host__formulabar-input {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    outline: 0;
+    color: var(--fc-fg);
+    font: inherit;
+    font-family: var(--fc-font-ui);
+    font-feature-settings:
+      "tnum" 1,
+      "zero" 1;
+    min-height: 24px;
+    padding: 2px 6px;
+    border: var(--fc-hairline) solid var(--fc-rule);
+    border-radius: 2px;
+    background: var(--fc-bg);
+    caret-color: var(--fc-accent);
+    resize: none;
+    line-height: 1.4;
+    overflow: hidden;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .fc-host__formulabar[data-fc-expanded="1"] .fc-host__formulabar-input {
+    overflow-y: auto;
+    max-height: 200px;
+  }
+
+  .fc-host__formulabar-expand {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 24px;
+    padding: 0;
+    background: transparent;
+    border: var(--fc-hairline) solid var(--fc-rule);
+    border-radius: var(--fc-radius-sm);
+    color: var(--fc-fg-mute);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .fc-host__formulabar-expand:hover {
+    border-color: var(--fc-accent);
+    color: var(--fc-accent);
+  }
+  .fc-host__formulabar-expand:focus-visible {
+    outline: 2px solid var(--fc-accent);
+    outline-offset: 1px;
+  }
+}

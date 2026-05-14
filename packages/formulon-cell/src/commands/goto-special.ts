@@ -1,6 +1,6 @@
+import { addrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { addrKey } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore } from '../store/store.js';
 
 /** Desktop spreadsheets "Go To Special" categories supported in v1. Mirrors the radio list

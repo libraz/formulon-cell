@@ -1,0 +1,106 @@
+@layer fc.app {
+  .fc-objects {
+    position: absolute;
+    inset: 48px 16px auto auto;
+    z-index: var(--fc-z-grid, 2147483010);
+    width: min(420px, calc(100% - 32px));
+    max-height: min(520px, calc(100% - 64px));
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--fc-bg-elev, Canvas);
+    color: var(--fc-fg, CanvasText);
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+    border-radius: var(--fc-radius-md, 6px);
+    box-shadow:
+      0 20px 44px rgba(0, 0, 0, 0.22),
+      0 1px 2px rgba(0, 0, 0, 0.12);
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 12px;
+    line-height: 1.4;
+    outline: none;
+  }
+
+  .fc-objects[hidden] {
+    display: none;
+  }
+
+  .fc-objects__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 34px;
+    padding: 6px 8px 6px 10px;
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+  }
+
+  .fc-objects__title {
+    font-weight: 600;
+  }
+
+  .fc-objects__close {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--fc-radius-sm, 4px);
+    background: transparent;
+    color: var(--fc-fg-mute, currentColor);
+    font: inherit;
+    font-size: 16px;
+    cursor: pointer;
+  }
+
+  .fc-objects__close:hover {
+    background: var(--fc-accent-soft, color-mix(in srgb, Highlight 14%, Canvas));
+    color: var(--fc-fg, CanvasText);
+  }
+
+  .fc-objects__body {
+    overflow: auto;
+    padding: 10px;
+  }
+
+  .fc-objects__section + .fc-objects__section {
+    margin-top: 12px;
+  }
+
+  .fc-objects__heading {
+    margin-bottom: 5px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 66%, transparent));
+    font-weight: 600;
+  }
+
+  .fc-objects__row {
+    display: grid;
+    grid-template-columns: minmax(120px, 0.7fr) minmax(0, 1fr);
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule-soft, color-mix(in srgb, CanvasText 8%, transparent));
+  }
+
+  .fc-objects__key {
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 66%, transparent));
+  }
+
+  .fc-objects__value,
+  .fc-objects__list,
+  .fc-objects__paths {
+    overflow-wrap: anywhere;
+  }
+
+  .fc-objects__paths {
+    margin: 0;
+    padding-left: 18px;
+    font-family: var(--fc-font-mono, monospace);
+    font-size: 11px;
+  }
+
+  .fc-objects__empty {
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 66%, transparent));
+  }
+}

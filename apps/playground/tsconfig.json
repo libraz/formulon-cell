@@ -5,7 +5,10 @@
     "types": ["vite/client", "node"],
     "paths": {
       "@libraz/formulon-cell": ["../../packages/formulon-cell/src/index.ts"],
-      "@libraz/formulon-cell/styles.css": ["../../packages/formulon-cell/src/styles/index.css"]
+      "@libraz/formulon-cell/styles.css": ["../../packages/formulon-cell/src/styles/index.css"],
+      "@libraz/formulon-cell/styles/toolbar.css": [
+        "../../packages/formulon-cell/src/styles/toolbar.css"
+      ]
     }
   },
   "include": ["src/**/*", "vite.config.ts"]

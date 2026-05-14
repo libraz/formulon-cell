@@ -1,0 +1,95 @@
+@layer fc.base {
+  /* z-index tiers — named floors for every floating UI surface.
+   *
+   * All tiers compute from --fc-z-base so the entire overlay stack
+   * shifts as a unit with a single knob. The default sits well above
+   * typical host modal/backdrop ranges (1000–9999), so floating UI
+   * stays reachable when .fc-host is embedded inside a host modal,
+   * drawer, or fullscreen overlay.
+   *
+   * Declared on :where(html) (not just .fc-host) so the cascade
+   * reaches body-portaled UI (context menu, autocomplete, hover tip,
+   * etc.) that lives outside the .fc-host subtree.
+   *
+   * Tiers, bottom → top:
+   *   --fc-z-grid     in-grid panels: find bar, slicer, charts,
+   *                   quick analysis, objects inspector
+   *   --fc-z-dialog   modal-with-backdrop dialogs (Format Cells,
+   *                   Iterative Calc, External Links, CF Rules,
+   *                   Cell Styles gallery)
+   *   --fc-z-tooltip  passive hover tip
+   *   --fc-z-popover  anchored popovers: autocomplete, arg helper,
+   *                   validation list, filter dropdown, sheet-tab
+   *                   menu, status-bar aggregate chooser
+   *   --fc-z-callout  cell-anchored sticky note (cmtnote)
+   *   --fc-z-menu     right-click context menu (preempts all)
+   *   --fc-z-error    error / data-validation indicator popup
+   *
+   * Override knobs, in priority order:
+   *   1. Bump --fc-z-base to shift the entire stack.
+   *   2. Override a single tier (e.g. --fc-z-menu) to retarget one layer.
+   *   3. Set z-index directly on a class for a single element override. */
+  :where(html) {
+    --fc-z-base: 2147483000;
+    --fc-z-grid: calc(var(--fc-z-base) + 10);
+    --fc-z-dialog: calc(var(--fc-z-base) + 20);
+    --fc-z-tooltip: calc(var(--fc-z-base) + 30);
+    --fc-z-popover: calc(var(--fc-z-base) + 40);
+    --fc-z-callout: calc(var(--fc-z-base) + 50);
+    --fc-z-menu: calc(var(--fc-z-base) + 60);
+    --fc-z-error: calc(var(--fc-z-base) + 70);
+  }
+  .fc-host {
+    /* Typography is consumer-overridable. We never bundle webfonts in core. */
+    --fc-font-ui: var(
+      --fc-font-ui-fallback,
+      Aptos,
+      "Aptos Display",
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      sans-serif
+    );
+    --fc-font-mono: var(
+      --fc-font-mono-fallback,
+      ui-monospace,
+      "SF Mono",
+      "JetBrains Mono",
+      monospace
+    );
+    --fc-font-display: var(--fc-font-display-fallback, var(--fc-font-ui));
+
+    /* Sizing scale — small + dense, but never cramped. */
+    --fc-text-cell: 13px;
+    --fc-text-header: 11px;
+    --fc-text-formula: 13px;
+    --fc-text-rail: 11px;
+
+    --fc-leading-cell: 1.35;
+    --fc-tracking-tight: 0;
+    --fc-tracking-wide: 0.04em;
+
+    --fc-radius-sm: 4px;
+    --fc-radius-md: 6px;
+    --fc-radius-lg: 10px;
+
+    --fc-dur-fast: 90ms;
+    --fc-dur-base: 160ms;
+    --fc-dur-slow: 280ms;
+    --fc-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --fc-ease-in-out: cubic-bezier(0.6, 0.04, 0.4, 1);
+
+    /* Hairline rule width — set by render layer to 0.5px on retina. */
+    --fc-hairline: 1px;
+
+    font-family: var(--fc-font-ui);
+    font-size: var(--fc-text-cell);
+    line-height: var(--fc-leading-cell);
+    color: var(--fc-fg);
+    background: var(--fc-bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: geometricPrecision;
+  }
+}

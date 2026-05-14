@@ -1,0 +1,6 @@
+@layer fc.reset {
+  .fc-host,
+  .fc-host * {
+    box-sizing: border-box;
+  }
+}

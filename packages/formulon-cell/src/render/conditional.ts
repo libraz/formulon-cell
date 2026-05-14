@@ -1,5 +1,5 @@
+import { addrKey } from '../engine/address.js';
 import type { CellValue, Range } from '../engine/types.js';
-import { addrKey } from '../engine/workbook-handle.js';
 import type { CellFormat, ConditionalIconSet, ConditionalRule, State } from '../store/store.js';
 
 const inRange = (sheet: number, row: number, col: number, r: Range): boolean =>

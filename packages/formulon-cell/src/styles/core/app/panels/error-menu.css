@@ -1,0 +1,48 @@
+@layer fc.app {
+  /* Error / validation triangle popover. Anchored at viewport coordinates
+ * by error-menu.ts (position: fixed); we only own the visual shell. */
+  .fc-errmenu {
+    position: fixed;
+    z-index: var(--fc-z-error, 2147483070);
+    min-width: 200px;
+    max-width: 260px;
+    padding: 4px;
+    background: var(--fc-bg, Canvas);
+    color: var(--fc-fg, CanvasText);
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: var(--fc-radius-md, 6px);
+    box-shadow: 0 6px 18px color-mix(in srgb, CanvasText 18%, transparent);
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 12px;
+  }
+  .fc-errmenu__heading {
+    padding: 6px 10px;
+    font-weight: 600;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 10%, transparent));
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .fc-errmenu__item {
+    appearance: none;
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 0;
+    padding: 6px 10px;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    border-radius: var(--fc-radius-sm, 4px);
+  }
+  .fc-errmenu__item:hover,
+  .fc-errmenu__item:focus-visible {
+    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 8%, transparent));
+    outline: none;
+  }
+}

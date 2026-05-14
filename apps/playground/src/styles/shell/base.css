@@ -1,0 +1,24 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--shell-bg);
+  color: var(--shell-fg);
+  font-family: var(--shell-font-ui);
+  font-size: 12px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
+}
+
+/* Default spreadsheet-ish letter-spacing. Aptos/Segoe are humanist — give them air. */
+.app {
+  letter-spacing: -0.003em;
+}

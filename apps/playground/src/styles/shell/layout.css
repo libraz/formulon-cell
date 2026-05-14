@@ -1,0 +1,43 @@
+/* ── App shell ─────────────────────────────────────────────────────── */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background: var(--shell-bg);
+  color: var(--shell-fg);
+}
+
+.app__ribbon-root {
+  flex: 0 0 auto;
+}
+
+.app__ribbon-shell {
+  --demo-font: var(--shell-font-ui);
+  --demo-mono: var(--shell-font-mono);
+  --demo-bg: var(--shell-bg);
+  --demo-card: var(--shell-surface);
+  --demo-fg: var(--shell-fg);
+  --demo-fg-soft: var(--shell-fg-mute);
+  --demo-line: var(--shell-rule-2);
+  --demo-line-soft: var(--shell-rule);
+  --demo-accent: var(--shell-accent);
+  --demo-accent-strong: var(--shell-accent-strong);
+  --demo-accent-soft: var(--shell-accent-soft);
+  --demo-title-fg: var(--shell-accent-fg);
+  --demo-ribbon-bg: var(--shell-surface);
+  --demo-ribbon-rail: var(--shell-bg-2);
+  --demo-ribbon-hover: var(--shell-bg-3);
+  --demo-ribbon-line: var(--shell-rule-2);
+  --demo-input-bg: var(--shell-surface);
+  --demo-input-fg: var(--shell-fg);
+}
+
+.app__ribbon-root [hidden] {
+  display: none !important;
+}
+
+.app__ribbon-root .demo__ribbon-tools {
+  position: relative;
+}

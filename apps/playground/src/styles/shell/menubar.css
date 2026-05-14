@@ -1,0 +1,81 @@
+/* ── Menu strip (full spreadsheet ribbon tabs — 32px) ─────────────────── */
+
+.app__menubar {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  height: 32px;
+  padding: 0 6px;
+  background: var(--shell-surface);
+  border-bottom: 1px solid var(--shell-rule);
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 5;
+}
+.app__menubar-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 12px;
+  background: transparent;
+  border: 0;
+  color: var(--shell-fg);
+  font-family: var(--shell-font-ui);
+  font-size: 12px;
+  font-weight: 400;
+  cursor: pointer;
+  transition:
+    background 100ms ease,
+    color 100ms ease;
+}
+.app__menubar-item:hover {
+  background: var(--shell-bg-2);
+}
+.app__menubar-item:active {
+  background: var(--shell-bg-3);
+}
+.app__menubar-item:focus-visible {
+  outline: 2px solid var(--shell-accent);
+  outline-offset: -3px;
+  border-radius: 2px;
+}
+/* The current ribbon tab — green underline plus subtle background. */
+.app__menubar-item--current {
+  font-weight: 500;
+  color: var(--shell-fg);
+}
+.app__menubar-item--current::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  height: 2px;
+  background: var(--shell-accent);
+  border-radius: 1px 1px 0 0;
+}
+
+/* "File" tab — spreadsheet marks this in green. */
+.app__menubar-item--file {
+  margin-right: 4px;
+  background: var(--shell-accent);
+  color: var(--shell-accent-fg);
+  padding: 0 18px;
+  font-weight: 500;
+}
+.app__menubar-item--file:hover {
+  background: var(--shell-accent-strong);
+  color: var(--shell-accent-fg);
+}
+.app__menubar-item--file:active {
+  background: var(--shell-accent-darker);
+}
+.app__menubar-item--file:focus-visible {
+  outline-color: var(--shell-accent-fg);
+}
+.app__menubar-group {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+}

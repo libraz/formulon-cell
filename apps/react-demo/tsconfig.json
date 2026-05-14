@@ -9,6 +9,9 @@
       "@libraz/formulon-cell/styles/contrast.css": [
         "../../packages/formulon-cell/src/styles/theme-contrast.css"
       ],
+      "@libraz/formulon-cell/styles/toolbar.css": [
+        "../../packages/formulon-cell/src/styles/toolbar.css"
+      ],
       "@libraz/formulon-cell-react": ["../../packages/formulon-cell-react/src/index.ts"]
     }
   },

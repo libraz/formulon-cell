@@ -1,6 +1,6 @@
 import { type History, recordFormatChange } from '../commands/history.js';
+import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
-import { addrKey } from '../engine/workbook-handle.js';
 import { hitTest } from '../render/geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore } from '../store/store.js';
 

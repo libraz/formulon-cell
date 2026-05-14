@@ -656,3 +656,21 @@ export type {
 export { createSpreadsheetStore, defaultPageSetup, getPageSetup, mutators } from './store/store.js';
 export type { ResolvedTheme } from './theme/resolve.js';
 export { resolveTheme } from './theme/resolve.js';
+export type { FluentIconName } from './toolbar/fluent-icons.js';
+export { FLUENT_ICON_PATHS, fluentIconPaths } from './toolbar/fluent-icons.js';
+export type {
+  RibbonCommand,
+  RibbonGroupModel,
+  RibbonOption,
+  RibbonTab,
+  RibbonTabModel,
+  ToolbarLang,
+  ToolbarText,
+} from './toolbar/ribbon-model.js';
+export {
+  buildRibbonModel,
+  FONT_FAMILIES,
+  FONT_SIZES,
+  RIBBON_TAB_LABELS,
+  toolbarText,
+} from './toolbar/ribbon-model.js';

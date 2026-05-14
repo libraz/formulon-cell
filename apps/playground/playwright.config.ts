@@ -1,14 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
-/**
- * Playwright config for the playground app. Currently used only by the
- * a11y audit (axe). The dev server is auto-started by Playwright; no manual
- * `yarn dev` is required.
- *
- * Browser binaries: run `yarn test:e2e:install` once before the first run.
- */
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: ['**/visual/**'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -17,15 +11,14 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:5173',
     trace: 'on-first-retry',
+    viewport: { width: 1280, height: 800 },
   },
   projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],
   webServer: {
-    command: 'yarn dev --host 127.0.0.1 --port 5173',
+    command: 'yarn workspace @formulon-cell/playground dev --host 127.0.0.1 --port 5173',
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: !process.env.CI,
     stdout: 'pipe',

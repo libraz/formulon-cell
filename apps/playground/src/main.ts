@@ -4,25 +4,29 @@ import {
   applyUnmerge,
   attachFilterDropdown,
   autoSum,
+  buildRibbonModel,
   bumpDecimals,
-  clearFilter,
+  type CellBorderStyle,
   clearFormat,
   cycleCurrency,
   cyclePercent,
-  moveSheet,
+  fluentIconPaths,
   mutators,
+  type RibbonCommand,
+  type RibbonTab,
   recordFormatChange,
-  removeDuplicates,
-  removeSheet,
-  renameSheet,
   Spreadsheet,
   type SpreadsheetInstance,
   setAlign,
+  setBorderPreset,
   setBorders,
+  setFillColor,
+  setFont,
+  setFontColor,
   setFreezePanes,
+  setNumFmt,
   setSheetHidden,
-  setSheetZoom,
-  sortRange,
+  setVAlign,
   toggleBold,
   toggleItalic,
   toggleStrike,
@@ -30,6 +34,10 @@ import {
   toggleWrap,
   WorkbookHandle,
 } from '@libraz/formulon-cell';
+import { applyFixture, isFixtureName } from './fixtures.js';
+import { seedWorkbook } from './seed.js';
+import { openSheetTabMenu } from './sheet-tab-menu.js';
+import { setupSortMenu, setupZoomControls } from './zoom-sort.js';
 
 const sheetEl = document.getElementById('sheet');
 const themeToggle = document.getElementById('theme-toggle') as HTMLButtonElement | null;
@@ -41,6 +49,7 @@ const statusSelection = document.getElementById('status-selection');
 const statusMetric = document.getElementById('status-metric');
 const statusEngine = document.getElementById('status-engine');
 const statusObjects = document.getElementById('status-objects');
+const ribbonRoot = document.getElementById('ribbon-root');
 
 if (!sheetEl) throw new Error('#sheet missing');
 
@@ -49,44 +58,458 @@ type CoreTheme = 'paper' | 'ink';
 type UiTheme = 'light' | 'dark';
 
 const html = document.documentElement;
-let uiTheme: UiTheme = (html.dataset.theme as UiTheme | undefined) ?? 'light';
+// URL params: `?theme=light|dark` and `?locale=en|ja` let E2E / visual specs
+// pin the boot state without scripting the toolbar. They simply override the
+// initial values; user toggles still work afterwards.
+const bootParams = new URLSearchParams(window.location.search);
+const themeParam = bootParams.get('theme');
+const localeParam = bootParams.get('locale');
+const initialUiTheme: UiTheme =
+  themeParam === 'dark' || themeParam === 'light'
+    ? themeParam
+    : ((html.dataset.theme as UiTheme | undefined) ?? 'light');
+let uiTheme: UiTheme = initialUiTheme;
+html.dataset.theme = uiTheme;
 const toCore = (t: UiTheme): CoreTheme => (t === 'dark' ? 'ink' : 'paper');
 
 let inst: SpreadsheetInstance | null = null;
 
-const seed = (wb: WorkbookHandle): void => {
-  // Small editorial demo. Headers in row 0, items below, formulas in col D + E.
-  wb.setText({ sheet: 0, row: 0, col: 0 }, 'item');
-  wb.setText({ sheet: 0, row: 0, col: 1 }, 'qty');
-  wb.setText({ sheet: 0, row: 0, col: 2 }, 'unit');
-  wb.setText({ sheet: 0, row: 0, col: 3 }, 'subtotal');
-  wb.setText({ sheet: 0, row: 0, col: 4 }, 'tax (8%)');
+const seed = seedWorkbook;
 
-  const rows = [
-    ['paper', 24, 0.42],
-    ['vermillion ink', 6, 12.5],
-    ['rule pen', 2, 8.9],
-    ['draftsman pad', 1, 24.0],
-    ['eraser', 3, 1.25],
-  ] as const;
+const ribbonLang = localeParam === 'ja' ? 'ja' : 'en';
+let activeRibbonTab: RibbonTab = 'home';
+let selectedBorderStyle: CellBorderStyle = 'thin';
 
-  rows.forEach(([name, qty, unit], i) => {
-    const r = i + 1;
-    wb.setText({ sheet: 0, row: r, col: 0 }, name);
-    wb.setNumber({ sheet: 0, row: r, col: 1 }, qty);
-    wb.setNumber({ sheet: 0, row: r, col: 2 }, unit);
-    wb.setFormula({ sheet: 0, row: r, col: 3 }, `=B${r + 1}*C${r + 1}`);
-    wb.setFormula({ sheet: 0, row: r, col: 4 }, `=D${r + 1}*0.08`);
+const legacyCommandIds: Record<string, string> = {
+  alignC: 'btn-align-center',
+  alignL: 'btn-align-left',
+  alignR: 'btn-align-right',
+  autosum: 'btn-autosum',
+  bold: 'btn-bold',
+  borders: 'btn-borders',
+  currency: 'btn-currency',
+  decDown: 'btn-decimals-down',
+  decUp: 'btn-decimals-up',
+  filter: 'btn-sort',
+  fontGrow: 'btn-font-grow',
+  fontShrink: 'btn-font-shrink',
+  formatPainter: 'btn-format-painter',
+  freeze: 'btn-freeze',
+  italic: 'btn-italic',
+  merge: 'btn-merge',
+  middle: 'btn-middle',
+  percent: 'btn-percent',
+  comma: 'btn-comma',
+  commentInsert: 'btn-comment',
+  hyperlinkInsert: 'btn-hyperlink',
+  newCommentReview: 'btn-review-comment',
+  pivotTableInsert: 'btn-pivot',
+  redoHome: 'btn-redo',
+  strike: 'btn-strike',
+  top: 'btn-top',
+  underline: 'btn-underline',
+  undoHome: 'btn-undo',
+  wrap: 'btn-wrap',
+};
+
+const renderRibbon = (): void => {
+  if (!ribbonRoot) return;
+  const model = buildRibbonModel(ribbonLang);
+  const shell = document.createElement('div');
+  shell.className = 'demo__ribbon-shell app__ribbon-shell';
+
+  const tabs = document.createElement('div');
+  tabs.className = 'demo__ribbon-tabs';
+  tabs.setAttribute('role', 'tablist');
+  tabs.setAttribute('aria-label', 'Ribbon tabs');
+  for (const tab of model) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `demo__ribbon-tab${tab.id === 'file' ? ' demo__ribbon-tab--file' : ''}${
+      tab.id === activeRibbonTab ? ' demo__ribbon-tab--active' : ''
+    }`;
+    btn.setAttribute('role', 'tab');
+    btn.setAttribute('aria-selected', tab.id === activeRibbonTab ? 'true' : 'false');
+    btn.dataset.ribbonTab = tab.id;
+    btn.textContent = tab.label;
+    tabs.appendChild(btn);
+  }
+  shell.appendChild(tabs);
+
+  for (const tab of model) {
+    const panel = document.createElement('div');
+    panel.className = 'demo__ribbon';
+    panel.setAttribute('role', 'toolbar');
+    panel.setAttribute('aria-label', `${tab.id} ribbon`);
+    panel.dataset.ribbonPanel = tab.id;
+    panel.hidden = tab.id !== activeRibbonTab;
+
+    for (const g of tab.groups) {
+      const group = document.createElement('section');
+      group.className = `demo__ribbon-group${g.variant ? ` demo__ribbon-group--${g.variant}` : ''}`;
+      group.setAttribute('aria-label', g.title);
+
+      const tools = document.createElement('div');
+      tools.className = 'demo__ribbon-tools';
+      for (const c of g.commands) {
+        if (c.kind === 'break') {
+          const rowBreak = document.createElement('div');
+          rowBreak.className = 'demo__rb-break';
+          rowBreak.dataset.ribbonCommand = c.id;
+          tools.appendChild(rowBreak);
+          continue;
+        }
+        if (c.kind === 'select') {
+          tools.appendChild(createRibbonSelect(c));
+          continue;
+        }
+        if (c.kind === 'color') {
+          tools.appendChild(createRibbonColor(c));
+          continue;
+        }
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `demo__rb${c.kind === 'large' ? ' demo__rb--large' : ''}${
+          c.kind === 'wide' ? ' demo__rb--wide' : ''
+        }${c.kind === 'mono' ? ' demo__rb--mono' : ''}`;
+        b.title = c.title;
+        b.setAttribute('aria-label', c.title);
+        b.dataset.ribbonCommand = c.id;
+        const legacyId = legacyCommandIds[c.id];
+        if (legacyId) b.id = legacyId;
+        b.disabled = !!c.disabled;
+        const textOnly = !c.icon || c.kind === 'mono';
+        const showLabel = textOnly || c.kind === 'wide' || c.kind === 'large';
+        const icon = c.icon && c.kind !== 'mono' ? createRibbonIcon(c.icon) : null;
+        if (icon) {
+          b.appendChild(icon);
+        }
+        if (showLabel || (!icon && c.kind !== 'mono')) {
+          const label = document.createElement('span');
+          label.textContent = c.label;
+          b.appendChild(label);
+        }
+        tools.appendChild(b);
+        if (c.id === 'borders') tools.appendChild(createBordersMenu());
+        else if (c.id === 'freeze') tools.appendChild(createFreezeMenu());
+        else if (c.id === 'filter') tools.appendChild(createSortMenu());
+      }
+
+      const label = document.createElement('div');
+      label.className = 'demo__ribbon-label';
+      label.textContent = g.title;
+      group.appendChild(tools);
+      group.appendChild(label);
+      panel.appendChild(group);
+    }
+
+    shell.appendChild(panel);
+  }
+
+  ribbonRoot.replaceChildren(shell);
+};
+
+const createRibbonIcon = (name: string): SVGSVGElement | null => {
+  const paths = fluentIconPaths(name);
+  if (!paths) return null;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.classList.add('demo__rb-icon');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'currentColor');
+  svg.setAttribute('focusable', 'false');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const d of paths) {
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', d);
+    svg.appendChild(path);
+  }
+  return svg;
+};
+
+const activeCellFormat = () => {
+  if (!inst) return null;
+  const s = inst.store.getState();
+  const a = s.selection.active;
+  return s.format.formats.get(`${a.sheet}:${a.row}:${a.col}`) ?? null;
+};
+
+const currentRibbonControlValue = (id: string): string => {
+  const f = activeCellFormat();
+  if (id === 'fontFamily') return f?.fontFamily ?? 'Aptos';
+  if (id === 'fontSize') return String(f?.fontSize ?? 11);
+  if (id === 'fontColor') return f?.color ?? '#201f1e';
+  if (id === 'fillColor') return f?.fill ?? '#ffffff';
+  if (id === 'borderPreset') return 'outline';
+  if (id === 'borderStyle') return selectedBorderStyle;
+  if (id === 'marginsPreset') return 'normal';
+  if (id === 'orientationPreset') return 'portrait';
+  if (id === 'paperSizePreset') return 'A4';
+  return '';
+};
+
+function applyRibbonFormat(
+  fn: (
+    state: ReturnType<SpreadsheetInstance['store']['getState']>,
+    store: SpreadsheetInstance['store'],
+  ) => void,
+): void {
+  const i = inst;
+  if (!i) return;
+  recordFormatChange(i.history, i.store, () => {
+    fn(i.store.getState(), i.store);
+  });
+  (sheetEl as HTMLElement).focus();
+}
+
+function applyRibbonControl(id: string, value: string): void {
+  if (id === 'fontFamily') {
+    applyRibbonFormat((state, store) => setFont(state, store, { fontFamily: value }));
+  } else if (id === 'fontSize') {
+    applyRibbonFormat((state, store) => setFont(state, store, { fontSize: Number(value) }));
+  } else if (id === 'fontColor') {
+    applyRibbonFormat((state, store) => setFontColor(state, store, value));
+  } else if (id === 'fillColor') {
+    applyRibbonFormat((state, store) => setFillColor(state, store, value));
+  } else if (id === 'borderPreset') {
+    applyRibbonFormat((state, store) =>
+      setBorderPreset(
+        state,
+        store,
+        value as 'none' | 'outline' | 'all' | 'top' | 'bottom' | 'left' | 'right' | 'doubleBottom',
+        selectedBorderStyle,
+      ),
+    );
+  } else if (id === 'borderStyle') {
+    selectedBorderStyle = value as CellBorderStyle;
+  } else if (id === 'marginsPreset' || id === 'orientationPreset' || id === 'paperSizePreset') {
+    inst?.openPageSetup();
+  }
+}
+
+const makeSvg = (viewBox: string, pathData: string, className: string): SVGSVGElement => {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.classList.add(className);
+  svg.setAttribute('viewBox', viewBox);
+  svg.setAttribute('fill', 'currentColor');
+  svg.setAttribute('focusable', 'false');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', pathData);
+  svg.appendChild(path);
+  return svg;
+};
+
+const createRibbonSelect = (command: RibbonCommand): HTMLDivElement => {
+  const wrap = document.createElement('div');
+  wrap.className = `demo__rb-dd${command.className ? ` ${command.className}` : ''}`;
+  wrap.dataset.ribbonCommand = command.id;
+  wrap.dataset.ribbonSelect = command.id;
+  wrap.dataset.ribbonOptions = JSON.stringify(command.options ?? []);
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'demo__rb-dd__btn';
+  button.title = command.title;
+  button.setAttribute('aria-label', command.title);
+  button.setAttribute('aria-haspopup', 'listbox');
+  button.setAttribute('aria-expanded', 'false');
+
+  const value = document.createElement('span');
+  value.className = 'demo__rb-dd__value';
+  button.append(
+    value,
+    makeSvg(
+      '0 0 12 12',
+      'M2.15 4.65a.5.5 0 0 1 .7 0L6 7.79l3.15-3.14a.5.5 0 1 1 .7.7l-3.5 3.5a.5.5 0 0 1-.7 0l-3.5-3.5a.5.5 0 0 1 0-.7Z',
+      'demo__rb-dd__chev',
+    ),
+  );
+  wrap.appendChild(button);
+
+  const close = (): void => {
+    wrap.classList.remove('demo__rb-dd--open');
+    button.setAttribute('aria-expanded', 'false');
+    wrap.querySelector('.demo__rb-dd__list')?.remove();
+  };
+  const open = (): void => {
+    closeOpenRibbonDropdowns(wrap);
+    wrap.classList.add('demo__rb-dd--open');
+    button.setAttribute('aria-expanded', 'true');
+    const list = document.createElement('div');
+    list.className = 'demo__rb-dd__list';
+    list.setAttribute('role', 'listbox');
+    list.setAttribute('aria-label', command.title);
+    list.tabIndex = -1;
+    const current = currentRibbonControlValue(command.id);
+    for (const option of command.options ?? []) {
+      const selected = option.value === current;
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = `demo__rb-dd__opt${selected ? ' demo__rb-dd__opt--selected' : ''}`;
+      item.setAttribute('role', 'option');
+      item.setAttribute('aria-selected', selected ? 'true' : 'false');
+      item.dataset.value = option.value;
+      const check = document.createElement('span');
+      check.className = 'demo__rb-dd__check';
+      check.setAttribute('aria-hidden', 'true');
+      if (selected) {
+        check.appendChild(
+          makeSvg(
+            '0 0 16 16',
+            'M13.36 3.74c.29.28.29.77 0 1.05l-7.01 7.01a.75.75 0 0 1-1.06 0L2.64 9.15a.75.75 0 1 1 1.06-1.06l2.12 2.12 6.48-6.47a.75.75 0 0 1 1.06 0Z',
+            'demo__rb-dd__check-icon',
+          ),
+        );
+      }
+      const label = document.createElement('span');
+      label.className = 'demo__rb-dd__label';
+      label.textContent = option.label;
+      item.append(check, label);
+      item.addEventListener('click', () => {
+        applyRibbonControl(command.id, option.value);
+        value.textContent = option.label;
+        close();
+      });
+      list.appendChild(item);
+    }
+    wrap.appendChild(list);
+    list.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+    setTimeout(() => {
+      const onDocDown = (ev: MouseEvent): void => {
+        if (ev.target instanceof Node && wrap.contains(ev.target)) return;
+        document.removeEventListener('mousedown', onDocDown, true);
+        close();
+      };
+      document.addEventListener('mousedown', onDocDown, true);
+    }, 0);
+  };
+
+  button.addEventListener('click', () => {
+    if (wrap.classList.contains('demo__rb-dd--open')) close();
+    else open();
+  });
+  button.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      open();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      close();
+    }
   });
 
-  wb.setText({ sheet: 0, row: 7, col: 0 }, 'total');
-  wb.setFormula({ sheet: 0, row: 7, col: 3 }, '=SUM(D2:D6)');
-  wb.setFormula({ sheet: 0, row: 7, col: 4 }, '=SUM(E2:E6)');
-  wb.setFormula({ sheet: 0, row: 8, col: 3 }, '=D8+E8');
-  wb.setText({ sheet: 0, row: 8, col: 0 }, 'with tax');
-
-  wb.recalc();
+  updateRibbonSelectDisplay(wrap, command);
+  return wrap;
 };
+
+const createRibbonColor = (command: RibbonCommand): HTMLLabelElement => {
+  const label = document.createElement('label');
+  label.className = 'demo__rb-color';
+  label.title = command.title;
+  label.dataset.ribbonCommand = command.id;
+  if (command.icon) {
+    const icon = createRibbonIcon(command.icon);
+    if (icon) label.appendChild(icon);
+  }
+  const input = document.createElement('input');
+  input.type = 'color';
+  input.setAttribute('aria-label', command.title);
+  input.value = currentRibbonControlValue(command.id);
+  input.addEventListener('change', () => applyRibbonControl(command.id, input.value));
+  label.appendChild(input);
+  return label;
+};
+
+const closeOpenRibbonDropdowns = (except?: HTMLElement): void => {
+  for (const open of document.querySelectorAll<HTMLElement>('.demo__rb-dd--open')) {
+    if (except && open === except) continue;
+    open.classList.remove('demo__rb-dd--open');
+    open
+      .querySelector<HTMLButtonElement>('.demo__rb-dd__btn')
+      ?.setAttribute('aria-expanded', 'false');
+    open.querySelector('.demo__rb-dd__list')?.remove();
+  }
+};
+
+const updateRibbonSelectDisplay = (wrap: HTMLElement, command: RibbonCommand): void => {
+  const current = currentRibbonControlValue(command.id);
+  const option = command.options?.find((candidate) => candidate.value === current);
+  const value = wrap.querySelector<HTMLElement>('.demo__rb-dd__value');
+  if (value) value.textContent = option?.label ?? current;
+};
+
+const ribbonSelectLabel = (wrap: HTMLElement, current: string): string => {
+  try {
+    const options = JSON.parse(wrap.dataset.ribbonOptions ?? '[]') as {
+      value: string;
+      label: string;
+    }[];
+    return options.find((option) => option.value === current)?.label ?? current;
+  } catch {
+    return current;
+  }
+};
+
+const createMenu = (id: string): HTMLDivElement => {
+  const menu = document.createElement('div');
+  menu.className = 'app__menu';
+  menu.id = id;
+  menu.setAttribute('role', 'menu');
+  menu.hidden = true;
+  return menu;
+};
+
+const menuButton = (label: string, attr: string, value: string): HTMLButtonElement => {
+  const button = document.createElement('button');
+  button.className = 'app__menu-item';
+  button.type = 'button';
+  button.setAttribute('role', 'menuitem');
+  button.dataset[attr] = value;
+  button.textContent = label;
+  return button;
+};
+
+const createBordersMenu = (): HTMLDivElement => {
+  const menu = createMenu('menu-borders');
+  menu.append(
+    menuButton('All borders', 'border', 'all'),
+    menuButton('Top border', 'border', 'top'),
+    menuButton('Bottom border', 'border', 'bottom'),
+    menuButton('Left border', 'border', 'left'),
+    menuButton('Right border', 'border', 'right'),
+    menuButton('No border', 'border', 'clear'),
+    menuButton('Grid lines', 'border', 'gridlines'),
+    menuButton('More borders…', 'border', 'format'),
+  );
+  return menu;
+};
+
+const createFreezeMenu = (): HTMLDivElement => {
+  const menu = createMenu('menu-freeze');
+  menu.append(
+    menuButton('Freeze first row', 'freeze', 'row'),
+    menuButton('Freeze first column', 'freeze', 'col'),
+    menuButton('Freeze up to selection', 'freeze', 'selection'),
+    menuButton('Unfreeze', 'freeze', 'off'),
+  );
+  return menu;
+};
+
+const createSortMenu = (): HTMLDivElement => {
+  const menu = createMenu('menu-sort');
+  menu.append(
+    menuButton('Sort A → Z', 'sort', 'asc'),
+    menuButton('Sort Z → A', 'sort', 'desc'),
+    menuButton('Filter…', 'sort', 'filter'),
+    menuButton('Clear filter', 'sort', 'filter-clear'),
+    menuButton('Remove duplicates', 'sort', 'dedupe'),
+    menuButton('Conditional formatting…', 'sort', 'conditional'),
+    menuButton('Named ranges…', 'sort', 'named'),
+  );
+  return menu;
+};
+
+renderRibbon();
 
 const colLabel = (n: number): string => {
   let out = '';
@@ -220,7 +643,7 @@ statusMetric?.addEventListener('contextmenu', (e) => {
   setTimeout(() => document.addEventListener('mousedown', close), 0);
 });
 
-const ACTIVE_CLASS = 'app__tool--active';
+const ACTIVE_CLASS = 'demo__rb--active';
 const setActive = (id: string, on: boolean): void => {
   const el = document.getElementById(id);
   if (!el) return;
@@ -242,6 +665,26 @@ function projectFormatToolbar(): void {
   setActive('btn-align-right', f?.align === 'right');
   setActive('btn-currency', f?.numFmt?.kind === 'currency');
   setActive('btn-percent', f?.numFmt?.kind === 'percent');
+  for (const wrap of document.querySelectorAll<HTMLElement>('[data-ribbon-select]')) {
+    const id = wrap.dataset.ribbonSelect;
+    if (!id) continue;
+    const current = currentRibbonControlValue(id);
+    const value = wrap.querySelector<HTMLElement>('.demo__rb-dd__value');
+    if (value) value.textContent = ribbonSelectLabel(wrap, current);
+    for (const option of wrap.querySelectorAll<HTMLElement>('.demo__rb-dd__opt')) {
+      const selected = option.dataset.value === current;
+      option.classList.toggle('demo__rb-dd__opt--selected', selected);
+      option.setAttribute('aria-selected', selected ? 'true' : 'false');
+    }
+  }
+  const fontColorInput = document.querySelector<HTMLInputElement>(
+    '[data-ribbon-command="fontColor"] input',
+  );
+  if (fontColorInput) fontColorInput.value = f?.color ?? '#201f1e';
+  const fillColorInput = document.querySelector<HTMLInputElement>(
+    '[data-ribbon-command="fillColor"] input',
+  );
+  if (fillColorInput) fillColorInput.value = f?.fill ?? '#ffffff';
 }
 
 async function boot(): Promise<void> {
@@ -264,11 +707,18 @@ async function boot(): Promise<void> {
   inst = await Spreadsheet.mount(sheetEl as HTMLElement, {
     theme: toCore(uiTheme),
     workbook: wb,
-    locale: 'en',
+    locale: localeParam === 'ja' ? 'ja' : 'en',
   });
   // Debug-only: expose for browser console / e2e poking. Safe to leave on the
   // playground build; the core package never references this global.
   (window as unknown as { __fcInst?: SpreadsheetInstance }).__fcInst = inst;
+
+  // Visual-regression fixtures. `?fixture=cf|sparkline|selection|frozen`
+  // replaces the default seed with a deterministic shape.
+  const fixtureParam = bootParams.get('fixture');
+  if (fixtureParam && isFixtureName(fixtureParam)) {
+    applyFixture(fixtureParam, wb, inst);
+  }
 
   filterDropdown = attachFilterDropdown({ store: inst.store });
 
@@ -329,6 +779,20 @@ document.getElementById('btn-autosum')?.addEventListener('click', () => {
   mutators.replaceCells(inst.store, inst.workbook.cells(result.addr.sheet));
   mutators.setActive(inst.store, result.addr);
   (sheetEl as HTMLElement).focus();
+});
+document.getElementById('btn-pivot')?.addEventListener('click', () => {
+  inst?.openPivotTableDialog();
+});
+document.getElementById('btn-hyperlink')?.addEventListener('click', () => {
+  inst?.openHyperlinkDialog();
+});
+const openCommentDialog = (): void => {
+  inst?.openCommentDialog();
+};
+document.getElementById('btn-comment')?.addEventListener('click', openCommentDialog);
+document.getElementById('btn-review-comment')?.addEventListener('click', openCommentDialog);
+document.getElementById('btn-help-readme')?.addEventListener('click', () => {
+  window.open('https://github.com/libraz/formulon-cell#readme', '_blank', 'noopener,noreferrer');
 });
 
 document.getElementById('btn-undo')?.addEventListener('click', () => {
@@ -400,9 +864,22 @@ wireFormat('btn-underline', toggleUnderline);
 wireFormat('btn-strike', toggleStrike);
 wireFormat('btn-currency', cycleCurrency);
 wireFormat('btn-percent', cyclePercent);
+wireFormat('btn-comma', (state, store) => setNumFmt(state, store, { kind: 'fixed', decimals: 2 }));
+wireFormat('btn-font-grow', (state, store) => {
+  const a = state.selection.active;
+  const f = state.format.formats.get(`${a.sheet}:${a.row}:${a.col}`);
+  setFont(state, store, { fontSize: (f?.fontSize ?? 11) + 1 });
+});
+wireFormat('btn-font-shrink', (state, store) => {
+  const a = state.selection.active;
+  const f = state.format.formats.get(`${a.sheet}:${a.row}:${a.col}`);
+  setFont(state, store, { fontSize: Math.max(1, (f?.fontSize ?? 11) - 1) });
+});
 wireFormat('btn-align-left', (state, store) => setAlign(state, store, 'left'));
 wireFormat('btn-align-center', (state, store) => setAlign(state, store, 'center'));
 wireFormat('btn-align-right', (state, store) => setAlign(state, store, 'right'));
+wireFormat('btn-top', (state, store) => setVAlign(state, store, 'top'));
+wireFormat('btn-middle', (state, store) => setVAlign(state, store, 'middle'));
 wireFormat('btn-decimals-up', (state, store) => bumpDecimals(state, store, 1));
 wireFormat('btn-decimals-down', (state, store) => bumpDecimals(state, store, -1));
 
@@ -745,6 +1222,21 @@ const markDirty = (): void => {
 };
 // Subscribe once boot completes — see end of boot().
 
+// ── Ribbon tab strip ────────────────────────────────────────────────────
+ribbonRoot?.addEventListener('click', (event) => {
+  const tab = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-ribbon-tab]');
+  if (!tab) return;
+  activeRibbonTab = (tab.dataset.ribbonTab as RibbonTab | undefined) ?? 'home';
+  for (const item of ribbonRoot.querySelectorAll<HTMLButtonElement>('[data-ribbon-tab]')) {
+    const isActive = item.dataset.ribbonTab === activeRibbonTab;
+    item.classList.toggle('demo__ribbon-tab--active', isActive);
+    item.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  }
+  for (const panel of ribbonRoot.querySelectorAll<HTMLElement>('[data-ribbon-panel]')) {
+    panel.hidden = panel.dataset.ribbonPanel !== activeRibbonTab;
+  }
+});
+
 // ── View menu (Show Formulas / R1C1 / Grid / Headers toggles) ────────────
 const viewBtn = document.getElementById('menu-view');
 const viewDrop = document.getElementById('menu-view-dropdown');
@@ -924,324 +1416,19 @@ const closeTabMenu = (): void => {
   tabMenuEl = null;
 };
 
-interface PromptOptions {
-  title: string;
-  label: string;
-  initial?: string;
-  placeholder?: string;
-  okLabel?: string;
-  cancelLabel?: string;
-  validate?: (value: string) => string | null;
-}
-
-/** Excel 365-styled modal prompt. Returns the entered value, or `null`
- *  when the user cancels. Replaces native `window.prompt`. */
-const showPrompt = (opts: PromptOptions): Promise<string | null> => {
-  return new Promise<string | null>((resolve) => {
-    const overlay = document.createElement('div');
-    overlay.className = 'fc-fmtdlg app__dlg';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', opts.title);
-
-    const panel = document.createElement('div');
-    panel.className = 'fc-fmtdlg__panel app__dlg__panel';
-    overlay.appendChild(panel);
-
-    const header = document.createElement('div');
-    header.className = 'fc-fmtdlg__header';
-    header.textContent = opts.title;
-    panel.appendChild(header);
-
-    const body = document.createElement('div');
-    body.className = 'fc-fmtdlg__body';
-    panel.appendChild(body);
-
-    const row = document.createElement('div');
-    row.className = 'fc-fmtdlg__row fc-fmtdlg__row--block';
-    const label = document.createElement('label');
-    label.className = 'app__dlg__label';
-    label.textContent = opts.label;
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'app__dlg__input';
-    input.value = opts.initial ?? '';
-    if (opts.placeholder) input.placeholder = opts.placeholder;
-    label.appendChild(input);
-    row.appendChild(label);
-    body.appendChild(row);
-
-    const errorRow = document.createElement('div');
-    errorRow.className = 'app__dlg__error';
-    errorRow.setAttribute('role', 'alert');
-    errorRow.hidden = true;
-    body.appendChild(errorRow);
-
-    const footer = document.createElement('div');
-    footer.className = 'fc-fmtdlg__footer';
-    panel.appendChild(footer);
-
-    const cancelBtn = document.createElement('button');
-    cancelBtn.type = 'button';
-    cancelBtn.className = 'fc-fmtdlg__btn';
-    cancelBtn.textContent = opts.cancelLabel ?? 'Cancel';
-    footer.appendChild(cancelBtn);
-
-    const okBtn = document.createElement('button');
-    okBtn.type = 'button';
-    okBtn.className = 'fc-fmtdlg__btn fc-fmtdlg__btn--primary';
-    okBtn.textContent = opts.okLabel ?? 'OK';
-    footer.appendChild(okBtn);
-
-    let done = false;
-    const finish = (value: string | null): void => {
-      if (done) return;
-      done = true;
-      overlay.removeEventListener('keydown', onKey);
-      overlay.remove();
-      resolve(value);
-    };
-    const onOk = (): void => {
-      const v = input.value;
-      const err = opts.validate?.(v) ?? null;
-      if (err) {
-        errorRow.textContent = err;
-        errorRow.hidden = false;
-        input.focus();
-        input.select();
-        return;
-      }
-      finish(v);
-    };
-    const onCancel = (): void => finish(null);
-    const onKey = (e: KeyboardEvent): void => {
-      e.stopPropagation();
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onCancel();
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        onOk();
-      }
-    };
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', onCancel);
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) onCancel();
-    });
-    overlay.addEventListener('keydown', onKey);
-
-    document.body.appendChild(overlay);
-    requestAnimationFrame(() => {
-      input.focus();
-      input.select();
-    });
-  });
-};
-
-interface ConfirmOptions {
-  title: string;
-  message: string;
-  okLabel?: string;
-  cancelLabel?: string;
-  destructive?: boolean;
-}
-
-/** Excel 365-styled modal confirm. Returns true on accept, false on
- *  cancel/dismiss. Replaces native `window.confirm`. */
-const showConfirm = (opts: ConfirmOptions): Promise<boolean> => {
-  return new Promise<boolean>((resolve) => {
-    const overlay = document.createElement('div');
-    overlay.className = 'fc-fmtdlg app__dlg';
-    overlay.setAttribute('role', 'alertdialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', opts.title);
-
-    const panel = document.createElement('div');
-    panel.className = 'fc-fmtdlg__panel app__dlg__panel';
-    overlay.appendChild(panel);
-
-    const header = document.createElement('div');
-    header.className = 'fc-fmtdlg__header';
-    header.textContent = opts.title;
-    panel.appendChild(header);
-
-    const body = document.createElement('div');
-    body.className = 'fc-fmtdlg__body app__dlg__body';
-    const msg = document.createElement('p');
-    msg.className = 'app__dlg__message';
-    msg.textContent = opts.message;
-    body.appendChild(msg);
-    panel.appendChild(body);
-
-    const footer = document.createElement('div');
-    footer.className = 'fc-fmtdlg__footer';
-    panel.appendChild(footer);
-
-    const cancelBtn = document.createElement('button');
-    cancelBtn.type = 'button';
-    cancelBtn.className = 'fc-fmtdlg__btn';
-    cancelBtn.textContent = opts.cancelLabel ?? 'Cancel';
-    footer.appendChild(cancelBtn);
-
-    const okBtn = document.createElement('button');
-    okBtn.type = 'button';
-    okBtn.className = `fc-fmtdlg__btn fc-fmtdlg__btn--primary${
-      opts.destructive ? ' app__dlg__btn--danger' : ''
-    }`;
-    okBtn.textContent = opts.okLabel ?? 'OK';
-    footer.appendChild(okBtn);
-
-    let done = false;
-    const finish = (value: boolean): void => {
-      if (done) return;
-      done = true;
-      overlay.removeEventListener('keydown', onKey);
-      overlay.remove();
-      resolve(value);
-    };
-    const onKey = (e: KeyboardEvent): void => {
-      e.stopPropagation();
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        finish(false);
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        finish(true);
-      }
-    };
-    okBtn.addEventListener('click', () => finish(true));
-    cancelBtn.addEventListener('click', () => finish(false));
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) finish(false);
-    });
-    overlay.addEventListener('keydown', onKey);
-
-    document.body.appendChild(overlay);
-    requestAnimationFrame(() => {
-      okBtn.focus();
-    });
-  });
-};
 const openTabMenu = (idx: number, x: number, y: number): void => {
   if (!inst) return;
-  closeTabMenu();
-  const wb = inst.workbook;
-  const store = inst.store;
-  const n = wb.sheetCount;
-
-  const menu = document.createElement('div');
-  menu.className = 'app__menu';
-  menu.style.position = 'fixed';
-  menu.style.left = `${x}px`;
-  menu.style.top = `${y}px`;
-  menu.style.zIndex = '90';
-
-  const addItem = (text: string, disabled: boolean, onClick: () => void): void => {
-    const it = document.createElement('button');
-    it.type = 'button';
-    it.className = 'app__menu-item';
-    it.textContent = text;
-    it.disabled = disabled;
-    it.style.opacity = disabled ? '0.45' : '1';
-    it.style.cursor = disabled ? 'not-allowed' : 'pointer';
-    it.addEventListener('click', () => {
-      if (disabled) return;
-      closeTabMenu();
-      onClick();
-    });
-    menu.appendChild(it);
-  };
-
-  addItem('Rename…', false, () => {
-    if (!inst) return;
-    const cur = wb.sheetName(idx);
-    void showPrompt({
-      title: 'Rename sheet',
-      label: 'Sheet name',
-      initial: cur,
-      placeholder: 'Sheet name',
-      okLabel: 'Rename',
-      validate: (v) => {
-        const trimmed = v.trim();
-        if (trimmed.length === 0) return 'Enter a sheet name.';
-        return null;
-      },
-    }).then((next) => {
-      if (next == null) return;
-      const trimmed = next.trim();
-      if (trimmed === cur) return;
-      if (!inst) return;
-      if (renameSheet(wb, idx, trimmed)) renderSheetTabs();
-    });
+  openSheetTabMenu({
+    closeTabMenu,
+    idx,
+    inst,
+    renderSheetTabs,
+    setTabMenuEl: (el) => {
+      tabMenuEl = el;
+    },
+    x,
+    y,
   });
-  addItem('Delete', n <= 1, () => {
-    if (!inst) return;
-    const name = wb.sheetName(idx);
-    void showConfirm({
-      title: 'Delete sheet',
-      message: `Delete "${name}"? This action can't be undone.`,
-      okLabel: 'Delete',
-      destructive: true,
-    }).then((ok) => {
-      if (!ok || !inst) return;
-      if (removeSheet(store, wb, idx)) {
-        const newActive = store.getState().data.sheetIndex;
-        mutators.replaceCells(store, wb.cells(newActive));
-        renderSheetTabs();
-      }
-    });
-  });
-  // Hide tab — disabled when this is the last visible sheet and when the
-  // engine doesn't expose `setSheetTabHidden`.
-  const visibleCount = n - store.getState().layout.hiddenSheets.size;
-  const hideDisabled = !wb.capabilities.sheetTabHidden || visibleCount <= 1;
-  addItem('Hide tab', hideDisabled, () => {
-    if (!inst) return;
-    if (setSheetHidden(store, wb, inst.history, idx, true)) {
-      const newActive = store.getState().data.sheetIndex;
-      mutators.replaceCells(store, wb.cells(newActive));
-      renderSheetTabs();
-    }
-  });
-  const sep = document.createElement('div');
-  sep.className = 'app__menu-sep';
-  menu.appendChild(sep);
-  addItem('Move left', idx === 0, () => {
-    if (!inst) return;
-    if (moveSheet(store, wb, idx, idx - 1)) renderSheetTabs();
-  });
-  addItem('Move right', idx >= n - 1, () => {
-    if (!inst) return;
-    if (moveSheet(store, wb, idx, idx + 1)) renderSheetTabs();
-  });
-
-  document.body.appendChild(menu);
-  tabMenuEl = menu;
-
-  // Clamp into viewport.
-  const rect = menu.getBoundingClientRect();
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  if (rect.right > vw) menu.style.left = `${Math.max(0, vw - rect.width - 4)}px`;
-  if (rect.bottom > vh) menu.style.top = `${Math.max(0, vh - rect.height - 4)}px`;
-
-  const onDocClick = (ev: MouseEvent): void => {
-    if (!tabMenuEl) return;
-    if (ev.target instanceof Node && tabMenuEl.contains(ev.target)) return;
-    closeTabMenu();
-    document.removeEventListener('mousedown', onDocClick, true);
-    document.removeEventListener('keydown', onDocKey, true);
-  };
-  const onDocKey = (ev: KeyboardEvent): void => {
-    if (ev.key === 'Escape') {
-      closeTabMenu();
-      document.removeEventListener('mousedown', onDocClick, true);
-      document.removeEventListener('keydown', onDocKey, true);
-    }
-  };
-  document.addEventListener('mousedown', onDocClick, true);
-  document.addEventListener('keydown', onDocKey, true);
 };
 
 const switchSheet = (idx: number): void => {
@@ -1265,40 +1452,7 @@ tabAddBtn?.addEventListener('click', () => {
   switchSheet(idx);
 });
 
-// Zoom display + rail. The UI clamps to 25–300%, matching what the engine
-// accepts comfortably.
-const zoomDisplay = document.getElementById('zoom-display');
-const zoomRailFill = document.getElementById('zoom-rail-fill');
-const zoomRailThumb = document.getElementById('zoom-rail-thumb');
-const Z_MIN = 0.25;
-const Z_MAX = 3.0;
-const refreshZoom = (): void => {
-  if (!inst) return;
-  const z = inst.store.getState().viewport.zoom;
-  if (zoomDisplay) zoomDisplay.textContent = `${Math.round(z * 100)}%`;
-  // Map [Z_MIN..Z_MAX] → [0..100%] on the rail. The thumb tracks the fill.
-  const pct = Math.max(0, Math.min(1, (z - Z_MIN) / (Z_MAX - Z_MIN))) * 100;
-  if (zoomRailFill) zoomRailFill.style.width = `${pct}%`;
-  if (zoomRailThumb) zoomRailThumb.style.left = `${pct}%`;
-};
-const stepZoom = (delta: number): void => {
-  if (!inst) return;
-  const z = inst.store.getState().viewport.zoom;
-  const next = Math.max(Z_MIN, Math.min(Z_MAX, Math.round((z + delta) * 100) / 100));
-  if (next === z) return;
-  setSheetZoom(inst.store, next, inst.workbook);
-  refreshZoom();
-};
-zoomDisplay?.addEventListener('click', () => {
-  if (!inst) return;
-  // Cycle 75 → 100 → 125 → 150 → 75 …
-  const z = inst.store.getState().viewport.zoom;
-  const next = z >= 1.5 ? 0.75 : Math.round((z + 0.25) * 100) / 100;
-  setSheetZoom(inst.store, next, inst.workbook);
-  refreshZoom();
-});
-document.getElementById('btn-zoom-out')?.addEventListener('click', () => stepZoom(-0.1));
-document.getElementById('btn-zoom-in')?.addEventListener('click', () => stepZoom(0.1));
+const { refreshZoom } = setupZoomControls(() => inst);
 
 tabPrevBtn?.addEventListener('click', () => {
   if (!inst) return;
@@ -1314,7 +1468,6 @@ document.getElementById('btn-merge')?.addEventListener('click', () => {
   if (!inst) return;
   const s = inst.store.getState();
   const r = s.selection.range;
-  // If the range is already merged, unmerge; otherwise merge.
   const anchorAt0 = s.merges.byAnchor.get(`${r.sheet}:${r.r0}:${r.c0}`);
   const isExactMerge =
     anchorAt0 &&
@@ -1322,11 +1475,8 @@ document.getElementById('btn-merge')?.addEventListener('click', () => {
     r.c0 === anchorAt0.c0 &&
     r.r1 === anchorAt0.r1 &&
     r.c1 === anchorAt0.c1;
-  if (isExactMerge) {
-    applyUnmerge(inst.store, inst.workbook, inst.history, r);
-  } else {
-    applyMerge(inst.store, inst.workbook, inst.history, r);
-  }
+  if (isExactMerge) applyUnmerge(inst.store, inst.workbook, inst.history, r);
+  else applyMerge(inst.store, inst.workbook, inst.history, r);
   (sheetEl as HTMLElement).focus();
 });
 
@@ -1339,72 +1489,11 @@ document.getElementById('btn-wrap')?.addEventListener('click', () => {
   (sheetEl as HTMLElement).focus();
 });
 
-const sortBtn = document.getElementById('btn-sort');
-const sortMenu = document.getElementById('menu-sort');
-const closeSortMenu = (): void => {
-  if (!sortMenu) return;
-  sortMenu.hidden = true;
-  sortBtn?.setAttribute('aria-expanded', 'false');
-};
-const openSortMenu = (): void => {
-  if (!sortMenu) return;
-  sortMenu.hidden = false;
-  sortBtn?.setAttribute('aria-expanded', 'true');
-};
-sortBtn?.addEventListener('click', (e) => {
-  e.stopPropagation();
-  if (!sortMenu) return;
-  if (sortMenu.hidden) openSortMenu();
-  else closeSortMenu();
-});
-document.addEventListener('mousedown', (e) => {
-  if (!sortMenu || sortMenu.hidden) return;
-  if (sortMenu.contains(e.target as Node)) return;
-  if (sortBtn?.contains(e.target as Node)) return;
-  closeSortMenu();
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !sortMenu?.hidden) closeSortMenu();
-});
-
-sortMenu?.querySelectorAll<HTMLButtonElement>('[data-sort]').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    if (!inst) return;
-    const action = btn.dataset.sort;
-    closeSortMenu();
-    const state = inst.store.getState();
-    const r = state.selection.range;
-    if (r.r0 === r.r1 && r.c0 === r.c1) return; // single cell — nothing to sort
-    if (action === 'asc' || action === 'desc') {
-      sortRange(state, inst.store, inst.workbook, r, {
-        byCol: r.c0,
-        direction: action,
-      });
-      mutators.replaceCells(inst.store, inst.workbook.cells(state.data.sheetIndex));
-    } else if (action === 'dedupe') {
-      const removed = removeDuplicates(state, inst.store, inst.workbook, r);
-      mutators.replaceCells(inst.store, inst.workbook.cells(state.data.sheetIndex));
-      if (statusMetric)
-        statusMetric.textContent = `Removed ${removed} duplicate row${removed === 1 ? '' : 's'}`;
-    } else if (action === 'filter') {
-      // Stamp the autofilter range so column headers paint the chevron, even
-      // before the user picks any filter values.
-      mutators.setFilterRange(inst.store, r);
-      const sheetRect = sheetEl?.getBoundingClientRect() ?? { left: 0, top: 0, height: 0 };
-      filterDropdown?.open(r, r.c0, {
-        x: sheetRect.left + 80,
-        y: sheetRect.top,
-        h: 32,
-      });
-    } else if (action === 'filter-clear') {
-      clearFilter(state, inst.store, r);
-    } else if (action === 'conditional') {
-      inst.openConditionalDialog();
-    } else if (action === 'named') {
-      inst.openNamedRangeDialog();
-    }
-    (sheetEl as HTMLElement).focus();
-  });
+setupSortMenu({
+  getFilterDropdown: () => filterDropdown,
+  getInst: () => inst,
+  sheetEl: sheetEl as HTMLElement,
+  statusMetric,
 });
 
 let filterDropdown: ReturnType<typeof attachFilterDropdown> | null = null;

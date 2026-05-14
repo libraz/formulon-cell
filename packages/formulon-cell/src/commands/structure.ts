@@ -1,5 +1,6 @@
+import { addrKey } from '../engine/address.js';
 import type { Addr, CellValue } from '../engine/types.js';
-import { addrKey, type WorkbookHandle } from '../engine/workbook-handle.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import {
   type CellFormat,
   type LayoutSlice,

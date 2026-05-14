@@ -1,0 +1,141 @@
+@layer fc.surface {
+  .fc-host__statusbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 26px;
+    padding: 3px 12px;
+    border-top: var(--fc-hairline) solid
+      var(--fc-statusbar-border, var(--fc-accent-strong, var(--fc-accent)));
+    background: var(--fc-statusbar-bg, var(--fc-accent));
+    color: var(--fc-statusbar-fg, color-mix(in srgb, var(--fc-accent-fg, #fff) 76%, transparent));
+    font-size: var(--fc-text-rail);
+    font-family: var(--fc-font-ui);
+    font-feature-settings: "tnum" 1;
+    letter-spacing: 0;
+    text-transform: uppercase;
+    flex: 0 0 auto;
+  }
+
+  .fc-host__statusbar-left {
+    flex: 0 0 auto;
+  }
+
+  .fc-host__statusbar-aggs {
+    flex: 1 1 auto;
+    text-align: center;
+    cursor: pointer;
+    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
+    text-transform: none;
+    letter-spacing: 0;
+    font-feature-settings:
+      "tnum" 1,
+      "zero" 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 10px;
+  }
+
+  .fc-host__statusbar-aggs:hover {
+    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
+    text-decoration: underline;
+  }
+
+  .fc-host__statusbar-right {
+    flex: 0 0 auto;
+  }
+
+  .fc-host__statusbar-zoom {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    margin-left: 4px;
+    color: var(--fc-statusbar-fg, color-mix(in srgb, var(--fc-accent-fg, #fff) 82%, transparent));
+    font-family: var(--fc-font-ui);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .fc-host__statusbar-zoom-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: var(--fc-hairline) solid
+      var(--fc-statusbar-control, color-mix(in srgb, var(--fc-accent-fg, #fff) 36%, transparent));
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .fc-host__statusbar-zoom-btn:hover:not(:disabled) {
+    border-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
+    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
+  }
+
+  .fc-host__statusbar-zoom-btn:disabled {
+    opacity: 0.38;
+    cursor: default;
+  }
+
+  .fc-host__statusbar-zoom-slider {
+    width: 86px;
+    accent-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
+  }
+
+  .fc-host__statusbar-zoom-label {
+    min-width: 42px;
+    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
+    font-feature-settings: "tnum" 1;
+    text-align: right;
+  }
+
+  .fc-host__statusbar-calcmode {
+    flex: 0 0 auto;
+    appearance: none;
+    border: 1px solid
+      var(--fc-statusbar-control, color-mix(in srgb, var(--fc-accent-fg, #fff) 32%, transparent));
+    border-radius: 2px;
+    background: transparent;
+    color: inherit;
+    padding: 1px 7px;
+    margin: 0 8px;
+    font: inherit;
+    font-size: 11px;
+    line-height: 1.4;
+    cursor: pointer;
+  }
+
+  .fc-host__statusbar-calcmode[data-calc-mode="1"] {
+    background: color-mix(
+      in srgb,
+      var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff)) 18%,
+      transparent
+    );
+    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
+    border-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
+  }
+
+  .fc-host__statusbar-calcmode:hover {
+    border-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
+  }
+
+  .fc-host__statusbar-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--fc-accent-fg, #fff);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--fc-accent-fg, #fff) 18%, transparent);
+    margin-right: 8px;
+    vertical-align: 1px;
+  }
+}

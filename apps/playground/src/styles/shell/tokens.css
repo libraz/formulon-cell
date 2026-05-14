@@ -1,0 +1,75 @@
+:root {
+  /* ── Fluent neutrals (light) ─────────────────────────────────────── */
+  --shell-bg: #faf9f8; /* Fluent neutralLighterAlt — body */
+  --shell-bg-2: #f3f2f1; /* Fluent neutralLighter — hover/header rail */
+  --shell-bg-3: #edebe9; /* Fluent neutralLight — pressed */
+  --shell-surface: #ffffff;
+  --shell-surface-2: #faf9f8;
+  --shell-rule: #e1dfdd; /* Fluent neutralQuaternary — hairline */
+  --shell-rule-2: #d2d0ce; /* Fluent neutralQuaternaryAlt — strong */
+  --shell-rule-3: #a19f9d; /* Fluent neutralTertiary */
+  --shell-fg: #201f1e; /* Fluent neutralPrimary */
+  --shell-fg-strong: #11100f;
+  --shell-fg-mute: #605e5c; /* Fluent neutralSecondary */
+  --shell-fg-faint: #8a8886; /* Fluent neutralTertiaryAlt */
+
+  /* ── spreadsheet green ─────────────────────────────────────────────────── */
+  --shell-accent: #107c41; /* spreadsheet green — file tab, active cell */
+  --shell-accent-strong: #0e6b39; /* Hover on accent */
+  --shell-accent-darker: #0b5c30; /* Pressed on accent */
+  --shell-accent-soft: rgba(16, 124, 65, 0.1);
+  --shell-accent-pale: #e6f4ec; /* Toggle-on background */
+  --shell-accent-tint: #caead8; /* Lifted tab fill */
+  --shell-accent-fg: #ffffff;
+
+  --shell-hover: rgba(0, 0, 0, 0.04);
+  --shell-active: rgba(0, 0, 0, 0.08);
+
+  /* Fluent-style depth shadows with ambient + key-light layers. */
+  --shell-shadow-2: 0 0.3px 0.9px rgba(0, 0, 0, 0.07), 0 1.6px 3.6px rgba(0, 0, 0, 0.11);
+  --shell-shadow-4: 0 0.6px 1.8px rgba(0, 0, 0, 0.1), 0 3.2px 7.2px rgba(0, 0, 0, 0.13);
+  --shell-shadow-8: 0 1.2px 3.6px rgba(0, 0, 0, 0.1), 0 6.4px 14.4px rgba(0, 0, 0, 0.13);
+
+  /* Type stack — Aptos / Segoe UI Variable on Windows; Apple system stack
+     on macOS; IBM Plex Sans (bundled webfont) as the deterministic
+     fallback for Linux + headless renderers. */
+  --shell-font-ui:
+    "Aptos", "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    system-ui, "IBM Plex Sans", "Helvetica Neue", sans-serif;
+  --shell-font-display:
+    "Aptos Display", "Segoe UI Variable Display", "Segoe UI", -apple-system, "SF Pro Display",
+    system-ui, "IBM Plex Sans", sans-serif;
+  --shell-font-mono:
+    "Cascadia Mono", "Cascadia Code", "Consolas", "IBM Plex Mono", ui-monospace, "SF Mono",
+    monospace;
+}
+
+[data-theme="dark"] {
+  --shell-bg: #1b1a19;
+  --shell-bg-2: #252423;
+  --shell-bg-3: #2d2c2b;
+  --shell-surface: #1f1e1d;
+  --shell-surface-2: #252423;
+  --shell-rule: #3b3a39;
+  --shell-rule-2: #484644;
+  --shell-rule-3: #605e5c;
+  --shell-fg: #f3f2f1;
+  --shell-fg-strong: #ffffff;
+  --shell-fg-mute: #c8c6c4;
+  --shell-fg-faint: #a19f9d;
+
+  --shell-accent: #4cc26b;
+  --shell-accent-strong: #6dd587;
+  --shell-accent-darker: #2faa55;
+  --shell-accent-soft: rgba(76, 194, 107, 0.18);
+  --shell-accent-pale: rgba(76, 194, 107, 0.16);
+  --shell-accent-tint: rgba(76, 194, 107, 0.28);
+  --shell-accent-fg: #11100f;
+
+  --shell-hover: rgba(255, 255, 255, 0.06);
+  --shell-active: rgba(255, 255, 255, 0.12);
+  --shell-shadow-2: 0 0.3px 0.9px rgba(0, 0, 0, 0.45);
+  --shell-shadow-4: 0 0.6px 1.8px rgba(0, 0, 0, 0.5);
+  --shell-shadow-8: 0 1.2px 3.6px rgba(0, 0, 0, 0.55);
+  color-scheme: dark;
+}

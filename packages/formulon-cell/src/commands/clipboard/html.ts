@@ -4,9 +4,9 @@
  * Spreadsheets parse these on paste.
  */
 
+import { addrKey } from '../../engine/address.js';
 import type { Range } from '../../engine/types.js';
 import { formatCell } from '../../engine/value.js';
-import { addrKey } from '../../engine/workbook-handle.js';
 import type { CellFormat, State } from '../../store/store.js';
 import { formatNumber } from '../format.js';
 

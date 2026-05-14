@@ -1,0 +1,52 @@
+@layer fc.app {
+  /* Paste Special — laid out as two side-by-side fieldsets, with a
+     bottom row for the orthogonal options. */
+  .fc-pastesp__panel {
+    max-width: 480px;
+  }
+  .fc-pastesp__body {
+    padding: 14px 16px;
+  }
+  .fc-pastesp__cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .fc-pastesp__group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: var(--fc-radius-sm, 4px);
+    background: var(--fc-bg, inherit);
+  }
+  .fc-pastesp__legend {
+    font-size: 11px;
+    letter-spacing: var(--fc-tracking-wide, 0.04em);
+    text-transform: uppercase;
+    color: var(--fc-fg-mute, currentColor);
+    margin-bottom: 4px;
+  }
+  .fc-pastesp__list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .fc-pastesp__list .fc-fmtdlg__radio {
+    padding: 2px 0;
+  }
+  .fc-pastesp__bottomrow {
+    display: flex;
+    gap: 24px;
+    padding-top: 4px;
+    border-top: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 10%, transparent));
+    padding-top: 12px;
+  }
+
+  /* Filter dropdown — column header popover with checkboxes for distinct
+     values. Lives in document.body so it can escape clipping ancestors. */
+}

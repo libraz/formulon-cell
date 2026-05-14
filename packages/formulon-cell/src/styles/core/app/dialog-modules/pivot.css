@@ -1,0 +1,70 @@
+@layer fc.app {
+  .fc-pivotdlg__panel {
+    max-width: 520px;
+  }
+  .fc-pivotdlg__body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .fc-pivotdlg__source {
+    border: var(--fc-hairline, 1px) solid color-mix(in srgb, #5b9bd5 42%, transparent);
+    border-radius: 2px;
+    background: #eaf3f8;
+    color: #1f4e79;
+    padding: 7px 9px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .fc-pivotdlg__section {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 12px;
+    padding: 10px 0;
+    border-top: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+  }
+  .fc-pivotdlg__field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 4px;
+    font-size: 12px;
+    min-width: 0;
+  }
+  .fc-pivotdlg__field > span {
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 66%, transparent));
+    font-size: 11px;
+  }
+  .fc-pivotdlg__field > input,
+  .fc-pivotdlg__field > select {
+    width: 100%;
+    min-width: 0;
+  }
+  .fc-pivotdlg__checkgrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 4px 12px;
+    padding: 10px 0 2px;
+    border-top: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+  }
+  .fc-pivotdlg__check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 24px;
+    font-size: 12px;
+    color: var(--fc-fg, CanvasText);
+  }
+  .fc-pivotdlg__check input {
+    margin: 0;
+  }
+  @media (max-width: 540px) {
+    .fc-pivotdlg__section,
+    .fc-pivotdlg__checkgrid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+}

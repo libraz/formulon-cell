@@ -1,6 +1,6 @@
 import { applyFilter, clearFilter, distinctValues } from '../commands/filter.js';
+import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
-import { addrKey } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';

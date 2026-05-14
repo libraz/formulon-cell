@@ -1,0 +1,106 @@
+/* ── Excel 365 modal dialogs (rename / delete / etc.) ──────────────
+   Reuses the core .fc-fmtdlg shell and themes it with the playground's
+   shell tokens so the surface stays cohesive across light/dark. */
+.app__dlg {
+  font-family: var(--shell-font);
+}
+.app__dlg .fc-fmtdlg__panel {
+  width: min(94vw, 420px);
+  max-height: min(80vh, 320px);
+  background: var(--shell-surface);
+  color: var(--shell-fg);
+  border: 1px solid var(--shell-rule);
+  box-shadow: var(--shell-shadow-8);
+}
+.app__dlg .fc-fmtdlg__header {
+  background: var(--shell-bg-2);
+  border-bottom: 1px solid var(--shell-rule);
+  color: var(--shell-fg);
+}
+.app__dlg .fc-fmtdlg__footer {
+  background: var(--shell-bg-2);
+  border-top: 1px solid var(--shell-rule);
+}
+.app__dlg__panel {
+  /* placeholder for future per-instance tweaks */
+}
+.app__dlg__label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--shell-fg-mute);
+}
+.app__dlg__input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--shell-rule-2);
+  border-radius: 2px;
+  background: var(--shell-surface);
+  color: var(--shell-fg);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  transition:
+    border-color 80ms ease,
+    box-shadow 80ms ease;
+}
+.app__dlg__input:hover {
+  border-color: var(--shell-rule-3);
+}
+.app__dlg__input:focus {
+  border-color: var(--shell-accent);
+  box-shadow: 0 0 0 2px var(--shell-accent-soft);
+}
+.app__dlg__error {
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: rgba(196, 49, 75, 0.08);
+  border: 1px solid rgba(196, 49, 75, 0.4);
+  border-radius: 2px;
+  color: #a4262c;
+  font-size: 12px;
+}
+.app__dlg__body--message {
+  padding-top: 4px;
+}
+.app__dlg__message {
+  margin: 0;
+  padding: 4px 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--shell-fg);
+}
+.app__dlg .fc-fmtdlg__btn {
+  background: var(--shell-surface);
+  border-color: var(--shell-rule-2);
+  color: var(--shell-fg);
+}
+.app__dlg .fc-fmtdlg__btn:hover {
+  background: var(--shell-bg-2);
+  border-color: var(--shell-rule-3);
+}
+.app__dlg .fc-fmtdlg__btn--primary {
+  background: var(--shell-accent);
+  border-color: var(--shell-accent);
+  color: var(--shell-accent-fg);
+}
+.app__dlg .fc-fmtdlg__btn--primary:hover {
+  background: var(--shell-accent-strong);
+  border-color: var(--shell-accent-strong);
+  filter: none;
+}
+.app__dlg__btn--danger {
+  background: #c4314b !important;
+  border-color: #c4314b !important;
+  color: #ffffff !important;
+}
+.app__dlg__btn--danger:hover {
+  background: #a4262c !important;
+  border-color: #a4262c !important;
+}

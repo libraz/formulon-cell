@@ -45,6 +45,7 @@
     "./styles/ink.css": "./dist/styles/theme-ink.css",
     "./styles/contrast.css": "./dist/styles/theme-contrast.css",
     "./styles/tokens.css": "./dist/styles/tokens.css",
+    "./styles/toolbar.css": "./dist/styles/toolbar.css",
     "./package.json": "./package.json"
   },
   "files": [

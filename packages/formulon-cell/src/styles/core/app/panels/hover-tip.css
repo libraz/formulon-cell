@@ -1,0 +1,16 @@
+@layer fc.app {
+  .fc-hover-tip {
+    z-index: var(--fc-z-tooltip, 2147483030);
+    background: #fff8c4;
+    color: #2b2b2b;
+    border: 1px solid #d4ba2a;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+    padding: 6px 10px;
+    border-radius: 3px;
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 12px;
+    line-height: 1.45;
+    max-width: 280px;
+    white-space: pre-wrap;
+  }
+}

@@ -1,0 +1,6 @@
+/* Subpixel rules on retina screens — the grid should feel etched. */
+@media (resolution >= 1.5dppx) {
+  .fc-host {
+    --fc-hairline: 0.5px;
+  }
+}

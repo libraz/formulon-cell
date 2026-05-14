@@ -26,7 +26,55 @@ on:
 
 jobs:
   build:
+    name: build (node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - run: corepack enable
+      - run: corepack prepare yarn@4.5.0 --activate
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .yarn/cache
+            node_modules
+          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - run: yarn install --immutable
+      - run: yarn lint
+      - run: yarn build:all
+      - run: yarn typecheck
+      - name: Run unit tests with coverage
+        run: yarn workspace @libraz/formulon-cell test:coverage
+
+      - name: Upload coverage to Codecov
+        if: matrix.node-version == '22'
+        uses: codecov/codecov-action@v5
+        with:
+          files: packages/formulon-cell/coverage/lcov.info
+          flags: formulon-cell
+          fail_ci_if_error: false
+
+  e2e:
+    name: e2e (${{ matrix.app }} / ${{ matrix.browser }})
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [playground, react-demo, vue-demo]
+        browser: [chromium, webkit]
     steps:
       - uses: actions/checkout@v4
 
@@ -47,7 +95,27 @@ jobs:
             ${{ runner.os }}-yarn-
 
       - run: yarn install --immutable
-      - run: yarn lint
-      - run: yarn build:all
-      - run: yarn typecheck
-      - run: yarn test --run
+
+      # Browser binaries for this matrix entry only. The matrix values
+      # (chromium / webkit) come from the strategy block above — they
+      # are static, not untrusted input — but we still pipe them via env
+      # so the surrounding shell never sees a raw interpolation.
+      - name: Install browser binaries
+        env:
+          APP: ${{ matrix.app }}
+          BROWSER: ${{ matrix.browser }}
+        run: yarn workspace "@formulon-cell/${APP}" exec playwright install --with-deps "${BROWSER}"
+
+      - name: Run E2E
+        env:
+          APP: ${{ matrix.app }}
+          BROWSER: ${{ matrix.browser }}
+          CI: 'true'
+        run: yarn workspace "@formulon-cell/${APP}" test:e2e --project="${BROWSER}"
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-${{ matrix.app }}-${{ matrix.browser }}
+          path: apps/${{ matrix.app }}/playwright-report
+          retention-days: 7

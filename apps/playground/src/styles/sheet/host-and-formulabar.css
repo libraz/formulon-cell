@@ -1,0 +1,116 @@
+.app__sheet {
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--shell-surface);
+  position: relative;
+  /* Pipe playground tokens into the core's font fallbacks. */
+  --fc-font-ui-fallback: var(--shell-font-ui);
+  --fc-font-mono-fallback: var(--shell-font-mono);
+  --fc-font-display-fallback: var(--shell-font-display);
+}
+
+/* The core ships its own status bar; we replace it with our bottom row. */
+.app__sheet .fc-host__statusbar {
+  display: none;
+}
+
+/* Formula bar — spreadsheet layout: [Name Box ▾] [fx] [input] */
+.app__sheet .fc-host__formulabar {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 6px 0 0;
+  gap: 0;
+  background: var(--shell-surface);
+  border-bottom: 1px solid var(--shell-rule);
+  align-items: center;
+}
+/* spreadsheet-style Name Box — fixed-width input with a dropdown chevron baked in
+ * via background-image. The padding-right reserves space for the glyph. */
+.app__sheet .fc-host__formulabar-tag {
+  width: 116px;
+  min-width: 116px;
+  height: 24px;
+  margin: 2px 0 2px 6px;
+  padding: 0 22px 0 10px;
+  font-family: var(--shell-font-ui);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  font-feature-settings: "tnum" 1;
+  border-radius: 2px;
+  background-color: var(--shell-surface);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none' stroke='%23605e5c' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'><path d='M2 4l3 3 3-3'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 10px 10px;
+  border: 1px solid var(--shell-rule);
+  color: var(--shell-fg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+.app__sheet .fc-host__formulabar-tag:hover {
+  border-color: var(--shell-rule-2);
+}
+.app__sheet .fc-host__formulabar-tag:focus {
+  border-color: var(--shell-accent);
+  box-shadow: 0 0 0 1px var(--shell-accent);
+}
+.app__sheet .fc-host__formulabar-fx {
+  font-family: var(--shell-font-display);
+  font-size: 13px;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--shell-fg-mute);
+  align-self: center;
+  margin: 0 10px;
+  padding: 2px 6px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition:
+    background 80ms ease,
+    color 80ms ease;
+}
+.app__sheet .fc-host__formulabar-fx:hover {
+  background: var(--shell-bg-2);
+  color: var(--shell-accent);
+}
+.app__sheet .fc-host__formulabar-input {
+  height: 24px;
+  align-self: center;
+  padding: 4px 8px;
+  border-radius: 2px;
+  border: 1px solid transparent;
+  font-family: var(--shell-font-mono);
+  font-size: 12.5px;
+  color: var(--shell-fg);
+  caret-color: var(--shell-accent);
+  background: transparent;
+  cursor: text;
+  transition:
+    border-color 100ms ease,
+    background 100ms ease;
+}
+.app__sheet .fc-host__formulabar-input:hover {
+  background: var(--shell-bg-2);
+}
+.app__sheet .fc-host__formulabar-input:focus {
+  border-color: var(--shell-accent);
+  background: var(--shell-surface);
+  outline: none;
+  box-shadow: 0 0 0 1px var(--shell-accent);
+}
+.app__sheet .fc-host__formulabar-expand {
+  width: 22px;
+  height: 22px;
+  align-self: center;
+  border-radius: 2px;
+  border: 1px solid transparent;
+  color: var(--shell-fg-mute);
+}
+.app__sheet .fc-host__formulabar-expand:hover {
+  background: var(--shell-bg-2);
+  border-color: var(--shell-rule);
+  color: var(--shell-fg);
+}

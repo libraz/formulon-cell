@@ -1,5 +1,5 @@
+import { addrKey } from '../engine/address.js';
 import type { CellValue } from '../engine/types.js';
-import { addrKey } from '../engine/workbook-handle.js';
 
 /**
  * the spreadsheet's F9 key, while editing a formula, replaces the highlighted

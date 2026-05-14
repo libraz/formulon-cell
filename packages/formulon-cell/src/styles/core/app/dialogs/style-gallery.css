@@ -1,0 +1,50 @@
+@layer fc.app {
+  /* Named cell-styles gallery — preset style chips. */
+  .fc-stylegallery {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.32);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--fc-z-dialog, 2147483020);
+  }
+  .fc-stylegallery[hidden] {
+    display: none;
+  }
+  .fc-stylegallery__panel {
+    width: 480px;
+    max-width: 92vw;
+    max-height: 80vh;
+    background: var(--fc-bg, #fff);
+    color: var(--fc-fg, #1f1f1f);
+    border-radius: 6px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+    overflow: auto;
+    padding: 16px;
+  }
+  .fc-stylegallery__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+  }
+  .fc-stylegallery__chip {
+    border: 1px solid var(--fc-rule, #d8d8d8);
+    border-radius: 4px;
+    padding: 8px 10px;
+    background: var(--fc-bg-elev, Canvas);
+    color: var(--fc-fg, currentColor);
+    cursor: pointer;
+    text-align: center;
+    font: inherit;
+    transition: filter 80ms ease;
+  }
+  .fc-stylegallery__chip:hover {
+    filter: brightness(1.05);
+    border-color: var(--fc-accent, #2b6cb0);
+  }
+  .fc-stylegallery__chip:focus-visible {
+    outline: 2px solid var(--fc-accent, #2b6cb0);
+    outline-offset: 1px;
+  }
+}

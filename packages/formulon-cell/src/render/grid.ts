@@ -1,19 +1,11 @@
-import { coerceInput } from '../commands/coerce-input.js';
-import {
-  isBandedRow,
-  isHeaderRow,
-  isTotalRow,
-  type TableOverlay,
-  tableForCell,
-} from '../commands/format-as-table.js';
-import { validateAgainst } from '../commands/validate.js';
+import { isHeaderRow, tableForCell } from '../commands/format-as-table.js';
+import { addrKey } from '../engine/address.js';
 import { evaluateCfFromEngine } from '../engine/cf-sync.js';
 import { makeRangeResolver, type RangeResolver } from '../engine/range-resolver.js';
 import { findSpillBlockers, findSpillRanges, looksLikeArrayFormula } from '../engine/spill.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { addrKey } from '../engine/workbook-handle.js';
-import type { CellFormat, CellValidation, State } from '../store/store.js';
+import type { CellFormat, State } from '../store/store.js';
 import type { ResolvedTheme } from '../theme/resolve.js';
 import { evaluateConditional } from './conditional.js';
 import {
@@ -34,8 +26,21 @@ import {
   rowHeight,
 } from './geometry.js';
 import {
+  detectErrorKind,
+  detectValidationViolation,
+  ERROR_TRIANGLE_COLOR,
+  type ErrorTriangleHit,
+  isPlainTextOverflowCandidate,
+  normalizeFormatLocale,
+  setErrorTriangleHits,
+  setFillHandleRect,
+  setOutlineToggles,
+  setValidationChevron,
+  VALIDATION_TRIANGLE_COLOR,
+} from './grid/hit-state.js';
+import { tableCellFormat } from './grid/table-format.js';
+import {
   CONDITIONAL_ICON_GUTTER,
-  type OutlineToggleHit,
   paintActiveCellOutline,
   paintCellBackground,
   paintCellBorders,
@@ -61,168 +66,6 @@ import {
   TRACE_PRECEDENT_COLOR,
 } from './painters.js';
 import { paintCellSparkline } from './sparkline.js';
-
-function tableCellFormat(table: TableOverlay, row: number, col: number): CellFormat | undefined {
-  if (isHeaderRow(table, row, col)) {
-    return {
-      fill: table.style === 'dark' ? '#1f4e78' : table.style === 'light' ? '#d9eaf7' : '#5b9bd5',
-      color: table.style === 'light' ? '#1f1f1f' : '#ffffff',
-      bold: true,
-    };
-  }
-  if (isTotalRow(table, row, col)) {
-    return {
-      fill: table.style === 'dark' ? '#385723' : table.style === 'light' ? '#e2f0d9' : '#a9d18e',
-      color: '#1f1f1f',
-      bold: true,
-    };
-  }
-  if (isBandedRow(table, row, col)) {
-    return {
-      fill: table.style === 'dark' ? '#d9e2f3' : table.style === 'light' ? '#f3f8fc' : '#ddebf7',
-    };
-  }
-  return undefined;
-}
-
-export function isPlainTextOverflowCandidate(input: {
-  value: CellValue;
-  formula: string | null;
-  format?: CellFormat;
-  showFormulas: boolean;
-  displayOverride: string | null;
-  tableHeader: boolean;
-  hasIcon: boolean;
-  isMergeAnchor: boolean;
-}): boolean {
-  if (input.tableHeader || input.hasIcon || input.isMergeAnchor) return false;
-  if (input.format?.wrap || input.format?.rotation || input.format?.align) return false;
-  if (input.showFormulas && input.formula) return false;
-  if (input.displayOverride != null) return input.value.kind === 'text';
-  return input.value.kind === 'text' && !input.formula;
-}
-
-export type ErrorTriangleKind = 'error' | 'validation';
-
-/** Hot-zone of an error/validation triangle painted in this frame. The
- *  click layer (mount.ts) hit-tests these to open the popover menu. */
-export interface ErrorTriangleHit {
-  rect: Rect;
-  addr: { sheet: number; row: number; col: number };
-  kind: ErrorTriangleKind;
-}
-
-/** Color used for formula-error triangles (spreadsheet-style green). */
-export const ERROR_TRIANGLE_COLOR = '#2ea043';
-/** Color used for data-validation violation triangles (spreadsheet-style red). */
-export const VALIDATION_TRIANGLE_COLOR = '#d24545';
-
-let cachedFillHandleRect: Rect | null = null;
-let cachedValidationChevron: { rect: Rect; row: number; col: number } | null = null;
-let cachedOutlineToggles: OutlineToggleHit[] = [];
-let cachedErrorTriangles: ErrorTriangleHit[] = [];
-
-/** Latest hit-rects of all error / validation triangles painted in this
- *  frame. The mount-level click handler hit-tests these to open the
- *  error-info popover. */
-export function getErrorTriangleHits(): ErrorTriangleHit[] {
-  return cachedErrorTriangles;
-}
-
-function setErrorTriangleHits(hits: ErrorTriangleHit[]): void {
-  cachedErrorTriangles = hits;
-}
-
-/** Spreadsheet error sentinels that the renderer surfaces with a green corner
- *  triangle. Engine-typed errors take the `value.kind === 'error'` branch;
- *  the string set covers cases where a custom formatter / passthrough
- *  layer left a string sentinel in the cell. */
-const ERROR_SENTINELS: ReadonlySet<string> = new Set([
-  '#DIV/0!',
-  '#NAME?',
-  '#REF!',
-  '#VALUE!',
-  '#NUM!',
-  '#N/A',
-  '#NULL!',
-  '#CIRCULAR!',
-]);
-
-const normalizeFormatLocale = (locale: string): string => {
-  if (locale === 'ja') return 'ja-JP';
-  if (locale === 'en') return 'en-US';
-  return locale || 'en-US';
-};
-
-/** Detect whether `cell.value` should surface an error indicator. */
-export function detectErrorKind(value: CellValue): boolean {
-  if (value.kind === 'error') return true;
-  if (value.kind === 'text') return ERROR_SENTINELS.has(value.value);
-  return false;
-}
-
-/** Detect whether `cell.value` violates `validation`. Returns false when
- *  validation is missing, when the cell is blank and `allowBlank` is set,
- *  or when the value is itself an error (we surface that as an error
- *  triangle, not a validation triangle). */
-export function detectValidationViolation(
-  value: CellValue,
-  validation: CellValidation | undefined,
-  resolveRange?: RangeResolver,
-): boolean {
-  if (!validation) return false;
-  if (value.kind === 'error') return false;
-  // Re-use coerceInput by stringifying the value first — same shape the
-  // keyboard / formula-bar paths feed validateAgainst.
-  let raw: string;
-  switch (value.kind) {
-    case 'blank':
-      raw = '';
-      break;
-    case 'number':
-      raw = String(value.value);
-      break;
-    case 'bool':
-      raw = value.value ? 'TRUE' : 'FALSE';
-      break;
-    case 'text':
-      raw = value.value;
-      break;
-  }
-  const coerced = coerceInput(raw);
-  const outcome = validateAgainst(validation, coerced, resolveRange);
-  return !outcome.ok;
-}
-
-/** Latest hit-rects of all outline +/- toggles painted in this frame. The
- *  pointer layer hit-tests these to route clicks to collapse/expand. */
-export function getOutlineToggleHits(): OutlineToggleHit[] {
-  return cachedOutlineToggles;
-}
-
-function setOutlineToggles(hits: OutlineToggleHit[]): void {
-  cachedOutlineToggles = hits;
-}
-
-/** Latest device-space bounds of the fill handle. Hit-tested by the pointer
- *  layer to start a fill drag. Null while the handle is offscreen. */
-export function getFillHandleRect(): Rect | null {
-  return cachedFillHandleRect;
-}
-
-function setFillHandleRect(r: Rect | null): void {
-  cachedFillHandleRect = r;
-}
-
-/** Bounds + addr of the active cell's validation chevron, or null when the
- *  active cell has no list validation. */
-export function getValidationChevron(): { rect: Rect; row: number; col: number } | null {
-  return cachedValidationChevron;
-}
-
-function setValidationChevron(v: { rect: Rect; row: number; col: number } | null): void {
-  cachedValidationChevron = v;
-}
 
 const inRange = (a: Addr, r: Range): boolean =>
   a.row >= r.r0 && a.row <= r.r1 && a.col >= r.c0 && a.col <= r.c1;
@@ -1119,3 +962,17 @@ export class GridRenderer {
     }
   }
 }
+
+export {
+  detectErrorKind,
+  detectValidationViolation,
+  ERROR_TRIANGLE_COLOR,
+  type ErrorTriangleHit,
+  type ErrorTriangleKind,
+  getErrorTriangleHits,
+  getFillHandleRect,
+  getOutlineToggleHits,
+  getValidationChevron,
+  isPlainTextOverflowCandidate,
+  VALIDATION_TRIANGLE_COLOR,
+} from './grid/hit-state.js';

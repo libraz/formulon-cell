@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { attachContextMenu } from '../../../src/interact/context-menu.js';
+import { en } from '../../../src/i18n/strings/en.js';
+import { attachContextMenu, type ContextMenuHandle } from '../../../src/interact/context-menu.js';
 import {
   createSpreadsheetStore,
   mutators,
@@ -80,7 +81,7 @@ describe('attachContextMenu', () => {
   let host: HTMLElement;
   let store: SpreadsheetStore;
   let wb: WorkbookHandle;
-  let detach: () => void;
+  let detach: ContextMenuHandle | null;
   let onAfterCommit: Mock<() => void>;
   let onFormatDialog: Mock<() => void>;
   let onPasteSpecial: Mock<() => void>;
@@ -94,6 +95,7 @@ describe('attachContextMenu', () => {
     onAfterCommit = vi.fn<() => void>();
     onFormatDialog = vi.fn<() => void>();
     onPasteSpecial = vi.fn<() => void>();
+    detach = null;
   });
 
   afterEach(() => {
@@ -188,6 +190,43 @@ describe('attachContextMenu', () => {
       sheetBar.dispatchEvent(e);
       expect(visibleMenu()).toBeNull();
       expect(e.defaultPrevented).toBe(false);
+    });
+
+    it('copies host theme tokens onto the body-mounted menu each time it opens', () => {
+      host.style.setProperty('--fc-bg-elev', '#101820');
+      host.style.setProperty('--fc-fg', '#f6f7f8');
+      host.style.setProperty('--fc-accent', '#40c4ff');
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+
+      fireContextMenu(host, 200, 70);
+      const menu = visibleMenu();
+      expect(menu?.parentElement).toBe(document.body);
+      expect(menu?.style.getPropertyValue('--fc-bg-elev')).toBe('#101820');
+      expect(menu?.style.getPropertyValue('--fc-fg')).toBe('#f6f7f8');
+      expect(menu?.style.getPropertyValue('--fc-accent')).toBe('#40c4ff');
+
+      host.style.setProperty('--fc-bg-elev', '#fff7d6');
+      host.style.setProperty('--fc-fg', '#24211a');
+      host.style.setProperty('--fc-accent', '#c74700');
+      document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      fireContextMenu(host, 200, 70);
+
+      expect(visibleMenu()?.style.getPropertyValue('--fc-bg-elev')).toBe('#fff7d6');
+      expect(visibleMenu()?.style.getPropertyValue('--fc-fg')).toBe('#24211a');
+      expect(visibleMenu()?.style.getPropertyValue('--fc-accent')).toBe('#c74700');
+    });
+
+    it('closes the open menu and rebuilds labels from the next string dictionary', () => {
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      fireContextMenu(host, 200, 70);
+      expect(item('copy')?.textContent).toContain('コピー');
+
+      detach.setStrings(en);
+
+      expect(visibleMenu()).toBeNull();
+      fireContextMenu(host, 200, 70);
+      expect(item('copy')?.textContent).toContain('Copy');
+      expect(item('formatCells')?.textContent).toContain('Format Cells');
     });
   });
 
@@ -584,14 +623,14 @@ describe('attachContextMenu', () => {
       detach = attachContextMenu({ host, store, wb });
       expect(document.querySelector('.fc-ctxmenu')).not.toBeNull();
       detach();
-      detach = (): void => {};
+      detach = null;
       expect(document.querySelector('.fc-ctxmenu')).toBeNull();
     });
 
     it('after detach, contextmenu events do not open the menu', () => {
       detach = attachContextMenu({ host, store, wb });
       detach();
-      detach = (): void => {};
+      detach = null;
       fireContextMenu(host, 200, 70);
       expect(visibleMenu()).toBeNull();
     });

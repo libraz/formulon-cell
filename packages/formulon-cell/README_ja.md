@@ -5,8 +5,9 @@
 [![bundle size](https://img.shields.io/bundlephobia/minzip/@libraz/formulon-cell)](https://bundlephobia.com/package/@libraz/formulon-cell)
 
 [formulon](https://github.com/libraz/formulon) WASM 計算エンジン向けの
-スプレッドシート UI。デスクトップ表計算ソフト風のクロム、Canvas レンダリング
-のグリッド、拡張ベースの機能構成、ランタイム i18n を提供します。
+スプレッドシート UI。デスクトップ表計算ソフト風の UI 表層、
+Canvas 描画によるグリッド、拡張ベースの機能構成、実行時ロケール切替を
+提供します。
 
 ## インストール
 
@@ -14,11 +15,11 @@
 npm install @libraz/formulon-cell zustand
 ```
 
-`zustand` は peer dependency です。WASM エンジンは
+`zustand` はピア依存として公開しています。WASM エンジンは
 [crossOriginIsolated](https://developer.mozilla.org/docs/Web/API/crossOriginIsolated)
 コンテキスト (`COOP: same-origin` + `COEP: require-corp`) を必要とします。
 ヘッダが無い環境では formulon-cell はインメモリのスタブエンジンに
-フォールバックし、再計算と xlsx ラウンドトリップは no-op に縮退します。
+フォールバックし、再計算と xlsx の読み書きは無効化されます。
 
 Vite / webpack / esbuild の設定は
 [バンドラ統合](https://github.com/libraz/formulon-cell/blob/main/README_ja.md#バンドラ統合)
@@ -38,8 +39,8 @@ const sheet = await Spreadsheet.mount(host, {
   locale: 'ja',
 });
 
-sheet.i18n.setLocale('en');     // ランタイムロケール切替
-sheet.setTheme('ink');           // ダークモード
+sheet.i18n.setLocale('en');     // 実行時にロケールを切り替え
+sheet.setTheme('ink');           // ダークテーマへ切り替え
 ```
 
 ## プリセット
@@ -47,15 +48,15 @@ sheet.setTheme('ink');           // ダークモード
 | プリセット | 含まれる機能 |
 |----------|------------|
 | `presets.minimal()`  | 数式バー、ステータスバー、基本キーマップ |
-| `presets.standard()` | + View ツールバー、クイック分析、コンテキストメニュー、検索／置換、クリップボード、書式コピー |
+| `presets.standard()` | + ビューツールバー、クイック分析、コンテキストメニュー、検索／置換、クリップボード、書式コピー |
 | `presets.full()`     | + 書式ダイアログ、形式を選択して貼り付け、条件付き書式、名前付き範囲、ハイパーリンクダイアログ、ピボットテーブル作成、入力規則、オートコンプリート、ホバーコメント |
 
-## サブパス export
+## サブパスエクスポート
 
-| import パス | 説明 |
+| インポートパス | 説明 |
 |---|---|
 | `@libraz/formulon-cell` | コア: `Spreadsheet`、`WorkbookHandle`、`presets`、拡張ファクトリ |
-| `@libraz/formulon-cell/extensions` | 全拡張ファクトリ (re-export) |
+| `@libraz/formulon-cell/extensions` | 拡張ファクトリ一式（再エクスポート） |
 | `@libraz/formulon-cell/extensions/*` | 個別の拡張 (`statusBar`、`findReplace`、`contextMenu` など) |
 | `@libraz/formulon-cell/i18n/ja` | 日本語ロケール辞書 |
 | `@libraz/formulon-cell/i18n/en` | 英語ロケール辞書 |
@@ -70,14 +71,14 @@ sheet.setTheme('ink');           // ダークモード
 | API | 説明 |
 |-----|------|
 | `Spreadsheet.mount(host, opts)` | スプレッドシート UI を DOM 要素にマウント |
-| `WorkbookHandle.createDefault()` | WASM エンジン (またはスタブ) でワークブックを生成 |
+| `WorkbookHandle.createDefault()` | WASM エンジン（またはスタブ）でワークブックを生成 |
 | `isUsingStub()` | スタブエンジンが使われているかを判定 |
 | `presets.{minimal,standard,full}()` | 内蔵プリセット |
-| `instance.i18n.setLocale(loc)` | 再マウント無しでロケール切替 |
-| `instance.setTheme(theme)` | ランタイムでテーマ切替 |
+| `instance.i18n.setLocale(loc)` | 再マウント不要でロケールを切り替え |
+| `instance.setTheme(theme)` | 実行時にテーマを切り替え |
 | `createSessionChart(store, range, options)` | セッションの縦棒／折れ線チャートを作成 |
-| `saveSheetView` / `activateSheetView` | セッション Sheet View の管理 |
-| `listDefinedNames` / `upsertDefinedName` | ヘッドレス Name Manager API |
+| `saveSheetView` / `activateSheetView` | セッション内のシートビュー管理 |
+| `listDefinedNames` / `upsertDefinedName` | ヘッドレスな名前マネージャー API |
 
 完全な API リファレンスは
 [プロジェクト README](https://github.com/libraz/formulon-cell/blob/main/README_ja.md)

@@ -1,0 +1,278 @@
+@layer fc.app {
+  .fc-filter-dropdown {
+    z-index: var(--fc-z-popover, 2147483040);
+    background: var(--fc-bg-elev, Canvas);
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: var(--fc-radius-sm, 4px);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.16),
+      0 1px 3px rgba(0, 0, 0, 0.06);
+    color: var(--fc-fg, currentColor);
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: var(--fc-text-cell, 13px);
+    width: 240px;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+  }
+  .fc-filter-dropdown__search {
+    margin: 8px;
+    padding: 6px 8px;
+    background: var(--fc-bg, Canvas);
+    border: var(--fc-hairline, 1px) solid var(--fc-rule);
+    border-radius: var(--fc-radius-sm, 3px);
+    font: inherit;
+    color: inherit;
+    outline: none;
+  }
+  .fc-filter-dropdown__search:focus {
+    border-color: var(--fc-accent, dodgerblue);
+    box-shadow: 0 0 0 2px var(--fc-accent-soft, rgba(30, 122, 224, 0.15));
+  }
+  .fc-filter-dropdown__list {
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 0 4px 4px;
+    outline: none;
+  }
+  .fc-filter-dropdown__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    cursor: pointer;
+    border-radius: 2px;
+    line-height: 1.3;
+  }
+  .fc-filter-dropdown__row:hover {
+    background: var(--fc-accent-soft, rgba(30, 122, 224, 0.1));
+  }
+  .fc-filter-dropdown__row--all {
+    border-bottom: var(--fc-hairline, 1px) solid var(--fc-rule);
+    margin-bottom: 4px;
+    padding-bottom: 6px;
+    font-weight: 500;
+  }
+  .fc-filter-dropdown__row input[type="checkbox"] {
+    margin: 0;
+  }
+  .fc-filter-dropdown__row span {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .fc-filter-dropdown__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    padding: 8px;
+    border-top: var(--fc-hairline, 1px) solid var(--fc-rule);
+  }
+  .fc-filter-dropdown__actions button {
+    font: inherit;
+    padding: 4px 12px;
+    background: var(--fc-bg, Canvas);
+    border: var(--fc-hairline, 1px) solid var(--fc-rule);
+    border-radius: var(--fc-radius-sm, 3px);
+    color: inherit;
+    cursor: pointer;
+  }
+  .fc-filter-dropdown__actions button:hover {
+    background: var(--fc-bg-rail, color-mix(in srgb, CanvasText 6%, Canvas));
+  }
+  .fc-filter-dropdown__apply {
+    background: var(--fc-accent, dodgerblue) !important;
+    color: white !important;
+    border-color: var(--fc-accent, dodgerblue) !important;
+  }
+  .fc-filter-dropdown__apply:hover {
+    filter: brightness(1.1);
+  }
+
+  /* Function autocomplete — popover under the active editor offering matching
+     function names in a compact monospace listing. */
+  .fc-autocomplete {
+    position: fixed;
+    z-index: var(--fc-z-popover, 2147483040);
+    background: var(--fc-bg-elev, Canvas);
+    border: var(--fc-hairline, 1px) solid var(--fc-rule-strong, var(--fc-rule));
+    border-radius: 3px;
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.18),
+      0 2px 6px rgba(0, 0, 0, 0.12);
+    max-height: 292px;
+    overflow-y: auto;
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 12px;
+    color: var(--fc-fg, currentColor);
+    user-select: none;
+  }
+  .fc-autocomplete__item {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 42px;
+    padding: 5px 10px;
+    border: 0;
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 10%, transparent));
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    line-height: 1.4;
+  }
+  .fc-autocomplete__item:last-child {
+    border-bottom: 0;
+  }
+  .fc-autocomplete__item:hover,
+  .fc-autocomplete__item--active {
+    background: #f3f2f1;
+    color: var(--fc-fg, currentColor);
+  }
+  .fc-autocomplete__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 22px;
+    border: 1px solid var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+    border-radius: 2px;
+    background: var(--fc-bg-rail, color-mix(in srgb, CanvasText 4%, Canvas));
+    color: var(--fc-accent, currentColor);
+    font-family: var(--fc-font-mono, monospace);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .fc-autocomplete__main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .fc-autocomplete__name {
+    overflow: hidden;
+    color: var(--fc-fg-strong, currentColor);
+    font-family: var(--fc-font-mono, monospace);
+    font-size: 12.5px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .fc-autocomplete__detail {
+    overflow: hidden;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Argument helper — floating signature tip above the editor that shows
+     the active function's signature with the current argument bolded. */
+  .fc-arghelper {
+    position: fixed;
+    z-index: var(--fc-z-popover, 2147483040);
+    background: var(--fc-bg-elev, Canvas);
+    border: var(--fc-hairline, 1px) solid var(--fc-rule);
+    border-radius: var(--fc-radius-sm, 3px);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+    padding: 4px 10px;
+    font-family: var(--fc-font-mono, monospace);
+    font-size: 12px;
+    color: var(--fc-fg, currentColor);
+    user-select: none;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .fc-arghelper__name {
+    color: var(--fc-fg-muted, gray);
+  }
+  .fc-arghelper__sep {
+    color: var(--fc-fg-muted, gray);
+  }
+  .fc-arghelper__arg {
+    color: var(--fc-fg-muted, gray);
+  }
+  .fc-arghelper__arg--active {
+    color: var(--fc-accent, dodgerblue);
+    font-weight: 600;
+  }
+
+  /* Validation list — small dropdown anchored under the cell's ▼ chevron. */
+  .fc-validation-list {
+    background: var(--fc-bg-elev, Canvas);
+    border: var(--fc-hairline, 1px) solid var(--fc-rule);
+    border-radius: var(--fc-radius-sm, 3px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+    z-index: var(--fc-z-popover, 2147483040);
+    max-height: 220px;
+    overflow-y: auto;
+    min-width: 120px;
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: var(--fc-text-cell, 13px);
+    color: var(--fc-fg, currentColor);
+    user-select: none;
+  }
+  .fc-validation-list__item {
+    padding: 5px 12px;
+    cursor: pointer;
+  }
+  .fc-validation-list__item:hover {
+    background: var(--fc-accent-soft, rgba(30, 122, 224, 0.14));
+    color: var(--fc-accent, dodgerblue);
+  }
+
+  /* Status bar aggregate chooser — popover above the statusbar with
+     checkmark rows for each Sum/Avg/Count/Min/Max readout. */
+  .fc-statusbar__chooser {
+    position: fixed;
+    z-index: var(--fc-z-popover, 2147483040);
+    min-width: 200px;
+    padding: 4px;
+    background: var(--fc-bg-elev, Canvas);
+    color: var(--fc-fg, CanvasText);
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: var(--fc-radius-md, 6px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 12.5px;
+  }
+  .fc-statusbar__chooser-heading {
+    padding: 6px 10px 4px;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: var(--fc-tracking-wide, 0.04em);
+    color: var(--fc-fg-mute, currentColor);
+  }
+  .fc-statusbar__chooser-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 10px;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    border-radius: var(--fc-radius-sm, 4px);
+  }
+  .fc-statusbar__chooser-item:hover {
+    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 8%, transparent));
+  }
+  .fc-statusbar__chooser-check {
+    display: inline-block;
+    width: 14px;
+    color: var(--fc-accent, currentColor);
+    text-align: center;
+  }
+
+  /* Iterative-calculation dialog — small modal for formula convergence settings. */
+}

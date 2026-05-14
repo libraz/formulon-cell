@@ -1,0 +1,129 @@
+/* ── Status bar (spreadsheet-style: state · selection · metric — engine ・ zoom) */
+
+.app__status {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-left: auto;
+  font-family: var(--shell-font-ui);
+  font-size: 11px;
+  font-feature-settings:
+    "tnum" 1,
+    "zero" 1;
+  color: var(--shell-fg-mute);
+}
+.app__status-block {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 12px;
+  border-left: 1px solid var(--shell-rule);
+  white-space: nowrap;
+  letter-spacing: 0;
+  cursor: default;
+}
+.app__status-block--state {
+  border-left: 0;
+  color: var(--shell-fg);
+  font-weight: 500;
+}
+.app__status-block--selection {
+  font-family: var(--shell-font-mono);
+  font-size: 11px;
+  color: var(--shell-fg);
+}
+.app__status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--shell-accent);
+  margin-right: 8px;
+  box-shadow: 0 0 0 2px var(--shell-accent-soft);
+}
+.app__status-block--metric:empty {
+  display: none;
+}
+.app__status-block--metric {
+  cursor: context-menu;
+  font-family: var(--shell-font-mono);
+  font-size: 11px;
+  color: var(--shell-fg);
+}
+.app__status-block--metric:hover {
+  background: var(--shell-bg);
+  color: var(--shell-accent);
+}
+.app__status-block--engine {
+  color: var(--shell-fg-faint);
+  font-size: 10.5px;
+  font-family: var(--shell-font-mono);
+  letter-spacing: 0.01em;
+}
+
+/* spreadsheet-style zoom control — thin rail with percentage readout, plus stepper
+ * buttons on either side. The rail is purely decorative: it just reflects
+ * the current zoom level. */
+.app__zoomctl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 12px;
+}
+.app__zoom-step {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  color: var(--shell-fg-mute);
+  font-family: var(--shell-font-ui);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 80ms ease,
+    color 80ms ease;
+}
+.app__zoom-step:hover {
+  background: var(--shell-bg);
+  color: var(--shell-accent);
+}
+.app__zoom-step:active {
+  background: var(--shell-bg-3);
+}
+.app__zoom-rail {
+  position: relative;
+  display: inline-block;
+  width: 88px;
+  height: 4px;
+  background: var(--shell-rule);
+  border-radius: 2px;
+}
+.app__zoom-rail-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 33%;
+  background: var(--shell-accent);
+  border-radius: 2px;
+  transition: width 120ms ease;
+}
+.app__zoom-rail-thumb {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  margin-top: -6px;
+  background: var(--shell-surface);
+  border: 1px solid var(--shell-accent);
+  border-radius: 50%;
+  box-shadow: var(--shell-shadow-2);
+  left: 33%;
+  transition: left 120ms ease;
+}

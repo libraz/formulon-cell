@@ -1,0 +1,138 @@
+@layer fc.app {
+  .fc-ctxmenu {
+    position: fixed;
+    z-index: var(--fc-z-menu, 2147483060);
+    min-width: 216px;
+    max-width: min(320px, calc(100vw - 8px));
+    max-height: calc(100vh - 8px);
+    overflow-y: auto;
+    padding: 3px;
+    background: var(--fc-bg-elev, Canvas);
+    color: var(--fc-fg, CanvasText);
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+    border-radius: var(--fc-radius-sm, 4px);
+    box-shadow:
+      0 16px 36px rgba(0, 0, 0, 0.18),
+      0 1px 2px rgba(0, 0, 0, 0.1);
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 12.5px;
+    line-height: 1.35;
+    outline: none;
+  }
+  .fc-ctxmenu[hidden] {
+    display: none;
+  }
+  .fc-ctxmenu__item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 8px;
+    width: 100%;
+    min-height: 28px;
+    padding: 4px 8px 4px 5px;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    border-radius: 2px;
+    text-align: left;
+    font: inherit;
+  }
+  .fc-ctxmenu__item::before {
+    content: "";
+    width: 16px;
+    height: 16px;
+    justify-self: center;
+    color: var(--fc-fg-mute, currentColor);
+    opacity: 0.85;
+    background: var(--fc-menu-icon-color, transparent);
+    -webkit-mask: var(--fc-menu-icon, none) center / 16px 16px no-repeat;
+    mask: var(--fc-menu-icon, none) center / 16px 16px no-repeat;
+  }
+  .fc-ctxmenu__item:hover:not([disabled]),
+  .fc-ctxmenu__item:focus-visible:not([disabled]) {
+    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 8%, transparent));
+    outline: none;
+  }
+  .fc-ctxmenu__item[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .fc-ctxmenu__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .fc-ctxmenu__hint {
+    font-family: var(--fc-font-mono, monospace);
+    font-size: 11px;
+    opacity: 0.7;
+    justify-self: end;
+    white-space: nowrap;
+  }
+  .fc-ctxmenu__sep {
+    display: block;
+    height: 1px;
+    margin: 3px 8px 3px 31px;
+    background: var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+    border: 0;
+    border-top: 0;
+  }
+  .fc-ctxmenu__sep + .fc-ctxmenu__sep,
+  .fc-ctxmenu__sep:first-child,
+  .fc-ctxmenu__sep:last-child {
+    display: none;
+  }
+
+  .fc-ctxmenu__item[data-fc-action="copy"] {
+    --fc-menu-icon-color: currentColor;
+    --fc-menu-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M7 5h8v10H7z' fill='none' stroke='black' stroke-width='1.5'/%3E%3Cpath d='M5 13H4V3h8v1' fill='none' stroke='black' stroke-width='1.5'/%3E%3C/svg%3E");
+  }
+  .fc-ctxmenu__item[data-fc-action="cut"] {
+    --fc-menu-icon-color: currentColor;
+    --fc-menu-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 4l10 12M15 4L5 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3Ccircle cx='5' cy='4' r='1.5'/%3E%3Ccircle cx='5' cy='16' r='1.5'/%3E%3C/svg%3E");
+  }
+  .fc-ctxmenu__item[data-fc-action="paste"],
+  .fc-ctxmenu__item[data-fc-action="pasteSpecial"] {
+    --fc-menu-icon-color: currentColor;
+    --fc-menu-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M7 5h6l1 2v9H6V7z' fill='none' stroke='black' stroke-width='1.5'/%3E%3Cpath d='M8 5c0-1.2.8-2 2-2s2 .8 2 2' fill='none' stroke='black' stroke-width='1.5'/%3E%3C/svg%3E");
+  }
+  .fc-ctxmenu__item[data-fc-action="bold"] {
+    --fc-menu-icon-color: currentColor;
+    --fc-menu-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M7 4h4.5a3 3 0 010 6H7zM7 10h5a3 3 0 010 6H7z' fill='none' stroke='black' stroke-width='1.8'/%3E%3C/svg%3E");
+  }
+  .fc-ctxmenu__item[data-fc-action="italic"] {
+    --fc-menu-icon-color: currentColor;
+    --fc-menu-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M9 4h6M6 16h6M12 4L9 16' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+  }
+  .fc-ctxmenu__item[data-fc-action="underline"] {
+    --fc-menu-icon-color: currentColor;
+    --fc-menu-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M6 4v5a4 4 0 008 0V4M5 17h10' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+  }
+  .fc-ctxmenu__item[data-fc-action*="Insert"],
+  .fc-ctxmenu__item[data-fc-action="selectAll"] {
+    --fc-menu-icon-color: currentColor;
+    --fc-menu-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 4v12M4 10h12' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round'/%3E%3C/svg%3E");
+  }
+  .fc-ctxmenu__item[data-fc-action*="Delete"],
+  .fc-ctxmenu__item[data-fc-action="clear"],
+  .fc-ctxmenu__item[data-fc-action="clearFormat"],
+  .fc-ctxmenu__item[data-fc-action="deleteComment"] {
+    --fc-menu-icon-color: currentColor;
+    --fc-menu-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M6 6l8 8M14 6l-8 8' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+  }
+  .fc-ctxmenu__item[data-fc-action*="Hide"] {
+    --fc-menu-icon-color: currentColor;
+    --fc-menu-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4 10s2.2-4 6-4 6 4 6 4-2.2 4-6 4-6-4-6-4z' fill='none' stroke='black' stroke-width='1.5'/%3E%3Cpath d='M5 15L15 5' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+  }
+  .fc-ctxmenu__item[data-fc-action*="Unhide"] {
+    --fc-menu-icon-color: currentColor;
+    --fc-menu-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4 10s2.2-4 6-4 6 4 6 4-2.2 4-6 4-6-4-6-4z' fill='none' stroke='black' stroke-width='1.5'/%3E%3Ccircle cx='10' cy='10' r='2'/%3E%3C/svg%3E");
+  }
+  .fc-ctxmenu__item[data-fc-action="formatCells"] {
+    --fc-menu-icon-color: currentColor;
+    --fc-menu-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 5h10v10H5zM8 5v10M5 8h10' fill='none' stroke='black' stroke-width='1.5'/%3E%3C/svg%3E");
+  }
+}

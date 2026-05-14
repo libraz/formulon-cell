@@ -1,5 +1,5 @@
+import { addrKey } from './address.js';
 import type { Addr, CellValue, Range } from './types.js';
-import { addrKey } from './workbook-handle.js';
 
 /** Functions whose result is expected to spill. Anchor-cell formulas starting
  *  with one of these (case-insensitive) are candidates for spill detection.
