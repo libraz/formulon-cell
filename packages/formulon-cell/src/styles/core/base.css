@@ -93,3 +93,39 @@
     text-rendering: geometricPrecision;
   }
 }
+
+.fc-mount-error {
+  display: grid;
+  gap: 10px;
+  max-width: 720px;
+  margin: 24px;
+  padding: 24px;
+  color: #201f1e;
+  background: #fff4f4;
+  border: 1px solid #d92d20;
+  border-radius: 6px;
+  font:
+    14px / 1.45 system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+.fc-mount-error strong {
+  font-size: 18px;
+}
+
+.fc-mount-error p {
+  margin: 0;
+}
+
+.fc-mount-error code {
+  overflow-wrap: anywhere;
+  padding: 10px;
+  color: #7a271a;
+  background: #ffffff;
+  border: 1px solid #f4b5ad;
+  border-radius: 4px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}

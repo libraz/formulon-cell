@@ -18,8 +18,9 @@ npm install @libraz/formulon-cell zustand
 `zustand` はピア依存として公開しています。WASM エンジンは
 [crossOriginIsolated](https://developer.mozilla.org/docs/Web/API/crossOriginIsolated)
 コンテキスト (`COOP: same-origin` + `COEP: require-corp`) を必要とします。
-ヘッダが無い環境では formulon-cell はインメモリのスタブエンジンに
-フォールバックし、再計算と xlsx の読み書きは無効化されます。
+ヘッダが無い環境では `WorkbookHandle.createDefault()` がマウント前に失敗
+します。インメモリのスタブエンジンは、テストや明示的なデモ向けに
+`preferStub: true` を渡した場合だけ使います。
 
 Vite / webpack / esbuild の設定は
 [バンドラ統合](https://github.com/libraz/formulon-cell/blob/main/README_ja.md#バンドラ統合)
@@ -71,8 +72,8 @@ sheet.setTheme('ink');           // ダークテーマへ切り替え
 | API | 説明 |
 |-----|------|
 | `Spreadsheet.mount(host, opts)` | スプレッドシート UI を DOM 要素にマウント |
-| `WorkbookHandle.createDefault()` | WASM エンジン（またはスタブ）でワークブックを生成 |
-| `isUsingStub()` | スタブエンジンが使われているかを判定 |
+| `WorkbookHandle.createDefault()` | WASM エンジンでワークブックを生成 |
+| `isUsingStub()` | 明示的なスタブエンジンが使われているかを判定 |
 | `presets.{minimal,standard,full}()` | 内蔵プリセット |
 | `instance.i18n.setLocale(loc)` | 再マウント不要でロケールを切り替え |
 | `instance.setTheme(theme)` | 実行時にテーマを切り替え |

@@ -27,6 +27,13 @@ export interface MountOptions {
     impl: CustomFunction['impl'];
     meta?: CustomFunctionMeta;
   }[];
+  /** Called when mount fails before an instance exists, most commonly when
+   *  the WASM engine cannot start because SharedArrayBuffer is unavailable. */
+  onError?: (error: unknown) => void;
+  /** Whether core should render its built-in mount error panel into `host`
+   *  before rejecting. Defaults to true. Wrappers can disable this and render
+   *  their framework-native fallback instead. */
+  renderError?: boolean;
 }
 
 export interface SpreadsheetInstance {

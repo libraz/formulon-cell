@@ -688,8 +688,8 @@ function projectFormatToolbar(): void {
 }
 
 async function boot(): Promise<void> {
-  // Default to the real WASM engine. Pass ?engine=stub to force the JS fallback
-  // (useful for environments without crossOriginIsolated, or for diffing behavior).
+  // Default to the real WASM engine. Pass ?engine=stub to force the JS stub
+  // for explicit demos or behavior diffs.
   const params = new URLSearchParams(window.location.search);
   const preferStub = params.get('engine') === 'stub';
   const wb = await WorkbookHandle.createDefault({
@@ -732,20 +732,9 @@ async function boot(): Promise<void> {
     const e = ev as CustomEvent<{ count: number }>;
     refreshObjectsBadge('tables', e.detail);
   });
-  // Header chevron click → open the filter dropdown anchored under the header.
-  inst.host.addEventListener('fc:openfilter', (ev) => {
-    const e = ev as CustomEvent<{
-      range: { sheet: number; r0: number; c0: number; r1: number; c1: number };
-      col: number;
-      anchor: { clientX: number; clientY: number; h: number };
-    }>;
-    const { range, col, anchor } = e.detail;
-    filterDropdown?.open(range, col, {
-      x: anchor.clientX,
-      y: anchor.clientY - 4,
-      h: anchor.h,
-    });
-  });
+  // Header chevron click → mount.ts owns the `fc:openfilter` listener and
+  // opens its own dropdown. The playground keeps its `filterDropdown` only
+  // for the sort menu's "filter" action.
 
   const engineLabel = wb.isStub ? 'stub engine' : `formulon ${wb.version}`;
   if (enginePill) enginePill.textContent = `engine · ${engineLabel}`;

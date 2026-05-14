@@ -40,8 +40,10 @@ the same store the chrome subscribes to.
 The WASM engine ships pthread-enabled and requires a
 [crossOriginIsolated context](https://developer.mozilla.org/docs/Web/API/crossOriginIsolated)
 (`Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy:
-require-corp`). Without it, formulon-cell falls back to an in-memory stub
-engine — the UI keeps working, formulas degrade gracefully.
+require-corp`). Without it, `WorkbookHandle.createDefault()` rejects before
+mounting so a host configuration issue cannot masquerade as a working
+spreadsheet. The in-memory stub engine is opt-in via `preferStub: true` for
+tests and explicit demos.
 
 ## Quick Start
 
@@ -108,18 +110,17 @@ export default defineConfig({
 **4. SharedArrayBuffer requires cross-origin isolation.** Serve your page
 with `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy:
 require-corp`. Without these headers, `SharedArrayBuffer` is undefined and
-formulon-cell drops to an in-memory **stub engine**: the canvas, formula
-bar, and editing affordances all keep working, but formula evaluation,
-recalc, and xlsx round-trip degrade to no-ops. Detect at runtime via
-`crossOriginIsolated` or via `isUsingStub()` after
-`WorkbookHandle.createDefault()`:
+`WorkbookHandle.createDefault()` rejects instead of silently falling back to
+the in-memory **stub engine**. The stub is reserved for tests and explicit
+demos via `preferStub: true`, because formula evaluation, recalc, and xlsx
+round-trip are intentionally incomplete there.
 
 ```ts
 import { WorkbookHandle, isUsingStub } from '@libraz/formulon-cell';
 
 const wb = await WorkbookHandle.createDefault();
 if (isUsingStub()) {
-  console.warn('formulon-cell: running on stub engine — recalc disabled');
+  console.warn('formulon-cell: explicit stub engine selected');
 }
 ```
 

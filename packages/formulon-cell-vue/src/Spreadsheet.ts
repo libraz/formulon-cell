@@ -23,6 +23,7 @@ import {
   type Ref,
   ref,
   shallowRef,
+  type VNodeChild,
   watch,
 } from 'vue';
 
@@ -72,6 +73,10 @@ export const Spreadsheet = defineComponent({
     extensions: { type: Array as PropType<ExtensionInput[]>, default: undefined },
     functions: { type: Array as PropType<MountOptions['functions']>, default: undefined },
     seed: { type: Function as PropType<MountOptions['seed']>, default: undefined },
+    errorFallback: {
+      type: Function as PropType<(error: unknown) => VNodeChild>,
+      default: undefined,
+    },
     class: { type: [String, Array, Object] as PropType<string | string[] | object>, default: '' },
     style: { type: Object as PropType<CSSProperties>, default: undefined },
   },
@@ -83,11 +88,13 @@ export const Spreadsheet = defineComponent({
     localeChange: (_e: LocaleChangeEvent) => true,
     themeChange: (_e: ThemeChangeEvent) => true,
     recalc: (_e: RecalcEvent) => true,
+    error: (_e: unknown) => true,
   },
   setup(props, { emit, expose }) {
     const hostEl = ref<HTMLDivElement | null>(null);
     // shallowRef so Vue doesn't deep-walk the spreadsheet's internal state.
     const instance = shallowRef<SpreadsheetInstance | null>(null);
+    const mountError = shallowRef<unknown>(null);
     const eventDisposers: (() => void)[] = [];
     let disposed = false;
 
@@ -103,6 +110,11 @@ export const Spreadsheet = defineComponent({
       if (props.extensions) opts.extensions = props.extensions;
       if (props.functions) opts.functions = props.functions;
       if (props.seed) opts.seed = props.seed;
+      opts.renderError = !props.errorFallback;
+      opts.onError = (error) => {
+        mountError.value = error;
+        emit('error', error);
+      };
       const mountedWith = {
         workbook: opts.workbook,
         theme: opts.theme,
@@ -111,11 +123,18 @@ export const Spreadsheet = defineComponent({
         features: opts.features,
         extensions: opts.extensions,
       };
-      const inst = await SpreadsheetCore.mount(host, opts);
+      let inst: SpreadsheetInstance;
+      try {
+        inst = await SpreadsheetCore.mount(host, opts);
+      } catch (error) {
+        mountError.value = error;
+        return;
+      }
       if (disposed) {
         inst.dispose();
         return;
       }
+      mountError.value = null;
       instance.value = inst;
       eventDisposers.push(
         inst.on('cellChange', (e) => emit('cellChange', e)),
@@ -185,6 +204,10 @@ export const Spreadsheet = defineComponent({
     const renderHost = computed(() =>
       h('div', { ref: hostEl, class: props.class, style: props.style }),
     );
-    return () => renderHost.value;
+    return () => {
+      const fallback =
+        mountError.value && props.errorFallback ? props.errorFallback(mountError.value) : null;
+      return fallback ? [renderHost.value, fallback] : renderHost.value;
+    };
   },
 });

@@ -158,4 +158,28 @@ describe('integration: filter range', () => {
       'cherry',
     ]);
   });
+
+  it('fc:openfilter positions the dropdown by viewport (clientX/Y), not host-relative coords', () => {
+    const { host, instance } = sheet;
+    setAutoFilter(instance.store, { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 0 });
+
+    // Host placed at non-zero offset to make the bug visible: if mount.ts
+    // forwarded host-relative `x/y` straight through, the dropdown would
+    // be anchored at the wrong (0,0)-ish corner.
+    host.dispatchEvent(
+      new CustomEvent('fc:openfilter', {
+        detail: {
+          range: { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 0 },
+          col: 0,
+          anchor: { x: 0, y: 0, h: 24, clientX: 250, clientY: 120 },
+        },
+      }),
+    );
+
+    const root = document.querySelector('.fc-filter-dropdown') as HTMLElement | null;
+    expect(root).not.toBeNull();
+    // 250 viewport-x → left:250px ; 120 viewport-y - 4 + h:24 → top:140px.
+    expect(root?.style.left).toBe('250px');
+    expect(root?.style.top).toBe('140px');
+  });
 });

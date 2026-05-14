@@ -72,7 +72,7 @@ export const buildRibbonGroups = ({
       group(tr.workbook, [
         tool(
           'pageSetup',
-          'Page setup',
+          tr.pageSetup,
           iconLabel('page', tr.pageSetup),
           () => instance?.openPageSetup(),
           false,
@@ -88,7 +88,7 @@ export const buildRibbonGroups = ({
         ),
         tool(
           'links',
-          'Edit links',
+          tr.links,
           iconLabel('link', tr.links),
           () => instance?.openExternalLinksDialog(),
           false,
@@ -98,7 +98,7 @@ export const buildRibbonGroups = ({
       group(tr.inspect, [
         tool(
           'formatCells',
-          'Format cells',
+          tr.formatCells,
           iconLabel('formatCells', tr.formatCells),
           () => instance?.openFormatDialog(),
           false,
@@ -106,8 +106,8 @@ export const buildRibbonGroups = ({
         ),
         tool(
           'gotoSpecial',
-          'Go To Special',
-          iconLabel('goTo', tr.goTo),
+          tr.gotoSpecial,
+          iconLabel('goTo', tr.gotoSpecial),
           () => instance?.openGoToSpecial(),
           false,
           ' demo__rb--wide',
@@ -140,7 +140,7 @@ export const buildRibbonGroups = ({
           ),
           tool(
             'clearFormat',
-            'Clear formats',
+            tr.clearFormats,
             <Icon name="clear" />,
             () => wrapFormat(clearFormat),
             false,
@@ -163,10 +163,10 @@ export const buildRibbonGroups = ({
           select('fontSize', 'Font size', active.fontSize, FONT_SIZES, (value) =>
             wrapFormat((s, st) => setFont(s, st, { fontSize: Number(value) })),
           ),
-          tool('fontGrow', 'Increase font size', <Icon name="fontGrow" />, () =>
+          tool('fontGrow', tr.increaseFontSize, <Icon name="fontGrow" />, () =>
             wrapFormat((s, st) => setFont(s, st, { fontSize: active.fontSize + 1 })),
           ),
-          tool('fontShrink', 'Decrease font size', <Icon name="fontShrink" />, () =>
+          tool('fontShrink', tr.decreaseFontSize, <Icon name="fontShrink" />, () =>
             wrapFormat((s, st) => setFont(s, st, { fontSize: Math.max(1, active.fontSize - 1) })),
           ),
           rowBreak('font-row-2'),
@@ -202,7 +202,7 @@ export const buildRibbonGroups = ({
             active.strike,
             ' demo__rb--strike',
           ),
-          tool('borders', 'Borders', <Icon name="borders" />, () => wrapFormat(cycleBorders)),
+          tool('borders', tr.borders, <Icon name="borders" />, () => wrapFormat(cycleBorders)),
           optionSelect(
             'borderPreset',
             'Border pattern',
@@ -275,8 +275,8 @@ export const buildRibbonGroups = ({
             () => wrapFormat((s, st) => setAlign(s, st, 'right')),
             active.alignRight,
           ),
-          tool('wrap', 'Wrap text', <Icon name="wrap" />, () => wrapFormat(toggleWrap)),
-          tool('merge', 'Merge cells', <Icon name="merge" />, onMerge),
+          tool('wrap', tr.wrapText, <Icon name="wrap" />, () => wrapFormat(toggleWrap)),
+          tool('merge', tr.mergeCells, <Icon name="merge" />, onMerge),
         ],
         'alignment',
       ),
@@ -308,13 +308,13 @@ export const buildRibbonGroups = ({
             active.percent,
             ' demo__rb--mono',
           ),
-          tool('comma', 'Comma style', <Icon name="comma" />, () =>
+          tool('comma', tr.commaStyle, <Icon name="comma" />, () =>
             wrapFormat((s, st) => setNumFmt(s, st, { kind: 'fixed', decimals: 2 })),
           ),
-          tool('decDown', 'Decrease decimals', <Icon name="decDown" />, () =>
+          tool('decDown', tr.decreaseDecimals, <Icon name="decDown" />, () =>
             wrapFormat((s, st) => bumpDecimals(s, st, -1)),
           ),
-          tool('decUp', 'Increase decimals', <Icon name="decUp" />, () =>
+          tool('decUp', tr.increaseDecimals, <Icon name="decUp" />, () =>
             wrapFormat((s, st) => bumpDecimals(s, st, 1)),
           ),
         ],
@@ -353,10 +353,10 @@ export const buildRibbonGroups = ({
       group(
         tr.cells,
         [
-          tool('insertRows', 'Insert selected rows', <Icon name="insertRows" />, onInsertRows),
-          tool('deleteRows', 'Delete selected rows', <Icon name="deleteRows" />, onDeleteRows),
-          tool('insertCols', 'Insert selected columns', <Icon name="insertCols" />, onInsertCols),
-          tool('deleteCols', 'Delete selected columns', <Icon name="deleteCols" />, onDeleteCols),
+          tool('insertRows', tr.insertRows, <Icon name="insertRows" />, onInsertRows),
+          tool('deleteRows', tr.deleteRows, <Icon name="deleteRows" />, onDeleteRows),
+          tool('insertCols', tr.insertCols, <Icon name="insertCols" />, onInsertCols),
+          tool('deleteCols', tr.deleteCols, <Icon name="deleteCols" />, onDeleteCols),
           tool(
             'formatCellsHome',
             'Format cells',
@@ -386,7 +386,7 @@ export const buildRibbonGroups = ({
           ),
           tool(
             'gotoSpecialHome',
-            'Go To Special',
+            tr.gotoSpecial,
             iconLabel('goTo', tr.gotoSpecial),
             () => instance?.openGoToSpecial(),
             false,

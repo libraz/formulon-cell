@@ -1,3 +1,4 @@
+import { normalizeFormatLocale } from '../format/locale.js';
 import type {
   CellAlign,
   CellBorders,
@@ -7,6 +8,8 @@ import type {
   ValidationErrorStyle,
   ValidationOp,
 } from '../store/store.js';
+
+export { normalizeFormatLocale };
 
 /** Discriminator for the dialog's "kind" dropdown. `none` means clear the
  *  validation; the rest mirror `CellValidation['kind']`. */
@@ -96,12 +99,6 @@ export const THEME_SWATCHES = [
   '#002060',
   '#7030a0',
 ] as const;
-
-export const normalizeFormatLocale = (locale: string): string => {
-  if (locale === 'ja') return 'ja-JP';
-  if (locale === 'en') return 'en-US';
-  return locale || 'en-US';
-};
 
 export const defaultCurrencySymbolFor = (locale: string): string =>
   normalizeFormatLocale(locale).startsWith('ja') ? '¥' : '$';

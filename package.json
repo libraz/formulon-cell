@@ -10,7 +10,8 @@
   },
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/*",
+    "tests/e2e-shared"
   ],
   "scripts": {
     "dev": "yarn workspace @formulon-cell/playground dev",

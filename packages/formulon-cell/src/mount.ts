@@ -63,6 +63,29 @@ import { resolveTheme } from './theme/resolve.js';
 
 export type { MountOptions, SpreadsheetInstance } from './mount/types.js';
 
+function mountErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function renderMountError(host: HTMLElement, error: unknown): void {
+  const panel = document.createElement('div');
+  panel.className = 'fc-mount-error';
+  panel.setAttribute('role', 'alert');
+
+  const title = document.createElement('strong');
+  title.textContent = 'Spreadsheet engine unavailable';
+
+  const help = document.createElement('p');
+  help.textContent =
+    'The formulon WASM engine could not start. Serve the page with COOP: same-origin and COEP: require-corp so SharedArrayBuffer is available.';
+
+  const detail = document.createElement('code');
+  detail.textContent = mountErrorMessage(error);
+
+  panel.append(title, help, detail);
+  host.replaceChildren(panel);
+}
+
 /**
  * Mount a spreadsheet onto a DOM host. Returns an instance with imperative
  * controls. The host element is taken over — its existing children are
@@ -91,6 +114,25 @@ export const Spreadsheet = {
     host.dataset.fcEngineState = 'loading';
 
     let sheetTabsController: SheetTabsController | null = null;
+
+    // Track ownership before seeding — only owned (default-created) workbooks
+    // should be touched by `seed`. Pre-loaded workbooks are the consumer's
+    // data and must not be overwritten by the demo helper.
+    let ownsWb = !opts.workbook;
+    let wb: WorkbookHandle;
+    try {
+      wb = opts.workbook ?? (await WorkbookHandle.createDefault());
+      if (opts.seed && ownsWb) opts.seed(wb);
+    } catch (err) {
+      host.dataset.fcEngineState = 'error';
+      try {
+        opts.onError?.(err);
+      } catch (hookErr) {
+        console.error('formulon-cell: mount error handler threw', hookErr);
+      }
+      if (opts.renderError !== false) renderMountError(host, err);
+      throw err;
+    }
 
     const {
       formulabar,
@@ -121,13 +163,6 @@ export const Spreadsheet = {
         sheetTabsController?.showMenu(idx, tab, x, y);
       },
     });
-
-    // Track ownership before seeding — only owned (default-created) workbooks
-    // should be touched by `seed`. Pre-loaded workbooks are the consumer's
-    // data and must not be overwritten by the demo helper.
-    let ownsWb = !opts.workbook;
-    let wb: WorkbookHandle = opts.workbook ?? (await WorkbookHandle.createDefault());
-    if (opts.seed && ownsWb) opts.seed(wb);
 
     const store = createSpreadsheetStore();
     if (opts.theme) mutators.setTheme(store, opts.theme);
@@ -169,7 +204,7 @@ export const Spreadsheet = {
       getDisplay: (addr, value, formula, format) =>
         cellRegistry.resolveDisplay({ addr, value, formula, format }),
     });
-    cellRegistry.subscribe(() => renderer.invalidate());
+    const unsubCellRegistry = cellRegistry.subscribe(() => renderer.invalidate());
     renderer.resize();
     sheetTabsController = attachSheetTabsController({
       addSheetBtn,
@@ -217,12 +252,19 @@ export const Spreadsheet = {
     interface OpenFilterDetail {
       range: import('./engine/types.js').Range;
       col: number;
-      anchor: { x: number; y: number; h: number };
+      anchor: { x: number; y: number; h: number; clientX: number; clientY: number };
     }
     const onOpenFilter = (e: Event): void => {
       const detail = (e as CustomEvent<OpenFilterDetail>).detail;
       if (!detail) return;
-      filterDropdown.open(detail.range, detail.col, detail.anchor);
+      // The dropdown is positioned with `position: fixed`, so it expects
+      // viewport-relative coords. The pointer payload's `x/y` are host-relative;
+      // use `clientX/clientY` instead. `- 4` matches the chevron offset.
+      filterDropdown.open(detail.range, detail.col, {
+        x: detail.anchor.clientX,
+        y: detail.anchor.clientY - 4,
+        h: detail.anchor.h,
+      });
     };
     host.addEventListener('fc:openfilter', onOpenFilter);
 
@@ -802,6 +844,9 @@ export const Spreadsheet = {
         formulaBar.detach();
         sheetTabsController?.detach();
         chromeSync?.detach();
+        host.removeEventListener('fc:openfilter', onOpenFilter);
+        filterDropdown.detach();
+        unsubCellRegistry();
         unsubI18n();
         i18n.dispose();
         renderer.dispose();

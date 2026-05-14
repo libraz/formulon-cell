@@ -44,8 +44,9 @@ WASM エンジンは pthread 有効版を同梱しており、
 [crossOriginIsolated コンテキスト](https://developer.mozilla.org/docs/Web/API/crossOriginIsolated)
 （`Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy:
 require-corp`）を必要とします。これが満たされない環境では formulon-cell は
-インメモリのスタブエンジンにフォールバックします。UI はそのまま動作し、
-数式計算のみが段階的に機能を落とす形になります。
+マウント前に `WorkbookHandle.createDefault()` が失敗します。インメモリの
+スタブエンジンは、テストや明示的なデモ向けに `preferStub: true` を渡した
+場合だけ使います。
 
 ## クイックスタート
 
@@ -115,18 +116,17 @@ export default defineConfig({
 `Cross-Origin-Opener-Policy: same-origin` と
 `Cross-Origin-Embedder-Policy: require-corp` ヘッダを付与してください。
 これらのヘッダが無い環境では `SharedArrayBuffer` が未定義となり、
-formulon-cell はインメモリの **スタブエンジン** にフォールバックします。
-キャンバス・数式バー・編集系の操作は引き続き動作しますが、数式評価・
-再計算・xlsx の読み書きは無効化され、呼び出しても何も起こりません。
-実行時に判定するには `crossOriginIsolated` を参照するか、
-`WorkbookHandle.createDefault()` の後に `isUsingStub()` を呼び出してください。
+`WorkbookHandle.createDefault()` はインメモリの **スタブエンジン** に静かに
+フォールバックせず、失敗します。スタブは `preferStub: true` を渡した
+テストや明示的なデモ専用です。数式評価・再計算・xlsx の読み書きが不完全な
+ため、通常の実行パスでは使わないでください。
 
 ```ts
 import { WorkbookHandle, isUsingStub } from '@libraz/formulon-cell';
 
 const wb = await WorkbookHandle.createDefault();
 if (isUsingStub()) {
-  console.warn('formulon-cell: スタブエンジンで実行中 — 再計算は無効');
+  console.warn('formulon-cell: 明示的にスタブエンジンを使用中');
 }
 ```
 

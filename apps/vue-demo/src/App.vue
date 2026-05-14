@@ -24,6 +24,8 @@ const LOCALES = [
   { value: 'ja', label: 'JA' },
 ];
 
+const formatLoadError = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+
 const UI = {
   en: {
     saved: 'Saved to this device',
@@ -50,6 +52,9 @@ const UI = {
     options: 'Options',
     optionsDesc: 'Show the integration panel and feature toggles.',
     noCommands: 'No commands found',
+    engineUnavailable: 'Spreadsheet engine unavailable',
+    engineSetup:
+      'Serve this demo with COOP: same-origin and COEP: require-corp so SharedArrayBuffer is available.',
   },
   ja: {
     saved: 'このデバイスに保存済み',
@@ -76,6 +81,9 @@ const UI = {
     options: 'オプション',
     optionsDesc: '統合パネルと機能トグルを表示します。',
     noCommands: 'コマンドが見つかりません',
+    engineUnavailable: 'スプレッドシートエンジンを起動できません',
+    engineSetup:
+      'SharedArrayBuffer を有効にするため、COOP: same-origin と COEP: require-corp 付きで配信してください。',
   },
 } as const;
 
@@ -263,16 +271,22 @@ const ribbonTab = ref<RibbonTab>('home');
 const searchQuery = ref('');
 const searchOpen = ref(false);
 const bookName = ref('Book1');
+const loadError = ref<string | null>(null);
 
 const features = computed<FeatureFlags>(() => composeFeatures(preset.value, overrides.value));
 const ui = computed(() => UI[locale.value === 'ja' ? 'ja' : 'en']);
 
-void WorkbookHandle.createDefault().then((wb) => {
-  // Core only auto-seeds when it owns the workbook (no `workbook` prop).
-  // The demo passes a pre-built handle, so seed by hand here.
-  seed(wb);
-  workbook.value = wb;
-});
+void WorkbookHandle.createDefault()
+  .then((wb) => {
+    // Core only auto-seeds when it owns the workbook (no `workbook` prop).
+    // The demo passes a pre-built handle, so seed by hand here.
+    seed(wb);
+    loadError.value = null;
+    workbook.value = wb;
+  })
+  .catch((err: unknown) => {
+    loadError.value = formatLoadError(err);
+  });
 
 watch(
   [instance, () => formatters.value.uppercase, () => formatters.value.arrows],
@@ -300,6 +314,9 @@ const onCellChange = (e: CellChangeEvent): void => {
 
 const onReady = (inst: SpreadsheetInstance): void => {
   instance.value = inst;
+  // Expose the live instance on `window.__fcInst` so cross-demo E2E scenarios
+  // can drive imperative paths without depending on demo-specific UI.
+  (window as unknown as { __fcInst?: SpreadsheetInstance | null }).__fcInst = inst;
 };
 
 const selection = useSelection(instance);
@@ -355,10 +372,15 @@ const onOpenFiles = async (ev: Event): Promise<void> => {
   target.value = '';
   const inst = instance.value;
   if (!inst) return;
-  const buf = await file.arrayBuffer();
-  const next = await WorkbookHandle.loadBytes(new Uint8Array(buf));
-  await inst.setWorkbook(next);
-  bookName.value = file.name.replace(/\.(xlsx|xlsm)$/i, '');
+  try {
+    const buf = await file.arrayBuffer();
+    const next = await WorkbookHandle.loadBytes(new Uint8Array(buf));
+    await inst.setWorkbook(next);
+    loadError.value = null;
+    bookName.value = file.name.replace(/\.(xlsx|xlsm)$/i, '');
+  } catch (err) {
+    window.alert(formatLoadError(err));
+  }
 };
 
 const onPresetChange = (next: PresetKey): void => {
@@ -574,7 +596,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="!workbook" class="demo demo--loading">Loading engine…</div>
+  <div v-if="!workbook" class="demo demo--loading">
+    <div v-if="loadError" class="demo__load-error" role="alert">
+      <strong>{{ ui.engineUnavailable }}</strong>
+      <span>{{ ui.engineSetup }}</span>
+      <code>{{ loadError }}</code>
+    </div>
+    <template v-else>Loading engine…</template>
+  </div>
   <div v-else class="demo" :data-theme="theme">
     <header class="demo__head">
       <div class="demo__titlebar">

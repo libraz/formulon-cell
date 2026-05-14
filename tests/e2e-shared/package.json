@@ -1,0 +1,9 @@
+{
+  "name": "@formulon-cell/e2e-shared",
+  "private": true,
+  "type": "module",
+  "peerDependencies": {
+    "@axe-core/playwright": "*",
+    "@playwright/test": "*"
+  }
+}

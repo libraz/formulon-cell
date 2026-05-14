@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { EngineCapabilities } from '../../../src/engine/capabilities.js';
+import type { EngineCapabilities } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import en from '../../../src/i18n/en.js';
 import type { Strings } from '../../../src/i18n/strings.js';

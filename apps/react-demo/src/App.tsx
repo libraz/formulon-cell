@@ -27,6 +27,9 @@ const LOCALES = [
   { value: 'ja', label: 'JA' },
 ];
 
+const formatLoadError = (err: unknown): string =>
+  err instanceof Error ? err.message : String(err);
+
 const UI = {
   en: {
     saved: 'Saved to this device',
@@ -54,6 +57,9 @@ const UI = {
     options: 'Options',
     optionsDesc: 'Show the integration panel and feature toggles.',
     noCommands: 'No commands found',
+    engineUnavailable: 'Spreadsheet engine unavailable',
+    engineSetup:
+      'Serve this demo with COOP: same-origin and COEP: require-corp so SharedArrayBuffer is available.',
   },
   ja: {
     saved: 'このデバイスに保存済み',
@@ -81,6 +87,9 @@ const UI = {
     options: 'オプション',
     optionsDesc: '統合パネルと機能トグルを表示します。',
     noCommands: 'コマンドが見つかりません',
+    engineUnavailable: 'スプレッドシートエンジンを起動できません',
+    engineSetup:
+      'SharedArrayBuffer を有効にするため、COOP: same-origin と COEP: require-corp 付きで配信してください。',
   },
 } as const;
 
@@ -270,6 +279,7 @@ export const App = (): ReactElement => {
   const [ribbonTab, setRibbonTab] = useState<RibbonTab>('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   // Workbook display name. Untitled until the user opens or saves a file —
   // mirrors the spreadsheet titlebar convention. Stripping the extension
   // keeps it tidy in the chrome while preserving the user's filename for
@@ -282,13 +292,19 @@ export const App = (): ReactElement => {
 
   useEffect(() => {
     let alive = true;
-    void WorkbookHandle.createDefault().then((wb) => {
-      if (!alive) return;
-      // Core only auto-seeds when it owns the workbook (no `workbook` prop).
-      // The demo passes a pre-built handle, so seed by hand here.
-      seed(wb);
-      setWorkbook(wb);
-    });
+    void WorkbookHandle.createDefault()
+      .then((wb) => {
+        if (!alive) return;
+        // Core only auto-seeds when it owns the workbook (no `workbook` prop).
+        // The demo passes a pre-built handle, so seed by hand here.
+        seed(wb);
+        setLoadError(null);
+        setWorkbook(wb);
+      })
+      .catch((err: unknown) => {
+        if (!alive) return;
+        setLoadError(formatLoadError(err));
+      });
     return () => {
       alive = false;
     };
@@ -311,6 +327,16 @@ export const App = (): ReactElement => {
   useEffect(() => {
     instance?.i18n.setLocale(locale);
   }, [instance, locale]);
+
+  // Expose the live instance on `window.__fcInst` so cross-demo E2E scenarios
+  // can drive imperative paths (named-range, paste-special, etc.) without
+  // depending on demo-specific UI.
+  useEffect(() => {
+    (window as unknown as { __fcInst?: SpreadsheetInstance | null }).__fcInst = instance;
+    return () => {
+      delete (window as unknown as { __fcInst?: SpreadsheetInstance | null }).__fcInst;
+    };
+  }, [instance]);
 
   const onCellChange = useCallback((e: CellChangeEvent) => {
     const cell = `${colLabel(e.addr.col)}${e.addr.row + 1}`;
@@ -367,10 +393,15 @@ export const App = (): ReactElement => {
   const onOpen = useCallback(
     async (file: File) => {
       if (!instance) return;
-      const buf = await file.arrayBuffer();
-      const next = await WorkbookHandle.loadBytes(new Uint8Array(buf));
-      await instance.setWorkbook(next);
-      setBookName(file.name.replace(/\.(xlsx|xlsm)$/i, ''));
+      try {
+        const buf = await file.arrayBuffer();
+        const next = await WorkbookHandle.loadBytes(new Uint8Array(buf));
+        await instance.setWorkbook(next);
+        setLoadError(null);
+        setBookName(file.name.replace(/\.(xlsx|xlsm)$/i, ''));
+      } catch (err) {
+        window.alert(formatLoadError(err));
+      }
     },
     [instance],
   );
@@ -561,7 +592,19 @@ export const App = (): ReactElement => {
   }, []);
 
   if (!workbook) {
-    return <div className="demo demo--loading">Loading engine…</div>;
+    return (
+      <div className="demo demo--loading">
+        {loadError ? (
+          <div className="demo__load-error" role="alert">
+            <strong>{ui.engineUnavailable}</strong>
+            <span>{ui.engineSetup}</span>
+            <code>{loadError}</code>
+          </div>
+        ) : (
+          'Loading engine…'
+        )}
+      </div>
+    );
   }
 
   return (

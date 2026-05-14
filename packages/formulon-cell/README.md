@@ -17,8 +17,8 @@ npm install @libraz/formulon-cell zustand
 `zustand` is a peer dependency. The WASM engine requires a
 [crossOriginIsolated](https://developer.mozilla.org/docs/Web/API/crossOriginIsolated)
 context (`COOP: same-origin` + `COEP: require-corp`); without it,
-formulon-cell falls back to an in-memory stub engine and recalc/xlsx
-round-trip degrade to no-ops.
+`WorkbookHandle.createDefault()` rejects before mounting. The in-memory stub
+engine is opt-in via `preferStub: true` for tests and explicit demos.
 
 See [bundler integration](https://github.com/libraz/formulon-cell#bundler-integration)
 for Vite / webpack / esbuild setup notes.
@@ -69,8 +69,8 @@ sheet.setTheme('ink');           // dark mode
 | API | Description |
 |-----|-------------|
 | `Spreadsheet.mount(host, opts)` | Mount the spreadsheet UI into a DOM element |
-| `WorkbookHandle.createDefault()` | Create a workbook backed by the WASM engine (or stub fallback) |
-| `isUsingStub()` | Detect whether the stub engine is in use |
+| `WorkbookHandle.createDefault()` | Create a workbook backed by the WASM engine |
+| `isUsingStub()` | Detect whether the explicit stub engine is in use |
 | `presets.{minimal,standard,full}()` | Built-in feature presets |
 | `instance.i18n.setLocale(loc)` | Swap locale at runtime — no remount |
 | `instance.setTheme(theme)` | Swap theme at runtime |

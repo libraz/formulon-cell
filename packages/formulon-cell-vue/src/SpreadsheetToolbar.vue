@@ -375,10 +375,10 @@ const onZoom = (zoom: number): void => {
         <section class="demo__ribbon-group demo__ribbon-group--tiles" :aria-label="tr.inspect">
           <div class="demo__ribbon-tools">
             <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="props.instance?.openFormatDialog()">
-              <RibbonIcon name="format" /><span>{{ tr.formatCells }}</span>
+              <RibbonIcon name="formatCells" /><span>{{ tr.formatCells }}</span>
             </button>
             <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="props.instance?.openGoToSpecial()">
-              <RibbonIcon name="search" /><span>{{ tr.goTo }}</span>
+              <RibbonIcon name="goTo" /><span>{{ tr.goTo }}</span>
             </button>
           </div>
           <div class="demo__ribbon-label">{{ tr.inspect }}</div>
@@ -535,6 +535,7 @@ const onZoom = (zoom: number): void => {
           :key="preset.value"
           type="button"
           role="option"
+          :aria-selected="false"
           class="demo__rb-dd__opt"
           @click="onDropdownPick('borderPreset', preset.value)"
         >
@@ -568,7 +569,8 @@ const onZoom = (zoom: number): void => {
           :key="style.value"
           type="button"
           role="option"
-          class="demo__rb-dd__opt"
+          :aria-selected="borderStyle === style.value"
+          :class="['demo__rb-dd__opt', { 'demo__rb-dd__opt--selected': borderStyle === style.value }]"
           @click="onDropdownPick('borderStyle', style.value)"
         >
           <span class="demo__rb-dd__check" aria-hidden="true" />
@@ -801,23 +803,23 @@ const onZoom = (zoom: number): void => {
             <div class="demo__rb-dd demo__rb-select--border" :class="{ 'demo__rb-dd--open': openDropdown === 'margins' }">
               <button type="button" class="demo__rb-dd__btn" :disabled="disabled" :title="tr.margins" :aria-label="tr.margins" aria-haspopup="listbox" :aria-expanded="openDropdown === 'margins'" @click="toggleDropdown('margins')"><span class="demo__rb-dd__value">{{ active.marginPreset === 'wide' ? tr.marginsWide : active.marginPreset === 'narrow' ? tr.marginsNarrow : active.marginPreset === 'normal' ? tr.marginsNormal : tr.marginsCustom }}</span><svg class="demo__rb-dd__chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5l3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
               <div v-if="openDropdown === 'margins'" class="demo__rb-dd__list" role="listbox" :aria-label="tr.margins" tabindex="-1">
-                <button class="demo__rb-dd__opt" type="button" @click="onDropdownPick('margins', 'normal')"><span class="demo__rb-dd__check" aria-hidden="true" /><span class="demo__rb-dd__label">{{ tr.marginsNormal }}</span></button>
-                <button class="demo__rb-dd__opt" type="button" @click="onDropdownPick('margins', 'wide')"><span class="demo__rb-dd__check" aria-hidden="true" /><span class="demo__rb-dd__label">{{ tr.marginsWide }}</span></button>
-                <button class="demo__rb-dd__opt" type="button" @click="onDropdownPick('margins', 'narrow')"><span class="demo__rb-dd__check" aria-hidden="true" /><span class="demo__rb-dd__label">{{ tr.marginsNarrow }}</span></button>
-                <button class="demo__rb-dd__opt" type="button" @click="onDropdownPick('margins', 'custom')"><span class="demo__rb-dd__check" aria-hidden="true" /><span class="demo__rb-dd__label">{{ tr.marginsCustom }}</span></button>
+                <button class="demo__rb-dd__opt" type="button" role="option" :aria-selected="active.marginPreset === 'normal'" @click="onDropdownPick('margins', 'normal')"><span class="demo__rb-dd__check" aria-hidden="true" /><span class="demo__rb-dd__label">{{ tr.marginsNormal }}</span></button>
+                <button class="demo__rb-dd__opt" type="button" role="option" :aria-selected="active.marginPreset === 'wide'" @click="onDropdownPick('margins', 'wide')"><span class="demo__rb-dd__check" aria-hidden="true" /><span class="demo__rb-dd__label">{{ tr.marginsWide }}</span></button>
+                <button class="demo__rb-dd__opt" type="button" role="option" :aria-selected="active.marginPreset === 'narrow'" @click="onDropdownPick('margins', 'narrow')"><span class="demo__rb-dd__check" aria-hidden="true" /><span class="demo__rb-dd__label">{{ tr.marginsNarrow }}</span></button>
+                <button class="demo__rb-dd__opt" type="button" role="option" :aria-selected="false" @click="onDropdownPick('margins', 'custom')"><span class="demo__rb-dd__check" aria-hidden="true" /><span class="demo__rb-dd__label">{{ tr.marginsCustom }}</span></button>
               </div>
             </div>
             <div class="demo__rb-dd demo__rb-select--border" :class="{ 'demo__rb-dd--open': openDropdown === 'orientation' }">
               <button type="button" class="demo__rb-dd__btn" :disabled="disabled" :title="tr.orientation" :aria-label="tr.orientation" aria-haspopup="listbox" :aria-expanded="openDropdown === 'orientation'" @click="toggleDropdown('orientation')"><span class="demo__rb-dd__value">{{ active.pageOrientation === 'landscape' ? tr.landscape : tr.portrait }}</span><svg class="demo__rb-dd__chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5l3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
               <div v-if="openDropdown === 'orientation'" class="demo__rb-dd__list" role="listbox" :aria-label="tr.orientation" tabindex="-1">
-                <button class="demo__rb-dd__opt" type="button" @click="onDropdownPick('orientation', 'portrait')"><span class="demo__rb-dd__check" aria-hidden="true" /><span class="demo__rb-dd__label">{{ tr.portrait }}</span></button>
-                <button class="demo__rb-dd__opt" type="button" @click="onDropdownPick('orientation', 'landscape')"><span class="demo__rb-dd__check" aria-hidden="true" /><span class="demo__rb-dd__label">{{ tr.landscape }}</span></button>
+                <button class="demo__rb-dd__opt" type="button" role="option" :aria-selected="active.pageOrientation === 'portrait'" @click="onDropdownPick('orientation', 'portrait')"><span class="demo__rb-dd__check" aria-hidden="true" /><span class="demo__rb-dd__label">{{ tr.portrait }}</span></button>
+                <button class="demo__rb-dd__opt" type="button" role="option" :aria-selected="active.pageOrientation === 'landscape'" @click="onDropdownPick('orientation', 'landscape')"><span class="demo__rb-dd__check" aria-hidden="true" /><span class="demo__rb-dd__label">{{ tr.landscape }}</span></button>
               </div>
             </div>
             <div class="demo__rb-dd demo__rb-select--border" :class="{ 'demo__rb-dd--open': openDropdown === 'paperSize' }">
               <button type="button" class="demo__rb-dd__btn" :disabled="disabled" :title="tr.paperSize" :aria-label="tr.paperSize" aria-haspopup="listbox" :aria-expanded="openDropdown === 'paperSize'" @click="toggleDropdown('paperSize')"><span class="demo__rb-dd__value">{{ active.paperSize }}</span><svg class="demo__rb-dd__chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5l3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
               <div v-if="openDropdown === 'paperSize'" class="demo__rb-dd__list" role="listbox" :aria-label="tr.paperSize" tabindex="-1">
-                <button v-for="paper in ['A4', 'A3', 'A5', 'letter', 'legal', 'tabloid']" :key="paper" class="demo__rb-dd__opt" type="button" @click="onDropdownPick('paperSize', paper)"><span class="demo__rb-dd__check" aria-hidden="true" /><span class="demo__rb-dd__label">{{ paper === 'letter' ? tr.paperLetter : paper === 'legal' ? tr.paperLegal : paper === 'tabloid' ? tr.paperTabloid : paper }}</span></button>
+                <button v-for="paper in ['A4', 'A3', 'A5', 'letter', 'legal', 'tabloid']" :key="paper" class="demo__rb-dd__opt" type="button" role="option" :aria-selected="active.paperSize === paper" @click="onDropdownPick('paperSize', paper)"><span class="demo__rb-dd__check" aria-hidden="true" /><span class="demo__rb-dd__label">{{ paper === 'letter' ? tr.paperLetter : paper === 'legal' ? tr.paperLegal : paper === 'tabloid' ? tr.paperTabloid : paper }}</span></button>
               </div>
             </div>
             <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="props.instance?.openPageSetup()"><RibbonIcon name="options" /><span>{{ tr.pageSetup }}</span></button>
@@ -858,10 +860,10 @@ const onZoom = (zoom: number): void => {
         <section class="demo__ribbon-group demo__ribbon-group--tiles" :aria-label="tr.formulaAuditing">
           <div class="demo__ribbon-tools">
             <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="props.instance?.tracePrecedents()">
-              <RibbonIcon name="tracePrecedents" /><span>{{ tr.tracePrecedents }}</span>
+              <RibbonIcon name="trace" /><span>{{ tr.tracePrecedents }}</span>
             </button>
             <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="props.instance?.traceDependents()">
-              <RibbonIcon name="traceDependents" /><span>{{ tr.traceDependents }}</span>
+              <RibbonIcon name="dependents" /><span>{{ tr.traceDependents }}</span>
             </button>
             <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="props.instance?.clearTraces()">
               <RibbonIcon name="clearArrows" /><span>{{ tr.removeArrows }}</span>

@@ -69,11 +69,7 @@ const ERROR_SENTINELS: ReadonlySet<string> = new Set([
   '#CIRCULAR!',
 ]);
 
-export const normalizeFormatLocale = (locale: string): string => {
-  if (locale === 'ja') return 'ja-JP';
-  if (locale === 'en') return 'en-US';
-  return locale || 'en-US';
-};
+export { normalizeFormatLocale } from '../../format/locale.js';
 
 /** Detect whether `cell.value` should surface an error indicator. */
 export function detectErrorKind(value: CellValue): boolean {

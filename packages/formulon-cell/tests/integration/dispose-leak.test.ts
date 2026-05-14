@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type MountedStubSheet, mountStubSheet } from '../test-utils/index.js';
 
@@ -46,5 +46,50 @@ describe('integration: dispose hygiene', () => {
     } finally {
       second.dispose();
     }
+  });
+
+  it('does not invoke the filter dropdown after dispose() — fc:openfilter detached', async () => {
+    sheet = await mountStubSheet();
+    const host = sheet.host;
+    sheet.instance.dispose();
+
+    // Capture any thrown errors that bubble through to the document if the
+    // listener still fires. Successful detach: dispatch is a no-op.
+    let threw = false;
+    try {
+      host.dispatchEvent(
+        new CustomEvent('fc:openfilter', {
+          detail: {
+            range: { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 },
+            col: 0,
+            anchor: { x: 0, y: 0, h: 24, clientX: 0, clientY: 0 },
+          },
+        }),
+      );
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
+    // No popover root should be attached anywhere after the dispatch.
+    expect(document.querySelector('.fc-filter-dropdown')).toBeNull();
+  });
+
+  it('cell-registry listeners do not survive dispose() — no rAF after teardown', async () => {
+    sheet = await mountStubSheet();
+    const cells = sheet.instance.cells;
+    sheet.instance.dispose();
+
+    // After dispose, mutating the registry must NOT schedule a paint on the
+    // disposed renderer. Spying on rAF catches a leaked subscription that
+    // would otherwise keep the canvas alive.
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame');
+    cells.registerFormatter({
+      id: 'test-after-dispose',
+      priority: 50,
+      match: () => true,
+      format: () => '',
+    });
+    expect(rafSpy).not.toHaveBeenCalled();
+    rafSpy.mockRestore();
   });
 });

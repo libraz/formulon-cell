@@ -13,7 +13,7 @@ import {
   type WorkbookHandle,
 } from '@libraz/formulon-cell';
 import type { CSSProperties, ForwardedRef, ReactNode } from 'react';
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 
 export interface SpreadsheetProps {
   /** Optional pre-loaded workbook (e.g. from xlsx bytes). When omitted, a
@@ -39,6 +39,10 @@ export interface SpreadsheetProps {
   /** Fires once after mount with the live instance. Use this to wire toolbars
    *  / menus that talk to the spreadsheet's imperative API. */
   onReady?: (instance: SpreadsheetInstance) => void;
+  /** Fires when the component cannot mount a spreadsheet instance. */
+  onError?: (error: unknown) => void;
+  /** Optional framework-native fallback shown after mount failure. */
+  errorFallback?: ReactNode | ((error: unknown) => ReactNode);
   /** Fires every time a cell value changes (engine-side). Use this to
    *  mirror the spreadsheet into outer state (Redux, Zustand, server). */
   onCellChange?: (e: CellChangeEvent) => void;
@@ -86,6 +90,7 @@ const SpreadsheetComponent = (
 ): ReactNode => {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const instanceRef = useRef<SpreadsheetInstance | null>(null);
+  const [mountError, setMountError] = useState<unknown>(null);
   // Keep the latest props in a ref so the mount effect doesn't have to
   // re-run when callbacks change. Mounting is expensive (it creates the
   // wb + canvas + listeners) so we only re-mount on workbook identity.
@@ -118,11 +123,17 @@ const SpreadsheetComponent = (
         ...(cur.extensions ? { extensions: cur.extensions } : {}),
         ...(cur.functions ? { functions: cur.functions } : {}),
         ...(cur.seed ? { seed: cur.seed } : {}),
+        renderError: !cur.errorFallback,
+        onError: (error) => {
+          setMountError(error);
+          propsRef.current.onError?.(error);
+        },
       });
       if (disposed) {
         inst.dispose();
         return;
       }
+      setMountError(null);
       instanceRef.current = inst;
       // Wire event props through `inst.on(...)`. Each handler reads from
       // propsRef, so callers can swap callbacks without re-mounting.
@@ -139,7 +150,10 @@ const SpreadsheetComponent = (
         if (disposed) return;
       }
       propsRef.current.onReady?.(inst);
-    })();
+    })().catch((error: unknown) => {
+      if (disposed) return;
+      setMountError(error);
+    });
     return () => {
       disposed = true;
       for (const d of eventDisposers) d();
@@ -197,10 +211,17 @@ const SpreadsheetComponent = (
         ? props.children(instanceRef.current)
         : null
       : props.children;
+  const errorFallback =
+    mountError && props.errorFallback
+      ? typeof props.errorFallback === 'function'
+        ? props.errorFallback(mountError)
+        : props.errorFallback
+      : null;
 
   return (
     <>
       <div ref={hostRef} className={props.className} style={props.style} />
+      {errorFallback}
       {children}
     </>
   );

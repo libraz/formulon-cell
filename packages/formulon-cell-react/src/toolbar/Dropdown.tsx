@@ -31,6 +31,9 @@ export function Dropdown<V extends string | number>({
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  // Index of the option currently holding roving focus. Initialised to the
+  // selected option each time the list opens.
+  const [focusIdx, setFocusIdx] = useState(-1);
   const matched = options.find((o) => o.value === value);
   const shown = display ?? matched?.label ?? String(value);
 
@@ -56,15 +59,64 @@ export function Dropdown<V extends string | number>({
     };
   }, [open]);
 
-  // Scroll the active row into view when opening, so long lists (font sizes)
-  // don't strand the user at the top.
+  // On open: seed focus on the selected option and scroll it into view so
+  // long lists (font sizes) don't strand the user at the top.
   useEffect(() => {
     if (!open) return;
+    const idx = Math.max(
+      0,
+      options.findIndex((o) => o.value === value),
+    );
+    setFocusIdx(idx);
+  }, [open, options, value]);
+
+  // Move DOM focus + scroll-into-view whenever the focused index changes
+  // while the list is open.
+  useEffect(() => {
+    if (!open || focusIdx < 0) return;
     const list = listRef.current;
     if (!list) return;
-    const sel = list.querySelector<HTMLElement>('[aria-selected="true"]');
-    sel?.scrollIntoView({ block: 'nearest' });
-  }, [open]);
+    const target = list.querySelectorAll<HTMLElement>('[role="option"]')[focusIdx];
+    if (!target) return;
+    target.focus();
+    target.scrollIntoView({ block: 'nearest' });
+  }, [open, focusIdx]);
+
+  const moveFocus = (delta: number): void => {
+    if (options.length === 0) return;
+    setFocusIdx((cur) => {
+      const start = cur < 0 ? 0 : cur;
+      const next = start + delta;
+      // Wrap around so ArrowUp at top jumps to bottom (Excel-like).
+      if (next < 0) return options.length - 1;
+      if (next >= options.length) return 0;
+      return next;
+    });
+  };
+
+  const onListKeyDown = (e: React.KeyboardEvent<HTMLDivElement>): void => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      moveFocus(1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      moveFocus(-1);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setFocusIdx(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      setFocusIdx(options.length - 1);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      const idx = focusIdx >= 0 ? focusIdx : options.findIndex((o) => o.value === value);
+      const opt = options[idx];
+      if (opt) {
+        onChange(opt.value);
+        setOpen(false);
+      }
+    }
+  };
 
   return (
     <div
@@ -99,8 +151,9 @@ export function Dropdown<V extends string | number>({
           role="listbox"
           aria-label={title}
           tabIndex={-1}
+          onKeyDown={onListKeyDown}
         >
-          {options.map((o) => {
+          {options.map((o, idx) => {
             const selected = o.value === value;
             return (
               <button
@@ -108,6 +161,7 @@ export function Dropdown<V extends string | number>({
                 type="button"
                 role="option"
                 aria-selected={selected}
+                tabIndex={idx === focusIdx ? 0 : -1}
                 className={`demo__rb-dd__opt${selected ? ' demo__rb-dd__opt--selected' : ''}`}
                 onClick={() => {
                   onChange(o.value);

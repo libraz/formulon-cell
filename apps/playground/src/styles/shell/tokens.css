@@ -42,6 +42,13 @@
   --shell-font-mono:
     "Cascadia Mono", "Cascadia Code", "Consolas", "IBM Plex Mono", ui-monospace, "SF Mono",
     monospace;
+
+  /* Shell stacking tiers — sit below fc-host's --fc-z-base (2147483000+).
+     Menubar / toolbar own the top of the page; their dropdowns float above
+     the surrounding shell but never overtake fc-host popovers. */
+  --shell-z-strip: 100;
+  --shell-z-menu: 110;
+  --shell-z-dropdown: 120;
 }
 
 [data-theme="dark"] {
