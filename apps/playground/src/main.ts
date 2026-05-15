@@ -25,8 +25,10 @@ import {
   insertCols,
   insertRows,
   mutators,
+  type NumFmt,
   parseScriptCommand,
   pasteTSV,
+  projectActiveState,
   type ReviewCell,
   RIBBON_KEYSHORTCUTS,
   type RibbonCommand,
@@ -38,7 +40,6 @@ import {
   type SpreadsheetInstance,
   setAlign,
   setBorderPreset,
-  setBorders,
   setFillColor,
   setFont,
   setFontColor,
@@ -108,6 +109,7 @@ const ribbonLang = localeParam === 'ja' ? 'ja' : 'en';
 const ribbonText = toolbarText(ribbonLang);
 let activeRibbonTab: RibbonTab = 'home';
 let selectedBorderStyle: CellBorderStyle = 'thin';
+let selectedBorderColor = '#000000';
 
 const legacyCommandIds: Record<string, string> = {
   alignC: 'btn-align-center',
@@ -271,12 +273,43 @@ const currentRibbonControlValue = (id: string): string => {
   if (id === 'fontSize') return String(f?.fontSize ?? 11);
   if (id === 'fontColor') return f?.color ?? '#201f1e';
   if (id === 'fillColor') return f?.fill ?? '#ffffff';
-  if (id === 'borderPreset') return 'outline';
-  if (id === 'borderStyle') return selectedBorderStyle;
+  if (id === 'numberFormat') return inst ? projectActiveState(inst).numberFormat : 'general';
   if (id === 'marginsPreset') return 'normal';
   if (id === 'orientationPreset') return 'portrait';
   if (id === 'paperSizePreset') return 'A4';
   return '';
+};
+
+const numberFormatForAction = (action: string): NumFmt | null => {
+  const symbol = ribbonLang === 'ja' ? '¥' : '$';
+  switch (action) {
+    case 'general':
+      return { kind: 'general' };
+    case 'fixed':
+      return { kind: 'fixed', decimals: 0 };
+    case 'currency':
+      return { kind: 'currency', decimals: 0, symbol };
+    case 'accounting':
+      return { kind: 'accounting', decimals: 0, symbol };
+    case 'shortDate':
+      return { kind: 'date', pattern: ribbonLang === 'ja' ? 'yyyy/m/d' : 'm/d/yyyy' };
+    case 'longDate':
+      return { kind: 'date', pattern: ribbonLang === 'ja' ? 'yyyy"年"m"月"d"日' : 'mmmm d, yyyy' };
+    case 'time':
+      return { kind: 'time', pattern: ribbonLang === 'ja' ? 'H:MM' : 'h:MM AM/PM' };
+    case 'percent':
+      return { kind: 'percent', decimals: 0 };
+    case 'fraction':
+      return { kind: 'custom', pattern: '# ?/?' };
+    case 'scientific':
+      return { kind: 'scientific', decimals: 2 };
+    case 'text':
+      return { kind: 'text' };
+    case 'more':
+      return null;
+    default:
+      return { kind: 'general' };
+  }
 };
 
 function applyRibbonFormat(
@@ -302,17 +335,13 @@ function applyRibbonControl(id: string, value: string): void {
     applyRibbonFormat((state, store) => setFontColor(state, store, value));
   } else if (id === 'fillColor') {
     applyRibbonFormat((state, store) => setFillColor(state, store, value));
-  } else if (id === 'borderPreset') {
-    applyRibbonFormat((state, store) =>
-      setBorderPreset(
-        state,
-        store,
-        value as 'none' | 'outline' | 'all' | 'top' | 'bottom' | 'left' | 'right' | 'doubleBottom',
-        selectedBorderStyle,
-      ),
-    );
-  } else if (id === 'borderStyle') {
-    selectedBorderStyle = value as CellBorderStyle;
+  } else if (id === 'numberFormat') {
+    if (value === 'more') {
+      inst?.openFormatDialog();
+      return;
+    }
+    const fmt = numberFormatForAction(value);
+    if (fmt) applyRibbonFormat((state, store) => setNumFmt(state, store, fmt));
   } else if (id === 'marginsPreset' || id === 'orientationPreset' || id === 'paperSizePreset') {
     inst?.openPageSetup();
   }
@@ -329,6 +358,108 @@ const makeSvg = (viewBox: string, pathData: string, className: string): SVGSVGEl
   path.setAttribute('d', pathData);
   svg.appendChild(path);
   return svg;
+};
+
+const ribbonMarginDetail = (value: string): string | null => {
+  const ja = ribbonLang === 'ja';
+  const fmt = (top: string, bottom: string, left: string, right: string): string =>
+    ja
+      ? `上: ${top}", 下: ${bottom}", 左: ${left}", 右: ${right}"`
+      : `Top: ${top}", Bottom: ${bottom}", Left: ${left}", Right: ${right}"`;
+  switch (value) {
+    case 'normal':
+      return fmt('0.75', '0.75', '0.7', '0.7');
+    case 'wide':
+      return fmt('1', '1', '1', '1');
+    case 'narrow':
+      return fmt('0.75', '0.75', '0.25', '0.25');
+    case 'custom':
+      return ja ? 'ユーザー設定の余白...' : 'Custom margins...';
+    default:
+      return null;
+  }
+};
+
+const createMarginPresetIcon = (value: string): HTMLSpanElement => {
+  const icon = document.createElement('span');
+  icon.className = `demo__rb-dd__margin-icon demo__rb-dd__margin-icon--${value}`;
+  icon.setAttribute('aria-hidden', 'true');
+  icon.append(document.createElement('span'), document.createElement('span'));
+  return icon;
+};
+
+const themeFontValues = new Set(['Aptos', 'Aptos Display', 'Aptos Narrow']);
+const recentFontValues = new Set(['Yu Gothic UI']);
+const commonFontValues = new Set(['Calibri', 'Arial', 'Segoe UI', 'Times New Roman', 'Consolas']);
+const fontSubmenuFamilies = new Set(['Yu Gothic UI', 'BIZ UDGothic', 'Meiryo UI']);
+const fontAvailabilityCache = new Map<string, boolean>();
+
+const isJapaneseFontName = (value: string): boolean => /[\u3000-\u9fff]/.test(value);
+
+const fontProbeContext = (): CanvasRenderingContext2D | null => {
+  const canvas = document.createElement('canvas');
+  return canvas.getContext('2d');
+};
+
+const isFontProbablyAvailable = (font: string): boolean => {
+  if (themeFontValues.has(font) || commonFontValues.has(font)) return true;
+  const cached = fontAvailabilityCache.get(font);
+  if (cached !== undefined) return cached;
+  const ctx = fontProbeContext();
+  if (!ctx) return true;
+  const sample = 'mmmmmmmmmwwwwwiiiiii 0123456789 あいう漢字';
+  const available = ['serif', 'sans-serif', 'monospace'].some((fallback) => {
+    ctx.font = `16px ${fallback}`;
+    const fallbackWidth = ctx.measureText(sample).width;
+    ctx.font = `16px "${font}", ${fallback}`;
+    return Math.abs(ctx.measureText(sample).width - fallbackWidth) > 0.5;
+  });
+  fontAvailabilityCache.set(font, available);
+  return available;
+};
+
+const shouldShowFontOption = (value: string, current: string): boolean => {
+  if (value === current) return true;
+  if (ribbonLang !== 'ja' && isJapaneseFontName(value)) return false;
+  return isFontProbablyAvailable(value);
+};
+
+const ribbonFontSection = (
+  value: string,
+  options: readonly { value: string; label: string }[],
+): string | null => {
+  const firstTheme = options.find((option) => themeFontValues.has(option.value))?.value;
+  if (value === firstTheme) return ribbonLang === 'ja' ? 'テーマのフォント' : 'Theme Fonts';
+  const firstRecent = options.find((option) => recentFontValues.has(option.value))?.value;
+  if (value === firstRecent)
+    return ribbonLang === 'ja' ? '最近使ったフォント' : 'Recently Used Fonts';
+  const firstAll = options.find(
+    (option) => !themeFontValues.has(option.value) && !recentFontValues.has(option.value),
+  )?.value;
+  if (value === firstAll) return ribbonLang === 'ja' ? 'すべてのフォント' : 'All Fonts';
+  return null;
+};
+
+const ribbonFontRole = (value: string): string | null => {
+  switch (value) {
+    case 'Aptos Display':
+    case '游ゴシック Light':
+      return ribbonLang === 'ja' ? '(見出し)' : '(Heading)';
+    case 'Aptos Narrow':
+    case '游ゴシック Regular':
+      return ribbonLang === 'ja' ? '(本文)' : '(Body)';
+    default:
+      return null;
+  }
+};
+
+const ribbonOptionsForCommand = (
+  command: RibbonCommand,
+  current: string,
+): readonly { value: string; label: string }[] => {
+  const options = command.options ?? [];
+  if (command.id !== 'fontFamily') return options;
+  return options.filter((option) => shouldShowFontOption(option.value, current));
 };
 
 const createRibbonSelect = (command: RibbonCommand): HTMLDivElement => {
@@ -392,8 +523,21 @@ const createRibbonSelect = (command: RibbonCommand): HTMLDivElement => {
     list.setAttribute('role', 'listbox');
     list.setAttribute('aria-label', command.title);
     list.tabIndex = -1;
+    const anchorRect = button.getBoundingClientRect();
+    list.style.left = `${Math.round(anchorRect.left)}px`;
+    list.style.top = `${Math.round(anchorRect.bottom + 3)}px`;
+    list.style.minWidth = `${Math.round(anchorRect.width)}px`;
     const current = currentRibbonControlValue(command.id);
-    for (const option of command.options ?? []) {
+    const options = ribbonOptionsForCommand(command, current);
+    for (const option of options) {
+      const section = command.id === 'fontFamily' ? ribbonFontSection(option.value, options) : null;
+      if (section) {
+        const heading = document.createElement('div');
+        heading.className = 'demo__rb-dd__section';
+        heading.setAttribute('role', 'presentation');
+        heading.textContent = section;
+        list.appendChild(heading);
+      }
       const selected = option.value === current;
       const item = document.createElement('button');
       item.type = 'button';
@@ -402,6 +546,7 @@ const createRibbonSelect = (command: RibbonCommand): HTMLDivElement => {
       item.setAttribute('aria-selected', selected ? 'true' : 'false');
       item.tabIndex = -1;
       item.dataset.value = option.value;
+      item.dataset.fcValue = option.value;
       const check = document.createElement('span');
       check.className = 'demo__rb-dd__check';
       check.setAttribute('aria-hidden', 'true');
@@ -417,7 +562,38 @@ const createRibbonSelect = (command: RibbonCommand): HTMLDivElement => {
       const label = document.createElement('span');
       label.className = 'demo__rb-dd__label';
       label.textContent = option.label;
-      item.append(check, label);
+      if (command.id === 'marginsPreset') {
+        const text = document.createElement('span');
+        text.className = 'demo__rb-dd__margin-text';
+        const detail = document.createElement('span');
+        detail.className = 'demo__rb-dd__detail';
+        detail.textContent = ribbonMarginDetail(option.value) ?? '';
+        text.append(label, detail);
+        item.append(check, createMarginPresetIcon(option.value), text);
+      } else if (command.id === 'fontFamily') {
+        const preview = document.createElement('span');
+        preview.className = 'demo__rb-dd__font-preview';
+        preview.style.fontFamily = `"${option.value}", sans-serif`;
+        const role = ribbonFontRole(option.value);
+        if (role) {
+          const detail = document.createElement('span');
+          detail.className = 'demo__rb-dd__font-role';
+          detail.textContent = role;
+          preview.append(label, detail);
+        } else {
+          preview.append(label);
+        }
+        item.append(check, preview);
+        if (fontSubmenuFamilies.has(option.value)) {
+          const arrow = document.createElement('span');
+          arrow.className = 'demo__rb-dd__submenu';
+          arrow.setAttribute('aria-hidden', 'true');
+          arrow.textContent = '›';
+          item.appendChild(arrow);
+        }
+      } else {
+        item.append(check, label);
+      }
       item.addEventListener('click', () => pickOption(item));
       list.appendChild(item);
     }
@@ -552,18 +728,389 @@ const menuButton = (label: string, attr: string, value: string): HTMLButtonEleme
   return button;
 };
 
+// ── Borders dropdown (Excel-365 parity) ─────────────────────────────────
+// Renders a small SVG cell-outline icon for each border preset. Sides are
+// drawn solid in the foreground color (thin/thick/double); the unset sides
+// show as a faint dashed cell-outline base so the user can still see the
+// cell shape.
+type BorderPreviewSide = 'thin' | 'thick' | 'double' | null;
+interface BorderPreviewSpec {
+  top?: BorderPreviewSide;
+  right?: BorderPreviewSide;
+  bottom?: BorderPreviewSide;
+  left?: BorderPreviewSide;
+  /** When true draws an inner cross dividing the icon into 2×2 cells
+   *  (used for the "格子 / All borders" icon). */
+  innerGrid?: boolean;
+  /** When false suppresses the faint dashed cell-outline base. */
+  showBase?: boolean;
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const BORDER_ICON_BOX = { x: 2, y: 2, w: 12, h: 12 } as const;
+const BORDER_BASE_COLOR = '#c7c7c7';
+
+const drawBorderEdge = (
+  svg: SVGSVGElement,
+  side: BorderPreviewSide,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+): void => {
+  if (!side) return;
+  const isHorizontal = y1 === y2;
+  const mk = (offset = 0, width = 1): void => {
+    const line = document.createElementNS(SVG_NS, 'line');
+    line.setAttribute('x1', String(isHorizontal ? x1 : x1 + offset));
+    line.setAttribute('y1', String(isHorizontal ? y1 + offset : y1));
+    line.setAttribute('x2', String(isHorizontal ? x2 : x2 + offset));
+    line.setAttribute('y2', String(isHorizontal ? y2 + offset : y2));
+    line.setAttribute('stroke', 'currentColor');
+    line.setAttribute('stroke-width', String(width));
+    line.setAttribute('stroke-linecap', 'square');
+    svg.appendChild(line);
+  };
+  if (side === 'thin') mk(0, 1);
+  else if (side === 'thick') mk(0, 2);
+  else if (side === 'double') {
+    mk(-1, 0.75);
+    mk(1, 0.75);
+  }
+};
+
+const createBorderPreview = (spec: BorderPreviewSpec): SVGSVGElement => {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('width', '16');
+  svg.setAttribute('height', '16');
+  svg.setAttribute('focusable', 'false');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.classList.add('app__border-preview');
+  const { x, y, w, h } = BORDER_ICON_BOX;
+  if (spec.showBase !== false) {
+    const base = document.createElementNS(SVG_NS, 'rect');
+    base.setAttribute('x', String(x + 0.5));
+    base.setAttribute('y', String(y + 0.5));
+    base.setAttribute('width', String(w - 1));
+    base.setAttribute('height', String(h - 1));
+    base.setAttribute('fill', 'none');
+    base.setAttribute('stroke', BORDER_BASE_COLOR);
+    base.setAttribute('stroke-width', '1');
+    base.setAttribute('stroke-dasharray', '1.5 1.5');
+    svg.appendChild(base);
+  }
+  if (spec.innerGrid) {
+    const v = document.createElementNS(SVG_NS, 'line');
+    v.setAttribute('x1', String(x + w / 2));
+    v.setAttribute('y1', String(y));
+    v.setAttribute('x2', String(x + w / 2));
+    v.setAttribute('y2', String(y + h));
+    v.setAttribute('stroke', 'currentColor');
+    v.setAttribute('stroke-width', '1');
+    svg.appendChild(v);
+    const hLine = document.createElementNS(SVG_NS, 'line');
+    hLine.setAttribute('x1', String(x));
+    hLine.setAttribute('y1', String(y + h / 2));
+    hLine.setAttribute('x2', String(x + w));
+    hLine.setAttribute('y2', String(y + h / 2));
+    hLine.setAttribute('stroke', 'currentColor');
+    hLine.setAttribute('stroke-width', '1');
+    svg.appendChild(hLine);
+  }
+  drawBorderEdge(svg, spec.top ?? null, x, y, x + w, y);
+  drawBorderEdge(svg, spec.bottom ?? null, x, y + h, x + w, y + h);
+  drawBorderEdge(svg, spec.left ?? null, x, y, x, y + h);
+  drawBorderEdge(svg, spec.right ?? null, x + w, y, x + w, y + h);
+  return svg;
+};
+
+const BORDER_PRESETS: Record<string, BorderPreviewSpec> = {
+  bottom: { bottom: 'thin' },
+  top: { top: 'thin' },
+  left: { left: 'thin' },
+  right: { right: 'thin' },
+  clear: {},
+  all: {
+    top: 'thin',
+    right: 'thin',
+    bottom: 'thin',
+    left: 'thin',
+    innerGrid: true,
+    showBase: false,
+  },
+  outline: {
+    top: 'thin',
+    right: 'thin',
+    bottom: 'thin',
+    left: 'thin',
+    showBase: false,
+  },
+  thickOutline: {
+    top: 'thick',
+    right: 'thick',
+    bottom: 'thick',
+    left: 'thick',
+    showBase: false,
+  },
+  doubleBottom: { bottom: 'double' },
+  thickBottom: { bottom: 'thick' },
+  topAndBottom: { top: 'thin', bottom: 'thin' },
+  topAndThickBottom: { top: 'thin', bottom: 'thick' },
+  topAndDoubleBottom: { top: 'thin', bottom: 'double' },
+};
+
+const presetMenuItem = (presetKey: string, label: string): HTMLButtonElement => {
+  const btn = document.createElement('button');
+  btn.className = 'app__menu-item app__menu-item--preset';
+  btn.type = 'button';
+  btn.setAttribute('role', 'menuitem');
+  btn.dataset.borderPreset = presetKey;
+  const spec = BORDER_PRESETS[presetKey];
+  if (spec) btn.appendChild(createBorderPreview(spec));
+  else {
+    const spacer = document.createElement('span');
+    spacer.className = 'app__menu-item__icon-spacer';
+    btn.appendChild(spacer);
+  }
+  const text = document.createElement('span');
+  text.className = 'app__menu-item__text';
+  text.textContent = label;
+  btn.appendChild(text);
+  return btn;
+};
+
+const menuSeparator = (): HTMLDivElement => {
+  const sep = document.createElement('div');
+  sep.className = 'app__menu-sep';
+  sep.setAttribute('role', 'separator');
+  return sep;
+};
+
+const menuSectionHeader = (label: string): HTMLDivElement => {
+  const el = document.createElement('div');
+  el.className = 'app__menu-heading';
+  el.setAttribute('role', 'presentation');
+  el.textContent = label;
+  return el;
+};
+
+const drawActionItem = (
+  action: string,
+  label: string,
+  icon?: BorderPreviewSpec,
+): HTMLButtonElement => {
+  const btn = document.createElement('button');
+  btn.className = 'app__menu-item app__menu-item--preset';
+  btn.type = 'button';
+  btn.setAttribute('role', 'menuitemcheckbox');
+  btn.setAttribute('aria-checked', 'false');
+  btn.dataset.borderDraw = action;
+  if (icon) btn.appendChild(createBorderPreview(icon));
+  else {
+    const spacer = document.createElement('span');
+    spacer.className = 'app__menu-item__icon-spacer';
+    btn.appendChild(spacer);
+  }
+  const text = document.createElement('span');
+  text.className = 'app__menu-item__text';
+  text.textContent = label;
+  btn.appendChild(text);
+  return btn;
+};
+
+const submenuTrigger = (
+  submenuKey: 'lineColor' | 'lineStyle',
+  label: string,
+): HTMLButtonElement => {
+  const btn = document.createElement('button');
+  btn.className = 'app__menu-item app__menu-item--preset app__menu-item--submenu';
+  btn.type = 'button';
+  btn.setAttribute('role', 'menuitem');
+  btn.setAttribute('aria-haspopup', 'menu');
+  btn.setAttribute('aria-expanded', 'false');
+  btn.dataset.borderSubmenu = submenuKey;
+  const spacer = document.createElement('span');
+  spacer.className = 'app__menu-item__icon-spacer';
+  btn.appendChild(spacer);
+  const text = document.createElement('span');
+  text.className = 'app__menu-item__text';
+  text.textContent = label;
+  btn.appendChild(text);
+  const caret = document.createElement('span');
+  caret.className = 'app__menu-item__caret';
+  caret.setAttribute('aria-hidden', 'true');
+  caret.textContent = '▶';
+  btn.appendChild(caret);
+  return btn;
+};
+
+// Visual line-style sample for the "線のスタイル" submenu (image #2).
+const createLineSamplePreview = (style: CellBorderStyle | 'none'): SVGSVGElement => {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 80 12');
+  svg.setAttribute('width', '80');
+  svg.setAttribute('height', '12');
+  svg.setAttribute('focusable', 'false');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.classList.add('app__line-sample');
+  if (style === 'none') return svg;
+  const draw = (yOffset: number, w: number, d: string | null): void => {
+    const line = document.createElementNS(SVG_NS, 'line');
+    line.setAttribute('x1', '4');
+    line.setAttribute('y1', String(yOffset));
+    line.setAttribute('x2', '76');
+    line.setAttribute('y2', String(yOffset));
+    line.setAttribute('stroke', 'currentColor');
+    line.setAttribute('stroke-width', String(w));
+    if (d) line.setAttribute('stroke-dasharray', d);
+    svg.appendChild(line);
+  };
+  if (style === 'double') {
+    draw(4, 1, null);
+    draw(8, 1, null);
+    return svg;
+  }
+  if (style === 'thin') draw(6, 1, null);
+  else if (style === 'hair') draw(6, 0.5, null);
+  else if (style === 'medium') draw(6, 1.75, null);
+  else if (style === 'thick') draw(6, 2.5, null);
+  else if (style === 'dotted') draw(6, 1, '1.2 1.6');
+  else if (style === 'dashed') draw(6, 1, '3 2');
+  else if (style === 'mediumDashed') draw(6, 1.75, '4 2');
+  else if (style === 'dashDot') draw(6, 1, '4 2 1 2');
+  else if (style === 'mediumDashDot') draw(6, 1.75, '4 2 1 2');
+  else if (style === 'dashDotDot') draw(6, 1, '4 2 1 2 1 2');
+  else if (style === 'mediumDashDotDot') draw(6, 1.75, '4 2 1 2 1 2');
+  else if (style === 'slantDashDot') draw(6, 1, '4 2 2 2');
+  return svg;
+};
+
+const LINE_STYLES_ALL: (CellBorderStyle | 'none')[] = [
+  'none',
+  'thin',
+  'hair',
+  'dotted',
+  'dashed',
+  'dashDot',
+  'dashDotDot',
+  'mediumDashed',
+  'mediumDashDot',
+  'medium',
+  'double',
+  'thick',
+];
+
+const createLineStyleSubmenu = (label: string): HTMLDivElement => {
+  const submenu = document.createElement('div');
+  submenu.className = 'app__submenu app__submenu--line-style';
+  submenu.id = 'menu-borders-line-style';
+  submenu.setAttribute('role', 'menu');
+  submenu.setAttribute('aria-label', label);
+  submenu.hidden = true;
+  for (const value of LINE_STYLES_ALL) {
+    const btn = document.createElement('button');
+    btn.className = 'app__submenu-item';
+    btn.type = 'button';
+    btn.setAttribute('role', 'menuitemradio');
+    btn.setAttribute('aria-checked', value === 'thin' ? 'true' : 'false');
+    btn.dataset.borderLineStyle = value;
+    if (value === 'none') {
+      const span = document.createElement('span');
+      span.textContent = ribbonText.lineStyleNone;
+      span.className = 'app__submenu-item__text';
+      btn.appendChild(span);
+    } else {
+      btn.appendChild(createLineSamplePreview(value));
+    }
+    submenu.appendChild(btn);
+  }
+  return submenu;
+};
+
+const LINE_COLOR_PALETTE = [
+  '#000000',
+  '#7f7f7f',
+  '#c00000',
+  '#ff0000',
+  '#ffc000',
+  '#ffff00',
+  '#92d050',
+  '#00b050',
+  '#00b0f0',
+  '#0070c0',
+  '#002060',
+  '#7030a0',
+];
+
+const createLineColorSubmenu = (label: string): HTMLDivElement => {
+  const submenu = document.createElement('div');
+  submenu.className = 'app__submenu app__submenu--line-color';
+  submenu.id = 'menu-borders-line-color';
+  submenu.setAttribute('role', 'menu');
+  submenu.setAttribute('aria-label', label);
+  submenu.hidden = true;
+  const grid = document.createElement('div');
+  grid.className = 'app__color-grid';
+  for (const hex of LINE_COLOR_PALETTE) {
+    const swatch = document.createElement('button');
+    swatch.className = 'app__color-swatch';
+    swatch.type = 'button';
+    swatch.setAttribute('role', 'menuitemradio');
+    swatch.setAttribute('aria-checked', hex === '#000000' ? 'true' : 'false');
+    swatch.dataset.borderLineColor = hex;
+    swatch.style.background = hex;
+    swatch.setAttribute('aria-label', hex);
+    grid.appendChild(swatch);
+  }
+  submenu.appendChild(grid);
+  return submenu;
+};
+
 const createBordersMenu = (): HTMLDivElement => {
+  const t = ribbonText;
   const menu = createMenu('menu-borders');
+  menu.classList.add('app__menu--borders');
   menu.append(
-    menuButton('All borders', 'border', 'all'),
-    menuButton('Top border', 'border', 'top'),
-    menuButton('Bottom border', 'border', 'bottom'),
-    menuButton('Left border', 'border', 'left'),
-    menuButton('Right border', 'border', 'right'),
-    menuButton('No border', 'border', 'clear'),
-    menuButton('Grid lines', 'border', 'gridlines'),
-    menuButton('More borders…', 'border', 'format'),
+    // Section 1: single-side edges (image 1: 下罫線 / 上罫線 / 左罫線 / 右罫線)
+    presetMenuItem('bottom', t.bottomBorder),
+    presetMenuItem('top', t.topBorder),
+    presetMenuItem('left', t.leftBorder),
+    presetMenuItem('right', t.rightBorder),
+    menuSeparator(),
+    // Section 2: frame presets
+    presetMenuItem('clear', t.noBorder),
+    presetMenuItem('all', t.allBorders),
+    presetMenuItem('outline', t.outsideBorders),
+    presetMenuItem('thickOutline', t.thickOutsideBorders),
+    menuSeparator(),
+    // Section 3: combined
+    presetMenuItem('doubleBottom', t.doubleBottomBorder),
+    presetMenuItem('thickBottom', t.thickBottomBorder),
+    presetMenuItem('topAndBottom', t.topAndBottomBorder),
+    presetMenuItem('topAndThickBottom', t.topAndThickBottomBorder),
+    presetMenuItem('topAndDoubleBottom', t.topAndDoubleBottomBorder),
+    // Section 4 header + draw actions
+    menuSectionHeader(t.drawBordersHeading),
+    drawActionItem('draw', t.drawBorder, { bottom: 'thin' }),
+    drawActionItem('grid', t.drawBorderGrid, {
+      top: 'thin',
+      right: 'thin',
+      bottom: 'thin',
+      left: 'thin',
+      innerGrid: true,
+      showBase: false,
+    }),
+    drawActionItem('erase', t.eraseBorder),
+    submenuTrigger('lineColor', t.lineColor),
+    submenuTrigger('lineStyle', t.lineStyle),
+    menuSeparator(),
+    // Footer
+    presetMenuItem('format', t.moreBorders),
   );
+  // Submenus sit beside the main dropdown.
+  menu.appendChild(createLineColorSubmenu(t.lineColor));
+  menu.appendChild(createLineStyleSubmenu(t.lineStyle));
   return menu;
 };
 
@@ -981,27 +1528,52 @@ wireFormat('btn-decimals-down', (state, store) => bumpDecimals(state, store, -1)
 
 void clearFormat; // Reserved for a "Clear formatting" menu item; keep the import live.
 
-// ── Borders menu ─────────────────────────────────────────────────────────
+// ── Borders dropdown (Excel-365 parity) ──────────────────────────────────
+// Wires the integrated dropdown built by createBordersMenu(): edge / frame
+// / combined presets, "More borders..." entry, and the "罫線の作成" block
+// which arms the border-draw controller (drives pointer-edge editing on
+// the grid) and exposes two submenus for the line color & line style
+// brush settings.
 const borderBtn = document.getElementById('btn-borders');
 const borderMenu = document.getElementById('menu-borders');
+const lineColorSubmenu =
+  borderMenu?.querySelector<HTMLElement>('.app__submenu--line-color') ?? null;
+const lineStyleSubmenu =
+  borderMenu?.querySelector<HTMLElement>('.app__submenu--line-style') ?? null;
+
+const BORDER_DRAW_ACTIVE_CLASS = 'app__menu-item--active';
+
+const closeBorderSubmenus = (): void => {
+  if (lineColorSubmenu) lineColorSubmenu.hidden = true;
+  if (lineStyleSubmenu) lineStyleSubmenu.hidden = true;
+  borderMenu?.querySelectorAll<HTMLButtonElement>('[data-border-submenu]').forEach((b) => {
+    b.setAttribute('aria-expanded', 'false');
+  });
+};
 
 const closeBorderMenu = (restoreFocus = false): void => {
   if (!borderMenu) return;
   borderMenu.hidden = true;
   borderBtn?.setAttribute('aria-expanded', 'false');
+  closeBorderSubmenus();
   if (restoreFocus) borderBtn?.focus();
 };
-const refreshBorderMenu = (): void => {
-  if (!inst || !borderMenu) return;
-  const gridlinesOn = inst.store.getState().ui.showGridLines !== false;
-  const gridlinesItem = borderMenu.querySelector<HTMLElement>('[data-border="gridlines"]');
-  const check = gridlinesItem?.querySelector<HTMLElement>('[data-fc-check]');
-  if (check) check.textContent = gridlinesOn ? '✓' : '';
-  gridlinesItem?.setAttribute('aria-checked', gridlinesOn ? 'true' : 'false');
+
+const refreshBorderMenuState = (): void => {
+  if (!borderMenu) return;
+  // Reflect currently-armed draw mode in the menu so the user can see
+  // (and toggle off) the active brush.
+  const mode = inst?.borderDraw?.getMode() ?? null;
+  borderMenu.querySelectorAll<HTMLButtonElement>('[data-border-draw]').forEach((btn) => {
+    const armed = btn.dataset.borderDraw === mode;
+    btn.classList.toggle(BORDER_DRAW_ACTIVE_CLASS, armed);
+    btn.setAttribute('aria-checked', armed ? 'true' : 'false');
+  });
 };
+
 const openBorderMenu = (): void => {
   if (!borderMenu) return;
-  refreshBorderMenu();
+  refreshBorderMenuState();
   borderMenu.hidden = false;
   borderBtn?.setAttribute('aria-expanded', 'true');
   focusMenuItem(borderMenu);
@@ -1029,48 +1601,142 @@ borderMenu?.addEventListener('keydown', (e) => {
   handleMenuKeydown(e, borderMenu, { close: closeBorderMenu, restoreFocusTo: borderBtn });
 });
 
-borderMenu?.querySelectorAll<HTMLButtonElement>('[data-border]').forEach((btn) => {
+type BorderPresetKey =
+  | 'none'
+  | 'outline'
+  | 'thickOutline'
+  | 'all'
+  | 'top'
+  | 'bottom'
+  | 'left'
+  | 'right'
+  | 'doubleBottom'
+  | 'thickBottom'
+  | 'topAndBottom'
+  | 'topAndThickBottom'
+  | 'topAndDoubleBottom';
+
+// Map menu key → engine preset. `clear` is the "罫線なし" entry: the
+// engine's `'none'` preset wipes every side.
+const MENU_TO_PRESET: Record<string, BorderPresetKey> = {
+  clear: 'none',
+  all: 'all',
+  outline: 'outline',
+  thickOutline: 'thickOutline',
+  top: 'top',
+  bottom: 'bottom',
+  left: 'left',
+  right: 'right',
+  doubleBottom: 'doubleBottom',
+  thickBottom: 'thickBottom',
+  topAndBottom: 'topAndBottom',
+  topAndThickBottom: 'topAndThickBottom',
+  topAndDoubleBottom: 'topAndDoubleBottom',
+};
+
+borderMenu?.querySelectorAll<HTMLButtonElement>('[data-border-preset]').forEach((btn) => {
   btn.addEventListener('click', () => {
     const i = inst;
     if (!i) return;
-    const action = btn.dataset.border;
-    closeBorderMenu();
-    if (action === 'format') {
+    const key = btn.dataset.borderPreset ?? '';
+    if (key === 'format') {
+      closeBorderMenu();
       i.openFormatDialog();
       return;
     }
-    if (action === 'gridlines') {
-      const ui = i.store.getState().ui;
-      mutators.setShowGridLines(i.store, !ui.showGridLines);
-      (sheetEl as HTMLElement).focus();
-      return;
+    const preset = MENU_TO_PRESET[key];
+    if (!preset) return;
+    closeBorderMenu();
+    i.borderDraw?.deactivate();
+    applyRibbonFormat((state, store) => setBorderPreset(state, store, preset, selectedBorderStyle));
+  });
+});
+
+borderMenu?.querySelectorAll<HTMLButtonElement>('[data-border-draw]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const i = inst;
+    if (!i) return;
+    const action = btn.dataset.borderDraw as 'draw' | 'grid' | 'erase' | undefined;
+    if (!action) return;
+    const draw = i.borderDraw;
+    if (!draw) return;
+    if (draw.getMode() === action) {
+      draw.deactivate();
+    } else {
+      draw.activate(action, selectedBorderStyle, selectedBorderColor);
     }
-    recordFormatChange(i.history, i.store, () => {
-      const state = i.store.getState();
-      if (action === 'all') {
-        setBorders(state, i.store, { top: true, right: true, bottom: true, left: true });
-      } else if (action === 'top') {
-        setBorders(state, i.store, { top: true });
-      } else if (action === 'bottom') {
-        setBorders(state, i.store, { bottom: true });
-      } else if (action === 'left') {
-        setBorders(state, i.store, { left: true });
-      } else if (action === 'right') {
-        setBorders(state, i.store, { right: true });
-      } else if (action === 'clear') {
-        setBorders(state, i.store, {
-          top: false,
-          right: false,
-          bottom: false,
-          left: false,
-          diagonalDown: false,
-          diagonalUp: false,
-        });
-      }
-    });
+    closeBorderMenu();
+    refreshBorderMenuState();
     (sheetEl as HTMLElement).focus();
   });
 });
+
+const openSubmenu = (which: 'lineColor' | 'lineStyle'): void => {
+  if (which === 'lineColor') {
+    if (lineStyleSubmenu) lineStyleSubmenu.hidden = true;
+    if (lineColorSubmenu) lineColorSubmenu.hidden = false;
+  } else {
+    if (lineColorSubmenu) lineColorSubmenu.hidden = true;
+    if (lineStyleSubmenu) lineStyleSubmenu.hidden = false;
+  }
+  borderMenu?.querySelectorAll<HTMLButtonElement>('[data-border-submenu]').forEach((b) => {
+    b.setAttribute('aria-expanded', b.dataset.borderSubmenu === which ? 'true' : 'false');
+  });
+};
+
+borderMenu?.querySelectorAll<HTMLButtonElement>('[data-border-submenu]').forEach((btn) => {
+  btn.addEventListener('mouseenter', () => {
+    const which = btn.dataset.borderSubmenu as 'lineColor' | 'lineStyle' | undefined;
+    if (which) openSubmenu(which);
+  });
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const which = btn.dataset.borderSubmenu as 'lineColor' | 'lineStyle' | undefined;
+    if (which) openSubmenu(which);
+  });
+});
+
+// Mousing over a non-submenu item dismisses any open submenu — matches
+// Excel's single-active-submenu behavior.
+borderMenu
+  ?.querySelectorAll<HTMLButtonElement>('[data-border-preset], [data-border-draw]')
+  .forEach((btn) => {
+    btn.addEventListener('mouseenter', closeBorderSubmenus);
+  });
+
+lineColorSubmenu
+  ?.querySelectorAll<HTMLButtonElement>('[data-border-line-color]')
+  .forEach((swatch) => {
+    swatch.addEventListener('click', () => {
+      const hex = swatch.dataset.borderLineColor ?? '#000000';
+      selectedBorderColor = hex;
+      lineColorSubmenu
+        .querySelectorAll<HTMLButtonElement>('[data-border-line-color]')
+        .forEach((s) => {
+          s.setAttribute('aria-checked', s === swatch ? 'true' : 'false');
+        });
+      inst?.borderDraw?.setColor(hex);
+      closeBorderSubmenus();
+    });
+  });
+
+lineStyleSubmenu
+  ?.querySelectorAll<HTMLButtonElement>('[data-border-line-style]')
+  .forEach((styleBtn) => {
+    styleBtn.addEventListener('click', () => {
+      const value = styleBtn.dataset.borderLineStyle ?? 'thin';
+      if (value !== 'none') {
+        selectedBorderStyle = value as CellBorderStyle;
+        inst?.borderDraw?.setStyle(selectedBorderStyle);
+      }
+      lineStyleSubmenu
+        .querySelectorAll<HTMLButtonElement>('[data-border-line-style]')
+        .forEach((s) => {
+          s.setAttribute('aria-checked', s === styleBtn ? 'true' : 'false');
+        });
+      closeBorderSubmenus();
+    });
+  });
 
 // ── Freeze Panes menu ─────────────────────────────────────────────────────
 const freezeBtn = document.getElementById('btn-freeze');

@@ -10,7 +10,7 @@
     --fc-bg: #ffffff;
     --fc-bg-elev: #ffffff;
     --fc-bg-rail: #faf9f8;
-    --fc-bg-header: #eaf6ee; /* pale green chip when row/col is active */
+    --fc-bg-header: #cfcfcf; /* gray fill for selected row/column headers */
 
     /* Foreground — Fluent neutralPrimary scale */
     --fc-fg: #201f1e;
@@ -22,21 +22,21 @@
     --fc-rule: #d2d0ce;
     --fc-rule-strong: #a19f9d;
 
-    /* Accent — spreadsheet green (#107C41) */
-    --fc-accent: #107c41;
-    --fc-accent-strong: #0e6b39;
-    --fc-accent-soft: rgba(16, 124, 65, 0.1);
+    /* Accent — Excel 365 selection green. */
+    --fc-accent: #217346;
+    --fc-accent-strong: #185c37;
+    --fc-accent-soft: rgba(0, 0, 0, 0.2);
     --fc-accent-fg: #ffffff;
 
     /* Cell-state tints */
     --fc-cell-error-fg: #a4262c;
     --fc-cell-formula-fg: #201f1e;
-    --fc-cell-bool-fg: #107c41;
+    --fc-cell-bool-fg: #217346;
     --fc-cell-num-fg: var(--fc-fg-strong);
 
     /* Header — spreadsheet uses cool gray rail with darker active text */
     --fc-header-fg: #605e5c;
-    --fc-header-fg-active: #107c41;
+    --fc-header-fg-active: #217346;
     --fc-header-bg: var(--fc-bg-rail);
     --fc-header-rule: var(--fc-rule);
 

@@ -97,3 +97,28 @@ for (const c of dialogCases) {
     });
   });
 }
+
+const formatTabCases = [
+  { tab: 'Alignment', snapshot: 'dialog-format-cells-alignment.png' },
+  { tab: 'Font', snapshot: 'dialog-format-cells-font.png' },
+  { tab: 'Border', snapshot: 'dialog-format-cells-border.png' },
+  { tab: 'Fill', snapshot: 'dialog-format-cells-fill.png' },
+  { tab: 'Protection', snapshot: 'dialog-format-cells-protection.png' },
+] as const;
+
+for (const c of formatTabCases) {
+  test(`@visual format cells tab — ${c.tab}`, async ({ page }) => {
+    await mountVisualPage(page, '/?theme=light&locale=en');
+    await clickRibbonCommand(page, 'File', 'formatCells');
+
+    const dialog = page.locator('[class="fc-fmtdlg"]').first();
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('tab', { name: c.tab, exact: true }).click();
+    await page.waitForTimeout(150);
+
+    await expect(dialog).toHaveScreenshot(c.snapshot, {
+      maxDiffPixels: 100,
+      animations: 'disabled',
+    });
+  });
+}

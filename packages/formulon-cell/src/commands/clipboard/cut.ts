@@ -11,11 +11,13 @@ import { type CopyResult, copy } from './copy.js';
 export function cut(state: State, wb: WorkbookHandle): CopyResult | null {
   const result = copy(state);
   if (!result) return null;
-  const { range } = result;
+  const ranges = result.payloadRanges ?? result.ranges ?? [result.range];
   const sheet = state.data.sheetIndex;
-  for (let row = range.r0; row <= range.r1; row += 1) {
-    for (let col = range.c0; col <= range.c1; col += 1) {
-      wb.setBlank({ sheet, row, col });
+  for (const range of ranges) {
+    for (let row = range.r0; row <= range.r1; row += 1) {
+      for (let col = range.c0; col <= range.c1; col += 1) {
+        wb.setBlank({ sheet, row, col });
+      }
     }
   }
   return result;

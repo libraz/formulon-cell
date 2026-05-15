@@ -16,6 +16,7 @@ export const ALL_FEATURE_IDS = [
   'findReplace',
   'formatDialog',
   'formatPainter',
+  'borderDraw',
   'conditional',
   'iterative',
   'namedRanges',

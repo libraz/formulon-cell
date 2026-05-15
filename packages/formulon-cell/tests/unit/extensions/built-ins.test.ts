@@ -94,6 +94,7 @@ describe('built-in extension factories', () => {
   it('bundles default-on public built-in factories in allBuiltIns', () => {
     expect(allBuiltIns().map((ext) => ext.id)).toEqual([
       'formatPainter',
+      'borderDraw',
       'quickAnalysis',
       'charts',
       'pivotTableDialog',

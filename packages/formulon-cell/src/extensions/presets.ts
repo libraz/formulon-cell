@@ -20,6 +20,7 @@ export const minimal = (): FeatureFlags => ({
   findReplace: false,
   formatDialog: false,
   formatPainter: false,
+  borderDraw: false,
   conditional: false,
   iterative: false,
   gotoSpecial: false,

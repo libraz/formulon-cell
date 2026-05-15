@@ -18,6 +18,7 @@
 // replacement registered under the same id participates correctly.
 import type { History } from '../commands/history.js';
 import { setSheetZoom } from '../commands/structure.js';
+import { attachBorderDraw } from '../interact/border-draw.js';
 import { attachClipboard } from '../interact/clipboard.js';
 import { attachCommentDialog } from '../interact/comment-dialog.js';
 import { attachConditionalDialog } from '../interact/conditional-dialog.js';
@@ -57,6 +58,25 @@ export const formatPainter = (): Extension => ({
   priority: 50,
   setup(ctx) {
     const handle = attachFormatPainter({
+      host: ctx.host,
+      store: ctx.store,
+      history: ctx.history,
+    });
+    return {
+      ...handle,
+      dispose: handle.detach,
+    };
+  },
+});
+
+/** Border draw handle. Built-in id `'borderDraw'`. Drives Excel-parity
+ *  draw / draw-grid / erase modes. Pair with `features: { borderDraw: false }`
+ *  to replace. */
+export const borderDraw = (): Extension => ({
+  id: 'borderDraw',
+  priority: 50,
+  setup(ctx) {
+    const handle = attachBorderDraw({
       host: ctx.host,
       store: ctx.store,
       history: ctx.history,
@@ -598,6 +618,7 @@ export const contextMenu = (): Extension => ({
     };
     let detach = attachContextMenu({
       host: ctx.host,
+      grid: ctx.grid,
       store: ctx.store,
       wb: ctx.getWb(),
       strings: ctx.i18n.strings,
@@ -613,6 +634,7 @@ export const contextMenu = (): Extension => ({
         detach();
         detach = attachContextMenu({
           host: ctx.host,
+          grid: ctx.grid,
           store: ctx.store,
           wb,
           strings: ctx.i18n.strings,
@@ -715,6 +737,7 @@ export const wheel = (): Extension => ({
  *  Default-off factories (`watchWindow`, `slicer`) stay opt-in. */
 export const allBuiltIns = (): Extension[] => [
   formatPainter(),
+  borderDraw(),
   quickAnalysis(),
   charts(),
   pivotTableDialog(),

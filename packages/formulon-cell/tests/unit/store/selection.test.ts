@@ -49,6 +49,15 @@ describe('store/selection — mutators', () => {
     expect(r.c1 - r.c0).toBeGreaterThan(50);
   });
 
+  it('selectRows selects an entire row band and keeps the original anchor row', () => {
+    const store = createSpreadsheetStore();
+    mutators.selectRows(store, 7, 4);
+    const s = store.getState().selection;
+    expect(s.range).toEqual({ sheet: 0, r0: 4, c0: 0, r1: 7, c1: 16383 });
+    expect(s.anchor).toEqual({ sheet: 0, row: 7, col: 0 });
+    expect(s.active).toEqual({ sheet: 0, row: 4, col: 0 });
+  });
+
   it('selectCol selects the entire column across the sheet height', () => {
     const store = createSpreadsheetStore();
     mutators.selectCol(store, 2);
@@ -56,6 +65,15 @@ describe('store/selection — mutators', () => {
     expect(r.c0).toBe(2);
     expect(r.c1).toBe(2);
     expect(r.r1 - r.r0).toBeGreaterThan(50);
+  });
+
+  it('selectCols selects an entire column band and keeps the original anchor column', () => {
+    const store = createSpreadsheetStore();
+    mutators.selectCols(store, 5, 2);
+    const s = store.getState().selection;
+    expect(s.range).toEqual({ sheet: 0, r0: 0, c0: 2, r1: 1048575, c1: 5 });
+    expect(s.anchor).toEqual({ sheet: 0, row: 0, col: 5 });
+    expect(s.active).toEqual({ sheet: 0, row: 0, col: 2 });
   });
 
   it('selectAll selects every cell on the sheet', () => {

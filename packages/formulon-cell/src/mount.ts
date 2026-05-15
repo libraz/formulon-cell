@@ -583,6 +583,9 @@ export const Spreadsheet = {
       get formatPainter() {
         return featureState.formatPainter ?? undefined;
       },
+      get borderDraw() {
+        return featureState.borderDraw ?? undefined;
+      },
       formula: formulaRegistry,
       cells: cellRegistry,
       use(input) {

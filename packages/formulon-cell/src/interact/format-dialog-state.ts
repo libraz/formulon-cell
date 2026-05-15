@@ -200,6 +200,8 @@ export function computeDialogNumFmt(
       return { kind: 'accounting', decimals: draft.decimals, symbol: draft.currencySymbol };
     case 'text':
       return { kind: 'text' };
+    case 'special':
+      return { kind: 'custom', pattern: draft.pattern || defaultPatternFor('special') };
     case 'date':
       return { kind: 'date', pattern: draft.pattern || defaultPatternFor('date') };
     case 'time':

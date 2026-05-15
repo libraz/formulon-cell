@@ -174,6 +174,7 @@ export function Dropdown<V extends string | number>({
                 aria-selected={selected}
                 tabIndex={idx === focusIdx ? 0 : -1}
                 className={`demo__rb-dd__opt${selected ? ' demo__rb-dd__opt--selected' : ''}`}
+                data-fc-value={String(o.value)}
                 onClick={() => {
                   onChange(o.value);
                   setOpen(false);

@@ -117,6 +117,7 @@ export class InlineEditor {
     input.wrap = 'soft';
     input.value = seed;
     this.input = input;
+    this.applyTextAlignment(seed);
     this.position(a);
     this.deps.grid.appendChild(input);
     this.refreshHeight();
@@ -349,6 +350,7 @@ export class InlineEditor {
 
   private readonly onInput = (): void => {
     this.refreshHeight();
+    if (this.input) this.applyTextAlignment(this.input.value);
     if (this.input) syncEditorRefs(this.deps.store, this.input.value);
     this.autocomplete?.refresh();
     this.argHelper?.refresh();
@@ -377,6 +379,23 @@ export class InlineEditor {
     // Spreadsheets grow the editor downward; mirror that with a min-height bump.
     const baseRow = this.deps.store.getState().layout.defaultRowHeight;
     this.input.style.minHeight = `${baseRow * lines}px`;
+  }
+
+  private applyTextAlignment(raw: string): void {
+    if (!this.input || !this.editingAddr) return;
+    const fmt = this.deps.store.getState().format.formats.get(addrKey(this.editingAddr));
+    if (fmt?.align) {
+      this.input.style.textAlign = fmt.align;
+      return;
+    }
+    if (raw.startsWith('=')) {
+      this.input.style.textAlign = 'left';
+      return;
+    }
+    const coerced = coerceInput(raw);
+    if (coerced.kind === 'number') this.input.style.textAlign = 'right';
+    else if (coerced.kind === 'bool') this.input.style.textAlign = 'center';
+    else this.input.style.textAlign = 'left';
   }
 
   /** Walk the column upward from `beforeRow - 1` collecting plain-text values

@@ -499,7 +499,7 @@ export function paintCellText({
   if (value.kind === 'blank' && !formula && displayOverride == null) return;
 
   const padX = 7;
-  const padY = 4;
+  const padY = 3;
   let text: string;
   if (displayOverride != null) {
     text = displayOverride;
@@ -791,10 +791,7 @@ export const FILL_HANDLE_SIZE = 6;
 /** Spreadsheet-style fill handle. Drawn at the selection range's bottom-right
  *  corner (or active-cell corner when selection is a single cell). The square
  *  is filled in `theme.accent` (resolves from `--fc-accent`, falls back to
- *  `#0078d4` when unset) and surrounded by a 1px white border so it stands
- *  proud against any cell fill. The returned rect spans the white border so
- *  the pointer layer hit-tests against the visible area, not just the inner
- *  filled square. */
+ *  `#217346` when unset). */
 export function paintFillHandle(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
@@ -806,8 +803,6 @@ export function paintFillHandle(
   const x = bounds.x + bounds.w - hs / 2;
   const y = bounds.y + bounds.h - hs / 2;
   const accent = theme.accent || '#0078d4';
-  // 1px white border ring. Painted as a slightly larger white square first;
-  // the accent fill on top leaves a 1px ring exposed.
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(x - 1, y - 1, hs + 2, hs + 2);
   ctx.fillStyle = accent;
@@ -831,12 +826,12 @@ export function paintFillPreview(
   ctx.restore();
 }
 
-/** Dashed copy-source marquee. Spreadsheets animate the dashes; this renderer keeps
- *  it static but uses the same high-contrast black/white double stroke. */
-export function paintCopyMarquee(ctx: CanvasRenderingContext2D, bounds: Rect): void {
+/** Animated dashed copy-source marquee ("marching ants"). */
+export function paintCopyMarquee(ctx: CanvasRenderingContext2D, bounds: Rect, phase = 0): void {
   ctx.save();
   ctx.lineWidth = 1;
   ctx.setLineDash([4, 3]);
+  ctx.lineDashOffset = -phase;
   ctx.strokeStyle = '#ffffff';
   ctx.strokeRect(
     bounds.x + 1.5,
@@ -844,6 +839,7 @@ export function paintCopyMarquee(ctx: CanvasRenderingContext2D, bounds: Rect): v
     Math.max(0, bounds.w - 3),
     Math.max(0, bounds.h - 3),
   );
+  ctx.lineDashOffset = 3.5 - phase;
   ctx.strokeStyle = '#111111';
   ctx.strokeRect(
     bounds.x + 0.5,

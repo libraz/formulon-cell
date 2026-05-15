@@ -231,6 +231,45 @@ describe('attachPointer', () => {
       });
     });
 
+    it('Ctrl/Cmd-click on row headers builds a disjoint row selection', () => {
+      detach = attachPointer(host, store, wb);
+
+      fireDown(host, 10, 460); // row 15 header
+      fireDown(host, 10, 516, { ctrlKey: true }); // row 17 header
+      fireDown(host, 10, 572, { ctrlKey: true }); // row 19 header
+
+      const sel = store.getState().selection;
+      expect(sel.range).toEqual({ sheet: 0, r0: 19, c0: 0, r1: 19, c1: 16383 });
+      expect(sel.extraRanges).toEqual([
+        { sheet: 0, r0: 15, c0: 0, r1: 15, c1: 16383 },
+        { sheet: 0, r0: 17, c0: 0, r1: 17, c1: 16383 },
+      ]);
+    });
+
+    it('Shift-click on row headers selects a contiguous row band', () => {
+      detach = attachPointer(host, store, wb);
+
+      fireDown(host, 10, 460); // row 15 header
+      fireDown(host, 10, 572, { shiftKey: true }); // row 19 header
+
+      const sel = store.getState().selection;
+      expect(sel.range).toEqual({ sheet: 0, r0: 15, c0: 0, r1: 19, c1: 16383 });
+      expect(sel.anchor).toEqual({ sheet: 0, row: 15, col: 0 });
+      expect(sel.active).toEqual({ sheet: 0, row: 19, col: 0 });
+    });
+
+    it('Shift-click on column headers selects a contiguous column band', () => {
+      detach = attachPointer(host, store, wb);
+
+      fireDown(host, 100, 10); // col 0 header
+      fireDown(host, 300, 10, { shiftKey: true }); // col 2 header
+
+      const sel = store.getState().selection;
+      expect(sel.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 2 });
+      expect(sel.anchor).toEqual({ sheet: 0, row: 0, col: 0 });
+      expect(sel.active).toEqual({ sheet: 0, row: 0, col: 2 });
+    });
+
     it('corner click selects the entire sheet', () => {
       detach = attachPointer(host, store, wb);
       fireDown(host, 10, 10);

@@ -9,6 +9,7 @@
 // `MountOptions.features` and re-mounting their own through `extensions`.
 export {
   allBuiltIns,
+  borderDraw,
   charts,
   clipboard,
   commentDialog,

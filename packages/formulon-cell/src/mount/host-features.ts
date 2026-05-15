@@ -9,6 +9,7 @@ import type { FormulaRegistry } from '../formula.js';
 import type { Strings } from '../i18n/strings.js';
 import { attachArgHelper } from '../interact/arg-helper.js';
 import { attachAutocomplete } from '../interact/autocomplete.js';
+import { attachBorderDraw, type BorderDrawHandle } from '../interact/border-draw.js';
 import { attachCommentDialog } from '../interact/comment-dialog.js';
 import { attachConditionalDialog } from '../interact/conditional-dialog.js';
 import { attachErrorMenu, type ErrorMenuHandle } from '../interact/error-menu.js';
@@ -45,6 +46,7 @@ export type AutocompleteHandle = ReturnType<typeof attachAutocomplete>;
 export const HOST_TOGGLEABLE_IDS = [
   'formatDialog',
   'formatPainter',
+  'borderDraw',
   'hoverComment',
   'conditional',
   'iterative',
@@ -102,6 +104,7 @@ export const WB_TOGGLEABLE_IDS = [
 export interface HostFeatureState {
   formatDialog: ReturnType<typeof attachFormatDialog> | null;
   formatPainter: FormatPainterHandle | null;
+  borderDraw: BorderDrawHandle | null;
   hover: ReturnType<typeof attachHover> | null;
   conditionalDialog: ReturnType<typeof attachConditionalDialog> | null;
   iterativeDialog: ReturnType<typeof attachIterativeDialog> | null;
@@ -177,6 +180,7 @@ export function createHostFeatureState(autocompleteStub: AutocompleteHandle): Ho
   return {
     formatDialog: null,
     formatPainter: null,
+    borderDraw: null,
     hover: null,
     conditionalDialog: null,
     iterativeDialog: null,
@@ -241,6 +245,18 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         input.featureRegistry.set(
           'formatPainter',
           input.wrapHandle(s.formatPainter, () => s.formatPainter?.detach()),
+        );
+        break;
+      case 'borderDraw':
+        if (s.borderDraw) return;
+        s.borderDraw = attachBorderDraw({
+          host: input.host,
+          store: input.store,
+          history: input.history,
+        });
+        input.featureRegistry.set(
+          'borderDraw',
+          input.wrapHandle(s.borderDraw, () => s.borderDraw?.detach()),
         );
         break;
       case 'hoverComment':
@@ -547,6 +563,11 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         s.formatPainter?.detach();
         s.formatPainter = null;
         input.featureRegistry.delete('formatPainter');
+        break;
+      case 'borderDraw':
+        s.borderDraw?.detach();
+        s.borderDraw = null;
+        input.featureRegistry.delete('borderDraw');
         break;
       case 'hoverComment':
         s.hover?.detach();

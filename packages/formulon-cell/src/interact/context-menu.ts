@@ -1,5 +1,6 @@
 import { copy } from '../commands/clipboard/copy.js';
 import { cut } from '../commands/clipboard/cut.js';
+import { insertCopiedCellsFromTSV } from '../commands/clipboard/insert-copied-cells.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
 import { clearComment } from '../commands/comment.js';
 import {
@@ -28,9 +29,13 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { hitZone } from '../render/geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';
+import { openInsertCopiedCellsDialog } from './insert-copied-cells-dialog.js';
 
 export interface ContextMenuDeps {
   host: HTMLElement;
+  /** Element whose coordinate space matches grid hit-testing. Defaults to host
+   *  for standalone tests/legacy embedders. */
+  grid?: HTMLElement;
   store: SpreadsheetStore;
   wb: WorkbookHandle;
   /** UI string dictionary. Falls back to the package default (ja) if omitted. */
@@ -66,6 +71,7 @@ type ItemId =
   | 'cut'
   | 'paste'
   | 'pasteSpecial'
+  | 'insertCopiedCells'
   | 'clear'
   | 'bold'
   | 'italic'
@@ -77,6 +83,8 @@ type ItemId =
   | 'clearFormat'
   | 'formatCells'
   | 'selectAll'
+  | 'rowHeight'
+  | 'colWidth'
   | 'rowInsertAbove'
   | 'rowInsertBelow'
   | 'rowDelete'
@@ -109,6 +117,7 @@ function buildCellEntries(s: Strings): MenuEntry[] {
     { kind: 'item', id: 'cut', label: t.cut, hint: '⌘X' },
     { kind: 'item', id: 'paste', label: t.paste, hint: '⌘V' },
     { kind: 'item', id: 'pasteSpecial', label: t.pasteSpecial, hint: '⌘⇧V' },
+    { kind: 'item', id: 'insertCopiedCells', label: t.insertCopiedCells },
     { kind: 'item', id: 'clear', label: t.clear, hint: 'Del' },
     { kind: 'sep', id: 'sep1' },
     { kind: 'item', id: 'bold', label: t.bold, hint: '⌘B' },
@@ -137,42 +146,43 @@ function buildCellEntries(s: Strings): MenuEntry[] {
 function buildRowEntries(s: Strings): MenuEntry[] {
   const t = s.contextMenu;
   return [
-    { kind: 'item', id: 'copy', label: t.copy, hint: '⌘C' },
     { kind: 'item', id: 'cut', label: t.cut, hint: '⌘X' },
+    { kind: 'item', id: 'copy', label: t.copy, hint: '⌘C' },
     { kind: 'item', id: 'paste', label: t.paste, hint: '⌘V' },
     { kind: 'sep', id: 'sepR1' },
-    { kind: 'item', id: 'rowInsertAbove', label: t.rowInsertAbove },
+    { kind: 'item', id: 'rowInsertAbove', label: t.insert },
     { kind: 'item', id: 'rowInsertBelow', label: t.rowInsertBelow },
-    { kind: 'item', id: 'rowDelete', label: t.rowDelete },
+    { kind: 'item', id: 'rowDelete', label: t.delete },
+    { kind: 'item', id: 'clear', label: t.clear, hint: 'Del' },
     { kind: 'sep', id: 'sepR2' },
+    { kind: 'item', id: 'formatCells', label: t.formatCells, hint: '⌘1' },
+    { kind: 'item', id: 'rowHeight', label: t.rowHeight },
     { kind: 'item', id: 'rowHide', label: t.rowHide },
     { kind: 'item', id: 'rowUnhide', label: t.rowUnhide },
     { kind: 'sep', id: 'sepR3' },
-    { kind: 'item', id: 'rowGroup', label: t.rowGroup, hint: '⌥⇧→' },
-    { kind: 'item', id: 'rowUngroup', label: t.rowUngroup, hint: '⌥⇧←' },
-    { kind: 'sep', id: 'sepR4' },
-    { kind: 'item', id: 'clear', label: t.clear, hint: 'Del' },
+    { kind: 'item', id: 'selectAll', label: t.selectAll, hint: '⌘A' },
   ];
 }
 
 function buildColEntries(s: Strings): MenuEntry[] {
   const t = s.contextMenu;
   return [
-    { kind: 'item', id: 'copy', label: t.copy, hint: '⌘C' },
     { kind: 'item', id: 'cut', label: t.cut, hint: '⌘X' },
+    { kind: 'item', id: 'copy', label: t.copy, hint: '⌘C' },
     { kind: 'item', id: 'paste', label: t.paste, hint: '⌘V' },
+    { kind: 'item', id: 'pasteSpecial', label: t.pasteSpecial, hint: '⌘⇧V' },
     { kind: 'sep', id: 'sepC1' },
-    { kind: 'item', id: 'colInsertLeft', label: t.colInsertLeft },
+    { kind: 'item', id: 'colInsertLeft', label: t.insert },
     { kind: 'item', id: 'colInsertRight', label: t.colInsertRight },
-    { kind: 'item', id: 'colDelete', label: t.colDelete },
+    { kind: 'item', id: 'colDelete', label: t.delete },
+    { kind: 'item', id: 'clear', label: t.clear, hint: 'Del' },
     { kind: 'sep', id: 'sepC2' },
+    { kind: 'item', id: 'formatCells', label: t.formatCells, hint: '⌘1' },
+    { kind: 'item', id: 'colWidth', label: t.colWidth },
     { kind: 'item', id: 'colHide', label: t.colHide },
     { kind: 'item', id: 'colUnhide', label: t.colUnhide },
     { kind: 'sep', id: 'sepC3' },
-    { kind: 'item', id: 'colGroup', label: t.colGroup, hint: '⌥⇧→' },
-    { kind: 'item', id: 'colUngroup', label: t.colUngroup, hint: '⌥⇧←' },
-    { kind: 'sep', id: 'sepC4' },
-    { kind: 'item', id: 'clear', label: t.clear, hint: 'Del' },
+    { kind: 'item', id: 'selectAll', label: t.selectAll, hint: '⌘A' },
   ];
 }
 
@@ -204,6 +214,7 @@ export interface ContextMenuHandle {
 
 export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   const { host, store, wb } = deps;
+  const hitHost = deps.grid ?? host;
   const history = deps.history ?? null;
   let strings = deps.strings ?? defaultStrings;
   const wrapFmt = (fn: () => void): void => recordFormatChange(history, store, fn);
@@ -259,12 +270,14 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     // Hide entries the host has not opted into. `insertHyperlink` and
     // `toggleWatch` are optional — the rest are always available.
     const activeAddr = store.getState().selection.active;
+    const hasCopiedCells = !!store.getState().ui.copyRange;
     const watched = !!deps.isWatched?.(activeAddr);
     const entries = compactMenuEntries(
       raw
         .filter(
           (e) => !(e.kind === 'item' && e.id === 'insertHyperlink' && !deps.onInsertHyperlink),
         )
+        .filter((e) => !(e.kind === 'item' && e.id === 'insertCopiedCells' && !hasCopiedCells))
         .filter((e) => !(e.kind === 'item' && e.id === 'insertComment' && !deps.onEditComment))
         .filter((e) => !(e.kind === 'item' && e.id === 'toggleWatch' && !deps.onToggleWatch))
         .map((e) => {
@@ -362,24 +375,35 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
    *  clicks promote the selection to the whole row/column so the action
    *  inherits a sensible band. */
   const resolveMenuKind = (e: MouseEvent): MenuKind => {
-    const rect = host.getBoundingClientRect();
+    const rect = hitHost.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const s = store.getState();
-    const zone = hitZone(s.layout, s.viewport, x, y);
+    const zone = hitZone(s.layout, s.viewport, x, y, null, { resizeHandles: false });
     if (!zone) return 'cell';
+    const selectedRanges = [s.selection.range, ...(s.selection.extraRanges ?? [])];
     if (zone.kind === 'row-header' || zone.kind === 'row-resize') {
       // Promote selection to the row (preserving multi-row drags).
-      const sel = s.selection.range;
-      const inSel = zone.row >= sel.r0 && zone.row <= sel.r1 && sel.c0 === 0 && sel.c1 >= 16383;
+      const inSel = selectedRanges.some(
+        (sel) => zone.row >= sel.r0 && zone.row <= sel.r1 && sel.c0 === 0 && sel.c1 >= 16383,
+      );
       if (!inSel) mutators.selectRow(store, zone.row);
       return 'row';
     }
     if (zone.kind === 'col-header' || zone.kind === 'col-resize') {
-      const sel = s.selection.range;
-      const inSel = zone.col >= sel.c0 && zone.col <= sel.c1 && sel.r0 === 0 && sel.r1 >= 1048575;
+      const inSel = selectedRanges.some(
+        (sel) => zone.col >= sel.c0 && zone.col <= sel.c1 && sel.r0 === 0 && sel.r1 >= 1048575,
+      );
       if (!inSel) mutators.selectCol(store, zone.col);
       return 'col';
+    }
+    if (zone.kind === 'cell') {
+      const selected = selectedRanges.find(
+        (sel) =>
+          zone.row >= sel.r0 && zone.row <= sel.r1 && zone.col >= sel.c0 && zone.col <= sel.c1,
+      );
+      if (selected?.c0 === 0 && selected.c1 >= 16383) return 'row';
+      if (selected?.r0 === 0 && selected.r1 >= 1048575) return 'col';
     }
     return 'cell';
   };
@@ -440,25 +464,55 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     switch (id) {
       case 'copy': {
         const r = copy(state);
-        if (r) void writeClipboard(r.tsv);
+        if (r) {
+          if (r.ranges) mutators.setCopyRanges(store, r.ranges);
+          else mutators.setCopyRange(store, r.range);
+          void writeClipboard(r.tsv);
+        } else {
+          mutators.setCopyRange(store, null);
+        }
         return;
       }
       case 'cut': {
         const r = cut(state, wb);
-        if (r) void writeClipboard(r.tsv);
+        if (r) {
+          mutators.setCopyRange(store, r.range);
+          void writeClipboard(r.tsv);
+        }
         deps.onAfterCommit?.();
         return;
       }
       case 'paste': {
         void readClipboard().then((text) => {
           if (!text) return;
-          pasteTSV(store.getState(), wb, text);
+          const r = pasteTSV(store.getState(), wb, text);
+          if (r) {
+            mutators.setCopyRange(store, null);
+            mutators.setRange(store, r.writtenRange);
+          }
           deps.onAfterCommit?.();
         });
         return;
       }
       case 'pasteSpecial': {
         deps.onPasteSpecial?.();
+        return;
+      }
+      case 'insertCopiedCells': {
+        openInsertCopiedCellsDialog({
+          strings,
+          onSubmit: (direction) => {
+            void readClipboard().then((text) => {
+              if (!text) return;
+              const r = insertCopiedCellsFromTSV(store, wb, history, text, direction);
+              if (r) {
+                mutators.setCopyRange(store, null);
+                mutators.setRange(store, r.writtenRange);
+                deps.onAfterCommit?.();
+              }
+            });
+          },
+        });
         return;
       }
       case 'clear': {
@@ -511,6 +565,10 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       }
       case 'formatCells': {
         deps.onFormatDialog?.();
+        return;
+      }
+      case 'rowHeight':
+      case 'colWidth': {
         return;
       }
       case 'selectAll': {

@@ -2,12 +2,11 @@
   .fc-fmtdlg input[type="text"],
   .fc-fmtdlg input[type="number"],
   .fc-fmtdlg select {
-    min-height: 28px;
-    padding: 4px 8px;
-    border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 18%, transparent));
-    border-radius: 2px;
-    background: var(--fc-bg, inherit);
+    min-height: 24px;
+    padding: 2px 8px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: #eeeeee;
     color: inherit;
     font: inherit;
     outline: none;
@@ -16,12 +15,16 @@
   .fc-fmtdlg input[type="number"]:hover,
   .fc-fmtdlg select:hover,
   .fc-fmtdlg__textarea:hover {
-    border-color: var(--fc-rule-strong, color-mix(in srgb, CanvasText 28%, transparent));
+    border-color: #d3d3d3;
   }
   .fc-fmtdlg input[type="text"]:focus,
   .fc-fmtdlg input[type="number"]:focus,
   .fc-fmtdlg select:focus {
-    border-color: var(--fc-accent, currentColor);
-    box-shadow: 0 0 0 2px var(--fc-accent-soft, transparent);
+    border-color: #6f9878;
+    box-shadow: 0 0 0 2px rgba(33, 115, 70, 0.3);
+  }
+
+  .fc-fmtdlg input[type="number"] {
+    width: 58px;
   }
 }

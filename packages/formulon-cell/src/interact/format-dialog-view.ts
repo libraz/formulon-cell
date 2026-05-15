@@ -129,6 +129,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     { id: 'time', label: t.catTime },
     { id: 'datetime', label: t.catDateTime },
     { id: 'text', label: t.catText },
+    { id: 'special', label: t.catOther },
     { id: 'custom', label: t.catCustom },
   ];
   const catButtons = new Map<NumberCategory, HTMLButtonElement>();
@@ -210,6 +211,47 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   patternRow.append(patternLabel, patternInput);
   numberControls.appendChild(patternRow);
 
+  const localeRow = document.createElement('label');
+  localeRow.className = 'fc-fmtdlg__row';
+  const localeLabel = document.createElement('span');
+  localeLabel.textContent = t.languageLocation;
+  const localeSelect = document.createElement('select');
+  localeSelect.setAttribute('aria-label', t.languageLocation);
+  for (const [value, label] of [
+    ['ja', '日本語'],
+    ['en', 'English'],
+  ] as const) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    localeSelect.appendChild(opt);
+  }
+  localeRow.append(localeLabel, localeSelect);
+  numberControls.appendChild(localeRow);
+
+  const negativeList = document.createElement('div');
+  negativeList.className = 'fc-fmtdlg__negative';
+  const negativeLabel = document.createElement('div');
+  negativeLabel.className = 'fc-fmtdlg__negative-label';
+  negativeLabel.textContent = t.negativeNumbers;
+  const negativeOptions = document.createElement('div');
+  negativeOptions.className = 'fc-fmtdlg__negative-list';
+  negativeOptions.setAttribute('role', 'listbox');
+  negativeOptions.setAttribute('aria-label', t.negativeNumbers);
+  const negativeSamples = ['(1234)', '(1234)', '1234', '-1234', '-1234', '△ 1234', '▲ 1234'];
+  for (const [index, text] of negativeSamples.entries()) {
+    const item = document.createElement('div');
+    item.className = 'fc-fmtdlg__negative-item';
+    item.setAttribute('role', 'option');
+    item.setAttribute('aria-selected', index === 3 ? 'true' : 'false');
+    if (index === 0 || index === 2 || index === 4)
+      item.classList.add('fc-fmtdlg__negative-item--red');
+    item.textContent = text;
+    negativeOptions.appendChild(item);
+  }
+  negativeList.append(negativeLabel, negativeOptions);
+  numberControls.appendChild(negativeList);
+
   // ── Alignment tab ──────────────────────────────────────────────────────
   const alignPanel = tabPanels.get('align') as HTMLDivElement;
 
@@ -245,6 +287,21 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     hAlignRadios.set(a.id, radio);
   }
 
+  const hAlignSelectRow = document.createElement('label');
+  hAlignSelectRow.className = 'fc-fmtdlg__row fc-fmtdlg__align-select-row';
+  const hAlignSelectLabel = document.createElement('span');
+  hAlignSelectLabel.textContent = t.horizontalAlign;
+  const hAlignSelect = document.createElement('select');
+  hAlignSelect.setAttribute('aria-label', t.horizontalAlign);
+  for (const a of hAlignDefs) {
+    const opt = document.createElement('option');
+    opt.value = a.id;
+    opt.textContent = a.label;
+    hAlignSelect.appendChild(opt);
+  }
+  hAlignSelectRow.append(hAlignSelectLabel, hAlignSelect);
+  alignPanel.appendChild(hAlignSelectRow);
+
   // Vertical
   const vAlignLegend = document.createElement('div');
   vAlignLegend.textContent = t.verticalAlign;
@@ -277,6 +334,21 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     vAlignRadios.set(a.id, radio);
   }
 
+  const vAlignSelectRow = document.createElement('label');
+  vAlignSelectRow.className = 'fc-fmtdlg__row fc-fmtdlg__align-select-row';
+  const vAlignSelectLabel = document.createElement('span');
+  vAlignSelectLabel.textContent = t.verticalAlign;
+  const vAlignSelect = document.createElement('select');
+  vAlignSelect.setAttribute('aria-label', t.verticalAlign);
+  for (const a of vAlignDefs) {
+    const opt = document.createElement('option');
+    opt.value = a.id;
+    opt.textContent = a.label;
+    vAlignSelect.appendChild(opt);
+  }
+  vAlignSelectRow.append(vAlignSelectLabel, vAlignSelect);
+  alignPanel.appendChild(vAlignSelectRow);
+
   // Wrap / Indent / Rotation
   const wrapRow = document.createElement('div');
   wrapRow.className = 'fc-fmtdlg__choice-grid';
@@ -299,7 +371,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   alignPanel.appendChild(indentRow);
 
   const rotationRow = document.createElement('label');
-  rotationRow.className = 'fc-fmtdlg__row';
+  rotationRow.className = 'fc-fmtdlg__row fc-fmtdlg__rotation-row';
   const rotationLabel = document.createElement('span');
   rotationLabel.textContent = t.rotation;
   const rotationInput = document.createElement('input');
@@ -310,6 +382,44 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   rotationInput.step = '1';
   rotationRow.append(rotationLabel, rotationInput);
   alignPanel.appendChild(rotationRow);
+
+  const alignPreview = document.createElement('div');
+  alignPreview.className = 'fc-fmtdlg__align-preview';
+  const alignPreviewTitle = document.createElement('div');
+  alignPreviewTitle.className = 'fc-fmtdlg__align-preview-title';
+  alignPreviewTitle.textContent = t.direction;
+  const alignPreviewBox = document.createElement('div');
+  alignPreviewBox.className = 'fc-fmtdlg__align-preview-box';
+  const alignPreviewVertical = document.createElement('div');
+  alignPreviewVertical.className = 'fc-fmtdlg__align-preview-vertical';
+  alignPreviewVertical.textContent = t.previewText;
+  const alignPreviewDial = document.createElement('div');
+  alignPreviewDial.className = 'fc-fmtdlg__align-preview-dial';
+  const alignPreviewDialText = document.createElement('span');
+  alignPreviewDialText.textContent = t.previewText;
+  alignPreviewDial.appendChild(alignPreviewDialText);
+  alignPreviewBox.append(alignPreviewVertical, alignPreviewDial);
+  const alignPreviewDegree = document.createElement('label');
+  alignPreviewDegree.className = 'fc-fmtdlg__align-degree';
+  const alignPreviewDegreeLabel = document.createElement('span');
+  alignPreviewDegreeLabel.textContent = t.rotation.replace(/\s*\(.*\)$/, '');
+  alignPreviewDegree.append(alignPreviewDegreeLabel, rotationInput);
+  alignPreview.append(alignPreviewTitle, alignPreviewBox, alignPreviewDegree);
+  alignPanel.appendChild(alignPreview);
+
+  const textControl = document.createElement('div');
+  textControl.className = 'fc-fmtdlg__text-control';
+  const textControlTitle = document.createElement('div');
+  textControlTitle.className = 'fc-fmtdlg__text-control-title';
+  textControlTitle.textContent = t.textControl;
+  const shrinkCk = makeCheckbox(t.shrinkToFit);
+  shrinkCk.wrap.classList.add('fc-fmtdlg__check--muted');
+  shrinkCk.input.disabled = true;
+  const mergeCk = makeCheckbox(t.mergeCells);
+  mergeCk.wrap.classList.add('fc-fmtdlg__check--muted');
+  mergeCk.input.disabled = true;
+  textControl.append(textControlTitle, wrapCk.wrap, shrinkCk.wrap, mergeCk.wrap);
+  alignPanel.appendChild(textControl);
 
   // ── Font tab ───────────────────────────────────────────────────────────
   const fontPanel = tabPanels.get('font') as HTMLDivElement;
@@ -351,6 +461,45 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   familyRow.append(familyLabel, familyInput, familyDatalist);
   fontPanel.appendChild(familyRow);
 
+  const familyList = document.createElement('div');
+  familyList.className = 'fc-fmtdlg__font-list fc-fmtdlg__font-list--family';
+  familyList.setAttribute('role', 'listbox');
+  familyList.setAttribute('aria-label', t.fontFamily);
+  for (const [index, family] of COMMON_FONTS.slice(0, 8).entries()) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'fc-fmtdlg__font-list-item';
+    item.textContent = family;
+    item.setAttribute('role', 'option');
+    item.setAttribute('aria-selected', index === 0 ? 'true' : 'false');
+    item.addEventListener('click', () => {
+      familyInput.value = family;
+      familyInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    familyList.appendChild(item);
+  }
+  fontPanel.appendChild(familyList);
+
+  const fontStyleList = document.createElement('div');
+  fontStyleList.className = 'fc-fmtdlg__font-list fc-fmtdlg__font-list--style';
+  fontStyleList.setAttribute('role', 'listbox');
+  fontStyleList.setAttribute('aria-label', t.fontStyle);
+  for (const [index, label] of [
+    t.alignDefault,
+    t.fontItalic,
+    t.fontBold,
+    `${t.fontBold} ${t.fontItalic}`,
+  ].entries()) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'fc-fmtdlg__font-list-item';
+    item.textContent = label;
+    item.setAttribute('role', 'option');
+    item.setAttribute('aria-selected', index === 0 ? 'true' : 'false');
+    fontStyleList.appendChild(item);
+  }
+  fontPanel.appendChild(fontStyleList);
+
   // Font size
   const sizeRow = document.createElement('label');
   sizeRow.className = 'fc-fmtdlg__row';
@@ -364,6 +513,25 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   sizeInput.step = '1';
   sizeRow.append(sizeLabel, sizeInput);
   fontPanel.appendChild(sizeRow);
+
+  const sizeList = document.createElement('div');
+  sizeList.className = 'fc-fmtdlg__font-list fc-fmtdlg__font-list--size';
+  sizeList.setAttribute('role', 'listbox');
+  sizeList.setAttribute('aria-label', t.fontSize);
+  for (const size of [8, 9, 10, 11, 12, 14, 16, 18]) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'fc-fmtdlg__font-list-item';
+    item.textContent = String(size);
+    item.setAttribute('role', 'option');
+    item.setAttribute('aria-selected', size === 12 ? 'true' : 'false');
+    item.addEventListener('click', () => {
+      sizeInput.value = String(size);
+      sizeInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    sizeList.appendChild(item);
+  }
+  fontPanel.appendChild(sizeList);
 
   // Font color
   const colorRow = document.createElement('div');
@@ -379,6 +547,17 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   fontPanel.appendChild(colorRow);
   const fontSwatches = makeSwatches('font');
   fontPanel.appendChild(fontSwatches);
+
+  const fontPreview = document.createElement('div');
+  fontPreview.className = 'fc-fmtdlg__font-preview';
+  const fontPreviewLabel = document.createElement('div');
+  fontPreviewLabel.className = 'fc-fmtdlg__font-preview-label';
+  fontPreviewLabel.textContent = t.preview;
+  const fontPreviewBox = document.createElement('div');
+  fontPreviewBox.className = 'fc-fmtdlg__font-preview-box';
+  fontPreviewBox.textContent = 'Yu Gothic';
+  fontPreview.append(fontPreviewLabel, fontPreviewBox);
+  fontPanel.appendChild(fontPreview);
 
   // ── Border tab ─────────────────────────────────────────────────────────
   const borderPanel = tabPanels.get('border') as HTMLDivElement;
@@ -774,10 +953,15 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     patternPresetSelect,
     patternRow,
     patternInput,
+    localeRow,
+    localeSelect,
+    negativeList,
     numberSummaryTitle,
     numberSummaryDesc,
     hAlignRadios,
+    hAlignSelect,
     vAlignRadios,
+    vAlignSelect,
     wrapCk,
     indentInput,
     rotationInput,

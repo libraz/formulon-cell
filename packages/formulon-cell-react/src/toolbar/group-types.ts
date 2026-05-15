@@ -56,6 +56,7 @@ export interface BuildRibbonGroupsOptions {
   iconLabel: (icon: IconName, text: string) => ReactElement;
   instance: SpreadsheetInstance | null;
   lang: 'ja' | 'en';
+  mergeMenu: ReactElement;
   onAutoSum: () => void;
   onBorderPreset: (preset: BorderPreset) => void;
   onCopy: () => void;
@@ -72,7 +73,7 @@ export interface BuildRibbonGroupsOptions {
   onInsertCols: () => void;
   onInsertRows: () => void;
   onMarginPreset: (next: MarginPreset) => void;
-  onMerge: () => void;
+  onNumberFormat: (next: string) => void;
   onPageOrientation: (next: PageOrientation) => void;
   onPaperSize: (next: PaperSize) => void;
   onPaste: () => void;

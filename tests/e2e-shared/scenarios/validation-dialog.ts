@@ -20,9 +20,15 @@ export async function runValidationDialogScenario(page: Page): Promise<void> {
   const morePanel = page.locator('[role="tabpanel"][data-fc-tab="more"]');
   await expect(morePanel).toBeVisible();
 
-  // Switch validation kind to "whole" — the bound-pair rows appear.
-  const kindSelect = morePanel.locator('select').first();
-  await kindSelect.selectOption('whole');
+  // Switch validation kind to "whole" through the custom Excel-style combobox
+  // while asserting the underlying select remains the form-state source.
+  const kindSelect = morePanel.locator('select[aria-label="Kind"]').first();
+  const kindCombo = morePanel.locator('label:has(select[aria-label="Kind"]) .fc-select__button');
+  await expect(kindCombo).toBeVisible();
+  await kindCombo.click();
+  await page
+    .locator('.fc-select__list:not([hidden]) [role="option"]', { hasText: 'Whole number' })
+    .click();
   await expect(kindSelect).toHaveValue('whole');
 
   await page.keyboard.press('Escape');

@@ -199,12 +199,17 @@ export function setBorders(state: State, store: SpreadsheetStore, sides: CellBor
 export type BorderPreset =
   | 'none'
   | 'outline'
+  | 'thickOutline'
   | 'all'
   | 'top'
   | 'bottom'
   | 'left'
   | 'right'
-  | 'doubleBottom';
+  | 'doubleBottom'
+  | 'thickBottom'
+  | 'topAndBottom'
+  | 'topAndThickBottom'
+  | 'topAndDoubleBottom';
 
 export function setBorderPreset(
   state: State,
@@ -215,6 +220,8 @@ export function setBorderPreset(
   const range = state.selection.range;
   if (gateProtection(state, range) === null) return;
   const side: CellBorderSide = { style };
+  const thickSide: CellBorderSide = { style: 'thick' };
+  const doubleSide: CellBorderSide = { style: 'double' };
   if (preset === 'all') {
     applyRangePatch(state, store, range, {
       borders: { top: side, right: side, bottom: side, left: side },
@@ -245,11 +252,27 @@ export function setBorderPreset(
         if (r === range.r1) borders.bottom = side;
         if (c === range.c0) borders.left = side;
         if (c === range.c1) borders.right = side;
+      } else if (preset === 'thickOutline') {
+        if (r === range.r0) borders.top = thickSide;
+        if (r === range.r1) borders.bottom = thickSide;
+        if (c === range.c0) borders.left = thickSide;
+        if (c === range.c1) borders.right = thickSide;
       } else if (preset === 'top' && r === range.r0) borders.top = side;
       else if (preset === 'bottom' && r === range.r1) borders.bottom = side;
       else if (preset === 'left' && c === range.c0) borders.left = side;
       else if (preset === 'right' && c === range.c1) borders.right = side;
-      else if (preset === 'doubleBottom' && r === range.r1) borders.bottom = { style: 'double' };
+      else if (preset === 'doubleBottom' && r === range.r1) borders.bottom = doubleSide;
+      else if (preset === 'thickBottom' && r === range.r1) borders.bottom = thickSide;
+      else if (preset === 'topAndBottom') {
+        if (r === range.r0) borders.top = side;
+        if (r === range.r1) borders.bottom = side;
+      } else if (preset === 'topAndThickBottom') {
+        if (r === range.r0) borders.top = side;
+        if (r === range.r1) borders.bottom = thickSide;
+      } else if (preset === 'topAndDoubleBottom') {
+        if (r === range.r0) borders.top = side;
+        if (r === range.r1) borders.bottom = doubleSide;
+      }
       if (borders.top || borders.right || borders.bottom || borders.left) {
         mutators.setCellFormat(store, addr, { borders });
       }

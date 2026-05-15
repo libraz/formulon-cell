@@ -1,3 +1,4 @@
+import { enhanceCustomSelect, syncCustomSelects } from './custom-select.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface DialogShellDeps {
@@ -97,6 +98,7 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
   let disposed = false;
   let restoreFocusEl: HTMLElement | null = null;
   const listeners: BoundListener[] = [];
+  const selectHandles: Array<{ dispose(): void }> = [];
 
   const overlay = document.createElement('div');
   overlay.className = className;
@@ -109,6 +111,27 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
   panel.className = `${className}__panel`;
   panel.tabIndex = -1;
   overlay.appendChild(panel);
+
+  const enhanceSelects = (root: ParentNode): void => {
+    for (const select of Array.from(root.querySelectorAll<HTMLSelectElement>('select'))) {
+      const handle = enhanceCustomSelect(select);
+      if (handle) selectHandles.push(handle);
+    }
+  };
+
+  const selectObserver = new MutationObserver((records) => {
+    for (const record of records) {
+      for (const node of Array.from(record.addedNodes)) {
+        if (!(node instanceof HTMLElement)) continue;
+        if (node instanceof HTMLSelectElement) {
+          const handle = enhanceCustomSelect(node);
+          if (handle) selectHandles.push(handle);
+        }
+        enhanceSelects(node);
+      }
+    }
+  });
+  selectObserver.observe(panel, { childList: true, subtree: true });
 
   inheritHostTokens(host, overlay);
   document.body.appendChild(overlay);
@@ -171,6 +194,8 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
     on,
     open() {
       if (disposed) return;
+      enhanceSelects(panel);
+      syncCustomSelects(panel);
       if (!overlay.contains(document.activeElement)) {
         restoreFocusEl =
           document.activeElement instanceof HTMLElement ? document.activeElement : host;
@@ -203,6 +228,8 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
         l.target.removeEventListener(l.event, l.handler, l.options);
       }
       listeners.length = 0;
+      selectObserver.disconnect();
+      for (const handle of selectHandles.splice(0)) handle.dispose();
       restoreFocusEl = null;
       overlay.remove();
     },

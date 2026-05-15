@@ -25,8 +25,6 @@ const ribbonTabs = [
       'underline',
       'strike',
       'borders',
-      'borderPreset',
-      'borderStyle',
       'fontColor',
       'fillColor',
       'top',
@@ -37,7 +35,7 @@ const ribbonTabs = [
       'alignR',
       'wrap',
       'merge',
-      'general',
+      'numberFormat',
       'number-row-2',
       'currency',
       'percent',
@@ -199,8 +197,7 @@ test('R02: Home font controls render and apply formatting', async ({ page }) => 
   await expect(page.locator('[data-ribbon-select="fontSize"] .demo__rb-dd__value')).toHaveText(
     '11',
   );
-  await expect(page.locator('[data-ribbon-select="borderPreset"]')).toBeVisible();
-  await expect(page.locator('[data-ribbon-select="borderStyle"]')).toBeVisible();
+  await expect(page.locator('[data-ribbon-command="borders"]')).toBeVisible();
   await expect(page.locator('[data-ribbon-command="fontColor"] input[type="color"]')).toHaveValue(
     '#201f1e',
   );
@@ -536,26 +533,22 @@ test('R05: ribbon dropdowns support keyboard selection and Escape dismissal', as
   const list = page.locator('[data-ribbon-select="fontFamily"] .demo__rb-dd__list');
   await expect(list).toBeVisible();
   await expect(fontButton).toHaveAttribute('aria-expanded', 'true');
-  await expect(
-    page.locator('[data-ribbon-select="fontFamily"] [data-value="Aptos"]'),
-  ).toBeFocused();
+  const options = page.locator('[data-ribbon-select="fontFamily"] [role="option"]');
+  await expect(options.nth(0)).toBeFocused();
   await page.keyboard.press('ArrowDown');
-  await expect(
-    page.locator('[data-ribbon-select="fontFamily"] [data-value="Calibri"]'),
-  ).toBeFocused();
+  await expect(options.nth(1)).toBeFocused();
+  const secondLabel = (await options.nth(1).locator('.demo__rb-dd__label').textContent()) ?? '';
   await page.keyboard.press('Enter');
   await expect(list).toBeHidden();
   await expect(fontButton).toBeFocused();
   await expect(page.locator('[data-ribbon-select="fontFamily"] .demo__rb-dd__value')).toHaveText(
-    'Calibri',
+    secondLabel,
   );
 
   await page.keyboard.press('ArrowDown');
   await expect(list).toBeVisible();
   await page.keyboard.press('End');
-  await expect(
-    page.locator('[data-ribbon-select="fontFamily"] [data-value="Consolas"]'),
-  ).toBeFocused();
+  await expect(options.last()).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(list).toBeHidden();
   await expect(fontButton).toBeFocused();
@@ -571,9 +564,14 @@ test('R06: ribbon split menus support menu keyboard navigation and focus return'
   const borderMenu = page.locator('#menu-borders');
   await borders.click();
   await expect(borderMenu).toBeVisible();
-  await expect(borderMenu.getByRole('menuitem', { name: 'All borders' })).toBeFocused();
+  // Excel-365 first preset row: 下罫線 / Bottom Border.
+  await expect(
+    borderMenu.getByRole('menuitem', { name: 'Bottom Border', exact: true }),
+  ).toBeFocused();
   await page.keyboard.press('End');
-  await expect(borderMenu.getByRole('menuitem', { name: 'More borders…' })).toBeFocused();
+  await expect(
+    borderMenu.getByRole('menuitem', { name: 'More Borders...', exact: true }),
+  ).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(borderMenu).toBeHidden();
   await expect(borders).toBeFocused();

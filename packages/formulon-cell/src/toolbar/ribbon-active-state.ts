@@ -4,7 +4,7 @@ import type { MarginPreset } from '../commands/page-setup.js';
 import { marginPresetOf, pageSetupForSheet } from '../commands/page-setup.js';
 import { hiddenInSelection } from '../commands/structure.js';
 import type { SpreadsheetInstance } from '../mount.js';
-import type { CellBorderStyle, PageOrientation, PaperSize } from '../store/types.js';
+import type { CellBorderStyle, NumFmt, PageOrientation, PaperSize } from '../store/types.js';
 
 /**
  * Ribbon active-state contract shared by every framework wrapper.
@@ -26,6 +26,7 @@ export interface ActiveState {
   alignRight: boolean;
   currency: boolean;
   percent: boolean;
+  numberFormat: string;
   frozen: boolean;
   filterOn: boolean;
   rowsHidden: boolean;
@@ -55,6 +56,7 @@ export const EMPTY_ACTIVE_STATE: ActiveState = {
   alignRight: false,
   currency: false,
   percent: false,
+  numberFormat: 'general',
   frozen: false,
   filterOn: false,
   rowsHidden: false,
@@ -70,6 +72,36 @@ export const EMPTY_ACTIVE_STATE: ActiveState = {
   pageOrientation: 'portrait',
   paperSize: 'A4',
   marginPreset: 'normal',
+};
+
+const numberFormatOf = (fmt: NumFmt | undefined): string => {
+  if (!fmt) return 'general';
+  switch (fmt.kind) {
+    case 'fixed':
+      return 'fixed';
+    case 'currency':
+      return 'currency';
+    case 'accounting':
+      return 'accounting';
+    case 'date':
+      return fmt.pattern.includes('mmmm') || fmt.pattern.includes('"年"')
+        ? 'longDate'
+        : 'shortDate';
+    case 'time':
+      return 'time';
+    case 'percent':
+      return 'percent';
+    case 'custom':
+      return fmt.pattern.includes('?/?') ? 'fraction' : 'general';
+    case 'scientific':
+      return 'scientific';
+    case 'text':
+      return 'text';
+    case 'datetime':
+      return 'shortDate';
+    default:
+      return 'general';
+  }
 };
 
 export const BORDER_PRESETS: { value: CommandBorderPreset; label: string }[] = [
@@ -108,6 +140,7 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
     alignRight: f?.align === 'right',
     currency: f?.numFmt?.kind === 'currency',
     percent: f?.numFmt?.kind === 'percent',
+    numberFormat: numberFormatOf(f?.numFmt),
     frozen: s.layout.freezeRows > 0 || s.layout.freezeCols > 0,
     filterOn: s.ui.filterRange != null,
     rowsHidden: hiddenInSelection(s.layout, 'row', r.r0, r.r1).length > 0,

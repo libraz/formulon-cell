@@ -58,10 +58,10 @@ describe('interact/format-dialog-model', () => {
       expect(presets.date).toContain('m/d/yyyy');
     });
 
-    it('exposes the four category keys for every locale', () => {
+    it('exposes the number-pattern category keys for every locale', () => {
       for (const loc of ['en', 'ja', 'fr-CA', 'pt-BR']) {
         const p = patternPresetsFor(loc);
-        expect(Object.keys(p).sort()).toEqual(['custom', 'date', 'datetime', 'time']);
+        expect(Object.keys(p).sort()).toEqual(['custom', 'date', 'datetime', 'special', 'time']);
         for (const arr of Object.values(p)) expect(arr.length).toBeGreaterThan(0);
       }
     });

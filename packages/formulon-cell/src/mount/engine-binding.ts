@@ -160,6 +160,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
   const detachContextMenu = flags.contextMenu
     ? attachContextMenu({
         host,
+        grid,
         store,
         wb,
         strings,

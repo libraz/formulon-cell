@@ -1,3 +1,4 @@
+import { ChevronDown12Regular } from '@fluentui/react-icons';
 import {
   applyMerge,
   applyUnmerge,
@@ -14,16 +15,20 @@ import {
   insertRows,
   type MarginPreset,
   mutators,
+  type NumFmt,
   type PageOrientation,
   type PaperSize,
   recordFormatChange,
+  recordMergesChangeWithEngine,
   recordPageSetupChange,
   removeDuplicates,
   type SpreadsheetInstance,
+  setAlign,
   setAutoFilter,
   setBorderPreset,
   setFreezePanes,
   setMarginPreset,
+  setNumFmt,
   setPageOrientation,
   setPaperSize,
   setSheetZoom,
@@ -57,6 +62,327 @@ import {
 import { toolbarText } from './toolbar/translations.js';
 
 export type { RibbonTab, SpreadsheetToolbarProps } from './toolbar/model.js';
+
+type MergeAction = 'mergeCenter' | 'mergeAcross' | 'mergeCells' | 'unmergeCells';
+type NumberFormatAction =
+  | 'general'
+  | 'fixed'
+  | 'currency'
+  | 'accounting'
+  | 'shortDate'
+  | 'longDate'
+  | 'time'
+  | 'percent'
+  | 'fraction'
+  | 'scientific'
+  | 'text'
+  | 'more';
+
+const numberFormatForAction = (action: NumberFormatAction, lang: 'ja' | 'en'): NumFmt | null => {
+  const symbol = lang === 'ja' ? '¥' : '$';
+  switch (action) {
+    case 'general':
+      return { kind: 'general' };
+    case 'fixed':
+      return { kind: 'fixed', decimals: 0 };
+    case 'currency':
+      return { kind: 'currency', decimals: 0, symbol };
+    case 'accounting':
+      return { kind: 'accounting', decimals: 0, symbol };
+    case 'shortDate':
+      return { kind: 'date', pattern: lang === 'ja' ? 'yyyy/m/d' : 'm/d/yyyy' };
+    case 'longDate':
+      return { kind: 'date', pattern: lang === 'ja' ? 'yyyy"年"m"月"d"日' : 'mmmm d, yyyy' };
+    case 'time':
+      return { kind: 'time', pattern: lang === 'ja' ? 'H:MM' : 'h:MM AM/PM' };
+    case 'percent':
+      return { kind: 'percent', decimals: 0 };
+    case 'fraction':
+      return { kind: 'custom', pattern: '# ?/?' };
+    case 'scientific':
+      return { kind: 'scientific', decimals: 2 };
+    case 'text':
+      return { kind: 'text' };
+    case 'more':
+      return null;
+  }
+};
+
+const THEME_COLORS = [
+  '#ffffff',
+  '#000000',
+  '#e7e6e6',
+  '#44546a',
+  '#5b9bd5',
+  '#ed7d31',
+  '#70ad47',
+  '#4472c4',
+  '#a64d79',
+  '#70ad47',
+  '#f2f2f2',
+  '#7f7f7f',
+  '#d9e2f3',
+  '#d9eaf7',
+  '#fce4d6',
+  '#e2f0d9',
+  '#d9e2f3',
+  '#eadcf8',
+  '#e2f0d9',
+  '#d9d9d9',
+  '#595959',
+  '#b4c6e7',
+  '#bdd7ee',
+  '#f8cbad',
+  '#c6e0b4',
+  '#b4c6e7',
+  '#d9bce3',
+  '#c6e0b4',
+  '#bfbfbf',
+  '#404040',
+  '#8eaadb',
+  '#9dc3e6',
+  '#f4b183',
+  '#a9d18e',
+  '#8eaadb',
+  '#c27ba0',
+  '#a9d18e',
+  '#a6a6a6',
+  '#262626',
+  '#2f5597',
+  '#2e75b6',
+  '#c65911',
+  '#548235',
+  '#2f5597',
+  '#741b47',
+  '#548235',
+] as const;
+
+const STANDARD_COLORS = [
+  '#c00000',
+  '#ff0000',
+  '#ffc000',
+  '#ffff00',
+  '#92d050',
+  '#00b050',
+  '#00b0f0',
+  '#0070c0',
+  '#002060',
+  '#7030a0',
+] as const;
+
+const THEME_SWATCHES = THEME_COLORS.map((color, index) => ({
+  color,
+  id: `theme-${index}-${color}`,
+}));
+
+interface ColorDropdownProps {
+  id: string;
+  title: string;
+  value: string;
+  labels: {
+    automatic: string;
+    highContrastOnly: string;
+    moreColors: string;
+    standardColors: string;
+    themeColors: string;
+  };
+  label: ReactElement;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}
+
+function ColorDropdown({
+  id,
+  title,
+  value,
+  labels,
+  label,
+  disabled,
+  onChange,
+}: ColorDropdownProps): ReactElement {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocDown = (e: MouseEvent): void => {
+      if (e.target instanceof Node && wrapRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    const onKey = (e: globalThis.KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocDown, true);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('mousedown', onDocDown, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
+  }, [open]);
+
+  const choose = (next: string): void => {
+    onChange(next);
+    setOpen(false);
+  };
+
+  return (
+    <div
+      key={id}
+      ref={wrapRef}
+      className={`demo__rb-color${open ? ' demo__rb-color--open' : ''}`}
+      title={title}
+    >
+      <button
+        type="button"
+        className="demo__rb-color__btn"
+        aria-keyshortcuts={RIBBON_KEYSHORTCUTS[id]}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen((next) => !next)}
+      >
+        <span className="demo__rb-color__icon">{label}</span>
+        <span className="demo__rb-color__swatch" style={{ backgroundColor: value }} />
+        <ChevronDown12Regular className="demo__rb-color__chev" aria-hidden="true" />
+      </button>
+      {open ? (
+        <div className="demo__color-menu" role="menu" aria-label={title}>
+          <label className="demo__color-menu__check">
+            <input type="checkbox" disabled />
+            <span>{labels.highContrastOnly}</span>
+          </label>
+          <button
+            className="demo__color-menu__auto"
+            type="button"
+            role="menuitem"
+            onClick={() => choose('#000000')}
+          >
+            {labels.automatic}
+          </button>
+          <div className="demo__color-menu__section">{labels.themeColors}</div>
+          <div className="demo__color-menu__grid demo__color-menu__grid--theme">
+            {THEME_SWATCHES.map((swatch) => (
+              <button
+                key={swatch.id}
+                type="button"
+                className="demo__color-menu__chip"
+                style={{ backgroundColor: swatch.color }}
+                aria-label={swatch.color}
+                onClick={() => choose(swatch.color)}
+              />
+            ))}
+          </div>
+          <div className="demo__color-menu__section">{labels.standardColors}</div>
+          <div className="demo__color-menu__grid demo__color-menu__grid--standard">
+            {STANDARD_COLORS.map((color) => (
+              <button
+                key={color}
+                type="button"
+                className="demo__color-menu__chip"
+                style={{ backgroundColor: color }}
+                aria-label={color}
+                onClick={() => choose(color)}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            className="demo__color-menu__more"
+            role="menuitem"
+            onClick={() => inputRef.current?.click()}
+          >
+            <span className="demo__color-menu__wheel" aria-hidden="true" />
+            {labels.moreColors}
+          </button>
+          <input
+            ref={inputRef}
+            className="demo__color-menu__native"
+            type="color"
+            value={value}
+            onChange={(e) => choose(e.currentTarget.value)}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+interface MergeMenuProps {
+  disabled: boolean;
+  labels: {
+    mergeAndCenter: string;
+    mergeAcross: string;
+    mergeCells: string;
+    unmergeCells: string;
+  };
+  onPick: (action: MergeAction) => void;
+}
+
+function MergeMenu({ disabled, labels, onPick }: MergeMenuProps): ReactElement {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const options: readonly { action: MergeAction; label: string }[] = [
+    { action: 'mergeCenter', label: labels.mergeAndCenter },
+    { action: 'mergeAcross', label: labels.mergeAcross },
+    { action: 'mergeCells', label: labels.mergeCells },
+    { action: 'unmergeCells', label: labels.unmergeCells },
+  ];
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocDown = (e: MouseEvent): void => {
+      if (e.target instanceof Node && wrapRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    const onKey = (e: globalThis.KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocDown, true);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('mousedown', onDocDown, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
+  }, [open]);
+
+  return (
+    <div ref={wrapRef} className={`demo__rb-menu${open ? ' demo__rb-menu--open' : ''}`}>
+      <button
+        type="button"
+        className="demo__rb demo__rb-menu__btn"
+        title={labels.mergeCells}
+        aria-label={labels.mergeCells}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen((next) => !next)}
+      >
+        <Icon name="merge" />
+        <ChevronDown12Regular className="demo__rb-menu__chev" aria-hidden="true" />
+      </button>
+      {open ? (
+        <div className="demo__merge-menu" role="menu" aria-label={labels.mergeCells}>
+          {options.map((option) => (
+            <button
+              key={option.action}
+              type="button"
+              className="demo__merge-menu__item"
+              role="menuitem"
+              onClick={() => {
+                onPick(option.action);
+                setOpen(false);
+              }}
+            >
+              <Icon name="merge" />
+              <span>{option.label}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export const SpreadsheetToolbar = ({
   instance,
@@ -207,20 +533,45 @@ export const SpreadsheetToolbar = ({
     mutators.setActive(instance.store, result.addr);
   }, [instance]);
 
-  const onMerge = useCallback(() => {
-    if (!instance) return;
-    const s = instance.store.getState();
-    const r = s.selection.range;
-    const anchor = s.merges.byAnchor.get(`${r.sheet}:${r.r0}:${r.c0}`);
-    const isExact =
-      anchor &&
-      r.r0 === anchor.r0 &&
-      r.c0 === anchor.c0 &&
-      r.r1 === anchor.r1 &&
-      r.c1 === anchor.c1;
-    if (isExact) applyUnmerge(instance.store, instance.workbook, instance.history, r);
-    else applyMerge(instance.store, instance.workbook, instance.history, r);
-  }, [instance]);
+  const onMergeAction = useCallback(
+    (action: MergeAction) => {
+      if (!instance) return;
+      const s = instance.store.getState();
+      const r = s.selection.range;
+      if (action === 'unmergeCells') {
+        applyUnmerge(instance.store, instance.workbook, instance.history, r);
+        return;
+      }
+      if (action === 'mergeAcross') {
+        recordMergesChangeWithEngine(
+          instance.history,
+          instance.store,
+          instance.workbook,
+          r.sheet,
+          () => {
+            for (let row = r.r0; row <= r.r1; row += 1) {
+              if (r.c0 === r.c1) continue;
+              mutators.mergeRange(instance.store, {
+                sheet: r.sheet,
+                r0: row,
+                c0: r.c0,
+                r1: row,
+                c1: r.c1,
+              });
+            }
+          },
+        );
+        return;
+      }
+      applyMerge(instance.store, instance.workbook, instance.history, r);
+      if (action === 'mergeCenter') {
+        recordFormatChange(instance.history, instance.store, () =>
+          setAlign(instance.store.getState(), instance.store, 'center'),
+        );
+      }
+    },
+    [instance],
+  );
 
   const onBorderPreset = useCallback(
     (preset: BorderPreset) => {
@@ -362,6 +713,21 @@ export const SpreadsheetToolbar = ({
     [instance],
   );
 
+  const onNumberFormat = useCallback(
+    (next: string) => {
+      if (!instance) return;
+      const action = next as NumberFormatAction;
+      if (action === 'more') {
+        instance.openFormatDialog();
+        return;
+      }
+      const fmt = numberFormatForAction(action, lang);
+      if (!fmt) return;
+      wrapFormat((s, st) => setNumFmt(s, st, fmt));
+    },
+    [instance, lang, wrapFormat],
+  );
+
   // Insert tab > Format as Table — applies the default session table overlay
   // to the active range. Excel opens a style picker first; ours ships a
   // single default style today, so calling the command directly is honest
@@ -465,21 +831,22 @@ export const SpreadsheetToolbar = ({
     onChange: (value: string) => void,
     label: ReactElement,
   ): ReactElement => (
-    <label
+    <ColorDropdown
       key={id}
-      className="demo__rb-color"
+      id={id}
       title={title}
-      aria-label={title}
-      aria-keyshortcuts={RIBBON_KEYSHORTCUTS[id]}
-    >
-      <span>{label}</span>
-      <input
-        type="color"
-        value={value}
-        disabled={!instance}
-        onChange={(e) => onChange(e.currentTarget.value)}
-      />
-    </label>
+      value={value}
+      labels={{
+        automatic: tr.automatic,
+        highContrastOnly: tr.highContrastOnly,
+        moreColors: tr.moreColors,
+        standardColors: tr.standardColors,
+        themeColors: tr.themeColors,
+      }}
+      label={label}
+      disabled={!instance}
+      onChange={onChange}
+    />
   );
 
   const ribbonGroups = buildRibbonGroups({
@@ -492,6 +859,19 @@ export const SpreadsheetToolbar = ({
     iconLabel,
     instance,
     lang,
+    mergeMenu: (
+      <MergeMenu
+        key="merge"
+        disabled={!instance}
+        labels={{
+          mergeAndCenter: tr.mergeAndCenter,
+          mergeAcross: tr.mergeAcross,
+          mergeCells: tr.mergeCells,
+          unmergeCells: tr.unmergeCells,
+        }}
+        onPick={onMergeAction}
+      />
+    ),
     onAutoSum,
     onBorderPreset,
     onCopy,
@@ -508,7 +888,7 @@ export const SpreadsheetToolbar = ({
     onInsertCols,
     onInsertRows,
     onMarginPreset,
-    onMerge,
+    onNumberFormat,
     onPageOrientation,
     onPaperSize,
     onPaste,

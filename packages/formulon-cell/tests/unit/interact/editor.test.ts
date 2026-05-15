@@ -75,6 +75,40 @@ describe('InlineEditor', () => {
     expect(input.style.height).toBe('28px');
   });
 
+  it('mirrors spreadsheet default edit alignment for typed values', () => {
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+
+    editor.begin('42');
+    let input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    expect(input.style.textAlign).toBe('right');
+
+    input.value = 'TRUE';
+    input.dispatchEvent(new Event('input'));
+    expect(input.style.textAlign).toBe('center');
+
+    input.value = '=A1';
+    input.dispatchEvent(new Event('input'));
+    expect(input.style.textAlign).toBe('left');
+
+    editor.cancel();
+    editor.begin('text');
+    input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    expect(input.style.textAlign).toBe('left');
+  });
+
+  it('honors explicit cell alignment while editing', () => {
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { align: 'center' });
+
+    editor.begin('42');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    expect(input.style.textAlign).toBe('center');
+
+    input.value = '=A1';
+    input.dispatchEvent(new Event('input'));
+    expect(input.style.textAlign).toBe('center');
+  });
+
   it('cancel removes the input and resets editor mode', () => {
     mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
     editor.begin('x');

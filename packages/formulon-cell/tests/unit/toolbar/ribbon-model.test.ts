@@ -30,6 +30,10 @@ const reactRibbonControls = (): RibbonControl[] => {
             : (kind as ReactRibbonControlKind),
     });
   }
+  if (source.includes('mergeMenu,')) {
+    const wrapIndex = controls.findIndex((control) => control.id === 'wrap');
+    controls.splice(wrapIndex + 1, 0, { id: 'merge', kind: 'select' });
+  }
   return controls;
 };
 

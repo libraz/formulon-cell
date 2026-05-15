@@ -20,9 +20,11 @@ import {
   insertRows,
   type MarginPreset,
   mutators,
+  type NumFmt,
   type PageOrientation,
   type PaperSize,
   recordFormatChange,
+  recordMergesChangeWithEngine,
   recordPageSetupChange,
   removeDuplicates,
   setAlign,
@@ -77,6 +79,113 @@ interface Props {
   onTranslate?: () => void;
   onAddIn?: () => void;
 }
+
+type MergeAction = 'mergeCenter' | 'mergeAcross' | 'mergeCells' | 'unmergeCells';
+type NumberFormatAction =
+  | 'general'
+  | 'fixed'
+  | 'currency'
+  | 'accounting'
+  | 'shortDate'
+  | 'longDate'
+  | 'time'
+  | 'percent'
+  | 'fraction'
+  | 'scientific'
+  | 'text'
+  | 'more';
+
+const numberFormatForAction = (action: NumberFormatAction, currentLang: 'ja' | 'en'): NumFmt | null => {
+  const symbol = currentLang === 'ja' ? '¥' : '$';
+  switch (action) {
+    case 'general':
+      return { kind: 'general' };
+    case 'fixed':
+      return { kind: 'fixed', decimals: 0 };
+    case 'currency':
+      return { kind: 'currency', decimals: 0, symbol };
+    case 'accounting':
+      return { kind: 'accounting', decimals: 0, symbol };
+    case 'shortDate':
+      return { kind: 'date', pattern: currentLang === 'ja' ? 'yyyy/m/d' : 'm/d/yyyy' };
+    case 'longDate':
+      return { kind: 'date', pattern: currentLang === 'ja' ? 'yyyy"年"m"月"d"日' : 'mmmm d, yyyy' };
+    case 'time':
+      return { kind: 'time', pattern: currentLang === 'ja' ? 'H:MM' : 'h:MM AM/PM' };
+    case 'percent':
+      return { kind: 'percent', decimals: 0 };
+    case 'fraction':
+      return { kind: 'custom', pattern: '# ?/?' };
+    case 'scientific':
+      return { kind: 'scientific', decimals: 2 };
+    case 'text':
+      return { kind: 'text' };
+    case 'more':
+      return null;
+  }
+};
+
+const THEME_COLORS = [
+  '#ffffff',
+  '#000000',
+  '#e7e6e6',
+  '#44546a',
+  '#5b9bd5',
+  '#ed7d31',
+  '#70ad47',
+  '#4472c4',
+  '#a64d79',
+  '#70ad47',
+  '#f2f2f2',
+  '#7f7f7f',
+  '#d9e2f3',
+  '#d9eaf7',
+  '#fce4d6',
+  '#e2f0d9',
+  '#d9e2f3',
+  '#eadcf8',
+  '#e2f0d9',
+  '#d9d9d9',
+  '#595959',
+  '#b4c6e7',
+  '#bdd7ee',
+  '#f8cbad',
+  '#c6e0b4',
+  '#b4c6e7',
+  '#d9bce3',
+  '#c6e0b4',
+  '#bfbfbf',
+  '#404040',
+  '#8eaadb',
+  '#9dc3e6',
+  '#f4b183',
+  '#a9d18e',
+  '#8eaadb',
+  '#c27ba0',
+  '#a9d18e',
+  '#a6a6a6',
+  '#262626',
+  '#2f5597',
+  '#2e75b6',
+  '#c65911',
+  '#548235',
+  '#2f5597',
+  '#741b47',
+  '#548235',
+] as const;
+
+const STANDARD_COLORS = [
+  '#c00000',
+  '#ff0000',
+  '#ffc000',
+  '#ffff00',
+  '#92d050',
+  '#00b050',
+  '#00b0f0',
+  '#0070c0',
+  '#002060',
+  '#7030a0',
+] as const;
 
 const props = defineProps<Props>();
 const emit = defineEmits<{
@@ -205,16 +314,30 @@ const onAutoSum = (): void => {
   mutators.setActive(inst.store, result.addr);
 };
 
-const onMerge = (): void => {
+const onMergeAction = (action: MergeAction): void => {
   const inst = props.instance;
   if (!inst) return;
   const s = inst.store.getState();
   const r = s.selection.range;
-  const anchor = s.merges.byAnchor.get(`${r.sheet}:${r.r0}:${r.c0}`);
-  const isExact =
-    anchor && r.r0 === anchor.r0 && r.c0 === anchor.c0 && r.r1 === anchor.r1 && r.c1 === anchor.c1;
-  if (isExact) applyUnmerge(inst.store, inst.workbook, inst.history, r);
-  else applyMerge(inst.store, inst.workbook, inst.history, r);
+  if (action === 'unmergeCells') {
+    applyUnmerge(inst.store, inst.workbook, inst.history, r);
+    return;
+  }
+  if (action === 'mergeAcross') {
+    recordMergesChangeWithEngine(inst.history, inst.store, inst.workbook, r.sheet, () => {
+      for (let row = r.r0; row <= r.r1; row += 1) {
+        if (r.c0 === r.c1) continue;
+        mutators.mergeRange(inst.store, { sheet: r.sheet, r0: row, c0: r.c0, r1: row, c1: r.c1 });
+      }
+    });
+    return;
+  }
+  applyMerge(inst.store, inst.workbook, inst.history, r);
+  if (action === 'mergeCenter') {
+    recordFormatChange(inst.history, inst.store, () =>
+      setAlign(inst.store.getState(), inst.store, 'center'),
+    );
+  }
 };
 
 const onFreezeToggle = (): void => {
@@ -264,6 +387,18 @@ const onMarginPreset = (next: MarginPreset): void => {
   const sheet = inst.store.getState().data.sheetIndex;
   recordPageSetupChange(inst.history, inst.store, () => setMarginPreset(inst.store, sheet, next));
 };
+const onNumberFormat = (next: string): void => {
+  const inst = props.instance;
+  if (!inst) return;
+  const action = next as NumberFormatAction;
+  if (action === 'more') {
+    inst.openFormatDialog();
+    return;
+  }
+  const fmt = numberFormatForAction(action, lang.value);
+  if (!fmt) return;
+  wrapFormat((s, st) => setNumFmt(s, st, fmt));
+};
 
 const { borderStyle, closeDropdown, onDropdownKeydown, onDropdownPick, openDropdown, toggleDropdown } =
   useToolbarDropdown({
@@ -271,6 +406,7 @@ const { borderStyle, closeDropdown, onDropdownKeydown, onDropdownPick, openDropd
     onFontFamily,
     onFontSize,
     onMarginPreset,
+    onNumberFormat,
     onOpenPageSetup: () => props.instance?.openPageSetup(),
     onPageOrientation,
     onPaperSize,
@@ -280,6 +416,11 @@ const onFontColor = (value: string): void => {
 };
 const onFillColor = (value: string): void => {
   wrapFormat((s, st) => setFillColor(s, st, value));
+};
+const onPaletteColor = (kind: 'fontColor' | 'fillColor', value: string): void => {
+  if (kind === 'fontColor') onFontColor(value);
+  else onFillColor(value);
+  closeDropdown();
 };
 
 const onFormatAsTable = (): void => {
@@ -630,14 +771,34 @@ const onZoom = (zoom: number): void => {
         </button>
       </div>
     </div>
-    <label class="demo__rb-color" :title="tr.fontColor" :aria-label="tr.fontColor">
-      <span><RibbonIcon name="fontColor" /></span>
-      <input type="color" :value="active.fontColor" :disabled="disabled" @change="onFontColor(($event.target as HTMLInputElement).value)" />
-    </label>
-    <label class="demo__rb-color" :title="tr.fillColor" :aria-label="tr.fillColor">
-      <span><RibbonIcon name="fillColor" /></span>
-      <input type="color" :value="active.fillColor" :disabled="disabled" @change="onFillColor(($event.target as HTMLInputElement).value)" />
-    </label>
+    <div class="demo__rb-color" :class="{ 'demo__rb-color--open': openDropdown === 'fontColor' }" data-dropdown-name="fontColor" :title="tr.fontColor" :aria-label="tr.fontColor">
+      <button type="button" class="demo__rb-color__btn" :disabled="disabled" :aria-label="tr.fontColor" aria-haspopup="menu" :aria-expanded="openDropdown === 'fontColor'" @click="toggleDropdown('fontColor')">
+        <span class="demo__rb-color__icon"><RibbonIcon name="fontColor" /></span><span class="demo__rb-color__swatch" :style="{ backgroundColor: active.fontColor }" /><svg class="demo__rb-color__chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5l3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      </button>
+      <div v-if="openDropdown === 'fontColor'" class="demo__color-menu" role="menu" :aria-label="tr.fontColor">
+        <label class="demo__color-menu__check"><input type="checkbox" disabled /><span>{{ tr.highContrastOnly }}</span></label>
+        <button class="demo__color-menu__auto" type="button" role="menuitem" @click="onPaletteColor('fontColor', '#000000')">{{ tr.automatic }}</button>
+        <div class="demo__color-menu__section">{{ tr.themeColors }}</div>
+        <div class="demo__color-menu__grid demo__color-menu__grid--theme"><button v-for="(color, index) in THEME_COLORS" :key="`${color}-${index}`" type="button" class="demo__color-menu__chip" :style="{ backgroundColor: color }" :aria-label="color" @click="onPaletteColor('fontColor', color)" /></div>
+        <div class="demo__color-menu__section">{{ tr.standardColors }}</div>
+        <div class="demo__color-menu__grid demo__color-menu__grid--standard"><button v-for="color in STANDARD_COLORS" :key="color" type="button" class="demo__color-menu__chip" :style="{ backgroundColor: color }" :aria-label="color" @click="onPaletteColor('fontColor', color)" /></div>
+        <label class="demo__color-menu__more"><span class="demo__color-menu__wheel" aria-hidden="true" />{{ tr.moreColors }}<input class="demo__color-menu__native" type="color" :value="active.fontColor" @change="onPaletteColor('fontColor', ($event.target as HTMLInputElement).value)" /></label>
+      </div>
+    </div>
+    <div class="demo__rb-color" :class="{ 'demo__rb-color--open': openDropdown === 'fillColor' }" data-dropdown-name="fillColor" :title="tr.fillColor" :aria-label="tr.fillColor">
+      <button type="button" class="demo__rb-color__btn" :disabled="disabled" :aria-label="tr.fillColor" aria-haspopup="menu" :aria-expanded="openDropdown === 'fillColor'" @click="toggleDropdown('fillColor')">
+        <span class="demo__rb-color__icon"><RibbonIcon name="fillColor" /></span><span class="demo__rb-color__swatch" :style="{ backgroundColor: active.fillColor }" /><svg class="demo__rb-color__chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5l3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      </button>
+      <div v-if="openDropdown === 'fillColor'" class="demo__color-menu" role="menu" :aria-label="tr.fillColor">
+        <label class="demo__color-menu__check"><input type="checkbox" disabled /><span>{{ tr.highContrastOnly }}</span></label>
+        <button class="demo__color-menu__auto" type="button" role="menuitem" @click="onPaletteColor('fillColor', '#ffffff')">{{ tr.automatic }}</button>
+        <div class="demo__color-menu__section">{{ tr.themeColors }}</div>
+        <div class="demo__color-menu__grid demo__color-menu__grid--theme"><button v-for="(color, index) in THEME_COLORS" :key="`${color}-${index}`" type="button" class="demo__color-menu__chip" :style="{ backgroundColor: color }" :aria-label="color" @click="onPaletteColor('fillColor', color)" /></div>
+        <div class="demo__color-menu__section">{{ tr.standardColors }}</div>
+        <div class="demo__color-menu__grid demo__color-menu__grid--standard"><button v-for="color in STANDARD_COLORS" :key="color" type="button" class="demo__color-menu__chip" :style="{ backgroundColor: color }" :aria-label="color" @click="onPaletteColor('fillColor', color)" /></div>
+        <label class="demo__color-menu__more"><span class="demo__color-menu__wheel" aria-hidden="true" />{{ tr.moreColors }}<input class="demo__color-menu__native" type="color" :value="active.fillColor" @change="onPaletteColor('fillColor', ($event.target as HTMLInputElement).value)" /></label>
+      </div>
+    </div>
         </div>
         <div class="demo__ribbon-label">{{ tr.font }}</div>
       </section>
@@ -660,9 +821,17 @@ const onZoom = (zoom: number): void => {
     <button class="demo__rb" :class="{ 'demo__rb--active': active.alignRight }" type="button" :disabled="disabled" :title="tr.alignRight" :aria-label="tr.alignRight" @click="onAlign('right')">
       <RibbonIcon name="alignRight" />
     </button>
-    <button class="demo__rb" type="button" :disabled="disabled" :title="tr.mergeCells" :aria-label="tr.mergeCells" @click="onMerge">
-      <RibbonIcon name="merge" />
-    </button>
+    <div class="demo__rb-menu" :class="{ 'demo__rb-menu--open': openDropdown === 'merge' }" data-dropdown-name="merge">
+      <button class="demo__rb demo__rb-menu__btn" type="button" :disabled="disabled" :title="tr.mergeCells" :aria-label="tr.mergeCells" aria-haspopup="menu" :aria-expanded="openDropdown === 'merge'" @click="toggleDropdown('merge')">
+        <RibbonIcon name="merge" /><svg class="demo__rb-menu__chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5l3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      </button>
+      <div v-if="openDropdown === 'merge'" class="demo__merge-menu" role="menu" :aria-label="tr.mergeCells">
+        <button class="demo__merge-menu__item" type="button" role="menuitem" @click="onMergeAction('mergeCenter'); closeDropdown()"><RibbonIcon name="merge" /><span>{{ tr.mergeAndCenter }}</span></button>
+        <button class="demo__merge-menu__item" type="button" role="menuitem" @click="onMergeAction('mergeAcross'); closeDropdown()"><RibbonIcon name="merge" /><span>{{ tr.mergeAcross }}</span></button>
+        <button class="demo__merge-menu__item" type="button" role="menuitem" @click="onMergeAction('mergeCells'); closeDropdown()"><RibbonIcon name="merge" /><span>{{ tr.mergeCells }}</span></button>
+        <button class="demo__merge-menu__item" type="button" role="menuitem" @click="onMergeAction('unmergeCells'); closeDropdown()"><RibbonIcon name="merge" /><span>{{ tr.unmergeCells }}</span></button>
+      </div>
+    </div>
     <button class="demo__rb" type="button" :disabled="disabled" :title="tr.wrapText" :aria-label="tr.wrapText" @click="wrapFormat(toggleWrap)">
       <RibbonIcon name="wrap" />
     </button>
@@ -672,9 +841,43 @@ const onZoom = (zoom: number): void => {
 
       <section class="demo__ribbon-group demo__ribbon-group--number" :aria-label="tr.number">
         <div class="demo__ribbon-tools">
-    <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" :title="tr.general" :aria-label="tr.general" @click="wrapFormat((s, st) => setNumFmt(s, st, { kind: 'general' }))">
-      <RibbonIcon name="formatCells" /><span>{{ tr.general }}</span>
-    </button>
+    <div class="demo__rb-dd demo__rb-select--number-format" data-dropdown-name="numberFormat" :class="{ 'demo__rb-dd--open': openDropdown === 'numberFormat' }">
+      <button type="button" class="demo__rb-dd__btn" :disabled="disabled" title="Number format" aria-label="Number format" aria-haspopup="listbox" :aria-expanded="openDropdown === 'numberFormat'" @click="toggleDropdown('numberFormat')">
+        <span class="demo__rb-dd__value">{{ [
+          { value: 'general', label: tr.general },
+          { value: 'fixed', label: tr.fixedNumber },
+          { value: 'currency', label: tr.currency },
+          { value: 'accounting', label: tr.accounting },
+          { value: 'shortDate', label: tr.shortDate },
+          { value: 'longDate', label: tr.longDate },
+          { value: 'time', label: tr.timeFormat },
+          { value: 'percent', label: tr.percent },
+          { value: 'fraction', label: tr.fraction },
+          { value: 'scientific', label: tr.scientific },
+          { value: 'text', label: tr.textFormat },
+        ].find((option) => option.value === active.numberFormat)?.label ?? tr.general }}</span>
+        <svg class="demo__rb-dd__chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5l3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      </button>
+      <div v-if="openDropdown === 'numberFormat'" class="demo__rb-dd__list" role="listbox" aria-label="Number format" tabindex="-1">
+        <button v-for="option in [
+          { value: 'general', label: tr.general },
+          { value: 'fixed', label: tr.fixedNumber },
+          { value: 'currency', label: tr.currency },
+          { value: 'accounting', label: tr.accounting },
+          { value: 'shortDate', label: tr.shortDate },
+          { value: 'longDate', label: tr.longDate },
+          { value: 'time', label: tr.timeFormat },
+          { value: 'percent', label: tr.percent },
+          { value: 'fraction', label: tr.fraction },
+          { value: 'scientific', label: tr.scientific },
+          { value: 'text', label: tr.textFormat },
+          { value: 'more', label: tr.moreNumberFormats },
+        ]" :key="option.value" class="demo__rb-dd__opt" :data-fc-value="option.value" type="button" role="option" :aria-selected="active.numberFormat === option.value" @click="onDropdownPick('numberFormat', option.value)">
+          <span class="demo__rb-dd__check" aria-hidden="true" />
+          <span class="demo__rb-dd__label">{{ option.label }}</span>
+        </button>
+      </div>
+    </div>
     <span class="demo__rb-break" aria-hidden="true" />
     <button class="demo__rb" :class="{ 'demo__rb--active': active.currency }" type="button" :disabled="disabled" :title="tr.currency" :aria-label="tr.currency" @click="wrapFormat(cycleCurrency)">
       <RibbonIcon name="currency" />

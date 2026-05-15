@@ -11,6 +11,7 @@ import type {
 import type { CustomFunction, CustomFunctionMeta, FormulaRegistry } from '../formula.js';
 import type { I18nController } from '../i18n/controller.js';
 import type { DeepPartial, Locale, Strings } from '../i18n/strings.js';
+import type { BorderDrawHandle } from '../interact/border-draw.js';
 import type { FormatPainterHandle } from '../interact/format-painter.js';
 import type { SlicerSpec, SpreadsheetStore } from '../store/store.js';
 
@@ -44,6 +45,7 @@ export interface SpreadsheetInstance {
   readonly i18n: I18nController;
   readonly features: Readonly<Record<string, ExtensionHandle | undefined>>;
   readonly formatPainter: FormatPainterHandle | undefined;
+  readonly borderDraw: BorderDrawHandle | undefined;
   readonly formula: FormulaRegistry;
   readonly cells: CellRegistry;
   use(ext: ExtensionInput): void;

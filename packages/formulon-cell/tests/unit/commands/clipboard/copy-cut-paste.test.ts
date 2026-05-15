@@ -93,6 +93,58 @@ describe('copy', () => {
     setRange(store, 0, 0, 0, 2);
     expect(copy(store.getState())?.tsv).toBe('x\t\t');
   });
+
+  it('copies same-width disjoint ranges in visual row order', () => {
+    seedAndMirror(store, wb, [
+      { row: 1, col: 0, value: 'r2' },
+      { row: 3, col: 0, value: 'r4' },
+      { row: 5, col: 0, value: 'r6' },
+    ]);
+    setRange(store, 5, 0, 5, 0);
+    store.setState((s) => ({
+      ...s,
+      selection: {
+        ...s.selection,
+        extraRanges: [
+          { sheet: 0, r0: 1, c0: 0, r1: 1, c1: 0 },
+          { sheet: 0, r0: 3, c0: 0, r1: 3, c1: 0 },
+        ],
+      },
+    }));
+
+    const got = copy(store.getState());
+    expect(got?.tsv).toBe('r2\r\nr4\r\nr6');
+    expect(got?.ranges).toEqual([
+      { sheet: 0, r0: 1, c0: 0, r1: 1, c1: 0 },
+      { sheet: 0, r0: 3, c0: 0, r1: 3, c1: 0 },
+      { sheet: 0, r0: 5, c0: 0, r1: 5, c1: 0 },
+    ]);
+  });
+
+  it('trims whole-row copies to the used column span while preserving source range', () => {
+    seedAndMirror(store, wb, [
+      { row: 2, col: 3, value: 'left' },
+      { row: 2, col: 5, value: 'right' },
+    ]);
+    setRange(store, 2, 0, 2, 16383);
+
+    const got = copy(store.getState());
+    expect(got?.tsv).toBe('left\t\tright');
+    expect(got?.range).toEqual({ sheet: 0, r0: 2, c0: 0, r1: 2, c1: 16383 });
+    expect(got?.payloadRanges).toEqual([{ sheet: 0, r0: 2, c0: 3, r1: 2, c1: 5 }]);
+  });
+
+  it('refuses ragged disjoint ranges', () => {
+    setRange(store, 0, 0, 0, 1);
+    store.setState((s) => ({
+      ...s,
+      selection: {
+        ...s.selection,
+        extraRanges: [{ sheet: 0, r0: 2, c0: 0, r1: 2, c1: 2 }],
+      },
+    }));
+    expect(copy(store.getState())).toBeNull();
+  });
 });
 
 describe('cut', () => {

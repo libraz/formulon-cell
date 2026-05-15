@@ -3,23 +3,23 @@
     position: fixed;
     z-index: var(--fc-z-menu, 2147483060);
     pointer-events: auto;
-    min-width: 216px;
-    max-width: min(320px, calc(100vw - 8px));
+    min-width: 286px;
+    max-width: min(360px, calc(100vw - 8px));
     max-height: calc(100vh - 8px);
     overflow-y: auto;
-    padding: 3px;
-    background: var(--fc-bg-elev, Canvas);
+    padding: 8px 0;
+    background: rgba(255, 255, 255, 0.96);
     color: var(--fc-fg, CanvasText);
-    border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
-    border-radius: var(--fc-radius-sm, 4px);
+    border: 1px solid rgba(0, 0, 0, 0.13);
+    border-radius: 10px;
     box-shadow:
-      0 16px 36px rgba(0, 0, 0, 0.18),
-      0 1px 2px rgba(0, 0, 0, 0.1);
+      0 18px 42px rgba(0, 0, 0, 0.2),
+      0 1px 5px rgba(0, 0, 0, 0.16);
     font-family: var(--fc-font-ui, system-ui);
-    font-size: 12.5px;
-    line-height: 1.35;
+    font-size: 13px;
+    line-height: 1.25;
     outline: none;
+    backdrop-filter: blur(18px);
   }
   .fc-ctxmenu[hidden] {
     display: none;
@@ -27,17 +27,17 @@
   .fc-ctxmenu__item {
     position: relative;
     display: grid;
-    grid-template-columns: 22px minmax(0, 1fr) auto;
+    grid-template-columns: 18px minmax(0, 1fr) auto;
     align-items: center;
-    column-gap: 8px;
+    column-gap: 6px;
     width: 100%;
-    min-height: 28px;
-    padding: 4px 8px 4px 5px;
+    min-height: 24px;
+    padding: 3px 16px 3px 13px;
     background: transparent;
     border: 0;
     color: inherit;
     cursor: pointer;
-    border-radius: 2px;
+    border-radius: 0;
     text-align: left;
     font: inherit;
   }
@@ -54,11 +54,13 @@
   }
   .fc-ctxmenu__item:hover:not([disabled]),
   .fc-ctxmenu__item:focus-visible:not([disabled]) {
-    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 8%, transparent));
+    background: rgba(44, 129, 80, 0.72);
+    color: #ffffff;
     outline: none;
   }
   .fc-ctxmenu__item[disabled] {
-    opacity: 0.4;
+    color: rgba(0, 0, 0, 0.28);
+    opacity: 1;
     cursor: not-allowed;
   }
   .fc-ctxmenu__label {
@@ -69,15 +71,15 @@
   .fc-ctxmenu__hint {
     font-family: var(--fc-font-mono, monospace);
     font-size: 11px;
-    opacity: 0.7;
+    opacity: 0.45;
     justify-self: end;
     white-space: nowrap;
   }
   .fc-ctxmenu__sep {
     display: block;
     height: 1px;
-    margin: 3px 8px 3px 31px;
-    background: var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+    margin: 7px 16px 7px 14px;
+    background: rgba(0, 0, 0, 0.1);
     border: 0;
     border-top: 0;
   }

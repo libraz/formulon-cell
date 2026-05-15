@@ -74,6 +74,7 @@ export const createSpreadsheetStore = () =>
       theme: 'paper',
       fillPreview: null,
       copyRange: null,
+      copyRanges: null,
       showGridLines: true,
       showHeaders: true,
       showFormulas: false,
@@ -139,6 +140,32 @@ export const mutators = {
             r1: addr.row,
             c1: addr.col,
           },
+          extraRanges: [...(s.selection.extraRanges ?? []), prevPrimary],
+        },
+      };
+    });
+  },
+
+  /** Add a disjoint range, promoting it to the primary selection and demoting
+   *  the previous primary into `extraRanges`. Used by Ctrl/Cmd row/column
+   *  header selection. */
+  addExtraRange(store: SpreadsheetStore, range: Range, active?: Addr): void {
+    store.setState((s) => {
+      const prevPrimary = s.selection.range;
+      const sameAsPrimary =
+        prevPrimary.sheet === range.sheet &&
+        prevPrimary.r0 === range.r0 &&
+        prevPrimary.c0 === range.c0 &&
+        prevPrimary.r1 === range.r1 &&
+        prevPrimary.c1 === range.c1;
+      if (sameAsPrimary) return s;
+      const nextActive = active ?? { sheet: range.sheet, row: range.r0, col: range.c0 };
+      return {
+        ...s,
+        selection: {
+          active: nextActive,
+          anchor: nextActive,
+          range: { ...range },
           extraRanges: [...(s.selection.extraRanges ?? []), prevPrimary],
         },
       };
@@ -246,7 +273,21 @@ export const mutators = {
   },
 
   setCopyRange(store: SpreadsheetStore, range: Range | null): void {
-    store.setState((s) => ({ ...s, ui: { ...s.ui, copyRange: range ? { ...range } : null } }));
+    store.setState((s) => ({
+      ...s,
+      ui: { ...s.ui, copyRange: range ? { ...range } : null, copyRanges: null },
+    }));
+  },
+
+  setCopyRanges(store: SpreadsheetStore, ranges: Range[] | null): void {
+    store.setState((s) => ({
+      ...s,
+      ui: {
+        ...s.ui,
+        copyRange: ranges?.[0] ? { ...ranges[0] } : null,
+        copyRanges: ranges && ranges.length > 0 ? ranges.map((r) => ({ ...r })) : null,
+      },
+    }));
   },
 
   setCell(
@@ -317,6 +358,20 @@ export const mutators = {
     }));
   },
 
+  selectRows(store: SpreadsheetStore, anchorRow: number, activeRow: number): void {
+    const r0 = Math.min(anchorRow, activeRow);
+    const r1 = Math.max(anchorRow, activeRow);
+    store.setState((s) => ({
+      ...s,
+      selection: {
+        active: { sheet: s.data.sheetIndex, row: activeRow, col: 0 },
+        anchor: { sheet: s.data.sheetIndex, row: anchorRow, col: 0 },
+        range: { sheet: s.data.sheetIndex, r0, c0: 0, r1, c1: 16383 },
+        extraRanges: [],
+      },
+    }));
+  },
+
   selectCol(store: SpreadsheetStore, col: number): void {
     store.setState((s) => ({
       ...s,
@@ -324,6 +379,20 @@ export const mutators = {
         active: { sheet: s.data.sheetIndex, row: 0, col },
         anchor: { sheet: s.data.sheetIndex, row: 0, col },
         range: { sheet: s.data.sheetIndex, r0: 0, c0: col, r1: 1048575, c1: col },
+        extraRanges: [],
+      },
+    }));
+  },
+
+  selectCols(store: SpreadsheetStore, anchorCol: number, activeCol: number): void {
+    const c0 = Math.min(anchorCol, activeCol);
+    const c1 = Math.max(anchorCol, activeCol);
+    store.setState((s) => ({
+      ...s,
+      selection: {
+        active: { sheet: s.data.sheetIndex, row: 0, col: activeCol },
+        anchor: { sheet: s.data.sheetIndex, row: 0, col: anchorCol },
+        range: { sheet: s.data.sheetIndex, r0: 0, c0, r1: 1048575, c1 },
         extraRanges: [],
       },
     }));

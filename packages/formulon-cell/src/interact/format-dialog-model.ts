@@ -27,6 +27,7 @@ export type NumberCategory =
   | 'time'
   | 'datetime'
   | 'text'
+  | 'special'
   | 'custom';
 export type BorderStyleKey = 'thin' | 'medium' | 'thick' | 'dashed' | 'dotted' | 'double';
 export type SideKey = 'top' | 'right' | 'bottom' | 'left' | 'diagonalDown' | 'diagonalUp';
@@ -105,7 +106,7 @@ export const defaultCurrencySymbolFor = (locale: string): string =>
 
 export const patternPresetsFor = (
   locale: string,
-): Record<'date' | 'time' | 'datetime' | 'custom', string[]> => {
+): Record<'date' | 'time' | 'datetime' | 'special' | 'custom', string[]> => {
   if (normalizeFormatLocale(locale).startsWith('ja')) {
     return {
       date: [
@@ -117,6 +118,15 @@ export const patternPresetsFor = (
       ],
       time: ['HH:MM', 'HH:MM:SS', 'h:MM AM/PM', 'h:MM:SS AM/PM'],
       datetime: ['yyyy"年"m"月"d"日" HH:MM', 'yyyy/m/d HH:MM', 'yyyy-mm-dd HH:MM'],
+      special: [
+        '000',
+        '[<=9999999]000-0000;000-0000',
+        '+0;△0',
+        '[DBNum1]0',
+        '[DBNum2]0',
+        '[DBNum3]0',
+        '[DBNum3]#,##0',
+      ],
       custom: ['#,##0', '#,##0.00', '0%', '0.00%', '¥#,##0;[Red]-¥#,##0', '0.00E+00'],
     };
   }
@@ -124,6 +134,7 @@ export const patternPresetsFor = (
     date: ['m/d/yyyy', 'mmmm d, yyyy', 'd-mmm-yy', 'yyyy-mm-dd', 'dddd, mmmm d, yyyy'],
     time: ['h:MM AM/PM', 'h:MM:SS AM/PM', 'HH:MM', 'HH:MM:SS'],
     datetime: ['m/d/yyyy h:MM AM/PM', 'mmmm d, yyyy h:MM AM/PM', 'yyyy-mm-dd HH:MM'],
+    special: ['00000', '00000-0000', '[<=9999999]000-0000;000-0000', '000-00-0000'],
     custom: ['0.00', '#,##0', '#,##0.00', '0%', '0.00%', '$#,##0;[Red]-$#,##0', '0.00E+00'],
   };
 };

@@ -88,10 +88,15 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     patternPresetSelect,
     patternRow,
     patternInput,
+    localeRow,
+    localeSelect,
+    negativeList,
     numberSummaryTitle,
     numberSummaryDesc,
     hAlignRadios,
+    hAlignSelect,
     vAlignRadios,
+    vAlignSelect,
     wrapCk,
     indentInput,
     rotationInput,
@@ -190,8 +195,10 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     // Alignment
     const hKey: 'default' | CellAlign = draft.align ?? 'default';
     for (const [id, r] of hAlignRadios) r.checked = id === hKey;
+    hAlignSelect.value = hKey;
     const vKey: 'default' | CellVAlign = draft.vAlign ?? 'default';
     for (const [id, r] of vAlignRadios) r.checked = id === vKey;
+    vAlignSelect.value = vKey;
     wrapCk.input.checked = draft.wrap;
     indentInput.value = String(draft.indent);
     rotationInput.value = String(draft.rotation);
@@ -263,6 +270,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
 
   const syncNumberControlsVisibility = (): void => {
     const cat = draft.numberCategory;
+    tabPanels.get('number')?.setAttribute('data-number-category', cat);
     const decimalsCats = new Set<NumberCategory>([
       'fixed',
       'currency',
@@ -271,11 +279,14 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       'accounting',
     ]);
     const symbolCats = new Set<NumberCategory>(['currency', 'accounting']);
-    const patternCats = new Set<NumberCategory>(['date', 'time', 'datetime', 'custom']);
+    const patternCats = new Set<NumberCategory>(['date', 'time', 'datetime', 'special', 'custom']);
     decimalsRow.hidden = !decimalsCats.has(cat);
     symbolRow.hidden = !symbolCats.has(cat);
     patternPresetRow.hidden = !patternCats.has(cat);
-    patternRow.hidden = !patternCats.has(cat);
+    patternRow.hidden = cat !== 'custom';
+    localeRow.hidden = cat !== 'date' && cat !== 'time' && cat !== 'datetime' && cat !== 'special';
+    localeSelect.value = normalizeFormatLocale(getFormatLocale()).startsWith('ja') ? 'ja' : 'en';
+    negativeList.hidden = cat !== 'fixed' && cat !== 'currency';
     const active = catDefs.find((c) => c.id === cat);
     numberSummaryTitle.textContent = active?.label ?? t.catGeneral;
     numberSummaryDesc.textContent = numberCategoryDescription(cat);
@@ -359,7 +370,10 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     //  categories use a serial near the present (45123 ≈ 2023-07-16).
     const isDateLike =
       numFmt.kind === 'date' || numFmt.kind === 'time' || numFmt.kind === 'datetime';
-    const sampleValue = isDateLike ? 45123.625 : 12345;
+    const sampleValue =
+      isDateLike || draft.numberCategory === 'currency' || draft.numberCategory === 'special'
+        ? 10
+        : 12345;
     const numericText = formatNumber(sampleValue, numFmt, getFormatLocale());
     previewCell.textContent = numericText;
   };
@@ -367,7 +381,11 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   // ── Compute helpers ────────────────────────────────────────────────────
   const defaultPatternFor = (cat: NumberCategory): string => {
     const presets =
-      cat === 'date' || cat === 'time' || cat === 'datetime' || cat === 'custom'
+      cat === 'date' ||
+      cat === 'time' ||
+      cat === 'datetime' ||
+      cat === 'special' ||
+      cat === 'custom'
         ? patternPresetsFor(getFormatLocale())[cat]
         : [];
     if (presets[0]) return presets[0];
@@ -378,6 +396,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
         return 'HH:MM:SS';
       case 'datetime':
         return 'yyyy-mm-dd HH:MM';
+      case 'special':
+        return '000';
       case 'custom':
         return '0.00';
       default:
@@ -387,17 +407,22 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
 
   const syncPatternPresetOptions = (): void => {
     const cat = draft.numberCategory;
+    const specialLabels = t.specialFormatLabels.split('\n');
     const patterns =
-      cat === 'date' || cat === 'time' || cat === 'datetime' || cat === 'custom'
+      cat === 'date' ||
+      cat === 'time' ||
+      cat === 'datetime' ||
+      cat === 'special' ||
+      cat === 'custom'
         ? [...patternPresetsFor(getFormatLocale())[cat]]
         : [];
     const current = draft.pattern || defaultPatternFor(cat);
     if (current && !patterns.includes(current)) patterns.unshift(current);
     patternPresetSelect.replaceChildren();
-    for (const pattern of patterns) {
+    for (const [index, pattern] of patterns.entries()) {
       const opt = document.createElement('option');
       opt.value = pattern;
-      opt.textContent = pattern;
+      opt.textContent = cat === 'special' ? (specialLabels[index] ?? pattern) : pattern;
       patternPresetSelect.appendChild(opt);
     }
     patternPresetSelect.value = current;
@@ -423,6 +448,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
         return t.descDateTime;
       case 'text':
         return t.descText;
+      case 'special':
+        return t.descOther;
       case 'custom':
         return t.descCustom;
       default:
@@ -611,12 +638,26 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const r = e.target as HTMLInputElement;
     if (!r.checked) return;
     draft.align = r.value === 'default' ? undefined : (r.value as CellAlign);
+    hAlignSelect.value = r.value;
     renderPreview();
   };
   const onVAlignChange = (e: Event): void => {
     const r = e.target as HTMLInputElement;
     if (!r.checked) return;
     draft.vAlign = r.value === 'default' ? undefined : (r.value as CellVAlign);
+    vAlignSelect.value = r.value;
+    renderPreview();
+  };
+  const onHAlignSelectChange = (): void => {
+    const value = hAlignSelect.value as 'default' | CellAlign;
+    draft.align = value === 'default' ? undefined : value;
+    for (const [id, r] of hAlignRadios) r.checked = id === value;
+    renderPreview();
+  };
+  const onVAlignSelectChange = (): void => {
+    const value = vAlignSelect.value as 'default' | CellVAlign;
+    draft.vAlign = value === 'default' ? undefined : value;
+    for (const [id, r] of vAlignRadios) r.checked = id === value;
     renderPreview();
   };
   const onWrapChange = (): void => {
@@ -887,6 +928,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   shell.on(patternPresetSelect, 'change', onPatternPresetChange);
   for (const r of hAlignRadios.values()) shell.on(r, 'change', onHAlignChange);
   for (const r of vAlignRadios.values()) shell.on(r, 'change', onVAlignChange);
+  shell.on(hAlignSelect, 'change', onHAlignSelectChange);
+  shell.on(vAlignSelect, 'change', onVAlignSelectChange);
   shell.on(wrapCk.input, 'change', onWrapChange);
   shell.on(indentInput, 'input', onIndentInput);
   shell.on(rotationInput, 'input', onRotationInput);

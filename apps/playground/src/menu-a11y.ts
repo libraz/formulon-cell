@@ -4,7 +4,9 @@ type MenuOptions = {
 };
 
 const menuItems = (menu: HTMLElement): HTMLButtonElement[] =>
-  Array.from(menu.querySelectorAll<HTMLButtonElement>('button')).filter((item) => !item.disabled);
+  Array.from(menu.querySelectorAll<HTMLButtonElement>('button')).filter(
+    (item) => !item.disabled && item.closest<HTMLElement>('[role="menu"]') === menu,
+  );
 
 export function prepareMenu(menu: HTMLElement, label?: string): void {
   menu.setAttribute('role', 'menu');

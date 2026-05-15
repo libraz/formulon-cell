@@ -43,11 +43,15 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     const s = store.getState();
     if (s.ui.editor.kind !== 'idle') return; // let the input handle it
     const r = copy(s);
-    if (!r || !e.clipboardData) return;
+    if (!r || !e.clipboardData) {
+      mutators.setCopyRange(store, null);
+      return;
+    }
     e.clipboardData.setData('text/plain', r.tsv);
     e.clipboardData.setData('text/html', encodeHtml(s, r.range));
     snapshot = captureSnapshot(s, r.range);
-    mutators.setCopyRange(store, r.range);
+    if (r.ranges) mutators.setCopyRanges(store, r.ranges);
+    else mutators.setCopyRange(store, r.range);
     e.preventDefault();
   };
 
@@ -88,6 +92,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     e.preventDefault();
     if (r) {
       mutators.setCopyRange(store, null);
+      mutators.setRange(store, r.writtenRange);
       deps.onAfterCommit();
     }
   };
@@ -109,9 +114,13 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     if (s.ui.editor.kind !== 'idle') return;
     if (kind === 'copy') {
       const r = copy(s);
-      if (!r) return;
+      if (!r) {
+        mutators.setCopyRange(store, null);
+        return;
+      }
       snapshot = captureSnapshot(s, r.range);
-      mutators.setCopyRange(store, r.range);
+      if (r.ranges) mutators.setCopyRanges(store, r.ranges);
+      else mutators.setCopyRange(store, r.range);
       await writeClipboardText(r.tsv);
       return;
     }
@@ -149,6 +158,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     const r = pasteTSV(s, wb, text);
     if (r) {
       mutators.setCopyRange(store, null);
+      mutators.setRange(store, r.writtenRange);
       deps.onAfterCommit();
     }
   };

@@ -16,6 +16,8 @@
 @import "./app/dialog-modules/goto-special.css";
 @import "./app/dialog-modules/fx-dialog.css";
 @import "./app/dialog-modules/paste-special.css";
+@import "./app/dialog-modules/insert-copied-cells.css";
+@import "./app/dialog-modules/custom-select.css";
 @import "./app/editor-popups.css";
 @import "./app/dialogs/iterative.css";
 @import "./app/dialogs/external-links.css";

@@ -239,6 +239,8 @@ export interface UiSlice {
   /** Source range currently held by the internal clipboard. Painted as a
    *  dashed copy marquee, similar to "marching ants". */
   copyRange: Range | null;
+  /** Disjoint clipboard ranges for Ctrl/Cmd multi-row or multi-column copies. */
+  copyRanges?: Range[] | null;
   /** When false, the renderer skips drawing inter-cell hairline gridlines. */
   showGridLines: boolean;
   /** When false, the renderer hides the row-number / column-letter strips. */

@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachClipboard } from '../../../src/interact/clipboard.js';
-import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
+import {
+  createSpreadsheetStore,
+  mutators,
+  type SpreadsheetStore,
+} from '../../../src/store/store.js';
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
@@ -114,6 +118,40 @@ describe('attachClipboard', () => {
     handle.detach();
   });
 
+  it('copy clears a stale copy marquee when the next copy cannot be materialized', () => {
+    mutators.setCopyRanges(store, [
+      { sheet: 0, r0: 2, c0: 0, r1: 2, c1: 16383 },
+      { sheet: 0, r0: 4, c0: 0, r1: 4, c1: 16383 },
+    ]);
+    setRange(store, 0, 0, 1_048_575, 16_383);
+    const handle = attachClipboard({ host, store, wb, onAfterCommit });
+
+    fireClipboard(host, 'copy');
+
+    expect(store.getState().ui.copyRange).toBeNull();
+    expect(store.getState().ui.copyRanges).toBeNull();
+    handle.detach();
+  });
+
+  it('replaces row copy marquees when copying a column next', () => {
+    seedAndMirror(store, wb, [
+      { row: 2, col: 1, value: 'row' },
+      { row: 0, col: 3, value: 'col' },
+    ]);
+    setRange(store, 2, 0, 2, 16383);
+    const handle = attachClipboard({ host, store, wb, onAfterCommit });
+
+    fireClipboard(host, 'copy');
+    expect(store.getState().ui.copyRange).toEqual({ sheet: 0, r0: 2, c0: 0, r1: 2, c1: 16383 });
+
+    setRange(store, 0, 3, 1048575, 3);
+    fireClipboard(host, 'copy');
+
+    expect(store.getState().ui.copyRange).toEqual({ sheet: 0, r0: 0, c0: 3, r1: 1048575, c1: 3 });
+    expect(store.getState().ui.copyRanges).toBeNull();
+    handle.detach();
+  });
+
   it('cut writes TSV, snapshots, blanks the source, and notifies onAfterCommit', () => {
     seedAndMirror(store, wb, [
       { row: 0, col: 0, value: 5 },
@@ -159,6 +197,7 @@ describe('attachClipboard', () => {
     expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'text', value: 'foo' });
     expect(wb.getValue({ sheet: 0, row: 1, col: 2 })).toEqual({ kind: 'number', value: 42 });
     expect(store.getState().ui.copyRange).toBeNull();
+    expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 1, c0: 1, r1: 1, c1: 2 });
     expect(onAfterCommit).toHaveBeenCalledTimes(1);
     handle.detach();
   });

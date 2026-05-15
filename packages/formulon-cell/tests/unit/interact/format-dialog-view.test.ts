@@ -40,9 +40,9 @@ describe('interact/format-dialog-view', () => {
     }
   });
 
-  it('renders the 11 number-category buttons with role="option"', () => {
+  it('renders the 12 number-category buttons with role="option"', () => {
     const view = createFormatDialogView({ host, strings: en, t: en.formatDialog });
-    expect(view.catButtons.size).toBe(11);
+    expect(view.catButtons.size).toBe(12);
     for (const btn of view.catButtons.values()) {
       expect(btn.getAttribute('role')).toBe('option');
     }

@@ -16,6 +16,7 @@ export interface Strings {
     cut: string;
     paste: string;
     pasteSpecial: string;
+    insertCopiedCells: string;
     clear: string;
     bold: string;
     italic: string;
@@ -27,6 +28,10 @@ export interface Strings {
     clearFormat: string;
     formatCells: string;
     selectAll: string;
+    insert: string;
+    delete: string;
+    rowHeight: string;
+    colWidth: string;
     rowInsertAbove: string;
     rowInsertBelow: string;
     rowDelete: string;
@@ -65,6 +70,7 @@ export interface Strings {
     catTime: string;
     catDateTime: string;
     catText: string;
+    catOther: string;
     catCustom: string;
     descGeneral: string;
     descFixed: string;
@@ -76,12 +82,16 @@ export interface Strings {
     descTime: string;
     descDateTime: string;
     descText: string;
+    descOther: string;
     descCustom: string;
     decimals: string;
+    negativeNumbers: string;
     symbol: string;
     patternType: string;
     pattern: string;
     patternPlaceholder: string;
+    languageLocation: string;
+    specialFormatLabels: string;
     alignDefault: string;
     alignLeft: string;
     alignCenter: string;
@@ -92,7 +102,11 @@ export interface Strings {
     vAlignMiddle: string;
     vAlignBottom: string;
     wrap: string;
+    shrinkToFit: string;
+    mergeCells: string;
+    textControl: string;
     indent: string;
+    direction: string;
     rotation: string;
     fontFamily: string;
     fontSize: string;
@@ -201,6 +215,13 @@ export interface Strings {
     opDivide: string;
     skipBlanks: string;
     transpose: string;
+    cancel: string;
+    ok: string;
+  };
+  insertCopiedCellsDialog: {
+    title: string;
+    shiftRight: string;
+    shiftDown: string;
     cancel: string;
     ok: string;
   };

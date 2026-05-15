@@ -86,6 +86,40 @@ describe('interact/dialog-shell', () => {
     shell.dispose();
   });
 
+  it('enhances native selects into keyboardable custom comboboxes without breaking change events', () => {
+    const shell = createDialogShell({ host, className: 'fc-x', ariaLabel: 'X' });
+    const select = document.createElement('select');
+    select.setAttribute('aria-label', 'Number format');
+    for (const { value, label } of [
+      { value: 'general', label: 'General' },
+      { value: 'currency', label: 'Currency' },
+      { value: 'date', label: 'Date' },
+    ]) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      select.appendChild(option);
+    }
+    const onChange = vi.fn();
+    select.addEventListener('change', onChange);
+    shell.panel.appendChild(select);
+
+    shell.open();
+
+    const combo = shell.panel.querySelector<HTMLButtonElement>('.fc-select__button');
+    expect(combo).not.toBeNull();
+    expect(select.classList.contains('fc-select__native')).toBe(true);
+    expect(combo?.textContent).toContain('General');
+
+    combo?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    combo?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    expect(select.value).toBe('currency');
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(combo?.textContent).toContain('Currency');
+    shell.dispose();
+  });
+
   it('traps Tab and Shift+Tab focus within the dialog while open', () => {
     const shell = createDialogShell({ host, className: 'fc-x', ariaLabel: 'X' });
     const first = document.createElement('button');

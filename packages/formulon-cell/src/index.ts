@@ -23,6 +23,11 @@ export type { CSVEncodeOptions } from './commands/clipboard/csv.js';
 export { encodeCSV, parseCSV } from './commands/clipboard/csv.js';
 export { cut } from './commands/clipboard/cut.js';
 export { encodeHtml } from './commands/clipboard/html.js';
+export type {
+  InsertCopiedCellsDirection,
+  InsertCopiedCellsResult,
+} from './commands/clipboard/insert-copied-cells.js';
+export { insertCopiedCellsFromTSV } from './commands/clipboard/insert-copied-cells.js';
 export type { PasteResult } from './commands/clipboard/paste.js';
 export { pasteTSV } from './commands/clipboard/paste.js';
 export type {
@@ -150,6 +155,7 @@ export {
   recordFormatChange,
   recordLayoutChange,
   recordMergesChange,
+  recordMergesChangeWithEngine,
   recordPageSetupChange,
   recordSlicersChange,
   recordSparklineChange,
@@ -525,6 +531,12 @@ export type {
   AutocompleteTable,
 } from './interact/autocomplete.js';
 export { attachAutocomplete } from './interact/autocomplete.js';
+export type {
+  BorderDrawDeps,
+  BorderDrawHandle,
+  BorderDrawMode,
+} from './interact/border-draw.js';
+export { attachBorderDraw } from './interact/border-draw.js';
 export type {
   CellStylesGalleryDeps,
   CellStylesGalleryHandle,

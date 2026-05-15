@@ -1,0 +1,116 @@
+@layer fc.app {
+  .fc-select {
+    position: relative;
+    display: inline-flex;
+    min-width: 128px;
+    max-width: 100%;
+    vertical-align: middle;
+  }
+
+  .fc-select > select.fc-select__native {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .fc-select__button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    min-width: 128px;
+    min-height: 24px;
+    padding: 2px 8px 2px 10px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: #eeeeee;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+  }
+
+  .fc-select__button:hover,
+  .fc-select__button[aria-expanded="true"] {
+    background: #e5e5e5;
+    border-color: #d0d0d0;
+  }
+
+  .fc-select__button:focus-visible {
+    border-color: #6f9878;
+    outline: 1px solid #6f9878;
+    outline-offset: -1px;
+    box-shadow: 0 0 0 2px var(--fc-accent-soft, transparent);
+  }
+
+  .fc-select__value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fc-select__arrow {
+    width: 0;
+    height: 0;
+    border-right: 4px solid transparent;
+    border-left: 4px solid transparent;
+    border-top: 5px solid currentColor;
+    opacity: 0.7;
+  }
+
+  .fc-select__list {
+    position: absolute;
+    z-index: calc(var(--fc-z-dialog, 2147483020) + 1);
+    top: calc(100% + 2px);
+    left: 0;
+    width: max(100%, 150px);
+    max-height: 220px;
+    padding: 2px;
+    overflow-y: auto;
+    background: #ffffff;
+    border: 1px solid #d0d0d0;
+    border-radius: 10px;
+    box-shadow:
+      0 8px 20px rgba(0, 0, 0, 0.18),
+      0 1px 4px rgba(0, 0, 0, 0.14);
+  }
+
+  .fc-select__list[hidden] {
+    display: none;
+  }
+
+  .fc-select__option {
+    display: block;
+    width: 100%;
+    min-height: 24px;
+    padding: 3px 8px;
+    border: 0;
+    border-radius: 2px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .fc-select__option:hover,
+  .fc-select__option--active {
+    background: #edebe9;
+  }
+
+  .fc-select__option[aria-selected="true"] {
+    background: var(--fc-accent-soft, color-mix(in srgb, Highlight 16%, transparent));
+    color: var(--fc-fg-strong, CanvasText);
+  }
+}

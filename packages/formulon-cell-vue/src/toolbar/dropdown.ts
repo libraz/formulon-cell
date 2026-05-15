@@ -12,7 +12,11 @@ type DropdownName =
   | 'fontSize'
   | 'borderPreset'
   | 'borderStyle'
+  | 'fillColor'
+  | 'fontColor'
   | 'margins'
+  | 'merge'
+  | 'numberFormat'
   | 'orientation'
   | 'paperSize';
 
@@ -21,6 +25,7 @@ interface DropdownHandlers {
   onFontFamily(value: string): void;
   onFontSize(value: string | number): void;
   onMarginPreset(value: MarginPreset): void;
+  onNumberFormat(value: string): void;
   onOpenPageSetup(): void;
   onPageOrientation(value: PageOrientation): void;
   onPaperSize(value: PaperSize): void;
@@ -70,6 +75,7 @@ export function useToolbarDropdown(handlers: DropdownHandlers) {
       else handlers.onMarginPreset(String(value) as MarginPreset);
     } else if (name === 'orientation') handlers.onPageOrientation(String(value) as PageOrientation);
     else if (name === 'paperSize') handlers.onPaperSize(String(value) as PaperSize);
+    else if (name === 'numberFormat') handlers.onNumberFormat(String(value));
     closeDropdown();
   };
   const onDocPointerDown = (e: MouseEvent): void => {

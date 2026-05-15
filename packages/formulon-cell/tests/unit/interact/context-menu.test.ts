@@ -161,6 +161,76 @@ describe('attachContextMenu', () => {
       expect(store.getState().selection.range).toEqual(before);
     });
 
+    it('keeps a selected row when right-clicking near its top resize edge', () => {
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      mutators.selectRow(store, 1);
+      fireContextMenu(host, 10, 59); // row 1 header, inside resize slack from row 0
+
+      expect(item('rowInsertAbove')).not.toBeNull();
+      expect(store.getState().selection.range).toEqual({
+        sheet: 0,
+        r0: 1,
+        c0: 0,
+        r1: 1,
+        c1: 16383,
+      });
+    });
+
+    it('uses grid coordinates for row header context hit-testing', () => {
+      const grid = document.createElement('div');
+      host.appendChild(grid);
+      vi.spyOn(host, 'getBoundingClientRect').mockReturnValue({
+        left: 0,
+        top: 40,
+        right: 800,
+        bottom: 640,
+        width: 800,
+        height: 600,
+        x: 0,
+        y: 40,
+        toJSON: () => ({}),
+      });
+      vi.spyOn(grid, 'getBoundingClientRect').mockReturnValue({
+        left: 0,
+        top: 200,
+        right: 800,
+        bottom: 640,
+        width: 800,
+        height: 440,
+        x: 0,
+        y: 200,
+        toJSON: () => ({}),
+      });
+      detach = attachContextMenu({ host, grid, store, wb, onAfterCommit });
+      mutators.selectRow(store, 1);
+      fireContextMenu(host, 10, 260); // grid-local y=60 => row 1 header
+
+      expect(item('rowInsertAbove')).not.toBeNull();
+      expect(store.getState().selection.range).toEqual({
+        sheet: 0,
+        r0: 1,
+        c0: 0,
+        r1: 1,
+        c1: 16383,
+      });
+    });
+
+    it('right-click inside an existing row band opens the row menu without changing selection', () => {
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      setRange(store, 1, 0, 3, 16383);
+      fireContextMenu(host, 200, 70); // row 1 cell area
+
+      expect(item('rowInsertAbove')).not.toBeNull();
+      expect(item('rowDelete')).not.toBeNull();
+      expect(store.getState().selection.range).toEqual({
+        sheet: 0,
+        r0: 1,
+        c0: 0,
+        r1: 3,
+        c1: 16383,
+      });
+    });
+
     it('right-click on the formula bar does not open the menu', () => {
       const formulaBar = document.createElement('div');
       formulaBar.className = 'fc-host__formulabar';
@@ -324,7 +394,22 @@ describe('attachContextMenu', () => {
       fireContextMenu(host, 200, 70);
       item('copy')?.click();
       expect(writeText).toHaveBeenCalledWith('X');
+      expect(store.getState().ui.copyRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
       expect(visibleMenu()).toBeNull();
+    });
+
+    it('Copy clears a stale copy marquee when the selected range cannot be copied', () => {
+      mutators.setCopyRanges(store, [
+        { sheet: 0, r0: 2, c0: 0, r1: 2, c1: 16383 },
+        { sheet: 0, r0: 4, c0: 0, r1: 4, c1: 16383 },
+      ]);
+      setRange(store, 0, 0, 1048575, 16383);
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      fireContextMenu(host, 200, 70);
+      item('copy')?.click();
+
+      expect(store.getState().ui.copyRange).toBeNull();
+      expect(store.getState().ui.copyRanges).toBeNull();
     });
 
     it('Cut writes TSV, blanks the range, and notifies onAfterCommit', () => {
@@ -352,6 +437,7 @@ describe('attachContextMenu', () => {
       wb.recalc();
       expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'text', value: 'foo' });
       expect(wb.getValue({ sheet: 0, row: 1, col: 2 })).toEqual({ kind: 'number', value: 42 });
+      expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 1, c0: 1, r1: 1, c1: 2 });
       expect(onAfterCommit).toHaveBeenCalled();
     });
 
@@ -371,6 +457,31 @@ describe('attachContextMenu', () => {
       fireContextMenu(host, 200, 70);
       item('pasteSpecial')?.click();
       expect(onPasteSpecial).toHaveBeenCalled();
+    });
+
+    it('shows Insert Copied Cells only during copy mode and shifts cells after OK', async () => {
+      vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('new');
+      seed(store, wb, [{ row: 1, col: 1, value: 'old' }]);
+      setRange(store, 1, 1, 1, 1);
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+
+      fireContextMenu(host, 200, 70);
+      expect(item('insertCopiedCells')).toBeNull();
+      document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+
+      mutators.setCopyRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+      fireContextMenu(host, 200, 70);
+      item('insertCopiedCells')?.click();
+      expect(document.querySelector('.fc-insertcopied')).not.toBeNull();
+      document.querySelector<HTMLButtonElement>('.fc-insertcopied__button--primary')?.click();
+
+      await Promise.resolve();
+      await Promise.resolve();
+      wb.recalc();
+      expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'text', value: 'new' });
+      expect(wb.getValue({ sheet: 0, row: 2, col: 1 })).toEqual({ kind: 'text', value: 'old' });
+      expect(store.getState().ui.copyRange).toBeNull();
+      expect(onAfterCommit).toHaveBeenCalled();
     });
 
     it('Clear blanks every populated cell within the selection range', () => {

@@ -925,10 +925,15 @@ export class GridRenderer {
       const rects = rangeRects(layout, viewport, preview);
       for (const r of rects) paintFillPreview(this.ctx, r, theme);
     }
-    const copyRange = ui.copyRange;
-    if (copyRange) {
-      const rects = rangeRects(layout, viewport, copyRange);
-      for (const r of rects) paintCopyMarquee(this.ctx, r);
+    const copyRanges = ui.copyRanges && ui.copyRanges.length > 0 ? ui.copyRanges : null;
+    const rangesToPaint = copyRanges ?? (ui.copyRange ? [ui.copyRange] : []);
+    if (rangesToPaint.length > 0) {
+      const phase = (performance.now() / 180) % 7;
+      for (const copyRange of rangesToPaint) {
+        const rects = rangeRects(layout, viewport, copyRange);
+        for (const r of rects) paintCopyMarquee(this.ctx, r, phase);
+      }
+      requestAnimationFrame(() => this.invalidate());
     }
 
     if (isRowVisible(layout, viewport, r.r1) && isColVisible(layout, viewport, r.c1)) {

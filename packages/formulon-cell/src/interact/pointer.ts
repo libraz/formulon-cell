@@ -188,6 +188,24 @@ export function attachPointer(
         return;
 
       case 'col-header': {
+        if (e.shiftKey) {
+          const anchorCol =
+            s.selection.range.r0 === 0 && s.selection.range.r1 >= MAX_ROW
+              ? s.selection.anchor.col
+              : s.selection.active.col;
+          mutators.selectCols(store, anchorCol, zone.col);
+          drag = { kind: 'col-header', anchorCol };
+          return;
+        }
+        if (e.ctrlKey || e.metaKey) {
+          mutators.addExtraRange(
+            store,
+            { sheet: s.data.sheetIndex, r0: 0, c0: zone.col, r1: MAX_ROW, c1: zone.col },
+            { sheet: s.data.sheetIndex, row: 0, col: zone.col },
+          );
+          drag = { kind: 'none' };
+          return;
+        }
         mutators.selectCol(store, zone.col);
         drag = { kind: 'col-header', anchorCol: zone.col };
         return;
@@ -223,6 +241,24 @@ export function attachPointer(
       }
 
       case 'row-header': {
+        if (e.shiftKey) {
+          const anchorRow =
+            s.selection.range.c0 === 0 && s.selection.range.c1 >= MAX_COL
+              ? s.selection.anchor.row
+              : s.selection.active.row;
+          mutators.selectRows(store, anchorRow, zone.row);
+          drag = { kind: 'row-header', anchorRow };
+          return;
+        }
+        if (e.ctrlKey || e.metaKey) {
+          mutators.addExtraRange(
+            store,
+            { sheet: s.data.sheetIndex, r0: zone.row, c0: 0, r1: zone.row, c1: MAX_COL },
+            { sheet: s.data.sheetIndex, row: zone.row, col: 0 },
+          );
+          drag = { kind: 'none' };
+          return;
+        }
         mutators.selectRow(store, zone.row);
         drag = { kind: 'row-header', anchorRow: zone.row };
         return;
@@ -334,14 +370,14 @@ export function attachPointer(
       case 'col-header': {
         const zone = hitZone(s.layout, s.viewport, x, y);
         if (zone && (zone.kind === 'col-header' || zone.kind === 'col-resize')) {
-          mutators.extendRangeTo(store, { sheet: s.data.sheetIndex, row: MAX_ROW, col: zone.col });
+          mutators.selectCols(store, drag.anchorCol, zone.col);
         }
         return;
       }
       case 'row-header': {
         const zone = hitZone(s.layout, s.viewport, x, y);
         if (zone && (zone.kind === 'row-header' || zone.kind === 'row-resize')) {
-          mutators.extendRangeTo(store, { sheet: s.data.sheetIndex, row: zone.row, col: MAX_COL });
+          mutators.selectRows(store, drag.anchorRow, zone.row);
         }
         return;
       }

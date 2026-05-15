@@ -270,7 +270,9 @@ export function hitZone(
   x: number,
   y: number,
   filterRange?: Range | null,
+  opts?: { resizeHandles?: boolean },
 ): HitZone | null {
+  const resizeHandles = opts?.resizeHandles !== false;
   // Outline gutters sit outboard of the row/col header strips. Treat them as
   // header zones for now — the pointer layer routes outline-toggle clicks
   // through a dedicated hit-test before reaching this fall-through.
@@ -282,8 +284,14 @@ export function hitZone(
   if (inHeaderRows) {
     const found = colAtX(layout, viewport, x);
     if (!found) return null;
-    if (found.rightEdge - x <= RESIZE_SLACK) return { kind: 'col-resize', col: found.col };
-    if (x - found.leftEdge <= RESIZE_SLACK && isColVisible(layout, viewport, found.col - 1)) {
+    if (resizeHandles && found.rightEdge - x <= RESIZE_SLACK) {
+      return { kind: 'col-resize', col: found.col };
+    }
+    if (
+      resizeHandles &&
+      x - found.leftEdge <= RESIZE_SLACK &&
+      isColVisible(layout, viewport, found.col - 1)
+    ) {
       return { kind: 'col-resize', col: found.col - 1 };
     }
     if (filterRange && found.col >= filterRange.c0 && found.col <= filterRange.c1) {
@@ -297,8 +305,14 @@ export function hitZone(
   if (inHeaderCols) {
     const found = rowAtY(layout, viewport, y);
     if (!found) return null;
-    if (found.bottomEdge - y <= RESIZE_SLACK) return { kind: 'row-resize', row: found.row };
-    if (y - found.topEdge <= RESIZE_SLACK && isRowVisible(layout, viewport, found.row - 1)) {
+    if (resizeHandles && found.bottomEdge - y <= RESIZE_SLACK) {
+      return { kind: 'row-resize', row: found.row };
+    }
+    if (
+      resizeHandles &&
+      y - found.topEdge <= RESIZE_SLACK &&
+      isRowVisible(layout, viewport, found.row - 1)
+    ) {
       return { kind: 'row-resize', row: found.row - 1 };
     }
     return { kind: 'row-header', row: found.row };
