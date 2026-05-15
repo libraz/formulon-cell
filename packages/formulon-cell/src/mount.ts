@@ -353,6 +353,7 @@ export const Spreadsheet = {
       hostTag: tag,
       hyperlinkDialog: () => featureState.hyperlinkDialog,
       invalidate: () => renderer.invalidate(),
+      namedRangeDialog: () => featureState.namedRangeDialog,
       pasteSpecialDialog: () => binding.pasteSpecialDialog,
       quickAnalysis: () => binding.quickAnalysis,
       store,

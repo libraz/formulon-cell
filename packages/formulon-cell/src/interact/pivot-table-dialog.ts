@@ -303,6 +303,9 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     if (e.key === 'Escape') {
       e.preventDefault();
       close();
+    } else if (e.key === 'Enter' && !okBtn.disabled) {
+      e.preventDefault();
+      body.requestSubmit();
     }
   };
   const onOk = (): void => body.requestSubmit();
@@ -317,7 +320,8 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       render();
       shell.open();
       open = true;
-      nameInput.focus({ preventScroll: true });
+      const initial = nameInput.isConnected && !okBtn.disabled ? nameInput : cancelBtn;
+      initial.focus({ preventScroll: true });
     },
     close,
     setStrings(next) {

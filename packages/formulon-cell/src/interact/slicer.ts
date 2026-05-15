@@ -103,6 +103,9 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
 
     const body = document.createElement('div');
     body.className = 'fc-slicer__body';
+    body.setAttribute('role', 'listbox');
+    body.setAttribute('aria-multiselectable', 'true');
+    body.setAttribute('aria-label', spec.column);
 
     root.append(header, body);
     host.appendChild(root);
@@ -144,17 +147,35 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
     }
     const distinct = listSlicerValues(store, wb, spec);
     const selected = new Set(spec.selected);
+    const focusChip = (idx: number): void => {
+      const chips = Array.from(entry.body.querySelectorAll<HTMLButtonElement>('.fc-slicer__chip'));
+      if (chips.length === 0) return;
+      const next = (idx + chips.length) % chips.length;
+      for (const [i, chip] of chips.entries()) chip.tabIndex = i === next ? 0 : -1;
+      chips[next]?.focus({ preventScroll: true });
+    };
+    const restoreChipFocus = (value: string): void => {
+      requestAnimationFrame(() => {
+        const next = Array.from(
+          entry.body.querySelectorAll<HTMLButtonElement>('.fc-slicer__chip'),
+        ).find((chip) => chip.dataset.fcValue === value);
+        next?.focus({ preventScroll: true });
+      });
+    };
     for (const value of distinct) {
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'fc-slicer__chip';
       chip.dataset.fcValue = value;
+      chip.setAttribute('role', 'option');
       const isOn = selected.size === 0 || selected.has(value);
       // "Selected" visual state — when no chip is selected (empty array)
       //  every chip reads as on (include-all). When at least one is on,
       //  the unselected ones dim.
       chip.classList.toggle('fc-slicer__chip--on', isOn);
       chip.setAttribute('aria-pressed', String(isOn));
+      chip.setAttribute('aria-selected', String(isOn));
+      chip.tabIndex = entry.body.childElementCount === 0 ? 0 : -1;
       chip.textContent = value === '' ? '(blank)' : value;
 
       chip.addEventListener('click', () => {
@@ -174,6 +195,29 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
         const next = current.size === distinct.length ? [] : Array.from(current).sort();
         withHistory(() => setSlicerSelected(store, spec.id, next));
         recomputeAndRender();
+        restoreChipFocus(value);
+      });
+      chip.addEventListener('keydown', (e) => {
+        const chips = Array.from(
+          entry.body.querySelectorAll<HTMLButtonElement>('.fc-slicer__chip'),
+        );
+        const idx = chips.indexOf(chip);
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          focusChip(idx + 1);
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          focusChip(idx - 1);
+        } else if (e.key === 'Home') {
+          e.preventDefault();
+          focusChip(0);
+        } else if (e.key === 'End') {
+          e.preventDefault();
+          focusChip(chips.length - 1);
+        } else if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          chip.click();
+        }
       });
       entry.body.appendChild(chip);
     }
@@ -203,6 +247,7 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
         // Keep the title in sync — column may change via updateSlicer.
         entry.title.textContent = spec.column;
         entry.root.setAttribute('aria-label', `${strings.slicer.title}: ${spec.column}`);
+        entry.body.setAttribute('aria-label', spec.column);
         entry.root.style.left = `${spec.x ?? DEFAULT_OFFSET_X}px`;
         entry.root.style.top = `${spec.y ?? DEFAULT_OFFSET_Y}px`;
       }

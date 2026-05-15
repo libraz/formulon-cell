@@ -49,6 +49,7 @@ import {
   type BorderPreset,
   EMPTY_ACTIVE_STATE,
   projectActiveState,
+  RIBBON_KEYSHORTCUTS,
   RIBBON_TAB_LABELS,
   type RibbonTab,
   type SpreadsheetToolbarProps,
@@ -386,6 +387,7 @@ export const SpreadsheetToolbar = ({
       className={`demo__rb${extra}${isActive ? ' demo__rb--active' : ''}`}
       title={title}
       aria-label={title}
+      aria-keyshortcuts={RIBBON_KEYSHORTCUTS[id]}
       onClick={onClick}
       disabled={disabled || !instance}
     >
@@ -426,6 +428,7 @@ export const SpreadsheetToolbar = ({
     <Dropdown
       key={id}
       title={title}
+      ariaKeyshortcuts={RIBBON_KEYSHORTCUTS[id]}
       value={value}
       options={values.map((v) => ({ value: v, label: String(v) }))}
       onChange={(v) => onChange(String(v))}
@@ -446,6 +449,7 @@ export const SpreadsheetToolbar = ({
     <Dropdown<T>
       key={id}
       title={title}
+      ariaKeyshortcuts={RIBBON_KEYSHORTCUTS[id]}
       value={value}
       options={options}
       onChange={onChange}
@@ -461,7 +465,13 @@ export const SpreadsheetToolbar = ({
     onChange: (value: string) => void,
     label: ReactElement,
   ): ReactElement => (
-    <label key={id} className="demo__rb-color" title={title} aria-label={title}>
+    <label
+      key={id}
+      className="demo__rb-color"
+      title={title}
+      aria-label={title}
+      aria-keyshortcuts={RIBBON_KEYSHORTCUTS[id]}
+    >
       <span>{label}</span>
       <input
         type="color"

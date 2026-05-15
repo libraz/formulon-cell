@@ -72,6 +72,19 @@ export function attachExternalLinksDialog(
   closeBtn.textContent = t.close;
   shell.on(closeBtn, 'click', () => shell.close());
   footer.appendChild(closeBtn);
+  let selectedIndex = 0;
+
+  const focusRow = (idx: number): void => {
+    const rows = Array.from(tableWrap.querySelectorAll<HTMLTableRowElement>('tbody tr'));
+    if (rows.length === 0) return;
+    selectedIndex = (idx + rows.length) % rows.length;
+    for (const [rowIdx, row] of rows.entries()) {
+      const selected = rowIdx === selectedIndex;
+      row.tabIndex = selected ? 0 : -1;
+      row.setAttribute('aria-selected', selected ? 'true' : 'false');
+    }
+    rows[selectedIndex]?.focus({ preventScroll: true });
+  };
 
   const renderTable = (): void => {
     tableWrap.replaceChildren();
@@ -93,8 +106,25 @@ export function attachExternalLinksDialog(
     thead.appendChild(headRow);
     table.appendChild(thead);
     const tbody = document.createElement('tbody');
-    for (const link of links) {
+    for (const [rowIndex, link] of links.entries()) {
       const row = document.createElement('tr');
+      row.tabIndex = rowIndex === selectedIndex ? 0 : -1;
+      row.setAttribute('aria-selected', rowIndex === selectedIndex ? 'true' : 'false');
+      row.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          focusRow(rowIndex + 1);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          focusRow(rowIndex - 1);
+        } else if (e.key === 'Home') {
+          e.preventDefault();
+          focusRow(0);
+        } else if (e.key === 'End') {
+          e.preventDefault();
+          focusRow(links.length - 1);
+        }
+      });
       const idx = document.createElement('td');
       idx.textContent = String(link.index);
       const kind = document.createElement('td');
@@ -110,6 +140,8 @@ export function attachExternalLinksDialog(
     }
     table.appendChild(tbody);
     tableWrap.appendChild(table);
+    selectedIndex = Math.min(selectedIndex, links.length - 1);
+    focusRow(selectedIndex);
   };
 
   return {

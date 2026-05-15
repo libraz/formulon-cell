@@ -112,6 +112,8 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('.fc-namedlg__input'));
     expect(inputs.length).toBe(2);
     const [nameField, formulaField] = inputs;
+    expect(nameField?.getAttribute('aria-label')).toBeTruthy();
+    expect(formulaField?.getAttribute('aria-label')).toBeTruthy();
     if (nameField) nameField.value = 'TaxRate';
     if (formulaField) formulaField.value = '=Sheet1!$A$1';
     form?.requestSubmit();
@@ -157,6 +159,55 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     expect(calls).toEqual([{ name: 'TaxRate', formula: '' }]);
     // List should now be empty.
     expect(document.querySelector<HTMLElement>('.fc-namedlg__empty')?.textContent).toBeTruthy();
+    handle.detach();
+  });
+
+  it('exposes a selectable listbox and moves row selection with keyboard', () => {
+    const { wb, registry } = makeMutableWb();
+    registry.set('TaxRate', '=Sheet1!$A$1');
+    registry.set('Budget', '=Sheet1!$B$1');
+    const handle = attachNamedRangeDialog({ host, wb });
+    handle.open();
+
+    const list = document.querySelector<HTMLElement>('.fc-namedlg__list');
+    expect(list?.getAttribute('role')).toBe('listbox');
+    const rows = Array.from(document.querySelectorAll<HTMLElement>('.fc-namedlg__item'));
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.getAttribute('role')).toBe('option');
+    expect(rows[0]?.getAttribute('aria-selected')).toBe('true');
+    expect(rows[0]?.tabIndex).toBe(0);
+    expect(rows[1]?.getAttribute('aria-selected')).toBe('false');
+    expect(rows[1]?.tabIndex).toBe(-1);
+
+    rows[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(rows[1]?.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(rows[1]);
+
+    rows[1]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    expect(rows[0]?.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(rows[0]);
+
+    rows[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    expect(rows[1]?.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(rows[1]);
+    handle.detach();
+  });
+
+  it('Delete key removes the selected defined-name row', () => {
+    const { wb, calls, registry } = makeMutableWb();
+    registry.set('TaxRate', '=Sheet1!$A$1');
+    registry.set('Budget', '=Sheet1!$B$1');
+    const handle = attachNamedRangeDialog({ host, wb });
+    handle.open();
+
+    const firstRow = document.querySelector<HTMLElement>('.fc-namedlg__item');
+    firstRow?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
+
+    expect(calls).toEqual([{ name: 'TaxRate', formula: '' }]);
+    const rows = Array.from(document.querySelectorAll<HTMLElement>('.fc-namedlg__item'));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.textContent).toContain('Budget');
+    expect(rows[0]?.getAttribute('aria-selected')).toBe('true');
     handle.detach();
   });
 });

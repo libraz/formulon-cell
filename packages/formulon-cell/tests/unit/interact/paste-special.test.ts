@@ -115,6 +115,11 @@ describe('attachPasteSpecial', () => {
 
     const overlay = document.querySelector<HTMLElement>('.fc-pastesp');
     expect(overlay?.hidden).toBe(false);
+    const radioGroups = Array.from(
+      document.querySelectorAll<HTMLElement>('.fc-pastesp__list[role="radiogroup"]'),
+    );
+    expect(radioGroups).toHaveLength(2);
+    for (const group of radioGroups) expect(group.getAttribute('aria-label')).toBeTruthy();
 
     // Default: what='all', operation='none', no skipBlanks/transpose.
     const allRadio = document.querySelector<HTMLInputElement>('input[type="radio"][value="all"]');

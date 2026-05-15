@@ -8,6 +8,7 @@ export {
   FONT_FAMILIES,
   FONT_SIZES,
   projectActiveState,
+  RIBBON_KEYSHORTCUTS,
   RIBBON_TAB_LABELS,
 } from '@libraz/formulon-cell';
 

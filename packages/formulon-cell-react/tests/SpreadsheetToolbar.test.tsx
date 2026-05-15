@@ -142,6 +142,32 @@ describe('React <SpreadsheetToolbar>', () => {
     expect(homeTab?.className).not.toContain('demo__ribbon-tab--active');
   });
 
+  it('exposes Excel-style shortcut hints on routed ribbon buttons', async () => {
+    mounted = await mountReactSpreadsheet();
+    toolbar = await renderToolbar(mounted, { activeTab: 'home', onTabChange: vi.fn() });
+
+    const formatCells = Array.from(toolbar.host.querySelectorAll<HTMLButtonElement>('button')).find(
+      (b) => b.getAttribute('aria-label') === 'Format cells',
+    );
+    expect(formatCells?.getAttribute('aria-keyshortcuts')).toContain('Control+1');
+
+    const find = Array.from(toolbar.host.querySelectorAll<HTMLButtonElement>('button')).find((b) =>
+      b.getAttribute('aria-label')?.startsWith('Find'),
+    );
+    expect(find?.getAttribute('aria-keyshortcuts')).toContain('Control+F');
+
+    await toolbar.rerender('formulas');
+    const namedRanges = Array.from(toolbar.host.querySelectorAll<HTMLButtonElement>('button')).find(
+      (b) => b.getAttribute('aria-label') === 'Name manager',
+    );
+    expect(namedRanges?.getAttribute('aria-keyshortcuts')).toBe('Control+F3');
+
+    const fx = Array.from(toolbar.host.querySelectorAll<HTMLButtonElement>('button')).find(
+      (b) => b.getAttribute('aria-label') === 'Insert function',
+    );
+    expect(fx?.getAttribute('aria-keyshortcuts')).toBe('Shift+F3');
+  });
+
   it('reflects bold=true in the toolbar after the bold button is clicked', async () => {
     mounted = await mountReactSpreadsheet();
     toolbar = await renderToolbar(mounted, { activeTab: 'home', onTabChange: vi.fn() });

@@ -160,6 +160,14 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
   shell.on(maxChangeInput, 'input', onChange);
   shell.on(okBtn, 'click', onOk);
   shell.on(cancelBtn, 'click', () => api.close());
+  shell.on(shell.overlay, 'keydown', (e) => {
+    const event = e as KeyboardEvent;
+    event.stopPropagation();
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      onOk();
+    }
+  });
 
   const api: IterativeDialogHandle = {
     open(): void {

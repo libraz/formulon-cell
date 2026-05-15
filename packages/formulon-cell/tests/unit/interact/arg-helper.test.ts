@@ -30,9 +30,13 @@ describe('attachArgHelper', () => {
     const handle = attachArgHelper({ input });
     handle.refresh();
     expect(tooltip()).not.toBeNull();
+    expect(tooltip()?.getAttribute('role')).toBe('tooltip');
+    expect(tooltip()?.id).toMatch(/^fc-arghelper-/);
+    expect(input.getAttribute('aria-describedby')).toBe(tooltip()?.id);
     const list = args().map((a) => a.textContent);
     expect(list).toEqual(['number1', '[number2]', '...']);
     expect(activeArg()?.textContent).toBe('number1');
+    expect(activeArg()?.getAttribute('aria-current')).toBe('true');
     handle.detach();
   });
 
@@ -67,6 +71,7 @@ describe('attachArgHelper', () => {
     setText(input, '=SUM(1)');
     handle.refresh();
     expect(tooltip()).toBeNull();
+    expect(input.hasAttribute('aria-describedby')).toBe(false);
     handle.detach();
   });
 
@@ -93,5 +98,6 @@ describe('attachArgHelper', () => {
     expect(tooltip()).not.toBeNull();
     handle.detach();
     expect(tooltip()).toBeNull();
+    expect(input.hasAttribute('aria-describedby')).toBe(false);
   });
 });

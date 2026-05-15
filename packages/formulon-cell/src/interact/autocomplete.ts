@@ -1,6 +1,8 @@
 import { FUNCTION_SIGNATURES, suggestFunctions } from '../commands/refs.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';
 
+let autocompleteSeq = 0;
+
 export interface AutocompleteHandle {
   /** Re-evaluate the suggestion list against the current input value/caret.
    *  Hides the popover when there's nothing to suggest. */
@@ -95,6 +97,7 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
   let root: HTMLDivElement | null = null;
   let ctx: SuggestionContext | null = null;
   let highlight = 0;
+  let rootId = '';
 
   const close = (): void => {
     if (!root) return;
@@ -102,6 +105,9 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
     root = null;
     ctx = null;
     highlight = 0;
+    input.setAttribute('aria-expanded', 'false');
+    input.removeAttribute('aria-controls');
+    input.removeAttribute('aria-activedescendant');
   };
 
   const positionUnderCaret = (el: HTMLDivElement): void => {
@@ -115,18 +121,26 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
     if (!ctx) return;
     if (!root) {
       root = document.createElement('div');
+      autocompleteSeq += 1;
+      rootId = `fc-autocomplete-${autocompleteSeq}`;
+      root.id = rootId;
       root.className = 'fc-autocomplete';
       root.setAttribute('role', 'listbox');
       document.body.appendChild(root);
     }
+    input.setAttribute('aria-expanded', 'true');
+    input.setAttribute('aria-controls', root.id);
     inheritHostTokens(input, root);
     root.replaceChildren();
     for (let i = 0; i < ctx.matches.length; i += 1) {
       const pick = ctx.matches[i] ?? '';
       const item = document.createElement('button');
       item.className = 'fc-autocomplete__item';
-      if (i === highlight) item.classList.add('fc-autocomplete__item--active');
+      item.id = `${rootId}-option-${i}`;
       item.setAttribute('role', 'option');
+      item.setAttribute('aria-selected', i === highlight ? 'true' : 'false');
+      item.tabIndex = -1;
+      if (i === highlight) item.classList.add('fc-autocomplete__item--active');
       item.dataset.fcKind = ctx.kind;
       item.type = 'button';
 
@@ -161,7 +175,19 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
         highlight = i;
         acceptHighlighted();
       });
+      item.addEventListener('mousemove', () => {
+        if (highlight === i) return;
+        highlight = i;
+        render();
+      });
       root.appendChild(item);
+    }
+    const active = root.querySelector<HTMLElement>('.fc-autocomplete__item--active');
+    if (active) {
+      input.setAttribute('aria-activedescendant', active.id);
+      active.scrollIntoView({ block: 'nearest' });
+    } else {
+      input.removeAttribute('aria-activedescendant');
     }
     positionUnderCaret(root);
   };

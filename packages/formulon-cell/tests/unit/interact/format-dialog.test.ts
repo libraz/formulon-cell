@@ -192,14 +192,72 @@ describe('attachFormatDialog', () => {
     fontTab?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(fontTab?.getAttribute('aria-selected')).toBe('true');
+    expect(fontTab?.tabIndex).toBe(0);
+    expect(fontTab?.getAttribute('aria-controls')).toBe('fc-fmtdlg-panel-font');
     const numberTab = document.querySelector<HTMLButtonElement>('button[data-fc-tab="number"]');
     expect(numberTab?.getAttribute('aria-selected')).toBe('false');
+    expect(numberTab?.tabIndex).toBe(-1);
 
     const fontPanel = document.querySelector<HTMLDivElement>('div[data-fc-tab="font"]');
     const numberPanel = document.querySelector<HTMLDivElement>('div[data-fc-tab="number"]');
     expect(fontPanel?.hidden).toBe(false);
+    expect(fontPanel?.getAttribute('aria-labelledby')).toBe('fc-fmtdlg-tab-font');
     expect(numberPanel?.hidden).toBe(true);
 
+    handle.detach();
+  });
+
+  it('format tabs support Excel-style arrow, Home, and End keyboard navigation', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+
+    const numberTab = document.querySelector<HTMLButtonElement>('button[data-fc-tab="number"]');
+    const alignTab = document.querySelector<HTMLButtonElement>('button[data-fc-tab="align"]');
+    const moreTab = document.querySelector<HTMLButtonElement>('button[data-fc-tab="more"]');
+    numberTab?.focus();
+    numberTab?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(alignTab?.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(alignTab);
+
+    alignTab?.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    expect(moreTab?.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(moreTab);
+
+    moreTab?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    expect(numberTab?.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(numberTab);
+
+    handle.detach();
+  });
+
+  it('labels Format Cells controls for keyboard and assistive navigation', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+
+    const namedControls = Array.from(
+      document.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
+        '.fc-fmtdlg input[aria-label], .fc-fmtdlg select[aria-label], .fc-fmtdlg textarea[aria-label]',
+      ),
+    );
+    expect(namedControls.length).toBeGreaterThan(20);
+
+    const colorInputs = Array.from(
+      document.querySelectorAll<HTMLInputElement>('.fc-fmtdlg input[type="color"]'),
+    );
+    expect(colorInputs.length).toBeGreaterThan(0);
+    for (const input of colorInputs) expect(input.getAttribute('aria-label')).toBeTruthy();
+
+    const textareas = Array.from(
+      document.querySelectorAll<HTMLTextAreaElement>('.fc-fmtdlg textarea'),
+    );
+    expect(textareas.length).toBeGreaterThan(0);
+    for (const area of textareas) expect(area.getAttribute('aria-label')).toBeTruthy();
+
+    const radioGroups = Array.from(
+      document.querySelectorAll<HTMLElement>('.fc-fmtdlg__choice-grid[role="radiogroup"]'),
+    );
+    expect(radioGroups.length).toBeGreaterThanOrEqual(2);
+    for (const group of radioGroups) expect(group.getAttribute('aria-label')).toBeTruthy();
     handle.detach();
   });
 
@@ -251,6 +309,32 @@ describe('attachFormatDialog', () => {
     catList?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     const generalBtn = document.querySelector<HTMLButtonElement>('button[data-fc-cat="general"]');
     expect(generalBtn?.getAttribute('aria-selected')).toBe('true');
+    handle.detach();
+  });
+
+  it('number categories support Excel-style arrow, Home, and End keyboard navigation', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+
+    const generalBtn = document.querySelector<HTMLButtonElement>('button[data-fc-cat="general"]');
+    const fixedBtn = document.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]');
+    const customBtn = document.querySelector<HTMLButtonElement>('button[data-fc-cat="custom"]');
+    expect(generalBtn?.tabIndex).toBe(0);
+    expect(fixedBtn?.tabIndex).toBe(-1);
+
+    generalBtn?.focus();
+    generalBtn?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(fixedBtn?.getAttribute('aria-selected')).toBe('true');
+    expect(fixedBtn?.tabIndex).toBe(0);
+    expect(document.activeElement).toBe(fixedBtn);
+
+    fixedBtn?.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    expect(customBtn?.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(customBtn);
+
+    customBtn?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    expect(generalBtn?.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(generalBtn);
     handle.detach();
   });
 

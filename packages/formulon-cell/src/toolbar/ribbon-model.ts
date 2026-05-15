@@ -55,6 +55,26 @@ export const RIBBON_TAB_LABELS: Record<RibbonTab, { en: string; ja: string }> = 
   acrobat: { en: 'Acrobat', ja: 'Acrobat' },
 };
 
+export const RIBBON_KEYSHORTCUTS: Readonly<Record<string, string>> = {
+  copy: 'Control+C Meta+C',
+  cut: 'Control+X Meta+X',
+  findHome: 'Control+F Meta+F',
+  findReview: 'Control+F Meta+F',
+  formatCells: 'Control+1 Meta+1',
+  formatCellsHome: 'Control+1 Meta+1',
+  fx: 'Shift+F3',
+  fxInsert: 'Shift+F3',
+  gotoSpecial: 'F5 Control+G Meta+G',
+  gotoSpecialHome: 'F5 Control+G Meta+G',
+  hyperlinkInsert: 'Control+K Meta+K',
+  namedRanges: 'Control+F3',
+  namedRangesInsert: 'Control+F3',
+  paste: 'Control+V Meta+V',
+  recalcNow: 'F9',
+  redoHome: 'Control+Y Meta+Y Meta+Shift+Z',
+  undoHome: 'Control+Z Meta+Z',
+};
+
 export const FONT_FAMILIES = [
   'Aptos',
   'Calibri',

@@ -218,9 +218,11 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   const fillInput = document.createElement('input');
   fillInput.type = 'color';
   fillInput.value = '#ffeb3b';
+  fillInput.setAttribute('aria-label', t.fillColor);
   const fillToggle = document.createElement('input');
   fillToggle.type = 'checkbox';
   fillToggle.checked = true;
+  fillToggle.setAttribute('aria-label', t.fillColor);
   applyRow1.append(fillToggle, fillLabel, fillInput);
 
   const applyRow2 = document.createElement('div');
@@ -231,8 +233,10 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   const fontInput = document.createElement('input');
   fontInput.type = 'color';
   fontInput.value = '#000000';
+  fontInput.setAttribute('aria-label', t.fontColor);
   const fontToggle = document.createElement('input');
   fontToggle.type = 'checkbox';
+  fontToggle.setAttribute('aria-label', t.fontColor);
   applyRow2.append(fontToggle, fontLabel, fontInput);
 
   const styleRow = document.createElement('div');
@@ -275,6 +279,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   const stopMinInput = document.createElement('input');
   stopMinInput.type = 'color';
   stopMinInput.value = '#f8696b';
+  stopMinInput.setAttribute('aria-label', t.stopMin);
   stopMinRow.append(stopMinLabel, stopMinInput);
   colorScaleGroup.appendChild(stopMinRow);
 
@@ -285,6 +290,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   const stopMidInput = document.createElement('input');
   stopMidInput.type = 'color';
   stopMidInput.value = '#ffeb84';
+  stopMidInput.setAttribute('aria-label', t.stopMid);
   stopMidRow.append(stopMidLabel, stopMidInput);
   stopMidRow.hidden = true;
   colorScaleGroup.appendChild(stopMidRow);
@@ -296,6 +302,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   const stopMaxInput = document.createElement('input');
   stopMaxInput.type = 'color';
   stopMaxInput.value = '#63be7b';
+  stopMaxInput.setAttribute('aria-label', t.stopMax);
   stopMaxRow.append(stopMaxLabel, stopMaxInput);
   colorScaleGroup.appendChild(stopMaxRow);
 
@@ -311,6 +318,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   const barColorInput = document.createElement('input');
   barColorInput.type = 'color';
   barColorInput.value = '#638ec6';
+  barColorInput.setAttribute('aria-label', t.barColor);
   barColorRow.append(barColorLabel, barColorInput);
   dataBarGroup.appendChild(barColorRow);
 
@@ -432,11 +440,13 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   const applyFillToggle = document.createElement('input');
   applyFillToggle.type = 'checkbox';
   applyFillToggle.checked = true;
+  applyFillToggle.setAttribute('aria-label', t.fillColor);
   const applyFillLabel = document.createElement('span');
   applyFillLabel.textContent = t.fillColor;
   const applyFillInput = document.createElement('input');
   applyFillInput.type = 'color';
   applyFillInput.value = '#ffeb3b';
+  applyFillInput.setAttribute('aria-label', t.fillColor);
   applyFillRow.append(applyFillToggle, applyFillLabel, applyFillInput);
 
   const applyFontRow = document.createElement('div');
@@ -444,11 +454,13 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   applyGroup.appendChild(applyFontRow);
   const applyFontToggle = document.createElement('input');
   applyFontToggle.type = 'checkbox';
+  applyFontToggle.setAttribute('aria-label', t.fontColor);
   const applyFontLabel = document.createElement('span');
   applyFontLabel.textContent = t.fontColor;
   const applyFontInput = document.createElement('input');
   applyFontInput.type = 'color';
   applyFontInput.value = '#000000';
+  applyFontInput.setAttribute('aria-label', t.fontColor);
   applyFontRow.append(applyFontToggle, applyFontLabel, applyFontInput);
 
   const applyStyleRow = document.createElement('div');
@@ -691,6 +703,9 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     if (e.key === 'Escape') {
       e.preventDefault();
       api.close();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      onAdd();
     }
   };
 

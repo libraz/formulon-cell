@@ -49,6 +49,21 @@ describe('attachPageSetupDialog', () => {
     handle.detach();
   });
 
+  it('labels Page Setup controls for dialog-style keyboard and assistive navigation', () => {
+    const handle = attachPageSetupDialog({ host, store });
+    handle.open();
+    const [orientSelect, paperSelect] = selects();
+    expect(orientSelect?.getAttribute('aria-label')).toBeTruthy();
+    expect(paperSelect?.getAttribute('aria-label')).toBeTruthy();
+    for (const input of marginInputs()) {
+      expect(input.getAttribute('aria-label')).toBeTruthy();
+    }
+    expect(
+      document.querySelector<HTMLInputElement>('.fc-pgsetup__text')?.getAttribute('aria-label'),
+    ).toBeTruthy();
+    handle.detach();
+  });
+
   it('OK with a flipped orientation/paper persists via mutators.setPageSetup', () => {
     const handle = attachPageSetupDialog({ host, store });
     handle.open();

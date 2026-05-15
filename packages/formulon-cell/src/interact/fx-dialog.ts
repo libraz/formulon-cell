@@ -147,6 +147,10 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   searchInput.type = 'text';
   searchInput.className = 'fc-fxdialog__search';
   searchInput.placeholder = t.searchPlaceholder;
+  searchInput.setAttribute('aria-label', t.searchPlaceholder);
+  searchInput.setAttribute('role', 'combobox');
+  searchInput.setAttribute('aria-autocomplete', 'list');
+  searchInput.setAttribute('aria-expanded', 'true');
   searchInput.autocomplete = 'off';
   searchInput.spellcheck = false;
   pickerWrap.appendChild(searchInput);
@@ -154,6 +158,9 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   const list = document.createElement('div');
   list.className = 'fc-fxdialog__list';
   list.setAttribute('role', 'listbox');
+  list.setAttribute('aria-label', t.title);
+  list.id = `fc-fxdialog-list-${Math.random().toString(36).slice(2, 8)}`;
+  searchInput.setAttribute('aria-controls', list.id);
   pickerWrap.appendChild(list);
 
   // ── Step 2: argument inputs ─────────────────────────────────────────────
@@ -241,6 +248,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       empty.textContent = t.empty;
       list.appendChild(empty);
       highlightIndex = -1;
+      searchInput.removeAttribute('aria-activedescendant');
       return;
     }
     if (highlightIndex < 0 || highlightIndex >= names.length) highlightIndex = 0;
@@ -248,11 +256,14 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       const item = document.createElement('div');
       item.className = 'fc-fxdialog__item';
       item.setAttribute('role', 'option');
+      item.id = `${list.id}-option-${i}`;
       item.dataset.fxName = name;
       item.dataset.fxIndex = String(i);
       if (i === highlightIndex) {
         item.classList.add('fc-fxdialog__item--active');
         item.setAttribute('aria-selected', 'true');
+      } else {
+        item.setAttribute('aria-selected', 'false');
       }
       const nameEl = document.createElement('span');
       nameEl.className = 'fc-fxdialog__item-name';
@@ -270,6 +281,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       // count O(1) instead of O(n) and lets dispose() sweep them all.
       list.appendChild(item);
     });
+    searchInput.setAttribute('aria-activedescendant', `${list.id}-option-${highlightIndex}`);
   };
 
   const assembleFormula = (): string => {
@@ -360,6 +372,16 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       if (names.length === 0) return;
       highlightIndex = Math.max(highlightIndex - 1, 0);
       renderList();
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      if (names.length === 0) return;
+      highlightIndex = 0;
+      renderList();
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      if (names.length === 0) return;
+      highlightIndex = names.length - 1;
+      renderList();
     } else if (e.key === 'Enter') {
       const target = names[highlightIndex];
       if (!target) return;
@@ -419,6 +441,8 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     shell.setAriaLabel(t.title);
     header.textContent = t.title;
     searchInput.placeholder = t.searchPlaceholder;
+    searchInput.setAttribute('aria-label', t.searchPlaceholder);
+    list.setAttribute('aria-label', t.title);
     previewLabel.textContent = t.preview;
     backBtn.textContent = t.back;
     cancelBtn.textContent = t.cancel;

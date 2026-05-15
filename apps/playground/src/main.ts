@@ -28,6 +28,7 @@ import {
   parseScriptCommand,
   pasteTSV,
   type ReviewCell,
+  RIBBON_KEYSHORTCUTS,
   type RibbonCommand,
   type RibbonReportItem,
   type RibbonTab,
@@ -55,7 +56,7 @@ import {
   toolbarText,
   WorkbookHandle,
 } from '@libraz/formulon-cell';
-import { showMessage, showPrompt } from './dialogs.js';
+import { showMessage, showPrompt, showReport } from './dialogs.js';
 import { applyFixture, isFixtureName } from './fixtures.js';
 import { focusMenuItem, handleMenuKeydown, prepareMenu } from './menu-a11y.js';
 import { seedWorkbook } from './seed.js';
@@ -203,6 +204,8 @@ const renderRibbon = (): void => {
         }${c.kind === 'mono' ? ' demo__rb--mono' : ''}`;
         b.title = c.title;
         b.setAttribute('aria-label', c.title);
+        const keyshortcuts = RIBBON_KEYSHORTCUTS[c.id];
+        if (keyshortcuts) b.setAttribute('aria-keyshortcuts', keyshortcuts);
         b.dataset.ribbonCommand = c.id;
         const legacyId = legacyCommandIds[c.id];
         if (legacyId) b.id = legacyId;
@@ -1454,70 +1457,7 @@ const reviewCellsForSheet = (sheet: number): ReviewCell[] => {
 };
 
 const showRibbonReport = (title: string, items: readonly RibbonReportItem[]): void => {
-  const overlay = document.createElement('div');
-  overlay.className = 'fc-fmtdlg app__dlg';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', title);
-
-  const panel = document.createElement('div');
-  panel.className = 'fc-fmtdlg__panel app__dlg__panel';
-  overlay.appendChild(panel);
-
-  const header = document.createElement('div');
-  header.className = 'fc-fmtdlg__header';
-  header.textContent = title;
-  panel.appendChild(header);
-
-  const body = document.createElement('div');
-  body.className = 'fc-fmtdlg__body app__dlg__body';
-  panel.appendChild(body);
-
-  const list = document.createElement('div');
-  list.className = 'app__dlg__list';
-  if (items.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'app__dlg__note';
-    empty.textContent = 'No issues found.';
-    list.appendChild(empty);
-  } else {
-    for (const item of items) {
-      const row = document.createElement('div');
-      row.className = 'fc-fmtdlg__row fc-fmtdlg__row--block';
-      const label = document.createElement('strong');
-      label.textContent = `${item.severity === 'warning' ? 'Warning' : 'Info'} · ${item.label}`;
-      const detail = document.createElement('div');
-      detail.textContent = item.detail;
-      row.append(label, detail);
-      list.appendChild(row);
-    }
-  }
-  body.appendChild(list);
-
-  const footer = document.createElement('div');
-  footer.className = 'fc-fmtdlg__footer';
-  panel.appendChild(footer);
-
-  const closeBtn = document.createElement('button');
-  closeBtn.type = 'button';
-  closeBtn.className = 'fc-fmtdlg__btn fc-fmtdlg__btn--primary';
-  closeBtn.textContent = 'Close';
-  footer.appendChild(closeBtn);
-
-  const close = (): void => overlay.remove();
-  closeBtn.addEventListener('click', close);
-  overlay.addEventListener('click', (event) => {
-    if (event.target === overlay) close();
-  });
-  overlay.addEventListener('keydown', (event) => {
-    event.stopPropagation();
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      close();
-    }
-  });
-  document.body.appendChild(overlay);
-  closeBtn.focus();
+  void showReport({ title, items });
 };
 
 const selectedPlainText = (): string => {

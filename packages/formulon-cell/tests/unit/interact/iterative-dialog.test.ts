@@ -108,6 +108,22 @@ describe('attachIterativeDialog', () => {
     handle.detach();
   });
 
+  it('Enter acts as the default OK command', () => {
+    const fake = makeFakeWb();
+    const handle = attachIterativeDialog({ host, getWb: () => fake.handle });
+    handle.open();
+    const cb = enableInput();
+    if (!cb) throw new Error('checkbox missing');
+    cb.checked = true;
+    cb.dispatchEvent(new Event('change', { bubbles: true }));
+
+    overlay()?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    expect(fake.setIterative).toHaveBeenCalledWith(true, 100, 0.001);
+    expect(overlay()?.hidden).toBe(true);
+    handle.detach();
+  });
+
   it('numeric input clamps min iterations to 1', () => {
     const fake = makeFakeWb();
     const handle = attachIterativeDialog({ host, getWb: () => fake.handle });

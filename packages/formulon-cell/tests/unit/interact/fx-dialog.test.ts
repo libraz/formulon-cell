@@ -78,6 +78,41 @@ describe('attachFxDialog', () => {
     handle.detach();
   });
 
+  it('wires the function search box to the active listbox option', () => {
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      onInsert: () => {},
+    });
+    handle.open();
+    const search = document.querySelector<HTMLInputElement>('.fc-fxdialog__search');
+    const list = document.querySelector<HTMLElement>('.fc-fxdialog__list');
+    if (!search || !list) throw new Error('expected function picker controls');
+    expect(search.getAttribute('role')).toBe('combobox');
+    expect(search.getAttribute('aria-controls')).toBe(list.id);
+    expect(search.getAttribute('aria-label')).toBeTruthy();
+    expect(list.getAttribute('role')).toBe('listbox');
+    expect(list.getAttribute('aria-label')).toBeTruthy();
+
+    const firstActive = search.getAttribute('aria-activedescendant');
+    expect(firstActive).toBeTruthy();
+    expect(document.getElementById(firstActive ?? '')?.getAttribute('aria-selected')).toBe('true');
+
+    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    const secondActive = search.getAttribute('aria-activedescendant');
+    expect(secondActive).toBeTruthy();
+    expect(secondActive).not.toBe(firstActive);
+
+    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    expect(search.getAttribute('aria-activedescendant')).toBe(firstActive);
+
+    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    const lastActive = search.getAttribute('aria-activedescendant');
+    expect(lastActive).toBeTruthy();
+    expect(lastActive).not.toBe(firstActive);
+    handle.detach();
+  });
+
   it('assembles the formula and fires onInsert on confirm', () => {
     const inserted: string[] = [];
     const handle = attachFxDialog({

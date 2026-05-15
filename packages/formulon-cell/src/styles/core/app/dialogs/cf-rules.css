@@ -77,6 +77,13 @@
     font-weight: 600;
     color: var(--fc-fg-soft, #555);
   }
+  .fc-cfrulesdlg__table tbody tr[aria-selected="true"] {
+    background: var(--fc-accent-soft, color-mix(in srgb, Highlight 14%, transparent));
+  }
+  .fc-cfrulesdlg__table tbody tr:focus-visible {
+    outline: 1px solid var(--fc-accent, Highlight);
+    outline-offset: -1px;
+  }
   .fc-cfrulesdlg__cell-range {
     word-break: break-all;
     max-width: 280px;

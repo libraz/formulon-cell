@@ -690,6 +690,7 @@ export {
   buildRibbonModel,
   FONT_FAMILIES,
   FONT_SIZES,
+  RIBBON_KEYSHORTCUTS,
   RIBBON_TAB_LABELS,
   toolbarText,
 } from './toolbar/ribbon-model.js';

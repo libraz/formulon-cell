@@ -13,6 +13,7 @@ interface DropdownProps<V extends string | number> {
   onChange: (value: V) => void;
   disabled?: boolean;
   className?: string;
+  ariaKeyshortcuts?: string;
   /** Optional override of what's shown in the closed display. Defaults to the
    *  option label matching `value`, or the raw `value` if no label matches.
    *  Used for the font-name dropdown so unknown faces still render. */
@@ -26,6 +27,7 @@ export function Dropdown<V extends string | number>({
   onChange,
   disabled,
   className,
+  ariaKeyshortcuts,
   display,
 }: DropdownProps<V>): ReactElement {
   const [open, setOpen] = useState(false);
@@ -138,6 +140,7 @@ export function Dropdown<V extends string | number>({
         className="demo__rb-dd__btn"
         title={title}
         aria-label={title}
+        aria-keyshortcuts={ariaKeyshortcuts}
         aria-haspopup="listbox"
         aria-expanded={open}
         disabled={disabled}

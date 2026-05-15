@@ -174,6 +174,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     // Number
     for (const [id, btn] of catButtons) {
       btn.setAttribute('aria-selected', id === draft.numberCategory ? 'true' : 'false');
+      btn.tabIndex = id === draft.numberCategory ? 0 : -1;
     }
     decimalsInput.value = String(draft.decimals);
     symbolSelect.value = draft.currencySymbol;
@@ -429,10 +430,12 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     }
   };
   // ── Tab switch ─────────────────────────────────────────────────────────
+  const tabOrder = Array.from(tabButtons.keys());
   const setActiveTab = (id: TabId): void => {
     activeTab = id;
     for (const [tabId, btn] of tabButtons) {
       btn.setAttribute('aria-selected', tabId === id ? 'true' : 'false');
+      btn.tabIndex = tabId === id ? 0 : -1;
     }
     for (const [tabId, p] of tabPanels) {
       p.hidden = tabId !== id;
@@ -489,7 +492,38 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const btn = target.closest('button[data-fc-tab]') as HTMLButtonElement | null;
     if (!btn) return;
     const id = btn.dataset.fcTab as TabId | undefined;
-    if (id) setActiveTab(id);
+    if (id) {
+      setActiveTab(id);
+      btn.focus();
+    }
+  };
+
+  const focusTabByIndex = (idx: number): void => {
+    const next = tabOrder[(idx + tabOrder.length) % tabOrder.length];
+    if (!next) return;
+    setActiveTab(next);
+    tabButtons.get(next)?.focus();
+  };
+
+  const onTabKeyDown = (e: KeyboardEvent): void => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-fc-tab]');
+    if (!btn) return;
+    const id = btn.dataset.fcTab as TabId | undefined;
+    const idx = id ? tabOrder.indexOf(id) : -1;
+    if (idx < 0) return;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusTabByIndex(idx + 1);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusTabByIndex(idx - 1);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      focusTabByIndex(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      focusTabByIndex(tabOrder.length - 1);
+    }
   };
 
   const onCatClick = (e: MouseEvent): void => {
@@ -498,6 +532,11 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     if (!btn) return;
     const id = btn.dataset.fcCat as NumberCategory | undefined;
     if (!id) return;
+    setNumberCategory(id);
+    btn.focus();
+  };
+
+  const setNumberCategory = (id: NumberCategory): void => {
     const previous = draft.numberCategory;
     draft.numberCategory = id;
     if (previous !== id) {
@@ -513,6 +552,36 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     }
     syncControlsFromDraft();
     renderPreview();
+  };
+
+  const focusCategoryByIndex = (idx: number): void => {
+    const categories = Array.from(catButtons.keys());
+    const next = categories[(idx + categories.length) % categories.length];
+    if (!next) return;
+    setNumberCategory(next);
+    catButtons.get(next)?.focus();
+  };
+
+  const onCatKeyDown = (e: KeyboardEvent): void => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-fc-cat]');
+    if (!btn) return;
+    const id = btn.dataset.fcCat as NumberCategory | undefined;
+    const categories = Array.from(catButtons.keys());
+    const idx = id ? categories.indexOf(id) : -1;
+    if (idx < 0) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      focusCategoryByIndex(idx + 1);
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      focusCategoryByIndex(idx - 1);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      focusCategoryByIndex(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      focusCategoryByIndex(categories.length - 1);
+    }
   };
 
   const onDecimalsInput = (): void => {
@@ -809,7 +878,9 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
 
   // ── Wire up ────────────────────────────────────────────────────────────
   shell.on(tabsStrip, 'click', onTabClick as EventListener);
+  shell.on(tabsStrip, 'keydown', onTabKeyDown as EventListener);
   shell.on(catList, 'click', onCatClick as EventListener);
+  shell.on(catList, 'keydown', onCatKeyDown as EventListener);
   shell.on(decimalsInput, 'input', onDecimalsInput);
   shell.on(symbolSelect, 'change', onSymbolChange);
   shell.on(patternInput, 'input', onPatternInput);

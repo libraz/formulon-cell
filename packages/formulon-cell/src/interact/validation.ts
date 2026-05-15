@@ -28,13 +28,17 @@ export interface ValidationListHandle {
 export function attachValidationList(deps: ValidationListDeps): ValidationListHandle {
   const { grid, store, wb } = deps;
   let popover: HTMLDivElement | null = null;
+  let restoreFocus: HTMLElement | null = null;
 
-  const close = (): void => {
+  const close = (shouldRestoreFocus = false): void => {
     if (!popover) return;
     popover.remove();
     popover = null;
     document.removeEventListener('mousedown', onDocMouseDown, true);
     document.removeEventListener('keydown', onDocKey, true);
+    const focusTarget = restoreFocus;
+    restoreFocus = null;
+    if (shouldRestoreFocus) focusTarget?.focus({ preventScroll: true });
   };
 
   const onDocMouseDown = (e: MouseEvent): void => {
@@ -45,8 +49,34 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
   const onDocKey = (e: KeyboardEvent): void => {
     if (e.key === 'Escape') {
       e.preventDefault();
-      close();
+      close(true);
     }
+  };
+
+  const items = (): HTMLElement[] =>
+    popover ? Array.from(popover.querySelectorAll<HTMLElement>('.fc-validation-list__item')) : [];
+
+  const focusItem = (idx: number): void => {
+    const options = items();
+    if (options.length === 0) return;
+    const next = (idx + options.length) % options.length;
+    for (const [i, option] of options.entries()) {
+      option.tabIndex = i === next ? 0 : -1;
+      option.setAttribute('aria-selected', i === next ? 'true' : 'false');
+    }
+    options[next]?.focus({ preventScroll: true });
+    options[next]?.scrollIntoView({ block: 'nearest' });
+  };
+
+  const commitValue = (row: number, col: number, value: string): void => {
+    const sheet = store.getState().data.sheetIndex;
+    try {
+      writeInput(wb, { sheet, row, col }, value);
+    } catch (err) {
+      console.warn('formulon-cell: validation write failed', err);
+    }
+    deps.onAfterCommit();
+    close();
   };
 
   const open = (row: number, col: number, list: string[]): void => {
@@ -62,29 +92,59 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
     div.style.left = `${rect.left + chevron.rect.x}px`;
     div.style.top = `${rect.top + chevron.rect.y + chevron.rect.h}px`;
     div.setAttribute('role', 'listbox');
+    div.tabIndex = -1;
+    restoreFocus =
+      document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+        ? document.activeElement
+        : grid;
 
-    for (const v of list) {
+    for (const [idx, v] of list.entries()) {
       const item = document.createElement('div');
       item.className = 'fc-validation-list__item';
       item.setAttribute('role', 'option');
+      item.setAttribute('aria-selected', idx === 0 ? 'true' : 'false');
+      item.tabIndex = idx === 0 ? 0 : -1;
       item.textContent = v;
       item.addEventListener('mousedown', (e) => {
         e.preventDefault();
-        const sheet = store.getState().data.sheetIndex;
-        try {
-          writeInput(wb, { sheet, row, col }, v);
-        } catch (err) {
-          console.warn('formulon-cell: validation write failed', err);
-        }
-        deps.onAfterCommit();
-        close();
+        commitValue(row, col, v);
+      });
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        commitValue(row, col, v);
       });
       div.appendChild(item);
     }
+    div.addEventListener('keydown', (e) => {
+      const options = items();
+      const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      const idx = active ? options.indexOf(active) : -1;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        focusItem(idx + 1);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        focusItem(idx - 1);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        focusItem(0);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        focusItem(options.length - 1);
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        const value = active?.textContent ?? '';
+        if (value) commitValue(row, col, value);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        close(true);
+      }
+    });
 
     inheritHostTokens(grid, div);
     document.body.appendChild(div);
     popover = div;
+    focusItem(0);
     document.addEventListener('mousedown', onDocMouseDown, true);
     document.addEventListener('keydown', onDocKey, true);
   };

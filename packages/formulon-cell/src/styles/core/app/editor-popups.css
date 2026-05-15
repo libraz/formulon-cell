@@ -225,9 +225,15 @@
     padding: 5px 12px;
     cursor: pointer;
   }
-  .fc-validation-list__item:hover {
+  .fc-validation-list__item:hover,
+  .fc-validation-list__item:focus-visible,
+  .fc-validation-list__item[aria-selected="true"] {
     background: var(--fc-accent-soft, rgba(30, 122, 224, 0.14));
     color: var(--fc-accent, dodgerblue);
+  }
+  .fc-validation-list__item:focus-visible {
+    outline: 1px solid var(--fc-accent, dodgerblue);
+    outline-offset: -1px;
   }
 
   /* Status bar aggregate chooser — popover above the statusbar with

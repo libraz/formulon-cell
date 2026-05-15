@@ -135,6 +135,20 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   closeBtn.className = 'fc-cfrulesdlg__close';
   closeBtn.textContent = t.close;
   footer.appendChild(closeBtn);
+  let selectedRuleIndex = 0;
+
+  const focusRuleRow = (idx: number): void => {
+    const rows = Array.from(tableWrap.querySelectorAll<HTMLTableRowElement>('tbody tr'));
+    if (rows.length === 0) return;
+    selectedRuleIndex = (idx + rows.length) % rows.length;
+    for (const [rowIdx, row] of rows.entries()) {
+      const selected = rowIdx === selectedRuleIndex;
+      row.tabIndex = selected ? 0 : -1;
+      row.setAttribute('aria-selected', selected ? 'true' : 'false');
+      row.classList.toggle('fc-cfrulesdlg__row--selected', selected);
+    }
+    rows[selectedRuleIndex]?.focus({ preventScroll: true });
+  };
 
   const onKey = (e: KeyboardEvent): void => {
     if (overlay.hidden) return;
@@ -172,6 +186,9 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     const tbody = document.createElement('tbody');
     rules.forEach((rule, index) => {
       const row = document.createElement('tr');
+      row.tabIndex = index === selectedRuleIndex ? 0 : -1;
+      row.setAttribute('aria-selected', index === selectedRuleIndex ? 'true' : 'false');
+      row.classList.toggle('fc-cfrulesdlg__row--selected', index === selectedRuleIndex);
       const prio = document.createElement('td');
       prio.textContent = String(rule.priority);
       const kind = document.createElement('td');
@@ -189,7 +206,30 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
         if (!wb) return;
         if (wb.removeConditionalFormatAt(sheet, index)) {
           onChanged?.();
+          selectedRuleIndex = Math.min(index, Math.max(0, rules.length - 2));
           renderTable();
+          requestAnimationFrame(() => focusRuleRow(selectedRuleIndex));
+        }
+      });
+      row.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          focusRuleRow(index + 1);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          focusRuleRow(index - 1);
+        } else if (e.key === 'Home') {
+          e.preventDefault();
+          focusRuleRow(0);
+        } else if (e.key === 'End') {
+          e.preventDefault();
+          focusRuleRow(rules.length - 1);
+        } else if (e.key === 'Delete' || e.key === 'Backspace') {
+          e.preventDefault();
+          rm.click();
+        } else if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          rm.focus();
         }
       });
       actions.appendChild(rm);
@@ -198,6 +238,8 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     });
     table.appendChild(tbody);
     tableWrap.appendChild(table);
+    selectedRuleIndex = Math.min(selectedRuleIndex, rules.length - 1);
+    focusRuleRow(selectedRuleIndex);
   };
 
   // Two-step "Clear all": first click arms the button, second click within

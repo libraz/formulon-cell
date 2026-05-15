@@ -58,6 +58,7 @@ import {
   type BorderPreset,
   FONT_FAMILIES,
   FONT_SIZES,
+  RIBBON_KEYSHORTCUTS,
   RIBBON_TAB_LABELS,
   type RibbonTab,
 } from './toolbar/model.js';
@@ -86,6 +87,7 @@ const lang = computed(() => (props.locale === 'ja' ? 'ja' : 'en'));
 const tabs = computed(() => toolbarTabs(lang.value));
 const tr = computed(() => toolbarText(lang.value));
 const tablistRef = ref<HTMLDivElement | null>(null);
+const keyShortcuts = (id: string): string | undefined => RIBBON_KEYSHORTCUTS[id];
 const borderPresets = computed(() =>
   BORDER_PRESETS.map((preset) => ({
     ...preset,
@@ -420,10 +422,10 @@ const onZoom = (zoom: number): void => {
         </section>
         <section class="demo__ribbon-group demo__ribbon-group--tiles" :aria-label="tr.inspect">
           <div class="demo__ribbon-tools">
-            <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="props.instance?.openFormatDialog()">
+            <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" :aria-keyshortcuts="keyShortcuts('formatCells')" @click="props.instance?.openFormatDialog()">
               <RibbonIcon name="formatCells" /><span>{{ tr.formatCells }}</span>
             </button>
-            <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="props.instance?.openGoToSpecial()">
+            <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" :aria-keyshortcuts="keyShortcuts('gotoSpecial')" @click="props.instance?.openGoToSpecial()">
               <RibbonIcon name="goTo" /><span>{{ tr.goTo }}</span>
             </button>
           </div>
@@ -434,14 +436,14 @@ const onZoom = (zoom: number): void => {
       <template v-else-if="props.activeTab === 'home'">
       <section class="demo__ribbon-group demo__ribbon-group--clipboard" :aria-label="tr.clipboard">
         <div class="demo__ribbon-tools">
-    <button class="demo__rb demo__rb--large" type="button" :disabled="disabled" :title="tr.paste" :aria-label="tr.paste" @click="dispatchClipboard('paste')">
+    <button class="demo__rb demo__rb--large" type="button" :disabled="disabled" :title="tr.paste" :aria-label="tr.paste" :aria-keyshortcuts="keyShortcuts('paste')" @click="dispatchClipboard('paste')">
       <RibbonIcon name="paste" />
       <span>{{ tr.paste }}</span>
     </button>
-    <button class="demo__rb" type="button" :disabled="disabled" :title="tr.cut" :aria-label="tr.cut" @click="dispatchClipboard('cut')">
+    <button class="demo__rb" type="button" :disabled="disabled" :title="tr.cut" :aria-label="tr.cut" :aria-keyshortcuts="keyShortcuts('cut')" @click="dispatchClipboard('cut')">
       <RibbonIcon name="cut" />
     </button>
-    <button class="demo__rb" type="button" :disabled="disabled" :title="tr.copy" :aria-label="tr.copy" @click="dispatchClipboard('copy')">
+    <button class="demo__rb" type="button" :disabled="disabled" :title="tr.copy" :aria-label="tr.copy" :aria-keyshortcuts="keyShortcuts('copy')" @click="dispatchClipboard('copy')">
       <RibbonIcon name="copy" />
     </button>
     <button class="demo__rb" :class="{ 'demo__rb--active': active.formatPainterArmed }" type="button" :disabled="disabled" :title="tr.formatPainter" :aria-label="tr.formatPainter" @click="onFormatPainter">
@@ -743,7 +745,7 @@ const onZoom = (zoom: number): void => {
     <button class="demo__rb" type="button" :disabled="disabled" :title="tr.deleteCols" :aria-label="tr.deleteCols" @click="onDeleteCols">
       <RibbonIcon name="deleteCols" />
     </button>
-    <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" :title="tr.formatCells" :aria-label="tr.formatCells" @click="props.instance?.openFormatDialog()">
+    <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" :title="tr.formatCells" :aria-label="tr.formatCells" :aria-keyshortcuts="keyShortcuts('formatCellsHome')" @click="props.instance?.openFormatDialog()">
       <RibbonIcon name="formatCells" /><span>{{ tr.formatCells }}</span>
     </button>
         </div>
@@ -755,10 +757,10 @@ const onZoom = (zoom: number): void => {
     <button class="demo__rb" type="button" :disabled="disabled" :title="`${tr.autoSum} (Σ)`" :aria-label="`${tr.autoSum} (Σ)`" @click="onAutoSum">
       <RibbonIcon name="autosum" />
     </button>
-    <button class="demo__rb" type="button" :disabled="disabled" :title="`${tr.undo} (⌘Z)`" :aria-label="`${tr.undo} (⌘Z)`" @click="onUndo">
+    <button class="demo__rb" type="button" :disabled="disabled" :title="`${tr.undo} (⌘Z)`" :aria-label="`${tr.undo} (⌘Z)`" :aria-keyshortcuts="keyShortcuts('undoHome')" @click="onUndo">
       <RibbonIcon name="undo" />
     </button>
-    <button class="demo__rb" type="button" :disabled="disabled" :title="`${tr.redo} (⌘⇧Z)`" :aria-label="`${tr.redo} (⌘⇧Z)`" @click="onRedo">
+    <button class="demo__rb" type="button" :disabled="disabled" :title="`${tr.redo} (⌘⇧Z)`" :aria-label="`${tr.redo} (⌘⇧Z)`" :aria-keyshortcuts="keyShortcuts('redoHome')" @click="onRedo">
       <RibbonIcon name="redo" />
     </button>
     <button class="demo__rb" type="button" :disabled="disabled" :title="tr.sortAscending" :aria-label="tr.sortAscending" @click="onSort('asc')">
@@ -767,10 +769,10 @@ const onZoom = (zoom: number): void => {
     <button class="demo__rb" :class="{ 'demo__rb--active': active.filterOn }" type="button" :disabled="disabled" :title="tr.filter" :aria-label="tr.filter" @click="onFilterToggle">
       <RibbonIcon name="filter" />
     </button>
-    <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" :title="`${tr.find} (⌘F)`" :aria-label="`${tr.find} (⌘F)`" @click="props.instance?.openFindReplace()">
+    <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" :title="`${tr.find} (⌘F)`" :aria-label="`${tr.find} (⌘F)`" :aria-keyshortcuts="keyShortcuts('findHome')" @click="props.instance?.openFindReplace()">
       <RibbonIcon name="find" /><span>{{ tr.find }}</span>
     </button>
-    <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" :title="tr.gotoSpecial" :aria-label="tr.gotoSpecial" @click="props.instance?.openGoToSpecial()">
+    <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" :title="tr.gotoSpecial" :aria-label="tr.gotoSpecial" :aria-keyshortcuts="keyShortcuts('gotoSpecialHome')" @click="props.instance?.openGoToSpecial()">
       <RibbonIcon name="goTo" /><span>{{ tr.gotoSpecial }}</span>
     </button>
         </div>
@@ -787,7 +789,7 @@ const onZoom = (zoom: number): void => {
             <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="onFormatAsTable">
               <RibbonIcon name="tableStyle" /><span>{{ tr.formatTable }}</span>
             </button>
-            <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="props.instance?.openNamedRangeDialog()">
+            <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" :aria-keyshortcuts="keyShortcuts('namedRangesInsert')" @click="props.instance?.openNamedRangeDialog()">
               <RibbonIcon name="names" /><span>{{ tr.names }}</span>
             </button>
             <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="onRemoveDuplicates">
@@ -806,7 +808,7 @@ const onZoom = (zoom: number): void => {
         </section>
         <section class="demo__ribbon-group demo__ribbon-group--tiles" :aria-label="tr.links">
           <div class="demo__ribbon-tools">
-            <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="props.instance?.openHyperlinkDialog()">
+            <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" :aria-keyshortcuts="keyShortcuts('hyperlinkInsert')" @click="props.instance?.openHyperlinkDialog()">
               <RibbonIcon name="link" /><span>{{ tr.hyperlink }}</span>
             </button>
             <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="props.instance?.openExternalLinksDialog()">
@@ -825,7 +827,7 @@ const onZoom = (zoom: number): void => {
         </section>
         <section class="demo__ribbon-group demo__ribbon-group--tiles" :aria-label="tr.symbols">
           <div class="demo__ribbon-tools">
-            <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="props.instance?.openFunctionArguments()">
+            <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" :aria-keyshortcuts="keyShortcuts('fxInsert')" @click="props.instance?.openFunctionArguments()">
               <RibbonIcon name="function" /><span>fx</span>
             </button>
           </div>
@@ -884,7 +886,7 @@ const onZoom = (zoom: number): void => {
       <template v-else-if="props.activeTab === 'formulas'">
         <section class="demo__ribbon-group demo__ribbon-group--tiles" :aria-label="tr.functionLibrary">
           <div class="demo__ribbon-tools">
-            <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="props.instance?.openFunctionArguments()">
+            <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" :aria-keyshortcuts="keyShortcuts('fx')" @click="props.instance?.openFunctionArguments()">
               <RibbonIcon name="function" />
             </button>
             <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="onAutoSum">
@@ -901,7 +903,7 @@ const onZoom = (zoom: number): void => {
         </section>
         <section class="demo__ribbon-group demo__ribbon-group--tiles" :aria-label="tr.definedNames">
           <div class="demo__ribbon-tools">
-            <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="props.instance?.openNamedRangeDialog()">
+            <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" :aria-keyshortcuts="keyShortcuts('namedRanges')" @click="props.instance?.openNamedRangeDialog()">
               <RibbonIcon name="names" /><span>{{ tr.names }}</span>
             </button>
           </div>
@@ -923,7 +925,7 @@ const onZoom = (zoom: number): void => {
         </section>
         <section class="demo__ribbon-group demo__ribbon-group--tiles" :aria-label="tr.calculation">
           <div class="demo__ribbon-tools">
-            <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="props.instance?.recalc()">
+            <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" :aria-keyshortcuts="keyShortcuts('recalcNow')" @click="props.instance?.recalc()">
               <RibbonIcon name="autosum" /><span>{{ tr.recalc }}</span>
             </button>
             <button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="props.instance?.openIterativeDialog()">
@@ -990,7 +992,7 @@ const onZoom = (zoom: number): void => {
           <div class="demo__ribbon-label">{{ tr.comments }}</div>
         </section>
         <section class="demo__ribbon-group demo__ribbon-group--tiles" :aria-label="tr.find">
-          <div class="demo__ribbon-tools"><button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" @click="props.instance?.openFindReplace()"><RibbonIcon name="find" /><span>{{ tr.find }}</span></button></div>
+          <div class="demo__ribbon-tools"><button class="demo__rb demo__rb--wide" type="button" :disabled="disabled" :aria-keyshortcuts="keyShortcuts('findReview')" @click="props.instance?.openFindReplace()"><RibbonIcon name="find" /><span>{{ tr.find }}</span></button></div>
           <div class="demo__ribbon-label">{{ tr.find }}</div>
         </section>
         <section class="demo__ribbon-group demo__ribbon-group--tiles" :aria-label="tr.protection">

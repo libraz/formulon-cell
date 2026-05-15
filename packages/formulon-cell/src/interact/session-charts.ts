@@ -178,6 +178,7 @@ export function attachSessionCharts(deps: {
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
       mutators.removeChart(store, chart.id);
+      host.focus({ preventScroll: true });
       return;
     }
 
@@ -217,7 +218,12 @@ export function attachSessionCharts(deps: {
         panel.dataset.chartId = chart.id;
         panel.tabIndex = 0;
         panel.setAttribute('role', 'group');
+        panel.setAttribute('aria-roledescription', 'chart');
         panel.setAttribute('aria-selected', chart.id === selectedId ? 'true' : 'false');
+        panel.setAttribute(
+          'aria-keyshortcuts',
+          'ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown Delete Backspace',
+        );
         panel.setAttribute(
           'aria-label',
           chart.title ?? (chart.kind === 'line' ? labels.lineChart : labels.columnChart),
@@ -250,7 +256,10 @@ export function attachSessionCharts(deps: {
         close.className = 'fc-chart__close';
         close.setAttribute('aria-label', labels.close);
         close.textContent = '×';
-        close.addEventListener('click', () => mutators.removeChart(store, chart.id));
+        close.addEventListener('click', () => {
+          mutators.removeChart(store, chart.id);
+          host.focus({ preventScroll: true });
+        });
         header.append(title, close);
 
         const svg = document.createElementNS(SVG_NS, 'svg');

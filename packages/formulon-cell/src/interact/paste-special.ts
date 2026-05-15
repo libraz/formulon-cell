@@ -233,6 +233,8 @@ function makeFieldset(legend: string): { fieldset: HTMLDivElement; body: HTMLDiv
   lg.textContent = legend;
   const body = document.createElement('div');
   body.className = 'fc-pastesp__list';
+  body.setAttribute('role', 'radiogroup');
+  body.setAttribute('aria-label', legend);
   fieldset.append(lg, body);
   return { fieldset, body };
 }

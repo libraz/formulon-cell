@@ -70,6 +70,9 @@ describe('attachValidationList', () => {
     firePointerInChevron(grid, 50, 30);
     expect(popover()).not.toBeNull();
     expect(items().map((i) => i.textContent)).toEqual(['alpha', 'beta', 'gamma']);
+    expect(popover()?.getAttribute('role')).toBe('listbox');
+    expect(document.activeElement).toBe(items()[0]);
+    expect(items()[0]?.getAttribute('aria-selected')).toBe('true');
     handle.detach();
   });
 
@@ -105,6 +108,55 @@ describe('attachValidationList', () => {
     expect(popover()).not.toBeNull();
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(popover()).toBeNull();
+    handle.detach();
+  });
+
+  it('supports arrow-key selection and Enter commit', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      { validation: { kind: 'list', source: ['small', 'medium', 'large'] } },
+    );
+    setValidationChevron({ rect: { x: 10, y: 10, w: 12, h: 12 }, row: 0, col: 0 });
+
+    const handle = attachValidationList({ grid, store, wb, onAfterCommit });
+    firePointerInChevron(grid, 10, 10);
+    expect(document.activeElement).toBe(items()[0]);
+
+    items()[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(document.activeElement).toBe(items()[1]);
+    expect(items()[1]?.getAttribute('aria-selected')).toBe('true');
+
+    items()[1]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    expect(document.activeElement).toBe(items()[2]);
+
+    items()[2]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(onAfterCommit).toHaveBeenCalledTimes(1);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
+      kind: 'text',
+      value: 'large',
+    });
+    expect(popover()).toBeNull();
+    handle.detach();
+  });
+
+  it('Escape restores focus to the grid opener', () => {
+    grid.tabIndex = 0;
+    grid.focus();
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      { validation: { kind: 'list', source: ['only'] } },
+    );
+    setValidationChevron({ rect: { x: 10, y: 10, w: 12, h: 12 }, row: 0, col: 0 });
+
+    const handle = attachValidationList({ grid, store, wb, onAfterCommit });
+    firePointerInChevron(grid, 10, 10);
+    expect(popover()).not.toBeNull();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    expect(popover()).toBeNull();
+    expect(document.activeElement).toBe(grid);
     handle.detach();
   });
 

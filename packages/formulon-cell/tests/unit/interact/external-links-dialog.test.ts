@@ -65,8 +65,51 @@ describe('attachExternalLinksDialog', () => {
     expect(rows[0]?.textContent).toContain('1');
     expect(rows[0]?.textContent).toContain('externalBook');
     expect(rows[0]?.textContent).toContain('book2.xlsx');
+    expect(rows[0]?.tabIndex).toBe(0);
+    expect(rows[0]?.getAttribute('aria-selected')).toBe('true');
+    expect(rows[1]?.tabIndex).toBe(-1);
     // Empty target renders as a dash placeholder.
     expect(rows[1]?.textContent).toContain('—');
+    handle.detach();
+  });
+
+  it('supports Excel-style row navigation keys', () => {
+    const handle = attachExternalLinksDialog({
+      host,
+      getWb: () =>
+        fakeWb([
+          {
+            index: 1,
+            relId: 'rId3',
+            partPath: 'xl/externalLinks/externalLink1.xml',
+            target: 'file:///fixtures/book2.xlsx',
+            targetExternal: true,
+            kind: 'externalBook',
+          },
+          {
+            index: 2,
+            relId: 'rId7',
+            partPath: 'xl/externalLinks/externalLink2.xml',
+            target: '',
+            targetExternal: false,
+            kind: 'unknown',
+          },
+        ]),
+    });
+    handle.open();
+    const rows = (): HTMLTableRowElement[] =>
+      Array.from(document.querySelectorAll<HTMLTableRowElement>('.fc-extlinkdlg__table tbody tr'));
+
+    rows()[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(rows()[1]?.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(rows()[1]);
+
+    rows()[1]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    expect(rows()[0]?.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(rows()[0]);
+
+    rows()[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    expect(rows()[1]?.getAttribute('aria-selected')).toBe('true');
     handle.detach();
   });
 

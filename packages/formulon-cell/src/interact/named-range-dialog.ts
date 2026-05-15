@@ -60,6 +60,8 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
 
   const list = document.createElement('div');
   list.className = 'fc-namedlg__list';
+  list.setAttribute('role', 'listbox');
+  list.setAttribute('aria-label', t.title);
   body.appendChild(list);
 
   // Add-row form. Only inserted into the DOM when the engine supports
@@ -70,12 +72,14 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   nameInput.type = 'text';
   nameInput.className = 'fc-namedlg__input';
   nameInput.placeholder = t.namePlaceholder;
+  nameInput.setAttribute('aria-label', t.nameHeader);
   nameInput.autocomplete = 'off';
   nameInput.spellcheck = false;
   const formulaInput = document.createElement('input');
   formulaInput.type = 'text';
   formulaInput.className = 'fc-namedlg__input';
   formulaInput.placeholder = t.formulaPlaceholder;
+  formulaInput.setAttribute('aria-label', t.formulaHeader);
   formulaInput.autocomplete = 'off';
   formulaInput.spellcheck = false;
   const addBtn = document.createElement('button');
@@ -110,15 +114,42 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     errorRow.hidden = true;
     errorRow.textContent = '';
   };
+  let selectedNameIndex = 0;
+
+  const updateRowSelection = (): HTMLElement[] => {
+    const rows = Array.from(list.querySelectorAll<HTMLElement>('.fc-namedlg__item'));
+    if (rows.length === 0) return rows;
+    selectedNameIndex = Math.min(selectedNameIndex, rows.length - 1);
+    for (const [rowIdx, row] of rows.entries()) {
+      const selected = rowIdx === selectedNameIndex;
+      row.tabIndex = selected ? 0 : -1;
+      row.setAttribute('aria-selected', selected ? 'true' : 'false');
+      row.classList.toggle('fc-namedlg__item--selected', selected);
+    }
+    return rows;
+  };
+
+  const focusNameRow = (idx: number): void => {
+    const rows = Array.from(list.querySelectorAll<HTMLElement>('.fc-namedlg__item'));
+    if (rows.length === 0) return;
+    selectedNameIndex = (idx + rows.length) % rows.length;
+    updateRowSelection();
+    rows[selectedNameIndex]?.focus({ preventScroll: true });
+  };
 
   const renderList = (): void => {
     list.replaceChildren();
     let count = 0;
     const canMutate = wb.capabilities.definedNameMutate;
     for (const entry of wb.definedNames()) {
+      const rowIndex = count;
       count += 1;
       const item = document.createElement('div');
       item.className = 'fc-namedlg__item fc-namedlg__row';
+      item.setAttribute('role', 'option');
+      item.setAttribute('aria-selected', rowIndex === selectedNameIndex ? 'true' : 'false');
+      item.tabIndex = rowIndex === selectedNameIndex ? 0 : -1;
+      item.classList.toggle('fc-namedlg__item--selected', rowIndex === selectedNameIndex);
       const name = document.createElement('span');
       name.textContent = entry.name;
       const formulaCell = document.createElement('span');
@@ -126,8 +157,9 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       const formulaText = document.createElement('span');
       formulaText.textContent = entry.formula;
       formulaCell.appendChild(formulaText);
+      let del: HTMLButtonElement | null = null;
       if (canMutate) {
-        const del = document.createElement('button');
+        del = document.createElement('button');
         del.type = 'button';
         del.className = 'fc-namedlg__del';
         del.textContent = t.deleteButton;
@@ -138,19 +170,45 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
             return;
           }
           clearError();
+          selectedNameIndex = Math.min(rowIndex, Math.max(0, count - 2));
           renderList();
+          requestAnimationFrame(() => focusNameRow(selectedNameIndex));
         });
         formulaCell.appendChild(del);
       }
+      item.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          focusNameRow(rowIndex + 1);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          focusNameRow(rowIndex - 1);
+        } else if (e.key === 'Home') {
+          e.preventDefault();
+          focusNameRow(0);
+        } else if (e.key === 'End') {
+          e.preventDefault();
+          focusNameRow(count - 1);
+        } else if ((e.key === 'Delete' || e.key === 'Backspace') && del) {
+          e.preventDefault();
+          del.click();
+        } else if ((e.key === 'Enter' || e.key === ' ') && del) {
+          e.preventDefault();
+          del.focus();
+        }
+      });
       item.append(name, formulaCell);
       list.appendChild(item);
     }
     if (count === 0) {
+      selectedNameIndex = 0;
       const empty = document.createElement('div');
       empty.className = 'fc-namedlg__empty';
       empty.textContent = t.empty;
       list.appendChild(empty);
+      return;
     }
+    updateRowSelection();
   };
 
   const onSubmit = (e: SubmitEvent): void => {

@@ -86,17 +86,22 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     btn.textContent = def.label;
     btn.setAttribute('role', 'tab');
     btn.setAttribute('aria-selected', 'false');
+    btn.setAttribute('aria-controls', `fc-fmtdlg-panel-${def.id}`);
+    btn.tabIndex = -1;
     btn.dataset.fcTab = def.id;
     tabsStrip.appendChild(btn);
     tabButtons.set(def.id, btn);
 
     const panelEl = document.createElement('div');
     panelEl.className = 'fc-fmtdlg__panel-tab';
+    panelEl.id = `fc-fmtdlg-panel-${def.id}`;
     panelEl.setAttribute('role', 'tabpanel');
+    panelEl.setAttribute('aria-labelledby', `fc-fmtdlg-tab-${def.id}`);
     panelEl.dataset.fcTab = def.id;
     panelEl.hidden = true;
     body.appendChild(panelEl);
     tabPanels.set(def.id, panelEl);
+    btn.id = `fc-fmtdlg-tab-${def.id}`;
   }
 
   // ── Number tab ─────────────────────────────────────────────────────────
@@ -133,6 +138,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     b.className = 'fc-fmtdlg__cat-item';
     b.textContent = c.label;
     b.setAttribute('role', 'option');
+    b.tabIndex = -1;
     b.dataset.fcCat = c.id;
     catList.appendChild(b);
     catButtons.set(c.id, b);
@@ -158,6 +164,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   decimalsLabel.textContent = t.decimals;
   const decimalsInput = document.createElement('input');
   decimalsInput.type = 'number';
+  decimalsInput.setAttribute('aria-label', t.decimals);
   decimalsInput.min = '0';
   decimalsInput.max = '10';
   decimalsInput.step = '1';
@@ -169,6 +176,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   const symbolLabel = document.createElement('span');
   symbolLabel.textContent = t.symbol;
   const symbolSelect = document.createElement('select');
+  symbolSelect.setAttribute('aria-label', t.symbol);
   for (const s of CURRENCY_SYMBOLS) {
     const opt = document.createElement('option');
     opt.value = s;
@@ -183,6 +191,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   const patternPresetLabel = document.createElement('span');
   patternPresetLabel.textContent = t.patternType;
   const patternPresetSelect = document.createElement('select');
+  patternPresetSelect.setAttribute('aria-label', t.patternType);
   patternPresetRow.append(patternPresetLabel, patternPresetSelect);
   numberControls.appendChild(patternPresetRow);
 
@@ -193,6 +202,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   patternLabel.textContent = t.pattern;
   const patternInput = document.createElement('input');
   patternInput.type = 'text';
+  patternInput.setAttribute('aria-label', t.pattern);
   patternInput.dataset.fcInput = 'pattern';
   patternInput.spellcheck = false;
   patternInput.autocomplete = 'off';
@@ -209,6 +219,8 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   alignPanel.appendChild(hAlignLegend);
   const hAlignFieldset = document.createElement('div');
   hAlignFieldset.className = 'fc-fmtdlg__choice-grid';
+  hAlignFieldset.setAttribute('role', 'radiogroup');
+  hAlignFieldset.setAttribute('aria-label', t.horizontalAlign);
   alignPanel.appendChild(hAlignFieldset);
 
   const hAlignName = `fc-fmtdlg-halign-${Math.random().toString(36).slice(2, 8)}`;
@@ -239,6 +251,8 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   alignPanel.appendChild(vAlignLegend);
   const vAlignFieldset = document.createElement('div');
   vAlignFieldset.className = 'fc-fmtdlg__choice-grid';
+  vAlignFieldset.setAttribute('role', 'radiogroup');
+  vAlignFieldset.setAttribute('aria-label', t.verticalAlign);
   alignPanel.appendChild(vAlignFieldset);
 
   const vAlignName = `fc-fmtdlg-valign-${Math.random().toString(36).slice(2, 8)}`;
@@ -277,6 +291,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   indentLabel.textContent = t.indent;
   const indentInput = document.createElement('input');
   indentInput.type = 'number';
+  indentInput.setAttribute('aria-label', t.indent);
   indentInput.min = '0';
   indentInput.max = '15';
   indentInput.step = '1';
@@ -289,6 +304,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   rotationLabel.textContent = t.rotation;
   const rotationInput = document.createElement('input');
   rotationInput.type = 'number';
+  rotationInput.setAttribute('aria-label', t.rotation);
   rotationInput.min = '-90';
   rotationInput.max = '90';
   rotationInput.step = '1';
@@ -319,6 +335,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   familyLabel.textContent = t.fontFamily;
   const familyInput = document.createElement('input');
   familyInput.type = 'text';
+  familyInput.setAttribute('aria-label', t.fontFamily);
   familyInput.dataset.fcInput = 'family';
   familyInput.spellcheck = false;
   familyInput.autocomplete = 'off';
@@ -341,6 +358,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   sizeLabel.textContent = t.fontSize;
   const sizeInput = document.createElement('input');
   sizeInput.type = 'number';
+  sizeInput.setAttribute('aria-label', t.fontSize);
   sizeInput.min = '8';
   sizeInput.max = '72';
   sizeInput.step = '1';
@@ -354,6 +372,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   colorLabel.textContent = t.color;
   const colorInput = document.createElement('input');
   colorInput.type = 'color';
+  colorInput.setAttribute('aria-label', t.color);
   colorInput.dataset.fcColor = 'font';
   const colorReset = makeButton(t.resetToDefault);
   colorRow.append(colorLabel, colorInput, colorReset);
@@ -370,6 +389,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   const borderStyleLabel = document.createElement('span');
   borderStyleLabel.textContent = t.borderStyle;
   const borderStyleSelect = document.createElement('select');
+  borderStyleSelect.setAttribute('aria-label', t.borderStyle);
   const styleOptions: { id: BorderStyleKey; label: string }[] = [
     { id: 'thin', label: t.borderStyleThin },
     { id: 'medium', label: t.borderStyleMedium },
@@ -413,6 +433,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   borderColorLabel.textContent = t.borderColor;
   const borderColorInput = document.createElement('input');
   borderColorInput.type = 'color';
+  borderColorInput.setAttribute('aria-label', t.borderColor);
   borderColorInput.dataset.fcColor = 'border';
   const borderColorReset = makeButton(t.resetToDefault);
   borderColorRow.append(borderColorLabel, borderColorInput, borderColorReset);
@@ -512,6 +533,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   fillLabel.textContent = t.fill;
   const fillInput = document.createElement('input');
   fillInput.type = 'color';
+  fillInput.setAttribute('aria-label', t.fill);
   fillInput.dataset.fcColor = 'fill';
   const fillReset = makeButton(t.fillNone);
   fillRow.append(fillLabel, fillInput, fillReset);
@@ -553,6 +575,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   hlLabel.textContent = t.hyperlink;
   const hlInput = document.createElement('input');
   hlInput.type = 'text';
+  hlInput.setAttribute('aria-label', t.hyperlink);
   hlInput.spellcheck = false;
   hlInput.autocomplete = 'off';
   hlInput.placeholder = t.hyperlinkPlaceholder;
@@ -565,6 +588,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   const commentArea = document.createElement('textarea');
   commentArea.className = 'fc-fmtdlg__textarea';
   commentArea.rows = 3;
+  commentArea.setAttribute('aria-label', t.comment);
   commentArea.placeholder = t.commentPlaceholder;
   const commentClear = makeButton(t.clearField);
   commentRow.append(commentArea, commentClear);
@@ -575,6 +599,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   const validationKindLabel = document.createElement('span');
   validationKindLabel.textContent = t.validationKind;
   const validationKindSelect = document.createElement('select');
+  validationKindSelect.setAttribute('aria-label', t.validationKind);
   const kindDefs: { id: ValidationKind; label: string }[] = [
     { id: 'none', label: t.validationKindNone },
     { id: 'list', label: t.validationKindList },
@@ -600,6 +625,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   const validationOpLabel = document.createElement('span');
   validationOpLabel.textContent = t.validationOp;
   const validationOpSelect = document.createElement('select');
+  validationOpSelect.setAttribute('aria-label', t.validationOp);
   const opDefs: { id: ValidationOp; label: string }[] = [
     { id: 'between', label: t.validationOpBetween },
     { id: 'notBetween', label: t.validationOpNotBetween },
@@ -625,6 +651,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   validationALabel.textContent = t.validationValueA;
   const validationAInput = document.createElement('input');
   validationAInput.type = 'number';
+  validationAInput.setAttribute('aria-label', t.validationValueA);
   validationAInput.step = 'any';
   validationARow.append(validationALabel, validationAInput);
   validationSection.appendChild(validationARow);
@@ -635,6 +662,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   validationBLabel.textContent = t.validationValueB;
   const validationBInput = document.createElement('input');
   validationBInput.type = 'number';
+  validationBInput.setAttribute('aria-label', t.validationValueB);
   validationBInput.step = 'any';
   validationBRow.append(validationBLabel, validationBInput);
   validationSection.appendChild(validationBRow);
@@ -646,6 +674,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   validationFormulaLabel.textContent = t.validationFormula;
   const validationFormulaInput = document.createElement('input');
   validationFormulaInput.type = 'text';
+  validationFormulaInput.setAttribute('aria-label', t.validationFormula);
   validationFormulaInput.spellcheck = false;
   validationFormulaInput.autocomplete = 'off';
   validationFormulaInput.placeholder = t.validationFormulaPlaceholder;
@@ -672,6 +701,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   const validationArea = document.createElement('textarea');
   validationArea.className = 'fc-fmtdlg__textarea';
   validationArea.rows = 4;
+  validationArea.setAttribute('aria-label', t.validationListSourceLiteral);
   validationArea.placeholder = t.validationListPlaceholder;
   const validationClear = makeButton(t.clearField);
   validationRow.append(validationArea, validationClear);
@@ -684,6 +714,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   validationListRangeLabel.textContent = t.validationListSourceRange;
   const validationListRangeInput = document.createElement('input');
   validationListRangeInput.type = 'text';
+  validationListRangeInput.setAttribute('aria-label', t.validationListSourceRange);
   validationListRangeInput.spellcheck = false;
   validationListRangeInput.autocomplete = 'off';
   validationListRangeInput.placeholder = t.validationListRangePlaceholder;
@@ -705,6 +736,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   const validationErrorStyleLabel = document.createElement('span');
   validationErrorStyleLabel.textContent = t.validationErrorStyle;
   const validationErrorStyleSelect = document.createElement('select');
+  validationErrorStyleSelect.setAttribute('aria-label', t.validationErrorStyle);
   for (const e of [
     { id: 'stop' as const, label: t.validationErrorStop },
     { id: 'warning' as const, label: t.validationErrorWarning },

@@ -143,10 +143,20 @@ describe('attachSlicer', () => {
     const handle = attachSlicer({ host, store, getWb: () => wb });
     const spec = handle.addSlicer({ tableName: 'Sales', column: 'Region' });
     expect(spec.column).toBe('Region');
+    expect(host.querySelector<HTMLElement>('.fc-slicer__body')?.getAttribute('role')).toBe(
+      'listbox',
+    );
+    expect(
+      host.querySelector<HTMLElement>('.fc-slicer__body')?.getAttribute('aria-multiselectable'),
+    ).toBe('true');
     const chips = host.querySelectorAll<HTMLButtonElement>('.fc-slicer__chip');
     const labels = Array.from(chips).map((c) => c.textContent);
     // distinctValues sorts asc — East < West.
     expect(labels).toEqual(['East', 'West']);
+    expect(chips[0]?.getAttribute('role')).toBe('option');
+    expect(chips[0]?.getAttribute('aria-selected')).toBe('true');
+    expect(chips[0]?.tabIndex).toBe(0);
+    expect(chips[1]?.tabIndex).toBe(-1);
     handle.detach();
   });
 
@@ -161,6 +171,31 @@ describe('attachSlicer', () => {
     // The two East rows (1, 3) stay visible.
     expect(store.getState().layout.hiddenRows.has(1)).toBe(false);
     expect(store.getState().layout.hiddenRows.has(3)).toBe(false);
+    handle.detach();
+  });
+
+  it('supports Excel-style arrow keys and keyboard chip toggles', () => {
+    const handle = attachSlicer({ host, store, getWb: () => wb });
+    handle.addSlicer({ tableName: 'Sales', column: 'Region' });
+    const chips = (): HTMLButtonElement[] =>
+      Array.from(host.querySelectorAll<HTMLButtonElement>('.fc-slicer__chip'));
+
+    chips()[0]?.focus();
+    expect(document.activeElement).toBe(chips()[0]);
+    chips()[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(document.activeElement).toBe(chips()[1]);
+    expect(chips()[1]?.tabIndex).toBe(0);
+
+    chips()[1]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    expect(document.activeElement).toBe(chips()[0]);
+
+    chips()[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(store.getState().slicers.slicers[0]?.selected).toEqual(['East']);
+    expect(
+      host
+        .querySelector<HTMLButtonElement>('.fc-slicer__chip[data-fc-value="West"]')
+        ?.getAttribute('aria-selected'),
+    ).toBe('false');
     handle.detach();
   });
 

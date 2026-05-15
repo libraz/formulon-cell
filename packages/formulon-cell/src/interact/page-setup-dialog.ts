@@ -95,6 +95,7 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   const orientRow = makeRow(t.orientation);
   const orientSelect = document.createElement('select');
   orientSelect.className = 'fc-pgsetup__select';
+  orientSelect.setAttribute('aria-label', t.orientation);
   for (const o of ORIENTATIONS) {
     const opt = document.createElement('option');
     opt.value = o;
@@ -108,6 +109,7 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   const paperRow = makeRow(t.paperSize);
   const paperSelect = document.createElement('select');
   paperSelect.className = 'fc-pgsetup__select';
+  paperSelect.setAttribute('aria-label', t.paperSize);
   for (const p of PAPER_SIZES) {
     const opt = document.createElement('option');
     opt.value = p;
@@ -122,9 +124,13 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   const marginGroup = document.createElement('div');
   marginGroup.className = 'fc-pgsetup__margins';
   const topInput = makeNumberInput(0.7);
+  topInput.setAttribute('aria-label', t.marginTop);
   const rightInput = makeNumberInput(0.7);
+  rightInput.setAttribute('aria-label', t.marginRight);
   const bottomInput = makeNumberInput(0.7);
+  bottomInput.setAttribute('aria-label', t.marginBottom);
   const leftInput = makeNumberInput(0.7);
+  leftInput.setAttribute('aria-label', t.marginLeft);
   const labelize = (label: string, input: HTMLInputElement): HTMLLabelElement => {
     const lab = document.createElement('label');
     lab.className = 'fc-pgsetup__margin';
@@ -158,8 +164,11 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
     const wrap = document.createElement('span');
     wrap.className = 'fc-pgsetup__value';
     const lInp = makeTextInput('', t.slotLeftPlaceholder);
+    lInp.setAttribute('aria-label', `${legendText} ${t.slotLeftPlaceholder}`);
     const cInp = makeTextInput('', t.slotCenterPlaceholder);
+    cInp.setAttribute('aria-label', `${legendText} ${t.slotCenterPlaceholder}`);
     const rInp = makeTextInput('', t.slotRightPlaceholder);
+    rInp.setAttribute('aria-label', `${legendText} ${t.slotRightPlaceholder}`);
     wrap.append(lInp, cInp, rInp);
     legendRow.append(lbl, wrap);
     return { legendRow, leftInput: lInp, centerInput: cInp, rightInput: rInp };
@@ -171,27 +180,32 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   // ── Print titles ────────────────────────────────────────────────────────
   const titleRowsRow = makeRow(t.printTitleRows);
   const titleRowsInput = makeTextInput('', t.printTitleRowsPlaceholder);
+  titleRowsInput.setAttribute('aria-label', t.printTitleRows);
   titleRowsRow.valueCell.appendChild(titleRowsInput);
   body.appendChild(titleRowsRow.row);
 
   const titleColsRow = makeRow(t.printTitleCols);
   const titleColsInput = makeTextInput('', t.printTitleColsPlaceholder);
+  titleColsInput.setAttribute('aria-label', t.printTitleCols);
   titleColsRow.valueCell.appendChild(titleColsInput);
   body.appendChild(titleColsRow.row);
 
   // ── Scale + fit ─────────────────────────────────────────────────────────
   const scaleRow = makeRow(t.scale);
   const scaleInput = makeNumberInput(1, 0.05, 0.1, 4);
+  scaleInput.setAttribute('aria-label', t.scale);
   scaleRow.valueCell.appendChild(scaleInput);
   body.appendChild(scaleRow.row);
 
   const fitWidthRow = makeRow(t.fitWidth);
   const fitWidthInput = makeNumberInput(0, 1, 0, 99);
+  fitWidthInput.setAttribute('aria-label', t.fitWidth);
   fitWidthRow.valueCell.appendChild(fitWidthInput);
   body.appendChild(fitWidthRow.row);
 
   const fitHeightRow = makeRow(t.fitHeight);
   const fitHeightInput = makeNumberInput(0, 1, 0, 99);
+  fitHeightInput.setAttribute('aria-label', t.fitHeight);
   fitHeightRow.valueCell.appendChild(fitHeightInput);
   body.appendChild(fitHeightRow.row);
 

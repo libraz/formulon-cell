@@ -30,6 +30,7 @@ interface Setup {
     formatPainter: ReturnType<typeof fakePainter> | null;
     goToDialog: ReturnType<typeof fakeOpenable> | null;
     hyperlinkDialog: ReturnType<typeof fakeOpenable> | null;
+    namedRangeDialog: ReturnType<typeof fakeOpenable> | null;
     pasteSpecialDialog: ReturnType<typeof fakeOpenable> | null;
     quickAnalysis: ReturnType<typeof fakeOpenable> | null;
   };
@@ -55,6 +56,7 @@ function makeSetup(): Setup {
     formatPainter: fakePainter(),
     goToDialog: fakeOpenable(),
     hyperlinkDialog: fakeOpenable(),
+    namedRangeDialog: fakeOpenable(),
     pasteSpecialDialog: fakeOpenable(),
     quickAnalysis: fakeOpenable(),
   };
@@ -68,6 +70,7 @@ function makeSetup(): Setup {
     hostTag,
     hyperlinkDialog: () => feature.hyperlinkDialog,
     invalidate,
+    namedRangeDialog: () => feature.namedRangeDialog,
     pasteSpecialDialog: () => feature.pasteSpecialDialog,
     quickAnalysis: () => feature.quickAnalysis,
     store,
@@ -149,6 +152,20 @@ describe('mount/host-shortcuts', () => {
   it('Ctrl+Shift+V opens paste-special', () => {
     s.handler(key({ key: 'v', ctrlKey: true, shiftKey: true }));
     expect(s.feature.pasteSpecialDialog?.open).toHaveBeenCalledTimes(1);
+  });
+
+  it('Ctrl+Alt+V opens paste-special', () => {
+    const e = key({ key: 'v', ctrlKey: true, altKey: true });
+    s.handler(e);
+    expect(s.feature.pasteSpecialDialog?.open).toHaveBeenCalledTimes(1);
+    expect(e.defaultPrevented).toBe(true);
+  });
+
+  it('Ctrl+F3 opens Name Manager', () => {
+    const e = key({ key: 'F3', ctrlKey: true });
+    s.handler(e);
+    expect(s.feature.namedRangeDialog?.open).toHaveBeenCalledTimes(1);
+    expect(e.defaultPrevented).toBe(true);
   });
 
   it('Ctrl+Q opens quick analysis (but Cmd+Q does not — reserved for the OS)', () => {

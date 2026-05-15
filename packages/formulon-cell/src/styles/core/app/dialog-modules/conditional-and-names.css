@@ -63,6 +63,14 @@
   .fc-namedlg__item:hover {
     background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 6%, transparent));
   }
+  .fc-namedlg__item[aria-selected="true"],
+  .fc-namedlg__item--selected {
+    background: var(--fc-accent-soft, color-mix(in srgb, Highlight 14%, transparent));
+  }
+  .fc-namedlg__item:focus-visible {
+    outline: 1px solid var(--fc-accent, Highlight);
+    outline-offset: -1px;
+  }
   .fc-conddlg__empty,
   .fc-namedlg__empty {
     color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));

@@ -43,12 +43,14 @@ describe('attachSessionCharts', () => {
 
     expect(host.querySelector('.fc-chart__title')?.textContent).toBe('Revenue');
     expect(host.querySelector('svg rect[fill="#0f6cbd"]')).toBeTruthy();
+    host.tabIndex = -1;
 
     const close = host.querySelector<HTMLButtonElement>('.fc-chart__close');
     expect(close?.getAttribute('aria-label')).toBe('閉じる');
     close?.click();
     expect(store.getState().charts.charts).toHaveLength(0);
     expect(host.querySelector('.fc-chart')).toBeNull();
+    expect(document.activeElement).toBe(host);
 
     handle.detach();
   });
@@ -179,6 +181,8 @@ describe('attachSessionCharts', () => {
     const chart = host.querySelector<HTMLElement>('.fc-chart');
     expect(chart?.tabIndex).toBe(0);
     expect(chart?.getAttribute('aria-label')).toBe('Accessible chart');
+    expect(chart?.getAttribute('aria-roledescription')).toBe('chart');
+    expect(chart?.getAttribute('aria-keyshortcuts')).toContain('Shift+ArrowDown');
     if (!chart) throw new Error('missing chart');
 
     const move = fireKey(chart, 'ArrowRight');
@@ -194,6 +198,7 @@ describe('attachSessionCharts', () => {
     fireKey(host.querySelector<HTMLElement>('.fc-chart') ?? chart, 'Delete');
     expect(store.getState().charts.charts).toHaveLength(0);
     expect(host.querySelector('.fc-chart')).toBeNull();
+    expect(document.activeElement).toBe(host);
 
     handle.detach();
   });

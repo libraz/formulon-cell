@@ -131,4 +131,39 @@ describe('attachAutocomplete labels', () => {
     handle.detach();
     input.remove();
   });
+
+  it('wires listbox state to the editor input and selected option', () => {
+    const input = document.createElement('textarea');
+    input.value = '=S';
+    document.body.appendChild(input);
+    input.setSelectionRange(input.value.length, input.value.length);
+    const handle = attachAutocomplete({
+      input,
+      getFunctionNames: () => ['SUM', 'SUBTOTAL'],
+    });
+
+    handle.refresh();
+    const root = document.querySelector<HTMLElement>('.fc-autocomplete');
+    expect(root?.getAttribute('role')).toBe('listbox');
+    expect(input.getAttribute('aria-expanded')).toBe('true');
+    expect(input.getAttribute('aria-controls')).toBe(root?.id);
+
+    const options = Array.from(root?.querySelectorAll<HTMLElement>('[role="option"]') ?? []);
+    expect(options[0]?.getAttribute('aria-selected')).toBe('true');
+    expect(input.getAttribute('aria-activedescendant')).toBe(options[0]?.id);
+
+    handle.move(1);
+    const nextOptions = Array.from(
+      document.querySelectorAll<HTMLElement>('.fc-autocomplete [role="option"]'),
+    );
+    expect(nextOptions[0]?.getAttribute('aria-selected')).toBe('false');
+    expect(nextOptions[1]?.getAttribute('aria-selected')).toBe('true');
+    expect(input.getAttribute('aria-activedescendant')).toBe(nextOptions[1]?.id);
+
+    handle.close();
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+    expect(input.hasAttribute('aria-controls')).toBe(false);
+    expect(input.hasAttribute('aria-activedescendant')).toBe(false);
+    input.remove();
+  });
 });

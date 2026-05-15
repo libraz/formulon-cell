@@ -130,6 +130,32 @@ describe('attachConditionalDialog', () => {
     handle.detach();
   });
 
+  it('labels apply-format color controls and treats Enter as Add Rule', () => {
+    setRange(store, 0, 0, 1, 0);
+    const handle = attachConditionalDialog({ host, store });
+    handle.open();
+
+    const colorInputs = Array.from(
+      document.querySelectorAll<HTMLInputElement>('.fc-conddlg__form input[type="color"]'),
+    );
+    expect(colorInputs.length).toBeGreaterThan(0);
+    for (const input of colorInputs) expect(input.getAttribute('aria-label')).toBeTruthy();
+
+    const toggleInputs = Array.from(
+      document.querySelectorAll<HTMLInputElement>(
+        '.fc-conddlg__form .fc-fmtdlg__row > input[type="checkbox"]',
+      ),
+    );
+    expect(toggleInputs.length).toBeGreaterThan(0);
+    for (const input of toggleInputs) expect(input.getAttribute('aria-label')).toBeTruthy();
+
+    document
+      .querySelector<HTMLElement>('.fc-conddlg')
+      ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(store.getState().conditional.rules).toHaveLength(1);
+    handle.detach();
+  });
+
   it('Escape closes the overlay', () => {
     const handle = attachConditionalDialog({ host, store });
     handle.open();

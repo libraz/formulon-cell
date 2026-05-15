@@ -168,6 +168,26 @@ test('R01: ribbon tabs switch visible panels and render expected commands', asyn
       )
       .toEqual([...tab.commands]);
   }
+
+  await page.getByRole('tab', { name: 'Home', exact: true }).click();
+  await expect(page.locator('[data-ribbon-command="formatCellsHome"]')).toHaveAttribute(
+    'aria-keyshortcuts',
+    /Control\+1/,
+  );
+  await expect(page.locator('[data-ribbon-command="findHome"]')).toHaveAttribute(
+    'aria-keyshortcuts',
+    /Control\+F/,
+  );
+
+  await page.getByRole('tab', { name: 'Formulas', exact: true }).click();
+  await expect(page.locator('[data-ribbon-command="namedRanges"]')).toHaveAttribute(
+    'aria-keyshortcuts',
+    'Control+F3',
+  );
+  await expect(page.locator('[data-ribbon-command="fx"]')).toHaveAttribute(
+    'aria-keyshortcuts',
+    'Shift+F3',
+  );
 });
 
 test('R02: Home font controls render and apply formatting', async ({ page }) => {

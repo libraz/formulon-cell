@@ -1,6 +1,8 @@
 import { caretInsideImplicitIntersection, findActiveSignature } from '../commands/refs.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';
 
+let argHelperSeq = 0;
+
 export interface ArgHelperHandle {
   /** Re-evaluate the tooltip against the current input value/caret. */
   refresh(): void;
@@ -33,11 +35,13 @@ export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
     ...deps.labels,
   };
   let root: HTMLDivElement | null = null;
+  let rootId = '';
 
   const close = (): void => {
     if (!root) return;
     root.remove();
     root = null;
+    input.removeAttribute('aria-describedby');
   };
 
   const positionAboveCaret = (el: HTMLDivElement): void => {
@@ -55,11 +59,15 @@ export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
     let el = root;
     if (!el) {
       el = document.createElement('div');
+      argHelperSeq += 1;
+      rootId = `fc-arghelper-${argHelperSeq}`;
+      el.id = rootId;
       el.className = 'fc-arghelper';
       el.setAttribute('role', 'tooltip');
       document.body.appendChild(el);
       root = el;
     }
+    input.setAttribute('aria-describedby', el.id);
     inheritHostTokens(input, el);
     el.replaceChildren();
     if (implicit) {
@@ -86,7 +94,10 @@ export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
       // Anchor the highlight on the last arg when the caret has run past the
       // declared count — desktop spreadsheets do the same so variadic tails stay visible.
       const isActive = i === active || (i === args.length - 1 && active >= args.length);
-      if (isActive) span.classList.add('fc-arghelper__arg--active');
+      if (isActive) {
+        span.classList.add('fc-arghelper__arg--active');
+        span.setAttribute('aria-current', 'true');
+      }
       span.textContent = arg;
       el.appendChild(span);
     });

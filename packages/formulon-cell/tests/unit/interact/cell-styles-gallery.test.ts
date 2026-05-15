@@ -56,9 +56,36 @@ describe('attachCellStylesGallery', () => {
   it('renders one chip per CELL_STYLES entry', () => {
     const handle = attachCellStylesGallery({ host, store });
     handle.open();
+    expect(
+      document.querySelector<HTMLElement>('.fc-stylegallery__grid')?.getAttribute('role'),
+    ).toBe('toolbar');
     const list = chips();
     expect(list.length).toBe(CELL_STYLES.length);
     expect(list.map((c) => c.dataset.fcStyle)).toEqual(CELL_STYLES.map((s) => s.id));
+    expect(list[0]?.tabIndex).toBe(0);
+    expect(list[1]?.tabIndex).toBe(-1);
+    handle.detach();
+  });
+
+  it('moves chip focus with Excel-style arrow, Home, and End keys', () => {
+    const handle = attachCellStylesGallery({ host, store });
+    handle.open();
+    const list = chips();
+    if (!list[0] || !list[1]) throw new Error('expected style chips');
+    list[0].focus();
+
+    list[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(document.activeElement).toBe(list[1]);
+    expect(list[1].tabIndex).toBe(0);
+    expect(list[0].tabIndex).toBe(-1);
+
+    list[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    expect(document.activeElement).toBe(list[list.length - 1]);
+
+    list[list.length - 1]?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Home', bubbles: true }),
+    );
+    expect(document.activeElement).toBe(list[0]);
     handle.detach();
   });
 

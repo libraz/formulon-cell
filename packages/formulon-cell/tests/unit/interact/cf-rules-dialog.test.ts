@@ -88,7 +88,42 @@ describe('attachCfRulesDialog', () => {
     expect(rows.length).toBe(2);
     expect(rows[0]?.textContent).toContain('cellIs');
     expect(rows[0]?.textContent).toContain('A1:A5');
+    expect(rows[0]?.tabIndex).toBe(0);
+    expect(rows[0]?.getAttribute('aria-selected')).toBe('true');
+    expect(rows[1]?.tabIndex).toBe(-1);
     expect(rows[1]?.textContent).toContain('duplicateValues');
+    handle.detach();
+  });
+
+  it('supports Excel-style row selection keys and Delete removal', () => {
+    const { wb, removed } = fakeWb([
+      rule({ id: 'a', priority: 1 }),
+      rule({ id: 'b', priority: 2 }),
+      rule({ id: 'c', priority: 3 }),
+    ]);
+    const handle = attachCfRulesDialog({
+      host,
+      getWb: () => wb,
+      getActiveSheet: () => 0,
+    });
+    handle.open();
+    const rows = (): HTMLTableRowElement[] =>
+      Array.from(document.querySelectorAll<HTMLTableRowElement>('.fc-cfrulesdlg__table tbody tr'));
+
+    rows()[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(rows()[1]?.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(rows()[1]);
+
+    rows()[1]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    expect(rows()[2]?.getAttribute('aria-selected')).toBe('true');
+
+    rows()[2]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    expect(rows()[0]?.getAttribute('aria-selected')).toBe('true');
+
+    rows()[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
+    expect(removed).toEqual([0]);
+    expect(rows()).toHaveLength(2);
+    expect(rows()[0]?.getAttribute('aria-selected')).toBe('true');
     handle.detach();
   });
 

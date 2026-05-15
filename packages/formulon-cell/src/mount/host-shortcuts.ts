@@ -15,6 +15,7 @@ interface HostShortcutInput {
   hostTag: HTMLInputElement;
   hyperlinkDialog: () => { open(): void } | null;
   invalidate: () => void;
+  namedRangeDialog: () => { open(): void } | null;
   pasteSpecialDialog: () => { open(): void } | null;
   quickAnalysis: () => { open(): void } | null;
   store: SpreadsheetStore;
@@ -30,6 +31,13 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       currentWb.recalc();
       mutators.replaceCells(input.store, currentWb.cells(input.store.getState().data.sheetIndex));
       input.invalidate();
+      return;
+    }
+    if (e.ctrlKey && !e.metaKey && e.key === 'F3') {
+      const dialog = input.namedRangeDialog();
+      if (!dialog) return;
+      e.preventDefault();
+      dialog.open();
       return;
     }
     if (!meta) return;

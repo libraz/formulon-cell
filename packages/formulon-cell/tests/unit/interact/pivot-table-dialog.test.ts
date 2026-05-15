@@ -82,6 +82,21 @@ describe('attachPivotTableDialog', () => {
     handle.detach();
   });
 
+  it('treats Enter as the default OK action when creation is available', () => {
+    const { wb, calls } = makeWb();
+    const store = createSpreadsheetStore();
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 });
+    const handle = attachPivotTableDialog({ host, store, wb, strings: en });
+
+    handle.open();
+    const overlay = document.querySelector<HTMLElement>('.fc-pivotdlg');
+    overlay?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    expect(calls).toContain('pivot');
+    expect(overlay?.hasAttribute('hidden')).toBe(true);
+    handle.detach();
+  });
+
   it('shows a disabled-state message when mutation is unavailable', () => {
     const { wb } = makeWb();
     Object.defineProperty(wb, 'capabilities', { value: { pivotTableMutate: false } });
@@ -92,6 +107,7 @@ describe('attachPivotTableDialog', () => {
     handle.open();
     expect(document.body.textContent).toContain('does not support PivotTable creation');
     expect(document.querySelector('.fc-fmtdlg__btn--primary')?.hasAttribute('disabled')).toBe(true);
+    expect(document.activeElement?.textContent).toBe('Cancel');
     handle.detach();
   });
 });

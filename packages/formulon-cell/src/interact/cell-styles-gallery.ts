@@ -47,13 +47,32 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
 
   const grid = document.createElement('div');
   grid.className = 'fc-stylegallery__grid';
+  grid.setAttribute('role', 'toolbar');
+  grid.setAttribute('aria-label', 'Cell styles');
   panel.appendChild(grid);
 
-  for (const style of CELL_STYLES) {
+  let activeChipIndex = 0;
+  const chips: HTMLButtonElement[] = [];
+  const focusChip = (idx: number): void => {
+    if (chips.length === 0) return;
+    activeChipIndex = (idx + chips.length) % chips.length;
+    for (const [chipIndex, chip] of chips.entries()) {
+      chip.tabIndex = chipIndex === activeChipIndex ? 0 : -1;
+    }
+    chips[activeChipIndex]?.focus({ preventScroll: true });
+  };
+  const gridColumnCount = (): number => {
+    const columns = getComputedStyle(grid).gridTemplateColumns;
+    const count = columns ? columns.split(' ').filter(Boolean).length : 0;
+    return Math.max(1, count || 3);
+  };
+
+  for (const [index, style] of CELL_STYLES.entries()) {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'fc-stylegallery__chip';
     chip.dataset.fcStyle = style.id;
+    chip.tabIndex = index === 0 ? 0 : -1;
     if (style.format.bold) chip.style.fontWeight = '700';
     if (style.format.italic) chip.style.fontStyle = 'italic';
     if (style.format.underline) chip.style.textDecoration = 'underline';
@@ -62,6 +81,7 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
     if (style.format.fontSize) chip.style.fontSize = `${style.format.fontSize}px`;
     chip.textContent = labelFor(style.id);
     grid.appendChild(chip);
+    chips.push(chip);
   }
 
   const close = (): void => {
@@ -93,6 +113,24 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
     if (e.key === 'Escape') {
       e.preventDefault();
       close();
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      focusChip(activeChipIndex + 1);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      focusChip(activeChipIndex - 1);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusChip(activeChipIndex + gridColumnCount());
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusChip(activeChipIndex - gridColumnCount());
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      focusChip(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      focusChip(chips.length - 1);
     }
   };
 
@@ -103,8 +141,7 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
     open(): void {
       shell.open();
       requestAnimationFrame(() => {
-        const first = grid.querySelector<HTMLElement>('.fc-stylegallery__chip');
-        first?.focus();
+        focusChip(activeChipIndex);
       });
     },
     close,
