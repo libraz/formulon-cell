@@ -1,7 +1,7 @@
 import { deleteDefinedName, upsertDefinedName } from '../commands/named-ranges.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
+import { createDialogShell } from './dialog-shell.js';
 
 export interface NamedRangeDialogDeps {
   host: HTMLElement;
@@ -30,16 +30,15 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   const strings = deps.strings ?? defaultStrings;
   const t = strings.namedRangeDialog;
 
-  const overlay = document.createElement('div');
-  overlay.className = 'fc-fmtdlg fc-namedlg';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', t.title);
-  overlay.hidden = true;
-
-  const panel = document.createElement('div');
-  panel.className = 'fc-fmtdlg__panel fc-namedlg__panel';
-  overlay.appendChild(panel);
+  const shell = createDialogShell({
+    host,
+    className: 'fc-namedlg',
+    ariaLabel: t.title,
+    onDismiss: () => api.close(),
+  });
+  shell.overlay.classList.add('fc-fmtdlg');
+  shell.panel.classList.add('fc-fmtdlg__panel', 'fc-namedlg__panel');
+  const { overlay, panel } = shell;
 
   const header = document.createElement('div');
   header.className = 'fc-fmtdlg__header';
@@ -102,10 +101,6 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   closeBtn.className = 'fc-fmtdlg__btn';
   closeBtn.textContent = t.close;
   footer.appendChild(closeBtn);
-
-  // Body-portal so the modal escapes `.fc-host`'s `contain: strict`.
-  inheritHostTokens(host, overlay);
-  document.body.appendChild(overlay);
 
   const showError = (msg: string): void => {
     errorRow.textContent = msg;
@@ -195,9 +190,6 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   };
 
   const onClose = (): void => api.close();
-  const onOverlayClick = (e: MouseEvent): void => {
-    if (e.target === overlay) api.close();
-  };
   const onOverlayKey = (e: KeyboardEvent): void => {
     e.stopPropagation();
     if (e.key === 'Escape') {
@@ -220,23 +212,22 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     }
   };
 
-  formRow.addEventListener('submit', onSubmit);
-  closeBtn.addEventListener('click', onClose);
-  overlay.addEventListener('click', onOverlayClick);
-  overlay.addEventListener('keydown', onOverlayKey);
+  shell.on(formRow, 'submit', onSubmit as EventListener);
+  shell.on(closeBtn, 'click', onClose);
+  shell.on(overlay, 'keydown', onOverlayKey as EventListener);
 
   const api: NamedRangeDialogHandle = {
     open(): void {
       refreshFormState();
       renderList();
-      overlay.hidden = false;
+      shell.open();
       requestAnimationFrame(() => {
         if (wb.capabilities.definedNameMutate) nameInput.focus();
         else closeBtn.focus();
       });
     },
     close(): void {
-      overlay.hidden = true;
+      shell.close();
       host.focus();
     },
     bindWorkbook(next: WorkbookHandle): void {
@@ -244,11 +235,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       refreshFormState();
     },
     detach(): void {
-      formRow.removeEventListener('submit', onSubmit);
-      closeBtn.removeEventListener('click', onClose);
-      overlay.removeEventListener('click', onOverlayClick);
-      overlay.removeEventListener('keydown', onOverlayKey);
-      overlay.remove();
+      shell.dispose();
     },
   };
 

@@ -471,3 +471,103 @@ test('R03: routed ribbon commands open dialogs and mutate workbook state', async
   });
   expect(zoom).toBe(1.25);
 });
+
+test('R04: ribbon tabs support Excel-style arrow, Home, and End keyboard navigation', async ({
+  page,
+}) => {
+  await mount(page);
+
+  const home = page.getByRole('tab', { name: 'Home', exact: true });
+  const insert = page.getByRole('tab', { name: 'Insert', exact: true });
+  const acrobat = page.getByRole('tab', { name: 'Acrobat', exact: true });
+  const file = page.getByRole('tab', { name: 'File', exact: true });
+
+  await home.focus();
+  await expect(home).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(insert).toBeFocused();
+  await expect(insert).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.demo__ribbon:not([hidden])')).toHaveAttribute(
+    'data-ribbon-panel',
+    'insert',
+  );
+
+  await page.keyboard.press('End');
+  await expect(acrobat).toBeFocused();
+  await expect(acrobat).toHaveAttribute('aria-selected', 'true');
+
+  await page.keyboard.press('Home');
+  await expect(file).toBeFocused();
+  await expect(file).toHaveAttribute('aria-selected', 'true');
+
+  await page.keyboard.press('ArrowLeft');
+  await expect(acrobat).toBeFocused();
+  await expect(acrobat).toHaveAttribute('tabindex', '0');
+  await expect(home).toHaveAttribute('tabindex', '-1');
+});
+
+test('R05: ribbon dropdowns support keyboard selection and Escape dismissal', async ({ page }) => {
+  await mount(page);
+
+  const fontButton = page.locator('[data-ribbon-select="fontFamily"] .demo__rb-dd__btn');
+  await fontButton.focus();
+  await page.keyboard.press('ArrowDown');
+
+  const list = page.locator('[data-ribbon-select="fontFamily"] .demo__rb-dd__list');
+  await expect(list).toBeVisible();
+  await expect(fontButton).toHaveAttribute('aria-expanded', 'true');
+  await expect(
+    page.locator('[data-ribbon-select="fontFamily"] [data-value="Aptos"]'),
+  ).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(
+    page.locator('[data-ribbon-select="fontFamily"] [data-value="Calibri"]'),
+  ).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(list).toBeHidden();
+  await expect(fontButton).toBeFocused();
+  await expect(page.locator('[data-ribbon-select="fontFamily"] .demo__rb-dd__value')).toHaveText(
+    'Calibri',
+  );
+
+  await page.keyboard.press('ArrowDown');
+  await expect(list).toBeVisible();
+  await page.keyboard.press('End');
+  await expect(
+    page.locator('[data-ribbon-select="fontFamily"] [data-value="Consolas"]'),
+  ).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(list).toBeHidden();
+  await expect(fontButton).toBeFocused();
+  await expect(fontButton).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('R06: ribbon split menus support menu keyboard navigation and focus return', async ({
+  page,
+}) => {
+  await mount(page);
+
+  const borders = page.locator('#btn-borders');
+  const borderMenu = page.locator('#menu-borders');
+  await borders.click();
+  await expect(borderMenu).toBeVisible();
+  await expect(borderMenu.getByRole('menuitem', { name: 'All borders' })).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(borderMenu.getByRole('menuitem', { name: 'More borders…' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(borderMenu).toBeHidden();
+  await expect(borders).toBeFocused();
+
+  await page.getByRole('tab', { name: 'Data', exact: true }).click();
+  const sort = page.locator('#btn-sort');
+  const sortMenu = page.locator('#menu-sort');
+  await sort.click();
+  await expect(sortMenu).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  await expect(sortMenu.getByRole('menuitem', { name: 'Sort Z → A' })).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(sortMenu.getByRole('menuitem', { name: 'Sort A → Z' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(sortMenu).toBeHidden();
+  await expect(sort).toBeFocused();
+});

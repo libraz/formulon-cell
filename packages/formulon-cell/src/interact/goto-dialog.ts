@@ -7,7 +7,7 @@ import {
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
+import { createDialogShell } from './dialog-shell.js';
 
 export interface GoToDialogDeps {
   host: HTMLElement;
@@ -37,41 +37,40 @@ const KINDS: readonly GoToSpecialKind[] = [
 ];
 
 /**
- * Spreadsheet-style "Go To Special" dialog. Lets the user pick a category (blanks,
- * formulas, errors, validation, …) and rewrites the selection to the
+ * Spreadsheet-style "Go To Special" dialog. Lets the user pick a category
+ * (blanks, formulas, errors, validation, …) and rewrites the selection to the
  * bounding range of every matching cell on the active sheet (or just inside
  * the current selection when one is provided).
  *
- * Lifecycle mirrors the other modals: `attach…()` mounts a hidden overlay
- * on the host; `open()` shows it, `close()` hides it, `detach()` tears it
- * down. The OK button runs the predicate; on no matches an inline status
- * message is shown and the dialog stays open. On 1+ matches the selection
- * jumps to the bounding rect and the dialog closes.
+ * Lifecycle mirrors the other modals: `attach…()` mounts a hidden overlay on
+ * the host; `open()` shows it, `close()` hides it, `detach()` tears it down.
+ * The OK button runs the predicate; on no matches an inline status message is
+ * shown and the dialog stays open. On 1+ matches the selection jumps to the
+ * bounding rect and the dialog closes.
  */
 export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   const { host, store, getWb } = deps;
   const strings = deps.strings ?? defaultStrings;
   const t = strings.goToDialog;
 
-  const overlay = document.createElement('div');
-  overlay.className = 'fc-fmtdlg fc-goto';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', t.title);
-  overlay.hidden = true;
-
-  const panel = document.createElement('div');
-  panel.className = 'fc-fmtdlg__panel fc-goto__panel';
-  overlay.appendChild(panel);
+  const shell = createDialogShell({
+    host,
+    className: 'fc-goto',
+    ariaLabel: t.title,
+    onDismiss: () => api.close(),
+  });
+  // Reuse the shared format-dialog skin for header/footer/btn styling.
+  shell.overlay.classList.add('fc-fmtdlg');
+  shell.panel.classList.add('fc-fmtdlg__panel', 'fc-goto__panel');
 
   const header = document.createElement('div');
   header.className = 'fc-fmtdlg__header';
   header.textContent = t.title;
-  panel.appendChild(header);
+  shell.panel.appendChild(header);
 
   const body = document.createElement('div');
   body.className = 'fc-fmtdlg__body';
-  panel.appendChild(body);
+  shell.panel.appendChild(body);
 
   // ── Scope (only meaningful when current selection is multi-cell) ───────
   const scopeLegend = document.createElement('div');
@@ -154,7 +153,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   // Footer: Cancel / OK
   const footer = document.createElement('div');
   footer.className = 'fc-fmtdlg__footer';
-  panel.appendChild(footer);
+  shell.panel.appendChild(footer);
   const cancelBtn = document.createElement('button');
   cancelBtn.type = 'button';
   cancelBtn.className = 'fc-fmtdlg__btn';
@@ -165,10 +164,6 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   okBtn.textContent = t.ok;
   footer.append(cancelBtn, okBtn);
 
-  // Body-portal so the modal escapes `.fc-host`'s `contain: strict`.
-  inheritHostTokens(host, overlay);
-  document.body.appendChild(overlay);
-
   const isSelectionMulti = (): boolean => {
     const r = store.getState().selection.range;
     return r.r1 > r.r0 || r.c1 > r.c0;
@@ -176,8 +171,9 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
 
   const syncScopeAvailability = (): void => {
     const multi = isSelectionMulti();
-    // Disable selection scope when only one cell is selected — matching the spreadsheet convention,
-    // which silently widens to "active sheet" in that case.
+    // Disable selection scope when only one cell is selected — matching the
+    // spreadsheet convention, which silently widens to "active sheet" in
+    // that case.
     scopeSelection.disabled = !multi;
     if (!multi) {
       scopeSheet.checked = true;
@@ -214,33 +210,23 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
     }));
     api.close();
   };
-  const onCancel = (): void => api.close();
 
-  const onOverlayClick = (e: MouseEvent): void => {
-    if (e.target === overlay) api.close();
-  };
-  const onOverlayKey = (e: KeyboardEvent): void => {
-    e.stopPropagation();
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      api.close();
-    } else if (e.key === 'Enter') {
-      // Enter on any control inside the modal commits — matches the spreadsheet convention.
+  shell.on(okBtn, 'click', onOk);
+  shell.on(cancelBtn, 'click', () => api.close());
+  // Enter on any control inside the modal commits — matches the spreadsheet
+  // convention. Escape and backdrop dismissals are handled by the shell.
+  shell.on(shell.overlay, 'keydown', (e) => {
+    if ((e as KeyboardEvent).key === 'Enter') {
       e.preventDefault();
       onOk();
     }
-  };
-
-  okBtn.addEventListener('click', onOk);
-  cancelBtn.addEventListener('click', onCancel);
-  overlay.addEventListener('click', onOverlayClick);
-  overlay.addEventListener('keydown', onOverlayKey);
+  });
 
   const api: GoToDialogHandle = {
     open(): void {
       statusLine.textContent = '';
       syncScopeAvailability();
-      overlay.hidden = false;
+      shell.open();
       requestAnimationFrame(() => {
         // Focus the first kind radio so keyboard users can immediately arrow
         // through the list.
@@ -249,15 +235,11 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
       });
     },
     close(): void {
-      overlay.hidden = true;
+      shell.close();
       host.focus();
     },
     detach(): void {
-      okBtn.removeEventListener('click', onOk);
-      cancelBtn.removeEventListener('click', onCancel);
-      overlay.removeEventListener('click', onOverlayClick);
-      overlay.removeEventListener('keydown', onOverlayKey);
-      overlay.remove();
+      shell.dispose();
     },
   };
   return api;

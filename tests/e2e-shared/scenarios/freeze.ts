@@ -12,7 +12,8 @@ import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
  *  deterministic, and it asserts that the engine echoes the layout change
  *  back through the workbook hint surface (used by the canvas renderer).
  *
- *  Playground-only — the React/Vue wrappers do not expose `__fcInst`. */
+ *  Portable across all three demo apps — playground, react-demo, and vue-demo
+ *  each expose the live spreadsheet instance on `window.__fcInst`. */
 export async function runFreezePanesScenario(page: Page): Promise<void> {
   const sp = new SpreadsheetPage(page);
   await sp.mount();

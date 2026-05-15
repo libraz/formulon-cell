@@ -111,6 +111,7 @@ describe('attachContextMenu', () => {
       expect(e.defaultPrevented).toBe(true);
       const menu = visibleMenu();
       expect(menu).not.toBeNull();
+      expect(menu?.getAttribute('aria-label')).toBe('コンテキスト メニュー');
       expect(item('copy')).not.toBeNull();
       expect(item('formatCells')).not.toBeNull();
       // No row/col-only items in cell menu.
@@ -251,9 +252,11 @@ describe('attachContextMenu', () => {
 
     it('Escape hides the menu', () => {
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      host.focus();
       fireContextMenu(host, 200, 70);
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
       expect(visibleMenu()).toBeNull();
+      expect(document.activeElement).toBe(host);
     });
 
     it('Arrow keys move focus through enabled menu items and Enter invokes the focused item', () => {

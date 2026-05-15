@@ -48,33 +48,71 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
   let visible = false;
   let currentAddr: Addr | null = null;
   let currentKind: ErrorMenuKind = 'error';
+  let activeIndex = -1;
+  let restoreFocusEl: HTMLElement | null = null;
 
-  const close = (): void => {
+  const close = (restoreFocus = false): void => {
     if (!visible) return;
     visible = false;
     root.style.display = 'none';
     root.replaceChildren();
     currentAddr = null;
+    activeIndex = -1;
+    const focusTarget = restoreFocusEl;
+    restoreFocusEl = null;
     document.removeEventListener('mousedown', onDocMouseDown, true);
     document.removeEventListener('keydown', onDocKey, true);
     window.removeEventListener('scroll', onScroll, true);
+    if (restoreFocus) {
+      (focusTarget ?? host).focus({ preventScroll: true });
+    }
+  };
+
+  const menuItems = (): HTMLButtonElement[] =>
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.fc-errmenu__item')).filter(
+      (btn) => !btn.disabled,
+    );
+
+  const focusMenuItem = (idx: number): void => {
+    const items = menuItems();
+    if (items.length === 0) return;
+    activeIndex = (idx + items.length) % items.length;
+    items[activeIndex]?.focus({ preventScroll: true });
   };
 
   const onDocMouseDown = (e: MouseEvent): void => {
     if (!visible) return;
     if (e.target instanceof Node && root.contains(e.target)) return;
-    close();
+    close(false);
   };
 
   const onDocKey = (e: KeyboardEvent): void => {
     if (!visible) return;
     if (e.key === 'Escape') {
       e.preventDefault();
-      close();
+      close(true);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusMenuItem(activeIndex + 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusMenuItem(activeIndex - 1);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      focusMenuItem(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      focusMenuItem(menuItems().length - 1);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      const target = document.activeElement;
+      if (target instanceof HTMLButtonElement && root.contains(target)) {
+        e.preventDefault();
+        target.click();
+      }
     }
   };
 
-  const onScroll = (): void => close();
+  const onScroll = (): void => close(false);
 
   const clampToViewport = (x: number, y: number): { x: number; y: number } => {
     const w = root.offsetWidth;
@@ -115,6 +153,7 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
     const heading = document.createElement('div');
     heading.className = 'fc-errmenu__heading';
     const label = kind === 'validation' ? t.validationHeading : t.errorHeading;
+    root.setAttribute('aria-label', label);
     const detail = describeCell(addr);
     heading.textContent = detail ? `${label} — ${detail}` : label;
     root.appendChild(heading);
@@ -138,7 +177,7 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
         ev.preventDefault();
         ev.stopPropagation();
         run(entry.id, addr, kind);
-        close();
+        close(false);
       });
       root.appendChild(btn);
     }
@@ -193,6 +232,8 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
     open(addr: Addr, screenX: number, screenY: number, kind: ErrorMenuKind): void {
       currentAddr = addr;
       currentKind = kind;
+      restoreFocusEl =
+        document.activeElement instanceof HTMLElement ? document.activeElement : host;
       // Touch the workbook getter so consumers wiring Strict Mode can rely
       // on the same lazy resolution shape used elsewhere.
       void getWb();
@@ -209,6 +250,7 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
       document.addEventListener('mousedown', onDocMouseDown, true);
       document.addEventListener('keydown', onDocKey, true);
       window.addEventListener('scroll', onScroll, true);
+      focusMenuItem(0);
     },
     close,
     detach(): void {

@@ -3,7 +3,7 @@ import type { History } from '../commands/history.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
+import { createDialogShell } from './dialog-shell.js';
 
 export interface CellStylesGalleryDeps {
   host: HTMLElement;
@@ -37,15 +37,13 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
   const getWb = deps.getWb ?? ((): WorkbookHandle | null => null);
   const labelFor = deps.labelFor ?? ((id) => CELL_STYLES.find((s) => s.id === id)?.label ?? id);
 
-  const overlay = document.createElement('div');
-  overlay.className = 'fc-stylegallery';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.hidden = true;
-
-  const panel = document.createElement('div');
-  panel.className = 'fc-stylegallery__panel';
-  overlay.appendChild(panel);
+  const shell = createDialogShell({
+    host,
+    className: 'fc-stylegallery',
+    ariaLabel: 'Cell styles',
+    onDismiss: () => close(),
+  });
+  const { overlay, panel } = shell;
 
   const grid = document.createElement('div');
   grid.className = 'fc-stylegallery__grid';
@@ -66,12 +64,8 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
     grid.appendChild(chip);
   }
 
-  // Body-portal so the modal escapes `.fc-host`'s `contain: strict`.
-  inheritHostTokens(host, overlay);
-  document.body.appendChild(overlay);
-
   const close = (): void => {
-    overlay.hidden = true;
+    shell.close();
   };
 
   const apply = (id: CellStyleId): void => {
@@ -102,12 +96,12 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
     }
   };
 
-  overlay.addEventListener('click', onClick);
-  overlay.addEventListener('keydown', onKey);
+  shell.on(overlay, 'click', onClick as EventListener);
+  shell.on(overlay, 'keydown', onKey as EventListener);
 
   return {
     open(): void {
-      overlay.hidden = false;
+      shell.open();
       requestAnimationFrame(() => {
         const first = grid.querySelector<HTMLElement>('.fc-stylegallery__chip');
         first?.focus();
@@ -115,9 +109,7 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
     },
     close,
     detach(): void {
-      overlay.removeEventListener('click', onClick);
-      overlay.removeEventListener('keydown', onKey);
-      overlay.remove();
+      shell.dispose();
     },
   };
 }

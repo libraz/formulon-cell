@@ -62,10 +62,13 @@ export interface BuildRibbonGroupsOptions {
   onCut: () => void;
   onDeleteCols: () => void;
   onDeleteRows: () => void;
+  onAddIn?: () => void;
   onFilterToggle: () => void;
   onFormatAsTable: () => void;
   onFormatPainter: () => void;
   onFreezeToggle: () => void;
+  onDrawEraser?: () => void;
+  onDrawPen?: () => void;
   onInsertCols: () => void;
   onInsertRows: () => void;
   onMarginPreset: (next: MarginPreset) => void;
@@ -75,7 +78,11 @@ export interface BuildRibbonGroupsOptions {
   onPaste: () => void;
   onRedo: () => void;
   onRemoveDuplicates: () => void;
+  onAccessibilityCheck?: () => void;
+  onRunScript?: () => void;
   onSort: (direction: 'asc' | 'desc') => void;
+  onSpellingReview?: () => void;
+  onTranslate?: () => void;
   onToggleColsHidden: () => void;
   onToggleRowsHidden: () => void;
   onUndo: () => void;

@@ -108,4 +108,19 @@ describe('attachWorkbookObjectsPanel', () => {
     expect(host.textContent).toContain('xl/pivotTables/pivotTable1.xml');
     handle.detach();
   });
+
+  it('Escape closes the panel and restores focus to the opener', () => {
+    host.tabIndex = -1;
+    const handle = attachWorkbookObjectsPanel({ host, wb: emptyWb(), strings: en });
+    host.focus();
+    handle.open();
+    const root = host.querySelector<HTMLElement>('.fc-objects');
+    expect(document.activeElement).toBe(root);
+
+    root?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    expect(root?.hidden).toBe(true);
+    expect(document.activeElement).toBe(host);
+    handle.detach();
+  });
 });

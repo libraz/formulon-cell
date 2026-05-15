@@ -83,6 +83,7 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
   let wb = deps.wb;
   let strings = deps.strings;
   let open = false;
+  let restoreFocusEl: HTMLElement | null = null;
 
   const root = document.createElement('div');
   root.className = 'fc-quick';
@@ -93,10 +94,19 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
   host.appendChild(root);
   inheritHostTokens(host, root);
 
-  const close = (): void => {
+  const close = (restoreFocus = false): void => {
     if (!open) return;
     open = false;
+    const focusTarget = restoreFocusEl;
+    restoreFocusEl = null;
     root.hidden = true;
+    if (
+      restoreFocus &&
+      focusTarget &&
+      (root.contains(document.activeElement) || document.activeElement === document.body)
+    ) {
+      focusTarget.focus({ preventScroll: true });
+    }
   };
 
   const execute = (actionId: QuickAnalysisActionId): void => {
@@ -105,14 +115,14 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
     const range = state.selection.range;
     if (actionId === 'tables-pivot' && deps.onOpenPivotTable) {
       deps.onOpenPivotTable();
-      close();
+      close(false);
       return;
     }
     const result = executeQuickAnalysisAction({ store, wb, actionId, range, stats });
     if (!result.ok) return;
     if (result.kind === 'formula') deps.onAfterCommit?.();
     deps.invalidate?.();
-    close();
+    close(false);
   };
 
   const render = (): void => {
@@ -163,6 +173,7 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
 
   const openPanel = (): void => {
     render();
+    restoreFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : host;
     root.hidden = false;
     open = true;
     positionPanel(host, root, store);
@@ -170,12 +181,12 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
   };
 
   const onKey = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape') close();
+    if (e.key === 'Escape') close(true);
   };
   const onHostPointerDown = (e: PointerEvent): void => {
     if (!open) return;
     if (root.contains(e.target as Node | null)) return;
-    close();
+    close(true);
   };
   root.addEventListener('keydown', onKey);
   host.addEventListener('pointerdown', onHostPointerDown, true);

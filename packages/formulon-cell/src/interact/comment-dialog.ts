@@ -72,6 +72,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
   const textarea = document.createElement('textarea');
   textarea.className = 'fc-cmtnote__textarea';
   textarea.placeholder = t.placeholder;
+  textarea.setAttribute('aria-label', t.placeholder);
   textarea.spellcheck = true;
   wrap.appendChild(textarea);
 
@@ -205,6 +206,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
       removeBtn.hidden = !current;
       title.textContent = current ? t.titleEdit : t.title;
       wrap.setAttribute('aria-label', current ? t.titleEdit : t.title);
+      textarea.setAttribute('aria-label', t.placeholder);
       wrap.hidden = false;
       place();
       if (!attached) {

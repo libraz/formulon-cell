@@ -18,6 +18,13 @@ declare const SpreadsheetToolbar: DefineComponent<{
   instance: SpreadsheetInstance | null;
   activeTab: RibbonTab;
   locale: string;
+  onSpellingReview?: () => void;
+  onAccessibilityCheck?: () => void;
+  onRunScript?: () => void;
+  onDrawPen?: () => void;
+  onDrawEraser?: () => void;
+  onTranslate?: () => void;
+  onAddIn?: () => void;
 }>;
 
 export default SpreadsheetToolbar;

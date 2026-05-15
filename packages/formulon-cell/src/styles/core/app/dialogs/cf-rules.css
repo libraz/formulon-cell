@@ -3,35 +3,46 @@
   .fc-cfrulesdlg {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.32);
+    background: color-mix(in srgb, CanvasText 28%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: var(--fc-z-dialog, 2147483020);
     pointer-events: auto;
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--fc-fg, CanvasText);
   }
   .fc-cfrulesdlg[hidden] {
     display: none;
   }
   .fc-cfrulesdlg__panel {
     width: 600px;
-    max-width: 92vw;
-    max-height: 80vh;
-    background: var(--fc-bg, #fff);
-    color: var(--fc-fg, #1f1f1f);
-    border-radius: 6px;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+    max-width: 94vw;
+    max-height: min(90vh, 660px);
+    background: var(--fc-bg-elev, Canvas);
+    color: var(--fc-fg, CanvasText);
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: 4px;
+    box-shadow:
+      0 18px 48px rgba(0, 0, 0, 0.22),
+      0 2px 8px rgba(0, 0, 0, 0.16);
     display: flex;
     flex-direction: column;
     overflow: hidden;
   }
   .fc-cfrulesdlg__header {
-    padding: 12px 16px;
+    min-height: 38px;
+    padding: 8px 14px;
     font-weight: 600;
-    border-bottom: 1px solid var(--fc-rule, #e0e0e0);
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+    background: #f3f2f1;
   }
   .fc-cfrulesdlg__body {
-    padding: 14px 16px;
+    padding: 12px 14px 14px;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -71,24 +82,53 @@
     max-width: 280px;
   }
   .fc-cfrulesdlg__remove {
-    padding: 2px 10px;
-    border: 1px solid var(--fc-rule, #ccc);
-    border-radius: 3px;
-    background: #f5f5f5;
+    min-height: 26px;
+    padding: 3px 10px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: 2px;
+    background: #ffffff;
+    color: inherit;
     cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+  }
+  .fc-cfrulesdlg__remove:hover {
+    background: #faf9f8;
+    border-color: var(--fc-rule-strong, color-mix(in srgb, CanvasText 28%, transparent));
   }
   .fc-cfrulesdlg__footer {
-    padding: 10px 16px;
+    padding: 10px 16px 12px;
     display: flex;
     justify-content: space-between;
-    border-top: 1px solid var(--fc-rule, #e0e0e0);
+    border-top: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+    background: #f3f2f1;
   }
-  .fc-cfrulesdlg__clearall {
-    padding: 4px 14px;
-    border: 1px solid var(--fc-rule, #ccc);
-    border-radius: 3px;
-    background: #f5f5f5;
+  .fc-cfrulesdlg__clearall,
+  .fc-cfrulesdlg__close {
+    min-width: 78px;
+    min-height: 30px;
+    padding: 5px 13px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: 2px;
+    background: #ffffff;
+    color: inherit;
     cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+  }
+  .fc-cfrulesdlg__clearall:hover,
+  .fc-cfrulesdlg__close:hover {
+    background: #faf9f8;
+    border-color: var(--fc-rule-strong, color-mix(in srgb, CanvasText 28%, transparent));
+  }
+  .fc-cfrulesdlg__clearall:focus-visible,
+  .fc-cfrulesdlg__close:focus-visible,
+  .fc-cfrulesdlg__remove:focus-visible {
+    outline: 2px solid var(--fc-accent, currentColor);
+    outline-offset: 1px;
   }
   .fc-cfrulesdlg__clearall:disabled {
     opacity: 0.5;
@@ -98,12 +138,5 @@
     background: #cf3a4c;
     color: #fff;
     border-color: transparent;
-  }
-  .fc-cfrulesdlg__close {
-    padding: 4px 14px;
-    border: 1px solid var(--fc-rule, #ccc);
-    border-radius: 3px;
-    background: #f5f5f5;
-    cursor: pointer;
   }
 }

@@ -14,7 +14,7 @@ import {
   type PaperSize,
   type SpreadsheetStore,
 } from '../store/store.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
+import { createDialogShell } from './dialog-shell.js';
 
 export interface PageSetupDialogDeps {
   host: HTMLElement;
@@ -72,16 +72,15 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   const strings = deps.strings ?? defaultStrings;
   const t = strings.pageSetup;
 
-  const overlay = document.createElement('div');
-  overlay.className = 'fc-fmtdlg fc-pgsetup';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', t.title);
-  overlay.hidden = true;
-
-  const panel = document.createElement('div');
-  panel.className = 'fc-fmtdlg__panel fc-pgsetup__panel';
-  overlay.appendChild(panel);
+  const shell = createDialogShell({
+    host,
+    className: 'fc-pgsetup',
+    ariaLabel: t.title,
+    onDismiss: () => onCancel(),
+  });
+  shell.overlay.classList.add('fc-fmtdlg');
+  shell.panel.classList.add('fc-fmtdlg__panel', 'fc-pgsetup__panel');
+  const { overlay, panel } = shell;
 
   const header = document.createElement('div');
   header.className = 'fc-fmtdlg__header';
@@ -232,10 +231,6 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   footer.append(cancelBtn, okBtn);
   panel.appendChild(footer);
 
-  // Body-portal so the modal escapes `.fc-host`'s `contain: strict`.
-  inheritHostTokens(host, overlay);
-  document.body.appendChild(overlay);
-
   /** Snapshot of the dialog values when it opened. Used by Cancel to revert
    *  inline edits and (more importantly) by OK to push a single history entry
    *  spanning the whole apply. */
@@ -313,9 +308,6 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
     api.close();
   };
 
-  const onOverlayClick = (e: MouseEvent): void => {
-    if (e.target === overlay) onCancel();
-  };
   const onOverlayKey = (e: KeyboardEvent): void => {
     e.stopPropagation();
     if (e.key === 'Escape') {
@@ -330,30 +322,25 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
     }
   };
 
-  okBtn.addEventListener('click', onOk);
-  cancelBtn.addEventListener('click', onCancel);
-  overlay.addEventListener('click', onOverlayClick);
-  overlay.addEventListener('keydown', onOverlayKey);
+  shell.on(okBtn, 'click', onOk);
+  shell.on(cancelBtn, 'click', onCancel);
+  shell.on(overlay, 'keydown', onOverlayKey as EventListener);
 
   const api: PageSetupDialogHandle = {
     open(): void {
       const sheet = store.getState().data.sheetIndex;
       hydrateFrom(getPageSetup(store.getState(), sheet));
-      overlay.hidden = false;
+      shell.open();
       requestAnimationFrame(() => {
         orientSelect.focus();
       });
     },
     close(): void {
-      overlay.hidden = true;
+      shell.close();
       host.focus();
     },
     detach(): void {
-      okBtn.removeEventListener('click', onOk);
-      cancelBtn.removeEventListener('click', onCancel);
-      overlay.removeEventListener('click', onOverlayClick);
-      overlay.removeEventListener('keydown', onOverlayKey);
-      overlay.remove();
+      shell.dispose();
     },
   };
 

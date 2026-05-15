@@ -1,5 +1,6 @@
 import type { Strings } from '../i18n/strings.js';
 import type { CellAlign, CellVAlign, ValidationOp } from '../store/store.js';
+import { createDialogShell } from './dialog-shell.js';
 import {
   makeButton,
   makeCheckbox,
@@ -17,7 +18,6 @@ import {
   type TabId,
   type ValidationKind,
 } from './format-dialog-model.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
 
 interface CreateFormatDialogViewInput {
   host: HTMLElement;
@@ -27,18 +27,12 @@ interface CreateFormatDialogViewInput {
 
 export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   const { host, strings, t } = input;
-  // Root overlay (backdrop)
-  const overlay = document.createElement('div');
-  overlay.className = 'fc-fmtdlg';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', t.title);
-  overlay.hidden = true;
-
-  // Panel
-  const panel = document.createElement('div');
-  panel.className = 'fc-fmtdlg__panel';
-  overlay.appendChild(panel);
+  const shell = createDialogShell({
+    host,
+    className: 'fc-fmtdlg',
+    ariaLabel: t.title,
+  });
+  const { overlay, panel } = shell;
 
   // Header
   const header = document.createElement('div');
@@ -729,17 +723,8 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   const okBtn = makeButton(t.ok, true);
   footer.append(cancelBtn, okBtn);
 
-  // Attach to document.body so the dialog escapes `.fc-host`'s `contain:
-  // strict` containing block and `isolation: isolate` stacking context.
-  // Without this, `position: fixed` resolves relative to the host (clipping
-  // the dialog to the host's bounds) and the host's stacking context buries
-  // the dialog behind any sibling with a higher z-index. inheritHostTokens
-  // copies theme/locale custom properties so the body-portaled overlay
-  // still resolves --fc-bg / --fc-fg / --fc-accent / etc.
-  inheritHostTokens(host, overlay);
-  document.body.appendChild(overlay);
-
   return {
+    shell,
     overlay,
     preview,
     previewCell,

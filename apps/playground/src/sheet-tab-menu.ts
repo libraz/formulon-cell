@@ -7,6 +7,7 @@ import {
   setSheetHidden,
 } from '@libraz/formulon-cell';
 import { showConfirm, showPrompt } from './dialogs.js';
+import { focusMenuItem, handleMenuKeydown, prepareMenu } from './menu-a11y.js';
 
 export function openSheetTabMenu(input: {
   closeTabMenu: () => void;
@@ -22,18 +23,23 @@ export function openSheetTabMenu(input: {
   const wb = inst.workbook;
   const store = inst.store;
   const n = wb.sheetCount;
+  const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
   const menu = document.createElement('div');
   menu.className = 'app__menu';
+  prepareMenu(menu, 'Sheet tab');
   menu.style.position = 'fixed';
   menu.style.left = `${x}px`;
   menu.style.top = `${y}px`;
   menu.style.zIndex = '90';
+  let cleanupMenuListeners = (): void => {};
 
   const addItem = (text: string, disabled: boolean, onClick: () => void): void => {
     const it = document.createElement('button');
     it.type = 'button';
     it.className = 'app__menu-item';
+    it.setAttribute('role', 'menuitem');
+    it.tabIndex = -1;
     it.textContent = text;
     it.disabled = disabled;
     it.style.opacity = disabled ? '0.45' : '1';
@@ -41,6 +47,7 @@ export function openSheetTabMenu(input: {
     it.addEventListener('click', () => {
       if (disabled) return;
       closeTabMenu();
+      cleanupMenuListeners();
       onClick();
     });
     menu.appendChild(it);
@@ -97,6 +104,7 @@ export function openSheetTabMenu(input: {
 
   document.body.appendChild(menu);
   setTabMenuEl(menu);
+  focusMenuItem(menu);
 
   const rect = menu.getBoundingClientRect();
   if (rect.right > window.innerWidth)
@@ -107,15 +115,20 @@ export function openSheetTabMenu(input: {
   const onDocClick = (ev: MouseEvent): void => {
     if (ev.target instanceof Node && menu.contains(ev.target)) return;
     closeTabMenu();
-    document.removeEventListener('mousedown', onDocClick, true);
-    document.removeEventListener('keydown', onDocKey, true);
+    cleanupMenuListeners();
   };
   const onDocKey = (ev: KeyboardEvent): void => {
-    if (ev.key === 'Escape') {
-      closeTabMenu();
-      document.removeEventListener('mousedown', onDocClick, true);
-      document.removeEventListener('keydown', onDocKey, true);
-    }
+    handleMenuKeydown(ev, menu, {
+      close: (restoreFocus) => {
+        closeTabMenu();
+        cleanupMenuListeners();
+        if (restoreFocus) opener?.focus();
+      },
+    });
+  };
+  cleanupMenuListeners = () => {
+    document.removeEventListener('mousedown', onDocClick, true);
+    document.removeEventListener('keydown', onDocKey, true);
   };
   document.addEventListener('mousedown', onDocClick, true);
   document.addEventListener('keydown', onDocKey, true);

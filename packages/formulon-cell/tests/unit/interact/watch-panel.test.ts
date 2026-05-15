@@ -85,7 +85,40 @@ describe('attachWatchPanel', () => {
     expect(root?.hidden).toBe(true);
     handle.open();
     expect(root?.hidden).toBe(false);
+    expect(root?.tabIndex).toBe(-1);
     expect(host.querySelector<HTMLElement>('.fc-watch__empty')?.hidden).toBe(false);
+    handle.detach();
+  });
+
+  it('open focuses the panel actions and Escape closes back to the opener', async () => {
+    const handle = attachWatchPanel({ host, store, getWb: () => wb });
+    host.focus();
+    handle.open();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const root = host.querySelector<HTMLElement>('.fc-watch');
+    const addBtn = host.querySelector<HTMLButtonElement>('.fc-watch__btn');
+
+    expect(document.activeElement).toBe(addBtn);
+
+    root?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    expect(root?.hidden).toBe(true);
+    expect(document.activeElement).toBe(host);
+    handle.detach();
+  });
+
+  it('close button closes the panel and restores focus to the opener', async () => {
+    const handle = attachWatchPanel({ host, store, getWb: () => wb });
+    host.focus();
+    handle.open();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const root = host.querySelector<HTMLElement>('.fc-watch');
+    const closeBtn = host.querySelector<HTMLButtonElement>('.fc-watch__close');
+    closeBtn?.focus();
+    closeBtn?.click();
+
+    expect(root?.hidden).toBe(true);
+    expect(document.activeElement).toBe(host);
     handle.detach();
   });
 

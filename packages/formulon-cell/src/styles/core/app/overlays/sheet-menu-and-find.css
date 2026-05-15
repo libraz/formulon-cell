@@ -67,8 +67,10 @@
     color: var(--fc-fg, CanvasText);
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: var(--fc-radius-md, 8px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+    border-radius: 4px;
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.16),
+      0 1px 3px rgba(0, 0, 0, 0.12);
     font-family: var(--fc-font-ui, system-ui);
     font-size: 12.5px;
     line-height: 1.4;
@@ -80,7 +82,7 @@
     padding: 4px 8px;
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 18%, transparent));
-    border-radius: var(--fc-radius-sm, 4px);
+    border-radius: 2px;
     background: var(--fc-bg, inherit);
     color: inherit;
     min-width: 200px;
@@ -101,7 +103,7 @@
     background: transparent;
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: var(--fc-radius-sm, 4px);
+    border-radius: 2px;
     color: inherit;
     cursor: pointer;
     font: inherit;
@@ -109,6 +111,16 @@
   }
   .fc-find__btn:hover {
     background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 6%, transparent));
+  }
+  .fc-find__btn:focus-visible {
+    outline: 2px solid var(--fc-accent, currentColor);
+    outline-offset: 1px;
+  }
+  .fc-find__btn--icon {
+    min-width: 26px;
+    padding-inline: 7px;
+    font-size: 13px;
+    line-height: 1;
   }
   .fc-find__pill {
     font-family: var(--fc-font-mono, monospace);

@@ -1,6 +1,6 @@
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
+import { createDialogShell } from './dialog-shell.js';
 
 export interface CfRulesDialogDeps {
   host: HTMLElement;
@@ -88,16 +88,13 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   let strings = deps.strings ?? defaultStrings;
   let t = strings.cfRulesDialog;
 
-  const overlay = document.createElement('div');
-  overlay.className = 'fc-cfrulesdlg';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', t.title);
-  overlay.hidden = true;
-
-  const panel = document.createElement('div');
-  panel.className = 'fc-cfrulesdlg__panel';
-  overlay.appendChild(panel);
+  const shell = createDialogShell({
+    host,
+    className: 'fc-cfrulesdlg',
+    ariaLabel: t.title,
+    onDismiss: () => close(),
+  });
+  const { overlay, panel } = shell;
 
   const header = document.createElement('div');
   header.className = 'fc-cfrulesdlg__header';
@@ -137,17 +134,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   closeBtn.type = 'button';
   closeBtn.className = 'fc-cfrulesdlg__close';
   closeBtn.textContent = t.close;
-  closeBtn.addEventListener('click', () => close());
   footer.appendChild(closeBtn);
-
-  // Body-portal so the modal escapes `.fc-host`'s `contain: strict`.
-  inheritHostTokens(host, overlay);
-  document.body.appendChild(overlay);
-
-  const onOverlayClick = (e: MouseEvent): void => {
-    if (e.target === overlay) close();
-  };
-  overlay.addEventListener('click', onOverlayClick);
 
   const onKey = (e: KeyboardEvent): void => {
     if (overlay.hidden) return;
@@ -156,7 +143,8 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       close();
     }
   };
-  document.addEventListener('keydown', onKey);
+  shell.on(document, 'keydown', onKey as EventListener);
+  shell.on(closeBtn, 'click', () => close());
 
   const renderTable = (): void => {
     tableWrap.replaceChildren();
@@ -225,7 +213,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     clearAllBtn.classList.remove('fc-cfrulesdlg__clearall--armed');
     clearAllBtn.textContent = t.clearAll;
   };
-  clearAllBtn.addEventListener('click', () => {
+  shell.on(clearAllBtn, 'click', () => {
     const wb = getWb();
     const sheet = getActiveSheet();
     if (!wb) return;
@@ -246,18 +234,18 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   const open = (): void => {
     resetArmed();
     renderTable();
-    overlay.hidden = false;
+    shell.open();
   };
 
   const close = (): void => {
     resetArmed();
-    overlay.hidden = true;
+    shell.close();
   };
 
   const refresh = (): void => {
     strings = deps.strings ?? defaultStrings;
     t = strings.cfRulesDialog;
-    overlay.setAttribute('aria-label', t.title);
+    shell.setAriaLabel(t.title);
     header.textContent = t.title;
     note.textContent = t.note;
     empty.textContent = t.empty;
@@ -272,9 +260,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     refresh,
     detach() {
       resetArmed();
-      overlay.removeEventListener('click', onOverlayClick);
-      document.removeEventListener('keydown', onKey);
-      overlay.remove();
+      shell.dispose();
     },
   };
 }

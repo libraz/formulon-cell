@@ -35,6 +35,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
   let activeRange: Range | null = null;
   let activeCol = 0;
   let activeHidden = new Set<string>();
+  let restoreFocus: HTMLElement | null = null;
 
   const close = (): void => {
     if (!root) return;
@@ -44,6 +45,8 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     activeHidden = new Set();
     document.removeEventListener('mousedown', onDocMouseDown, true);
     document.removeEventListener('keydown', onDocKey, true);
+    restoreFocus?.focus({ preventScroll: true });
+    restoreFocus = null;
   };
 
   const onDocMouseDown = (e: MouseEvent): void => {
@@ -74,6 +77,10 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
 
   const open = (range: Range, col: number, anchor: { x: number; y: number; h: number }): void => {
     close();
+    restoreFocus =
+      document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+        ? document.activeElement
+        : null;
     activeRange = range;
     activeCol = col;
 
@@ -96,17 +103,48 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     r.style.left = `${anchor.x}px`;
     r.style.top = `${anchor.y + anchor.h}px`;
     r.setAttribute('role', 'dialog');
+    r.setAttribute('aria-modal', 'false');
     r.setAttribute('aria-label', t.title);
 
     const search = document.createElement('input');
     search.className = 'fc-filter-dropdown__search';
     search.type = 'search';
     search.placeholder = t.searchPlaceholder;
+    search.setAttribute('aria-label', t.searchPlaceholder);
     search.spellcheck = false;
 
     const list = document.createElement('div');
     list.className = 'fc-filter-dropdown__list';
+    list.setAttribute('role', 'group');
+    list.setAttribute('aria-label', t.title);
     list.tabIndex = -1;
+
+    const rowCheckboxes = (): HTMLInputElement[] =>
+      Array.from(list.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
+    const focusCheckbox = (idx: number): void => {
+      const boxes = rowCheckboxes();
+      if (boxes.length === 0) return;
+      const next = (idx + boxes.length) % boxes.length;
+      boxes[next]?.focus({ preventScroll: true });
+    };
+    const handleRowKey = (event: KeyboardEvent): void => {
+      const boxes = rowCheckboxes();
+      const idx = boxes.indexOf(event.currentTarget as HTMLInputElement);
+      if (idx < 0) return;
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        focusCheckbox(idx + 1);
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        focusCheckbox(idx - 1);
+      } else if (event.key === 'Home') {
+        event.preventDefault();
+        focusCheckbox(0);
+      } else if (event.key === 'End') {
+        event.preventDefault();
+        focusCheckbox(boxes.length - 1);
+      }
+    };
 
     const renderRows = (filter: string): void => {
       list.innerHTML = '';
@@ -118,6 +156,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       allCb.type = 'checkbox';
       allCb.checked = distinct.every((v) => !hidden.has(v));
       allCb.indeterminate = !allCb.checked && distinct.some((v) => !hidden.has(v));
+      allCb.addEventListener('keydown', handleRowKey);
       allCb.addEventListener('change', () => {
         if (allCb.checked) {
           hidden.clear();
@@ -125,6 +164,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
           for (const v of distinct) hidden.add(v);
         }
         renderRows(search.value);
+        requestAnimationFrame(() => focusCheckbox(0));
       });
       const allLabel = document.createElement('span');
       allLabel.textContent = t.selectAll;
@@ -140,6 +180,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
         cb.type = 'checkbox';
         cb.value = v;
         cb.checked = !hidden.has(v);
+        cb.addEventListener('keydown', handleRowKey);
         cb.addEventListener('change', () => {
           if (cb.checked) hidden.delete(v);
           else hidden.add(v);
@@ -155,6 +196,15 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     };
     renderRows('');
     search.addEventListener('input', () => renderRows(search.value));
+    search.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        focusCheckbox(0);
+      } else if (event.key === 'End' && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        focusCheckbox(rowCheckboxes().length - 1);
+      }
+    });
 
     const actions = document.createElement('div');
     actions.className = 'fc-filter-dropdown__actions';

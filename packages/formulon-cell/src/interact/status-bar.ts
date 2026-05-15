@@ -211,6 +211,20 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   document.body.appendChild(popover);
 
   let popoverVisible = false;
+  let popoverActiveIndex = -1;
+  let restoreFocusEl: HTMLElement | null = null;
+
+  const chooserItems = (): HTMLButtonElement[] =>
+    Array.from(popover.querySelectorAll<HTMLButtonElement>('.fc-statusbar__chooser-item')).filter(
+      (btn) => !btn.disabled,
+    );
+
+  const focusChooserItem = (idx: number): void => {
+    const items = chooserItems();
+    if (items.length === 0) return;
+    popoverActiveIndex = (idx + items.length) % items.length;
+    items[popoverActiveIndex]?.focus({ preventScroll: true });
+  };
 
   const buildChooser = (): void => {
     popover.replaceChildren();
@@ -224,6 +238,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
       row.type = 'button';
       row.className = 'fc-statusbar__chooser-item';
       row.setAttribute('role', 'menuitemcheckbox');
+      row.setAttribute('aria-checked', active.has(key) ? 'true' : 'false');
       const check = document.createElement('span');
       check.className = 'fc-statusbar__chooser-check';
       check.textContent = active.has(key) ? '✓' : '';
@@ -234,7 +249,9 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
         e.preventDefault();
         e.stopPropagation();
         mutators.toggleStatusAgg(store, key);
-        check.textContent = store.getState().ui.statusAggs.includes(key) ? '✓' : '';
+        const checked = store.getState().ui.statusAggs.includes(key);
+        check.textContent = checked ? '✓' : '';
+        row.setAttribute('aria-checked', checked ? 'true' : 'false');
       });
       popover.appendChild(row);
     }
@@ -253,18 +270,30 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
 
   const showChooser = (clientX: number, clientY: number): void => {
     inheritHostTokens(statusbar, popover);
+    restoreFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     buildChooser();
     popover.style.display = 'block';
     popover.style.left = '-9999px';
     popover.style.top = '-9999px';
     popoverVisible = true;
     placeChooser(clientX, clientY);
+    focusChooserItem(0);
   };
 
-  const hideChooser = (): void => {
+  const hideChooser = (restoreFocus = false): void => {
     if (!popoverVisible) return;
     popoverVisible = false;
+    popoverActiveIndex = -1;
     popover.style.display = 'none';
+    const focusTarget = restoreFocusEl;
+    restoreFocusEl = null;
+    if (
+      restoreFocus &&
+      focusTarget &&
+      (popover.contains(document.activeElement) || document.activeElement === document.body)
+    ) {
+      focusTarget.focus({ preventScroll: true });
+    }
   };
 
   const onContextMenu = (e: MouseEvent): void => {
@@ -281,14 +310,32 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   const onDocPointerDown = (e: MouseEvent): void => {
     if (!popoverVisible) return;
     if (e.target instanceof Node && popover.contains(e.target)) return;
-    hideChooser();
+    hideChooser(false);
   };
 
   const onDocKey = (e: KeyboardEvent): void => {
     if (!popoverVisible) return;
     if (e.key === 'Escape') {
       e.preventDefault();
-      hideChooser();
+      hideChooser(true);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusChooserItem(popoverActiveIndex + 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusChooserItem(popoverActiveIndex - 1);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      focusChooserItem(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      focusChooserItem(chooserItems().length - 1);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      const target = document.activeElement;
+      if (target instanceof HTMLButtonElement && popover.contains(target)) {
+        e.preventDefault();
+        target.click();
+      }
     }
   };
 

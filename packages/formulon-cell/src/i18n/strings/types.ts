@@ -11,6 +11,7 @@
  */
 export interface Strings {
   contextMenu: {
+    title: string;
     copy: string;
     cut: string;
     paste: string;

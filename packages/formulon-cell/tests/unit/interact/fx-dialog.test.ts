@@ -106,4 +106,85 @@ describe('attachFxDialog', () => {
     expect(FUNCTION_DESCRIPTIONS.IF?.en).toMatch(/condition|true|false/i);
     expect(FUNCTION_DESCRIPTIONS.VLOOKUP?.en).toMatch(/lookup|column/i);
   });
+
+  it('clicks on rendered picker items via event delegation (no per-item listeners)', () => {
+    // Pre-refactor regression check: each render of the picker used to attach
+    // a fresh `click` listener to every item, leaving 9 add / 7 remove pairs
+    // in detach(). The delegated handler should fire whether the click hits
+    // the item element directly or any of its children (name span / desc span).
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      onInsert: () => {},
+    });
+    handle.open();
+    const sumItem = Array.from(document.querySelectorAll<HTMLElement>('.fc-fxdialog__item')).find(
+      (el) => el.dataset.fxName === 'SUM',
+    );
+    expect(sumItem).toBeTruthy();
+    if (!sumItem) return;
+
+    // Click on the name span (a child) — delegation must still resolve back
+    // to the parent item via closest().
+    const nameSpan = sumItem.querySelector<HTMLElement>('.fc-fxdialog__item-name');
+    nameSpan?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const args = document.querySelector<HTMLElement>('.fc-fxdialog__args');
+    expect(args?.hidden).toBe(false);
+    const argName = document.querySelector<HTMLElement>('.fc-fxdialog__args-name');
+    expect(argName?.textContent).toMatch(/^SUM\(/);
+    handle.detach();
+  });
+
+  it('does not leak listeners across many search-filter rerenders', () => {
+    // The picker rebuilds its item list on every keystroke. With the old
+    // per-item listener approach, 200 keystrokes × ~600 items would
+    // accumulate hundreds of thousands of listeners. With delegation, only
+    // the single shell-tracked listener on `list` exists. Functional check:
+    // after lots of rerenders the click still works exactly once.
+    let inserted = 0;
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      onInsert: () => {
+        inserted += 1;
+      },
+    });
+    handle.open();
+    const search = document.querySelector<HTMLInputElement>('.fc-fxdialog__search');
+    if (!search) throw new Error('expected search input');
+    // End with the empty filter so SUM is back in the rendered list.
+    for (const q of ['', 'S', 'SU', 'SUM', '', 'V', 'VL', 'VLO', '', 'I', 'IF', '']) {
+      search.value = q;
+      search.dispatchEvent(new Event('input'));
+    }
+    const sumItem = Array.from(document.querySelectorAll<HTMLElement>('.fc-fxdialog__item')).find(
+      (el) => el.dataset.fxName === 'SUM',
+    );
+    expect(sumItem).toBeTruthy();
+    sumItem?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const insertBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    insertBtn?.click();
+    expect(inserted).toBe(1);
+    handle.detach();
+  });
+
+  it('detach removes the overlay and disables further listener firing', () => {
+    let inserted = 0;
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      onInsert: () => {
+        inserted += 1;
+      },
+    });
+    handle.open('SUM');
+    const insertBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    expect(insertBtn).toBeTruthy();
+    handle.detach();
+    expect(document.querySelector('.fc-fxdialog')).toBeNull();
+    // Stale reference should be inert.
+    insertBtn?.click();
+    expect(inserted).toBe(0);
+  });
 });

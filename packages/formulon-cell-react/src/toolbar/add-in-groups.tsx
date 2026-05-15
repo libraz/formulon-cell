@@ -4,7 +4,7 @@ import { RIBBON_TAB_LABELS } from './model.js';
 
 type AddInGroupOptions = Pick<
   BuildRibbonGroupsOptions,
-  'group' | 'iconLabel' | 'instance' | 'lang' | 'tool' | 'tr'
+  'group' | 'iconLabel' | 'instance' | 'lang' | 'onAddIn' | 'onRunScript' | 'tool' | 'tr'
 >;
 
 export const buildAddInRibbonGroups = ({
@@ -12,6 +12,8 @@ export const buildAddInRibbonGroups = ({
   iconLabel,
   instance,
   lang,
+  onAddIn,
+  onRunScript,
   tool,
   tr,
 }: AddInGroupOptions): { automate: ReactElement[]; acrobat: ReactElement[] } => ({
@@ -23,10 +25,10 @@ export const buildAddInRibbonGroups = ({
           'script',
           tr.script,
           iconLabel('script', tr.script),
-          () => undefined,
+          () => onRunScript?.(),
           false,
           ' demo__rb--wide',
-          true,
+          !onRunScript,
         ),
       ],
       'tiles',
@@ -40,10 +42,10 @@ export const buildAddInRibbonGroups = ({
           'addIn',
           tr.addIn,
           iconLabel('addIn', tr.addIn),
-          () => undefined,
+          () => onAddIn?.(),
           false,
           ' demo__rb--wide',
-          true,
+          !onAddIn,
         ),
       ],
       'tiles',

@@ -1,7 +1,7 @@
 import { FUNCTION_SIGNATURES } from '../commands/refs.js';
 import { defaultStrings, en as enStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
+import { createDialogShell } from './dialog-shell.js';
 
 /** Heuristic locale detector — we don't get a `Locale` flag through deps so
  *  we sniff the active dictionary's title against the canonical English one.
@@ -117,16 +117,17 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   let locale: 'en' | 'ja' = detectLocale(strings);
 
   // ── Overlay + panel ─────────────────────────────────────────────────────
-  const overlay = document.createElement('div');
-  overlay.className = 'fc-fmtdlg fc-fxdialog';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', t.title);
-  overlay.hidden = true;
-
-  const panel = document.createElement('div');
-  panel.className = 'fc-fmtdlg__panel fc-fxdialog__panel';
-  overlay.appendChild(panel);
+  const shell = createDialogShell({
+    host,
+    className: 'fc-fxdialog',
+    ariaLabel: t.title,
+    onDismiss: () => api.close(),
+  });
+  // Reuse the shared format-dialog skin for header/footer/btn styling.
+  const overlay = shell.overlay;
+  const panel = shell.panel;
+  overlay.classList.add('fc-fmtdlg');
+  panel.classList.add('fc-fmtdlg__panel', 'fc-fxdialog__panel');
 
   const header = document.createElement('div');
   header.className = 'fc-fmtdlg__header';
@@ -212,10 +213,6 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   insertBtn.disabled = true;
   footer.appendChild(insertBtn);
 
-  // Body-portal so the modal escapes `.fc-host`'s `contain: strict`.
-  inheritHostTokens(host, overlay);
-  document.body.appendChild(overlay);
-
   // ── State ───────────────────────────────────────────────────────────────
   // Sorted catalog of all known function names; rebuilt once and reused.
   const allNames: readonly string[] = Object.keys(FUNCTION_SIGNATURES).slice().sort();
@@ -251,6 +248,8 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       const item = document.createElement('div');
       item.className = 'fc-fxdialog__item';
       item.setAttribute('role', 'option');
+      item.dataset.fxName = name;
+      item.dataset.fxIndex = String(i);
       if (i === highlightIndex) {
         item.classList.add('fc-fxdialog__item--active');
         item.setAttribute('aria-selected', 'true');
@@ -266,10 +265,9 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
         descEl.textContent = desc;
         item.appendChild(descEl);
       }
-      item.addEventListener('click', () => {
-        highlightIndex = i;
-        choose(name);
-      });
+      // No per-item listener — clicks bubble to the delegated handler on
+      // `list`, registered once via shell.on() below. That keeps listener
+      // count O(1) instead of O(n) and lets dispose() sweep them all.
       list.appendChild(item);
     });
   };
@@ -315,7 +313,9 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       input.className = 'fc-fxdialog__arg-input';
       input.autocomplete = 'off';
       input.spellcheck = false;
-      input.addEventListener('input', updatePreview);
+      // Tracked via shell.on so dispose() removes it; required because
+      // step-2 inputs are dynamically rebuilt every choose() call.
+      shell.on(input, 'input', updatePreview);
       row.append(labelEl, input);
       argsFields.appendChild(row);
       argInputs.push(input);
@@ -379,10 +379,6 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   const onCancel = (): void => api.close();
   const onBack = (): void => goBackToPicker();
 
-  const onOverlayClick = (e: MouseEvent): void => {
-    if (e.target === overlay) api.close();
-  };
-
   const onOverlayKey = (e: KeyboardEvent): void => {
     e.stopPropagation();
     if (e.key === 'Escape') {
@@ -398,17 +394,29 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     }
   };
 
-  searchInput.addEventListener('input', onSearchInput);
-  searchInput.addEventListener('keydown', onSearchKey);
-  insertBtn.addEventListener('click', onInsertClick);
-  cancelBtn.addEventListener('click', onCancel);
-  backBtn.addEventListener('click', onBack);
-  overlay.addEventListener('click', onOverlayClick);
-  overlay.addEventListener('keydown', onOverlayKey);
+  // Delegated picker click — fires for any rendered .fc-fxdialog__item via
+  // bubble. Replaces the per-item listener that used to pile up on every
+  // search-filter rerender and stayed unmatched in detach(). Listener count
+  // is now O(1) regardless of how many functions are visible.
+  const onListClick = (e: Event): void => {
+    const target = (e.target as HTMLElement | null)?.closest<HTMLElement>('.fc-fxdialog__item');
+    if (!target?.dataset.fxName) return;
+    const idx = Number.parseInt(target.dataset.fxIndex ?? '-1', 10);
+    if (Number.isFinite(idx) && idx >= 0) highlightIndex = idx;
+    choose(target.dataset.fxName);
+  };
+
+  shell.on(list, 'click', onListClick);
+  shell.on(searchInput, 'input', onSearchInput);
+  shell.on(searchInput, 'keydown', onSearchKey as EventListener);
+  shell.on(insertBtn, 'click', onInsertClick);
+  shell.on(cancelBtn, 'click', onCancel);
+  shell.on(backBtn, 'click', onBack);
+  shell.on(overlay, 'keydown', onOverlayKey as EventListener);
 
   const refreshLabels = (): void => {
     t = strings.fxDialog;
-    overlay.setAttribute('aria-label', t.title);
+    shell.setAriaLabel(t.title);
     header.textContent = t.title;
     searchInput.placeholder = t.searchPlaceholder;
     previewLabel.textContent = t.preview;
@@ -440,14 +448,14 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
         insertBtn.disabled = true;
         renderList();
       }
-      overlay.hidden = false;
+      shell.open();
       requestAnimationFrame(() => {
         if (argsWrap.hidden) searchInput.focus();
         else argInputs[0]?.focus();
       });
     },
     close(): void {
-      overlay.hidden = true;
+      shell.close();
       host.focus();
     },
     refresh(): void {
@@ -458,14 +466,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       refreshLabels();
     },
     detach(): void {
-      searchInput.removeEventListener('input', onSearchInput);
-      searchInput.removeEventListener('keydown', onSearchKey);
-      insertBtn.removeEventListener('click', onInsertClick);
-      cancelBtn.removeEventListener('click', onCancel);
-      backBtn.removeEventListener('click', onBack);
-      overlay.removeEventListener('click', onOverlayClick);
-      overlay.removeEventListener('keydown', onOverlayKey);
-      overlay.remove();
+      shell.dispose();
     },
   };
 

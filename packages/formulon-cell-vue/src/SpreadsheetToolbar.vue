@@ -49,7 +49,7 @@ import {
   toggleWrap,
 } from '@libraz/formulon-cell';
 import { RibbonIcon } from './toolbar/icons.js';
-import { computed } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { useToolbarActive } from './toolbar/active.js';
 import { useToolbarDropdown } from './toolbar/dropdown.js';
 import {
@@ -68,6 +68,13 @@ interface Props {
   instance: SpreadsheetInstance | null;
   activeTab: RibbonTab;
   locale: string;
+  onSpellingReview?: () => void;
+  onAccessibilityCheck?: () => void;
+  onRunScript?: () => void;
+  onDrawPen?: () => void;
+  onDrawEraser?: () => void;
+  onTranslate?: () => void;
+  onAddIn?: () => void;
 }
 
 const props = defineProps<Props>();
@@ -78,6 +85,7 @@ const emit = defineEmits<{
 const lang = computed(() => (props.locale === 'ja' ? 'ja' : 'en'));
 const tabs = computed(() => toolbarTabs(lang.value));
 const tr = computed(() => toolbarText(lang.value));
+const tablistRef = ref<HTMLDivElement | null>(null);
 const borderPresets = computed(() =>
   BORDER_PRESETS.map((preset) => ({
     ...preset,
@@ -122,6 +130,35 @@ const active = useToolbarActive(() => props.instance);
 const disabled = computed(() => !props.instance);
 const setActiveTab = (tab: RibbonTab): void => {
   emit('tabChange', tab);
+};
+
+const focusRibbonTab = async (tab: RibbonTab): Promise<void> => {
+  await nextTick();
+  tablistRef.value
+    ?.querySelector<HTMLButtonElement>(`[data-ribbon-tab="${tab}"]`)
+    ?.focus({ preventScroll: true });
+};
+
+const onRibbonTabKeydown = (event: KeyboardEvent): void => {
+  const target = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-ribbon-tab]');
+  if (!target) return;
+  const list = tabs.value;
+  const currentId = (target.dataset.ribbonTab as RibbonTab | undefined) ?? props.activeTab;
+  const current = Math.max(
+    0,
+    list.findIndex((tab) => tab.id === currentId),
+  );
+  let next = current;
+  if (event.key === 'ArrowRight') next = (current + 1) % list.length;
+  else if (event.key === 'ArrowLeft') next = (current - 1 + list.length) % list.length;
+  else if (event.key === 'Home') next = 0;
+  else if (event.key === 'End') next = list.length - 1;
+  else return;
+  event.preventDefault();
+  const nextTab = list[next]?.id;
+  if (!nextTab) return;
+  setActiveTab(nextTab);
+  void focusRibbonTab(nextTab);
 };
 
 const wrapFormat = (
@@ -226,15 +263,16 @@ const onMarginPreset = (next: MarginPreset): void => {
   recordPageSetupChange(inst.history, inst.store, () => setMarginPreset(inst.store, sheet, next));
 };
 
-const { borderStyle, closeDropdown, onDropdownPick, openDropdown, toggleDropdown } = useToolbarDropdown({
-  onBorderPreset,
-  onFontFamily,
-  onFontSize,
-  onMarginPreset,
-  onOpenPageSetup: () => props.instance?.openPageSetup(),
-  onPageOrientation,
-  onPaperSize,
-});
+const { borderStyle, closeDropdown, onDropdownKeydown, onDropdownPick, openDropdown, toggleDropdown } =
+  useToolbarDropdown({
+    onBorderPreset,
+    onFontFamily,
+    onFontSize,
+    onMarginPreset,
+    onOpenPageSetup: () => props.instance?.openPageSetup(),
+    onPageOrientation,
+    onPaperSize,
+  });
 const onFontColor = (value: string): void => {
   wrapFormat((s, st) => setFontColor(s, st, value));
 };
@@ -337,8 +375,14 @@ const onZoom = (zoom: number): void => {
 </script>
 
 <template>
-  <div class="demo__ribbon-shell">
-    <div class="demo__ribbon-tabs" role="tablist" :aria-label="tr.ribbonTabs">
+  <div class="demo__ribbon-shell" @keydown="onDropdownKeydown">
+    <div
+      ref="tablistRef"
+      class="demo__ribbon-tabs"
+      role="tablist"
+      :aria-label="tr.ribbonTabs"
+      @keydown="onRibbonTabKeydown"
+    >
       <button
         v-for="tab in tabs"
         :key="tab.id"
@@ -350,7 +394,9 @@ const onZoom = (zoom: number): void => {
         ]"
         type="button"
         role="tab"
+        :data-ribbon-tab="tab.id"
         :aria-selected="props.activeTab === tab.id"
+        :tabindex="props.activeTab === tab.id ? 0 : -1"
         @click="setActiveTab(tab.id)"
       >
         {{ tab.label }}
@@ -412,6 +458,7 @@ const onZoom = (zoom: number): void => {
         <div class="demo__ribbon-tools">
     <div
       class="demo__rb-dd demo__rb-select--font"
+      data-dropdown-name="fontFamily"
       :class="{ 'demo__rb-dd--open': openDropdown === 'fontFamily' }"
     >
       <button
@@ -451,6 +498,7 @@ const onZoom = (zoom: number): void => {
     </div>
     <div
       class="demo__rb-dd"
+      data-dropdown-name="fontSize"
       :class="{ 'demo__rb-dd--open': openDropdown === 'fontSize' }"
     >
       <button
@@ -512,6 +560,7 @@ const onZoom = (zoom: number): void => {
     </button>
     <div
       class="demo__rb-dd demo__rb-select--border"
+      data-dropdown-name="borderPreset"
       :class="{ 'demo__rb-dd--open': openDropdown === 'borderPreset' }"
     >
       <button
@@ -546,6 +595,7 @@ const onZoom = (zoom: number): void => {
     </div>
     <div
       class="demo__rb-dd demo__rb-select--border-style"
+      data-dropdown-name="borderStyle"
       :class="{ 'demo__rb-dd--open': openDropdown === 'borderStyle' }"
     >
       <button
@@ -786,10 +836,10 @@ const onZoom = (zoom: number): void => {
       <template v-else-if="props.activeTab === 'draw'">
         <section class="demo__ribbon-group demo__ribbon-group--tiles" :aria-label="RIBBON_TAB_LABELS.draw[lang]">
           <div class="demo__ribbon-tools">
-            <button class="demo__rb demo__rb--wide" type="button" disabled>
+            <button class="demo__rb demo__rb--wide" type="button" :disabled="!props.onDrawPen" @click="props.onDrawPen?.()">
               <RibbonIcon name="pen" /><span>{{ tr.pen }}</span>
             </button>
-            <button class="demo__rb demo__rb--wide" type="button" disabled>
+            <button class="demo__rb demo__rb--wide" type="button" :disabled="!props.onDrawEraser" @click="props.onDrawEraser?.()">
               <RibbonIcon name="eraser" /><span>{{ tr.eraser }}</span>
             </button>
           </div>
@@ -800,7 +850,7 @@ const onZoom = (zoom: number): void => {
       <template v-else-if="props.activeTab === 'pageLayout'">
         <section class="demo__ribbon-group demo__ribbon-group--tiles" :aria-label="tr.pageSetup">
           <div class="demo__ribbon-tools">
-            <div class="demo__rb-dd demo__rb-select--border" :class="{ 'demo__rb-dd--open': openDropdown === 'margins' }">
+            <div class="demo__rb-dd demo__rb-select--border" data-dropdown-name="margins" :class="{ 'demo__rb-dd--open': openDropdown === 'margins' }">
               <button type="button" class="demo__rb-dd__btn" :disabled="disabled" :title="tr.margins" :aria-label="tr.margins" aria-haspopup="listbox" :aria-expanded="openDropdown === 'margins'" @click="toggleDropdown('margins')"><span class="demo__rb-dd__value">{{ active.marginPreset === 'wide' ? tr.marginsWide : active.marginPreset === 'narrow' ? tr.marginsNarrow : active.marginPreset === 'normal' ? tr.marginsNormal : tr.marginsCustom }}</span><svg class="demo__rb-dd__chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5l3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
               <div v-if="openDropdown === 'margins'" class="demo__rb-dd__list" role="listbox" :aria-label="tr.margins" tabindex="-1">
                 <button class="demo__rb-dd__opt" type="button" role="option" :aria-selected="active.marginPreset === 'normal'" @click="onDropdownPick('margins', 'normal')"><span class="demo__rb-dd__check" aria-hidden="true" /><span class="demo__rb-dd__label">{{ tr.marginsNormal }}</span></button>
@@ -809,14 +859,14 @@ const onZoom = (zoom: number): void => {
                 <button class="demo__rb-dd__opt" type="button" role="option" :aria-selected="false" @click="onDropdownPick('margins', 'custom')"><span class="demo__rb-dd__check" aria-hidden="true" /><span class="demo__rb-dd__label">{{ tr.marginsCustom }}</span></button>
               </div>
             </div>
-            <div class="demo__rb-dd demo__rb-select--border" :class="{ 'demo__rb-dd--open': openDropdown === 'orientation' }">
+            <div class="demo__rb-dd demo__rb-select--border" data-dropdown-name="orientation" :class="{ 'demo__rb-dd--open': openDropdown === 'orientation' }">
               <button type="button" class="demo__rb-dd__btn" :disabled="disabled" :title="tr.orientation" :aria-label="tr.orientation" aria-haspopup="listbox" :aria-expanded="openDropdown === 'orientation'" @click="toggleDropdown('orientation')"><span class="demo__rb-dd__value">{{ active.pageOrientation === 'landscape' ? tr.landscape : tr.portrait }}</span><svg class="demo__rb-dd__chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5l3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
               <div v-if="openDropdown === 'orientation'" class="demo__rb-dd__list" role="listbox" :aria-label="tr.orientation" tabindex="-1">
                 <button class="demo__rb-dd__opt" type="button" role="option" :aria-selected="active.pageOrientation === 'portrait'" @click="onDropdownPick('orientation', 'portrait')"><span class="demo__rb-dd__check" aria-hidden="true" /><span class="demo__rb-dd__label">{{ tr.portrait }}</span></button>
                 <button class="demo__rb-dd__opt" type="button" role="option" :aria-selected="active.pageOrientation === 'landscape'" @click="onDropdownPick('orientation', 'landscape')"><span class="demo__rb-dd__check" aria-hidden="true" /><span class="demo__rb-dd__label">{{ tr.landscape }}</span></button>
               </div>
             </div>
-            <div class="demo__rb-dd demo__rb-select--border" :class="{ 'demo__rb-dd--open': openDropdown === 'paperSize' }">
+            <div class="demo__rb-dd demo__rb-select--border" data-dropdown-name="paperSize" :class="{ 'demo__rb-dd--open': openDropdown === 'paperSize' }">
               <button type="button" class="demo__rb-dd__btn" :disabled="disabled" :title="tr.paperSize" :aria-label="tr.paperSize" aria-haspopup="listbox" :aria-expanded="openDropdown === 'paperSize'" @click="toggleDropdown('paperSize')"><span class="demo__rb-dd__value">{{ active.paperSize }}</span><svg class="demo__rb-dd__chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5l3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
               <div v-if="openDropdown === 'paperSize'" class="demo__rb-dd__list" role="listbox" :aria-label="tr.paperSize" tabindex="-1">
                 <button v-for="paper in ['A4', 'A3', 'A5', 'letter', 'legal', 'tabloid']" :key="paper" class="demo__rb-dd__opt" type="button" role="option" :aria-selected="active.paperSize === paper" @click="onDropdownPick('paperSize', paper)"><span class="demo__rb-dd__check" aria-hidden="true" /><span class="demo__rb-dd__label">{{ paper === 'letter' ? tr.paperLetter : paper === 'legal' ? tr.paperLegal : paper === 'tabloid' ? tr.paperTabloid : paper }}</span></button>
@@ -928,11 +978,11 @@ const onZoom = (zoom: number): void => {
 
       <template v-else-if="props.activeTab === 'review'">
         <section class="demo__ribbon-group demo__ribbon-group--tiles" :aria-label="tr.proofing">
-          <div class="demo__ribbon-tools"><button class="demo__rb demo__rb--wide" type="button" disabled><RibbonIcon name="spelling" /><span>{{ tr.spelling }}</span></button></div>
+          <div class="demo__ribbon-tools"><button class="demo__rb demo__rb--wide" type="button" :disabled="!props.onSpellingReview" @click="props.onSpellingReview?.()"><RibbonIcon name="spelling" /><span>{{ tr.spelling }}</span></button></div>
           <div class="demo__ribbon-label">{{ tr.proofing }}</div>
         </section>
         <section class="demo__ribbon-group demo__ribbon-group--tiles" :aria-label="tr.language">
-          <div class="demo__ribbon-tools"><button class="demo__rb demo__rb--wide" type="button" disabled><RibbonIcon name="translate" /><span>{{ tr.translate }}</span></button></div>
+          <div class="demo__ribbon-tools"><button class="demo__rb demo__rb--wide" type="button" :disabled="!props.onTranslate" @click="props.onTranslate?.()"><RibbonIcon name="translate" /><span>{{ tr.translate }}</span></button></div>
           <div class="demo__ribbon-label">{{ tr.language }}</div>
         </section>
         <section class="demo__ribbon-group demo__ribbon-group--tiles" :aria-label="tr.comments">
@@ -948,7 +998,7 @@ const onZoom = (zoom: number): void => {
           <div class="demo__ribbon-label">{{ tr.protection }}</div>
         </section>
         <section class="demo__ribbon-group demo__ribbon-group--tiles" :aria-label="tr.accessibility">
-          <div class="demo__ribbon-tools"><button class="demo__rb demo__rb--wide" type="button" disabled><RibbonIcon name="accessibility" /><span>{{ tr.accessibility }}</span></button></div>
+          <div class="demo__ribbon-tools"><button class="demo__rb demo__rb--wide" type="button" :disabled="!props.onAccessibilityCheck" @click="props.onAccessibilityCheck?.()"><RibbonIcon name="accessibility" /><span>{{ tr.accessibility }}</span></button></div>
           <div class="demo__ribbon-label">{{ tr.accessibility }}</div>
         </section>
       </template>
@@ -978,7 +1028,7 @@ const onZoom = (zoom: number): void => {
       <template v-else-if="props.activeTab === 'automate'">
         <section class="demo__ribbon-group demo__ribbon-group--tiles" :aria-label="RIBBON_TAB_LABELS.automate[lang]">
           <div class="demo__ribbon-tools">
-            <button class="demo__rb demo__rb--wide" type="button" disabled>
+            <button class="demo__rb demo__rb--wide" type="button" :disabled="!props.onRunScript" @click="props.onRunScript?.()">
               <RibbonIcon name="script" /><span>{{ tr.script }}</span>
             </button>
           </div>
@@ -989,7 +1039,7 @@ const onZoom = (zoom: number): void => {
       <template v-else-if="props.activeTab === 'acrobat'">
         <section class="demo__ribbon-group demo__ribbon-group--tiles" :aria-label="tr.addIn">
           <div class="demo__ribbon-tools">
-            <button class="demo__rb demo__rb--wide" type="button" disabled>
+            <button class="demo__rb demo__rb--wide" type="button" :disabled="!props.onAddIn" @click="props.onAddIn?.()">
               <RibbonIcon name="addIn" /><span>{{ tr.addIn }}</span>
             </button>
           </div>
@@ -1005,16 +1055,7 @@ const onZoom = (zoom: number): void => {
         </section>
       </template>
 
-      <template v-else>
-        <section class="demo__ribbon-group demo__ribbon-group--tiles" :aria-label="RIBBON_TAB_LABELS[props.activeTab][lang]">
-          <div class="demo__ribbon-tools">
-            <button class="demo__rb demo__rb--wide" type="button" disabled>
-              <RibbonIcon name="page" /><span>{{ tr.disabled }}</span>
-            </button>
-          </div>
-          <div class="demo__ribbon-label">{{ RIBBON_TAB_LABELS[props.activeTab][lang] }}</div>
-        </section>
-      </template>
+      <template v-else></template>
     </div>
   </div>
 </template>

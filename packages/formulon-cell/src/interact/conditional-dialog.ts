@@ -7,7 +7,7 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../store/store.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
+import { createDialogShell } from './dialog-shell.js';
 
 export interface ConditionalDialogDeps {
   host: HTMLElement;
@@ -73,16 +73,15 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   const strings = deps.strings ?? defaultStrings;
   const t = strings.conditionalDialog;
 
-  const overlay = document.createElement('div');
-  overlay.className = 'fc-fmtdlg fc-conddlg';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', t.title);
-  overlay.hidden = true;
-
-  const panel = document.createElement('div');
-  panel.className = 'fc-fmtdlg__panel fc-conddlg__panel';
-  overlay.appendChild(panel);
+  const shell = createDialogShell({
+    host,
+    className: 'fc-conddlg',
+    ariaLabel: t.title,
+    onDismiss: () => api.close(),
+  });
+  shell.overlay.classList.add('fc-fmtdlg');
+  shell.panel.classList.add('fc-fmtdlg__panel', 'fc-conddlg__panel');
+  const { overlay, panel } = shell;
 
   const header = document.createElement('div');
   header.className = 'fc-fmtdlg__header';
@@ -491,10 +490,6 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   closeBtn.textContent = t.close;
   footer.appendChild(closeBtn);
 
-  // Body-portal so the modal escapes `.fc-host`'s `contain: strict`.
-  inheritHostTokens(host, overlay);
-  document.body.appendChild(overlay);
-
   // ── Behaviour ──────────────────────────────────────────────────────────
   /** Kinds that re-use the shared `applyGroup` (fill/font/style) controls
    *  for their "apply when matched" format. cell-value carries its own
@@ -691,9 +686,6 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   };
   const onClose = (): void => api.close();
 
-  const onOverlayClick = (e: MouseEvent): void => {
-    if (e.target === overlay) api.close();
-  };
   const onOverlayKey = (e: KeyboardEvent): void => {
     e.stopPropagation();
     if (e.key === 'Escape') {
@@ -702,14 +694,13 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     }
   };
 
-  kindSelect.addEventListener('change', syncSubforms);
-  opSelect.addEventListener('change', syncCellValueOp);
-  useThreeCk.addEventListener('change', syncThreeStops);
-  addBtn.addEventListener('click', onAdd);
-  clearAllBtn.addEventListener('click', onClearAll);
-  closeBtn.addEventListener('click', onClose);
-  overlay.addEventListener('click', onOverlayClick);
-  overlay.addEventListener('keydown', onOverlayKey);
+  shell.on(kindSelect, 'change', syncSubforms);
+  shell.on(opSelect, 'change', syncCellValueOp);
+  shell.on(useThreeCk, 'change', syncThreeStops);
+  shell.on(addBtn, 'click', onAdd);
+  shell.on(clearAllBtn, 'click', onClearAll);
+  shell.on(closeBtn, 'click', onClose);
+  shell.on(overlay, 'keydown', onOverlayKey as EventListener);
 
   const api: ConditionalDialogHandle = {
     open(): void {
@@ -724,25 +715,17 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       syncCellValueOp();
       syncThreeStops();
       renderRules();
-      overlay.hidden = false;
+      shell.open();
       requestAnimationFrame(() => {
         rangeInput.focus();
       });
     },
     close(): void {
-      overlay.hidden = true;
+      shell.close();
       host.focus();
     },
     detach(): void {
-      kindSelect.removeEventListener('change', syncSubforms);
-      opSelect.removeEventListener('change', syncCellValueOp);
-      useThreeCk.removeEventListener('change', syncThreeStops);
-      addBtn.removeEventListener('click', onAdd);
-      clearAllBtn.removeEventListener('click', onClearAll);
-      closeBtn.removeEventListener('click', onClose);
-      overlay.removeEventListener('click', onOverlayClick);
-      overlay.removeEventListener('keydown', onOverlayKey);
-      overlay.remove();
+      shell.dispose();
     },
   };
 

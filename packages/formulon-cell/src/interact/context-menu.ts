@@ -211,6 +211,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   const root = document.createElement('div');
   root.className = 'fc-ctxmenu';
   root.setAttribute('role', 'menu');
+  root.setAttribute('aria-label', strings.contextMenu.title);
   root.style.display = 'none';
   root.tabIndex = -1;
   document.body.appendChild(root);
@@ -220,12 +221,18 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   let visible = false;
   let pasteBtnRef: HTMLButtonElement | null = null;
   let activeIndex = -1;
+  let restoreFocusEl: HTMLElement | null = null;
 
-  const hide = (): void => {
+  const hide = (restoreFocus = false): void => {
     if (!visible) return;
     visible = false;
     root.style.display = 'none';
     activeIndex = -1;
+    const focusTarget = restoreFocusEl;
+    restoreFocusEl = null;
+    if (restoreFocus) {
+      (focusTarget ?? host).focus({ preventScroll: true });
+    }
   };
 
   const menuItems = (): HTMLButtonElement[] =>
@@ -295,7 +302,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         e.stopPropagation();
         if (btn.disabled) return;
         run(entry.id);
-        hide();
+        hide(false);
       });
       root.appendChild(btn);
       if (entry.id === 'paste') pasteBtnRef = btn;
@@ -332,6 +339,8 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
 
   const show = (clientX: number, clientY: number, kind: MenuKind): void => {
     inheritHostTokens(host, root);
+    restoreFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : host;
+    root.setAttribute('aria-label', strings.contextMenu.title);
     buildMenu(kind);
     if (pasteBtnRef) {
       const canPaste = canReadClipboard();
@@ -389,20 +398,20 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   const onDocPointerDown = (e: MouseEvent): void => {
     if (!visible) return;
     if (e.target instanceof Node && root.contains(e.target)) return;
-    hide();
+    hide(false);
   };
 
   const onDocContextMenu = (e: MouseEvent): void => {
     if (!visible) return;
     if (e.target instanceof Node && root.contains(e.target)) return;
-    hide();
+    hide(false);
   };
 
   const onDocKey = (e: KeyboardEvent): void => {
     if (!visible) return;
     if (e.key === 'Escape') {
       e.preventDefault();
-      hide();
+      hide(true);
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       focusMenuItem(activeIndex + 1);
@@ -424,7 +433,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     }
   };
 
-  const onScroll = (): void => hide();
+  const onScroll = (): void => hide(false);
 
   function run(id: ItemId): void {
     const state = store.getState();

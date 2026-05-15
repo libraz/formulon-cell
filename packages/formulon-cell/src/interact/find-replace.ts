@@ -35,6 +35,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   const overlay = document.createElement('div');
   overlay.className = 'fc-find';
   overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'false');
   overlay.hidden = true;
 
   const findRow = document.createElement('div');
@@ -46,6 +47,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   const pill = document.createElement('span');
   pill.className = 'fc-find__pill';
   pill.textContent = '0 / 0';
+  pill.setAttribute('aria-live', 'polite');
   findRow.append(findInput, pill);
 
   const replaceRow = document.createElement('div');
@@ -70,6 +72,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   const caseText = document.createElement('span');
   caseLabel.append(caseToggle, caseText);
   const closeBtn = makeBtn();
+  closeBtn.classList.add('fc-find__btn--icon');
   closeBtn.textContent = '×';
   buttonRow.append(prevBtn, nextBtn, replaceBtn, replaceAllBtn, caseLabel, closeBtn);
 
@@ -93,6 +96,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     replaceAllBtn.setAttribute('aria-label', t.replaceAll);
     caseText.textContent = t.matchCase;
     closeBtn.setAttribute('aria-label', t.close);
+    closeBtn.title = t.close;
   };
   relabel();
 

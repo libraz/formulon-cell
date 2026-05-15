@@ -95,6 +95,20 @@ describe('attachFindReplace', () => {
     handle.detach();
   });
 
+  it('exposes match count as a polite live region and labels the close button', () => {
+    const handle = attachFindReplace({ host, store, wb });
+    const overlay = $<HTMLElement>(host, '.fc-find');
+    expect(overlay.getAttribute('aria-modal')).toBe('false');
+    const pill = $<HTMLElement>(host, '.fc-find__pill');
+    expect(pill.getAttribute('aria-live')).toBe('polite');
+
+    const closeBtn = host.querySelectorAll<HTMLButtonElement>('.fc-find__btn')[4];
+    expect(closeBtn?.getAttribute('aria-label')).toBeTruthy();
+    expect(closeBtn?.title).toBe(closeBtn?.getAttribute('aria-label'));
+    expect(closeBtn?.classList.contains('fc-find__btn--icon')).toBe(true);
+    handle.detach();
+  });
+
   it('typing into the find input updates the pill with total matches', () => {
     seed(store, wb, [
       { row: 0, col: 0, value: 'foo' },

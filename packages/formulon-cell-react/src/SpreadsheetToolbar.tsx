@@ -31,7 +31,14 @@ import {
   showRows,
   sortRange,
 } from '@libraz/formulon-cell';
-import { type ReactElement, useCallback, useEffect, useState } from 'react';
+import {
+  type KeyboardEvent,
+  type ReactElement,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { Dropdown } from './toolbar/Dropdown.js';
 import { buildRibbonGroups } from './toolbar/groups.js';
 import { Icon, type IconName } from './toolbar/icons.js';
@@ -55,9 +62,17 @@ export const SpreadsheetToolbar = ({
   activeTab,
   onTabChange,
   locale,
+  onSpellingReview,
+  onAccessibilityCheck,
+  onRunScript,
+  onDrawPen,
+  onDrawEraser,
+  onTranslate,
+  onAddIn,
 }: SpreadsheetToolbarProps): ReactElement => {
   const [active, setActive] = useState<ActiveState>(EMPTY_ACTIVE_STATE);
   const [borderStyle, setBorderStyle] = useState<CellBorderStyle>('thin');
+  const tablistRef = useRef<HTMLDivElement | null>(null);
   const lang = locale === 'ja' ? 'ja' : 'en';
   const tr = toolbarText(lang);
   const borderPresets = BORDER_PRESETS.map((preset) => ({
@@ -100,6 +115,41 @@ export const SpreadsheetToolbar = ({
       id,
       label: RIBBON_TAB_LABELS[id][lang],
     }));
+
+  const focusRibbonTab = useCallback((tab: RibbonTab) => {
+    requestAnimationFrame(() => {
+      tablistRef.current
+        ?.querySelector<HTMLButtonElement>(`[data-ribbon-tab="${tab}"]`)
+        ?.focus({ preventScroll: true });
+    });
+  }, []);
+
+  const onRibbonTabKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      const target = (event.target as Element | null)?.closest<HTMLButtonElement>(
+        '[data-ribbon-tab]',
+      );
+      if (!target) return;
+      const currentId = (target.dataset.ribbonTab as RibbonTab | undefined) ?? activeTab;
+      const current = Math.max(
+        0,
+        ribbonTabs.findIndex((tab) => tab.id === currentId),
+      );
+      let next = current;
+      if (event.key === 'ArrowRight') next = (current + 1) % ribbonTabs.length;
+      else if (event.key === 'ArrowLeft')
+        next = (current - 1 + ribbonTabs.length) % ribbonTabs.length;
+      else if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = ribbonTabs.length - 1;
+      else return;
+      event.preventDefault();
+      const nextTab = ribbonTabs[next]?.id;
+      if (!nextTab) return;
+      onTabChange(nextTab);
+      focusRibbonTab(nextTab);
+    },
+    [activeTab, focusRibbonTab, onTabChange, ribbonTabs],
+  );
 
   useEffect(() => {
     if (!instance) return;
@@ -438,10 +488,13 @@ export const SpreadsheetToolbar = ({
     onCut,
     onDeleteCols,
     onDeleteRows,
+    onAddIn,
     onFilterToggle,
     onFormatAsTable,
     onFormatPainter,
     onFreezeToggle,
+    onDrawEraser,
+    onDrawPen,
     onInsertCols,
     onInsertRows,
     onMarginPreset,
@@ -451,7 +504,11 @@ export const SpreadsheetToolbar = ({
     onPaste,
     onRedo,
     onRemoveDuplicates,
+    onAccessibilityCheck,
+    onRunScript,
     onSort,
+    onSpellingReview,
+    onTranslate,
     onToggleColsHidden,
     onToggleRowsHidden,
     onUndo,
@@ -467,21 +524,33 @@ export const SpreadsheetToolbar = ({
 
   return (
     <div className="demo__ribbon-shell">
-      <div className="demo__ribbon-tabs" role="tablist" aria-label={tr.ribbonTabs}>
+      <div
+        ref={tablistRef}
+        className="demo__ribbon-tabs"
+        role="tablist"
+        aria-label={tr.ribbonTabs}
+        onKeyDown={onRibbonTabKeyDown}
+      >
         {ribbonTabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
             className={`demo__ribbon-tab${activeTab === tab.id ? ' demo__ribbon-tab--active' : ''}`}
             role="tab"
+            data-ribbon-tab={tab.id}
             aria-selected={activeTab === tab.id}
+            tabIndex={activeTab === tab.id ? 0 : -1}
             onClick={() => onTabChange(tab.id)}
           >
             {tab.label}
           </button>
         ))}
       </div>
-      <div className="demo__ribbon" role="toolbar" aria-label={`${activeTab} ribbon`}>
+      <div
+        className="demo__ribbon"
+        role="toolbar"
+        aria-label={`${RIBBON_TAB_LABELS[activeTab][lang]} ${tr.ribbon}`}
+      >
         {ribbonGroups[activeTab]}
       </div>
     </div>

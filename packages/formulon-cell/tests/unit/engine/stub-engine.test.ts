@@ -85,3 +85,74 @@ describe('stub-engine recalc', () => {
     }
   });
 });
+
+describe('stub-engine defensive *At() handlers', () => {
+  // The stub historically threw `not impl` from definedNameAt/tableAt/
+  // passthroughAt. Callers in workbook-handle.ts gate iteration on
+  // *Count() === 0, so the throws were unreachable in practice — but a
+  // future caller that forgets the count check (or a try/iterate-by-index
+  // pattern) would crash the page. These tests pin the safer behaviour:
+  // returning an `ok=false` status that any sane caller skips.
+
+  it('definedNameAt returns ok=false instead of throwing', () => {
+    const wb = newWorkbook();
+    try {
+      expect(wb.definedNameCount()).toBe(0);
+      const e = wb.definedNameAt(0);
+      expect(e.status.ok).toBe(false);
+      expect(e.name).toBe('');
+      expect(e.formula).toBe('');
+    } finally {
+      wb.delete();
+    }
+  });
+
+  it('tableAt returns ok=false instead of throwing', () => {
+    const wb = newWorkbook();
+    try {
+      expect(wb.tableCount()).toBe(0);
+      const e = wb.tableAt(0);
+      expect(e.status.ok).toBe(false);
+      expect(e.name).toBe('');
+      expect(e.displayName).toBe('');
+      expect(e.ref).toBe('');
+      expect(e.sheetIndex).toBe(0);
+    } finally {
+      wb.delete();
+    }
+  });
+
+  it('passthroughAt returns ok=false instead of throwing', () => {
+    const wb = newWorkbook();
+    try {
+      expect(wb.passthroughCount()).toBe(0);
+      const e = wb.passthroughAt(0);
+      expect(e.status.ok).toBe(false);
+      expect(e.path).toBe('');
+    } finally {
+      wb.delete();
+    }
+  });
+
+  it('does NOT crash an iterate-without-count loop pattern', () => {
+    // Synthesises the kind of caller that prompted this hardening: a `for`
+    // loop that calls `*At(i)` until status.ok is false (instead of using
+    // the *Count gate). With the old `throw`, this loop would crash on
+    // i=0; now it terminates cleanly.
+    const wb = newWorkbook();
+    try {
+      let crashed = false;
+      try {
+        for (let i = 0; i < 8; i++) {
+          const e = wb.definedNameAt(i);
+          if (!e.status.ok) break;
+        }
+      } catch {
+        crashed = true;
+      }
+      expect(crashed).toBe(false);
+    } finally {
+      wb.delete();
+    }
+  });
+});

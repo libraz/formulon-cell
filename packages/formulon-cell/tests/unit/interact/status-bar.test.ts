@@ -118,24 +118,55 @@ describe('attachStatusBar', () => {
 
     const items = chooser?.querySelectorAll<HTMLButtonElement>('.fc-statusbar__chooser-item');
     expect(items?.length).toBe(6);
+    expect(document.activeElement).toBe(items?.[0]);
+    expect(items?.[0]?.getAttribute('role')).toBe('menuitemcheckbox');
+    expect(items?.[0]?.getAttribute('aria-checked')).toBe('true');
     // Toggle "sum" off — initial set is ['sum','average','count'].
     const sumItem = Array.from(items ?? []).find((b) => b.textContent?.includes('合計'));
     expect(sumItem).toBeDefined();
     sumItem?.click();
     expect(store.getState().ui.statusAggs).not.toContain('sum');
+    expect(sumItem?.getAttribute('aria-checked')).toBe('false');
     handle.detach();
   });
 
-  it('Escape closes the chooser', () => {
+  it('Escape closes the chooser and restores focus to the opener', () => {
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      getEngineLabel: () => 'stub',
+    });
+    statusbar.tabIndex = -1;
+    statusbar.focus();
+    statusbar.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    const chooser = document.querySelector<HTMLElement>('.fc-statusbar__chooser');
+    expect(chooser?.style.display).toBe('none');
+    expect(document.activeElement).toBe(statusbar);
+    handle.detach();
+  });
+
+  it('chooser supports arrow keys and Enter/Space toggles', () => {
     const handle = attachStatusBar({
       statusbar,
       store,
       getEngineLabel: () => 'stub',
     });
     statusbar.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     const chooser = document.querySelector<HTMLElement>('.fc-statusbar__chooser');
-    expect(chooser?.style.display).toBe('none');
+    const items = chooser?.querySelectorAll<HTMLButtonElement>('.fc-statusbar__chooser-item');
+    if (!items || items.length < 2) throw new Error('expected chooser items');
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', cancelable: true }));
+    expect(document.activeElement).toBe(items[items.length - 1]);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true }));
+    expect(document.activeElement).toBe(items[0]);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', cancelable: true }));
+    expect(document.activeElement).toBe(items[0]);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', cancelable: true }));
+
+    expect(store.getState().ui.statusAggs).not.toContain('average');
+    expect(items[0]?.getAttribute('aria-checked')).toBe('false');
     handle.detach();
   });
 

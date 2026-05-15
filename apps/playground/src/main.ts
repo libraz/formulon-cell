@@ -52,10 +52,12 @@ import {
   toggleStrike,
   toggleUnderline,
   toggleWrap,
+  toolbarText,
   WorkbookHandle,
 } from '@libraz/formulon-cell';
-import { showPrompt } from './dialogs.js';
+import { showMessage, showPrompt } from './dialogs.js';
 import { applyFixture, isFixtureName } from './fixtures.js';
+import { focusMenuItem, handleMenuKeydown, prepareMenu } from './menu-a11y.js';
 import { seedWorkbook } from './seed.js';
 import { openSheetTabMenu } from './sheet-tab-menu.js';
 import { setupSortMenu, setupZoomControls } from './zoom-sort.js';
@@ -73,6 +75,10 @@ const statusObjects = document.getElementById('status-objects');
 const ribbonRoot = document.getElementById('ribbon-root');
 
 if (!sheetEl) throw new Error('#sheet missing');
+if (statusMetric) {
+  statusMetric.tabIndex = 0;
+  statusMetric.setAttribute('aria-haspopup', 'menu');
+}
 
 // `paper` / `ink` are the core's theme names; the UI labels them Light / Dark.
 type CoreTheme = 'paper' | 'ink';
@@ -98,6 +104,7 @@ let inst: SpreadsheetInstance | null = null;
 const seed = seedWorkbook;
 
 const ribbonLang = localeParam === 'ja' ? 'ja' : 'en';
+const ribbonText = toolbarText(ribbonLang);
 let activeRibbonTab: RibbonTab = 'home';
 let selectedBorderStyle: CellBorderStyle = 'thin';
 
@@ -142,7 +149,7 @@ const renderRibbon = (): void => {
   const tabs = document.createElement('div');
   tabs.className = 'demo__ribbon-tabs';
   tabs.setAttribute('role', 'tablist');
-  tabs.setAttribute('aria-label', 'Ribbon tabs');
+  tabs.setAttribute('aria-label', ribbonText.ribbonTabs);
   for (const tab of model) {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -151,6 +158,7 @@ const renderRibbon = (): void => {
     }`;
     btn.setAttribute('role', 'tab');
     btn.setAttribute('aria-selected', tab.id === activeRibbonTab ? 'true' : 'false');
+    btn.tabIndex = tab.id === activeRibbonTab ? 0 : -1;
     btn.dataset.ribbonTab = tab.id;
     btn.textContent = tab.label;
     tabs.appendChild(btn);
@@ -161,7 +169,7 @@ const renderRibbon = (): void => {
     const panel = document.createElement('div');
     panel.className = 'demo__ribbon';
     panel.setAttribute('role', 'toolbar');
-    panel.setAttribute('aria-label', `${tab.id} ribbon`);
+    panel.setAttribute('aria-label', `${tab.label} ${ribbonText.ribbon}`);
     panel.dataset.ribbonPanel = tab.id;
     panel.hidden = tab.id !== activeRibbonTab;
 
@@ -347,10 +355,30 @@ const createRibbonSelect = (command: RibbonCommand): HTMLDivElement => {
   );
   wrap.appendChild(button);
 
+  let detachDocDown: (() => void) | null = null;
   const close = (): void => {
     wrap.classList.remove('demo__rb-dd--open');
     button.setAttribute('aria-expanded', 'false');
     wrap.querySelector('.demo__rb-dd__list')?.remove();
+    detachDocDown?.();
+    detachDocDown = null;
+  };
+  const focusListOption = (list: HTMLElement, index: number): void => {
+    const options = Array.from(list.querySelectorAll<HTMLButtonElement>('[role="option"]'));
+    if (options.length === 0) return;
+    const next = ((index % options.length) + options.length) % options.length;
+    for (const [idx, option] of options.entries()) option.tabIndex = idx === next ? 0 : -1;
+    options[next]?.focus({ preventScroll: true });
+    options[next]?.scrollIntoView({ block: 'nearest' });
+  };
+  const pickOption = (option: HTMLButtonElement): void => {
+    const nextValue = option.dataset.value;
+    if (nextValue == null) return;
+    applyRibbonControl(command.id, nextValue);
+    const label = option.querySelector<HTMLElement>('.demo__rb-dd__label')?.textContent;
+    if (label) value.textContent = label;
+    close();
+    button.focus({ preventScroll: true });
   };
   const open = (): void => {
     closeOpenRibbonDropdowns(wrap);
@@ -369,6 +397,7 @@ const createRibbonSelect = (command: RibbonCommand): HTMLDivElement => {
       item.className = `demo__rb-dd__opt${selected ? ' demo__rb-dd__opt--selected' : ''}`;
       item.setAttribute('role', 'option');
       item.setAttribute('aria-selected', selected ? 'true' : 'false');
+      item.tabIndex = -1;
       item.dataset.value = option.value;
       const check = document.createElement('span');
       check.className = 'demo__rb-dd__check';
@@ -386,22 +415,52 @@ const createRibbonSelect = (command: RibbonCommand): HTMLDivElement => {
       label.className = 'demo__rb-dd__label';
       label.textContent = option.label;
       item.append(check, label);
-      item.addEventListener('click', () => {
-        applyRibbonControl(command.id, option.value);
-        value.textContent = option.label;
-        close();
-      });
+      item.addEventListener('click', () => pickOption(item));
       list.appendChild(item);
     }
+    list.addEventListener('keydown', (event) => {
+      const options = Array.from(list.querySelectorAll<HTMLButtonElement>('[role="option"]'));
+      const currentIndex = Math.max(
+        0,
+        options.indexOf(document.activeElement as HTMLButtonElement),
+      );
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        focusListOption(list, currentIndex + 1);
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        focusListOption(list, currentIndex - 1);
+      } else if (event.key === 'Home') {
+        event.preventDefault();
+        focusListOption(list, 0);
+      } else if (event.key === 'End') {
+        event.preventDefault();
+        focusListOption(list, options.length - 1);
+      } else if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        const option = document.activeElement?.closest<HTMLButtonElement>('[role="option"]');
+        if (option && list.contains(option)) pickOption(option);
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        close();
+        button.focus({ preventScroll: true });
+      }
+    });
     wrap.appendChild(list);
-    list.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+    const selectedIndex = Math.max(
+      0,
+      Array.from(list.querySelectorAll<HTMLButtonElement>('[role="option"]')).findIndex(
+        (option) => option.getAttribute('aria-selected') === 'true',
+      ),
+    );
+    focusListOption(list, selectedIndex);
     setTimeout(() => {
       const onDocDown = (ev: MouseEvent): void => {
         if (ev.target instanceof Node && wrap.contains(ev.target)) return;
-        document.removeEventListener('mousedown', onDocDown, true);
         close();
       };
       document.addEventListener('mousedown', onDocDown, true);
+      detachDocDown = () => document.removeEventListener('mousedown', onDocDown, true);
     }, 0);
   };
 
@@ -475,8 +534,8 @@ const createMenu = (id: string): HTMLDivElement => {
   const menu = document.createElement('div');
   menu.className = 'app__menu';
   menu.id = id;
-  menu.setAttribute('role', 'menu');
   menu.hidden = true;
+  prepareMenu(menu);
   return menu;
 };
 
@@ -634,34 +693,52 @@ function projectStatus(): void {
 // Right-click on the status metric → checkbox menu to toggle stats.
 statusMetric?.addEventListener('contextmenu', (e) => {
   e.preventDefault();
+  const opener =
+    document.activeElement instanceof HTMLElement ? document.activeElement : statusMetric;
   const menu = document.createElement('div');
   menu.className = 'app__dropdown';
+  prepareMenu(menu, 'Selection summary');
   menu.style.position = 'fixed';
   menu.style.left = `${e.clientX}px`;
   menu.style.bottom = `${window.innerHeight - e.clientY + 4}px`;
   menu.style.top = '';
+  let cleanupMenuListeners = (): void => {};
+  const closeMenu = (restoreFocus = false): void => {
+    menu.remove();
+    cleanupMenuListeners();
+    if (restoreFocus) opener?.focus();
+  };
   for (const key of STAT_KEYS) {
     const item = document.createElement('button');
     item.type = 'button';
     item.className = 'app__menu-item';
+    item.setAttribute('role', 'menuitemcheckbox');
+    item.setAttribute('aria-checked', activeStats.has(key) ? 'true' : 'false');
+    item.tabIndex = -1;
     item.textContent = `${activeStats.has(key) ? '✓ ' : '  '}${key.toUpperCase()}`;
     item.addEventListener('click', () => {
       if (activeStats.has(key)) activeStats.delete(key);
       else activeStats.add(key);
       persistStats();
       projectStatus();
-      menu.remove();
+      const checked = activeStats.has(key);
+      item.setAttribute('aria-checked', checked ? 'true' : 'false');
+      item.textContent = `${checked ? '✓ ' : '  '}${key.toUpperCase()}`;
     });
     menu.appendChild(item);
   }
   const close = (ev: MouseEvent): void => {
     if (!menu.contains(ev.target as Node)) {
-      menu.remove();
-      document.removeEventListener('mousedown', close);
+      closeMenu();
     }
   };
+  menu.addEventListener('keydown', (event) => {
+    handleMenuKeydown(event, menu, { close: closeMenu, restoreFocusTo: opener });
+  });
+  cleanupMenuListeners = () => document.removeEventListener('mousedown', close, true);
   document.body.appendChild(menu);
-  setTimeout(() => document.addEventListener('mousedown', close), 0);
+  focusMenuItem(menu);
+  setTimeout(() => document.addEventListener('mousedown', close, true), 0);
 });
 
 const ACTIVE_CLASS = 'demo__rb--active';
@@ -905,10 +982,11 @@ void clearFormat; // Reserved for a "Clear formatting" menu item; keep the impor
 const borderBtn = document.getElementById('btn-borders');
 const borderMenu = document.getElementById('menu-borders');
 
-const closeBorderMenu = (): void => {
+const closeBorderMenu = (restoreFocus = false): void => {
   if (!borderMenu) return;
   borderMenu.hidden = true;
   borderBtn?.setAttribute('aria-expanded', 'false');
+  if (restoreFocus) borderBtn?.focus();
 };
 const refreshBorderMenu = (): void => {
   if (!inst || !borderMenu) return;
@@ -923,7 +1001,7 @@ const openBorderMenu = (): void => {
   refreshBorderMenu();
   borderMenu.hidden = false;
   borderBtn?.setAttribute('aria-expanded', 'true');
-  (borderMenu.querySelector('button') as HTMLButtonElement | null)?.focus();
+  focusMenuItem(borderMenu);
 };
 
 borderBtn?.addEventListener('click', (e) => {
@@ -941,7 +1019,11 @@ document.addEventListener('mousedown', (e) => {
 });
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !borderMenu?.hidden) closeBorderMenu();
+  if (e.key === 'Escape' && !borderMenu?.hidden) closeBorderMenu(true);
+});
+
+borderMenu?.addEventListener('keydown', (e) => {
+  handleMenuKeydown(e, borderMenu, { close: closeBorderMenu, restoreFocusTo: borderBtn });
 });
 
 borderMenu?.querySelectorAll<HTMLButtonElement>('[data-border]').forEach((btn) => {
@@ -991,17 +1073,17 @@ borderMenu?.querySelectorAll<HTMLButtonElement>('[data-border]').forEach((btn) =
 const freezeBtn = document.getElementById('btn-freeze');
 const freezeMenu = document.getElementById('menu-freeze');
 
-const closeFreezeMenu = (): void => {
+const closeFreezeMenu = (restoreFocus = false): void => {
   if (!freezeMenu) return;
   freezeMenu.hidden = true;
   freezeBtn?.setAttribute('aria-expanded', 'false');
+  if (restoreFocus) freezeBtn?.focus();
 };
 const openFreezeMenu = (): void => {
   if (!freezeMenu) return;
   freezeMenu.hidden = false;
   freezeBtn?.setAttribute('aria-expanded', 'true');
-  // Focus first item for keyboard nav
-  (freezeMenu.querySelector('button') as HTMLButtonElement | null)?.focus();
+  focusMenuItem(freezeMenu);
 };
 
 freezeBtn?.addEventListener('click', (e) => {
@@ -1019,7 +1101,11 @@ document.addEventListener('mousedown', (e) => {
 });
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !freezeMenu?.hidden) closeFreezeMenu();
+  if (e.key === 'Escape' && !freezeMenu?.hidden) closeFreezeMenu(true);
+});
+
+freezeMenu?.addEventListener('keydown', (e) => {
+  handleMenuKeydown(e, freezeMenu, { close: closeFreezeMenu, restoreFocusTo: freezeBtn });
 });
 
 freezeMenu?.querySelectorAll<HTMLButtonElement>('[data-freeze]').forEach((btn) => {
@@ -1134,11 +1220,18 @@ const triggerSave = (filename = `${docName.replace(/\.xlsx$/i, '')}.xlsx`): void
   }
 };
 
-const triggerSaveAs = (): void => {
-  const name = prompt('File name', docName) ?? null;
+const triggerSaveAs = async (): Promise<void> => {
+  const name = await showPrompt({
+    title: 'Save As',
+    label: 'File name',
+    initial: docName,
+    okLabel: 'Save',
+    validate: (value) => (value.trim() ? null : 'Enter a file name.'),
+  });
   if (!name) return;
-  setDocName(name);
-  triggerSave(name.endsWith('.xlsx') ? name : `${name}.xlsx`);
+  const trimmed = name.trim();
+  setDocName(trimmed);
+  triggerSave(trimmed.endsWith('.xlsx') ? trimmed : `${trimmed}.xlsx`);
 };
 
 const loadXlsxFile = async (file: File): Promise<void> => {
@@ -1155,7 +1248,10 @@ const loadXlsxFile = async (file: File): Promise<void> => {
     // eslint-disable-next-line no-console
     console.error('open failed', err);
     if (docState) docState.textContent = 'Open failed';
-    alert(err instanceof Error ? err.message : String(err));
+    void showMessage({
+      title: 'Open failed',
+      message: err instanceof Error ? err.message : String(err),
+    });
   }
 };
 
@@ -1183,7 +1279,7 @@ fileMenuDrop?.querySelectorAll<HTMLButtonElement>('[data-file]').forEach((btn) =
     } else if (action === 'save') {
       triggerSave();
     } else if (action === 'save-as') {
-      triggerSaveAs();
+      void triggerSaveAs();
     }
   });
 });
@@ -1211,7 +1307,7 @@ window.addEventListener('keydown', (e) => {
     triggerOpen();
   } else if (k === 's') {
     e.preventDefault();
-    if (e.shiftKey) triggerSaveAs();
+    if (e.shiftKey) void triggerSaveAs();
     else triggerSave();
   } else if (k === 'n' && !e.shiftKey) {
     // Ctrl+N — create a fresh workbook in place.
@@ -1747,18 +1843,41 @@ const applyRibbonCommand = (id: string): boolean => {
 };
 
 // ── Ribbon tab strip ────────────────────────────────────────────────────
-ribbonRoot?.addEventListener('click', (event) => {
-  const tab = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-ribbon-tab]');
-  if (!tab) return;
-  activeRibbonTab = (tab.dataset.ribbonTab as RibbonTab | undefined) ?? 'home';
+const selectRibbonTab = (tabId: RibbonTab, focusTab = false): void => {
+  if (!ribbonRoot) return;
+  activeRibbonTab = tabId;
   for (const item of ribbonRoot.querySelectorAll<HTMLButtonElement>('[data-ribbon-tab]')) {
     const isActive = item.dataset.ribbonTab === activeRibbonTab;
     item.classList.toggle('demo__ribbon-tab--active', isActive);
     item.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    item.tabIndex = isActive ? 0 : -1;
+    if (focusTab && isActive) item.focus({ preventScroll: true });
   }
   for (const panel of ribbonRoot.querySelectorAll<HTMLElement>('[data-ribbon-panel]')) {
     panel.hidden = panel.dataset.ribbonPanel !== activeRibbonTab;
   }
+};
+
+ribbonRoot?.addEventListener('click', (event) => {
+  const tab = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-ribbon-tab]');
+  if (!tab) return;
+  selectRibbonTab((tab.dataset.ribbonTab as RibbonTab | undefined) ?? 'home');
+});
+
+ribbonRoot?.addEventListener('keydown', (event) => {
+  const tab = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-ribbon-tab]');
+  if (!tab) return;
+  const tabs = Array.from(ribbonRoot.querySelectorAll<HTMLButtonElement>('[data-ribbon-tab]'));
+  const current = Math.max(0, tabs.indexOf(tab));
+  let next = current;
+  if (event.key === 'ArrowRight') next = (current + 1) % tabs.length;
+  else if (event.key === 'ArrowLeft') next = (current - 1 + tabs.length) % tabs.length;
+  else if (event.key === 'Home') next = 0;
+  else if (event.key === 'End') next = tabs.length - 1;
+  else return;
+  event.preventDefault();
+  const nextTab = tabs[next]?.dataset.ribbonTab as RibbonTab | undefined;
+  if (nextTab) selectRibbonTab(nextTab, true);
 });
 
 ribbonRoot?.addEventListener('click', (event) => {
@@ -1908,18 +2027,23 @@ const openUnhideMenu = (x: number, y: number): void => {
 
   const menu = document.createElement('div');
   menu.className = 'app__menu';
+  prepareMenu(menu, 'Unhide sheet');
   menu.style.position = 'fixed';
   menu.style.left = `${x}px`;
   menu.style.top = `${y}px`;
   menu.style.zIndex = '90';
+  let cleanupMenuListeners = (): void => {};
 
   for (const i of Array.from(hidden).sort((a, b) => a - b)) {
     const it = document.createElement('button');
     it.type = 'button';
     it.className = 'app__menu-item';
+    it.setAttribute('role', 'menuitem');
+    it.tabIndex = -1;
     it.textContent = wb.sheetName(i);
     it.addEventListener('click', () => {
       closeTabMenu();
+      cleanupMenuListeners();
       if (setSheetHidden(store, wb, inst?.history ?? null, i, false)) {
         renderSheetTabs();
       }
@@ -1929,6 +2053,7 @@ const openUnhideMenu = (x: number, y: number): void => {
 
   document.body.appendChild(menu);
   tabMenuEl = menu;
+  focusMenuItem(menu);
 
   const rect = menu.getBoundingClientRect();
   if (rect.right > window.innerWidth) {
@@ -1942,9 +2067,25 @@ const openUnhideMenu = (x: number, y: number): void => {
     if (!tabMenuEl) return;
     if (ev.target instanceof Node && tabMenuEl.contains(ev.target)) return;
     closeTabMenu();
+    cleanupMenuListeners();
+  };
+  const onDocKey = (ev: KeyboardEvent): void => {
+    handleMenuKeydown(ev, menu, {
+      close: (restoreFocus) => {
+        closeTabMenu();
+        cleanupMenuListeners();
+        if (restoreFocus) {
+          document.querySelector<HTMLButtonElement>('.app__tab--unhide')?.focus();
+        }
+      },
+    });
+  };
+  cleanupMenuListeners = () => {
     document.removeEventListener('mousedown', onDocDown, true);
+    document.removeEventListener('keydown', onDocKey, true);
   };
   document.addEventListener('mousedown', onDocDown, true);
+  document.addEventListener('keydown', onDocKey, true);
 };
 
 let tabMenuEl: HTMLDivElement | null = null;

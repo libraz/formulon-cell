@@ -16,4 +16,11 @@ export interface SpreadsheetToolbarProps {
   activeTab: RibbonTab;
   onTabChange: (tab: RibbonTab) => void;
   locale: string;
+  onSpellingReview?: () => void;
+  onAccessibilityCheck?: () => void;
+  onRunScript?: () => void;
+  onDrawPen?: () => void;
+  onDrawEraser?: () => void;
+  onTranslate?: () => void;
+  onAddIn?: () => void;
 }

@@ -196,24 +196,34 @@ class StubWorkbook {
     return 0;
   }
 
-  definedNameAt(): never {
-    throw new Error('not impl');
+  // Stub returns an `ok=false` entry rather than throwing. The callers in
+  // workbook-handle.ts iterate via `definedNameCount()` so this branch is
+  // unreachable in normal use, but a defensive return keeps any future
+  // caller that forgets the count gate from crashing the page.
+  definedNameAt(): { status: Status; name: string; formula: string } {
+    return { status: err('not impl'), name: '', formula: '' };
   }
 
   tableCount(): number {
     return 0;
   }
 
-  tableAt(): never {
-    throw new Error('not impl');
+  tableAt(): {
+    status: Status;
+    name: string;
+    displayName: string;
+    ref: string;
+    sheetIndex: number;
+  } {
+    return { status: err('not impl'), name: '', displayName: '', ref: '', sheetIndex: 0 };
   }
 
   passthroughCount(): number {
     return 0;
   }
 
-  passthroughAt(): never {
-    throw new Error('not impl');
+  passthroughAt(): { status: Status; path: string } {
+    return { status: err('not impl'), path: '' };
   }
 
   // ---- internals -----------------------------------------------------

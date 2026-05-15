@@ -1,6 +1,6 @@
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
+import { createDialogShell } from './dialog-shell.js';
 
 export interface IterativeDialogDeps {
   host: HTMLElement;
@@ -36,25 +36,21 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
   const strings = deps.strings ?? defaultStrings;
   const t = strings.iterativeDialog;
 
-  const overlay = document.createElement('div');
-  overlay.className = 'fc-iterdlg';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', t.title);
-  overlay.hidden = true;
-
-  const panel = document.createElement('div');
-  panel.className = 'fc-iterdlg__panel';
-  overlay.appendChild(panel);
+  const shell = createDialogShell({
+    host,
+    className: 'fc-iterdlg',
+    ariaLabel: t.title,
+    onDismiss: () => api.close(),
+  });
 
   const header = document.createElement('div');
   header.className = 'fc-iterdlg__header';
   header.textContent = t.title;
-  panel.appendChild(header);
+  shell.panel.appendChild(header);
 
   const body = document.createElement('div');
   body.className = 'fc-iterdlg__body';
-  panel.appendChild(body);
+  shell.panel.appendChild(body);
 
   const note = document.createElement('p');
   note.className = 'fc-iterdlg__note';
@@ -99,7 +95,7 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
 
   const footer = document.createElement('div');
   footer.className = 'fc-iterdlg__footer';
-  panel.appendChild(footer);
+  shell.panel.appendChild(footer);
   const cancelBtn = document.createElement('button');
   cancelBtn.type = 'button';
   cancelBtn.className = 'fc-iterdlg__btn';
@@ -109,10 +105,6 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
   okBtn.className = 'fc-iterdlg__btn fc-iterdlg__btn--primary';
   okBtn.textContent = t.ok;
   footer.append(cancelBtn, okBtn);
-
-  // Body-portal so the modal escapes `.fc-host`'s `contain: strict`.
-  inheritHostTokens(host, overlay);
-  document.body.appendChild(overlay);
 
   const draft: IterativeSettings = { ...DEFAULTS };
 
@@ -162,46 +154,26 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
     }
     api.close();
   };
-  const onCancel = (): void => api.close();
 
-  const onOverlayClick = (e: MouseEvent): void => {
-    if (e.target === overlay) api.close();
-  };
-  const onOverlayKey = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      api.close();
-    }
-  };
-
-  enableInput.addEventListener('change', onEnable);
-  maxIterInput.addEventListener('input', onIter);
-  maxChangeInput.addEventListener('input', onChange);
-  okBtn.addEventListener('click', onOk);
-  cancelBtn.addEventListener('click', onCancel);
-  overlay.addEventListener('click', onOverlayClick);
-  overlay.addEventListener('keydown', onOverlayKey);
+  shell.on(enableInput, 'change', onEnable);
+  shell.on(maxIterInput, 'input', onIter);
+  shell.on(maxChangeInput, 'input', onChange);
+  shell.on(okBtn, 'click', onOk);
+  shell.on(cancelBtn, 'click', () => api.close());
 
   const api: IterativeDialogHandle = {
     open(): void {
       status.textContent = '';
       syncControls();
-      overlay.hidden = false;
+      shell.open();
       requestAnimationFrame(() => enableInput.focus());
     },
     close(): void {
-      overlay.hidden = true;
+      shell.close();
       host.focus();
     },
     detach(): void {
-      enableInput.removeEventListener('change', onEnable);
-      maxIterInput.removeEventListener('input', onIter);
-      maxChangeInput.removeEventListener('input', onChange);
-      okBtn.removeEventListener('click', onOk);
-      cancelBtn.removeEventListener('click', onCancel);
-      overlay.removeEventListener('click', onOverlayClick);
-      overlay.removeEventListener('keydown', onOverlayKey);
-      overlay.remove();
+      shell.dispose();
     },
   };
   return api;

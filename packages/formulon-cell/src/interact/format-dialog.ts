@@ -70,6 +70,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
 
   const view = createFormatDialogView({ host, strings, t });
   const {
+    shell,
     overlay,
     preview,
     previewCell,
@@ -789,10 +790,6 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const onOk = (): void => applyAndClose();
   const onCancel = (): void => api.close();
 
-  const onOverlayClick = (e: MouseEvent): void => {
-    if (e.target === overlay) api.close();
-  };
-
   const onOverlayKey = (e: KeyboardEvent): void => {
     e.stopPropagation();
     if (e.key === 'Escape') {
@@ -811,146 +808,83 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
 
   // ── Wire up ────────────────────────────────────────────────────────────
-  tabsStrip.addEventListener('click', onTabClick);
-  catList.addEventListener('click', onCatClick);
-  decimalsInput.addEventListener('input', onDecimalsInput);
-  symbolSelect.addEventListener('change', onSymbolChange);
-  patternInput.addEventListener('input', onPatternInput);
-  patternPresetSelect.addEventListener('change', onPatternPresetChange);
-  for (const r of hAlignRadios.values()) r.addEventListener('change', onHAlignChange);
-  for (const r of vAlignRadios.values()) r.addEventListener('change', onVAlignChange);
-  wrapCk.input.addEventListener('change', onWrapChange);
-  indentInput.addEventListener('input', onIndentInput);
-  rotationInput.addEventListener('input', onRotationInput);
-  boldCk.input.addEventListener('change', onBoldChange);
-  italicCk.input.addEventListener('change', onItalicChange);
-  underlineCk.input.addEventListener('change', onUnderlineChange);
-  strikeCk.input.addEventListener('change', onStrikeChange);
-  familyInput.addEventListener('input', onFamilyInput);
-  sizeInput.addEventListener('input', onSizeInput);
-  colorInput.addEventListener('input', onColorInput);
-  colorReset.addEventListener('click', onColorReset);
-  fontSwatches.addEventListener('click', onFontSwatchClick);
-  borderStyleSelect.addEventListener('change', onBorderStyleChange);
-  borderStyleGallery.addEventListener('click', onBorderStyleGalleryClick);
-  borderColorInput.addEventListener('input', onBorderColorInput);
-  borderColorReset.addEventListener('click', onBorderColorReset);
-  borderSwatches.addEventListener('click', onBorderSwatchClick);
-  presetNone.addEventListener('click', onPresetNone);
-  presetOutline.addEventListener('click', onPresetOutline);
-  presetAll.addEventListener('click', onPresetAll);
-  topCk.input.addEventListener('change', onTopChange);
-  bottomCk.input.addEventListener('change', onBottomChange);
-  leftCk.input.addEventListener('change', onLeftChange);
-  rightCk.input.addEventListener('change', onRightChange);
-  diagDownCk.input.addEventListener('change', onDiagDownChange);
-  diagUpCk.input.addEventListener('change', onDiagUpChange);
-  borderVisualStage.addEventListener('click', onVisualSideClick);
-  fillInput.addEventListener('input', onFillInput);
-  fillReset.addEventListener('click', onFillReset);
-  fillSwatches.addEventListener('click', onFillSwatchClick);
-  lockedCk.input.addEventListener('change', onLockedChange);
-  hlInput.addEventListener('input', onHlInput);
-  hlClear.addEventListener('click', onHlClear);
-  commentArea.addEventListener('input', onCommentInput);
-  commentClear.addEventListener('click', onCommentClear);
-  validationArea.addEventListener('input', onValidationInput);
-  validationClear.addEventListener('click', onValidationClear);
-  validationListRangeInput.addEventListener('input', onValidationListRangeInput);
-  validationListLiteralRadio.input.addEventListener('change', onValidationListSourceKindChange);
-  validationListRangeRadio.input.addEventListener('change', onValidationListSourceKindChange);
-  validationKindSelect.addEventListener('change', onValidationKindChange);
-  validationOpSelect.addEventListener('change', onValidationOpChange);
-  validationAInput.addEventListener('input', onValidationAInput);
-  validationBInput.addEventListener('input', onValidationBInput);
-  validationFormulaInput.addEventListener('input', onValidationFormulaInput);
-  validationAllowBlankInput.addEventListener('change', onValidationAllowBlankChange);
-  validationErrorStyleSelect.addEventListener('change', onValidationErrorStyleChange);
-  okBtn.addEventListener('click', onOk);
-  cancelBtn.addEventListener('click', onCancel);
-  overlay.addEventListener('click', onOverlayClick);
-  overlay.addEventListener('keydown', onOverlayKey);
+  shell.on(tabsStrip, 'click', onTabClick as EventListener);
+  shell.on(catList, 'click', onCatClick as EventListener);
+  shell.on(decimalsInput, 'input', onDecimalsInput);
+  shell.on(symbolSelect, 'change', onSymbolChange);
+  shell.on(patternInput, 'input', onPatternInput);
+  shell.on(patternPresetSelect, 'change', onPatternPresetChange);
+  for (const r of hAlignRadios.values()) shell.on(r, 'change', onHAlignChange);
+  for (const r of vAlignRadios.values()) shell.on(r, 'change', onVAlignChange);
+  shell.on(wrapCk.input, 'change', onWrapChange);
+  shell.on(indentInput, 'input', onIndentInput);
+  shell.on(rotationInput, 'input', onRotationInput);
+  shell.on(boldCk.input, 'change', onBoldChange);
+  shell.on(italicCk.input, 'change', onItalicChange);
+  shell.on(underlineCk.input, 'change', onUnderlineChange);
+  shell.on(strikeCk.input, 'change', onStrikeChange);
+  shell.on(familyInput, 'input', onFamilyInput);
+  shell.on(sizeInput, 'input', onSizeInput);
+  shell.on(colorInput, 'input', onColorInput);
+  shell.on(colorReset, 'click', onColorReset);
+  shell.on(fontSwatches, 'click', onFontSwatchClick);
+  shell.on(borderStyleSelect, 'change', onBorderStyleChange);
+  shell.on(borderStyleGallery, 'click', onBorderStyleGalleryClick);
+  shell.on(borderColorInput, 'input', onBorderColorInput);
+  shell.on(borderColorReset, 'click', onBorderColorReset);
+  shell.on(borderSwatches, 'click', onBorderSwatchClick);
+  shell.on(presetNone, 'click', onPresetNone);
+  shell.on(presetOutline, 'click', onPresetOutline);
+  shell.on(presetAll, 'click', onPresetAll);
+  shell.on(topCk.input, 'change', onTopChange);
+  shell.on(bottomCk.input, 'change', onBottomChange);
+  shell.on(leftCk.input, 'change', onLeftChange);
+  shell.on(rightCk.input, 'change', onRightChange);
+  shell.on(diagDownCk.input, 'change', onDiagDownChange);
+  shell.on(diagUpCk.input, 'change', onDiagUpChange);
+  shell.on(borderVisualStage, 'click', onVisualSideClick);
+  shell.on(fillInput, 'input', onFillInput);
+  shell.on(fillReset, 'click', onFillReset);
+  shell.on(fillSwatches, 'click', onFillSwatchClick);
+  shell.on(lockedCk.input, 'change', onLockedChange);
+  shell.on(hlInput, 'input', onHlInput);
+  shell.on(hlClear, 'click', onHlClear);
+  shell.on(commentArea, 'input', onCommentInput);
+  shell.on(commentClear, 'click', onCommentClear);
+  shell.on(validationArea, 'input', onValidationInput);
+  shell.on(validationClear, 'click', onValidationClear);
+  shell.on(validationListRangeInput, 'input', onValidationListRangeInput);
+  shell.on(validationListLiteralRadio.input, 'change', onValidationListSourceKindChange);
+  shell.on(validationListRangeRadio.input, 'change', onValidationListSourceKindChange);
+  shell.on(validationKindSelect, 'change', onValidationKindChange);
+  shell.on(validationOpSelect, 'change', onValidationOpChange);
+  shell.on(validationAInput, 'input', onValidationAInput);
+  shell.on(validationBInput, 'input', onValidationBInput);
+  shell.on(validationFormulaInput, 'input', onValidationFormulaInput);
+  shell.on(validationAllowBlankInput, 'change', onValidationAllowBlankChange);
+  shell.on(validationErrorStyleSelect, 'change', onValidationErrorStyleChange);
+  shell.on(okBtn, 'click', onOk);
+  shell.on(cancelBtn, 'click', onCancel);
+  shell.on(overlay, 'click', (e) => {
+    if ((e as MouseEvent).target === overlay) api.close();
+  });
+  shell.on(overlay, 'keydown', onOverlayKey as EventListener);
 
   const api: FormatDialogHandle = {
     open(): void {
       hydrateFromActive();
-      overlay.hidden = false;
+      shell.open();
       requestAnimationFrame(() => {
         const first = tabButtons.get(activeTab);
         if (first) first.focus();
       });
     },
     close(): void {
-      overlay.hidden = true;
+      shell.close();
       host.focus();
     },
     detach(): void {
-      tabsStrip.removeEventListener('click', onTabClick);
-      catList.removeEventListener('click', onCatClick);
-      decimalsInput.removeEventListener('input', onDecimalsInput);
-      symbolSelect.removeEventListener('change', onSymbolChange);
-      patternInput.removeEventListener('input', onPatternInput);
-      patternPresetSelect.removeEventListener('change', onPatternPresetChange);
-      for (const r of hAlignRadios.values()) r.removeEventListener('change', onHAlignChange);
-      for (const r of vAlignRadios.values()) r.removeEventListener('change', onVAlignChange);
-      wrapCk.input.removeEventListener('change', onWrapChange);
-      indentInput.removeEventListener('input', onIndentInput);
-      rotationInput.removeEventListener('input', onRotationInput);
-      boldCk.input.removeEventListener('change', onBoldChange);
-      italicCk.input.removeEventListener('change', onItalicChange);
-      underlineCk.input.removeEventListener('change', onUnderlineChange);
-      strikeCk.input.removeEventListener('change', onStrikeChange);
-      familyInput.removeEventListener('input', onFamilyInput);
-      sizeInput.removeEventListener('input', onSizeInput);
-      colorInput.removeEventListener('input', onColorInput);
-      colorReset.removeEventListener('click', onColorReset);
-      fontSwatches.removeEventListener('click', onFontSwatchClick);
-      borderStyleSelect.removeEventListener('change', onBorderStyleChange);
-      borderStyleGallery.removeEventListener('click', onBorderStyleGalleryClick);
-      borderColorInput.removeEventListener('input', onBorderColorInput);
-      borderColorReset.removeEventListener('click', onBorderColorReset);
-      borderSwatches.removeEventListener('click', onBorderSwatchClick);
-      presetNone.removeEventListener('click', onPresetNone);
-      presetOutline.removeEventListener('click', onPresetOutline);
-      presetAll.removeEventListener('click', onPresetAll);
-      topCk.input.removeEventListener('change', onTopChange);
-      bottomCk.input.removeEventListener('change', onBottomChange);
-      leftCk.input.removeEventListener('change', onLeftChange);
-      rightCk.input.removeEventListener('change', onRightChange);
-      diagDownCk.input.removeEventListener('change', onDiagDownChange);
-      diagUpCk.input.removeEventListener('change', onDiagUpChange);
-      borderVisualStage.removeEventListener('click', onVisualSideClick);
-      fillInput.removeEventListener('input', onFillInput);
-      fillReset.removeEventListener('click', onFillReset);
-      fillSwatches.removeEventListener('click', onFillSwatchClick);
-      lockedCk.input.removeEventListener('change', onLockedChange);
-      hlInput.removeEventListener('input', onHlInput);
-      hlClear.removeEventListener('click', onHlClear);
-      commentArea.removeEventListener('input', onCommentInput);
-      commentClear.removeEventListener('click', onCommentClear);
-      validationArea.removeEventListener('input', onValidationInput);
-      validationClear.removeEventListener('click', onValidationClear);
-      validationListRangeInput.removeEventListener('input', onValidationListRangeInput);
-      validationListLiteralRadio.input.removeEventListener(
-        'change',
-        onValidationListSourceKindChange,
-      );
-      validationListRangeRadio.input.removeEventListener(
-        'change',
-        onValidationListSourceKindChange,
-      );
-      validationKindSelect.removeEventListener('change', onValidationKindChange);
-      validationOpSelect.removeEventListener('change', onValidationOpChange);
-      validationAInput.removeEventListener('input', onValidationAInput);
-      validationBInput.removeEventListener('input', onValidationBInput);
-      validationFormulaInput.removeEventListener('input', onValidationFormulaInput);
-      validationAllowBlankInput.removeEventListener('change', onValidationAllowBlankChange);
-      validationErrorStyleSelect.removeEventListener('change', onValidationErrorStyleChange);
-      okBtn.removeEventListener('click', onOk);
-      cancelBtn.removeEventListener('click', onCancel);
-      overlay.removeEventListener('click', onOverlayClick);
-      overlay.removeEventListener('keydown', onOverlayKey);
-      overlay.remove();
+      shell.dispose();
     },
   };
 

@@ -2,6 +2,7 @@ import type { Strings } from './types.js';
 
 export const ja: Strings = {
   contextMenu: {
+    title: 'コンテキスト メニュー',
     copy: 'コピー',
     cut: '切り取り',
     paste: '貼り付け',

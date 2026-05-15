@@ -2,6 +2,7 @@ import type { Strings } from './types.js';
 
 export const en: Strings = {
   contextMenu: {
+    title: 'Context menu',
     copy: 'Copy',
     cut: 'Cut',
     paste: 'Paste',

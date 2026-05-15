@@ -4,14 +4,20 @@ import {
   type CellValue,
   type FeatureFlags,
   type FeatureId,
+  analyzeAccessibilityCells,
+  analyzeSpellingCells,
+  applyTextScript,
+  mutators,
+  parseScriptCommand,
   presets,
+  type ReviewCell,
   type SpreadsheetInstance,
   type ThemeName,
   WorkbookHandle,
 } from '@libraz/formulon-cell';
 import { type RibbonTab, Spreadsheet, useSelection } from '@libraz/formulon-cell-vue';
 import SpreadsheetToolbar from '@libraz/formulon-cell-vue/toolbar.vue';
-import { computed, onUnmounted, ref, shallowRef, watch } from 'vue';
+import { computed, nextTick, onUnmounted, ref, shallowRef, watch } from 'vue';
 import {
   createDemoStrings,
   DEMO_FUNCTIONS,
@@ -54,7 +60,69 @@ interface CommandItem {
   readonly run: () => void;
 }
 
+interface ReviewDialogState {
+  readonly title: string;
+  readonly items: readonly { label: string; detail: string }[];
+}
+
 let changeId = 0;
+
+const FOCUSABLE_MODAL_SELECTOR = [
+  'button',
+  'input',
+  'select',
+  'textarea',
+  'a[href]',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
+const focusableModalItems = (root: HTMLElement): HTMLElement[] =>
+  Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_MODAL_SELECTOR)).filter((el) => {
+    if (el.closest('[hidden],[aria-hidden="true"]')) return false;
+    if ('disabled' in el && (el as HTMLButtonElement | HTMLInputElement).disabled) return false;
+    return el.tabIndex >= 0;
+  });
+
+const activateDemoModal = (root: HTMLElement, onClose: () => void): (() => void) => {
+  const restoreFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const focusFirst = window.requestAnimationFrame(() => {
+    (focusableModalItems(root)[0] ?? root).focus({ preventScroll: true });
+  });
+  const onKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const items = focusableModalItems(root);
+    if (items.length === 0) {
+      event.preventDefault();
+      root.focus({ preventScroll: true });
+      return;
+    }
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last?.focus({ preventScroll: true });
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first?.focus({ preventScroll: true });
+    }
+  };
+  root.addEventListener('keydown', onKeyDown);
+  return () => {
+    window.cancelAnimationFrame(focusFirst);
+    root.removeEventListener('keydown', onKeyDown);
+    if (
+      restoreFocusEl &&
+      (root.contains(document.activeElement) || document.activeElement === document.body)
+    ) {
+      restoreFocusEl.focus({ preventScroll: true });
+    }
+  };
+};
 
 const previewValue = (e: CellChangeEvent): string => {
   if (e.formula) return e.formula;
@@ -102,6 +170,24 @@ const composeFeatures = (preset: PresetKey, overrides: FeatureFlags): FeatureFla
   ...overrides,
 });
 
+const reviewCellsForInstance = (inst: SpreadsheetInstance): ReviewCell[] => {
+  const sheet = inst.store.getState().data.sheetIndex;
+  return Array.from(inst.workbook.cells(sheet), (entry) => ({
+    label: `${colLabel(entry.addr.col)}${entry.addr.row + 1}`,
+    value:
+      entry.value.kind === 'text'
+        ? { kind: 'text' as const, value: entry.value.value }
+        : entry.value.kind === 'error'
+          ? { kind: 'error' as const, text: entry.value.text }
+          : entry.value.kind === 'number'
+            ? { kind: 'number' as const }
+            : entry.value.kind === 'bool'
+              ? { kind: 'bool' as const }
+              : { kind: 'blank' as const },
+    formula: entry.formula,
+  }));
+};
+
 const theme = ref<ThemeName>('paper');
 const locale = ref<string>('en');
 const workbook = shallowRef<WorkbookHandle | null>(null);
@@ -121,6 +207,12 @@ const searchQuery = ref('');
 const searchOpen = ref(false);
 const bookName = ref('Book1');
 const loadError = ref<string | null>(null);
+const reviewDialog = ref<ReviewDialogState | null>(null);
+const scriptOpen = ref(false);
+const scriptCommand = ref('uppercase');
+const scriptError = ref<string | null>(null);
+const reviewModalEl = ref<HTMLElement | null>(null);
+const scriptModalEl = ref<HTMLElement | null>(null);
 
 const features = computed<FeatureFlags>(() => composeFeatures(preset.value, overrides.value));
 const ui = computed(() => UI[locale.value === 'ja' ? 'ja' : 'en']);
@@ -199,6 +291,105 @@ const runProbe = (name: string, args: CellValue[]): void => {
   }
 };
 
+const onSpellingReview = (): void => {
+  const inst = instance.value;
+  if (!inst) return;
+  reviewDialog.value = {
+    title: 'Spelling Review',
+    items: analyzeSpellingCells(reviewCellsForInstance(inst)),
+  };
+};
+
+const onAccessibilityCheck = (): void => {
+  const inst = instance.value;
+  if (!inst) return;
+  reviewDialog.value = {
+    title: 'Accessibility Check',
+    items: analyzeAccessibilityCells(reviewCellsForInstance(inst)),
+  };
+};
+
+const onRunScript = (): void => {
+  const inst = instance.value;
+  if (!inst) return;
+  scriptCommand.value = 'uppercase';
+  scriptError.value = null;
+  scriptOpen.value = true;
+};
+
+const closeReviewDialog = (): void => {
+  reviewDialog.value = null;
+};
+
+const closeScriptDialog = (): void => {
+  scriptOpen.value = false;
+};
+
+let demoModalCleanup: (() => void) | null = null;
+
+watch(
+  () => (reviewDialog.value ? 'review' : scriptOpen.value ? 'script' : null),
+  async (openModal) => {
+    demoModalCleanup?.();
+    demoModalCleanup = null;
+    if (!openModal) return;
+    await nextTick();
+    const root = openModal === 'review' ? reviewModalEl.value : scriptModalEl.value;
+    if (!root) return;
+    demoModalCleanup = activateDemoModal(
+      root,
+      openModal === 'review' ? closeReviewDialog : closeScriptDialog,
+    );
+  },
+);
+
+const showRibbonNotice = (title: string, detail: string): void => {
+  reviewDialog.value = { title, items: [{ label: 'Ribbon command', detail }] };
+};
+
+const applyScriptCommand = (): void => {
+  const inst = instance.value;
+  if (!inst) return;
+  const command = parseScriptCommand(scriptCommand.value);
+  if (!command) {
+    scriptError.value = 'Use one of: uppercase, lowercase, trim, clear.';
+    return;
+  }
+  const range = inst.store.getState().selection.range;
+  let changed = 0;
+  inst.history.begin();
+  try {
+    for (let row = range.r0; row <= range.r1; row += 1) {
+      for (let col = range.c0; col <= range.c1; col += 1) {
+        const addr = { sheet: range.sheet, row, col };
+        const value = inst.workbook.getValue(addr);
+        if (command === 'clear') {
+          if (value.kind !== 'blank' || inst.workbook.cellFormula(addr)) {
+            inst.workbook.setBlank(addr);
+            changed += 1;
+          }
+          continue;
+        }
+        if (value.kind === 'text') {
+          const next = applyTextScript(value.value, command);
+          if (next !== value.value) {
+            inst.workbook.setText(addr, next);
+            changed += 1;
+          }
+        }
+      }
+    }
+  } finally {
+    inst.history.end();
+  }
+  mutators.replaceCells(inst.store, inst.workbook.cells(range.sheet));
+  scriptOpen.value = false;
+  reviewDialog.value = {
+    title: 'Script',
+    items: [{ label: 'Selection', detail: `${changed} cells updated.` }],
+  };
+};
+
 const onSave = (): void => {
   const inst = instance.value;
   if (!inst) return;
@@ -230,7 +421,10 @@ const onOpenFiles = async (ev: Event): Promise<void> => {
     loadError.value = null;
     bookName.value = file.name.replace(/\.(xlsx|xlsm)$/i, '');
   } catch (err) {
-    window.alert(formatLoadError(err));
+    reviewDialog.value = {
+      title: 'Open failed',
+      items: [{ label: 'Workbook', detail: formatLoadError(err) }],
+    };
   }
 };
 
@@ -442,6 +636,7 @@ const onSearchKeydown = (ev: KeyboardEvent): void => {
 };
 
 onUnmounted(() => {
+  demoModalCleanup?.();
   // The Spreadsheet component disposes itself; nothing extra to clean up.
 });
 </script>
@@ -581,6 +776,21 @@ onUnmounted(() => {
           :instance="instance"
           :active-tab="ribbonTab"
           :locale="locale"
+          :on-spelling-review="onSpellingReview"
+          :on-accessibility-check="onAccessibilityCheck"
+          :on-run-script="onRunScript"
+          :on-draw-pen="
+            () => showRibbonNotice('Draw', 'Ink strokes are not persisted in this demo workbook.')
+          "
+          :on-draw-eraser="
+            () => showRibbonNotice('Draw', 'Select an ink stroke first to use the eraser.')
+          "
+          :on-translate="
+            () => showRibbonNotice('Translate', 'No translation service is connected in this demo.')
+          "
+          :on-add-in="
+            () => showRibbonNotice('Add-ins', 'Office add-ins are represented by host callbacks here.')
+          "
           @tab-change="ribbonTab = $event"
         />
         <Spreadsheet
@@ -798,5 +1008,74 @@ onUnmounted(() => {
         </section>
       </aside>
     </main>
+    <div
+      v-if="reviewDialog"
+      ref="reviewModalEl"
+      class="demo__modal"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="reviewDialog.title"
+    >
+      <section class="demo__modal-panel">
+        <header class="demo__modal-header">
+          <h2>{{ reviewDialog.title }}</h2>
+          <button
+            type="button"
+            class="demo__modal-x"
+            aria-label="Close"
+            @click="closeReviewDialog"
+          >
+            ×
+          </button>
+        </header>
+        <div class="demo__modal-body">
+          <p v-if="reviewDialog.items.length === 0" class="demo__modal-empty">
+            No issues found.
+          </p>
+          <ul v-else class="demo__modal-list">
+            <li v-for="(item, index) in reviewDialog.items" :key="`${item.label}-${index}`">
+              <strong>{{ item.label }}</strong>
+              <span>{{ item.detail }}</span>
+            </li>
+          </ul>
+        </div>
+        <footer class="demo__modal-footer">
+          <button type="button" class="demo__btn" @click="closeReviewDialog">OK</button>
+        </footer>
+      </section>
+    </div>
+    <div
+      v-if="scriptOpen"
+      ref="scriptModalEl"
+      class="demo__modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Script"
+    >
+      <form class="demo__modal-panel demo__modal-panel--narrow" @submit.prevent="applyScriptCommand">
+        <header class="demo__modal-header">
+          <h2>Script</h2>
+          <button
+            type="button"
+            class="demo__modal-x"
+            aria-label="Close"
+            @click="closeScriptDialog"
+          >
+            ×
+          </button>
+        </header>
+        <div class="demo__modal-body">
+          <label class="demo__modal-field">
+            <span>Command</span>
+            <input v-model="scriptCommand" autofocus @input="scriptError = null" />
+          </label>
+          <p v-if="scriptError" class="demo__modal-error">{{ scriptError }}</p>
+        </div>
+        <footer class="demo__modal-footer">
+          <button type="button" class="demo__btn" @click="closeScriptDialog">Cancel</button>
+          <button type="submit" class="demo__btn demo__btn--active">Run</button>
+        </footer>
+      </form>
+    </div>
   </div>
 </template>

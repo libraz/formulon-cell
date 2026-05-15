@@ -1,7 +1,7 @@
 import { listExternalLinks } from '../commands/external-links.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
+import { createDialogShell } from './dialog-shell.js';
 
 export interface ExternalLinksDialogDeps {
   host: HTMLElement;
@@ -31,25 +31,21 @@ export function attachExternalLinksDialog(
   let strings = deps.strings ?? defaultStrings;
   let t = strings.externalLinksDialog;
 
-  const overlay = document.createElement('div');
-  overlay.className = 'fc-extlinkdlg';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', t.title);
-  overlay.hidden = true;
-
-  const panel = document.createElement('div');
-  panel.className = 'fc-extlinkdlg__panel';
-  overlay.appendChild(panel);
+  const shell = createDialogShell({
+    host,
+    className: 'fc-extlinkdlg',
+    ariaLabel: t.title,
+    onDismiss: () => shell.close(),
+  });
 
   const header = document.createElement('div');
   header.className = 'fc-extlinkdlg__header';
   header.textContent = t.title;
-  panel.appendChild(header);
+  shell.panel.appendChild(header);
 
   const body = document.createElement('div');
   body.className = 'fc-extlinkdlg__body';
-  panel.appendChild(body);
+  shell.panel.appendChild(body);
 
   const note = document.createElement('p');
   note.className = 'fc-extlinkdlg__note';
@@ -68,32 +64,14 @@ export function attachExternalLinksDialog(
 
   const footer = document.createElement('div');
   footer.className = 'fc-extlinkdlg__footer';
-  panel.appendChild(footer);
+  shell.panel.appendChild(footer);
 
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
   closeBtn.className = 'fc-extlinkdlg__close';
   closeBtn.textContent = t.close;
-  closeBtn.addEventListener('click', () => close());
+  shell.on(closeBtn, 'click', () => shell.close());
   footer.appendChild(closeBtn);
-
-  // Body-portal so the modal escapes `.fc-host`'s `contain: strict`.
-  inheritHostTokens(host, overlay);
-  document.body.appendChild(overlay);
-
-  const onOverlayClick = (e: MouseEvent): void => {
-    if (e.target === overlay) close();
-  };
-  overlay.addEventListener('click', onOverlayClick);
-
-  const onKey = (e: KeyboardEvent): void => {
-    if (overlay.hidden) return;
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      close();
-    }
-  };
-  document.addEventListener('keydown', onKey);
 
   const renderTable = (): void => {
     tableWrap.replaceChildren();
@@ -134,34 +112,26 @@ export function attachExternalLinksDialog(
     tableWrap.appendChild(table);
   };
 
-  const open = (): void => {
-    renderTable();
-    overlay.hidden = false;
-  };
-
-  const close = (): void => {
-    overlay.hidden = true;
-  };
-
-  const refresh = (): void => {
-    strings = deps.strings ?? defaultStrings;
-    t = strings.externalLinksDialog;
-    overlay.setAttribute('aria-label', t.title);
-    header.textContent = t.title;
-    note.textContent = t.note;
-    empty.textContent = t.empty;
-    closeBtn.textContent = t.close;
-    if (!overlay.hidden) renderTable();
-  };
-
   return {
-    open,
-    close,
-    refresh,
+    open() {
+      renderTable();
+      shell.open();
+    },
+    close() {
+      shell.close();
+    },
+    refresh() {
+      strings = deps.strings ?? defaultStrings;
+      t = strings.externalLinksDialog;
+      shell.setAriaLabel(t.title);
+      header.textContent = t.title;
+      note.textContent = t.note;
+      empty.textContent = t.empty;
+      closeBtn.textContent = t.close;
+      if (shell.isOpen()) renderTable();
+    },
     detach() {
-      overlay.removeEventListener('click', onOverlayClick);
-      document.removeEventListener('keydown', onKey);
-      overlay.remove();
+      shell.dispose();
     },
   };
 }

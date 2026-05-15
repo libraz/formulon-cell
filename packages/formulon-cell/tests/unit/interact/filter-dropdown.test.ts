@@ -21,9 +21,13 @@ describe('attachFilterDropdown', () => {
 
     const root = document.querySelector<HTMLElement>('.fc-filter-dropdown');
     expect(root?.getAttribute('aria-label')).toBe('フィルター');
-    expect(root?.querySelector<HTMLInputElement>('.fc-filter-dropdown__search')?.placeholder).toBe(
-      '検索…',
-    );
+    expect(root?.getAttribute('aria-modal')).toBe('false');
+    const search = root?.querySelector<HTMLInputElement>('.fc-filter-dropdown__search');
+    expect(search?.placeholder).toBe('検索…');
+    expect(search?.getAttribute('aria-label')).toBe('検索…');
+    expect(
+      root?.querySelector<HTMLElement>('.fc-filter-dropdown__list')?.getAttribute('role'),
+    ).toBe('group');
     expect(root?.textContent).toContain('(すべて選択)');
     expect(root?.textContent).toContain('OK');
     expect(root?.textContent).toContain('クリア');
@@ -70,5 +74,18 @@ describe('attachFilterDropdown', () => {
 
     expect(handle.isOpen()).toBe(false);
     expect(store.getState().layout.hiddenRows.has(2)).toBe(true);
+  });
+
+  it('restores focus to the opener when dismissed with Escape', () => {
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    opener.focus();
+
+    const handle = attachFilterDropdown({ store, strings: en });
+    handle.open({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 }, 0, { x: 10, y: 20, h: 24 });
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    expect(handle.isOpen()).toBe(false);
+    expect(document.activeElement).toBe(opener);
   });
 });

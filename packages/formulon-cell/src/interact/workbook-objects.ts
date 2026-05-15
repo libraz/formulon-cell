@@ -70,6 +70,7 @@ export function attachWorkbookObjectsPanel(
   let wb = deps.wb;
   let strings = deps.strings ?? defaultStrings;
   let open = false;
+  let restoreFocusEl: HTMLElement | null = null;
 
   const root = document.createElement('div');
   root.className = 'fc-objects';
@@ -80,9 +81,20 @@ export function attachWorkbookObjectsPanel(
   host.appendChild(root);
   inheritHostTokens(host, root);
 
-  const close = (): void => {
+  const close = (restoreFocus = false): void => {
+    const wasOpen = open;
     open = false;
+    const focusTarget = restoreFocusEl;
+    restoreFocusEl = null;
     root.hidden = true;
+    if (
+      wasOpen &&
+      restoreFocus &&
+      focusTarget &&
+      (root.contains(document.activeElement) || document.activeElement === document.body)
+    ) {
+      focusTarget.focus({ preventScroll: true });
+    }
   };
 
   const item = (label: string, value: string | number): HTMLDivElement => {
@@ -118,7 +130,7 @@ export function attachWorkbookObjectsPanel(
     closeBtn.className = 'fc-objects__close';
     closeBtn.textContent = '×';
     closeBtn.setAttribute('aria-label', t.close);
-    closeBtn.addEventListener('click', close);
+    closeBtn.addEventListener('click', () => close(false));
     header.append(title, closeBtn);
     root.appendChild(header);
 
@@ -279,13 +291,14 @@ export function attachWorkbookObjectsPanel(
 
   const openPanel = (): void => {
     render();
+    restoreFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : host;
     root.hidden = false;
     open = true;
     root.focus({ preventScroll: true });
   };
 
   const onKey = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape') close();
+    if (e.key === 'Escape') close(true);
   };
   root.addEventListener('keydown', onKey);
 

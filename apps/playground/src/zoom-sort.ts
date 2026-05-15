@@ -6,6 +6,7 @@ import {
   setSheetZoom,
   sortRange,
 } from '@libraz/formulon-cell';
+import { focusMenuItem, handleMenuKeydown, prepareMenu } from './menu-a11y.js';
 
 export function setupZoomControls(getInst: () => SpreadsheetInstance | null): {
   refreshZoom(): void;
@@ -56,15 +57,19 @@ export function setupSortMenu(input: {
 }): void {
   const sortBtn = document.getElementById('btn-sort');
   const sortMenu = document.getElementById('menu-sort');
-  const closeSortMenu = (): void => {
+  if (sortMenu) prepareMenu(sortMenu, 'Sort and filter');
+
+  const closeSortMenu = (restoreFocus = false): void => {
     if (!sortMenu) return;
     sortMenu.hidden = true;
     sortBtn?.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) sortBtn?.focus();
   };
   const openSortMenu = (): void => {
     if (!sortMenu) return;
     sortMenu.hidden = false;
     sortBtn?.setAttribute('aria-expanded', 'true');
+    focusMenuItem(sortMenu);
   };
   sortBtn?.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -79,7 +84,10 @@ export function setupSortMenu(input: {
     closeSortMenu();
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !sortMenu?.hidden) closeSortMenu();
+    if (e.key === 'Escape' && !sortMenu?.hidden) closeSortMenu(true);
+  });
+  sortMenu?.addEventListener('keydown', (e) => {
+    handleMenuKeydown(e, sortMenu, { close: closeSortMenu, restoreFocusTo: sortBtn });
   });
 
   sortMenu?.querySelectorAll<HTMLButtonElement>('[data-sort]').forEach((btn) => {

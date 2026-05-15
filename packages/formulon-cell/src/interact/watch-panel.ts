@@ -58,6 +58,7 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
   root.setAttribute('role', 'region');
   root.setAttribute('aria-label', strings.watchPanel.title);
   root.hidden = !store.getState().ui.watchPanelOpen;
+  root.tabIndex = -1;
 
   const header = document.createElement('div');
   header.className = 'fc-watch__header';
@@ -120,6 +121,25 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
 
   root.append(header, body, empty);
   host.appendChild(root);
+
+  let restoreFocusEl: HTMLElement | null = null;
+
+  const focusInitial = (): void => {
+    requestAnimationFrame(() => {
+      if (root.hidden) return;
+      if (root.contains(document.activeElement)) return;
+      addBtn.focus({ preventScroll: true });
+    });
+  };
+
+  const restoreFocus = (): void => {
+    const target = restoreFocusEl;
+    restoreFocusEl = null;
+    if (!target) return;
+    if (root.contains(document.activeElement) || document.activeElement === document.body) {
+      target.focus({ preventScroll: true });
+    }
+  };
 
   /** Find a defined name (workbook scope) whose ref points exactly at `addr`.
    *  Returns null when there's no exact match — which keeps the column quiet
@@ -244,13 +264,20 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
   };
 
   const open = (): void => {
+    restoreFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : host;
     mutators.setWatchPanelOpen(store, true);
+    focusInitial();
   };
-  const close = (): void => {
+  const close = (restore = true): void => {
     mutators.setWatchPanelOpen(store, false);
+    if (restore) restoreFocus();
   };
   const toggle = (): void => {
-    mutators.setWatchPanelOpen(store, !store.getState().ui.watchPanelOpen);
+    if (store.getState().ui.watchPanelOpen) {
+      close(true);
+    } else {
+      open();
+    }
   };
 
   const onAdd = (): void => {
@@ -259,10 +286,17 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
   const onClear = (): void => {
     mutators.clearWatches(store);
   };
-  const onClose = (): void => close();
+  const onClose = (): void => close(true);
+  const onKeyDown = (e: KeyboardEvent): void => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    e.stopPropagation();
+    close(true);
+  };
   addBtn.addEventListener('click', onAdd);
   clearBtn.addEventListener('click', onClear);
   closeBtn.addEventListener('click', onClose);
+  root.addEventListener('keydown', onKeyDown);
 
   // Re-render on any store change. Cheap — the table is at most a few rows.
   // Tracks watches list, panel visibility, and live cell-value updates that
@@ -277,7 +311,10 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
     if (visible !== lastVisible) {
       lastVisible = visible;
       root.hidden = !visible;
-      if (visible) refresh();
+      if (visible) {
+        refresh();
+        if (restoreFocusEl) focusInitial();
+      }
     }
     const watchesChanged = s.watch.watches !== lastWatches;
     const cellsChanged = s.data.cells !== lastCells;
@@ -299,6 +336,7 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
       addBtn.removeEventListener('click', onAdd);
       clearBtn.removeEventListener('click', onClear);
       closeBtn.removeEventListener('click', onClose);
+      root.removeEventListener('keydown', onKeyDown);
       unsub();
       root.remove();
     },

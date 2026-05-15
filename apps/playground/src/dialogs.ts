@@ -8,10 +8,57 @@ export interface PromptOptions {
   validate?: (value: string) => string | null;
 }
 
+const FOCUSABLE_DIALOG_SELECTOR = [
+  'button',
+  'input',
+  'select',
+  'textarea',
+  'a[href]',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
+const focusableDialogItems = (root: HTMLElement): HTMLElement[] =>
+  Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_DIALOG_SELECTOR)).filter((el) => {
+    if (el.closest('[hidden],[aria-hidden="true"]')) return false;
+    if ('disabled' in el && (el as HTMLButtonElement | HTMLInputElement).disabled) return false;
+    return el.tabIndex >= 0;
+  });
+
+const trapDialogTab = (root: HTMLElement, event: KeyboardEvent): boolean => {
+  if (event.key !== 'Tab') return false;
+  const items = focusableDialogItems(root);
+  if (items.length === 0) {
+    event.preventDefault();
+    root.focus({ preventScroll: true });
+    return true;
+  }
+  const first = items[0];
+  const last = items[items.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last?.focus({ preventScroll: true });
+    return true;
+  }
+  if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first?.focus({ preventScroll: true });
+    return true;
+  }
+  return false;
+};
+
+const restoreDialogFocus = (overlay: HTMLElement, opener: HTMLElement | null): void => {
+  if (!opener) return;
+  if (overlay.contains(document.activeElement) || document.activeElement === document.body) {
+    opener.focus({ preventScroll: true });
+  }
+};
+
 /** Excel 365-styled modal prompt. Returns the entered value, or `null`
  *  when the user cancels. Replaces native `window.prompt`. */
 export const showPrompt = (opts: PromptOptions): Promise<string | null> => {
   return new Promise<string | null>((resolve) => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const overlay = document.createElement('div');
     overlay.className = 'fc-fmtdlg app__dlg';
     overlay.setAttribute('role', 'dialog');
@@ -72,6 +119,7 @@ export const showPrompt = (opts: PromptOptions): Promise<string | null> => {
       if (done) return;
       done = true;
       overlay.removeEventListener('keydown', onKey);
+      restoreDialogFocus(overlay, opener);
       overlay.remove();
       resolve(value);
     };
@@ -90,6 +138,7 @@ export const showPrompt = (opts: PromptOptions): Promise<string | null> => {
     const onCancel = (): void => finish(null);
     const onKey = (e: KeyboardEvent): void => {
       e.stopPropagation();
+      if (trapDialogTab(overlay, e)) return;
       if (e.key === 'Escape') {
         e.preventDefault();
         onCancel();
@@ -125,6 +174,7 @@ export interface ConfirmOptions {
  *  cancel/dismiss. Replaces native `window.confirm`. */
 export const showConfirm = (opts: ConfirmOptions): Promise<boolean> => {
   return new Promise<boolean>((resolve) => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const overlay = document.createElement('div');
     overlay.className = 'fc-fmtdlg app__dlg';
     overlay.setAttribute('role', 'alertdialog');
@@ -171,11 +221,13 @@ export const showConfirm = (opts: ConfirmOptions): Promise<boolean> => {
       if (done) return;
       done = true;
       overlay.removeEventListener('keydown', onKey);
+      restoreDialogFocus(overlay, opener);
       overlay.remove();
       resolve(value);
     };
     const onKey = (e: KeyboardEvent): void => {
       e.stopPropagation();
+      if (trapDialogTab(overlay, e)) return;
       if (e.key === 'Escape') {
         e.preventDefault();
         finish(false);
@@ -188,6 +240,80 @@ export const showConfirm = (opts: ConfirmOptions): Promise<boolean> => {
     cancelBtn.addEventListener('click', () => finish(false));
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) finish(false);
+    });
+    overlay.addEventListener('keydown', onKey);
+
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => {
+      okBtn.focus();
+    });
+  });
+};
+
+export interface MessageOptions {
+  title: string;
+  message: string;
+  okLabel?: string;
+}
+
+/** Excel 365-styled message dialog. Use for one-button errors/info instead
+ *  of native `window.alert`, keeping focus and stacking inside app chrome. */
+export const showMessage = (opts: MessageOptions): Promise<void> => {
+  return new Promise<void>((resolve) => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const overlay = document.createElement('div');
+    overlay.className = 'fc-fmtdlg app__dlg';
+    overlay.setAttribute('role', 'alertdialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', opts.title);
+
+    const panel = document.createElement('div');
+    panel.className = 'fc-fmtdlg__panel app__dlg__panel';
+    overlay.appendChild(panel);
+
+    const header = document.createElement('div');
+    header.className = 'fc-fmtdlg__header';
+    header.textContent = opts.title;
+    panel.appendChild(header);
+
+    const body = document.createElement('div');
+    body.className = 'fc-fmtdlg__body app__dlg__body';
+    const msg = document.createElement('p');
+    msg.className = 'app__dlg__message';
+    msg.textContent = opts.message;
+    body.appendChild(msg);
+    panel.appendChild(body);
+
+    const footer = document.createElement('div');
+    footer.className = 'fc-fmtdlg__footer';
+    panel.appendChild(footer);
+
+    const okBtn = document.createElement('button');
+    okBtn.type = 'button';
+    okBtn.className = 'fc-fmtdlg__btn fc-fmtdlg__btn--primary';
+    okBtn.textContent = opts.okLabel ?? 'OK';
+    footer.appendChild(okBtn);
+
+    let done = false;
+    const finish = (): void => {
+      if (done) return;
+      done = true;
+      overlay.removeEventListener('keydown', onKey);
+      restoreDialogFocus(overlay, opener);
+      overlay.remove();
+      resolve();
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      e.stopPropagation();
+      if (trapDialogTab(overlay, e)) return;
+      if (e.key === 'Escape' || e.key === 'Enter') {
+        e.preventDefault();
+        finish();
+      }
+    };
+    okBtn.addEventListener('click', finish);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) finish();
     });
     overlay.addEventListener('keydown', onKey);
 

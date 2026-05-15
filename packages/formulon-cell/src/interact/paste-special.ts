@@ -9,7 +9,7 @@ import { type History, recordFormatChange } from '../commands/history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
+import { createDialogShell } from './dialog-shell.js';
 
 export interface PasteSpecialDeps {
   host: HTMLElement;
@@ -68,16 +68,15 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
   const whatOptions = buildWhatOptions(strings);
   const opOptions = buildOpOptions(strings);
 
-  const overlay = document.createElement('div');
-  overlay.className = 'fc-fmtdlg fc-pastesp';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', t.title);
-  overlay.hidden = true;
-
-  const panel = document.createElement('div');
-  panel.className = 'fc-fmtdlg__panel fc-pastesp__panel';
-  overlay.appendChild(panel);
+  const shell = createDialogShell({
+    host,
+    className: 'fc-pastesp',
+    ariaLabel: t.title,
+    onDismiss: () => close(),
+  });
+  shell.overlay.classList.add('fc-fmtdlg');
+  shell.panel.classList.add('fc-fmtdlg__panel', 'fc-pastesp__panel');
+  const { overlay, panel } = shell;
 
   const header = document.createElement('div');
   header.className = 'fc-fmtdlg__header';
@@ -148,15 +147,8 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
   };
   setDefaults();
 
-  // Body-portal so the modal escapes `.fc-host`'s `contain: strict` /
-  // `isolation: isolate`. inheritHostTokens copies theme custom properties
-  // (--fc-accent, --fc-bg-elev, etc.) so the body-portaled overlay still
-  // renders with the active theme.
-  inheritHostTokens(host, overlay);
-  document.body.appendChild(overlay);
-
   const close = (): void => {
-    overlay.hidden = true;
+    shell.close();
     host.focus();
   };
 
@@ -168,7 +160,7 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
       return;
     }
     setDefaults();
-    overlay.hidden = false;
+    shell.open();
     // Focus first radio for keyboard nav.
     whatRadios.get('all')?.focus();
   };
@@ -210,11 +202,8 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
     if (result) deps.onAfterCommit();
   };
 
-  cancelBtn.addEventListener('click', close);
-  okBtn.addEventListener('click', apply);
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) close();
-  });
+  shell.on(cancelBtn, 'click', close);
+  shell.on(okBtn, 'click', apply);
   const onKey = (e: KeyboardEvent): void => {
     if (overlay.hidden) return;
     if (e.key === 'Escape') {
@@ -225,14 +214,13 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
       apply();
     }
   };
-  document.addEventListener('keydown', onKey, true);
+  shell.on(document, 'keydown', onKey as EventListener, true);
 
   return {
     open,
     close,
     detach() {
-      document.removeEventListener('keydown', onKey, true);
-      overlay.remove();
+      shell.dispose();
     },
   };
 }

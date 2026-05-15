@@ -4,7 +4,7 @@ import type {
   PageOrientation,
   PaperSize,
 } from '@libraz/formulon-cell';
-import { onMounted, onUnmounted, ref } from 'vue';
+import { nextTick, onMounted, onUnmounted, ref } from 'vue';
 import type { BorderPreset } from './model.js';
 
 type DropdownName =
@@ -32,8 +32,33 @@ export function useToolbarDropdown(handlers: DropdownHandlers) {
   const closeDropdown = (): void => {
     openDropdown.value = null;
   };
+  const focusDropdownButton = (root: HTMLElement | null): void => {
+    root?.querySelector<HTMLButtonElement>('.demo__rb-dd__btn')?.focus({ preventScroll: true });
+  };
+  const focusDropdownOption = (list: HTMLElement | null, index: number): void => {
+    if (!list) return;
+    const options = Array.from(list.querySelectorAll<HTMLButtonElement>('[role="option"]'));
+    if (options.length === 0) return;
+    const next = ((index % options.length) + options.length) % options.length;
+    for (const [idx, option] of options.entries()) option.tabIndex = idx === next ? 0 : -1;
+    options[next]?.focus({ preventScroll: true });
+    options[next]?.scrollIntoView({ block: 'nearest' });
+  };
+  const focusOpenDropdownSelection = async (): Promise<void> => {
+    await nextTick();
+    const root = document.querySelector<HTMLElement>('.demo__rb-dd--open');
+    const list = root?.querySelector<HTMLElement>('.demo__rb-dd__list') ?? null;
+    const selectedIndex = Math.max(
+      0,
+      Array.from(list?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []).findIndex(
+        (option) => option.getAttribute('aria-selected') === 'true',
+      ),
+    );
+    focusDropdownOption(list, selectedIndex);
+  };
   const toggleDropdown = (name: DropdownName): void => {
     openDropdown.value = openDropdown.value === name ? null : name;
+    if (openDropdown.value === name) void focusOpenDropdownSelection();
   };
   const onDropdownPick = (name: DropdownName, value: string | number): void => {
     if (name === 'fontFamily') handlers.onFontFamily(String(value));
@@ -57,7 +82,55 @@ export function useToolbarDropdown(handlers: DropdownHandlers) {
   const onDocKey = (e: KeyboardEvent): void => {
     if (e.key === 'Escape' && openDropdown.value != null) {
       e.preventDefault();
+      const root = document.querySelector<HTMLElement>('.demo__rb-dd--open');
       closeDropdown();
+      focusDropdownButton(root);
+    }
+  };
+  const onDropdownKeydown = (e: KeyboardEvent): void => {
+    const target = e.target as Element | null;
+    const root = target?.closest<HTMLElement>('.demo__rb-dd');
+    if (!root) return;
+    const name = root.dataset.dropdownName as DropdownName | undefined;
+    if (!name) return;
+    const button = target?.closest<HTMLButtonElement>('.demo__rb-dd__btn');
+    if (button) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openDropdown.value = name;
+        void focusOpenDropdownSelection();
+      } else if (e.key === 'Escape' && openDropdown.value === name) {
+        e.preventDefault();
+        closeDropdown();
+        button.focus({ preventScroll: true });
+      }
+      return;
+    }
+
+    const list = target?.closest<HTMLElement>('.demo__rb-dd__list');
+    if (!list) return;
+    const options = Array.from(list.querySelectorAll<HTMLButtonElement>('[role="option"]'));
+    const current = Math.max(0, options.indexOf(document.activeElement as HTMLButtonElement));
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusDropdownOption(list, current + 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusDropdownOption(list, current - 1);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      focusDropdownOption(list, 0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      focusDropdownOption(list, options.length - 1);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      (document.activeElement as HTMLButtonElement | null)?.click();
+      focusDropdownButton(root);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeDropdown();
+      focusDropdownButton(root);
     }
   };
   onMounted(() => {
@@ -68,5 +141,12 @@ export function useToolbarDropdown(handlers: DropdownHandlers) {
     document.removeEventListener('mousedown', onDocPointerDown, true);
     document.removeEventListener('keydown', onDocKey, true);
   });
-  return { borderStyle, closeDropdown, onDropdownPick, openDropdown, toggleDropdown };
+  return {
+    borderStyle,
+    closeDropdown,
+    onDropdownKeydown,
+    onDropdownPick,
+    openDropdown,
+    toggleDropdown,
+  };
 }

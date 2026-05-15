@@ -7,7 +7,7 @@ import { PivotAggregation } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
+import { createDialogShell } from './dialog-shell.js';
 
 export interface PivotTableDialogDeps {
   host: HTMLElement;
@@ -66,16 +66,15 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   let strings = deps.strings ?? defaultStrings;
   let open = false;
 
-  const overlay = document.createElement('div');
-  overlay.className = 'fc-fmtdlg fc-pivotdlg';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.hidden = true;
-  inheritHostTokens(host, overlay);
-
-  const panel = document.createElement('div');
-  panel.className = 'fc-fmtdlg__panel fc-pivotdlg__panel';
-  overlay.appendChild(panel);
+  const shell = createDialogShell({
+    host,
+    className: 'fc-pivotdlg',
+    ariaLabel: strings.pivotTableDialog.title,
+    onDismiss: () => close(),
+  });
+  shell.overlay.classList.add('fc-fmtdlg');
+  shell.panel.classList.add('fc-fmtdlg__panel', 'fc-pivotdlg__panel');
+  const { overlay, panel } = shell;
 
   const header = document.createElement('div');
   header.className = 'fc-fmtdlg__header';
@@ -141,9 +140,6 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   okBtn.type = 'button';
   okBtn.className = 'fc-fmtdlg__btn fc-fmtdlg__btn--primary';
   footer.append(cancelBtn, okBtn);
-  // Body-portal so the dialog escapes `.fc-host`'s `contain: strict` /
-  // `isolation: isolate`. `inheritHostTokens` was called at construction.
-  document.body.appendChild(overlay);
 
   const showError = (msg: string): void => {
     error.textContent = msg;
@@ -185,7 +181,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   const render = (): void => {
     const t = strings.pivotTableDialog;
     header.textContent = t.title;
-    overlay.setAttribute('aria-label', t.title);
+    shell.setAriaLabel(t.title);
     cancelBtn.textContent = t.cancel;
     okBtn.textContent = t.ok;
     nameInput.placeholder = t.namePlaceholder;
@@ -264,7 +260,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
 
   const close = (): void => {
     open = false;
-    overlay.hidden = true;
+    shell.close();
   };
 
   const onSubmit = (e: SubmitEvent): void => {
@@ -302,9 +298,6 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     close();
   };
 
-  const onOverlayClick = (e: MouseEvent): void => {
-    if (e.target === overlay) close();
-  };
   const onKey = (e: KeyboardEvent): void => {
     e.stopPropagation();
     if (e.key === 'Escape') {
@@ -314,16 +307,15 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   };
   const onOk = (): void => body.requestSubmit();
 
-  body.addEventListener('submit', onSubmit);
-  okBtn.addEventListener('click', onOk);
-  cancelBtn.addEventListener('click', close);
-  overlay.addEventListener('click', onOverlayClick);
-  overlay.addEventListener('keydown', onKey);
+  shell.on(body, 'submit', onSubmit as EventListener);
+  shell.on(okBtn, 'click', onOk);
+  shell.on(cancelBtn, 'click', close);
+  shell.on(overlay, 'keydown', onKey as EventListener);
 
   return {
     open() {
       render();
-      overlay.hidden = false;
+      shell.open();
       open = true;
       nameInput.focus({ preventScroll: true });
     },
@@ -337,12 +329,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       if (open) render();
     },
     detach() {
-      body.removeEventListener('submit', onSubmit);
-      okBtn.removeEventListener('click', onOk);
-      cancelBtn.removeEventListener('click', close);
-      overlay.removeEventListener('click', onOverlayClick);
-      overlay.removeEventListener('keydown', onKey);
-      overlay.remove();
+      shell.dispose();
     },
   };
 }

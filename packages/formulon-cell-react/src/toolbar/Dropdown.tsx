@@ -30,6 +30,7 @@ export function Dropdown<V extends string | number>({
 }: DropdownProps<V>): ReactElement {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   // Index of the option currently holding roving focus. Initialised to the
   // selected option each time the list opens.
@@ -49,6 +50,7 @@ export function Dropdown<V extends string | number>({
       if (e.key === 'Escape') {
         e.preventDefault();
         setOpen(false);
+        buttonRef.current?.focus({ preventScroll: true });
       }
     };
     document.addEventListener('mousedown', onDocDown, true);
@@ -114,7 +116,12 @@ export function Dropdown<V extends string | number>({
       if (opt) {
         onChange(opt.value);
         setOpen(false);
+        buttonRef.current?.focus({ preventScroll: true });
       }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setOpen(false);
+      buttonRef.current?.focus({ preventScroll: true });
     }
   };
 
@@ -126,6 +133,7 @@ export function Dropdown<V extends string | number>({
       }`}
     >
       <button
+        ref={buttonRef}
         type="button"
         className="demo__rb-dd__btn"
         title={title}
@@ -166,6 +174,7 @@ export function Dropdown<V extends string | number>({
                 onClick={() => {
                   onChange(o.value);
                   setOpen(false);
+                  buttonRef.current?.focus({ preventScroll: true });
                 }}
               >
                 <span className="demo__rb-dd__check" aria-hidden="true">
