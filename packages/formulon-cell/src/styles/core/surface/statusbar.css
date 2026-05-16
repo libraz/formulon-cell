@@ -8,7 +8,7 @@
     border-top: var(--fc-hairline) solid
       var(--fc-statusbar-border, var(--fc-accent-strong, var(--fc-accent)));
     background: var(--fc-statusbar-bg, var(--fc-accent));
-    color: var(--fc-statusbar-fg, color-mix(in srgb, var(--fc-accent-fg, #fff) 76%, transparent));
+    color: var(--fc-statusbar-fg, color-mix(in srgb, var(--fc-accent-fg) 76%, transparent));
     font-size: var(--fc-text-rail);
     font-family: var(--fc-font-ui);
     font-feature-settings: "tnum" 1;
@@ -25,7 +25,7 @@
     flex: 1 1 auto;
     text-align: center;
     cursor: pointer;
-    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
+    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
     text-transform: none;
     letter-spacing: 0;
     font-feature-settings:
@@ -38,7 +38,7 @@
   }
 
   .fc-host__statusbar-aggs:hover {
-    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
+    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
     text-decoration: underline;
   }
 
@@ -70,9 +70,9 @@
 
   .fc-host__statusbar-view:hover,
   .fc-host__statusbar-view--active {
-    border-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
-    background: color-mix(in srgb, var(--fc-accent-fg, #fff) 12%, transparent);
-    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
+    border-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
+    background: color-mix(in srgb, var(--fc-accent-fg) 12%, transparent);
+    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
   }
 
   .fc-host__statusbar-viewicon {
@@ -111,7 +111,7 @@
     gap: 6px;
     flex: 0 0 auto;
     margin-left: 4px;
-    color: var(--fc-statusbar-fg, color-mix(in srgb, var(--fc-accent-fg, #fff) 82%, transparent));
+    color: var(--fc-statusbar-fg, color-mix(in srgb, var(--fc-accent-fg) 82%, transparent));
     font-family: var(--fc-font-ui);
     letter-spacing: 0;
     text-transform: none;
@@ -125,7 +125,7 @@
     height: 18px;
     padding: 0;
     border: var(--fc-hairline) solid
-      var(--fc-statusbar-control, color-mix(in srgb, var(--fc-accent-fg, #fff) 36%, transparent));
+      var(--fc-statusbar-control, color-mix(in srgb, var(--fc-accent-fg) 36%, transparent));
     border-radius: 50%;
     background: transparent;
     color: inherit;
@@ -136,8 +136,8 @@
   }
 
   .fc-host__statusbar-zoom-btn:hover:not(:disabled) {
-    border-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
-    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
+    border-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
+    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
   }
 
   .fc-host__statusbar-zoom-btn:disabled {
@@ -147,12 +147,12 @@
 
   .fc-host__statusbar-zoom-slider {
     width: 86px;
-    accent-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
+    accent-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
   }
 
   .fc-host__statusbar-zoom-label {
     min-width: 42px;
-    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
+    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
     font-feature-settings: "tnum" 1;
     text-align: right;
   }
@@ -161,7 +161,7 @@
     flex: 0 0 auto;
     appearance: none;
     border: 1px solid
-      var(--fc-statusbar-control, color-mix(in srgb, var(--fc-accent-fg, #fff) 32%, transparent));
+      var(--fc-statusbar-control, color-mix(in srgb, var(--fc-accent-fg) 32%, transparent));
     border-radius: 2px;
     background: transparent;
     color: inherit;
@@ -176,15 +176,15 @@
   .fc-host__statusbar-calcmode[data-calc-mode="1"] {
     background: color-mix(
       in srgb,
-      var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff)) 18%,
+      var(--fc-statusbar-fg-strong, var(--fc-accent-fg)) 18%,
       transparent
     );
-    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
-    border-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
+    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
+    border-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
   }
 
   .fc-host__statusbar-calcmode:hover {
-    border-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
+    border-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
   }
 
   .fc-host__statusbar-dot {
@@ -192,8 +192,8 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--fc-accent-fg, #fff);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--fc-accent-fg, #fff) 18%, transparent);
+    background: var(--fc-accent-fg);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--fc-accent-fg) 18%, transparent);
     margin-right: 8px;
     vertical-align: 1px;
   }

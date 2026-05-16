@@ -1,0 +1,187 @@
+/* Format Cells dialog — frame, header, close button, sample preview,
+   the horizontal tab strip, and the body container. */
+
+@layer fc.app {
+  .fc-fmtdlg {
+    position: fixed;
+    inset: 0;
+    z-index: var(--fc-z-dialog, 2147483020);
+    /* Defensive: re-enable pointer events in case a host ancestor sets
+       pointer-events:none on its subtree. Without this, hosts running
+       transition libraries / global resets can leave the dialog visible
+       but un-clickable. */
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, CanvasText 22%, transparent);
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--fc-fmtdlg-panel-fg, var(--fc-fg, CanvasText));
+  }
+  .fc-fmtdlg[hidden] {
+    display: none;
+  }
+  .fc-fmtdlg__panel {
+    display: flex;
+    flex-direction: column;
+    width: min(96vw, 620px);
+    height: min(92vh, 612px);
+    background: var(--fc-fmtdlg-panel-bg);
+    color: var(--fc-fmtdlg-panel-fg, var(--fc-fg, CanvasText));
+    border: 1px solid var(--fc-fmtdlg-rule);
+    border-radius: 8px;
+    box-shadow:
+      0 18px 38px rgba(0, 0, 0, 0.42),
+      0 2px 6px rgba(0, 0, 0, 0.18);
+    overflow: hidden;
+  }
+  .fc-fmtdlg__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 36px;
+    padding: 6px 8px 6px 20px;
+    background: var(--fc-fmtdlg-header-bg);
+    color: var(--fc-fmtdlg-panel-fg, inherit);
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .fc-fmtdlg__close {
+    width: 32px;
+    height: 24px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--fc-fmtdlg-panel-fg);
+    cursor: pointer;
+    font: inherit;
+    font-size: 18px;
+    line-height: 1;
+  }
+  .fc-fmtdlg__close:hover {
+    background: #e81123;
+    color: #ffffff;
+  }
+  .fc-fmtdlg__close:focus-visible {
+    outline: 2px solid var(--fc-accent);
+    outline-offset: -2px;
+  }
+  .fc-fmtdlg__preview {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 6px;
+    overflow: visible;
+  }
+  .fc-fmtdlg__preview-label {
+    color: var(--fc-fmtdlg-label-fg);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .fc-fmtdlg__preview-cell {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 100%;
+    min-height: 38px;
+    padding: 8px 12px;
+    background: var(--fc-fmtdlg-preview-bg);
+    border: 1px solid var(--fc-fmtdlg-preview-border);
+    border-radius: 6px;
+    box-sizing: border-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--fc-fmtdlg-preview-fg);
+    font-size: 13px;
+  }
+  .fc-fmtdlg__tabs {
+    display: flex;
+    gap: 0;
+    align-self: stretch;
+    justify-content: center;
+    margin: 0 22px;
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid var(--fc-fmtdlg-tab-border);
+    border-radius: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    background: var(--fc-fmtdlg-tab-bg, transparent);
+  }
+  .fc-fmtdlg__tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .fc-fmtdlg__tab {
+    position: relative;
+    min-width: 64px;
+    min-height: 31px;
+    padding: 0 12px;
+    background: transparent;
+    border: 0;
+    border-radius: var(--fc-fmtdlg-tab-radius, 0);
+    color: var(--fc-fmtdlg-tab-color);
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    margin: 0;
+    white-space: nowrap;
+    transition:
+      background-color 80ms ease,
+      color 80ms ease;
+  }
+  .fc-fmtdlg__tab:hover {
+    background: var(--fc-fmtdlg-tab-hover);
+    color: var(--fc-fmtdlg-tab-hover-color);
+  }
+  .fc-fmtdlg__tab:focus-visible {
+    outline: 2px solid var(--fc-accent, currentColor);
+    outline-offset: -2px;
+  }
+  .fc-fmtdlg__tab[aria-selected="true"] {
+    background: var(--fc-fmtdlg-tab-active-bg, transparent);
+    color: var(--fc-fmtdlg-tab-active-color);
+    font-weight: 600;
+  }
+  .fc-fmtdlg__tab[aria-selected="true"]::after {
+    display: var(--fc-fmtdlg-tab-active-underline, block);
+    position: absolute;
+    right: 10px;
+    bottom: -1px;
+    left: 10px;
+    height: 2px;
+    background: var(--fc-accent);
+    content: "";
+  }
+  .fc-fmtdlg__tab[aria-selected="true"]:hover {
+    background: var(--fc-fmtdlg-tab-active-bg, var(--fc-fmtdlg-tab-hover));
+    filter: brightness(1.06);
+  }
+  .fc-fmtdlg__body {
+    flex: 1;
+    overflow-y: auto;
+    margin: 0 22px;
+    padding: 12px 4px 8px;
+    border: 0;
+    border-radius: 0;
+    background: var(--fc-fmtdlg-body-bg);
+  }
+  .fc-fmtdlg__panel-tab[hidden] {
+    display: none !important;
+  }
+  .fc-fmtdlg__panel-tab {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 100%;
+  }
+}

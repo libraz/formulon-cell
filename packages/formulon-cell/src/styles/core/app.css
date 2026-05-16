@@ -4,7 +4,8 @@
 @import "./app/overlays/paste-options.css";
 @import "./app/overlays/quick-analysis-and-charts.css";
 @import "./app/overlays/workbook-objects.css";
-@import "./app/overlays/sheet-menu-and-find.css";
+@import "./app/overlays/sheet-menu.css";
+@import "./app/overlays/find-bar.css";
 @import "./app/format-dialog/shell.css";
 @import "./app/format-dialog/comment-note.css";
 @import "./app/format-dialog/controls.css";

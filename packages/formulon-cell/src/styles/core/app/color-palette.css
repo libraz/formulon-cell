@@ -12,14 +12,14 @@
     width: max-content;
     padding: 6px;
     box-sizing: border-box;
-    font-family: var(--fc-font, inherit);
+    font-family: var(--fc-font-ui, inherit);
     font-size: 12px;
-    color: var(--fc-fg, #1f1f1f);
+    color: var(--fc-fg);
   }
 
   .fc-colorpalette__heading {
     margin-top: 4px;
-    color: var(--fc-fg-soft, #6a6a6a);
+    color: var(--fc-fg-mute);
     font-size: 11px;
     line-height: 1.4;
   }
@@ -50,17 +50,17 @@
   }
 
   .fc-colorpalette__swatch:hover {
-    outline: 2px solid var(--fc-accent, #217346);
+    outline: 2px solid var(--fc-accent);
     outline-offset: 1px;
   }
 
   .fc-colorpalette__swatch:focus-visible {
-    outline: 2px solid var(--fc-accent, #217346);
+    outline: 2px solid var(--fc-accent);
     outline-offset: 1px;
   }
 
   .fc-colorpalette__swatch--selected {
-    outline: 2px solid var(--fc-accent, #217346);
+    outline: 2px solid var(--fc-accent);
     outline-offset: 1px;
     box-shadow: 0 0 0 1px #ffffff inset;
   }
@@ -84,18 +84,18 @@
 
   .fc-colorpalette__action:hover,
   .fc-colorpalette__action:focus-visible {
-    background: var(--fc-accent-soft, rgba(33, 115, 70, 0.1));
+    background: var(--fc-accent-soft);
     outline: none;
   }
 
   .fc-colorpalette__action--automatic {
-    border-color: var(--fc-line, #c8c8c8);
-    background: var(--fc-input-bg, #ffffff);
+    border-color: var(--fc-rule);
+    background: var(--fc-bg);
   }
 
   .fc-colorpalette__action--automatic:hover,
   .fc-colorpalette__action--automatic:focus-visible {
-    border-color: var(--fc-accent, #217346);
+    border-color: var(--fc-accent);
   }
 
   .fc-colorpalette__action-chip {
@@ -108,7 +108,7 @@
   .fc-colorpalette__action--more {
     margin-top: 2px;
     padding-top: 6px;
-    border-top: 1px solid var(--fc-line, #e5e5e5);
+    border-top: 1px solid var(--fc-rule);
     border-radius: 0;
   }
 

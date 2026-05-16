@@ -94,13 +94,13 @@
     color: var(--fc-fg, CanvasText);
   }
   .fc-slicer__chip--on {
-    background: var(--fc-accent, #2b6cb0);
-    border-color: var(--fc-accent, #2b6cb0);
-    color: var(--fc-on-accent, #fff);
+    background: var(--fc-accent);
+    border-color: var(--fc-accent);
+    color: var(--fc-accent-fg);
   }
   .fc-slicer__chip--on:hover {
-    background: var(--fc-accent, #2b6cb0);
-    color: var(--fc-on-accent, #fff);
+    background: var(--fc-accent);
+    color: var(--fc-accent-fg);
     filter: brightness(1.05);
   }
   .fc-slicer__empty {

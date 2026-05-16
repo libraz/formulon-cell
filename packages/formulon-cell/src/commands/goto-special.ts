@@ -1,8 +1,9 @@
 import { addrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { SelectionSlice } from '../store/types.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import type { SelectionSlice } from '../store/types.js';
+import { listComments } from './comment.js';
 
 /** Desktop spreadsheets "Go To Special" categories supported in v1. Mirrors the radio list
  *  on the dialog. Future expansion can add `row-differences`,
@@ -252,4 +253,114 @@ export const selectionFromMatches = (matches: readonly Addr[]): SelectionSlice =
       c1: addr.col,
     })),
   };
+};
+
+export type RibbonFindAction =
+  | 'find'
+  | 'replace'
+  | 'go-to'
+  | 'go-to-special'
+  | 'formulas'
+  | 'constants'
+  | 'numbers'
+  | 'text'
+  | 'errors'
+  | 'conditional-format'
+  | 'data-validation'
+  | 'comments';
+
+export interface RibbonFindActionReportItem {
+  severity: 'info' | 'warning';
+  label: string;
+  detail: string;
+}
+
+export interface RibbonFindActionReport {
+  title: string;
+  items: RibbonFindActionReportItem[];
+}
+
+export type RibbonFindActionResult =
+  | { kind: 'open-find'; mode: 'find' | 'replace' }
+  | { kind: 'open-go-to' }
+  | { kind: 'open-go-to-special' }
+  | { kind: 'selected' }
+  | { kind: 'report'; report: RibbonFindActionReport }
+  | { kind: 'noop' };
+
+export interface ExecuteRibbonFindActionDeps {
+  store: SpreadsheetStore;
+  workbook: WorkbookHandle;
+  action: RibbonFindAction;
+  strings: {
+    findSelect: string;
+    findNoMatches: string;
+    commentNone: string;
+  };
+}
+
+const SPECIAL_FIND_KINDS = new Set<RibbonFindAction>([
+  'formulas',
+  'constants',
+  'numbers',
+  'text',
+  'errors',
+  'conditional-format',
+  'data-validation',
+]);
+
+/** Shared "Find & Select" ribbon split-button. Resolves the action into a
+ *  host-routable verdict — dialog opener, selection update applied in place,
+ *  or a report dialog payload to surface "no matches"/"no comments".
+ *
+ *  This keeps React/Vue wrappers free of the "which dialog → which selector →
+ *  what message" branching; each host just plugs the result into its dialog
+ *  setter and `openFindReplace` / `openGoTo` / `openGoToSpecial` methods. */
+export const executeRibbonFindAction = (
+  deps: ExecuteRibbonFindActionDeps,
+): RibbonFindActionResult => {
+  const { store, workbook, action, strings } = deps;
+  if (action === 'find') return { kind: 'open-find', mode: 'find' };
+  if (action === 'replace') return { kind: 'open-find', mode: 'replace' };
+  if (action === 'go-to') return { kind: 'open-go-to' };
+  if (action === 'go-to-special') return { kind: 'open-go-to-special' };
+  if (SPECIAL_FIND_KINDS.has(action)) {
+    const matches = findMatchingCells(
+      workbook,
+      store,
+      'sheet',
+      action as Exclude<
+        RibbonFindAction,
+        'find' | 'replace' | 'go-to' | 'go-to-special' | 'comments'
+      >,
+    );
+    if (!matches[0]) {
+      return {
+        kind: 'report',
+        report: {
+          title: strings.findSelect,
+          items: [{ severity: 'info', label: strings.findNoMatches, detail: '' }],
+        },
+      };
+    }
+    store.setState((state) => ({ ...state, selection: selectionFromMatches(matches) }));
+    return { kind: 'selected' };
+  }
+  if (action === 'comments') {
+    const comments = listComments(store.getState());
+    const first = comments[0]?.addr;
+    if (!first) {
+      return {
+        kind: 'report',
+        report: {
+          title: strings.findSelect,
+          items: [{ severity: 'info', label: strings.commentNone, detail: '' }],
+        },
+      };
+    }
+    const selection = selectionFromMatches(comments.map((entry) => entry.addr));
+    store.setState((state) => ({ ...state, selection }));
+    return { kind: 'selected' };
+  }
+  return { kind: 'noop' };
 };

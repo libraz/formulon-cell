@@ -102,8 +102,12 @@ export type {
   ExternalLinksSummary,
 } from './commands/external-links.js';
 export { listExternalLinks, summarizeExternalLinks } from './commands/external-links.js';
-export type { FillOptions } from './commands/fill.js';
-export { fillDestFor, fillRange } from './commands/fill.js';
+export type {
+  ExecuteRibbonFillActionDeps,
+  FillOptions,
+  RibbonFillAction,
+} from './commands/fill.js';
+export { executeRibbonFillAction, fillDestFor, fillRange } from './commands/fill.js';
 export type {
   AdvancedFilterCopyOptions,
   ConditionFilterOp,
@@ -195,11 +199,21 @@ export {
   upsertTable,
 } from './commands/format-as-table.js';
 export type {
+  ExecuteRibbonFindActionDeps,
   GoToScope,
   GoToSpecialKind,
   GoToSpecialValueFilters,
+  RibbonFindAction,
+  RibbonFindActionReport,
+  RibbonFindActionReportItem,
+  RibbonFindActionResult,
 } from './commands/goto-special.js';
-export { boundingRange, findMatchingCells, selectionFromMatches } from './commands/goto-special.js';
+export {
+  boundingRange,
+  executeRibbonFindAction,
+  findMatchingCells,
+  selectionFromMatches,
+} from './commands/goto-special.js';
 export type { HistoryEntry, LayoutSnapshot, MergesSnapshot } from './commands/history.js';
 export {
   applyChartsSnapshot,
@@ -317,9 +331,19 @@ export {
 export type {
   CreatePivotTableOptions,
   CreatePivotTableResult,
+  ExecuteRibbonPivotTableActionDeps,
   PivotSourceField,
+  RibbonPivotTableAction,
+  RibbonPivotTableActionResult,
+  RibbonPivotTableActionStrings,
+  RibbonPivotTableReport,
+  RibbonPivotTableReportItem,
 } from './commands/pivot-table.js';
-export { createPivotTableFromRange, inferPivotSourceFields } from './commands/pivot-table.js';
+export {
+  createPivotTableFromRange,
+  executeRibbonPivotTableAction,
+  inferPivotSourceFields,
+} from './commands/pivot-table.js';
 export type { PrintDocument } from './commands/print.js';
 export {
   buildPrintDocument,
@@ -382,14 +406,23 @@ export {
   suggestFunctions,
 } from './commands/refs.js';
 export type {
+  ExecuteRibbonClearActionDeps,
+  RibbonClearAction,
+} from './commands/ribbon-clear.js';
+export { executeRibbonClearAction } from './commands/ribbon-clear.js';
+export type {
+  CreateRibbonChartFromSelectionOptions,
   CreateSessionChartOptions,
+  RibbonChartAction,
   SessionChartPatch,
   SessionChartSeriesPoint,
 } from './commands/session-chart.js';
 export {
   clearSessionChart,
   clearSessionChartsInRange,
+  createRibbonChartFromSelection,
   createSessionChart,
+  inferRecommendedChartKind,
   listSessionCharts,
   sessionChartById,
   sessionChartSeries,
@@ -434,8 +467,19 @@ export {
   setSlicerSelected,
   updateSlicer,
 } from './commands/slicers.js';
-export type { SortDirection, SortOptions } from './commands/sort.js';
-export { inferSortHasHeader, removeDuplicates, sortRange } from './commands/sort.js';
+export type {
+  SortActiveColumnAutoOptions,
+  SortDirection,
+  SortOptions,
+  SortRangeWithHistoryDeps,
+} from './commands/sort.js';
+export {
+  inferSortHasHeader,
+  removeDuplicates,
+  sortActiveColumnAuto,
+  sortRange,
+  sortRangeWithHistory,
+} from './commands/sort.js';
 export type { SparklineEntry } from './commands/sparkline.js';
 export {
   clearSparkline,
@@ -748,6 +792,21 @@ export type { PasteSpecialDeps, PasteSpecialHandle } from './interact/paste-spec
 export { attachPasteSpecial } from './interact/paste-special.js';
 export type { QuickAnalysisDeps, QuickAnalysisHandle } from './interact/quick-analysis.js';
 export { attachQuickAnalysis } from './interact/quick-analysis.js';
+export type {
+  BuildRibbonAddInReportStrings,
+  RibbonAddInAction,
+  RibbonAddInReport,
+  RibbonAddInReportItem,
+} from './interact/ribbon-add-in-report.js';
+export { buildRibbonAddInReport } from './interact/ribbon-add-in-report.js';
+export type {
+  ResolveRibbonPdfActionStrings,
+  RibbonPdfAction,
+  RibbonPdfActionResult,
+  RibbonPdfReport,
+  RibbonPdfReportItem,
+} from './interact/ribbon-pdf-report.js';
+export { resolveRibbonPdfAction } from './interact/ribbon-pdf-report.js';
 export type { SessionChartLabels, SessionChartsHandle } from './interact/session-charts.js';
 export { attachSessionCharts } from './interact/session-charts.js';
 export type { SlicerDeps, SlicerHandle } from './interact/slicer.js';
@@ -774,10 +833,17 @@ export { attachViewToolbar } from './interact/view-toolbar.js';
 export type { WatchPanelDeps, WatchPanelHandle } from './interact/watch-panel.js';
 export { attachWatchPanel } from './interact/watch-panel.js';
 export type {
+  SpreadsheetCompatibilityReportItem,
   WorkbookObjectsPanelDeps,
   WorkbookObjectsPanelHandle,
 } from './interact/workbook-objects.js';
-export { attachWorkbookObjectsPanel } from './interact/workbook-objects.js';
+export {
+  attachWorkbookObjectsPanel,
+  buildSpreadsheetCompatibilityReport,
+  spreadsheetCompatibilityDetail,
+  spreadsheetCompatibilityLabel,
+  spreadsheetCompatibilityStatusLabel,
+} from './interact/workbook-objects.js';
 export type { MountOptions, SpreadsheetInstance } from './mount.js';
 export { Spreadsheet } from './mount.js';
 export type { ErrorTriangleHit, ErrorTriangleKind } from './render/grid.js';

@@ -6,7 +6,7 @@
     padding: 2px 8px;
     border: 1px solid var(--fc-fmtdlg-input-border, transparent);
     border-radius: 6px;
-    background: var(--fc-fmtdlg-input-bg, #eeeeee);
+    background: var(--fc-fmtdlg-input-bg);
     color: var(--fc-fmtdlg-input-fg, inherit);
     font: inherit;
     outline: none;
@@ -15,13 +15,13 @@
   .fc-fmtdlg input[type="number"]:hover,
   .fc-fmtdlg select:hover,
   .fc-fmtdlg__textarea:hover {
-    border-color: var(--fc-fmtdlg-input-hover-border, #d3d3d3);
+    border-color: var(--fc-fmtdlg-input-hover-border);
   }
   .fc-fmtdlg input[type="text"]:focus,
   .fc-fmtdlg input[type="number"]:focus,
   .fc-fmtdlg select:focus {
-    border-color: var(--fc-fmtdlg-list-focus-border, #6f9878);
-    box-shadow: 0 0 0 2px var(--fc-accent-soft, rgba(33, 115, 70, 0.3));
+    border-color: var(--fc-fmtdlg-list-focus-border);
+    box-shadow: 0 0 0 2px var(--fc-accent-soft);
   }
 
   .fc-fmtdlg input[type="number"] {

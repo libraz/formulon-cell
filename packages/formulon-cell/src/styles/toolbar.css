@@ -5,6 +5,8 @@
 @import "./toolbar/base/layout.css";
 @import "./toolbar/base/backstage.css";
 @import "./toolbar/ribbon/layout-and-buttons.css";
-@import "./toolbar/ribbon/dropdowns-and-colors.css";
+@import "./toolbar/ribbon/dropdowns.css";
+@import "./toolbar/ribbon/color-controls.css";
+@import "./toolbar/ribbon/menus.css";
 @import "./toolbar/ribbon/groups.css";
 @import "./toolbar/panels.css";

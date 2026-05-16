@@ -39,7 +39,7 @@
     font-weight: 600;
     border-bottom: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
-    background: #f3f2f1;
+    background: var(--fc-bg-hover);
   }
   .fc-cfrulesdlg__body {
     padding: 12px 14px 14px;
@@ -51,12 +51,12 @@
   .fc-cfrulesdlg__note {
     margin: 0;
     font-size: 12px;
-    color: var(--fc-fg-soft, #555);
+    color: var(--fc-fg-mute);
   }
   .fc-cfrulesdlg__empty {
     padding: 24px;
     text-align: center;
-    color: var(--fc-fg-soft, #888);
+    color: var(--fc-fg-mute);
   }
   .fc-cfrulesdlg__tablewrap {
     overflow: auto;
@@ -69,13 +69,13 @@
   .fc-cfrulesdlg__table th,
   .fc-cfrulesdlg__table td {
     padding: 6px 8px;
-    border-bottom: 1px solid var(--fc-rule, #eee);
+    border-bottom: 1px solid var(--fc-rule);
     text-align: left;
     vertical-align: middle;
   }
   .fc-cfrulesdlg__table th {
     font-weight: 600;
-    color: var(--fc-fg-soft, #555);
+    color: var(--fc-fg-mute);
   }
   .fc-cfrulesdlg__table tbody tr[aria-selected="true"] {
     background: var(--fc-accent-soft, color-mix(in srgb, Highlight 14%, transparent));
@@ -94,14 +94,14 @@
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
     border-radius: 2px;
-    background: #ffffff;
+    background: var(--fc-bg-elev);
     color: inherit;
     cursor: pointer;
     font: inherit;
     font-size: 12px;
   }
   .fc-cfrulesdlg__remove:hover {
-    background: #faf9f8;
+    background: var(--fc-bg-rail);
     border-color: var(--fc-rule-strong, color-mix(in srgb, CanvasText 28%, transparent));
   }
   .fc-cfrulesdlg__footer {
@@ -110,7 +110,7 @@
     justify-content: space-between;
     border-top: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
-    background: #f3f2f1;
+    background: var(--fc-bg-hover);
   }
   .fc-cfrulesdlg__clearall,
   .fc-cfrulesdlg__close {
@@ -120,7 +120,7 @@
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
     border-radius: 2px;
-    background: #ffffff;
+    background: var(--fc-bg-elev);
     color: inherit;
     cursor: pointer;
     font: inherit;
@@ -128,7 +128,7 @@
   }
   .fc-cfrulesdlg__clearall:hover,
   .fc-cfrulesdlg__close:hover {
-    background: #faf9f8;
+    background: var(--fc-bg-rail);
     border-color: var(--fc-rule-strong, color-mix(in srgb, CanvasText 28%, transparent));
   }
   .fc-cfrulesdlg__clearall:focus-visible,

@@ -14,6 +14,7 @@
     --fc-bg: #ffffff;
     --fc-bg-elev: #ffffff;
     --fc-bg-rail: #f3f3f3;
+    --fc-bg-hover: #ffff00;
     --fc-bg-header: #ffeb3b;
 
     --fc-fg: #000000;
@@ -116,6 +117,21 @@
     --fc-fmtdlg-dial-dot-active: #0033cc;
     --fc-fmtdlg-dial-pointer: #0033cc;
     --fc-fmtdlg-dial-text: #000000;
+
+    /* Elevation — use the rule color (black) for hard, high-contrast edges. */
+    --fc-shadow-2: 0 0 0 1px #000000;
+    --fc-shadow-4: 0 0 0 2px #000000;
+    --fc-shadow-8: 0 0 0 2px #000000;
+    --fc-shadow-16: 0 0 0 3px #000000;
+
+    /* Bump hairlines to 2px in high contrast for WCAG-friendly rules. */
+    --fc-hairline: 2px;
+    --fc-rule-soft: #000000;
+    --fc-rule-subtle: #000000;
+    --fc-selection-fill: #ffff00;
+
+    --fc-fmtdlg-border-diag-color: #000000;
+    --fc-fmtdlg-border-diag-width: 2px;
 
     color-scheme: light;
   }

@@ -1,0 +1,197 @@
+/* Format Cells dialog — Font, Border, Fill and Protection tab content:
+   listboxes (family / style / size), font preview, row layout, textarea. */
+
+@layer fc.app {
+  .fc-fmtdlg__panel-tab[data-fc-tab="font"] {
+    display: grid;
+    grid-template-columns: 1.1fr 0.72fr 0.52fr;
+    grid-auto-rows: max-content;
+    gap: 8px 18px;
+    align-content: start;
+  }
+
+  .fc-fmtdlg__panel-tab[data-fc-tab="border"],
+  .fc-fmtdlg__panel-tab[data-fc-tab="fill"] {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows: max-content;
+    gap: 12px 24px;
+    align-content: start;
+  }
+
+  .fc-fmtdlg__panel-tab[data-fc-tab="protection"] .fc-fmtdlg__section {
+    min-height: 420px;
+  }
+  .fc-fmtdlg__row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 0;
+    min-height: 26px;
+  }
+  .fc-fmtdlg__row > span:first-child {
+    min-width: 124px;
+    color: var(--fc-fmtdlg-label-fg);
+    font-weight: 600;
+  }
+  .fc-fmtdlg__row[hidden] {
+    display: none;
+  }
+  .fc-fmtdlg__row--block {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .fc-fmtdlg__row--block > .fc-fmtdlg__btn {
+    align-self: flex-end;
+  }
+
+  .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__choice-grid {
+    grid-column: 1 / -1;
+    order: 20;
+    padding-top: 10px;
+    border-top: 1px solid var(--fc-fmtdlg-rule);
+  }
+
+  .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__row:has([data-fc-input="family"]) {
+    grid-column: 1;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__row:has(input[type="number"]) {
+    grid-column: 3;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__row:has([data-fc-color="font"]) {
+    grid-column: 2 / -1;
+  }
+
+  /* ── Font listbox (family / style / size) ──────────────────────────── */
+  .fc-fmtdlg__font-list {
+    min-height: 92px;
+    border: 1px solid var(--fc-fmtdlg-list-border);
+    background: var(--fc-fmtdlg-list-bg);
+    color: var(--fc-fmtdlg-list-fg, inherit);
+    overflow: hidden;
+    transition:
+      border-color 80ms ease,
+      box-shadow 80ms ease;
+  }
+  .fc-fmtdlg__font-list:focus-within {
+    border: 2px solid var(--fc-fmtdlg-list-focus-border);
+  }
+
+  .fc-fmtdlg__font-list--family {
+    grid-column: 1;
+  }
+
+  .fc-fmtdlg__font-list--style {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    margin-top: 45px;
+  }
+
+  .fc-fmtdlg__font-list--size {
+    grid-column: 3;
+    margin-top: -8px;
+  }
+
+  .fc-fmtdlg__font-list-item {
+    display: block;
+    width: 100%;
+    min-height: 17px;
+    padding: 1px 7px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+  }
+
+  .fc-fmtdlg__font-list-item:hover,
+  .fc-fmtdlg__font-list-item[aria-selected="true"] {
+    background: var(--fc-fmtdlg-list-selected-bg);
+    color: var(--fc-fmtdlg-list-selected-fg, inherit);
+  }
+
+  /* ── Font preview box ──────────────────────────────────────────────── */
+  .fc-fmtdlg__font-preview {
+    grid-column: 2 / -1;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--fc-fmtdlg-rule);
+  }
+
+  .fc-fmtdlg__font-preview-label {
+    font-weight: 600;
+  }
+
+  .fc-fmtdlg__font-preview-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 46px;
+    background: var(--fc-fmtdlg-preview-bg);
+    color: var(--fc-fmtdlg-preview-fg);
+    border: 1px solid var(--fc-fmtdlg-preview-border, transparent);
+    border-radius: 4px;
+  }
+
+  .fc-fmtdlg__font-preview-box::before,
+  .fc-fmtdlg__font-preview-box::after {
+    content: "";
+    width: 42px;
+    border-top: 1px solid currentColor;
+    margin: 0 24px;
+  }
+
+  .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__swatches {
+    grid-column: 1 / -1;
+    order: 21;
+    margin-left: 0;
+  }
+
+  /* ── Border / Fill grid placement ──────────────────────────────────── */
+  .fc-fmtdlg__panel-tab[data-fc-tab="border"] .fc-fmtdlg__row,
+  .fc-fmtdlg__panel-tab[data-fc-tab="fill"] .fc-fmtdlg__row {
+    min-height: 28px;
+  }
+
+  .fc-fmtdlg__panel-tab[data-fc-tab="border"] .fc-fmtdlg__line-gallery {
+    grid-column: 1;
+    grid-row: 1 / span 4;
+  }
+
+  .fc-fmtdlg__panel-tab[data-fc-tab="border"] .fc-fmtdlg__border-visual {
+    grid-column: 2;
+    grid-row: 4 / span 3;
+  }
+
+  /* ── Textarea (used by Protection note / comment) ──────────────────── */
+  .fc-fmtdlg__textarea {
+    width: 100%;
+    min-height: 60px;
+    resize: vertical;
+    padding: 6px 8px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 18%, transparent));
+    border-radius: 5px;
+    background: var(--fc-fmtdlg-input-bg);
+    color: var(--fc-fmtdlg-input-fg, inherit);
+    font: inherit;
+    outline: none;
+  }
+  .fc-fmtdlg__textarea:focus {
+    border-color: var(--fc-accent, currentColor);
+    box-shadow: 0 0 0 2px var(--fc-accent-soft, transparent);
+  }
+}

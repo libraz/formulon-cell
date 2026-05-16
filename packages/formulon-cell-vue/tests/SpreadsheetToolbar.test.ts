@@ -195,11 +195,9 @@ describe('Vue <SpreadsheetToolbar> ribbon command surface', () => {
     expect(source).toContain(
       'setWorkbookStructureProtected(inst.store, !isWorkbookStructureProtected(inst.store.getState()))',
     );
-    expect(source).toContain('summarizeSpreadsheetCompatibility(inst.workbook)');
-    expect(source).toContain('const objectsText = strings.value.workbookObjects');
-    expect(source).toContain('objectsText.compatibilityLabels.cellFormatting');
-    expect(source).toContain('objectsText.compatibilityDetails.cellFormatting');
-    expect(source).toContain('objectsText.sessionOnly');
+    expect(source).toContain(
+      'buildSpreadsheetCompatibilityReport(inst.workbook, strings.value.workbookObjects)',
+    );
     expect(source).toContain('strings.value.pageScale');
     expect(source).toContain('strings.value.viewToggle');
     expect(source).toContain('data-dropdown-name="textOrientation"');
@@ -224,11 +222,10 @@ describe('Vue <SpreadsheetToolbar> ribbon command surface', () => {
     expect(source).toContain("onCreateChart('pie')");
     expect(source).toContain("onCreateChart('scatter')");
     expect(source).toContain("onCreateChart('recommended')");
-    expect(source).toContain("action === 'recommended'");
-    expect(source).toContain('createSessionChart(');
-    expect(source).toContain('inst.store');
-    expect(source).toContain('range,');
-    expect(source).toContain('inst.history');
+    expect(source).toContain('createRibbonChartFromSelection({');
+    expect(source).toContain("idPrefix: 'vue-ribbon-chart'");
+    expect(source).toContain('store: inst.store');
+    expect(source).toContain('history: inst.history');
     expect(source).not.toContain(
       'data-ribbon-command="chartInsert" type="button" :disabled="disabled" @click="props.instance?.openQuickAnalysis()"',
     );
@@ -242,7 +239,6 @@ describe('Vue <SpreadsheetToolbar> ribbon command surface', () => {
     expect(source).toContain(':data-insert-action="MORE_SYMBOL_ACTION"');
     expect(source).toContain('window.prompt(cellText.value.symbolPrompt');
     expect(source).toContain('isCellWritable(inst.store.getState(), addr)');
-    expect(source).toContain('writableAddrs(inst.store.getState(), range)');
     expect(source).toContain('data-ribbon-command="dataValidation"');
     expect(source).toContain('data-dropdown-name="dataValidation"');
     expect(source).toContain("onDataValidationAction('settings')");
@@ -255,13 +251,14 @@ describe('Vue <SpreadsheetToolbar> ribbon command surface', () => {
     expect(source).toContain('data-ribbon-command="addIn"');
     expect(source).toContain("onAddInAction('my')");
     expect(source).toContain('cellText.addInGet');
-    expect(source).toContain('title: cellText.value.addInMy');
+    expect(source).toContain('buildRibbonAddInReport(action, {');
     expect(source).toContain('cellText.addInManage');
     expect(source).toContain('data-ribbon-command="pdf"');
     expect(source).toContain("onPdfAction('create')");
     expect(source).toContain("onPdfAction('share')");
     expect(source).toContain("onPdfAction('preferences')");
-    expect(source).toContain('cellText.value.pdfCreateReady');
+    expect(source).toContain('resolveRibbonPdfAction(action, {');
+    expect(source).toContain('cellMenu: cellText.value');
   });
 
   it('renders View > Window > Freeze Panes as an Excel-style menu', () => {
@@ -487,20 +484,12 @@ describe('Vue <SpreadsheetToolbar> ribbon command surface', () => {
     expect(source.match(/data-ribbon-command="clearFormat"/g)).toHaveLength(1);
     expect(source).toContain("onFillAction('down')");
     expect(source).toContain("onFillAction('flash')");
-    expect(source).toContain('inferFlashFillPattern(examples)');
-    expect(source).toContain('applyFlashFill(');
-    expect(source).toContain(
-      'isCellWritable(inst.store.getState(), { sheet: range.sheet, row, col: range.c0 })',
-    );
     expect(source).toContain("onFillAction('weekdays')");
     expect(source).toContain("onFillAction('months')");
-    expect(source).toContain('dateUnit: isDateSeries ? action : undefined');
-    expect(source).toContain('fillRange(inst.store.getState(), inst.workbook, src, range');
+    expect(source).toContain('executeRibbonFillAction({');
+    expect(source).toContain('action,');
     expect(source).toContain("onClearAction('contents')");
-    expect(source).toContain(
-      'clearValidationInRangeWithEngine(inst.store, inst.history, inst.workbook, range)',
-    );
-    expect(source).toContain('wrapFormat(clearVisualFormat)');
+    expect(source).toContain('executeRibbonClearAction({');
     expect(source).toContain("onSortMenuAction('dedupe')");
     expect(source).toContain("onSortMenuAction('filter-reapply')");
     expect(source).toContain("onSortMenuAction('filter-advanced')");
@@ -509,9 +498,9 @@ describe('Vue <SpreadsheetToolbar> ribbon command surface', () => {
     expect(source).toContain('listRange: formatA1Range(s.selection.range)');
     expect(source).toContain('copyTo:');
     expect(source).toContain('data-ribbon-command="removeDupes"');
-    expect(source).toContain('inst.history.begin()');
-    expect(source).toContain('inst.history.end()');
-    expect(source).toContain('ok = sortRange(s, inst.store, inst.workbook, range');
+    expect(source).toContain('sortActiveColumnAuto({');
+    expect(source).toContain('sortRangeWithHistory({');
+    expect(source).toContain('range: inst.store.getState().selection.range');
     expect(source).toContain(
       'const removeDuplicatesDialog = ref<RemoveDuplicatesDialogDraft | null>(null)',
     );
@@ -536,19 +525,14 @@ describe('Vue <SpreadsheetToolbar> ribbon command surface', () => {
     expect(source).toContain("onFindAction('text')");
     expect(source).toContain("onFindAction('errors')");
     expect(source).toContain("onFindAction('data-validation')");
-    expect(source).toContain("inst.openFindReplace('replace')");
-    expect(source).toContain("action === 'go-to') inst.openGoTo()");
-    expect(source).toContain("action === 'go-to-special') inst.openGoToSpecial()");
-    expect(source).toContain("'numbers'");
-    expect(source).toContain("'text'");
-    expect(source).toContain("'errors'");
-    expect(source).toContain("findMatchingCells(inst.workbook, inst.store, 'sheet', kind)");
-    expect(source).toContain('label: cellText.value.findNoMatches');
-    expect(source).toContain('label: cellText.value.commentNone');
-    expect(source).toContain('selectionFromMatches(matches)');
+    expect(source).toContain('executeRibbonFindAction({');
+    expect(source).toContain('inst.openFindReplace(result.mode)');
+    expect(source).toContain('inst.openGoTo()');
+    expect(source).toContain('inst.openGoToSpecial()');
+    expect(source).toContain('findNoMatches: cellText.value.findNoMatches');
+    expect(source).toContain('commentNone: cellText.value.commentNone');
     expect(source).not.toContain("action === 'conditional-format') inst.openCfRulesDialog()");
-    expect(source).toContain('const comments = listComments(inst.store.getState())');
-    expect(source).toContain('selectionFromMatches(comments.map((entry) => entry.addr))');
+    expect(source).toContain('listComments(state)');
     expect(source).toContain('data-dropdown-name="deleteCommentReview"');
     expect(source).toContain("onCommentAction('delete-active')");
     expect(source).toContain("onCommentAction('delete-all')");

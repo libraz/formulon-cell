@@ -1,7 +1,10 @@
 import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
+import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import { applyFlashFill, inferFlashFillPattern } from './flash-fill.js';
+import { type History, recordFormatChange } from './history.js';
+import { isCellWritable } from './protection.js';
 import { shiftFormulaRefs } from './refs.js';
 
 /**
@@ -614,3 +617,113 @@ export function fillDestFor(src: Range, target: { row: number; col: number }): R
     ? { sheet: src.sheet, r0: src.r0, c0: src.c0, r1: src.r1, c1: target.col }
     : { sheet: src.sheet, r0: src.r0, c0: target.col, r1: src.r1, c1: src.c1 };
 }
+
+export type RibbonFillAction =
+  | 'down'
+  | 'right'
+  | 'up'
+  | 'left'
+  | 'flash'
+  | 'series'
+  | 'days'
+  | 'weekdays'
+  | 'months'
+  | 'years';
+
+export interface ExecuteRibbonFillActionDeps {
+  store: SpreadsheetStore;
+  workbook: WorkbookHandle;
+  history: History;
+  action: RibbonFillAction;
+}
+
+const cellValueAsText = (value: ReturnType<WorkbookHandle['getValue']>): string => {
+  if (value.kind === 'text') return value.value;
+  if (value.kind === 'number') return String(value.value);
+  if (value.kind === 'bool') return String(value.value);
+  return '';
+};
+
+const executeRibbonFlashFill = (
+  store: SpreadsheetStore,
+  workbook: WorkbookHandle,
+  history: History,
+  range: Range,
+): boolean => {
+  if (range.c0 !== range.c1 || range.c0 === 0) return false;
+  const examples: { input: string; output: string }[] = [];
+  const pending: { row: number; input: string }[] = [];
+  for (let row = range.r0; row <= range.r1; row += 1) {
+    const inputValue = workbook.getValue({ sheet: range.sheet, row, col: range.c0 - 1 });
+    const outputValue = workbook.getValue({ sheet: range.sheet, row, col: range.c0 });
+    const input = cellValueAsText(inputValue);
+    if (input.length === 0) continue;
+    if (outputValue.kind === 'text' && outputValue.value.length > 0) {
+      examples.push({ input, output: outputValue.value });
+    } else if (
+      outputValue.kind === 'blank' &&
+      isCellWritable(store.getState(), { sheet: range.sheet, row, col: range.c0 })
+    ) {
+      pending.push({ row, input });
+    }
+  }
+  const pattern = inferFlashFillPattern(examples);
+  if (!pattern || pending.length === 0) return false;
+  const filled = applyFlashFill(
+    pattern,
+    pending.map((entry) => entry.input),
+  );
+  history.begin();
+  try {
+    pending.forEach((entry, index) => {
+      const value = filled[index];
+      if (value != null)
+        workbook.setText({ sheet: range.sheet, row: entry.row, col: range.c0 }, value);
+    });
+  } finally {
+    history.end();
+  }
+  mutators.replaceCells(store, workbook.cells(range.sheet));
+  return true;
+};
+
+const DATE_SERIES_ACTIONS = new Set(['days', 'weekdays', 'months', 'years']);
+
+/** Shared "Fill" ribbon split-button action. Covers flash-fill, directional
+ *  copy (down/right/up/left), series, and date-series variants. Returns
+ *  whether anything actually changed so hosts can short-circuit dropdown
+ *  closure or status updates. */
+export const executeRibbonFillAction = (deps: ExecuteRibbonFillActionDeps): boolean => {
+  const { store, workbook, history, action } = deps;
+  const range = store.getState().selection.range;
+  if (action === 'flash') return executeRibbonFlashFill(store, workbook, history, range);
+
+  const direction: 'down' | 'right' | 'up' | 'left' =
+    action === 'down' || action === 'right' || action === 'up' || action === 'left'
+      ? action
+      : 'down';
+  let src = range;
+  if (direction === 'down') src = { ...range, r1: range.r0 };
+  else if (direction === 'up') src = { ...range, r0: range.r1 };
+  else if (direction === 'right') src = { ...range, c1: range.c0 };
+  else src = { ...range, c0: range.c1 };
+  if (src.r0 === range.r0 && src.r1 === range.r1 && src.c0 === range.c0 && src.c1 === range.c1)
+    return false;
+
+  const isDateSeries = DATE_SERIES_ACTIONS.has(action);
+  history.begin();
+  try {
+    recordFormatChange(history, store, () => {
+      fillRange(store.getState(), workbook, src, range, {
+        copyOnly: action === 'series' || isDateSeries ? false : undefined,
+        dateUnit: isDateSeries ? (action as 'days' | 'weekdays' | 'months' | 'years') : undefined,
+        formatting: 'with',
+        store,
+      });
+    });
+  } finally {
+    history.end();
+  }
+  mutators.replaceCells(store, workbook.cells(range.sheet));
+  return true;
+};

@@ -5,11 +5,11 @@
     width: 22px;
     height: 22px;
     padding: 0;
-    border: 1px solid #8a8886;
+    border: 1px solid var(--fc-rule-strong);
     border-radius: 2px;
-    background: #ffffff;
-    color: #107c41;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+    background: var(--fc-bg-elev);
+    color: var(--fc-accent);
+    box-shadow: var(--fc-shadow-2);
     cursor: pointer;
   }
 
@@ -35,7 +35,7 @@
 
   .fc-quick__button:hover,
   .fc-quick__button:focus-visible {
-    border-color: #107c41;
+    border-color: var(--fc-accent);
     outline: none;
   }
 
@@ -94,13 +94,13 @@
   }
 
   .fc-quick__tab[aria-selected="true"] {
-    border-bottom-color: #107c41;
+    border-bottom-color: var(--fc-accent);
     color: var(--fc-fg, CanvasText);
   }
 
   .fc-quick__tab:hover,
   .fc-quick__tab:focus-visible {
-    background: color-mix(in srgb, #107c41 10%, Canvas);
+    background: color-mix(in srgb, var(--fc-accent) 10%, Canvas);
     outline: none;
   }
 

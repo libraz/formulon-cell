@@ -32,6 +32,58 @@ function defaultChartId(range: Range, kind: SessionChartKind): string {
   return `chart-${range.sheet}-${range.r0}-${range.c0}-${range.r1}-${range.c1}-${kind}`;
 }
 
+export type RibbonChartAction = SessionChartKind | 'recommended';
+
+/** Pick a chart kind that fits the selection's shape. One-row selections
+ *  default to lines, one-column to bars, narrow categorical lookups to pies,
+ *  and everything else to columns. The same rule of thumb is used by every
+ *  host (React/Vue/playground) so the "Recommended" toolbar entry feels
+ *  identical regardless of framework. */
+export function inferRecommendedChartKind(range: Range): SessionChartKind {
+  if (range.r0 === range.r1 && range.c1 - range.c0 >= 2) return 'line';
+  if (range.c0 === range.c1 && range.r1 - range.r0 >= 2) return 'bar';
+  if (range.c1 - range.c0 === 1 && range.r1 - range.r0 <= 6) return 'pie';
+  return 'column';
+}
+
+export interface CreateRibbonChartFromSelectionOptions {
+  store: SpreadsheetStore;
+  range: Range;
+  /** Chart kind or `'recommended'` to auto-pick via [[inferRecommendedChartKind]]. */
+  action: RibbonChartAction;
+  history?: History | null;
+  /** Prefix used to derive the chart id, so different hosts can spawn parallel
+   *  overlays without colliding. Defaults to `'ribbon-chart'`. */
+  idPrefix?: string;
+}
+
+/** Spawn a session chart overlay anchored to the current selection using the
+ *  same positioning heuristics every ribbon host shares. */
+export function createRibbonChartFromSelection({
+  store,
+  range,
+  action,
+  history = null,
+  idPrefix = 'ribbon-chart',
+}: CreateRibbonChartFromSelectionOptions): SessionChart | null {
+  const kind = action === 'recommended' ? inferRecommendedChartKind(range) : action;
+  const count = store.getState().charts.charts.length;
+  return createSessionChart(
+    store,
+    range,
+    {
+      id: `${idPrefix}-${range.sheet}-${range.r0}-${range.c0}-${range.r1}-${range.c1}-${kind}-${count}`,
+      kind,
+      title: null,
+      x: 340 + (count % 3) * 24,
+      y: 96 + (count % 3) * 24,
+      w: 360,
+      h: 220,
+    },
+    history,
+  );
+}
+
 function defaultTitle(kind: SessionChartKind): string {
   if (kind === 'bar') return 'Bar chart';
   if (kind === 'line') return 'Line chart';

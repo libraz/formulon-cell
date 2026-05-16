@@ -22,8 +22,8 @@
   .fc-goto__reference input {
     min-height: 28px;
     padding: 3px 6px;
-    color: var(--fc-input-fg, CanvasText);
-    background: var(--fc-input-bg, Canvas);
+    color: var(--fc-fg, CanvasText);
+    background: var(--fc-bg, Canvas);
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
     border-radius: var(--fc-radius-sm, 4px);
@@ -86,7 +86,7 @@
     font-style: italic;
   }
   .fc-goto__status:not(:empty) {
-    color: var(--fc-error, #c53030);
+    color: var(--fc-cell-error-fg);
     font-style: normal;
   }
 }

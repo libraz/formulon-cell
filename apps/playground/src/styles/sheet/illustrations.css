@@ -42,7 +42,7 @@
 }
 
 .app-illustration[aria-selected="true"] {
-  outline: 2px solid #217346;
+  outline: 2px solid var(--shell-accent);
   outline-offset: 2px;
 }
 
@@ -59,7 +59,7 @@
   width: 10px;
   height: 10px;
   box-sizing: border-box;
-  border: 1px solid #217346;
+  border: 1px solid var(--shell-accent);
   background: #fff;
   cursor: nwse-resize;
   pointer-events: auto;
@@ -137,6 +137,6 @@
   top: 42px;
   width: 84px;
   height: 54px;
-  border: 2px solid #217346;
-  background: rgba(33, 115, 70, 0.08);
+  border: 2px solid var(--shell-accent);
+  background: color-mix(in srgb, var(--shell-accent) 8%, transparent);
 }

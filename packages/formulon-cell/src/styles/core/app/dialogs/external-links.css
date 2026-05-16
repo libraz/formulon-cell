@@ -39,7 +39,7 @@
     font-weight: 600;
     border-bottom: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
-    background: #f3f2f1;
+    background: var(--fc-bg-hover);
   }
   .fc-extlinkdlg__body {
     padding: 12px 14px 14px;
@@ -51,12 +51,12 @@
   .fc-extlinkdlg__note {
     margin: 0;
     font-size: 12px;
-    color: var(--fc-fg-soft, #555);
+    color: var(--fc-fg-mute);
   }
   .fc-extlinkdlg__empty {
     padding: 24px;
     text-align: center;
-    color: var(--fc-fg-soft, #888);
+    color: var(--fc-fg-mute);
   }
   .fc-extlinkdlg__tablewrap {
     overflow: auto;
@@ -69,13 +69,13 @@
   .fc-extlinkdlg__table th,
   .fc-extlinkdlg__table td {
     padding: 6px 8px;
-    border-bottom: 1px solid var(--fc-rule, #eee);
+    border-bottom: 1px solid var(--fc-rule);
     text-align: left;
     vertical-align: top;
   }
   .fc-extlinkdlg__table th {
     font-weight: 600;
-    color: var(--fc-fg-soft, #555);
+    color: var(--fc-fg-mute);
   }
   .fc-extlinkdlg__table tbody tr[aria-selected="true"] {
     background: var(--fc-accent-soft, color-mix(in srgb, Highlight 14%, transparent));
@@ -94,7 +94,7 @@
     justify-content: flex-end;
     border-top: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
-    background: #f3f2f1;
+    background: var(--fc-bg-hover);
   }
   .fc-extlinkdlg__close {
     min-width: 78px;
@@ -103,14 +103,14 @@
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
     border-radius: 2px;
-    background: #ffffff;
+    background: var(--fc-bg-elev);
     color: inherit;
     cursor: pointer;
     font: inherit;
     font-size: 12px;
   }
   .fc-extlinkdlg__close:hover {
-    background: #faf9f8;
+    background: var(--fc-bg-rail);
     border-color: var(--fc-rule-strong, color-mix(in srgb, CanvasText 28%, transparent));
   }
   .fc-extlinkdlg__close:focus-visible {

@@ -1,108 +1,7 @@
+/* Find & Replace panel — anchored under the formula bar, holds the
+   tabbed Find / Replace form plus a results table with row selection. */
+
 @layer fc.app {
-  .fc-sheetmenu {
-    position: fixed;
-    z-index: var(--fc-z-popover, 2147483040);
-    /* Survive host ancestors that set pointer-events:none. */
-    pointer-events: auto;
-    min-width: 176px;
-    padding: 4px;
-    background: var(--fc-bg-elev, Canvas);
-    color: var(--fc-fg, CanvasText);
-    border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
-    border-radius: 4px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
-    font-family: var(--fc-font-ui, system-ui);
-    font-size: 12.5px;
-    line-height: 1.4;
-  }
-
-  .fc-sheetmenu[hidden] {
-    display: none;
-  }
-
-  .fc-sheetmenu__item {
-    display: flex;
-    width: 100%;
-    min-height: 28px;
-    align-items: center;
-    padding: 5px 10px;
-    border: 0;
-    border-radius: 2px;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .fc-sheetmenu__item:hover:not(:disabled),
-  .fc-sheetmenu__item:focus-visible:not(:disabled) {
-    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 8%, transparent));
-    outline: 0;
-  }
-
-  .fc-sheetmenu__item:disabled {
-    opacity: 0.45;
-    cursor: default;
-  }
-
-  .fc-sheetmenu__sep {
-    height: 1px;
-    margin: 4px 6px;
-    background: var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
-  }
-
-  .fc-sheetmenu__colors {
-    padding: 5px 8px 7px;
-  }
-
-  .fc-sheetmenu__colors-label {
-    margin-bottom: 6px;
-    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 72%, transparent));
-    font-size: 11.5px;
-  }
-
-  .fc-sheetmenu__swatches {
-    display: grid;
-    grid-template-columns: repeat(5, 20px);
-    gap: 5px;
-  }
-
-  .fc-sheetmenu__swatch {
-    position: relative;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 18%, transparent));
-    border-radius: 2px;
-    background: var(--fc-sheet-tab-color);
-    cursor: pointer;
-  }
-
-  .fc-sheetmenu__swatch--none {
-    background:
-      linear-gradient(135deg, transparent 44%, #c00000 46%, #c00000 54%, transparent 56%),
-      var(--fc-bg, Canvas);
-  }
-
-  .fc-sheetmenu__swatch:hover,
-  .fc-sheetmenu__swatch:focus-visible {
-    border-color: var(--fc-accent, currentColor);
-    box-shadow: 0 0 0 2px var(--fc-accent-soft, transparent);
-    outline: 0;
-  }
-
-  .fc-sheetmenu__swatch[aria-checked="true"]::after {
-    position: absolute;
-    inset: -4px;
-    border: 2px solid var(--fc-accent, currentColor);
-    border-radius: 4px;
-    content: "";
-    pointer-events: none;
-  }
-
   .fc-find {
     position: absolute;
     top: 54px;
@@ -135,6 +34,7 @@
     display: none !important;
   }
 
+  /* ── Header (title bar + tab strip) ──────────────────────────────── */
   .fc-find__titlebar {
     display: flex;
     min-height: 30px;
@@ -172,6 +72,7 @@
     font-weight: 600;
   }
 
+  /* ── Form fields ─────────────────────────────────────────────────── */
   .fc-find__form {
     display: grid;
     gap: 7px;
@@ -257,6 +158,7 @@
     align-self: start;
   }
 
+  /* ── Results table ───────────────────────────────────────────────── */
   .fc-find__results {
     min-height: 118px;
     max-height: 190px;
@@ -318,6 +220,7 @@
     background: Canvas;
   }
 
+  /* ── Footer buttons ──────────────────────────────────────────────── */
   .fc-find__footer {
     display: flex;
     flex-wrap: wrap;
@@ -371,6 +274,7 @@
     min-width: 82px;
   }
 
+  /* ── Narrow viewport collapse ────────────────────────────────────── */
   @media (max-width: 560px) {
     .fc-find {
       top: 48px;

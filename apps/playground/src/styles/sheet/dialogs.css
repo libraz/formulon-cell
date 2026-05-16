@@ -60,10 +60,10 @@
 .app__dlg__error {
   margin-top: 8px;
   padding: 6px 8px;
-  background: rgba(196, 49, 75, 0.08);
-  border: 1px solid rgba(196, 49, 75, 0.4);
+  background: var(--shell-danger-soft);
+  border: 1px solid var(--shell-danger-soft-border);
   border-radius: 2px;
-  color: #a4262c;
+  color: var(--shell-danger-strong);
   font-size: 12px;
 }
 .app__dlg__body--message {
@@ -96,11 +96,11 @@
   filter: none;
 }
 .app__dlg__btn--danger {
-  background: #c4314b !important;
-  border-color: #c4314b !important;
-  color: #ffffff !important;
+  background: var(--shell-danger) !important;
+  border-color: var(--shell-danger) !important;
+  color: var(--shell-danger-fg) !important;
 }
 .app__dlg__btn--danger:hover {
-  background: #a4262c !important;
-  border-color: #a4262c !important;
+  background: var(--shell-danger-strong) !important;
+  border-color: var(--shell-danger-strong) !important;
 }

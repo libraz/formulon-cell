@@ -1,0 +1,193 @@
+/* Demo modal dialogs (built-in Workbook menu actions like Sort, Report, …).
+   Differs from the format dialog: smaller frame, no tab strip, no scrollbar
+   in the header. */
+
+.demo__modal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--fc-z-dialog, 2147483020);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.demo__modal-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(560px, 100%);
+  max-height: min(620px, calc(100vh - 48px));
+  overflow: hidden;
+  color: var(--demo-fg);
+  background: var(--demo-card);
+  border: 1px solid var(--demo-line);
+  border-radius: 4px;
+  box-shadow: var(--fc-shadow-16);
+  font: 13px / 1.35 var(--demo-font);
+}
+
+.demo__modal-panel--narrow {
+  width: min(420px, 100%);
+}
+
+.demo__modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 0 12px 0 16px;
+  border-bottom: 1px solid var(--demo-line);
+}
+
+.demo__modal-header h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.demo__modal-x {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: var(--demo-fg);
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.demo__modal-x:hover {
+  background: var(--demo-ribbon-hover);
+}
+
+.demo__modal-body {
+  overflow: auto;
+  padding: 16px;
+}
+
+.demo__modal-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.demo__modal-list li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--demo-bg);
+  border: 1px solid var(--demo-line);
+  border-radius: 3px;
+}
+
+.demo__modal-list strong {
+  font-size: 12px;
+}
+
+.demo__modal-list span,
+.demo__modal-empty,
+.demo__modal-error {
+  color: var(--demo-fg-soft);
+}
+
+.demo__modal-empty,
+.demo__modal-error {
+  margin: 0;
+}
+
+.demo__modal-error {
+  color: var(--demo-error);
+}
+
+.demo__modal-field {
+  display: grid;
+  gap: 6px;
+}
+
+.demo__modal-field span {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.demo__modal-field legend {
+  margin-bottom: 6px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.demo__modal-field input,
+.demo__modal-field select {
+  height: 30px;
+  padding: 0 8px;
+  color: var(--demo-fg);
+  background: var(--demo-input-bg);
+  border: 1px solid var(--demo-ribbon-line);
+  border-radius: 2px;
+  font: inherit;
+}
+
+.demo__modal-field input:focus,
+.demo__modal-field select:focus {
+  outline: 2px solid var(--demo-accent);
+  outline-offset: 1px;
+}
+
+.demo__modal-note {
+  margin: 0;
+  font-size: 13px;
+}
+
+.demo__modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.demo__report-list {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.demo__report-item {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  background: var(--demo-panel-bg);
+  border: 1px solid var(--demo-ribbon-line);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.demo__sort-dialog {
+  display: grid;
+  gap: 12px;
+}
+
+.demo__sort-dialog__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.demo__btn--primary {
+  color: var(--demo-title-fg);
+  background: var(--demo-accent);
+  border-color: var(--demo-accent);
+}
+
+.demo__modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--demo-line);
+}

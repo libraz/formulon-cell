@@ -1,6 +1,4 @@
 import { type History, recordConditionalRulesChange } from '../commands/history.js';
-import { parseRangeRef } from '../engine/range-resolver.js';
-import type { Range } from '../engine/types.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
   type CellFormat,
@@ -10,6 +8,16 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../store/store.js';
+import {
+  type AverageMode,
+  type CellValueOp,
+  type DatePeriod,
+  type FormatPreset,
+  formatPresetPatch,
+  formatRange,
+  parseRange,
+  type RuleKind,
+} from './conditional-dialog-spec.js';
 import { createDialogShell } from './dialog-shell.js';
 
 export interface ConditionalDialogDeps {
@@ -35,53 +43,6 @@ export interface ConditionalDialogHandle {
   close(): void;
   detach(): void;
 }
-
-type RuleKind = ConditionalRule['kind'];
-type CellValueOp = '>' | '<' | '>=' | '<=' | '=' | '<>' | 'between' | 'not-between';
-type DatePeriod = Extract<ConditionalRule, { kind: 'date-occurring' }>['period'];
-type AverageMode = Extract<ConditionalRule, { kind: 'average' }>['mode'];
-type FormatPreset = 'red-fill' | 'yellow-fill' | 'green-fill' | 'red-text' | 'plain';
-
-const formatPresetPatch = (preset: FormatPreset): Partial<CellFormat> => {
-  switch (preset) {
-    case 'red-fill':
-      return { color: '#9c0006', fill: '#ffc7ce' };
-    case 'yellow-fill':
-      return { color: '#9c6500', fill: '#ffeb9c' };
-    case 'green-fill':
-      return { color: '#006100', fill: '#c6efce' };
-    case 'red-text':
-      return { color: '#c00000' };
-    case 'plain':
-      return {};
-  }
-};
-
-const colLetters = (col: number): string => {
-  let n = col;
-  let s = '';
-  while (true) {
-    s = String.fromCharCode(65 + (n % 26)) + s;
-    n = Math.floor(n / 26) - 1;
-    if (n < 0) break;
-  }
-  return s;
-};
-
-const formatRange = (r: Range): string =>
-  `${colLetters(r.c0)}${r.r0 + 1}:${colLetters(r.c1)}${r.r1 + 1}`;
-
-const parseRange = (raw: string, fallback: Range): Range => {
-  const parsed = parseRangeRef(raw);
-  if (!parsed || parsed.sheetName != null) return fallback;
-  return {
-    sheet: fallback.sheet,
-    r0: parsed.r0,
-    c0: parsed.c0,
-    r1: parsed.r1,
-    c1: parsed.c1,
-  };
-};
 
 /**
  * Manage conditional formatting rules: list / add / remove.

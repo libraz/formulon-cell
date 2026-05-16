@@ -1,7 +1,9 @@
 import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
+import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import { inferAutoFilterRange } from './filter.js';
+import type { History } from './history.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
 /** Spreadsheet parity: refuse to sort when the range intersects any merge —
@@ -379,3 +381,56 @@ export function removeDuplicates(
   wb.recalc();
   return range.r1 - range.r0 + 1 - snaps.length;
 }
+
+export interface SortRangeWithHistoryDeps {
+  store: SpreadsheetStore;
+  workbook: WorkbookHandle;
+  history: History;
+  range: Range;
+  options: SortOptions;
+}
+
+/** Wrap [[sortRange]] in a history transaction and refresh the affected
+ *  sheet's cells when anything actually moved. Returns whether the sort
+ *  changed any data, so callers can short-circuit follow-up side effects. */
+export const sortRangeWithHistory = (deps: SortRangeWithHistoryDeps): boolean => {
+  const { store, workbook, history, range, options } = deps;
+  const state = store.getState();
+  history.begin();
+  let ok = false;
+  try {
+    ok = sortRange(state, store, workbook, range, options);
+  } finally {
+    history.end();
+  }
+  if (ok) mutators.replaceCells(store, workbook.cells(state.data.sheetIndex));
+  return ok;
+};
+
+export interface SortActiveColumnAutoOptions {
+  store: SpreadsheetStore;
+  workbook: WorkbookHandle;
+  history: History;
+  direction: SortDirection;
+}
+
+/** "Sort A→Z / Z→A" toolbar action. Auto-detects the contiguous range around
+ *  the selection, picks header behavior automatically, sorts by the active
+ *  cell's column, and refreshes the sheet cells. Returns whether anything
+ *  actually changed so the host can skip side effects on a no-op. */
+export const sortActiveColumnAuto = (deps: SortActiveColumnAutoOptions): boolean => {
+  const { store, workbook, history, direction } = deps;
+  const state = store.getState();
+  const range = inferAutoFilterRange(state);
+  return sortRangeWithHistory({
+    store,
+    workbook,
+    history,
+    range,
+    options: {
+      byCol: state.selection.active.col,
+      direction,
+      hasHeader: inferSortHasHeader(state, range),
+    },
+  });
+};

@@ -4,12 +4,30 @@ import { describe, expect, it } from 'vitest';
 import { buildRibbonModel } from '../../../src/toolbar/ribbon-model.js';
 
 const playgroundMainSource = (): string => {
-  const sourcePath = [
-    resolve(process.cwd(), '../../apps/playground/src/main.ts'),
-    resolve(process.cwd(), 'apps/playground/src/main.ts'),
-  ].find((candidate) => existsSync(candidate));
-  expect(sourcePath).toBeTruthy();
-  return readFileSync(sourcePath!, 'utf8');
+  // The Cells menu DOM has been extracted to apps/playground/src/ribbon/menus/
+  // factories (home.ts, insert.ts, ...). To keep these source-scrape checks
+  // pointing at the playground surface, concatenate main.ts with every menu
+  // factory module so the assertions match regardless of which file actually
+  // owns a given menuButton/case.
+  const roots = [resolve(process.cwd(), '../../'), resolve(process.cwd())];
+  const playgroundRoot = roots.find((r) => existsSync(`${r}/apps/playground/src/main.ts`));
+  expect(playgroundRoot).toBeTruthy();
+  const root = playgroundRoot!;
+  const files = [
+    `${root}/apps/playground/src/main.ts`,
+    `${root}/apps/playground/src/ribbon/menus/borders.ts`,
+    `${root}/apps/playground/src/ribbon/menus/conditional.ts`,
+    `${root}/apps/playground/src/ribbon/menus/general.ts`,
+    `${root}/apps/playground/src/ribbon/menus/home.ts`,
+    `${root}/apps/playground/src/ribbon/menus/insert.ts`,
+    `${root}/apps/playground/src/ribbon/menus/page-layout.ts`,
+    `${root}/apps/playground/src/ribbon/menus/formulas.ts`,
+    `${root}/apps/playground/src/ribbon/menus/paste.ts`,
+    `${root}/apps/playground/src/ribbon/menus/review.ts`,
+    `${root}/apps/playground/src/ribbon/menus/styles.ts`,
+    `${root}/apps/playground/src/ribbon/menus/text-orientation.ts`,
+  ].filter((path) => existsSync(path));
+  return files.map((path) => readFileSync(path, 'utf8')).join('\n');
 };
 
 const extractSwitchCases = (source: string, functionName: string): Set<string> => {
@@ -93,13 +111,17 @@ describe('playground ribbon command surface', () => {
     expect(source).toContain("menuButton(t.insertShiftDown, 'cellInsert', 'shift-down')");
     expect(source).toContain("menuButton(t.insertShiftRight, 'cellInsert', 'shift-right')");
     expect(source).toContain("menuButton(sheetTabs.insertSheet, 'cellInsert', 'sheet')");
-    expect(source).toContain("insertCells(i.store, i.workbook, i.history, range, action === 'shift-down' ? 'down' : 'right')");
+    expect(source).toContain(
+      "insertCells(i.store, i.workbook, i.history, range, action === 'shift-down' ? 'down' : 'right')",
+    );
     expect(source).toContain('const added = addSheet(i.store, i.workbook, i.history);');
 
     expect(source).toContain("menuButton(t.deleteShiftUp, 'cellDelete', 'shift-up')");
     expect(source).toContain("menuButton(t.deleteShiftLeft, 'cellDelete', 'shift-left')");
     expect(source).toContain("menuButton(sheetTabs.deleteSheet, 'cellDelete', 'sheet')");
-    expect(source).toContain("deleteCells(i.store, i.workbook, i.history, range, action === 'shift-up' ? 'up' : 'left')");
+    expect(source).toContain(
+      "deleteCells(i.store, i.workbook, i.history, range, action === 'shift-up' ? 'up' : 'left')",
+    );
     expect(source).toContain('removeSheet(i.store, i.workbook, before)');
   });
 
@@ -110,7 +132,9 @@ describe('playground ribbon command surface', () => {
     expect(source).toContain("menuButton(sheetTabs.moveRight, 'cellFormat', 'move-sheet-right')");
     expect(source).toContain("menuButton(sheetTabs.hideSheet, 'cellFormat', 'hide-sheet')");
     expect(source).toContain("menuButton(sheetTabs.unhideSheet, 'cellFormat', 'unhide-sheet')");
-    expect(source).toContain("menuButton(`${sheetTabs.tabColor}: ${sheetTabs.noColor}`, 'cellFormat', 'tab-color-none')");
+    expect(source).toContain(
+      "menuButton(`${sheetTabs.tabColor}: ${sheetTabs.noColor}`, 'cellFormat', 'tab-color-none')",
+    );
     expect(source).toContain('renameSheet(i.workbook, sheet, name.trim(), i.store, i.history)');
     expect(source).toContain('moveSheet(i.store, i.workbook, sheet, target, i.history)');
     expect(source).toContain('setSheetHidden(i.store, i.workbook, i.history, sheet, true)');

@@ -10,12 +10,12 @@
        2px Excel-365 green ring around the active listbox. */
     border: 2px solid var(--fc-fmtdlg-list-border, transparent);
     border-radius: 2px;
-    background: var(--fc-fmtdlg-list-bg, #ffffff);
+    background: var(--fc-fmtdlg-list-bg);
     color: var(--fc-fmtdlg-list-fg, inherit);
     transition: border-color 80ms ease;
   }
   .fc-fmtdlg__cat:focus-within {
-    border-color: var(--fc-fmtdlg-list-focus-border, #1f5f31);
+    border-color: var(--fc-fmtdlg-list-focus-border);
   }
   .fc-fmtdlg__number-layout {
     display: grid;
@@ -36,11 +36,11 @@
     font-size: 12px;
   }
   .fc-fmtdlg__cat-item:hover {
-    background: var(--fc-fmtdlg-list-hover-bg, #e7efe9);
+    background: var(--fc-fmtdlg-list-hover-bg);
   }
   .fc-fmtdlg__cat-item[aria-selected="true"] {
-    background: var(--fc-fmtdlg-cat-selected-bg, #1f5f31);
-    color: var(--fc-fmtdlg-cat-selected-fg, #ffffff);
+    background: var(--fc-fmtdlg-cat-selected-bg);
+    color: var(--fc-fmtdlg-cat-selected-fg);
   }
   .fc-fmtdlg__cat-controls {
     flex: 1;
@@ -62,7 +62,7 @@
   }
   .fc-fmtdlg__number-desc {
     margin: 0;
-    color: var(--fc-fmtdlg-hint-fg, #222222);
+    color: var(--fc-fmtdlg-hint-fg);
     font-size: 12px;
   }
 
@@ -81,13 +81,13 @@
     min-height: 124px;
     padding: 2px 0;
     border: 2px solid var(--fc-fmtdlg-list-border, transparent);
-    background: var(--fc-fmtdlg-list-bg, #ffffff);
+    background: var(--fc-fmtdlg-list-bg);
     color: var(--fc-fmtdlg-list-fg, inherit);
     overflow: hidden;
     transition: border-color 80ms ease;
   }
   .fc-fmtdlg__negative-list:focus-within {
-    border-color: var(--fc-fmtdlg-list-focus-border, #1f5f31);
+    border-color: var(--fc-fmtdlg-list-focus-border);
   }
 
   .fc-fmtdlg__negative-item {
@@ -110,11 +110,11 @@
   }
 
   .fc-fmtdlg__negative-item:hover {
-    background: var(--fc-fmtdlg-list-hover-bg, #f1f7f3);
+    background: var(--fc-fmtdlg-list-hover-bg);
   }
 
   .fc-fmtdlg__negative-item[aria-selected="true"] {
-    background: var(--fc-fmtdlg-list-selected-bg, #b7d5bd);
+    background: var(--fc-fmtdlg-list-selected-bg);
   }
 
   .fc-fmtdlg__negative-item[aria-selected="true"]::after {
@@ -124,7 +124,7 @@
     right: 0;
     width: 3px;
     height: 100%;
-    background: var(--fc-fmtdlg-list-selected-bar, #1f5f31);
+    background: var(--fc-fmtdlg-list-selected-bar);
   }
 
   .fc-fmtdlg__pattern-list-wrap {
@@ -138,7 +138,7 @@
   }
 
   .fc-fmtdlg__pattern-list-label {
-    color: var(--fc-fmtdlg-label-fg, #262626);
+    color: var(--fc-fmtdlg-label-fg);
     font-weight: 600;
   }
 
@@ -147,13 +147,13 @@
     max-height: 196px;
     padding: 2px 0;
     border: 2px solid var(--fc-fmtdlg-list-border, transparent);
-    background: var(--fc-fmtdlg-list-bg, #ffffff);
+    background: var(--fc-fmtdlg-list-bg);
     color: var(--fc-fmtdlg-list-fg, inherit);
     overflow: auto;
     transition: border-color 80ms ease;
   }
   .fc-fmtdlg__pattern-list:focus-within {
-    border-color: var(--fc-fmtdlg-list-focus-border, #1f5f31);
+    border-color: var(--fc-fmtdlg-list-focus-border);
   }
 
   .fc-fmtdlg__pattern-item {
@@ -172,11 +172,11 @@
   }
 
   .fc-fmtdlg__pattern-item:hover {
-    background: var(--fc-fmtdlg-list-hover-bg, #f1f7f3);
+    background: var(--fc-fmtdlg-list-hover-bg);
   }
 
   .fc-fmtdlg__pattern-item[aria-selected="true"] {
-    background: var(--fc-fmtdlg-list-selected-bg, #d6d6d6);
+    background: var(--fc-fmtdlg-list-selected-bg);
     color: var(--fc-fmtdlg-list-selected-fg, inherit);
   }
 

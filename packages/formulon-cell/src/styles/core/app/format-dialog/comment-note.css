@@ -169,13 +169,13 @@
     outline-offset: 1px;
   }
   .fc-cmtnote__btn--primary {
-    background: var(--fc-accent, #107c41);
-    border-color: var(--fc-accent, #107c41);
-    color: var(--fc-accent-fg, #ffffff);
+    background: var(--fc-accent);
+    border-color: var(--fc-accent);
+    color: var(--fc-accent-fg);
   }
   .fc-cmtnote__btn--primary:hover {
-    background: var(--fc-accent, #107c41);
-    border-color: var(--fc-accent, #107c41);
+    background: var(--fc-accent);
+    border-color: var(--fc-accent);
     filter: brightness(1.05);
   }
 }

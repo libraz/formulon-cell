@@ -1,9 +1,12 @@
 :root {
-  /* ── Fluent neutrals (light) ─────────────────────────────────────── */
+  /* ── Fluent neutrals (light) ─────────────────────────────────────────────
+   * Shared values reference --demo-* primitives defined by toolbar.css
+   * (loaded ahead of this file via shell/dependencies.css). Values that
+   * have no public --demo-* equivalent stay literal. */
   --shell-bg: #faf9f8; /* Fluent neutralLighterAlt — body */
-  --shell-bg-2: #f3f2f1; /* Fluent neutralLighter — hover/header rail */
-  --shell-bg-3: #edebe9; /* Fluent neutralLight — pressed */
-  --shell-surface: #ffffff;
+  --shell-bg-2: var(--demo-ribbon-rail); /* #f3f2f1 — hover/header rail */
+  --shell-bg-3: var(--demo-ribbon-hover); /* #edebe9 — pressed */
+  --shell-surface: var(--demo-card); /* #ffffff */
   --shell-surface-2: #faf9f8;
   --shell-rule: #e1dfdd; /* Fluent neutralQuaternary — hairline */
   --shell-rule-2: #d2d0ce; /* Fluent neutralQuaternaryAlt — strong */
@@ -13,14 +16,25 @@
   --shell-fg-mute: #605e5c; /* Fluent neutralSecondary */
   --shell-fg-faint: #8a8886; /* Fluent neutralTertiaryAlt */
 
-  /* ── spreadsheet green ─────────────────────────────────────────────────── */
-  --shell-accent: #107c41; /* spreadsheet green — file tab, active cell */
-  --shell-accent-strong: #0e6b39; /* Hover on accent */
+  /* ── spreadsheet green ──────────────────────────────────────────────────
+   * Light-mode values mirror the public --demo-accent palette so the
+   * toolbar (--demo-*) and surrounding shell (--shell-*) agree by
+   * construction. Each dark-theme block below re-defines the shell
+   * accent explicitly — demo's "ink" override doesn't reach here. */
+  --shell-accent: var(--demo-accent); /* #107c41 */
+  --shell-accent-strong: var(--demo-accent-strong); /* #0e6b39 */
   --shell-accent-darker: #0b5c30; /* Pressed on accent */
-  --shell-accent-soft: rgba(16, 124, 65, 0.1);
+  --shell-accent-soft: var(--demo-accent-soft); /* rgba(16, 124, 65, 0.1) */
   --shell-accent-pale: #e6f4ec; /* Toggle-on background */
   --shell-accent-tint: #caead8; /* Lifted tab fill */
   --shell-accent-fg: #ffffff;
+
+  /* Destructive action — delete buttons, error text. */
+  --shell-danger: #c4314b;
+  --shell-danger-strong: #a4262c;
+  --shell-danger-fg: #ffffff;
+  --shell-danger-soft: rgba(196, 49, 75, 0.08);
+  --shell-danger-soft-border: rgba(196, 49, 75, 0.4);
 
   --shell-hover: rgba(0, 0, 0, 0.04);
   --shell-active: rgba(0, 0, 0, 0.08);
@@ -72,6 +86,12 @@
   --shell-accent-pale: rgba(76, 194, 107, 0.16);
   --shell-accent-tint: rgba(76, 194, 107, 0.28);
   --shell-accent-fg: #11100f;
+
+  --shell-danger: #e16170;
+  --shell-danger-strong: #f1707b;
+  --shell-danger-fg: #1b1a19;
+  --shell-danger-soft: rgba(241, 112, 123, 0.12);
+  --shell-danger-soft-border: rgba(241, 112, 123, 0.4);
 
   --shell-hover: rgba(255, 255, 255, 0.06);
   --shell-active: rgba(255, 255, 255, 0.12);

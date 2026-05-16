@@ -19,19 +19,19 @@
     padding: 3px 9px;
     border: 1px solid transparent;
     border-radius: 6px;
-    background: var(--fc-fmtdlg-chip-bg, #eeeeee);
+    background: var(--fc-fmtdlg-chip-bg);
     color: var(--fc-fmtdlg-panel-fg, inherit);
   }
   .fc-fmtdlg__choice-grid .fc-fmtdlg__radio:has(input:checked),
   .fc-fmtdlg__choice-grid .fc-fmtdlg__check:has(input:checked) {
-    border-color: var(--fc-fmtdlg-chip-checked-border, #6f9878);
-    background: var(--fc-fmtdlg-chip-checked-bg, #e8f0ea);
+    border-color: var(--fc-fmtdlg-chip-checked-border);
+    background: var(--fc-fmtdlg-chip-checked-bg);
   }
   .fc-fmtdlg input[type="checkbox"],
   .fc-fmtdlg input[type="radio"] {
     width: 15px;
     height: 15px;
-    accent-color: var(--fc-accent, #217346);
+    accent-color: var(--fc-accent);
   }
   .fc-fmtdlg input[type="color"] {
     width: 128px;
@@ -39,11 +39,11 @@
     padding: 2px;
     border: 1px solid transparent;
     border-radius: 6px;
-    background: var(--fc-fmtdlg-input-bg, #eeeeee);
+    background: var(--fc-fmtdlg-input-bg);
     cursor: pointer;
   }
   .fc-fmtdlg__hint {
-    color: var(--fc-fmtdlg-hint-fg, #222222);
+    color: var(--fc-fmtdlg-hint-fg);
     font-size: 12px;
   }
   .fc-fmtdlg__panel-tab > div:not([class]),

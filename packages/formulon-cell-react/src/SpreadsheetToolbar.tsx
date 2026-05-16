@@ -6,13 +6,14 @@ import {
   applyAdvancedFilter,
   applyCellStyle,
   applyConditionalPresetAction,
-  applyFlashFill,
   applyMerge,
   applyTextScriptToRange,
   applyUnmerge,
   autofitColsWidth,
   autofitRowsHeight,
   autoSum,
+  buildRibbonAddInReport,
+  buildSpreadsheetCompatibilityReport,
   CELL_STYLE_GROUPS,
   CELL_STYLES,
   type CellBorderStyle,
@@ -27,7 +28,6 @@ import {
   clearAllowedEditRanges,
   clearComment,
   clearFilter,
-  clearFormat,
   clearHyperlink,
   clearPrintArea,
   clearPrintTitles,
@@ -36,24 +36,24 @@ import {
   clearTraceArrowsByKind,
   clearValidationCircles,
   clearValidationInRangeWithEngine,
-  clearVisualFormat,
   clearWatchedCells,
   commentAt,
   copyAdvancedFilterResult,
   createColorPalette,
   createDefinedNamesFromSelection,
-  createPivotTableFromRange,
-  createSessionChart,
+  createRibbonChartFromSelection,
   deleteCells,
   deleteCols,
   deleteRows,
   deleteSelectedCols,
   deleteSelectedRows,
   dispatchHostClipboard,
+  executeRibbonClearAction,
+  executeRibbonFillAction,
+  executeRibbonFindAction,
+  executeRibbonPivotTableAction,
   type FreezeAction,
-  fillRange,
   filterBySelectedCellValue,
-  findMatchingCells,
   formatAsTable,
   groupCols,
   groupRows,
@@ -72,8 +72,6 @@ import {
   hyperlinkAt,
   ignoreCellError,
   inferAutoFilterRange,
-  inferFlashFillPattern,
-  inferPivotSourceFields,
   inferSortHasHeader,
   insertCells,
   insertCols,
@@ -96,7 +94,6 @@ import {
   type PageOrientation,
   type PaperSize,
   type PasteAction,
-  PivotAggregation,
   reapplyFilters,
   recordConditionalRulesChange,
   recordDefinedNamesChange,
@@ -114,10 +111,10 @@ import {
   removeSheet,
   renameSheet,
   resetManualPageBreaks,
+  resolveRibbonPdfAction,
   type ScriptCommand,
   type SpreadsheetInstance,
   type Strings,
-  selectionFromMatches,
   selectNextFormulaError,
   setAlign,
   setAutoFilter,
@@ -141,8 +138,8 @@ import {
   setWorkbookStructureProtected,
   showColsAroundSelection,
   showRowsAroundSelection,
-  sortRange,
-  summarizeSpreadsheetCompatibility,
+  sortActiveColumnAuto,
+  sortRangeWithHistory,
   textToColumns,
   toggleSelectedColsHidden,
   toggleSelectedRowsHidden,
@@ -152,7 +149,6 @@ import {
   type WindowAction,
   warnProtected,
   watchRange,
-  writableAddrs,
 } from '@libraz/formulon-cell';
 import {
   type ChangeEvent,
@@ -241,598 +237,10 @@ import {
   type WatchAction,
 } from '@libraz/formulon-cell';
 
-interface ColorDropdownProps {
-  id: string;
-  title: string;
-  value: string;
-  labels: {
-    automatic: string;
-    moreColors: string;
-    standardColors: string;
-    themeColors: string;
-  };
-  label: ReactElement;
-  disabled: boolean;
-  onChange: (value: string) => void;
-}
-
-function ColorDropdown({
-  id,
-  title,
-  value,
-  labels,
-  label,
-  disabled,
-  onChange,
-}: ColorDropdownProps): ReactElement {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  // Latest props for the imperatively-mounted palette, so the mount effect
-  // can depend on `[open]` alone and never re-create the widget mid-use.
-  const latest = useRef({ id, title, value, labels, onChange });
-  latest.current = { id, title, value, labels, onChange };
-
-  useEffect(() => {
-    if (!open) return;
-    const onDocDown = (e: MouseEvent): void => {
-      if (e.target instanceof Node && wrapRef.current?.contains(e.target)) return;
-      setOpen(false);
-    };
-    const onKey = (e: globalThis.KeyboardEvent): void => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', onDocDown, true);
-    document.addEventListener('keydown', onKey, true);
-    return () => {
-      document.removeEventListener('mousedown', onDocDown, true);
-      document.removeEventListener('keydown', onKey, true);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!open || !host) return;
-    const props = latest.current;
-    const palette = createColorPalette({
-      themeLabel: props.labels.themeColors,
-      standardLabel: props.labels.standardColors,
-      moreColorsLabel: props.labels.moreColors,
-      ariaLabel: props.title,
-      value: props.value,
-      automatic:
-        props.id === 'fontColor' ? { label: props.labels.automatic, color: '#000000' } : null,
-      onPick: (color) => {
-        latest.current.onChange(color);
-        setOpen(false);
-      },
-      onMoreColors: () => {
-        setOpen(false);
-        inputRef.current?.click();
-      },
-    });
-    host.appendChild(palette.el);
-    palette.focus();
-    return () => {
-      palette.el.remove();
-    };
-  }, [open]);
-
-  return (
-    <div
-      key={id}
-      ref={wrapRef}
-      className={`demo__rb-color${open ? ' demo__rb-color--open' : ''}`}
-      data-ribbon-command={id}
-      title={title}
-    >
-      <button
-        type="button"
-        className="demo__rb-color__btn"
-        aria-label={title}
-        aria-keyshortcuts={RIBBON_KEYSHORTCUTS[id]}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        disabled={disabled}
-        onClick={() => setOpen((next) => !next)}
-      >
-        <span className="demo__rb-color__icon">{label}</span>
-        <span className="demo__rb-color__swatch" style={{ backgroundColor: value }} />
-        <ChevronDown12Regular className="demo__rb-color__chev" aria-hidden="true" />
-      </button>
-      {open ? <div ref={hostRef} className="demo__color-flyout" /> : null}
-      <input
-        ref={inputRef}
-        className="demo__color-flyout__native"
-        type="color"
-        value={value}
-        aria-hidden="true"
-        tabIndex={-1}
-        onChange={(e) => {
-          onChange(e.currentTarget.value);
-          setOpen(false);
-        }}
-      />
-    </div>
-  );
-}
-
-interface MergeMenuProps {
-  disabled: boolean;
-  activeAction?: 'mergeCenter' | 'mergeCells' | null;
-  labels: {
-    mergeAndCenter: string;
-    mergeAcross: string;
-    mergeCells: string;
-    unmergeCells: string;
-  };
-  onPick: (action: MergeAction) => void;
-}
-
-function MergeMenu({ disabled, activeAction, labels, onPick }: MergeMenuProps): ReactElement {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-  const options: readonly { action: MergeAction; label: string }[] = [
-    { action: 'mergeCenter', label: labels.mergeAndCenter },
-    { action: 'mergeAcross', label: labels.mergeAcross },
-    { action: 'mergeCells', label: labels.mergeCells },
-    { action: 'unmergeCells', label: labels.unmergeCells },
-  ];
-
-  useEffect(() => {
-    if (!open) return;
-    const onDocDown = (e: MouseEvent): void => {
-      if (e.target instanceof Node && wrapRef.current?.contains(e.target)) return;
-      setOpen(false);
-    };
-    const onKey = (e: globalThis.KeyboardEvent): void => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', onDocDown, true);
-    document.addEventListener('keydown', onKey, true);
-    return () => {
-      document.removeEventListener('mousedown', onDocDown, true);
-      document.removeEventListener('keydown', onKey, true);
-    };
-  }, [open]);
-
-  return (
-    <div
-      ref={wrapRef}
-      className={`demo__rb-menu${open ? ' demo__rb-menu--open' : ''}`}
-      data-ribbon-command="merge"
-    >
-      <button
-        type="button"
-        className={`demo__rb demo__rb-menu__btn${activeAction ? ' demo__rb--active' : ''}`}
-        title={labels.mergeCells}
-        aria-label={labels.mergeCells}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        disabled={disabled}
-        onClick={() => setOpen((next) => !next)}
-      >
-        <Icon name="merge" />
-        <ChevronDown12Regular className="demo__rb-menu__chev" aria-hidden="true" />
-      </button>
-      {open ? (
-        <div className="demo__merge-menu" role="menu" aria-label={labels.mergeCells}>
-          {options.map((option) => {
-            const checked = activeAction === option.action;
-            return (
-              <button
-                key={option.action}
-                type="button"
-                className={`demo__merge-menu__item${checked ? ' demo__rb--active' : ''}`}
-                role={
-                  option.action === 'unmergeCells' || option.action === 'mergeAcross'
-                    ? 'menuitem'
-                    : 'menuitemradio'
-                }
-                aria-checked={
-                  option.action === 'unmergeCells' || option.action === 'mergeAcross'
-                    ? undefined
-                    : checked
-                }
-                onClick={() => {
-                  onPick(option.action);
-                  setOpen(false);
-                }}
-              >
-                <Icon name="merge" />
-                <span>{option.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-interface CellMenuProps<T extends string> {
-  command: string;
-  disabled: boolean;
-  icon: IconName;
-  label: string;
-  options: readonly {
-    action: T;
-    label: string;
-    separatorBefore?: boolean;
-    section?: boolean;
-    active?: boolean;
-  }[];
-  activeAction?: T | null;
-  activeButton?: boolean;
-  onPick: (action: T) => void;
-}
-
-function CellMenu<T extends string>({
-  command,
-  disabled,
-  icon,
-  label,
-  options,
-  activeAction,
-  activeButton,
-  onPick,
-}: CellMenuProps<T>): ReactElement {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDocDown = (e: MouseEvent): void => {
-      if (e.target instanceof Node && wrapRef.current?.contains(e.target)) return;
-      setOpen(false);
-    };
-    const onKey = (e: globalThis.KeyboardEvent): void => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', onDocDown, true);
-    document.addEventListener('keydown', onKey, true);
-    return () => {
-      document.removeEventListener('mousedown', onDocDown, true);
-      document.removeEventListener('keydown', onKey, true);
-    };
-  }, [open]);
-
-  return (
-    <div
-      ref={wrapRef}
-      className={`demo__rb-menu${open ? ' demo__rb-menu--open' : ''}`}
-      data-ribbon-command={command}
-    >
-      <button
-        type="button"
-        className={`demo__rb demo__rb-menu__btn demo__rb--wide${activeButton ? ' demo__rb--active' : ''}`}
-        title={label}
-        aria-label={label}
-        aria-keyshortcuts={RIBBON_KEYSHORTCUTS[command]}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        disabled={disabled}
-        onClick={() => setOpen((next) => !next)}
-      >
-        <Icon name={icon} />
-        <span>{label}</span>
-        <ChevronDown12Regular className="demo__rb-menu__chev" aria-hidden="true" />
-      </button>
-      {open ? (
-        <div className="demo__merge-menu demo__cell-menu" role="menu" aria-label={label}>
-          {options.map((option) => {
-            if (option.section) {
-              return (
-                <div
-                  key={option.action}
-                  className="demo__cf-menu__panel-title demo__cell-menu__section"
-                  role="presentation"
-                >
-                  {option.label}
-                </div>
-              );
-            }
-            const checked = activeAction === option.action || option.active === true;
-            const className = `demo__merge-menu__item${checked ? ' demo__rb--active' : ''}`;
-            const radioLike = activeAction != null || option.active === true;
-            const onClick = (): void => {
-              onPick(option.action);
-              setOpen(false);
-            };
-            return (
-              <Fragment key={option.action}>
-                {option.separatorBefore ? (
-                  <div className="demo__cf-menu__sep" role="presentation" />
-                ) : null}
-                {!radioLike ? (
-                  <button
-                    type="button"
-                    className={className}
-                    role="menuitem"
-                    data-cell-action={option.action}
-                    onClick={onClick}
-                  >
-                    <Icon name={icon} />
-                    <span>{option.label}</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className={className}
-                    role="menuitemradio"
-                    aria-checked={checked}
-                    data-cell-action={option.action}
-                    onClick={onClick}
-                  >
-                    <Icon name={icon} />
-                    <span>{option.label}</span>
-                  </button>
-                )}
-              </Fragment>
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-import {
-  type ConditionalIconSetAction,
-  conditionalColorScaleLabel,
-  conditionalDataBarLabel,
-  conditionalIconSetLabel,
-} from '@libraz/formulon-cell';
-
-interface ConditionalMenuProps {
-  disabled: boolean;
-  active: boolean;
-  instance: SpreadsheetInstance | null;
-  strings: Strings;
-}
-
-function ConditionalMenu({
-  disabled,
-  active,
-  instance,
-  strings,
-}: ConditionalMenuProps): ReactElement {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-  const labels = strings.conditionalMenu;
-  const dataBarLabel = (action: ConditionalPresetAction): string =>
-    conditionalDataBarLabel(action, labels);
-  const colorScaleLabel = (action: ConditionalPresetAction): string =>
-    conditionalColorScaleLabel(action, labels);
-  const iconSetLabel = (action: ConditionalIconSetAction): string =>
-    conditionalIconSetLabel(action, labels);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDocDown = (e: MouseEvent): void => {
-      if (e.target instanceof Node && wrapRef.current?.contains(e.target)) return;
-      setOpen(false);
-    };
-    const onKey = (e: globalThis.KeyboardEvent): void => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', onDocDown, true);
-    document.addEventListener('keydown', onKey, true);
-    return () => {
-      document.removeEventListener('mousedown', onDocDown, true);
-      document.removeEventListener('keydown', onKey, true);
-    };
-  }, [open]);
-
-  const onPick = (action: ConditionalMenuAction): void => {
-    handleConditionalAction(instance, action);
-    setOpen(false);
-  };
-
-  const item = (
-    action: ConditionalMenuAction,
-    label: string,
-    key: string = action,
-  ): ReactElement => (
-    <button
-      key={key}
-      type="button"
-      className="demo__merge-menu__item demo__cf-menu__item"
-      role="menuitem"
-      data-cf-action={action}
-      onClick={() => onPick(action)}
-    >
-      <Icon name="conditional" />
-      <span>{label}</span>
-    </button>
-  );
-
-  const swatch = (
-    action: ConditionalPresetAction,
-    colors: readonly string[],
-    label: string,
-  ): ReactElement => {
-    const colorCounts = new Map<string, number>();
-    const swatchParts = colors.map((color) => {
-      const count = (colorCounts.get(color) ?? 0) + 1;
-      colorCounts.set(color, count);
-      return { color, key: `${action}-${color}-${count}` };
-    });
-    return (
-      <button
-        key={action}
-        type="button"
-        className="demo__cf-menu__swatch"
-        role="menuitem"
-        data-cf-action={action}
-        title={label}
-        aria-label={label}
-        onClick={() => onPick(action)}
-      >
-        {swatchParts.map((part) => (
-          <span key={part.key} style={{ backgroundColor: part.color }} />
-        ))}
-      </button>
-    );
-  };
-
-  const iconSwatch = (
-    action: ConditionalIconSetAction,
-    family: string,
-    slots: readonly string[],
-  ): ReactElement => (
-    <button
-      key={action}
-      type="button"
-      className="demo__cf-menu__iconset"
-      role="menuitem"
-      data-cf-action={action}
-      title={iconSetLabel(action)}
-      aria-label={iconSetLabel(action)}
-      onClick={() => onPick(action)}
-    >
-      {slots.map((slot, index) => (
-        <span
-          key={`${action}-${slot}-${index}`}
-          className={`demo__cf-icon demo__cf-icon--${family} demo__cf-icon--${slot}`}
-        />
-      ))}
-    </button>
-  );
-
-  const iconSection = (label: string): ReactElement => (
-    <div key={`section-${label}`} className="demo__cf-menu__panel-title" role="presentation">
-      {label}
-    </div>
-  );
-
-  const submenu = (label: string, children: ReactElement[], panelClass = ''): ReactElement => (
-    <div className="demo__cf-menu__submenu" role="none">
-      <button type="button" className="demo__merge-menu__item demo__cf-menu__item" role="menuitem">
-        <Icon name="conditional" />
-        <span>{label}</span>
-        <span className="demo__cf-menu__arrow">›</span>
-      </button>
-      <div className={`demo__cf-menu__panel${panelClass ? ` ${panelClass}` : ''}`} role="menu">
-        {children}
-      </div>
-    </div>
-  );
-
-  return (
-    <div
-      ref={wrapRef}
-      className={`demo__rb-menu demo__cf-menu-wrap${open ? ' demo__rb-menu--open' : ''}`}
-      data-ribbon-command="conditional"
-    >
-      <button
-        type="button"
-        className={`demo__rb demo__rb-menu__btn demo__rb--wide${active ? ' demo__rb--active' : ''}`}
-        title={labels.title}
-        aria-label={labels.title}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        disabled={disabled}
-        onClick={() => setOpen((next) => !next)}
-      >
-        <Icon name="conditional" />
-        <span>{labels.title}</span>
-        <ChevronDown12Regular className="demo__rb-menu__chev" aria-hidden="true" />
-      </button>
-      {open ? (
-        <div className="demo__merge-menu demo__cf-menu" role="menu" aria-label={labels.title}>
-          {submenu(labels.highlight, [
-            item('cell-greater', labels.greater),
-            item('cell-less', labels.less),
-            item('cell-between', labels.between),
-            item('cell-equal', labels.equal),
-            item('text-contains', labels.textContains),
-            item('date-occurring', labels.dateOccurring),
-            item('duplicates', labels.duplicates),
-            item('unique', labels.unique),
-            item('highlight-more', labels.otherRules),
-          ])}
-          {submenu(labels.topBottom, [
-            item('top10', labels.top10),
-            item('bottom10', labels.bottom10),
-            item('top10-percent', labels.top10Percent),
-            item('bottom10-percent', labels.bottom10Percent),
-            item('above-avg', labels.aboveAvg),
-            item('below-avg', labels.belowAvg),
-            item('top-bottom-more', labels.otherRules),
-          ])}
-          {submenu(labels.dataBars, [
-            swatch('data-blue', ['#ffffff', '#638ec6'], dataBarLabel('data-blue')),
-            swatch('data-green', ['#ffffff', '#63a95c'], dataBarLabel('data-green')),
-            swatch('data-red', ['#ffffff', '#c45a5a'], dataBarLabel('data-red')),
-            swatch('data-orange', ['#ffffff', '#d6a440'], dataBarLabel('data-orange')),
-            swatch('data-purple', ['#ffffff', '#8a74b9'], dataBarLabel('data-purple')),
-            swatch('data-teal', ['#ffffff', '#4ba1a8'], dataBarLabel('data-teal')),
-            swatch('data-solid-blue', ['#4472c4', '#4472c4'], dataBarLabel('data-solid-blue')),
-            swatch('data-solid-green', ['#70ad47', '#70ad47'], dataBarLabel('data-solid-green')),
-            swatch('data-solid-red', ['#c00000', '#c00000'], dataBarLabel('data-solid-red')),
-            swatch('data-solid-orange', ['#ed7d31', '#ed7d31'], dataBarLabel('data-solid-orange')),
-            swatch('data-solid-purple', ['#8064a2', '#8064a2'], dataBarLabel('data-solid-purple')),
-            swatch('data-solid-gray', ['#7f7f7f', '#7f7f7f'], dataBarLabel('data-solid-gray')),
-            item('data-bars-more', labels.otherRules),
-          ])}
-          {submenu(labels.colorScales, [
-            swatch('scale-gyr', ['#63be7b', '#ffeb84', '#f8696b'], colorScaleLabel('scale-gyr')),
-            swatch('scale-ryg', ['#f8696b', '#ffeb84', '#63be7b'], colorScaleLabel('scale-ryg')),
-            swatch('scale-gw', ['#63be7b', '#ffffff'], colorScaleLabel('scale-gw')),
-            swatch('scale-rw', ['#f8696b', '#ffffff'], colorScaleLabel('scale-rw')),
-            swatch('scale-bwr', ['#5a8dee', '#ffffff', '#f8696b'], colorScaleLabel('scale-bwr')),
-            swatch('scale-rwb', ['#f8696b', '#ffffff', '#5a8dee'], colorScaleLabel('scale-rwb')),
-            swatch('scale-gwg', ['#63be7b', '#ffffff', '#00a651'], colorScaleLabel('scale-gwg')),
-            swatch('scale-ywg', ['#ffeb84', '#ffffff', '#63be7b'], colorScaleLabel('scale-ywg')),
-            swatch('scale-rwr', ['#f8696b', '#ffffff', '#c00000'], colorScaleLabel('scale-rwr')),
-            swatch('scale-bwb', ['#5a8dee', '#ffffff', '#4472c4'], colorScaleLabel('scale-bwb')),
-            swatch('scale-yry', ['#ffeb84', '#f8696b', '#63be7b'], colorScaleLabel('scale-yry')),
-            swatch('scale-gyg', ['#63be7b', '#ffeb84', '#00a651'], colorScaleLabel('scale-gyg')),
-            item('color-scales-more', labels.otherRules),
-          ])}
-          {submenu(
-            labels.iconSets,
-            [
-              iconSection(labels.direction),
-              iconSwatch('icons-arrows3', 'arrow', ['up-green', 'right-yellow', 'down-red']),
-              iconSwatch('icons-arrows5', 'arrow', [
-                'up-green',
-                'up-right-gray',
-                'right-gray',
-                'down-right-gray',
-                'down-gray',
-              ]),
-              iconSwatch('icons-triangles3', 'triangle', ['up-green', 'flat-yellow', 'down-red']),
-              iconSection(labels.shapes),
-              iconSwatch('icons-traffic3', 'circle', ['green', 'yellow', 'red']),
-              iconSwatch('icons-trafficRim3', 'rim', ['green', 'yellow', 'red']),
-              iconSwatch('icons-symbols3', 'symbol', ['check-green', 'bang-yellow', 'x-red']),
-              iconSwatch('icons-flags3', 'flag', ['green', 'yellow', 'red']),
-              iconSection(labels.ratings),
-              iconSwatch('icons-stars3', 'star', ['gold', 'half', 'empty']),
-              iconSwatch('icons-quarters5', 'quarter', ['q4', 'q3', 'q2', 'q1', 'q0']),
-              iconSwatch('icons-ratings5', 'rating', ['r4', 'r3', 'r2', 'r1', 'r0']),
-              iconSwatch('icons-bars5', 'bars', ['b4', 'b3', 'b2', 'b1', 'b0']),
-              iconSwatch('icons-boxes5', 'boxes', ['b4', 'b3', 'b2', 'b1', 'b0']),
-              item('icon-sets-more', labels.otherRules),
-            ],
-            'demo__cf-menu__panel--icons',
-          )}
-          <div className="demo__cf-menu__sep" role="presentation" />
-          {item('new-rule', labels.newRule)}
-          {submenu(labels.clear, [
-            item('clear-selection', labels.clearSelection),
-            item('clear-sheet', labels.clearSheet),
-          ])}
-          {item('manage', labels.manage)}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
+import { CellMenu } from './toolbar/menus/CellMenu.js';
+import { ColorDropdown } from './toolbar/menus/ColorDropdown.js';
+import { ConditionalMenu } from './toolbar/menus/ConditionalMenu.js';
+import { MergeMenu } from './toolbar/menus/MergeMenu.js';
 export const SpreadsheetToolbar = ({
   instance,
   features,
@@ -1231,89 +639,12 @@ export const SpreadsheetToolbar = ({
   const onFillAction = useCallback(
     (action: FillAction) => {
       if (!instance) return;
-      const range = instance.store.getState().selection.range;
-      if (action === 'flash') {
-        if (range.c0 !== range.c1 || range.c0 === 0) return;
-        const examples: { input: string; output: string }[] = [];
-        const pending: { row: number; input: string }[] = [];
-        for (let row = range.r0; row <= range.r1; row += 1) {
-          const inputValue = instance.workbook.getValue({
-            sheet: range.sheet,
-            row,
-            col: range.c0 - 1,
-          });
-          const outputValue = instance.workbook.getValue({
-            sheet: range.sheet,
-            row,
-            col: range.c0,
-          });
-          const input =
-            inputValue.kind === 'text'
-              ? inputValue.value
-              : inputValue.kind === 'number'
-                ? String(inputValue.value)
-                : inputValue.kind === 'bool'
-                  ? String(inputValue.value)
-                  : '';
-          if (input.length === 0) continue;
-          if (outputValue.kind === 'text' && outputValue.value.length > 0) {
-            examples.push({ input, output: outputValue.value });
-          } else if (
-            outputValue.kind === 'blank' &&
-            isCellWritable(instance.store.getState(), { sheet: range.sheet, row, col: range.c0 })
-          ) {
-            pending.push({ row, input });
-          }
-        }
-        const pattern = inferFlashFillPattern(examples);
-        if (!pattern || pending.length === 0) return;
-        const filled = applyFlashFill(
-          pattern,
-          pending.map((entry) => entry.input),
-        );
-        instance.history.begin();
-        try {
-          pending.forEach((entry, index) => {
-            const value = filled[index];
-            if (value != null)
-              instance.workbook.setText(
-                { sheet: range.sheet, row: entry.row, col: range.c0 },
-                value,
-              );
-          });
-        } finally {
-          instance.history.end();
-        }
-        mutators.replaceCells(instance.store, instance.workbook.cells(range.sheet));
-        return;
-      }
-      const isDateSeries =
-        action === 'days' || action === 'weekdays' || action === 'months' || action === 'years';
-      const direction: 'down' | 'right' | 'up' | 'left' =
-        action === 'down' || action === 'right' || action === 'up' || action === 'left'
-          ? action
-          : 'down';
-      let src = range;
-      if (direction === 'down') src = { ...range, r1: range.r0 };
-      else if (direction === 'up') src = { ...range, r0: range.r1 };
-      else if (direction === 'right') src = { ...range, c1: range.c0 };
-      else src = { ...range, c0: range.c1 };
-      if (src.r0 === range.r0 && src.r1 === range.r1 && src.c0 === range.c0 && src.c1 === range.c1)
-        return;
-      instance.history.begin();
-      try {
-        recordFormatChange(instance.history, instance.store, () => {
-          fillRange(instance.store.getState(), instance.workbook, src, range, {
-            copyOnly: action === 'series' || isDateSeries ? false : undefined,
-            dateUnit: isDateSeries ? action : undefined,
-            formatting: 'with',
-            store: instance.store,
-          });
-        });
-      } finally {
-        instance.history.end();
-      }
-      mutators.replaceCells(instance.store, instance.workbook.cells(range.sheet));
+      executeRibbonFillAction({
+        store: instance.store,
+        workbook: instance.workbook,
+        history: instance.history,
+        action,
+      });
     },
     [instance],
   );
@@ -1321,63 +652,14 @@ export const SpreadsheetToolbar = ({
   const onClearAction = useCallback(
     (action: ClearAction) => {
       if (!instance) return;
-      const range = instance.store.getState().selection.range;
-      const eachCell = (fn: (row: number, col: number) => void): void => {
-        for (let row = range.r0; row <= range.r1; row += 1) {
-          for (let col = range.c0; col <= range.c1; col += 1) fn(row, col);
-        }
-      };
-      if (action === 'formats') {
-        wrapFormat(clearVisualFormat);
-        return;
-      }
-      if (action === 'conditional') {
-        recordConditionalRulesChange(instance.history, instance.store, () => {
-          mutators.clearConditionalRulesInRange(instance.store, range);
-        });
-        return;
-      }
-      instance.history.begin();
-      try {
-        if (action === 'contents' || action === 'all') {
-          for (const addr of writableAddrs(instance.store.getState(), range)) {
-            instance.workbook.setBlank(addr);
-          }
-        }
-        if (action === 'comments' || action === 'all') {
-          recordFormatChange(instance.history, instance.store, () => {
-            eachCell((row, col) =>
-              clearComment(instance.store, { sheet: range.sheet, row, col }, instance.workbook),
-            );
-          });
-        }
-        if (action === 'hyperlinks' || action === 'all') {
-          recordFormatChange(instance.history, instance.store, () => {
-            eachCell((row, col) =>
-              clearHyperlink(instance.store, { sheet: range.sheet, row, col }, instance.workbook),
-            );
-          });
-        }
-        if (action === 'all') {
-          clearValidationInRangeWithEngine(
-            instance.store,
-            instance.history,
-            instance.workbook,
-            range,
-          );
-          recordFormatChange(instance.history, instance.store, () => {
-            clearFormat(instance.store.getState(), instance.store);
-          });
-          recordConditionalRulesChange(instance.history, instance.store, () => {
-            mutators.clearConditionalRulesInRange(instance.store, range);
-          });
-        }
-      } finally {
-        instance.history.end();
-      }
-      mutators.replaceCells(instance.store, instance.workbook.cells(range.sheet));
+      executeRibbonClearAction({
+        store: instance.store,
+        workbook: instance.workbook,
+        history: instance.history,
+        action,
+      });
     },
-    [instance, wrapFormat],
+    [instance],
   );
 
   const onFilterToggle = useCallback(() => {
@@ -1457,20 +739,17 @@ export const SpreadsheetToolbar = ({
 
   const applyCustomSort = useCallback(() => {
     if (!instance || !sortDialog) return;
-    const s = instance.store.getState();
-    const range = s.selection.range;
-    instance.history.begin();
-    let ok = false;
-    try {
-      ok = sortRange(s, instance.store, instance.workbook, range, {
+    sortRangeWithHistory({
+      store: instance.store,
+      workbook: instance.workbook,
+      history: instance.history,
+      range: instance.store.getState().selection.range,
+      options: {
         byCol: sortDialog.byCol,
         direction: sortDialog.direction,
         hasHeader: sortDialog.hasHeader,
-      });
-    } finally {
-      instance.history.end();
-    }
-    if (ok) mutators.replaceCells(instance.store, instance.workbook.cells(s.data.sheetIndex));
+      },
+    });
     setSortDialog(null);
   }, [instance, sortDialog]);
 
@@ -1479,19 +758,12 @@ export const SpreadsheetToolbar = ({
       if (!instance) return;
       const s = instance.store.getState();
       if (action === 'asc' || action === 'desc') {
-        instance.history.begin();
-        let ok = false;
-        try {
-          const range = inferAutoFilterRange(s);
-          ok = sortRange(s, instance.store, instance.workbook, range, {
-            byCol: s.selection.active.col,
-            direction: action,
-            hasHeader: inferSortHasHeader(s, range),
-          });
-        } finally {
-          instance.history.end();
-        }
-        if (ok) mutators.replaceCells(instance.store, instance.workbook.cells(s.data.sheetIndex));
+        sortActiveColumnAuto({
+          store: instance.store,
+          workbook: instance.workbook,
+          history: instance.history,
+          direction: action,
+        });
       } else if (action === 'custom') onCustomSort();
       else if (action === 'filter') onFilterToggle();
       else if (action === 'filter-clear' && s.ui.filterRange)
@@ -1803,62 +1075,22 @@ export const SpreadsheetToolbar = ({
   const onFindAction = useCallback(
     (action: FindAction) => {
       if (!instance) return;
-      const selectSpecialMatches = (
-        kind:
-          | 'formulas'
-          | 'constants'
-          | 'numbers'
-          | 'text'
-          | 'errors'
-          | 'conditional-format'
-          | 'data-validation',
-      ): void => {
-        const matches = findMatchingCells(instance.workbook, instance.store, 'sheet', kind);
-        const first = matches[0];
-        if (!first) {
-          setRibbonReportDialog({
-            title: cellMenuText.findSelect,
-            items: [{ severity: 'info', label: cellMenuText.findNoMatches, detail: '' }],
-          });
-          return;
-        }
-        instance.store.setState((state) => ({
-          ...state,
-          selection: selectionFromMatches(matches),
-        }));
-      };
-      if (action === 'find') instance.openFindReplace('find');
-      else if (action === 'replace') instance.openFindReplace('replace');
-      else if (action === 'go-to') instance.openGoTo();
-      else if (action === 'go-to-special') instance.openGoToSpecial();
-      else if (
-        action === 'formulas' ||
-        action === 'constants' ||
-        action === 'numbers' ||
-        action === 'text' ||
-        action === 'errors' ||
-        action === 'conditional-format' ||
-        action === 'data-validation'
-      )
-        selectSpecialMatches(action);
-      else if (action === 'comments') {
-        const comments = listComments(instance.store.getState());
-        const first = comments[0]?.addr;
-        if (!first) {
-          setRibbonReportDialog({
-            title: cellMenuText.findSelect,
-            items: [{ severity: 'info', label: cellMenuText.commentNone, detail: '' }],
-          });
-          return;
-        }
-        const selection = selectionFromMatches(comments.map((entry) => entry.addr));
-        instance.store.setState((state) => ({
-          ...state,
-          selection,
-        }));
-      }
+      const result = executeRibbonFindAction({
+        store: instance.store,
+        workbook: instance.workbook,
+        action,
+        strings: {
+          findSelect: cellMenuText.findSelect,
+          findNoMatches: cellMenuText.findNoMatches,
+          commentNone: cellMenuText.commentNone,
+        },
+      });
+      if (result.kind === 'open-find') instance.openFindReplace(result.mode);
+      else if (result.kind === 'open-go-to') instance.openGoTo();
+      else if (result.kind === 'open-go-to-special') instance.openGoToSpecial();
+      else if (result.kind === 'report') setRibbonReportDialog(result.report);
     },
-    [instance],
+    [cellMenuText.commentNone, cellMenuText.findNoMatches, cellMenuText.findSelect, instance],
   );
 
   const onCommentAction = useCallback(
@@ -1981,32 +1213,13 @@ export const SpreadsheetToolbar = ({
   const onChartAction = useCallback(
     (action: ChartAction) => {
       if (!instance) return;
-      const range = instance.store.getState().selection.range;
-      const count = instance.store.getState().charts.charts.length;
-      const kind =
-        action === 'recommended'
-          ? range.r0 === range.r1 && range.c1 - range.c0 >= 2
-            ? 'line'
-            : range.c0 === range.c1 && range.r1 - range.r0 >= 2
-              ? 'bar'
-              : range.c1 - range.c0 === 1 && range.r1 - range.r0 <= 6
-                ? 'pie'
-                : 'column'
-          : action;
-      createSessionChart(
-        instance.store,
-        range,
-        {
-          id: `react-ribbon-chart-${range.sheet}-${range.r0}-${range.c0}-${range.r1}-${range.c1}-${kind}-${count}`,
-          kind,
-          title: null,
-          x: 340 + (count % 3) * 24,
-          y: 96 + (count % 3) * 24,
-          w: 360,
-          h: 220,
-        },
-        instance.history,
-      );
+      createRibbonChartFromSelection({
+        store: instance.store,
+        history: instance.history,
+        range: instance.store.getState().selection.range,
+        action,
+        idPrefix: 'react-ribbon-chart',
+      });
     },
     [instance],
   );
@@ -2365,180 +1578,33 @@ export const SpreadsheetToolbar = ({
   ]);
   const onAddInAction = useCallback(
     (action: AddInAction) => {
-      if (action === 'get') {
-        setRibbonReportDialog({
-          title: cellMenuText.addInGet,
-          items: [
-            {
-              severity: 'info',
-              label: cellMenuText.addInStoreLabel,
-              detail: cellMenuText.addInStoreDetail,
-            },
-            {
-              severity: 'info',
-              label: cellMenuText.addInBuiltInLabel,
-              detail: cellMenuText.addInBuiltInDetail,
-            },
-          ],
-        });
-        return;
-      }
-      if (action === 'manage') {
-        setRibbonReportDialog({
-          title: cellMenuText.addInManage,
-          items: [
-            {
-              severity: 'info',
-              label: cellMenuText.addInManagedStatus,
-              detail: cellMenuText.addInExternalDetail,
-            },
-          ],
-        });
-        return;
-      }
-      if (action === 'my') {
-        setRibbonReportDialog({
-          title: cellMenuText.addInMy,
-          items: [
-            {
-              severity: 'info',
-              label: cellMenuText.addInBuiltInLabel,
-              detail: cellMenuText.addInBuiltInDetail,
-            },
-            {
-              severity: 'info',
-              label: cellMenuText.addInExternalLabel,
-              detail: cellMenuText.addInExternalDetail,
-            },
-          ],
-        });
-        return;
-      }
-      if (onAddIn) {
-        onAddIn();
-        return;
-      }
-      setRibbonReportDialog({
-        title: tr.addIn,
-        items: [
-          {
-            severity: 'info',
-            label: cellMenuText.addInBuiltInLabel,
-            detail: cellMenuText.addInBuiltInDetail,
-          },
-          {
-            severity: 'info',
-            label: cellMenuText.addInExternalLabel,
-            detail: cellMenuText.addInExternalDetail,
-          },
-        ],
+      const report = buildRibbonAddInReport(action, {
+        cellMenu: cellMenuText,
+        addInDefaultTitle: tr.addIn,
       });
+      if (report) setRibbonReportDialog(report);
     },
-    [
-      cellMenuText.addInBuiltInDetail,
-      cellMenuText.addInBuiltInLabel,
-      cellMenuText.addInExternalDetail,
-      cellMenuText.addInExternalLabel,
-      cellMenuText.addInGet,
-      cellMenuText.addInManage,
-      cellMenuText.addInManagedStatus,
-      cellMenuText.addInMy,
-      cellMenuText.addInStoreDetail,
-      cellMenuText.addInStoreLabel,
-      onAddIn,
-      tr.addIn,
-    ],
+    [cellMenuText, tr.addIn],
   );
   const onPivotTableAction = useCallback(
     (action: PivotTableAction) => {
       if (!instance) return;
-      if (action === 'dialog' || action === 'existing-sheet') {
-        instance.openPivotTableDialog();
-        return;
-      }
-      if (!instance.workbook.capabilities.pivotTableMutate) {
-        setRibbonReportDialog({
-          title:
-            action === 'recommended'
-              ? cellMenuText.recommendedPivotTables
-              : cellMenuText.pivotTableNewSheet,
-          items: [
-            {
-              severity: 'info',
-              label: tr.pivotTable,
-              detail: strings.workbookObjects.compatibilityDetails.pivotAuthoring,
-            },
-          ],
-        });
-        return;
-      }
-      const source = instance.store.getState().selection.range;
-      const fields = inferPivotSourceFields(instance.workbook, source);
-      const valueField = fields.find((field) => field.numericCount > 0) ?? fields.at(-1);
-      const rowField = fields.find((field) => field.name !== valueField?.name) ?? fields[0];
-      if (!rowField || !valueField || rowField.name === valueField.name) {
-        setRibbonReportDialog({
-          title: tr.pivotTable,
-          items: [
-            {
-              severity: 'warning',
-              label: tr.pivotTable,
-              detail: strings.workbookObjects.compatibilityDetails.pivotAuthoring,
-            },
-          ],
-        });
-        return;
-      }
-      let destinationSheet = source.sheet;
-      if (action === 'new-sheet') {
-        const added = addSheet(instance.store, instance.workbook, instance.history);
-        if (added < 0) {
-          setRibbonReportDialog({
-            title: cellMenuText.pivotTableNewSheet,
-            items: [
-              {
-                severity: 'warning',
-                label: tr.pivotTable,
-                detail: cellMenuText.workbookStructureProtectedBlocked,
-              },
-            ],
-          });
-          return;
-        }
-        destinationSheet = added;
-      }
-      const destination =
-        action === 'new-sheet'
-          ? { sheet: destinationSheet, row: 0, col: 0 }
-          : { sheet: destinationSheet, row: source.r1 + 3, col: source.c0 };
-      const result = createPivotTableFromRange(instance.workbook, {
-        source,
-        destination,
-        name: `PivotTable${instance.workbook.getPivotTables().length + 1}`,
-        rowField: rowField.name,
-        valueField: valueField.name,
-        aggregation: valueField.numericCount > 0 ? PivotAggregation.Sum : PivotAggregation.Count,
+      const result = executeRibbonPivotTableAction({
+        store: instance.store,
+        workbook: instance.workbook,
+        history: instance.history,
+        action,
+        strings: {
+          pivotTable: tr.pivotTable,
+          pivotTableNewSheet: cellMenuText.pivotTableNewSheet,
+          recommendedPivotTables: cellMenuText.recommendedPivotTables,
+          pivotAuthoringDetail: strings.workbookObjects.compatibilityDetails.pivotAuthoring,
+          workbookStructureProtectedBlocked: cellMenuText.workbookStructureProtectedBlocked,
+        },
       });
-      if (result.ok) {
-        mutators.replaceCells(instance.store, instance.workbook.cells(destinationSheet));
-        mutators.setSheetIndex(instance.store, destinationSheet);
-        mutators.setActive(instance.store, destination);
-        setActive(projectActiveState(instance));
-        return;
-      }
-      setRibbonReportDialog({
-        title:
-          action === 'recommended'
-            ? cellMenuText.recommendedPivotTables
-            : cellMenuText.pivotTableNewSheet,
-        items: [
-          {
-            severity: 'info',
-            label: tr.pivotTable,
-            detail: strings.workbookObjects.compatibilityDetails.pivotAuthoring,
-          },
-        ],
-      });
+      if (result.kind === 'open-dialog') instance.openPivotTableDialog();
+      else if (result.kind === 'report') setRibbonReportDialog(result.report);
+      else setActive(projectActiveState(instance));
     },
     [
       cellMenuText.pivotTableNewSheet,
@@ -2552,41 +1618,17 @@ export const SpreadsheetToolbar = ({
   const onPdfAction = useCallback(
     (action: PdfAction) => {
       if (!instance) return;
-      if (action === 'preferences') {
-        instance.openPageSetup();
-        return;
-      }
-      instance.print('pdf');
-      if (action === 'create') {
-        setRibbonReportDialog({
-          title: tr.pdf,
-          items: [
-            {
-              severity: 'info',
-              label: cellMenuText.pdfCreate,
-              detail: cellMenuText.pdfCreateReady,
-            },
-          ],
-        });
-        return;
-      }
-      if (action === 'share') {
-        setRibbonReportDialog({
-          title: tr.pdf,
-          items: [
-            { severity: 'info', label: cellMenuText.pdfShare, detail: cellMenuText.pdfShareReady },
-          ],
-        });
+      const result = resolveRibbonPdfAction(action, {
+        cellMenu: cellMenuText,
+        pdfTitle: tr.pdf,
+      });
+      if (result.kind === 'open-page-setup') instance.openPageSetup();
+      else {
+        instance.print('pdf');
+        if (result.report) setRibbonReportDialog(result.report);
       }
     },
-    [
-      cellMenuText.pdfCreate,
-      cellMenuText.pdfCreateReady,
-      cellMenuText.pdfShare,
-      cellMenuText.pdfShareReady,
-      instance,
-      tr.pdf,
-    ],
+    [cellMenuText, instance, tr.pdf],
   );
   const onIllustrationAction = useCallback(
     (label: string) => {
@@ -2614,105 +1656,9 @@ export const SpreadsheetToolbar = ({
   }, [instance]);
   const inspectWorkbookFromBackstage = useCallback(() => {
     if (!instance) return;
-    const summary = summarizeSpreadsheetCompatibility(instance.workbook);
-    const objectsCopy = strings.workbookObjects;
-    const compatibilityLabel = (id: (typeof summary.items)[number]['id']): string => {
-      switch (id) {
-        case 'cell-formatting':
-          return objectsCopy.compatibilityLabels.cellFormatting;
-        case 'conditional-formatting':
-          return objectsCopy.compatibilityLabels.conditionalFormatting;
-        case 'data-validation':
-          return objectsCopy.compatibilityLabels.dataValidation;
-        case 'hyperlinks':
-          return objectsCopy.compatibilityLabels.hyperlinks;
-        case 'comments':
-          return objectsCopy.compatibilityLabels.comments;
-        case 'defined-names':
-          return objectsCopy.compatibilityLabels.definedNames;
-        case 'sheet-protection':
-          return objectsCopy.compatibilityLabels.sheetProtection;
-        case 'sheet-views':
-          return objectsCopy.compatibilityLabels.sheetViews;
-        case 'loaded-tables':
-          return objectsCopy.compatibilityLabels.loadedTables;
-        case 'format-as-table':
-          return objectsCopy.compatibilityLabels.formatAsTable;
-        case 'pivot-layouts':
-          return objectsCopy.compatibilityLabels.pivotLayouts;
-        case 'pivot-authoring':
-          return objectsCopy.compatibilityLabels.pivotAuthoring;
-        case 'session-charts':
-          return objectsCopy.compatibilityLabels.sessionCharts;
-        case 'charts-drawings':
-          return objectsCopy.compatibilityLabels.chartsDrawings;
-        case 'chart-authoring':
-          return objectsCopy.compatibilityLabels.chartAuthoring;
-        case 'external-links':
-          return objectsCopy.compatibilityLabels.externalLinks;
-      }
-    };
-    const compatibilityDetail = (id: (typeof summary.items)[number]['id']): string => {
-      switch (id) {
-        case 'cell-formatting':
-          return objectsCopy.compatibilityDetails.cellFormatting;
-        case 'conditional-formatting':
-          return objectsCopy.compatibilityDetails.conditionalFormatting;
-        case 'data-validation':
-          return objectsCopy.compatibilityDetails.dataValidation;
-        case 'hyperlinks':
-          return objectsCopy.compatibilityDetails.hyperlinks;
-        case 'comments':
-          return objectsCopy.compatibilityDetails.comments;
-        case 'defined-names':
-          return objectsCopy.compatibilityDetails.definedNames;
-        case 'sheet-protection':
-          return objectsCopy.compatibilityDetails.sheetProtection;
-        case 'sheet-views':
-          return objectsCopy.compatibilityDetails.sheetViews;
-        case 'loaded-tables':
-          return objectsCopy.compatibilityDetails.loadedTables;
-        case 'format-as-table':
-          return objectsCopy.compatibilityDetails.formatAsTable;
-        case 'pivot-layouts':
-          return objectsCopy.compatibilityDetails.pivotLayouts;
-        case 'pivot-authoring':
-          return objectsCopy.compatibilityDetails.pivotAuthoring;
-        case 'session-charts':
-          return objectsCopy.compatibilityDetails.sessionCharts;
-        case 'charts-drawings':
-          return objectsCopy.compatibilityDetails.chartsDrawings;
-        case 'chart-authoring':
-          return objectsCopy.compatibilityDetails.chartAuthoring;
-        case 'external-links':
-          return objectsCopy.compatibilityDetails.externalLinks;
-      }
-    };
-    const statusLabel = (status: keyof typeof summary.byStatus): string => {
-      if (status === 'writable') return objectsCopy.writable;
-      if (status === 'read-only') return objectsCopy.readOnly;
-      if (status === 'session') return objectsCopy.sessionOnly;
-      return objectsCopy.unsupported;
-    };
     setRibbonReportDialog({
       title: strings.backstage.inspect,
-      items: [
-        {
-          severity: 'info',
-          label: objectsCopy.compatibility,
-          detail: `${objectsCopy.writable} ${summary.byStatus.writable}, ${objectsCopy.readOnly} ${summary.byStatus['read-only']}, ${objectsCopy.sessionOnly} ${summary.byStatus.session}, ${objectsCopy.unsupported} ${summary.byStatus.unsupported}`,
-        },
-        ...summary.items.map((item) => ({
-          severity:
-            item.status === 'unsupported' || item.status === 'read-only'
-              ? ('warning' as const)
-              : ('info' as const),
-          label: `${compatibilityLabel(item.id)} · ${statusLabel(item.status)}`,
-          detail: item.count
-            ? `${compatibilityDetail(item.id)} (${item.count})`
-            : compatibilityDetail(item.id),
-        })),
-      ],
+      items: buildSpreadsheetCompatibilityReport(instance.workbook, strings.workbookObjects),
     });
   }, [instance, strings.backstage.inspect, strings.workbookObjects]);
 
@@ -2763,20 +1709,12 @@ export const SpreadsheetToolbar = ({
   const onSort = useCallback(
     (direction: 'asc' | 'desc') => {
       if (!instance) return;
-      const s = instance.store.getState();
-      instance.history.begin();
-      let ok = false;
-      try {
-        const range = inferAutoFilterRange(s);
-        ok = sortRange(s, instance.store, instance.workbook, range, {
-          byCol: s.selection.active.col,
-          direction,
-          hasHeader: inferSortHasHeader(s, range),
-        });
-      } finally {
-        instance.history.end();
-      }
-      if (ok) mutators.replaceCells(instance.store, instance.workbook.cells(s.data.sheetIndex));
+      sortActiveColumnAuto({
+        store: instance.store,
+        workbook: instance.workbook,
+        history: instance.history,
+        direction,
+      });
     },
     [instance],
   );

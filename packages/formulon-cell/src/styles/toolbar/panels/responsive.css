@@ -1,0 +1,73 @@
+/* Narrow-viewport adjustments (≤900px): collapse the multi-column
+   shell into a single column, hide the search box, dock the side panel
+   to the bottom instead of the right edge. */
+
+@media (max-width: 900px) {
+  .demo__titlebar {
+    grid-template-columns: auto 1fr auto;
+  }
+
+  .demo__title {
+    justify-content: start;
+  }
+
+  .demo__search {
+    display: none;
+  }
+
+  .demo__commandbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .demo__controls {
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .demo__body {
+    grid-template-columns: 1fr;
+  }
+
+  .demo__body--panel {
+    grid-template-rows: 1fr;
+  }
+
+  .demo__backstage {
+    inset: 39px 0 0;
+    grid-template-columns: 120px minmax(0, 1fr);
+  }
+
+  .demo__backstage-nav {
+    padding: 12px 8px;
+  }
+
+  .demo__backstage-nav strong {
+    margin: 0 8px 8px;
+    font-size: 18px;
+  }
+
+  .demo__backstage-main {
+    padding: 18px;
+  }
+
+  .demo__backstage-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .demo__panel {
+    top: auto;
+    left: 0;
+    width: auto;
+    max-height: 42vh;
+    border-top: 1px solid var(--demo-line);
+    border-left: 0;
+    padding: 12px;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.14);
+  }
+
+  .demo__modal {
+    padding: 12px;
+  }
+}

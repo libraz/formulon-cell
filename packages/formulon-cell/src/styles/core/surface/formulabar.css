@@ -36,7 +36,7 @@
   }
   .fc-host__formulabar-tag:focus {
     border-color: var(--fc-accent);
-    box-shadow: 0 0 0 2px var(--fc-accent-soft, rgba(56, 89, 255, 0.15));
+    box-shadow: 0 0 0 2px var(--fc-accent-soft);
   }
 
   .fc-host__formulabar-fx {
@@ -150,7 +150,7 @@
     border: var(--fc-hairline) solid var(--fc-rule);
     border-radius: 2px;
     background: var(--fc-bg-elev, Canvas);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+    box-shadow: var(--fc-shadow-8);
     color: var(--fc-fg, CanvasText);
     font-family: var(--fc-font-ui);
     font-size: 12px;

@@ -34,6 +34,8 @@
     --fc-bg-rail: initial;
     /* Active row/column header tint. */
     --fc-bg-header: initial;
+    /* Neutral hover surface — menu rows, list rows, dialog inner hover. */
+    --fc-bg-hover: initial;
 
     /* === FOREGROUND — cell text scale === */
     /* Default cell text. */
@@ -105,6 +107,26 @@
     --fc-radius-sm: initial;
     --fc-radius-md: initial;
     --fc-radius-lg: initial;
+    /* Default hairline rule width — bump to 2px for hi-res / contrast modes. */
+    --fc-hairline: initial;
+
+    /* === RULES (extended) === */
+    /* Even softer than --fc-rule — used for in-table row separators. */
+    --fc-rule-soft: initial;
+    /* Light divider between menu/list rows; lighter than --fc-rule. */
+    --fc-rule-subtle: initial;
+    /* Active-range wash painted across selected cells. */
+    --fc-selection-fill: initial;
+
+    /* === FORMAT-CELLS DIALOG — DIAGONAL BORDER === */
+    /* Diagonal line color & thickness for the Format Cells border tab swatch. */
+    --fc-fmtdlg-border-diag-color: initial;
+    --fc-fmtdlg-border-diag-width: initial;
+
+    /* === MENU ICONS (set per-item from JS) === */
+    /* Per-row data-URL mask + color used by context-menu / sheet-menu items. */
+    --fc-menu-icon: initial;
+    --fc-menu-icon-color: initial;
 
     /* === MOTION === */
     --fc-dur-fast: initial;
@@ -112,6 +134,18 @@
     --fc-dur-slow: initial;
     --fc-ease-out: initial;
     --fc-ease-in-out: initial;
+
+    /* === ELEVATION — Fluent-style ambient + key-light depth tiers ===
+     * Use semantically by surface, not by pixel value:
+     *   --fc-shadow-2   subtle (status bar lift, hover tips lifted slightly off rail)
+     *   --fc-shadow-4   small popovers (autocomplete, validation tooltip)
+     *   --fc-shadow-8   menus, dropdowns, flyouts
+     *   --fc-shadow-16  dialogs, modal panels
+     * Dark themes typically deepen these — see theme-ink.css. */
+    --fc-shadow-2: initial;
+    --fc-shadow-4: initial;
+    --fc-shadow-8: initial;
+    --fc-shadow-16: initial;
   }
 
   /* === Z-INDEX TIERS — floating UI stacking floors ===

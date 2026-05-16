@@ -5,16 +5,16 @@
     gap: 8px;
     padding: 12px 22px 16px;
     border-top: 0;
-    background: var(--fc-fmtdlg-footer-bg, #ffffff);
+    background: var(--fc-fmtdlg-footer-bg);
   }
   .fc-fmtdlg__btn {
     min-width: 88px;
     min-height: 30px;
     padding: 4px 16px;
-    background: var(--fc-fmtdlg-btn-bg, #ffffff);
-    border: 1px solid var(--fc-fmtdlg-btn-border, #c8c8c8);
+    background: var(--fc-fmtdlg-btn-bg);
+    border: 1px solid var(--fc-fmtdlg-btn-border);
     border-radius: 4px;
-    color: var(--fc-fmtdlg-btn-fg, #1f2328);
+    color: var(--fc-fmtdlg-btn-fg);
     cursor: pointer;
     font: inherit;
     font-size: 12px;
@@ -23,27 +23,27 @@
       border-color 80ms ease;
   }
   .fc-fmtdlg__btn:hover {
-    background: var(--fc-fmtdlg-btn-hover-bg, #f3f3f3);
-    border-color: var(--fc-fmtdlg-btn-hover-border, #8a8886);
+    background: var(--fc-fmtdlg-btn-hover-bg);
+    border-color: var(--fc-fmtdlg-btn-hover-border);
   }
   .fc-fmtdlg__btn:focus-visible {
     outline: 2px solid var(--fc-accent, currentColor);
     outline-offset: 1px;
   }
   .fc-fmtdlg__btn--primary {
-    background: var(--fc-fmtdlg-btn-primary-bg, #1f5f31);
-    color: var(--fc-fmtdlg-btn-primary-fg, #ffffff);
-    border-color: var(--fc-fmtdlg-btn-primary-bg, #1f5f31);
+    background: var(--fc-fmtdlg-btn-primary-bg);
+    color: var(--fc-fmtdlg-btn-primary-fg);
+    border-color: var(--fc-fmtdlg-btn-primary-bg);
   }
   .fc-fmtdlg__btn--primary:hover {
-    background: var(--fc-fmtdlg-btn-primary-hover-bg, #25753c);
-    border-color: var(--fc-fmtdlg-btn-primary-hover-bg, #25753c);
+    background: var(--fc-fmtdlg-btn-primary-hover-bg);
+    border-color: var(--fc-fmtdlg-btn-primary-hover-bg);
   }
   .fc-fmtdlg__hintbar {
     padding: 10px 22px 12px;
-    border-top: 1px solid var(--fc-fmtdlg-rule, #ebebeb);
-    background: var(--fc-fmtdlg-footer-bg, #ffffff);
-    color: var(--fc-fmtdlg-hint-fg, #424242);
+    border-top: 1px solid var(--fc-fmtdlg-rule);
+    background: var(--fc-fmtdlg-footer-bg);
+    color: var(--fc-fmtdlg-hint-fg);
     font-size: 12px;
     line-height: 1.4;
   }

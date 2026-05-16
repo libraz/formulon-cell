@@ -30,10 +30,8 @@ import {
   clearTraceArrows,
   clearTraceArrowsByKind,
   clearFilter,
-  clearFormat,
   clearComment,
   clearHyperlink,
-  clearVisualFormat,
   clearValidationCircles,
   clearValidationInRangeWithEngine,
   clearWatchedCells,
@@ -44,9 +42,12 @@ import {
   collapseRowGroup,
   copyAdvancedFilterResult,
   createDefinedNamesFromSelection,
+  buildRibbonAddInReport,
   createColorPalette,
-  createPivotTableFromRange,
-  createSessionChart,
+  createRibbonChartFromSelection,
+  executeRibbonClearAction,
+  executeRibbonPivotTableAction,
+  resolveRibbonPdfAction,
   deleteCells,
   deleteSheetView,
   cycleBorders,
@@ -54,10 +55,9 @@ import {
   cyclePercent,
   deleteCols,
   deleteRows,
-  fillRange,
+  executeRibbonFillAction,
+  executeRibbonFindAction,
   filterBySelectedCellValue,
-  findMatchingCells,
-  applyFlashFill,
   formatAsTable,
   type FeatureFlags,
   groupCols,
@@ -65,8 +65,6 @@ import {
   hiddenInSelection,
   hyperlinkAt,
   inferAutoFilterRange,
-  inferFlashFillPattern,
-  inferPivotSourceFields,
   ignoreCellError,
   insertCells,
   hideCols,
@@ -84,7 +82,6 @@ import {
   numberFormatForAction,
   type PageOrientation,
   type PaperSize,
-  PivotAggregation,
   reviewCellsFromState,
   recordConditionalRulesChange,
   recordDefinedNamesChange,
@@ -133,7 +130,6 @@ import {
   setSheetZoom,
   setWorkbookStructureProtected,
   selectNextFormulaError,
-  selectionFromMatches,
   setShowFormulas,
   setWorkbookView,
   type ScriptCommand,
@@ -142,12 +138,13 @@ import {
   showRows,
   showRowsAroundSelection,
   inferSortHasHeader,
-  sortRange,
+  sortActiveColumnAuto,
+  sortRangeWithHistory,
   type SpreadsheetInstance,
   insertDefinedNameFormula,
   isCellWritable,
   isWorkbookStructureProtected,
-  summarizeSpreadsheetCompatibility,
+  buildSpreadsheetCompatibilityReport,
   textToColumns,
   setVAlign,
   toggleBold,
@@ -160,7 +157,6 @@ import {
   ungroupRows,
   warnProtected,
   watchRange,
-  writableAddrs,
   type CellDeleteAction,
   type CellInsertAction,
   type ConditionalMenuAction,
@@ -730,187 +726,45 @@ const onAllScripts = (): void => {
   };
 };
 const onAddInAction = (action: 'get' | 'my' | 'manage'): void => {
-  if (action === 'get') {
-    ribbonReportDialog.value = {
-      title: cellText.value.addInGet,
-      items: [
-        {
-          severity: 'info',
-          label: cellText.value.addInStoreLabel,
-          detail: cellText.value.addInStoreDetail,
-        },
-        {
-          severity: 'info',
-          label: cellText.value.addInBuiltInLabel,
-          detail: cellText.value.addInBuiltInDetail,
-        },
-      ],
-    };
-    return;
-  }
-  if (action === 'manage') {
-    ribbonReportDialog.value = {
-      title: cellText.value.addInManage,
-      items: [
-        {
-          severity: 'info',
-          label: cellText.value.addInManagedStatus,
-          detail: cellText.value.addInExternalDetail,
-        },
-      ],
-    };
-    return;
-  }
-  if (action === 'my') {
-    ribbonReportDialog.value = {
-      title: cellText.value.addInMy,
-      items: [
-        {
-          severity: 'info',
-          label: cellText.value.addInBuiltInLabel,
-          detail: cellText.value.addInBuiltInDetail,
-        },
-        {
-          severity: 'info',
-          label: cellText.value.addInExternalLabel,
-          detail: cellText.value.addInExternalDetail,
-        },
-      ],
-    };
-    return;
-  }
-  if (props.onAddIn) {
-    props.onAddIn();
-    return;
-  }
-  ribbonReportDialog.value = {
-    title: tr.value.addIn,
-    items: [
-      {
-        severity: 'info',
-        label: cellText.value.addInBuiltInLabel,
-        detail: cellText.value.addInBuiltInDetail,
-      },
-      {
-        severity: 'info',
-        label: cellText.value.addInExternalLabel,
-        detail: cellText.value.addInExternalDetail,
-      },
-    ],
-  };
+  const report = buildRibbonAddInReport(action, {
+    cellMenu: cellText.value,
+    addInDefaultTitle: tr.value.addIn,
+  });
+  if (report) ribbonReportDialog.value = report;
 };
 const onPdfAction = (action: 'create' | 'share' | 'preferences'): void => {
   const inst = props.instance;
   if (!inst) return;
-  if (action === 'preferences') {
+  const result = resolveRibbonPdfAction(action, {
+    cellMenu: cellText.value,
+    pdfTitle: tr.value.pdf,
+  });
+  if (result.kind === 'open-page-setup') {
     inst.openPageSetup();
     return;
   }
   inst.print('pdf');
-  if (action === 'create') {
-    ribbonReportDialog.value = {
-      title: tr.value.pdf,
-      items: [{ severity: 'info', label: cellText.value.pdfCreate, detail: cellText.value.pdfCreateReady }],
-    };
-    return;
-  }
-  if (action === 'share') {
-    ribbonReportDialog.value = {
-      title: tr.value.pdf,
-      items: [{ severity: 'info', label: cellText.value.pdfShare, detail: cellText.value.pdfShareReady }],
-    };
-  }
+  if (result.report) ribbonReportDialog.value = result.report;
 };
 const onPivotTableAction = (action: PivotTableAction): void => {
   const inst = props.instance;
   if (!inst) return;
-  if (action === 'dialog' || action === 'existing-sheet') {
-    inst.openPivotTableDialog();
-    return;
-  }
-  if (!inst.workbook.capabilities.pivotTableMutate) {
-    ribbonReportDialog.value = {
-      title:
-        action === 'recommended'
-          ? cellText.value.recommendedPivotTables
-          : cellText.value.pivotTableNewSheet,
-      items: [
-        {
-          severity: 'info',
-          label: tr.value.pivotTable,
-          detail: strings.value.workbookObjects.compatibilityDetails.pivotAuthoring,
-        },
-      ],
-    };
-    return;
-  }
-  const source = inst.store.getState().selection.range;
-  const fields = inferPivotSourceFields(inst.workbook, source);
-  const valueField = fields.find((field) => field.numericCount > 0) ?? fields.at(-1);
-  const rowField = fields.find((field) => field.name !== valueField?.name) ?? fields[0];
-  if (!rowField || !valueField || rowField.name === valueField.name) {
-    ribbonReportDialog.value = {
-      title: tr.value.pivotTable,
-      items: [
-        {
-          severity: 'warning',
-          label: tr.value.pivotTable,
-          detail: strings.value.workbookObjects.compatibilityDetails.pivotAuthoring,
-        },
-      ],
-    };
-    return;
-  }
-  let destinationSheet = source.sheet;
-  if (action === 'new-sheet') {
-    const added = addSheet(inst.store, inst.workbook, inst.history);
-    if (added < 0) {
-      ribbonReportDialog.value = {
-        title: cellText.value.pivotTableNewSheet,
-        items: [
-          {
-            severity: 'warning',
-            label: tr.value.pivotTable,
-            detail: cellText.value.workbookStructureProtectedBlocked,
-          },
-        ],
-      };
-      return;
-    }
-    destinationSheet = added;
-  }
-  const destination =
-    action === 'new-sheet'
-      ? { sheet: destinationSheet, row: 0, col: 0 }
-      : { sheet: destinationSheet, row: source.r1 + 3, col: source.c0 };
-  const result = createPivotTableFromRange(inst.workbook, {
-    source,
-    destination,
-    name: `PivotTable${inst.workbook.getPivotTables().length + 1}`,
-    rowField: rowField.name,
-    valueField: valueField.name,
-    aggregation: valueField.numericCount > 0 ? PivotAggregation.Sum : PivotAggregation.Count,
+  const result = executeRibbonPivotTableAction({
+    store: inst.store,
+    workbook: inst.workbook,
+    history: inst.history,
+    action,
+    strings: {
+      pivotTable: tr.value.pivotTable,
+      pivotTableNewSheet: cellText.value.pivotTableNewSheet,
+      recommendedPivotTables: cellText.value.recommendedPivotTables,
+      pivotAuthoringDetail: strings.value.workbookObjects.compatibilityDetails.pivotAuthoring,
+      workbookStructureProtectedBlocked: cellText.value.workbookStructureProtectedBlocked,
+    },
   });
-  if (result.ok) {
-    mutators.replaceCells(inst.store, inst.workbook.cells(destinationSheet));
-    mutators.setSheetIndex(inst.store, destinationSheet);
-    mutators.setActive(inst.store, destination);
-    active.value = projectActiveState(inst);
-    return;
-  }
-  ribbonReportDialog.value = {
-    title:
-      action === 'recommended'
-        ? cellText.value.recommendedPivotTables
-        : cellText.value.pivotTableNewSheet,
-    items: [
-      {
-        severity: 'info',
-        label: tr.value.pivotTable,
-        detail: strings.value.workbookObjects.compatibilityDetails.pivotAuthoring,
-      },
-    ],
-  };
+  if (result.kind === 'open-dialog') inst.openPivotTableDialog();
+  else if (result.kind === 'report') ribbonReportDialog.value = result.report;
+  else active.value = projectActiveState(inst);
 };
 const onIllustrationAction = (label: string): void => {
   if (!props.instance) return;
@@ -934,100 +788,9 @@ const onBackstageProtectWorkbook = (): void => {
 const onBackstageInspectWorkbook = (): void => {
   const inst = props.instance;
   if (!inst) return;
-  const summary = summarizeSpreadsheetCompatibility(inst.workbook);
-  const objectsText = strings.value.workbookObjects;
-  const compatibilityLabel = (id: (typeof summary.items)[number]['id']): string => {
-    switch (id) {
-      case 'cell-formatting':
-        return objectsText.compatibilityLabels.cellFormatting;
-      case 'conditional-formatting':
-        return objectsText.compatibilityLabels.conditionalFormatting;
-      case 'data-validation':
-        return objectsText.compatibilityLabels.dataValidation;
-      case 'hyperlinks':
-        return objectsText.compatibilityLabels.hyperlinks;
-      case 'comments':
-        return objectsText.compatibilityLabels.comments;
-      case 'defined-names':
-        return objectsText.compatibilityLabels.definedNames;
-      case 'sheet-protection':
-        return objectsText.compatibilityLabels.sheetProtection;
-      case 'sheet-views':
-        return objectsText.compatibilityLabels.sheetViews;
-      case 'loaded-tables':
-        return objectsText.compatibilityLabels.loadedTables;
-      case 'format-as-table':
-        return objectsText.compatibilityLabels.formatAsTable;
-      case 'pivot-layouts':
-        return objectsText.compatibilityLabels.pivotLayouts;
-      case 'pivot-authoring':
-        return objectsText.compatibilityLabels.pivotAuthoring;
-      case 'session-charts':
-        return objectsText.compatibilityLabels.sessionCharts;
-      case 'charts-drawings':
-        return objectsText.compatibilityLabels.chartsDrawings;
-      case 'chart-authoring':
-        return objectsText.compatibilityLabels.chartAuthoring;
-      case 'external-links':
-        return objectsText.compatibilityLabels.externalLinks;
-    }
-  };
-  const compatibilityDetail = (id: (typeof summary.items)[number]['id']): string => {
-    switch (id) {
-      case 'cell-formatting':
-        return objectsText.compatibilityDetails.cellFormatting;
-      case 'conditional-formatting':
-        return objectsText.compatibilityDetails.conditionalFormatting;
-      case 'data-validation':
-        return objectsText.compatibilityDetails.dataValidation;
-      case 'hyperlinks':
-        return objectsText.compatibilityDetails.hyperlinks;
-      case 'comments':
-        return objectsText.compatibilityDetails.comments;
-      case 'defined-names':
-        return objectsText.compatibilityDetails.definedNames;
-      case 'sheet-protection':
-        return objectsText.compatibilityDetails.sheetProtection;
-      case 'sheet-views':
-        return objectsText.compatibilityDetails.sheetViews;
-      case 'loaded-tables':
-        return objectsText.compatibilityDetails.loadedTables;
-      case 'format-as-table':
-        return objectsText.compatibilityDetails.formatAsTable;
-      case 'pivot-layouts':
-        return objectsText.compatibilityDetails.pivotLayouts;
-      case 'pivot-authoring':
-        return objectsText.compatibilityDetails.pivotAuthoring;
-      case 'session-charts':
-        return objectsText.compatibilityDetails.sessionCharts;
-      case 'charts-drawings':
-        return objectsText.compatibilityDetails.chartsDrawings;
-      case 'chart-authoring':
-        return objectsText.compatibilityDetails.chartAuthoring;
-      case 'external-links':
-        return objectsText.compatibilityDetails.externalLinks;
-    }
-  };
-  const statusLabel = (status: keyof typeof summary.byStatus): string => {
-    if (status === 'writable') return objectsText.writable;
-    if (status === 'read-only') return objectsText.readOnly;
-    if (status === 'session') return objectsText.sessionOnly;
-    return objectsText.unsupported;
-  };
   ribbonReportDialog.value = {
     title: backstageText.value.inspect,
-    items: [
-      {
-        severity: 'info',
-        label: objectsText.compatibility,
-        detail: `${objectsText.writable} ${summary.byStatus.writable}, ${objectsText.readOnly} ${summary.byStatus['read-only']}, ${objectsText.sessionOnly} ${summary.byStatus.session}, ${objectsText.unsupported} ${summary.byStatus.unsupported}`,
-      },
-      ...summary.items.map((item) => ({
-        severity: (item.status === 'unsupported' || item.status === 'read-only' ? 'warning' : 'info') as 'warning' | 'info',
-        label: `${compatibilityLabel(item.id)} · ${statusLabel(item.status)}`,
-        detail: item.count ? `${compatibilityDetail(item.id)} (${item.count})` : compatibilityDetail(item.id),
-      })),
-    ],
+    items: buildSpreadsheetCompatibilityReport(inst.workbook, strings.value.workbookObjects),
   };
 };
 const onDrawPen = (): void => {
@@ -1494,20 +1257,12 @@ const onFilterToggle = (): void => {
 const onSort = (direction: 'asc' | 'desc'): void => {
   const inst = props.instance;
   if (!inst) return;
-  const s = inst.store.getState();
-  inst.history.begin();
-  let ok = false;
-  try {
-    const range = inferAutoFilterRange(s);
-    ok = sortRange(s, inst.store, inst.workbook, range, {
-      byCol: s.selection.active.col,
-      direction,
-      hasHeader: inferSortHasHeader(s, range),
-    });
-  } finally {
-    inst.history.end();
-  }
-  if (ok) mutators.replaceCells(inst.store, inst.workbook.cells(s.data.sheetIndex));
+  sortActiveColumnAuto({
+    store: inst.store,
+    workbook: inst.workbook,
+    history: inst.history,
+    direction,
+  });
 };
 
 const onRemoveDuplicates = (): void => {
@@ -1586,20 +1341,17 @@ const applyCustomSort = (): void => {
   const inst = props.instance;
   const draft = sortDialog.value;
   if (!inst || !draft) return;
-  const s = inst.store.getState();
-  const range = s.selection.range;
-  inst.history.begin();
-  let ok = false;
-  try {
-    ok = sortRange(s, inst.store, inst.workbook, range, {
+  sortRangeWithHistory({
+    store: inst.store,
+    workbook: inst.workbook,
+    history: inst.history,
+    range: inst.store.getState().selection.range,
+    options: {
       byCol: draft.byCol,
       direction: draft.direction,
       hasHeader: draft.hasHeader,
-    });
-  } finally {
-    inst.history.end();
-  }
-  if (ok) mutators.replaceCells(inst.store, inst.workbook.cells(s.data.sheetIndex));
+    },
+  });
   sortDialog.value = null;
 };
 
@@ -1860,66 +1612,20 @@ const onClearArrowsAction = (action: ClearArrowsAction): void => {
 const onFindAction = (action: FindAction): void => {
   const inst = props.instance;
   if (!inst) return;
-  const selectSpecialMatches = (
-    kind:
-      | 'formulas'
-      | 'constants'
-      | 'numbers'
-      | 'text'
-      | 'errors'
-      | 'conditional-format'
-      | 'data-validation',
-  ): boolean => {
-    const matches = findMatchingCells(inst.workbook, inst.store, 'sheet', kind);
-    const first = matches[0];
-    if (!first) {
-      ribbonReportDialog.value = {
-        title: cellText.value.findSelect,
-        items: [{ severity: 'info', label: cellText.value.findNoMatches, detail: '' }],
-      };
-      return false;
-    }
-    inst.store.setState((state) => ({
-      ...state,
-      selection: selectionFromMatches(matches),
-    }));
-    return true;
-  };
-  if (action === 'find') inst.openFindReplace('find');
-  else if (action === 'replace') inst.openFindReplace('replace');
-  else if (action === 'go-to') inst.openGoTo();
-  else if (action === 'go-to-special') inst.openGoToSpecial();
-  else if (
-    action === 'formulas' ||
-    action === 'constants' ||
-    action === 'numbers' ||
-    action === 'text' ||
-    action === 'errors' ||
-    action === 'conditional-format' ||
-    action === 'data-validation'
-  ) {
-    if (!selectSpecialMatches(action)) {
-      closeDropdown();
-      return;
-    }
-  }
-  else if (action === 'comments') {
-    const comments = listComments(inst.store.getState());
-    const first = comments[0]?.addr;
-    if (!first) {
-      ribbonReportDialog.value = {
-        title: cellText.value.findSelect,
-        items: [{ severity: 'info', label: cellText.value.commentNone, detail: '' }],
-      };
-      closeDropdown();
-      return;
-    }
-    const selection = selectionFromMatches(comments.map((entry) => entry.addr));
-    inst.store.setState((state) => ({
-      ...state,
-      selection,
-    }));
-  }
+  const result = executeRibbonFindAction({
+    store: inst.store,
+    workbook: inst.workbook,
+    action,
+    strings: {
+      findSelect: cellText.value.findSelect,
+      findNoMatches: cellText.value.findNoMatches,
+      commentNone: cellText.value.commentNone,
+    },
+  });
+  if (result.kind === 'open-find') inst.openFindReplace(result.mode);
+  else if (result.kind === 'open-go-to') inst.openGoTo();
+  else if (result.kind === 'open-go-to-special') inst.openGoToSpecial();
+  else if (result.kind === 'report') ribbonReportDialog.value = result.report;
   closeDropdown();
 };
 
@@ -2179,193 +1885,48 @@ const onSymbolAction = (symbol: SymbolAction): void => {
 const onFillDown = (): void => {
   const inst = props.instance;
   if (!inst) return;
-  const range = inst.store.getState().selection.range;
-  if (range.r0 === range.r1) return;
-  const src = { ...range, r1: range.r0 };
-  inst.history.begin();
-  try {
-    recordFormatChange(inst.history, inst.store, () => {
-      fillRange(inst.store.getState(), inst.workbook, src, range, {
-        formatting: 'with',
-        store: inst.store,
-      });
-    });
-  } finally {
-    inst.history.end();
-  }
-  mutators.replaceCells(inst.store, inst.workbook.cells(range.sheet));
+  executeRibbonFillAction({
+    store: inst.store,
+    workbook: inst.workbook,
+    history: inst.history,
+    action: 'down',
+  });
 };
 
 const onFillAction = (action: FillAction): void => {
   const inst = props.instance;
   if (!inst) return;
-  const range = inst.store.getState().selection.range;
-  if (action === 'flash') {
-    if (range.c0 !== range.c1 || range.c0 === 0) {
-      closeDropdown();
-      return;
-    }
-    const examples: { input: string; output: string }[] = [];
-    const pending: { row: number; input: string }[] = [];
-    for (let row = range.r0; row <= range.r1; row += 1) {
-      const inputValue = inst.workbook.getValue({ sheet: range.sheet, row, col: range.c0 - 1 });
-      const outputValue = inst.workbook.getValue({ sheet: range.sheet, row, col: range.c0 });
-      const input =
-        inputValue.kind === 'text'
-          ? inputValue.value
-          : inputValue.kind === 'number'
-            ? String(inputValue.value)
-            : inputValue.kind === 'bool'
-              ? String(inputValue.value)
-              : '';
-      if (input.length === 0) continue;
-      if (outputValue.kind === 'text' && outputValue.value.length > 0) {
-        examples.push({ input, output: outputValue.value });
-      } else if (
-        outputValue.kind === 'blank' &&
-        isCellWritable(inst.store.getState(), { sheet: range.sheet, row, col: range.c0 })
-      ) {
-        pending.push({ row, input });
-      }
-    }
-    const pattern = inferFlashFillPattern(examples);
-    if (!pattern || pending.length === 0) {
-      closeDropdown();
-      return;
-    }
-    const filled = applyFlashFill(
-      pattern,
-      pending.map((entry) => entry.input),
-    );
-    inst.history.begin();
-    try {
-      pending.forEach((entry, index) => {
-        const value = filled[index];
-        if (value != null) inst.workbook.setText({ sheet: range.sheet, row: entry.row, col: range.c0 }, value);
-      });
-    } finally {
-      inst.history.end();
-    }
-    mutators.replaceCells(inst.store, inst.workbook.cells(range.sheet));
-    closeDropdown();
-    return;
-  }
-  const isDateSeries =
-    action === 'days' || action === 'weekdays' || action === 'months' || action === 'years';
-  const direction =
-    action === 'down' || action === 'right' || action === 'up' || action === 'left'
-      ? action
-      : 'down';
-  let src = range;
-  if (direction === 'down') src = { ...range, r1: range.r0 };
-  else if (direction === 'up') src = { ...range, r0: range.r1 };
-  else if (direction === 'right') src = { ...range, c1: range.c0 };
-  else src = { ...range, c0: range.c1 };
-  if (src.r0 === range.r0 && src.r1 === range.r1 && src.c0 === range.c0 && src.c1 === range.c1) return;
-  inst.history.begin();
-  try {
-    recordFormatChange(inst.history, inst.store, () => {
-      fillRange(inst.store.getState(), inst.workbook, src, range, {
-        copyOnly: action === 'series' || isDateSeries ? false : undefined,
-        dateUnit: isDateSeries ? action : undefined,
-        formatting: 'with',
-        store: inst.store,
-      });
-    });
-  } finally {
-    inst.history.end();
-  }
-  mutators.replaceCells(inst.store, inst.workbook.cells(range.sheet));
+  executeRibbonFillAction({
+    store: inst.store,
+    workbook: inst.workbook,
+    history: inst.history,
+    action,
+  });
   closeDropdown();
 };
 
 const onClearAction = (action: ClearAction): void => {
   const inst = props.instance;
   if (!inst) return;
-  const range = inst.store.getState().selection.range;
-  const eachCell = (fn: (row: number, col: number) => void): void => {
-    for (let row = range.r0; row <= range.r1; row += 1) {
-      for (let col = range.c0; col <= range.c1; col += 1) fn(row, col);
-    }
-  };
-  if (action === 'formats') {
-    wrapFormat(clearVisualFormat);
-    closeDropdown();
-    return;
-  }
-  if (action === 'conditional') {
-    recordConditionalRulesChange(inst.history, inst.store, () => {
-      mutators.clearConditionalRulesInRange(inst.store, range);
-    });
-    closeDropdown();
-    return;
-  }
-  inst.history.begin();
-  try {
-    if (action === 'contents' || action === 'all') {
-      for (const addr of writableAddrs(inst.store.getState(), range)) {
-        inst.workbook.setBlank(addr);
-      }
-    }
-    if (action === 'comments' || action === 'all') {
-      recordFormatChange(inst.history, inst.store, () => {
-        eachCell((row, col) =>
-          clearComment(inst.store, { sheet: range.sheet, row, col }, inst.workbook),
-        );
-      });
-    }
-    if (action === 'hyperlinks' || action === 'all') {
-      recordFormatChange(inst.history, inst.store, () => {
-        eachCell((row, col) =>
-          clearHyperlink(inst.store, { sheet: range.sheet, row, col }, inst.workbook),
-        );
-      });
-    }
-    if (action === 'all') {
-      clearValidationInRangeWithEngine(inst.store, inst.history, inst.workbook, range);
-      recordFormatChange(inst.history, inst.store, () => {
-        clearFormat(inst.store.getState(), inst.store);
-      });
-      recordConditionalRulesChange(inst.history, inst.store, () => {
-        mutators.clearConditionalRulesInRange(inst.store, range);
-      });
-    }
-  } finally {
-    inst.history.end();
-  }
-  mutators.replaceCells(inst.store, inst.workbook.cells(range.sheet));
+  executeRibbonClearAction({
+    store: inst.store,
+    workbook: inst.workbook,
+    history: inst.history,
+    action,
+  });
   closeDropdown();
 };
 
 const onCreateChart = (action: ChartAction = 'column'): void => {
   const inst = props.instance;
   if (!inst) return;
-  const range = inst.store.getState().selection.range;
-  const count = inst.store.getState().charts.charts.length;
-  const kind =
-    action === 'recommended'
-      ? range.r0 === range.r1 && range.c1 - range.c0 >= 2
-        ? 'line'
-        : range.c0 === range.c1 && range.r1 - range.r0 >= 2
-          ? 'bar'
-          : range.c1 - range.c0 === 1 && range.r1 - range.r0 <= 6
-            ? 'pie'
-            : 'column'
-      : action;
-  createSessionChart(
-    inst.store,
-    range,
-    {
-      id: `vue-ribbon-chart-${range.sheet}-${range.r0}-${range.c0}-${range.r1}-${range.c1}-${kind}-${count}`,
-      kind,
-      title: null,
-      x: 340 + (count % 3) * 24,
-      y: 96 + (count % 3) * 24,
-      w: 360,
-      h: 220,
-    },
-    inst.history,
-  );
+  createRibbonChartFromSelection({
+    store: inst.store,
+    history: inst.history,
+    range: inst.store.getState().selection.range,
+    action,
+    idPrefix: 'vue-ribbon-chart',
+  });
   closeDropdown();
 };
 

@@ -59,7 +59,7 @@
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
     border-radius: 2px;
     padding: 0;
-    background: #ffffff;
+    background: var(--fc-bg-elev);
   }
   .fc-fxdialog__item {
     display: flex;
@@ -75,7 +75,7 @@
     border-bottom: 0;
   }
   .fc-fxdialog__item:hover {
-    background: #f3f2f1;
+    background: var(--fc-bg-hover);
   }
   .fc-fxdialog__item--active {
     background: #e7f6ed;
@@ -104,7 +104,7 @@
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
     border-radius: 2px;
-    background: #fafafa;
+    background: var(--fc-bg-rail);
   }
   .fc-fxdialog__function-summary[hidden] {
     display: none;
@@ -126,7 +126,7 @@
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
     border-radius: 4px 4px 0 0;
-    background: #f3f2f1;
+    background: var(--fc-bg-hover);
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 13px;
     font-weight: 600;

@@ -1,0 +1,106 @@
+/* Data Validation list + input prompt, and the status-bar aggregate
+   chooser. All three are anchored popovers triggered from the edge
+   of an active cell or chrome surface. */
+
+@layer fc.app {
+  /* Validation list — small dropdown anchored under the cell's ▼ chevron. */
+  .fc-validation-list {
+    background: var(--fc-bg-elev, Canvas);
+    border: var(--fc-hairline, 1px) solid var(--fc-rule);
+    border-radius: var(--fc-radius-sm, 3px);
+    box-shadow: var(--fc-shadow-8);
+    z-index: var(--fc-z-popover, 2147483040);
+    pointer-events: auto;
+    max-height: 220px;
+    overflow-y: auto;
+    min-width: 120px;
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: var(--fc-text-cell, 13px);
+    color: var(--fc-fg, currentColor);
+    user-select: none;
+  }
+  .fc-validation-list__item {
+    padding: 5px 12px;
+    cursor: pointer;
+  }
+  .fc-validation-list__item:hover,
+  .fc-validation-list__item:focus-visible,
+  .fc-validation-list__item[aria-selected="true"] {
+    background: var(--fc-accent-soft, rgba(30, 122, 224, 0.14));
+    color: var(--fc-accent, dodgerblue);
+  }
+  .fc-validation-list__item:focus-visible {
+    outline: 1px solid var(--fc-accent, dodgerblue);
+    outline-offset: -1px;
+  }
+
+  /* Data Validation input message — passive prompt shown near the active cell. */
+  .fc-validation-prompt {
+    position: fixed;
+    z-index: var(--fc-z-tooltip, 2147483030);
+    pointer-events: none;
+    max-width: 280px;
+    padding: 8px 10px;
+    border: var(--fc-hairline, 1px) solid var(--fc-rule);
+    border-radius: var(--fc-radius-sm, 3px);
+    background: var(--fc-bg-elev, Canvas);
+    box-shadow: var(--fc-shadow-8);
+    color: var(--fc-fg, currentColor);
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: var(--fc-text-cell, 13px);
+    line-height: 1.35;
+    white-space: pre-wrap;
+  }
+  .fc-validation-prompt__title {
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  /* Status bar aggregate chooser — popover above the statusbar with
+     checkmark rows for each Sum/Avg/Count/Min/Max readout. */
+  .fc-statusbar__chooser {
+    position: fixed;
+    z-index: var(--fc-z-popover, 2147483040);
+    pointer-events: auto;
+    min-width: 200px;
+    padding: 4px;
+    background: var(--fc-bg-elev, Canvas);
+    color: var(--fc-fg, CanvasText);
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: var(--fc-radius-md, 6px);
+    box-shadow: var(--fc-shadow-8);
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 12.5px;
+  }
+  .fc-statusbar__chooser-heading {
+    padding: 6px 10px 4px;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: var(--fc-tracking-wide, 0.04em);
+    color: var(--fc-fg-mute, currentColor);
+  }
+  .fc-statusbar__chooser-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 10px;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    border-radius: var(--fc-radius-sm, 4px);
+  }
+  .fc-statusbar__chooser-item:hover {
+    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 8%, transparent));
+  }
+  .fc-statusbar__chooser-check {
+    display: inline-block;
+    width: 14px;
+    color: var(--fc-accent, currentColor);
+    text-align: center;
+  }
+}

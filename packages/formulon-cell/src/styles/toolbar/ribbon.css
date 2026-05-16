@@ -1,3 +1,5 @@
 @import "./ribbon/layout-and-buttons.css";
-@import "./ribbon/dropdowns-and-colors.css";
+@import "./ribbon/dropdowns.css";
+@import "./ribbon/color-controls.css";
+@import "./ribbon/menus.css";
 @import "./ribbon/groups.css";

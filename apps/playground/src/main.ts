@@ -17,6 +17,7 @@ import {
   backstageMenuText,
   boundingRange,
   buildRibbonModel,
+  buildSpreadsheetCompatibilityReport,
   buildTranslationReviewItems,
   bumpDecimals,
   bumpIndent,
@@ -50,13 +51,12 @@ import {
   colLetter,
   collapseColGroup,
   collapseRowGroup,
-  conditionalMenuText,
   copy,
   copyAdvancedFilterResult,
   createColorPalette,
   createDefinedNamesFromSelection,
   createPivotTableFromRange,
-  createSessionChart,
+  createRibbonChartFromSelection,
   cut,
   cycleCurrency,
   cyclePercent,
@@ -86,6 +86,7 @@ import {
   ignoreCellError,
   inferAutoFilterRange,
   inferPivotSourceFields,
+  inferRecommendedChartKind,
   inferSortHasHeader,
   insertCells,
   insertCols,
@@ -179,7 +180,6 @@ import {
   showCols,
   showRows,
   sortRange,
-  summarizeSpreadsheetCompatibility,
   TABLE_STYLE_COLORS,
   type TableStyle,
   tableStyleSwatch,
@@ -224,6 +224,29 @@ import {
   SVG_NS,
 } from './ribbon/border-icons.js';
 import { isJapaneseFontName, shouldShowFontOption } from './ribbon/font-availability.js';
+import { createBordersMenu as createBordersMenuImpl } from './ribbon/menus/borders.js';
+import {
+  buildCfMenuText,
+  createConditionalMenu as createConditionalMenuImpl,
+} from './ribbon/menus/conditional.js';
+import { type AutoSumFormulaName, createFormulasMenuFactories } from './ribbon/menus/formulas.js';
+import {
+  createMenu,
+  menuButton,
+  menuSectionHeader,
+  menuSeparator,
+} from './ribbon/menus/general.js';
+import { createHomeMenuFactories } from './ribbon/menus/home.js';
+import { createInsertMenuFactories } from './ribbon/menus/insert.js';
+import { createPageLayoutMenuFactories } from './ribbon/menus/page-layout.js';
+import { createPasteMenu as createPasteMenuImpl } from './ribbon/menus/paste.js';
+import { createReviewMenuFactories } from './ribbon/menus/review.js';
+import {
+  createStylesMenuFactories,
+  type TableVariantId,
+  tableVariantOptions,
+} from './ribbon/menus/styles.js';
+import { createTextOrientationMenu as createTextOrientationMenuImpl } from './ribbon/menus/text-orientation.js';
 import { seedWorkbook } from './seed.js';
 import { openSheetTabMenu } from './sheet-tab-menu.js';
 import { setupZoomControls } from './zoom-sort.js';
@@ -301,7 +324,52 @@ const automationRuns: AutomationRun[] = [];
 const ribbonLang = localeParam === 'en' ? 'en' : 'ja';
 const ribbonText = toolbarText(ribbonLang);
 const ribbonMenuText = toolbarMenuText(ribbonLang);
+const {
+  createSymbolMenu,
+  createPivotTableMenu,
+  createDefinedNamesMenu,
+  createLinksMenu,
+  createDataValidationMenu,
+  createChartInsertMenu,
+  createPictureInsertMenu,
+  createShapesInsertMenu,
+  createScreenshotInsertMenu,
+  createScriptMenu,
+  createAddInMenu,
+  createPdfMenu,
+} = createInsertMenuFactories(ribbonMenuText);
+const {
+  createPrintAreaMenu,
+  createPageBreaksMenu,
+  createSheetBackgroundMenu,
+  createPrintTitlesMenu,
+  createPageThemeMenu,
+} = createPageLayoutMenuFactories(ribbonMenuText);
+const { createAutoSumMenu, createCalcOptionsMenu, createClearArrowsMenu, createErrorCheckingMenu } =
+  createFormulasMenuFactories(ribbonMenuText, ribbonLang);
+const { createWatchMenu, createReviewCommentsMenu, createProtectMenu } =
+  createReviewMenuFactories(ribbonMenuText);
 const pageScaleText = pageScaleMenuText(ribbonLang);
+const {
+  createFreezeMenu,
+  createFillMenu,
+  createClearMenu,
+  createInsertCellsMenu,
+  createDeleteCellsMenu,
+  createFormatCellsMenu,
+  createSortMenu,
+  createTextToColumnsMenu,
+  createFindSelectMenu,
+} = createHomeMenuFactories({
+  ribbonLang,
+  ribbonMenuText,
+  ribbonText,
+  sheetTabs: dictionaries[ribbonLang].sheetTabs,
+});
+const createTextOrientationMenu = (): HTMLDivElement =>
+  createTextOrientationMenuImpl(ribbonMenuText);
+const { createTableStyleMenu, createCellStylesMenu, createCurrencyMenu } =
+  createStylesMenuFactories({ ribbonLang, ribbonMenuText, ribbonText });
 const ribbonReportText = dictionaries[ribbonLang].reviewReports;
 const backstageText = backstageMenuText(ribbonLang);
 const ribbonDisplayOptionsText = ribbonDisplayText(ribbonLang);
@@ -458,6 +526,127 @@ const legacyCommandIds: Record<string, string> = {
   wrap: 'btn-wrap',
 };
 
+// Lookup table for ribbon command-id → sub-menu DOM factory. Used by the
+// renderer to attach the right dropdown under each split-button. Kept as a
+// per-call thunk so factories that themselves close over module state (border
+// color, paste menu, etc.) stay lazy.
+const ribbonSubmenuFactoryFor = (
+  commandId: string,
+  groupVariant?: string,
+): (() => HTMLDivElement) | null => {
+  if (commandId === 'clearFormat') return groupVariant === 'editing' ? createClearMenu : null;
+  switch (commandId) {
+    case 'paste':
+      return createPasteMenu;
+    case 'pivotTableInsert':
+      return createPivotTableMenu;
+    case 'namedRangesInsert':
+      return () => createDefinedNamesMenu('menu-defined-names-insert');
+    case 'namedRanges':
+      return () => createDefinedNamesMenu('menu-defined-names');
+    case 'links':
+      return () => createLinksMenu('menu-links-file');
+    case 'linksInsert':
+      return () => createLinksMenu('menu-links-insert');
+    case 'linksData':
+      return () => createLinksMenu('menu-links-data');
+    case 'borders':
+      return createBordersMenu;
+    case 'textOrientation':
+      return createTextOrientationMenu;
+    case 'conditional':
+      return createConditionalMenu;
+    case 'fillHome':
+      return createFillMenu;
+    case 'insertRows':
+      return createInsertCellsMenu;
+    case 'deleteRows':
+      return createDeleteCellsMenu;
+    case 'formatCellsHome':
+      return createFormatCellsMenu;
+    case 'autosum':
+      return () => createAutoSumMenu('menu-autosum-home');
+    case 'freeze':
+      return createFreezeMenu;
+    case 'autosumFormula':
+      return () => createAutoSumMenu('menu-autosum-formulas');
+    case 'clearArrows':
+      return createClearArrowsMenu;
+    case 'errorChecking':
+      return createErrorCheckingMenu;
+    case 'watch':
+      return () => createWatchMenu('menu-watch-formulas');
+    case 'watchView':
+      return () => createWatchMenu('menu-watch-view');
+    case 'deleteCommentReview':
+      return createReviewCommentsMenu;
+    case 'protectReview':
+      return () => createProtectMenu('menu-protect-review');
+    case 'protect':
+      return () => createProtectMenu('menu-protect-view');
+    case 'calcOptions':
+      return createCalcOptionsMenu;
+    case 'filter':
+      return () => createSortMenu('menu-sort');
+    case 'textToColumns':
+      return createTextToColumnsMenu;
+    case 'dataValidation':
+      return createDataValidationMenu;
+    case 'sortFilterHome':
+      return () => createSortMenu('menu-sort-home');
+    case 'findHome':
+      return createFindSelectMenu;
+    case 'pictureInsert':
+      return createPictureInsertMenu;
+    case 'shapesInsert':
+      return createShapesInsertMenu;
+    case 'screenshotInsert':
+      return createScreenshotInsertMenu;
+    case 'chartInsert':
+      return createChartInsertMenu;
+    case 'formatTableHome':
+      return () => createTableStyleMenu('menu-table-style-home');
+    case 'formatTableInsert':
+      return () => createTableStyleMenu('menu-table-style-insert');
+    case 'cellStyles':
+      return createCellStylesMenu;
+    case 'currency':
+      return createCurrencyMenu;
+    case 'pageTheme':
+      return createPageThemeMenu;
+    case 'printArea':
+      return createPrintAreaMenu;
+    case 'pageBreaks':
+      return createPageBreaksMenu;
+    case 'sheetBackground':
+      return createSheetBackgroundMenu;
+    case 'printTitles':
+      return createPrintTitlesMenu;
+    case 'symbolInsert':
+      return createSymbolMenu;
+    case 'script':
+      return createScriptMenu;
+    case 'addIn':
+      return createAddInMenu;
+    case 'pdf':
+      return createPdfMenu;
+    default:
+      return null;
+  }
+};
+
+// Split-button commands that need an extra chevron, aria-haspopup, and the
+// open/close state on the primary button.
+const RIBBON_SPLIT_BUTTON_COMMANDS = new Set<string>([
+  'paste',
+  'autosum',
+  'autosumFormula',
+  'addIn',
+  'script',
+  'currency',
+  'pageTheme',
+]);
+
 const renderRibbon = (): void => {
   if (!ribbonRoot) return;
   const model = buildRibbonModel(ribbonLang);
@@ -541,75 +730,14 @@ const renderRibbon = (): void => {
           label.textContent = c.label;
           b.appendChild(label);
         }
-        if (
-          c.id === 'paste' ||
-          c.id === 'autosum' ||
-          c.id === 'autosumFormula' ||
-          c.id === 'addIn' ||
-          c.id === 'script' ||
-          c.id === 'currency' ||
-          c.id === 'pageTheme'
-        ) {
+        if (RIBBON_SPLIT_BUTTON_COMMANDS.has(c.id)) {
           b.setAttribute('aria-haspopup', 'menu');
           b.setAttribute('aria-expanded', 'false');
           b.appendChild(makeSvg('0 0 12 12', RIBBON_CHEVRON_PATH, 'demo__rb-split-chevron'));
         }
         tools.appendChild(b);
-        if (c.id === 'paste') tools.appendChild(createPasteMenu());
-        else if (c.id === 'pivotTableInsert') tools.appendChild(createPivotTableMenu());
-        else if (c.id === 'namedRangesInsert')
-          tools.appendChild(createDefinedNamesMenu('menu-defined-names-insert'));
-        else if (c.id === 'namedRanges')
-          tools.appendChild(createDefinedNamesMenu('menu-defined-names'));
-        else if (c.id === 'links') tools.appendChild(createLinksMenu('menu-links-file'));
-        else if (c.id === 'linksInsert') tools.appendChild(createLinksMenu('menu-links-insert'));
-        else if (c.id === 'linksData') tools.appendChild(createLinksMenu('menu-links-data'));
-        else if (c.id === 'borders') tools.appendChild(createBordersMenu());
-        else if (c.id === 'textOrientation') tools.appendChild(createTextOrientationMenu());
-        else if (c.id === 'conditional') tools.appendChild(createConditionalMenu());
-        else if (c.id === 'fillHome') tools.appendChild(createFillMenu());
-        else if (c.id === 'clearFormat' && g.variant === 'editing')
-          tools.appendChild(createClearMenu());
-        else if (c.id === 'insertRows') tools.appendChild(createInsertCellsMenu());
-        else if (c.id === 'deleteRows') tools.appendChild(createDeleteCellsMenu());
-        else if (c.id === 'formatCellsHome') tools.appendChild(createFormatCellsMenu());
-        else if (c.id === 'autosum') tools.appendChild(createAutoSumMenu('menu-autosum-home'));
-        else if (c.id === 'freeze') tools.appendChild(createFreezeMenu());
-        else if (c.id === 'autosumFormula')
-          tools.appendChild(createAutoSumMenu('menu-autosum-formulas'));
-        else if (c.id === 'clearArrows') tools.appendChild(createClearArrowsMenu());
-        else if (c.id === 'errorChecking') tools.appendChild(createErrorCheckingMenu());
-        else if (c.id === 'watch') tools.appendChild(createWatchMenu('menu-watch-formulas'));
-        else if (c.id === 'watchView') tools.appendChild(createWatchMenu('menu-watch-view'));
-        else if (c.id === 'deleteCommentReview') tools.appendChild(createReviewCommentsMenu());
-        else if (c.id === 'protectReview')
-          tools.appendChild(createProtectMenu('menu-protect-review'));
-        else if (c.id === 'protect') tools.appendChild(createProtectMenu('menu-protect-view'));
-        else if (c.id === 'calcOptions') tools.appendChild(createCalcOptionsMenu());
-        else if (c.id === 'filter') tools.appendChild(createSortMenu('menu-sort'));
-        else if (c.id === 'textToColumns') tools.appendChild(createTextToColumnsMenu());
-        else if (c.id === 'dataValidation') tools.appendChild(createDataValidationMenu());
-        else if (c.id === 'sortFilterHome') tools.appendChild(createSortMenu('menu-sort-home'));
-        else if (c.id === 'findHome') tools.appendChild(createFindSelectMenu());
-        else if (c.id === 'pictureInsert') tools.appendChild(createPictureInsertMenu());
-        else if (c.id === 'shapesInsert') tools.appendChild(createShapesInsertMenu());
-        else if (c.id === 'screenshotInsert') tools.appendChild(createScreenshotInsertMenu());
-        else if (c.id === 'chartInsert') tools.appendChild(createChartInsertMenu());
-        else if (c.id === 'formatTableHome')
-          tools.appendChild(createTableStyleMenu('menu-table-style-home'));
-        else if (c.id === 'formatTableInsert')
-          tools.appendChild(createTableStyleMenu('menu-table-style-insert'));
-        else if (c.id === 'cellStyles') tools.appendChild(createCellStylesMenu());
-        else if (c.id === 'currency') tools.appendChild(createCurrencyMenu());
-        else if (c.id === 'pageTheme') tools.appendChild(createPageThemeMenu());
-        else if (c.id === 'printArea') tools.appendChild(createPrintAreaMenu());
-        else if (c.id === 'pageBreaks') tools.appendChild(createPageBreaksMenu());
-        else if (c.id === 'sheetBackground') tools.appendChild(createSheetBackgroundMenu());
-        else if (c.id === 'printTitles') tools.appendChild(createPrintTitlesMenu());
-        else if (c.id === 'symbolInsert') tools.appendChild(createSymbolMenu());
-        else if (c.id === 'script') tools.appendChild(createScriptMenu());
-        else if (c.id === 'addIn') tools.appendChild(createAddInMenu());
-        else if (c.id === 'pdf') tools.appendChild(createPdfMenu());
+        const submenu = ribbonSubmenuFactoryFor(c.id, g.variant);
+        if (submenu) tools.appendChild(submenu());
       }
 
       const label = document.createElement('div');
@@ -1412,149 +1540,6 @@ const ribbonSelectLabel = (wrap: HTMLElement, current: string): string => {
   }
 };
 
-const createMenu = (id: string): HTMLDivElement => {
-  const menu = document.createElement('div');
-  menu.className = 'app__menu';
-  menu.id = id;
-  menu.hidden = true;
-  prepareMenu(menu);
-  return menu;
-};
-
-const menuButton = (label: string, attr: string, value: string): HTMLButtonElement => {
-  const button = document.createElement('button');
-  button.className = 'app__menu-item';
-  button.type = 'button';
-  button.setAttribute('role', 'menuitem');
-  button.dataset[attr] = value;
-  button.textContent = label;
-  return button;
-};
-
-const createPrintAreaMenu = (): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu('menu-print-area');
-  menu.append(
-    menuButton(t.printAreaSet, 'printAreaAction', 'set'),
-    menuButton(t.printAreaClear, 'printAreaAction', 'clear'),
-  );
-  return menu;
-};
-
-const createPageBreaksMenu = (): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu('menu-page-breaks');
-  menu.append(
-    menuButton(t.pageBreakInsertRow, 'pageBreakAction', 'insert-row'),
-    menuButton(t.pageBreakInsertCol, 'pageBreakAction', 'insert-col'),
-    menuSeparator(),
-    menuButton(t.pageBreakRemoveRow, 'pageBreakAction', 'remove-row'),
-    menuButton(t.pageBreakRemoveCol, 'pageBreakAction', 'remove-col'),
-    menuSeparator(),
-    menuButton(t.pageBreakResetAll, 'pageBreakAction', 'reset-all'),
-  );
-  return menu;
-};
-
-const createSheetBackgroundMenu = (): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu('menu-sheet-background');
-  menu.append(
-    menuButton(t.sheetBackgroundSet, 'sheetBackgroundAction', 'set'),
-    menuButton(t.sheetBackgroundClear, 'sheetBackgroundAction', 'clear'),
-  );
-  return menu;
-};
-
-const createPrintTitlesMenu = (): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu('menu-print-titles');
-  menu.append(
-    menuButton(t.printTitleRowsSet, 'printTitlesAction', 'rows'),
-    menuButton(t.printTitleColsSet, 'printTitlesAction', 'cols'),
-    menuSeparator(),
-    menuButton(t.printTitlesClear, 'printTitlesAction', 'clear'),
-  );
-  return menu;
-};
-
-const createPageThemeMenu = (): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu('menu-page-theme');
-  menu.append(
-    menuButton(t.themePaper, 'pageThemeAction', 'light'),
-    menuButton(t.themeInk, 'pageThemeAction', 'dark'),
-    menuButton(t.themeContrast, 'pageThemeAction', 'contrast'),
-  );
-  return menu;
-};
-
-const SYMBOL_GROUPS = [
-  {
-    label: ribbonMenuText.symbolMath,
-    symbols: ['±', '×', '÷', '≤', '≥', '≠', '≈', '∞', '√', '∑', '∫', 'π'],
-  },
-  {
-    label: ribbonMenuText.symbolGreek,
-    symbols: ['Α', 'Β', 'Γ', 'Δ', 'Θ', 'Λ', 'Ξ', 'Π', 'Σ', 'Φ', 'Ψ', 'Ω'],
-  },
-  { label: ribbonMenuText.symbolCurrency, symbols: ['$', '€', '¥', '£', '¢', '₩', '₹', '₽'] },
-  { label: ribbonMenuText.symbolLegal, symbols: ['©', '®', '™', '§', '¶', '†', '‡', '•'] },
-] as const;
-
-const symbolMenuHeading = (label: string): HTMLDivElement => {
-  const heading = document.createElement('div');
-  heading.className = 'app__menu-heading';
-  heading.setAttribute('role', 'presentation');
-  heading.textContent = label;
-  return heading;
-};
-
-const createSymbolMenu = (): HTMLDivElement => {
-  const menu = createMenu('menu-symbol');
-  menu.classList.add('app__menu--symbols');
-  for (const group of SYMBOL_GROUPS) {
-    menu.append(symbolMenuHeading(group.label));
-    for (const symbol of group.symbols) {
-      const button = menuButton(symbol, 'symbol', symbol);
-      button.title = symbol;
-      menu.append(button);
-    }
-  }
-  menu.append(menuSeparator(), menuButton(ribbonMenuText.symbolMore, 'symbolAction', 'more'));
-  return menu;
-};
-
-const createPivotTableMenu = (): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu('menu-pivot-table');
-  menu.append(
-    menuButton(t.pivotTableFromRange, 'pivotTableAction', 'dialog'),
-    menuButton(t.recommendedPivotTables, 'pivotTableAction', 'recommended'),
-    menuSeparator(),
-    menuButton(t.pivotTableNewSheet, 'pivotTableAction', 'new-sheet'),
-    menuButton(t.pivotTableExistingSheet, 'pivotTableAction', 'existing-sheet'),
-  );
-  return menu;
-};
-
-const createDefinedNamesMenu = (id: string): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu(id);
-  menu.append(
-    menuButton(t.defineName, 'definedNameAction', 'define'),
-    menuButton(t.nameManager, 'definedNameAction', 'manager'),
-    menuSeparator(),
-    menuButton(t.createFromSelectionTop, 'definedNameAction', 'create-top-row'),
-    menuButton(t.createFromSelectionBottom, 'definedNameAction', 'create-bottom-row'),
-    menuButton(t.createFromSelectionLeft, 'definedNameAction', 'create-left-column'),
-    menuButton(t.createFromSelectionRight, 'definedNameAction', 'create-right-column'),
-    menuSeparator(),
-    menuButton(t.useInFormula, 'definedNameAction', 'use-formula'),
-  );
-  return menu;
-};
-
 const updateDefinedNamesMenu = (menu: HTMLElement): void => {
   const t = ribbonMenuText;
   menu.querySelectorAll('[data-defined-name-dynamic]').forEach((node) => node.remove());
@@ -1581,1285 +1566,26 @@ const updateDefinedNamesMenu = (menu: HTMLElement): void => {
   }
 };
 
-const createLinksMenu = (id: string): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu(id);
-  menu.append(
-    menuButton(t.linkInsertOrEdit, 'linkAction', 'hyperlink'),
-    menuButton(t.linkOpen, 'linkAction', 'open'),
-    menuButton(t.linkClear, 'linkAction', 'clear'),
-    menuSeparator(),
-    menuButton(t.linkExternalLinks, 'linkAction', 'external'),
-  );
-  return menu;
-};
-
-const createDataValidationMenu = (): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu('menu-data-validation');
-  menu.append(
-    menuButton(t.validationSettings, 'validationAction', 'settings'),
-    menuButton(t.validationCircleInvalid, 'validationAction', 'circle-invalid'),
-    menuButton(t.validationClearCircles, 'validationAction', 'clear-circles'),
-    menuSeparator(),
-    menuButton(t.validationClearRules, 'validationAction', 'clear-rules'),
-  );
-  return menu;
-};
-
 // ── Borders dropdown (Excel-365 parity) ─────────────────────────────────
 // Renders a small SVG cell-outline icon for each border preset. Sides are
 // drawn solid in the foreground color (thin/thick/double); the unset sides
 // show as a faint dashed cell-outline base so the user can still see the
-// cell shape.
-// ── Borders dropdown (Excel-365 parity) ─────────────────────────────────
-// SVG preview factories + presets live in ribbon/border-icons.ts so the
-// menu factory below stays focused on wiring labels and click handlers.
+// ── Borders dropdown lives in ribbon/menus/borders.ts ──
 
-const presetMenuItem = (presetKey: string, label: string): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.className = 'app__menu-item app__menu-item--preset';
-  btn.type = 'button';
-  btn.setAttribute('role', 'menuitem');
-  btn.dataset.borderPreset = presetKey;
-  const spec = BORDER_PRESETS[presetKey];
-  if (spec) btn.appendChild(createBorderPreview(spec));
-  else {
-    const spacer = document.createElement('span');
-    spacer.className = 'app__menu-item__icon-spacer';
-    btn.appendChild(spacer);
-  }
-  const text = document.createElement('span');
-  text.className = 'app__menu-item__text';
-  text.textContent = label;
-  btn.appendChild(text);
-  return btn;
-};
+const createPasteMenu = (): HTMLDivElement => createPasteMenuImpl(ribbonLang);
 
-const menuSeparator = (): HTMLDivElement => {
-  const sep = document.createElement('div');
-  sep.className = 'app__menu-sep';
-  sep.setAttribute('role', 'separator');
-  return sep;
-};
+const createConditionalMenu = (): HTMLDivElement => createConditionalMenuImpl(ribbonLang);
 
-const menuSectionHeader = (label: string): HTMLDivElement => {
-  const el = document.createElement('div');
-  el.className = 'app__menu-heading';
-  el.setAttribute('role', 'presentation');
-  el.textContent = label;
-  return el;
-};
-
-const createPasteMenu = (): HTMLDivElement => {
-  const ja = ribbonLang === 'ja';
-  const menu = createMenu('menu-paste');
-  menu.append(
-    menuButton(ja ? '貼り付け' : 'Paste', 'pasteAction', 'all'),
-    menuButton(ja ? '数式' : 'Formulas', 'pasteAction', 'formulas'),
-    menuButton(
-      ja ? '数式と数値の書式' : 'Formulas & Number Formatting',
-      'pasteAction',
-      'formulas-and-numfmt',
-    ),
-    menuButton(ja ? '値' : 'Values', 'pasteAction', 'values'),
-    menuButton(
-      ja ? '値と数値の書式' : 'Values & Number Formatting',
-      'pasteAction',
-      'values-and-numfmt',
-    ),
-    menuButton(ja ? '書式設定' : 'Formatting', 'pasteAction', 'formats'),
-    menuSeparator(),
-    menuButton(ja ? '行/列の入れ替え' : 'Transpose', 'pasteAction', 'transpose'),
-    menuButton(ja ? '形式を選択して貼り付け...' : 'Paste Special...', 'pasteAction', 'dialog'),
-  );
-  return menu;
-};
-
-type CfSubmenuKey = 'highlight' | 'topBottom' | 'dataBar' | 'colorScale' | 'iconSet' | 'clear';
-
-const cfMenuText = () =>
-  (() => {
-    const t = conditionalMenuText(ribbonLang);
-    return {
-      highlight: t.highlight,
-      topBottom: t.topBottom,
-      dataBar: t.dataBars,
-      colorScale: t.colorScales,
-      iconSet: t.iconSets,
-      newRule: t.newRule,
-      clear: t.clear,
-      manage: t.manage,
-      greater: t.greater,
-      less: t.less,
-      between: t.between,
-      equal: t.equal,
-      text: t.textContains,
-      date: t.dateOccurring,
-      duplicate: t.duplicates,
-      unique: t.unique,
-      top10: t.top10,
-      bottom10: t.bottom10,
-      top10Percent: t.top10Percent,
-      bottom10Percent: t.bottom10Percent,
-      aboveAvg: t.aboveAvg,
-      belowAvg: t.belowAvg,
-      textPrompt: t.textPrompt,
-      datePrompt: t.datePrompt,
-      otherRules: t.otherRules,
-      gradient: t.gradientFill,
-      solid: t.solidFill,
-      direction: t.direction,
-      shapes: t.shapes,
-      indicators: t.indicators,
-      ratings: t.ratings,
-      flags: t.flags,
-      bars: t.bars,
-      clearSelection: t.clearSelection,
-      clearSheet: t.clearSheet,
-      dataBarGradientBlue: t.dataBarGradientBlue,
-      dataBarGradientGreen: t.dataBarGradientGreen,
-      dataBarGradientRed: t.dataBarGradientRed,
-      dataBarGradientOrange: t.dataBarGradientOrange,
-      dataBarGradientPurple: t.dataBarGradientPurple,
-      dataBarGradientTeal: t.dataBarGradientTeal,
-      dataBarSolidBlue: t.dataBarSolidBlue,
-      dataBarSolidGreen: t.dataBarSolidGreen,
-      dataBarSolidRed: t.dataBarSolidRed,
-      dataBarSolidOrange: t.dataBarSolidOrange,
-      dataBarSolidPurple: t.dataBarSolidPurple,
-      dataBarSolidGray: t.dataBarSolidGray,
-      colorScaleGreenYellowRed: t.colorScaleGreenYellowRed,
-      colorScaleRedYellowGreen: t.colorScaleRedYellowGreen,
-      colorScaleGreenWhite: t.colorScaleGreenWhite,
-      colorScaleRedWhite: t.colorScaleRedWhite,
-      colorScaleBlueWhiteRed: t.colorScaleBlueWhiteRed,
-      colorScaleRedWhiteBlue: t.colorScaleRedWhiteBlue,
-      colorScaleGreenWhiteGreen: t.colorScaleGreenWhiteGreen,
-      colorScaleYellowWhiteGreen: t.colorScaleYellowWhiteGreen,
-      colorScaleRedWhiteRed: t.colorScaleRedWhiteRed,
-      colorScaleBlueWhiteBlue: t.colorScaleBlueWhiteBlue,
-      colorScaleYellowRedGreen: t.colorScaleYellowRedGreen,
-      colorScaleGreenYellowGreen: t.colorScaleGreenYellowGreen,
-      iconArrows3: t.iconArrows3,
-      iconArrows5: t.iconArrows5,
-      iconTriangles3: t.iconTriangles3,
-      iconTraffic3: t.iconTraffic3,
-      iconTrafficRim3: t.iconTrafficRim3,
-      iconSymbols3: t.iconSymbols3,
-      iconFlags3: t.iconFlags3,
-      iconStars3: t.iconStars3,
-      iconQuarters5: t.iconQuarters5,
-      iconRatings5: t.iconRatings5,
-      iconBars5: t.iconBars5,
-      iconBoxes5: t.iconBoxes5,
-    };
-  })();
-
-const cfIcon = (kind: 'rule' | 'top' | 'bar' | 'scale' | 'icon' | 'new' | 'clear' | 'manage') => {
-  const span = document.createElement('span');
-  span.className = `app__cf-icon app__cf-icon--${kind}`;
-  span.setAttribute('aria-hidden', 'true');
-  return span;
-};
-
-const cfMenuItem = (
-  label: string,
-  action: string,
-  icon: Parameters<typeof cfIcon>[0] = 'rule',
-): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.className = 'app__menu-item app__menu-item--preset';
-  btn.type = 'button';
-  btn.setAttribute('role', 'menuitem');
-  btn.dataset.cfAction = action;
-  btn.appendChild(cfIcon(icon));
-  const text = document.createElement('span');
-  text.className = 'app__menu-item__text';
-  text.textContent = label;
-  btn.appendChild(text);
-  return btn;
-};
-
-const cfSubmenuTrigger = (
-  key: CfSubmenuKey,
-  label: string,
-  icon: Parameters<typeof cfIcon>[0],
-): HTMLButtonElement => {
-  const btn = cfMenuItem(label, `submenu-${key}`, icon);
-  btn.classList.add('app__menu-item--submenu');
-  btn.dataset.cfSubmenu = key;
-  const caret = document.createElement('span');
-  caret.className = 'app__menu-item__caret';
-  caret.textContent = '▶';
-  btn.appendChild(caret);
-  return btn;
-};
-
-const cfSwatchButton = (action: string, colors: string[], title: string): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.className = 'app__cf-choice';
-  btn.type = 'button';
-  btn.title = title;
-  btn.setAttribute('aria-label', title);
-  btn.dataset.cfAction = action;
-  const grid = document.createElement('span');
-  grid.className = 'app__cf-choice-grid';
-  for (const color of colors) {
-    const cell = document.createElement('span');
-    cell.style.background = color;
-    grid.appendChild(cell);
-  }
-  btn.appendChild(grid);
-  return btn;
-};
-
-const cfIconChoice = (action: string, glyphs: string[], title: string): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.className = 'app__cf-icon-choice';
-  btn.type = 'button';
-  btn.title = title;
-  btn.setAttribute('aria-label', title);
-  btn.dataset.cfAction = action;
-  for (const glyph of glyphs) {
-    const span = document.createElement('span');
-    span.textContent = glyph;
-    btn.appendChild(span);
-  }
-  return btn;
-};
-
-const createCfPanelSubmenu = (key: CfSubmenuKey, label: string): HTMLDivElement => {
-  const t = cfMenuText();
-  const submenu = document.createElement('div');
-  submenu.className = `app__submenu app__submenu--cf app__submenu--cf-${key}`;
-  submenu.dataset.cfPanel = key;
-  submenu.setAttribute('role', 'menu');
-  submenu.setAttribute('aria-label', label);
-  submenu.hidden = true;
-
-  if (key === 'highlight') {
-    submenu.append(
-      cfMenuItem(t.greater, 'cell-gt', 'rule'),
-      cfMenuItem(t.less, 'cell-lt', 'rule'),
-      cfMenuItem(t.between, 'cell-between', 'rule'),
-      cfMenuItem(t.equal, 'cell-eq', 'rule'),
-      cfMenuItem(t.text, 'text-contains', 'rule'),
-      cfMenuItem(t.date, 'date-occurring', 'rule'),
-      cfMenuItem(t.duplicate, 'duplicates', 'rule'),
-      cfMenuItem(t.unique, 'unique', 'rule'),
-      menuSeparator(),
-      cfMenuItem(t.otherRules, 'new-rule', 'manage'),
-    );
-  } else if (key === 'topBottom') {
-    submenu.append(
-      cfMenuItem(t.top10, 'top10', 'top'),
-      cfMenuItem(t.bottom10, 'bottom10', 'top'),
-      cfMenuItem(t.top10Percent, 'top10-percent', 'top'),
-      cfMenuItem(t.bottom10Percent, 'bottom10-percent', 'top'),
-      cfMenuItem(t.aboveAvg, 'above-avg', 'top'),
-      cfMenuItem(t.belowAvg, 'below-avg', 'top'),
-      menuSeparator(),
-      cfMenuItem(t.otherRules, 'new-rule', 'manage'),
-    );
-  } else if (key === 'dataBar') {
-    submenu.append(menuSectionHeader(t.gradient));
-    const gradient = document.createElement('div');
-    gradient.className = 'app__cf-choice-row';
-    const gradientBars: readonly (readonly [string, string, string])[] = [
-      ['data-blue', '#638ec6', t.dataBarGradientBlue],
-      ['data-green', '#63a95c', t.dataBarGradientGreen],
-      ['data-red', '#c45a5a', t.dataBarGradientRed],
-      ['data-orange', '#d6a440', t.dataBarGradientOrange],
-      ['data-purple', '#8a74b9', t.dataBarGradientPurple],
-      ['data-teal', '#4ba1a8', t.dataBarGradientTeal],
-    ];
-    gradientBars.forEach(([action, color, label]) => {
-      gradient.appendChild(cfSwatchButton(action, ['#fff', color], label));
-    });
-    submenu.appendChild(gradient);
-    submenu.append(menuSectionHeader(t.solid));
-    const solid = document.createElement('div');
-    solid.className = 'app__cf-choice-row';
-    const solidBars: readonly (readonly [string, string, string])[] = [
-      ['data-solid-blue', '#4472c4', t.dataBarSolidBlue],
-      ['data-solid-green', '#70ad47', t.dataBarSolidGreen],
-      ['data-solid-red', '#c00000', t.dataBarSolidRed],
-      ['data-solid-orange', '#ed7d31', t.dataBarSolidOrange],
-      ['data-solid-purple', '#8064a2', t.dataBarSolidPurple],
-      ['data-solid-gray', '#7f7f7f', t.dataBarSolidGray],
-    ];
-    solidBars.forEach(([action, color, label]) => {
-      solid.appendChild(cfSwatchButton(action, [color, color], label));
-    });
-    submenu.append(solid, menuSeparator(), cfMenuItem(t.otherRules, 'new-rule', 'manage'));
-  } else if (key === 'colorScale') {
-    const scales = document.createElement('div');
-    scales.className = 'app__cf-choice-grid-panel';
-    const colorScales: readonly (readonly [string, readonly string[], string])[] = [
-      ['scale-gyr', ['#63be7b', '#ffeb84', '#f8696b'], t.colorScaleGreenYellowRed],
-      ['scale-ryg', ['#f8696b', '#ffeb84', '#63be7b'], t.colorScaleRedYellowGreen],
-      ['scale-gw', ['#63be7b', '#ffffff'], t.colorScaleGreenWhite],
-      ['scale-rw', ['#f8696b', '#ffffff'], t.colorScaleRedWhite],
-      ['scale-bwr', ['#5a8dee', '#ffffff', '#f8696b'], t.colorScaleBlueWhiteRed],
-      ['scale-rwb', ['#f8696b', '#ffffff', '#5a8dee'], t.colorScaleRedWhiteBlue],
-      ['scale-gwg', ['#63be7b', '#ffffff', '#00a651'], t.colorScaleGreenWhiteGreen],
-      ['scale-ywg', ['#ffeb84', '#ffffff', '#63be7b'], t.colorScaleYellowWhiteGreen],
-      ['scale-rwr', ['#f8696b', '#ffffff', '#c00000'], t.colorScaleRedWhiteRed],
-      ['scale-bwb', ['#5a8dee', '#ffffff', '#4472c4'], t.colorScaleBlueWhiteBlue],
-      ['scale-yry', ['#ffeb84', '#f8696b', '#63be7b'], t.colorScaleYellowRedGreen],
-      ['scale-gyg', ['#63be7b', '#ffeb84', '#00a651'], t.colorScaleGreenYellowGreen],
-    ];
-    colorScales.forEach(([action, colors, label]) => {
-      scales.appendChild(cfSwatchButton(action, [...colors], label));
-    });
-    submenu.append(scales, menuSeparator(), cfMenuItem(t.otherRules, 'new-rule', 'manage'));
-  } else if (key === 'iconSet') {
-    submenu.append(menuSectionHeader(t.direction));
-    const directions = document.createElement('div');
-    directions.className = 'app__cf-icon-panel';
-    directions.append(
-      cfIconChoice('icons-arrows3', ['▲', '▶', '▼'], t.iconArrows3),
-      cfIconChoice('icons-arrows5', ['▲', '↗', '▶', '↘', '▼'], t.iconArrows5),
-      cfIconChoice('icons-triangles3', ['▲', '▬', '▼'], t.iconTriangles3),
-    );
-    submenu.appendChild(directions);
-    submenu.append(menuSectionHeader(t.shapes));
-    const shapes = document.createElement('div');
-    shapes.className = 'app__cf-icon-panel';
-    shapes.append(
-      cfIconChoice('icons-traffic3', ['●', '●', '●'], t.iconTraffic3),
-      cfIconChoice('icons-trafficRim3', ['●', '●', '●'], t.iconTrafficRim3),
-      cfIconChoice('icons-stars3', ['★', '★', '★'], t.iconStars3),
-    );
-    submenu.append(shapes, menuSectionHeader(t.indicators));
-    const indicators = document.createElement('div');
-    indicators.className = 'app__cf-icon-panel';
-    indicators.append(
-      cfIconChoice('icons-symbols3', ['✓', '!', '×'], t.iconSymbols3),
-      cfIconChoice('icons-flags3', ['⚑', '⚑', '⚑'], t.iconFlags3),
-    );
-    submenu.append(indicators, menuSectionHeader(t.ratings));
-    const ratings = document.createElement('div');
-    ratings.className = 'app__cf-icon-panel';
-    ratings.append(
-      cfIconChoice('icons-stars3', ['★', '★', '★'], t.ratings),
-      cfIconChoice('icons-quarters5', ['◔', '◑', '◕', '●', '●'], t.iconQuarters5),
-      cfIconChoice('icons-ratings5', ['●', '●', '●', '●', '●'], t.iconRatings5),
-      cfIconChoice('icons-bars5', ['▮', '▮', '▮', '▮', '▮'], t.iconBars5),
-      cfIconChoice('icons-boxes5', ['■', '■', '■', '■', '■'], t.iconBoxes5),
-    );
-    submenu.append(ratings, menuSeparator(), cfMenuItem(t.otherRules, 'new-rule', 'manage'));
-  } else if (key === 'clear') {
-    submenu.append(
-      cfMenuItem(t.clearSelection, 'clear-selection', 'clear'),
-      cfMenuItem(t.clearSheet, 'clear-sheet', 'clear'),
-    );
-  }
-  return submenu;
-};
-
-const createConditionalMenu = (): HTMLDivElement => {
-  const t = cfMenuText();
-  const menu = createMenu('menu-conditional');
-  menu.classList.add('app__menu--conditional');
-  menu.append(
-    cfSubmenuTrigger('highlight', t.highlight, 'rule'),
-    cfSubmenuTrigger('topBottom', t.topBottom, 'top'),
-    menuSeparator(),
-    cfSubmenuTrigger('dataBar', t.dataBar, 'bar'),
-    cfSubmenuTrigger('colorScale', t.colorScale, 'scale'),
-    cfSubmenuTrigger('iconSet', t.iconSet, 'icon'),
-    menuSeparator(),
-    cfMenuItem(t.newRule, 'new-rule', 'new'),
-    cfSubmenuTrigger('clear', t.clear, 'clear'),
-    cfMenuItem(t.manage, 'manage', 'manage'),
-  );
-  menu.append(
-    createCfPanelSubmenu('highlight', t.highlight),
-    createCfPanelSubmenu('topBottom', t.topBottom),
-    createCfPanelSubmenu('dataBar', t.dataBar),
-    createCfPanelSubmenu('colorScale', t.colorScale),
-    createCfPanelSubmenu('iconSet', t.iconSet),
-    createCfPanelSubmenu('clear', t.clear),
-  );
-  return menu;
-};
-
-const drawActionItem = (
-  action: string,
-  label: string,
-  icon?: BorderPreviewSpec,
-): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.className = 'app__menu-item app__menu-item--preset';
-  btn.type = 'button';
-  btn.setAttribute('role', 'menuitemcheckbox');
-  btn.setAttribute('aria-checked', 'false');
-  btn.dataset.borderDraw = action;
-  if (icon) btn.appendChild(createBorderPreview(icon));
-  else {
-    const spacer = document.createElement('span');
-    spacer.className = 'app__menu-item__icon-spacer';
-    btn.appendChild(spacer);
-  }
-  const text = document.createElement('span');
-  text.className = 'app__menu-item__text';
-  text.textContent = label;
-  btn.appendChild(text);
-  return btn;
-};
-
-const submenuTrigger = (
-  submenuKey: 'lineColor' | 'lineStyle',
-  label: string,
-): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.className = 'app__menu-item app__menu-item--preset app__menu-item--submenu';
-  btn.type = 'button';
-  btn.setAttribute('role', 'menuitem');
-  btn.setAttribute('aria-haspopup', 'menu');
-  btn.setAttribute('aria-expanded', 'false');
-  btn.dataset.borderSubmenu = submenuKey;
-  const spacer = document.createElement('span');
-  spacer.className = 'app__menu-item__icon-spacer';
-  btn.appendChild(spacer);
-  const text = document.createElement('span');
-  text.className = 'app__menu-item__text';
-  text.textContent = label;
-  btn.appendChild(text);
-  const caret = document.createElement('span');
-  caret.className = 'app__menu-item__caret';
-  caret.setAttribute('aria-hidden', 'true');
-  caret.textContent = '▶';
-  btn.appendChild(caret);
-  return btn;
-};
-
-// Line sample preview + LINE_STYLES_ALL live in ribbon/border-icons.ts.
-
-const createLineStyleSubmenu = (label: string): HTMLDivElement => {
-  const submenu = document.createElement('div');
-  submenu.className = 'app__submenu app__submenu--line-style';
-  submenu.id = 'menu-borders-line-style';
-  submenu.setAttribute('role', 'menu');
-  submenu.setAttribute('aria-label', label);
-  submenu.hidden = true;
-  for (const value of LINE_STYLES_ALL) {
-    const btn = document.createElement('button');
-    btn.className = 'app__submenu-item';
-    btn.type = 'button';
-    btn.setAttribute('role', 'menuitemradio');
-    btn.setAttribute('aria-checked', value === 'thin' ? 'true' : 'false');
-    btn.dataset.borderLineStyle = value;
-    if (value === 'none') {
-      const span = document.createElement('span');
-      span.textContent = ribbonText.lineStyleNone;
-      span.className = 'app__submenu-item__text';
-      btn.appendChild(span);
-    } else {
-      btn.appendChild(createLineSamplePreview(value));
-    }
-    submenu.appendChild(btn);
-  }
-  return submenu;
-};
-
-const createLineColorSubmenu = (label: string): HTMLDivElement => {
-  const submenu = document.createElement('div');
-  submenu.className = 'app__submenu app__submenu--line-color';
-  submenu.id = 'menu-borders-line-color';
-  submenu.setAttribute('role', 'menu');
-  submenu.setAttribute('aria-label', label);
-  submenu.hidden = true;
-  const palette = createColorPalette({
-    themeLabel: ribbonText.themeColors,
-    standardLabel: ribbonText.standardColors,
-    ariaLabel: label,
-    value: selectedBorderColor,
-    automatic: { label: ribbonText.automatic, color: '#000000' },
-    onPick: (color) => {
+const createBordersMenu = (): HTMLDivElement =>
+  createBordersMenuImpl({
+    ribbonText,
+    getBorderColor: () => selectedBorderColor,
+    onPickColor: (color) => {
       selectedBorderColor = color;
       inst?.borderDraw?.setColor(color);
       closeBorderSubmenus();
     },
   });
-  submenu.appendChild(palette.el);
-  return submenu;
-};
-
-const createBordersMenu = (): HTMLDivElement => {
-  const t = ribbonText;
-  const menu = createMenu('menu-borders');
-  menu.classList.add('app__menu--borders');
-  menu.append(
-    // Section 1: single-side edges (image 1: 下罫線 / 上罫線 / 左罫線 / 右罫線)
-    presetMenuItem('bottom', t.bottomBorder),
-    presetMenuItem('top', t.topBorder),
-    presetMenuItem('left', t.leftBorder),
-    presetMenuItem('right', t.rightBorder),
-    menuSeparator(),
-    // Section 2: frame presets
-    presetMenuItem('clear', t.noBorder),
-    presetMenuItem('all', t.allBorders),
-    presetMenuItem('outline', t.outsideBorders),
-    presetMenuItem('thickOutline', t.thickOutsideBorders),
-    menuSeparator(),
-    // Section 3: combined
-    presetMenuItem('doubleBottom', t.doubleBottomBorder),
-    presetMenuItem('thickBottom', t.thickBottomBorder),
-    presetMenuItem('topAndBottom', t.topAndBottomBorder),
-    presetMenuItem('topAndThickBottom', t.topAndThickBottomBorder),
-    presetMenuItem('topAndDoubleBottom', t.topAndDoubleBottomBorder),
-    // Section 4 header + draw actions
-    menuSectionHeader(t.drawBordersHeading),
-    drawActionItem('draw', t.drawBorder, { bottom: 'thin' }),
-    drawActionItem('grid', t.drawBorderGrid, {
-      top: 'thin',
-      right: 'thin',
-      bottom: 'thin',
-      left: 'thin',
-      innerGrid: true,
-      showBase: false,
-    }),
-    drawActionItem('erase', t.eraseBorder),
-    submenuTrigger('lineColor', t.lineColor),
-    submenuTrigger('lineStyle', t.lineStyle),
-    menuSeparator(),
-    // Footer
-    presetMenuItem('format', t.moreBorders),
-  );
-  // Submenus sit beside the main dropdown.
-  menu.appendChild(createLineColorSubmenu(t.lineColor));
-  menu.appendChild(createLineStyleSubmenu(t.lineStyle));
-  return menu;
-};
-
-const createFreezeMenu = (): HTMLDivElement => {
-  const ja = ribbonLang === 'ja';
-  const menu = createMenu('menu-freeze');
-  menu.append(
-    menuButton(ja ? '先頭行の固定' : 'Freeze Top Row', 'freeze', 'row'),
-    menuButton(ja ? '先頭列の固定' : 'Freeze First Column', 'freeze', 'col'),
-    menuButton(ja ? 'ウィンドウ枠の固定' : 'Freeze Panes', 'freeze', 'selection'),
-    menuButton(ja ? 'ウィンドウ枠固定の解除' : 'Unfreeze Panes', 'freeze', 'off'),
-  );
-  return menu;
-};
-
-const createFillMenu = (): HTMLDivElement => {
-  const t = toolbarMenuText(ribbonLang);
-  const menu = createMenu('menu-fill');
-  menu.append(
-    menuButton(t.fillDown, 'fill', 'down'),
-    menuButton(t.fillRight, 'fill', 'right'),
-    menuButton(t.fillUp, 'fill', 'up'),
-    menuButton(t.fillLeft, 'fill', 'left'),
-    menuSeparator(),
-    menuButton(t.series, 'fill', 'series'),
-    menuSeparator(),
-    menuButton(t.fillDays, 'fill', 'days'),
-    menuButton(t.fillWeekdays, 'fill', 'weekdays'),
-    menuButton(t.fillMonths, 'fill', 'months'),
-    menuButton(t.fillYears, 'fill', 'years'),
-  );
-  return menu;
-};
-
-const createClearMenu = (): HTMLDivElement => {
-  const t = toolbarMenuText(ribbonLang);
-  const menu = createMenu('menu-clear');
-  menu.append(
-    menuButton(t.clearAll, 'clear', 'all'),
-    menuButton(t.clearFormats, 'clear', 'formats'),
-    menuButton(t.clearContents, 'clear', 'contents'),
-    menuButton(t.clearComments, 'clear', 'comments'),
-    menuButton(t.clearHyperlinks, 'clear', 'hyperlinks'),
-    menuButton(t.removeHyperlinks, 'clear', 'remove-hyperlinks'),
-    menuButton(t.clearConditional, 'clear', 'conditional'),
-  );
-  return menu;
-};
-
-type TextOrientationGlyph = 'ccw' | 'cw' | 'vertical' | 'up' | 'down' | 'format';
-
-const createTextOrientationIcon = (glyph: TextOrientationGlyph): SVGSVGElement => {
-  const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 16 16');
-  svg.setAttribute('width', '16');
-  svg.setAttribute('height', '16');
-  svg.setAttribute('focusable', 'false');
-  svg.setAttribute('aria-hidden', 'true');
-  svg.setAttribute('fill', 'none');
-  svg.setAttribute('stroke', 'currentColor');
-  svg.setAttribute('stroke-width', '1.2');
-  svg.setAttribute('stroke-linecap', 'round');
-  svg.setAttribute('stroke-linejoin', 'round');
-  const baseline = document.createElementNS(SVG_NS, 'line');
-  baseline.setAttribute('x1', '2');
-  baseline.setAttribute('y1', '13');
-  baseline.setAttribute('x2', '14');
-  baseline.setAttribute('y2', '13');
-  svg.appendChild(baseline);
-  if (glyph === 'ccw' || glyph === 'cw') {
-    const angle = glyph === 'ccw' ? -35 : 35;
-    const text = document.createElementNS(SVG_NS, 'text');
-    text.setAttribute('x', '4');
-    text.setAttribute('y', '11');
-    text.setAttribute('transform', `rotate(${angle} 8 11)`);
-    text.setAttribute('font-family', 'system-ui, sans-serif');
-    text.setAttribute('font-size', '7');
-    text.setAttribute('font-weight', '700');
-    text.setAttribute('fill', 'currentColor');
-    text.setAttribute('stroke', 'none');
-    text.textContent = 'ab';
-    svg.appendChild(text);
-  } else if (glyph === 'vertical') {
-    for (let i = 0; i < 3; i += 1) {
-      const ch = document.createElementNS(SVG_NS, 'text');
-      ch.setAttribute('x', '8');
-      ch.setAttribute('y', String(4 + i * 3));
-      ch.setAttribute('text-anchor', 'middle');
-      ch.setAttribute('font-family', 'system-ui, sans-serif');
-      ch.setAttribute('font-size', '3');
-      ch.setAttribute('font-weight', '700');
-      ch.setAttribute('fill', 'currentColor');
-      ch.setAttribute('stroke', 'none');
-      ch.textContent = 'a';
-      svg.appendChild(ch);
-    }
-  } else if (glyph === 'up' || glyph === 'down') {
-    const text = document.createElementNS(SVG_NS, 'text');
-    text.setAttribute('x', '0');
-    text.setAttribute('y', '0');
-    const rotate = glyph === 'up' ? -90 : 90;
-    text.setAttribute('transform', `translate(8 11) rotate(${rotate})`);
-    text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('font-family', 'system-ui, sans-serif');
-    text.setAttribute('font-size', '7');
-    text.setAttribute('font-weight', '700');
-    text.setAttribute('fill', 'currentColor');
-    text.setAttribute('stroke', 'none');
-    text.textContent = 'ab';
-    svg.appendChild(text);
-  } else if (glyph === 'format') {
-    const grid = document.createElementNS(SVG_NS, 'rect');
-    grid.setAttribute('x', '2.5');
-    grid.setAttribute('y', '3.5');
-    grid.setAttribute('width', '11');
-    grid.setAttribute('height', '7');
-    svg.appendChild(grid);
-    const hLine = document.createElementNS(SVG_NS, 'line');
-    hLine.setAttribute('x1', '2.5');
-    hLine.setAttribute('y1', '7');
-    hLine.setAttribute('x2', '13.5');
-    hLine.setAttribute('y2', '7');
-    svg.appendChild(hLine);
-    const vLine = document.createElementNS(SVG_NS, 'line');
-    vLine.setAttribute('x1', '8');
-    vLine.setAttribute('y1', '3.5');
-    vLine.setAttribute('x2', '8');
-    vLine.setAttribute('y2', '10.5');
-    svg.appendChild(vLine);
-  }
-  return svg;
-};
-
-const textOrientationMenuItem = (
-  glyph: TextOrientationGlyph,
-  label: string,
-  value: string,
-): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.className = 'app__menu-item app__menu-item--preset';
-  btn.type = 'button';
-  btn.setAttribute('role', 'menuitem');
-  btn.dataset.textOrientation = value;
-  btn.appendChild(createTextOrientationIcon(glyph));
-  const text = document.createElement('span');
-  text.className = 'app__menu-item__text';
-  text.textContent = label;
-  btn.appendChild(text);
-  return btn;
-};
-
-const createTextOrientationMenu = (): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu('menu-text-orientation');
-  menu.append(
-    textOrientationMenuItem('ccw', t.orientationAngleCounterclockwise, 'ccw'),
-    textOrientationMenuItem('cw', t.orientationAngleClockwise, 'cw'),
-    textOrientationMenuItem('vertical', t.orientationVerticalText, 'vertical'),
-    textOrientationMenuItem('up', t.orientationRotateTextUp, 'up'),
-    textOrientationMenuItem('down', t.orientationRotateTextDown, 'down'),
-    menuSeparator(),
-    textOrientationMenuItem('format', t.orientationFormatAlignment, 'format'),
-  );
-  return menu;
-};
-
-const createInsertCellsMenu = (): HTMLDivElement => {
-  const ja = ribbonLang === 'ja';
-  const t = toolbarMenuText(ribbonLang);
-  const sheetTabs = dictionaries[ribbonLang].sheetTabs;
-  const menu = createMenu('menu-insert-cells');
-  menu.append(
-    menuButton(ja ? 'セルを挿入...' : 'Insert Cells...', 'cellInsert', 'cells'),
-    menuButton(t.insertShiftDown, 'cellInsert', 'shift-down'),
-    menuButton(t.insertShiftRight, 'cellInsert', 'shift-right'),
-    menuSeparator(),
-    menuButton(ja ? 'シートの行を挿入' : 'Insert Sheet Rows', 'cellInsert', 'rows'),
-    menuButton(ja ? 'シートの列を挿入' : 'Insert Sheet Columns', 'cellInsert', 'cols'),
-    menuSeparator(),
-    menuButton(sheetTabs.insertSheet, 'cellInsert', 'sheet'),
-  );
-  return menu;
-};
-
-const createDeleteCellsMenu = (): HTMLDivElement => {
-  const ja = ribbonLang === 'ja';
-  const t = toolbarMenuText(ribbonLang);
-  const sheetTabs = dictionaries[ribbonLang].sheetTabs;
-  const menu = createMenu('menu-delete-cells');
-  menu.append(
-    menuButton(ja ? 'セルを削除...' : 'Delete Cells...', 'cellDelete', 'cells'),
-    menuButton(t.deleteShiftUp, 'cellDelete', 'shift-up'),
-    menuButton(t.deleteShiftLeft, 'cellDelete', 'shift-left'),
-    menuSeparator(),
-    menuButton(ja ? 'シートの行を削除' : 'Delete Sheet Rows', 'cellDelete', 'rows'),
-    menuButton(ja ? 'シートの列を削除' : 'Delete Sheet Columns', 'cellDelete', 'cols'),
-    menuSeparator(),
-    menuButton(sheetTabs.deleteSheet, 'cellDelete', 'sheet'),
-  );
-  return menu;
-};
-
-const createFormatCellsMenu = (): HTMLDivElement => {
-  const t = toolbarMenuText(ribbonLang);
-  const sheetTabs = dictionaries[ribbonLang].sheetTabs;
-  const menu = createMenu('menu-format-cells');
-  menu.append(
-    menuButton(t.formatCells, 'cellFormat', 'dialog'),
-    menuSeparator(),
-    menuButton(t.rowHeight, 'cellFormat', 'row-height'),
-    menuButton(t.autoFitRowHeight, 'cellFormat', 'row-autofit'),
-    menuButton(t.colWidth, 'cellFormat', 'col-width'),
-    menuButton(t.autoFitColWidth, 'cellFormat', 'col-autofit'),
-    menuSeparator(),
-    menuButton(t.hideRows, 'cellFormat', 'hide-rows'),
-    menuButton(t.showRows, 'cellFormat', 'show-rows'),
-    menuButton(t.hideCols, 'cellFormat', 'hide-cols'),
-    menuButton(t.showCols, 'cellFormat', 'show-cols'),
-    menuSeparator(),
-    menuButton(sheetTabs.rename, 'cellFormat', 'rename-sheet'),
-    menuButton(sheetTabs.moveLeft, 'cellFormat', 'move-sheet-left'),
-    menuButton(sheetTabs.moveRight, 'cellFormat', 'move-sheet-right'),
-    menuButton(sheetTabs.hideSheet, 'cellFormat', 'hide-sheet'),
-    menuButton(sheetTabs.unhideSheet, 'cellFormat', 'unhide-sheet'),
-    menuSeparator(),
-    menuButton(`${sheetTabs.tabColor}: ${sheetTabs.noColor}`, 'cellFormat', 'tab-color-none'),
-    menuButton(`${sheetTabs.tabColor}: ${sheetTabs.tabColorRed}`, 'cellFormat', 'tab-color-red'),
-    menuButton(
-      `${sheetTabs.tabColor}: ${sheetTabs.tabColorOrange}`,
-      'cellFormat',
-      'tab-color-orange',
-    ),
-    menuButton(
-      `${sheetTabs.tabColor}: ${sheetTabs.tabColorYellow}`,
-      'cellFormat',
-      'tab-color-yellow',
-    ),
-    menuButton(
-      `${sheetTabs.tabColor}: ${sheetTabs.tabColorGreen}`,
-      'cellFormat',
-      'tab-color-green',
-    ),
-    menuButton(`${sheetTabs.tabColor}: ${sheetTabs.tabColorBlue}`, 'cellFormat', 'tab-color-blue'),
-    menuButton(
-      `${sheetTabs.tabColor}: ${sheetTabs.tabColorPurple}`,
-      'cellFormat',
-      'tab-color-purple',
-    ),
-    menuButton(`${sheetTabs.tabColor}: ${sheetTabs.tabColorGray}`, 'cellFormat', 'tab-color-gray'),
-    menuSeparator(),
-    menuButton(ribbonMenuText.lockCell, 'cellFormat', 'lock-cell'),
-    menuButton(ribbonMenuText.unlockCell, 'cellFormat', 'unlock-cell'),
-    menuButton(t.protectSheet, 'cellFormat', 'protect-sheet'),
-  );
-  return menu;
-};
-
-type AutoSumFormulaName = 'SUM' | 'AVERAGE' | 'COUNT' | 'MAX' | 'MIN' | 'MORE';
-
-const createAutoSumMenu = (id: string): HTMLDivElement => {
-  const t = toolbarMenuText(ribbonLang);
-  const menu = createMenu(id);
-  menu.append(
-    menuButton(t.autosumSum, 'autosumFn', 'SUM'),
-    menuButton(t.autosumAverage, 'autosumFn', 'AVERAGE'),
-    menuButton(t.autosumCount, 'autosumFn', 'COUNT'),
-    menuButton(t.autosumMax, 'autosumFn', 'MAX'),
-    menuButton(t.autosumMin, 'autosumFn', 'MIN'),
-    menuSeparator(),
-    menuButton(t.autosumMoreFunctions, 'autosumFn', 'MORE'),
-  );
-  return menu;
-};
-
-const calcOptionButton = (label: string, value: string): HTMLButtonElement => {
-  const button = menuButton(label, 'calcOption', value);
-  if (value === 'auto' || value === 'manual' || value === 'auto-no-table') {
-    button.setAttribute('role', 'menuitemradio');
-    button.setAttribute('aria-checked', 'false');
-  }
-  return button;
-};
-
-const createCalcOptionsMenu = (): HTMLDivElement => {
-  const ja = ribbonLang === 'ja';
-  const menu = createMenu('menu-calc-options');
-  menu.append(
-    calcOptionButton(ja ? '自動' : 'Automatic', 'auto'),
-    calcOptionButton(
-      ja ? 'データ テーブル以外自動' : 'Automatic Except for Data Tables',
-      'auto-no-table',
-    ),
-    calcOptionButton(ja ? '手動' : 'Manual', 'manual'),
-    menuSeparator(),
-    calcOptionButton(ja ? '再計算実行' : 'Calculate Now', 'calculate-now'),
-    calcOptionButton(ja ? 'シート再計算' : 'Calculate Sheet', 'calculate-sheet'),
-    menuSeparator(),
-    calcOptionButton(ja ? '反復計算...' : 'Iterative Calculation...', 'iterative'),
-  );
-  return menu;
-};
-
-const createClearArrowsMenu = (): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu('menu-clear-arrows');
-  menu.append(
-    menuButton(t.removeArrowsAll, 'formulaAuditAction', 'clear-all'),
-    menuButton(t.removePrecedentArrows, 'formulaAuditAction', 'clear-precedents'),
-    menuButton(t.removeDependentArrows, 'formulaAuditAction', 'clear-dependents'),
-  );
-  return menu;
-};
-
-const createErrorCheckingMenu = (): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu('menu-error-checking');
-  menu.append(
-    menuButton(t.errorChecking, 'formulaAuditAction', 'error-checking'),
-    menuButton(t.traceError, 'formulaAuditAction', 'trace-error'),
-    menuSeparator(),
-    menuButton(t.ignoreError, 'formulaAuditAction', 'ignore-error'),
-  );
-  return menu;
-};
-
-const createWatchMenu = (id: string): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu(id);
-  menu.append(
-    menuButton(t.watchWindow, 'watchAction', 'open'),
-    menuButton(t.watchAdd, 'watchAction', 'add'),
-    menuButton(t.watchDelete, 'watchAction', 'delete'),
-    menuSeparator(),
-    menuButton(t.watchDeleteAll, 'watchAction', 'delete-all'),
-  );
-  return menu;
-};
-
-const createReviewCommentsMenu = (): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu('menu-review-comments');
-  menu.append(
-    menuButton(t.commentDelete, 'commentAction', 'delete-active'),
-    menuButton(t.commentDeleteAll, 'commentAction', 'delete-all'),
-  );
-  return menu;
-};
-
-const createProtectMenu = (id: string): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu(id);
-  menu.append(
-    menuButton(t.protectSheetCommand, 'protectAction', 'protect-sheet'),
-    menuButton(t.unprotectSheetCommand, 'protectAction', 'unprotect-sheet'),
-    menuSeparator(),
-    menuButton(t.lockCell, 'protectAction', 'lock-cell'),
-    menuButton(t.unlockCell, 'protectAction', 'unlock-cell'),
-    menuSeparator(),
-    menuButton(t.protectWorkbookCommand, 'protectAction', 'protect-workbook'),
-    menuButton(t.unprotectWorkbookCommand, 'protectAction', 'unprotect-workbook'),
-    menuButton(t.allowEditRangesCommand, 'protectAction', 'allow-edit-ranges'),
-    menuButton(t.allowEditRangesClearCommand, 'protectAction', 'clear-allowed-edit-ranges'),
-  );
-  return menu;
-};
-
-const createChartInsertMenu = (): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu('menu-chart-insert');
-  menu.append(
-    menuButton(t.chartColumn, 'chartInsert', 'column'),
-    menuButton(t.chartBar, 'chartInsert', 'bar'),
-    menuButton(t.chartLine, 'chartInsert', 'line'),
-    menuButton(t.chartArea, 'chartInsert', 'area'),
-    menuButton(t.chartPie, 'chartInsert', 'pie'),
-    menuButton(t.chartScatter, 'chartInsert', 'scatter'),
-    menuSeparator(),
-    menuButton(t.recommendedCharts, 'chartInsert', 'recommended'),
-  );
-  return menu;
-};
-
-const createPictureInsertMenu = (): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu('menu-picture-insert');
-  menu.append(
-    menuButton(t.pictureThisDevice, 'pictureInsert', 'device'),
-    menuButton(t.pictureOnline, 'pictureInsert', 'online'),
-  );
-  return menu;
-};
-
-const createShapesInsertMenu = (): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu('menu-shapes-insert');
-  menu.append(
-    menuButton(t.shapeRectangle, 'shapeInsert', 'rectangle'),
-    menuButton(t.shapeRoundedRectangle, 'shapeInsert', 'rounded-rectangle'),
-    menuButton(t.shapeOval, 'shapeInsert', 'oval'),
-    menuSeparator(),
-    menuButton(t.shapeLine, 'shapeInsert', 'line'),
-    menuButton(t.shapeArrow, 'shapeInsert', 'arrow'),
-  );
-  return menu;
-};
-
-const createScreenshotInsertMenu = (): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu('menu-screenshot-insert');
-  menu.append(
-    menuButton(t.screenshotCurrentView, 'screenshotInsert', 'current-view'),
-    menuButton(t.screenshotScreenClipping, 'screenshotInsert', 'screen-clipping'),
-  );
-  return menu;
-};
-
-const createScriptMenu = (): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu('menu-script');
-  menu.append(
-    menuButton(t.scriptCommandUppercase, 'scriptAction', 'uppercase'),
-    menuButton(t.scriptCommandLowercase, 'scriptAction', 'lowercase'),
-    menuButton(t.scriptCommandTrim, 'scriptAction', 'trim'),
-    menuButton(t.scriptCommandClear, 'scriptAction', 'clear'),
-    menuSeparator(),
-    menuButton(t.scriptRunCustom, 'scriptAction', 'custom'),
-  );
-  return menu;
-};
-
-const createAddInMenu = (): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu('menu-add-ins');
-  menu.append(
-    menuButton(t.addInGet, 'addInAction', 'get'),
-    menuButton(t.addInMy, 'addInAction', 'my'),
-    menuSeparator(),
-    menuButton(t.addInManage, 'addInAction', 'manage'),
-  );
-  return menu;
-};
-
-const createPdfMenu = (): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu('menu-pdf');
-  menu.append(
-    menuButton(t.pdfCreate, 'pdfAction', 'create'),
-    menuButton(t.pdfShare, 'pdfAction', 'share'),
-    menuSeparator(),
-    menuButton(t.pdfPreferences, 'pdfAction', 'preferences'),
-  );
-  return menu;
-};
-
-type TableVariantId = 'plain' | 'banded' | 'firstCol' | 'bandedFirstCol';
-
-const TABLE_VARIANTS_LIGHT_MEDIUM: TableVariantId[] = [
-  'plain',
-  'banded',
-  'firstCol',
-  'bandedFirstCol',
-];
-const TABLE_VARIANTS_DARK: TableVariantId[] = ['banded'];
-
-const tableVariantOptions = (variant: TableVariantId): { banded: boolean; firstCol: boolean } => {
-  switch (variant) {
-    case 'plain':
-      return { banded: false, firstCol: false };
-    case 'banded':
-      return { banded: true, firstCol: false };
-    case 'firstCol':
-      return { banded: false, firstCol: true };
-    case 'bandedFirstCol':
-      return { banded: true, firstCol: true };
-  }
-};
-
-const createTableStyleSwatch = (
-  style: TableStyle,
-  color: string,
-  variant: TableVariantId,
-  label: string,
-): HTMLButtonElement => {
-  const swatch = tableStyleSwatch(style, color);
-  const { banded, firstCol } = tableVariantOptions(variant);
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'app__tablestyle-swatch';
-  btn.setAttribute('role', 'menuitem');
-  btn.dataset.tableStyle = style;
-  btn.dataset.tableColor = color;
-  btn.dataset.tableVariant = variant;
-  btn.title = label;
-  btn.setAttribute('aria-label', label);
-  btn.style.cssText =
-    'display:flex;flex-direction:column;width:46px;height:34px;padding:0;' +
-    'border:1px solid #c8c6c4;border-radius:2px;overflow:hidden;cursor:pointer;background:#fff;';
-  const head = document.createElement('div');
-  head.style.cssText = `flex:0 0 9px;background:${swatch.header};`;
-  btn.appendChild(head);
-  for (let i = 0; i < 3; i += 1) {
-    const row = document.createElement('div');
-    const rowFill = banded && i % 2 === 1 ? swatch.band : '#ffffff';
-    row.style.cssText = `flex:1;display:flex;background:${rowFill};`;
-    if (firstCol) {
-      const emphasis = document.createElement('div');
-      emphasis.style.cssText = `flex:0 0 10px;background:${swatch.header};`;
-      row.appendChild(emphasis);
-      const rest = document.createElement('div');
-      rest.style.cssText = 'flex:1;';
-      row.appendChild(rest);
-    }
-    btn.appendChild(row);
-  }
-  return btn;
-};
-
-const tableStyleFooterButton = (label: string, action: string): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'app__menu-item app__tablestyle-footer';
-  btn.setAttribute('role', 'menuitem');
-  btn.dataset.tableStyleFooter = action;
-  btn.textContent = label;
-  btn.style.cssText =
-    'display:flex;width:100%;padding:6px 12px;border:0;background:transparent;cursor:pointer;text-align:left;font-size:12px;color:#1f1f1f;';
-  return btn;
-};
-
-const createTableStyleMenu = (id: string): HTMLDivElement => {
-  const t = toolbarMenuText(ribbonLang);
-  const menu = createMenu(id);
-  menu.style.width = 'auto';
-  menu.style.maxWidth = '420px';
-  const intensities: {
-    id: TableStyle;
-    label: string;
-    variants: readonly TableVariantId[];
-  }[] = [
-    { id: 'light', label: t.tableStyleLight, variants: TABLE_VARIANTS_LIGHT_MEDIUM },
-    { id: 'medium', label: t.tableStyleMedium, variants: TABLE_VARIANTS_LIGHT_MEDIUM },
-    { id: 'dark', label: t.tableStyleDark, variants: TABLE_VARIANTS_DARK },
-  ];
-  for (const intensity of intensities) {
-    const heading = document.createElement('div');
-    heading.textContent = intensity.label;
-    heading.style.cssText = 'padding:6px 10px 2px;font-size:11px;font-weight:600;color:#605e5c;';
-    menu.appendChild(heading);
-    const grid = document.createElement('div');
-    grid.setAttribute('role', 'group');
-    grid.setAttribute('aria-label', intensity.label);
-    grid.style.cssText =
-      'display:grid;grid-template-columns:repeat(7,46px);gap:4px;padding:2px 8px 6px;';
-    for (const variant of intensity.variants) {
-      for (const color of TABLE_STYLE_COLORS) {
-        grid.appendChild(createTableStyleSwatch(intensity.id, color, variant, intensity.label));
-      }
-    }
-    menu.appendChild(grid);
-  }
-  menu.appendChild(menuSeparator());
-  menu.appendChild(tableStyleFooterButton(t.tableStyleNew, 'new-table-style'));
-  menu.appendChild(tableStyleFooterButton(t.tableStyleNewPivot, 'new-pivot-style'));
-  return menu;
-};
-
-const cellStyleGalleryLabel = (id: CellStyleId): string => {
-  const strings = dictionaries[ribbonLang].cellStylesGallery.styles;
-  return strings[id] ?? CELL_STYLES.find((s) => s.id === id)?.label ?? id;
-};
-
-const cellStyleGroupLabel = (id: CellStyleGroupId): string =>
-  dictionaries[ribbonLang].cellStylesGallery.groups[id];
-
-const createCellStyleChip = (id: CellStyleId): HTMLButtonElement => {
-  const def = CELL_STYLES.find((s) => s.id === id);
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'app__menu-item app__cellstyle-chip';
-  btn.setAttribute('role', 'menuitem');
-  btn.dataset.cellStyle = id;
-  const label = cellStyleGalleryLabel(id);
-  btn.title = label;
-  btn.setAttribute('aria-label', label);
-  btn.textContent = label;
-  const fmt = def?.format ?? {};
-  const css: string[] = [
-    'display:flex;align-items:center;justify-content:center;',
-    'min-width:88px;height:28px;padding:2px 8px;',
-    'border:1px solid #d0cfcd;border-radius:2px;cursor:pointer;',
-    'font-size:11px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;',
-    `background:${fmt.fill ?? '#ffffff'};`,
-    `color:${fmt.color ?? '#1f1f1f'};`,
-  ];
-  if (fmt.bold) css.push('font-weight:700;');
-  if (fmt.italic) css.push('font-style:italic;');
-  if (fmt.underline) css.push('text-decoration:underline;');
-  if (fmt.fontSize) css.push(`font-size:${Math.min(fmt.fontSize, 13)}px;`);
-  btn.style.cssText = css.join('');
-  return btn;
-};
-
-const cellStyleFooterButton = (label: string, action: string): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'app__menu-item app__cellstyle-footer';
-  btn.setAttribute('role', 'menuitem');
-  btn.dataset.cellStyleFooter = action;
-  btn.textContent = label;
-  btn.style.cssText =
-    'display:flex;width:100%;padding:6px 12px;border:0;background:transparent;cursor:pointer;text-align:left;font-size:12px;color:#1f1f1f;';
-  return btn;
-};
-
-const currencyFooterButton = (label: string, action: string): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'app__menu-item app__currency-footer';
-  btn.setAttribute('role', 'menuitem');
-  btn.dataset.currencyFooter = action;
-  btn.textContent = label;
-  btn.style.cssText =
-    'display:flex;width:100%;padding:6px 12px;border:0;background:transparent;cursor:pointer;text-align:left;font-size:12px;color:#1f1f1f;';
-  return btn;
-};
-
-const currencyPresetItem = (label: string, symbol: string): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'app__menu-item';
-  btn.setAttribute('role', 'menuitem');
-  btn.dataset.currencyPreset = symbol;
-  btn.textContent = label;
-  return btn;
-};
-
-const createCurrencyMenu = (): HTMLDivElement => {
-  const menu = createMenu('menu-currency-home');
-  menu.style.width = 'auto';
-  menu.style.maxWidth = '320px';
-  menu.append(
-    currencyPresetItem(ribbonText.currencyPresetJpy, '¥'),
-    currencyPresetItem(ribbonText.currencyPresetUsd, '$'),
-    currencyPresetItem(ribbonText.currencyPresetEur, '€'),
-    currencyPresetItem(ribbonText.currencyPresetGbp, '£'),
-    currencyPresetItem(ribbonText.currencyPresetChf, 'CHF'),
-    menuSeparator(),
-    currencyFooterButton(ribbonText.moreCurrencyFormats, 'more'),
-  );
-  return menu;
-};
-
-const createCellStylesMenu = (): HTMLDivElement => {
-  const t = toolbarMenuText(ribbonLang);
-  const menu = createMenu('menu-cell-styles-home');
-  menu.style.width = 'auto';
-  menu.style.maxWidth = '620px';
-  for (const group of CELL_STYLE_GROUPS) {
-    const heading = document.createElement('div');
-    heading.textContent = cellStyleGroupLabel(group.id);
-    heading.style.cssText = 'padding:6px 10px 2px;font-size:11px;font-weight:600;color:#605e5c;';
-    menu.appendChild(heading);
-    const grid = document.createElement('div');
-    grid.setAttribute('role', 'group');
-    grid.setAttribute('aria-label', cellStyleGroupLabel(group.id));
-    grid.style.cssText =
-      'display:grid;grid-template-columns:repeat(6,minmax(88px,1fr));gap:4px;padding:2px 8px 6px;';
-    for (const id of group.styleIds) grid.appendChild(createCellStyleChip(id));
-    menu.appendChild(grid);
-  }
-  menu.appendChild(menuSeparator());
-  menu.appendChild(cellStyleFooterButton(t.cellStyleNew, 'new-cell-style'));
-  menu.appendChild(cellStyleFooterButton(t.cellStyleMerge, 'merge-cell-style'));
-  return menu;
-};
-
-const createSortMenu = (id: string): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu(id);
-  menu.append(
-    menuButton(t.sortAscendingMenu, 'sort', 'asc'),
-    menuButton(t.sortDescendingMenu, 'sort', 'desc'),
-    menuButton(t.sortCustom, 'sort', 'custom'),
-    menuSeparator(),
-    menuButton(t.filterToggle, 'sort', 'filter'),
-    menuButton(t.filterBySelectedCellValue, 'sort', 'filter-by-value'),
-    menuButton(t.filterClearAll, 'sort', 'filter-clear'),
-    menuButton(t.filterReapply, 'sort', 'filter-reapply'),
-    menuButton(t.filterAdvanced, 'sort', 'filter-advanced'),
-    menuSeparator(),
-    menuButton(ribbonText.removeDuplicates, 'sort', 'dedupe'),
-    menuButton(ribbonText.conditionalFormatting, 'sort', 'conditional'),
-    menuButton(t.nameManager, 'sort', 'named'),
-  );
-  return menu;
-};
-
-const createTextToColumnsMenu = (): HTMLDivElement => {
-  const t = ribbonMenuText;
-  const menu = createMenu('menu-text-to-columns');
-  menu.append(
-    menuButton(t.textToColumnsComma, 'textToColumnsDelimiter', ','),
-    menuButton(t.textToColumnsTab, 'textToColumnsDelimiter', '\\t'),
-    menuButton(t.textToColumnsSemicolon, 'textToColumnsDelimiter', ';'),
-    menuButton(t.textToColumnsSpace, 'textToColumnsDelimiter', ' '),
-    menuSeparator(),
-    menuButton(t.textToColumnsCustom, 'textToColumnsDelimiter', 'custom'),
-  );
-  return menu;
-};
-
-const createFindSelectMenu = (): HTMLDivElement => {
-  const t = toolbarMenuText(ribbonLang);
-  const menu = createMenu('menu-find-select');
-  menu.append(
-    menuButton(t.find, 'findSelect', 'find'),
-    menuButton(t.replace, 'findSelect', 'replace'),
-    menuButton(t.goTo, 'findSelect', 'go-to'),
-    menuButton(t.goToSpecial, 'findSelect', 'go-to-special'),
-    menuSeparator(),
-    menuButton(t.findFormulas, 'findSelect', 'formulas'),
-    menuButton(t.findConstants, 'findSelect', 'constants'),
-    menuButton(t.findConditionalFormatting, 'findSelect', 'conditional-format'),
-    menuButton(t.findDataValidation, 'findSelect', 'data-validation'),
-    menuButton(t.comments, 'findSelect', 'comments'),
-  );
-  return menu;
-};
 
 const selectMatchingAddresses = (
   matches: readonly { sheet: number; row: number; col: number }[],
@@ -3734,7 +2460,7 @@ const applyConditionalMenuAction = async (action: string, panel?: string): Promi
   const i = inst;
   const range = cfSelectionRange();
   if (!i || !range) return;
-  const title = cfMenuText();
+  const title = buildCfMenuText(ribbonLang);
   if (action === 'new-rule') {
     i.openConditionalDialog({ mode: 'new', kind: conditionalRuleKindForPanel(panel) });
     return;
@@ -6827,103 +5553,10 @@ const triggerSaveAs = async (): Promise<void> => {
 const inspectWorkbookFromBackstage = (): void => {
   const i = inst;
   if (!i) return;
-  const summary = summarizeSpreadsheetCompatibility(i.workbook);
-  const objectsText = dictionaries[ribbonLang].workbookObjects;
-  const compatibilityLabel = (id: (typeof summary.items)[number]['id']): string => {
-    switch (id) {
-      case 'cell-formatting':
-        return objectsText.compatibilityLabels.cellFormatting;
-      case 'conditional-formatting':
-        return objectsText.compatibilityLabels.conditionalFormatting;
-      case 'data-validation':
-        return objectsText.compatibilityLabels.dataValidation;
-      case 'hyperlinks':
-        return objectsText.compatibilityLabels.hyperlinks;
-      case 'comments':
-        return objectsText.compatibilityLabels.comments;
-      case 'defined-names':
-        return objectsText.compatibilityLabels.definedNames;
-      case 'sheet-protection':
-        return objectsText.compatibilityLabels.sheetProtection;
-      case 'sheet-views':
-        return objectsText.compatibilityLabels.sheetViews;
-      case 'loaded-tables':
-        return objectsText.compatibilityLabels.loadedTables;
-      case 'format-as-table':
-        return objectsText.compatibilityLabels.formatAsTable;
-      case 'pivot-layouts':
-        return objectsText.compatibilityLabels.pivotLayouts;
-      case 'pivot-authoring':
-        return objectsText.compatibilityLabels.pivotAuthoring;
-      case 'session-charts':
-        return objectsText.compatibilityLabels.sessionCharts;
-      case 'charts-drawings':
-        return objectsText.compatibilityLabels.chartsDrawings;
-      case 'chart-authoring':
-        return objectsText.compatibilityLabels.chartAuthoring;
-      case 'external-links':
-        return objectsText.compatibilityLabels.externalLinks;
-    }
-  };
-  const compatibilityDetail = (id: (typeof summary.items)[number]['id']): string => {
-    switch (id) {
-      case 'cell-formatting':
-        return objectsText.compatibilityDetails.cellFormatting;
-      case 'conditional-formatting':
-        return objectsText.compatibilityDetails.conditionalFormatting;
-      case 'data-validation':
-        return objectsText.compatibilityDetails.dataValidation;
-      case 'hyperlinks':
-        return objectsText.compatibilityDetails.hyperlinks;
-      case 'comments':
-        return objectsText.compatibilityDetails.comments;
-      case 'defined-names':
-        return objectsText.compatibilityDetails.definedNames;
-      case 'sheet-protection':
-        return objectsText.compatibilityDetails.sheetProtection;
-      case 'sheet-views':
-        return objectsText.compatibilityDetails.sheetViews;
-      case 'loaded-tables':
-        return objectsText.compatibilityDetails.loadedTables;
-      case 'format-as-table':
-        return objectsText.compatibilityDetails.formatAsTable;
-      case 'pivot-layouts':
-        return objectsText.compatibilityDetails.pivotLayouts;
-      case 'pivot-authoring':
-        return objectsText.compatibilityDetails.pivotAuthoring;
-      case 'session-charts':
-        return objectsText.compatibilityDetails.sessionCharts;
-      case 'charts-drawings':
-        return objectsText.compatibilityDetails.chartsDrawings;
-      case 'chart-authoring':
-        return objectsText.compatibilityDetails.chartAuthoring;
-      case 'external-links':
-        return objectsText.compatibilityDetails.externalLinks;
-    }
-  };
-  const statusLabel = (status: keyof typeof summary.byStatus): string => {
-    if (status === 'writable') return objectsText.writable;
-    if (status === 'read-only') return objectsText.readOnly;
-    if (status === 'session') return objectsText.sessionOnly;
-    return objectsText.unsupported;
-  };
-  showRibbonReport(dictionaries[ribbonLang].backstage.inspect, [
-    {
-      severity: 'info',
-      label: objectsText.compatibility,
-      detail: `${objectsText.writable} ${summary.byStatus.writable}, ${objectsText.readOnly} ${summary.byStatus['read-only']}, ${objectsText.sessionOnly} ${summary.byStatus.session}, ${objectsText.unsupported} ${summary.byStatus.unsupported}`,
-    },
-    ...summary.items.map((item) => ({
-      severity:
-        item.status === 'unsupported' || item.status === 'read-only'
-          ? ('warning' as const)
-          : ('info' as const),
-      label: `${compatibilityLabel(item.id)} · ${statusLabel(item.status)}`,
-      detail: item.count
-        ? `${compatibilityDetail(item.id)} (${item.count})`
-        : compatibilityDetail(item.id),
-    })),
-  ]);
+  showRibbonReport(
+    dictionaries[ribbonLang].backstage.inspect,
+    buildSpreadsheetCompatibilityReport(i.workbook, dictionaries[ribbonLang].workbookObjects),
+  );
 };
 
 const loadXlsxFile = async (file: File): Promise<void> => {
@@ -8657,32 +7290,18 @@ const insertScreenshotFromRibbon = (): void => {
 
 const createChartFromSelection = (kind: SessionChartKind = 'column'): void => {
   if (!inst) return;
-  const r = inst.store.getState().selection.range;
-  const count = inst.store.getState().charts.charts.length;
-  createSessionChart(
-    inst.store,
-    r,
-    {
-      id: `ribbon-chart-${r.sheet}-${r.r0}-${r.c0}-${r.r1}-${r.c1}-${kind}-${count}`,
-      kind,
-      title: null,
-      x: 340 + (count % 3) * 24,
-      y: 96 + (count % 3) * 24,
-      w: 360,
-      h: 220,
-    },
-    inst.history,
-  );
+  createRibbonChartFromSelection({
+    store: inst.store,
+    history: inst.history,
+    range: inst.store.getState().selection.range,
+    action: kind,
+  });
   focusSheet();
 };
 
 const recommendedChartKind = (): SessionChartKind => {
   const r = inst?.store.getState().selection.range;
-  if (!r) return 'column';
-  if (r.r0 === r.r1 && r.c1 - r.c0 >= 2) return 'line';
-  if (r.c0 === r.c1 && r.r1 - r.r0 >= 2) return 'bar';
-  if (r.c1 - r.c0 === 1 && r.r1 - r.r0 <= 6) return 'pie';
-  return 'column';
+  return r ? inferRecommendedChartKind(r) : 'column';
 };
 
 const chartLabel = (kind: SessionChartKind): string => {

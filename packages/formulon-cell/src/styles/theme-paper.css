@@ -10,6 +10,7 @@
     --fc-bg: #ffffff;
     --fc-bg-elev: #ffffff;
     --fc-bg-rail: #faf9f8;
+    --fc-bg-hover: #f3f2f1;
     --fc-bg-header: #cfcfcf; /* gray fill for selected row/column headers */
 
     /* Foreground — Fluent neutralPrimary scale */
@@ -53,6 +54,22 @@
 
     /* Hover row/column tints */
     --fc-hover-stripe: rgba(16, 124, 65, 0.025);
+
+    /* Elevation — Fluent depth scale (paired ambient + key light layers). */
+    --fc-shadow-2: 0 1px 2px rgba(0, 0, 0, 0.18);
+    --fc-shadow-4: 0 3px 8px rgba(0, 0, 0, 0.12);
+    --fc-shadow-8: 0 8px 24px rgba(0, 0, 0, 0.16);
+    --fc-shadow-16: 0 18px 48px rgba(0, 0, 0, 0.28);
+
+    /* Sizing / rule extras consumed across overlays + dialogs. */
+    --fc-hairline: 1px;
+    --fc-rule-soft: color-mix(in srgb, var(--fc-rule) 60%, transparent);
+    --fc-rule-subtle: #edebe9;
+    --fc-selection-fill: color-mix(in srgb, var(--fc-accent) 12%, transparent);
+
+    /* Format-Cells border swatch — diagonal line preview. */
+    --fc-fmtdlg-border-diag-color: currentColor;
+    --fc-fmtdlg-border-diag-width: 1px;
 
     /* === FORMAT-CELLS DIALOG (light) ===
      * Spreadsheet-Properties-dialog look, light variant. Panel + body stay

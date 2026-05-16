@@ -1,6 +1,9 @@
 import type { CellValue, Range } from '../engine/types.js';
 import { PivotAggregation, PivotAxis } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { mutators, type SpreadsheetStore } from '../store/store.js';
+import type { History } from './history.js';
+import { addSheet } from './sheet-mutate.js';
 
 export interface PivotSourceField {
   name: string;
@@ -227,3 +230,135 @@ export function createPivotTableFromRange(
 
   return { ok: true, cacheId, pivotIndex };
 }
+
+export type RibbonPivotTableAction = 'dialog' | 'recommended' | 'new-sheet' | 'existing-sheet';
+
+export interface RibbonPivotTableReportItem {
+  severity: 'info' | 'warning';
+  label: string;
+  detail: string;
+}
+
+export interface RibbonPivotTableReport {
+  title: string;
+  items: RibbonPivotTableReportItem[];
+}
+
+export type RibbonPivotTableActionResult =
+  | { kind: 'open-dialog' }
+  | {
+      kind: 'created';
+      destinationSheet: number;
+      destination: { sheet: number; row: number; col: number };
+    }
+  | { kind: 'report'; report: RibbonPivotTableReport };
+
+export interface RibbonPivotTableActionStrings {
+  pivotTable: string;
+  pivotTableNewSheet: string;
+  recommendedPivotTables: string;
+  pivotAuthoringDetail: string;
+  workbookStructureProtectedBlocked: string;
+}
+
+export interface ExecuteRibbonPivotTableActionDeps {
+  store: SpreadsheetStore;
+  workbook: WorkbookHandle;
+  action: RibbonPivotTableAction;
+  strings: RibbonPivotTableActionStrings;
+  history?: History | null;
+}
+
+/** Implements the cross-host "PivotTable" ribbon split-button. Returns one of:
+ *  - `open-dialog` — host should run its own `openPivotTableDialog` flow.
+ *  - `created` — engine wrote the pivot; `mutators.replaceCells / setSheetIndex /
+ *    setActive` have already been applied, the host only needs to mirror its
+ *    local active-state cache.
+ *  - `report` — show this report dialog to the user (unsupported workbook,
+ *    insufficient source data, blocked by structure protection, or engine
+ *    refusal to author the pivot).
+ *
+ *  Encapsulating the branching here keeps React, Vue, and the playground
+ *  shells identical and removes ~100 lines of duplication per host. */
+export const executeRibbonPivotTableAction = (
+  deps: ExecuteRibbonPivotTableActionDeps,
+): RibbonPivotTableActionResult => {
+  const { store, workbook, action, strings, history = null } = deps;
+  if (action === 'dialog' || action === 'existing-sheet') {
+    return { kind: 'open-dialog' };
+  }
+  if (!workbook.capabilities.pivotTableMutate) {
+    return {
+      kind: 'report',
+      report: {
+        title:
+          action === 'recommended' ? strings.recommendedPivotTables : strings.pivotTableNewSheet,
+        items: [
+          { severity: 'info', label: strings.pivotTable, detail: strings.pivotAuthoringDetail },
+        ],
+      },
+    };
+  }
+  const source = store.getState().selection.range;
+  const fields = inferPivotSourceFields(workbook, source);
+  const valueField = fields.find((field) => field.numericCount > 0) ?? fields.at(-1);
+  const rowField = fields.find((field) => field.name !== valueField?.name) ?? fields[0];
+  if (!rowField || !valueField || rowField.name === valueField.name) {
+    return {
+      kind: 'report',
+      report: {
+        title: strings.pivotTable,
+        items: [
+          { severity: 'warning', label: strings.pivotTable, detail: strings.pivotAuthoringDetail },
+        ],
+      },
+    };
+  }
+  let destinationSheet = source.sheet;
+  if (action === 'new-sheet') {
+    const added = addSheet(store, workbook, history);
+    if (added < 0) {
+      return {
+        kind: 'report',
+        report: {
+          title: strings.pivotTableNewSheet,
+          items: [
+            {
+              severity: 'warning',
+              label: strings.pivotTable,
+              detail: strings.workbookStructureProtectedBlocked,
+            },
+          ],
+        },
+      };
+    }
+    destinationSheet = added;
+  }
+  const destination =
+    action === 'new-sheet'
+      ? { sheet: destinationSheet, row: 0, col: 0 }
+      : { sheet: destinationSheet, row: source.r1 + 3, col: source.c0 };
+  const result = createPivotTableFromRange(workbook, {
+    source,
+    destination,
+    name: `PivotTable${workbook.getPivotTables().length + 1}`,
+    rowField: rowField.name,
+    valueField: valueField.name,
+    aggregation: valueField.numericCount > 0 ? PivotAggregation.Sum : PivotAggregation.Count,
+  });
+  if (result.ok) {
+    mutators.replaceCells(store, workbook.cells(destinationSheet));
+    mutators.setSheetIndex(store, destinationSheet);
+    mutators.setActive(store, destination);
+    return { kind: 'created', destinationSheet, destination };
+  }
+  return {
+    kind: 'report',
+    report: {
+      title: action === 'recommended' ? strings.recommendedPivotTables : strings.pivotTableNewSheet,
+      items: [
+        { severity: 'info', label: strings.pivotTable, detail: strings.pivotAuthoringDetail },
+      ],
+    },
+  };
+};
