@@ -52,6 +52,71 @@
 
     --fc-hover-stripe: rgba(0, 51, 204, 0.06);
 
+    /* === FORMAT-CELLS DIALOG (high-contrast) ===
+     * Pure black/white surfaces with the accent blue serving as the focus
+     * ring and primary-action color. Active tab uses a filled pill. */
+    --fc-fmtdlg-panel-bg: #ffffff;
+    --fc-fmtdlg-panel-fg: #000000;
+    --fc-fmtdlg-header-bg: #ffffff;
+    --fc-fmtdlg-body-bg: #ffffff;
+    --fc-fmtdlg-footer-bg: #ffffff;
+    --fc-fmtdlg-rule: #000000;
+    --fc-fmtdlg-label-fg: #000000;
+    --fc-fmtdlg-section-fg: #000000;
+    --fc-fmtdlg-hint-fg: #000000;
+
+    --fc-fmtdlg-tab-bg: transparent;
+    --fc-fmtdlg-tab-border: #000000;
+    --fc-fmtdlg-tab-color: #000000;
+    --fc-fmtdlg-tab-hover: #ffff00;
+    --fc-fmtdlg-tab-hover-color: #000000;
+    --fc-fmtdlg-tab-active-bg: #0033cc;
+    --fc-fmtdlg-tab-active-color: #ffffff;
+    --fc-fmtdlg-tab-active-underline: none;
+    --fc-fmtdlg-tab-radius: 0;
+
+    --fc-fmtdlg-preview-bg: #ffffff;
+    --fc-fmtdlg-preview-fg: #000000;
+    --fc-fmtdlg-preview-border: #000000;
+
+    --fc-fmtdlg-list-bg: #ffffff;
+    --fc-fmtdlg-list-fg: #000000;
+    --fc-fmtdlg-list-border: #000000;
+    --fc-fmtdlg-list-focus-border: #0033cc;
+    --fc-fmtdlg-list-hover-bg: #ffff00;
+    --fc-fmtdlg-list-selected-bg: #0033cc;
+    --fc-fmtdlg-list-selected-fg: #ffffff;
+    --fc-fmtdlg-list-selected-bar: #0033cc;
+    --fc-fmtdlg-cat-selected-bg: #0033cc;
+    --fc-fmtdlg-cat-selected-fg: #ffffff;
+
+    --fc-fmtdlg-input-bg: #ffffff;
+    --fc-fmtdlg-input-fg: #000000;
+    --fc-fmtdlg-input-border: #000000;
+    --fc-fmtdlg-input-hover-border: #0033cc;
+
+    --fc-fmtdlg-btn-bg: #ffffff;
+    --fc-fmtdlg-btn-fg: #000000;
+    --fc-fmtdlg-btn-border: #000000;
+    --fc-fmtdlg-btn-hover-bg: #ffff00;
+    --fc-fmtdlg-btn-hover-border: #000000;
+    --fc-fmtdlg-btn-primary-bg: #0033cc;
+    --fc-fmtdlg-btn-primary-fg: #ffffff;
+    --fc-fmtdlg-btn-primary-hover-bg: #001f80;
+
+    --fc-fmtdlg-chip-bg: #ffffff;
+    --fc-fmtdlg-chip-checked-bg: #0033cc;
+    --fc-fmtdlg-chip-checked-border: #000000;
+
+    --fc-fmtdlg-dial-border: #000000;
+    --fc-fmtdlg-dial-bg: #ffffff;
+    --fc-fmtdlg-dial-arc: #000000;
+    --fc-fmtdlg-dial-dot: #000000;
+    --fc-fmtdlg-dial-dot-hover: #0033cc;
+    --fc-fmtdlg-dial-dot-active: #0033cc;
+    --fc-fmtdlg-dial-pointer: #0033cc;
+    --fc-fmtdlg-dial-text: #000000;
+
     color-scheme: light;
   }
 }

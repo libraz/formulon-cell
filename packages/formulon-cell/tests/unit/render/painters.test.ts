@@ -83,10 +83,13 @@ function makeTextSpy(): {
   ctx: CanvasRenderingContext2D;
   fonts: string[];
   fills: Array<{ text: string; x: number; y: number; font: string }>;
+  directions: string[];
 } {
   const fonts: string[] = [];
   const fills: Array<{ text: string; x: number; y: number; font: string }> = [];
+  const directions: string[] = [];
   let font = '';
+  let direction = 'inherit';
   const ctx = {
     get font(): string {
       return font;
@@ -96,6 +99,13 @@ function makeTextSpy(): {
       fonts.push(v);
     },
     fillStyle: '',
+    get direction(): string {
+      return direction;
+    },
+    set direction(v: string) {
+      direction = v;
+      directions.push(v);
+    },
     textBaseline: 'alphabetic',
     textAlign: 'left',
     save(): void {},
@@ -115,7 +125,7 @@ function makeTextSpy(): {
       fills.push({ text, x, y, font });
     },
   } as unknown as CanvasRenderingContext2D;
-  return { ctx, fonts, fills };
+  return { ctx, fonts, fills, directions };
 }
 
 const theme = (over: Partial<ResolvedTheme> = {}): ResolvedTheme =>
@@ -332,6 +342,42 @@ describe('paintCellText font strictness', () => {
     expect(errSpy.fills[0]?.x).toBe(40);
   });
 
+  it('applies explicit text direction to the canvas context', () => {
+    const spy = makeTextSpy();
+    paintCellText({
+      ctx: spy.ctx,
+      bounds: { x: 0, y: 0, w: 80, h: 20 },
+      theme: theme({ textCell: 13 }),
+      value: { kind: 'text', value: 'שלום' },
+      formula: null,
+      isActive: false,
+      isInRange: false,
+      format: { textDirection: 'rtl' },
+    });
+
+    expect(spy.directions).toContain('rtl');
+  });
+
+  it('applies Excel-style indent as left text inset', () => {
+    const plain = makeTextSpy();
+    const indented = makeTextSpy();
+    const base = {
+      bounds: { x: 10, y: 0, w: 100, h: 20 },
+      theme: theme({ textCell: 13 }),
+      value: { kind: 'text' as const, value: 'ABC' },
+      formula: null,
+      isActive: false,
+      isInRange: false,
+    };
+
+    paintCellText({ ...base, ctx: plain.ctx });
+    paintCellText({ ...base, ctx: indented.ctx, format: { indent: 2 } });
+
+    expect(plain.fills[0]?.x).toBe(13);
+    expect(indented.fills[0]?.x).toBe(29);
+    expect((indented.fills[0]?.x ?? 0) - (plain.fills[0]?.x ?? 0)).toBe(16);
+  });
+
   it('uses the monospace font only for formula-display mode', () => {
     const spy = makeTextSpy();
     paintCellText({
@@ -347,7 +393,7 @@ describe('paintCellText font strictness', () => {
 
     expect(spy.fonts.at(-1)).toBe('400 13px Menlo');
     expect(spy.fills[0]?.text).toBe('=A1+1');
-    expect(spy.fills[0]?.x).toBe(7);
+    expect(spy.fills[0]?.x).toBe(3);
   });
 
   it('shrinks unformatted numbers to fit the cell width before falling back to ####', () => {
@@ -370,8 +416,8 @@ describe('paintCellText font strictness', () => {
       },
     } as unknown as CanvasRenderingContext2D;
 
-    // 686.666666666667 at 6px/char ≈ 96px. A 60px-wide cell (~46px available
-    // after padding) can fit "686.667" (42px) but not the full string. The
+    // 686.666666666667 at 6px/char ≈ 96px. A 60px-wide cell (~54px available
+    // after padding) can fit "686.6667" (48px) but not the full string. The
     // renderer must trim, not clip.
     paintCellText({
       ctx,
@@ -386,7 +432,7 @@ describe('paintCellText font strictness', () => {
     expect(fills).toHaveLength(1);
     const rendered = fills[0] ?? '';
     expect(rendered.startsWith('686')).toBe(true);
-    expect(rendered.length * 6).toBeLessThanOrEqual(60 - 14);
+    expect(rendered.length * 6).toBeLessThanOrEqual(60 - 6);
     expect(rendered).not.toMatch(/^#+$/);
   });
 
@@ -455,7 +501,7 @@ describe('paintCellText font strictness', () => {
       format: { numFmt: { kind: 'fixed', decimals: 0, thousands: true } },
     });
 
-    expect(fills).toEqual(['##']);
+    expect(fills).toEqual(['###']);
   });
 
   it('keeps the same font size and baseline when only bold changes', () => {

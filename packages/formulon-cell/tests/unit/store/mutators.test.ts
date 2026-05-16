@@ -62,6 +62,16 @@ describe('store mutators — status aggregates', () => {
   });
 });
 
+describe('store mutators — sheet tab color', () => {
+  it('sets and clears a sheet tab color', () => {
+    const store = createSpreadsheetStore();
+    mutators.setSheetTabColor(store, 1, '#c00000');
+    expect(store.getState().layout.sheetTabColors.get(1)).toBe('#c00000');
+    mutators.setSheetTabColor(store, 1, null);
+    expect(store.getState().layout.sheetTabColors.has(1)).toBe(false);
+  });
+});
+
 describe('store mutators — multi-range selection', () => {
   it('addExtraCell demotes the current range and promotes the new cell', () => {
     const store = createSpreadsheetStore();

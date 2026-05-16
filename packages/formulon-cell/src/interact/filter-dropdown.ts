@@ -1,4 +1,13 @@
-import { applyFilter, clearFilter, distinctValues } from '../commands/filter.js';
+import {
+  applyConditionFilter,
+  applyValueFilter,
+  clearFilter,
+  type ConditionFilterOp,
+  distinctValues,
+  filterValueKey,
+  recordFilterChange,
+} from '../commands/filter.js';
+import type { History } from '../commands/history.js';
 import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -7,6 +16,7 @@ import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface FilterDropdownDeps {
   store: SpreadsheetStore;
+  history?: History | null;
   strings?: Strings;
   /** Where to anchor the popover. When omitted the popover is centred. */
   anchorRect?: { x: number; y: number; w: number; h: number };
@@ -66,11 +76,25 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
 
   const applyActiveFilter = (): void => {
     if (!activeRange || !root) return;
-    clearFilter(deps.store.getState(), deps.store, activeRange);
-    const state2 = deps.store.getState();
-    applyFilter(state2, deps.store, activeRange, activeCol, (cell) => {
-      const key = cellToKey(cell?.value);
-      return !activeHidden.has(key);
+    const condition = root.querySelector<HTMLSelectElement>('.fc-filter-dropdown__condition-op');
+    const conditionValue = root.querySelector<HTMLInputElement>(
+      '.fc-filter-dropdown__condition-value',
+    );
+    recordFilterChange(deps.history ?? null, deps.store, () => {
+      if (condition?.value && conditionValue?.value.trim()) {
+        applyConditionFilter(deps.store.getState(), deps.store, activeRange as Range, activeCol, {
+          op: condition.value as ConditionFilterOp,
+          value: conditionValue.value,
+        });
+      } else {
+        applyValueFilter(
+          deps.store.getState(),
+          deps.store,
+          activeRange as Range,
+          activeCol,
+          Array.from(activeHidden),
+        );
+      }
     });
     close();
   };
@@ -93,7 +117,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     for (let r = range.r0 + 1; r <= range.r1; r += 1) {
       if (!state.layout.hiddenRows.has(r)) continue;
       const cell = state.data.cells.get(addrKey({ sheet: range.sheet, row: r, col }));
-      const key = cellToKey(cell?.value);
+      const key = filterValueKey(cell?.value);
       hidden.add(key);
     }
 
@@ -112,6 +136,39 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     search.placeholder = t.searchPlaceholder;
     search.setAttribute('aria-label', t.searchPlaceholder);
     search.spellcheck = false;
+
+    const conditionPanel = document.createElement('div');
+    conditionPanel.className = 'fc-filter-dropdown__condition';
+    const conditionLabel = document.createElement('label');
+    conditionLabel.className = 'fc-filter-dropdown__condition-label';
+    conditionLabel.textContent = t.condition;
+    const conditionSelect = document.createElement('select');
+    conditionSelect.className = 'fc-filter-dropdown__condition-op';
+    conditionSelect.setAttribute('aria-label', t.condition);
+    const conditionOptions: Array<{ value: '' | ConditionFilterOp; label: string }> = [
+      { value: '', label: t.conditionNone },
+      { value: 'equals', label: t.conditionEquals },
+      { value: 'notEquals', label: t.conditionNotEquals },
+      { value: 'contains', label: t.conditionContains },
+      { value: 'notContains', label: t.conditionNotContains },
+      { value: 'greaterThan', label: t.conditionGreaterThan },
+      { value: 'greaterThanOrEqual', label: t.conditionGreaterThanOrEqual },
+      { value: 'lessThan', label: t.conditionLessThan },
+      { value: 'lessThanOrEqual', label: t.conditionLessThanOrEqual },
+    ];
+    for (const optionSpec of conditionOptions) {
+      const option = document.createElement('option');
+      option.value = optionSpec.value;
+      option.textContent = optionSpec.label;
+      conditionSelect.appendChild(option);
+    }
+    const conditionInput = document.createElement('input');
+    conditionInput.type = 'text';
+    conditionInput.className = 'fc-filter-dropdown__condition-value';
+    conditionInput.placeholder = t.conditionValue;
+    conditionInput.setAttribute('aria-label', t.conditionValue);
+    conditionLabel.appendChild(conditionSelect);
+    conditionPanel.append(conditionLabel, conditionInput);
 
     const list = document.createElement('div');
     list.className = 'fc-filter-dropdown__list';
@@ -219,12 +276,14 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     clear.textContent = t.clear;
     clear.addEventListener('click', () => {
       if (!activeRange) return;
-      clearFilter(deps.store.getState(), deps.store, activeRange);
+      recordFilterChange(deps.history ?? null, deps.store, () => {
+        clearFilter(deps.store.getState(), deps.store, activeRange as Range);
+      });
       close();
     });
     actions.append(clear, apply);
 
-    r.append(search, list, actions);
+    r.append(conditionPanel, search, list, actions);
     // Borrow theme tokens from the first .fc-host on the page (filter is
     // body-attached, so `[data-fc-theme]` doesn't cascade automatically).
     const host = document.querySelector('.fc-host');
@@ -252,12 +311,3 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     },
   };
 }
-
-const cellToKey = (v: unknown): string => {
-  if (!v || typeof v !== 'object') return '';
-  const cv = v as { kind: string; value?: unknown };
-  if (cv.kind === 'number') return String(cv.value);
-  if (cv.kind === 'text') return String(cv.value ?? '');
-  if (cv.kind === 'bool') return cv.value ? 'TRUE' : 'FALSE';
-  return '';
-};

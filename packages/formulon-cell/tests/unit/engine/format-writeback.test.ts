@@ -187,6 +187,20 @@ describe('numFmtToFormatCode / formatCodeToNumFmt', () => {
     expect(formatCodeToNumFmt('yyyy-mm-dd')).toEqual({ kind: 'date', pattern: 'yyyy-mm-dd' });
   });
 
+  it('special pattern round-trips as Special instead of Custom', () => {
+    expect(numFmtToFormatCode({ kind: 'special', pattern: '00000' })).toBe('00000');
+    expect(formatCodeToNumFmt('00000')).toEqual({
+      kind: 'special',
+      pattern: '00000',
+    });
+    expect(numFmtToFormatCode({ kind: 'special', pattern: '00000-0000' })).toBe('00000-0000');
+    expect(formatCodeToNumFmt('00000-0000')).toEqual({
+      kind: 'special',
+      pattern: '00000-0000',
+    });
+    expect(formatCodeToNumFmt('[DBNum1]0')).toEqual({ kind: 'special', pattern: '[DBNum1]0' });
+  });
+
   it('reads spreadsheet locale-tagged currency formats', () => {
     expect(formatCodeToNumFmt('[$¥-411]#,##0;[Red]-[$¥-411]#,##0')).toEqual({
       kind: 'currency',

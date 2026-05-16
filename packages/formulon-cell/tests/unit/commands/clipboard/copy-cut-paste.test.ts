@@ -3,7 +3,11 @@ import { copy } from '../../../../src/commands/clipboard/copy.js';
 import { cut } from '../../../../src/commands/clipboard/cut.js';
 import { pasteTSV } from '../../../../src/commands/clipboard/paste.js';
 import { addrKey, WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
-import { createSpreadsheetStore, type SpreadsheetStore } from '../../../../src/store/store.js';
+import {
+  createSpreadsheetStore,
+  mutators,
+  type SpreadsheetStore,
+} from '../../../../src/store/store.js';
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
@@ -207,6 +211,19 @@ describe('pasteTSV', () => {
     expect(v10.kind === 'bool' && v10.value).toBe(true);
     // Formula cell.
     expect(wb.cellFormula({ sheet: 0, row: 2, col: 3 })).toBe('=A1');
+  });
+
+  it('respects Text-formatted destination cells when coercing pasted values', () => {
+    setRange(store, 0, 0, 0, 0);
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { numFmt: { kind: 'text' } });
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 1 }, { numFmt: { kind: 'text' } });
+
+    pasteTSV(store.getState(), wb, '00123\t=A1');
+    wb.recalc();
+
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: '00123' });
+    expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'text', value: '=A1' });
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 1 })).toBeNull();
   });
 
   it('reports the widest row in writtenRange when rows have unequal column counts', () => {

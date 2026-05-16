@@ -1,4 +1,5 @@
-import { type SideKey, THEME_SWATCHES } from './format-dialog-model.js';
+import { type ColorPaletteHandle, createColorPalette } from '../components/color-palette.js';
+import type { SideKey } from './format-dialog-model.js';
 
 export function makeCheckbox(label: string): {
   wrap: HTMLLabelElement;
@@ -22,21 +23,22 @@ export function makeButton(label: string, primary = false): HTMLButtonElement {
   return b;
 }
 
-export function makeSwatches(kind: 'font' | 'border' | 'fill'): HTMLDivElement {
-  const group = document.createElement('div');
-  group.className = 'fc-fmtdlg__swatches';
-  group.dataset.swatches = kind;
-  for (const color of THEME_SWATCHES) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'fc-fmtdlg__swatch';
-    btn.dataset.color = color;
-    btn.title = color;
-    btn.setAttribute('aria-label', color);
-    btn.style.backgroundColor = color;
-    group.appendChild(btn);
-  }
-  return group;
+export function makeSwatches(
+  kind: 'font' | 'border' | 'fill',
+  themeLabel: string,
+  standardLabel: string,
+): ColorPaletteHandle {
+  const palette = createColorPalette({
+    themeLabel,
+    standardLabel,
+    ariaLabel: themeLabel,
+    // Picks are committed by the dialog controller via click delegation on
+    // the palette's `[data-color]` swatches; the palette only owns its own
+    // highlight state here.
+    onPick: () => {},
+  });
+  palette.el.dataset.swatches = kind;
+  return palette;
 }
 
 export function makeVisualSideButton(

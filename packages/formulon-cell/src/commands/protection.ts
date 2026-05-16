@@ -2,12 +2,42 @@ import { addrKey } from '../engine/address.js';
 import { flushProtectionToEngine } from '../engine/protection-sync.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import {
+  type AllowedEditRange,
+  type CellFormat,
+  mutators,
+  type SpreadsheetStore,
+  type State,
+} from '../store/store.js';
+import type { History } from './history.js';
 
 export interface SheetProtectionOptions {
   password?: string;
   workbook?: WorkbookHandle;
 }
+
+export interface WorkbookStructureProtectionOptions {
+  password?: string;
+}
+
+export interface AllowedEditRangeOptions {
+  id?: string;
+  title?: string;
+  password?: string;
+}
+
+interface ProtectionSnapshot {
+  protectedSheets: Map<number, { password?: string }>;
+  workbookStructure?: { password?: string };
+  allowedEditRanges: AllowedEditRange[];
+}
+
+const rangeContainsAddr = (range: Range, addr: Addr): boolean =>
+  range.sheet === addr.sheet &&
+  addr.row >= range.r0 &&
+  addr.row <= range.r1 &&
+  addr.col >= range.c0 &&
+  addr.col <= range.c1;
 
 /** Whether `sheet` is currently flagged protected on the workbook. Mirrors
  *  the protection slice as a pure helper so call sites don't reach into the
@@ -45,6 +75,133 @@ export function protectedSheetPassword(state: State, sheet: number): string | un
   return state.protection.protectedSheets.get(sheet)?.password;
 }
 
+export function isWorkbookStructureProtected(state: State): boolean {
+  return !!state.protection.workbookStructure;
+}
+
+export function workbookStructurePassword(state: State): string | undefined {
+  return state.protection.workbookStructure?.password;
+}
+
+export function setWorkbookStructureProtected(
+  store: SpreadsheetStore,
+  on: boolean,
+  options: WorkbookStructureProtectionOptions = {},
+): void {
+  mutators.setWorkbookStructureProtected(
+    store,
+    on,
+    options.password !== undefined ? { password: options.password } : undefined,
+  );
+}
+
+export function toggleWorkbookStructureProtected(
+  store: SpreadsheetStore,
+  options: WorkbookStructureProtectionOptions = {},
+): boolean {
+  const on = !isWorkbookStructureProtected(store.getState());
+  setWorkbookStructureProtected(store, on, options);
+  return on;
+}
+
+export function allowedEditRangesForSheet(state: State, sheet: number): AllowedEditRange[] {
+  return state.protection.allowedEditRanges.filter((entry) => entry.range.sheet === sheet);
+}
+
+export function isAddrInAllowedEditRange(state: State, addr: Addr): boolean {
+  return state.protection.allowedEditRanges.some((entry) => rangeContainsAddr(entry.range, addr));
+}
+
+export function addAllowedEditRange(
+  store: SpreadsheetStore,
+  range: Range,
+  options: AllowedEditRangeOptions = {},
+): string {
+  return mutators.addAllowedEditRange(store, {
+    id: options.id,
+    title: options.title ?? `Range ${store.getState().protection.allowedEditRanges.length + 1}`,
+    range,
+    ...(options.password !== undefined ? { password: options.password } : {}),
+  });
+}
+
+export function clearAllowedEditRanges(store: SpreadsheetStore, sheet?: number): void {
+  mutators.clearAllowedEditRanges(store, sheet);
+}
+
+const cloneRange = (range: Range): Range => ({ ...range });
+
+const cloneAllowedEditRange = (entry: AllowedEditRange): AllowedEditRange => ({
+  ...entry,
+  range: cloneRange(entry.range),
+});
+
+const captureProtectionSnapshot = (state: State): ProtectionSnapshot => ({
+  protectedSheets: new Map(
+    [...state.protection.protectedSheets.entries()].map(([sheet, entry]) => [
+      sheet,
+      { ...entry },
+    ]),
+  ),
+  ...(state.protection.workbookStructure
+    ? { workbookStructure: { ...state.protection.workbookStructure } }
+    : {}),
+  allowedEditRanges: state.protection.allowedEditRanges.map(cloneAllowedEditRange),
+});
+
+const sameProtectionSnapshot = (a: ProtectionSnapshot, b: ProtectionSnapshot): boolean =>
+  JSON.stringify({
+    protectedSheets: [...a.protectedSheets.entries()].sort(([x], [y]) => x - y),
+    workbookStructure: a.workbookStructure ?? null,
+    allowedEditRanges: a.allowedEditRanges,
+  }) ===
+  JSON.stringify({
+    protectedSheets: [...b.protectedSheets.entries()].sort(([x], [y]) => x - y),
+    workbookStructure: b.workbookStructure ?? null,
+    allowedEditRanges: b.allowedEditRanges,
+  });
+
+const applyProtectionSnapshot = (
+  store: SpreadsheetStore,
+  wb: WorkbookHandle | undefined,
+  snap: ProtectionSnapshot,
+): void => {
+  const previousSheets = new Set(store.getState().protection.protectedSheets.keys());
+  store.setState((s) => ({
+    ...s,
+    protection: {
+      protectedSheets: new Map(snap.protectedSheets),
+      ...(snap.workbookStructure ? { workbookStructure: { ...snap.workbookStructure } } : {}),
+      allowedEditRanges: snap.allowedEditRanges.map(cloneAllowedEditRange),
+    },
+  }));
+  if (!wb) return;
+  const sheets = new Set([...previousSheets, ...snap.protectedSheets.keys()]);
+  for (const sheet of sheets) {
+    const entry = snap.protectedSheets.get(sheet);
+    flushProtectionToEngine(wb, sheet, !!entry, entry?.password);
+  }
+};
+
+export function recordProtectionChange<T>(
+  history: History | null,
+  store: SpreadsheetStore,
+  wb: WorkbookHandle | undefined,
+  mutate: () => T,
+): T {
+  if (!history || history.isReplaying()) return mutate();
+  const before = captureProtectionSnapshot(store.getState());
+  const result = mutate();
+  const after = captureProtectionSnapshot(store.getState());
+  if (!sameProtectionSnapshot(before, after)) {
+    history.push({
+      undo: () => applyProtectionSnapshot(store, wb, before),
+      redo: () => applyProtectionSnapshot(store, wb, after),
+    });
+  }
+  return result;
+}
+
 /** Whether the cell at `addr` is locked. desktop default is locked, so a
  *  missing format entry (or `locked === undefined`) returns `true`. Only
  *  an explicit `locked: false` opts the cell out. */
@@ -58,6 +215,7 @@ export function isCellLocked(state: State, addr: Addr): boolean {
  *  time so locked + protected → no-op rather than throw. */
 export function isCellWritable(state: State, addr: Addr): boolean {
   if (!isSheetProtected(state, addr.sheet)) return true;
+  if (isAddrInAllowedEditRange(state, addr)) return true;
   return !isCellLocked(state, addr);
 }
 
@@ -86,7 +244,9 @@ export function gateProtection(state: State, range: Range): Range | null {
   for (let r = range.r0; r <= range.r1; r += 1) {
     for (let c = range.c0; c <= range.c1; c += 1) {
       const fmt = state.format.formats.get(addrKey({ sheet: range.sheet, row: r, col: c }));
-      if (fmt?.locked === false) return range;
+      if (fmt?.locked === false || isAddrInAllowedEditRange(state, { sheet: range.sheet, row: r, col: c })) {
+        return range;
+      }
     }
   }
   return null;
@@ -101,7 +261,9 @@ export function* writableAddrs(state: State, range: Range): IterableIterator<Add
   for (let r = range.r0; r <= range.r1; r += 1) {
     for (let c = range.c0; c <= range.c1; c += 1) {
       const addr: Addr = { sheet: range.sheet, row: r, col: c };
-      if (!protectedSheet || !isCellLocked(state, addr)) yield addr;
+      if (!protectedSheet || !isCellLocked(state, addr) || isAddrInAllowedEditRange(state, addr)) {
+        yield addr;
+      }
     }
   }
 }

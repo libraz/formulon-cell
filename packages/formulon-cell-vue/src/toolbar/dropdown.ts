@@ -8,20 +8,77 @@ import { nextTick, onMounted, onUnmounted, ref } from 'vue';
 import type { BorderPreset } from './model.js';
 
 type DropdownName =
+  | 'paste'
   | 'fontFamily'
   | 'fontSize'
   | 'borderPreset'
   | 'borderStyle'
+  | 'borderColor'
   | 'fillColor'
   | 'fontColor'
+  | 'textOrientation'
   | 'margins'
   | 'merge'
   | 'numberFormat'
   | 'orientation'
-  | 'paperSize';
+  | 'paperSize'
+  | 'autosum'
+  | 'autosumFormula'
+  | 'definedNames'
+  | 'errorChecking'
+  | 'calcOptions'
+  | 'dataFilter'
+  | 'textToColumns'
+  | 'dataValidation'
+  | 'conditional'
+  | 'formatTableHome'
+  | 'formatTableInsert'
+  | 'pivotTableInsert'
+  | 'pictureInsert'
+  | 'shapesInsert'
+  | 'screenshotInsert'
+  | 'chartInsert'
+  | 'symbolInsert'
+  | 'cellInsert'
+  | 'cellDelete'
+  | 'cellFormat'
+  | 'cellStyles'
+  | 'fillHome'
+  | 'clearHome'
+  | 'sortHome'
+  | 'findHome'
+  | 'clearArrows'
+  | 'watch'
+  | 'watchView'
+  | 'deleteCommentReview'
+  | 'protectionReview'
+  | 'addIn'
+  | 'pdf'
+  | 'hyperlinkInsert'
+  | 'definedNamesInsert'
+  | 'outlineGroup'
+  | 'outlineUngroup'
+  | 'ifFormula'
+  | 'xlookupFormula'
+  | 'concatFormula'
+  | 'todayFormula'
+  | 'pmtFormula'
+  | 'roundFormula'
+  | 'sortData'
+  | 'pageTheme'
+  | 'printArea'
+  | 'pageBreaks'
+  | 'sheetBackground'
+  | 'printTitles'
+  | 'scaleWidth'
+  | 'scaleHeight'
+  | 'scalePercent'
+  | 'windowVisibility'
+  | 'freeze';
 
 interface DropdownHandlers {
   onBorderPreset(value: BorderPreset): void;
+  onBorderStyle(value: CellBorderStyle): void;
   onFontFamily(value: string): void;
   onFontSize(value: string | number): void;
   onMarginPreset(value: MarginPreset): void;
@@ -69,8 +126,11 @@ export function useToolbarDropdown(handlers: DropdownHandlers) {
     if (name === 'fontFamily') handlers.onFontFamily(String(value));
     else if (name === 'fontSize') handlers.onFontSize(value);
     else if (name === 'borderPreset') handlers.onBorderPreset(String(value) as BorderPreset);
-    else if (name === 'borderStyle') borderStyle.value = String(value) as CellBorderStyle;
-    else if (name === 'margins') {
+    else if (name === 'borderStyle') {
+      const next = String(value) as CellBorderStyle;
+      borderStyle.value = next;
+      handlers.onBorderStyle(next);
+    } else if (name === 'margins') {
       if (value === 'custom') handlers.onOpenPageSetup();
       else handlers.onMarginPreset(String(value) as MarginPreset);
     } else if (name === 'orientation') handlers.onPageOrientation(String(value) as PageOrientation);
@@ -82,7 +142,7 @@ export function useToolbarDropdown(handlers: DropdownHandlers) {
     if (openDropdown.value == null) return;
     const target = e.target;
     if (!(target instanceof Element)) return;
-    if (target.closest('.demo__rb-dd')) return;
+    if (target.closest('.demo__rb-dd, .demo__rb-menu, .demo__rb-color')) return;
     closeDropdown();
   };
   const onDocKey = (e: KeyboardEvent): void => {

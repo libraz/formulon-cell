@@ -1,68 +1,74 @@
 import type { ReactElement } from 'react';
 import type { BuildRibbonGroupsOptions } from './group-types.js';
-import { RIBBON_TAB_LABELS } from './model.js';
 
 type AddInGroupOptions = Pick<
   BuildRibbonGroupsOptions,
-  'group' | 'iconLabel' | 'instance' | 'lang' | 'onAddIn' | 'onRunScript' | 'tool' | 'tr'
+  | 'addInMenu'
+  | 'pdfMenu'
+  | 'group'
+  | 'iconLabel'
+  | 'strings'
+  | 'onRunScript'
+  | 'onRecordActions'
+  | 'onAllScripts'
+  | 'tool'
+  | 'tr'
 >;
 
 export const buildAddInRibbonGroups = ({
+  addInMenu,
+  pdfMenu,
   group,
   iconLabel,
-  instance,
-  lang,
-  onAddIn,
+  strings,
   onRunScript,
+  onRecordActions,
+  onAllScripts,
   tool,
   tr,
-}: AddInGroupOptions): { automate: ReactElement[]; acrobat: ReactElement[] } => ({
-  automate: [
-    group(
-      RIBBON_TAB_LABELS.automate[lang],
-      [
-        tool(
-          'script',
-          tr.script,
-          iconLabel('script', tr.script),
-          () => onRunScript?.(),
-          false,
-          ' demo__rb--wide',
-          !onRunScript,
-        ),
-      ],
-      'tiles',
-    ),
-  ],
-  acrobat: [
-    group(
-      tr.addIn,
-      [
-        tool(
-          'addIn',
-          tr.addIn,
-          iconLabel('addIn', tr.addIn),
-          () => onAddIn?.(),
-          false,
-          ' demo__rb--wide',
-          !onAddIn,
-        ),
-      ],
-      'tiles',
-    ),
-    group(
-      tr.pdf,
-      [
-        tool(
-          'pdf',
-          tr.pdf,
-          iconLabel('pdf', tr.pdf),
-          () => instance?.print(),
-          false,
-          ' demo__rb--wide',
-        ),
-      ],
-      'tiles',
-    ),
-  ],
-});
+}: AddInGroupOptions): { automate: ReactElement[]; acrobat: ReactElement[] } => {
+  return {
+    automate: [
+      group(
+        strings.ribbon.tabs.automate,
+        [
+          tool(
+            'script',
+            tr.script,
+            iconLabel('script', tr.script),
+            () => onRunScript?.(),
+            false,
+            ' demo__rb--wide',
+            !onRunScript,
+            !!onRunScript,
+          ),
+          tool(
+            'recordActions',
+            tr.recordActions,
+            iconLabel('script', tr.recordActions),
+            () => onRecordActions?.(),
+            false,
+            ' demo__rb--wide',
+            !onRecordActions,
+            !!onRecordActions,
+          ),
+          tool(
+            'allScripts',
+            tr.allScripts,
+            iconLabel('script', tr.allScripts),
+            () => onAllScripts?.(),
+            false,
+            ' demo__rb--wide',
+            !onAllScripts,
+            !!onAllScripts,
+          ),
+        ],
+        'tiles',
+      ),
+    ],
+    acrobat: [
+      group(tr.addIn, [addInMenu], 'tiles'),
+      group(tr.pdf, [pdfMenu], 'tiles'),
+    ],
+  };
+};

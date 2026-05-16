@@ -160,6 +160,7 @@ export function numFmtToFormatCode(fmt: NumFmt | undefined): string | null {
     case 'date':
     case 'time':
     case 'datetime':
+    case 'special':
     case 'custom':
       return fmt.pattern;
     case 'text':
@@ -336,6 +337,7 @@ export function formatCodeToNumFmt(code: string): NumFmt | null {
   if (tFixMatch) {
     return { kind: 'fixed', decimals: tFixMatch[1] ? tFixMatch[1].length : 0, thousands: true };
   }
+  if (isSpecialFormatCode(code)) return { kind: 'special', pattern: code };
   // Plain fixed
   const fixMatch = probe.match(/^0(?:\.(0+))?$/);
   if (fixMatch) {
@@ -348,6 +350,55 @@ export function formatCodeToNumFmt(code: string): NumFmt | null {
     return { kind: 'date', pattern: code };
   }
   return { kind: 'custom', pattern: code };
+}
+
+function isSpecialFormatCode(code: string): boolean {
+  const sections = splitFormatSectionsForSpecial(code).map((section) =>
+    normalizeFormatCode(section.replace(/^\s*\[(?:>=|<=|<>|=|>|<)\s*-?\d+(?:\.\d+)?\s*\]/, '')),
+  );
+  return sections.some((section) => {
+    if (/\[DBNum[123]\]/i.test(section)) return true;
+    if (/^0{2,}$/.test(section)) return true;
+    return /^(?:[() +△▲-]*[0#?]+[() +△▲0#?-]*)+$/.test(section) && /[-()]/.test(section);
+  });
+}
+
+function splitFormatSectionsForSpecial(s: string): string[] {
+  const out: string[] = [];
+  let buf = '';
+  let inQuote = false;
+  let inBracket = false;
+  for (let i = 0; i < s.length; i += 1) {
+    const ch = s[i];
+    if (ch === '\\' && i + 1 < s.length) {
+      buf += ch + s[i + 1];
+      i += 1;
+      continue;
+    }
+    if (!inBracket && ch === '"') {
+      inQuote = !inQuote;
+      buf += ch;
+      continue;
+    }
+    if (!inQuote && ch === '[') {
+      inBracket = true;
+      buf += ch;
+      continue;
+    }
+    if (inBracket && ch === ']') {
+      inBracket = false;
+      buf += ch;
+      continue;
+    }
+    if (!inQuote && !inBracket && ch === ';') {
+      out.push(buf);
+      buf = '';
+      continue;
+    }
+    buf += ch;
+  }
+  out.push(buf);
+  return out;
 }
 
 function firstFormatSection(code: string): string {

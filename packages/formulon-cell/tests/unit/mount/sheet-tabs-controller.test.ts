@@ -309,6 +309,28 @@ describe('mount/sheet-tabs-controller', () => {
       const enabled = items.map((b) => !b.disabled);
       // [rename, insert, moveLeft, moveRight, delete, hide, unhide]
       expect(enabled).toEqual([true, true, true, true, true, true, false]);
+      expect(h.sheetMenu.querySelector('.fc-sheetmenu__colors')).not.toBeNull();
+    });
+
+    it('sets and clears an Excel-style tab color from the sheet menu palette', () => {
+      h = mount({ sheets: ['A', 'B'], capabilities: {} });
+      const tab = h.sheetTabs.querySelectorAll<HTMLButtonElement>('.fc-host__sheetbar-tab')[0];
+      if (!tab) throw new Error('tab not found');
+      h.controller.showMenu(0, tab, 0, 0);
+
+      const swatches = h.sheetMenu.querySelectorAll<HTMLButtonElement>('.fc-sheetmenu__swatch');
+      expect(swatches.length).toBe(9);
+      swatches[1]?.click();
+
+      expect(h.store.getState().layout.sheetTabColors.get(0)).toBe('#c00000');
+      const coloredTab =
+        h.sheetTabs.querySelectorAll<HTMLButtonElement>('.fc-host__sheetbar-tab')[0];
+      expect(coloredTab?.dataset.fcSheetTabColor).toBe('true');
+      expect(coloredTab?.style.getPropertyValue('--fc-sheet-tab-color')).toBe('#c00000');
+
+      h.controller.showMenu(0, coloredTab as HTMLButtonElement, 0, 0);
+      h.sheetMenu.querySelector<HTMLButtonElement>('.fc-sheetmenu__swatch--none')?.click();
+      expect(h.store.getState().layout.sheetTabColors.has(0)).toBe(false);
     });
 
     it('disables mutation entries when capabilities forbid them', () => {

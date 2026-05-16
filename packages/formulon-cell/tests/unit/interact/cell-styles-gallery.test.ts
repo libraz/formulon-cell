@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { CELL_STYLES } from '../../../src/commands/cell-styles.js';
+import { CELL_STYLE_GROUPS, CELL_STYLES } from '../../../src/commands/cell-styles.js';
 import { addrKey } from '../../../src/engine/address.js';
+import { en, ja } from '../../../src/i18n/strings.js';
 import { attachCellStylesGallery } from '../../../src/interact/cell-styles-gallery.js';
 import {
   createSpreadsheetStore,
@@ -11,6 +12,10 @@ import {
 const overlay = (): HTMLElement | null => document.querySelector<HTMLElement>('.fc-stylegallery');
 const chips = (): HTMLButtonElement[] =>
   Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-stylegallery__chip'));
+const headings = (): string[] =>
+  Array.from(document.querySelectorAll<HTMLElement>('.fc-stylegallery__heading')).map((h) =>
+    (h.textContent ?? '').trim(),
+  );
 
 const setRange = (
   store: SpreadsheetStore,
@@ -53,17 +58,48 @@ describe('attachCellStylesGallery', () => {
     handle.detach();
   });
 
-  it('renders one chip per CELL_STYLES entry', () => {
-    const handle = attachCellStylesGallery({ host, store });
+  it('renders Excel-style groups with one chip per CELL_STYLES entry', () => {
+    const handle = attachCellStylesGallery({ host, store, strings: en });
     handle.open();
     expect(
       document.querySelector<HTMLElement>('.fc-stylegallery__grid')?.getAttribute('role'),
     ).toBe('toolbar');
+    expect(headings()).toEqual([
+      'Good, Bad and Neutral',
+      'Data and Model',
+      'Titles and Headings',
+      'Themed Cell Styles',
+      'Number Format',
+    ]);
     const list = chips();
+    const expectedOrder = CELL_STYLE_GROUPS.flatMap((group) => group.styleIds);
     expect(list.length).toBe(CELL_STYLES.length);
-    expect(list.map((c) => c.dataset.fcStyle)).toEqual(CELL_STYLES.map((s) => s.id));
+    expect(list.map((c) => c.dataset.fcStyle)).toEqual(expectedOrder);
     expect(list[0]?.tabIndex).toBe(0);
     expect(list[1]?.tabIndex).toBe(-1);
+    handle.detach();
+  });
+
+  it('uses localized style labels and updates them on locale changes', () => {
+    const handle = attachCellStylesGallery({ host, store, strings: ja });
+    handle.open();
+    expect(overlay()?.getAttribute('aria-label')).toBe('セル スタイル');
+    expect(headings()).toContain('テーマのセル スタイル');
+    expect(chips().find((c) => c.dataset.fcStyle === 'normal')?.textContent).toBe('標準');
+    expect(chips().find((c) => c.dataset.fcStyle === 'checkCell')?.textContent).toBe(
+      'チェック セル',
+    );
+    expect(chips().find((c) => c.dataset.fcStyle === 'accent1_20')?.textContent).toBe(
+      '20% - アクセント1',
+    );
+
+    handle.setStrings(en);
+    expect(overlay()?.getAttribute('aria-label')).toBe('Cell styles');
+    expect(headings()).toContain('Themed Cell Styles');
+    expect(chips().find((c) => c.dataset.fcStyle === 'normal')?.textContent).toBe('Normal');
+    expect(chips().find((c) => c.dataset.fcStyle === 'checkCell')?.textContent).toBe(
+      'Check Cell',
+    );
     handle.detach();
   });
 

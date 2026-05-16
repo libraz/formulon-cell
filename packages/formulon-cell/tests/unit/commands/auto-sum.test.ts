@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { autoSum } from '../../../src/commands/auto-sum.js';
 import type { Addr } from '../../../src/engine/types.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
+import { createSpreadsheetStore, mutators, type SpreadsheetStore } from '../../../src/store/store.js';
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
@@ -91,6 +91,16 @@ describe('autoSum', () => {
     const got = autoSum(store.getState(), wb);
     expect(got).toEqual({ addr: { sheet: 0, row: 3, col: 0 }, formula: '=SUM(A1:A3)' });
     expect(wb.cellFormula({ sheet: 0, row: 3, col: 0 })).toBe('=SUM(A1:A3)');
+  });
+
+  it('can insert the other AutoSum dropdown functions', () => {
+    seedNumber(store, wb, 0, 0, 10);
+    seedNumber(store, wb, 1, 0, 20);
+    setActive(store, { sheet: 0, row: 2, col: 0 });
+
+    const got = autoSum(store.getState(), wb, 'AVERAGE');
+    expect(got).toEqual({ addr: { sheet: 0, row: 2, col: 0 }, formula: '=AVERAGE(A1:A2)' });
+    expect(wb.cellFormula({ sheet: 0, row: 2, col: 0 })).toBe('=AVERAGE(A1:A2)');
   });
 
   it('falls back to the row to the left when the column above is empty', () => {
@@ -198,6 +208,48 @@ describe('autoSum', () => {
     expect(wb.cellFormula({ sheet: 0, row: 2, col: 0 })).toBe('=SUM(A1:A2)');
     expect(wb.cellFormula({ sheet: 0, row: 2, col: 1 })).toBe('=SUM(B1:B2)');
     expect(wb.cellFormula({ sheet: 0, row: 2, col: 2 })).toBe('=SUM(C1:C2)');
+  });
+
+  it('skips locked protected targets in a multi-cell totals row', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    seedNumber(store, wb, 0, 0, 1);
+    seedNumber(store, wb, 0, 1, 2);
+    seedNumber(store, wb, 1, 0, 3);
+    seedNumber(store, wb, 1, 1, 4);
+    mutators.setCellFormat(store, { sheet: 0, row: 2, col: 1 }, { locked: false });
+    mutators.setSheetProtected(store, 0, true);
+    setRangeOnly(store, 0, 0, 2, 1);
+
+    try {
+      const got = autoSum(store.getState(), wb);
+
+      expect(got?.addr).toEqual({ sheet: 0, row: 2, col: 1 });
+      expect(wb.cellFormula({ sheet: 0, row: 2, col: 0 })).toBeNull();
+      expect(wb.cellFormula({ sheet: 0, row: 2, col: 1 })).toBe('=SUM(B1:B2)');
+      expect(warn).toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('falls back to the row target when the column target is locked on a protected sheet', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    seedNumber(store, wb, 0, 0, 1);
+    seedNumber(store, wb, 0, 1, 2);
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 2 }, { locked: false });
+    mutators.setSheetProtected(store, 0, true);
+    setActive(store, { sheet: 0, row: 0, col: 0 });
+
+    try {
+      const got = autoSum(store.getState(), wb);
+
+      expect(got).toEqual({ addr: { sheet: 0, row: 0, col: 2 }, formula: '=SUM(A1:B1)' });
+      expect(wb.cellFormula({ sheet: 0, row: 1, col: 0 })).toBeNull();
+      expect(wb.cellFormula({ sheet: 0, row: 0, col: 2 })).toBe('=SUM(A1:B1)');
+      expect(warn).toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('returns null for a multi-cell numeric range when both candidate targets are non-empty', () => {

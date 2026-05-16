@@ -13,6 +13,7 @@ import {
   hitZone,
   isColVisible,
   isRowVisible,
+  layoutForView,
   rangeRects,
   rowHeight,
   rowTopEdge,
@@ -38,6 +39,7 @@ function makeLayout(over: Partial<LayoutSlice> = {}): LayoutSlice {
     outlineRowGutter: 0,
     outlineColGutter: 0,
     hiddenSheets: new Set(),
+    sheetTabColors: new Map(),
     ...over,
   };
 }
@@ -271,6 +273,14 @@ describe('hitTest', () => {
     // (col=2, row=3): x = 50 + 200 + half col, y = 30 + 60 + half row
     const got = hitTest(layout, viewport, 50 + 250, 30 + 70);
     expect(got).toEqual({ row: 3, col: 2 });
+  });
+
+  it('resolves cells from the top-left when row and column headings are hidden', () => {
+    const layout = layoutForView(makeLayout(), false);
+    const viewport = makeViewport();
+
+    expect(hitTest(layout, viewport, 10, 10)).toEqual({ row: 0, col: 0 });
+    expect(hitZone(layout, viewport, 5, 5)).toEqual({ kind: 'cell', row: 0, col: 0 });
   });
 
   it('resolves a frozen cell when pointer is inside the frozen band', () => {

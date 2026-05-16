@@ -11,7 +11,9 @@ import type {
 import type { CustomFunction, CustomFunctionMeta, FormulaRegistry } from '../formula.js';
 import type { I18nController } from '../i18n/controller.js';
 import type { DeepPartial, Locale, Strings } from '../i18n/strings.js';
+import type { PasteSpecialOptions } from '../commands/clipboard/paste-special.js';
 import type { BorderDrawHandle } from '../interact/border-draw.js';
+import type { ConditionalDialogOpenOptions } from '../interact/conditional-dialog.js';
 import type { FormatPainterHandle } from '../interact/format-painter.js';
 import type { SlicerSpec, SpreadsheetStore } from '../store/store.js';
 
@@ -52,22 +54,31 @@ export interface SpreadsheetInstance {
   remove(id: string): boolean;
   setFeatures(next: FeatureFlags): void;
   setExtensions(next: ExtensionInput[] | undefined): void;
-  openConditionalDialog(): void;
+  openConditionalDialog(options?: ConditionalDialogOpenOptions): void;
   openNamedRangeDialog(): void;
-  openFormatDialog(): void;
+  openFormatDialog(
+    tab?: 'number' | 'align' | 'font' | 'border' | 'fill' | 'protection' | 'more',
+  ): void;
+  openDataValidationDialog(): void;
+  openGoTo(): void;
   openGoToSpecial(): void;
+  openFilterDropdown(range?: import('../engine/types.js').Range, col?: number): void;
   openIterativeDialog(): void;
   openExternalLinksDialog(): void;
   openCfRulesDialog(): void;
   openCellStylesGallery(): void;
+  openEvaluateFormulaDialog(): void;
   openFunctionArguments(seedName?: string): void;
   openHyperlinkDialog(): void;
   openCommentDialog(): void;
-  openFindReplace(): void;
+  openDefineNameDialog(): void;
+  openFindReplace(tab?: 'find' | 'replace'): void;
   closeFindReplace(): void;
   openPasteSpecial(): void;
+  pasteSpecial(options: PasteSpecialOptions): boolean;
+  openInsertCopiedCells(): void;
   openPageSetup(): void;
-  print(): void;
+  print(mode?: 'print' | 'pdf'): void;
   recalc(): void;
   openWatchWindow(): void;
   closeWatchWindow(): void;
@@ -86,8 +97,8 @@ export interface SpreadsheetInstance {
   toggleSheetProtection(): void;
   setSheetProtected(on: boolean, password?: string): void;
   isSheetProtected(): boolean;
-  tracePrecedents(): void;
-  traceDependents(): void;
+  tracePrecedents(): number;
+  traceDependents(): number;
   clearTraces(): void;
   setTheme(t: ThemeName): void;
   undo(): boolean;

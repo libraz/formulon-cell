@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CellValue } from '../../../src/engine/types.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachWatchPanel } from '../../../src/interact/watch-panel.js';
+import { History } from '../../../src/commands/history.js';
 import {
   createSpreadsheetStore,
   mutators,
@@ -36,6 +37,21 @@ describe('watch slice mutators', () => {
     mutators.addWatch(store, { sheet: 0, row: 1, col: 2 });
     mutators.addWatch(store, { sheet: 0, row: 1, col: 2 });
     expect(store.getState().watch.watches).toEqual([{ sheet: 0, row: 1, col: 2 }]);
+  });
+
+  it('addWatchRanges appends cells row-major and ignores duplicates', () => {
+    mutators.addWatch(store, { sheet: 0, row: 0, col: 0 });
+    mutators.addWatchRanges(store, [
+      { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 },
+      { sheet: 1, r0: 2, c0: 3, r1: 2, c1: 3 },
+    ]);
+    expect(store.getState().watch.watches).toEqual([
+      { sheet: 0, row: 0, col: 0 },
+      { sheet: 0, row: 0, col: 1 },
+      { sheet: 0, row: 1, col: 0 },
+      { sheet: 0, row: 1, col: 1 },
+      { sheet: 1, row: 2, col: 3 },
+    ]);
   });
 
   it('removeWatch drops the matching Addr', () => {
@@ -122,21 +138,40 @@ describe('attachWatchPanel', () => {
     handle.detach();
   });
 
-  it('renders one row per watched cell with sheet/cell/value/formula', () => {
+  it('renders one row per watched cell with book/sheet/cell/value/formula', () => {
     setCellInStore(store, 0, 1, 2, { kind: 'number', value: 42 });
     // Seed the engine too so wb.getValue returns the same number.
     wb.setNumber({ sheet: 0, row: 1, col: 2 }, 42);
     mutators.setWatchPanelOpen(store, true);
     mutators.addWatch(store, { sheet: 0, row: 1, col: 2 });
 
-    const handle = attachWatchPanel({ host, store, getWb: () => wb });
+    const handle = attachWatchPanel({ host, store, getWb: () => wb, workbookName: 'Budget.xlsx' });
     const rows = host.querySelectorAll<HTMLTableRowElement>('.fc-watch__row');
     expect(rows.length).toBe(1);
     const cells = rows[0]?.querySelectorAll('td');
-    // sheet | cell | name | value | formula | remove
-    expect(cells?.length).toBe(6);
-    expect(cells?.[1]?.textContent).toBe('C2');
-    expect(cells?.[3]?.textContent).toContain('42');
+    // book | sheet | name | cell | value | formula | remove
+    expect(cells?.length).toBe(7);
+    expect(cells?.[0]?.textContent).toBe('Budget.xlsx');
+    expect(cells?.[3]?.textContent).toBe('C2');
+    expect(cells?.[4]?.textContent).toContain('42');
+    handle.detach();
+  });
+
+  it('marks the row matching the active selection', () => {
+    mutators.setWatchPanelOpen(store, true);
+    mutators.addWatch(store, { sheet: 0, row: 1, col: 1 });
+    mutators.addWatch(store, { sheet: 0, row: 2, col: 2 });
+    mutators.setActive(store, { sheet: 0, row: 2, col: 2 });
+    const handle = attachWatchPanel({ host, store, getWb: () => wb });
+    let selected = host.querySelectorAll<HTMLTableRowElement>('.fc-watch__row--selected');
+    expect(selected.length).toBe(1);
+    expect(selected[0]?.dataset.fcRow).toBe('2');
+
+    mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
+
+    selected = host.querySelectorAll<HTMLTableRowElement>('.fc-watch__row--selected');
+    expect(selected.length).toBe(1);
+    expect(selected[0]?.dataset.fcRow).toBe('1');
     handle.detach();
   });
 
@@ -166,15 +201,67 @@ describe('attachWatchPanel', () => {
     handle.detach();
   });
 
-  it('header Add button watches the active cell', () => {
+  it('header Add button watches every cell in the selected ranges', () => {
     mutators.setActive(store, { sheet: 0, row: 9, col: 9 });
+    mutators.setRange(store, { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 2 });
+    store.setState((s) => ({
+      ...s,
+      selection: {
+        ...s.selection,
+        extraRanges: [{ sheet: 0, r0: 3, c0: 3, r1: 3, c1: 3 }],
+      },
+    }));
     mutators.setWatchPanelOpen(store, true);
     const handle = attachWatchPanel({ host, store, getWb: () => wb });
     const addBtn = Array.from(host.querySelectorAll<HTMLButtonElement>('.fc-watch__btn')).find(
       (b) => !b.classList.contains('fc-watch__close'),
     );
     addBtn?.click();
-    expect(store.getState().watch.watches).toEqual([{ sheet: 0, row: 9, col: 9 }]);
+    expect(store.getState().watch.watches).toEqual([
+      { sheet: 0, row: 1, col: 1 },
+      { sheet: 0, row: 1, col: 2 },
+      { sheet: 0, row: 3, col: 3 },
+    ]);
+    handle.detach();
+  });
+
+  it('records panel Add, row remove, and Clear All as undoable watch changes', () => {
+    const history = new History();
+    mutators.setRange(store, { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 2 });
+    mutators.setWatchPanelOpen(store, true);
+    const handle = attachWatchPanel({ host, store, getWb: () => wb, history });
+    const [addBtn, clearBtn] = Array.from(
+      host.querySelectorAll<HTMLButtonElement>('.fc-watch__btn:not(.fc-watch__close)'),
+    );
+
+    addBtn?.click();
+    expect(store.getState().watch.watches).toEqual([
+      { sheet: 0, row: 1, col: 1 },
+      { sheet: 0, row: 1, col: 2 },
+    ]);
+    expect(history.undo()).toBe(true);
+    expect(store.getState().watch.watches).toEqual([]);
+    expect(history.redo()).toBe(true);
+    expect(store.getState().watch.watches).toEqual([
+      { sheet: 0, row: 1, col: 1 },
+      { sheet: 0, row: 1, col: 2 },
+    ]);
+
+    host.querySelector<HTMLButtonElement>('.fc-watch__remove')?.click();
+    expect(store.getState().watch.watches).toEqual([{ sheet: 0, row: 1, col: 2 }]);
+    expect(history.undo()).toBe(true);
+    expect(store.getState().watch.watches).toEqual([
+      { sheet: 0, row: 1, col: 1 },
+      { sheet: 0, row: 1, col: 2 },
+    ]);
+
+    clearBtn?.click();
+    expect(store.getState().watch.watches).toEqual([]);
+    expect(history.undo()).toBe(true);
+    expect(store.getState().watch.watches).toEqual([
+      { sheet: 0, row: 1, col: 1 },
+      { sheet: 0, row: 1, col: 2 },
+    ]);
     handle.detach();
   });
 

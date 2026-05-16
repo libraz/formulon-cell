@@ -1,0 +1,126 @@
+/* Shared color palette — the spreadsheet-standard "Office" color picker.
+ *
+ * Rendered by `createColorPalette()` (see src/components/color-palette.ts).
+ * Used by the ribbon font/fill color flyouts, the border line-color submenu
+ * and the Format Cells dialog so every color surface looks identical. */
+
+@layer fc.app {
+  .fc-colorpalette {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: max-content;
+    padding: 6px;
+    box-sizing: border-box;
+    font-family: var(--fc-font, inherit);
+    font-size: 12px;
+    color: var(--fc-fg, #1f1f1f);
+  }
+
+  .fc-colorpalette__heading {
+    margin-top: 4px;
+    color: var(--fc-fg-soft, #6a6a6a);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  .fc-colorpalette__grid {
+    display: grid;
+    grid-template-columns: repeat(10, 16px);
+    gap: 2px;
+  }
+
+  /* Office puts a small gap between the base row and the five tint rows. */
+  .fc-colorpalette__grid--theme {
+    row-gap: 2px;
+  }
+  .fc-colorpalette__swatch--base {
+    margin-bottom: 4px;
+  }
+
+  .fc-colorpalette__swatch {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 1px solid rgba(0, 0, 0, 0.22);
+    border-radius: 0;
+    background-clip: padding-box;
+    cursor: pointer;
+    transition: outline-color 80ms ease;
+  }
+
+  .fc-colorpalette__swatch:hover {
+    outline: 2px solid var(--fc-accent, #217346);
+    outline-offset: 1px;
+  }
+
+  .fc-colorpalette__swatch:focus-visible {
+    outline: 2px solid var(--fc-accent, #217346);
+    outline-offset: 1px;
+  }
+
+  .fc-colorpalette__swatch--selected {
+    outline: 2px solid var(--fc-accent, #217346);
+    outline-offset: 1px;
+    box-shadow: 0 0 0 1px #ffffff inset;
+  }
+
+  /* ── Automatic / More colors action rows ─────────────────────────────── */
+  .fc-colorpalette__action {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 24px;
+    padding: 3px 4px;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .fc-colorpalette__action:hover,
+  .fc-colorpalette__action:focus-visible {
+    background: var(--fc-accent-soft, rgba(33, 115, 70, 0.1));
+    outline: none;
+  }
+
+  .fc-colorpalette__action--automatic {
+    border-color: var(--fc-line, #c8c8c8);
+    background: var(--fc-input-bg, #ffffff);
+  }
+
+  .fc-colorpalette__action--automatic:hover,
+  .fc-colorpalette__action--automatic:focus-visible {
+    border-color: var(--fc-accent, #217346);
+  }
+
+  .fc-colorpalette__action-chip {
+    width: 14px;
+    height: 14px;
+    border: 1px solid rgba(0, 0, 0, 0.3);
+    background-clip: padding-box;
+  }
+
+  .fc-colorpalette__action--more {
+    margin-top: 2px;
+    padding-top: 6px;
+    border-top: 1px solid var(--fc-line, #e5e5e5);
+    border-radius: 0;
+  }
+
+  /* A multi-hue ring with a punched-out white center. */
+  .fc-colorpalette__wheel {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    border: 1px solid rgba(0, 0, 0, 0.25);
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 50% 50%, #ffffff 0 27%, transparent 29%),
+      conic-gradient(#d83b01, #ffb900, #107c10, #0078d4, #5c2d91, #d83b01);
+  }
+}

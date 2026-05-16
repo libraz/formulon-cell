@@ -1,9 +1,12 @@
+import { type History, recordConditionalRulesChange } from '../commands/history.js';
+import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Range } from '../engine/types.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
   type CellFormat,
   type ConditionalIconSet,
   type ConditionalRule,
+  type ConditionalScalePoint,
   mutators,
   type SpreadsheetStore,
 } from '../store/store.js';
@@ -12,17 +15,47 @@ import { createDialogShell } from './dialog-shell.js';
 export interface ConditionalDialogDeps {
   host: HTMLElement;
   store: SpreadsheetStore;
+  history?: History | null;
   strings?: Strings;
 }
 
+export interface ConditionalDialogOpenOptions {
+  mode?: 'manage' | 'new';
+  kind?: ConditionalRule['kind'];
+  cellValueOp?: CellValueOp;
+  topBottomMode?: 'top' | 'bottom';
+  topBottomPercent?: boolean;
+  averageMode?: AverageMode;
+  text?: string;
+  datePeriod?: DatePeriod;
+}
+
 export interface ConditionalDialogHandle {
-  open(): void;
+  open(options?: ConditionalDialogOpenOptions): void;
   close(): void;
   detach(): void;
 }
 
 type RuleKind = ConditionalRule['kind'];
 type CellValueOp = '>' | '<' | '>=' | '<=' | '=' | '<>' | 'between' | 'not-between';
+type DatePeriod = Extract<ConditionalRule, { kind: 'date-occurring' }>['period'];
+type AverageMode = Extract<ConditionalRule, { kind: 'average' }>['mode'];
+type FormatPreset = 'red-fill' | 'yellow-fill' | 'green-fill' | 'red-text' | 'plain';
+
+const formatPresetPatch = (preset: FormatPreset): Partial<CellFormat> => {
+  switch (preset) {
+    case 'red-fill':
+      return { color: '#9c0006', fill: '#ffc7ce' };
+    case 'yellow-fill':
+      return { color: '#9c6500', fill: '#ffeb9c' };
+    case 'green-fill':
+      return { color: '#006100', fill: '#c6efce' };
+    case 'red-text':
+      return { color: '#c00000' };
+    case 'plain':
+      return {};
+  }
+};
 
 const colLetters = (col: number): string => {
   let n = col;
@@ -39,27 +72,14 @@ const formatRange = (r: Range): string =>
   `${colLetters(r.c0)}${r.r0 + 1}:${colLetters(r.c1)}${r.r1 + 1}`;
 
 const parseRange = (raw: string, fallback: Range): Range => {
-  const m = raw
-    .trim()
-    .toUpperCase()
-    .match(/^\$?([A-Z]+)\$?([1-9][0-9]*):\$?([A-Z]+)\$?([1-9][0-9]*)$/);
-  if (!m) return fallback;
-  const lettersToCol = (letters: string): number => {
-    let c = 0;
-    for (let i = 0; i < letters.length; i += 1) c = c * 26 + (letters.charCodeAt(i) - 64);
-    return c - 1;
-  };
-  const c0 = lettersToCol(m[1] ?? '');
-  const r0 = Number.parseInt(m[2] ?? '', 10) - 1;
-  const c1 = lettersToCol(m[3] ?? '');
-  const r1 = Number.parseInt(m[4] ?? '', 10) - 1;
-  if (c0 < 0 || r0 < 0 || c1 < 0 || r1 < 0) return fallback;
+  const parsed = parseRangeRef(raw);
+  if (!parsed || parsed.sheetName != null) return fallback;
   return {
     sheet: fallback.sheet,
-    r0: Math.min(r0, r1),
-    c0: Math.min(c0, c1),
-    r1: Math.max(r0, r1),
-    c1: Math.max(c0, c1),
+    r0: parsed.r0,
+    c0: parsed.c0,
+    r1: parsed.r1,
+    c1: parsed.c1,
   };
 };
 
@@ -70,6 +90,7 @@ const parseRange = (raw: string, fallback: Range): Range => {
  */
 export function attachConditionalDialog(deps: ConditionalDialogDeps): ConditionalDialogHandle {
   const { host, store } = deps;
+  const history = deps.history ?? null;
   const strings = deps.strings ?? defaultStrings;
   const t = strings.conditionalDialog;
 
@@ -117,6 +138,18 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   form.className = 'fc-conddlg__form';
   body.appendChild(form);
 
+  const ruleStyleRow = document.createElement('label');
+  ruleStyleRow.className = 'fc-fmtdlg__row fc-conddlg__style-row';
+  const styleLabel = document.createElement('span');
+  styleLabel.textContent = t.styleLabel;
+  const styleSelect = document.createElement('select');
+  const styleOpt = document.createElement('option');
+  styleOpt.value = 'classic';
+  styleOpt.textContent = t.styleClassic;
+  styleSelect.appendChild(styleOpt);
+  ruleStyleRow.append(styleLabel, styleSelect);
+  form.appendChild(ruleStyleRow);
+
   // Range
   const rangeRow = document.createElement('label');
   rangeRow.className = 'fc-fmtdlg__row';
@@ -141,7 +174,10 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     { id: 'data-bar', label: t.kindDataBar },
     { id: 'icon-set', label: t.kindIconSet },
     { id: 'top-bottom', label: t.kindTopBottom },
+    { id: 'average', label: t.kindAverage },
     { id: 'formula', label: t.kindFormula },
+    { id: 'text-contains', label: t.kindTextContains },
+    { id: 'date-occurring', label: t.kindDateOccurring },
     { id: 'duplicates', label: t.kindDuplicates },
     { id: 'unique', label: t.kindUnique },
     { id: 'blanks', label: t.kindBlanks },
@@ -258,6 +294,33 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   const cvUnderlineCk = makeApplyCheckbox(t.underline);
   const cvStrikeCk = makeApplyCheckbox(t.strike);
 
+  const cellPresetRow = document.createElement('label');
+  cellPresetRow.className = 'fc-fmtdlg__row fc-conddlg__format-row';
+  const cellPresetLabel = document.createElement('span');
+  cellPresetLabel.textContent = t.formatLabel;
+  const cellPresetSelect = document.createElement('select');
+  const formatPresetOptions: { id: FormatPreset; label: string }[] = [
+    { id: 'red-fill', label: t.formatRedFill },
+    { id: 'yellow-fill', label: t.formatYellowFill },
+    { id: 'green-fill', label: t.formatGreenFill },
+    { id: 'red-text', label: t.formatRedText },
+    { id: 'plain', label: t.formatPlain },
+  ];
+  for (const o of formatPresetOptions) {
+    const opt = document.createElement('option');
+    opt.value = o.id;
+    opt.textContent = o.label;
+    cellPresetSelect.appendChild(opt);
+  }
+  const cellPresetPreview = document.createElement('span');
+  cellPresetPreview.className = 'fc-conddlg__preview';
+  cellPresetPreview.textContent = t.previewText;
+  const cellPresetWrap = document.createElement('span');
+  cellPresetWrap.className = 'fc-conddlg__format-picker';
+  cellPresetWrap.append(cellPresetSelect, cellPresetPreview);
+  cellPresetRow.append(cellPresetLabel, cellPresetWrap);
+  cellValueGroup.appendChild(cellPresetRow);
+
   // ── Color scale subform ────────────────────────────────────────────────
   const colorScaleGroup = document.createElement('div');
   colorScaleGroup.className = 'fc-conddlg__sub';
@@ -306,10 +369,69 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   stopMaxRow.append(stopMaxLabel, stopMaxInput);
   colorScaleGroup.appendChild(stopMaxRow);
 
+  const scaleTypeOptions = [
+    { id: 'min', label: t.scaleTypeMin },
+    { id: 'max', label: t.scaleTypeMax },
+    { id: 'number', label: t.scaleTypeNumber },
+    { id: 'percent', label: t.scaleTypePercent },
+    { id: 'percentile', label: t.scaleTypePercentile },
+  ] as const;
+  const makeScalePointRow = (
+    label: string,
+    defaultType: ConditionalScalePoint['kind'],
+    defaultValue: string,
+  ): { row: HTMLLabelElement; type: HTMLSelectElement; value: HTMLInputElement } => {
+    const row = document.createElement('label');
+    row.className = 'fc-fmtdlg__row';
+    const span = document.createElement('span');
+    span.textContent = `${label} ${t.scaleType}`;
+    const type = document.createElement('select');
+    for (const option of scaleTypeOptions) {
+      const opt = document.createElement('option');
+      opt.value = option.id;
+      opt.textContent = option.label;
+      type.appendChild(opt);
+    }
+    type.value = defaultType;
+    const value = document.createElement('input');
+    value.type = 'number';
+    value.value = defaultValue;
+    value.setAttribute('aria-label', `${label} ${t.scaleValue}`);
+    const syncValue = (): void => {
+      value.hidden = type.value === 'min' || type.value === 'max';
+    };
+    type.addEventListener('change', syncValue);
+    syncValue();
+    row.append(span, type, value);
+    colorScaleGroup.appendChild(row);
+    return { row, type, value };
+  };
+  const scaleMin = makeScalePointRow(t.stopMin, 'min', '0');
+  const scaleMid = makeScalePointRow(t.stopMid, 'percentile', '50');
+  scaleMid.row.hidden = true;
+  const scaleMax = makeScalePointRow(t.stopMax, 'max', '100');
+
   // ── Data bar subform ───────────────────────────────────────────────────
   const dataBarGroup = document.createElement('div');
   dataBarGroup.className = 'fc-conddlg__sub';
   form.appendChild(dataBarGroup);
+
+  const barFillStyleRow = document.createElement('label');
+  barFillStyleRow.className = 'fc-fmtdlg__row';
+  const barFillStyleLabel = document.createElement('span');
+  barFillStyleLabel.textContent = t.barFillStyle;
+  const barFillStyleSelect = document.createElement('select');
+  for (const option of [
+    { id: 'gradient', label: t.gradientFill },
+    { id: 'solid', label: t.solidFill },
+  ] as const) {
+    const opt = document.createElement('option');
+    opt.value = option.id;
+    opt.textContent = option.label;
+    barFillStyleSelect.appendChild(opt);
+  }
+  barFillStyleRow.append(barFillStyleLabel, barFillStyleSelect);
+  dataBarGroup.appendChild(barFillStyleRow);
 
   const barColorRow = document.createElement('label');
   barColorRow.className = 'fc-fmtdlg__row';
@@ -345,8 +467,16 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   const iconSetOptions: { id: ConditionalIconSet; label: string }[] = [
     { id: 'arrows3', label: t.iconSetArrows3 },
     { id: 'arrows5', label: t.iconSetArrows5 },
+    { id: 'triangles3', label: t.iconSetTriangles3 },
     { id: 'traffic3', label: t.iconSetTraffic3 },
+    { id: 'trafficRim3', label: t.iconSetTrafficRim3 },
+    { id: 'symbols3', label: t.iconSetSymbols3 },
+    { id: 'flags3', label: t.iconSetFlags3 },
     { id: 'stars3', label: t.iconSetStars3 },
+    { id: 'quarters5', label: t.iconSetQuarters5 },
+    { id: 'ratings5', label: t.iconSetRatings5 },
+    { id: 'bars5', label: t.iconSetBars5 },
+    { id: 'boxes5', label: t.iconSetBoxes5 },
   ];
   for (const o of iconSetOptions) {
     const opt = document.createElement('option');
@@ -354,6 +484,8 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     opt.textContent = o.label;
     iconSetSelect.appendChild(opt);
   }
+  const iconSetLabelFor = (id: ConditionalIconSet): string =>
+    iconSetOptions.find((option) => option.id === id)?.label ?? id;
   iconSetRow.append(iconSetLabel, iconSetSelect);
   iconSetGroup.appendChild(iconSetRow);
 
@@ -366,6 +498,44 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   iconReverseRow.append(iconReverseCk, iconReverseText);
   iconSetGroup.appendChild(iconReverseRow);
 
+  const iconOnlyRow = document.createElement('label');
+  iconOnlyRow.className = 'fc-fmtdlg__check';
+  const iconOnlyCk = document.createElement('input');
+  iconOnlyCk.type = 'checkbox';
+  const iconOnlyText = document.createElement('span');
+  iconOnlyText.textContent = t.showIconOnly;
+  iconOnlyRow.append(iconOnlyCk, iconOnlyText);
+  iconSetGroup.appendChild(iconOnlyRow);
+
+  const makeIconThresholdRow = (
+    index: number,
+  ): { row: HTMLLabelElement; type: HTMLSelectElement; value: HTMLInputElement } => {
+    const row = document.createElement('label');
+    row.className = 'fc-fmtdlg__row';
+    const span = document.createElement('span');
+    span.textContent = `${t.iconThreshold} ${index + 1}`;
+    const type = document.createElement('select');
+    for (const option of scaleTypeOptions) {
+      const opt = document.createElement('option');
+      opt.value = option.id;
+      opt.textContent = option.label;
+      type.appendChild(opt);
+    }
+    type.value = 'percent';
+    const value = document.createElement('input');
+    value.type = 'number';
+    value.setAttribute('aria-label', `${t.iconThreshold} ${index + 1} ${t.scaleValue}`);
+    const syncValue = (): void => {
+      value.hidden = type.value === 'min' || type.value === 'max';
+    };
+    type.addEventListener('change', syncValue);
+    syncValue();
+    row.append(span, type, value);
+    iconSetGroup.appendChild(row);
+    return { row, type, value };
+  };
+  const iconThresholdControls = [0, 1, 2, 3].map((index) => makeIconThresholdRow(index));
+
   // ── Top/Bottom subform ─────────────────────────────────────────────────
   const topBottomGroup = document.createElement('div');
   topBottomGroup.className = 'fc-conddlg__sub';
@@ -377,8 +547,8 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   tbModeLabel.textContent = t.topBottomMode;
   const tbModeSelect = document.createElement('select');
   for (const o of [
-    { id: 'top', label: `${t.kindTopBottom} ↑` },
-    { id: 'bottom', label: `${t.kindTopBottom} ↓` },
+    { id: 'top', label: t.topMode },
+    { id: 'bottom', label: t.bottomMode },
   ] as const) {
     const opt = document.createElement('option');
     opt.value = o.id;
@@ -409,6 +579,33 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   tbPercentRow.append(tbPercentCk, tbPercentText);
   topBottomGroup.appendChild(tbPercentRow);
 
+  // ── Above/below average subform ────────────────────────────────────────
+  const averageGroup = document.createElement('div');
+  averageGroup.className = 'fc-conddlg__sub';
+  form.appendChild(averageGroup);
+
+  const averageModeRow = document.createElement('label');
+  averageModeRow.className = 'fc-fmtdlg__row';
+  const averageModeLabel = document.createElement('span');
+  averageModeLabel.textContent = t.averageModeLabel;
+  const averageModeSelect = document.createElement('select');
+  const averageModeOptions: { id: AverageMode; label: string }[] = [
+    { id: 'above', label: t.averageAbove },
+    { id: 'below', label: t.averageBelow },
+    { id: 'equal-or-above', label: t.averageEqualOrAbove },
+    { id: 'equal-or-below', label: t.averageEqualOrBelow },
+  ];
+  for (const o of averageModeOptions) {
+    const opt = document.createElement('option');
+    opt.value = o.id;
+    opt.textContent = o.label;
+    averageModeSelect.appendChild(opt);
+  }
+  averageModeRow.append(averageModeLabel, averageModeSelect);
+  averageGroup.appendChild(averageModeRow);
+  const averageModeLabelFor = (id: AverageMode): string =>
+    averageModeOptions.find((option) => option.id === id)?.label ?? id;
+
   // ── Formula subform ────────────────────────────────────────────────────
   const formulaGroup = document.createElement('div');
   formulaGroup.className = 'fc-conddlg__sub';
@@ -425,6 +622,65 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   formulaInput.placeholder = t.formulaPlaceholder;
   formulaRow.append(formulaLabelEl, formulaInput);
   formulaGroup.appendChild(formulaRow);
+
+  // ── Text-containing subform ────────────────────────────────────────────
+  const textContainsGroup = document.createElement('div');
+  textContainsGroup.className = 'fc-conddlg__sub';
+  form.appendChild(textContainsGroup);
+
+  const textContainsRow = document.createElement('label');
+  textContainsRow.className = 'fc-fmtdlg__row';
+  const textContainsLabel = document.createElement('span');
+  textContainsLabel.textContent = t.textContainsLabel;
+  const textContainsInput = document.createElement('input');
+  textContainsInput.type = 'text';
+  textContainsInput.spellcheck = false;
+  textContainsInput.autocomplete = 'off';
+  textContainsInput.placeholder = t.textContainsPlaceholder;
+  textContainsRow.append(textContainsLabel, textContainsInput);
+  textContainsGroup.appendChild(textContainsRow);
+
+  const caseSensitiveRow = document.createElement('label');
+  caseSensitiveRow.className = 'fc-fmtdlg__check';
+  const caseSensitiveCk = document.createElement('input');
+  caseSensitiveCk.type = 'checkbox';
+  const caseSensitiveText = document.createElement('span');
+  caseSensitiveText.textContent = t.caseSensitive;
+  caseSensitiveRow.append(caseSensitiveCk, caseSensitiveText);
+  textContainsGroup.appendChild(caseSensitiveRow);
+
+  // ── Date-occurring subform ─────────────────────────────────────────────
+  const dateOccurringGroup = document.createElement('div');
+  dateOccurringGroup.className = 'fc-conddlg__sub';
+  form.appendChild(dateOccurringGroup);
+
+  const datePeriodRow = document.createElement('label');
+  datePeriodRow.className = 'fc-fmtdlg__row';
+  const datePeriodLabel = document.createElement('span');
+  datePeriodLabel.textContent = t.datePeriodLabel;
+  const datePeriodSelect = document.createElement('select');
+  const datePeriodOptions: { id: DatePeriod; label: string }[] = [
+    { id: 'yesterday', label: t.dateYesterday },
+    { id: 'today', label: t.dateToday },
+    { id: 'tomorrow', label: t.dateTomorrow },
+    { id: 'last7', label: t.dateLast7 },
+    { id: 'last-week', label: t.dateLastWeek },
+    { id: 'this-week', label: t.dateThisWeek },
+    { id: 'next-week', label: t.dateNextWeek },
+    { id: 'last-month', label: t.dateLastMonth },
+    { id: 'this-month', label: t.dateThisMonth },
+    { id: 'next-month', label: t.dateNextMonth },
+  ];
+  for (const o of datePeriodOptions) {
+    const opt = document.createElement('option');
+    opt.value = o.id;
+    opt.textContent = o.label;
+    datePeriodSelect.appendChild(opt);
+  }
+  const datePeriodLabelFor = (id: DatePeriod): string =>
+    datePeriodOptions.find((option) => option.id === id)?.label ?? id;
+  datePeriodRow.append(datePeriodLabel, datePeriodSelect);
+  dateOccurringGroup.appendChild(datePeriodRow);
 
   // ── Apply-format shared by top-bottom / formula / dups / unique /
   //    blanks / non-blanks / errors / no-errors. We re-use the same
@@ -482,6 +738,20 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   const applyUnderlineCk = makeApplyCheckboxIn(applyStyleRow, t.underline);
   const applyStrikeCk = makeApplyCheckboxIn(applyStyleRow, t.strike);
 
+  const sharedPresetRow = document.createElement('label');
+  sharedPresetRow.className = 'fc-fmtdlg__row fc-conddlg__format-row';
+  const sharedPresetLabel = document.createElement('span');
+  sharedPresetLabel.textContent = t.formatLabel;
+  const sharedPresetSelect = cellPresetSelect.cloneNode(true) as HTMLSelectElement;
+  const sharedPresetPreview = document.createElement('span');
+  sharedPresetPreview.className = 'fc-conddlg__preview';
+  sharedPresetPreview.textContent = t.previewText;
+  const sharedPresetWrap = document.createElement('span');
+  sharedPresetWrap.className = 'fc-conddlg__format-picker';
+  sharedPresetWrap.append(sharedPresetSelect, sharedPresetPreview);
+  sharedPresetRow.append(sharedPresetLabel, sharedPresetWrap);
+  applyGroup.appendChild(sharedPresetRow);
+
   // Add button
   const addRow = document.createElement('div');
   addRow.className = 'fc-fmtdlg__row fc-conddlg__addrow';
@@ -508,7 +778,10 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
    *  controls inside `cellValueGroup` and so is excluded here. */
   const APPLY_KINDS: ReadonlySet<RuleKind> = new Set([
     'top-bottom',
+    'average',
     'formula',
+    'text-contains',
+    'date-occurring',
     'duplicates',
     'unique',
     'blanks',
@@ -523,7 +796,10 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     dataBarGroup.hidden = kind !== 'data-bar';
     iconSetGroup.hidden = kind !== 'icon-set';
     topBottomGroup.hidden = kind !== 'top-bottom';
+    averageGroup.hidden = kind !== 'average';
     formulaGroup.hidden = kind !== 'formula';
+    textContainsGroup.hidden = kind !== 'text-contains';
+    dateOccurringGroup.hidden = kind !== 'date-occurring';
     applyGroup.hidden = !APPLY_KINDS.has(kind);
   };
   const syncCellValueOp = (): void => {
@@ -532,6 +808,54 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   };
   const syncThreeStops = (): void => {
     stopMidRow.hidden = !useThreeCk.checked;
+    scaleMid.row.hidden = !useThreeCk.checked;
+  };
+  const syncIconThresholds = (): void => {
+    const slots = iconSetSelect.value.endsWith('5') ? 5 : 3;
+    for (let index = 0; index < iconThresholdControls.length; index += 1) {
+      const control = iconThresholdControls[index];
+      if (!control) continue;
+      control.row.hidden = index >= slots - 1;
+      if (control.value.value === '') {
+        control.value.value = String(Math.round(((index + 1) * 100) / slots));
+      }
+    }
+  };
+  const syncPresetPreview = (preview: HTMLElement, preset: FormatPreset): void => {
+    const patch = formatPresetPatch(preset);
+    preview.style.color = patch.color ?? '#201f1e';
+    preview.style.background = patch.fill ?? 'transparent';
+  };
+  const syncCellPreset = (): void => {
+    const patch = formatPresetPatch(cellPresetSelect.value as FormatPreset);
+    fillToggle.checked = !!patch.fill;
+    fontToggle.checked = !!patch.color;
+    if (patch.fill) fillInput.value = patch.fill;
+    if (patch.color) fontInput.value = patch.color;
+    syncPresetPreview(cellPresetPreview, cellPresetSelect.value as FormatPreset);
+  };
+  const syncSharedPreset = (): void => {
+    const patch = formatPresetPatch(sharedPresetSelect.value as FormatPreset);
+    applyFillToggle.checked = !!patch.fill;
+    applyFontToggle.checked = !!patch.color;
+    if (patch.fill) applyFillInput.value = patch.fill;
+    if (patch.color) applyFontInput.value = patch.color;
+    syncPresetPreview(sharedPresetPreview, sharedPresetSelect.value as FormatPreset);
+  };
+
+  let currentMode: 'manage' | 'new' = 'manage';
+  const syncDialogMode = (): void => {
+    const isNew = currentMode === 'new';
+    header.textContent = isNew ? t.newRuleTitle : t.title;
+    overlay.setAttribute('aria-label', isNew ? t.newRuleTitle : t.title);
+    shell.panel.classList.toggle('fc-conddlg__panel--new', isNew);
+    body.classList.toggle('fc-conddlg__body--new', isNew);
+    rulesLegend.hidden = isNew;
+    rulesList.hidden = isNew;
+    clearAllBtn.hidden = isNew;
+    formLegend.hidden = isNew;
+    addBtn.textContent = isNew ? t.ok : t.addRule;
+    closeBtn.textContent = isNew ? t.cancel : t.close;
   };
 
   const renderRules = (): void => {
@@ -554,7 +878,9 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       removeBtn.className = 'fc-fmtdlg__btn';
       removeBtn.textContent = t.removeRule;
       removeBtn.addEventListener('click', () => {
-        mutators.removeConditionalRuleAt(store, idx);
+        recordConditionalRulesChange(history, store, () => {
+          mutators.removeConditionalRuleAt(store, idx);
+        });
         renderRules();
       });
       item.append(summary, removeBtn);
@@ -574,15 +900,24 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
         return `${range} · ${t.kindCellValue} (${opLabel} ${tail})`;
       }
       case 'color-scale':
-        return `${range} · ${t.kindColorScale} (${rule.stops.length} stop)`;
+        return `${range} · ${t.kindColorScale} (${rule.stops.length} ${t.stopsLabel})`;
       case 'data-bar':
-        return `${range} · ${t.kindDataBar}`;
+        return `${range} · ${t.kindDataBar} (${rule.gradient ? t.gradientFill : t.solidFill})`;
       case 'icon-set':
-        return `${range} · ${t.kindIconSet} (${rule.icons})`;
+        return `${range} · ${t.kindIconSet} (${iconSetLabelFor(rule.icons)}${
+          rule.showValue === false ? `, ${t.showIconOnly}` : ''
+        })`;
       case 'top-bottom': {
         const pct = rule.percent ? '%' : '';
-        return `${range} · ${t.kindTopBottom} (${rule.mode} ${rule.n}${pct})`;
+        const modeLabel = rule.mode === 'top' ? t.topMode : t.bottomMode;
+        return `${range} · ${t.kindTopBottom} (${modeLabel} ${rule.n}${pct})`;
       }
+      case 'average':
+        return `${range} · ${t.kindAverage} (${averageModeLabelFor(rule.mode)})`;
+      case 'text-contains':
+        return `${range} · ${t.kindTextContains} ("${rule.text}")`;
+      case 'date-occurring':
+        return `${range} · ${t.kindDateOccurring} (${datePeriodLabelFor(rule.period)})`;
       case 'formula':
         return `${range} · ${t.kindFormula} (${rule.formula})`;
       case 'duplicates':
@@ -611,10 +946,22 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     return apply;
   };
 
+  const collectScalePoint = (input: {
+    type: HTMLSelectElement;
+    value: HTMLInputElement;
+  }): ConditionalScalePoint | null => {
+    const kind = input.type.value as ConditionalScalePoint['kind'];
+    if (kind === 'min' || kind === 'max') return { kind };
+    const value = Number.parseFloat(input.value.value);
+    if (!Number.isFinite(value)) return null;
+    return { kind, value };
+  };
+
   const onAdd = (): void => {
     const fallback = store.getState().selection.range;
     const range = parseRange(rangeInput.value, fallback);
     const kind = kindSelect.value as RuleKind;
+    let rule: ConditionalRule | null = null;
     if (kind === 'cell-value') {
       const op = opSelect.value as CellValueOp;
       const a = Number.parseFloat(valueAInput.value);
@@ -627,7 +974,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       if (cvItalicCk.checked) applyPatch.italic = true;
       if (cvUnderlineCk.checked) applyPatch.underline = true;
       if (cvStrikeCk.checked) applyPatch.strike = true;
-      const rule: ConditionalRule = {
+      rule = {
         kind: 'cell-value',
         range,
         op,
@@ -635,46 +982,85 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
         ...(op === 'between' || op === 'not-between' ? { b } : {}),
         apply: applyPatch,
       };
-      mutators.addConditionalRule(store, rule);
     } else if (kind === 'color-scale') {
       const stops: [string, string] | [string, string, string] = useThreeCk.checked
         ? [stopMinInput.value, stopMidInput.value, stopMaxInput.value]
         : [stopMinInput.value, stopMaxInput.value];
-      mutators.addConditionalRule(store, { kind: 'color-scale', range, stops });
+      const minPoint = collectScalePoint(scaleMin);
+      const maxPoint = collectScalePoint(scaleMax);
+      if (!minPoint || !maxPoint) return;
+      if (useThreeCk.checked) {
+        const midPoint = collectScalePoint(scaleMid);
+        if (!midPoint) return;
+        rule = { kind: 'color-scale', range, stops, thresholds: [minPoint, midPoint, maxPoint] };
+      } else {
+        rule = { kind: 'color-scale', range, stops, thresholds: [minPoint, maxPoint] };
+      }
     } else if (kind === 'data-bar') {
-      mutators.addConditionalRule(store, {
+      rule = {
         kind: 'data-bar',
         range,
         color: barColorInput.value,
+        gradient: barFillStyleSelect.value === 'gradient',
         showValue: showValueCk.checked,
-      });
+      };
     } else if (kind === 'icon-set') {
-      mutators.addConditionalRule(store, {
+      const iconThresholds = iconThresholdControls
+        .filter((control) => !control.row.hidden)
+        .map((control) => collectScalePoint(control));
+      if (iconThresholds.some((point) => point === null)) return;
+      rule = {
         kind: 'icon-set',
         range,
         icons: iconSetSelect.value as ConditionalIconSet,
+        showValue: !iconOnlyCk.checked,
+        thresholds: iconThresholds as ConditionalScalePoint[],
         reverseOrder: iconReverseCk.checked,
-      });
+      };
     } else if (kind === 'top-bottom') {
       const n = Number.parseInt(tbNInput.value, 10);
       if (!Number.isFinite(n) || n <= 0) return;
-      mutators.addConditionalRule(store, {
+      rule = {
         kind: 'top-bottom',
         range,
         mode: tbModeSelect.value as 'top' | 'bottom',
         n,
         percent: tbPercentCk.checked,
         apply: collectApplyPatch(),
-      });
+      };
+    } else if (kind === 'average') {
+      rule = {
+        kind: 'average',
+        range,
+        mode: averageModeSelect.value as AverageMode,
+        apply: collectApplyPatch(),
+      };
     } else if (kind === 'formula') {
       const f = formulaInput.value.trim();
       if (f === '') return;
-      mutators.addConditionalRule(store, {
+      rule = {
         kind: 'formula',
         range,
         formula: f,
         apply: collectApplyPatch(),
-      });
+      };
+    } else if (kind === 'text-contains') {
+      const text = textContainsInput.value.trim();
+      if (text === '') return;
+      rule = {
+        kind: 'text-contains',
+        range,
+        text,
+        caseSensitive: caseSensitiveCk.checked,
+        apply: collectApplyPatch(),
+      };
+    } else if (kind === 'date-occurring') {
+      rule = {
+        kind: 'date-occurring',
+        range,
+        period: datePeriodSelect.value as DatePeriod,
+        apply: collectApplyPatch(),
+      };
     } else if (
       kind === 'duplicates' ||
       kind === 'unique' ||
@@ -683,17 +1069,25 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       kind === 'errors' ||
       kind === 'no-errors'
     ) {
-      mutators.addConditionalRule(store, {
+      rule = {
         kind,
         range,
         apply: collectApplyPatch(),
-      });
+      };
     }
+    if (!rule) return;
+    const newRule = rule;
+    recordConditionalRulesChange(history, store, () => {
+      mutators.addConditionalRule(store, newRule);
+    });
     renderRules();
+    if (currentMode === 'new') api.close();
   };
 
   const onClearAll = (): void => {
-    mutators.clearConditionalRules(store);
+    recordConditionalRulesChange(history, store, () => {
+      mutators.clearConditionalRules(store);
+    });
     renderRules();
   };
   const onClose = (): void => api.close();
@@ -712,23 +1106,56 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   shell.on(kindSelect, 'change', syncSubforms);
   shell.on(opSelect, 'change', syncCellValueOp);
   shell.on(useThreeCk, 'change', syncThreeStops);
+  shell.on(iconSetSelect, 'change', syncIconThresholds);
+  shell.on(cellPresetSelect, 'change', syncCellPreset);
+  shell.on(sharedPresetSelect, 'change', syncSharedPreset);
   shell.on(addBtn, 'click', onAdd);
   shell.on(clearAllBtn, 'click', onClearAll);
   shell.on(closeBtn, 'click', onClose);
   shell.on(overlay, 'keydown', onOverlayKey as EventListener);
 
   const api: ConditionalDialogHandle = {
-    open(): void {
+    open(options = {}): void {
+      currentMode = options.mode ?? 'manage';
       const sel = store.getState().selection.range;
       rangeInput.value = formatRange(sel);
-      kindSelect.value = 'cell-value';
-      opSelect.value = '>';
+      kindSelect.value = options.kind ?? 'cell-value';
+      opSelect.value = options.cellValueOp ?? '>';
       valueAInput.value = '0';
       valueBInput.value = '0';
       useThreeCk.checked = false;
+      scaleMin.type.value = 'min';
+      scaleMin.value.value = '0';
+      scaleMax.type.value = 'max';
+      scaleMax.value.value = '100';
+      scaleMid.type.value = 'percentile';
+      scaleMid.value.value = '50';
+      iconSetSelect.value = 'arrows3';
+      iconReverseCk.checked = false;
+      iconOnlyCk.checked = false;
+      for (const control of iconThresholdControls) {
+        control.type.value = 'percent';
+        control.value.value = '';
+        control.type.dispatchEvent(new Event('change'));
+      }
+      tbModeSelect.value = options.topBottomMode ?? 'top';
+      tbPercentCk.checked = options.topBottomPercent ?? false;
+      averageModeSelect.value = options.averageMode ?? 'above';
+      textContainsInput.value = options.text ?? '';
+      caseSensitiveCk.checked = false;
+      datePeriodSelect.value = options.datePeriod ?? 'today';
+      cellPresetSelect.value = 'red-fill';
+      sharedPresetSelect.value = 'red-fill';
       syncSubforms();
       syncCellValueOp();
       syncThreeStops();
+      syncIconThresholds();
+      scaleMin.type.dispatchEvent(new Event('change'));
+      scaleMid.type.dispatchEvent(new Event('change'));
+      scaleMax.type.dispatchEvent(new Event('change'));
+      syncCellPreset();
+      syncSharedPreset();
+      syncDialogMode();
       renderRules();
       shell.open();
       requestAnimationFrame(() => {

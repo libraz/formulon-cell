@@ -4,7 +4,12 @@ import {
   statusAggregateValue,
 } from '../commands/aggregate.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { mutators, type SpreadsheetStore, type StatusAggKey } from '../store/store.js';
+import {
+  mutators,
+  type SpreadsheetStore,
+  type StatusAggKey,
+  type WorkbookViewMode,
+} from '../store/store.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface StatusBarDeps {
@@ -84,6 +89,30 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   right.className = 'fc-host__statusbar-right';
   right.textContent = '—';
 
+  const viewShortcuts = document.createElement('span');
+  viewShortcuts.className = 'fc-host__statusbar-views';
+  const viewButtons: Record<WorkbookViewMode, HTMLButtonElement> = {
+    normal: document.createElement('button'),
+    pageLayout: document.createElement('button'),
+    pageBreakPreview: document.createElement('button'),
+  };
+  const viewIcon = (button: HTMLButtonElement, mode: WorkbookViewMode): void => {
+    button.type = 'button';
+    button.className = 'fc-host__statusbar-view';
+    button.dataset.viewMode = mode;
+    button.addEventListener('click', () => {
+      mutators.setWorkbookView(store, mode);
+      refresh();
+    });
+    const icon = document.createElement('span');
+    icon.className = `fc-host__statusbar-viewicon fc-host__statusbar-viewicon--${mode}`;
+    button.appendChild(icon);
+  };
+  viewIcon(viewButtons.normal, 'normal');
+  viewIcon(viewButtons.pageLayout, 'pageLayout');
+  viewIcon(viewButtons.pageBreakPreview, 'pageBreakPreview');
+  viewShortcuts.append(viewButtons.normal, viewButtons.pageLayout, viewButtons.pageBreakPreview);
+
   const zoom = document.createElement('div');
   zoom.className = 'fc-host__statusbar-zoom';
   const zoomOut = document.createElement('button');
@@ -104,7 +133,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   zoomLabel.className = 'fc-host__statusbar-zoom-label';
   zoom.append(zoomOut, zoomSlider, zoomIn, zoomLabel);
 
-  statusbar.append(left, center, calcBadge, right, zoom);
+  statusbar.append(left, center, calcBadge, right, viewShortcuts, zoom);
 
   const calcLabelFor = (mode: 0 | 1 | 2): string => {
     const t = strings.statusBar;
@@ -137,6 +166,12 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     zoomOut.setAttribute('aria-label', t.zoomOut);
     zoomSlider.setAttribute('aria-label', t.zoom);
     zoomIn.setAttribute('aria-label', t.zoomIn);
+    viewButtons.normal.setAttribute('aria-label', t.normalView);
+    viewButtons.normal.title = t.normalView;
+    viewButtons.pageLayout.setAttribute('aria-label', t.pageLayoutView);
+    viewButtons.pageLayout.title = t.pageLayoutView;
+    viewButtons.pageBreakPreview.setAttribute('aria-label', t.pageBreakPreview);
+    viewButtons.pageBreakPreview.title = t.pageBreakPreview;
     readyText.nodeValue = t.ready;
   };
 
@@ -182,6 +217,14 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     zoomLabel.textContent = `${zoomPct}%`;
     zoomOut.disabled = s.viewport.zoom <= 0.5;
     zoomIn.disabled = s.viewport.zoom >= 4;
+    for (const [mode, button] of Object.entries(viewButtons) as [
+      WorkbookViewMode,
+      HTMLButtonElement,
+    ][]) {
+      const active = s.ui.workbookView === mode;
+      button.classList.toggle('fc-host__statusbar-view--active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
     refreshCalcBadge();
   };
 

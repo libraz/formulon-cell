@@ -17,14 +17,15 @@ export function prepareMenu(menu: HTMLElement, label?: string): void {
   }
 }
 
-export function focusMenuItem(menu: HTMLElement, index = 0): void {
+export function focusMenuItem(menu: HTMLElement, index: number | 'first' | 'last' = 0): void {
   const items = menuItems(menu);
   if (items.length === 0) {
     menu.tabIndex = -1;
     menu.focus();
     return;
   }
-  const next = Math.max(0, Math.min(index, items.length - 1));
+  const numericIndex = index === 'first' ? 0 : index === 'last' ? items.length - 1 : index;
+  const next = Math.max(0, Math.min(numericIndex, items.length - 1));
   for (const [idx, item] of items.entries()) item.tabIndex = idx === next ? 0 : -1;
   items[next]?.focus();
 }

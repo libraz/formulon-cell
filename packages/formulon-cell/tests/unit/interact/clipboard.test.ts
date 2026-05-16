@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { History } from '../../../src/commands/history.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachClipboard } from '../../../src/interact/clipboard.js';
 import {
+  type CellFormat,
   createSpreadsheetStore,
   mutators,
   type SpreadsheetStore,
@@ -48,6 +50,17 @@ const setRange = (
     },
   }));
 };
+
+const setFormat = (store: SpreadsheetStore, row: number, col: number, format: CellFormat): void => {
+  store.setState((s) => {
+    const formats = new Map(s.format.formats);
+    formats.set(addrKey({ sheet: 0, row, col }), format);
+    return { ...s, format: { formats } };
+  });
+};
+
+const formatAt = (store: SpreadsheetStore, row: number, col: number): CellFormat | undefined =>
+  store.getState().format.formats.get(addrKey({ sheet: 0, row, col }));
 
 const fireClipboard = (
   host: HTMLElement,
@@ -157,6 +170,8 @@ describe('attachClipboard', () => {
       { row: 0, col: 0, value: 5 },
       { row: 0, col: 1, value: 6 },
     ]);
+    setFormat(store, 0, 0, { bold: true, fill: '#fff2cc' });
+    setFormat(store, 0, 1, { italic: true });
     setRange(store, 0, 0, 0, 1);
     const handle = attachClipboard({ host, store, wb, onAfterCommit });
 
@@ -168,7 +183,28 @@ describe('attachClipboard', () => {
     wb.recalc();
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
     expect(wb.getValue({ sheet: 0, row: 0, col: 1 }).kind).toBe('blank');
+    expect(formatAt(store, 0, 0)).toBeUndefined();
+    expect(formatAt(store, 0, 1)).toBeUndefined();
     expect(onAfterCommit).toHaveBeenCalledTimes(1);
+    handle.detach();
+  });
+
+  it('records cut values and source formats as one undo step when history is attached', () => {
+    const history = new History();
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 5 }]);
+    setFormat(store, 0, 0, { bold: true, fill: '#fff2cc' });
+    setRange(store, 0, 0, 0, 0);
+    const handle = attachClipboard({ host, history, store, wb, onAfterCommit });
+
+    fireClipboard(host, 'cut');
+    wb.recalc();
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
+    expect(formatAt(store, 0, 0)).toBeUndefined();
+
+    expect(history.undo()).toBe(true);
+    wb.recalc();
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 5 });
+    expect(formatAt(store, 0, 0)).toMatchObject({ bold: true, fill: '#fff2cc' });
     handle.detach();
   });
 
@@ -199,6 +235,71 @@ describe('attachClipboard', () => {
     expect(store.getState().ui.copyRange).toBeNull();
     expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 1, c0: 1, r1: 1, c1: 2 });
     expect(onAfterCommit).toHaveBeenCalledTimes(1);
+    handle.detach();
+  });
+
+  it('records a multi-cell paste as one undo step when history is attached', () => {
+    const history = new History();
+    setRange(store, 1, 1, 1, 1);
+    const handle = attachClipboard({ host, history, store, wb, onAfterCommit });
+
+    fireClipboard(host, 'paste', 'foo\t42\r\nbar\t99');
+    wb.recalc();
+    expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'text', value: 'foo' });
+    expect(wb.getValue({ sheet: 0, row: 2, col: 2 })).toEqual({ kind: 'number', value: 99 });
+
+    expect(history.undo()).toBe(true);
+    wb.recalc();
+    expect(wb.getValue({ sheet: 0, row: 1, col: 1 }).kind).toBe('blank');
+    expect(wb.getValue({ sheet: 0, row: 1, col: 2 }).kind).toBe('blank');
+    expect(wb.getValue({ sheet: 0, row: 2, col: 1 }).kind).toBe('blank');
+    expect(wb.getValue({ sheet: 0, row: 2, col: 2 }).kind).toBe('blank');
+    expect(history.canUndo()).toBe(false);
+    handle.detach();
+  });
+
+  it('paste from the current internal copy preserves source formatting by default', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
+    setFormat(store, 0, 0, {
+      bold: true,
+      fill: '#fff2cc',
+      numFmt: { kind: 'currency', symbol: '$', decimals: 0 },
+    });
+    setRange(store, 0, 0, 0, 0);
+    const handle = attachClipboard({ host, store, wb, onAfterCommit });
+
+    const { transfer } = fireClipboard(host, 'copy');
+    setRange(store, 2, 2, 2, 2);
+    const { event } = fireClipboard(host, 'paste', transfer.getData('text/plain'));
+
+    expect(event.defaultPrevented).toBe(true);
+    wb.recalc();
+    expect(wb.getValue({ sheet: 0, row: 2, col: 2 })).toEqual({ kind: 'number', value: 7 });
+    expect(formatAt(store, 2, 2)).toMatchObject({
+      bold: true,
+      fill: '#fff2cc',
+      numFmt: { kind: 'currency', symbol: '$', decimals: 0 },
+    });
+    expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 2, c0: 2, r1: 2, c1: 2 });
+    expect(onAfterCommit).toHaveBeenCalledTimes(1);
+    handle.detach();
+  });
+
+  it('paste with external text ignores a stale internal snapshot', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
+    setFormat(store, 0, 0, { bold: true, fill: '#fff2cc' });
+    setFormat(store, 2, 2, { italic: true, fill: '#ddebf7' });
+    setRange(store, 0, 0, 0, 0);
+    const handle = attachClipboard({ host, store, wb, onAfterCommit });
+
+    fireClipboard(host, 'copy');
+    setRange(store, 2, 2, 2, 2);
+    fireClipboard(host, 'paste', 'external');
+
+    wb.recalc();
+    expect(wb.getValue({ sheet: 0, row: 2, col: 2 })).toEqual({ kind: 'text', value: 'external' });
+    expect(formatAt(store, 2, 2)).toEqual({ italic: true, fill: '#ddebf7' });
+    expect(handle.getSnapshot()).toBeNull();
     handle.detach();
   });
 

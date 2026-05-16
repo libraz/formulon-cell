@@ -18,6 +18,42 @@ describe('formatCellForEdit', () => {
     expect(formatCellForEdit({ value: num(42), formula: '=SUM(A1:A3)' })).toBe('=SUM(A1:A3)');
   });
 
+  it('uses the optional formula display transform for formula edit seeds', () => {
+    expect(
+      formatCellForEdit({ value: num(42), formula: '=SUM(A1:A3)' }, undefined, undefined, {
+        formatFormula: (formula) => formula.replace('A1:A3', 'R[-3]C[-3]:R[-1]C[-3]'),
+      }),
+    ).toBe('=SUM(R[-3]C[-3]:R[-1]C[-3])');
+  });
+
+  it('hides formula text only when both formulaHidden and sheetProtected are active', () => {
+    const cell = { value: num(5), formula: '=2+3' };
+    expect(formatCellForEdit(cell, undefined, undefined, { formulaHidden: true })).toBe('=2+3');
+    expect(formatCellForEdit(cell, undefined, undefined, { sheetProtected: true })).toBe('=2+3');
+    expect(
+      formatCellForEdit(cell, undefined, undefined, {
+        formulaHidden: true,
+        sheetProtected: true,
+      }),
+    ).toBe('');
+  });
+
+  it('hides lambda formula text when the cell is Hidden on a protected sheet', () => {
+    const cell = { value: blank(), formula: null };
+    const wb = wbWithLambda('LAMBDA(x, x+1)');
+    expect(
+      formatCellForEdit(
+        cell,
+        wb,
+        { sheet: 0, row: 0, col: 0 },
+        {
+          formulaHidden: true,
+          sheetProtected: true,
+        },
+      ),
+    ).toBe('');
+  });
+
   it('renders a number without formatting', () => {
     expect(formatCellForEdit({ value: num(1234.56), formula: null })).toBe('1234.56');
   });

@@ -1,4 +1,5 @@
 import { isHeaderRow, tableForCell } from '../commands/format-as-table.js';
+import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
 import { addrKey } from '../engine/address.js';
 import { evaluateCfFromEngine } from '../engine/cf-sync.js';
 import { makeRangeResolver, type RangeResolver } from '../engine/range-resolver.js';
@@ -21,6 +22,7 @@ import {
   gridOriginY,
   isColVisible,
   isRowVisible,
+  layoutForView,
   type Rect,
   rangeRects,
   rowHeight,
@@ -61,6 +63,7 @@ import {
   paintTraceArrow,
   paintTraceDot,
   paintValidationChevron,
+  paintValidationCircle,
   paintValidationTriangle,
   TRACE_DEPENDENT_COLOR,
   TRACE_PRECEDENT_COLOR,
@@ -144,6 +147,11 @@ export class GridRenderer {
 
   private rafId = 0;
 
+  private readonly sheetBackgroundImages = new Map<
+    string,
+    { image: HTMLImageElement; status: 'loading' | 'loaded' | 'error' }
+  >();
+
   constructor(deps: RendererDeps) {
     this.host = deps.host;
     this.canvas = deps.canvas;
@@ -174,7 +182,8 @@ export class GridRenderer {
   private resizeViewport(): void {
     if (!this.onViewportSize) return;
     const state = this.getState();
-    const { layout, viewport } = state;
+    const layout = layoutForView(state.layout, state.ui.showHeaders !== false);
+    const { viewport } = state;
     const bodyH = Math.max(
       0,
       this.cssHeight - gridOriginY(layout) - frozenRowsHeight(layout, viewport),
@@ -211,7 +220,11 @@ export class GridRenderer {
   private paint(): void {
     if (this.cssWidth === 0 || this.cssHeight === 0) return;
 
-    const state = this.getState();
+    const baseState = this.getState();
+    const state =
+      baseState.ui.showHeaders === false
+        ? { ...baseState, layout: layoutForView(baseState.layout, false) }
+        : baseState;
     const theme = this.getTheme();
     const ctx = this.ctx;
 
@@ -226,6 +239,7 @@ export class GridRenderer {
     const cols = buildColLayout(state.layout, state.viewport);
     const rows = buildRowLayout(state.layout, state.viewport);
 
+    this.paintSheetBackground(state);
     if (state.ui.showGridLines !== false) this.paintGridLines(state, theme, cols, rows);
     this.paintCells(state, theme, cols, rows);
     if (state.ui.showHeaders !== false) this.paintHeaders(state, theme, cols, rows);
@@ -252,6 +266,49 @@ export class GridRenderer {
     ) {
       wb.setViewportHint(state.data.sheetIndex, firstRow, firstCol, lastRow, lastCol);
     }
+  }
+
+  private paintSheetBackground(state: State): void {
+    const url = state.ui.sheetBackgroundImages.get(state.data.sheetIndex);
+    if (!url) return;
+    let entry = this.sheetBackgroundImages.get(url);
+    if (!entry) {
+      const image = new Image();
+      entry = { image, status: 'loading' };
+      image.onload = () => {
+        const current = this.sheetBackgroundImages.get(url);
+        if (!current) return;
+        current.status = 'loaded';
+        this.invalidate();
+      };
+      image.onerror = () => {
+        const current = this.sheetBackgroundImages.get(url);
+        if (!current) return;
+        current.status = 'error';
+      };
+      image.src = url;
+      this.sheetBackgroundImages.set(url, entry);
+    }
+    if (
+      entry.status !== 'loaded' ||
+      entry.image.naturalWidth <= 0 ||
+      entry.image.naturalHeight <= 0
+    ) {
+      return;
+    }
+
+    const ox = gridOriginX(state.layout);
+    const oy = gridOriginY(state.layout);
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    const pattern = ctx.createPattern(entry.image, 'repeat');
+    if (pattern) {
+      ctx.fillStyle = pattern;
+      ctx.translate(ox, oy);
+      ctx.fillRect(0, 0, this.cssWidth - ox, this.cssHeight - oy);
+    }
+    ctx.restore();
   }
 
   private paintEditorRefs(state: State): void {
@@ -350,6 +407,7 @@ export class GridRenderer {
     const conditional = evaluateConditional(state);
     const sparklines = sparkline.sparklines;
     const ignored = errorIndicators.ignoredErrors;
+    const validationCircles = errorIndicators.validationCircles;
     // Lock-icon overlay only fires when the active sheet is currently
     // protected. Pre-compute the flag so the per-cell loop can skip the
     // Map lookup on every iteration.
@@ -455,6 +513,27 @@ export class GridRenderer {
       }
       return w === base.w ? base : { ...base, w };
     };
+    const centerContinuousBounds = (row: number, col: number, base: Rect): Rect => {
+      let right = base.x + base.w;
+      for (let nextCol = col + 1; cols.positionAt.has(nextCol); nextCol += 1) {
+        const nextKey = addrKey({ sheet: data.sheetIndex, row, col: nextCol });
+        const nextCell = data.cells.get(nextKey);
+        const nextFmt = format.formats.get(nextKey);
+        const nextTable = tableForCell(tables.tables, data.sheetIndex, row, nextCol);
+        if (
+          nextTable ||
+          merges.byCell.has(nextKey) ||
+          merges.byAnchor.has(nextKey) ||
+          nextFmt?.align !== 'centerContinuous' ||
+          (nextCell && (nextCell.formula || nextCell.value.kind !== 'blank'))
+        ) {
+          break;
+        }
+        const r2 = cellRectIn(layout, cols, rows, row, nextCol);
+        right = r2.x + r2.w;
+      }
+      return right === base.x + base.w ? base : { ...base, w: right - base.x };
+    };
 
     // Single visible-cells walk paints both static format fills (for blank
     // formatted cells too) and cell content. Iterating format.formats here
@@ -472,9 +551,18 @@ export class GridRenderer {
         const isMergeAnchor = merges.byAnchor.has(key);
         const spark = sparklines.get(key);
         const isActive = r === active.row && c === active.col;
+        const hasValidationCircle = validationCircles.has(key);
         // Render-worthy when there's data, a merge anchor, a static fill, or a
         // sparkline/table host — all reasons to paint into an otherwise blank cell.
-        if (!cell && !isActive && !isMergeAnchor && !fmt?.fill && !tableFmt?.fill && !spark)
+        if (
+          !cell &&
+          !isActive &&
+          !isMergeAnchor &&
+          !fmt?.fill &&
+          !tableFmt?.fill &&
+          !spark &&
+          !hasValidationCircle
+        )
           continue;
         const bounds = mergeBounds(r, c) ?? cellRectIn(layout, cols, rows, r, c);
         const isInRange = inRange({ sheet: data.sheetIndex, row: r, col: c }, rng);
@@ -501,9 +589,18 @@ export class GridRenderer {
             : baseFmt;
 
         const value: CellValue = cell?.value ?? { kind: 'blank' };
-        const formula = cell?.formula ?? null;
+        const storedFormula = cell?.formula ?? null;
+        const formula =
+          storedFormula && state.ui.showFormulas === true && state.ui.r1c1 === true
+            ? formatA1FormulaAsR1C1(storedFormula, { row: r, col: c })
+            : storedFormula;
         const displayOverride =
-          this.getDisplay?.({ sheet: data.sheetIndex, row: r, col: c }, value, formula, fmt) ??
+          this.getDisplay?.(
+            { sheet: data.sheetIndex, row: r, col: c },
+            value,
+            storedFormula,
+            fmt,
+          ) ??
           null;
         const paintCtx = {
           ctx,
@@ -526,26 +623,43 @@ export class GridRenderer {
         if (isActive && !effectiveFmt?.fill) paintCellBackground(paintCtx);
         if (overlay?.bar !== undefined && overlay.barColor) {
           ctx.save();
-          ctx.fillStyle = overlay.barColor;
+          if (overlay.barGradient) {
+            const gradient = ctx.createLinearGradient(bounds.x, 0, bounds.x + bounds.w, 0);
+            gradient.addColorStop(0, overlay.barColor);
+            gradient.addColorStop(1, 'rgba(255,255,255,0.25)');
+            ctx.fillStyle = gradient;
+          } else {
+            ctx.fillStyle = overlay.barColor;
+          }
           ctx.globalAlpha = 0.45;
           const w = bounds.w * overlay.bar;
           ctx.fillRect(bounds.x, bounds.y + 1, w, bounds.h - 2);
           ctx.restore();
         }
+        const hideConditionalValue =
+          overlay?.showValue === false &&
+          (overlay.bar !== undefined || (overlay.iconKind && overlay.iconSlot !== undefined));
         // Icon-set: paint glyph in left gutter and shift text right by the
         // gutter width so the value reads cleanly next to the icon.
         const tableHeader = table ? isHeaderRow(table, r, c) : false;
         if (overlay?.iconKind && overlay.iconSlot !== undefined) {
           paintConditionalIcon(ctx, bounds, overlay.iconKind, overlay.iconSlot);
-          const insetBounds = {
-            x: bounds.x + CONDITIONAL_ICON_GUTTER,
-            y: bounds.y,
-            w: bounds.w - CONDITIONAL_ICON_GUTTER,
-            h: bounds.h,
-          };
-          paintCellText({ ...paintCtx, bounds: insetBounds });
+          if (!hideConditionalValue) {
+            const insetBounds = {
+              x: bounds.x + CONDITIONAL_ICON_GUTTER,
+              y: bounds.y,
+              w: bounds.w - CONDITIONAL_ICON_GUTTER,
+              h: bounds.h,
+            };
+            paintCellText({ ...paintCtx, bounds: insetBounds });
+          }
+        } else if (hideConditionalValue) {
+          // Conditional formatting's "Show Bar/Icon Only" suppresses the
+          // value text while still leaving fills, bars, and icons visible.
         } else if (tableHeader) {
           paintCellText({ ...paintCtx, bounds: { ...bounds, w: Math.max(0, bounds.w - 20) } });
+        } else if (effectiveFmt?.align === 'centerContinuous' && !isMergeAnchor) {
+          paintCellText({ ...paintCtx, bounds: centerContinuousBounds(r, c, bounds) });
         } else if (
           isPlainTextOverflowCandidate({
             value,
@@ -565,6 +679,7 @@ export class GridRenderer {
         if (tableHeader) paintTableHeaderChevron(ctx, bounds, theme);
         if (spark) paintCellSparkline(ctx, bounds, spark, state, this.getWb());
         if (fmt?.comment) paintCommentMarker(ctx, bounds);
+        if (hasValidationCircle) paintValidationCircle(ctx, bounds, VALIDATION_TRIANGLE_COLOR);
         // Lock-icon overlay — only when the sheet is protected AND the cell
         // is explicitly unlocked, signalling which cells the user can still
         // type into despite the protection flag.

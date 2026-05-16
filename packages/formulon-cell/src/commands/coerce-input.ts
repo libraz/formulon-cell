@@ -1,8 +1,9 @@
 import { makeRangeResolver } from '../engine/range-resolver.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { CellValidation, SpreadsheetStore } from '../store/store.js';
+import type { CellValidation, SpreadsheetStore, State } from '../store/store.js';
 import { isCellWritable, warnProtected } from './protection.js';
+import { normalizeR1C1Formula } from './refs.js';
 import { type ValidationOutcome, validateAgainst } from './validate.js';
 
 export type CoercedInput =
@@ -11,6 +12,10 @@ export type CoercedInput =
   | { kind: 'number'; value: number }
   | { kind: 'bool'; value: boolean }
   | { kind: 'text'; value: string };
+
+export interface CoerceInputOptions {
+  forceText?: boolean;
+}
 
 const NUMERIC = /^[+-]?(?:(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
 const CURRENCY = /^[¥$€£]\s*/;
@@ -65,12 +70,13 @@ const parseTimeValue = (raw: string): number | null => {
  * neither the engine nor the store. Shared between the keyboard path,
  * formula bar, and clipboard paste so the rules stay in one place.
  */
-export function coerceInput(raw: string): CoercedInput {
+export function coerceInput(raw: string, options?: CoerceInputOptions): CoercedInput {
   const trimmed = raw.trim();
   const numericTrimmed = normalizeNumericText(trimmed);
   if (trimmed === '') return { kind: 'blank' };
-  if (trimmed.startsWith('=')) return { kind: 'formula', text: trimmed };
   if (trimmed.startsWith("'")) return { kind: 'text', value: trimmed.slice(1) };
+  if (options?.forceText === true) return { kind: 'text', value: raw };
+  if (trimmed.startsWith('=')) return { kind: 'formula', text: trimmed };
   const boolText = numericTrimmed.toUpperCase();
   if (boolText === 'TRUE' || boolText === 'FALSE') {
     return { kind: 'bool', value: boolText === 'TRUE' };
@@ -80,6 +86,12 @@ export function coerceInput(raw: string): CoercedInput {
   const n = parseNumericValue(numericTrimmed);
   if (n !== null) return { kind: 'number', value: n };
   return { kind: 'text', value: raw };
+}
+
+export function coerceInputForCell(state: State, a: Addr, raw: string): CoercedInput {
+  return coerceInput(raw, {
+    forceText: state.format.formats.get(`${a.sheet}:${a.row}:${a.col}`)?.numFmt?.kind === 'text',
+  });
 }
 
 /**
@@ -93,7 +105,7 @@ export function writeCoerced(wb: WorkbookHandle, a: Addr, c: CoercedInput): void
       wb.setBlank(a);
       return;
     case 'formula':
-      wb.setFormula(a, c.text);
+      wb.setFormula(a, normalizeR1C1Formula(c.text, a));
       return;
     case 'number':
       wb.setNumber(a, c.value);
@@ -115,20 +127,27 @@ export function writeInput(
   raw: string,
   store?: SpreadsheetStore,
 ): void {
-  if (store && !isCellWritable(store.getState(), a)) {
-    warnProtected(a);
-    return;
+  let coerced: CoercedInput | null = null;
+  if (store) {
+    const state = store.getState();
+    if (!isCellWritable(state, a)) {
+      warnProtected(a);
+      return;
+    }
+    coerced = coerceInputForCell(state, a, raw);
   }
-  writeCoerced(wb, a, coerceInput(raw));
+  writeCoerced(wb, a, coerced ?? coerceInput(raw));
 }
 
 /** Coerce + validate + write. When validation rejects with severity `stop`,
  *  the write is skipped and the outcome is returned so the caller can surface
- *  the error. `warning` and `information` outcomes still write through but
- *  the message is returned for an inline toast. Range-backed list sources
- *  resolve against `wb` rooted at `a.sheet`. When `store` is supplied,
- *  sheet-protection is gated first; gated cells return `{ ok: true }` and
- *  emit a console warning rather than writing through. */
+ *  the error. Spreadsheet-compatible exception: rules with `showErrorMessage`
+ *  disabled still record the invalid value, so Circle Invalid Data can flag it
+ *  later. `warning` and `information` outcomes also write through but return
+ *  the outcome for an inline toast. Range-backed list sources resolve against
+ *  `wb` rooted at `a.sheet`. When `store` is supplied, sheet-protection is
+ *  gated first; gated cells return `{ ok: true }` and emit a console warning
+ *  rather than writing through. */
 export function writeInputValidated(
   wb: WorkbookHandle,
   a: Addr,
@@ -136,17 +155,22 @@ export function writeInputValidated(
   validation: CellValidation | undefined,
   store?: SpreadsheetStore,
 ): ValidationOutcome {
-  if (store && !isCellWritable(store.getState(), a)) {
-    warnProtected(a);
-    return { ok: true };
+  let coerced: CoercedInput | null = null;
+  if (store) {
+    const state = store.getState();
+    if (!isCellWritable(state, a)) {
+      warnProtected(a);
+      return { ok: true };
+    }
+    coerced = coerceInputForCell(state, a, raw);
   }
-  const coerced = coerceInput(raw);
+  coerced ??= coerceInput(raw);
   if (!validation) {
     writeCoerced(wb, a, coerced);
     return { ok: true };
   }
   const outcome = validateAgainst(validation, coerced, makeRangeResolver(wb, a.sheet));
-  if (outcome.ok || outcome.severity !== 'stop') {
+  if (outcome.ok || outcome.severity !== 'stop' || validation.showErrorMessage === false) {
     writeCoerced(wb, a, coerced);
   }
   return outcome;

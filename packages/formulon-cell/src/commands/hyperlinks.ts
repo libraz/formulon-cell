@@ -3,6 +3,7 @@ import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import { isCellWritable, warnProtected } from './protection.js';
 
 export interface HyperlinkEntry {
   addr: Addr;
@@ -45,6 +46,10 @@ export function setHyperlink(
   target: string,
   workbook?: WorkbookHandle,
 ): void {
+  if (!isCellWritable(store.getState(), addr)) {
+    warnProtected(addr);
+    return;
+  }
   const range = { sheet: addr.sheet, r0: addr.row, c0: addr.col, r1: addr.row, c1: addr.col };
   const next = target.trim();
   mutators.setRangeFormat(store, range, { hyperlink: next.length > 0 ? next : undefined });
@@ -56,6 +61,11 @@ export function clearHyperlink(
   addr: Addr,
   workbook?: WorkbookHandle,
 ): void {
+  if (!isCellWritable(store.getState(), addr)) {
+    warnProtected(addr);
+    return;
+  }
+  if (hyperlinkAt(store.getState(), addr) === null) return;
   const range = { sheet: addr.sheet, r0: addr.row, c0: addr.col, r1: addr.row, c1: addr.col };
   mutators.setRangeFormat(store, range, { hyperlink: undefined });
   if (workbook) flushFormatToEngine(workbook, store, addr.sheet);

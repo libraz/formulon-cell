@@ -18,11 +18,25 @@ export type CellStyleId =
   | 'neutral'
   | 'note'
   | 'warning'
+  | 'checkCell'
+  | 'explanatoryText'
   | 'inputCell'
   | 'outputCell'
   | 'calculation'
   | 'linkedCell'
   | 'totalCell'
+  | 'accent1'
+  | 'accent2'
+  | 'accent3'
+  | 'accent4'
+  | 'accent5'
+  | 'accent6'
+  | 'accent1_20'
+  | 'accent2_20'
+  | 'accent3_20'
+  | 'accent4_20'
+  | 'accent5_20'
+  | 'accent6_20'
   | 'currency'
   | 'currency0'
   | 'percent'
@@ -35,6 +49,18 @@ export interface CellStyleDef {
    *  passes the id back to `applyCellStyle`. */
   label: string;
   format: Partial<CellFormat>;
+}
+
+export type CellStyleGroupId =
+  | 'goodBadNeutral'
+  | 'dataAndModel'
+  | 'titlesAndHeadings'
+  | 'themedCellStyles'
+  | 'numberFormat';
+
+export interface CellStyleGroupDef {
+  id: CellStyleGroupId;
+  styleIds: readonly CellStyleId[];
 }
 
 /** Spreadsheet-flavored named cell style presets. The format payloads stay close to
@@ -96,6 +122,16 @@ export const CELL_STYLES: readonly CellStyleDef[] = [
     format: { color: '#ff0000', italic: true },
   },
   {
+    id: 'checkCell',
+    label: 'Check Cell',
+    format: { fill: '#a9d08e', color: '#375623', bold: true },
+  },
+  {
+    id: 'explanatoryText',
+    label: 'Explanatory Text',
+    format: { color: '#7f7f7f', italic: true },
+  },
+  {
     id: 'inputCell',
     label: 'Input',
     format: { fill: '#ffcc99', color: '#3f3f76' },
@@ -127,6 +163,66 @@ export const CELL_STYLES: readonly CellStyleDef[] = [
     },
   },
   {
+    id: 'accent1',
+    label: 'Accent1',
+    format: { color: '#ffffff', fill: '#4472c4' },
+  },
+  {
+    id: 'accent2',
+    label: 'Accent2',
+    format: { color: '#ffffff', fill: '#ed7d31' },
+  },
+  {
+    id: 'accent3',
+    label: 'Accent3',
+    format: { color: '#ffffff', fill: '#a5a5a5' },
+  },
+  {
+    id: 'accent4',
+    label: 'Accent4',
+    format: { color: '#000000', fill: '#ffc000' },
+  },
+  {
+    id: 'accent5',
+    label: 'Accent5',
+    format: { color: '#ffffff', fill: '#5b9bd5' },
+  },
+  {
+    id: 'accent6',
+    label: 'Accent6',
+    format: { color: '#ffffff', fill: '#70ad47' },
+  },
+  {
+    id: 'accent1_20',
+    label: '20% - Accent1',
+    format: { color: '#1f4e79', fill: '#d9e2f3' },
+  },
+  {
+    id: 'accent2_20',
+    label: '20% - Accent2',
+    format: { color: '#833c0c', fill: '#fce4d6' },
+  },
+  {
+    id: 'accent3_20',
+    label: '20% - Accent3',
+    format: { color: '#525252', fill: '#ededed' },
+  },
+  {
+    id: 'accent4_20',
+    label: '20% - Accent4',
+    format: { color: '#7f6000', fill: '#fff2cc' },
+  },
+  {
+    id: 'accent5_20',
+    label: '20% - Accent5',
+    format: { color: '#1f4e79', fill: '#ddebf7' },
+  },
+  {
+    id: 'accent6_20',
+    label: '20% - Accent6',
+    format: { color: '#375623', fill: '#e2f0d9' },
+  },
+  {
     id: 'currency',
     label: 'Currency',
     format: { numFmt: { kind: 'currency', decimals: 2, symbol: '$' } },
@@ -150,6 +246,52 @@ export const CELL_STYLES: readonly CellStyleDef[] = [
     id: 'comma0',
     label: 'Comma [0]',
     format: { numFmt: { kind: 'fixed', decimals: 0, thousands: true } },
+  },
+];
+
+export const CELL_STYLE_GROUPS: readonly CellStyleGroupDef[] = [
+  {
+    id: 'goodBadNeutral',
+    styleIds: ['normal', 'good', 'bad', 'neutral'],
+  },
+  {
+    id: 'dataAndModel',
+    styleIds: [
+      'note',
+      'warning',
+      'checkCell',
+      'explanatoryText',
+      'inputCell',
+      'outputCell',
+      'calculation',
+      'linkedCell',
+      'totalCell',
+    ],
+  },
+  {
+    id: 'titlesAndHeadings',
+    styleIds: ['title', 'heading1', 'heading2', 'heading3', 'heading4'],
+  },
+  {
+    id: 'themedCellStyles',
+    styleIds: [
+      'accent1',
+      'accent2',
+      'accent3',
+      'accent4',
+      'accent5',
+      'accent6',
+      'accent1_20',
+      'accent2_20',
+      'accent3_20',
+      'accent4_20',
+      'accent5_20',
+      'accent6_20',
+    ],
+  },
+  {
+    id: 'numberFormat',
+    styleIds: ['currency', 'currency0', 'percent', 'comma', 'comma0'],
   },
 ];
 
@@ -191,9 +333,10 @@ export function applyCellStyle(
         fontFamily: undefined,
         fontSize: undefined,
         numFmt: undefined,
+        cellStyle: undefined,
       });
       return;
     }
-    mutators.setRangeFormat(store, range, def.format);
+    mutators.setRangeFormat(store, range, { ...def.format, cellStyle: id });
   });
 }

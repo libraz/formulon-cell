@@ -114,3 +114,16 @@
   border-color: var(--shell-rule);
   color: var(--shell-fg);
 }
+
+.fc-namebox-menu {
+  border-color: var(--shell-rule);
+  background: var(--shell-surface);
+  box-shadow: var(--shell-shadow-8);
+  color: var(--shell-fg);
+  font-family: var(--shell-font-ui);
+}
+
+.fc-namebox-menu__item:hover,
+.fc-namebox-menu__item:focus-visible {
+  background: var(--shell-bg-2);
+}

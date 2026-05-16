@@ -3,13 +3,16 @@ import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type {
   CellFormat,
+  ConditionalRule,
   LayoutSlice,
   PageSetup,
+  SessionChart,
   SlicerSpec,
   Sparkline,
   SpreadsheetStore,
   State,
 } from '../store/store.js';
+import type { TableOverlay } from './format-as-table.js';
 
 const LIMIT = 200;
 
@@ -149,6 +152,94 @@ export function applyFormatSnapshot(store: SpreadsheetStore, snap: Map<string, C
   store.setState((s) => ({ ...s, format: { formats: new Map(snap) } }));
 }
 
+const formatSnapshotKey = (snap: Map<string, CellFormat>): string =>
+  JSON.stringify([...snap.entries()].sort(([a], [b]) => a.localeCompare(b)));
+
+const sameFormatSnapshot = (a: Map<string, CellFormat>, b: Map<string, CellFormat>): boolean =>
+  a.size === b.size && formatSnapshotKey(a) === formatSnapshotKey(b);
+
+const mapSnapshotKey = <T>(snap: Map<string, T>): string =>
+  JSON.stringify([...snap.entries()].sort(([a], [b]) => a.localeCompare(b)));
+
+const sameMapSnapshot = <T>(a: Map<string, T>, b: Map<string, T>): boolean =>
+  a.size === b.size && mapSnapshotKey(a) === mapSnapshotKey(b);
+
+const sameJsonSnapshot = <T>(a: readonly T[], b: readonly T[]): boolean =>
+  a.length === b.length && JSON.stringify(a) === JSON.stringify(b);
+
+const cloneTableOverlay = (table: TableOverlay): TableOverlay => ({
+  ...table,
+  range: { ...table.range },
+});
+
+export function captureTableOverlaysSnapshot(state: State): TableOverlay[] {
+  return state.tables.tables.map(cloneTableOverlay);
+}
+
+export function applyTableOverlaysSnapshot(
+  store: SpreadsheetStore,
+  snap: readonly TableOverlay[],
+): void {
+  store.setState((s) => ({
+    ...s,
+    tables: { tables: snap.map(cloneTableOverlay) },
+  }));
+}
+
+export function recordTablesChange(
+  history: History | null,
+  store: SpreadsheetStore,
+  mutate: () => void,
+): void {
+  if (!history || history.isReplaying()) {
+    mutate();
+    return;
+  }
+  const before = captureTableOverlaysSnapshot(store.getState());
+  mutate();
+  const after = captureTableOverlaysSnapshot(store.getState());
+  if (sameJsonSnapshot(before, after)) return;
+  history.push({
+    undo: () => applyTableOverlaysSnapshot(store, before),
+    redo: () => applyTableOverlaysSnapshot(store, after),
+  });
+}
+
+const cloneSessionChart = (chart: SessionChart): SessionChart => ({
+  ...chart,
+  source: { ...chart.source },
+});
+
+export function captureChartsSnapshot(state: State): SessionChart[] {
+  return state.charts.charts.map(cloneSessionChart);
+}
+
+export function applyChartsSnapshot(store: SpreadsheetStore, snap: readonly SessionChart[]): void {
+  store.setState((s) => ({
+    ...s,
+    charts: { charts: snap.map(cloneSessionChart) },
+  }));
+}
+
+export function recordChartsChange(
+  history: History | null,
+  store: SpreadsheetStore,
+  mutate: () => void,
+): void {
+  if (!history || history.isReplaying()) {
+    mutate();
+    return;
+  }
+  const before = captureChartsSnapshot(store.getState());
+  mutate();
+  const after = captureChartsSnapshot(store.getState());
+  if (sameJsonSnapshot(before, after)) return;
+  history.push({
+    undo: () => applyChartsSnapshot(store, before),
+    redo: () => applyChartsSnapshot(store, after),
+  });
+}
+
 export interface LayoutSnapshot {
   colWidths: Map<number, number>;
   rowHeights: Map<number, number>;
@@ -161,6 +252,7 @@ export interface LayoutSnapshot {
   outlineRowGutter: number;
   outlineColGutter: number;
   hiddenSheets: Set<number>;
+  sheetTabColors: Map<number, string>;
 }
 
 export function captureLayoutSnapshot(state: State): LayoutSnapshot {
@@ -176,6 +268,7 @@ export function captureLayoutSnapshot(state: State): LayoutSnapshot {
     outlineRowGutter: state.layout.outlineRowGutter,
     outlineColGutter: state.layout.outlineColGutter,
     hiddenSheets: new Set(state.layout.hiddenSheets),
+    sheetTabColors: new Map(state.layout.sheetTabColors),
   };
 }
 
@@ -195,9 +288,33 @@ export function applyLayoutSnapshot(store: SpreadsheetStore, snap: LayoutSnapsho
       outlineRowGutter: snap.outlineRowGutter,
       outlineColGutter: snap.outlineColGutter,
       hiddenSheets: new Set(snap.hiddenSheets),
+      sheetTabColors: new Map(snap.sheetTabColors),
     } as LayoutSlice,
   }));
 }
+
+const sameNumberMap = (a: Map<number, number>, b: Map<number, number>): boolean =>
+  a.size === b.size && [...a].every(([key, value]) => b.get(key) === value);
+
+const sameNumberSet = (a: Set<number>, b: Set<number>): boolean =>
+  a.size === b.size && [...a].every((value) => b.has(value));
+
+const sameNumberStringMap = (a: Map<number, string>, b: Map<number, string>): boolean =>
+  a.size === b.size && [...a].every(([key, value]) => b.get(key) === value);
+
+const sameLayoutSnapshot = (a: LayoutSnapshot, b: LayoutSnapshot): boolean =>
+  sameNumberMap(a.colWidths, b.colWidths) &&
+  sameNumberMap(a.rowHeights, b.rowHeights) &&
+  a.freezeRows === b.freezeRows &&
+  a.freezeCols === b.freezeCols &&
+  sameNumberSet(a.hiddenRows, b.hiddenRows) &&
+  sameNumberSet(a.hiddenCols, b.hiddenCols) &&
+  sameNumberMap(a.outlineRows, b.outlineRows) &&
+  sameNumberMap(a.outlineCols, b.outlineCols) &&
+  a.outlineRowGutter === b.outlineRowGutter &&
+  a.outlineColGutter === b.outlineColGutter &&
+  sameNumberSet(a.hiddenSheets, b.hiddenSheets) &&
+  sameNumberStringMap(a.sheetTabColors, b.sheetTabColors);
 
 /** Run `mutate`, capturing the format slice before and after, pushing one
  *  entry. No-op when `history` is null. */
@@ -213,6 +330,7 @@ export function recordFormatChange(
   const before = captureFormatSnapshot(store.getState());
   mutate();
   const after = captureFormatSnapshot(store.getState());
+  if (sameFormatSnapshot(before, after)) return;
   history.push({
     undo: () => applyFormatSnapshot(store, before),
     redo: () => applyFormatSnapshot(store, after),
@@ -231,9 +349,52 @@ export function recordLayoutChange(
   const before = captureLayoutSnapshot(store.getState());
   mutate();
   const after = captureLayoutSnapshot(store.getState());
+  if (sameLayoutSnapshot(before, after)) return;
   history.push({
     undo: () => applyLayoutSnapshot(store, before),
     redo: () => applyLayoutSnapshot(store, after),
+  });
+}
+
+const cloneConditionalRule = (rule: ConditionalRule): ConditionalRule => {
+  const out = { ...rule, range: { ...rule.range } } as ConditionalRule;
+  if ('apply' in out) out.apply = { ...out.apply };
+  if ('stops' in out) {
+    out.stops = [...out.stops] as [string, string] | [string, string, string];
+  }
+  return out;
+};
+
+export function captureConditionalRulesSnapshot(state: State): ConditionalRule[] {
+  return state.conditional.rules.map(cloneConditionalRule);
+}
+
+export function applyConditionalRulesSnapshot(
+  store: SpreadsheetStore,
+  snap: readonly ConditionalRule[],
+): void {
+  store.setState((s) => ({
+    ...s,
+    conditional: { rules: snap.map(cloneConditionalRule) },
+  }));
+}
+
+export function recordConditionalRulesChange(
+  history: History | null,
+  store: SpreadsheetStore,
+  mutate: () => void,
+): void {
+  if (!history || history.isReplaying()) {
+    mutate();
+    return;
+  }
+  const before = captureConditionalRulesSnapshot(store.getState());
+  mutate();
+  const after = captureConditionalRulesSnapshot(store.getState());
+  if (sameJsonSnapshot(before, after)) return;
+  history.push({
+    undo: () => applyConditionalRulesSnapshot(store, before),
+    redo: () => applyConditionalRulesSnapshot(store, after),
   });
 }
 
@@ -257,6 +418,7 @@ export function recordLayoutChangeWithEngine(
   const before = captureLayoutSnapshot(store.getState());
   mutate();
   const after = captureLayoutSnapshot(store.getState());
+  if (sameLayoutSnapshot(before, after)) return;
   syncLayoutToEngine(wb, store.getState().layout, sheet, before, after);
   if (!history || history.isReplaying()) return;
   history.push({
@@ -290,6 +452,21 @@ export function applyMergesSnapshot(store: SpreadsheetStore, snap: MergesSnapsho
   }));
 }
 
+const rangeKey = (range: Range): string =>
+  `${range.sheet}:${range.r0}:${range.c0}:${range.r1}:${range.c1}`;
+
+const sameStringMap = (a: Map<string, string>, b: Map<string, string>): boolean =>
+  a.size === b.size && [...a].every(([key, value]) => b.get(key) === value);
+
+const sameRangeMap = (a: Map<string, Range>, b: Map<string, Range>): boolean =>
+  a.size === b.size && [...a].every(([key, range]) => {
+    const other = b.get(key);
+    return other !== undefined && rangeKey(range) === rangeKey(other);
+  });
+
+const sameMergesSnapshot = (a: MergesSnapshot, b: MergesSnapshot): boolean =>
+  sameRangeMap(a.byAnchor, b.byAnchor) && sameStringMap(a.byCell, b.byCell);
+
 export function recordMergesChange(
   history: History | null,
   store: SpreadsheetStore,
@@ -302,6 +479,7 @@ export function recordMergesChange(
   const before = captureMergesSnapshot(store.getState());
   mutate();
   const after = captureMergesSnapshot(store.getState());
+  if (sameMergesSnapshot(before, after)) return;
   history.push({
     undo: () => applyMergesSnapshot(store, before),
     redo: () => applyMergesSnapshot(store, after),
@@ -331,6 +509,7 @@ export function recordMergesChangeWithEngine(
   const before = captureMergesSnapshot(store.getState());
   mutate();
   const after = captureMergesSnapshot(store.getState());
+  if (sameMergesSnapshot(before, after)) return;
   sync(after);
   if (!history || history.isReplaying()) return;
   history.push({
@@ -368,6 +547,7 @@ export function recordSparklineChange(
   const before = captureSparklineSnapshot(store.getState());
   mutate();
   const after = captureSparklineSnapshot(store.getState());
+  if (sameMapSnapshot(before, after)) return;
   history.push({
     undo: () => applySparklineSnapshot(store, before),
     redo: () => applySparklineSnapshot(store, after),
@@ -375,12 +555,14 @@ export function recordSparklineChange(
 }
 
 export function capturePageSetupSnapshot(state: State): Map<number, PageSetup> {
-  // Deep-clone each entry — margins is the only nested object so shallow copy
-  // suffices but a fresh object guards against future field additions that
-  // might re-use the same reference.
   const out = new Map<number, PageSetup>();
   for (const [k, v] of state.pageSetup.setupBySheet) {
-    out.set(k, { ...v, margins: { ...v.margins } });
+    out.set(k, {
+      ...v,
+      margins: { ...v.margins },
+      manualPageBreakRows: v.manualPageBreakRows ? [...v.manualPageBreakRows] : undefined,
+      manualPageBreakCols: v.manualPageBreakCols ? [...v.manualPageBreakCols] : undefined,
+    });
   }
   return out;
 }
@@ -391,10 +573,69 @@ export function applyPageSetupSnapshot(
 ): void {
   const next = new Map<number, PageSetup>();
   for (const [k, v] of snap) {
-    next.set(k, { ...v, margins: { ...v.margins } });
+    next.set(k, {
+      ...v,
+      margins: { ...v.margins },
+      manualPageBreakRows: v.manualPageBreakRows ? [...v.manualPageBreakRows] : undefined,
+      manualPageBreakCols: v.manualPageBreakCols ? [...v.manualPageBreakCols] : undefined,
+    });
   }
   store.setState((s) => ({ ...s, pageSetup: { setupBySheet: next } }));
 }
+
+const sameOptionalArray = (a: readonly number[] | undefined, b: readonly number[] | undefined) => {
+  if (!a && !b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
+};
+
+const samePageSetup = (a: PageSetup, b: PageSetup): boolean =>
+  a.orientation === b.orientation &&
+  a.paperSize === b.paperSize &&
+  a.margins.top === b.margins.top &&
+  a.margins.right === b.margins.right &&
+  a.margins.bottom === b.margins.bottom &&
+  a.margins.left === b.margins.left &&
+  a.headerMargin === b.headerMargin &&
+  a.footerMargin === b.footerMargin &&
+  a.centerHorizontally === b.centerHorizontally &&
+  a.centerVertically === b.centerVertically &&
+  a.headerLeft === b.headerLeft &&
+  a.headerCenter === b.headerCenter &&
+  a.headerRight === b.headerRight &&
+  a.footerLeft === b.footerLeft &&
+  a.footerCenter === b.footerCenter &&
+  a.footerRight === b.footerRight &&
+  a.differentOddEvenPages === b.differentOddEvenPages &&
+  a.differentFirstPage === b.differentFirstPage &&
+  a.scaleHeaderFooterWithDocument === b.scaleHeaderFooterWithDocument &&
+  a.alignHeaderFooterWithMargins === b.alignHeaderFooterWithMargins &&
+  a.printArea === b.printArea &&
+  a.printTitleRows === b.printTitleRows &&
+  a.printTitleCols === b.printTitleCols &&
+  a.fitWidth === b.fitWidth &&
+  a.fitHeight === b.fitHeight &&
+  sameOptionalArray(a.manualPageBreakRows, b.manualPageBreakRows) &&
+  sameOptionalArray(a.manualPageBreakCols, b.manualPageBreakCols) &&
+  a.scale === b.scale &&
+  a.printQuality === b.printQuality &&
+  a.firstPageNumber === b.firstPageNumber &&
+  a.showGridlines === b.showGridlines &&
+  a.showHeadings === b.showHeadings &&
+  a.blackAndWhite === b.blackAndWhite &&
+  a.draftQuality === b.draftQuality &&
+  a.comments === b.comments &&
+  a.cellErrorsAs === b.cellErrorsAs &&
+  a.pageOrder === b.pageOrder;
+
+const samePageSetupSnapshot = (a: Map<number, PageSetup>, b: Map<number, PageSetup>): boolean => {
+  if (a.size !== b.size) return false;
+  for (const [sheet, setup] of a) {
+    const other = b.get(sheet);
+    if (!other || !samePageSetup(setup, other)) return false;
+  }
+  return true;
+};
 
 /** Run `mutate`, capturing the page-setup slice before and after, pushing one
  *  entry. No-op when `history` is null. */
@@ -410,6 +651,7 @@ export function recordPageSetupChange(
   const before = capturePageSetupSnapshot(store.getState());
   mutate();
   const after = capturePageSetupSnapshot(store.getState());
+  if (samePageSetupSnapshot(before, after)) return;
   history.push({
     undo: () => applyPageSetupSnapshot(store, before),
     redo: () => applyPageSetupSnapshot(store, after),
@@ -445,6 +687,7 @@ export function recordSlicersChange(
   const before = captureSlicersSnapshot(store.getState());
   mutate();
   const after = captureSlicersSnapshot(store.getState());
+  if (sameJsonSnapshot(before, after)) return;
   history.push({
     undo: () => applySlicersSnapshot(store, before),
     redo: () => applySlicersSnapshot(store, after),

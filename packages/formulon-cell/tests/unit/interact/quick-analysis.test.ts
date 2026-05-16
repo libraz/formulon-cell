@@ -70,7 +70,7 @@ describe('attachQuickAnalysis', () => {
     handle.detach();
   });
 
-  it('open() reveals the popover and renders a section per non-empty group', () => {
+  it('open() reveals the popover and renders Excel-style group tabs', () => {
     seed(store, wb, [
       { row: 0, col: 0, value: 1 },
       { row: 0, col: 1, value: 2 },
@@ -81,11 +81,62 @@ describe('attachQuickAnalysis', () => {
     handle.open();
     const root = host.querySelector<HTMLElement>('.fc-quick');
     expect(root?.hidden).toBe(false);
-    const sections = root?.querySelectorAll('.fc-quick__section') ?? [];
-    // Formatting + Totals + Tables + Sparklines + Charts (5 max). Empty groups are skipped.
-    expect(sections.length).toBeGreaterThanOrEqual(3);
+    const tabs = root?.querySelectorAll('[role="tab"]') ?? [];
+    expect(tabs.length).toBeGreaterThanOrEqual(3);
+    expect(root?.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe(
+      defaultStrings.quickAnalysis.groups.formatting,
+    );
     handle.close();
     expect(root?.hidden).toBe(true);
+    handle.detach();
+  });
+
+  it('shows an Excel-style Quick Analysis button for a multi-cell selection', () => {
+    seed(store, wb, [
+      { row: 0, col: 0, value: 1 },
+      { row: 0, col: 1, value: 2 },
+    ]);
+    setRange(store, 0, 0, 0, 1);
+    const handle = attachQuickAnalysis({ host, store, wb, strings: defaultStrings });
+    const button = host.querySelector<HTMLButtonElement>('.fc-quick__button');
+
+    expect(button).not.toBeNull();
+    expect(button?.hidden).toBe(false);
+    expect(button?.getAttribute('aria-label')).toBe(defaultStrings.quickAnalysis.title);
+
+    button?.click();
+    expect(host.querySelector<HTMLElement>('.fc-quick')?.hidden).toBe(false);
+    expect(button?.hidden).toBe(true);
+    handle.detach();
+  });
+
+  it('hides the Quick Analysis button for a single-cell selection', () => {
+    seed(store, wb, [{ row: 0, col: 0, value: 1 }]);
+    setRange(store, 0, 0, 0, 0);
+    const handle = attachQuickAnalysis({ host, store, wb, strings: defaultStrings });
+
+    expect(host.querySelector<HTMLButtonElement>('.fc-quick__button')?.hidden).toBe(true);
+    handle.detach();
+  });
+
+  it('hides the Quick Analysis button while editing and restores it when editing ends', () => {
+    seed(store, wb, [
+      { row: 0, col: 0, value: 1 },
+      { row: 0, col: 1, value: 2 },
+    ]);
+    setRange(store, 0, 0, 0, 1);
+    const handle = attachQuickAnalysis({ host, store, wb, strings: defaultStrings });
+    const button = host.querySelector<HTMLButtonElement>('.fc-quick__button');
+    expect(button?.hidden).toBe(false);
+
+    store.setState((s) => ({
+      ...s,
+      ui: { ...s.ui, editor: { kind: 'edit', raw: '1', caret: 1 } },
+    }));
+    expect(button?.hidden).toBe(true);
+
+    store.setState((s) => ({ ...s, ui: { ...s.ui, editor: { kind: 'idle' } } }));
+    expect(button?.hidden).toBe(false);
     handle.detach();
   });
 
@@ -113,6 +164,52 @@ describe('attachQuickAnalysis', () => {
     handle.detach();
   });
 
+  it('switches visible Quick Analysis tab panels when a group tab is clicked', () => {
+    seed(store, wb, [
+      { row: 0, col: 0, value: 1 },
+      { row: 0, col: 1, value: 2 },
+      { row: 0, col: 2, value: 3 },
+    ]);
+    setRange(store, 0, 0, 0, 2);
+    const handle = attachQuickAnalysis({ host, store, wb, strings: defaultStrings });
+    handle.open();
+
+    const totalsTab = host.querySelector<HTMLButtonElement>('[role="tab"][data-group="totals"]');
+    totalsTab?.click();
+    const selectedTotalsTab = host.querySelector<HTMLButtonElement>(
+      '[role="tab"][data-group="totals"]',
+    );
+
+    expect(selectedTotalsTab?.getAttribute('aria-selected')).toBe('true');
+    expect(host.querySelector<HTMLElement>('#fc-quick-panel-formatting')?.hidden).toBe(true);
+    expect(host.querySelector<HTMLElement>('#fc-quick-panel-totals')?.hidden).toBe(false);
+    handle.detach();
+  });
+
+  it('Quick Analysis tabs support Excel-style arrow, Home, and End navigation', () => {
+    seed(store, wb, [
+      { row: 0, col: 0, value: 1 },
+      { row: 0, col: 1, value: 2 },
+      { row: 0, col: 2, value: 3 },
+    ]);
+    setRange(store, 0, 0, 0, 2);
+    const handle = attachQuickAnalysis({ host, store, wb, strings: defaultStrings });
+    handle.open();
+
+    const selected = () =>
+      host.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]');
+    selected()?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(selected()?.dataset.group).toBe('charts');
+
+    selected()?.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    expect(selected()?.dataset.group).toBe('sparklines');
+
+    selected()?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    expect(selected()?.dataset.group).toBe('formatting');
+    expect(document.activeElement).toBe(selected());
+    handle.detach();
+  });
+
   it('clicking format-data-bar invokes executeQuickAnalysisAction → adds a conditional rule', () => {
     seed(store, wb, [
       { row: 0, col: 0, value: 5 },
@@ -131,6 +228,44 @@ describe('attachQuickAnalysis', () => {
     const rules = store.getState().conditional.rules;
     expect(rules).toHaveLength(1);
     expect(rules[0]?.kind).toBe('data-bar');
+    handle.detach();
+  });
+
+  it('opens the PivotTable creation flow from the Tables group when available', () => {
+    seed(store, wb, [
+      { row: 0, col: 0, value: 'Region' },
+      { row: 0, col: 1, value: 'Sales' },
+      { row: 1, col: 0, value: 'East' },
+      { row: 1, col: 1, value: 12 },
+    ]);
+    Object.defineProperty(wb, 'capabilities', {
+      configurable: true,
+      value: { ...wb.capabilities, pivotTableMutate: true },
+    });
+    setRange(store, 0, 0, 1, 1);
+    let opened = 0;
+    const handle = attachQuickAnalysis({
+      host,
+      store,
+      wb,
+      strings: defaultStrings,
+      onOpenPivotTable: () => {
+        opened += 1;
+      },
+      canOpenPivotTable: () => true,
+    });
+    handle.open();
+
+    host.querySelector<HTMLButtonElement>('[role="tab"][data-group="tables"]')?.click();
+    const pivotBtn = host.querySelector<HTMLButtonElement>('button[data-action="tables-pivot"]');
+    expect(pivotBtn).not.toBeNull();
+    expect(pivotBtn?.disabled).toBe(false);
+    expect(pivotBtn?.textContent).toBe(defaultStrings.quickAnalysis.actions.pivotTable);
+
+    pivotBtn?.click();
+
+    expect(opened).toBe(1);
+    expect(host.querySelector<HTMLElement>('.fc-quick')?.hidden).toBe(true);
     handle.detach();
   });
 
@@ -171,6 +306,7 @@ describe('attachQuickAnalysis', () => {
     expect(host.querySelector('.fc-quick')).not.toBeNull();
     handle.detach();
     expect(host.querySelector('.fc-quick')).toBeNull();
+    expect(host.querySelector('.fc-quick__button')).toBeNull();
   });
 
   it('setStrings re-renders labels while open', () => {

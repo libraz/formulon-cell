@@ -150,6 +150,122 @@ const colToLetters = (col: number): string => {
   return s;
 };
 
+const R1C1_REF_RE = /R(?:\[(-?\d+)\]|([1-9]\d*))?C(?:\[(-?\d+)\]|([1-9]\d*))?/iy;
+
+const r1c1AtomToA1 = (
+  raw: string,
+  base: { row: number; col: number },
+): string => {
+  const m = /^R(?:\[(-?\d+)\]|([1-9]\d*))?C(?:\[(-?\d+)\]|([1-9]\d*))?$/i.exec(raw);
+  if (!m) return raw;
+  const row =
+    m[2] !== undefined
+      ? Number.parseInt(m[2], 10) - 1
+      : base.row + (m[1] !== undefined ? Number.parseInt(m[1], 10) : 0);
+  const col =
+    m[4] !== undefined
+      ? Number.parseInt(m[4], 10) - 1
+      : base.col + (m[3] !== undefined ? Number.parseInt(m[3], 10) : 0);
+  if (row < 0 || col < 0 || row > 1048575 || col > 16383) return '#REF!';
+  return `${colToLetters(col)}${row + 1}`;
+};
+
+/** Convert R1C1 references in a user-authored formula into A1 references for
+ *  the workbook engine. This keeps the public R1C1 editing surface while
+ *  preserving the existing A1 formula backend. */
+export function normalizeR1C1Formula(
+  formula: string,
+  base: { row: number; col: number },
+): string {
+  if (!formula.startsWith('=')) return formula;
+  let out = '';
+  let i = 0;
+  let inString = false;
+  while (i < formula.length) {
+    const ch = formula[i] ?? '';
+    if (ch === '"') {
+      inString = !inString;
+      out += ch;
+      i += 1;
+      continue;
+    }
+    if (!inString) {
+      const prev = i > 0 ? (formula[i - 1] ?? '') : '';
+      const prevIsIdent = /[A-Za-z0-9_]/.test(prev);
+      if (!prevIsIdent) {
+        R1C1_REF_RE.lastIndex = i;
+        const m = R1C1_REF_RE.exec(formula);
+        if (m && m.index === i) {
+          const raw = m[0];
+          const next = formula[i + raw.length] ?? '';
+          if (!/[A-Za-z0-9_\[]/.test(next)) {
+            out += r1c1AtomToA1(raw, base);
+            i += raw.length;
+            continue;
+          }
+        }
+      }
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
+
+const a1AtomToR1C1 = (
+  raw: string,
+  base: { row: number; col: number },
+): string => {
+  const m = /^(\$?)([A-Za-z]+)(\$?)(\d+)$/.exec(raw);
+  if (!m) return raw;
+  const colAbs = m[1] === '$';
+  const rowAbs = m[3] === '$';
+  const col = lettersToCol(m[2] ?? '');
+  const row = Number.parseInt(m[4] ?? '', 10) - 1;
+  if (row < 0 || col < 0 || row > 1048575 || col > 16383) return raw;
+  const r = rowAbs ? `R${row + 1}` : row === base.row ? 'R' : `R[${row - base.row}]`;
+  const c = colAbs ? `C${col + 1}` : col === base.col ? 'C' : `C[${col - base.col}]`;
+  return `${r}${c}`;
+};
+
+/** Format stored A1 formulas as R1C1 for formula-bar / inline-editor display.
+ *  The workbook still stores A1 formulas; this is a presentation transform. */
+export function formatA1FormulaAsR1C1(
+  formula: string,
+  base: { row: number; col: number },
+): string {
+  if (!formula.startsWith('=')) return formula;
+  let out = '';
+  let i = 0;
+  let inString = false;
+  const atomRe = /\$?[A-Za-z]+\$?\d+/y;
+  while (i < formula.length) {
+    const ch = formula[i] ?? '';
+    if (ch === '"') {
+      inString = !inString;
+      out += ch;
+      i += 1;
+      continue;
+    }
+    if (!inString) {
+      const prev = i > 0 ? (formula[i - 1] ?? '') : '';
+      const prevIsIdent = /[A-Za-z0-9_]/.test(prev);
+      if (!prevIsIdent) {
+        atomRe.lastIndex = i;
+        const m = atomRe.exec(formula);
+        if (m && m.index === i) {
+          out += a1AtomToR1C1(m[0], base);
+          i += m[0].length;
+          continue;
+        }
+      }
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
+
 /**
  * Shift every relative cell reference in `formula` by (dRow, dCol). Refs
  * locked with `$` on either axis stay put on that axis. Sheet-qualified refs
@@ -637,7 +753,18 @@ export function findActiveSignature(text: string, caret: number): ActiveSignatur
       depth -= 1;
     }
   }
-  if (openParenAt <= 0) return null;
+  if (openParenAt <= 0) {
+    // The caret may be sitting on the function NAME itself (before its `(`) —
+    // e.g. just after a double-click selected the name. Treat that as the
+    // first argument so the ScreenTip still shows.
+    const onName = functionNameRangeAt(text, caret);
+    if (onName) {
+      const name = text.slice(onName.start, onName.end).toUpperCase();
+      const args = FUNCTION_SIGNATURES[name];
+      if (args) return { name, args, activeArgIndex: 0 };
+    }
+    return null;
+  }
   const beforeParen = text.slice(0, openParenAt);
   const m = /([A-Za-z_][A-Za-z0-9_]*)$/.exec(beforeParen);
   if (!m) return null;
@@ -659,4 +786,99 @@ export function findActiveSignature(text: string, caret: number): ActiveSignatur
     else if (ch === ',' && d2 === 0) activeArgIndex += 1;
   }
   return { name, args, activeArgIndex };
+}
+
+const isNameChar = (c: string | undefined): boolean => c != null && /[A-Za-z0-9_.]/.test(c);
+
+/** When `pos` sits on (or directly after) an identifier that is followed by
+ *  `(` — i.e. a function name — return that identifier's `[start, end)`
+ *  range. Returns null otherwise. */
+function functionNameRangeAt(formula: string, pos: number): FormulaSelectionRange | null {
+  let start = pos;
+  let end = pos;
+  while (start > 0 && isNameChar(formula[start - 1])) start -= 1;
+  while (end < formula.length && isNameChar(formula[end])) end += 1;
+  if (end <= start) return null;
+  // A function name starts with a letter or underscore (not a digit/dot).
+  if (!/[A-Za-z_]/.test(formula[start] ?? '')) return null;
+  let k = end;
+  while (k < formula.length && formula[k] === ' ') k += 1;
+  if (formula[k] !== '(') return null;
+  return { start, end };
+}
+
+const trimmedRange = (
+  formula: string,
+  rawStart: number,
+  rawEnd: number,
+): FormulaSelectionRange | null => {
+  let start = rawStart;
+  let end = rawEnd;
+  while (start < end && formula[start] === ' ') start += 1;
+  while (end > start && formula[end - 1] === ' ') end -= 1;
+  return start < end ? { start, end } : null;
+};
+
+/** A `[start, end)` slice of a formula string. */
+export interface FormulaSelectionRange {
+  start: number;
+  end: number;
+}
+
+/**
+ * Resolve the selection range for a double-click inside a formula editor at
+ * probe offset `probe`:
+ *  - the function-name identifier when the probe sits on a name followed by
+ *    `(`;
+ *  - otherwise the enclosing call argument (comma/paren-delimited at its own
+ *    nesting depth, trimmed of surrounding whitespace) — so a range like
+ *    `F4:F8` is selected as a whole rather than split at the colon;
+ *  - null when the probe is at the top level, so the caller can fall back to
+ *    the browser's native word selection.
+ */
+export function dblClickRange(formula: string, probe: number): FormulaSelectionRange | null {
+  const n = formula.length;
+  if (n === 0) return null;
+  const p = Math.max(0, Math.min(probe, n));
+
+  const fnName = functionNameRangeAt(formula, p);
+  if (fnName) return fnName;
+
+  // Single forward pass — tracks string state so quoted commas/parens inside
+  // string arguments don't confuse the segment boundaries.
+  let inString = false;
+  const stack: { sep: number }[] = [];
+  let probeDepth = -1;
+  let probeSep = -1;
+  for (let i = 0; i <= n; i += 1) {
+    if (i === p) {
+      if (stack.length === 0) return null; // top level
+      probeDepth = stack.length;
+      probeSep = stack[stack.length - 1]?.sep ?? -1;
+    }
+    if (i === n) break;
+    const ch = formula[i];
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === '(') {
+      stack.push({ sep: i });
+    } else if (ch === ')') {
+      if (probeDepth >= 0 && stack.length === probeDepth) {
+        return trimmedRange(formula, probeSep + 1, i);
+      }
+      stack.pop();
+    } else if (ch === ',') {
+      if (probeDepth >= 0 && stack.length === probeDepth) {
+        return trimmedRange(formula, probeSep + 1, i);
+      }
+      const top = stack[stack.length - 1];
+      if (top) top.sep = i;
+    }
+  }
+  // Unclosed enclosing paren — extend the argument to the end of the formula.
+  if (probeDepth >= 0) return trimmedRange(formula, probeSep + 1, n);
+  return null;
 }

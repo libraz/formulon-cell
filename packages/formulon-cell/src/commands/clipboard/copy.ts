@@ -3,7 +3,9 @@ import type { State } from '../../store/store.js';
 import { encodeTSV } from './tsv.js';
 
 export interface CopyResult {
-  /** TSV payload — values only; formulas resolve to their displayed text. */
+  /** TSV payload. Formula cells emit their formula text verbatim (`=...`) so
+   *  a paste into Excel / Sheets reconstructs the formula; plain cells emit
+   *  their value. */
   tsv: string;
   /** The range that was copied. */
   range: Range;
@@ -15,9 +17,10 @@ export interface CopyResult {
 }
 
 /**
- * Snapshot the current selection into a TSV payload. Values come from the
- * store's cached cell map (no engine reads) — for formula cells this means
- * the last computed value, matching the spreadsheet's "values only" copy semantic.
+ * Snapshot the current selection into a TSV payload. Cells come from the
+ * store's cached cell map (no engine reads). Formula cells emit their formula
+ * text verbatim so a paste into Excel / Sheets rebuilds the formula; plain
+ * cells emit their cached value.
  */
 export function copy(state: State): CopyResult | null {
   const normalized = normalizedCopyRanges(state);
@@ -118,6 +121,10 @@ function sameRange(a: Range | undefined, b: Range | undefined): boolean {
 function displayValue(state: State, sheet: number, row: number, col: number): string {
   const cell = state.data.cells.get(`${sheet}:${row}:${col}`);
   if (!cell) return '';
+  // Formula cells emit the formula text (already `=`-prefixed) so a paste
+  //  into Excel / Sheets reconstructs the formula instead of freezing the
+  //  last computed value.
+  if (cell.formula != null) return cell.formula;
   switch (cell.value.kind) {
     case 'number':
       return String(cell.value.value);

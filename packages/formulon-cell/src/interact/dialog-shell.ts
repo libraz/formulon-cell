@@ -196,6 +196,9 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
       if (disposed) return;
       enhanceSelects(panel);
       syncCustomSelects(panel);
+      // Re-snapshot host theme tokens so paper↔ink swaps applied since the
+      // shell was constructed are reflected on this open.
+      inheritHostTokens(host, overlay);
       if (!overlay.contains(document.activeElement)) {
         restoreFocusEl =
           document.activeElement instanceof HTMLElement ? document.activeElement : host;

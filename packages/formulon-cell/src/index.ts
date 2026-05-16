@@ -14,9 +14,21 @@ export {
   statusAggregateValue,
   visibleStatusAggregates,
 } from './commands/aggregate.js';
-export { autoSum } from './commands/auto-sum.js';
-export type { CellStyleDef, CellStyleId } from './commands/cell-styles.js';
-export { applyCellStyle, CELL_STYLES, getCellStyle } from './commands/cell-styles.js';
+export { type AutoSumFunction, autoSum } from './commands/auto-sum.js';
+export type { DeleteCellsDirection, InsertCellsDirection } from './commands/cell-shift.js';
+export { deleteCells, insertCells } from './commands/cell-shift.js';
+export type {
+  CellStyleDef,
+  CellStyleGroupDef,
+  CellStyleGroupId,
+  CellStyleId,
+} from './commands/cell-styles.js';
+export {
+  applyCellStyle,
+  CELL_STYLE_GROUPS,
+  CELL_STYLES,
+  getCellStyle,
+} from './commands/cell-styles.js';
 export type { CopyResult } from './commands/clipboard/copy.js';
 export { copy } from './commands/clipboard/copy.js';
 export type { CSVEncodeOptions } from './commands/clipboard/csv.js';
@@ -43,17 +55,26 @@ export type {
 } from './commands/clipboard/snapshot.js';
 export { captureSnapshot } from './commands/clipboard/snapshot.js';
 export { encodeTSV, parseTSV } from './commands/clipboard/tsv.js';
-export type { CoercedInput } from './commands/coerce-input.js';
+export type { CoercedInput, CoerceInputOptions } from './commands/coerce-input.js';
 export {
   coerceInput,
+  coerceInputForCell,
   writeCoerced,
   writeInput,
   writeInputValidated,
 } from './commands/coerce-input.js';
 export type { CommentEntry } from './commands/comment.js';
-export { clearComment, commentAt, listComments, setComment } from './commands/comment.js';
+export {
+  clearComment,
+  commentAt,
+  listComments,
+  recordCommentChange,
+  setComment,
+} from './commands/comment.js';
+export type { ConditionalPresetAction } from './commands/conditional-format.js';
 export {
   addConditionalRule,
+  applyConditionalPresetAction,
   clearConditionalRules,
   clearConditionalRulesInRange,
   conditionalRulesForRange,
@@ -61,10 +82,18 @@ export {
   removeConditionalRuleAt,
 } from './commands/conditional-format.js';
 export {
+  cellValueIsFormulaError,
+  circleInvalidValidationData,
+  circleInvalidValidationDataInSheet,
   clearIgnoredCellErrors,
+  clearValidationCircles,
+  formulaErrorCellsInRange,
   ignoreCellError,
   isCellErrorIgnored,
+  recordIgnoredErrorsChange,
+  recordValidationCirclesChange,
   restoreCellErrorIndicator,
+  selectNextFormulaError,
   toggleCellErrorIgnored,
 } from './commands/error-indicators.js';
 export type {
@@ -75,8 +104,27 @@ export type {
 export { listExternalLinks, summarizeExternalLinks } from './commands/external-links.js';
 export type { FillOptions } from './commands/fill.js';
 export { fillDestFor, fillRange } from './commands/fill.js';
-export type { FilterPredicate } from './commands/filter.js';
-export { applyFilter, clearFilter, distinctValues, setAutoFilter } from './commands/filter.js';
+export type {
+  AdvancedFilterCopyOptions,
+  ConditionFilterOp,
+  ConditionFilterOptions,
+  FilterPredicate,
+} from './commands/filter.js';
+export {
+  applyAdvancedFilter,
+  applyConditionFilter,
+  applyFilter,
+  applyValueFilter,
+  clearFilter,
+  copyAdvancedFilterResult,
+  distinctValues,
+  filterBySelectedCellValue,
+  filterValueKey,
+  inferAutoFilterRange,
+  reapplyFilters,
+  recordFilterChange,
+  setAutoFilter,
+} from './commands/filter.js';
 export type { FindMatch, FindOptions } from './commands/find.js';
 export {
   applySubstitution,
@@ -85,11 +133,18 @@ export {
   replaceAll,
   replaceOne,
 } from './commands/find.js';
+export type { FlashFillExample, FlashFillPattern } from './commands/flash-fill.js';
+export {
+  applyFlashFill,
+  applyFlashFillPattern,
+  inferFlashFillPattern,
+} from './commands/flash-fill.js';
 export type { BorderPreset } from './commands/format.js';
 export {
   bumpDecimals,
   bumpIndent,
   clearFormat,
+  clearVisualFormat,
   cycleBorders,
   cycleCurrency,
   cyclePercent,
@@ -114,44 +169,62 @@ export type {
   TableOverlay,
   TableOverlayPatch,
   TableStyle,
+  TableStyleSwatch,
 } from './commands/format-as-table.js';
 export {
   clearTable,
   clearTablesInRange,
+  DEFAULT_TABLE_COLOR,
   defaultTableOverlay,
   engineTableOverlays,
   formatAsTable,
   isBandedRow,
+  isFirstCol,
   isHeaderRow,
+  isLastCol,
   isTotalRow,
   listTableOverlays,
   removeTable,
   sessionTableOverlays,
+  TABLE_STYLE_COLORS,
   tableForCell,
   tableOverlayAt,
   tableOverlayById,
+  tableStyleSwatch,
   updateTableOverlay,
   upsertTable,
 } from './commands/format-as-table.js';
-export type { GoToScope, GoToSpecialKind } from './commands/goto-special.js';
-export { boundingRange, findMatchingCells } from './commands/goto-special.js';
+export type {
+  GoToScope,
+  GoToSpecialKind,
+  GoToSpecialValueFilters,
+} from './commands/goto-special.js';
+export { boundingRange, findMatchingCells, selectionFromMatches } from './commands/goto-special.js';
 export type { HistoryEntry, LayoutSnapshot, MergesSnapshot } from './commands/history.js';
 export {
+  applyChartsSnapshot,
+  applyConditionalRulesSnapshot,
   applyFormatSnapshot,
   applyLayoutSnapshot,
   applyMergesSnapshot,
   applyPageSetupSnapshot,
   applySlicersSnapshot,
   applySparklineSnapshot,
+  applyTableOverlaysSnapshot,
   canRedo,
   canUndo,
+  captureChartsSnapshot,
+  captureConditionalRulesSnapshot,
   captureFormatSnapshot,
   captureLayoutSnapshot,
   captureMergesSnapshot,
   capturePageSetupSnapshot,
   captureSlicersSnapshot,
   captureSparklineSnapshot,
+  captureTableOverlaysSnapshot,
   History,
+  recordChartsChange,
+  recordConditionalRulesChange,
   recordFormatChange,
   recordLayoutChange,
   recordMergesChange,
@@ -159,6 +232,7 @@ export {
   recordPageSetupChange,
   recordSlicersChange,
   recordSparklineChange,
+  recordTablesChange,
   redo,
   undo,
 } from './commands/history.js';
@@ -181,13 +255,17 @@ export {
   stepWithMerge,
 } from './commands/merge.js';
 export type {
+  CreateDefinedNamesSource,
   DefinedNameDeleteResult,
   DefinedNameEntry,
   DefinedNameMutationResult,
 } from './commands/named-ranges.js';
 export {
+  createDefinedNamesFromSelection,
   deleteDefinedName,
+  insertDefinedNameFormula,
   listDefinedNames,
+  recordDefinedNamesChange,
   upsertDefinedName,
 } from './commands/named-ranges.js';
 export {
@@ -206,18 +284,32 @@ export {
   ungroupCols,
   ungroupRows,
 } from './commands/outline.js';
-export type { MarginPreset, PageSetupEntry, PageSetupPatch } from './commands/page-setup.js';
+export type {
+  MarginPreset,
+  PageBreakAxis,
+  PageSetupEntry,
+  PageSetupPatch,
+} from './commands/page-setup.js';
 export {
+  clearPrintArea,
   clearPrintTitles,
+  insertManualPageBreak,
   listPageSetups,
   marginPresetOf,
   marginPresetValues,
   pageSetupForSheet,
+  removeManualPageBreak,
+  resetManualPageBreaks,
   resetPageSetup,
+  setFitToPages,
   setMarginPreset,
   setPageOrientation,
+  setPageScale,
   setPageSetup,
   setPaperSize,
+  setPrintArea,
+  setPrintGridlines,
+  setPrintHeadings,
   setPrintTitleCols,
   setPrintTitleRows,
   togglePageOrientation,
@@ -232,21 +324,35 @@ export type { PrintDocument } from './commands/print.js';
 export {
   buildPrintDocument,
   colLetter,
+  parsePrintArea,
   parsePrintTitleCols,
   parsePrintTitleRows,
   printSheet,
 } from './commands/print.js';
-export type { SheetProtectionOptions } from './commands/protection.js';
+export type {
+  AllowedEditRangeOptions,
+  SheetProtectionOptions,
+  WorkbookStructureProtectionOptions,
+} from './commands/protection.js';
 export {
+  addAllowedEditRange,
+  allowedEditRangesForSheet,
+  clearAllowedEditRanges,
   gateProtection,
+  isAddrInAllowedEditRange,
   isCellLocked,
   isCellWritable,
   isSheetProtected,
+  isWorkbookStructureProtected,
   protectedSheetPassword,
+  recordProtectionChange,
   setCellLocked,
   setProtectedSheet,
+  setWorkbookStructureProtected,
   toggleProtectedSheet,
+  toggleWorkbookStructureProtected,
   warnProtected,
+  workbookStructurePassword,
   writableAddrs,
 } from './commands/protection.js';
 export type {
@@ -291,6 +397,7 @@ export {
   updateSessionChart,
 } from './commands/session-chart.js';
 export {
+  addSheet,
   moveSheet,
   removeSheet,
   renameSheet,
@@ -309,6 +416,7 @@ export {
   captureSheetView,
   deleteSheetView,
   findSheetView,
+  recordSheetViewsChange,
   removeSheetView,
   saveSheetView,
   upsertSheetView,
@@ -327,7 +435,7 @@ export {
   updateSlicer,
 } from './commands/slicers.js';
 export type { SortDirection, SortOptions } from './commands/sort.js';
-export { removeDuplicates, sortRange } from './commands/sort.js';
+export { inferSortHasHeader, removeDuplicates, sortRange } from './commands/sort.js';
 export type { SparklineEntry } from './commands/sparkline.js';
 export {
   clearSparkline,
@@ -337,6 +445,8 @@ export {
   sparklineAt,
 } from './commands/sparkline.js';
 export {
+  autofitColsWidth,
+  autofitRowsHeight,
   deleteCols,
   deleteRows,
   hiddenInSelection,
@@ -344,26 +454,41 @@ export {
   hideRows,
   insertCols,
   insertRows,
+  setColsWidth,
   setFreezePanes,
+  setRowsHeight,
   setSheetZoom,
   showCols,
+  showColsAroundSelection,
   showRows,
+  showRowsAroundSelection,
 } from './commands/structure.js';
+export { applyTextScriptToRange } from './commands/text-script.js';
 export { textToColumns } from './commands/text-to-columns.js';
 export {
   addTraceArrow,
   clearTraceArrows,
+  clearTraceArrowsByKind,
+  recordTraceChange,
   traceDependents,
   tracePrecedents,
 } from './commands/traces.js';
 export type { ValidationOutcome } from './commands/validate.js';
-export { resolveListValues, validateAgainst } from './commands/validate.js';
 export {
+  clearValidationInRange,
+  clearValidationInRangeWithEngine,
+  resolveListValues,
+  validateAgainst,
+} from './commands/validate.js';
+export {
+  clearSheetBackgroundImage,
   setGridlinesVisible,
   setHeadingsVisible,
   setR1C1ReferenceStyle,
+  setSheetBackgroundImage,
   setShowFormulas,
   setStatusAggregates,
+  setWorkbookView,
   setZoomPercent,
   setZoomScale,
   toggleStatusAggregate,
@@ -371,11 +496,27 @@ export {
 export {
   clearWatchedCells,
   isWatched,
+  recordWatchesChange,
   setWatchWindowOpen,
   toggleWatchCell,
   unwatchCell,
   watchCell,
+  watchRange,
+  watchRanges,
 } from './commands/watch.js';
+export type {
+  AutomaticColorOption,
+  ColorPaletteHandle,
+  ColorPaletteOptions,
+  ThemeColorColumn,
+} from './components/color-palette.js';
+export {
+  createColorPalette,
+  normalizeHex,
+  PALETTE_COLUMNS,
+  STANDARD_COLORS,
+  THEME_COLOR_COLUMNS,
+} from './components/color-palette.js';
 export type { NamedCellStyle } from './engine/cell-styles-meta.js';
 export { computeNamedCellStyles } from './engine/cell-styles-meta.js';
 export type {
@@ -452,6 +593,8 @@ export {
 export { formatCell, fromEngineValue } from './engine/value.js';
 export type { ChangeEvent, ChangeListener } from './engine/workbook-handle.js';
 export { WorkbookHandle } from './engine/workbook-handle.js';
+export type { WorkbookHandleFeatureMethods } from './engine/workbook-handle-features.js';
+export type { WorkbookHandlePivotMethods } from './engine/workbook-handle-pivot.js';
 // Public event surface — adapter packages and direct consumers wire to
 // these via `inst.on(...)`.
 export type {
@@ -521,7 +664,14 @@ export { FormulaRegistry } from './formula.js';
 export type { I18nControllerInit } from './i18n/controller.js';
 export { createI18nController } from './i18n/controller.js';
 export type { DeepPartial, Locale, Strings } from './i18n/strings.js';
-export { defaultStrings, dictionaries, en, ja, mergeStrings } from './i18n/strings.js';
+export {
+  defaultStrings,
+  dictionaries,
+  dictionaryLocaleFor,
+  en,
+  ja,
+  mergeStrings,
+} from './i18n/strings.js';
 export type { ArgHelperDeps, ArgHelperHandle, ArgHelperLabels } from './interact/arg-helper.js';
 export { attachArgHelper } from './interact/arg-helper.js';
 export type {
@@ -549,6 +699,7 @@ export { attachClipboard } from './interact/clipboard.js';
 export type {
   ConditionalDialogDeps,
   ConditionalDialogHandle,
+  ConditionalDialogOpenOptions,
 } from './interact/conditional-dialog.js';
 export { attachConditionalDialog } from './interact/conditional-dialog.js';
 export type { ContextMenuDeps } from './interact/context-menu.js';
@@ -603,8 +754,21 @@ export type { SlicerDeps, SlicerHandle } from './interact/slicer.js';
 export { attachSlicer } from './interact/slicer.js';
 export type { StatusBarDeps, StatusBarHandle } from './interact/status-bar.js';
 export { attachStatusBar } from './interact/status-bar.js';
-export type { ValidationListDeps, ValidationListHandle } from './interact/validation.js';
-export { attachValidationList } from './interact/validation.js';
+export type {
+  ValidationAlertDeps,
+  ValidationAlertHandle,
+  ValidationAlertLabels,
+  ValidationAlertMessage,
+  ValidationListDeps,
+  ValidationListHandle,
+  ValidationPromptDeps,
+  ValidationPromptHandle,
+} from './interact/validation.js';
+export {
+  attachValidationAlert,
+  attachValidationList,
+  attachValidationPrompt,
+} from './interact/validation.js';
 export type { ViewToolbarDeps, ViewToolbarHandle } from './interact/view-toolbar.js';
 export { attachViewToolbar } from './interact/view-toolbar.js';
 export type { WatchPanelDeps, WatchPanelHandle } from './interact/watch-panel.js';
@@ -635,6 +799,7 @@ export type {
   ChartsSlice,
   ConditionalIconSet,
   ConditionalRule,
+  ConditionalScalePoint,
   ConditionalSlice,
   ErrorIndicatorSlice,
   FormatSlice,
@@ -664,29 +829,54 @@ export type {
   ValidationMeta,
   ValidationOp,
   WatchSlice,
+  WorkbookViewMode,
 } from './store/store.js';
 export { createSpreadsheetStore, defaultPageSetup, getPageSetup, mutators } from './store/store.js';
 export type { ResolvedTheme } from './theme/resolve.js';
 export { resolveTheme } from './theme/resolve.js';
 export type { FluentIconName } from './toolbar/fluent-icons.js';
 export { FLUENT_ICON_PATHS, fluentIconPaths } from './toolbar/fluent-icons.js';
+export type { IconName } from './toolbar/icon-paths.js';
+export { ICON_PATHS } from './toolbar/icon-paths.js';
+export {
+  type BackstageMenuText,
+  backstageMenuText,
+  type ConditionalMenuText,
+  conditionalMenuText,
+  type PageScaleMenuText,
+  pageScaleMenuText,
+  type RibbonDisplayText,
+  ribbonDisplayText,
+  type ToolbarMenuText,
+  toolbarMenuText,
+  type ViewToggleMenuText,
+  viewToggleMenuText,
+} from './toolbar/menu-text.js';
+export type { NumberFormatAction } from './toolbar/number-format.js';
+export { numberFormatForAction } from './toolbar/number-format.js';
 export type {
   ReviewCell,
   ReviewCellValue,
   RibbonReportItem,
+  RibbonReportLang,
   ScriptCommand,
 } from './toolbar/review-tools.js';
 export {
   analyzeAccessibilityCells,
   analyzeSpellingCells,
   applyTextScript,
+  buildTranslationReviewItems,
+  formatRibbonReport,
   parseScriptCommand,
+  reviewCellsFromState,
 } from './toolbar/review-tools.js';
 export type { ActiveState } from './toolbar/ribbon-active-state.js';
 export {
   BORDER_PRESETS,
   BORDER_STYLES,
   EMPTY_ACTIVE_STATE,
+  localizeBorderPresets,
+  localizeBorderStyles,
   projectActiveState,
 } from './toolbar/ribbon-active-state.js';
 export type {
@@ -704,5 +894,103 @@ export {
   FONT_SIZES,
   RIBBON_KEYSHORTCUTS,
   RIBBON_TAB_LABELS,
+  RIBBON_TABS,
+  ribbonTabLabel,
   toolbarText,
 } from './toolbar/ribbon-model.js';
+export type {
+  ConditionalIconSetAction,
+  ToolbarInsertSymbol,
+} from './wrappers/conditional-menu-labels.js';
+export {
+  conditionalColorScaleLabel,
+  conditionalColorScaleSwatchColors,
+  conditionalDataBarLabel,
+  conditionalDataBarSwatchColor,
+  conditionalIconSetLabel,
+  TOOLBAR_INSERT_SYMBOLS,
+} from './wrappers/conditional-menu-labels.js';
+export { cellLabel, formatA1Range, parseA1Atom, parseA1Range } from './wrappers/toolbar-a1.js';
+export type {
+  AutoSumAction,
+  CellDeleteAction,
+  CellInsertAction,
+  ConditionalMenuAction,
+  FreezeAction,
+  MergeAction,
+  PasteAction,
+  WindowAction,
+} from './wrappers/toolbar-actions.js';
+export {
+  deleteSelectedCols,
+  deleteSelectedRows,
+  dispatchHostClipboard,
+  handleAutoSum,
+  handleAutoSumAction,
+  handleConditionalAction,
+  handleDeleteCellsAction,
+  handleFreezeAction,
+  handleInsertCellsAction,
+  handleMergeAction,
+  handlePasteAction,
+  handleWindowAction,
+  insertSelectedCols,
+  insertSelectedRows,
+  toggleSelectedColsHidden,
+  toggleSelectedRowsHidden,
+} from './wrappers/toolbar-actions.js';
+export type {
+  AddInAction,
+  AdvancedFilterDialogDraft,
+  AutomationRunDraft,
+  CalculationAction,
+  CellFormatAction,
+  CellStyleAction,
+  ChartAction,
+  ClearAction,
+  ClearArrowsAction,
+  CommentAction,
+  DataValidationAction,
+  DefinedNameAction,
+  DimensionDialogDraft,
+  FillAction,
+  FilterDataAction,
+  FindAction,
+  FormatTableAction,
+  FormulaAuditingAction,
+  FunctionAction,
+  HyperlinkAction,
+  OutlineAxisAction,
+  PageBreakAction,
+  PdfAction,
+  PictureAction,
+  PivotTableAction,
+  PrintAreaAction,
+  PrintTitleAction,
+  ProtectionAction,
+  RemoveDuplicatesDialogDraft,
+  RibbonReportDialogDraft,
+  ScreenshotAction,
+  ScriptDialogDraft,
+  ShapeAction,
+  SheetBackgroundAction,
+  SheetCell,
+  SheetCellFor,
+  SheetRange,
+  SheetRangeFor,
+  SheetRenameDialogDraft,
+  SortAction,
+  SortDialogDraft,
+  SymbolAction,
+  TextOrientationAction,
+  TextToColumnsAction,
+  TextToColumnsDialogDraft,
+  ThemeAction,
+  WatchAction,
+} from './wrappers/toolbar-types.js';
+export {
+  CELL_STYLE_SECTION_ACTION_PREFIX,
+  MORE_SYMBOL_ACTION,
+  SHEET_TAB_COLOR_ACTIONS,
+  TEXT_TO_COLUMNS_DIALOG_KEYS,
+} from './wrappers/toolbar-types.js';

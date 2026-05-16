@@ -13,7 +13,11 @@ export interface SessionChartLabels {
   close: string;
   resize: string;
   columnChart: string;
+  barChart: string;
   lineChart: string;
+  areaChart: string;
+  pieChart: string;
+  scatterChart: string;
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -25,7 +29,21 @@ const DEFAULT_LABELS: SessionChartLabels = {
   close: 'Close',
   resize: 'Resize chart',
   columnChart: 'Column chart',
+  barChart: 'Bar chart',
   lineChart: 'Line chart',
+  areaChart: 'Area chart',
+  pieChart: 'Pie chart',
+  scatterChart: 'Scatter chart',
+};
+
+const chartLabel = (chart: SessionChart, labels: SessionChartLabels): string => {
+  if (chart.title) return chart.title;
+  if (chart.kind === 'bar') return labels.barChart;
+  if (chart.kind === 'line') return labels.lineChart;
+  if (chart.kind === 'area') return labels.areaChart;
+  if (chart.kind === 'pie') return labels.pieChart;
+  if (chart.kind === 'scatter') return labels.scatterChart;
+  return labels.columnChart;
 };
 
 function appendSvg<K extends keyof SVGElementTagNameMap>(
@@ -69,16 +87,56 @@ function renderChartSvg(
   });
 
   const color = chart.color ?? '#0f6cbd';
-  if (chart.kind === 'line') {
-    const points = series.map((s, i) => `${xFor(i)},${yFor(s.value)}`).join(' ');
-    appendSvg(svg, 'polyline', {
-      points,
-      fill: 'none',
-      stroke: color,
-      'stroke-width': 2.5,
-      'stroke-linejoin': 'round',
-      'stroke-linecap': 'round',
+  if (chart.kind === 'pie') {
+    const total = series.reduce((sum, point) => sum + Math.max(0, point.value), 0);
+    const cx = w / 2;
+    const cy = h / 2;
+    const r = Math.min(w, h) / 2 - pad;
+    if (total <= 0) {
+      appendSvg(svg, 'circle', { cx, cy, r, fill: '#d9d9d9' });
+      return;
+    }
+    let start = -Math.PI / 2;
+    series.forEach((point, index) => {
+      const value = Math.max(0, point.value);
+      const end = start + (value / total) * Math.PI * 2;
+      const x1 = cx + Math.cos(start) * r;
+      const y1 = cy + Math.sin(start) * r;
+      const x2 = cx + Math.cos(end) * r;
+      const y2 = cy + Math.sin(end) * r;
+      const large = end - start > Math.PI ? 1 : 0;
+      appendSvg(svg, 'path', {
+        d: `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`,
+        fill: chart.color ?? `hsl(${(index * 57) % 360} 64% 48%)`,
+        stroke: 'Canvas',
+        'stroke-width': 1,
+      });
+      start = end;
     });
+    return;
+  }
+
+  if (chart.kind === 'line' || chart.kind === 'area' || chart.kind === 'scatter') {
+    if (chart.kind === 'area') {
+      const points = series.map((s, i) => `${xFor(i)},${yFor(s.value)}`).join(' ');
+      const area = `${pad},${zeroY} ${points} ${w - pad},${zeroY}`;
+      appendSvg(svg, 'polygon', {
+        points: area,
+        fill: color,
+        'fill-opacity': 0.2,
+      });
+    }
+    const points = series.map((s, i) => `${xFor(i)},${yFor(s.value)}`).join(' ');
+    if (chart.kind !== 'scatter') {
+      appendSvg(svg, 'polyline', {
+        points,
+        fill: 'none',
+        stroke: color,
+        'stroke-width': 2.5,
+        'stroke-linejoin': 'round',
+        'stroke-linecap': 'round',
+      });
+    }
     for (let i = 0; i < series.length; i += 1) {
       appendSvg(svg, 'circle', { cx: xFor(i), cy: yFor(series[i]?.value ?? 0), r: 3, fill: color });
     }
@@ -90,14 +148,28 @@ function renderChartSvg(
   for (let i = 0; i < series.length; i += 1) {
     const v = series[i]?.value ?? 0;
     const y = yFor(v);
-    appendSvg(svg, 'rect', {
-      x: pad + i * slot + (slot - bw) / 2,
-      y: Math.min(y, zeroY),
-      width: bw,
-      height: Math.max(1, Math.abs(zeroY - y)),
-      rx: 2,
-      fill: v < 0 ? '#d13438' : color,
-    });
+    if (chart.kind === 'bar') {
+      const barY = pad + i * slot + (slot - bw) / 2;
+      const zeroX = pad + ((0 - min) / span) * (w - pad * 2);
+      const x = pad + ((v - min) / span) * (w - pad * 2);
+      appendSvg(svg, 'rect', {
+        x: Math.min(x, zeroX),
+        y: barY,
+        width: Math.max(1, Math.abs(zeroX - x)),
+        height: bw,
+        rx: 2,
+        fill: v < 0 ? '#d13438' : color,
+      });
+    } else {
+      appendSvg(svg, 'rect', {
+        x: pad + i * slot + (slot - bw) / 2,
+        y: Math.min(y, zeroY),
+        width: bw,
+        height: Math.max(1, Math.abs(zeroY - y)),
+        rx: 2,
+        fill: v < 0 ? '#d13438' : color,
+      });
+    }
   }
 }
 
@@ -226,7 +298,7 @@ export function attachSessionCharts(deps: {
         );
         panel.setAttribute(
           'aria-label',
-          chart.title ?? (chart.kind === 'line' ? labels.lineChart : labels.columnChart),
+          chartLabel(chart, labels),
         );
         panel.style.left = `${chart.x ?? 320 + idx * 24}px`;
         panel.style.top = `${chart.y ?? 72 + idx * 24}px`;
@@ -249,8 +321,7 @@ export function attachSessionCharts(deps: {
         });
         const title = document.createElement('div');
         title.className = 'fc-chart__title';
-        title.textContent =
-          chart.title ?? (chart.kind === 'line' ? labels.lineChart : labels.columnChart);
+        title.textContent = chartLabel(chart, labels);
         const close = document.createElement('button');
         close.type = 'button';
         close.className = 'fc-chart__close';

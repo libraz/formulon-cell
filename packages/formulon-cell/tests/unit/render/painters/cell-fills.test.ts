@@ -11,7 +11,9 @@ import type { ResolvedTheme } from '../../../../src/theme/resolve.js';
 
 function makeFillSpy() {
   const rects: { style: string; rect: [number, number, number, number] }[] = [];
+  const strokes: string[] = [];
   let fillStyle = '';
+  let strokeStyle = '';
   const ctx = {
     get fillStyle() {
       return fillStyle;
@@ -34,12 +36,16 @@ function makeFillSpy() {
     fill() {
       rects.push({ style: fillStyle, rect: [0, 0, 0, 0] });
     },
-    stroke() {},
+    stroke() {
+      strokes.push(strokeStyle);
+    },
     setLineDash() {},
-    set strokeStyle(_v: string) {},
+    set strokeStyle(v: string) {
+      strokeStyle = v;
+    },
     set lineWidth(_v: number) {},
   } as unknown as CanvasRenderingContext2D;
-  return { ctx, rects };
+  return { ctx, rects, strokes };
 }
 
 const theme = {
@@ -101,6 +107,18 @@ describe('render/painters — paintCellFill', () => {
     expect(spy.rects[0]?.style).toBe('#ffe0b0');
   });
 
+  it('paints fill patterns over the background fill', () => {
+    const spy = makeFillSpy();
+    paintCellFill({
+      ...makeCtx({
+        format: { fill: '#ffeecc', fillPattern: 'horizontal', fillPatternColor: '#336699' },
+      }),
+      ctx: spy.ctx,
+    });
+    expect(spy.rects[0]?.style).toBe('#ffeecc');
+    expect(spy.strokes).toContain('#336699');
+  });
+
   it('no-ops when format.fill is missing', () => {
     const spy = makeFillSpy();
     paintCellFill({ ...makeCtx({ format: {} }), ctx: spy.ctx });
@@ -142,5 +160,13 @@ describe('render/painters — paintConditionalIcon', () => {
     expect(() =>
       paintConditionalIcon(spy.ctx, { x: 0, y: 0, w: 20, h: 20 }, 'traffic3', 99),
     ).not.toThrow();
+  });
+
+  it('paints expanded icon families without external assets', () => {
+    for (const kind of ['triangles3', 'symbols3', 'flags3', 'quarters5', 'bars5', 'boxes5'] as const) {
+      const spy = makeFillSpy();
+      paintConditionalIcon(spy.ctx, { x: 0, y: 0, w: 20, h: 20 }, kind, 1);
+      expect(spy.rects.length).toBeGreaterThan(0);
+    }
   });
 });

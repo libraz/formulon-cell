@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { History } from '../../../src/commands/history.js';
 import {
   addTraceArrow,
   clearTraceArrows,
+  clearTraceArrowsByKind,
   traceDependents,
   tracePrecedents,
 } from '../../../src/commands/traces.js';
@@ -63,5 +65,55 @@ describe('trace commands', () => {
     clearTraceArrows(store);
 
     expect(store.getState().traces.items).toEqual([]);
+  });
+
+  it('records trace changes as undoable visual state', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    const a1 = { sheet: 0, row: 0, col: 0 };
+    const b1 = { sheet: 0, row: 0, col: 1 };
+    const workbook = wbWithEngine(new Map([[key(b1), [a1]]]), new Map());
+
+    expect(tracePrecedents(store, workbook, b1, history)).toBe(1);
+    expect(store.getState().traces.items).toEqual([{ kind: 'precedent', from: a1, to: b1 }]);
+
+    expect(history.undo()).toBe(true);
+    expect(store.getState().traces.items).toEqual([]);
+
+    expect(history.redo()).toBe(true);
+    expect(store.getState().traces.items).toEqual([{ kind: 'precedent', from: a1, to: b1 }]);
+  });
+
+  it('records clear arrows as one undoable visual command', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    const a1 = { sheet: 0, row: 0, col: 0 };
+    const b1 = { sheet: 0, row: 0, col: 1 };
+    addTraceArrow(store, { kind: 'dependent', from: a1, to: b1 });
+
+    clearTraceArrows(store, history);
+    expect(store.getState().traces.items).toEqual([]);
+
+    expect(history.undo()).toBe(true);
+    expect(store.getState().traces.items).toEqual([{ kind: 'dependent', from: a1, to: b1 }]);
+  });
+
+  it('clears only matching trace-arrow kinds', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    const a1 = { sheet: 0, row: 0, col: 0 };
+    const b1 = { sheet: 0, row: 0, col: 1 };
+    const c1 = { sheet: 0, row: 0, col: 2 };
+    addTraceArrow(store, { kind: 'precedent', from: a1, to: c1 });
+    addTraceArrow(store, { kind: 'dependent', from: b1, to: c1 });
+
+    clearTraceArrowsByKind(store, 'precedent', history);
+    expect(store.getState().traces.items).toEqual([{ kind: 'dependent', from: b1, to: c1 }]);
+
+    expect(history.undo()).toBe(true);
+    expect(store.getState().traces.items).toEqual([
+      { kind: 'precedent', from: a1, to: c1 },
+      { kind: 'dependent', from: b1, to: c1 },
+    ]);
   });
 });

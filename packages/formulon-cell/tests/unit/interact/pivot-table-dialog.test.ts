@@ -12,6 +12,8 @@ const makeWb = () => {
   const calls: string[] = [];
   const wb = {
     capabilities: { pivotTableMutate: true },
+    sheetCount: 1,
+    sheetName: () => 'Sheet1',
     getPivotTables: () => [],
     getValue: ({ row, col }: { row: number; col: number }) => {
       if (row === 0 && col === 0) return text('Region');
@@ -63,8 +65,10 @@ describe('attachPivotTableDialog', () => {
 
     handle.open();
     expect(document.body.textContent).toContain('Create PivotTable');
-    expect(document.body.textContent).toContain('A1:B3');
-    expect(document.querySelectorAll('.fc-pivotdlg__section')).toHaveLength(3);
+    expect(document.querySelector<HTMLInputElement>('.fc-pivotdlg__field input')?.value).toBe(
+      'A1:B3',
+    );
+    expect(document.querySelectorAll('.fc-pivotdlg__section')).toHaveLength(4);
     expect(document.querySelectorAll('.fc-pivotdlg__checkgrid .fc-pivotdlg__check')).toHaveLength(
       4,
     );
@@ -79,6 +83,34 @@ describe('attachPivotTableDialog', () => {
     expect(calls).toContain('pivot');
     expect(calls).toContain('grand:true:true');
     expect(document.querySelector('.fc-pivotdlg')?.hasAttribute('hidden')).toBe(true);
+    handle.detach();
+  });
+
+  it('rebuilds fields from an edited source range', () => {
+    const { wb, calls } = makeWb();
+    const store = createSpreadsheetStore();
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    const handle = attachPivotTableDialog({ host, store, wb, strings: en });
+
+    handle.open();
+    expect(document.querySelector('.fc-fmtdlg__btn--primary')?.hasAttribute('disabled')).toBe(true);
+    const source = document.querySelector<HTMLInputElement>('.fc-pivotdlg__field input');
+    expect(source).toBeTruthy();
+    if (!source) throw new Error('missing source input');
+    source.value = 'A1:B3';
+    source.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(document.querySelector('.fc-fmtdlg__btn--primary')?.hasAttribute('disabled')).toBe(
+      false,
+    );
+
+    const form = document.querySelector('form');
+    expect(form).toBeTruthy();
+    if (!form) throw new Error('missing PivotTable form');
+    form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+
+    expect(calls).toContain('field:Region');
+    expect(calls).toContain('field:Sales');
+    expect(calls).toContain('pivot');
     handle.detach();
   });
 

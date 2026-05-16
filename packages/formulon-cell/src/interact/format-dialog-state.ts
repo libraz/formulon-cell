@@ -18,13 +18,17 @@ export function makeEmptyDraft(formatLocale: string): DraftState {
     numFmt: undefined,
     numberCategory: 'general',
     decimals: 2,
+    thousands: false,
+    negativeStyle: 'minus',
     currencySymbol: defaultCurrencySymbolFor(formatLocale),
     pattern: '',
     align: undefined,
     vAlign: undefined,
     wrap: false,
+    shrinkToFit: false,
     indent: 0,
     rotation: 0,
+    textDirection: 'context',
     bold: false,
     italic: false,
     underline: false,
@@ -33,6 +37,8 @@ export function makeEmptyDraft(formatLocale: string): DraftState {
     fontSize: undefined,
     color: undefined,
     fill: undefined,
+    fillPattern: undefined,
+    fillPatternColor: undefined,
     borders: {},
     borderStyle: 'thin',
     borderColor: undefined,
@@ -48,7 +54,14 @@ export function makeEmptyDraft(formatLocale: string): DraftState {
     validationFormula: '',
     validationAllowBlank: true,
     validationErrorStyle: 'stop',
+    validationShowInputMessage: true,
+    validationPromptTitle: '',
+    validationPromptMessage: '',
+    validationShowErrorMessage: true,
+    validationErrorTitle: '',
+    validationErrorMessage: '',
     locked: true,
+    formulaHidden: false,
   };
 }
 
@@ -63,11 +76,14 @@ export function hydrateDraftFromFormat(
       case 'fixed':
         draft.numberCategory = 'fixed';
         draft.decimals = fmt.numFmt.decimals;
+        draft.thousands = fmt.numFmt.thousands === true;
+        draft.negativeStyle = fmt.numFmt.negativeStyle ?? 'minus';
         break;
       case 'currency':
         draft.numberCategory = 'currency';
         draft.decimals = fmt.numFmt.decimals;
         draft.currencySymbol = fmt.numFmt.symbol ?? '$';
+        draft.negativeStyle = fmt.numFmt.negativeStyle ?? 'minus';
         break;
       case 'percent':
         draft.numberCategory = 'percent';
@@ -94,6 +110,10 @@ export function hydrateDraftFromFormat(
         draft.numberCategory = 'datetime';
         draft.pattern = fmt.numFmt.pattern;
         break;
+      case 'special':
+        draft.numberCategory = 'special';
+        draft.pattern = fmt.numFmt.pattern;
+        break;
       case 'text':
         draft.numberCategory = 'text';
         break;
@@ -108,6 +128,8 @@ export function hydrateDraftFromFormat(
     draft.numFmt = { kind: 'general' };
     draft.numberCategory = 'general';
     draft.decimals = 2;
+    draft.thousands = false;
+    draft.negativeStyle = 'minus';
     draft.currencySymbol = defaultCurrencySymbolFor(formatLocale);
     draft.pattern = '';
   }
@@ -115,8 +137,10 @@ export function hydrateDraftFromFormat(
   draft.align = fmt.align;
   draft.vAlign = fmt.vAlign;
   draft.wrap = !!fmt.wrap;
+  draft.shrinkToFit = !!fmt.shrinkToFit;
   draft.indent = fmt.indent ?? 0;
   draft.rotation = fmt.rotation ?? 0;
+  draft.textDirection = fmt.textDirection ?? 'context';
   draft.bold = !!fmt.bold;
   draft.italic = !!fmt.italic;
   draft.underline = !!fmt.underline;
@@ -125,6 +149,8 @@ export function hydrateDraftFromFormat(
   draft.fontSize = fmt.fontSize;
   draft.color = fmt.color;
   draft.fill = fmt.fill;
+  draft.fillPattern = fmt.fillPattern;
+  draft.fillPatternColor = fmt.fillPatternColor;
   draft.borders = { ...(fmt.borders ?? {}) };
 
   const sides: SideKey[] = ['top', 'right', 'bottom', 'left', 'diagonalDown', 'diagonalUp'];
@@ -144,6 +170,7 @@ export function hydrateDraftFromFormat(
   draft.comment = fmt.comment ?? '';
   hydrateValidationDraft(draft, fmt.validation);
   draft.locked = fmt.locked !== false;
+  draft.formulaHidden = fmt.formulaHidden === true;
 }
 
 export function activeDraftSide(draft: DraftState): CellBorderSide {
@@ -189,9 +216,19 @@ export function computeDialogNumFmt(
     case 'general':
       return { kind: 'general' };
     case 'fixed':
-      return { kind: 'fixed', decimals: draft.decimals };
+      return {
+        kind: 'fixed',
+        decimals: draft.decimals,
+        ...(draft.thousands ? { thousands: true } : {}),
+        ...(draft.negativeStyle !== 'minus' ? { negativeStyle: draft.negativeStyle } : {}),
+      };
     case 'currency':
-      return { kind: 'currency', decimals: draft.decimals, symbol: draft.currencySymbol };
+      return {
+        kind: 'currency',
+        decimals: draft.decimals,
+        symbol: draft.currencySymbol,
+        ...(draft.negativeStyle !== 'minus' ? { negativeStyle: draft.negativeStyle } : {}),
+      };
     case 'percent':
       return { kind: 'percent', decimals: draft.decimals };
     case 'scientific':
@@ -201,7 +238,7 @@ export function computeDialogNumFmt(
     case 'text':
       return { kind: 'text' };
     case 'special':
-      return { kind: 'custom', pattern: draft.pattern || defaultPatternFor('special') };
+      return { kind: 'special', pattern: draft.pattern || defaultPatternFor('special') };
     case 'date':
       return { kind: 'date', pattern: draft.pattern || defaultPatternFor('date') };
     case 'time':
@@ -222,6 +259,18 @@ export function computeDialogValidation(
   const meta = {
     ...(draft.validationAllowBlank ? {} : { allowBlank: false }),
     ...(draft.validationErrorStyle !== 'stop' ? { errorStyle: draft.validationErrorStyle } : {}),
+    ...(draft.validationShowInputMessage ? {} : { showInputMessage: false }),
+    ...(draft.validationPromptTitle.trim()
+      ? { promptTitle: draft.validationPromptTitle.trim() }
+      : {}),
+    ...(draft.validationPromptMessage.trim()
+      ? { promptMessage: draft.validationPromptMessage.trim() }
+      : {}),
+    ...(draft.validationShowErrorMessage ? {} : { showErrorMessage: false }),
+    ...(draft.validationErrorTitle.trim() ? { errorTitle: draft.validationErrorTitle.trim() } : {}),
+    ...(draft.validationErrorMessage.trim()
+      ? { errorMessage: draft.validationErrorMessage.trim() }
+      : {}),
   };
   switch (k) {
     case 'list':
@@ -265,12 +314,24 @@ function hydrateValidationDraft(draft: DraftState, validation: CellValidation | 
     draft.validationB = 0;
     draft.validationAllowBlank = true;
     draft.validationErrorStyle = 'stop';
+    draft.validationShowInputMessage = true;
+    draft.validationPromptTitle = '';
+    draft.validationPromptMessage = '';
+    draft.validationShowErrorMessage = true;
+    draft.validationErrorTitle = '';
+    draft.validationErrorMessage = '';
     return;
   }
 
   draft.validationKind = v.kind;
   draft.validationAllowBlank = v.allowBlank !== false;
   draft.validationErrorStyle = v.errorStyle ?? 'stop';
+  draft.validationShowInputMessage = v.showInputMessage !== false;
+  draft.validationPromptTitle = v.promptTitle ?? '';
+  draft.validationPromptMessage = v.promptMessage ?? '';
+  draft.validationShowErrorMessage = v.showErrorMessage !== false;
+  draft.validationErrorTitle = v.errorTitle ?? '';
+  draft.validationErrorMessage = v.errorMessage ?? '';
   if (v.kind === 'list') {
     if (Array.isArray(v.source)) {
       draft.validationListSourceKind = 'literal';

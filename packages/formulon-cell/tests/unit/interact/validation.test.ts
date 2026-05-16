@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { attachValidationList } from '../../../src/interact/validation.js';
+import {
+  attachValidationAlert,
+  attachValidationList,
+  attachValidationPrompt,
+} from '../../../src/interact/validation.js';
 import { setValidationChevron } from '../../../src/render/grid/hit-state.js';
 import {
   createSpreadsheetStore,
@@ -14,6 +19,8 @@ const popover = (): HTMLElement | null =>
   document.querySelector<HTMLElement>('.fc-validation-list');
 const items = (): HTMLElement[] =>
   Array.from(document.querySelectorAll<HTMLElement>('.fc-validation-list__item'));
+const prompt = (): HTMLElement | null =>
+  document.querySelector<HTMLElement>('.fc-validation-prompt');
 
 const stubGridRect = (grid: HTMLElement): void => {
   grid.getBoundingClientRect = (): DOMRect =>
@@ -95,6 +102,32 @@ describe('attachValidationList', () => {
     handle.detach();
   });
 
+  it('does not write a validation-list pick into a locked protected cell', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      { validation: { kind: 'list', source: ['x', 'y'] } },
+    );
+    setProtectedSheet(store, 0, true);
+    setValidationChevron({ rect: { x: 70, y: 50, w: 12, h: 12 }, row: 0, col: 0 });
+
+    try {
+      const handle = attachValidationList({ grid, store, wb, onAfterCommit });
+      firePointerInChevron(grid, 70, 50);
+      const item = items().find((i) => i.textContent === 'y');
+      item?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'blank' });
+      expect(onAfterCommit).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(popover()).toBeNull();
+      handle.detach();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('Escape on the document closes an open popover', () => {
     mutators.setCellFormat(
       store,
@@ -137,6 +170,24 @@ describe('attachValidationList', () => {
       value: 'large',
     });
     expect(popover()).toBeNull();
+    handle.detach();
+  });
+
+  it('opens with the current cell value selected when it is in the list', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      { validation: { kind: 'list', source: ['small', 'medium', 'large'] } },
+    );
+    mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'text', value: 'medium' });
+    setValidationChevron({ rect: { x: 10, y: 10, w: 12, h: 12 }, row: 0, col: 0 });
+
+    const handle = attachValidationList({ grid, store, wb, onAfterCommit });
+    firePointerInChevron(grid, 10, 10);
+
+    expect(document.activeElement).toBe(items()[1]);
+    expect(items()[1]?.getAttribute('aria-selected')).toBe('true');
+    expect(items()[0]?.getAttribute('aria-selected')).toBe('false');
     handle.detach();
   });
 
@@ -205,6 +256,117 @@ describe('attachValidationList', () => {
     // Far-away click.
     firePointerInChevron(grid, 0, 0);
     expect(popover()).toBeNull();
+    handle.detach();
+  });
+});
+
+describe('attachValidationPrompt', () => {
+  let grid: HTMLElement;
+  let store: SpreadsheetStore;
+
+  beforeEach(() => {
+    grid = document.createElement('div');
+    document.body.appendChild(grid);
+    stubGridRect(grid);
+    store = createSpreadsheetStore();
+  });
+
+  afterEach(() => {
+    while (document.body.firstChild) document.body.removeChild(document.body.firstChild);
+  });
+
+  it('shows the active cell validation input message', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        validation: {
+          kind: 'list',
+          source: ['Open', 'Closed'],
+          promptTitle: 'Status',
+          promptMessage: 'Choose a workflow state.',
+        },
+      },
+    );
+
+    const handle = attachValidationPrompt({ grid, store });
+
+    expect(prompt()).not.toBeNull();
+    expect(prompt()?.hidden).toBe(false);
+    expect(prompt()?.textContent).toContain('Status');
+    expect(prompt()?.textContent).toContain('Choose a workflow state.');
+    handle.detach();
+  });
+
+  it('hides when showInputMessage is false or the selection moves away', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        validation: {
+          kind: 'whole',
+          op: 'between',
+          a: 1,
+          b: 10,
+          promptMessage: 'Enter 1 to 10.',
+          showInputMessage: false,
+        },
+      },
+    );
+    const handle = attachValidationPrompt({ grid, store });
+    expect(prompt()).toBeNull();
+
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 1, col: 0 },
+      {
+        validation: {
+          kind: 'whole',
+          op: 'between',
+          a: 1,
+          b: 10,
+          promptMessage: 'Enter 1 to 10.',
+        },
+      },
+    );
+    mutators.setActive(store, { sheet: 0, row: 1, col: 0 });
+    expect(prompt()?.hidden).toBe(false);
+
+    mutators.setActive(store, { sheet: 0, row: 2, col: 0 });
+    expect(prompt()?.hidden).toBe(true);
+    handle.detach();
+  });
+});
+
+describe('attachValidationAlert', () => {
+  let host: HTMLElement;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    while (document.body.firstChild) document.body.removeChild(document.body.firstChild);
+  });
+
+  it('shows a validation error alert with a custom title and message', () => {
+    const handle = attachValidationAlert({
+      host,
+      labels: { ok: 'OK', stop: 'Stop', warning: 'Warning', information: 'Information' },
+    });
+
+    handle.show({
+      severity: 'stop',
+      title: 'Invalid status',
+      message: 'Use Open, Closed, or Hold.',
+    });
+
+    const dialog = document.querySelector<HTMLElement>('.fc-valdlg');
+    expect(dialog).not.toBeNull();
+    expect(dialog?.hidden).toBe(false);
+    expect(dialog?.getAttribute('aria-label')).toBe('Invalid status');
+    expect(dialog?.textContent).toContain('Use Open, Closed, or Hold.');
     handle.detach();
   });
 });

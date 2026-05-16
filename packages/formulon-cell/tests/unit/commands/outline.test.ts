@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import {
   colGroupRangeAt,
@@ -16,6 +16,7 @@ import {
   ungroupCols,
   ungroupRows,
 } from '../../../src/commands/outline.js';
+import { setProtectedSheet } from '../../../src/commands/protection.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 
@@ -71,6 +72,21 @@ describe('groupRows / ungroupRows', () => {
     expect(store.getState().layout.outlineRows.size).toBe(0);
     h.redo();
     expect(store.getState().layout.outlineRows.get(2)).toBe(1);
+  });
+
+  it('rejects row grouping on a protected sheet', () => {
+    const store = createSpreadsheetStore();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    setProtectedSheet(store, 0, true);
+
+    try {
+      groupRows(store, new History(), 0, 2);
+
+      expect(store.getState().layout.outlineRows.size).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 
@@ -129,6 +145,21 @@ describe('collapse / expand', () => {
     expandRowGroup(store, null, 1, 3);
     expect(isRowGroupCollapsed(store.getState().layout, 1, 3)).toBe(false);
     expect(store.getState().layout.hiddenRows.size).toBe(0);
+  });
+
+  it('rejects detail collapse on a protected sheet', () => {
+    const store = createSpreadsheetStore();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    setProtectedSheet(store, 0, true);
+
+    try {
+      collapseRowGroup(store, new History(), 1, 3);
+
+      expect(store.getState().layout.hiddenRows.size).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('collapseColGroup mirrors row behavior', () => {

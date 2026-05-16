@@ -53,80 +53,342 @@
     background: var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
   }
 
+  .fc-sheetmenu__colors {
+    padding: 5px 8px 7px;
+  }
+
+  .fc-sheetmenu__colors-label {
+    margin-bottom: 6px;
+    color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 72%, transparent));
+    font-size: 11.5px;
+  }
+
+  .fc-sheetmenu__swatches {
+    display: grid;
+    grid-template-columns: repeat(5, 20px);
+    gap: 5px;
+  }
+
+  .fc-sheetmenu__swatch {
+    position: relative;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 18%, transparent));
+    border-radius: 2px;
+    background: var(--fc-sheet-tab-color);
+    cursor: pointer;
+  }
+
+  .fc-sheetmenu__swatch--none {
+    background:
+      linear-gradient(135deg, transparent 44%, #c00000 46%, #c00000 54%, transparent 56%),
+      var(--fc-bg, Canvas);
+  }
+
+  .fc-sheetmenu__swatch:hover,
+  .fc-sheetmenu__swatch:focus-visible {
+    border-color: var(--fc-accent, currentColor);
+    box-shadow: 0 0 0 2px var(--fc-accent-soft, transparent);
+    outline: 0;
+  }
+
+  .fc-sheetmenu__swatch[aria-checked="true"]::after {
+    position: absolute;
+    inset: -4px;
+    border: 2px solid var(--fc-accent, currentColor);
+    border-radius: 4px;
+    content: "";
+    pointer-events: none;
+  }
+
   .fc-find {
     position: absolute;
-    top: 8px;
-    right: 12px;
+    top: 54px;
+    left: 50%;
     z-index: var(--fc-z-grid, 2147483010);
     pointer-events: auto;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 8px 10px;
+    width: min(520px, calc(100% - 32px));
+    min-height: 206px;
+    transform: translateX(-50%);
     background: var(--fc-bg-elev, Canvas);
     color: var(--fc-fg, CanvasText);
     border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+      var(--fc-rule, color-mix(in srgb, CanvasText 24%, transparent));
     border-radius: 4px;
     box-shadow:
-      0 8px 24px rgba(0, 0, 0, 0.16),
+      0 14px 36px rgba(0, 0, 0, 0.2),
       0 1px 3px rgba(0, 0, 0, 0.12);
     font-family: var(--fc-font-ui, system-ui);
-    font-size: 12.5px;
-    line-height: 1.4;
+    font-size: 12px;
+    line-height: 1.35;
   }
+
   .fc-find[hidden] {
     display: none;
   }
+
+  .fc-find [hidden] {
+    display: none !important;
+  }
+
+  .fc-find__titlebar {
+    display: flex;
+    min-height: 30px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 6px 3px 10px;
+    background: color-mix(in srgb, CanvasText 4%, Canvas);
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+  }
+
+  .fc-find__title {
+    font-size: 12px;
+  }
+
+  .fc-find__tabs {
+    display: flex;
+    gap: 1px;
+    padding: 8px 10px 0;
+  }
+
+  .fc-find__tab {
+    min-width: 76px;
+    padding: 5px 14px;
+    border-bottom-color: transparent;
+    border-radius: 3px 3px 0 0;
+    background: color-mix(in srgb, CanvasText 5%, Canvas);
+  }
+
+  .fc-find__tab[aria-selected="true"] {
+    position: relative;
+    z-index: 1;
+    background: Canvas;
+    border-bottom-color: Canvas;
+    font-weight: 600;
+  }
+
+  .fc-find__form {
+    display: grid;
+    gap: 7px;
+    padding: 10px;
+    border-top: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+  }
+
+  .fc-find__field {
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+  }
+
+  .fc-find__field label {
+    text-align: right;
+  }
+
   .fc-find input[type="text"] {
-    padding: 4px 8px;
+    width: 100%;
+    min-width: 0;
+    padding: 3px 5px;
     border: var(--fc-hairline, 1px) solid
-      var(--fc-rule, color-mix(in srgb, CanvasText 18%, transparent));
+      var(--fc-rule, color-mix(in srgb, CanvasText 30%, transparent));
     border-radius: 2px;
     background: var(--fc-bg, inherit);
     color: inherit;
-    min-width: 200px;
     font: inherit;
     outline: none;
   }
+
+  .fc-find select {
+    min-width: 134px;
+    padding: 2px 22px 2px 5px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 30%, transparent));
+    border-radius: 2px;
+    background: Canvas;
+    color: inherit;
+    font: inherit;
+  }
+
   .fc-find input[type="text"]:focus {
     border-color: var(--fc-accent, currentColor);
-    box-shadow: 0 0 0 2px var(--fc-accent-soft, transparent);
+    box-shadow: 0 0 0 1px var(--fc-accent, currentColor);
   }
-  .fc-find__row {
+
+  .fc-find__options-row {
     display: flex;
+    justify-content: flex-end;
+  }
+
+  .fc-find__options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px 14px;
+  }
+
+  .fc-find__options[hidden] {
+    display: none;
+  }
+
+  .fc-find__field--short {
+    grid-template-columns: 72px minmax(116px, 1fr);
+  }
+
+  .fc-find__checks {
+    display: grid;
+    gap: 6px;
+    align-content: start;
+  }
+
+  .fc-find__check {
+    display: inline-flex;
     gap: 6px;
     align-items: center;
+    white-space: nowrap;
   }
-  .fc-find__btn {
-    padding: 3px 9px;
-    background: transparent;
+
+  .fc-find__field--format {
+    grid-template-columns: 1fr auto;
+    align-self: start;
+  }
+
+  .fc-find__results {
+    min-height: 118px;
+    max-height: 190px;
+    margin: 0 10px 8px;
+    overflow: auto;
     border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 28%, transparent));
+    background: Canvas;
+  }
+
+  .fc-find__results[hidden] {
+    display: none;
+  }
+
+  .fc-find__results-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11.5px;
+  }
+
+  .fc-find__results-table th,
+  .fc-find__results-table td {
+    padding: 3px 6px;
+    border-right: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 10%, transparent));
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .fc-find__results-table th {
+    position: sticky;
+    top: 0;
+    background: color-mix(in srgb, CanvasText 6%, Canvas);
+    font-weight: 400;
+  }
+
+  .fc-find__result-col--sheet {
+    width: 92px;
+  }
+
+  .fc-find__result-col--cell {
+    width: 72px;
+  }
+
+  .fc-find__results-table tr:hover,
+  .fc-find__results-table tr:focus-visible {
+    background: var(--fc-accent-soft, color-mix(in srgb, Highlight 18%, transparent));
+    outline: 0;
+  }
+
+  .fc-find__results-summary {
+    position: sticky;
+    bottom: 0;
+    padding: 4px 6px;
+    border-top: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 16%, transparent));
+    background: Canvas;
+  }
+
+  .fc-find__footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+    padding: 0 10px 10px;
+  }
+
+  .fc-find__btn {
+    min-width: 74px;
+    padding: 4px 10px;
+    background: color-mix(in srgb, CanvasText 3%, Canvas);
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 28%, transparent));
     border-radius: 2px;
     color: inherit;
     cursor: pointer;
     font: inherit;
-    font-size: 11.5px;
+    font-size: 12px;
   }
+
   .fc-find__btn:hover {
     background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 6%, transparent));
   }
+
+  .fc-find__btn:disabled {
+    opacity: 0.48;
+    cursor: default;
+  }
+
   .fc-find__btn:focus-visible {
     outline: 2px solid var(--fc-accent, currentColor);
     outline-offset: 1px;
   }
   .fc-find__btn--icon {
-    min-width: 26px;
-    padding-inline: 7px;
-    font-size: 13px;
+    min-width: 22px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    font-size: 16px;
     line-height: 1;
   }
-  .fc-find__pill {
-    font-family: var(--fc-font-mono, monospace);
-    font-size: 10.5px;
-    opacity: 0.7;
-    min-width: 64px;
-    text-align: right;
+
+  .fc-find__options-btn {
+    min-width: 26px;
+  }
+
+  .fc-find__format-btn {
+    min-width: 82px;
+  }
+
+  @media (max-width: 560px) {
+    .fc-find {
+      top: 48px;
+      width: calc(100% - 18px);
+    }
+
+    .fc-find__field,
+    .fc-find__field--short {
+      grid-template-columns: 1fr;
+      gap: 3px;
+    }
+
+    .fc-find__field label {
+      text-align: left;
+    }
+
+    .fc-find__options {
+      grid-template-columns: 1fr;
+    }
   }
 }

@@ -75,7 +75,7 @@ describe('integration: clipboard copy → paste', () => {
     expect(copy(instance.store.getState())).toBeNull();
   });
 
-  it('copying a formula cell yields its displayed value, not the formula', () => {
+  it('copying a formula cell yields its formula text, not the computed value', () => {
     const { instance, workbook } = sheet;
     workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 6);
     workbook.setFormula({ sheet: 0, row: 1, col: 0 }, '=A1*2');
@@ -84,9 +84,8 @@ describe('integration: clipboard copy → paste', () => {
 
     mutators.setRange(instance.store, { sheet: 0, r0: 1, c0: 0, r1: 1, c1: 0 });
     const cp = copy(instance.store.getState());
-    expect(cp?.tsv).toBe('12');
-    // Confirm the formula was NOT in the TSV.
-    expect(cp?.tsv.includes('=')).toBe(false);
+    // The formula travels verbatim so a paste into Excel / Sheets rebuilds it.
+    expect(cp?.tsv).toBe('=A1*2');
     // Suppress unused-var lint in addrKey import.
     expect(addrKey({ sheet: 0, row: 1, col: 0 })).toBe('0:1:0');
   });

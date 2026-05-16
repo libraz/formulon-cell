@@ -138,4 +138,39 @@
     outline: 2px solid var(--fc-accent);
     outline-offset: 1px;
   }
+
+  .fc-namebox-menu {
+    position: fixed;
+    z-index: var(--fc-z-popover, 2147483040);
+    display: flex;
+    flex-direction: column;
+    max-height: 240px;
+    overflow-y: auto;
+    padding: 3px;
+    border: var(--fc-hairline) solid var(--fc-rule);
+    border-radius: 2px;
+    background: var(--fc-bg-elev, Canvas);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+    color: var(--fc-fg, CanvasText);
+    font-family: var(--fc-font-ui);
+    font-size: 12px;
+  }
+
+  .fc-namebox-menu__item {
+    min-height: 24px;
+    padding: 4px 8px;
+    border: 0;
+    border-radius: 2px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .fc-namebox-menu__item:hover,
+  .fc-namebox-menu__item:focus-visible {
+    background: var(--fc-accent-soft);
+    outline: 0;
+  }
 }

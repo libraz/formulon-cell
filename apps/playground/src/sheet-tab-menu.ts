@@ -1,4 +1,5 @@
 import {
+  isWorkbookStructureProtected,
   moveSheet,
   mutators,
   removeSheet,
@@ -8,6 +9,17 @@ import {
 } from '@libraz/formulon-cell';
 import { showConfirm, showPrompt } from './dialogs.js';
 import { focusMenuItem, handleMenuKeydown, prepareMenu } from './menu-a11y.js';
+
+const SHEET_TAB_COLORS = [
+  '#c00000',
+  '#ed7d31',
+  '#ffc000',
+  '#70ad47',
+  '#00b0f0',
+  '#4472c4',
+  '#7030a0',
+  '#a5a5a5',
+] as const;
 
 export function openSheetTabMenu(input: {
   closeTabMenu: () => void;
@@ -23,6 +35,7 @@ export function openSheetTabMenu(input: {
   const wb = inst.workbook;
   const store = inst.store;
   const n = wb.sheetCount;
+  const structureProtected = isWorkbookStructureProtected(store.getState());
   const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
   const menu = document.createElement('div');
@@ -53,7 +66,49 @@ export function openSheetTabMenu(input: {
     menu.appendChild(it);
   };
 
-  addItem('Rename…', false, () => {
+  const addColorPalette = (): void => {
+    const selectedColor = store.getState().layout.sheetTabColors.get(idx);
+    const group = document.createElement('div');
+    group.className = 'app__sheet-tab-colors';
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', 'Tab Color');
+
+    const label = document.createElement('div');
+    label.className = 'app__sheet-tab-colors-label';
+    label.textContent = 'Tab Color';
+    const swatches = document.createElement('div');
+    swatches.className = 'app__sheet-tab-swatches';
+
+    const addSwatch = (text: string, color: string | null, selected: boolean): void => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = color
+        ? 'app__sheet-tab-swatch'
+        : 'app__sheet-tab-swatch app__sheet-tab-swatch--none';
+      button.setAttribute('role', 'menuitemradio');
+      button.setAttribute('aria-label', color ? `${text} ${color}` : text);
+      button.setAttribute('aria-checked', selected ? 'true' : 'false');
+      button.tabIndex = -1;
+      button.title = color ? `${text} ${color}` : text;
+      if (color) button.style.setProperty('--app-sheet-tab-color', color);
+      button.addEventListener('click', () => {
+        closeTabMenu();
+        cleanupMenuListeners();
+        mutators.setSheetTabColor(store, idx, color);
+        renderSheetTabs();
+      });
+      swatches.appendChild(button);
+    };
+
+    addSwatch('No Color', null, selectedColor === undefined);
+    for (const color of SHEET_TAB_COLORS) {
+      addSwatch('Tab Color', color, selectedColor?.toLowerCase() === color);
+    }
+    group.append(label, swatches);
+    menu.appendChild(group);
+  };
+
+  addItem('Rename…', structureProtected, () => {
     const cur = wb.sheetName(idx);
     void showPrompt({
       title: 'Rename sheet',
@@ -65,10 +120,10 @@ export function openSheetTabMenu(input: {
     }).then((next) => {
       const trimmed = next?.trim();
       if (!trimmed || trimmed === cur) return;
-      if (renameSheet(wb, idx, trimmed)) renderSheetTabs();
+      if (renameSheet(wb, idx, trimmed, store)) renderSheetTabs();
     });
   });
-  addItem('Delete', n <= 1, () => {
+  addItem('Delete', structureProtected || n <= 1, () => {
     const name = wb.sheetName(idx);
     void showConfirm({
       title: 'Delete sheet',
@@ -85,20 +140,28 @@ export function openSheetTabMenu(input: {
     });
   });
   const visibleCount = n - store.getState().layout.hiddenSheets.size;
-  addItem('Hide tab', !wb.capabilities.sheetTabHidden || visibleCount <= 1, () => {
-    if (setSheetHidden(store, wb, inst.history, idx, true)) {
-      const newActive = store.getState().data.sheetIndex;
-      mutators.replaceCells(store, wb.cells(newActive));
-      renderSheetTabs();
-    }
-  });
+  addItem(
+    'Hide tab',
+    structureProtected || !wb.capabilities.sheetTabHidden || visibleCount <= 1,
+    () => {
+      if (setSheetHidden(store, wb, inst.history, idx, true)) {
+        const newActive = store.getState().data.sheetIndex;
+        mutators.replaceCells(store, wb.cells(newActive));
+        renderSheetTabs();
+      }
+    },
+  );
   const sep = document.createElement('div');
   sep.className = 'app__menu-sep';
   menu.appendChild(sep);
-  addItem('Move left', idx === 0, () => {
+  addColorPalette();
+  const colorSep = document.createElement('div');
+  colorSep.className = 'app__menu-sep';
+  menu.appendChild(colorSep);
+  addItem('Move left', structureProtected || idx === 0, () => {
     if (moveSheet(store, wb, idx, idx - 1)) renderSheetTabs();
   });
-  addItem('Move right', idx >= n - 1, () => {
+  addItem('Move right', structureProtected || idx >= n - 1, () => {
     if (moveSheet(store, wb, idx, idx + 1)) renderSheetTabs();
   });
 

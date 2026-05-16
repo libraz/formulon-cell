@@ -1,3 +1,4 @@
+import { formatA1FormulaAsR1C1 } from './refs.js';
 import type { CellValue } from '../engine/types.js';
 // Print / PDF export.
 //
@@ -19,6 +20,7 @@ import {
   defaultPageSetup,
   getPageSetup,
   type PageSetup,
+  type PrintCellErrorsMode,
   type SpreadsheetStore,
 } from '../store/store.js';
 
@@ -85,6 +87,35 @@ export function parsePrintTitleCols(raw?: string): [number, number] | null {
   return [Math.min(a, b), Math.max(a, b)];
 }
 
+/** Parse an A1-style rectangular print area like "A1:D20" / "$A$1:$D$20"
+ *  / "B2" → zero-indexed bounds. Returns null on bad input. */
+export function parsePrintArea(
+  raw?: string,
+): { row0: number; col0: number; row1: number; col1: number } | null {
+  if (!raw) return null;
+  const trimmed = raw.trim().replace(/\$/g, '');
+  if (!trimmed) return null;
+  const parseCell = (cell: string): { row: number; col: number } | null => {
+    const match = /^([A-Za-z]+)([1-9][0-9]*)$/.exec(cell.trim());
+    if (!match) return null;
+    const col = colFromLetters(match[1] ?? '');
+    const row = Number.parseInt(match[2] ?? '', 10) - 1;
+    if (col < 0 || row < 0) return null;
+    return { row, col };
+  };
+  const parts = trimmed.split(':');
+  if (parts.length > 2) return null;
+  const a = parseCell(parts[0] ?? '');
+  const b = parseCell(parts[1] ?? parts[0] ?? '');
+  if (!a || !b) return null;
+  return {
+    row0: Math.min(a.row, b.row),
+    col0: Math.min(a.col, b.col),
+    row1: Math.max(a.row, b.row),
+    col1: Math.max(a.col, b.col),
+  };
+}
+
 const escapeHtml = (s: string): string =>
   s
     .replace(/&/g, '&amp;')
@@ -93,16 +124,54 @@ const escapeHtml = (s: string): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
-const cellDisplay = (value: CellValue, formula: string | null, showFormulas: boolean): string => {
-  if (showFormulas && formula) return formula;
+const cellDisplay = (
+  value: CellValue,
+  formula: string | null,
+  showFormulas: boolean,
+  addr?: { row: number; col: number },
+  r1c1 = false,
+  cellErrorsAs: PrintCellErrorsMode = 'displayed',
+): string => {
+  if (showFormulas && formula) return r1c1 && addr ? formatA1FormulaAsR1C1(formula, addr) : formula;
   if (value.kind === 'blank') return '';
+  if (value.kind === 'error') {
+    if (cellErrorsAs === 'blank') return '';
+    if (cellErrorsAs === 'dash') return '--';
+    if (cellErrorsAs === 'na') return '#N/A';
+  }
   return formatCell(value);
+};
+
+const fillPatternCss = (pattern: CellFormat['fillPattern'], color = '#000000'): string => {
+  switch (pattern) {
+    case 'gray125':
+      return `radial-gradient(${color} 0.6px, transparent 0.6px)`;
+    case 'gray25':
+      return `radial-gradient(${color} 1px, transparent 1px)`;
+    case 'gray50':
+      return `repeating-linear-gradient(45deg, ${color} 0 2px, transparent 2px 4px)`;
+    case 'horizontal':
+      return `repeating-linear-gradient(0deg, ${color} 0 1px, transparent 1px 4px)`;
+    case 'vertical':
+      return `repeating-linear-gradient(90deg, ${color} 0 1px, transparent 1px 4px)`;
+    case 'diagonalDown':
+      return `repeating-linear-gradient(45deg, ${color} 0 1px, transparent 1px 5px)`;
+    case 'diagonalUp':
+      return `repeating-linear-gradient(135deg, ${color} 0 1px, transparent 1px 5px)`;
+    default:
+      return '';
+  }
 };
 
 /** Translate a `CellFormat` into an inline-style string. Only the subset that
  *  matters for print is included — borders are emitted on the cell itself
  *  so colspan/rowspan merges retain their outline. */
-function inlineCellStyle(fmt: CellFormat | undefined, showGridlines: boolean): string {
+function inlineCellStyle(
+  fmt: CellFormat | undefined,
+  value: CellValue,
+  showGridlines: boolean,
+  blackAndWhite: boolean,
+): string {
   const parts: string[] = [];
   if (showGridlines) {
     // Default hairline grid for unformatted cells. Per-side overrides below.
@@ -117,9 +186,19 @@ function inlineCellStyle(fmt: CellFormat | undefined, showGridlines: boolean): s
     if (fmt.strike) decos.push('line-through');
     parts.push(`text-decoration:${decos.join(' ')}`);
   }
-  if (fmt.align) parts.push(`text-align:${fmt.align}`);
+  if (fmt.align) {
+    const align =
+      fmt.align === 'centerContinuous'
+        ? 'center'
+        : fmt.align === 'justify' || fmt.align === 'distributed'
+          ? 'justify'
+          : fmt.align === 'fill'
+            ? 'left'
+            : fmt.align;
+    parts.push(`text-align:${align}`);
+  }
   if (fmt.vAlign) {
-    const v = fmt.vAlign === 'middle' ? 'middle' : fmt.vAlign;
+    const v = fmt.vAlign === 'justify' || fmt.vAlign === 'distributed' ? 'middle' : fmt.vAlign;
     parts.push(`vertical-align:${v}`);
   }
   if (fmt.wrap) parts.push('white-space:pre-wrap');
@@ -130,8 +209,23 @@ function inlineCellStyle(fmt: CellFormat | undefined, showGridlines: boolean): s
   if (typeof fmt.rotation === 'number' && fmt.rotation !== 0) {
     parts.push(`transform:rotate(${-fmt.rotation}deg);transform-origin:center`);
   }
-  if (fmt.color) parts.push(`color:${fmt.color}`);
-  if (fmt.fill) parts.push(`background:${fmt.fill}`);
+  if (fmt.textDirection === 'rtl') parts.push('direction:rtl');
+  else if (fmt.textDirection === 'ltr') parts.push('direction:ltr');
+  const redNegative =
+    value.kind === 'number' &&
+    value.value < 0 &&
+    (fmt.numFmt?.kind === 'fixed' || fmt.numFmt?.kind === 'currency') &&
+    (fmt.numFmt.negativeStyle === 'red' || fmt.numFmt.negativeStyle === 'red-parens');
+  if (fmt.color && !blackAndWhite) parts.push(`color:${fmt.color}`);
+  else if (redNegative && !blackAndWhite) parts.push('color:#c00000');
+  if (fmt.fill && !blackAndWhite) parts.push(`background:${fmt.fill}`);
+  if (fmt.fillPattern && !blackAndWhite) {
+    const image = fillPatternCss(fmt.fillPattern, fmt.fillPatternColor);
+    if (image) parts.push(`background-image:${image}`);
+    if (fmt.fillPattern === 'gray125' || fmt.fillPattern === 'gray25') {
+      parts.push('background-size:4px 4px');
+    }
+  }
   if (fmt.fontFamily) parts.push(`font-family:${fmt.fontFamily}`);
   if (typeof fmt.fontSize === 'number') parts.push(`font-size:${fmt.fontSize}px`);
   if (fmt.borders) {
@@ -154,7 +248,7 @@ function inlineCellStyle(fmt: CellFormat | undefined, showGridlines: boolean): s
                 : b.style === 'dotted'
                   ? '1px dotted'
                   : '1px solid';
-      parts.push(`border-${side}:${style} ${b.color ?? '#000'}`);
+      parts.push(`border-${side}:${style} ${blackAndWhite ? '#000' : (b.color ?? '#000')}`);
     };
     sideToCss('top');
     sideToCss('right');
@@ -190,6 +284,12 @@ interface CellSnap {
   format?: CellFormat;
 }
 
+interface PrintCommentSnap {
+  row: number;
+  col: number;
+  text: string;
+}
+
 /** Render the print document HTML for `sheet`. The selection / viewport are
  *  ignored — printing always emits the full populated range. Hidden rows and
  *  columns honour the layout slice. */
@@ -197,6 +297,7 @@ export function buildPrintDocument(
   wb: WorkbookHandle,
   store: SpreadsheetStore,
   sheet: number,
+  title = 'Print',
 ): PrintDocument {
   const state = store.getState();
   const setup = getPageSetup(state, sheet);
@@ -215,6 +316,19 @@ export function buildPrintDocument(
     cellMap.set(key, { value: e.value, formula: e.formula, format: fmt });
     if (e.addr.row > maxRow) maxRow = e.addr.row;
     if (e.addr.col > maxCol) maxCol = e.addr.col;
+  }
+  for (const [formatKey, fmt] of state.format.formats) {
+    const [sheetPart, rowPart, colPart] = formatKey.split(':');
+    if (Number(sheetPart) !== sheet) continue;
+    const row = Number(rowPart);
+    const col = Number(colPart);
+    if (!Number.isInteger(row) || !Number.isInteger(col)) continue;
+    const key = `${row}:${col}`;
+    if (!cellMap.has(key)) {
+      cellMap.set(key, { value: { kind: 'blank' }, formula: null, format: fmt });
+    }
+    if (row > maxRow) maxRow = row;
+    if (col > maxCol) maxCol = col;
   }
 
   // Merges shape colspan/rowspan + cell-skip set (cells inside but not at
@@ -245,20 +359,94 @@ export function buildPrintDocument(
 
   const titleRowRange = parsePrintTitleRows(setup.printTitleRows);
   const titleColRange = parsePrintTitleCols(setup.printTitleCols);
+  const manualRowBreaks = new Set(setup.manualPageBreakRows ?? []);
+  const manualColBreaks = new Set(setup.manualPageBreakCols ?? []);
+  const printArea = parsePrintArea(setup.printArea);
+  const minPrintRow = printArea?.row0 ?? 0;
+  const minPrintCol = printArea?.col0 ?? 0;
+  if (printArea) {
+    maxRow = Math.min(maxRow, printArea.row1);
+    maxCol = Math.min(maxCol, printArea.col1);
+    if (maxRow < minPrintRow) maxRow = minPrintRow;
+    if (maxCol < minPrintCol) maxCol = minPrintCol;
+  }
+
+  const commentEntries: PrintCommentSnap[] =
+    setup.comments === 'none'
+      ? []
+      : [...state.format.formats.entries()]
+          .map(([formatKey, fmt]): PrintCommentSnap | null => {
+            if (typeof fmt.comment !== 'string' || fmt.comment.length === 0) return null;
+            const [sheetPart, rowPart, colPart] = formatKey.split(':');
+            if (Number(sheetPart) !== sheet) return null;
+            const row = Number(rowPart);
+            const col = Number(colPart);
+            if (!Number.isInteger(row) || !Number.isInteger(col)) return null;
+            if (row < minPrintRow || row > maxRow || col < minPrintCol || col > maxCol) {
+              return null;
+            }
+            if (hiddenRows.has(row) || hiddenCols.has(col)) return null;
+            return { row, col, text: fmt.comment };
+          })
+          .filter((entry): entry is PrintCommentSnap => entry !== null)
+          .sort((a, b) => a.row - b.row || a.col - b.col);
+  const commentByCell = new Map(commentEntries.map((entry) => [`${entry.row}:${entry.col}`, entry]));
 
   // Build column letters used for the optional `<colgroup>` headings strip.
   const renderCell = (row: number, col: number, tag: 'td' | 'th'): string => {
     const key = `${row}:${col}`;
     if (skipKeys.has(key)) return '';
-    const span = spanByAnchor.get(key);
     const snap = cellMap.get(key);
     const value: CellValue = snap?.value ?? { kind: 'blank' };
-    const text = cellDisplay(value, snap?.formula ?? null, showFormulas);
-    const style = inlineCellStyle(snap?.format, setup.showGridlines === true);
+    const text = cellDisplay(
+      value,
+      snap?.formula ?? null,
+      showFormulas,
+      { row, col },
+      state.ui.r1c1 === true,
+      setup.cellErrorsAs,
+    );
+    const span = (() => {
+      const mergeSpan = spanByAnchor.get(key);
+      if (mergeSpan) return mergeSpan;
+      if (snap?.format?.align !== 'centerContinuous' || !text) return undefined;
+      let colspan = 1;
+      for (let nextCol = col + 1; nextCol <= maxCol; nextCol += 1) {
+        if (hiddenCols.has(nextCol)) continue;
+        const nextKey = `${row}:${nextCol}`;
+        if (skipKeys.has(nextKey)) break;
+        const nextSnap = cellMap.get(nextKey);
+        const nextText = cellDisplay(
+          nextSnap?.value ?? { kind: 'blank' },
+          nextSnap?.formula ?? null,
+          showFormulas,
+          { row, col: nextCol },
+          state.ui.r1c1 === true,
+          setup.cellErrorsAs,
+        );
+        if (nextSnap?.format?.align !== 'centerContinuous' || nextText) break;
+        skipKeys.add(nextKey);
+        colspan += 1;
+      }
+      return colspan > 1 ? { rowspan: 1, colspan } : undefined;
+    })();
+    const style = inlineCellStyle(
+      snap?.format,
+      value,
+      setup.showGridlines === true,
+      setup.blackAndWhite === true,
+    );
     const rowspanAttr = span && span.rowspan > 1 ? ` rowspan="${span.rowspan}"` : '';
     const colspanAttr = span && span.colspan > 1 ? ` colspan="${span.colspan}"` : '';
     const styleAttr = style ? ` style="${style}"` : '';
-    return `<${tag}${rowspanAttr}${colspanAttr}${styleAttr}>${escapeHtml(text)}</${tag}>`;
+    const comment = setup.comments === 'asDisplayed' ? commentByCell.get(key) : undefined;
+    const commentHtml = comment
+      ? `<div class="fc-print__comment-note">${escapeHtml(comment.text)}</div>`
+      : '';
+    const classAttr = manualColBreaks.has(col)
+      ? ' class="fc-print__manual-break-col"'
+      : '';
+    return `<${tag}${classAttr}${rowspanAttr}${colspanAttr}${styleAttr}>${escapeHtml(text)}${commentHtml}</${tag}>`;
   };
 
   const renderRow = (row: number, isTitle: boolean): string => {
@@ -267,11 +455,12 @@ export function buildPrintDocument(
     if (setup.showHeadings) {
       cells.push(`<th class="fc-print__rowhead">${row + 1}</th>`);
     }
-    for (let c = 0; c <= maxCol; c += 1) {
+    for (let c = minPrintCol; c <= maxCol; c += 1) {
       if (hiddenCols.has(c)) continue;
       cells.push(renderCell(row, c, isTitle ? 'th' : 'td'));
     }
-    return `<tr>${cells.join('')}</tr>`;
+    const cls = manualRowBreaks.has(row) && !isTitle ? ' class="fc-print__manual-break-row"' : '';
+    return `<tr${cls}>${cells.join('')}</tr>`;
   };
 
   // Optional column-letter heading row. Repeated inside <thead> when print-
@@ -279,9 +468,12 @@ export function buildPrintDocument(
   const headingRow = ((): string => {
     if (!setup.showHeadings) return '';
     const cells: string[] = [`<th class="fc-print__corner"></th>`];
-    for (let c = 0; c <= maxCol; c += 1) {
+    for (let c = minPrintCol; c <= maxCol; c += 1) {
       if (hiddenCols.has(c)) continue;
-      cells.push(`<th class="fc-print__colhead">${colLetter(c)}</th>`);
+      const cls = manualColBreaks.has(c)
+        ? 'fc-print__colhead fc-print__manual-break-col'
+        : 'fc-print__colhead';
+      cells.push(`<th class="${cls}">${colLetter(c)}</th>`);
     }
     return `<tr>${cells.join('')}</tr>`;
   })();
@@ -305,7 +497,7 @@ export function buildPrintDocument(
   if (titleRowRange) {
     for (let r = titleRowRange[0]; r <= titleRowRange[1]; r += 1) titleSet.add(r);
   }
-  for (let r = 0; r <= maxRow; r += 1) {
+  for (let r = minPrintRow; r <= maxRow; r += 1) {
     if (titleSet.has(r)) continue;
     const html = renderRow(r, false);
     if (html) bodyRows.push(html);
@@ -335,7 +527,20 @@ export function buildPrintDocument(
     )}</span><span>${escapeHtml(r)}</span></div>`;
   })();
 
-  const scale = setup.scale && setup.scale > 0 ? setup.scale : 1;
+  const commentsHtml =
+    setup.comments === 'endOfSheet' && commentEntries.length
+      ? `<section class="fc-print__comments"><h2>Comments and Notes</h2><table><tbody>${commentEntries
+          .map(
+            (entry) =>
+              `<tr><th>${colLetter(entry.col)}${entry.row + 1}</th><td>${escapeHtml(
+                entry.text,
+              )}</td></tr>`,
+          )
+          .join('')}</tbody></table></section>`
+      : '';
+
+  const hasFitToPages = (setup.fitWidth ?? 0) > 0 || (setup.fitHeight ?? 0) > 0;
+  const scale = hasFitToPages ? 1 : setup.scale && setup.scale > 0 ? setup.scale : 1;
   const tableTransform =
     scale === 1 ? '' : ` style="transform:scale(${scale});transform-origin:top left;"`;
 
@@ -348,7 +553,7 @@ export function buildPrintDocument(
     if (!titleColRange) return '';
     const cols: string[] = [];
     if (setup.showHeadings) cols.push('<col>');
-    for (let c = 0; c <= maxCol; c += 1) {
+    for (let c = minPrintCol; c <= maxCol; c += 1) {
       if (hiddenCols.has(c)) continue;
       const isTitle = c >= titleColRange[0] && c <= titleColRange[1];
       cols.push(isTitle ? '<col class="fc-print__title-col">' : '<col>');
@@ -363,8 +568,27 @@ export function buildPrintDocument(
     '--fc-print-margin-right': `${setup.margins.right}in`,
     '--fc-print-margin-bottom': `${setup.margins.bottom}in`,
     '--fc-print-margin-left': `${setup.margins.left}in`,
+    '--fc-print-header-margin': `${setup.headerMargin ?? 0.3}in`,
+    '--fc-print-footer-margin': `${setup.footerMargin ?? 0.3}in`,
     '--fc-print-scale': String(scale),
+    '--fc-print-fit-width': String(setup.fitWidth ?? 0),
+    '--fc-print-fit-height': String(setup.fitHeight ?? 0),
+    '--fc-print-quality': setup.printQuality ?? 'automatic',
+    '--fc-print-first-page': String(setup.firstPageNumber ?? 'auto'),
+    '--fc-print-header-footer-scale': String(
+      setup.scaleHeaderFooterWithDocument === false ? 1 : scale,
+    ),
   };
+  const bodyClasses = [
+    setup.centerHorizontally ? 'fc-print--center-h' : '',
+    setup.centerVertically ? 'fc-print--center-v' : '',
+    setup.blackAndWhite ? 'fc-print--black-white' : '',
+    setup.draftQuality ? 'fc-print--draft' : '',
+    hasFitToPages ? 'fc-print--fit-to-pages' : '',
+    setup.alignHeaderFooterWithMargins === false ? 'fc-print--hf-free' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   const css = [
     buildPageRule(setup),
@@ -374,24 +598,45 @@ export function buildPrintDocument(
     'table.fc-print__table thead th { background: #f5f5f5; }',
     '.fc-print__rowhead, .fc-print__colhead, .fc-print__corner { background: #f0f0f0; color: #555; font-weight: 500; text-align: center; min-width: 24px; }',
     '.fc-print__header, .fc-print__footer { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 4px 0; font-size: 9pt; color: #555; }',
+    '.fc-print__header, .fc-print__footer { transform: scale(var(--fc-print-header-footer-scale, 1)); transform-origin: top left; }',
+    '.fc-print__header { margin-top: calc(-1 * var(--fc-print-header-margin, 0.3in)); }',
+    '.fc-print__footer { margin-bottom: calc(-1 * var(--fc-print-footer-margin, 0.3in)); }',
+    '.fc-print--hf-free .fc-print__header, .fc-print--hf-free .fc-print__footer { margin-left: calc(-1 * var(--fc-print-margin-left)); margin-right: calc(-1 * var(--fc-print-margin-right)); }',
     '.fc-print__header > :nth-child(2), .fc-print__footer > :nth-child(2) { text-align: center; }',
     '.fc-print__header > :nth-child(3), .fc-print__footer > :nth-child(3) { text-align: right; }',
+    '.fc-print--center-h .fc-print__table { margin-left: auto; margin-right: auto; width: auto; }',
+    '.fc-print--center-v { min-height: calc(100vh - var(--fc-print-margin-top) - var(--fc-print-margin-bottom)); display: flex; flex-direction: column; justify-content: center; }',
+    '.fc-print--black-white { filter: grayscale(1); }',
+    '.fc-print--draft * { box-shadow: none !important; text-shadow: none !important; }',
+    '.fc-print--fit-to-pages .fc-print__table { width: 100%; max-width: 100%; }',
+    '.fc-print__comment-note { margin-top: 3px; padding: 3px 5px; border: 1px solid #d6a100; background: #fff8cc; color: #3b3a00; font-size: 8pt; white-space: normal; }',
+    '.fc-print__comments { break-before: page; page-break-before: always; margin-top: 16px; }',
+    '.fc-print__comments h2 { font-size: 12pt; margin: 0 0 8px; }',
+    '.fc-print__comments table { border-collapse: collapse; width: 100%; }',
+    '.fc-print__comments th, .fc-print__comments td { border: 1px solid #c8c8c8; padding: 4px 6px; text-align: left; vertical-align: top; }',
+    '.fc-print__comments th { width: 80px; background: #f0f0f0; }',
+    typeof setup.firstPageNumber === 'number'
+      ? `body { counter-reset: page ${Math.max(0, setup.firstPageNumber - 1)}; }`
+      : '',
     '.fc-print__title-col { background-color: rgba(0,0,0,0.0); }',
-    '@media print { thead { display: table-header-group; } tfoot { display: table-footer-group; } tr, td, th { page-break-inside: avoid; } }',
+    '.fc-print__manual-break-row { break-before: page; page-break-before: always; }',
+    '.fc-print__manual-break-col { break-before: page; page-break-before: always; }',
+    '@media print { thead { display: table-header-group; } tfoot { display: table-footer-group; } tr, td, th { page-break-inside: avoid; } .fc-print__manual-break-row, .fc-print__manual-break-col { break-before: page; page-break-before: always; } }',
   ].join('\n');
 
   const html = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
-<title>Print</title>
+<title>${escapeHtml(title)}</title>
 <style>
 ${css}
 </style>
 </head>
-<body>
+<body class="${bodyClasses}">
 ${headerHtml}
 <table class="fc-print__table"${tableTransform}>${colgroup}${thead}${tbody}</table>
+${commentsHtml}
 ${footerHtml}
 </body>
 </html>`;
@@ -409,10 +654,13 @@ export function printSheet(
   store: SpreadsheetStore,
   sheet: number,
   host: HTMLElement,
+  title?: string,
+  mode: 'print' | 'pdf' = 'print',
 ): () => void {
-  const doc = buildPrintDocument(wb, store, sheet);
+  const doc = buildPrintDocument(wb, store, sheet, title);
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');
+  iframe.dataset.fcPrintMode = mode;
   iframe.style.position = 'fixed';
   iframe.style.right = '0';
   iframe.style.bottom = '0';

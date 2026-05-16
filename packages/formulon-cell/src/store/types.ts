@@ -22,14 +22,31 @@ export type NumFmt =
   | { kind: 'date'; pattern: string }
   | { kind: 'time'; pattern: string }
   | { kind: 'datetime'; pattern: string }
+  | { kind: 'special'; pattern: string }
   | { kind: 'text' }
   | { kind: 'custom'; pattern: string };
 
 /** How negative numbers display. */
 export type NegativeStyle = 'minus' | 'parens' | 'red' | 'red-parens';
 
-export type CellAlign = 'left' | 'center' | 'right';
-export type CellVAlign = 'top' | 'middle' | 'bottom';
+export type CellAlign =
+  | 'left'
+  | 'center'
+  | 'right'
+  | 'fill'
+  | 'justify'
+  | 'centerContinuous'
+  | 'distributed';
+export type CellVAlign = 'top' | 'middle' | 'bottom' | 'justify' | 'distributed';
+export type TextDirection = 'context' | 'ltr' | 'rtl';
+export type FillPattern =
+  | 'gray125'
+  | 'gray25'
+  | 'gray50'
+  | 'horizontal'
+  | 'vertical'
+  | 'diagonalDown'
+  | 'diagonalUp';
 
 /** Per-side border style. The renderer treats `false`/missing as "no border"
  *  and `true` as the legacy single-line border (back-compat). Object form
@@ -70,6 +87,10 @@ export interface CellBorders {
 }
 
 export interface CellFormat {
+  /** Named cell style id last applied through the Cell Styles gallery. Direct
+   *  formatting may still override individual fields, mirroring spreadsheets'
+   *  style + local-format layering. */
+  cellStyle?: string;
   numFmt?: NumFmt;
   bold?: boolean;
   italic?: boolean;
@@ -80,15 +101,23 @@ export interface CellFormat {
   vAlign?: CellVAlign;
   /** Wrap text within the cell — paint multi-line with hard wrapping. */
   wrap?: boolean;
+  /** Shrink single-line text to fit the available cell width. */
+  shrinkToFit?: boolean;
   /** Indent level (left-align padding in increments of ~8px). 0..15. */
   indent?: number;
   /** Text rotation in degrees, -90..90. 0 = horizontal. */
   rotation?: number;
+  /** Text reading direction. Context maps to Excel's default/context mode. */
+  textDirection?: TextDirection;
   borders?: CellBorders;
   /** Foreground (font) color as a CSS color string. */
   color?: string;
   /** Background fill color as a CSS color string. */
   fill?: string;
+  /** Spreadsheet fill pattern drawn over `fill` using `fillPatternColor`. */
+  fillPattern?: FillPattern;
+  /** Foreground color for `fillPattern`. */
+  fillPatternColor?: string;
   /** Override theme font family for this cell. */
   fontFamily?: string;
   /** Font size in CSS pixels. */
@@ -110,6 +139,10 @@ export interface CellFormat {
    *  only takes effect when the containing sheet is also marked protected
    *  via `setSheetProtected`. */
   locked?: boolean;
+  /** Formula-hidden flag. When true and the containing sheet is protected,
+   *  formula text is suppressed from the formula bar, matching the desktop
+   *  Format Cells > Protection > Hidden behavior. */
+  formulaHidden?: boolean;
 }
 
 /** Comparison ordinals match OOXML data-validation `op`:
@@ -205,6 +238,8 @@ export interface LayoutSlice {
   /** Sheets whose tab is hidden (the desktop-spreadsheet "Hide Sheet"). Indexed by sheet
    *  index. Hidden sheets keep their data; only the tab is suppressed. */
   hiddenSheets: Set<number>;
+  /** Sheet tab fill colors keyed by sheet index, matching Excel's Tab Color affordance. */
+  sheetTabColors: Map<number, string>;
 }
 
 /** Snapshot of every populated cell on the active sheet. The store does not
@@ -248,6 +283,10 @@ export interface UiSlice {
   /** When true, formula cells display the formula text instead of the
    *  evaluated value. Equivalent to the desktop-spreadsheet "Show Formulas" (Ctrl+`). */
   showFormulas: boolean;
+  /** Workbook view mode surfaced by View > Workbook Views. The renderer keeps
+   *  the grid model identical for now; chrome stamps the mode on the host so
+   *  themes and wrappers can distinguish Normal, Page Layout, and Page Break Preview. */
+  workbookView: WorkbookViewMode;
   /** Display refs in R1C1 form instead of A1 (headers, name box). Underlying
    *  storage stays A1 — only the rendered representation changes. */
   r1c1: boolean;
@@ -259,10 +298,24 @@ export interface UiSlice {
   /** Range with autofilter enabled. Header row inside this range paints a
    *  small filter button (▼). null = no autofilter. */
   filterRange: Range | null;
+  /** Value-filter criteria keyed by filter range + column. Reapply uses this
+   *  to recompute hidden rows after the sheet data changes. */
+  filterCriteria: ValueFilterCriteria[];
   /** Visibility flag for the Watch Window panel. Session-only state — the
    *  panel itself reads `watch.watches` for content. */
   watchPanelOpen: boolean;
+  /** Excel-style sheet background image URLs keyed by sheet index. These are
+   *  painted behind cells for on-screen use and intentionally excluded from print. */
+  sheetBackgroundImages: Map<number, string>;
 }
+
+export interface ValueFilterCriteria {
+  range: Range;
+  byCol: number;
+  hiddenValues: string[];
+}
+
+export type WorkbookViewMode = 'normal' | 'pageLayout' | 'pageBreakPreview';
 
 /** Aggregate readouts available in the status bar. Spreadsheets ship these six. */
 export type StatusAggKey = 'sum' | 'average' | 'count' | 'countNumbers' | 'min' | 'max';
@@ -281,10 +334,25 @@ export interface MergesSlice {
   byCell: Map<string, string>;
 }
 
-/** Icon-set artwork name. `arrows3` / `traffic3` / `stars3` use 3 slots
- *  classified by [0.33, 0.67]; `arrows5` uses 5 slots classified by
- *  [0.20, 0.40, 0.60, 0.80]. */
-export type ConditionalIconSet = 'arrows3' | 'arrows5' | 'traffic3' | 'stars3';
+/** Icon-set artwork name. 3-slot families classify by [0.33, 0.67];
+ *  5-slot families classify by [0.20, 0.40, 0.60, 0.80]. */
+export type ConditionalIconSet =
+  | 'arrows3'
+  | 'arrows5'
+  | 'triangles3'
+  | 'traffic3'
+  | 'trafficRim3'
+  | 'symbols3'
+  | 'flags3'
+  | 'stars3'
+  | 'quarters5'
+  | 'ratings5'
+  | 'bars5'
+  | 'boxes5';
+
+export type ConditionalScalePoint =
+  | { kind: 'min' | 'max' }
+  | { kind: 'number' | 'percent' | 'percentile'; value: number };
 
 /** Conditional formatting rule. Evaluated by the renderer against cell
  *  values; the predicate kinds (cell-value, top-bottom, formula, blanks,
@@ -309,11 +377,20 @@ export type ConditionalRule =
        *  are interpolated linearly across [min, max] (or [min, mid, max]) of
        *  the range. */
       stops: [string, string] | [string, string, string];
+      /** Excel-style threshold metadata for each color stop. Omitted rules use
+       *  min/max for two-color scales and min/50th percentile/max for
+       *  three-color scales. */
+      thresholds?:
+        | [ConditionalScalePoint, ConditionalScalePoint]
+        | [ConditionalScalePoint, ConditionalScalePoint, ConditionalScalePoint];
     }
   | {
       kind: 'data-bar';
       range: Range;
       color: string;
+      /** True for Excel's gradient-fill data bars, false for solid-fill bars.
+       *  Omitted legacy rules render as solid bars. */
+      gradient?: boolean;
       /** When true, paint the bar across the whole cell with the text on top
        *  (like the spreadsheet's "Show Bar Only" being false). */
       showValue?: boolean;
@@ -323,6 +400,11 @@ export type ConditionalRule =
       range: Range;
       /** Icon family. 3-slot or 5-slot determined by the suffix. */
       icons: ConditionalIconSet;
+      /** When false, render only the icon and suppress the cell value text. */
+      showValue?: boolean;
+      /** Boundaries between icon slots, ordered from low to high. Omitted
+       *  rules use Excel's default percent thresholds. */
+      thresholds?: ConditionalScalePoint[];
       /** Invert slot index so the highest values get the "low" icon. */
       reverseOrder?: boolean;
     }
@@ -335,6 +417,36 @@ export type ConditionalRule =
       /** When true, `n` is interpreted as a percentage (0..100) of the
        *  range's numeric-cell count. */
       percent?: boolean;
+      apply: Partial<CellFormat>;
+    }
+  | {
+      kind: 'average';
+      range: Range;
+      /** Spreadsheet average rules over numeric cells in the range. */
+      mode: 'above' | 'below' | 'equal-or-above' | 'equal-or-below';
+      apply: Partial<CellFormat>;
+    }
+  | {
+      kind: 'text-contains';
+      range: Range;
+      text: string;
+      caseSensitive?: boolean;
+      apply: Partial<CellFormat>;
+    }
+  | {
+      kind: 'date-occurring';
+      range: Range;
+      period:
+        | 'yesterday'
+        | 'today'
+        | 'tomorrow'
+        | 'last7'
+        | 'last-week'
+        | 'this-week'
+        | 'next-week'
+        | 'last-month'
+        | 'this-month'
+        | 'next-month';
       apply: Partial<CellFormat>;
     }
   | {
@@ -382,7 +494,7 @@ export interface SparklineSlice {
   sparklines: Map<string, Sparkline>;
 }
 
-export type SessionChartKind = 'column' | 'line';
+export type SessionChartKind = 'column' | 'bar' | 'line' | 'area' | 'pie' | 'scatter';
 
 /** Session chart overlay. This is intentionally UI-owned until the engine
  *  exposes chart authoring; the source range can later map to a persisted
@@ -434,6 +546,10 @@ export interface TracesSlice {
  *  session and doesn't survive a reload. */
 export interface ErrorIndicatorSlice {
   ignoredErrors: Set<string>;
+  /** Excel-style "Circle Invalid Data" marks. Session-only; populated on demand
+   *  from Data Validation > Circle Invalid Data and cleared by Clear
+   *  Validation Circles. */
+  validationCircles: Set<string>;
 }
 
 /** Page orientation for print / PDF export. */
@@ -453,6 +569,11 @@ export interface PageMargins {
   left: number;
 }
 
+export type PrintCommentsMode = 'none' | 'asDisplayed' | 'endOfSheet';
+export type PrintCellErrorsMode = 'displayed' | 'blank' | 'dash' | 'na';
+export type PrintPageOrder = 'downThenOver' | 'overThenDown';
+export type PrintQuality = 'automatic' | '300' | '600' | '1200';
+
 /** Per-sheet page-setup configuration. Drives both the Page Setup dialog and
  *  the print document builder. Default values come from `defaultPageSetup()`;
  *  unset fields fall back to that default — `getPageSetup` always returns a
@@ -461,6 +582,12 @@ export interface PageSetup {
   orientation: PageOrientation;
   paperSize: PaperSize;
   margins: PageMargins;
+  /** Distance from page edge to header/footer text, in inches. */
+  headerMargin?: number;
+  footerMargin?: number;
+  /** Center printed content within the page margins. */
+  centerHorizontally?: boolean;
+  centerVertically?: boolean;
   /** Header / footer text — desktop spreadsheets splits the strip into three slots
    *  (left / center / right). Empty / missing strings render as nothing. */
   headerLeft?: string;
@@ -469,6 +596,13 @@ export interface PageSetup {
   footerLeft?: string;
   footerCenter?: string;
   footerRight?: string;
+  /** Header/Footer tab options. */
+  differentOddEvenPages?: boolean;
+  differentFirstPage?: boolean;
+  scaleHeaderFooterWithDocument?: boolean;
+  alignHeaderFooterWithMargins?: boolean;
+  /** A1-style print area, e.g. "A1:D20". Empty means print the used range. */
+  printArea?: string;
   /** A1-style row range ("1:3" or "$1:$3") whose rows repeat at the top of
    *  every printed page. Single-row form ("2") is allowed. */
   printTitleRows?: string;
@@ -479,13 +613,27 @@ export interface PageSetup {
   fitWidth?: number;
   /** Fit-to-N-pages-tall. 0 means no height constraint. */
   fitHeight?: number;
+  /** Manual page breaks before the given zero-based rows / columns. */
+  manualPageBreakRows?: number[];
+  manualPageBreakCols?: number[];
   /** Print scale, 0.10..4.00 (1 = 100%). When `fitWidth`/`fitHeight` is set
    *  the browser ignores the explicit scale. */
   scale?: number;
+  /** Printer quality and first printed page number from Excel's Page tab.
+   *  `firstPageNumber` undefined means Auto. */
+  printQuality?: PrintQuality;
+  firstPageNumber?: number;
   /** Paint inter-cell hairline gridlines on the print document. */
   showGridlines?: boolean;
   /** Paint row-numbers and column-letters on the print document. */
   showHeadings?: boolean;
+  /** Excel Sheet tab print options. Some are preserved for parity even when
+   *  browser print has no exact equivalent. */
+  blackAndWhite?: boolean;
+  draftQuality?: boolean;
+  comments?: PrintCommentsMode;
+  cellErrorsAs?: PrintCellErrorsMode;
+  pageOrder?: PrintPageOrder;
 }
 
 export interface PageSetupSlice {
@@ -505,9 +653,23 @@ export function defaultPageSetup(): PageSetup {
     orientation: 'portrait',
     paperSize: 'A4',
     margins: { top: 0.75, right: 0.7, bottom: 0.75, left: 0.7 },
+    headerMargin: 0.3,
+    footerMargin: 0.3,
+    centerHorizontally: false,
+    centerVertically: false,
+    differentOddEvenPages: false,
+    differentFirstPage: false,
+    scaleHeaderFooterWithDocument: true,
+    alignHeaderFooterWithMargins: true,
     scale: 1,
+    printQuality: 'automatic',
     showGridlines: false,
     showHeadings: false,
+    blackAndWhite: false,
+    draftQuality: false,
+    comments: 'none',
+    cellErrorsAs: 'displayed',
+    pageOrder: 'downThenOver',
   };
 }
 
@@ -547,6 +709,13 @@ export interface SheetViewsSlice {
   activeViewId: string | null;
 }
 
+export interface AllowedEditRange {
+  id: string;
+  title: string;
+  range: Range;
+  password?: string;
+}
+
 /** Workbook-level sheet-protection state. Each protected sheet is keyed by
  *  its index; the value records whether a password was supplied (currently
  *  stored verbatim, not enforced — v1 ships without password validation).
@@ -555,6 +724,8 @@ export interface SheetViewsSlice {
  *  on `CellFormat.locked`; this slice only owns the sheet-side flag. */
 export interface ProtectionSlice {
   protectedSheets: Map<number, { password?: string }>;
+  workbookStructure?: { password?: string };
+  allowedEditRanges: readonly AllowedEditRange[];
 }
 
 export interface State {

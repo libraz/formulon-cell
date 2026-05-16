@@ -344,7 +344,15 @@
   font-weight: 600;
 }
 
-.demo__modal-field input {
+.demo__modal-field legend {
+  margin-bottom: 6px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.demo__modal-field input,
+.demo__modal-field select {
   height: 30px;
   padding: 0 8px;
   color: var(--demo-fg);
@@ -354,9 +362,56 @@
   font: inherit;
 }
 
-.demo__modal-field input:focus {
+.demo__modal-field input:focus,
+.demo__modal-field select:focus {
   outline: 2px solid var(--demo-accent);
   outline-offset: 1px;
+}
+
+.demo__modal-note {
+  margin: 0;
+  font-size: 13px;
+}
+
+.demo__modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.demo__report-list {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.demo__report-item {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  background: var(--demo-panel-bg);
+  border: 1px solid var(--demo-ribbon-line);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.demo__sort-dialog {
+  display: grid;
+  gap: 12px;
+}
+
+.demo__sort-dialog__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.demo__btn--primary {
+  color: var(--demo-title-fg);
+  background: var(--demo-accent);
+  border-color: var(--demo-accent);
 }
 
 .demo__modal-footer {
@@ -400,7 +455,7 @@
   }
 
   .demo__backstage {
-    inset: 103px 0 0;
+    inset: 39px 0 0;
     grid-template-columns: 120px minmax(0, 1fr);
   }
 

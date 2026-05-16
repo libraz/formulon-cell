@@ -1,6 +1,12 @@
 import { addrKey } from '../engine/address.js';
 import type { CellValue, Range } from '../engine/types.js';
-import type { CellFormat, ConditionalIconSet, ConditionalRule, State } from '../store/store.js';
+import type {
+  CellFormat,
+  ConditionalIconSet,
+  ConditionalRule,
+  ConditionalScalePoint,
+  State,
+} from '../store/store.js';
 
 const inRange = (sheet: number, row: number, col: number, r: Range): boolean =>
   r.sheet === sheet && row >= r.r0 && row <= r.r1 && col >= r.c0 && col <= r.c1;
@@ -19,11 +25,14 @@ export interface ConditionalCellOverlay {
    *  When set, `barColor` is also defined. */
   bar?: number;
   barColor?: string;
+  barGradient?: boolean;
   /** Icon-set artwork + slot index. When set, the painter draws a small
    *  glyph in a left gutter inside the cell. `slot` is 0-based and
    *  bounded by the icon family (3 or 5). */
   iconKind?: ConditionalIconSet;
   iconSlot?: number;
+  /** False when conditional formatting should hide the underlying cell value. */
+  showValue?: boolean;
 }
 
 // Single-slot identity cache. zustand replaces conditional.rules /
@@ -46,14 +55,20 @@ export function _resetConditionalCache(): void {
 /** Number of slots per icon family. `arrows5` is the only 5-slot family;
  *  the rest land on 3 slots with thresholds at 0.33 / 0.67. */
 export function iconSetSlotCount(set: ConditionalIconSet): 3 | 5 {
-  return set === 'arrows5' ? 5 : 3;
+  return set === 'arrows5' ||
+    set === 'quarters5' ||
+    set === 'ratings5' ||
+    set === 'bars5' ||
+    set === 'boxes5'
+    ? 5
+    : 3;
 }
 
 /** Classify `t` (a 0..1 percentile) into a slot index for the icon family.
  *  Uses the spreadsheet's default thresholds — [0.33, 0.67] for 3-slot families and
  *  [0.20, 0.40, 0.60, 0.80] for 5-slot families. */
 export function iconSetSlotFor(set: ConditionalIconSet, t: number): number {
-  if (set === 'arrows5') {
+  if (iconSetSlotCount(set) === 5) {
     if (t < 0.2) return 0;
     if (t < 0.4) return 1;
     if (t < 0.6) return 2;
@@ -206,6 +221,12 @@ export function evaluateConditional(state: State): Map<string, ConditionalCellOv
       paintIconSet(state, rule, out);
     } else if (rule.kind === 'top-bottom') {
       paintTopBottom(state, rule, out);
+    } else if (rule.kind === 'average') {
+      paintAverage(state, rule, out);
+    } else if (rule.kind === 'text-contains') {
+      paintTextContains(state, rule, out);
+    } else if (rule.kind === 'date-occurring') {
+      paintDateOccurring(state, rule, out);
     } else if (rule.kind === 'formula') {
       paintFormula(state, rule, out);
     } else if (rule.kind === 'duplicates' || rule.kind === 'unique') {
@@ -254,30 +275,89 @@ function paintColorScale(
   out: Map<string, ConditionalCellOverlay>,
 ): void {
   const sheet = state.data.sheetIndex;
-  let min = Number.POSITIVE_INFINITY;
-  let max = Number.NEGATIVE_INFINITY;
+  const values: number[] = [];
   for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
     for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
       const cell = state.data.cells.get(addrKey({ sheet, row: r, col: c }));
       if (!cell || cell.value.kind !== 'number') continue;
-      const v = cell.value.value;
-      if (v < min) min = v;
-      if (v > max) max = v;
+      values.push(cell.value.value);
     }
   }
-  if (!Number.isFinite(min)) return;
+  if (values.length === 0) return;
+  const scale = colorScaleThresholds(rule, values);
+  if (!scale) return;
   for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
     for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
       const key = addrKey({ sheet, row: r, col: c });
       const cell = state.data.cells.get(key);
       if (!cell || cell.value.kind !== 'number') continue;
       const v = cell.value.value;
-      const t = max === min ? 0.5 : (v - min) / (max - min);
+      const t = colorScalePosition(v, scale);
       const overlay = out.get(key) ?? {};
       overlay.fill = pickStop(rule.stops, t);
       out.set(key, overlay);
     }
   }
+}
+
+interface ColorScaleThresholds {
+  low: number;
+  mid?: number;
+  high: number;
+}
+
+function colorScaleThresholds(
+  rule: Extract<ConditionalRule, { kind: 'color-scale' }>,
+  values: readonly number[],
+): ColorScaleThresholds | null {
+  const sorted = values
+    .filter((value) => Number.isFinite(value))
+    .slice()
+    .sort((a, b) => a - b);
+  if (sorted.length === 0) return null;
+  const defaultThresholds =
+    rule.stops.length === 2
+      ? ([{ kind: 'min' }, { kind: 'max' }] as const)
+      : ([{ kind: 'min' }, { kind: 'percentile', value: 50 }, { kind: 'max' }] as const);
+  const thresholds = rule.thresholds ?? defaultThresholds;
+  const low = resolveScalePoint(thresholds[0] ?? { kind: 'min' }, sorted);
+  const high = resolveScalePoint(thresholds[thresholds.length - 1] ?? { kind: 'max' }, sorted);
+  if (rule.stops.length === 2) return { low, high };
+  const mid = resolveScalePoint(thresholds[1] ?? { kind: 'percentile', value: 50 }, sorted);
+  return { low, mid, high };
+}
+
+function resolveScalePoint(point: ConditionalScalePoint, sorted: readonly number[]): number {
+  const min = sorted[0] ?? 0;
+  const max = sorted[sorted.length - 1] ?? min;
+  if (point.kind === 'min') return min;
+  if (point.kind === 'max') return max;
+  if (point.kind === 'number') return point.value;
+  if (point.kind !== 'percent' && point.kind !== 'percentile') return min;
+  const pct = Math.max(0, Math.min(100, point.value));
+  if (point.kind === 'percent') return min + ((max - min) * pct) / 100;
+  const rank = ((sorted.length - 1) * pct) / 100;
+  const lo = Math.floor(rank);
+  const hi = Math.ceil(rank);
+  const a = sorted[lo] ?? min;
+  const b = sorted[hi] ?? a;
+  return a + (b - a) * (rank - lo);
+}
+
+function colorScalePosition(value: number, thresholds: ColorScaleThresholds): number {
+  const low = thresholds.low;
+  const high = thresholds.high;
+  const mid = thresholds.mid;
+  if (mid === undefined) {
+    if (high === low) return 0.5;
+    return Math.max(0, Math.min(1, (value - low) / (high - low)));
+  }
+  if (value <= mid) {
+    if (mid === low) return value <= low ? 0 : 0.5;
+    return Math.max(0, Math.min(0.5, ((value - low) / (mid - low)) * 0.5));
+  }
+  if (high === mid) return value >= high ? 1 : 0.5;
+  return Math.max(0.5, Math.min(1, 0.5 + ((value - mid) / (high - mid)) * 0.5));
 }
 
 function paintDataBar(
@@ -308,6 +388,8 @@ function paintDataBar(
       const overlay = out.get(key) ?? {};
       overlay.bar = Math.max(0, Math.min(1, Math.abs(v) / denom));
       overlay.barColor = rule.color;
+      overlay.barGradient = rule.gradient === true;
+      overlay.showValue = rule.showValue !== false;
       out.set(key, overlay);
     }
   }
@@ -319,19 +401,23 @@ function paintIconSet(
   out: Map<string, ConditionalCellOverlay>,
 ): void {
   const sheet = state.data.sheetIndex;
-  let min = Number.POSITIVE_INFINITY;
-  let max = Number.NEGATIVE_INFINITY;
+  const values: number[] = [];
   for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
     for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
       const cell = state.data.cells.get(addrKey({ sheet, row: r, col: c }));
       if (!cell || cell.value.kind !== 'number') continue;
-      const v = cell.value.value;
-      if (v < min) min = v;
-      if (v > max) max = v;
+      values.push(cell.value.value);
     }
   }
-  if (!Number.isFinite(min)) return;
+  const sorted = values
+    .filter((value) => Number.isFinite(value))
+    .slice()
+    .sort((a, b) => a - b);
+  if (sorted.length === 0) return;
+  const min = sorted[0] ?? 0;
+  const max = sorted[sorted.length - 1] ?? min;
   const slots = iconSetSlotCount(rule.icons);
+  const thresholds = iconSetThresholdValues(rule, sorted);
   for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
     for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
       const key = addrKey({ sheet, row: r, col: c });
@@ -339,14 +425,31 @@ function paintIconSet(
       if (!cell || cell.value.kind !== 'number') continue;
       const v = cell.value.value;
       const t = max === min ? 0.5 : (v - min) / (max - min);
-      let slot = iconSetSlotFor(rule.icons, t);
+      let slot =
+        thresholds === null
+          ? iconSetSlotFor(rule.icons, t)
+          : thresholds.reduce((count, threshold) => (v >= threshold ? count + 1 : count), 0);
+      slot = Math.max(0, Math.min(slots - 1, slot));
       if (rule.reverseOrder) slot = slots - 1 - slot;
       const overlay = out.get(key) ?? {};
       overlay.iconKind = rule.icons;
       overlay.iconSlot = slot;
+      overlay.showValue = rule.showValue !== false;
       out.set(key, overlay);
     }
   }
+}
+
+function iconSetThresholdValues(
+  rule: Extract<ConditionalRule, { kind: 'icon-set' }>,
+  sorted: readonly number[],
+): number[] | null {
+  const slots = iconSetSlotCount(rule.icons);
+  if (!rule.thresholds || rule.thresholds.length === 0) return null;
+  return rule.thresholds
+    .slice(0, slots - 1)
+    .map((point) => resolveScalePoint(point, sorted))
+    .sort((a, b) => a - b);
 }
 
 function paintTopBottom(
@@ -372,6 +475,155 @@ function paintTopBottom(
       const v = cell.value.value;
       const passes = rule.mode === 'top' ? v >= cutoff : v <= cutoff;
       if (!passes) continue;
+      const overlay = out.get(key) ?? {};
+      mergeApply(overlay, rule.apply);
+      out.set(key, overlay);
+    }
+  }
+}
+
+function paintAverage(
+  state: State,
+  rule: Extract<ConditionalRule, { kind: 'average' }>,
+  out: Map<string, ConditionalCellOverlay>,
+): void {
+  const sheet = state.data.sheetIndex;
+  const values: number[] = [];
+  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
+    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
+      const cell = state.data.cells.get(addrKey({ sheet, row: r, col: c }));
+      if (cell?.value.kind === 'number' && Number.isFinite(cell.value.value)) {
+        values.push(cell.value.value);
+      }
+    }
+  }
+  if (values.length === 0) return;
+  const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
+  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
+    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
+      const key = addrKey({ sheet, row: r, col: c });
+      const cell = state.data.cells.get(key);
+      if (!cell || cell.value.kind !== 'number') continue;
+      const v = cell.value.value;
+      const passes =
+        rule.mode === 'above'
+          ? v > avg
+          : rule.mode === 'below'
+            ? v < avg
+            : rule.mode === 'equal-or-above'
+              ? v >= avg
+              : v <= avg;
+      if (!passes) continue;
+      const overlay = out.get(key) ?? {};
+      mergeApply(overlay, rule.apply);
+      out.set(key, overlay);
+    }
+  }
+}
+
+function cellText(v: CellValue): string | null {
+  if (v.kind === 'text') return v.value;
+  if (v.kind === 'number') return String(v.value);
+  if (v.kind === 'bool') return v.value ? 'TRUE' : 'FALSE';
+  if (v.kind === 'error') return v.text;
+  return null;
+}
+
+function paintTextContains(
+  state: State,
+  rule: Extract<ConditionalRule, { kind: 'text-contains' }>,
+  out: Map<string, ConditionalCellOverlay>,
+): void {
+  const needle = rule.caseSensitive ? rule.text : rule.text.toLocaleLowerCase();
+  if (needle.length === 0) return;
+  const sheet = state.data.sheetIndex;
+  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
+    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
+      const key = addrKey({ sheet, row: r, col: c });
+      const cell = state.data.cells.get(key);
+      if (!cell) continue;
+      const raw = cellText(cell.value);
+      if (raw === null) continue;
+      const haystack = rule.caseSensitive ? raw : raw.toLocaleLowerCase();
+      if (!haystack.includes(needle)) continue;
+      const overlay = out.get(key) ?? {};
+      mergeApply(overlay, rule.apply);
+      out.set(key, overlay);
+    }
+  }
+}
+
+const DAY_MS = 86_400_000;
+
+function normalizeDate(d: Date): number {
+  return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY_MS);
+}
+
+function excelSerialToDate(serial: number): Date {
+  return new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * DAY_MS);
+}
+
+function cellDateDay(v: CellValue): number | null {
+  if (v.kind === 'number' && Number.isFinite(v.value)) return normalizeDate(excelSerialToDate(v.value));
+  if (v.kind === 'text') {
+    const time = Date.parse(v.value);
+    if (Number.isFinite(time)) return normalizeDate(new Date(time));
+  }
+  return null;
+}
+
+function weekStart(day: number): number {
+  const d = new Date(day * DAY_MS);
+  const dow = d.getUTCDay();
+  return day - dow;
+}
+
+function monthKey(day: number): number {
+  const d = new Date(day * DAY_MS);
+  return d.getUTCFullYear() * 12 + d.getUTCMonth();
+}
+
+function datePeriodMatches(day: number, period: Extract<ConditionalRule, { kind: 'date-occurring' }>['period']): boolean {
+  const today = normalizeDate(new Date());
+  switch (period) {
+    case 'yesterday':
+      return day === today - 1;
+    case 'today':
+      return day === today;
+    case 'tomorrow':
+      return day === today + 1;
+    case 'last7':
+      return day >= today - 6 && day <= today;
+    case 'last-week':
+      return weekStart(day) === weekStart(today) - 7;
+    case 'this-week':
+      return weekStart(day) === weekStart(today);
+    case 'next-week':
+      return weekStart(day) === weekStart(today) + 7;
+    case 'last-month':
+      return monthKey(day) === monthKey(today) - 1;
+    case 'this-month':
+      return monthKey(day) === monthKey(today);
+    case 'next-month':
+      return monthKey(day) === monthKey(today) + 1;
+    default:
+      return false;
+  }
+}
+
+function paintDateOccurring(
+  state: State,
+  rule: Extract<ConditionalRule, { kind: 'date-occurring' }>,
+  out: Map<string, ConditionalCellOverlay>,
+): void {
+  const sheet = state.data.sheetIndex;
+  for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
+    for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
+      const key = addrKey({ sheet, row: r, col: c });
+      const cell = state.data.cells.get(key);
+      if (!cell) continue;
+      const day = cellDateDay(cell.value);
+      if (day === null || !datePeriodMatches(day, rule.period)) continue;
       const overlay = out.get(key) ?? {};
       mergeApply(overlay, rule.apply);
       out.set(key, overlay);

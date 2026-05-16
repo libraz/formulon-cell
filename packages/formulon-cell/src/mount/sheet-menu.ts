@@ -28,6 +28,28 @@ export function createSheetMenuSeparator(): HTMLDivElement {
   return sep;
 }
 
+export function createSheetMenuColorButton(
+  label: string,
+  color: string | null,
+  selected: boolean,
+  onClick: () => void,
+): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = color
+    ? 'fc-sheetmenu__swatch'
+    : 'fc-sheetmenu__swatch fc-sheetmenu__swatch--none';
+  button.setAttribute('role', 'menuitemradio');
+  button.setAttribute('aria-label', color ? `${label} ${color}` : label);
+  button.setAttribute('aria-checked', selected ? 'true' : 'false');
+  button.title = color ? `${label} ${color}` : label;
+  if (color) button.style.setProperty('--fc-sheet-tab-color', color);
+  button.addEventListener('click', () => {
+    onClick();
+  });
+  return button;
+}
+
 export function positionSheetMenu(menu: HTMLElement, x: number, y: number): void {
   menu.hidden = false;
   menu.style.left = '0px';

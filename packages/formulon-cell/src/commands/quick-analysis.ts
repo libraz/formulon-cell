@@ -2,8 +2,17 @@ import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SparklineKind, type SpreadsheetStore } from '../store/store.js';
 import type { SelectionStats } from './aggregate.js';
-import { clearFormat } from './format.js';
+import { applyFormatPatch } from './format.js';
 import { formatAsTable as applyFormatAsTable } from './format-as-table.js';
+import {
+  type History,
+  recordChartsChange,
+  recordConditionalRulesChange,
+  recordFormatChange,
+  recordSparklineChange,
+  recordTablesChange,
+} from './history.js';
+import { isCellWritable, isSheetProtected, warnProtected } from './protection.js';
 import { createSessionChart } from './session-chart.js';
 
 /**
@@ -16,7 +25,7 @@ import { createSessionChart } from './session-chart.js';
  *   - 書式設定 (Formatting)  — fill / data-bar / icon-set tied to numbers.
  *   - グラフ (Charts)        — session chart overlays.
  *   - 合計 (Totals)          — sum / average etc. for numeric ranges.
- *   - テーブル (Tables)      — Format-As-Table / Pivot stub.
+ *   - テーブル (Tables)      — Format-As-Table / PivotTable creation flow.
  *   - スパークライン         — line / column / win-loss for numeric ranges.
  */
 export type QuickAnalysisGroup = 'formatting' | 'charts' | 'totals' | 'tables' | 'sparklines';
@@ -64,6 +73,9 @@ export interface QuickAnalysisExecuteInput extends QuickAnalysisInput {
   store: SpreadsheetStore;
   wb: WorkbookHandle;
   actionId: QuickAnalysisActionId;
+  /** Shared undo/redo journal. When supplied, multi-cell Quick Analysis
+   *  actions are committed as one Excel-style undo step. */
+  history?: History | null;
 }
 
 export type QuickAnalysisExecuteResult =
@@ -72,7 +84,7 @@ export type QuickAnalysisExecuteResult =
       kind: 'conditional-format' | 'formula' | 'sparkline' | 'chart' | 'table' | 'clear-format';
       count: number;
     }
-  | { ok: false; reason: 'disabled' | 'unsupported' | 'out-of-bounds' };
+  | { ok: false; reason: 'disabled' | 'unsupported' | 'out-of-bounds' | 'protected' };
 
 const MAX_COL = 16383;
 const MAX_ROW = 1048575;
@@ -163,7 +175,7 @@ export function buildQuickAnalysisActions(input: QuickAnalysisInput): QuickAnaly
   out.push({
     id: 'tables-pivot',
     group: 'tables',
-    labelKey: 'pivotStub',
+    labelKey: 'pivotTable',
     disabled: !multi || input.pivotTableAvailable !== true,
   });
 
@@ -240,10 +252,32 @@ export function enabledQuickAnalysisActions(input: QuickAnalysisInput): QuickAna
   return buildQuickAnalysisActions(input).filter((action) => action.disabled !== true);
 }
 
+function firstLockedProtectedAddr(input: QuickAnalysisExecuteInput, range: Range) {
+  const state = input.store.getState();
+  if (!isSheetProtected(state, range.sheet)) return null;
+  for (let row = range.r0; row <= range.r1; row += 1) {
+    for (let col = range.c0; col <= range.c1; col += 1) {
+      const addr = { sheet: range.sheet, row, col };
+      if (!isCellWritable(state, addr)) return addr;
+    }
+  }
+  return null;
+}
+
 function addConditionalFormat(input: QuickAnalysisExecuteInput): QuickAnalysisExecuteResult {
   const { actionId, range, stats, store } = input;
+  const locked = firstLockedProtectedAddr(input, range);
+  if (locked) {
+    warnProtected(locked);
+    return { ok: false, reason: 'protected' };
+  }
+  const add = (rule: Parameters<typeof mutators.addConditionalRule>[1]) => {
+    recordConditionalRulesChange(input.history ?? null, store, () => {
+      mutators.addConditionalRule(store, rule);
+    });
+  };
   if (actionId === 'format-data-bar') {
-    mutators.addConditionalRule(store, {
+    add({
       kind: 'data-bar',
       range,
       color: '#5b9bd5',
@@ -252,19 +286,29 @@ function addConditionalFormat(input: QuickAnalysisExecuteInput): QuickAnalysisEx
     return { ok: true, kind: 'conditional-format', count: 1 };
   }
   if (actionId === 'format-color-scale') {
-    mutators.addConditionalRule(store, {
+    add({
       kind: 'color-scale',
       range,
       stops: ['#f8696b', '#ffeb84', '#63be7b'],
+      thresholds: [{ kind: 'min' }, { kind: 'percentile', value: 50 }, { kind: 'max' }],
     });
     return { ok: true, kind: 'conditional-format', count: 1 };
   }
   if (actionId === 'format-icon-set') {
-    mutators.addConditionalRule(store, { kind: 'icon-set', range, icons: 'traffic3' });
+    add({
+      kind: 'icon-set',
+      range,
+      icons: 'traffic3',
+      showValue: true,
+      thresholds: [
+        { kind: 'percent', value: 100 / 3 },
+        { kind: 'percent', value: 200 / 3 },
+      ],
+    });
     return { ok: true, kind: 'conditional-format', count: 1 };
   }
   if (actionId === 'format-greater-than') {
-    mutators.addConditionalRule(store, {
+    add({
       kind: 'cell-value',
       range,
       op: '>',
@@ -274,7 +318,7 @@ function addConditionalFormat(input: QuickAnalysisExecuteInput): QuickAnalysisEx
     return { ok: true, kind: 'conditional-format', count: 1 };
   }
   if (actionId === 'format-top-10') {
-    mutators.addConditionalRule(store, {
+    add({
       kind: 'top-bottom',
       range,
       mode: 'top',
@@ -287,7 +331,7 @@ function addConditionalFormat(input: QuickAnalysisExecuteInput): QuickAnalysisEx
 }
 
 function writeTotalFormulas(input: QuickAnalysisExecuteInput): QuickAnalysisExecuteResult {
-  const { actionId, range, wb } = input;
+  const { actionId, range, store, wb } = input;
   const fn =
     actionId === 'totals-average-row'
       ? 'AVERAGE'
@@ -303,10 +347,26 @@ function writeTotalFormulas(input: QuickAnalysisExecuteInput): QuickAnalysisExec
   ) {
     const row = range.r1 + 1;
     if (row > MAX_ROW) return { ok: false, reason: 'out-of-bounds' };
+    const writes: Array<{ addr: { sheet: number; row: number; col: number }; formula: string }> =
+      [];
     for (let col = range.c0; col <= range.c1; col += 1) {
+      const addr = { sheet: range.sheet, row, col };
+      if (!isCellWritable(store.getState(), addr)) {
+        warnProtected(addr);
+        continue;
+      }
       const formula = `=${fn}(${colLetter(col)}${range.r0 + 1}:${colLetter(col)}${range.r1 + 1})`;
-      wb.setFormula({ sheet: range.sheet, row, col }, formula);
-      count += 1;
+      writes.push({ addr, formula });
+    }
+    if (writes.length === 0) return { ok: false, reason: 'protected' };
+    if (input.history) input.history.begin();
+    try {
+      for (const write of writes) {
+        wb.setFormula(write.addr, write.formula);
+        count += 1;
+      }
+    } finally {
+      if (input.history) input.history.end();
     }
     return { ok: true, kind: 'formula', count };
   }
@@ -314,10 +374,26 @@ function writeTotalFormulas(input: QuickAnalysisExecuteInput): QuickAnalysisExec
   if (actionId === 'totals-sum-col') {
     const col = range.c1 + 1;
     if (col > MAX_COL) return { ok: false, reason: 'out-of-bounds' };
+    const writes: Array<{ addr: { sheet: number; row: number; col: number }; formula: string }> =
+      [];
     for (let row = range.r0; row <= range.r1; row += 1) {
+      const addr = { sheet: range.sheet, row, col };
+      if (!isCellWritable(store.getState(), addr)) {
+        warnProtected(addr);
+        continue;
+      }
       const formula = `=SUM(${colLetter(range.c0)}${row + 1}:${colLetter(range.c1)}${row + 1})`;
-      wb.setFormula({ sheet: range.sheet, row, col }, formula);
-      count += 1;
+      writes.push({ addr, formula });
+    }
+    if (writes.length === 0) return { ok: false, reason: 'protected' };
+    if (input.history) input.history.begin();
+    try {
+      for (const write of writes) {
+        wb.setFormula(write.addr, write.formula);
+        count += 1;
+      }
+    } finally {
+      if (input.history) input.history.end();
     }
     return { ok: true, kind: 'formula', count };
   }
@@ -335,45 +411,78 @@ function addSparkline(input: QuickAnalysisExecuteInput): QuickAnalysisExecuteRes
         : 'line';
   const col = range.c1 + 1;
   if (col > MAX_COL) return { ok: false, reason: 'out-of-bounds' };
-  mutators.setSparkline(
-    store,
-    { sheet: range.sheet, row: range.r0, col },
-    { kind, source: rangeRef(range), showNegative: kind !== 'line' },
-  );
+  const addr = { sheet: range.sheet, row: range.r0, col };
+  if (!isCellWritable(store.getState(), addr)) {
+    warnProtected(addr);
+    return { ok: false, reason: 'protected' };
+  }
+  recordSparklineChange(input.history ?? null, store, () => {
+    mutators.setSparkline(store, addr, {
+      kind,
+      source: rangeRef(range),
+      showNegative: kind !== 'line',
+    });
+  });
   return { ok: true, kind: 'sparkline', count: 1 };
 }
 
 function addChart(input: QuickAnalysisExecuteInput): QuickAnalysisExecuteResult {
   const { actionId, range, store } = input;
+  if (isSheetProtected(store.getState(), range.sheet)) return { ok: false, reason: 'protected' };
   const kind = actionId === 'charts-line' ? 'line' : 'column';
   const count = store.getState().charts.charts.length;
-  createSessionChart(store, range, {
-    id: `qa-chart-${range.sheet}-${range.r0}-${range.c0}-${range.r1}-${range.c1}-${kind}`,
-    kind,
-    title: null,
-    x: 320 + (count % 3) * 24,
-    y: 72 + (count % 3) * 24,
-    w: 360,
-    h: 220,
+  recordChartsChange(input.history ?? null, store, () => {
+    createSessionChart(store, range, {
+      id: `qa-chart-${range.sheet}-${range.r0}-${range.c0}-${range.r1}-${range.c1}-${kind}`,
+      kind,
+      title: null,
+      x: 320 + (count % 3) * 24,
+      y: 72 + (count % 3) * 24,
+      w: 360,
+      h: 220,
+    });
   });
   return { ok: true, kind: 'chart', count: 1 };
 }
 
 function formatAsTable(input: QuickAnalysisExecuteInput): QuickAnalysisExecuteResult {
   const { range, store } = input;
-  applyFormatAsTable(store, range, {
-    id: `qa-table-${range.sheet}-${range.r0}-${range.c0}-${range.r1}-${range.c1}`,
+  let ok = false;
+  recordTablesChange(input.history ?? null, store, () => {
+    ok =
+      applyFormatAsTable(store, range, {
+        id: `qa-table-${range.sheet}-${range.r0}-${range.c0}-${range.r1}-${range.c1}`,
+      }) != null;
   });
+  if (!ok) return { ok: false, reason: 'protected' };
   return { ok: true, kind: 'table', count: 1 };
 }
 
 function clearAnalysisFormatting(input: QuickAnalysisExecuteInput): QuickAnalysisExecuteResult {
   const { store, range } = input;
-  clearFormat(store.getState(), store);
-  mutators.clearConditionalRulesInRange(store, range);
-  mutators.clearSparklinesInRange(store, range);
-  mutators.clearChartsInRange(store, range);
-  mutators.clearTableOverlaysInRange(store, range);
+  const history = input.history ?? null;
+  if (history) history.begin();
+  try {
+    recordFormatChange(history, store, () => {
+      applyFormatPatch(store.getState(), store, range, null);
+    });
+    if (!isSheetProtected(store.getState(), range.sheet)) {
+      recordConditionalRulesChange(history, store, () => {
+        mutators.clearConditionalRulesInRange(store, range);
+      });
+      recordSparklineChange(history, store, () => {
+        mutators.clearSparklinesInRange(store, range);
+      });
+      recordChartsChange(history, store, () => {
+        mutators.clearChartsInRange(store, range);
+      });
+      recordTablesChange(history, store, () => {
+        mutators.clearTableOverlaysInRange(store, range);
+      });
+    }
+  } finally {
+    if (history) history.end();
+  }
   return { ok: true, kind: 'clear-format', count: 1 };
 }
 

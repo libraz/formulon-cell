@@ -1,4 +1,5 @@
 import { listExternalLinks } from '../commands/external-links.js';
+import type { ExternalLinkKind } from '../commands/external-links.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { createDialogShell } from './dialog-shell.js';
@@ -17,6 +18,22 @@ export interface ExternalLinksDialogHandle {
   /** Re-read i18n strings (e.g. after a locale switch). */
   refresh(): void;
   detach(): void;
+}
+
+function externalLinkKindText(
+  kind: ExternalLinkKind,
+  labels: Strings['externalLinksDialog'],
+): string {
+  switch (kind) {
+    case 'externalBook':
+      return labels.kindExternalBook;
+    case 'ole':
+      return labels.kindOle;
+    case 'dde':
+      return labels.kindDde;
+    case 'unknown':
+      return labels.kindUnknown;
+  }
 }
 
 /**
@@ -128,7 +145,7 @@ export function attachExternalLinksDialog(
       const idx = document.createElement('td');
       idx.textContent = String(link.index);
       const kind = document.createElement('td');
-      kind.textContent = link.kind;
+      kind.textContent = externalLinkKindText(link.kind, t);
       const target = document.createElement('td');
       target.className = 'fc-extlinkdlg__cell-target';
       target.textContent = link.target || '—';

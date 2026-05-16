@@ -1,6 +1,7 @@
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { State } from '../store/store.js';
+import { isCellWritable, warnProtected } from './protection.js';
 
 const colLetter = (n: number): string => {
   let v = n;
@@ -27,6 +28,12 @@ const isEmpty = (state: State, sheet: number, row: number, col: number): boolean
   return !cell || cell.value.kind === 'blank';
 };
 
+const canWriteFormula = (state: State, addr: Addr): boolean => {
+  if (isCellWritable(state, addr)) return true;
+  warnProtected(addr);
+  return false;
+};
+
 /**
  * the spreadsheet's Σ button. Decides where a SUM formula belongs based on the current
  * selection and writes it. Returns the inserted location + formula (when
@@ -49,11 +56,18 @@ const isEmpty = (state: State, sheet: number, row: number, col: number): boolean
  *   - Otherwise, place `=SUM(<range>)` directly below the range, or to
  *     its right when below is occupied.
  */
-export function autoSum(state: State, wb: WorkbookHandle): { addr: Addr; formula: string } | null {
+export type AutoSumFunction = 'SUM' | 'AVERAGE' | 'COUNT' | 'MAX' | 'MIN';
+
+export function autoSum(
+  state: State,
+  wb: WorkbookHandle,
+  functionName: AutoSumFunction = 'SUM',
+): { addr: Addr; formula: string } | null {
   const r = state.selection.range;
   const sheet = state.data.sheetIndex;
   const isSingle = r.r0 === r.r1 && r.c0 === r.c1;
   const a = state.selection.active;
+  const fn = functionName;
 
   if (isSingle) {
     if (isEmpty(state, sheet, a.row, a.col)) {
@@ -62,7 +76,8 @@ export function autoSum(state: State, wb: WorkbookHandle): { addr: Addr; formula
       let r0 = r1;
       while (r0 - 1 >= 0 && isNum(state, sheet, r0 - 1, a.col)) r0 -= 1;
       if (r1 >= 0 && isNum(state, sheet, r1, a.col)) {
-        const formula = `=SUM(${colLetter(a.col)}${r0 + 1}:${colLetter(a.col)}${r1 + 1})`;
+        const formula = `=${fn}(${colLetter(a.col)}${r0 + 1}:${colLetter(a.col)}${r1 + 1})`;
+        if (!canWriteFormula(state, a)) return null;
         wb.setFormula(a, formula);
         return { addr: a, formula };
       }
@@ -71,7 +86,8 @@ export function autoSum(state: State, wb: WorkbookHandle): { addr: Addr; formula
       let c0 = c1;
       while (c0 - 1 >= 0 && isNum(state, sheet, a.row, c0 - 1)) c0 -= 1;
       if (c1 >= 0 && isNum(state, sheet, a.row, c1)) {
-        const formula = `=SUM(${colLetter(c0)}${a.row + 1}:${colLetter(c1)}${a.row + 1})`;
+        const formula = `=${fn}(${colLetter(c0)}${a.row + 1}:${colLetter(c1)}${a.row + 1})`;
+        if (!canWriteFormula(state, a)) return null;
         wb.setFormula(a, formula);
         return { addr: a, formula };
       }
@@ -87,9 +103,11 @@ export function autoSum(state: State, wb: WorkbookHandle): { addr: Addr; formula
       while (isNum(state, sheet, bottom + 1, a.col)) bottom += 1;
       const colTarget: Addr = { sheet, row: bottom + 1, col: a.col };
       if (isEmpty(state, sheet, colTarget.row, colTarget.col)) {
-        const formula = `=SUM(${colLetter(a.col)}${top + 1}:${colLetter(a.col)}${bottom + 1})`;
-        wb.setFormula(colTarget, formula);
-        return { addr: colTarget, formula };
+        const formula = `=${fn}(${colLetter(a.col)}${top + 1}:${colLetter(a.col)}${bottom + 1})`;
+        if (canWriteFormula(state, colTarget)) {
+          wb.setFormula(colTarget, formula);
+          return { addr: colTarget, formula };
+        }
       }
       // Fall back to the row direction.
       let left = a.col;
@@ -98,9 +116,11 @@ export function autoSum(state: State, wb: WorkbookHandle): { addr: Addr; formula
       while (isNum(state, sheet, a.row, right + 1)) right += 1;
       const rowTarget: Addr = { sheet, row: a.row, col: right + 1 };
       if (isEmpty(state, sheet, rowTarget.row, rowTarget.col)) {
-        const formula = `=SUM(${colLetter(left)}${a.row + 1}:${colLetter(right)}${a.row + 1})`;
-        wb.setFormula(rowTarget, formula);
-        return { addr: rowTarget, formula };
+        const formula = `=${fn}(${colLetter(left)}${a.row + 1}:${colLetter(right)}${a.row + 1})`;
+        if (canWriteFormula(state, rowTarget)) {
+          wb.setFormula(rowTarget, formula);
+          return { addr: rowTarget, formula };
+        }
       }
     }
     return null;
@@ -122,9 +142,10 @@ export function autoSum(state: State, wb: WorkbookHandle): { addr: Addr; formula
     if (lastNumRow < 0 || lastNumRow >= r.r1) continue;
     const target: Addr = { sheet, row: lastNumRow + 1, col };
     if (!isEmpty(state, sheet, target.row, target.col)) continue;
+    if (!canWriteFormula(state, target)) continue;
     let top = lastNumRow;
     while (top - 1 >= r.r0 && isNum(state, sheet, top - 1, col)) top -= 1;
-    const formula = `=SUM(${colLetter(col)}${top + 1}:${colLetter(col)}${lastNumRow + 1})`;
+    const formula = `=${fn}(${colLetter(col)}${top + 1}:${colLetter(col)}${lastNumRow + 1})`;
     colWrites.push({ addr: target, formula });
   }
   if (colWrites.length > 0) {
@@ -146,9 +167,10 @@ export function autoSum(state: State, wb: WorkbookHandle): { addr: Addr; formula
     if (lastNumCol < 0 || lastNumCol >= r.c1) continue;
     const target: Addr = { sheet, row, col: lastNumCol + 1 };
     if (!isEmpty(state, sheet, target.row, target.col)) continue;
+    if (!canWriteFormula(state, target)) continue;
     let left = lastNumCol;
     while (left - 1 >= r.c0 && isNum(state, sheet, row, left - 1)) left -= 1;
-    const formula = `=SUM(${colLetter(left)}${row + 1}:${colLetter(lastNumCol)}${row + 1})`;
+    const formula = `=${fn}(${colLetter(left)}${row + 1}:${colLetter(lastNumCol)}${row + 1})`;
     rowWrites.push({ addr: target, formula });
   }
   if (rowWrites.length > 0) {
@@ -163,7 +185,8 @@ export function autoSum(state: State, wb: WorkbookHandle): { addr: Addr; formula
   ];
   for (const t of candidates) {
     if (isEmpty(state, sheet, t.row, t.col)) {
-      const formula = `=SUM(${ref})`;
+      const formula = `=${fn}(${ref})`;
+      if (!canWriteFormula(state, t)) continue;
       wb.setFormula(t, formula);
       return { addr: t, formula };
     }

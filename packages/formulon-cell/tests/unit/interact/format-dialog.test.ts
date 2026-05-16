@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
+import { setCellLocked, setProtectedSheet } from '../../../src/commands/protection.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { attachFormatDialog } from '../../../src/interact/format-dialog.js';
 import {
@@ -77,6 +78,19 @@ describe('attachFormatDialog', () => {
     handle.detach();
   });
 
+  it('open(tab) opens the requested tab and focuses it', async () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open('more');
+    const moreTab = document.querySelector<HTMLButtonElement>('button[data-fc-tab="more"]');
+    const morePanel = document.querySelector<HTMLDivElement>('div[data-fc-tab="more"]');
+    expect(moreTab?.getAttribute('aria-selected')).toBe('true');
+    expect(morePanel?.hidden).toBe(false);
+
+    await flushRaf();
+    expect(document.activeElement).toBe(moreTab);
+    handle.detach();
+  });
+
   it('close() hides the overlay and refocuses host', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
@@ -84,6 +98,26 @@ describe('attachFormatDialog', () => {
     const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg');
     expect(overlay?.hidden).toBe(true);
     expect(document.activeElement).toBe(host);
+    handle.detach();
+  });
+
+  it('header close button hides the overlay without applying changes', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+
+    const fontTab = document.querySelector<HTMLButtonElement>('button[data-fc-tab="font"]');
+    fontTab?.click();
+    const boldInput = document.querySelector<HTMLInputElement>('input[data-fc-check="bold"]');
+    if (!boldInput) throw new Error('bold input missing');
+    boldInput.checked = true;
+    boldInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__close')?.click();
+
+    expect(document.querySelector<HTMLElement>('.fc-fmtdlg')?.hidden).toBe(true);
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toBe(
+      undefined,
+    );
     handle.detach();
   });
 
@@ -99,8 +133,9 @@ describe('attachFormatDialog', () => {
       store,
       { sheet: 0, row: 0, col: 0 },
       {
-        numFmt: { kind: 'fixed', decimals: 4 },
+        numFmt: { kind: 'fixed', decimals: 4, thousands: true },
         align: 'right',
+        shrinkToFit: true,
         bold: true,
         italic: true,
         underline: true,
@@ -119,6 +154,9 @@ describe('attachFormatDialog', () => {
       'input[type="number"][min="0"][max="10"]',
     );
     expect(decimalsInput?.value).toBe('4');
+    expect(
+      document.querySelector<HTMLInputElement>('input[data-fc-check="thousands"]')?.checked,
+    ).toBe(true);
 
     const boldInput = document.querySelector<HTMLInputElement>('input[data-fc-check="bold"]');
     expect(boldInput?.checked).toBe(true);
@@ -135,6 +173,9 @@ describe('attachFormatDialog', () => {
       'input[type="radio"][value="right"]',
     );
     expect(rightAlign?.checked).toBe(true);
+    expect(
+      document.querySelector<HTMLInputElement>('input[data-fc-check="shrinkToFit"]')?.checked,
+    ).toBe(true);
 
     handle.detach();
   });
@@ -284,6 +325,8 @@ describe('attachFormatDialog', () => {
     fixedBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(fixedBtn?.getAttribute('aria-selected')).toBe('true');
     expect(decimalsRow?.hidden).toBe(false);
+    const thousands = document.querySelector<HTMLInputElement>('input[data-fc-check="thousands"]');
+    expect(thousands?.closest('label')?.hidden).toBe(false);
 
     const symbolRow = document.querySelectorAll<HTMLLabelElement>(
       '.fc-fmtdlg__cat-controls .fc-fmtdlg__row',
@@ -298,8 +341,101 @@ describe('attachFormatDialog', () => {
     percentBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(symbolRow?.hidden).toBe(true);
     expect(decimalsRow?.hidden).toBe(false);
+    expect(thousands?.closest('label')?.hidden).toBe(true);
 
     handle.detach();
+  });
+
+  it('Number category can persist Excel-style 1000 separator option', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+
+    document
+      .querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const decimalsInput = document.querySelector<HTMLInputElement>(
+      'input[type="number"][min="0"][max="10"]',
+    );
+    const thousands = document.querySelector<HTMLInputElement>('input[data-fc-check="thousands"]');
+    if (!decimalsInput || !thousands) throw new Error('number controls missing');
+    decimalsInput.value = '2';
+    decimalsInput.dispatchEvent(new Event('input', { bubbles: true }));
+    thousands.checked = true;
+    thousands.dispatchEvent(new Event('change', { bubbles: true }));
+
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.numFmt,
+    ).toEqual({
+      kind: 'fixed',
+      decimals: 2,
+      thousands: true,
+    });
+    handle.detach();
+  });
+
+  it('Number category can persist Excel-style negative number style', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+
+    document
+      .querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const redParens = document.querySelector<HTMLButtonElement>(
+      'button[data-fc-negative-style="red-parens"]',
+    );
+    if (!redParens) throw new Error('negative style option missing');
+    redParens.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(redParens.getAttribute('aria-selected')).toBe('true');
+
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.numFmt,
+    ).toEqual({
+      kind: 'fixed',
+      decimals: 2,
+      negativeStyle: 'red-parens',
+    });
+    handle.detach();
+  });
+
+  it('Number category persists and rehydrates Special formats as Special', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+
+    document
+      .querySelector<HTMLButtonElement>('button[data-fc-cat="special"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const preset = document.querySelector<HTMLSelectElement>(
+      'select[data-fc-select="patternPreset"]',
+    );
+    if (!preset) throw new Error('special preset select missing');
+    preset.value = '00000-0000';
+    preset.dispatchEvent(new Event('change', { bubbles: true }));
+
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.numFmt,
+    ).toEqual({ kind: 'special', pattern: '00000-0000' });
+    handle.detach();
+
+    const reopened = attachFormatDialog({ host, store });
+    reopened.open();
+    expect(
+      document
+        .querySelector<HTMLButtonElement>('button[data-fc-cat="special"]')
+        ?.getAttribute('aria-selected'),
+    ).toBe('true');
+    reopened.detach();
   });
 
   it('clicking on cat list outside button is a no-op', () => {
@@ -416,6 +552,170 @@ describe('attachFormatDialog', () => {
     handle.detach();
   });
 
+  it('Alignment tab exposes Excel-style extended horizontal and vertical choices', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+    document
+      .querySelector<HTMLButtonElement>('button[data-fc-tab="align"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const horizontal = document.querySelector<HTMLSelectElement>('select[data-fc-select="align"]');
+    const vertical = document.querySelector<HTMLSelectElement>('select[data-fc-select="vAlign"]');
+    if (!horizontal || !vertical) throw new Error('alignment selects missing');
+    expect([...horizontal.options].map((o) => o.value)).toEqual([
+      'default',
+      'left',
+      'center',
+      'right',
+      'fill',
+      'justify',
+      'centerContinuous',
+      'distributed',
+    ]);
+    expect([...vertical.options].map((o) => o.value)).toEqual([
+      'default',
+      'top',
+      'middle',
+      'bottom',
+      'justify',
+      'distributed',
+    ]);
+
+    horizontal.value = 'centerContinuous';
+    horizontal.dispatchEvent(new Event('change', { bubbles: true }));
+    vertical.value = 'distributed';
+    vertical.dispatchEvent(new Event('change', { bubbles: true }));
+
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
+    expect(fmt?.align).toBe('centerContinuous');
+    expect(fmt?.vAlign).toBe('distributed');
+    handle.detach();
+  });
+
+  it('Alignment tab persists Shrink to Fit like Excel text control', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+    document
+      .querySelector<HTMLButtonElement>('button[data-fc-tab="align"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const shrink = document.querySelector<HTMLInputElement>('input[data-fc-check="shrinkToFit"]');
+    expect(shrink?.disabled).toBe(false);
+    if (!shrink) throw new Error('shrink checkbox missing');
+    shrink.checked = true;
+    shrink.dispatchEvent(new Event('change', { bubbles: true }));
+
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.shrinkToFit,
+    ).toBe(true);
+    handle.detach();
+  });
+
+  it('Alignment tab persists text direction', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+    document
+      .querySelector<HTMLButtonElement>('button[data-fc-tab="align"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const direction = document.querySelector<HTMLSelectElement>(
+      'select[data-fc-select="textDirection"]',
+    );
+    if (!direction) throw new Error('text direction select missing');
+    direction.value = 'rtl';
+    direction.dispatchEvent(new Event('change', { bubbles: true }));
+
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.textDirection,
+    ).toBe('rtl');
+    handle.detach();
+  });
+
+  it('Alignment tab Merge cells applies a merge to a multi-cell selection', () => {
+    setRange(store, 0, 0, 1, 1);
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+    document
+      .querySelector<HTMLButtonElement>('button[data-fc-tab="align"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const merge = document.querySelector<HTMLInputElement>('input[data-fc-check="mergeCells"]');
+    expect(merge?.disabled).toBe(false);
+    if (!merge) throw new Error('merge checkbox missing');
+    merge.checked = true;
+    merge.dispatchEvent(new Event('change', { bubbles: true }));
+
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(store.getState().merges.byAnchor.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toEqual({
+      sheet: 0,
+      r0: 0,
+      c0: 0,
+      r1: 1,
+      c1: 1,
+    });
+    handle.detach();
+  });
+
+  it('Alignment tab Merge cells hydrates checked and can unmerge', () => {
+    setRange(store, 0, 0, 1, 1);
+    mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+    document
+      .querySelector<HTMLButtonElement>('button[data-fc-tab="align"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const merge = document.querySelector<HTMLInputElement>('input[data-fc-check="mergeCells"]');
+    expect(merge?.checked).toBe(true);
+    if (!merge) throw new Error('merge checkbox missing');
+    merge.checked = false;
+    merge.dispatchEvent(new Event('change', { bubbles: true }));
+
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(store.getState().merges.byAnchor.size).toBe(0);
+    handle.detach();
+  });
+
+  it('Protection tab persists the Hidden formula flag', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+    document
+      .querySelector<HTMLButtonElement>('button[data-fc-tab="protection"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const hidden = document.querySelector<HTMLInputElement>('input[data-fc-check="formulaHidden"]');
+    if (!hidden) throw new Error('formula hidden checkbox missing');
+    hidden.checked = true;
+    hidden.dispatchEvent(new Event('change', { bubbles: true }));
+
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.formulaHidden,
+    ).toBe(true);
+    handle.detach();
+  });
+
   it('alignment "default" radio clears align', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { align: 'right' });
     const handle = attachFormatDialog({ host, store });
@@ -480,6 +780,74 @@ describe('attachFormatDialog', () => {
     expect(fmt?.italic).toBe(true);
     expect(fmt?.underline).toBe(true);
     expect(fmt?.strike).toBe(true);
+    handle.detach();
+  });
+
+  it('Font tab style list applies Regular, Italic, Bold, and Bold Italic choices', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+    document
+      .querySelector<HTMLButtonElement>('button[data-fc-tab="font"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const normal = document.querySelector<HTMLInputElement>('input[data-fc-check="normalFont"]');
+    const boldItalic = document.querySelector<HTMLButtonElement>(
+      'button[data-fc-font-style="boldItalic"]',
+    );
+    if (!normal || !boldItalic) throw new Error('font style controls missing');
+    expect(normal.checked).toBe(true);
+
+    boldItalic.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(normal.checked).toBe(false);
+    expect(boldItalic.getAttribute('aria-selected')).toBe('true');
+
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
+    expect(fmt?.bold).toBe(true);
+    expect(fmt?.italic).toBe(true);
+    handle.detach();
+  });
+
+  it('Normal font resets font family, size, color, and effects', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        bold: true,
+        italic: true,
+        underline: true,
+        strike: true,
+        fontFamily: 'Georgia',
+        fontSize: 18,
+        color: '#ff0000',
+      },
+    );
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+    document
+      .querySelector<HTMLButtonElement>('button[data-fc-tab="font"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const normal = document.querySelector<HTMLInputElement>('input[data-fc-check="normalFont"]');
+    if (!normal) throw new Error('normal font checkbox missing');
+    normal.checked = true;
+    normal.dispatchEvent(new Event('change', { bubbles: true }));
+
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
+    expect(fmt?.bold).toBe(false);
+    expect(fmt?.italic).toBe(false);
+    expect(fmt?.underline).toBe(false);
+    expect(fmt?.strike).toBe(false);
+    expect(fmt?.fontFamily).toBeUndefined();
+    expect(fmt?.fontSize).toBeUndefined();
+    expect(fmt?.color).toBeUndefined();
     handle.detach();
   });
 
@@ -683,6 +1051,34 @@ describe('attachFormatDialog', () => {
     handle.detach();
   });
 
+  it('border Outline preset applies only the perimeter of a multi-cell selection', () => {
+    setRange(store, 0, 0, 1, 1);
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+
+    const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'));
+    const presetOutline = buttons.find((b) => b.textContent === '外枠') as HTMLButtonElement;
+    presetOutline.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const fmt = store.getState().format.formats;
+    const topLeft = fmt.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.borders;
+    const topRight = fmt.get(addrKey({ sheet: 0, row: 0, col: 1 }))?.borders;
+    const bottomLeft = fmt.get(addrKey({ sheet: 0, row: 1, col: 0 }))?.borders;
+    const bottomRight = fmt.get(addrKey({ sheet: 0, row: 1, col: 1 }))?.borders;
+    const thinSide = { style: 'thin' };
+    expect(topLeft).toMatchObject({ top: thinSide, left: thinSide });
+    expect(topLeft?.right).toBeUndefined();
+    expect(topLeft?.bottom).toBeUndefined();
+    expect(topRight).toMatchObject({ top: thinSide, right: thinSide });
+    expect(bottomLeft).toMatchObject({ bottom: thinSide, left: thinSide });
+    expect(bottomRight).toMatchObject({ bottom: thinSide, right: thinSide });
+    handle.detach();
+  });
+
   it('visual line style picker sets the active border style', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
@@ -786,6 +1182,35 @@ describe('attachFormatDialog', () => {
       store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.fill,
     ).toBeUndefined();
 
+    handle.detach();
+  });
+
+  it('Fill tab persists pattern style and pattern color', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+    document
+      .querySelector<HTMLButtonElement>('button[data-fc-tab="fill"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const pattern = document.querySelector<HTMLSelectElement>(
+      'select[data-fc-select="fillPattern"]',
+    );
+    const patternColor = document.querySelector<HTMLInputElement>(
+      'input[data-fc-color="fillPattern"]',
+    );
+    if (!pattern || !patternColor) throw new Error('fill pattern controls missing');
+    pattern.value = 'horizontal';
+    pattern.dispatchEvent(new Event('change', { bubbles: true }));
+    patternColor.value = '#336699';
+    patternColor.dispatchEvent(new Event('input', { bubbles: true }));
+
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
+    expect(fmt?.fillPattern).toBe('horizontal');
+    expect(fmt?.fillPatternColor).toBe('#336699');
     handle.detach();
   });
 
@@ -967,6 +1392,28 @@ describe('attachFormatDialog', () => {
     expect(formats.get(addrKey({ sheet: 0, row: 0, col: 1 }))?.bold).toBe(true);
     expect(formats.get(addrKey({ sheet: 0, row: 1, col: 0 }))?.bold).toBe(true);
     expect(formats.get(addrKey({ sheet: 0, row: 1, col: 1 }))?.bold).toBe(true);
+    handle.detach();
+  });
+
+  it('applies dialog format changes only to unlocked cells on protected sheets', () => {
+    setRange(store, 0, 0, 0, 1);
+    setCellLocked(store, { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 }, false);
+    setProtectedSheet(store, 0, true);
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+
+    const bold = document.querySelector<HTMLInputElement>(
+      'input[data-fc-check="bold"]',
+    ) as HTMLInputElement;
+    bold.checked = true;
+    bold.dispatchEvent(new Event('change', { bubbles: true }));
+
+    const okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    okBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const formats = store.getState().format.formats;
+    expect(formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.bold).toBeUndefined();
+    expect(formats.get(addrKey({ sheet: 0, row: 0, col: 1 }))?.bold).toBe(true);
     handle.detach();
   });
 

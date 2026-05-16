@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { History } from '../../../src/commands/history.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { attachHyperlinkDialog } from '../../../src/interact/hyperlink-dialog.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
@@ -29,7 +30,8 @@ describe('attachHyperlinkDialog', () => {
 
   it('OK with a non-empty URL writes hyperlink onto the active cell', () => {
     const store = createSpreadsheetStore();
-    const handle = attachHyperlinkDialog({ host, store });
+    const history = new History();
+    const handle = attachHyperlinkDialog({ host, store, history });
     handle.open();
     const input = document.querySelector<HTMLInputElement>('.fc-hldlg input');
     if (!input) throw new Error('expected url input');
@@ -40,6 +42,17 @@ describe('attachHyperlinkDialog', () => {
 
     const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
     expect(fmt?.hyperlink).toBe('https://example.com');
+    expect(history.canUndo()).toBe(true);
+
+    history.undo();
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toBe(
+      undefined,
+    );
+
+    history.redo();
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.hyperlink,
+    ).toBe('https://example.com');
     handle.detach();
   });
 
@@ -58,13 +71,14 @@ describe('attachHyperlinkDialog', () => {
 
   it('Remove button clears the hyperlink', () => {
     const store = createSpreadsheetStore();
+    const history = new History();
     store.setState((s) => ({
       ...s,
       format: {
         formats: new Map([[addrKey({ sheet: 0, row: 0, col: 0 }), { hyperlink: 'https://old' }]]),
       },
     }));
-    const handle = attachHyperlinkDialog({ host, store });
+    const handle = attachHyperlinkDialog({ host, store, history });
     handle.open();
     const removeBtn = document.querySelectorAll<HTMLButtonElement>('.fc-hldlg button')[0];
     if (!removeBtn) throw new Error('expected remove button');
@@ -72,6 +86,16 @@ describe('attachHyperlinkDialog', () => {
 
     const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
     expect(fmt?.hyperlink).toBeUndefined();
+
+    history.undo();
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.hyperlink,
+    ).toBe('https://old');
+
+    history.redo();
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.hyperlink,
+    ).toBeUndefined();
     handle.detach();
   });
 

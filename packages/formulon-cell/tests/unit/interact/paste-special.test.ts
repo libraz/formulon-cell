@@ -157,6 +157,55 @@ describe('attachPasteSpecial', () => {
     handle.detach();
   });
 
+  it('apply() runs pasteSpecial directly without opening the dialog', () => {
+    seed(store, wb, [{ row: 0, col: 0, value: 11 }]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    setActive(store, 6, 6);
+
+    const handle = attachPasteSpecial({
+      host,
+      store,
+      wb,
+      getSnapshot: () => snap,
+      onAfterCommit,
+    });
+
+    expect(
+      handle.apply({
+        what: 'values',
+        operation: 'none',
+        skipBlanks: false,
+        transpose: false,
+      }),
+    ).toBe(true);
+    wb.recalc();
+    expect(wb.getValue({ sheet: 0, row: 6, col: 6 })).toEqual({ kind: 'number', value: 11 });
+    expect(onAfterCommit).toHaveBeenCalledTimes(1);
+    expect(document.querySelector<HTMLElement>('.fc-pastesp')?.hidden).toBe(true);
+    handle.detach();
+  });
+
+  it('apply() returns false when there is no structured clipboard snapshot', () => {
+    const handle = attachPasteSpecial({
+      host,
+      store,
+      wb,
+      getSnapshot: () => null,
+      onAfterCommit,
+    });
+
+    expect(
+      handle.apply({
+        what: 'values',
+        operation: 'none',
+        skipBlanks: false,
+        transpose: false,
+      }),
+    ).toBe(false);
+    expect(onAfterCommit).not.toHaveBeenCalled();
+    handle.detach();
+  });
+
   it('arithmetic operations apply on top of the destination', () => {
     seed(store, wb, [
       { row: 0, col: 0, value: 7 },
@@ -206,6 +255,7 @@ describe('attachPasteSpecial', () => {
     );
 
     expect(history.undo()).toBe(true);
+    expect(wb.getValue({ sheet: 0, row: 4, col: 4 }).kind).toBe('blank');
     // Format reverts on undo.
     expect(
       store.getState().format.formats.get(addrKey({ sheet: 0, row: 4, col: 4 })),

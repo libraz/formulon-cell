@@ -73,6 +73,19 @@ describe('mount/formula-bar — edit lifecycle', () => {
     expect(formulabar.dataset.fcEditing).toBe('0');
   });
 
+  it('Enter preserves numeric-looking input as text for cells formatted as Text', () => {
+    const addr = { sheet: 0, row: 0, col: 0 };
+    mutators.setActive(sheet.instance.store, addr);
+    mutators.setCellFormat(sheet.instance.store, addr, { numFmt: { kind: 'text' } });
+    fxInput.focus();
+    fxInput.dispatchEvent(new FocusEvent('focus'));
+    fxInput.value = '00123';
+    fxInput.dispatchEvent(new Event('input'));
+    fxInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    expect(sheet.workbook.getValue(addr)).toEqual({ kind: 'text', value: '00123' });
+  });
+
   it('Tab commits and advances the active cell right', () => {
     mutators.setActive(sheet.instance.store, { sheet: 0, row: 0, col: 0 });
     fxInput.focus();

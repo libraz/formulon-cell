@@ -1,3 +1,5 @@
+import type { History } from '../commands/history.js';
+import { recordWatchesChange } from '../commands/watch.js';
 import type { Addr } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -17,6 +19,11 @@ export interface WatchPanelDeps {
    *  performs no writes, so this is reserved for symmetry with the rest of
    *  the interact modules. */
   onAfterCommit?: () => void;
+  /** Optional history stack used to keep panel Add/Delete/Clear aligned with
+   *  ribbon Watch Window commands. */
+  history?: History | null;
+  /** Workbook label shown in the Excel-compatible Book column. */
+  workbookName?: string;
 }
 
 export interface WatchPanelHandle {
@@ -91,9 +98,10 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
   const thead = document.createElement('thead');
   const headRow = document.createElement('tr');
   const headers = [
+    'bookHeader',
     'sheetHeader',
-    'cellHeader',
     'nameHeader',
+    'cellHeader',
     'valueHeader',
     'formulaHeader',
   ] as const;
@@ -168,6 +176,8 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
     }
   };
 
+  const bookLabel = (): string => deps.workbookName ?? 'Book1';
+
   const readValue = (addr: Addr): string => {
     try {
       return formatCell(getWb().getValue(addr));
@@ -195,19 +205,26 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
     empty.hidden = true;
     table.hidden = false;
     for (const addr of watches) {
+      const active = store.getState().selection.active;
+      const selected =
+        active.sheet === addr.sheet && active.row === addr.row && active.col === addr.col;
       const tr = document.createElement('tr');
       tr.className = 'fc-watch__row';
+      tr.classList.toggle('fc-watch__row--selected', selected);
       tr.dataset.fcSheet = String(addr.sheet);
       tr.dataset.fcRow = String(addr.row);
       tr.dataset.fcCol = String(addr.col);
       tr.tabIndex = 0;
+      tr.setAttribute('aria-selected', String(selected));
 
+      const tdBook = document.createElement('td');
+      tdBook.textContent = bookLabel();
       const tdSheet = document.createElement('td');
       tdSheet.textContent = sheetLabel(addr.sheet);
-      const tdCell = document.createElement('td');
-      tdCell.textContent = a1(addr);
       const tdName = document.createElement('td');
       tdName.textContent = nameOf(addr);
+      const tdCell = document.createElement('td');
+      tdCell.textContent = a1(addr);
       const tdValue = document.createElement('td');
       tdValue.className = 'fc-watch__value';
       tdValue.textContent = readValue(addr);
@@ -225,11 +242,13 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
       removeBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        mutators.removeWatch(store, addr);
+        recordWatchesChange(deps.history ?? null, store, () => {
+          mutators.removeWatch(store, addr);
+        });
       });
       tdRemove.appendChild(removeBtn);
 
-      tr.append(tdSheet, tdCell, tdName, tdValue, tdFormula, tdRemove);
+      tr.append(tdBook, tdSheet, tdName, tdCell, tdValue, tdFormula, tdRemove);
       tr.addEventListener('click', () => jumpTo(addr));
       tr.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -281,10 +300,15 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
   };
 
   const onAdd = (): void => {
-    mutators.addWatch(store, store.getState().selection.active);
+    const selection = store.getState().selection;
+    recordWatchesChange(deps.history ?? null, store, () => {
+      mutators.addWatchRanges(store, [selection.range, ...(selection.extraRanges ?? [])]);
+    });
   };
   const onClear = (): void => {
-    mutators.clearWatches(store);
+    recordWatchesChange(deps.history ?? null, store, () => {
+      mutators.clearWatches(store);
+    });
   };
   const onClose = (): void => close(true);
   const onKeyDown = (e: KeyboardEvent): void => {
@@ -305,6 +329,7 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
   let lastVisible = store.getState().ui.watchPanelOpen;
   let lastCells = store.getState().data.cells;
   let lastSheetIdx = store.getState().data.sheetIndex;
+  let lastActive = store.getState().selection.active;
   const unsub = store.subscribe(() => {
     const s = store.getState();
     const visible = s.ui.watchPanelOpen;
@@ -319,10 +344,12 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
     const watchesChanged = s.watch.watches !== lastWatches;
     const cellsChanged = s.data.cells !== lastCells;
     const sheetChanged = s.data.sheetIndex !== lastSheetIdx;
+    const activeChanged = s.selection.active !== lastActive;
     if (watchesChanged) lastWatches = s.watch.watches;
     if (cellsChanged) lastCells = s.data.cells;
     if (sheetChanged) lastSheetIdx = s.data.sheetIndex;
-    if (visible && (watchesChanged || cellsChanged || sheetChanged)) refresh();
+    if (activeChanged) lastActive = s.selection.active;
+    if (visible && (watchesChanged || cellsChanged || sheetChanged || activeChanged)) refresh();
   });
 
   if (!root.hidden) refresh();

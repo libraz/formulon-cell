@@ -40,6 +40,34 @@ describe('commands/clipboard/encodeHtml', () => {
     expect(html).toBe('<table><tr><td>A</td></tr></table>');
   });
 
+  it('emits the formula text for formula cells', async () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => {
+      const map = new Map(s.data.cells);
+      map.set(addrKey({ sheet: 0, row: 0, col: 0 }), {
+        value: { kind: 'number', value: 12 },
+        formula: '=A1*2',
+      });
+      return { ...s, data: { ...s.data, cells: map } };
+    });
+    const html = encodeHtml(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    expect(html).toBe('<table><tr><td>=A1*2</td></tr></table>');
+  });
+
+  it('escapes comparison operators in formula text', async () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => {
+      const map = new Map(s.data.cells);
+      map.set(addrKey({ sheet: 0, row: 0, col: 0 }), {
+        value: { kind: 'number', value: 1 },
+        formula: '=IF(A1<0,1,0)',
+      });
+      return { ...s, data: { ...s.data, cells: map } };
+    });
+    const html = encodeHtml(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    expect(html).toContain('=IF(A1&lt;0,1,0)');
+  });
+
   it('escapes HTML special characters in text values', async () => {
     const store = await seed([{ row: 0, col: 0, value: '<a&b>"c"' }]);
     const html = encodeHtml(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });

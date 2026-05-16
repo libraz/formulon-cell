@@ -1,6 +1,17 @@
 import type { RangeResolver } from '../engine/range-resolver.js';
+import { addrKey } from '../engine/address.js';
+import type { CellValue, Range } from '../engine/types.js';
+import { syncValidationsToEngine } from '../engine/validation-sync.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { CellValidation, ValidationOp } from '../store/store.js';
+import type { SpreadsheetStore } from '../store/store.js';
 import type { CoercedInput } from './coerce-input.js';
+import {
+  applyFormatSnapshot,
+  captureFormatSnapshot,
+  type History,
+} from './history.js';
+import { isCellWritable } from './protection.js';
 
 export type ValidationOutcome =
   | { ok: true }
@@ -9,6 +20,76 @@ export type ValidationOutcome =
 type BoundedKind = 'whole' | 'decimal' | 'date' | 'time' | 'textLength';
 type BoundedValidation = Extract<CellValidation, { kind: BoundedKind }>;
 type ListValidation = Extract<CellValidation, { kind: 'list' }>;
+
+export function clearValidationInRange(store: SpreadsheetStore, range: Range): number {
+  let cleared = 0;
+  store.setState((s) => {
+    const formats = new Map(s.format.formats);
+    for (let row = range.r0; row <= range.r1; row += 1) {
+      for (let col = range.c0; col <= range.c1; col += 1) {
+        const addr = { sheet: range.sheet, row, col };
+        if (!isCellWritable(s, addr)) continue;
+        const key = addrKey(addr);
+        const current = formats.get(key);
+        if (!current?.validation) continue;
+        const { validation: _validation, ...next } = current;
+        if (Object.keys(next).length === 0) formats.delete(key);
+        else formats.set(key, next);
+        cleared += 1;
+      }
+    }
+    return { ...s, format: { formats } };
+  });
+  return cleared;
+}
+
+export function clearValidationInRangeWithEngine(
+  store: SpreadsheetStore,
+  history: History | null,
+  wb: WorkbookHandle | null,
+  range: Range,
+): number {
+  let cleared = 0;
+  const sync = (): void => {
+    if (wb) syncValidationsToEngine(wb, store, range.sheet);
+  };
+  if (!history || history.isReplaying()) {
+    cleared = clearValidationInRange(store, range);
+    sync();
+    return cleared;
+  }
+  const before = captureFormatSnapshot(store.getState());
+  cleared = clearValidationInRange(store, range);
+  if (cleared === 0) return cleared;
+  const after = captureFormatSnapshot(store.getState());
+  sync();
+  history.push({
+    undo: () => {
+      applyFormatSnapshot(store, before);
+      sync();
+    },
+    redo: () => {
+      applyFormatSnapshot(store, after);
+      sync();
+    },
+  });
+  return cleared;
+}
+
+/** Evaluate an existing cell value against a data-validation rule. This mirrors
+ *  the typed-input path closely enough for renderers and ribbon commands:
+ *  numbers stay numeric, booleans stay boolean, and text that looks like a
+ *  number/bool is interpreted the same way a user-typed value is. */
+export function cellValueViolatesValidation(
+  value: CellValue,
+  validation: CellValidation | undefined,
+  resolveRange?: RangeResolver,
+): boolean {
+  if (!validation) return false;
+  if (value.kind === 'error') return false;
+  const outcome = validateAgainst(validation, coerceCellValue(value), resolveRange);
+  return !outcome.ok;
+}
 
 /** Materialize a list-validation's source to a flat string array. Inline
  *  literals pass through; range refs route through `resolveRange`. Returns
@@ -88,6 +169,26 @@ function inputAsText(input: Exclude<CoercedInput, { kind: 'formula' }>): string 
       return input.value ? 'TRUE' : 'FALSE';
     case 'text':
       return input.value;
+  }
+}
+
+const NUMERIC = /^[+-]?(?:(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
+
+function coerceCellValue(value: Exclude<CellValue, { kind: 'error' }>): CoercedInput {
+  switch (value.kind) {
+    case 'blank':
+      return { kind: 'blank' };
+    case 'number':
+      return { kind: 'number', value: value.value };
+    case 'bool':
+      return { kind: 'bool', value: value.value };
+    case 'text': {
+      const text = value.value.trim();
+      if (text === '') return { kind: 'blank' };
+      if (/^(true|false)$/i.test(text)) return { kind: 'bool', value: /^true$/i.test(text) };
+      if (NUMERIC.test(text)) return { kind: 'number', value: Number(text.replaceAll(',', '')) };
+      return { kind: 'text', value: value.value };
+    }
   }
 }
 

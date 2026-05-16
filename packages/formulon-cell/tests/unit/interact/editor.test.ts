@@ -137,6 +137,21 @@ describe('InlineEditor', () => {
     expect(editor.isActive()).toBe(false);
   });
 
+  it('commit preserves numeric-looking input as text for cells formatted as Text', () => {
+    const addr = { sheet: 0, row: 0, col: 0 };
+    mutators.setActive(store, addr);
+    mutators.setCellFormat(store, addr, { numFmt: { kind: 'text' } });
+    editor.begin('');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.value = '00123';
+
+    editor.commit('none');
+    wb.recalc();
+
+    expect(wb.getValue(addr)).toEqual({ kind: 'text', value: '00123' });
+    expect(store.getState().selection.active).toEqual(addr);
+  });
+
   it('commit("right") advances column instead of row', () => {
     mutators.setActive(store, { sheet: 0, row: 4, col: 4 });
     editor.begin('');

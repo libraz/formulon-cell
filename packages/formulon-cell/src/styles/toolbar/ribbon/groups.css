@@ -85,3 +85,111 @@
 .demo__ribbon-group--tiles .demo__rb--mono:not(:has(.demo__rb-icon))::first-line {
   font-size: 15px;
 }
+
+.demo__ribbon--office365-home {
+  min-height: 87px;
+  padding: 3px 8px 2px;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-group {
+  grid-template-rows: 1fr;
+  padding: 0 8px;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-label {
+  display: none;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-tools {
+  min-height: 82px;
+  max-height: 82px;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-group--clipboard .demo__ribbon-tools {
+  grid-template-columns: 52px repeat(2, 24px);
+  grid-auto-rows: 22px;
+  min-height: 68px;
+  max-height: 68px;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-group--clipboard .demo__rb--large {
+  width: 50px;
+  height: 58px;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-group--clipboard .demo__rb--large .demo__rb-icon {
+  width: 30px;
+  height: 30px;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-group--clipboard .demo__rb:not(.demo__rb--large) {
+  width: 24px;
+  height: 24px;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-group--clipboard .demo__rb--wide {
+  grid-column: 2 / span 2;
+  width: 50px;
+  min-width: 50px;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-group--font .demo__ribbon-tools {
+  width: 336px;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-group--alignment .demo__ribbon-tools {
+  width: 332px;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-group--number .demo__ribbon-tools {
+  width: 172px;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-group--styles .demo__ribbon-tools {
+  width: 190px;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-group--cells .demo__ribbon-tools {
+  width: 164px;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-group--editing .demo__ribbon-tools {
+  width: 290px;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-group--font .demo__rb-select--font {
+  width: 176px;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-group--font .demo__rb-dd:not(.demo__rb-select--font) {
+  width: 54px;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-group--alignment .demo__rb--wide {
+  width: 164px;
+  max-width: 164px;
+  justify-content: flex-start;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-group--alignment .demo__rb-select--merge {
+  width: 174px;
+}
+
+.demo__ribbon--office365-home
+  .demo__ribbon-group--alignment
+  .demo__rb-select--merge
+  > .demo__rb-dd__btn {
+  width: 100%;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-group--editing .demo__rb--wide {
+  width: 92px;
+  max-width: 92px;
+  justify-content: flex-start;
+}
+
+.demo__ribbon--office365-home .demo__ribbon-group--cells .demo__rb--wide {
+  width: 52px;
+  min-width: 52px;
+  max-width: 52px;
+}

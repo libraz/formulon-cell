@@ -1,0 +1,116 @@
+@layer fc.app {
+  .fc-paste-options__button {
+    position: fixed;
+    z-index: var(--fc-z-menu, 2147483060);
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid #8a8886;
+    border-radius: 2px;
+    background: #ffffff;
+    color: #201f1e;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+    cursor: pointer;
+  }
+
+  .fc-paste-options__button::before {
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 3px;
+    width: 11px;
+    height: 13px;
+    border: 1px solid #605e5c;
+    border-radius: 1px;
+    background:
+      linear-gradient(#107c41 0 0) 3px 3px / 5px 1px no-repeat,
+      linear-gradient(#107c41 0 0) 3px 6px / 5px 1px no-repeat,
+      #ffffff;
+  }
+
+  .fc-paste-options__button::after {
+    content: "";
+    position: absolute;
+    right: 3px;
+    bottom: 3px;
+    border-left: 3px solid transparent;
+    border-right: 3px solid transparent;
+    border-top: 4px solid currentColor;
+  }
+
+  .fc-paste-options__button:hover,
+  .fc-paste-options__button:focus-visible {
+    border-color: #107c41;
+    outline: none;
+  }
+
+  .fc-paste-options__menu {
+    position: fixed;
+    z-index: var(--fc-z-menu, 2147483060);
+    min-width: 192px;
+    padding: 4px 0;
+    border: 1px solid #c8c6c4;
+    border-radius: 4px;
+    background: #ffffff;
+    color: #201f1e;
+    box-shadow:
+      0 6px 16px rgba(0, 0, 0, 0.18),
+      0 1px 3px rgba(0, 0, 0, 0.14);
+    font-family: var(--fc-font-ui, system-ui);
+    font-size: 13px;
+  }
+
+  .fc-paste-options__item {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    min-height: 30px;
+    padding: 4px 12px 4px 8px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .fc-paste-options__item::before {
+    content: "";
+    width: 14px;
+    height: 14px;
+    color: #107c41;
+    background: currentColor;
+    -webkit-mask:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 2h6l2 2v10H3V2h2zm1 2v2h4V4H6zm-1 5h6V8H5v1zm0 3h5v-1H5v1z'/%3E%3C/svg%3E")
+      center / 14px 14px no-repeat;
+    mask:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 2h6l2 2v10H3V2h2zm1 2v2h4V4H6zm-1 5h6V8H5v1zm0 3h5v-1H5v1z'/%3E%3C/svg%3E")
+      center / 14px 14px no-repeat;
+  }
+
+  .fc-paste-options__item[data-fc-mode="values"]::before {
+    -webkit-mask:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 3h10v10H3V3zm2 2v2h6V5H5zm0 3v3h2V8H5zm3 0v3h3V8H8z'/%3E%3C/svg%3E")
+      center / 14px 14px no-repeat;
+    mask:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 3h10v10H3V3zm2 2v2h6V5H5zm0 3v3h2V8H5zm3 0v3h3V8H8z'/%3E%3C/svg%3E")
+      center / 14px 14px no-repeat;
+  }
+
+  .fc-paste-options__item[data-fc-mode="formatting"]::before {
+    -webkit-mask:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M11.5 2.5l2 2-6.7 6.7H4.8V9.2l6.7-6.7zM3 12h10v2H3v-2z'/%3E%3C/svg%3E")
+      center / 14px 14px no-repeat;
+    mask:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M11.5 2.5l2 2-6.7 6.7H4.8V9.2l6.7-6.7zM3 12h10v2H3v-2z'/%3E%3C/svg%3E")
+      center / 14px 14px no-repeat;
+  }
+
+  .fc-paste-options__item:hover,
+  .fc-paste-options__item:focus-visible {
+    background: #f3f2f1;
+    outline: none;
+  }
+}

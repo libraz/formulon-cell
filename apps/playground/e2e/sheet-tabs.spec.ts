@@ -35,3 +35,25 @@ test('T03 (playground): sheet tab menu supports menu keys and Escape focus retur
   await expect(menu).toBeHidden();
   await expect(firstTab).toBeFocused();
 });
+
+test('T04 (playground): sheet tab menu sets and clears tab color', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForSelector('.fc-host', { state: 'attached', timeout: 30_000 });
+  await page.locator('#btn-sheet-add').click();
+  await expect(page.locator('.app__tab')).toHaveCount(2);
+
+  const firstTab = page.locator('.app__tab').first();
+  await firstTab.click({ button: 'right' });
+  const menu = page.getByRole('menu', { name: 'Sheet tab' });
+  await expect(menu).toBeVisible();
+  await menu.getByRole('menuitemradio', { name: 'Tab Color #c00000' }).click();
+
+  const coloredTab = page.locator('.app__tab').first();
+  await expect(coloredTab).toHaveAttribute('data-sheet-tab-color', 'true');
+  await expect(coloredTab).toHaveCSS('--app-sheet-tab-color', '#c00000');
+
+  await coloredTab.click({ button: 'right' });
+  await expect(menu).toBeVisible();
+  await menu.getByRole('menuitemradio', { name: 'No Color' }).click();
+  await expect(page.locator('.app__tab').first()).not.toHaveAttribute('data-sheet-tab-color');
+});

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { applyValueFilter } from '../../../src/commands/filter.js';
+import { History } from '../../../src/commands/history.js';
 import {
   activateSheetView,
   applySheetView,
@@ -6,6 +8,7 @@ import {
   deleteSheetView,
   findSheetView,
   removeSheetView,
+  recordSheetViewsChange,
   type SheetView,
   type SheetViewSnapshotInput,
   saveSheetView,
@@ -58,6 +61,7 @@ describe('applySheetView', () => {
     expect(applySheetView(view)).toEqual({
       sheet: 0,
       filterRange: null,
+      filterCriteria: [],
       freezeRows: 0,
       freezeCols: 0,
       hiddenRows: [],
@@ -70,6 +74,13 @@ describe('applySheetView', () => {
     const snap: SheetViewSnapshotInput = {
       sheet: 0,
       filterRange: { sheet: 0, r0: 0, c0: 0, r1: 9, c1: 2 },
+      filterCriteria: [
+        {
+          range: { sheet: 0, r0: 0, c0: 0, r1: 9, c1: 2 },
+          byCol: 1,
+          hiddenValues: ['Closed'],
+        },
+      ],
       freezeRows: 1,
       freezeCols: 0,
       hiddenRows: new Set([2]),
@@ -81,6 +92,7 @@ describe('applySheetView', () => {
     expect(patch).toEqual({
       sheet: 0,
       filterRange: snap.filterRange,
+      filterCriteria: snap.filterCriteria,
       freezeRows: 1,
       freezeCols: 0,
       hiddenRows: [2],
@@ -123,6 +135,7 @@ describe('store-backed sheet views', () => {
     const store = createSpreadsheetStore();
     const range = { sheet: 0, r0: 0, c0: 0, r1: 10, c1: 2 };
     mutators.setFilterRange(store, range);
+    applyValueFilter(store.getState(), store, range, 1, ['Closed']);
     mutators.setFreezePanes(store, 1, 2);
     store.setState((s) => ({
       ...s,
@@ -140,6 +153,7 @@ describe('store-backed sheet views', () => {
       name: 'Review',
       sheet: 0,
       filterRange: range,
+      filterCriteria: [{ range, byCol: 1, hiddenValues: ['Closed'] }],
       freeze: { rows: 1, cols: 2 },
       hiddenRows: [2, 4],
       hiddenCols: [3],
@@ -151,7 +165,8 @@ describe('store-backed sheet views', () => {
   it('activates a stored view on the current sheet', () => {
     const store = createSpreadsheetStore();
     saveSheetView(store, 'v1', 'Base');
-    mutators.setFilterRange(store, { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 1 });
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 1 };
+    applyValueFilter(store.getState(), store, range, 1, ['Closed']);
     mutators.setFreezePanes(store, 2, 1);
     store.setState((s) => ({
       ...s,
@@ -163,6 +178,7 @@ describe('store-backed sheet views', () => {
     mutators.setFreezePanes(store, 0, 0);
     store.setState((s) => ({
       ...s,
+      ui: { ...s.ui, filterCriteria: [] },
       layout: { ...s.layout, hiddenRows: new Set(), hiddenCols: new Set() },
     }));
 
@@ -171,7 +187,8 @@ describe('store-backed sheet views', () => {
 
     expect(result.ok).toBe(true);
     expect(state.sheetViews.activeViewId).toBe('v2');
-    expect(state.ui.filterRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 4, c1: 1 });
+    expect(state.ui.filterRange).toEqual(range);
+    expect(state.ui.filterCriteria).toEqual([{ range, byCol: 1, hiddenValues: ['Closed'] }]);
     expect(state.layout.freezeRows).toBe(2);
     expect(state.layout.freezeCols).toBe(1);
     expect([...state.layout.hiddenRows]).toEqual([6]);
@@ -187,5 +204,33 @@ describe('store-backed sheet views', () => {
 
     deleteSheetView(store, 'v2');
     expect(store.getState().sheetViews.views).toEqual([]);
+  });
+
+  it('records sheet view save/delete and active-view changes in history', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+
+    recordSheetViewsChange(history, store, () => {
+      saveSheetView(store, 'v1', 'Ops');
+      store.setState((s) => ({ ...s, sheetViews: { ...s.sheetViews, activeViewId: 'v1' } }));
+    });
+    expect(store.getState().sheetViews.views).toMatchObject([{ id: 'v1', name: 'Ops' }]);
+    expect(store.getState().sheetViews.activeViewId).toBe('v1');
+
+    expect(history.undo()).toBe(true);
+    expect(store.getState().sheetViews.views).toEqual([]);
+    expect(store.getState().sheetViews.activeViewId).toBeNull();
+
+    expect(history.redo()).toBe(true);
+    expect(store.getState().sheetViews.views).toMatchObject([{ id: 'v1', name: 'Ops' }]);
+    expect(store.getState().sheetViews.activeViewId).toBe('v1');
+
+    deleteSheetView(store, 'v1', history);
+    expect(store.getState().sheetViews.views).toEqual([]);
+    expect(store.getState().sheetViews.activeViewId).toBeNull();
+
+    expect(history.undo()).toBe(true);
+    expect(store.getState().sheetViews.views).toMatchObject([{ id: 'v1', name: 'Ops' }]);
+    expect(store.getState().sheetViews.activeViewId).toBe('v1');
   });
 });

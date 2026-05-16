@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SelectionStats } from '../../../src/commands/aggregate.js';
+import { History } from '../../../src/commands/history.js';
+import { setProtectedSheet } from '../../../src/commands/protection.js';
 import {
   buildQuickAnalysisActions,
   enabledQuickAnalysisActions,
@@ -9,7 +11,10 @@ import {
   quickAnalysisActionById,
 } from '../../../src/commands/quick-analysis.js';
 import type { Range } from '../../../src/engine/types.js';
-import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import {
+  WorkbookHandle,
+  type WorkbookHandle as WorkbookHandleType,
+} from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const mkStats = (overrides: Partial<SelectionStats> = {}): SelectionStats => ({
@@ -178,7 +183,7 @@ describe('groupQuickAnalysisActions', () => {
 
 describe('executeQuickAnalysisAction', () => {
   const makeWb = (): {
-    wb: WorkbookHandle;
+    wb: WorkbookHandleType;
     formulas: Array<{ addr: { sheet: number; row: number; col: number }; formula: string }>;
   } => {
     const formulas: Array<{ addr: { sheet: number; row: number; col: number }; formula: string }> =
@@ -189,7 +194,7 @@ describe('executeQuickAnalysisAction', () => {
           formulas.push({ addr, formula });
           return true;
         },
-      } as unknown as WorkbookHandle,
+      } as unknown as WorkbookHandleType,
       formulas,
     };
   };
@@ -234,6 +239,41 @@ describe('executeQuickAnalysisAction', () => {
     ]);
   });
 
+  it('skips locked protected total targets while writing unlocked targets', () => {
+    const store = createSpreadsheetStore();
+    const { wb, formulas } = makeWb();
+    setProtectedSheet(store, 0, true);
+    mutators.setCellFormat(store, { sheet: 0, row: 4, col: 1 }, { locked: false });
+
+    const result = executeQuickAnalysisAction({
+      store,
+      wb,
+      actionId: 'totals-sum-row',
+      range: range(1, 0, 3, 1),
+      stats: mkStats({ numericCount: 6 }),
+    });
+
+    expect(result).toEqual({ ok: true, kind: 'formula', count: 1 });
+    expect(formulas).toEqual([{ addr: { sheet: 0, row: 4, col: 1 }, formula: '=SUM(B2:B4)' }]);
+  });
+
+  it('returns protected when every Quick Analysis total target is locked', () => {
+    const store = createSpreadsheetStore();
+    const { wb, formulas } = makeWb();
+    setProtectedSheet(store, 0, true);
+
+    const result = executeQuickAnalysisAction({
+      store,
+      wb,
+      actionId: 'totals-sum-row',
+      range: range(1, 0, 3, 1),
+      stats: mkStats({ numericCount: 6 }),
+    });
+
+    expect(result).toEqual({ ok: false, reason: 'protected' });
+    expect(formulas).toEqual([]);
+  });
+
   it('writes column total formulas to the right of the selected range', () => {
     const store = createSpreadsheetStore();
     const { wb, formulas } = makeWb();
@@ -271,6 +311,40 @@ describe('executeQuickAnalysisAction', () => {
     });
   });
 
+  it('rejects sparklines when the adjacent host cell is locked on a protected sheet', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeWb();
+    setProtectedSheet(store, 0, true);
+
+    const result = executeQuickAnalysisAction({
+      store,
+      wb,
+      actionId: 'sparkline-line',
+      range: range(2, 0, 2, 3),
+      stats: mkStats({ numericCount: 4 }),
+    });
+
+    expect(result).toEqual({ ok: false, reason: 'protected' });
+    expect(store.getState().sparkline.sparklines.size).toBe(0);
+  });
+
+  it('rejects conditional formatting over locked cells on a protected sheet', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeWb();
+    setProtectedSheet(store, 0, true);
+
+    const result = executeQuickAnalysisAction({
+      store,
+      wb,
+      actionId: 'format-data-bar',
+      range: range(0, 0, 4, 0),
+      stats: mkStats({ numericCount: 5 }),
+    });
+
+    expect(result).toEqual({ ok: false, reason: 'protected' });
+    expect(store.getState().conditional.rules).toEqual([]);
+  });
+
   it('adds a session chart overlay for chart actions', () => {
     const store = createSpreadsheetStore();
     const { wb } = makeWb();
@@ -295,6 +369,51 @@ describe('executeQuickAnalysisAction', () => {
     expect(store.getState().charts.charts[0]?.title).toBeUndefined();
   });
 
+  it('records Quick Analysis sparklines as undoable overlay changes', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    const { wb } = makeWb();
+
+    executeQuickAnalysisAction({
+      store,
+      wb,
+      history,
+      actionId: 'sparkline-column',
+      range: range(2, 0, 2, 3),
+      stats: mkStats({ numericCount: 4 }),
+    });
+
+    expect(store.getState().sparkline.sparklines.size).toBe(1);
+    expect(history.undo()).toBe(true);
+    expect(store.getState().sparkline.sparklines.size).toBe(0);
+    expect(history.redo()).toBe(true);
+    expect(store.getState().sparkline.sparklines.size).toBe(1);
+  });
+
+  it('groups multi-cell Quick Analysis totals into one undo step', async () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    wb.attachHistory(history);
+
+    const result = executeQuickAnalysisAction({
+      store,
+      wb,
+      history,
+      actionId: 'totals-sum-row',
+      range: range(1, 0, 3, 1),
+      stats: mkStats({ numericCount: 6 }),
+    });
+
+    expect(result).toEqual({ ok: true, kind: 'formula', count: 2 });
+    expect(wb.cellFormula({ sheet: 0, row: 4, col: 0 })).toBe('=SUM(A2:A4)');
+    expect(wb.cellFormula({ sheet: 0, row: 4, col: 1 })).toBe('=SUM(B2:B4)');
+
+    expect(history.undo()).toBe(true);
+    expect(wb.cellFormula({ sheet: 0, row: 4, col: 0 })).toBeNull();
+    expect(wb.cellFormula({ sheet: 0, row: 4, col: 1 })).toBeNull();
+  });
+
   it('adds a session table overlay for Format As Table', () => {
     const store = createSpreadsheetStore();
     const { wb } = makeWb();
@@ -314,6 +433,7 @@ describe('executeQuickAnalysisAction', () => {
         source: 'session',
         range: r,
         style: 'medium',
+        color: '#5b9bd5',
         showHeader: true,
         showTotal: false,
         banded: true,

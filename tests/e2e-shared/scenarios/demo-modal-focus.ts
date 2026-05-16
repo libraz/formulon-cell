@@ -51,6 +51,7 @@ export async function runDemoModalFocusScenario(page: Page): Promise<void> {
   const script = page.getByRole('button', { name: /^Script$/i }).first();
   await expect(script).toBeEnabled();
   await script.click();
+  await page.locator('#menu-script [data-script-action="custom"]').click();
 
   const scriptDialog = page
     .locator('.demo__modal[role="dialog"][aria-modal="true"]')

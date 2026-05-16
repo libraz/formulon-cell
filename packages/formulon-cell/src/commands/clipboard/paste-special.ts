@@ -163,8 +163,10 @@ export function pasteSpecial(
       for (const { key, format } of formatWrites) {
         if (format === null) {
           formats.delete(key);
+        } else if (wantsFormats(opt.what)) {
+          formats.set(key, format);
         } else {
-          // For 'formats' wholesale-replace; for cherry-picks merge.
+          // For cherry-picks (number format only), merge into the existing cell format.
           const existing = formats.get(key) ?? {};
           formats.set(key, { ...existing, ...format });
         }

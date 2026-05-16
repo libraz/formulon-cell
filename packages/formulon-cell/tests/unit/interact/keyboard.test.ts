@@ -307,6 +307,17 @@ describe('attachKeyboard', () => {
       expect(onBeginEdit).toHaveBeenCalledWith('=2+3');
     });
 
+    it('F2 hides a formula seed when the cell is Hidden on a protected sheet', () => {
+      setup();
+      const addr = { sheet: 0, row: 0, col: 0 };
+      seed(store, wb, [{ row: 0, col: 0, value: 5, formula: '=2+3' }]);
+      mutators.setCellFormat(store, addr, { formulaHidden: true });
+      mutators.setSheetProtected(store, 0, true);
+      mutators.setActive(store, addr);
+      fire(host, 'F2');
+      expect(onBeginEdit).toHaveBeenCalledWith('');
+    });
+
     it('F2 seeds with formatted number when no formula', () => {
       setup();
       seed(store, wb, [{ row: 0, col: 0, value: 42 }]);

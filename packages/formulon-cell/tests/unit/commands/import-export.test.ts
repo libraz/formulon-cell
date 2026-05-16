@@ -1,5 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { History } from '../../../src/commands/history.js';
 import { exportCSV, importCSV } from '../../../src/commands/import-export.js';
+import { setCellLocked, setProtectedSheet } from '../../../src/commands/protection.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
   createSpreadsheetStore,
@@ -83,6 +85,19 @@ describe('importCSV', () => {
     });
   });
 
+  it('respects Text-formatted destination cells when importing CSV', () => {
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { numFmt: { kind: 'text' } });
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 1 }, { numFmt: { kind: 'text' } });
+
+    const result = importCSV(store.getState(), wb, '00123,=A1');
+
+    expect(result?.cellsWritten).toBe(2);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: '00123' });
+    expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'text', value: '=A1' });
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 1 })).toBeNull();
+  });
+
   it('uses the explicit anchor when provided', () => {
     const result = importCSV(store.getState(), wb, 'x', { sheet: 0, row: 9, col: 5 });
     expect(result?.writtenRange.r0).toBe(9);
@@ -104,6 +119,49 @@ describe('importCSV', () => {
       kind: 'number',
       value: 6,
     });
+  });
+
+  it('skips locked protected destinations while importing into unlocked cells', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    seedAndMirror(store, wb, [{ row: 0, col: 1, value: 'locked' }]);
+    setCellLocked(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, false);
+    setCellLocked(store, { sheet: 0, r0: 1, c0: 0, r1: 1, c1: 1 }, false);
+    setProtectedSheet(store, 0, true);
+
+    try {
+      const result = importCSV(store.getState(), wb, 'a,b\n1,2');
+
+      expect(result?.cellsWritten).toBe(3);
+      expect(result?.writtenRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'a' });
+      expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({
+        kind: 'text',
+        value: 'locked',
+      });
+      expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'number', value: 1 });
+      expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'number', value: 2 });
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('groups CSV imports into one undo step when history is supplied', () => {
+    const history = new History();
+    wb.attachHistory(history);
+    history.clear();
+
+    const result = importCSV(store.getState(), wb, 'a,b\n1,2', undefined, history);
+
+    expect(result?.cellsWritten).toBe(4);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'a' });
+    expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'number', value: 2 });
+
+    expect(history.undo()).toBe(true);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'blank' });
+    expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'blank' });
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'blank' });
+    expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'blank' });
   });
 });
 

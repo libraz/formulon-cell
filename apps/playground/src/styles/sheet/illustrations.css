@@ -1,0 +1,142 @@
+.app-illustrations {
+  position: absolute;
+  inset: 0;
+  z-index: calc(var(--fc-z-grid, 2147483010) + 1);
+  pointer-events: none;
+}
+
+.app-ink {
+  position: absolute;
+  inset: 0;
+  z-index: calc(var(--fc-z-grid, 2147483010) + 2);
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.app-ink__stroke {
+  fill: none;
+  stroke: #c00000;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-ink--pen .fc-host__grid {
+  cursor: crosshair;
+}
+
+.app-ink--erase .fc-host__grid {
+  cursor: not-allowed;
+}
+
+.app-illustration {
+  position: absolute;
+  box-sizing: border-box;
+  padding: 0;
+  border: 1px solid #5b5b5b;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1f1f1f;
+  pointer-events: auto;
+  cursor: move;
+}
+
+.app-illustration[aria-selected="true"] {
+  outline: 2px solid #217346;
+  outline-offset: 2px;
+}
+
+.app-illustration:focus-visible {
+  outline: 2px solid #0f6cbd;
+  outline-offset: 2px;
+}
+
+.app-illustration__resize {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: 0;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 1px solid #217346;
+  background: #fff;
+  cursor: nwse-resize;
+  pointer-events: auto;
+}
+
+.app-illustration:not([aria-selected="true"]) .app-illustration__resize {
+  display: none;
+}
+
+.app-illustration--image {
+  overflow: hidden;
+  border-color: #b7b7b7;
+  background: #fff;
+}
+
+.app-illustration--image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.app-illustration--shape {
+  background: rgba(91, 155, 213, 0.22);
+  border: 2px solid #5b9bd5;
+}
+
+.app-illustration--rounded-rectangle {
+  border-radius: 12px;
+}
+
+.app-illustration--oval {
+  border-radius: 999px;
+}
+
+.app-illustration--line,
+.app-illustration--arrow {
+  border: 0;
+  background: transparent;
+}
+
+.app-illustration--line::before,
+.app-illustration--arrow::before {
+  position: absolute;
+  content: "";
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 3px solid #5b9bd5;
+}
+
+.app-illustration--arrow::after {
+  position: absolute;
+  content: "";
+  right: -1px;
+  top: calc(50% - 6px);
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-left: 12px solid #5b9bd5;
+}
+
+.app-illustration--screenshot {
+  overflow: hidden;
+  border-color: #8f8f8f;
+  background:
+    linear-gradient(#f4f4f4 0 20px, transparent 20px),
+    repeating-linear-gradient(0deg, transparent 0 23px, rgba(0, 0, 0, 0.12) 23px 24px),
+    repeating-linear-gradient(90deg, transparent 0 47px, rgba(0, 0, 0, 0.12) 47px 48px),
+    #fff;
+}
+
+.app-illustration--screenshot span {
+  position: absolute;
+  left: 18px;
+  top: 42px;
+  width: 84px;
+  height: 54px;
+  border: 2px solid #217346;
+  background: rgba(33, 115, 70, 0.08);
+}

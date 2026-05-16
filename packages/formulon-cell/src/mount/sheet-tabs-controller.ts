@@ -1,5 +1,6 @@
 import type { History } from '../commands/history.js';
-import { moveSheet, removeSheet, setSheetHidden } from '../commands/sheet-mutate.js';
+import { addSheet, moveSheet, removeSheet, renameSheet, setSheetHidden } from '../commands/sheet-mutate.js';
+import { isWorkbookStructureProtected } from '../commands/protection.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { inheritHostTokens } from '../interact/inherit-host-tokens.js';
@@ -8,10 +9,22 @@ import { mutators } from '../store/store.js';
 import { hiddenSheetIndexes, visibleSheetIndexes } from './sheet-indexes.js';
 import {
   createSheetMenuButton,
+  createSheetMenuColorButton,
   createSheetMenuSeparator,
   formatSheetLabel,
   positionSheetMenu,
 } from './sheet-menu.js';
+
+const SHEET_TAB_COLORS = [
+  '#c00000',
+  '#ed7d31',
+  '#ffc000',
+  '#70ad47',
+  '#00b0f0',
+  '#4472c4',
+  '#7030a0',
+  '#a5a5a5',
+] as const;
 
 interface SheetTabsControllerInput {
   addSheetBtn: HTMLButtonElement;
@@ -92,6 +105,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
   };
 
   const beginRename = (idx: number, tab: HTMLButtonElement): void => {
+    if (isWorkbookStructureProtected(store.getState())) return;
     const wb = getWb();
     const strings = getStrings();
     const before = wb.sheetName(idx);
@@ -110,7 +124,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       done = true;
       const next = renameInput.value.trim();
       if (commit && next && next !== before) {
-        const ok = wb.renameSheet(idx, next);
+        const ok = renameSheet(wb, idx, next, store, history);
         if (!ok) {
           renameInput.setAttribute('aria-invalid', 'true');
           done = false;
@@ -143,10 +157,11 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     const strings = getStrings();
     const visibleIndexes = visible();
     const hiddenIndexes = hidden();
+    const structureProtected = isWorkbookStructureProtected(store.getState());
     const canMutate = wb.capabilities.sheetMutate;
     const canHide = wb.capabilities.sheetTabHidden;
     const moveAndRefresh = (from: number, to: number): void => {
-      if (!moveSheet(store, wb, from, to)) return;
+      if (!moveSheet(store, wb, from, to, history)) return;
       hydrateActiveSheet();
       update();
       refreshStatusBar();
@@ -154,25 +169,65 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     };
     const menuButton = (label: string, onClick: () => void, disabled = false): HTMLButtonElement =>
       createSheetMenuButton(label, onClick, closeMenu, disabled);
+    const tabColor = store.getState().layout.sheetTabColors.get(idx);
+    const colorPalette = document.createElement('div');
+    colorPalette.className = 'fc-sheetmenu__colors';
+    colorPalette.setAttribute('role', 'group');
+    colorPalette.setAttribute('aria-label', strings.sheetTabs.tabColor);
+    const colorLabel = document.createElement('div');
+    colorLabel.className = 'fc-sheetmenu__colors-label';
+    colorLabel.textContent = strings.sheetTabs.tabColor;
+    const swatches = document.createElement('div');
+    swatches.className = 'fc-sheetmenu__swatches';
+    swatches.append(
+      createSheetMenuColorButton(strings.sheetTabs.noColor, null, tabColor === undefined, () => {
+        mutators.setSheetTabColor(store, idx, null);
+        update();
+        closeMenu();
+      }),
+      ...SHEET_TAB_COLORS.map((color) =>
+        createSheetMenuColorButton(
+          strings.sheetTabs.tabColor,
+          color,
+          tabColor?.toLowerCase() === color,
+          () => {
+            mutators.setSheetTabColor(store, idx, color);
+            update();
+            closeMenu();
+          },
+        ),
+      ),
+    );
+    colorPalette.append(colorLabel, swatches);
 
     sheetMenu.replaceChildren(
-      menuButton(strings.sheetTabs.rename, () => beginRename(idx, tab), !canMutate),
-      menuButton(strings.sheetTabs.insertSheet, () => {
-        const added = wb.addSheet();
-        if (added < 0) return;
-        switchSheet(added);
-        update();
-      }),
+      menuButton(
+        strings.sheetTabs.rename,
+        () => beginRename(idx, tab),
+        structureProtected || !canMutate,
+      ),
+      menuButton(
+        strings.sheetTabs.insertSheet,
+        () => {
+          const added = addSheet(store, wb, history);
+          if (added < 0) return;
+          switchSheet(added);
+          update();
+        },
+        structureProtected,
+      ),
       menuButton(
         strings.sheetTabs.moveLeft,
         () => moveAndRefresh(idx, idx - 1),
-        !canMutate || idx <= 0,
+        structureProtected || !canMutate || idx <= 0,
       ),
       menuButton(
         strings.sheetTabs.moveRight,
         () => moveAndRefresh(idx, idx + 1),
-        !canMutate || idx >= wb.sheetCount - 1,
+        structureProtected || !canMutate || idx >= wb.sheetCount - 1,
       ),
+      createSheetMenuSeparator(),
+      colorPalette,
       createSheetMenuSeparator(),
       menuButton(
         strings.sheetTabs.deleteSheet,
@@ -183,7 +238,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
           refreshStatusBar();
           invalidate();
         },
-        !canMutate || wb.sheetCount <= 1,
+        structureProtected || !canMutate || wb.sheetCount <= 1,
       ),
       menuButton(
         strings.sheetTabs.hideSheet,
@@ -194,7 +249,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
           refreshStatusBar();
           invalidate();
         },
-        !canHide || visibleIndexes.length <= 1,
+        structureProtected || !canHide || visibleIndexes.length <= 1,
       ),
       menuButton(
         hiddenIndexes.length > 0
@@ -210,7 +265,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
           switchSheet(target);
           update();
         },
-        !canHide || hiddenIndexes.length === 0,
+        structureProtected || !canHide || hiddenIndexes.length === 0,
       ),
     );
     inheritHostTokens(host, sheetMenu);
@@ -234,6 +289,11 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       tab.setAttribute('aria-selected', selected ? 'true' : 'false');
       tab.tabIndex = selected ? 0 : -1;
       tab.textContent = wb.sheetName(idx);
+      const tabColor = store.getState().layout.sheetTabColors.get(idx);
+      if (tabColor) {
+        tab.dataset.fcSheetTabColor = 'true';
+        tab.style.setProperty('--fc-sheet-tab-color', tabColor);
+      }
       tab.addEventListener('click', () => switchSheet(idx));
       tab.addEventListener('contextmenu', (e) => {
         e.preventDefault();
@@ -268,13 +328,13 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     const activePos = visibleIndexes.indexOf(active);
     firstSheet.disabled = activePos <= 0;
     lastSheet.disabled = activePos < 0 || activePos >= visibleIndexes.length - 1;
-    addSheetBtn.disabled = false;
+    addSheetBtn.disabled = isWorkbookStructureProtected(store.getState());
   };
 
   const onFirstSheetClick = (): void => switchRelative(-1);
   const onLastSheetClick = (): void => switchRelative(1);
   const onAddSheetClick = (): void => {
-    const idx = getWb().addSheet();
+    const idx = addSheet(store, getWb(), history);
     if (idx < 0) return;
     switchSheet(idx);
     update();

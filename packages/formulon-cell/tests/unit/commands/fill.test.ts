@@ -1,8 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { fillDestFor, fillRange } from '../../../src/commands/fill.js';
+import { addrKey } from '../../../src/engine/address.js';
 import type { Range } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
+import {
+  type CellFormat,
+  createSpreadsheetStore,
+  type SpreadsheetStore,
+} from '../../../src/store/store.js';
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
@@ -15,6 +20,20 @@ const text = (wb: WorkbookHandle, sheet: number, row: number, col: number): stri
   const v = wb.getValue({ sheet, row, col });
   return v.kind === 'text' ? v.value : '';
 };
+
+const dateSerial = (year: number, month: number, day: number): number =>
+  Date.UTC(year, month - 1, day) / 86_400_000 + 25569;
+
+const setFormat = (store: SpreadsheetStore, row: number, col: number, format: CellFormat): void => {
+  store.setState((s) => {
+    const formats = new Map(s.format.formats);
+    formats.set(addrKey({ sheet: 0, row, col }), format);
+    return { ...s, format: { formats } };
+  });
+};
+
+const getFormat = (store: SpreadsheetStore, row: number, col: number): CellFormat | undefined =>
+  store.getState().format.formats.get(addrKey({ sheet: 0, row, col }));
 
 /**
  * Mirror writes on `wb` back into the store's data map so fillRange can read
@@ -324,6 +343,105 @@ describe('fillRange', () => {
     expect(num(wb, 0, 3, 0)).toBe(2);
     expect(num(wb, 0, 4, 0)).toBe(1);
     expect(num(wb, 0, 5, 0)).toBe(2);
+  });
+
+  it('copies source formatting by default when a store is supplied', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 1 },
+      { row: 1, col: 0, value: 2 },
+    ]);
+    setFormat(store, 0, 0, { fill: '#ff0000', bold: true });
+    setFormat(store, 1, 0, { fill: '#00ff00', italic: true });
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 };
+
+    fillRange(store.getState(), wb, src, dest, { formatting: 'with', store });
+
+    expect(getFormat(store, 2, 0)).toEqual({ fill: '#ff0000', bold: true });
+    expect(getFormat(store, 3, 0)).toEqual({ fill: '#00ff00', italic: true });
+  });
+
+  it('can fill values without overwriting destination formatting', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 1 },
+      { row: 1, col: 0, value: 2 },
+    ]);
+    setFormat(store, 0, 0, { fill: '#ff0000' });
+    setFormat(store, 2, 0, { fill: '#0000ff', underline: true });
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 };
+
+    fillRange(store.getState(), wb, src, dest, { formatting: 'without', store });
+    wb.recalc();
+
+    expect(num(wb, 0, 2, 0)).toBe(3);
+    expect(getFormat(store, 2, 0)).toEqual({ fill: '#0000ff', underline: true });
+  });
+
+  it('can fill formatting only without changing destination values', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 1 },
+      { row: 1, col: 0, value: 99 },
+    ]);
+    setFormat(store, 0, 0, { fill: '#ff0000', bold: true });
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 };
+
+    fillRange(store.getState(), wb, src, dest, { formatting: 'only', store });
+    wb.recalc();
+
+    expect(num(wb, 0, 1, 0)).toBe(99);
+    expect(getFormat(store, 1, 0)).toEqual({ fill: '#ff0000', bold: true });
+  });
+
+  it('fills date serials by days when requested from Auto Fill Options', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: dateSerial(2024, 1, 5) }]);
+    setFormat(store, 0, 0, { numFmt: { kind: 'date', pattern: 'yyyy-mm-dd' } });
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 };
+
+    fillRange(store.getState(), wb, src, dest, { dateUnit: 'days' });
+    wb.recalc();
+
+    expect(num(wb, 0, 1, 0)).toBe(dateSerial(2024, 1, 6));
+    expect(num(wb, 0, 2, 0)).toBe(dateSerial(2024, 1, 7));
+  });
+
+  it('fills weekdays by skipping Saturday and Sunday', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: dateSerial(2024, 1, 5) }]);
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 };
+
+    fillRange(store.getState(), wb, src, dest, { dateUnit: 'weekdays' });
+    wb.recalc();
+
+    expect(num(wb, 0, 1, 0)).toBe(dateSerial(2024, 1, 8));
+    expect(num(wb, 0, 2, 0)).toBe(dateSerial(2024, 1, 9));
+  });
+
+  it('fills months and years with end-of-month clamping', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: dateSerial(2024, 1, 31) },
+      { row: 0, col: 2, value: dateSerial(2024, 2, 29) },
+    ]);
+    fillRange(
+      store.getState(),
+      wb,
+      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+      { dateUnit: 'months' },
+    );
+    fillRange(
+      store.getState(),
+      wb,
+      { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+      { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 3 },
+      { dateUnit: 'years' },
+    );
+    wb.recalc();
+
+    expect(num(wb, 0, 0, 1)).toBe(dateSerial(2024, 2, 29));
+    expect(num(wb, 0, 0, 3)).toBe(dateSerial(2025, 2, 28));
   });
 
   it('shifts relative refs when filling formulas down', () => {

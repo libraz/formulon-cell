@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
 import { coerceInput } from '../../../src/commands/coerce-input.js';
-import { resolveListValues, validateAgainst } from '../../../src/commands/validate.js';
+import { History } from '../../../src/commands/history.js';
+import {
+  clearValidationInRange,
+  clearValidationInRangeWithEngine,
+  resolveListValues,
+  validateAgainst,
+} from '../../../src/commands/validate.js';
+import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { setCellLocked, setProtectedSheet } from '../../../src/commands/protection.js';
+import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const coerce = (raw: string): ReturnType<typeof coerceInput> => coerceInput(raw);
 
@@ -221,5 +230,129 @@ describe('resolveListValues', () => {
         errorStyle: 'stop',
       }),
     ).toEqual([]);
+  });
+});
+
+describe('clearValidationInRange', () => {
+  it('removes validation while preserving unrelated format fields', () => {
+    const store = createSpreadsheetStore();
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      { bold: true, validation: { kind: 'list', source: ['A', 'B'] } },
+    );
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 1 },
+      { validation: { kind: 'whole', op: 'between', a: 1, b: 10 } },
+    );
+
+    const count = clearValidationInRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
+
+    expect(count).toBe(2);
+    expect(store.getState().format.formats.get('0:0:0')).toEqual({ bold: true });
+    expect(store.getState().format.formats.has('0:0:1')).toBe(false);
+  });
+
+  it('skips locked cells on protected sheets while clearing unlocked cells', () => {
+    const store = createSpreadsheetStore();
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      { validation: { kind: 'list', source: ['A', 'B'] } },
+    );
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 1 },
+      { validation: { kind: 'whole', op: 'between', a: 1, b: 10 } },
+    );
+    setCellLocked(store, { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 }, false);
+    setProtectedSheet(store, 0, true);
+
+    const count = clearValidationInRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
+
+    expect(count).toBe(1);
+    expect(store.getState().format.formats.get('0:0:0')?.validation).toEqual({
+      kind: 'list',
+      source: ['A', 'B'],
+    });
+    expect(store.getState().format.formats.get('0:0:1')).toEqual({ locked: false });
+  });
+
+  it('syncs validation clearing to the engine and replays sync on undo/redo', () => {
+    const store = createSpreadsheetStore();
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      { validation: { kind: 'list', source: ['A', 'B'] } },
+    );
+    const calls: Array<{ kind: 'clear'; sheet: number } | { kind: 'add'; sheet: number; count: number }> = [];
+    const wb = {
+      capabilities: { dataValidation: true },
+      clearValidations: (sheet: number) => {
+        calls.push({ kind: 'clear', sheet });
+        return true;
+      },
+      addValidationEntry: (sheet: number, input: { ranges: unknown[] }) => {
+        calls.push({ kind: 'add', sheet, count: input.ranges.length });
+        return true;
+      },
+    } as unknown as WorkbookHandle;
+    const history = new History();
+
+    const count = clearValidationInRangeWithEngine(
+      store,
+      history,
+      wb,
+      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+    );
+
+    expect(count).toBe(1);
+    expect(calls).toEqual([{ kind: 'clear', sheet: 0 }]);
+
+    history.undo();
+    expect(store.getState().format.formats.get('0:0:0')?.validation).toEqual({
+      kind: 'list',
+      source: ['A', 'B'],
+    });
+    expect(calls).toEqual([
+      { kind: 'clear', sheet: 0 },
+      { kind: 'clear', sheet: 0 },
+      { kind: 'add', sheet: 0, count: 1 },
+    ]);
+
+    history.redo();
+    expect(store.getState().format.formats.has('0:0:0')).toBe(false);
+    expect(calls).toEqual([
+      { kind: 'clear', sheet: 0 },
+      { kind: 'clear', sheet: 0 },
+      { kind: 'add', sheet: 0, count: 1 },
+      { kind: 'clear', sheet: 0 },
+    ]);
+  });
+
+  it('skips history and engine sync when no validations are cleared', () => {
+    const store = createSpreadsheetStore();
+    const calls: Array<{ kind: 'clear'; sheet: number }> = [];
+    const wb = {
+      capabilities: { dataValidation: true },
+      clearValidations: (sheet: number) => {
+        calls.push({ kind: 'clear', sheet });
+        return true;
+      },
+      addValidationEntry: () => true,
+    } as unknown as WorkbookHandle;
+    const history = new History();
+
+    const count = clearValidationInRangeWithEngine(
+      store,
+      history,
+      wb,
+      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+    );
+
+    expect(count).toBe(0);
+    expect(calls).toEqual([]);
+    expect(history.canUndo()).toBe(false);
   });
 });

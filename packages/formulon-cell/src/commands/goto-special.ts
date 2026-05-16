@@ -1,6 +1,7 @@
 import { addrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import type { SelectionSlice } from '../store/types.js';
 import type { SpreadsheetStore } from '../store/store.js';
 
 /** Desktop spreadsheets "Go To Special" categories supported in v1. Mirrors the radio list
@@ -21,6 +22,15 @@ export type GoToSpecialKind =
  *  selection rectangle. Spreadsheets use the selection scope automatically when the
  *  current selection covers more than one cell. */
 export type GoToScope = 'sheet' | 'selection';
+
+/** Excel-style subfilters used by the Formulas and Constants choices in
+ *  Go To Special. Omitted options mean "all value kinds". */
+export interface GoToSpecialValueFilters {
+  numbers?: boolean;
+  text?: boolean;
+  logical?: boolean;
+  errors?: boolean;
+}
 
 /** Spreadsheet error sentinels — the strings that can appear in a `text` value via
  *  user input or pasted data. The engine returns `kind: 'error'` for live
@@ -64,6 +74,7 @@ export function findMatchingCells(
   store: SpreadsheetStore,
   scope: GoToScope,
   kind: GoToSpecialKind,
+  filters?: GoToSpecialValueFilters,
 ): Addr[] {
   const state = store.getState();
   const sheet = state.data.sheetIndex;
@@ -80,7 +91,7 @@ export function findMatchingCells(
   const matches: Addr[] = [];
   for (const entry of wb.cells(sheet)) {
     if (useSelection && !inRange(entry.addr, selection)) continue;
-    if (matchesKind(entry.addr, entry.value, entry.formula, kind, store)) {
+    if (matchesKind(entry.addr, entry.value, entry.formula, kind, store, filters)) {
       matches.push(entry.addr);
     }
   }
@@ -102,14 +113,15 @@ const matchesKind = (
   formula: string | null,
   kind: GoToSpecialKind,
   store: SpreadsheetStore,
+  filters?: GoToSpecialValueFilters,
 ): boolean => {
   switch (kind) {
     case 'non-blanks':
       return value.kind !== 'blank';
     case 'formulas':
-      return !!formula;
+      return !!formula && valueMatchesFilters(value, filters);
     case 'constants':
-      return !formula && value.kind !== 'blank';
+      return !formula && value.kind !== 'blank' && valueMatchesFilters(value, filters);
     case 'numbers':
       return value.kind === 'number';
     case 'text':
@@ -132,6 +144,31 @@ const matchesKind = (
     case 'blanks':
       // Handled separately above — populated cells don't match `blanks`.
       return false;
+    default:
+      return false;
+  }
+};
+
+const valueMatchesFilters = (
+  value: CellEntry['value'],
+  filters: GoToSpecialValueFilters | undefined,
+): boolean => {
+  if (!filters) return true;
+  const any =
+    filters.numbers === true ||
+    filters.text === true ||
+    filters.logical === true ||
+    filters.errors === true;
+  if (!any) return false;
+  switch (value.kind) {
+    case 'number':
+      return filters.numbers === true;
+    case 'bool':
+      return filters.logical === true;
+    case 'text':
+      return ERROR_SENTINELS.has(value.value) ? filters.errors === true : filters.text === true;
+    case 'error':
+      return filters.errors === true;
     default:
       return false;
   }
@@ -192,4 +229,27 @@ export const boundingRange = (matches: readonly Addr[]): Range => {
     if (a.col > c1) c1 = a.col;
   }
   return { sheet: first.sheet, r0, c0, r1, c1 };
+};
+
+/** Build an exact multi-range selection for a list of row-major matches.
+ *  The first matched cell becomes the primary range and the rest are stored as
+ *  single-cell `extraRanges`, avoiding the false positives introduced by an
+ *  enclosing rectangle. */
+export const selectionFromMatches = (matches: readonly Addr[]): SelectionSlice => {
+  if (matches.length === 0) {
+    throw new Error('selectionFromMatches: empty match list');
+  }
+  const first = matches[0] as Addr;
+  return {
+    active: first,
+    anchor: first,
+    range: { sheet: first.sheet, r0: first.row, c0: first.col, r1: first.row, c1: first.col },
+    extraRanges: matches.slice(1).map((addr) => ({
+      sheet: addr.sheet,
+      r0: addr.row,
+      c0: addr.col,
+      r1: addr.row,
+      c1: addr.col,
+    })),
+  };
 };

@@ -6,6 +6,8 @@ import {
   type SpreadsheetStore,
   type State,
 } from '../store/store.js';
+import { type History, recordChartsChange } from './history.js';
+import { isSheetProtected } from './protection.js';
 
 export interface CreateSessionChartOptions {
   id?: string;
@@ -31,7 +33,12 @@ function defaultChartId(range: Range, kind: SessionChartKind): string {
 }
 
 function defaultTitle(kind: SessionChartKind): string {
-  return kind === 'line' ? 'Line chart' : 'Column chart';
+  if (kind === 'bar') return 'Bar chart';
+  if (kind === 'line') return 'Line chart';
+  if (kind === 'area') return 'Area chart';
+  if (kind === 'pie') return 'Pie chart';
+  if (kind === 'scatter') return 'Scatter chart';
+  return 'Column chart';
 }
 
 /** Create or replace a session chart overlay for `range`. This is UI-owned
@@ -41,7 +48,9 @@ export function createSessionChart(
   store: SpreadsheetStore,
   range: Range,
   options: CreateSessionChartOptions = {},
-): SessionChart {
+  history: History | null = null,
+): SessionChart | null {
+  if (isSheetProtected(store.getState(), range.sheet)) return null;
   const kind = options.kind ?? 'column';
   const chart: SessionChart = {
     id: options.id ?? defaultChartId(range, kind),
@@ -54,7 +63,9 @@ export function createSessionChart(
   if (options.y !== undefined) chart.y = options.y;
   if (options.w !== undefined) chart.w = options.w;
   if (options.h !== undefined) chart.h = options.h;
-  mutators.upsertChart(store, chart);
+  recordChartsChange(history, store, () => {
+    mutators.upsertChart(store, chart);
+  });
   return chart;
 }
 
@@ -79,8 +90,18 @@ export function sessionChartsForRange(
 }
 
 /** Remove a session chart overlay by id. */
-export function clearSessionChart(store: SpreadsheetStore, id: string): void {
-  mutators.removeChart(store, id);
+export function clearSessionChart(
+  store: SpreadsheetStore,
+  id: string,
+  history: History | null = null,
+): boolean {
+  const chart = sessionChartById(store.getState(), id);
+  if (!chart) return false;
+  if (isSheetProtected(store.getState(), chart.source.sheet)) return false;
+  recordChartsChange(history, store, () => {
+    mutators.removeChart(store, id);
+  });
+  return true;
 }
 
 /** Patch placement or visual metadata for an existing session chart. */
@@ -88,15 +109,30 @@ export function updateSessionChart(
   store: SpreadsheetStore,
   id: string,
   patch: SessionChartPatch,
+  history: History | null = null,
 ): SessionChart | null {
-  if (!sessionChartById(store.getState(), id)) return null;
-  mutators.updateChart(store, id, patch);
+  const chart = sessionChartById(store.getState(), id);
+  if (!chart) return null;
+  if (isSheetProtected(store.getState(), chart.source.sheet)) return null;
+  recordChartsChange(history, store, () => {
+    mutators.updateChart(store, id, patch);
+  });
   return sessionChartById(store.getState(), id);
 }
 
 /** Remove every session chart whose source range intersects `range`. */
-export function clearSessionChartsInRange(store: SpreadsheetStore, range: Range): void {
-  mutators.clearChartsInRange(store, range);
+export function clearSessionChartsInRange(
+  store: SpreadsheetStore,
+  range: Range,
+  history: History | null = null,
+): number {
+  if (isSheetProtected(store.getState(), range.sheet)) return 0;
+  const count = sessionChartsForRange(store.getState(), range).length;
+  if (count === 0) return 0;
+  recordChartsChange(history, store, () => {
+    mutators.clearChartsInRange(store, range);
+  });
+  return count;
 }
 
 export function sessionChartSeries(

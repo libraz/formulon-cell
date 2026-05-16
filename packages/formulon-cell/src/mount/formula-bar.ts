@@ -25,6 +25,11 @@ interface AttachFormulaBarInput {
   getAutocomplete: () => FormulaBarAutocomplete;
   cancelBindingEditor: () => void;
   host: HTMLElement;
+  onValidation?: (outcome: {
+    severity: 'stop' | 'warning' | 'information';
+    title?: string;
+    message: string;
+  }) => void;
   store: SpreadsheetStore;
   updateChrome: () => void;
   wb: () => WorkbookHandle;
@@ -50,6 +55,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     getAutocomplete,
     cancelBindingEditor,
     host,
+    onValidation,
     store,
     updateChrome,
     wb,
@@ -83,12 +89,25 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     const a = s.selection.active;
     try {
       const fmt = s.format.formats.get(`${a.sheet}:${a.row}:${a.col}`);
-      const outcome = writeInputValidated(currentWb, a, fxInput.value, fmt?.validation);
+      const outcome = writeInputValidated(currentWb, a, fxInput.value, fmt?.validation, store);
       if (!outcome.ok) {
-        console.warn(`formulon-cell: validation ${outcome.severity}: ${outcome.message}`);
         if (outcome.severity === 'stop') {
           fxInput.focus();
+          onValidation?.({
+            severity: outcome.severity,
+            title: fmt?.validation?.errorTitle,
+            message: outcome.message,
+          });
           return;
+        }
+        if (onValidation) {
+          onValidation({
+            severity: outcome.severity,
+            title: fmt?.validation?.errorTitle,
+            message: outcome.message,
+          });
+        } else {
+          console.warn(`formulon-cell: validation ${outcome.severity}: ${outcome.message}`);
         }
       }
     } catch (err) {

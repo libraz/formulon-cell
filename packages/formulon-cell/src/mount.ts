@@ -1,4 +1,5 @@
 import { CellRegistry } from './cells.js';
+import { insertCopiedCellsFromTSV } from './commands/clipboard/insert-copied-cells.js';
 import { History } from './commands/history.js';
 import { printSheet } from './commands/print.js';
 import {
@@ -27,8 +28,10 @@ import { createI18nController } from './i18n/controller.js';
 import type { Strings } from './i18n/strings.js';
 import { attachCellStylesGallery } from './interact/cell-styles-gallery.js';
 import { attachCfRulesDialog } from './interact/cf-rules-dialog.js';
+import { attachEvaluateFormulaDialog } from './interact/evaluate-formula-dialog.js';
 import { attachExternalLinksDialog } from './interact/external-links-dialog.js';
 import { attachFilterDropdown, type FilterDropdownHandle } from './interact/filter-dropdown.js';
+import { openInsertCopiedCellsDialog } from './interact/insert-copied-cells-dialog.js';
 import { createMountChrome } from './mount/chrome.js';
 import { attachChromeSync, type ChromeSyncController } from './mount/chrome-sync.js';
 import {
@@ -57,6 +60,7 @@ import {
   type SheetTabsController,
 } from './mount/sheet-tabs-controller.js';
 import type { MountOptions, SpreadsheetInstance } from './mount/types.js';
+import { colWidth, colX, gridOriginX, layoutForView } from './render/geometry.js';
 import { GridRenderer, getErrorTriangleHits } from './render/grid.js';
 import { createSpreadsheetStore, mutators } from './store/store.js';
 import { resolveTheme } from './theme/resolve.js';
@@ -67,17 +71,16 @@ function mountErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function renderMountError(host: HTMLElement, error: unknown): void {
+function renderMountError(host: HTMLElement, error: unknown, strings: Strings['mountError']): void {
   const panel = document.createElement('div');
   panel.className = 'fc-mount-error';
   panel.setAttribute('role', 'alert');
 
   const title = document.createElement('strong');
-  title.textContent = 'Spreadsheet engine unavailable';
+  title.textContent = strings.title;
 
   const help = document.createElement('p');
-  help.textContent =
-    'The formulon WASM engine could not start. Serve the page with COOP: same-origin and COEP: require-corp so SharedArrayBuffer is available.';
+  help.textContent = strings.engineHelp;
 
   const detail = document.createElement('code');
   detail.textContent = mountErrorMessage(error);
@@ -130,7 +133,7 @@ export const Spreadsheet = {
       } catch (hookErr) {
         console.error('formulon-cell: mount error handler threw', hookErr);
       }
-      if (opts.renderError !== false) renderMountError(host, err);
+      if (opts.renderError !== false) renderMountError(host, err, strings.mountError);
       throw err;
     }
 
@@ -237,6 +240,15 @@ export const Spreadsheet = {
       getWb: () => wb,
       getActiveSheet: () => store.getState().data.sheetIndex,
       onChanged: () => renderer.invalidate(),
+      onNewRule: () => featureState.conditionalDialog?.open({ mode: 'new' }),
+      store,
+      history,
+      strings,
+    });
+    let evaluateFormulaDialog = attachEvaluateFormulaDialog({
+      host,
+      store,
+      getWb: () => wb,
       strings,
     });
     const cellStylesGallery = attachCellStylesGallery({
@@ -244,11 +256,12 @@ export const Spreadsheet = {
       store,
       history,
       getWb: () => wb,
+      strings,
     });
     // Filter dropdown — opens when the pointer dispatches `fc:openfilter`
     // from a clicked column-filter chevron. Rebuilt on locale change so its
     // captured strings stay fresh; no public toggle.
-    let filterDropdown: FilterDropdownHandle = attachFilterDropdown({ store, strings });
+    let filterDropdown: FilterDropdownHandle = attachFilterDropdown({ store, history, strings });
     interface OpenFilterDetail {
       range: import('./engine/types.js').Range;
       col: number;
@@ -327,6 +340,7 @@ export const Spreadsheet = {
         getFormatPainter: () => featureState.formatPainter,
         getGoToDialog: () => featureState.goToDialog,
         getHyperlinkDialog: () => featureState.hyperlinkDialog,
+        getNamedRangeDialog: () => featureState.namedRangeDialog,
         getPivotTableDialog: () => featureState.pivotTableDialog,
         getSessionCharts: () => featureState.sessionCharts,
         getSheetTabs: () => sheetTabsController,
@@ -397,6 +411,7 @@ export const Spreadsheet = {
       getArgHelper: () => featureState.fxArgHelper,
       getAutocomplete: () => featureState.fxAutocomplete,
       host,
+      onValidation: (outcome) => binding.validationAlert?.show(outcome),
       store,
       updateChrome,
       wb: () => wb,
@@ -500,6 +515,9 @@ export const Spreadsheet = {
     });
     const attachHostFeature = hostFeatures.attach;
     const detachHostFeature = hostFeatures.detach;
+    const ensureWatchWindow = (): void => {
+      if (!featureState.watchPanel) attachHostFeature('watchWindow');
+    };
 
     // Initial host-feature attach — runs after every helper closure
     // (`onCanvasClick`, `onHostKey`, `syncFxRefs`, `commitFx`) is in
@@ -525,6 +543,7 @@ export const Spreadsheet = {
       featureState.fxAutocomplete.setLabels(next.autocomplete);
       featureState.fxArgHelper?.setLabels(next.argHelper);
       sheetTabsController?.update();
+      cellStylesGallery.setStrings(next);
       renderer.invalidate();
 
       // Always-on dialogs: rebuild — none of these expose setStrings yet.
@@ -536,10 +555,20 @@ export const Spreadsheet = {
         getWb: () => wb,
         getActiveSheet: () => store.getState().data.sheetIndex,
         onChanged: () => renderer.invalidate(),
+        onNewRule: () => featureState.conditionalDialog?.open({ mode: 'new' }),
+        store,
+        history,
+        strings,
+      });
+      evaluateFormulaDialog.detach();
+      evaluateFormulaDialog = attachEvaluateFormulaDialog({
+        host,
+        store,
+        getWb: () => wb,
         strings,
       });
       filterDropdown.detach();
-      filterDropdown = attachFilterDropdown({ store, strings });
+      filterDropdown = attachFilterDropdown({ store, history, strings });
 
       // Toggleable host features: prefer setStrings when the handle exposes
       // it, otherwise fall back to detach+reattach.
@@ -649,8 +678,8 @@ export const Spreadsheet = {
         }
         refreshFeaturesView();
       },
-      openConditionalDialog() {
-        featureState.conditionalDialog?.open();
+      openConditionalDialog(options) {
+        featureState.conditionalDialog?.open(options);
       },
       openIterativeDialog() {
         featureState.iterativeDialog?.open();
@@ -664,6 +693,9 @@ export const Spreadsheet = {
       openCellStylesGallery() {
         cellStylesGallery.open();
       },
+      openEvaluateFormulaDialog() {
+        evaluateFormulaDialog.open();
+      },
       openFunctionArguments(seedName?: string) {
         featureState.fxDialog?.open(seedName);
       },
@@ -673,8 +705,8 @@ export const Spreadsheet = {
       openCommentDialog() {
         featureState.commentDialog?.open();
       },
-      openFindReplace() {
-        binding.findReplace?.open();
+      openFindReplace(tab?: 'find' | 'replace') {
+        binding.findReplace?.open(tab);
       },
       closeFindReplace() {
         binding.findReplace?.close();
@@ -682,38 +714,100 @@ export const Spreadsheet = {
       openPasteSpecial() {
         binding.pasteSpecialDialog?.open();
       },
+      pasteSpecial(options) {
+        return binding.pasteSpecialDialog?.apply(options) ?? false;
+      },
+      openInsertCopiedCells() {
+        openInsertCopiedCellsDialog({
+          strings: i18n.strings,
+          onSubmit: (direction) => {
+            void readClipboardText().then((text) => {
+              if (!text) return;
+              const result = insertCopiedCellsFromTSV(store, wb, history, text, direction);
+              if (!result) return;
+              mutators.setCopyRange(store, null);
+              mutators.setRange(store, result.writtenRange);
+              refreshCells();
+              updateChrome();
+              renderer.invalidate();
+            });
+          },
+        });
+      },
       openNamedRangeDialog() {
         featureState.namedRangeDialog?.open();
+      },
+      openDefineNameDialog() {
+        featureState.namedRangeDialog?.openNew();
       },
       openPageSetup() {
         featureState.pageSetupDialog?.open();
       },
-      print() {
+      print(mode = 'print') {
         // The print command is wired through the same flag as the dialog —
         // when the feature is off, both call sites are no-ops. Skip if the
         // dialog never attached so consumers can rely on the gate.
         if (!featureState.pageSetupDialog) return;
-        printSheet(wb, store, store.getState().data.sheetIndex, host);
+        printSheet(
+          wb,
+          store,
+          store.getState().data.sheetIndex,
+          host,
+          mode === 'pdf' ? strings.ribbon.pdf : strings.ribbon.print,
+          mode,
+        );
       },
       recalc() {
         wb.recalc();
         mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
         renderer.invalidate();
       },
-      openFormatDialog() {
-        featureState.formatDialog?.open();
+      openFormatDialog(tab) {
+        featureState.formatDialog?.open(tab);
+      },
+      openDataValidationDialog() {
+        featureState.formatDialog?.open('more');
+      },
+      openGoTo() {
+        featureState.goToDialog?.open('go-to');
       },
       openGoToSpecial() {
-        featureState.goToDialog?.open();
+        featureState.goToDialog?.open('special');
+      },
+      openFilterDropdown(range, col) {
+        const s = store.getState();
+        const layout = layoutForView(s.layout, s.ui.showHeaders !== false);
+        const targetRange = range ?? s.ui.filterRange ?? s.selection.range;
+        const targetCol = Math.min(
+          Math.max(col ?? s.selection.active.col, targetRange.c0),
+          targetRange.c1,
+        );
+        const hostRect = host.getBoundingClientRect();
+        const x =
+          hostRect.left +
+          gridOriginX(layout) +
+          colX(layout, s.viewport, targetCol) +
+          colWidth(layout, targetCol, s.viewport) -
+          4;
+        const y = hostRect.top + layout.outlineColGutter + layout.headerRowHeight - 4;
+        filterDropdown.open(targetRange, targetCol, {
+          x,
+          y,
+          h: layout.headerRowHeight,
+        });
       },
       openWatchWindow() {
+        ensureWatchWindow();
         featureState.watchPanel?.open();
+        refreshFeaturesView();
       },
       closeWatchWindow() {
         featureState.watchPanel?.close();
       },
       toggleWatchWindow() {
+        ensureWatchWindow();
         featureState.watchPanel?.toggle();
+        refreshFeaturesView();
       },
       openQuickAnalysis() {
         const userQuick = userHandles.get('quickAnalysis') as
@@ -766,15 +860,17 @@ export const Spreadsheet = {
         return isSheetProtected(store.getState(), store.getState().data.sheetIndex);
       },
       tracePrecedents() {
-        tracePrecedentArrows(store, wb);
+        const count = tracePrecedentArrows(store, wb, store.getState().selection.active, history);
         renderer.invalidate();
+        return count;
       },
       traceDependents() {
-        traceDependentArrows(store, wb);
+        const count = traceDependentArrows(store, wb, store.getState().selection.active, history);
         renderer.invalidate();
+        return count;
       },
       clearTraces() {
-        clearTraceArrows(store);
+        clearTraceArrows(store, history);
         renderer.invalidate();
       },
       setTheme(t) {
@@ -849,6 +945,7 @@ export const Spreadsheet = {
         sheetTabsController?.detach();
         chromeSync?.detach();
         host.removeEventListener('fc:openfilter', onOpenFilter);
+        evaluateFormulaDialog.detach();
         filterDropdown.detach();
         unsubCellRegistry();
         unsubI18n();
@@ -860,3 +957,13 @@ export const Spreadsheet = {
     };
   },
 };
+
+async function readClipboardText(): Promise<string> {
+  if (typeof navigator === 'undefined' || !navigator.clipboard?.readText) return '';
+  try {
+    return await navigator.clipboard.readText();
+  } catch (err) {
+    console.warn('formulon-cell: clipboard read failed', err);
+    return '';
+  }
+}

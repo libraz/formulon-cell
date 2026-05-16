@@ -1,10 +1,83 @@
 import type { Range } from '../engine/types.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { isSheetProtected } from './protection.js';
 
 /** UI-only "Format As Table" overlay. Native workbook tables have a full
  * engine model, but this layer can decorate a plain range while writable
  * table APIs are unavailable. */
 export type TableStyle = 'light' | 'medium' | 'dark';
+
+/** Built-in table-style hues — one column per swatch in the style gallery,
+ *  ordered to mirror the desktop spreadsheet's themed accent columns. */
+export const TABLE_STYLE_COLORS: readonly string[] = [
+  '#808080',
+  '#4472c4',
+  '#ed7d31',
+  '#a5a5a5',
+  '#ffc000',
+  '#5b9bd5',
+  '#70ad47',
+];
+
+/** Fallback hue for overlays created before the gallery existed, or loaded
+ *  from the engine without an explicit color. */
+export const DEFAULT_TABLE_COLOR = '#5b9bd5';
+
+const parseHex = (hex: string): [number, number, number] => {
+  const h = hex.replace('#', '');
+  return [
+    Number.parseInt(h.slice(0, 2), 16),
+    Number.parseInt(h.slice(2, 4), 16),
+    Number.parseInt(h.slice(4, 6), 16),
+  ];
+};
+const toHexByte = (n: number): string =>
+  Math.max(0, Math.min(255, Math.round(n)))
+    .toString(16)
+    .padStart(2, '0');
+const mixHex = (hex: string, toward: string, t: number): string => {
+  const [r, g, b] = parseHex(hex);
+  const [tr, tg, tb] = parseHex(toward);
+  return `#${toHexByte(r + (tr - r) * t)}${toHexByte(g + (tg - g) * t)}${toHexByte(b + (tb - b) * t)}`;
+};
+
+/** Resolved fills for a table style — shared by the grid painter and the
+ *  style-gallery thumbnails so the preview always matches the applied look. */
+export interface TableStyleSwatch {
+  base: string;
+  header: string;
+  headerText: string;
+  band: string;
+}
+
+/** Derive the header / banded-row fills for a `(style, color)` pair. */
+export function tableStyleSwatch(
+  style: TableStyle,
+  color: string = DEFAULT_TABLE_COLOR,
+): TableStyleSwatch {
+  if (style === 'light') {
+    return {
+      base: color,
+      header: mixHex(color, '#ffffff', 0.72),
+      headerText: '#1f1f1f',
+      band: mixHex(color, '#ffffff', 0.92),
+    };
+  }
+  if (style === 'dark') {
+    return {
+      base: color,
+      header: mixHex(color, '#000000', 0.45),
+      headerText: '#ffffff',
+      band: mixHex(color, '#ffffff', 0.8),
+    };
+  }
+  return {
+    base: color,
+    header: color,
+    headerText: '#ffffff',
+    band: mixHex(color, '#ffffff', 0.84),
+  };
+}
 
 export interface TableOverlay {
   /** Stable id used by mutators / pointer routing. */
@@ -16,25 +89,45 @@ export interface TableOverlay {
    *  the total row. */
   range: Range;
   style: TableStyle;
+  /** Hue for the style. Optional — engine-loaded and pre-gallery overlays
+   *  fall back to `DEFAULT_TABLE_COLOR`. */
+  color?: string;
   /** Render the first row as a header (bold + tinted). Defaults to true. */
   showHeader: boolean;
   /** Render the last row as a total row (bold + tinted). Defaults to false. */
   showTotal: boolean;
   /** Apply zebra fills to data rows. Defaults to true. */
   banded: boolean;
+  /** Emphasize the first column with bold text. Defaults to false. */
+  firstCol?: boolean;
+  /** Emphasize the last column with bold text. Defaults to false. */
+  lastCol?: boolean;
 }
 
 export interface FormatAsTableOptions {
   id?: string;
   style?: TableStyle;
+  color?: string;
   showHeader?: boolean;
   showTotal?: boolean;
   banded?: boolean;
+  firstCol?: boolean;
+  lastCol?: boolean;
 }
 
 export type TableOverlayPatch = Partial<
-  Pick<TableOverlay, 'range' | 'style' | 'showHeader' | 'showTotal' | 'banded'>
+  Pick<
+    TableOverlay,
+    'range' | 'style' | 'color' | 'showHeader' | 'showTotal' | 'banded' | 'firstCol' | 'lastCol'
+  >
 >;
+
+const blockedByProtection = (store: SpreadsheetStore, sheet: number, op: string): boolean => {
+  if (!isSheetProtected(store.getState(), sheet)) return false;
+  // eslint-disable-next-line no-console
+  console.warn(`formulon-cell: ${op} blocked — sheet ${sheet} is protected`);
+  return true;
+};
 
 /** Default factory — keeps the construction site small. */
 export function defaultTableOverlay(id: string, range: Range): TableOverlay {
@@ -43,6 +136,7 @@ export function defaultTableOverlay(id: string, range: Range): TableOverlay {
     source: 'session',
     range,
     style: 'medium',
+    color: DEFAULT_TABLE_COLOR,
     showHeader: true,
     showTotal: false,
     banded: true,
@@ -59,7 +153,8 @@ export function formatAsTable(
   store: SpreadsheetStore,
   range: Range,
   options: FormatAsTableOptions = {},
-): TableOverlay {
+): TableOverlay | null {
+  if (blockedByProtection(store, range.sheet, 'formatAsTable')) return null;
   const overlay: TableOverlay = {
     ...defaultTableOverlay(options.id ?? defaultTableId(range), range),
     ...options,
@@ -114,6 +209,7 @@ export function updateTableOverlay(
 ): TableOverlay | null {
   const current = tableOverlayById(store.getState(), id);
   if (!current || current.source !== 'session') return null;
+  if (blockedByProtection(store, current.range.sheet, 'updateTableOverlay')) return null;
   const next: TableOverlay = { ...current, ...patch, id: current.id, source: 'session' };
   mutators.upsertTableOverlay(store, next);
   return next;
@@ -121,11 +217,14 @@ export function updateTableOverlay(
 
 /** Remove a session Format-as-Table overlay by id. */
 export function clearTable(store: SpreadsheetStore, id: string): void {
+  const current = tableOverlayById(store.getState(), id);
+  if (current && blockedByProtection(store, current.range.sheet, 'clearTable')) return;
   mutators.removeTableOverlay(store, id);
 }
 
 /** Remove every session table overlay that intersects `range`. */
 export function clearTablesInRange(store: SpreadsheetStore, range: Range): void {
+  if (blockedByProtection(store, range.sheet, 'clearTablesInRange')) return;
   mutators.clearTableOverlaysInRange(store, range);
 }
 
@@ -141,6 +240,22 @@ export function isTotalRow(t: TableOverlay, row: number, col: number): boolean {
   if (!t.showTotal) return false;
   if (row !== t.range.r1) return false;
   return col >= t.range.c0 && col <= t.range.c1;
+}
+
+/** True when (row, col) is on the emphasized first data column. */
+export function isFirstCol(t: TableOverlay, row: number, col: number): boolean {
+  if (!t.firstCol) return false;
+  if (col !== t.range.c0) return false;
+  if (row < t.range.r0 || row > t.range.r1) return false;
+  return true;
+}
+
+/** True when (row, col) is on the emphasized last data column. */
+export function isLastCol(t: TableOverlay, row: number, col: number): boolean {
+  if (!t.lastCol) return false;
+  if (col !== t.range.c1) return false;
+  if (row < t.range.r0 || row > t.range.r1) return false;
+  return true;
 }
 
 /** True when the row should paint with the alternate zebra fill. Header

@@ -6,6 +6,7 @@ import {
   setHeadingsVisible,
   setR1C1ReferenceStyle,
   setShowFormulas,
+  setWorkbookView,
 } from '../commands/view.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -47,6 +48,13 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
 
   const title = document.createElement('span');
   title.className = 'fc-viewbar__title';
+
+  const workbookViews = document.createElement('div');
+  workbookViews.className = 'fc-viewbar__group fc-viewbar__group--workbookviews';
+  const normalView = makeButton('fc-viewbar__button');
+  const pageLayoutView = makeButton('fc-viewbar__button');
+  const pageBreakPreview = makeButton('fc-viewbar__button');
+  workbookViews.append(normalView, pageLayoutView, pageBreakPreview);
 
   const toggles = document.createElement('div');
   toggles.className = 'fc-viewbar__group';
@@ -95,7 +103,7 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
   const objectsBtn = makeButton('fc-viewbar__button');
   if (deps.onOpenObjects) objects.appendChild(objectsBtn);
 
-  toolbar.append(title, toggles, freeze, zoom, sheetViews, objects);
+  toolbar.append(title, workbookViews, toggles, freeze, zoom, sheetViews, objects);
 
   const applyChanged = (): void => {
     deps.onChanged?.();
@@ -116,6 +124,18 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
   });
   r1c1.addEventListener('click', () => {
     setR1C1ReferenceStyle(store, !store.getState().ui.r1c1);
+    applyChanged();
+  });
+  normalView.addEventListener('click', () => {
+    setWorkbookView(store, 'normal');
+    applyChanged();
+  });
+  pageLayoutView.addEventListener('click', () => {
+    setWorkbookView(store, 'pageLayout');
+    applyChanged();
+  });
+  pageBreakPreview.addEventListener('click', () => {
+    setWorkbookView(store, 'pageBreakPreview');
     applyChanged();
   });
   freezeNone.addEventListener('click', () => {
@@ -170,6 +190,9 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
   function refreshLabels(): void {
     const t = strings.viewToolbar;
     title.textContent = t.title;
+    normalView.textContent = t.normalView;
+    pageLayoutView.textContent = t.pageLayoutView;
+    pageBreakPreview.textContent = t.pageBreakPreview;
     gridlines.textContent = t.gridlines;
     headings.textContent = t.headings;
     formulas.textContent = t.formulas;
@@ -184,7 +207,18 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
     saveView.textContent = t.saveView;
     deleteView.textContent = t.deleteView;
     objectsBtn.textContent = t.objects;
-    for (const btn of [gridlines, headings, formulas, r1c1, freezeNone, freezeTop, freezeFirst]) {
+    for (const btn of [
+      normalView,
+      pageLayoutView,
+      pageBreakPreview,
+      gridlines,
+      headings,
+      formulas,
+      r1c1,
+      freezeNone,
+      freezeTop,
+      freezeFirst,
+    ]) {
       btn.setAttribute('aria-label', btn.textContent ?? '');
     }
     freezePanes.setAttribute('aria-label', t.freezePanes);
@@ -203,6 +237,9 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
     headings.setAttribute('aria-pressed', String(s.ui.showHeaders));
     formulas.setAttribute('aria-pressed', String(s.ui.showFormulas));
     r1c1.setAttribute('aria-pressed', String(s.ui.r1c1));
+    normalView.setAttribute('aria-pressed', String(s.ui.workbookView === 'normal'));
+    pageLayoutView.setAttribute('aria-pressed', String(s.ui.workbookView === 'pageLayout'));
+    pageBreakPreview.setAttribute('aria-pressed', String(s.ui.workbookView === 'pageBreakPreview'));
     freezeNone.setAttribute(
       'aria-pressed',
       String(s.layout.freezeRows === 0 && s.layout.freezeCols === 0),

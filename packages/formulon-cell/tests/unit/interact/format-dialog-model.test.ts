@@ -7,7 +7,6 @@ import {
   isHexColor,
   normalizeFormatLocale,
   patternPresetsFor,
-  THEME_SWATCHES,
 } from '../../../src/interact/format-dialog-model.js';
 
 describe('interact/format-dialog-model', () => {
@@ -91,11 +90,6 @@ describe('interact/format-dialog-model', () => {
 
     it('exposes the 4 baseline currency symbols', () => {
       expect(CURRENCY_SYMBOLS).toEqual(['$', '¥', '€', '£']);
-    });
-
-    it('exposes the 12 theme swatches as valid hex colors', () => {
-      expect(THEME_SWATCHES.length).toBe(12);
-      for (const s of THEME_SWATCHES) expect(isHexColor(s)).toBe(true);
     });
   });
 });

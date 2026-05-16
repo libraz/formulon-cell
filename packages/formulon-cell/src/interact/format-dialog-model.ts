@@ -4,7 +4,10 @@ import type {
   CellBorders,
   CellVAlign,
   CellValidation,
+  FillPattern,
+  NegativeStyle,
   NumFmt,
+  TextDirection,
   ValidationErrorStyle,
   ValidationOp,
 } from '../store/store.js';
@@ -36,14 +39,18 @@ export interface DraftState {
   numFmt: NumFmt | undefined;
   numberCategory: NumberCategory;
   decimals: number;
+  thousands: boolean;
+  negativeStyle: NegativeStyle;
   currencySymbol: string;
   /** Pattern for date/time/datetime/custom categories. */
   pattern: string;
   align: CellAlign | undefined;
   vAlign: CellVAlign | undefined;
   wrap: boolean;
+  shrinkToFit: boolean;
   indent: number;
   rotation: number;
+  textDirection: TextDirection;
   bold: boolean;
   italic: boolean;
   underline: boolean;
@@ -52,6 +59,8 @@ export interface DraftState {
   fontSize: number | undefined;
   color: string | undefined;
   fill: string | undefined;
+  fillPattern: FillPattern | undefined;
+  fillPatternColor: string | undefined;
   borders: CellBorders;
   /** "Active" line style — applied when a side checkbox is turned on. */
   borderStyle: BorderStyleKey;
@@ -71,9 +80,17 @@ export interface DraftState {
   validationFormula: string;
   validationAllowBlank: boolean;
   validationErrorStyle: ValidationErrorStyle;
+  validationShowInputMessage: boolean;
+  validationPromptTitle: string;
+  validationPromptMessage: string;
+  validationShowErrorMessage: boolean;
+  validationErrorTitle: string;
+  validationErrorMessage: string;
   /** Sheet-protection lock flag. desktop default is `true` (locked); the
    *  Protection tab exposes a single checkbox. */
   locked: boolean;
+  /** Formula-hidden flag exposed by the Protection tab. */
+  formulaHidden: boolean;
 }
 
 export const COMMON_FONTS = [
@@ -86,20 +103,6 @@ export const COMMON_FONTS = [
   'monospace',
 ];
 export const CURRENCY_SYMBOLS = ['$', '¥', '€', '£'];
-export const THEME_SWATCHES = [
-  '#000000',
-  '#ffffff',
-  '#c00000',
-  '#ff0000',
-  '#ffc000',
-  '#ffff00',
-  '#92d050',
-  '#00b050',
-  '#00b0f0',
-  '#0070c0',
-  '#002060',
-  '#7030a0',
-] as const;
 
 export const defaultCurrencySymbolFor = (locale: string): string =>
   normalizeFormatLocale(locale).startsWith('ja') ? '¥' : '$';
@@ -134,7 +137,7 @@ export const patternPresetsFor = (
     date: ['m/d/yyyy', 'mmmm d, yyyy', 'd-mmm-yy', 'yyyy-mm-dd', 'dddd, mmmm d, yyyy'],
     time: ['h:MM AM/PM', 'h:MM:SS AM/PM', 'HH:MM', 'HH:MM:SS'],
     datetime: ['m/d/yyyy h:MM AM/PM', 'mmmm d, yyyy h:MM AM/PM', 'yyyy-mm-dd HH:MM'],
-    special: ['00000', '00000-0000', '[<=9999999]000-0000;000-0000', '000-00-0000'],
+    special: ['00000', '00000-0000', '[<=9999999]000-0000;(000) 000-0000', '000-00-0000'],
     custom: ['0.00', '#,##0', '#,##0.00', '0%', '0.00%', '$#,##0;[Red]-$#,##0', '0.00E+00'],
   };
 };

@@ -1,4 +1,5 @@
 import { aggregateSelection } from '../commands/aggregate.js';
+import type { History } from '../commands/history.js';
 import {
   buildQuickAnalysisActions,
   executeQuickAnalysisAction,
@@ -18,6 +19,7 @@ export interface QuickAnalysisDeps {
   store: SpreadsheetStore;
   wb: WorkbookHandle;
   strings: Strings;
+  history?: History | null;
   onAfterCommit?: () => void;
   invalidate?: () => void;
   onOpenPivotTable?: () => void;
@@ -53,7 +55,7 @@ const ACTION_LABELS: Record<string, keyof Strings['quickAnalysis']['actions']> =
   avgRow: 'avgRow',
   countRow: 'countRow',
   formatAsTable: 'formatAsTable',
-  pivotStub: 'pivotStub',
+  pivotTable: 'pivotTable',
   sparkLine: 'sparkLine',
   sparkColumn: 'sparkColumn',
   sparkWinLoss: 'sparkWinLoss',
@@ -83,7 +85,16 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
   let wb = deps.wb;
   let strings = deps.strings;
   let open = false;
+  let activeGroup: QuickAnalysisGroup = 'formatting';
   let restoreFocusEl: HTMLElement | null = null;
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'fc-quick__button';
+  button.hidden = true;
+  button.setAttribute('aria-haspopup', 'dialog');
+  host.appendChild(button);
+  inheritHostTokens(host, button);
 
   const root = document.createElement('div');
   root.className = 'fc-quick';
@@ -94,12 +105,33 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
   host.appendChild(root);
   inheritHostTokens(host, root);
 
+  const isMultiSelection = (): boolean => {
+    const r = store.getState().selection.range;
+    return r.r1 > r.r0 || r.c1 > r.c0;
+  };
+
+  const positionButton = (): void => {
+    const state = store.getState();
+    const rects = rangeRects(state.layout, state.viewport, state.selection.range);
+    const anchor = rects[rects.length - 1];
+    if (!anchor || !isMultiSelection() || state.ui.editor.kind !== 'idle' || open) {
+      button.hidden = true;
+      return;
+    }
+    button.hidden = false;
+    button.title = strings.quickAnalysis.title;
+    button.setAttribute('aria-label', strings.quickAnalysis.title);
+    button.style.left = `${Math.max(4, Math.min(host.clientWidth - 26, anchor.x + anchor.w + 3))}px`;
+    button.style.top = `${Math.max(4, Math.min(host.clientHeight - 26, anchor.y + anchor.h + 3))}px`;
+  };
+
   const close = (restoreFocus = false): void => {
     if (!open) return;
     open = false;
     const focusTarget = restoreFocusEl;
     restoreFocusEl = null;
     root.hidden = true;
+    positionButton();
     if (
       restoreFocus &&
       focusTarget &&
@@ -118,11 +150,70 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
       close(false);
       return;
     }
-    const result = executeQuickAnalysisAction({ store, wb, actionId, range, stats });
+    const result = executeQuickAnalysisAction({
+      store,
+      wb,
+      actionId,
+      range,
+      stats,
+      history: deps.history ?? null,
+    });
     if (!result.ok) return;
     if (result.kind === 'formula') deps.onAfterCommit?.();
     deps.invalidate?.();
     close(false);
+  };
+
+  const selectGroup = (group: QuickAnalysisGroup): void => {
+    activeGroup = group;
+    render();
+    positionPanel(host, root, store);
+  };
+
+  const focusActiveTab = (): void => {
+    root.querySelector<HTMLButtonElement>('.fc-quick__tab[aria-selected="true"]')?.focus({
+      preventScroll: true,
+    });
+  };
+
+  const moveTab = (from: QuickAnalysisGroup, delta: number): void => {
+    const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('.fc-quick__tab'));
+    const groups = tabs
+      .map((tab) => tab.dataset.group as QuickAnalysisGroup | undefined)
+      .filter((group): group is QuickAnalysisGroup => group != null);
+    if (groups.length === 0) return;
+    const index = Math.max(0, groups.indexOf(from));
+    const next = groups[(index + delta + groups.length) % groups.length];
+    if (!next) return;
+    selectGroup(next);
+    focusActiveTab();
+  };
+
+  const onTabKeyDown = (event: KeyboardEvent, group: QuickAnalysisGroup): void => {
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      moveTab(group, 1);
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      moveTab(group, -1);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      const first = root.querySelector<HTMLButtonElement>('.fc-quick__tab');
+      const next = first?.dataset.group as QuickAnalysisGroup | undefined;
+      if (next) {
+        selectGroup(next);
+        focusActiveTab();
+      }
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('.fc-quick__tab'));
+      const last = tabs[tabs.length - 1];
+      const next = last?.dataset.group as QuickAnalysisGroup | undefined;
+      if (next) {
+        selectGroup(next);
+        focusActiveTab();
+      }
+    }
   };
 
   const render = (): void => {
@@ -138,6 +229,8 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
       chartAvailable: deps.canCreateChart?.() ?? true,
     });
     const grouped = groupQuickAnalysisActions(actions);
+    const availableGroups = GROUP_ORDER.filter((group) => grouped[group].length > 0);
+    if (!availableGroups.includes(activeGroup)) activeGroup = availableGroups[0] ?? 'formatting';
 
     root.replaceChildren();
     const title = document.createElement('div');
@@ -145,15 +238,35 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
     title.textContent = strings.quickAnalysis.title;
     root.appendChild(title);
 
+    const tabs = document.createElement('div');
+    tabs.className = 'fc-quick__tabs';
+    tabs.setAttribute('role', 'tablist');
+    tabs.setAttribute('aria-label', strings.quickAnalysis.title);
+    root.appendChild(tabs);
+
     for (const group of GROUP_ORDER) {
       const groupActions = grouped[group];
       if (groupActions.length === 0) continue;
+      const tab = document.createElement('button');
+      tab.type = 'button';
+      tab.className = 'fc-quick__tab';
+      tab.dataset.group = group;
+      tab.id = `fc-quick-tab-${group}`;
+      tab.setAttribute('role', 'tab');
+      tab.setAttribute('aria-selected', group === activeGroup ? 'true' : 'false');
+      tab.setAttribute('aria-controls', `fc-quick-panel-${group}`);
+      tab.tabIndex = group === activeGroup ? 0 : -1;
+      tab.textContent = strings.quickAnalysis.groups[group];
+      tab.addEventListener('click', () => selectGroup(group));
+      tab.addEventListener('keydown', (event) => onTabKeyDown(event, group));
+      tabs.appendChild(tab);
+
       const section = document.createElement('section');
       section.className = 'fc-quick__section';
-      const heading = document.createElement('div');
-      heading.className = 'fc-quick__heading';
-      heading.textContent = strings.quickAnalysis.groups[group];
-      section.appendChild(heading);
+      section.id = `fc-quick-panel-${group}`;
+      section.setAttribute('role', 'tabpanel');
+      section.setAttribute('aria-labelledby', tab.id);
+      section.hidden = group !== activeGroup;
       const grid = document.createElement('div');
       grid.className = 'fc-quick__actions';
       for (const action of groupActions) {
@@ -172,9 +285,11 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
   };
 
   const openPanel = (): void => {
+    activeGroup = 'formatting';
     render();
     restoreFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : host;
     root.hidden = false;
+    button.hidden = true;
     open = true;
     positionPanel(host, root, store);
     root.focus({ preventScroll: true });
@@ -190,12 +305,16 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
   };
   root.addEventListener('keydown', onKey);
   host.addEventListener('pointerdown', onHostPointerDown, true);
+  button.addEventListener('click', openPanel);
+  const unsub = store.subscribe(positionButton);
+  positionButton();
 
   return {
     open: openPanel,
     close,
     setStrings(next) {
       strings = next;
+      positionButton();
       if (open) {
         render();
         positionPanel(host, root, store);
@@ -207,6 +326,9 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
     detach() {
       root.removeEventListener('keydown', onKey);
       host.removeEventListener('pointerdown', onHostPointerDown, true);
+      button.removeEventListener('click', openPanel);
+      unsub();
+      button.remove();
       root.remove();
     },
   };

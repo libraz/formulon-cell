@@ -12,6 +12,34 @@ import type { Rect } from './geometry.js';
 export const TRACE_PRECEDENT_COLOR = '#1f7ae0';
 export const TRACE_DEPENDENT_COLOR = '#cf3a4c';
 
+function canvasTextAlign(align: CellFormat['align'] | undefined): CanvasTextAlign | null {
+  switch (align) {
+    case 'left':
+    case 'center':
+    case 'right':
+      return align;
+    case 'centerContinuous':
+      return 'center';
+    case 'fill':
+    case 'justify':
+    case 'distributed':
+      return 'left';
+    default:
+      return null;
+  }
+}
+
+function canvasTextVAlign(align: CellFormat['vAlign'] | undefined): TextVAlign {
+  switch (align) {
+    case 'top':
+    case 'middle':
+    case 'bottom':
+      return align;
+    default:
+      return 'middle';
+  }
+}
+
 /** Paint a small filled dot at the source cell of a trace arrow. The dot
  *  sits at the center of `rect`. Mirrors the blue/red round endpoint convention. */
 export function paintTraceDot(
@@ -188,6 +216,29 @@ export function paintValidationTriangle(
   color = '#d24545',
 ): Rect {
   return paintErrorTriangle(ctx, bounds, color);
+}
+
+/** Excel-style "Circle Invalid Data" marker. It intentionally sits inside the
+ *  cell bounds so it remains visible with gridlines, fills, and selection
+ *  outlines. */
+export function paintValidationCircle(
+  ctx: CanvasRenderingContext2D,
+  bounds: Rect,
+  color = '#d24545',
+): void {
+  const insetX = Math.min(5, Math.max(2, bounds.w * 0.08));
+  const insetY = Math.min(4, Math.max(2, bounds.h * 0.12));
+  const x = bounds.x + insetX;
+  const y = bounds.y + insetY;
+  const w = Math.max(4, bounds.w - insetX * 2);
+  const h = Math.max(4, bounds.h - insetY * 2);
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
 }
 
 /** Paint a small lock-icon overlay in the upper-right corner of a cell.
@@ -424,16 +475,128 @@ export function paintConditionalIcon(
     ctx.lineTo(baseX - px * headHalf, baseY - py * headHalf);
     ctx.closePath();
     ctx.fill();
-  } else if (kind === 'traffic3') {
+  } else if (kind === 'triangles3') {
+    const idx = Math.max(0, Math.min(2, slot));
+    const colors = ['#d24545', '#cfa64a', '#3aa055'];
+    ctx.fillStyle = colors[idx] ?? '#777';
+    if (idx === 1) {
+      ctx.fillRect(cx - r, cy - 1, r * 2, 2);
+    } else {
+      const up = idx === 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + (up ? -r : r));
+      ctx.lineTo(cx - r, cy + (up ? r : -r));
+      ctx.lineTo(cx + r, cy + (up ? r : -r));
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else if (kind === 'traffic3' || kind === 'trafficRim3') {
     // Three colored circles, only the slot's circle is filled solid; the
     // other two are dim outlines so the icon reads as a single state.
     const idx = Math.max(0, Math.min(2, slot));
     const colors = ['#d24545', '#cfa64a', '#3aa055'];
     const color = colors[idx] ?? '#777';
+    if (kind === 'trafficRim3') {
+      ctx.strokeStyle = '#4f4f4f';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.rect(cx - r - 2, cy - r - 2, (r + 2) * 2, (r + 2) * 2);
+      ctx.stroke();
+    }
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
+  } else if (kind === 'symbols3') {
+    const idx = Math.max(0, Math.min(2, slot));
+    ctx.lineWidth = 1.6;
+    if (idx === 2) {
+      ctx.strokeStyle = '#3aa055';
+      ctx.beginPath();
+      ctx.moveTo(cx - r, cy);
+      ctx.lineTo(cx - 1, cy + r - 1);
+      ctx.lineTo(cx + r, cy - r);
+      ctx.stroke();
+    } else if (idx === 1) {
+      ctx.strokeStyle = '#cfa64a';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - r);
+      ctx.lineTo(cx, cy + 1);
+      ctx.stroke();
+      ctx.fillStyle = '#cfa64a';
+      ctx.beginPath();
+      ctx.arc(cx, cy + r - 1, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = '#d24545';
+      ctx.beginPath();
+      ctx.moveTo(cx - r, cy - r);
+      ctx.lineTo(cx + r, cy + r);
+      ctx.moveTo(cx + r, cy - r);
+      ctx.lineTo(cx - r, cy + r);
+      ctx.stroke();
+    }
+  } else if (kind === 'flags3') {
+    const idx = Math.max(0, Math.min(2, slot));
+    const colors = ['#d24545', '#cfa64a', '#3aa055'];
+    ctx.strokeStyle = '#5c5c5c';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - r, cy + r);
+    ctx.lineTo(cx - r, cy - r);
+    ctx.stroke();
+    ctx.fillStyle = colors[idx] ?? '#777';
+    ctx.beginPath();
+    ctx.moveTo(cx - r, cy - r);
+    ctx.lineTo(cx + r, cy - r + 1.5);
+    ctx.lineTo(cx - r, cy + 1);
+    ctx.closePath();
+    ctx.fill();
+  } else if (kind === 'quarters5' || kind === 'ratings5') {
+    const idx = Math.max(0, Math.min(4, slot));
+    ctx.strokeStyle = '#5c5c5c';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = '#3f7ad8';
+    if (kind === 'ratings5') {
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.globalAlpha = 0.25 + idx * 0.18;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    } else {
+      const end = -Math.PI / 2 + ((idx + 1) / 4) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, -Math.PI / 2, end);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else if (kind === 'bars5' || kind === 'boxes5') {
+    const idx = Math.max(0, Math.min(4, slot));
+    ctx.fillStyle = '#3f7ad8';
+    if (kind === 'bars5') {
+      const barW = 2;
+      const gap = 1;
+      const baseX = cx - 5;
+      for (let i = 0; i < 5; i += 1) {
+        const h = 3 + i * 2;
+        ctx.globalAlpha = i <= idx ? 1 : 0.25;
+        ctx.fillRect(baseX + i * (barW + gap), cy + r - h, barW, h);
+      }
+      ctx.globalAlpha = 1;
+    } else {
+      const size = 3;
+      const baseX = cx - 5;
+      const baseY = cy - 4;
+      for (let i = 0; i < 5; i += 1) {
+        ctx.globalAlpha = i <= idx ? 1 : 0.25;
+        ctx.fillRect(baseX + (i % 3) * 4, baseY + Math.floor(i / 3) * 4, size, size);
+      }
+      ctx.globalAlpha = 1;
+    }
   } else {
     // stars3 — outlined or filled 5-pointed star. slot 0 = empty,
     // slot 1 = half (filled lower-half), slot 2 = full.
@@ -480,9 +643,63 @@ export function paintConditionalIcon(
  *  cells with explicit fill stay visually filled even when selected. */
 export function paintCellFill({ ctx, bounds, format }: CellPaintCtx): void {
   const fill = format?.fill;
-  if (!fill) return;
-  ctx.fillStyle = fill;
-  ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
+  const pattern = format?.fillPattern;
+  if (!fill && !pattern) return;
+  if (fill) {
+    ctx.fillStyle = fill;
+    ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
+  }
+  if (!pattern) return;
+  const color = format?.fillPatternColor ?? '#000000';
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(bounds.x, bounds.y, bounds.w, bounds.h);
+  ctx.clip();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 1;
+  switch (pattern) {
+    case 'gray125':
+    case 'gray25':
+    case 'gray50': {
+      const step = pattern === 'gray125' ? 6 : pattern === 'gray25' ? 4 : 3;
+      const size = pattern === 'gray50' ? 1.5 : 1;
+      for (let y = bounds.y + 2; y < bounds.y + bounds.h; y += step) {
+        for (let x = bounds.x + 2; x < bounds.x + bounds.w; x += step) {
+          ctx.fillRect(x, y, size, size);
+        }
+      }
+      break;
+    }
+    case 'horizontal':
+      for (let y = bounds.y + 3; y < bounds.y + bounds.h; y += 4) {
+        ctx.beginPath();
+        ctx.moveTo(bounds.x, y);
+        ctx.lineTo(bounds.x + bounds.w, y);
+        ctx.stroke();
+      }
+      break;
+    case 'vertical':
+      for (let x = bounds.x + 3; x < bounds.x + bounds.w; x += 4) {
+        ctx.beginPath();
+        ctx.moveTo(x, bounds.y);
+        ctx.lineTo(x, bounds.y + bounds.h);
+        ctx.stroke();
+      }
+      break;
+    case 'diagonalDown':
+    case 'diagonalUp': {
+      const direction = pattern === 'diagonalDown' ? 1 : -1;
+      for (let x = bounds.x - bounds.h; x < bounds.x + bounds.w; x += 6) {
+        ctx.beginPath();
+        ctx.moveTo(x, direction > 0 ? bounds.y : bounds.y + bounds.h);
+        ctx.lineTo(x + bounds.h, direction > 0 ? bounds.y + bounds.h : bounds.y);
+        ctx.stroke();
+      }
+      break;
+    }
+  }
+  ctx.restore();
 }
 
 export function paintCellText({
@@ -498,7 +715,7 @@ export function paintCellText({
 }: CellPaintCtx): void {
   if (value.kind === 'blank' && !formula && displayOverride == null) return;
 
-  const padX = 7;
+  const padX = 3;
   const padY = 3;
   let text: string;
   if (displayOverride != null) {
@@ -517,6 +734,11 @@ export function paintCellText({
   const isError = value.kind === 'error';
   const isBool = value.kind === 'bool';
   const isFormulaDisplay = showFormulas && formula != null;
+  const redNegative =
+    value.kind === 'number' &&
+    value.value < 0 &&
+    (format?.numFmt?.kind === 'fixed' || format?.numFmt?.kind === 'currency') &&
+    (format.numFmt.negativeStyle === 'red' || format.numFmt.negativeStyle === 'red-parens');
   const weight = format?.bold ? 700 : 400;
   const styleSlant = format?.italic ? 'italic ' : '';
   const fontSize = format?.fontSize ?? theme.textCell;
@@ -531,19 +753,23 @@ export function paintCellText({
         ? theme.cellErrorFg
         : isBool
           ? theme.cellBoolFg
-          : isNumeric
-            ? theme.cellNumFg
-            : theme.fg;
+          : redNegative
+            ? '#c00000'
+            : isNumeric
+              ? theme.cellNumFg
+              : theme.fg;
 
   let align: CanvasTextAlign;
   if (format?.align) {
-    align = format.align;
+    align = canvasTextAlign(format.align) ?? 'left';
   } else {
     align = isFormulaDisplay ? 'left' : isNumeric ? 'right' : isBool || isError ? 'center' : 'left';
   }
   const indentPx = (format?.indent ?? 0) * 8;
   const rotation = format?.rotation ?? 0;
   const wrap = !!format?.wrap;
+  ctx.direction =
+    format?.textDirection === 'rtl' ? 'rtl' : format?.textDirection === 'ltr' ? 'ltr' : 'inherit';
 
   ctx.save();
   ctx.beginPath();
@@ -567,7 +793,7 @@ export function paintCellText({
     const lines = wrapText(ctx, text, bounds.w - padX * 2 - indentPx);
     const lineH = Math.round(fontSize * 1.28);
     const totalH = lineH * lines.length;
-    const vAlign = format?.vAlign ?? 'bottom';
+    const vAlign = canvasTextVAlign(format?.vAlign ?? 'bottom');
     const measured = stableTextMetricsBox(fontSize);
     let startY = textBaselineY(bounds, measured, vAlign, padY);
     if (vAlign === 'middle') startY -= (totalH - lineH) / 2;
@@ -593,8 +819,16 @@ export function paintCellText({
   else if (align === 'center') tx = bounds.x + bounds.w / 2;
   else tx = bounds.x + padX + indentPx;
 
-  const vAlign = format?.vAlign ?? 'bottom';
+  const vAlign = canvasTextVAlign(format?.vAlign ?? 'bottom');
   const availableTextWidth = Math.max(0, bounds.w - padX * 2 - indentPx);
+  let drawFontSize = fontSize;
+  if (format?.shrinkToFit) {
+    const measuredWidth = ctx.measureText(text).width;
+    if (measuredWidth > availableTextWidth && availableTextWidth > 0) {
+      drawFontSize = Math.max(8, Math.floor(fontSize * (availableTextWidth / measuredWidth)));
+      ctx.font = `${styleSlant}${weight} ${drawFontSize}px ${fontCss(fontFamily)}`;
+    }
+  }
   if (isNumeric && ctx.measureText(text).width > availableTextWidth) {
     if (format?.numFmt) {
       // Explicit number format: Excel shows #### when the formatted value
@@ -611,12 +845,12 @@ export function paintCellText({
         value.value,
         availableTextWidth,
         locale ?? 'en-US',
-        fontSize,
+        drawFontSize,
       );
     }
   }
   const metrics = ctx.measureText(text);
-  const box = stableTextMetricsBox(fontSize);
+  const box = stableTextMetricsBox(drawFontSize);
   const ty = textBaselineY(bounds, box, vAlign, padY);
 
   ctx.fillText(text, tx, ty);

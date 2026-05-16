@@ -61,6 +61,8 @@ import {
   TextBold24Regular,
   TextBulletListSquare24Regular,
   TextColor24Regular,
+  TextIndentDecrease24Regular,
+  TextIndentIncrease24Regular,
   TextItalic24Regular,
   TextProofingTools24Regular,
   TextStrikethrough24Regular,
@@ -70,82 +72,10 @@ import {
   Window24Regular,
   ZoomFit24Regular,
 } from '@fluentui/react-icons';
+import type { IconName } from '@libraz/formulon-cell';
 import type { ReactElement } from 'react';
 
-export type IconName =
-  | 'accessibility'
-  | 'add'
-  | 'paste'
-  | 'cut'
-  | 'copy'
-  | 'paint'
-  | 'undo'
-  | 'redo'
-  | 'fontGrow'
-  | 'fontShrink'
-  | 'bold'
-  | 'italic'
-  | 'underline'
-  | 'strike'
-  | 'fontColor'
-  | 'fillColor'
-  | 'top'
-  | 'middle'
-  | 'currency'
-  | 'percent'
-  | 'comma'
-  | 'decDown'
-  | 'decUp'
-  | 'autosum'
-  | 'alignLeft'
-  | 'alignCenter'
-  | 'alignRight'
-  | 'borders'
-  | 'merge'
-  | 'wrap'
-  | 'freeze'
-  | 'insertRows'
-  | 'deleteRows'
-  | 'insertCols'
-  | 'deleteCols'
-  | 'filter'
-  | 'sortAsc'
-  | 'sortDesc'
-  | 'table'
-  | 'tableStyle'
-  | 'conditional'
-  | 'formatCells'
-  | 'removeDuplicates'
-  | 'link'
-  | 'pen'
-  | 'eraser'
-  | 'page'
-  | 'margins'
-  | 'orientation'
-  | 'scale'
-  | 'print'
-  | 'function'
-  | 'names'
-  | 'trace'
-  | 'dependents'
-  | 'clearArrows'
-  | 'options'
-  | 'watch'
-  | 'comment'
-  | 'commentAdd'
-  | 'commentMultiple'
-  | 'protect'
-  | 'zoom'
-  | 'script'
-  | 'addIn'
-  | 'pdf'
-  | 'goTo'
-  | 'find'
-  | 'findSelect'
-  | 'translate'
-  | 'spelling'
-  | 'chart'
-  | 'clear';
+export type { IconName };
 
 export const Icon = ({ name }: { name: IconName }): ReactElement => {
   const common = { className: 'demo__rb-icon', 'aria-hidden': true };
@@ -186,6 +116,14 @@ export const Icon = ({ name }: { name: IconName }): ReactElement => {
       return <AlignSpaceEvenlyVertical24Regular {...common} />;
     case 'middle':
       return <TextAlignCenter24Regular {...common} />;
+    case 'bottomAlign':
+      return pathIcon(common, [
+        'M4 20.25c0-.41.34-.75.75-.75h14.5a.75.75 0 0 1 0 1.5H4.75a.75.75 0 0 1-.75-.75ZM6.25 3h11.5C18.99 3 20 4 20 5.25v1.5C20 7.99 19 9 17.75 9H6.25C5.01 9 4 8 4 6.75v-1.5C4 4.01 5 3 6.25 3Zm0 1.5a.75.75 0 0 0-.75.75v1.5c0 .41.34.75.75.75h11.5c.41 0 .75-.34.75-.75v-1.5a.75.75 0 0 0-.75-.75H6.25Zm0 7h11.5c1.24 0 2.25 1 2.25 2.25v1.5c0 1.24-1 2.25-2.25 2.25H6.25C5.01 17.5 4 16.5 4 15.25v-1.5c0-1.24 1-2.25 2.25-2.25Zm0 1.5a.75.75 0 0 0-.75.75v1.5c0 .41.34.75.75.75h11.5c.41 0 .75-.34.75-.75v-1.5a.75.75 0 0 0-.75-.75H6.25Z',
+      ]);
+    case 'textOrientation':
+      return pathIcon(common, [
+        'M4.22 17.72 15.72 6.22a.75.75 0 1 1 1.06 1.06l-11.5 11.5a.75.75 0 0 1-1.06-1.06Zm2.06-8.44a.75.75 0 0 1 0-1.06l3-3a.75.75 0 0 1 1.06 0l5.44 5.44a.75.75 0 0 1-1.06 1.06L13.5 10.5 10 14l1.22 1.22a.75.75 0 0 1-1.06 1.06L4.72 10.84a.75.75 0 1 1 1.06-1.06L7 11l3.5-3.5-1.22-1.22-1.94 1.94a.75.75 0 0 1-1.06 0ZM18.25 4a.75.75 0 0 1 .75.75V9.5a.75.75 0 0 1-1.5 0V6.56l-2.22 2.22a.75.75 0 0 1-1.06-1.06l2.22-2.22H13.5a.75.75 0 0 1 0-1.5h4.75Z',
+      ]);
     case 'currency':
       return <CurrencyDollarEuro24Regular {...common} />;
     case 'percent':
@@ -204,6 +142,10 @@ export const Icon = ({ name }: { name: IconName }): ReactElement => {
       return <AlignCenterHorizontal24Regular {...common} />;
     case 'alignRight':
       return <AlignRight24Regular {...common} />;
+    case 'indentDecrease':
+      return <TextIndentDecrease24Regular {...common} />;
+    case 'indentIncrease':
+      return <TextIndentIncrease24Regular {...common} />;
     case 'borders':
       return <BorderAll24Regular {...common} />;
     case 'merge':
@@ -298,3 +240,14 @@ export const Icon = ({ name }: { name: IconName }): ReactElement => {
       return <Shield24Regular {...common} />;
   }
 };
+
+const pathIcon = (
+  common: { className: string; 'aria-hidden': boolean },
+  paths: readonly string[],
+): ReactElement => (
+  <svg {...common} viewBox="0 0 24 24" fill="currentColor" focusable="false">
+    {paths.map((d) => (
+      <path key={d} d={d} />
+    ))}
+  </svg>
+);

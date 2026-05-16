@@ -8,7 +8,6 @@ import {
   mutators,
   parseScriptCommand,
   presets,
-  type ReviewCell,
   type SpreadsheetInstance,
   type ThemeName,
   WorkbookHandle,
@@ -29,28 +28,27 @@ import {
   useState,
 } from 'react';
 import {
+  activateDemoModal,
   createDemoStrings,
   DEMO_FUNCTIONS,
+  demoColLabel,
+  demoCommandText,
   FEATURE_GROUPS,
   FORMATTERS,
   formatLoadError,
   LOCALES,
   PRESETS,
   type PresetKey,
+  previewCellChange,
+  resolveInitialLocale,
+  reviewCellsForInstance,
+  seedDemoWorkbook,
   THEMES,
 } from '../../demo-shared/index.js';
 
 const UI = createDemoStrings('React');
 
-const colLabel = (n: number): string => {
-  let out = '';
-  let v = n;
-  do {
-    out = String.fromCharCode(65 + (v % 26)) + out;
-    v = Math.floor(v / 26) - 1;
-  } while (v >= 0);
-  return out;
-};
+const colLabel = demoColLabel;
 
 interface ChangeLogEntry {
   readonly id: number;
@@ -73,22 +71,9 @@ interface ReviewDialogState {
 
 let changeId = 0;
 
-const FOCUSABLE_MODAL_SELECTOR = [
-  'button',
-  'input',
-  'select',
-  'textarea',
-  'a[href]',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',');
-
-const focusableModalItems = (root: HTMLElement): HTMLElement[] =>
-  Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_MODAL_SELECTOR)).filter((el) => {
-    if (el.closest('[hidden],[aria-hidden="true"]')) return false;
-    if ('disabled' in el && (el as HTMLButtonElement | HTMLInputElement).disabled) return false;
-    return el.tabIndex >= 0;
-  });
-
+// Modal focus trap + Esc-to-close. `activateDemoModal` lives in demo-shared
+// and is shared with the Vue demo; this hook adapts it to React's effect
+// model by attaching on mount/open and detaching on unmount/close.
 const useDemoModalFocus = (
   rootRef: RefObject<HTMLElement | null>,
   open: boolean,
@@ -98,88 +83,12 @@ const useDemoModalFocus = (
     if (!open) return;
     const root = rootRef.current;
     if (!root) return;
-    const restoreFocusEl =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const focusFirst = window.requestAnimationFrame(() => {
-      (focusableModalItems(root)[0] ?? root).focus({ preventScroll: true });
-    });
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-      if (event.key !== 'Tab') return;
-      const items = focusableModalItems(root);
-      if (items.length === 0) {
-        event.preventDefault();
-        root.focus({ preventScroll: true });
-        return;
-      }
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last?.focus({ preventScroll: true });
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first?.focus({ preventScroll: true });
-      }
-    };
-    root.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.cancelAnimationFrame(focusFirst);
-      root.removeEventListener('keydown', onKeyDown);
-      if (
-        restoreFocusEl &&
-        (root.contains(document.activeElement) || document.activeElement === document.body)
-      ) {
-        restoreFocusEl.focus({ preventScroll: true });
-      }
-    };
+    return activateDemoModal(root, onClose);
   }, [rootRef, open, onClose]);
 };
 
-const previewValue = (e: CellChangeEvent): string => {
-  if (e.formula) return e.formula;
-  switch (e.value.kind) {
-    case 'number':
-      return String(e.value.value);
-    case 'text':
-      return JSON.stringify(e.value.value);
-    case 'bool':
-      return String(e.value.value);
-    case 'error':
-      return `#${e.value.code}`;
-    case 'blank':
-      return '∅';
-    default:
-      return '?';
-  }
-};
-
-// Demo seed — only runs once on the initial blank workbook (core gates
-// `seed` on `ownsWb`, so re-mounts and Open xlsx don't re-trigger it).
-const seed = (wb: WorkbookHandle): void => {
-  wb.setText({ sheet: 0, row: 0, col: 0 }, 'item');
-  wb.setText({ sheet: 0, row: 0, col: 1 }, 'celsius');
-  wb.setText({ sheet: 0, row: 0, col: 2 }, 'fahrenheit');
-  wb.setText({ sheet: 0, row: 0, col: 3 }, 'greeting');
-  const rows: [string, number][] = [
-    ['London', 8],
-    ['Tokyo', 22],
-    ['Reykjavík', -3],
-    ['Cairo', 31],
-  ];
-  rows.forEach(([city, c], i) => {
-    const r = i + 1;
-    wb.setText({ sheet: 0, row: r, col: 0 }, city);
-    wb.setNumber({ sheet: 0, row: r, col: 1 }, c);
-    wb.setFormula({ sheet: 0, row: r, col: 2 }, `=B${r + 1}*1.8+32`);
-    wb.setFormula({ sheet: 0, row: r, col: 3 }, `=A${r + 1}&" ☼"`);
-  });
-  wb.recalc();
-};
+const previewValue = previewCellChange;
+const seed = seedDemoWorkbook;
 
 // Combine a preset's flags with explicit overrides. Overrides win — that
 // way the user can pick "Full" then individually disable e.g. context
@@ -189,27 +98,9 @@ const composeFeatures = (preset: PresetKey, overrides: FeatureFlags): FeatureFla
   ...overrides,
 });
 
-const reviewCellsForInstance = (inst: SpreadsheetInstance): ReviewCell[] => {
-  const sheet = inst.store.getState().data.sheetIndex;
-  return Array.from(inst.workbook.cells(sheet), (entry) => ({
-    label: `${colLabel(entry.addr.col)}${entry.addr.row + 1}`,
-    value:
-      entry.value.kind === 'text'
-        ? { kind: 'text' as const, value: entry.value.value }
-        : entry.value.kind === 'error'
-          ? { kind: 'error' as const, text: entry.value.text }
-          : entry.value.kind === 'number'
-            ? { kind: 'number' as const }
-            : entry.value.kind === 'bool'
-              ? { kind: 'bool' as const }
-              : { kind: 'blank' as const },
-    formula: entry.formula,
-  }));
-};
-
 export const App = (): ReactElement => {
   const [theme, setTheme] = useState<ThemeName>('paper');
-  const [locale, setLocale] = useState<string>('en');
+  const [locale, setLocale] = useState<string>(() => resolveInitialLocale());
   const [workbook, setWorkbook] = useState<WorkbookHandle | null>(null);
   const [instance, setInstance] = useState<SpreadsheetInstance | null>(null);
   const [log, setLog] = useState<ChangeLogEntry[]>([]);
@@ -238,6 +129,7 @@ export const App = (): ReactElement => {
 
   const features = useMemo(() => composeFeatures(preset, overrides), [preset, overrides]);
   const ui = UI[locale === 'ja' ? 'ja' : 'en'];
+  const commandText = useMemo(() => demoCommandText(locale), [locale]);
   const closeReviewDialog = useCallback(() => setReviewDialog(null), []);
   const closeScriptDialog = useCallback(() => setScriptOpen(false), []);
 
@@ -282,6 +174,7 @@ export const App = (): ReactElement => {
 
   useEffect(() => {
     instance?.i18n.setLocale(locale);
+    document.documentElement.lang = locale === 'ja' ? 'ja' : 'en';
   }, [instance, locale]);
 
   // Expose the live instance on `window.__fcInst` so cross-demo E2E scenarios
@@ -341,10 +234,10 @@ export const App = (): ReactElement => {
   const onAccessibilityCheck = useCallback(() => {
     if (!instance) return;
     setReviewDialog({
-      title: 'Accessibility Check',
+      title: commandText.accessibilityCheck,
       items: analyzeAccessibilityCells(reviewCellsForInstance(instance)),
     });
-  }, [instance]);
+  }, [commandText.accessibilityCheck, instance]);
 
   const onRunScript = useCallback(() => {
     if (!instance) return;
@@ -353,15 +246,18 @@ export const App = (): ReactElement => {
     setScriptOpen(true);
   }, [instance]);
 
-  const showRibbonNotice = useCallback((title: string, detail: string) => {
-    setReviewDialog({ title, items: [{ label: 'Ribbon command', detail }] });
-  }, []);
+  const showRibbonNotice = useCallback(
+    (title: string, detail: string) => {
+      setReviewDialog({ title, items: [{ label: commandText.ribbonCommand, detail }] });
+    },
+    [commandText.ribbonCommand],
+  );
 
   const applyScriptCommand = useCallback(() => {
     if (!instance) return;
     const command = parseScriptCommand(scriptCommand);
     if (!command) {
-      setScriptError('Use one of: uppercase, lowercase, trim, clear.');
+      setScriptError(commandText.scriptCommandError);
       return;
     }
     const range = instance.store.getState().selection.range;
@@ -394,10 +290,22 @@ export const App = (): ReactElement => {
     mutators.replaceCells(instance.store, instance.workbook.cells(range.sheet));
     setScriptOpen(false);
     setReviewDialog({
-      title: 'Script',
-      items: [{ label: 'Selection', detail: `${changed} cells updated.` }],
+      title: commandText.script,
+      items: [
+        {
+          label: commandText.selection,
+          detail: commandText.cellsUpdated.replace('{count}', String(changed)),
+        },
+      ],
     });
-  }, [instance, scriptCommand]);
+  }, [
+    commandText.cellsUpdated,
+    commandText.script,
+    commandText.scriptCommandError,
+    commandText.selection,
+    instance,
+    scriptCommand,
+  ]);
 
   const onSave = useCallback(() => {
     if (!instance) return;
@@ -426,12 +334,12 @@ export const App = (): ReactElement => {
         setBookName(file.name.replace(/\.(xlsx|xlsm)$/i, ''));
       } catch (err) {
         setReviewDialog({
-          title: 'Open failed',
-          items: [{ label: 'Workbook', detail: formatLoadError(err) }],
+          title: commandText.openFailed,
+          items: [{ label: commandText.workbook, detail: formatLoadError(err) }],
         });
       }
     },
-    [instance],
+    [commandText.openFailed, commandText.workbook, instance],
   );
 
   const onPresetChange = useCallback(
@@ -467,141 +375,141 @@ export const App = (): ReactElement => {
     () => [
       {
         id: 'open',
-        label: 'Open',
-        hint: 'Open an xlsx or xlsm workbook',
+        label: commandText.commands.open.label,
+        hint: commandText.commands.open.hint,
         tab: 'file',
         run: () => fileInputRef.current?.click(),
       },
       {
         id: 'save',
-        label: 'Save',
-        hint: 'Download the workbook as xlsx',
+        label: commandText.commands.save.label,
+        hint: commandText.commands.save.hint,
         tab: 'file',
         run: onSave,
       },
       {
         id: 'page-setup',
-        label: 'Page Setup',
-        hint: 'Open page setup',
+        label: commandText.commands.pageSetup.label,
+        hint: commandText.commands.pageSetup.hint,
         tab: 'file',
         run: () => instance?.openPageSetup(),
       },
       {
         id: 'print',
-        label: 'Print',
-        hint: 'Open browser print dialog',
+        label: commandText.commands.print.label,
+        hint: commandText.commands.print.hint,
         tab: 'file',
-        run: () => instance?.print(),
+        run: () => instance?.print('print'),
       },
       {
         id: 'format-cells',
-        label: 'Format Cells',
-        hint: 'Open the format dialog',
+        label: commandText.commands.formatCells.label,
+        hint: commandText.commands.formatCells.hint,
         tab: 'home',
         run: () => instance?.openFormatDialog(),
       },
       {
         id: 'conditional',
-        label: 'Conditional Formatting',
-        hint: 'Create or edit conditional formatting',
+        label: commandText.commands.conditionalFormatting.label,
+        hint: commandText.commands.conditionalFormatting.hint,
         tab: 'insert',
         run: () => instance?.openConditionalDialog(),
       },
       {
         id: 'cell-styles',
-        label: 'Cell Styles',
-        hint: 'Open the style gallery',
+        label: commandText.commands.cellStyles.label,
+        hint: commandText.commands.cellStyles.hint,
         tab: 'insert',
         run: () => instance?.openCellStylesGallery(),
       },
       {
         id: 'name-manager',
-        label: 'Name Manager',
-        hint: 'Inspect named ranges',
+        label: commandText.commands.nameManager.label,
+        hint: commandText.commands.nameManager.hint,
         tab: 'insert',
         run: () => instance?.openNamedRangeDialog(),
       },
       {
         id: 'insert-function',
-        label: 'Insert Function',
-        hint: 'Open function arguments',
+        label: commandText.commands.insertFunction.label,
+        hint: commandText.commands.insertFunction.hint,
         tab: 'formulas',
         run: () => instance?.openFunctionArguments(),
       },
       {
         id: 'trace-precedents',
-        label: 'Trace Precedents',
-        hint: 'Show precedent arrows',
+        label: commandText.commands.tracePrecedents.label,
+        hint: commandText.commands.tracePrecedents.hint,
         tab: 'formulas',
         run: () => instance?.tracePrecedents(),
       },
       {
         id: 'watch-window',
-        label: 'Watch Window',
-        hint: 'Toggle Watch Window',
+        label: commandText.commands.watchWindow.label,
+        hint: commandText.commands.watchWindow.hint,
         tab: 'formulas',
         run: () => instance?.toggleWatchWindow(),
       },
       {
         id: 'filter',
-        label: 'Filter',
-        hint: 'Show the Data tab filter tools',
+        label: commandText.commands.filter.label,
+        hint: commandText.commands.filter.hint,
         tab: 'data',
         run: () => setRibbonTab('data'),
       },
       {
         id: 'sort',
-        label: 'Sort',
-        hint: 'Show sort buttons',
+        label: commandText.commands.sort.label,
+        hint: commandText.commands.sort.hint,
         tab: 'data',
         run: () => setRibbonTab('data'),
       },
       {
         id: 'freeze-panes',
-        label: 'Freeze Panes',
-        hint: 'Show Freeze Panes',
+        label: commandText.commands.freezePanes.label,
+        hint: commandText.commands.freezePanes.hint,
         tab: 'view',
         run: () => setRibbonTab('view'),
       },
       {
         id: 'protect-sheet',
-        label: 'Protect Sheet',
-        hint: 'Toggle sheet protection from View',
+        label: commandText.commands.protectSheet.label,
+        hint: commandText.commands.protectSheet.hint,
         tab: 'view',
         run: () => instance?.toggleSheetProtection(),
       },
       {
         id: 'options-pane',
-        label: 'Options',
-        hint: 'Show or hide the integration panel',
+        label: commandText.commands.options.label,
+        hint: commandText.commands.options.hint,
         run: () => setShowPanel((v) => !v),
       },
       {
         id: 'theme-light',
-        label: 'Light Theme',
-        hint: 'Switch to light workbook theme',
+        label: commandText.commands.lightTheme.label,
+        hint: commandText.commands.lightTheme.hint,
         run: () => setTheme('paper'),
       },
       {
         id: 'theme-dark',
-        label: 'Dark Theme',
-        hint: 'Switch to dark workbook theme',
+        label: commandText.commands.darkTheme.label,
+        hint: commandText.commands.darkTheme.hint,
         run: () => setTheme('ink'),
       },
       {
         id: 'locale-ja',
-        label: 'Japanese Locale',
-        hint: 'Switch labels to JA',
+        label: commandText.commands.japaneseLocale.label,
+        hint: commandText.commands.japaneseLocale.hint,
         run: () => setLocale('ja'),
       },
       {
         id: 'locale-en',
-        label: 'English Locale',
-        hint: 'Switch labels to EN',
+        label: commandText.commands.englishLocale.label,
+        hint: commandText.commands.englishLocale.hint,
         run: () => setLocale('en'),
       },
     ],
-    [instance, onSave],
+    [commandText.commands, instance, onSave],
   );
 
   const filteredCommands = useMemo(() => {
@@ -670,7 +578,7 @@ export const App = (): ReactElement => {
             <input
               type="search"
               placeholder={ui.search}
-              aria-label="Search commands"
+              aria-label={ui.searchCommands}
               value={searchQuery}
               onFocus={() => setSearchOpen(true)}
               onChange={(e) => {
@@ -714,7 +622,7 @@ export const App = (): ReactElement => {
             <button type="button" className="demo__share">
               {ui.share}
             </button>
-            <span className="demo__avatar" role="img" aria-label="Signed in user">
+            <span className="demo__avatar" role="img" aria-label={ui.signedInUser}>
               FC
             </span>
           </div>
@@ -726,7 +634,7 @@ export const App = (): ReactElement => {
             <span className="demo__brand-tag">{ui.workbook}</span>
           </div>
           <div className="demo__controls">
-            <div className="demo__seg" role="group" aria-label="Theme">
+            <div className="demo__seg" role="group" aria-label={ui.theme}>
               {THEMES.map((t) => (
                 <button
                   key={t.value}
@@ -739,7 +647,7 @@ export const App = (): ReactElement => {
                 </button>
               ))}
             </div>
-            <div className="demo__seg" role="group" aria-label="Locale">
+            <div className="demo__seg" role="group" aria-label={ui.locale}>
               {LOCALES.map((l) => (
                 <button
                   key={l.value}
@@ -796,21 +704,12 @@ export const App = (): ReactElement => {
               onSpellingReview={onSpellingReview}
               onAccessibilityCheck={onAccessibilityCheck}
               onRunScript={onRunScript}
-              onDrawPen={() =>
-                showRibbonNotice('Draw', 'Ink strokes are not persisted in this demo workbook.')
-              }
-              onDrawEraser={() =>
-                showRibbonNotice('Draw', 'Select an ink stroke first to use the eraser.')
-              }
+              onDrawPen={() => showRibbonNotice(commandText.draw, commandText.inkNotPersisted)}
+              onDrawEraser={() => showRibbonNotice(commandText.draw, commandText.selectInkFirst)}
               onTranslate={() =>
-                showRibbonNotice('Translate', 'No translation service is connected in this demo.')
+                showRibbonNotice(commandText.translate, commandText.translationUnavailable)
               }
-              onAddIn={() =>
-                showRibbonNotice(
-                  'Add-ins',
-                  'Office add-ins are represented by host callbacks here.',
-                )
-              }
+              onAddIn={() => showRibbonNotice(commandText.addIns, commandText.addInsHostCallbacks)}
             />
           ) : null}
           <Spreadsheet
@@ -846,7 +745,7 @@ export const App = (): ReactElement => {
                 <button
                   type="button"
                   className="demo__backstage-navitem"
-                  onClick={() => instance?.print()}
+                  onClick={() => instance?.print('print')}
                   disabled={!instance}
                 >
                   {ui.print}
@@ -891,7 +790,7 @@ export const App = (): ReactElement => {
                   <button
                     type="button"
                     className="demo__backstage-card"
-                    onClick={() => instance?.print()}
+                    onClick={() => instance?.print('print')}
                     disabled={!instance}
                   >
                     <strong>{ui.print}</strong>
@@ -994,7 +893,7 @@ export const App = (): ReactElement => {
           </section>
 
           <section className="demo__card">
-            <h2>Selection</h2>
+            <h2>{commandText.selection}</h2>
             <p className="demo__mono">{selectionLabel}</p>
           </section>
 

@@ -1,6 +1,13 @@
 import type { Addr, CellValue } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
+export interface FormatCellForEditOptions {
+  formulaHidden?: boolean;
+  sheetProtected?: boolean;
+  formulaOverride?: string | null;
+  formatFormula?: (formula: string) => string;
+}
+
 /**
  * Resolve the seed text the formula bar / inline editor should display
  * for `cell`. Honours four cases in priority order:
@@ -22,12 +29,17 @@ export function formatCellForEdit(
   cell: { value: CellValue; formula: string | null } | undefined,
   wb?: WorkbookHandle,
   addr?: Addr,
+  options?: FormatCellForEditOptions,
 ): string {
-  if (!cell) return '';
-  if (cell.formula) return cell.formula;
+  const hideFormula = options?.formulaHidden === true && options.sheetProtected === true;
+  const formula =
+    options && 'formulaOverride' in options ? options.formulaOverride : (cell?.formula ?? null);
+  const displayFormula = (text: string): string => options?.formatFormula?.(text) ?? text;
+  if (!cell) return formula ? (hideFormula ? '' : displayFormula(formula)) : '';
+  if (formula) return hideFormula ? '' : displayFormula(formula);
   if (wb && addr) {
     const lambda = wb.getLambdaText(addr);
-    if (lambda) return `=${lambda}`;
+    if (lambda) return hideFormula ? '' : displayFormula(`=${lambda}`);
   }
   const v = cell.value;
   switch (v.kind) {

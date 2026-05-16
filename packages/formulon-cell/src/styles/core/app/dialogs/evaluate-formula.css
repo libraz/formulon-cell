@@ -1,0 +1,111 @@
+@layer fc {
+  .fc-evaldlg {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: rgb(0 0 0 / 18%);
+    z-index: var(--fc-z-dialog, 2147483020);
+    color: var(--fc-text, #242424);
+    font-family: var(--fc-font-family, system-ui, sans-serif);
+  }
+
+  .fc-evaldlg[hidden] {
+    display: none !important;
+  }
+
+  .fc-evaldlg__panel {
+    width: min(520px, calc(100vw - 32px));
+    border: 1px solid var(--fc-border, #d0d0d0);
+    border-radius: 8px;
+    background: var(--fc-bg, #fff);
+    box-shadow: 0 18px 48px rgb(0 0 0 / 18%);
+    overflow: hidden;
+  }
+
+  .fc-evaldlg__header {
+    padding: 14px 18px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--fc-border, #e1e1e1);
+  }
+
+  .fc-evaldlg__body {
+    display: grid;
+    gap: 8px;
+    padding: 16px 18px;
+  }
+
+  .fc-evaldlg__target,
+  .fc-evaldlg__label {
+    font-size: 12px;
+    color: var(--fc-muted, #616161);
+  }
+
+  .fc-evaldlg__target {
+    font-weight: 600;
+  }
+
+  .fc-evaldlg__box {
+    min-height: 38px;
+    margin: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--fc-border, #d0d0d0);
+    border-radius: 4px;
+    background: var(--fc-surface, #fafafa);
+    font:
+      12px / 1.45 ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      Consolas,
+      monospace;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .fc-evaldlg__box--result {
+    min-height: 28px;
+  }
+
+  .fc-evaldlg__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 18px 16px;
+    border-top: 1px solid var(--fc-border, #e1e1e1);
+  }
+
+  .fc-evaldlg__btn {
+    min-width: 84px;
+    height: 30px;
+    border: 1px solid var(--fc-border, #bdbdbd);
+    border-radius: 4px;
+    background: var(--fc-bg, #fff);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .fc-evaldlg__btn:hover {
+    background: var(--fc-hover, #f3f2f1);
+  }
+
+  .fc-evaldlg__btn:focus-visible {
+    outline: 2px solid var(--fc-accent, #217346);
+    outline-offset: 2px;
+  }
+
+  .fc-evaldlg__btn--primary {
+    border-color: var(--fc-accent, #217346);
+    background: var(--fc-accent, #217346);
+    color: #fff;
+  }
+
+  .fc-evaldlg__btn--primary:hover {
+    background: var(--fc-accent-strong, #185c37);
+  }
+
+  .fc-evaldlg__btn:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+}

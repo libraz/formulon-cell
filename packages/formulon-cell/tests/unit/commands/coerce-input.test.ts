@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { coerceInput, writeCoerced, writeInput } from '../../../src/commands/coerce-input.js';
+import {
+  coerceInput,
+  writeCoerced,
+  writeInput,
+  writeInputValidated,
+} from '../../../src/commands/coerce-input.js';
 import type { Addr } from '../../../src/engine/types.js';
-import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 describe('coerceInput', () => {
   it('returns blank for empty / whitespace strings', () => {
@@ -68,6 +74,12 @@ describe('coerceInput', () => {
     expect(coerceInput("'=A1")).toEqual({ kind: 'text', value: '=A1' });
   });
 
+  it('can force nonblank input to text for preformatted Text cells', () => {
+    expect(coerceInput('123', { forceText: true })).toEqual({ kind: 'text', value: '123' });
+    expect(coerceInput('=A1', { forceText: true })).toEqual({ kind: 'text', value: '=A1' });
+    expect(coerceInput('', { forceText: true })).toEqual({ kind: 'blank' });
+  });
+
   it('preserves the original (non-trimmed) string for text values', () => {
     // Trim is only applied for classification; the text value keeps its original spacing
     // so users can place leading-space text.
@@ -123,5 +135,73 @@ describe('writeInput', () => {
     expect(wb.setFormula).toHaveBeenCalledWith(addr, '=A1');
     expect(wb.setBlank).toHaveBeenCalledWith(addr);
     expect(wb.setNumber).toHaveBeenCalledWith(addr, 3.14);
+  });
+
+  it('normalizes R1C1 formula input to A1 before writing to the workbook', () => {
+    const wb = stubHandle();
+
+    writeInput(wb, { sheet: 0, row: 3, col: 3 }, '=SUM(R[-2]C[-2]:R[-1]C[-1])');
+
+    expect(wb.setFormula).toHaveBeenCalledWith(
+      { sheet: 0, row: 3, col: 3 },
+      '=SUM(B2:C3)',
+    );
+  });
+
+  it('normalizes R1C1 formula input before workbook calculation', async () => {
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    wb.setNumber({ sheet: 0, row: 1, col: 1 }, 2);
+    wb.setNumber({ sheet: 0, row: 1, col: 2 }, 3);
+    wb.setNumber({ sheet: 0, row: 2, col: 1 }, 4);
+    wb.setNumber({ sheet: 0, row: 2, col: 2 }, 5);
+
+    writeInput(wb, { sheet: 0, row: 3, col: 3 }, '=SUM(R[-2]C[-2]:R[-1]C[-1])');
+    wb.recalc();
+
+    expect(wb.cellFormula({ sheet: 0, row: 3, col: 3 })).toBe('=SUM(B2:C3)');
+    expect(wb.getValue({ sheet: 0, row: 3, col: 3 })).toEqual({ kind: 'number', value: 14 });
+  });
+
+  it('writes numeric and formula-looking input as text when the cell format is Text', () => {
+    const wb = stubHandle();
+    const store = createSpreadsheetStore();
+    mutators.setCellFormat(store, addr, { numFmt: { kind: 'text' } });
+
+    writeInput(wb, addr, '00123', store);
+    writeInput(wb, addr, '=A1', store);
+
+    expect(wb.setText).toHaveBeenCalledWith(addr, '00123');
+    expect(wb.setText).toHaveBeenCalledWith(addr, '=A1');
+    expect(wb.setNumber).not.toHaveBeenCalled();
+    expect(wb.setFormula).not.toHaveBeenCalled();
+  });
+});
+
+describe('writeInputValidated', () => {
+  it('blocks invalid stop-style input when error alerts are enabled', () => {
+    const wb = stubHandle();
+
+    const outcome = writeInputValidated(wb, addr, 'Closed', {
+      kind: 'list',
+      source: ['Open'],
+      errorStyle: 'stop',
+    });
+
+    expect(outcome.ok).toBe(false);
+    expect(wb.setText).not.toHaveBeenCalled();
+  });
+
+  it('writes invalid input when the validation error alert is disabled', () => {
+    const wb = stubHandle();
+
+    const outcome = writeInputValidated(wb, addr, 'Closed', {
+      kind: 'list',
+      source: ['Open'],
+      errorStyle: 'stop',
+      showErrorMessage: false,
+    });
+
+    expect(outcome.ok).toBe(false);
+    expect(wb.setText).toHaveBeenCalledWith(addr, 'Closed');
   });
 });

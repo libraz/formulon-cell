@@ -11,10 +11,144 @@ import { createDialogShell } from './dialog-shell.js';
 const detectLocale = (s: Strings): 'en' | 'ja' =>
   s.fxDialog.title === enStrings.fxDialog.title ? 'en' : 'ja';
 
+type FunctionCategory =
+  | 'all'
+  | 'recent'
+  | 'logical'
+  | 'lookup'
+  | 'text'
+  | 'datetime'
+  | 'math'
+  | 'financial'
+  | 'dynamicArray';
+
+const FUNCTION_CATEGORY_NAMES: Record<Exclude<FunctionCategory, 'all' | 'recent'>, readonly string[]> = {
+  logical: ['IF', 'IFS', 'IFERROR', 'IFNA', 'AND', 'OR', 'NOT', 'XOR', 'TRUE', 'FALSE'],
+  lookup: [
+    'VLOOKUP',
+    'HLOOKUP',
+    'XLOOKUP',
+    'INDEX',
+    'MATCH',
+    'XMATCH',
+    'OFFSET',
+    'INDIRECT',
+    'CHOOSE',
+    'ROW',
+    'COLUMN',
+    'ROWS',
+    'COLUMNS',
+  ],
+  text: [
+    'CONCATENATE',
+    'CONCAT',
+    'TEXTJOIN',
+    'TEXTSPLIT',
+    'TEXTBEFORE',
+    'TEXTAFTER',
+    'LEFT',
+    'RIGHT',
+    'MID',
+    'LEN',
+    'UPPER',
+    'LOWER',
+    'PROPER',
+    'TRIM',
+    'SUBSTITUTE',
+    'REPLACE',
+    'FIND',
+    'SEARCH',
+    'TEXT',
+    'VALUE',
+    'NUMBERVALUE',
+  ],
+  datetime: [
+    'TODAY',
+    'NOW',
+    'DATE',
+    'YEAR',
+    'MONTH',
+    'DAY',
+    'HOUR',
+    'MINUTE',
+    'SECOND',
+    'WEEKDAY',
+    'EOMONTH',
+    'DATEDIF',
+    'NETWORKDAYS',
+    'WORKDAY',
+  ],
+  math: [
+    'SUM',
+    'AVERAGE',
+    'COUNT',
+    'COUNTA',
+    'COUNTIF',
+    'COUNTIFS',
+    'SUMIF',
+    'SUMIFS',
+    'AVERAGEIF',
+    'AVERAGEIFS',
+    'MIN',
+    'MAX',
+    'MEDIAN',
+    'ROUND',
+    'ROUNDUP',
+    'ROUNDDOWN',
+    'CEILING',
+    'FLOOR',
+    'INT',
+    'MOD',
+    'ABS',
+    'POWER',
+    'SQRT',
+    'EXP',
+    'LN',
+    'LOG',
+    'LOG10',
+  ],
+  financial: ['PMT', 'PV', 'FV', 'NPV', 'IRR', 'RATE', 'NPER'],
+  dynamicArray: [
+    'TRANSPOSE',
+    'UNIQUE',
+    'SORT',
+    'SORTBY',
+    'FILTER',
+    'SEQUENCE',
+    'RANDARRAY',
+    'VSTACK',
+    'HSTACK',
+    'TOROW',
+    'TOCOL',
+    'WRAPROWS',
+    'WRAPCOLS',
+    'CHOOSEROWS',
+    'CHOOSECOLS',
+    'TAKE',
+    'DROP',
+    'EXPAND',
+    'LAMBDA',
+    'LET',
+    'MAP',
+    'REDUCE',
+    'SCAN',
+    'BYROW',
+    'BYCOL',
+    'MAKEARRAY',
+    'GROUPBY',
+    'PIVOTBY',
+    'PERCENTOF',
+    'IMAGE',
+  ],
+};
+
 export interface FxDialogDeps {
   host: HTMLElement;
   store: SpreadsheetStore;
   strings?: Strings;
+  /** Optional spreadsheet-context seed for function arguments, e.g. the
+   *  currently selected range when a seeded ribbon function opens. */
+  getInitialArguments?: (functionName: string) => readonly string[] | null;
   /** Called with the assembled formula text (including leading '='). */
   onInsert: (formula: string) => void;
 }
@@ -143,6 +277,18 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   pickerWrap.className = 'fc-fxdialog__picker';
   body.appendChild(pickerWrap);
 
+  const categoryRow = document.createElement('label');
+  categoryRow.className = 'fc-fxdialog__category-row';
+  pickerWrap.appendChild(categoryRow);
+
+  const categoryLabel = document.createElement('span');
+  categoryLabel.textContent = t.categoryLabel;
+  categoryRow.appendChild(categoryLabel);
+
+  const categorySelect = document.createElement('select');
+  categorySelect.className = 'fc-fxdialog__category';
+  categoryRow.appendChild(categorySelect);
+
   const searchInput = document.createElement('input');
   searchInput.type = 'text';
   searchInput.className = 'fc-fxdialog__search';
@@ -162,6 +308,19 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   list.id = `fc-fxdialog-list-${Math.random().toString(36).slice(2, 8)}`;
   searchInput.setAttribute('aria-controls', list.id);
   pickerWrap.appendChild(list);
+
+  const functionSummary = document.createElement('div');
+  functionSummary.className = 'fc-fxdialog__function-summary';
+  functionSummary.setAttribute('aria-live', 'polite');
+  pickerWrap.appendChild(functionSummary);
+
+  const functionSummaryName = document.createElement('div');
+  functionSummaryName.className = 'fc-fxdialog__summary-name';
+  functionSummary.appendChild(functionSummaryName);
+
+  const functionSummaryDesc = document.createElement('div');
+  functionSummaryDesc.className = 'fc-fxdialog__summary-desc';
+  functionSummary.appendChild(functionSummaryDesc);
 
   // ── Step 2: argument inputs ─────────────────────────────────────────────
   const argsWrap = document.createElement('div');
@@ -223,6 +382,8 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   // ── State ───────────────────────────────────────────────────────────────
   // Sorted catalog of all known function names; rebuilt once and reused.
   const allNames: readonly string[] = Object.keys(FUNCTION_SIGNATURES).slice().sort();
+  let selectedCategory: FunctionCategory = 'all';
+  let recentNames: string[] = [];
   let selectedName: string | null = null;
   let highlightIndex = 0;
   let argInputs: HTMLInputElement[] = [];
@@ -233,10 +394,59 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     return locale === 'ja' ? entry.ja : entry.en;
   };
 
+  const functionSyntax = (name: string): string =>
+    `${name}(${(FUNCTION_SIGNATURES[name] ?? []).join(', ')})`;
+
+  const updateFunctionSummary = (name: string | null): void => {
+    if (!name) {
+      functionSummary.hidden = true;
+      functionSummaryName.textContent = '';
+      functionSummaryDesc.textContent = '';
+      return;
+    }
+    functionSummary.hidden = false;
+    functionSummaryName.textContent = functionSyntax(name);
+    functionSummaryDesc.textContent = localizedDescription(name);
+  };
+
+  const categoryOptions = (): Array<{ value: FunctionCategory; label: string }> => [
+    { value: 'all', label: t.categoryAll },
+    { value: 'recent', label: t.categoryRecent },
+    { value: 'logical', label: t.categoryLogical },
+    { value: 'lookup', label: t.categoryLookup },
+    { value: 'text', label: t.categoryText },
+    { value: 'datetime', label: t.categoryDateTime },
+    { value: 'math', label: t.categoryMath },
+    { value: 'financial', label: t.categoryFinancial },
+    { value: 'dynamicArray', label: t.categoryDynamicArray },
+  ];
+
+  const renderCategoryOptions = (): void => {
+    categorySelect.replaceChildren();
+    for (const option of categoryOptions()) {
+      const el = document.createElement('option');
+      el.value = option.value;
+      el.textContent = option.label;
+      categorySelect.appendChild(el);
+    }
+    categorySelect.value = selectedCategory;
+  };
+
+  const categoryNames = (): string[] => {
+    if (selectedCategory === 'all') return [...allNames];
+    if (selectedCategory === 'recent')
+      return recentNames.filter((name) => name in FUNCTION_SIGNATURES).slice().sort();
+    return FUNCTION_CATEGORY_NAMES[selectedCategory]
+      .filter((name) => name in FUNCTION_SIGNATURES)
+      .slice()
+      .sort();
+  };
+
   const filteredNames = (): string[] => {
     const q = searchInput.value.trim().toUpperCase();
-    if (!q) return [...allNames];
-    return allNames.filter((n) => n.includes(q));
+    const source = categoryNames();
+    if (!q) return source;
+    return source.filter((n) => n.includes(q));
   };
 
   const renderList = (): void => {
@@ -249,6 +459,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       list.appendChild(empty);
       highlightIndex = -1;
       searchInput.removeAttribute('aria-activedescendant');
+      updateFunctionSummary(null);
       return;
     }
     if (highlightIndex < 0 || highlightIndex >= names.length) highlightIndex = 0;
@@ -282,6 +493,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       list.appendChild(item);
     });
     searchInput.setAttribute('aria-activedescendant', `${list.id}-option-${highlightIndex}`);
+    updateFunctionSummary(names[highlightIndex] ?? null);
   };
 
   const assembleFormula = (): string => {
@@ -299,14 +511,15 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     insertBtn.disabled = !selectedName;
   };
 
-  const choose = (name: string): void => {
+  const choose = (name: string, initialArgs: readonly string[] = []): void => {
     selectedName = name;
+    recentNames = [name, ...recentNames.filter((entry) => entry !== name)].slice(0, 12);
     pickerWrap.hidden = true;
     argsWrap.hidden = false;
     backBtn.hidden = false;
     insertBtn.disabled = false;
 
-    argsName.textContent = `${name}(${(FUNCTION_SIGNATURES[name] ?? []).join(', ')})`;
+    argsName.textContent = functionSyntax(name);
     argsDesc.textContent = localizedDescription(name);
 
     argsFields.replaceChildren();
@@ -330,6 +543,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       shell.on(input, 'input', updatePreview);
       row.append(labelEl, input);
       argsFields.appendChild(row);
+      input.value = initialArgs[argInputs.length] ?? '';
       argInputs.push(input);
     });
     if (sig.includes('...')) {
@@ -356,6 +570,12 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
 
   // ── Event handlers ──────────────────────────────────────────────────────
   const onSearchInput = (): void => {
+    highlightIndex = 0;
+    renderList();
+  };
+
+  const onCategoryChange = (): void => {
+    selectedCategory = categorySelect.value as FunctionCategory;
     highlightIndex = 0;
     renderList();
   };
@@ -429,6 +649,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   };
 
   shell.on(list, 'click', onListClick);
+  shell.on(categorySelect, 'change', onCategoryChange);
   shell.on(searchInput, 'input', onSearchInput);
   shell.on(searchInput, 'keydown', onSearchKey as EventListener);
   shell.on(insertBtn, 'click', onInsertClick);
@@ -440,6 +661,8 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     t = strings.fxDialog;
     shell.setAriaLabel(t.title);
     header.textContent = t.title;
+    categoryLabel.textContent = t.categoryLabel;
+    renderCategoryOptions();
     searchInput.placeholder = t.searchPlaceholder;
     searchInput.setAttribute('aria-label', t.searchPlaceholder);
     list.setAttribute('aria-label', t.title);
@@ -460,10 +683,11 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       searchInput.value = '';
       highlightIndex = 0;
       argInputs = [];
+      renderCategoryOptions();
       const seed = seedName ? seedName.toUpperCase() : null;
       if (seed && FUNCTION_SIGNATURES[seed]) {
         // Skip the picker — jump straight to argument entry.
-        choose(seed);
+        choose(seed, deps.getInitialArguments?.(seed) ?? []);
       } else {
         selectedName = null;
         pickerWrap.hidden = false;
@@ -496,6 +720,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
 
   // First paint of the picker so a synchronous open() can render without a
   // microtask in tests.
+  renderCategoryOptions();
   renderList();
 
   return api;

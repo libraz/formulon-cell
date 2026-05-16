@@ -1,5 +1,5 @@
-import { clearComment, commentAt, setComment } from '../commands/comment.js';
-import { type History, recordFormatChange } from '../commands/history.js';
+import { clearComment, commentAt, recordCommentChange, setComment } from '../commands/comment.js';
+import type { History } from '../commands/history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { cellRect } from '../render/geometry.js';
@@ -96,7 +96,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
     const state = store.getState();
     const addr = state.selection.active;
     const wb = getWb() ?? undefined;
-    recordFormatChange(history, store, () => {
+    recordCommentChange(history, store, wb, [addr], () => {
       if (next != null && next !== '') setComment(store, addr, next, wb);
       else clearComment(store, addr, wb);
     });

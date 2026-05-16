@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import {
   __testing,
+  autofitColsWidth,
+  autofitRowsHeight,
   deleteCols,
   deleteRows,
   hiddenInSelection,
@@ -9,10 +11,14 @@ import {
   hideRows,
   insertCols,
   insertRows,
+  setColsWidth,
   setFreezePanes,
+  setRowsHeight,
   setSheetZoom,
   showCols,
+  showColsAroundSelection,
   showRows,
+  showRowsAroundSelection,
 } from '../../../src/commands/structure.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
@@ -355,11 +361,29 @@ describe('hideRows / showRows / hideCols / showCols', () => {
     expect(Array.from(store.getState().layout.hiddenRows).sort()).toEqual([1, 5]);
   });
 
+  it('showRowsAroundSelection clears hidden rows directly adjacent to the selection', () => {
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, hiddenRows: new Set([1, 2, 4, 5, 9]) },
+    }));
+    showRowsAroundSelection(store, null, 3, 3);
+    expect(Array.from(store.getState().layout.hiddenRows).sort()).toEqual([9]);
+  });
+
   it('hideCols / showCols mirror the row variants', () => {
     hideCols(store, null, 0, 1);
     expect(Array.from(store.getState().layout.hiddenCols).sort()).toEqual([0, 1]);
     showCols(store, null, 0, 0);
     expect(Array.from(store.getState().layout.hiddenCols)).toEqual([1]);
+  });
+
+  it('showColsAroundSelection clears hidden columns directly adjacent to the selection', () => {
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, hiddenCols: new Set([0, 2, 3, 5]) },
+    }));
+    showColsAroundSelection(store, null, 1, 1);
+    expect(Array.from(store.getState().layout.hiddenCols).sort()).toEqual([5]);
   });
 
   it('round-trips through history', () => {
@@ -370,6 +394,53 @@ describe('hideRows / showRows / hideCols / showCols', () => {
     expect(store.getState().layout.hiddenRows.size).toBe(0);
     h.redo();
     expect(store.getState().layout.hiddenRows.size).toBe(2);
+  });
+
+  it('sets row heights and column widths through history', () => {
+    const h = new History();
+    setRowsHeight(store, h, 1, 2, 32);
+    setColsWidth(store, h, 3, 4, 140);
+
+    expect(store.getState().layout.rowHeights.get(1)).toBe(32);
+    expect(store.getState().layout.rowHeights.get(2)).toBe(32);
+    expect(store.getState().layout.colWidths.get(3)).toBe(140);
+    expect(store.getState().layout.colWidths.get(4)).toBe(140);
+
+    h.undo();
+    expect(store.getState().layout.colWidths.size).toBe(0);
+    h.undo();
+    expect(store.getState().layout.rowHeights.size).toBe(0);
+  });
+
+  it('autofits selected rows and columns through history', () => {
+    const h = new History();
+    store.setState((s) => ({
+      ...s,
+      data: {
+        ...s.data,
+        cells: new Map([
+          ['0:1:2', { value: { kind: 'text', value: 'wide enough for autofit' }, formula: null }],
+          [
+            '0:2:2',
+            {
+              value: { kind: 'text', value: 'first line\nsecond line\nthird line' },
+              formula: null,
+            },
+          ],
+        ]),
+      },
+    }));
+
+    autofitColsWidth(store, h, 2, 2);
+    autofitRowsHeight(store, h, 2, 2);
+
+    expect(store.getState().layout.colWidths.get(2)).toBeGreaterThan(100);
+    expect(store.getState().layout.rowHeights.get(2)).toBeGreaterThan(40);
+
+    h.undo();
+    expect(store.getState().layout.rowHeights.get(2)).toBeUndefined();
+    h.undo();
+    expect(store.getState().layout.colWidths.get(2)).toBeUndefined();
   });
 });
 

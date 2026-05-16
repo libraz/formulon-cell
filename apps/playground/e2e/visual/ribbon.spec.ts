@@ -3,12 +3,17 @@ import { expect, test } from '@playwright/test';
 import { mountVisualPage } from './helpers.js';
 
 const ribbonTabs = [
+  { id: 'file', label: 'File' },
   { id: 'home', label: 'Home' },
   { id: 'insert', label: 'Insert' },
+  { id: 'draw', label: 'Draw' },
   { id: 'pageLayout', label: 'Page Layout' },
+  { id: 'formulas', label: 'Formulas' },
   { id: 'data', label: 'Data' },
   { id: 'review', label: 'Review' },
   { id: 'view', label: 'View' },
+  { id: 'automate', label: 'Automate' },
+  { id: 'acrobat', label: 'Acrobat' },
 ] as const;
 
 for (const tab of ribbonTabs) {
@@ -18,6 +23,14 @@ for (const tab of ribbonTabs) {
 
     const ribbon = page.locator('.app__ribbon-shell').first();
     await expect(ribbon).toBeVisible();
+    if (tab.id === 'file') {
+      await expect(page.locator('.demo__backstage')).toBeVisible();
+      await expect(page).toHaveScreenshot('ribbon-file.png', {
+        maxDiffPixels: 120,
+        animations: 'disabled',
+      });
+      return;
+    }
     await expect(page.locator('.demo__ribbon:not([hidden])')).toHaveAttribute(
       'data-ribbon-panel',
       tab.id,
@@ -29,6 +42,32 @@ for (const tab of ribbonTabs) {
     });
   });
 }
+
+test('@visual ribbon collapsed — tabs only', async ({ page }) => {
+  await mountVisualPage(page, '/?theme=light&locale=en');
+  const home = page.getByRole('tab', { name: 'Home', exact: true });
+  await home.focus();
+  await page.keyboard.press('Control+F1');
+
+  const ribbon = page.locator('.app__ribbon-shell').first();
+  await expect(ribbon).toHaveClass(/demo__ribbon-shell--collapsed/);
+  await expect(page.locator('.demo__ribbon:not([hidden])')).not.toBeVisible();
+  await expect(ribbon).toHaveScreenshot('ribbon-collapsed-tabs-only.png', {
+    maxDiffPixels: 80,
+    animations: 'disabled',
+  });
+});
+
+test('@visual ribbon display options menu', async ({ page }) => {
+  await mountVisualPage(page, '/?theme=light&locale=en');
+  await page.getByRole('button', { name: 'Ribbon Display Options' }).click();
+
+  await expect(page.getByRole('menuitemradio', { name: 'Always show Ribbon' })).toBeVisible();
+  await expect(page).toHaveScreenshot('ribbon-display-options-menu.png', {
+    maxDiffPixels: 80,
+    animations: 'disabled',
+  });
+});
 
 test('@visual ribbon dropdown — page layout margins', async ({ page }) => {
   await mountVisualPage(page, '/?theme=light&locale=ja');
@@ -105,7 +144,9 @@ test('@visual ribbon dropdown — line style submenu', async ({ page }) => {
   await mountVisualPage(page, '/?theme=light&locale=ja');
   await page.getByRole('tab', { name: 'ホーム', exact: true }).click();
   await page.locator('#btn-borders').click();
-  await page.locator('[data-border-submenu="lineStyle"]').hover();
+  const lineStyleTrigger = page.locator('[data-border-submenu="lineStyle"]');
+  await lineStyleTrigger.dispatchEvent('click');
+  await expect(lineStyleTrigger).toHaveAttribute('aria-expanded', 'true');
   const submenu = page.locator('.app__submenu--line-style');
   await expect(submenu).toBeVisible();
   await expect(page).toHaveScreenshot('ribbon-borders-line-style.png', {

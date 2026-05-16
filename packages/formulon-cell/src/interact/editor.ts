@@ -1,6 +1,6 @@
 import { coerceInput, writeCoerced, writeInputValidated } from '../commands/coerce-input.js';
 import { stepWithMerge } from '../commands/merge.js';
-import { extractRefs, rotateRefAt, shiftFormulaRefs } from '../commands/refs.js';
+import { dblClickRange, extractRefs, rotateRefAt, shiftFormulaRefs } from '../commands/refs.js';
 import { addrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -40,6 +40,7 @@ export interface EditorDeps {
    *  toast. When omitted the editor logs to the console. */
   onValidation?: (outcome: {
     severity: 'stop' | 'warning' | 'information';
+    title?: string;
     message: string;
   }) => void;
   getLabels?: () => {
@@ -97,7 +98,7 @@ export class InlineEditor {
     const caret = stripped.length + ref.length;
     el.setSelectionRange(caret, caret);
     el.focus();
-    this.refreshHeight();
+    this.refreshSize();
     syncEditorRefs(this.deps.store, el.value);
     this.argHelper?.refresh();
   }
@@ -120,7 +121,7 @@ export class InlineEditor {
     this.applyTextAlignment(seed);
     this.position(a);
     this.deps.grid.appendChild(input);
-    this.refreshHeight();
+    this.refreshSize();
 
     // Focus synchronously so the *next* keystroke (post-seed) lands on the
     // editor input, not on the host. Deferring this via requestAnimationFrame
@@ -134,6 +135,8 @@ export class InlineEditor {
     input.addEventListener('keyup', this.onKeyUp);
     input.addEventListener('input', this.onInput);
     input.addEventListener('blur', this.onBlur);
+    input.addEventListener('dblclick', this.onDblClick);
+    input.addEventListener('click', this.onClick);
     this.autocomplete = attachAutocomplete({
       input,
       onAfterInsert: () => syncEditorRefs(this.deps.store, input.value),
@@ -158,6 +161,8 @@ export class InlineEditor {
     this.input.removeEventListener('keyup', this.onKeyUp);
     this.input.removeEventListener('input', this.onInput);
     this.input.removeEventListener('blur', this.onBlur);
+    this.input.removeEventListener('dblclick', this.onDblClick);
+    this.input.removeEventListener('click', this.onClick);
     this.input.remove();
     this.input = null;
     this.editingAddr = null;
@@ -175,12 +180,23 @@ export class InlineEditor {
     const a = this.editingAddr;
     const fmt = this.deps.store.getState().format.formats.get(addrKey(a));
     let rejected = false;
+    let rejectedOutcome: { severity: 'stop'; title?: string; message: string } | null = null;
     try {
-      const outcome = writeInputValidated(this.deps.wb, a, raw, fmt?.validation);
+      const outcome = writeInputValidated(this.deps.wb, a, raw, fmt?.validation, this.deps.store);
       if (!outcome.ok) {
         rejected = outcome.severity === 'stop';
-        if (this.deps.onValidation) {
-          this.deps.onValidation({ severity: outcome.severity, message: outcome.message });
+        if (rejected) {
+          rejectedOutcome = {
+            severity: 'stop',
+            title: fmt?.validation?.errorTitle,
+            message: outcome.message,
+          };
+        } else if (this.deps.onValidation) {
+          this.deps.onValidation({
+            severity: outcome.severity,
+            title: fmt?.validation?.errorTitle,
+            message: outcome.message,
+          });
         } else {
           console.warn(`formulon-cell: validation ${outcome.severity}: ${outcome.message}`);
         }
@@ -192,6 +208,7 @@ export class InlineEditor {
       // Keep the editor open with the offending value so the user can correct.
       this.input.focus();
       this.input.select();
+      if (rejectedOutcome) this.deps.onValidation?.(rejectedOutcome);
       return;
     }
     this.deps.onAfterCommit();
@@ -222,12 +239,41 @@ export class InlineEditor {
     const ranges = [s.selection.range, ...(s.selection.extraRanges ?? [])];
     const sheet = s.data.sheetIndex;
     const isFormula = raw.startsWith('=');
-    const baseCoerced = coerceInput(raw);
     for (const r of ranges) {
       for (let row = r.r0; row <= r.r1; row += 1) {
         for (let col = r.c0; col <= r.c1; col += 1) {
           const target = { sheet, row, col };
-          if (isFormula) {
+          const fmt = s.format.formats.get(addrKey(target));
+          const forceText = fmt?.numFmt?.kind === 'text';
+          if (forceText) {
+            if (row === anchor.row && col === anchor.col) {
+              const outcome = writeInputValidated(
+                this.deps.wb,
+                target,
+                raw,
+                fmt?.validation,
+                this.deps.store,
+              );
+              if (!outcome.ok && outcome.severity === 'stop') {
+                if (this.deps.onValidation) {
+                  this.deps.onValidation({
+                    severity: outcome.severity,
+                    title: fmt?.validation?.errorTitle,
+                    message: outcome.message,
+                  });
+                }
+                this.input.focus();
+                this.input.select();
+                return;
+              }
+            } else {
+              try {
+                writeCoerced(this.deps.wb, target, coerceInput(raw, { forceText: true }));
+              } catch (err) {
+                console.warn('formulon-cell: writeCoerced failed', err);
+              }
+            }
+          } else if (isFormula) {
             const shifted = shiftFormulaRefs(raw, row - anchor.row, col - anchor.col);
             try {
               writeCoerced(this.deps.wb, target, { kind: 'formula', text: shifted });
@@ -236,11 +282,20 @@ export class InlineEditor {
             }
           } else if (row === anchor.row && col === anchor.col) {
             // Anchor goes through the validated path so DV stop-rejections still bite.
-            const fmt = s.format.formats.get(addrKey(target));
-            const outcome = writeInputValidated(this.deps.wb, target, raw, fmt?.validation);
+            const outcome = writeInputValidated(
+              this.deps.wb,
+              target,
+              raw,
+              fmt?.validation,
+              this.deps.store,
+            );
             if (!outcome.ok && outcome.severity === 'stop') {
               if (this.deps.onValidation) {
-                this.deps.onValidation({ severity: outcome.severity, message: outcome.message });
+                this.deps.onValidation({
+                  severity: outcome.severity,
+                  title: fmt?.validation?.errorTitle,
+                  message: outcome.message,
+                });
               }
               this.input.focus();
               this.input.select();
@@ -248,7 +303,7 @@ export class InlineEditor {
             }
           } else {
             try {
-              writeCoerced(this.deps.wb, target, baseCoerced);
+              writeCoerced(this.deps.wb, target, coerceInput(raw));
             } catch (err) {
               console.warn('formulon-cell: writeCoerced failed', err);
             }
@@ -349,10 +404,39 @@ export class InlineEditor {
   };
 
   private readonly onInput = (): void => {
-    this.refreshHeight();
+    this.refreshSize();
     if (this.input) this.applyTextAlignment(this.input.value);
     if (this.input) syncEditorRefs(this.deps.store, this.input.value);
     this.autocomplete?.refresh();
+    this.argHelper?.refresh();
+  };
+
+  /** Double-click inside a formula edit selects a semantic token rather than
+   *  a bare word — the function name, or a whole call argument (so a range
+   *  like `F4:F8` selects as a unit). Non-formula edits keep the browser's
+   *  native word selection. */
+  private readonly onDblClick = (e: MouseEvent): void => {
+    const el = this.input;
+    if (!el || !el.value.startsWith('=')) return;
+    // The browser has already selected a word; probe its midpoint so the hit
+    //  point lands inside the intended token.
+    const a = el.selectionStart ?? 0;
+    const b = el.selectionEnd ?? a;
+    const probe = a === b ? a : Math.floor((a + b) / 2);
+    const range = dblClickRange(el.value, probe);
+    if (range) {
+      e.preventDefault();
+      el.setSelectionRange(range.start, range.end);
+    }
+    this.argHelper?.refresh();
+  };
+
+  /** Triple-click inside a formula edit selects the whole formula. */
+  private readonly onClick = (e: MouseEvent): void => {
+    const el = this.input;
+    if (!el || e.detail < 3 || !el.value.startsWith('=')) return;
+    e.preventDefault();
+    el.setSelectionRange(0, el.value.length);
     this.argHelper?.refresh();
   };
 
@@ -364,32 +448,60 @@ export class InlineEditor {
     el.value = `${el.value.slice(0, start)}\n${el.value.slice(end)}`;
     const caret = start + 1;
     el.setSelectionRange(caret, caret);
-    this.refreshHeight();
+    this.refreshSize();
   }
 
-  private refreshHeight(): void {
+  private refreshSize(): void {
     if (!this.input) return;
     const lines = Math.max(1, (this.input.value.match(/\n/g)?.length ?? 0) + 1);
     if (lines === 1) {
       // Hide the per-line growth on a fresh single-line edit so the editor
       //  visually matches the cell rect exactly.
       this.input.style.minHeight = '';
+    } else {
+      // Spreadsheets grow the editor downward; mirror that with a min-height bump.
+      const baseRow = this.deps.store.getState().layout.defaultRowHeight;
+      this.input.style.minHeight = `${baseRow * lines}px`;
+    }
+    this.refreshWidth();
+  }
+
+  /** Grow the editor rightward to fit content wider than the cell — desktop
+   *  spreadsheet behavior, so a long formula shows from its leading `=`
+   *  instead of scrolling to its tail. Capped at the grid's right edge so the
+   *  editor never escapes the viewport. */
+  private refreshWidth(): void {
+    if (!this.input || !this.editingAddr) return;
+    const s = this.deps.store.getState();
+    const r = cellRect(s.layout, s.viewport, this.editingAddr.row, this.editingAddr.col);
+    // Reset to the cell width first so the editor can shrink back as content
+    //  is deleted, then measure the natural content width.
+    this.input.style.width = `${r.w}px`;
+    const content = this.input.scrollWidth;
+    if (content <= r.w) {
+      this.input.classList.remove('fc-host__editor--overflow');
       return;
     }
-    // Spreadsheets grow the editor downward; mirror that with a min-height bump.
-    const baseRow = this.deps.store.getState().layout.defaultRowHeight;
-    this.input.style.minHeight = `${baseRow * lines}px`;
+    const maxWidth = Math.max(r.w, this.deps.grid.clientWidth - r.x - 2);
+    const want = content + 2;
+    this.input.style.width = `${Math.min(want, maxWidth)}px`;
+    // When the content is still wider than the editor can grow, the text
+    //  scrolls; flag the overflow so the editor drops its right border.
+    this.input.classList.toggle('fc-host__editor--overflow', want > maxWidth);
   }
 
   private applyTextAlignment(raw: string): void {
     if (!this.input || !this.editingAddr) return;
+    // Formula edits are always left-aligned in the editor regardless of the
+    // cell's display alignment, so the leading `=` and start of the formula
+    // stay in view rather than scrolling off to the right.
+    if (raw.startsWith('=')) {
+      this.input.style.textAlign = 'left';
+      return;
+    }
     const fmt = this.deps.store.getState().format.formats.get(addrKey(this.editingAddr));
     if (fmt?.align) {
       this.input.style.textAlign = fmt.align;
-      return;
-    }
-    if (raw.startsWith('=')) {
-      this.input.style.textAlign = 'left';
       return;
     }
     const coerced = coerceInput(raw);

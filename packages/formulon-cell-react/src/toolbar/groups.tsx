@@ -1,75 +1,308 @@
 import {
+  analyzeAccessibilityCells,
+  analyzeSpellingCells,
+  activateSheetView,
+  buildTranslationReviewItems,
   bumpDecimals,
-  clearFormat,
+  bumpIndent,
+  collapseColGroup,
+  collapseRowGroup,
   cycleBorders,
   cycleCurrency,
   cyclePercent,
+  deleteSheetView,
+  groupCols,
+  groupRows,
+  listComments,
   type MarginPreset,
+  mutators,
   type PageOrientation,
   type PaperSize,
+  reviewCellsFromState,
+  saveSheetView,
   setAlign,
   setFillColor,
   setFont,
   setFontColor,
+  setGridlinesVisible,
+  setHeadingsVisible,
   setNumFmt,
+  setPrintGridlines,
+  setPrintHeadings,
+  setR1C1ReferenceStyle,
+  setShowFormulas,
   setVAlign,
+  setWorkbookView,
+  showCols,
+  showRows,
   toggleBold,
   toggleItalic,
   toggleStrike,
   toggleUnderline,
   toggleWrap,
+  ungroupCols,
+  ungroupRows,
 } from '@libraz/formulon-cell';
 import type { ReactElement } from 'react';
 import { buildAddInRibbonGroups } from './add-in-groups.js';
 import type { BuildRibbonGroupsOptions } from './group-types.js';
 import { Icon } from './icons.js';
-import { FONT_FAMILIES, FONT_SIZES, RIBBON_TAB_LABELS, type RibbonTab } from './model.js';
+import { FONT_SIZES, type RibbonTab } from './model.js';
 
 export const buildRibbonGroups = ({
   active,
+  addInMenu,
+  autosumFormulaMenu,
+  autosumMenu,
+  borderPresets,
+  borderColor,
+  borderStyle,
+  borderStyles,
+  cellDeleteMenu,
+  cellFormatMenu,
+  cellInsertMenu,
+  cellStylesMenu,
+  calcOptionsMenu,
+  chartMenu,
+  clearMenu,
+  clearArrowsMenu,
   color,
+  conditionalMenu,
+  dataFilterMenu,
+  dataSortMenu,
+  dataValidationMenu,
+  definedNamesInsertMenu,
+  definedNamesMenu,
+  deleteCommentMenu,
+  errorCheckingMenu,
+  freezeMenu,
+  windowMenu,
+  formatTableHomeMenu,
+  formatTableInsertMenu,
+  fillMenu,
+  findMenu,
+  functionDateTimeMenu,
+  functionFinancialMenu,
+  functionLogicalMenu,
+  functionLookupMenu,
+  functionMathTrigMenu,
+  functionTextMenu,
+  hyperlinkMenu,
+  formulaBarVisible,
   group,
   iconLabel,
   instance,
   lang,
+  strings,
   mergeMenu,
-  onAutoSum,
   onCopy,
   onCut,
-  onDeleteCols,
-  onDeleteRows,
   onAddIn,
-  onFilterToggle,
-  onFormatAsTable,
   onFormatPainter,
-  onFreezeToggle,
   onDrawEraser,
   onDrawPen,
-  onInsertCols,
-  onInsertRows,
   onMarginPreset,
   onNumberFormat,
   onPageOrientation,
   onPaperSize,
-  onPaste,
-  onRedo,
+  onProtectWorkbook,
+  onInspectWorkbook,
   onRemoveDuplicates,
+  onScaleFit,
+  onScalePercent,
   onAccessibilityCheck,
+  onBorderPreset,
   onRunScript,
+  onRecordActions,
+  onAllScripts,
+  onBuiltInReview,
   onSort,
   onSpellingReview,
   onTranslate,
-  onToggleColsHidden,
-  onToggleRowsHidden,
-  onUndo,
+  onToggleFormulaBar,
   onZoom,
+  onZoomDialog,
+  onZoomSelection,
+  pdfMenu,
+  pivotTableMenu,
+  protectionMenu,
   optionSelect,
   rowBreak,
   select,
+  setBorderStyle,
+  setBorderColor,
+  printAreaMenu,
+  pageBreaksMenu,
+  pasteMenu,
+  outlineGroupMenu,
+  outlineUngroupMenu,
+  pictureInsertMenu,
+  sheetBackgroundMenu,
+  shapesInsertMenu,
+  screenshotInsertMenu,
+  printTitlesMenu,
+  sortMenu,
+  symbolMenu,
+  themeMenu,
+  textOrientationMenu,
+  textToColumnsMenu,
+  watchMenu,
+  watchViewMenu,
   tool,
   tr,
+  workbookStructureProtected,
   wrapFormat,
 }: BuildRibbonGroupsOptions): Record<RibbonTab, ReactElement[]> => {
+  const pageScaleText = strings.pageScale;
+  const scalePageOption = (value: '1' | '2' | '3'): string =>
+    `${value} ${value === '1' ? pageScaleText.page : pageScaleText.pages}`;
+  const viewText = strings.viewToggle;
+  const pageSetupText = strings.pageSetup;
+  const cellMenuText = strings.ribbonMenu;
+  const functionArgsTitle = (name: string): string =>
+    strings.ribbon.functionArgumentsTitle.replace('{name}', name);
+  const showBuiltInReview = (
+    title: string,
+    items: ReturnType<typeof analyzeSpellingCells>,
+  ): void => {
+    onBuiltInReview?.(title, items);
+  };
+  const runSpellingReview = (): void => {
+    if (onSpellingReview) {
+      onSpellingReview();
+      return;
+    }
+    if (!instance) return;
+    showBuiltInReview(
+      tr.spelling,
+      analyzeSpellingCells(reviewCellsFromState(instance.store.getState()), lang),
+    );
+  };
+  const runAccessibilityReview = (): void => {
+    if (onAccessibilityCheck) {
+      onAccessibilityCheck();
+      return;
+    }
+    if (!instance) return;
+    showBuiltInReview(
+      tr.accessibility,
+      analyzeAccessibilityCells(reviewCellsFromState(instance.store.getState()), lang),
+    );
+  };
+  const runTranslateReview = (): void => {
+    if (onTranslate) {
+      onTranslate();
+      return;
+    }
+    if (!instance) return;
+    const state = instance.store.getState();
+    showBuiltInReview(
+      tr.translate,
+      buildTranslationReviewItems(
+        reviewCellsFromState(state, state.data.sheetIndex, state.selection.range),
+        lang,
+      ),
+    );
+  };
+  const runDrawPen = (): void => {
+    if (onDrawPen) {
+      onDrawPen();
+      return;
+    }
+    instance?.borderDraw?.activate('draw', borderStyle, borderColor);
+  };
+  const runDrawGrid = (): void => {
+    instance?.borderDraw?.activate('grid', borderStyle, borderColor);
+  };
+  const runDrawEraser = (): void => {
+    if (onDrawEraser) {
+      onDrawEraser();
+      return;
+    }
+    instance?.borderDraw?.activate('erase');
+  };
+  const selectComment = (direction: 1 | -1): void => {
+    if (!instance) return;
+    const state = instance.store.getState();
+    const comments = listComments(state);
+    if (comments.length === 0) return;
+    const activeAddr = state.selection.active;
+    const current = comments.findIndex(
+      (entry) => entry.addr.row === activeAddr.row && entry.addr.col === activeAddr.col,
+    );
+    const nextIndex =
+      current >= 0
+        ? (current + direction + comments.length) % comments.length
+        : direction > 0
+          ? 0
+          : comments.length - 1;
+    const next = comments[nextIndex]?.addr;
+    if (next) mutators.setActive(instance.store, next);
+  };
+  const selectionOutlineAxis = (): 'row' | 'col' => {
+    if (!instance) return 'row';
+    const range = instance.store.getState().selection.range;
+    return range.r1 - range.r0 >= range.c1 - range.c0 ? 'row' : 'col';
+  };
+  const sheetViewOptions = (): readonly { value: string; label: string }[] => {
+    const state = instance?.store.getState();
+    const current = { value: 'current', label: strings.viewToolbar.currentView };
+    if (!state) return [current];
+    return [
+      current,
+      ...state.sheetViews.views
+        .filter((view) => view.sheet === state.data.sheetIndex)
+        .map((view) => ({ value: view.id, label: view.name })),
+    ];
+  };
+  const saveSheetViewFromRibbon = (): void => {
+    if (!instance) return;
+    const count = instance.store.getState().sheetViews.views.length + 1;
+    const id = `view-${Date.now().toString(36)}-${count}`;
+    saveSheetView(instance.store, id, `${strings.viewToolbar.views} ${count}`);
+    instance.store.setState((state) => ({
+      ...state,
+      sheetViews: { ...state.sheetViews, activeViewId: id },
+    }));
+  };
+  const deleteActiveSheetViewFromRibbon = (): void => {
+    if (!instance) return;
+    const id = instance.store.getState().sheetViews.activeViewId;
+    if (id) deleteSheetView(instance.store, id);
+  };
+  const applyOutlineAction = (
+    action: 'group' | 'ungroup' | 'show-detail' | 'hide-detail',
+  ): void => {
+    if (!instance) return;
+    const range = instance.store.getState().selection.range;
+    if (selectionOutlineAxis() === 'row') {
+      if (action === 'group')
+        groupRows(instance.store, instance.history, range.r0, range.r1, instance.workbook);
+      else if (action === 'ungroup')
+        ungroupRows(instance.store, instance.history, range.r0, range.r1, instance.workbook);
+      else if (action === 'show-detail')
+        showRows(instance.store, instance.history, range.r0, range.r1, instance.workbook);
+      else
+        collapseRowGroup(instance.store, instance.history, range.r0, range.r1, instance.workbook);
+    } else {
+      if (action === 'group')
+        groupCols(instance.store, instance.history, range.c0, range.c1, instance.workbook);
+      else if (action === 'ungroup')
+        ungroupCols(instance.store, instance.history, range.c0, range.c1, instance.workbook);
+      else if (action === 'show-detail')
+        showCols(instance.store, instance.history, range.c0, range.c1, instance.workbook);
+      else
+        collapseColGroup(instance.store, instance.history, range.c0, range.c1, instance.workbook);
+    }
+  };
+  const toggleViewFlag = (flag: 'gridlines' | 'headings' | 'formulas' | 'r1c1'): void => {
+    if (!instance) return;
+    const ui = instance.store.getState().ui;
+    if (flag === 'gridlines') setGridlinesVisible(instance.store, ui.showGridLines === false);
+    else if (flag === 'headings') setHeadingsVisible(instance.store, ui.showHeaders === false);
+    else if (flag === 'formulas') setShowFormulas(instance.store, !ui.showFormulas);
+    else setR1C1ReferenceStyle(instance.store, !ui.r1c1);
+  };
   return {
     file: [
       group(tr.workbook, [
@@ -85,33 +318,25 @@ export const buildRibbonGroups = ({
           'print',
           tr.print,
           iconLabel('print', tr.print),
-          () => instance?.print(),
+          () => instance?.print('print'),
           false,
           ' demo__rb--wide',
         ),
         tool(
-          'links',
-          tr.links,
-          iconLabel('link', tr.links),
-          () => instance?.openExternalLinksDialog(),
+          'protect',
+          tr.protect,
+          iconLabel('protect', tr.protect),
+          () => onProtectWorkbook?.(),
           false,
           ' demo__rb--wide',
         ),
       ]),
       group(tr.inspect, [
         tool(
-          'formatCells',
-          tr.formatCells,
-          iconLabel('formatCells', tr.formatCells),
-          () => instance?.openFormatDialog(),
-          false,
-          ' demo__rb--wide',
-        ),
-        tool(
-          'gotoSpecial',
-          tr.gotoSpecial,
-          iconLabel('goTo', tr.gotoSpecial),
-          () => instance?.openGoToSpecial(),
+          'inspect',
+          tr.inspect,
+          iconLabel('goTo', tr.inspect),
+          () => onInspectWorkbook?.(),
           false,
           ' demo__rb--wide',
         ),
@@ -121,17 +346,7 @@ export const buildRibbonGroups = ({
       group(
         tr.clipboard,
         [
-          tool(
-            'paste',
-            tr.paste,
-            <>
-              <Icon name="paste" />
-              <span>{tr.paste}</span>
-            </>,
-            onPaste,
-            false,
-            ' demo__rb--large',
-          ),
+          pasteMenu,
           tool('cut', tr.cut, <Icon name="cut" />, onCut),
           tool('copy', tr.copy, <Icon name="copy" />, onCopy),
           tool(
@@ -141,14 +356,6 @@ export const buildRibbonGroups = ({
             onFormatPainter,
             active.formatPainterArmed,
           ),
-          tool(
-            'clearFormat',
-            tr.clearFormats,
-            <Icon name="clear" />,
-            () => wrapFormat(clearFormat),
-            false,
-            ' demo__rb--wide',
-          ),
         ],
         'clipboard',
       ),
@@ -157,13 +364,13 @@ export const buildRibbonGroups = ({
         [
           select(
             'fontFamily',
-            'Font',
+            tr.font,
             active.fontFamily,
-            FONT_FAMILIES,
+            strings.ribbon.fontFamilies,
             (value) => wrapFormat((s, st) => setFont(s, st, { fontFamily: value })),
             ' demo__rb-select--font',
           ),
-          select('fontSize', 'Font size', active.fontSize, FONT_SIZES, (value) =>
+          select('fontSize', tr.fontSize, active.fontSize, FONT_SIZES, (value) =>
             wrapFormat((s, st) => setFont(s, st, { fontSize: Number(value) })),
           ),
           tool('fontGrow', tr.increaseFontSize, <Icon name="fontGrow" />, () =>
@@ -175,7 +382,7 @@ export const buildRibbonGroups = ({
           rowBreak('font-row-2'),
           tool(
             'bold',
-            'Bold (⌘B)',
+            `${tr.bold} (⌘B)`,
             <Icon name="bold" />,
             () => wrapFormat(toggleBold),
             active.bold,
@@ -183,7 +390,7 @@ export const buildRibbonGroups = ({
           ),
           tool(
             'italic',
-            'Italic (⌘I)',
+            `${tr.italic} (⌘I)`,
             <Icon name="italic" />,
             () => wrapFormat(toggleItalic),
             active.italic,
@@ -191,7 +398,7 @@ export const buildRibbonGroups = ({
           ),
           tool(
             'underline',
-            'Underline (⌘U)',
+            `${tr.underline} (⌘U)`,
             <Icon name="underline" />,
             () => wrapFormat(toggleUnderline),
             active.underline,
@@ -199,23 +406,78 @@ export const buildRibbonGroups = ({
           ),
           tool(
             'strike',
-            'Strikethrough',
+            tr.strikethrough,
             <Icon name="strike" />,
             () => wrapFormat(toggleStrike),
             active.strike,
             ' demo__rb--strike',
           ),
           tool('borders', tr.borders, <Icon name="borders" />, () => wrapFormat(cycleBorders)),
+          optionSelect(
+            'borderPreset',
+            tr.borderPattern,
+            'outline',
+            borderPresets,
+            onBorderPreset,
+            ' demo__rb-select--border',
+          ),
+          optionSelect(
+            'borderStyle',
+            tr.borderLineStyle,
+            borderStyle,
+            borderStyles,
+            setBorderStyle,
+            ' demo__rb-select--border-style',
+          ),
+          color(
+            'borderColor',
+            tr.lineColor,
+            borderColor,
+            setBorderColor,
+            <Icon name="fontColor" />,
+          ),
+          tool('moreBorders', tr.moreBorders, <Icon name="formatCells" />, () =>
+            instance?.openFormatDialog('border'),
+          ),
+          tool(
+            'drawBorder',
+            tr.drawBorder,
+            <Icon name="pen" />,
+            runDrawPen,
+            false,
+            '',
+            !onDrawPen && !instance?.borderDraw,
+            !!onDrawPen,
+          ),
+          tool(
+            'drawBorderGrid',
+            tr.drawBorderGrid,
+            <Icon name="borders" />,
+            runDrawGrid,
+            false,
+            '',
+            !instance?.borderDraw,
+          ),
+          tool(
+            'eraseBorder',
+            tr.eraseBorder,
+            <Icon name="eraser" />,
+            runDrawEraser,
+            false,
+            '',
+            !onDrawEraser && !instance?.borderDraw,
+            !!onDrawEraser,
+          ),
           color(
             'fontColor',
-            'Font color',
+            tr.fontColor,
             active.fontColor,
             (value) => wrapFormat((s, st) => setFontColor(s, st, value)),
             <Icon name="fontColor" />,
           ),
           color(
             'fillColor',
-            'Fill color',
+            tr.fillColor,
             active.fillColor,
             (value) => wrapFormat((s, st) => setFillColor(s, st, value)),
             <Icon name="fillColor" />,
@@ -228,41 +490,61 @@ export const buildRibbonGroups = ({
         [
           tool(
             'top',
-            'Top align',
+            tr.topAlign,
             <Icon name="top" />,
             () => wrapFormat((s, st) => setVAlign(s, st, 'top')),
-            false,
+            active.vAlignTop,
           ),
           tool(
             'middle',
-            'Middle align',
+            tr.middleAlign,
             <Icon name="middle" />,
             () => wrapFormat((s, st) => setVAlign(s, st, 'middle')),
-            false,
+            active.vAlignMiddle,
           ),
+          tool(
+            'bottomAlign',
+            tr.bottomAlign,
+            iconLabel('bottomAlign', tr.bottomAlign),
+            () => wrapFormat((s, st) => setVAlign(s, st, 'bottom')),
+            active.vAlignBottom,
+          ),
+          textOrientationMenu,
+          tool('wrap', tr.wrapText, <Icon name="wrap" />, () => wrapFormat(toggleWrap), active.wrapText),
           rowBreak('alignment-row-2'),
           tool(
             'alignL',
-            'Align left',
+            tr.alignLeft,
             <Icon name="alignLeft" />,
             () => wrapFormat((s, st) => setAlign(s, st, 'left')),
             active.alignLeft,
           ),
           tool(
             'alignC',
-            'Align center',
+            tr.alignCenter,
             <Icon name="alignCenter" />,
             () => wrapFormat((s, st) => setAlign(s, st, 'center')),
             active.alignCenter,
           ),
           tool(
             'alignR',
-            'Align right',
+            tr.alignRight,
             <Icon name="alignRight" />,
             () => wrapFormat((s, st) => setAlign(s, st, 'right')),
             active.alignRight,
           ),
-          tool('wrap', tr.wrapText, <Icon name="wrap" />, () => wrapFormat(toggleWrap)),
+          tool(
+            'indentDecrease',
+            tr.decreaseIndent,
+            iconLabel('indentDecrease', tr.decreaseIndent),
+            () => wrapFormat((s, st) => bumpIndent(s, st, -1)),
+          ),
+          tool(
+            'indentIncrease',
+            tr.increaseIndent,
+            iconLabel('indentIncrease', tr.increaseIndent),
+            () => wrapFormat((s, st) => bumpIndent(s, st, 1)),
+          ),
           mergeMenu,
         ],
         'alignment',
@@ -272,7 +554,7 @@ export const buildRibbonGroups = ({
         [
           optionSelect(
             'numberFormat',
-            'Number format',
+            tr.number,
             active.numberFormat,
             [
               { value: 'general', label: tr.general },
@@ -294,22 +576,25 @@ export const buildRibbonGroups = ({
           rowBreak('number-row-2'),
           tool(
             'currency',
-            'Currency',
+            tr.currency,
             <Icon name="currency" />,
-            () => wrapFormat(cycleCurrency),
+            () => wrapFormat((s, st) => cycleCurrency(s, st, lang)),
             active.currency,
             ' demo__rb--mono',
           ),
           tool(
             'percent',
-            'Percent',
+            tr.percent,
             <Icon name="percent" />,
             () => wrapFormat(cyclePercent),
             active.percent,
             ' demo__rb--mono',
           ),
           tool('comma', tr.commaStyle, <Icon name="comma" />, () =>
-            wrapFormat((s, st) => setNumFmt(s, st, { kind: 'fixed', decimals: 2 })),
+            wrapFormat((s, st) =>
+              setNumFmt(s, st, { kind: 'fixed', decimals: 2, thousands: true }),
+            ),
+            active.commaStyle,
           ),
           tool('decDown', tr.decreaseDecimals, <Icon name="decDown" />, () =>
             wrapFormat((s, st) => bumpDecimals(s, st, -1)),
@@ -320,113 +605,20 @@ export const buildRibbonGroups = ({
         ],
         'number',
       ),
-      group(
-        tr.styles,
-        [
-          tool(
-            'conditional',
-            'Conditional formatting',
-            iconLabel('conditional', tr.conditional),
-            () => instance?.openConditionalDialog(),
-            false,
-            ' demo__rb--wide',
-          ),
-          tool(
-            'cellStyles',
-            'Cell styles',
-            iconLabel('tableStyle', tr.cellStyles),
-            () => instance?.openCellStylesGallery(),
-            false,
-            ' demo__rb--wide',
-          ),
-          tool(
-            'rules',
-            'Manage conditional formatting rules',
-            iconLabel('options', tr.rules),
-            () => instance?.openCfRulesDialog(),
-            false,
-            ' demo__rb--wide',
-          ),
-        ],
-        'styles',
-      ),
-      group(
-        tr.cells,
-        [
-          tool('insertRows', tr.insertRows, <Icon name="insertRows" />, onInsertRows),
-          tool('deleteRows', tr.deleteRows, <Icon name="deleteRows" />, onDeleteRows),
-          tool('insertCols', tr.insertCols, <Icon name="insertCols" />, onInsertCols),
-          tool('deleteCols', tr.deleteCols, <Icon name="deleteCols" />, onDeleteCols),
-          tool(
-            'formatCellsHome',
-            'Format cells',
-            iconLabel('formatCells', tr.formatCells),
-            () => instance?.openFormatDialog(),
-            false,
-            ' demo__rb--wide',
-          ),
-        ],
-        'cells',
-      ),
-      group(
-        tr.editing,
-        [
-          tool('autosum', 'AutoSum (Σ)', <Icon name="autosum" />, onAutoSum),
-          tool('undoHome', 'Undo (⌘Z)', <Icon name="undo" />, onUndo),
-          tool('redoHome', 'Redo (⌘⇧Z)', <Icon name="redo" />, onRedo),
-          tool('sortAscHome', 'Sort ascending', <Icon name="sortAsc" />, () => onSort('asc')),
-          tool('filterHome', 'Filter', <Icon name="filter" />, onFilterToggle, active.filterOn),
-          tool(
-            'findHome',
-            `${tr.find} (⌘F)`,
-            iconLabel('find', tr.find),
-            () => instance?.openFindReplace(),
-            false,
-            ' demo__rb--wide',
-          ),
-          tool(
-            'gotoSpecialHome',
-            tr.gotoSpecial,
-            iconLabel('goTo', tr.gotoSpecial),
-            () => instance?.openGoToSpecial(),
-            false,
-            ' demo__rb--wide',
-          ),
-        ],
-        'editing',
-      ),
+      group(tr.styles, [conditionalMenu, formatTableHomeMenu, cellStylesMenu], 'styles'),
+      group(tr.cells, [cellInsertMenu, cellDeleteMenu, cellFormatMenu], 'cells'),
+      group(tr.editing, [autosumMenu, fillMenu, clearMenu, sortMenu, findMenu], 'editing'),
     ],
     insert: [
       group(
         tr.tables,
         [
-          tool(
-            'pivotTableInsert',
-            'PivotTable',
-            iconLabel('table', tr.pivotTable),
-            () => instance?.openPivotTableDialog(),
-            false,
-            ' demo__rb--wide',
-          ),
-          tool(
-            'formatTableInsert',
-            'Format as Table',
-            iconLabel('tableStyle', tr.formatTable),
-            onFormatAsTable,
-            false,
-            ' demo__rb--wide',
-          ),
-          tool(
-            'namedRangesInsert',
-            'Name manager',
-            iconLabel('names', tr.names),
-            () => instance?.openNamedRangeDialog(),
-            false,
-            ' demo__rb--wide',
-          ),
+          pivotTableMenu,
+          formatTableInsertMenu,
+          definedNamesInsertMenu,
           tool(
             'removeDupesInsert',
-            'Remove duplicates',
+            tr.removeDuplicates,
             iconLabel('removeDuplicates', tr.removeDuplicates),
             onRemoveDuplicates,
             false,
@@ -436,33 +628,18 @@ export const buildRibbonGroups = ({
         'tiles',
       ),
       group(
-        tr.charts,
-        [
-          tool(
-            'chartInsert',
-            'Recommended chart',
-            iconLabel('chart', tr.chart),
-            () => instance?.openQuickAnalysis(),
-            false,
-            ' demo__rb--wide',
-          ),
-        ],
+        tr.illustrations,
+        [pictureInsertMenu, shapesInsertMenu, screenshotInsertMenu],
         'tiles',
       ),
+      group(tr.charts, [chartMenu], 'tiles'),
       group(
         tr.links,
         [
-          tool(
-            'hyperlinkInsert',
-            'Insert hyperlink (⌘K)',
-            iconLabel('link', tr.hyperlink),
-            () => instance?.openHyperlinkDialog(),
-            false,
-            ' demo__rb--wide',
-          ),
+          hyperlinkMenu,
           tool(
             'linksInsert',
-            'Edit links',
+            tr.links,
             iconLabel('link', tr.links),
             () => instance?.openExternalLinksDialog(),
             false,
@@ -476,7 +653,7 @@ export const buildRibbonGroups = ({
         [
           tool(
             'commentInsert',
-            active.hasComment ? 'Edit Note' : 'New Note',
+            active.hasComment ? tr.editComment : tr.newComment,
             iconLabel(
               active.hasComment ? 'commentMultiple' : 'commentAdd',
               active.hasComment ? tr.editComment : tr.newComment,
@@ -488,48 +665,47 @@ export const buildRibbonGroups = ({
         ],
         'tiles',
       ),
-      group(
-        tr.symbols,
-        [
-          tool(
-            'fxInsert',
-            'Insert function (Σ)',
-            iconLabel('function', 'fx'),
-            () => instance?.openFunctionArguments(),
-            false,
-            ' demo__rb--wide',
-          ),
-        ],
-        'tiles',
-      ),
+      group(tr.symbols, [symbolMenu], 'tiles'),
     ],
     draw: [
       group(
-        RIBBON_TAB_LABELS.draw[lang],
+        strings.ribbon.tabs.draw,
         [
           tool(
             'drawPen',
-            RIBBON_TAB_LABELS.draw[lang],
+            strings.ribbon.tabs.draw,
             iconLabel('pen', tr.pen),
-            () => onDrawPen?.(),
+            runDrawPen,
             false,
             ' demo__rb--wide',
-            !onDrawPen,
+            !onDrawPen && !instance?.borderDraw,
+            !!onDrawPen,
+          ),
+          tool(
+            'drawGrid',
+            tr.drawBorderGrid,
+            iconLabel('borders', tr.drawBorderGrid),
+            runDrawGrid,
+            false,
+            ' demo__rb--wide',
+            !instance?.borderDraw,
           ),
           tool(
             'drawErase',
-            'Eraser',
+            tr.eraser,
             iconLabel('eraser', tr.eraser),
-            () => onDrawEraser?.(),
+            runDrawEraser,
             false,
             ' demo__rb--wide',
-            !onDrawEraser,
+            !onDrawEraser && !instance?.borderDraw,
+            !!onDrawEraser,
           ),
         ],
         'tiles',
       ),
     ],
     pageLayout: [
+      group(cellMenuText.theme, [themeMenu], 'tiles'),
       group(
         tr.pageSetup,
         [
@@ -583,10 +759,109 @@ export const buildRibbonGroups = ({
           ),
           tool(
             'pageSetupAdvanced',
-            'Advanced page setup',
+            tr.pageSetup,
             iconLabel('options', tr.pageSetup),
             () => instance?.openPageSetup(),
             false,
+            ' demo__rb--wide',
+          ),
+          printAreaMenu,
+          pageBreaksMenu,
+          sheetBackgroundMenu,
+          printTitlesMenu,
+        ],
+        'tiles',
+      ),
+      group(
+        tr.scale,
+        [
+          optionSelect(
+            'scaleWidth',
+            pageScaleText.width,
+            active.fitWidth == null ? '0' : String(active.fitWidth),
+            [
+              { value: '0', label: pageScaleText.automatic },
+              { value: '1', label: scalePageOption('1') },
+              { value: '2', label: scalePageOption('2') },
+              { value: '3', label: scalePageOption('3') },
+            ],
+            (value) => onScaleFit('width', value),
+            ' demo__rb-select--border',
+          ),
+          optionSelect(
+            'scaleHeight',
+            pageScaleText.height,
+            active.fitHeight == null ? '0' : String(active.fitHeight),
+            [
+              { value: '0', label: pageScaleText.automatic },
+              { value: '1', label: scalePageOption('1') },
+              { value: '2', label: scalePageOption('2') },
+              { value: '3', label: scalePageOption('3') },
+            ],
+            (value) => onScaleFit('height', value),
+            ' demo__rb-select--border',
+          ),
+          optionSelect(
+            'scalePercent',
+            pageScaleText.scale,
+            String(Math.round(active.pageScale * 100)),
+            [
+              { value: '25', label: '25%' },
+              { value: '50', label: '50%' },
+              { value: '75', label: '75%' },
+              { value: '100', label: '100%' },
+              { value: '125', label: '125%' },
+              { value: '150', label: '150%' },
+              { value: '200', label: '200%' },
+              { value: '400', label: '400%' },
+            ],
+            onScalePercent,
+            ' demo__rb-select--border',
+          ),
+        ],
+        'tiles',
+      ),
+      group(
+        tr.sheetOptions,
+        [
+          tool(
+            'pageLayoutGridlinesView',
+            `${viewText.gridlines} ${tr.show}`,
+            iconLabel('table', viewText.gridlines),
+            () => toggleViewFlag('gridlines'),
+            active.gridlinesVisible,
+            ' demo__rb--wide',
+          ),
+          tool(
+            'pageLayoutGridlinesPrint',
+            pageSetupText.showGridlines,
+            iconLabel('print', pageSetupText.showGridlines),
+            () => {
+              if (!instance) return;
+              const sheet = instance.store.getState().data.sheetIndex;
+              setPrintGridlines(instance.store, sheet, !active.printGridlines, instance.history);
+            },
+            active.printGridlines,
+            ' demo__rb--wide',
+          ),
+          tool(
+            'pageLayoutHeadingsView',
+            `${viewText.headings} ${tr.show}`,
+            iconLabel('table', viewText.headings),
+            () => toggleViewFlag('headings'),
+            active.headingsVisible,
+            ' demo__rb--wide',
+          ),
+          tool(
+            'pageLayoutHeadingsPrint',
+            pageSetupText.showHeadings,
+            iconLabel('print', pageSetupText.showHeadings),
+            () => {
+              if (!instance) return;
+              const sheet = instance.store.getState().data.sheetIndex;
+              setPrintHeadings(instance.store, sheet, !active.printHeadings, instance.history);
+            },
+            active.printHeadings,
             ' demo__rb--wide',
           ),
         ],
@@ -599,7 +874,7 @@ export const buildRibbonGroups = ({
             'printPageLayout',
             tr.print,
             iconLabel('print', tr.print),
-            () => instance?.print(),
+            () => instance?.print('print'),
             false,
             ' demo__rb--wide',
           ),
@@ -613,24 +888,16 @@ export const buildRibbonGroups = ({
         [
           tool(
             'fx',
-            'Insert function',
+            tr.insertFunction,
             <Icon name="function" />,
             () => instance?.openFunctionArguments(),
             false,
             ' demo__rb--mono',
           ),
-          tool(
-            'autosumFormula',
-            'AutoSum (Σ)',
-            <>
-              <Icon name="autosum" />
-              <span>{tr.autoSum}</span>
-            </>,
-            onAutoSum,
-          ),
+          autosumFormulaMenu,
           tool(
             'sum',
-            'SUM arguments',
+            functionArgsTitle('SUM'),
             iconLabel('function', 'SUM'),
             () => instance?.openFunctionArguments('SUM'),
             false,
@@ -638,35 +905,28 @@ export const buildRibbonGroups = ({
           ),
           tool(
             'avg',
-            'AVERAGE arguments',
+            functionArgsTitle('AVERAGE'),
             iconLabel('function', 'AVG'),
             () => instance?.openFunctionArguments('AVERAGE'),
             false,
             ' demo__rb--mono',
           ),
+          functionLogicalMenu,
+          functionLookupMenu,
+          functionTextMenu,
+          functionDateTimeMenu,
+          functionFinancialMenu,
+          functionMathTrigMenu,
         ],
         'tiles',
       ),
-      group(
-        tr.definedNames,
-        [
-          tool(
-            'namedRanges',
-            'Name manager',
-            iconLabel('names', tr.names),
-            () => instance?.openNamedRangeDialog(),
-            false,
-            ' demo__rb--wide',
-          ),
-        ],
-        'tiles',
-      ),
+      group(tr.definedNames, [definedNamesMenu], 'tiles'),
       group(
         tr.formulaAuditing,
         [
           tool(
             'precedents',
-            'Trace precedents',
+            tr.tracePrecedents,
             iconLabel('trace', tr.tracePrecedents),
             () => instance?.tracePrecedents(),
             false,
@@ -674,17 +934,27 @@ export const buildRibbonGroups = ({
           ),
           tool(
             'dependents',
-            'Trace dependents',
+            tr.traceDependents,
             iconLabel('dependents', tr.traceDependents),
             () => instance?.traceDependents(),
             false,
             ' demo__rb--wide',
           ),
+          clearArrowsMenu,
+          errorCheckingMenu,
           tool(
-            'clearArrows',
-            'Remove arrows',
-            iconLabel('clearArrows', tr.removeArrows),
-            () => instance?.clearTraces(),
+            'showFormulasFormula',
+            viewText.formulas,
+            iconLabel('function', viewText.formulas),
+            () => toggleViewFlag('formulas'),
+            active.formulasVisible,
+            ' demo__rb--wide',
+          ),
+          tool(
+            'evaluateFormula',
+            tr.evaluateFormula,
+            iconLabel('function', tr.evaluateFormula),
+            () => instance?.openEvaluateFormulaDialog(),
             false,
             ' demo__rb--wide',
           ),
@@ -696,28 +966,14 @@ export const buildRibbonGroups = ({
         [
           tool(
             'recalcNow',
-            'Calculate Now (F9)',
+            `${tr.recalc} (F9)`,
             iconLabel('autosum', tr.recalc),
             () => instance?.recalc(),
             false,
             ' demo__rb--wide',
           ),
-          tool(
-            'calcOptions',
-            'Calculation options',
-            iconLabel('options', tr.options),
-            () => instance?.openIterativeDialog(),
-            false,
-            ' demo__rb--wide',
-          ),
-          tool(
-            'watch',
-            'Watch Window',
-            iconLabel('watch', tr.watch),
-            () => instance?.toggleWatchWindow(),
-            false,
-            ' demo__rb--wide',
-          ),
+          calcOptionsMenu,
+          watchMenu,
         ],
         'tiles',
       ),
@@ -726,19 +982,10 @@ export const buildRibbonGroups = ({
       group(
         tr.sortFilter,
         [
-          tool(
-            'filter',
-            'Filter',
-            <>
-              <Icon name="filter" />
-              <span>{tr.filter}</span>
-            </>,
-            onFilterToggle,
-            active.filterOn,
-          ),
+          dataFilterMenu,
           tool(
             'sortAsc',
-            'Sort ascending',
+            tr.sortAscending,
             <>
               <Icon name="sortAsc" />
               <span>A-Z</span>
@@ -747,30 +994,33 @@ export const buildRibbonGroups = ({
           ),
           tool(
             'sortDesc',
-            'Sort descending',
+            tr.sortDescending,
             <>
               <Icon name="sortDesc" />
               <span>Z-A</span>
             </>,
             () => onSort('desc'),
           ),
+          dataSortMenu,
         ],
         'tiles',
       ),
       group(
         tr.dataTools,
         [
+          textToColumnsMenu,
           tool(
             'removeDupes',
-            'Remove duplicates',
+            tr.removeDuplicates,
             iconLabel('removeDuplicates', tr.removeDuplicates),
             onRemoveDuplicates,
             false,
             ' demo__rb--wide',
           ),
+          dataValidationMenu,
           tool(
             'linksData',
-            'Edit links',
+            tr.links,
             iconLabel('link', tr.links),
             () => instance?.openExternalLinksDialog(),
             false,
@@ -782,20 +1032,22 @@ export const buildRibbonGroups = ({
       group(
         tr.outline,
         [
+          outlineGroupMenu,
+          outlineUngroupMenu,
           tool(
-            'hideRows',
-            active.rowsHidden ? 'Show selected rows' : 'Hide selected rows',
-            iconLabel('table', active.rowsHidden ? tr.showRows : tr.hideRows),
-            onToggleRowsHidden,
-            active.rowsHidden,
+            'outlineShowDetail',
+            tr.showDetail,
+            iconLabel('table', tr.showDetail),
+            () => applyOutlineAction('show-detail'),
+            false,
             ' demo__rb--wide',
           ),
           tool(
-            'hideCols',
-            active.colsHidden ? 'Show selected columns' : 'Hide selected columns',
-            iconLabel('table', active.colsHidden ? tr.showCols : tr.hideCols),
-            onToggleColsHidden,
-            active.colsHidden,
+            'outlineHideDetail',
+            tr.hideDetail,
+            iconLabel('table', tr.hideDetail),
+            () => applyOutlineAction('hide-detail'),
+            false,
             ' demo__rb--wide',
           ),
         ],
@@ -810,10 +1062,11 @@ export const buildRibbonGroups = ({
             'spellingReview',
             tr.spelling,
             iconLabel('spelling', tr.spelling),
-            () => onSpellingReview?.(),
+            runSpellingReview,
             false,
             ' demo__rb--wide',
-            !onSpellingReview,
+            !instance && !onSpellingReview,
+            !!onSpellingReview,
           ),
         ],
         'tiles',
@@ -825,10 +1078,11 @@ export const buildRibbonGroups = ({
             'translateReview',
             tr.translate,
             iconLabel('translate', tr.translate),
-            () => onTranslate?.(),
+            runTranslateReview,
             false,
             ' demo__rb--wide',
-            !onTranslate,
+            !instance && !onTranslate,
+            !!onTranslate,
           ),
         ],
         'tiles',
@@ -838,13 +1092,30 @@ export const buildRibbonGroups = ({
         [
           tool(
             'newCommentReview',
-            active.hasComment ? 'Edit Note' : 'New Note',
+            active.hasComment ? tr.editComment : tr.newComment,
             iconLabel(
               active.hasComment ? 'commentMultiple' : 'commentAdd',
               active.hasComment ? tr.editComment : tr.newComment,
             ),
             () => instance?.openCommentDialog(),
             active.hasComment,
+            ' demo__rb--wide',
+          ),
+          deleteCommentMenu,
+          tool(
+            'previousCommentReview',
+            tr.previousComment,
+            iconLabel('goTo', tr.previousComment),
+            () => selectComment(-1),
+            false,
+            ' demo__rb--wide',
+          ),
+          tool(
+            'nextCommentReview',
+            tr.nextComment,
+            iconLabel('goTo', tr.nextComment),
+            () => selectComment(1),
+            false,
             ' demo__rb--wide',
           ),
         ],
@@ -857,7 +1128,7 @@ export const buildRibbonGroups = ({
             'findReview',
             `${tr.find} (⌘F)`,
             iconLabel('find', tr.find),
-            () => instance?.openFindReplace(),
+            () => instance?.openFindReplace('find'),
             false,
             ' demo__rb--wide',
           ),
@@ -869,12 +1140,28 @@ export const buildRibbonGroups = ({
         [
           tool(
             'protectReview',
-            active.protected ? 'Unprotect sheet' : 'Protect sheet',
+            active.protected ? tr.unprotect : tr.protect,
             iconLabel('protect', active.protected ? tr.unprotect : tr.protect),
             () => instance?.toggleSheetProtection(),
             active.protected,
             ' demo__rb--wide',
           ),
+          tool(
+            'protectWorkbookReview',
+            workbookStructureProtected
+              ? cellMenuText.unprotectWorkbookCommand
+              : cellMenuText.protectWorkbookCommand,
+            iconLabel(
+              'protect',
+              workbookStructureProtected
+                ? cellMenuText.unprotectWorkbookCommand
+                : cellMenuText.protectWorkbookCommand,
+            ),
+            () => onProtectWorkbook?.(),
+            workbookStructureProtected,
+            ' demo__rb--wide',
+          ),
+          protectionMenu,
         ],
         'tiles',
       ),
@@ -885,10 +1172,11 @@ export const buildRibbonGroups = ({
             'accessibility',
             tr.accessibility,
             iconLabel('accessibility', tr.accessibility),
-            () => onAccessibilityCheck?.(),
+            runAccessibilityReview,
             false,
             ' demo__rb--wide',
-            !onAccessibilityCheck,
+            !instance && !onAccessibilityCheck,
+            !!onAccessibilityCheck,
           ),
         ],
         'tiles',
@@ -899,38 +1187,144 @@ export const buildRibbonGroups = ({
         tr.workbookViews,
         [
           tool(
-            'watchView',
-            'Watch Window',
-            iconLabel('watch', tr.watch),
-            () => instance?.toggleWatchWindow(),
-            false,
+            'viewNormal',
+            tr.normalView,
+            iconLabel('table', tr.normalView),
+            () => instance && setWorkbookView(instance.store, 'normal'),
+            active.workbookView === 'normal',
+            ' demo__rb--wide',
+          ),
+          tool(
+            'viewPageLayout',
+            tr.pageLayoutView,
+            iconLabel('page', tr.pageLayoutView),
+            () => instance && setWorkbookView(instance.store, 'pageLayout'),
+            active.workbookView === 'pageLayout',
+            ' demo__rb--wide',
+          ),
+          tool(
+            'viewPageBreakPreview',
+            tr.pageBreakPreview,
+            iconLabel('table', tr.pageBreakPreview),
+            () => instance && setWorkbookView(instance.store, 'pageBreakPreview'),
+            active.workbookView === 'pageBreakPreview',
+            ' demo__rb--wide',
+          ),
+          watchViewMenu,
+        ],
+        'tiles',
+      ),
+      group(
+        strings.viewToolbar.views,
+        [
+          optionSelect(
+            'sheetViewSelect',
+            strings.viewToolbar.views,
+            instance?.store.getState().sheetViews.activeViewId ?? 'current',
+            sheetViewOptions(),
+            (value) => {
+              if (!instance) return;
+              if (value === 'current') {
+                instance.store.setState((state) => ({
+                  ...state,
+                  sheetViews: { ...state.sheetViews, activeViewId: null },
+                }));
+                return;
+              }
+              activateSheetView(instance.store, value);
+            },
+            ' demo__rb-select--border',
+          ),
+          tool(
+            'sheetViewSave',
+            strings.viewToolbar.saveView,
+            iconLabel('options', strings.viewToolbar.saveView),
+            saveSheetViewFromRibbon,
+          ),
+          tool(
+            'sheetViewDelete',
+            strings.viewToolbar.deleteView,
+            iconLabel('clear', strings.viewToolbar.deleteView),
+            deleteActiveSheetViewFromRibbon,
+          ),
+          tool(
+            'workbookObjectsView',
+            strings.viewToolbar.objects,
+            iconLabel('options', strings.viewToolbar.objects),
+            () => instance?.openWorkbookObjects(),
+          ),
+        ],
+        'tiles',
+      ),
+      group(
+        tr.show,
+        [
+          tool(
+            'viewGridlines',
+            viewText.gridlines,
+            iconLabel('table', viewText.gridlines),
+            () => toggleViewFlag('gridlines'),
+            active.gridlinesVisible,
+            ' demo__rb--wide',
+          ),
+          tool(
+            'viewHeadings',
+            viewText.headings,
+            iconLabel('table', viewText.headings),
+            () => toggleViewFlag('headings'),
+            active.headingsVisible,
+            ' demo__rb--wide',
+          ),
+          tool(
+            'viewFormulas',
+            viewText.formulas,
+            iconLabel('function', viewText.formulas),
+            () => toggleViewFlag('formulas'),
+            active.formulasVisible,
+            ' demo__rb--wide',
+          ),
+          tool(
+            'viewFormulaBar',
+            viewText.formulaBar,
+            iconLabel('function', viewText.formulaBar),
+            onToggleFormulaBar,
+            formulaBarVisible,
+            ' demo__rb--wide',
+          ),
+          tool(
+            'viewR1C1',
+            'R1C1',
+            iconLabel('options', 'R1C1'),
+            () => toggleViewFlag('r1c1'),
+            active.r1c1,
             ' demo__rb--wide',
           ),
         ],
         'tiles',
       ),
-      group(
-        tr.window,
-        [
-          tool(
-            'freeze',
-            'Freeze panes',
-            <>
-              <Icon name="freeze" />
-              <span>{tr.freeze}</span>
-            </>,
-            onFreezeToggle,
-            active.frozen,
-          ),
-        ],
-        'tiles',
-      ),
+      group(tr.window, [freezeMenu, windowMenu], 'tiles'),
       group(
         tr.zoom,
         [
           tool(
+            'zoomDialog',
+            `${tr.zoom}...`,
+            iconLabel('zoom', tr.zoom),
+            onZoomDialog,
+            false,
+            ' demo__rb--wide',
+          ),
+          tool(
+            'zoomSelection',
+            tr.zoomSelection,
+            iconLabel('zoom', tr.zoomSelection),
+            onZoomSelection,
+            false,
+            ' demo__rb--wide',
+          ),
+          tool(
             'zoom75',
-            'Zoom to 75%',
+            `${tr.zoom} 75%`,
             iconLabel('zoom', '75%'),
             () => onZoom(0.75),
             active.zoom === 0.75,
@@ -938,7 +1332,7 @@ export const buildRibbonGroups = ({
           ),
           tool(
             'zoom100',
-            'Zoom to 100%',
+            `${tr.zoom} 100%`,
             iconLabel('zoom', '100%'),
             () => onZoom(1),
             active.zoom === 1,
@@ -946,7 +1340,7 @@ export const buildRibbonGroups = ({
           ),
           tool(
             'zoom125',
-            'Zoom to 125%',
+            `${tr.zoom} 125%`,
             iconLabel('zoom', '125%'),
             () => onZoom(1.25),
             active.zoom === 1.25,
@@ -960,7 +1354,7 @@ export const buildRibbonGroups = ({
         [
           tool(
             'protect',
-            active.protected ? 'Unprotect sheet' : 'Protect sheet',
+            active.protected ? tr.unprotect : tr.protect,
             iconLabel('protect', active.protected ? tr.unprotect : tr.protect),
             () => instance?.toggleSheetProtection(),
             active.protected,
@@ -973,10 +1367,12 @@ export const buildRibbonGroups = ({
     ...buildAddInRibbonGroups({
       group,
       iconLabel,
-      instance,
-      lang,
-      onAddIn,
+      addInMenu,
+      pdfMenu,
       onRunScript,
+      onRecordActions,
+      onAllScripts,
+      strings,
       tool,
       tr,
     }),

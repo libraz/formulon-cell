@@ -7,6 +7,7 @@ interface DropdownOption<V extends string | number> {
 }
 
 interface DropdownProps<V extends string | number> {
+  commandId?: string;
   title: string;
   value: V;
   options: readonly DropdownOption<V>[];
@@ -21,6 +22,7 @@ interface DropdownProps<V extends string | number> {
 }
 
 export function Dropdown<V extends string | number>({
+  commandId,
   title,
   value,
   options,
@@ -133,6 +135,7 @@ export function Dropdown<V extends string | number>({
       className={`demo__rb-dd${className ? ` ${className}` : ''}${
         open ? ' demo__rb-dd--open' : ''
       }`}
+      data-ribbon-command={commandId}
     >
       <button
         ref={buttonRef}

@@ -18,7 +18,7 @@
     display: none;
   }
   .fc-stylegallery__panel {
-    width: 480px;
+    width: 560px;
     max-width: 94vw;
     max-height: min(90vh, 660px);
     background: var(--fc-bg-elev, Canvas);
@@ -30,18 +30,37 @@
       0 18px 48px rgba(0, 0, 0, 0.22),
       0 2px 8px rgba(0, 0, 0, 0.16);
     overflow: auto;
-    padding: 12px 14px 14px;
+    padding: 8px 0 10px;
+  }
+  .fc-stylegallery__body {
+    display: grid;
+    gap: 0;
+  }
+  .fc-stylegallery__section {
+    padding: 7px 12px 10px;
+    border-bottom: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
+  }
+  .fc-stylegallery__section:last-child {
+    border-bottom: 0;
+  }
+  .fc-stylegallery__heading {
+    margin: 0 0 6px;
+    color: color-mix(in srgb, var(--fc-fg, CanvasText) 72%, transparent);
+    font-size: 12px;
+    line-height: 1.25;
   }
   .fc-stylegallery__grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+    gap: 6px;
   }
   .fc-stylegallery__chip {
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
     border-radius: 2px;
-    padding: 8px 10px;
+    min-height: 32px;
+    padding: 6px 9px;
     background: var(--fc-bg-elev, Canvas);
     color: var(--fc-fg, currentColor);
     cursor: pointer;

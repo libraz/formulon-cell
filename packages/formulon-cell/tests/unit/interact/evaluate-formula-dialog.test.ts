@@ -1,0 +1,77 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { en } from '../../../src/i18n/strings.js';
+import { attachEvaluateFormulaDialog } from '../../../src/interact/evaluate-formula-dialog.js';
+import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
+
+const overlay = (): HTMLElement | null => document.querySelector<HTMLElement>('.fc-evaldlg');
+const boxes = (): HTMLElement[] =>
+  Array.from(document.querySelectorAll<HTMLElement>('.fc-evaldlg__box'));
+const evalButton = (): HTMLButtonElement | null =>
+  Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-evaldlg__btn')).find(
+    (button) => !button.classList.contains('fc-evaldlg__btn--primary'),
+  ) ?? null;
+
+describe('attachEvaluateFormulaDialog', () => {
+  let host: HTMLElement;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    while (document.body.firstChild) document.body.removeChild(document.body.firstChild);
+  });
+
+  it('shows the active formula, step evaluation, and current result', () => {
+    const store = createSpreadsheetStore();
+    const addr = { sheet: 0, row: 0, col: 0 };
+    mutators.setActive(store, addr);
+    mutators.setCell(store, addr, { kind: 'number', value: 3 }, '=A2+B2');
+    const wb = {
+      cellFormula: vi.fn(() => '=A2+B2'),
+      getValue: vi.fn((a) => {
+        if (a.row === 1 && a.col === 0) return { kind: 'number', value: 1 };
+        if (a.row === 1 && a.col === 1) return { kind: 'number', value: 2 };
+        return { kind: 'number', value: 3 };
+      }),
+    } as unknown as WorkbookHandle;
+
+    const handle = attachEvaluateFormulaDialog({ host, store, getWb: () => wb, strings: en });
+    handle.open();
+
+    expect(overlay()?.hidden).toBe(false);
+    expect(boxes()[0]?.textContent).toBe('=A2+B2');
+    expect(boxes()[1]?.textContent).toBe('=A2+B2');
+    expect(boxes()[2]?.textContent).toBe('3');
+    expect(evalButton()?.disabled).toBe(false);
+
+    evalButton()?.click();
+    expect(boxes()[1]?.textContent).toBe('=1+B2');
+    expect(evalButton()?.disabled).toBe(false);
+
+    evalButton()?.click();
+    expect(boxes()[1]?.textContent).toBe('=1+2');
+    expect(evalButton()?.disabled).toBe(true);
+    handle.detach();
+  });
+
+  it('shows an empty-state when the active cell has no formula', () => {
+    const store = createSpreadsheetStore();
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    const wb = {
+      cellFormula: vi.fn(() => null),
+      getValue: vi.fn(() => ({ kind: 'blank' })),
+    } as unknown as WorkbookHandle;
+
+    const handle = attachEvaluateFormulaDialog({ host, store, getWb: () => wb, strings: en });
+    handle.open();
+
+    expect(boxes()[0]?.textContent).toBe('The active cell does not contain a formula.');
+    expect(boxes()[1]?.textContent).toBe('');
+    expect(boxes()[2]?.textContent).toBe('');
+    expect(evalButton()?.disabled).toBe(true);
+    handle.detach();
+  });
+});

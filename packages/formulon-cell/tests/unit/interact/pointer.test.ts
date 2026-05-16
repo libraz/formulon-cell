@@ -197,6 +197,38 @@ describe('attachPointer', () => {
     });
   });
 
+  describe('formula range insertion', () => {
+    it('inserts A1 references while editing formulas in the default reference style', () => {
+      const insertRefAtCaret = vi.fn();
+      detach = attachPointer(host, store, wb, undefined, null, () => ({
+        isFormulaEdit: () => true,
+        insertRefAtCaret,
+      }));
+
+      fireDown(host, 200, 70); // B2
+      fireMove(host, 300, 100); // C3
+
+      expect(insertRefAtCaret).toHaveBeenNthCalledWith(1, 'B2');
+      expect(insertRefAtCaret).toHaveBeenNthCalledWith(2, 'B2:C3');
+    });
+
+    it('inserts relative R1C1 references when R1C1 reference style is enabled', () => {
+      const insertRefAtCaret = vi.fn();
+      mutators.setActive(store, { sheet: 0, row: 3, col: 3 }); // D4 formula cell.
+      store.setState((s) => ({ ...s, ui: { ...s.ui, r1c1: true } }));
+      detach = attachPointer(host, store, wb, undefined, null, () => ({
+        isFormulaEdit: () => true,
+        insertRefAtCaret,
+      }));
+
+      fireDown(host, 200, 70); // B2, two rows/cols before D4.
+      fireMove(host, 300, 100); // C3.
+
+      expect(insertRefAtCaret).toHaveBeenNthCalledWith(1, 'R[-2]C[-2]');
+      expect(insertRefAtCaret).toHaveBeenNthCalledWith(2, 'R[-2]C[-2]:R[-1]C[-1]');
+    });
+  });
+
   describe('headers', () => {
     it('col-header click selects the entire column', () => {
       detach = attachPointer(host, store, wb);
@@ -469,6 +501,8 @@ describe('attachPointer', () => {
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
 
       const onAfterCommit = vi.fn();
+      const onAutoFillOptions = vi.fn();
+      host.addEventListener('fc:autofilloptions', onAutoFillOptions);
       detach = attachPointer(host, store, wb, onAfterCommit);
 
       fireDown(host, 155, 57); // grab handle
@@ -481,6 +515,15 @@ describe('attachPointer', () => {
       // After commit, the fill preview is cleared and the active range moved.
       expect(store.getState().ui.fillPreview).toBeNull();
       expect(onAfterCommit).toHaveBeenCalled();
+      expect(onAutoFillOptions).toHaveBeenCalledWith(
+        expect.objectContaining({
+          detail: expect.objectContaining({
+            src: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+            dest: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 },
+            mode: 'series',
+          }),
+        }),
+      );
       wb.recalc();
       // Fill replicated 5 down the column. The selection now covers (0..2, 0).
       expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'number', value: 5 });

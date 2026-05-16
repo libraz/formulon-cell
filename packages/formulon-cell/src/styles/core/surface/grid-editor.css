@@ -21,7 +21,9 @@
     position: absolute;
     z-index: 2;
     box-sizing: border-box;
-    padding: 4px 7px;
+    /* 1.5px padding + 1.5px border = 3px text inset, matching the canvas
+     * painter's padX so the caret/text doesn't jump on commit. */
+    padding: 4px 1.5px;
     margin: 0;
     background: var(--fc-bg-elev);
     color: var(--fc-fg);
@@ -40,6 +42,14 @@
     white-space: pre;
     caret-color: var(--fc-accent);
     transition: box-shadow var(--fc-dur-fast) var(--fc-ease-out);
+  }
+
+  /* When a long formula/value overflows past the editor's grown right edge,
+   * drop the right border and surrounding glow so the open edge signals the
+   * content continues — desktop spreadsheet behavior. */
+  .fc-host__editor--overflow {
+    border-right-color: transparent;
+    box-shadow: none;
   }
 
   /* a11y mirror — visually hidden but in the a11y tree */

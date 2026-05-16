@@ -35,6 +35,20 @@
   .fc-pgsetup__select {
     min-width: 140px;
   }
+  .fc-pgsetup__checks {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(130px, 1fr));
+    gap: 6px 12px;
+    width: 100%;
+  }
+  .fc-pgsetup__scaling {
+    display: grid;
+    gap: 6px;
+    width: 100%;
+  }
+  .fc-pgsetup__scaling .fc-pgsetup__num {
+    width: 64px;
+  }
   .fc-pgsetup__margins {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -50,5 +64,15 @@
   }
   .fc-pgsetup__margin > input {
     width: 100%;
+  }
+  .fc-pgsetup__text[aria-invalid='true'] {
+    outline: 2px solid color-mix(in srgb, #c50f1f 75%, CanvasText);
+    outline-offset: 1px;
+  }
+  .fc-pgsetup__error {
+    margin: 4px 16px 8px 188px;
+    color: #c50f1f;
+    font-size: 12px;
+    line-height: 1.3;
   }
 }

@@ -66,6 +66,7 @@ export const createSpreadsheetStore = () =>
       outlineRowGutter: 0,
       outlineColGutter: 0,
       hiddenSheets: new Set(),
+      sheetTabColors: new Map(),
     },
     data: { sheetIndex: 0, cells: new Map() },
     ui: {
@@ -78,11 +79,14 @@ export const createSpreadsheetStore = () =>
       showGridLines: true,
       showHeaders: true,
       showFormulas: false,
+      workbookView: 'normal',
       editorRefs: [],
       r1c1: false,
-      statusAggs: ['sum', 'average', 'count'],
+      statusAggs: ['average', 'count', 'sum'],
       filterRange: null,
+      filterCriteria: [],
       watchPanelOpen: false,
+      sheetBackgroundImages: new Map(),
     },
     format: { formats: new Map() },
     merges: { byAnchor: new Map(), byCell: new Map() },
@@ -91,12 +95,12 @@ export const createSpreadsheetStore = () =>
     charts: { charts: [] },
     watch: { watches: [] },
     traces: { items: [] },
-    errorIndicators: { ignoredErrors: new Set() },
+    errorIndicators: { ignoredErrors: new Set(), validationCircles: new Set() },
     pageSetup: { setupBySheet: new Map() },
     slicers: { slicers: [] },
     tables: { tables: [] },
     sheetViews: { views: [], activeViewId: null },
-    protection: { protectedSheets: new Map() },
+    protection: { protectedSheets: new Map(), allowedEditRanges: [] },
   }));
 
 export type SpreadsheetStore = ReturnType<typeof createSpreadsheetStore>;
@@ -214,6 +218,25 @@ export const mutators = {
 
   setShowFormulas(store: SpreadsheetStore, on: boolean): void {
     store.setState((s) => ({ ...s, ui: { ...s.ui, showFormulas: on } }));
+  },
+
+  setSheetBackgroundImage(store: SpreadsheetStore, sheet: number, url: string | undefined): void {
+    store.setState((s) => {
+      const sheetBackgroundImages = new Map(s.ui.sheetBackgroundImages);
+      const normalized = url?.trim();
+      if (normalized) sheetBackgroundImages.set(sheet, normalized);
+      else sheetBackgroundImages.delete(sheet);
+      return { ...s, ui: { ...s.ui, sheetBackgroundImages } };
+    });
+  },
+
+  setWorkbookView(
+    store: SpreadsheetStore,
+    mode: 'normal' | 'pageLayout' | 'pageBreakPreview',
+  ): void {
+    store.setState((s) =>
+      s.ui.workbookView === mode ? s : { ...s, ui: { ...s.ui, workbookView: mode } },
+    );
   },
 
   setR1C1(store: SpreadsheetStore, on: boolean): void {
@@ -647,6 +670,35 @@ export const mutators = {
     });
   },
 
+  /** Pin every cell in `range` to the Watch Window. Existing entries are
+   *  ignored and the append happens in one store update for multi-cell adds. */
+  addWatchRange(store: SpreadsheetStore, range: Range): void {
+    mutators.addWatchRanges(store, [range]);
+  },
+
+  /** Pin every cell in each range to the Watch Window, preserving row-major
+   *  order across ranges while de-duplicating already watched addresses. */
+  addWatchRanges(store: SpreadsheetStore, ranges: readonly Range[]): void {
+    store.setState((s) => {
+      const seen = new Set(s.watch.watches.map((w) => `${w.sheet}:${w.row}:${w.col}`));
+      const next: Addr[] = [...s.watch.watches];
+      let changed = false;
+      for (const range of ranges) {
+        for (let row = range.r0; row <= range.r1; row += 1) {
+          for (let col = range.c0; col <= range.c1; col += 1) {
+            const key = `${range.sheet}:${row}:${col}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            next.push({ sheet: range.sheet, row, col });
+            changed = true;
+          }
+        }
+      }
+      if (!changed) return s;
+      return { ...s, watch: { watches: next } };
+    });
+  },
+
   /** Unpin `addr` from the Watch Window. No-op when not present. */
   removeWatch(store: SpreadsheetStore, addr: Addr): void {
     store.setState((s) => {
@@ -661,6 +713,14 @@ export const mutators = {
   /** Drop every watched cell. */
   clearWatches(store: SpreadsheetStore): void {
     store.setState((s) => (s.watch.watches.length === 0 ? s : { ...s, watch: { watches: [] } }));
+  },
+
+  /** Replace the Watch Window entries. */
+  setWatches(store: SpreadsheetStore, watches: readonly Addr[]): void {
+    store.setState((s) => ({
+      ...s,
+      watch: { watches: watches.map((addr) => ({ ...addr })) },
+    }));
   },
 
   /** Show or hide the Watch Window panel. */
@@ -706,7 +766,7 @@ export const mutators = {
       if (s.errorIndicators.ignoredErrors.has(key)) return s;
       const next = new Set(s.errorIndicators.ignoredErrors);
       next.add(key);
-      return { ...s, errorIndicators: { ignoredErrors: next } };
+      return { ...s, errorIndicators: { ...s.errorIndicators, ignoredErrors: next } };
     });
   },
 
@@ -717,7 +777,7 @@ export const mutators = {
       if (!s.errorIndicators.ignoredErrors.has(key)) return s;
       const next = new Set(s.errorIndicators.ignoredErrors);
       next.delete(key);
-      return { ...s, errorIndicators: { ignoredErrors: next } };
+      return { ...s, errorIndicators: { ...s.errorIndicators, ignoredErrors: next } };
     });
   },
 
@@ -726,7 +786,32 @@ export const mutators = {
     store.setState((s) =>
       s.errorIndicators.ignoredErrors.size === 0
         ? s
-        : { ...s, errorIndicators: { ignoredErrors: new Set() } },
+        : { ...s, errorIndicators: { ...s.errorIndicators, ignoredErrors: new Set() } },
+    );
+  },
+
+  /** Replace the current ignored-error suppressions. */
+  setIgnoredErrors(store: SpreadsheetStore, keys: Set<string>): void {
+    store.setState((s) => ({
+      ...s,
+      errorIndicators: { ...s.errorIndicators, ignoredErrors: new Set(keys) },
+    }));
+  },
+
+  /** Replace the current "Circle Invalid Data" marks. */
+  setValidationCircles(store: SpreadsheetStore, keys: Set<string>): void {
+    store.setState((s) => ({
+      ...s,
+      errorIndicators: { ...s.errorIndicators, validationCircles: new Set(keys) },
+    }));
+  },
+
+  /** Clear every visible "Circle Invalid Data" mark. */
+  clearValidationCircles(store: SpreadsheetStore): void {
+    store.setState((s) =>
+      s.errorIndicators.validationCircles.size === 0
+        ? s
+        : { ...s, errorIndicators: { ...s.errorIndicators, validationCircles: new Set() } },
     );
   },
 
@@ -806,7 +891,62 @@ export const mutators = {
       } else {
         return s;
       }
-      return { ...s, protection: { protectedSheets: next } };
+      return { ...s, protection: { ...s.protection, protectedSheets: next } };
+    });
+  },
+
+  /** Toggle workbook-structure protection. When enabled, sheet-structure
+   *  commands reject adding, deleting, moving, renaming, hiding, and unhiding
+   *  sheets. This is intentionally not history-tracked, matching spreadsheet
+   *  protection settings. */
+  setWorkbookStructureProtected(
+    store: SpreadsheetStore,
+    on: boolean,
+    options?: { password?: string },
+  ): void {
+    store.setState((s) => {
+      const current = s.protection.workbookStructure;
+      if (on) {
+        const next: { password?: string } = {};
+        if (options?.password !== undefined) next.password = options.password;
+        if (current && current.password === next.password) return s;
+        return { ...s, protection: { ...s.protection, workbookStructure: next } };
+      }
+      if (!current) return s;
+      const { workbookStructure: _discard, ...rest } = s.protection;
+      return { ...s, protection: rest };
+    });
+  },
+
+  addAllowedEditRange(
+    store: SpreadsheetStore,
+    entry: { id?: string; title: string; range: Range; password?: string },
+  ): string {
+    const id = entry.id ?? `allowed-edit-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    store.setState((s) => {
+      const nextEntry = {
+        id,
+        title: entry.title,
+        range: entry.range,
+        ...(entry.password !== undefined ? { password: entry.password } : {}),
+      };
+      const next = s.protection.allowedEditRanges.filter((r) => r.id !== id);
+      return {
+        ...s,
+        protection: { ...s.protection, allowedEditRanges: [...next, nextEntry] },
+      };
+    });
+    return id;
+  },
+
+  clearAllowedEditRanges(store: SpreadsheetStore, sheet?: number): void {
+    store.setState((s) => {
+      const next =
+        sheet === undefined
+          ? []
+          : s.protection.allowedEditRanges.filter((entry) => entry.range.sheet !== sheet);
+      if (next.length === s.protection.allowedEditRanges.length) return s;
+      return { ...s, protection: { ...s.protection, allowedEditRanges: next } };
     });
   },
 
@@ -925,9 +1065,21 @@ export const mutators = {
         rowStart: Math.max(Math.max(0, Math.floor(patch.freezeRows)), s.viewport.rowStart),
         colStart: Math.max(Math.max(0, Math.floor(patch.freezeCols)), s.viewport.colStart),
       },
-      ui: { ...s.ui, filterRange: patch.filterRange },
+      ui: { ...s.ui, filterRange: patch.filterRange, filterCriteria: patch.filterCriteria },
       sheetViews: { ...s.sheetViews, activeViewId },
     }));
+  },
+
+  setSheetTabColor(store: SpreadsheetStore, sheet: number, color: string | null): void {
+    store.setState((s) => {
+      const sheetTabColors = new Map(s.layout.sheetTabColors);
+      if (color) {
+        sheetTabColors.set(sheet, color);
+      } else {
+        sheetTabColors.delete(sheet);
+      }
+      return { ...s, layout: { ...s.layout, sheetTabColors } };
+    });
   },
 };
 

@@ -10,6 +10,12 @@ const kindRadios = (): HTMLInputElement[] =>
   Array.from(document.querySelectorAll<HTMLInputElement>('.fc-goto__kinds input[type="radio"]'));
 const scopeRadios = (): HTMLInputElement[] =>
   Array.from(document.querySelectorAll<HTMLInputElement>('.fc-goto__scope input[type="radio"]'));
+const valueFilterChecks = (): HTMLInputElement[] =>
+  Array.from(
+    document.querySelectorAll<HTMLInputElement>('.fc-goto__value-filters input[type="checkbox"]'),
+  );
+const referenceInput = (): HTMLInputElement | null =>
+  document.querySelector<HTMLInputElement>('.fc-goto__reference input');
 const okBtn = (): HTMLButtonElement | null =>
   document.querySelector<HTMLButtonElement>('.fc-goto .fc-fmtdlg__btn--primary');
 const status = (): HTMLElement | null => document.querySelector<HTMLElement>('.fc-goto__status');
@@ -78,6 +84,14 @@ describe('attachGoToDialog', () => {
     ]);
     const checked = radios.find((r) => r.checked);
     expect(checked?.value).toBe('constants');
+    expect(document.querySelector<HTMLElement>('.fc-goto__value-filters')?.hidden).toBe(false);
+    expect(valueFilterChecks().map((c) => c.value)).toEqual([
+      'numbers',
+      'text',
+      'logical',
+      'errors',
+    ]);
+    expect(valueFilterChecks().every((c) => c.checked)).toBe(true);
     handle.detach();
   });
 
@@ -116,7 +130,7 @@ describe('attachGoToDialog', () => {
     handle.detach();
   });
 
-  it('OK with 1+ matches closes the dialog and moves the selection to the bounding range', () => {
+  it('OK with 1+ matches closes the dialog and selects the exact matched cells', () => {
     wb.setNumber({ sheet: 0, row: 2, col: 1 }, 11);
     wb.setNumber({ sheet: 0, row: 5, col: 4 }, 22);
     wb.recalc();
@@ -129,7 +143,56 @@ describe('attachGoToDialog', () => {
     expect(overlay()?.hidden).toBe(true);
     const sel = store.getState().selection;
     expect(sel.active).toEqual({ sheet: 0, row: 2, col: 1 });
-    expect(sel.range).toEqual({ sheet: 0, r0: 2, c0: 1, r1: 5, c1: 4 });
+    expect(sel.range).toEqual({ sheet: 0, r0: 2, c0: 1, r1: 2, c1: 1 });
+    expect(sel.extraRanges).toEqual([{ sheet: 0, r0: 5, c0: 4, r1: 5, c1: 4 }]);
+    handle.detach();
+  });
+
+  it('OK applies constants value-kind filters before selecting matches', () => {
+    wb.setNumber({ sheet: 0, row: 1, col: 1 }, 11);
+    wb.setText({ sheet: 0, row: 2, col: 2 }, 'text');
+    wb.setBool({ sheet: 0, row: 3, col: 3 }, true);
+    wb.recalc();
+    sync(store, wb);
+    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    handle.open();
+    for (const check of valueFilterChecks()) {
+      check.checked = check.value === 'logical';
+    }
+    okBtn()?.click();
+    const sel = store.getState().selection;
+    expect(sel.active).toEqual({ sheet: 0, row: 3, col: 3 });
+    expect(sel.extraRanges).toEqual([]);
+    handle.detach();
+  });
+
+  it('normal Go To jumps to a typed reference range', () => {
+    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    handle.open('go-to');
+    expect(document.body.textContent).toContain('参照先');
+    expect(referenceInput()?.hidden).toBe(false);
+    expect(kindRadios()[0]?.closest('.fc-goto__kinds')?.hasAttribute('hidden')).toBe(true);
+    expect(document.querySelector<HTMLElement>('.fc-goto__value-filters')?.hidden).toBe(true);
+    const input = referenceInput();
+    expect(input).toBeTruthy();
+    if (!input) throw new Error('missing reference input');
+    input.value = 'B2:D4';
+    okBtn()?.click();
+    expect(overlay()?.hidden).toBe(true);
+    const sel = store.getState().selection;
+    expect(sel.active).toEqual({ sheet: 0, row: 1, col: 1 });
+    expect(sel.range).toEqual({ sheet: 0, r0: 1, c0: 1, r1: 3, c1: 3 });
+    handle.detach();
+  });
+
+  it('normal Go To keeps the dialog open on an invalid reference', () => {
+    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    handle.open('go-to');
+    const input = referenceInput();
+    if (input) input.value = 'not a ref';
+    okBtn()?.click();
+    expect(status()?.textContent).toContain('有効なセル参照');
+    expect(overlay()?.hidden).toBe(false);
     handle.detach();
   });
 

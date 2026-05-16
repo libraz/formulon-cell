@@ -1,7 +1,7 @@
 import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { State } from '../store/store.js';
+import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
 import { shiftFormulaRefs } from './refs.js';
 
 /**
@@ -216,10 +216,69 @@ interface SeriesProjection {
  *  - "Item 1"                → copy
  *  - mixed                   → cycle
  */
-function buildProjection(line: SourceCell[]): SeriesProjection {
+type DateFillUnit = 'days' | 'weekdays' | 'months' | 'years';
+
+const MS_PER_DAY = 86_400_000;
+const SERIAL_UNIX_EPOCH = 25569;
+
+const serialToDate = (serial: number): Date =>
+  new Date((Math.floor(serial) - SERIAL_UNIX_EPOCH) * MS_PER_DAY);
+
+const dateToSerial = (date: Date, fraction: number): number =>
+  Math.floor(date.getTime() / MS_PER_DAY + SERIAL_UNIX_EPOCH) + fraction;
+
+const daysInMonth = (year: number, month: number): number =>
+  new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+
+const addMonthsClamped = (date: Date, months: number): Date => {
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth() + months;
+  const day = date.getUTCDate();
+  const first = new Date(Date.UTC(year, month, 1));
+  const maxDay = daysInMonth(first.getUTCFullYear(), first.getUTCMonth());
+  return new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), Math.min(day, maxDay)));
+};
+
+const addWeekdays = (date: Date, weekdays: number): Date => {
+  const next = new Date(date.getTime());
+  let remaining = weekdays;
+  const step = remaining < 0 ? -1 : 1;
+  while (remaining !== 0) {
+    next.setUTCDate(next.getUTCDate() + step);
+    const dow = next.getUTCDay();
+    if (dow !== 0 && dow !== 6) remaining -= step;
+  }
+  return next;
+};
+
+function buildDateProjection(line: SourceCell[], unit: DateFillUnit): SeriesProjection | null {
+  if (line.length === 0 || !line.every((c) => c.numeric !== null && c.formula === null)) {
+    return null;
+  }
+  const last = line[line.length - 1]?.numeric ?? 0;
+  const fraction = last - Math.floor(last);
+  const lastDate = serialToDate(last);
+  return {
+    at: (i) => {
+      const date =
+        unit === 'days'
+          ? new Date(lastDate.getTime() + i * MS_PER_DAY)
+          : unit === 'weekdays'
+            ? addWeekdays(lastDate, i)
+            : unit === 'months'
+              ? addMonthsClamped(lastDate, i)
+              : addMonthsClamped(lastDate, i * 12);
+      return { kind: 'number', value: dateToSerial(date, fraction) };
+    },
+  };
+}
+
+function buildProjection(line: SourceCell[], dateUnit?: DateFillUnit): SeriesProjection {
   if (line.length === 0) {
     return { at: () => null };
   }
+  const dateProjection = dateUnit ? buildDateProjection(line, dateUnit) : null;
+  if (dateProjection) return dateProjection;
   // All numeric?
   if (line.every((c) => c.numeric !== null && c.formula === null)) {
     if (line.length === 1) {
@@ -328,9 +387,54 @@ const writeProjected = (
   else wb.setBlank({ sheet, row, col });
 };
 
+const cloneFormat = (format: CellFormat): CellFormat => ({
+  ...format,
+  borders: format.borders ? { ...format.borders } : undefined,
+});
+
+const sourceCoordFor = (value: number, start: number, size: number): number =>
+  start + ((((value - start) % size) + size) % size);
+
+function applyFillFormats(state: State, store: SpreadsheetStore, src: Range, dest: Range): boolean {
+  const srcRows = src.r1 - src.r0 + 1;
+  const srcCols = src.c1 - src.c0 + 1;
+  let changed = false;
+  store.setState((s) => {
+    const formats = new Map(s.format.formats);
+    for (let r = dest.r0; r <= dest.r1; r += 1) {
+      for (let c = dest.c0; c <= dest.c1; c += 1) {
+        if (r >= src.r0 && r <= src.r1 && c >= src.c0 && c <= src.c1) continue;
+        const source = {
+          sheet: src.sheet,
+          row: sourceCoordFor(r, src.r0, srcRows),
+          col: sourceCoordFor(c, src.c0, srcCols),
+        };
+        const targetKey = addrKey({ sheet: dest.sheet, row: r, col: c });
+        const sourceFormat = state.format.formats.get(addrKey(source));
+        if (sourceFormat) {
+          formats.set(targetKey, cloneFormat(sourceFormat));
+        } else {
+          formats.delete(targetKey);
+        }
+        changed = true;
+      }
+    }
+    return changed ? { ...s, format: { formats } } : s;
+  });
+  return changed;
+}
+
+export type FillFormattingMode = 'with' | 'without' | 'only';
+
 export interface FillOptions {
   /** Bypass series detection and tile the source verbatim (Ctrl-drag). */
   copyOnly?: boolean;
+  /** Spreadsheet Auto Fill option for including, suppressing, or only copying format. */
+  formatting?: FillFormattingMode;
+  /** Explicit date-series Auto Fill option. */
+  dateUnit?: DateFillUnit;
+  /** Required when `formatting` should write cell formats. */
+  store?: SpreadsheetStore;
 }
 
 /**
@@ -354,9 +458,13 @@ export function fillRange(
   const dir = opts?.copyOnly ? 'copy' : detectDirection(src, dest);
   const sheet = src.sheet;
   const source = readSource(state, src);
+  const writeValues = opts?.formatting !== 'only';
+  const writeFormats = opts?.store && opts.formatting !== 'without';
+  let wroteValues = false;
 
   // Per-cell formula tile with relative-ref shifting. Returns true when used.
   const tileFormula = (destRow: number, destCol: number, srcCell: SourceCell): boolean => {
+    if (!writeValues) return false;
     if (!srcCell.formula) return false;
     const shifted = shiftFormulaRefs(srcCell.formula, destRow - srcCell.row, destCol - srcCell.col);
     wb.setFormula({ sheet, row: destRow, col: destCol }, shifted);
@@ -369,7 +477,7 @@ export function fillRange(
     for (let c = 0; c < cols; c += 1) {
       const line: SourceCell[] = source.map((row) => row[c] as SourceCell);
       const allFormula = line.length > 0 && line.every((cc) => cc.formula !== null);
-      const proj = allFormula ? null : buildProjection(line);
+      const proj = allFormula ? null : buildProjection(line, opts?.dateUnit);
       if (dir === 'down') {
         const ext = dest.r1 - src.r1;
         for (let i = 1; i <= ext; i += 1) {
@@ -377,29 +485,34 @@ export function fillRange(
           const destCol = src.c0 + c;
           if (allFormula) {
             const srcCell = line[(i - 1) % line.length] as SourceCell;
-            tileFormula(destRow, destCol, srcCell);
-          } else {
+            if (tileFormula(destRow, destCol, srcCell)) wroteValues = true;
+          } else if (writeValues) {
             writeProjected(wb, sheet, destRow, destCol, proj?.at(i) ?? null);
+            wroteValues = true;
           }
         }
       } else {
         // Up: extension index 1 is the row just above src.r0.
         const ext = src.r0 - dest.r0;
         const reversed = [...line].reverse();
-        const projUp = allFormula ? null : buildProjection(reversed);
+        const projUp = allFormula ? null : buildProjection(reversed, opts?.dateUnit);
         for (let i = 1; i <= ext; i += 1) {
           const destRow = src.r0 - i;
           const destCol = src.c0 + c;
           if (allFormula) {
             const srcCell = reversed[(i - 1) % reversed.length] as SourceCell;
-            tileFormula(destRow, destCol, srcCell);
-          } else {
+            if (tileFormula(destRow, destCol, srcCell)) wroteValues = true;
+          } else if (writeValues) {
             writeProjected(wb, sheet, destRow, destCol, projUp?.at(i) ?? null);
+            wroteValues = true;
           }
         }
       }
     }
-    return true;
+    const wroteFormats = writeFormats
+      ? applyFillFormats(state, opts.store as SpreadsheetStore, src, dest)
+      : false;
+    return wroteValues || wroteFormats;
   }
 
   if (dir === 'right' || dir === 'left') {
@@ -407,7 +520,7 @@ export function fillRange(
     for (let r = 0; r < rows; r += 1) {
       const line: SourceCell[] = source[r] ?? [];
       const allFormula = line.length > 0 && line.every((cc) => cc.formula !== null);
-      const proj = allFormula ? null : buildProjection(line);
+      const proj = allFormula ? null : buildProjection(line, opts?.dateUnit);
       if (dir === 'right') {
         const ext = dest.c1 - src.c1;
         for (let i = 1; i <= ext; i += 1) {
@@ -415,28 +528,33 @@ export function fillRange(
           const destCol = src.c1 + i;
           if (allFormula) {
             const srcCell = line[(i - 1) % line.length] as SourceCell;
-            tileFormula(destRow, destCol, srcCell);
-          } else {
+            if (tileFormula(destRow, destCol, srcCell)) wroteValues = true;
+          } else if (writeValues) {
             writeProjected(wb, sheet, destRow, destCol, proj?.at(i) ?? null);
+            wroteValues = true;
           }
         }
       } else {
         const ext = src.c0 - dest.c0;
         const reversed = [...line].reverse();
-        const projLeft = allFormula ? null : buildProjection(reversed);
+        const projLeft = allFormula ? null : buildProjection(reversed, opts?.dateUnit);
         for (let i = 1; i <= ext; i += 1) {
           const destRow = src.r0 + r;
           const destCol = src.c0 - i;
           if (allFormula) {
             const srcCell = reversed[(i - 1) % reversed.length] as SourceCell;
-            tileFormula(destRow, destCol, srcCell);
-          } else {
+            if (tileFormula(destRow, destCol, srcCell)) wroteValues = true;
+          } else if (writeValues) {
             writeProjected(wb, sheet, destRow, destCol, projLeft?.at(i) ?? null);
+            wroteValues = true;
           }
         }
       }
     }
-    return true;
+    const wroteFormats = writeFormats
+      ? applyFillFormats(state, opts.store as SpreadsheetStore, src, dest)
+      : false;
+    return wroteValues || wroteFormats;
   }
 
   // 2D / arbitrary: tile source over dest.
@@ -448,23 +566,32 @@ export function fillRange(
       const sr = (((r - src.r0) % sR) + sR) % sR;
       const sc = (((c - src.c0) % sC) + sC) % sC;
       const cell = source[sr]?.[sc];
+      if (!writeValues) continue;
       if (!cell || cell.blank) {
         wb.setBlank({ sheet, row: r, col: c });
+        wroteValues = true;
         continue;
       }
       if (cell.formula) {
         const shifted = shiftFormulaRefs(cell.formula, r - cell.row, c - cell.col);
         wb.setFormula({ sheet, row: r, col: c }, shifted);
+        wroteValues = true;
       } else if (cell.numeric !== null) {
         wb.setNumber({ sheet, row: r, col: c }, cell.numeric);
+        wroteValues = true;
       } else if (cell.text !== null) {
         wb.setText({ sheet, row: r, col: c }, cell.text);
+        wroteValues = true;
       } else if (cell.bool !== null) {
         wb.setBool({ sheet, row: r, col: c }, cell.bool);
+        wroteValues = true;
       }
     }
   }
-  return true;
+  const wroteFormats = writeFormats
+    ? applyFillFormats(state, opts.store as SpreadsheetStore, src, dest)
+    : false;
+  return wroteValues || wroteFormats;
 }
 
 /** Compute the dest range for a drag from the source's bottom-right corner

@@ -1,12 +1,118 @@
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { type LayoutSlice, mutators, type SpreadsheetStore } from '../store/store.js';
 import { type History, recordLayoutChangeWithEngine } from './history.js';
+import { isWorkbookStructureProtected } from './protection.js';
+
+const shiftedAfterRemove = (idx: number, removed: number): number | null => {
+  if (idx === removed) return null;
+  return idx > removed ? idx - 1 : idx;
+};
+
+const shiftedAfterMove = (idx: number, from: number, to: number): number => {
+  if (idx === from) return to;
+  if (from < to && idx > from && idx <= to) return idx - 1;
+  if (from > to && idx >= to && idx < from) return idx + 1;
+  return idx;
+};
+
+const remapWorkbookSheetLayout = (
+  store: SpreadsheetStore,
+  mapIndex: (idx: number) => number | null,
+): void => {
+  store.setState((s) => {
+    const hiddenSheets = new Set<number>();
+    for (const idx of s.layout.hiddenSheets) {
+      const next = mapIndex(idx);
+      if (next !== null) hiddenSheets.add(next);
+    }
+    const sheetTabColors = new Map<number, string>();
+    for (const [idx, color] of s.layout.sheetTabColors) {
+      const next = mapIndex(idx);
+      if (next !== null) sheetTabColors.set(next, color);
+    }
+    const protectedSheets = new Map<number, { password?: string }>();
+    for (const [idx, protection] of s.protection.protectedSheets) {
+      const next = mapIndex(idx);
+      if (next !== null) protectedSheets.set(next, protection);
+    }
+    const allowedEditRanges = s.protection.allowedEditRanges.flatMap((entry) => {
+      const next = mapIndex(entry.range.sheet);
+      return next === null ? [] : [{ ...entry, range: { ...entry.range, sheet: next } }];
+    });
+    return {
+      ...s,
+      layout: { ...s.layout, hiddenSheets, sheetTabColors },
+      protection: { ...s.protection, protectedSheets, allowedEditRanges },
+    };
+  });
+};
+
+const warnWorkbookStructureProtected = (op: string): void => {
+  // eslint-disable-next-line no-console
+  console.warn(`formulon-cell: ${op} blocked — workbook structure is protected`);
+};
+
+function structureAllowed(store: SpreadsheetStore | null | undefined, op: string): boolean {
+  if (!store || !isWorkbookStructureProtected(store.getState())) return true;
+  warnWorkbookStructureProtected(op);
+  return false;
+}
+
+export function addSheet(
+  store: SpreadsheetStore | null | undefined,
+  wb: WorkbookHandle,
+  history?: History | null,
+): number {
+  if (!structureAllowed(store, 'add sheet')) return -1;
+  const beforeActive = store?.getState().data.sheetIndex ?? 0;
+  const added = wb.addSheet();
+  if (added < 0) return added;
+  const name = 'sheetName' in wb ? wb.sheetName(added) : undefined;
+  if (store && history && !history.isReplaying()) {
+    history.push({
+      undo: () => {
+        const active = store.getState().data.sheetIndex;
+        if (active === added || active >= wb.sheetCount) {
+          mutators.setSheetIndex(store, Math.min(beforeActive, Math.max(0, wb.sheetCount - 2)));
+        }
+        if (wb.removeSheet(added)) {
+          remapWorkbookSheetLayout(store, (sheet) => shiftedAfterRemove(sheet, added));
+        }
+      },
+      redo: () => {
+        const next = wb.addSheet(name);
+        if (next >= 0) mutators.setSheetIndex(store, next);
+      },
+    });
+  }
+  return added;
+}
 
 /** Rename the sheet at `idx`. Returns true on success. The store has no
  *  per-sheet name slot — the playground reads names from `wb.sheetName` —
  *  so this is a pass-through to the engine. */
-export function renameSheet(wb: WorkbookHandle, idx: number, name: string): boolean {
-  return wb.renameSheet(idx, name);
+export function renameSheet(
+  wb: WorkbookHandle,
+  idx: number,
+  name: string,
+  store?: SpreadsheetStore | null,
+  history?: History | null,
+): boolean {
+  if (!structureAllowed(store, 'rename sheet')) return false;
+  const beforeName = 'sheetName' in wb ? wb.sheetName(idx) : null;
+  const ok = wb.renameSheet(idx, name);
+  if (!ok) return false;
+  if (beforeName && history && !history.isReplaying()) {
+    history.push({
+      undo: () => {
+        wb.renameSheet(idx, beforeName);
+      },
+      redo: () => {
+        wb.renameSheet(idx, name);
+      },
+    });
+  }
+  return true;
 }
 
 /** Remove the sheet at `idx`. When the active sheet is affected, the store's
@@ -18,9 +124,11 @@ export function renameSheet(wb: WorkbookHandle, idx: number, name: string): bool
  *  the removal is rejected (e.g. trying to remove the last sheet) or when
  *  the engine lacks `sheetMutate`. */
 export function removeSheet(store: SpreadsheetStore, wb: WorkbookHandle, idx: number): boolean {
+  if (!structureAllowed(store, 'remove sheet')) return false;
   if (wb.sheetCount <= 1) return false;
   const ok = wb.removeSheet(idx);
   if (!ok) return false;
+  remapWorkbookSheetLayout(store, (sheet) => shiftedAfterRemove(sheet, idx));
 
   const cur = store.getState().data.sheetIndex;
   let next = cur;
@@ -41,10 +149,14 @@ export function moveSheet(
   wb: WorkbookHandle,
   from: number,
   to: number,
+  history?: History | null,
 ): boolean {
+  if (!structureAllowed(store, 'move sheet')) return false;
   if (from === to) return true;
+  const beforeActive = store.getState().data.sheetIndex;
   const ok = wb.moveSheet(from, to);
   if (!ok) return false;
+  remapWorkbookSheetLayout(store, (sheet) => shiftedAfterMove(sheet, from, to));
 
   const cur = store.getState().data.sheetIndex;
   let next = cur;
@@ -53,6 +165,21 @@ export function moveSheet(
   else if (from > cur && to <= cur) next = cur + 1;
   if (next !== cur) {
     mutators.setSheetIndex(store, next);
+  }
+  const afterActive = store.getState().data.sheetIndex;
+  if (history && !history.isReplaying()) {
+    history.push({
+      undo: () => {
+        if (!wb.moveSheet(to, from)) return;
+        remapWorkbookSheetLayout(store, (sheet) => shiftedAfterMove(sheet, to, from));
+        mutators.setSheetIndex(store, beforeActive);
+      },
+      redo: () => {
+        if (!wb.moveSheet(from, to)) return;
+        remapWorkbookSheetLayout(store, (sheet) => shiftedAfterMove(sheet, from, to));
+        mutators.setSheetIndex(store, afterActive);
+      },
+    });
   }
   return true;
 }
@@ -78,6 +205,7 @@ export function setSheetHidden(
   idx: number,
   hidden: boolean,
 ): boolean {
+  if (!structureAllowed(store, hidden ? 'hide sheet' : 'unhide sheet')) return false;
   const state = store.getState();
   const n = wb ? wb.sheetCount : 1;
   const cur = new Set(state.layout.hiddenSheets);

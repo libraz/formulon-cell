@@ -9,6 +9,7 @@ import {
   type DeepPartial,
   defaultStrings,
   dictionaries,
+  dictionaryLocaleFor,
   type Locale,
   mergeStrings,
   type Strings,
@@ -48,7 +49,8 @@ export const createI18nController = (init: I18nControllerInit = {}): I18nControl
   const listeners = new Set<(s: Strings) => void>();
 
   const resolve = (): Strings => {
-    const base = registry.get(current) ?? defaultStrings;
+    const base =
+      registry.get(current) ?? registry.get(dictionaryLocaleFor(current)) ?? defaultStrings;
     const overlay = overlays.get(current);
     return overlay ? mergeStrings(base, overlay) : base;
   };

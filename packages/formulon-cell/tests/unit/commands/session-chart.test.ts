@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { History } from '../../../src/commands/history.js';
+import { setProtectedSheet } from '../../../src/commands/protection.js';
 import {
   clearSessionChart,
   clearSessionChartsInRange,
@@ -47,6 +49,19 @@ describe('session chart commands', () => {
     expect(store.getState().charts.charts).toEqual([chart]);
   });
 
+  it('supports Excel-style chart kinds used by the ribbon', () => {
+    const store = createSpreadsheetStore();
+
+    expect(createSessionChart(store, range(0, 0, 3, 1), { kind: 'bar' })?.title).toBe('Bar chart');
+    expect(createSessionChart(store, range(0, 0, 3, 1), { kind: 'area' })?.title).toBe(
+      'Area chart',
+    );
+    expect(createSessionChart(store, range(0, 0, 3, 1), { kind: 'pie' })?.title).toBe('Pie chart');
+    expect(createSessionChart(store, range(0, 0, 3, 1), { kind: 'scatter' })?.title).toBe(
+      'Scatter chart',
+    );
+  });
+
   it('can leave the title unset for localized render fallbacks', () => {
     const store = createSpreadsheetStore();
     const chart = createSessionChart(store, range(0, 0, 2, 0), {
@@ -54,7 +69,7 @@ describe('session chart commands', () => {
       title: null,
     });
 
-    expect(chart.title).toBeUndefined();
+    expect(chart?.title).toBeUndefined();
     expect(store.getState().charts.charts[0]?.title).toBeUndefined();
   });
 
@@ -87,10 +102,10 @@ describe('session chart commands', () => {
     createSessionChart(store, range(0, 0, 3, 1), { id: 'a' });
     createSessionChart(store, range(10, 0, 13, 1), { id: 'b' });
 
-    clearSessionChart(store, 'a');
+    expect(clearSessionChart(store, 'a')).toBe(true);
     expect(store.getState().charts.charts.map((c) => c.id)).toEqual(['b']);
 
-    clearSessionChartsInRange(store, range(11, 0, 12, 1));
+    expect(clearSessionChartsInRange(store, range(11, 0, 12, 1))).toBe(1);
     expect(store.getState().charts.charts).toHaveLength(0);
   });
 
@@ -140,9 +155,45 @@ describe('session chart commands', () => {
       { label: '1', value: 1 },
       { label: '2', value: 3 },
     ]);
+    if (!chart) throw new Error('expected chart to be created');
     expect(sessionChartSeries(store.getState(), chart)).toEqual([
       { label: 'A', value: 4 },
       { label: 'B', value: 6 },
     ]);
+  });
+
+  it('rejects create, update, and clear on protected sheets', () => {
+    const store = createSpreadsheetStore();
+    const chart = createSessionChart(store, range(0, 0, 3, 1), { id: 'a' });
+    expect(chart).not.toBeNull();
+    setProtectedSheet(store, 0, true);
+
+    expect(createSessionChart(store, range(1, 0, 4, 1), { id: 'b' })).toBeNull();
+    expect(updateSessionChart(store, 'a', { x: 32 })).toBeNull();
+    expect(clearSessionChart(store, 'a')).toBe(false);
+    expect(clearSessionChartsInRange(store, range(0, 0, 3, 1))).toBe(0);
+    expect(listSessionCharts(store.getState())).toEqual([chart]);
+  });
+
+  it('records session chart create, update, and clear in history', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+
+    const chart = createSessionChart(store, range(0, 0, 3, 1), { id: 'a' }, history);
+    expect(chart).not.toBeNull();
+    expect(listSessionCharts(store.getState()).map((c) => c.id)).toEqual(['a']);
+    expect(history.undo()).toBe(true);
+    expect(listSessionCharts(store.getState())).toEqual([]);
+    expect(history.redo()).toBe(true);
+    expect(listSessionCharts(store.getState()).map((c) => c.id)).toEqual(['a']);
+
+    expect(updateSessionChart(store, 'a', { x: 10 }, history)).toMatchObject({ x: 10 });
+    expect(history.undo()).toBe(true);
+    expect(sessionChartById(store.getState(), 'a')?.x).toBeUndefined();
+
+    expect(clearSessionChart(store, 'a', history)).toBe(true);
+    expect(listSessionCharts(store.getState())).toEqual([]);
+    expect(history.undo()).toBe(true);
+    expect(listSessionCharts(store.getState()).map((c) => c.id)).toEqual(['a']);
   });
 });

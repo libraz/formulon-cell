@@ -88,6 +88,13 @@
 .app__tab:hover {
   background: var(--shell-bg);
 }
+.app__tab[data-sheet-tab-color="true"] {
+  background: color-mix(in srgb, var(--app-sheet-tab-color) 24%, var(--shell-bg-2));
+  color: var(--shell-fg);
+}
+.app__tab[data-sheet-tab-color="true"]:hover {
+  background: color-mix(in srgb, var(--app-sheet-tab-color) 32%, var(--shell-bg-2));
+}
 .app__tab--active {
   color: var(--shell-accent);
   background: var(--shell-surface);
@@ -96,6 +103,9 @@
   margin-top: -1px;
   padding-top: 1px;
   box-shadow: inset 0 1px 0 var(--shell-rule);
+}
+.app__tab--active[data-sheet-tab-color="true"] {
+  background: color-mix(in srgb, var(--app-sheet-tab-color) 10%, var(--shell-surface));
 }
 .app__tab--active::before,
 .app__tab--active + .app__tab::before {
@@ -109,6 +119,9 @@
   bottom: 0;
   height: 2px;
   background: var(--shell-accent);
+}
+.app__tab--active[data-sheet-tab-color="true"]::after {
+  background: var(--app-sheet-tab-color);
 }
 .app__tab--unhide {
   color: var(--shell-fg-mute);

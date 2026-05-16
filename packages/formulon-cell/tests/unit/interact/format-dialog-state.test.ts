@@ -80,6 +80,35 @@ describe('interact/format-dialog-state', () => {
       expect(draft.borderStyle).toBe('thick');
       expect(draft.borderColor).toBe('#aabbcc');
     });
+
+    it('hydrates validation input-message and error-alert metadata', () => {
+      const draft = makeEmptyDraft('en');
+      hydrateDraftFromFormat(
+        draft,
+        {
+          validation: {
+            kind: 'whole',
+            op: '=',
+            a: 5,
+            showInputMessage: false,
+            promptTitle: 'Number',
+            promptMessage: 'Enter five.',
+            showErrorMessage: false,
+            errorTitle: 'Wrong number',
+            errorMessage: 'Only five is allowed.',
+          },
+        },
+        'en',
+      );
+
+      expect(draft.validationKind).toBe('whole');
+      expect(draft.validationShowInputMessage).toBe(false);
+      expect(draft.validationPromptTitle).toBe('Number');
+      expect(draft.validationPromptMessage).toBe('Enter five.');
+      expect(draft.validationShowErrorMessage).toBe(false);
+      expect(draft.validationErrorTitle).toBe('Wrong number');
+      expect(draft.validationErrorMessage).toBe('Only five is allowed.');
+    });
   });
 
   describe('border draft helpers', () => {
@@ -223,6 +252,28 @@ describe('interact/format-dialog-state', () => {
         a: 5,
         allowBlank: false,
         errorStyle: 'warning',
+      });
+    });
+
+    it('threads input-message and error-alert metadata', () => {
+      const draft = makeEmptyDraft('en');
+      draft.validationKind = 'list';
+      draft.validationShowInputMessage = false;
+      draft.validationPromptTitle = 'Pick a status';
+      draft.validationPromptMessage = 'Use one of the approved workflow states.';
+      draft.validationShowErrorMessage = false;
+      draft.validationErrorTitle = 'Invalid status';
+      draft.validationErrorMessage = 'Choose Open, Closed, or Hold.';
+
+      expect(computeDialogValidation(draft, ['Open', 'Closed', 'Hold'])).toEqual({
+        kind: 'list',
+        source: ['Open', 'Closed', 'Hold'],
+        showInputMessage: false,
+        promptTitle: 'Pick a status',
+        promptMessage: 'Use one of the approved workflow states.',
+        showErrorMessage: false,
+        errorTitle: 'Invalid status',
+        errorMessage: 'Choose Open, Closed, or Hold.',
       });
     });
   });

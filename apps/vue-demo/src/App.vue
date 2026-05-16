@@ -10,7 +10,6 @@ import {
   mutators,
   parseScriptCommand,
   presets,
-  type ReviewCell,
   type SpreadsheetInstance,
   type ThemeName,
   WorkbookHandle,
@@ -19,14 +18,21 @@ import { type RibbonTab, Spreadsheet, useSelection } from '@libraz/formulon-cell
 import SpreadsheetToolbar from '@libraz/formulon-cell-vue/toolbar.vue';
 import { computed, nextTick, onUnmounted, ref, shallowRef, watch } from 'vue';
 import {
+  activateDemoModal,
   createDemoStrings,
   DEMO_FUNCTIONS,
+  demoColLabel,
+  demoCommandText,
   FEATURE_GROUPS,
   formatLoadError,
   FORMATTERS,
   LOCALES,
   type PresetKey,
   PRESETS,
+  previewCellChange,
+  resolveInitialLocale,
+  reviewCellsForInstance,
+  seedDemoWorkbook,
   THEMES,
 } from '../../demo-shared/index.js';
 
@@ -34,15 +40,7 @@ const UI = createDemoStrings('Vue');
 
 
 
-const colLabel = (n: number): string => {
-  let out = '';
-  let v = n;
-  do {
-    out = String.fromCharCode(65 + (v % 26)) + out;
-    v = Math.floor(v / 26) - 1;
-  } while (v >= 0);
-  return out;
-};
+const colLabel = demoColLabel;
 
 
 
@@ -67,129 +65,19 @@ interface ReviewDialogState {
 
 let changeId = 0;
 
-const FOCUSABLE_MODAL_SELECTOR = [
-  'button',
-  'input',
-  'select',
-  'textarea',
-  'a[href]',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',');
-
-const focusableModalItems = (root: HTMLElement): HTMLElement[] =>
-  Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_MODAL_SELECTOR)).filter((el) => {
-    if (el.closest('[hidden],[aria-hidden="true"]')) return false;
-    if ('disabled' in el && (el as HTMLButtonElement | HTMLInputElement).disabled) return false;
-    return el.tabIndex >= 0;
-  });
-
-const activateDemoModal = (root: HTMLElement, onClose: () => void): (() => void) => {
-  const restoreFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  const focusFirst = window.requestAnimationFrame(() => {
-    (focusableModalItems(root)[0] ?? root).focus({ preventScroll: true });
-  });
-  const onKeyDown = (event: KeyboardEvent): void => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      onClose();
-      return;
-    }
-    if (event.key !== 'Tab') return;
-    const items = focusableModalItems(root);
-    if (items.length === 0) {
-      event.preventDefault();
-      root.focus({ preventScroll: true });
-      return;
-    }
-    const first = items[0];
-    const last = items[items.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last?.focus({ preventScroll: true });
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first?.focus({ preventScroll: true });
-    }
-  };
-  root.addEventListener('keydown', onKeyDown);
-  return () => {
-    window.cancelAnimationFrame(focusFirst);
-    root.removeEventListener('keydown', onKeyDown);
-    if (
-      restoreFocusEl &&
-      (root.contains(document.activeElement) || document.activeElement === document.body)
-    ) {
-      restoreFocusEl.focus({ preventScroll: true });
-    }
-  };
-};
-
-const previewValue = (e: CellChangeEvent): string => {
-  if (e.formula) return e.formula;
-  switch (e.value.kind) {
-    case 'number':
-      return String(e.value.value);
-    case 'text':
-      return JSON.stringify(e.value.value);
-    case 'bool':
-      return String(e.value.value);
-    case 'error':
-      return `#${e.value.code}`;
-    case 'blank':
-      return '∅';
-    default:
-      return '?';
-  }
-};
-
-// Demo seed — only runs once on the initial blank workbook (core gates
-// `seed` on `ownsWb`).
-const seed = (wb: WorkbookHandle): void => {
-  wb.setText({ sheet: 0, row: 0, col: 0 }, 'item');
-  wb.setText({ sheet: 0, row: 0, col: 1 }, 'celsius');
-  wb.setText({ sheet: 0, row: 0, col: 2 }, 'fahrenheit');
-  wb.setText({ sheet: 0, row: 0, col: 3 }, 'greeting');
-  const rows: [string, number][] = [
-    ['London', 8],
-    ['Tokyo', 22],
-    ['Reykjavík', -3],
-    ['Cairo', 31],
-  ];
-  rows.forEach(([city, c], i) => {
-    const r = i + 1;
-    wb.setText({ sheet: 0, row: r, col: 0 }, city);
-    wb.setNumber({ sheet: 0, row: r, col: 1 }, c);
-    wb.setFormula({ sheet: 0, row: r, col: 2 }, `=B${r + 1}*1.8+32`);
-    wb.setFormula({ sheet: 0, row: r, col: 3 }, `=A${r + 1}&" ☼"`);
-  });
-  wb.recalc();
-};
+// Modal focus trap + Esc-to-close + change-log preview + seed +
+// review-cell projection all live in demo-shared/index.ts so the React
+// and Vue demos stay aligned.
+const previewValue = previewCellChange;
+const seed = seedDemoWorkbook;
 
 const composeFeatures = (preset: PresetKey, overrides: FeatureFlags): FeatureFlags => ({
   ...presets[preset](),
   ...overrides,
 });
 
-const reviewCellsForInstance = (inst: SpreadsheetInstance): ReviewCell[] => {
-  const sheet = inst.store.getState().data.sheetIndex;
-  return Array.from(inst.workbook.cells(sheet), (entry) => ({
-    label: `${colLabel(entry.addr.col)}${entry.addr.row + 1}`,
-    value:
-      entry.value.kind === 'text'
-        ? { kind: 'text' as const, value: entry.value.value }
-        : entry.value.kind === 'error'
-          ? { kind: 'error' as const, text: entry.value.text }
-          : entry.value.kind === 'number'
-            ? { kind: 'number' as const }
-            : entry.value.kind === 'bool'
-              ? { kind: 'bool' as const }
-              : { kind: 'blank' as const },
-    formula: entry.formula,
-  }));
-};
-
 const theme = ref<ThemeName>('paper');
-const locale = ref<string>('en');
+const locale = ref<string>(resolveInitialLocale());
 const workbook = shallowRef<WorkbookHandle | null>(null);
 // Vue's reactive proxy walks deeply by default; the spreadsheet instance
 // holds a canvas + many internal refs that should not be reactivified.
@@ -216,6 +104,15 @@ const scriptModalEl = ref<HTMLElement | null>(null);
 
 const features = computed<FeatureFlags>(() => composeFeatures(preset.value, overrides.value));
 const ui = computed(() => UI[locale.value === 'ja' ? 'ja' : 'en']);
+const commandText = computed(() => demoCommandText(locale.value));
+
+watch(
+  locale,
+  (next) => {
+    document.documentElement.lang = next === 'ja' ? 'ja' : 'en';
+  },
+  { immediate: true },
+);
 
 void WorkbookHandle.createDefault()
   .then((wb) => {
@@ -304,7 +201,7 @@ const onAccessibilityCheck = (): void => {
   const inst = instance.value;
   if (!inst) return;
   reviewDialog.value = {
-    title: 'Accessibility Check',
+    title: commandText.value.accessibilityCheck,
     items: analyzeAccessibilityCells(reviewCellsForInstance(inst)),
   };
 };
@@ -344,7 +241,7 @@ watch(
 );
 
 const showRibbonNotice = (title: string, detail: string): void => {
-  reviewDialog.value = { title, items: [{ label: 'Ribbon command', detail }] };
+  reviewDialog.value = { title, items: [{ label: commandText.value.ribbonCommand, detail }] };
 };
 
 const applyScriptCommand = (): void => {
@@ -352,7 +249,7 @@ const applyScriptCommand = (): void => {
   if (!inst) return;
   const command = parseScriptCommand(scriptCommand.value);
   if (!command) {
-    scriptError.value = 'Use one of: uppercase, lowercase, trim, clear.';
+    scriptError.value = commandText.value.scriptCommandError;
     return;
   }
   const range = inst.store.getState().selection.range;
@@ -385,8 +282,13 @@ const applyScriptCommand = (): void => {
   mutators.replaceCells(inst.store, inst.workbook.cells(range.sheet));
   scriptOpen.value = false;
   reviewDialog.value = {
-    title: 'Script',
-    items: [{ label: 'Selection', detail: `${changed} cells updated.` }],
+    title: commandText.value.script,
+    items: [
+      {
+        label: commandText.value.selection,
+        detail: commandText.value.cellsUpdated.replace('{count}', String(changed)),
+      },
+    ],
   };
 };
 
@@ -422,8 +324,8 @@ const onOpenFiles = async (ev: Event): Promise<void> => {
     bookName.value = file.name.replace(/\.(xlsx|xlsm)$/i, '');
   } catch (err) {
     reviewDialog.value = {
-      title: 'Open failed',
-      items: [{ label: 'Workbook', detail: formatLoadError(err) }],
+      title: commandText.value.openFailed,
+      items: [{ label: commandText.value.workbook, detail: formatLoadError(err) }],
     };
   }
 };
@@ -458,85 +360,85 @@ const isFeatureOn = (id: FeatureId): boolean =>
 const commands = computed<CommandItem[]>(() => [
   {
     id: 'open',
-    label: 'Open',
-    hint: 'Open an xlsx or xlsm workbook',
+    label: commandText.value.commands.open.label,
+    hint: commandText.value.commands.open.hint,
     tab: 'file',
     run: () => fileInput.value?.click(),
   },
   {
     id: 'save',
-    label: 'Save',
-    hint: 'Download the workbook as xlsx',
+    label: commandText.value.commands.save.label,
+    hint: commandText.value.commands.save.hint,
     tab: 'file',
     run: onSave,
   },
   {
     id: 'page-setup',
-    label: 'Page Setup',
-    hint: 'Open page setup',
+    label: commandText.value.commands.pageSetup.label,
+    hint: commandText.value.commands.pageSetup.hint,
     tab: 'file',
     run: () => instance.value?.openPageSetup(),
   },
   {
     id: 'print',
-    label: 'Print',
-    hint: 'Open browser print dialog',
+    label: commandText.value.commands.print.label,
+    hint: commandText.value.commands.print.hint,
     tab: 'file',
-    run: () => instance.value?.print(),
+    run: () => instance.value?.print('print'),
   },
   {
     id: 'format-cells',
-    label: 'Format Cells',
-    hint: 'Open the format dialog',
+    label: commandText.value.commands.formatCells.label,
+    hint: commandText.value.commands.formatCells.hint,
     tab: 'home',
     run: () => instance.value?.openFormatDialog(),
   },
   {
     id: 'conditional',
-    label: 'Conditional Formatting',
-    hint: 'Create or edit conditional formatting',
+    label: commandText.value.commands.conditionalFormatting.label,
+    hint: commandText.value.commands.conditionalFormatting.hint,
     tab: 'insert',
     run: () => instance.value?.openConditionalDialog(),
   },
   {
     id: 'cell-styles',
-    label: 'Cell Styles',
-    hint: 'Open the style gallery',
+    label: commandText.value.commands.cellStyles.label,
+    hint: commandText.value.commands.cellStyles.hint,
     tab: 'insert',
     run: () => instance.value?.openCellStylesGallery(),
   },
   {
     id: 'name-manager',
-    label: 'Name Manager',
-    hint: 'Inspect named ranges',
+    label: commandText.value.commands.nameManager.label,
+    hint: commandText.value.commands.nameManager.hint,
     tab: 'insert',
     run: () => instance.value?.openNamedRangeDialog(),
   },
   {
     id: 'insert-function',
-    label: 'Insert Function',
-    hint: 'Open function arguments',
+    label: commandText.value.commands.insertFunction.label,
+    hint: commandText.value.commands.insertFunction.hint,
     tab: 'formulas',
     run: () => instance.value?.openFunctionArguments(),
   },
   {
     id: 'trace-precedents',
-    label: 'Trace Precedents',
-    hint: 'Show precedent arrows',
+    label: commandText.value.commands.tracePrecedents.label,
+    hint: commandText.value.commands.tracePrecedents.hint,
     tab: 'formulas',
     run: () => instance.value?.tracePrecedents(),
   },
   {
     id: 'watch-window',
-    label: 'Watch Window',
-    hint: 'Toggle Watch Window',
+    label: commandText.value.commands.watchWindow.label,
+    hint: commandText.value.commands.watchWindow.hint,
     tab: 'formulas',
     run: () => instance.value?.toggleWatchWindow(),
   },
   {
     id: 'filter',
-    label: 'Filter',
-    hint: 'Show the Data tab filter tools',
+    label: commandText.value.commands.filter.label,
+    hint: commandText.value.commands.filter.hint,
     tab: 'data',
     run: () => {
       ribbonTab.value = 'data';
@@ -544,8 +446,8 @@ const commands = computed<CommandItem[]>(() => [
   },
   {
     id: 'sort',
-    label: 'Sort',
-    hint: 'Show sort buttons',
+    label: commandText.value.commands.sort.label,
+    hint: commandText.value.commands.sort.hint,
     tab: 'data',
     run: () => {
       ribbonTab.value = 'data';
@@ -553,8 +455,8 @@ const commands = computed<CommandItem[]>(() => [
   },
   {
     id: 'freeze-panes',
-    label: 'Freeze Panes',
-    hint: 'Show Freeze Panes',
+    label: commandText.value.commands.freezePanes.label,
+    hint: commandText.value.commands.freezePanes.hint,
     tab: 'view',
     run: () => {
       ribbonTab.value = 'view';
@@ -562,47 +464,47 @@ const commands = computed<CommandItem[]>(() => [
   },
   {
     id: 'protect-sheet',
-    label: 'Protect Sheet',
-    hint: 'Toggle sheet protection from View',
+    label: commandText.value.commands.protectSheet.label,
+    hint: commandText.value.commands.protectSheet.hint,
     tab: 'view',
     run: () => instance.value?.toggleSheetProtection(),
   },
   {
     id: 'options-pane',
-    label: 'Options',
-    hint: 'Show or hide the integration panel',
+    label: commandText.value.commands.options.label,
+    hint: commandText.value.commands.options.hint,
     run: () => {
       showPanel.value = !showPanel.value;
     },
   },
   {
     id: 'theme-light',
-    label: 'Light Theme',
-    hint: 'Switch to light workbook theme',
+    label: commandText.value.commands.lightTheme.label,
+    hint: commandText.value.commands.lightTheme.hint,
     run: () => {
       theme.value = 'paper';
     },
   },
   {
     id: 'theme-dark',
-    label: 'Dark Theme',
-    hint: 'Switch to dark workbook theme',
+    label: commandText.value.commands.darkTheme.label,
+    hint: commandText.value.commands.darkTheme.hint,
     run: () => {
       theme.value = 'ink';
     },
   },
   {
     id: 'locale-ja',
-    label: 'Japanese Locale',
-    hint: 'Switch labels to JA',
+    label: commandText.value.commands.japaneseLocale.label,
+    hint: commandText.value.commands.japaneseLocale.hint,
     run: () => {
       locale.value = 'ja';
     },
   },
   {
     id: 'locale-en',
-    label: 'English Locale',
-    hint: 'Switch labels to EN',
+    label: commandText.value.commands.englishLocale.label,
+    hint: commandText.value.commands.englishLocale.hint,
     run: () => {
       locale.value = 'en';
     },
@@ -688,7 +590,7 @@ onUnmounted(() => {
             v-model="searchQuery"
             type="search"
             :placeholder="ui.search"
-            aria-label="Search commands"
+            :aria-label="ui.searchCommands"
             @focus="searchOpen = true"
             @input="searchOpen = true"
             @keydown="onSearchKeydown"
@@ -716,7 +618,7 @@ onUnmounted(() => {
           <button type="button" class="demo__share">
             {{ ui.share }}
           </button>
-          <span class="demo__avatar" role="img" aria-label="Signed in user">FC</span>
+          <span class="demo__avatar" role="img" :aria-label="ui.signedInUser">FC</span>
         </div>
       </div>
       <div class="demo__commandbar">
@@ -726,7 +628,7 @@ onUnmounted(() => {
           <span class="demo__brand-tag">{{ ui.workbook }}</span>
         </div>
         <div class="demo__controls">
-          <div class="demo__seg" role="group" aria-label="Theme">
+          <div class="demo__seg" role="group" :aria-label="ui.theme">
             <button
               v-for="t in THEMES"
               :key="t.value"
@@ -738,7 +640,7 @@ onUnmounted(() => {
               {{ t.label }}
             </button>
           </div>
-          <div class="demo__seg" role="group" aria-label="Locale">
+          <div class="demo__seg" role="group" :aria-label="ui.locale">
             <button
               v-for="l in LOCALES"
               :key="l.value"
@@ -780,16 +682,16 @@ onUnmounted(() => {
           :on-accessibility-check="onAccessibilityCheck"
           :on-run-script="onRunScript"
           :on-draw-pen="
-            () => showRibbonNotice('Draw', 'Ink strokes are not persisted in this demo workbook.')
+            () => showRibbonNotice(commandText.draw, commandText.inkNotPersisted)
           "
           :on-draw-eraser="
-            () => showRibbonNotice('Draw', 'Select an ink stroke first to use the eraser.')
+            () => showRibbonNotice(commandText.draw, commandText.selectInkFirst)
           "
           :on-translate="
-            () => showRibbonNotice('Translate', 'No translation service is connected in this demo.')
+            () => showRibbonNotice(commandText.translate, commandText.translationUnavailable)
           "
           :on-add-in="
-            () => showRibbonNotice('Add-ins', 'Office add-ins are represented by host callbacks here.')
+            () => showRibbonNotice(commandText.addIns, commandText.addInsHostCallbacks)
           "
           @tab-change="ribbonTab = $event"
         />
@@ -819,7 +721,7 @@ onUnmounted(() => {
               type="button"
               class="demo__backstage-navitem"
               :disabled="!instance"
-              @click="instance?.print()"
+              @click="instance?.print('print')"
             >
               {{ ui.print }}
             </button>
@@ -856,7 +758,7 @@ onUnmounted(() => {
                 type="button"
                 class="demo__backstage-card"
                 :disabled="!instance"
-                @click="instance?.print()"
+                @click="instance?.print('print')"
               >
                 <strong>{{ ui.print }}</strong>
                 <span>{{ ui.printDesc }}</span>
@@ -942,7 +844,7 @@ onUnmounted(() => {
         </section>
 
         <section class="demo__card">
-          <h2>Selection</h2>
+          <h2>{{ commandText.selection }}</h2>
           <p class="demo__mono">{{ selectionLabel }}</p>
         </section>
 

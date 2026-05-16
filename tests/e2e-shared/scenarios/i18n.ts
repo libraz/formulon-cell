@@ -15,11 +15,46 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
   await page.goto('/?locale=ja');
   await sp.waitForReady();
   await sp.expectNoStub();
-  // The playground places engine info text in #engine-pill; the format dialog
-  // strings will swap, but on a clean mount we can't observe that directly
-  // without opening it. Use the host `lang` attribute or the document.documentElement.
-  // Loose check: load did not crash + crossOriginIsolated still holds.
+  const jaToggle = page.getByRole('button', { name: 'JA', exact: true });
+  if ((await jaToggle.count()) > 0) await jaToggle.first().click();
+
+  await expect(page.getByRole('tab', { name: 'ホーム', exact: true })).toBeVisible();
+  await expect(page.getByRole('tab', { name: '挿入', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'ペースト', exact: true }).first()).toBeVisible();
+  const searchBox = page.getByRole('searchbox').first();
+  const hasSearchBox = (await searchBox.count()) > 0;
+  if (hasSearchBox) {
+    await expect(searchBox).toHaveAttribute('aria-label', 'コマンドの検索');
+    await searchBox.fill('書式');
+    await expect(page.getByRole('button', { name: /セルの書式設定/ })).toBeVisible();
+    await searchBox.evaluate((el: HTMLElement) => el.blur());
+    await expect(page.locator('.demo__command-menu')).toHaveCount(0);
+  }
+
+  const lang = await page.evaluate(() => document.documentElement.lang);
+  expect(lang === 'ja' || lang === '').toBe(true);
   expect(await sp.isCrossOriginIsolated()).toBe(true);
+
+  const enToggle = page.getByRole('button', { name: 'EN', exact: true });
+  if ((await enToggle.count()) > 0) {
+    await enToggle.first().click();
+    await expect(page.getByRole('tab', { name: 'Home', exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Insert', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Paste', exact: true }).first()).toBeVisible();
+    if (hasSearchBox) {
+      await expect(searchBox).toHaveAttribute('aria-label', 'Search commands');
+      await searchBox.fill('format');
+      await expect(page.getByRole('button', { name: /Format Cells/ })).toBeVisible();
+      await searchBox.evaluate((el: HTMLElement) => el.blur());
+      await expect(page.locator('.demo__command-menu')).toHaveCount(0);
+    }
+  } else {
+    await page.goto('/?locale=en');
+    await sp.waitForReady();
+    await expect(page.getByRole('tab', { name: 'Home', exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Insert', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Paste', exact: true }).first()).toBeVisible();
+  }
 }
 
 /** I02 — `?theme=dark` boots the playground in the `ink` core theme.

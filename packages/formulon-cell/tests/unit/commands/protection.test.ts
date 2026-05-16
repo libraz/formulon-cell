@@ -3,16 +3,26 @@ import { pasteTSV } from '../../../src/commands/clipboard/paste.js';
 import { writeInput, writeInputValidated } from '../../../src/commands/coerce-input.js';
 import { setFillColor, setNumFmt, toggleBold } from '../../../src/commands/format.js';
 import {
+  addAllowedEditRange,
+  allowedEditRangesForSheet,
+  clearAllowedEditRanges,
   gateProtection,
+  isAddrInAllowedEditRange,
   isCellLocked,
   isCellWritable,
   isSheetProtected,
+  isWorkbookStructureProtected,
   protectedSheetPassword,
+  recordProtectionChange,
   setCellLocked,
   setProtectedSheet,
+  setWorkbookStructureProtected,
   toggleProtectedSheet,
+  toggleWorkbookStructureProtected,
+  workbookStructurePassword,
 } from '../../../src/commands/protection.js';
-import { deleteRows, insertRows } from '../../../src/commands/structure.js';
+import { History } from '../../../src/commands/history.js';
+import { deleteRows, hideRows, insertRows, showRows } from '../../../src/commands/structure.js';
 import type { Addr, Range } from '../../../src/engine/types.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
@@ -82,6 +92,20 @@ describe('protection helpers', () => {
     expect(isSheetProtected(store.getState(), 0)).toBe(true);
   });
 
+  it('sets, toggles, and exposes workbook structure protection', () => {
+    expect(isWorkbookStructureProtected(store.getState())).toBe(false);
+
+    setWorkbookStructureProtected(store, true, { password: 'book' });
+    expect(isWorkbookStructureProtected(store.getState())).toBe(true);
+    expect(workbookStructurePassword(store.getState())).toBe('book');
+
+    expect(toggleWorkbookStructureProtected(store)).toBe(false);
+    expect(isWorkbookStructureProtected(store.getState())).toBe(false);
+
+    expect(toggleWorkbookStructureProtected(store)).toBe(true);
+    expect(isWorkbookStructureProtected(store.getState())).toBe(true);
+  });
+
   it('can flush sheet protection through an engine handle when available', () => {
     const setSheetProtection = vi.fn(() => ({ ok: true }));
     const wb = {
@@ -119,12 +143,95 @@ describe('protection helpers', () => {
     expect(isCellWritable(store.getState(), a)).toBe(true);
   });
 
+  it('allows protected locked cells inside allowed edit ranges', () => {
+    const a: Addr = { sheet: 0, row: 2, col: 2 };
+    const b: Addr = { sheet: 0, row: 4, col: 4 };
+    mutators.setSheetProtected(store, 0, true);
+
+    const id = addAllowedEditRange(
+      store,
+      { sheet: 0, r0: 2, c0: 2, r1: 3, c1: 3 },
+      { title: 'Input range' },
+    );
+
+    expect(id).toMatch(/^allowed-edit-/);
+    expect(isAddrInAllowedEditRange(store.getState(), a)).toBe(true);
+    expect(isCellWritable(store.getState(), a)).toBe(true);
+    expect(isCellWritable(store.getState(), b)).toBe(false);
+    expect(allowedEditRangesForSheet(store.getState(), 0)).toHaveLength(1);
+
+    clearAllowedEditRanges(store, 0);
+    expect(isCellWritable(store.getState(), a)).toBe(false);
+  });
+
+  it('records protection slice changes as one undoable operation', () => {
+    const history = new History();
+    recordProtectionChange(history, store, undefined, () => {
+      setProtectedSheet(store, 0, true, { password: 'pw' });
+      setWorkbookStructureProtected(store, true, { password: 'book' });
+      addAllowedEditRange(store, { sheet: 0, r0: 2, c0: 2, r1: 3, c1: 3 }, { title: 'Input' });
+    });
+
+    expect(isSheetProtected(store.getState(), 0)).toBe(true);
+    expect(protectedSheetPassword(store.getState(), 0)).toBe('pw');
+    expect(isWorkbookStructureProtected(store.getState())).toBe(true);
+    expect(allowedEditRangesForSheet(store.getState(), 0)).toHaveLength(1);
+
+    expect(history.undo()).toBe(true);
+    expect(isSheetProtected(store.getState(), 0)).toBe(false);
+    expect(isWorkbookStructureProtected(store.getState())).toBe(false);
+    expect(allowedEditRangesForSheet(store.getState(), 0)).toHaveLength(0);
+    expect(history.canUndo()).toBe(false);
+
+    expect(history.redo()).toBe(true);
+    expect(isSheetProtected(store.getState(), 0)).toBe(true);
+    expect(protectedSheetPassword(store.getState(), 0)).toBe('pw');
+    expect(isWorkbookStructureProtected(store.getState())).toBe(true);
+    expect(workbookStructurePassword(store.getState())).toBe('book');
+    expect(allowedEditRangesForSheet(store.getState(), 0)[0]).toMatchObject({
+      title: 'Input',
+      range: { sheet: 0, r0: 2, c0: 2, r1: 3, c1: 3 },
+    });
+  });
+
+  it('replays sheet protection snapshots to the engine on undo and redo', () => {
+    const history = new History();
+    const setSheetProtection = vi.fn(() => ({ ok: true }));
+    const wb = {
+      capabilities: { sheetProtectionRoundtrip: true },
+      setSheetProtection,
+    } as unknown as WorkbookHandle;
+
+    recordProtectionChange(history, store, wb, () => {
+      setProtectedSheet(store, 1, true, { workbook: wb, password: 'pw' });
+    });
+    setSheetProtection.mockClear();
+
+    expect(history.undo()).toBe(true);
+    expect(setSheetProtection).toHaveBeenLastCalledWith(1, { enabled: false });
+
+    setSheetProtection.mockClear();
+    expect(history.redo()).toBe(true);
+    expect(setSheetProtection).toHaveBeenLastCalledWith(1, {
+      enabled: true,
+      sheet: true,
+      legacyPassword: 'pw',
+    });
+  });
+
   it('gateProtection returns null when entire range is locked on protected sheet', () => {
     mutators.setSheetProtected(store, 0, true);
     const range: Range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
     expect(gateProtection(store.getState(), range)).toBeNull();
     setCellLocked(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, false);
     // Now A1 is unlocked → range survives the gate.
+    expect(gateProtection(store.getState(), range)).toEqual(range);
+  });
+
+  it('gateProtection returns the range when any cell is allowed by edit ranges', () => {
+    mutators.setSheetProtected(store, 0, true);
+    const range: Range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
+    addAllowedEditRange(store, { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 });
     expect(gateProtection(store.getState(), range)).toEqual(range);
   });
 });
@@ -229,6 +336,16 @@ describe('structure mutators on protected sheet', () => {
     deleteRows(store, wb, null, 1, 1);
     // recalc should never be reached when blocked.
     expect(wb.recalc).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects hideRows / showRows on protected sheet', () => {
+    const wb = stubHandle();
+    mutators.setSheetProtected(store, 0, true);
+    hideRows(store, null, 1, 2, wb);
+    showRows(store, null, 1, 2, wb);
+
+    expect(store.getState().layout.hiddenRows.size).toBe(0);
     expect(warnSpy).toHaveBeenCalledTimes(2);
   });
 });

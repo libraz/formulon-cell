@@ -46,6 +46,80 @@
 
     --fc-hover-stripe: rgba(76, 194, 107, 0.04);
 
+    /* === FORMAT-CELLS DIALOG (dark) ===
+     * Reproduces the Spreadsheet-Properties dark dialog: near-black panel,
+     * filled-pill active tab, internal list panes keep a light background for
+     * Fluent-style high contrast, focused listbox shows a 2px green ring. */
+    --fc-fmtdlg-panel-bg: #1f1f1f;
+    --fc-fmtdlg-panel-fg: #f3f2f1;
+    --fc-fmtdlg-header-bg: #1f1f1f;
+    --fc-fmtdlg-body-bg: #1f1f1f;
+    --fc-fmtdlg-footer-bg: #1f1f1f;
+    --fc-fmtdlg-rule: #3b3a39;
+    --fc-fmtdlg-label-fg: #f3f2f1;
+    --fc-fmtdlg-section-fg: #f3f2f1;
+    --fc-fmtdlg-hint-fg: #c8c6c4;
+
+    /* Tabs — dark switches to a filled green pill on the active tab and
+     *        hides the underline. */
+    --fc-fmtdlg-tab-bg: transparent;
+    --fc-fmtdlg-tab-border: #3b3a39;
+    --fc-fmtdlg-tab-color: #c8c6c4;
+    --fc-fmtdlg-tab-hover: #2b2a29;
+    --fc-fmtdlg-tab-hover-color: #ffffff;
+    --fc-fmtdlg-tab-active-bg: #1f5f31;
+    --fc-fmtdlg-tab-active-color: #ffffff;
+    --fc-fmtdlg-tab-active-underline: none;
+    --fc-fmtdlg-tab-radius: 4px;
+
+    /* Sample preview cell — slightly elevated near-black */
+    --fc-fmtdlg-preview-bg: #2b2a29;
+    --fc-fmtdlg-preview-fg: #f3f2f1;
+    --fc-fmtdlg-preview-border: #3b3a39;
+
+    /* Listbox panes — stay light against the dark panel for legibility */
+    --fc-fmtdlg-list-bg: #f8f8f8;
+    --fc-fmtdlg-list-fg: #1f1f1f;
+    --fc-fmtdlg-list-border: transparent;
+    --fc-fmtdlg-list-focus-border: #2da153;
+    --fc-fmtdlg-list-hover-bg: #e7efe9;
+    --fc-fmtdlg-list-selected-bg: #b7d5bd;
+    --fc-fmtdlg-list-selected-fg: #1f1f1f;
+    --fc-fmtdlg-list-selected-bar: #1f5f31;
+    --fc-fmtdlg-cat-selected-bg: #1f5f31;
+    --fc-fmtdlg-cat-selected-fg: #ffffff;
+
+    /* Inputs — keep white for high contrast (matches reference screenshots) */
+    --fc-fmtdlg-input-bg: #ffffff;
+    --fc-fmtdlg-input-fg: #1f1f1f;
+    --fc-fmtdlg-input-border: transparent;
+    --fc-fmtdlg-input-hover-border: #8a8886;
+
+    /* Action buttons */
+    --fc-fmtdlg-btn-bg: #2b2a29;
+    --fc-fmtdlg-btn-fg: #f3f2f1;
+    --fc-fmtdlg-btn-border: #605e5c;
+    --fc-fmtdlg-btn-hover-bg: #3b3a39;
+    --fc-fmtdlg-btn-hover-border: #8a8886;
+    --fc-fmtdlg-btn-primary-bg: #1f5f31;
+    --fc-fmtdlg-btn-primary-fg: #ffffff;
+    --fc-fmtdlg-btn-primary-hover-bg: #25753c;
+
+    /* Chip-style choice grid items */
+    --fc-fmtdlg-chip-bg: #2b2a29;
+    --fc-fmtdlg-chip-checked-bg: #1f3a2a;
+    --fc-fmtdlg-chip-checked-border: #4cc26b;
+
+    /* Alignment dial */
+    --fc-fmtdlg-dial-border: #605e5c;
+    --fc-fmtdlg-dial-bg: #252423;
+    --fc-fmtdlg-dial-arc: #605e5c;
+    --fc-fmtdlg-dial-dot: #c8c6c4;
+    --fc-fmtdlg-dial-dot-hover: #f1707b;
+    --fc-fmtdlg-dial-dot-active: #f1707b;
+    --fc-fmtdlg-dial-pointer: #f1707b;
+    --fc-fmtdlg-dial-text: #f3f2f1;
+
     color-scheme: dark;
   }
 }

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { defaultStrings, dictionaries, en, ja, mergeStrings } from '../../../src/i18n/strings.js';
+import {
+  defaultStrings,
+  dictionaries,
+  dictionaryLocaleFor,
+  en,
+  ja,
+  mergeStrings,
+} from '../../../src/i18n/strings.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -30,6 +37,13 @@ describe('dictionaries', () => {
     expect(defaultStrings).toBe(ja);
   });
 
+  it('maps BCP 47 locale tags to the bundled dictionary language', () => {
+    expect(dictionaryLocaleFor('en-US')).toBe('en');
+    expect(dictionaryLocaleFor('en_GB')).toBe('en');
+    expect(dictionaryLocaleFor('ja-JP')).toBe('ja');
+    expect(dictionaryLocaleFor('fr-FR')).toBe('ja');
+  });
+
   it('keeps the same shape for ja and en', () => {
     const jaSections = Object.keys(ja).sort();
     const enSections = Object.keys(en).sort();
@@ -50,9 +64,17 @@ describe('dictionaries', () => {
   });
 
   it('does not ship missing or empty dictionary leaves', () => {
+    const isStringArrayLeaf = (value: unknown): value is readonly string[] =>
+      Array.isArray(value) &&
+      value.length > 0 &&
+      value.every((item) => typeof item === 'string' && item.trim() !== '');
+
     for (const [locale, dict] of Object.entries(dictionaries)) {
       const badLeaves = collectStringLeaves(dict)
-        .filter(([, value]) => typeof value !== 'string' || value.trim() === '')
+        .filter(([, value]) => {
+          if (isStringArrayLeaf(value)) return false;
+          return typeof value !== 'string' || value.trim() === '';
+        })
         .map(([path, value]) => `${locale}.${path}=${JSON.stringify(value)}`);
 
       expect(badLeaves).toEqual([]);
@@ -69,6 +91,13 @@ describe('mergeStrings', () => {
     const out = mergeStrings(en, { contextMenu: { copy: 'Duplicate' } });
     expect(out.contextMenu.copy).toBe('Duplicate');
     expect(out.contextMenu.cut).toBe(en.contextMenu.cut);
+  });
+
+  it('overlays nested keys without replacing sibling nested entries', () => {
+    const out = mergeStrings(en, { ribbon: { tabs: { home: 'Start' } } });
+    expect(out.ribbon.tabs.home).toBe('Start');
+    expect(out.ribbon.tabs.insert).toBe(en.ribbon.tabs.insert);
+    expect(out.ribbon.bold).toBe(en.ribbon.bold);
   });
 
   it('does not mutate the base dictionary', () => {

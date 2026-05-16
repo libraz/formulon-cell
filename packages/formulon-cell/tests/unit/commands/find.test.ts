@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applySubstitution,
   findAll,
@@ -6,6 +6,7 @@ import {
   replaceAll,
   replaceOne,
 } from '../../../src/commands/find.js';
+import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
 
@@ -103,6 +104,56 @@ describe('findAll', () => {
     expect(got).toHaveLength(1);
     expect(got[0]?.addr.sheet).toBe(0);
   });
+
+  it('can search the whole workbook when Within is Workbook', () => {
+    store.setState((s) => {
+      const map = new Map(s.data.cells);
+      map.set(addrKey({ sheet: 0, row: 0, col: 0 }), {
+        value: { kind: 'text', value: 'hit' },
+        formula: null,
+      });
+      map.set(addrKey({ sheet: 1, row: 0, col: 0 }), {
+        value: { kind: 'text', value: 'hit' },
+        formula: null,
+      });
+      return { ...s, data: { ...s.data, cells: map } };
+    });
+    const got = findAll(store.getState(), { query: 'hit', within: 'workbook' });
+    expect(got.map((m) => m.addr.sheet)).toEqual([0, 1]);
+  });
+
+  it('can traverse by columns for Excel Search: By Columns', () => {
+    seed(store, [
+      { row: 4, col: 0, value: 'x' },
+      { row: 1, col: 1, value: 'x' },
+      { row: 0, col: 0, value: 'x' },
+    ]);
+    const got = findAll(store.getState(), { query: 'x', searchBy: 'columns' });
+    expect(got.map((m) => `${m.addr.row}:${m.addr.col}`)).toEqual(['0:0', '4:0', '1:1']);
+  });
+
+  it('can look in formulas and comments', () => {
+    store.setState((s) => {
+      const map = new Map(s.data.cells);
+      map.set(addrKey({ sheet: 0, row: 0, col: 0 }), {
+        value: { kind: 'number', value: 2 },
+        formula: '=1+1',
+      });
+      map.set(addrKey({ sheet: 0, row: 1, col: 0 }), {
+        value: { kind: 'text', value: 'visible' },
+        formula: null,
+      });
+      const formats = new Map(s.format.formats);
+      formats.set(addrKey({ sheet: 0, row: 1, col: 0 }), { comment: 'needle in note' });
+      return {
+        ...s,
+        data: { ...s.data, cells: map },
+        format: { ...s.format, formats },
+      };
+    });
+    expect(findAll(store.getState(), { query: '1+1', lookIn: 'formulas' })).toHaveLength(1);
+    expect(findAll(store.getState(), { query: 'needle', lookIn: 'comments' })).toHaveLength(1);
+  });
 });
 
 describe('findNext', () => {
@@ -147,6 +198,12 @@ describe('findNext', () => {
     const from = { sheet: 0, row: 5, col: 0 };
     const got = findNext(store.getState(), { query: 'x' }, from, 'prev');
     expect(got?.addr).toEqual({ sheet: 0, row: 2, col: 1 });
+  });
+
+  it('steps according to column-major order when requested', () => {
+    const from = { sheet: 0, row: 0, col: 0 };
+    const got = findNext(store.getState(), { query: 'x', searchBy: 'columns' }, from, 'next');
+    expect(got?.addr).toEqual({ sheet: 0, row: 5, col: 0 });
   });
 });
 
@@ -205,7 +262,7 @@ describe('replaceOne / replaceAll', () => {
 
   it('replaceOne writes the replacement verbatim through writeInput', () => {
     sync([{ row: 0, col: 0, raw: 'apple' }]);
-    replaceOne(wb, { addr: { sheet: 0, row: 0, col: 0 } }, 'banana');
+    expect(replaceOne(wb, { addr: { sheet: 0, row: 0, col: 0 } }, 'banana')).toBe(true);
     wb.recalc();
     const v = wb.getValue({ sheet: 0, row: 0, col: 0 });
     expect(v.kind === 'text' && v.value).toBe('banana');
@@ -214,8 +271,20 @@ describe('replaceOne / replaceAll', () => {
   it('replaceOne refuses to overwrite formula cells', () => {
     wb.setFormula({ sheet: 0, row: 0, col: 0 }, '=1+1');
     wb.recalc();
-    replaceOne(wb, { addr: { sheet: 0, row: 0, col: 0 } }, 'overwrite');
+    expect(replaceOne(wb, { addr: { sheet: 0, row: 0, col: 0 } }, 'overwrite')).toBe(false);
     expect(wb.cellFormula({ sheet: 0, row: 0, col: 0 })).toBe('=1+1');
+  });
+
+  it('replaceOne refuses locked cells on protected sheets', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    sync([{ row: 0, col: 0, raw: 'apple' }]);
+    setProtectedSheet(store, 0, true);
+
+    expect(replaceOne(wb, { addr: { sheet: 0, row: 0, col: 0 } }, 'banana', store)).toBe(false);
+
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'apple' });
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it('replaceAll counts substituted cells and skips formula cells', () => {
@@ -241,6 +310,28 @@ describe('replaceOne / replaceAll', () => {
     const b = wb.getValue({ sheet: 0, row: 1, col: 0 });
     expect(a.kind === 'text' && a.value).toBe('X bar');
     expect(b.kind === 'text' && b.value).toBe('XX');
+  });
+
+  it('replaceAll skips locked protected cells while replacing unlocked cells', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    sync([
+      { row: 0, col: 0, raw: 'foo' },
+      { row: 1, col: 0, raw: 'foo' },
+    ]);
+    setProtectedSheet(store, 0, true);
+    store.setState((s) => {
+      const formats = new Map(s.format.formats);
+      formats.set(addrKey({ sheet: 0, row: 1, col: 0 }), { locked: false });
+      return { ...s, format: { formats } };
+    });
+
+    const count = replaceAll(store.getState(), wb, { query: 'foo' }, 'bar', store);
+
+    expect(count).toBe(1);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'foo' });
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'bar' });
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 
   it('replaceAll returns 0 for empty query', () => {

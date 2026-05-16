@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   clearTable,
   clearTablesInRange,
@@ -18,6 +18,7 @@ import {
   updateTableOverlay,
   upsertTable,
 } from '../../../src/commands/format-as-table.js';
+import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const range = (r0: number, c0: number, r1: number, c1: number) =>
@@ -164,6 +165,7 @@ describe('formatAsTable command helpers', () => {
       source: 'session',
       range: range(0, 0, 3, 2),
       style: 'dark',
+      color: '#5b9bd5',
       showHeader: true,
       showTotal: true,
       banded: true,
@@ -213,6 +215,8 @@ describe('formatAsTable command helpers', () => {
   it('updates session overlays without mutating read-only engine overlays', () => {
     const store = createSpreadsheetStore();
     const session = formatAsTable(store, range(0, 0, 3, 2), { id: 'session' });
+    expect(session).not.toBeNull();
+    if (!session) return;
     mutators.replaceEngineTableOverlays(store, [
       {
         ...session,
@@ -233,5 +237,26 @@ describe('formatAsTable command helpers', () => {
     });
     expect(tableOverlayById(store.getState(), 'engine')?.banded).toBe(true);
     expect(updateTableOverlay(store, 'missing', { style: 'dark' })).toBeNull();
+  });
+
+  it('rejects creating, updating, and clearing session overlays on protected sheets', () => {
+    const store = createSpreadsheetStore();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const created = formatAsTable(store, range(0, 0, 3, 2), { id: 'locked' });
+    expect(created).not.toBeNull();
+    setProtectedSheet(store, 0, true);
+
+    try {
+      expect(formatAsTable(store, range(5, 0, 8, 2), { id: 'blocked' })).toBeNull();
+      expect(updateTableOverlay(store, 'locked', { style: 'dark' })).toBeNull();
+      clearTable(store, 'locked');
+      clearTablesInRange(store, range(0, 0, 3, 2));
+
+      expect(tableOverlayById(store.getState(), 'blocked')).toBeNull();
+      expect(tableOverlayById(store.getState(), 'locked')?.style).toBe('medium');
+      expect(warn).toHaveBeenCalledTimes(4);
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

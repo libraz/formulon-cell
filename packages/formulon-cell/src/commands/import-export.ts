@@ -7,7 +7,9 @@ import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { State } from '../store/store.js';
 import { type CSVEncodeOptions, encodeCSV, parseCSV } from './clipboard/csv.js';
-import { coerceInput, writeCoerced } from './coerce-input.js';
+import { coerceInputForCell, writeCoerced } from './coerce-input.js';
+import type { History } from './history.js';
+import { isCellWritable, warnProtected } from './protection.js';
 
 export interface ImportResult {
   /** Range that received writes. r0/c0 = anchor; r1/c1 = far corner. */
@@ -29,6 +31,7 @@ export function importCSV(
   wb: WorkbookHandle,
   text: string,
   anchor?: Addr,
+  history?: History | null,
 ): ImportResult | null {
   if (!text) return null;
   const rows = parseCSV(text);
@@ -39,14 +42,23 @@ export function importCSV(
   let maxCols = 0;
   let cellsWritten = 0;
 
-  for (let r = 0; r < rows.length; r += 1) {
-    const cells = rows[r] ?? [];
-    if (cells.length > maxCols) maxCols = cells.length;
-    for (let c = 0; c < cells.length; c += 1) {
-      const addr: Addr = { sheet, row: origin.row + r, col: origin.col + c };
-      writeCoerced(wb, addr, coerceInput(cells[c] ?? ''));
-      cellsWritten += 1;
+  if (history) history.begin();
+  try {
+    for (let r = 0; r < rows.length; r += 1) {
+      const cells = rows[r] ?? [];
+      if (cells.length > maxCols) maxCols = cells.length;
+      for (let c = 0; c < cells.length; c += 1) {
+        const addr: Addr = { sheet, row: origin.row + r, col: origin.col + c };
+        if (!isCellWritable(state, addr)) {
+          warnProtected(addr);
+          continue;
+        }
+        writeCoerced(wb, addr, coerceInputForCell(state, addr, cells[c] ?? ''));
+        cellsWritten += 1;
+      }
     }
+  } finally {
+    if (history) history.end();
   }
 
   return {

@@ -7,7 +7,7 @@ import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 
 interface HostShortcutInput {
-  findReplace: () => { open(): void } | null;
+  findReplace: () => { open(tab?: 'find' | 'replace'): void } | null;
   formatDialog: () => { open(): void } | null;
   formatPainter: () => { activate(sticky?: boolean): void } | null;
   goToDialog: () => { open(): void } | null;
@@ -75,6 +75,11 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       if (!findReplace) return;
       e.preventDefault();
       findReplace.open();
+    } else if (k === 'h') {
+      const findReplace = input.findReplace();
+      if (!findReplace) return;
+      e.preventDefault();
+      findReplace.open('replace');
     } else if (k === 'k') {
       const dialog = input.hyperlinkDialog();
       if (!dialog) return;
@@ -117,6 +122,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
           currentWb,
           { sheet: r.sheet, r0: r.r0, c0: r.c0, r1: r.r0, c1: r.c1 },
           r,
+          { formatting: 'with', store: input.store },
         );
         mutators.replaceCells(input.store, currentWb.cells(input.store.getState().data.sheetIndex));
       }
@@ -129,6 +135,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
           currentWb,
           { sheet: r.sheet, r0: r.r0, c0: r.c0, r1: r.r1, c1: r.c0 },
           r,
+          { formatting: 'with', store: input.store },
         );
         mutators.replaceCells(input.store, currentWb.cells(input.store.getState().data.sheetIndex));
       }

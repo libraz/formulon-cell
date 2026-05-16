@@ -1,6 +1,8 @@
 import { expandRangeWithMerges, mergeAnchorOf, stepWithMerge } from '../commands/merge.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
+import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
 import { addrKey } from '../engine/address.js';
+import { formatCellForEdit } from '../engine/edit-seed.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
@@ -232,8 +234,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       e.preventDefault();
       return;
     } else if (k === 'F2') {
-      const f = deps.wb.cellFormula(a);
-      const seed = f ?? formatExisting(s, a);
+      const seed = formatExisting(s, a, deps.wb);
       deps.onBeginEdit(seed);
       e.preventDefault();
       return;
@@ -305,20 +306,17 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
   return () => host.removeEventListener('keydown', onKey);
 }
 
-function formatExisting(s: ReturnType<SpreadsheetStore['getState']>, a: Addr): string {
-  const cell = s.data.cells.get(`${a.sheet}:${a.row}:${a.col}`);
-  if (!cell) return '';
-  if (cell.formula) return cell.formula;
-  switch (cell.value.kind) {
-    case 'number':
-      return String(cell.value.value);
-    case 'bool':
-      return cell.value.value ? 'TRUE' : 'FALSE';
-    case 'text':
-      return cell.value.value;
-    case 'error':
-      return cell.value.text;
-    default:
-      return '';
-  }
+function formatExisting(
+  s: ReturnType<SpreadsheetStore['getState']>,
+  a: Addr,
+  wb: WorkbookHandle,
+): string {
+  const key = `${a.sheet}:${a.row}:${a.col}`;
+  const fmt = s.format.formats.get(key);
+  return formatCellForEdit(s.data.cells.get(key), wb, a, {
+    formulaOverride: wb.cellFormula(a),
+    formulaHidden: fmt?.formulaHidden === true,
+    sheetProtected: s.protection.protectedSheets.has(a.sheet),
+    formatFormula: s.ui.r1c1 ? (formula) => formatA1FormulaAsR1C1(formula, a) : undefined,
+  });
 }

@@ -46,6 +46,65 @@
     flex: 0 0 auto;
   }
 
+  .fc-host__statusbar-views {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex: 0 0 auto;
+    margin-left: 2px;
+  }
+
+  .fc-host__statusbar-view {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 20px;
+    padding: 0;
+    border: var(--fc-hairline) solid transparent;
+    border-radius: 2px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .fc-host__statusbar-view:hover,
+  .fc-host__statusbar-view--active {
+    border-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
+    background: color-mix(in srgb, var(--fc-accent-fg, #fff) 12%, transparent);
+    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg, #fff));
+  }
+
+  .fc-host__statusbar-viewicon {
+    position: relative;
+    width: 13px;
+    height: 13px;
+    border: 1px solid currentColor;
+    opacity: 0.9;
+  }
+
+  .fc-host__statusbar-viewicon--normal {
+    background:
+      linear-gradient(currentColor 0 0) 0 4px / 100% 1px no-repeat,
+      linear-gradient(currentColor 0 0) 0 8px / 100% 1px no-repeat,
+      linear-gradient(currentColor 0 0) 4px 0 / 1px 100% no-repeat,
+      linear-gradient(currentColor 0 0) 8px 0 / 1px 100% no-repeat;
+  }
+
+  .fc-host__statusbar-viewicon--pageLayout::before {
+    content: "";
+    position: absolute;
+    inset: 2px;
+    border: 1px solid currentColor;
+  }
+
+  .fc-host__statusbar-viewicon--pageBreakPreview {
+    border-style: dashed;
+    background:
+      linear-gradient(currentColor 0 0) 0 6px / 100% 1px no-repeat,
+      linear-gradient(currentColor 0 0) 6px 0 / 1px 100% no-repeat;
+  }
+
   .fc-host__statusbar-zoom {
     display: inline-flex;
     align-items: center;

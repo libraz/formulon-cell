@@ -29,6 +29,7 @@ export interface PasteSpecialDeps {
 
 export interface PasteSpecialHandle {
   open(): void;
+  apply(options: PasteSpecialOptions): boolean;
   close(): void;
   detach(): void;
 }
@@ -63,6 +64,7 @@ const buildOpOptions = (s: Strings): { id: PasteOperation; label: string }[] => 
  */
 export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
   const { host, store, wb } = deps;
+  if (deps.history) wb.attachHistory(deps.history);
   const strings = deps.strings ?? defaultStrings;
   const t = strings.pasteSpecialDialog;
   const whatOptions = buildWhatOptions(strings);
@@ -166,22 +168,11 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
   };
 
   const history = deps.history ?? null;
-  const apply = (): void => {
+  const applyOptions = (opts: PasteSpecialOptions): boolean => {
     const snap = deps.getSnapshot();
     if (!snap) {
-      close();
-      return;
+      return false;
     }
-    const what =
-      [...whatRadios.entries()].find(([, el]) => el.checked)?.[0] ?? ('all' as PasteWhat);
-    const operation =
-      [...opRadios.entries()].find(([, el]) => el.checked)?.[0] ?? ('none' as PasteOperation);
-    const opts: PasteSpecialOptions = {
-      what,
-      operation,
-      skipBlanks: skipBlanks.input.checked,
-      transpose: transpose.input.checked,
-    };
     // Bundle every value/format mutation into one undoable step. Cell writes
     // route through the workbook (which pushes to the same history); the
     // format slice change goes through recordFormatChange to capture both.
@@ -198,8 +189,22 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
     } else {
       result = pasteSpecial(store.getState(), store, wb, snap, opts);
     }
-    close();
     if (result) deps.onAfterCommit();
+    return !!result;
+  };
+
+  const apply = (): void => {
+    const what =
+      [...whatRadios.entries()].find(([, el]) => el.checked)?.[0] ?? ('all' as PasteWhat);
+    const operation =
+      [...opRadios.entries()].find(([, el]) => el.checked)?.[0] ?? ('none' as PasteOperation);
+    applyOptions({
+      what,
+      operation,
+      skipBlanks: skipBlanks.input.checked,
+      transpose: transpose.input.checked,
+    });
+    close();
   };
 
   shell.on(cancelBtn, 'click', close);
@@ -218,6 +223,7 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
 
   return {
     open,
+    apply: applyOptions,
     close,
     detach() {
       shell.dispose();

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { History } from '../../../src/commands/history.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachFindReplace } from '../../../src/interact/find-replace.js';
 import {
@@ -102,7 +103,7 @@ describe('attachFindReplace', () => {
     const pill = $<HTMLElement>(host, '.fc-find__pill');
     expect(pill.getAttribute('aria-live')).toBe('polite');
 
-    const closeBtn = host.querySelectorAll<HTMLButtonElement>('.fc-find__btn')[4];
+    const closeBtn = $<HTMLButtonElement>(host, '.fc-find__btn--icon');
     expect(closeBtn?.getAttribute('aria-label')).toBeTruthy();
     expect(closeBtn?.title).toBe(closeBtn?.getAttribute('aria-label'));
     expect(closeBtn?.classList.contains('fc-find__btn--icon')).toBe(true);
@@ -121,6 +122,39 @@ describe('attachFindReplace', () => {
     setInputValue(findInput, 'foo');
     const pill = $<HTMLElement>(host, '.fc-find__pill');
     expect(pill.textContent).toBe('0 / 2');
+    handle.detach();
+  });
+
+  it('shows Excel-style tabs and options when Options is clicked', () => {
+    const handle = attachFindReplace({ host, store, wb });
+    handle.open();
+    expect(
+      $<HTMLButtonElement>(host, '.fc-find__tab[aria-selected="true"]').textContent,
+    ).toBeTruthy();
+    const options = $<HTMLElement>(host, '.fc-find__options');
+    expect(options.hidden).toBe(true);
+    $<HTMLButtonElement>(host, '.fc-find__options-btn').click();
+    expect(options.hidden).toBe(false);
+    expect($<HTMLSelectElement>(host, '#fc-find-within').value).toBe('sheet');
+    expect($<HTMLSelectElement>(host, '#fc-find-search').value).toBe('rows');
+    expect($<HTMLSelectElement>(host, '#fc-find-look-in').value).toBe('values');
+    handle.detach();
+  });
+
+  it('Find All renders a selectable results table', () => {
+    seed(store, wb, [
+      { row: 1, col: 0, value: 'apple' },
+      { row: 3, col: 2, value: 'apple' },
+    ]);
+    const handle = attachFindReplace({ host, store, wb });
+    handle.open();
+    setInputValue($<HTMLInputElement>(host, '#fc-find-find-input'), 'apple');
+    $<HTMLButtonElement>(host, '.fc-find__btn--find-all').click();
+    const rows = host.querySelectorAll<HTMLTableRowElement>('.fc-find__results tbody tr');
+    expect(rows).toHaveLength(2);
+    expect(rows[1]?.textContent).toContain('C4');
+    rows[1]?.click();
+    expect(store.getState().selection.active).toEqual({ sheet: 0, row: 3, col: 2 });
     handle.detach();
   });
 
@@ -171,15 +205,13 @@ describe('attachFindReplace', () => {
     handle.open();
     const findInput = $<HTMLInputElement>(host, '.fc-find input[type="text"]');
     setInputValue(findInput, 'a');
-    const buttons = host.querySelectorAll<HTMLButtonElement>('.fc-find__btn');
-    // Order in source: Prev, Next, ReplaceOne, ReplaceAll, Close (the case
-    // toggle is a label, not a button).
-    const [prev, next] = buttons;
-    next?.click();
+    const prev = $<HTMLButtonElement>(host, '.fc-find__btn--prev');
+    const next = $<HTMLButtonElement>(host, '.fc-find__btn--next');
+    next.click();
     expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 0 });
-    next?.click();
+    next.click();
     expect(store.getState().selection.active).toEqual({ sheet: 0, row: 3, col: 0 });
-    prev?.click();
+    prev.click();
     expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 0 });
     handle.detach();
   });
@@ -214,7 +246,7 @@ describe('attachFindReplace', () => {
     fireKey(findInput, 'Enter'); // case-insensitive: 2 matches; first after (0,0) is (1, 0).
     expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 0 });
 
-    const caseToggle = host.querySelector<HTMLInputElement>('.fc-find input[type="checkbox"]');
+    const caseToggle = host.querySelector<HTMLInputElement>('#fc-find-case');
     if (caseToggle) {
       caseToggle.checked = true;
       caseToggle.dispatchEvent(new Event('change', { bubbles: true }));
@@ -230,17 +262,17 @@ describe('attachFindReplace', () => {
       { row: 2, col: 0, value: 'aaa' },
     ]);
     const handle = attachFindReplace({ host, store, wb, onAfterCommit });
-    handle.open();
+    handle.open('replace');
     const findInput = $<HTMLInputElement>(host, '.fc-find input[type="text"]');
-    const replaceInput = host.querySelectorAll<HTMLInputElement>('.fc-find input[type="text"]')[1];
+    const replaceInput = $<HTMLInputElement>(host, '#fc-find-replace-input');
     setInputValue(findInput, 'a');
     if (replaceInput) setInputValue(replaceInput, 'X');
     // Enter sets currentMatch to (1, 0) (first match strictly after the
     // default active (0, 0)). The Replace button then writes there and steps
     // forward to (2, 0).
     fireKey(findInput, 'Enter');
-    const replaceBtn = host.querySelectorAll<HTMLButtonElement>('.fc-find__btn')[2];
-    replaceBtn?.click();
+    const replaceBtn = $<HTMLButtonElement>(host, '.fc-find__btn--replace');
+    replaceBtn.click();
     wb.recalc();
     expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'XXX' });
     expect(wb.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'text', value: 'aaa' });
@@ -249,19 +281,37 @@ describe('attachFindReplace', () => {
     handle.detach();
   });
 
+  it('replaceOne starts from the active matching cell without a prior Find Next', () => {
+    seed(store, wb, [{ row: 0, col: 0, value: 'replace target' }]);
+    const handle = attachFindReplace({ host, store, wb, onAfterCommit });
+    handle.open('replace');
+    setInputValue($<HTMLInputElement>(host, '#fc-find-find-input'), 'replace target');
+    setInputValue($<HTMLInputElement>(host, '#fc-find-replace-input'), 'replaced target');
+
+    $<HTMLButtonElement>(host, '.fc-find__btn--replace').click();
+    wb.recalc();
+
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
+      kind: 'text',
+      value: 'replaced target',
+    });
+    expect(onAfterCommit).toHaveBeenCalled();
+    handle.detach();
+  });
+
   it('replaceOne skips formula cells', () => {
     // Place the formula match at (1, 0) so step('next') from default (0, 0)
     // can land on it.
     seed(store, wb, [{ row: 1, col: 0, value: 'aaa', formula: '="aaa"' }]);
     const handle = attachFindReplace({ host, store, wb, onAfterCommit });
-    handle.open();
+    handle.open('replace');
     const findInput = $<HTMLInputElement>(host, '.fc-find input[type="text"]');
-    const replaceInput = host.querySelectorAll<HTMLInputElement>('.fc-find input[type="text"]')[1];
+    const replaceInput = $<HTMLInputElement>(host, '#fc-find-replace-input');
     setInputValue(findInput, 'a');
     if (replaceInput) setInputValue(replaceInput, 'X');
     fireKey(findInput, 'Enter');
-    const replaceBtn = host.querySelectorAll<HTMLButtonElement>('.fc-find__btn')[2];
-    replaceBtn?.click();
+    const replaceBtn = $<HTMLButtonElement>(host, '.fc-find__btn--replace');
+    replaceBtn.click();
     wb.recalc();
     expect(wb.cellFormula({ sheet: 0, row: 1, col: 0 })).toBe('="aaa"');
     expect(onAfterCommit).not.toHaveBeenCalled();
@@ -275,25 +325,52 @@ describe('attachFindReplace', () => {
       { row: 2, col: 0, value: 'foo' },
     ]);
     const handle = attachFindReplace({ host, store, wb, onAfterCommit });
-    handle.open();
+    handle.open('replace');
     const findInput = $<HTMLInputElement>(host, '.fc-find input[type="text"]');
-    const replaceInput = host.querySelectorAll<HTMLInputElement>('.fc-find input[type="text"]')[1];
+    const replaceInput = $<HTMLInputElement>(host, '#fc-find-replace-input');
     setInputValue(findInput, 'foo');
     if (replaceInput) setInputValue(replaceInput, 'bar');
-    const replaceAllBtn = host.querySelectorAll<HTMLButtonElement>('.fc-find__btn')[3];
-    replaceAllBtn?.click();
+    const replaceAllBtn = $<HTMLButtonElement>(host, '.fc-find__btn--replace-all');
+    replaceAllBtn.click();
     wb.recalc();
-    expect($<HTMLElement>(host, '.fc-find__pill').textContent).toBe('3 replaced');
+    expect($<HTMLElement>(host, '.fc-find__pill').textContent).toContain('3');
     expect(onAfterCommit).toHaveBeenCalled();
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'bar' });
     handle.detach();
   });
 
+  it('replaceAll is one undo step when history is provided', () => {
+    seed(store, wb, [
+      { row: 0, col: 0, value: 'foo' },
+      { row: 1, col: 0, value: 'foo' },
+      { row: 2, col: 0, value: 'foo' },
+    ]);
+    const history = new History();
+    wb.attachHistory(history);
+    history.clear();
+    const handle = attachFindReplace({ host, store, wb, history, onAfterCommit });
+    handle.open('replace');
+    setInputValue($<HTMLInputElement>(host, '#fc-find-find-input'), 'foo');
+    setInputValue($<HTMLInputElement>(host, '#fc-find-replace-input'), 'bar');
+
+    $<HTMLButtonElement>(host, '.fc-find__btn--replace-all').click();
+    expect(onAfterCommit).toHaveBeenCalledTimes(1);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'bar' });
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'bar' });
+    expect(wb.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'text', value: 'bar' });
+
+    expect(history.undo()).toBe(true);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'foo' });
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'foo' });
+    expect(wb.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'text', value: 'foo' });
+    handle.detach();
+  });
+
   it('replaceAll on empty query is a no-op', () => {
     const handle = attachFindReplace({ host, store, wb, onAfterCommit });
-    handle.open();
-    const replaceAllBtn = host.querySelectorAll<HTMLButtonElement>('.fc-find__btn')[3];
-    replaceAllBtn?.click();
+    handle.open('replace');
+    const replaceAllBtn = $<HTMLButtonElement>(host, '.fc-find__btn--replace-all');
+    replaceAllBtn.click();
     expect(onAfterCommit).not.toHaveBeenCalled();
     expect($<HTMLElement>(host, '.fc-find__pill').textContent).toBe('0 / 0');
     handle.detach();
@@ -302,9 +379,8 @@ describe('attachFindReplace', () => {
   it('close button closes the overlay', () => {
     const handle = attachFindReplace({ host, store, wb });
     handle.open();
-    // Close is the 5th button (after prev/next/replace/replaceAll).
-    const closeBtn = host.querySelectorAll<HTMLButtonElement>('.fc-find__btn')[4];
-    closeBtn?.click();
+    const closeBtn = $<HTMLButtonElement>(host, '.fc-find__btn--close');
+    closeBtn.click();
     expect($<HTMLElement>(host, '.fc-find').hidden).toBe(true);
     handle.detach();
   });

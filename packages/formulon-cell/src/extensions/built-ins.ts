@@ -16,6 +16,7 @@
 // Cross-feature dependencies (context menu opening the format dialog
 // etc.) resolve through `ctx.resolve(id)` at call time, so a user
 // replacement registered under the same id participates correctly.
+import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import type { History } from '../commands/history.js';
 import { setSheetZoom } from '../commands/structure.js';
 import { attachBorderDraw } from '../interact/border-draw.js';
@@ -142,6 +143,7 @@ export const quickAnalysis = (): Extension => ({
       store: ctx.store,
       wb: ctx.getWb(),
       strings: ctx.i18n.strings,
+      history: ctx.history as History,
       onAfterCommit: () => refreshCells(ctx),
       invalidate: () => ctx.invalidate(),
       onOpenPivotTable: () =>
@@ -305,6 +307,7 @@ export const conditionalDialog = (): Extension => ({
     let handle = attachConditionalDialog({
       host: ctx.host,
       store: ctx.store,
+      history: ctx.history as History,
       strings: ctx.i18n.strings,
     });
     return {
@@ -312,7 +315,12 @@ export const conditionalDialog = (): Extension => ({
       close: () => handle.close(),
       setStrings: (next) => {
         handle.detach();
-        handle = attachConditionalDialog({ host: ctx.host, store: ctx.store, strings: next });
+        handle = attachConditionalDialog({
+          host: ctx.host,
+          store: ctx.store,
+          history: ctx.history as History,
+          strings: next,
+        });
       },
       dispose: () => handle.detach(),
     };
@@ -379,6 +387,7 @@ export const namedRangeDialog = (): Extension => ({
     let handle = attachNamedRangeDialog({
       host: ctx.host,
       wb: ctx.getWb(),
+      history: ctx.history as History,
       strings: ctx.i18n.strings,
     });
     return {
@@ -387,7 +396,12 @@ export const namedRangeDialog = (): Extension => ({
       rebindWorkbook: (wb) => handle.bindWorkbook(wb),
       setStrings: (next) => {
         handle.detach();
-        handle = attachNamedRangeDialog({ host: ctx.host, wb: ctx.getWb(), strings: next });
+        handle = attachNamedRangeDialog({
+          host: ctx.host,
+          wb: ctx.getWb(),
+          history: ctx.history as History,
+          strings: next,
+        });
       },
       dispose: () => handle.detach(),
     };
@@ -484,6 +498,7 @@ export const findReplace = (): Extension => ({
       store: ctx.store,
       wb: ctx.getWb(),
       strings: ctx.i18n.strings,
+      history: ctx.history as History,
       onAfterCommit: () => refreshCells(ctx),
     });
     return {
@@ -496,6 +511,7 @@ export const findReplace = (): Extension => ({
           store: ctx.store,
           wb,
           strings: ctx.i18n.strings,
+          history: ctx.history as History,
           onAfterCommit: () => refreshCells(ctx),
         });
       },
@@ -540,6 +556,7 @@ export const clipboard = (): Extension => ({
   setup(ctx) {
     let handle = attachClipboard({
       host: ctx.host,
+      history: ctx.history as History,
       store: ctx.store,
       wb: ctx.getWb(),
       onAfterCommit: () => refreshCells(ctx),
@@ -550,6 +567,7 @@ export const clipboard = (): Extension => ({
         handle.detach();
         handle = attachClipboard({
           host: ctx.host,
+          history: ctx.history as History,
           store: ctx.store,
           wb,
           onAfterCommit: () => refreshCells(ctx),
@@ -616,6 +634,12 @@ export const contextMenu = (): Extension => ({
       const handle = ctx.resolve<ExtensionHandle & { open: () => void }>(id);
       handle?.open?.();
     };
+    const getClipboardSnapshot = (): ClipboardSnapshot | null => {
+      const cb = ctx.resolve<ExtensionHandle & { getSnapshot?: () => ClipboardSnapshot | null }>(
+        'clipboard',
+      );
+      return cb?.getSnapshot?.() ?? null;
+    };
     let detach = attachContextMenu({
       host: ctx.host,
       grid: ctx.grid,
@@ -628,6 +652,8 @@ export const contextMenu = (): Extension => ({
       onPasteSpecial: () => callOpen('pasteSpecial'),
       onInsertHyperlink: () => callOpen('hyperlink'),
       onEditComment: () => callOpen('commentDialog'),
+      onDefineName: () => callOpen('namedRanges'),
+      getClipboardSnapshot,
     });
     return {
       rebindWorkbook: (wb) => {
@@ -644,6 +670,8 @@ export const contextMenu = (): Extension => ({
           onPasteSpecial: () => callOpen('pasteSpecial'),
           onInsertHyperlink: () => callOpen('hyperlink'),
           onEditComment: () => callOpen('commentDialog'),
+          onDefineName: () => callOpen('namedRanges'),
+          getClipboardSnapshot,
         });
       },
       // attachContextMenu's detacher exposes setStrings; use it directly

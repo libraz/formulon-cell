@@ -51,13 +51,23 @@ describe('i18n/strings — locale parity', () => {
       return out;
     }
 
-    for (const [path, val] of flatEntries(en)) {
-      expect(typeof val, `en[${path}] should be string`).toBe('string');
-      expect((val as string).length, `en[${path}] should be non-empty`).toBeGreaterThan(0);
-    }
-    for (const [path, val] of flatEntries(ja)) {
-      expect(typeof val, `ja[${path}] should be string`).toBe('string');
-      expect((val as string).length, `ja[${path}] should be non-empty`).toBeGreaterThan(0);
-    }
+    const assertLeafValue = (locale: 'en' | 'ja', path: string, val: unknown): void => {
+      if (Array.isArray(val)) {
+        expect(val.length, `${locale}[${path}] should be a non-empty array`).toBeGreaterThan(0);
+        for (const item of val) {
+          expect(typeof item, `${locale}[${path}] items should be strings`).toBe('string');
+          expect(
+            (item as string).length,
+            `${locale}[${path}] items should be non-empty`,
+          ).toBeGreaterThan(0);
+        }
+        return;
+      }
+      expect(typeof val, `${locale}[${path}] should be string`).toBe('string');
+      expect((val as string).length, `${locale}[${path}] should be non-empty`).toBeGreaterThan(0);
+    };
+
+    for (const [path, val] of flatEntries(en)) assertLeafValue('en', path, val);
+    for (const [path, val] of flatEntries(ja)) assertLeafValue('ja', path, val);
   });
 });

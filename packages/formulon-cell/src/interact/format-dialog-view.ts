@@ -1,5 +1,12 @@
 import type { Strings } from '../i18n/strings.js';
-import type { CellAlign, CellVAlign, ValidationOp } from '../store/store.js';
+import type {
+  CellAlign,
+  CellVAlign,
+  FillPattern,
+  NegativeStyle,
+  TextDirection,
+  ValidationOp,
+} from '../store/store.js';
 import { createDialogShell } from './dialog-shell.js';
 import {
   makeButton,
@@ -37,7 +44,14 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   // Header
   const header = document.createElement('div');
   header.className = 'fc-fmtdlg__header';
-  header.textContent = t.title;
+  const headerTitle = document.createElement('span');
+  headerTitle.textContent = t.title;
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'fc-fmtdlg__close';
+  closeBtn.setAttribute('aria-label', t.cancel);
+  closeBtn.textContent = '×';
+  header.append(headerTitle, closeBtn);
   panel.appendChild(header);
 
   // Preview
@@ -54,12 +68,19 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   const tabsStrip = document.createElement('div');
   tabsStrip.className = 'fc-fmtdlg__tabs';
   tabsStrip.setAttribute('role', 'tablist');
+  tabsStrip.setAttribute('aria-label', t.title);
   panel.appendChild(tabsStrip);
 
   // Body
   const body = document.createElement('div');
   body.className = 'fc-fmtdlg__body';
   panel.appendChild(body);
+
+  // Hint bar (full-width context description shown above the footer; only
+  // populated for the Number tab — other tabs leave it empty/hidden).
+  const hintBar = document.createElement('div');
+  hintBar.className = 'fc-fmtdlg__hintbar';
+  panel.appendChild(hintBar);
 
   // Footer
   const footer = document.createElement('div');
@@ -172,6 +193,12 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   decimalsRow.append(decimalsLabel, decimalsInput);
   numberControls.appendChild(decimalsRow);
 
+  const thousandsCk = makeCheckbox(t.thousandsSeparator);
+  thousandsCk.input.setAttribute('aria-label', t.thousandsSeparator);
+  thousandsCk.input.dataset.fcCheck = 'thousands';
+  thousandsCk.wrap.classList.add('fc-fmtdlg__number-check');
+  numberControls.appendChild(thousandsCk.wrap);
+
   const symbolRow = document.createElement('label');
   symbolRow.className = 'fc-fmtdlg__row';
   const symbolLabel = document.createElement('span');
@@ -193,8 +220,25 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   patternPresetLabel.textContent = t.patternType;
   const patternPresetSelect = document.createElement('select');
   patternPresetSelect.setAttribute('aria-label', t.patternType);
+  patternPresetSelect.dataset.fcSelect = 'patternPreset';
   patternPresetRow.append(patternPresetLabel, patternPresetSelect);
   numberControls.appendChild(patternPresetRow);
+
+  // Pattern listbox — Office365-style clickable list of formatted example
+  // strings (shown for date/time/datetime/special). Replaces the select
+  // dropdown above for those categories so users see the actual rendering
+  // instead of cryptic pattern codes.
+  const patternListWrap = document.createElement('div');
+  patternListWrap.className = 'fc-fmtdlg__pattern-list-wrap';
+  const patternListLabel = document.createElement('div');
+  patternListLabel.className = 'fc-fmtdlg__pattern-list-label';
+  patternListLabel.textContent = t.patternType;
+  const patternList = document.createElement('div');
+  patternList.className = 'fc-fmtdlg__pattern-list';
+  patternList.setAttribute('role', 'listbox');
+  patternList.setAttribute('aria-label', t.patternType);
+  patternListWrap.append(patternListLabel, patternList);
+  numberControls.appendChild(patternListWrap);
 
   // Pattern row — visible for date/time/datetime/custom categories.
   const patternRow = document.createElement('label');
@@ -229,6 +273,28 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   localeRow.append(localeLabel, localeSelect);
   numberControls.appendChild(localeRow);
 
+  // Calendar type — visible only for the date category. Choices mirror
+  // Office365's Gregorian/Japanese options; pattern output is unchanged
+  // since downstream rendering does not yet implement era formatting.
+  const calendarRow = document.createElement('label');
+  calendarRow.className = 'fc-fmtdlg__row';
+  const calendarLabel = document.createElement('span');
+  calendarLabel.textContent = t.calendarType;
+  const calendarSelect = document.createElement('select');
+  calendarSelect.setAttribute('aria-label', t.calendarType);
+  calendarSelect.dataset.fcSelect = 'calendarType';
+  for (const [value, label] of [
+    ['gregorian', t.calendarTypeGregorian],
+    ['japanese', t.calendarTypeJapanese],
+  ] as const) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    calendarSelect.appendChild(opt);
+  }
+  calendarRow.append(calendarLabel, calendarSelect);
+  numberControls.appendChild(calendarRow);
+
   const negativeList = document.createElement('div');
   negativeList.className = 'fc-fmtdlg__negative';
   const negativeLabel = document.createElement('div');
@@ -238,15 +304,21 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   negativeOptions.className = 'fc-fmtdlg__negative-list';
   negativeOptions.setAttribute('role', 'listbox');
   negativeOptions.setAttribute('aria-label', t.negativeNumbers);
-  const negativeSamples = ['(1234)', '(1234)', '1234', '-1234', '-1234', '△ 1234', '▲ 1234'];
-  for (const [index, text] of negativeSamples.entries()) {
-    const item = document.createElement('div');
+  const negativeSamples: Array<{ value: NegativeStyle; text: string; red?: boolean }> = [
+    { value: 'parens', text: '(1234)' },
+    { value: 'red-parens', text: '(1234)', red: true },
+    { value: 'red', text: '-1234', red: true },
+    { value: 'minus', text: '-1234' },
+  ];
+  for (const [index, sample] of negativeSamples.entries()) {
+    const item = document.createElement('button');
+    item.type = 'button';
     item.className = 'fc-fmtdlg__negative-item';
     item.setAttribute('role', 'option');
     item.setAttribute('aria-selected', index === 3 ? 'true' : 'false');
-    if (index === 0 || index === 2 || index === 4)
-      item.classList.add('fc-fmtdlg__negative-item--red');
-    item.textContent = text;
+    item.dataset.fcNegativeStyle = sample.value;
+    if (sample.red) item.classList.add('fc-fmtdlg__negative-item--red');
+    item.textContent = sample.text;
     negativeOptions.appendChild(item);
   }
   negativeList.append(negativeLabel, negativeOptions);
@@ -271,6 +343,10 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     { id: 'left', label: t.alignLeft },
     { id: 'center', label: t.alignCenter },
     { id: 'right', label: t.alignRight },
+    { id: 'fill', label: t.alignFill },
+    { id: 'justify', label: t.alignJustify },
+    { id: 'centerContinuous', label: t.alignCenterAcrossSelection },
+    { id: 'distributed', label: t.alignDistributed },
   ];
   const hAlignRadios = new Map<'default' | CellAlign, HTMLInputElement>();
   for (const a of hAlignDefs) {
@@ -293,6 +369,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   hAlignSelectLabel.textContent = t.horizontalAlign;
   const hAlignSelect = document.createElement('select');
   hAlignSelect.setAttribute('aria-label', t.horizontalAlign);
+  hAlignSelect.dataset.fcSelect = 'align';
   for (const a of hAlignDefs) {
     const opt = document.createElement('option');
     opt.value = a.id;
@@ -318,6 +395,8 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     { id: 'top', label: t.vAlignTop },
     { id: 'middle', label: t.vAlignMiddle },
     { id: 'bottom', label: t.vAlignBottom },
+    { id: 'justify', label: t.vAlignJustify },
+    { id: 'distributed', label: t.vAlignDistributed },
   ];
   const vAlignRadios = new Map<'default' | CellVAlign, HTMLInputElement>();
   for (const a of vAlignDefs) {
@@ -340,6 +419,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   vAlignSelectLabel.textContent = t.verticalAlign;
   const vAlignSelect = document.createElement('select');
   vAlignSelect.setAttribute('aria-label', t.verticalAlign);
+  vAlignSelect.dataset.fcSelect = 'vAlign';
   for (const a of vAlignDefs) {
     const opt = document.createElement('option');
     opt.value = a.id;
@@ -370,6 +450,27 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   indentRow.append(indentLabel, indentInput);
   alignPanel.appendChild(indentRow);
 
+  const textDirectionRow = document.createElement('label');
+  textDirectionRow.className = 'fc-fmtdlg__row';
+  const textDirectionLabel = document.createElement('span');
+  textDirectionLabel.textContent = t.textDirection;
+  const textDirectionSelect = document.createElement('select');
+  textDirectionSelect.setAttribute('aria-label', t.textDirection);
+  textDirectionSelect.dataset.fcSelect = 'textDirection';
+  const directionDefs: Array<{ id: TextDirection; label: string }> = [
+    { id: 'context', label: t.directionContext },
+    { id: 'ltr', label: t.directionLeftToRight },
+    { id: 'rtl', label: t.directionRightToLeft },
+  ];
+  for (const direction of directionDefs) {
+    const opt = document.createElement('option');
+    opt.value = direction.id;
+    opt.textContent = direction.label;
+    textDirectionSelect.appendChild(opt);
+  }
+  textDirectionRow.append(textDirectionLabel, textDirectionSelect);
+  alignPanel.appendChild(textDirectionRow);
+
   const rotationRow = document.createElement('label');
   rotationRow.className = 'fc-fmtdlg__row fc-fmtdlg__rotation-row';
   const rotationLabel = document.createElement('span');
@@ -395,7 +496,38 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   alignPreviewVertical.textContent = t.previewText;
   const alignPreviewDial = document.createElement('div');
   alignPreviewDial.className = 'fc-fmtdlg__align-preview-dial';
+  alignPreviewDial.setAttribute('role', 'group');
+  alignPreviewDial.setAttribute('aria-label', t.rotation);
+  const alignPreviewDialArc = document.createElement('span');
+  alignPreviewDialArc.className = 'fc-fmtdlg__align-preview-arc';
+  alignPreviewDialArc.setAttribute('aria-hidden', 'true');
+  alignPreviewDial.appendChild(alignPreviewDialArc);
+  const ANGLE_STEPS = [90, 75, 60, 45, 30, 15, 0, -15, -30, -45, -60, -75, -90];
+  const alignPreviewDialDots: HTMLButtonElement[] = [];
+  for (const angle of ANGLE_STEPS) {
+    const dot = document.createElement('button');
+    dot.type = 'button';
+    dot.className = 'fc-fmtdlg__align-preview-dot';
+    dot.dataset.fcAngle = String(angle);
+    dot.setAttribute('aria-label', `${angle}°`);
+    dot.title = `${angle}°`;
+    const rad = (angle * Math.PI) / 180;
+    const cx = 12;
+    const cy = 66;
+    const radius = 56;
+    const px = cx + radius * Math.cos(rad);
+    const py = cy - radius * Math.sin(rad);
+    dot.style.left = `${px}px`;
+    dot.style.top = `${py}px`;
+    alignPreviewDial.appendChild(dot);
+    alignPreviewDialDots.push(dot);
+  }
+  const alignPreviewDialPointer = document.createElement('span');
+  alignPreviewDialPointer.className = 'fc-fmtdlg__align-preview-pointer';
+  alignPreviewDialPointer.setAttribute('aria-hidden', 'true');
+  alignPreviewDial.appendChild(alignPreviewDialPointer);
   const alignPreviewDialText = document.createElement('span');
+  alignPreviewDialText.className = 'fc-fmtdlg__align-preview-text';
   alignPreviewDialText.textContent = t.previewText;
   alignPreviewDial.appendChild(alignPreviewDialText);
   alignPreviewBox.append(alignPreviewVertical, alignPreviewDial);
@@ -413,11 +545,9 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   textControlTitle.className = 'fc-fmtdlg__text-control-title';
   textControlTitle.textContent = t.textControl;
   const shrinkCk = makeCheckbox(t.shrinkToFit);
-  shrinkCk.wrap.classList.add('fc-fmtdlg__check--muted');
-  shrinkCk.input.disabled = true;
+  shrinkCk.input.dataset.fcCheck = 'shrinkToFit';
   const mergeCk = makeCheckbox(t.mergeCells);
-  mergeCk.wrap.classList.add('fc-fmtdlg__check--muted');
-  mergeCk.input.disabled = true;
+  mergeCk.input.dataset.fcCheck = 'mergeCells';
   textControl.append(textControlTitle, wrapCk.wrap, shrinkCk.wrap, mergeCk.wrap);
   alignPanel.appendChild(textControl);
 
@@ -437,6 +567,10 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   const strikeCk = makeCheckbox(t.fontStrike);
   strikeCk.input.dataset.fcCheck = 'strike';
   styleRow.append(boldCk.wrap, italicCk.wrap, underlineCk.wrap, strikeCk.wrap);
+
+  const normalFontCk = makeCheckbox(t.normalFont);
+  normalFontCk.input.dataset.fcCheck = 'normalFont';
+  fontPanel.appendChild(normalFontCk.wrap);
 
   // Font family
   const familyRow = document.createElement('label');
@@ -484,16 +618,18 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   fontStyleList.className = 'fc-fmtdlg__font-list fc-fmtdlg__font-list--style';
   fontStyleList.setAttribute('role', 'listbox');
   fontStyleList.setAttribute('aria-label', t.fontStyle);
-  for (const [index, label] of [
-    t.alignDefault,
-    t.fontItalic,
-    t.fontBold,
-    `${t.fontBold} ${t.fontItalic}`,
-  ].entries()) {
+  const fontStyleOptions = [
+    { id: 'regular', label: t.fontRegular },
+    { id: 'italic', label: t.fontItalic },
+    { id: 'bold', label: t.fontBold },
+    { id: 'boldItalic', label: `${t.fontBold} ${t.fontItalic}` },
+  ] as const;
+  for (const [index, option] of fontStyleOptions.entries()) {
     const item = document.createElement('button');
     item.type = 'button';
     item.className = 'fc-fmtdlg__font-list-item';
-    item.textContent = label;
+    item.textContent = option.label;
+    item.dataset.fcFontStyle = option.id;
     item.setAttribute('role', 'option');
     item.setAttribute('aria-selected', index === 0 ? 'true' : 'false');
     fontStyleList.appendChild(item);
@@ -545,8 +681,8 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   const colorReset = makeButton(t.resetToDefault);
   colorRow.append(colorLabel, colorInput, colorReset);
   fontPanel.appendChild(colorRow);
-  const fontSwatches = makeSwatches('font');
-  fontPanel.appendChild(fontSwatches);
+  const fontSwatches = makeSwatches('font', t.themeColors, t.standardColors);
+  fontPanel.appendChild(fontSwatches.el);
 
   const fontPreview = document.createElement('div');
   fontPreview.className = 'fc-fmtdlg__font-preview';
@@ -555,7 +691,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   fontPreviewLabel.textContent = t.preview;
   const fontPreviewBox = document.createElement('div');
   fontPreviewBox.className = 'fc-fmtdlg__font-preview-box';
-  fontPreviewBox.textContent = 'Yu Gothic';
+  fontPreviewBox.textContent = t.previewText;
   fontPreview.append(fontPreviewLabel, fontPreviewBox);
   fontPanel.appendChild(fontPreview);
 
@@ -617,8 +753,8 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   const borderColorReset = makeButton(t.resetToDefault);
   borderColorRow.append(borderColorLabel, borderColorInput, borderColorReset);
   borderPanel.appendChild(borderColorRow);
-  const borderSwatches = makeSwatches('border');
-  borderPanel.appendChild(borderSwatches);
+  const borderSwatches = makeSwatches('border', t.themeColors, t.standardColors);
+  borderPanel.appendChild(borderSwatches.el);
 
   // Presets
   const presetRow = document.createElement('div');
@@ -717,8 +853,43 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   const fillReset = makeButton(t.fillNone);
   fillRow.append(fillLabel, fillInput, fillReset);
   fillSection.appendChild(fillRow);
-  const fillSwatches = makeSwatches('fill');
-  fillSection.appendChild(fillSwatches);
+  const fillSwatches = makeSwatches('fill', t.themeColors, t.standardColors);
+  fillSection.appendChild(fillSwatches.el);
+  const fillPatternRow = document.createElement('label');
+  fillPatternRow.className = 'fc-fmtdlg__row';
+  const fillPatternLabel = document.createElement('span');
+  fillPatternLabel.textContent = t.fillPatternStyle;
+  const fillPatternSelect = document.createElement('select');
+  fillPatternSelect.setAttribute('aria-label', t.fillPatternStyle);
+  fillPatternSelect.dataset.fcSelect = 'fillPattern';
+  const fillPatternOptions: Array<{ value: '' | FillPattern; label: string }> = [
+    { value: '', label: t.fillPatternSolid },
+    { value: 'gray125', label: t.fillPatternGray125 },
+    { value: 'gray25', label: t.fillPatternGray25 },
+    { value: 'gray50', label: t.fillPatternGray50 },
+    { value: 'horizontal', label: t.fillPatternHorizontal },
+    { value: 'vertical', label: t.fillPatternVertical },
+    { value: 'diagonalDown', label: t.fillPatternDiagonalDown },
+    { value: 'diagonalUp', label: t.fillPatternDiagonalUp },
+  ];
+  for (const option of fillPatternOptions) {
+    const opt = document.createElement('option');
+    opt.value = option.value;
+    opt.textContent = option.label;
+    fillPatternSelect.appendChild(opt);
+  }
+  fillPatternRow.append(fillPatternLabel, fillPatternSelect);
+  fillSection.appendChild(fillPatternRow);
+  const fillPatternColorRow = document.createElement('div');
+  fillPatternColorRow.className = 'fc-fmtdlg__row';
+  const fillPatternColorLabel = document.createElement('span');
+  fillPatternColorLabel.textContent = t.fillPatternColor;
+  const fillPatternColorInput = document.createElement('input');
+  fillPatternColorInput.type = 'color';
+  fillPatternColorInput.setAttribute('aria-label', t.fillPatternColor);
+  fillPatternColorInput.dataset.fcColor = 'fillPattern';
+  fillPatternColorRow.append(fillPatternColorLabel, fillPatternColorInput);
+  fillSection.appendChild(fillPatternColorRow);
 
   // ── Protection tab ─────────────────────────────────────────────────────
   const protectionPanel = tabPanels.get('protection') as HTMLDivElement;
@@ -733,7 +904,9 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   lockedRow.className = 'fc-fmtdlg__row';
   const lockedCk = makeCheckbox(strings.protection.locked);
   lockedCk.input.dataset.fcCheck = 'locked';
-  lockedRow.append(lockedCk.wrap);
+  const hiddenFormulaCk = makeCheckbox(strings.protection.hiddenFormula);
+  hiddenFormulaCk.input.dataset.fcCheck = 'formulaHidden';
+  lockedRow.append(lockedCk.wrap, hiddenFormulaCk.wrap);
   protectionSection.appendChild(lockedRow);
   const lockedHint = document.createElement('div');
   lockedHint.className = 'fc-fmtdlg__hint';
@@ -929,6 +1102,68 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   validationErrorStyleRow.append(validationErrorStyleLabel, validationErrorStyleSelect);
   validationSection.appendChild(validationErrorStyleRow);
 
+  const validationShowInputMessageRow = document.createElement('label');
+  validationShowInputMessageRow.className = 'fc-fmtdlg__check';
+  const validationShowInputMessageInput = document.createElement('input');
+  validationShowInputMessageInput.type = 'checkbox';
+  const validationShowInputMessageSpan = document.createElement('span');
+  validationShowInputMessageSpan.textContent = t.validationShowInputMessage;
+  validationShowInputMessageRow.append(
+    validationShowInputMessageInput,
+    validationShowInputMessageSpan,
+  );
+  validationSection.appendChild(validationShowInputMessageRow);
+
+  const validationPromptTitleRow = document.createElement('label');
+  validationPromptTitleRow.className = 'fc-fmtdlg__row';
+  const validationPromptTitleLabel = document.createElement('span');
+  validationPromptTitleLabel.textContent = t.validationPromptTitle;
+  const validationPromptTitleInput = document.createElement('input');
+  validationPromptTitleInput.type = 'text';
+  validationPromptTitleInput.setAttribute('aria-label', t.validationPromptTitle);
+  validationPromptTitleRow.append(validationPromptTitleLabel, validationPromptTitleInput);
+  validationSection.appendChild(validationPromptTitleRow);
+
+  const validationPromptMessageRow = document.createElement('div');
+  validationPromptMessageRow.className = 'fc-fmtdlg__row fc-fmtdlg__row--block';
+  const validationPromptMessageArea = document.createElement('textarea');
+  validationPromptMessageArea.className = 'fc-fmtdlg__textarea';
+  validationPromptMessageArea.rows = 3;
+  validationPromptMessageArea.setAttribute('aria-label', t.validationPromptMessage);
+  validationPromptMessageRow.appendChild(validationPromptMessageArea);
+  validationSection.appendChild(validationPromptMessageRow);
+
+  const validationShowErrorMessageRow = document.createElement('label');
+  validationShowErrorMessageRow.className = 'fc-fmtdlg__check';
+  const validationShowErrorMessageInput = document.createElement('input');
+  validationShowErrorMessageInput.type = 'checkbox';
+  const validationShowErrorMessageSpan = document.createElement('span');
+  validationShowErrorMessageSpan.textContent = t.validationShowErrorMessage;
+  validationShowErrorMessageRow.append(
+    validationShowErrorMessageInput,
+    validationShowErrorMessageSpan,
+  );
+  validationSection.appendChild(validationShowErrorMessageRow);
+
+  const validationErrorTitleRow = document.createElement('label');
+  validationErrorTitleRow.className = 'fc-fmtdlg__row';
+  const validationErrorTitleLabel = document.createElement('span');
+  validationErrorTitleLabel.textContent = t.validationErrorTitle;
+  const validationErrorTitleInput = document.createElement('input');
+  validationErrorTitleInput.type = 'text';
+  validationErrorTitleInput.setAttribute('aria-label', t.validationErrorTitle);
+  validationErrorTitleRow.append(validationErrorTitleLabel, validationErrorTitleInput);
+  validationSection.appendChild(validationErrorTitleRow);
+
+  const validationErrorMessageRow = document.createElement('div');
+  validationErrorMessageRow.className = 'fc-fmtdlg__row fc-fmtdlg__row--block';
+  const validationErrorMessageArea = document.createElement('textarea');
+  validationErrorMessageArea.className = 'fc-fmtdlg__textarea';
+  validationErrorMessageArea.rows = 3;
+  validationErrorMessageArea.setAttribute('aria-label', t.validationErrorMessage);
+  validationErrorMessageRow.appendChild(validationErrorMessageArea);
+  validationSection.appendChild(validationErrorMessageRow);
+
   // ── Footer buttons ─────────────────────────────────────────────────────
   const cancelBtn = makeButton(t.cancel);
   const okBtn = makeButton(t.ok, true);
@@ -947,15 +1182,21 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     catButtons,
     decimalsRow,
     decimalsInput,
+    thousandsCk,
     symbolRow,
     symbolSelect,
     patternPresetRow,
     patternPresetSelect,
+    patternListWrap,
+    patternList,
     patternRow,
     patternInput,
     localeRow,
     localeSelect,
+    calendarRow,
+    calendarSelect,
     negativeList,
+    negativeOptions,
     numberSummaryTitle,
     numberSummaryDesc,
     hAlignRadios,
@@ -963,12 +1204,21 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     vAlignRadios,
     vAlignSelect,
     wrapCk,
+    shrinkCk,
+    mergeCk,
     indentInput,
+    textDirectionSelect,
     rotationInput,
+    alignPreviewDial,
+    alignPreviewDialDots,
+    alignPreviewDialPointer,
+    alignPreviewDialText,
     boldCk,
     italicCk,
     underlineCk,
     strikeCk,
+    normalFontCk,
+    fontStyleList,
     familyInput,
     sizeInput,
     colorInput,
@@ -995,7 +1245,10 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     fillInput,
     fillReset,
     fillSwatches,
+    fillPatternSelect,
+    fillPatternColorInput,
     lockedCk,
+    hiddenFormulaCk,
     hlInput,
     hlClear,
     commentArea,
@@ -1021,7 +1274,21 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     validationAllowBlankInput,
     validationErrorStyleRow,
     validationErrorStyleSelect,
+    validationShowInputMessageRow,
+    validationShowInputMessageInput,
+    validationPromptTitleRow,
+    validationPromptTitleInput,
+    validationPromptMessageRow,
+    validationPromptMessageArea,
+    validationShowErrorMessageRow,
+    validationShowErrorMessageInput,
+    validationErrorTitleRow,
+    validationErrorTitleInput,
+    validationErrorMessageRow,
+    validationErrorMessageArea,
+    closeBtn,
     okBtn,
     cancelBtn,
+    hintBar,
   };
 }

@@ -1,7 +1,9 @@
 import type { History } from '../commands/history.js';
+import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
 import { setSheetZoom } from '../commands/structure.js';
 import { tracePrecedents as tracePrecedentArrows } from '../commands/traces.js';
 import { formatCellForEdit } from '../engine/edit-seed.js';
+import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetEmitter } from '../events.js';
 import type { ExtensionHandle, resolveFlags } from '../extensions/index.js';
@@ -39,6 +41,42 @@ import { mutators } from '../store/store.js';
 import type { ChromeSlot } from './chrome.js';
 import type { FormulaBarController } from './formula-bar.js';
 import type { SheetTabsController } from './sheet-tabs-controller.js';
+
+const colLetter = (col: number): string => {
+  let value = col;
+  let out = '';
+  do {
+    out = String.fromCharCode(65 + (value % 26)) + out;
+    value = Math.floor(value / 26) - 1;
+  } while (value >= 0);
+  return out;
+};
+
+const a1Range = (range: Range): string => {
+  const start = `${colLetter(range.c0)}${range.r0 + 1}`;
+  const end = `${colLetter(range.c1)}${range.r1 + 1}`;
+  return start === end ? start : `${start}:${end}`;
+};
+
+const SELECTION_SEEDED_FUNCTIONS = new Set([
+  'SUM',
+  'AVERAGE',
+  'COUNT',
+  'COUNTA',
+  'MIN',
+  'MAX',
+  'MEDIAN',
+  'SUMIF',
+  'SUMIFS',
+  'COUNTIF',
+  'COUNTIFS',
+  'AVERAGEIF',
+  'AVERAGEIFS',
+  'INDEX',
+]);
+
+const shouldSeedFunctionWithSelection = (functionName: string): boolean =>
+  SELECTION_SEEDED_FUNCTIONS.has(functionName);
 
 type FeatureFlags = ReturnType<typeof resolveFlags>;
 export type AutocompleteHandle = ReturnType<typeof attachAutocomplete>;
@@ -272,6 +310,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         s.conditionalDialog = attachConditionalDialog({
           host: input.host,
           store: input.store,
+          history: input.history,
           strings,
         });
         input.featureRegistry.set(
@@ -306,6 +345,12 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           host: input.host,
           store: input.store,
           strings,
+          getInitialArguments: (functionName) => {
+            if (!shouldSeedFunctionWithSelection(functionName)) return null;
+            const range = input.store.getState().selection.range;
+            if (range.r0 === range.r1 && range.c0 === range.c1) return null;
+            return [a1Range(range)];
+          },
           onInsert: (formula) => {
             input.fxInput.value = formula;
             input.fxInput.focus();
@@ -323,7 +368,12 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         break;
       case 'namedRanges':
         if (s.namedRangeDialog) return;
-        s.namedRangeDialog = attachNamedRangeDialog({ host: input.host, wb, strings });
+        s.namedRangeDialog = attachNamedRangeDialog({
+          host: input.host,
+          wb,
+          history: input.history,
+          strings,
+        });
         input.featureRegistry.set(
           'namedRanges',
           input.wrapHandle(s.namedRangeDialog, () => s.namedRangeDialog?.detach()),
@@ -452,6 +502,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           host: input.watchDock,
           store: input.store,
           getWb: input.wb,
+          history: input.history,
           strings,
         });
         input.featureRegistry.set(
@@ -498,10 +549,18 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           strings,
           onEditCell: (addr) => {
             mutators.setActive(input.store, addr);
-            const cell = input.store
-              .getState()
-              .data.cells.get(`${addr.sheet}:${addr.row}:${addr.col}`);
-            input.fxInput.value = formatCellForEdit(cell, wb, addr);
+            const state = input.store.getState();
+            const key = `${addr.sheet}:${addr.row}:${addr.col}`;
+            const cell = state.data.cells.get(key);
+            const fmt = state.format.formats.get(key);
+            input.fxInput.value = formatCellForEdit(cell, wb, addr, {
+              formulaOverride: wb.cellFormula(addr),
+              formulaHidden: fmt?.formulaHidden === true,
+              sheetProtected: state.protection.protectedSheets.has(addr.sheet),
+              formatFormula: state.ui.r1c1
+                ? (formula) => formatA1FormulaAsR1C1(formula, addr)
+                : undefined,
+            });
             input.fxInput.focus();
             input.fxInput.setSelectionRange(input.fxInput.value.length, input.fxInput.value.length);
           },

@@ -83,6 +83,28 @@ describe('attachStatusBar', () => {
     handle.detach();
   });
 
+  it('uses Excel default aggregate order: Average, Count, Sum', () => {
+    seedNumber(store, 0, 0, 10);
+    seedNumber(store, 1, 0, 20);
+    setRange(store, 0, 0, 1, 0);
+
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      strings: en,
+      getEngineLabel: () => 'stub',
+    });
+    const text =
+      statusbar.querySelector<HTMLElement>('.fc-host__statusbar-aggs')?.textContent ?? '';
+    const averageIndex = text.indexOf('Average');
+    const countIndex = text.indexOf('Count');
+    const sumIndex = text.indexOf('Sum');
+    expect(averageIndex).toBeGreaterThanOrEqual(0);
+    expect(countIndex).toBeGreaterThan(averageIndex);
+    expect(sumIndex).toBeGreaterThan(countIndex);
+    handle.detach();
+  });
+
   it('keeps center empty when nothing is selected (and no aggs apply)', () => {
     setRange(store, 0, 0, 0, 0);
     const handle = attachStatusBar({
@@ -121,7 +143,7 @@ describe('attachStatusBar', () => {
     expect(document.activeElement).toBe(items?.[0]);
     expect(items?.[0]?.getAttribute('role')).toBe('menuitemcheckbox');
     expect(items?.[0]?.getAttribute('aria-checked')).toBe('true');
-    // Toggle "sum" off — initial set is ['sum','average','count'].
+    // Toggle "sum" off from the Excel default Average, Count, Sum set.
     const sumItem = Array.from(items ?? []).find((b) => b.textContent?.includes('合計'));
     expect(sumItem).toBeDefined();
     sumItem?.click();
@@ -270,6 +292,26 @@ describe('attachStatusBar', () => {
     slider.dispatchEvent(new Event('input'));
     expect(store.getState().viewport.zoom).toBe(1.5);
     expect(label?.textContent).toBe('150%');
+    handle.detach();
+  });
+
+  it('renders workbook view shortcuts and switches the active view mode', () => {
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      strings: en,
+      getEngineLabel: () => 'stub',
+    });
+    const buttons = statusbar.querySelectorAll<HTMLButtonElement>('.fc-host__statusbar-view');
+    expect(buttons.length).toBe(3);
+    expect(buttons[0]?.getAttribute('aria-label')).toBe('Normal');
+    expect(buttons[0]?.getAttribute('aria-pressed')).toBe('true');
+    expect(buttons[2]?.getAttribute('aria-label')).toBe('Page Break Preview');
+
+    buttons[2]?.click();
+    expect(store.getState().ui.workbookView).toBe('pageBreakPreview');
+    expect(buttons[0]?.getAttribute('aria-pressed')).toBe('false');
+    expect(buttons[2]?.getAttribute('aria-pressed')).toBe('true');
     handle.detach();
   });
 

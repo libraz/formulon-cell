@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { defaultStrings } from '../../../src/i18n/strings.js';
 import { attachExternalLinksDialog } from '../../../src/interact/external-links-dialog.js';
 
 type LinkRecord = ReturnType<WorkbookHandle['getExternalLinks']>[number];
@@ -63,11 +64,12 @@ describe('attachExternalLinksDialog', () => {
     const rows = document.querySelectorAll<HTMLTableRowElement>('.fc-extlinkdlg__table tbody tr');
     expect(rows.length).toBe(2);
     expect(rows[0]?.textContent).toContain('1');
-    expect(rows[0]?.textContent).toContain('externalBook');
+    expect(rows[0]?.textContent).toContain(defaultStrings.externalLinksDialog.kindExternalBook);
     expect(rows[0]?.textContent).toContain('book2.xlsx');
     expect(rows[0]?.tabIndex).toBe(0);
     expect(rows[0]?.getAttribute('aria-selected')).toBe('true');
     expect(rows[1]?.tabIndex).toBe(-1);
+    expect(rows[1]?.textContent).toContain(defaultStrings.externalLinksDialog.kindUnknown);
     // Empty target renders as a dash placeholder.
     expect(rows[1]?.textContent).toContain('—');
     handle.detach();

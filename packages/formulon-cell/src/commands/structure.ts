@@ -1,12 +1,15 @@
 import { addrKey } from '../engine/address.js';
 import type { Addr, CellValue } from '../engine/types.js';
+import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import {
   type CellFormat,
   type LayoutSlice,
   mutators,
   type SpreadsheetStore,
+  type State,
 } from '../store/store.js';
+import { formatNumber } from './format.js';
 import {
   captureLayoutSnapshot,
   type History,
@@ -611,6 +614,8 @@ export function hideRows(
   r1: number,
   wb?: WorkbookHandle,
 ): void {
+  const sheet = store.getState().data.sheetIndex;
+  if (blockedByProtection(store, sheet, 'hideRows')) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
       const next = new Set(s.layout.hiddenRows);
@@ -627,6 +632,8 @@ export function showRows(
   r1: number,
   wb?: WorkbookHandle,
 ): void {
+  const sheet = store.getState().data.sheetIndex;
+  if (blockedByProtection(store, sheet, 'showRows')) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
       const next = new Set(s.layout.hiddenRows);
@@ -636,6 +643,21 @@ export function showRows(
   });
 }
 
+export function showRowsAroundSelection(
+  store: SpreadsheetStore,
+  history: History | null,
+  r0: number,
+  r1: number,
+  wb?: WorkbookHandle,
+): void {
+  const hidden = store.getState().layout.hiddenRows;
+  let start = r0;
+  let end = r1;
+  while (start > 0 && hidden.has(start - 1)) start -= 1;
+  while (end < MAX_ROW && hidden.has(end + 1)) end += 1;
+  showRows(store, history, start, end, wb);
+}
+
 export function hideCols(
   store: SpreadsheetStore,
   history: History | null,
@@ -643,6 +665,8 @@ export function hideCols(
   c1: number,
   wb?: WorkbookHandle,
 ): void {
+  const sheet = store.getState().data.sheetIndex;
+  if (blockedByProtection(store, sheet, 'hideCols')) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
       const next = new Set(s.layout.hiddenCols);
@@ -659,6 +683,8 @@ export function showCols(
   c1: number,
   wb?: WorkbookHandle,
 ): void {
+  const sheet = store.getState().data.sheetIndex;
+  if (blockedByProtection(store, sheet, 'showCols')) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
       const next = new Set(s.layout.hiddenCols);
@@ -666,6 +692,250 @@ export function showCols(
       return { ...s, layout: { ...s.layout, hiddenCols: next } };
     });
   });
+}
+
+export function showColsAroundSelection(
+  store: SpreadsheetStore,
+  history: History | null,
+  c0: number,
+  c1: number,
+  wb?: WorkbookHandle,
+): void {
+  const hidden = store.getState().layout.hiddenCols;
+  let start = c0;
+  let end = c1;
+  while (start > 0 && hidden.has(start - 1)) start -= 1;
+  while (end < MAX_COL && hidden.has(end + 1)) end += 1;
+  showCols(store, history, start, end, wb);
+}
+
+export function setRowsHeight(
+  store: SpreadsheetStore,
+  history: History | null,
+  r0: number,
+  r1: number,
+  px: number,
+  wb?: WorkbookHandle,
+): void {
+  if (!Number.isFinite(px)) return;
+  recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
+    for (let row = r0; row <= r1; row += 1) mutators.setRowHeight(store, row, px);
+  });
+}
+
+export function setColsWidth(
+  store: SpreadsheetStore,
+  history: History | null,
+  c0: number,
+  c1: number,
+  px: number,
+  wb?: WorkbookHandle,
+): void {
+  if (!Number.isFinite(px)) return;
+  recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
+    for (let col = c0; col <= c1; col += 1) mutators.setColWidth(store, col, px);
+  });
+}
+
+export function autofitRowsHeight(
+  store: SpreadsheetStore,
+  history: History | null,
+  r0: number,
+  r1: number,
+  wb?: WorkbookHandle,
+): void {
+  recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
+    const ctx = createAutofitMeasureContext();
+    for (let row = r0; row <= r1; row += 1) {
+      mutators.setRowHeight(store, row, computeAutofitRowHeight(store.getState(), row, ctx));
+    }
+  });
+}
+
+export function autofitColsWidth(
+  store: SpreadsheetStore,
+  history: History | null,
+  c0: number,
+  c1: number,
+  wb?: WorkbookHandle,
+): void {
+  recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
+    const ctx = createAutofitMeasureContext();
+    for (let col = c0; col <= c1; col += 1) {
+      mutators.setColWidth(store, col, computeAutofitColWidth(store.getState(), col, ctx));
+    }
+  });
+}
+
+function createAutofitMeasureContext(): CanvasRenderingContext2D | null {
+  const doc = globalThis.document;
+  const canvas = doc?.createElement?.('canvas');
+  return canvas?.getContext?.('2d') ?? null;
+}
+
+function computeAutofitColWidth(
+  state: State,
+  col: number,
+  ctx: CanvasRenderingContext2D | null,
+): number {
+  const sheet = state.data.sheetIndex;
+  const padding = 16;
+  const minWidth = 48;
+  let max = 0;
+
+  for (const [key, cell] of state.data.cells) {
+    const parsed = parseCellKey(key);
+    if (!parsed || parsed.sheet !== sheet || parsed.col !== col) continue;
+    const text = autofitDisplayText(state, key, cell);
+    if (!text) continue;
+    const fmt = state.format.formats.get(key);
+    const fontSize = fmt?.fontSize ?? 13;
+    if (ctx) ctx.font = autofitFont(fmt);
+    const width =
+      maxExplicitLineWidth(text, ctx, fontSize) +
+      (isFilterHeaderCell(state, parsed.sheet, parsed.row, parsed.col) ? 28 : 0);
+    if (width > max) max = width;
+  }
+
+  return Math.max(minWidth, Math.ceil(max) + padding);
+}
+
+function computeAutofitRowHeight(
+  state: State,
+  row: number,
+  ctx: CanvasRenderingContext2D | null,
+): number {
+  const sheet = state.data.sheetIndex;
+  let max = state.layout.defaultRowHeight;
+
+  for (const [key, cell] of state.data.cells) {
+    const parsed = parseCellKey(key);
+    if (!parsed || parsed.sheet !== sheet || parsed.row !== row) continue;
+    const text = autofitDisplayText(state, key, cell);
+    if (!text) continue;
+    const fmt = state.format.formats.get(key);
+    const fontSize = fmt?.fontSize ?? 13;
+    if (ctx) ctx.font = autofitFont(fmt);
+    const lineHeight = Math.round(fontSize * 1.28);
+    const colW = state.layout.colWidths.get(parsed.col) ?? state.layout.defaultColWidth;
+    const lines = autofitLineCount(text, fmt?.wrap === true, colW, ctx, fontSize);
+    const height = Math.ceil(lines * lineHeight + 8);
+    if (height > max) max = height;
+  }
+
+  return max;
+}
+
+function parseCellKey(key: string): { sheet: number; row: number; col: number } | null {
+  const parts = key.split(':');
+  if (parts.length !== 3) return null;
+  const sheet = Number(parts[0]);
+  const row = Number(parts[1]);
+  const col = Number(parts[2]);
+  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
+  return { sheet, row, col };
+}
+
+function autofitDisplayText(
+  state: State,
+  key: string,
+  cell: { value: CellValue; formula: string | null },
+): string {
+  if (state.ui.showFormulas && cell.formula) return cell.formula;
+  const fmt = state.format.formats.get(key);
+  if (cell.value.kind === 'number' && fmt?.numFmt)
+    return formatNumber(cell.value.value, fmt.numFmt);
+  return formatCell(cell.value);
+}
+
+function isFilterHeaderCell(state: State, sheet: number, row: number, col: number): boolean {
+  const fr = state.ui.filterRange;
+  return !!fr && fr.sheet === sheet && fr.r0 === row && col >= fr.c0 && col <= fr.c1;
+}
+
+function autofitFont(format: CellFormat | undefined): string {
+  const styleSlant = format?.italic ? 'italic ' : '';
+  const weight = format?.bold ? 700 : 400;
+  const size = format?.fontSize ?? 13;
+  const family = format?.fontFamily ?? 'system-ui, sans-serif';
+  return `${styleSlant}${weight} ${size}px ${fontFamilyCss(family)}`;
+}
+
+function fontFamilyCss(family: string): string {
+  return family
+    .split(',')
+    .map((part) => {
+      const trimmed = part.trim();
+      if (/^["'].*["']$/.test(trimmed) || /^[a-z-]+$/i.test(trimmed)) return trimmed;
+      return `"${trimmed.replace(/"/g, '\\"')}"`;
+    })
+    .join(', ');
+}
+
+function maxExplicitLineWidth(
+  text: string,
+  ctx: CanvasRenderingContext2D | null,
+  fontSize: number,
+): number {
+  let max = 0;
+  for (const line of text.split(/\r\n|\r|\n/)) {
+    const measured = ctx ? ctx.measureText(line).width : 0;
+    const width = measured > 0 ? measured : line.length * fontSize * 0.54;
+    if (width > max) max = width;
+  }
+  return max;
+}
+
+function autofitLineCount(
+  text: string,
+  wrap: boolean,
+  colWidth: number,
+  ctx: CanvasRenderingContext2D | null,
+  fontSize: number,
+): number {
+  const paragraphs = text.split(/\r\n|\r|\n/);
+  if (!wrap) return Math.max(1, paragraphs.length);
+
+  const available = Math.max(1, colWidth - 12);
+  let lines = 0;
+  for (const paragraph of paragraphs) {
+    if (paragraph.length === 0) {
+      lines += 1;
+      continue;
+    }
+    lines += wrapAutofitParagraph(paragraph, available, ctx, fontSize);
+  }
+  return Math.max(1, lines);
+}
+
+function wrapAutofitParagraph(
+  paragraph: string,
+  maxWidth: number,
+  ctx: CanvasRenderingContext2D | null,
+  fontSize: number,
+): number {
+  const words = paragraph.split(/(\s+)/);
+  let line = '';
+  let count = 0;
+  for (const word of words) {
+    const candidate = line + word;
+    if (measureAutofitText(candidate, ctx, fontSize) <= maxWidth || line === '') {
+      line = candidate;
+    } else {
+      count += 1;
+      line = word.trimStart();
+    }
+  }
+  return count + (line ? 1 : 0);
+}
+
+function measureAutofitText(
+  text: string,
+  ctx: CanvasRenderingContext2D | null,
+  fontSize: number,
+): number {
+  const measured = ctx ? ctx.measureText(text).width : 0;
+  return measured > 0 ? measured : text.length * fontSize * 0.54;
 }
 
 /** Resolve which row/col indices to show again from the current selection.

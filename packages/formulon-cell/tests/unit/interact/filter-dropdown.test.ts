@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { History } from '../../../src/commands/history.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
 import { attachFilterDropdown } from '../../../src/interact/filter-dropdown.js';
@@ -47,7 +48,40 @@ describe('attachFilterDropdown', () => {
       'Search…',
     );
     expect(root?.textContent).toContain('(Select all)');
+    expect(root?.textContent).toContain('Filter by condition');
     expect(root?.textContent).toContain('Apply');
+    handle.detach();
+  });
+
+  it('applies a condition filter when a condition and value are entered', () => {
+    store.setState((s) => {
+      const cells = new Map(s.data.cells);
+      cells.set(addrKey({ sheet: 0, row: 1, col: 0 }), {
+        value: { kind: 'text', value: 'paper' },
+        formula: null,
+      });
+      cells.set(addrKey({ sheet: 0, row: 2, col: 0 }), {
+        value: { kind: 'text', value: 'ink' },
+        formula: null,
+      });
+      cells.set(addrKey({ sheet: 0, row: 3, col: 0 }), {
+        value: { kind: 'text', value: 'pencil' },
+        formula: null,
+      });
+      return { ...s, data: { ...s.data, cells } };
+    });
+    const handle = attachFilterDropdown({ store, strings: en });
+    handle.open({ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 }, 0, { x: 10, y: 20, h: 24 });
+
+    const op = document.querySelector<HTMLSelectElement>('.fc-filter-dropdown__condition-op');
+    const value = document.querySelector<HTMLInputElement>('.fc-filter-dropdown__condition-value');
+    if (op) op.value = 'contains';
+    if (value) value.value = 'p';
+    document.querySelector<HTMLButtonElement>('.fc-filter-dropdown__apply')?.click();
+
+    expect(store.getState().layout.hiddenRows.has(1)).toBe(false);
+    expect(store.getState().layout.hiddenRows.has(2)).toBe(true);
+    expect(store.getState().layout.hiddenRows.has(3)).toBe(false);
     handle.detach();
   });
 
@@ -77,6 +111,56 @@ describe('attachFilterDropdown', () => {
 
     expect(handle.isOpen()).toBe(false);
     expect(store.getState().layout.hiddenRows.has(2)).toBe(true);
+  });
+
+  it('records apply and clear through unified history when provided', () => {
+    const history = new History();
+    store.setState((s) => {
+      const cells = new Map(s.data.cells);
+      cells.set(addrKey({ sheet: 0, row: 1, col: 0 }), {
+        value: { kind: 'text', value: 'A' },
+        formula: null,
+      });
+      cells.set(addrKey({ sheet: 0, row: 2, col: 0 }), {
+        value: { kind: 'text', value: 'B' },
+        formula: null,
+      });
+      return { ...s, data: { ...s.data, cells } };
+    });
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 };
+    const handle = attachFilterDropdown({ store, strings: en, history });
+    handle.open(range, 0, { x: 10, y: 20, h: 24 });
+    const second = document.querySelectorAll<HTMLInputElement>(
+      '.fc-filter-dropdown__row:not(.fc-filter-dropdown__row--all) input[type="checkbox"]',
+    )[1];
+    if (!second) throw new Error('expected second filter checkbox');
+    second.checked = false;
+    second.dispatchEvent(new Event('change', { bubbles: true }));
+    document.querySelector<HTMLButtonElement>('.fc-filter-dropdown__apply')?.click();
+
+    expect(store.getState().layout.hiddenRows.has(2)).toBe(true);
+    expect(store.getState().ui.filterRange).toEqual(range);
+    expect(store.getState().ui.filterCriteria).toEqual([{ range, byCol: 0, hiddenValues: ['B'] }]);
+    expect(history.canUndo()).toBe(true);
+
+    history.undo();
+    expect(store.getState().layout.hiddenRows.size).toBe(0);
+    expect(store.getState().ui.filterRange).toBeNull();
+    expect(store.getState().ui.filterCriteria).toEqual([]);
+
+    history.redo();
+    expect(store.getState().layout.hiddenRows.has(2)).toBe(true);
+    expect(store.getState().ui.filterRange).toEqual(range);
+
+    handle.open(range, 0, { x: 10, y: 20, h: 24 });
+    document.querySelector<HTMLButtonElement>('.fc-filter-dropdown__clear')?.click();
+    expect(store.getState().layout.hiddenRows.size).toBe(0);
+    expect(store.getState().ui.filterRange).toBeNull();
+
+    history.undo();
+    expect(store.getState().layout.hiddenRows.has(2)).toBe(true);
+    expect(store.getState().ui.filterRange).toEqual(range);
+    handle.detach();
   });
 
   it('restores focus to the opener when dismissed with Escape', () => {

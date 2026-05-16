@@ -1,4 +1,7 @@
+@import "./app/color-palette.css";
 @import "./app/overlays/context-menu.css";
+@import "./app/overlays/auto-fill-options.css";
+@import "./app/overlays/paste-options.css";
 @import "./app/overlays/quick-analysis-and-charts.css";
 @import "./app/overlays/workbook-objects.css";
 @import "./app/overlays/sheet-menu-and-find.css";
@@ -20,6 +23,7 @@
 @import "./app/dialog-modules/custom-select.css";
 @import "./app/editor-popups.css";
 @import "./app/dialogs/iterative.css";
+@import "./app/dialogs/evaluate-formula.css";
 @import "./app/dialogs/external-links.css";
 @import "./app/dialogs/cf-rules.css";
 @import "./app/dialogs/style-gallery.css";

@@ -66,6 +66,39 @@ describe('mount/chrome-sync — name box and formula bar reflect store state', (
     expect(fxInput.value).toBe('=A1+B1');
   });
 
+  it('R1C1 mode formats formula bar source as relative R1C1 references', () => {
+    sheet.workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 3);
+    sheet.workbook.setNumber({ sheet: 0, row: 0, col: 1 }, 4);
+    sheet.workbook.setFormula({ sheet: 0, row: 0, col: 2 }, '=A1+B1');
+    sheet.workbook.recalc();
+    mutators.replaceCells(sheet.instance.store, sheet.workbook.cells(0));
+    mutators.setR1C1(sheet.instance.store, true);
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 0, col: 2 });
+    expect(fxInput.value).toBe('=RC[-2]+RC[-1]');
+  });
+
+  it('hides formula bar source when the cell is Hidden and the sheet is protected', () => {
+    sheet.workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 3);
+    sheet.workbook.setNumber({ sheet: 0, row: 0, col: 1 }, 4);
+    sheet.workbook.setFormula({ sheet: 0, row: 0, col: 2 }, '=A1+B1');
+    sheet.workbook.recalc();
+    mutators.replaceCells(sheet.instance.store, sheet.workbook.cells(0));
+    mutators.setCellFormat(
+      sheet.instance.store,
+      { sheet: 0, row: 0, col: 2 },
+      {
+        formulaHidden: true,
+      },
+    );
+    mutators.setSheetProtected(sheet.instance.store, 0, true);
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 0, col: 2 });
+
+    expect(fxInput.value).toBe('');
+
+    mutators.setSheetProtected(sheet.instance.store, 0, false);
+    expect(fxInput.value).toBe('=A1+B1');
+  });
+
   it('text and bool cells display their natural rendering', () => {
     sheet.workbook.setText({ sheet: 0, row: 0, col: 0 }, 'hello');
     sheet.workbook.recalc();
@@ -109,6 +142,125 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
     tag.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     const sel = sheet.instance.store.getState().selection;
     expect(sel.range).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 });
+  });
+
+  it('Alt+ArrowDown opens the Excel-like defined-name list and selecting one jumps there', () => {
+    const wb = sheet.workbook as unknown as {
+      definedNames: () => Generator<{ name: string; formula: string }>;
+    };
+    wb.definedNames = function* () {
+      yield { name: 'Sales', formula: 'Sheet1!$B$2:$C$4' };
+    };
+
+    tag.focus();
+    tag.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true }),
+    );
+
+    const menu = document.querySelector<HTMLElement>('.fc-namebox-menu');
+    expect(menu).not.toBeNull();
+    const item = menu?.querySelector<HTMLButtonElement>('[role="option"]');
+    expect(item?.textContent).toBe('Sales');
+    item?.click();
+
+    const sel = sheet.instance.store.getState().selection;
+    expect(sel.range).toEqual({ sheet: 0, r0: 1, c0: 1, r1: 3, c1: 2 });
+    expect(document.querySelector('.fc-namebox-menu')).toBeNull();
+  });
+
+  it('Ctrl-click in the name box list adds a defined range to the multi-selection', () => {
+    const wb = sheet.workbook as unknown as {
+      definedNames: () => Generator<{ name: string; formula: string }>;
+    };
+    wb.definedNames = function* () {
+      yield { name: 'North', formula: 'Sheet1!$B$2:$B$4' };
+      yield { name: 'South', formula: 'Sheet1!$D$2:$D$4' };
+    };
+
+    tag.focus();
+    tag.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true }),
+    );
+    const items = document.querySelectorAll<HTMLButtonElement>('.fc-namebox-menu [role="option"]');
+    expect(items.length).toBe(2);
+    items[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true }));
+    items[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true }));
+
+    const sel = sheet.instance.store.getState().selection;
+    expect(sel.range).toEqual({ sheet: 0, r0: 1, c0: 3, r1: 3, c1: 3 });
+    expect(sel.extraRanges).toEqual([
+      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+      { sheet: 0, r0: 1, c0: 1, r1: 3, c1: 1 },
+    ]);
+    expect(document.querySelector('.fc-namebox-menu')).not.toBeNull();
+  });
+
+  it('Enter on an Excel-style name defines the current selection as a workbook name', () => {
+    const calls: { name: string; formula: string }[] = [];
+    Object.defineProperty(sheet.workbook, 'capabilities', {
+      configurable: true,
+      value: { ...sheet.workbook.capabilities, definedNameMutate: true },
+    });
+    const wb = sheet.workbook as unknown as {
+      setDefinedNameEntry(name: string, formula: string): boolean;
+    };
+    wb.setDefinedNameEntry = (name, formula) => {
+      calls.push({ name, formula });
+      return true;
+    };
+
+    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 });
+    tag.focus();
+    tag.value = 'Sales_Total';
+    tag.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    expect(calls).toEqual([{ name: 'Sales_Total', formula: '=Sheet1!$A$1:$B$3' }]);
+  });
+
+  it('quotes sheet names when defining a name from the name box', () => {
+    const calls: { name: string; formula: string }[] = [];
+    Object.defineProperty(sheet.workbook, 'capabilities', {
+      configurable: true,
+      value: { ...sheet.workbook.capabilities, definedNameMutate: true },
+    });
+    const wb = sheet.workbook as unknown as {
+      setDefinedNameEntry(name: string, formula: string): boolean;
+      sheetName(idx: number): string;
+    };
+    wb.sheetName = () => "FY 26's Plan";
+    wb.setDefinedNameEntry = (name, formula) => {
+      calls.push({ name, formula });
+      return true;
+    };
+
+    tag.focus();
+    tag.value = 'PlanCell';
+    tag.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    expect(calls).toEqual([{ name: 'PlanCell', formula: "='FY 26''s Plan'!$A$1" }]);
+  });
+
+  it('Enter does not define invalid names or cell references from the name box', () => {
+    const calls: { name: string; formula: string }[] = [];
+    Object.defineProperty(sheet.workbook, 'capabilities', {
+      configurable: true,
+      value: { ...sheet.workbook.capabilities, definedNameMutate: true },
+    });
+    const wb = sheet.workbook as unknown as {
+      setDefinedNameEntry(name: string, formula: string): boolean;
+    };
+    wb.setDefinedNameEntry = (name, formula) => {
+      calls.push({ name, formula });
+      return true;
+    };
+
+    for (const value of ['not a name', 'A1', 'C', 'R']) {
+      tag.focus();
+      tag.value = value;
+      tag.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    }
+
+    expect(calls).toEqual([]);
   });
 
   it('Enter on garbage input leaves the selection alone', () => {

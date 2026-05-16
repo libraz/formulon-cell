@@ -48,16 +48,25 @@ describe('attachViewToolbar', () => {
     const gridlines = toolbar.querySelector<HTMLButtonElement>('button[aria-label="Gridlines"]');
     const formulas = toolbar.querySelector<HTMLButtonElement>('button[aria-label="Formulas"]');
     const r1c1 = toolbar.querySelector<HTMLButtonElement>('button[aria-label="R1C1"]');
+    const pageBreak = toolbar.querySelector<HTMLButtonElement>(
+      'button[aria-label="Page Break Preview"]',
+    );
+    const normal = toolbar.querySelector<HTMLButtonElement>('button[aria-label="Normal"]');
+    expect(normal?.getAttribute('aria-pressed')).toBe('true');
     expect(gridlines?.getAttribute('aria-pressed')).toBe('true');
 
+    pageBreak?.click();
     gridlines?.click();
     formulas?.click();
     r1c1?.click();
 
+    expect(store.getState().ui.workbookView).toBe('pageBreakPreview');
+    expect(pageBreak?.getAttribute('aria-pressed')).toBe('true');
+    expect(normal?.getAttribute('aria-pressed')).toBe('false');
     expect(store.getState().ui.showGridLines).toBe(false);
     expect(store.getState().ui.showFormulas).toBe(true);
     expect(store.getState().ui.r1c1).toBe(true);
-    expect(invalidate).toHaveBeenCalledTimes(3);
+    expect(invalidate).toHaveBeenCalledTimes(4);
     handle.detach();
   });
 
@@ -99,6 +108,9 @@ describe('attachViewToolbar', () => {
 
     handle.setStrings(ja);
     expect(toolbar.textContent).toContain('表示');
+    expect(
+      toolbar.querySelector<HTMLButtonElement>('button[aria-label="改ページ プレビュー"]'),
+    ).not.toBeNull();
     expect(toolbar.querySelector<HTMLButtonElement>('button[aria-label="枠線"]')).not.toBeNull();
     toolbar.querySelector<HTMLButtonElement>('button[aria-label="オブジェクト"]')?.click();
     expect(openObjects).toHaveBeenCalledOnce();

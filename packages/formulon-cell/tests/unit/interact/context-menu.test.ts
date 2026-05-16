@@ -71,6 +71,9 @@ const fireContextMenu = (
 const item = (id: string): HTMLButtonElement | null =>
   document.querySelector<HTMLButtonElement>(`.fc-ctxmenu__item[data-fc-action="${id}"]`);
 
+const miniItem = (id: string): HTMLButtonElement | null =>
+  document.querySelector<HTMLButtonElement>(`.fc-ctxmenu__mini-btn[data-fc-action="${id}"]`);
+
 const visibleMenu = (): HTMLElement | null => {
   const root = document.querySelector<HTMLElement>('.fc-ctxmenu');
   if (!root) return null;
@@ -117,6 +120,22 @@ describe('attachContextMenu', () => {
       // No row/col-only items in cell menu.
       expect(item('rowInsertAbove')).toBeNull();
       expect(item('colInsertLeft')).toBeNull();
+      expect(document.querySelector('.fc-ctxmenu__mini')).not.toBeNull();
+      expect(miniItem('bold')).not.toBeNull();
+    });
+
+    it('mini toolbar invokes cell formatting actions', () => {
+      detach = attachContextMenu({ host, store, wb, onAfterCommit, onFormatDialog });
+      fireContextMenu(host, 200, 70);
+      miniItem('bold')?.click();
+
+      const fmt = store.getState().format.formats.get('0:0:0');
+      expect(fmt?.bold).toBe(true);
+      expect(visibleMenu()).toBeNull();
+
+      fireContextMenu(host, 200, 70);
+      miniItem('formatCells')?.click();
+      expect(onFormatDialog).toHaveBeenCalledTimes(1);
     });
 
     it('does not leave adjacent or trailing separators when optional entries are hidden', () => {
@@ -310,6 +329,25 @@ describe('attachContextMenu', () => {
       expect(visibleMenu()).toBeNull();
     });
 
+    it('does not carry the cell mini toolbar into row or column menus after dismissal', () => {
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      fireContextMenu(host, 200, 70);
+      expect(document.querySelector('.fc-ctxmenu__mini')).not.toBeNull();
+
+      document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      expect(visibleMenu()).toBeNull();
+
+      fireContextMenu(host, 10, 40);
+      expect(visibleMenu()).not.toBeNull();
+      expect(item('rowInsertAbove')).not.toBeNull();
+      expect(document.querySelector('.fc-ctxmenu__mini')).toBeNull();
+
+      document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      fireContextMenu(host, 100, 10);
+      expect(item('colInsertLeft')).not.toBeNull();
+      expect(document.querySelector('.fc-ctxmenu__mini')).toBeNull();
+    });
+
     it('right-clicking outside the menu hides it without opening another menu', () => {
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
       fireContextMenu(host, 200, 70);
@@ -333,7 +371,7 @@ describe('attachContextMenu', () => {
       detach = attachContextMenu({ host, store, wb, onAfterCommit, onFormatDialog });
       fireContextMenu(host, 200, 70);
 
-      expect(document.activeElement).toBe(item('copy'));
+      expect(document.activeElement).toBe(item('cut'));
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', cancelable: true }));
       expect(document.activeElement).toBe(item('selectAll'));
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', cancelable: true }));
@@ -441,6 +479,29 @@ describe('attachContextMenu', () => {
       expect(onAfterCommit).toHaveBeenCalled();
     });
 
+    it('Paste bundles multi-cell writes into one undo step when history is attached', async () => {
+      const history = new History();
+      vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('foo\t42\r\nbar\t99');
+      setRange(store, 1, 1, 1, 1);
+      detach = attachContextMenu({ host, store, wb, history, onAfterCommit });
+      fireContextMenu(host, 200, 70);
+      item('paste')?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      wb.recalc();
+      expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'text', value: 'foo' });
+      expect(wb.getValue({ sheet: 0, row: 2, col: 2 })).toEqual({ kind: 'number', value: 99 });
+
+      expect(history.undo()).toBe(true);
+      wb.recalc();
+      expect(wb.getValue({ sheet: 0, row: 1, col: 1 }).kind).toBe('blank');
+      expect(wb.getValue({ sheet: 0, row: 1, col: 2 }).kind).toBe('blank');
+      expect(wb.getValue({ sheet: 0, row: 2, col: 1 }).kind).toBe('blank');
+      expect(wb.getValue({ sheet: 0, row: 2, col: 2 }).kind).toBe('blank');
+      expect(history.canUndo()).toBe(false);
+    });
+
     it('Paste resolves to empty string and is a no-op', async () => {
       vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('');
       setRange(store, 1, 1, 1, 1);
@@ -455,8 +516,31 @@ describe('attachContextMenu', () => {
     it('Paste Special triggers the onPasteSpecial callback', () => {
       detach = attachContextMenu({ host, store, wb, onPasteSpecial });
       fireContextMenu(host, 200, 70);
-      item('pasteSpecial')?.click();
+      // Paste Special is a submenu — open it, then click the dialog entry.
+      document
+        .querySelector<HTMLButtonElement>('[data-fc-submenu="pasteSpecialMenu"]')
+        ?.dispatchEvent(new MouseEvent('mouseenter'));
+      document
+        .querySelector<HTMLButtonElement>('.fc-ctxmenu__sub [data-fc-action="pasteSpecial"]')
+        ?.click();
       expect(onPasteSpecial).toHaveBeenCalled();
+    });
+
+    it('delegates Copy/Cut/Paste to the shared clipboard path when wired', () => {
+      const onClipboardShortcut = vi.fn();
+      detach = attachContextMenu({ host, store, wb, onAfterCommit, onClipboardShortcut });
+
+      fireContextMenu(host, 200, 70);
+      item('copy')?.click();
+      fireContextMenu(host, 200, 70);
+      item('cut')?.click();
+      fireContextMenu(host, 200, 70);
+      item('paste')?.click();
+
+      expect(onClipboardShortcut).toHaveBeenNthCalledWith(1, 'copy');
+      expect(onClipboardShortcut).toHaveBeenNthCalledWith(2, 'cut');
+      expect(onClipboardShortcut).toHaveBeenNthCalledWith(3, 'paste');
+      expect(onClipboardShortcut).toHaveBeenCalledTimes(3);
     });
 
     it('shows Insert Copied Cells only during copy mode and shifts cells after OK', async () => {
@@ -509,13 +593,13 @@ describe('attachContextMenu', () => {
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
 
       fireContextMenu(host, 200, 70);
-      item('bold')?.click();
+      miniItem('bold')?.click();
       expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.bold).toBe(
         true,
       );
 
       fireContextMenu(host, 200, 70);
-      item('italic')?.click();
+      miniItem('italic')?.click();
       expect(
         store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.italic,
       ).toBe(true);
@@ -532,19 +616,19 @@ describe('attachContextMenu', () => {
       detach = attachContextMenu({ host, store, wb });
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
       fireContextMenu(host, 200, 70);
-      item('alignLeft')?.click();
+      miniItem('alignLeft')?.click();
       expect(
         store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.align,
       ).toBe('left');
 
       fireContextMenu(host, 200, 70);
-      item('alignCenter')?.click();
+      miniItem('alignCenter')?.click();
       expect(
         store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.align,
       ).toBe('center');
 
       fireContextMenu(host, 200, 70);
-      item('alignRight')?.click();
+      miniItem('alignRight')?.click();
       expect(
         store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.align,
       ).toBe('right');
@@ -554,19 +638,9 @@ describe('attachContextMenu', () => {
       detach = attachContextMenu({ host, store, wb });
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
       fireContextMenu(host, 200, 70);
-      item('borders')?.click();
+      miniItem('borders')?.click();
       const f = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
       expect(f?.borders).toBeDefined();
-    });
-
-    it('Clear Format wipes the format entry', () => {
-      mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { bold: true });
-      detach = attachContextMenu({ host, store, wb });
-      fireContextMenu(host, 200, 70);
-      item('clearFormat')?.click();
-      expect(
-        store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 })),
-      ).toBeUndefined();
     });
 
     it('Format Cells… triggers the onFormatDialog callback', () => {

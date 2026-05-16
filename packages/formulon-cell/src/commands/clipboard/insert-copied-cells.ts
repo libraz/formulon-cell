@@ -2,7 +2,7 @@ import { addrKey } from '../../engine/address.js';
 import type { Addr, CellValue, Range } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import type { CellFormat, SpreadsheetStore, State } from '../../store/store.js';
-import { coerceInput, writeCoerced } from '../coerce-input.js';
+import { coerceInputForCell, writeCoerced } from '../coerce-input.js';
 import { type History, recordFormatChange, recordMergesChangeWithEngine } from '../history.js';
 import { isCellWritable, isSheetProtected } from '../protection.js';
 import { parseTSV } from './tsv.js';
@@ -74,7 +74,7 @@ export function insertCopiedCellsFromTSV(
       for (let c = 0; c < cells.length; c += 1) {
         const addr: Addr = { sheet, row: origin.row + r, col: origin.col + c };
         if (!isCellWritable(store.getState(), addr)) continue;
-        writeCoerced(wb, addr, coerceInput(cells[c] ?? ''));
+        writeCoerced(wb, addr, coerceInputForCell(store.getState(), addr, cells[c] ?? ''));
       }
     }
     copySourceMerges(store, wb, history, origin, height, width);

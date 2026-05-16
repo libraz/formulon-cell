@@ -1,10 +1,10 @@
 /* ── File backstage ─────────────────────────────────────────────────── */
 .demo__backstage {
-  position: absolute;
-  inset: 103px 0 0;
-  z-index: 30;
+  position: fixed;
+  inset: 39px 0 0;
+  z-index: calc(var(--shell-z-menu, 1000) + 20);
   display: grid;
-  grid-template-columns: 184px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
   background: var(--demo-backstage-bg);
   color: var(--demo-input-fg);
   border-top: 1px solid var(--demo-ribbon-line);
@@ -15,7 +15,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 18px 12px;
+  padding: 12px 12px 18px;
   background: var(--demo-backstage-rail);
   border-right: 1px solid var(--demo-line);
 }
@@ -30,7 +30,7 @@
   min-height: 34px;
   padding: 0 12px;
   border: 1px solid transparent;
-  border-radius: 3px;
+  border-radius: 0;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -58,7 +58,7 @@
 
 .demo__backstage-main {
   overflow: auto;
-  padding: 28px 34px;
+  padding: 34px 42px;
 }
 
 .demo__backstage-title {
@@ -91,6 +91,132 @@
   font-size: 13px;
 }
 
+.demo__backstage-info {
+  display: grid;
+  grid-template-columns: minmax(280px, 640px) minmax(220px, 300px);
+  gap: 28px;
+  align-items: start;
+  max-width: 990px;
+  margin-bottom: 24px;
+}
+
+.demo__backstage-section-title {
+  margin: 0 0 10px;
+  color: var(--demo-input-fg);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.demo__backstage-command-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.demo__backstage-command {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  min-height: 62px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.demo__backstage-command:hover:not(:disabled),
+.demo__backstage-command:focus-visible {
+  border-color: var(--demo-line);
+  background: var(--demo-ribbon-bg);
+  outline: 0;
+}
+
+.demo__backstage-command--active {
+  border-color: var(--demo-accent);
+  background: var(--demo-accent-soft, color-mix(in srgb, var(--demo-accent) 12%, transparent));
+}
+
+.demo__backstage-command--active .demo__backstage-command-icon {
+  border-color: var(--demo-accent);
+  background: var(--demo-accent);
+  color: #fff;
+}
+
+.demo__backstage-command:disabled {
+  opacity: 0.48;
+}
+
+.demo__backstage-command-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--demo-line);
+  background: var(--demo-ribbon-bg);
+  color: var(--demo-accent);
+  font-size: 16px;
+}
+
+.demo__backstage-command strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.demo__backstage-command span {
+  color: var(--demo-fg-soft);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.demo__backstage-properties {
+  padding: 0 0 0 20px;
+  border-left: 1px solid var(--demo-line-soft);
+}
+
+.demo__backstage-preview {
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 146px;
+  margin: 0 0 18px;
+  border: 1px solid var(--demo-line);
+  background:
+    linear-gradient(#d9eadf 1px, transparent 1px) 0 0 / 100% 18px,
+    linear-gradient(90deg, #d9eadf 1px, transparent 1px) 0 0 / 18px 100%,
+    #ffffff;
+  color: var(--demo-accent);
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.demo__backstage-prop-list {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 7px 12px;
+  margin: 0;
+  color: var(--demo-fg-soft);
+  font-size: 12px;
+}
+
+.demo__backstage-prop-list dt {
+  color: var(--demo-input-fg);
+  font-weight: 600;
+}
+
+.demo__backstage-prop-list dd {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .demo__backstage-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
@@ -105,7 +231,7 @@
   min-height: 104px;
   padding: 15px;
   border: 1px solid var(--demo-line);
-  border-radius: 4px;
+  border-radius: 0;
   background: var(--demo-ribbon-bg);
   color: inherit;
   font: inherit;
@@ -129,4 +255,23 @@
   color: var(--demo-fg-soft);
   font-size: 12px;
   line-height: 1.45;
+}
+
+@media (max-width: 780px) {
+  .demo__backstage {
+    grid-template-columns: 160px minmax(0, 1fr);
+  }
+
+  .demo__backstage-main {
+    padding: 24px;
+  }
+
+  .demo__backstage-info {
+    grid-template-columns: 1fr;
+  }
+
+  .demo__backstage-properties {
+    padding-left: 0;
+    border-left: 0;
+  }
 }

@@ -27,6 +27,7 @@ function makeLayout(over: Partial<LayoutSlice> = {}): LayoutSlice {
     outlineRowGutter: 0,
     outlineColGutter: 0,
     hiddenSheets: new Set(),
+    sheetTabColors: new Map(),
     ...over,
   };
 }

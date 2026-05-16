@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ja } from '../../../src/i18n/strings.js';
 import { attachFxDialog, FUNCTION_DESCRIPTIONS } from '../../../src/interact/fx-dialog.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 
@@ -59,6 +60,27 @@ describe('attachFxDialog', () => {
     handle.detach();
   });
 
+  it('prefills seeded function arguments from the spreadsheet context', () => {
+    const inserted: string[] = [];
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      getInitialArguments: (name) => (name === 'SUM' ? ['A1:A5'] : null),
+      onInsert: (formula) => inserted.push(formula),
+    });
+    handle.open('SUM');
+
+    const input = document.querySelector<HTMLInputElement>('.fc-fxdialog__arg-input');
+    expect(input?.value).toBe('A1:A5');
+    expect(document.querySelector<HTMLElement>('.fc-fxdialog__preview')?.textContent).toBe(
+      '=SUM(A1:A5)',
+    );
+
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    expect(inserted).toEqual(['=SUM(A1:A5)']);
+    handle.detach();
+  });
+
   it('filters the picker list by case-insensitive prefix', () => {
     const handle = attachFxDialog({
       host,
@@ -75,6 +97,54 @@ describe('attachFxDialog', () => {
     const names = Array.from(items).map((i) => i.textContent ?? '');
     expect(names.every((n) => n.includes('VLO'))).toBe(true);
     expect(names).toContain('VLOOKUP');
+    handle.detach();
+  });
+
+  it('filters the function picker by category', () => {
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      onInsert: () => {},
+    });
+    handle.open();
+    const category = document.querySelector<HTMLSelectElement>('.fc-fxdialog__category');
+    expect(category).toBeTruthy();
+    if (!category) return;
+
+    category.value = 'text';
+    category.dispatchEvent(new Event('change'));
+
+    const names = Array.from(document.querySelectorAll<HTMLElement>('.fc-fxdialog__item-name')).map(
+      (item) => item.textContent ?? '',
+    );
+    expect(names).toContain('CONCAT');
+    expect(names).toContain('TEXT');
+    expect(names).not.toContain('SUM');
+    handle.detach();
+  });
+
+  it('lists recently used functions alphabetically', () => {
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      onInsert: () => {},
+    });
+
+    handle.open('VLOOKUP');
+    handle.close();
+    handle.open('IF');
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn')?.click();
+
+    const category = document.querySelector<HTMLSelectElement>('.fc-fxdialog__category');
+    expect(category).toBeTruthy();
+    if (!category) return;
+    category.value = 'recent';
+    category.dispatchEvent(new Event('change'));
+
+    const names = Array.from(document.querySelectorAll<HTMLElement>('.fc-fxdialog__item-name')).map(
+      (item) => item.textContent ?? '',
+    );
+    expect(names).toEqual(['IF', 'VLOOKUP']);
     handle.detach();
   });
 
@@ -97,11 +167,16 @@ describe('attachFxDialog', () => {
     const firstActive = search.getAttribute('aria-activedescendant');
     expect(firstActive).toBeTruthy();
     expect(document.getElementById(firstActive ?? '')?.getAttribute('aria-selected')).toBe('true');
+    const firstName = document.querySelector<HTMLElement>('.fc-fxdialog__summary-name')?.textContent;
+    expect(firstName).toContain('(');
 
     search.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     const secondActive = search.getAttribute('aria-activedescendant');
     expect(secondActive).toBeTruthy();
     expect(secondActive).not.toBe(firstActive);
+    expect(document.querySelector<HTMLElement>('.fc-fxdialog__summary-name')?.textContent).not.toBe(
+      firstName,
+    );
 
     search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
     expect(search.getAttribute('aria-activedescendant')).toBe(firstActive);
@@ -136,10 +211,91 @@ describe('attachFxDialog', () => {
     handle.detach();
   });
 
+  it('assembles multi-argument and zero-argument formulas', () => {
+    const inserted: string[] = [];
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      onInsert: (f) => inserted.push(f),
+    });
+
+    handle.open('IF');
+    const ifInputs = document.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input');
+    expect(ifInputs).toHaveLength(3);
+    const [logicalTest, valueIfTrue, valueIfFalse] = Array.from(ifInputs);
+    if (!logicalTest || !valueIfTrue || !valueIfFalse) throw new Error('expected IF argument inputs');
+    logicalTest.value = 'A1>5';
+    logicalTest.dispatchEvent(new Event('input'));
+    valueIfTrue.value = '"yes"';
+    valueIfTrue.dispatchEvent(new Event('input'));
+    valueIfFalse.value = '"no"';
+    valueIfFalse.dispatchEvent(new Event('input'));
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    expect(inserted.at(-1)).toBe('=IF(A1>5, "yes", "no")');
+
+    handle.open('ROUND');
+    const roundInputs = document.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input');
+    expect(roundInputs).toHaveLength(2);
+    const [numberInput, digitsInput] = Array.from(roundInputs);
+    if (!numberInput || !digitsInput) throw new Error('expected ROUND argument inputs');
+    numberInput.value = '1.234';
+    numberInput.dispatchEvent(new Event('input'));
+    digitsInput.value = '2';
+    digitsInput.dispatchEvent(new Event('input'));
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    expect(inserted.at(-1)).toBe('=ROUND(1.234, 2)');
+
+    handle.open('TODAY');
+    expect(document.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input')).toHaveLength(0);
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    expect(inserted.at(-1)).toBe('=TODAY()');
+
+    handle.detach();
+  });
+
   it('exposes spreadsheet-style descriptions for the common functions', () => {
     expect(FUNCTION_DESCRIPTIONS.SUM?.en).toMatch(/sum|add/i);
     expect(FUNCTION_DESCRIPTIONS.IF?.en).toMatch(/condition|true|false/i);
     expect(FUNCTION_DESCRIPTIONS.VLOOKUP?.en).toMatch(/lookup|column/i);
+  });
+
+  it('renders Japanese picker and argument labels from the i18n dictionary', () => {
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      strings: ja,
+      onInsert: () => {},
+    });
+
+    handle.open();
+    expect(document.querySelector<HTMLElement>('.fc-fmtdlg__header')?.textContent).toBe(
+      '関数の引数',
+    );
+    expect(document.querySelector<HTMLElement>('.fc-fxdialog__category-row')?.textContent).toContain(
+      'カテゴリを選択',
+    );
+    expect(document.querySelector<HTMLInputElement>('.fc-fxdialog__search')?.placeholder).toBe(
+      '関数を検索…',
+    );
+    const categoryLabels = Array.from(
+      document.querySelectorAll<HTMLOptionElement>('.fc-fxdialog__category option'),
+    ).map((option) => option.textContent ?? '');
+    expect(categoryLabels).toEqual(
+      expect.arrayContaining(['すべて', '最近使用した関数', '論理', '検索/行列']),
+    );
+
+    handle.open('IF');
+    expect(document.querySelector<HTMLElement>('.fc-fxdialog__args-desc')?.textContent).toContain(
+      '条件が真',
+    );
+    expect(document.querySelector<HTMLElement>('.fc-fxdialog__preview-label')?.textContent).toBe(
+      '数式の結果',
+    );
+    expect(document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.textContent).toBe(
+      '挿入',
+    );
+
+    handle.detach();
   });
 
   it('clicks on rendered picker items via event delegation (no per-item listeners)', () => {

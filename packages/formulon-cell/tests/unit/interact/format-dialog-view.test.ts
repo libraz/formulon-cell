@@ -22,11 +22,14 @@ describe('interact/format-dialog-view', () => {
     expect(view.overlay.getAttribute('role')).toBe('dialog');
     expect(view.overlay.getAttribute('aria-modal')).toBe('true');
     expect(view.overlay.getAttribute('aria-label')).toBe(en.formatDialog.title);
+    expect(view.closeBtn.getAttribute('aria-label')).toBe(en.formatDialog.cancel);
   });
 
   it('creates one button + one panel per tab id', () => {
     const view = createFormatDialogView({ host, strings: en, t: en.formatDialog });
     const expectedTabs = ['number', 'align', 'font', 'border', 'fill', 'protection', 'more'];
+    expect(view.tabsStrip.getAttribute('role')).toBe('tablist');
+    expect(view.tabsStrip.getAttribute('aria-label')).toBe(en.formatDialog.title);
     for (const id of expectedTabs) {
       expect(view.tabButtons.has(id as never), `button missing for tab ${id}`).toBe(true);
       expect(view.tabPanels.has(id as never), `panel missing for tab ${id}`).toBe(true);
@@ -48,10 +51,10 @@ describe('interact/format-dialog-view', () => {
     }
   });
 
-  it('renders both alignment fieldsets (horizontal + vertical) with 4 radios each', () => {
+  it('renders the Excel-style horizontal and vertical alignment choices', () => {
     const view = createFormatDialogView({ host, strings: en, t: en.formatDialog });
-    expect(view.hAlignRadios.size).toBe(4); // default + left + center + right
-    expect(view.vAlignRadios.size).toBe(4); // default + top + middle + bottom
+    expect(view.hAlignRadios.size).toBe(8); // default + left/center/right + fill/justify/center-across/distributed
+    expect(view.vAlignRadios.size).toBe(6); // default + top/middle/bottom + justify/distributed
   });
 
   it('wires data-fc-check on the font + alignment checkboxes', () => {

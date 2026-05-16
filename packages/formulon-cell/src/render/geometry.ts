@@ -48,6 +48,16 @@ export function rowHeight(layout: LayoutSlice, row: number, viewport?: ViewportS
   return (layout.rowHeights.get(row) ?? layout.defaultRowHeight) * viewportZoom(viewport);
 }
 
+/** Return the geometry layout for the current view. Excel's "Headings" view
+ *  toggle removes the row/column header rails from the sheet viewport; the
+ *  underlying layout metrics are kept intact so turning headings back on
+ *  restores the original header chrome. */
+export function layoutForView(layout: LayoutSlice, showHeaders: boolean): LayoutSlice {
+  if (showHeaders) return layout;
+  if (layout.headerColWidth === 0 && layout.headerRowHeight === 0) return layout;
+  return { ...layout, headerColWidth: 0, headerRowHeight: 0 };
+}
+
 /** Total left offset before the first data column. Includes the row-outline
  *  bracket gutter (when rows are grouped) plus the row-number header strip. */
 export function gridOriginX(layout: LayoutSlice): number {

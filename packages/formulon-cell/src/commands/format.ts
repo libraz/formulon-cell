@@ -1,5 +1,6 @@
 import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
+import { normalizeFormatLocale } from '../format/locale.js';
 import {
   type CellAlign,
   type CellBorderSide,
@@ -30,7 +31,7 @@ function eachKey(range: Range, fn: (key: string) => void): void {
  *  walks the range cell-by-cell and only writes through the cells that
  *  are explicitly unlocked. Returns false when the entire range is gated
  *  so the caller can short-circuit (e.g. emit a single warning). */
-function applyRangePatch(
+export function applyFormatPatch(
   state: State,
   store: SpreadsheetStore,
   range: Range,
@@ -87,7 +88,7 @@ function anyHave(
 function toggleFlag(state: State, store: SpreadsheetStore, key: ToggleKey): void {
   const range = state.selection.range;
   const allOn = allHave(state, range, (f) => f?.[key] === true);
-  applyRangePatch(state, store, range, { [key]: !allOn } as Partial<CellFormat>);
+  applyFormatPatch(state, store, range, { [key]: !allOn } as Partial<CellFormat>);
 }
 
 export function toggleBold(state: State, store: SpreadsheetStore): void {
@@ -107,17 +108,17 @@ export function toggleStrike(state: State, store: SpreadsheetStore): void {
 }
 
 export function setAlign(state: State, store: SpreadsheetStore, align: CellAlign): void {
-  applyRangePatch(state, store, state.selection.range, { align });
+  applyFormatPatch(state, store, state.selection.range, { align });
 }
 
 export function setVAlign(state: State, store: SpreadsheetStore, vAlign: CellVAlign): void {
-  applyRangePatch(state, store, state.selection.range, { vAlign });
+  applyFormatPatch(state, store, state.selection.range, { vAlign });
 }
 
 export function toggleWrap(state: State, store: SpreadsheetStore): void {
   const range = state.selection.range;
   const allOn = allHave(state, range, (f) => f?.wrap === true);
-  applyRangePatch(state, store, range, { wrap: !allOn });
+  applyFormatPatch(state, store, range, { wrap: !allOn });
 }
 
 export function bumpIndent(state: State, store: SpreadsheetStore, delta: 1 | -1): void {
@@ -138,27 +139,30 @@ export function bumpIndent(state: State, store: SpreadsheetStore, delta: 1 | -1)
 
 export function setRotation(state: State, store: SpreadsheetStore, deg: number): void {
   const r = Math.max(-90, Math.min(90, Math.round(deg)));
-  applyRangePatch(state, store, state.selection.range, { rotation: r });
+  applyFormatPatch(state, store, state.selection.range, { rotation: r });
 }
 
 export function setNumFmt(state: State, store: SpreadsheetStore, fmt: NumFmt): void {
-  applyRangePatch(state, store, state.selection.range, { numFmt: fmt });
+  applyFormatPatch(state, store, state.selection.range, { numFmt: fmt });
 }
 
-export function cycleCurrency(state: State, store: SpreadsheetStore): void {
+const defaultCurrencySymbol = (locale: string): string =>
+  normalizeFormatLocale(locale).startsWith('ja') ? '¥' : '$';
+
+export function cycleCurrency(state: State, store: SpreadsheetStore, locale = 'en-US'): void {
   const range = state.selection.range;
   const hasCurrency = anyHave(state, range, (f) => f?.numFmt?.kind === 'currency');
   const next: NumFmt = hasCurrency
     ? { kind: 'general' }
-    : { kind: 'currency', decimals: 2, symbol: '$' };
-  applyRangePatch(state, store, range, { numFmt: next });
+    : { kind: 'currency', decimals: 2, symbol: defaultCurrencySymbol(locale) };
+  applyFormatPatch(state, store, range, { numFmt: next });
 }
 
 export function cyclePercent(state: State, store: SpreadsheetStore): void {
   const range = state.selection.range;
   const hasPercent = anyHave(state, range, (f) => f?.numFmt?.kind === 'percent');
   const next: NumFmt = hasPercent ? { kind: 'general' } : { kind: 'percent', decimals: 0 };
-  applyRangePatch(state, store, range, { numFmt: next });
+  applyFormatPatch(state, store, range, { numFmt: next });
 }
 
 const clampDecimals = (n: number): number => Math.max(0, Math.min(10, n));
@@ -193,7 +197,7 @@ export function bumpDecimals(state: State, store: SpreadsheetStore, delta: 1 | -
 }
 
 export function setBorders(state: State, store: SpreadsheetStore, sides: CellBorders): void {
-  applyRangePatch(state, store, state.selection.range, { borders: sides });
+  applyFormatPatch(state, store, state.selection.range, { borders: sides });
 }
 
 export type BorderPreset =
@@ -201,6 +205,9 @@ export type BorderPreset =
   | 'outline'
   | 'thickOutline'
   | 'all'
+  | 'inside'
+  | 'insideHorizontal'
+  | 'insideVertical'
   | 'top'
   | 'bottom'
   | 'left'
@@ -209,27 +216,67 @@ export type BorderPreset =
   | 'thickBottom'
   | 'topAndBottom'
   | 'topAndThickBottom'
-  | 'topAndDoubleBottom';
+  | 'topAndDoubleBottom'
+  | 'diagonalDown'
+  | 'diagonalUp';
 
 export function setBorderPreset(
   state: State,
   store: SpreadsheetStore,
   preset: BorderPreset,
   style: CellBorderStyle = 'thin',
+  color?: string,
 ): void {
   const range = state.selection.range;
   if (gateProtection(state, range) === null) return;
-  const side: CellBorderSide = { style };
-  const thickSide: CellBorderSide = { style: 'thick' };
-  const doubleSide: CellBorderSide = { style: 'double' };
+  const side: CellBorderSide = color === undefined ? { style } : { style, color };
+  const thickSide: CellBorderSide =
+    color === undefined ? { style: 'thick' } : { style: 'thick', color };
+  const doubleSide: CellBorderSide =
+    color === undefined ? { style: 'double' } : { style: 'double', color };
   if (preset === 'all') {
-    applyRangePatch(state, store, range, {
+    applyFormatPatch(state, store, range, {
       borders: { top: side, right: side, bottom: side, left: side },
     });
     return;
   }
+  if (preset === 'inside') {
+    for (let r = range.r0; r <= range.r1; r += 1) {
+      for (let c = range.c0; c <= range.c1; c += 1) {
+        const addr = { sheet: range.sheet, row: r, col: c };
+        if (!isCellWritable(state, addr)) continue;
+        const borders: CellBorders = {};
+        if (r > range.r0) borders.top = side;
+        if (c > range.c0) borders.left = side;
+        if (borders.top || borders.left) mutators.setCellFormat(store, addr, { borders });
+      }
+    }
+    return;
+  }
+  if (preset === 'insideHorizontal') {
+    if (range.r0 === range.r1) return;
+    for (let r = range.r0 + 1; r <= range.r1; r += 1) {
+      for (let c = range.c0; c <= range.c1; c += 1) {
+        const addr = { sheet: range.sheet, row: r, col: c };
+        if (isCellWritable(state, addr))
+          mutators.setCellFormat(store, addr, { borders: { top: side } });
+      }
+    }
+    return;
+  }
+  if (preset === 'insideVertical') {
+    if (range.c0 === range.c1) return;
+    for (let r = range.r0; r <= range.r1; r += 1) {
+      for (let c = range.c0 + 1; c <= range.c1; c += 1) {
+        const addr = { sheet: range.sheet, row: r, col: c };
+        if (isCellWritable(state, addr))
+          mutators.setCellFormat(store, addr, { borders: { left: side } });
+      }
+    }
+    return;
+  }
   if (preset === 'none') {
-    applyRangePatch(state, store, range, {
+    applyFormatPatch(state, store, range, {
       borders: {
         top: false,
         right: false,
@@ -272,8 +319,16 @@ export function setBorderPreset(
       } else if (preset === 'topAndDoubleBottom') {
         if (r === range.r0) borders.top = side;
         if (r === range.r1) borders.bottom = doubleSide;
-      }
-      if (borders.top || borders.right || borders.bottom || borders.left) {
+      } else if (preset === 'diagonalDown') borders.diagonalDown = side;
+      else if (preset === 'diagonalUp') borders.diagonalUp = side;
+      if (
+        borders.top ||
+        borders.right ||
+        borders.bottom ||
+        borders.left ||
+        borders.diagonalDown ||
+        borders.diagonalUp
+      ) {
         mutators.setCellFormat(store, addr, { borders });
       }
     }
@@ -314,12 +369,12 @@ export function cycleBorders(state: State, store: SpreadsheetStore): void {
     (f) => !!(f?.borders?.top && f.borders.right && f.borders.bottom && f.borders.left),
   );
   if (allFour) {
-    applyRangePatch(state, store, range, {
+    applyFormatPatch(state, store, range, {
       borders: { top: false, right: false, bottom: false, left: false },
     });
     return;
   }
-  applyRangePatch(state, store, range, {
+  applyFormatPatch(state, store, range, {
     borders: { top: true, right: true, bottom: true, left: true },
   });
 }
@@ -342,22 +397,76 @@ export function clearFormat(state: State, store: SpreadsheetStore): void {
   }
 }
 
+const visualFormatKeys: readonly (keyof CellFormat)[] = [
+  'cellStyle',
+  'numFmt',
+  'bold',
+  'italic',
+  'underline',
+  'strike',
+  'align',
+  'vAlign',
+  'wrap',
+  'shrinkToFit',
+  'indent',
+  'rotation',
+  'textDirection',
+  'borders',
+  'color',
+  'fill',
+  'fillPattern',
+  'fillPatternColor',
+  'fontFamily',
+  'fontSize',
+];
+
+function stripVisualFormat(format: CellFormat): CellFormat | null {
+  const next: CellFormat = { ...format };
+  for (const key of visualFormatKeys) delete next[key];
+  return Object.keys(next).length > 0 ? next : null;
+}
+
+/** Clear only visual cell formatting, preserving cell metadata such as
+ *  comments, hyperlinks, data validation, and protection flags. Mirrors
+ *  Excel's Home > Clear > Clear Formats more closely than `clearFormat`,
+ *  which is the low-level full-format reset used by Clear All. */
+export function clearVisualFormat(state: State, store: SpreadsheetStore): void {
+  const range = state.selection.range;
+  if (gateProtection(state, range) === null) return;
+  store.setState((s) => {
+    const formats = new Map(s.format.formats);
+    for (let r = range.r0; r <= range.r1; r += 1) {
+      for (let c = range.c0; c <= range.c1; c += 1) {
+        const addr = { sheet: range.sheet, row: r, col: c };
+        if (!isCellWritable(state, addr)) continue;
+        const key = addrKey(addr);
+        const current = formats.get(key);
+        if (!current) continue;
+        const next = stripVisualFormat(current);
+        if (next) formats.set(key, next);
+        else formats.delete(key);
+      }
+    }
+    return { ...s, format: { formats } };
+  });
+}
+
 /** Set or clear the font color across the selection. Pass `null` to clear. */
 export function setFontColor(state: State, store: SpreadsheetStore, color: string | null): void {
   if (color === null) {
-    applyRangePatch(state, store, state.selection.range, { color: undefined });
+    applyFormatPatch(state, store, state.selection.range, { color: undefined });
     return;
   }
-  applyRangePatch(state, store, state.selection.range, { color });
+  applyFormatPatch(state, store, state.selection.range, { color });
 }
 
 /** Set or clear the fill (background) color across the selection. */
 export function setFillColor(state: State, store: SpreadsheetStore, color: string | null): void {
   if (color === null) {
-    applyRangePatch(state, store, state.selection.range, { fill: undefined });
+    applyFormatPatch(state, store, state.selection.range, { fill: undefined });
     return;
   }
-  applyRangePatch(state, store, state.selection.range, { fill: color });
+  applyFormatPatch(state, store, state.selection.range, { fill: color });
 }
 
 /** Update font family and/or size across the selection. */
@@ -373,7 +482,7 @@ export function setFont(
   if (patch.fontSize !== undefined) {
     next.fontSize = patch.fontSize ?? undefined;
   }
-  applyRangePatch(state, store, state.selection.range, next);
+  applyFormatPatch(state, store, state.selection.range, next);
 }
 
 export function formatNumber(value: number, fmt: NumFmt | undefined, locale = 'en-US'): string {
@@ -432,6 +541,9 @@ export function formatNumber(value: number, fmt: NumFmt | undefined, locale = 'e
   }
   if (fmt.kind === 'datetime') {
     return renderDateTimePattern(value, fmt.pattern, locale);
+  }
+  if (fmt.kind === 'special') {
+    return formatSpecialPattern(value, fmt.pattern);
   }
   if (fmt.kind === 'custom') {
     return formatCustomPattern(value, fmt.pattern, locale);
@@ -522,6 +634,43 @@ function formatCustomPattern(value: number, pattern: string, locale: string): st
   }
 
   return renderNumericPattern(useAbs ? Math.abs(value) : value, active, locale);
+}
+
+function formatSpecialPattern(value: number, pattern: string): string {
+  const sections = splitSections(pattern);
+  const active =
+    sections.find((sec) => {
+      const cond = parseCondition(sec);
+      return cond ? cond.test(value) : false;
+    }) ??
+    (value < 0
+      ? (sections[1] ?? sections[0])
+      : value === 0
+        ? (sections[2] ?? sections[0])
+        : sections[0]) ??
+    '';
+  const withoutCondition = parseCondition(active)?.body ?? active;
+  const body = normalizeFormatSection(withoutCondition);
+  const digits = String(Math.trunc(Math.abs(value)));
+  let cursor = digits.length - 1;
+  let out = '';
+  for (let i = body.length - 1; i >= 0; i -= 1) {
+    const ch = body[i] ?? '';
+    if (ch === '0' || ch === '#' || ch === '?') {
+      if (cursor >= 0) {
+        out = digits[cursor] + out;
+        cursor -= 1;
+      } else if (ch === '0') {
+        out = `0${out}`;
+      } else if (ch === '?') {
+        out = ` ${out}`;
+      }
+    } else {
+      out = ch + out;
+    }
+  }
+  if (cursor >= 0) out = digits.slice(0, cursor + 1) + out;
+  return value < 0 ? `-${out}` : out;
 }
 
 function normalizeFormatSection(section: string): string {

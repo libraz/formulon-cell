@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-
+import { STANDARD_COLORS, THEME_COLOR_COLUMNS } from '../../../src/components/color-palette.js';
 import {
   makeButton,
   makeCheckbox,
@@ -8,7 +8,7 @@ import {
   makeSwatches,
   makeVisualSideButton,
 } from '../../../src/interact/format-dialog-dom.js';
-import { type SideKey, THEME_SWATCHES } from '../../../src/interact/format-dialog-model.js';
+import type { SideKey } from '../../../src/interact/format-dialog-model.js';
 
 describe('interact/format-dialog-dom', () => {
   describe('makeCheckbox', () => {
@@ -36,15 +36,14 @@ describe('interact/format-dialog-dom', () => {
   });
 
   describe('makeSwatches', () => {
-    it('renders 12 theme swatches with color metadata', () => {
-      const group = makeSwatches('font');
-      expect(group.dataset.swatches).toBe('font');
-      const swatches = group.querySelectorAll('button');
-      expect(swatches.length).toBe(THEME_SWATCHES.length);
-      for (let i = 0; i < swatches.length; i += 1) {
-        const btn = swatches[i] as HTMLButtonElement;
-        expect(btn.dataset.color).toBe(THEME_SWATCHES[i]);
-        expect(btn.getAttribute('aria-label')).toBe(THEME_SWATCHES[i]);
+    it('renders the shared color palette with theme + standard swatches', () => {
+      const palette = makeSwatches('font', 'Theme Colors', 'Standard Colors');
+      expect(palette.el.dataset.swatches).toBe('font');
+      const swatches = palette.el.querySelectorAll<HTMLButtonElement>('[data-color]');
+      // 10 theme columns × 6 rows + 10 standard colors.
+      expect(swatches.length).toBe(THEME_COLOR_COLUMNS.length * 6 + STANDARD_COLORS.length);
+      for (const btn of swatches) {
+        expect(btn.dataset.color).toMatch(/^#[0-9a-f]{6}$/);
       }
     });
   });

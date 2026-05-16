@@ -1,5 +1,6 @@
 import type { Range } from '../engine/types.js';
-import type { SpreadsheetStore } from '../store/store.js';
+import type { SpreadsheetStore, ValueFilterCriteria } from '../store/store.js';
+import type { History } from './history.js';
 
 /**
  * Sheet Views — the desktop spreadsheet's per-user filter / sort profiles. Each view
@@ -27,6 +28,9 @@ export interface SheetView {
   sheet: number;
   /** Optional autofilter rect mirrored from `ui.filterRange`. */
   filterRange?: Range;
+  /** Value-filter criteria captured with the view so Reapply and dropdown
+   *  state survive switching between sheet views. */
+  filterCriteria?: readonly ValueFilterCriteria[];
   /** Frozen-pane configuration. Default = neither row nor col frozen. */
   freeze?: { rows: number; cols: number };
   /** Active sort key (single-column, like the basic single-column sort UX). */
@@ -40,12 +44,20 @@ export interface SheetView {
 export interface SheetViewSnapshotInput {
   sheet: number;
   filterRange: Range | null;
+  filterCriteria?: readonly ValueFilterCriteria[];
   freezeRows: number;
   freezeCols: number;
   hiddenRows: ReadonlySet<number>;
   hiddenCols: ReadonlySet<number>;
   sort?: SheetViewSort;
 }
+
+const cloneFilterCriteria = (criteria: readonly ValueFilterCriteria[]): ValueFilterCriteria[] =>
+  criteria.map((criterion) => ({
+    range: { ...criterion.range },
+    byCol: criterion.byCol,
+    hiddenValues: [...criterion.hiddenValues],
+  }));
 
 /** Build a SheetView from the current store state. The id + name are
  *  caller-supplied so the picker can show user-friendly names. */
@@ -60,6 +72,7 @@ export function captureSheetView(
     sheet: input.sheet,
   };
   if (input.filterRange) view.filterRange = input.filterRange;
+  if (input.filterCriteria?.length) view.filterCriteria = cloneFilterCriteria(input.filterCriteria);
   if (input.freezeRows > 0 || input.freezeCols > 0) {
     view.freeze = { rows: input.freezeRows, cols: input.freezeCols };
   }
@@ -78,6 +91,7 @@ export function captureSheetView(
 export interface SheetViewPatch {
   sheet: number;
   filterRange: Range | null;
+  filterCriteria: ValueFilterCriteria[];
   freezeRows: number;
   freezeCols: number;
   hiddenRows: number[];
@@ -90,6 +104,7 @@ export function applySheetView(view: SheetView): SheetViewPatch {
   return {
     sheet: view.sheet,
     filterRange: view.filterRange ?? null,
+    filterCriteria: cloneFilterCriteria(view.filterCriteria ?? []),
     freezeRows: view.freeze?.rows ?? 0,
     freezeCols: view.freeze?.cols ?? 0,
     hiddenRows: [...(view.hiddenRows ?? [])],
@@ -122,26 +137,89 @@ export type SheetViewStoreResult =
   | { ok: true; view: SheetView }
   | { ok: false; reason: 'not-found' | 'different-sheet' };
 
+interface SheetViewsSnapshot {
+  views: SheetView[];
+  activeViewId: string | null;
+}
+
+const cloneRange = (range: Range): Range => ({ ...range });
+
+const cloneSheetView = (view: SheetView): SheetView => ({
+  ...view,
+  ...(view.filterRange ? { filterRange: cloneRange(view.filterRange) } : {}),
+  ...(view.filterCriteria ? { filterCriteria: cloneFilterCriteria(view.filterCriteria) } : {}),
+  ...(view.freeze ? { freeze: { ...view.freeze } } : {}),
+  ...(view.sort ? { sort: { ...view.sort } } : {}),
+  ...(view.hiddenRows ? { hiddenRows: [...view.hiddenRows] } : {}),
+  ...(view.hiddenCols ? { hiddenCols: [...view.hiddenCols] } : {}),
+});
+
+const captureSheetViewsSnapshot = (store: SpreadsheetStore): SheetViewsSnapshot => {
+  const state = store.getState();
+  return {
+    views: state.sheetViews.views.map(cloneSheetView),
+    activeViewId: state.sheetViews.activeViewId,
+  };
+};
+
+const applySheetViewsSnapshot = (
+  store: SpreadsheetStore,
+  snapshot: SheetViewsSnapshot,
+): void => {
+  store.setState((s) => ({
+    ...s,
+    sheetViews: {
+      views: snapshot.views.map(cloneSheetView),
+      activeViewId: snapshot.activeViewId,
+    },
+  }));
+};
+
+const sameSheetViewsSnapshot = (a: SheetViewsSnapshot, b: SheetViewsSnapshot): boolean =>
+  JSON.stringify(a) === JSON.stringify(b);
+
+export function recordSheetViewsChange<T>(
+  history: History | null,
+  store: SpreadsheetStore,
+  mutate: () => T,
+): T {
+  if (!history || history.isReplaying()) return mutate();
+  const before = captureSheetViewsSnapshot(store);
+  const result = mutate();
+  const after = captureSheetViewsSnapshot(store);
+  if (!sameSheetViewsSnapshot(before, after)) {
+    history.push({
+      undo: () => applySheetViewsSnapshot(store, before),
+      redo: () => applySheetViewsSnapshot(store, after),
+    });
+  }
+  return result;
+}
+
 /** Capture the current store view settings and register them in the store. */
 export function saveSheetView(
   store: SpreadsheetStore,
   id: string,
   name: string,
   sort?: SheetViewSort,
+  history: History | null = null,
 ): SheetView {
   const state = store.getState();
   const view = captureSheetView(id, name, {
     sheet: state.data.sheetIndex,
     filterRange: state.ui.filterRange,
+    filterCriteria: state.ui.filterCriteria,
     freezeRows: state.layout.freezeRows,
     freezeCols: state.layout.freezeCols,
     hiddenRows: state.layout.hiddenRows,
     hiddenCols: state.layout.hiddenCols,
     sort,
   });
-  store.setState((s) => {
-    const next = s.sheetViews.views.filter((v) => v.id !== view.id);
-    return { ...s, sheetViews: { ...s.sheetViews, views: [...next, view] } };
+  recordSheetViewsChange(history, store, () => {
+    store.setState((s) => {
+      const next = s.sheetViews.views.filter((v) => v.id !== view.id);
+      return { ...s, sheetViews: { ...s.sheetViews, views: [...next, view] } };
+    });
   });
   return view;
 }
@@ -167,23 +245,29 @@ export function activateSheetView(store: SpreadsheetStore, id: string): SheetVie
       rowStart: Math.max(Math.max(0, Math.floor(patch.freezeRows)), s.viewport.rowStart),
       colStart: Math.max(Math.max(0, Math.floor(patch.freezeCols)), s.viewport.colStart),
     },
-    ui: { ...s.ui, filterRange: patch.filterRange },
+    ui: { ...s.ui, filterRange: patch.filterRange, filterCriteria: patch.filterCriteria },
     sheetViews: { ...s.sheetViews, activeViewId: id },
   }));
   return { ok: true, view };
 }
 
 /** Remove a stored sheet view and clear the active marker when needed. */
-export function deleteSheetView(store: SpreadsheetStore, id: string): void {
-  store.setState((s) => {
-    const views = s.sheetViews.views.filter((v) => v.id !== id);
-    if (views.length === s.sheetViews.views.length) return s;
-    return {
-      ...s,
-      sheetViews: {
-        views,
-        activeViewId: s.sheetViews.activeViewId === id ? null : s.sheetViews.activeViewId,
-      },
-    };
+export function deleteSheetView(
+  store: SpreadsheetStore,
+  id: string,
+  history: History | null = null,
+): void {
+  recordSheetViewsChange(history, store, () => {
+    store.setState((s) => {
+      const views = s.sheetViews.views.filter((v) => v.id !== id);
+      if (views.length === s.sheetViews.views.length) return s;
+      return {
+        ...s,
+        sheetViews: {
+          views,
+          activeViewId: s.sheetViews.activeViewId === id ? null : s.sheetViews.activeViewId,
+        },
+      };
+    });
   });
 }

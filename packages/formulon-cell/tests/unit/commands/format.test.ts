@@ -1,21 +1,27 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   bumpDecimals,
+  bumpIndent,
   clearFormat,
+  clearVisualFormat,
   cycleBorders,
   cycleCurrency,
   cyclePercent,
   formatNumber,
   setAlign,
+  setBorderPreset,
   setBorders,
   setFillColor,
   setFont,
   setFontColor,
   setNumFmt,
+  setRotation,
+  setVAlign,
   toggleBold,
   toggleItalic,
   toggleStrike,
   toggleUnderline,
+  toggleWrap,
 } from '../../../src/commands/format.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import {
@@ -120,6 +126,47 @@ describe('setAlign', () => {
   });
 });
 
+describe('alignment ribbon formatting', () => {
+  let store: SpreadsheetStore;
+
+  beforeEach(() => {
+    store = createSpreadsheetStore();
+    setRange(store, 1, 1, 2, 2);
+  });
+
+  it('writes vertical alignment and wrap across the selected range', () => {
+    setVAlign(store.getState(), store, 'middle');
+    toggleWrap(store.getState(), store);
+
+    expect(fmtAt(store, 1, 1)).toMatchObject({ vAlign: 'middle', wrap: true });
+    expect(fmtAt(store, 2, 2)).toMatchObject({ vAlign: 'middle', wrap: true });
+  });
+
+  it('bumps indent for every selected cell and clamps at Excel-style bounds', () => {
+    for (let i = 0; i < 20; i += 1) bumpIndent(store.getState(), store, 1);
+
+    expect(fmtAt(store, 1, 1)?.indent).toBe(15);
+    expect(fmtAt(store, 2, 2)?.indent).toBe(15);
+
+    for (let i = 0; i < 20; i += 1) bumpIndent(store.getState(), store, -1);
+
+    expect(fmtAt(store, 1, 1)?.indent).toBe(0);
+    expect(fmtAt(store, 2, 2)?.indent).toBe(0);
+  });
+
+  it('sets text rotation across the range and clamps to the supported angle range', () => {
+    setRotation(store.getState(), store, 45);
+    expect(fmtAt(store, 1, 1)?.rotation).toBe(45);
+    expect(fmtAt(store, 2, 2)?.rotation).toBe(45);
+
+    setRotation(store.getState(), store, 120);
+    expect(fmtAt(store, 1, 1)?.rotation).toBe(90);
+
+    setRotation(store.getState(), store, -120);
+    expect(fmtAt(store, 1, 1)?.rotation).toBe(-90);
+  });
+});
+
 describe('setNumFmt / cycleCurrency / cyclePercent', () => {
   let store: SpreadsheetStore;
 
@@ -136,6 +183,11 @@ describe('setNumFmt / cycleCurrency / cyclePercent', () => {
   it('cycleCurrency turns currency on when none is set', () => {
     cycleCurrency(store.getState(), store);
     expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'currency', decimals: 2, symbol: '$' });
+  });
+
+  it('cycleCurrency uses the active locale currency symbol', () => {
+    cycleCurrency(store.getState(), store, 'ja');
+    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'currency', decimals: 2, symbol: '¥' });
   });
 
   it('cycleCurrency clears back to general when at least one cell is currency', () => {
@@ -204,6 +256,46 @@ describe('borders', () => {
     expect(fmtAt(store, 0, 0)?.borders).toMatchObject({ top: true, bottom: true });
   });
 
+  it('setBorderPreset carries the selected line color into styled border sides', () => {
+    setRange(store, 0, 0, 0, 0);
+    setBorderPreset(store.getState(), store, 'outline', 'thick', '#c00000');
+
+    expect(fmtAt(store, 0, 0)?.borders).toEqual({
+      top: { style: 'thick', color: '#c00000' },
+      bottom: { style: 'thick', color: '#c00000' },
+      left: { style: 'thick', color: '#c00000' },
+      right: { style: 'thick', color: '#c00000' },
+    });
+  });
+
+  it('setBorderPreset applies inside borders only between cells in a range', () => {
+    setRange(store, 0, 0, 1, 1);
+    setBorderPreset(store.getState(), store, 'inside', 'thin', '#00a000');
+
+    expect(fmtAt(store, 0, 0)?.borders).toBeUndefined();
+    expect(fmtAt(store, 0, 1)?.borders).toEqual({
+      left: { style: 'thin', color: '#00a000' },
+    });
+    expect(fmtAt(store, 1, 0)?.borders).toEqual({
+      top: { style: 'thin', color: '#00a000' },
+    });
+    expect(fmtAt(store, 1, 1)?.borders).toEqual({
+      top: { style: 'thin', color: '#00a000' },
+      left: { style: 'thin', color: '#00a000' },
+    });
+  });
+
+  it('setBorderPreset applies diagonal borders with the selected style and color', () => {
+    setRange(store, 0, 0, 0, 0);
+    setBorderPreset(store.getState(), store, 'diagonalDown', 'dashed', '#4472c4');
+    setBorderPreset(store.getState(), store, 'diagonalUp', 'double', '#c00000');
+
+    expect(fmtAt(store, 0, 0)?.borders).toEqual({
+      diagonalDown: { style: 'dashed', color: '#4472c4' },
+      diagonalUp: { style: 'double', color: '#c00000' },
+    });
+  });
+
   it('cycleBorders paints an outline on first call (perimeter only)', () => {
     cycleBorders(store.getState(), store);
     // Top-left corner: top + left only.
@@ -252,6 +344,32 @@ describe('clearFormat / colors / font', () => {
     expect(fmtAt(store, 0, 0)).toBeUndefined();
   });
 
+  it('clearVisualFormat preserves metadata while removing visual fields', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        bold: true,
+        cellStyle: 'good',
+        fill: '#ff0000',
+        numFmt: { kind: 'fixed', decimals: 2 },
+        comment: 'keep',
+        hyperlink: 'https://example.com',
+        validation: { kind: 'list', source: ['A', 'B'] },
+        locked: false,
+      },
+    );
+
+    clearVisualFormat(store.getState(), store);
+
+    expect(fmtAt(store, 0, 0)).toEqual({
+      comment: 'keep',
+      hyperlink: 'https://example.com',
+      validation: { kind: 'list', source: ['A', 'B'] },
+      locked: false,
+    });
+  });
+
   it('setFontColor / setFillColor write and clear', () => {
     setFontColor(store.getState(), store, '#ff0000');
     expect(fmtAt(store, 0, 0)?.color).toBe('#ff0000');
@@ -289,11 +407,25 @@ describe('formatNumber', () => {
   it('applies fixed decimals', () => {
     expect(formatNumber(1.5, { kind: 'fixed', decimals: 3 })).toBe('1.500');
     expect(formatNumber(1.2345, { kind: 'fixed', decimals: 2 })).toBe('1.23');
+    expect(formatNumber(1234.5, { kind: 'fixed', decimals: 2, thousands: true })).toBe('1,234.50');
   });
 
   it('renders currency with prefix symbol and respects negatives', () => {
     expect(formatNumber(99, { kind: 'currency', decimals: 2, symbol: '$' })).toBe('$99.00');
     expect(formatNumber(-99, { kind: 'currency', decimals: 0, symbol: '€' })).toBe('-€99');
+  });
+
+  it('renders Excel-style negative number variants', () => {
+    expect(formatNumber(-99, { kind: 'fixed', decimals: 0, negativeStyle: 'parens' })).toBe('(99)');
+    expect(formatNumber(-99, { kind: 'fixed', decimals: 0, negativeStyle: 'red' })).toBe('-99');
+    expect(
+      formatNumber(-99, {
+        kind: 'currency',
+        decimals: 0,
+        symbol: '$',
+        negativeStyle: 'red-parens',
+      }),
+    ).toBe('($99)');
   });
 
   it('falls back to "$" when currency symbol is missing', () => {
@@ -309,6 +441,14 @@ describe('formatNumber', () => {
     const fmt = { kind: 'custom' as const, pattern: '[$¥-411]#,##0;[Red]-[$¥-411]#,##0' };
     expect(formatNumber(1234, fmt, 'ja-JP')).toBe('¥1,234');
     expect(formatNumber(-1234, fmt, 'ja-JP')).toBe('-¥1,234');
+  });
+
+  it('renders Special category masks without losing the category semantics', () => {
+    expect(formatNumber(12345, { kind: 'special', pattern: '00000' })).toBe('12345');
+    expect(formatNumber(123456789, { kind: 'special', pattern: '00000-0000' })).toBe('12345-6789');
+    expect(formatNumber(123456789, { kind: 'special', pattern: '000-00-0000' })).toBe(
+      '123-45-6789',
+    );
   });
 
   it('hides spreadsheet accounting spacing and fill directives in custom output', () => {

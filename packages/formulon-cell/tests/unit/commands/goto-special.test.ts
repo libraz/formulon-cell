@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { boundingRange, findMatchingCells } from '../../../src/commands/goto-special.js';
+import {
+  boundingRange,
+  findMatchingCells,
+  selectionFromMatches,
+} from '../../../src/commands/goto-special.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
   createSpreadsheetStore,
@@ -54,6 +58,41 @@ describe('findMatchingCells', () => {
     const got = findMatchingCells(wb, store, 'sheet', 'constants');
     const keys = got.map((a) => `${a.row}:${a.col}`).sort();
     expect(keys).toEqual(['0:1', '1:0']);
+  });
+
+  it('constants — can be filtered by value kind', () => {
+    wb.setNumber({ sheet: 0, row: 0, col: 0 }, 42);
+    wb.setText({ sheet: 0, row: 0, col: 1 }, 'hello');
+    wb.setBool({ sheet: 0, row: 0, col: 2 }, true);
+    wb.setText({ sheet: 0, row: 0, col: 3 }, '#REF!');
+    wb.setFormula({ sheet: 0, row: 1, col: 0 }, '=10');
+    wb.recalc();
+    sync(store, wb);
+    const got = findMatchingCells(wb, store, 'sheet', 'constants', {
+      numbers: false,
+      text: true,
+      logical: true,
+      errors: false,
+    });
+    const keys = got.map((a) => `${a.row}:${a.col}`).sort();
+    expect(keys).toEqual(['0:1', '0:2']);
+  });
+
+  it('formulas — can be filtered by evaluated value kind', () => {
+    wb.setFormula({ sheet: 0, row: 0, col: 0 }, '=1+2');
+    wb.setFormula({ sheet: 0, row: 0, col: 1 }, '="apple"');
+    wb.setFormula({ sheet: 0, row: 0, col: 2 }, '=1/0');
+    wb.setNumber({ sheet: 0, row: 1, col: 0 }, 42);
+    wb.recalc();
+    sync(store, wb);
+    const got = findMatchingCells(wb, store, 'sheet', 'formulas', {
+      numbers: false,
+      text: true,
+      logical: false,
+      errors: true,
+    });
+    const keys = got.map((a) => `${a.row}:${a.col}`).sort();
+    expect(keys).toEqual(['0:1', '0:2']);
   });
 
   it('numbers — only number-kind cells', () => {
@@ -182,5 +221,28 @@ describe('boundingRange', () => {
 
   it('throws on empty input', () => {
     expect(() => boundingRange([])).toThrow();
+  });
+});
+
+describe('selectionFromMatches', () => {
+  it('keeps non-contiguous matches as primary + extra single-cell ranges', () => {
+    const selection = selectionFromMatches([
+      { sheet: 0, row: 1, col: 2 },
+      { sheet: 0, row: 4, col: 0 },
+      { sheet: 0, row: 2, col: 5 },
+    ]);
+    expect(selection).toEqual({
+      active: { sheet: 0, row: 1, col: 2 },
+      anchor: { sheet: 0, row: 1, col: 2 },
+      range: { sheet: 0, r0: 1, c0: 2, r1: 1, c1: 2 },
+      extraRanges: [
+        { sheet: 0, r0: 4, c0: 0, r1: 4, c1: 0 },
+        { sheet: 0, r0: 2, c0: 5, r1: 2, c1: 5 },
+      ],
+    });
+  });
+
+  it('throws on empty input', () => {
+    expect(() => selectionFromMatches([])).toThrow();
   });
 });

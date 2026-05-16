@@ -33,6 +33,13 @@ describe('mount/engine-binding — feature gating against preset.full()', () => 
   it('paste-special is attached when both pasteSpecial flag and clipboard are on', () => {
     expect(sheet.instance.features.pasteSpecial).toBeTruthy();
   });
+
+  it('opens the Insert Copied Cells dialog from the public instance API', () => {
+    sheet.instance.openInsertCopiedCells();
+    const dialog = document.querySelector<HTMLElement>('.fc-insertcopied');
+    expect(dialog).not.toBeNull();
+    expect(dialog?.getAttribute('role')).toBe('dialog');
+  });
 });
 
 describe('mount/engine-binding — feature gating against preset.minimal()', () => {
@@ -118,6 +125,23 @@ describe('mount/engine-binding — grid double-click begins inline edit', () => 
     const editor = sheet.host.querySelector('.fc-host__editor') as HTMLTextAreaElement | null;
     expect(editor).not.toBeNull();
     expect(editor?.value).toBe('7');
+  });
+
+  it('dblclick hides formula text when the active cell is Hidden on a protected sheet', () => {
+    const addr = { sheet: 0, row: 0, col: 0 };
+    sheet.workbook.setFormula(addr, '=2+3');
+    sheet.workbook.recalc();
+    mutators.replaceCells(sheet.instance.store, sheet.workbook.cells(0));
+    mutators.setCellFormat(sheet.instance.store, addr, { formulaHidden: true });
+    mutators.setSheetProtected(sheet.instance.store, 0, true);
+    mutators.setActive(sheet.instance.store, addr);
+
+    const grid = sheet.host.querySelector('.fc-host__grid') as HTMLElement;
+    grid.dispatchEvent(new MouseEvent('dblclick', { button: 0, bubbles: true }));
+
+    const editor = sheet.host.querySelector('.fc-host__editor') as HTMLTextAreaElement | null;
+    expect(editor).not.toBeNull();
+    expect(editor?.value).toBe('');
   });
 
   it('dblclick is ignored while the editor is already active', () => {

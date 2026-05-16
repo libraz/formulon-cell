@@ -10,6 +10,16 @@ describe('i18n/controller — runtime swap', () => {
     expect(en.strings).toBe(dictionaries.en);
   });
 
+  it('resolves regional locale tags through their base language dictionary', () => {
+    const enUS = createI18nController({ locale: 'en-US' });
+    expect(enUS.locale).toBe('en-US');
+    expect(enUS.strings).toBe(dictionaries.en);
+
+    enUS.setLocale('ja-JP');
+    expect(enUS.locale).toBe('ja-JP');
+    expect(enUS.strings).toBe(dictionaries.ja);
+  });
+
   it('defaults to "ja" when no locale is provided', () => {
     const c = createI18nController();
     expect(c.locale).toBe('ja');

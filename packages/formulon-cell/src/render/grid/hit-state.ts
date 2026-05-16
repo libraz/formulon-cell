@@ -1,5 +1,4 @@
-import { coerceInput } from '../../commands/coerce-input.js';
-import { validateAgainst } from '../../commands/validate.js';
+import { cellValueViolatesValidation } from '../../commands/validate.js';
 import type { RangeResolver } from '../../engine/range-resolver.js';
 import type { CellValue } from '../../engine/types.js';
 import type { CellFormat, CellValidation } from '../../store/store.js';
@@ -87,28 +86,7 @@ export function detectValidationViolation(
   validation: CellValidation | undefined,
   resolveRange?: RangeResolver,
 ): boolean {
-  if (!validation) return false;
-  if (value.kind === 'error') return false;
-  // Re-use coerceInput by stringifying the value first — same shape the
-  // keyboard / formula-bar paths feed validateAgainst.
-  let raw: string;
-  switch (value.kind) {
-    case 'blank':
-      raw = '';
-      break;
-    case 'number':
-      raw = String(value.value);
-      break;
-    case 'bool':
-      raw = value.value ? 'TRUE' : 'FALSE';
-      break;
-    case 'text':
-      raw = value.value;
-      break;
-  }
-  const coerced = coerceInput(raw);
-  const outcome = validateAgainst(validation, coerced, resolveRange);
-  return !outcome.ok;
+  return cellValueViolatesValidation(value, validation, resolveRange);
 }
 
 /** Latest hit-rects of all outline +/- toggles painted in this frame. The

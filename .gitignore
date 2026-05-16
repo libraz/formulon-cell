@@ -28,6 +28,17 @@ coverage
 playwright-report
 test-results
 
+# Playwright visual-regression baselines.
+# Previously-tracked baselines were generated against the old design and are
+# no longer meaningful — regenerate from a single canonical environment
+# (Linux CI) once the visual surface stabilises, then drop this line if we
+# decide to commit them again.
+**/*.spec.ts-snapshots/
+
+# Local ad-hoc screenshot scratch directory at the repo root — not
+# referenced by any tool, ignored so manual captures don't pollute the index.
+/screenshots/
+
 # editor / OS
 .DS_Store
 Thumbs.db

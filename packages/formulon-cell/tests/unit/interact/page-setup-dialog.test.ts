@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { setMarginPreset } from '../../../src/commands/page-setup.js';
+import { en } from '../../../src/i18n/strings.js';
 import { attachPageSetupDialog } from '../../../src/interact/page-setup-dialog.js';
 import {
   createSpreadsheetStore,
@@ -15,6 +16,20 @@ const marginInputs = (): HTMLInputElement[] =>
   Array.from(document.querySelectorAll<HTMLInputElement>('.fc-pgsetup__margins input'));
 const buttons = (): HTMLButtonElement[] =>
   Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-pgsetup .fc-fmtdlg__btn'));
+const footerButtons = (): HTMLButtonElement[] =>
+  Array.from(
+    document.querySelectorAll<HTMLButtonElement>('.fc-pgsetup .fc-fmtdlg__footer .fc-fmtdlg__btn'),
+  );
+const tab = (id: string): HTMLButtonElement | null =>
+  document.querySelector<HTMLButtonElement>(`.fc-pgsetup [data-pgsetup-tab="${id}"]`);
+const panel = (id: string): HTMLDivElement | null =>
+  document.querySelector<HTMLDivElement>(`.fc-pgsetup [data-pgsetup-tab="${id}"][role="tabpanel"]`);
+const inputByLabel = (label: string): HTMLInputElement | null =>
+  document.querySelector<HTMLInputElement>(`.fc-pgsetup input[aria-label="${label}"]`);
+const selectByLabel = (label: string): HTMLSelectElement | null =>
+  document.querySelector<HTMLSelectElement>(`.fc-pgsetup select[aria-label="${label}"]`);
+const referenceError = (): HTMLElement | null =>
+  document.querySelector<HTMLElement>('.fc-pgsetup__error');
 
 describe('attachPageSetupDialog', () => {
   let host: HTMLElement;
@@ -52,15 +67,47 @@ describe('attachPageSetupDialog', () => {
   it('labels Page Setup controls for dialog-style keyboard and assistive navigation', () => {
     const handle = attachPageSetupDialog({ host, store });
     handle.open();
+    const tablist = document.querySelector<HTMLElement>('.fc-pgsetup [role="tablist"]');
+    expect(tablist?.getAttribute('aria-label')).toBeTruthy();
     const [orientSelect, paperSelect] = selects();
     expect(orientSelect?.getAttribute('aria-label')).toBeTruthy();
     expect(paperSelect?.getAttribute('aria-label')).toBeTruthy();
     for (const input of marginInputs()) {
       expect(input.getAttribute('aria-label')).toBeTruthy();
     }
+    const centerChecks = Array.from(
+      document.querySelectorAll<HTMLInputElement>('.fc-pgsetup__center input[type="checkbox"]'),
+    );
+    expect(centerChecks).toHaveLength(2);
+    for (const input of centerChecks) expect(input.getAttribute('aria-label')).toBeTruthy();
     expect(
       document.querySelector<HTMLInputElement>('.fc-pgsetup__text')?.getAttribute('aria-label'),
     ).toBeTruthy();
+    handle.detach();
+  });
+
+  it('renders Excel-style Page Setup tabs with arrow, Home, and End navigation', () => {
+    const handle = attachPageSetupDialog({ host, store });
+    handle.open();
+
+    expect(tab('page')?.getAttribute('aria-selected')).toBe('true');
+    expect(panel('page')?.hidden).toBe(false);
+    expect(panel('margins')?.hidden).toBe(true);
+
+    tab('page')?.focus();
+    tab('page')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(tab('margins')?.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(tab('margins'));
+    expect(panel('margins')?.hidden).toBe(false);
+
+    tab('margins')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    expect(tab('sheet')?.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(tab('sheet'));
+
+    tab('sheet')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    expect(tab('page')?.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(tab('page'));
+
     handle.detach();
   });
 
@@ -80,6 +127,34 @@ describe('attachPageSetupDialog', () => {
     handle.detach();
   });
 
+  it('OK after editing Page tab scaling, quality, and first page number persists them', () => {
+    const handle = attachPageSetupDialog({ host, store, strings: en });
+    handle.open();
+    const fit = inputByLabel('Fit to');
+    const fitWidth = inputByLabel('Fit to width (pages)');
+    const fitHeight = inputByLabel('Fit to height (pages)');
+    const quality = selectByLabel('Print quality');
+    const firstPage = inputByLabel('First page number');
+    if (!fit || !fitWidth || !fitHeight || !quality || !firstPage) {
+      throw new Error('page scaling controls missing');
+    }
+
+    fit.checked = true;
+    fitWidth.value = '1';
+    fitHeight.value = '3';
+    quality.value = '600';
+    firstPage.value = '7';
+
+    const ok = buttons().find((b) => b.classList.contains('fc-fmtdlg__btn--primary'));
+    ok?.click();
+    const setup = getPageSetup(store.getState(), 0);
+    expect(setup.fitWidth).toBe(1);
+    expect(setup.fitHeight).toBe(3);
+    expect(setup.printQuality).toBe('600');
+    expect(setup.firstPageNumber).toBe(7);
+    handle.detach();
+  });
+
   it('Cancel does not mutate the page setup', () => {
     // Seed with a known value so the dialog can be canceled and we can confirm
     // the slice didn't move.
@@ -92,10 +167,24 @@ describe('attachPageSetupDialog', () => {
     if (orientSelect) orientSelect.value = 'landscape';
     const inputs = marginInputs();
     if (inputs[0]) inputs[0].value = '9';
-    const cancel = buttons().find((b) => !b.classList.contains('fc-fmtdlg__btn--primary'));
+    const cancel = footerButtons().find((b) => !b.classList.contains('fc-fmtdlg__btn--primary'));
     cancel?.click();
     const after = getPageSetup(store.getState(), 0);
     expect(after).toEqual(before);
+    expect(dialog()?.hidden).toBe(true);
+    handle.detach();
+  });
+
+  it('header close button does not mutate the page setup', () => {
+    setMarginPreset(store, 0, 'narrow');
+    const before = getPageSetup(store.getState(), 0);
+    const handle = attachPageSetupDialog({ host, store });
+    handle.open();
+    const [orientSelect] = selects();
+    if (orientSelect) orientSelect.value = 'landscape';
+    document.querySelector<HTMLButtonElement>('.fc-pgsetup .fc-fmtdlg__close')?.click();
+
+    expect(getPageSetup(store.getState(), 0)).toEqual(before);
     expect(dialog()?.hidden).toBe(true);
     handle.detach();
   });
@@ -115,8 +204,10 @@ describe('attachPageSetupDialog', () => {
     const handle = attachPageSetupDialog({ host, store });
     handle.open();
     const inputs = marginInputs();
-    if (inputs.length !== 4) throw new Error('expected 4 margin inputs');
-    const [top, right, bottom, left] = inputs as [
+    if (inputs.length !== 6) throw new Error('expected 6 margin inputs');
+    const [top, right, bottom, left, header, footer] = inputs as [
+      HTMLInputElement,
+      HTMLInputElement,
       HTMLInputElement,
       HTMLInputElement,
       HTMLInputElement,
@@ -126,10 +217,207 @@ describe('attachPageSetupDialog', () => {
     right.value = '0.4';
     bottom.value = '0.3';
     left.value = '0.2';
+    header.value = '0.15';
+    footer.value = '0.25';
+    const centerChecks = Array.from(
+      document.querySelectorAll<HTMLInputElement>('.fc-pgsetup__center input[type="checkbox"]'),
+    );
+    if (centerChecks.length !== 2) throw new Error('expected 2 center checkboxes');
+    const [centerH, centerV] = centerChecks as [HTMLInputElement, HTMLInputElement];
+    centerH.checked = true;
+    centerV.checked = true;
     const ok = buttons().find((b) => b.classList.contains('fc-fmtdlg__btn--primary'));
     ok?.click();
     const setup = getPageSetup(store.getState(), 0);
     expect(setup.margins).toEqual({ top: 0.5, right: 0.4, bottom: 0.3, left: 0.2 });
+    expect(setup.headerMargin).toBe(0.15);
+    expect(setup.footerMargin).toBe(0.25);
+    expect(setup.centerHorizontally).toBe(true);
+    expect(setup.centerVertically).toBe(true);
+    handle.detach();
+  });
+
+  it('Header/Footer tab exposes built-in presets and custom edit entry points', () => {
+    const handle = attachPageSetupDialog({ host, store, strings: en });
+    handle.open();
+    tab('headerFooter')?.click();
+
+    expect(selectByLabel('Header')).toBeTruthy();
+    expect(selectByLabel('Footer')).toBeTruthy();
+    expect(
+      buttons().some((button) => button.getAttribute('aria-label') === 'Custom Header...'),
+    ).toBe(true);
+    expect(
+      buttons().some((button) => button.getAttribute('aria-label') === 'Custom Footer...'),
+    ).toBe(true);
+
+    handle.detach();
+  });
+
+  it('OK after choosing built-in Header/Footer presets persists the generated slots', () => {
+    const handle = attachPageSetupDialog({ host, store, strings: en });
+    handle.open();
+    tab('headerFooter')?.click();
+
+    const headerSelect = selectByLabel('Header');
+    const footerSelect = selectByLabel('Footer');
+    if (!headerSelect || !footerSelect) throw new Error('header/footer selects missing');
+    headerSelect.value = 'page';
+    headerSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    footerSelect.value = 'path';
+    footerSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(inputByLabel('Header Center')?.value).toBe('Page 1');
+    expect(inputByLabel('Footer Center')?.value).toBe('Book1.xlsx');
+
+    const ok = buttons().find((b) => b.classList.contains('fc-fmtdlg__btn--primary'));
+    ok?.click();
+    const setup = getPageSetup(store.getState(), 0);
+    expect(setup.headerLeft).toBe('');
+    expect(setup.headerCenter).toBe('Page 1');
+    expect(setup.headerRight).toBe('');
+    expect(setup.footerLeft).toBe('');
+    expect(setup.footerCenter).toBe('Book1.xlsx');
+    expect(setup.footerRight).toBe('');
+    handle.detach();
+  });
+
+  it('Header/Footer tab persists Excel-style header and footer option checkboxes', () => {
+    const handle = attachPageSetupDialog({ host, store, strings: en });
+    handle.open();
+    tab('headerFooter')?.click();
+
+    const oddEven = inputByLabel('Different odd and even pages');
+    const first = inputByLabel('Different first page');
+    const scale = inputByLabel('Scale with document');
+    const align = inputByLabel('Align with page margins');
+    if (!oddEven || !first || !scale || !align) {
+      throw new Error('header/footer option checkboxes missing');
+    }
+    expect(scale.checked).toBe(true);
+    expect(align.checked).toBe(true);
+
+    oddEven.checked = true;
+    first.checked = true;
+    scale.checked = false;
+    align.checked = false;
+
+    const ok = buttons().find((b) => b.classList.contains('fc-fmtdlg__btn--primary'));
+    ok?.click();
+    const setup = getPageSetup(store.getState(), 0);
+    expect(setup.differentOddEvenPages).toBe(true);
+    expect(setup.differentFirstPage).toBe(true);
+    expect(setup.scaleHeaderFooterWithDocument).toBe(false);
+    expect(setup.alignHeaderFooterWithMargins).toBe(false);
+    handle.detach();
+  });
+
+  it('Custom Header button focuses the direct left-header input without applying a preset', () => {
+    const handle = attachPageSetupDialog({ host, store, strings: en });
+    handle.open();
+    tab('headerFooter')?.click();
+
+    const customHeader = buttons().find(
+      (button) => button.getAttribute('aria-label') === 'Custom Header...',
+    );
+    customHeader?.click();
+
+    expect(document.activeElement).toBe(inputByLabel('Header Left'));
+    expect(selectByLabel('Header')?.value).toBe('custom');
+    handle.detach();
+  });
+
+  it('Sheet tab persists Excel-style print area, print options, comments, errors, and page order', () => {
+    const handle = attachPageSetupDialog({ host, store, strings: en });
+    handle.open();
+    tab('sheet')?.click();
+
+    const printArea = inputByLabel('Print area');
+    const rows = inputByLabel('Print title rows');
+    const cols = inputByLabel('Print title columns');
+    const comments = selectByLabel('Comments and notes');
+    const errors = selectByLabel('Cell errors as');
+    const blackWhite = inputByLabel('Black and white');
+    const draft = inputByLabel('Draft quality');
+    const overThenDown = inputByLabel('Over, then down');
+    if (
+      !printArea ||
+      !rows ||
+      !cols ||
+      !comments ||
+      !errors ||
+      !blackWhite ||
+      !draft ||
+      !overThenDown
+    ) {
+      throw new Error('sheet tab controls missing');
+    }
+
+    printArea.value = 'B2:D10';
+    rows.value = '1:2';
+    cols.value = 'A:B';
+    blackWhite.checked = true;
+    draft.checked = true;
+    comments.value = 'endOfSheet';
+    errors.value = 'dash';
+    overThenDown.checked = true;
+
+    const ok = buttons().find((b) => b.classList.contains('fc-fmtdlg__btn--primary'));
+    ok?.click();
+    const setup = getPageSetup(store.getState(), 0);
+    expect(setup.printArea).toBe('B2:D10');
+    expect(setup.printTitleRows).toBe('1:2');
+    expect(setup.printTitleCols).toBe('A:B');
+    expect(setup.blackAndWhite).toBe(true);
+    expect(setup.draftQuality).toBe(true);
+    expect(setup.comments).toBe('endOfSheet');
+    expect(setup.cellErrorsAs).toBe('dash');
+    expect(setup.pageOrder).toBe('overThenDown');
+    handle.detach();
+  });
+
+  it('rejects invalid Sheet tab print references without mutating page setup', () => {
+    const handle = attachPageSetupDialog({ host, store, strings: en });
+    handle.open();
+    tab('sheet')?.click();
+
+    const printArea = inputByLabel('Print area');
+    const rows = inputByLabel('Print title rows');
+    const cols = inputByLabel('Print title columns');
+    if (!printArea || !rows || !cols) throw new Error('sheet reference controls missing');
+
+    printArea.value = '1:3';
+    rows.value = '1:2';
+    cols.value = 'A:B';
+    const ok = buttons().find((b) => b.classList.contains('fc-fmtdlg__btn--primary'));
+    ok?.click();
+
+    expect(dialog()?.hidden).toBe(false);
+    expect(getPageSetup(store.getState(), 0).printArea).toBeUndefined();
+    expect(printArea.getAttribute('aria-invalid')).toBe('true');
+    expect(referenceError()?.textContent).toBe('Enter a valid cell range, such as A1:D20.');
+    expect(tab('sheet')?.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(printArea);
+
+    printArea.value = 'B2:D10';
+    printArea.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(referenceError()?.hidden).toBe(true);
+    expect(printArea.hasAttribute('aria-invalid')).toBe(false);
+
+    rows.value = 'A:B';
+    ok?.click();
+    expect(getPageSetup(store.getState(), 0).printArea).toBeUndefined();
+    expect(rows.getAttribute('aria-invalid')).toBe('true');
+    expect(referenceError()?.textContent).toBe('Enter valid rows to repeat, such as 1:3.');
+
+    rows.value = '1:2';
+    rows.dispatchEvent(new Event('input', { bubbles: true }));
+    cols.value = '1:3';
+    ok?.click();
+    expect(getPageSetup(store.getState(), 0).printArea).toBeUndefined();
+    expect(cols.getAttribute('aria-invalid')).toBe('true');
+    expect(referenceError()?.textContent).toBe('Enter valid columns to repeat, such as A:B.');
+
     handle.detach();
   });
 

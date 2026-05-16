@@ -1,9 +1,11 @@
 import {
-  boundingRange,
   findMatchingCells,
+  selectionFromMatches,
   type GoToScope,
   type GoToSpecialKind,
+  type GoToSpecialValueFilters,
 } from '../commands/goto-special.js';
+import { parseRangeRef } from '../engine/range-resolver.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
@@ -19,7 +21,7 @@ export interface GoToDialogDeps {
 }
 
 export interface GoToDialogHandle {
-  open(): void;
+  open(mode?: 'go-to' | 'special'): void;
   close(): void;
   detach(): void;
 }
@@ -52,6 +54,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   const { host, store, getWb } = deps;
   const strings = deps.strings ?? defaultStrings;
   const t = strings.goToDialog;
+  let mode: 'go-to' | 'special' = 'special';
 
   const shell = createDialogShell({
     host,
@@ -71,6 +74,19 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   const body = document.createElement('div');
   body.className = 'fc-fmtdlg__body';
   shell.panel.appendChild(body);
+
+  // ── Direct reference (normal Go To) ───────────────────────────────────
+  const referenceRow = document.createElement('label');
+  referenceRow.className = 'fc-goto__reference';
+  const referenceLabel = document.createElement('span');
+  referenceLabel.textContent = t.reference;
+  const referenceInput = document.createElement('input');
+  referenceInput.type = 'text';
+  referenceInput.placeholder = t.referencePlaceholder;
+  referenceInput.autocomplete = 'off';
+  referenceInput.spellcheck = false;
+  referenceRow.append(referenceLabel, referenceInput);
+  body.appendChild(referenceRow);
 
   // ── Scope (only meaningful when current selection is multi-cell) ───────
   const scopeLegend = document.createElement('div');
@@ -143,6 +159,39 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   // Default selection — spreadsheets open with `constants` highlighted; we mirror that.
   (kindInputs.get('constants') as HTMLInputElement).checked = true;
 
+  // Excel shows value-type checkboxes when either Formulas or Constants is
+  // selected. They let the user narrow the match to number/text/logical/error
+  // results without changing the top-level category.
+  const valueFilters = document.createElement('fieldset');
+  valueFilters.className = 'fc-goto__value-filters';
+  const valueLegend = document.createElement('legend');
+  valueLegend.textContent = t.valueFilterLabel;
+  valueFilters.appendChild(valueLegend);
+  body.appendChild(valueFilters);
+
+  const makeValueFilter = (
+    key: keyof GoToSpecialValueFilters,
+    label: string,
+  ): HTMLInputElement => {
+    const wrap = document.createElement('label');
+    wrap.className = 'fc-goto__check';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.value = key;
+    input.checked = true;
+    const span = document.createElement('span');
+    span.textContent = label;
+    wrap.append(input, span);
+    valueFilters.appendChild(wrap);
+    return input;
+  };
+  const valueFilterInputs = {
+    numbers: makeValueFilter('numbers', t.kindNumbers),
+    text: makeValueFilter('text', t.kindText),
+    logical: makeValueFilter('logical', t.kindLogical),
+    errors: makeValueFilter('errors', t.kindErrors),
+  };
+
   // Inline status (shown when a search returns zero results).
   const statusLine = document.createElement('div');
   statusLine.className = 'fc-goto__status';
@@ -184,32 +233,81 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
     for (const [k, input] of kindInputs) if (input.checked) return k;
     return 'constants';
   };
+  const getValueFilters = (kind: GoToSpecialKind): GoToSpecialValueFilters | undefined => {
+    if (kind !== 'formulas' && kind !== 'constants') return undefined;
+    return {
+      numbers: valueFilterInputs.numbers.checked,
+      text: valueFilterInputs.text.checked,
+      logical: valueFilterInputs.logical.checked,
+      errors: valueFilterInputs.errors.checked,
+    };
+  };
   const getCheckedScope = (): GoToScope => (scopeSelection.checked ? 'selection' : 'sheet');
-
-  const onOk = (): void => {
-    statusLine.textContent = '';
-    const kind = getCheckedKind();
-    const scope = getCheckedScope();
+  const sheetIndexByName = (name: string): number => {
+    const target = name.toLowerCase();
     const wb = getWb();
-    const matches = findMatchingCells(wb, store, scope, kind);
-    if (matches.length === 0) {
-      statusLine.textContent = t.noResults;
-      return;
+    for (let i = 0; i < wb.sheetCount; i += 1) {
+      if (wb.sheetName(i).toLowerCase() === target) return i;
     }
-    const range = boundingRange(matches);
-    const first = matches[0];
-    if (!first) return;
+    return -1;
+  };
+
+  const goToReference = (): boolean => {
+    const parsed = parseRangeRef(referenceInput.value);
+    if (!parsed) {
+      statusLine.textContent = t.invalidReference;
+      return false;
+    }
+    const currentSheet = store.getState().data.sheetIndex;
+    const sheet = parsed.sheetName == null ? currentSheet : sheetIndexByName(parsed.sheetName);
+    if (sheet < 0) {
+      statusLine.textContent = t.invalidReference;
+      return false;
+    }
+    const active = { sheet, row: parsed.r0, col: parsed.c0 };
     store.setState((s) => ({
       ...s,
+      data: { ...s.data, sheetIndex: sheet },
       selection: {
-        active: first,
-        anchor: first,
-        range,
+        active,
+        anchor: active,
+        range: { sheet, r0: parsed.r0, c0: parsed.c0, r1: parsed.r1, c1: parsed.c1 },
         extraRanges: [],
       },
     }));
     api.close();
+    return true;
   };
+
+  const onOk = (): void => {
+    statusLine.textContent = '';
+    if (mode === 'go-to') {
+      goToReference();
+      return;
+    }
+    const kind = getCheckedKind();
+    const scope = getCheckedScope();
+    const wb = getWb();
+    const matches = findMatchingCells(wb, store, scope, kind, getValueFilters(kind));
+    if (matches.length === 0) {
+      statusLine.textContent = t.noResults;
+      return;
+    }
+    store.setState((s) => ({
+      ...s,
+      selection: selectionFromMatches(matches),
+    }));
+    api.close();
+  };
+
+  const syncValueFilters = (): void => {
+    const kind = getCheckedKind();
+    valueFilters.hidden = mode === 'go-to' || (kind !== 'formulas' && kind !== 'constants');
+  };
+
+  for (const input of kindInputs.values()) {
+    shell.on(input, 'change', syncValueFilters);
+  }
 
   shell.on(okBtn, 'click', onOk);
   shell.on(cancelBtn, 'click', () => api.close());
@@ -223,13 +321,27 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   });
 
   const api: GoToDialogHandle = {
-    open(): void {
+    open(nextMode = 'special'): void {
+      mode = nextMode;
       statusLine.textContent = '';
+      const normal = mode === 'go-to';
+      header.textContent = normal ? t.goToTitle : t.title;
+      shell.setAriaLabel(normal ? t.goToTitle : t.title);
+      referenceRow.hidden = !normal;
+      scopeLegend.hidden = normal;
+      scopeGroup.hidden = normal;
+      kindLegend.hidden = normal;
+      kindList.hidden = normal;
+      syncValueFilters();
+      referenceInput.value = normal ? '' : referenceInput.value;
       syncScopeAvailability();
+      if (!normal && isSelectionMulti()) scopeSelection.checked = true;
       shell.open();
       requestAnimationFrame(() => {
-        // Focus the first kind radio so keyboard users can immediately arrow
-        // through the list.
+        if (normal) {
+          referenceInput.focus();
+          return;
+        }
         const first = kindInputs.values().next().value;
         if (first) first.focus();
       });

@@ -114,6 +114,15 @@ describe('slicers slice mutators', () => {
     expect(history.redo()).toBe(true);
     expect(store.getState().slicers.slicers[0]?.selected).toEqual(['East']);
   });
+
+  it('history skips unchanged slicer snapshots', () => {
+    mutators.addSlicer(store, { id: 'a', tableName: 'T', column: 'C', selected: ['East'] });
+    const history = new History();
+    recordSlicersChange(history, store, () => {
+      mutators.setSlicerSelected(store, 'a', ['East']);
+    });
+    expect(history.canUndo()).toBe(false);
+  });
 });
 
 describe('attachSlicer', () => {

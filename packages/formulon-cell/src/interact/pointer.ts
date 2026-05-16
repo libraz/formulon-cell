@@ -19,7 +19,7 @@ import { syncLayoutSizesToEngine } from '../engine/layout-sync.js';
 import type { Range } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { hitTest, hitZone } from '../render/geometry.js';
+import { hitTest, hitZone, layoutForView } from '../render/geometry.js';
 import { getFillHandleRect, getOutlineToggleHits } from '../render/grid.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 
@@ -37,6 +37,8 @@ type DragMode =
       kind: 'range-insert';
       anchor: { row: number; col: number };
       tip: { row: number; col: number };
+      base: { row: number; col: number };
+      r1c1: boolean;
     };
 
 const colLetters = (col: number): string => {
@@ -50,19 +52,40 @@ const colLetters = (col: number): string => {
   return s;
 };
 
-const refOf = (row: number, col: number): string => `${colLetters(col)}${row + 1}`;
-const rangeRefOf = (a: { row: number; col: number }, b: { row: number; col: number }): string => {
-  if (a.row === b.row && a.col === b.col) return refOf(a.row, a.col);
+const a1RefOf = (row: number, col: number): string => `${colLetters(col)}${row + 1}`;
+const r1c1Axis = (prefix: 'R' | 'C', target: number, base: number): string => {
+  const delta = target - base;
+  return delta === 0 ? prefix : `${prefix}[${delta}]`;
+};
+const r1c1RefOf = (
+  row: number,
+  col: number,
+  base: { row: number; col: number },
+): string => `${r1c1Axis('R', row, base.row)}${r1c1Axis('C', col, base.col)}`;
+const refOf = (
+  row: number,
+  col: number,
+  mode: { r1c1: boolean; base: { row: number; col: number } },
+): string => (mode.r1c1 ? r1c1RefOf(row, col, mode.base) : a1RefOf(row, col));
+const rangeRefOf = (
+  a: { row: number; col: number },
+  b: { row: number; col: number },
+  mode: { r1c1: boolean; base: { row: number; col: number } },
+): string => {
+  if (a.row === b.row && a.col === b.col) return refOf(a.row, a.col, mode);
   const r0 = Math.min(a.row, b.row);
   const r1 = Math.max(a.row, b.row);
   const c0 = Math.min(a.col, b.col);
   const c1 = Math.max(a.col, b.col);
-  return `${refOf(r0, c0)}:${refOf(r1, c1)}`;
+  return `${refOf(r0, c0, mode)}:${refOf(r1, c1, mode)}`;
 };
 
 const MAX_ROW = 1048575;
 const MAX_COL = 16383;
 const FILTER_DROPDOWN_RESERVED_WIDTH = 20;
+
+const geometryLayout = (state: State): State['layout'] =>
+  layoutForView(state.layout, state.ui.showHeaders !== false);
 
 export interface PointerDeps {
   store: SpreadsheetStore;
@@ -113,6 +136,11 @@ export function attachPointer(
 
   const onDown = (e: PointerEvent): void => {
     if (e.button !== 0) return;
+    // Clicks that land on the inline editor itself are not grid clicks — let
+    //  the editor handle them natively. Without this, clicking inside an open
+    //  formula editor would hit-test to the editing cell and insert that
+    //  cell's own ref into the formula.
+    if (e.target instanceof Element && e.target.closest('.fc-host__editor')) return;
     const { x, y } = localXY(e);
     const s = store.getState();
 
@@ -164,7 +192,8 @@ export function attachPointer(
       return;
     }
 
-    const zone = hitZone(s.layout, s.viewport, x, y, s.ui.filterRange);
+    const layout = geometryLayout(s);
+    const zone = hitZone(layout, s.viewport, x, y, s.ui.filterRange);
     if (!zone) return;
 
     // Range-insert: keep focus on the editor (preventDefault avoids the
@@ -173,8 +202,10 @@ export function attachPointer(
       e.preventDefault();
       tryCapture();
       const anchor = { row: zone.row, col: zone.col };
-      editor.insertRefAtCaret(refOf(anchor.row, anchor.col));
-      drag = { kind: 'range-insert', anchor, tip: anchor };
+      const base = { row: s.selection.active.row, col: s.selection.active.col };
+      const r1c1 = s.ui.r1c1 === true;
+      editor.insertRefAtCaret(refOf(anchor.row, anchor.col, { r1c1, base }));
+      drag = { kind: 'range-insert', anchor, tip: anchor, base, r1c1 };
       return;
     }
 
@@ -368,21 +399,24 @@ export function attachPointer(
         return;
       }
       case 'col-header': {
-        const zone = hitZone(s.layout, s.viewport, x, y);
+        const layout = geometryLayout(s);
+        const zone = hitZone(layout, s.viewport, x, y);
         if (zone && (zone.kind === 'col-header' || zone.kind === 'col-resize')) {
           mutators.selectCols(store, drag.anchorCol, zone.col);
         }
         return;
       }
       case 'row-header': {
-        const zone = hitZone(s.layout, s.viewport, x, y);
+        const layout = geometryLayout(s);
+        const zone = hitZone(layout, s.viewport, x, y);
         if (zone && (zone.kind === 'row-header' || zone.kind === 'row-resize')) {
           mutators.selectRows(store, drag.anchorRow, zone.row);
         }
         return;
       }
       case 'cell': {
-        const zone = hitZone(s.layout, s.viewport, x, y);
+        const layout = geometryLayout(s);
+        const zone = hitZone(layout, s.viewport, x, y);
         if (zone && zone.kind === 'cell') {
           mutators.extendRangeTo(store, {
             sheet: s.data.sheetIndex,
@@ -403,7 +437,7 @@ export function attachPointer(
         return;
       }
       case 'fill': {
-        const cell = hitTest(s.layout, s.viewport, x, y);
+        const cell = hitTest(geometryLayout(s), s.viewport, x, y);
         if (!cell) return;
         const dest = fillDestFor(drag.src, { row: cell.row, col: cell.col });
         mutators.setFillPreview(store, dest);
@@ -411,13 +445,15 @@ export function attachPointer(
         return;
       }
       case 'range-insert': {
-        const cell = hitTest(s.layout, s.viewport, x, y);
+        const cell = hitTest(geometryLayout(s), s.viewport, x, y);
         if (!cell) return;
         if (cell.row === drag.tip.row && cell.col === drag.tip.col) return;
         drag.tip = { row: cell.row, col: cell.col };
         const editor = getEditor();
         if (editor) {
-          editor.insertRefAtCaret(rangeRefOf(drag.anchor, drag.tip));
+          editor.insertRefAtCaret(
+            rangeRefOf(drag.anchor, drag.tip, { r1c1: drag.r1c1, base: drag.base }),
+          );
         }
         return;
       }
@@ -461,7 +497,7 @@ export function attachPointer(
           // Strip any merges that intersect the fill destination — fill cannot
           // tear merged rectangles apart silently.
           applyUnmerge(store, wb, history, dest);
-          wrote = fillRange(s, wb, drag.src, dest, { copyOnly });
+          wrote = fillRange(s, wb, drag.src, dest, { copyOnly, formatting: 'with', store });
         } finally {
           if (history) history.end();
         }
@@ -470,6 +506,18 @@ export function attachPointer(
           // Promote dest as the new selection.
           mutators.setActive(store, { sheet: dest.sheet, row: dest.r0, col: dest.c0 });
           mutators.extendRangeTo(store, { sheet: dest.sheet, row: dest.r1, col: dest.c1 });
+          host.dispatchEvent(
+            new CustomEvent('fc:autofilloptions', {
+              bubbles: true,
+              detail: {
+                src: drag.src,
+                dest,
+                mode: copyOnly ? 'copy' : 'series',
+                clientX: e.clientX,
+                clientY: e.clientY,
+              },
+            }),
+          );
         }
       }
     }
@@ -497,7 +545,7 @@ export function attachPointer(
       if (history) history.begin();
       let wrote = false;
       try {
-        wrote = fillRange(s, wb, src, dest);
+        wrote = fillRange(s, wb, src, dest, { formatting: 'with', store });
       } finally {
         if (history) history.end();
       }
@@ -509,7 +557,7 @@ export function attachPointer(
       return;
     }
 
-    const zone = hitZone(s.layout, s.viewport, x, y);
+    const zone = hitZone(geometryLayout(s), s.viewport, x, y);
     if (!zone) return;
 
     if (zone.kind === 'col-resize') {
@@ -588,7 +636,7 @@ function updateCursor(host: HTMLElement, store: SpreadsheetStore, x: number, y: 
     }
   }
   const s = store.getState();
-  const zone = hitZone(s.layout, s.viewport, x, y, s.ui.filterRange);
+  const zone = hitZone(geometryLayout(s), s.viewport, x, y, s.ui.filterRange);
   if (!zone) {
     host.style.cursor = '';
     return;

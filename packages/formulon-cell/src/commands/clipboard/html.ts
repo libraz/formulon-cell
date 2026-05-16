@@ -39,11 +39,16 @@ export function encodeHtml(state: State, range: Range): string {
       const key = addrKey({ sheet: range.sheet, row: r, col: c });
       const cell = state.data.cells.get(key);
       const fmt = state.format.formats.get(key);
+      // Formula cells emit their formula text verbatim (`=...`); Excel and
+      //  Sheets parse `=`-prefixed cell content on paste and rebuild the
+      //  formula rather than freezing the last computed value.
       const text = !cell
         ? ''
-        : cell.value.kind === 'number' && fmt?.numFmt
-          ? formatNumber(cell.value.value, fmt.numFmt)
-          : formatCell(cell.value);
+        : cell.formula != null
+          ? cell.formula
+          : cell.value.kind === 'number' && fmt?.numFmt
+            ? formatNumber(cell.value.value, fmt.numFmt)
+            : formatCell(cell.value);
       const style = styleOf(fmt);
       const styleAttr = style ? ` style="${style}"` : '';
       const body = fmt?.hyperlink
