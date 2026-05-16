@@ -492,16 +492,18 @@ export class InlineEditor {
 
   private applyTextAlignment(raw: string): void {
     if (!this.input || !this.editingAddr) return;
-    // Formula edits are always left-aligned in the editor regardless of the
-    // cell's display alignment, so the leading `=` and start of the formula
-    // stay in view rather than scrolling off to the right.
-    if (raw.startsWith('=')) {
-      this.input.style.textAlign = 'left';
-      return;
-    }
+    // Explicit cell alignment wins over the type-based defaults below — once
+    // a user sets center/right/justify on a cell, the editor honors it even
+    // for formula edits so the visual position stays anchored.
     const fmt = this.deps.store.getState().format.formats.get(addrKey(this.editingAddr));
     if (fmt?.align) {
       this.input.style.textAlign = fmt.align;
+      return;
+    }
+    // Formula edits default to left so the leading `=` stays in view rather
+    // than scrolling off to the right under content overflow.
+    if (raw.startsWith('=')) {
+      this.input.style.textAlign = 'left';
       return;
     }
     const coerced = coerceInput(raw);

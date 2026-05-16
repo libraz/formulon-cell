@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {
   activateSheetView,
-  addAllowedEditRange,
   addSheet,
   applyAdvancedFilter,
   applyMerge,
@@ -17,27 +16,20 @@ import {
   buildTranslationReviewItems,
   CELL_STYLE_GROUPS,
   CELL_STYLES,
-  cellValueIsFormulaError,
   type CellStyleId,
   bumpDecimals,
   bumpIndent,
   type CellBorderStyle,
   type ConditionalPresetAction,
-  clearAllowedEditRanges,
   clearPrintArea,
   clearPrintTitles,
   clearSheetBackgroundImage,
   clearTraceArrows,
   clearTraceArrowsByKind,
-  clearFilter,
-  clearComment,
-  clearHyperlink,
   clearValidationCircles,
   clearValidationInRangeWithEngine,
   clearWatchedCells,
-  circleInvalidValidationData,
   circleInvalidValidationDataInSheet,
-  commentAt,
   collapseColGroup,
   collapseRowGroup,
   copyAdvancedFilterResult,
@@ -46,7 +38,12 @@ import {
   createColorPalette,
   createRibbonChartFromSelection,
   executeRibbonClearAction,
+  executeRibbonCommentAction,
+  executeRibbonFilterDataAction,
+  executeRibbonFormulaAuditingAction,
+  executeRibbonHyperlinkAction,
   executeRibbonPivotTableAction,
+  executeRibbonProtectionAction,
   resolveRibbonPdfAction,
   deleteCells,
   deleteSheetView,
@@ -57,15 +54,11 @@ import {
   deleteRows,
   executeRibbonFillAction,
   executeRibbonFindAction,
-  filterBySelectedCellValue,
   formatAsTable,
   type FeatureFlags,
   groupCols,
   groupRows,
   hiddenInSelection,
-  hyperlinkAt,
-  inferAutoFilterRange,
-  ignoreCellError,
   insertCells,
   hideCols,
   hideRows,
@@ -87,14 +80,12 @@ import {
   recordDefinedNamesChange,
   recordFilterChange,
   recordFormatChange,
-  recordIgnoredErrorsChange,
   recordLayoutChange,
   recordMergesChangeWithEngine,
   recordPageSetupChange,
   recordTablesChange,
   recordValidationCirclesChange,
   recordWatchesChange,
-  reapplyFilters,
   renameSheet,
   removeSheet,
   removeDuplicates,
@@ -102,7 +93,6 @@ import {
   resetManualPageBreaks,
   saveSheetView,
   setAlign,
-  setAutoFilter,
   setBorderPreset,
   setColsWidth,
   setFillColor,
@@ -129,9 +119,9 @@ import {
   setSheetBackgroundImage,
   setSheetZoom,
   setWorkbookStructureProtected,
-  selectNextFormulaError,
   setShowFormulas,
   setWorkbookView,
+  toggleAutoFilterFromSelection,
   type ScriptCommand,
   showCols,
   showColsAroundSelection,
@@ -1247,11 +1237,7 @@ const onWindowAction = (action: WindowAction): void => {
 const onFilterToggle = (): void => {
   const inst = props.instance;
   if (!inst) return;
-  const s = inst.store.getState();
-  recordFilterChange(inst.history, inst.store, () => {
-    if (s.ui.filterRange) clearFilter(s, inst.store, s.ui.filterRange);
-    else setAutoFilter(inst.store, inferAutoFilterRange(s));
-  });
+  toggleAutoFilterFromSelection(inst.store, inst.history);
 };
 
 const onSort = (direction: 'asc' | 'desc'): void => {
@@ -1363,17 +1349,15 @@ const onSortMenuAction = (action: SortAction): void => {
   else if (action === 'custom') onCustomSort();
   else if (action === 'filter') onFilterToggle();
   else if (action === 'filter-clear' && s.ui.filterRange)
-    recordFilterChange(inst.history, inst.store, () =>
-      clearFilter(s, inst.store, s.ui.filterRange ?? undefined),
-    );
+    executeRibbonFilterDataAction({ store: inst.store, history: inst.history, action: 'clear' });
   else if (action === 'filter-reapply')
-    recordFilterChange(inst.history, inst.store, () =>
-      reapplyFilters(inst.store.getState(), inst.store),
-    );
+    executeRibbonFilterDataAction({ store: inst.store, history: inst.history, action: 'reapply' });
   else if (action === 'filter-by-selected')
-    recordFilterChange(inst.history, inst.store, () =>
-      filterBySelectedCellValue(inst.store.getState(), inst.store),
-    );
+    executeRibbonFilterDataAction({
+      store: inst.store,
+      history: inst.history,
+      action: 'filter-by-selected',
+    });
   else if (action === 'filter-advanced')
     advancedFilterDialog.value = {
       listRange: formatA1Range(s.selection.range),
@@ -1390,35 +1374,20 @@ const onSortMenuAction = (action: SortAction): void => {
 const onFilterDataAction = (action: FilterDataAction): void => {
   const inst = props.instance;
   if (!inst) return;
-  const s = inst.store.getState();
-  if (action === 'toggle') onFilterToggle();
-  else if (action === 'clear')
-    recordFilterChange(inst.history, inst.store, () =>
-      clearFilter(s, inst.store, s.ui.filterRange ?? undefined),
-    );
-  else if (action === 'reapply')
-    recordFilterChange(inst.history, inst.store, () =>
-      reapplyFilters(inst.store.getState(), inst.store),
-    );
-  else if (action === 'filter-by-selected')
-    recordFilterChange(inst.history, inst.store, () =>
-      filterBySelectedCellValue(inst.store.getState(), inst.store),
-    );
-  else if (action === 'advanced') {
-    const range = s.ui.filterRange ?? inferAutoFilterRange(s);
+  const result = executeRibbonFilterDataAction({
+    store: inst.store,
+    history: inst.history,
+    action,
+  });
+  if (result.kind === 'open-advanced') {
     advancedFilterDialog.value = {
-      listRange: formatA1Range(range),
+      listRange: formatA1Range(result.range),
       criteriaRange: '',
       copyTo: '',
       uniqueOnly: false,
     };
-  }
-  else {
-    const range = s.ui.filterRange ?? inferAutoFilterRange(s);
-    recordFilterChange(inst.history, inst.store, () => {
-      if (!s.ui.filterRange) setAutoFilter(inst.store, range);
-    });
-    inst.openFilterDropdown(range, s.selection.active.col);
+  } else if (result.kind === 'open-filter-dropdown') {
+    inst.openFilterDropdown(result.range, result.column);
   }
   closeDropdown();
 };
@@ -1567,35 +1536,15 @@ const onDataValidationAction = (action: DataValidationAction): void => {
 const onFormulaAuditingAction = (action: FormulaAuditingAction): void => {
   const inst = props.instance;
   if (!inst) return;
-  if (action === 'traceError') inst.tracePrecedents();
-  else if (action === 'ignoreError') {
-    const state = inst.store.getState();
-    const activeCell = state.data.cells.get(
-      `${state.selection.active.sheet}:${state.selection.active.row}:${state.selection.active.col}`,
-    );
-    if (activeCell?.formula && cellValueIsFormulaError(activeCell.value)) {
-      recordIgnoredErrorsChange(inst.history, inst.store, () => {
-        ignoreCellError(inst.store, state.selection.active);
-      });
-    } else if (!selectNextFormulaError(inst.store)) {
-      ribbonReportDialog.value = { title: cellText.value.errorChecking, items: [] };
-    }
-  }
-  else if (action === 'clearCircles')
-    recordValidationCirclesChange(inst.history, inst.store, () => {
-      clearValidationCircles(inst.store);
-    });
-  else if (action === 'circleInvalid') {
-    const state = inst.store.getState();
-    recordValidationCirclesChange(inst.history, inst.store, () => {
-      circleInvalidValidationData(
-        inst.store,
-        state.selection.range,
-        makeRangeResolver(inst.workbook, state.data.sheetIndex),
-      );
-    });
-  } else if (!selectNextFormulaError(inst.store))
-    ribbonReportDialog.value = { title: cellText.value.errorChecking, items: [] };
+  const result = executeRibbonFormulaAuditingAction({
+    store: inst.store,
+    workbook: inst.workbook,
+    history: inst.history,
+    action,
+    strings: { errorChecking: cellText.value.errorChecking },
+  });
+  if (result.kind === 'trace-precedents') inst.tracePrecedents();
+  else if (result.kind === 'report') ribbonReportDialog.value = result.report;
   closeDropdown();
 };
 
@@ -1632,19 +1581,11 @@ const onFindAction = (action: FindAction): void => {
 const onCommentAction = (action: CommentAction): void => {
   const inst = props.instance;
   if (!inst) return;
-  const state = inst.store.getState();
-  const comments =
-    action === 'delete-active'
-      ? commentAt(state, state.selection.active) === null
-        ? []
-        : [{ addr: state.selection.active }]
-      : listComments(state);
-  if (comments.length === 0) {
-    closeDropdown();
-    return;
-  }
-  recordFormatChange(inst.history, inst.store, () => {
-    for (const entry of comments) clearComment(inst.store, entry.addr, inst.workbook);
+  executeRibbonCommentAction({
+    store: inst.store,
+    workbook: inst.workbook,
+    history: inst.history,
+    action,
   });
   closeDropdown();
 };
@@ -1652,69 +1593,28 @@ const onCommentAction = (action: CommentAction): void => {
 const onProtectionAction = (action: ProtectionAction): void => {
   const inst = props.instance;
   if (!inst) return;
-  const state = inst.store.getState();
-  const range = state.selection.range;
-  const rangeText = formatA1Range(range);
-  if (action === 'allow-edit-range') {
-    addAllowedEditRange(inst.store, range, { title: rangeText });
-    ribbonReportDialog.value = {
-      title: cellText.value.allowEditRangesDialogTitle,
-      items: [
-        {
-          severity: 'info',
-          label: cellText.value.allowEditRangesCommand,
-          detail: cellText.value.allowedEditRangeAddedStatus.replace('{range}', rangeText),
-        },
-      ],
-    };
-    closeDropdown();
-    return;
-  }
-  clearAllowedEditRanges(inst.store, state.data.sheetIndex);
-  ribbonReportDialog.value = {
-    title: cellText.value.allowEditRangesDialogTitle,
-    items: [
-      {
-        severity: 'info',
-        label: cellText.value.allowEditRangesClearCommand,
-        detail: cellText.value.allowedEditRangesClearedStatus,
-      },
-    ],
-  };
+  ribbonReportDialog.value = executeRibbonProtectionAction({
+    store: inst.store,
+    action,
+    strings: cellText.value,
+  });
   closeDropdown();
 };
 
 const onHyperlinkAction = (action: HyperlinkAction): void => {
   const inst = props.instance;
   if (!inst) return;
-  if (action === 'edit') {
-    inst.openHyperlinkDialog();
-    closeDropdown();
-    return;
-  }
-  if (action === 'external') {
-    inst.openExternalLinksDialog();
-    closeDropdown();
-    return;
-  }
-  const state = inst.store.getState();
-  const target = hyperlinkAt(state, state.selection.active);
-  if (!target) {
-    ribbonReportDialog.value = {
-      title: cellText.value.linkOpen,
-      items: [{ severity: 'info', label: cellText.value.linkNoHyperlink, detail: '' }],
-    };
-    closeDropdown();
-    return;
-  }
-  if (action === 'open') {
-    window.open(target, '_blank', 'noopener,noreferrer');
-    closeDropdown();
-    return;
-  }
-  recordFormatChange(inst.history, inst.store, () => {
-    clearHyperlink(inst.store, state.selection.active, inst.workbook);
+  const result = executeRibbonHyperlinkAction({
+    store: inst.store,
+    workbook: inst.workbook,
+    history: inst.history,
+    action,
+    strings: cellText.value,
   });
+  if (result.kind === 'open-hyperlink-dialog') inst.openHyperlinkDialog();
+  else if (result.kind === 'open-external-dialog') inst.openExternalLinksDialog();
+  else if (result.kind === 'open-url') window.open(result.url, '_blank', 'noopener,noreferrer');
+  else if (result.kind === 'report') ribbonReportDialog.value = result.report;
   closeDropdown();
 };
 

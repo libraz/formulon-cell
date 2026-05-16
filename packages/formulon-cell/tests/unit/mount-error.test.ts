@@ -16,7 +16,7 @@ describe('Spreadsheet.mount error handling', () => {
     document.body.appendChild(host);
     const onError = vi.fn();
 
-    await expect(Spreadsheet.mount(host, { onError })).rejects.toThrow(err);
+    await expect(Spreadsheet.mount(host, { locale: 'en', onError })).rejects.toThrow(err);
 
     expect(onError).toHaveBeenCalledWith(err);
     expect(host.dataset.fcEngineState).toBe('error');

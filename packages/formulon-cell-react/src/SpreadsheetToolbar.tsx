@@ -1,7 +1,6 @@
 import { ChevronDown12Regular } from '@fluentui/react-icons';
 import {
   type AutoSumFunction,
-  addAllowedEditRange,
   addSheet,
   applyAdvancedFilter,
   applyCellStyle,
@@ -22,13 +21,7 @@ import {
   type CellStyleId,
   type ConditionalMenuAction,
   type ConditionalPresetAction,
-  cellValueIsFormulaError,
-  circleInvalidValidationData,
   circleInvalidValidationDataInSheet,
-  clearAllowedEditRanges,
-  clearComment,
-  clearFilter,
-  clearHyperlink,
   clearPrintArea,
   clearPrintTitles,
   clearSheetBackgroundImage,
@@ -37,7 +30,6 @@ import {
   clearValidationCircles,
   clearValidationInRangeWithEngine,
   clearWatchedCells,
-  commentAt,
   copyAdvancedFilterResult,
   createColorPalette,
   createDefinedNamesFromSelection,
@@ -49,11 +41,15 @@ import {
   deleteSelectedRows,
   dispatchHostClipboard,
   executeRibbonClearAction,
+  executeRibbonCommentAction,
   executeRibbonFillAction,
+  executeRibbonFilterDataAction,
   executeRibbonFindAction,
+  executeRibbonFormulaAuditingAction,
+  executeRibbonHyperlinkAction,
   executeRibbonPivotTableAction,
+  executeRibbonProtectionAction,
   type FreezeAction,
-  filterBySelectedCellValue,
   formatAsTable,
   groupCols,
   groupRows,
@@ -69,9 +65,6 @@ import {
   hiddenInSelection,
   hideCols,
   hideRows,
-  hyperlinkAt,
-  ignoreCellError,
-  inferAutoFilterRange,
   inferSortHasHeader,
   insertCells,
   insertCols,
@@ -82,7 +75,6 @@ import {
   insertSelectedRows,
   isCellWritable,
   isWorkbookStructureProtected,
-  listComments,
   listDefinedNames,
   type MarginPreset,
   type MergeAction,
@@ -94,12 +86,10 @@ import {
   type PageOrientation,
   type PaperSize,
   type PasteAction,
-  reapplyFilters,
   recordConditionalRulesChange,
   recordDefinedNamesChange,
   recordFilterChange,
   recordFormatChange,
-  recordIgnoredErrorsChange,
   recordLayoutChange,
   recordMergesChangeWithEngine,
   recordPageSetupChange,
@@ -115,9 +105,7 @@ import {
   type ScriptCommand,
   type SpreadsheetInstance,
   type Strings,
-  selectNextFormulaError,
   setAlign,
-  setAutoFilter,
   setBorderPreset,
   setColsWidth,
   setFitToPages,
@@ -141,6 +129,7 @@ import {
   sortActiveColumnAuto,
   sortRangeWithHistory,
   textToColumns,
+  toggleAutoFilterFromSelection,
   toggleSelectedColsHidden,
   toggleSelectedRowsHidden,
   ungroupCols,
@@ -664,11 +653,7 @@ export const SpreadsheetToolbar = ({
 
   const onFilterToggle = useCallback(() => {
     if (!instance) return;
-    const s = instance.store.getState();
-    recordFilterChange(instance.history, instance.store, () => {
-      if (s.ui.filterRange) clearFilter(s, instance.store, s.ui.filterRange);
-      else setAutoFilter(instance.store, inferAutoFilterRange(s));
-    });
+    toggleAutoFilterFromSelection(instance.store, instance.history);
   }, [instance]);
 
   const [removeDuplicatesDialog, setRemoveDuplicatesDialog] =
@@ -767,18 +752,24 @@ export const SpreadsheetToolbar = ({
       } else if (action === 'custom') onCustomSort();
       else if (action === 'filter') onFilterToggle();
       else if (action === 'filter-clear' && s.ui.filterRange)
-        recordFilterChange(instance.history, instance.store, () =>
-          clearFilter(s, instance.store, s.ui.filterRange ?? undefined),
-        );
+        executeRibbonFilterDataAction({
+          store: instance.store,
+          history: instance.history,
+          action: 'clear',
+        });
       else if (action === 'filter-reapply')
-        recordFilterChange(instance.history, instance.store, () =>
-          reapplyFilters(instance.store.getState(), instance.store),
-        );
-      else if (action === 'filter-by-selected') {
-        recordFilterChange(instance.history, instance.store, () =>
-          filterBySelectedCellValue(instance.store.getState(), instance.store),
-        );
-      } else if (action === 'filter-advanced')
+        executeRibbonFilterDataAction({
+          store: instance.store,
+          history: instance.history,
+          action: 'reapply',
+        });
+      else if (action === 'filter-by-selected')
+        executeRibbonFilterDataAction({
+          store: instance.store,
+          history: instance.history,
+          action: 'filter-by-selected',
+        });
+      else if (action === 'filter-advanced')
         setAdvancedFilterDialog({
           listRange: formatA1Range(s.selection.range),
           criteriaRange: '',
@@ -795,46 +786,23 @@ export const SpreadsheetToolbar = ({
   const onFilterDataAction = useCallback(
     (action: FilterDataAction) => {
       if (!instance) return;
-      const s = instance.store.getState();
-      if (action === 'toggle') {
-        onFilterToggle();
-        return;
-      }
-      if (action === 'clear') {
-        recordFilterChange(instance.history, instance.store, () =>
-          clearFilter(s, instance.store, s.ui.filterRange ?? undefined),
-        );
-        return;
-      }
-      if (action === 'reapply') {
-        recordFilterChange(instance.history, instance.store, () =>
-          reapplyFilters(instance.store.getState(), instance.store),
-        );
-        return;
-      }
-      if (action === 'filter-by-selected') {
-        recordFilterChange(instance.history, instance.store, () =>
-          filterBySelectedCellValue(instance.store.getState(), instance.store),
-        );
-        return;
-      }
-      if (action === 'advanced') {
-        const range = s.ui.filterRange ?? inferAutoFilterRange(s);
+      const result = executeRibbonFilterDataAction({
+        store: instance.store,
+        history: instance.history,
+        action,
+      });
+      if (result.kind === 'open-advanced') {
         setAdvancedFilterDialog({
-          listRange: formatA1Range(range),
+          listRange: formatA1Range(result.range),
           criteriaRange: '',
           copyTo: '',
           uniqueOnly: false,
         });
-        return;
+      } else if (result.kind === 'open-filter-dropdown') {
+        instance.openFilterDropdown(result.range, result.column);
       }
-      const range = s.ui.filterRange ?? inferAutoFilterRange(s);
-      recordFilterChange(instance.history, instance.store, () => {
-        if (!s.ui.filterRange) setAutoFilter(instance.store, range);
-      });
-      instance.openFilterDropdown(range, s.selection.active.col);
     },
-    [instance, onFilterToggle],
+    [instance],
   );
 
   const applyAdvancedFilterDialog = useCallback(() => {
@@ -1005,44 +973,15 @@ export const SpreadsheetToolbar = ({
   const onFormulaAuditingAction = useCallback(
     (action: FormulaAuditingAction) => {
       if (!instance) return;
-      if (action === 'traceError') {
-        instance.tracePrecedents();
-        return;
-      }
-      if (action === 'ignoreError') {
-        const state = instance.store.getState();
-        const activeCell = state.data.cells.get(
-          `${state.selection.active.sheet}:${state.selection.active.row}:${state.selection.active.col}`,
-        );
-        if (activeCell?.formula && cellValueIsFormulaError(activeCell.value)) {
-          recordIgnoredErrorsChange(instance.history, instance.store, () => {
-            ignoreCellError(instance.store, state.selection.active);
-          });
-          return;
-        }
-        const next = selectNextFormulaError(instance.store);
-        if (!next) setRibbonReportDialog({ title: cellMenuText.errorChecking, items: [] });
-        return;
-      }
-      if (action === 'clearCircles') {
-        recordValidationCirclesChange(instance.history, instance.store, () => {
-          clearValidationCircles(instance.store);
-        });
-        return;
-      }
-      if (action === 'circleInvalid') {
-        const state = instance.store.getState();
-        recordValidationCirclesChange(instance.history, instance.store, () => {
-          circleInvalidValidationData(
-            instance.store,
-            state.selection.range,
-            makeRangeResolver(instance.workbook, state.data.sheetIndex),
-          );
-        });
-        return;
-      }
-      const next = selectNextFormulaError(instance.store);
-      if (!next) setRibbonReportDialog({ title: cellMenuText.errorChecking, items: [] });
+      const result = executeRibbonFormulaAuditingAction({
+        store: instance.store,
+        workbook: instance.workbook,
+        history: instance.history,
+        action,
+        strings: { errorChecking: cellMenuText.errorChecking },
+      });
+      if (result.kind === 'trace-precedents') instance.tracePrecedents();
+      else if (result.kind === 'report') setRibbonReportDialog(result.report);
     },
     [cellMenuText.errorChecking, instance],
   );
@@ -1096,16 +1035,11 @@ export const SpreadsheetToolbar = ({
   const onCommentAction = useCallback(
     (action: CommentAction) => {
       if (!instance) return;
-      const state = instance.store.getState();
-      const comments =
-        action === 'delete-active'
-          ? commentAt(state, state.selection.active) === null
-            ? []
-            : [{ addr: state.selection.active }]
-          : listComments(state);
-      if (comments.length === 0) return;
-      recordFormatChange(instance.history, instance.store, () => {
-        for (const entry of comments) clearComment(instance.store, entry.addr, instance.workbook);
+      executeRibbonCommentAction({
+        store: instance.store,
+        workbook: instance.workbook,
+        history: instance.history,
+        action,
       });
     },
     [instance],
@@ -1114,34 +1048,12 @@ export const SpreadsheetToolbar = ({
   const onProtectionAction = useCallback(
     (action: ProtectionAction) => {
       if (!instance) return;
-      const state = instance.store.getState();
-      const range = state.selection.range;
-      const rangeText = formatA1Range(range);
-      if (action === 'allow-edit-range') {
-        addAllowedEditRange(instance.store, range, { title: rangeText });
-        setRibbonReportDialog({
-          title: cellMenuText.allowEditRangesDialogTitle,
-          items: [
-            {
-              severity: 'info',
-              label: cellMenuText.allowEditRangesCommand,
-              detail: cellMenuText.allowedEditRangeAddedStatus.replace('{range}', rangeText),
-            },
-          ],
-        });
-        return;
-      }
-      clearAllowedEditRanges(instance.store, state.data.sheetIndex);
-      setRibbonReportDialog({
-        title: cellMenuText.allowEditRangesDialogTitle,
-        items: [
-          {
-            severity: 'info',
-            label: cellMenuText.allowEditRangesClearCommand,
-            detail: cellMenuText.allowedEditRangesClearedStatus,
-          },
-        ],
+      const report = executeRibbonProtectionAction({
+        store: instance.store,
+        action,
+        strings: cellMenuText,
       });
+      setRibbonReportDialog(report);
     },
     [cellMenuText, instance],
   );
@@ -1149,32 +1061,19 @@ export const SpreadsheetToolbar = ({
   const onHyperlinkAction = useCallback(
     (action: HyperlinkAction) => {
       if (!instance) return;
-      if (action === 'edit') {
-        instance.openHyperlinkDialog();
-        return;
-      }
-      if (action === 'external') {
-        instance.openExternalLinksDialog();
-        return;
-      }
-      const state = instance.store.getState();
-      const target = hyperlinkAt(state, state.selection.active);
-      if (!target) {
-        setRibbonReportDialog({
-          title: cellMenuText.linkOpen,
-          items: [{ severity: 'info', label: cellMenuText.linkNoHyperlink, detail: '' }],
-        });
-        return;
-      }
-      if (action === 'open') {
-        window.open(target, '_blank', 'noopener,noreferrer');
-        return;
-      }
-      recordFormatChange(instance.history, instance.store, () => {
-        clearHyperlink(instance.store, state.selection.active, instance.workbook);
+      const result = executeRibbonHyperlinkAction({
+        store: instance.store,
+        workbook: instance.workbook,
+        history: instance.history,
+        action,
+        strings: cellMenuText,
       });
+      if (result.kind === 'open-hyperlink-dialog') instance.openHyperlinkDialog();
+      else if (result.kind === 'open-external-dialog') instance.openExternalLinksDialog();
+      else if (result.kind === 'open-url') window.open(result.url, '_blank', 'noopener,noreferrer');
+      else if (result.kind === 'report') setRibbonReportDialog(result.report);
     },
-    [cellMenuText.linkNoHyperlink, cellMenuText.linkOpen, instance],
+    [cellMenuText, instance],
   );
 
   const onFunctionAction = useCallback(

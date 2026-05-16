@@ -493,7 +493,7 @@ describe('Vue <SpreadsheetToolbar> ribbon command surface', () => {
     expect(source).toContain("onSortMenuAction('dedupe')");
     expect(source).toContain("onSortMenuAction('filter-reapply')");
     expect(source).toContain("onSortMenuAction('filter-advanced')");
-    expect(source).toContain('reapplyFilters(inst.store.getState(), inst.store)');
+    expect(source).toContain("action: 'reapply'");
     expect(source).toContain('advancedFilterDialog.value = {');
     expect(source).toContain('listRange: formatA1Range(s.selection.range)');
     expect(source).toContain('copyTo:');
@@ -574,11 +574,7 @@ describe('Vue <SpreadsheetToolbar> ribbon command surface', () => {
     expect(source).toContain('data-dropdown-name="deleteCommentReview"');
     expect(source).toContain("onCommentAction('delete-active')");
     expect(source).toContain("onCommentAction('delete-all')");
-    expect(source).toContain('commentAt(state, state.selection.active)');
-    expect(source).toContain('recordFormatChange(inst.history, inst.store, () =>');
-    expect(source).toContain(
-      'for (const entry of comments) clearComment(inst.store, entry.addr, inst.workbook)',
-    );
+    expect(source).toContain('executeRibbonCommentAction({');
     expect(source).toContain('data-ribbon-command="previousCommentReview"');
     expect(source).toContain('data-ribbon-command="nextCommentReview"');
     expect(source).toContain('@click="onSelectComment(-1)"');
@@ -603,8 +599,8 @@ describe('Vue <SpreadsheetToolbar> ribbon command surface', () => {
     expect(source).toContain('data-dropdown-name="protectionReview"');
     expect(source).toContain("onProtectionAction('allow-edit-range')");
     expect(source).toContain("onProtectionAction('clear-allowed-edit-ranges')");
-    expect(source).toContain('addAllowedEditRange(inst.store, range, { title: rangeText })');
-    expect(source).toContain('clearAllowedEditRanges(inst.store, state.data.sheetIndex)');
+    expect(source).toContain('executeRibbonProtectionAction({');
+    expect(source).toContain('strings: cellText.value');
     expect(source).toContain('{{ active.protected ? tr.unprotect : tr.protect }}');
   });
 
@@ -686,8 +682,7 @@ describe('Vue <SpreadsheetToolbar> ribbon command surface', () => {
     expect(source).toContain("onHyperlinkAction('open')");
     expect(source).toContain("onHyperlinkAction('clear')");
     expect(source).toContain("onHyperlinkAction('external')");
-    expect(source).toContain('hyperlinkAt(state, state.selection.active)');
-    expect(source).toContain('clearHyperlink(inst.store, state.selection.active, inst.workbook)');
+    expect(source).toContain('executeRibbonHyperlinkAction({');
     expect(source).toContain("onPivotTableAction('dialog')");
     expect(source).toContain("onPivotTableAction('recommended')");
     expect(source).toContain('strings.value.workbookObjects.compatibilityDetails.pivotAuthoring');
@@ -865,12 +860,10 @@ describe('Vue <SpreadsheetToolbar> ribbon command surface', () => {
     expect(source).toContain("onFormulaAuditingAction('errorChecking')");
     expect(source).toContain("onFormulaAuditingAction('traceError')");
     expect(source).toContain("onFormulaAuditingAction('ignoreError')");
-    expect(source).toContain('cellValueIsFormulaError(activeCell.value)');
-    expect(source).toContain('recordIgnoredErrorsChange(inst.history, inst.store');
-    expect(source).toContain('ignoreCellError(inst.store, state.selection.active)');
     expect(source).toContain("onFormulaAuditingAction('circleInvalid')");
     expect(source).toContain("onFormulaAuditingAction('clearCircles')");
-    expect(source).toContain('selectNextFormulaError(inst.store)');
+    expect(source).toContain('executeRibbonFormulaAuditingAction({');
+    expect(source).toContain('errorChecking: cellText.value.errorChecking');
   });
 
   it('renders Formula Auditing Evaluate Formula as a dialog command', () => {
@@ -890,10 +883,7 @@ describe('Vue <SpreadsheetToolbar> ribbon command surface', () => {
     expect(source).toContain("onFilterDataAction('reapply')");
     expect(source).toContain("onFilterDataAction('filter-by-selected')");
     expect(source).toContain("onFilterDataAction('advanced')");
-    expect(source).toContain('recordFilterChange(inst.history, inst.store');
-    expect(source).toContain('clearFilter(s, inst.store, s.ui.filterRange ?? undefined)');
-    expect(source).toContain('reapplyFilters(inst.store.getState(), inst.store)');
-    expect(source).toContain('filterBySelectedCellValue(inst.store.getState(), inst.store)');
+    expect(source).toContain('executeRibbonFilterDataAction({');
     expect(source).toContain('advancedFilterDialog');
     expect(source).toContain('cellText.advancedFilterDialogTitle');
     expect(source).toContain('v-model="advancedFilterDialog.listRange"');

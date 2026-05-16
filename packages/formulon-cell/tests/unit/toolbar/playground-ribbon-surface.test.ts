@@ -14,7 +14,36 @@ const playgroundMainSource = (): string => {
   expect(playgroundRoot).toBeTruthy();
   const root = playgroundRoot!;
   const files = [
+    // `apply-ribbon-command.ts` first so its `const applyRibbonCommand = (` (with
+    // the full switch body) wins `indexOf` against the thin wrapper in main.ts.
+    `${root}/apps/playground/src/ribbon/apply-ribbon-command.ts`,
     `${root}/apps/playground/src/main.ts`,
+    `${root}/apps/playground/src/boot-wiring.ts`,
+    `${root}/apps/playground/src/clipboard.ts`,
+    `${root}/apps/playground/src/data-menu-wirings.ts`,
+    `${root}/apps/playground/src/home-menu-wirings.ts`,
+    `${root}/apps/playground/src/illustrations.ts`,
+    `${root}/apps/playground/src/protection-flows.ts`,
+    `${root}/apps/playground/src/range-utils.ts`,
+    `${root}/apps/playground/src/ribbon-actions.ts`,
+    `${root}/apps/playground/src/script-addin-actions.ts`,
+    `${root}/apps/playground/src/sheet-tabs-runtime.ts`,
+    `${root}/apps/playground/src/shell-locale.ts`,
+    `${root}/apps/playground/src/shell-menus.ts`,
+    `${root}/apps/playground/src/sort-filter.ts`,
+    `${root}/apps/playground/src/status-projection.ts`,
+    `${root}/apps/playground/src/workbook-actions.ts`,
+    `${root}/apps/playground/src/xlsx-io.ts`,
+    `${root}/apps/playground/src/ribbon/backstage-title.ts`,
+    `${root}/apps/playground/src/ribbon/border-menu.ts`,
+    `${root}/apps/playground/src/ribbon/cell-format-action.ts`,
+    `${root}/apps/playground/src/ribbon/command-tables.ts`,
+    `${root}/apps/playground/src/ribbon/conditional-menu-action.ts`,
+    `${root}/apps/playground/src/ribbon/control-dispatch.ts`,
+    `${root}/apps/playground/src/ribbon/dynamic-dropdowns.ts`,
+    `${root}/apps/playground/src/ribbon/fill-series.ts`,
+    `${root}/apps/playground/src/ribbon/render-ribbon.ts`,
+    `${root}/apps/playground/src/ribbon/select-color.ts`,
     `${root}/apps/playground/src/ribbon/menus/borders.ts`,
     `${root}/apps/playground/src/ribbon/menus/conditional.ts`,
     `${root}/apps/playground/src/ribbon/menus/general.ts`,
@@ -40,20 +69,53 @@ const extractSwitchCases = (source: string, functionName: string): Set<string> =
 };
 
 const extractDynamicDropdownCommands = (source: string): Set<string> => {
-  const start = source.indexOf('const dynamicDropdownSpecForButton');
-  expect(start).toBeGreaterThanOrEqual(0);
-  const end = source.indexOf('\n};', start);
-  expect(end).toBeGreaterThan(start);
-  const body = source.slice(start, end);
-  return new Set(Array.from(body.matchAll(/command === '([^']+)'/g), (match) => match[1] ?? ''));
+  const ids = new Set<string>();
+  // Legacy form: `if (command === 'foo')` literals inside dynamicDropdownSpecForButton.
+  const fnStart = source.indexOf('const dynamicDropdownSpecForButton');
+  if (fnStart >= 0) {
+    const fnEnd = source.indexOf('\n};', fnStart);
+    if (fnEnd > fnStart) {
+      const body = source.slice(fnStart, fnEnd);
+      for (const match of body.matchAll(/command === '([^']+)'/g)) {
+        if (match[1]) ids.add(match[1]);
+      }
+    }
+  }
+  // Current form: keys of RIBBON_DROPDOWN_MENU_FOR_COMMAND.
+  const tableMatch = source.match(
+    /const RIBBON_DROPDOWN_MENU_FOR_COMMAND[\s\S]*?=\s*\{([\s\S]*?)\n\};/,
+  );
+  if (tableMatch?.[1]) {
+    for (const m of tableMatch[1].matchAll(/^\s*([A-Za-z0-9]+):/gm)) {
+      if (m[1]) ids.add(m[1]);
+    }
+  }
+  return ids;
 };
 
 const extractLegacyCommands = (source: string): Set<string> => {
-  const match = source.match(/const legacyCommandIds:[\s\S]*?=\s*\{([\s\S]*?)\n\};/);
+  const match = source.match(
+    /const (?:legacyCommandIds|LEGACY_COMMAND_IDS):[\s\S]*?=\s*\{([\s\S]*?)\n\};/,
+  );
   expect(match?.[1]).toBeTruthy();
   return new Set(
     Array.from((match?.[1] ?? '').matchAll(/^\s*([A-Za-z0-9]+):/gm), (m) => m[1] ?? ''),
   );
+};
+
+/** Collect the keys of every RIBBON_* dispatch table in command-tables.ts.
+ *  Each table entry replaces a `case '<id>':` body that used to live inside
+ *  `applyRibbonCommand`, so the surface check has to see them too. */
+const extractDispatchTableCommands = (source: string): Set<string> => {
+  const ids = new Set<string>();
+  for (const table of source.matchAll(
+    /export const RIBBON_[A-Z_]+(?::[\s\S]*?)?=\s*\{([\s\S]*?)\n\};/g,
+  )) {
+    for (const entry of (table[1] ?? '').matchAll(/^\s*([A-Za-z0-9]+):/gm)) {
+      if (entry[1]) ids.add(entry[1]);
+    }
+  }
+  return ids;
 };
 
 describe('playground ribbon command surface', () => {
@@ -62,11 +124,13 @@ describe('playground ribbon command surface', () => {
     const applyCases = extractSwitchCases(source, 'applyRibbonCommand');
     const dynamicCommands = extractDynamicDropdownCommands(source);
     const legacyCommands = extractLegacyCommands(source);
+    const dispatchTableCommands = extractDispatchTableCommands(source);
     const specialClickCommands = new Set(['borders', 'freeze', 'printArea', 'symbolInsert']);
     const covered = new Set([
       ...applyCases,
       ...dynamicCommands,
       ...legacyCommands,
+      ...dispatchTableCommands,
       ...specialClickCommands,
     ]);
 
@@ -111,17 +175,13 @@ describe('playground ribbon command surface', () => {
     expect(source).toContain("menuButton(t.insertShiftDown, 'cellInsert', 'shift-down')");
     expect(source).toContain("menuButton(t.insertShiftRight, 'cellInsert', 'shift-right')");
     expect(source).toContain("menuButton(sheetTabs.insertSheet, 'cellInsert', 'sheet')");
-    expect(source).toContain(
-      "insertCells(i.store, i.workbook, i.history, range, action === 'shift-down' ? 'down' : 'right')",
-    );
+    expect(source).toContain("action === 'shift-down' ? 'down' : 'right'");
     expect(source).toContain('const added = addSheet(i.store, i.workbook, i.history);');
 
     expect(source).toContain("menuButton(t.deleteShiftUp, 'cellDelete', 'shift-up')");
     expect(source).toContain("menuButton(t.deleteShiftLeft, 'cellDelete', 'shift-left')");
     expect(source).toContain("menuButton(sheetTabs.deleteSheet, 'cellDelete', 'sheet')");
-    expect(source).toContain(
-      "deleteCells(i.store, i.workbook, i.history, range, action === 'shift-up' ? 'up' : 'left')",
-    );
+    expect(source).toContain("action === 'shift-up' ? 'up' : 'left'");
     expect(source).toContain('removeSheet(i.store, i.workbook, before)');
   });
 

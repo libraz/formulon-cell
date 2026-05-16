@@ -411,6 +411,24 @@ export type {
 } from './commands/ribbon-clear.js';
 export { executeRibbonClearAction } from './commands/ribbon-clear.js';
 export type {
+  ExecuteRibbonCommentActionDeps,
+  RibbonCommentAction,
+} from './commands/ribbon-comment.js';
+export { executeRibbonCommentAction } from './commands/ribbon-comment.js';
+export type {
+  ExecuteRibbonFormulaAuditingActionDeps,
+  RibbonFormulaAuditingAction,
+  RibbonFormulaAuditingActionResult,
+  RibbonFormulaAuditingReport,
+} from './commands/ribbon-formula-auditing.js';
+export { executeRibbonFormulaAuditingAction } from './commands/ribbon-formula-auditing.js';
+export type {
+  ExecuteRibbonProtectionActionDeps,
+  RibbonProtectionAction,
+  RibbonProtectionReport,
+} from './commands/ribbon-protection.js';
+export { executeRibbonProtectionAction } from './commands/ribbon-protection.js';
+export type {
   CreateRibbonChartFromSelectionOptions,
   CreateSessionChartOptions,
   RibbonChartAction,
@@ -799,6 +817,22 @@ export type {
   RibbonAddInReportItem,
 } from './interact/ribbon-add-in-report.js';
 export { buildRibbonAddInReport } from './interact/ribbon-add-in-report.js';
+export type {
+  ExecuteRibbonFilterDataActionDeps,
+  RibbonFilterDataAction,
+  RibbonFilterDataActionResult,
+} from './interact/ribbon-filter-data.js';
+export {
+  executeRibbonFilterDataAction,
+  toggleAutoFilterFromSelection,
+} from './interact/ribbon-filter-data.js';
+export type {
+  ExecuteRibbonHyperlinkActionDeps,
+  RibbonHyperlinkAction,
+  RibbonHyperlinkActionResult,
+  RibbonHyperlinkReport,
+} from './interact/ribbon-hyperlink.js';
+export { executeRibbonHyperlinkAction } from './interact/ribbon-hyperlink.js';
 export type {
   ResolveRibbonPdfActionStrings,
   RibbonPdfAction,
