@@ -28,6 +28,7 @@ import {
 import type { RibbonFormatMutator } from '../toolbar/ribbon/command-tables.js';
 import {
   createDynamicDropdowns,
+  type DynamicDropdownsApi,
   type DynamicDropdownsCtx,
 } from '../toolbar/ribbon/dynamic-dropdowns.js';
 import {
@@ -112,12 +113,12 @@ export interface MountToolbarOptions {
 
   /** Opt-in for the built-in dropdown-menu click delegation. Pass `true` for
    *  the full default ctx (fill / clear / autosum / etc. derived from the
-   *  instance), or a partial bag whose keys override individual handlers.
-   *  When omitted the toolbar's legacy fallback only opens / closes the
-   *  menu DOM — clicks inside an open menu do nothing. Hosts that own a
-   *  bespoke `createDynamicDropdowns` wiring (the playground) should leave
-   *  this undefined to keep their existing click handler authoritative. */
-  dynamicDropdowns?: true | Partial<DynamicDropdownsCtx>;
+   *  instance), a partial bag whose keys override individual handlers, or a
+   *  getter that returns the partial bag — the getter form is for hosts
+   *  whose ctx isn't ready at mount time (the playground builds its ctx
+   *  after `mountToolbar` returns). When omitted, clicks inside an open
+   *  menu do nothing. */
+  dynamicDropdowns?: true | Partial<DynamicDropdownsCtx> | (() => Partial<DynamicDropdownsCtx>);
 
   /** Pluggable runtime hooks the dispatcher needs but core can't yet derive
    *  on its own. Each falls back to a no-op or a sensible default. */
@@ -173,6 +174,11 @@ export interface ToolbarInstance {
   getBorderStyle(): CellBorderStyle;
   setBorderColor(color: string): void;
   getBorderColor(): string;
+  /** When the toolbar was mounted with `dynamicDropdowns` enabled, exposes
+   *  the core's dropdown api so hosts can drive open/close (interceptCommand,
+   *  click-outside, arrow-key nav) without re-creating their own ctx. Null
+   *  when the option was omitted. */
+  readonly dropdownsApi: DynamicDropdownsApi | null;
   dispose(): void;
 }
 
@@ -293,21 +299,30 @@ export function mountToolbar(
   // dispatcher. We capture the unsubscribe and undo it in dispose so the
   // listener does not leak after re-mounts.
   let dynamicDropdownClickHandler: ((event: MouseEvent) => void) | null = null;
-  if (opts.dynamicDropdowns && defaultsInstance) {
-    const overrides: Partial<DynamicDropdownsCtx> =
+  let dropdownsApi: DynamicDropdownsApi | null = null;
+  if (opts.dynamicDropdowns) {
+    const overridesOpt: Partial<DynamicDropdownsCtx> | (() => Partial<DynamicDropdownsCtx>) =
       opts.dynamicDropdowns === true ? {} : opts.dynamicDropdowns;
     // `createDefaultDynamicDropdownsCtx` uses the `@libraz/formulon-cell`
     // self-import for `SpreadsheetInstance` (matching `dynamic-dropdowns.ts`)
     // so its parameter type resolves to dist. This file imports the
     // src-side declaration via `./types.js`, so the two structurally
     // identical declarations need one bridge cast.
+    //
+    // When `defaultsInstance` is null (deferred-mount hosts like the
+    // playground), the built-in base handlers stay unreachable as long as
+    // the host overrides every handler it dispatches. The override getter
+    // (recommended for deferred hosts) captures the live instance via its
+    // own closure so it can hand back the real `inst` once mounted.
     const dropdownsCtx = createDefaultDynamicDropdownsCtx(
-      defaultsInstance as unknown as Parameters<typeof createDefaultDynamicDropdownsCtx>[0],
-      { overrides },
+      (defaultsInstance ?? ({} as SpreadsheetInstance)) as unknown as Parameters<
+        typeof createDefaultDynamicDropdownsCtx
+      >[0],
+      { overrides: overridesOpt },
     );
-    const { dynamicRibbonDropdownClick } = createDynamicDropdowns(dropdownsCtx);
+    dropdownsApi = createDynamicDropdowns(dropdownsCtx);
     dynamicDropdownClickHandler = (event: MouseEvent): void => {
-      dynamicRibbonDropdownClick(event);
+      dropdownsApi?.dynamicRibbonDropdownClick(event);
     };
     document.addEventListener('click', dynamicDropdownClickHandler);
   }
@@ -636,6 +651,9 @@ export function mountToolbar(
       borderColor = next;
     },
     getBorderColor: () => borderColor,
+    get dropdownsApi() {
+      return dropdownsApi;
+    },
     dispose: () => {
       host.removeEventListener('click', onClick);
       host.removeEventListener('dblclick', onDoubleClick);
@@ -647,6 +665,7 @@ export function mountToolbar(
         document.removeEventListener('click', dynamicDropdownClickHandler);
         dynamicDropdownClickHandler = null;
       }
+      dropdownsApi = null;
       unsubStore?.();
       unsubStore = null;
       subscribedInstance = null;

@@ -70,7 +70,6 @@ import {
   createConditionalMenu as createConditionalMenuImpl,
   createControlDispatch,
   createDefinedNamesFromSelection,
-  createDynamicDropdowns,
   createFormulasMenuFactories,
   createHomeMenuFactories,
   createInsertMenuFactories,
@@ -87,6 +86,7 @@ import {
   cut,
   cycleCurrency,
   cyclePercent,
+  type DynamicDropdownsCtx,
   deleteCells,
   deleteCols,
   deleteRows,
@@ -631,6 +631,10 @@ let deferredProjectFormatToolbar: (() => void) | undefined;
 let deferredInterceptCommand:
   | ((id: string, button: HTMLButtonElement, event: MouseEvent) => boolean)
   | undefined;
+// Live ctx the core's dropdown delegator consults on every menu click.
+// Populated below once the playground's action handlers exist; mountToolbar
+// reads it through a getter so it sees whatever we assign post-mount.
+const deferredDropdownsCtx: Partial<DynamicDropdownsCtx> = {};
 // Hooks the toolbar dispatcher fans into for clipboard / etc. They live in
 // playground modules created after mountToolbar (clipboard.ts, sortFilter,
 // illustrations, …) — the thunks let those modules attach late without
@@ -760,6 +764,11 @@ const tb = Spreadsheet.mountToolbar(ribbonRoot as HTMLElement, () => inst, {
   borderColor: selectedBorderColor,
   commandDelegation: true,
   interceptCommand: (id, button, event) => deferredInterceptCommand?.(id, button, event) ?? false,
+  // Hand core the playground's live ctx via a getter so the click delegator
+  // is a single source of truth — there's no second listener competing for
+  // `.app__menu` clicks anymore. `dropdownsApi` on the returned ToolbarInstance
+  // gives us the spec-lookup helpers we need for interceptCommand / keydown.
+  dynamicDropdowns: () => deferredDropdownsCtx,
   hooks: {
     clipboard: {
       copy: () => deferredCopyHook?.(),
@@ -1390,7 +1399,11 @@ const {
   getSymbolMenu,
 } = homeMenus;
 
-const dynamicDropdowns = createDynamicDropdowns({
+// Install the playground's ctx into the live bag that core's auto-wired
+// dispatcher reads on every menu click. Core's `createDefaultDynamicDropdownsCtx`
+// fills any handler we don't override with a no-op default; the entries here
+// reach further (dialogs, refreshes) than those defaults so we list them all.
+Object.assign(deferredDropdownsCtx, {
   getInst: () => inst,
   updateCalcOptionsMenu,
   updateDefinedNamesMenu,
@@ -1443,6 +1456,11 @@ const dynamicDropdowns = createDynamicDropdowns({
   applyAddInAction,
   applyConditionalMenuAction,
 });
+// `dropdownsApi` is populated synchronously by mountToolbar when
+// `dynamicDropdowns` is set — assert non-null and pull the helper functions
+// the legacy wiring below needs (spec lookup + open / close).
+const dropdownsApi = tb.dropdownsApi;
+if (!dropdownsApi) throw new Error('mountToolbar did not expose dropdownsApi');
 const {
   DYNAMIC_RIBBON_DROPDOWN_IDS,
   dynamicDropdownSpecForButton,
@@ -1453,8 +1471,7 @@ const {
   closeAllDynamicRibbonDropdowns,
   closeDynamicConditionalSubmenus,
   openDynamicConditionalSubmenu,
-  dynamicRibbonDropdownClick,
-} = dynamicDropdowns;
+} = dropdownsApi;
 
 // Late-bind the toolbar's interceptCommand hook so dropdown-owning buttons
 // (calcOptions, dataValidation, sort, etc.) open / close their menu instead
@@ -1508,9 +1525,8 @@ deferredInterceptCommand = (id, button, event) => {
   return true;
 };
 
-document.addEventListener('click', (event) => {
-  dynamicRibbonDropdownClick(event);
-});
+// The dropdown-item dispatcher is now mounted by core's mountToolbar — no
+// per-host listener required.
 
 document.addEventListener('mouseover', (event) => {
   const target = event.target as Element | null;

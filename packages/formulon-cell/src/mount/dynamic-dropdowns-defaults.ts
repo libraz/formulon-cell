@@ -47,8 +47,11 @@ import {
  *  shared `focusSheet` closure) without polluting the dropdown ctx itself. */
 export interface DefaultDynamicDropdownsOptions {
   /** Per-handler overrides. Merged on top of the defaults so the host only
-   *  has to supply the ones that need a real dialog. */
-  overrides?: Partial<DynamicDropdownsCtx>;
+   *  has to supply the ones that need a real dialog. Pass a getter when the
+   *  overrides aren't ready at mount time (e.g. the playground builds its
+   *  ctx after `mountToolbar` returns) — the ctx will lazily resolve each
+   *  handler on every dispatch. */
+  overrides?: Partial<DynamicDropdownsCtx> | (() => Partial<DynamicDropdownsCtx>);
 }
 
 const noop = (): void => undefined;
@@ -435,5 +438,22 @@ export function createDefaultDynamicDropdownsCtx(
     applyAddInAction: asyncNoop,
   };
 
-  return { ...base, ...opts.overrides };
+  // Object form: spread once at construction. Function form: build a live
+  // ctx whose every property re-reads the latest override on each access so
+  // hosts can swap handlers post-mount without re-creating the api.
+  if (typeof opts.overrides !== 'function') {
+    return { ...base, ...opts.overrides };
+  }
+  const getOverrides = opts.overrides;
+  const ctx = {} as DynamicDropdownsCtx;
+  for (const key of Object.keys(base) as (keyof DynamicDropdownsCtx)[]) {
+    Object.defineProperty(ctx, key, {
+      enumerable: true,
+      get() {
+        const override = (getOverrides() as Partial<DynamicDropdownsCtx>)[key];
+        return override !== undefined ? override : base[key];
+      },
+    });
+  }
+  return ctx;
 }

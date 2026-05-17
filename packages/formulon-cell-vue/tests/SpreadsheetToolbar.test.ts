@@ -8,7 +8,12 @@
 // exercised through Vue's reactivity. The smoke tests parallel the React
 // adapter's coverage: DOM mount, tab forwarding both ways, ribbon-command
 // hooks, and dispose on unmount.
-import { Spreadsheet, type SpreadsheetInstance, type ToolbarInstance } from '@libraz/formulon-cell';
+import {
+  type DynamicDropdownsCtx,
+  Spreadsheet,
+  type SpreadsheetInstance,
+  type ToolbarInstance,
+} from '@libraz/formulon-cell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createApp,
@@ -39,6 +44,7 @@ interface AdapterProps {
   onDrawEraser?: () => void;
   onTranslate?: () => void;
   onAddIn?: () => void;
+  dropdownActions?: Partial<DynamicDropdownsCtx>;
 }
 
 // Verbatim copy of the SFC's `<script setup>` body, expressed as a
@@ -56,6 +62,10 @@ const AdapterComponent = defineComponent({
     onDrawEraser: { type: Function as unknown as () => () => void, default: undefined },
     onTranslate: { type: Function as unknown as () => () => void, default: undefined },
     onAddIn: { type: Function as unknown as () => () => void, default: undefined },
+    dropdownActions: {
+      type: Object as () => Partial<DynamicDropdownsCtx> | undefined,
+      default: undefined,
+    },
   },
   emits: ['tabChange'],
   setup(props: AdapterProps, { emit }) {
@@ -66,19 +76,25 @@ const AdapterComponent = defineComponent({
       const host = hostEl.value;
       if (!host) return;
       toolbar?.dispose();
+      const dropdownOverrides: Partial<DynamicDropdownsCtx> = {
+        applyScriptAction: (action) => {
+          if (action === 'custom') props.onRunScript?.();
+        },
+        applyAddInAction: (action) => {
+          if (action === 'manage') props.onAddIn?.();
+        },
+        ...props.dropdownActions,
+      };
       toolbar = Spreadsheet.mountToolbar(host, instance, {
         lang: props.locale === 'en' ? 'en' : 'ja',
         activeTab: props.activeTab,
         onTabChange: (tab) => emit('tabChange', tab),
+        dynamicDropdowns: dropdownOverrides,
         hooks: {
           review: {
             spelling: () => props.onSpellingReview?.(),
             accessibility: () => props.onAccessibilityCheck?.(),
             translate: () => props.onTranslate?.(),
-          },
-          automation: {
-            runScript: () => props.onRunScript?.(),
-            addInManager: () => props.onAddIn?.(),
           },
           drawing: {
             setInkMode: (mode) => {
@@ -229,16 +245,23 @@ describe('<SpreadsheetToolbar> Vue adapter (thin)', () => {
       },
       'review',
     );
-    const click = (cmd: string): void => {
+    const clickCommand = (cmd: string): void => {
       harness.host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${cmd}"]`)?.click();
     };
-    click('spellingReview');
-    click('accessibility');
-    click('translateReview');
-    click('script');
-    click('addIn');
-    click('drawPen');
-    click('drawErase');
+    const clickAttr = (attr: string, value: string): void => {
+      harness.host.querySelector<HTMLButtonElement>(`[data-${attr}="${value}"]`)?.click();
+    };
+    clickCommand('spellingReview');
+    clickCommand('accessibility');
+    clickCommand('translateReview');
+    // Script / AddIn ribbon buttons open a menu on plain click; the host
+    // callback fires only when the user picks the action wired to its prop.
+    clickCommand('script');
+    clickAttr('script-action', 'custom');
+    clickCommand('addIn');
+    clickAttr('add-in-action', 'manage');
+    clickCommand('drawPen');
+    clickCommand('drawErase');
     await flush();
     expect(onSpellingReview).toHaveBeenCalledTimes(1);
     expect(onAccessibilityCheck).toHaveBeenCalledTimes(1);
@@ -247,6 +270,19 @@ describe('<SpreadsheetToolbar> Vue adapter (thin)', () => {
     expect(onAddIn).toHaveBeenCalledTimes(1);
     expect(onDrawPen).toHaveBeenCalledTimes(1);
     expect(onDrawEraser).toHaveBeenCalledTimes(1);
+    await harness.unmount();
+  });
+
+  it('routes dropdownActions overrides through core dynamic-dropdowns dispatcher', async () => {
+    const onProtect = vi.fn();
+    const harness = await mountAdapter(
+      mounted.instance,
+      { dropdownActions: { applyProtectAction: onProtect } },
+      'review',
+    );
+    harness.host.querySelector<HTMLButtonElement>('[data-protect-action="lock-cell"]')?.click();
+    await flush();
+    expect(onProtect).toHaveBeenCalledWith('lock-cell');
     await harness.unmount();
   });
 

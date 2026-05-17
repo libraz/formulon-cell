@@ -4,6 +4,7 @@
 // component just owns a host div and mounts / disposes the core toolbar; all
 // DOM, helpers, menus, and hook defaults come from core.
 import {
+  type DynamicDropdownsCtx,
   type FeatureFlags,
   Spreadsheet,
   type SpreadsheetInstance,
@@ -28,6 +29,11 @@ interface Props {
   onOpenWorkbook?: () => void;
   onSaveWorkbook?: () => void;
   onSaveWorkbookAs?: () => void;
+  /** Override one or more entries in the core's default dynamic-dropdowns
+   *  context. Use for dialog-opening handlers (sort, protect, file picker,
+   *  etc.) that the wrapper can't represent as a named prop. Handlers
+   *  supplied here win over the wrapper's built-in script/addIn wiring. */
+  dropdownActions?: Partial<DynamicDropdownsCtx>;
 }
 
 const props = defineProps<Props>();
@@ -42,6 +48,17 @@ const mountToolbarFor = (instance: SpreadsheetInstance): void => {
   const host = hostEl.value;
   if (!host) return;
   toolbar?.dispose();
+  // Host-supplied `dropdownActions` win over the wrapper's built-in
+  // script/addIn wiring — consumers can fully replace those if they want.
+  const dropdownOverrides: Partial<DynamicDropdownsCtx> = {
+    applyScriptAction: (action) => {
+      if (action === 'custom') props.onRunScript?.();
+    },
+    applyAddInAction: (action) => {
+      if (action === 'manage') props.onAddIn?.();
+    },
+    ...props.dropdownActions,
+  };
   toolbar = Spreadsheet.mountToolbar(host, instance, {
     lang: props.locale === 'en' ? 'en' : 'ja',
     activeTab: props.activeTab,
@@ -49,16 +66,12 @@ const mountToolbarFor = (instance: SpreadsheetInstance): void => {
     // Opt into core's default dropdown-menu click delegator so Fill / Clear
     // / AutoSum / etc. work without each consumer reimplementing the
     // playground's `createDynamicDropdowns` wiring.
-    dynamicDropdowns: true,
+    dynamicDropdowns: dropdownOverrides,
     hooks: {
       review: {
         spelling: () => props.onSpellingReview?.(),
         accessibility: () => props.onAccessibilityCheck?.(),
         translate: () => props.onTranslate?.(),
-      },
-      automation: {
-        runScript: () => props.onRunScript?.(),
-        addInManager: () => props.onAddIn?.(),
       },
       drawing: {
         setInkMode: (mode) => {
@@ -77,7 +90,7 @@ onMounted(() => {
 });
 
 watch(
-  () => [props.instance, props.locale] as const,
+  () => [props.instance, props.locale, props.dropdownActions] as const,
   ([instance]) => {
     if (!hostEl.value) return;
     if (instance) mountToolbarFor(instance);

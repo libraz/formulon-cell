@@ -129,17 +129,24 @@ describe('<SpreadsheetToolbar> (thin adapter)', () => {
         onDrawEraser={onDrawEraser}
       />,
     );
-    const click = (cmd: string): void => {
+    const clickCommand = (cmd: string): void => {
       harness.host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${cmd}"]`)?.click();
     };
+    const clickAttr = (attr: string, value: string): void => {
+      harness.host.querySelector<HTMLButtonElement>(`[data-${attr}="${value}"]`)?.click();
+    };
     await act(async () => {
-      click('spellingReview');
-      click('accessibility');
-      click('translateReview');
-      click('script');
-      click('addIn');
-      click('drawPen');
-      click('drawErase');
+      clickCommand('spellingReview');
+      clickCommand('accessibility');
+      clickCommand('translateReview');
+      // Script / AddIn ribbon buttons open a menu on plain click; the host
+      // callback fires only when the user picks the action wired to its prop.
+      clickCommand('script');
+      clickAttr('script-action', 'custom');
+      clickCommand('addIn');
+      clickAttr('add-in-action', 'manage');
+      clickCommand('drawPen');
+      clickCommand('drawErase');
       await flush();
     });
     expect(onSpellingReview).toHaveBeenCalledTimes(1);
@@ -149,6 +156,26 @@ describe('<SpreadsheetToolbar> (thin adapter)', () => {
     expect(onAddIn).toHaveBeenCalledTimes(1);
     expect(onDrawPen).toHaveBeenCalledTimes(1);
     expect(onDrawEraser).toHaveBeenCalledTimes(1);
+    await harness.unmount();
+  });
+
+  it('routes dropdownActions overrides through core dynamic-dropdowns dispatcher', async () => {
+    const onProtect = vi.fn();
+    const harness = await mountToolbar(
+      mounted,
+      <SpreadsheetToolbar
+        instance={mounted.instance}
+        activeTab="review"
+        onTabChange={() => {}}
+        locale="en"
+        dropdownActions={{ applyProtectAction: onProtect }}
+      />,
+    );
+    await act(async () => {
+      harness.host.querySelector<HTMLButtonElement>('[data-protect-action="lock-cell"]')?.click();
+      await flush();
+    });
+    expect(onProtect).toHaveBeenCalledWith('lock-cell');
     await harness.unmount();
   });
 

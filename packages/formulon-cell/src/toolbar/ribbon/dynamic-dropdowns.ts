@@ -417,7 +417,9 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
       if (value === undefined) continue;
       event.preventDefault();
       event.stopPropagation();
-      closeDynamicRibbonDropdown(spec);
+      // Restore focus to the menu's opener before invoking the handler so any
+      // dialog the handler opens captures the opener as its `restoreFocusEl`.
+      closeDynamicRibbonDropdown(spec, true);
       void entry.handler(value, { menu, button });
       return true;
     }

@@ -1,4 +1,9 @@
-import type { FeatureFlags, RibbonTab, SpreadsheetInstance } from '@libraz/formulon-cell';
+import type {
+  DynamicDropdownsCtx,
+  FeatureFlags,
+  RibbonTab,
+  SpreadsheetInstance,
+} from '@libraz/formulon-cell';
 
 export type { ActiveState, BorderPreset, RibbonTab } from '@libraz/formulon-cell';
 export {
@@ -33,4 +38,9 @@ export interface SpreadsheetToolbarProps {
   onOpenWorkbook?: () => void;
   onSaveWorkbook?: () => void;
   onSaveWorkbookAs?: () => void;
+  /** Override one or more entries in the core's default dynamic-dropdowns
+   *  context. Use for dialog-opening handlers (sort, protect, file picker,
+   *  etc.) that the wrapper can't represent as a named prop. Handlers
+   *  supplied here win over the wrapper's built-in script/addIn wiring. */
+  dropdownActions?: Partial<DynamicDropdownsCtx>;
 }

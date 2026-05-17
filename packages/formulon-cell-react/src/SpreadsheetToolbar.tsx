@@ -8,7 +8,12 @@
 // React-native ribbon UI) was retired in Phase 3-b; consumers that depended
 // on internal class names or sub-component exports should migrate to the
 // core's `data-ribbon-*` attributes for selection.
-import { Spreadsheet, type SpreadsheetInstance, type ToolbarInstance } from '@libraz/formulon-cell';
+import {
+  type DynamicDropdownsCtx,
+  Spreadsheet,
+  type SpreadsheetInstance,
+  type ToolbarInstance,
+} from '@libraz/formulon-cell';
 import { type ReactElement, useEffect, useRef } from 'react';
 
 import type { SpreadsheetToolbarProps } from './toolbar/model.js';
@@ -38,6 +43,7 @@ export const SpreadsheetToolbar = ({
   onDrawEraser,
   onTranslate,
   onAddIn,
+  dropdownActions,
 }: SpreadsheetToolbarProps): ReactElement => {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const toolbarRef = useRef<ToolbarInstance | null>(null);
@@ -66,9 +72,27 @@ export const SpreadsheetToolbar = ({
     onAddIn,
   };
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: activeTab handled by the tab-switch effect below; including it would re-mount the toolbar on every tab click
   useEffect(() => {
     const host = hostRef.current;
     if (!host || !instance) return undefined;
+    // Forward host-supplied callbacks onto the matching `scriptAction` /
+    // `addInAction` menu items so a plain click on the Script / AddIn ribbon
+    // button opens its menu (built-in UX) and the host hook fires only when
+    // the user picks the action that maps to its prop. Other menu items keep
+    // the default no-op until a future PR extends the prop surface.
+    // Host-supplied `dropdownActions` win over the wrapper's built-in
+    // script/addIn wiring — consumers can fully replace those if they want.
+    // Pass a memoized object to avoid re-mounting the toolbar on every render.
+    const dropdownOverrides: Partial<DynamicDropdownsCtx> = {
+      applyScriptAction: (action) => {
+        if (action === 'custom') callbacksRef.current.onRunScript?.();
+      },
+      applyAddInAction: (action) => {
+        if (action === 'manage') callbacksRef.current.onAddIn?.();
+      },
+      ...dropdownActions,
+    };
     const tb = Spreadsheet.mountToolbar(host as HTMLElement, instance as SpreadsheetInstance, {
       lang: locale === 'en' ? 'en' : 'ja',
       activeTab,
@@ -76,16 +100,12 @@ export const SpreadsheetToolbar = ({
       // Opt into core's default dropdown-menu click delegator so Fill / Clear
       // / AutoSum / etc. work without each consumer reimplementing the
       // playground's `createDynamicDropdowns` wiring.
-      dynamicDropdowns: true,
+      dynamicDropdowns: dropdownOverrides,
       hooks: {
         review: {
           spelling: () => callbacksRef.current.onSpellingReview?.(),
           accessibility: () => callbacksRef.current.onAccessibilityCheck?.(),
           translate: () => callbacksRef.current.onTranslate?.(),
-        },
-        automation: {
-          runScript: () => callbacksRef.current.onRunScript?.(),
-          addInManager: () => callbacksRef.current.onAddIn?.(),
         },
         drawing: {
           setInkMode: (mode) => {
@@ -100,10 +120,7 @@ export const SpreadsheetToolbar = ({
       tb.dispose();
       toolbarRef.current = null;
     };
-    // activeTab is intentionally NOT a dep: changing it should drive the
-    // toolbar via the effect below, not re-mount the whole thing.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: see comment above
-  }, [instance, locale]);
+  }, [instance, locale, dropdownActions]);
 
   // Forward external tab changes into the toolbar without re-mounting.
   useEffect(() => {
