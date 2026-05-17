@@ -71,15 +71,24 @@ export type ConditionalMenuAction =
   | 'text-contains'
   | 'date-occurring';
 
-/** Focuses the host (so clipboard listeners run with a real selection) and
- *  hands off to `document.execCommand`. The browser may reject the call —
- *  we swallow the error since the user can always fall back to Ctrl/⌘+C/V. */
+/** Routes a ribbon Copy/Cut/Paste click through the same `runShortcut` the
+ *  keyboard router uses, so React/Vue hosts using `createDefaultRibbonHooks`
+ *  get working Copy/Paste buttons without re-implementing snapshot tracking.
+ *
+ *  Falls back to `document.execCommand` only when the clipboard handle is
+ *  absent (the `clipboard` feature flag is off). That fallback is
+ *  best-effort: the grid host is `user-select: none` so `execCommand` won't
+ *  fire copy/paste events on it, but the user can still use Ctrl/⌘+C/V. */
 export const dispatchHostClipboard = (
   instance: SpreadsheetInstance | null,
   kind: 'copy' | 'cut' | 'paste',
 ): void => {
   if (!instance) return;
   instance.host.focus();
+  if (instance.clipboard) {
+    void instance.clipboard.runShortcut(kind);
+    return;
+  }
   try {
     document.execCommand(kind);
   } catch {

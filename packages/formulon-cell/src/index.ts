@@ -944,6 +944,7 @@ export type { FluentIconName } from './toolbar/fluent-icons.js';
 export { FLUENT_ICON_PATHS, fluentIconPaths } from './toolbar/fluent-icons.js';
 export type { IconName } from './toolbar/icon-paths.js';
 export { ICON_PATHS } from './toolbar/icon-paths.js';
+export { focusMenuItem, handleMenuKeydown, prepareMenu } from './toolbar/menu-a11y.js';
 export {
   type BackstageMenuText,
   backstageMenuText,

@@ -13,6 +13,7 @@ import type { CustomFunction, CustomFunctionMeta, FormulaRegistry } from '../for
 import type { I18nController } from '../i18n/controller.js';
 import type { DeepPartial, Locale, Strings } from '../i18n/strings.js';
 import type { BorderDrawHandle } from '../interact/border-draw.js';
+import type { ClipboardHandle } from '../interact/clipboard.js';
 import type { ConditionalDialogOpenOptions } from '../interact/conditional-dialog.js';
 import type { FormatPainterHandle } from '../interact/format-painter.js';
 import type { PasteSpecialOpenOptions } from '../interact/paste-special.js';
@@ -47,6 +48,12 @@ export interface SpreadsheetInstance {
   readonly history: History;
   readonly i18n: I18nController;
   readonly features: Readonly<Record<string, ExtensionHandle | undefined>>;
+  /** Clipboard handle the engine binding produced. `null` when the
+   *  `clipboard` feature flag is off (e.g. read-only embeds). Ribbon and
+   *  context-menu actions read this so they can route Copy/Cut/Paste through
+   *  `runShortcut` — `document.execCommand` doesn't fire copy/paste events
+   *  on the non-editable grid host. */
+  readonly clipboard: ClipboardHandle | null;
   readonly formatPainter: FormatPainterHandle | undefined;
   readonly borderDraw: BorderDrawHandle | undefined;
   readonly formula: FormulaRegistry;

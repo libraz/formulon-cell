@@ -101,12 +101,14 @@ import {
   findMatchingCells,
   findNext,
   fluentIconPaths,
+  focusMenuItem,
   formatAsTable,
   formatCell,
   formatNumber,
   getPageSetup,
   groupCols,
   groupRows,
+  handleMenuKeydown,
   hiddenInSelection,
   hideCols,
   hideRows,
@@ -148,6 +150,7 @@ import {
   pageScaleMenuText,
   parseScriptCommand,
   pasteTSV,
+  prepareMenu,
   projectActiveState,
   protectedSheetPassword,
   type Range,
@@ -249,9 +252,9 @@ import {
   watchRange,
   workbookStructurePassword,
 } from '@libraz/formulon-cell';
+import { createCommandPalette } from '../../demo-shared/command-palette.js';
 import { createBootWiring } from './boot-wiring.js';
 import { createClipboard } from './clipboard.js';
-import { createCommandPalette } from './command-palette.js';
 import { createDataMenuWirings } from './data-menu-wirings.js';
 import {
   showAdvancedFilterDialog,
@@ -267,7 +270,6 @@ import {
 import { applyFixture, isFixtureName } from './fixtures.js';
 import { createHomeMenuWirings } from './home-menu-wirings.js';
 import { createIllustrations, type SessionShapeKind } from './illustrations.js';
-import { focusMenuItem, handleMenuKeydown, prepareMenu } from './menu-a11y.js';
 import { createProtectionFlows } from './protection-flows.js';
 import { createRangeUtils } from './range-utils.js';
 import { createRibbonActions, type PrintTitlesAction } from './ribbon-actions.js';
@@ -1033,7 +1035,6 @@ const { addSessionIllustration, setDrawInkMode } = illustrations;
 
 const clipboard = createClipboard({
   getInst: () => inst,
-  refreshWorkbookCells,
   focusSheet,
   ribbonLang,
 });

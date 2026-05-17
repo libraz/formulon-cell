@@ -1,14 +1,16 @@
 import {
+  focusMenuItem,
+  handleMenuKeydown,
   isWorkbookStructureProtected,
   moveSheet,
   mutators,
+  prepareMenu,
   removeSheet,
   renameSheet,
   type SpreadsheetInstance,
   setSheetHidden,
 } from '@libraz/formulon-cell';
 import { showConfirm, showPrompt } from './dialogs.js';
-import { focusMenuItem, handleMenuKeydown, prepareMenu } from './menu-a11y.js';
 
 const SHEET_TAB_COLORS = [
   '#c00000',

@@ -1,5 +1,10 @@
-import { aggregateSelection, type SpreadsheetInstance } from '@libraz/formulon-cell';
-import { focusMenuItem, handleMenuKeydown, prepareMenu } from './menu-a11y.js';
+import {
+  aggregateSelection,
+  focusMenuItem,
+  handleMenuKeydown,
+  prepareMenu,
+  type SpreadsheetInstance,
+} from '@libraz/formulon-cell';
 
 export const ACTIVE_CLASS = 'demo__rb--active';
 

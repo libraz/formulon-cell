@@ -165,12 +165,20 @@ describe('playground ribbon command surface', () => {
     expect(source).not.toContain('if (applyConditionalPresetAction(i.store, action, range))');
   });
 
-  it('keeps playground ribbon text paste undoable and selects the pasted range', () => {
+  it('routes playground ribbon paste actions through the core clipboard handle', () => {
     const source = playgroundMainSource();
+    // Phase 1.5 collapsed the ribbon-side snapshot tracking — the playground
+    // now defers to `dispatchHostClipboard` (which routes through the typed
+    // `instance.clipboard.runShortcut`) and to `instance.pasteSpecial` for
+    // the preset paste menu items.
+    expect(source).toContain("dispatchHostClipboard(getInst(), 'copy');");
+    expect(source).toContain("dispatchHostClipboard(getInst(), 'cut');");
+    expect(source).toContain("dispatchHostClipboard(getInst(), 'paste');");
+    expect(source).toContain('if (i.pasteSpecial(opts)) {');
     expect(source).toContain("if (action === 'all' || action === 'values') {");
-    expect(source).toContain('let result: ReturnType<typeof pasteTSV> = null;');
-    expect(source).toContain('result = pasteTSV(i.store.getState(), i.workbook, text);');
-    expect(source).toContain('if (result) mutators.setRange(i.store, result.writtenRange);');
+    expect(source).toContain("dispatchHostClipboard(i, 'paste');");
+    expect(source).not.toContain('captureSnapshot(state, result.range)');
+    expect(source).not.toContain('ribbonClipboardSnapshot');
   });
 
   it('exposes concrete playground Cells insert/delete actions without relying only on prompts', () => {

@@ -1,5 +1,9 @@
-import { colLetter, type SpreadsheetInstance } from '@libraz/formulon-cell';
-import { focusMenuItem, handleMenuKeydown } from './menu-a11y.js';
+import {
+  colLetter,
+  focusMenuItem,
+  handleMenuKeydown,
+  type SpreadsheetInstance,
+} from '@libraz/formulon-cell';
 
 export interface HomeMenuWiringsCtx {
   getInst: () => SpreadsheetInstance | null;

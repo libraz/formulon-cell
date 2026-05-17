@@ -1,11 +1,13 @@
 import {
   addSheet,
+  focusMenuItem,
+  handleMenuKeydown,
   isWorkbookStructureProtected,
   mutators,
+  prepareMenu,
   type SpreadsheetInstance,
   setSheetHidden,
 } from '@libraz/formulon-cell';
-import { focusMenuItem, handleMenuKeydown, prepareMenu } from './menu-a11y.js';
 import { openSheetTabMenu } from './sheet-tab-menu.js';
 
 export interface SheetTabsCtx {

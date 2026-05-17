@@ -28,6 +28,8 @@ import type { AutoSumFormulaName } from '@libraz/formulon-cell';
 import {
   clearFilter,
   filterBySelectedCellValue,
+  focusMenuItem,
+  handleMenuKeydown,
   inferAutoFilterRange,
   reapplyFilters,
   recordFilterChange,
@@ -37,7 +39,6 @@ import {
 } from '@libraz/formulon-cell';
 
 import { showMessage } from './dialogs.js';
-import { focusMenuItem, handleMenuKeydown } from './menu-a11y.js';
 
 export interface DataMenuWiringsCtx {
   getInst: () => SpreadsheetInstance | null;

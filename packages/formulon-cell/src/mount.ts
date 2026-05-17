@@ -627,6 +627,9 @@ export const Spreadsheet = {
       history,
       i18n,
       features: featuresView,
+      get clipboard() {
+        return binding.clipboardH;
+      },
       get formatPainter() {
         return featureState.formatPainter ?? undefined;
       },
