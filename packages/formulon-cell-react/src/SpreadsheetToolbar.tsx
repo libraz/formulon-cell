@@ -73,6 +73,10 @@ export const SpreadsheetToolbar = ({
       lang: locale === 'en' ? 'en' : 'ja',
       activeTab,
       onTabChange: (tab) => callbacksRef.current.onTabChange(tab),
+      // Opt into core's default dropdown-menu click delegator so Fill / Clear
+      // / AutoSum / etc. work without each consumer reimplementing the
+      // playground's `createDynamicDropdowns` wiring.
+      dynamicDropdowns: true,
       hooks: {
         review: {
           spelling: () => callbacksRef.current.onSpellingReview?.(),

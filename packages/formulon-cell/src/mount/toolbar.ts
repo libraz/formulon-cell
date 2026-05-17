@@ -27,6 +27,10 @@ import {
 } from '../toolbar/ribbon/apply-ribbon-command.js';
 import type { RibbonFormatMutator } from '../toolbar/ribbon/command-tables.js';
 import {
+  createDynamicDropdowns,
+  type DynamicDropdownsCtx,
+} from '../toolbar/ribbon/dynamic-dropdowns.js';
+import {
   createRenderRibbon,
   type RibbonMenus,
   type RibbonRenderHelpers,
@@ -37,6 +41,7 @@ import {
   type ToolbarText,
   toolbarText,
 } from '../toolbar/ribbon-model.js';
+import { createDefaultDynamicDropdownsCtx } from './dynamic-dropdowns-defaults.js';
 import {
   createDefaultRibbonHelpers,
   createDefaultRibbonHooks,
@@ -104,6 +109,15 @@ export interface MountToolbarOptions {
    *  The third arg is the click event so split-button hosts can branch
    *  on whether the chevron (vs the primary face) was clicked. */
   interceptCommand?: (id: string, button: HTMLButtonElement, event: MouseEvent) => boolean;
+
+  /** Opt-in for the built-in dropdown-menu click delegation. Pass `true` for
+   *  the full default ctx (fill / clear / autosum / etc. derived from the
+   *  instance), or a partial bag whose keys override individual handlers.
+   *  When omitted the toolbar's legacy fallback only opens / closes the
+   *  menu DOM — clicks inside an open menu do nothing. Hosts that own a
+   *  bespoke `createDynamicDropdowns` wiring (the playground) should leave
+   *  this undefined to keep their existing click handler authoritative. */
+  dynamicDropdowns?: true | Partial<DynamicDropdownsCtx>;
 
   /** Pluggable runtime hooks the dispatcher needs but core can't yet derive
    *  on its own. Each falls back to a no-op or a sensible default. */
@@ -271,6 +285,31 @@ export function mountToolbar(
       // biome-ignore lint/suspicious/noExplicitAny: index access onto union
       (mergedHooks as any)[key] = { ...(defaultGroup ?? {}), ...hostGroup };
     }
+  }
+
+  // Auto-wire the default dynamic-dropdowns click delegator when the host
+  // opts in. The handler is attached to `document` (matching the playground
+  // wiring) so clicks anywhere inside an open `.app__menu` reach the
+  // dispatcher. We capture the unsubscribe and undo it in dispose so the
+  // listener does not leak after re-mounts.
+  let dynamicDropdownClickHandler: ((event: MouseEvent) => void) | null = null;
+  if (opts.dynamicDropdowns && defaultsInstance) {
+    const overrides: Partial<DynamicDropdownsCtx> =
+      opts.dynamicDropdowns === true ? {} : opts.dynamicDropdowns;
+    // `createDefaultDynamicDropdownsCtx` uses the `@libraz/formulon-cell`
+    // self-import for `SpreadsheetInstance` (matching `dynamic-dropdowns.ts`)
+    // so its parameter type resolves to dist. This file imports the
+    // src-side declaration via `./types.js`, so the two structurally
+    // identical declarations need one bridge cast.
+    const dropdownsCtx = createDefaultDynamicDropdownsCtx(
+      defaultsInstance as unknown as Parameters<typeof createDefaultDynamicDropdownsCtx>[0],
+      { overrides },
+    );
+    const { dynamicRibbonDropdownClick } = createDynamicDropdowns(dropdownsCtx);
+    dynamicDropdownClickHandler = (event: MouseEvent): void => {
+      dynamicRibbonDropdownClick(event);
+    };
+    document.addEventListener('click', dynamicDropdownClickHandler);
   }
 
   const renderApi = createRenderRibbon({
@@ -604,6 +643,10 @@ export function mountToolbar(
       host.removeEventListener('keydown', onDisplayKey);
       document.removeEventListener('keydown', onGlobalKey);
       document.removeEventListener('mousedown', onDocumentMouseDown);
+      if (dynamicDropdownClickHandler) {
+        document.removeEventListener('click', dynamicDropdownClickHandler);
+        dynamicDropdownClickHandler = null;
+      }
       unsubStore?.();
       unsubStore = null;
       subscribedInstance = null;

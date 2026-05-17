@@ -46,6 +46,10 @@ const mountToolbarFor = (instance: SpreadsheetInstance): void => {
     lang: props.locale === 'en' ? 'en' : 'ja',
     activeTab: props.activeTab,
     onTabChange: (tab) => emit('tabChange', tab),
+    // Opt into core's default dropdown-menu click delegator so Fill / Clear
+    // / AutoSum / etc. work without each consumer reimplementing the
+    // playground's `createDynamicDropdowns` wiring.
+    dynamicDropdowns: true,
     hooks: {
       review: {
         spelling: () => props.onSpellingReview?.(),

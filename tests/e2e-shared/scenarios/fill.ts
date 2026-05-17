@@ -27,3 +27,29 @@ export async function runFillDownScenario(page: Page): Promise<void> {
   await page.keyboard.press('ArrowUp');
   expect(await sp.formulaBarValue()).toBe('seed');
 }
+
+/** Ribbon Fill > Down — exercises the dropdown-menu click delegator core
+ *  auto-wires when the host passes `dynamicDropdowns: true`. Seeds A1,
+ *  selects A1:A3, opens the Fill dropdown via the ribbon button, then
+ *  clicks the "down" menu item. A3 must hold the seeded value. */
+export async function runRibbonFillDownScenario(page: Page): Promise<void> {
+  const sp = new SpreadsheetPage(page);
+  await sp.mount();
+  await sp.expectNoStub();
+
+  await sp.typeIntoActiveCell('ribbon-fill');
+
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('Shift+ArrowDown');
+  await page.keyboard.press('Shift+ArrowDown');
+
+  await page.locator('[data-ribbon-command="fillHome"]').click();
+  await page.locator('#menu-fill [data-fill="down"]').click();
+
+  // Active cell stays at A3 (selection anchor unchanged). Confirm via the
+  // formula bar to avoid querying canvas content directly.
+  await expect.poll(() => sp.formulaBarValue(), { timeout: 2_000 }).toBe('ribbon-fill');
+
+  await page.keyboard.press('ArrowUp');
+  expect(await sp.formulaBarValue()).toBe('ribbon-fill');
+}
