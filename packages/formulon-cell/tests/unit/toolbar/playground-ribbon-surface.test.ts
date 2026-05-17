@@ -4,19 +4,41 @@ import { describe, expect, it } from 'vitest';
 import { buildRibbonModel } from '../../../src/toolbar/ribbon-model.js';
 
 const playgroundMainSource = (): string => {
-  // The Cells menu DOM has been extracted to apps/playground/src/ribbon/menus/
-  // factories (home.ts, insert.ts, ...). To keep these source-scrape checks
-  // pointing at the playground surface, concatenate main.ts with every menu
-  // factory module so the assertions match regardless of which file actually
-  // owns a given menuButton/case.
+  // Phase 4 moved every ribbon helper into core's
+  // packages/formulon-cell/src/toolbar/ribbon/ tree, so these source-scrape
+  // checks now concatenate the playground glue files with the core ribbon
+  // modules that own the labels / cases they assert against.
   const roots = [resolve(process.cwd(), '../../'), resolve(process.cwd())];
   const playgroundRoot = roots.find((r) => existsSync(`${r}/apps/playground/src/main.ts`));
   expect(playgroundRoot).toBeTruthy();
   const root = playgroundRoot!;
+  const corePrefix = `${root}/packages/formulon-cell/src/toolbar/ribbon`;
   const files = [
-    // `apply-ribbon-command.ts` first so its `const applyRibbonCommand = (` (with
-    // the full switch body) wins `indexOf` against the thin wrapper in main.ts.
-    `${root}/apps/playground/src/ribbon/apply-ribbon-command.ts`,
+    // core ribbon dispatch / dropdowns / menus
+    `${corePrefix}/apply-ribbon-command.ts`,
+    `${corePrefix}/backstage.ts`,
+    `${corePrefix}/backstage-title.ts`,
+    `${corePrefix}/border-menu.ts`,
+    `${corePrefix}/cell-format-action.ts`,
+    `${corePrefix}/command-tables.ts`,
+    `${corePrefix}/conditional-menu-action.ts`,
+    `${corePrefix}/control-dispatch.ts`,
+    `${corePrefix}/dynamic-dropdowns.ts`,
+    `${corePrefix}/fill-series.ts`,
+    `${corePrefix}/render-ribbon.ts`,
+    `${corePrefix}/select-color.ts`,
+    `${corePrefix}/menus/borders.ts`,
+    `${corePrefix}/menus/conditional.ts`,
+    `${corePrefix}/menus/general.ts`,
+    `${corePrefix}/menus/home.ts`,
+    `${corePrefix}/menus/insert.ts`,
+    `${corePrefix}/menus/page-layout.ts`,
+    `${corePrefix}/menus/formulas.ts`,
+    `${corePrefix}/menus/paste.ts`,
+    `${corePrefix}/menus/review.ts`,
+    `${corePrefix}/menus/styles.ts`,
+    `${corePrefix}/menus/text-orientation.ts`,
+    // playground glue
     `${root}/apps/playground/src/main.ts`,
     `${root}/apps/playground/src/boot-wiring.ts`,
     `${root}/apps/playground/src/clipboard.ts`,
@@ -34,27 +56,6 @@ const playgroundMainSource = (): string => {
     `${root}/apps/playground/src/status-projection.ts`,
     `${root}/apps/playground/src/workbook-actions.ts`,
     `${root}/apps/playground/src/xlsx-io.ts`,
-    `${root}/apps/playground/src/ribbon/backstage-title.ts`,
-    `${root}/apps/playground/src/ribbon/border-menu.ts`,
-    `${root}/apps/playground/src/ribbon/cell-format-action.ts`,
-    `${root}/apps/playground/src/ribbon/command-tables.ts`,
-    `${root}/apps/playground/src/ribbon/conditional-menu-action.ts`,
-    `${root}/apps/playground/src/ribbon/control-dispatch.ts`,
-    `${root}/apps/playground/src/ribbon/dynamic-dropdowns.ts`,
-    `${root}/apps/playground/src/ribbon/fill-series.ts`,
-    `${root}/apps/playground/src/ribbon/render-ribbon.ts`,
-    `${root}/apps/playground/src/ribbon/select-color.ts`,
-    `${root}/apps/playground/src/ribbon/menus/borders.ts`,
-    `${root}/apps/playground/src/ribbon/menus/conditional.ts`,
-    `${root}/apps/playground/src/ribbon/menus/general.ts`,
-    `${root}/apps/playground/src/ribbon/menus/home.ts`,
-    `${root}/apps/playground/src/ribbon/menus/insert.ts`,
-    `${root}/apps/playground/src/ribbon/menus/page-layout.ts`,
-    `${root}/apps/playground/src/ribbon/menus/formulas.ts`,
-    `${root}/apps/playground/src/ribbon/menus/paste.ts`,
-    `${root}/apps/playground/src/ribbon/menus/review.ts`,
-    `${root}/apps/playground/src/ribbon/menus/styles.ts`,
-    `${root}/apps/playground/src/ribbon/menus/text-orientation.ts`,
   ].filter((path) => existsSync(path));
   return files.map((path) => readFileSync(path, 'utf8')).join('\n');
 };
@@ -147,7 +148,9 @@ describe('playground ribbon command surface', () => {
   it('uses dedicated routes for chart insertion and data validation', () => {
     const source = playgroundMainSource();
     expect(source).toContain("case 'chartInsert':");
-    expect(source).toContain('createChartFromSelection();');
+    // Phase 4 routes chartInsert via the toolbar's `insert.createChart` hook;
+    // the playground wires the hook to its `createChartFromSelection` helper.
+    expect(source).toContain('createChartFromSelection(');
     expect(source).toContain("case 'dataValidation':");
     expect(source).toContain('i.openDataValidationDialog();');
     expect(source).not.toContain("case 'dataValidation':\n      i.openFormatDialog('more');");

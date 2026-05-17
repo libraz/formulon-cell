@@ -19,8 +19,14 @@ export class SpreadsheetPage {
    *  to opt back into the default seed (e.g. for "with real data" scenarios). */
   async mount(opts: { fixture?: string | null } = {}): Promise<void> {
     const fixture = opts.fixture === undefined ? 'empty' : opts.fixture;
-    const url = fixture ? `/?fixture=${encodeURIComponent(fixture)}` : '/';
-    await this.page.goto(url);
+    // Default to `?locale=en` so cross-app scenarios don't have to special-case
+    // playground's `ja` default — react/vue demos already drive locale via
+    // their own toggles. Tests that need ja go through `page.goto('/?locale=ja')`
+    // directly (see I01).
+    const params = new URLSearchParams();
+    params.set('locale', 'en');
+    if (fixture) params.set('fixture', fixture);
+    await this.page.goto(`/?${params.toString()}`);
     await this.waitForReady();
   }
 

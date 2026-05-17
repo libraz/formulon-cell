@@ -1,4 +1,5 @@
 import {
+  type AutoSumFormulaName,
   activateSheetView,
   addAllowedEditRange,
   addSheet,
@@ -6,16 +7,23 @@ import {
   analyzeAccessibilityCells,
   analyzeSpellingCells,
   applyAdvancedFilter,
+  applyCellFormatAction as applyCellFormatActionImpl,
   applyCellStyle,
+  applyConditionalMenuAction as applyConditionalMenuActionImpl,
   applyConditionalPresetAction,
   applyMerge,
   applyPasteSpecial,
   applyTextScriptToRange,
   applyUnmerge,
   type attachFilterDropdown,
+  autofitColWidth,
+  autofitRowHeight,
   autoSum,
+  BORDER_PRESETS,
+  type BorderPreviewSpec,
   backstageMenuText,
   boundingRange,
+  buildCfMenuText,
   buildRibbonModel,
   buildSpreadsheetCompatibilityReport,
   buildTranslationReviewItems,
@@ -53,10 +61,29 @@ import {
   collapseRowGroup,
   copy,
   copyAdvancedFilterResult,
+  createBackstageFactories,
+  createBackstageTitle,
+  createBorderMenu,
+  createBorderPreview,
+  createBordersMenu as createBordersMenuImpl,
   createColorPalette,
+  createConditionalMenu as createConditionalMenuImpl,
+  createControlDispatch,
   createDefinedNamesFromSelection,
+  createDynamicDropdowns,
+  createFormulasMenuFactories,
+  createHomeMenuFactories,
+  createInsertMenuFactories,
+  createLineSamplePreview,
+  createMenu,
+  createPageLayoutMenuFactories,
+  createPasteMenu as createPasteMenuImpl,
   createPivotTableFromRange,
+  createReviewMenuFactories,
   createRibbonChartFromSelection,
+  createSelectColorRibbon,
+  createStylesMenuFactories,
+  createTextOrientationMenu as createTextOrientationMenuImpl,
   cut,
   cycleCurrency,
   cyclePercent,
@@ -69,6 +96,7 @@ import {
   expandRowGroup,
   type FeatureFlags,
   fillRange,
+  fillSeriesSourceRange,
   filterBySelectedCellValue,
   findMatchingCells,
   findNext,
@@ -85,6 +113,7 @@ import {
   hyperlinkAt,
   ignoreCellError,
   inferAutoFilterRange,
+  inferFillSeriesDirection,
   inferPivotSourceFields,
   inferRecommendedChartKind,
   inferSortHasHeader,
@@ -94,11 +123,17 @@ import {
   insertManualPageBreak,
   insertRows,
   isCellWritable,
+  isJapaneseFontName,
   isWorkbookStructureProtected,
+  LEGACY_COMMAND_IDS,
+  LINE_STYLES_ALL,
   listComments,
   listDefinedNames,
   type MarginPreset,
   marginPresetOf,
+  menuButton,
+  menuSectionHeader,
+  menuSeparator,
   moveSheet,
   mutators,
   type NumberFormatAction,
@@ -117,8 +152,16 @@ import {
   protectedSheetPassword,
   type Range,
   type ReviewCell,
+  RIBBON_BORDER_DRAW_MODES,
+  RIBBON_DIALOG_OPENERS,
+  RIBBON_FORMAT_MUTATORS,
+  RIBBON_FUNCTION_ARG_OPENERS,
   RIBBON_KEYSHORTCUTS,
+  RIBBON_VIEW_MODES,
+  RIBBON_ZOOM_PRESETS,
   type RibbonCommand,
+  type RibbonFillDirection,
+  type RibbonFillSeriesMode,
   type RibbonReportItem,
   type RibbonTab,
   reapplyFilters,
@@ -145,8 +188,10 @@ import {
   rowGroupRangeAt,
   type ScriptCommand,
   type SessionChartKind,
+  SPLIT_BUTTON_COMMANDS,
   Spreadsheet,
   type SpreadsheetInstance,
+  SVG_NS,
   saveSheetView,
   selectNextFormulaError,
   setAlign,
@@ -177,12 +222,16 @@ import {
   setVAlign,
   setWorkbookStructureProtected,
   setWorkbookView,
+  shouldShowFontOption,
   showCols,
+  showFillSeriesDialog,
   showRows,
   sortRange,
   TABLE_STYLE_COLORS,
   type TableStyle,
+  type TableVariantId,
   tableStyleSwatch,
+  tableVariantOptions,
   textToColumns,
   toggleBold,
   toggleItalic,
@@ -220,64 +269,6 @@ import { createIllustrations, type SessionShapeKind } from './illustrations.js';
 import { focusMenuItem, handleMenuKeydown, prepareMenu } from './menu-a11y.js';
 import { createProtectionFlows } from './protection-flows.js';
 import { createRangeUtils } from './range-utils.js';
-import { applyRibbonCommand as applyRibbonCommandImpl } from './ribbon/apply-ribbon-command.js';
-import { autofitColWidth, autofitRowHeight } from './ribbon/autofit.js';
-import { createBackstageFactories } from './ribbon/backstage.js';
-import { createBackstageTitle } from './ribbon/backstage-title.js';
-import {
-  BORDER_PRESETS,
-  type BorderPreviewSpec,
-  createBorderPreview,
-  createLineSamplePreview,
-  LINE_STYLES_ALL,
-  SVG_NS,
-} from './ribbon/border-icons.js';
-import { createBorderMenu } from './ribbon/border-menu.js';
-import { applyCellFormatAction as applyCellFormatActionImpl } from './ribbon/cell-format-action.js';
-import {
-  RIBBON_BORDER_DRAW_MODES,
-  RIBBON_DIALOG_OPENERS,
-  RIBBON_FORMAT_MUTATORS,
-  RIBBON_FUNCTION_ARG_OPENERS,
-  RIBBON_VIEW_MODES,
-  RIBBON_ZOOM_PRESETS,
-} from './ribbon/command-tables.js';
-import { applyConditionalMenuAction as applyConditionalMenuActionImpl } from './ribbon/conditional-menu-action.js';
-import { createControlDispatch } from './ribbon/control-dispatch.js';
-import { createDynamicDropdowns } from './ribbon/dynamic-dropdowns.js';
-import {
-  fillSeriesSourceRange,
-  inferFillSeriesDirection,
-  type RibbonFillDirection,
-  type RibbonFillSeriesMode,
-  showFillSeriesDialog,
-} from './ribbon/fill-series.js';
-import { isJapaneseFontName, shouldShowFontOption } from './ribbon/font-availability.js';
-import { createBordersMenu as createBordersMenuImpl } from './ribbon/menus/borders.js';
-import {
-  buildCfMenuText,
-  createConditionalMenu as createConditionalMenuImpl,
-} from './ribbon/menus/conditional.js';
-import { type AutoSumFormulaName, createFormulasMenuFactories } from './ribbon/menus/formulas.js';
-import {
-  createMenu,
-  menuButton,
-  menuSectionHeader,
-  menuSeparator,
-} from './ribbon/menus/general.js';
-import { createHomeMenuFactories } from './ribbon/menus/home.js';
-import { createInsertMenuFactories } from './ribbon/menus/insert.js';
-import { createPageLayoutMenuFactories } from './ribbon/menus/page-layout.js';
-import { createPasteMenu as createPasteMenuImpl } from './ribbon/menus/paste.js';
-import { createReviewMenuFactories } from './ribbon/menus/review.js';
-import {
-  createStylesMenuFactories,
-  type TableVariantId,
-  tableVariantOptions,
-} from './ribbon/menus/styles.js';
-import { createTextOrientationMenu as createTextOrientationMenuImpl } from './ribbon/menus/text-orientation.js';
-import { createRenderRibbon } from './ribbon/render-ribbon.js';
-import { createSelectColorRibbon } from './ribbon/select-color.js';
 import { createRibbonActions, type PrintTitlesAction } from './ribbon-actions.js';
 import { createScriptAddinActions } from './script-addin-actions.js';
 import { seedWorkbook } from './seed.js';
@@ -439,6 +430,7 @@ const shellText =
         saveFailed: '保存失敗',
         saved: '保存済み',
         search: '検索',
+        searchCommands: 'コマンドの検索',
         searchPlaceholder: '検索 (Cmd + Ctrl + U)',
         share: '共有',
         shareReady:
@@ -473,6 +465,7 @@ const shellText =
         saveFailed: 'Save failed',
         saved: 'Saved',
         search: 'Search',
+        searchCommands: 'Search commands',
         searchPlaceholder: 'Search (Cmd + Ctrl + U)',
         share: 'Share',
         shareReady:
@@ -624,68 +617,236 @@ const createBordersMenu = (): HTMLDivElement =>
     },
   });
 
-const { renderRibbon, playgroundFeatureFlags, legacyCommandIds, RIBBON_SPLIT_BUTTON_COMMANDS } =
-  createRenderRibbon({
-    getInst: () => inst,
-    ribbonLang,
-    ribbonText,
-    ribbonMenuText,
-    ribbonDisplayOptionsText,
-    ribbonRoot,
-    getActiveRibbonTab: () => activeRibbonTab,
-    getRibbonCollapsed: () => ribbonCollapsed,
-    getBackstageOpen: () => backstageOpen,
-    getRibbonDisplayMenuOpen: () => ribbonDisplayMenuOpen,
-    getFormulaBarVisible: () => formulaBarVisible,
-    createRibbonSelect,
-    createRibbonColor,
-    createRibbonIcon,
+// Forward declaration so the mountToolbar closure below can resolve it at
+// call-time even though `projectFormatToolbar` (the const this points at)
+// is created later by statusProjection. Without this indirection the
+// renderRibbon() that mountToolbar fires at the end of its setup would
+// TDZ-fault on the still-unborn const.
+let deferredProjectFormatToolbar: (() => void) | undefined;
+// Same TDZ deferral for the dynamic-dropdowns interceptor — created later
+// (line ~1276 after action handlers exist).
+let deferredInterceptCommand:
+  | ((id: string, button: HTMLButtonElement, event: MouseEvent) => boolean)
+  | undefined;
+// Hooks the toolbar dispatcher fans into for clipboard / etc. They live in
+// playground modules created after mountToolbar (clipboard.ts, sortFilter,
+// illustrations, …) — the thunks let those modules attach late without
+// breaking TDZ.
+let deferredCopyHook: (() => unknown) | undefined;
+let deferredCutHook: (() => unknown) | undefined;
+let deferredPasteHook: (() => unknown) | undefined;
+const deferredHooksBag: {
+  sortFilter?: {
+    sort: (dir: 'asc' | 'desc') => void;
+    customSort: () => Promise<unknown> | unknown;
+    openFilter: () => void;
+    removeDuplicates: () => void;
+    splitTextToColumns: (sep: string) => void;
+  };
+  insert?: {
+    createTable: (variant: 'medium') => Promise<unknown> | unknown;
+    createChart: () => void;
+    insertPicture: (source: 'online') => Promise<unknown> | unknown;
+    insertShape: (shape: 'rectangle') => void;
+    insertScreenshot: () => void;
+  };
+  page?: {
+    pageBreak: () => void;
+    sheetBackground: (action: 'set') => Promise<unknown> | unknown;
+    pdf: (action: 'create') => void;
+    inspect: () => void;
+    outline: (action: 'group' | 'ungroup' | 'show-detail' | 'hide-detail') => void;
+  };
+  drawing?: { setInkMode: (mode: 'pen' | 'erase') => void };
+  review?: {
+    spelling: () => void;
+    translate: () => void;
+    accessibility: () => void;
+    deleteComment: () => void;
+    selectComment: (direction: 1 | -1) => void;
+  };
+  protection?: {
+    runSheet: () => Promise<unknown> | unknown;
+    runWorkbook: (protect: boolean) => Promise<unknown> | unknown;
+    allowEditRanges: () => Promise<unknown> | unknown;
+  };
+  automation?: {
+    runScript: () => Promise<unknown> | unknown;
+    recordActions: () => void;
+    allScripts: () => void;
+    addInManager: () => void;
+  };
+  formula?: {
+    autoSum: (fn: AutoSumFormulaName) => void;
+    errorChecking: () => void;
+  };
+  sheetView?: {
+    save: () => Promise<unknown> | unknown;
+    deleteActive: () => void;
+    zoomDialog: () => Promise<unknown> | unknown;
+  };
+} = {};
+
+// Toolbar driven by the core `Spreadsheet.mountToolbar` API. State (active
+// tab, collapsed, backstage, theme, border style/color, formula-bar) lives
+// inside the toolbar instance — the `let activeRibbonTab/…` mirrors above
+// stay synced via the on*Change callbacks so existing module-scope readers
+// keep working. `commandDelegation: false` keeps the toolbar from
+// double-firing the legacy `wireFormat('btn-…')` listeners and the
+// `home-menu-wirings.ts` / `data-menu-wirings.ts` per-command click
+// handlers; a later phase will collapse those into the toolbar's `hooks`.
+const tb = Spreadsheet.mountToolbar(ribbonRoot as HTMLElement, () => inst, {
+  lang: ribbonLang,
+  text: ribbonText,
+  menuText: ribbonMenuText,
+  helpers: {
+    createSelect: createRibbonSelect,
+    createColor: createRibbonColor,
+    createIcon: createRibbonIcon,
     makeSvg,
-    RIBBON_CHEVRON_PATH,
-    createPasteMenu,
-    createPivotTableMenu,
-    createDefinedNamesMenu,
-    createLinksMenu,
-    createBordersMenu,
-    createTextOrientationMenu,
-    createConditionalMenu,
-    createFillMenu,
-    createInsertCellsMenu,
-    createDeleteCellsMenu,
-    createFormatCellsMenu,
-    createAutoSumMenu,
-    createFreezeMenu,
-    createClearArrowsMenu,
-    createErrorCheckingMenu,
-    createWatchMenu,
-    createReviewCommentsMenu,
-    createProtectMenu,
-    createCalcOptionsMenu,
-    createSortMenu,
-    createTextToColumnsMenu,
-    createDataValidationMenu,
-    createFindSelectMenu,
-    createPictureInsertMenu,
-    createShapesInsertMenu,
-    createScreenshotInsertMenu,
-    createChartInsertMenu,
-    createTableStyleMenu,
-    createCellStylesMenu,
-    createCurrencyMenu,
-    createPageThemeMenu,
-    createPrintAreaMenu,
-    createPageBreaksMenu,
-    createSheetBackgroundMenu,
-    createPrintTitlesMenu,
-    createSymbolMenu,
-    createScriptMenu,
-    createAddInMenu,
-    createPdfMenu,
-    createClearMenu,
-    createBackstageView,
-    projectFormatToolbar: () => projectFormatToolbar(),
-  });
+    chevronPath: RIBBON_CHEVRON_PATH,
+  },
+  menus: {
+    paste: createPasteMenu,
+    pivotTable: createPivotTableMenu,
+    definedNames: createDefinedNamesMenu,
+    links: createLinksMenu,
+    borders: createBordersMenu,
+    textOrientation: createTextOrientationMenu,
+    conditional: createConditionalMenu,
+    fill: createFillMenu,
+    insertCells: createInsertCellsMenu,
+    deleteCells: createDeleteCellsMenu,
+    formatCells: createFormatCellsMenu,
+    autoSum: createAutoSumMenu,
+    freeze: createFreezeMenu,
+    clearArrows: createClearArrowsMenu,
+    errorChecking: createErrorCheckingMenu,
+    watch: createWatchMenu,
+    reviewComments: createReviewCommentsMenu,
+    protect: createProtectMenu,
+    calcOptions: createCalcOptionsMenu,
+    sort: createSortMenu,
+    textToColumns: createTextToColumnsMenu,
+    dataValidation: createDataValidationMenu,
+    findSelect: createFindSelectMenu,
+    pictureInsert: createPictureInsertMenu,
+    shapesInsert: createShapesInsertMenu,
+    screenshotInsert: createScreenshotInsertMenu,
+    chartInsert: createChartInsertMenu,
+    tableStyle: createTableStyleMenu,
+    cellStyles: createCellStylesMenu,
+    currency: createCurrencyMenu,
+    pageTheme: createPageThemeMenu,
+    printArea: createPrintAreaMenu,
+    pageBreaks: createPageBreaksMenu,
+    sheetBackground: createSheetBackgroundMenu,
+    printTitles: createPrintTitlesMenu,
+    symbol: createSymbolMenu,
+    script: createScriptMenu,
+    addIn: createAddInMenu,
+    pdf: createPdfMenu,
+    clear: createClearMenu,
+  },
+  createBackstageView,
+  activeTab: activeRibbonTab,
+  collapsed: ribbonCollapsed,
+  formulaBarVisible,
+  theme: uiTheme,
+  borderStyle: selectedBorderStyle,
+  borderColor: selectedBorderColor,
+  commandDelegation: true,
+  interceptCommand: (id, button, event) => deferredInterceptCommand?.(id, button, event) ?? false,
+  hooks: {
+    clipboard: {
+      copy: () => deferredCopyHook?.(),
+      cut: () => deferredCutHook?.(),
+      paste: () => deferredPasteHook?.(),
+    },
+    sortFilter: {
+      sort: (dir) => deferredHooksBag.sortFilter?.sort(dir),
+      customSort: () => deferredHooksBag.sortFilter?.customSort(),
+      openFilter: () => deferredHooksBag.sortFilter?.openFilter(),
+      removeDuplicates: () => deferredHooksBag.sortFilter?.removeDuplicates(),
+      splitTextToColumns: (sep) => deferredHooksBag.sortFilter?.splitTextToColumns(sep),
+    },
+    insert: {
+      createTable: (v) => deferredHooksBag.insert?.createTable(v),
+      createChart: () => deferredHooksBag.insert?.createChart(),
+      insertPicture: (s) => deferredHooksBag.insert?.insertPicture(s),
+      insertShape: (s) => deferredHooksBag.insert?.insertShape(s),
+      insertScreenshot: () => deferredHooksBag.insert?.insertScreenshot(),
+    },
+    page: {
+      pageBreak: () => deferredHooksBag.page?.pageBreak(),
+      sheetBackground: (a) => deferredHooksBag.page?.sheetBackground(a),
+      pdf: (a) => deferredHooksBag.page?.pdf(a),
+      inspect: () => deferredHooksBag.page?.inspect(),
+      outline: (a) => deferredHooksBag.page?.outline(a),
+    },
+    drawing: { setInkMode: (m) => deferredHooksBag.drawing?.setInkMode(m) },
+    review: {
+      spelling: () => deferredHooksBag.review?.spelling(),
+      translate: () => deferredHooksBag.review?.translate(),
+      accessibility: () => deferredHooksBag.review?.accessibility(),
+      deleteComment: () => deferredHooksBag.review?.deleteComment(),
+      selectComment: (d) => deferredHooksBag.review?.selectComment(d),
+    },
+    protection: {
+      runSheet: () => deferredHooksBag.protection?.runSheet(),
+      runWorkbook: (p) => deferredHooksBag.protection?.runWorkbook(p),
+      allowEditRanges: () => deferredHooksBag.protection?.allowEditRanges(),
+    },
+    automation: {
+      runScript: () => deferredHooksBag.automation?.runScript(),
+      recordActions: () => deferredHooksBag.automation?.recordActions(),
+      allScripts: () => deferredHooksBag.automation?.allScripts(),
+      addInManager: () => deferredHooksBag.automation?.addInManager(),
+    },
+    formula: {
+      autoSum: (fn) => deferredHooksBag.formula?.autoSum(fn),
+      errorChecking: () => deferredHooksBag.formula?.errorChecking(),
+    },
+    sheetView: {
+      save: () => deferredHooksBag.sheetView?.save(),
+      deleteActive: () => deferredHooksBag.sheetView?.deleteActive(),
+      zoomDialog: () => deferredHooksBag.sheetView?.zoomDialog(),
+    },
+  },
+  applyRibbonFormat,
+  focusSheet: () => focusSheet(),
+  refreshCells: () => refreshWorkbookCells(),
+  // projectFormatToolbar is declared later — defer the call so TDZ doesn't
+  // fire during the initial mount's renderRibbon(). statusProjection's
+  // store.subscribe takes over once boot completes.
+  projectFormatToolbar: () => deferredProjectFormatToolbar?.(),
+  onTabChange: (tab) => {
+    activeRibbonTab = tab;
+  },
+  onCollapsedChange: (next) => {
+    ribbonCollapsed = next;
+  },
+  onBackstageOpenChange: (next) => {
+    backstageOpen = next;
+  },
+  onThemeChange: (next) => {
+    applyUiTheme(next);
+  },
+  onFormulaBarChange: (next) => {
+    formulaBarVisible = next;
+  },
+});
+const renderRibbon = (): void => tb.rerender();
+const playgroundFeatureFlags = (): FeatureFlags => ({
+  viewToolbar: false,
+  watchWindow: true,
+  workbookObjects: true,
+  formulaBar: formulaBarVisible,
+});
+const legacyCommandIds = LEGACY_COMMAND_IDS;
+const RIBBON_SPLIT_BUTTON_COMMANDS = SPLIT_BUTTON_COMMANDS;
 void RIBBON_SPLIT_BUTTON_COMMANDS;
+void tb;
 
 const applyCellFormatAction = (action: string): Promise<void> =>
   applyCellFormatActionImpl(action, {
@@ -750,6 +911,10 @@ const {
   markCurrentLegacyRibbonBindings,
   persistStats,
 } = statusProjection;
+// Late-bind the toolbar's deferred projection hook now that the function
+// exists. See the `let deferredProjectFormatToolbar` declaration above the
+// mountToolbar call for the initial-mount TDZ this works around.
+deferredProjectFormatToolbar = projectFormatToolbar;
 void persistStats;
 void setRibbonCommandActive;
 
@@ -813,36 +978,23 @@ document.getElementById('btn-redo')?.addEventListener('click', () => {
   (sheetEl as HTMLElement).focus();
 });
 
-// Format Painter — single click arms one-shot, double click arms sticky mode.
-// Re-clicking the active button deactivates.
-
-wireFormat('btn-bold', toggleBold);
-wireFormat('btn-italic', toggleItalic);
-wireFormat('btn-underline', toggleUnderline);
-wireFormat('btn-strike', toggleStrike);
-wireFormat('btn-percent', cyclePercent);
-wireFormat('btn-comma', (state, store) =>
-  setNumFmt(state, store, { kind: 'fixed', decimals: 2, thousands: true }),
-);
-wireFormat('btn-font-grow', (state, store) => {
-  const a = state.selection.active;
-  const f = state.format.formats.get(`${a.sheet}:${a.row}:${a.col}`);
-  setFont(state, store, { fontSize: (f?.fontSize ?? 11) + 1 });
-});
-wireFormat('btn-font-shrink', (state, store) => {
-  const a = state.selection.active;
-  const f = state.format.formats.get(`${a.sheet}:${a.row}:${a.col}`);
-  setFont(state, store, { fontSize: Math.max(1, (f?.fontSize ?? 11) - 1) });
-});
-wireFormat('btn-align-left', (state, store) => setAlign(state, store, 'left'));
-wireFormat('btn-align-center', (state, store) => setAlign(state, store, 'center'));
-wireFormat('btn-align-right', (state, store) => setAlign(state, store, 'right'));
-wireFormat('btn-top', (state, store) => setVAlign(state, store, 'top'));
-wireFormat('btn-middle', (state, store) => setVAlign(state, store, 'middle'));
-wireFormat('btn-decimals-up', (state, store) => bumpDecimals(state, store, 1));
-wireFormat('btn-decimals-down', (state, store) => bumpDecimals(state, store, -1));
+// Format-button click handlers (bold/italic/align/font-grow/…) are dispatched
+// by mountToolbar via commandDelegation against `[data-ribbon-command]`. No
+// per-button wireFormat needed — see RIBBON_FORMAT_MUTATORS and the fontGrow
+// /fontShrink cases in core's applyRibbonCommand.
 
 void clearFormat; // Reserved for a "Clear formatting" menu item; keep the import live.
+void wireFormat;
+void toggleBold;
+void toggleItalic;
+void toggleUnderline;
+void toggleStrike;
+void cyclePercent;
+void setNumFmt;
+void setFont;
+void setAlign;
+void setVAlign;
+void bumpDecimals;
 
 // ── Borders dropdown (Excel-365 parity) ──────────────────────────────────
 
@@ -890,6 +1042,12 @@ const {
   pasteClipboardIntoSelection,
   applyRibbonPasteAction,
 } = clipboard;
+
+// Late-bind clipboard hooks so the toolbar's applyRibbonCommand path can
+// fan copy / cut / paste clicks into the playground's clipboard helpers.
+deferredCopyHook = () => copySelectionToClipboard();
+deferredCutHook = () => cutSelectionToClipboard();
+deferredPasteHook = () => pasteClipboardIntoSelection();
 
 const sortFilter = createSortFilter({
   getInst: () => inst,
@@ -1097,65 +1255,58 @@ const {
   chartKindFromAction,
 } = ribbonActions;
 
-const applyRibbonCommand = (id: string): boolean =>
-  applyRibbonCommandImpl(id, {
-    inst,
-    ribbonText,
-    ribbonMenuText,
-    uiTheme,
-    selectedBorderStyle,
-    selectedBorderColor,
-    formulaBarVisible,
-    applyRibbonFormat,
-    applyUiTheme,
-    focusSheet,
-    projectFormatToolbar,
-    refreshWorkbookCells,
-    refreshZoom,
-    selectedRowCount,
-    selectedColCount,
-    setFormulaBarVisible: (next) => {
-      formulaBarVisible = next;
-    },
-    playgroundFeatureFlags,
-    showMessage,
-    copySelectionToClipboard,
-    cutSelectionToClipboard,
-    pasteClipboardIntoSelection,
-    sortSelection,
-    customSortSelection,
-    openFilterForSelection,
-    removeDuplicateRows,
-    splitTextToColumns,
-    createTableFromSelection,
-    createChartFromSelection,
-    insertPictureFromRibbon,
-    insertShapeFromRibbon,
-    insertScreenshotFromRibbon,
-    applyPageBreakAction,
-    applySheetBackgroundAction,
-    applyPdfAction,
-    inspectWorkbookFromBackstage,
-    applyOutlineAction,
-    setDrawInkMode,
-    runSpellingReview,
-    openTranslateReview,
-    runAccessibilityCheck,
-    deleteActiveReviewComment,
-    selectReviewComment,
-    runSheetProtectionFlow,
-    runWorkbookProtectionFlow,
-    applyProtectAction,
-    runPlaygroundScript,
-    recordSelectedActions,
-    openAllScripts,
-    openAddInManager,
-    applyAutoSumFormula,
-    runFormulaErrorChecking,
-    saveCurrentSheetViewFromRibbon,
-    deleteActiveSheetViewFromRibbon,
-    showZoomDialogFromRibbon,
-  });
+// Late-bind toolbar hooks now that every action helper exists. Mirrors the
+// old per-call `applyRibbonCommandImpl` deps struct but as a single object
+// the toolbar can call into on every dispatch.
+deferredHooksBag.sortFilter = {
+  sort: (dir) => sortSelection(dir),
+  customSort: () => customSortSelection(),
+  openFilter: () => openFilterForSelection(),
+  removeDuplicates: () => removeDuplicateRows(),
+  splitTextToColumns: (sep) => splitTextToColumns(sep),
+};
+deferredHooksBag.insert = {
+  createTable: () => createTableFromSelection(),
+  createChart: () => createChartFromSelection(recommendedChartKind()),
+  insertPicture: (s) => insertPictureFromRibbon(s),
+  insertShape: (s) => insertShapeFromRibbon(s),
+  insertScreenshot: () => insertScreenshotFromRibbon(),
+};
+deferredHooksBag.page = {
+  pageBreak: () => applyPageBreakAction('insert-auto'),
+  sheetBackground: (a) => applySheetBackgroundAction(a),
+  pdf: (a) => applyPdfAction(a),
+  inspect: () => inspectWorkbookFromBackstage(),
+  outline: (a) => applyOutlineAction(a),
+};
+deferredHooksBag.drawing = { setInkMode: (m) => setDrawInkMode(m) };
+deferredHooksBag.review = {
+  spelling: () => runSpellingReview(),
+  translate: () => openTranslateReview(),
+  accessibility: () => runAccessibilityCheck(),
+  deleteComment: () => deleteActiveReviewComment(),
+  selectComment: (d) => selectReviewComment(d),
+};
+deferredHooksBag.protection = {
+  runSheet: () => runSheetProtectionFlow(),
+  runWorkbook: (p) => runWorkbookProtectionFlow(p),
+  allowEditRanges: () => applyProtectAction('allow-edit-ranges'),
+};
+deferredHooksBag.automation = {
+  runScript: () => runPlaygroundScript(),
+  recordActions: () => recordSelectedActions(),
+  allScripts: () => openAllScripts(),
+  addInManager: () => openAddInManager(),
+};
+deferredHooksBag.formula = {
+  autoSum: (fn) => applyAutoSumFormula(fn),
+  errorChecking: () => runFormulaErrorChecking(),
+};
+deferredHooksBag.sheetView = {
+  save: () => saveCurrentSheetViewFromRibbon(),
+  deleteActive: () => deleteActiveSheetViewFromRibbon(),
+  zoomDialog: () => showZoomDialogFromRibbon(),
+};
 
 const dataMenus = createDataMenuWirings({
   getInst: () => inst,
@@ -1302,6 +1453,58 @@ const {
   openDynamicConditionalSubmenu,
   dynamicRibbonDropdownClick,
 } = dynamicDropdowns;
+
+// Late-bind the toolbar's interceptCommand hook so dropdown-owning buttons
+// (calcOptions, dataValidation, sort, etc.) open / close their menu instead
+// of falling through to applyRibbonCommand (which would otherwise open the
+// dialog associated with that command id). Survives ribbon re-renders since
+// the dropdown spec is looked up per-click via the current DOM.
+//
+// Split-button commands (paste, autosum, …) are skipped so the primary
+// action still fires through applyRibbonCommand → hooks; the chevron-open
+// path lives in home-menu-wirings and only works pre-rerender, which
+// matches the legacy behaviour.
+// Split buttons whose primary click runs an action (paste / autosum /
+// currency) rather than opening the dropdown — the chevron-vs-main click
+// split lives in home-menu-wirings / data-menu-wirings. The remaining split
+// buttons (pageTheme / addIn / script) are menu-only: a plain click opens
+// the dropdown the same as a non-split menu owner.
+const PRIMARY_ACTION_SPLIT_COMMANDS = new Set<string>([
+  'paste',
+  'autosum',
+  'autosumFormula',
+  'currency',
+]);
+// Menus that aren't owned by dynamic-dropdowns (border / freeze / printArea
+// / symbol live in border-menu / data-menu-wirings / home-menu-wirings),
+// but the toolbar still needs to open them on a fresh click so the wiring
+// survives ribbon re-renders.
+const LEGACY_MENU_OPENERS: Record<string, () => void> = {
+  printArea: () => openPrintAreaMenu(),
+  symbolInsert: () => openSymbolMenu(),
+  freeze: () => openFreezeMenu(),
+  borders: () => openBorderMenu(),
+};
+deferredInterceptCommand = (id, button, event) => {
+  const legacyOpener = LEGACY_MENU_OPENERS[id];
+  if (legacyOpener) {
+    legacyOpener();
+    return true;
+  }
+  // Split buttons: chevron click opens dropdown, primary click runs the
+  // action via applyRibbonCommand. event.target lets us tell the two apart
+  // even when the legacy data-menu-wirings handler is stale (post-rerender).
+  const target = event.target as Element | null;
+  const isChevronClick = !!target?.closest('.demo__rb-split-chevron');
+  if (PRIMARY_ACTION_SPLIT_COMMANDS.has(id) && !isChevronClick) return false;
+  const spec = dynamicDropdownSpecForButton(button);
+  if (!spec) return false;
+  const menu = document.getElementById(spec.menuId) as HTMLDivElement | null;
+  if (!menu) return false;
+  if (menu.hidden) openDynamicRibbonDropdown(spec, button);
+  else closeDynamicRibbonDropdown(spec, true);
+  return true;
+};
 
 document.addEventListener('click', (event) => {
   dynamicRibbonDropdownClick(event);

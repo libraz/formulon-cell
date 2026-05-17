@@ -970,6 +970,143 @@ export {
   parseScriptCommand,
   reviewCellsFromState,
 } from './toolbar/review-tools.js';
+export type {
+  ApplyRibbonCommandDeps,
+  RibbonHooks,
+  RibbonRuntime,
+  RibbonUiState,
+} from './toolbar/ribbon/apply-ribbon-command.js';
+export { applyRibbonCommand } from './toolbar/ribbon/apply-ribbon-command.js';
+export type { AutofitCellFormat } from './toolbar/ribbon/autofit.js';
+export { autofitColWidth, autofitRowHeight } from './toolbar/ribbon/autofit.js';
+export type {
+  BackstageDeps,
+  BackstageFactories,
+  BackstageRibbonText,
+  BackstageText,
+} from './toolbar/ribbon/backstage.js';
+export { createBackstageFactories } from './toolbar/ribbon/backstage.js';
+export type {
+  BackstageTitleApi,
+  BackstageTitleCtx,
+  BackstageTitleShellText,
+} from './toolbar/ribbon/backstage-title.js';
+export { createBackstageTitle } from './toolbar/ribbon/backstage-title.js';
+export type { BorderPreviewSide, BorderPreviewSpec } from './toolbar/ribbon/border-icons.js';
+export {
+  createBorderPreview,
+  createLineSamplePreview,
+  LINE_STYLES_ALL,
+  SVG_NS,
+} from './toolbar/ribbon/border-icons.js';
+export type { BorderMenuApi, BorderMenuCtx } from './toolbar/ribbon/border-menu.js';
+export { createBorderMenu } from './toolbar/ribbon/border-menu.js';
+export type { CellFormatActionDeps } from './toolbar/ribbon/cell-format-action.js';
+export { applyCellFormatAction } from './toolbar/ribbon/cell-format-action.js';
+export type {
+  RibbonBorderDrawMode,
+  RibbonFormatMutator as RibbonCommandTableMutator,
+  RibbonViewMode,
+} from './toolbar/ribbon/command-tables.js';
+export {
+  RIBBON_BORDER_DRAW_MODES,
+  RIBBON_DIALOG_OPENERS,
+  RIBBON_FORMAT_MUTATORS,
+  RIBBON_FUNCTION_ARG_OPENERS,
+  RIBBON_VIEW_MODES,
+  RIBBON_ZOOM_PRESETS,
+} from './toolbar/ribbon/command-tables.js';
+export type {
+  CfFillStyle,
+  ConditionalMenuActionDeps,
+} from './toolbar/ribbon/conditional-menu-action.js';
+export { applyConditionalMenuAction } from './toolbar/ribbon/conditional-menu-action.js';
+export type {
+  ControlDispatchApi,
+  ControlDispatchCtx,
+  RibbonFormatMutator as ControlDispatchMutator,
+} from './toolbar/ribbon/control-dispatch.js';
+export { createControlDispatch } from './toolbar/ribbon/control-dispatch.js';
+export type {
+  DynamicDropdownsApi,
+  DynamicDropdownsCtx,
+  PrintTitlesAction as DynamicDropdownsPrintTitlesAction,
+  RibbonDropdownSpec,
+  UiTheme as DynamicDropdownsUiTheme,
+} from './toolbar/ribbon/dynamic-dropdowns.js';
+export { createDynamicDropdowns } from './toolbar/ribbon/dynamic-dropdowns.js';
+export type {
+  RibbonFillDirection,
+  RibbonFillSeriesMode,
+} from './toolbar/ribbon/fill-series.js';
+export {
+  fillSeriesSourceRange,
+  inferFillSeriesDirection,
+  makeFillSeriesRadio,
+  selectedFillSeriesRadio,
+  showFillSeriesDialog,
+} from './toolbar/ribbon/fill-series.js';
+export {
+  COMMON_FONT_VALUES,
+  FONT_SUBMENU_FAMILIES,
+  isFontProbablyAvailable,
+  isJapaneseFontName,
+  RECENT_FONT_VALUES,
+  shouldShowFontOption,
+  THEME_FONT_VALUES,
+} from './toolbar/ribbon/font-availability.js';
+export type { BordersMenuDeps } from './toolbar/ribbon/menus/borders.js';
+export { createBordersMenu } from './toolbar/ribbon/menus/borders.js';
+export type { CfSubmenuKey } from './toolbar/ribbon/menus/conditional.js';
+export { buildCfMenuText, createConditionalMenu } from './toolbar/ribbon/menus/conditional.js';
+export type {
+  AutoSumFormulaName,
+  FormulasMenuFactories,
+} from './toolbar/ribbon/menus/formulas.js';
+export { createFormulasMenuFactories } from './toolbar/ribbon/menus/formulas.js';
+export {
+  createMenu,
+  menuButton,
+  menuSectionHeader,
+  menuSeparator,
+} from './toolbar/ribbon/menus/general.js';
+export type { HomeMenuDeps, HomeMenuFactories } from './toolbar/ribbon/menus/home.js';
+export { createHomeMenuFactories } from './toolbar/ribbon/menus/home.js';
+export type { InsertMenuFactories } from './toolbar/ribbon/menus/insert.js';
+export { createInsertMenuFactories } from './toolbar/ribbon/menus/insert.js';
+export type { PageLayoutMenuFactories } from './toolbar/ribbon/menus/page-layout.js';
+export { createPageLayoutMenuFactories } from './toolbar/ribbon/menus/page-layout.js';
+export { createPasteMenu } from './toolbar/ribbon/menus/paste.js';
+export type { ReviewMenuFactories } from './toolbar/ribbon/menus/review.js';
+export { createReviewMenuFactories } from './toolbar/ribbon/menus/review.js';
+export type {
+  StylesMenuDeps,
+  StylesMenuFactories,
+  TableVariantId,
+} from './toolbar/ribbon/menus/styles.js';
+export { createStylesMenuFactories, tableVariantOptions } from './toolbar/ribbon/menus/styles.js';
+export type { TextOrientationGlyph } from './toolbar/ribbon/menus/text-orientation.js';
+export { createTextOrientationMenu } from './toolbar/ribbon/menus/text-orientation.js';
+export type {
+  RenderRibbonApi,
+  RenderRibbonCtx,
+  RibbonMenuFactory,
+  RibbonMenus,
+  RibbonRenderHelpers,
+  RibbonRenderState,
+} from './toolbar/ribbon/render-ribbon.js';
+export {
+  createRenderRibbon,
+  LEGACY_COMMAND_IDS,
+  SPLIT_BUTTON_COMMANDS,
+} from './toolbar/ribbon/render-ribbon.js';
+export type {
+  SelectColorApi,
+  SelectColorCtx,
+  SelectColorPageScaleText,
+  SelectColorRibbonText,
+} from './toolbar/ribbon/select-color.js';
+export { createSelectColorRibbon } from './toolbar/ribbon/select-color.js';
 export type { ActiveState } from './toolbar/ribbon-active-state.js';
 export {
   BORDER_PRESETS,

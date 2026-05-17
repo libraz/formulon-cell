@@ -59,12 +59,23 @@ import {
   attachSheetTabsController,
   type SheetTabsController,
 } from './mount/sheet-tabs-controller.js';
+import {
+  type MountToolbarOptions,
+  mountToolbar,
+  type ToolbarInstance,
+  type ToolbarInstanceRef,
+} from './mount/toolbar.js';
 import type { MountOptions, SpreadsheetInstance } from './mount/types.js';
 import { colWidth, colX, gridOriginX, layoutForView } from './render/geometry.js';
 import { GridRenderer, getErrorTriangleHits } from './render/grid.js';
 import { createSpreadsheetStore, mutators } from './store/store.js';
 import { resolveTheme } from './theme/resolve.js';
 
+export type {
+  MountToolbarOptions,
+  ToolbarInstance,
+  ToolbarInstanceRef,
+} from './mount/toolbar.js';
 export type { MountOptions, SpreadsheetInstance } from './mount/types.js';
 
 function mountErrorMessage(error: unknown): string {
@@ -95,6 +106,13 @@ function renderMountError(host: HTMLElement, error: unknown, strings: Strings['m
  * cleared. Idempotent dispose.
  */
 export const Spreadsheet = {
+  mountToolbar(
+    host: HTMLElement,
+    instance: ToolbarInstanceRef,
+    opts: MountToolbarOptions,
+  ): ToolbarInstance {
+    return mountToolbar(host, instance, opts);
+  },
   async mount(host: HTMLElement, opts: MountOptions = {}): Promise<SpreadsheetInstance> {
     if (!host) throw new Error('Spreadsheet.mount: host element required');
 
@@ -711,11 +729,11 @@ export const Spreadsheet = {
       closeFindReplace() {
         binding.findReplace?.close();
       },
-      openPasteSpecial() {
-        binding.pasteSpecialDialog?.open();
+      openPasteSpecial(opts) {
+        binding.pasteSpecialDialog?.open(opts);
       },
-      pasteSpecial(options) {
-        return binding.pasteSpecialDialog?.apply(options) ?? false;
+      pasteSpecial(options, opts) {
+        return binding.pasteSpecialDialog?.apply(options, opts) ?? false;
       },
       openInsertCopiedCells() {
         openInsertCopiedCellsDialog({
@@ -946,6 +964,9 @@ export const Spreadsheet = {
         chromeSync?.detach();
         host.removeEventListener('fc:openfilter', onOpenFilter);
         evaluateFormulaDialog.detach();
+        externalLinksDialog.detach();
+        cfRulesDialog.detach();
+        cellStylesGallery.detach();
         filterDropdown.detach();
         unsubCellRegistry();
         unsubI18n();

@@ -1,4 +1,5 @@
 import type { CellRegistry } from '../cells.js';
+import type { PasteSpecialOptions } from '../commands/clipboard/paste-special.js';
 import type { History } from '../commands/history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetEventHandler, SpreadsheetEventName } from '../events.js';
@@ -11,10 +12,10 @@ import type {
 import type { CustomFunction, CustomFunctionMeta, FormulaRegistry } from '../formula.js';
 import type { I18nController } from '../i18n/controller.js';
 import type { DeepPartial, Locale, Strings } from '../i18n/strings.js';
-import type { PasteSpecialOptions } from '../commands/clipboard/paste-special.js';
 import type { BorderDrawHandle } from '../interact/border-draw.js';
 import type { ConditionalDialogOpenOptions } from '../interact/conditional-dialog.js';
 import type { FormatPainterHandle } from '../interact/format-painter.js';
+import type { PasteSpecialOpenOptions } from '../interact/paste-special.js';
 import type { SlicerSpec, SpreadsheetStore } from '../store/store.js';
 
 export interface MountOptions {
@@ -74,8 +75,8 @@ export interface SpreadsheetInstance {
   openDefineNameDialog(): void;
   openFindReplace(tab?: 'find' | 'replace'): void;
   closeFindReplace(): void;
-  openPasteSpecial(): void;
-  pasteSpecial(options: PasteSpecialOptions): boolean;
+  openPasteSpecial(opts?: PasteSpecialOpenOptions): void;
+  pasteSpecial(options: PasteSpecialOptions, opts?: PasteSpecialOpenOptions): boolean;
   openInsertCopiedCells(): void;
   openPageSetup(): void;
   print(mode?: 'print' | 'pdf'): void;

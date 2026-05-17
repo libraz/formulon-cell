@@ -24,6 +24,7 @@
 //   - openFreezeMenu / closeFreezeMenu / getFreezeMenu / getFreezeBtn are
 //     used by the id='freeze' branch of the generic ribbon click handler.
 
+import type { AutoSumFormulaName } from '@libraz/formulon-cell';
 import {
   clearFilter,
   filterBySelectedCellValue,
@@ -37,7 +38,6 @@ import {
 
 import { showMessage } from './dialogs.js';
 import { focusMenuItem, handleMenuKeydown } from './menu-a11y.js';
-import type { AutoSumFormulaName } from './ribbon/menus/formulas.js';
 
 export interface DataMenuWiringsCtx {
   getInst: () => SpreadsheetInstance | null;

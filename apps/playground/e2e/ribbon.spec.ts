@@ -284,7 +284,9 @@ test('R00a: Japanese defined-name menu uses localized labels', async ({ page }) 
   await expect(menu).toContainText('定義された名前はありません');
 });
 
-test('R00-data-ja: Japanese Data remove-duplicates dialog uses localized labels', async ({ page }) => {
+test('R00-data-ja: Japanese Data remove-duplicates dialog uses localized labels', async ({
+  page,
+}) => {
   await mount(page, '/?locale=ja');
 
   await selectRangeAndSetValues(page, { r0: 0, c0: 0, r1: 2, c1: 1 }, [
@@ -446,9 +448,7 @@ test('R00c: Japanese Automate and Add-ins dialogs use localized copy', async ({ 
   await expect(page.locator('[data-ribbon-command="recordActions"]')).toHaveText(
     /アクションの記録/,
   );
-  await expect(page.locator('[data-ribbon-command="allScripts"]')).toHaveText(
-    /すべてのスクリプト/,
-  );
+  await expect(page.locator('[data-ribbon-command="allScripts"]')).toHaveText(/すべてのスクリプト/);
   await page.locator('[data-ribbon-command="script"]').click();
   await expect(page.locator('#menu-script')).toContainText('大文字に変換');
   await page.locator('#menu-script [data-script-action="custom"]').click();
@@ -2577,9 +2577,7 @@ test('R02d: Conditional-format flyouts create and clear preset rules', async ({ 
   await page.locator('[data-cf-submenu="dataBar"]').hover();
   await page.locator('.app__submenu--cf-dataBar [data-cf-action="new-rule"]').click();
   await expect(newRuleDialog).toBeVisible();
-  await expect(newRuleDialog.locator('.fc-conddlg__sub:not([hidden])')).toContainText(
-    'Bar color',
-  );
+  await expect(newRuleDialog.locator('.fc-conddlg__sub:not([hidden])')).toContainText('Bar color');
   await newRuleDialog.getByRole('button', { name: 'Cancel' }).click();
 
   await page.locator('[data-ribbon-command="conditional"]').click();
@@ -2589,23 +2587,31 @@ test('R02d: Conditional-format flyouts create and clear preset rules', async ({ 
   await expect(rulesDialog).toContainText('Data Bar');
   await expect(rulesDialog).toContainText('A1');
   await rulesDialog.getByRole('button', { name: 'Move Down' }).first().click();
-  await expect.poll(async () => (await readConditionalRuleSummaries(page))[0]).toMatchObject({
-    kind: 'color-scale',
-  });
+  await expect
+    .poll(async () => (await readConditionalRuleSummaries(page))[0])
+    .toMatchObject({
+      kind: 'color-scale',
+    });
   expect(await undoViaInstance(page)).toBe(true);
-  await expect.poll(async () => (await readConditionalRuleSummaries(page))[0]).toMatchObject({
-    kind: 'data-bar',
-    color: '#70ad47',
-  });
+  await expect
+    .poll(async () => (await readConditionalRuleSummaries(page))[0])
+    .toMatchObject({
+      kind: 'data-bar',
+      color: '#70ad47',
+    });
   expect(await redoViaInstance(page)).toBe(true);
-  await expect.poll(async () => (await readConditionalRuleSummaries(page))[0]).toMatchObject({
-    kind: 'color-scale',
-  });
+  await expect
+    .poll(async () => (await readConditionalRuleSummaries(page))[0])
+    .toMatchObject({
+      kind: 'color-scale',
+    });
   await rulesDialog.locator('.fc-cfrulesdlg__move-up:not(:disabled)').first().click();
-  await expect.poll(async () => (await readConditionalRuleSummaries(page))[0]).toMatchObject({
-    kind: 'data-bar',
-    color: '#70ad47',
-  });
+  await expect
+    .poll(async () => (await readConditionalRuleSummaries(page))[0])
+    .toMatchObject({
+      kind: 'data-bar',
+      color: '#70ad47',
+    });
   await rulesDialog.getByRole('button', { name: 'New Rule...' }).click();
   await expect(rulesDialog).toBeHidden();
   await expect(newRuleDialog).toBeVisible();
@@ -2627,10 +2633,12 @@ test('R02d: Conditional-format flyouts create and clear preset rules', async ({ 
   await closeDialog(page);
   expect(await undoViaInstance(page)).toBe(true);
   await expect.poll(() => readConditionalRuleSummaries(page)).toHaveLength(8);
-  await expect.poll(async () => (await readConditionalRuleSummaries(page))[0]).toMatchObject({
-    kind: 'data-bar',
-    color: '#70ad47',
-  });
+  await expect
+    .poll(async () => (await readConditionalRuleSummaries(page))[0])
+    .toMatchObject({
+      kind: 'data-bar',
+      color: '#70ad47',
+    });
   expect(await redoViaInstance(page)).toBe(true);
   await expect.poll(() => readConditionalRuleSummaries(page)).toHaveLength(7);
   expect(await undoViaInstance(page)).toBe(true);
@@ -2763,9 +2771,7 @@ test('R02d-highlight: Conditional-format highlight prompts create Excel-style pr
     ]);
 });
 
-test('R02d-new-rule: Conditional-format New Rule creates formula-based rules', async ({
-  page,
-}) => {
+test('R02d-new-rule: Conditional-format New Rule creates formula-based rules', async ({ page }) => {
   await mount(page, '/?locale=en&fixture=empty');
 
   await page.getByRole('tab', { name: 'Home', exact: true }).click();
@@ -2948,9 +2954,9 @@ test('R02e: Home cell insert, delete, and format menus mutate sheet state', asyn
       rowHeights: expect.arrayContaining([[3, expect.any(Number)]]),
     });
   expect(await undoViaInstance(page)).toBe(true);
-  await expect.poll(async () => (await readLayoutSummary(page)).rowHeights.some(([row]) => row === 3)).toBe(
-    false,
-  );
+  await expect
+    .poll(async () => (await readLayoutSummary(page)).rowHeights.some(([row]) => row === 3))
+    .toBe(false);
   expect(await redoViaInstance(page)).toBe(true);
   await expect
     .poll(() => readLayoutSummary(page))
@@ -2967,9 +2973,9 @@ test('R02e: Home cell insert, delete, and format menus mutate sheet state', asyn
       colWidths: expect.arrayContaining([[4, expect.any(Number)]]),
     });
   expect(await undoViaInstance(page)).toBe(true);
-  await expect.poll(async () => (await readLayoutSummary(page)).colWidths.some(([col]) => col === 4)).toBe(
-    false,
-  );
+  await expect
+    .poll(async () => (await readLayoutSummary(page)).colWidths.some(([col]) => col === 4))
+    .toBe(false);
   expect(await redoViaInstance(page)).toBe(true);
   await expect
     .poll(() => readLayoutSummary(page))
@@ -3042,17 +3048,21 @@ test('R02f: Home editing menus apply fill, clear, autosum, sort, and find action
   await page.locator('[data-ribbon-command="fillHome"]').click();
   await expect(page.locator('#menu-fill')).toContainText('Weekdays');
   await page.locator('#menu-fill [data-fill="weekdays"]').click();
-  await expect.poll(() => readCellSummary(page, 43, 14)).toMatchObject({
-    kind: 'number',
-    value: 45299,
-  });
+  await expect
+    .poll(() => readCellSummary(page, 43, 14))
+    .toMatchObject({
+      kind: 'number',
+      value: 45299,
+    });
   expect(await undoViaInstance(page)).toBe(true);
   await expect.poll(() => readCellSummary(page, 43, 14)).toMatchObject({ kind: 'blank' });
   expect(await redoViaInstance(page)).toBe(true);
-  await expect.poll(() => readCellSummary(page, 43, 14)).toMatchObject({
-    kind: 'number',
-    value: 45299,
-  });
+  await expect
+    .poll(() => readCellSummary(page, 43, 14))
+    .toMatchObject({
+      kind: 'number',
+      value: 45299,
+    });
 
   await selectRangeAndSetValues(page, { r0: 34, c0: 14, r1: 34, c1: 16 }, [
     { row: 34, col: 14, value: 'right-source' },
@@ -3101,34 +3111,42 @@ test('R02f: Home editing menus apply fill, clear, autosum, sort, and find action
   ]);
   await page.locator('[data-ribbon-command="fillHome"]').click();
   await page.locator('#menu-fill [data-fill="months"]').click();
-  await expect.poll(() => readCellSummary(page, 40, 15)).toMatchObject({
-    kind: 'number',
-    value: 45351,
-  });
+  await expect
+    .poll(() => readCellSummary(page, 40, 15))
+    .toMatchObject({
+      kind: 'number',
+      value: 45351,
+    });
   expect(await undoViaInstance(page)).toBe(true);
   await expect.poll(() => readCellSummary(page, 40, 15)).toMatchObject({ kind: 'blank' });
   expect(await redoViaInstance(page)).toBe(true);
-  await expect.poll(() => readCellSummary(page, 40, 15)).toMatchObject({
-    kind: 'number',
-    value: 45351,
-  });
+  await expect
+    .poll(() => readCellSummary(page, 40, 15))
+    .toMatchObject({
+      kind: 'number',
+      value: 45351,
+    });
 
   await selectRangeAndSetValues(page, { r0: 41, c0: 14, r1: 41, c1: 15 }, [
     { row: 41, col: 14, value: 45351 },
   ]);
   await page.locator('[data-ribbon-command="fillHome"]').click();
   await page.locator('#menu-fill [data-fill="years"]').click();
-  await expect.poll(() => readCellSummary(page, 41, 15)).toMatchObject({
-    kind: 'number',
-    value: 45716,
-  });
+  await expect
+    .poll(() => readCellSummary(page, 41, 15))
+    .toMatchObject({
+      kind: 'number',
+      value: 45716,
+    });
   expect(await undoViaInstance(page)).toBe(true);
   await expect.poll(() => readCellSummary(page, 41, 15)).toMatchObject({ kind: 'blank' });
   expect(await redoViaInstance(page)).toBe(true);
-  await expect.poll(() => readCellSummary(page, 41, 15)).toMatchObject({
-    kind: 'number',
-    value: 45716,
-  });
+  await expect
+    .poll(() => readCellSummary(page, 41, 15))
+    .toMatchObject({
+      kind: 'number',
+      value: 45716,
+    });
 
   await selectRangeAndSetValues(page, { r0: 45, c0: 14, r1: 45, c1: 16 }, [
     { row: 45, col: 14, value: 'series-copy' },
@@ -3175,11 +3193,20 @@ test('R02f: Home editing menus apply fill, clear, autosum, sort, and find action
     const inst = (window as Window & { __fcInst?: unknown }).__fcInst as
       | {
           store: {
-            getState: () => { selection: { active: CellAddr }; format: { formats: Map<string, ActiveCellFormat & { validation?: ValidationSummary }> } };
-            setState: (updater: (state: {
+            getState: () => {
               selection: { active: CellAddr };
-              format: { formats: Map<string, ActiveCellFormat & { validation?: ValidationSummary }> };
-            }) => unknown) => void;
+              format: {
+                formats: Map<string, ActiveCellFormat & { validation?: ValidationSummary }>;
+              };
+            };
+            setState: (
+              updater: (state: {
+                selection: { active: CellAddr };
+                format: {
+                  formats: Map<string, ActiveCellFormat & { validation?: ValidationSummary }>;
+                };
+              }) => unknown,
+            ) => void;
           };
         }
       | undefined;
@@ -3198,46 +3225,54 @@ test('R02f: Home editing menus apply fill, clear, autosum, sort, and find action
   });
   await page.locator('[data-ribbon-command="clearFormat"]').click();
   await page.locator('#menu-clear [data-clear="formats"]').click();
-  await expect.poll(async () => {
-    const format = await readActiveCellFormat(page);
-    const validation = await readActiveValidation(page);
-    return {
-      fill: format?.fill,
-      color: format?.color,
-      underline: format?.underline,
-      hyperlink: format?.hyperlink,
-      locked: format?.locked,
-      validation,
-    };
-  }).toEqual({
-    fill: undefined,
-    color: undefined,
-    underline: undefined,
-    hyperlink: 'https://example.com/metadata',
-    locked: false,
-    validation: { kind: 'list', source: ['Open', 'Closed'] },
-  });
+  await expect
+    .poll(async () => {
+      const format = await readActiveCellFormat(page);
+      const validation = await readActiveValidation(page);
+      return {
+        fill: format?.fill,
+        color: format?.color,
+        underline: format?.underline,
+        hyperlink: format?.hyperlink,
+        locked: format?.locked,
+        validation,
+      };
+    })
+    .toEqual({
+      fill: undefined,
+      color: undefined,
+      underline: undefined,
+      hyperlink: 'https://example.com/metadata',
+      locked: false,
+      validation: { kind: 'list', source: ['Open', 'Closed'] },
+    });
   expect(await undoViaInstance(page)).toBe(true);
-  await expect.poll(() => readActiveCellFormat(page)).toMatchObject({
-    fill: '#fff2cc',
-    color: '#c00000',
-    underline: true,
-    hyperlink: 'https://example.com/metadata',
-    locked: false,
-  });
-  await expect.poll(() => readActiveValidation(page)).toEqual({
-    kind: 'list',
-    source: ['Open', 'Closed'],
-  });
+  await expect
+    .poll(() => readActiveCellFormat(page))
+    .toMatchObject({
+      fill: '#fff2cc',
+      color: '#c00000',
+      underline: true,
+      hyperlink: 'https://example.com/metadata',
+      locked: false,
+    });
+  await expect
+    .poll(() => readActiveValidation(page))
+    .toEqual({
+      kind: 'list',
+      source: ['Open', 'Closed'],
+    });
   expect(await redoViaInstance(page)).toBe(true);
   await expect.poll(async () => (await readActiveCellFormat(page))?.fill).toBeUndefined();
-  await expect.poll(async () => (await readActiveCellFormat(page))?.hyperlink).toBe(
-    'https://example.com/metadata',
-  );
-  await expect.poll(() => readActiveValidation(page)).toEqual({
-    kind: 'list',
-    source: ['Open', 'Closed'],
-  });
+  await expect
+    .poll(async () => (await readActiveCellFormat(page))?.hyperlink)
+    .toBe('https://example.com/metadata');
+  await expect
+    .poll(() => readActiveValidation(page))
+    .toEqual({
+      kind: 'list',
+      source: ['Open', 'Closed'],
+    });
 
   await selectCellAndSetText(page, 4, 5, 'clear-link-only');
   await patchActiveCellFormat(page, {
@@ -3247,20 +3282,26 @@ test('R02f: Home editing menus apply fill, clear, autosum, sort, and find action
   });
   await page.locator('[data-ribbon-command="clearFormat"]').click();
   await page.locator('#menu-clear [data-clear="hyperlinks"]').click();
-  await expect.poll(async () => {
-    const format = await readActiveCellFormat(page);
-    return [format?.hyperlink, format?.color, format?.underline];
-  }).toEqual([undefined, '#0563c1', true]);
+  await expect
+    .poll(async () => {
+      const format = await readActiveCellFormat(page);
+      return [format?.hyperlink, format?.color, format?.underline];
+    })
+    .toEqual([undefined, '#0563c1', true]);
   expect(await undoViaInstance(page)).toBe(true);
-  await expect.poll(async () => {
-    const format = await readActiveCellFormat(page);
-    return [format?.hyperlink, format?.color, format?.underline];
-  }).toEqual(['https://example.com/clear-only', '#0563c1', true]);
+  await expect
+    .poll(async () => {
+      const format = await readActiveCellFormat(page);
+      return [format?.hyperlink, format?.color, format?.underline];
+    })
+    .toEqual(['https://example.com/clear-only', '#0563c1', true]);
   expect(await redoViaInstance(page)).toBe(true);
-  await expect.poll(async () => {
-    const format = await readActiveCellFormat(page);
-    return [format?.hyperlink, format?.color, format?.underline];
-  }).toEqual([undefined, '#0563c1', true]);
+  await expect
+    .poll(async () => {
+      const format = await readActiveCellFormat(page);
+      return [format?.hyperlink, format?.color, format?.underline];
+    })
+    .toEqual([undefined, '#0563c1', true]);
 
   await selectCellAndSetText(page, 4, 1, 'link');
   await patchActiveCellFormat(page, {
@@ -3270,20 +3311,26 @@ test('R02f: Home editing menus apply fill, clear, autosum, sort, and find action
   });
   await page.locator('[data-ribbon-command="clearFormat"]').click();
   await page.locator('#menu-clear [data-clear="remove-hyperlinks"]').click();
-  await expect.poll(async () => {
-    const format = await readActiveCellFormat(page);
-    return [format?.hyperlink, format?.color, format?.underline];
-  }).toEqual([undefined, undefined, undefined]);
+  await expect
+    .poll(async () => {
+      const format = await readActiveCellFormat(page);
+      return [format?.hyperlink, format?.color, format?.underline];
+    })
+    .toEqual([undefined, undefined, undefined]);
   expect(await undoViaInstance(page)).toBe(true);
-  await expect.poll(async () => {
-    const format = await readActiveCellFormat(page);
-    return [format?.hyperlink, format?.color, format?.underline];
-  }).toEqual(['https://example.com', '#0563c1', true]);
+  await expect
+    .poll(async () => {
+      const format = await readActiveCellFormat(page);
+      return [format?.hyperlink, format?.color, format?.underline];
+    })
+    .toEqual(['https://example.com', '#0563c1', true]);
   expect(await redoViaInstance(page)).toBe(true);
-  await expect.poll(async () => {
-    const format = await readActiveCellFormat(page);
-    return [format?.hyperlink, format?.color, format?.underline];
-  }).toEqual([undefined, undefined, undefined]);
+  await expect
+    .poll(async () => {
+      const format = await readActiveCellFormat(page);
+      return [format?.hyperlink, format?.color, format?.underline];
+    })
+    .toEqual([undefined, undefined, undefined]);
 
   await selectRangeAndSetValues(page, { r0: 4, c0: 6, r1: 4, c1: 6 }, [
     { row: 4, col: 6, value: 'commented' },
@@ -3293,11 +3340,16 @@ test('R02f: Home editing menus apply fill, clear, autosum, sort, and find action
     const inst = (window as Window & { __fcInst?: unknown }).__fcInst as
       | {
           store: {
-            getState: () => { selection: { active: CellAddr }; format: { formats: Map<string, ActiveCellFormat> } };
-            setState: (updater: (state: {
+            getState: () => {
               selection: { active: CellAddr };
               format: { formats: Map<string, ActiveCellFormat> };
-            }) => unknown) => void;
+            };
+            setState: (
+              updater: (state: {
+                selection: { active: CellAddr };
+                format: { formats: Map<string, ActiveCellFormat> };
+              }) => unknown,
+            ) => void;
           };
           workbook: {
             capabilities?: { comments?: boolean };
@@ -3322,21 +3374,23 @@ test('R02f: Home editing menus apply fill, clear, autosum, sort, and find action
     });
     inst.workbook.setCommentEntry?.(active.sheet, active.row, active.col, '', 'keep the format');
   });
-  await expect.poll(() => readCommentSummaries(page)).toEqual([
-    { addr: { sheet: 0, row: 4, col: 6 }, text: 'keep the format' },
-  ]);
+  await expect
+    .poll(() => readCommentSummaries(page))
+    .toEqual([{ addr: { sheet: 0, row: 4, col: 6 }, text: 'keep the format' }]);
   await page.locator('[data-ribbon-command="clearFormat"]').click();
   await page.locator('#menu-clear [data-clear="comments"]').click();
   await expect.poll(() => readCommentSummaries(page)).toEqual([]);
   await expect.poll(() => readCellText(page, 4, 6)).toBe('commented');
-  await expect.poll(() => readActiveCellFormat(page)).toMatchObject({
-    fill: '#e2f0d9',
-    color: '#375623',
-  });
+  await expect
+    .poll(() => readActiveCellFormat(page))
+    .toMatchObject({
+      fill: '#e2f0d9',
+      color: '#375623',
+    });
   expect(await undoViaInstance(page)).toBe(true);
-  await expect.poll(() => readCommentSummaries(page)).toEqual([
-    { addr: { sheet: 0, row: 4, col: 6 }, text: 'keep the format' },
-  ]);
+  await expect
+    .poll(() => readCommentSummaries(page))
+    .toEqual([{ addr: { sheet: 0, row: 4, col: 6 }, text: 'keep the format' }]);
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -3344,11 +3398,7 @@ test('R02f: Home editing menus apply fill, clear, autosum, sort, and find action
           | {
               workbook: {
                 capabilities?: { comments?: boolean };
-                getComment?: (
-                  sheet: number,
-                  row: number,
-                  col: number,
-                ) => { text: string } | null;
+                getComment?: (sheet: number, row: number, col: number) => { text: string } | null;
               };
             }
           | undefined;
@@ -3367,9 +3417,7 @@ test('R02f: Home editing menus apply fill, clear, autosum, sort, and find action
     const inst = (window as Window & { __fcInst?: unknown }).__fcInst as
       | {
           store: {
-            setState: (updater: (state: {
-              conditional: { rules: unknown[] };
-            }) => unknown) => void;
+            setState: (updater: (state: { conditional: { rules: unknown[] } }) => unknown) => void;
           };
         }
       | undefined;
@@ -3406,9 +3454,7 @@ test('R02f: Home editing menus apply fill, clear, autosum, sort, and find action
     const inst = (window as Window & { __fcInst?: unknown }).__fcInst as
       | {
           store: {
-            setState: (updater: (state: {
-              conditional: { rules: unknown[] };
-            }) => unknown) => void;
+            setState: (updater: (state: { conditional: { rules: unknown[] } }) => unknown) => void;
           };
         }
       | undefined;
@@ -3429,10 +3475,12 @@ test('R02f: Home editing menus apply fill, clear, autosum, sort, and find action
     }));
   });
   await expect.poll(() => readCellText(page, 4, 3)).toBe('clear-all');
-  await expect.poll(() => readActiveCellFormat(page)).toMatchObject({
-    fill: '#fff2cc',
-    color: '#c00000',
-  });
+  await expect
+    .poll(() => readActiveCellFormat(page))
+    .toMatchObject({
+      fill: '#fff2cc',
+      color: '#c00000',
+    });
   await expect.poll(() => readConditionalRuleSummaries(page)).toHaveLength(1);
   await page.locator('[data-ribbon-command="clearFormat"]').click();
   await page.locator('#menu-clear [data-clear="all"]').click();
@@ -3441,10 +3489,12 @@ test('R02f: Home editing menus apply fill, clear, autosum, sort, and find action
   await expect.poll(() => readConditionalRuleSummaries(page)).toEqual([]);
   expect(await undoViaInstance(page)).toBe(true);
   await expect.poll(() => readCellText(page, 4, 3)).toBe('clear-all');
-  await expect.poll(() => readActiveCellFormat(page)).toMatchObject({
-    fill: '#fff2cc',
-    color: '#c00000',
-  });
+  await expect
+    .poll(() => readActiveCellFormat(page))
+    .toMatchObject({
+      fill: '#fff2cc',
+      color: '#c00000',
+    });
   await expect.poll(() => readConditionalRuleSummaries(page)).toHaveLength(1);
   expect(await redoViaInstance(page)).toBe(true);
   await expect.poll(() => readCellSummary(page, 4, 3)).toMatchObject({ kind: 'blank' });
@@ -3692,11 +3742,13 @@ test('R02f: Home editing menus apply fill, clear, autosum, sort, and find action
   await expect.poll(() => readFilterSummary(page)).toMatchObject({ hiddenRows: [] });
   await page.locator('[data-ribbon-command="sortFilterHome"]').click();
   await page.locator('#menu-sort-home [data-sort="filter-clear"]').click();
-  await expect.poll(() => readFilterSummary(page)).toMatchObject({
-    filterRange: null,
-    filterCriteria: [],
-    hiddenRows: [],
-  });
+  await expect
+    .poll(() => readFilterSummary(page))
+    .toMatchObject({
+      filterRange: null,
+      filterCriteria: [],
+      hiddenRows: [],
+    });
 
   await selectRangeAndSetValues(page, { r0: 35, c0: 10, r1: 37, c1: 10 }, [
     { row: 35, col: 10, value: 'Name' },
@@ -3720,11 +3772,13 @@ test('R02f: Home editing menus apply fill, clear, autosum, sort, and find action
     });
   await page.locator('[data-ribbon-command="sortFilterHome"]').click();
   await page.locator('#menu-sort-home [data-sort="filter"]').click();
-  await expect.poll(() => readFilterSummary(page)).toMatchObject({
-    filterRange: null,
-    filterCriteria: [],
-    hiddenRows: [],
-  });
+  await expect
+    .poll(() => readFilterSummary(page))
+    .toMatchObject({
+      filterRange: null,
+      filterCriteria: [],
+      hiddenRows: [],
+    });
   expect(await undoViaInstance(page)).toBe(true);
   await expect
     .poll(() => readFilterSummary(page))
@@ -3774,9 +3828,7 @@ test('R02fa: Find & Select locates formulas, constants, comments, and data valid
   await page.locator('#menu-find-select [data-find-select="replace"]').click();
   const replaceDialog = page.getByRole('dialog', { name: 'Find and Replace' });
   await expect(replaceDialog).toBeVisible();
-  await expect(replaceDialog.locator('.fc-find__tab[aria-selected="true"]')).toHaveText(
-    'Replace',
-  );
+  await expect(replaceDialog.locator('.fc-find__tab[aria-selected="true"]')).toHaveText('Replace');
   await replaceDialog.getByLabel('Find what:').fill('replace target');
   await replaceDialog.getByLabel('Replace with:').fill('replaced target');
   await replaceDialog.getByRole('button', { name: 'Replace', exact: true }).click();
@@ -3867,14 +3919,16 @@ test('R02fa: Find & Select locates formulas, constants, comments, and data valid
     const inst = (window as Window & { __fcInst?: unknown }).__fcInst as
       | {
           store: {
-            setState: (updater: (state: {
-              selection: {
-                active: CellAddr;
-                anchor: CellAddr;
-                range: { sheet: number; r0: number; c0: number; r1: number; c1: number };
-                extraRanges?: unknown[];
-              };
-            }) => unknown) => void;
+            setState: (
+              updater: (state: {
+                selection: {
+                  active: CellAddr;
+                  anchor: CellAddr;
+                  range: { sheet: number; r0: number; c0: number; r1: number; c1: number };
+                  extraRanges?: unknown[];
+                };
+              }) => unknown,
+            ) => void;
           };
         }
       | undefined;
@@ -3923,7 +3977,10 @@ test('R02g: Insert tab commands create objects, clean data, and open authoring d
 
   await page.locator('[data-ribbon-command="formatTableInsert"]').click();
   await page.locator('#menu-table-style-insert [data-table-style="medium"]').first().click();
-  await page.getByRole('dialog', { name: 'Format as Table' }).getByRole('button', { name: 'OK' }).click();
+  await page
+    .getByRole('dialog', { name: 'Format as Table' })
+    .getByRole('button', { name: 'OK' })
+    .click();
   await expect
     .poll(() => readInsertObjectSummary(page))
     .toMatchObject({
@@ -4055,13 +4112,17 @@ test('R02g: Insert tab commands create objects, clean data, and open authoring d
   await page.locator('[data-ribbon-command="screenshotInsert"]').click();
   await expect(page.locator('#menu-screenshot-insert')).toBeVisible();
   await page.locator('#menu-screenshot-insert [data-screenshot-insert="current-view"]').click();
-  await expect(page.locator('.app-illustration[data-illustration-type="screenshot"]')).toBeVisible();
+  await expect(
+    page.locator('.app-illustration[data-illustration-type="screenshot"]'),
+  ).toBeVisible();
   expect(await undoViaInstance(page)).toBe(true);
   await expect(page.locator('.app-illustration[data-illustration-type="screenshot"]')).toHaveCount(
     0,
   );
   expect(await redoViaInstance(page)).toBe(true);
-  await expect(page.locator('.app-illustration[data-illustration-type="screenshot"]')).toBeVisible();
+  await expect(
+    page.locator('.app-illustration[data-illustration-type="screenshot"]'),
+  ).toBeVisible();
 
   await selectRangeAndSetValues(page, { r0: 44, c0: 0, r1: 46, c1: 1 }, [
     { row: 44, col: 0, value: 'A' },
@@ -4306,7 +4367,9 @@ test('R02h: Page Layout ribbon commands update print and display setup', async (
       setup: { margins: { right: 0.25, left: 0.25 } },
     });
   expect(await undoViaInstance(page)).toBe(true);
-  await expect.poll(async () => (await readPageLayoutSummary(page)).setup.margins ?? null).toBeNull();
+  await expect
+    .poll(async () => (await readPageLayoutSummary(page)).setup.margins ?? null)
+    .toBeNull();
   await page.locator('[data-ribbon-select="marginsPreset"] .demo__rb-dd__btn').click();
   await page.locator('[data-ribbon-select="marginsPreset"] [data-value="narrow"]').click();
   await expect
@@ -4398,7 +4461,9 @@ test('R02h: Page Layout ribbon commands update print and display setup', async (
     .toMatchObject({
       setup: { orientation: 'landscape', paperSize: 'letter' },
     });
-  await expect.poll(async () => (await readPageLayoutSummary(page)).setup.printArea ?? null).toBeNull();
+  await expect
+    .poll(async () => (await readPageLayoutSummary(page)).setup.printArea ?? null)
+    .toBeNull();
   expect(await redoViaInstance(page)).toBe(true);
   await expect
     .poll(() => readPageLayoutSummary(page))
@@ -5477,7 +5542,9 @@ test('R02m-whole: Data Validation creates whole-number bounds and blocks invalid
   await dialog.getByRole('spinbutton', { name: 'Value', exact: true }).fill('1');
   await dialog.getByRole('spinbutton', { name: 'Upper value' }).fill('10');
   await dialog.getByRole('textbox', { name: 'Error title' }).fill('Quantity out of range');
-  await dialog.getByRole('textbox', { name: 'Error message' }).fill('Use a whole number from 1 to 10.');
+  await dialog
+    .getByRole('textbox', { name: 'Error message' })
+    .fill('Use a whole number from 1 to 10.');
   await dialog.getByRole('button', { name: 'OK', exact: true }).click();
 
   await expect
@@ -5509,10 +5576,12 @@ test('R02m-whole: Data Validation creates whole-number bounds and blocks invalid
 
   await page.locator('.fc-host__formulabar-input').fill('7');
   await page.locator('.fc-host__formulabar-input').press('Enter');
-  await expect.poll(() => readCellSummary(page, 6, 0)).toMatchObject({
-    kind: 'number',
-    value: 7,
-  });
+  await expect
+    .poll(() => readCellSummary(page, 6, 0))
+    .toMatchObject({
+      kind: 'number',
+      value: 7,
+    });
 });
 
 test('R02m-text-length: Data Validation enforces text-length rules', async ({ page }) => {
@@ -5529,7 +5598,9 @@ test('R02m-text-length: Data Validation enforces text-length rules', async ({ pa
   await dialog.locator('select[aria-label="Condition"]').selectOption('<=', { force: true });
   await dialog.getByRole('spinbutton', { name: 'Value', exact: true }).fill('5');
   await dialog.getByRole('textbox', { name: 'Error title' }).fill('Text too long');
-  await dialog.getByRole('textbox', { name: 'Error message' }).fill('Use five characters or fewer.');
+  await dialog
+    .getByRole('textbox', { name: 'Error message' })
+    .fill('Use five characters or fewer.');
   await dialog.getByRole('button', { name: 'OK', exact: true }).click();
 
   await expect
@@ -6239,15 +6310,19 @@ test('R02q: View ribbon commands update workbook view, toggles, and zoom state',
       viewport: { ...state.viewport, rowStart: 0, colStart: 0 },
     }));
   });
-  await expect.poll(() => readFilterSummary(page)).toMatchObject({
-    filterRange: null,
-    filterCriteria: [],
-    hiddenRows: [],
-  });
-  await expect.poll(() => readLayoutSummary(page)).toMatchObject({
-    hiddenCols: [],
-    outlineRows: [],
-  });
+  await expect
+    .poll(() => readFilterSummary(page))
+    .toMatchObject({
+      filterRange: null,
+      filterCriteria: [],
+      hiddenRows: [],
+    });
+  await expect
+    .poll(() => readLayoutSummary(page))
+    .toMatchObject({
+      hiddenCols: [],
+      outlineRows: [],
+    });
 
   await page.locator('[data-ribbon-command="sheetViewSelect"] .demo__rb-dd__btn').click();
   await page.getByRole('option', { name: 'Filtered view' }).click();
@@ -6264,11 +6339,13 @@ test('R02q: View ribbon commands update workbook view, toggles, and zoom state',
       ],
       hiddenRows: [92],
     });
-  await expect.poll(() => readViewSummary(page)).toMatchObject({
-    activeSheetViewId: statefulView.activeSheetViewId,
-    freezeRows: 2,
-    freezeCols: 1,
-  });
+  await expect
+    .poll(() => readViewSummary(page))
+    .toMatchObject({
+      activeSheetViewId: statefulView.activeSheetViewId,
+      freezeRows: 2,
+      freezeCols: 1,
+    });
   await expect.poll(() => readLayoutSummary(page)).toMatchObject({ hiddenCols: [5] });
   await page.locator('[data-ribbon-command="sheetViewSelect"] .demo__rb-dd__btn').click();
   await page.getByRole('option', { name: 'Current view' }).click();
@@ -6392,13 +6469,13 @@ test('R02q: View ribbon commands update workbook view, toggles, and zoom state',
       },
     }));
   });
-  await expect(page.locator('.fc-host__formulabar-input')).toHaveValue(
-    '=R[-3]C[-3]+R[-3]C[-2]',
-  );
+  await expect(page.locator('.fc-host__formulabar-input')).toHaveValue('=R[-3]C[-3]+R[-3]C[-2]');
   await page.locator('.fc-host canvas').click({ position: { x: 10, y: 10 } });
-  await expect.poll(() => readSelectionSummary(page)).toMatchObject({
-    active: { sheet: 0, row: 0, col: 0 },
-  });
+  await expect
+    .poll(() => readSelectionSummary(page))
+    .toMatchObject({
+      active: { sheet: 0, row: 0, col: 0 },
+    });
 
   await expect.poll(() => readViewSummary(page)).toMatchObject({ formulaBarAttached: true });
   await page.locator('[data-ribbon-command="viewFormulaBar"]').click();
@@ -6485,7 +6562,9 @@ test('R02r: Home style commands create undoable tables and apply cell styles', a
   await expect(formatTableDialog.getByLabel('Where is the data for your table?')).toHaveValue(
     'A81:B83',
   );
-  await expect(formatTableDialog.getByRole('checkbox', { name: 'My table has headers' })).toBeChecked();
+  await expect(
+    formatTableDialog.getByRole('checkbox', { name: 'My table has headers' }),
+  ).toBeChecked();
   await formatTableDialog.getByRole('button', { name: 'OK', exact: true }).click();
   await expect
     .poll(() => readInsertObjectSummary(page))
@@ -6578,9 +6657,7 @@ test('R02r: Home style commands create undoable tables and apply cell styles', a
   await expect(stylesMenu).toContainText('Themed Cell Styles');
   await expect(stylesMenu).toContainText('Number Format');
   await expect(stylesMenu.locator('[data-cell-style="checkCell"]')).toContainText('Check Cell');
-  await expect(stylesMenu.locator('[data-cell-style="accent1_20"]')).toContainText(
-    '20% - Accent1',
-  );
+  await expect(stylesMenu.locator('[data-cell-style="accent1_20"]')).toContainText('20% - Accent1');
   await stylesMenu.locator('[data-cell-style="good"]').click();
   await expect
     .poll(() => readActiveCellFormat(page))
@@ -6636,22 +6713,28 @@ test('R02s: Home Cells menus mutate workbook state and participate in undo where
   await page.locator('[data-ribbon-command="insertRows"]').click();
   await expect(page.locator('#menu-insert-cells')).toBeVisible();
   await page.locator('#menu-insert-cells [data-cell-insert="shift-down"]').click();
-  await expect.poll(() => readCellSummary(page, 22, 1)).toMatchObject({
-    kind: 'text',
-    value: 'B21',
-  });
+  await expect
+    .poll(() => readCellSummary(page, 22, 1))
+    .toMatchObject({
+      kind: 'text',
+      value: 'B21',
+    });
   await expect.poll(() => readCellSummary(page, 20, 1)).toMatchObject({ kind: 'blank' });
   await expect.poll(() => readCellSummary(page, 21, 1)).toMatchObject({ kind: 'blank' });
   expect(await undoViaInstance(page)).toBe(true);
-  await expect.poll(() => readCellSummary(page, 20, 1)).toMatchObject({
-    kind: 'text',
-    value: 'B21',
-  });
+  await expect
+    .poll(() => readCellSummary(page, 20, 1))
+    .toMatchObject({
+      kind: 'text',
+      value: 'B21',
+    });
   expect(await redoViaInstance(page)).toBe(true);
-  await expect.poll(() => readCellSummary(page, 22, 1)).toMatchObject({
-    kind: 'text',
-    value: 'B21',
-  });
+  await expect
+    .poll(() => readCellSummary(page, 22, 1))
+    .toMatchObject({
+      kind: 'text',
+      value: 'B21',
+    });
   await expect.poll(() => readCellSummary(page, 20, 1)).toMatchObject({ kind: 'blank' });
 
   await selectRangeAndSetValues(page, { r0: 22, c0: 2, r1: 22, c1: 2 }, [
@@ -6661,20 +6744,26 @@ test('R02s: Home Cells menus mutate workbook state and participate in undo where
   await page.locator('[data-ribbon-command="deleteRows"]').click();
   await expect(page.locator('#menu-delete-cells')).toBeVisible();
   await page.locator('#menu-delete-cells [data-cell-delete="shift-left"]').click();
-  await expect.poll(() => readCellSummary(page, 22, 2)).toMatchObject({
-    kind: 'text',
-    value: 'D23',
-  });
+  await expect
+    .poll(() => readCellSummary(page, 22, 2))
+    .toMatchObject({
+      kind: 'text',
+      value: 'D23',
+    });
   expect(await undoViaInstance(page)).toBe(true);
-  await expect.poll(() => readCellSummary(page, 22, 2)).toMatchObject({
-    kind: 'text',
-    value: 'C23',
-  });
+  await expect
+    .poll(() => readCellSummary(page, 22, 2))
+    .toMatchObject({
+      kind: 'text',
+      value: 'C23',
+    });
   expect(await redoViaInstance(page)).toBe(true);
-  await expect.poll(() => readCellSummary(page, 22, 2)).toMatchObject({
-    kind: 'text',
-    value: 'D23',
-  });
+  await expect
+    .poll(() => readCellSummary(page, 22, 2))
+    .toMatchObject({
+      kind: 'text',
+      value: 'D23',
+    });
 
   await selectRangeAndSetValues(page, { r0: 24, c0: 0, r1: 24, c1: 0 }, []);
   await page.locator('[data-ribbon-command="formatCellsHome"]').click();
@@ -6689,21 +6778,27 @@ test('R02s: Home Cells menus mutate workbook state and participate in undo where
   const beforeSheets = await readCellsGroupState(page);
   await page.locator('[data-ribbon-command="insertRows"]').click();
   await page.locator('#menu-insert-cells [data-cell-insert="sheet"]').click();
-  await expect.poll(() => readCellsGroupState(page)).toMatchObject({
-    sheetCount: beforeSheets.sheetCount + 1,
-    activeSheet: beforeSheets.sheetCount,
-  });
+  await expect
+    .poll(() => readCellsGroupState(page))
+    .toMatchObject({
+      sheetCount: beforeSheets.sheetCount + 1,
+      activeSheet: beforeSheets.sheetCount,
+    });
   await expect(page.locator('.app__tab')).toHaveCount(beforeSheets.sheetCount + 1);
   expect(await undoViaInstance(page)).toBe(true);
-  await expect.poll(() => readCellsGroupState(page)).toMatchObject({
-    sheetCount: beforeSheets.sheetCount,
-    activeSheet: beforeSheets.activeSheet,
-  });
+  await expect
+    .poll(() => readCellsGroupState(page))
+    .toMatchObject({
+      sheetCount: beforeSheets.sheetCount,
+      activeSheet: beforeSheets.activeSheet,
+    });
   expect(await redoViaInstance(page)).toBe(true);
-  await expect.poll(() => readCellsGroupState(page)).toMatchObject({
-    sheetCount: beforeSheets.sheetCount + 1,
-    activeSheet: beforeSheets.sheetCount,
-  });
+  await expect
+    .poll(() => readCellsGroupState(page))
+    .toMatchObject({
+      sheetCount: beforeSheets.sheetCount + 1,
+      activeSheet: beforeSheets.sheetCount,
+    });
 
   await page.locator('[data-ribbon-command="formatCellsHome"]').click();
   await page.locator('#menu-format-cells [data-cell-format="tab-color-red"]').click();
@@ -6711,32 +6806,42 @@ test('R02s: Home Cells menus mutate workbook state and participate in undo where
     'data-sheet-tab-color',
     'true',
   );
-  await expect.poll(() => readCellsGroupState(page)).toMatchObject({
-    sheetTabColors: [[beforeSheets.sheetCount, '#c00000']],
-  });
+  await expect
+    .poll(() => readCellsGroupState(page))
+    .toMatchObject({
+      sheetTabColors: [[beforeSheets.sheetCount, '#c00000']],
+    });
   expect(await undoViaInstance(page)).toBe(true);
   await expect.poll(() => readCellsGroupState(page)).toMatchObject({ sheetTabColors: [] });
   expect(await redoViaInstance(page)).toBe(true);
-  await expect.poll(() => readCellsGroupState(page)).toMatchObject({
-    sheetTabColors: [[beforeSheets.sheetCount, '#c00000']],
-  });
+  await expect
+    .poll(() => readCellsGroupState(page))
+    .toMatchObject({
+      sheetTabColors: [[beforeSheets.sheetCount, '#c00000']],
+    });
 
   await page.locator('[data-ribbon-command="formatCellsHome"]').click();
   await page.locator('#menu-format-cells [data-cell-format="hide-sheet"]').click();
-  await expect.poll(() => readCellsGroupState(page)).toMatchObject({
-    activeSheet: 0,
-    hiddenSheets: [beforeSheets.sheetCount],
-  });
+  await expect
+    .poll(() => readCellsGroupState(page))
+    .toMatchObject({
+      activeSheet: 0,
+      hiddenSheets: [beforeSheets.sheetCount],
+    });
   expect(await undoViaInstance(page)).toBe(true);
-  await expect.poll(() => readCellsGroupState(page)).toMatchObject({
-    activeSheet: 0,
-    hiddenSheets: [],
-  });
+  await expect
+    .poll(() => readCellsGroupState(page))
+    .toMatchObject({
+      activeSheet: 0,
+      hiddenSheets: [],
+    });
   expect(await redoViaInstance(page)).toBe(true);
-  await expect.poll(() => readCellsGroupState(page)).toMatchObject({
-    activeSheet: 0,
-    hiddenSheets: [beforeSheets.sheetCount],
-  });
+  await expect
+    .poll(() => readCellsGroupState(page))
+    .toMatchObject({
+      activeSheet: 0,
+      hiddenSheets: [beforeSheets.sheetCount],
+    });
   await expect(page.locator('.app__tab--unhide')).toBeVisible();
 });
 
@@ -6841,7 +6946,10 @@ test('R03: routed ribbon commands open dialogs and mutate workbook state', async
   await page.getByRole('tab', { name: 'Insert', exact: true }).click();
   await page.locator('[data-ribbon-command="formatTableInsert"]').click();
   await page.locator('#menu-table-style-insert [data-table-style="medium"]').first().click();
-  await page.getByRole('dialog', { name: 'Format as Table' }).getByRole('button', { name: 'OK' }).click();
+  await page
+    .getByRole('dialog', { name: 'Format as Table' })
+    .getByRole('button', { name: 'OK' })
+    .click();
   await page.locator('[data-ribbon-command="chartInsert"]').click();
   await page.locator('#menu-chart-insert [data-chart-insert="column"]').click();
   await expect(page.locator('.fc-chart')).toBeVisible();
@@ -7143,7 +7251,9 @@ test('R03: routed ribbon commands open dialogs and mutate workbook state', async
   await expect.poll(() => readCellSummary(page, 96, 1)).toMatchObject({ kind: 'blank' });
   expect(await undoViaInstance(page)).toBe(true);
   await expect.poll(() => readCellText(page, 96, 0)).toBe('delete me');
-  await expect.poll(() => readCellSummary(page, 96, 1)).toMatchObject({ kind: 'number', value: 123 });
+  await expect
+    .poll(() => readCellSummary(page, 96, 1))
+    .toMatchObject({ kind: 'number', value: 123 });
   expect(await redoViaInstance(page)).toBe(true);
   await expect.poll(() => readCellSummary(page, 96, 0)).toMatchObject({ kind: 'blank' });
   await expect.poll(() => readCellSummary(page, 96, 1)).toMatchObject({ kind: 'blank' });
@@ -7161,12 +7271,8 @@ test('R03: routed ribbon commands open dialogs and mutate workbook state', async
   await closeDialog(page);
   await page.locator('[data-ribbon-command="addIn"]').click();
   await page.locator('#menu-add-ins [data-add-in-action="my"]').click();
-  await expect(page.getByRole('dialog', { name: 'My Add-ins' })).toContainText(
-    'Built-in add-ins',
-  );
-  await expect(page.getByRole('dialog', { name: 'My Add-ins' })).toContainText(
-    'External add-ins',
-  );
+  await expect(page.getByRole('dialog', { name: 'My Add-ins' })).toContainText('Built-in add-ins');
+  await expect(page.getByRole('dialog', { name: 'My Add-ins' })).toContainText('External add-ins');
   await closeDialog(page);
   await page.locator('[data-ribbon-command="pdf"]').click();
   await expect(page.locator('#menu-pdf')).toBeVisible();
@@ -7181,9 +7287,7 @@ test('R03: routed ribbon commands open dialogs and mutate workbook state', async
     .toBe('print,pdf');
   await page.locator('[data-ribbon-command="pdf"]').click();
   await page.locator('#menu-pdf [data-pdf-action="share"]').click();
-  await expect(page.getByRole('dialog', { name: 'PDF' })).toContainText(
-    'PDF export is ready.',
-  );
+  await expect(page.getByRole('dialog', { name: 'PDF' })).toContainText('PDF export is ready.');
   await closeDialog(page);
   await expect
     .poll(() =>
@@ -7315,7 +7419,6 @@ test('R04c: Mac-style ribbon keeps File backstage tab hidden', async ({ page }) 
     'aria-selected',
     'true',
   );
-
 });
 
 test('R04d: title-bar quick access buttons route Save, Save As, Undo, Redo, and Home', async ({
@@ -7413,9 +7516,11 @@ test('R04d: title-bar quick access buttons route Save, Save As, Undo, Redo, and 
   const findDialog = page.getByRole('dialog', { name: 'Find and Replace' });
   await expect(findDialog).toBeVisible();
   await expect(findDialog.locator('input[type="text"]').first()).toHaveValue('target');
-  await expect.poll(() => readSelectionSummary(page)).toMatchObject({
-    active: { sheet: 0, row: 10, col: 2 },
-  });
+  await expect
+    .poll(() => readSelectionSummary(page))
+    .toMatchObject({
+      active: { sheet: 0, row: 10, col: 2 },
+    });
   await closeDialog(page);
   await titleSearch.fill('not-present');
   await titleSearch.press('Enter');

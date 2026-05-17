@@ -19,7 +19,7 @@ import {
   tableStyleSwatch,
 } from '@libraz/formulon-cell';
 
-import { createMenu, menuSeparator } from './general.js';
+import { createMenu, menuIdForCommand, menuSeparator } from './general.js';
 
 export interface StylesMenuDeps {
   ribbonLang: ToolbarLang;
@@ -184,7 +184,7 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
   };
 
   const createTableStyleMenu = (id: string): HTMLDivElement => {
-    const menu = createMenu(id);
+    const menu = createMenu(menuIdForCommand(id));
     menu.style.width = 'auto';
     menu.style.maxWidth = '420px';
     const intensities: {

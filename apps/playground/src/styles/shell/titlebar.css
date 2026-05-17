@@ -134,7 +134,11 @@
 .app__crumb {
   overflow: hidden;
   max-width: 72px;
-  color: var(--shell-fg-faint);
+  /* WCAG 2.1 AA — `--shell-fg-faint` (#8a8886) falls short of the 4.5:1
+     contrast ratio against the titlebar background for 10.5 px text. Use
+     the slightly darker `--shell-fg-mute` (Fluent neutralSecondary) which
+     reaches 6.7:1. */
+  color: var(--shell-fg-mute);
   font-size: 10.5px;
   text-overflow: ellipsis;
   white-space: nowrap;

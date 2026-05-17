@@ -1,6 +1,4 @@
-import type { SpreadsheetInstance } from '@libraz/formulon-cell';
-
-import { SVG_NS } from './ribbon/border-icons.js';
+import { type SpreadsheetInstance, SVG_NS } from '@libraz/formulon-cell';
 
 export type SessionIllustrationKind = 'image' | 'shape' | 'screenshot';
 export type SessionShapeKind = 'rectangle' | 'rounded-rectangle' | 'oval' | 'line' | 'arrow';

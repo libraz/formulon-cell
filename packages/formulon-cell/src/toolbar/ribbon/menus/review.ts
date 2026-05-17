@@ -3,7 +3,7 @@
 
 import type { ToolbarMenuText } from '@libraz/formulon-cell';
 
-import { createMenu, menuButton, menuSeparator } from './general.js';
+import { createMenu, menuButton, menuIdForCommand, menuSeparator } from './general.js';
 
 export interface ReviewMenuFactories {
   createWatchMenu: (id: string) => HTMLDivElement;
@@ -15,7 +15,7 @@ export const createReviewMenuFactories = (ribbonMenuText: ToolbarMenuText): Revi
   const t = ribbonMenuText;
 
   const createWatchMenu = (id: string): HTMLDivElement => {
-    const menu = createMenu(id);
+    const menu = createMenu(menuIdForCommand(id));
     menu.append(
       menuButton(t.watchWindow, 'watchAction', 'open'),
       menuButton(t.watchAdd, 'watchAction', 'add'),
@@ -36,7 +36,7 @@ export const createReviewMenuFactories = (ribbonMenuText: ToolbarMenuText): Revi
   };
 
   const createProtectMenu = (id: string): HTMLDivElement => {
-    const menu = createMenu(id);
+    const menu = createMenu(menuIdForCommand(id));
     menu.append(
       menuButton(t.protectSheetCommand, 'protectAction', 'protect-sheet'),
       menuButton(t.unprotectSheetCommand, 'protectAction', 'unprotect-sheet'),

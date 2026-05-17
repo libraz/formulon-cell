@@ -22,8 +22,10 @@ export async function runWrapperReactivityScenario(page: Page): Promise<void> {
   await sp.mount();
   await sp.expectNoStub();
 
-  // Open the Options panel.
-  const optionsBtn = page.getByRole('button', { name: 'Options' });
+  // Open the Options panel. The toolbar now adds a "Ribbon Display Options"
+  // button that loosely matches "Options" — use `exact: true` so the
+  // demo-side toggle is selected unambiguously.
+  const optionsBtn = page.getByRole('button', { name: 'Options', exact: true });
   if ((await optionsBtn.getAttribute('aria-pressed')) === 'false') {
     await optionsBtn.click();
   }

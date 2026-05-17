@@ -5,37 +5,29 @@
 // the small `createRibbonIcon` SVG helper because both this module and the
 // select/color factory need it.
 
+import { setAlign, setFillColor, setFont, setFontColor, setNumFmt } from '../../commands/format.js';
+import { recordFormatChange, recordPageSetupChange } from '../../commands/history.js';
+import { applyMerge, applyUnmerge } from '../../commands/merge.js';
 import {
-  activateSheetView,
-  applyMerge,
-  applyUnmerge,
-  fluentIconPaths,
-  getPageSetup,
   type MarginPreset,
   marginPresetOf,
-  mutators,
-  type NumberFormatAction,
-  type NumFmt,
-  type PageOrientation,
-  type PageScaleMenuText,
-  type PaperSize,
-  projectActiveState,
-  recordFormatChange,
-  recordPageSetupChange,
-  type SpreadsheetInstance,
-  setAlign,
-  setFillColor,
-  setFont,
-  setFontColor,
   setMarginPreset,
-  setNumFmt,
   setPageOrientation,
   setPaperSize,
-  type ToolbarText,
-  numberFormatForAction as toolbarNumberFormatForAction,
-} from '@libraz/formulon-cell';
-
+} from '../../commands/page-setup.js';
+import { activateSheetView } from '../../commands/sheet-views.js';
+import type { SpreadsheetInstance } from '../../mount/types.js';
+import { getPageSetup, mutators } from '../../store/store.js';
+import type { NumFmt, PageOrientation, PaperSize } from '../../store/types.js';
 import { showPrompt } from '../dialogs.js';
+import { fluentIconPaths } from '../fluent-icons.js';
+import type { PageScaleMenuText } from '../menu-text.js';
+import {
+  type NumberFormatAction,
+  numberFormatForAction as toolbarNumberFormatForAction,
+} from '../number-format.js';
+import { projectActiveState } from '../ribbon-active-state.js';
+import type { ToolbarText } from '../ribbon-model.js';
 
 export type RibbonFormatMutator = (
   state: ReturnType<SpreadsheetInstance['store']['getState']>,

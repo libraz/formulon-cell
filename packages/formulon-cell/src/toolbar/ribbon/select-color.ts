@@ -3,11 +3,9 @@
 // value, font availability, color palette) and produces the DOM elements that
 // renderRibbon mounts.
 
-import {
-  createColorPalette,
-  type RibbonCommand,
-  type SpreadsheetInstance,
-} from '@libraz/formulon-cell';
+import { createColorPalette } from '../../components/color-palette.js';
+import type { SpreadsheetInstance } from '../../mount/types.js';
+import type { RibbonCommand } from '../ribbon-model.js';
 
 export interface SelectColorRibbonText {
   numberFormatNoSpecific: string;

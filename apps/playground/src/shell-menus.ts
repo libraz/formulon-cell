@@ -1,11 +1,7 @@
 import {
-  applyMerge,
-  applyUnmerge,
   isWorkbookStructureProtected,
   mutators,
-  recordFormatChange,
   type SpreadsheetInstance,
-  toggleWrap,
   WorkbookHandle,
 } from '@libraz/formulon-cell';
 
@@ -289,33 +285,10 @@ export const createShellMenus = (ctx: ShellMenusCtx): ShellMenusApi => {
     });
   });
 
-  // ── Merge / Wrap / Sort buttons ───────────────────────────────────────────
-  document.getElementById('btn-merge')?.addEventListener('click', () => {
-    const inst = getInst();
-    if (!inst) return;
-    const s = inst.store.getState();
-    const r = s.selection.range;
-    const anchorAt0 = s.merges.byAnchor.get(`${r.sheet}:${r.r0}:${r.c0}`);
-    const isExactMerge =
-      anchorAt0 &&
-      r.r0 === anchorAt0.r0 &&
-      r.c0 === anchorAt0.c0 &&
-      r.r1 === anchorAt0.r1 &&
-      r.c1 === anchorAt0.c1;
-    if (isExactMerge) applyUnmerge(inst.store, inst.workbook, inst.history, r);
-    else applyMerge(inst.store, inst.workbook, inst.history, r);
-    sheetEl.focus();
-  });
-
-  document.getElementById('btn-wrap')?.addEventListener('click', () => {
-    const inst = getInst();
-    if (!inst) return;
-    const current = inst;
-    recordFormatChange(inst.history, inst.store, () => {
-      toggleWrap(current.store.getState(), current.store);
-    });
-    sheetEl.focus();
-  });
+  // Merge / Wrap clicks land on the toolbar (commandDelegation routes them
+  // through applyRibbonCommand). The previous legacy listeners on btn-merge
+  // and btn-wrap double-fired with the toolbar dispatch on the initial
+  // render — removed because the ribbon now owns those commands.
 
   return { refreshViewMenu };
 };

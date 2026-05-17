@@ -16,7 +16,9 @@ export interface PasteSpecialDeps {
   store: SpreadsheetStore;
   wb: WorkbookHandle;
   /** Source for the structured clipboard. The clipboard adapter mutates this
-   *  snapshot on copy/cut; we read it lazily on open. */
+   *  snapshot on copy/cut; we read it lazily on open. Callers that maintain
+   *  their own snapshot (e.g. a ribbon-driven paste flow) can override this
+   *  per-open via {@link PasteSpecialOpenOptions.snapshot}. */
   getSnapshot: () => ClipboardSnapshot | null;
   /** UI string dictionary. */
   strings?: Strings;
@@ -27,9 +29,19 @@ export interface PasteSpecialDeps {
   onAfterCommit: () => void;
 }
 
+export interface PasteSpecialOpenOptions {
+  /** Force the dialog to operate on this snapshot instead of the one returned
+   *  by `getSnapshot()`. Used by hosts that capture their own structured
+   *  clipboard (e.g. ribbon copy/cut buttons) separately from the in-grid
+   *  Ctrl+C/Ctrl+X path. Accepts `null` so callers can pass through their
+   *  own typed snapshot getter (which often returns `T | null`) without an
+   *  extra `?? undefined` guard. */
+  snapshot?: ClipboardSnapshot | null;
+}
+
 export interface PasteSpecialHandle {
-  open(): void;
-  apply(options: PasteSpecialOptions): boolean;
+  open(opts?: PasteSpecialOpenOptions): void;
+  apply(options: PasteSpecialOptions, opts?: PasteSpecialOpenOptions): boolean;
   close(): void;
   detach(): void;
 }
@@ -149,18 +161,26 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
   };
   setDefaults();
 
+  // Snapshot captured when the dialog opens; overrides the live getSnapshot()
+  // when the host wants to pin the paste source for the duration of the modal
+  // (e.g. ribbon paste flows whose snapshot is owned outside the core).
+  let openSnapshot: ClipboardSnapshot | null = null;
+
   const close = (): void => {
+    openSnapshot = null;
     shell.close();
     host.focus();
   };
 
-  const open = (): void => {
-    if (!deps.getSnapshot()) {
+  const open = (openOpts?: PasteSpecialOpenOptions): void => {
+    const snap = openOpts?.snapshot ?? deps.getSnapshot();
+    if (!snap) {
       // Nothing on the internal clipboard — the dialog has nothing to paste.
       // Spreadsheets fall back to a much older dialog here; we simply no-op so the
       // standard ⌘V paste path can fill in.
       return;
     }
+    openSnapshot = openOpts?.snapshot ?? null;
     setDefaults();
     shell.open();
     // Focus first radio for keyboard nav.
@@ -168,8 +188,8 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
   };
 
   const history = deps.history ?? null;
-  const applyOptions = (opts: PasteSpecialOptions): boolean => {
-    const snap = deps.getSnapshot();
+  const applyOptions = (opts: PasteSpecialOptions, openOpts?: PasteSpecialOpenOptions): boolean => {
+    const snap = openOpts?.snapshot ?? openSnapshot ?? deps.getSnapshot();
     if (!snap) {
       return false;
     }

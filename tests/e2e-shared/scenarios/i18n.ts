@@ -26,7 +26,11 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
   if (hasSearchBox) {
     await expect(searchBox).toHaveAttribute('aria-label', 'コマンドの検索');
     await searchBox.fill('書式');
-    await expect(page.getByRole('button', { name: /セルの書式設定/ })).toBeVisible();
+    // Scope to the command menu so we don't also match the ribbon button
+    // (which now lives in the shared toolbar and shares the same label).
+    await expect(
+      page.locator('.demo__command-menu').getByRole('button', { name: /セルの書式設定/ }),
+    ).toBeVisible();
     await searchBox.evaluate((el: HTMLElement) => el.blur());
     await expect(page.locator('.demo__command-menu')).toHaveCount(0);
   }

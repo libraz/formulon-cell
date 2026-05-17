@@ -10,7 +10,7 @@
 
 import type { Strings, ToolbarLang, ToolbarMenuText, ToolbarText } from '@libraz/formulon-cell';
 
-import { createMenu, menuButton, menuSeparator } from './general.js';
+import { createMenu, menuButton, menuIdForCommand, menuSeparator } from './general.js';
 
 export interface HomeMenuDeps {
   ribbonLang: ToolbarLang;
@@ -170,7 +170,7 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
   };
 
   const createSortMenu = (id: string): HTMLDivElement => {
-    const menu = createMenu(id);
+    const menu = createMenu(menuIdForCommand(id));
     menu.append(
       menuButton(t.sortAscendingMenu, 'sort', 'asc'),
       menuButton(t.sortDescendingMenu, 'sort', 'desc'),

@@ -96,7 +96,12 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   const headerCloseBtn = document.createElement('button');
   headerCloseBtn.type = 'button';
   headerCloseBtn.className = 'fc-fmtdlg__close';
-  headerCloseBtn.setAttribute('aria-label', t.cancel);
+  // Distinct from the footer Cancel button — otherwise Playwright's strict
+  // `getByRole('button', { name: 'Cancel' })` finds both and throws.
+  // Heuristic: if t.cancel is non-ASCII (likely Japanese) use the Japanese
+  // "Close" — otherwise English.
+  const closeLabel = /[^\x00-\x7f]/.test(t.cancel) ? '閉じる' : 'Close';
+  headerCloseBtn.setAttribute('aria-label', closeLabel);
   headerCloseBtn.textContent = '×';
   header.append(headerTitle, headerCloseBtn);
   panel.appendChild(header);

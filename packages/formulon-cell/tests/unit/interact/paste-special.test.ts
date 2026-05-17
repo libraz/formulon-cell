@@ -423,6 +423,72 @@ describe('attachPasteSpecial', () => {
     handle.detach();
   });
 
+  it('open({ snapshot }) overrides getSnapshot for hosts that own their clipboard', () => {
+    // Host owns its own snapshot (e.g. ribbon copy/cut). getSnapshot stays null
+    // because nothing was copied via the in-grid clipboard path.
+    seed(store, wb, [{ row: 0, col: 0, value: 42 }]);
+    const ribbonSnap = captureSnapshot(store.getState(), {
+      sheet: 0,
+      r0: 0,
+      c0: 0,
+      r1: 0,
+      c1: 0,
+    });
+    setActive(store, 9, 9);
+
+    const handle = attachPasteSpecial({
+      host,
+      store,
+      wb,
+      getSnapshot: () => null,
+      onAfterCommit,
+    });
+    handle.open({ snapshot: ribbonSnap });
+
+    // The overlay must reveal even though getSnapshot returned null.
+    expect(document.querySelector<HTMLElement>('.fc-pastesp')?.hidden).toBe(false);
+    // OK applies against the override snapshot.
+    document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn--primary')[0]?.click();
+    wb.recalc();
+    expect(wb.getValue({ sheet: 0, row: 9, col: 9 })).toEqual({ kind: 'number', value: 42 });
+    expect(onAfterCommit).toHaveBeenCalled();
+    // The override is dropped after close; a subsequent open() with no snapshot
+    // is once again a no-op.
+    handle.open();
+    expect(document.querySelector<HTMLElement>('.fc-pastesp')?.hidden).toBe(true);
+    handle.detach();
+  });
+
+  it('apply({...}, { snapshot }) runs against the override without opening', () => {
+    seed(store, wb, [{ row: 0, col: 0, value: 13 }]);
+    const ribbonSnap = captureSnapshot(store.getState(), {
+      sheet: 0,
+      r0: 0,
+      c0: 0,
+      r1: 0,
+      c1: 0,
+    });
+    setActive(store, 8, 8);
+
+    const handle = attachPasteSpecial({
+      host,
+      store,
+      wb,
+      getSnapshot: () => null,
+      onAfterCommit,
+    });
+    expect(
+      handle.apply(
+        { what: 'values', operation: 'none', skipBlanks: false, transpose: false },
+        { snapshot: ribbonSnap },
+      ),
+    ).toBe(true);
+    wb.recalc();
+    expect(wb.getValue({ sheet: 0, row: 8, col: 8 })).toEqual({ kind: 'number', value: 13 });
+    expect(onAfterCommit).toHaveBeenCalledTimes(1);
+    handle.detach();
+  });
+
   it('skipBlanks and transpose options are read from the checkboxes at apply-time', () => {
     seed(store, wb, [
       { row: 0, col: 0, value: 1 },

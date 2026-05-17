@@ -1,4 +1,5 @@
 import {
+  type AutoSumFormulaName,
   addSheet,
   autoSum,
   boundingRange,
@@ -28,6 +29,7 @@ import {
   expandColGroup,
   expandRowGroup,
   fillRange,
+  fillSeriesSourceRange,
   filterBySelectedCellValue,
   findMatchingCells,
   getPageSetup,
@@ -35,6 +37,7 @@ import {
   groupRows,
   ignoreCellError,
   inferAutoFilterRange,
+  inferFillSeriesDirection,
   inferRecommendedChartKind,
   insertCells,
   insertCols,
@@ -45,6 +48,8 @@ import {
   listComments,
   mutators,
   type Range,
+  type RibbonFillDirection,
+  type RibbonFillSeriesMode,
   recordCommentChange,
   recordConditionalRulesChange,
   recordFilterChange,
@@ -65,6 +70,7 @@ import {
   setPrintTitleRows,
   setRotation,
   setSheetBackgroundImage,
+  showFillSeriesDialog,
   type ToolbarMenuText,
   type ToolbarText,
   ungroupCols,
@@ -75,14 +81,6 @@ import {
 } from '@libraz/formulon-cell';
 import { showChoiceDialog, showMessage, showNumberPrompt, showPrompt } from './dialogs.js';
 import type { SessionShapeKind } from './illustrations.js';
-import {
-  fillSeriesSourceRange,
-  inferFillSeriesDirection,
-  type RibbonFillDirection,
-  type RibbonFillSeriesMode,
-  showFillSeriesDialog,
-} from './ribbon/fill-series.js';
-import type { AutoSumFormulaName } from './ribbon/menus/formulas.js';
 
 type PageBreakAction =
   | 'insert-auto'

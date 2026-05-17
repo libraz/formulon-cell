@@ -67,7 +67,12 @@
   opacity: 0.62;
 }
 
-.demo__ribbon {
+/* `:not([hidden])` so the user-agent `[hidden] { display: none }` rule isn't
+ * shadowed by our `display: flex`. Without this, non-active ribbon panels
+ * stay laid out and stack vertically, breaking the sheet height. The
+ * playground worked around this with an `!important` override but consumers
+ * shouldn't need to know about that. */
+.demo__ribbon:not([hidden]) {
   display: flex;
   align-items: stretch;
   gap: 0;

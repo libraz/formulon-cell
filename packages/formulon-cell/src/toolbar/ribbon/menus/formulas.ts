@@ -5,7 +5,7 @@
 
 import type { ToolbarLang, ToolbarMenuText } from '@libraz/formulon-cell';
 
-import { createMenu, menuButton, menuSeparator } from './general.js';
+import { createMenu, menuButton, menuIdForCommand, menuSeparator } from './general.js';
 
 export type AutoSumFormulaName = 'SUM' | 'AVERAGE' | 'COUNT' | 'MAX' | 'MIN' | 'MORE';
 
@@ -33,7 +33,7 @@ export const createFormulasMenuFactories = (
   const ja = ribbonLang === 'ja';
 
   const createAutoSumMenu = (id: string): HTMLDivElement => {
-    const menu = createMenu(id);
+    const menu = createMenu(menuIdForCommand(id));
     menu.append(
       menuButton(t.autosumSum, 'autosumFn', 'SUM'),
       menuButton(t.autosumAverage, 'autosumFn', 'AVERAGE'),

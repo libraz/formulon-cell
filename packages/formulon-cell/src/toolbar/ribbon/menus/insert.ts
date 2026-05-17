@@ -5,7 +5,7 @@
 
 import type { ToolbarMenuText } from '@libraz/formulon-cell';
 
-import { createMenu, menuButton, menuSeparator } from './general.js';
+import { createMenu, menuButton, menuIdForCommand, menuSeparator } from './general.js';
 
 export interface InsertMenuFactories {
   createSymbolMenu: () => HTMLDivElement;
@@ -74,7 +74,7 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
   };
 
   const createDefinedNamesMenu = (id: string): HTMLDivElement => {
-    const menu = createMenu(id);
+    const menu = createMenu(menuIdForCommand(id));
     menu.append(
       menuButton(t.defineName, 'definedNameAction', 'define'),
       menuButton(t.nameManager, 'definedNameAction', 'manager'),
@@ -90,7 +90,7 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
   };
 
   const createLinksMenu = (id: string): HTMLDivElement => {
-    const menu = createMenu(id);
+    const menu = createMenu(menuIdForCommand(id));
     menu.append(
       menuButton(t.linkInsertOrEdit, 'linkAction', 'hyperlink'),
       menuButton(t.linkOpen, 'linkAction', 'open'),

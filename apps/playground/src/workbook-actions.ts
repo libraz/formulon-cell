@@ -21,11 +21,12 @@ import {
   type SpreadsheetInstance,
   setNumFmt,
   type TableStyle,
+  type TableVariantId,
   type ToolbarMenuText,
   type ToolbarText,
+  tableVariantOptions,
 } from '@libraz/formulon-cell';
 import { showChoiceDialog, showFormatAsTableDialog, showMessage } from './dialogs.js';
-import { type TableVariantId, tableVariantOptions } from './ribbon/menus/styles.js';
 
 export type { TableVariantId };
 

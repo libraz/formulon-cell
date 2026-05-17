@@ -3,7 +3,6 @@
 // triplet in `applyRibbonCommand`. Pulled out of main.ts so the dispatcher can
 // stay short and the data sits in a single grep-friendly location.
 
-import type { SpreadsheetInstance, SpreadsheetStore } from '@libraz/formulon-cell';
 import {
   bumpDecimals,
   bumpIndent,
@@ -19,7 +18,9 @@ import {
   toggleStrike,
   toggleUnderline,
   toggleWrap,
-} from '@libraz/formulon-cell';
+} from '../../commands/format.js';
+import type { SpreadsheetInstance } from '../../mount/types.js';
+import type { SpreadsheetStore } from '../../store/store.js';
 
 type RibbonState = ReturnType<SpreadsheetStore['getState']>;
 export type RibbonFormatMutator = (state: RibbonState, store: SpreadsheetStore) => void;
