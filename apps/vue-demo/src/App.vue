@@ -16,7 +16,16 @@ import {
 } from '@libraz/formulon-cell';
 import { type RibbonTab, Spreadsheet, useSelection } from '@libraz/formulon-cell-vue';
 import SpreadsheetToolbar from '@libraz/formulon-cell-vue/toolbar.vue';
-import { computed, nextTick, onUnmounted, ref, shallowRef, watch } from 'vue';
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  onUnmounted,
+  ref,
+  shallowRef,
+  watch,
+} from 'vue';
 import {
   activateDemoModal,
   createDemoStrings,
@@ -244,14 +253,9 @@ const showRibbonNotice = (title: string, detail: string): void => {
   reviewDialog.value = { title, items: [{ label: commandText.value.ribbonCommand, detail }] };
 };
 
-const applyScriptCommand = (): void => {
+const applyParsedScript = (command: ReturnType<typeof parseScriptCommand>): void => {
   const inst = instance.value;
-  if (!inst) return;
-  const command = parseScriptCommand(scriptCommand.value);
-  if (!command) {
-    scriptError.value = commandText.value.scriptCommandError;
-    return;
-  }
+  if (!inst || !command) return;
   const range = inst.store.getState().selection.range;
   let changed = 0;
   inst.history.begin();
@@ -280,7 +284,6 @@ const applyScriptCommand = (): void => {
     inst.history.end();
   }
   mutators.replaceCells(inst.store, inst.workbook.cells(range.sheet));
-  scriptOpen.value = false;
   reviewDialog.value = {
     title: commandText.value.script,
     items: [
@@ -291,6 +294,48 @@ const applyScriptCommand = (): void => {
     ],
   };
 };
+
+const applyScriptCommand = (): void => {
+  const command = parseScriptCommand(scriptCommand.value);
+  if (!command) {
+    scriptError.value = commandText.value.scriptCommandError;
+    return;
+  }
+  scriptOpen.value = false;
+  applyParsedScript(command);
+};
+
+const onScriptMenuClick = (e: MouseEvent): void => {
+  const target = e.target;
+  if (!(target instanceof Element)) return;
+  const btn = target.closest<HTMLButtonElement>('[data-script-action]');
+  if (!btn) return;
+  const menu = btn.closest<HTMLDivElement>('#menu-script');
+  if (!menu) return;
+  const action = btn.dataset.scriptAction ?? '';
+  menu.hidden = true;
+  const opener = menu.previousElementSibling;
+  if (opener instanceof HTMLElement) {
+    opener.setAttribute('aria-expanded', 'false');
+    opener.focus({ preventScroll: true });
+  }
+  if (action === 'custom') {
+    if (!instance.value) return;
+    scriptCommand.value = 'uppercase';
+    scriptError.value = null;
+    scriptOpen.value = true;
+    return;
+  }
+  const command = parseScriptCommand(action);
+  if (command) applyParsedScript(command);
+};
+
+onMounted(() => {
+  document.addEventListener('click', onScriptMenuClick);
+});
+onBeforeUnmount(() => {
+  document.removeEventListener('click', onScriptMenuClick);
+});
 
 const onSave = (): void => {
   const inst = instance.value;

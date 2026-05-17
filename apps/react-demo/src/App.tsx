@@ -253,59 +253,94 @@ export const App = (): ReactElement => {
     [commandText.ribbonCommand],
   );
 
+  const applyParsedScript = useCallback(
+    (command: ReturnType<typeof parseScriptCommand>) => {
+      if (!instance || !command) return;
+      const range = instance.store.getState().selection.range;
+      let changed = 0;
+      instance.history.begin();
+      try {
+        for (let row = range.r0; row <= range.r1; row += 1) {
+          for (let col = range.c0; col <= range.c1; col += 1) {
+            const addr = { sheet: range.sheet, row, col };
+            const value = instance.workbook.getValue(addr);
+            if (command === 'clear') {
+              if (value.kind !== 'blank' || instance.workbook.cellFormula(addr)) {
+                instance.workbook.setBlank(addr);
+                changed += 1;
+              }
+              continue;
+            }
+            if (value.kind === 'text') {
+              const next = applyTextScript(value.value, command);
+              if (next !== value.value) {
+                instance.workbook.setText(addr, next);
+                changed += 1;
+              }
+            }
+          }
+        }
+      } finally {
+        instance.history.end();
+      }
+      mutators.replaceCells(instance.store, instance.workbook.cells(range.sheet));
+      setReviewDialog({
+        title: commandText.script,
+        items: [
+          {
+            label: commandText.selection,
+            detail: commandText.cellsUpdated.replace('{count}', String(changed)),
+          },
+        ],
+      });
+    },
+    [commandText.cellsUpdated, commandText.script, commandText.selection, instance],
+  );
+
   const applyScriptCommand = useCallback(() => {
-    if (!instance) return;
     const command = parseScriptCommand(scriptCommand);
     if (!command) {
       setScriptError(commandText.scriptCommandError);
       return;
     }
-    const range = instance.store.getState().selection.range;
-    let changed = 0;
-    instance.history.begin();
-    try {
-      for (let row = range.r0; row <= range.r1; row += 1) {
-        for (let col = range.c0; col <= range.c1; col += 1) {
-          const addr = { sheet: range.sheet, row, col };
-          const value = instance.workbook.getValue(addr);
-          if (command === 'clear') {
-            if (value.kind !== 'blank' || instance.workbook.cellFormula(addr)) {
-              instance.workbook.setBlank(addr);
-              changed += 1;
-            }
-            continue;
-          }
-          if (value.kind === 'text') {
-            const next = applyTextScript(value.value, command);
-            if (next !== value.value) {
-              instance.workbook.setText(addr, next);
-              changed += 1;
-            }
-          }
-        }
-      }
-    } finally {
-      instance.history.end();
-    }
-    mutators.replaceCells(instance.store, instance.workbook.cells(range.sheet));
     setScriptOpen(false);
-    setReviewDialog({
-      title: commandText.script,
-      items: [
-        {
-          label: commandText.selection,
-          detail: commandText.cellsUpdated.replace('{count}', String(changed)),
-        },
-      ],
-    });
-  }, [
-    commandText.cellsUpdated,
-    commandText.script,
-    commandText.scriptCommandError,
-    commandText.selection,
-    instance,
-    scriptCommand,
-  ]);
+    applyParsedScript(command);
+  }, [applyParsedScript, commandText.scriptCommandError, scriptCommand]);
+
+  // Wire script-menu items. mountToolbar opens `#menu-script` for the Script
+  // split button but doesn't dispatch its `[data-script-action]` children;
+  // we handle them here so the demo's dialog/quick actions stay in App scope.
+  useEffect(() => {
+    const onMenuClick = (e: MouseEvent): void => {
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+      const btn = target.closest<HTMLButtonElement>('[data-script-action]');
+      if (!btn) return;
+      const menu = btn.closest<HTMLDivElement>('#menu-script');
+      if (!menu) return;
+      const action = btn.dataset.scriptAction ?? '';
+      menu.hidden = true;
+      const opener = menu.previousElementSibling;
+      if (opener instanceof HTMLElement) {
+        opener.setAttribute('aria-expanded', 'false');
+        // Focus the ribbon command so `activateDemoModal` captures it as the
+        // restore target; without this, Esc would try to refocus the now-
+        // hidden menu item and fail.
+        opener.focus({ preventScroll: true });
+      }
+      if (action === 'custom') {
+        if (!instance) return;
+        setScriptCommand('uppercase');
+        setScriptError(null);
+        setScriptOpen(true);
+        return;
+      }
+      const command = parseScriptCommand(action);
+      if (command) applyParsedScript(command);
+    };
+    document.addEventListener('click', onMenuClick);
+    return () => document.removeEventListener('click', onMenuClick);
+  }, [applyParsedScript, instance]);
 
   const onSave = useCallback(() => {
     if (!instance) return;

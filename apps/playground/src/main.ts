@@ -251,6 +251,7 @@ import {
 } from '@libraz/formulon-cell';
 import { createBootWiring } from './boot-wiring.js';
 import { createClipboard } from './clipboard.js';
+import { createCommandPalette } from './command-palette.js';
 import { createDataMenuWirings } from './data-menu-wirings.js';
 import {
   showAdvancedFilterDialog,
@@ -1598,6 +1599,20 @@ void selectRibbonTab;
 void setRibbonCollapsed;
 
 const { refreshZoom } = setupZoomControls(() => inst);
+
+if (titleSearchInput) {
+  const searchContainer =
+    titleSearchInput.closest<HTMLElement>('.app__search') ?? titleSearchInput.parentElement;
+  if (searchContainer) {
+    createCommandPalette({
+      input: titleSearchInput,
+      container: searchContainer,
+      ribbonText,
+      ribbonLang,
+      applyCommand: (id) => tb.applyCommand(id),
+    });
+  }
+}
 
 createShellMenus({
   getInst: () => inst,

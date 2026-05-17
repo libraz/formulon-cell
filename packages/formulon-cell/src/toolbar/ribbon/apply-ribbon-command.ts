@@ -73,63 +73,65 @@ export interface RibbonRuntime {
 }
 
 /** Optional feature hooks grouped by category. Each group is independently
- *  opt-in: omitting a group makes the matching command ids no-op. */
+ *  opt-in: omitting a group (or any single field within a group) makes the
+ *  matching command ids no-op. The dispatcher accesses every field through
+ *  optional chaining, so partial wiring is safe. */
 export interface RibbonHooks {
   clipboard?: {
-    copy: () => Promise<unknown> | unknown;
-    cut: () => Promise<unknown> | unknown;
-    paste: () => Promise<unknown> | unknown;
+    copy?: () => Promise<unknown> | unknown;
+    cut?: () => Promise<unknown> | unknown;
+    paste?: () => Promise<unknown> | unknown;
   };
   sortFilter?: {
-    sort: (dir: 'asc' | 'desc') => void;
-    customSort: () => Promise<unknown> | unknown;
-    openFilter: () => void;
-    removeDuplicates: () => void;
-    splitTextToColumns: (sep: string) => void;
+    sort?: (dir: 'asc' | 'desc') => void;
+    customSort?: () => Promise<unknown> | unknown;
+    openFilter?: () => void;
+    removeDuplicates?: () => void;
+    splitTextToColumns?: (sep: string) => void;
   };
   insert?: {
-    createTable: (variant: 'medium') => Promise<unknown> | unknown;
-    createChart: () => void;
-    insertPicture: (source: 'online') => Promise<unknown> | unknown;
-    insertShape: (shape: 'rectangle') => void;
-    insertScreenshot: () => void;
+    createTable?: (variant: 'medium') => Promise<unknown> | unknown;
+    createChart?: () => void;
+    insertPicture?: (source: 'online') => Promise<unknown> | unknown;
+    insertShape?: (shape: 'rectangle') => void;
+    insertScreenshot?: () => void;
   };
   page?: {
-    pageBreak: () => void;
-    sheetBackground: (action: 'set') => Promise<unknown> | unknown;
-    pdf: (action: 'create') => void;
-    inspect: () => void;
-    outline: (action: 'group' | 'ungroup' | 'show-detail' | 'hide-detail') => void;
+    pageBreak?: () => void;
+    sheetBackground?: (action: 'set') => Promise<unknown> | unknown;
+    pdf?: (action: 'create') => void;
+    inspect?: () => void;
+    outline?: (action: 'group' | 'ungroup' | 'show-detail' | 'hide-detail') => void;
   };
   drawing?: {
-    setInkMode: (mode: 'pen' | 'erase') => void;
+    setInkMode?: (mode: 'pen' | 'erase') => void;
   };
   review?: {
-    spelling: () => void;
-    translate: () => void;
-    accessibility: () => void;
-    deleteComment: () => void;
-    selectComment: (direction: 1 | -1) => void;
+    spelling?: () => void;
+    translate?: () => void;
+    accessibility?: () => void;
+    deleteComment?: () => void;
+    selectComment?: (direction: 1 | -1) => void;
   };
   protection?: {
-    runSheet: () => Promise<unknown> | unknown;
-    runWorkbook: (protect: boolean) => Promise<unknown> | unknown;
-    allowEditRanges: () => Promise<unknown> | unknown;
+    runSheet?: () => Promise<unknown> | unknown;
+    runWorkbook?: (protect: boolean) => Promise<unknown> | unknown;
+    allowEditRanges?: () => Promise<unknown> | unknown;
   };
   automation?: {
-    runScript: () => Promise<unknown> | unknown;
-    recordActions: () => void;
-    allScripts: () => void;
-    addInManager: () => void;
+    runScript?: () => Promise<unknown> | unknown;
+    recordActions?: () => void;
+    allScripts?: () => void;
+    addInManager?: () => void;
   };
   formula?: {
-    autoSum: (fn: AutoSumFormulaName) => void;
-    errorChecking: () => void;
+    autoSum?: (fn: AutoSumFormulaName) => void;
+    errorChecking?: () => void;
   };
   sheetView?: {
-    save: () => Promise<unknown> | unknown;
-    deleteActive: () => void;
-    zoomDialog: () => Promise<unknown> | unknown;
+    save?: () => Promise<unknown> | unknown;
+    deleteActive?: () => void;
+    zoomDialog?: () => Promise<unknown> | unknown;
   };
 }
 
@@ -196,33 +198,33 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
   }
   switch (id) {
     case 'pageBreaks':
-      hooks?.page?.pageBreak();
+      hooks?.page?.pageBreak?.();
       return true;
     case 'pageTheme':
       runtime.applyUiTheme(ui.theme === 'dark' ? 'light' : 'dark');
       runtime.focusSheet();
       return true;
     case 'sheetBackground':
-      void hooks?.page?.sheetBackground('set');
+      void hooks?.page?.sheetBackground?.('set');
       return true;
     case 'print':
     case 'printPageLayout':
       i.print('print');
       return true;
     case 'pdf':
-      hooks?.page?.pdf('create');
+      hooks?.page?.pdf?.('create');
       return true;
     case 'inspect':
-      hooks?.page?.inspect();
+      hooks?.page?.inspect?.();
       return true;
     case 'paste':
-      void hooks?.clipboard?.paste();
+      void hooks?.clipboard?.paste?.();
       return true;
     case 'cut':
-      void hooks?.clipboard?.cut();
+      void hooks?.clipboard?.cut?.();
       return true;
     case 'copy':
-      void hooks?.clipboard?.copy();
+      void hooks?.clipboard?.copy?.();
       return true;
     case 'undoHome':
       if (i.undo()) runtime.focusSheet();
@@ -267,7 +269,7 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
       return true;
     }
     case 'formatTableHome':
-      void hooks?.insert?.createTable('medium');
+      void hooks?.insert?.createTable?.('medium');
       return true;
     case 'insertRows':
       insertRows(i.store, i.workbook, i.history, range.r0, rowCount);
@@ -292,78 +294,78 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
     case 'sortAscHome':
     case 'sortAsc':
     case 'sortFilterHome':
-      hooks?.sortFilter?.sort('asc');
+      hooks?.sortFilter?.sort?.('asc');
       return true;
     case 'sortDesc':
-      hooks?.sortFilter?.sort('desc');
+      hooks?.sortFilter?.sort?.('desc');
       return true;
     case 'sortData':
-      void hooks?.sortFilter?.customSort();
+      void hooks?.sortFilter?.customSort?.();
       return true;
     case 'filterHome':
-      hooks?.sortFilter?.openFilter();
+      hooks?.sortFilter?.openFilter?.();
       return true;
     case 'outlineGroup':
-      hooks?.page?.outline('group');
+      hooks?.page?.outline?.('group');
       return true;
     case 'outlineUngroup':
-      hooks?.page?.outline('ungroup');
+      hooks?.page?.outline?.('ungroup');
       return true;
     case 'outlineShowDetail':
-      hooks?.page?.outline('show-detail');
+      hooks?.page?.outline?.('show-detail');
       return true;
     case 'outlineHideDetail':
-      hooks?.page?.outline('hide-detail');
+      hooks?.page?.outline?.('hide-detail');
       return true;
     case 'drawPen':
       i.borderDraw?.deactivate();
-      hooks?.drawing?.setInkMode('pen');
+      hooks?.drawing?.setInkMode?.('pen');
       return true;
     case 'drawErase':
       i.borderDraw?.deactivate();
-      hooks?.drawing?.setInkMode('erase');
+      hooks?.drawing?.setInkMode?.('erase');
       return true;
     case 'findHome':
     case 'findReview':
       i.openFindReplace();
       return true;
     case 'spellingReview':
-      hooks?.review?.spelling();
+      hooks?.review?.spelling?.();
       return true;
     case 'translateReview':
-      hooks?.review?.translate();
+      hooks?.review?.translate?.();
       return true;
     case 'accessibility':
-      hooks?.review?.accessibility();
+      hooks?.review?.accessibility?.();
       return true;
     case 'formatTableInsert':
-      void hooks?.insert?.createTable('medium');
+      void hooks?.insert?.createTable?.('medium');
       return true;
     case 'removeDupesInsert':
     case 'removeDupes':
-      hooks?.sortFilter?.removeDuplicates();
+      hooks?.sortFilter?.removeDuplicates?.();
       return true;
     case 'textToColumns':
-      hooks?.sortFilter?.splitTextToColumns(',');
+      hooks?.sortFilter?.splitTextToColumns?.(',');
       return true;
     case 'dataValidation':
       i.openDataValidationDialog();
       return true;
     case 'chartInsert':
-      hooks?.insert?.createChart();
+      hooks?.insert?.createChart?.();
       return true;
     case 'pictureInsert':
-      void hooks?.insert?.insertPicture('online');
+      void hooks?.insert?.insertPicture?.('online');
       return true;
     case 'shapesInsert':
-      hooks?.insert?.insertShape('rectangle');
+      hooks?.insert?.insertShape?.('rectangle');
       return true;
     case 'screenshotInsert':
-      hooks?.insert?.insertScreenshot();
+      hooks?.insert?.insertScreenshot?.();
       return true;
     case 'autosum':
     case 'autosumFormula':
-      hooks?.formula?.autoSum('SUM');
+      hooks?.formula?.autoSum?.('SUM');
       return true;
     case 'precedents':
       if (i.tracePrecedents() === 0) {
@@ -385,7 +387,7 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
       i.clearTraces();
       return true;
     case 'errorChecking':
-      hooks?.formula?.errorChecking();
+      hooks?.formula?.errorChecking?.();
       return true;
     case 'showFormulasFormula':
       setShowFormulas(i.store, !i.store.getState().ui.showFormulas);
@@ -429,10 +431,10 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
       return true;
     }
     case 'sheetViewSave':
-      void hooks?.sheetView?.save();
+      void hooks?.sheetView?.save?.();
       return true;
     case 'sheetViewDelete':
-      hooks?.sheetView?.deleteActive();
+      hooks?.sheetView?.deleteActive?.();
       return true;
     case 'viewFormulas':
       setShowFormulas(i.store, !i.store.getState().ui.showFormulas);
@@ -459,35 +461,35 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
       runtime.focusSheet();
       return true;
     case 'deleteCommentReview':
-      hooks?.review?.deleteComment();
+      hooks?.review?.deleteComment?.();
       return true;
     case 'previousCommentReview':
-      hooks?.review?.selectComment(-1);
+      hooks?.review?.selectComment?.(-1);
       return true;
     case 'nextCommentReview':
-      hooks?.review?.selectComment(1);
+      hooks?.review?.selectComment?.(1);
       return true;
     case 'protectReview':
     case 'protect':
-      void hooks?.protection?.runSheet();
+      void hooks?.protection?.runSheet?.();
       return true;
     case 'protectWorkbookReview':
-      void hooks?.protection?.runWorkbook(!isWorkbookStructureProtected(i.store.getState()));
+      void hooks?.protection?.runWorkbook?.(!isWorkbookStructureProtected(i.store.getState()));
       return true;
     case 'protectionReview':
-      void hooks?.protection?.allowEditRanges();
+      void hooks?.protection?.allowEditRanges?.();
       return true;
     case 'script':
-      void hooks?.automation?.runScript();
+      void hooks?.automation?.runScript?.();
       return true;
     case 'recordActions':
-      hooks?.automation?.recordActions();
+      hooks?.automation?.recordActions?.();
       return true;
     case 'allScripts':
-      hooks?.automation?.allScripts();
+      hooks?.automation?.allScripts?.();
       return true;
     case 'addIn':
-      hooks?.automation?.addInManager();
+      hooks?.automation?.addInManager?.();
       return true;
     case 'zoomSelection': {
       const selected = i.store.getState().selection.range;
@@ -501,7 +503,7 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
       return true;
     }
     case 'zoomDialog':
-      void hooks?.sheetView?.zoomDialog();
+      void hooks?.sheetView?.zoomDialog?.();
       return true;
     default:
       return false;

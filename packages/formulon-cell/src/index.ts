@@ -878,7 +878,13 @@ export {
   spreadsheetCompatibilityLabel,
   spreadsheetCompatibilityStatusLabel,
 } from './interact/workbook-objects.js';
-export type { MountOptions, SpreadsheetInstance } from './mount.js';
+export type {
+  MountOptions,
+  MountToolbarOptions,
+  SpreadsheetInstance,
+  ToolbarInstance,
+  ToolbarInstanceRef,
+} from './mount.js';
 export { Spreadsheet } from './mount.js';
 export type { ErrorTriangleHit, ErrorTriangleKind } from './render/grid.js';
 export {
