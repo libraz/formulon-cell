@@ -7,6 +7,7 @@ import type {
   ExtensionHandle,
   ExtensionInput,
   FeatureFlags,
+  SpreadsheetUiOptions,
   ThemeName,
 } from '../extensions/index.js';
 import type { CustomFunction, CustomFunctionMeta, FormulaRegistry } from '../formula.js';
@@ -21,6 +22,7 @@ import type { SlicerSpec, SpreadsheetStore } from '../store/store.js';
 
 export interface MountOptions {
   workbook?: WorkbookHandle;
+  ui?: SpreadsheetUiOptions;
   theme?: ThemeName;
   seed?: (wb: WorkbookHandle) => void;
   locale?: Locale | (string & {});

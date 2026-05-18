@@ -7,9 +7,7 @@ import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
  *  Japanese-only chrome string we can match in all 3 apps, so we check the
  *  HTML lang or doc title shift after asking the page to re-render in ja.
  *
- *  For all 3 apps the `?locale=` query is at least respected by the playground;
- *  in react-demo / vue-demo it's set internally. The test scopes its assertion
- *  to the playground since it has the URL plumbing. */
+ *  React and Vue demos set the locale internally after booting. */
 export async function runLocaleBootScenario(page: Page): Promise<void> {
   const sp = new SpreadsheetPage(page);
   await page.goto('/?locale=ja');
@@ -61,7 +59,7 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
   }
 }
 
-/** I02 — `?theme=dark` boots the playground in the `ink` core theme.
+/** I02 — `?theme=dark` boots the app in the `ink` core theme.
  *  Observable via the host's `data-fc-theme` attribute. */
 export async function runThemeBootScenario(page: Page): Promise<void> {
   const sp = new SpreadsheetPage(page);

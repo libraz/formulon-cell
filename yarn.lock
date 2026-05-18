@@ -385,41 +385,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@fontsource-variable/fraunces@npm:5.1.1":
-  version: 5.1.1
-  resolution: "@fontsource-variable/fraunces@npm:5.1.1"
-  checksum: 10c0/35735990f96466835451470abdc0174ceb7484e09e3f0ecc620969ba6910be1f6505019f17c600c1ebcf50ba5c687f934816c014d800fa181ce9a7dab7895865
-  languageName: node
-  linkType: hard
-
-"@fontsource/ibm-plex-mono@npm:5.1.1":
-  version: 5.1.1
-  resolution: "@fontsource/ibm-plex-mono@npm:5.1.1"
-  checksum: 10c0/7c823e8379a27199e6fe11e84e47c391fae8794f106712404b71ea9d30eb0acba4035ecbdf20b5e0d58146bd8bec9589b4ff7936f23e9d42f954298eb151da80
-  languageName: node
-  linkType: hard
-
-"@fontsource/ibm-plex-sans@npm:5.1.1":
-  version: 5.1.1
-  resolution: "@fontsource/ibm-plex-sans@npm:5.1.1"
-  checksum: 10c0/a8e904a27d745db26daf4665c11d111e4161914e25c18ccb03d8e0acb2e80319db1117f1831842db9a1b01231f7ff2da01341bae4ccbe2588d5836cab1a00532
-  languageName: node
-  linkType: hard
-
-"@formulon-cell/playground@workspace:apps/playground":
-  version: 0.0.0-use.local
-  resolution: "@formulon-cell/playground@workspace:apps/playground"
-  dependencies:
-    "@fontsource-variable/fraunces": "npm:5.1.1"
-    "@fontsource/ibm-plex-mono": "npm:5.1.1"
-    "@fontsource/ibm-plex-sans": "npm:5.1.1"
-    "@libraz/formulon-cell": "workspace:*"
-    "@types/node": "npm:^22"
-    typescript: "npm:6.0.3"
-    vite: "npm:8.0.10"
-  languageName: unknown
-  linkType: soft
-
 "@formulon-cell/react-demo@workspace:apps/react-demo":
   version: 0.0.0-use.local
   resolution: "@formulon-cell/react-demo@workspace:apps/react-demo"

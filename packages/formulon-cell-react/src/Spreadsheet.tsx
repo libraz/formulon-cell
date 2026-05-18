@@ -5,9 +5,11 @@ import {
   type LocaleChangeEvent,
   type MountOptions,
   type RecalcEvent,
+  resolveSpreadsheetUiOptions,
   type SelectionChangeEvent,
   Spreadsheet as SpreadsheetCore,
   type SpreadsheetInstance,
+  type SpreadsheetUiOptions,
   type ThemeChangeEvent,
   type WorkbookChangeEvent,
   type WorkbookHandle,
@@ -19,6 +21,9 @@ export interface SpreadsheetProps {
   /** Optional pre-loaded workbook (e.g. from xlsx bytes). When omitted, a
    *  fresh default workbook is created on mount. */
   workbook?: WorkbookHandle;
+  /** Simplified Excel-365-style UI preset and feature switches. `theme` and
+   *  `features` props override the matching values when both are supplied. */
+  ui?: SpreadsheetUiOptions;
   /** Theme. When the prop changes after mount, the component calls
    *  `instance.setTheme()` to keep the spreadsheet in sync. */
   theme?: MountOptions['theme'];
@@ -72,15 +77,21 @@ const applyRuntimeProps = async (
   props: SpreadsheetProps,
   baseline: SpreadsheetProps = {},
 ): Promise<void> => {
+  const ui = props.ui ? resolveSpreadsheetUiOptions(props.ui) : null;
   if (props.workbook && props.workbook !== baseline.workbook && props.workbook !== inst.workbook) {
     await inst.setWorkbook(props.workbook);
   }
-  if (props.theme && props.theme !== baseline.theme) inst.setTheme(props.theme);
+  const nextTheme = props.theme ?? ui?.theme;
+  const baselineTheme =
+    baseline.theme ?? (baseline.ui ? resolveSpreadsheetUiOptions(baseline.ui).theme : undefined);
+  if (nextTheme && nextTheme !== baselineTheme) inst.setTheme(nextTheme);
   if (props.locale && props.locale !== baseline.locale) inst.i18n.setLocale(props.locale);
   if (props.strings && props.strings !== baseline.strings) {
     inst.i18n.extend(inst.i18n.locale, props.strings);
   }
-  if (props.features !== baseline.features) inst.setFeatures(props.features ?? {});
+  if (props.features !== baseline.features || props.ui !== baseline.ui) {
+    inst.setFeatures({ ...(ui?.features ?? {}), ...(props.features ?? {}) });
+  }
   if (props.extensions !== baseline.extensions) inst.setExtensions(props.extensions);
 };
 
@@ -116,6 +127,7 @@ const SpreadsheetComponent = (
       const cur = propsRef.current;
       const inst = await SpreadsheetCore.mount(host, {
         ...(cur.workbook ? { workbook: cur.workbook } : {}),
+        ...(cur.ui ? { ui: cur.ui } : {}),
         ...(cur.theme ? { theme: cur.theme } : {}),
         ...(cur.locale ? { locale: cur.locale } : {}),
         ...(cur.strings ? { strings: cur.strings } : {}),
@@ -174,9 +186,11 @@ const SpreadsheetComponent = (
 
   useEffect(() => {
     const inst = instanceRef.current;
-    if (!inst || !props.theme) return;
-    inst.setTheme(props.theme);
-  }, [props.theme]);
+    if (!inst) return;
+    const ui = props.ui ? resolveSpreadsheetUiOptions(props.ui) : null;
+    const nextTheme = props.theme ?? ui?.theme;
+    if (nextTheme) inst.setTheme(nextTheme);
+  }, [props.theme, props.ui]);
 
   useEffect(() => {
     const inst = instanceRef.current;
@@ -193,8 +207,9 @@ const SpreadsheetComponent = (
   useEffect(() => {
     const inst = instanceRef.current;
     if (!inst) return;
-    inst.setFeatures(props.features ?? {});
-  }, [props.features]);
+    const ui = props.ui ? resolveSpreadsheetUiOptions(props.ui) : null;
+    inst.setFeatures({ ...(ui?.features ?? {}), ...(props.features ?? {}) });
+  }, [props.features, props.ui]);
 
   useEffect(() => {
     const inst = instanceRef.current;

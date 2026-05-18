@@ -5,9 +5,11 @@ import {
   type LocaleChangeEvent,
   type MountOptions,
   type RecalcEvent,
+  resolveSpreadsheetUiOptions,
   type SelectionChangeEvent,
   Spreadsheet as SpreadsheetCore,
   type SpreadsheetInstance,
+  type SpreadsheetUiOptions,
   type ThemeChangeEvent,
   type WorkbookChangeEvent,
   type WorkbookHandle,
@@ -34,6 +36,7 @@ export type SpreadsheetExposed = {
 const applyRuntimeProps = async (
   inst: SpreadsheetInstance,
   props: {
+    ui?: SpreadsheetUiOptions;
     workbook?: WorkbookHandle;
     theme?: MountOptions['theme'];
     locale?: MountOptions['locale'];
@@ -42,6 +45,7 @@ const applyRuntimeProps = async (
     extensions?: ExtensionInput[];
   },
   baseline: {
+    ui?: SpreadsheetUiOptions;
     workbook?: WorkbookHandle;
     theme?: MountOptions['theme'];
     locale?: MountOptions['locale'];
@@ -50,21 +54,28 @@ const applyRuntimeProps = async (
     extensions?: ExtensionInput[];
   } = {},
 ): Promise<void> => {
+  const ui = props.ui ? resolveSpreadsheetUiOptions(props.ui) : null;
   if (props.workbook && props.workbook !== baseline.workbook && props.workbook !== inst.workbook) {
     await inst.setWorkbook(props.workbook);
   }
-  if (props.theme && props.theme !== baseline.theme) inst.setTheme(props.theme);
+  const nextTheme = props.theme ?? ui?.theme;
+  const baselineTheme =
+    baseline.theme ?? (baseline.ui ? resolveSpreadsheetUiOptions(baseline.ui).theme : undefined);
+  if (nextTheme && nextTheme !== baselineTheme) inst.setTheme(nextTheme);
   if (props.locale && props.locale !== baseline.locale) inst.i18n.setLocale(props.locale);
   if (props.strings && props.strings !== baseline.strings) {
     inst.i18n.extend(inst.i18n.locale, props.strings);
   }
-  if (props.features !== baseline.features) inst.setFeatures(props.features ?? {});
+  if (props.features !== baseline.features || props.ui !== baseline.ui) {
+    inst.setFeatures({ ...(ui?.features ?? {}), ...(props.features ?? {}) });
+  }
   if (props.extensions !== baseline.extensions) inst.setExtensions(props.extensions);
 };
 
 export const Spreadsheet = defineComponent({
   name: 'Spreadsheet',
   props: {
+    ui: { type: Object as PropType<SpreadsheetUiOptions>, default: undefined },
     workbook: { type: Object as PropType<WorkbookHandle>, default: undefined },
     theme: { type: String as PropType<MountOptions['theme']>, default: undefined },
     locale: { type: String as PropType<MountOptions['locale']>, default: undefined },
@@ -102,6 +113,7 @@ export const Spreadsheet = defineComponent({
       const host = hostEl.value;
       if (!host) return;
       const opts: MountOptions = {};
+      if (props.ui) opts.ui = props.ui;
       if (props.workbook) opts.workbook = props.workbook;
       if (props.theme) opts.theme = props.theme;
       if (props.locale) opts.locale = props.locale;
@@ -117,6 +129,7 @@ export const Spreadsheet = defineComponent({
       };
       const mountedWith = {
         workbook: opts.workbook,
+        ui: opts.ui,
         theme: opts.theme,
         locale: opts.locale,
         strings: opts.strings,
@@ -152,9 +165,11 @@ export const Spreadsheet = defineComponent({
     // Theme / locale / workbook are all cheap to swap via the imperative
     // API — react to prop changes without re-mounting.
     watch(
-      () => props.theme,
-      (next) => {
-        if (next && instance.value) instance.value.setTheme(next);
+      () => [props.theme, props.ui] as const,
+      ([nextTheme, nextUi]) => {
+        const resolved = nextUi ? resolveSpreadsheetUiOptions(nextUi) : null;
+        const theme = nextTheme ?? resolved?.theme;
+        if (theme && instance.value) instance.value.setTheme(theme);
       },
     );
     watch(
@@ -179,9 +194,12 @@ export const Spreadsheet = defineComponent({
       },
     );
     watch(
-      () => props.features,
-      (next) => {
-        if (instance.value) instance.value.setFeatures(next ?? {});
+      () => [props.features, props.ui] as const,
+      ([nextFeatures, nextUi]) => {
+        const resolved = nextUi ? resolveSpreadsheetUiOptions(nextUi) : null;
+        if (instance.value) {
+          instance.value.setFeatures({ ...(resolved?.features ?? {}), ...(nextFeatures ?? {}) });
+        }
       },
       { deep: true },
     );

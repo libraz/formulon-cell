@@ -21,6 +21,7 @@ import {
   type ExtensionHandle,
   flattenExtensions,
   resolveFlags,
+  resolveSpreadsheetUiOptions,
   sortByPriority,
 } from './extensions/index.js';
 import { FormulaRegistry } from './formula.js';
@@ -122,7 +123,9 @@ export const Spreadsheet = {
     // wire setStrings hooks for live label updates.
     const i18n = createI18nController({ locale: opts.locale, overlay: opts.strings });
     let strings: Strings = i18n.strings;
-    let flags = resolveFlags(opts.features);
+    const ui = resolveSpreadsheetUiOptions(opts.ui);
+    const initialTheme = opts.theme ?? ui.theme;
+    let flags = resolveFlags({ ...ui.features, ...opts.features });
     const emitter = new SpreadsheetEmitter();
     const formulaRegistry = new FormulaRegistry();
     if (opts.functions) {
@@ -131,7 +134,7 @@ export const Spreadsheet = {
       }
     }
 
-    const instanceId = prepareMountHost(host, strings, opts.theme);
+    const instanceId = prepareMountHost(host, strings, initialTheme);
     host.dataset.fcEngineState = 'loading';
 
     let sheetTabsController: SheetTabsController | null = null;
@@ -186,7 +189,7 @@ export const Spreadsheet = {
     });
 
     const store = createSpreadsheetStore();
-    if (opts.theme) mutators.setTheme(store, opts.theme);
+    mutators.setTheme(store, initialTheme);
 
     // Unified undo/redo. Attach BEFORE seed-cell hydration so the seed itself
     // doesn't pollute the stack — but seed runs above on the wb. Clear the

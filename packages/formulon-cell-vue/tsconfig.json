@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "rootDir": "./src",
     "outDir": "./dist",
     "types": ["node"],
     // tsup 8.5.x injects a synthetic `baseUrl` for its DTS pass, which TS 6

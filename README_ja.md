@@ -177,8 +177,7 @@ sheet.i18n.setLocale('fr');
 
 | アプリ | 起動 | 内容 |
 |-----|-----|------|
-| `apps/playground`  | `yarn dev`        | Vanilla DOM プレイグラウンド（表計算キーマップ） |
-| `apps/react-demo`  | `yarn dev:react`  | React コンポーネント `<Spreadsheet>` と同じ機能面 |
+| `apps/react-demo`  | `yarn dev` / `yarn dev:react` | React コンポーネント `<Spreadsheet>` と同じ機能面 |
 | `apps/vue-demo`    | `yarn dev:vue`    | Vue コンポーネント `<Spreadsheet>` と同じ機能面 |
 
 ## フレームワーク向けリボンツールバー

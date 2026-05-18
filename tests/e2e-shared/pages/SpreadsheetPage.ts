@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 
 /**
  * App-agnostic page object that hides the demo-app shell so the same
- * scenario can run against playground (vanilla), react-demo, and vue-demo.
+ * scenario can run against react-demo and vue-demo.
  *
  * Selectors target the `.fc-host__*` chrome classes emitted by the core
  * mount, NOT the demo wrappers. That keeps the DSL robust as wrappers
@@ -19,10 +19,9 @@ export class SpreadsheetPage {
    *  to opt back into the default seed (e.g. for "with real data" scenarios). */
   async mount(opts: { fixture?: string | null } = {}): Promise<void> {
     const fixture = opts.fixture === undefined ? 'empty' : opts.fixture;
-    // Default to `?locale=en` so cross-app scenarios don't have to special-case
-    // playground's `ja` default — react/vue demos already drive locale via
-    // their own toggles. Tests that need ja go through `page.goto('/?locale=ja')`
-    // directly (see I01).
+    // Default to `?locale=en` so cross-app scenarios start consistently.
+    // Tests that need ja go through `page.goto('/?locale=ja')` directly
+    // (see I01).
     const params = new URLSearchParams();
     params.set('locale', 'en');
     if (fixture) params.set('fixture', fixture);

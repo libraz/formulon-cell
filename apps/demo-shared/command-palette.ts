@@ -1,8 +1,7 @@
 // Lightweight command palette that filters ribbon commands as the user types
 // into a search input. Framework-agnostic: hosts pass a plain
 // `HTMLInputElement` plus a container the menu can be appended to. React/Vue
-// demos call it from `useEffect` / `onMounted`; the playground wires it
-// straight from its boot sequence.
+// demos call it from `useEffect` / `onMounted`.
 
 import type { ToolbarText } from '@libraz/formulon-cell';
 

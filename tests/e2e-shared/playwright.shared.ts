@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 import type { DemoApp } from './types.js';
 
 /**
- * Builds a Playwright config for a demo app. All three apps share the same
+ * Builds a Playwright config for a demo app. Both framework demos share the same
  * config surface — only the dev-server port and workspace name change.
  *
  * Browsers: Chromium + WebKit. Firefox is skipped (cf. tidy-seeking-whisper
@@ -23,9 +23,7 @@ export function defineDemoAppConfig(app: DemoApp) {
     // own spec directory.
     testDir: './e2e',
     // Visual regression specs live under `e2e/visual/` and require a Linux
-    // baseline. They're opt-in via `--grep @visual` (and run only on the
-    // playground app — wrappers don't change canvas pixels). Normal e2e runs
-    // skip them.
+    // baseline. Normal e2e runs skip them.
     testIgnore: ['**/visual/**'],
     fullyParallel: true,
     forbidOnly: !!process.env.CI,

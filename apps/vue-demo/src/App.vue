@@ -28,6 +28,7 @@ import {
 } from 'vue';
 import {
   activateDemoModal,
+  composeDemoUiOptions,
   createDemoStrings,
   DEMO_FUNCTIONS,
   demoColLabel,
@@ -80,11 +81,6 @@ let changeId = 0;
 const previewValue = previewCellChange;
 const seed = seedDemoWorkbook;
 
-const composeFeatures = (preset: PresetKey, overrides: FeatureFlags): FeatureFlags => ({
-  ...presets[preset](),
-  ...overrides,
-});
-
 const theme = ref<ThemeName>('paper');
 const locale = ref<string>(resolveInitialLocale());
 const workbook = shallowRef<WorkbookHandle | null>(null);
@@ -111,7 +107,15 @@ const scriptError = ref<string | null>(null);
 const reviewModalEl = ref<HTMLElement | null>(null);
 const scriptModalEl = ref<HTMLElement | null>(null);
 
-const features = computed<FeatureFlags>(() => composeFeatures(preset.value, overrides.value));
+const resolvedUi = computed(() =>
+  composeDemoUiOptions({
+    preset: preset.value,
+    overrides: overrides.value,
+    showRibbon: showRibbon.value,
+    theme: theme.value,
+  }),
+);
+const features = computed<FeatureFlags>(() => resolvedUi.value.features);
 const ui = computed(() => UI[locale.value === 'ja' ? 'ja' : 'en']);
 const commandText = computed(() => demoCommandText(locale.value));
 
@@ -719,7 +723,7 @@ onUnmounted(() => {
     <main :class="['demo__body', { 'demo__body--panel': showPanel }]">
       <div class="demo__sheet-col">
         <SpreadsheetToolbar
-          v-if="showRibbon"
+          v-if="resolvedUi.ribbon"
           :instance="instance"
           :active-tab="ribbonTab"
           :locale="locale"
@@ -879,7 +883,7 @@ onUnmounted(() => {
               </label>
               <label
                 v-if="group.title === 'Chrome'"
-                :class="['demo__feat', { 'demo__feat--on': showRibbon }]"
+                :class="['demo__feat', { 'demo__feat--on': resolvedUi.ribbon }]"
               >
                 <input type="checkbox" v-model="showRibbon" />
                 <span>Spreadsheet ribbon</span>

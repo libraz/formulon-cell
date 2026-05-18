@@ -47,3 +47,10 @@ export type {
   ThemeName,
 } from './types.js';
 export { dedupeById, flattenExtensions, sortByPriority } from './types.js';
+export type {
+  ResolvedSpreadsheetUiOptions,
+  SpreadsheetFeatureSwitches,
+  SpreadsheetUiOptions,
+  SpreadsheetUiProfile,
+} from './ui-options.js';
+export { resolveSpreadsheetUiOptions } from './ui-options.js';

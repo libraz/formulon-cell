@@ -10,19 +10,22 @@
  * doubled review surface for every UI tweak. This module is the single
  * source of truth so the two demos can stay aligned.
  *
- * The vanilla `playground` demo uses a different chrome model and does not
- * consume this file — that's intentional.
+ * Shared helpers keep the React and Vue demos on the same integration line.
  */
+
 import type {
   CellChangeEvent,
   CellRenderInput,
   CellValue,
+  FeatureFlags,
   FeatureId,
   ReviewCell,
   SpreadsheetInstance,
+  SpreadsheetUiOptions,
   ThemeName,
   WorkbookHandle,
 } from '@libraz/formulon-cell';
+import { resolveSpreadsheetUiOptions } from '@libraz/formulon-cell';
 
 export type DemoFramework = 'React' | 'Vue';
 
@@ -59,6 +62,22 @@ export const PRESETS: { value: PresetKey; label: string; hint: string }[] = [
   { value: 'standard', label: 'Standard', hint: 'lightweight editing chrome' },
   { value: 'full', label: 'Full', hint: 'complete spreadsheet chrome' },
 ];
+
+export const composeDemoUiOptions = (input: {
+  preset: PresetKey;
+  overrides: FeatureFlags;
+  showRibbon: boolean;
+  theme: ThemeName;
+}): ReturnType<typeof resolveSpreadsheetUiOptions> => {
+  const profile: SpreadsheetUiOptions['profile'] =
+    input.preset === 'full' ? 'excel365' : input.preset;
+  return resolveSpreadsheetUiOptions({
+    profile,
+    theme: input.theme,
+    features: { ribbon: input.showRibbon },
+    advancedFeatures: input.overrides,
+  });
+};
 
 export const FEATURE_GROUPS: {
   title: string;

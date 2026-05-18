@@ -4,11 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
-const configs = [
-  'apps/playground/vite.config.ts',
-  'apps/react-demo/vite.config.ts',
-  'apps/vue-demo/vite.config.ts',
-];
+const configs = ['apps/react-demo/vite.config.ts', 'apps/vue-demo/vite.config.ts'];
 const sharedBase = 'apps/vite.base.ts';
 const shimPrefix = '`$' + '{nodeShimDir}/';
 // Both `find` and `replacement` literals must show up so we know the alias

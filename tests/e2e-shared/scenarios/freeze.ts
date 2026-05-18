@@ -7,13 +7,13 @@ import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
  *  Setting and clearing freeze panes is a layout mutation. The visible result
  *  (a thin pane divider on the canvas) is hard to assert from Playwright
  *  without pixel diffing, but the underlying `layout.freezeRows / freezeCols`
- *  state is observable through the playground's `window.__fcInst` exposure.
+ *  state is observable through the demo's `window.__fcInst` exposure.
  *  This scenario drives the imperative API directly so the test is fast and
  *  deterministic, and it asserts that the engine echoes the layout change
  *  back through the workbook hint surface (used by the canvas renderer).
  *
- *  Portable across all three demo apps — playground, react-demo, and vue-demo
- *  each expose the live spreadsheet instance on `window.__fcInst`. */
+ *  Portable across the framework demo apps — both expose the live spreadsheet
+ *  instance on `window.__fcInst`. */
 export async function runFreezePanesScenario(page: Page): Promise<void> {
   const sp = new SpreadsheetPage(page);
   await sp.mount();

@@ -679,6 +679,10 @@ export type {
   FeatureFlags,
   FeatureId,
   I18nController,
+  ResolvedSpreadsheetUiOptions,
+  SpreadsheetFeatureSwitches,
+  SpreadsheetUiOptions,
+  SpreadsheetUiProfile,
   ThemeName,
 } from './extensions/index.js';
 export {
@@ -706,6 +710,7 @@ export {
   presets,
   quickAnalysis,
   resolveFlags,
+  resolveSpreadsheetUiOptions,
   slicer,
   sortByPriority,
   standard,

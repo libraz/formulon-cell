@@ -2,9 +2,9 @@ import { resolve } from 'node:path';
 import type { Alias, UserConfig } from 'vite';
 
 /**
- * Shared Vite settings for the three demo apps (playground, react-demo,
- * vue-demo). Each app's own `vite.config.ts` calls this and then layers its
- * framework plugin, additional aliases, and port. The shared bits are:
+ * Shared Vite settings for the framework demo apps. Each app's own
+ * `vite.config.ts` calls this and then layers its framework plugin,
+ * additional aliases, and port. The shared bits are:
  *
  *  - alias `@libraz/formulon-cell` to the workspace source so editing TS
  *    in `packages/formulon-cell/src/` is picked up without a build step

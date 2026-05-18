@@ -3,9 +3,8 @@ import { expect } from '@playwright/test';
 
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
-/** U02 — named range undo. We use the playground's imperative `window.__fcInst`
- *  to add and undo a named range. The wrappers don't expose this surface yet,
- *  so this scenario runs against the playground only. */
+/** U02 — named range undo. We use the demo's imperative `window.__fcInst`
+ *  to add and undo a named range. */
 export async function runNamedRangeUndoScenario(page: Page): Promise<void> {
   const sp = new SpreadsheetPage(page);
   await sp.mount();

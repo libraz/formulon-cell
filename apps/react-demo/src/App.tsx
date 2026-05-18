@@ -29,6 +29,7 @@ import {
 } from 'react';
 import {
   activateDemoModal,
+  composeDemoUiOptions,
   createDemoStrings,
   DEMO_FUNCTIONS,
   demoColLabel,
@@ -90,14 +91,6 @@ const useDemoModalFocus = (
 const previewValue = previewCellChange;
 const seed = seedDemoWorkbook;
 
-// Combine a preset's flags with explicit overrides. Overrides win — that
-// way the user can pick "Full" then individually disable e.g. context
-// menu without losing the rest of the preset.
-const composeFeatures = (preset: PresetKey, overrides: FeatureFlags): FeatureFlags => ({
-  ...presets[preset](),
-  ...overrides,
-});
-
 export const App = (): ReactElement => {
   const [theme, setTheme] = useState<ThemeName>('paper');
   const [locale, setLocale] = useState<string>(() => resolveInitialLocale());
@@ -127,7 +120,11 @@ export const App = (): ReactElement => {
   const reviewModalRef = useRef<HTMLDivElement | null>(null);
   const scriptModalRef = useRef<HTMLDivElement | null>(null);
 
-  const features = useMemo(() => composeFeatures(preset, overrides), [preset, overrides]);
+  const resolvedUi = useMemo(
+    () => composeDemoUiOptions({ preset, overrides, showRibbon, theme }),
+    [overrides, preset, showRibbon, theme],
+  );
+  const features = resolvedUi.features;
   const ui = UI[locale === 'ja' ? 'ja' : 'en'];
   const commandText = useMemo(() => demoCommandText(locale), [locale]);
   const closeReviewDialog = useCallback(() => setReviewDialog(null), []);
@@ -730,7 +727,7 @@ export const App = (): ReactElement => {
 
       <main className={`demo__body${showPanel ? ' demo__body--panel' : ''}`}>
         <div className="demo__sheet-col">
-          {showRibbon ? (
+          {resolvedUi.ribbon ? (
             <SpreadsheetToolbar
               instance={instance}
               activeTab={ribbonTab}
@@ -913,10 +910,10 @@ export const App = (): ReactElement => {
                     );
                   })}
                   {group.title === 'Chrome' ? (
-                    <label className={`demo__feat${showRibbon ? ' demo__feat--on' : ''}`}>
+                    <label className={`demo__feat${resolvedUi.ribbon ? ' demo__feat--on' : ''}`}>
                       <input
                         type="checkbox"
-                        checked={showRibbon}
+                        checked={resolvedUi.ribbon}
                         onChange={(e) => setShowRibbon(e.target.checked)}
                       />
                       <span>Spreadsheet ribbon</span>

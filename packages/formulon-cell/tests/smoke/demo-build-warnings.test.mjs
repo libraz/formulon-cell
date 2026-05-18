@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
-const demos = ['@formulon-cell/playground', '@formulon-cell/react-demo', '@formulon-cell/vue-demo'];
+const demos = ['@formulon-cell/react-demo', '@formulon-cell/vue-demo'];
 const forbiddenWarnings = [/externalized for browser compatibility/];
 
 const extractWarningLines = (output) =>

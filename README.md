@@ -170,8 +170,7 @@ sheet.i18n.setLocale('fr');
 
 | app | run | what it shows |
 |-----|-----|---------------|
-| `apps/playground`  | `yarn dev`        | Vanilla DOM playground (spreadsheet keymap) |
-| `apps/react-demo`  | `yarn dev:react`  | Same surface as `<Spreadsheet>` React component |
+| `apps/react-demo`  | `yarn dev` / `yarn dev:react` | Same surface as `<Spreadsheet>` React component |
 | `apps/vue-demo`    | `yarn dev:vue`    | Same surface as `<Spreadsheet>` Vue component |
 
 ## Framework Ribbon Toolbars

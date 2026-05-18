@@ -4,7 +4,7 @@ import { expect } from '@playwright/test';
 import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
 
 /** D05 — the CF Rules dialog is reachable via `instance.openCfRulesDialog()`.
- *  Verify calling it from the playground exposes a visible overlay and that
+ *  Verify calling it from a demo app exposes a visible overlay and that
  *  Esc closes it cleanly. */
 export async function runCfRulesDialogScenario(page: Page): Promise<void> {
   const sp = new SpreadsheetPage(page);
