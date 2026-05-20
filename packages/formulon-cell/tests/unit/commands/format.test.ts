@@ -50,6 +50,24 @@ const setRange = (
 const fmtAt = (store: SpreadsheetStore, row: number, col: number): CellFormat | undefined =>
   store.getState().format.formats.get(addrKey({ sheet: 0, row, col }));
 
+const effectiveFmtAt = (
+  store: SpreadsheetStore,
+  row: number,
+  col: number,
+): CellFormat | undefined => {
+  const stored = fmtAt(store, row, col);
+  const pending = store.getState().ui.pendingFormat;
+  if (
+    !pending ||
+    pending.addr.sheet !== 0 ||
+    pending.addr.row !== row ||
+    pending.addr.col !== col
+  ) {
+    return stored;
+  }
+  return { ...(stored ?? {}), ...pending.format };
+};
+
 describe('toggle flags', () => {
   let store: SpreadsheetStore;
 
@@ -154,6 +172,22 @@ describe('alignment ribbon formatting', () => {
     expect(fmtAt(store, 2, 2)?.indent).toBe(0);
   });
 
+  it('stages indent as pending input format for a single empty active cell', () => {
+    const single = createSpreadsheetStore();
+    setRange(single, 0, 0, 0, 0);
+    mutators.setActive(single, { sheet: 0, row: 0, col: 0 });
+
+    bumpIndent(single.getState(), single, 1);
+    bumpIndent(single.getState(), single, 1);
+
+    expect(single.getState().ui.pendingFormat).toEqual({
+      addr: { sheet: 0, row: 0, col: 0 },
+      format: { indent: 2 },
+    });
+    expect(fmtAt(single, 0, 0)).toBeUndefined();
+    expect(effectiveFmtAt(single, 0, 0)?.indent).toBe(2);
+  });
+
   it('sets text rotation across the range and clamps to the supported angle range', () => {
     setRotation(store.getState(), store, 45);
     expect(fmtAt(store, 1, 1)?.rotation).toBe(45);
@@ -177,30 +211,38 @@ describe('setNumFmt / cycleCurrency / cyclePercent', () => {
 
   it('setNumFmt installs the supplied format', () => {
     setNumFmt(store.getState(), store, { kind: 'fixed', decimals: 3 });
-    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'fixed', decimals: 3 });
+    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'fixed', decimals: 3 });
   });
 
   it('cycleCurrency turns currency on when none is set', () => {
     cycleCurrency(store.getState(), store);
-    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'currency', decimals: 2, symbol: '$' });
+    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({
+      kind: 'currency',
+      decimals: 2,
+      symbol: '$',
+    });
   });
 
   it('cycleCurrency uses the active locale currency symbol', () => {
     cycleCurrency(store.getState(), store, 'ja');
-    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'currency', decimals: 2, symbol: '¥' });
+    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({
+      kind: 'currency',
+      decimals: 2,
+      symbol: '¥',
+    });
   });
 
   it('cycleCurrency clears back to general when at least one cell is currency', () => {
     cycleCurrency(store.getState(), store); // on
     cycleCurrency(store.getState(), store); // off
-    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'general' });
+    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'general' });
   });
 
   it('cyclePercent toggles percent on / off', () => {
     cyclePercent(store.getState(), store);
-    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'percent', decimals: 0 });
+    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'percent', decimals: 0 });
     cyclePercent(store.getState(), store);
-    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'general' });
+    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'general' });
   });
 });
 
@@ -214,32 +256,36 @@ describe('bumpDecimals', () => {
 
   it('promotes a general cell to fixed:2 on +1', () => {
     bumpDecimals(store.getState(), store, 1);
-    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'fixed', decimals: 2 });
+    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'fixed', decimals: 2 });
   });
 
   it('does nothing on -1 when the cell is general', () => {
     bumpDecimals(store.getState(), store, -1);
-    expect(fmtAt(store, 0, 0)?.numFmt).toBeUndefined();
+    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toBeUndefined();
   });
 
   it('walks fixed decimals up and down with clamping', () => {
     setNumFmt(store.getState(), store, { kind: 'fixed', decimals: 0 });
     bumpDecimals(store.getState(), store, -1);
-    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'fixed', decimals: 0 });
+    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'fixed', decimals: 0 });
     for (let i = 0; i < 12; i += 1) bumpDecimals(store.getState(), store, 1);
-    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'fixed', decimals: 10 });
+    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'fixed', decimals: 10 });
   });
 
   it('preserves currency symbol while bumping decimals', () => {
     setNumFmt(store.getState(), store, { kind: 'currency', decimals: 2, symbol: '€' });
     bumpDecimals(store.getState(), store, 1);
-    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'currency', decimals: 3, symbol: '€' });
+    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({
+      kind: 'currency',
+      decimals: 3,
+      symbol: '€',
+    });
   });
 
   it('walks percent decimals', () => {
     setNumFmt(store.getState(), store, { kind: 'percent', decimals: 0 });
     bumpDecimals(store.getState(), store, 1);
-    expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'percent', decimals: 1 });
+    expect(effectiveFmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'percent', decimals: 1 });
   });
 });
 
@@ -260,7 +306,7 @@ describe('borders', () => {
     setRange(store, 0, 0, 0, 0);
     setBorderPreset(store.getState(), store, 'outline', 'thick', '#c00000');
 
-    expect(fmtAt(store, 0, 0)?.borders).toEqual({
+    expect(effectiveFmtAt(store, 0, 0)?.borders).toEqual({
       top: { style: 'thick', color: '#c00000' },
       bottom: { style: 'thick', color: '#c00000' },
       left: { style: 'thick', color: '#c00000' },
@@ -290,9 +336,43 @@ describe('borders', () => {
     setBorderPreset(store.getState(), store, 'diagonalDown', 'dashed', '#4472c4');
     setBorderPreset(store.getState(), store, 'diagonalUp', 'double', '#c00000');
 
-    expect(fmtAt(store, 0, 0)?.borders).toEqual({
+    expect(effectiveFmtAt(store, 0, 0)?.borders).toEqual({
       diagonalDown: { style: 'dashed', color: '#4472c4' },
       diagonalUp: { style: 'double', color: '#c00000' },
+    });
+  });
+
+  it('setBorderPreset merges with pending input format for a single empty active cell', () => {
+    setRange(store, 0, 0, 0, 0);
+    toggleBold(store.getState(), store);
+    setBorderPreset(store.getState(), store, 'bottom', 'thin', '#4472c4');
+
+    expect(fmtAt(store, 0, 0)).toBeUndefined();
+    expect(store.getState().ui.pendingFormat).toEqual({
+      addr: { sheet: 0, row: 0, col: 0 },
+      format: {
+        bold: true,
+        borders: { bottom: { style: 'thin', color: '#4472c4' } },
+      },
+    });
+    expect(effectiveFmtAt(store, 0, 0)?.borders?.bottom).toEqual({
+      style: 'thin',
+      color: '#4472c4',
+    });
+  });
+
+  it('cycleBorders uses pending input format for a single empty active cell', () => {
+    setRange(store, 0, 0, 0, 0);
+    toggleItalic(store.getState(), store);
+    cycleBorders(store.getState(), store);
+
+    expect(fmtAt(store, 0, 0)).toBeUndefined();
+    expect(store.getState().ui.pendingFormat).toEqual({
+      addr: { sheet: 0, row: 0, col: 0 },
+      format: {
+        italic: true,
+        borders: { top: true, right: true, bottom: true, left: true },
+      },
     });
   });
 
@@ -339,9 +419,10 @@ describe('clearFormat / colors / font', () => {
 
   it('clearFormat drops the format entry entirely', () => {
     setNumFmt(store.getState(), store, { kind: 'fixed', decimals: 2 });
-    expect(fmtAt(store, 0, 0)).toBeDefined();
+    expect(effectiveFmtAt(store, 0, 0)).toBeDefined();
     clearFormat(store.getState(), store);
     expect(fmtAt(store, 0, 0)).toBeUndefined();
+    expect(store.getState().ui.pendingFormat).toBeNull();
   });
 
   it('clearVisualFormat preserves metadata while removing visual fields', () => {
@@ -372,25 +453,25 @@ describe('clearFormat / colors / font', () => {
 
   it('setFontColor / setFillColor write and clear', () => {
     setFontColor(store.getState(), store, '#ff0000');
-    expect(fmtAt(store, 0, 0)?.color).toBe('#ff0000');
+    expect(effectiveFmtAt(store, 0, 0)?.color).toBe('#ff0000');
     setFontColor(store.getState(), store, null);
-    expect(fmtAt(store, 0, 0)?.color).toBeUndefined();
+    expect(effectiveFmtAt(store, 0, 0)?.color).toBeUndefined();
 
     setFillColor(store.getState(), store, '#0f0');
-    expect(fmtAt(store, 0, 0)?.fill).toBe('#0f0');
+    expect(effectiveFmtAt(store, 0, 0)?.fill).toBe('#0f0');
     setFillColor(store.getState(), store, null);
-    expect(fmtAt(store, 0, 0)?.fill).toBeUndefined();
+    expect(effectiveFmtAt(store, 0, 0)?.fill).toBeUndefined();
   });
 
   it('setFont updates family / size and clears with null', () => {
     setFont(store.getState(), store, { fontFamily: 'Inter', fontSize: 14 });
-    expect(fmtAt(store, 0, 0)?.fontFamily).toBe('Inter');
-    expect(fmtAt(store, 0, 0)?.fontSize).toBe(14);
+    expect(effectiveFmtAt(store, 0, 0)?.fontFamily).toBe('Inter');
+    expect(effectiveFmtAt(store, 0, 0)?.fontSize).toBe(14);
 
     setFont(store.getState(), store, { fontFamily: null });
-    expect(fmtAt(store, 0, 0)?.fontFamily).toBeUndefined();
+    expect(effectiveFmtAt(store, 0, 0)?.fontFamily).toBeUndefined();
     // size untouched.
-    expect(fmtAt(store, 0, 0)?.fontSize).toBe(14);
+    expect(effectiveFmtAt(store, 0, 0)?.fontSize).toBe(14);
   });
 });
 

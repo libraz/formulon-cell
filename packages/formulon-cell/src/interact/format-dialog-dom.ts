@@ -1,4 +1,5 @@
 import { type ColorPaletteHandle, createColorPalette } from '../components/color-palette.js';
+import { createDialogButton, createDialogToggleButton } from './dialog-shell.js';
 import type { SideKey } from './format-dialog-model.js';
 
 export function makeCheckbox(label: string): {
@@ -16,11 +17,7 @@ export function makeCheckbox(label: string): {
 }
 
 export function makeButton(label: string, primary = false): HTMLButtonElement {
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = primary ? 'fc-fmtdlg__btn fc-fmtdlg__btn--primary' : 'fc-fmtdlg__btn';
-  b.textContent = label;
-  return b;
+  return createDialogButton({ label, variant: primary ? 'primary' : 'secondary' });
 }
 
 export function makeSwatches(
@@ -47,12 +44,13 @@ export function makeVisualSideButton(
   label: string,
   extraClass = '',
 ): HTMLButtonElement {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = `fc-fmtdlg__border-hit fc-fmtdlg__border-hit--${key}${extraClass}`;
-  btn.dataset.borderSide = key;
-  btn.setAttribute('aria-label', label);
-  btn.setAttribute('aria-pressed', 'false');
+  const btn = createDialogToggleButton({
+    label,
+    baseClass: `fc-fmtdlg__border-hit fc-fmtdlg__border-hit--${key}`,
+    extraClass: extraClass.trim() || undefined,
+    datasetKey: 'borderSide',
+    value: key,
+  });
   const buttons = visualSideButtons.get(key) ?? [];
   buttons.push(btn);
   visualSideButtons.set(key, buttons);

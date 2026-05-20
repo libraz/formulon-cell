@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { setCellLocked, setProtectedSheet } from '../../../src/commands/protection.js';
@@ -8,6 +11,8 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const setActive = (store: SpreadsheetStore, row: number, col: number): void => {
   store.setState((s) => ({
@@ -88,6 +93,60 @@ describe('attachFormatDialog', () => {
 
     await flushRaf();
     expect(document.activeElement).toBe(moreTab);
+    handle.detach();
+  });
+
+  it('opens the shared validation editor as a dedicated Data Validation dialog', async () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open('more', { mode: 'dataValidation', focus: 'validation' });
+
+    const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg');
+    const title = document.querySelector<HTMLElement>('.fc-fmtdlg__title');
+    const tabs = document.querySelector<HTMLElement>('.fc-fmtdlg__tabs');
+    const preview = document.querySelector<HTMLElement>('.fc-fmtdlg__preview');
+    const sections = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        '.fc-fmtdlg__panel-tab[data-fc-tab="more"] > .fc-fmtdlg__section',
+      ),
+    );
+    const validationKind = document.querySelector<HTMLSelectElement>(
+      '.fc-fmtdlg__panel-tab[data-fc-tab="more"] select[aria-label="種類"]',
+    );
+
+    expect(overlay?.classList.contains('fc-fmtdlg--data-validation')).toBe(true);
+    expect(title?.textContent).toBe('入力規則');
+    expect(tabs?.hidden).toBe(true);
+    expect(preview?.hidden).toBe(true);
+    expect(sections.map((section) => section.hidden)).toEqual([true, true, false]);
+    expect(sections[2]?.classList.contains('fc-fmtdlg__section--standalone')).toBe(true);
+
+    await flushRaf();
+    expect(document.activeElement).toBe(validationKind);
+
+    handle.detach();
+  });
+
+  it('restores the normal Format Cells chrome after Data Validation mode', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open('more', { mode: 'dataValidation', focus: 'validation' });
+    handle.close();
+    handle.open('font');
+
+    const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg');
+    expect(overlay?.classList.contains('fc-fmtdlg--data-validation')).toBe(false);
+    expect(document.querySelector<HTMLElement>('.fc-fmtdlg__title')?.textContent).toBe(
+      'セルの書式設定',
+    );
+    expect(document.querySelector<HTMLElement>('.fc-fmtdlg__tabs')?.hidden).toBe(false);
+    expect(document.querySelector<HTMLElement>('.fc-fmtdlg__preview')?.hidden).toBe(false);
+    expect(
+      Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '.fc-fmtdlg__panel-tab[data-fc-tab="more"] > .fc-fmtdlg__section',
+        ),
+      ).map((section) => section.hidden),
+    ).toEqual([false, false, false]);
+
     handle.detach();
   });
 
@@ -269,6 +328,51 @@ describe('attachFormatDialog', () => {
     expect(document.activeElement).toBe(numberTab);
 
     handle.detach();
+  });
+
+  it('uses the shared range picker for validation list range sources', () => {
+    setRange(store, 0, 0, 4, 2);
+    const handle = attachFormatDialog({ host, store });
+    try {
+      handle.open('more');
+
+      const validationKind = document.querySelector<HTMLSelectElement>('select[aria-label="種類"]');
+      const rangeRadio = document.querySelector<HTMLInputElement>(
+        'input[name="fc-validation-list-source"][value="range"]',
+      );
+      const rangePicker = document.querySelector<HTMLButtonElement>(
+        '[data-range-picker="format-validation-list-range"]',
+      );
+      const rangeInput = rangePicker
+        ?.closest('.fc-range-picker')
+        ?.querySelector<HTMLInputElement>('input');
+      expect(rangeInput).toBeTruthy();
+      expect(rangePicker?.getAttribute('aria-label')).toBe('範囲の選択');
+
+      if (!validationKind || !rangeRadio || !rangeInput) {
+        throw new Error('validation range controls missing');
+      }
+      validationKind.value = 'list';
+      validationKind.dispatchEvent(new Event('change', { bubbles: true }));
+      rangeRadio.checked = true;
+      rangeRadio.dispatchEvent(new Event('change', { bubbles: true }));
+
+      rangePicker?.click();
+      expect(rangePicker?.dataset.rangePickerActive).toBe('true');
+      expect(
+        document.querySelector('.fc-fmtdlg')?.classList.contains('fc-fmtdlg--range-picking'),
+      ).toBe(true);
+      setRange(store, 2, 1, 6, 1);
+      expect(rangeInput.value).toBe('B3:B7');
+
+      handle.close();
+      expect(rangePicker?.dataset.rangePickerActive).toBe('false');
+      expect(
+        document.querySelector('.fc-fmtdlg')?.classList.contains('fc-fmtdlg--range-picking'),
+      ).toBe(false);
+    } finally {
+      handle.detach();
+    }
   });
 
   it('labels Format Cells controls for keyboard and assistive navigation', () => {
@@ -668,6 +772,27 @@ describe('attachFormatDialog', () => {
       r1: 1,
       c1: 1,
     });
+    handle.detach();
+  });
+
+  it('Alignment tab Merge cells projects a disabled reason for a single unmerged cell', () => {
+    setActive(store, 0, 0);
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+    document
+      .querySelector<HTMLButtonElement>('button[data-fc-tab="align"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const merge = document.querySelector<HTMLInputElement>('input[data-fc-check="mergeCells"]');
+    if (!merge) throw new Error('merge checkbox missing');
+    const wrap = merge.closest<HTMLElement>('label');
+    expect(merge.disabled).toBe(true);
+    expect(merge.dataset.disabledReason).toBe(
+      'セルを結合するには 2 つ以上のセルを選択してください。',
+    );
+    expect(wrap?.dataset.disabledReason).toBe(
+      'セルを結合するには 2 つ以上のセルを選択してください。',
+    );
     handle.detach();
   });
 
@@ -1214,6 +1339,70 @@ describe('attachFormatDialog', () => {
     handle.detach();
   });
 
+  it('renders Format Cells select controls through the shared dialog select contract', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open('align');
+
+    const hAlign = document.querySelector<HTMLSelectElement>('select[data-fc-select="align"]');
+    const vAlign = document.querySelector<HTMLSelectElement>('select[data-fc-select="vAlign"]');
+    const textDirection = document.querySelector<HTMLSelectElement>(
+      'select[data-fc-select="textDirection"]',
+    );
+    expect(hAlign?.getAttribute('aria-label')).toBe('横位置');
+    expect(Array.from(hAlign?.options ?? []).map((option) => option.value)).toEqual([
+      'default',
+      'left',
+      'center',
+      'right',
+      'fill',
+      'justify',
+      'centerContinuous',
+      'distributed',
+    ]);
+    expect(Array.from(vAlign?.options ?? []).map((option) => option.value)).toEqual([
+      'default',
+      'top',
+      'middle',
+      'bottom',
+      'justify',
+      'distributed',
+    ]);
+    expect(Array.from(textDirection?.options ?? []).map((option) => option.value)).toEqual([
+      'context',
+      'ltr',
+      'rtl',
+    ]);
+
+    document
+      .querySelector<HTMLButtonElement>('button[data-fc-tab="fill"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const fillPattern = document.querySelector<HTMLSelectElement>(
+      'select[data-fc-select="fillPattern"]',
+    );
+    expect(fillPattern?.getAttribute('aria-label')).toBe('パターンの種類');
+    expect(Array.from(fillPattern?.options ?? []).map((option) => option.value)).toContain(
+      'diagonalUp',
+    );
+
+    document
+      .querySelector<HTMLButtonElement>('button[data-fc-tab="border"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const borderStyle = document.querySelector<HTMLSelectElement>(
+      '.fc-fmtdlg__panel-tab[data-fc-tab="border"] select',
+    );
+    expect(borderStyle?.getAttribute('aria-label')).toBe('スタイル');
+    expect(Array.from(borderStyle?.options ?? []).map((option) => option.value)).toEqual([
+      'thin',
+      'medium',
+      'thick',
+      'dashed',
+      'dotted',
+      'double',
+    ]);
+
+    handle.detach();
+  });
+
   it('font and fill swatches apply colors', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
@@ -1462,6 +1651,12 @@ describe('attachFormatDialog', () => {
     expect(preview.style.textAlign).toBe('right');
 
     handle.detach();
+  });
+
+  it('keeps number pattern list buttons on the shared dialog option primitive', () => {
+    const source = readFileSync(join(root, 'src/interact/format-dialog.ts'), 'utf8');
+    expect(source).toContain('appendDialogOptionButton(patternList');
+    expect(source).not.toContain("const item = document.createElement('button')");
   });
 
   it('detach() removes wired listeners (clicking after detach is inert)', () => {

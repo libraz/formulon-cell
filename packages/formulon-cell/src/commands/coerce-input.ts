@@ -1,6 +1,7 @@
 import { makeRangeResolver } from '../engine/range-resolver.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { formatWithPending } from '../store/pending-format.js';
 import type { CellValidation, SpreadsheetStore, State } from '../store/store.js';
 import { isCellWritable, warnProtected } from './protection.js';
 import { normalizeR1C1Formula } from './refs.js';
@@ -89,8 +90,9 @@ export function coerceInput(raw: string, options?: CoerceInputOptions): CoercedI
 }
 
 export function coerceInputForCell(state: State, a: Addr, raw: string): CoercedInput {
+  const format = formatWithPending(state, a);
   return coerceInput(raw, {
-    forceText: state.format.formats.get(`${a.sheet}:${a.row}:${a.col}`)?.numFmt?.kind === 'text',
+    forceText: format?.numFmt?.kind === 'text',
   });
 }
 

@@ -5,6 +5,7 @@ import { addrKey } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { cellRect } from '../render/geometry.js';
+import { formatWithPending, sameAddr } from '../store/pending-format.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { type ArgHelperHandle, type ArgHelperLabels, attachArgHelper } from './arg-helper.js';
 import {
@@ -167,6 +168,7 @@ export class InlineEditor {
     this.input = null;
     this.editingAddr = null;
     mutators.setEditor(this.deps.store, { kind: 'idle' });
+    mutators.setPendingFormat(this.deps.store, null);
     mutators.setEditorRefs(this.deps.store, []);
     // Removing the focused input drops focus to <body>; without this, the
     // host's keydown listener stops receiving navigation keys until the
@@ -178,7 +180,7 @@ export class InlineEditor {
     if (!this.input || !this.editingAddr) return;
     const raw = this.input.value;
     const a = this.editingAddr;
-    const fmt = this.deps.store.getState().format.formats.get(addrKey(a));
+    const fmt = formatWithPending(this.deps.store.getState(), a);
     let rejected = false;
     let rejectedOutcome: { severity: 'stop'; title?: string; message: string } | null = null;
     try {
@@ -210,6 +212,11 @@ export class InlineEditor {
       this.input.select();
       if (rejectedOutcome) this.deps.onValidation?.(rejectedOutcome);
       return;
+    }
+    const pending = this.deps.store.getState().ui.pendingFormat;
+    if (pending && sameAddr(pending.addr, a)) {
+      mutators.setCellFormat(this.deps.store, a, pending.format);
+      mutators.setPendingFormat(this.deps.store, null);
     }
     this.deps.onAfterCommit();
     this.cancel();
@@ -243,7 +250,10 @@ export class InlineEditor {
       for (let row = r.r0; row <= r.r1; row += 1) {
         for (let col = r.c0; col <= r.c1; col += 1) {
           const target = { sheet, row, col };
-          const fmt = s.format.formats.get(addrKey(target));
+          const fmt =
+            target.sheet === anchor.sheet && target.row === anchor.row && target.col === anchor.col
+              ? formatWithPending(this.deps.store.getState(), target)
+              : s.format.formats.get(addrKey(target));
           const forceText = fmt?.numFmt?.kind === 'text';
           if (forceText) {
             if (row === anchor.row && col === anchor.col) {
@@ -310,6 +320,11 @@ export class InlineEditor {
           }
         }
       }
+    }
+    const pending = this.deps.store.getState().ui.pendingFormat;
+    if (pending && sameAddr(pending.addr, anchor)) {
+      mutators.setCellFormat(this.deps.store, anchor, pending.format);
+      mutators.setPendingFormat(this.deps.store, null);
     }
     this.deps.onAfterCommit();
     this.cancel();

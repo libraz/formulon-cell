@@ -2,6 +2,8 @@
 // checkboxes plus family/size/color pickers and swatch grids.
 
 import type { Strings } from '../../i18n/strings.js';
+import { appendDialogDatalistOptions } from '../../toolbar/dialogs/form-controls.js';
+import { appendDialogOptionButton } from '../dialog-shell.js';
 import { makeButton, makeCheckbox, makeSwatches } from '../format-dialog-dom.js';
 import { COMMON_FONTS } from '../format-dialog-model.js';
 
@@ -53,11 +55,7 @@ export function createFontTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   familyInput.setAttribute('list', familyListId);
   const familyDatalist = document.createElement('datalist');
   familyDatalist.id = familyListId;
-  for (const f of COMMON_FONTS) {
-    const opt = document.createElement('option');
-    opt.value = f;
-    familyDatalist.appendChild(opt);
-  }
+  appendDialogDatalistOptions(familyDatalist, COMMON_FONTS);
   familyRow.append(familyLabel, familyInput, familyDatalist);
   panel.appendChild(familyRow);
 
@@ -66,17 +64,17 @@ export function createFontTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   familyList.setAttribute('role', 'listbox');
   familyList.setAttribute('aria-label', t.fontFamily);
   for (const [index, family] of COMMON_FONTS.slice(0, 8).entries()) {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.className = 'fc-fmtdlg__font-list-item';
-    item.textContent = family;
-    item.setAttribute('role', 'option');
-    item.setAttribute('aria-selected', index === 0 ? 'true' : 'false');
+    const item = appendDialogOptionButton(familyList, {
+      label: family,
+      baseClass: 'fc-fmtdlg__font-list-item',
+      datasetKey: 'fcFontFamily',
+      value: family,
+      selected: index === 0,
+    });
     item.addEventListener('click', () => {
       familyInput.value = family;
       familyInput.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    familyList.appendChild(item);
   }
   panel.appendChild(familyList);
 
@@ -91,14 +89,13 @@ export function createFontTab(panel: HTMLDivElement, t: Strings['formatDialog'])
     { id: 'boldItalic', label: `${t.fontBold} ${t.fontItalic}` },
   ] as const;
   for (const [index, option] of fontStyleOptions.entries()) {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.className = 'fc-fmtdlg__font-list-item';
-    item.textContent = option.label;
-    item.dataset.fcFontStyle = option.id;
-    item.setAttribute('role', 'option');
-    item.setAttribute('aria-selected', index === 0 ? 'true' : 'false');
-    fontStyleList.appendChild(item);
+    appendDialogOptionButton(fontStyleList, {
+      label: option.label,
+      baseClass: 'fc-fmtdlg__font-list-item',
+      datasetKey: 'fcFontStyle',
+      value: option.id,
+      selected: index === 0,
+    });
   }
   panel.appendChild(fontStyleList);
 
@@ -121,17 +118,17 @@ export function createFontTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   sizeList.setAttribute('role', 'listbox');
   sizeList.setAttribute('aria-label', t.fontSize);
   for (const size of [8, 9, 10, 11, 12, 14, 16, 18]) {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.className = 'fc-fmtdlg__font-list-item';
-    item.textContent = String(size);
-    item.setAttribute('role', 'option');
-    item.setAttribute('aria-selected', size === 12 ? 'true' : 'false');
+    const item = appendDialogOptionButton(sizeList, {
+      label: String(size),
+      baseClass: 'fc-fmtdlg__font-list-item',
+      datasetKey: 'fcFontSize',
+      value: String(size),
+      selected: size === 12,
+    });
     item.addEventListener('click', () => {
       sizeInput.value = String(size);
       sizeInput.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    sizeList.appendChild(item);
   }
   panel.appendChild(sizeList);
 

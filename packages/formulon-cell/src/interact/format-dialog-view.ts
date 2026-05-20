@@ -1,6 +1,12 @@
 import type { Strings } from '../i18n/strings.js';
 import type { NegativeStyle } from '../store/store.js';
-import { createDialogShell } from './dialog-shell.js';
+import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
+import {
+  appendDialogIconButton,
+  appendDialogOptionButton,
+  appendDialogTabPair,
+  createDialogShell,
+} from './dialog-shell.js';
 import { makeButton, makeCheckbox } from './format-dialog-dom.js';
 import { CURRENCY_SYMBOLS, type NumberCategory, type TabId } from './format-dialog-model.js';
 import { createAlignTab } from './format-dialog-tabs/align.js';
@@ -28,13 +34,14 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   const header = document.createElement('div');
   header.className = 'fc-fmtdlg__header';
   const headerTitle = document.createElement('span');
+  headerTitle.className = 'fc-fmtdlg__title';
   headerTitle.textContent = t.title;
-  const closeBtn = document.createElement('button');
-  closeBtn.type = 'button';
-  closeBtn.className = 'fc-fmtdlg__close';
-  closeBtn.setAttribute('aria-label', t.cancel);
-  closeBtn.textContent = '×';
-  header.append(headerTitle, closeBtn);
+  header.appendChild(headerTitle);
+  const closeBtn = appendDialogIconButton(header, {
+    label: '×',
+    ariaLabel: t.cancel,
+    baseClass: 'fc-fmtdlg__close',
+  });
   panel.appendChild(header);
 
   // Preview
@@ -84,28 +91,16 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   const tabPanels = new Map<TabId, HTMLDivElement>();
 
   for (const def of tabDefs) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'fc-fmtdlg__tab';
-    btn.textContent = def.label;
-    btn.setAttribute('role', 'tab');
-    btn.setAttribute('aria-selected', 'false');
-    btn.setAttribute('aria-controls', `fc-fmtdlg-panel-${def.id}`);
-    btn.tabIndex = -1;
-    btn.dataset.fcTab = def.id;
-    tabsStrip.appendChild(btn);
-    tabButtons.set(def.id, btn);
-
-    const panelEl = document.createElement('div');
-    panelEl.className = 'fc-fmtdlg__panel-tab';
-    panelEl.id = `fc-fmtdlg-panel-${def.id}`;
-    panelEl.setAttribute('role', 'tabpanel');
-    panelEl.setAttribute('aria-labelledby', `fc-fmtdlg-tab-${def.id}`);
-    panelEl.dataset.fcTab = def.id;
-    panelEl.hidden = true;
-    body.appendChild(panelEl);
+    const { button, panel: panelEl } = appendDialogTabPair(tabsStrip, body, {
+      id: def.id,
+      label: def.label,
+      tabId: `fc-fmtdlg-tab-${def.id}`,
+      panelId: `fc-fmtdlg-panel-${def.id}`,
+      tabDatasetKey: 'fcTab',
+      panelDatasetKey: 'fcTab',
+    });
+    tabButtons.set(def.id, button);
     tabPanels.set(def.id, panelEl);
-    btn.id = `fc-fmtdlg-tab-${def.id}`;
   }
 
   // ── Number tab ─────────────────────────────────────────────────────────
@@ -138,14 +133,12 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   ];
   const catButtons = new Map<NumberCategory, HTMLButtonElement>();
   for (const c of catDefs) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'fc-fmtdlg__cat-item';
-    b.textContent = c.label;
-    b.setAttribute('role', 'option');
-    b.tabIndex = -1;
-    b.dataset.fcCat = c.id;
-    catList.appendChild(b);
+    const b = appendDialogOptionButton(catList, {
+      label: c.label,
+      baseClass: 'fc-fmtdlg__cat-item',
+      datasetKey: 'fcCat',
+      value: c.id,
+    });
     catButtons.set(c.id, b);
   }
 
@@ -186,14 +179,11 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   symbolRow.className = 'fc-fmtdlg__row';
   const symbolLabel = document.createElement('span');
   symbolLabel.textContent = t.symbol;
-  const symbolSelect = document.createElement('select');
-  symbolSelect.setAttribute('aria-label', t.symbol);
-  for (const s of CURRENCY_SYMBOLS) {
-    const opt = document.createElement('option');
-    opt.value = s;
-    opt.textContent = s;
-    symbolSelect.appendChild(opt);
-  }
+  const symbolSelect = createDialogSelect(
+    CURRENCY_SYMBOLS.map((symbol) => ({ value: symbol, label: symbol })),
+    CURRENCY_SYMBOLS[0] ?? '',
+    { className: '', ariaLabel: t.symbol },
+  );
   symbolRow.append(symbolLabel, symbolSelect);
   numberControls.appendChild(symbolRow);
 
@@ -201,8 +191,10 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   patternPresetRow.className = 'fc-fmtdlg__row';
   const patternPresetLabel = document.createElement('span');
   patternPresetLabel.textContent = t.patternType;
-  const patternPresetSelect = document.createElement('select');
-  patternPresetSelect.setAttribute('aria-label', t.patternType);
+  const patternPresetSelect = createDialogSelect([], '', {
+    className: '',
+    ariaLabel: t.patternType,
+  });
   patternPresetSelect.dataset.fcSelect = 'patternPreset';
   patternPresetRow.append(patternPresetLabel, patternPresetSelect);
   numberControls.appendChild(patternPresetRow);
@@ -242,17 +234,14 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   localeRow.className = 'fc-fmtdlg__row';
   const localeLabel = document.createElement('span');
   localeLabel.textContent = t.languageLocation;
-  const localeSelect = document.createElement('select');
-  localeSelect.setAttribute('aria-label', t.languageLocation);
-  for (const [value, label] of [
-    ['ja', '日本語'],
-    ['en', 'English'],
-  ] as const) {
-    const opt = document.createElement('option');
-    opt.value = value;
-    opt.textContent = label;
-    localeSelect.appendChild(opt);
-  }
+  const localeSelect = createDialogSelect(
+    [
+      { value: 'ja', label: '日本語' },
+      { value: 'en', label: 'English' },
+    ],
+    'ja',
+    { className: '', ariaLabel: t.languageLocation },
+  );
   localeRow.append(localeLabel, localeSelect);
   numberControls.appendChild(localeRow);
 
@@ -263,18 +252,15 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   calendarRow.className = 'fc-fmtdlg__row';
   const calendarLabel = document.createElement('span');
   calendarLabel.textContent = t.calendarType;
-  const calendarSelect = document.createElement('select');
-  calendarSelect.setAttribute('aria-label', t.calendarType);
+  const calendarSelect = createDialogSelect(
+    [
+      { value: 'gregorian', label: t.calendarTypeGregorian },
+      { value: 'japanese', label: t.calendarTypeJapanese },
+    ],
+    'gregorian',
+    { className: '', ariaLabel: t.calendarType },
+  );
   calendarSelect.dataset.fcSelect = 'calendarType';
-  for (const [value, label] of [
-    ['gregorian', t.calendarTypeGregorian],
-    ['japanese', t.calendarTypeJapanese],
-  ] as const) {
-    const opt = document.createElement('option');
-    opt.value = value;
-    opt.textContent = label;
-    calendarSelect.appendChild(opt);
-  }
   calendarRow.append(calendarLabel, calendarSelect);
   numberControls.appendChild(calendarRow);
 
@@ -294,15 +280,14 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     { value: 'minus', text: '-1234' },
   ];
   for (const [index, sample] of negativeSamples.entries()) {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.className = 'fc-fmtdlg__negative-item';
-    item.setAttribute('role', 'option');
-    item.setAttribute('aria-selected', index === 3 ? 'true' : 'false');
-    item.dataset.fcNegativeStyle = sample.value;
-    if (sample.red) item.classList.add('fc-fmtdlg__negative-item--red');
-    item.textContent = sample.text;
-    negativeOptions.appendChild(item);
+    appendDialogOptionButton(negativeOptions, {
+      label: sample.text,
+      baseClass: 'fc-fmtdlg__negative-item',
+      datasetKey: 'fcNegativeStyle',
+      value: sample.value,
+      selected: index === 3,
+      extraClass: sample.red ? 'fc-fmtdlg__negative-item--red' : undefined,
+    });
   }
   negativeList.append(negativeLabel, negativeOptions);
   numberControls.appendChild(negativeList);
@@ -394,6 +379,9 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   // ── More tab (hyperlink / comment / validation) ────────────────────────
   const moreTab = createMoreTab(tabPanels.get('more') as HTMLDivElement, t);
   const {
+    hyperlinkSection,
+    commentSection,
+    validationSection,
     hlInput,
     hlClear,
     commentArea,
@@ -441,6 +429,8 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   return {
     shell,
     overlay,
+    panel,
+    headerTitle,
     preview,
     previewCell,
     tabsStrip,
@@ -518,6 +508,9 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     fillPatternColorInput,
     lockedCk,
     hiddenFormulaCk,
+    hyperlinkSection,
+    commentSection,
+    validationSection,
     hlInput,
     hlClear,
     commentArea,

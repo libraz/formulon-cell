@@ -1,6 +1,7 @@
 import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import { normalizeFormatLocale } from '../format/locale.js';
+import { formatWithPending, sameAddr } from '../store/pending-format.js';
 import {
   type CellAlign,
   type CellBorderSide,
@@ -25,6 +26,39 @@ function eachKey(range: Range, fn: (key: string) => void): void {
   }
 }
 
+const singleCellAddr = (range: Range): { sheet: number; row: number; col: number } | null =>
+  range.r0 === range.r1 && range.c0 === range.c1
+    ? { sheet: range.sheet, row: range.r0, col: range.c0 }
+    : null;
+
+const canStagePendingFormat = (state: State, range: Range): boolean => {
+  if ((state.selection.extraRanges?.length ?? 0) > 0 || state.ui.editor.kind !== 'idle') {
+    return false;
+  }
+  const addr = singleCellAddr(range);
+  if (!addr || !sameAddr(addr, state.selection.active)) return false;
+  const key = addrKey(addr);
+  if (state.format.formats.has(key)) return false;
+  const cell = state.data.cells.get(key);
+  return !cell || (cell.value.kind === 'blank' && !cell.formula);
+};
+
+const stagePendingFormat = (
+  state: State,
+  store: SpreadsheetStore,
+  range: Range,
+  patch: Partial<CellFormat>,
+): void => {
+  const addr = singleCellAddr(range);
+  if (!addr) return;
+  const previous = sameAddr(state.ui.pendingFormat?.addr ?? addr, addr)
+    ? (state.ui.pendingFormat?.format ?? {})
+    : {};
+  const next: Partial<CellFormat> = { ...previous, ...patch };
+  if (patch.borders) next.borders = { ...(previous.borders ?? {}), ...patch.borders };
+  mutators.setPendingFormat(store, { addr, format: next });
+};
+
 /** Apply a partial format patch to every writable cell in `range`. When
  *  the sheet is unprotected this falls back to the bulk
  *  `mutators.setRangeFormat` path (one setState call); when protected it
@@ -36,9 +70,15 @@ export function applyFormatPatch(
   store: SpreadsheetStore,
   range: Range,
   patch: Partial<CellFormat> | null,
+  opts: { allowPending?: boolean } = {},
 ): boolean {
   const allowed = gateProtection(state, range);
   if (allowed === null) return false;
+  if (patch !== null && opts.allowPending !== false && canStagePendingFormat(state, range)) {
+    stagePendingFormat(state, store, range, patch);
+    return true;
+  }
+  if (state.ui.pendingFormat) mutators.setPendingFormat(store, null);
   // Fast path: sheet unprotected, or entire range writable.
   // We can still use the bulk mutator because per-cell-locked cells inside
   // a partially-unlocked range need to be skipped — fall through to the
@@ -66,6 +106,15 @@ function allHave(
   range: Range,
   predicate: (f: CellFormat | undefined) => boolean,
 ): boolean {
+  const pendingAddr = singleCellAddr(range);
+  if (
+    pendingAddr &&
+    state.ui.pendingFormat &&
+    sameAddr(state.ui.pendingFormat.addr, pendingAddr) &&
+    !state.format.formats.has(addrKey(pendingAddr))
+  ) {
+    return predicate(formatWithPending(state, pendingAddr));
+  }
   let all = true;
   eachKey(range, (key) => {
     if (!predicate(state.format.formats.get(key))) all = false;
@@ -78,6 +127,15 @@ function anyHave(
   range: Range,
   predicate: (f: CellFormat | undefined) => boolean,
 ): boolean {
+  const pendingAddr = singleCellAddr(range);
+  if (
+    pendingAddr &&
+    state.ui.pendingFormat &&
+    sameAddr(state.ui.pendingFormat.addr, pendingAddr) &&
+    !state.format.formats.has(addrKey(pendingAddr))
+  ) {
+    return predicate(formatWithPending(state, pendingAddr));
+  }
   let any = false;
   eachKey(range, (key) => {
     if (predicate(state.format.formats.get(key))) any = true;
@@ -88,7 +146,12 @@ function anyHave(
 function toggleFlag(state: State, store: SpreadsheetStore, key: ToggleKey): void {
   const range = state.selection.range;
   const allOn = allHave(state, range, (f) => f?.[key] === true);
-  applyFormatPatch(state, store, range, { [key]: !allOn } as Partial<CellFormat>);
+  const patch = { [key]: !allOn } as Partial<CellFormat>;
+  if (canStagePendingFormat(state, range)) {
+    stagePendingFormat(state, store, range, patch);
+    return;
+  }
+  applyFormatPatch(state, store, range, patch);
 }
 
 export function toggleBold(state: State, store: SpreadsheetStore): void {
@@ -124,12 +187,19 @@ export function toggleWrap(state: State, store: SpreadsheetStore): void {
 export function bumpIndent(state: State, store: SpreadsheetStore, delta: 1 | -1): void {
   const range = state.selection.range;
   if (gateProtection(state, range) === null) return;
+  const single = singleCellAddr(range);
+  if (single && canStagePendingFormat(state, range)) {
+    const cur = formatWithPending(state, single)?.indent ?? 0;
+    applyFormatPatch(state, store, range, { indent: Math.max(0, Math.min(15, cur + delta)) });
+    return;
+  }
+  if (state.ui.pendingFormat) mutators.setPendingFormat(store, null);
   const sheet = range.sheet;
   for (let r = range.r0; r <= range.r1; r += 1) {
     for (let c = range.c0; c <= range.c1; c += 1) {
       const addr = { sheet, row: r, col: c };
       if (!isCellWritable(state, addr)) continue;
-      const fmt = state.format.formats.get(addrKey(addr));
+      const fmt = formatWithPending(state, addr);
       const cur = fmt?.indent ?? 0;
       const next = Math.max(0, Math.min(15, cur + delta));
       mutators.setCellFormat(store, addr, { indent: next });
@@ -175,7 +245,7 @@ export function bumpDecimals(state: State, store: SpreadsheetStore, delta: 1 | -
     for (let c = range.c0; c <= range.c1; c += 1) {
       const addr = { sheet, row: r, col: c };
       if (!isCellWritable(state, addr)) continue;
-      const fmt = state.format.formats.get(addrKey(addr));
+      const fmt = formatWithPending(state, addr);
       const cur = fmt?.numFmt;
       let nextFmt: NumFmt | undefined;
       if (!cur || cur.kind === 'general') {
@@ -191,7 +261,16 @@ export function bumpDecimals(state: State, store: SpreadsheetStore, delta: 1 | -
       } else if (cur.kind === 'percent') {
         nextFmt = { kind: 'percent', decimals: clampDecimals(cur.decimals + delta) };
       }
-      if (nextFmt) mutators.setCellFormat(store, addr, { numFmt: nextFmt });
+      if (nextFmt) {
+        const patch = { numFmt: nextFmt };
+        const cellRange = { sheet, r0: r, c0: c, r1: r, c1: c };
+        if (canStagePendingFormat(state, cellRange)) {
+          stagePendingFormat(state, store, cellRange, patch);
+        } else {
+          if (state.ui.pendingFormat) mutators.setPendingFormat(store, null);
+          mutators.setCellFormat(store, addr, patch);
+        }
+      }
     }
   }
 }
@@ -234,6 +313,50 @@ export function setBorderPreset(
     color === undefined ? { style: 'thick' } : { style: 'thick', color };
   const doubleSide: CellBorderSide =
     color === undefined ? { style: 'double' } : { style: 'double', color };
+  if (canStagePendingFormat(state, range)) {
+    const borders: CellBorders = {};
+    if (preset === 'inside' || preset === 'insideHorizontal' || preset === 'insideVertical') return;
+    if (preset === 'outline') {
+      borders.top = side;
+      borders.right = side;
+      borders.bottom = side;
+      borders.left = side;
+    } else if (preset === 'thickOutline') {
+      borders.top = thickSide;
+      borders.right = thickSide;
+      borders.bottom = thickSide;
+      borders.left = thickSide;
+    } else if (preset === 'top') borders.top = side;
+    else if (preset === 'bottom') borders.bottom = side;
+    else if (preset === 'left') borders.left = side;
+    else if (preset === 'right') borders.right = side;
+    else if (preset === 'doubleBottom') borders.bottom = doubleSide;
+    else if (preset === 'thickBottom') borders.bottom = thickSide;
+    else if (preset === 'topAndBottom') {
+      borders.top = side;
+      borders.bottom = side;
+    } else if (preset === 'topAndThickBottom') {
+      borders.top = side;
+      borders.bottom = thickSide;
+    } else if (preset === 'topAndDoubleBottom') {
+      borders.top = side;
+      borders.bottom = doubleSide;
+    } else if (preset === 'diagonalDown') borders.diagonalDown = side;
+    else if (preset === 'diagonalUp') borders.diagonalUp = side;
+    if (
+      borders.top ||
+      borders.right ||
+      borders.bottom ||
+      borders.left ||
+      borders.diagonalDown ||
+      borders.diagonalUp
+    ) {
+      applyFormatPatch(state, store, range, { borders });
+      return;
+    }
+  } else if (state.ui.pendingFormat) {
+    mutators.setPendingFormat(store, null);
+  }
   if (preset === 'all') {
     applyFormatPatch(state, store, range, {
       borders: { top: side, right: side, bottom: side, left: side },
@@ -345,6 +468,13 @@ export function cycleBorders(state: State, store: SpreadsheetStore): void {
     return !!(b && (b.top || b.right || b.bottom || b.left));
   });
   if (!hasAny) {
+    if (canStagePendingFormat(state, range)) {
+      applyFormatPatch(state, store, range, {
+        borders: { top: true, right: true, bottom: true, left: true },
+      });
+      return;
+    }
+    if (state.ui.pendingFormat) mutators.setPendingFormat(store, null);
     // Outline: paint only the perimeter sides.
     const sheet = range.sheet;
     for (let r = range.r0; r <= range.r1; r += 1) {
@@ -382,6 +512,7 @@ export function cycleBorders(state: State, store: SpreadsheetStore): void {
 export function clearFormat(state: State, store: SpreadsheetStore): void {
   const range = state.selection.range;
   if (gateProtection(state, range) === null) return;
+  if (state.ui.pendingFormat) mutators.setPendingFormat(store, null);
   if (!state.protection.protectedSheets.has(range.sheet)) {
     mutators.setRangeFormat(store, range, null);
     return;
@@ -433,6 +564,7 @@ function stripVisualFormat(format: CellFormat): CellFormat | null {
 export function clearVisualFormat(state: State, store: SpreadsheetStore): void {
   const range = state.selection.range;
   if (gateProtection(state, range) === null) return;
+  if (state.ui.pendingFormat) mutators.setPendingFormat(store, null);
   store.setState((s) => {
     const formats = new Map(s.format.formats);
     for (let r = range.r0; r <= range.r1; r += 1) {

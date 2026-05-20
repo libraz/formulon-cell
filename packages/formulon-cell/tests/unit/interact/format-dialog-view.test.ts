@@ -1,8 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { dictionaries } from '../../../src/i18n/strings.js';
 import { createFormatDialogView } from '../../../src/interact/format-dialog-view.js';
 
 const en = dictionaries.en;
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 describe('interact/format-dialog-view', () => {
   let host: HTMLElement;
@@ -67,6 +71,15 @@ describe('interact/format-dialog-view', () => {
     expect(view.lockedCk.input.dataset.fcCheck).toBe('locked');
   });
 
+  it('renders font family datalist options through the shared dialog option helper', () => {
+    const view = createFormatDialogView({ host, strings: en, t: en.formatDialog });
+    const datalist = document.getElementById(
+      view.familyInput.getAttribute('list') ?? '',
+    ) as HTMLDataListElement | null;
+    expect(datalist).toBeTruthy();
+    expect(Array.from(datalist?.options ?? [], (option) => option.value)).toContain('Arial');
+  });
+
   it('appends the overlay to document.body so it escapes `.fc-host` contain:strict / isolation:isolate', () => {
     const view = createFormatDialogView({ host, strings: en, t: en.formatDialog });
     expect(document.body.contains(view.overlay)).toBe(true);
@@ -88,5 +101,56 @@ describe('interact/format-dialog-view', () => {
     const view = createFormatDialogView({ host, strings: en, t: en.formatDialog });
     expect(view.validationKindSelect.options.length).toBe(8); // none + 7 kinds
     expect(view.validationOpSelect.options.length).toBe(8); // between/notBetween/=/<>/</<=/>/>=
+    expect(view.validationKindSelect.getAttribute('aria-label')).toBe(
+      en.formatDialog.validationKind,
+    );
+    expect(Array.from(view.validationKindSelect.options, (option) => option.value)).toEqual([
+      'none',
+      'list',
+      'whole',
+      'decimal',
+      'date',
+      'time',
+      'textLength',
+      'custom',
+    ]);
+    expect(Array.from(view.validationErrorStyleSelect.options, (option) => option.value)).toEqual([
+      'stop',
+      'warning',
+      'information',
+    ]);
+  });
+
+  it('renders number tab selects through the shared dialog select contract', () => {
+    const view = createFormatDialogView({ host, strings: en, t: en.formatDialog });
+    expect(view.symbolSelect.getAttribute('aria-label')).toBe(en.formatDialog.symbol);
+    expect(Array.from(view.symbolSelect.options, (option) => option.value)).toContain('€');
+    expect(view.patternPresetSelect.dataset.fcSelect).toBe('patternPreset');
+    expect(view.patternPresetSelect.getAttribute('aria-label')).toBe(en.formatDialog.patternType);
+    expect(
+      Array.from(view.localeSelect.options, (option) => [option.value, option.textContent]),
+    ).toEqual([
+      ['ja', '日本語'],
+      ['en', 'English'],
+    ]);
+    expect(view.calendarSelect.dataset.fcSelect).toBe('calendarType');
+    expect(Array.from(view.calendarSelect.options, (option) => option.value)).toEqual([
+      'gregorian',
+      'japanese',
+    ]);
+  });
+
+  it('keeps font list and alignment dial buttons on shared dialog primitives', () => {
+    const fontSource = readFileSync(join(root, 'src/interact/format-dialog-tabs/font.ts'), 'utf8');
+    const alignSource = readFileSync(
+      join(root, 'src/interact/format-dialog-tabs/align.ts'),
+      'utf8',
+    );
+    expect(fontSource).toContain('appendDialogOptionButton(familyList');
+    expect(fontSource).toContain('appendDialogOptionButton(fontStyleList');
+    expect(fontSource).toContain('appendDialogOptionButton(sizeList');
+    expect(fontSource).not.toContain("document.createElement('button')");
+    expect(alignSource).toContain('createDialogToggleButton({');
+    expect(alignSource).not.toContain("document.createElement('button')");
   });
 });

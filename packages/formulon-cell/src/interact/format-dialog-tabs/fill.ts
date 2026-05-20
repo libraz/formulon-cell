@@ -3,6 +3,7 @@
 
 import type { Strings } from '../../i18n/strings.js';
 import type { FillPattern } from '../../store/store.js';
+import { createDialogSelect } from '../../toolbar/dialogs/form-controls.js';
 import { makeButton, makeSwatches } from '../format-dialog-dom.js';
 
 export interface FillTabRefs {
@@ -38,9 +39,6 @@ export function createFillTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   fillPatternRow.className = 'fc-fmtdlg__row';
   const fillPatternLabel = document.createElement('span');
   fillPatternLabel.textContent = t.fillPatternStyle;
-  const fillPatternSelect = document.createElement('select');
-  fillPatternSelect.setAttribute('aria-label', t.fillPatternStyle);
-  fillPatternSelect.dataset.fcSelect = 'fillPattern';
   const fillPatternOptions: Array<{ value: '' | FillPattern; label: string }> = [
     { value: '', label: t.fillPatternSolid },
     { value: 'gray125', label: t.fillPatternGray125 },
@@ -51,12 +49,11 @@ export function createFillTab(panel: HTMLDivElement, t: Strings['formatDialog'])
     { value: 'diagonalDown', label: t.fillPatternDiagonalDown },
     { value: 'diagonalUp', label: t.fillPatternDiagonalUp },
   ];
-  for (const option of fillPatternOptions) {
-    const opt = document.createElement('option');
-    opt.value = option.value;
-    opt.textContent = option.label;
-    fillPatternSelect.appendChild(opt);
-  }
+  const fillPatternSelect = createDialogSelect(fillPatternOptions, '', {
+    ariaLabel: t.fillPatternStyle,
+    className: '',
+  });
+  fillPatternSelect.dataset.fcSelect = 'fillPattern';
   fillPatternRow.append(fillPatternLabel, fillPatternSelect);
   fillSection.appendChild(fillPatternRow);
   const fillPatternColorRow = document.createElement('div');

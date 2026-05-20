@@ -4,9 +4,17 @@
 // owns the imperative `runFillSeries` / `applyFillSeries` glue.
 
 import type { Range } from '@libraz/formulon-cell';
+import { dictionaries, type Strings } from '../../i18n/strings.js';
+import {
+  appendDialogActions,
+  createDialogShell,
+  installDialogLifecycle,
+  mountDialog,
+} from '../dialogs/shell.js';
 
 export type RibbonFillDirection = 'down' | 'right' | 'up' | 'left';
 export type RibbonFillSeriesMode = 'auto' | 'copy' | 'days' | 'weekdays' | 'months' | 'years';
+export type FillSeriesDialogText = Strings['fillSeriesDialog'];
 
 export const fillSeriesSourceRange = (range: Range, direction: RibbonFillDirection): Range => {
   if (direction === 'down') return { ...range, r1: range.r0 };
@@ -47,51 +55,35 @@ export const selectedFillSeriesRadio = <T extends string>(
 
 export const showFillSeriesDialog = (
   range: Range,
-  ribbonLang: 'ja' | 'en',
+  text: FillSeriesDialogText | 'ja' | 'en',
 ): Promise<{ direction: RibbonFillDirection; mode: RibbonFillSeriesMode } | null> => {
   return new Promise((resolve) => {
-    const ja = ribbonLang === 'ja';
-    const title = ja ? '連続データ' : 'Series';
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const overlay = document.createElement('div');
-    overlay.className = 'fc-fmtdlg app__dlg';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', title);
-
-    const panel = document.createElement('div');
-    panel.className = 'fc-fmtdlg__panel app__dlg__panel fc-pastesp__panel';
-    overlay.appendChild(panel);
-
-    const header = document.createElement('div');
-    header.className = 'fc-fmtdlg__header';
-    header.textContent = title;
-    panel.appendChild(header);
-
-    const body = document.createElement('div');
-    body.className = 'fc-fmtdlg__body fc-pastesp__body';
-    panel.appendChild(body);
+    const t = typeof text === 'string' ? dictionaries[text].fillSeriesDialog : text;
+    const title = t.title;
+    const shell = createDialogShell({ title });
+    shell.panel.classList.add('fc-pastesp__panel');
+    shell.body.classList.add('fc-pastesp__body');
 
     const cols = document.createElement('div');
     cols.className = 'fc-pastesp__cols';
-    body.appendChild(cols);
+    shell.body.appendChild(cols);
 
     const dirName = `app-fill-series-dir-${Math.random().toString(36).slice(2)}`;
     const dirGroup = document.createElement('div');
     dirGroup.className = 'fc-pastesp__group';
     const dirLegend = document.createElement('div');
     dirLegend.className = 'fc-pastesp__legend';
-    dirLegend.textContent = ja ? '範囲' : 'Series in';
+    dirLegend.textContent = t.seriesIn;
     const dirList = document.createElement('div');
     dirList.className = 'fc-pastesp__list';
     dirList.setAttribute('role', 'radiogroup');
     dirList.setAttribute('aria-label', dirLegend.textContent);
     const initialDirection = inferFillSeriesDirection(range);
     const directionOptions: Array<{ value: RibbonFillDirection; label: string }> = [
-      { value: 'down', label: ja ? '列' : 'Columns' },
-      { value: 'right', label: ja ? '行' : 'Rows' },
-      { value: 'up', label: ja ? '上方向' : 'Up' },
-      { value: 'left', label: ja ? '左方向' : 'Left' },
+      { value: 'down', label: t.columns },
+      { value: 'right', label: t.rows },
+      { value: 'up', label: t.up },
+      { value: 'left', label: t.left },
     ];
     for (const option of directionOptions) {
       dirList.appendChild(
@@ -106,18 +98,18 @@ export const showFillSeriesDialog = (
     modeGroup.className = 'fc-pastesp__group';
     const modeLegend = document.createElement('div');
     modeLegend.className = 'fc-pastesp__legend';
-    modeLegend.textContent = ja ? '種類' : 'Type';
+    modeLegend.textContent = t.type;
     const modeList = document.createElement('div');
     modeList.className = 'fc-pastesp__list';
     modeList.setAttribute('role', 'radiogroup');
     modeList.setAttribute('aria-label', modeLegend.textContent);
     const modeOptions: Array<{ value: RibbonFillSeriesMode; label: string }> = [
-      { value: 'auto', label: ja ? 'オートフィル' : 'AutoFill' },
-      { value: 'copy', label: ja ? 'コピー' : 'Copy' },
-      { value: 'days', label: ja ? '日' : 'Day' },
-      { value: 'weekdays', label: ja ? '週日' : 'Weekday' },
-      { value: 'months', label: ja ? '月' : 'Month' },
-      { value: 'years', label: ja ? '年' : 'Year' },
+      { value: 'auto', label: t.autoFill },
+      { value: 'copy', label: t.copy },
+      { value: 'days', label: t.day },
+      { value: 'weekdays', label: t.weekday },
+      { value: 'months', label: t.month },
+      { value: 'years', label: t.year },
     ];
     for (const option of modeOptions) {
       modeList.appendChild(
@@ -127,54 +119,34 @@ export const showFillSeriesDialog = (
     modeGroup.append(modeLegend, modeList);
     cols.appendChild(modeGroup);
 
-    const footer = document.createElement('div');
-    footer.className = 'fc-fmtdlg__footer';
-    panel.appendChild(footer);
-    const cancelBtn = document.createElement('button');
-    cancelBtn.type = 'button';
-    cancelBtn.className = 'fc-fmtdlg__btn';
-    cancelBtn.textContent = ja ? 'キャンセル' : 'Cancel';
-    const okBtn = document.createElement('button');
-    okBtn.type = 'button';
-    okBtn.className = 'fc-fmtdlg__btn fc-fmtdlg__btn--primary';
-    okBtn.textContent = 'OK';
-    footer.append(cancelBtn, okBtn);
-
-    let done = false;
-    const finish = (
+    const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
+      cancelLabel: t.cancel,
+      okLabel: t.ok,
+    });
+    let finish!: (
       value: { direction: RibbonFillDirection; mode: RibbonFillSeriesMode } | null,
-    ): void => {
-      if (done) return;
-      done = true;
-      overlay.removeEventListener('keydown', onKey);
-      overlay.remove();
-      opener?.focus({ preventScroll: true });
-      resolve(value);
-    };
+    ) => void;
     const apply = (): void => {
       finish({
-        direction: selectedFillSeriesRadio<RibbonFillDirection>(overlay, dirName, initialDirection),
-        mode: selectedFillSeriesRadio<RibbonFillSeriesMode>(overlay, modeName, 'auto'),
+        direction: selectedFillSeriesRadio<RibbonFillDirection>(
+          shell.overlay,
+          dirName,
+          initialDirection,
+        ),
+        mode: selectedFillSeriesRadio<RibbonFillSeriesMode>(shell.overlay, modeName, 'auto'),
       });
     };
-    const onKey = (event: KeyboardEvent): void => {
-      event.stopPropagation();
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        finish(null);
-      } else if (event.key === 'Enter') {
-        event.preventDefault();
-        apply();
-      }
-    };
+    ({ finish } = installDialogLifecycle<
+      { direction: RibbonFillDirection; mode: RibbonFillSeriesMode } | null
+    >({
+      shell,
+      resolve,
+      onSubmit: apply,
+      onCancel: () => null,
+    }));
     cancelBtn.addEventListener('click', () => finish(null));
     okBtn.addEventListener('click', apply);
-    overlay.addEventListener('keydown', onKey);
-    overlay.addEventListener('click', (event) => {
-      if (event.target === overlay) finish(null);
-    });
-    document.body.appendChild(overlay);
-    requestAnimationFrame(() => {
+    mountDialog(shell, () => {
       dirList.querySelector<HTMLInputElement>('input[type="radio"]')?.focus();
     });
   });

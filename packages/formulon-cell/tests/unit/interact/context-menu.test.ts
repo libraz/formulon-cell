@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -8,6 +11,8 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
@@ -124,13 +129,69 @@ describe('attachContextMenu', () => {
       expect(miniItem('bold')).not.toBeNull();
     });
 
+    it('clamps the root menu inside the viewport through shared positioning', () => {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 180 });
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      const root = document.querySelector<HTMLElement>('.fc-ctxmenu');
+      expect(root).toBeTruthy();
+      if (root) {
+        Object.defineProperty(root, 'offsetWidth', { configurable: true, value: 292 });
+        Object.defineProperty(root, 'offsetHeight', { configurable: true, value: 160 });
+      }
+
+      fireContextMenu(host, 310, 170);
+
+      expect(root?.style.left).toBe('24px');
+      expect(root?.style.top).toBe('16px');
+    });
+
+    it('flips and clamps submenus through the shared context menu positioning', () => {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 160 });
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      fireContextMenu(host, 200, 70);
+      const trigger = document.querySelector<HTMLButtonElement>(
+        '[data-fc-submenu="pasteSpecialMenu"]',
+      );
+      const sub = document.querySelector<HTMLElement>('.fc-ctxmenu__sub');
+      expect(trigger).toBeTruthy();
+      expect(sub).toBeTruthy();
+      if (trigger) {
+        trigger.getBoundingClientRect = vi.fn(
+          () =>
+            ({
+              left: 250,
+              right: 300,
+              top: 140,
+              bottom: 170,
+              width: 50,
+              height: 30,
+            }) as DOMRect,
+        );
+      }
+      if (sub) {
+        Object.defineProperty(sub, 'offsetWidth', { configurable: true, value: 180 });
+        Object.defineProperty(sub, 'offsetHeight', { configurable: true, value: 130 });
+      }
+
+      trigger?.dispatchEvent(new MouseEvent('mouseenter'));
+
+      expect(sub?.style.display).toBe('block');
+      expect(sub?.style.left).toBe('72px');
+      expect(sub?.style.top).toBe('26px');
+    });
+
     it('mini toolbar invokes cell formatting actions', () => {
       detach = attachContextMenu({ host, store, wb, onAfterCommit, onFormatDialog });
       fireContextMenu(host, 200, 70);
       miniItem('bold')?.click();
 
-      const fmt = store.getState().format.formats.get('0:0:0');
-      expect(fmt?.bold).toBe(true);
+      expect(store.getState().ui.pendingFormat).toEqual({
+        addr: { sheet: 0, row: 0, col: 0 },
+        format: { bold: true },
+      });
+      expect(store.getState().format.formats.get('0:0:0')).toBeUndefined();
       expect(visibleMenu()).toBeNull();
 
       fireContextMenu(host, 200, 70);
@@ -404,10 +465,16 @@ describe('attachContextMenu', () => {
 
   describe('row and column action availability', () => {
     it('disables row unhide when the selected row band has no hidden rows', () => {
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ host, store, wb, onAfterCommit, strings: en });
       fireContextMenu(host, 10, 40);
 
       expect(item('rowUnhide')?.disabled).toBe(true);
+      expect(item('rowUnhide')?.dataset.disabledReason).toBe(
+        'There are no hidden rows in the selected row band.',
+      );
+      expect(item('rowUnhide')?.getAttribute('aria-description')).toBe(
+        'There are no hidden rows in the selected row band.',
+      );
     });
 
     it('enables row unhide when the selected row band contains hidden rows', () => {
@@ -416,10 +483,12 @@ describe('attachContextMenu', () => {
         ...s,
         layout: { ...s.layout, hiddenRows: new Set([1]) },
       }));
-      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      detach = attachContextMenu({ host, store, wb, onAfterCommit, strings: en });
       fireContextMenu(host, 10, 40);
 
       expect(item('rowUnhide')?.disabled).toBe(false);
+      expect(item('rowUnhide')?.dataset.disabledReason).toBeUndefined();
+      expect(item('rowUnhide')?.getAttribute('aria-description')).toBeNull();
     });
   });
 
@@ -526,6 +595,32 @@ describe('attachContextMenu', () => {
       expect(onPasteSpecial).toHaveBeenCalled();
     });
 
+    it('projects a shared disabled reason on Paste Special quick actions without a copied cell snapshot', () => {
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        strings: en,
+        getClipboardSnapshot: () => null,
+      });
+      fireContextMenu(host, 200, 70);
+      document
+        .querySelector<HTMLButtonElement>('[data-fc-submenu="pasteSpecialMenu"]')
+        ?.dispatchEvent(new MouseEvent('mouseenter'));
+
+      const pasteValues = document.querySelector<HTMLButtonElement>(
+        '.fc-ctxmenu__sub [data-fc-action="pasteValues"]',
+      );
+      expect(pasteValues?.disabled).toBe(true);
+      expect(pasteValues?.getAttribute('aria-disabled')).toBe('true');
+      expect(pasteValues?.dataset.disabledReason).toBe(
+        'Copy or cut cells before using this paste option.',
+      );
+      expect(pasteValues?.getAttribute('aria-description')).toBe(
+        'Copy or cut cells before using this paste option.',
+      );
+    });
+
     it('delegates Copy/Cut/Paste to the shared clipboard path when wired', () => {
       const onClipboardShortcut = vi.fn();
       detach = attachContextMenu({ host, store, wb, onAfterCommit, onClipboardShortcut });
@@ -594,22 +689,16 @@ describe('attachContextMenu', () => {
 
       fireContextMenu(host, 200, 70);
       miniItem('bold')?.click();
-      expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.bold).toBe(
-        true,
-      );
+      expect(store.getState().ui.pendingFormat?.format.bold).toBe(true);
+      expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toBeUndefined();
 
       fireContextMenu(host, 200, 70);
       miniItem('italic')?.click();
-      expect(
-        store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.italic,
-      ).toBe(true);
-
-      // Undo through history reverts both.
-      expect(history.undo()).toBe(true);
-      expect(history.undo()).toBe(true);
-      expect(
-        store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 })),
-      ).toBeUndefined();
+      expect(store.getState().ui.pendingFormat).toEqual({
+        addr: { sheet: 0, row: 0, col: 0 },
+        format: { bold: true, italic: true },
+      });
+      expect(history.undo()).toBe(false);
     });
 
     it('Align Left / Center / Right set the alignment', () => {
@@ -617,21 +706,16 @@ describe('attachContextMenu', () => {
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
       fireContextMenu(host, 200, 70);
       miniItem('alignLeft')?.click();
-      expect(
-        store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.align,
-      ).toBe('left');
+      expect(store.getState().ui.pendingFormat?.format.align).toBe('left');
+      expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toBeUndefined();
 
       fireContextMenu(host, 200, 70);
       miniItem('alignCenter')?.click();
-      expect(
-        store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.align,
-      ).toBe('center');
+      expect(store.getState().ui.pendingFormat?.format.align).toBe('center');
 
       fireContextMenu(host, 200, 70);
       miniItem('alignRight')?.click();
-      expect(
-        store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.align,
-      ).toBe('right');
+      expect(store.getState().ui.pendingFormat?.format.align).toBe('right');
     });
 
     it('Borders cycles through outline → all → clear', () => {
@@ -639,8 +723,8 @@ describe('attachContextMenu', () => {
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
       fireContextMenu(host, 200, 70);
       miniItem('borders')?.click();
-      const f = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
-      expect(f?.borders).toBeDefined();
+      expect(store.getState().ui.pendingFormat?.format.borders).toBeDefined();
+      expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toBeUndefined();
     });
 
     it('Format Cells… triggers the onFormatDialog callback', () => {
@@ -788,10 +872,13 @@ describe('attachContextMenu', () => {
         configurable: true,
         value: undefined,
       });
-      detach = attachContextMenu({ host, store, wb });
+      detach = attachContextMenu({ host, store, wb, strings: en });
       fireContextMenu(host, 200, 70);
       expect(item('paste')?.disabled).toBe(true);
       expect(item('paste')?.getAttribute('aria-disabled')).toBe('true');
+      expect(item('paste')?.dataset.disabledReason).toBe(
+        'Clipboard paste is unavailable in this environment.',
+      );
       Object.defineProperty(navigator.clipboard, 'readText', {
         configurable: true,
         value: original,
@@ -799,10 +886,11 @@ describe('attachContextMenu', () => {
     });
 
     it('enables the Paste button when navigator.clipboard.readText is available', () => {
-      detach = attachContextMenu({ host, store, wb });
+      detach = attachContextMenu({ host, store, wb, strings: en });
       fireContextMenu(host, 200, 70);
       expect(item('paste')?.disabled).toBe(false);
-      expect(item('paste')?.hasAttribute('aria-disabled')).toBe(false);
+      expect(item('paste')?.getAttribute('aria-disabled')).toBe('false');
+      expect(item('paste')?.dataset.disabledReason).toBeUndefined();
     });
   });
 
@@ -821,6 +909,21 @@ describe('attachContextMenu', () => {
       detach = null;
       fireContextMenu(host, 200, 70);
       expect(visibleMenu()).toBeNull();
+    });
+  });
+
+  describe('DOM primitives', () => {
+    it('keeps context menu button DOM on the shared interaction primitive', () => {
+      const source = readFileSync(join(root, 'src/interact/context-menu.ts'), 'utf8');
+
+      expect(source).toContain("import { createInteractionButton } from './chip-button.js'");
+      expect(source).toContain('const createContextMenuItemButton');
+      expect(source).toContain('const createContextSubmenuButton');
+      expect(source).toContain('const createContextMiniToolbarButton');
+      expect(source).toContain('const btn = createContextSubmenuButton(entry)');
+      expect(source).toContain('const btn = createContextMenuItemButton(entry)');
+      expect(source).toContain('const btn = createContextMiniToolbarButton(item)');
+      expect(source).not.toContain("document.createElement('button')");
     });
   });
 });

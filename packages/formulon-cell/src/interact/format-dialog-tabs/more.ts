@@ -4,10 +4,14 @@
 
 import type { Strings } from '../../i18n/strings.js';
 import type { ValidationOp } from '../../store/store.js';
+import { createDialogSelect } from '../../toolbar/dialogs/form-controls.js';
 import { makeButton, makeListSourceRadio, makeSection } from '../format-dialog-dom.js';
 import type { ValidationKind } from '../format-dialog-model.js';
 
 export interface MoreTabRefs {
+  hyperlinkSection: HTMLDivElement;
+  commentSection: HTMLDivElement;
+  validationSection: HTMLDivElement;
   hlInput: HTMLInputElement;
   hlClear: HTMLButtonElement;
   commentArea: HTMLTextAreaElement;
@@ -83,8 +87,6 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   validationKindRow.className = 'fc-fmtdlg__row';
   const validationKindLabel = document.createElement('span');
   validationKindLabel.textContent = t.validationKind;
-  const validationKindSelect = document.createElement('select');
-  validationKindSelect.setAttribute('aria-label', t.validationKind);
   const kindDefs: { id: ValidationKind; label: string }[] = [
     { id: 'none', label: t.validationKindNone },
     { id: 'list', label: t.validationKindList },
@@ -95,12 +97,11 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
     { id: 'textLength', label: t.validationKindTextLength },
     { id: 'custom', label: t.validationKindCustom },
   ];
-  for (const k of kindDefs) {
-    const opt = document.createElement('option');
-    opt.value = k.id;
-    opt.textContent = k.label;
-    validationKindSelect.appendChild(opt);
-  }
+  const validationKindSelect = createDialogSelect(
+    kindDefs.map((item) => ({ value: item.id, label: item.label })),
+    'none',
+    { className: '', ariaLabel: t.validationKind },
+  );
   validationKindRow.append(validationKindLabel, validationKindSelect);
   validationSection.appendChild(validationKindRow);
 
@@ -109,8 +110,6 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   validationOpRow.className = 'fc-fmtdlg__row';
   const validationOpLabel = document.createElement('span');
   validationOpLabel.textContent = t.validationOp;
-  const validationOpSelect = document.createElement('select');
-  validationOpSelect.setAttribute('aria-label', t.validationOp);
   const opDefs: { id: ValidationOp; label: string }[] = [
     { id: 'between', label: t.validationOpBetween },
     { id: 'notBetween', label: t.validationOpNotBetween },
@@ -121,12 +120,11 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
     { id: '>', label: t.validationOpGt },
     { id: '>=', label: t.validationOpGte },
   ];
-  for (const o of opDefs) {
-    const opt = document.createElement('option');
-    opt.value = o.id;
-    opt.textContent = o.label;
-    validationOpSelect.appendChild(opt);
-  }
+  const validationOpSelect = createDialogSelect(
+    opDefs.map((item) => ({ value: item.id, label: item.label })),
+    'between',
+    { className: '', ariaLabel: t.validationOp },
+  );
   validationOpRow.append(validationOpLabel, validationOpSelect);
   validationSection.appendChild(validationOpRow);
 
@@ -220,18 +218,15 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   validationErrorStyleRow.className = 'fc-fmtdlg__row';
   const validationErrorStyleLabel = document.createElement('span');
   validationErrorStyleLabel.textContent = t.validationErrorStyle;
-  const validationErrorStyleSelect = document.createElement('select');
-  validationErrorStyleSelect.setAttribute('aria-label', t.validationErrorStyle);
-  for (const e of [
-    { id: 'stop' as const, label: t.validationErrorStop },
-    { id: 'warning' as const, label: t.validationErrorWarning },
-    { id: 'information' as const, label: t.validationErrorInfo },
-  ]) {
-    const opt = document.createElement('option');
-    opt.value = e.id;
-    opt.textContent = e.label;
-    validationErrorStyleSelect.appendChild(opt);
-  }
+  const validationErrorStyleSelect = createDialogSelect(
+    [
+      { value: 'stop', label: t.validationErrorStop },
+      { value: 'warning', label: t.validationErrorWarning },
+      { value: 'information', label: t.validationErrorInfo },
+    ],
+    'stop',
+    { className: '', ariaLabel: t.validationErrorStyle },
+  );
   validationErrorStyleRow.append(validationErrorStyleLabel, validationErrorStyleSelect);
   validationSection.appendChild(validationErrorStyleRow);
 
@@ -298,6 +293,9 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   validationSection.appendChild(validationErrorMessageRow);
 
   return {
+    hyperlinkSection,
+    commentSection,
+    validationSection,
     hlInput,
     hlClear,
     commentArea,

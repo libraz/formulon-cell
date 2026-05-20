@@ -271,9 +271,18 @@ export interface EditorRefHighlight {
   colorIndex: number;
 }
 
+export interface PendingFormat {
+  addr: Addr;
+  format: Partial<CellFormat>;
+}
+
 export interface UiSlice {
   editor: EditorMode;
   hover: Addr | null;
+  /** Excel-style input format staged for a single empty active cell. It is
+   *  committed only when the user enters a value in that cell and is cleared
+   *  on cancel or navigation away. */
+  pendingFormat?: PendingFormat | null;
   /** Theme id stamped on the host (`data-fc-theme`). Built-ins ship `paper`,
    *  `ink`, and `contrast`; consumers can register additional themes via
    *  custom CSS keyed off the same attribute. */
@@ -549,7 +558,14 @@ export interface ChartsSlice {
   charts: readonly SessionChart[];
 }
 
-export type SessionShapeKind = 'rectangle' | 'rounded-rectangle' | 'oval' | 'line' | 'arrow';
+export type SessionShapeKind =
+  | 'rectangle'
+  | 'rounded-rectangle'
+  | 'oval'
+  | 'triangle'
+  | 'diamond'
+  | 'line'
+  | 'arrow';
 
 /** Session illustration overlay. Like session charts, this is UI-owned until
  *  writable drawing parts exist in the engine. */
@@ -782,13 +798,42 @@ export interface AllowedEditRange {
 }
 
 /** Workbook-level sheet-protection state. Each protected sheet is keyed by
- *  its index; the value records whether a password was supplied (currently
- *  stored verbatim, not enforced — v1 ships without password validation).
- *  NOT history-tracked: spreadsheets expose protection as a workbook-level
- *  setting and toggling it doesn't appear in undo. Cell-level locks live
- *  on `CellFormat.locked`; this slice only owns the sheet-side flag. */
+ *  its index; the value records the supplied legacy password plus the
+ *  permission flags mirrored from `<sheetProtection>`. Cell-level locks live
+ *  on `CellFormat.locked`; this slice owns the sheet-side protection state. */
+export interface SheetProtectionPermissions {
+  objects?: boolean;
+  scenarios?: boolean;
+  selectLockedCells?: boolean;
+  selectUnlockedCells?: boolean;
+  formatCells?: boolean;
+  formatColumns?: boolean;
+  formatRows?: boolean;
+  insertColumns?: boolean;
+  insertRows?: boolean;
+  insertHyperlinks?: boolean;
+  deleteColumns?: boolean;
+  deleteRows?: boolean;
+  sort?: boolean;
+  autoFilter?: boolean;
+  pivotTables?: boolean;
+}
+
+export interface SheetProtectionPasswordHash {
+  algorithmName: string;
+  hashValue: string;
+  saltValue: string;
+  spinCount: number;
+}
+
+export interface SheetProtectionState {
+  password?: string;
+  passwordHash?: SheetProtectionPasswordHash;
+  permissions?: SheetProtectionPermissions;
+}
+
 export interface ProtectionSlice {
-  protectedSheets: Map<number, { password?: string }>;
+  protectedSheets: Map<number, SheetProtectionState>;
   workbookStructure?: { password?: string };
   allowedEditRanges: readonly AllowedEditRange[];
 }

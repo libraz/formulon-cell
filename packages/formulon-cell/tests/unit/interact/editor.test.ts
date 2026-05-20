@@ -137,6 +137,41 @@ describe('InlineEditor', () => {
     expect(editor.isActive()).toBe(false);
   });
 
+  it('commit applies pending empty-cell format to the typed cell and then clears it', () => {
+    const addr = { sheet: 0, row: 0, col: 0 };
+    mutators.setActive(store, addr);
+    mutators.setPendingFormat(store, {
+      addr,
+      format: { align: 'center', bold: true, numFmt: { kind: 'text' } },
+    });
+    editor.begin('');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.value = '00123';
+
+    editor.commit('none');
+    wb.recalc();
+
+    expect(wb.getValue(addr)).toEqual({ kind: 'text', value: '00123' });
+    expect(store.getState().format.formats.get('0:0:0')).toMatchObject({
+      align: 'center',
+      bold: true,
+      numFmt: { kind: 'text' },
+    });
+    expect(store.getState().ui.pendingFormat).toBeNull();
+  });
+
+  it('cancel clears pending empty-cell format without writing it to the cell', () => {
+    const addr = { sheet: 0, row: 0, col: 0 };
+    mutators.setActive(store, addr);
+    mutators.setPendingFormat(store, { addr, format: { bold: true } });
+    editor.begin('');
+
+    editor.cancel();
+
+    expect(store.getState().format.formats.get('0:0:0')).toBeUndefined();
+    expect(store.getState().ui.pendingFormat).toBeNull();
+  });
+
   it('commit preserves numeric-looking input as text for cells formatted as Text', () => {
     const addr = { sheet: 0, row: 0, col: 0 };
     mutators.setActive(store, addr);

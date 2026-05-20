@@ -2,6 +2,8 @@
 // shortcuts, per-side checkboxes, and the visual border-stage previewer.
 
 import type { Strings } from '../../i18n/strings.js';
+import { createDialogSelect } from '../../toolbar/dialogs/form-controls.js';
+import { createDialogToggleButton } from '../dialog-shell.js';
 import {
   makeButton,
   makeCheckbox,
@@ -37,8 +39,6 @@ export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog'
   borderStyleRow.className = 'fc-fmtdlg__row';
   const borderStyleLabel = document.createElement('span');
   borderStyleLabel.textContent = t.borderStyle;
-  const borderStyleSelect = document.createElement('select');
-  borderStyleSelect.setAttribute('aria-label', t.borderStyle);
   const styleOptions: { id: BorderStyleKey; label: string }[] = [
     { id: 'thin', label: t.borderStyleThin },
     { id: 'medium', label: t.borderStyleMedium },
@@ -47,12 +47,11 @@ export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog'
     { id: 'dotted', label: t.borderStyleDotted },
     { id: 'double', label: t.borderStyleDouble },
   ];
-  for (const s of styleOptions) {
-    const opt = document.createElement('option');
-    opt.value = s.id;
-    opt.textContent = s.label;
-    borderStyleSelect.appendChild(opt);
-  }
+  const borderStyleSelect = createDialogSelect(
+    styleOptions.map((s) => ({ value: s.id, label: s.label })),
+    'thin',
+    { ariaLabel: t.borderStyle, className: '' },
+  );
   borderStyleRow.append(borderStyleLabel, borderStyleSelect);
   panel.appendChild(borderStyleRow);
 
@@ -60,12 +59,13 @@ export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog'
   borderStyleGallery.className = 'fc-fmtdlg__line-gallery';
   const borderStyleButtons = new Map<BorderStyleKey, HTMLButtonElement>();
   for (const s of styleOptions) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = `fc-fmtdlg__line-style fc-fmtdlg__line-style--${s.id}`;
-    btn.dataset.borderStyle = s.id;
-    btn.setAttribute('aria-label', s.label);
-    btn.setAttribute('aria-pressed', 'false');
+    const btn = createDialogToggleButton({
+      label: s.label,
+      baseClass: 'fc-fmtdlg__line-style',
+      extraClass: `fc-fmtdlg__line-style--${s.id}`,
+      datasetKey: 'borderStyle',
+      value: s.id,
+    });
     const sample = document.createElement('span');
     sample.className = 'fc-fmtdlg__line-sample';
     const label = document.createElement('span');

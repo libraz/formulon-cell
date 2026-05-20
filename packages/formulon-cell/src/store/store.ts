@@ -7,6 +7,7 @@ import type {
 import type { SheetView, SheetViewPatch } from '../commands/sheet-views.js';
 import { addrKey } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
+import { sameAddr } from './pending-format.js';
 import type {
   CellFormat,
   ConditionalRule,
@@ -16,6 +17,9 @@ import type {
   PageSetup,
   SessionChart,
   SessionIllustration,
+  SheetProtectionPasswordHash,
+  SheetProtectionPermissions,
+  SheetProtectionState,
   SlicerSpec,
   Sparkline,
   State,
@@ -79,6 +83,7 @@ export const createSpreadsheetStore = () =>
     ui: {
       editor: { kind: 'idle' },
       hover: null,
+      pendingFormat: null,
       theme: 'paper',
       fillPreview: null,
       copyRange: null,
@@ -123,11 +128,17 @@ export const createSpreadsheetStore = () =>
 
 export type SpreadsheetStore = ReturnType<typeof createSpreadsheetStore>;
 
+const clearPendingFormatOnMove = (s: State, nextActive: Addr): State['ui'] =>
+  s.ui.pendingFormat && !sameAddr(s.ui.pendingFormat.addr, nextActive)
+    ? { ...s.ui, pendingFormat: null }
+    : s.ui;
+
 // Tiny mutation helpers — single source of truth for state shape changes.
 export const mutators = {
   setActive(store: SpreadsheetStore, addr: Addr): void {
     store.setState((s) => ({
       ...s,
+      ui: clearPendingFormatOnMove(s, addr),
       selection: {
         active: addr,
         anchor: addr,
@@ -152,6 +163,7 @@ export const mutators = {
       // cell to primary so future shift-extends widen the new band.
       return {
         ...s,
+        ui: clearPendingFormatOnMove(s, addr),
         selection: {
           active: addr,
           anchor: addr,
@@ -184,6 +196,7 @@ export const mutators = {
       const nextActive = active ?? { sheet: range.sheet, row: range.r0, col: range.c0 };
       return {
         ...s,
+        ui: clearPendingFormatOnMove(s, nextActive),
         selection: {
           active: nextActive,
           anchor: nextActive,
@@ -199,6 +212,7 @@ export const mutators = {
       const a = s.selection.anchor;
       return {
         ...s,
+        ui: clearPendingFormatOnMove(s, to),
         selection: {
           ...s.selection,
           active: to,
@@ -216,6 +230,10 @@ export const mutators = {
 
   setEditor(store: SpreadsheetStore, mode: EditorMode): void {
     store.setState((s) => ({ ...s, ui: { ...s.ui, editor: mode } }));
+  },
+
+  setPendingFormat(store: SpreadsheetStore, pending: State['ui']['pendingFormat']): void {
+    store.setState((s) => ({ ...s, ui: { ...s.ui, pendingFormat: pending } }));
   },
 
   setHover(store: SpreadsheetStore, addr: Addr | null): void {
@@ -374,6 +392,7 @@ export const mutators = {
     store.setState((s) => ({
       ...s,
       data: { ...s.data, sheetIndex: idx, cells: new Map() },
+      ui: { ...s.ui, pendingFormat: null },
       selection: {
         active: { sheet: idx, row: 0, col: 0 },
         anchor: { sheet: idx, row: 0, col: 0 },
@@ -403,6 +422,7 @@ export const mutators = {
   selectRow(store: SpreadsheetStore, row: number): void {
     store.setState((s) => ({
       ...s,
+      ui: { ...s.ui, pendingFormat: null },
       selection: {
         active: { sheet: s.data.sheetIndex, row, col: 0 },
         anchor: { sheet: s.data.sheetIndex, row, col: 0 },
@@ -417,6 +437,7 @@ export const mutators = {
     const r1 = Math.max(anchorRow, activeRow);
     store.setState((s) => ({
       ...s,
+      ui: { ...s.ui, pendingFormat: null },
       selection: {
         active: { sheet: s.data.sheetIndex, row: activeRow, col: 0 },
         anchor: { sheet: s.data.sheetIndex, row: anchorRow, col: 0 },
@@ -429,6 +450,7 @@ export const mutators = {
   selectCol(store: SpreadsheetStore, col: number): void {
     store.setState((s) => ({
       ...s,
+      ui: { ...s.ui, pendingFormat: null },
       selection: {
         active: { sheet: s.data.sheetIndex, row: 0, col },
         anchor: { sheet: s.data.sheetIndex, row: 0, col },
@@ -443,6 +465,7 @@ export const mutators = {
     const c1 = Math.max(anchorCol, activeCol);
     store.setState((s) => ({
       ...s,
+      ui: { ...s.ui, pendingFormat: null },
       selection: {
         active: { sheet: s.data.sheetIndex, row: 0, col: activeCol },
         anchor: { sheet: s.data.sheetIndex, row: 0, col: anchorCol },
@@ -455,6 +478,7 @@ export const mutators = {
   selectAll(store: SpreadsheetStore): void {
     store.setState((s) => ({
       ...s,
+      ui: { ...s.ui, pendingFormat: null },
       selection: {
         active: { sheet: s.data.sheetIndex, row: 0, col: 0 },
         anchor: { sheet: s.data.sheetIndex, row: 0, col: 0 },
@@ -470,6 +494,7 @@ export const mutators = {
   setRange(store: SpreadsheetStore, range: Range): void {
     store.setState((s) => ({
       ...s,
+      ui: { ...s.ui, pendingFormat: null },
       selection: { ...s.selection, range: { ...range } },
     }));
   },
@@ -947,20 +972,25 @@ export const mutators = {
 
   /** Toggle sheet-level protection for `sheet`. When `on` is `true` the sheet
    *  enters protected mode and the command layer gates writes against
-   *  per-cell `locked` flags. The optional `password` is stored verbatim —
-   *  v1 does NOT enforce it (no challenge dialog) but the value round-trips
-   *  through the slice so callers can persist it. NOT history-tracked. */
+   *  per-cell `locked` flags. The optional password and permission flags
+   *  round-trip through the slice so callers can persist them. */
   setSheetProtected(
     store: SpreadsheetStore,
     sheet: number,
     on: boolean,
-    options?: { password?: string },
+    options?: {
+      password?: string;
+      passwordHash?: SheetProtectionPasswordHash;
+      permissions?: SheetProtectionPermissions;
+    },
   ): void {
     store.setState((s) => {
       const next = new Map(s.protection.protectedSheets);
       if (on) {
-        const entry: { password?: string } = {};
+        const entry: SheetProtectionState = {};
         if (options?.password !== undefined) entry.password = options.password;
+        if (options?.passwordHash !== undefined) entry.passwordHash = { ...options.passwordHash };
+        if (options?.permissions !== undefined) entry.permissions = { ...options.permissions };
         next.set(sheet, entry);
       } else if (next.has(sheet)) {
         next.delete(sheet);

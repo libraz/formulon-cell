@@ -4,6 +4,8 @@
 
 import type { Strings } from '../../i18n/strings.js';
 import type { CellAlign, CellVAlign, TextDirection } from '../../store/store.js';
+import { createDialogSelect } from '../../toolbar/dialogs/form-controls.js';
+import { createDialogToggleButton } from '../dialog-shell.js';
 import { makeCheckbox } from '../format-dialog-dom.js';
 
 export interface AlignTabRefs {
@@ -64,15 +66,12 @@ export function createAlignTab(panel: HTMLDivElement, t: Strings['formatDialog']
   hAlignSelectRow.className = 'fc-fmtdlg__row fc-fmtdlg__align-select-row';
   const hAlignSelectLabel = document.createElement('span');
   hAlignSelectLabel.textContent = t.horizontalAlign;
-  const hAlignSelect = document.createElement('select');
-  hAlignSelect.setAttribute('aria-label', t.horizontalAlign);
+  const hAlignSelect = createDialogSelect(
+    hAlignDefs.map((a) => ({ value: a.id, label: a.label })),
+    'default',
+    { ariaLabel: t.horizontalAlign, className: '' },
+  );
   hAlignSelect.dataset.fcSelect = 'align';
-  for (const a of hAlignDefs) {
-    const opt = document.createElement('option');
-    opt.value = a.id;
-    opt.textContent = a.label;
-    hAlignSelect.appendChild(opt);
-  }
   hAlignSelectRow.append(hAlignSelectLabel, hAlignSelect);
   panel.appendChild(hAlignSelectRow);
 
@@ -114,15 +113,12 @@ export function createAlignTab(panel: HTMLDivElement, t: Strings['formatDialog']
   vAlignSelectRow.className = 'fc-fmtdlg__row fc-fmtdlg__align-select-row';
   const vAlignSelectLabel = document.createElement('span');
   vAlignSelectLabel.textContent = t.verticalAlign;
-  const vAlignSelect = document.createElement('select');
-  vAlignSelect.setAttribute('aria-label', t.verticalAlign);
+  const vAlignSelect = createDialogSelect(
+    vAlignDefs.map((a) => ({ value: a.id, label: a.label })),
+    'default',
+    { ariaLabel: t.verticalAlign, className: '' },
+  );
   vAlignSelect.dataset.fcSelect = 'vAlign';
-  for (const a of vAlignDefs) {
-    const opt = document.createElement('option');
-    opt.value = a.id;
-    opt.textContent = a.label;
-    vAlignSelect.appendChild(opt);
-  }
   vAlignSelectRow.append(vAlignSelectLabel, vAlignSelect);
   panel.appendChild(vAlignSelectRow);
 
@@ -151,20 +147,17 @@ export function createAlignTab(panel: HTMLDivElement, t: Strings['formatDialog']
   textDirectionRow.className = 'fc-fmtdlg__row';
   const textDirectionLabel = document.createElement('span');
   textDirectionLabel.textContent = t.textDirection;
-  const textDirectionSelect = document.createElement('select');
-  textDirectionSelect.setAttribute('aria-label', t.textDirection);
-  textDirectionSelect.dataset.fcSelect = 'textDirection';
   const directionDefs: Array<{ id: TextDirection; label: string }> = [
     { id: 'context', label: t.directionContext },
     { id: 'ltr', label: t.directionLeftToRight },
     { id: 'rtl', label: t.directionRightToLeft },
   ];
-  for (const direction of directionDefs) {
-    const opt = document.createElement('option');
-    opt.value = direction.id;
-    opt.textContent = direction.label;
-    textDirectionSelect.appendChild(opt);
-  }
+  const textDirectionSelect = createDialogSelect(
+    directionDefs.map((direction) => ({ value: direction.id, label: direction.label })),
+    'context',
+    { ariaLabel: t.textDirection, className: '' },
+  );
+  textDirectionSelect.dataset.fcSelect = 'textDirection';
   textDirectionRow.append(textDirectionLabel, textDirectionSelect);
   panel.appendChild(textDirectionRow);
 
@@ -202,12 +195,13 @@ export function createAlignTab(panel: HTMLDivElement, t: Strings['formatDialog']
   const ANGLE_STEPS = [90, 75, 60, 45, 30, 15, 0, -15, -30, -45, -60, -75, -90];
   const alignPreviewDialDots: HTMLButtonElement[] = [];
   for (const angle of ANGLE_STEPS) {
-    const dot = document.createElement('button');
-    dot.type = 'button';
-    dot.className = 'fc-fmtdlg__align-preview-dot';
-    dot.dataset.fcAngle = String(angle);
-    dot.setAttribute('aria-label', `${angle}°`);
-    dot.title = `${angle}°`;
+    const dot = createDialogToggleButton({
+      label: `${angle}°`,
+      baseClass: 'fc-fmtdlg__align-preview-dot',
+      title: `${angle}°`,
+      datasetKey: 'fcAngle',
+      value: String(angle),
+    });
     const rad = (angle * Math.PI) / 180;
     const cx = 12;
     const cy = 66;

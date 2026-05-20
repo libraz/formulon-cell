@@ -34,6 +34,7 @@ import {
   type TabId,
   type ValidationKind,
 } from './format-dialog-model.js';
+import { attachRangePickerButton } from './range-picker-control.js';
 import {
   activeDraftSide,
   computeDialogNumFmt,
@@ -45,6 +46,10 @@ import {
   setDraftSide,
 } from './format-dialog-state.js';
 import { createFormatDialogView } from './format-dialog-view.js';
+import { appendDialogSelectOptions } from '../toolbar/dialogs/form-controls.js';
+import { formatA1Range } from '../wrappers/toolbar-a1.js';
+import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
+import { appendDialogOptionButton } from './dialog-shell.js';
 
 export interface FormatDialogDeps {
   host: HTMLElement;
@@ -62,8 +67,13 @@ export interface FormatDialogDeps {
   getLocale?: () => string;
 }
 
+export interface FormatDialogOpenOptions {
+  mode?: 'format' | 'dataValidation';
+  focus?: 'activeTab' | 'validation';
+}
+
 export interface FormatDialogHandle {
-  open(tab?: TabId): void;
+  open(tab?: TabId, options?: FormatDialogOpenOptions): void;
   close(): void;
   detach(): void;
 }
@@ -80,6 +90,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const {
     shell,
     overlay,
+    panel,
+    headerTitle,
     preview,
     previewCell,
     tabsStrip,
@@ -157,6 +169,9 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     fillPatternColorInput,
     lockedCk,
     hiddenFormulaCk,
+    hyperlinkSection,
+    commentSection,
+    validationSection,
     hlInput,
     hlClear,
     commentArea,
@@ -199,6 +214,12 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     cancelBtn,
     hintBar,
   } = view;
+  attachRangePickerButton(validationListRangeInput, {
+    label: strings.pivotTableDialog.rangePickerSelect,
+    getValue: () => formatA1Range(store.getState().selection.range),
+    subscribeToRangeChanges: (listener) => store.subscribe(listener),
+    kind: 'format-validation-list-range',
+  });
 
   // ── State ──────────────────────────────────────────────────────────────
   let activeTab: TabId = 'number';
@@ -217,7 +238,16 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const activeMerge = mergeAt(state, state.selection.active);
     const multiCell = range.r0 !== range.r1 || range.c0 !== range.c1;
     mergeCk.input.checked = activeMerge !== null;
-    mergeCk.input.disabled = !multiCell && activeMerge === null;
+    const mergeDisabled = !multiCell && activeMerge === null;
+    const mergeReason = mergeDisabled ? strings.formatDialog.mergeCellsRequiresMultiCell : null;
+    projectDisabledState(mergeCk.input, mergeDisabled, mergeReason, {
+      datasetKey: 'disabledReason',
+      titlePrefix: strings.formatDialog.mergeCells,
+    });
+    projectDisabledReason(mergeCk.wrap, mergeReason, {
+      datasetKey: 'disabledReason',
+      titlePrefix: strings.formatDialog.mergeCells,
+    });
     mergeCk.wrap.classList.toggle('fc-fmtdlg__check--muted', mergeCk.input.disabled);
     renderPreview();
     setActiveTab('number');
@@ -626,12 +656,13 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const current = draft.pattern || defaultPatternFor(cat);
     if (current && !patterns.includes(current)) patterns.unshift(current);
     patternPresetSelect.replaceChildren();
-    for (const [index, pattern] of patterns.entries()) {
-      const opt = document.createElement('option');
-      opt.value = pattern;
-      opt.textContent = cat === 'special' ? (specialLabels[index] ?? pattern) : pattern;
-      patternPresetSelect.appendChild(opt);
-    }
+    appendDialogSelectOptions(
+      patternPresetSelect,
+      patterns.map((pattern, index) => ({
+        value: pattern,
+        label: cat === 'special' ? (specialLabels[index] ?? pattern) : pattern,
+      })),
+    );
     patternPresetSelect.value = current;
     syncPatternListItems(patterns, current, specialLabels);
   };
@@ -667,18 +698,12 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const locale = getFormatLocale();
     patternList.replaceChildren();
     for (const [index, pattern] of patterns.entries()) {
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.className = 'fc-fmtdlg__pattern-item';
-      item.dataset.fcPattern = pattern;
-      item.setAttribute('role', 'option');
-      item.setAttribute('aria-selected', pattern === current ? 'true' : 'false');
+      let label = '';
       if (cat === 'special') {
-        item.textContent = specialLabels[index] ?? pattern;
+        label = specialLabels[index] ?? pattern;
       } else {
-        let rendered = '';
         try {
-          rendered = formatNumber(
+          label = formatNumber(
             sample,
             cat === 'date'
               ? { kind: 'date', pattern }
@@ -688,11 +713,17 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
             locale,
           );
         } catch {
-          rendered = pattern;
+          label = pattern;
         }
-        item.textContent = rendered || pattern;
+        label = label || pattern;
       }
-      patternList.appendChild(item);
+      appendDialogOptionButton(patternList, {
+        label,
+        baseClass: 'fc-fmtdlg__pattern-item',
+        datasetKey: 'fcPattern',
+        value: pattern,
+        selected: pattern === current,
+      });
     }
   };
 
@@ -746,6 +777,18 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     } else {
       hintBar.textContent = '';
     }
+  };
+
+  const setDialogMode = (mode: FormatDialogOpenOptions['mode'] = 'format'): void => {
+    const dataValidationMode = mode === 'dataValidation';
+    overlay.classList.toggle('fc-fmtdlg--data-validation', dataValidationMode);
+    panel.setAttribute('aria-label', dataValidationMode ? t.validationLegend : t.title);
+    headerTitle.textContent = dataValidationMode ? t.validationLegend : t.title;
+    tabsStrip.hidden = dataValidationMode;
+    preview.hidden = dataValidationMode;
+    hyperlinkSection.hidden = dataValidationMode;
+    commentSection.hidden = dataValidationMode;
+    validationSection.classList.toggle('fc-fmtdlg__section--standalone', dataValidationMode);
   };
 
   // ── Apply OK ───────────────────────────────────────────────────────────
@@ -807,6 +850,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
               store,
               { sheet: range.sheet, r0: row, c0: col, r1: row, c1: col },
               { borders },
+              { allowPending: false },
             );
           }
         }
@@ -815,7 +859,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     if (history) history.begin();
     try {
       recordFormatChange(history, store, () => {
-        const wroteFormat = applyFormatPatch(state, store, range, patch);
+        const wroteFormat = applyFormatPatch(state, store, range, patch, { allowPending: false });
         if (wroteFormat && useRangeOutline) applyOutlineToRange();
       });
       if (mergeCk.input.checked) {
@@ -1473,13 +1517,19 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   shell.on(overlay, 'keydown', onOverlayKey as EventListener);
 
   const api: FormatDialogHandle = {
-    open(tab?: TabId): void {
+    open(tab?: TabId, options?: FormatDialogOpenOptions): void {
       hydrateFromActive();
+      setDialogMode(options?.mode);
       if (tab && tabButtons.has(tab)) setActiveTab(tab);
+      if (options?.mode === 'dataValidation') setActiveTab('more');
       shell.open();
       requestAnimationFrame(() => {
-        const first = tabButtons.get(activeTab);
-        if (first) first.focus();
+        if (options?.focus === 'validation' || options?.mode === 'dataValidation') {
+          validationKindSelect.focus();
+          validationKindSelect.scrollIntoView({ block: 'nearest' });
+          return;
+        }
+        tabButtons.get(activeTab)?.focus();
       });
     },
     close(): void {

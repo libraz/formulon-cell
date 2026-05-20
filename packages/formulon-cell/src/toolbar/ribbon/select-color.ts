@@ -6,6 +6,12 @@
 import { createColorPalette } from '../../components/color-palette.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import type { RibbonCommand } from '../ribbon-model.js';
+import {
+  FONT_SUBMENU_FAMILIES,
+  RECENT_FONT_VALUES,
+  THEME_FONT_VALUES,
+} from './font-availability.js';
+import { createRibbonButton } from './button.js';
 
 export interface SelectColorRibbonText {
   numberFormatNoSpecific: string;
@@ -13,6 +19,17 @@ export interface SelectColorRibbonText {
   standardColors: string;
   moreColors: string;
   automatic: string;
+  marginsCustomDialog: string;
+  marginTop: string;
+  marginBottom: string;
+  marginLeft: string;
+  marginRight: string;
+  fontSectionTheme: string;
+  fontSectionRecent: string;
+  fontSectionAll: string;
+  fontRoleHeading: string;
+  fontRoleBody: string;
+  currentView: string;
 }
 
 export interface SelectColorPageScaleText {
@@ -68,11 +85,8 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
   };
 
   const ribbonMarginDetail = (value: string): string | null => {
-    const ja = ribbonLang === 'ja';
     const fmt = (top: string, bottom: string, left: string, right: string): string =>
-      ja
-        ? `上: ${top}", 下: ${bottom}", 左: ${left}", 右: ${right}"`
-        : `Top: ${top}", Bottom: ${bottom}", Left: ${left}", Right: ${right}"`;
+      `${ribbonText.marginTop}: ${top}", ${ribbonText.marginBottom}: ${bottom}", ${ribbonText.marginLeft}: ${left}", ${ribbonText.marginRight}: ${right}"`;
     switch (value) {
       case 'normal':
         return fmt('0.75', '0.75', '0.7', '0.7');
@@ -81,7 +95,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
       case 'narrow':
         return fmt('0.75', '0.75', '0.25', '0.25');
       case 'custom':
-        return ja ? 'ユーザー設定の余白...' : 'Custom margins...';
+        return ribbonText.marginsCustomDialog;
       default:
         return null;
     }
@@ -100,25 +114,18 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
   const numberFormatSubtitle = (value: string): string =>
     value === 'general' ? ribbonText.numberFormatNoSpecific : '';
 
-  const themeFontValues = new Set(['Aptos', 'Aptos Display', 'Aptos Narrow']);
-  const recentFontValues = new Set(['Yu Gothic UI']);
-  const commonFontValues = new Set(['Calibri', 'Arial', 'Segoe UI', 'Times New Roman', 'Consolas']);
-  const fontSubmenuFamilies = new Set(['Yu Gothic UI', 'BIZ UDGothic', 'Meiryo UI']);
-  void commonFontValues;
-
   const ribbonFontSection = (
     value: string,
     options: readonly { value: string; label: string }[],
   ): string | null => {
-    const firstTheme = options.find((option) => themeFontValues.has(option.value))?.value;
-    if (value === firstTheme) return ribbonLang === 'ja' ? 'テーマのフォント' : 'Theme Fonts';
-    const firstRecent = options.find((option) => recentFontValues.has(option.value))?.value;
-    if (value === firstRecent)
-      return ribbonLang === 'ja' ? '最近使ったフォント' : 'Recently Used Fonts';
+    const firstTheme = options.find((option) => THEME_FONT_VALUES.has(option.value))?.value;
+    if (value === firstTheme) return ribbonText.fontSectionTheme;
+    const firstRecent = options.find((option) => RECENT_FONT_VALUES.has(option.value))?.value;
+    if (value === firstRecent) return ribbonText.fontSectionRecent;
     const firstAll = options.find(
-      (option) => !themeFontValues.has(option.value) && !recentFontValues.has(option.value),
+      (option) => !THEME_FONT_VALUES.has(option.value) && !RECENT_FONT_VALUES.has(option.value),
     )?.value;
-    if (value === firstAll) return ribbonLang === 'ja' ? 'すべてのフォント' : 'All Fonts';
+    if (value === firstAll) return ribbonText.fontSectionAll;
     return null;
   };
 
@@ -126,10 +133,10 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     switch (value) {
       case 'Aptos Display':
       case '游ゴシック Light':
-        return ribbonLang === 'ja' ? '(見出し)' : '(Heading)';
+        return ribbonText.fontRoleHeading;
       case 'Aptos Narrow':
       case '游ゴシック Regular':
-        return ribbonLang === 'ja' ? '(本文)' : '(Body)';
+        return ribbonText.fontRoleBody;
       default:
         return null;
     }
@@ -142,13 +149,12 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     const options = command.options ?? [];
     if (command.id === 'sheetViewSelect') {
       const inst = getInst();
-      const currentLabel = ribbonLang === 'ja' ? '現在の表示' : 'Current view';
       const views =
         inst?.store
           .getState()
           .sheetViews.views.filter((view) => view.sheet === inst?.store.getState().data.sheetIndex)
           .map((view) => ({ value: view.id, label: view.name })) ?? [];
-      return [{ value: 'current', label: currentLabel }, ...views];
+      return [{ value: 'current', label: ribbonText.currentView }, ...views];
     }
     if (command.id !== 'fontFamily') return options;
     return options.filter((option) => shouldShowFontOption(option.value, current, ribbonLang));
@@ -189,6 +195,30 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     }
   };
 
+  const createRibbonControlButton = (opts: {
+    className: string;
+    title?: string;
+    ariaLabel?: string;
+    ariaHaspopup?: string;
+    ariaExpanded?: boolean;
+    role?: string;
+    selected?: boolean;
+    tabIndex?: number;
+    dataset?: Record<string, string>;
+  }): HTMLButtonElement => {
+    return createRibbonButton({
+      className: opts.className,
+      title: opts.title,
+      ariaLabel: opts.ariaLabel,
+      ariaHaspopup: opts.ariaHaspopup,
+      ariaExpanded: opts.ariaExpanded,
+      role: opts.role,
+      ariaSelected: opts.selected,
+      tabIndex: opts.tabIndex,
+      dataset: opts.dataset,
+    });
+  };
+
   const createRibbonSelect = (command: RibbonCommand): HTMLDivElement => {
     const wrap = document.createElement('div');
     wrap.className = `demo__rb-dd${command.className ? ` ${command.className}` : ''}`;
@@ -196,13 +226,13 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     wrap.dataset.ribbonSelect = command.id;
     wrap.dataset.ribbonOptions = JSON.stringify(command.options ?? []);
 
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'demo__rb-dd__btn';
-    button.title = command.title;
-    button.setAttribute('aria-label', command.title);
-    button.setAttribute('aria-haspopup', 'listbox');
-    button.setAttribute('aria-expanded', 'false');
+    const button = createRibbonControlButton({
+      className: 'demo__rb-dd__btn',
+      title: command.title,
+      ariaLabel: command.title,
+      ariaHaspopup: 'listbox',
+      ariaExpanded: false,
+    });
 
     const value = document.createElement('span');
     value.className = 'demo__rb-dd__value';
@@ -267,14 +297,13 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
           list.appendChild(heading);
         }
         const selected = option.value === current;
-        const item = document.createElement('button');
-        item.type = 'button';
-        item.className = `demo__rb-dd__opt${selected ? ' demo__rb-dd__opt--selected' : ''}`;
-        item.setAttribute('role', 'option');
-        item.setAttribute('aria-selected', selected ? 'true' : 'false');
-        item.tabIndex = -1;
-        item.dataset.value = option.value;
-        item.dataset.fcValue = option.value;
+        const item = createRibbonControlButton({
+          className: `demo__rb-dd__opt${selected ? ' demo__rb-dd__opt--selected' : ''}`,
+          role: 'option',
+          selected,
+          tabIndex: -1,
+          dataset: { value: option.value, fcValue: option.value },
+        });
         const check = document.createElement('span');
         check.className = 'demo__rb-dd__check';
         check.setAttribute('aria-hidden', 'true');
@@ -312,7 +341,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
             preview.append(label);
           }
           item.append(check, preview);
-          if (fontSubmenuFamilies.has(option.value)) {
+          if (FONT_SUBMENU_FAMILIES.has(option.value)) {
             const arrow = document.createElement('span');
             arrow.className = 'demo__rb-dd__submenu';
             arrow.setAttribute('aria-hidden', 'true');
@@ -405,13 +434,13 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     wrap.className = 'demo__rb-color';
     wrap.dataset.ribbonCommand = command.id;
 
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'demo__rb-color__btn';
-    button.title = command.title;
-    button.setAttribute('aria-label', command.title);
-    button.setAttribute('aria-haspopup', 'true');
-    button.setAttribute('aria-expanded', 'false');
+    const button = createRibbonControlButton({
+      className: 'demo__rb-color__btn',
+      title: command.title,
+      ariaLabel: command.title,
+      ariaHaspopup: 'true',
+      ariaExpanded: false,
+    });
     if (command.icon) {
       const icon = createRibbonIcon(command.icon);
       if (icon) {
@@ -512,7 +541,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
 
   const ribbonSelectLabel = (wrap: HTMLElement, current: string): string => {
     if (wrap.dataset.ribbonSelect === 'sheetViewSelect') {
-      if (current === 'current') return ribbonLang === 'ja' ? '現在の表示' : 'Current view';
+      if (current === 'current') return ribbonText.currentView;
       const state = getInst()?.store.getState();
       return state?.sheetViews.views.find((view) => view.id === current)?.name ?? current;
     }

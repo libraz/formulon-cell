@@ -387,7 +387,12 @@ describe('recordFormatChange / recordLayoutChange', () => {
     recordTablesChange(h, store, () => {
       mutators.upsertTableOverlay(store, table);
     });
-    expect(captureTableOverlaysSnapshot(store.getState())).toEqual([table]);
+    expect(captureTableOverlaysSnapshot(store.getState())).toEqual({
+      tables: [table],
+      customTableStyles: [],
+      customPivotTableStyles: [],
+      pivotTableStyles: [],
+    });
 
     h.undo();
     expect(store.getState().tables.tables).toEqual([]);

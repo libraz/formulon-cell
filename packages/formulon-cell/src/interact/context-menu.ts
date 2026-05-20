@@ -41,6 +41,8 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { hitZone } from '../render/geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { createInteractionButton } from './chip-button.js';
 import {
   buildCellEntries,
   buildColEntries,
@@ -54,6 +56,7 @@ import {
 } from './context-menu-spec.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';
 import { openInsertCopiedCellsDialog } from './insert-copied-cells-dialog.js';
+import { clampPanelToViewport, panelSize, viewportSize } from './overlay-position.js';
 
 export interface ContextMenuDeps {
   host: HTMLElement;
@@ -99,6 +102,73 @@ export interface ContextMenuDeps {
 }
 
 const VIEWPORT_PAD = 4;
+
+const appendContextMenuLabel = (
+  button: HTMLButtonElement,
+  labelText: string,
+  hintText?: string,
+): void => {
+  const label = document.createElement('span');
+  label.className = 'fc-ctxmenu__label';
+  label.textContent = labelText;
+  button.appendChild(label);
+  if (hintText !== undefined) {
+    const hint = document.createElement('span');
+    hint.className = 'fc-ctxmenu__hint';
+    hint.textContent = hintText;
+    button.appendChild(hint);
+  }
+};
+
+const createContextMenuItemButton = (
+  entry: Extract<MenuEntry, { kind: 'item' }>,
+): HTMLButtonElement => {
+  const button = createInteractionButton({
+    className: 'fc-ctxmenu__item',
+    dataset: { fcAction: entry.id },
+    role: 'menuitem',
+    tabIndex: -1,
+  });
+  appendContextMenuLabel(button, entry.label, entry.hint ?? '');
+  return button;
+};
+
+const createContextSubmenuButton = (
+  entry: Extract<MenuEntry, { kind: 'submenu' }>,
+): HTMLButtonElement => {
+  const button = createInteractionButton({
+    className: 'fc-ctxmenu__item fc-ctxmenu__item--parent',
+    dataset: {
+      fcSubmenu: entry.id,
+      fcAction: SUBMENU_ICON_ACTION[entry.id] ?? entry.id,
+    },
+    role: 'menuitem',
+    tabIndex: -1,
+  });
+  button.setAttribute('aria-haspopup', 'menu');
+  button.setAttribute('aria-expanded', 'false');
+  appendContextMenuLabel(button, entry.label);
+  const arrow = document.createElement('span');
+  arrow.className = 'fc-ctxmenu__arrow';
+  arrow.textContent = '›';
+  arrow.setAttribute('aria-hidden', 'true');
+  button.appendChild(arrow);
+  return button;
+};
+
+const createContextMiniToolbarButton = (item: {
+  id: ItemId;
+  label: string;
+  text?: string;
+}): HTMLButtonElement => {
+  return createInteractionButton({
+    className: 'fc-ctxmenu__mini-btn',
+    dataset: { fcAction: item.id },
+    ariaLabel: item.label,
+    tabIndex: -1,
+    text: item.text,
+  });
+};
 
 /** Detacher returned by `attachContextMenu`. Also exposes `setStrings` so the
  *  active dictionary can be swapped after attach. */
@@ -215,14 +285,13 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     sub.style.left = '-9999px';
     sub.style.top = '-9999px';
     const r = parentBtn.getBoundingClientRect();
-    const sw = sub.offsetWidth;
-    const sh = sub.offsetHeight;
+    const { width: sw } = panelSize(sub);
+    const viewport = viewportSize();
     let x = r.right - 2;
-    if (x + sw > window.innerWidth - VIEWPORT_PAD) x = r.left - sw + 2;
-    x = Math.max(VIEWPORT_PAD, x);
-    const y = Math.max(VIEWPORT_PAD, Math.min(r.top - 4, window.innerHeight - sh - VIEWPORT_PAD));
-    sub.style.left = `${x}px`;
-    sub.style.top = `${y}px`;
+    if (x + sw > viewport.width - VIEWPORT_PAD) x = r.left - sw + 2;
+    const pos = clampPanelToViewport(sub, x, r.top - 4, { pad: VIEWPORT_PAD });
+    sub.style.left = `${pos.x}px`;
+    sub.style.top = `${pos.y}px`;
     openSub = { id, parentBtn };
     parentBtn.setAttribute('aria-expanded', 'true');
     parentBtn.classList.add('fc-ctxmenu__item--open');
@@ -242,23 +311,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     }
     if (entry.kind === 'submenu') {
       submenuChildren.set(entry.id, entry.children);
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'fc-ctxmenu__item fc-ctxmenu__item--parent';
-      btn.dataset.fcSubmenu = entry.id;
-      btn.dataset.fcAction = SUBMENU_ICON_ACTION[entry.id] ?? entry.id;
-      btn.setAttribute('role', 'menuitem');
-      btn.setAttribute('aria-haspopup', 'menu');
-      btn.setAttribute('aria-expanded', 'false');
-      btn.tabIndex = -1;
-      const label = document.createElement('span');
-      label.className = 'fc-ctxmenu__label';
-      label.textContent = entry.label;
-      const arrow = document.createElement('span');
-      arrow.className = 'fc-ctxmenu__arrow';
-      arrow.textContent = '›';
-      arrow.setAttribute('aria-hidden', 'true');
-      btn.append(label, arrow);
+      const btn = createContextSubmenuButton(entry);
       btn.addEventListener('mouseenter', () => {
         openSubmenu(entry.id, btn);
       });
@@ -272,23 +325,10 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       container.appendChild(btn);
       return;
     }
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'fc-ctxmenu__item';
-    btn.dataset.fcAction = entry.id;
-    btn.setAttribute('role', 'menuitem');
-    btn.tabIndex = -1;
+    const btn = createContextMenuItemButton(entry);
     if (disabledIds.has(entry.id)) {
-      btn.disabled = true;
-      btn.setAttribute('aria-disabled', 'true');
+      setContextMenuItemDisabled(btn, true, strings.contextMenu.pasteSpecialRequiresCopiedCells);
     }
-    const label = document.createElement('span');
-    label.className = 'fc-ctxmenu__label';
-    label.textContent = entry.label;
-    const hint = document.createElement('span');
-    hint.className = 'fc-ctxmenu__hint';
-    hint.textContent = entry.hint ?? '';
-    btn.append(label, hint);
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -325,13 +365,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     ];
 
     for (const item of buttons) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'fc-ctxmenu__mini-btn';
-      btn.dataset.fcAction = item.id;
-      btn.setAttribute('aria-label', item.label);
-      btn.tabIndex = -1;
-      if (item.text) btn.textContent = item.text;
+      const btn = createContextMiniToolbarButton(item);
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -390,23 +424,11 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     const rowUnhide = root.querySelector<HTMLButtonElement>('[data-fc-action="rowUnhide"]');
     const colUnhide = root.querySelector<HTMLButtonElement>('[data-fc-action="colUnhide"]');
     if (rowUnhide) {
-      rowUnhide.disabled = !rowHidden;
-      rowUnhide.setAttribute('aria-disabled', rowHidden ? 'false' : 'true');
+      setContextMenuItemDisabled(rowUnhide, !rowHidden, strings.contextMenu.noHiddenRows);
     }
     if (colUnhide) {
-      colUnhide.disabled = !colHidden;
-      colUnhide.setAttribute('aria-disabled', colHidden ? 'false' : 'true');
+      setContextMenuItemDisabled(colUnhide, !colHidden, strings.contextMenu.noHiddenColumns);
     }
-  };
-
-  const clampToViewport = (x: number, y: number): { x: number; y: number } => {
-    const w = root.offsetWidth;
-    const h = root.offsetHeight;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const cx = Math.max(VIEWPORT_PAD, Math.min(x, vw - w - VIEWPORT_PAD));
-    const cy = Math.max(VIEWPORT_PAD, Math.min(y, vh - h - VIEWPORT_PAD));
-    return { x: cx, y: cy };
   };
 
   const show = (clientX: number, clientY: number, kind: MenuKind): void => {
@@ -417,15 +439,17 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     buildMenu(kind);
     if (pasteBtnRef) {
       const canPaste = canReadClipboard();
-      pasteBtnRef.disabled = !canPaste;
-      if (!canPaste) pasteBtnRef.setAttribute('aria-disabled', 'true');
-      else pasteBtnRef.removeAttribute('aria-disabled');
+      setContextMenuItemDisabled(
+        pasteBtnRef,
+        !canPaste,
+        strings.contextMenu.clipboardUnavailable,
+      );
     }
     root.style.display = 'block';
     root.style.left = '-9999px';
     root.style.top = '-9999px';
     visible = true;
-    const { x, y } = clampToViewport(clientX, clientY);
+    const { x, y } = clampPanelToViewport(root, clientX, clientY, { pad: VIEWPORT_PAD });
     root.style.left = `${x}px`;
     root.style.top = `${y}px`;
     focusMenuItem(0);
@@ -910,6 +934,16 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
 
 function canReadClipboard(): boolean {
   return typeof navigator !== 'undefined' && typeof navigator.clipboard?.readText === 'function';
+}
+
+function setContextMenuItemDisabled(
+  button: HTMLButtonElement,
+  disabled: boolean,
+  reason: string | null,
+): void {
+  projectDisabledState(button, disabled, reason, {
+    datasetKey: 'disabledReason',
+  });
 }
 
 async function writeClipboard(text: string): Promise<void> {

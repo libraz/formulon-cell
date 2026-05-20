@@ -21,6 +21,13 @@ import {
 } from '@libraz/formulon-cell';
 import { autofitColWidth, autofitRowHeight } from './autofit.js';
 
+type CellFormatMenuText = ToolbarMenuText & {
+  rowHeightLabel: string;
+  colWidthLabel: string;
+  sheetNameLabel: string;
+  sheetNameRequired: string;
+};
+
 export interface CellFormatActionDeps {
   inst: SpreadsheetInstance | null;
   ribbonLang: 'ja' | 'en';
@@ -31,14 +38,11 @@ export interface CellFormatActionDeps {
   /** Sheet-tab "Rename" label from `dictionaries[ribbonLang].sheetTabs`. */
   renameSheetLabel: string;
   runSheetProtectionFlow: () => Promise<void>;
-  showPrompt: (opts: {
+  showRenameSheetDialog: (opts: {
     title: string;
     label: string;
-    initial?: string;
-    placeholder?: string;
-    okLabel?: string;
-    cancelLabel?: string;
-    validate?: (value: string) => string | null;
+    initial: string;
+    requiredMessage: string;
   }) => Promise<string | null>;
   promptDimension: (
     title: string,
@@ -60,6 +64,7 @@ export const applyCellFormatAction = async (
 ): Promise<void> => {
   const { inst: i, range, ribbonLang, statusMetric, ribbonMenuText } = deps;
   if (!i || !range) return;
+  const t = ribbonMenuText as CellFormatMenuText;
   if (action === 'dialog') {
     i.openFormatDialog();
     return;
@@ -71,18 +76,13 @@ export const applyCellFormatAction = async (
   if (action === 'rename-sheet') {
     const sheet = i.store.getState().data.sheetIndex;
     const current = i.workbook.sheetName(sheet);
-    const name = await deps.showPrompt({
+    const name = await deps.showRenameSheetDialog({
       title: deps.renameSheetLabel,
-      label: ribbonLang === 'ja' ? 'シート名' : 'Sheet name',
+      label: t.sheetNameLabel,
       initial: current,
-      validate: (raw) =>
-        raw.trim()
-          ? null
-          : ribbonLang === 'ja'
-            ? 'シート名を入力してください。'
-            : 'Enter a sheet name.',
+      requiredMessage: t.sheetNameRequired,
     });
-    if (name !== null && renameSheet(i.workbook, sheet, name.trim(), i.store, i.history)) {
+    if (name !== null && renameSheet(i.workbook, sheet, name, i.store, i.history)) {
       deps.renderSheetTabs();
     }
     return;
@@ -157,8 +157,8 @@ export const applyCellFormatAction = async (
   }
   if (action === 'row-height') {
     const n = await deps.promptDimension(
-      ribbonLang === 'ja' ? '行の高さ' : 'Row Height',
-      ribbonLang === 'ja' ? '高さ (px)' : 'Height (px)',
+      t.rowHeight,
+      t.rowHeightLabel,
       i.store.getState().layout.defaultRowHeight,
       409,
     );
@@ -183,8 +183,8 @@ export const applyCellFormatAction = async (
   }
   if (action === 'col-width') {
     const n = await deps.promptDimension(
-      ribbonLang === 'ja' ? '列の幅' : 'Column Width',
-      ribbonLang === 'ja' ? '幅 (px)' : 'Width (px)',
+      t.colWidth,
+      t.colWidthLabel,
       i.store.getState().layout.defaultColWidth,
       2048,
     );
