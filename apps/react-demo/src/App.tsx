@@ -41,6 +41,8 @@ import {
   DEMO_FUNCTIONS,
   DEMO_ICONS,
   DEMO_PRINT_PREVIEW_LINES,
+  DEMO_PRINTER_PROFILE_ID,
+  DEMO_PRINTER_PROFILES,
   type DemoBackstageAction,
   type DemoIconName,
   type DemoSearchItem,
@@ -62,10 +64,12 @@ import {
   previewCellChange,
   queryDemoSearchItems,
   recordDemoSearchUsage,
+  refreshDemoPrinterProfiles,
   resolveInitialLocale,
   reviewCellsForInstance,
   runDemoBackstageAction,
   saveDemoSearchUsagePrior,
+  saveDemoWorkbookToDownload,
   seedDemoWorkbook,
   THEMES,
 } from '../../demo-shared/index.js';
@@ -148,6 +152,7 @@ export const App = (): ReactElement => {
   const [scriptOpen, setScriptOpen] = useState(false);
   const [scriptCommand, setScriptCommand] = useState('uppercase');
   const [scriptError, setScriptError] = useState<string | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<'saved' | 'saving' | 'error' | null>(null);
   // Workbook display name. Untitled until the user opens or saves a file —
   // mirrors the spreadsheet titlebar convention. Stripping the extension
   // keeps it tidy in the chrome while preserving the user's filename for
@@ -393,19 +398,7 @@ export const App = (): ReactElement => {
   }, [applyParsedScript, instance]);
 
   const onSave = useCallback(() => {
-    if (!instance) return;
-    const bytes = instance.workbook.save();
-    const blob = new Blob([bytes as BlobPart], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${bookName}.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    saveDemoWorkbookToDownload({ instance, bookName, setUploadStatus });
   }, [bookName, instance]);
 
   const onNewWorkbook = useCallback(async () => {
@@ -523,6 +516,7 @@ export const App = (): ReactElement => {
         locale,
         setRibbonTab,
         (commandId) => toolbarRef.current?.applyCommand(commandId) ?? false,
+        EXCEL365_STANDARD_RIBBON_TABS,
       ),
     [commands, locale],
   );
@@ -660,9 +654,11 @@ export const App = (): ReactElement => {
                       type="button"
                       role="option"
                       aria-selected={index === searchActiveIndex}
+                      aria-disabled={cmd.disabled ? 'true' : undefined}
+                      data-disabled-reason={cmd.disabledReason}
                       className={`demo__command-item${
                         index === searchActiveIndex ? ' demo__command-item--active' : ''
-                      }`}
+                      }${cmd.disabled ? ' demo__command-item--disabled' : ''}`}
                       onMouseDown={(e) => e.preventDefault()}
                       onMouseEnter={() => setSearchActiveIndex(index)}
                       onClick={() => runCommand(cmd)}
@@ -735,6 +731,11 @@ export const App = (): ReactElement => {
             locale={locale}
             features={features}
             functions={DEMO_FUNCTIONS}
+            printerProfiles={DEMO_PRINTER_PROFILES}
+            printerProfileId={DEMO_PRINTER_PROFILE_ID}
+            refreshPrinterProfiles={refreshDemoPrinterProfiles}
+            uploadStatus={uploadStatus}
+            macroRecording={scriptOpen}
             onReady={setInstance}
             onCellChange={onCellChange}
           />

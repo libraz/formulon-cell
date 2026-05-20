@@ -9,7 +9,7 @@ import { type History, recordFormatChange } from '../commands/history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { createDialogShell } from './dialog-shell.js';
+import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
 
 export interface PasteSpecialDeps {
   host: HTMLElement;
@@ -89,17 +89,12 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
     onDismiss: () => close(),
   });
   shell.overlay.classList.add('fc-fmtdlg');
-  shell.panel.classList.add('fc-fmtdlg__panel', 'fc-pastesp__panel');
-  const { overlay, panel } = shell;
-
-  const header = document.createElement('div');
-  header.className = 'fc-fmtdlg__header';
-  header.textContent = t.title;
-  panel.appendChild(header);
-
-  const body = document.createElement('div');
-  body.className = 'fc-fmtdlg__body fc-pastesp__body';
-  panel.appendChild(body);
+  const { overlay } = shell;
+  const { body, footer } = appendDialogFrame(shell, {
+    title: t.title,
+    panelClasses: ['fc-fmtdlg__panel', 'fc-pastesp__panel'],
+    bodyClass: 'fc-fmtdlg__body fc-pastesp__body',
+  });
 
   // Two-column layout: paste section (left), operation section (right).
   const cols = document.createElement('div');
@@ -135,20 +130,10 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
   const transpose = makeCheck(t.transpose);
   bottomRow.append(skipBlanks.label, transpose.label);
 
-  // Footer
-  const footer = document.createElement('div');
-  footer.className = 'fc-fmtdlg__footer';
-  panel.appendChild(footer);
-
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.className = 'fc-fmtdlg__btn';
-  cancelBtn.textContent = t.cancel;
-  const okBtn = document.createElement('button');
-  okBtn.type = 'button';
-  okBtn.className = 'fc-fmtdlg__btn fc-fmtdlg__btn--primary';
-  okBtn.textContent = t.ok;
-  footer.append(cancelBtn, okBtn);
+  const { cancelBtn, okBtn } = appendDialogActions(footer, {
+    cancelLabel: t.cancel,
+    okLabel: t.ok,
+  });
 
   // Initial defaults
   const setDefaults = (): void => {

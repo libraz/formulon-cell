@@ -1,9 +1,14 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en, ja } from '../../../src/i18n/strings.js';
 import { attachViewToolbar } from '../../../src/interact/view-toolbar.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const fakeWb = () =>
   ({
@@ -100,6 +105,13 @@ describe('attachViewToolbar', () => {
     });
     const select = toolbar.querySelector<HTMLSelectElement>('.fc-viewbar__select');
     if (!select) throw new Error('expected zoom select');
+    expect(Array.from(select.options).map((option) => option.value)).toEqual([
+      '75',
+      '100',
+      '125',
+      '150',
+      '200',
+    ]);
 
     select.value = '150';
     select.dispatchEvent(new Event('change'));
@@ -139,6 +151,15 @@ describe('attachViewToolbar', () => {
 
     mutators.setFilterRange(store, { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 1 });
     mutators.setFreezePanes(store, 2, 1);
+    const deleteButton = toolbar.querySelector<HTMLButtonElement>('button[aria-label="Delete"]');
+    expect(deleteButton?.disabled).toBe(true);
+    expect(deleteButton?.dataset.disabledReason).toBe(en.viewToolbar.deleteViewRequiresActive);
+    expect(deleteButton?.getAttribute('aria-description')).toBe(
+      en.viewToolbar.deleteViewRequiresActive,
+    );
+    expect(deleteButton?.title).toBe(
+      `${en.viewToolbar.deleteView}\n${en.viewToolbar.deleteViewRequiresActive}`,
+    );
     toolbar.querySelector<HTMLButtonElement>('button[aria-label="Save"]')?.click();
     const saved = store.getState().sheetViews.views[0];
     expect(saved).toMatchObject({ name: 'Views 1', freeze: { rows: 2, cols: 1 } });
@@ -147,16 +168,39 @@ describe('attachViewToolbar', () => {
     mutators.setFreezePanes(store, 0, 0);
     const select = toolbar.querySelector<HTMLSelectElement>('select[aria-label="Views"]');
     if (!select || !saved) throw new Error('missing sheet-view controls');
+    expect(Array.from(select.options).map((option) => option.textContent)).toEqual([
+      'Current view',
+      'Views 1',
+    ]);
     select.value = saved.id;
     select.dispatchEvent(new Event('change'));
     expect(store.getState().sheetViews.activeViewId).toBe(saved.id);
     expect(store.getState().layout.freezeRows).toBe(2);
     expect(store.getState().ui.filterRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 4, c1: 1 });
+    expect(deleteButton?.disabled).toBe(false);
+    expect(deleteButton?.dataset.disabledReason).toBeUndefined();
+    expect(deleteButton?.hasAttribute('aria-description')).toBe(false);
+    expect(deleteButton?.title).toBe(en.viewToolbar.deleteView);
 
-    toolbar.querySelector<HTMLButtonElement>('button[aria-label="Delete"]')?.click();
+    deleteButton?.click();
     expect(store.getState().sheetViews.views).toEqual([]);
     expect(store.getState().sheetViews.activeViewId).toBeNull();
+    expect(deleteButton?.disabled).toBe(true);
+    expect(deleteButton?.dataset.disabledReason).toBe(en.viewToolbar.deleteViewRequiresActive);
     expect(invalidate).toHaveBeenCalledTimes(3);
     handle.detach();
+  });
+
+  it('keeps view toolbar button DOM on the shared interaction primitive', () => {
+    const source = readFileSync(join(root, 'src/interact/view-toolbar.ts'), 'utf8');
+
+    expect(source).toContain("import { createInteractionButton } from './chip-button.js'");
+    expect(source).toContain('function createViewToolbarButton');
+    expect(source).toContain("const normalView = createViewToolbarButton('fc-viewbar__button')");
+    expect(source).toContain("const gridlines = createViewToolbarButton('fc-viewbar__toggle')");
+    expect(source).toContain("const zoomFit = createViewToolbarButton('fc-viewbar__button')");
+    expect(source).toContain("const objectsBtn = createViewToolbarButton('fc-viewbar__button')");
+    expect(source).not.toContain('function makeButton');
+    expect(source).not.toContain("document.createElement('button')");
   });
 });

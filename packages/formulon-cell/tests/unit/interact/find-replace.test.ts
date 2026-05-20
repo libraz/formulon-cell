@@ -1,12 +1,18 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { en } from '../../../src/i18n/strings.js';
 import { attachFindReplace } from '../../../src/interact/find-replace.js';
 import {
   createSpreadsheetStore,
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
@@ -110,6 +116,12 @@ describe('attachFindReplace', () => {
     handle.detach();
   });
 
+  it('keeps Find/Replace buttons on the shared dialog button primitive', () => {
+    const source = readFileSync(join(root, 'src/interact/find-replace.ts'), 'utf8');
+    expect(source).toContain("createDialogButton({ label: '', baseClass: 'fc-find__btn' })");
+    expect(source).not.toContain("document.createElement('button')");
+  });
+
   it('typing into the find input updates the pill with total matches', () => {
     seed(store, wb, [
       { row: 0, col: 0, value: 'foo' },
@@ -126,7 +138,7 @@ describe('attachFindReplace', () => {
   });
 
   it('shows Excel-style tabs and options when Options is clicked', () => {
-    const handle = attachFindReplace({ host, store, wb });
+    const handle = attachFindReplace({ host, store, wb, strings: en });
     handle.open();
     expect(
       $<HTMLButtonElement>(host, '.fc-find__tab[aria-selected="true"]').textContent,
@@ -138,6 +150,36 @@ describe('attachFindReplace', () => {
     expect($<HTMLSelectElement>(host, '#fc-find-within').value).toBe('sheet');
     expect($<HTMLSelectElement>(host, '#fc-find-search').value).toBe('rows');
     expect($<HTMLSelectElement>(host, '#fc-find-look-in').value).toBe('values');
+    const formatBtn = $<HTMLButtonElement>(host, '.fc-find__format-btn');
+    expect(formatBtn.disabled).toBe(true);
+    expect(formatBtn.dataset.disabledReason).toBe(en.findReplace.formatUnavailable);
+    expect(formatBtn.getAttribute('aria-description')).toBe(en.findReplace.formatUnavailable);
+    expect(formatBtn.title).toBe(`${en.findReplace.format}\n${en.findReplace.formatUnavailable}`);
+    handle.detach();
+  });
+
+  it('projects the Look in disabled reason on the Replace tab', () => {
+    const handle = attachFindReplace({ host, store, wb, strings: en });
+    handle.open('replace');
+    $<HTMLButtonElement>(host, '.fc-find__options-btn').click();
+    const lookIn = $<HTMLSelectElement>(host, '#fc-find-look-in');
+    expect(lookIn.disabled).toBe(true);
+    expect(lookIn.value).toBe('formulas');
+    expect(lookIn.dataset.disabledReason).toBe(en.findReplace.lookInRequiresFindTab);
+    expect(lookIn.getAttribute('aria-description')).toBe(en.findReplace.lookInRequiresFindTab);
+    expect(lookIn.title).toBe(`${en.findReplace.lookIn}\n${en.findReplace.lookInRequiresFindTab}`);
+    expect(host.querySelector<HTMLLabelElement>('label[for="fc-find-look-in"]')?.title).toBe(
+      `${en.findReplace.lookIn}\n${en.findReplace.lookInRequiresFindTab}`,
+    );
+
+    $<HTMLButtonElement>(host, '.fc-find__tab').click();
+    expect(lookIn.disabled).toBe(false);
+    expect(lookIn.dataset.disabledReason).toBeUndefined();
+    expect(lookIn.hasAttribute('aria-description')).toBe(false);
+    expect(lookIn.title).toBe(en.findReplace.lookIn);
+    expect(host.querySelector<HTMLLabelElement>('label[for="fc-find-look-in"]')?.title).toBe(
+      en.findReplace.lookIn,
+    );
     handle.detach();
   });
 

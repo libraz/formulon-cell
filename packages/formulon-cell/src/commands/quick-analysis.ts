@@ -37,7 +37,18 @@ export interface QuickAnalysisAction {
   labelKey: string;
   /** True when the action is a no-op for the current selection. */
   disabled?: boolean;
+  /** Untranslated disabled-reason key for hosts to project into aria/title. */
+  disabledReason?: QuickAnalysisDisabledReasonKey;
 }
+
+export type QuickAnalysisDisabledReasonKey =
+  | 'requiresNumbers'
+  | 'requiresTwoNumbers'
+  | 'requiresThreeNumbers'
+  | 'requiresMultiCell'
+  | 'requiresHorizontalRun'
+  | 'pivotUnavailable'
+  | 'chartUnavailable';
 
 export type QuickAnalysisActionId =
   | 'format-data-bar'
@@ -114,6 +125,18 @@ export function buildQuickAnalysisActions(input: QuickAnalysisInput): QuickAnaly
   const out: QuickAnalysisAction[] = [];
   const multi = isMulti(range);
   const hasNumbers = stats.numericCount > 0;
+  const totalsReason: QuickAnalysisDisabledReasonKey | undefined = !multi
+    ? 'requiresMultiCell'
+    : !hasNumbers
+      ? 'requiresNumbers'
+      : undefined;
+  const chartReason: QuickAnalysisDisabledReasonKey | undefined = !multi
+    ? 'requiresMultiCell'
+    : !hasNumbers
+      ? 'requiresNumbers'
+      : input.chartAvailable !== true
+        ? 'chartUnavailable'
+        : undefined;
 
   // Formatting section — color highlights work even on a single cell, but
   // data bars / icon sets need at least two numeric values to interpolate.
@@ -122,30 +145,35 @@ export function buildQuickAnalysisActions(input: QuickAnalysisInput): QuickAnaly
     group: 'formatting',
     labelKey: 'dataBar',
     disabled: stats.numericCount < 2,
+    disabledReason: stats.numericCount < 2 ? 'requiresTwoNumbers' : undefined,
   });
   out.push({
     id: 'format-color-scale',
     group: 'formatting',
     labelKey: 'colorScale',
     disabled: stats.numericCount < 2,
+    disabledReason: stats.numericCount < 2 ? 'requiresTwoNumbers' : undefined,
   });
   out.push({
     id: 'format-icon-set',
     group: 'formatting',
     labelKey: 'iconSet',
     disabled: stats.numericCount < 3,
+    disabledReason: stats.numericCount < 3 ? 'requiresThreeNumbers' : undefined,
   });
   out.push({
     id: 'format-greater-than',
     group: 'formatting',
     labelKey: 'greaterThan',
     disabled: !hasNumbers,
+    disabledReason: !hasNumbers ? 'requiresNumbers' : undefined,
   });
   out.push({
     id: 'format-top-10',
     group: 'formatting',
     labelKey: 'top10',
     disabled: stats.numericCount < 2,
+    disabledReason: stats.numericCount < 2 ? 'requiresTwoNumbers' : undefined,
   });
   out.push({ id: 'format-clear', group: 'formatting', labelKey: 'clearFormat' });
 
@@ -155,28 +183,48 @@ export function buildQuickAnalysisActions(input: QuickAnalysisInput): QuickAnaly
     group: 'totals',
     labelKey: 'sumRow',
     disabled: !hasNumbers || !multi,
+    disabledReason: totalsReason,
   });
   out.push({
     id: 'totals-sum-col',
     group: 'totals',
     labelKey: 'sumCol',
     disabled: !hasNumbers || !multi,
+    disabledReason: totalsReason,
   });
   out.push({
     id: 'totals-average-row',
     group: 'totals',
     labelKey: 'avgRow',
     disabled: !hasNumbers || !multi,
+    disabledReason: totalsReason,
   });
-  out.push({ id: 'totals-count-row', group: 'totals', labelKey: 'countRow', disabled: !multi });
+  out.push({
+    id: 'totals-count-row',
+    group: 'totals',
+    labelKey: 'countRow',
+    disabled: !multi,
+    disabledReason: !multi ? 'requiresMultiCell' : undefined,
+  });
 
   // Tables section.
-  out.push({ id: 'tables-as-table', group: 'tables', labelKey: 'formatAsTable', disabled: !multi });
+  out.push({
+    id: 'tables-as-table',
+    group: 'tables',
+    labelKey: 'formatAsTable',
+    disabled: !multi,
+    disabledReason: !multi ? 'requiresMultiCell' : undefined,
+  });
   out.push({
     id: 'tables-pivot',
     group: 'tables',
     labelKey: 'pivotTable',
     disabled: !multi || input.pivotTableAvailable !== true,
+    disabledReason: !multi
+      ? 'requiresMultiCell'
+      : input.pivotTableAvailable !== true
+        ? 'pivotUnavailable'
+        : undefined,
   });
 
   // Sparkline section — only meaningful for a horizontal series.
@@ -186,18 +234,21 @@ export function buildQuickAnalysisActions(input: QuickAnalysisInput): QuickAnaly
     group: 'sparklines',
     labelKey: 'sparkLine',
     disabled: !horizontalRun,
+    disabledReason: !horizontalRun ? 'requiresHorizontalRun' : undefined,
   });
   out.push({
     id: 'sparkline-column',
     group: 'sparklines',
     labelKey: 'sparkColumn',
     disabled: !horizontalRun,
+    disabledReason: !horizontalRun ? 'requiresHorizontalRun' : undefined,
   });
   out.push({
     id: 'sparkline-win-loss',
     group: 'sparklines',
     labelKey: 'sparkWinLoss',
     disabled: !horizontalRun,
+    disabledReason: !horizontalRun ? 'requiresHorizontalRun' : undefined,
   });
 
   out.push({
@@ -205,12 +256,14 @@ export function buildQuickAnalysisActions(input: QuickAnalysisInput): QuickAnaly
     group: 'charts',
     labelKey: 'chartColumn',
     disabled: !hasNumbers || !multi || input.chartAvailable !== true,
+    disabledReason: chartReason,
   });
   out.push({
     id: 'charts-line',
     group: 'charts',
     labelKey: 'chartLine',
     disabled: !hasNumbers || !multi || input.chartAvailable !== true,
+    disabledReason: chartReason,
   });
 
   return out;

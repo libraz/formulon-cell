@@ -2,7 +2,8 @@ import { listExternalLinks } from '../commands/external-links.js';
 import type { ExternalLinkKind } from '../commands/external-links.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { createDialogShell } from './dialog-shell.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { appendDialogButton, createDialogShell } from './dialog-shell.js';
 
 export interface ExternalLinksDialogDeps {
   host: HTMLElement;
@@ -34,6 +35,27 @@ function externalLinkKindText(
     case 'unknown':
       return labels.kindUnknown;
   }
+}
+
+type ExternalLinkAction =
+  | 'updateValues'
+  | 'changeSource'
+  | 'openSource'
+  | 'breakLink'
+  | 'checkStatus'
+  | 'startupPrompt';
+
+function appendExternalLinkActionButton(
+  parent: HTMLElement,
+  action: ExternalLinkAction,
+  label: string,
+): HTMLButtonElement {
+  const button = appendDialogButton(parent, {
+    label,
+    baseClass: 'fc-extlinkdlg__action',
+  });
+  button.dataset.externalLinkAction = action;
+  return button;
 }
 
 /**
@@ -69,6 +91,23 @@ export function attachExternalLinksDialog(
   note.textContent = t.note;
   body.appendChild(note);
 
+  const actionBar = document.createElement('div');
+  actionBar.className = 'fc-extlinkdlg__actions';
+  body.appendChild(actionBar);
+
+  const actionButtons = new Map<ExternalLinkAction, HTMLButtonElement>();
+  const makeActionButton = (action: ExternalLinkAction, label: string): HTMLButtonElement => {
+    const button = appendExternalLinkActionButton(actionBar, action, label);
+    actionButtons.set(action, button);
+    return button;
+  };
+  makeActionButton('updateValues', t.updateValues);
+  makeActionButton('changeSource', t.changeSource);
+  makeActionButton('openSource', t.openSource);
+  makeActionButton('breakLink', t.breakLink);
+  makeActionButton('checkStatus', t.checkStatus);
+  makeActionButton('startupPrompt', t.startupPrompt);
+
   const tableWrap = document.createElement('div');
   tableWrap.className = 'fc-extlinkdlg__tablewrap';
   body.appendChild(tableWrap);
@@ -83,13 +122,25 @@ export function attachExternalLinksDialog(
   footer.className = 'fc-extlinkdlg__footer';
   shell.panel.appendChild(footer);
 
-  const closeBtn = document.createElement('button');
-  closeBtn.type = 'button';
-  closeBtn.className = 'fc-extlinkdlg__close';
-  closeBtn.textContent = t.close;
+  const closeBtn = appendDialogButton(footer, {
+    label: t.close,
+    baseClass: 'fc-extlinkdlg__close',
+  });
   shell.on(closeBtn, 'click', () => shell.close());
-  footer.appendChild(closeBtn);
   let selectedIndex = 0;
+
+  const currentLinks = (): ReturnType<typeof listExternalLinks> => listExternalLinks(getWb());
+
+  const updateActionButtons = (): void => {
+    const hasSelection = currentLinks().length > 0;
+    const reason = hasSelection ? t.readOnlyActionReason : t.noSelectionActionReason;
+    for (const button of actionButtons.values()) {
+      projectDisabledState(button, true, reason, {
+        ariaDescription: true,
+        datasetKey: 'disabledReason',
+      });
+    }
+  };
 
   const focusRow = (idx: number): void => {
     const rows = Array.from(tableWrap.querySelectorAll<HTMLTableRowElement>('tbody tr'));
@@ -101,13 +152,16 @@ export function attachExternalLinksDialog(
       row.setAttribute('aria-selected', selected ? 'true' : 'false');
     }
     rows[selectedIndex]?.focus({ preventScroll: true });
+    updateActionButtons();
   };
 
   const renderTable = (): void => {
     tableWrap.replaceChildren();
-    const links = listExternalLinks(getWb());
+    const links = currentLinks();
     if (links.length === 0) {
       empty.hidden = false;
+      selectedIndex = 0;
+      updateActionButtons();
       return;
     }
     empty.hidden = true;
@@ -127,6 +181,7 @@ export function attachExternalLinksDialog(
       const row = document.createElement('tr');
       row.tabIndex = rowIndex === selectedIndex ? 0 : -1;
       row.setAttribute('aria-selected', rowIndex === selectedIndex ? 'true' : 'false');
+      row.addEventListener('click', () => focusRow(rowIndex));
       row.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowDown') {
           e.preventDefault();
@@ -177,6 +232,13 @@ export function attachExternalLinksDialog(
       note.textContent = t.note;
       empty.textContent = t.empty;
       closeBtn.textContent = t.close;
+      actionButtons.get('updateValues')!.textContent = t.updateValues;
+      actionButtons.get('changeSource')!.textContent = t.changeSource;
+      actionButtons.get('openSource')!.textContent = t.openSource;
+      actionButtons.get('breakLink')!.textContent = t.breakLink;
+      actionButtons.get('checkStatus')!.textContent = t.checkStatus;
+      actionButtons.get('startupPrompt')!.textContent = t.startupPrompt;
+      updateActionButtons();
       if (shell.isOpen()) renderTable();
     },
     detach() {

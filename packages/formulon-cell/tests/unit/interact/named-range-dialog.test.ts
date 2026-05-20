@@ -1,7 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { en } from '../../../src/i18n/strings.js';
 import { attachNamedRangeDialog } from '../../../src/interact/named-range-dialog.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
@@ -58,7 +64,19 @@ describe('attachNamedRangeDialog', () => {
     const handle = attachNamedRangeDialog({ host, wb });
     handle.open();
     expect(document.querySelector<HTMLElement>('.fc-namedlg__form')).toBeNull();
-    expect(document.querySelector<HTMLElement>('.fc-namedlg__note')?.textContent).toBeTruthy();
+    const note = document.querySelector<HTMLElement>('.fc-namedlg__note');
+    expect(note?.textContent).toBeTruthy();
+    expect(note?.id).toBe('fc-namedlg-readonly-note');
+    const [newBtn, editBtn, deleteBtn] = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('.fc-namedlg__actions button'),
+    );
+    const quickInput = document.querySelector<HTMLInputElement>('.fc-namedlg__refers-input');
+    const quickCommit = document.querySelector<HTMLButtonElement>('.fc-namedlg__refers-icon');
+    for (const control of [newBtn, editBtn, deleteBtn, quickInput, quickCommit]) {
+      expect(control?.disabled).toBe(true);
+      expect(control?.getAttribute('aria-describedby')).toBe('fc-namedlg-readonly-note');
+      expect(control?.title).toBe(note?.textContent);
+    }
     handle.detach();
   });
 });
@@ -104,6 +122,41 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     document.body.innerHTML = '';
   });
 
+  it('projects disabled reasons when no defined name is selected', () => {
+    const { wb } = makeMutableWb();
+    const handle = attachNamedRangeDialog({ host, wb, strings: en });
+    handle.open();
+    const [newBtn, editBtn, deleteBtn, filterBtn] = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('.fc-namedlg__actions button'),
+    );
+    const quickInput = document.querySelector<HTMLInputElement>('.fc-namedlg__refers-input');
+    const quickCommit = document.querySelector<HTMLButtonElement>('.fc-namedlg__refers-icon');
+    const quickCancel = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('.fc-namedlg__refers-icon'),
+    )[1];
+
+    expect(newBtn?.disabled).toBe(false);
+    expect(editBtn?.disabled).toBe(true);
+    expect(deleteBtn?.disabled).toBe(true);
+    expect(filterBtn?.disabled).toBe(true);
+    expect(editBtn?.dataset.disabledReason).toBe(en.namedRangeDialog.selectNameActionReason);
+    expect(deleteBtn?.getAttribute('aria-description')).toBe(
+      en.namedRangeDialog.selectNameActionReason,
+    );
+    expect(filterBtn?.dataset.disabledReason).toBe(en.namedRangeDialog.filterRequiresNames);
+    expect(filterBtn?.title).toBe(
+      `${en.namedRangeDialog.filterButton}\n${en.namedRangeDialog.filterRequiresNames}`,
+    );
+    expect(quickInput?.disabled).toBe(true);
+    expect(quickCommit?.dataset.disabledReason).toBe(
+      en.namedRangeDialog.quickRefersRequiresSelection,
+    );
+    expect(quickCancel?.dataset.disabledReason).toBe(
+      en.namedRangeDialog.quickRefersRequiresSelection,
+    );
+    handle.detach();
+  });
+
   it('New opens a New Name dialog and writes through on submit', () => {
     const { wb, calls } = makeMutableWb();
     const handle = attachNamedRangeDialog({ host, wb });
@@ -123,6 +176,13 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     );
     expect(nameField?.getAttribute('aria-label')).toBeTruthy();
     expect(formulaField?.getAttribute('aria-label')).toBeTruthy();
+    const scopeField = document.querySelector<HTMLSelectElement>(
+      '.fc-namedlg-editor__input[aria-label="範囲"]',
+    );
+    expect(scopeField?.value).toBe('workbook');
+    expect(
+      Array.from(scopeField?.options ?? [], (option) => [option.value, option.textContent]),
+    ).toEqual([['workbook', 'ブック']]);
     if (nameField) nameField.value = 'TaxRate';
     if (formulaField) formulaField.value = '=Sheet1!$A$1';
     form?.requestSubmit();
@@ -274,6 +334,52 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     cancel?.click();
     expect(calls).toEqual([{ name: 'TaxRate', formula: '=Sheet1!$C$3' }]);
     expect(quick?.value).toBe('=Sheet1!$C$3');
+    handle.detach();
+  });
+
+  it('uses shared range pickers for Name Manager reference inputs', () => {
+    const { wb, registry } = makeMutableWb();
+    registry.set('TaxRate', '=A1');
+    let picked = '=B2:C4';
+    const listeners: Array<() => void> = [];
+    const handle = attachNamedRangeDialog({
+      host,
+      wb,
+      getSelectedRangeFormula: () => picked,
+      subscribeToRangeChanges: (listener) => {
+        listeners.push(listener);
+        return () => undefined;
+      },
+    });
+    handle.open();
+
+    const quickButton = document.querySelector<HTMLButtonElement>(
+      '[data-range-picker="named-range-quick-refers-to"]',
+    );
+    const quickInput = document.querySelector<HTMLInputElement>('.fc-namedlg__refers-input');
+    expect(quickButton?.getAttribute('aria-label')).toBe('範囲の選択');
+    quickButton?.click();
+    expect(quickInput?.value).toBe('=B2:C4');
+    expect(quickButton?.getAttribute('aria-pressed')).toBe('true');
+    expect(document.querySelector('.fc-namedlg.fc-fmtdlg--range-picking')).toBeTruthy();
+    picked = '=D5:D8';
+    listeners.at(-1)?.();
+    expect(quickInput?.value).toBe('=D5:D8');
+
+    document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button')?.click();
+    const editorButton = document.querySelector<HTMLButtonElement>(
+      '[data-range-picker="named-range-editor-refers-to"]',
+    );
+    const editorInput = document.querySelector<HTMLInputElement>(
+      '.fc-namedlg-editor__input[aria-label="参照"]',
+    );
+    editorButton?.click();
+    expect(quickButton?.getAttribute('aria-pressed')).toBe('false');
+    expect(editorButton?.getAttribute('aria-pressed')).toBe('true');
+    picked = '=E1:F2';
+    listeners.at(-1)?.();
+    expect(editorInput?.value).toBe('=E1:F2');
+
     handle.detach();
   });
 
@@ -437,5 +543,13 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     expect(rows[0]?.textContent).toContain('TaxRate');
     expect(rows[0]?.getAttribute('aria-selected')).toBe('true');
     handle.detach();
+  });
+
+  it('keeps Name Manager sort and filter menu buttons on the shared dialog primitive', () => {
+    const source = readFileSync(join(root, 'src/interact/named-range-dialog.ts'), 'utf8');
+    expect(source).toContain('function createNameManagerButton(');
+    expect(source).toContain("createNameManagerButton(label, 'fc-namedlg__sort')");
+    expect(source).toContain("createNameManagerButton(filterLabel(filter), 'fc-namedlg__filter-item'");
+    expect(source).not.toContain("document.createElement('button')");
   });
 });

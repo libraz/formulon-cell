@@ -1,9 +1,14 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   attachAutocomplete,
   suggestColumnHistory,
   suggestStructuredRef,
 } from '../../../src/interact/autocomplete.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const sales = {
   name: 'Sales',
@@ -165,5 +170,13 @@ describe('attachAutocomplete labels', () => {
     expect(input.hasAttribute('aria-controls')).toBe(false);
     expect(input.hasAttribute('aria-activedescendant')).toBe(false);
     input.remove();
+  });
+
+  it('keeps option buttons on the autocomplete item helper', () => {
+    const source = readFileSync(join(root, 'src/interact/autocomplete.ts'), 'utf8');
+    expect(source).toContain("import { createInteractionButton } from './chip-button.js'");
+    expect(source).toContain('function createAutocompleteItemButton(');
+    expect(source).toContain('createAutocompleteItemButton({');
+    expect(source).not.toContain("document.createElement('button')");
   });
 });

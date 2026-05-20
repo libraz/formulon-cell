@@ -2,6 +2,8 @@
 // purely presentational: it builds the navigation rail, properties panel, and
 // the command/card grid. Behaviour is wired by the parent through data-backstage-*
 // attributes on the produced buttons.
+import { projectDisabledState } from '../menu-a11y.js';
+import { createRibbonButton } from './button.js';
 
 export interface BackstageText {
   properties: string;
@@ -47,6 +49,7 @@ export interface BackstageText {
   pageSetupBody: string;
   editLinksBody: string;
   optionsBody: string;
+  commandUnavailable: string;
 }
 
 export interface BackstageRibbonText {
@@ -78,12 +81,18 @@ export interface BackstageFactories {
     body: string,
     action: string,
     disabled?: boolean,
+    disabledReason?: string,
   ) => HTMLButtonElement;
   createBackstageCommand: (
     title: string,
     body: string,
     icon: string,
     action?: string,
+  ) => HTMLButtonElement;
+  createBackstagePrintAction: (
+    label: string,
+    action: BackstageAction,
+    primary?: boolean,
   ) => HTMLButtonElement;
   createBackstageProperties: () => HTMLElement;
   createBackstagePrintView: () => HTMLElement;
@@ -150,19 +159,32 @@ export const backstageCardItems = (
 export const createBackstageFactories = (deps: BackstageDeps): BackstageFactories => {
   const { backstageText, ribbonText, shellSavedText, docName, printPreviewHtml, docState } = deps;
 
+  const createBackstageActionButton = (
+    className: string,
+    action: string,
+    label?: string,
+    opts: { ariaLabel?: string; activeClassName?: string; active?: boolean } = {},
+  ): HTMLButtonElement => {
+    return createRibbonButton({
+      className:
+        opts.active && opts.activeClassName ? `${className} ${opts.activeClassName}` : className,
+      dataset: { backstageAction: action },
+      ariaLabel: opts.ariaLabel,
+      text: label,
+    });
+  };
+
   const createBackstageButton = (
     label: string,
     action: string,
     active = false,
     ariaLabel?: string,
   ): HTMLButtonElement => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = `demo__backstage-navitem${active ? ' demo__backstage-navitem--active' : ''}`;
-    button.dataset.backstageAction = action;
-    if (ariaLabel) button.setAttribute('aria-label', ariaLabel);
-    button.textContent = label;
-    return button;
+    return createBackstageActionButton('demo__backstage-navitem', action, label, {
+      active,
+      activeClassName: 'demo__backstage-navitem--active',
+      ariaLabel,
+    });
   };
 
   const createBackstageCard = (
@@ -170,12 +192,13 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     body: string,
     action: string,
     disabled = false,
+    disabledReason = backstageText.commandUnavailable,
   ): HTMLButtonElement => {
-    const card = document.createElement('button');
-    card.type = 'button';
-    card.className = 'demo__backstage-card';
-    card.dataset.backstageAction = action;
-    card.disabled = disabled;
+    const card = createBackstageActionButton('demo__backstage-card', action);
+    projectDisabledState(card, disabled, disabledReason, {
+      datasetKey: 'disabledReason',
+      titlePrefix: title,
+    });
     const heading = document.createElement('strong');
     heading.textContent = title;
     const text = document.createElement('span');
@@ -190,11 +213,17 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     icon: string,
     action?: string,
   ): HTMLButtonElement => {
-    const command = document.createElement('button');
-    command.type = 'button';
-    command.className = 'demo__backstage-command';
-    if (action) command.dataset.backstageAction = action;
-    else command.disabled = true;
+    const command = createBackstageActionButton(
+      'demo__backstage-command',
+      action ?? 'unavailable',
+    );
+    if (!action) {
+      delete command.dataset.backstageAction;
+      projectDisabledState(command, true, backstageText.commandUnavailable, {
+        datasetKey: 'disabledReason',
+        titlePrefix: title,
+      });
+    }
     const mark = document.createElement('span');
     mark.className = 'demo__backstage-command-icon';
     mark.textContent = icon;
@@ -206,6 +235,17 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     copy.append(heading, text);
     command.append(mark, copy);
     return command;
+  };
+
+  const createBackstagePrintAction = (
+    label: string,
+    action: BackstageAction,
+    primary = false,
+  ): HTMLButtonElement => {
+    return createBackstageActionButton('demo__print-action', action, label, {
+      active: primary,
+      activeClassName: 'demo__print-action--primary',
+    });
   };
 
   const createBackstageProperties = (): HTMLElement => {
@@ -248,21 +288,9 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     title.textContent = backstageText.printPreviewTitle;
     const subtitle = document.createElement('p');
     subtitle.textContent = docName();
-    const print = document.createElement('button');
-    print.type = 'button';
-    print.className = 'demo__print-action demo__print-action--primary';
-    print.dataset.backstageAction = 'print';
-    print.textContent = backstageText.printNow;
-    const pdf = document.createElement('button');
-    pdf.type = 'button';
-    pdf.className = 'demo__print-action';
-    pdf.dataset.backstageAction = 'export';
-    pdf.textContent = backstageText.printToPdf;
-    const pageSetup = document.createElement('button');
-    pageSetup.type = 'button';
-    pageSetup.className = 'demo__print-action';
-    pageSetup.dataset.backstageAction = 'page-setup';
-    pageSetup.textContent = backstageText.pageSetup;
+    const print = createBackstagePrintAction(backstageText.printNow, 'print', true);
+    const pdf = createBackstagePrintAction(backstageText.printToPdf, 'export');
+    const pageSetup = createBackstagePrintAction(backstageText.pageSetup, 'page-setup');
     settings.append(title, subtitle, print, pdf, pageSetup);
 
     const paper = document.createElement('section');
@@ -369,6 +397,7 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     createBackstageButton,
     createBackstageCard,
     createBackstageCommand,
+    createBackstagePrintAction,
     createBackstageProperties,
     createBackstagePrintView,
     createBackstageView,

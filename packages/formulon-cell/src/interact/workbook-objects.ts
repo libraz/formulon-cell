@@ -15,12 +15,16 @@ import { PivotAggregation, PivotAxis, type PivotFilterSpec } from '../engine/typ
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SessionIllustration } from '../store/store.js';
+import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { appendDialogIconButton, createDialogButton } from './dialog-shell.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';
 import {
   createPivotFilterConditionControls,
   type PivotFilterConditionState,
   pivotFilterConditionToSpec,
   pivotFilterSpecToCondition,
+  showPivotFilterDialog,
 } from './pivot-field-settings.js';
 
 type WorkbookObjectsStrings = Strings['workbookObjects'];
@@ -126,6 +130,20 @@ export interface WorkbookObjectsPanelHandle {
   setStrings(next: Strings): void;
   bindWorkbook(next: WorkbookHandle): void;
   detach(): void;
+}
+
+function createWorkbookObjectsActionButton(
+  label: string,
+  opts: { primary?: boolean; type?: 'button' | 'submit' } = {},
+): HTMLButtonElement {
+  const button = createDialogButton({
+    label,
+    baseClass: 'fc-objects__action',
+    variant: opts.primary ? 'primary' : undefined,
+    primaryClass: 'fc-objects__action--primary',
+  });
+  button.type = opts.type ?? 'button';
+  return button;
 }
 
 const compatibilityLabelKey = (
@@ -330,38 +348,32 @@ export function attachWorkbookObjectsPanel(
         const check = document.createElement('input');
         check.type = 'checkbox';
         check.checked = true;
-        check.disabled = true;
+        projectDisabledState(check, true, t.pivotFieldListCheckboxReadOnly, {
+          datasetKey: 'disabledReason',
+        });
         item.append(check, document.createTextNode(field));
         availableFields.appendChild(item);
       }
-      const select = document.createElement('select');
-      select.className = 'fc-objects__input';
+      const select = createDialogSelect(
+        axisOptions,
+        filterConditions.has(index)
+          ? String(PivotAxis.Page)
+          : index === 0
+            ? String(PivotAxis.Row)
+            : String(PivotAxis.Value),
+        { className: 'fc-objects__input' },
+      );
       select.dataset.pivotFieldIndex = String(index);
-      for (const option of axisOptions) {
-        const opt = document.createElement('option');
-        opt.value = option.value;
-        opt.textContent = option.label;
-        select.appendChild(opt);
-      }
-      select.value = filterConditions.has(index)
-        ? String(PivotAxis.Page)
-        : index === 0
-          ? String(PivotAxis.Row)
-          : String(PivotAxis.Value);
       fieldAreaSelects.push(select);
       const row = document.createElement('div');
       row.className = 'fc-objects__pivot-field-row';
       row.appendChild(pivotEditField(field, select));
-      const aggregation = document.createElement('select');
-      aggregation.className = 'fc-objects__input';
+      const aggregation = createDialogSelect(
+        aggregationOptions,
+        String(PivotAggregation.Sum),
+        { className: 'fc-objects__input' },
+      );
       aggregation.dataset.pivotAggregationFieldIndex = String(index);
-      for (const option of aggregationOptions) {
-        const opt = document.createElement('option');
-        opt.value = option.value;
-        opt.textContent = option.label;
-        aggregation.appendChild(opt);
-      }
-      aggregation.value = String(PivotAggregation.Sum);
       const numberFormat = document.createElement('input');
       numberFormat.className = 'fc-objects__input';
       numberFormat.type = 'text';
@@ -389,6 +401,24 @@ export function attachWorkbookObjectsPanel(
         fieldRow: pivotEditField,
         onChange: syncFilterCondition,
         onUserChange: () => filterConditionDirty.add(index),
+      });
+      const filterDialogButton = createWorkbookObjectsActionButton(
+        strings.pivotTableDialog.filterDialog,
+      );
+      filterDialogButton.addEventListener('click', () => {
+        void showPivotFilterDialog({
+          host,
+          strings: strings.pivotTableDialog,
+          fieldName: field,
+          condition: filterConditions.get(index),
+          okLabel: strings.pageSetup.ok,
+          cancelLabel: strings.pageSetup.cancel,
+        }).then((condition) => {
+          if (!condition) return;
+          syncFilterCondition(condition);
+          filterConditionDirty.add(index);
+          render();
+        });
       });
       const filterChecklist = document.createElement('div');
       filterChecklist.className = 'fc-objects__pivot-filter-items';
@@ -419,6 +449,7 @@ export function attachWorkbookObjectsPanel(
           : pivotEditField(t.pivotFilterItems, filterItems),
       );
       filterSettings.append(...filterConditionControls);
+      filterSettings.appendChild(filterDialogButton);
       select.addEventListener('change', () => {
         settings.hidden = select.value !== String(PivotAxis.Value);
         filterSettings.hidden = select.value !== String(PivotAxis.Page);
@@ -442,14 +473,8 @@ export function attachWorkbookObjectsPanel(
     error.textContent = pivotEditError;
     const actions = document.createElement('div');
     actions.className = 'fc-objects__actions';
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.className = 'fc-objects__action';
-    remove.textContent = t.deletePivotTable;
-    const apply = document.createElement('button');
-    apply.type = 'submit';
-    apply.className = 'fc-objects__action fc-objects__action--primary';
-    apply.textContent = t.apply;
+    const remove = createWorkbookObjectsActionButton(t.deletePivotTable);
+    const apply = createWorkbookObjectsActionButton(t.apply, { primary: true, type: 'submit' });
     if (fieldListOnly) actions.append(apply);
     else actions.append(remove, apply);
     remove.addEventListener('click', () => {
@@ -631,10 +656,7 @@ export function attachWorkbookObjectsPanel(
     const headerActions = document.createElement('div');
     headerActions.className = 'fc-objects__header-actions';
     if (activeFieldListPivot) {
-      const back = document.createElement('button');
-      back.type = 'button';
-      back.className = 'fc-objects__action';
-      back.textContent = t.backToWorkbookObjects;
+      const back = createWorkbookObjectsActionButton(t.backToWorkbookObjects);
       back.addEventListener('click', () => {
         activePivotFieldListKey = '';
         pivotEditError = '';
@@ -642,13 +664,12 @@ export function attachWorkbookObjectsPanel(
       });
       headerActions.appendChild(back);
     }
-    const closeBtn = document.createElement('button');
-    closeBtn.type = 'button';
-    closeBtn.className = 'fc-objects__close';
-    closeBtn.textContent = '×';
-    closeBtn.setAttribute('aria-label', t.close);
+    const closeBtn = appendDialogIconButton(headerActions, {
+      label: '×',
+      ariaLabel: t.close,
+      baseClass: 'fc-objects__close',
+    });
     closeBtn.addEventListener('click', () => close(false));
-    headerActions.appendChild(closeBtn);
     header.append(title, headerActions);
     root.appendChild(header);
 
@@ -790,10 +811,7 @@ export function attachWorkbookObjectsPanel(
           const actions = document.createElement('div');
           actions.className = 'fc-objects__actions';
           if (canEditPivot) {
-            const edit = document.createElement('button');
-            edit.type = 'button';
-            edit.className = 'fc-objects__action';
-            edit.textContent = t.editPivotTable;
+            const edit = createWorkbookObjectsActionButton(t.editPivotTable);
             edit.addEventListener('click', () => {
               const key = pivotKey(pivot.sheetIndex, pivot.pivotIndex);
               activePivotEditKey = activePivotEditKey === key ? '' : key;
@@ -804,10 +822,7 @@ export function attachWorkbookObjectsPanel(
             actions.appendChild(edit);
           }
           if (canEditPivot) {
-            const fieldList = document.createElement('button');
-            fieldList.type = 'button';
-            fieldList.className = 'fc-objects__action';
-            fieldList.textContent = t.pivotFieldList;
+            const fieldList = createWorkbookObjectsActionButton(t.pivotFieldList);
             fieldList.addEventListener('click', () => {
               const key = pivotKey(pivot.sheetIndex, pivot.pivotIndex);
               activePivotFieldListKey = activePivotFieldListKey === key ? '' : key;
@@ -817,20 +832,14 @@ export function attachWorkbookObjectsPanel(
             });
             actions.appendChild(fieldList);
           }
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.className = 'fc-objects__action';
-          button.textContent = t.createPivotTable;
+          const button = createWorkbookObjectsActionButton(t.createPivotTable);
           button.addEventListener('click', () => deps.onOpenPivotTableDialog?.());
           actions.appendChild(button);
           card.appendChild(actions);
         } else if (canEditPivot) {
           const actions = document.createElement('div');
           actions.className = 'fc-objects__actions';
-          const edit = document.createElement('button');
-          edit.type = 'button';
-          edit.className = 'fc-objects__action';
-          edit.textContent = t.editPivotTable;
+          const edit = createWorkbookObjectsActionButton(t.editPivotTable);
           edit.addEventListener('click', () => {
             const key = pivotKey(pivot.sheetIndex, pivot.pivotIndex);
             activePivotEditKey = activePivotEditKey === key ? '' : key;
@@ -839,10 +848,7 @@ export function attachWorkbookObjectsPanel(
             render();
           });
           actions.appendChild(edit);
-          const fieldList = document.createElement('button');
-          fieldList.type = 'button';
-          fieldList.className = 'fc-objects__action';
-          fieldList.textContent = t.pivotFieldList;
+          const fieldList = createWorkbookObjectsActionButton(t.pivotFieldList);
           fieldList.addEventListener('click', () => {
             const key = pivotKey(pivot.sheetIndex, pivot.pivotIndex);
             activePivotFieldListKey = activePivotFieldListKey === key ? '' : key;

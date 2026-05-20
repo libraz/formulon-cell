@@ -6,6 +6,7 @@
 import type { CellStyleId } from '../commands/cell-styles.js';
 import type { TableStyle } from '../commands/format-as-table.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
+import { SHEET_TAB_COLOR_CHOICES } from '../sheet-tab-colors.js';
 import type { SessionChartKind } from '../store/types.js';
 import type { RibbonReportItem, ScriptCommand } from '../toolbar/review-tools.js';
 
@@ -142,16 +143,25 @@ export type ClearArrowsAction = 'clear-all' | 'clear-precedents' | 'clear-depend
 
 export type PivotTableAction = 'dialog' | 'recommended' | 'new-sheet' | 'existing-sheet';
 export type ChartAction = SessionChartKind | 'recommended';
-export type PictureAction = 'device' | 'online';
-export type ShapeAction = 'rectangle' | 'rounded-rectangle' | 'oval' | 'line' | 'arrow';
+export type PictureAction = 'device' | 'stock' | 'online';
+export type ShapeAction =
+  | 'rectangle'
+  | 'rounded-rectangle'
+  | 'oval'
+  | 'triangle'
+  | 'diamond'
+  | 'line'
+  | 'arrow';
 export type ScreenshotAction = 'current-view' | 'screen-clipping';
 export type SymbolAction = string;
 
 export type PrintAreaAction = 'set' | 'add' | 'clear';
 export type PrintTitleAction = 'rows' | 'cols' | 'clear';
 export type PageBreakAction =
+  | 'insert'
   | 'insert-row'
   | 'insert-col'
+  | 'remove'
   | 'remove-row'
   | 'remove-col'
   | 'reset-all';
@@ -243,12 +253,9 @@ export const MORE_SYMBOL_ACTION = '__more-symbols__';
 export const CELL_STYLE_SECTION_ACTION_PREFIX = '__cell-style-section__';
 export const TEXT_TO_COLUMNS_DIALOG_KEYS = ['comma', 'tab', 'semicolon', 'space'] as const;
 
-export const SHEET_TAB_COLOR_ACTIONS = [
-  { action: 'tabColorRed', color: '#c00000' },
-  { action: 'tabColorOrange', color: '#ed7d31' },
-  { action: 'tabColorYellow', color: '#ffc000' },
-  { action: 'tabColorGreen', color: '#70ad47' },
-  { action: 'tabColorBlue', color: '#4472c4' },
-  { action: 'tabColorPurple', color: '#7030a0' },
-  { action: 'tabColorGray', color: '#7f7f7f' },
-] as const satisfies readonly { action: CellFormatAction; color: string }[];
+export const SHEET_TAB_COLOR_ACTIONS = SHEET_TAB_COLOR_CHOICES.filter(
+  (choice) => choice.color !== null,
+).map((choice) => ({ action: choice.wrapperAction, color: choice.color })) as readonly {
+  action: CellFormatAction;
+  color: string;
+}[];

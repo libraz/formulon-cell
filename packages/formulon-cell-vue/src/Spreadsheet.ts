@@ -97,7 +97,7 @@ const applyRuntimeProps = async (
   }
 };
 
-export const Spreadsheet = defineComponent({
+export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
   name: 'Spreadsheet',
   props: {
     ui: { type: Object as PropType<SpreadsheetUiOptions>, default: undefined },

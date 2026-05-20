@@ -1,8 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings/en.js';
 import { attachErrorMenu } from '../../../src/interact/error-menu.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const fakeWb = () => ({}) as WorkbookHandle;
 
@@ -67,6 +72,28 @@ describe('attachErrorMenu', () => {
     handle.detach();
   });
 
+  it('clamps the menu inside the viewport through the shared overlay helper', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 180 });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    const addr = { sheet: 0, row: 1, col: 2 };
+    const handle = attachErrorMenu({ host, store, getWb: fakeWb, strings: en });
+    const root = document.querySelector<HTMLElement>('.fc-errmenu');
+    expect(root).toBeTruthy();
+    if (root) {
+      Object.defineProperty(root, 'offsetWidth', { configurable: true, value: 240 });
+      Object.defineProperty(root, 'offsetHeight', { configurable: true, value: 120 });
+    }
+
+    handle.open(addr, 310, 170, 'error');
+
+    expect(root?.style.left).toBe('76px');
+    expect(root?.style.top).toBe('56px');
+    handle.detach();
+  });
+
   it('Enter invokes the focused menu item', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -123,5 +150,16 @@ describe('attachErrorMenu', () => {
 
     expect(store.getState().errorIndicators.ignoredErrors.has('0:0:0')).toBe(true);
     handle.detach();
+  });
+
+  it('keeps error menu item button DOM on the shared interaction primitive', () => {
+    const source = readFileSync(join(root, 'src/interact/error-menu.ts'), 'utf8');
+
+    expect(source).toContain("import { createInteractionButton } from './chip-button.js'");
+    expect(source).toContain('const createErrorMenuItemButton');
+    expect(source).toContain('const btn = createErrorMenuItemButton(entry)');
+    expect(source).toContain("className: 'fc-errmenu__item'");
+    expect(source).toContain("role: 'menuitem'");
+    expect(source).not.toContain("document.createElement('button')");
   });
 });

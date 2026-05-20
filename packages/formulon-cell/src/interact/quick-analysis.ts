@@ -12,6 +12,8 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { rangeRects } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { createInteractionButton } from './chip-button.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface QuickAnalysisDeps {
@@ -68,6 +70,11 @@ function actionLabel(strings: Strings, action: QuickAnalysisAction): string {
   return key ? strings.quickAnalysis.actions[key] : action.labelKey;
 }
 
+function actionDisabledReason(strings: Strings, action: QuickAnalysisAction): string | null {
+  const key = action.disabledReason;
+  return key ? strings.quickAnalysis.disabledReasons[key] : null;
+}
+
 function positionPanel(host: HTMLElement, root: HTMLElement, store: SpreadsheetStore): void {
   const s = store.getState();
   const rects = rangeRects(s.layout, s.viewport, s.selection.range);
@@ -80,6 +87,49 @@ function positionPanel(host: HTMLElement, root: HTMLElement, store: SpreadsheetS
   root.style.top = `${Math.max(8, Math.min(host.clientHeight - panelH - 8, top))}px`;
 }
 
+function createQuickAnalysisLauncher(): HTMLButtonElement {
+  const button = createInteractionButton({ className: 'fc-quick__button' });
+  button.hidden = true;
+  button.setAttribute('aria-haspopup', 'dialog');
+  return button;
+}
+
+function createQuickAnalysisTab(
+  group: QuickAnalysisGroup,
+  label: string,
+  active: boolean,
+): HTMLButtonElement {
+  const tab = createInteractionButton({
+    className: 'fc-quick__tab',
+    role: 'tab',
+    selected: active,
+    tabIndex: active ? 0 : -1,
+    dataset: { group },
+    text: label,
+  });
+  tab.id = `fc-quick-tab-${group}`;
+  tab.setAttribute('aria-controls', `fc-quick-panel-${group}`);
+  return tab;
+}
+
+function createQuickAnalysisActionButton(
+  strings: Strings,
+  action: QuickAnalysisAction,
+): HTMLButtonElement {
+  const disabled = action.disabled === true;
+  const label = actionLabel(strings, action);
+  const button = createInteractionButton({
+    className: 'fc-quick__action',
+    dataset: { action: action.id },
+    text: label,
+  });
+  projectDisabledState(button, disabled, actionDisabledReason(strings, action), {
+    datasetKey: 'disabledReason',
+    titlePrefix: label,
+  });
+  return button;
+}
+
 export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandle {
   const { host, store } = deps;
   let wb = deps.wb;
@@ -88,11 +138,7 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
   let activeGroup: QuickAnalysisGroup = 'formatting';
   let restoreFocusEl: HTMLElement | null = null;
 
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'fc-quick__button';
-  button.hidden = true;
-  button.setAttribute('aria-haspopup', 'dialog');
+  const button = createQuickAnalysisLauncher();
   host.appendChild(button);
   inheritHostTokens(host, button);
 
@@ -247,16 +293,11 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
     for (const group of GROUP_ORDER) {
       const groupActions = grouped[group];
       if (groupActions.length === 0) continue;
-      const tab = document.createElement('button');
-      tab.type = 'button';
-      tab.className = 'fc-quick__tab';
-      tab.dataset.group = group;
-      tab.id = `fc-quick-tab-${group}`;
-      tab.setAttribute('role', 'tab');
-      tab.setAttribute('aria-selected', group === activeGroup ? 'true' : 'false');
-      tab.setAttribute('aria-controls', `fc-quick-panel-${group}`);
-      tab.tabIndex = group === activeGroup ? 0 : -1;
-      tab.textContent = strings.quickAnalysis.groups[group];
+      const tab = createQuickAnalysisTab(
+        group,
+        strings.quickAnalysis.groups[group],
+        group === activeGroup,
+      );
       tab.addEventListener('click', () => selectGroup(group));
       tab.addEventListener('keydown', (event) => onTabKeyDown(event, group));
       tabs.appendChild(tab);
@@ -270,12 +311,7 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
       const grid = document.createElement('div');
       grid.className = 'fc-quick__actions';
       for (const action of groupActions) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'fc-quick__action';
-        btn.dataset.action = action.id;
-        btn.disabled = action.disabled === true;
-        btn.textContent = actionLabel(strings, action);
+        const btn = createQuickAnalysisActionButton(strings, action);
         btn.addEventListener('click', () => execute(action.id));
         grid.appendChild(btn);
       }

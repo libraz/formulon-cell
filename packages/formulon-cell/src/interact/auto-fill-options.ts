@@ -6,6 +6,11 @@ import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import {
+  createFloatingOptionsButton,
+  createFloatingOptionsMenuItem,
+} from './floating-options-menu.js';
+import { clampPanelToViewport } from './overlay-position.js';
 
 type AutoFillMode =
   | 'copy'
@@ -41,9 +46,6 @@ export interface AutoFillOptionsDeps {
 
 const VIEWPORT_PAD = 4;
 
-const clamp = (value: number, min: number, max: number): number =>
-  Math.max(min, Math.min(max, value));
-
 export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOptionsHandle {
   const { host, store, wb } = deps;
   const history = deps.history ?? null;
@@ -51,49 +53,25 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
   let detail: AutoFillOptionsDetail | null = null;
   let menuOpen = false;
 
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'fc-autofill-options__button';
-  button.setAttribute('aria-haspopup', 'menu');
-  button.style.display = 'none';
+  const button = createFloatingOptionsButton({ className: 'fc-autofill-options__button' });
 
   const menu = document.createElement('div');
   menu.className = 'fc-autofill-options__menu';
   menu.setAttribute('role', 'menu');
   menu.style.display = 'none';
 
-  const copyItem = document.createElement('button');
-  copyItem.type = 'button';
-  copyItem.className = 'fc-autofill-options__item';
-  copyItem.dataset.fcMode = 'copy';
-  copyItem.setAttribute('role', 'menuitemradio');
+  const createAutoFillItem = (mode: AutoFillMode): HTMLButtonElement =>
+    createFloatingOptionsMenuItem({
+      className: 'fc-autofill-options__item',
+      mode,
+      role: 'menuitemradio',
+    });
 
-  const seriesItem = document.createElement('button');
-  seriesItem.type = 'button';
-  seriesItem.className = 'fc-autofill-options__item';
-  seriesItem.dataset.fcMode = 'series';
-  seriesItem.setAttribute('role', 'menuitemradio');
-
-  const formattingOnlyItem = document.createElement('button');
-  formattingOnlyItem.type = 'button';
-  formattingOnlyItem.className = 'fc-autofill-options__item';
-  formattingOnlyItem.dataset.fcMode = 'formattingOnly';
-  formattingOnlyItem.setAttribute('role', 'menuitemradio');
-
-  const withoutFormattingItem = document.createElement('button');
-  withoutFormattingItem.type = 'button';
-  withoutFormattingItem.className = 'fc-autofill-options__item';
-  withoutFormattingItem.dataset.fcMode = 'withoutFormatting';
-  withoutFormattingItem.setAttribute('role', 'menuitemradio');
-
-  const dayItems = (['days', 'weekdays', 'months', 'years'] as const).map((mode) => {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.className = 'fc-autofill-options__item';
-    item.dataset.fcMode = mode;
-    item.setAttribute('role', 'menuitemradio');
-    return item;
-  });
+  const copyItem = createAutoFillItem('copy');
+  const seriesItem = createAutoFillItem('series');
+  const formattingOnlyItem = createAutoFillItem('formattingOnly');
+  const withoutFormattingItem = createAutoFillItem('withoutFormatting');
+  const dayItems = (['days', 'weekdays', 'months', 'years'] as const).map(createAutoFillItem);
 
   menu.append(copyItem, seriesItem, formattingOnlyItem, withoutFormattingItem, ...dayItems);
   document.body.append(button, menu);
@@ -135,12 +113,20 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
   };
 
   const position = (x: number, y: number): void => {
-    const left = clamp(x + 6, VIEWPORT_PAD, window.innerWidth - 28);
-    const top = clamp(y + 6, VIEWPORT_PAD, window.innerHeight - 28);
-    button.style.left = `${left}px`;
-    button.style.top = `${top}px`;
-    menu.style.left = `${clamp(left, VIEWPORT_PAD, window.innerWidth - 180)}px`;
-    menu.style.top = `${clamp(top + 24, VIEWPORT_PAD, window.innerHeight - 80)}px`;
+    const buttonPos = clampPanelToViewport(button, x + 6, y + 6, {
+      pad: VIEWPORT_PAD,
+      fallbackWidth: 28,
+      fallbackHeight: 28,
+    });
+    button.style.left = `${buttonPos.x}px`;
+    button.style.top = `${buttonPos.y}px`;
+    const menuPos = clampPanelToViewport(menu, buttonPos.x, buttonPos.y + 24, {
+      pad: VIEWPORT_PAD,
+      fallbackWidth: 180,
+      fallbackHeight: 80,
+    });
+    menu.style.left = `${menuPos.x}px`;
+    menu.style.top = `${menuPos.y}px`;
   };
 
   const updateChecked = (): void => {

@@ -59,13 +59,13 @@ export async function runMultiCellPasteUndoScenario(page: Page): Promise<void> {
 
   const readCell = (row: number, col: number) =>
     page.evaluate(
-      ([r, c]) => {
+      ([r, c]: [number, number]) => {
         const inst = (window as Window & { __fcInst?: unknown }).__fcInst as
           | { workbook: { getValue: (addr: { sheet: number; row: number; col: number }) => unknown } }
           | undefined;
         return inst?.workbook.getValue({ sheet: 0, row: r, col: c });
       },
-      [row, col],
+      [row, col] as [number, number],
     );
   const seedCell = (row: number, col: number, value: string | number) =>
     page.evaluate(
@@ -180,13 +180,13 @@ export async function runRibbonPasteUndoScenario(page: Page): Promise<void> {
 
   const readCell = (row: number, col: number) =>
     page.evaluate(
-      ([r, c]) => {
+      ([r, c]: [number, number]) => {
         const inst = (window as Window & { __fcInst?: unknown }).__fcInst as
           | { workbook: { getValue: (addr: { sheet: number; row: number; col: number }) => unknown } }
           | undefined;
         return inst?.workbook.getValue({ sheet: 0, row: r, col: c });
       },
-      [row, col],
+      [row, col] as [number, number],
     );
   const seedCell = (row: number, col: number, value: string | number) =>
     page.evaluate(

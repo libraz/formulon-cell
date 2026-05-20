@@ -11,6 +11,12 @@ import {
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import {
+  appendDialogSelectOptions,
+  createDialogSelect,
+} from '../toolbar/dialogs/form-controls.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { createInteractionButton } from './chip-button.js';
 
 export interface ViewToolbarDeps {
   toolbar: HTMLElement;
@@ -32,11 +38,8 @@ export interface ViewToolbarHandle {
 const ZOOM_PRESETS = [75, 100, 125, 150, 200];
 const CURRENT_VIEW_VALUE = '';
 
-function makeButton(className: string): HTMLButtonElement {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = className;
-  return btn;
+function createViewToolbarButton(className: string): HTMLButtonElement {
+  return createInteractionButton({ className });
 }
 
 export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
@@ -51,56 +54,54 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
 
   const workbookViews = document.createElement('div');
   workbookViews.className = 'fc-viewbar__group fc-viewbar__group--workbookviews';
-  const normalView = makeButton('fc-viewbar__button');
-  const pageLayoutView = makeButton('fc-viewbar__button');
-  const pageBreakPreview = makeButton('fc-viewbar__button');
+  const normalView = createViewToolbarButton('fc-viewbar__button');
+  const pageLayoutView = createViewToolbarButton('fc-viewbar__button');
+  const pageBreakPreview = createViewToolbarButton('fc-viewbar__button');
   workbookViews.append(normalView, pageLayoutView, pageBreakPreview);
 
   const toggles = document.createElement('div');
   toggles.className = 'fc-viewbar__group';
 
-  const gridlines = makeButton('fc-viewbar__toggle');
-  const headings = makeButton('fc-viewbar__toggle');
-  const formulas = makeButton('fc-viewbar__toggle');
-  const r1c1 = makeButton('fc-viewbar__toggle');
+  const gridlines = createViewToolbarButton('fc-viewbar__toggle');
+  const headings = createViewToolbarButton('fc-viewbar__toggle');
+  const formulas = createViewToolbarButton('fc-viewbar__toggle');
+  const r1c1 = createViewToolbarButton('fc-viewbar__toggle');
   toggles.append(gridlines, headings, formulas, r1c1);
 
   const freeze = document.createElement('div');
   freeze.className = 'fc-viewbar__group';
-  const freezeNone = makeButton('fc-viewbar__button');
-  const freezeTop = makeButton('fc-viewbar__button');
-  const freezeFirst = makeButton('fc-viewbar__button');
-  const freezePanes = makeButton('fc-viewbar__button');
+  const freezeNone = createViewToolbarButton('fc-viewbar__button');
+  const freezeTop = createViewToolbarButton('fc-viewbar__button');
+  const freezeFirst = createViewToolbarButton('fc-viewbar__button');
+  const freezePanes = createViewToolbarButton('fc-viewbar__button');
   freeze.append(freezeNone, freezeTop, freezeFirst, freezePanes);
 
   const zoom = document.createElement('div');
   zoom.className = 'fc-viewbar__group fc-viewbar__group--zoom';
   const zoomLabel = document.createElement('span');
   zoomLabel.className = 'fc-viewbar__label';
-  const zoomSelect = document.createElement('select');
-  zoomSelect.className = 'fc-viewbar__select';
-  for (const pct of ZOOM_PRESETS) {
-    const opt = document.createElement('option');
-    opt.value = String(pct);
-    opt.textContent = `${pct}%`;
-    zoomSelect.appendChild(opt);
-  }
-  const zoomFit = makeButton('fc-viewbar__button');
+  const zoomSelect = createDialogSelect(
+    ZOOM_PRESETS.map((pct) => ({ value: String(pct), label: `${pct}%` })),
+    '100',
+    { className: 'fc-viewbar__select' },
+  );
+  const zoomFit = createViewToolbarButton('fc-viewbar__button');
   zoom.append(zoomLabel, zoomSelect, zoomFit);
 
   const sheetViews = document.createElement('div');
   sheetViews.className = 'fc-viewbar__group fc-viewbar__group--sheetviews';
   const sheetViewsLabel = document.createElement('span');
   sheetViewsLabel.className = 'fc-viewbar__label';
-  const sheetViewsSelect = document.createElement('select');
-  sheetViewsSelect.className = 'fc-viewbar__select';
-  const saveView = makeButton('fc-viewbar__button');
-  const deleteView = makeButton('fc-viewbar__button');
+  const sheetViewsSelect = createDialogSelect([], CURRENT_VIEW_VALUE, {
+    className: 'fc-viewbar__select',
+  });
+  const saveView = createViewToolbarButton('fc-viewbar__button');
+  const deleteView = createViewToolbarButton('fc-viewbar__button');
   sheetViews.append(sheetViewsLabel, sheetViewsSelect, saveView, deleteView);
 
   const objects = document.createElement('div');
   objects.className = 'fc-viewbar__group';
-  const objectsBtn = makeButton('fc-viewbar__button');
+  const objectsBtn = createViewToolbarButton('fc-viewbar__button');
   if (deps.onOpenObjects) objects.appendChild(objectsBtn);
 
   toolbar.append(title, workbookViews, toggles, freeze, zoom, sheetViews, objects);
@@ -256,18 +257,23 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
     zoomSelect.title = `${pct}%`;
 
     sheetViewsSelect.replaceChildren();
-    const current = document.createElement('option');
-    current.value = CURRENT_VIEW_VALUE;
-    current.textContent = strings.viewToolbar.currentView;
-    sheetViewsSelect.appendChild(current);
-    for (const view of s.sheetViews.views.filter((v) => v.sheet === s.data.sheetIndex)) {
-      const opt = document.createElement('option');
-      opt.value = view.id;
-      opt.textContent = view.name;
-      sheetViewsSelect.appendChild(opt);
-    }
+    appendDialogSelectOptions(sheetViewsSelect, [
+      { value: CURRENT_VIEW_VALUE, label: strings.viewToolbar.currentView },
+      ...s.sheetViews.views
+        .filter((v) => v.sheet === s.data.sheetIndex)
+        .map((view) => ({ value: view.id, label: view.name })),
+    ]);
     sheetViewsSelect.value = s.sheetViews.activeViewId ?? CURRENT_VIEW_VALUE;
-    deleteView.disabled = !s.sheetViews.activeViewId;
+    const canDeleteView = !!s.sheetViews.activeViewId;
+    projectDisabledState(
+      deleteView,
+      !canDeleteView,
+      strings.viewToolbar.deleteViewRequiresActive,
+      {
+        datasetKey: 'disabledReason',
+        titlePrefix: strings.viewToolbar.deleteView,
+      },
+    );
   }
 
   const unsub = store.subscribe(refresh);

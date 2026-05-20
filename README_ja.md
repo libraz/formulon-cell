@@ -182,10 +182,19 @@ sheet.i18n.setLocale('fr');
 
 ## フレームワーク向けリボンツールバー
 
-React 版・Vue 版のパッケージは、デモアプリで使用しているリボンを再利用可能
-な UI 表層として公開しています。どちらの実装も同じタブ構成・同じコマンド
-ラインナップを提供します。コンポーネントと一緒にツールバー用 CSS も
-読み込んでください。
+React 版・Vue 版のパッケージは、core の `Spreadsheet.mountToolbar` に対する
+薄いアダプタを公開しています。リボン DOM、メニュー factory、activation
+model、dynamic dropdown dispatcher は `@libraz/formulon-cell` に集約され、
+framework wrapper は別個のメニュー実装を持ちません。コンポーネントと一緒に
+ツールバー用 CSS も読み込んでください。
+
+host 側でリボンを監査・拡張する場合は、`ribbonActivationEntries`、
+`ribbonSurfaceCommandIds`、`DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS` などの
+shared manifest を core から import します。`attachRangePickerButton`、
+`appendConditionalApplyFormatControls`、`conditionalStyleOptions`、
+`showReport`、`reportDialogLabels`、`projectDisabledReason` などの dialog/helper も core から
+公開されており、Excel 365 型 dialog / report control を React/Vue 側で
+再実装しないための境界として使います。
 
 ```tsx
 import { SpreadsheetToolbar, type RibbonTab } from '@libraz/formulon-cell-react';

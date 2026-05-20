@@ -286,8 +286,10 @@ export const Spreadsheet = {
       host,
       getWb: () => wb,
       getActiveSheet: () => store.getState().data.sheetIndex,
+      getSelectionRange: () => store.getState().selection.range,
       onChanged: () => renderer.invalidate(),
       onNewRule: () => featureState.conditionalDialog?.open({ mode: 'new' }),
+      onEditRule: (editIndex) => featureState.conditionalDialog?.open({ mode: 'edit', editIndex }),
       store,
       history,
       strings,
@@ -482,6 +484,7 @@ export const Spreadsheet = {
       fxInput,
       getArgHelper: () => featureState.fxArgHelper,
       getAutocomplete: () => featureState.fxAutocomplete,
+      getStrings: () => i18n.strings,
       host,
       onValidation: (outcome) => binding.validationAlert?.show(outcome),
       store,
@@ -643,8 +646,11 @@ export const Spreadsheet = {
         host,
         getWb: () => wb,
         getActiveSheet: () => store.getState().data.sheetIndex,
+        getSelectionRange: () => store.getState().selection.range,
         onChanged: () => renderer.invalidate(),
         onNewRule: () => featureState.conditionalDialog?.open({ mode: 'new' }),
+        onEditRule: (editIndex) =>
+          featureState.conditionalDialog?.open({ mode: 'edit', editIndex }),
         store,
         history,
         strings,
@@ -832,8 +838,8 @@ export const Spreadsheet = {
       openDefineNameDialog() {
         featureState.namedRangeDialog?.openNew();
       },
-      openPageSetup() {
-        featureState.pageSetupDialog?.open();
+      openPageSetup(tab) {
+        featureState.pageSetupDialog?.open(tab);
       },
       print(mode = 'print') {
         // The print command is wired through the same flag as the dialog —
@@ -875,7 +881,7 @@ export const Spreadsheet = {
         featureState.formatDialog?.open(tab);
       },
       openDataValidationDialog() {
-        featureState.formatDialog?.open('more');
+        featureState.formatDialog?.open('more', { mode: 'dataValidation', focus: 'validation' });
       },
       openGoTo() {
         featureState.goToDialog?.open('go-to');
@@ -965,15 +971,15 @@ export const Spreadsheet = {
           false
         );
       },
-      openPivotTableDialog() {
+      openPivotTableDialog(opts) {
         const userPivot = userHandles.get('pivotTableDialog') as
-          | (ExtensionHandle & { open?: () => void })
+          | (ExtensionHandle & { open?: (opts?: { placement?: 'new' | 'existing' }) => void })
           | undefined;
         if (userPivot?.open) {
-          userPivot.open();
+          userPivot.open(opts);
           return;
         }
-        featureState.pivotTableDialog?.open();
+        featureState.pivotTableDialog?.open(opts);
       },
       addSlicer(input) {
         if (!featureState.slicer) {
@@ -988,8 +994,16 @@ export const Spreadsheet = {
         toggleProtectedSheet(store, store.getState().data.sheetIndex, { workbook: wb });
         renderer.invalidate();
       },
-      setSheetProtected(on: boolean, password?: string) {
-        setProtectedSheet(store, store.getState().data.sheetIndex, on, { workbook: wb, password });
+      setSheetProtected(
+        on: boolean,
+        password?: string,
+        permissions?: import('./store/types.js').SheetProtectionPermissions,
+      ) {
+        setProtectedSheet(store, store.getState().data.sheetIndex, on, {
+          workbook: wb,
+          password,
+          permissions,
+        });
         renderer.invalidate();
       },
       isSheetProtected() {

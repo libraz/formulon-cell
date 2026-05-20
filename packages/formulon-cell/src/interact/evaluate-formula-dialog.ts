@@ -3,7 +3,8 @@ import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { createDialogShell } from './dialog-shell.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { appendDialogButton, appendDialogFrame, createDialogShell } from './dialog-shell.js';
 
 export interface EvaluateFormulaDialogDeps {
   host: HTMLElement;
@@ -81,14 +82,12 @@ export function attachEvaluateFormulaDialog(
     onDismiss: () => api.close(),
   });
 
-  const header = document.createElement('div');
-  header.className = 'fc-evaldlg__header';
-  header.textContent = t.title;
-  shell.panel.appendChild(header);
-
-  const body = document.createElement('div');
-  body.className = 'fc-evaldlg__body';
-  shell.panel.appendChild(body);
+  const { body, footer } = appendDialogFrame(shell, {
+    title: t.title,
+    headerClass: 'fc-evaldlg__header',
+    bodyClass: 'fc-evaldlg__body',
+    footerClass: 'fc-evaldlg__footer',
+  });
 
   const target = document.createElement('div');
   target.className = 'fc-evaldlg__target';
@@ -121,26 +120,28 @@ export function attachEvaluateFormulaDialog(
   resultBox.className = 'fc-evaldlg__box fc-evaldlg__box--result';
   body.appendChild(resultBox);
 
-  const footer = document.createElement('div');
-  footer.className = 'fc-evaldlg__footer';
-  shell.panel.appendChild(footer);
-
-  const evalBtn = document.createElement('button');
-  evalBtn.type = 'button';
-  evalBtn.className = 'fc-evaldlg__btn';
-  evalBtn.textContent = t.evaluate;
-
-  const closeBtn = document.createElement('button');
-  closeBtn.type = 'button';
-  closeBtn.className = 'fc-evaldlg__btn fc-evaldlg__btn--primary';
-  closeBtn.textContent = t.close;
-  footer.append(evalBtn, closeBtn);
+  const evalBtn = appendDialogButton(footer, {
+    label: t.evaluate,
+    baseClass: 'fc-evaldlg__btn',
+  });
+  const closeBtn = appendDialogButton(footer, {
+    label: t.close,
+    variant: 'primary',
+    baseClass: 'fc-evaldlg__btn',
+  });
 
   let currentFormula = '';
   let currentRefs: FormulaRef[] = [];
   let stepIndex = 0;
 
   const uniqueRefCount = (refs: FormulaRef[]): number => new Set(refs.map(formulaRefKey)).size;
+
+  const setEvaluateDisabled = (disabled: boolean, reason: string | null): void => {
+    projectDisabledState(evalBtn, disabled, reason, {
+      datasetKey: 'disabledReason',
+      titlePrefix: t.evaluate,
+    });
+  };
 
   const syncEvaluation = (): void => {
     const wb = getWb();
@@ -152,7 +153,14 @@ export function attachEvaluateFormulaDialog(
       wb,
       active.sheet,
     );
-    evalBtn.disabled = currentRefs.length === 0 || stepIndex >= uniqueRefCount(currentRefs);
+    const uniqueRefs = uniqueRefCount(currentRefs);
+    const reason =
+      currentRefs.length === 0
+        ? t.evaluateRequiresReference
+        : stepIndex >= uniqueRefs
+          ? t.evaluateComplete
+          : null;
+    setEvaluateDisabled(reason !== null, reason);
   };
 
   const refresh = (): void => {
@@ -167,7 +175,7 @@ export function attachEvaluateFormulaDialog(
       formulaBox.textContent = t.noFormula;
       evaluationBox.textContent = '';
       resultBox.textContent = '';
-      evalBtn.disabled = true;
+      setEvaluateDisabled(true, t.evaluateRequiresFormula);
       return;
     }
     currentFormula = formula;

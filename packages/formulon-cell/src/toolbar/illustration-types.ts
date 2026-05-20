@@ -4,4 +4,11 @@
 // the consumer.
 
 export type SessionIllustrationKind = 'image' | 'shape' | 'screenshot';
-export type SessionShapeKind = 'rectangle' | 'rounded-rectangle' | 'oval' | 'line' | 'arrow';
+export type SessionShapeKind =
+  | 'rectangle'
+  | 'rounded-rectangle'
+  | 'oval'
+  | 'triangle'
+  | 'diamond'
+  | 'line'
+  | 'arrow';

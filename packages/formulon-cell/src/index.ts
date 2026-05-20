@@ -88,6 +88,12 @@ export {
   listConditionalRules,
   removeConditionalRuleAt,
 } from './commands/conditional-format.js';
+export type {
+  ReportDialogLabels,
+  ReportItem,
+  ReportOptions,
+} from './toolbar/dialogs/report.js';
+export { reportDialogLabels, showReport } from './toolbar/dialogs/report.js';
 export {
   cellValueIsFormulaError,
   circleInvalidValidationData,
@@ -333,6 +339,8 @@ export type {
   PageBreakAxis,
   PageSetupEntry,
   PageSetupPatch,
+  HostPrinterDevice,
+  HostPrinterPaperOption,
   PrinterProfile,
 } from './commands/page-setup.js';
 export {
@@ -348,6 +356,7 @@ export {
   normalizePrinterProfile,
   normalizePrinterProfileId,
   normalizePrinterProfiles,
+  printerProfilesFromHostDevices,
   pageSetupForSheet,
   removeManualPageBreak,
   resetManualPageBreaks,
@@ -416,12 +425,15 @@ export {
   isSheetProtected,
   isWorkbookStructureProtected,
   protectedSheetPassword,
+  protectedSheetPasswordHash,
+  protectedSheetPermissions,
   recordProtectionChange,
   setCellLocked,
   setProtectedSheet,
   setWorkbookStructureProtected,
   toggleProtectedSheet,
   toggleWorkbookStructureProtected,
+  verifySheetProtectionPasswordHash,
   warnProtected,
   workbookStructurePassword,
   writableAddrs,
@@ -829,6 +841,28 @@ export { attachCfRulesDialog } from './interact/cf-rules-dialog.js';
 export type { ClipboardHandle } from './interact/clipboard.js';
 export { attachClipboard } from './interact/clipboard.js';
 export type {
+  ConditionalApplyFormatControls,
+  ConditionalApplyFormatLabels,
+  ConditionalApplyFormatOptions,
+} from './interact/conditional-apply-controls.js';
+export {
+  appendConditionalApplyFormatControls,
+  applyPatchToConditionalApplyControls,
+  applyPresetPatchToConditionalApplyControls,
+  collectConditionalApplyPatch,
+} from './interact/conditional-apply-controls.js';
+export type {
+  ConditionalFormatDialogStyle,
+  ConditionalFormatStyleOption,
+  ConditionalFormatStyleStrings,
+} from './toolbar/dialogs/conditional-format-style.js';
+export {
+  applyConditionalStylePreview,
+  conditionalStyleFromValue,
+  conditionalStyleOptions,
+  showConditionalFormatCustomStyleDialog,
+} from './toolbar/dialogs/conditional-format-style.js';
+export type {
   ConditionalDialogDeps,
   ConditionalDialogHandle,
   ConditionalDialogOpenOptions,
@@ -853,6 +887,11 @@ export type { FindReplaceDeps, FindReplaceHandle } from './interact/find-replace
 export { attachFindReplace } from './interact/find-replace.js';
 export type { FormatDialogDeps, FormatDialogHandle } from './interact/format-dialog.js';
 export { attachFormatDialog } from './interact/format-dialog.js';
+export type { RangePickerControlOptions } from './interact/range-picker-control.js';
+export {
+  attachRangePickerButton,
+  updateRangePickerLabel,
+} from './interact/range-picker-control.js';
 export type { FormatPainterDeps, FormatPainterHandle } from './interact/format-painter.js';
 export { attachFormatPainter } from './interact/format-painter.js';
 export type { FxDialogDeps, FxDialogHandle } from './interact/fx-dialog.js';
@@ -1025,7 +1064,14 @@ export type { FluentIconName } from './toolbar/fluent-icons.js';
 export { FLUENT_ICON_PATHS, fluentIconPaths } from './toolbar/fluent-icons.js';
 export type { IconName } from './toolbar/icon-paths.js';
 export { ICON_PATHS } from './toolbar/icon-paths.js';
-export { focusMenuItem, handleMenuKeydown, prepareMenu } from './toolbar/menu-a11y.js';
+export {
+  focusMenuItem,
+  handleMenuKeydown,
+  prepareMenu,
+  projectDisabledReason,
+  projectDisabledState,
+} from './toolbar/menu-a11y.js';
+export type { DisabledReasonProjectionOptions } from './toolbar/menu-a11y.js';
 export {
   type BackstageMenuText,
   backstageMenuText,
@@ -1058,6 +1104,37 @@ export {
   parseScriptCommand,
   reviewCellsFromState,
 } from './toolbar/review-tools.js';
+export {
+  RIBBON_BORDERS_MENU_ID,
+  RIBBON_DIALOG_COMMANDS,
+  RIBBON_DISABLED_COMMANDS,
+  RIBBON_DROPDOWN_COMMANDS,
+  RIBBON_DROPDOWN_MENU_FOR_COMMAND,
+  RIBBON_DYNAMIC_MENU_FIRST_COMMANDS,
+  RIBBON_EXTERNAL_MENU_FOR_COMMAND,
+  RIBBON_EXTERNAL_MENU_FIRST_COMMANDS,
+  RIBBON_GALLERY_COMMANDS,
+  RIBBON_MENU_FACTORY_FOR_COMMAND,
+  RIBBON_MENU_FACTORY_KEYS,
+  RIBBON_MENU_FOR_COMMAND,
+  RIBBON_MENU_FIRST_COMMANDS,
+  RIBBON_PRIMARY_FACE_MENU_COMMANDS,
+  RIBBON_PRIMARY_ACTION_COMMANDS,
+  RIBBON_PRIMARY_ACTION_SPLIT_COMMANDS,
+  RIBBON_SPLIT_BUTTON_COMMANDS,
+  RIBBON_SPLIT_TOGGLE_COMMANDS,
+  RIBBON_TOGGLE_COMMANDS,
+  ribbonActivationCategories,
+  ribbonActivationCommandIds,
+  ribbonActivationEntries,
+  ribbonActivationEntriesForCommands,
+  ribbonActivationForCommand,
+} from './toolbar/ribbon/activation.js';
+export type {
+  RibbonActivationEntry,
+  RibbonActivationKind,
+  RibbonActivationSpec,
+} from './toolbar/ribbon/activation.js';
 export type {
   ApplyRibbonCommandDeps,
   RibbonHooks,
@@ -1108,6 +1185,7 @@ export {
   RIBBON_FORMAT_MUTATORS,
   RIBBON_FUNCTION_ARG_OPENERS,
   RIBBON_VIEW_MODES,
+  RIBBON_PRIMARY_SPLIT_DIALOG_COMMANDS,
   RIBBON_ZOOM_PRESETS,
 } from './toolbar/ribbon/command-tables.js';
 export type {
@@ -1122,13 +1200,18 @@ export type {
 } from './toolbar/ribbon/control-dispatch.js';
 export { createControlDispatch } from './toolbar/ribbon/control-dispatch.js';
 export type {
+  DynamicDropdownMenuRefresherKey,
   DynamicDropdownsApi,
   DynamicDropdownsCtx,
-  PrintTitlesAction as DynamicDropdownsPrintTitlesAction,
   RibbonDropdownSpec,
   UiTheme as DynamicDropdownsUiTheme,
 } from './toolbar/ribbon/dynamic-dropdowns.js';
-export { createDynamicDropdowns } from './toolbar/ribbon/dynamic-dropdowns.js';
+export {
+  createDynamicDropdowns,
+  DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS,
+  DYNAMIC_RIBBON_DROPDOWN_HANDLER_DATASET_KEYS,
+  DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS,
+} from './toolbar/ribbon/dynamic-dropdowns.js';
 export type {
   RibbonFillDirection,
   RibbonFillSeriesMode,
@@ -1160,7 +1243,6 @@ export type {
 export { createFormulasMenuFactories } from './toolbar/ribbon/menus/formulas.js';
 export {
   createMenu,
-  menuButton,
   menuSectionHeader,
   menuSeparator,
 } from './toolbar/ribbon/menus/general.js';
@@ -1219,6 +1301,7 @@ export {
   localizeBorderPresets,
   localizeBorderStyles,
   projectActiveState,
+  RIBBON_ACTIVE_COMMANDS,
 } from './toolbar/ribbon-active-state.js';
 export type {
   RibbonCommand,
@@ -1234,10 +1317,23 @@ export {
   EXCEL365_STANDARD_RIBBON_TABS,
   FONT_FAMILIES,
   FONT_SIZES,
+  HOME_MIXED_LAYOUT_GROUP_VARIANTS,
+  HOME_STACKED_LAYOUT_GROUP_VARIANTS,
+  HOME_TILE_LAYOUT_GROUP_VARIANTS,
+  isRibbonActivatableCommand,
   OPTIONAL_RIBBON_TABS,
   RIBBON_KEYSHORTCUTS,
   RIBBON_TAB_LABELS,
   RIBBON_TABS,
+  ribbonActivatableCommandIds,
+  ribbonActivatableCommands,
+  ribbonActivatableSurfaceCommandIds,
+  ribbonActivatableSurfaceCommands,
+  ribbonCommands,
+  ribbonCommandIds,
+  ribbonSurfaceCommandIds,
+  ribbonSurfaceCommands,
+  ribbonTabCommandIds,
   ribbonTabLabel,
   toolbarText,
 } from './toolbar/ribbon-model.js';

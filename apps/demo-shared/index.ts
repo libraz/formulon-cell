@@ -19,6 +19,7 @@ import type {
   CellValue,
   FeatureFlags,
   FeatureId,
+  PrinterProfile,
   ReviewCell,
   RibbonSearchItem,
   RibbonSearchUsagePrior,
@@ -32,8 +33,10 @@ import type {
 import {
   buildPrintDocument,
   buildRibbonSearchIndex,
+  EXCEL365_STANDARD_RIBBON_TABS,
   getPageSetup,
   queryRibbonSearchIndex,
+  resolvePrinterProfileBounds,
   resolveSpreadsheetUiOptions,
 } from '@libraz/formulon-cell';
 
@@ -49,6 +52,78 @@ export const LOCALES = [
   { value: 'en', label: 'EN' },
   { value: 'ja', label: 'JA' },
 ] as const;
+
+export const DEMO_PRINTER_PROFILES: readonly PrinterProfile[] = [
+  {
+    id: 'demo-office-a4',
+    name: 'Demo Office Printer - A4',
+    paperSize: 'A4',
+    orientation: 'portrait',
+    printableBounds: { top: 0.16, right: 0.14, bottom: 0.18, left: 0.14 },
+  },
+  {
+    id: 'demo-office-a4-landscape',
+    name: 'Demo Office Printer - A4 Landscape',
+    paperSize: 'A4',
+    orientation: 'landscape',
+    printableBounds: { top: 0.14, right: 0.16, bottom: 0.14, left: 0.16 },
+  },
+  {
+    id: 'demo-label-letter',
+    name: 'Demo Label Printer - Letter',
+    paperSize: 'letter',
+    orientation: 'portrait',
+    printableBounds: { top: 0.32, right: 0.28, bottom: 0.34, left: 0.28 },
+  },
+];
+
+export const DEMO_PRINTER_PROFILE_ID = 'demo-office-a4';
+
+export const refreshDemoPrinterProfiles = async (): Promise<readonly PrinterProfile[]> =>
+  DEMO_PRINTER_PROFILES.map((profile) => ({
+    ...profile,
+    printableBounds: { ...profile.printableBounds },
+  }));
+
+export type DemoUploadStatus = 'saved' | 'saving' | 'error' | null;
+
+export interface SaveDemoWorkbookOptions {
+  instance: Pick<SpreadsheetInstance, 'workbook'> | null;
+  bookName: string;
+  setUploadStatus: (status: DemoUploadStatus) => void;
+  documentRef?: Pick<Document, 'body' | 'createElement'>;
+  urlApi?: Pick<typeof URL, 'createObjectURL' | 'revokeObjectURL'>;
+  setTimeoutFn?: (handler: () => void, timeout: number) => unknown;
+}
+
+export const saveDemoWorkbookToDownload = ({
+  instance,
+  bookName,
+  setUploadStatus,
+  documentRef = globalThis.document,
+  urlApi = globalThis.URL,
+  setTimeoutFn = globalThis.setTimeout.bind(globalThis),
+}: SaveDemoWorkbookOptions): void => {
+  if (!instance) return;
+  setUploadStatus('saving');
+  try {
+    const bytes = instance.workbook.save();
+    const blob = new Blob([bytes as BlobPart], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = urlApi.createObjectURL(blob);
+    const a = documentRef.createElement('a');
+    a.href = url;
+    a.download = `${bookName}.xlsx`;
+    documentRef.body.appendChild(a);
+    a.click();
+    documentRef.body.removeChild(a);
+    setTimeoutFn(() => urlApi.revokeObjectURL(url), 1_000);
+    setUploadStatus('saved');
+  } catch {
+    setUploadStatus('error');
+  }
+};
 
 export const DEMO_ICONS = {
   app: ['M4 5.2 10 3.4l6 1.8v9.6l-6 1.8-6-1.8z', 'M10 3.4v13.2', 'M4 8.6h12', 'M4 11.4h12'],
@@ -299,6 +374,8 @@ export interface DemoUiStrings {
   printPreviewSheet: string;
   printPreviewOrientation: string;
   printPreviewPaper: string;
+  printPreviewPrinter: string;
+  printPreviewPrinterMargins: string;
   printPreviewMargins: string;
   printPreviewScale: string;
   printPreviewArea: string;
@@ -364,6 +441,7 @@ export interface DemoCommandItem {
   readonly id: string;
   readonly label: string;
   readonly hint: string;
+  readonly keywords?: string;
   readonly tab?: RibbonTab;
   readonly run: () => void;
 }
@@ -373,7 +451,9 @@ export interface DemoSearchItem {
   readonly label: string;
   readonly hint: string;
   readonly commandId?: string;
+  readonly disabled?: boolean;
   readonly disabledReason?: string;
+  readonly keywords?: string;
   readonly tab?: RibbonTab;
   readonly run: () => void;
 }
@@ -595,10 +675,12 @@ export const buildDemoSearchItems = (
   locale: string,
   setRibbonTab: (tab: RibbonTab) => void,
   applyRibbonCommand?: (commandId: string) => boolean,
+  ribbonTabs: readonly RibbonTab[] = EXCEL365_STANDARD_RIBBON_TABS,
 ): readonly DemoSearchItem[] => {
   const commandKeys = new Set(commandItems.flatMap((item) => [item.id, item.label]));
   const ribbonItems = buildRibbonSearchIndex(locale === 'en' ? 'en' : 'ja', {
     includeDisabled: true,
+    tabs: ribbonTabs,
   })
     .filter((item) => !commandKeys.has(item.commandId ?? '') && !commandKeys.has(item.label))
     .map(
@@ -607,7 +689,9 @@ export const buildDemoSearchItems = (
         label: item.label,
         hint: ribbonSearchHint(item),
         commandId: item.commandId,
+        disabled: item.disabled,
         disabledReason: item.disabledReason,
+        keywords: item.keywords,
         tab: item.tab,
         run: () => {
           if (item.commandId && applyRibbonCommand?.(item.commandId)) return;
@@ -629,7 +713,7 @@ export const queryDemoSearchItems = (
   const ribbonBacked = items.filter((item) => item.id.startsWith('ribbon:'));
   const demoBacked = items.filter((item) => !item.id.startsWith('ribbon:'));
   const demoMatches = demoBacked.filter((item) =>
-    `${item.label} ${item.hint}`.toLowerCase().includes(q),
+    `${item.label} ${item.hint} ${item.keywords ?? ''}`.toLowerCase().includes(q),
   );
   const ribbonMatches = queryRibbonSearchIndex(
     ribbonBacked.map(
@@ -640,7 +724,9 @@ export const queryDemoSearchItems = (
         hint: item.hint,
         tab: item.tab ?? 'home',
         commandId: item.commandId,
-        keywords: `${item.label} ${item.hint}`.toLowerCase(),
+        disabled: item.disabled,
+        disabledReason: item.disabledReason,
+        keywords: `${item.label} ${item.hint} ${item.keywords ?? ''}`.toLowerCase(),
       }),
     ),
     query,
@@ -769,6 +855,10 @@ const formatMarginSummary = (margins: {
   left: number;
 }): string => `${margins.top}" / ${margins.right}" / ${margins.bottom}" / ${margins.left}"`;
 
+const selectedDemoPrinterProfile = (): PrinterProfile | undefined =>
+  DEMO_PRINTER_PROFILES.find((profile) => profile.id === DEMO_PRINTER_PROFILE_ID) ??
+  DEMO_PRINTER_PROFILES[0];
+
 export const buildDemoPrintPreviewModel = (
   ui: DemoUiStrings,
   instance: SpreadsheetInstance | null | undefined,
@@ -794,6 +884,27 @@ export const buildDemoPrintPreviewModel = (
     setup.fitWidth || setup.fitHeight
       ? `${setup.fitWidth || 1} x ${setup.fitHeight || 1}`
       : `${Math.round((setup.scale ?? 1) * 100)}%`;
+  const printerProfile = selectedDemoPrinterProfile();
+  const printerBounds = resolvePrinterProfileBounds(
+    setup,
+    DEMO_PRINTER_PROFILES,
+    DEMO_PRINTER_PROFILE_ID,
+  );
+  const printerSettings = [
+    printerProfile?.name ? { label: ui.printPreviewPrinter, value: printerProfile.name } : null,
+    printerBounds
+      ? { label: ui.printPreviewPrinterMargins, value: formatMarginSummary(printerBounds) }
+      : null,
+  ].filter((item): item is { label: string; value: string } => item !== null);
+  const printDocument = buildPrintDocument(
+    instance.workbook,
+    instance.store,
+    sheet,
+    ui.printPreviewTitle,
+    {
+      printableBounds: printerBounds ?? null,
+    },
+  );
   return {
     title: ui.printPreviewTitle,
     subtitle: bookName,
@@ -802,12 +913,12 @@ export const buildDemoPrintPreviewModel = (
     pageSetupLabel: ui.pageSetup,
     previewTitle: `${ui.printPreviewPage} 1`,
     previewHint: ui.printPreviewHint,
-    previewHtml: buildPrintDocument(instance.workbook, instance.store, sheet, ui.printPreviewTitle)
-      .html,
+    previewHtml: printDocument.html,
     settings: [
       { label: ui.printPreviewSheet, value: String(sheet + 1) },
       { label: ui.printPreviewOrientation, value: setup.orientation },
       { label: ui.printPreviewPaper, value: setup.paperSize },
+      ...printerSettings,
       { label: ui.printPreviewMargins, value: formatMarginSummary(setup.margins) },
       { label: ui.printPreviewScale, value: scale },
       { label: ui.printPreviewArea, value: setup.printArea?.trim() || ui.printPreviewNoArea },
@@ -888,6 +999,8 @@ export function createDemoStrings(framework: DemoFramework): DemoStrings {
       printPreviewSheet: 'Active sheet',
       printPreviewOrientation: 'Orientation',
       printPreviewPaper: 'Paper size',
+      printPreviewPrinter: 'Printer',
+      printPreviewPrinterMargins: 'Minimum margins',
       printPreviewMargins: 'Margins',
       printPreviewScale: 'Scaling',
       printPreviewArea: 'Print area',
@@ -941,6 +1054,8 @@ export function createDemoStrings(framework: DemoFramework): DemoStrings {
       printPreviewSheet: 'アクティブ シート',
       printPreviewOrientation: '印刷の向き',
       printPreviewPaper: '用紙サイズ',
+      printPreviewPrinter: 'プリンター',
+      printPreviewPrinterMargins: '最小余白',
       printPreviewMargins: '余白',
       printPreviewScale: '拡大縮小',
       printPreviewArea: '印刷範囲',

@@ -9,7 +9,10 @@ import { parseRangeRef } from '../engine/range-resolver.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { createDialogShell } from './dialog-shell.js';
+import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
+import { formatA1Range } from '../wrappers/toolbar-a1.js';
+import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
+import { attachRangePickerButton } from './range-picker-control.js';
 
 export interface GoToDialogDeps {
   host: HTMLElement;
@@ -64,16 +67,10 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   });
   // Reuse the shared format-dialog skin for header/footer/btn styling.
   shell.overlay.classList.add('fc-fmtdlg');
-  shell.panel.classList.add('fc-fmtdlg__panel', 'fc-goto__panel');
-
-  const header = document.createElement('div');
-  header.className = 'fc-fmtdlg__header';
-  header.textContent = t.title;
-  shell.panel.appendChild(header);
-
-  const body = document.createElement('div');
-  body.className = 'fc-fmtdlg__body';
-  shell.panel.appendChild(body);
+  const { header, body, footer } = appendDialogFrame(shell, {
+    title: t.title,
+    panelClasses: ['fc-fmtdlg__panel', 'fc-goto__panel'],
+  });
 
   // ── Direct reference (normal Go To) ───────────────────────────────────
   const referenceRow = document.createElement('label');
@@ -86,6 +83,12 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   referenceInput.autocomplete = 'off';
   referenceInput.spellcheck = false;
   referenceRow.append(referenceLabel, referenceInput);
+  attachRangePickerButton(referenceInput, {
+    label: strings.pivotTableDialog.rangePickerSelect,
+    getValue: () => formatA1Range(store.getState().selection.range),
+    subscribeToRangeChanges: (listener) => store.subscribe(listener),
+    kind: 'go-to-reference',
+  });
   body.appendChild(referenceRow);
 
   // ── Scope (only meaningful when current selection is multi-cell) ───────
@@ -199,19 +202,10 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   statusLine.setAttribute('aria-live', 'polite');
   body.appendChild(statusLine);
 
-  // Footer: Cancel / OK
-  const footer = document.createElement('div');
-  footer.className = 'fc-fmtdlg__footer';
-  shell.panel.appendChild(footer);
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.className = 'fc-fmtdlg__btn';
-  cancelBtn.textContent = t.cancel;
-  const okBtn = document.createElement('button');
-  okBtn.type = 'button';
-  okBtn.className = 'fc-fmtdlg__btn fc-fmtdlg__btn--primary';
-  okBtn.textContent = t.ok;
-  footer.append(cancelBtn, okBtn);
+  const { cancelBtn, okBtn } = appendDialogActions(footer, {
+    cancelLabel: t.cancel,
+    okLabel: t.ok,
+  });
 
   const isSelectionMulti = (): boolean => {
     const r = store.getState().selection.range;
@@ -223,7 +217,15 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
     // Disable selection scope when only one cell is selected — matching the
     // spreadsheet convention, which silently widens to "active sheet" in
     // that case.
-    scopeSelection.disabled = !multi;
+    const reason = multi ? null : t.scopeSelectionRequiresMultiCell;
+    projectDisabledState(scopeSelection, !multi, reason, { datasetKey: 'disabledReason' });
+    const scopeSelectionLabel = scopeSelection.closest<HTMLElement>('label');
+    if (scopeSelectionLabel) {
+      projectDisabledReason(scopeSelectionLabel, reason, {
+        ariaDescription: false,
+        titlePrefix: t.scopeSelection,
+      });
+    }
     if (!multi) {
       scopeSheet.checked = true;
     }

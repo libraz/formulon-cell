@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { ja } from '../../../src/i18n/strings.js';
+import { en, ja } from '../../../src/i18n/strings.js';
 import { attachFxDialog, FUNCTION_DESCRIPTIONS } from '../../../src/interact/fx-dialog.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 
@@ -41,6 +41,35 @@ describe('attachFxDialog', () => {
     expect(picker?.hidden).toBe(false);
     expect(args?.hidden).toBe(true);
     expect(document.querySelectorAll('.fc-fxdialog__item').length).toBeGreaterThan(0);
+    handle.detach();
+  });
+
+  it('projects and clears the Insert disabled reason across picker and args steps', () => {
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      strings: en,
+      onInsert: () => {},
+    });
+    handle.open();
+    const insertBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    expect(insertBtn?.disabled).toBe(true);
+    expect(insertBtn?.dataset.disabledReason).toBe('Select a function before inserting it.');
+    expect(insertBtn?.getAttribute('aria-description')).toBe(
+      'Select a function before inserting it.',
+    );
+
+    const sumItem = Array.from(document.querySelectorAll<HTMLElement>('.fc-fxdialog__item')).find(
+      (el) => el.dataset.fxName === 'SUM',
+    );
+    sumItem?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(insertBtn?.disabled).toBe(false);
+    expect(insertBtn?.dataset.disabledReason).toBeUndefined();
+    expect(insertBtn?.getAttribute('aria-description')).toBeNull();
+
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn')?.click();
+    expect(insertBtn?.disabled).toBe(true);
+    expect(insertBtn?.dataset.disabledReason).toBe('Select a function before inserting it.');
     handle.detach();
   });
 
@@ -110,6 +139,17 @@ describe('attachFxDialog', () => {
     const category = document.querySelector<HTMLSelectElement>('.fc-fxdialog__category');
     expect(category).toBeTruthy();
     if (!category) return;
+    expect(Array.from(category.options, (option) => option.value)).toEqual([
+      'all',
+      'recent',
+      'logical',
+      'lookup',
+      'text',
+      'datetime',
+      'math',
+      'financial',
+      'dynamicArray',
+    ]);
 
     category.value = 'text';
     category.dispatchEvent(new Event('change'));

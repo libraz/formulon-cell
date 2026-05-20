@@ -1,9 +1,14 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PivotAxis, PivotFilterType, PivotFilterValueKind } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en, ja } from '../../../src/i18n/strings.js';
 import { attachWorkbookObjectsPanel } from '../../../src/interact/workbook-objects.js';
 import type { SessionIllustration } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const wbWithObjects = () => {
   const calls: string[] = [];
@@ -332,6 +337,26 @@ describe('attachWorkbookObjectsPanel', () => {
     );
     expect(fieldSelects).toHaveLength(2);
     const [regionField, salesField] = fieldSelects as [HTMLSelectElement, HTMLSelectElement];
+    expect(regionField.classList.contains('fc-objects__input')).toBe(true);
+    expect(Array.from(regionField.options, (option) => [option.value, option.textContent])).toEqual([
+      ['0', 'Rows'],
+      ['1', 'Columns'],
+      ['3', 'Filters'],
+      ['2', 'Values'],
+    ]);
+    const salesAggregation = form?.querySelector<HTMLSelectElement>(
+      '[data-pivot-aggregation-field-index="1"]',
+    );
+    expect(salesAggregation?.classList.contains('fc-objects__input')).toBe(true);
+    expect(
+      Array.from(salesAggregation?.options ?? [], (option) => [option.value, option.textContent]),
+    ).toEqual([
+      ['0', 'Sum'],
+      ['1', 'Count'],
+      ['2', 'Average'],
+      ['3', 'Max'],
+      ['4', 'Min'],
+    ]);
     regionField.value = '3';
     salesField.value = '1';
     form?.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
@@ -365,6 +390,20 @@ describe('attachWorkbookObjectsPanel', () => {
     expect(form.textContent).toContain('East');
     expect(form.textContent).toContain('West');
     expect(form.textContent).not.toContain('Anchor cell');
+    const fieldListChecks = Array.from(
+      form.querySelectorAll<HTMLInputElement>(
+        '.fc-objects__pivot-field-list > .fc-objects__pivot-field-list-item > input',
+      ),
+    );
+    expect(fieldListChecks).toHaveLength(2);
+    for (const check of fieldListChecks) {
+      expect(check.disabled).toBe(true);
+      expect(check.dataset.disabledReason).toBe(en.workbookObjects.pivotFieldListCheckboxReadOnly);
+      expect(check.getAttribute('aria-description')).toBe(
+        en.workbookObjects.pivotFieldListCheckboxReadOnly,
+      );
+      expect(check.title).toBe(en.workbookObjects.pivotFieldListCheckboxReadOnly);
+    }
 
     const regionAxis = form.querySelector<HTMLSelectElement>('[data-pivot-field-index="0"]');
     if (!regionAxis) throw new Error('missing region field axis');
@@ -500,6 +539,39 @@ describe('attachWorkbookObjectsPanel', () => {
     handle.detach();
   });
 
+  it('opens the shared PivotTable filter dialog from existing PivotTable edit', async () => {
+    const { wb } = wbWithObjects();
+    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    handle.open();
+    const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
+      el.textContent?.includes('Edit'),
+    );
+    edit?.click();
+    const form = host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit');
+    const regionAxis = form?.querySelector<HTMLSelectElement>('[data-pivot-field-index="0"]');
+    if (!form || !regionAxis) throw new Error('missing pivot edit controls');
+    regionAxis.value = '3';
+    regionAxis.dispatchEvent(new Event('change', { bubbles: true }));
+    const filterDialogButton = Array.from(form.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent === 'Filter...',
+    );
+    expect(filterDialogButton).toBeTruthy();
+    filterDialogButton?.click();
+
+    const dialog = document.body.querySelector<HTMLElement>(
+      '.fc-pivotdlg[role="dialog"]:not([hidden])',
+    );
+    expect(dialog?.textContent).toContain('PivotTable Filter: Region');
+    const condition = dialog?.querySelector<HTMLSelectElement>(
+      'select[data-pivot-filter-condition="true"]',
+    );
+    expect(condition?.value).toBe('none');
+    dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn')?.click();
+    await Promise.resolve();
+    expect(document.body.textContent).not.toContain('PivotTable Filter: Region');
+    handle.detach();
+  });
+
   it('hydrates existing PivotTable filters into the shared condition editor', () => {
     const { wb } = wbWithObjects();
     wb.getPivotTables = () => [
@@ -583,5 +655,12 @@ describe('attachWorkbookObjectsPanel', () => {
     expect(root?.hidden).toBe(true);
     expect(document.activeElement).toBe(host);
     handle.detach();
+  });
+
+  it('keeps workbook object action buttons on the shared dialog primitive', () => {
+    const source = readFileSync(join(root, 'src/interact/workbook-objects.ts'), 'utf8');
+    expect(source).toContain('function createWorkbookObjectsActionButton(');
+    expect(source).toContain("createDialogButton({\n    label,\n    baseClass: 'fc-objects__action'");
+    expect(source).not.toContain("document.createElement('button')");
   });
 });

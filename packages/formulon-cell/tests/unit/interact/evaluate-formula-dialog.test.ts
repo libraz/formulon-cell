@@ -54,6 +54,9 @@ describe('attachEvaluateFormulaDialog', () => {
     evalButton()?.click();
     expect(boxes()[1]?.textContent).toBe('=1+2');
     expect(evalButton()?.disabled).toBe(true);
+    expect(evalButton()?.dataset.disabledReason).toBe(
+      'The formula has already been fully evaluated.',
+    );
     handle.detach();
   });
 
@@ -72,6 +75,29 @@ describe('attachEvaluateFormulaDialog', () => {
     expect(boxes()[1]?.textContent).toBe('');
     expect(boxes()[2]?.textContent).toBe('');
     expect(evalButton()?.disabled).toBe(true);
+    expect(evalButton()?.getAttribute('aria-description')).toBe(
+      'Select a cell that contains a formula.',
+    );
+    handle.detach();
+  });
+
+  it('disables Evaluate with a reason when the formula has no references', () => {
+    const store = createSpreadsheetStore();
+    const addr = { sheet: 0, row: 0, col: 0 };
+    mutators.setActive(store, addr);
+    mutators.setCell(store, addr, { kind: 'number', value: 3 }, '=1+2');
+    const wb = {
+      cellFormula: vi.fn(() => '=1+2'),
+      getValue: vi.fn(() => ({ kind: 'number', value: 3 })),
+    } as unknown as WorkbookHandle;
+
+    const handle = attachEvaluateFormulaDialog({ host, store, getWb: () => wb, strings: en });
+    handle.open();
+
+    expect(evalButton()?.disabled).toBe(true);
+    expect(evalButton()?.dataset.disabledReason).toBe(
+      'The formula has no cell references to evaluate.',
+    );
     handle.detach();
   });
 });

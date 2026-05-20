@@ -1,6 +1,7 @@
-import { mutators, WorkbookHandle } from '@libraz/formulon-cell';
+import * as Core from '@libraz/formulon-cell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
+import * as VuePackage from '../src';
 import type { ScreenClipCapture, ScreenClipResult } from '../src';
 import { type MountedVueSpreadsheet, mountVueSpreadsheet } from './test-utils/mount';
 
@@ -56,7 +57,7 @@ describe('Vue <Spreadsheet>', () => {
     const onSelectionChange = vi.fn();
     mounted = await mountVueSpreadsheet({ listeners: { onSelectionChange } });
 
-    mutators.setActive(mounted.instance.store, { sheet: 0, row: 4, col: 1 });
+    Core.mutators.setActive(mounted.instance.store, { sheet: 0, row: 4, col: 1 });
     await flush();
 
     expect(onSelectionChange).toHaveBeenCalled();
@@ -70,7 +71,7 @@ describe('Vue <Spreadsheet>', () => {
     mounted = await mountVueSpreadsheet({ listeners: { onWorkbookChange } });
     const original = mounted.instance.workbook;
 
-    const next = await WorkbookHandle.createDefault({ preferStub: true });
+    const next = await Core.WorkbookHandle.createDefault({ preferStub: true });
     expect(next).not.toBe(original);
 
     await mounted.setProp('workbook', next);
@@ -190,6 +191,34 @@ describe('Vue <Spreadsheet>', () => {
     }
   });
 
+  it('forwards host status bar prop updates without remounting', async () => {
+    mounted = await mountVueSpreadsheet({
+      props: {
+        uploadStatus: 'saving',
+        macroRecording: false,
+      },
+    });
+    const original = mounted.instance;
+    mounted.instance.store.setState((state) => ({
+      ...state,
+      ui: {
+        ...state.ui,
+        statusOptions: { ...state.ui.statusOptions, uploadStatus: true, macroRecording: true },
+      },
+    }));
+
+    await mounted.setProp('uploadStatus', 'error');
+    await mounted.setProp('macroRecording', true);
+
+    expect(mounted.exposed.instance.value).toBe(original);
+    expect(
+      mounted.host.querySelector<HTMLElement>('.fc-host__statusbar-upload')?.dataset.uploadStatus,
+    ).toBe('error');
+    expect(
+      mounted.host.querySelector<HTMLElement>('.fc-host__statusbar-macro')?.dataset.macroRecording,
+    ).toBe('true');
+  });
+
   it('re-exports Screen Clipping host hook types from the Vue package', async () => {
     const capture: ScreenClipCapture = () => ({
       src: 'data:image/png;base64,vue-export',
@@ -201,6 +230,22 @@ describe('Vue <Spreadsheet>', () => {
       src: 'data:image/png;base64,vue-export',
       alt: 'Vue export',
     });
+  });
+
+  it('re-exports shared ribbon and dialog helpers from the Vue package', () => {
+    expect(VuePackage.ribbonActivationEntries).toBe(Core.ribbonActivationEntries);
+    expect(VuePackage.ribbonSurfaceCommandIds).toBe(Core.ribbonSurfaceCommandIds);
+    expect(VuePackage.DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS).toBe(
+      Core.DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS,
+    );
+    expect(VuePackage.attachRangePickerButton).toBe(Core.attachRangePickerButton);
+    expect(VuePackage.appendConditionalApplyFormatControls).toBe(
+      Core.appendConditionalApplyFormatControls,
+    );
+    expect(VuePackage.conditionalStyleOptions).toBe(Core.conditionalStyleOptions);
+    expect(VuePackage.reportDialogLabels).toBe(Core.reportDialogLabels);
+    expect(VuePackage.projectDisabledReason).toBe(Core.projectDisabledReason);
+    expect(VuePackage.projectDisabledState).toBe(Core.projectDisabledState);
   });
 
   it('disposes the engine instance on unmount and unwires event subscriptions', async () => {

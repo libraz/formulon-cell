@@ -17,6 +17,10 @@
 @import "./app/dialog-modules/format-dialog-mobile.css";
 @import "./app/dialog-modules/conditional-and-names.css";
 @import "./app/dialog-modules/pivot.css";
+@import "./app/dialog-modules/sort.css";
+@import "./app/dialog-modules/remove-duplicates.css";
+@import "./app/dialog-modules/text-to-columns.css";
+@import "./app/dialog-modules/advanced-filter.css";
 @import "./app/dialog-modules/goto-special.css";
 @import "./app/dialog-modules/fx-dialog.css";
 @import "./app/dialog-modules/paste-special.css";

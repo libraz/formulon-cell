@@ -1,6 +1,7 @@
 import { type SessionChartSeriesPoint, sessionChartSeries } from '../commands/session-chart.js';
 import type { SessionChart, SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
+import { createInteractionButton } from './chip-button.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface SessionChartsHandle {
@@ -35,6 +36,13 @@ const DEFAULT_LABELS: SessionChartLabels = {
   pieChart: 'Pie chart',
   scatterChart: 'Scatter chart',
 };
+
+const createSessionChartCloseButton = (label: string): HTMLButtonElement =>
+  createInteractionButton({
+    className: 'fc-chart__close',
+    ariaLabel: label,
+    text: '×',
+  });
 
 const chartLabel = (chart: SessionChart, labels: SessionChartLabels): string => {
   if (chart.title) return chart.title;
@@ -322,11 +330,7 @@ export function attachSessionCharts(deps: {
         const title = document.createElement('div');
         title.className = 'fc-chart__title';
         title.textContent = chartLabel(chart, labels);
-        const close = document.createElement('button');
-        close.type = 'button';
-        close.className = 'fc-chart__close';
-        close.setAttribute('aria-label', labels.close);
-        close.textContent = '×';
+        const close = createSessionChartCloseButton(labels.close);
         close.addEventListener('click', () => {
           mutators.removeChart(store, chart.id);
           host.focus({ preventScroll: true });

@@ -3,7 +3,15 @@ import { clearHyperlink, hyperlinkAt, setHyperlink } from '../commands/hyperlink
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { createDialogShell } from './dialog-shell.js';
+import {
+  appendDialogActions,
+  appendDialogButton,
+  appendDialogFrame,
+  clearDialogError,
+  createDialogShell,
+  focusAndSelectInput,
+  showDialogError,
+} from './dialog-shell.js';
 
 export interface HyperlinkDialogDeps {
   host: HTMLElement;
@@ -40,17 +48,11 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
     onDismiss: () => api.close(),
   });
   shell.overlay.classList.add('fc-fmtdlg');
-  shell.panel.classList.add('fc-fmtdlg__panel', 'fc-hldlg__panel');
-  const { overlay, panel } = shell;
-
-  const header = document.createElement('div');
-  header.className = 'fc-fmtdlg__header';
-  header.textContent = t.title;
-  panel.appendChild(header);
-
-  const body = document.createElement('div');
-  body.className = 'fc-fmtdlg__body';
-  panel.appendChild(body);
+  const { overlay } = shell;
+  const { body, footer } = appendDialogFrame(shell, {
+    title: t.title,
+    panelClasses: ['fc-fmtdlg__panel', 'fc-hldlg__panel'],
+  });
 
   const urlRow = document.createElement('div');
   urlRow.className = 'fc-fmtdlg__row';
@@ -72,37 +74,19 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
   errorRow.hidden = true;
   body.appendChild(errorRow);
 
-  const footer = document.createElement('div');
-  footer.className = 'fc-fmtdlg__footer';
-  panel.appendChild(footer);
-
-  const removeBtn = document.createElement('button');
-  removeBtn.type = 'button';
-  removeBtn.className = 'fc-fmtdlg__btn';
-  removeBtn.textContent = t.remove;
+  const removeBtn = appendDialogButton(footer, { label: t.remove });
   // Anchored on the left side so it doesn't get confused with OK/Cancel.
   removeBtn.style.marginRight = 'auto';
-  footer.appendChild(removeBtn);
-
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.className = 'fc-fmtdlg__btn';
-  cancelBtn.textContent = t.cancel;
-  footer.appendChild(cancelBtn);
-
-  const okBtn = document.createElement('button');
-  okBtn.type = 'button';
-  okBtn.className = 'fc-fmtdlg__btn fc-fmtdlg__btn--primary';
-  okBtn.textContent = t.ok;
-  footer.appendChild(okBtn);
+  const { cancelBtn, okBtn } = appendDialogActions(footer, {
+    cancelLabel: t.cancel,
+    okLabel: t.ok,
+  });
 
   const showError = (msg: string): void => {
-    errorRow.textContent = msg;
-    errorRow.hidden = false;
+    showDialogError(errorRow, msg);
   };
   const clearError = (): void => {
-    errorRow.hidden = true;
-    errorRow.textContent = '';
+    clearDialogError(errorRow);
   };
 
   const writeHyperlink = (next: string | undefined): void => {
@@ -119,7 +103,7 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
     const url = urlInput.value.trim();
     if (!url) {
       showError(t.errorEmptyUrl);
-      urlInput.focus();
+      focusAndSelectInput(urlInput);
       return;
     }
     clearError();
@@ -164,8 +148,7 @@ export function attachHyperlinkDialog(deps: HyperlinkDialogDeps): HyperlinkDialo
       clearError();
       shell.open();
       requestAnimationFrame(() => {
-        urlInput.focus();
-        urlInput.select();
+        focusAndSelectInput(urlInput);
       });
     },
     close(): void {

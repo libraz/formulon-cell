@@ -54,13 +54,25 @@ ref.current?.instance?.undo();
 
 ## ツールバー
 
-`SpreadsheetToolbar` は、React デモが採用しているリボン UI 表層を
-そのまま再利用できるコンポーネントです。
+`SpreadsheetToolbar` は core の `Spreadsheet.mountToolbar` に対する薄い
+アダプタです。リボン DOM、メニュー factory、activation model、dynamic
+dropdown dispatcher は `@libraz/formulon-cell` に集約されており、React 側に
+別個のリボン実装は持ちません。
+
+host 側の監査や独自 chrome では、`ribbonActivationEntries`、
+`ribbonSurfaceCommandIds`、`DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS`、
+`attachRangePickerButton`、`appendConditionalApplyFormatControls`、
+`conditionalStyleOptions`、`showReport`、`reportDialogLabels`、`projectDisabledReason` などの core
+export を使います。React 側で ribbon command set や Excel 型 dialog/report
+control、disabled/read-only reason の投影を再実装しません。
 
 ```tsx
 import { SpreadsheetToolbar, type RibbonTab } from '@libraz/formulon-cell-react';
 import '@libraz/formulon-cell-react/toolbar.css';
 ```
+
+個別の dropdown 動作だけ差し替える場合は、リボンを fork せず
+`dropdownActions` を使います。
 
 ## 実行時の props 更新
 
@@ -73,7 +85,9 @@ import '@libraz/formulon-cell-react/toolbar.css';
 
 このパッケージは、コア側のコマンドヘルパーと型（`createSessionChart`・
 `saveSheetView`・`activateSheetView`・`listDefinedNames`・
-`upsertDefinedName` など）を再エクスポートしています。React アプリの
+`upsertDefinedName`・`ribbonActivationEntries`・`attachRangePickerButton`・
+`appendConditionalApplyFormatControls`・`conditionalStyleOptions`・
+`showReport`・`reportDialogLabels`・`projectDisabledReason` など）を再エクスポートしています。React アプリの
 ホスト側 UI 表層に必要な型を、単一のインポート元から取り込めます。
 
 ## ドキュメント

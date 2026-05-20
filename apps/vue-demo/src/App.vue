@@ -41,6 +41,8 @@ import {
   DEMO_ICONS,
   DEMO_FUNCTIONS,
   DEMO_PRINT_PREVIEW_LINES,
+  DEMO_PRINTER_PROFILE_ID,
+  DEMO_PRINTER_PROFILES,
   demoColLabel,
   demoCommandText,
   type DemoBackstageAction,
@@ -60,10 +62,12 @@ import {
   installDemoSearchShortcut,
   queryDemoSearchItems,
   recordDemoSearchUsage,
+  refreshDemoPrinterProfiles,
   resolveInitialLocale,
   reviewCellsForInstance,
   runDemoBackstageAction,
   saveDemoSearchUsagePrior,
+  saveDemoWorkbookToDownload,
   seedDemoWorkbook,
   THEMES,
 } from '../../demo-shared/index.js';
@@ -126,6 +130,7 @@ const reviewDialog = ref<ReviewDialogState | null>(null);
 const scriptOpen = ref(false);
 const scriptCommand = ref('uppercase');
 const scriptError = ref<string | null>(null);
+const uploadStatus = ref<'saved' | 'saving' | 'error' | null>(null);
 const reviewModalEl = ref<HTMLElement | null>(null);
 const scriptModalEl = ref<HTMLElement | null>(null);
 
@@ -370,20 +375,13 @@ onBeforeUnmount(() => {
 });
 
 const onSave = (): void => {
-  const inst = instance.value;
-  if (!inst) return;
-  const bytes = inst.workbook.save();
-  const blob = new Blob([bytes as BlobPart], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  saveDemoWorkbookToDownload({
+    instance: instance.value,
+    bookName: bookName.value,
+    setUploadStatus: (next) => {
+      uploadStatus.value = next;
+    },
   });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${bookName.value}.xlsx`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1_000);
 };
 
 const onNewWorkbook = async (): Promise<void> => {
@@ -497,6 +495,7 @@ const searchItems = computed(() =>
       ribbonTab.value = tab;
     },
     (commandId) => toolbar.value?.applyCommand(commandId) ?? false,
+    EXCEL365_STANDARD_RIBBON_TABS,
   ),
 );
 
@@ -642,7 +641,15 @@ onBeforeUnmount(() => {
               type="button"
               role="option"
               :aria-selected="index === searchActiveIndex"
-              :class="['demo__command-item', { 'demo__command-item--active': index === searchActiveIndex }]"
+              :aria-disabled="cmd.disabled ? 'true' : undefined"
+              :data-disabled-reason="cmd.disabledReason"
+              :class="[
+                'demo__command-item',
+                {
+                  'demo__command-item--active': index === searchActiveIndex,
+                  'demo__command-item--disabled': cmd.disabled,
+                },
+              ]"
               @mousedown.prevent
               @mouseenter="searchActiveIndex = index"
               @click="runCommand(cmd)"
@@ -703,6 +710,11 @@ onBeforeUnmount(() => {
           :locale="locale"
           :features="features"
           :functions="DEMO_FUNCTIONS"
+          :printer-profiles="DEMO_PRINTER_PROFILES"
+          :printer-profile-id="DEMO_PRINTER_PROFILE_ID"
+          :refresh-printer-profiles="refreshDemoPrinterProfiles"
+          :upload-status="uploadStatus"
+          :macro-recording="scriptOpen"
           @ready="onReady"
           @cell-change="onCellChange"
         />

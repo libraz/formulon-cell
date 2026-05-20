@@ -1,5 +1,6 @@
-import { WorkbookHandle } from '@libraz/formulon-cell';
+import * as Core from '@libraz/formulon-cell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as ReactPackage from '../src';
 import type { ScreenClipCapture, ScreenClipResult } from '../src';
 import { type MountedReactSpreadsheet, mountReactSpreadsheet } from './test-utils/mount';
 
@@ -64,7 +65,7 @@ describe('React <Spreadsheet>', () => {
     mounted = await mountReactSpreadsheet({ onWorkbookChange });
     const original = mounted.instance.workbook;
 
-    const next = await WorkbookHandle.createDefault({ preferStub: true });
+    const next = await Core.WorkbookHandle.createDefault({ preferStub: true });
     expect(next).not.toBe(original);
     await mounted.rerender({ workbook: next, onWorkbookChange });
 
@@ -177,6 +178,34 @@ describe('React <Spreadsheet>', () => {
     }
   });
 
+  it('forwards host status bar prop updates without remounting', async () => {
+    mounted = await mountReactSpreadsheet({
+      uploadStatus: 'saving',
+      macroRecording: false,
+    });
+    const original = mounted.instance;
+    mounted.instance.store.setState((state) => ({
+      ...state,
+      ui: {
+        ...state.ui,
+        statusOptions: { ...state.ui.statusOptions, uploadStatus: true, macroRecording: true },
+      },
+    }));
+
+    await mounted.rerender({
+      uploadStatus: 'error',
+      macroRecording: true,
+    });
+
+    expect(mounted.instance).toBe(original);
+    expect(
+      mounted.host.querySelector<HTMLElement>('.fc-host__statusbar-upload')?.dataset.uploadStatus,
+    ).toBe('error');
+    expect(
+      mounted.host.querySelector<HTMLElement>('.fc-host__statusbar-macro')?.dataset.macroRecording,
+    ).toBe('true');
+  });
+
   it('re-exports Screen Clipping host hook types from the React package', async () => {
     const capture: ScreenClipCapture = () => ({
       src: 'data:image/png;base64,react-export',
@@ -188,6 +217,22 @@ describe('React <Spreadsheet>', () => {
       src: 'data:image/png;base64,react-export',
       alt: 'React export',
     });
+  });
+
+  it('re-exports shared ribbon and dialog helpers from the React package', () => {
+    expect(ReactPackage.ribbonActivationEntries).toBe(Core.ribbonActivationEntries);
+    expect(ReactPackage.ribbonSurfaceCommandIds).toBe(Core.ribbonSurfaceCommandIds);
+    expect(ReactPackage.DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS).toBe(
+      Core.DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS,
+    );
+    expect(ReactPackage.attachRangePickerButton).toBe(Core.attachRangePickerButton);
+    expect(ReactPackage.appendConditionalApplyFormatControls).toBe(
+      Core.appendConditionalApplyFormatControls,
+    );
+    expect(ReactPackage.conditionalStyleOptions).toBe(Core.conditionalStyleOptions);
+    expect(ReactPackage.reportDialogLabels).toBe(Core.reportDialogLabels);
+    expect(ReactPackage.projectDisabledReason).toBe(Core.projectDisabledReason);
+    expect(ReactPackage.projectDisabledState).toBe(Core.projectDisabledState);
   });
 
   it('disposes the engine instance on unmount and unwires event subscriptions', async () => {

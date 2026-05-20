@@ -200,6 +200,8 @@ export const illustrations = (): Extension => ({
       store: ctx.store,
       history: ctx.history,
       closeLabel: ctx.i18n.strings.workbookObjects.close,
+      pictureLabel: ctx.i18n.strings.ribbon.pictures,
+      shapeLabel: ctx.i18n.strings.ribbon.shapes,
       resizeLabel: ctx.i18n.strings.sessionCharts.resize,
     });
     return {

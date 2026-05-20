@@ -11,6 +11,7 @@ import {
   engineTableOverlays,
   formatAsTable,
   formatAsTableByStyleId,
+  inferTableHasHeaders,
   isBandedRow,
   isHeaderRow,
   isTotalRow,
@@ -33,6 +34,15 @@ import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 const range = (r0: number, c0: number, r1: number, c1: number) =>
   ({ sheet: 0, r0, c0, r1, c1 }) as const;
 
+const headerWorkbook = (cells: Record<string, 'blank' | string | number>) => ({
+  getValue({ row, col }: { row: number; col: number }) {
+    const value = cells[`${row}:${col}`] ?? 'blank';
+    if (value === 'blank') return { kind: 'blank' } as const;
+    if (typeof value === 'number') return { kind: 'number', value } as const;
+    return { kind: 'text', value } as const;
+  },
+});
+
 describe('defaultTableOverlay', () => {
   it('produces sensible defaults (header on, banded on, total off)', () => {
     const t = defaultTableOverlay('tbl1', range(0, 0, 5, 3));
@@ -40,6 +50,37 @@ describe('defaultTableOverlay', () => {
     expect(t.showHeader).toBe(true);
     expect(t.showTotal).toBe(false);
     expect(t.banded).toBe(true);
+  });
+});
+
+describe('inferTableHasHeaders', () => {
+  it('checks headers only when the first row is text and data exists below it', () => {
+    expect(
+      inferTableHasHeaders(
+        headerWorkbook({
+          '0:0': 'Region',
+          '0:1': 'Sales',
+          '1:0': 'East',
+          '1:1': 10,
+        }),
+        range(0, 0, 2, 1),
+      ),
+    ).toBe(true);
+  });
+
+  it('leaves single empty selections and numeric first rows unchecked', () => {
+    expect(inferTableHasHeaders(headerWorkbook({}), range(4, 4, 4, 4))).toBe(false);
+    expect(
+      inferTableHasHeaders(
+        headerWorkbook({
+          '0:0': 2026,
+          '0:1': 'Sales',
+          '1:0': 1,
+          '1:1': 10,
+        }),
+        range(0, 0, 2, 1),
+      ),
+    ).toBe(false);
   });
 });
 

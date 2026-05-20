@@ -65,6 +65,9 @@ describe('<SpreadsheetToolbar> (thin adapter)', () => {
 
   afterEach(async () => {
     await mounted.dispose();
+    document.body.querySelectorAll('.app__dlg').forEach((el) => {
+      el.remove();
+    });
     uninstallReactDomStubs();
   });
 
@@ -182,6 +185,128 @@ describe('<SpreadsheetToolbar> (thin adapter)', () => {
       await flush();
     });
     expect(onProtect).toHaveBeenCalledWith('lock-cell');
+    await harness.unmount();
+  });
+
+  it('preserves core Insert activation parity for PivotTable, Table, and Pictures', async () => {
+    mounted.instance.setFeatures({ pivotTableDialog: true, illustrations: true });
+    await flush();
+    const openPivotTableDialog = vi.spyOn(mounted.instance, 'openPivotTableDialog');
+    const onToolbarReady = vi.fn();
+    const harness = await mountToolbar(
+      mounted,
+      <SpreadsheetToolbar
+        instance={mounted.instance}
+        activeTab="insert"
+        onTabChange={() => {}}
+        locale="en"
+        onToolbarReady={onToolbarReady}
+      />,
+    );
+    const toolbar = onToolbarReady.mock.calls
+      .map((call) => call[0])
+      .find((candidate) => candidate?.applyCommand);
+    expect(toolbar).toBeTruthy();
+    const pivotButton = harness.host.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="pivotTableInsert"]',
+    );
+    const tableButton = harness.host.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="formatTableInsert"]',
+    );
+    const pictureButton = harness.host.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="pictureInsert"]',
+    );
+    expect(pivotButton?.dataset.ribbonActivation).toBe('splitPrimary');
+    expect(tableButton?.dataset.ribbonActivation).toBe('dialog');
+    expect(tableButton?.dataset.ribbonMenuId).toBeUndefined();
+    expect(pictureButton?.dataset.ribbonActivation).toBe('gallery');
+
+    await act(async () => {
+      expect(toolbar?.applyCommand('pivotTableInsert')).toBe(true);
+      await flush();
+    });
+    expect(openPivotTableDialog).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      expect(toolbar?.applyCommand('formatTableInsert')).toBe(true);
+      await flush();
+    });
+    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+      'Create Table',
+    );
+    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn')?.click();
+    await flush();
+
+    await act(async () => {
+      pictureButton?.click();
+      await flush();
+    });
+    const pictureMenu = harness.host.querySelector<HTMLElement>('#menu-picture-insert');
+    expect(pictureMenu?.hidden).toBe(false);
+    expect(pictureMenu?.classList.contains('app__menu--visual')).toBe(true);
+    expect(
+      pictureMenu?.querySelector<HTMLButtonElement>('[data-picture-insert="stock"]'),
+    ).toBeTruthy();
+
+    await harness.unmount();
+    openPivotTableDialog.mockRestore();
+  });
+
+  it('preserves core Home split/dropdown parity for Underline and Fill', async () => {
+    const onToolbarReady = vi.fn();
+    const harness = await mountToolbar(
+      mounted,
+      <SpreadsheetToolbar
+        instance={mounted.instance}
+        activeTab="home"
+        onTabChange={() => {}}
+        locale="en"
+        onToolbarReady={onToolbarReady}
+      />,
+    );
+    const toolbar = onToolbarReady.mock.calls
+      .map((call) => call[0])
+      .find((candidate) => candidate?.dropdownsApi);
+    expect(toolbar).toBeTruthy();
+
+    const underline = harness.host.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="underline"]',
+    );
+    const underlineMenu = harness.host.querySelector<HTMLDivElement>('#menu-underline');
+    expect(underline?.dataset.ribbonActivation).toBe('splitToggle');
+    expect(underline?.dataset.ribbonMenuId).toBe('menu-underline');
+    expect(underline?.getAttribute('aria-pressed')).toBe('false');
+    await act(async () => {
+      underline?.click();
+      await flush();
+    });
+    expect(underline?.getAttribute('aria-pressed')).toBe('true');
+    expect(underlineMenu?.hidden).toBe(true);
+    await act(async () => {
+      toolbar.dropdownsApi.openDynamicRibbonDropdown(
+        { command: 'underline', menuId: 'menu-underline' },
+        underline as HTMLButtonElement,
+      );
+      await flush();
+    });
+    expect(underlineMenu?.hidden).toBe(false);
+    expect(
+      Array.from(
+        harness.host.querySelectorAll<HTMLButtonElement>('#menu-underline .app__menu-item--iconic'),
+      ).map((item) => item.textContent),
+    ).toEqual(['Underline', 'Double Underline']);
+
+    const fill = harness.host.querySelector<HTMLButtonElement>('[data-ribbon-command="fillHome"]');
+    await act(async () => {
+      fill?.click();
+      await flush();
+    });
+    expect(
+      Array.from(harness.host.querySelectorAll<HTMLButtonElement>('#menu-fill [data-fill]')).map(
+        (item) => item.dataset.fill,
+      ),
+    ).toEqual(['down', 'right', 'up', 'left', 'series', 'days', 'weekdays', 'months', 'years']);
+
     await harness.unmount();
   });
 

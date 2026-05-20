@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { defaultStrings } from '../../../src/i18n/strings.js';
 import { attachGoToDialog } from '../../../src/interact/goto-dialog.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
 
@@ -100,8 +101,15 @@ describe('attachGoToDialog', () => {
     const handle = attachGoToDialog({ host, store, getWb: () => wb });
     handle.open();
     const [sheetRadio, selectionRadio] = scopeRadios();
+    const reason = defaultStrings.goToDialog.scopeSelectionRequiresMultiCell;
     expect(sheetRadio?.checked).toBe(true);
     expect(selectionRadio?.disabled).toBe(true);
+    expect(selectionRadio?.dataset.disabledReason).toBe(reason);
+    expect(selectionRadio?.getAttribute('aria-description')).toBe(reason);
+    expect(selectionRadio?.title).toBe(reason);
+    expect(selectionRadio?.closest('label')?.title).toBe(
+      `${defaultStrings.goToDialog.scopeSelection}\n${reason}`,
+    );
     handle.detach();
   });
 
@@ -111,6 +119,10 @@ describe('attachGoToDialog', () => {
     handle.open();
     const [, selectionRadio] = scopeRadios();
     expect(selectionRadio?.disabled).toBe(false);
+    expect(selectionRadio?.dataset.disabledReason).toBeUndefined();
+    expect(selectionRadio?.hasAttribute('aria-description')).toBe(false);
+    expect(selectionRadio?.title).toBe('');
+    expect(selectionRadio?.closest('label')?.title).toBe(defaultStrings.goToDialog.scopeSelection);
     handle.detach();
   });
 
@@ -182,6 +194,27 @@ describe('attachGoToDialog', () => {
     const sel = store.getState().selection;
     expect(sel.active).toEqual({ sheet: 0, row: 1, col: 1 });
     expect(sel.range).toEqual({ sheet: 0, r0: 1, c0: 1, r1: 3, c1: 3 });
+    handle.detach();
+  });
+
+  it('normal Go To uses the shared range picker for the reference input', () => {
+    setRange(store, 1, 1, 3, 3);
+    const handle = attachGoToDialog({ host, store, getWb: () => wb });
+    handle.open('go-to');
+
+    const picker = document.querySelector<HTMLButtonElement>('[data-range-picker="go-to-reference"]');
+    const input = referenceInput();
+    expect(picker?.getAttribute('aria-label')).toBe('範囲の選択');
+    picker?.click();
+    expect(input?.value).toBe('B2:D4');
+    expect(picker?.getAttribute('aria-pressed')).toBe('true');
+    expect(overlay()?.classList.contains('fc-fmtdlg--range-picking')).toBe(true);
+
+    setRange(store, 4, 2, 6, 4);
+    expect(input?.value).toBe('C5:E7');
+    handle.close();
+    expect(picker?.getAttribute('aria-pressed')).toBe('false');
+    expect(overlay()?.classList.contains('fc-fmtdlg--range-picking')).toBe(false);
     handle.detach();
   });
 

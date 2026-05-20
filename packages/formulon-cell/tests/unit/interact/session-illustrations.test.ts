@@ -56,6 +56,8 @@ describe('attachSessionIllustrations', () => {
     const handle = attachSessionIllustrations({
       host,
       store,
+      pictureLabel: 'Picture overlay',
+      shapeLabel: 'Shape overlay',
       resizeLabel: 'Resize illustration',
     });
 
@@ -66,7 +68,39 @@ describe('attachSessionIllustrations', () => {
     ]);
     expect(host.querySelector<HTMLImageElement>('img')?.alt).toBe('Image label');
     expect(host.querySelector('svg ellipse[stroke="#107c10"]')).toBeTruthy();
+    expect(overlays[0]?.getAttribute('aria-roledescription')).toBe('Picture overlay');
+    expect(overlays[1]?.getAttribute('aria-roledescription')).toBe('Shape overlay');
     expect(host.querySelector('[aria-label="Resize illustration"]')).toBeTruthy();
+
+    handle.detach();
+  });
+
+  it('does not expose English fallback labels when no overlay labels are supplied', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const store = createSpreadsheetStore();
+    mutators.upsertIllustration(store, {
+      id: 'image-without-alt',
+      kind: 'image',
+      sheet: 0,
+      src: 'data:image/png;base64,image',
+    });
+    mutators.upsertIllustration(store, {
+      id: 'shape-without-kind',
+      kind: 'shape',
+      sheet: 0,
+    });
+
+    const handle = attachSessionIllustrations({ host, store });
+    const overlays = Array.from(host.querySelectorAll<HTMLElement>('.fc-illustration'));
+
+    expect(overlays.map((overlay) => overlay.getAttribute('aria-label'))).toEqual([
+      'image-without-alt',
+      'shape-without-kind',
+    ]);
+    expect(host.querySelector('[aria-label="Resize shape"]')).toBeNull();
+    expect(host.textContent).not.toContain('Picture');
+    expect(host.textContent).not.toContain('Shape');
 
     handle.detach();
   });

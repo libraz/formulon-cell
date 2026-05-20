@@ -12,7 +12,10 @@ import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
+import { createInteractionButton } from './chip-button.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';
+import { clampPanelToViewport } from './overlay-position.js';
 
 export interface FilterDropdownDeps {
   store: SpreadsheetStore;
@@ -30,6 +33,16 @@ export interface FilterDropdownHandle {
   isOpen(): boolean;
   detach(): void;
 }
+
+const createFilterDropdownActionButton = (
+  className: string,
+  label: string,
+): HTMLButtonElement => {
+  return createInteractionButton({
+    className,
+    text: label,
+  });
+};
 
 /**
  * Lightweight column-filter popover. Lists distinct values in the column with
@@ -142,9 +155,6 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     const conditionLabel = document.createElement('label');
     conditionLabel.className = 'fc-filter-dropdown__condition-label';
     conditionLabel.textContent = t.condition;
-    const conditionSelect = document.createElement('select');
-    conditionSelect.className = 'fc-filter-dropdown__condition-op';
-    conditionSelect.setAttribute('aria-label', t.condition);
     const conditionOptions: Array<{ value: '' | ConditionFilterOp; label: string }> = [
       { value: '', label: t.conditionNone },
       { value: 'equals', label: t.conditionEquals },
@@ -156,12 +166,10 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       { value: 'lessThan', label: t.conditionLessThan },
       { value: 'lessThanOrEqual', label: t.conditionLessThanOrEqual },
     ];
-    for (const optionSpec of conditionOptions) {
-      const option = document.createElement('option');
-      option.value = optionSpec.value;
-      option.textContent = optionSpec.label;
-      conditionSelect.appendChild(option);
-    }
+    const conditionSelect = createDialogSelect(conditionOptions, '', {
+      ariaLabel: t.condition,
+      className: 'fc-filter-dropdown__condition-op',
+    });
     const conditionInput = document.createElement('input');
     conditionInput.type = 'text';
     conditionInput.className = 'fc-filter-dropdown__condition-value';
@@ -265,15 +273,9 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
 
     const actions = document.createElement('div');
     actions.className = 'fc-filter-dropdown__actions';
-    const apply = document.createElement('button');
-    apply.type = 'button';
-    apply.className = 'fc-filter-dropdown__apply';
-    apply.textContent = t.apply;
+    const apply = createFilterDropdownActionButton('fc-filter-dropdown__apply', t.apply);
     apply.addEventListener('click', () => applyActiveFilter());
-    const clear = document.createElement('button');
-    clear.type = 'button';
-    clear.className = 'fc-filter-dropdown__clear';
-    clear.textContent = t.clear;
+    const clear = createFilterDropdownActionButton('fc-filter-dropdown__clear', t.clear);
     clear.addEventListener('click', () => {
       if (!activeRange) return;
       recordFilterChange(deps.history ?? null, deps.store, () => {
@@ -290,11 +292,13 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     if (host) inheritHostTokens(host, r);
     document.body.appendChild(r);
     root = r;
-    const rect = r.getBoundingClientRect();
-    const left = Math.max(4, Math.min(anchor.x, window.innerWidth - rect.width - 4));
-    const top = Math.max(4, Math.min(anchor.y + anchor.h, window.innerHeight - rect.height - 4));
-    r.style.left = `${left}px`;
-    r.style.top = `${top}px`;
+    const position = clampPanelToViewport(r, anchor.x, anchor.y + anchor.h, {
+      pad: 4,
+      fallbackWidth: 260,
+      fallbackHeight: 320,
+    });
+    r.style.left = `${position.x}px`;
+    r.style.top = `${position.y}px`;
 
     requestAnimationFrame(() => search.focus());
 

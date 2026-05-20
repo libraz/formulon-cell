@@ -6,13 +6,26 @@ import {
 } from '../commands/named-ranges.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { createDialogShell } from './dialog-shell.js';
+import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
+import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
+import {
+  appendDialogButton,
+  appendDialogIconButton,
+  clearDialogError,
+  createDialogButton,
+  createDialogShell,
+  focusAndSelectInput,
+  showDialogError,
+} from './dialog-shell.js';
+import { attachRangePickerButton } from './range-picker-control.js';
 
 export interface NamedRangeDialogDeps {
   host: HTMLElement;
   wb: WorkbookHandle;
   history?: History | null;
   strings?: Strings;
+  getSelectedRangeFormula?: () => string;
+  subscribeToRangeChanges?: (listener: () => void) => () => void;
 }
 
 export interface NamedRangeDialogHandle {
@@ -26,6 +39,16 @@ export interface NamedRangeDialogHandle {
 
 type NameFilter = 'all' | 'errors' | 'noErrors' | 'workbook';
 type NameSortKey = 'name' | 'value' | 'formula' | 'scope' | 'comment';
+
+function createNameManagerButton(
+  label: string,
+  className: string,
+  opts: { role?: string } = {},
+): HTMLButtonElement {
+  const button = createDialogButton({ label, baseClass: className });
+  if (opts.role) button.setAttribute('role', opts.role);
+  return button;
+}
 
 const hasFormulaError = (formula: string): boolean =>
   /#(?:REF|NAME|VALUE|DIV\/0|N\/A|NULL|NUM)!?/i.test(formula);
@@ -42,6 +65,14 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   const history = deps.history ?? null;
   const strings = deps.strings ?? defaultStrings;
   const t = strings.namedRangeDialog;
+  const rangePickerOptions =
+    deps.getSelectedRangeFormula && deps.subscribeToRangeChanges
+      ? {
+          label: strings.pivotTableDialog.rangePickerSelect,
+          getValue: deps.getSelectedRangeFormula,
+          subscribeToRangeChanges: deps.subscribeToRangeChanges,
+        }
+      : null;
 
   const shell = createDialogShell({
     host,
@@ -64,24 +95,11 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
 
   const actionBar = document.createElement('div');
   actionBar.className = 'fc-namedlg__actions';
-  const newBtn = document.createElement('button');
-  newBtn.type = 'button';
-  newBtn.className = 'fc-fmtdlg__btn';
-  newBtn.textContent = t.newButton;
-  const editBtn = document.createElement('button');
-  editBtn.type = 'button';
-  editBtn.className = 'fc-fmtdlg__btn';
-  editBtn.textContent = t.editButton;
-  const deleteBtn = document.createElement('button');
-  deleteBtn.type = 'button';
-  deleteBtn.className = 'fc-fmtdlg__btn';
-  deleteBtn.textContent = t.deleteButton;
-  const filterBtn = document.createElement('button');
-  filterBtn.type = 'button';
-  filterBtn.className = 'fc-fmtdlg__btn';
-  filterBtn.textContent = t.filterButton;
+  const newBtn = appendDialogButton(actionBar, { label: t.newButton });
+  const editBtn = appendDialogButton(actionBar, { label: t.editButton });
+  const deleteBtn = appendDialogButton(actionBar, { label: t.deleteButton });
+  const filterBtn = appendDialogButton(actionBar, { label: t.filterButton });
   filterBtn.setAttribute('aria-haspopup', 'menu');
-  actionBar.append(newBtn, editBtn, deleteBtn, filterBtn);
   body.appendChild(actionBar);
 
   const list = document.createElement('div');
@@ -99,11 +117,8 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   ];
   for (const { key, label } of headerSpecs) {
     const cell = document.createElement('span');
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'fc-namedlg__sort';
+    const button = createNameManagerButton(label, 'fc-namedlg__sort');
     button.dataset.sortKey = key;
-    button.textContent = label;
     button.addEventListener('click', () => {
       if (sortKey === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
       else {
@@ -131,17 +146,23 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   quickInput.autocomplete = 'off';
   quickInput.spellcheck = false;
   quickLabel.appendChild(quickInput);
-  const quickCommitBtn = document.createElement('button');
-  quickCommitBtn.type = 'button';
-  quickCommitBtn.className = 'fc-namedlg__refers-icon';
-  quickCommitBtn.textContent = '✓';
-  quickCommitBtn.setAttribute('aria-label', t.commitButton);
-  const quickCancelBtn = document.createElement('button');
-  quickCancelBtn.type = 'button';
-  quickCancelBtn.className = 'fc-namedlg__refers-icon';
-  quickCancelBtn.textContent = '×';
-  quickCancelBtn.setAttribute('aria-label', t.cancelButton);
-  quickRow.append(quickLabel, quickCommitBtn, quickCancelBtn);
+  if (rangePickerOptions) {
+    attachRangePickerButton(quickInput, {
+      ...rangePickerOptions,
+      kind: 'named-range-quick-refers-to',
+    });
+  }
+  quickRow.appendChild(quickLabel);
+  const quickCommitBtn = appendDialogIconButton(quickRow, {
+    label: '✓',
+    ariaLabel: t.commitButton,
+    baseClass: 'fc-namedlg__refers-icon',
+  });
+  const quickCancelBtn = appendDialogIconButton(quickRow, {
+    label: '×',
+    ariaLabel: t.cancelButton,
+    baseClass: 'fc-namedlg__refers-icon',
+  });
   body.appendChild(quickRow);
 
   const editorShell = createDialogShell({
@@ -176,14 +197,15 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   nameInput.setAttribute('aria-label', t.nameHeader);
   nameInput.autocomplete = 'off';
   nameInput.spellcheck = false;
-  const scopeSelect = document.createElement('select');
-  scopeSelect.className = 'fc-namedlg-editor__input';
-  scopeSelect.setAttribute('aria-label', t.scopeHeader);
-  const workbookOption = document.createElement('option');
-  workbookOption.value = 'workbook';
-  workbookOption.textContent = t.workbookScope;
-  scopeSelect.appendChild(workbookOption);
-  scopeSelect.disabled = true;
+  const scopeSelect = createDialogSelect(
+    [{ value: 'workbook', label: t.workbookScope }],
+    'workbook',
+    { className: 'fc-namedlg-editor__input', ariaLabel: t.scopeHeader },
+  );
+  projectDisabledState(scopeSelect, true, t.scopeWorkbookOnly, {
+    datasetKey: 'disabledReason',
+    titlePrefix: t.scopeHeader,
+  });
   const commentInput = document.createElement('textarea');
   commentInput.className = 'fc-namedlg-editor__input';
   commentInput.setAttribute('aria-label', t.commentHeader);
@@ -201,17 +223,17 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     makeEditorRow(t.commentHeader, commentInput),
     makeEditorRow(t.formulaHeader, formulaInput),
   );
+  if (rangePickerOptions) {
+    attachRangePickerButton(formulaInput, {
+      ...rangePickerOptions,
+      kind: 'named-range-editor-refers-to',
+    });
+  }
   const editorButtons = document.createElement('div');
   editorButtons.className = 'fc-namedlg-editor__buttons';
-  const editorOkBtn = document.createElement('button');
+  const editorOkBtn = appendDialogButton(editorButtons, { label: t.ok, variant: 'primary' });
   editorOkBtn.type = 'submit';
-  editorOkBtn.className = 'fc-fmtdlg__btn fc-fmtdlg__btn--primary';
-  editorOkBtn.textContent = t.ok;
-  const editorCancelBtn = document.createElement('button');
-  editorCancelBtn.type = 'button';
-  editorCancelBtn.className = 'fc-fmtdlg__btn';
-  editorCancelBtn.textContent = t.cancel;
-  editorButtons.append(editorOkBtn, editorCancelBtn);
+  const editorCancelBtn = appendDialogButton(editorButtons, { label: t.cancel });
   formRow.appendChild(editorButtons);
   const errorRow = document.createElement('div');
   errorRow.className = 'fc-namedlg__error';
@@ -236,15 +258,8 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   deleteMessage.className = 'fc-namedlg-confirm__message';
   const deleteButtons = document.createElement('div');
   deleteButtons.className = 'fc-namedlg-confirm__buttons';
-  const deleteOkBtn = document.createElement('button');
-  deleteOkBtn.type = 'button';
-  deleteOkBtn.className = 'fc-fmtdlg__btn fc-fmtdlg__btn--primary';
-  deleteOkBtn.textContent = t.ok;
-  const deleteCancelBtn = document.createElement('button');
-  deleteCancelBtn.type = 'button';
-  deleteCancelBtn.className = 'fc-fmtdlg__btn';
-  deleteCancelBtn.textContent = t.cancel;
-  deleteButtons.append(deleteOkBtn, deleteCancelBtn);
+  const deleteOkBtn = appendDialogButton(deleteButtons, { label: t.ok, variant: 'primary' });
+  const deleteCancelBtn = appendDialogButton(deleteButtons, { label: t.cancel });
   deleteBody.append(deleteMessage, deleteButtons);
   deleteShell.panel.append(deleteTitle, deleteBody);
 
@@ -256,32 +271,25 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
 
   const note = document.createElement('div');
   note.className = 'fc-namedlg__note';
+  note.id = 'fc-namedlg-readonly-note';
   note.textContent = t.note;
 
   const footer = document.createElement('div');
   footer.className = 'fc-fmtdlg__footer';
   panel.appendChild(footer);
-  const closeBtn = document.createElement('button');
-  closeBtn.type = 'button';
-  closeBtn.className = 'fc-fmtdlg__btn';
-  closeBtn.textContent = t.close;
-  footer.appendChild(closeBtn);
+  const closeBtn = appendDialogButton(footer, { label: t.close });
 
   const showError = (msg: string): void => {
-    errorRow.textContent = msg;
-    errorRow.hidden = false;
+    showDialogError(errorRow, msg);
   };
   const clearError = (): void => {
-    errorRow.hidden = true;
-    errorRow.textContent = '';
+    clearDialogError(errorRow);
   };
   const showMainError = (msg: string): void => {
-    mainErrorRow.textContent = msg;
-    mainErrorRow.hidden = false;
+    showDialogError(mainErrorRow, msg);
   };
   const clearMainError = (): void => {
-    mainErrorRow.hidden = true;
-    mainErrorRow.textContent = '';
+    clearDialogError(mainErrorRow);
   };
   let selectedNameIndex = 0;
   let currentRows: { name: string; formula: string }[] = [];
@@ -291,6 +299,28 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   let filterMenu: HTMLDivElement | null = null;
   let editorMode: 'new' | 'edit' = 'new';
   let pendingDeleteName: string | null = null;
+
+  const setReadOnlyState = (
+    el: HTMLElement & { disabled?: boolean },
+    disabledByReadOnly: boolean,
+  ): void => {
+    if (disabledByReadOnly) delete el.dataset.disabledReason;
+    projectDisabledState(el, disabledByReadOnly, t.note, {
+      ariaDescription: false,
+      describedById: note.id,
+    });
+  };
+  const setStateDisabledReason = (
+    el: HTMLElement & { disabled?: boolean },
+    disabled: boolean,
+    reason: string | null,
+    titlePrefix: string,
+  ): void => {
+    projectDisabledState(el, disabled, reason, {
+      datasetKey: 'disabledReason',
+      titlePrefix,
+    });
+  };
 
   const updateRowSelection = (): HTMLElement[] => {
     const rows = Array.from(list.querySelectorAll<HTMLElement>('.fc-namedlg__item'));
@@ -316,11 +346,19 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
 
   const syncQuickRefers = (): void => {
     const entry = currentRows[selectedNameIndex];
-    const enabled = wb.capabilities.definedNameMutate && Boolean(entry);
+    const canMutate = wb.capabilities.definedNameMutate;
+    const enabled = canMutate && Boolean(entry);
     quickInput.value = entry?.formula ?? '';
-    quickInput.disabled = !enabled;
-    quickCommitBtn.disabled = !enabled;
-    quickCancelBtn.disabled = !entry;
+    if (!canMutate) {
+      setReadOnlyState(quickInput, true);
+      setReadOnlyState(quickCommitBtn, true);
+      setReadOnlyState(quickCancelBtn, true);
+    } else {
+      const reason = entry ? null : t.quickRefersRequiresSelection;
+      setStateDisabledReason(quickInput, !enabled, reason, t.formulaHeader);
+      setStateDisabledReason(quickCommitBtn, !enabled, reason, t.commitButton);
+      setStateDisabledReason(quickCancelBtn, !entry, reason, t.cancelButton);
+    }
   };
 
   const renderList = (): void => {
@@ -411,9 +449,20 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     }
     updateRowSelection();
     const hasSelection = count > 0;
-    editBtn.disabled = !canMutate || !hasSelection;
-    deleteBtn.disabled = !canMutate || !hasSelection;
-    filterBtn.disabled = allRows.length === 0;
+    if (!canMutate) {
+      setReadOnlyState(editBtn, true);
+      setReadOnlyState(deleteBtn, true);
+    } else {
+      const selectionReason = hasSelection ? null : t.selectNameActionReason;
+      setStateDisabledReason(editBtn, !hasSelection, selectionReason, t.editButton);
+      setStateDisabledReason(deleteBtn, !hasSelection, selectionReason, t.deleteButton);
+    }
+    setStateDisabledReason(
+      filterBtn,
+      allRows.length === 0,
+      allRows.length === 0 ? t.filterRequiresNames : null,
+      t.filterButton,
+    );
     syncQuickRefers();
     filterBtn.textContent =
       activeFilter === 'all' ? t.filterButton : `${t.filterButton}: ${filterLabel(activeFilter)}`;
@@ -501,12 +550,10 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     menu.setAttribute('role', 'menu');
     const filters: NameFilter[] = ['all', 'errors', 'noErrors', 'workbook'];
     for (const filter of filters) {
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.className = 'fc-namedlg__filter-item';
-      item.setAttribute('role', 'menuitem');
+      const item = createNameManagerButton(filterLabel(filter), 'fc-namedlg__filter-item', {
+        role: 'menuitem',
+      });
       item.setAttribute('aria-checked', filter === activeFilter ? 'true' : 'false');
-      item.textContent = filterLabel(filter);
       item.addEventListener('click', () => {
         activeFilter = filter;
         selectedNameIndex = 0;
@@ -527,6 +574,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   };
 
   function closeEditor(): void {
+    editorShell.overlay.dispatchEvent(new CustomEvent('fc-range-picker-stop-all'));
     editorShell.close();
     clearError();
     if (shell.isOpen()) panel.focus();
@@ -535,6 +583,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   const openEditor = (mode: 'new' | 'edit'): void => {
     const entry = mode === 'edit' ? currentRows[selectedNameIndex] : null;
     if (mode === 'edit' && !entry) return;
+    overlay.dispatchEvent(new CustomEvent('fc-range-picker-stop-all'));
     editorMode = mode;
     const title = mode === 'new' ? t.newNameTitle : t.editNameTitle;
     editorTitle.textContent = title;
@@ -546,8 +595,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     clearError();
     editorShell.open();
     requestAnimationFrame(() => {
-      nameInput.focus();
-      nameInput.select();
+      focusAndSelectInput(nameInput);
     });
   };
 
@@ -616,7 +664,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     const formula = formulaInput.value.trim();
     if (!name) {
       showError(t.errorEmptyName);
-      nameInput.focus();
+      focusAndSelectInput(nameInput);
       return;
     }
     const result = recordDefinedNamesChange(history, wb, () => upsertDefinedName(wb, name, formula));
@@ -637,8 +685,22 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
 
   const refreshFormState = (): void => {
     const canMutate = wb.capabilities.definedNameMutate;
-    newBtn.disabled = !canMutate;
-    filterBtn.disabled = currentRows.length === 0;
+    if (!canMutate) {
+      setReadOnlyState(filterBtn, currentRows.length === 0);
+    }
+    setReadOnlyState(newBtn, !canMutate);
+    setReadOnlyState(editBtn, !canMutate);
+    setReadOnlyState(deleteBtn, !canMutate);
+    setReadOnlyState(quickInput, !canMutate);
+    setReadOnlyState(quickCommitBtn, !canMutate);
+    if (canMutate) {
+      setStateDisabledReason(
+        filterBtn,
+        currentRows.length === 0,
+        currentRows.length === 0 ? t.filterRequiresNames : null,
+        t.filterButton,
+      );
+    }
     if (canMutate) {
       if (note.parentElement) note.remove();
     } else {

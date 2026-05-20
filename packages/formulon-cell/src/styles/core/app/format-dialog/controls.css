@@ -27,4 +27,105 @@
   .fc-fmtdlg input[type="number"] {
     width: 58px;
   }
+
+  .app__dlg__hint {
+    color: color-mix(in srgb, var(--fc-fmtdlg-panel-fg, CanvasText) 68%, transparent);
+    font-size: 11px;
+  }
+
+  .app__dlg__preview {
+    min-height: 74px;
+    max-height: 150px;
+    margin: 0;
+    padding: 8px;
+    border: 1px solid var(--fc-fmtdlg-input-border, transparent);
+    border-radius: 6px;
+    background: var(--fc-fmtdlg-input-bg);
+    color: var(--fc-fmtdlg-input-fg, inherit);
+    overflow: auto;
+    font: 12px/1.45 var(--fc-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+    white-space: pre;
+  }
+
+  .app__dlg__format-choice .app__dlg__label {
+    gap: 6px;
+  }
+
+  .app__dlg__format-preview {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 26px;
+    margin-top: 6px;
+    padding: 3px 10px;
+    border: 1px solid var(--fc-fmtdlg-preview-border, transparent);
+    border-radius: 4px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .fc-range-picker {
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+  }
+
+  .fc-range-picker > input {
+    min-width: 0;
+    flex: 1 1 auto;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .fc-range-picker__btn {
+    position: relative;
+    flex: 0 0 26px;
+    width: 26px;
+    min-height: 24px;
+    border: 1px solid var(--fc-fmtdlg-input-border, transparent);
+    border-left: 0;
+    border-radius: 0 6px 6px 0;
+    background: var(--fc-fmtdlg-input-bg);
+    color: #185abd;
+    cursor: pointer;
+  }
+
+  .fc-range-picker__btn:hover,
+  .fc-range-picker__btn:focus-visible {
+    border-color: var(--fc-fmtdlg-input-hover-border);
+    outline: none;
+  }
+
+  .fc-range-picker--picking > input {
+    border-color: var(--fc-fmtdlg-list-focus-border);
+    box-shadow: 0 0 0 2px var(--fc-accent-soft);
+  }
+
+  .fc-range-picker--picking .fc-range-picker__btn {
+    border-color: var(--fc-fmtdlg-list-focus-border);
+    background: var(--fc-accent-soft);
+  }
+
+  .fc-range-picker__btn::before {
+    position: absolute;
+    inset: 5px;
+    border: 1px solid #8a8886;
+    background:
+      linear-gradient(#e1dfdd 0 0) 0 33% / 100% 1px no-repeat,
+      linear-gradient(#e1dfdd 0 0) 0 66% / 100% 1px no-repeat,
+      linear-gradient(90deg, #e1dfdd 0 0) 33% 0 / 1px 100% no-repeat,
+      linear-gradient(90deg, #e1dfdd 0 0) 66% 0 / 1px 100% no-repeat,
+      #ffffff;
+    content: "";
+  }
+
+  .fc-range-picker__btn::after {
+    position: absolute;
+    right: 3px;
+    bottom: 2px;
+    color: #185abd;
+    font-size: 10px;
+    line-height: 1;
+    content: "↗";
+  }
 }

@@ -7,7 +7,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { cellRect } from '../render/geometry.js';
 import { getValidationChevron } from '../render/grid.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
-import { createDialogShell } from './dialog-shell.js';
+import { appendDialogButton, createDialogShell } from './dialog-shell.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface ValidationListDeps {
@@ -353,11 +353,10 @@ export function attachValidationAlert(deps: ValidationAlertDeps): ValidationAler
   footer.className = 'fc-fmtdlg__footer';
   shell.panel.appendChild(footer);
 
-  const okBtn = document.createElement('button');
-  okBtn.type = 'button';
-  okBtn.className = 'fc-fmtdlg__btn fc-fmtdlg__btn--primary';
-  okBtn.textContent = labels.ok;
-  footer.appendChild(okBtn);
+  const okBtn = appendDialogButton(footer, {
+    label: labels.ok,
+    variant: 'primary',
+  });
 
   const defaultTitle = (severity: ValidationAlertMessage['severity']): string => {
     if (severity === 'warning') return labels.warning;

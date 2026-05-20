@@ -3,7 +3,9 @@ import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { createInteractionButton } from './chip-button.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';
+import { clampPanelToViewport } from './overlay-position.js';
 
 export type ErrorMenuKind = 'error' | 'validation';
 
@@ -31,8 +33,6 @@ export interface ErrorMenuHandle {
   close(): void;
   detach(): void;
 }
-
-const VIEWPORT_PAD = 4;
 
 export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
   const { host, store, getWb } = deps;
@@ -114,14 +114,16 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
 
   const onScroll = (): void => close(false);
 
-  const clampToViewport = (x: number, y: number): { x: number; y: number } => {
-    const w = root.offsetWidth;
-    const h = root.offsetHeight;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const cx = Math.max(VIEWPORT_PAD, Math.min(x, vw - w - VIEWPORT_PAD));
-    const cy = Math.max(VIEWPORT_PAD, Math.min(y, vh - h - VIEWPORT_PAD));
-    return { x: cx, y: cy };
+  type ErrorMenuAction = 'showInfo' | 'editCell' | 'traceError' | 'ignore';
+  type ErrorMenuEntry = { id: ErrorMenuAction; label: string };
+
+  const createErrorMenuItemButton = (entry: ErrorMenuEntry): HTMLButtonElement => {
+    return createInteractionButton({
+      className: 'fc-errmenu__item',
+      dataset: { fcAction: entry.id },
+      role: 'menuitem',
+      text: entry.label,
+    });
   };
 
   /** Format a short "{code} — {value}" preview for the heading row. Falls
@@ -158,8 +160,7 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
     heading.textContent = detail ? `${label} — ${detail}` : label;
     root.appendChild(heading);
 
-    type Entry = { id: 'showInfo' | 'editCell' | 'traceError' | 'ignore'; label: string };
-    const entries: Entry[] = [
+    const entries: ErrorMenuEntry[] = [
       { id: 'showInfo', label: t.showInfo },
       { id: 'editCell', label: t.editCell },
       { id: 'traceError', label: t.traceError },
@@ -167,12 +168,7 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
     ];
 
     for (const entry of entries) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'fc-errmenu__item';
-      btn.dataset.fcAction = entry.id;
-      btn.setAttribute('role', 'menuitem');
-      btn.textContent = entry.label;
+      const btn = createErrorMenuItemButton(entry);
       btn.addEventListener('click', (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
@@ -183,11 +179,7 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
     }
   };
 
-  const run = (
-    id: 'showInfo' | 'editCell' | 'traceError' | 'ignore',
-    addr: Addr,
-    kind: ErrorMenuKind,
-  ): void => {
+  const run = (id: ErrorMenuAction, addr: Addr, kind: ErrorMenuKind): void => {
     switch (id) {
       case 'showInfo': {
         // Surface the error/value detail through aria-live for non-blocking
@@ -244,7 +236,7 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
       root.style.left = '-9999px';
       root.style.top = '-9999px';
       visible = true;
-      const { x, y } = clampToViewport(screenX, screenY);
+      const { x, y } = clampPanelToViewport(root, screenX, screenY);
       root.style.left = `${x}px`;
       root.style.top = `${y}px`;
       document.addEventListener('mousedown', onDocMouseDown, true);

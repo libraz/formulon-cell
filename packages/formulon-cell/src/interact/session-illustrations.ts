@@ -62,6 +62,28 @@ const renderShape = (svg: SVGSVGElement, item: SessionIllustration): void => {
     });
     return;
   }
+  if (item.shape === 'triangle') {
+    appendSvg(svg, 'polygon', {
+      points: '80,12 148,84 12,84',
+      fill: color,
+      'fill-opacity': 0.16,
+      stroke: color,
+      'stroke-width': 3,
+      'stroke-linejoin': 'round',
+    });
+    return;
+  }
+  if (item.shape === 'diamond') {
+    appendSvg(svg, 'polygon', {
+      points: '80,10 150,48 80,86 10,48',
+      fill: color,
+      'fill-opacity': 0.16,
+      stroke: color,
+      'stroke-width': 3,
+      'stroke-linejoin': 'round',
+    });
+    return;
+  }
   appendSvg(svg, 'rect', {
     x: 12,
     y: 12,
@@ -95,6 +117,8 @@ export function attachSessionIllustrations(deps: {
   store: SpreadsheetStore;
   history?: History | null;
   closeLabel?: string;
+  pictureLabel?: string;
+  shapeLabel?: string;
   resizeLabel?: string;
 }): SessionIllustrationsHandle {
   const { host, store, history = null } = deps;
@@ -220,11 +244,18 @@ export function attachSessionIllustrations(deps: {
         panel.dataset.illustrationId = item.id;
         panel.tabIndex = 0;
         panel.setAttribute('role', 'group');
-        panel.setAttribute('aria-roledescription', item.kind === 'image' ? 'picture' : 'shape');
+        panel.setAttribute(
+          'aria-roledescription',
+          item.kind === 'image'
+            ? (deps.pictureLabel ?? item.kind)
+            : (deps.shapeLabel ?? item.kind),
+        );
         panel.setAttribute('aria-selected', item.id === selectedId ? 'true' : 'false');
         panel.setAttribute(
           'aria-label',
-          item.kind === 'image' ? (item.alt ?? 'Picture') : (item.shape ?? 'Shape'),
+          item.kind === 'image'
+            ? (item.alt ?? deps.pictureLabel ?? item.id)
+            : (item.shape ?? deps.shapeLabel ?? item.id),
         );
         panel.style.cssText =
           'position:absolute;pointer-events:auto;background:transparent;box-sizing:border-box;';
@@ -253,7 +284,7 @@ export function attachSessionIllustrations(deps: {
 
         const resize = document.createElement('div');
         resize.setAttribute('role', 'separator');
-        resize.setAttribute('aria-label', deps.resizeLabel ?? 'Resize shape');
+        resize.setAttribute('aria-label', deps.resizeLabel ?? deps.shapeLabel ?? item.id);
         resize.style.cssText =
           'position:absolute;right:-4px;bottom:-4px;width:8px;height:8px;background:var(--fc-accent, #0f6cbd);cursor:nwse-resize;';
         resize.addEventListener('pointerdown', (event) => applyDrag(event, item, 'resize', panel));

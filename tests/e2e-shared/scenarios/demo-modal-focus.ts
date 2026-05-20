@@ -68,3 +68,33 @@ export async function runDemoModalFocusScenario(page: Page): Promise<void> {
   await expect(scriptDialog).toBeHidden();
   await expectActive(script, 'script dialog should restore focus to its ribbon command');
 }
+
+export async function runDemoStatusBarHostStateScenario(page: Page): Promise<void> {
+  const sp = new SpreadsheetPage(page);
+  await sp.mount();
+  await sp.expectNoStub();
+
+  const upload = page.locator('.fc-host__statusbar-upload').first();
+  const macro = page.locator('.fc-host__statusbar-macro').first();
+
+  await page.locator('.demo__quick button[aria-label="Save"]').click();
+  await expect(upload).toBeVisible();
+  await expect(upload).toHaveAttribute('data-upload-status', 'saved');
+
+  await page.locator('[data-ribbon-tab="automate"]').click();
+  const script = page.getByRole('button', { name: /^Script$/i }).first();
+  await expect(script).toBeEnabled();
+  await script.click();
+  await page.locator('#menu-script [data-script-action="custom"]').click();
+
+  const scriptDialog = page
+    .locator('.demo__modal[role="dialog"][aria-modal="true"]')
+    .filter({ hasText: /^Script/ });
+  await expect(scriptDialog).toBeVisible();
+  await expect(macro).toBeVisible();
+  await expect(macro).toHaveAttribute('data-macro-recording', 'true');
+
+  await page.keyboard.press('Escape');
+  await expect(scriptDialog).toBeHidden();
+  await expect(macro).toHaveAttribute('data-macro-recording', 'false');
+}

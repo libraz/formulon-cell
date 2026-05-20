@@ -13,7 +13,7 @@ import {
 } from '@libraz/formulon-cell';
 
 import { focusMenuItem, handleMenuKeydown } from '../menu-a11y.js';
-import { createMenu, menuButton, menuSeparator } from './menus/general.js';
+import { createMenu, menuIconButton, menuSeparator } from './menus/general.js';
 
 export interface BackstageTitleShellText {
   save: string;
@@ -24,11 +24,11 @@ export interface BackstageTitleShellText {
   comments: string;
   share: string;
   shareReady: string;
+  findNoMatches: string;
 }
 
 export interface BackstageTitleCtx {
   getInst: () => SpreadsheetInstance | null;
-  ribbonLang: 'ja' | 'en';
   shellText: BackstageTitleShellText;
   ribbonRoot: HTMLElement | null;
   titleSearchInput: HTMLInputElement | null;
@@ -75,7 +75,6 @@ export interface BackstageTitleApi {
 export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi => {
   const {
     getInst,
-    ribbonLang,
     shellText,
     ribbonRoot,
     titleSearchInput,
@@ -237,8 +236,7 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
       mutators.setActive(inst.store, match.addr);
       projectFormatToolbar();
     } else if (statusMetric) {
-      statusMetric.textContent =
-        ribbonLang === 'ja' ? `「${query}」は見つかりませんでした` : `No matches for "${query}"`;
+      statusMetric.textContent = shellText.findNoMatches.replace('{query}', query);
     }
   };
 
@@ -273,12 +271,12 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
   const titleMoreMenu = createMenu('menu-title-more');
   titleMoreMenu.classList.add('app__title-more-menu');
   titleMoreMenu.append(
-    menuButton(shellText.save, 'titleMoreAction', 'save'),
-    menuButton(shellText.saveAs, 'titleMoreAction', 'save-as'),
-    menuButton(shellText.autosave, 'titleMoreAction', 'autosave'),
+    menuIconButton(shellText.save, 'titleMoreAction', 'save', 'title-save'),
+    menuIconButton(shellText.saveAs, 'titleMoreAction', 'save-as', 'title-save-as'),
+    menuIconButton(shellText.autosave, 'titleMoreAction', 'autosave', 'title-autosave'),
     menuSeparator(),
-    menuButton(shellText.comments, 'titleMoreAction', 'comments'),
-    menuButton(shellText.share, 'titleMoreAction', 'share'),
+    menuIconButton(shellText.comments, 'titleMoreAction', 'comments', 'title-comments'),
+    menuIconButton(shellText.share, 'titleMoreAction', 'share', 'title-share'),
   );
   document.body.appendChild(titleMoreMenu);
 

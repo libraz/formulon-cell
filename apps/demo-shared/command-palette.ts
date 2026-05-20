@@ -5,10 +5,10 @@
 
 import {
   buildRibbonSearchIndex,
+  projectDisabledReason,
   queryRibbonSearchIndex,
   type RibbonSearchItem,
   type RibbonTab,
-  type ToolbarText,
 } from '@libraz/formulon-cell';
 
 export interface CommandPaletteItem {
@@ -20,7 +20,6 @@ export interface CommandPaletteItem {
 export interface CommandPaletteOptions {
   input: HTMLInputElement;
   container: HTMLElement;
-  ribbonText: ToolbarText;
   ribbonLang: 'ja' | 'en';
   applyCommand: (id: string) => boolean;
   selectTab?: (tab: RibbonTab) => void;
@@ -32,12 +31,17 @@ const noCommandsLabel = (lang: 'ja' | 'en'): string =>
 const toPaletteItem = (item: RibbonSearchItem): CommandPaletteItem => ({
   id: item.commandId ?? item.id,
   label: item.label,
-  hint: item.kind === 'tab' || item.kind === 'help' ? item.hint : `${item.hint} · ${item.tab}`,
+  hint: [
+    item.kind === 'tab' || item.kind === 'help' ? item.hint : `${item.hint} · ${item.tab}`,
+    item.disabledReason,
+  ]
+    .filter(Boolean)
+    .join(' · '),
 });
 
 export const createCommandPalette = (opts: CommandPaletteOptions): { dispose: () => void } => {
   const { input, container, ribbonLang, applyCommand, selectTab } = opts;
-  const commands = buildRibbonSearchIndex(ribbonLang);
+  const commands = buildRibbonSearchIndex(ribbonLang, { includeDisabled: true });
 
   let menu: HTMLDivElement | null = null;
   let usagePrior: { commandBoosts?: Record<string, number> } = {};
@@ -79,6 +83,11 @@ export const createCommandPalette = (opts: CommandPaletteOptions): { dispose: ()
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'demo__command-item';
+      if (cmd.disabled) btn.setAttribute('aria-disabled', 'true');
+      projectDisabledReason(btn, cmd.disabledReason ?? null, {
+        datasetKey: 'disabledReason',
+        title: false,
+      });
       const label = document.createElement('strong');
       label.textContent = paletteItem.label;
       const hint = document.createElement('span');

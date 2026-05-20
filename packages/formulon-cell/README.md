@@ -58,17 +58,13 @@ const sheet = await Spreadsheet.mount(host, {
     {
       id: 'office-printer',
       name: 'Office Printer',
-      papers: [
-        {
-          paper: 'A4',
-          orientation: 'portrait',
-          printableBounds: { top: 4, right: 4, bottom: 4, left: 4 },
-        },
-      ],
+      paperSize: 'A4',
+      orientation: 'portrait',
+      printableBounds: { top: 0.16, right: 0.16, bottom: 0.16, left: 0.16 },
     },
   ],
   refreshPrinterProfiles: () => nativeListPrinterProfiles(),
-  uploadStatus: 'syncing',
+  uploadStatus: 'saving',
   macroRecording: false,
 });
 ```
@@ -76,7 +72,9 @@ const sheet = await Spreadsheet.mount(host, {
 `captureScreenClip` powers Insert > Screenshot > Screen Clipping. When omitted,
 that command reports that native screen clipping is host-provided. Printer
 profiles supply physical printer minimum margins for Page Setup / print
-preview; browser-only hosts can omit them.
+preview; browser-only hosts can omit them. `uploadStatus` accepts `saved`,
+`saving`, `error`, or `null`; `macroRecording` accepts `true`, `false`, or
+`null`.
 
 ## Presets
 
@@ -114,6 +112,11 @@ preview; browser-only hosts can omit them.
 | `createSessionChart(store, range, options)` | Create session column/line chart overlays |
 | `saveSheetView` / `activateSheetView` | Manage session Sheet Views |
 | `listDefinedNames` / `upsertDefinedName` | Headless Name Manager API |
+| `ribbonActivationEntries` / `ribbonSurfaceCommandIds` | Shared ribbon command manifests for host audits and wrapper parity |
+| `attachRangePickerButton` | Shared dialog range-picker control used by Excel-style dialogs |
+| `appendConditionalApplyFormatControls` / `conditionalStyleOptions` | Shared conditional-format rule UI helpers |
+| `showReport` / `reportDialogLabels` | Shared report dialog and localized label mapping for host-dependent compatibility reports |
+| `projectDisabledReason` / `projectDisabledState` | Shared disabled/read-only reason projection for aria, title, dataset attributes, and control state |
 
 For the complete API reference, see the [project README](https://github.com/libraz/formulon-cell).
 
@@ -140,6 +143,10 @@ import SpreadsheetToolbar from '@libraz/formulon-cell-vue/toolbar.vue';
 import '@libraz/formulon-cell-vue/toolbar.css';
 </script>
 ```
+
+Both wrappers are thin adapters over core `Spreadsheet.mountToolbar`; the
+ribbon DOM, menu factories, activation model, and dynamic dropdown dispatcher
+are shared by `@libraz/formulon-cell`.
 
 ## License
 

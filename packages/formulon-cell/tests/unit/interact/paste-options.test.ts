@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { pasteSpecial } from '../../../src/commands/clipboard/paste-special.js';
 import { captureSnapshot } from '../../../src/commands/clipboard/snapshot.js';
@@ -10,6 +13,8 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
@@ -156,5 +161,71 @@ describe('attachPasteOptions', () => {
     expect(formatAt(store, 2, 2)).toEqual({ bold: true, fill: '#fff2cc' });
     expect(onAfterCommit).toHaveBeenCalledTimes(1);
     handle.detach();
+  });
+
+  it('keeps the smart button and menu within the viewport', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 180 });
+    grid.getBoundingClientRect = () =>
+      ({
+        left: 280,
+        top: 150,
+        right: 600,
+        bottom: 400,
+        width: 320,
+        height: 250,
+        x: 280,
+        y: 150,
+        toJSON: () => ({}),
+      }) as DOMRect;
+    seedNumber(store, wb, 0, 0, 7);
+    seedNumber(store, wb, 2, 2, 2);
+    const source = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    const before = captureSnapshot(store.getState(), { sheet: 0, r0: 2, c0: 2, r1: 2, c1: 2 });
+    expect(source).not.toBeNull();
+    expect(before).not.toBeNull();
+    if (!source || !before) throw new Error('missing clipboard snapshots');
+
+    const handle = attachPasteOptions({
+      host,
+      grid,
+      store,
+      wb,
+      strings: defaultStrings,
+      onAfterCommit,
+    });
+    const button = document.querySelector<HTMLButtonElement>('.fc-paste-options__button');
+    const menu = document.querySelector<HTMLDivElement>('.fc-paste-options__menu');
+    expect(button).not.toBeNull();
+    expect(menu).not.toBeNull();
+    if (!button || !menu) throw new Error('missing paste options elements');
+    Object.defineProperty(button, 'offsetWidth', { configurable: true, value: 28 });
+    Object.defineProperty(button, 'offsetHeight', { configurable: true, value: 28 });
+    Object.defineProperty(menu, 'offsetWidth', { configurable: true, value: 220 });
+    Object.defineProperty(menu, 'offsetHeight', { configurable: true, value: 112 });
+
+    handle.show({
+      source,
+      before,
+      range: { sheet: 0, r0: 2, c0: 2, r1: 2, c1: 2 },
+    });
+
+    expect(button.style.left).toBe('288px');
+    expect(button.style.top).toBe('148px');
+    expect(menu.style.left).toBe('96px');
+    expect(menu.style.top).toBe('64px');
+    handle.detach();
+  });
+
+  it('keeps smart button and menu item DOM on the shared floating options helper', () => {
+    const source = readFileSync(join(root, 'src/interact/paste-options.ts'), 'utf8');
+    const helperSource = readFileSync(join(root, 'src/interact/floating-options-menu.ts'), 'utf8');
+
+    expect(source).toContain('createFloatingOptionsButton({');
+    expect(source).toContain('createFloatingOptionsMenuItem({');
+    expect(source).not.toContain("const button = document.createElement('button')");
+    expect(source).not.toContain("const item = document.createElement('button')");
+    expect(helperSource).toContain("import { createInteractionButton } from './chip-button.js'");
+    expect(helperSource).not.toContain("document.createElement('button')");
   });
 });

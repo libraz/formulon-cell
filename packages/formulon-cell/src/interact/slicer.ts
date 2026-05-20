@@ -10,6 +10,8 @@ import {
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SlicerSpec, SpreadsheetStore } from '../store/store.js';
+import { createInteractionChipButton } from './chip-button.js';
+import { appendDialogButton } from './dialog-shell.js';
 
 export interface SlicerDeps {
   /** Element the floating panels attach to. Each panel is appended as a
@@ -89,16 +91,14 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
     title.textContent = spec.column;
     const actions = document.createElement('span');
     actions.className = 'fc-slicer__actions';
-    const clearBtn = document.createElement('button');
-    clearBtn.type = 'button';
-    clearBtn.className = 'fc-slicer__btn fc-slicer__clear';
-    clearBtn.textContent = strings.slicer.clear;
-    const closeBtn = document.createElement('button');
-    closeBtn.type = 'button';
-    closeBtn.className = 'fc-slicer__btn fc-slicer__close';
+    const clearBtn = appendDialogButton(actions, {
+      label: strings.slicer.clear,
+      baseClass: 'fc-slicer__btn',
+    });
+    clearBtn.classList.add('fc-slicer__clear');
+    const closeBtn = appendDialogButton(actions, { label: '×', baseClass: 'fc-slicer__btn' });
+    closeBtn.classList.add('fc-slicer__close');
     closeBtn.setAttribute('aria-label', strings.slicer.close);
-    closeBtn.textContent = '×';
-    actions.append(clearBtn, closeBtn);
     header.append(title, actions);
 
     const body = document.createElement('div');
@@ -163,20 +163,20 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
       });
     };
     for (const value of distinct) {
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'fc-slicer__chip';
-      chip.dataset.fcValue = value;
-      chip.setAttribute('role', 'option');
       const isOn = selected.size === 0 || selected.has(value);
+      const chip = createInteractionChipButton({
+        className: 'fc-slicer__chip',
+        label: value === '' ? '(blank)' : value,
+        dataset: { fcValue: value },
+        role: 'option',
+        pressed: isOn,
+        selected: isOn,
+        tabIndex: entry.body.childElementCount === 0 ? 0 : -1,
+      });
       // "Selected" visual state — when no chip is selected (empty array)
       //  every chip reads as on (include-all). When at least one is on,
       //  the unselected ones dim.
       chip.classList.toggle('fc-slicer__chip--on', isOn);
-      chip.setAttribute('aria-pressed', String(isOn));
-      chip.setAttribute('aria-selected', String(isOn));
-      chip.tabIndex = entry.body.childElementCount === 0 ? 0 : -1;
-      chip.textContent = value === '' ? '(blank)' : value;
 
       chip.addEventListener('click', () => {
         const current = new Set(spec.selected);

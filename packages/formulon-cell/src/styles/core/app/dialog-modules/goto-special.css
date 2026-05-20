@@ -29,6 +29,9 @@
     border-radius: var(--fc-radius-sm, 4px);
     font: inherit;
   }
+  .fc-goto__reference .fc-range-picker {
+    width: 100%;
+  }
   .fc-goto__kinds {
     display: grid;
     grid-template-columns: 1fr 1fr;

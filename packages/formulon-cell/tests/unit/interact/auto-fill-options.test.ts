@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings/en.js';
@@ -7,6 +10,8 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
@@ -162,5 +167,56 @@ describe('auto fill options', () => {
 
     expect(num(wb, 1, 0)).toBe(dateSerial(2024, 2, 29));
     expect(num(wb, 2, 0)).toBe(dateSerial(2024, 3, 31));
+  });
+
+  it('keeps the smart button and menu within the viewport', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 180 });
+    const handle = attachAutoFillOptions({
+      host,
+      store,
+      wb,
+      strings: en,
+    });
+    detach = () => handle.detach();
+    const button = document.querySelector<HTMLButtonElement>('.fc-autofill-options__button');
+    const menu = document.querySelector<HTMLDivElement>('.fc-autofill-options__menu');
+    expect(button).not.toBeNull();
+    expect(menu).not.toBeNull();
+    if (!button || !menu) throw new Error('missing auto fill options elements');
+    Object.defineProperty(button, 'offsetWidth', { configurable: true, value: 28 });
+    Object.defineProperty(button, 'offsetHeight', { configurable: true, value: 28 });
+    Object.defineProperty(menu, 'offsetWidth', { configurable: true, value: 180 });
+    Object.defineProperty(menu, 'offsetHeight', { configurable: true, value: 80 });
+
+    host.dispatchEvent(
+      new CustomEvent('fc:autofilloptions', {
+        detail: {
+          src: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+          dest: { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 },
+          mode: 'series',
+          clientX: 310,
+          clientY: 170,
+        },
+      }),
+    );
+
+    expect(button.style.left).toBe('288px');
+    expect(button.style.top).toBe('148px');
+    expect(menu.style.left).toBe('136px');
+    expect(menu.style.top).toBe('96px');
+  });
+
+  it('keeps smart button and menu item DOM on the shared floating options helper', () => {
+    const source = readFileSync(join(root, 'src/interact/auto-fill-options.ts'), 'utf8');
+    const helperSource = readFileSync(join(root, 'src/interact/floating-options-menu.ts'), 'utf8');
+
+    expect(source).toContain('createFloatingOptionsButton({');
+    expect(source).toContain('createFloatingOptionsMenuItem({');
+    expect(source).not.toContain("const button = document.createElement('button')");
+    expect(source).not.toContain("const copyItem = document.createElement('button')");
+    expect(source).not.toContain("const item = document.createElement('button')");
+    expect(helperSource).toContain("import { createInteractionButton } from './chip-button.js'");
+    expect(helperSource).not.toContain("document.createElement('button')");
   });
 });

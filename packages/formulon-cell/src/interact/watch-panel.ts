@@ -5,6 +5,7 @@ import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { appendDialogButton } from './dialog-shell.js';
 
 export interface WatchPanelDeps {
   /** Element the panel docks under. The panel appends itself as a child of
@@ -74,20 +75,17 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
   title.textContent = strings.watchPanel.title;
   const actions = document.createElement('span');
   actions.className = 'fc-watch__actions';
-  const addBtn = document.createElement('button');
-  addBtn.type = 'button';
-  addBtn.className = 'fc-watch__btn';
-  addBtn.textContent = strings.watchPanel.addWatch;
-  const clearBtn = document.createElement('button');
-  clearBtn.type = 'button';
-  clearBtn.className = 'fc-watch__btn';
-  clearBtn.textContent = strings.watchPanel.clearAll;
-  const closeBtn = document.createElement('button');
-  closeBtn.type = 'button';
-  closeBtn.className = 'fc-watch__btn fc-watch__close';
+  const addBtn = appendDialogButton(actions, {
+    label: strings.watchPanel.addWatch,
+    baseClass: 'fc-watch__btn',
+  });
+  const clearBtn = appendDialogButton(actions, {
+    label: strings.watchPanel.clearAll,
+    baseClass: 'fc-watch__btn',
+  });
+  const closeBtn = appendDialogButton(actions, { label: '×', baseClass: 'fc-watch__btn' });
+  closeBtn.classList.add('fc-watch__close');
   closeBtn.setAttribute('aria-label', strings.watchPanel.close);
-  closeBtn.textContent = '×';
-  actions.append(addBtn, clearBtn, closeBtn);
   header.append(title, actions);
 
   const body = document.createElement('div');
@@ -234,11 +232,11 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
 
       const tdRemove = document.createElement('td');
       tdRemove.className = 'fc-watch__remove-cell';
-      const removeBtn = document.createElement('button');
-      removeBtn.type = 'button';
-      removeBtn.className = 'fc-watch__remove';
+      const removeBtn = appendDialogButton(tdRemove, {
+        label: '×',
+        baseClass: 'fc-watch__remove',
+      });
       removeBtn.setAttribute('aria-label', strings.watchPanel.removeWatch);
-      removeBtn.textContent = '×';
       removeBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -246,7 +244,6 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
           mutators.removeWatch(store, addr);
         });
       });
-      tdRemove.appendChild(removeBtn);
 
       tr.append(tdBook, tdSheet, tdName, tdCell, tdValue, tdFormula, tdRemove);
       tr.addEventListener('click', () => jumpTo(addr));

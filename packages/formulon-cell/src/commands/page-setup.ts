@@ -13,15 +13,19 @@ import { type History, recordPageSetupChange } from './history.js';
 import { parsePrintAreas, parsePrintTitleCols, parsePrintTitleRows } from './print.js';
 import {
   normalizePrintableBounds,
+  type HostPrinterDevice,
+  type HostPrinterPaperOption,
   type PrinterProfile,
+  printerProfilesFromHostDevices,
   resolvePrinterProfileBounds,
 } from './printer-profile.js';
 
-export type { PrinterProfile } from './printer-profile.js';
+export type { HostPrinterDevice, HostPrinterPaperOption, PrinterProfile } from './printer-profile.js';
 export {
   normalizePrinterProfile,
   normalizePrinterProfileId,
   normalizePrinterProfiles,
+  printerProfilesFromHostDevices,
   resolvePrinterProfileBounds,
 } from './printer-profile.js';
 

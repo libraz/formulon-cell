@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setMarginPreset } from '../../../src/commands/page-setup.js';
-import { en } from '../../../src/i18n/strings.js';
+import { defaultStrings, en } from '../../../src/i18n/strings.js';
 import { attachPageSetupDialog } from '../../../src/interact/page-setup-dialog.js';
 import {
   createSpreadsheetStore,
   defaultPageSetup,
   getPageSetup,
+  mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
 
@@ -73,6 +74,23 @@ describe('attachPageSetupDialog', () => {
     expect(paperSelect?.value).toBe(defaultPageSetup().paperSize);
     expect(orientSelect?.options.length).toBe(2);
     expect(paperSelect?.options.length).toBe(6);
+    expect(orientSelect?.classList.contains('fc-pgsetup__select')).toBe(true);
+    expect(
+      Array.from(orientSelect?.options ?? [], (option) => [option.value, option.textContent]),
+    ).toEqual([
+      ['portrait', defaultStrings.pageSetup.orientPortrait],
+      ['landscape', defaultStrings.pageSetup.orientLandscape],
+    ]);
+    const printQuality = selectByLabel(defaultStrings.pageSetup.printQuality);
+    expect(printQuality?.classList.contains('fc-pgsetup__select')).toBe(true);
+    expect(
+      Array.from(printQuality?.options ?? [], (option) => [option.value, option.textContent]),
+    ).toEqual([
+      ['automatic', defaultStrings.pageSetup.printQualityAutomatic],
+      ['300', '300 dpi'],
+      ['600', '600 dpi'],
+      ['1200', '1200 dpi'],
+    ]);
     handle.detach();
   });
 
@@ -317,6 +335,48 @@ describe('attachPageSetupDialog', () => {
       .find((button) => button.textContent === 'OK')
       ?.click();
     expect(setPrinterProfileId).toHaveBeenCalledWith('native');
+    handle.detach();
+  });
+
+  it('projects a disabled reason while printer profiles are refreshing', async () => {
+    let resolveRefresh: (
+      profiles: readonly { id: string; name: string; printableBounds: { top: number } }[],
+    ) => void = () => {};
+    const refreshPrinterProfiles = vi.fn(
+      () =>
+        new Promise<readonly { id: string; name: string; printableBounds: { top: number } }[]>(
+          (resolve) => {
+            resolveRefresh = resolve;
+          },
+        ),
+    );
+    const handle = attachPageSetupDialog({
+      host,
+      store,
+      strings: en,
+      getPrinterProfiles: () => [],
+      refreshPrinterProfiles,
+    });
+
+    handle.open();
+    const refresh = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent === 'Refresh printers',
+    );
+    if (!refresh) throw new Error('missing printer refresh button');
+    refresh.click();
+    await Promise.resolve();
+
+    expect(refresh.disabled).toBe(true);
+    expect(refresh.dataset.disabledReason).toBe(en.pageSetup.printerProfileRefreshInProgress);
+    expect(refresh.getAttribute('aria-description')).toBe(
+      en.pageSetup.printerProfileRefreshInProgress,
+    );
+
+    resolveRefresh([{ id: 'native', name: 'Native Printer', printableBounds: { top: 0.15 } }]);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(refresh.disabled).toBe(false);
+    expect(refresh.dataset.disabledReason).toBeUndefined();
     handle.detach();
   });
 
@@ -649,6 +709,52 @@ describe('attachPageSetupDialog', () => {
     expect(setup.comments).toBe('endOfSheet');
     expect(setup.cellErrorsAs).toBe('dash');
     expect(setup.pageOrder).toBe('overThenDown');
+    handle.detach();
+  });
+
+  it('Sheet tab range pickers use the live selection for print area and titles', () => {
+    const handle = attachPageSetupDialog({ host, store, strings: en });
+    handle.open('sheet');
+
+    const printArea = inputByLabel('Print area');
+    const rows = inputByLabel('Print title rows');
+    const cols = inputByLabel('Print title columns');
+    if (!printArea || !rows || !cols) throw new Error('sheet reference controls missing');
+
+    const printAreaPicker = document.querySelector<HTMLButtonElement>(
+      '[data-range-picker="page-setup-print-area"]',
+    );
+    const rowsPicker = document.querySelector<HTMLButtonElement>(
+      '[data-range-picker="page-setup-print-title-rows"]',
+    );
+    const colsPicker = document.querySelector<HTMLButtonElement>(
+      '[data-range-picker="page-setup-print-title-cols"]',
+    );
+    expect(printAreaPicker?.getAttribute('aria-label')).toBe('Select range');
+    expect(rowsPicker?.getAttribute('aria-label')).toBe('Select range');
+    expect(colsPicker?.getAttribute('aria-label')).toBe('Select range');
+
+    printAreaPicker?.click();
+    expect(printAreaPicker?.dataset.rangePickerActive).toBe('true');
+    expect(dialog()?.classList.contains('fc-fmtdlg--range-picking')).toBe(true);
+    mutators.setRange(store, { sheet: 0, r0: 1, c0: 1, r1: 9, c1: 3 });
+    expect(printArea.value).toBe('B2:D10');
+
+    rowsPicker?.click();
+    expect(printAreaPicker?.dataset.rangePickerActive).toBe('false');
+    expect(rowsPicker?.dataset.rangePickerActive).toBe('true');
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 2, r1: 1, c1: 5 });
+    expect(rows.value).toBe('1:2');
+
+    colsPicker?.click();
+    expect(rowsPicker?.dataset.rangePickerActive).toBe('false');
+    expect(colsPicker?.dataset.rangePickerActive).toBe('true');
+    mutators.setRange(store, { sheet: 0, r0: 4, c0: 0, r1: 12, c1: 1 });
+    expect(cols.value).toBe('A:B');
+
+    handle.close();
+    expect(colsPicker?.dataset.rangePickerActive).toBe('false');
+    expect(dialog()?.classList.contains('fc-fmtdlg--range-picking')).toBe(false);
     handle.detach();
   });
 

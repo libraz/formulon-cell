@@ -1,5 +1,6 @@
 import type { InsertCopiedCellsDirection } from '../commands/clipboard/insert-copied-cells.js';
 import type { Strings } from '../i18n/strings.js';
+import { appendDialogActions } from './dialog-shell.js';
 
 export interface InsertCopiedCellsDialogDeps {
   strings: Strings;
@@ -30,15 +31,13 @@ export function openInsertCopiedCellsDialog(deps: InsertCopiedCellsDialogDeps): 
 
   const footer = document.createElement('div');
   footer.className = 'fc-insertcopied__footer';
-  const cancel = document.createElement('button');
-  cancel.type = 'button';
-  cancel.className = 'fc-insertcopied__button fc-insertcopied__button--secondary';
-  cancel.textContent = t.cancel;
-  const ok = document.createElement('button');
-  ok.type = 'button';
-  ok.className = 'fc-insertcopied__button fc-insertcopied__button--primary';
-  ok.textContent = t.ok;
-  footer.append(cancel, ok);
+  const { cancelBtn: cancel, okBtn: ok } = appendDialogActions(footer, {
+    cancelLabel: t.cancel,
+    okLabel: t.ok,
+    buttonBaseClass: 'fc-insertcopied__button',
+    buttonPrimaryClass: 'fc-insertcopied__button--primary',
+    buttonSecondaryClass: 'fc-insertcopied__button--secondary',
+  });
 
   const close = (): void => root.remove();
   cancel.addEventListener('click', close);

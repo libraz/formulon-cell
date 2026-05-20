@@ -1,4 +1,5 @@
 import { FUNCTION_SIGNATURES, suggestFunctions } from '../commands/refs.js';
+import { createInteractionButton } from './chip-button.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';
 
 let autocompleteSeq = 0;
@@ -80,6 +81,50 @@ interface SuggestionContext {
   kind: 'function' | 'tableColumn' | 'column' | 'history';
 }
 
+interface AutocompleteItemButtonInput {
+  id: string;
+  kind: SuggestionContext['kind'];
+  label: string;
+  detail: string;
+  active: boolean;
+}
+
+function autocompleteBadgeText(kind: SuggestionContext['kind']): string {
+  return kind === 'function' ? 'fx' : kind === 'tableColumn' ? 'tbl' : 'list';
+}
+
+function createAutocompleteItemButton(input: AutocompleteItemButtonInput): HTMLButtonElement {
+  const item = createInteractionButton({
+    className: input.active
+      ? 'fc-autocomplete__item fc-autocomplete__item--active'
+      : 'fc-autocomplete__item',
+    role: 'option',
+    selected: input.active,
+    tabIndex: -1,
+    dataset: { fcKind: input.kind },
+  });
+  item.id = input.id;
+
+  const badge = document.createElement('span');
+  badge.className = 'fc-autocomplete__badge';
+  badge.textContent = autocompleteBadgeText(input.kind);
+
+  const main = document.createElement('span');
+  main.className = 'fc-autocomplete__main';
+
+  const name = document.createElement('span');
+  name.className = 'fc-autocomplete__name';
+  name.textContent = input.label;
+
+  const detail = document.createElement('span');
+  detail.className = 'fc-autocomplete__detail';
+  detail.textContent = input.detail;
+
+  main.append(name, detail);
+  item.append(badge, main);
+  return item;
+}
+
 /**
  * Function-name + structured-ref autocomplete popover. Hangs off the document
  * body — the caller calls `refresh()` from input handlers, and arrow / enter /
@@ -134,41 +179,20 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
     root.replaceChildren();
     for (let i = 0; i < ctx.matches.length; i += 1) {
       const pick = ctx.matches[i] ?? '';
-      const item = document.createElement('button');
-      item.className = 'fc-autocomplete__item';
-      item.id = `${rootId}-option-${i}`;
-      item.setAttribute('role', 'option');
-      item.setAttribute('aria-selected', i === highlight ? 'true' : 'false');
-      item.tabIndex = -1;
-      if (i === highlight) item.classList.add('fc-autocomplete__item--active');
-      item.dataset.fcKind = ctx.kind;
-      item.type = 'button';
-
-      const badge = document.createElement('span');
-      badge.className = 'fc-autocomplete__badge';
-      badge.textContent =
-        ctx.kind === 'function' ? 'fx' : ctx.kind === 'tableColumn' ? 'tbl' : 'list';
-
-      const main = document.createElement('span');
-      main.className = 'fc-autocomplete__main';
-
-      const name = document.createElement('span');
-      name.className = 'fc-autocomplete__name';
-      name.textContent = pick;
-
-      const detail = document.createElement('span');
-      detail.className = 'fc-autocomplete__detail';
+      let detail = labels.pickFromList;
       if (ctx.kind === 'function') {
         const sig = FUNCTION_SIGNATURES[pick.toUpperCase()];
-        detail.textContent = sig ? `${pick}(${sig.join(', ')})` : labels.customFunction;
+        detail = sig ? `${pick}(${sig.join(', ')})` : labels.customFunction;
       } else if (ctx.kind === 'tableColumn') {
-        detail.textContent = labels.structuredTableColumn;
-      } else {
-        detail.textContent = labels.pickFromList;
+        detail = labels.structuredTableColumn;
       }
-
-      main.append(name, detail);
-      item.append(badge, main);
+      const item = createAutocompleteItemButton({
+        id: `${rootId}-option-${i}`,
+        kind: ctx.kind,
+        label: pick,
+        detail,
+        active: i === highlight,
+      });
       // Use mousedown (not click) so the input doesn't blur first.
       item.addEventListener('mousedown', (e) => {
         e.preventDefault();

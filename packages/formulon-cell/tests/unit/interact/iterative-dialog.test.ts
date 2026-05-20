@@ -62,6 +62,12 @@ describe('attachIterativeDialog', () => {
     // When disabled, the numeric inputs are also disabled.
     expect(numberInput()?.disabled).toBe(true);
     expect(textInput()?.disabled).toBe(true);
+    expect(numberInput()?.dataset.disabledReason).toBe(
+      'この値を編集するには反復計算を有効にしてください。',
+    );
+    expect(textInput()?.getAttribute('aria-description')).toBe(
+      'この値を編集するには反復計算を有効にしてください。',
+    );
     handle.detach();
   });
 
@@ -75,6 +81,8 @@ describe('attachIterativeDialog', () => {
     cb.dispatchEvent(new Event('change', { bubbles: true }));
     expect(numberInput()?.disabled).toBe(false);
     expect(textInput()?.disabled).toBe(false);
+    expect(numberInput()?.dataset.disabledReason).toBeUndefined();
+    expect(textInput()?.getAttribute('aria-description')).toBeNull();
     handle.detach();
   });
 

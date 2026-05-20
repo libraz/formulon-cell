@@ -1,9 +1,14 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
 import { attachFilterDropdown } from '../../../src/interact/filter-dropdown.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 describe('attachFilterDropdown', () => {
   let store: SpreadsheetStore;
@@ -35,6 +40,19 @@ describe('attachFilterDropdown', () => {
     expect(root?.textContent).toContain('(すべて選択)');
     expect(root?.textContent).toContain('OK');
     expect(root?.textContent).toContain('クリア');
+    const condition = root?.querySelector<HTMLSelectElement>('.fc-filter-dropdown__condition-op');
+    expect(condition?.getAttribute('aria-label')).toBe('条件でフィルター');
+    expect(Array.from(condition?.options ?? []).map((option) => option.value)).toEqual([
+      '',
+      'equals',
+      'notEquals',
+      'contains',
+      'notContains',
+      'greaterThan',
+      'greaterThanOrEqual',
+      'lessThan',
+      'lessThanOrEqual',
+    ]);
     handle.detach();
   });
 
@@ -213,5 +231,35 @@ describe('attachFilterDropdown', () => {
     expect(document.activeElement).toBe(boxes[0]);
 
     handle.detach();
+  });
+
+  it('keeps the dropdown within the viewport near the bottom-right edge', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 240 });
+
+    const handle = attachFilterDropdown({ store, strings: en });
+    handle.open({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 }, 0, { x: 310, y: 220, h: 20 });
+
+    const root = document.querySelector<HTMLElement>('.fc-filter-dropdown');
+    expect(root).not.toBeNull();
+    if (!root) throw new Error('missing filter dropdown');
+
+    expect(root.style.left).toBe('56px');
+    expect(root.style.top).toBe('4px');
+    handle.detach();
+  });
+
+  it('keeps action button DOM on the shared interaction primitive', () => {
+    const source = readFileSync(join(root, 'src/interact/filter-dropdown.ts'), 'utf8');
+
+    expect(source).toContain("import { createInteractionButton } from './chip-button.js'");
+    expect(source).toContain('const createFilterDropdownActionButton');
+    expect(source).toContain(
+      "const apply = createFilterDropdownActionButton('fc-filter-dropdown__apply', t.apply)",
+    );
+    expect(source).toContain(
+      "const clear = createFilterDropdownActionButton('fc-filter-dropdown__clear', t.clear)",
+    );
+    expect(source).not.toContain("document.createElement('button')");
   });
 });

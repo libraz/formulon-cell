@@ -8,9 +8,18 @@
     border-radius: 0;
     background: transparent;
   }
+  .fc-fmtdlg__section[hidden] {
+    display: none;
+  }
+  .fc-fmtdlg__section--standalone {
+    padding: 4px 2px 0;
+  }
   .fc-fmtdlg__section-title {
     color: var(--fc-fmtdlg-section-fg);
     font-weight: 600;
+  }
+  .fc-fmtdlg__section--standalone > .fc-fmtdlg__section-title {
+    display: none;
   }
   .fc-fmtdlg__section .fc-fmtdlg__swatches {
     margin-left: 0;

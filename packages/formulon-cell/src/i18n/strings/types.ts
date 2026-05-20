@@ -66,6 +66,10 @@ export interface Strings {
     sort: string;
     sortAsc: string;
     sortDesc: string;
+    noHiddenRows: string;
+    noHiddenColumns: string;
+    clipboardUnavailable: string;
+    pasteSpecialRequiresCopiedCells: string;
   };
   cellStylesGallery: {
     title: string;
@@ -75,6 +79,7 @@ export interface Strings {
       titlesAndHeadings: string;
       themedCellStyles: string;
       numberFormat: string;
+      custom: string;
     };
     styles: {
       normal: string;
@@ -124,6 +129,23 @@ export interface Strings {
     fillWeekdays: string;
     fillMonths: string;
     fillYears: string;
+  };
+  fillSeriesDialog: {
+    title: string;
+    seriesIn: string;
+    columns: string;
+    rows: string;
+    up: string;
+    left: string;
+    type: string;
+    autoFill: string;
+    copy: string;
+    day: string;
+    weekday: string;
+    month: string;
+    year: string;
+    ok: string;
+    cancel: string;
   };
   pasteOptions: {
     title: string;
@@ -193,6 +215,7 @@ export interface Strings {
     wrap: string;
     shrinkToFit: string;
     mergeCells: string;
+    mergeCellsRequiresMultiCell: string;
     textControl: string;
     indent: string;
     direction: string;
@@ -364,6 +387,8 @@ export interface Strings {
     matchCase: string;
     matchEntire: string;
     format: string;
+    formatUnavailable: string;
+    lookInRequiresFindTab: string;
     findAll: string;
     prev: string;
     next: string;
@@ -384,15 +409,18 @@ export interface Strings {
     freezeFirstCol: string;
     freezeAtSelection: string;
     unfreeze: string;
+    unfreezePanes: string;
   };
   conditionalDialog: {
     title: string;
     newRuleTitle: string;
+    editRuleTitle: string;
     styleLabel: string;
     styleClassic: string;
     rangeLabel: string;
     rangeAuto: string;
     addRule: string;
+    saveRule: string;
     removeRule: string;
     clearAll: string;
     kindLabel: string;
@@ -517,6 +545,10 @@ export interface Strings {
     newButton: string;
     editButton: string;
     filterButton: string;
+    selectNameActionReason: string;
+    filterRequiresNames: string;
+    quickRefersRequiresSelection: string;
+    scopeWorkbookOnly: string;
     filterAll: string;
     filterNamesWithErrors: string;
     filterNamesWithoutErrors: string;
@@ -542,12 +574,25 @@ export interface Strings {
   };
   pivotTableDialog: {
     title: string;
+    sourceSection: string;
     source: string;
     sourcePlaceholder: string;
+    rangePickerSelect: string;
+    createTableTitle: string;
+    createTableRangeLabel: string;
+    createTableHeadersLabel: string;
+    createTableInvalidRange: string;
+    tableOrRange: string;
+    externalSource: string;
+    externalSourceUnavailable: string;
     name: string;
     namePlaceholder: string;
+    destinationSection: string;
+    newWorksheet: string;
+    existingWorksheet: string;
     destination: string;
     destinationPlaceholder: string;
+    destinationRequiresExistingWorksheet: string;
     fieldList: string;
     availableFields: string;
     fieldAreas: string;
@@ -557,6 +602,8 @@ export interface Strings {
     fieldSettingsRowsHelp: string;
     fieldSettingsColumnsHelp: string;
     fieldSettingsValuesHelp: string;
+    filterDialog: string;
+    filterDialogTitle: string;
     filtersArea: string;
     filterField: string;
     filterConditionCategory: string;
@@ -624,6 +671,8 @@ export interface Strings {
     cells: string;
     /** Right-click menu heading. */
     aggregatesHeading: string;
+    /** Secondary heading for status-bar visibility toggles. */
+    statusOptionsHeading: string;
     capsLock: string;
     numLock: string;
     scrollLock: string;
@@ -656,6 +705,8 @@ export interface Strings {
     zoom: string;
     zoomIn: string;
     zoomOut: string;
+    zoomInUnavailable: string;
+    zoomOutUnavailable: string;
   };
   viewToolbar: {
     title: string;
@@ -676,6 +727,7 @@ export interface Strings {
     currentView: string;
     saveView: string;
     deleteView: string;
+    deleteViewRequiresActive: string;
     objects: string;
   };
   workbookObjects: {
@@ -695,6 +747,7 @@ export interface Strings {
     createPivotTable: string;
     editPivotTable: string;
     pivotFieldList: string;
+    pivotFieldListCheckboxReadOnly: string;
     backToWorkbookObjects: string;
     pivotAvailableFields: string;
     pivotName: string;
@@ -773,6 +826,7 @@ export interface Strings {
       pivotAuthoring: string;
       sessionCharts: string;
       chartsDrawings: string;
+      mediaPickers: string;
       screenshotCurrentView: string;
       screenClipping: string;
       chartAuthoring: string;
@@ -835,12 +889,23 @@ export interface Strings {
       chartColumn: string;
       chartLine: string;
     };
+    disabledReasons: {
+      requiresNumbers: string;
+      requiresTwoNumbers: string;
+      requiresThreeNumbers: string;
+      requiresMultiCell: string;
+      requiresHorizontalRun: string;
+      pivotUnavailable: string;
+      chartUnavailable: string;
+    };
   };
   sheetTabs: {
     workbookSheets: string;
     previousSheet: string;
     nextSheet: string;
     addSheet: string;
+    previousSheetUnavailable: string;
+    nextSheetUnavailable: string;
     rename: string;
     renameSheet: string;
     insertSheet: string;
@@ -885,6 +950,7 @@ export interface Strings {
     enable: string;
     maxIterations: string;
     maxChange: string;
+    inputsRequireEnabled: string;
     unsupported: string;
     cancel: string;
     ok: string;
@@ -896,6 +962,9 @@ export interface Strings {
     result: string;
     noFormula: string;
     evaluate: string;
+    evaluateRequiresFormula: string;
+    evaluateRequiresReference: string;
+    evaluateComplete: string;
     close: string;
   };
   externalLinksDialog: {
@@ -914,6 +983,14 @@ export interface Strings {
     kindUnknown: string;
     /** Hint shown above the table — spreadsheet parity for the Edit Links dialog. */
     note: string;
+    updateValues: string;
+    changeSource: string;
+    openSource: string;
+    breakLink: string;
+    checkStatus: string;
+    startupPrompt: string;
+    readOnlyActionReason: string;
+    noSelectionActionReason: string;
     close: string;
   };
   cfRulesDialog: {
@@ -921,7 +998,14 @@ export interface Strings {
     title: string;
     /** Empty-state when the engine reports no CF rules on the active sheet. */
     empty: string;
+    scopeLabel: string;
+    scopeCurrentSelection: string;
+    scopeThisWorksheet: string;
     headerPriority: string;
+    headerRule: string;
+    headerFormat: string;
+    headerAppliesTo: string;
+    headerStopIfTrue: string;
     headerType: string;
     headerRange: string;
     headerActions: string;
@@ -945,12 +1029,21 @@ export interface Strings {
     ruleUniqueValues: string;
     /** Note above the table — flags the read-only fallback for visual rules. */
     note: string;
+    readOnlyRule: string;
+    editUnavailable: string;
+    selectRuleActionReason: string;
+    moveUpUnavailable: string;
+    moveDownUnavailable: string;
+    clearAllRequiresRules: string;
+    stopIfTrueUnavailable: string;
     /** Per-row action labels. */
     newRule: string;
+    editRule: string;
     moveUp: string;
     moveDown: string;
     duplicate: string;
     remove: string;
+    deleteRule: string;
     /** Footer button — drops every rule on the sheet. */
     clearAll: string;
     /** Confirmation text shown before clearAll fires. Inline confirmation, not a separate prompt. */
@@ -983,8 +1076,10 @@ export interface Strings {
     back: string;
     cancel: string;
     insert: string;
+    insertRequiresFunction: string;
     /** aria-label for the formula-bar fx button that opens this dialog. */
     fxButtonLabel: string;
+    fxButtonUnavailable: string;
   };
   watchPanel: {
     title: string;
@@ -1041,6 +1136,7 @@ export interface Strings {
     /** "Current selection" radio — sweeps only inside the active selection
      *  rectangle. Auto-disabled when the selection is a single cell. */
     scopeSelection: string;
+    scopeSelectionRequiresMultiCell: string;
     /** Section legend above the category radios. */
     kindLabel: string;
     kindBlanks: string;
@@ -1073,6 +1169,7 @@ export interface Strings {
     printerProfile: string;
     printerProfileAutomatic: string;
     printerProfileRefresh: string;
+    printerProfileRefreshInProgress: string;
     printerProfileRefreshFailed: string;
     paperSize: string;
     margins: string;
@@ -1171,16 +1268,40 @@ export interface Strings {
     protectSheet: string;
     /** Same control's label when protection is already on. */
     unprotectSheet: string;
-    /** Field label for the (currently un-enforced) password input. */
+    /** Field label for the optional sheet protection password input. */
     password: string;
     /** Placeholder text for the password input. */
     passwordPlaceholder: string;
+    /** Field label for confirming a new sheet protection password. */
+    confirmPassword: string;
+    /** Error message shown when confirmation does not match the password. */
+    passwordMismatch: string;
+    /** Heading above Protect Sheet permission checkboxes. */
+    allowUsersTo: string;
+    allowSelectLockedCells: string;
+    allowSelectUnlockedCells: string;
+    allowFormatCells: string;
+    allowFormatColumns: string;
+    allowFormatRows: string;
+    allowInsertColumns: string;
+    allowInsertRows: string;
+    allowInsertHyperlinks: string;
+    allowDeleteColumns: string;
+    allowDeleteRows: string;
+    allowSort: string;
+    allowAutoFilter: string;
+    allowPivotTables: string;
+    allowEditObjects: string;
+    allowEditScenarios: string;
   };
   a11y: {
     nameBox: string;
     formulaBar: string;
     cancelFormulaEdit: string;
     enterFormula: string;
+    cancelFormulaEditUnavailable: string;
+    enterFormulaUnavailable: string;
+    enterFormulaNoChanges: string;
     expandFormulaBar: string;
     collapseFormulaBar: string;
     spreadsheet: string;
@@ -1199,10 +1320,12 @@ export interface Strings {
     inspect: string;
     clipboard: string;
     paste: string;
+    pasteRequiresClipboard: string;
     cut: string;
     copy: string;
     formatPainter: string;
     clearFormats: string;
+    clearRequiresTarget: string;
     number: string;
     font: string;
     fontSize: string;
@@ -1429,10 +1552,24 @@ export interface Strings {
     paperTabloid: string;
     zoomDialogTitle: string;
     zoomDialogPercent: string;
+    zoomDialogInvalid: string;
     marginsNormal: string;
     marginsWide: string;
     marginsNarrow: string;
     marginsCustom: string;
+    marginsCustomDialog: string;
+    marginTop: string;
+    marginBottom: string;
+    marginLeft: string;
+    marginRight: string;
+    fontSectionTheme: string;
+    fontSectionRecent: string;
+    fontSectionAll: string;
+    fontRoleHeading: string;
+    fontRoleBody: string;
+    currentView: string;
+    defaultFontFamily: string;
+    defaultFontSize: string;
     recalc: string;
     pen: string;
     eraser: string;
@@ -1471,10 +1608,12 @@ export interface Strings {
     insert: string;
     delete: string;
     format: string;
+    insertCells: string;
     insertShiftDown: string;
     insertShiftRight: string;
     insertRows: string;
     insertCols: string;
+    deleteCells: string;
     deleteShiftUp: string;
     deleteShiftLeft: string;
     deleteRows: string;
@@ -1486,6 +1625,16 @@ export interface Strings {
     autoFitColWidth: string;
     rowHeightPrompt: string;
     colWidthPrompt: string;
+    rowHeightLabel: string;
+    colWidthLabel: string;
+    sheetNameLabel: string;
+    sheetNameRequired: string;
+    formatNoHiddenRows: string;
+    formatNoHiddenCols: string;
+    sheetActionUnavailable: string;
+    sheetMoveAtBoundary: string;
+    sheetHideRequiresVisibleSheet: string;
+    sheetUnhideRequiresHiddenSheet: string;
     hideRows: string;
     showRows: string;
     hideCols: string;
@@ -1535,11 +1684,14 @@ export interface Strings {
     removeDuplicates: string;
     conditional: string;
     namedRanges: string;
+    fillRequiresMultipleRows: string;
+    fillRequiresMultipleCols: string;
     linkInsertOrEdit: string;
     linkOpen: string;
     linkClear: string;
     linkExternalLinks: string;
     linkNoHyperlink: string;
+    definedNameMutationUnavailable: string;
     findSelect: string;
     find: string;
     replace: string;
@@ -1554,6 +1706,7 @@ export interface Strings {
     commentDelete: string;
     commentDeleteAll: string;
     commentNone: string;
+    commentDeleteRequiresActive: string;
     commentsDeleted: string;
     pivotTableFromRange: string;
     recommendedPivotTables: string;
@@ -1569,13 +1722,20 @@ export interface Strings {
     chartScatter: string;
     recommendedCharts: string;
     pictureThisDevice: string;
+    pictureStock: string;
     pictureOnline: string;
     pictureUrlPrompt: string;
+    shapeLines: string;
+    shapeRectangles: string;
+    shapeBasicShapes: string;
     shapeRectangle: string;
     shapeRoundedRectangle: string;
     shapeOval: string;
+    shapeTriangle: string;
+    shapeDiamond: string;
     shapeLine: string;
     shapeArrow: string;
+    screenshotAvailableWindows: string;
     screenshotCurrentView: string;
     screenshotScreenClipping: string;
     symbol: string;
@@ -1589,13 +1749,19 @@ export interface Strings {
     printAreaSet: string;
     printAreaAdd: string;
     printAreaClear: string;
+    printAreaRequiresExisting: string;
     printAreaStatusSet: string;
     printAreaStatusClear: string;
+    pageBreakInsert: string;
     pageBreakInsertRow: string;
     pageBreakInsertCol: string;
+    pageBreakRemove: string;
     pageBreakRemoveRow: string;
     pageBreakRemoveCol: string;
     pageBreakResetAll: string;
+    pageBreakInsertRequiresSelection: string;
+    pageBreakRemoveRequiresBreak: string;
+    pageBreakResetRequiresAny: string;
     sheetBackgroundSet: string;
     sheetBackgroundClear: string;
     sheetBackgroundPrompt: string;
@@ -1607,6 +1773,11 @@ export interface Strings {
     arrangeBringToFront: string;
     arrangeSendToBack: string;
     arrangeSelectionPane: string;
+    arrangeRequiresObject: string;
+    arrangeAtFront: string;
+    arrangeAtBack: string;
+    underlineSingle: string;
+    underlineDouble: string;
     autosumSum: string;
     autosumAverage: string;
     autosumCount: string;
@@ -1626,6 +1797,8 @@ export interface Strings {
     calcAutomatic: string;
     calcAutoNoTable: string;
     calcManual: string;
+    calcCalculateNow: string;
+    calcCalculateSheet: string;
     calcIterative: string;
     sortAscendingMenu: string;
     sortDescendingMenu: string;
@@ -1634,16 +1807,24 @@ export interface Strings {
     sortNoThenBy: string;
     sortOrder: string;
     sortMyDataHasHeaders: string;
+    sortAddLevel: string;
+    sortDeleteLevel: string;
+    sortCopyLevel: string;
+    sortLevelUnavailable: string;
     sortStatus: string;
     filterToggle: string;
     filterClearAll: string;
     filterReapply: string;
     filterAdvanced: string;
+    filterClearRequiresRange: string;
+    filterReapplyRequiresCriteria: string;
     advancedFilterDialogTitle: string;
     advancedFilterListRange: string;
     advancedFilterCriteriaRange: string;
     advancedFilterCopyTo: string;
     advancedFilterUniqueOnly: string;
+    advancedFilterRangePicker: string;
+    advancedFilterInvalidRange: string;
     advancedFilterCopiedStatus: string;
     orientationAngleCounterclockwise: string;
     orientationAngleClockwise: string;
@@ -1659,8 +1840,14 @@ export interface Strings {
     textToColumnsSpace: string;
     textToColumnsCustom: string;
     textToColumnsDialogTitle: string;
+    textToColumnsDataType: string;
+    textToColumnsDelimited: string;
+    textToColumnsFixedWidth: string;
+    textToColumnsFixedWidthUnavailable: string;
     textToColumnsDialogDelimiters: string;
+    textToColumnsOther: string;
     textToColumnsTreatConsecutive: string;
+    textToColumnsPreview: string;
     textToColumnsStatus: string;
     textToColumnsNoDelimited: string;
     removeDuplicatesDialogTitle: string;
@@ -1672,16 +1859,22 @@ export interface Strings {
     validationSettings: string;
     errorChecking: string;
     traceError: string;
+    traceErrorRequiresFormulaError: string;
     traceNoPrecedents: string;
     traceNoDependents: string;
     ignoreError: string;
     removeArrowsAll: string;
     removePrecedentArrows: string;
     removeDependentArrows: string;
+    removeArrowsRequiresAny: string;
+    removePrecedentArrowsRequiresAny: string;
+    removeDependentArrowsRequiresAny: string;
     watchWindow: string;
     watchAdd: string;
     watchDelete: string;
     watchDeleteAll: string;
+    watchDeleteRequiresActive: string;
+    watchDeleteAllRequiresAny: string;
     validationCircleInvalid: string;
     protectSheetCommand: string;
     unprotectSheetCommand: string;
@@ -1694,14 +1887,23 @@ export interface Strings {
     allowEditRangesDialogInvalid: string;
     allowedEditRangeAddedStatus: string;
     allowedEditRangesClearedStatus: string;
+    protectSheetAlreadyProtected: string;
+    unprotectSheetRequiresProtected: string;
+    protectWorkbookAlreadyProtected: string;
+    unprotectWorkbookRequiresProtected: string;
+    allowEditRangesClearRequiresAny: string;
     lockCell: string;
     unlockCell: string;
     cellsLockedStatus: string;
     cellsUnlockedStatus: string;
+    sheetDeleteRequiresAnotherSheet: string;
+    sheetMutationUnavailable: string;
     workbookProtectedStatus: string;
     workbookUnprotectedStatus: string;
     workbookIncorrectPassword: string;
     workbookStructureProtectedBlocked: string;
+    validationRequiresRules: string;
+    validationClearCirclesRequiresAny: string;
     validationClearCircles: string;
     validationClearRules: string;
     cellStyleNormal: string;
@@ -1728,6 +1930,8 @@ export interface Strings {
     tableStyleLight: string;
     tableStyleMedium: string;
     tableStyleDark: string;
+    tableStyleCustom: string;
+    pivotTableStyleCustom: string;
     tableStyleNew: string;
     tableStyleNewPivot: string;
     tableStyleName: string;
@@ -1736,6 +1940,7 @@ export interface Strings {
     tableStyleBandedRows: string;
     tableStyleFirstColumn: string;
     cellStyleNew: string;
+    cellStyleCustom: string;
     cellStyleName: string;
     cellStyleIncludes: string;
     cellStyleIncludeNumber: string;
@@ -1809,7 +2014,46 @@ export interface Strings {
     aboveAvg: string;
     belowAvg: string;
     textPrompt: string;
+    greaterPrompt: string;
+    lessPrompt: string;
+    betweenPrompt: string;
+    betweenAndPrompt: string;
+    equalPrompt: string;
+    topBottomPrompt: string;
+    formatWith: string;
+    formatPreview: string;
+    customFormat: string;
+    customFormatTitle: string;
+    customFillColor: string;
+    customTextColor: string;
+    customBold: string;
+    customItalic: string;
+    customUnderline: string;
+    customStrike: string;
+    formatLightRed: string;
+    formatYellow: string;
+    formatGreen: string;
+    formatLightRedFill: string;
+    formatRedText: string;
+    formatRedBorder: string;
+    formatRedFill: string;
+    formatRedTextFill: string;
+    invalidNumber: string;
+    invalidText: string;
     datePrompt: string;
+    dateYesterday: string;
+    dateToday: string;
+    dateTomorrow: string;
+    dateLast7: string;
+    dateLastWeek: string;
+    dateThisWeek: string;
+    dateNextWeek: string;
+    dateLastMonth: string;
+    dateThisMonth: string;
+    dateNextMonth: string;
+    dateUnsupported: string;
+    ok: string;
+    cancel: string;
     otherRules: string;
     gradientFill: string;
     solidFill: string;
@@ -1903,6 +2147,7 @@ export interface Strings {
     typeValue: string;
     statusValue: string;
     locationValue: string;
+    commandUnavailable: string;
   };
   /** Page-layout scaling controls (Width / Height / Scale dropdowns). */
   pageScale: {
@@ -1919,6 +2164,8 @@ export interface Strings {
     customPagesPrompt: string;
     invalidScale: string;
     invalidPages: string;
+    ok: string;
+    cancel: string;
   };
   /** Ribbon display-options menu. */
   ribbonDisplay: {

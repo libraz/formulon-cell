@@ -54,11 +54,34 @@ ref.current?.instance?.undo();
 
 ## Toolbar
 
-`SpreadsheetToolbar` provides the ribbon chrome used by the React demo.
+`SpreadsheetToolbar` is a thin adapter over core `Spreadsheet.mountToolbar`.
+The ribbon DOM, menu factories, activation model, and dynamic dropdown
+dispatcher live in `@libraz/formulon-cell`, so React does not carry a separate
+ribbon implementation.
+
+For host audits and custom chrome, use the core exports such as
+`ribbonActivationEntries`, `ribbonSurfaceCommandIds`,
+`DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS`, `attachRangePickerButton`,
+`appendConditionalApplyFormatControls`, `conditionalStyleOptions`,
+`showReport`, `reportDialogLabels`, `projectDisabledReason`, and `projectDisabledState`. Do not recreate ribbon command sets or
+Excel-style dialog/report controls in React.
 
 ```tsx
 import { SpreadsheetToolbar, type RibbonTab } from '@libraz/formulon-cell-react';
 import '@libraz/formulon-cell-react/toolbar.css';
+```
+
+Use `dropdownActions` to override specific core dropdown handlers without
+forking the ribbon:
+
+```tsx
+<SpreadsheetToolbar
+  instance={instance}
+  activeTab="home"
+  locale="en"
+  onTabChange={setActiveTab}
+  dropdownActions={{ applyProtectAction: openProtectDialog }}
+/>
 ```
 
 ## Runtime prop updates
@@ -88,8 +111,10 @@ profile props feed Page Setup / print preview minimum-margin handling.
 ## Core helpers
 
 This package re-exports core command helpers and types — `createSessionChart`,
-`saveSheetView`, `activateSheetView`, `listDefinedNames`,
-`upsertDefinedName`, `ScreenClipCapture`, `ScreenClipResult`, etc. — so React
+`saveSheetView`, `activateSheetView`, `listDefinedNames`, `upsertDefinedName`,
+`ribbonActivationEntries`, `attachRangePickerButton`,
+`appendConditionalApplyFormatControls`, `conditionalStyleOptions`, `showReport`,
+`reportDialogLabels`, `projectDisabledReason`, `projectDisabledState`, `ScreenClipCapture`, `ScreenClipResult`, etc. — so React
 apps can type host chrome from a single import.
 
 ## Documentation

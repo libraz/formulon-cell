@@ -1,8 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { defaultStrings } from '../../../src/i18n/strings.js';
 import { attachQuickAnalysis } from '../../../src/interact/quick-analysis.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
@@ -164,6 +169,34 @@ describe('attachQuickAnalysis', () => {
     handle.detach();
   });
 
+  it('projects disabled reasons on unavailable Quick Analysis actions', () => {
+    seed(store, wb, [
+      { row: 0, col: 0, value: 'A' },
+      { row: 0, col: 1, value: 'B' },
+    ]);
+    setRange(store, 0, 0, 0, 1);
+    const handle = attachQuickAnalysis({ host, store, wb, strings: defaultStrings });
+    handle.open();
+
+    const dataBar = host.querySelector<HTMLButtonElement>('button[data-action="format-data-bar"]');
+    const pivot = host.querySelector<HTMLButtonElement>('button[data-action="tables-pivot"]');
+    const chart = host.querySelector<HTMLButtonElement>('button[data-action="charts-column"]');
+
+    expect(dataBar?.disabled).toBe(true);
+    expect(dataBar?.dataset.disabledReason).toBe(
+      defaultStrings.quickAnalysis.disabledReasons.requiresTwoNumbers,
+    );
+    expect(pivot?.disabled).toBe(true);
+    expect(pivot?.dataset.disabledReason).toBe(
+      defaultStrings.quickAnalysis.disabledReasons.pivotUnavailable,
+    );
+    expect(chart?.disabled).toBe(true);
+    expect(chart?.getAttribute('aria-description')).toBe(
+      defaultStrings.quickAnalysis.disabledReasons.requiresNumbers,
+    );
+    handle.detach();
+  });
+
   it('switches visible Quick Analysis tab panels when a group tab is clicked', () => {
     seed(store, wb, [
       { row: 0, col: 0, value: 1 },
@@ -322,5 +355,19 @@ describe('attachQuickAnalysis', () => {
     const titleEl = host.querySelector<HTMLElement>('.fc-quick__title');
     expect(titleEl?.textContent).toBe(customTitle);
     handle.detach();
+  });
+
+  it('keeps launcher, tab, and action button DOM on the shared interaction primitive', () => {
+    const source = readFileSync(join(root, 'src/interact/quick-analysis.ts'), 'utf8');
+
+    expect(source).toContain("import { createInteractionButton } from './chip-button.js'");
+    expect(source).toContain('function createQuickAnalysisLauncher');
+    expect(source).toContain('function createQuickAnalysisTab');
+    expect(source).toContain('function createQuickAnalysisActionButton');
+    expect(source).toContain('const button = createQuickAnalysisLauncher()');
+    expect(source).toContain('const tab = createQuickAnalysisTab(');
+    expect(source).toContain('const btn = createQuickAnalysisActionButton(strings, action)');
+    expect(source).toContain('projectDisabledState(button, disabled');
+    expect(source).not.toContain("document.createElement('button')");
   });
 });

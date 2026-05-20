@@ -11,6 +11,7 @@ import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import { createInteractionChipButton } from './chip-button.js';
 import { createDialogShell } from './dialog-shell.js';
 
 export interface CellStylesGalleryDeps {
@@ -96,18 +97,18 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
       fontSize?: number;
     };
   }): HTMLButtonElement => {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'fc-stylegallery__chip';
-    chip.dataset.fcStyle = style.id;
-    chip.tabIndex = chips.length === 0 ? 0 : -1;
+    const chip = createInteractionChipButton({
+      className: 'fc-stylegallery__chip',
+      label: style.label,
+      dataset: { fcStyle: style.id },
+      tabIndex: chips.length === 0 ? 0 : -1,
+    });
     if (style.format.bold) chip.style.fontWeight = '700';
     if (style.format.italic) chip.style.fontStyle = 'italic';
     if (style.format.underline) chip.style.textDecoration = 'underline';
     if (style.format.color) chip.style.color = style.format.color;
     if (style.format.fill) chip.style.background = style.format.fill;
     if (style.format.fontSize) chip.style.fontSize = `${style.format.fontSize}px`;
-    chip.textContent = style.label;
     chips.push(chip);
     chipById.set(style.id, chip);
     return chip;
@@ -151,12 +152,12 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
       section.className = 'fc-stylegallery__section';
       const heading = document.createElement('div');
       heading.className = 'fc-stylegallery__heading';
-      heading.textContent = 'Custom';
+      heading.textContent = strings.cellStylesGallery.groups.custom;
       section.appendChild(heading);
       const groupGrid = document.createElement('div');
       groupGrid.className = 'fc-stylegallery__grid';
       groupGrid.setAttribute('role', 'toolbar');
-      groupGrid.setAttribute('aria-label', heading.textContent ?? 'Custom');
+      groupGrid.setAttribute('aria-label', strings.cellStylesGallery.groups.custom);
       for (const style of customStyles) groupGrid.appendChild(createChipFromDef(style));
       section.appendChild(groupGrid);
       grid.appendChild(section);

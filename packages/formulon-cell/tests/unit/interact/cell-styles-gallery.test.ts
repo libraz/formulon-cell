@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   CELL_STYLE_GROUPS,
@@ -20,6 +23,7 @@ const headings = (): string[] =>
   Array.from(document.querySelectorAll<HTMLElement>('.fc-stylegallery__heading')).map((h) =>
     (h.textContent ?? '').trim(),
   );
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const setRange = (
   store: SpreadsheetStore,
@@ -143,6 +147,7 @@ describe('attachCellStylesGallery', () => {
 
   it('renders session custom cell styles and reapplies them from the gallery', () => {
     setRange(store, 3, 4, 3, 4);
+    mutators.setCell(store, { sheet: 0, row: 3, col: 4 }, { kind: 'text', value: 'ready' });
     mutators.upsertCustomCellStyle(store, {
       id: customCellStyleId('Review OK'),
       label: 'Review OK',
@@ -151,7 +156,7 @@ describe('attachCellStylesGallery', () => {
     const handle = attachCellStylesGallery({ host, store });
     handle.open();
 
-    expect(headings()).toContain('Custom');
+    expect(headings()).toContain(ja.cellStylesGallery.groups.custom);
     const customChip = chips().find((c) => c.dataset.fcStyle === customCellStyleId('Review OK'));
     expect(customChip?.textContent).toBe('Review OK');
     customChip?.click();
@@ -164,6 +169,24 @@ describe('attachCellStylesGallery', () => {
       fill: '#c6efce',
       color: '#006100',
     });
+    handle.detach();
+  });
+
+  it('localizes the custom cell styles section heading', () => {
+    mutators.upsertCustomCellStyle(store, {
+      id: customCellStyleId('確認済み'),
+      label: '確認済み',
+      format: { bold: true },
+    });
+    const handle = attachCellStylesGallery({ host, store, strings: ja });
+    handle.open();
+
+    expect(headings()).toContain(ja.cellStylesGallery.groups.custom);
+    expect(
+      document
+        .querySelector<HTMLElement>('.fc-stylegallery__section:last-child .fc-stylegallery__grid')
+        ?.getAttribute('aria-label'),
+    ).toBe(ja.cellStylesGallery.groups.custom);
     handle.detach();
   });
 
@@ -205,5 +228,11 @@ describe('attachCellStylesGallery', () => {
     const handle = attachCellStylesGallery({ host, store });
     handle.detach();
     expect(overlay()).toBeNull();
+  });
+
+  it('keeps style chips on the shared interaction chip button helper', () => {
+    const source = readFileSync(join(root, 'src/interact/cell-styles-gallery.ts'), 'utf8');
+    expect(source).toContain('createInteractionChipButton({');
+    expect(source).not.toContain("const chip = document.createElement('button')");
   });
 });

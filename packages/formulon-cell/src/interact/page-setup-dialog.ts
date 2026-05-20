@@ -5,6 +5,7 @@
 // reverts the whole apply atomically.
 import { type History, recordPageSetupChange } from '../commands/history.js';
 import {
+  colLetter,
   parsePrintAreas,
   parsePrintTitleCols,
   parsePrintTitleRows,
@@ -31,7 +32,20 @@ import {
   type PrintQuality,
   type SpreadsheetStore,
 } from '../store/store.js';
-import { createDialogShell } from './dialog-shell.js';
+import {
+  appendDialogSelectOptions,
+  createDialogSelect,
+} from '../toolbar/dialogs/form-controls.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { formatA1Range } from '../wrappers/toolbar-a1.js';
+import {
+  appendDialogActions,
+  appendDialogButton,
+  appendDialogIconButton,
+  appendDialogTabPair,
+  createDialogShell,
+} from './dialog-shell.js';
+import { attachRangePickerButton } from './range-picker-control.js';
 
 export interface PageSetupDialogDeps {
   host: HTMLElement;
@@ -58,14 +72,14 @@ export interface PageSetupDialogDeps {
 }
 
 export interface PageSetupDialogHandle {
-  open(): void;
+  open(tab?: PageSetupDialogTab): void;
   close(): void;
   detach(): void;
 }
 
 const PAPER_SIZES: PaperSize[] = ['A4', 'A3', 'A5', 'letter', 'legal', 'tabloid'];
 const ORIENTATIONS: PageOrientation[] = ['portrait', 'landscape'];
-type PageSetupTab = 'page' | 'margins' | 'headerFooter' | 'sheet';
+export type PageSetupDialogTab = 'page' | 'margins' | 'headerFooter' | 'sheet';
 type HeaderFooterPreset = 'none' | 'page' | 'sheet' | 'path' | 'custom';
 
 function makeRow(label: string): { row: HTMLDivElement; valueCell: HTMLSpanElement } {
@@ -122,9 +136,6 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   header.className = 'fc-fmtdlg__header';
   const headerTitle = document.createElement('span');
   headerTitle.textContent = t.title;
-  const headerCloseBtn = document.createElement('button');
-  headerCloseBtn.type = 'button';
-  headerCloseBtn.className = 'fc-fmtdlg__close';
   // Distinct from the footer Cancel button — otherwise Playwright's strict
   // `getByRole('button', { name: 'Cancel' })` finds both and throws.
   // Heuristic: if t.cancel is non-ASCII (likely Japanese) use the Japanese
@@ -132,9 +143,12 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   const closeLabel = Array.from(t.cancel).some((ch) => ch.charCodeAt(0) > 0x7f)
     ? '閉じる'
     : 'Close';
-  headerCloseBtn.setAttribute('aria-label', closeLabel);
-  headerCloseBtn.textContent = '×';
-  header.append(headerTitle, headerCloseBtn);
+  header.appendChild(headerTitle);
+  const headerCloseBtn = appendDialogIconButton(header, {
+    label: '×',
+    ariaLabel: closeLabel,
+    baseClass: 'fc-fmtdlg__close',
+  });
   panel.appendChild(header);
 
   const tabsStrip = document.createElement('div');
@@ -147,36 +161,25 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   body.className = 'fc-fmtdlg__body';
   panel.appendChild(body);
 
-  const tabDefs: { id: PageSetupTab; label: string }[] = [
+  const tabDefs: { id: PageSetupDialogTab; label: string }[] = [
     { id: 'page', label: t.tabPage },
     { id: 'margins', label: t.tabMargins },
     { id: 'headerFooter', label: t.tabHeaderFooter },
     { id: 'sheet', label: t.tabSheet },
   ];
-  const tabButtons = new Map<PageSetupTab, HTMLButtonElement>();
-  const tabPanels = new Map<PageSetupTab, HTMLDivElement>();
+  const tabButtons = new Map<PageSetupDialogTab, HTMLButtonElement>();
+  const tabPanels = new Map<PageSetupDialogTab, HTMLDivElement>();
   for (const def of tabDefs) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'fc-fmtdlg__tab';
-    btn.textContent = def.label;
-    btn.setAttribute('role', 'tab');
-    btn.setAttribute('aria-selected', 'false');
-    btn.setAttribute('aria-controls', `fc-pgsetup-panel-${def.id}`);
-    btn.tabIndex = -1;
-    btn.dataset.pgsetupTab = def.id;
-    btn.id = `fc-pgsetup-tab-${def.id}`;
-    tabsStrip.appendChild(btn);
-    tabButtons.set(def.id, btn);
-
-    const tabPanel = document.createElement('div');
-    tabPanel.className = 'fc-fmtdlg__panel-tab fc-pgsetup__tab-panel';
-    tabPanel.id = `fc-pgsetup-panel-${def.id}`;
-    tabPanel.setAttribute('role', 'tabpanel');
-    tabPanel.setAttribute('aria-labelledby', btn.id);
-    tabPanel.dataset.pgsetupTab = def.id;
-    tabPanel.hidden = true;
-    body.appendChild(tabPanel);
+    const { button, panel: tabPanel } = appendDialogTabPair(tabsStrip, body, {
+      id: def.id,
+      label: def.label,
+      tabId: `fc-pgsetup-tab-${def.id}`,
+      panelId: `fc-pgsetup-panel-${def.id}`,
+      panelClass: 'fc-fmtdlg__panel-tab fc-pgsetup__tab-panel',
+      tabDatasetKey: 'pgsetupTab',
+      panelDatasetKey: 'pgsetupTab',
+    });
+    tabButtons.set(def.id, button);
     tabPanels.set(def.id, tabPanel);
   }
 
@@ -186,47 +189,44 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   const sheetPanel = tabPanels.get('sheet') as HTMLDivElement;
 
   const printerRow = makeRow(t.printerProfile);
-  const printerSelect = document.createElement('select');
-  printerSelect.className = 'fc-pgsetup__select';
+  const printerSelect = createDialogSelect([], '', {
+    className: 'fc-pgsetup__select',
+    ariaLabel: t.printerProfile,
+  });
   printerSelect.dataset.pgsetupPrinter = 'true';
-  printerSelect.setAttribute('aria-label', t.printerProfile);
-  const printerRefreshBtn = document.createElement('button');
-  printerRefreshBtn.type = 'button';
-  printerRefreshBtn.className = 'fc-pgsetup__mini-btn';
-  printerRefreshBtn.textContent = t.printerProfileRefresh;
+  const printerRefreshBtn = appendDialogButton(printerRow.valueCell, {
+    label: t.printerProfileRefresh,
+    baseClass: 'fc-pgsetup__mini-btn',
+  });
   printerRefreshBtn.hidden = !deps.refreshPrinterProfiles;
   const printerStatus = document.createElement('span');
   printerStatus.className = 'fc-pgsetup__status';
   printerStatus.setAttribute('role', 'status');
   printerStatus.setAttribute('aria-live', 'polite');
-  printerRow.valueCell.append(printerSelect, printerRefreshBtn, printerStatus);
+  printerRow.valueCell.insertBefore(printerSelect, printerRefreshBtn);
+  printerRow.valueCell.appendChild(printerStatus);
   pagePanel.appendChild(printerRow.row);
 
   // ── Orientation ─────────────────────────────────────────────────────────
   const orientRow = makeRow(t.orientation);
-  const orientSelect = document.createElement('select');
-  orientSelect.className = 'fc-pgsetup__select';
-  orientSelect.setAttribute('aria-label', t.orientation);
-  for (const o of ORIENTATIONS) {
-    const opt = document.createElement('option');
-    opt.value = o;
-    opt.textContent = o === 'portrait' ? t.orientPortrait : t.orientLandscape;
-    orientSelect.appendChild(opt);
-  }
+  const orientSelect = createDialogSelect(
+    ORIENTATIONS.map((o) => ({
+      value: o,
+      label: o === 'portrait' ? t.orientPortrait : t.orientLandscape,
+    })),
+    'portrait',
+    { className: 'fc-pgsetup__select', ariaLabel: t.orientation },
+  );
   orientRow.valueCell.appendChild(orientSelect);
   pagePanel.appendChild(orientRow.row);
 
   // ── Paper size ──────────────────────────────────────────────────────────
   const paperRow = makeRow(t.paperSize);
-  const paperSelect = document.createElement('select');
-  paperSelect.className = 'fc-pgsetup__select';
-  paperSelect.setAttribute('aria-label', t.paperSize);
-  for (const p of PAPER_SIZES) {
-    const opt = document.createElement('option');
-    opt.value = p;
-    opt.textContent = p;
-    paperSelect.appendChild(opt);
-  }
+  const paperSelect = createDialogSelect(
+    PAPER_SIZES.map((p) => ({ value: p, label: p })),
+    'A4',
+    { className: 'fc-pgsetup__select', ariaLabel: t.paperSize },
+  );
   paperRow.valueCell.appendChild(paperSelect);
   pagePanel.appendChild(paperRow.row);
 
@@ -275,20 +275,16 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   pagePanel.appendChild(scalingRow);
 
   const printQualityRow = makeRow(t.printQuality);
-  const printQualitySelect = document.createElement('select');
-  printQualitySelect.className = 'fc-pgsetup__select';
-  printQualitySelect.setAttribute('aria-label', t.printQuality);
-  for (const option of [
-    { value: 'automatic', label: t.printQualityAutomatic },
-    { value: '300', label: '300 dpi' },
-    { value: '600', label: '600 dpi' },
-    { value: '1200', label: '1200 dpi' },
-  ]) {
-    const opt = document.createElement('option');
-    opt.value = option.value;
-    opt.textContent = option.label;
-    printQualitySelect.appendChild(opt);
-  }
+  const printQualitySelect = createDialogSelect(
+    [
+      { value: 'automatic', label: t.printQualityAutomatic },
+      { value: '300', label: '300 dpi' },
+      { value: '600', label: '600 dpi' },
+      { value: '1200', label: '1200 dpi' },
+    ],
+    'automatic',
+    { className: 'fc-pgsetup__select', ariaLabel: t.printQuality },
+  );
   printQualityRow.valueCell.appendChild(printQualitySelect);
   pagePanel.appendChild(printQualityRow.row);
 
@@ -425,21 +421,18 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
     labelSpan.textContent = label;
     const valueCell = document.createElement('span');
     valueCell.className = 'fc-pgsetup__value';
-    const select = document.createElement('select');
-    select.className = 'fc-pgsetup__select';
-    select.setAttribute('aria-label', label);
-    for (const option of options) {
-      const opt = document.createElement('option');
-      opt.value = option.value;
-      opt.textContent = option.label;
-      select.appendChild(opt);
-    }
-    const customButton = document.createElement('button');
-    customButton.type = 'button';
-    customButton.className = 'fc-fmtdlg__btn fc-pgsetup__custom-btn';
-    customButton.textContent = customLabel;
+    const select = createDialogSelect(options, options[0]?.value ?? '', {
+      className: 'fc-pgsetup__select',
+      ariaLabel: label,
+    });
+    const customButton = appendDialogButton(valueCell, {
+      label: customLabel,
+      baseClass: 'fc-fmtdlg__btn',
+      secondaryClass: 'fc-pgsetup__custom-btn',
+      variant: 'secondary',
+    });
     customButton.setAttribute('aria-label', customLabel);
-    valueCell.append(select, customButton);
+    valueCell.insertBefore(select, customButton);
     row.append(labelSpan, valueCell);
 
     customButton.addEventListener('click', () => {
@@ -454,16 +447,10 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
     label: string,
     options: { value: string; label: string }[],
   ): HTMLSelectElement => {
-    const select = document.createElement('select');
-    select.className = 'fc-pgsetup__select';
-    select.setAttribute('aria-label', label);
-    for (const option of options) {
-      const opt = document.createElement('option');
-      opt.value = option.value;
-      opt.textContent = option.label;
-      select.appendChild(opt);
-    }
-    return select;
+    return createDialogSelect(options, options[0]?.value ?? '', {
+      className: 'fc-pgsetup__select',
+      ariaLabel: label,
+    });
   };
 
   const headerPreset = makeHeaderFooterPresetRow(
@@ -570,6 +557,12 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   const printAreaInput = makeTextInput('', t.printAreaPlaceholder);
   printAreaInput.setAttribute('aria-label', t.printArea);
   printAreaRow.valueCell.appendChild(printAreaInput);
+  attachRangePickerButton(printAreaInput, {
+    label: strings.pivotTableDialog.rangePickerSelect,
+    getValue: () => formatA1Range(store.getState().selection.range),
+    subscribeToRangeChanges: (listener) => store.subscribe(listener),
+    kind: 'page-setup-print-area',
+  });
   sheetPanel.appendChild(printAreaRow.row);
 
   // ── Print titles ────────────────────────────────────────────────────────
@@ -577,12 +570,30 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   const titleRowsInput = makeTextInput('', t.printTitleRowsPlaceholder);
   titleRowsInput.setAttribute('aria-label', t.printTitleRows);
   titleRowsRow.valueCell.appendChild(titleRowsInput);
+  attachRangePickerButton(titleRowsInput, {
+    label: strings.pivotTableDialog.rangePickerSelect,
+    getValue: () => {
+      const range = store.getState().selection.range;
+      return `${range.r0 + 1}:${range.r1 + 1}`;
+    },
+    subscribeToRangeChanges: (listener) => store.subscribe(listener),
+    kind: 'page-setup-print-title-rows',
+  });
   sheetPanel.appendChild(titleRowsRow.row);
 
   const titleColsRow = makeRow(t.printTitleCols);
   const titleColsInput = makeTextInput('', t.printTitleColsPlaceholder);
   titleColsInput.setAttribute('aria-label', t.printTitleCols);
   titleColsRow.valueCell.appendChild(titleColsInput);
+  attachRangePickerButton(titleColsInput, {
+    label: strings.pivotTableDialog.rangePickerSelect,
+    getValue: () => {
+      const range = store.getState().selection.range;
+      return `${colLetter(range.c0)}:${colLetter(range.c1)}`;
+    },
+    subscribeToRangeChanges: (listener) => store.subscribe(listener),
+    kind: 'page-setup-print-title-cols',
+  });
   sheetPanel.appendChild(titleColsRow.row);
 
   // ── Sheet: print options ────────────────────────────────────────────────
@@ -688,22 +699,17 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   // ── Footer / buttons ────────────────────────────────────────────────────
   const footer = document.createElement('div');
   footer.className = 'fc-fmtdlg__footer';
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.className = 'fc-fmtdlg__btn';
-  cancelBtn.textContent = t.cancel;
-  const okBtn = document.createElement('button');
-  okBtn.type = 'button';
-  okBtn.className = 'fc-fmtdlg__btn fc-fmtdlg__btn--primary';
-  okBtn.textContent = t.ok;
-  footer.append(cancelBtn, okBtn);
+  const { cancelBtn, okBtn } = appendDialogActions(footer, {
+    cancelLabel: t.cancel,
+    okLabel: t.ok,
+  });
   panel.appendChild(footer);
 
   /** Snapshot of the dialog values when it opened. Used by Cancel to revert
    *  inline edits and (more importantly) by OK to push a single history entry
    *  spanning the whole apply. */
   let opening: PageSetup = defaultPageSetup();
-  let activeTab: PageSetupTab = 'page';
+  let activeTab: PageSetupDialogTab = 'page';
 
   const referenceInputs = [printAreaInput, titleRowsInput, titleColsInput] as const;
 
@@ -742,7 +748,7 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
     return true;
   };
 
-  const setActiveTab = (id: PageSetupTab): void => {
+  const setActiveTab = (id: PageSetupDialogTab): void => {
     activeTab = id;
     for (const [tabId, btn] of tabButtons) {
       btn.setAttribute('aria-selected', tabId === id ? 'true' : 'false');
@@ -763,7 +769,7 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
 
   const onTabClick = (event: MouseEvent): void => {
     const btn = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-pgsetup-tab]');
-    const id = btn?.dataset.pgsetupTab as PageSetupTab | undefined;
+    const id = btn?.dataset.pgsetupTab as PageSetupDialogTab | undefined;
     if (!btn || !id) return;
     setActiveTab(id);
     btn.focus();
@@ -771,7 +777,7 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
 
   const onTabKeyDown = (event: KeyboardEvent): void => {
     const btn = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-pgsetup-tab]');
-    const id = btn?.dataset.pgsetupTab as PageSetupTab | undefined;
+    const id = btn?.dataset.pgsetupTab as PageSetupDialogTab | undefined;
     const index = id ? tabOrder.indexOf(id) : -1;
     if (index < 0) return;
     if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
@@ -794,17 +800,12 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
     const effectiveProfiles = normalizePrinterProfiles(nextProfiles ?? profiles) ?? [];
     const selected = normalizePrinterProfileId(deps.getPrinterProfileId?.()) ?? '';
     printerSelect.replaceChildren();
-    const auto = document.createElement('option');
-    auto.value = '';
-    auto.textContent = t.printerProfileAutomatic;
-    printerSelect.appendChild(auto);
-    for (const profile of effectiveProfiles) {
-      if (!profile.id) continue;
-      const opt = document.createElement('option');
-      opt.value = profile.id;
-      opt.textContent = profile.name || profile.id;
-      printerSelect.appendChild(opt);
-    }
+    appendDialogSelectOptions(printerSelect, [
+      { value: '', label: t.printerProfileAutomatic },
+      ...effectiveProfiles.flatMap((profile) =>
+        profile.id ? [{ value: profile.id, label: profile.name || profile.id }] : [],
+      ),
+    ]);
     printerRow.row.hidden = effectiveProfiles.length === 0 && !deps.refreshPrinterProfiles;
     printerSelect.value = selected;
     if (printerSelect.value !== selected) printerSelect.value = '';
@@ -812,7 +813,10 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
 
   const refreshPrinterProfilesFromHost = async (): Promise<void> => {
     if (!deps.refreshPrinterProfiles) return;
-    printerRefreshBtn.disabled = true;
+    projectDisabledState(printerRefreshBtn, true, t.printerProfileRefreshInProgress, {
+      datasetKey: 'disabledReason',
+      titlePrefix: t.printerProfileRefresh,
+    });
     printerStatus.textContent = '';
     try {
       const profiles = await deps.refreshPrinterProfiles();
@@ -820,7 +824,10 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
     } catch {
       printerStatus.textContent = t.printerProfileRefreshFailed;
     } finally {
-      printerRefreshBtn.disabled = false;
+      projectDisabledState(printerRefreshBtn, false, null, {
+        datasetKey: 'disabledReason',
+        titlePrefix: t.printerProfileRefresh,
+      });
     }
   };
 
@@ -1057,9 +1064,10 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   }
 
   const api: PageSetupDialogHandle = {
-    open(): void {
+    open(tab: PageSetupDialogTab = 'page'): void {
       const sheet = store.getState().data.sheetIndex;
       hydrateFrom(getPageSetup(store.getState(), sheet));
+      setActiveTab(tab);
       updatePrintableWarning();
       shell.open();
       requestAnimationFrame(() => {

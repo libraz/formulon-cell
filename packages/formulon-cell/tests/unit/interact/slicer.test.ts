@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History, recordSlicersChange } from '../../../src/commands/history.js';
 import type { CellValue } from '../../../src/engine/types.js';
@@ -10,6 +13,8 @@ import {
   type SlicerSpec,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const seedCell = (
   store: SpreadsheetStore,
@@ -301,5 +306,11 @@ describe('attachSlicer', () => {
     expect(host.querySelectorAll('.fc-slicer__chip').length).toBe(2);
     handle.detach();
     refreshSpy.mockRestore();
+  });
+
+  it('keeps slicer chips on the shared interaction chip button helper', () => {
+    const source = readFileSync(join(root, 'src/interact/slicer.ts'), 'utf8');
+    expect(source).toContain('createInteractionChipButton({');
+    expect(source).not.toContain("const chip = document.createElement('button')");
   });
 });

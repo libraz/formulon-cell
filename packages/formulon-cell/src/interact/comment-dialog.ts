@@ -4,6 +4,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { cellRect } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
+import { appendDialogActions, appendDialogIconButton } from './dialog-shell.js';
 
 export interface CommentDialogDeps {
   host: HTMLElement;
@@ -57,16 +58,16 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
   title.className = 'fc-cmtnote__title';
   title.textContent = t.title;
   head.appendChild(title);
-  const removeBtn = document.createElement('button');
-  removeBtn.type = 'button';
-  removeBtn.className = 'fc-cmtnote__icon';
-  removeBtn.setAttribute('aria-label', t.remove);
-  removeBtn.title = t.remove;
-  removeBtn.innerHTML =
-    '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">' +
-    '<path d="M5 2.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 .5.5V3h2.5a.5.5 0 0 1 0 1H13v9.5A1.5 1.5 0 0 1 11.5 15h-7A1.5 1.5 0 0 1 3 13.5V4H2.5a.5.5 0 0 1 0-1H5v-.5zM4 4v9.5a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5V4H4zm2.5 2a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5zm3 0a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5z" fill="currentColor"/>' +
-    '</svg>';
-  head.appendChild(removeBtn);
+  const removeBtn = appendDialogIconButton(head, {
+    label: t.remove,
+    ariaLabel: t.remove,
+    title: t.remove,
+    baseClass: 'fc-cmtnote__icon',
+    html:
+      '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">' +
+      '<path d="M5 2.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 .5.5V3h2.5a.5.5 0 0 1 0 1H13v9.5A1.5 1.5 0 0 1 11.5 15h-7A1.5 1.5 0 0 1 3 13.5V4H2.5a.5.5 0 0 1 0-1H5v-.5zM4 4v9.5a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5V4H4zm2.5 2a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5zm3 0a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5z" fill="currentColor"/>' +
+      '</svg>',
+  });
   wrap.appendChild(head);
 
   const textarea = document.createElement('textarea');
@@ -78,16 +79,11 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
 
   const footer = document.createElement('div');
   footer.className = 'fc-cmtnote__footer';
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.className = 'fc-cmtnote__btn';
-  cancelBtn.textContent = t.cancel;
-  footer.appendChild(cancelBtn);
-  const okBtn = document.createElement('button');
-  okBtn.type = 'button';
-  okBtn.className = 'fc-cmtnote__btn fc-cmtnote__btn--primary';
-  okBtn.textContent = t.ok;
-  footer.appendChild(okBtn);
+  const { cancelBtn, okBtn } = appendDialogActions(footer, {
+    cancelLabel: t.cancel,
+    okLabel: t.ok,
+    buttonBaseClass: 'fc-cmtnote__btn',
+  });
   wrap.appendChild(footer);
 
   host.appendChild(wrap);

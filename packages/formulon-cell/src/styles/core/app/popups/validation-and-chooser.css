@@ -80,6 +80,11 @@
     letter-spacing: var(--fc-tracking-wide, 0.04em);
     color: var(--fc-fg-mute, currentColor);
   }
+  .fc-statusbar__chooser-separator {
+    height: 1px;
+    margin: 4px 2px;
+    background: var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+  }
   .fc-statusbar__chooser-item {
     display: flex;
     align-items: center;

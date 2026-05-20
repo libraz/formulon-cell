@@ -12,6 +12,7 @@ import {
   normalizePrinterProfileId,
   normalizePrinterProfiles,
   pageSetupForSheet,
+  printerProfilesFromHostDevices,
   removeManualPageBreak,
   resetManualPageBreaks,
   resetPageSetup,
@@ -212,6 +213,69 @@ describe('page setup commands', () => {
         printableBounds: { top: 0.3, right: 0, bottom: 0, left: 0 },
       },
     ]);
+  });
+
+  it('converts host printer devices and paper options into normalized printer profiles', () => {
+    expect(
+      printerProfilesFromHostDevices([
+        {
+          id: ' office ',
+          name: ' Office Printer ',
+          paperOptions: [
+            {
+              id: ' a4 ',
+              label: ' A4 ',
+              paperSize: 'A4',
+              orientation: 'portrait',
+              hardwareMarginsInches: { top: 0.16, right: 0.14, bottom: 0.18, left: 0.14 },
+            },
+            {
+              id: ' a4-landscape ',
+              label: ' A4 Landscape ',
+              paperSize: 'A4',
+              orientation: 'landscape',
+              printableBounds: { top: 0.14, right: 0.16, bottom: 0.14, left: 0.16 },
+            },
+            {
+              id: ' a4 ',
+              label: 'Duplicate',
+              paperSize: 'unknown',
+              orientation: 'sideways',
+              hardwareMarginsInches: { top: -1 },
+            },
+          ],
+        },
+        {
+          name: 'Driver Default',
+          paperSize: 'letter',
+          orientation: 'portrait',
+          hardwareMarginsInches: { top: 0.32, right: 0.28, bottom: 0.34, left: 0.28 },
+        },
+      ]),
+    ).toEqual([
+      {
+        id: 'office:a4',
+        name: 'Office Printer - A4',
+        paperSize: 'A4',
+        orientation: 'portrait',
+        printableBounds: { top: 0.16, right: 0.14, bottom: 0.18, left: 0.14 },
+      },
+      {
+        id: 'office:a4-landscape',
+        name: 'Office Printer - A4 Landscape',
+        paperSize: 'A4',
+        orientation: 'landscape',
+        printableBounds: { top: 0.14, right: 0.16, bottom: 0.14, left: 0.16 },
+      },
+      {
+        id: 'Driver Default:1:letter:portrait',
+        name: 'Driver Default',
+        paperSize: 'letter',
+        orientation: 'portrait',
+        printableBounds: { top: 0.32, right: 0.28, bottom: 0.34, left: 0.28 },
+      },
+    ]);
+    expect(printerProfilesFromHostDevices(undefined)).toBeUndefined();
   });
 
   it('applies and clears host printer profile bounds on the sheet page setup', () => {

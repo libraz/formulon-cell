@@ -1,7 +1,17 @@
 import { FUNCTION_SIGNATURES } from '../commands/refs.js';
 import { defaultStrings, en as enStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { createDialogShell } from './dialog-shell.js';
+import {
+  appendDialogSelectOptions,
+  createDialogSelect,
+} from '../toolbar/dialogs/form-controls.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import {
+  appendDialogActions,
+  appendDialogButton,
+  appendDialogFrame,
+  createDialogShell,
+} from './dialog-shell.js';
 
 /** Heuristic locale detector — we don't get a `Locale` flag through deps so
  *  we sniff the active dictionary's title against the canonical English one.
@@ -259,18 +269,12 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   });
   // Reuse the shared format-dialog skin for header/footer/btn styling.
   const overlay = shell.overlay;
-  const panel = shell.panel;
   overlay.classList.add('fc-fmtdlg');
-  panel.classList.add('fc-fmtdlg__panel', 'fc-fxdialog__panel');
-
-  const header = document.createElement('div');
-  header.className = 'fc-fmtdlg__header';
-  header.textContent = t.title;
-  panel.appendChild(header);
-
-  const body = document.createElement('div');
-  body.className = 'fc-fmtdlg__body fc-fxdialog__body';
-  panel.appendChild(body);
+  const { header, body, footer } = appendDialogFrame(shell, {
+    title: t.title,
+    panelClasses: ['fc-fmtdlg__panel', 'fc-fxdialog__panel'],
+    bodyClass: 'fc-fmtdlg__body fc-fxdialog__body',
+  });
 
   // ── Step 1: function picker ─────────────────────────────────────────────
   const pickerWrap = document.createElement('div');
@@ -285,8 +289,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   categoryLabel.textContent = t.categoryLabel;
   categoryRow.appendChild(categoryLabel);
 
-  const categorySelect = document.createElement('select');
-  categorySelect.className = 'fc-fxdialog__category';
+  const categorySelect = createDialogSelect([], '', { className: 'fc-fxdialog__category' });
   categoryRow.appendChild(categorySelect);
 
   const searchInput = document.createElement('input');
@@ -354,30 +357,17 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   argsWrap.appendChild(preview);
 
   // ── Footer ──────────────────────────────────────────────────────────────
-  const footer = document.createElement('div');
-  footer.className = 'fc-fmtdlg__footer';
-  panel.appendChild(footer);
-
-  const backBtn = document.createElement('button');
-  backBtn.type = 'button';
-  backBtn.className = 'fc-fmtdlg__btn';
-  backBtn.textContent = t.back;
+  const backBtn = appendDialogButton(footer, { label: t.back });
   backBtn.style.marginRight = 'auto';
   backBtn.hidden = true;
-  footer.appendChild(backBtn);
-
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.className = 'fc-fmtdlg__btn';
-  cancelBtn.textContent = t.cancel;
-  footer.appendChild(cancelBtn);
-
-  const insertBtn = document.createElement('button');
-  insertBtn.type = 'button';
-  insertBtn.className = 'fc-fmtdlg__btn fc-fmtdlg__btn--primary';
-  insertBtn.textContent = t.insert;
-  insertBtn.disabled = true;
-  footer.appendChild(insertBtn);
+  const { cancelBtn, okBtn: insertBtn } = appendDialogActions(footer, {
+    cancelLabel: t.cancel,
+    okLabel: t.insert,
+  });
+  projectDisabledState(insertBtn, true, t.insertRequiresFunction, {
+    datasetKey: 'disabledReason',
+    titlePrefix: t.insert,
+  });
 
   // ── State ───────────────────────────────────────────────────────────────
   // Sorted catalog of all known function names; rebuilt once and reused.
@@ -387,6 +377,13 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   let selectedName: string | null = null;
   let highlightIndex = 0;
   let argInputs: HTMLInputElement[] = [];
+
+  const setInsertDisabled = (disabled: boolean, reason: string | null): void => {
+    projectDisabledState(insertBtn, disabled, reason, {
+      datasetKey: 'disabledReason',
+      titlePrefix: t.insert,
+    });
+  };
 
   const localizedDescription = (name: string): string => {
     const entry = FUNCTION_DESCRIPTIONS[name];
@@ -423,12 +420,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
 
   const renderCategoryOptions = (): void => {
     categorySelect.replaceChildren();
-    for (const option of categoryOptions()) {
-      const el = document.createElement('option');
-      el.value = option.value;
-      el.textContent = option.label;
-      categorySelect.appendChild(el);
-    }
+    appendDialogSelectOptions(categorySelect, categoryOptions());
     categorySelect.value = selectedCategory;
   };
 
@@ -508,7 +500,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
 
   const updatePreview = (): void => {
     preview.textContent = assembleFormula() || `=${selectedName ?? ''}()`;
-    insertBtn.disabled = !selectedName;
+    setInsertDisabled(!selectedName, selectedName ? null : t.insertRequiresFunction);
   };
 
   const choose = (name: string, initialArgs: readonly string[] = []): void => {
@@ -517,7 +509,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     pickerWrap.hidden = true;
     argsWrap.hidden = false;
     backBtn.hidden = false;
-    insertBtn.disabled = false;
+    setInsertDisabled(false, null);
 
     argsName.textContent = functionSyntax(name);
     argsDesc.textContent = localizedDescription(name);
@@ -563,7 +555,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     pickerWrap.hidden = false;
     argsWrap.hidden = true;
     backBtn.hidden = true;
-    insertBtn.disabled = true;
+    setInsertDisabled(true, t.insertRequiresFunction);
     argInputs = [];
     requestAnimationFrame(() => searchInput.focus());
   };
@@ -670,6 +662,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     backBtn.textContent = t.back;
     cancelBtn.textContent = t.cancel;
     insertBtn.textContent = t.insert;
+    setInsertDisabled(insertBtn.disabled, insertBtn.disabled ? t.insertRequiresFunction : null);
     if (selectedName) {
       argsDesc.textContent = localizedDescription(selectedName);
       const noteEl = argsFields.querySelector<HTMLElement>('.fc-fxdialog__variadic-note');
@@ -693,7 +686,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
         pickerWrap.hidden = false;
         argsWrap.hidden = true;
         backBtn.hidden = true;
-        insertBtn.disabled = true;
+        setInsertDisabled(true, t.insertRequiresFunction);
         renderList();
       }
       shell.open();

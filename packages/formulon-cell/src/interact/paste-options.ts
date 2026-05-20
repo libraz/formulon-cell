@@ -10,6 +10,11 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { rangeRects } from '../render/geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import {
+  createFloatingOptionsButton,
+  createFloatingOptionsMenuItem,
+} from './floating-options-menu.js';
+import { clampPanelToViewport } from './overlay-position.js';
 
 export type PasteOptionsMode = 'source' | 'values' | 'formatting';
 
@@ -37,9 +42,6 @@ export interface PasteOptionsHandle {
 
 const VIEWPORT_PAD = 4;
 
-const clamp = (value: number, min: number, max: number): number =>
-  Math.max(min, Math.min(max, value));
-
 const defaultOptions = (what: PasteSpecialOptions['what']): PasteSpecialOptions => ({
   what,
   operation: 'none',
@@ -55,11 +57,7 @@ export function attachPasteOptions(deps: PasteOptionsDeps): PasteOptionsHandle {
   let activation: PasteOptionsActivation | null = null;
   let menuOpen = false;
 
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'fc-paste-options__button';
-  button.setAttribute('aria-haspopup', 'menu');
-  button.style.display = 'none';
+  const button = createFloatingOptionsButton({ className: 'fc-paste-options__button' });
 
   const menu = document.createElement('div');
   menu.className = 'fc-paste-options__menu';
@@ -102,12 +100,20 @@ export function attachPasteOptions(deps: PasteOptionsDeps): PasteOptionsHandle {
     const anchor = rects[rects.length - 1];
     const x = anchor ? hostRect.left + anchor.x + anchor.w : hostRect.left + 24;
     const y = anchor ? hostRect.top + anchor.y + anchor.h : hostRect.top + 24;
-    const left = clamp(x + 3, VIEWPORT_PAD, window.innerWidth - 28);
-    const top = clamp(y + 3, VIEWPORT_PAD, window.innerHeight - 28);
+    const { x: left, y: top } = clampPanelToViewport(button, x + 3, y + 3, {
+      pad: VIEWPORT_PAD,
+      fallbackWidth: 28,
+      fallbackHeight: 28,
+    });
     button.style.left = `${left}px`;
     button.style.top = `${top}px`;
-    menu.style.left = `${clamp(left, VIEWPORT_PAD, window.innerWidth - 220)}px`;
-    menu.style.top = `${clamp(top + 24, VIEWPORT_PAD, window.innerHeight - 112)}px`;
+    const menuPos = clampPanelToViewport(menu, left, top + 24, {
+      pad: VIEWPORT_PAD,
+      fallbackWidth: 220,
+      fallbackHeight: 112,
+    });
+    menu.style.left = `${menuPos.x}px`;
+    menu.style.top = `${menuPos.y}px`;
   };
 
   const runPaste = (snap: ClipboardSnapshot, what: PasteSpecialOptions['what']) =>
@@ -219,10 +225,5 @@ export function attachPasteOptions(deps: PasteOptionsDeps): PasteOptionsHandle {
 }
 
 function makeItem(mode: PasteOptionsMode): HTMLButtonElement {
-  const item = document.createElement('button');
-  item.type = 'button';
-  item.className = 'fc-paste-options__item';
-  item.dataset.fcMode = mode;
-  item.setAttribute('role', 'menuitem');
-  return item;
+  return createFloatingOptionsMenuItem({ className: 'fc-paste-options__item', mode });
 }

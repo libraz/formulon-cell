@@ -1,19 +1,10 @@
-import type { SpreadsheetInstance, ToolbarInstance } from '@libraz/formulon-cell';
+import type {
+  DynamicDropdownsCtx,
+  RibbonTab,
+  SpreadsheetInstance,
+  ToolbarInstance,
+} from '@libraz/formulon-cell';
 import type { DefineComponent } from 'vue';
-
-type RibbonTab =
-  | 'file'
-  | 'home'
-  | 'insert'
-  | 'draw'
-  | 'pageLayout'
-  | 'formulas'
-  | 'data'
-  | 'review'
-  | 'view'
-  | 'help'
-  | 'automate'
-  | 'acrobat';
 
 declare const SpreadsheetToolbar: DefineComponent<{
   instance: SpreadsheetInstance | null;
@@ -27,6 +18,7 @@ declare const SpreadsheetToolbar: DefineComponent<{
   onTranslate?: () => void;
   onAddIn?: () => void;
   onToolbarReady?: (toolbar: ToolbarInstance | null) => void;
+  dropdownActions?: Partial<DynamicDropdownsCtx>;
   ribbonTabs?: readonly RibbonTab[];
 }>;
 

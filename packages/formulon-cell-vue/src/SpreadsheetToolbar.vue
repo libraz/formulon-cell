@@ -5,7 +5,6 @@
 // DOM, helpers, menus, and hook defaults come from core.
 import {
   type DynamicDropdownsCtx,
-  type FeatureFlags,
   type RibbonTab,
   Spreadsheet,
   type SpreadsheetInstance,
@@ -15,7 +14,6 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 interface Props {
   instance: SpreadsheetInstance | null;
-  features?: FeatureFlags;
   activeTab: RibbonTab;
   locale: string;
   onSpellingReview?: () => void;
@@ -25,10 +23,6 @@ interface Props {
   onDrawEraser?: () => void;
   onTranslate?: () => void;
   onAddIn?: () => void;
-  onNewWorkbook?: () => void;
-  onOpenWorkbook?: () => void;
-  onSaveWorkbook?: () => void;
-  onSaveWorkbookAs?: () => void;
   /** Receives the mounted core toolbar instance so hosts can dispatch shared
    *  commands from titlebar search / Tell me without querying DOM buttons. */
   onToolbarReady?: (toolbar: ToolbarInstance | null) => void;

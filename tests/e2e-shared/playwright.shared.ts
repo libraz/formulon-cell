@@ -2,6 +2,17 @@ import { defineConfig, devices } from '@playwright/test';
 
 import type { DemoApp } from './types.js';
 
+const portFromEnv = (app: DemoApp): number => {
+  const appSpecificKey = `FC_E2E_${app.id.replaceAll('-', '_').toUpperCase()}_PORT`;
+  const raw = process.env[appSpecificKey] ?? process.env.FC_E2E_PORT;
+  if (!raw) return app.port;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1 || value > 65_535) {
+    throw new Error(`${appSpecificKey} / FC_E2E_PORT must be a TCP port number.`);
+  }
+  return value;
+};
+
 /**
  * Builds a Playwright config for a demo app. Both framework demos share the same
  * config surface — only the dev-server port and workspace name change.
@@ -16,7 +27,9 @@ import type { DemoApp } from './types.js';
  * in `pages/SpreadsheetPage.ts`.
  */
 export function defineDemoAppConfig(app: DemoApp) {
-  const baseURL = `http://127.0.0.1:${app.port}`;
+  const port = portFromEnv(app);
+  const baseURL = `http://127.0.0.1:${port}`;
+  const reuseExistingServer = process.env.FC_REUSE_E2E_SERVER === '1' && !process.env.CI;
   return defineConfig({
     // Playwright resolves testDir relative to the consuming config file
     // (apps/<id>/playwright.config.ts), so `./e2e` points at each demo's
@@ -49,9 +62,12 @@ export function defineDemoAppConfig(app: DemoApp) {
       },
     ],
     webServer: {
-      command: `yarn workspace ${app.workspace} dev --host 127.0.0.1 --port ${app.port}`,
+      command: `yarn workspace ${app.workspace} dev --host 127.0.0.1 --port ${port} --strictPort`,
       url: baseURL,
-      reuseExistingServer: !process.env.CI,
+      // Reuse only when explicitly requested. Otherwise Playwright can attach
+      // to an unrelated app already listening on the demo port and report
+      // misleading UI failures before the spreadsheet even mounts.
+      reuseExistingServer,
       stdout: 'pipe',
       stderr: 'pipe',
       timeout: 120_000,

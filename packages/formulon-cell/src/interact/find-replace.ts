@@ -14,6 +14,9 @@ import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { createDialogSelect, type DialogSelectOption } from '../toolbar/dialogs/form-controls.js';
+import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
+import { createDialogButton } from './dialog-shell.js';
 
 export interface FindReplaceDeps {
   host: HTMLElement;
@@ -108,7 +111,10 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   const lookInRow = labeledControl('fc-find-look-in', lookInSelect, 'fc-find__field--short');
 
   const formatBtn = makeBtn('fc-find__format-btn');
-  formatBtn.disabled = true;
+  projectDisabledState(formatBtn, true, strings.findReplace.formatUnavailable, {
+    datasetKey: 'disabledReason',
+    titlePrefix: strings.findReplace.format,
+  });
   const formatRow = document.createElement('div');
   formatRow.className = 'fc-find__field fc-find__field--format';
   const formatSpacer = document.createElement('span');
@@ -198,6 +204,10 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     caseText.textContent = t.matchCase;
     wholeText.textContent = t.matchEntire;
     formatBtn.textContent = t.format;
+    projectDisabledState(formatBtn, true, t.formatUnavailable, {
+      datasetKey: 'disabledReason',
+      titlePrefix: t.format,
+    });
     findAllBtn.textContent = t.findAll;
     prevBtn.textContent = t.prev;
     nextBtn.textContent = t.next;
@@ -363,7 +373,20 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     replaceBtn.hidden = activeTab === 'find';
     replaceAllBtn.hidden = activeTab === 'find';
     findAllBtn.hidden = activeTab === 'replace';
-    lookInSelect.disabled = activeTab === 'replace';
+    const lookInDisabled = activeTab === 'replace';
+    projectDisabledState(
+      lookInSelect,
+      lookInDisabled,
+      t.lookInRequiresFindTab,
+      {
+        datasetKey: 'disabledReason',
+        titlePrefix: t.lookIn,
+      },
+    );
+    projectDisabledReason(lookInRow.label, lookInDisabled ? t.lookInRequiresFindTab : null, {
+      ariaDescription: false,
+      titlePrefix: t.lookIn,
+    });
     if (activeTab === 'replace') lookInSelect.value = 'formulas';
     findInput.placeholder = activeTab === 'find' ? t.findLabel : t.findWhat;
   };
@@ -507,21 +530,17 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
 }
 
 function makeBtn(extraClass?: string): HTMLButtonElement {
-  const b = document.createElement('button');
-  b.type = 'button';
+  const b = createDialogButton({ label: '', baseClass: 'fc-find__btn' });
   b.className = extraClass ? `fc-find__btn ${extraClass}` : 'fc-find__btn';
   return b;
 }
 
 function makeSelect(options: [string, string][]): HTMLSelectElement {
-  const select = document.createElement('select');
-  for (const [value, text] of options) {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = text;
-    select.append(option);
-  }
-  return select;
+  return createDialogSelect(
+    options.map(([value, label]): DialogSelectOption => ({ value, label })),
+    options[0]?.[0] ?? '',
+    { className: '' },
+  );
 }
 
 function setOptions(select: HTMLSelectElement, labels: string[]): void {

@@ -1,6 +1,7 @@
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { createDialogShell } from './dialog-shell.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
 
 export interface IterativeDialogDeps {
   host: HTMLElement;
@@ -43,14 +44,12 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
     onDismiss: () => api.close(),
   });
 
-  const header = document.createElement('div');
-  header.className = 'fc-iterdlg__header';
-  header.textContent = t.title;
-  shell.panel.appendChild(header);
-
-  const body = document.createElement('div');
-  body.className = 'fc-iterdlg__body';
-  shell.panel.appendChild(body);
+  const { body, footer } = appendDialogFrame(shell, {
+    title: t.title,
+    headerClass: 'fc-iterdlg__header',
+    bodyClass: 'fc-iterdlg__body',
+    footerClass: 'fc-iterdlg__footer',
+  });
 
   const note = document.createElement('p');
   note.className = 'fc-iterdlg__note';
@@ -93,18 +92,11 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
   status.className = 'fc-iterdlg__status';
   body.appendChild(status);
 
-  const footer = document.createElement('div');
-  footer.className = 'fc-iterdlg__footer';
-  shell.panel.appendChild(footer);
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.className = 'fc-iterdlg__btn';
-  cancelBtn.textContent = t.cancel;
-  const okBtn = document.createElement('button');
-  okBtn.type = 'button';
-  okBtn.className = 'fc-iterdlg__btn fc-iterdlg__btn--primary';
-  okBtn.textContent = t.ok;
-  footer.append(cancelBtn, okBtn);
+  const { cancelBtn, okBtn } = appendDialogActions(footer, {
+    cancelLabel: t.cancel,
+    okLabel: t.ok,
+    buttonBaseClass: 'fc-iterdlg__btn',
+  });
 
   const draft: IterativeSettings = { ...DEFAULTS };
 
@@ -112,8 +104,16 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
     enableInput.checked = draft.enabled;
     maxIterInput.value = String(draft.maxIterations);
     maxChangeInput.value = String(draft.maxChange);
-    maxIterInput.disabled = !draft.enabled;
-    maxChangeInput.disabled = !draft.enabled;
+    const disabled = !draft.enabled;
+    const reason = disabled ? t.inputsRequireEnabled : null;
+    projectDisabledState(maxIterInput, disabled, reason, {
+      datasetKey: 'disabledReason',
+      titlePrefix: t.maxIterations,
+    });
+    projectDisabledState(maxChangeInput, disabled, reason, {
+      datasetKey: 'disabledReason',
+      titlePrefix: t.maxChange,
+    });
   };
 
   const onEnable = (): void => {

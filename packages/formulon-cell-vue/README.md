@@ -57,7 +57,17 @@ const { locale, strings } = useI18n(instance);
 ## Toolbar
 
 `SpreadsheetToolbar` is published as an SFC subpath so Vue bundlers can
-compile it with the same pipeline as application components.
+compile it with the same pipeline as application components. It is a thin
+adapter over core `Spreadsheet.mountToolbar`; the ribbon DOM, menu factories,
+activation model, and dynamic dropdown dispatcher live in
+`@libraz/formulon-cell`.
+
+For host audits and custom chrome, use the core exports such as
+`ribbonActivationEntries`, `ribbonSurfaceCommandIds`,
+`DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS`, `attachRangePickerButton`,
+`appendConditionalApplyFormatControls`, `conditionalStyleOptions`,
+`showReport`, `reportDialogLabels`, `projectDisabledReason`, and `projectDisabledState`. Do not recreate ribbon command sets or
+Excel-style dialog/report controls in Vue.
 
 ```vue
 <script setup lang="ts">
@@ -66,6 +76,9 @@ import SpreadsheetToolbar from '@libraz/formulon-cell-vue/toolbar.vue';
 import '@libraz/formulon-cell-vue/toolbar.css';
 </script>
 ```
+
+Use `dropdownActions` to override specific core dropdown handlers without
+forking the ribbon.
 
 ## Runtime prop updates
 
@@ -93,8 +106,10 @@ profile props feed Page Setup / print preview minimum-margin handling.
 ## Core helpers
 
 This package re-exports core command helpers and types — `createSessionChart`,
-`saveSheetView`, `activateSheetView`, `listDefinedNames`,
-`upsertDefinedName`, `ScreenClipCapture`, `ScreenClipResult`, etc. — so Vue
+`saveSheetView`, `activateSheetView`, `listDefinedNames`, `upsertDefinedName`,
+`ribbonActivationEntries`, `attachRangePickerButton`,
+`appendConditionalApplyFormatControls`, `conditionalStyleOptions`, `showReport`,
+`reportDialogLabels`, `projectDisabledReason`, `projectDisabledState`, `ScreenClipCapture`, `ScreenClipResult`, etc. — so Vue
 apps can type host chrome from a single import.
 
 ## Documentation

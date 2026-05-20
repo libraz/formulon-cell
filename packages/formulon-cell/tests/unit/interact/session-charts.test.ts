@@ -1,6 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { attachSessionCharts } from '../../../src/interact/session-charts.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const firePointer = (
   target: EventTarget,
@@ -201,5 +206,14 @@ describe('attachSessionCharts', () => {
     expect(document.activeElement).toBe(host);
 
     handle.detach();
+  });
+
+  it('keeps chart close button DOM on the shared interaction primitive', () => {
+    const source = readFileSync(join(root, 'src/interact/session-charts.ts'), 'utf8');
+
+    expect(source).toContain("import { createInteractionButton } from './chip-button.js'");
+    expect(source).toContain('const createSessionChartCloseButton');
+    expect(source).toContain('const close = createSessionChartCloseButton(labels.close)');
+    expect(source).not.toContain("document.createElement('button')");
   });
 });

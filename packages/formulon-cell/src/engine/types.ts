@@ -93,6 +93,16 @@ export const PivotFilterType = {
   LabelContains: 3,
   LabelBeginsWith: 4,
   LabelDate: 5,
+  LabelEquals: 6,
+  LabelDoesNotEqual: 7,
+  LabelDoesNotContain: 8,
+  LabelEndsWith: 9,
+  ValueLessThan: 10,
+  ValueEquals: 11,
+  ValueNotBetween: 12,
+  DateBefore: 13,
+  DateAfter: 14,
+  DateBetween: 15,
 } as const;
 export type PivotFilterType = (typeof PivotFilterType)[keyof typeof PivotFilterType];
 
@@ -136,6 +146,7 @@ export interface PivotFilterSpec {
   readonly valueHighKind?: PivotFilterValueKind;
   readonly valueHighInt?: number;
   readonly valueHighDouble?: number;
+  readonly valueHighText?: string;
 }
 
 /** Value kind ordinals — mirror of `fm_value_kind_t`. We redeclare here to

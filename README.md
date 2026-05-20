@@ -175,9 +175,19 @@ sheet.i18n.setLocale('fr');
 
 ## Framework Ribbon Toolbars
 
-The React and Vue packages publish the demo ribbon as reusable framework
-chrome. Both implementations expose the same ribbon tab model and command
-surface; import the matching toolbar CSS alongside the component.
+The React and Vue packages publish thin adapters over the core
+`Spreadsheet.mountToolbar` ribbon. The ribbon DOM, menu factories, activation
+model, and dynamic dropdown dispatcher all live in `@libraz/formulon-cell`, so
+framework wrappers do not carry separate menu implementations. Import the
+matching toolbar CSS alongside the component.
+
+Hosts that need to audit or extend the ribbon should import the shared
+manifests from core (`ribbonActivationEntries`, `ribbonSurfaceCommandIds`,
+`DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS`) instead of reconstructing command
+sets in React or Vue. Dialog-level helpers such as `attachRangePickerButton`,
+`appendConditionalApplyFormatControls`, `conditionalStyleOptions`,
+`showReport`, `reportDialogLabels`, `projectDisabledReason`, and `projectDisabledState` are also published from core for host UI
+that must stay aligned with the built-in Excel 365-style dialogs and reports.
 
 ```tsx
 import { SpreadsheetToolbar, type RibbonTab } from '@libraz/formulon-cell-react';

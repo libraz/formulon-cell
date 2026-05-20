@@ -1,4 +1,4 @@
-import type { Range } from '../engine/types.js';
+import type { CellValue, Range } from '../engine/types.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { type History, recordTablesChange } from './history.js';
 import { isSheetProtected } from './protection.js';
@@ -136,8 +136,39 @@ export interface FormatAsTableOptions {
   lastCol?: boolean;
 }
 
+export interface TableHeaderInferenceWorkbook {
+  getValue(addr: { sheet: number; row: number; col: number }): CellValue;
+}
+
 const CUSTOM_TABLE_STYLE_PREFIX = 'custom-table:';
 const CUSTOM_PIVOT_TABLE_STYLE_PREFIX = 'custom-pivot-table:';
+
+const isNonEmptyTextValue = (value: CellValue): boolean =>
+  value.kind === 'text' && value.value.trim().length > 0;
+
+const isNonBlankValue = (value: CellValue): boolean => value.kind !== 'blank';
+
+/** Excel pre-checks "My table has headers" only when the selection looks like
+ *  a labelled data range. Keep the heuristic shared across host surfaces. */
+export function inferTableHasHeaders(
+  workbook: TableHeaderInferenceWorkbook,
+  range: Range,
+): boolean {
+  if (range.r1 <= range.r0) return false;
+  let headerTextCount = 0;
+  for (let col = range.c0; col <= range.c1; col += 1) {
+    const value = workbook.getValue({ sheet: range.sheet, row: range.r0, col });
+    if (!isNonEmptyTextValue(value)) return false;
+    headerTextCount += 1;
+  }
+  if (headerTextCount === 0) return false;
+  for (let row = range.r0 + 1; row <= range.r1; row += 1) {
+    for (let col = range.c0; col <= range.c1; col += 1) {
+      if (isNonBlankValue(workbook.getValue({ sheet: range.sheet, row, col }))) return true;
+    }
+  }
+  return false;
+}
 
 export function customTableStyleId(name: string): string {
   return `${CUSTOM_TABLE_STYLE_PREFIX}${name.trim()}`;
@@ -268,6 +299,7 @@ export function formatAsTableByStyleId(
   styleId: string,
   color?: string,
   variant: CustomTableStyle['variant'] = 'banded',
+  options: Pick<FormatAsTableOptions, 'showHeader' | 'showTotal' | 'firstCol' | 'lastCol'> = {},
 ): TableOverlay | null {
   const custom = customTableStyleById(store.getState(), styleId);
   if (custom) {
@@ -275,12 +307,14 @@ export function formatAsTableByStyleId(
       style: custom.style,
       color: custom.color,
       ...tableVariantOptions(custom.variant),
+      ...options,
     });
   }
   return formatAsTable(store, range, {
     style: styleId as TableStyle,
     color,
     ...tableVariantOptions(variant),
+    ...options,
   });
 }
 
