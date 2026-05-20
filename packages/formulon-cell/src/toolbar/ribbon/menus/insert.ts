@@ -4,7 +4,7 @@
 // hold them inline.
 
 import type { ToolbarMenuText } from '@libraz/formulon-cell';
-
+import { toolbarSymbolGroups } from '../symbols.js';
 import { createMenu, menuButton, menuIdForCommand, menuSeparator } from './general.js';
 
 export interface InsertMenuFactories {
@@ -33,23 +33,10 @@ const symbolMenuHeading = (label: string): HTMLDivElement => {
 export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): InsertMenuFactories => {
   const t = ribbonMenuText;
 
-  const SYMBOL_GROUPS = [
-    {
-      label: t.symbolMath,
-      symbols: ['±', '×', '÷', '≤', '≥', '≠', '≈', '∞', '√', '∑', '∫', 'π'],
-    },
-    {
-      label: t.symbolGreek,
-      symbols: ['Α', 'Β', 'Γ', 'Δ', 'Θ', 'Λ', 'Ξ', 'Π', 'Σ', 'Φ', 'Ψ', 'Ω'],
-    },
-    { label: t.symbolCurrency, symbols: ['$', '€', '¥', '£', '¢', '₩', '₹', '₽'] },
-    { label: t.symbolLegal, symbols: ['©', '®', '™', '§', '¶', '†', '‡', '•'] },
-  ] as const;
-
   const createSymbolMenu = (): HTMLDivElement => {
-    const menu = createMenu('menu-symbol');
+    const menu = createMenu(menuIdForCommand('symbolInsert'));
     menu.classList.add('app__menu--symbols');
-    for (const group of SYMBOL_GROUPS) {
+    for (const group of toolbarSymbolGroups(t)) {
       menu.append(symbolMenuHeading(group.label));
       for (const symbol of group.symbols) {
         const button = menuButton(symbol, 'symbol', symbol);

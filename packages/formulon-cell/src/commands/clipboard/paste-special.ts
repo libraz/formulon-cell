@@ -171,7 +171,7 @@ export function pasteSpecial(
           formats.set(key, { ...existing, ...format });
         }
       }
-      return { ...s, format: { formats } };
+      return { ...s, format: { ...s.format, formats } };
     });
   }
 

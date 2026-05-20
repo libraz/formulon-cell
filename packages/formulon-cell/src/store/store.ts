@@ -1,19 +1,26 @@
 import { createStore } from 'zustand/vanilla';
-import type { TableOverlay } from '../commands/format-as-table.js';
+import type {
+  CustomTableStyle,
+  PivotTableStyleAssignment,
+  TableOverlay,
+} from '../commands/format-as-table.js';
 import type { SheetView, SheetViewPatch } from '../commands/sheet-views.js';
 import { addrKey } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import type {
   CellFormat,
   ConditionalRule,
+  CustomCellStyle,
   EditorMode,
   EditorRefHighlight,
   PageSetup,
   SessionChart,
+  SessionIllustration,
   SlicerSpec,
   Sparkline,
   State,
   StatusAggKey,
+  StatusBarOptionKey,
   TraceArrow,
 } from './types.js';
 import { defaultPageSetup } from './types.js';
@@ -83,22 +90,33 @@ export const createSpreadsheetStore = () =>
       editorRefs: [],
       r1c1: false,
       statusAggs: ['average', 'count', 'sum'],
+      statusOptions: {
+        capsLock: true,
+        numLock: true,
+        scrollLock: true,
+        uploadStatus: false,
+        macroRecording: false,
+        viewShortcuts: true,
+        zoom: true,
+        zoomSlider: true,
+      },
       filterRange: null,
       filterCriteria: [],
       watchPanelOpen: false,
       sheetBackgroundImages: new Map(),
     },
-    format: { formats: new Map() },
+    format: { formats: new Map(), customCellStyles: [] },
     merges: { byAnchor: new Map(), byCell: new Map() },
     conditional: { rules: [] },
     sparkline: { sparklines: new Map() },
     charts: { charts: [] },
+    illustrations: { illustrations: [] },
     watch: { watches: [] },
     traces: { items: [] },
     errorIndicators: { ignoredErrors: new Set(), validationCircles: new Set() },
     pageSetup: { setupBySheet: new Map() },
     slicers: { slicers: [] },
-    tables: { tables: [] },
+    tables: { tables: [], customTableStyles: [], customPivotTableStyles: [], pivotTableStyles: [] },
     sheetViews: { views: [], activeViewId: null },
     protection: { protectedSheets: new Map(), allowedEditRanges: [] },
   }));
@@ -254,6 +272,19 @@ export const mutators = {
 
   setStatusAggs(store: SpreadsheetStore, keys: StatusAggKey[]): void {
     store.setState((s) => ({ ...s, ui: { ...s.ui, statusAggs: [...keys] } }));
+  },
+
+  toggleStatusOption(store: SpreadsheetStore, key: StatusBarOptionKey): void {
+    store.setState((s) => ({
+      ...s,
+      ui: {
+        ...s.ui,
+        statusOptions: {
+          ...s.ui.statusOptions,
+          [key]: !s.ui.statusOptions[key],
+        },
+      },
+    }));
   },
 
   setFilterRange(store: SpreadsheetStore, range: Range | null): void {
@@ -456,7 +487,7 @@ export const mutators = {
         if (patch.borders) next.borders = { ...(prev.borders ?? {}), ...patch.borders };
         formats.set(key, next);
       }
-      return { ...s, format: { formats } };
+      return { ...s, format: { ...s.format, formats } };
     });
   },
 
@@ -483,7 +514,7 @@ export const mutators = {
           }
         }
       }
-      return { ...s, format: { formats } };
+      return { ...s, format: { ...s.format, formats } };
     });
   },
 
@@ -652,6 +683,51 @@ export const mutators = {
       const next = s.charts.charts.filter((chart) => !rangesIntersect(chart.source, range));
       if (next.length === s.charts.charts.length) return s;
       return { ...s, charts: { charts: next } };
+    });
+  },
+
+  upsertCustomCellStyle(store: SpreadsheetStore, style: CustomCellStyle): void {
+    store.setState((s) => {
+      const next = (s.format.customCellStyles ?? []).filter((item) => item.id !== style.id);
+      return {
+        ...s,
+        format: {
+          ...s.format,
+          customCellStyles: [...next, { ...style, format: { ...style.format } }],
+        },
+      };
+    });
+  },
+
+  upsertIllustration(store: SpreadsheetStore, illustration: SessionIllustration): void {
+    store.setState((s) => {
+      const next = s.illustrations.illustrations.filter((item) => item.id !== illustration.id);
+      return { ...s, illustrations: { illustrations: [...next, { ...illustration }] } };
+    });
+  },
+
+  removeIllustration(store: SpreadsheetStore, id: string): void {
+    store.setState((s) => {
+      const next = s.illustrations.illustrations.filter((item) => item.id !== id);
+      if (next.length === s.illustrations.illustrations.length) return s;
+      return { ...s, illustrations: { illustrations: next } };
+    });
+  },
+
+  updateIllustration(
+    store: SpreadsheetStore,
+    id: string,
+    patch: Partial<Omit<SessionIllustration, 'id'>>,
+  ): void {
+    store.setState((s) => {
+      let changed = false;
+      const next = s.illustrations.illustrations.map((item) => {
+        if (item.id !== id) return item;
+        changed = true;
+        return { ...item, ...patch };
+      });
+      if (!changed) return s;
+      return { ...s, illustrations: { illustrations: next } };
     });
   },
 
@@ -922,7 +998,9 @@ export const mutators = {
     store: SpreadsheetStore,
     entry: { id?: string; title: string; range: Range; password?: string },
   ): string {
-    const id = entry.id ?? `allowed-edit-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const id =
+      entry.id ??
+      `allowed-edit-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     store.setState((s) => {
       const nextEntry = {
         id,
@@ -952,8 +1030,8 @@ export const mutators = {
 
   /** Merge a partial patch into the page-setup for `sheet`. Pass `null` to
    *  reset that sheet back to defaults. The merge is shallow except for
-   *  `margins`, which is deep-merged — so a patch like `{ margins: { top: 1 } }`
-   *  preserves the other three sides. */
+   *  `margins` and `printableBounds`, which are deep-merged — so a patch like
+   *  `{ margins: { top: 1 } }` preserves the other three sides. */
   setPageSetup(store: SpreadsheetStore, sheet: number, patch: Partial<PageSetup> | null): void {
     store.setState((s) => {
       const setupBySheet = new Map(s.pageSetup.setupBySheet);
@@ -964,6 +1042,12 @@ export const mutators = {
         const next: PageSetup = { ...prev, ...patch };
         if (patch.margins) {
           next.margins = { ...prev.margins, ...patch.margins };
+        }
+        if (patch.printableBounds) {
+          next.printableBounds = {
+            ...(prev.printableBounds ?? patch.printableBounds),
+            ...patch.printableBounds,
+          };
         }
         setupBySheet.set(sheet, next);
       }
@@ -996,7 +1080,7 @@ export const mutators = {
   upsertTableOverlay(store: SpreadsheetStore, next: TableOverlay): void {
     store.setState((s) => {
       const filtered = s.tables.tables.filter((t) => t.id !== next.id);
-      return { ...s, tables: { tables: [...filtered, next] } };
+      return { ...s, tables: { ...s.tables, tables: [...filtered, next] } };
     });
   },
 
@@ -1004,7 +1088,7 @@ export const mutators = {
     store.setState((s) => {
       const next = s.tables.tables.filter((t) => t.source === 'engine' || t.id !== id);
       if (next.length === s.tables.tables.length) return s;
-      return { ...s, tables: { tables: next } };
+      return { ...s, tables: { ...s.tables, tables: next } };
     });
   },
 
@@ -1014,14 +1098,49 @@ export const mutators = {
         (t) => t.source === 'engine' || !rangesIntersect(t.range, range),
       );
       if (next.length === s.tables.tables.length) return s;
-      return { ...s, tables: { tables: next } };
+      return { ...s, tables: { ...s.tables, tables: next } };
     });
   },
 
   replaceEngineTableOverlays(store: SpreadsheetStore, tables: readonly TableOverlay[]): void {
     store.setState((s) => {
       const session = s.tables.tables.filter((t) => t.source !== 'engine');
-      return { ...s, tables: { tables: [...tables, ...session] } };
+      return { ...s, tables: { ...s.tables, tables: [...tables, ...session] } };
+    });
+  },
+
+  upsertCustomTableStyle(store: SpreadsheetStore, style: CustomTableStyle): void {
+    store.setState((s) => {
+      const next = (s.tables.customTableStyles ?? []).filter((item) => item.id !== style.id);
+      return {
+        ...s,
+        tables: {
+          ...s.tables,
+          customTableStyles: [...next, { ...style }],
+        },
+      };
+    });
+  },
+
+  upsertCustomPivotTableStyle(store: SpreadsheetStore, style: CustomTableStyle): void {
+    store.setState((s) => {
+      const next = (s.tables.customPivotTableStyles ?? []).filter((item) => item.id !== style.id);
+      return {
+        ...s,
+        tables: { ...s.tables, customPivotTableStyles: [...next, { ...style }] },
+      };
+    });
+  },
+
+  upsertPivotTableStyle(store: SpreadsheetStore, style: PivotTableStyleAssignment): void {
+    store.setState((s) => {
+      const next = (s.tables.pivotTableStyles ?? []).filter(
+        (item) => item.sheetIndex !== style.sheetIndex || item.pivotIndex !== style.pivotIndex,
+      );
+      return {
+        ...s,
+        tables: { ...s.tables, pivotTableStyles: [...next, { ...style }] },
+      };
     });
   },
 
@@ -1096,5 +1215,6 @@ export function getPageSetup(state: State, sheet: number): PageSetup {
     ...def,
     ...entry,
     margins: { ...def.margins, ...entry.margins },
+    printableBounds: entry.printableBounds ? { ...entry.printableBounds } : undefined,
   };
 }

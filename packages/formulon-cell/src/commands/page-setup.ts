@@ -10,7 +10,20 @@ import {
   type State,
 } from '../store/store.js';
 import { type History, recordPageSetupChange } from './history.js';
-import { parsePrintArea, parsePrintTitleCols, parsePrintTitleRows } from './print.js';
+import { parsePrintAreas, parsePrintTitleCols, parsePrintTitleRows } from './print.js';
+import {
+  normalizePrintableBounds,
+  type PrinterProfile,
+  resolvePrinterProfileBounds,
+} from './printer-profile.js';
+
+export type { PrinterProfile } from './printer-profile.js';
+export {
+  normalizePrinterProfile,
+  normalizePrinterProfileId,
+  normalizePrinterProfiles,
+  resolvePrinterProfileBounds,
+} from './printer-profile.js';
 
 /** Built-in margin presets. Values match the spreadsheet defaults
  *  (Normal / Wide / Narrow), expressed in inches. */
@@ -49,8 +62,9 @@ export interface PageSetupEntry {
   setup: PageSetup;
 }
 
-export type PageSetupPatch = Omit<Partial<PageSetup>, 'margins'> & {
+export type PageSetupPatch = Omit<Partial<PageSetup>, 'margins' | 'printableBounds'> & {
   margins?: Partial<PageSetup['margins']>;
+  printableBounds?: Partial<PageSetup['printableBounds']>;
 };
 
 export type PageBreakAxis = 'row' | 'col';
@@ -82,12 +96,53 @@ export function setPageSetup(
   const next: Partial<PageSetup> = {
     ...patch,
     margins: patch.margins ? { ...current.margins, ...patch.margins } : undefined,
+    printableBounds: patch.printableBounds
+      ? { ...(current.printableBounds ?? current.margins), ...patch.printableBounds }
+      : undefined,
   };
   if (!patch.margins) delete next.margins;
+  if (!patch.printableBounds) delete next.printableBounds;
   recordPageSetupChange(history, store, () => {
     mutators.setPageSetup(store, sheet, next);
   });
   return getPageSetup(store.getState(), sheet);
+}
+
+export function setPrintableBounds(
+  store: SpreadsheetStore,
+  sheet: number,
+  bounds: Partial<PageMargins> | undefined,
+  history: History | null = null,
+): PageSetup {
+  recordPageSetupChange(history, store, () => {
+    mutators.setPageSetup(store, sheet, { printableBounds: normalizePrintableBounds(bounds) });
+  });
+  return getPageSetup(store.getState(), sheet);
+}
+
+export function clearPrintableBounds(
+  store: SpreadsheetStore,
+  sheet: number,
+  history: History | null = null,
+): PageSetup {
+  recordPageSetupChange(history, store, () => {
+    mutators.setPageSetup(store, sheet, { printableBounds: undefined });
+  });
+  return getPageSetup(store.getState(), sheet);
+}
+
+export function applyPrinterProfileBounds(
+  store: SpreadsheetStore,
+  sheet: number,
+  profiles: readonly PrinterProfile[],
+  history: History | null = null,
+  printerProfileId?: string,
+): PageSetup {
+  const setup = getPageSetup(store.getState(), sheet);
+  const bounds = resolvePrinterProfileBounds(setup, profiles, printerProfileId);
+  return bounds
+    ? setPrintableBounds(store, sheet, bounds, history)
+    : clearPrintableBounds(store, sheet, history);
 }
 
 export function resetPageSetup(
@@ -130,11 +185,24 @@ export function setPrintArea(
   history: History | null = null,
 ): PageSetup | null {
   const normalized = area?.trim();
-  if (normalized && !parsePrintArea(normalized)) return null;
+  if (normalized && !parsePrintAreas(normalized)) return null;
   recordPageSetupChange(history, store, () => {
     mutators.setPageSetup(store, sheet, { printArea: normalized || undefined });
   });
   return getPageSetup(store.getState(), sheet);
+}
+
+export function addPrintArea(
+  store: SpreadsheetStore,
+  sheet: number,
+  area: string,
+  history: History | null = null,
+): PageSetup | null {
+  const normalized = area.trim();
+  if (!normalized || !parsePrintAreas(normalized)) return null;
+  const current = getPageSetup(store.getState(), sheet).printArea?.trim();
+  const next = current ? `${current},${normalized}` : normalized;
+  return setPrintArea(store, sheet, next, history);
 }
 
 export function setPrintTitleRows(

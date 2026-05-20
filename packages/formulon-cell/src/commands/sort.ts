@@ -265,7 +265,7 @@ export function sortRange(
         formats.set(addrKey({ sheet: range.sheet, row: dstRow, col: cell.col }), cell.format);
       }
     }
-    return { ...s, format: { formats } };
+    return { ...s, format: { ...s.format, formats } };
   });
   wb.recalc();
   return true;
@@ -370,7 +370,7 @@ export function removeDuplicates(
         );
       }
     }
-    return { ...s, format: { formats } };
+    return { ...s, format: { ...s.format, formats } };
   });
   // Clear tail rows that were dropped.
   for (let r = range.r0 + snaps.length; r <= range.r1; r += 1) {

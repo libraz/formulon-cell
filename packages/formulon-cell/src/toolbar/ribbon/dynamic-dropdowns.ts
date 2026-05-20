@@ -4,12 +4,7 @@
 // callback through the factory; this module owns DOM open/close, focus, and
 // the click dispatch table.
 
-import type {
-  CellStyleId,
-  SessionChartKind,
-  SpreadsheetInstance,
-  TableStyle,
-} from '@libraz/formulon-cell';
+import type { SessionChartKind, SpreadsheetInstance } from '@libraz/formulon-cell';
 import type { SessionShapeKind } from '../illustration-types.js';
 import { focusMenuItem } from '../menu-a11y.js';
 import type { RibbonFillSeriesMode } from './fill-series.js';
@@ -22,6 +17,13 @@ export type RibbonDropdownSpec = {
 };
 
 export type PrintTitlesAction = 'rows' | 'cols' | 'clear';
+export type PrintAreaAction = 'set' | 'add' | 'clear';
+export type ArrangeAction =
+  | 'bring-forward'
+  | 'send-backward'
+  | 'bring-front'
+  | 'send-back'
+  | 'selection-pane';
 export type UiTheme = 'light' | 'dark' | 'contrast';
 
 export interface DynamicDropdownsCtx {
@@ -46,13 +48,16 @@ export interface DynamicDropdownsCtx {
   applyFillSeries: (mode?: RibbonFillSeriesMode) => void | Promise<void>;
   applyFillDirection: (direction: 'down' | 'right' | 'up' | 'left') => void;
   applyClearAction: (action: string) => void | Promise<void>;
+  applyFreezeAction: (action: string) => void;
   applyTextOrientationAction: (action: string) => void;
   applyCellInsertAction: (action: string) => void | Promise<void>;
   applyCellDeleteAction: (action: string) => void | Promise<void>;
   applyCellFormatAction: (action: string) => void | Promise<void>;
   applyPageBreakAction: (action: string) => void;
   applySheetBackgroundAction: (action: 'set' | 'clear') => void | Promise<void>;
+  applyPrintAreaAction: (action: PrintAreaAction) => void;
   applyPrintTitlesAction: (action: PrintTitlesAction) => void;
+  applyArrangeAction: (action: ArrangeAction) => void;
   applyUiTheme: (theme: UiTheme) => void;
   focusSheet: () => void;
   applySortMenuAction: (action: string) => void;
@@ -68,16 +73,17 @@ export interface DynamicDropdownsCtx {
   chartKindFromAction: (action: string) => SessionChartKind;
   insertPictureFromRibbon: (action: string) => void | Promise<void>;
   insertShapeFromRibbon: (shape: SessionShapeKind) => void;
-  insertScreenshotFromRibbon: () => void;
+  insertScreenshotFromRibbon: (action?: string) => void | Promise<void>;
   applyScriptAction: (action: string) => void | Promise<void>;
   applyPdfAction: (action: string) => void | Promise<void>;
   createTableFromSelection: (
-    style?: TableStyle,
+    style?: string,
     color?: string,
     variant?: TableVariantId,
   ) => void | Promise<void>;
   openTableStyleFooterAction: (action: string) => void | Promise<void>;
-  applyCellStyleFromRibbon: (id: CellStyleId) => void;
+  applyPivotTableStyleFromRibbon: (styleId: string) => void | Promise<void>;
+  applyCellStyleFromRibbon: (id: string) => void;
   openCellStyleFooterAction: (action: string) => void | Promise<void>;
   applyCurrencyPreset: (symbol: string) => void;
   openCurrencyFooterAction: (action: string) => void;
@@ -86,6 +92,7 @@ export interface DynamicDropdownsCtx {
   applyDataValidationAction: (action: string) => void;
   applyAddInAction: (action: string) => void | Promise<void>;
   applyConditionalMenuAction: (action: string, panel?: string) => void | Promise<void>;
+  applySymbolAction: (symbol: string) => void | Promise<void>;
 }
 
 export interface DynamicDropdownsApi {
@@ -106,17 +113,72 @@ type DynamicDropdownHandler = (
   ctx: { menu: HTMLElement; button: HTMLButtonElement },
 ) => void | Promise<void>;
 
+const DYNAMIC_DROPDOWN_HANDLER_ATTRS = [
+  'paste-action',
+  'pivot-table-action',
+  'defined-name-action',
+  'link-action',
+  'fill',
+  'clear',
+  'freeze',
+  'text-orientation',
+  'cell-insert',
+  'cell-delete',
+  'cell-format',
+  'page-break-action',
+  'sheet-background-action',
+  'print-area-action',
+  'print-titles-action',
+  'arrange-action',
+  'page-theme-action',
+  'sort',
+  'find-select',
+  'autosum-fn',
+  'formula-audit-action',
+  'watch-action',
+  'comment-action',
+  'protect-action',
+  'calc-option',
+  'chart-insert',
+  'picture-insert',
+  'shape-insert',
+  'screenshot-insert',
+  'symbol',
+  'symbol-action',
+  'script-action',
+  'pdf-action',
+  'table-style',
+  'table-style-footer',
+  'pivot-table-style',
+  'cell-style',
+  'cell-style-footer',
+  'currency-preset',
+  'currency-footer',
+  'text-to-columns-delimiter',
+  'validation-action',
+  'add-in-action',
+] as const;
+
+type DynamicDropdownHandlerAttr = (typeof DYNAMIC_DROPDOWN_HANDLER_ATTRS)[number];
+
+const datasetKeyForAttr = (attr: string): string =>
+  attr.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+
+export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_DATASET_KEYS: ReadonlySet<string> = new Set([
+  ...DYNAMIC_DROPDOWN_HANDLER_ATTRS.map(datasetKeyForAttr),
+  'cfAction',
+  'cfSubmenu',
+]);
+
 const DYNAMIC_RIBBON_DROPDOWN_IDS: ReadonlySet<string> = new Set([
   'menu-paste',
   'menu-pivot-table',
-  'menu-defined-names-insert',
   'menu-defined-names',
-  'menu-links-file',
-  'menu-links-insert',
   'menu-links-data',
   'menu-conditional',
   'menu-fill',
   'menu-clear',
+  'menu-freeze',
   'menu-text-orientation',
   'menu-insert-cells',
   'menu-delete-cells',
@@ -124,7 +186,9 @@ const DYNAMIC_RIBBON_DROPDOWN_IDS: ReadonlySet<string> = new Set([
   'menu-page-theme',
   'menu-page-breaks',
   'menu-sheet-background',
+  'menu-print-area',
   'menu-print-titles',
+  'menu-arrange-objects',
   'menu-sort-home',
   'menu-sort',
   'menu-find-select',
@@ -142,6 +206,7 @@ const DYNAMIC_RIBBON_DROPDOWN_IDS: ReadonlySet<string> = new Set([
   'menu-picture-insert',
   'menu-shapes-insert',
   'menu-screenshot-insert',
+  'menu-symbol',
   'menu-script',
   'menu-table-style-home',
   'menu-table-style-insert',
@@ -156,16 +221,14 @@ const DYNAMIC_RIBBON_DROPDOWN_IDS: ReadonlySet<string> = new Set([
 // Ribbon command id ↔ menu DOM id (the one-and-only inverse-mapping table).
 // Both spec lookups read this — the click-handler walks command→menuId, the
 // menu reader walks menuId→command via the derived inverse map below.
-const RIBBON_DROPDOWN_MENU_FOR_COMMAND: Readonly<Record<string, string>> = {
+export const RIBBON_DROPDOWN_MENU_FOR_COMMAND: Readonly<Record<string, string>> = {
   paste: 'menu-paste',
   pivotTableInsert: 'menu-pivot-table',
-  namedRangesInsert: 'menu-defined-names-insert',
   namedRanges: 'menu-defined-names',
-  links: 'menu-links-file',
-  linksInsert: 'menu-links-insert',
   linksData: 'menu-links-data',
   conditional: 'menu-conditional',
   fillHome: 'menu-fill',
+  freeze: 'menu-freeze',
   textOrientation: 'menu-text-orientation',
   insertRows: 'menu-insert-cells',
   deleteRows: 'menu-delete-cells',
@@ -173,7 +236,9 @@ const RIBBON_DROPDOWN_MENU_FOR_COMMAND: Readonly<Record<string, string>> = {
   pageTheme: 'menu-page-theme',
   pageBreaks: 'menu-page-breaks',
   sheetBackground: 'menu-sheet-background',
+  printArea: 'menu-print-area',
   printTitles: 'menu-print-titles',
+  arrangeObjectsPageLayout: 'menu-arrange-objects',
   sortFilterHome: 'menu-sort-home',
   filter: 'menu-sort',
   findHome: 'menu-find-select',
@@ -191,6 +256,7 @@ const RIBBON_DROPDOWN_MENU_FOR_COMMAND: Readonly<Record<string, string>> = {
   pictureInsert: 'menu-picture-insert',
   shapesInsert: 'menu-shapes-insert',
   screenshotInsert: 'menu-screenshot-insert',
+  symbolInsert: 'menu-symbol',
   script: 'menu-script',
   formatTableHome: 'menu-table-style-home',
   formatTableInsert: 'menu-table-style-insert',
@@ -201,6 +267,10 @@ const RIBBON_DROPDOWN_MENU_FOR_COMMAND: Readonly<Record<string, string>> = {
   addIn: 'menu-add-ins',
   pdf: 'menu-pdf',
 };
+
+export const ribbonDropdownMenuIdForCommand = (commandId: string): string | null =>
+  RIBBON_DROPDOWN_MENU_FOR_COMMAND[commandId] ?? null;
+
 const RIBBON_DROPDOWN_COMMAND_FOR_MENU: Readonly<Record<string, string>> = Object.fromEntries(
   Object.entries(RIBBON_DROPDOWN_MENU_FOR_COMMAND).map(([command, menuId]) => [menuId, command]),
 );
@@ -302,7 +372,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
   // the handler with the attribute's value — handlers that need other dataset
   // bits (table variant, color) pull them off ctx.button.
   const DYNAMIC_DROPDOWN_HANDLERS: ReadonlyArray<{
-    attr: string;
+    attr: DynamicDropdownHandlerAttr;
     handler: DynamicDropdownHandler;
   }> = [
     { attr: 'paste-action', handler: (v) => ctx.applyRibbonPasteAction(v) },
@@ -319,6 +389,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
       },
     },
     { attr: 'clear', handler: (v) => ctx.applyClearAction(v) },
+    { attr: 'freeze', handler: (v) => ctx.applyFreezeAction(v) },
     { attr: 'text-orientation', handler: (v) => ctx.applyTextOrientationAction(v) },
     { attr: 'cell-insert', handler: (v) => ctx.applyCellInsertAction(v) },
     { attr: 'cell-delete', handler: (v) => ctx.applyCellDeleteAction(v) },
@@ -329,8 +400,17 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
       handler: (v) => ctx.applySheetBackgroundAction(v === 'clear' ? 'clear' : 'set'),
     },
     {
+      attr: 'print-area-action',
+      handler: (v) =>
+        ctx.applyPrintAreaAction(v === 'add' ? 'add' : v === 'clear' ? 'clear' : 'set'),
+    },
+    {
       attr: 'print-titles-action',
       handler: (v) => ctx.applyPrintTitlesAction(v as PrintTitlesAction),
+    },
+    {
+      attr: 'arrange-action',
+      handler: (v) => ctx.applyArrangeAction(v as ArrangeAction),
     },
     {
       attr: 'page-theme-action',
@@ -356,18 +436,21 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     },
     { attr: 'picture-insert', handler: (v) => ctx.insertPictureFromRibbon(v) },
     { attr: 'shape-insert', handler: (v) => ctx.insertShapeFromRibbon(v as SessionShapeKind) },
-    { attr: 'screenshot-insert', handler: () => ctx.insertScreenshotFromRibbon() },
+    { attr: 'screenshot-insert', handler: (v) => ctx.insertScreenshotFromRibbon(v) },
+    { attr: 'symbol', handler: (v) => ctx.applySymbolAction(v) },
+    { attr: 'symbol-action', handler: (v) => ctx.applySymbolAction(v) },
     { attr: 'script-action', handler: (v) => ctx.applyScriptAction(v) },
     { attr: 'pdf-action', handler: (v) => ctx.applyPdfAction(v) },
     {
       attr: 'table-style',
       handler: (v, { button }) => {
         const variant = (button.dataset.tableVariant as TableVariantId | undefined) ?? 'banded';
-        return ctx.createTableFromSelection(v as TableStyle, button.dataset.tableColor, variant);
+        return ctx.createTableFromSelection(v, button.dataset.tableColor, variant);
       },
     },
     { attr: 'table-style-footer', handler: (v) => ctx.openTableStyleFooterAction(v) },
-    { attr: 'cell-style', handler: (v) => ctx.applyCellStyleFromRibbon(v as CellStyleId) },
+    { attr: 'pivot-table-style', handler: (v) => ctx.applyPivotTableStyleFromRibbon(v) },
+    { attr: 'cell-style', handler: (v) => ctx.applyCellStyleFromRibbon(v) },
     { attr: 'cell-style-footer', handler: (v) => ctx.openCellStyleFooterAction(v) },
     { attr: 'currency-preset', handler: (v) => ctx.applyCurrencyPreset(v) },
     { attr: 'currency-footer', handler: (v) => ctx.openCurrencyFooterAction(v) },
@@ -412,7 +495,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     for (const entry of DYNAMIC_DROPDOWN_HANDLERS) {
       const button = target?.closest<HTMLButtonElement>(`[data-${entry.attr}]`);
       if (!button) continue;
-      const datasetKey = entry.attr.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+      const datasetKey = datasetKeyForAttr(entry.attr);
       const value = button.dataset[datasetKey];
       if (value === undefined) continue;
       event.preventDefault();

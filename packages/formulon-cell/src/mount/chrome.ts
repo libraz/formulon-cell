@@ -62,18 +62,18 @@ export function createMountChrome({
   const fxCancel = document.createElement('button');
   fxCancel.type = 'button';
   fxCancel.className = 'fc-host__formulabar-action fc-host__formulabar-action--cancel';
-  fxCancel.textContent = '×';
   fxCancel.tabIndex = -1;
   fxCancel.disabled = true;
   fxCancel.setAttribute('aria-label', strings.a11y.cancelFormulaEdit);
+  appendHostIcon(fxCancel, ['M6 6l8 8', 'M14 6l-8 8']);
 
   const fxAccept = document.createElement('button');
   fxAccept.type = 'button';
   fxAccept.className = 'fc-host__formulabar-action fc-host__formulabar-action--accept';
-  fxAccept.textContent = '✓';
   fxAccept.tabIndex = -1;
   fxAccept.disabled = true;
   fxAccept.setAttribute('aria-label', strings.a11y.enterFormula);
+  appendHostIcon(fxAccept, ['M5 10.5l3 3 7-7']);
 
   const fxInput = document.createElement('textarea');
   fxInput.className = 'fc-host__formulabar-input';
@@ -88,7 +88,7 @@ export function createMountChrome({
   fxExpand.className = 'fc-host__formulabar-expand';
   fxExpand.setAttribute('aria-expanded', 'false');
   fxExpand.tabIndex = -1;
-  fxExpand.textContent = '⌄';
+  appendHostIcon(fxExpand, ['M5.5 7.5 10 12l4.5-4.5']);
 
   const refreshFormulaBarLabels = (): void => {
     const strings = getStrings();
@@ -109,12 +109,14 @@ export function createMountChrome({
     if (expanded) {
       delete formulabar.dataset.fcExpanded;
       fxExpand.setAttribute('aria-expanded', 'false');
-      fxExpand.textContent = '⌄';
+      fxExpand.replaceChildren();
+      appendHostIcon(fxExpand, ['M5.5 7.5 10 12l4.5-4.5']);
       fxInput.rows = 1;
     } else {
       formulabar.dataset.fcExpanded = '1';
       fxExpand.setAttribute('aria-expanded', 'true');
-      fxExpand.textContent = '⌃';
+      fxExpand.replaceChildren();
+      appendHostIcon(fxExpand, ['M5.5 12.5 10 8l4.5 4.5']);
       fxInput.rows = 4;
     }
     refreshFormulaBarLabels();
@@ -137,6 +139,7 @@ export function createMountChrome({
 
   const statusbar = document.createElement('div');
   statusbar.className = 'fc-host__statusbar';
+  statusbar.tabIndex = -1;
   const sheetbar = document.createElement('div');
   sheetbar.className = 'fc-host__sheetbar';
   const sheetNav = document.createElement('div');
@@ -144,11 +147,11 @@ export function createMountChrome({
   const firstSheet = document.createElement('button');
   firstSheet.type = 'button';
   firstSheet.className = 'fc-host__sheetbar-navbtn';
-  appendSheetbarIcon(firstSheet, ['M12.5 4.5 7 10l5.5 5.5']);
+  appendHostIcon(firstSheet, ['M12.5 4.5 7 10l5.5 5.5']);
   const lastSheet = document.createElement('button');
   lastSheet.type = 'button';
   lastSheet.className = 'fc-host__sheetbar-navbtn';
-  appendSheetbarIcon(lastSheet, ['M7.5 4.5 13 10l-5.5 5.5']);
+  appendHostIcon(lastSheet, ['M7.5 4.5 13 10l-5.5 5.5']);
   sheetNav.append(firstSheet, lastSheet);
 
   const sheetTabs = document.createElement('div');
@@ -157,7 +160,7 @@ export function createMountChrome({
   const addSheetBtn = document.createElement('button');
   addSheetBtn.type = 'button';
   addSheetBtn.className = 'fc-host__sheetbar-add';
-  appendSheetbarIcon(addSheetBtn, ['M10 4.5v11', 'M4.5 10h11']);
+  appendHostIcon(addSheetBtn, ['M10 4.5v11', 'M4.5 10h11']);
   sheetbar.append(sheetNav, sheetTabs, addSheetBtn);
 
   const sheetMenu = document.createElement('div');
@@ -251,7 +254,7 @@ export function createMountChrome({
   };
 }
 
-function appendSheetbarIcon(
+function appendHostIcon(
   button: HTMLButtonElement,
   paths: readonly string[],
   viewBox = '0 0 20 20',

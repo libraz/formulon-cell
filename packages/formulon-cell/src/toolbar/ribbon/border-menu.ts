@@ -33,6 +33,7 @@ export interface BorderMenuApi {
   refreshBorderMenuState: () => void;
   applyBorderPresetMenuAction: (key: string) => void;
   applyBorderDrawMenuAction: (action: string | undefined) => void;
+  detach: () => void;
 }
 
 type BorderPresetKey =
@@ -130,37 +131,44 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
     focusMenuItem(menu);
   };
 
-  borderBtn?.addEventListener('click', (e) => {
+  const onBorderButtonClick = (e: MouseEvent): void => {
     e.stopPropagation();
     if (!borderMenu) return;
     if (borderMenu.hidden) openBorderMenu();
     else closeBorderMenu();
-  });
+  };
+  borderBtn?.addEventListener('click', onBorderButtonClick);
 
-  document.addEventListener('mousedown', (e) => {
+  const onDocumentMouseDown = (e: MouseEvent): void => {
     const menu = getBorderMenu();
     const btn = getBorderBtn();
     if (!menu || menu.hidden) return;
     if (menu.contains(e.target as Node)) return;
     if (btn?.contains(e.target as Node)) return;
     closeBorderMenu();
-  });
+  };
+  document.addEventListener('mousedown', onDocumentMouseDown);
 
-  document.addEventListener('keydown', (e) => {
+  const onDocumentEscapeKey = (e: KeyboardEvent): void => {
     const menu = getBorderMenu();
     if (e.key === 'Escape' && !menu?.hidden) closeBorderMenu(true);
-  });
+  };
+  document.addEventListener('keydown', onDocumentEscapeKey);
 
-  borderMenu?.addEventListener('keydown', (e) => {
+  const onBorderMenuKeydown = (e: KeyboardEvent): void => {
+    if (!borderMenu) return;
     handleMenuKeydown(e, borderMenu, { close: closeBorderMenu, restoreFocusTo: borderBtn });
-  });
+  };
+  borderMenu?.addEventListener('keydown', onBorderMenuKeydown);
 
-  document.addEventListener('keydown', (event) => {
+  const onDocumentSubmenuKeydown = (event: KeyboardEvent): void => {
     const target = event.target as Element | null;
+    if (!(target instanceof Element)) return;
     const menu = target?.closest<HTMLDivElement>('#menu-borders');
     if (!menu || menu === borderMenu) return;
     handleMenuKeydown(event, menu, { close: closeBorderMenu, restoreFocusTo: getBorderBtn() });
-  });
+  };
+  document.addEventListener('keydown', onDocumentSubmenuKeydown);
 
   const applyBorderPresetMenuAction = (key: string): void => {
     const i = ctx.getInst();
@@ -265,8 +273,9 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
       });
     });
 
-  document.addEventListener('click', (event) => {
+  const onDocumentClick = (event: MouseEvent): void => {
     const target = event.target as Element | null;
+    if (!(target instanceof Element)) return;
     const menu = target?.closest<HTMLElement>('#menu-borders');
     if (!menu || menu === borderMenu) return;
     const preset = target?.closest<HTMLButtonElement>('[data-border-preset]');
@@ -305,10 +314,12 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
         });
       closeBorderSubmenus();
     }
-  });
+  };
+  document.addEventListener('click', onDocumentClick);
 
-  document.addEventListener('mouseover', (event) => {
+  const onDocumentMouseOver = (event: MouseEvent): void => {
     const target = event.target as Element | null;
+    if (!(target instanceof Element)) return;
     const menu = target?.closest<HTMLElement>('#menu-borders');
     if (!menu || menu === borderMenu) return;
     const submenu = target?.closest<HTMLButtonElement>('[data-border-submenu]');
@@ -318,7 +329,18 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
       return;
     }
     if (target?.closest('[data-border-preset], [data-border-draw]')) closeBorderSubmenus();
-  });
+  };
+  document.addEventListener('mouseover', onDocumentMouseOver);
+
+  const detach = (): void => {
+    borderBtn?.removeEventListener('click', onBorderButtonClick);
+    borderMenu?.removeEventListener('keydown', onBorderMenuKeydown);
+    document.removeEventListener('mousedown', onDocumentMouseDown);
+    document.removeEventListener('keydown', onDocumentEscapeKey);
+    document.removeEventListener('keydown', onDocumentSubmenuKeydown);
+    document.removeEventListener('click', onDocumentClick);
+    document.removeEventListener('mouseover', onDocumentMouseOver);
+  };
 
   return {
     openBorderMenu,
@@ -327,5 +349,6 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
     refreshBorderMenuState,
     applyBorderPresetMenuAction,
     applyBorderDrawMenuAction,
+    detach,
   };
 };

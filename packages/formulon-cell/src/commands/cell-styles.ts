@@ -1,5 +1,14 @@
+import { addrKey } from '../engine/address.js';
+import { cellFormatFromXf } from '../engine/cell-format-sync.js';
 import type { Range } from '../engine/types.js';
-import { type CellFormat, mutators, type SpreadsheetStore } from '../store/store.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import {
+  type CellFormat,
+  type CustomCellStyle,
+  mutators,
+  type SpreadsheetStore,
+} from '../store/store.js';
+import { applyFormatPatch } from './format.js';
 import type { History } from './history.js';
 import { recordFormatChange } from './history.js';
 
@@ -61,6 +70,24 @@ export type CellStyleGroupId =
 export interface CellStyleGroupDef {
   id: CellStyleGroupId;
   styleIds: readonly CellStyleId[];
+}
+
+export interface MergeCellStylesResult {
+  imported: number;
+  skipped: number;
+}
+
+export interface CellStyleIncludeOptions {
+  number?: boolean;
+  alignment?: boolean;
+  font?: boolean;
+  border?: boolean;
+  fill?: boolean;
+  protection?: boolean;
+}
+
+export interface CreateCellStyleOptions {
+  include?: CellStyleIncludeOptions;
 }
 
 /** Spreadsheet-flavored named cell style presets. The format payloads stay close to
@@ -296,9 +323,86 @@ export const CELL_STYLE_GROUPS: readonly CellStyleGroupDef[] = [
 ];
 
 const STYLE_BY_ID = new Map<CellStyleId, CellStyleDef>(CELL_STYLES.map((s) => [s.id, s]));
+const CUSTOM_STYLE_PREFIX = 'custom:';
+const BUILT_IN_STYLE_NAMES = new Set(
+  CELL_STYLES.flatMap((style) => [style.id.toLowerCase(), style.label.toLowerCase()]),
+);
 
 export function getCellStyle(id: CellStyleId): CellStyleDef | undefined {
   return STYLE_BY_ID.get(id);
+}
+
+export function customCellStyleId(name: string): string {
+  return `${CUSTOM_STYLE_PREFIX}${name.trim()}`;
+}
+
+export function listCustomCellStyles(state: {
+  format: { customCellStyles?: readonly CustomCellStyle[] };
+}): readonly CustomCellStyle[] {
+  return state.format.customCellStyles ?? [];
+}
+
+export function customCellStyleById(
+  state: { format: { customCellStyles?: readonly CustomCellStyle[] } },
+  id: string,
+): CustomCellStyle | null {
+  return (state.format.customCellStyles ?? []).find((style) => style.id === id) ?? null;
+}
+
+const DEFAULT_CELL_STYLE_INCLUDE: Required<CellStyleIncludeOptions> = {
+  number: true,
+  alignment: true,
+  font: true,
+  border: true,
+  fill: true,
+  protection: true,
+};
+
+export function filterCellStyleFormat(
+  format: Partial<CellFormat>,
+  include: CellStyleIncludeOptions = DEFAULT_CELL_STYLE_INCLUDE,
+): Partial<CellFormat> {
+  const opts = { ...DEFAULT_CELL_STYLE_INCLUDE, ...include };
+  const filtered: Partial<CellFormat> = {};
+  const copy = <K extends keyof CellFormat>(key: K): void => {
+    if (Object.hasOwn(format, key)) {
+      filtered[key] = format[key];
+    }
+  };
+  if (opts.number) {
+    copy('numFmt');
+  }
+  if (opts.alignment) {
+    copy('align');
+    copy('vAlign');
+    copy('wrap');
+    copy('shrinkToFit');
+    copy('indent');
+    copy('rotation');
+    copy('textDirection');
+  }
+  if (opts.font) {
+    copy('bold');
+    copy('italic');
+    copy('underline');
+    copy('strike');
+    copy('color');
+    copy('fontFamily');
+    copy('fontSize');
+  }
+  if (opts.border) {
+    copy('borders');
+  }
+  if (opts.fill) {
+    copy('fill');
+    copy('fillPattern');
+    copy('fillPatternColor');
+  }
+  if (opts.protection) {
+    copy('locked');
+    copy('formulaHidden');
+  }
+  return filtered;
 }
 
 /** Apply a named style to `range`. Wraps the format mutation in a single
@@ -339,4 +443,94 @@ export function applyCellStyle(
     }
     mutators.setRangeFormat(store, range, { ...def.format, cellStyle: id });
   });
+}
+
+export function applyCellStyleByName(
+  store: SpreadsheetStore,
+  history: History | null,
+  range: Range,
+  id: string,
+): boolean {
+  if (STYLE_BY_ID.has(id as CellStyleId)) {
+    applyCellStyle(store, history, range, id as CellStyleId);
+    return true;
+  }
+  const custom = customCellStyleById(store.getState(), id);
+  if (!custom) return false;
+  let applied = false;
+  recordFormatChange(history, store, () => {
+    applied = applyFormatPatch(store.getState(), store, range, {
+      ...custom.format,
+      cellStyle: custom.label,
+    });
+  });
+  return applied;
+}
+
+/** Create an ad-hoc named style from the active cell's current formatting and
+ *  apply it to `range`. This mirrors Excel's "New Cell Style..." default of
+ *  starting from the selected cell while keeping the implementation session
+ *  scoped until a full OOXML style registry is available. */
+export function createCellStyleFromActiveFormat(
+  store: SpreadsheetStore,
+  history: History | null,
+  range: Range,
+  name: string,
+  options: CreateCellStyleOptions = {},
+): boolean {
+  const styleName = name.trim();
+  if (!styleName) return false;
+  let applied = false;
+  recordFormatChange(history, store, () => {
+    const state = store.getState();
+    const { cellStyle: _cellStyle, ...activeFormat } =
+      state.format.formats.get(addrKey(state.selection.active)) ?? {};
+    const styleFormat = filterCellStyleFormat(activeFormat, options.include);
+    const patch: Partial<CellFormat> = { ...styleFormat, cellStyle: styleName };
+    mutators.upsertCustomCellStyle(store, {
+      id: customCellStyleId(styleName),
+      label: styleName,
+      format: styleFormat,
+    });
+    applied = applyFormatPatch(state, store, range, patch);
+  });
+  return applied;
+}
+
+export function mergeCellStylesFromWorkbook(
+  store: SpreadsheetStore,
+  history: History | null,
+  workbook: WorkbookHandle,
+): MergeCellStylesResult {
+  const namedStyles = workbook.getNamedCellStyles();
+  const merged: CustomCellStyle[] = [];
+  let skipped = 0;
+  for (const style of namedStyles) {
+    const label = style.name.trim();
+    if (!label) {
+      skipped += 1;
+      continue;
+    }
+    if (BUILT_IN_STYLE_NAMES.has(label.toLowerCase())) {
+      skipped += 1;
+      continue;
+    }
+    const xf = workbook.getCellStyleXf(style.xfId);
+    if (!xf) {
+      skipped += 1;
+      continue;
+    }
+    merged.push({
+      id: customCellStyleId(label),
+      label,
+      format: cellFormatFromXf(workbook, xf),
+    });
+  }
+  if (merged.length === 0) return { imported: 0, skipped };
+  recordFormatChange(history, store, () => {
+    for (const style of merged) {
+      mutators.upsertCustomCellStyle(store, style);
+    }
+  });
+  return { imported: merged.length, skipped };
 }

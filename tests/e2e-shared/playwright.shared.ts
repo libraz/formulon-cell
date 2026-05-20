@@ -23,8 +23,8 @@ export function defineDemoAppConfig(app: DemoApp) {
     // own spec directory.
     testDir: './e2e',
     // Visual regression specs live under `e2e/visual/` and require a Linux
-    // baseline. Normal e2e runs skip them.
-    testIgnore: ['**/visual/**'],
+    // baseline. Normal e2e runs skip them; opt in with FC_VISUAL=1.
+    testIgnore: process.env.FC_VISUAL ? [] : ['**/visual/**'],
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,

@@ -322,7 +322,7 @@ describe('replaceOne / replaceAll', () => {
     store.setState((s) => {
       const formats = new Map(s.format.formats);
       formats.set(addrKey({ sheet: 0, row: 1, col: 0 }), { locked: false });
-      return { ...s, format: { formats } };
+      return { ...s, format: { ...s.format, formats } };
     });
 
     const count = replaceAll(store.getState(), wb, { query: 'foo' }, 'bar', store);

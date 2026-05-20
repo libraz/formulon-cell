@@ -1,4 +1,5 @@
 import type { History } from '../commands/history.js';
+import type { PrinterProfile } from '../commands/printer-profile.js';
 import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
 import { setSheetZoom } from '../commands/structure.js';
 import { tracePrecedents as tracePrecedentArrows } from '../commands/traces.js';
@@ -26,8 +27,12 @@ import { attachNamedRangeDialog } from '../interact/named-range-dialog.js';
 import { attachPageSetupDialog } from '../interact/page-setup-dialog.js';
 import { attachPivotTableDialog } from '../interact/pivot-table-dialog.js';
 import { attachSessionCharts, type SessionChartsHandle } from '../interact/session-charts.js';
+import {
+  attachSessionIllustrations,
+  type SessionIllustrationsHandle,
+} from '../interact/session-illustrations.js';
 import { attachSlicer, type SlicerHandle } from '../interact/slicer.js';
-import { attachStatusBar } from '../interact/status-bar.js';
+import { attachStatusBar, type StatusBarDeps } from '../interact/status-bar.js';
 import { attachViewToolbar, type ViewToolbarHandle } from '../interact/view-toolbar.js';
 import { attachWatchPanel } from '../interact/watch-panel.js';
 import { attachWheel } from '../interact/wheel.js';
@@ -36,7 +41,7 @@ import {
   type WorkbookObjectsPanelHandle,
 } from '../interact/workbook-objects.js';
 import type { GridRenderer } from '../render/grid.js';
-import type { SpreadsheetStore } from '../store/store.js';
+import type { PageMargins, PageSetup, SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import type { ChromeSlot } from './chrome.js';
 import type { FormulaBarController } from './formula-bar.js';
@@ -100,6 +105,7 @@ export const HOST_TOGGLEABLE_IDS = [
   'watchWindow',
   'slicer',
   'charts',
+  'illustrations',
   'errorIndicators',
   'autocomplete',
   'wheel',
@@ -126,6 +132,7 @@ export const HOST_FEATURE_USES_STRINGS: ReadonlySet<string> = new Set([
   'watchWindow',
   'slicer',
   'charts',
+  'illustrations',
   'errorIndicators',
 ]);
 
@@ -160,6 +167,7 @@ export interface HostFeatureState {
   unsubWatchWb: () => void;
   slicer: SlicerHandle | null;
   sessionCharts: SessionChartsHandle | null;
+  sessionIllustrations: SessionIllustrationsHandle | null;
   viewToolbar: ViewToolbarHandle | null;
   workbookObjects: WorkbookObjectsPanelHandle | null;
   unsubSlicerRecalc: () => void;
@@ -184,6 +192,18 @@ interface HostFeatureControllerInput {
   getFormulaBar: () => FormulaBarController;
   getOnCanvasClick: () => (e: MouseEvent) => void;
   getOnHostKey: () => (e: KeyboardEvent) => void;
+  getPrintableBoundsForPageSetup: (
+    setup: PageSetup,
+    sheet: number,
+    previous: PageSetup,
+    printerProfileId: string | undefined,
+  ) => Partial<PageMargins> | null | undefined;
+  getPrinterProfiles: () => readonly PrinterProfile[] | undefined;
+  getPrinterProfileId: () => string | undefined;
+  setPrinterProfileId: (next: string | undefined) => void;
+  refreshPrinterProfiles: () => Promise<readonly PrinterProfile[] | undefined>;
+  getUploadStatus: StatusBarDeps['getUploadStatus'];
+  getMacroRecording: StatusBarDeps['getMacroRecording'];
   getSheetTabs: () => SheetTabsController | null;
   grid: HTMLElement;
   history: History;
@@ -236,6 +256,7 @@ export function createHostFeatureState(autocompleteStub: AutocompleteHandle): Ho
     unsubWatchWb: (): void => {},
     slicer: null,
     sessionCharts: null,
+    sessionIllustrations: null,
     viewToolbar: null,
     workbookObjects: null,
     unsubSlicerRecalc: (): void => {},
@@ -386,6 +407,11 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           store: input.store,
           strings,
           history: input.history,
+          resolvePrintableBounds: input.getPrintableBoundsForPageSetup,
+          getPrinterProfiles: input.getPrinterProfiles,
+          getPrinterProfileId: input.getPrinterProfileId,
+          setPrinterProfileId: input.setPrinterProfileId,
+          refreshPrinterProfiles: input.refreshPrinterProfiles,
         });
         input.featureRegistry.set(
           'pageSetup',
@@ -445,6 +471,9 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           store: input.store,
           strings,
           getEngineLabel: () => (wb.isStub ? 'stub' : `formulon ${wb.version}`),
+          getFormulaEditing: () => input.getFormulaBar().isEditing(),
+          getUploadStatus: input.getUploadStatus,
+          getMacroRecording: input.getMacroRecording,
           getCalcMode: () => wb.calcMode(),
           onCycleCalcMode: () => {
             const cur = wb.calcMode();
@@ -470,7 +499,18 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         break;
       case 'workbookObjects':
         if (s.workbookObjects) return;
-        s.workbookObjects = attachWorkbookObjectsPanel({ host: input.host, wb, strings });
+        s.workbookObjects = attachWorkbookObjectsPanel({
+          host: input.host,
+          wb,
+          strings,
+          listSessionIllustrations: () => input.store.getState().illustrations.illustrations,
+          subscribeSessionObjects: (listener) => input.store.subscribe(listener),
+          onOpenPivotTableDialog: () => s.pivotTableDialog?.open(),
+          onAfterPivotEdit: () => {
+            mutators.replaceCells(input.store, wb.cells(input.store.getState().data.sheetIndex));
+            input.renderer.invalidate();
+          },
+        });
         input.featureRegistry.set(
           'workbookObjects',
           input.wrapHandle(s.workbookObjects, () => s.workbookObjects?.detach()),
@@ -538,6 +578,20 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         input.featureRegistry.set(
           'charts',
           input.wrapHandle(s.sessionCharts, () => s.sessionCharts?.detach()),
+        );
+        break;
+      case 'illustrations':
+        if (s.sessionIllustrations) return;
+        s.sessionIllustrations = attachSessionIllustrations({
+          host: input.host,
+          store: input.store,
+          history: input.history,
+          closeLabel: strings.workbookObjects.close,
+          resizeLabel: strings.sessionCharts.resize,
+        });
+        input.featureRegistry.set(
+          'illustrations',
+          input.wrapHandle(s.sessionIllustrations, () => s.sessionIllustrations?.detach()),
         );
         break;
       case 'errorIndicators':
@@ -722,6 +776,11 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         s.sessionCharts?.detach();
         s.sessionCharts = null;
         input.featureRegistry.delete('charts');
+        break;
+      case 'illustrations':
+        s.sessionIllustrations?.detach();
+        s.sessionIllustrations = null;
+        input.featureRegistry.delete('illustrations');
         break;
       case 'errorIndicators':
         if (s.canvasErrorClickAttached)

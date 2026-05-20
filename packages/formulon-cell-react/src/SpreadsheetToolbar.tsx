@@ -28,6 +28,7 @@ type CallbackBag = {
   onDrawEraser?: () => void;
   onTranslate?: () => void;
   onAddIn?: () => void;
+  onToolbarReady?: (toolbar: ToolbarInstance | null) => void;
   onTabChange: (tab: import('./toolbar/model.js').RibbonTab) => void;
 };
 
@@ -43,7 +44,9 @@ export const SpreadsheetToolbar = ({
   onDrawEraser,
   onTranslate,
   onAddIn,
+  onToolbarReady,
   dropdownActions,
+  ribbonTabs,
 }: SpreadsheetToolbarProps): ReactElement => {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const toolbarRef = useRef<ToolbarInstance | null>(null);
@@ -60,6 +63,7 @@ export const SpreadsheetToolbar = ({
     onDrawEraser,
     onTranslate,
     onAddIn,
+    onToolbarReady,
   });
   callbacksRef.current = {
     onTabChange,
@@ -70,6 +74,7 @@ export const SpreadsheetToolbar = ({
     onDrawEraser,
     onTranslate,
     onAddIn,
+    onToolbarReady,
   };
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: activeTab handled by the tab-switch effect below; including it would re-mount the toolbar on every tab click
@@ -96,6 +101,7 @@ export const SpreadsheetToolbar = ({
     const tb = Spreadsheet.mountToolbar(host as HTMLElement, instance as SpreadsheetInstance, {
       lang: locale === 'en' ? 'en' : 'ja',
       activeTab,
+      ribbonTabs,
       onTabChange: (tab) => callbacksRef.current.onTabChange(tab),
       // Opt into core's default dropdown-menu click delegator so Fill / Clear
       // / AutoSum / etc. work without each consumer reimplementing the
@@ -116,11 +122,13 @@ export const SpreadsheetToolbar = ({
       },
     });
     toolbarRef.current = tb;
+    callbacksRef.current.onToolbarReady?.(tb);
     return () => {
+      callbacksRef.current.onToolbarReady?.(null);
       tb.dispose();
       toolbarRef.current = null;
     };
-  }, [instance, locale, dropdownActions]);
+  }, [instance, locale, dropdownActions, ribbonTabs]);
 
   // Forward external tab changes into the toolbar without re-mounting.
   useEffect(() => {

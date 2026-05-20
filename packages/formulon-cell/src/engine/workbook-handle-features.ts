@@ -730,6 +730,24 @@ export abstract class WorkbookHandleFeatureMethods {
     };
   }
 
+  /** Resolve the `<cellStyleXfs>` row used by a named style. This is
+   *  separate from cell XF rows: `getCellStyle(index).xfId` points here. */
+  getCellStyleXf(xfId: number): CellXf | null {
+    assertAlive(this);
+    if (!this.capabilities.cellStyles) return null;
+    const r = wb(this).getCellStyleXf(xfId);
+    if (!r.status.ok) return null;
+    return {
+      fontIndex: r.fontIndex,
+      fillIndex: r.fillIndex,
+      borderIndex: r.borderIndex,
+      numFmtId: r.numFmtId,
+      horizontalAlign: r.horizontalAlign,
+      verticalAlign: r.verticalAlign,
+      wrapText: r.wrapText,
+    };
+  }
+
   /** Enumerate every named cell style on the workbook — combines
    *  `cellStyleCount` + `getCellStyle` into one snapshot suitable for
    *  populating a "Cell Styles" UI. Empty under stub mode. Hidden

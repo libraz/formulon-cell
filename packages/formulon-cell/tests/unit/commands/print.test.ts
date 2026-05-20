@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildPrintDocument,
+  effectivePrintMargins,
   parsePrintArea,
+  parsePrintAreas,
   parsePrintTitleCols,
   parsePrintTitleRows,
+  printableMarginAdjustments,
   printSheet,
 } from '../../../src/commands/print.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -102,7 +105,16 @@ describe('parsePrintArea', () => {
   it('rejects malformed areas', () => {
     expect(parsePrintArea('1:3')).toBeNull();
     expect(parsePrintArea('A:C')).toBeNull();
+    expect(parsePrintArea('A1:B2,C3:D4')).toBeNull();
     expect(parsePrintArea('')).toBeNull();
+  });
+
+  it('parses comma-separated print areas', () => {
+    expect(parsePrintAreas('A1:B2, D4:E5')).toEqual([
+      { row0: 0, col0: 0, row1: 1, col1: 1 },
+      { row0: 3, col0: 3, row1: 4, col1: 4 },
+    ]);
+    expect(parsePrintAreas('A1:B2,1:3')).toBeNull();
   });
 });
 
@@ -305,6 +317,22 @@ describe('buildPrintDocument', () => {
     wb.dispose();
   });
 
+  it('prints multiple configured print areas as separate sections', async () => {
+    const wb = await newWb();
+    const store = createSpreadsheetStore();
+    setText(store, wb, 0, 0, 'first area');
+    setText(store, wb, 2, 2, 'outside gap');
+    setText(store, wb, 4, 4, 'second area');
+    mutators.setPageSetup(store, 0, { printArea: 'A1:A1,E5:E5' });
+
+    const doc = buildPrintDocument(wb, store, 0);
+    expect(doc.html).toContain('first area');
+    expect(doc.html).toContain('second area');
+    expect(doc.html).not.toContain('outside gap');
+    expect(doc.html).toContain('fc-print__area--break');
+    wb.dispose();
+  });
+
   it('prints comments as displayed or at the end of the sheet', async () => {
     const wb = await newWb();
     const store = createSpreadsheetStore();
@@ -450,6 +478,43 @@ describe('buildPrintDocument', () => {
     expect(doc.html).not.toContain('transform:scale(0.5)');
     wb.dispose();
   });
+
+  it('keeps printed content inside host-provided printable bounds', async () => {
+    const wb = await newWb();
+    const store = createSpreadsheetStore();
+    setNumber(store, wb, 0, 0, 1);
+    mutators.setPageSetup(store, 0, {
+      margins: { top: 0.1, right: 0.7, bottom: 0.1, left: 0.7 },
+      printableBounds: { top: 0.25, right: 0.2, bottom: 0.25, left: 0.2 },
+    });
+
+    const setup = store.getState().pageSetup.setupBySheet.get(0);
+    expect(setup ? effectivePrintMargins(setup) : null).toEqual({
+      top: 0.25,
+      right: 0.7,
+      bottom: 0.25,
+      left: 0.7,
+    });
+    expect(setup ? printableMarginAdjustments(setup) : null).toEqual([
+      { side: 'top', margin: 0.1, minimum: 0.25, effective: 0.25 },
+      { side: 'bottom', margin: 0.1, minimum: 0.25, effective: 0.25 },
+    ]);
+
+    const doc = buildPrintDocument(wb, store, 0);
+    expect(doc.html).toContain('@page { size: A4 portrait; margin: 0.25in 0.7in 0.25in 0.7in; }');
+    expect(doc.cssVars['--fc-print-margin-top']).toBe('0.1in');
+    expect(doc.cssVars['--fc-print-effective-margin-top']).toBe('0.25in');
+    expect(doc.cssVars['--fc-print-printable-top']).toBe('0.25in');
+
+    const profileDoc = buildPrintDocument(wb, store, 0, 'Print', {
+      printableBounds: { top: 0.4, right: 0.1, bottom: 0.4, left: 0.1 },
+    });
+    expect(profileDoc.html).toContain(
+      '@page { size: A4 portrait; margin: 0.4in 0.7in 0.4in 0.7in; }',
+    );
+    expect(profileDoc.cssVars['--fc-print-printable-top']).toBe('0.4in');
+    wb.dispose();
+  });
 });
 
 describe('printSheet', () => {
@@ -467,11 +532,28 @@ describe('printSheet', () => {
     const original = (window as unknown as { print?: () => void }).print;
     (window as unknown as { print: () => void }).print = winPrint;
 
-    const remove = printSheet(wb, store, 0, host, 'PDF', 'pdf');
+    const remove = printSheet(wb, store, 0, host, 'PDF', 'pdf', {
+      printerProfileId: 'selected',
+      printerProfiles: [
+        {
+          id: 'fallback',
+          paperSize: 'A4',
+          orientation: 'portrait',
+          printableBounds: { top: 0.4, right: 0.4, bottom: 0.4, left: 0.4 },
+        },
+        {
+          id: 'selected',
+          paperSize: 'A4',
+          orientation: 'portrait',
+          printableBounds: { top: 1, right: 0.8, bottom: 1, left: 0.8 },
+        },
+      ],
+    });
     const iframe = host.querySelector('iframe');
     expect(iframe).not.toBeNull();
     expect(iframe?.dataset.fcPrintMode).toBe('pdf');
     expect(iframe?.srcdoc).toContain('<title>PDF</title>');
+    expect(iframe?.srcdoc).toContain('@page { size: A4 portrait; margin: 1in 0.8in 1in 0.8in; }');
     if (iframe?.contentWindow) {
       // Stub the iframe's contentWindow.print too — without it the iframe
       // load handler would try to drive the real print pipeline.

@@ -1,7 +1,7 @@
 import {
+  activateSheetView,
   analyzeAccessibilityCells,
   analyzeSpellingCells,
-  activateSheetView,
   buildTranslationReviewItems,
   bumpDecimals,
   bumpIndent,
@@ -71,7 +71,6 @@ export const buildRibbonGroups = ({
   dataFilterMenu,
   dataSortMenu,
   dataValidationMenu,
-  definedNamesInsertMenu,
   definedNamesMenu,
   deleteCommentMenu,
   errorCheckingMenu,
@@ -97,7 +96,6 @@ export const buildRibbonGroups = ({
   mergeMenu,
   onCopy,
   onCut,
-  onAddIn,
   onFormatPainter,
   onDrawEraser,
   onDrawPen,
@@ -510,7 +508,13 @@ export const buildRibbonGroups = ({
             active.vAlignBottom,
           ),
           textOrientationMenu,
-          tool('wrap', tr.wrapText, <Icon name="wrap" />, () => wrapFormat(toggleWrap), active.wrapText),
+          tool(
+            'wrap',
+            tr.wrapText,
+            <Icon name="wrap" />,
+            () => wrapFormat(toggleWrap),
+            active.wrapText,
+          ),
           rowBreak('alignment-row-2'),
           tool(
             'alignL',
@@ -590,10 +594,14 @@ export const buildRibbonGroups = ({
             active.percent,
             ' demo__rb--mono',
           ),
-          tool('comma', tr.commaStyle, <Icon name="comma" />, () =>
-            wrapFormat((s, st) =>
-              setNumFmt(s, st, { kind: 'fixed', decimals: 2, thousands: true }),
-            ),
+          tool(
+            'comma',
+            tr.commaStyle,
+            <Icon name="comma" />,
+            () =>
+              wrapFormat((s, st) =>
+                setNumFmt(s, st, { kind: 'fixed', decimals: 2, thousands: true }),
+              ),
             active.commaStyle,
           ),
           tool('decDown', tr.decreaseDecimals, <Icon name="decDown" />, () =>
@@ -610,44 +618,10 @@ export const buildRibbonGroups = ({
       group(tr.editing, [autosumMenu, fillMenu, clearMenu, sortMenu, findMenu], 'editing'),
     ],
     insert: [
-      group(
-        tr.tables,
-        [
-          pivotTableMenu,
-          formatTableInsertMenu,
-          definedNamesInsertMenu,
-          tool(
-            'removeDupesInsert',
-            tr.removeDuplicates,
-            iconLabel('removeDuplicates', tr.removeDuplicates),
-            onRemoveDuplicates,
-            false,
-            ' demo__rb--wide',
-          ),
-        ],
-        'tiles',
-      ),
-      group(
-        tr.illustrations,
-        [pictureInsertMenu, shapesInsertMenu, screenshotInsertMenu],
-        'tiles',
-      ),
+      group(tr.tables, [pivotTableMenu, formatTableInsertMenu], 'tiles'),
+      group(tr.illustrations, [pictureInsertMenu, shapesInsertMenu, screenshotInsertMenu], 'tiles'),
       group(tr.charts, [chartMenu], 'tiles'),
-      group(
-        tr.links,
-        [
-          hyperlinkMenu,
-          tool(
-            'linksInsert',
-            tr.links,
-            iconLabel('link', tr.links),
-            () => instance?.openExternalLinksDialog(),
-            false,
-            ' demo__rb--wide',
-          ),
-        ],
-        'tiles',
-      ),
+      group(tr.links, [hyperlinkMenu], 'tiles'),
       group(
         tr.comments,
         [
@@ -868,6 +842,28 @@ export const buildRibbonGroups = ({
         'tiles',
       ),
       group(
+        tr.arrange,
+        [
+          tool(
+            'arrangeObjectsPageLayout',
+            tr.arrange,
+            iconLabel('options', tr.arrange),
+            () => instance?.openWorkbookObjects(),
+            false,
+            ' demo__rb--wide',
+          ),
+          tool(
+            'selectionPanePageLayout',
+            tr.selectionPane,
+            iconLabel('options', tr.selectionPane),
+            () => instance?.openWorkbookObjects(),
+            false,
+            ' demo__rb--wide',
+          ),
+        ],
+        'tiles',
+      ),
+      group(
         tr.print,
         [
           tool(
@@ -1072,6 +1068,22 @@ export const buildRibbonGroups = ({
         'tiles',
       ),
       group(
+        tr.accessibility,
+        [
+          tool(
+            'accessibility',
+            tr.accessibility,
+            iconLabel('accessibility', tr.accessibility),
+            runAccessibilityReview,
+            false,
+            ' demo__rb--wide',
+            !instance && !onAccessibilityCheck,
+            !!onAccessibilityCheck,
+          ),
+        ],
+        'tiles',
+      ),
+      group(
         tr.language,
         [
           tool(
@@ -1165,22 +1177,6 @@ export const buildRibbonGroups = ({
         ],
         'tiles',
       ),
-      group(
-        tr.accessibility,
-        [
-          tool(
-            'accessibility',
-            tr.accessibility,
-            iconLabel('accessibility', tr.accessibility),
-            runAccessibilityReview,
-            false,
-            ' demo__rb--wide',
-            !instance && !onAccessibilityCheck,
-            !!onAccessibilityCheck,
-          ),
-        ],
-        'tiles',
-      ),
     ],
     view: [
       group(
@@ -1252,6 +1248,14 @@ export const buildRibbonGroups = ({
             strings.viewToolbar.objects,
             iconLabel('options', strings.viewToolbar.objects),
             () => instance?.openWorkbookObjects(),
+          ),
+          tool(
+            'pivotFieldListView',
+            strings.workbookObjects.pivotFieldList,
+            iconLabel('options', strings.workbookObjects.pivotFieldList),
+            () => {
+              if (!instance?.openActivePivotFieldList()) instance?.openWorkbookObjects();
+            },
           ),
         ],
         'tiles',
@@ -1359,6 +1363,23 @@ export const buildRibbonGroups = ({
             () => instance?.toggleSheetProtection(),
             active.protected,
             ' demo__rb--wide',
+          ),
+        ],
+        'tiles',
+      ),
+    ],
+    help: [
+      group(
+        tr.tabs.help,
+        [
+          tool(
+            'helpSearch',
+            tr.tabs.help,
+            iconLabel('options', tr.tabs.help),
+            () => undefined,
+            false,
+            ' demo__rb--wide',
+            true,
           ),
         ],
         'tiles',

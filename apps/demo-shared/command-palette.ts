@@ -3,7 +3,13 @@
 // `HTMLInputElement` plus a container the menu can be appended to. React/Vue
 // demos call it from `useEffect` / `onMounted`.
 
-import type { ToolbarText } from '@libraz/formulon-cell';
+import {
+  buildRibbonSearchIndex,
+  queryRibbonSearchIndex,
+  type RibbonSearchItem,
+  type RibbonTab,
+  type ToolbarText,
+} from '@libraz/formulon-cell';
 
 export interface CommandPaletteItem {
   id: string;
@@ -17,72 +23,34 @@ export interface CommandPaletteOptions {
   ribbonText: ToolbarText;
   ribbonLang: 'ja' | 'en';
   applyCommand: (id: string) => boolean;
+  selectTab?: (tab: RibbonTab) => void;
 }
 
 const noCommandsLabel = (lang: 'ja' | 'en'): string =>
   lang === 'ja' ? '一致するコマンドはありません' : 'No matching commands';
 
-const buildCommands = (ribbonText: ToolbarText, lang: 'ja' | 'en'): CommandPaletteItem[] => {
-  const ja = lang === 'ja';
-  return [
-    {
-      id: 'formatCells',
-      label: ribbonText.formatCells,
-      hint: ja ? 'セルの書式を変更します' : 'Change cell formatting',
-    },
-    {
-      id: 'conditional',
-      label: ribbonText.conditional,
-      hint: ja ? '条件付き書式を編集' : 'Edit conditional formatting',
-    },
-    {
-      id: 'findHome',
-      label: ribbonText.find,
-      hint: ja ? 'シート内を検索 / 置換' : 'Find or replace on the sheet',
-    },
-    {
-      id: 'pageSetup',
-      label: ribbonText.pageSetup,
-      hint: ja ? 'ページ設定を開く' : 'Open page setup',
-    },
-    {
-      id: 'evaluateFormula',
-      label: ribbonText.evaluateFormula,
-      hint: ja ? '数式を 1 ステップずつ評価' : 'Step through a formula',
-    },
-    {
-      id: 'recalcNow',
-      label: ribbonText.recalc,
-      hint: ja ? 'ブックを再計算' : 'Recalculate the workbook',
-    },
-    {
-      id: 'sortAscHome',
-      label: ribbonText.sortAscending,
-      hint: ja ? '昇順に並べ替え' : 'Sort ascending',
-    },
-    {
-      id: 'sortDesc',
-      label: ribbonText.sortDescending,
-      hint: ja ? '降順に並べ替え' : 'Sort descending',
-    },
-    {
-      id: 'freeze',
-      label: ribbonText.freeze,
-      hint: ja ? 'ウィンドウ枠を固定' : 'Freeze panes',
-    },
-  ];
-};
-
-const matches = (cmd: CommandPaletteItem, query: string): boolean => {
-  const haystack = `${cmd.label} ${cmd.hint}`.toLowerCase();
-  return haystack.includes(query);
-};
+const toPaletteItem = (item: RibbonSearchItem): CommandPaletteItem => ({
+  id: item.commandId ?? item.id,
+  label: item.label,
+  hint: item.kind === 'tab' || item.kind === 'help' ? item.hint : `${item.hint} · ${item.tab}`,
+});
 
 export const createCommandPalette = (opts: CommandPaletteOptions): { dispose: () => void } => {
-  const { input, container, ribbonText, ribbonLang, applyCommand } = opts;
-  const commands = buildCommands(ribbonText, ribbonLang);
+  const { input, container, ribbonLang, applyCommand, selectTab } = opts;
+  const commands = buildRibbonSearchIndex(ribbonLang);
 
   let menu: HTMLDivElement | null = null;
+  let usagePrior: { commandBoosts?: Record<string, number> } = {};
+
+  const recordUsage = (commandId: string | undefined): void => {
+    if (!commandId) return;
+    usagePrior = {
+      commandBoosts: {
+        ...(usagePrior.commandBoosts ?? {}),
+        [commandId]: Math.min(100, (usagePrior.commandBoosts?.[commandId] ?? 0) + 12),
+      },
+    };
+  };
 
   const closeMenu = (): void => {
     menu?.remove();
@@ -91,9 +59,7 @@ export const createCommandPalette = (opts: CommandPaletteOptions): { dispose: ()
 
   const openMenu = (): void => {
     const query = input.value.trim().toLowerCase();
-    const visible = query
-      ? commands.filter((cmd) => matches(cmd, query)).slice(0, 8)
-      : commands.slice(0, 8);
+    const visible = queryRibbonSearchIndex(commands, query, 8, { usagePrior });
     if (!menu) {
       menu = document.createElement('div');
       menu.className = 'demo__command-menu';
@@ -109,19 +75,23 @@ export const createCommandPalette = (opts: CommandPaletteOptions): { dispose: ()
       return;
     }
     for (const cmd of visible) {
+      const paletteItem = toPaletteItem(cmd);
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'demo__command-item';
       const label = document.createElement('strong');
-      label.textContent = cmd.label;
+      label.textContent = paletteItem.label;
       const hint = document.createElement('span');
-      hint.textContent = cmd.hint;
+      hint.textContent = paletteItem.hint;
       btn.append(label, hint);
       // mousedown fires before blur; preventDefault keeps focus on the input
       // so the click handler runs before the menu disappears.
       btn.addEventListener('mousedown', (e) => e.preventDefault());
       btn.addEventListener('click', () => {
-        applyCommand(cmd.id);
+        if (cmd.commandId) {
+          recordUsage(cmd.commandId);
+          applyCommand(cmd.commandId);
+        } else selectTab?.(cmd.tab);
         input.value = '';
         closeMenu();
         input.blur();
@@ -141,10 +111,13 @@ export const createCommandPalette = (opts: CommandPaletteOptions): { dispose: ()
     }
     if (event.key === 'Enter') {
       const query = input.value.trim().toLowerCase();
-      const first = query ? commands.find((cmd) => matches(cmd, query)) : null;
+      const first = queryRibbonSearchIndex(commands, query, 1, { usagePrior })[0] ?? null;
       if (first) {
         event.preventDefault();
-        applyCommand(first.id);
+        if (first.commandId) {
+          recordUsage(first.commandId);
+          applyCommand(first.commandId);
+        } else selectTab?.(first.tab);
         input.value = '';
         closeMenu();
         input.blur();

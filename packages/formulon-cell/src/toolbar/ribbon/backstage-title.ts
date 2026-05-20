@@ -249,7 +249,10 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key.toLowerCase() !== 'u' || !event.metaKey || !event.ctrlKey) return;
+    const key = event.key.toLowerCase();
+    const excelSearchShortcut = key === 'q' && event.altKey && !event.ctrlKey && !event.metaKey;
+    const legacySearchShortcut = key === 'u' && event.metaKey && event.ctrlKey;
+    if (!excelSearchShortcut && !legacySearchShortcut) return;
     event.preventDefault();
     titleSearchInput?.focus();
     titleSearchInput?.select();

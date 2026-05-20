@@ -21,6 +21,8 @@ import {
   type ToolbarText,
 } from '../ribbon-model.js';
 
+export type RibbonDisplayMode = 'full' | 'singleLine' | 'tabsOnly' | 'autoHide';
+
 /** Submenu factory invoked when the user clicks a split-button. Receives the
  *  ribbon command id so a single factory can serve multiple panels (e.g.
  *  `menu-autosum-home` vs. `menu-autosum-formulas`). */
@@ -60,6 +62,7 @@ export interface RibbonMenus {
   cellStyles?: RibbonMenuFactory;
   currency?: RibbonMenuFactory;
   pageTheme?: RibbonMenuFactory;
+  arrange?: RibbonMenuFactory;
   printArea?: RibbonMenuFactory;
   pageBreaks?: RibbonMenuFactory;
   sheetBackground?: RibbonMenuFactory;
@@ -85,6 +88,8 @@ export interface RibbonRenderHelpers {
 export interface RibbonRenderState {
   getActiveTab: () => RibbonTab;
   getCollapsed: () => boolean;
+  getDisplayMode: () => RibbonDisplayMode;
+  getAutoHidePeek: () => boolean;
   getBackstageOpen: () => boolean;
   getDisplayMenuOpen: () => boolean;
   getFormulaBarVisible: () => boolean;
@@ -96,6 +101,7 @@ export interface RenderRibbonCtx {
   ribbonText: ToolbarText;
   ribbonMenuText: ToolbarMenuText;
   ribbonDisplayOptionsText: RibbonDisplayText;
+  ribbonTabs?: readonly RibbonTab[];
   ribbonRoot: HTMLElement | null;
   state: RibbonRenderState;
   helpers: RibbonRenderHelpers;
@@ -156,6 +162,7 @@ export const SPLIT_BUTTON_COMMANDS = new Set<string>([
   'script',
   'currency',
   'pageTheme',
+  'arrangeObjectsPageLayout',
 ]);
 
 // Maps a ribbon command id (with optional group variant) to the matching
@@ -165,10 +172,8 @@ type MenuRoute = { key: keyof RibbonMenus; variant?: string };
 const MENU_ROUTES: Record<string, MenuRoute> = {
   paste: { key: 'paste' },
   pivotTableInsert: { key: 'pivotTable' },
-  namedRangesInsert: { key: 'definedNames' },
   namedRanges: { key: 'definedNames' },
   links: { key: 'links' },
-  linksInsert: { key: 'links' },
   linksData: { key: 'links' },
   borders: { key: 'borders' },
   textOrientation: { key: 'textOrientation' },
@@ -202,6 +207,7 @@ const MENU_ROUTES: Record<string, MenuRoute> = {
   cellStyles: { key: 'cellStyles' },
   currency: { key: 'currency' },
   pageTheme: { key: 'pageTheme' },
+  arrangeObjectsPageLayout: { key: 'arrange' },
   printArea: { key: 'printArea' },
   pageBreaks: { key: 'pageBreaks' },
   sheetBackground: { key: 'sheetBackground' },
@@ -243,16 +249,21 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
     if (!ribbonRoot) return;
     const ribbonText = ctx.ribbonText;
     const activeRibbonTab = ctx.state.getActiveTab();
-    const ribbonCollapsed = ctx.state.getCollapsed();
+    const ribbonDisplayMode = ctx.state.getDisplayMode();
+    const ribbonAutoHidePeek = ribbonDisplayMode === 'autoHide' && ctx.state.getAutoHidePeek();
+    const ribbonCollapsed =
+      ribbonDisplayMode === 'tabsOnly' || (ribbonDisplayMode === 'autoHide' && !ribbonAutoHidePeek);
     const backstageOpen = ctx.state.getBackstageOpen();
     const ribbonDisplayMenuOpen = ctx.state.getDisplayMenuOpen();
     const ribbonDisplayOptionsText = ctx.ribbonDisplayOptionsText;
     const { createSelect, createColor, createIcon, makeSvg, chevronPath } = ctx.helpers;
-    const model = buildRibbonModel(ctx.ribbonLang);
+    const model = buildRibbonModel(ctx.ribbonLang, { tabs: ctx.ribbonTabs });
     const shell = document.createElement('div');
-    shell.className = `demo__ribbon-shell app__ribbon-shell${
-      ribbonCollapsed ? ' demo__ribbon-shell--collapsed' : ''
-    }`;
+    shell.className = `demo__ribbon-shell app__ribbon-shell demo__ribbon-shell--${ribbonDisplayMode}${
+      ribbonAutoHidePeek ? ' demo__ribbon-shell--autoHidePeek' : ''
+    }${ribbonCollapsed ? ' demo__ribbon-shell--collapsed' : ''}`;
+    shell.dataset.ribbonDisplayMode = ribbonDisplayMode;
+    if (ribbonAutoHidePeek) shell.dataset.ribbonAutoHidePeek = 'true';
 
     const tabs = document.createElement('div');
     tabs.className = 'demo__ribbon-tabs';
@@ -276,7 +287,7 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
 
     for (const tab of model) {
       const panel = document.createElement('div');
-      panel.className = `demo__ribbon${tab.id === 'home' ? ' demo__ribbon--office365-home' : ''}`;
+      panel.className = 'demo__ribbon';
       panel.setAttribute('role', 'toolbar');
       panel.setAttribute('aria-label', `${tab.label} ${ribbonText.ribbon}`);
       panel.dataset.ribbonPanel = tab.id;
@@ -367,8 +378,10 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
         menu.className = 'demo__ribbon-display-menu';
         menu.setAttribute('role', 'menu');
         const options: [string, boolean, string][] = [
-          [ribbonDisplayOptionsText.expanded, !ribbonCollapsed, 'expanded'],
-          [ribbonDisplayOptionsText.collapsed, ribbonCollapsed, 'collapsed'],
+          [ribbonDisplayOptionsText.expanded, ribbonDisplayMode === 'full', 'full'],
+          [ribbonDisplayOptionsText.singleLine, ribbonDisplayMode === 'singleLine', 'singleLine'],
+          [ribbonDisplayOptionsText.collapsed, ribbonDisplayMode === 'tabsOnly', 'tabsOnly'],
+          [ribbonDisplayOptionsText.autoHide, ribbonDisplayMode === 'autoHide', 'autoHide'],
         ];
         for (const [label, checked, option] of options) {
           const item = document.createElement('button');

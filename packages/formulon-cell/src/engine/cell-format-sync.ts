@@ -1,3 +1,8 @@
+import {
+  customPivotTableStyleById,
+  pivotTableStyleAssignment,
+  tableStyleSwatch,
+} from '../commands/format-as-table.js';
 import type { CellFormat, SpreadsheetStore } from '../store/store.js';
 import { addrKey } from './address.js';
 import { syncHyperlinksToEngine } from './format-sync.js';
@@ -13,6 +18,7 @@ import {
   formatCodeToNumFmt,
   numFmtToFormatCode,
 } from './format-writeback.js';
+import type { CellXf } from './types.js';
 import { syncValidationsToEngine } from './validation-sync.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -87,34 +93,21 @@ export function hydrateCellFormatsFromEngine(
     if (xfIndex === null || xfIndex <= 0) continue;
     const xf = wb.getCellXf(xfIndex);
     if (!xf) continue;
-    const patch: Partial<CellFormat> = {};
-    const font = wb.getFontRecord(xf.fontIndex);
-    if (font) Object.assign(patch, fontRecordToFormat(font));
-    const fill = wb.getFillRecord(xf.fillIndex);
-    if (fill) Object.assign(patch, fillRecordToFormat(fill));
-    const border = wb.getBorderRecord(xf.borderIndex);
-    if (border) Object.assign(patch, borderRecordToFormat(border));
-    if (xf.numFmtId !== BUILTIN_NUM_FMT_GENERAL) {
-      const code = wb.getNumFmtCode(xf.numFmtId);
-      if (code !== null) {
-        const numFmt = formatCodeToNumFmt(code);
-        if (numFmt) patch.numFmt = numFmt;
-      }
-    }
-    if (xf.horizontalAlign === 1) patch.align = 'left';
-    else if (xf.horizontalAlign === 2) patch.align = 'center';
-    else if (xf.horizontalAlign === 3) patch.align = 'right';
-    if (xf.verticalAlign === 0) patch.vAlign = 'top';
-    else if (xf.verticalAlign === 1) patch.vAlign = 'middle';
-    // the desktop default vertical alignment is bottom; do not surface it.
-    if (xf.wrapText) patch.wrap = true;
+    const patch = cellFormatFromXf(wb, xf);
     if (Object.keys(patch).length > 0) {
       updates.push({ key: addrKey(c.addr), patch });
     }
   }
   if (wb.pivotCells) {
     for (const c of wb.pivotCells(sheet)) {
-      const patch = pivotFormatPatch(c.kind, c.numberFormat);
+      const assignment =
+        typeof c.pivotIndex === 'number'
+          ? pivotTableStyleAssignment(store.getState(), sheet, c.pivotIndex)
+          : null;
+      const style = assignment
+        ? customPivotTableStyleById(store.getState(), assignment.styleId)
+        : null;
+      const patch = pivotFormatPatch(c.kind, c.numberFormat, style);
       if (Object.keys(patch).length > 0) updates.push({ key: addrKey(c.addr), patch });
     }
   }
@@ -125,34 +118,68 @@ export function hydrateCellFormatsFromEngine(
       const prev = formats.get(u.key) ?? {};
       formats.set(u.key, { ...prev, ...u.patch });
     }
-    return { ...s, format: { formats } };
+    return { ...s, format: { ...s.format, formats } };
   });
 }
 
-function pivotFormatPatch(kind: number, numberFormat: string): Partial<CellFormat> {
+function pivotFormatPatch(
+  kind: number,
+  numberFormat: string,
+  style?: ReturnType<typeof customPivotTableStyleById>,
+): Partial<CellFormat> {
   const patch: Partial<CellFormat> = {};
-  const blueRule = { style: 'thin' as const, color: '#9dc3e6' };
-  const lightRule = { style: 'thin' as const, color: '#d9eaf7' };
-  const totalRule = { style: 'medium' as const, color: '#5b9bd5' };
+  const swatch = style ? tableStyleSwatch(style.style, style.color) : null;
+  const headerFill = swatch?.header ?? '#d9eaf7';
+  const bandFill = swatch?.band ?? '#eaf3f8';
+  const totalFill = swatch ? swatch.header : '#bdd7ee';
+  const headerText = swatch?.headerText ?? '#1f4e79';
+  const blueRule = { style: 'thin' as const, color: swatch?.base ?? '#9dc3e6' };
+  const lightRule = { style: 'thin' as const, color: swatch?.band ?? '#d9eaf7' };
+  const totalRule = { style: 'medium' as const, color: swatch?.base ?? '#5b9bd5' };
   if (numberFormat) {
     const numFmt = formatCodeToNumFmt(numberFormat);
     if (numFmt) patch.numFmt = numFmt;
   }
   if (kind === PIVOT_KIND.Header || kind === PIVOT_KIND.RowLabel || kind === PIVOT_KIND.ColLabel) {
     patch.bold = true;
-    patch.fill = '#d9eaf7';
-    patch.color = '#1f4e79';
+    patch.fill = headerFill;
+    patch.color = headerText;
     patch.borders = { top: blueRule, bottom: blueRule };
   } else if (kind === PIVOT_KIND.RowSubtotal || kind === PIVOT_KIND.ColSubtotal) {
     patch.bold = true;
-    patch.fill = '#eaf3f8';
+    patch.fill = bandFill;
     patch.borders = { top: lightRule, bottom: blueRule };
   } else if (kind === PIVOT_KIND.GrandTotal) {
     patch.bold = true;
-    patch.fill = '#bdd7ee';
-    patch.color = '#1f4e79';
+    patch.fill = totalFill;
+    patch.color = headerText;
     patch.borders = { top: totalRule, bottom: totalRule };
   }
+  return patch;
+}
+
+export function cellFormatFromXf(wb: WorkbookHandle, xf: CellXf): Partial<CellFormat> {
+  const patch: Partial<CellFormat> = {};
+  const font = wb.getFontRecord(xf.fontIndex);
+  if (font) Object.assign(patch, fontRecordToFormat(font));
+  const fill = wb.getFillRecord(xf.fillIndex);
+  if (fill) Object.assign(patch, fillRecordToFormat(fill));
+  const border = wb.getBorderRecord(xf.borderIndex);
+  if (border) Object.assign(patch, borderRecordToFormat(border));
+  if (xf.numFmtId !== BUILTIN_NUM_FMT_GENERAL) {
+    const code = wb.getNumFmtCode(xf.numFmtId);
+    if (code !== null) {
+      const numFmt = formatCodeToNumFmt(code);
+      if (numFmt) patch.numFmt = numFmt;
+    }
+  }
+  if (xf.horizontalAlign === 1) patch.align = 'left';
+  else if (xf.horizontalAlign === 2) patch.align = 'center';
+  else if (xf.horizontalAlign === 3) patch.align = 'right';
+  if (xf.verticalAlign === 0) patch.vAlign = 'top';
+  else if (xf.verticalAlign === 1) patch.vAlign = 'middle';
+  // the desktop default vertical alignment is bottom; do not surface it.
+  if (xf.wrapText) patch.wrap = true;
   return patch;
 }
 

@@ -41,18 +41,21 @@ export const RIBBON_DIALOG_OPENERS: Readonly<Record<string, (i: SpreadsheetInsta
   commentInsert: (i) => i.openCommentDialog(),
   newCommentReview: (i) => i.openCommentDialog(),
   links: (i) => i.openExternalLinksDialog(),
-  linksInsert: (i) => i.openExternalLinksDialog(),
   linksData: (i) => i.openExternalLinksDialog(),
   conditional: (i) => i.openConditionalDialog(),
   cellStyles: (i) => i.openCellStylesGallery(),
   rules: (i) => i.openCfRulesDialog(),
   pivotTableInsert: (i) => i.openPivotTableDialog(),
-  namedRangesInsert: (i) => i.openNamedRangeDialog(),
   namedRanges: (i) => i.openNamedRangeDialog(),
   evaluateFormula: (i) => i.openEvaluateFormulaDialog(),
   fxInsert: (i) => i.openFunctionArguments(),
   fx: (i) => i.openFunctionArguments(),
   workbookObjectsView: (i) => i.openWorkbookObjects(),
+  arrangeObjectsPageLayout: (i) => i.openWorkbookObjects(),
+  selectionPanePageLayout: (i) => i.openWorkbookObjects(),
+  pivotFieldListView: (i) => {
+    if (!i.openActivePivotFieldList()) i.openWorkbookObjects();
+  },
   calcOptions: (i) => i.openIterativeDialog(),
 };
 

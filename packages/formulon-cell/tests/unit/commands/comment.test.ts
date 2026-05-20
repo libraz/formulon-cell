@@ -193,7 +193,7 @@ describe('comment commands', () => {
     store.setState((s) => {
       const formats = new Map(s.format.formats);
       formats.set(addrKey({ sheet: 0, row: 0, col: 0 }), { bold: true, color: '#ff0000' });
-      return { ...s, format: { formats } };
+      return { ...s, format: { ...s.format, formats } };
     });
     setComment(store, { sheet: 0, row: 0, col: 0 }, 'note');
     const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));

@@ -25,6 +25,11 @@ import {
   type RibbonHooks,
   type RibbonRuntime,
 } from '../toolbar/ribbon/apply-ribbon-command.js';
+import {
+  type BorderMenuApi,
+  type BorderMenuCtx,
+  createBorderMenu,
+} from '../toolbar/ribbon/border-menu.js';
 import type { RibbonFormatMutator } from '../toolbar/ribbon/command-tables.js';
 import {
   createDynamicDropdowns,
@@ -33,6 +38,7 @@ import {
 } from '../toolbar/ribbon/dynamic-dropdowns.js';
 import {
   createRenderRibbon,
+  type RibbonDisplayMode,
   type RibbonMenus,
   type RibbonRenderHelpers,
 } from '../toolbar/ribbon/render-ribbon.js';
@@ -51,6 +57,8 @@ import {
 import type { SpreadsheetInstance } from './types.js';
 
 type UiTheme = 'light' | 'dark' | 'contrast';
+
+export type { RibbonDisplayMode } from '../toolbar/ribbon/render-ribbon.js';
 
 const DEFAULT_BORDER_STYLE: CellBorderStyle = 'thin';
 const DEFAULT_BORDER_COLOR = '#000000';
@@ -88,6 +96,12 @@ export interface MountToolbarOptions {
 
   /** Initial UI state. */
   activeTab?: RibbonTab;
+  /** Explicit ribbon tab surface. Pass `EXCEL365_STANDARD_RIBBON_TABS` for
+   *  the Microsoft 365 baseline and append optional add-in/automation tabs
+   *  only when the host has those surfaces wired. Defaults to the historical
+   *  full tab set for backwards compatibility. */
+  ribbonTabs?: readonly RibbonTab[];
+  ribbonDisplayMode?: RibbonDisplayMode;
   collapsed?: boolean;
   formulaBarVisible?: boolean;
   theme?: UiTheme;
@@ -132,6 +146,7 @@ export interface MountToolbarOptions {
   /** Lifecycle callbacks fired after the matching internal state change. */
   onTabChange?: (tab: RibbonTab) => void;
   onCollapsedChange?: (collapsed: boolean) => void;
+  onDisplayModeChange?: (mode: RibbonDisplayMode) => void;
   onBackstageOpenChange?: (open: boolean) => void;
   onThemeChange?: (theme: UiTheme) => void;
   onFormulaBarChange?: (visible: boolean) => void;
@@ -159,10 +174,14 @@ export interface ToolbarInstance {
   /** Dispatch a ribbon command id through the same path as a button click.
    *  Returns true when a handler matched. */
   applyCommand(id: string): boolean;
+  /** Focuses the active ribbon tab. Used by Excel-style F6 landmark cycling. */
+  focusActiveTab(): boolean;
   setActiveTab(tab: RibbonTab): void;
   getActiveTab(): RibbonTab;
   setCollapsed(collapsed: boolean): void;
   getCollapsed(): boolean;
+  setDisplayMode(mode: RibbonDisplayMode): void;
+  getDisplayMode(): RibbonDisplayMode;
   setBackstageOpen(open: boolean): void;
   getBackstageOpen(): boolean;
   setDisplayMenuOpen(open: boolean): void;
@@ -228,7 +247,9 @@ export function mountToolbar(
   const displayOptionsText = ribbonDisplayText(lang);
 
   let activeTab: RibbonTab = opts.activeTab ?? 'home';
-  let collapsed = opts.collapsed ?? false;
+  let displayMode: RibbonDisplayMode =
+    opts.ribbonDisplayMode ?? (opts.collapsed ? 'tabsOnly' : 'full');
+  let autoHidePeek = false;
   let backstageOpen = false;
   let displayMenuOpen = false;
   let formulaBarVisible = opts.formulaBarVisible ?? true;
@@ -246,6 +267,18 @@ export function mountToolbar(
   const projectFormatToolbar = opts.projectFormatToolbar ?? ((): void => undefined);
   const showMessage = opts.showMessage ?? ((): void => undefined);
   const applyRibbonFormat = opts.applyRibbonFormat ?? defaultApplyRibbonFormat(getInstance);
+  const isCollapsedMode = (): boolean => displayMode === 'tabsOnly' || displayMode === 'autoHide';
+  let borderMenuApi: BorderMenuApi | null = null;
+  const setDisplayMode = (next: RibbonDisplayMode): void => {
+    if (next === displayMode) return;
+    const wasCollapsed = isCollapsedMode();
+    displayMode = next;
+    autoHidePeek = false;
+    opts.onDisplayModeChange?.(next);
+    const collapsed = isCollapsedMode();
+    if (collapsed !== wasCollapsed) opts.onCollapsedChange?.(collapsed);
+    renderToolbar();
+  };
 
   // Defaults are derived once at mount time. They close over the live
   // `borderStyle/borderColor` via getters so the borders submenu always
@@ -301,8 +334,20 @@ export function mountToolbar(
   let dynamicDropdownClickHandler: ((event: MouseEvent) => void) | null = null;
   let dropdownsApi: DynamicDropdownsApi | null = null;
   if (opts.dynamicDropdowns) {
-    const overridesOpt: Partial<DynamicDropdownsCtx> | (() => Partial<DynamicDropdownsCtx>) =
+    const hostOverrides: Partial<DynamicDropdownsCtx> | (() => Partial<DynamicDropdownsCtx>) =
       opts.dynamicDropdowns === true ? {} : opts.dynamicDropdowns;
+    const withToolbarDropdownOverrides = (
+      overrides: Partial<DynamicDropdownsCtx>,
+    ): Partial<DynamicDropdownsCtx> => ({
+      closeBorderMenu: (restoreFocus?: boolean) => {
+        borderMenuApi?.closeBorderMenu(restoreFocus);
+      },
+      ...overrides,
+    });
+    const overridesOpt: Partial<DynamicDropdownsCtx> | (() => Partial<DynamicDropdownsCtx>) =
+      typeof hostOverrides === 'function'
+        ? () => withToolbarDropdownOverrides(hostOverrides())
+        : withToolbarDropdownOverrides(hostOverrides);
     // `createDefaultDynamicDropdownsCtx` uses the `@libraz/formulon-cell`
     // self-import for `SpreadsheetInstance` (matching `dynamic-dropdowns.ts`)
     // so its parameter type resolves to dist. This file imports the
@@ -333,10 +378,13 @@ export function mountToolbar(
     ribbonText: text,
     ribbonMenuText: menuText,
     ribbonDisplayOptionsText: displayOptionsText,
+    ribbonTabs: opts.ribbonTabs,
     ribbonRoot: host,
     state: {
       getActiveTab: () => activeTab,
-      getCollapsed: () => collapsed,
+      getCollapsed: () => isCollapsedMode(),
+      getDisplayMode: () => displayMode,
+      getAutoHidePeek: () => autoHidePeek,
       getBackstageOpen: () => backstageOpen,
       getDisplayMenuOpen: () => displayMenuOpen,
       getFormulaBarVisible: () => formulaBarVisible,
@@ -346,6 +394,32 @@ export function mountToolbar(
     createBackstageView: opts.createBackstageView ?? (() => document.createElement('div')),
     projectFormatToolbar,
   });
+
+  const wireBorderMenu = (): void => {
+    borderMenuApi?.detach();
+    borderMenuApi = null;
+    if (!host.querySelector('#menu-borders')) return;
+    const current = getInstance();
+    if (!current) return;
+    borderMenuApi = createBorderMenu({
+      getInst: getInstance as unknown as BorderMenuCtx['getInst'],
+      sheetEl: current.host,
+      getSelectedBorderStyle: () => borderStyle,
+      setSelectedBorderStyle: (style) => {
+        borderStyle = style;
+        current.borderDraw?.setStyle(style);
+      },
+      getSelectedBorderColor: () => borderColor,
+      applyRibbonFormat: applyRibbonFormat as unknown as BorderMenuCtx['applyRibbonFormat'],
+    });
+  };
+
+  const renderToolbar = (): void => {
+    borderMenuApi?.detach();
+    borderMenuApi = null;
+    renderApi.renderRibbon();
+    wireBorderMenu();
+  };
 
   const applyCommand = (id: string): boolean => {
     const applied = applyRibbonCommand(id, {
@@ -362,7 +436,7 @@ export function mountToolbar(
         applyUiTheme: (next) => {
           theme = next;
           opts.onThemeChange?.(next);
-          renderApi.renderRibbon();
+          renderToolbar();
         },
         setFormulaBarVisible: (next) => {
           formulaBarVisible = next;
@@ -377,6 +451,15 @@ export function mountToolbar(
     return applied;
   };
 
+  const focusActiveTab = (): boolean => {
+    const tab =
+      host.querySelector<HTMLButtonElement>(`[data-ribbon-tab="${activeTab}"]`) ??
+      host.querySelector<HTMLButtonElement>('[data-ribbon-tab]');
+    if (!tab || tab.disabled) return false;
+    tab.focus({ preventScroll: true });
+    return document.activeElement === tab;
+  };
+
   const onClick = (e: MouseEvent): void => {
     const target = e.target;
     if (!(target instanceof Element)) return;
@@ -387,7 +470,7 @@ export function mountToolbar(
       if (tab && tab !== activeTab) {
         activeTab = tab;
         opts.onTabChange?.(tab);
-        renderApi.renderRibbon();
+        renderToolbar();
       }
       return;
     }
@@ -395,18 +478,24 @@ export function mountToolbar(
     const toggleBtn = target.closest<HTMLButtonElement>('[data-ribbon-toggle]');
     if (toggleBtn) {
       displayMenuOpen = !displayMenuOpen;
-      renderApi.renderRibbon();
+      renderToolbar();
       return;
     }
 
     const optionBtn = target.closest<HTMLButtonElement>('[data-ribbon-display-option]');
     if (optionBtn) {
       const option = optionBtn.dataset.ribbonDisplayOption;
-      if (option === 'expanded') collapsed = false;
-      else if (option === 'collapsed') collapsed = true;
       displayMenuOpen = false;
-      opts.onCollapsedChange?.(collapsed);
-      renderApi.renderRibbon();
+      if (
+        option === 'full' ||
+        option === 'singleLine' ||
+        option === 'tabsOnly' ||
+        option === 'autoHide'
+      ) {
+        setDisplayMode(option);
+      } else if (option === 'expanded') setDisplayMode('full');
+      else if (option === 'collapsed') setDisplayMode('tabsOnly');
+      else renderToolbar();
       return;
     }
 
@@ -434,6 +523,10 @@ export function mountToolbar(
         }
       }
       applyCommand(id);
+      if (displayMode === 'autoHide' && autoHidePeek) {
+        autoHidePeek = false;
+        renderToolbar();
+      }
     }
   };
   host.addEventListener('click', onClick);
@@ -447,9 +540,7 @@ export function mountToolbar(
     if (!tabBtn) return;
     if (tabBtn.dataset.ribbonTab === 'file') return;
     e.preventDefault();
-    collapsed = !collapsed;
-    opts.onCollapsedChange?.(collapsed);
-    renderApi.renderRibbon();
+    setDisplayMode(isCollapsedMode() ? 'full' : 'tabsOnly');
   };
   host.addEventListener('dblclick', onDoubleClick);
 
@@ -463,11 +554,10 @@ export function mountToolbar(
     if (!tabBtn) return;
     const key = e.key;
     if (key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'Home' && key !== 'End') return;
-    // File (backstage) tab sits outside the keyboard cycle — pressing
-    // ArrowRight from Home should land on Insert, not File. Hidden tabs are
-    // filtered too (Mac-style ribbons hide File entirely).
+    // Hidden tabs are filtered so custom tab profiles can omit optional
+    // add-in surfaces without leaving dead stops in the roving tabindex.
     const tabs = Array.from(host.querySelectorAll<HTMLButtonElement>('[data-ribbon-tab]')).filter(
-      (btn) => btn.dataset.ribbonTab !== 'file' && btn.offsetParent !== null,
+      (btn) => btn.offsetParent !== null,
     );
     if (tabs.length === 0) return;
     const currentIndex = tabs.indexOf(tabBtn);
@@ -485,7 +575,7 @@ export function mountToolbar(
     if (nextId && nextId !== activeTab) {
       activeTab = nextId;
       opts.onTabChange?.(nextId);
-      renderApi.renderRibbon();
+      renderToolbar();
       // After re-render, refetch the tab from the freshly-rendered DOM and
       // restore focus + roving-tabindex.
       const focusTarget = host.querySelector<HTMLButtonElement>(`[data-ribbon-tab="${nextId}"]`);
@@ -519,7 +609,7 @@ export function mountToolbar(
       e.preventDefault();
       if (!displayMenuOpen) {
         displayMenuOpen = true;
-        renderApi.renderRibbon();
+        renderToolbar();
       }
       focusDisplayOption(e.key === 'ArrowDown' ? 'first' : 'last');
       return;
@@ -538,7 +628,7 @@ export function mountToolbar(
     else if (e.key === 'Escape') {
       e.preventDefault();
       displayMenuOpen = false;
-      renderApi.renderRibbon();
+      renderToolbar();
       const reopenedToggle = host.querySelector<HTMLButtonElement>('[data-ribbon-toggle]');
       reopenedToggle?.focus();
       return;
@@ -553,11 +643,23 @@ export function mountToolbar(
   // location — Excel-style global shortcut. Attached at document so the
   // sheet (or any other focus target) doesn't need to route the key.
   const onGlobalKey = (e: KeyboardEvent): void => {
-    if (!e.ctrlKey || e.key !== 'F1') return;
-    e.preventDefault();
-    collapsed = !collapsed;
-    opts.onCollapsedChange?.(collapsed);
-    renderApi.renderRibbon();
+    if (e.ctrlKey && e.key === 'F1') {
+      e.preventDefault();
+      setDisplayMode(isCollapsedMode() ? 'full' : 'tabsOnly');
+      return;
+    }
+    if (displayMode === 'autoHide' && e.key === 'Alt' && !autoHidePeek) {
+      e.preventDefault();
+      autoHidePeek = true;
+      renderToolbar();
+      host.querySelector<HTMLButtonElement>(`[data-ribbon-tab="${activeTab}"]`)?.focus();
+      return;
+    }
+    if (displayMode === 'autoHide' && e.key === 'Escape' && autoHidePeek) {
+      e.preventDefault();
+      autoHidePeek = false;
+      renderToolbar();
+    }
   };
   document.addEventListener('keydown', onGlobalKey);
 
@@ -565,12 +667,13 @@ export function mountToolbar(
   // — Excel-style behaviour. Uses mousedown so the close happens before the
   // outside element's own click handler fires.
   const onDocumentMouseDown = (e: MouseEvent): void => {
-    if (!displayMenuOpen) return;
+    if (!displayMenuOpen && !(displayMode === 'autoHide' && autoHidePeek)) return;
     const target = e.target;
     if (!(target instanceof Element)) return;
     if (host.contains(target)) return;
-    displayMenuOpen = false;
-    renderApi.renderRibbon();
+    if (displayMenuOpen) displayMenuOpen = false;
+    if (displayMode === 'autoHide') autoHidePeek = false;
+    renderToolbar();
   };
   document.addEventListener('mousedown', onDocumentMouseDown);
 
@@ -593,7 +696,7 @@ export function mountToolbar(
 
   const rerender = (): void => {
     ensureStoreSubscription();
-    renderApi.renderRibbon();
+    renderToolbar();
   };
 
   rerender();
@@ -606,31 +709,31 @@ export function mountToolbar(
     },
     rerender,
     applyCommand,
+    focusActiveTab,
     setActiveTab: (tab) => {
       if (tab === activeTab) return;
       activeTab = tab;
       opts.onTabChange?.(tab);
-      renderApi.renderRibbon();
+      renderToolbar();
     },
     getActiveTab: () => activeTab,
     setCollapsed: (next) => {
-      if (next === collapsed) return;
-      collapsed = next;
-      opts.onCollapsedChange?.(next);
-      renderApi.renderRibbon();
+      setDisplayMode(next ? 'tabsOnly' : 'full');
     },
-    getCollapsed: () => collapsed,
+    getCollapsed: () => isCollapsedMode(),
+    setDisplayMode,
+    getDisplayMode: () => displayMode,
     setBackstageOpen: (next) => {
       if (next === backstageOpen) return;
       backstageOpen = next;
       opts.onBackstageOpenChange?.(next);
-      renderApi.renderRibbon();
+      renderToolbar();
     },
     getBackstageOpen: () => backstageOpen,
     setDisplayMenuOpen: (next) => {
       if (next === displayMenuOpen) return;
       displayMenuOpen = next;
-      renderApi.renderRibbon();
+      renderToolbar();
     },
     setFormulaBarVisible: (next) => {
       formulaBarVisible = next;
@@ -640,7 +743,7 @@ export function mountToolbar(
       if (next === theme) return;
       theme = next;
       opts.onThemeChange?.(next);
-      renderApi.renderRibbon();
+      renderToolbar();
     },
     getTheme: () => theme,
     setBorderStyle: (next) => {
@@ -665,6 +768,8 @@ export function mountToolbar(
         document.removeEventListener('click', dynamicDropdownClickHandler);
         dynamicDropdownClickHandler = null;
       }
+      borderMenuApi?.detach();
+      borderMenuApi = null;
       dropdownsApi = null;
       unsubStore?.();
       unsubStore = null;

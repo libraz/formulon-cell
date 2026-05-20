@@ -46,6 +46,9 @@ const makeFakeWb = (state: FakeWbState): WorkbookHandle => {
       state.sheets.splice(to, 0, s);
       return true;
     },
+    setSheetTabHidden(): boolean {
+      return true;
+    },
     clearViewportHint(): void {
       /* noop in tests */
     },
@@ -143,6 +146,7 @@ describe('mount/sheet-tabs-controller', () => {
       h = mount({ sheets: ['Alpha', 'Beta', 'Gamma'], capabilities: {} });
       const tabs = h.sheetTabs.querySelectorAll('.fc-host__sheetbar-tab');
       expect(tabs.length).toBe(3);
+      expect(h.sheetTabs.dataset.fcSheetOverflow).toBe('true');
       expect(tabs[0]?.textContent).toBe('Alpha');
       expect(tabs[0]?.getAttribute('aria-selected')).toBe('true');
       expect((tabs[0] as HTMLButtonElement).tabIndex).toBe(0);
@@ -167,6 +171,11 @@ describe('mount/sheet-tabs-controller', () => {
       h = mount({ sheets: ['A', 'B'], capabilities: {} });
       expect(h.firstSheet.disabled).toBe(true); // active=0 -> no prev
       expect(h.lastSheet.disabled).toBe(false);
+    });
+
+    it('marks single-sheet workbooks as non-overflowing', () => {
+      h = mount({ sheets: ['Only'], capabilities: {} });
+      expect(h.sheetTabs.dataset.fcSheetOverflow).toBe('false');
     });
   });
 
@@ -227,6 +236,49 @@ describe('mount/sheet-tabs-controller', () => {
     });
   });
 
+  describe('sheet navigation buttons', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('keeps click navigation as a single-step sheet switch', () => {
+      h = mount({ sheets: ['A', 'B', 'C'], capabilities: {} });
+      h.lastSheet.click();
+      expect(h.store.getState().data.sheetIndex).toBe(1);
+      h.firstSheet.click();
+      expect(h.store.getState().data.sheetIndex).toBe(0);
+    });
+
+    it('repeats sheet navigation while the pointer is held', () => {
+      vi.useFakeTimers();
+      h = mount({ sheets: ['A', 'B', 'C', 'D'], capabilities: {} });
+
+      h.lastSheet.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+      vi.advanceTimersByTime(350);
+      expect(h.store.getState().data.sheetIndex).toBe(1);
+      vi.advanceTimersByTime(120);
+      expect(h.store.getState().data.sheetIndex).toBe(2);
+      vi.advanceTimersByTime(120);
+      expect(h.store.getState().data.sheetIndex).toBe(3);
+
+      h.lastSheet.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, button: 0 }));
+      h.lastSheet.click();
+      expect(h.store.getState().data.sheetIndex).toBe(3);
+    });
+
+    it('cancels a pending repeat when the pointer leaves the button', () => {
+      vi.useFakeTimers();
+      h = mount({ sheets: ['A', 'B', 'C'], capabilities: {} });
+
+      h.lastSheet.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+      vi.advanceTimersByTime(200);
+      h.lastSheet.dispatchEvent(new MouseEvent('pointerleave', { bubbles: true, button: 0 }));
+      vi.advanceTimersByTime(350);
+
+      expect(h.store.getState().data.sheetIndex).toBe(0);
+    });
+  });
+
   describe('tab click + keyboard', () => {
     it('click on a tab switches the sheet', () => {
       h = mount({ sheets: ['A', 'B'], capabilities: {} });
@@ -249,6 +301,23 @@ describe('mount/sheet-tabs-controller', () => {
       const input = h.sheetTabs.querySelector<HTMLInputElement>('input.fc-host__sheetbar-rename');
       expect(input).not.toBeNull();
       expect(input?.value).toBe('A');
+    });
+
+    it('Home and End move to the first and last visible sheet tabs', () => {
+      h = mount({ sheets: ['A', 'B', 'C', 'D'], capabilities: {} }, { initialIndex: 1 });
+      h.store.setState((s) => ({
+        ...s,
+        layout: { ...s.layout, hiddenSheets: new Set([2]) },
+      }));
+      h.controller.update();
+      h.sheetTabs
+        .querySelector<HTMLButtonElement>('.fc-host__sheetbar-tab[aria-selected="true"]')
+        ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+      expect(h.store.getState().data.sheetIndex).toBe(3);
+      h.sheetTabs
+        .querySelector<HTMLButtonElement>('.fc-host__sheetbar-tab[aria-selected="true"]')
+        ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+      expect(h.store.getState().data.sheetIndex).toBe(0);
     });
   });
 
@@ -333,6 +402,29 @@ describe('mount/sheet-tabs-controller', () => {
       expect(h.store.getState().layout.sheetTabColors.has(0)).toBe(false);
     });
 
+    it('shows each hidden sheet as an unhide target in the sheet menu', () => {
+      h = mount({ sheets: ['A', 'B', 'C', 'D'], capabilities: {} });
+      h.store.setState((s) => ({
+        ...s,
+        layout: { ...s.layout, hiddenSheets: new Set([1, 3]) },
+      }));
+      h.controller.update();
+      const tab = h.sheetTabs.querySelectorAll<HTMLButtonElement>('.fc-host__sheetbar-tab')[0];
+      if (!tab) throw new Error('tab not found');
+      h.controller.showMenu(0, tab, 0, 0);
+
+      const items = Array.from(
+        h.sheetMenu.querySelectorAll<HTMLButtonElement>('.fc-sheetmenu__item'),
+      );
+      expect(items.map((item) => item.textContent)).toContain('Unhide B');
+      expect(items.map((item) => item.textContent)).toContain('Unhide D');
+
+      items.find((item) => item.textContent === 'Unhide D')?.click();
+      expect(h.store.getState().layout.hiddenSheets.has(3)).toBe(false);
+      expect(h.store.getState().layout.hiddenSheets.has(1)).toBe(true);
+      expect(h.store.getState().data.sheetIndex).toBe(3);
+    });
+
     it('disables mutation entries when capabilities forbid them', () => {
       h = mount({
         sheets: ['A', 'B'],
@@ -371,6 +463,57 @@ describe('mount/sheet-tabs-controller', () => {
       h.controller.showMenu(0, tab, 0, 0);
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
       expect(h.sheetMenu.hidden).toBe(true);
+    });
+
+    it('Escape returns focus to the sheet tab that opened the menu', () => {
+      h = mount({ sheets: ['A', 'B'], capabilities: {} });
+      const tab = h.sheetTabs.querySelectorAll<HTMLButtonElement>('.fc-host__sheetbar-tab')[0];
+      if (!tab) throw new Error('tab not found');
+      h.controller.showMenu(0, tab, 0, 0);
+      expect(document.activeElement).not.toBe(tab);
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+      expect(document.activeElement).toBe(tab);
+    });
+
+    it('supports Arrow/Home/End keyboard navigation inside the sheet menu', () => {
+      h = mount({ sheets: ['A', 'B', 'C'], capabilities: {} });
+      const tab = h.sheetTabs.querySelectorAll<HTMLButtonElement>('.fc-host__sheetbar-tab')[1];
+      if (!tab) throw new Error('tab not found');
+      h.controller.showMenu(1, tab, 0, 0);
+      const items = Array.from(
+        h.sheetMenu.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]'),
+      ).filter((item) => !item.disabled);
+      expect(document.activeElement).toBe(items[0]);
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+      expect(document.activeElement).toBe(items[1]);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+      expect(document.activeElement).toBe(items.at(-1));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+      expect(document.activeElement).toBe(items[0]);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+      expect(document.activeElement).toBe(items[0]);
+    });
+
+    it('Enter and Space activate the focused sheet menu item', () => {
+      h = mount({ sheets: ['A', 'B', 'C'], capabilities: {} });
+      const tab = h.sheetTabs.querySelectorAll<HTMLButtonElement>('.fc-host__sheetbar-tab')[1];
+      if (!tab) throw new Error('tab not found');
+      h.controller.showMenu(1, tab, 0, 0);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      expect(h.state.sheets).toEqual(['B', 'A', 'C']);
+
+      const movedTab = h.sheetTabs.querySelectorAll<HTMLButtonElement>('.fc-host__sheetbar-tab')[0];
+      if (!movedTab) throw new Error('moved tab not found');
+      h.controller.showMenu(0, movedTab, 0, 0);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      expect(h.state.sheets).toEqual(['A', 'B', 'C']);
     });
   });
 

@@ -1,9 +1,17 @@
 @layer fc.surface {
   .fc-host__sheetbar {
+    --fc-sheetbar-height: 30px;
+    --fc-sheetbar-button-size: 24px;
+    --fc-sheetbar-button-height: 22px;
+    --fc-sheetbar-tab-height: 28px;
+    --fc-sheetbar-tab-min-width: 96px;
+    --fc-sheetbar-tab-max-width: 180px;
+    --fc-sheetbar-rename-width: 136px;
+    --fc-sheetbar-rename-height: 24px;
     display: flex;
     align-items: stretch;
     gap: 0;
-    min-height: 34px;
+    min-height: var(--fc-sheetbar-height);
     border-top: var(--fc-hairline) solid var(--fc-rule);
     background: var(--fc-sheetbar-bg, var(--fc-bg-rail));
     flex: 0 0 auto;
@@ -12,7 +20,7 @@
   .fc-host__sheetbar-nav {
     display: flex;
     align-items: center;
-    padding: 3px 4px 3px 6px;
+    padding: 2px 4px 2px 6px;
     border-right: var(--fc-hairline) solid var(--fc-rule);
   }
 
@@ -35,8 +43,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
+    width: var(--fc-sheetbar-button-size);
+    height: var(--fc-sheetbar-button-height);
     padding: 0;
     border: 0;
     border-radius: 2px;
@@ -65,15 +73,17 @@
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--fc-fg-mute) 45%, transparent) transparent;
+    overscroll-behavior-x: contain;
   }
 
   .fc-host__sheetbar-tab {
     position: relative;
     flex: 0 0 auto;
-    min-width: 104px;
-    max-width: 220px;
-    height: 32px;
-    padding: 0 20px;
+    min-width: var(--fc-sheetbar-tab-min-width);
+    max-width: var(--fc-sheetbar-tab-max-width);
+    height: var(--fc-sheetbar-tab-height);
+    padding: 0 18px;
     overflow: hidden;
     border: 0;
     border-right: var(--fc-hairline) solid var(--fc-sheetbar-tab-rule, var(--fc-rule));
@@ -88,8 +98,8 @@
 
   .fc-host__sheetbar-rename {
     flex: 0 0 auto;
-    width: 136px;
-    height: 27px;
+    width: var(--fc-sheetbar-rename-width);
+    height: var(--fc-sheetbar-rename-height);
     align-self: end;
     margin: 0 2px 2px;
     padding: 0 10px;
@@ -156,7 +166,7 @@
   .fc-host__sheetbar-add {
     flex: 0 0 auto;
     align-self: center;
-    margin: 4px 8px;
+    margin: 3px 8px;
     border: 0;
     background: transparent;
     line-height: 1;

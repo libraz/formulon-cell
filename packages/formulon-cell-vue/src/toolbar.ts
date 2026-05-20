@@ -8,5 +8,8 @@ export type RibbonTab =
   | 'data'
   | 'review'
   | 'view'
+  | 'help'
   | 'automate'
   | 'acrobat';
+
+export type { ToolbarInstance } from '@libraz/formulon-cell';

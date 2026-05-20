@@ -22,12 +22,19 @@ export type {
   CellStyleGroupDef,
   CellStyleGroupId,
   CellStyleId,
+  MergeCellStylesResult,
 } from './commands/cell-styles.js';
 export {
   applyCellStyle,
+  applyCellStyleByName,
   CELL_STYLE_GROUPS,
   CELL_STYLES,
+  createCellStyleFromActiveFormat,
+  customCellStyleById,
+  customCellStyleId,
   getCellStyle,
+  listCustomCellStyles,
+  mergeCellStylesFromWorkbook,
 } from './commands/cell-styles.js';
 export type { CopyResult } from './commands/clipboard/copy.js';
 export { copy } from './commands/clipboard/copy.js';
@@ -169,25 +176,38 @@ export {
   toggleWrap,
 } from './commands/format.js';
 export type {
+  CustomTableStyle,
   FormatAsTableOptions,
+  PivotTableStyleAssignment,
   TableOverlay,
   TableOverlayPatch,
   TableStyle,
   TableStyleSwatch,
 } from './commands/format-as-table.js';
 export {
+  applyPivotTableStyleById,
   clearTable,
   clearTablesInRange,
+  createPivotTableStyleFromActivePivot,
+  createTableStyleFromActiveTable,
+  customPivotTableStyleById,
+  customPivotTableStyleId,
+  customTableStyleById,
+  customTableStyleId,
   DEFAULT_TABLE_COLOR,
   defaultTableOverlay,
   engineTableOverlays,
   formatAsTable,
+  formatAsTableByStyleId,
   isBandedRow,
   isFirstCol,
   isHeaderRow,
   isLastCol,
   isTotalRow,
+  listCustomPivotTableStyles,
+  listCustomTableStyles,
   listTableOverlays,
+  pivotTableStyleAssignment,
   removeTable,
   sessionTableOverlays,
   TABLE_STYLE_COLORS,
@@ -195,6 +215,7 @@ export {
   tableOverlayAt,
   tableOverlayById,
   tableStyleSwatch,
+  tableVariantFromOptions,
   updateTableOverlay,
   upsertTable,
 } from './commands/format-as-table.js';
@@ -214,11 +235,18 @@ export {
   findMatchingCells,
   selectionFromMatches,
 } from './commands/goto-special.js';
-export type { HistoryEntry, LayoutSnapshot, MergesSnapshot } from './commands/history.js';
+export type {
+  FormatSnapshot,
+  HistoryEntry,
+  LayoutSnapshot,
+  MergesSnapshot,
+  TablesSnapshot,
+} from './commands/history.js';
 export {
   applyChartsSnapshot,
   applyConditionalRulesSnapshot,
   applyFormatSnapshot,
+  applyIllustrationsSnapshot,
   applyLayoutSnapshot,
   applyMergesSnapshot,
   applyPageSetupSnapshot,
@@ -230,6 +258,7 @@ export {
   captureChartsSnapshot,
   captureConditionalRulesSnapshot,
   captureFormatSnapshot,
+  captureIllustrationsSnapshot,
   captureLayoutSnapshot,
   captureMergesSnapshot,
   capturePageSetupSnapshot,
@@ -240,6 +269,7 @@ export {
   recordChartsChange,
   recordConditionalRulesChange,
   recordFormatChange,
+  recordIllustrationsChange,
   recordLayoutChange,
   recordMergesChange,
   recordMergesChangeWithEngine,
@@ -303,18 +333,26 @@ export type {
   PageBreakAxis,
   PageSetupEntry,
   PageSetupPatch,
+  PrinterProfile,
 } from './commands/page-setup.js';
 export {
+  addPrintArea,
+  applyPrinterProfileBounds,
   clearPrintArea,
+  clearPrintableBounds,
   clearPrintTitles,
   insertManualPageBreak,
   listPageSetups,
   marginPresetOf,
   marginPresetValues,
+  normalizePrinterProfile,
+  normalizePrinterProfileId,
+  normalizePrinterProfiles,
   pageSetupForSheet,
   removeManualPageBreak,
   resetManualPageBreaks,
   resetPageSetup,
+  resolvePrinterProfileBounds,
   setFitToPages,
   setMarginPreset,
   setPageOrientation,
@@ -322,6 +360,7 @@ export {
   setPageSetup,
   setPaperSize,
   setPrintArea,
+  setPrintableBounds,
   setPrintGridlines,
   setPrintHeadings,
   setPrintTitleCols,
@@ -332,6 +371,7 @@ export type {
   CreatePivotTableOptions,
   CreatePivotTableResult,
   ExecuteRibbonPivotTableActionDeps,
+  PivotFieldItemVisibility,
   PivotSourceField,
   RibbonPivotTableAction,
   RibbonPivotTableActionResult,
@@ -342,13 +382,20 @@ export type {
 export {
   createPivotTableFromRange,
   executeRibbonPivotTableAction,
+  inferPivotFieldItems,
   inferPivotSourceFields,
 } from './commands/pivot-table.js';
-export type { PrintDocument } from './commands/print.js';
+export type {
+  BuildPrintDocumentOptions,
+  PrintAreaBounds,
+  PrintDocument,
+  PrintSheetOptions,
+} from './commands/print.js';
 export {
   buildPrintDocument,
   colLetter,
   parsePrintArea,
+  parsePrintAreas,
   parsePrintTitleCols,
   parsePrintTitleRows,
   printSheet,
@@ -447,6 +494,23 @@ export {
   sessionChartsForRange,
   updateSessionChart,
 } from './commands/session-chart.js';
+export type {
+  CreateSessionImageOptions,
+  CreateSessionShapeOptions,
+  SessionIllustrationArrangeAction,
+  SessionIllustrationPatch,
+} from './commands/session-illustration.js';
+export {
+  arrangeSessionIllustration,
+  clearSessionIllustration,
+  createRibbonImageFromSelection,
+  createRibbonShapeFromSelection,
+  createSessionImage,
+  createSessionShape,
+  listSessionIllustrations,
+  sessionIllustrationById,
+  updateSessionIllustration,
+} from './commands/session-illustration.js';
 export {
   addSheet,
   moveSheet,
@@ -607,6 +671,7 @@ export type {
 } from './engine/passthrough-sync.js';
 export {
   classifyWorkbookObjectPath,
+  findPivotTableAtCell,
   listWorkbookObjects,
   summarizePassthroughs,
   summarizePivotTables,
@@ -848,6 +913,8 @@ export type {
 export { resolveRibbonPdfAction } from './interact/ribbon-pdf-report.js';
 export type { SessionChartLabels, SessionChartsHandle } from './interact/session-charts.js';
 export { attachSessionCharts } from './interact/session-charts.js';
+export type { SessionIllustrationsHandle } from './interact/session-illustrations.js';
+export { attachSessionIllustrations } from './interact/session-illustrations.js';
 export type { SlicerDeps, SlicerHandle } from './interact/slicer.js';
 export { attachSlicer } from './interact/slicer.js';
 export type { StatusBarDeps, StatusBarHandle } from './interact/status-bar.js';
@@ -888,6 +955,10 @@ export { createDefaultDynamicDropdownsCtx } from './mount/dynamic-dropdowns-defa
 export type {
   MountOptions,
   MountToolbarOptions,
+  RibbonDisplayMode,
+  ScreenClipCapture,
+  ScreenClipCaptureResult,
+  ScreenClipResult,
   SpreadsheetInstance,
   ToolbarInstance,
   ToolbarInstanceRef,
@@ -914,6 +985,7 @@ export type {
   ConditionalRule,
   ConditionalScalePoint,
   ConditionalSlice,
+  CustomCellStyle,
   ErrorIndicatorSlice,
   FormatSlice,
   MergesSlice,
@@ -927,6 +999,8 @@ export type {
   ProtectionSlice,
   SessionChart,
   SessionChartKind,
+  SessionIllustration,
+  SessionShapeKind,
   SlicerSpec,
   SlicersSlice,
   Sparkline,
@@ -994,12 +1068,18 @@ export { applyRibbonCommand } from './toolbar/ribbon/apply-ribbon-command.js';
 export type { AutofitCellFormat } from './toolbar/ribbon/autofit.js';
 export { autofitColWidth, autofitRowHeight } from './toolbar/ribbon/autofit.js';
 export type {
+  BackstageAction,
   BackstageDeps,
   BackstageFactories,
+  BackstageItem,
   BackstageRibbonText,
   BackstageText,
 } from './toolbar/ribbon/backstage.js';
-export { createBackstageFactories } from './toolbar/ribbon/backstage.js';
+export {
+  backstageCardItems,
+  backstageNavItems,
+  createBackstageFactories,
+} from './toolbar/ribbon/backstage.js';
 export type {
   BackstageTitleApi,
   BackstageTitleCtx,
@@ -1115,6 +1195,16 @@ export {
   SPLIT_BUTTON_COMMANDS,
 } from './toolbar/ribbon/render-ribbon.js';
 export type {
+  BuildRibbonSearchIndexOptions,
+  RibbonSearchItem,
+  RibbonSearchItemKind,
+  RibbonSearchUsagePrior,
+} from './toolbar/ribbon/search-index.js';
+export {
+  buildRibbonSearchIndex,
+  queryRibbonSearchIndex,
+} from './toolbar/ribbon/search-index.js';
+export type {
   SelectColorApi,
   SelectColorCtx,
   SelectColorPageScaleText,
@@ -1141,8 +1231,10 @@ export type {
 } from './toolbar/ribbon-model.js';
 export {
   buildRibbonModel,
+  EXCEL365_STANDARD_RIBBON_TABS,
   FONT_FAMILIES,
   FONT_SIZES,
+  OPTIONAL_RIBBON_TABS,
   RIBBON_KEYSHORTCUTS,
   RIBBON_TAB_LABELS,
   RIBBON_TABS,

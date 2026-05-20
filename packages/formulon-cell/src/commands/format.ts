@@ -447,7 +447,7 @@ export function clearVisualFormat(state: State, store: SpreadsheetStore): void {
         else formats.delete(key);
       }
     }
-    return { ...s, format: { formats } };
+    return { ...s, format: { ...s.format, formats } };
   });
 }
 

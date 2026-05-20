@@ -168,6 +168,18 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
     expect(document.querySelector('.fc-namebox-menu')).toBeNull();
   });
 
+  it('Alt+ArrowDown shows an empty defined-name menu when no names exist', () => {
+    tag.focus();
+    tag.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true }),
+    );
+
+    const menu = document.querySelector<HTMLElement>('.fc-namebox-menu');
+    expect(menu).not.toBeNull();
+    expect(menu?.querySelector('.fc-namebox-menu__empty')?.textContent).toBeTruthy();
+    expect(menu?.querySelector('[role="option"]')).toBeNull();
+  });
+
   it('Ctrl-click in the name box list adds a defined range to the multi-selection', () => {
     const wb = sheet.workbook as unknown as {
       definedNames: () => Generator<{ name: string; formula: string }>;
@@ -193,6 +205,41 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
       { sheet: 0, r0: 1, c0: 1, r1: 3, c1: 1 },
     ]);
     expect(document.querySelector('.fc-namebox-menu')).not.toBeNull();
+  });
+
+  it('defined-name list supports Arrow/Home/End navigation and Enter activation', () => {
+    const wb = sheet.workbook as unknown as {
+      definedNames: () => Generator<{ name: string; formula: string }>;
+    };
+    wb.definedNames = function* () {
+      yield { name: 'North', formula: 'Sheet1!$B$2:$B$4' };
+      yield { name: 'South', formula: 'Sheet1!$D$2:$D$4' };
+      yield { name: 'West', formula: 'Sheet1!$F$2:$F$4' };
+    };
+
+    tag.focus();
+    tag.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true }),
+    );
+    const items = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('.fc-namebox-menu [role="option"]'),
+    );
+    expect(items.map((item) => item.textContent)).toEqual(['North', 'South', 'West']);
+    expect(document.activeElement).toBe(items[0]);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    expect(document.activeElement).toBe(items[2]);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(document.activeElement).toBe(items[0]);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    expect(document.activeElement).toBe(items[0]);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    expect(document.activeElement).toBe(items[2]);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    const sel = sheet.instance.store.getState().selection;
+    expect(sel.range).toEqual({ sheet: 0, r0: 1, c0: 5, r1: 3, c1: 5 });
+    expect(document.querySelector('.fc-namebox-menu')).toBeNull();
   });
 
   it('Enter on an Excel-style name defines the current selection as a workbook name', () => {

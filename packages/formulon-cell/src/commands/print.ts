@@ -1,4 +1,3 @@
-import { formatA1FormulaAsR1C1 } from './refs.js';
 import type { CellValue } from '../engine/types.js';
 // Print / PDF export.
 //
@@ -19,10 +18,13 @@ import {
   type CellFormat,
   defaultPageSetup,
   getPageSetup,
+  type PageMargins,
   type PageSetup,
   type PrintCellErrorsMode,
   type SpreadsheetStore,
 } from '../store/store.js';
+import { type PrinterProfile, resolvePrinterProfileBounds } from './printer-profile.js';
+import { formatA1FormulaAsR1C1 } from './refs.js';
 
 /** Output of `buildPrintDocument`. `html` is a complete HTML document string
  *  ready to feed into an iframe via `document.write`. `cssVars` carries
@@ -31,6 +33,22 @@ import {
 export interface PrintDocument {
   html: string;
   cssVars: Record<string, string>;
+}
+
+export interface BuildPrintDocumentOptions {
+  printableBounds?: PageMargins | null;
+}
+
+export interface PrintSheetOptions {
+  printerProfiles?: readonly PrinterProfile[];
+  printerProfileId?: string;
+}
+
+export interface PrintAreaBounds {
+  row0: number;
+  col0: number;
+  row1: number;
+  col1: number;
 }
 
 /** Convert a 0-indexed column number to A1 letter form ("A", "B", … "Z",
@@ -89,12 +107,10 @@ export function parsePrintTitleCols(raw?: string): [number, number] | null {
 
 /** Parse an A1-style rectangular print area like "A1:D20" / "$A$1:$D$20"
  *  / "B2" → zero-indexed bounds. Returns null on bad input. */
-export function parsePrintArea(
-  raw?: string,
-): { row0: number; col0: number; row1: number; col1: number } | null {
+export function parsePrintArea(raw?: string): PrintAreaBounds | null {
   if (!raw) return null;
   const trimmed = raw.trim().replace(/\$/g, '');
-  if (!trimmed) return null;
+  if (!trimmed || trimmed.includes(',')) return null;
   const parseCell = (cell: string): { row: number; col: number } | null => {
     const match = /^([A-Za-z]+)([1-9][0-9]*)$/.exec(cell.trim());
     if (!match) return null;
@@ -114,6 +130,18 @@ export function parsePrintArea(
     row1: Math.max(a.row, b.row),
     col1: Math.max(a.col, b.col),
   };
+}
+
+export function parsePrintAreas(raw?: string): PrintAreaBounds[] | null {
+  if (!raw) return null;
+  const parts = raw
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return null;
+  const areas = parts.map((part) => parsePrintArea(part));
+  if (areas.some((area) => area === null)) return null;
+  return areas as PrintAreaBounds[];
 }
 
 const escapeHtml = (s: string): string =>
@@ -267,11 +295,43 @@ const PAPER_DIMENSIONS: Record<string, string> = {
   tabloid: 'tabloid',
 };
 
+export function effectivePrintMargins(setup: PageSetup): PageMargins {
+  const printable = setup.printableBounds;
+  if (!printable) return { ...setup.margins };
+  return {
+    top: Math.max(setup.margins.top, printable.top),
+    right: Math.max(setup.margins.right, printable.right),
+    bottom: Math.max(setup.margins.bottom, printable.bottom),
+    left: Math.max(setup.margins.left, printable.left),
+  };
+}
+
+export interface PrintableMarginAdjustment {
+  side: keyof PageMargins;
+  margin: number;
+  minimum: number;
+  effective: number;
+}
+
+export function printableMarginAdjustments(setup: PageSetup): PrintableMarginAdjustment[] {
+  const printable = setup.printableBounds;
+  if (!printable) return [];
+  const sides: (keyof PageMargins)[] = ['top', 'right', 'bottom', 'left'];
+  return sides
+    .map((side) => ({
+      side,
+      margin: setup.margins[side],
+      minimum: printable[side],
+      effective: Math.max(setup.margins[side], printable[side]),
+    }))
+    .filter((item) => item.minimum > item.margin);
+}
+
 /** Build the @page CSS string for a given setup. Browsers honour orientation
  *  and (for print preview / PDF) the size keyword. */
 function buildPageRule(setup: PageSetup): string {
   const size = `${PAPER_DIMENSIONS[setup.paperSize] ?? 'A4'} ${setup.orientation}`;
-  const m = setup.margins;
+  const m = effectivePrintMargins(setup);
   return `@page { size: ${size}; margin: ${m.top}in ${m.right}in ${m.bottom}in ${m.left}in; }`;
 }
 
@@ -298,9 +358,17 @@ export function buildPrintDocument(
   store: SpreadsheetStore,
   sheet: number,
   title = 'Print',
+  options: BuildPrintDocumentOptions = {},
 ): PrintDocument {
   const state = store.getState();
-  const setup = getPageSetup(state, sheet);
+  const baseSetup = getPageSetup(state, sheet);
+  const setup: PageSetup =
+    options.printableBounds !== undefined
+      ? {
+          ...baseSetup,
+          printableBounds: options.printableBounds ? { ...options.printableBounds } : undefined,
+        }
+      : baseSetup;
   const showFormulas = state.ui.showFormulas;
   const hiddenRows = state.layout.hiddenRows;
   const hiddenCols = state.layout.hiddenCols;
@@ -361,15 +429,23 @@ export function buildPrintDocument(
   const titleColRange = parsePrintTitleCols(setup.printTitleCols);
   const manualRowBreaks = new Set(setup.manualPageBreakRows ?? []);
   const manualColBreaks = new Set(setup.manualPageBreakCols ?? []);
-  const printArea = parsePrintArea(setup.printArea);
-  const minPrintRow = printArea?.row0 ?? 0;
-  const minPrintCol = printArea?.col0 ?? 0;
-  if (printArea) {
-    maxRow = Math.min(maxRow, printArea.row1);
-    maxCol = Math.min(maxCol, printArea.col1);
-    if (maxRow < minPrintRow) maxRow = minPrintRow;
-    if (maxCol < minPrintCol) maxCol = minPrintCol;
-  }
+  const printAreas = parsePrintAreas(setup.printArea);
+  const printRegions: PrintAreaBounds[] = (
+    printAreas ?? [{ row0: 0, col0: 0, row1: maxRow, col1: maxCol }]
+  ).map((area) => {
+    const row1 = Math.min(maxRow, area.row1);
+    const col1 = Math.min(maxCol, area.col1);
+    return {
+      row0: area.row0,
+      col0: area.col0,
+      row1: row1 < area.row0 ? area.row0 : row1,
+      col1: col1 < area.col0 ? area.col0 : col1,
+    };
+  });
+  const cellInPrintRegions = (row: number, col: number): boolean =>
+    printRegions.some(
+      (area) => row >= area.row0 && row <= area.row1 && col >= area.col0 && col <= area.col1,
+    );
 
   const commentEntries: PrintCommentSnap[] =
     setup.comments === 'none'
@@ -382,20 +458,26 @@ export function buildPrintDocument(
             const row = Number(rowPart);
             const col = Number(colPart);
             if (!Number.isInteger(row) || !Number.isInteger(col)) return null;
-            if (row < minPrintRow || row > maxRow || col < minPrintCol || col > maxCol) {
-              return null;
-            }
+            if (!cellInPrintRegions(row, col)) return null;
             if (hiddenRows.has(row) || hiddenCols.has(col)) return null;
             return { row, col, text: fmt.comment };
           })
           .filter((entry): entry is PrintCommentSnap => entry !== null)
           .sort((a, b) => a.row - b.row || a.col - b.col);
-  const commentByCell = new Map(commentEntries.map((entry) => [`${entry.row}:${entry.col}`, entry]));
+  const commentByCell = new Map(
+    commentEntries.map((entry) => [`${entry.row}:${entry.col}`, entry]),
+  );
 
   // Build column letters used for the optional `<colgroup>` headings strip.
-  const renderCell = (row: number, col: number, tag: 'td' | 'th'): string => {
+  const renderCell = (
+    row: number,
+    col: number,
+    tag: 'td' | 'th',
+    regionMaxCol: number,
+    renderedSkipKeys: Set<string>,
+  ): string => {
     const key = `${row}:${col}`;
-    if (skipKeys.has(key)) return '';
+    if (renderedSkipKeys.has(key)) return '';
     const snap = cellMap.get(key);
     const value: CellValue = snap?.value ?? { kind: 'blank' };
     const text = cellDisplay(
@@ -411,10 +493,10 @@ export function buildPrintDocument(
       if (mergeSpan) return mergeSpan;
       if (snap?.format?.align !== 'centerContinuous' || !text) return undefined;
       let colspan = 1;
-      for (let nextCol = col + 1; nextCol <= maxCol; nextCol += 1) {
+      for (let nextCol = col + 1; nextCol <= regionMaxCol; nextCol += 1) {
         if (hiddenCols.has(nextCol)) continue;
         const nextKey = `${row}:${nextCol}`;
-        if (skipKeys.has(nextKey)) break;
+        if (renderedSkipKeys.has(nextKey)) break;
         const nextSnap = cellMap.get(nextKey);
         const nextText = cellDisplay(
           nextSnap?.value ?? { kind: 'blank' },
@@ -425,7 +507,7 @@ export function buildPrintDocument(
           setup.cellErrorsAs,
         );
         if (nextSnap?.format?.align !== 'centerContinuous' || nextText) break;
-        skipKeys.add(nextKey);
+        renderedSkipKeys.add(nextKey);
         colspan += 1;
       }
       return colspan > 1 ? { rowspan: 1, colspan } : undefined;
@@ -443,21 +525,24 @@ export function buildPrintDocument(
     const commentHtml = comment
       ? `<div class="fc-print__comment-note">${escapeHtml(comment.text)}</div>`
       : '';
-    const classAttr = manualColBreaks.has(col)
-      ? ' class="fc-print__manual-break-col"'
-      : '';
+    const classAttr = manualColBreaks.has(col) ? ' class="fc-print__manual-break-col"' : '';
     return `<${tag}${classAttr}${rowspanAttr}${colspanAttr}${styleAttr}>${escapeHtml(text)}${commentHtml}</${tag}>`;
   };
 
-  const renderRow = (row: number, isTitle: boolean): string => {
+  const renderRow = (
+    row: number,
+    isTitle: boolean,
+    region: PrintAreaBounds,
+    renderedSkipKeys: Set<string>,
+  ): string => {
     if (hiddenRows.has(row)) return '';
     const cells: string[] = [];
     if (setup.showHeadings) {
       cells.push(`<th class="fc-print__rowhead">${row + 1}</th>`);
     }
-    for (let c = minPrintCol; c <= maxCol; c += 1) {
+    for (let c = region.col0; c <= region.col1; c += 1) {
       if (hiddenCols.has(c)) continue;
-      cells.push(renderCell(row, c, isTitle ? 'th' : 'td'));
+      cells.push(renderCell(row, c, isTitle ? 'th' : 'td', region.col1, renderedSkipKeys));
     }
     const cls = manualRowBreaks.has(row) && !isTitle ? ' class="fc-print__manual-break-row"' : '';
     return `<tr${cls}>${cells.join('')}</tr>`;
@@ -465,10 +550,10 @@ export function buildPrintDocument(
 
   // Optional column-letter heading row. Repeated inside <thead> when print-
   // title rows are configured so it appears at the top of every page.
-  const headingRow = ((): string => {
+  const headingRow = (region: PrintAreaBounds): string => {
     if (!setup.showHeadings) return '';
     const cells: string[] = [`<th class="fc-print__corner"></th>`];
-    for (let c = minPrintCol; c <= maxCol; c += 1) {
+    for (let c = region.col0; c <= region.col1; c += 1) {
       if (hiddenCols.has(c)) continue;
       const cls = manualColBreaks.has(c)
         ? 'fc-print__colhead fc-print__manual-break-col'
@@ -476,33 +561,49 @@ export function buildPrintDocument(
       cells.push(`<th class="${cls}">${colLetter(c)}</th>`);
     }
     return `<tr>${cells.join('')}</tr>`;
-  })();
+  };
 
-  // <thead> repeats on every printed page. We always include the heading row
-  // (when configured) and any print-title rows here.
-  const theadRows: string[] = [];
-  if (headingRow) theadRows.push(headingRow);
-  if (titleRowRange) {
-    for (let r = titleRowRange[0]; r <= titleRowRange[1]; r += 1) {
-      const html = renderRow(r, true);
-      if (html) theadRows.push(html);
+  const renderTableSection = (region: PrintAreaBounds, sectionIndex: number): string => {
+    const renderedSkipKeys = new Set(skipKeys);
+    const theadRows: string[] = [];
+    const heading = headingRow(region);
+    if (heading) theadRows.push(heading);
+    if (titleRowRange) {
+      for (let r = titleRowRange[0]; r <= titleRowRange[1]; r += 1) {
+        const html = renderRow(r, true, region, renderedSkipKeys);
+        if (html) theadRows.push(html);
+      }
     }
-  }
-  const thead = theadRows.length ? `<thead>${theadRows.join('')}</thead>` : '';
+    const thead = theadRows.length ? `<thead>${theadRows.join('')}</thead>` : '';
 
-  // Body rows — skip rows already emitted by the title block to avoid
-  // duplicates inside <tbody>.
-  const bodyRows: string[] = [];
-  const titleSet = new Set<number>();
-  if (titleRowRange) {
-    for (let r = titleRowRange[0]; r <= titleRowRange[1]; r += 1) titleSet.add(r);
-  }
-  for (let r = minPrintRow; r <= maxRow; r += 1) {
-    if (titleSet.has(r)) continue;
-    const html = renderRow(r, false);
-    if (html) bodyRows.push(html);
-  }
-  const tbody = `<tbody>${bodyRows.join('')}</tbody>`;
+    const bodyRows: string[] = [];
+    const titleSet = new Set<number>();
+    if (titleRowRange) {
+      for (let r = titleRowRange[0]; r <= titleRowRange[1]; r += 1) titleSet.add(r);
+    }
+    for (let r = region.row0; r <= region.row1; r += 1) {
+      if (titleSet.has(r)) continue;
+      const html = renderRow(r, false, region, renderedSkipKeys);
+      if (html) bodyRows.push(html);
+    }
+    const tbody = `<tbody>${bodyRows.join('')}</tbody>`;
+
+    const colgroup = (() => {
+      if (!titleColRange) return '';
+      const cols: string[] = [];
+      if (setup.showHeadings) cols.push('<col>');
+      for (let c = region.col0; c <= region.col1; c += 1) {
+        if (hiddenCols.has(c)) continue;
+        const isTitle = c >= titleColRange[0] && c <= titleColRange[1];
+        cols.push(isTitle ? '<col class="fc-print__title-col">' : '<col>');
+      }
+      return `<colgroup>${cols.join('')}</colgroup>`;
+    })();
+
+    const sectionClass =
+      sectionIndex === 0 ? 'fc-print__area' : 'fc-print__area fc-print__area--break';
+    return `<section class="${sectionClass}"><table class="fc-print__table"${tableTransform}>${colgroup}${thead}${tbody}</table></section>`;
+  };
 
   // Header / footer strips — spreadsheets paint up to three slots per strip. We
   // emit them as fixed-position rows above/below the table; the @page
@@ -544,23 +645,11 @@ export function buildPrintDocument(
   const tableTransform =
     scale === 1 ? '' : ` style="transform:scale(${scale});transform-origin:top left;"`;
 
-  // Highlight the print-title columns by re-stating the col indices in a
-  // <colgroup>; the runtime CSS picks them up via :nth-child to repeat
-  // the underlying cell on the left of every page (browser-supported via
-  // `position: running()` is unreliable, so we duplicate left-frozen cells
-  // visually by tagging the columns).
-  const colgroup = ((): string => {
-    if (!titleColRange) return '';
-    const cols: string[] = [];
-    if (setup.showHeadings) cols.push('<col>');
-    for (let c = minPrintCol; c <= maxCol; c += 1) {
-      if (hiddenCols.has(c)) continue;
-      const isTitle = c >= titleColRange[0] && c <= titleColRange[1];
-      cols.push(isTitle ? '<col class="fc-print__title-col">' : '<col>');
-    }
-    return `<colgroup>${cols.join('')}</colgroup>`;
-  })();
+  const tablesHtml = printRegions
+    .map((region, index) => renderTableSection(region, index))
+    .join('');
 
+  const effectiveMargins = effectivePrintMargins(setup);
   const cssVars: Record<string, string> = {
     '--fc-print-paper': PAPER_DIMENSIONS[setup.paperSize] ?? 'A4',
     '--fc-print-orient': setup.orientation,
@@ -568,6 +657,14 @@ export function buildPrintDocument(
     '--fc-print-margin-right': `${setup.margins.right}in`,
     '--fc-print-margin-bottom': `${setup.margins.bottom}in`,
     '--fc-print-margin-left': `${setup.margins.left}in`,
+    '--fc-print-effective-margin-top': `${effectiveMargins.top}in`,
+    '--fc-print-effective-margin-right': `${effectiveMargins.right}in`,
+    '--fc-print-effective-margin-bottom': `${effectiveMargins.bottom}in`,
+    '--fc-print-effective-margin-left': `${effectiveMargins.left}in`,
+    '--fc-print-printable-top': `${setup.printableBounds?.top ?? 0}in`,
+    '--fc-print-printable-right': `${setup.printableBounds?.right ?? 0}in`,
+    '--fc-print-printable-bottom': `${setup.printableBounds?.bottom ?? 0}in`,
+    '--fc-print-printable-left': `${setup.printableBounds?.left ?? 0}in`,
     '--fc-print-header-margin': `${setup.headerMargin ?? 0.3}in`,
     '--fc-print-footer-margin': `${setup.footerMargin ?? 0.3}in`,
     '--fc-print-scale': String(scale),
@@ -609,6 +706,7 @@ export function buildPrintDocument(
     '.fc-print--black-white { filter: grayscale(1); }',
     '.fc-print--draft * { box-shadow: none !important; text-shadow: none !important; }',
     '.fc-print--fit-to-pages .fc-print__table { width: 100%; max-width: 100%; }',
+    '.fc-print__area--break { break-before: page; page-break-before: always; }',
     '.fc-print__comment-note { margin-top: 3px; padding: 3px 5px; border: 1px solid #d6a100; background: #fff8cc; color: #3b3a00; font-size: 8pt; white-space: normal; }',
     '.fc-print__comments { break-before: page; page-break-before: always; margin-top: 16px; }',
     '.fc-print__comments h2 { font-size: 12pt; margin: 0 0 8px; }',
@@ -635,7 +733,7 @@ ${css}
 </head>
 <body class="${bodyClasses}">
 ${headerHtml}
-<table class="fc-print__table"${tableTransform}>${colgroup}${thead}${tbody}</table>
+${tablesHtml}
 ${commentsHtml}
 ${footerHtml}
 </body>
@@ -656,8 +754,14 @@ export function printSheet(
   host: HTMLElement,
   title?: string,
   mode: 'print' | 'pdf' = 'print',
+  options: PrintSheetOptions = {},
 ): () => void {
-  const doc = buildPrintDocument(wb, store, sheet, title);
+  const setup = getPageSetup(store.getState(), sheet);
+  const printableBounds = options.printerProfiles
+    ? (resolvePrinterProfileBounds(setup, options.printerProfiles, options.printerProfileId) ??
+      null)
+    : undefined;
+  const doc = buildPrintDocument(wb, store, sheet, title, { printableBounds });
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');
   iframe.dataset.fcPrintMode = mode;

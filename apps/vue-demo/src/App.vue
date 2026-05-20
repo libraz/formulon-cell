@@ -4,6 +4,7 @@ import {
   type CellValue,
   type FeatureFlags,
   type FeatureId,
+  EXCEL365_STANDARD_RIBBON_TABS,
   analyzeAccessibilityCells,
   analyzeSpellingCells,
   applyTextScript,
@@ -12,6 +13,7 @@ import {
   presets,
   type SpreadsheetInstance,
   type ThemeName,
+  type ToolbarInstance,
   WorkbookHandle,
 } from '@libraz/formulon-cell';
 import { type RibbonTab, Spreadsheet, useSelection } from '@libraz/formulon-cell-vue';
@@ -28,20 +30,40 @@ import {
 } from 'vue';
 import {
   activateDemoModal,
+  buildDemoBackstageCards,
+  buildDemoBackstageNav,
+  buildDemoCommands,
+  buildDemoPrintPreviewModel,
+  buildDemoSearchItems,
   composeDemoUiOptions,
   createDemoStrings,
+  demoSearchOptionId,
+  DEMO_ICONS,
   DEMO_FUNCTIONS,
+  DEMO_PRINT_PREVIEW_LINES,
   demoColLabel,
   demoCommandText,
+  type DemoBackstageAction,
+  type DemoSearchItem,
+  type DemoSearchUsagePrior,
   FEATURE_GROUPS,
   formatLoadError,
   FORMATTERS,
+  installDemoF6Navigation,
+  isDemoBackstageActionDisabled,
+  loadDemoSearchUsagePrior,
   LOCALES,
+  nextDemoSearchIndex,
   type PresetKey,
   PRESETS,
   previewCellChange,
+  installDemoSearchShortcut,
+  queryDemoSearchItems,
+  recordDemoSearchUsage,
   resolveInitialLocale,
   reviewCellsForInstance,
+  runDemoBackstageAction,
+  saveDemoSearchUsagePrior,
   seedDemoWorkbook,
   THEMES,
 } from '../../demo-shared/index.js';
@@ -60,20 +82,14 @@ interface ChangeLogEntry {
   readonly preview: string;
 }
 
-interface CommandItem {
-  readonly id: string;
-  readonly label: string;
-  readonly hint: string;
-  readonly tab?: RibbonTab;
-  readonly run: () => void;
-}
-
 interface ReviewDialogState {
   readonly title: string;
   readonly items: readonly { label: string; detail: string }[];
 }
 
 let changeId = 0;
+let disposeSearchShortcut: (() => void) | undefined;
+let disposeF6Navigation: (() => void) | undefined;
 
 // Modal focus trap + Esc-to-close + change-log preview + seed +
 // review-cell projection all live in demo-shared/index.ts so the React
@@ -87,17 +103,23 @@ const workbook = shallowRef<WorkbookHandle | null>(null);
 // Vue's reactive proxy walks deeply by default; the spreadsheet instance
 // holds a canvas + many internal refs that should not be reactivified.
 const instance = shallowRef<SpreadsheetInstance | null>(null);
+const toolbar = shallowRef<ToolbarInstance | null>(null);
 const log = ref<ChangeLogEntry[]>([]);
 const formatters = ref({ uppercase: true, arrows: true });
 const probe = ref<{ name: string; result: string } | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
+const searchInput = ref<HTMLInputElement | null>(null);
+const quickAccess = ref<HTMLElement | null>(null);
 const preset = ref<PresetKey>('full');
 const overrides = ref<FeatureFlags>({});
 const showRibbon = ref(true);
 const showPanel = ref(false);
 const ribbonTab = ref<RibbonTab>('home');
+const backstageAction = ref<DemoBackstageAction>('info');
 const searchQuery = ref('');
 const searchOpen = ref(false);
+const searchActiveIndex = ref(-1);
+const searchUsagePrior = ref<DemoSearchUsagePrior>(loadDemoSearchUsagePrior());
 const bookName = ref('Book1');
 const loadError = ref<string | null>(null);
 const reviewDialog = ref<ReviewDialogState | null>(null);
@@ -118,6 +140,12 @@ const resolvedUi = computed(() =>
 const features = computed<FeatureFlags>(() => resolvedUi.value.features);
 const ui = computed(() => UI[locale.value === 'ja' ? 'ja' : 'en']);
 const commandText = computed(() => demoCommandText(locale.value));
+const backstageNav = computed(() => buildDemoBackstageNav(ui.value, backstageAction.value));
+const backstageCards = computed(() => buildDemoBackstageCards(ui.value));
+const printPreview = computed(() => {
+  void backstageAction.value;
+  return buildDemoPrintPreviewModel(ui.value, instance.value, bookName.value);
+});
 
 watch(
   locale,
@@ -358,6 +386,41 @@ const onSave = (): void => {
   setTimeout(() => URL.revokeObjectURL(url), 1_000);
 };
 
+const onNewWorkbook = async (): Promise<void> => {
+  const wb = await WorkbookHandle.createDefault();
+  workbook.value = wb;
+  await instance.value?.setWorkbook(wb);
+  bookName.value = 'Book1';
+  log.value = [];
+  ribbonTab.value = 'home';
+};
+
+const backstageActionDisabled = (action: DemoBackstageAction): boolean =>
+  isDemoBackstageActionDisabled(action, instance.value);
+
+const runBackstageAction = (action: DemoBackstageAction): void => {
+  if (action === 'info' || action === 'print') {
+    backstageAction.value = action;
+    return;
+  }
+  runDemoBackstageAction({
+    action,
+    instance: instance.value,
+    ui: ui.value,
+    newWorkbook: onNewWorkbook,
+    openWorkbook: () => fileInput.value?.click(),
+    saveWorkbook: onSave,
+    showNotice: showRibbonNotice,
+    toggleOptions: () => {
+      showPanel.value = !showPanel.value;
+    },
+    closeBackstage: () => {
+      backstageAction.value = 'info';
+      ribbonTab.value = 'home';
+    },
+  });
+};
+
 const onOpenFiles = async (ev: Event): Promise<void> => {
   const target = ev.target as HTMLInputElement;
   const file = target.files?.[0];
@@ -406,189 +469,102 @@ const isFeatureOn = (id: FeatureId): boolean =>
     ? features.value[id] === true
     : features.value[id] !== false;
 
-const commands = computed<CommandItem[]>(() => [
-  {
-    id: 'open',
-    label: commandText.value.commands.open.label,
-    hint: commandText.value.commands.open.hint,
-    tab: 'file',
-    run: () => fileInput.value?.click(),
-  },
-  {
-    id: 'save',
-    label: commandText.value.commands.save.label,
-    hint: commandText.value.commands.save.hint,
-    tab: 'file',
-    run: onSave,
-  },
-  {
-    id: 'page-setup',
-    label: commandText.value.commands.pageSetup.label,
-    hint: commandText.value.commands.pageSetup.hint,
-    tab: 'file',
-    run: () => instance.value?.openPageSetup(),
-  },
-  {
-    id: 'print',
-    label: commandText.value.commands.print.label,
-    hint: commandText.value.commands.print.hint,
-    tab: 'file',
-    run: () => instance.value?.print('print'),
-  },
-  {
-    id: 'format-cells',
-    label: commandText.value.commands.formatCells.label,
-    hint: commandText.value.commands.formatCells.hint,
-    tab: 'home',
-    run: () => instance.value?.openFormatDialog(),
-  },
-  {
-    id: 'conditional',
-    label: commandText.value.commands.conditionalFormatting.label,
-    hint: commandText.value.commands.conditionalFormatting.hint,
-    tab: 'insert',
-    run: () => instance.value?.openConditionalDialog(),
-  },
-  {
-    id: 'cell-styles',
-    label: commandText.value.commands.cellStyles.label,
-    hint: commandText.value.commands.cellStyles.hint,
-    tab: 'insert',
-    run: () => instance.value?.openCellStylesGallery(),
-  },
-  {
-    id: 'name-manager',
-    label: commandText.value.commands.nameManager.label,
-    hint: commandText.value.commands.nameManager.hint,
-    tab: 'insert',
-    run: () => instance.value?.openNamedRangeDialog(),
-  },
-  {
-    id: 'insert-function',
-    label: commandText.value.commands.insertFunction.label,
-    hint: commandText.value.commands.insertFunction.hint,
-    tab: 'formulas',
-    run: () => instance.value?.openFunctionArguments(),
-  },
-  {
-    id: 'trace-precedents',
-    label: commandText.value.commands.tracePrecedents.label,
-    hint: commandText.value.commands.tracePrecedents.hint,
-    tab: 'formulas',
-    run: () => instance.value?.tracePrecedents(),
-  },
-  {
-    id: 'watch-window',
-    label: commandText.value.commands.watchWindow.label,
-    hint: commandText.value.commands.watchWindow.hint,
-    tab: 'formulas',
-    run: () => instance.value?.toggleWatchWindow(),
-  },
-  {
-    id: 'filter',
-    label: commandText.value.commands.filter.label,
-    hint: commandText.value.commands.filter.hint,
-    tab: 'data',
-    run: () => {
-      ribbonTab.value = 'data';
+const commands = computed(() =>
+  buildDemoCommands({
+    commandText: commandText.value,
+    instance: instance.value,
+    openWorkbook: () => fileInput.value?.click(),
+    saveWorkbook: onSave,
+    setRibbonTab: (tab) => {
+      ribbonTab.value = tab;
     },
-  },
-  {
-    id: 'sort',
-    label: commandText.value.commands.sort.label,
-    hint: commandText.value.commands.sort.hint,
-    tab: 'data',
-    run: () => {
-      ribbonTab.value = 'data';
-    },
-  },
-  {
-    id: 'freeze-panes',
-    label: commandText.value.commands.freezePanes.label,
-    hint: commandText.value.commands.freezePanes.hint,
-    tab: 'view',
-    run: () => {
-      ribbonTab.value = 'view';
-    },
-  },
-  {
-    id: 'protect-sheet',
-    label: commandText.value.commands.protectSheet.label,
-    hint: commandText.value.commands.protectSheet.hint,
-    tab: 'view',
-    run: () => instance.value?.toggleSheetProtection(),
-  },
-  {
-    id: 'options-pane',
-    label: commandText.value.commands.options.label,
-    hint: commandText.value.commands.options.hint,
-    run: () => {
+    togglePanel: () => {
       showPanel.value = !showPanel.value;
     },
-  },
-  {
-    id: 'theme-light',
-    label: commandText.value.commands.lightTheme.label,
-    hint: commandText.value.commands.lightTheme.hint,
-    run: () => {
-      theme.value = 'paper';
+    setTheme: (next) => {
+      theme.value = next;
     },
-  },
-  {
-    id: 'theme-dark',
-    label: commandText.value.commands.darkTheme.label,
-    hint: commandText.value.commands.darkTheme.hint,
-    run: () => {
-      theme.value = 'ink';
+    setLocale: (next) => {
+      locale.value = next;
     },
-  },
-  {
-    id: 'locale-ja',
-    label: commandText.value.commands.japaneseLocale.label,
-    hint: commandText.value.commands.japaneseLocale.hint,
-    run: () => {
-      locale.value = 'ja';
+  }),
+);
+const searchItems = computed(() =>
+  buildDemoSearchItems(
+    commands.value,
+    locale.value,
+    (tab) => {
+      ribbonTab.value = tab;
     },
-  },
-  {
-    id: 'locale-en',
-    label: commandText.value.commands.englishLocale.label,
-    hint: commandText.value.commands.englishLocale.hint,
-    run: () => {
-      locale.value = 'en';
-    },
-  },
-]);
+    (commandId) => toolbar.value?.applyCommand(commandId) ?? false,
+  ),
+);
 
 const filteredCommands = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase();
-  if (!q) return commands.value.slice(0, 8);
-  return commands.value
-    .filter((cmd) => `${cmd.label} ${cmd.hint}`.toLowerCase().includes(q))
-    .slice(0, 8);
+  return queryDemoSearchItems(searchItems.value, searchQuery.value, 8, searchUsagePrior.value);
 });
 
-const runCommand = (cmd: CommandItem): void => {
+const runCommand = (cmd: DemoSearchItem): void => {
+  searchUsagePrior.value = recordDemoSearchUsage(searchUsagePrior.value, cmd);
   if (cmd.tab) ribbonTab.value = cmd.tab;
   cmd.run();
   searchQuery.value = '';
   searchOpen.value = false;
+  searchActiveIndex.value = -1;
 };
 
 const onSearchKeydown = (ev: KeyboardEvent): void => {
   if (ev.key === 'Escape') {
     searchOpen.value = false;
+    searchActiveIndex.value = -1;
     (ev.currentTarget as HTMLInputElement).blur();
   }
-  if (ev.key === 'Enter' && filteredCommands.value[0]) {
+  if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
     ev.preventDefault();
-    runCommand(filteredCommands.value[0]);
+    searchOpen.value = true;
+    searchActiveIndex.value = nextDemoSearchIndex(
+      searchActiveIndex.value,
+      filteredCommands.value.length,
+      ev.key === 'ArrowDown' ? 'next' : 'previous',
+    );
+  }
+  if (ev.key === 'Enter' && filteredCommands.value.length > 0) {
+    ev.preventDefault();
+    const index = nextDemoSearchIndex(
+      searchActiveIndex.value,
+      filteredCommands.value.length,
+      'first',
+    );
+    const command = filteredCommands.value[index];
+    if (command) runCommand(command);
   }
 };
+
+watch([searchQuery, searchOpen], () => {
+  searchActiveIndex.value = -1;
+});
+
+watch(searchUsagePrior, (prior) => saveDemoSearchUsagePrior(prior));
 
 onUnmounted(() => {
   demoModalCleanup?.();
   // The Spreadsheet component disposes itself; nothing extra to clean up.
+});
+
+onMounted(() => {
+  disposeSearchShortcut = installDemoSearchShortcut(() => searchInput.value);
+  disposeF6Navigation = installDemoF6Navigation({
+    getQuickAccess: () => quickAccess.value,
+    getToolbar: () => toolbar.value,
+    getInstance: () => instance.value,
+  });
+});
+
+onBeforeUnmount(() => {
+  disposeSearchShortcut?.();
+  disposeSearchShortcut = undefined;
+  disposeF6Navigation?.();
+  disposeF6Navigation = undefined;
 });
 </script>
 
@@ -604,25 +580,30 @@ onUnmounted(() => {
   <div v-else class="demo" :data-theme="theme">
     <header class="demo__head">
       <div class="demo__titlebar">
-        <div class="demo__quick" role="toolbar" aria-label="Quick access toolbar">
-          <span class="demo__brand-mark">⊞</span>
+        <div
+          ref="quickAccess"
+          class="demo__quick"
+          role="toolbar"
+          aria-label="Quick access toolbar"
+        >
+          <span class="demo__brand-mark" aria-hidden="true">
+            <svg class="demo__rb-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path v-for="path in DEMO_ICONS.app" :key="path" :d="path" />
+            </svg>
+          </span>
           <button type="button" class="demo__title-icon" aria-label="Save" @click="onSave">
             <svg class="demo__rb-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M4 4h10l2 2v10H4z" />
-              <path d="M7 4v5h6V4" />
-              <path d="M7 13h6" />
+              <path v-for="path in DEMO_ICONS.save" :key="path" :d="path" />
             </svg>
           </button>
           <button type="button" class="demo__title-icon" aria-label="Undo" @click="instance?.undo()">
             <svg class="demo__rb-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M7.2 5.2H3.8v-3.4" />
-              <path d="M4 5.2c2.2-2.1 5.7-2.3 8.1-.5 2.7 2.1 3 6.1.7 8.6-1.8 1.9-4.8 2.4-7.1 1.2" />
+              <path v-for="path in DEMO_ICONS.undo" :key="path" :d="path" />
             </svg>
           </button>
           <button type="button" class="demo__title-icon" aria-label="Redo" @click="instance?.redo()">
             <svg class="demo__rb-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M12.8 5.2h3.4v-3.4" />
-              <path d="M16 5.2c-2.2-2.1-5.7-2.3-8.1-.5-2.7 2.1-3 6.1-.7 8.6 1.8 1.9 4.8 2.4 7.1 1.2" />
+              <path v-for="path in DEMO_ICONS.redo" :key="path" :d="path" />
             </svg>
           </button>
         </div>
@@ -632,30 +613,38 @@ onUnmounted(() => {
         </div>
         <div class="demo__search">
           <svg class="demo__rb-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M8.5 14a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11z" />
-            <path d="M12.5 12.5L17 17" />
+            <path v-for="path in DEMO_ICONS.search" :key="path" :d="path" />
           </svg>
           <input
+            ref="searchInput"
             v-model="searchQuery"
             type="search"
+            role="combobox"
             :placeholder="ui.search"
             :aria-label="ui.searchCommands"
-            @focus="searchOpen = true"
-            @input="searchOpen = true"
+            aria-controls="demo-search-results"
+            :aria-expanded="searchOpen"
+            :aria-activedescendant="searchOpen && searchActiveIndex >= 0 ? demoSearchOptionId(searchActiveIndex) : undefined"
+            @focus="searchOpen = true; searchActiveIndex = -1"
+            @input="searchOpen = true; searchActiveIndex = -1"
             @keydown="onSearchKeydown"
             @blur="searchOpen = false"
           />
-          <div v-if="searchOpen" class="demo__command-menu">
+          <div v-if="searchOpen" id="demo-search-results" class="demo__command-menu" role="listbox">
             <div v-if="filteredCommands.length === 0" class="demo__command-empty">
               {{ ui.noCommands }}
             </div>
             <button
-              v-for="cmd in filteredCommands"
+              v-for="(cmd, index) in filteredCommands"
               v-else
               :key="cmd.id"
+              :id="demoSearchOptionId(index)"
               type="button"
-              class="demo__command-item"
+              role="option"
+              :aria-selected="index === searchActiveIndex"
+              :class="['demo__command-item', { 'demo__command-item--active': index === searchActiveIndex }]"
               @mousedown.prevent
+              @mouseenter="searchActiveIndex = index"
               @click="runCommand(cmd)"
             >
               <strong>{{ cmd.label }}</strong>
@@ -667,58 +656,19 @@ onUnmounted(() => {
           <button type="button" class="demo__share">
             {{ ui.share }}
           </button>
-          <span class="demo__avatar" role="img" :aria-label="ui.signedInUser">FC</span>
-        </div>
-      </div>
-      <div class="demo__commandbar">
-        <div class="demo__brand">
-          <strong>formulon-cell</strong>
-          <span class="demo__brand-sep">·</span>
-          <span class="demo__brand-tag">{{ ui.workbook }}</span>
-        </div>
-        <div class="demo__controls">
-          <div class="demo__seg" role="group" :aria-label="ui.theme">
-            <button
-              v-for="t in THEMES"
-              :key="t.value"
-              type="button"
-              :class="['demo__seg-btn', { 'demo__seg-btn--active': theme === t.value }]"
-              :aria-pressed="theme === t.value"
-              @click="theme = t.value"
-            >
-              {{ t.label }}
-            </button>
-          </div>
-          <div class="demo__seg" role="group" :aria-label="ui.locale">
-            <button
-              v-for="l in LOCALES"
-              :key="l.value"
-              type="button"
-              :class="['demo__seg-btn', { 'demo__seg-btn--active': locale === l.value }]"
-              :aria-pressed="locale === l.value"
-              @click="locale = l.value"
-            >
-              {{ l.label }}
-            </button>
-          </div>
           <button
             type="button"
-            :class="['demo__btn', { 'demo__btn--active': showPanel }]"
+            :class="['demo__share', { 'demo__share--active': showPanel }]"
             :aria-pressed="showPanel"
             @click="showPanel = !showPanel"
           >
             {{ ui.demoPane }}
           </button>
-          <button type="button" class="demo__btn" @click="fileInput?.click()">
-            {{ ui.open }}
-          </button>
-          <button type="button" class="demo__btn" :disabled="!instance" @click="onSave">
-            {{ ui.save }}
-          </button>
-          <input ref="fileInput" type="file" accept=".xlsx,.xlsm" hidden @change="onOpenFiles" />
+          <span class="demo__avatar" role="img" :aria-label="ui.signedInUser">FC</span>
         </div>
       </div>
     </header>
+    <input ref="fileInput" type="file" accept=".xlsx,.xlsm" hidden @change="onOpenFiles" />
 
     <main :class="['demo__body', { 'demo__body--panel': showPanel }]">
       <div class="demo__sheet-col">
@@ -727,6 +677,7 @@ onUnmounted(() => {
           :instance="instance"
           :active-tab="ribbonTab"
           :locale="locale"
+          :ribbon-tabs="EXCEL365_STANDARD_RIBBON_TABS"
           :on-spelling-review="onSpellingReview"
           :on-accessibility-check="onAccessibilityCheck"
           :on-run-script="onRunScript"
@@ -742,6 +693,7 @@ onUnmounted(() => {
           :on-add-in="
             () => showRibbonNotice(commandText.addIns, commandText.addInsHostCallbacks)
           "
+          :on-toolbar-ready="(next) => { toolbar = next }"
           @tab-change="ribbonTab = $event"
         />
         <Spreadsheet
@@ -757,88 +709,131 @@ onUnmounted(() => {
         <div v-if="ribbonTab === 'file'" class="demo__backstage" role="dialog" :aria-label="ui.file">
           <nav class="demo__backstage-nav" :aria-label="ui.file">
             <strong>{{ ui.file }}</strong>
-            <button type="button" class="demo__backstage-navitem demo__backstage-navitem--active">
-              {{ ui.info }}
-            </button>
-            <button type="button" class="demo__backstage-navitem" @click="fileInput?.click()">
-              {{ ui.openTitle }}
-            </button>
-            <button type="button" class="demo__backstage-navitem" @click="onSave">
-              {{ ui.save }}
-            </button>
             <button
+              v-for="item in backstageNav"
+              :key="item.action"
               type="button"
-              class="demo__backstage-navitem"
-              :disabled="!instance"
-              @click="instance?.print('print')"
+              :class="[
+                'demo__backstage-navitem',
+                item.active ? 'demo__backstage-navitem--active' : '',
+              ]"
+              :disabled="backstageActionDisabled(item.action)"
+              @click="runBackstageAction(item.action)"
             >
-              {{ ui.print }}
-            </button>
-            <button
-              type="button"
-              class="demo__backstage-navitem"
-              :disabled="!instance"
-              @click="instance?.openPageSetup()"
-            >
-              {{ ui.pageSetup }}
-            </button>
-            <button type="button" class="demo__backstage-navitem" @click="ribbonTab = 'home'">
-              {{ ui.close }}
+              {{ item.label }}
             </button>
           </nav>
           <div class="demo__backstage-main">
             <div class="demo__backstage-title">
-              <span class="demo__backstage-xl">⊞</span>
+              <span class="demo__backstage-xl" aria-hidden="true">
+                <svg class="demo__rb-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path v-for="path in DEMO_ICONS.app" :key="path" :d="path" />
+                </svg>
+              </span>
               <div>
                 <h1>{{ bookName }}</h1>
                 <p>{{ ui.backstageSub }}</p>
               </div>
             </div>
-            <div class="demo__backstage-grid">
-              <button type="button" class="demo__backstage-card" @click="fileInput?.click()">
-                <strong>{{ ui.openTitle }}</strong>
-                <span>{{ ui.openDesc }}</span>
-              </button>
-              <button type="button" class="demo__backstage-card" @click="onSave">
-                <strong>{{ ui.saveCopy }}</strong>
-                <span>{{ ui.saveDesc }}</span>
-              </button>
+            <div v-if="backstageAction === 'print'" class="demo__print-preview" data-demo-print-preview>
+              <section class="demo__print-settings" :aria-label="ui.printSettings">
+                <h2>{{ printPreview.title }}</h2>
+                <p>{{ printPreview.subtitle }}</p>
+                <button
+                  type="button"
+                  class="demo__print-action demo__print-action--primary"
+                  :disabled="!instance"
+                  @click="instance?.print('print')"
+                >
+                  {{ printPreview.printLabel }}
+                </button>
+                <button
+                  type="button"
+                  class="demo__print-action"
+                  :disabled="!instance"
+                  @click="instance?.print('pdf')"
+                >
+                  {{ printPreview.pdfLabel }}
+                </button>
+                <button
+                  type="button"
+                  class="demo__print-action"
+                  :disabled="!instance"
+                  @click="instance?.openPageSetup()"
+                >
+                  {{ printPreview.pageSetupLabel }}
+                </button>
+                <dl class="demo__print-meta">
+                  <div v-for="row in printPreview.settings" :key="row.label">
+                    <dt>{{ row.label }}</dt>
+                    <dd>{{ row.value }}</dd>
+                  </div>
+                </dl>
+              </section>
+              <section class="demo__print-paper" :aria-label="printPreview.previewTitle">
+                <iframe
+                  v-if="printPreview.previewHtml"
+                  class="demo__print-frame"
+                  :title="printPreview.previewTitle"
+                  sandbox=""
+                  :srcdoc="printPreview.previewHtml"
+                />
+                <div v-else class="demo__print-page">
+                  <strong>{{ printPreview.previewTitle }}</strong>
+                  <div aria-hidden="true" class="demo__print-sheet-lines">
+                    <span v-for="line in DEMO_PRINT_PREVIEW_LINES" :key="line" />
+                  </div>
+                </div>
+                <p>{{ printPreview.previewHint }}</p>
+              </section>
+            </div>
+            <div v-else class="demo__backstage-grid">
               <button
+                v-for="item in backstageCards"
+                :key="item.action"
                 type="button"
                 class="demo__backstage-card"
-                :disabled="!instance"
-                @click="instance?.print('print')"
+                :disabled="backstageActionDisabled(item.action)"
+                @click="runBackstageAction(item.action)"
               >
-                <strong>{{ ui.print }}</strong>
-                <span>{{ ui.printDesc }}</span>
-              </button>
-              <button
-                type="button"
-                class="demo__backstage-card"
-                :disabled="!instance"
-                @click="instance?.openPageSetup()"
-              >
-                <strong>{{ ui.pageSetup }}</strong>
-                <span>{{ ui.pageSetupDesc }}</span>
-              </button>
-              <button
-                type="button"
-                class="demo__backstage-card"
-                :disabled="!instance"
-                @click="instance?.openExternalLinksDialog()"
-              >
-                <strong>{{ ui.editLinks }}</strong>
-                <span>{{ ui.linksDesc }}</span>
-              </button>
-              <button type="button" class="demo__backstage-card" @click="showPanel = !showPanel">
-                <strong>{{ ui.options }}</strong>
-                <span>{{ ui.optionsDesc }}</span>
+                <strong>{{ item.label }}</strong>
+                <span>{{ item.desc }}</span>
               </button>
             </div>
           </div>
         </div>
       </div>
       <aside class="demo__panel" aria-label="Options panel" :hidden="!showPanel">
+        <section class="demo__card">
+          <h2>Demo chrome</h2>
+          <div class="demo__controls demo__controls--panel">
+            <div class="demo__seg" role="group" :aria-label="ui.theme">
+              <button
+                v-for="t in THEMES"
+                :key="t.value"
+                type="button"
+                :class="['demo__seg-btn', { 'demo__seg-btn--active': theme === t.value }]"
+                :aria-pressed="theme === t.value"
+                @click="theme = t.value"
+              >
+                {{ t.label }}
+              </button>
+            </div>
+            <div class="demo__seg" role="group" :aria-label="ui.locale">
+              <button
+                v-for="l in LOCALES"
+                :key="l.value"
+                type="button"
+                :class="['demo__seg-btn', { 'demo__seg-btn--active': locale === l.value }]"
+                :aria-pressed="locale === l.value"
+                @click="locale = l.value"
+              >
+                {{ l.label }}
+              </button>
+            </div>
+          </div>
+        </section>
+
         <section class="demo__card">
           <h2>Preset</h2>
           <p class="demo__hint">

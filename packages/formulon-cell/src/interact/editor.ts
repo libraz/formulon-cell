@@ -406,7 +406,14 @@ export class InlineEditor {
   private readonly onInput = (): void => {
     this.refreshSize();
     if (this.input) this.applyTextAlignment(this.input.value);
-    if (this.input) syncEditorRefs(this.deps.store, this.input.value);
+    if (this.input) {
+      mutators.setEditor(this.deps.store, {
+        kind: 'edit',
+        raw: this.input.value,
+        caret: this.input.selectionStart ?? this.input.value.length,
+      });
+      syncEditorRefs(this.deps.store, this.input.value);
+    }
     this.autocomplete?.refresh();
     this.argHelper?.refresh();
   };
@@ -417,7 +424,7 @@ export class InlineEditor {
    *  native word selection. */
   private readonly onDblClick = (e: MouseEvent): void => {
     const el = this.input;
-    if (!el || !el.value.startsWith('=')) return;
+    if (!el?.value.startsWith('=')) return;
     // The browser has already selected a word; probe its midpoint so the hit
     //  point lands inside the intended token.
     const a = el.selectionStart ?? 0;

@@ -1,4 +1,4 @@
-import type { CellValue, Range } from '../engine/types.js';
+import type { CellValue, PivotFilterSpec, Range } from '../engine/types.js';
 import { PivotAggregation, PivotAxis } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
@@ -13,13 +13,24 @@ export interface PivotSourceField {
 
 export type PivotSortDirection = 'none' | 'asc' | 'desc';
 
+export interface PivotFieldItemVisibility {
+  fieldName: string;
+  itemName: string;
+  visible: boolean;
+}
+
 export interface CreatePivotTableOptions {
   source: Range;
   destination: { sheet: number; row: number; col: number };
   name?: string;
   rowField: string;
   columnField?: string;
+  filterField?: string;
+  filterFields?: readonly string[];
+  filterItems?: readonly PivotFieldItemVisibility[];
+  pivotFilters?: readonly PivotFilterSpec[];
   valueField: string;
+  valueFields?: readonly string[];
   aggregation?: PivotAggregation;
   rowSort?: PivotSortDirection;
   columnSort?: PivotSortDirection;
@@ -79,6 +90,29 @@ export function inferPivotSourceFields(wb: WorkbookHandle, range: Range): PivotS
   return fields;
 }
 
+export function inferPivotFieldItems(
+  wb: WorkbookHandle,
+  range: Range,
+  fieldName: string,
+): string[] {
+  const field = inferPivotSourceFields(wb, range).find((candidate) => candidate.name === fieldName);
+  if (!field) return [];
+  const seen = new Set<string>();
+  const items: string[] = [];
+  for (let r = range.r0 + 1; r <= range.r1; r += 1) {
+    const value = wb.getValue({
+      sheet: range.sheet,
+      row: r,
+      col: range.c0 + field.index,
+    });
+    const label = cellLabel(value, '(blank)');
+    if (seen.has(label)) continue;
+    seen.add(label);
+    items.push(label);
+  }
+  return items;
+}
+
 export function createPivotTableFromRange(
   wb: WorkbookHandle,
   opts: CreatePivotTableOptions,
@@ -90,12 +124,39 @@ export function createPivotTableFromRange(
   const byName = new Map(fields.map((f) => [f.name, f]));
   const rowField = byName.get(opts.rowField);
   const columnField = opts.columnField ? byName.get(opts.columnField) : undefined;
-  const valueField = byName.get(opts.valueField);
+  const filterFieldNames = Array.from(
+    new Set(
+      (opts.filterFields && opts.filterFields.length > 0
+        ? opts.filterFields
+        : opts.filterField
+          ? [opts.filterField]
+          : []
+      ).filter(Boolean),
+    ),
+  );
+  const filterFields = filterFieldNames.map((name) => byName.get(name));
+  const pivotFilterFields = new Set((opts.pivotFilters ?? []).map((filter) => filter.fieldName));
+  const valueFieldNames = Array.from(
+    new Set(
+      (opts.valueFields && opts.valueFields.length > 0
+        ? opts.valueFields
+        : [opts.valueField]
+      ).filter(Boolean),
+    ),
+  );
+  const valueFields = valueFieldNames.map((name) => byName.get(name));
+  const filterItemFields = new Set((opts.filterItems ?? []).map((item) => item.fieldName));
   if (
     !rowField ||
-    !valueField ||
+    valueFields.length === 0 ||
+    valueFields.some((field) => field === undefined) ||
     (opts.columnField && !columnField) ||
-    rowField.name === columnField?.name
+    filterFields.some((field) => field === undefined) ||
+    Array.from(filterItemFields).some((name) => !filterFieldNames.includes(name)) ||
+    Array.from(pivotFilterFields).some((name) => !filterFieldNames.includes(name)) ||
+    rowField.name === columnField?.name ||
+    filterFields.some((field) => field?.name === rowField.name) ||
+    (columnField !== undefined && filterFields.some((field) => field?.name === columnField.name))
   ) {
     return { ok: false, reason: 'invalid-field' };
   }
@@ -211,22 +272,55 @@ export function createPivotTableFromRange(
     }
   }
 
-  const valuePivotField = wb.addPivotField(opts.destination.sheet, pivotIndex, {
-    sourceName: valueField.name,
-    axis: PivotAxis.Value,
-  });
-  if (valuePivotField < 0) return failAfterPivot('value-field');
-  const aggregation =
-    opts.aggregation ??
-    (valueField.numericCount > 0 ? PivotAggregation.Sum : PivotAggregation.Count);
+  for (const filterField of filterFields) {
+    if (!filterField) return failAfterPivot('filter-field');
+    const filterPivotField = wb.addPivotField(opts.destination.sheet, pivotIndex, {
+      sourceName: filterField.name,
+      axis: PivotAxis.Page,
+    });
+    if (filterPivotField < 0) return failAfterPivot('filter-field');
+    for (const item of opts.filterItems?.filter((entry) => entry.fieldName === filterField.name) ??
+      []) {
+      if (
+        !wb.addPivotFieldItem(
+          opts.destination.sheet,
+          pivotIndex,
+          filterPivotField,
+          item.itemName,
+          item.visible,
+        )
+      ) {
+        return failAfterPivot('filter-item');
+      }
+    }
+    for (const filter of opts.pivotFilters?.filter(
+      (entry) => entry.fieldName === filterField.name,
+    ) ?? []) {
+      if (!wb.addPivotFilter(opts.destination.sheet, pivotIndex, filter)) {
+        return failAfterPivot('pivot-filter');
+      }
+    }
+  }
 
-  const dataField = wb.addPivotDataField(opts.destination.sheet, pivotIndex, {
-    name: `${aggregation === PivotAggregation.Count ? 'Count' : 'Sum'} of ${valueField.name}`,
-    fieldIndex: valueField.index,
-    aggregation,
-    numberFormat: opts.valueNumberFormat?.trim() || undefined,
-  });
-  if (dataField < 0) return failAfterPivot('data-field');
+  for (const valueField of valueFields) {
+    if (!valueField) return failAfterPivot('value-field');
+    const valuePivotField = wb.addPivotField(opts.destination.sheet, pivotIndex, {
+      sourceName: valueField.name,
+      axis: PivotAxis.Value,
+    });
+    if (valuePivotField < 0) return failAfterPivot('value-field');
+    const aggregation =
+      opts.aggregation ??
+      (valueField.numericCount > 0 ? PivotAggregation.Sum : PivotAggregation.Count);
+
+    const dataField = wb.addPivotDataField(opts.destination.sheet, pivotIndex, {
+      name: `${aggregation === PivotAggregation.Count ? 'Count' : 'Sum'} of ${valueField.name}`,
+      fieldIndex: valueField.index,
+      aggregation,
+      numberFormat: opts.valueNumberFormat?.trim() || undefined,
+    });
+    if (dataField < 0) return failAfterPivot('data-field');
+  }
 
   return { ok: true, cacheId, pivotIndex };
 }

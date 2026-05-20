@@ -74,6 +74,11 @@
   border-color: rgba(255, 255, 255, 0.18);
 }
 
+.demo__share--active {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.52);
+}
+
 .demo__search {
   position: relative;
   display: flex;
@@ -88,9 +93,8 @@
   box-shadow: var(--fc-shadow-2);
 }
 
-.demo__search span {
+.demo__search .demo__rb-icon {
   flex: 0 0 auto;
-  font-size: 14px;
 }
 
 .demo__search input {
@@ -143,6 +147,8 @@
 }
 
 .demo__command-item:hover,
+.demo__command-item--active,
+.demo__command-item[aria-selected="true"],
 .demo__command-item:focus-visible {
   background: var(--demo-ribbon-rail);
   outline: 0;

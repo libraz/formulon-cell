@@ -1,4 +1,8 @@
-import type { TableOverlay } from '../commands/format-as-table.js';
+import type {
+  CustomTableStyle,
+  PivotTableStyleAssignment,
+  TableOverlay,
+} from '../commands/format-as-table.js';
 import type { SheetView } from '../commands/sheet-views.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 
@@ -143,6 +147,12 @@ export interface CellFormat {
    *  formula text is suppressed from the formula bar, matching the desktop
    *  Format Cells > Protection > Hidden behavior. */
   formulaHidden?: boolean;
+}
+
+export interface CustomCellStyle {
+  id: string;
+  label: string;
+  format: Partial<CellFormat>;
 }
 
 /** Comparison ordinals match OOXML data-validation `op`:
@@ -295,6 +305,8 @@ export interface UiSlice {
   editorRefs: EditorRefHighlight[];
   /** Which aggregate stats appear in the status bar for the active selection. */
   statusAggs: StatusAggKey[];
+  /** Excel-style right-click status bar toggles beyond aggregates. */
+  statusOptions: StatusBarOptions;
   /** Range with autofilter enabled. Header row inside this range paints a
    *  small filter button (▼). null = no autofilter. */
   filterRange: Range | null;
@@ -319,10 +331,32 @@ export type WorkbookViewMode = 'normal' | 'pageLayout' | 'pageBreakPreview';
 
 /** Aggregate readouts available in the status bar. Spreadsheets ship these six. */
 export type StatusAggKey = 'sum' | 'average' | 'count' | 'countNumbers' | 'min' | 'max';
+export type StatusBarOptionKey =
+  | 'capsLock'
+  | 'numLock'
+  | 'scrollLock'
+  | 'uploadStatus'
+  | 'macroRecording'
+  | 'viewShortcuts'
+  | 'zoom'
+  | 'zoomSlider';
+
+export interface StatusBarOptions {
+  capsLock: boolean;
+  numLock: boolean;
+  scrollLock: boolean;
+  uploadStatus: boolean;
+  macroRecording: boolean;
+  viewShortcuts: boolean;
+  zoom: boolean;
+  zoomSlider: boolean;
+}
 
 export interface FormatSlice {
   /** Per-cell format keyed by `addrKey`. Missing entries → defaults. */
   formats: Map<string, CellFormat>;
+  /** Session-scoped custom named styles created from the Cell Styles gallery. */
+  customCellStyles?: CustomCellStyle[];
 }
 
 export interface MergesSlice {
@@ -515,6 +549,28 @@ export interface ChartsSlice {
   charts: readonly SessionChart[];
 }
 
+export type SessionShapeKind = 'rectangle' | 'rounded-rectangle' | 'oval' | 'line' | 'arrow';
+
+/** Session illustration overlay. Like session charts, this is UI-owned until
+ *  writable drawing parts exist in the engine. */
+export interface SessionIllustration {
+  id: string;
+  kind: 'shape' | 'image';
+  shape?: SessionShapeKind;
+  src?: string;
+  alt?: string;
+  sheet: number;
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+  color?: string;
+}
+
+export interface IllustrationsSlice {
+  illustrations: readonly SessionIllustration[];
+}
+
 /** Cells the user has pinned in the Watch Window. Session-only — desktop spreadsheets
  *  parity: watches don't survive workbook close, and they aren't recorded
  *  in the undo stack. Order is insertion order. */
@@ -582,6 +638,11 @@ export interface PageSetup {
   orientation: PageOrientation;
   paperSize: PaperSize;
   margins: PageMargins;
+  /** Minimum printable insets from the physical page edge, in inches. This is
+   *  distinct from `printArea`: hosts may fill it from a printer profile or
+   *  preview preset so content is laid out inside the device's non-printable
+   *  border. Browser print cannot discover this automatically. */
+  printableBounds?: PageMargins;
   /** Distance from page edge to header/footer text, in inches. */
   headerMargin?: number;
   footerMargin?: number;
@@ -601,7 +662,8 @@ export interface PageSetup {
   differentFirstPage?: boolean;
   scaleHeaderFooterWithDocument?: boolean;
   alignHeaderFooterWithMargins?: boolean;
-  /** A1-style print area, e.g. "A1:D20". Empty means print the used range. */
+  /** A1-style print area, e.g. "A1:D20" or "A1:B2,D4:E5".
+   *  Empty means print the used range. */
   printArea?: string;
   /** A1-style row range ("1:3" or "$1:$3") whose rows repeat at the top of
    *  every printed page. Single-row form ("2") is allowed. */
@@ -702,6 +764,9 @@ export interface SlicersSlice {
  *  engine-gated; this slice gives the UI spreadsheet-style table visuals today. */
 export interface TablesSlice {
   tables: readonly TableOverlay[];
+  customTableStyles?: readonly CustomTableStyle[];
+  customPivotTableStyles?: readonly CustomTableStyle[];
+  pivotTableStyles?: readonly PivotTableStyleAssignment[];
 }
 
 export interface SheetViewsSlice {
@@ -739,6 +804,7 @@ export interface State {
   conditional: ConditionalSlice;
   sparkline: SparklineSlice;
   charts: ChartsSlice;
+  illustrations: IllustrationsSlice;
   watch: WatchSlice;
   traces: TracesSlice;
   errorIndicators: ErrorIndicatorSlice;

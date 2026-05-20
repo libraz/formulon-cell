@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkbookHandle } from '../../src/engine/workbook-handle.js';
 import type { Extension, ExtensionHandle } from '../../src/extensions/types.js';
 import { Spreadsheet } from '../../src/mount.js';
+import { mutators } from '../../src/store/store.js';
 
 class TestResizeObserver {
   observe(): void {}
@@ -85,6 +86,129 @@ describe('Spreadsheet feature registry', () => {
     expect(resolved.workbookObjects).toBeTruthy();
     expect(instance.features.probe).toBeTruthy();
 
+    instance.dispose();
+  });
+
+  it('delegates openPivotFieldList through a workbookObjects extension override', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    const calls: string[] = [];
+    const ext: Extension = {
+      id: 'workbookObjects',
+      setup() {
+        return {
+          dispose() {},
+          openPivotFieldList(sheetIndex: number, pivotIndex: number) {
+            calls.push(`${sheetIndex}:${pivotIndex}`);
+            return true;
+          },
+        };
+      },
+    };
+
+    const instance = await Spreadsheet.mount(host, { workbook, extensions: [ext] });
+
+    expect(instance.openPivotFieldList(1, 2)).toBe(true);
+    expect(calls).toEqual(['1:2']);
+    instance.dispose();
+  });
+
+  it('returns false when opening a missing built-in PivotTable Field List', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    const instance = await Spreadsheet.mount(host, { workbook });
+
+    expect(instance.openPivotFieldList(0, 0)).toBe(false);
+    expect(instance.openActivePivotFieldList()).toBe(false);
+    instance.dispose();
+  });
+
+  it('keeps an open PivotTable Field List synced to the active cell', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    vi.spyOn(workbook, 'getPivotTables').mockReturnValue([
+      {
+        sheetIndex: 0,
+        pivotIndex: 0,
+        top: 1,
+        left: 1,
+        rows: 2,
+        cols: 2,
+        cells: 4,
+        fields: ['Region'],
+        fieldItems: { Region: ['East'] },
+      },
+    ]);
+    const instance = await Spreadsheet.mount(host, { workbook });
+
+    expect(instance.openPivotFieldList(0, 0)).toBe(true);
+    expect(host.querySelector('.fc-objects--taskpane')).toBeTruthy();
+
+    mutators.setActive(instance.store, { sheet: 0, row: 1, col: 2 });
+    expect(host.querySelector('.fc-objects--taskpane')).toBeTruthy();
+
+    mutators.setActive(instance.store, { sheet: 0, row: 9, col: 9 });
+    expect(host.querySelector<HTMLElement>('.fc-objects')?.hidden).toBe(true);
+    instance.dispose();
+  });
+
+  it('opens the built-in PivotTable Field List when selection enters a PivotTable', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    vi.spyOn(workbook, 'getPivotTables').mockReturnValue([
+      {
+        sheetIndex: 0,
+        pivotIndex: 0,
+        top: 2,
+        left: 2,
+        rows: 3,
+        cols: 3,
+        cells: 9,
+        fields: ['Region'],
+        fieldItems: { Region: ['East'] },
+      },
+    ]);
+    const instance = await Spreadsheet.mount(host, { workbook });
+
+    expect(host.querySelector('.fc-objects--taskpane')).toBeNull();
+
+    mutators.setActive(instance.store, { sheet: 0, row: 3, col: 3 });
+
+    expect(host.querySelector('.fc-objects--taskpane')).toBeTruthy();
+    expect(host.querySelector('.fc-objects__title')?.textContent?.length).toBeGreaterThan(0);
+    instance.dispose();
+  });
+
+  it('updates host-driven status bar upload and macro indicators through the instance API', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    const instance = await Spreadsheet.mount(host, {
+      workbook,
+      uploadStatus: 'saving',
+      macroRecording: false,
+    });
+    instance.store.setState((state) => ({
+      ...state,
+      ui: {
+        ...state.ui,
+        statusOptions: { ...state.ui.statusOptions, uploadStatus: true, macroRecording: true },
+      },
+    }));
+
+    instance.setUploadStatus('error');
+    instance.setMacroRecording(true);
+
+    expect(
+      host.querySelector<HTMLElement>('.fc-host__statusbar-upload')?.dataset.uploadStatus,
+    ).toBe('error');
+    expect(
+      host.querySelector<HTMLElement>('.fc-host__statusbar-macro')?.dataset.macroRecording,
+    ).toBe('true');
     instance.dispose();
   });
 

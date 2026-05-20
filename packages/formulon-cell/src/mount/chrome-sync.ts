@@ -2,6 +2,7 @@ import { upsertDefinedName } from '../commands/named-ranges.js';
 import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { type SpreadsheetEmitter, selectionEquals } from '../events.js';
+import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import {
@@ -18,6 +19,7 @@ interface AttachChromeSyncInput {
   fxInput: HTMLTextAreaElement;
   getFormulaEditing: () => boolean;
   getSheetTabs: () => SheetTabsController | null;
+  getStrings: () => Strings;
   getWb: () => WorkbookHandle;
   host: HTMLElement;
   invalidate: () => void;
@@ -63,6 +65,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     fxInput,
     getFormulaEditing,
     getSheetTabs,
+    getStrings,
     getWb,
     host,
     invalidate,
@@ -245,11 +248,16 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
   const openNameMenu = (): void => {
     const rows = definedNameRows();
     closeNameMenu();
-    if (rows.length === 0) return;
     const menu = document.createElement('div');
     menu.className = 'fc-namebox-menu';
     menu.setAttribute('role', 'listbox');
     menu.setAttribute('aria-label', tag.getAttribute('aria-label') ?? 'Name box');
+    if (rows.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'fc-namebox-menu__empty';
+      empty.textContent = getStrings().ribbonMenu.noDefinedNames;
+      menu.appendChild(empty);
+    }
     for (const row of rows) {
       const item = document.createElement('button');
       item.type = 'button';

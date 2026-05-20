@@ -18,8 +18,29 @@
 //    that require app dialogs (sort/protect/review/automation) stay
 //    undefined — hosts opt in by passing their own implementation.
 
+import { listCustomCellStyles } from '../commands/cell-styles.js';
+import { listCustomPivotTableStyles, listCustomTableStyles } from '../commands/format-as-table.js';
+import {
+  collapseColGroup,
+  collapseRowGroup,
+  expandColGroup,
+  expandRowGroup,
+  groupCols,
+  groupRows,
+  ungroupCols,
+  ungroupRows,
+} from '../commands/outline.js';
+import { deleteSheetView, saveSheetView } from '../commands/sheet-views.js';
 import { dictionaries } from '../i18n/strings.js';
+import { showReport } from '../toolbar/dialogs/report.js';
 import { backstageMenuText, pageScaleMenuText, toolbarMenuText } from '../toolbar/menu-text.js';
+import {
+  analyzeAccessibilityCells,
+  analyzeSpellingCells,
+  buildTranslationReviewItems,
+  type RibbonReportLang,
+  reviewCellsFromState,
+} from '../toolbar/review-tools.js';
 import type { RibbonHooks } from '../toolbar/ribbon/apply-ribbon-command.js';
 import { createControlDispatch } from '../toolbar/ribbon/control-dispatch.js';
 import { shouldShowFontOption } from '../toolbar/ribbon/font-availability.js';
@@ -36,7 +57,9 @@ import { createTextOrientationMenu } from '../toolbar/ribbon/menus/text-orientat
 import type { RibbonMenus, RibbonRenderHelpers } from '../toolbar/ribbon/render-ribbon.js';
 import { createSelectColorRibbon } from '../toolbar/ribbon/select-color.js';
 import { toolbarText } from '../toolbar/ribbon-model.js';
+import { formatA1Range } from '../wrappers/toolbar-a1.js';
 import { dispatchHostClipboard, handleAutoSum } from '../wrappers/toolbar-actions.js';
+import { createDefaultDynamicDropdownsCtx } from './dynamic-dropdowns-defaults.js';
 import type { SpreadsheetInstance } from './types.js';
 
 /** Options shared by every default factory. */
@@ -138,6 +161,9 @@ export function createDefaultRibbonMenus(
     ribbonLang: lang,
     ribbonMenuText,
     ribbonText,
+    customCellStyles: () => listCustomCellStyles(instance.store.getState()),
+    customTableStyles: () => listCustomTableStyles(instance.store.getState()),
+    customPivotTableStyles: () => listCustomPivotTableStyles(instance.store.getState()),
   });
   const buildBorders = (): HTMLDivElement =>
     createBordersMenu({
@@ -171,6 +197,7 @@ export function createDefaultRibbonMenus(
 
     // Page Layout tab
     pageTheme: pageLayoutFactories.createPageThemeMenu,
+    arrange: pageLayoutFactories.createArrangeMenu,
     printArea: pageLayoutFactories.createPrintAreaMenu,
     pageBreaks: pageLayoutFactories.createPageBreaksMenu,
     sheetBackground: pageLayoutFactories.createSheetBackgroundMenu,
@@ -212,6 +239,57 @@ export function createDefaultRibbonHooks(
   instance: SpreadsheetInstance,
   _opts: ToolbarDefaultsOptions = {},
 ): RibbonHooks {
+  const dropdowns = createDefaultDynamicDropdownsCtx(
+    instance as unknown as Parameters<typeof createDefaultDynamicDropdownsCtx>[0],
+  );
+  const reportLang: RibbonReportLang = instance.i18n.locale === 'ja' ? 'ja' : 'en';
+  const showSharedReport = async (
+    title: string,
+    items: { severity: 'info' | 'warning'; label: string; detail: string }[],
+  ): Promise<void> => {
+    const strings = instance.i18n.strings;
+    await showReport({
+      title,
+      items,
+      closeLabel: strings.workbookObjects.close,
+      infoLabel: strings.reviewReports.info,
+      warningLabel: strings.reviewReports.warning,
+    });
+    instance.host.focus();
+  };
+  const showReviewReport = (
+    title: string,
+    buildItems: (
+      cells: ReturnType<typeof reviewCellsFromState>,
+    ) => { severity: 'info' | 'warning'; label: string; detail: string }[],
+  ): void => {
+    const state = instance.store.getState();
+    const cells = reviewCellsFromState(state, state.data.sheetIndex, state.selection.range);
+    void showSharedReport(title, buildItems(cells));
+  };
+  const applyOutline = (action: 'group' | 'ungroup' | 'show-detail' | 'hide-detail'): void => {
+    const range = instance.store.getState().selection.range;
+    const useRows = range.r1 > range.r0 || range.c0 === range.c1;
+    if (action === 'group') {
+      if (useRows)
+        groupRows(instance.store, instance.history, range.r0, range.r1, instance.workbook);
+      else groupCols(instance.store, instance.history, range.c0, range.c1, instance.workbook);
+    } else if (action === 'ungroup') {
+      if (useRows)
+        ungroupRows(instance.store, instance.history, range.r0, range.r1, instance.workbook);
+      else ungroupCols(instance.store, instance.history, range.c0, range.c1, instance.workbook);
+    } else if (action === 'hide-detail') {
+      if (useRows)
+        collapseRowGroup(instance.store, instance.history, range.r0, range.r1, instance.workbook);
+      else
+        collapseColGroup(instance.store, instance.history, range.c0, range.c1, instance.workbook);
+    } else if (useRows) {
+      expandRowGroup(instance.store, instance.history, range.r0, range.r1, instance.workbook);
+    } else {
+      expandColGroup(instance.store, instance.history, range.c0, range.c1, instance.workbook);
+    }
+    instance.host.focus();
+  };
   return {
     clipboard: {
       copy: () => {
@@ -228,10 +306,125 @@ export function createDefaultRibbonHooks(
       autoSum: () => {
         handleAutoSum(instance, 'SUM');
       },
-      // No default — host wires its own error-checking dialog (the playground
-      // routes this to a formula-audit flow). Stubbed so the type's required
-      // shape is satisfied; effect is a no-op.
-      errorChecking: () => undefined,
+      errorChecking: () => {
+        void dropdowns.applyFormulaAuditAction('error-checking');
+      },
+    },
+    sortFilter: {
+      sort: (direction) => void dropdowns.applySortMenuAction(direction),
+      customSort: () => dropdowns.applySortMenuAction('custom'),
+      openFilter: () => {
+        void dropdowns.applySortMenuAction('filter');
+      },
+      removeDuplicates: () => {
+        void dropdowns.applySortMenuAction('dedupe');
+      },
+      splitTextToColumns: (sep) => void dropdowns.splitTextToColumns(sep),
+    },
+    insert: {
+      createTable: () => dropdowns.createTableFromSelection('medium'),
+      createChart: () => {
+        dropdowns.createChartFromSelection('column');
+      },
+      insertPicture: (source) => dropdowns.insertPictureFromRibbon(source),
+      insertShape: (shape) => {
+        dropdowns.insertShapeFromRibbon(shape);
+      },
+      insertScreenshot: () => {
+        dropdowns.insertScreenshotFromRibbon();
+      },
+    },
+    page: {
+      pageBreak: () => {
+        dropdowns.applyPageBreakAction('insert-row');
+      },
+      sheetBackground: (action) => dropdowns.applySheetBackgroundAction(action),
+      pdf: (action) => {
+        void dropdowns.applyPdfAction(action);
+      },
+      inspect: () => {
+        instance.openWorkbookObjects();
+      },
+      outline: applyOutline,
+    },
+    review: {
+      spelling: () => {
+        showReviewReport(instance.i18n.strings.ribbon.spelling, (cells) =>
+          analyzeSpellingCells(cells, reportLang),
+        );
+      },
+      translate: () => {
+        showReviewReport(instance.i18n.strings.ribbon.translate, (cells) =>
+          buildTranslationReviewItems(cells, reportLang),
+        );
+      },
+      accessibility: () => {
+        showReviewReport(instance.i18n.strings.ribbon.accessibility, (cells) =>
+          analyzeAccessibilityCells(cells, reportLang),
+        );
+      },
+      deleteComment: () => {
+        dropdowns.applyReviewCommentAction('delete-active');
+      },
+      selectComment: () => undefined,
+    },
+    protection: {
+      runSheet: () => dropdowns.applyProtectAction('protect-sheet'),
+      runWorkbook: (protect) =>
+        dropdowns.applyProtectAction(protect ? 'protect-workbook' : 'unprotect-workbook'),
+      allowEditRanges: () => dropdowns.applyProtectAction('allow-edit-ranges'),
+    },
+    automation: {
+      runScript: () => dropdowns.applyScriptAction('custom'),
+      recordActions: () => {
+        const strings = instance.i18n.strings.ribbonMenu;
+        const range = instance.store.getState().selection.range;
+        void showSharedReport(strings.recordActionsStatus, [
+          {
+            severity: 'info',
+            label: strings.recordActionsStatus,
+            detail: `${strings.recordActionsEmpty} (${formatA1Range(range)})`,
+          },
+        ]);
+      },
+      allScripts: () => {
+        const strings = instance.i18n.strings.ribbonMenu;
+        void showSharedReport(strings.automationScriptsTitle, [
+          {
+            severity: 'info',
+            label: strings.automationBuiltInScriptsLabel,
+            detail: strings.automationBuiltInScriptsDetail,
+          },
+          {
+            severity: 'info',
+            label: strings.automationRecentRunsLabel,
+            detail: strings.automationNoRuns,
+          },
+        ]);
+      },
+      addInManager: () => {
+        void dropdowns.applyAddInAction('manage');
+      },
+    },
+    sheetView: {
+      save: () => {
+        const state = instance.store.getState();
+        const count =
+          state.sheetViews.views.filter((view) => view.sheet === state.data.sheetIndex).length + 1;
+        saveSheetView(
+          instance.store,
+          `view-${state.data.sheetIndex}-${count}`,
+          `${instance.i18n.strings.viewToolbar.views} ${count}`,
+          undefined,
+          instance.history,
+        );
+        instance.host.focus();
+      },
+      deleteActive: () => {
+        const id = instance.store.getState().sheetViews.activeViewId;
+        if (id) deleteSheetView(instance.store, id, instance.history);
+        instance.host.focus();
+      },
     },
   };
 }

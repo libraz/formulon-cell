@@ -4,12 +4,24 @@
 // through `mutators.setPageSetup` wrapped in a single history entry so undo
 // reverts the whole apply atomically.
 import { type History, recordPageSetupChange } from '../commands/history.js';
-import { parsePrintArea, parsePrintTitleCols, parsePrintTitleRows } from '../commands/print.js';
+import {
+  parsePrintAreas,
+  parsePrintTitleCols,
+  parsePrintTitleRows,
+  printableMarginAdjustments,
+} from '../commands/print.js';
+import {
+  normalizePrintableBounds,
+  normalizePrinterProfileId,
+  normalizePrinterProfiles,
+  type PrinterProfile,
+} from '../commands/printer-profile.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
   defaultPageSetup,
   getPageSetup,
   mutators,
+  type PageMargins,
   type PageOrientation,
   type PageSetup,
   type PaperSize,
@@ -27,6 +39,22 @@ export interface PageSetupDialogDeps {
   strings?: Strings;
   /** Shared history. When provided, OK pushes one page-setup snapshot entry. */
   history?: History | null;
+  /** Optional host hook for resolving printer non-printable bounds after the
+   *  user changes paper size or orientation. Browser APIs do not expose these
+   *  values, so Electron/native hosts can refresh their profile here. */
+  resolvePrintableBounds?: (
+    setup: PageSetup,
+    sheet: number,
+    previous: PageSetup,
+    printerProfileId: string | undefined,
+  ) => Partial<PageMargins> | null | undefined;
+  getPrinterProfiles?: () => readonly PrinterProfile[] | undefined;
+  getPrinterProfileId?: () => string | undefined;
+  setPrinterProfileId?: (next: string | undefined) => void;
+  refreshPrinterProfiles?: () =>
+    | readonly PrinterProfile[]
+    | undefined
+    | Promise<readonly PrinterProfile[] | undefined>;
 }
 
 export interface PageSetupDialogHandle {
@@ -78,6 +106,7 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   const history = deps.history ?? null;
   const strings = deps.strings ?? defaultStrings;
   const t = strings.pageSetup;
+  let openingPrinterProfileId = normalizePrinterProfileId(deps.getPrinterProfileId?.());
 
   const shell = createDialogShell({
     host,
@@ -100,7 +129,9 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   // `getByRole('button', { name: 'Cancel' })` finds both and throws.
   // Heuristic: if t.cancel is non-ASCII (likely Japanese) use the Japanese
   // "Close" — otherwise English.
-  const closeLabel = /[^\x00-\x7f]/.test(t.cancel) ? '閉じる' : 'Close';
+  const closeLabel = Array.from(t.cancel).some((ch) => ch.charCodeAt(0) > 0x7f)
+    ? '閉じる'
+    : 'Close';
   headerCloseBtn.setAttribute('aria-label', closeLabel);
   headerCloseBtn.textContent = '×';
   header.append(headerTitle, headerCloseBtn);
@@ -153,6 +184,23 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   const marginsPanel = tabPanels.get('margins') as HTMLDivElement;
   const headerFooterPanel = tabPanels.get('headerFooter') as HTMLDivElement;
   const sheetPanel = tabPanels.get('sheet') as HTMLDivElement;
+
+  const printerRow = makeRow(t.printerProfile);
+  const printerSelect = document.createElement('select');
+  printerSelect.className = 'fc-pgsetup__select';
+  printerSelect.dataset.pgsetupPrinter = 'true';
+  printerSelect.setAttribute('aria-label', t.printerProfile);
+  const printerRefreshBtn = document.createElement('button');
+  printerRefreshBtn.type = 'button';
+  printerRefreshBtn.className = 'fc-pgsetup__mini-btn';
+  printerRefreshBtn.textContent = t.printerProfileRefresh;
+  printerRefreshBtn.hidden = !deps.refreshPrinterProfiles;
+  const printerStatus = document.createElement('span');
+  printerStatus.className = 'fc-pgsetup__status';
+  printerStatus.setAttribute('role', 'status');
+  printerStatus.setAttribute('aria-live', 'polite');
+  printerRow.valueCell.append(printerSelect, printerRefreshBtn, printerStatus);
+  pagePanel.appendChild(printerRow.row);
 
   // ── Orientation ─────────────────────────────────────────────────────────
   const orientRow = makeRow(t.orientation);
@@ -284,6 +332,32 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   );
   marginRow.valueCell.appendChild(marginGroup);
   marginsPanel.appendChild(marginRow.row);
+
+  const printableRow = makeRow(t.printerMargins);
+  const printableGroup = document.createElement('div');
+  printableGroup.className = 'fc-pgsetup__margins fc-pgsetup__printable';
+  const printableTopInput = makeNumberInput(0);
+  printableTopInput.setAttribute('aria-label', t.printableTop);
+  const printableRightInput = makeNumberInput(0);
+  printableRightInput.setAttribute('aria-label', t.printableRight);
+  const printableBottomInput = makeNumberInput(0);
+  printableBottomInput.setAttribute('aria-label', t.printableBottom);
+  const printableLeftInput = makeNumberInput(0);
+  printableLeftInput.setAttribute('aria-label', t.printableLeft);
+  printableGroup.append(
+    labelize(t.marginTop, printableTopInput),
+    labelize(t.marginRight, printableRightInput),
+    labelize(t.marginBottom, printableBottomInput),
+    labelize(t.marginLeft, printableLeftInput),
+  );
+  printableRow.valueCell.appendChild(printableGroup);
+  marginsPanel.appendChild(printableRow.row);
+  const printableWarning = document.createElement('div');
+  printableWarning.className = 'fc-pgsetup__warning';
+  printableWarning.hidden = true;
+  printableWarning.setAttribute('role', 'status');
+  printableWarning.setAttribute('aria-live', 'polite');
+  marginsPanel.appendChild(printableWarning);
 
   const centerRow = document.createElement('div');
   centerRow.className = 'fc-pgsetup__row fc-fmtdlg__row';
@@ -650,7 +724,7 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
 
   const validateReferenceInputs = (): boolean => {
     const area = printAreaInput.value.trim();
-    if (area && !parsePrintArea(area)) {
+    if (area && !parsePrintAreas(area)) {
       showReferenceError(printAreaInput, t.invalidPrintArea);
       return false;
     }
@@ -715,7 +789,44 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
     }
   };
 
+  const renderPrinterProfiles = (nextProfiles?: readonly PrinterProfile[]): void => {
+    const profiles = deps.getPrinterProfiles?.() ?? [];
+    const effectiveProfiles = normalizePrinterProfiles(nextProfiles ?? profiles) ?? [];
+    const selected = normalizePrinterProfileId(deps.getPrinterProfileId?.()) ?? '';
+    printerSelect.replaceChildren();
+    const auto = document.createElement('option');
+    auto.value = '';
+    auto.textContent = t.printerProfileAutomatic;
+    printerSelect.appendChild(auto);
+    for (const profile of effectiveProfiles) {
+      if (!profile.id) continue;
+      const opt = document.createElement('option');
+      opt.value = profile.id;
+      opt.textContent = profile.name || profile.id;
+      printerSelect.appendChild(opt);
+    }
+    printerRow.row.hidden = effectiveProfiles.length === 0 && !deps.refreshPrinterProfiles;
+    printerSelect.value = selected;
+    if (printerSelect.value !== selected) printerSelect.value = '';
+  };
+
+  const refreshPrinterProfilesFromHost = async (): Promise<void> => {
+    if (!deps.refreshPrinterProfiles) return;
+    printerRefreshBtn.disabled = true;
+    printerStatus.textContent = '';
+    try {
+      const profiles = await deps.refreshPrinterProfiles();
+      renderPrinterProfiles(profiles);
+    } catch {
+      printerStatus.textContent = t.printerProfileRefreshFailed;
+    } finally {
+      printerRefreshBtn.disabled = false;
+    }
+  };
+
   const hydrateFrom = (setup: PageSetup): void => {
+    openingPrinterProfileId = normalizePrinterProfileId(deps.getPrinterProfileId?.());
+    renderPrinterProfiles();
     opening = { ...setup, margins: { ...setup.margins } };
     orientSelect.value = setup.orientation;
     paperSelect.value = setup.paperSize;
@@ -723,6 +834,10 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
     rightInput.value = String(setup.margins.right);
     bottomInput.value = String(setup.margins.bottom);
     leftInput.value = String(setup.margins.left);
+    printableTopInput.value = String(setup.printableBounds?.top ?? 0);
+    printableRightInput.value = String(setup.printableBounds?.right ?? 0);
+    printableBottomInput.value = String(setup.printableBounds?.bottom ?? 0);
+    printableLeftInput.value = String(setup.printableBounds?.left ?? 0);
     headerMarginInput.value = String(setup.headerMargin ?? 0.3);
     footerMarginInput.value = String(setup.footerMargin ?? 0.3);
     centerHInput.checked = setup.centerHorizontally === true;
@@ -798,6 +913,12 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
     const left = Number.parseFloat(leftInput.value) || 0;
     const headerMargin = Number.parseFloat(headerMarginInput.value);
     const footerMargin = Number.parseFloat(footerMarginInput.value);
+    const printableTop = Math.max(0, Number.parseFloat(printableTopInput.value) || 0);
+    const printableRight = Math.max(0, Number.parseFloat(printableRightInput.value) || 0);
+    const printableBottom = Math.max(0, Number.parseFloat(printableBottomInput.value) || 0);
+    const printableLeft = Math.max(0, Number.parseFloat(printableLeftInput.value) || 0);
+    const hasPrintableBounds =
+      printableTop > 0 || printableRight > 0 || printableBottom > 0 || printableLeft > 0;
     const scaleRaw = Number.parseFloat(scaleInput.value);
     const scale = Number.isFinite(scaleRaw) && scaleRaw > 0 ? scaleRaw / 100 : 1;
     const fitW = Number.parseInt(fitWidthInput.value, 10);
@@ -807,6 +928,14 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
       orientation,
       paperSize,
       margins: { top, right, bottom, left },
+      printableBounds: hasPrintableBounds
+        ? {
+            top: printableTop,
+            right: printableRight,
+            bottom: printableBottom,
+            left: printableLeft,
+          }
+        : undefined,
       headerMargin: Number.isFinite(headerMargin) ? Math.max(0, headerMargin) : 0.3,
       footerMargin: Number.isFinite(footerMargin) ? Math.max(0, footerMargin) : 0.3,
       centerHorizontally: centerHInput.checked,
@@ -843,10 +972,38 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
     return out;
   };
 
+  const updatePrintableWarning = (): void => {
+    const marginLabels = {
+      top: t.marginTop,
+      right: t.marginRight,
+      bottom: t.marginBottom,
+      left: t.marginLeft,
+    };
+    const adjustments = printableMarginAdjustments(collectFromInputs());
+    printableWarning.hidden = adjustments.length === 0;
+    printableWarning.textContent =
+      adjustments.length === 0
+        ? ''
+        : `${t.printableMarginWarning} ${adjustments
+            .map((item) => `${marginLabels[item.side]} ${item.effective}in`)
+            .join(', ')}`;
+  };
+
   const onOk = (): void => {
     if (!validateReferenceInputs()) return;
     const sheet = store.getState().data.sheetIndex;
     const next = collectFromInputs();
+    const nextPrinterProfileId = printerSelect.value || undefined;
+    const paperChanged =
+      next.paperSize !== opening.paperSize || next.orientation !== opening.orientation;
+    const printerProfileChanged = nextPrinterProfileId !== openingPrinterProfileId;
+    if (paperChanged || printerProfileChanged) {
+      const resolved = deps.resolvePrintableBounds?.(next, sheet, opening, nextPrinterProfileId);
+      if (resolved !== undefined) {
+        next.printableBounds = resolved ? normalizePrintableBounds(resolved) : undefined;
+      }
+    }
+    if (printerProfileChanged) deps.setPrinterProfileId?.(nextPrinterProfileId);
     recordPageSetupChange(history, store, () => {
       mutators.setPageSetup(store, sheet, next);
     });
@@ -881,13 +1038,29 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
   shell.on(headerCloseBtn, 'click', onCancel);
   shell.on(okBtn, 'click', onOk);
   shell.on(cancelBtn, 'click', onCancel);
+  shell.on(printerRefreshBtn, 'click', () => {
+    void refreshPrinterProfilesFromHost();
+  });
   shell.on(overlay, 'keydown', onOverlayKey as EventListener);
   for (const input of referenceInputs) shell.on(input, 'input', clearReferenceError);
+  for (const input of [
+    topInput,
+    rightInput,
+    bottomInput,
+    leftInput,
+    printableTopInput,
+    printableRightInput,
+    printableBottomInput,
+    printableLeftInput,
+  ]) {
+    shell.on(input, 'input', updatePrintableWarning);
+  }
 
   const api: PageSetupDialogHandle = {
     open(): void {
       const sheet = store.getState().data.sheetIndex;
       hydrateFrom(getPageSetup(store.getState(), sheet));
+      updatePrintableWarning();
       shell.open();
       requestAnimationFrame(() => {
         tabButtons.get(activeTab)?.focus();

@@ -3,6 +3,7 @@ import type {
   FeatureFlags,
   RibbonTab,
   SpreadsheetInstance,
+  ToolbarInstance,
 } from '@libraz/formulon-cell';
 
 export type { ActiveState, BorderPreset, RibbonTab } from '@libraz/formulon-cell';
@@ -10,10 +11,12 @@ export {
   BORDER_PRESETS,
   BORDER_STYLES,
   EMPTY_ACTIVE_STATE,
+  EXCEL365_STANDARD_RIBBON_TABS,
   FONT_FAMILIES,
   FONT_SIZES,
   localizeBorderPresets,
   localizeBorderStyles,
+  OPTIONAL_RIBBON_TABS,
   projectActiveState,
   RIBBON_KEYSHORTCUTS,
   RIBBON_TAB_LABELS,
@@ -38,9 +41,16 @@ export interface SpreadsheetToolbarProps {
   onOpenWorkbook?: () => void;
   onSaveWorkbook?: () => void;
   onSaveWorkbookAs?: () => void;
+  /** Receives the mounted core toolbar instance so hosts can dispatch shared
+   *  commands from titlebar search / Tell me without querying DOM buttons. */
+  onToolbarReady?: (toolbar: ToolbarInstance | null) => void;
   /** Override one or more entries in the core's default dynamic-dropdowns
    *  context. Use for dialog-opening handlers (sort, protect, file picker,
    *  etc.) that the wrapper can't represent as a named prop. Handlers
    *  supplied here win over the wrapper's built-in script/addIn wiring. */
   dropdownActions?: Partial<DynamicDropdownsCtx>;
+  /** Shared tab surface. Use `EXCEL365_STANDARD_RIBBON_TABS` for the
+   *  baseline Excel profile; append `OPTIONAL_RIBBON_TABS` only when those
+   *  add-in/automation tabs are intentionally exposed. */
+  ribbonTabs?: readonly RibbonTab[];
 }

@@ -45,7 +45,7 @@ const setValidation = (
       const prev = formats.get(k) ?? {};
       formats.set(k, { ...prev, validation: c.validation });
     }
-    return { ...s, format: { formats } };
+    return { ...s, format: { ...s.format, formats } };
   });
 };
 
@@ -63,7 +63,7 @@ const clearValidation = (
       if (Object.keys(rest).length === 0) formats.delete(k);
       else formats.set(k, rest);
     }
-    return { ...s, format: { formats } };
+    return { ...s, format: { ...s.format, formats } };
   });
 };
 

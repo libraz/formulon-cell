@@ -41,6 +41,43 @@ sheet.i18n.setLocale('ja');     // runtime locale swap
 sheet.setTheme('ink');           // dark mode
 ```
 
+## Host Integrations
+
+Browser APIs do not expose every desktop Excel integration point. Hosts can
+provide those capabilities through `MountOptions` and keep the shared ribbon /
+Backstage behavior in core:
+
+```ts
+const sheet = await Spreadsheet.mount(host, {
+  workbook: wb,
+  captureScreenClip: async () => ({
+    src: await nativeCaptureRegionAsDataUrl(),
+    alt: 'Screen clipping',
+  }),
+  printerProfiles: [
+    {
+      id: 'office-printer',
+      name: 'Office Printer',
+      papers: [
+        {
+          paper: 'A4',
+          orientation: 'portrait',
+          printableBounds: { top: 4, right: 4, bottom: 4, left: 4 },
+        },
+      ],
+    },
+  ],
+  refreshPrinterProfiles: () => nativeListPrinterProfiles(),
+  uploadStatus: 'syncing',
+  macroRecording: false,
+});
+```
+
+`captureScreenClip` powers Insert > Screenshot > Screen Clipping. When omitted,
+that command reports that native screen clipping is host-provided. Printer
+profiles supply physical printer minimum margins for Page Setup / print
+preview; browser-only hosts can omit them.
+
 ## Presets
 
 | preset | what's in it |

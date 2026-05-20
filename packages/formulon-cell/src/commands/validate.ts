@@ -38,7 +38,7 @@ export function clearValidationInRange(store: SpreadsheetStore, range: Range): n
         cleared += 1;
       }
     }
-    return { ...s, format: { formats } };
+    return { ...s, format: { ...s.format, formats } };
   });
   return cleared;
 }

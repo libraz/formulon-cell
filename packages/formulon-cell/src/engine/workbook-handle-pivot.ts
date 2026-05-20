@@ -4,7 +4,6 @@ import type {
   CellValue,
   EngineCapabilities,
   PivotAggregation,
-  PivotAxis,
   PivotCalendar,
   PivotCell,
   PivotDataFieldSpec,
@@ -13,6 +12,7 @@ import type {
   PivotFilterSpec,
   Workbook,
 } from './types.js';
+import { PivotAxis, PivotFilterType, PivotFilterValueKind } from './types.js';
 import { fromEngineValue } from './value.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -21,6 +21,9 @@ type WorkbookHandleInternals = {
   wb: Workbook;
   capabilities: WorkbookHandle['capabilities'];
   assertAlive(): void;
+};
+type MutablePivotFilterSpecDraft = {
+  -readonly [K in keyof PivotFilterSpec]?: PivotFilterSpec[K];
 };
 
 declare module './workbook-handle.js' {
@@ -53,6 +56,7 @@ export abstract class WorkbookHandlePivotMethods {
     formula: string | null;
     kind: number;
     numberFormat: string;
+    pivotIndex: number;
   }> {
     assertAlive(this);
     if (!this.capabilities.pivotTables) return;
@@ -63,7 +67,7 @@ export abstract class WorkbookHandlePivotMethods {
       for (const cell of layout.cells) {
         const value = fromEngineValue(cell.value);
         if (value.kind === 'blank') continue;
-        yield pivotCellEntry(sheet, cell, value);
+        yield pivotCellEntry(sheet, i, cell, value);
       }
     }
   }
@@ -80,6 +84,8 @@ export abstract class WorkbookHandlePivotMethods {
     cols: number;
     cells: number;
     fields: string[];
+    fieldItems: Record<string, string[]>;
+    pivotFilters?: readonly PivotFilterSpec[];
   }[] {
     assertAlive(this);
     if (!this.capabilities.pivotTables) return [];
@@ -92,6 +98,8 @@ export abstract class WorkbookHandlePivotMethods {
       cols: number;
       cells: number;
       fields: string[];
+      fieldItems: Record<string, string[]>;
+      pivotFilters?: readonly PivotFilterSpec[];
     }[] = [];
     for (let sheet = 0; sheet < this.sheetCount; sheet += 1) {
       const n = pivotWb(this).pivotCount(sheet);
@@ -99,9 +107,27 @@ export abstract class WorkbookHandlePivotMethods {
         const layout = pivotWb(this).pivotLayout(sheet, pivotIndex);
         if (!layout.status.ok) continue;
         const fields = new Set<string>();
+        const fieldItems = new Map<string, Set<string>>();
         for (const cell of layout.cells) {
-          if (cell.fieldName) fields.add(cell.fieldName);
+          if (!cell.fieldName) continue;
+          fields.add(cell.fieldName);
+          const value = fromEngineValue(cell.value);
+          const label = pivotCellItemLabel(value);
+          if (!label) continue;
+          const items = fieldItems.get(cell.fieldName) ?? new Set<string>();
+          items.add(label);
+          fieldItems.set(cell.fieldName, items);
         }
+        const cacheFieldItems = pivotCacheSharedItemLabels(
+          this,
+          fields,
+          this.pivotTableCacheId(sheet, pivotIndex),
+        );
+        for (const [field, labels] of cacheFieldItems) {
+          if (labels.length === 0) continue;
+          fieldItems.set(field, new Set(labels));
+        }
+        const pivotFilters = pivotFilterSpecs(this, sheet, pivotIndex);
         out.push({
           sheetIndex: sheet,
           pivotIndex,
@@ -111,6 +137,10 @@ export abstract class WorkbookHandlePivotMethods {
           cols: layout.cols,
           cells: layout.cells.length,
           fields: [...fields],
+          fieldItems: Object.fromEntries(
+            [...fieldItems.entries()].map(([field, items]) => [field, [...items]]),
+          ),
+          ...(pivotFilters.length > 0 ? { pivotFilters } : {}),
         });
       }
     }
@@ -162,6 +192,20 @@ export abstract class WorkbookHandlePivotMethods {
     for (let i = 0; i < n; i += 1) {
       const r = pivotWb(this).pivotCacheFieldName(cacheId, i);
       out.push(r.status.ok ? r.value : '');
+    }
+    return out;
+  }
+
+  pivotCacheSharedItems(cacheId: number, fieldIdx: number): CellValue[] {
+    assertAlive(this);
+    if (!this.capabilities.pivotTableMutate) return [];
+    const wb = pivotWb(this);
+    if (!wb.pivotCacheFieldSharedItemCount || !wb.pivotCacheFieldSharedItemValue) return [];
+    const out: CellValue[] = [];
+    const n = wb.pivotCacheFieldSharedItemCount(cacheId, fieldIdx);
+    for (let i = 0; i < n; i += 1) {
+      const r = wb.pivotCacheFieldSharedItemValue(cacheId, fieldIdx, i);
+      if (r.status.ok) out.push(fromEngineValue(r.value));
     }
     return out;
   }
@@ -246,6 +290,15 @@ export abstract class WorkbookHandlePivotMethods {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return -1;
     const r = pivotWb(this).pivotCreate(sheet, name, cacheId, anchor.row, anchor.col);
+    return r.status.ok ? r.index : -1;
+  }
+
+  pivotTableCacheId(sheet: number, pivotIdx: number): number {
+    assertAlive(this);
+    if (!this.capabilities.pivotTableMutate) return -1;
+    const wb = pivotWb(this);
+    if (!wb.pivotCacheId) return -1;
+    const r = wb.pivotCacheId(sheet, pivotIdx);
     return r.status.ok ? r.index : -1;
   }
 
@@ -506,8 +559,177 @@ export abstract class WorkbookHandlePivotMethods {
   }
 }
 
+function pivotCellItemLabel(value: CellValue): string {
+  if (value.kind === 'text') return value.value.trim();
+  if (value.kind === 'number') return String(value.value);
+  if (value.kind === 'bool') return value.value ? 'TRUE' : 'FALSE';
+  if (value.kind === 'error') return `#${value.code}`;
+  return '';
+}
+
+function pivotCacheSharedItemLabels(
+  handle: WorkbookHandlePivotMethods,
+  fields: ReadonlySet<string>,
+  preferredCacheId: number,
+): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  if (!handle.capabilities.pivotTableMutate) return out;
+  const cacheIds = preferredCacheId >= 0 ? [preferredCacheId] : handle.pivotCacheIds();
+  for (const cacheId of cacheIds) {
+    for (const [fieldIdx, fieldName] of handle.pivotCacheFieldNames(cacheId).entries()) {
+      if (!fields.has(fieldName) || out.has(fieldName)) continue;
+      const labels = handle
+        .pivotCacheSharedItems(cacheId, fieldIdx)
+        .map(pivotCellItemLabel)
+        .filter((label) => label.length > 0);
+      if (labels.length > 0) out.set(fieldName, [...new Set(labels)]);
+    }
+  }
+  return out;
+}
+
+function pivotFilterSpecs(
+  handle: WorkbookHandlePivotMethods,
+  sheet: number,
+  pivotIndex: number,
+): PivotFilterSpec[] {
+  const wb = pivotWb(handle);
+  if (typeof wb.pivotFilterCount !== 'function') return [];
+  const count = wb.pivotFilterCount(sheet, pivotIndex);
+  if (!Number.isFinite(count) || count <= 0) return [];
+  const out: PivotFilterSpec[] = [];
+  for (let filterIndex = 0; filterIndex < count; filterIndex += 1) {
+    const direct = wb.pivotFilterSpec?.(sheet, pivotIndex, filterIndex);
+    const spec =
+      sanitizePivotFilterSpec(direct?.status.ok ? direct.spec : undefined) ??
+      readPivotFilterSpec(wb, sheet, pivotIndex, filterIndex);
+    if (spec) out.push(spec);
+  }
+  return out;
+}
+
+function readPivotFilterSpec(
+  wb: PivotMutationWorkbook,
+  sheet: number,
+  pivotIndex: number,
+  filterIndex: number,
+): PivotFilterSpec | null {
+  const axis = pivotFilterNumber(wb.pivotFilterAxis, sheet, pivotIndex, filterIndex);
+  const fieldName = pivotFilterString(wb.pivotFilterFieldName, sheet, pivotIndex, filterIndex);
+  const type = pivotFilterNumber(wb.pivotFilterType, sheet, pivotIndex, filterIndex);
+  if (
+    !isPivotAxis(axis) ||
+    fieldName === undefined ||
+    fieldName.trim().length === 0 ||
+    !isPivotFilterType(type)
+  ) {
+    return null;
+  }
+  const spec: MutablePivotFilterSpecDraft = {
+    axis,
+    fieldName,
+    type,
+    valueInt: pivotFilterNumber(wb.pivotFilterValueInt, sheet, pivotIndex, filterIndex),
+    valueDouble: pivotFilterNumber(wb.pivotFilterValueDouble, sheet, pivotIndex, filterIndex),
+    valueText: pivotFilterString(wb.pivotFilterValueText, sheet, pivotIndex, filterIndex),
+    valueHighInt: pivotFilterNumber(wb.pivotFilterValueHighInt, sheet, pivotIndex, filterIndex),
+    valueHighDouble: pivotFilterNumber(
+      wb.pivotFilterValueHighDouble,
+      sheet,
+      pivotIndex,
+      filterIndex,
+    ),
+  };
+  const valueKind = pivotFilterNumber(wb.pivotFilterValueKind, sheet, pivotIndex, filterIndex);
+  const valueHighKind = pivotFilterNumber(
+    wb.pivotFilterValueHighKind,
+    sheet,
+    pivotIndex,
+    filterIndex,
+  );
+  if (isPivotFilterValueKind(valueKind)) spec.valueKind = valueKind;
+  if (isPivotFilterValueKind(valueHighKind)) spec.valueHighKind = valueHighKind;
+  return sanitizePivotFilterSpec(spec);
+}
+
+function sanitizePivotFilterSpec(
+  spec: Partial<PivotFilterSpec> | undefined | null,
+): PivotFilterSpec | null {
+  if (!spec) return null;
+  if (
+    !isPivotAxis(spec.axis) ||
+    typeof spec.fieldName !== 'string' ||
+    spec.fieldName.trim().length === 0 ||
+    !isPivotFilterType(spec.type)
+  ) {
+    return null;
+  }
+  return {
+    axis: spec.axis,
+    fieldName: spec.fieldName.trim(),
+    type: spec.type,
+    ...(isPivotFilterValueKind(spec.valueKind) ? { valueKind: spec.valueKind } : {}),
+    ...(Number.isFinite(spec.valueInt) ? { valueInt: spec.valueInt } : {}),
+    ...(Number.isFinite(spec.valueDouble) ? { valueDouble: spec.valueDouble } : {}),
+    ...(typeof spec.valueText === 'string' ? { valueText: spec.valueText } : {}),
+    ...(isPivotFilterValueKind(spec.valueHighKind) ? { valueHighKind: spec.valueHighKind } : {}),
+    ...(Number.isFinite(spec.valueHighInt) ? { valueHighInt: spec.valueHighInt } : {}),
+    ...(Number.isFinite(spec.valueHighDouble) ? { valueHighDouble: spec.valueHighDouble } : {}),
+  };
+}
+
+function pivotFilterNumber(
+  reader:
+    | ((
+        sheet: number,
+        pivotIndex: number,
+        filterIndex: number,
+      ) => { status: { ok: boolean }; value: number })
+    | undefined,
+  sheet: number,
+  pivotIndex: number,
+  filterIndex: number,
+): number | undefined {
+  const result = reader?.(sheet, pivotIndex, filterIndex);
+  return result?.status.ok && Number.isFinite(result.value) ? result.value : undefined;
+}
+
+function pivotFilterString(
+  reader:
+    | ((
+        sheet: number,
+        pivotIndex: number,
+        filterIndex: number,
+      ) => { status: { ok: boolean }; value: string })
+    | undefined,
+  sheet: number,
+  pivotIndex: number,
+  filterIndex: number,
+): string | undefined {
+  const result = reader?.(sheet, pivotIndex, filterIndex);
+  return result?.status.ok && typeof result.value === 'string' ? result.value : undefined;
+}
+
+function isPivotAxis(value: unknown): value is PivotAxis {
+  return typeof value === 'number' && Object.values(PivotAxis).includes(value as PivotAxis);
+}
+
+function isPivotFilterType(value: unknown): value is PivotFilterType {
+  return (
+    typeof value === 'number' && Object.values(PivotFilterType).includes(value as PivotFilterType)
+  );
+}
+
+function isPivotFilterValueKind(value: unknown): value is PivotFilterValueKind {
+  return (
+    typeof value === 'number' &&
+    Object.values(PivotFilterValueKind).includes(value as PivotFilterValueKind)
+  );
+}
+
 function pivotCellEntry(
   sheet: number,
+  pivotIndex: number,
   cell: PivotCell,
   value: CellValue,
 ): {
@@ -516,6 +738,7 @@ function pivotCellEntry(
   formula: string | null;
   kind: number;
   numberFormat: string;
+  pivotIndex: number;
 } {
   return {
     addr: { sheet, row: cell.row, col: cell.col },
@@ -523,6 +746,7 @@ function pivotCellEntry(
     formula: null,
     kind: cell.kind,
     numberFormat: cell.numberFormat,
+    pivotIndex,
   };
 }
 

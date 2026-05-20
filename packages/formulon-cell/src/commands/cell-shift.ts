@@ -151,7 +151,7 @@ function shiftFormats(
   recordFormatChange(history, store, () => {
     store.setState((s) => ({
       ...s,
-      format: { formats: shiftFormatMap(s.format.formats, affected, axis, delta) },
+      format: { ...s.format, formats: shiftFormatMap(s.format.formats, affected, axis, delta) },
     }));
   });
 }

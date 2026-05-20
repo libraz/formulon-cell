@@ -1,14 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import {
+  addPrintArea,
+  applyPrinterProfileBounds,
   clearPrintArea,
+  clearPrintableBounds,
   clearPrintTitles,
   insertManualPageBreak,
   listPageSetups,
+  normalizePrinterProfile,
+  normalizePrinterProfileId,
+  normalizePrinterProfiles,
   pageSetupForSheet,
   removeManualPageBreak,
   resetManualPageBreaks,
   resetPageSetup,
+  resolvePrinterProfileBounds,
   setFitToPages,
   setMarginPreset,
   setPageOrientation,
@@ -16,6 +23,7 @@ import {
   setPageSetup,
   setPaperSize,
   setPrintArea,
+  setPrintableBounds,
   setPrintGridlines,
   setPrintHeadings,
   setPrintTitleCols,
@@ -66,7 +74,12 @@ describe('page setup commands', () => {
 
     expect(setPrintArea(store, 0, ' B2:D5 ')).toMatchObject({ printArea: 'B2:D5' });
     expect(setPrintArea(store, 0, '$A$1:$C$3')).toMatchObject({ printArea: '$A$1:$C$3' });
+    expect(addPrintArea(store, 0, 'E1:F2')).toMatchObject({ printArea: '$A$1:$C$3,E1:F2' });
+    expect(setPrintArea(store, 0, 'A1:B2,D4:E5')).toMatchObject({
+      printArea: 'A1:B2,D4:E5',
+    });
     expect(setPrintArea(store, 0, '1:3')).toBeNull();
+    expect(addPrintArea(store, 0, 'A:C')).toBeNull();
 
     const cleared = clearPrintArea(store, 0);
     expect(cleared.printArea).toBeUndefined();
@@ -94,6 +107,162 @@ describe('page setup commands', () => {
     expect(setPrintHeadings(store, 0, true).showHeadings).toBe(true);
     expect(setPrintGridlines(store, 0, false).showGridlines).toBe(false);
     expect(setPrintHeadings(store, 0, false).showHeadings).toBe(false);
+  });
+
+  it('sets and clears printer printable bounds independently from print area', () => {
+    const store = createSpreadsheetStore();
+
+    const setup = setPrintableBounds(store, 0, {
+      top: 0.25,
+      right: 0.2,
+      bottom: 0.3,
+      left: 0.2,
+    });
+
+    expect(setup.printableBounds).toEqual({ top: 0.25, right: 0.2, bottom: 0.3, left: 0.2 });
+    expect(setup.printArea).toBeUndefined();
+
+    const normalized = setPrintableBounds(store, 0, {
+      top: -1,
+      right: Number.NaN,
+      bottom: 0.5,
+      left: 0.4,
+    });
+    expect(normalized.printableBounds).toEqual({ top: 0, right: 0, bottom: 0.5, left: 0.4 });
+
+    const cleared = clearPrintableBounds(store, 0);
+    expect(cleared.printableBounds).toBeUndefined();
+  });
+
+  it('resolves host printer profiles for the active paper and orientation', () => {
+    const setup = { ...defaultPageSetup(), paperSize: 'letter' as const };
+    setup.orientation = 'landscape';
+    const profiles = [
+      { name: 'generic', printableBounds: { top: 0.1, right: 0.1, bottom: 0.1, left: 0.1 } },
+      {
+        name: 'letter',
+        paperSize: 'letter' as const,
+        printableBounds: { top: 0.2, right: 0.2, bottom: 0.2, left: 0.2 },
+      },
+      {
+        name: 'letter landscape',
+        paperSize: 'letter' as const,
+        orientation: 'landscape' as const,
+        printableBounds: { top: 0.25, right: 0.18, bottom: 0.25, left: 0.18 },
+      },
+    ];
+
+    expect(resolvePrinterProfileBounds(setup, profiles)).toEqual({
+      top: 0.25,
+      right: 0.18,
+      bottom: 0.25,
+      left: 0.18,
+    });
+    expect(
+      resolvePrinterProfileBounds(
+        setup,
+        [
+          ...profiles,
+          {
+            id: 'manual-tray',
+            name: 'Manual tray',
+            printableBounds: { top: 0.4, right: 0.3, bottom: 0.4, left: 0.3 },
+          },
+        ],
+        ' manual-tray ',
+      ),
+    ).toEqual({
+      top: 0.4,
+      right: 0.3,
+      bottom: 0.4,
+      left: 0.3,
+    });
+  });
+
+  it('normalizes host printer profiles before profile resolution', () => {
+    expect(normalizePrinterProfileId(' office ')).toBe('office');
+    expect(normalizePrinterProfileId('   ')).toBeUndefined();
+    expect(
+      normalizePrinterProfile({
+        id: ' office ',
+        name: ' Office Printer ',
+        paperSize: 'tabloid',
+        orientation: 'landscape',
+        printableBounds: { top: -1, right: Number.NaN, bottom: 0.3, left: 0.2 },
+      }),
+    ).toEqual({
+      id: 'office',
+      name: 'Office Printer',
+      paperSize: 'tabloid',
+      orientation: 'landscape',
+      printableBounds: { top: 0, right: 0, bottom: 0.3, left: 0.2 },
+    });
+    expect(normalizePrinterProfiles(undefined)).toBeUndefined();
+    expect(
+      normalizePrinterProfiles([
+        { id: 'tray', printableBounds: { top: 0.1 } },
+        { id: ' tray ', name: 'Duplicate', printableBounds: { top: 0.2 } },
+        { name: 'A3 tray', paperSize: 'A3', printableBounds: { top: 0.3 } },
+      ]),
+    ).toEqual([
+      { id: 'tray', printableBounds: { top: 0.1, right: 0, bottom: 0, left: 0 } },
+      {
+        name: 'A3 tray',
+        paperSize: 'A3',
+        printableBounds: { top: 0.3, right: 0, bottom: 0, left: 0 },
+      },
+    ]);
+  });
+
+  it('applies and clears host printer profile bounds on the sheet page setup', () => {
+    const store = createSpreadsheetStore();
+    setPageSetup(store, 0, { paperSize: 'letter', orientation: 'landscape' });
+
+    const applied = applyPrinterProfileBounds(store, 0, [
+      {
+        paperSize: 'letter',
+        orientation: 'landscape',
+        printableBounds: { top: 0.25, right: 0.18, bottom: 0.25, left: 0.18 },
+      },
+    ]);
+    expect(applied.printableBounds).toEqual({
+      top: 0.25,
+      right: 0.18,
+      bottom: 0.25,
+      left: 0.18,
+    });
+
+    const cleared = applyPrinterProfileBounds(store, 0, [
+      { paperSize: 'A4', printableBounds: { top: 0.1, right: 0.1, bottom: 0.1, left: 0.1 } },
+    ]);
+    expect(cleared.printableBounds).toBeUndefined();
+
+    const preferred = applyPrinterProfileBounds(
+      store,
+      0,
+      [
+        {
+          id: 'default',
+          paperSize: 'letter',
+          orientation: 'landscape',
+          printableBounds: { top: 0.2, right: 0.2, bottom: 0.2, left: 0.2 },
+        },
+        {
+          id: 'manual',
+          paperSize: 'letter',
+          orientation: 'landscape',
+          printableBounds: { top: 0.5, right: 0.4, bottom: 0.5, left: 0.4 },
+        },
+      ],
+      null,
+      'manual',
+    );
+    expect(preferred.printableBounds).toEqual({
+      top: 0.5,
+      right: 0.4,
+      bottom: 0.5,
+      left: 0.4,
+    });
   });
 
   it('inserts, removes, and resets manual page breaks', () => {

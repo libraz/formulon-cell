@@ -1,5 +1,6 @@
 import { WorkbookHandle } from '@libraz/formulon-cell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ScreenClipCapture, ScreenClipResult } from '../src';
 import { type MountedReactSpreadsheet, mountReactSpreadsheet } from './test-utils/mount';
 
 /**
@@ -108,6 +109,85 @@ describe('React <Spreadsheet>', () => {
     expect(onLocaleChange).toHaveBeenCalled();
     const event = onLocaleChange.mock.calls.at(-1)?.[0];
     expect(event?.locale).toBe('ja');
+  });
+
+  it('keeps the Screen Clipping capture hook current without remounting', async () => {
+    const firstCapture = vi.fn(() => 'data:image/png;base64,react-first');
+    const secondCapture = vi.fn(() => ({
+      src: 'data:image/png;base64,react-second',
+      alt: 'React clip',
+    }));
+    mounted = await mountReactSpreadsheet({ captureScreenClip: firstCapture });
+    const original = mounted.instance;
+
+    expect(await mounted.instance.captureScreenClip()).toEqual({
+      src: 'data:image/png;base64,react-first',
+    });
+
+    await mounted.rerender({ captureScreenClip: secondCapture });
+
+    expect(mounted.instance).toBe(original);
+    expect(await mounted.instance.captureScreenClip()).toEqual({
+      src: 'data:image/png;base64,react-second',
+      alt: 'React clip',
+    });
+    expect(firstCapture).toHaveBeenCalledTimes(1);
+    expect(secondCapture).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies printer profile prop updates to the built-in print flow without remounting', async () => {
+    const fallback = {
+      id: 'fallback',
+      paperSize: 'A4' as const,
+      orientation: 'portrait' as const,
+      printableBounds: { top: 0.2, right: 0.2, bottom: 0.2, left: 0.2 },
+    };
+    const selected = {
+      id: 'selected',
+      paperSize: 'A4' as const,
+      orientation: 'portrait' as const,
+      printableBounds: { top: 1.2, right: 1.1, bottom: 1.2, left: 1.1 },
+    };
+    const print = vi.fn();
+    const originalPrint = (window as unknown as { print?: () => void }).print;
+    (window as unknown as { print: () => void }).print = print;
+    try {
+      mounted = await mountReactSpreadsheet({
+        printerProfiles: [fallback, selected],
+        printerProfileId: 'fallback',
+      });
+      const original = mounted.instance;
+
+      await mounted.rerender({
+        printerProfiles: [fallback, selected],
+        printerProfileId: ' selected ',
+      });
+      mounted.instance.print('print');
+
+      const iframe = mounted.host.querySelector<HTMLIFrameElement>('iframe[data-fc-print-mode]');
+      expect(mounted.instance).toBe(original);
+      expect(iframe?.srcdoc).toContain(
+        '@page { size: A4 portrait; margin: 1.2in 1.1in 1.2in 1.1in; }',
+      );
+      iframe?.dispatchEvent(new Event('load'));
+      iframe?.remove();
+    } finally {
+      if (originalPrint) (window as unknown as { print: () => void }).print = originalPrint;
+      else delete (window as unknown as { print?: () => void }).print;
+    }
+  });
+
+  it('re-exports Screen Clipping host hook types from the React package', async () => {
+    const capture: ScreenClipCapture = () => ({
+      src: 'data:image/png;base64,react-export',
+      alt: 'React export',
+    });
+    const result = (await capture()) as ScreenClipResult;
+
+    expect(result).toEqual({
+      src: 'data:image/png;base64,react-export',
+      alt: 'React export',
+    });
   });
 
   it('disposes the engine instance on unmount and unwires event subscriptions', async () => {

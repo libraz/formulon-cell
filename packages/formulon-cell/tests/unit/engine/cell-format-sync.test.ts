@@ -19,7 +19,7 @@ interface FakeOpts {
   /** Pre-populated cells the engine reports via cells(). */
   cells?: Addr[];
   /** Projected PivotTable cells reported separately from physical cells. */
-  pivotCells?: Array<{ addr: Addr; kind: number; numberFormat: string }>;
+  pivotCells?: Array<{ addr: Addr; kind: number; numberFormat: string; pivotIndex?: number }>;
   /** XF index per cell, keyed by addrKey. */
   xfIndices?: Map<string, number>;
   /** XF table — index → record. */
@@ -78,6 +78,7 @@ const makeFake = (opts: FakeOpts = {}): { wb: WorkbookHandle; log: FakeLog } => 
           formula: null,
           kind: c.kind,
           numberFormat: c.numberFormat,
+          pivotIndex: c.pivotIndex,
         };
       }
     },
@@ -351,6 +352,44 @@ describe('hydrateCellFormatsFromEngine', () => {
         bottom: { style: 'medium', color: '#5b9bd5' },
       },
       numFmt: { kind: 'fixed', decimals: 0, thousands: true },
+    });
+  });
+
+  it('hydrates PivotTable projection formats from assigned session pivot styles', () => {
+    const { wb } = makeFake({
+      pivotCells: [
+        { addr: { sheet: 0, row: 2, col: 0 }, kind: 0, numberFormat: '', pivotIndex: 1 },
+      ],
+    });
+    const store = createSpreadsheetStore();
+    store.setState((state) => ({
+      ...state,
+      tables: {
+        ...state.tables,
+        customPivotTableStyles: [
+          {
+            id: 'custom-pivot-table:Blue',
+            label: 'Blue',
+            style: 'dark',
+            color: '#4472c4',
+            variant: 'banded',
+          },
+        ],
+        pivotTableStyles: [{ sheetIndex: 0, pivotIndex: 1, styleId: 'custom-pivot-table:Blue' }],
+      },
+    }));
+
+    hydrateCellFormatsFromEngine(wb, store, 0);
+
+    const header = store.getState().format.formats.get(addrKey({ sheet: 0, row: 2, col: 0 }));
+    expect(header).toMatchObject({
+      bold: true,
+      color: '#ffffff',
+      fill: '#253f6c',
+      borders: {
+        top: { style: 'thin', color: '#4472c4' },
+        bottom: { style: 'thin', color: '#4472c4' },
+      },
     });
   });
 });

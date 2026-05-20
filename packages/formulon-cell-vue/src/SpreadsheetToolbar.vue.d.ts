@@ -1,4 +1,4 @@
-import type { SpreadsheetInstance } from '@libraz/formulon-cell';
+import type { SpreadsheetInstance, ToolbarInstance } from '@libraz/formulon-cell';
 import type { DefineComponent } from 'vue';
 
 type RibbonTab =
@@ -11,6 +11,7 @@ type RibbonTab =
   | 'data'
   | 'review'
   | 'view'
+  | 'help'
   | 'automate'
   | 'acrobat';
 
@@ -25,6 +26,8 @@ declare const SpreadsheetToolbar: DefineComponent<{
   onDrawEraser?: () => void;
   onTranslate?: () => void;
   onAddIn?: () => void;
+  onToolbarReady?: (toolbar: ToolbarInstance | null) => void;
+  ribbonTabs?: readonly RibbonTab[];
 }>;
 
 export default SpreadsheetToolbar;

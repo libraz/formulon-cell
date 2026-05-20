@@ -37,10 +37,6 @@
   color: var(--demo-fg);
 }
 
-.demo__ribbon-tab--file {
-  display: none;
-}
-
 .demo__ribbon-tab--file:hover {
   background: var(--demo-ribbon-hover);
   color: var(--demo-fg);
@@ -82,7 +78,42 @@
   overflow: visible;
 }
 
-.demo__ribbon-shell--collapsed .demo__ribbon {
+.demo__ribbon-shell--tabsOnly .demo__ribbon,
+.demo__ribbon-shell--autoHide:not(.demo__ribbon-shell--autoHidePeek) .demo__ribbon {
+  display: none;
+}
+
+.demo__ribbon-shell--autoHide:not(.demo__ribbon-shell--autoHidePeek) .demo__ribbon-tabs {
+  height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+  border-bottom: 0;
+}
+
+.demo__ribbon-shell--autoHide:not(.demo__ribbon-shell--autoHidePeek) {
+  min-height: 31px;
+}
+
+.demo__ribbon-shell--singleLine .demo__ribbon:not([hidden]) {
+  min-height: 42px;
+  padding: 3px 36px 2px 6px;
+  overflow-x: auto;
+}
+
+.demo__ribbon-shell--singleLine .demo__ribbon-group {
+  grid-template-rows: 1fr;
+}
+
+.demo__ribbon-shell--singleLine .demo__ribbon-tools {
+  flex-wrap: nowrap;
+  min-height: 32px;
+  max-height: 32px;
+  align-items: center;
+}
+
+.demo__ribbon-shell--singleLine .demo__ribbon-label,
+.demo__ribbon-shell--singleLine .demo__rb-break {
   display: none;
 }
 
@@ -93,7 +124,8 @@
   z-index: 2;
 }
 
-.demo__ribbon-shell--collapsed .demo__ribbon-display {
+.demo__ribbon-shell--tabsOnly .demo__ribbon-display,
+.demo__ribbon-shell--autoHide .demo__ribbon-display {
   top: 4px;
   bottom: auto;
 }
@@ -128,7 +160,8 @@
   transform: translateY(1px);
 }
 
-.demo__ribbon-shell--collapsed .demo__ribbon-toggle::before {
+.demo__ribbon-shell--tabsOnly .demo__ribbon-toggle::before,
+.demo__ribbon-shell--autoHide .demo__ribbon-toggle::before {
   content: "⌄";
 }
 
@@ -146,7 +179,8 @@
     0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
-.demo__ribbon-shell--collapsed .demo__ribbon-display-menu {
+.demo__ribbon-shell--tabsOnly .demo__ribbon-display-menu,
+.demo__ribbon-shell--autoHide .demo__ribbon-display-menu {
   top: calc(100% + 4px);
   bottom: auto;
 }

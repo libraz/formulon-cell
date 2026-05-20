@@ -1,13 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  applyPivotTableStyleById,
   clearTable,
   clearTablesInRange,
+  createPivotTableStyleFromActivePivot,
+  createTableStyleFromActiveTable,
+  customPivotTableStyleId,
+  customTableStyleId,
   defaultTableOverlay,
   engineTableOverlays,
   formatAsTable,
+  formatAsTableByStyleId,
   isBandedRow,
   isHeaderRow,
   isTotalRow,
+  listCustomPivotTableStyles,
+  listCustomTableStyles,
   listTableOverlays,
   removeTable,
   sessionTableOverlays,
@@ -18,6 +26,7 @@ import {
   updateTableOverlay,
   upsertTable,
 } from '../../../src/commands/format-as-table.js';
+import { History } from '../../../src/commands/history.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
@@ -237,6 +246,100 @@ describe('formatAsTable command helpers', () => {
     });
     expect(tableOverlayById(store.getState(), 'engine')?.banded).toBe(true);
     expect(updateTableOverlay(store, 'missing', { style: 'dark' })).toBeNull();
+  });
+
+  it('creates and reapplies session custom table styles', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    formatAsTable(store, range(0, 0, 3, 2), {
+      id: 'source',
+      style: 'dark',
+      color: '#4472c4',
+      banded: true,
+      firstCol: true,
+    });
+    mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
+
+    expect(
+      createTableStyleFromActiveTable(store, history, 'Review Table', {
+        style: 'light',
+        color: '#ed7d31',
+        variant: 'firstCol',
+      }),
+    ).toBe(true);
+    expect(listCustomTableStyles(store.getState())).toEqual([
+      {
+        id: customTableStyleId('Review Table'),
+        label: 'Review Table',
+        style: 'light',
+        color: '#ed7d31',
+        variant: 'firstCol',
+      },
+    ]);
+
+    const applied = formatAsTableByStyleId(
+      store,
+      range(5, 0, 8, 2),
+      customTableStyleId('Review Table'),
+    );
+    expect(applied).toMatchObject({
+      style: 'light',
+      color: '#ed7d31',
+      banded: false,
+      firstCol: true,
+    });
+    expect(history.undo()).toBe(true);
+    expect(listCustomTableStyles(store.getState())).toEqual([]);
+  });
+
+  it('creates and assigns session custom PivotTable styles', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+
+    expect(
+      createPivotTableStyleFromActivePivot(
+        store,
+        history,
+        'Review Pivot',
+        {
+          sheetIndex: 0,
+          pivotIndex: 2,
+        },
+        {
+          style: 'dark',
+          color: '#ed7d31',
+          variant: 'bandedFirstCol',
+        },
+      ),
+    ).toBe(true);
+    const styleId = customPivotTableStyleId('Review Pivot');
+    expect(listCustomPivotTableStyles(store.getState())).toEqual([
+      {
+        id: styleId,
+        label: 'Review Pivot',
+        style: 'dark',
+        color: '#ed7d31',
+        variant: 'bandedFirstCol',
+      },
+    ]);
+    expect(store.getState().tables.pivotTableStyles).toEqual([
+      { sheetIndex: 0, pivotIndex: 2, styleId },
+    ]);
+
+    expect(
+      applyPivotTableStyleById(store, history, { sheetIndex: 0, pivotIndex: 3 }, styleId),
+    ).toBe(true);
+    expect(store.getState().tables.pivotTableStyles).toContainEqual({
+      sheetIndex: 0,
+      pivotIndex: 3,
+      styleId,
+    });
+    expect(history.undo()).toBe(true);
+    expect(store.getState().tables.pivotTableStyles).toEqual([
+      { sheetIndex: 0, pivotIndex: 2, styleId },
+    ]);
+    expect(history.undo()).toBe(true);
+    expect(listCustomPivotTableStyles(store.getState())).toEqual([]);
   });
 
   it('rejects creating, updating, and clearing session overlays on protected sheets', () => {

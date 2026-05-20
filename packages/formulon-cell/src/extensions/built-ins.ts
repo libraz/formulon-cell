@@ -37,6 +37,7 @@ import { attachPasteSpecial } from '../interact/paste-special.js';
 import { attachPivotTableDialog } from '../interact/pivot-table-dialog.js';
 import { attachQuickAnalysis } from '../interact/quick-analysis.js';
 import { attachSessionCharts } from '../interact/session-charts.js';
+import { attachSessionIllustrations } from '../interact/session-illustrations.js';
 import { attachSlicer } from '../interact/slicer.js';
 import { attachStatusBar } from '../interact/status-bar.js';
 import { attachValidationList } from '../interact/validation.js';
@@ -189,6 +190,25 @@ export const charts = (): Extension => ({
   },
 });
 
+/** Session shape overlays — id `'illustrations'`. */
+export const illustrations = (): Extension => ({
+  id: 'illustrations',
+  priority: 51,
+  setup(ctx) {
+    const handle = attachSessionIllustrations({
+      host: ctx.host,
+      store: ctx.store,
+      history: ctx.history,
+      closeLabel: ctx.i18n.strings.workbookObjects.close,
+      resizeLabel: ctx.i18n.strings.sessionCharts.resize,
+    });
+    return {
+      refresh: () => handle.refresh(),
+      dispose: () => handle.detach(),
+    };
+  },
+});
+
 /** PivotTable creation dialog — id `'pivotTableDialog'`. */
 export const pivotTableDialog = (): Extension => ({
   id: 'pivotTableDialog',
@@ -221,6 +241,8 @@ export const workbookObjects = (): Extension => ({
       host: ctx.host,
       wb: ctx.getWb(),
       strings: ctx.i18n.strings,
+      listSessionIllustrations: () => ctx.store.getState().illustrations.illustrations,
+      subscribeSessionObjects: (listener) => ctx.store.subscribe(listener),
     });
     return {
       open: () => handle.open(),
@@ -768,6 +790,7 @@ export const allBuiltIns = (): Extension[] => [
   borderDraw(),
   quickAnalysis(),
   charts(),
+  illustrations(),
   pivotTableDialog(),
   statusBar(),
   workbookObjects(),

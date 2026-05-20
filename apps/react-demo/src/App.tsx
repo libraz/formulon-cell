@@ -3,6 +3,7 @@ import {
   analyzeSpellingCells,
   applyTextScript,
   type CellChangeEvent,
+  EXCEL365_STANDARD_RIBBON_TABS,
   type FeatureFlags,
   type FeatureId,
   mutators,
@@ -10,6 +11,7 @@ import {
   presets,
   type SpreadsheetInstance,
   type ThemeName,
+  type ToolbarInstance,
   WorkbookHandle,
 } from '@libraz/formulon-cell';
 import {
@@ -29,20 +31,41 @@ import {
 } from 'react';
 import {
   activateDemoModal,
+  buildDemoBackstageCards,
+  buildDemoBackstageNav,
+  buildDemoCommands,
+  buildDemoPrintPreviewModel,
+  buildDemoSearchItems,
   composeDemoUiOptions,
   createDemoStrings,
   DEMO_FUNCTIONS,
+  DEMO_ICONS,
+  DEMO_PRINT_PREVIEW_LINES,
+  type DemoBackstageAction,
+  type DemoIconName,
+  type DemoSearchItem,
+  type DemoSearchUsagePrior,
   demoColLabel,
   demoCommandText,
+  demoSearchOptionId,
   FEATURE_GROUPS,
   FORMATTERS,
   formatLoadError,
+  installDemoF6Navigation,
+  installDemoSearchShortcut,
+  isDemoBackstageActionDisabled,
   LOCALES,
+  loadDemoSearchUsagePrior,
+  nextDemoSearchIndex,
   PRESETS,
   type PresetKey,
   previewCellChange,
+  queryDemoSearchItems,
+  recordDemoSearchUsage,
   resolveInitialLocale,
   reviewCellsForInstance,
+  runDemoBackstageAction,
+  saveDemoSearchUsagePrior,
   seedDemoWorkbook,
   THEMES,
 } from '../../demo-shared/index.js';
@@ -55,14 +78,6 @@ interface ChangeLogEntry {
   readonly id: number;
   readonly cell: string;
   readonly preview: string;
-}
-
-interface CommandItem {
-  readonly id: string;
-  readonly label: string;
-  readonly hint: string;
-  readonly tab?: RibbonTab;
-  readonly run: () => void;
 }
 
 interface ReviewDialogState {
@@ -91,6 +106,23 @@ const useDemoModalFocus = (
 const previewValue = previewCellChange;
 const seed = seedDemoWorkbook;
 
+const DemoIcon = ({ name }: { name: DemoIconName }): ReactElement => (
+  <svg
+    className="demo__rb-icon"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.45"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    {DEMO_ICONS[name].map((path) => (
+      <path key={path} d={path} />
+    ))}
+  </svg>
+);
+
 export const App = (): ReactElement => {
   const [theme, setTheme] = useState<ThemeName>('paper');
   const [locale, setLocale] = useState<string>(() => resolveInitialLocale());
@@ -104,8 +136,13 @@ export const App = (): ReactElement => {
   const [showRibbon, setShowRibbon] = useState(true);
   const [showPanel, setShowPanel] = useState(false);
   const [ribbonTab, setRibbonTab] = useState<RibbonTab>('home');
+  const [backstageAction, setBackstageAction] = useState<DemoBackstageAction>('info');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchActiveIndex, setSearchActiveIndex] = useState(-1);
+  const [searchUsagePrior, setSearchUsagePrior] = useState<DemoSearchUsagePrior>(() =>
+    loadDemoSearchUsagePrior(),
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reviewDialog, setReviewDialog] = useState<ReviewDialogState | null>(null);
   const [scriptOpen, setScriptOpen] = useState(false);
@@ -117,6 +154,9 @@ export const App = (): ReactElement => {
   // re-saves.
   const [bookName, setBookName] = useState('Book1');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const quickAccessRef = useRef<HTMLDivElement | null>(null);
+  const toolbarRef = useRef<ToolbarInstance | null>(null);
   const reviewModalRef = useRef<HTMLDivElement | null>(null);
   const scriptModalRef = useRef<HTMLDivElement | null>(null);
 
@@ -173,6 +213,19 @@ export const App = (): ReactElement => {
     instance?.i18n.setLocale(locale);
     document.documentElement.lang = locale === 'ja' ? 'ja' : 'en';
   }, [instance, locale]);
+
+  useEffect(() => installDemoSearchShortcut(() => searchInputRef.current), []);
+
+  useEffect(() => saveDemoSearchUsagePrior(searchUsagePrior), [searchUsagePrior]);
+  useEffect(
+    () =>
+      installDemoF6Navigation({
+        getQuickAccess: () => quickAccessRef.current,
+        getToolbar: () => toolbarRef.current,
+        getInstance: () => instance,
+      }),
+    [instance],
+  );
 
   // Expose the live instance on `window.__fcInst` so cross-demo E2E scenarios
   // can drive imperative paths (named-range, paste-special, etc.) without
@@ -355,6 +408,15 @@ export const App = (): ReactElement => {
     setTimeout(() => URL.revokeObjectURL(url), 1_000);
   }, [bookName, instance]);
 
+  const onNewWorkbook = useCallback(async () => {
+    const wb = await WorkbookHandle.createDefault();
+    setWorkbook(wb);
+    await instance?.setWorkbook(wb);
+    setBookName('Book1');
+    setLog([]);
+    setRibbonTab('home');
+  }, [instance]);
+
   const onOpen = useCallback(
     async (file: File) => {
       if (!instance) return;
@@ -372,6 +434,43 @@ export const App = (): ReactElement => {
       }
     },
     [commandText.openFailed, commandText.workbook, instance],
+  );
+
+  const backstageNav = useMemo(
+    () => buildDemoBackstageNav(ui, backstageAction),
+    [backstageAction, ui],
+  );
+  const backstageCards = useMemo(() => buildDemoBackstageCards(ui), [ui]);
+  const printPreview = useMemo(() => {
+    void backstageAction;
+    return buildDemoPrintPreviewModel(ui, instance, bookName);
+  }, [backstageAction, bookName, instance, ui]);
+  const backstageActionDisabled = useCallback(
+    (action: DemoBackstageAction): boolean => isDemoBackstageActionDisabled(action, instance),
+    [instance],
+  );
+  const runBackstageAction = useCallback(
+    (action: DemoBackstageAction): void => {
+      if (action === 'info' || action === 'print') {
+        setBackstageAction(action);
+        return;
+      }
+      runDemoBackstageAction({
+        action,
+        instance,
+        ui,
+        newWorkbook: onNewWorkbook,
+        openWorkbook: () => fileInputRef.current?.click(),
+        saveWorkbook: onSave,
+        showNotice: showRibbonNotice,
+        toggleOptions: () => setShowPanel((v) => !v),
+        closeBackstage: () => {
+          setBackstageAction('info');
+          setRibbonTab('home');
+        },
+      });
+    },
+    [instance, onNewWorkbook, onSave, showRibbonNotice, ui],
   );
 
   const onPresetChange = useCallback(
@@ -403,160 +502,42 @@ export const App = (): ReactElement => {
     [features, overrides, preset],
   );
 
-  const commands = useMemo<CommandItem[]>(
-    () => [
-      {
-        id: 'open',
-        label: commandText.commands.open.label,
-        hint: commandText.commands.open.hint,
-        tab: 'file',
-        run: () => fileInputRef.current?.click(),
-      },
-      {
-        id: 'save',
-        label: commandText.commands.save.label,
-        hint: commandText.commands.save.hint,
-        tab: 'file',
-        run: onSave,
-      },
-      {
-        id: 'page-setup',
-        label: commandText.commands.pageSetup.label,
-        hint: commandText.commands.pageSetup.hint,
-        tab: 'file',
-        run: () => instance?.openPageSetup(),
-      },
-      {
-        id: 'print',
-        label: commandText.commands.print.label,
-        hint: commandText.commands.print.hint,
-        tab: 'file',
-        run: () => instance?.print('print'),
-      },
-      {
-        id: 'format-cells',
-        label: commandText.commands.formatCells.label,
-        hint: commandText.commands.formatCells.hint,
-        tab: 'home',
-        run: () => instance?.openFormatDialog(),
-      },
-      {
-        id: 'conditional',
-        label: commandText.commands.conditionalFormatting.label,
-        hint: commandText.commands.conditionalFormatting.hint,
-        tab: 'insert',
-        run: () => instance?.openConditionalDialog(),
-      },
-      {
-        id: 'cell-styles',
-        label: commandText.commands.cellStyles.label,
-        hint: commandText.commands.cellStyles.hint,
-        tab: 'insert',
-        run: () => instance?.openCellStylesGallery(),
-      },
-      {
-        id: 'name-manager',
-        label: commandText.commands.nameManager.label,
-        hint: commandText.commands.nameManager.hint,
-        tab: 'insert',
-        run: () => instance?.openNamedRangeDialog(),
-      },
-      {
-        id: 'insert-function',
-        label: commandText.commands.insertFunction.label,
-        hint: commandText.commands.insertFunction.hint,
-        tab: 'formulas',
-        run: () => instance?.openFunctionArguments(),
-      },
-      {
-        id: 'trace-precedents',
-        label: commandText.commands.tracePrecedents.label,
-        hint: commandText.commands.tracePrecedents.hint,
-        tab: 'formulas',
-        run: () => instance?.tracePrecedents(),
-      },
-      {
-        id: 'watch-window',
-        label: commandText.commands.watchWindow.label,
-        hint: commandText.commands.watchWindow.hint,
-        tab: 'formulas',
-        run: () => instance?.toggleWatchWindow(),
-      },
-      {
-        id: 'filter',
-        label: commandText.commands.filter.label,
-        hint: commandText.commands.filter.hint,
-        tab: 'data',
-        run: () => setRibbonTab('data'),
-      },
-      {
-        id: 'sort',
-        label: commandText.commands.sort.label,
-        hint: commandText.commands.sort.hint,
-        tab: 'data',
-        run: () => setRibbonTab('data'),
-      },
-      {
-        id: 'freeze-panes',
-        label: commandText.commands.freezePanes.label,
-        hint: commandText.commands.freezePanes.hint,
-        tab: 'view',
-        run: () => setRibbonTab('view'),
-      },
-      {
-        id: 'protect-sheet',
-        label: commandText.commands.protectSheet.label,
-        hint: commandText.commands.protectSheet.hint,
-        tab: 'view',
-        run: () => instance?.toggleSheetProtection(),
-      },
-      {
-        id: 'options-pane',
-        label: commandText.commands.options.label,
-        hint: commandText.commands.options.hint,
-        run: () => setShowPanel((v) => !v),
-      },
-      {
-        id: 'theme-light',
-        label: commandText.commands.lightTheme.label,
-        hint: commandText.commands.lightTheme.hint,
-        run: () => setTheme('paper'),
-      },
-      {
-        id: 'theme-dark',
-        label: commandText.commands.darkTheme.label,
-        hint: commandText.commands.darkTheme.hint,
-        run: () => setTheme('ink'),
-      },
-      {
-        id: 'locale-ja',
-        label: commandText.commands.japaneseLocale.label,
-        hint: commandText.commands.japaneseLocale.hint,
-        run: () => setLocale('ja'),
-      },
-      {
-        id: 'locale-en',
-        label: commandText.commands.englishLocale.label,
-        hint: commandText.commands.englishLocale.hint,
-        run: () => setLocale('en'),
-      },
-    ],
-    [commandText.commands, instance, onSave],
+  const commands = useMemo(
+    () =>
+      buildDemoCommands({
+        commandText,
+        instance,
+        openWorkbook: () => fileInputRef.current?.click(),
+        saveWorkbook: onSave,
+        setRibbonTab,
+        togglePanel: () => setShowPanel((v) => !v),
+        setTheme,
+        setLocale,
+      }),
+    [commandText, instance, onSave],
+  );
+  const searchItems = useMemo(
+    () =>
+      buildDemoSearchItems(
+        commands,
+        locale,
+        setRibbonTab,
+        (commandId) => toolbarRef.current?.applyCommand(commandId) ?? false,
+      ),
+    [commands, locale],
   );
 
   const filteredCommands = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return commands.slice(0, 8);
-    return commands
-      .filter((cmd) => `${cmd.label} ${cmd.hint}`.toLowerCase().includes(q))
-      .slice(0, 8);
-  }, [commands, searchQuery]);
+    return queryDemoSearchItems(searchItems, searchQuery, 8, searchUsagePrior);
+  }, [searchItems, searchQuery, searchUsagePrior]);
 
-  const runCommand = useCallback((cmd: CommandItem) => {
+  const runCommand = useCallback((cmd: DemoSearchItem) => {
+    setSearchUsagePrior((prior) => recordDemoSearchUsage(prior, cmd));
     if (cmd.tab) setRibbonTab(cmd.tab);
     cmd.run();
     setSearchQuery('');
     setSearchOpen(false);
+    setSearchActiveIndex(-1);
   }, []);
 
   if (!workbook) {
@@ -579,10 +560,17 @@ export const App = (): ReactElement => {
     <div className="demo" data-theme={theme}>
       <header className="demo__head">
         <div className="demo__titlebar">
-          <div className="demo__quick" role="toolbar" aria-label="Quick access toolbar">
-            <span className="demo__brand-mark">⊞</span>
+          <div
+            ref={quickAccessRef}
+            className="demo__quick"
+            role="toolbar"
+            aria-label="Quick access toolbar"
+          >
+            <span className="demo__brand-mark" aria-hidden="true">
+              <DemoIcon name="app" />
+            </span>
             <button type="button" className="demo__title-icon" aria-label="Save" onClick={onSave}>
-              💾
+              <DemoIcon name="save" />
             </button>
             <button
               type="button"
@@ -590,7 +578,7 @@ export const App = (): ReactElement => {
               aria-label="Undo"
               onClick={() => instance?.undo()}
             >
-              ↶
+              <DemoIcon name="undo" />
             </button>
             <button
               type="button"
@@ -598,7 +586,7 @@ export const App = (): ReactElement => {
               aria-label="Redo"
               onClick={() => instance?.redo()}
             >
-              ↷
+              <DemoIcon name="redo" />
             </button>
           </div>
           <div className="demo__title">
@@ -606,40 +594,77 @@ export const App = (): ReactElement => {
             <span>{ui.saved}</span>
           </div>
           <div className="demo__search">
-            <span aria-hidden="true">⌕</span>
+            <DemoIcon name="search" />
             <input
+              ref={searchInputRef}
               type="search"
+              role="combobox"
               placeholder={ui.search}
               aria-label={ui.searchCommands}
+              aria-controls="demo-search-results"
+              aria-expanded={searchOpen}
+              aria-activedescendant={
+                searchOpen && searchActiveIndex >= 0
+                  ? demoSearchOptionId(searchActiveIndex)
+                  : undefined
+              }
               value={searchQuery}
-              onFocus={() => setSearchOpen(true)}
+              onFocus={() => {
+                setSearchOpen(true);
+                setSearchActiveIndex(-1);
+              }}
               onChange={(e) => {
                 setSearchQuery(e.currentTarget.value);
                 setSearchOpen(true);
+                setSearchActiveIndex(-1);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') {
                   setSearchOpen(false);
+                  setSearchActiveIndex(-1);
                   e.currentTarget.blur();
                 }
-                if (e.key === 'Enter' && filteredCommands[0]) {
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
                   e.preventDefault();
-                  runCommand(filteredCommands[0]);
+                  setSearchOpen(true);
+                  setSearchActiveIndex((current) =>
+                    nextDemoSearchIndex(
+                      current,
+                      filteredCommands.length,
+                      e.key === 'ArrowDown' ? 'next' : 'previous',
+                    ),
+                  );
+                }
+                if (e.key === 'Enter' && filteredCommands.length > 0) {
+                  e.preventDefault();
+                  const index = nextDemoSearchIndex(
+                    searchActiveIndex,
+                    filteredCommands.length,
+                    'first',
+                  );
+                  const command = filteredCommands[index];
+                  if (command) runCommand(command);
                 }
               }}
               onBlur={() => setSearchOpen(false)}
             />
             {searchOpen ? (
-              <div className="demo__command-menu">
+              <div id="demo-search-results" className="demo__command-menu" role="listbox">
                 {filteredCommands.length === 0 ? (
                   <div className="demo__command-empty">{ui.noCommands}</div>
                 ) : (
-                  filteredCommands.map((cmd) => (
+                  filteredCommands.map((cmd, index) => (
                     <button
                       key={cmd.id}
+                      id={demoSearchOptionId(index)}
                       type="button"
-                      className="demo__command-item"
+                      role="option"
+                      aria-selected={index === searchActiveIndex}
+                      className={`demo__command-item${
+                        index === searchActiveIndex ? ' demo__command-item--active' : ''
+                      }`}
                       onMouseDown={(e) => e.preventDefault()}
+                      onMouseEnter={() => setSearchActiveIndex(index)}
                       onClick={() => runCommand(cmd)}
                     >
                       <strong>{cmd.label}</strong>
@@ -654,76 +679,31 @@ export const App = (): ReactElement => {
             <button type="button" className="demo__share">
               {ui.share}
             </button>
-            <span className="demo__avatar" role="img" aria-label={ui.signedInUser}>
-              FC
-            </span>
-          </div>
-        </div>
-        <div className="demo__commandbar">
-          <div className="demo__brand">
-            <strong>formulon-cell</strong>
-            <span className="demo__brand-sep">·</span>
-            <span className="demo__brand-tag">{ui.workbook}</span>
-          </div>
-          <div className="demo__controls">
-            <div className="demo__seg" role="group" aria-label={ui.theme}>
-              {THEMES.map((t) => (
-                <button
-                  key={t.value}
-                  type="button"
-                  className={`demo__seg-btn${t.value === theme ? ' demo__seg-btn--active' : ''}`}
-                  onClick={() => setTheme(t.value)}
-                  aria-pressed={t.value === theme}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-            <div className="demo__seg" role="group" aria-label={ui.locale}>
-              {LOCALES.map((l) => (
-                <button
-                  key={l.value}
-                  type="button"
-                  className={`demo__seg-btn${l.value === locale ? ' demo__seg-btn--active' : ''}`}
-                  onClick={() => setLocale(l.value)}
-                  aria-pressed={l.value === locale}
-                >
-                  {l.label}
-                </button>
-              ))}
-            </div>
             <button
               type="button"
-              className={`demo__btn${showPanel ? ' demo__btn--active' : ''}`}
+              className={`demo__share${showPanel ? ' demo__share--active' : ''}`}
               onClick={() => setShowPanel((v) => !v)}
               aria-pressed={showPanel}
             >
               {ui.demoPane}
             </button>
-            <button
-              type="button"
-              className="demo__btn"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {ui.open}
-            </button>
-            <button type="button" className="demo__btn" onClick={onSave} disabled={!instance}>
-              {ui.save}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xlsm"
-              hidden
-              onChange={(ev) => {
-                const f = ev.target.files?.[0];
-                if (f) void onOpen(f);
-                ev.target.value = '';
-              }}
-            />
+            <span className="demo__avatar" role="img" aria-label={ui.signedInUser}>
+              FC
+            </span>
           </div>
         </div>
       </header>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xlsm"
+        hidden
+        onChange={(ev) => {
+          const f = ev.target.files?.[0];
+          if (f) void onOpen(f);
+          ev.target.value = '';
+        }}
+      />
 
       <main className={`demo__body${showPanel ? ' demo__body--panel' : ''}`}>
         <div className="demo__sheet-col">
@@ -733,6 +713,7 @@ export const App = (): ReactElement => {
               activeTab={ribbonTab}
               onTabChange={setRibbonTab}
               locale={locale}
+              ribbonTabs={EXCEL365_STANDARD_RIBBON_TABS}
               onSpellingReview={onSpellingReview}
               onAccessibilityCheck={onAccessibilityCheck}
               onRunScript={onRunScript}
@@ -742,6 +723,9 @@ export const App = (): ReactElement => {
                 showRibbonNotice(commandText.translate, commandText.translationUnavailable)
               }
               onAddIn={() => showRibbonNotice(commandText.addIns, commandText.addInsHostCallbacks)}
+              onToolbarReady={(toolbar) => {
+                toolbarRef.current = toolbar;
+              }}
             />
           ) : null}
           <Spreadsheet
@@ -758,108 +742,142 @@ export const App = (): ReactElement => {
             <div className="demo__backstage" role="dialog" aria-label={ui.file}>
               <nav className="demo__backstage-nav" aria-label={ui.file}>
                 <strong>{ui.file}</strong>
-                <button
-                  type="button"
-                  className="demo__backstage-navitem demo__backstage-navitem--active"
-                >
-                  {ui.info}
-                </button>
-                <button
-                  type="button"
-                  className="demo__backstage-navitem"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {ui.openTitle}
-                </button>
-                <button type="button" className="demo__backstage-navitem" onClick={onSave}>
-                  {ui.save}
-                </button>
-                <button
-                  type="button"
-                  className="demo__backstage-navitem"
-                  onClick={() => instance?.print('print')}
-                  disabled={!instance}
-                >
-                  {ui.print}
-                </button>
-                <button
-                  type="button"
-                  className="demo__backstage-navitem"
-                  onClick={() => instance?.openPageSetup()}
-                  disabled={!instance}
-                >
-                  {ui.pageSetup}
-                </button>
-                <button
-                  type="button"
-                  className="demo__backstage-navitem"
-                  onClick={() => setRibbonTab('home')}
-                >
-                  {ui.close}
-                </button>
+                {backstageNav.map((item) => (
+                  <button
+                    key={item.action}
+                    type="button"
+                    className={`demo__backstage-navitem${
+                      item.active ? ' demo__backstage-navitem--active' : ''
+                    }`}
+                    onClick={() => runBackstageAction(item.action)}
+                    disabled={backstageActionDisabled(item.action)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
               </nav>
               <div className="demo__backstage-main">
                 <div className="demo__backstage-title">
-                  <span className="demo__backstage-xl">⊞</span>
+                  <span className="demo__backstage-xl" aria-hidden="true">
+                    <DemoIcon name="app" />
+                  </span>
                   <div>
                     <h1>{bookName}</h1>
                     <p>{ui.backstageSub}</p>
                   </div>
                 </div>
-                <div className="demo__backstage-grid">
-                  <button
-                    type="button"
-                    className="demo__backstage-card"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <strong>{ui.openTitle}</strong>
-                    <span>{ui.openDesc}</span>
-                  </button>
-                  <button type="button" className="demo__backstage-card" onClick={onSave}>
-                    <strong>{ui.saveCopy}</strong>
-                    <span>{ui.saveDesc}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="demo__backstage-card"
-                    onClick={() => instance?.print('print')}
-                    disabled={!instance}
-                  >
-                    <strong>{ui.print}</strong>
-                    <span>{ui.printDesc}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="demo__backstage-card"
-                    onClick={() => instance?.openPageSetup()}
-                    disabled={!instance}
-                  >
-                    <strong>{ui.pageSetup}</strong>
-                    <span>{ui.pageSetupDesc}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="demo__backstage-card"
-                    onClick={() => instance?.openExternalLinksDialog()}
-                    disabled={!instance}
-                  >
-                    <strong>{ui.editLinks}</strong>
-                    <span>{ui.linksDesc}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="demo__backstage-card"
-                    onClick={() => setShowPanel((v) => !v)}
-                  >
-                    <strong>{ui.options}</strong>
-                    <span>{ui.optionsDesc}</span>
-                  </button>
-                </div>
+                {backstageAction === 'print' ? (
+                  <div className="demo__print-preview" data-demo-print-preview>
+                    <section className="demo__print-settings" aria-label={ui.printSettings}>
+                      <h2>{printPreview.title}</h2>
+                      <p>{printPreview.subtitle}</p>
+                      <button
+                        type="button"
+                        className="demo__print-action demo__print-action--primary"
+                        onClick={() => instance?.print('print')}
+                        disabled={!instance}
+                      >
+                        {printPreview.printLabel}
+                      </button>
+                      <button
+                        type="button"
+                        className="demo__print-action"
+                        onClick={() => instance?.print('pdf')}
+                        disabled={!instance}
+                      >
+                        {printPreview.pdfLabel}
+                      </button>
+                      <button
+                        type="button"
+                        className="demo__print-action"
+                        onClick={() => instance?.openPageSetup()}
+                        disabled={!instance}
+                      >
+                        {printPreview.pageSetupLabel}
+                      </button>
+                      <dl className="demo__print-meta">
+                        {printPreview.settings.map((row) => (
+                          <div key={row.label}>
+                            <dt>{row.label}</dt>
+                            <dd>{row.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </section>
+                    <section className="demo__print-paper" aria-label={printPreview.previewTitle}>
+                      {printPreview.previewHtml ? (
+                        <iframe
+                          className="demo__print-frame"
+                          title={printPreview.previewTitle}
+                          sandbox=""
+                          srcDoc={printPreview.previewHtml}
+                        />
+                      ) : (
+                        <div className="demo__print-page">
+                          <strong>{printPreview.previewTitle}</strong>
+                          <div aria-hidden="true" className="demo__print-sheet-lines">
+                            {DEMO_PRINT_PREVIEW_LINES.map((line) => (
+                              <span key={line} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <p>{printPreview.previewHint}</p>
+                    </section>
+                  </div>
+                ) : (
+                  <div className="demo__backstage-grid">
+                    {backstageCards.map((item) => (
+                      <button
+                        key={item.action}
+                        type="button"
+                        className="demo__backstage-card"
+                        onClick={() => runBackstageAction(item.action)}
+                        disabled={backstageActionDisabled(item.action)}
+                      >
+                        <strong>{item.label}</strong>
+                        <span>{item.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ) : null}
         </div>
         <aside className="demo__panel" aria-label="Options panel" hidden={!showPanel}>
+          <section className="demo__card">
+            <h2>Demo chrome</h2>
+            <div className="demo__controls demo__controls--panel">
+              <div className="demo__seg" role="group" aria-label={ui.theme}>
+                {THEMES.map((t) => (
+                  <button
+                    key={t.value}
+                    type="button"
+                    className={`demo__seg-btn${t.value === theme ? ' demo__seg-btn--active' : ''}`}
+                    onClick={() => setTheme(t.value)}
+                    aria-pressed={t.value === theme}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <div className="demo__seg" role="group" aria-label={ui.locale}>
+                {LOCALES.map((l) => (
+                  <button
+                    key={l.value}
+                    type="button"
+                    className={`demo__seg-btn${l.value === locale ? ' demo__seg-btn--active' : ''}`}
+                    onClick={() => setLocale(l.value)}
+                    aria-pressed={l.value === locale}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
           <section className="demo__card">
             <h2>Preset</h2>
             <p className="demo__hint">

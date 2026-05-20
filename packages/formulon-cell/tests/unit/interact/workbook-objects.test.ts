@@ -1,10 +1,13 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PivotAxis, PivotFilterType, PivotFilterValueKind } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en, ja } from '../../../src/i18n/strings.js';
 import { attachWorkbookObjectsPanel } from '../../../src/interact/workbook-objects.js';
+import type { SessionIllustration } from '../../../src/store/store.js';
 
-const wbWithObjects = () =>
-  ({
+const wbWithObjects = () => {
+  const calls: string[] = [];
+  const wb = {
     capabilities: {
       cellFormatting: true,
       conditionalFormatMutate: true,
@@ -45,9 +48,103 @@ const wbWithObjects = () =>
         cols: 3,
         cells: 18,
         fields: ['Region', 'Sales'],
+        fieldItems: {
+          Region: ['East', 'West'],
+          Sales: ['10', '20'],
+        },
       },
     ],
-  }) as unknown as WorkbookHandle;
+    renamePivotTable: (sheet: number, pivot: number, name: string) => {
+      calls.push(`rename:${sheet}:${pivot}:${name}`);
+      return true;
+    },
+    setPivotTableAnchor: (
+      sheet: number,
+      pivot: number,
+      anchor: { row: number; col: number; rows: number; cols: number },
+    ) => {
+      calls.push(
+        `anchor:${sheet}:${pivot}:${anchor.row}:${anchor.col}:${anchor.rows}:${anchor.cols}`,
+      );
+      return true;
+    },
+    setPivotTableGrandTotals: (
+      sheet: number,
+      pivot: number,
+      rowsEnabled: boolean,
+      colsEnabled: boolean,
+    ) => {
+      calls.push(`totals:${sheet}:${pivot}:${rowsEnabled}:${colsEnabled}`);
+      return true;
+    },
+    removePivotTable: (sheet: number, pivot: number) => {
+      calls.push(`remove:${sheet}:${pivot}`);
+      return true;
+    },
+    setPivotFieldAxis: (sheet: number, pivot: number, field: number, axis: number) => {
+      calls.push(`field-axis:${sheet}:${pivot}:${field}:${axis}`);
+      return true;
+    },
+    clearPivotFieldAggregations: (sheet: number, pivot: number, field: number) => {
+      calls.push(`clear-agg:${sheet}:${pivot}:${field}`);
+      return true;
+    },
+    addPivotFieldAggregation: (sheet: number, pivot: number, field: number, agg: number) => {
+      calls.push(`add-agg:${sheet}:${pivot}:${field}:${agg}`);
+      return true;
+    },
+    setPivotFieldNumberFormat: (sheet: number, pivot: number, field: number, format: string) => {
+      calls.push(`format:${sheet}:${pivot}:${field}:${format}`);
+      return true;
+    },
+    clearPivotFieldItems: (sheet: number, pivot: number, field: number) => {
+      calls.push(`clear-items:${sheet}:${pivot}:${field}`);
+      return true;
+    },
+    addPivotFieldItem: (
+      sheet: number,
+      pivot: number,
+      field: number,
+      item: string,
+      visible: boolean,
+    ) => {
+      calls.push(`add-item:${sheet}:${pivot}:${field}:${item}:${visible}`);
+      return true;
+    },
+    clearPivotFilters: (sheet: number, pivot: number) => {
+      calls.push(`clear-filters:${sheet}:${pivot}`);
+      return true;
+    },
+    addPivotFilter: (
+      sheet: number,
+      pivot: number,
+      spec: {
+        fieldName: string;
+        type: number;
+        valueText?: string;
+        valueDouble?: number;
+        valueHighDouble?: number;
+        valueInt?: number;
+      },
+    ) => {
+      calls.push(
+        [
+          'add-filter',
+          String(sheet),
+          String(pivot),
+          spec.fieldName,
+          String(spec.type),
+          spec.valueText ?? '',
+          spec.valueDouble === undefined ? '' : String(spec.valueDouble),
+          spec.valueHighDouble === undefined ? '' : String(spec.valueHighDouble),
+          spec.valueInt === undefined ? '' : String(spec.valueInt),
+        ].join(':'),
+      );
+      return true;
+    },
+  } as unknown as WorkbookHandle;
+  return { wb, calls };
+};
 
 const emptyWb = () =>
   ({
@@ -66,7 +163,8 @@ describe('attachWorkbookObjectsPanel', () => {
   });
 
   it('lists preserved OOXML categories, paths, and table names', () => {
-    const handle = attachWorkbookObjectsPanel({ host, wb: wbWithObjects(), strings: en });
+    const { wb } = wbWithObjects();
+    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
     handle.open();
 
     expect(host.textContent).toContain('Workbook Objects');
@@ -83,11 +181,374 @@ describe('attachWorkbookObjectsPanel', () => {
     expect(host.textContent).toContain('Pivot 1');
     expect(host.textContent).toContain('R5C2');
     expect(host.textContent).toContain('6 x 3');
-    expect(host.textContent).toContain('Region, Sales');
+    expect(host.textContent).toContain('Region');
+    expect(host.textContent).toContain('Sales');
     expect(host.textContent).toContain('Spreadsheet compatibility');
     expect(host.textContent).toContain('PivotTable authoring');
     expect(host.textContent).toContain('Writable');
     expect(host.textContent).toContain('Unsupported');
+    handle.detach();
+  });
+
+  it('lists session illustrations supplied by the host feature', () => {
+    const handle = attachWorkbookObjectsPanel({
+      host,
+      wb: emptyWb(),
+      strings: en,
+      listSessionIllustrations: () => [
+        {
+          id: 'ribbon-image-0',
+          kind: 'image',
+          sheet: 0,
+          src: 'https://example.test/picture.png',
+          alt: 'picture.png',
+        },
+        {
+          id: 'ribbon-shape-0',
+          kind: 'shape',
+          shape: 'arrow',
+          sheet: 1,
+        },
+      ],
+    });
+    handle.open();
+
+    expect(host.textContent).toContain('Illustrations');
+    expect(host.textContent).toContain('Pictures · Sheet 1 · ribbon-image-0');
+    expect(host.textContent).toContain('arrow · Sheet 2 · ribbon-shape-0');
+    expect(host.textContent).not.toContain('No preserved charts');
+    handle.detach();
+  });
+
+  it('refreshes open session illustration details from the shared subscription', () => {
+    let illustrations: SessionIllustration[] = [];
+    const listeners = new Set<() => void>();
+    const handle = attachWorkbookObjectsPanel({
+      host,
+      wb: emptyWb(),
+      strings: en,
+      listSessionIllustrations: () => illustrations,
+      subscribeSessionObjects: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    });
+    handle.open();
+    expect(host.textContent).toContain('No preserved charts');
+
+    illustrations = [
+      {
+        id: 'shape-later',
+        kind: 'shape',
+        shape: 'oval',
+        sheet: 0,
+      },
+    ];
+    for (const listener of listeners) listener();
+    expect(host.textContent).toContain('oval · Sheet 1 · shape-later');
+
+    handle.detach();
+    illustrations = [
+      {
+        id: 'image-after-detach',
+        kind: 'image',
+        sheet: 0,
+        src: 'https://example.test/after.png',
+      },
+    ];
+    for (const listener of listeners) listener();
+    expect(host.textContent).not.toContain('image-after-detach');
+    expect(listeners.size).toBe(0);
+  });
+
+  it('opens the PivotTable creation flow from pivot details when supplied', () => {
+    let opened = 0;
+    const handle = attachWorkbookObjectsPanel({
+      host,
+      wb: wbWithObjects().wb,
+      strings: en,
+      onOpenPivotTableDialog: () => {
+        opened += 1;
+      },
+    });
+    handle.open();
+
+    const button = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
+      el.textContent?.includes('Create PivotTable'),
+    );
+    expect(button).toBeTruthy();
+    button?.click();
+    expect(opened).toBe(1);
+    handle.detach();
+  });
+
+  it('edits a projected PivotTable through workbook object details', () => {
+    const { wb, calls } = wbWithObjects();
+    const onAfterPivotEdit = vi.fn();
+    const handle = attachWorkbookObjectsPanel({
+      host,
+      wb,
+      strings: en,
+      onAfterPivotEdit,
+    });
+    handle.open();
+
+    const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
+      el.textContent?.includes('Edit'),
+    );
+    edit?.click();
+    const form = host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit');
+    const inputs = Array.from(form?.querySelectorAll<HTMLInputElement>('input') ?? []);
+    const name = inputs.find((input) => input.type === 'text' && input.value.includes('Pivot'));
+    const anchor = inputs.find((input) => input.type === 'text' && input.value === 'B5');
+    if (!form || !name || !anchor) throw new Error('missing pivot edit form');
+    name.value = 'Sales Pivot';
+    anchor.value = 'C7';
+    form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+
+    expect(calls).toContain('rename:0:0:Sales Pivot');
+    expect(calls).toContain('anchor:0:0:6:2:6:3');
+    expect(calls).toContain('totals:0:0:true:true');
+    expect(calls).toContain('field-axis:0:0:0:0');
+    expect(calls).toContain('field-axis:0:0:1:2');
+    expect(calls).toContain('clear-agg:0:0:0');
+    expect(calls).toContain('clear-agg:0:0:1');
+    expect(calls).toContain('add-agg:0:0:1:0');
+    expect(onAfterPivotEdit).toHaveBeenCalledTimes(1);
+    handle.detach();
+  });
+
+  it('edits existing PivotTable field axis assignments', () => {
+    const { wb, calls } = wbWithObjects();
+    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    handle.open();
+    const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
+      el.textContent?.includes('Edit'),
+    );
+    edit?.click();
+    const form = host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit');
+    const fieldSelects = Array.from(
+      form?.querySelectorAll<HTMLSelectElement>('[data-pivot-field-index]') ?? [],
+    );
+    expect(fieldSelects).toHaveLength(2);
+    const [regionField, salesField] = fieldSelects as [HTMLSelectElement, HTMLSelectElement];
+    regionField.value = '3';
+    salesField.value = '1';
+    form?.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+
+    expect(calls).toContain('field-axis:0:0:0:3');
+    expect(calls).toContain('field-axis:0:0:1:1');
+    expect(calls).toContain('clear-items:0:0:0');
+    expect(calls).not.toContain('add-agg:0:0:0:0');
+    expect(calls).not.toContain('add-agg:0:0:1:0');
+    handle.detach();
+  });
+
+  it('opens an existing PivotTable Field List without the general edit controls', () => {
+    const { wb, calls } = wbWithObjects();
+    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    handle.open();
+    const fieldList = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
+      el.textContent?.includes('PivotTable Fields'),
+    );
+    fieldList?.click();
+    const form = host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit');
+    if (!form) throw new Error('missing field list form');
+    expect(host.querySelector('.fc-objects')?.classList.contains('fc-objects--taskpane')).toBe(
+      true,
+    );
+    expect(host.textContent).toContain('Back to Workbook Objects');
+    expect(form.getAttribute('aria-label')).toBe('PivotTable Fields');
+    expect(form.textContent).toContain('Choose fields to add to report');
+    expect(form.textContent).toContain('Region');
+    expect(form.textContent).toContain('Sales');
+    expect(form.textContent).toContain('East');
+    expect(form.textContent).toContain('West');
+    expect(form.textContent).not.toContain('Anchor cell');
+
+    const regionAxis = form.querySelector<HTMLSelectElement>('[data-pivot-field-index="0"]');
+    if (!regionAxis) throw new Error('missing region field axis');
+    regionAxis.value = '3';
+    regionAxis.dispatchEvent(new Event('change', { bubbles: true }));
+    const eastItem = Array.from(
+      form.querySelectorAll<HTMLInputElement>(
+        '[data-pivot-filter-checklist-field-index="0"] input',
+      ),
+    ).find((input) => input.value === 'East');
+    if (!eastItem) throw new Error('missing East filter item');
+    eastItem.checked = false;
+    form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+
+    expect(calls).toContain('field-axis:0:0:0:3');
+    expect(calls).toContain('clear-items:0:0:0');
+    expect(calls).toContain('add-item:0:0:0:East:false');
+    expect(calls).toContain('add-item:0:0:0:West:true');
+    expect(calls.some((call) => call.startsWith('rename:'))).toBe(false);
+    expect(calls.some((call) => call.startsWith('anchor:'))).toBe(false);
+    handle.detach();
+  });
+
+  it('opens an existing PivotTable Field List through the shared panel handle', () => {
+    const { wb } = wbWithObjects();
+    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+
+    expect(handle.openPivotFieldList(0, 0)).toBe(true);
+    expect(host.querySelector('.fc-objects')?.classList.contains('fc-objects--taskpane')).toBe(
+      true,
+    );
+    expect(host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit')?.textContent).toContain(
+      'Choose fields to add to report',
+    );
+    expect(handle.openPivotFieldList(2, 0)).toBe(false);
+    handle.detach();
+  });
+
+  it('edits existing PivotTable value aggregation and number format', () => {
+    const { wb, calls } = wbWithObjects();
+    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    handle.open();
+    const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
+      el.textContent?.includes('Edit'),
+    );
+    edit?.click();
+    const form = host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit');
+    const salesAxis = form?.querySelector<HTMLSelectElement>('[data-pivot-field-index="1"]');
+    const aggregation = form?.querySelector<HTMLSelectElement>(
+      '[data-pivot-aggregation-field-index="1"]',
+    );
+    const format = form?.querySelector<HTMLInputElement>(
+      '[data-pivot-number-format-field-index="1"]',
+    );
+    if (!salesAxis || !aggregation || !format) throw new Error('missing value controls');
+    salesAxis.value = '2';
+    aggregation.value = '2';
+    format.value = '#,##0.00';
+    form?.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+
+    expect(calls).toContain('clear-agg:0:0:1');
+    expect(calls).toContain('add-agg:0:0:1:2');
+    expect(calls).toContain('format:0:0:1:#,##0.00');
+    handle.detach();
+  });
+
+  it('edits existing PivotTable filter item visibility list', () => {
+    const { wb, calls } = wbWithObjects();
+    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    handle.open();
+    const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
+      el.textContent?.includes('Edit'),
+    );
+    edit?.click();
+    const form = host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit');
+    const regionAxis = form?.querySelector<HTMLSelectElement>('[data-pivot-field-index="0"]');
+    if (!regionAxis || !form) throw new Error('missing filter item controls');
+    regionAxis.value = '3';
+    regionAxis.dispatchEvent(new Event('change', { bubbles: true }));
+    const westItem = Array.from(
+      form.querySelectorAll<HTMLInputElement>(
+        '[data-pivot-filter-checklist-field-index="0"] input',
+      ),
+    ).find((input) => input.value === 'West');
+    if (!westItem) throw new Error('missing West filter item');
+    westItem.checked = false;
+    form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+
+    expect(calls).toContain('clear-items:0:0:0');
+    expect(calls).toContain('add-item:0:0:0:East:true');
+    expect(calls).toContain('add-item:0:0:0:West:false');
+    expect(calls).not.toContain('clear-filters:0:0');
+    handle.detach();
+  });
+
+  it('edits existing PivotTable filter conditions with the shared condition model', () => {
+    const { wb, calls } = wbWithObjects();
+    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    handle.open();
+    const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
+      el.textContent?.includes('Edit'),
+    );
+    edit?.click();
+    const form = host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit');
+    const regionAxis = form?.querySelector<HTMLSelectElement>('[data-pivot-field-index="0"]');
+    const category = form?.querySelector<HTMLSelectElement>(
+      '[data-pivot-filter-category-field-index="0"]',
+    );
+    const condition = form?.querySelector<HTMLSelectElement>(
+      '[data-pivot-filter-condition-field-index="0"]',
+    );
+    if (!form || !regionAxis || !category || !condition) {
+      throw new Error('missing filter condition controls');
+    }
+    regionAxis.value = '3';
+    regionAxis.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(category.textContent).toContain('Label Filters');
+    expect(category.textContent).toContain('Value Filters');
+    category.value = 'label';
+    category.dispatchEvent(new Event('change', { bubbles: true }));
+    condition.value = 'label-contains';
+    condition.dispatchEvent(new Event('change', { bubbles: true }));
+    const value = form.querySelector<HTMLInputElement>(
+      '.fc-objects__pivot-filter-condition-values input',
+    );
+    if (!value) throw new Error('missing filter condition value');
+    value.value = 'East';
+    value.dispatchEvent(new Event('input', { bubbles: true }));
+    form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+
+    expect(calls).toContain('clear-filters:0:0');
+    expect(calls.some((call) => call.startsWith('add-filter:0:0:Region:3:East:'))).toBe(true);
+    handle.detach();
+  });
+
+  it('hydrates existing PivotTable filters into the shared condition editor', () => {
+    const { wb } = wbWithObjects();
+    wb.getPivotTables = () => [
+      {
+        sheetIndex: 0,
+        pivotIndex: 0,
+        top: 4,
+        left: 1,
+        rows: 6,
+        cols: 3,
+        cells: 18,
+        fields: ['Region', 'Sales'],
+        fieldItems: {
+          Region: ['East', 'West'],
+          Sales: ['-10', '20'],
+        },
+        pivotFilters: [
+          {
+            axis: PivotAxis.Page,
+            fieldName: 'Sales',
+            type: PivotFilterType.ValueBetween,
+            valueKind: PivotFilterValueKind.Double,
+            valueDouble: -10,
+            valueHighKind: PivotFilterValueKind.Double,
+            valueHighDouble: 20,
+          },
+        ],
+      },
+    ];
+    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    handle.open();
+    const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
+      el.textContent?.includes('Edit'),
+    );
+    edit?.click();
+
+    const axis = host.querySelector<HTMLSelectElement>('[data-pivot-field-index="1"]');
+    const category = host.querySelector<HTMLSelectElement>(
+      '[data-pivot-filter-category-field-index="1"]',
+    );
+    const condition = host.querySelector<HTMLSelectElement>(
+      '[data-pivot-filter-condition-field-index="1"]',
+    );
+    const valueContainer = condition?.closest('label')?.nextElementSibling;
+    const values = Array.from(valueContainer?.querySelectorAll<HTMLInputElement>('input') ?? []);
+    expect(axis?.value).toBe(String(PivotAxis.Page));
+    expect(category?.value).toBe('value');
+    expect(condition?.value).toBe('value-between');
+    expect(values.map((input) => input.value)).toEqual(['-10', '20']);
     handle.detach();
   });
 
@@ -100,7 +561,7 @@ describe('attachWorkbookObjectsPanel', () => {
     expect(host.textContent).toContain('保持されたグラフ');
     expect(host.textContent).toContain('スプレッドシート互換');
 
-    handle.bindWorkbook(wbWithObjects());
+    handle.bindWorkbook(wbWithObjects().wb);
     expect(host.textContent).toContain('グラフ');
     expect(host.textContent).toContain('シート 1');
     expect(host.textContent).toContain('3 列');

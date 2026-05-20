@@ -26,6 +26,7 @@ export const ALL_FEATURE_IDS = [
   'pasteSpecial',
   'quickAnalysis',
   'charts',
+  'illustrations',
   'pivotTableDialog',
   'validation',
   'autocomplete',

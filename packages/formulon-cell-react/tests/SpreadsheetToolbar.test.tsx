@@ -31,7 +31,7 @@ interface Harness {
 }
 
 const mountToolbar = async (
-  mounted: MountedReactSpreadsheet,
+  _mounted: MountedReactSpreadsheet,
   node: ReactNode,
 ): Promise<Harness> => {
   const host = document.createElement('div');
@@ -70,6 +70,7 @@ describe('<SpreadsheetToolbar> (thin adapter)', () => {
 
   it('mounts the core ribbon DOM into a wrapping host element', async () => {
     const onTabChange = vi.fn();
+    const onToolbarReady = vi.fn();
     const harness = await mountToolbar(
       mounted,
       <SpreadsheetToolbar
@@ -77,11 +78,16 @@ describe('<SpreadsheetToolbar> (thin adapter)', () => {
         activeTab="home"
         onTabChange={onTabChange}
         locale="en"
+        onToolbarReady={onToolbarReady}
       />,
     );
     expect(harness.host.querySelectorAll('[data-ribbon-tab]').length).toBeGreaterThan(0);
     expect(harness.host.querySelector('[data-ribbon-panel="home"]:not([hidden])')).toBeTruthy();
+    expect(onToolbarReady).toHaveBeenCalledWith(
+      expect.objectContaining({ applyCommand: expect.any(Function) }),
+    );
     await harness.unmount();
+    expect(onToolbarReady).toHaveBeenLastCalledWith(null);
   });
 
   it('forwards tab-button clicks via onTabChange', async () => {

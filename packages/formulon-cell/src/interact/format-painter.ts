@@ -134,7 +134,7 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
             }
           }
         }
-        return { ...s, format: { formats } };
+        return { ...s, format: { ...s.format, formats } };
       });
     });
 

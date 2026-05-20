@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setMarginPreset } from '../../../src/commands/page-setup.js';
 import { en } from '../../../src/i18n/strings.js';
 import { attachPageSetupDialog } from '../../../src/interact/page-setup-dialog.js';
@@ -11,9 +11,19 @@ import {
 
 const dialog = (): HTMLElement | null => document.querySelector<HTMLElement>('.fc-pgsetup');
 const selects = (): HTMLSelectElement[] =>
-  Array.from(document.querySelectorAll<HTMLSelectElement>('.fc-pgsetup__select'));
+  Array.from(
+    document.querySelectorAll<HTMLSelectElement>('.fc-pgsetup__select:not([data-pgsetup-printer])'),
+  );
 const marginInputs = (): HTMLInputElement[] =>
   Array.from(document.querySelectorAll<HTMLInputElement>('.fc-pgsetup__margins input'));
+const pageMarginInputs = (): HTMLInputElement[] =>
+  Array.from(
+    document.querySelectorAll<HTMLInputElement>(
+      '.fc-pgsetup__margins:not(.fc-pgsetup__printable) input',
+    ),
+  );
+const printableInputs = (): HTMLInputElement[] =>
+  Array.from(document.querySelectorAll<HTMLInputElement>('.fc-pgsetup__printable input'));
 const buttons = (): HTMLButtonElement[] =>
   Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-pgsetup .fc-fmtdlg__btn'));
 const footerButtons = (): HTMLButtonElement[] =>
@@ -30,6 +40,8 @@ const selectByLabel = (label: string): HTMLSelectElement | null =>
   document.querySelector<HTMLSelectElement>(`.fc-pgsetup select[aria-label="${label}"]`);
 const referenceError = (): HTMLElement | null =>
   document.querySelector<HTMLElement>('.fc-pgsetup__error');
+const printableWarning = (): HTMLElement | null =>
+  document.querySelector<HTMLElement>('.fc-pgsetup__warning');
 
 describe('attachPageSetupDialog', () => {
   let host: HTMLElement;
@@ -127,6 +139,220 @@ describe('attachPageSetupDialog', () => {
     handle.detach();
   });
 
+  it('refreshes printable bounds from a host printer profile when paper changes', () => {
+    const resolvePrintableBounds = vi.fn(() => ({
+      top: 0.45,
+      right: 0.35,
+      bottom: 0.45,
+      left: 0.35,
+    }));
+    const handle = attachPageSetupDialog({
+      host,
+      store,
+      resolvePrintableBounds,
+    });
+    handle.open();
+    const [, paperSelect] = selects();
+    if (!paperSelect) throw new Error('paper select missing');
+    paperSelect.value = 'letter';
+    const ok = buttons().find((b) => b.classList.contains('fc-fmtdlg__btn--primary'));
+    ok?.click();
+
+    const setup = getPageSetup(store.getState(), 0);
+    expect(resolvePrintableBounds).toHaveBeenCalledTimes(1);
+    expect(setup.paperSize).toBe('letter');
+    expect(setup.printableBounds).toEqual({
+      top: 0.45,
+      right: 0.35,
+      bottom: 0.45,
+      left: 0.35,
+    });
+    handle.detach();
+  });
+
+  it('lets Page Setup choose a host-provided printer profile', () => {
+    const setPrinterProfileId = vi.fn();
+    const resolvePrintableBounds = vi.fn(() => ({
+      top: 0.2,
+      right: 0.15,
+      bottom: 0.2,
+      left: 0.15,
+    }));
+    const handle = attachPageSetupDialog({
+      host,
+      store,
+      strings: en,
+      getPrinterProfiles: () => [
+        { id: 'office', name: 'Office Printer', printableBounds: { top: 0.1 } },
+        { id: 'label', name: 'Label Printer', printableBounds: { top: 0.2 } },
+      ],
+      getPrinterProfileId: () => ' office ',
+      setPrinterProfileId,
+      resolvePrintableBounds,
+    });
+    handle.open();
+    const printer = selectByLabel('Printer');
+    if (!printer) throw new Error('printer profile select missing');
+    expect(printer.hidden).toBe(false);
+    expect(Array.from(printer.options).map((option) => option.textContent)).toEqual([
+      'Automatically match paper and orientation',
+      'Office Printer',
+      'Label Printer',
+    ]);
+    expect(printer.value).toBe('office');
+
+    printer.value = 'label';
+    const ok = buttons().find((b) => b.classList.contains('fc-fmtdlg__btn--primary'));
+    ok?.click();
+
+    expect(setPrinterProfileId).toHaveBeenCalledWith('label');
+    expect(resolvePrintableBounds).toHaveBeenCalledWith(
+      expect.objectContaining({ paperSize: 'A4', orientation: 'portrait' }),
+      0,
+      expect.objectContaining({ paperSize: 'A4', orientation: 'portrait' }),
+      'label',
+    );
+    expect(getPageSetup(store.getState(), 0).printableBounds).toEqual({
+      top: 0.2,
+      right: 0.15,
+      bottom: 0.2,
+      left: 0.15,
+    });
+    handle.detach();
+  });
+
+  it('normalizes the selected printer profile id before comparing dialog changes', () => {
+    const setPrinterProfileId = vi.fn();
+    const resolvePrintableBounds = vi.fn();
+    const handle = attachPageSetupDialog({
+      host,
+      store,
+      strings: en,
+      getPrinterProfiles: () => [
+        { id: 'office', name: 'Office Printer', printableBounds: { top: 0.1 } },
+      ],
+      getPrinterProfileId: () => ' office ',
+      setPrinterProfileId,
+      resolvePrintableBounds,
+    });
+    handle.open();
+    const printer = selectByLabel('Printer');
+    if (!printer) throw new Error('printer profile select missing');
+    expect(printer.value).toBe('office');
+
+    const ok = buttons().find((b) => b.classList.contains('fc-fmtdlg__btn--primary'));
+    ok?.click();
+
+    expect(setPrinterProfileId).not.toHaveBeenCalled();
+    expect(resolvePrintableBounds).not.toHaveBeenCalled();
+    handle.detach();
+  });
+
+  it('normalizes raw dialog printer profiles before rendering the selector', () => {
+    const handle = attachPageSetupDialog({
+      host,
+      store,
+      strings: en,
+      getPrinterProfiles: () => [
+        {
+          id: ' office ',
+          name: ' Office Printer ',
+          printableBounds: { top: -1, right: Number.NaN, bottom: 0.1, left: 0.1 },
+        },
+        { id: ' office ', name: 'Duplicate', printableBounds: { top: 0.2 } },
+      ],
+      getPrinterProfileId: () => ' office ',
+    });
+    handle.open();
+
+    const printer = selectByLabel('Printer');
+    if (!printer) throw new Error('printer profile select missing');
+    expect(Array.from(printer.options).map((option) => [option.value, option.textContent])).toEqual(
+      [
+        ['', 'Automatically match paper and orientation'],
+        ['office', 'Office Printer'],
+      ],
+    );
+    expect(printer.value).toBe('office');
+    handle.detach();
+  });
+
+  it('refreshes host-provided printer profiles from Page Setup', async () => {
+    const setPrinterProfileId = vi.fn();
+    const refreshPrinterProfiles = vi
+      .fn()
+      .mockResolvedValue([
+        { id: 'native', name: 'Native Printer', printableBounds: { top: 0.15 } },
+      ]);
+    const handle = attachPageSetupDialog({
+      host,
+      store,
+      strings: en,
+      getPrinterProfiles: () => [],
+      getPrinterProfileId: () => undefined,
+      setPrinterProfileId,
+      refreshPrinterProfiles,
+    });
+
+    handle.open();
+    const refresh = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent === 'Refresh printers',
+    );
+    if (!refresh) throw new Error('missing printer refresh button');
+    refresh.click();
+    await Promise.resolve();
+
+    const printer = selectByLabel('Printer');
+    expect(refreshPrinterProfiles).toHaveBeenCalledTimes(1);
+    expect(printer?.value).toBe('');
+    expect(Array.from(printer?.options ?? []).map((option) => option.value)).toEqual([
+      '',
+      'native',
+    ]);
+
+    if (!printer) throw new Error('missing printer select');
+    printer.value = 'native';
+    printer.dispatchEvent(new Event('change', { bubbles: true }));
+    footerButtons()
+      .find((button) => button.textContent === 'OK')
+      ?.click();
+    expect(setPrinterProfileId).toHaveBeenCalledWith('native');
+    handle.detach();
+  });
+
+  it('clears stale printable bounds when host reports no matching printer profile', () => {
+    store.setState((s) => ({
+      ...s,
+      pageSetup: {
+        setupBySheet: new Map([
+          [
+            0,
+            {
+              ...defaultPageSetup(),
+              printableBounds: { top: 0.4, right: 0.4, bottom: 0.4, left: 0.4 },
+            },
+          ],
+        ]),
+      },
+    }));
+    const resolvePrintableBounds = vi.fn(() => null);
+    const handle = attachPageSetupDialog({
+      host,
+      store,
+      resolvePrintableBounds,
+    });
+    handle.open();
+    const [, paperSelect] = selects();
+    if (!paperSelect) throw new Error('paper select missing');
+    paperSelect.value = 'letter';
+    const ok = buttons().find((b) => b.classList.contains('fc-fmtdlg__btn--primary'));
+    ok?.click();
+
+    expect(resolvePrintableBounds).toHaveBeenCalledTimes(1);
+    expect(getPageSetup(store.getState(), 0).printableBounds).toBeUndefined();
+    handle.detach();
+  });
+
   it('OK after editing Page tab scaling, quality, and first page number persists them', () => {
     const handle = attachPageSetupDialog({ host, store, strings: en });
     handle.open();
@@ -165,7 +391,7 @@ describe('attachPageSetupDialog', () => {
     // Mutate inputs in the dialog.
     const [orientSelect] = selects();
     if (orientSelect) orientSelect.value = 'landscape';
-    const inputs = marginInputs();
+    const inputs = pageMarginInputs();
     if (inputs[0]) inputs[0].value = '9';
     const cancel = footerButtons().find((b) => !b.classList.contains('fc-fmtdlg__btn--primary'));
     cancel?.click();
@@ -203,7 +429,7 @@ describe('attachPageSetupDialog', () => {
   it('OK after editing margin inputs writes the updated margins to the slice', () => {
     const handle = attachPageSetupDialog({ host, store });
     handle.open();
-    const inputs = marginInputs();
+    const inputs = pageMarginInputs();
     if (inputs.length !== 6) throw new Error('expected 6 margin inputs');
     const [top, right, bottom, left, header, footer] = inputs as [
       HTMLInputElement,
@@ -234,6 +460,56 @@ describe('attachPageSetupDialog', () => {
     expect(setup.footerMargin).toBe(0.25);
     expect(setup.centerHorizontally).toBe(true);
     expect(setup.centerVertically).toBe(true);
+    handle.detach();
+  });
+
+  it('OK after editing printer minimum margins persists printable bounds separately', () => {
+    const handle = attachPageSetupDialog({ host, store, strings: en });
+    handle.open();
+    const inputs = printableInputs();
+    if (inputs.length !== 4) throw new Error('expected 4 printable bound inputs');
+    const [top, right, bottom, left] = inputs as [
+      HTMLInputElement,
+      HTMLInputElement,
+      HTMLInputElement,
+      HTMLInputElement,
+    ];
+    top.value = '0.25';
+    right.value = '0.2';
+    bottom.value = '0.3';
+    left.value = '0.2';
+
+    const ok = buttons().find((b) => b.classList.contains('fc-fmtdlg__btn--primary'));
+    ok?.click();
+
+    const setup = getPageSetup(store.getState(), 0);
+    expect(setup.printableBounds).toEqual({ top: 0.25, right: 0.2, bottom: 0.3, left: 0.2 });
+    expect(setup.margins).toEqual(defaultPageSetup().margins);
+    handle.detach();
+  });
+
+  it('warns when requested margins are below printer minimum margins', () => {
+    const handle = attachPageSetupDialog({ host, store, strings: en });
+    handle.open();
+    tab('margins')?.click();
+    const pageInputs = pageMarginInputs();
+    const printable = printableInputs();
+    if (pageInputs.length !== 6 || printable.length !== 4) {
+      throw new Error('expected margin inputs');
+    }
+    const [topMargin] = pageInputs as [HTMLInputElement, ...HTMLInputElement[]];
+    const [printableTop] = printable as [HTMLInputElement, ...HTMLInputElement[]];
+    topMargin.value = '0.1';
+    printableTop.value = '0.25';
+    printableTop.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(printableWarning()?.hidden).toBe(false);
+    expect(printableWarning()?.textContent).toContain('printer minimum');
+    expect(printableWarning()?.textContent).toContain('Top 0.25in');
+
+    topMargin.value = '0.3';
+    topMargin.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(printableWarning()?.hidden).toBe(true);
     handle.detach();
   });
 

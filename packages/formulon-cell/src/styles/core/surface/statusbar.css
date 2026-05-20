@@ -46,6 +46,36 @@
     flex: 0 0 auto;
   }
 
+  .fc-host__statusbar-locks {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
+  }
+
+  .fc-host__statusbar-lock {
+    white-space: nowrap;
+  }
+
+  .fc-host__statusbar-upload,
+  .fc-host__statusbar-macro {
+    flex: 0 0 auto;
+    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
+    white-space: nowrap;
+  }
+
+  .fc-host__statusbar-upload[data-upload-status="saving"],
+  .fc-host__statusbar-macro[data-macro-recording="true"] {
+    color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
+    font-weight: 600;
+  }
+
+  .fc-host__statusbar-upload[data-upload-status="error"] {
+    color: color-mix(in srgb, #ffd6d6 85%, var(--fc-statusbar-fg-strong, CanvasText));
+    font-weight: 600;
+  }
+
   .fc-host__statusbar-views {
     display: inline-flex;
     align-items: center;

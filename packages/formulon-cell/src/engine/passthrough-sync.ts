@@ -1,3 +1,4 @@
+import type { Addr, PivotFilterSpec } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 export interface PassthroughSummary {
@@ -111,6 +112,8 @@ export interface PivotTableSummary {
     cols: number;
     cells: number;
     fields: string[];
+    fieldItems?: Record<string, string[]>;
+    pivotFilters?: readonly PivotFilterSpec[];
   }[];
 }
 
@@ -238,4 +241,20 @@ export function summarizePivotTables(wb: WorkbookHandle): PivotTableSummary {
     bySheet,
     items,
   };
+}
+
+export function findPivotTableAtCell(
+  wb: WorkbookHandle,
+  addr: Addr,
+): PivotTableSummary['items'][number] | null {
+  return (
+    summarizePivotTables(wb).items.find(
+      (pivot) =>
+        pivot.sheetIndex === addr.sheet &&
+        addr.row >= pivot.top &&
+        addr.row < pivot.top + pivot.rows &&
+        addr.col >= pivot.left &&
+        addr.col < pivot.left + pivot.cols,
+    ) ?? null
+  );
 }

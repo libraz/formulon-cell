@@ -11,9 +11,17 @@ import {
   WORKBOOK_OBJECT_KINDS,
   workbookObjectKindCounts,
 } from '../engine/passthrough-sync.js';
+import { PivotAggregation, PivotAxis, type PivotFilterSpec } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
+import type { SessionIllustration } from '../store/store.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';
+import {
+  createPivotFilterConditionControls,
+  type PivotFilterConditionState,
+  pivotFilterConditionToSpec,
+  pivotFilterSpecToCondition,
+} from './pivot-field-settings.js';
 
 type WorkbookObjectsStrings = Strings['workbookObjects'];
 
@@ -103,10 +111,16 @@ export interface WorkbookObjectsPanelDeps {
   host: HTMLElement;
   wb: WorkbookHandle;
   strings?: Strings;
+  onOpenPivotTableDialog?: () => void;
+  onAfterPivotEdit?: () => void;
+  listSessionIllustrations?: () => readonly SessionIllustration[];
+  subscribeSessionObjects?: (listener: () => void) => () => void;
 }
 
 export interface WorkbookObjectsPanelHandle {
   open(): void;
+  openPivotFieldList(sheetIndex: number, pivotIndex: number): boolean;
+  isPivotFieldListOpen(): boolean;
   close(): void;
   refresh(): void;
   setStrings(next: Strings): void;
@@ -118,6 +132,32 @@ const compatibilityLabelKey = (
   id: SpreadsheetCompatibilityId,
 ): keyof WorkbookObjectsStrings['compatibilityLabels'] => COMPATIBILITY_LABEL_KEYS[id];
 
+const colLetter = (n: number): string => {
+  let v = n;
+  let out = '';
+  do {
+    out = String.fromCharCode(65 + (v % 26)) + out;
+    v = Math.floor(v / 26) - 1;
+  } while (v >= 0);
+  return out;
+};
+
+const cellRef = (row: number, col: number): string => `${colLetter(col)}${row + 1}`;
+
+const parseCellRef = (input: string): { row: number; col: number } | null => {
+  const m = input
+    .trim()
+    .replace(/\$/g, '')
+    .match(/^([A-Za-z]+)([1-9][0-9]*)$/);
+  if (!m) return null;
+  const letters = m[1];
+  const rows = m[2];
+  if (!letters || !rows) return null;
+  let col = 0;
+  for (const ch of letters.toUpperCase()) col = col * 26 + (ch.charCodeAt(0) - 64);
+  return { row: Number(rows) - 1, col: col - 1 };
+};
+
 export function attachWorkbookObjectsPanel(
   deps: WorkbookObjectsPanelDeps,
 ): WorkbookObjectsPanelHandle {
@@ -126,6 +166,9 @@ export function attachWorkbookObjectsPanel(
   let strings = deps.strings ?? defaultStrings;
   let open = false;
   let restoreFocusEl: HTMLElement | null = null;
+  let activePivotEditKey = '';
+  let activePivotFieldListKey = '';
+  let pivotEditError = '';
 
   const root = document.createElement('div');
   root.className = 'fc-objects';
@@ -165,38 +208,474 @@ export function attachWorkbookObjectsPanel(
     return row;
   };
 
+  const pivotAnchor = (pivot: {
+    top: number;
+    left: number;
+    rows: number;
+    cols: number;
+    cells: number;
+  }): string =>
+    `R${pivot.top + 1}C${pivot.left + 1} · ${pivot.rows} x ${pivot.cols} · ${pivot.cells} ${strings.workbookObjects.cells}`;
+
+  const fieldChips = (fields: readonly string[]): HTMLDivElement => {
+    const wrap = document.createElement('div');
+    wrap.className = 'fc-objects__chips';
+    for (const field of fields) {
+      const chip = document.createElement('span');
+      chip.className = 'fc-objects__chip';
+      chip.textContent = field;
+      wrap.appendChild(chip);
+    }
+    return wrap;
+  };
+
+  const pivotKey = (sheet: number, index: number): string => `${sheet}:${index}`;
+
+  const pivotEditField = (label: string, control: HTMLElement): HTMLLabelElement => {
+    const row = document.createElement('label');
+    row.className = 'fc-objects__pivot-edit-field';
+    const text = document.createElement('span');
+    text.textContent = label;
+    row.append(text, control);
+    return row;
+  };
+
+  const pivotEditCheck = (label: string, control: HTMLInputElement): HTMLLabelElement => {
+    const row = document.createElement('label');
+    row.className = 'fc-objects__pivot-edit-check';
+    row.append(control, document.createTextNode(label));
+    return row;
+  };
+
+  const renderPivotEditForm = (
+    pivot: {
+      sheetIndex: number;
+      pivotIndex: number;
+      top: number;
+      left: number;
+      rows: number;
+      cols: number;
+      fields: readonly string[];
+      fieldItems?: Record<string, readonly string[]>;
+    },
+    opts: { fieldListOnly?: boolean } = {},
+  ): HTMLFormElement => {
+    const t = strings.workbookObjects;
+    const fieldListOnly = opts.fieldListOnly === true;
+    const form = document.createElement('form');
+    form.className = 'fc-objects__pivot-edit';
+    form.setAttribute('aria-label', fieldListOnly ? t.pivotFieldList : t.editPivotTable);
+    const name = document.createElement('input');
+    name.className = 'fc-objects__input';
+    name.type = 'text';
+    name.value = `${t.pivot} ${pivot.pivotIndex + 1}`;
+    const anchor = document.createElement('input');
+    anchor.className = 'fc-objects__input';
+    anchor.type = 'text';
+    anchor.value = cellRef(pivot.top, pivot.left);
+    const rowTotals = document.createElement('input');
+    rowTotals.type = 'checkbox';
+    rowTotals.checked = true;
+    const colTotals = document.createElement('input');
+    colTotals.type = 'checkbox';
+    colTotals.checked = true;
+    const fieldAreaSelects: HTMLSelectElement[] = [];
+    const fieldAreas = document.createElement('div');
+    fieldAreas.className = 'fc-objects__pivot-field-areas';
+    const fieldAreasTitle = document.createElement('span');
+    fieldAreasTitle.textContent = t.pivotFieldAreas;
+    fieldAreas.appendChild(fieldAreasTitle);
+    const fieldListTitle = document.createElement('div');
+    fieldListTitle.className = 'fc-objects__pivot-field-list-title';
+    fieldListTitle.textContent = t.pivotFieldList;
+    const availableFields = document.createElement('div');
+    availableFields.className = 'fc-objects__pivot-field-list';
+    const availableTitle = document.createElement('span');
+    availableTitle.textContent = t.pivotAvailableFields;
+    availableFields.appendChild(availableTitle);
+    const axisOptions = [
+      { value: String(PivotAxis.Row), label: t.pivotAreaRows },
+      { value: String(PivotAxis.Col), label: t.pivotAreaColumns },
+      { value: String(PivotAxis.Page), label: t.pivotAreaFilters },
+      { value: String(PivotAxis.Value), label: t.pivotAreaValues },
+    ];
+    const aggregationOptions = [
+      { value: String(PivotAggregation.Sum), label: t.pivotAggregateSum },
+      { value: String(PivotAggregation.Count), label: t.pivotAggregateCount },
+      { value: String(PivotAggregation.Average), label: t.pivotAggregateAverage },
+      { value: String(PivotAggregation.Max), label: t.pivotAggregateMax },
+      { value: String(PivotAggregation.Min), label: t.pivotAggregateMin },
+    ];
+    const filterConditions = new Map<number, PivotFilterConditionState>();
+    for (const spec of (pivot as { pivotFilters?: readonly PivotFilterSpec[] }).pivotFilters ??
+      []) {
+      const fieldIndex = pivot.fields.indexOf(spec.fieldName);
+      if (fieldIndex < 0 || filterConditions.has(fieldIndex)) continue;
+      const condition = pivotFilterSpecToCondition(spec);
+      if (condition) filterConditions.set(fieldIndex, condition);
+    }
+    const filterConditionDirty = new Set<number>();
+    const valueFieldSettings: {
+      fieldIndex: number;
+      axisSelect: HTMLSelectElement;
+      aggregationSelect: HTMLSelectElement;
+      numberFormatInput: HTMLInputElement;
+      filterItemsInput: HTMLTextAreaElement;
+      filterCondition(): PivotFilterConditionState | undefined;
+    }[] = [];
+    for (const [index, field] of pivot.fields.entries()) {
+      if (fieldListOnly) {
+        const item = document.createElement('label');
+        item.className = 'fc-objects__pivot-field-list-item';
+        const check = document.createElement('input');
+        check.type = 'checkbox';
+        check.checked = true;
+        check.disabled = true;
+        item.append(check, document.createTextNode(field));
+        availableFields.appendChild(item);
+      }
+      const select = document.createElement('select');
+      select.className = 'fc-objects__input';
+      select.dataset.pivotFieldIndex = String(index);
+      for (const option of axisOptions) {
+        const opt = document.createElement('option');
+        opt.value = option.value;
+        opt.textContent = option.label;
+        select.appendChild(opt);
+      }
+      select.value = filterConditions.has(index)
+        ? String(PivotAxis.Page)
+        : index === 0
+          ? String(PivotAxis.Row)
+          : String(PivotAxis.Value);
+      fieldAreaSelects.push(select);
+      const row = document.createElement('div');
+      row.className = 'fc-objects__pivot-field-row';
+      row.appendChild(pivotEditField(field, select));
+      const aggregation = document.createElement('select');
+      aggregation.className = 'fc-objects__input';
+      aggregation.dataset.pivotAggregationFieldIndex = String(index);
+      for (const option of aggregationOptions) {
+        const opt = document.createElement('option');
+        opt.value = option.value;
+        opt.textContent = option.label;
+        aggregation.appendChild(opt);
+      }
+      aggregation.value = String(PivotAggregation.Sum);
+      const numberFormat = document.createElement('input');
+      numberFormat.className = 'fc-objects__input';
+      numberFormat.type = 'text';
+      numberFormat.placeholder = t.pivotNumberFormatPlaceholder;
+      numberFormat.dataset.pivotNumberFormatFieldIndex = String(index);
+      const filterItems = document.createElement('textarea');
+      filterItems.className = 'fc-objects__input';
+      filterItems.rows = 3;
+      filterItems.placeholder = t.pivotFilterItemsPlaceholder;
+      filterItems.dataset.pivotFilterItemsFieldIndex = String(index);
+      const inferredItems = pivot.fieldItems?.[field] ?? [];
+      if (fieldListOnly && inferredItems.length > 0) filterItems.value = inferredItems.join('\n');
+      const syncFilterCondition = (condition: PivotFilterConditionState): void => {
+        if (condition.kind === 'none' || !condition.value.trim()) filterConditions.delete(index);
+        else filterConditions.set(index, condition);
+      };
+      const filterConditionControls = createPivotFilterConditionControls({
+        strings: strings.pivotTableDialog,
+        condition: filterConditions.get(index),
+        selectClassName: 'fc-objects__input',
+        valueClassName: 'fc-objects__input',
+        valuesContainerClassName: 'fc-objects__pivot-filter-condition-values',
+        categoryDataset: { pivotFilterCategoryFieldIndex: String(index) },
+        conditionDataset: { pivotFilterConditionFieldIndex: String(index) },
+        fieldRow: pivotEditField,
+        onChange: syncFilterCondition,
+        onUserChange: () => filterConditionDirty.add(index),
+      });
+      const filterChecklist = document.createElement('div');
+      filterChecklist.className = 'fc-objects__pivot-filter-items';
+      filterChecklist.dataset.pivotFilterChecklistFieldIndex = String(index);
+      for (const itemName of inferredItems) {
+        const check = document.createElement('input');
+        check.type = 'checkbox';
+        check.checked = true;
+        check.value = itemName;
+        const checkLabel = document.createElement('label');
+        checkLabel.className = 'fc-objects__pivot-field-list-item';
+        checkLabel.append(check, document.createTextNode(itemName));
+        filterChecklist.appendChild(checkLabel);
+      }
+      const settings = document.createElement('div');
+      settings.className = 'fc-objects__pivot-value-settings';
+      settings.hidden = select.value !== String(PivotAxis.Value);
+      settings.append(
+        pivotEditField(t.pivotAggregation, aggregation),
+        pivotEditField(t.pivotNumberFormat, numberFormat),
+      );
+      const filterSettings = document.createElement('div');
+      filterSettings.className = 'fc-objects__pivot-value-settings';
+      filterSettings.hidden = select.value !== String(PivotAxis.Page);
+      filterSettings.appendChild(
+        inferredItems.length > 0
+          ? pivotEditField(t.pivotFilterItems, filterChecklist)
+          : pivotEditField(t.pivotFilterItems, filterItems),
+      );
+      filterSettings.append(...filterConditionControls);
+      select.addEventListener('change', () => {
+        settings.hidden = select.value !== String(PivotAxis.Value);
+        filterSettings.hidden = select.value !== String(PivotAxis.Page);
+      });
+      valueFieldSettings.push({
+        fieldIndex: index,
+        axisSelect: select,
+        aggregationSelect: aggregation,
+        numberFormatInput: numberFormat,
+        filterItemsInput: filterItems,
+        filterCondition: () => filterConditions.get(index),
+      });
+      row.appendChild(settings);
+      row.appendChild(filterSettings);
+      fieldAreas.appendChild(row);
+    }
+    const error = document.createElement('div');
+    error.className = 'fc-objects__error';
+    error.setAttribute('role', 'alert');
+    error.hidden = !pivotEditError;
+    error.textContent = pivotEditError;
+    const actions = document.createElement('div');
+    actions.className = 'fc-objects__actions';
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'fc-objects__action';
+    remove.textContent = t.deletePivotTable;
+    const apply = document.createElement('button');
+    apply.type = 'submit';
+    apply.className = 'fc-objects__action fc-objects__action--primary';
+    apply.textContent = t.apply;
+    if (fieldListOnly) actions.append(apply);
+    else actions.append(remove, apply);
+    remove.addEventListener('click', () => {
+      pivotEditError = '';
+      if (!wb.removePivotTable(pivot.sheetIndex, pivot.pivotIndex)) {
+        pivotEditError = t.pivotEditFailed;
+        render();
+        return;
+      }
+      activePivotEditKey = '';
+      deps.onAfterPivotEdit?.();
+      render();
+    });
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      pivotEditError = '';
+      const nextAnchor = fieldListOnly
+        ? { row: pivot.top, col: pivot.left }
+        : parseCellRef(anchor.value);
+      if (!nextAnchor) {
+        pivotEditError = t.invalidPivotAnchor;
+        render();
+        return;
+      }
+      const renamed =
+        fieldListOnly || wb.renamePivotTable(pivot.sheetIndex, pivot.pivotIndex, name.value.trim());
+      const moved =
+        fieldListOnly ||
+        wb.setPivotTableAnchor(pivot.sheetIndex, pivot.pivotIndex, {
+          row: nextAnchor.row,
+          col: nextAnchor.col,
+          rows: pivot.rows,
+          cols: pivot.cols,
+        });
+      const totaled =
+        fieldListOnly ||
+        wb.setPivotTableGrandTotals(
+          pivot.sheetIndex,
+          pivot.pivotIndex,
+          rowTotals.checked,
+          colTotals.checked,
+        );
+      const fieldsUpdated = fieldAreaSelects.every((select) =>
+        wb.setPivotFieldAxis(
+          pivot.sheetIndex,
+          pivot.pivotIndex,
+          Number(select.dataset.pivotFieldIndex),
+          Number(select.value) as PivotAxis,
+        ),
+      );
+      const valueFieldsUpdated = valueFieldSettings.every((field) => {
+        const cleared = wb.clearPivotFieldAggregations(
+          pivot.sheetIndex,
+          pivot.pivotIndex,
+          field.fieldIndex,
+        );
+        if (!cleared) return false;
+        if (field.axisSelect.value !== String(PivotAxis.Value)) return true;
+        const aggregated = wb.addPivotFieldAggregation(
+          pivot.sheetIndex,
+          pivot.pivotIndex,
+          field.fieldIndex,
+          Number(field.aggregationSelect.value) as PivotAggregation,
+        );
+        const format = field.numberFormatInput.value.trim();
+        const formatted =
+          format.length === 0 ||
+          wb.setPivotFieldNumberFormat(
+            pivot.sheetIndex,
+            pivot.pivotIndex,
+            field.fieldIndex,
+            format,
+          );
+        return aggregated && formatted;
+      });
+      const filterItemsUpdated = valueFieldSettings.every((field) => {
+        if (field.axisSelect.value !== String(PivotAxis.Page)) return true;
+        if (!wb.clearPivotFieldItems(pivot.sheetIndex, pivot.pivotIndex, field.fieldIndex)) {
+          return false;
+        }
+        const items = field.filterItemsInput.value
+          .split(/\r?\n/)
+          .map((item) => item.trim())
+          .filter(Boolean);
+        const checklist = form.querySelector<HTMLElement>(
+          `[data-pivot-filter-checklist-field-index="${field.fieldIndex}"]`,
+        );
+        if (checklist) {
+          const checkedItems = Array.from(
+            checklist.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
+          );
+          return checkedItems.every((item) =>
+            wb.addPivotFieldItem(
+              pivot.sheetIndex,
+              pivot.pivotIndex,
+              field.fieldIndex,
+              item.value,
+              item.checked,
+            ),
+          );
+        }
+        return items.every((item) =>
+          wb.addPivotFieldItem(pivot.sheetIndex, pivot.pivotIndex, field.fieldIndex, item, true),
+        );
+      });
+      const dirtyFilterSettings = valueFieldSettings.filter(
+        (field) =>
+          field.axisSelect.value === String(PivotAxis.Page) &&
+          filterConditionDirty.has(field.fieldIndex),
+      );
+      const nextPivotFilters = dirtyFilterSettings
+        .map((field) =>
+          pivotFilterConditionToSpec(pivot.fields[field.fieldIndex] ?? '', field.filterCondition()),
+        )
+        .filter((filter): filter is PivotFilterSpec => filter !== null);
+      const pivotFiltersUpdated =
+        dirtyFilterSettings.length === 0 ||
+        (wb.clearPivotFilters(pivot.sheetIndex, pivot.pivotIndex) &&
+          nextPivotFilters.every((filter) =>
+            wb.addPivotFilter(pivot.sheetIndex, pivot.pivotIndex, filter),
+          ));
+      if (
+        !renamed ||
+        !moved ||
+        !totaled ||
+        !fieldsUpdated ||
+        !valueFieldsUpdated ||
+        !filterItemsUpdated ||
+        !pivotFiltersUpdated
+      ) {
+        pivotEditError = t.pivotEditFailed;
+        render();
+        return;
+      }
+      activePivotEditKey = '';
+      activePivotFieldListKey = '';
+      deps.onAfterPivotEdit?.();
+      render();
+    });
+    if (fieldListOnly) {
+      form.append(fieldListTitle, availableFields, fieldAreas, error, actions);
+    } else {
+      form.append(
+        pivotEditField(t.pivotName, name),
+        pivotEditField(t.pivotAnchorCell, anchor),
+        fieldAreas,
+        pivotEditCheck(t.rowGrandTotals, rowTotals),
+        pivotEditCheck(t.columnGrandTotals, colTotals),
+        error,
+        actions,
+      );
+    }
+    return form;
+  };
+
   const render = (): void => {
     const t = strings.workbookObjects;
     const objects = listWorkbookObjects(wb);
     const passthroughs = summarizePassthroughs(wb);
     const tables = summarizeTables(wb);
     const pivots = summarizePivotTables(wb);
+    const illustrations = deps.listSessionIllustrations?.() ?? [];
     const support = summarizeSpreadsheetCompatibility(wb);
+    const activeFieldListPivot = activePivotFieldListKey
+      ? pivots.items.find(
+          (pivot) => pivotKey(pivot.sheetIndex, pivot.pivotIndex) === activePivotFieldListKey,
+        )
+      : undefined;
+    if (activePivotFieldListKey && !activeFieldListPivot) activePivotFieldListKey = '';
     root.replaceChildren();
-    root.setAttribute('aria-label', t.title);
+    root.className = `fc-objects${activeFieldListPivot ? ' fc-objects--taskpane' : ''}`;
+    root.setAttribute('aria-label', activeFieldListPivot ? t.pivotFieldList : t.title);
 
     const header = document.createElement('div');
     header.className = 'fc-objects__header';
     const title = document.createElement('div');
     title.className = 'fc-objects__title';
-    title.textContent = t.title;
+    title.textContent = activeFieldListPivot ? t.pivotFieldList : t.title;
+    const headerActions = document.createElement('div');
+    headerActions.className = 'fc-objects__header-actions';
+    if (activeFieldListPivot) {
+      const back = document.createElement('button');
+      back.type = 'button';
+      back.className = 'fc-objects__action';
+      back.textContent = t.backToWorkbookObjects;
+      back.addEventListener('click', () => {
+        activePivotFieldListKey = '';
+        pivotEditError = '';
+        render();
+      });
+      headerActions.appendChild(back);
+    }
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';
     closeBtn.className = 'fc-objects__close';
     closeBtn.textContent = '×';
     closeBtn.setAttribute('aria-label', t.close);
     closeBtn.addEventListener('click', () => close(false));
-    header.append(title, closeBtn);
+    headerActions.appendChild(closeBtn);
+    header.append(title, headerActions);
     root.appendChild(header);
 
     const body = document.createElement('div');
     body.className = 'fc-objects__body';
+    if (activeFieldListPivot) {
+      const section = document.createElement('section');
+      section.className = 'fc-objects__section';
+      const heading = document.createElement('div');
+      heading.className = 'fc-objects__heading';
+      heading.textContent = [
+        `${t.pivot} ${activeFieldListPivot.pivotIndex + 1}`,
+        `${t.sheet} ${activeFieldListPivot.sheetIndex + 1}`,
+        pivotAnchor(activeFieldListPivot),
+      ].join(' · ');
+      section.append(heading, renderPivotEditForm(activeFieldListPivot, { fieldListOnly: true }));
+      body.appendChild(section);
+      root.appendChild(body);
+      return;
+    }
     const summary = document.createElement('section');
     summary.className = 'fc-objects__section';
     summary.append(
       item(t.preservedParts, passthroughs.count),
       item(t.tables, tables.count),
       item(t.pivotTables, pivots.count),
+      item(strings.ribbon.illustrations, illustrations.length),
       item(t.writable, support.byStatus.writable),
       item(t.readOnly, support.byStatus['read-only']),
       item(t.sessionOnly, support.byStatus.session),
@@ -294,18 +773,119 @@ export function attachWorkbookObjectsPanel(
       heading.className = 'fc-objects__heading';
       heading.textContent = t.pivotDetails;
       section.appendChild(heading);
+      for (const pivot of pivots.items) {
+        const card = document.createElement('div');
+        card.className = 'fc-objects__pivot-card';
+        const titleRow = document.createElement('div');
+        titleRow.className = 'fc-objects__pivot-title';
+        const title = document.createElement('strong');
+        title.textContent = `${t.pivot} ${pivot.pivotIndex + 1}`;
+        const meta = document.createElement('span');
+        meta.textContent = `${t.sheet} ${pivot.sheetIndex + 1} · ${pivotAnchor(pivot)}`;
+        titleRow.append(title, meta);
+        card.appendChild(titleRow);
+        if (pivot.fields.length > 0) card.appendChild(fieldChips(pivot.fields));
+        const canEditPivot = wb.capabilities.pivotTableMutate;
+        if (deps.onOpenPivotTableDialog) {
+          const actions = document.createElement('div');
+          actions.className = 'fc-objects__actions';
+          if (canEditPivot) {
+            const edit = document.createElement('button');
+            edit.type = 'button';
+            edit.className = 'fc-objects__action';
+            edit.textContent = t.editPivotTable;
+            edit.addEventListener('click', () => {
+              const key = pivotKey(pivot.sheetIndex, pivot.pivotIndex);
+              activePivotEditKey = activePivotEditKey === key ? '' : key;
+              activePivotFieldListKey = '';
+              pivotEditError = '';
+              render();
+            });
+            actions.appendChild(edit);
+          }
+          if (canEditPivot) {
+            const fieldList = document.createElement('button');
+            fieldList.type = 'button';
+            fieldList.className = 'fc-objects__action';
+            fieldList.textContent = t.pivotFieldList;
+            fieldList.addEventListener('click', () => {
+              const key = pivotKey(pivot.sheetIndex, pivot.pivotIndex);
+              activePivotFieldListKey = activePivotFieldListKey === key ? '' : key;
+              activePivotEditKey = '';
+              pivotEditError = '';
+              render();
+            });
+            actions.appendChild(fieldList);
+          }
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'fc-objects__action';
+          button.textContent = t.createPivotTable;
+          button.addEventListener('click', () => deps.onOpenPivotTableDialog?.());
+          actions.appendChild(button);
+          card.appendChild(actions);
+        } else if (canEditPivot) {
+          const actions = document.createElement('div');
+          actions.className = 'fc-objects__actions';
+          const edit = document.createElement('button');
+          edit.type = 'button';
+          edit.className = 'fc-objects__action';
+          edit.textContent = t.editPivotTable;
+          edit.addEventListener('click', () => {
+            const key = pivotKey(pivot.sheetIndex, pivot.pivotIndex);
+            activePivotEditKey = activePivotEditKey === key ? '' : key;
+            activePivotFieldListKey = '';
+            pivotEditError = '';
+            render();
+          });
+          actions.appendChild(edit);
+          const fieldList = document.createElement('button');
+          fieldList.type = 'button';
+          fieldList.className = 'fc-objects__action';
+          fieldList.textContent = t.pivotFieldList;
+          fieldList.addEventListener('click', () => {
+            const key = pivotKey(pivot.sheetIndex, pivot.pivotIndex);
+            activePivotFieldListKey = activePivotFieldListKey === key ? '' : key;
+            activePivotEditKey = '';
+            pivotEditError = '';
+            render();
+          });
+          actions.appendChild(fieldList);
+          card.appendChild(actions);
+        }
+        if (canEditPivot && activePivotEditKey === pivotKey(pivot.sheetIndex, pivot.pivotIndex)) {
+          card.appendChild(renderPivotEditForm(pivot));
+        }
+        if (
+          canEditPivot &&
+          activePivotFieldListKey === pivotKey(pivot.sheetIndex, pivot.pivotIndex)
+        ) {
+          card.appendChild(renderPivotEditForm(pivot, { fieldListOnly: true }));
+        }
+        section.appendChild(card);
+      }
+      body.appendChild(section);
+    }
+
+    if (illustrations.length > 0) {
+      const section = document.createElement('section');
+      section.className = 'fc-objects__section';
+      const heading = document.createElement('div');
+      heading.className = 'fc-objects__heading';
+      heading.textContent = strings.ribbon.illustrations;
+      section.appendChild(heading);
       const list = document.createElement('ul');
       list.className = 'fc-objects__paths';
-      for (const pivot of pivots.items) {
+      for (const [index, illustration] of illustrations.entries()) {
         const li = document.createElement('li');
-        const fields = pivot.fields.length > 0 ? ` · ${pivot.fields.join(', ')}` : '';
         li.textContent = [
-          `${t.pivot} ${pivot.pivotIndex + 1}`,
-          `${t.sheet} ${pivot.sheetIndex + 1}`,
-          `R${pivot.top + 1}C${pivot.left + 1}`,
-          `${pivot.rows} x ${pivot.cols}`,
-          `${pivot.cells} ${t.cells}${fields}`,
+          illustration.kind === 'image'
+            ? strings.ribbon.pictures
+            : (illustration.shape ?? strings.ribbon.shapes),
+          `${t.sheet} ${illustration.sheet + 1}`,
+          illustration.id || `${strings.ribbon.illustrations} ${index + 1}`,
         ].join(' · ');
+        if (illustration.src) li.title = illustration.src;
         list.appendChild(li);
       }
       section.appendChild(list);
@@ -331,7 +911,12 @@ export function attachWorkbookObjectsPanel(
       body.appendChild(section);
     }
 
-    if (passthroughs.count === 0 && tables.count === 0 && pivots.count === 0) {
+    if (
+      passthroughs.count === 0 &&
+      tables.count === 0 &&
+      pivots.count === 0 &&
+      illustrations.length === 0
+    ) {
       const empty = document.createElement('div');
       empty.className = 'fc-objects__empty';
       empty.textContent = t.empty;
@@ -343,6 +928,7 @@ export function attachWorkbookObjectsPanel(
   const refresh = (): void => {
     if (open) render();
   };
+  const unsubscribeSessionObjects = deps.subscribeSessionObjects?.(refresh) ?? null;
 
   const openPanel = (): void => {
     render();
@@ -352,6 +938,22 @@ export function attachWorkbookObjectsPanel(
     root.focus({ preventScroll: true });
   };
 
+  const openPivotFieldList = (sheetIndex: number, pivotIndex: number): boolean => {
+    const key = pivotKey(sheetIndex, pivotIndex);
+    if (
+      !summarizePivotTables(wb).items.some(
+        (pivot) => pivotKey(pivot.sheetIndex, pivot.pivotIndex) === key,
+      )
+    ) {
+      return false;
+    }
+    activePivotEditKey = '';
+    activePivotFieldListKey = key;
+    pivotEditError = '';
+    openPanel();
+    return true;
+  };
+
   const onKey = (e: KeyboardEvent): void => {
     if (e.key === 'Escape') close(true);
   };
@@ -359,6 +961,8 @@ export function attachWorkbookObjectsPanel(
 
   return {
     open: openPanel,
+    openPivotFieldList,
+    isPivotFieldListOpen: () => open && activePivotFieldListKey.length > 0,
     close,
     refresh,
     setStrings(next) {
@@ -370,6 +974,7 @@ export function attachWorkbookObjectsPanel(
       refresh();
     },
     detach() {
+      unsubscribeSessionObjects?.();
       root.removeEventListener('keydown', onKey);
       root.remove();
     },

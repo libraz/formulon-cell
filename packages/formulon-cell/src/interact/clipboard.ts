@@ -66,7 +66,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
           }
         }
       }
-      return { ...s, format: { formats } };
+      return { ...s, format: { ...s.format, formats } };
     });
   };
 

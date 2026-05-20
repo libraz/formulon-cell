@@ -2,7 +2,7 @@
 // / PageTheme. Plain static label menus extracted from main.ts; the parent wires
 // up click handlers via the data-* attributes on the buttons.
 
-import type { ToolbarMenuText } from '@libraz/formulon-cell';
+import type { ToolbarMenuText } from '../../menu-text.js';
 
 import { createMenu, menuButton, menuSeparator } from './general.js';
 
@@ -12,6 +12,7 @@ export interface PageLayoutMenuFactories {
   createSheetBackgroundMenu: () => HTMLDivElement;
   createPrintTitlesMenu: () => HTMLDivElement;
   createPageThemeMenu: () => HTMLDivElement;
+  createArrangeMenu: () => HTMLDivElement;
 }
 
 export const createPageLayoutMenuFactories = (
@@ -23,6 +24,7 @@ export const createPageLayoutMenuFactories = (
     const menu = createMenu('menu-print-area');
     menu.append(
       menuButton(t.printAreaSet, 'printAreaAction', 'set'),
+      menuButton(t.printAreaAdd, 'printAreaAction', 'add'),
       menuButton(t.printAreaClear, 'printAreaAction', 'clear'),
     );
     return menu;
@@ -72,11 +74,26 @@ export const createPageLayoutMenuFactories = (
     return menu;
   };
 
+  const createArrangeMenu = (): HTMLDivElement => {
+    const menu = createMenu('menu-arrange-objects');
+    menu.append(
+      menuButton(t.arrangeBringForward, 'arrangeAction', 'bring-forward'),
+      menuButton(t.arrangeSendBackward, 'arrangeAction', 'send-backward'),
+      menuSeparator(),
+      menuButton(t.arrangeBringToFront, 'arrangeAction', 'bring-front'),
+      menuButton(t.arrangeSendToBack, 'arrangeAction', 'send-back'),
+      menuSeparator(),
+      menuButton(t.arrangeSelectionPane, 'arrangeAction', 'selection-pane'),
+    );
+    return menu;
+  };
+
   return {
     createPrintAreaMenu,
     createPageBreaksMenu,
     createSheetBackgroundMenu,
     createPrintTitlesMenu,
     createPageThemeMenu,
+    createArrangeMenu,
   };
 };

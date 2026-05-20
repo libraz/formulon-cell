@@ -303,6 +303,7 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
       void hooks?.sortFilter?.customSort?.();
       return true;
     case 'filterHome':
+    case 'filter':
       hooks?.sortFilter?.openFilter?.();
       return true;
     case 'outlineGroup':
@@ -341,7 +342,6 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
     case 'formatTableInsert':
       void hooks?.insert?.createTable?.('medium');
       return true;
-    case 'removeDupesInsert':
     case 'removeDupes':
       hooks?.sortFilter?.removeDuplicates?.();
       return true;

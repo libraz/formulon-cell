@@ -12,6 +12,7 @@ export type RibbonTab =
   | 'data'
   | 'review'
   | 'view'
+  | 'help'
   | 'automate'
   | 'acrobat';
 
@@ -45,18 +46,23 @@ export interface RibbonTabModel {
   groups: RibbonGroupModel[];
 }
 
-export const RIBBON_TABS: readonly RibbonTab[] = [
+export const EXCEL365_STANDARD_RIBBON_TABS: readonly RibbonTab[] = [
   'file',
   'home',
   'insert',
-  'draw',
   'pageLayout',
   'formulas',
   'data',
   'review',
   'view',
-  'automate',
-  'acrobat',
+  'help',
+];
+
+export const OPTIONAL_RIBBON_TABS: readonly RibbonTab[] = ['draw', 'automate', 'acrobat'];
+
+export const RIBBON_TABS: readonly RibbonTab[] = [
+  ...EXCEL365_STANDARD_RIBBON_TABS,
+  ...OPTIONAL_RIBBON_TABS,
 ];
 
 export const RIBBON_TAB_LABELS: Readonly<Record<RibbonTab, Record<ToolbarLang, string>>> = {
@@ -69,6 +75,7 @@ export const RIBBON_TAB_LABELS: Readonly<Record<RibbonTab, Record<ToolbarLang, s
   data: { ja: 'データ', en: 'Data' },
   review: { ja: '校閲', en: 'Review' },
   view: { ja: '表示', en: 'View' },
+  help: { ja: 'ヘルプ', en: 'Help' },
   automate: { ja: '自動化', en: 'Automate' },
   acrobat: { ja: 'Acrobat', en: 'Acrobat' },
 };
@@ -86,7 +93,6 @@ export const RIBBON_KEYSHORTCUTS: Readonly<Record<string, string>> = {
   gotoSpecialHome: 'F5 Control+G Meta+G',
   hyperlinkInsert: 'Control+K Meta+K',
   namedRanges: 'Control+F3',
-  namedRangesInsert: 'Control+F3',
   paste: 'Control+V Meta+V',
   recalcNow: 'F9',
   redoHome: 'Control+Y Meta+Y Meta+Shift+Z',
@@ -125,6 +131,13 @@ export const toolbarText = (input: Strings | ToolbarLang): ToolbarText =>
 export const ribbonTabLabel = (input: Strings | ToolbarLang, id: RibbonTab): string =>
   resolveStrings(input).ribbon.tabs[id];
 
+export interface BuildRibbonModelOptions {
+  /** Explicit tab surface. Use `EXCEL365_STANDARD_RIBBON_TABS` for the
+   *  Microsoft 365 baseline and append `OPTIONAL_RIBBON_TABS` only when the
+   *  host really exposes those add-in/automation surfaces. */
+  tabs?: readonly RibbonTab[];
+}
+
 const interpolate = (template: string, vars: Record<string, string>): string =>
   template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? '');
 
@@ -155,7 +168,10 @@ const colorCmd = (id: string, label: string, title: string, icon: string): Ribbo
 
 const breakCmd = (id: string): RibbonCommand => ({ id, title: '', label: '', kind: 'break' });
 
-export function buildRibbonModel(input: Strings | ToolbarLang): RibbonTabModel[] {
+export function buildRibbonModel(
+  input: Strings | ToolbarLang,
+  opts: BuildRibbonModelOptions = {},
+): RibbonTabModel[] {
   const strings = resolveStrings(input);
   const tr = strings.ribbon;
   const menuText = toolbarMenuText(strings);
@@ -190,16 +206,14 @@ export function buildRibbonModel(input: Strings | ToolbarLang): RibbonTabModel[]
   const borderPresetOptions = localizeBorderPresets(tr);
   const borderStyleOptions = localizeBorderStyles(tr);
 
-  return [
+  const allTabs = [
     tab('file', [
       group(tr.workbook, [
         cmd('pageSetup', tr.pageSetup, tr.pageSetup, 'page', 'wide'),
         cmd('print', tr.print, tr.print, 'print', 'wide'),
         cmd('protect', tr.protect, tr.protect, 'protect', 'wide'),
       ]),
-      group(tr.inspect, [
-        cmd('inspect', tr.inspect, tr.inspect, 'goTo', 'wide'),
-      ]),
+      group(tr.inspect, [cmd('inspect', tr.inspect, tr.inspect, 'goTo', 'wide')]),
     ]),
     tab('home', [
       group(
@@ -354,15 +368,7 @@ export function buildRibbonModel(input: Strings | ToolbarLang): RibbonTabModel[]
     tab('insert', [
       group(tr.tables, [
         cmd('pivotTableInsert', tr.pivotTable, tr.pivotTable, 'table', 'wide'),
-        cmd('formatTableInsert', tr.formatTable, tr.formatTable, 'tableStyle', 'wide'),
-        cmd('namedRangesInsert', tr.names, tr.names, 'names', 'wide'),
-        cmd(
-          'removeDupesInsert',
-          tr.removeDuplicates,
-          tr.removeDuplicates,
-          'removeDuplicates',
-          'wide',
-        ),
+        cmd('formatTableInsert', tr.table, tr.table, 'table', 'wide'),
       ]),
       group(tr.illustrations, [
         cmd('pictureInsert', tr.pictures, tr.pictures, 'page', 'wide'),
@@ -372,19 +378,11 @@ export function buildRibbonModel(input: Strings | ToolbarLang): RibbonTabModel[]
       group(tr.charts, [cmd('chartInsert', tr.chart, tr.chart, 'chart', 'wide')]),
       group(tr.links, [
         cmd('hyperlinkInsert', tr.hyperlink, `${tr.hyperlink} (⌘K)`, 'link', 'wide'),
-        cmd('linksInsert', tr.links, tr.links, 'link', 'wide'),
       ]),
       group(tr.comments, [
         cmd('commentInsert', tr.newComment, tr.newComment, 'commentAdd', 'wide'),
       ]),
       group(tr.symbols, [cmd('symbolInsert', tr.symbol, tr.symbol, 'function', 'wide')]),
-    ]),
-    tab('draw', [
-      group(tr.tabs.draw, [
-        cmd('drawPen', tr.pen, tr.tabs.draw, 'pen', 'wide'),
-        cmd('drawGrid', tr.drawBorderGrid, tr.drawBorderGrid, 'borders', 'wide'),
-        cmd('drawErase', tr.eraser, tr.eraser, 'eraser', 'wide'),
-      ]),
     ]),
     tab('pageLayout', [
       group(menuText.theme, [cmd('pageTheme', menuText.theme, menuText.theme, 'options', 'wide')]),
@@ -429,7 +427,7 @@ export function buildRibbonModel(input: Strings | ToolbarLang): RibbonTabModel[]
         cmd(
           'printArea',
           tr.printArea,
-          `${tr.printArea}: ${menuText.printAreaSet}/${menuText.printAreaClear}`,
+          `${tr.printArea}: ${menuText.printAreaSet}/${menuText.printAreaAdd}/${menuText.printAreaClear}`,
           'table',
           'wide',
         ),
@@ -512,6 +510,10 @@ export function buildRibbonModel(input: Strings | ToolbarLang): RibbonTabModel[]
           'wide',
         ),
       ]),
+      group(tr.arrange, [
+        cmd('arrangeObjectsPageLayout', tr.arrange, tr.arrange, 'options', 'wide'),
+        cmd('selectionPanePageLayout', tr.selectionPane, tr.selectionPane, 'options', 'wide'),
+      ]),
       group(tr.print, [cmd('printPageLayout', tr.print, tr.print, 'print', 'wide')]),
     ]),
     tab('formulas', [
@@ -564,6 +566,9 @@ export function buildRibbonModel(input: Strings | ToolbarLang): RibbonTabModel[]
     ]),
     tab('review', [
       group(tr.proofing, [cmd('spellingReview', tr.spelling, tr.spelling, 'spelling', 'wide')]),
+      group(tr.accessibility, [
+        cmd('accessibility', tr.accessibility, tr.accessibility, 'accessibility', 'wide'),
+      ]),
       group(tr.language, [cmd('translateReview', tr.translate, tr.translate, 'translate', 'wide')]),
       group(tr.comments, [
         cmd('newCommentReview', tr.newComment, tr.newComment, 'commentAdd', 'wide'),
@@ -589,9 +594,6 @@ export function buildRibbonModel(input: Strings | ToolbarLang): RibbonTabModel[]
           'wide',
         ),
       ]),
-      group(tr.accessibility, [
-        cmd('accessibility', tr.accessibility, tr.accessibility, 'accessibility', 'wide'),
-      ]),
     ]),
     tab('view', [
       group(tr.workbookViews, [
@@ -608,12 +610,7 @@ export function buildRibbonModel(input: Strings | ToolbarLang): RibbonTabModel[]
           [{ value: 'current', label: strings.viewToolbar.currentView }],
           'demo__rb-select--border',
         ),
-        cmd(
-          'sheetViewSave',
-          strings.viewToolbar.saveView,
-          strings.viewToolbar.saveView,
-          'options',
-        ),
+        cmd('sheetViewSave', strings.viewToolbar.saveView, strings.viewToolbar.saveView, 'options'),
         cmd(
           'sheetViewDelete',
           strings.viewToolbar.deleteView,
@@ -624,6 +621,12 @@ export function buildRibbonModel(input: Strings | ToolbarLang): RibbonTabModel[]
           'workbookObjectsView',
           strings.viewToolbar.objects,
           strings.viewToolbar.objects,
+          'options',
+        ),
+        cmd(
+          'pivotFieldListView',
+          strings.workbookObjects.pivotFieldList,
+          strings.workbookObjects.pivotFieldList,
           'options',
         ),
       ]),
@@ -647,6 +650,16 @@ export function buildRibbonModel(input: Strings | ToolbarLang): RibbonTabModel[]
       ]),
       group(tr.protection, [cmd('protect', tr.protect, tr.protect, 'protect', 'wide')]),
     ]),
+    tab('help', [
+      group(tr.tabs.help, [cmd('helpSearch', tr.tabs.help, tr.tabs.help, 'options', 'wide', true)]),
+    ]),
+    tab('draw', [
+      group(tr.tabs.draw, [
+        cmd('drawPen', tr.pen, tr.tabs.draw, 'pen', 'wide'),
+        cmd('drawGrid', tr.drawBorderGrid, tr.drawBorderGrid, 'borders', 'wide'),
+        cmd('drawErase', tr.eraser, tr.eraser, 'eraser', 'wide'),
+      ]),
+    ]),
     tab('automate', [
       group(tr.tabs.automate, [
         cmd('script', tr.script, tr.script, 'script', 'wide'),
@@ -659,4 +672,6 @@ export function buildRibbonModel(input: Strings | ToolbarLang): RibbonTabModel[]
       group(tr.pdf, [cmd('pdf', tr.pdf, tr.pdf, 'pdf', 'wide')]),
     ]),
   ];
+  const allowed = new Set(opts.tabs ?? RIBBON_TABS);
+  return allTabs.filter((tab) => allowed.has(tab.id));
 }

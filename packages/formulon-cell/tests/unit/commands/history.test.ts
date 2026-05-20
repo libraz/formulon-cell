@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  applyFormatSnapshot,
   applyChartsSnapshot,
   applyConditionalRulesSnapshot,
+  applyFormatSnapshot,
   applyLayoutSnapshot,
   applyTableOverlaysSnapshot,
-  captureFormatSnapshot,
   captureChartsSnapshot,
   captureConditionalRulesSnapshot,
+  captureFormatSnapshot,
   captureLayoutSnapshot,
   captureTableOverlaysSnapshot,
   History,
@@ -188,8 +188,8 @@ describe('snapshot helpers', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { bold: true });
     const snap = captureFormatSnapshot(store.getState());
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { italic: true });
-    expect(snap.get('0:0:0')?.bold).toBe(true);
-    expect(snap.get('0:0:0')?.italic).toBeUndefined();
+    expect(snap.formats.get('0:0:0')?.bold).toBe(true);
+    expect(snap.formats.get('0:0:0')?.italic).toBeUndefined();
   });
 
   it('applyFormatSnapshot restores prior state', () => {

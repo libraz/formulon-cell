@@ -1,0 +1,52 @@
+name: Visual Baselines
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generate:
+    name: generate Excel chrome visual baselines
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - run: corepack enable
+      - run: corepack prepare yarn@4.5.0 --activate
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .yarn/cache
+            node_modules
+          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - run: yarn install --immutable
+
+      - name: Install Chromium
+        run: yarn workspace @formulon-cell/react-demo exec playwright install --with-deps chromium
+
+      - name: Update visual snapshots
+        env:
+          CI: 'true'
+          FC_VISUAL: '1'
+        run: yarn test:e2e:visual:update
+
+      - name: Upload generated baselines and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-chrome-visual-baselines
+          path: |
+            apps/react-demo/e2e/visual/**/*-snapshots/**
+            apps/vue-demo/e2e/visual/**/*-snapshots/**
+            apps/react-demo/test-results/**
+            apps/vue-demo/test-results/**
+            apps/react-demo/playwright-report/**
+            apps/vue-demo/playwright-report/**
+          retention-days: 14

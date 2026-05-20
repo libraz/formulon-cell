@@ -63,17 +63,34 @@ import '@libraz/formulon-cell-react/toolbar.css';
 
 ## Runtime prop updates
 
-`theme`, `locale`, `strings`, `workbook`, `features`, and `extensions`
-update the running spreadsheet through the core imperative API. The
-component does **not** re-mount the canvas, so selection, focus, and
-host event subscriptions stay intact.
+`theme`, `locale`, `strings`, `workbook`, `features`, `extensions`,
+`printerProfiles`, `printerProfileId`, `uploadStatus`, and `macroRecording`
+update the running spreadsheet through the core imperative API. The component
+does **not** re-mount the canvas, so selection, focus, and host event
+subscriptions stay intact.
+
+Host-only capabilities can be passed as props without reimplementing ribbon
+behavior in React:
+
+```tsx
+<Spreadsheet
+  captureScreenClip={async () => ({
+    src: await nativeCaptureRegionAsDataUrl(),
+    alt: 'Screen clipping',
+  })}
+  refreshPrinterProfiles={() => nativeListPrinterProfiles()}
+/>
+```
+
+`captureScreenClip` backs Insert > Screenshot > Screen Clipping. Printer
+profile props feed Page Setup / print preview minimum-margin handling.
 
 ## Core helpers
 
 This package re-exports core command helpers and types — `createSessionChart`,
 `saveSheetView`, `activateSheetView`, `listDefinedNames`,
-`upsertDefinedName`, etc. — so React apps can type host chrome from a single
-import.
+`upsertDefinedName`, `ScreenClipCapture`, `ScreenClipResult`, etc. — so React
+apps can type host chrome from a single import.
 
 ## Documentation
 

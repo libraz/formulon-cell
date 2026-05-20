@@ -147,9 +147,14 @@ export type ShapeAction = 'rectangle' | 'rounded-rectangle' | 'oval' | 'line' | 
 export type ScreenshotAction = 'current-view' | 'screen-clipping';
 export type SymbolAction = string;
 
-export type PrintAreaAction = 'set' | 'clear';
+export type PrintAreaAction = 'set' | 'add' | 'clear';
 export type PrintTitleAction = 'rows' | 'cols' | 'clear';
-export type PageBreakAction = 'insert-row' | 'insert-col' | 'remove-row' | 'remove-col' | 'reset';
+export type PageBreakAction =
+  | 'insert-row'
+  | 'insert-col'
+  | 'remove-row'
+  | 'remove-col'
+  | 'reset-all';
 export type SheetBackgroundAction = 'set' | 'clear';
 export type ThemeAction = 'paper' | 'ink' | 'contrast';
 

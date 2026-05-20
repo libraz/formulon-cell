@@ -50,7 +50,7 @@ describe('attachStatusBar', () => {
     document.body.innerHTML = '';
   });
 
-  it('renders left/center/right segments and shows engine label on the right', () => {
+  it('renders left/center/right segments without leaking the engine label by default', () => {
     const handle = attachStatusBar({
       statusbar,
       store,
@@ -61,6 +61,18 @@ describe('attachStatusBar', () => {
     const right = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-right');
     expect(statusbar.querySelector('.fc-host__statusbar-left')?.textContent).toContain('準備完了');
     expect(right?.textContent).toContain('セル');
+    expect(right?.textContent).not.toContain('stub');
+    handle.detach();
+  });
+
+  it('can expose the engine label for dev/debug hosts', () => {
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      getEngineLabel: () => 'stub',
+      showEngineLabel: true,
+    });
+    const right = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-right');
     expect(right?.textContent).toContain('stub');
     handle.detach();
   });
@@ -105,6 +117,43 @@ describe('attachStatusBar', () => {
     handle.detach();
   });
 
+  it('reflects Excel-style Ready, Enter, Edit, and Point modes', () => {
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      strings: en,
+      getEngineLabel: () => 'stub',
+    });
+    const left = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-left');
+    expect(left?.textContent).toContain('Ready');
+
+    mutators.setEditor(store, { kind: 'enter', raw: 'abc' });
+    expect(left?.textContent).toContain('Enter');
+
+    mutators.setEditor(store, { kind: 'edit', raw: 'abc', caret: 3 });
+    expect(left?.textContent).toContain('Edit');
+
+    mutators.setEditorRefs(store, [{ r0: 0, c0: 0, r1: 0, c1: 0, colorIndex: 0 }]);
+    expect(left?.textContent).toContain('Point');
+    handle.detach();
+  });
+
+  it('uses Edit mode while the formula bar is active', () => {
+    let editing = false;
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      strings: en,
+      getEngineLabel: () => 'stub',
+      getFormulaEditing: () => editing,
+    });
+    const left = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-left');
+    editing = true;
+    handle.refresh();
+    expect(left?.textContent).toContain('Edit');
+    handle.detach();
+  });
+
   it('keeps center empty when nothing is selected (and no aggs apply)', () => {
     setRange(store, 0, 0, 0, 0);
     const handle = attachStatusBar({
@@ -139,7 +188,7 @@ describe('attachStatusBar', () => {
     expect(chooser?.style.display).toBe('block');
 
     const items = chooser?.querySelectorAll<HTMLButtonElement>('.fc-statusbar__chooser-item');
-    expect(items?.length).toBe(6);
+    expect(items?.length).toBe(14);
     expect(document.activeElement).toBe(items?.[0]);
     expect(items?.[0]?.getAttribute('role')).toBe('menuitemcheckbox');
     expect(items?.[0]?.getAttribute('aria-checked')).toBe('true');
@@ -149,6 +198,127 @@ describe('attachStatusBar', () => {
     sumItem?.click();
     expect(store.getState().ui.statusAggs).not.toContain('sum');
     expect(sumItem?.getAttribute('aria-checked')).toBe('false');
+    handle.detach();
+  });
+
+  it('right-click chooser toggles view shortcuts, zoom, and zoom slider', () => {
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      strings: en,
+      getEngineLabel: () => 'stub',
+    });
+    statusbar.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    const chooser = document.querySelector<HTMLElement>('.fc-statusbar__chooser');
+    const rows = Array.from(
+      chooser?.querySelectorAll<HTMLButtonElement>('.fc-statusbar__chooser-item') ?? [],
+    );
+    const viewShortcuts = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-views');
+    const zoom = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-zoom');
+    const zoomSlider = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-zoom-slider');
+
+    rows.find((row) => row.textContent?.includes('View Shortcuts'))?.click();
+    expect(store.getState().ui.statusOptions.viewShortcuts).toBe(false);
+    expect(viewShortcuts?.style.display).toBe('none');
+
+    rows.find((row) => row.textContent?.includes('Zoom Slider'))?.click();
+    expect(store.getState().ui.statusOptions.zoomSlider).toBe(false);
+    expect(zoomSlider?.style.display).toBe('none');
+
+    rows.find((row) => row.textContent?.includes('Zoom'))?.click();
+    expect(store.getState().ui.statusOptions.zoom).toBe(false);
+    expect(zoom?.style.display).toBe('none');
+    handle.detach();
+  });
+
+  it('can show host-driven upload status and macro recording indicators', () => {
+    let upload: 'saved' | 'saving' | 'error' | null = 'saving';
+    let recording = false;
+    store.setState((s) => ({
+      ...s,
+      ui: {
+        ...s.ui,
+        statusOptions: { ...s.ui.statusOptions, uploadStatus: true, macroRecording: true },
+      },
+    }));
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      strings: en,
+      getEngineLabel: () => 'stub',
+      getUploadStatus: () => upload,
+      getMacroRecording: () => recording,
+    });
+
+    const uploadEl = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-upload');
+    const macroEl = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-macro');
+    expect(uploadEl?.style.display).toBe('');
+    expect(uploadEl?.textContent).toBe('Saving...');
+    expect(uploadEl?.dataset.uploadStatus).toBe('saving');
+    expect(macroEl?.style.display).toBe('');
+    expect(macroEl?.textContent).toBe('Record Macro');
+
+    upload = 'error';
+    recording = true;
+    handle.refresh();
+    expect(uploadEl?.textContent).toBe('Upload failed');
+    expect(uploadEl?.dataset.uploadStatus).toBe('error');
+    expect(macroEl?.textContent).toBe('Recording Macro');
+    expect(macroEl?.dataset.macroRecording).toBe('true');
+    handle.detach();
+  });
+
+  it('keeps upload and macro indicators hidden without host drivers', () => {
+    store.setState((s) => ({
+      ...s,
+      ui: {
+        ...s.ui,
+        statusOptions: { ...s.ui.statusOptions, uploadStatus: true, macroRecording: true },
+      },
+    }));
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      strings: en,
+      getEngineLabel: () => 'stub',
+    });
+
+    expect(statusbar.querySelector<HTMLElement>('.fc-host__statusbar-upload')?.style.display).toBe(
+      'none',
+    );
+    expect(statusbar.querySelector<HTMLElement>('.fc-host__statusbar-macro')?.style.display).toBe(
+      'none',
+    );
+    handle.detach();
+  });
+
+  it('shows active keyboard lock indicators when their status options are enabled', () => {
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      strings: en,
+      getEngineLabel: () => 'stub',
+    });
+    const locks = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-locks');
+    expect(locks?.style.display).toBe('none');
+
+    const capsEvent = new KeyboardEvent('keydown', { bubbles: true });
+    Object.defineProperty(capsEvent, 'getModifierState', {
+      value: (key: string) => key === 'CapsLock',
+    });
+    document.dispatchEvent(capsEvent);
+    expect(locks?.textContent).toContain('Caps Lock');
+    expect(locks?.style.display).toBe('');
+
+    statusbar.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    const chooser = document.querySelector<HTMLElement>('.fc-statusbar__chooser');
+    const rows = Array.from(
+      chooser?.querySelectorAll<HTMLButtonElement>('.fc-statusbar__chooser-item') ?? [],
+    );
+    rows.find((row) => row.textContent?.includes('Caps Lock'))?.click();
+    expect(store.getState().ui.statusOptions.capsLock).toBe(false);
+    expect(locks?.textContent).not.toContain('Caps Lock');
+    expect(locks?.style.display).toBe('none');
     handle.detach();
   });
 
@@ -192,12 +362,37 @@ describe('attachStatusBar', () => {
     handle.detach();
   });
 
+  it('opens the chooser from keyboard context menu shortcuts', () => {
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      getEngineLabel: () => 'stub',
+    });
+    statusbar.tabIndex = -1;
+    statusbar.focus();
+    statusbar.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true }),
+    );
+    let chooser = document.querySelector<HTMLElement>('.fc-statusbar__chooser');
+    expect(chooser?.style.display).toBe('block');
+    expect(document.activeElement).toBe(
+      chooser?.querySelector<HTMLButtonElement>('.fc-statusbar__chooser-item'),
+    );
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    statusbar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true }));
+    chooser = document.querySelector<HTMLElement>('.fc-statusbar__chooser');
+    expect(chooser?.style.display).toBe('block');
+    handle.detach();
+  });
+
   it('refresh() re-reads the engine label', () => {
     let label = 'stub';
     const handle = attachStatusBar({
       statusbar,
       store,
       getEngineLabel: () => label,
+      showEngineLabel: true,
     });
     let right = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-right');
     expect(right?.textContent).toContain('stub');

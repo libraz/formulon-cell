@@ -4,6 +4,7 @@ import {
   type FeatureFlags,
   type LocaleChangeEvent,
   type MountOptions,
+  type PrinterProfile,
   type RecalcEvent,
   resolveSpreadsheetUiOptions,
   type SelectionChangeEvent,
@@ -43,6 +44,12 @@ const applyRuntimeProps = async (
     strings?: MountOptions['strings'];
     features?: FeatureFlags;
     extensions?: ExtensionInput[];
+    printerProfiles?: readonly PrinterProfile[];
+    printerProfileId?: string;
+    refreshPrinterProfiles?: MountOptions['refreshPrinterProfiles'];
+    captureScreenClip?: MountOptions['captureScreenClip'];
+    uploadStatus?: MountOptions['uploadStatus'];
+    macroRecording?: MountOptions['macroRecording'];
   },
   baseline: {
     ui?: SpreadsheetUiOptions;
@@ -52,6 +59,12 @@ const applyRuntimeProps = async (
     strings?: MountOptions['strings'];
     features?: FeatureFlags;
     extensions?: ExtensionInput[];
+    printerProfiles?: readonly PrinterProfile[];
+    printerProfileId?: string;
+    refreshPrinterProfiles?: MountOptions['refreshPrinterProfiles'];
+    captureScreenClip?: MountOptions['captureScreenClip'];
+    uploadStatus?: MountOptions['uploadStatus'];
+    macroRecording?: MountOptions['macroRecording'];
   } = {},
 ): Promise<void> => {
   const ui = props.ui ? resolveSpreadsheetUiOptions(props.ui) : null;
@@ -70,6 +83,18 @@ const applyRuntimeProps = async (
     inst.setFeatures({ ...(ui?.features ?? {}), ...(props.features ?? {}) });
   }
   if (props.extensions !== baseline.extensions) inst.setExtensions(props.extensions);
+  if (props.printerProfiles !== baseline.printerProfiles) {
+    inst.setPrinterProfiles(props.printerProfiles);
+  }
+  if (props.printerProfileId !== baseline.printerProfileId) {
+    inst.setPrinterProfileId(props.printerProfileId);
+  }
+  if (props.uploadStatus !== baseline.uploadStatus) {
+    inst.setUploadStatus(props.uploadStatus ?? null);
+  }
+  if (props.macroRecording !== baseline.macroRecording) {
+    inst.setMacroRecording(props.macroRecording ?? null);
+  }
 };
 
 export const Spreadsheet = defineComponent({
@@ -82,6 +107,21 @@ export const Spreadsheet = defineComponent({
     strings: { type: Object as PropType<MountOptions['strings']>, default: undefined },
     features: { type: Object as PropType<FeatureFlags>, default: undefined },
     extensions: { type: Array as PropType<ExtensionInput[]>, default: undefined },
+    printerProfiles: { type: Array as PropType<readonly PrinterProfile[]>, default: undefined },
+    printerProfileId: { type: String, default: undefined },
+    refreshPrinterProfiles: {
+      type: Function as PropType<MountOptions['refreshPrinterProfiles']>,
+      default: undefined,
+    },
+    captureScreenClip: {
+      type: Function as PropType<MountOptions['captureScreenClip']>,
+      default: undefined,
+    },
+    uploadStatus: { type: String as PropType<MountOptions['uploadStatus']>, default: undefined },
+    macroRecording: {
+      type: Boolean as PropType<MountOptions['macroRecording']>,
+      default: undefined,
+    },
     functions: { type: Array as PropType<MountOptions['functions']>, default: undefined },
     seed: { type: Function as PropType<MountOptions['seed']>, default: undefined },
     errorFallback: {
@@ -120,6 +160,14 @@ export const Spreadsheet = defineComponent({
       if (props.strings) opts.strings = props.strings;
       if (props.features) opts.features = props.features;
       if (props.extensions) opts.extensions = props.extensions;
+      if (props.printerProfiles) opts.printerProfiles = props.printerProfiles;
+      if (props.printerProfileId) opts.printerProfileId = props.printerProfileId;
+      if (props.refreshPrinterProfiles) opts.refreshPrinterProfiles = props.refreshPrinterProfiles;
+      if (props.captureScreenClip) {
+        opts.captureScreenClip = () => props.captureScreenClip?.();
+      }
+      if (props.uploadStatus !== undefined) opts.uploadStatus = props.uploadStatus;
+      if (props.macroRecording !== undefined) opts.macroRecording = props.macroRecording;
       if (props.functions) opts.functions = props.functions;
       if (props.seed) opts.seed = props.seed;
       opts.renderError = !props.errorFallback;
@@ -135,6 +183,11 @@ export const Spreadsheet = defineComponent({
         strings: opts.strings,
         features: opts.features,
         extensions: opts.extensions,
+        printerProfiles: opts.printerProfiles,
+        printerProfileId: opts.printerProfileId,
+        captureScreenClip: opts.captureScreenClip,
+        uploadStatus: opts.uploadStatus,
+        macroRecording: opts.macroRecording,
       };
       let inst: SpreadsheetInstance;
       try {
@@ -207,6 +260,30 @@ export const Spreadsheet = defineComponent({
       () => props.extensions,
       (next) => {
         if (instance.value) instance.value.setExtensions(next);
+      },
+    );
+    watch(
+      () => props.printerProfiles,
+      (next) => {
+        if (instance.value) instance.value.setPrinterProfiles(next);
+      },
+    );
+    watch(
+      () => props.printerProfileId,
+      (next) => {
+        if (instance.value) instance.value.setPrinterProfileId(next);
+      },
+    );
+    watch(
+      () => props.uploadStatus,
+      (next) => {
+        if (instance.value) instance.value.setUploadStatus(next ?? null);
+      },
+    );
+    watch(
+      () => props.macroRecording,
+      (next) => {
+        if (instance.value) instance.value.setMacroRecording(next ?? null);
       },
     );
 

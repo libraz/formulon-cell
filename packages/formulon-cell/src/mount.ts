@@ -3,6 +3,12 @@ import { insertCopiedCellsFromTSV } from './commands/clipboard/insert-copied-cel
 import { History } from './commands/history.js';
 import { printSheet } from './commands/print.js';
 import {
+  normalizePrinterProfileId,
+  normalizePrinterProfiles,
+  type PrinterProfile,
+  resolvePrinterProfileBounds,
+} from './commands/printer-profile.js';
+import {
   isSheetProtected,
   setProtectedSheet,
   toggleProtectedSheet,
@@ -12,6 +18,7 @@ import {
   traceDependents as traceDependentArrows,
   tracePrecedents as tracePrecedentArrows,
 } from './commands/traces.js';
+import { findPivotTableAtCell } from './engine/passthrough-sync.js';
 import { WorkbookHandle } from './engine/workbook-handle.js';
 import { SpreadsheetEmitter } from './events.js';
 import {
@@ -66,7 +73,7 @@ import {
   type ToolbarInstance,
   type ToolbarInstanceRef,
 } from './mount/toolbar.js';
-import type { MountOptions, SpreadsheetInstance } from './mount/types.js';
+import type { MountOptions, ScreenClipResult, SpreadsheetInstance } from './mount/types.js';
 import { colWidth, colX, gridOriginX, layoutForView } from './render/geometry.js';
 import { GridRenderer, getErrorTriangleHits } from './render/grid.js';
 import { createSpreadsheetStore, mutators } from './store/store.js';
@@ -74,10 +81,17 @@ import { resolveTheme } from './theme/resolve.js';
 
 export type {
   MountToolbarOptions,
+  RibbonDisplayMode,
   ToolbarInstance,
   ToolbarInstanceRef,
 } from './mount/toolbar.js';
-export type { MountOptions, SpreadsheetInstance } from './mount/types.js';
+export type {
+  MountOptions,
+  ScreenClipCapture,
+  ScreenClipCaptureResult,
+  ScreenClipResult,
+  SpreadsheetInstance,
+} from './mount/types.js';
 
 function mountErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -99,6 +113,12 @@ function renderMountError(host: HTMLElement, error: unknown, strings: Strings['m
 
   panel.append(title, help, detail);
   host.replaceChildren(panel);
+}
+
+function normalizeScreenClipResult(result: string | ScreenClipResult | null | undefined) {
+  if (!result) return null;
+  if (typeof result === 'string') return result ? { src: result } : null;
+  return result.src ? result : null;
 }
 
 /**
@@ -123,6 +143,12 @@ export const Spreadsheet = {
     // wire setStrings hooks for live label updates.
     const i18n = createI18nController({ locale: opts.locale, overlay: opts.strings });
     let strings: Strings = i18n.strings;
+    let printerProfiles = normalizePrinterProfiles(opts.printerProfiles);
+    let printerProfileId = normalizePrinterProfileId(opts.printerProfileId);
+    const refreshPrinterProfilesHook = opts.refreshPrinterProfiles;
+    const captureScreenClipHook = opts.captureScreenClip;
+    let uploadStatus = opts.uploadStatus ?? null;
+    let macroRecording = opts.macroRecording ?? null;
     const ui = resolveSpreadsheetUiOptions(opts.ui);
     const initialTheme = opts.theme ?? ui.theme;
     let flags = resolveFlags({ ...ui.features, ...opts.features });
@@ -313,6 +339,31 @@ export const Spreadsheet = {
 
     const autocompleteStub = createAutocompleteStub();
     const featureState = createHostFeatureState(autocompleteStub);
+    const refreshPrinterProfiles = async (): Promise<readonly PrinterProfile[] | undefined> => {
+      const next = await refreshPrinterProfilesHook?.();
+      if (next !== undefined) printerProfiles = normalizePrinterProfiles(next);
+      return printerProfiles;
+    };
+    const captureScreenClip = async (): Promise<ScreenClipResult | null> =>
+      normalizeScreenClipResult(await captureScreenClipHook?.());
+    const unsubPivotFieldListSelection = store.subscribe((state, prevState) => {
+      const workbookObjects = featureState.workbookObjects;
+      if (!workbookObjects) return;
+      const prev = prevState.selection.active;
+      const next = state.selection.active;
+      if (prev.sheet === next.sheet && prev.row === next.row && prev.col === next.col) return;
+      const nextPivot = findPivotTableAtCell(wb, next);
+      if (!nextPivot) {
+        if (workbookObjects.isPivotFieldListOpen()) workbookObjects.close();
+        return;
+      }
+      const prevPivot = findPivotTableAtCell(wb, prev);
+      const samePivot =
+        prevPivot?.sheetIndex === nextPivot.sheetIndex &&
+        prevPivot?.pivotIndex === nextPivot.pivotIndex;
+      if (samePivot && workbookObjects.isPivotFieldListOpen()) return;
+      workbookObjects.openPivotFieldList(nextPivot.sheetIndex, nextPivot.pivotIndex);
+    });
 
     const syncBindingFeatures = (current: EngineBinding): void => {
       for (const id of WB_REGISTRY_IDS) featureRegistry.delete(id);
@@ -444,6 +495,7 @@ export const Spreadsheet = {
       fxInput,
       getFormulaEditing: () => formulaBar.isEditing(),
       getSheetTabs: () => sheetTabsController,
+      getStrings: () => strings,
       getWb: () => wb,
       host,
       invalidate: () => renderer.invalidate(),
@@ -517,6 +569,22 @@ export const Spreadsheet = {
       getFormulaBar: () => formulaBar,
       getOnCanvasClick: () => onCanvasClick,
       getOnHostKey: () => onHostKey,
+      getPrintableBoundsForPageSetup: (setup, _sheet, _previous, selectedPrinterProfileId) =>
+        printerProfiles
+          ? (resolvePrinterProfileBounds(
+              setup,
+              printerProfiles,
+              selectedPrinterProfileId ?? printerProfileId,
+            ) ?? null)
+          : undefined,
+      getPrinterProfiles: () => printerProfiles,
+      getPrinterProfileId: () => printerProfileId,
+      setPrinterProfileId: (next) => {
+        printerProfileId = normalizePrinterProfileId(next);
+      },
+      refreshPrinterProfiles,
+      getUploadStatus: () => uploadStatus,
+      getMacroRecording: () => macroRecording,
       getSheetTabs: () => sheetTabsController,
       grid,
       history,
@@ -779,7 +847,24 @@ export const Spreadsheet = {
           host,
           mode === 'pdf' ? strings.ribbon.pdf : strings.ribbon.print,
           mode,
+          { printerProfiles, printerProfileId },
         );
+      },
+      setPrinterProfiles(next) {
+        printerProfiles = normalizePrinterProfiles(next);
+      },
+      setPrinterProfileId(next) {
+        printerProfileId = normalizePrinterProfileId(next);
+      },
+      refreshPrinterProfiles,
+      captureScreenClip,
+      setUploadStatus(next) {
+        uploadStatus = next;
+        featureState.statusBar?.refresh();
+      },
+      setMacroRecording(next) {
+        macroRecording = next;
+        featureState.statusBar?.refresh();
       },
       recalc() {
         wb.recalc();
@@ -852,6 +937,33 @@ export const Spreadsheet = {
           return;
         }
         featureState.workbookObjects?.open();
+      },
+      openPivotFieldList(sheetIndex, pivotIndex) {
+        const userObjects = userHandles.get('workbookObjects') as
+          | (ExtensionHandle & {
+              openPivotFieldList?: (sheetIndex: number, pivotIndex: number) => boolean;
+            })
+          | undefined;
+        if (userObjects?.openPivotFieldList) {
+          return userObjects.openPivotFieldList(sheetIndex, pivotIndex);
+        }
+        return featureState.workbookObjects?.openPivotFieldList(sheetIndex, pivotIndex) ?? false;
+      },
+      openActivePivotFieldList() {
+        const pivot = findPivotTableAtCell(wb, store.getState().selection.active);
+        if (!pivot) return false;
+        const userObjects = userHandles.get('workbookObjects') as
+          | (ExtensionHandle & {
+              openPivotFieldList?: (sheetIndex: number, pivotIndex: number) => boolean;
+            })
+          | undefined;
+        if (userObjects?.openPivotFieldList) {
+          return userObjects.openPivotFieldList(pivot.sheetIndex, pivot.pivotIndex);
+        }
+        return (
+          featureState.workbookObjects?.openPivotFieldList(pivot.sheetIndex, pivot.pivotIndex) ??
+          false
+        );
       },
       openPivotTableDialog() {
         const userPivot = userHandles.get('pivotTableDialog') as
@@ -975,6 +1087,7 @@ export const Spreadsheet = {
         cellStylesGallery.detach();
         filterDropdown.detach();
         unsubCellRegistry();
+        unsubPivotFieldListSelection();
         unsubI18n();
         i18n.dispose();
         renderer.dispose();

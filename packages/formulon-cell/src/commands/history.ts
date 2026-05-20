@@ -4,15 +4,22 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type {
   CellFormat,
   ConditionalRule,
+  CustomCellStyle,
   LayoutSlice,
+  PageMargins,
   PageSetup,
   SessionChart,
+  SessionIllustration,
   SlicerSpec,
   Sparkline,
   SpreadsheetStore,
   State,
 } from '../store/store.js';
-import type { TableOverlay } from './format-as-table.js';
+import type {
+  CustomTableStyle,
+  PivotTableStyleAssignment,
+  TableOverlay,
+} from './format-as-table.js';
 
 const LIMIT = 200;
 
@@ -144,19 +151,43 @@ export class History {
 
 /** Capture the entire format map. Sufficient for undo since the map is sparse
  *  (only explicitly formatted cells have entries). */
-export function captureFormatSnapshot(state: State): Map<string, CellFormat> {
-  return new Map(state.format.formats);
+export interface FormatSnapshot {
+  formats: Map<string, CellFormat>;
+  customCellStyles: CustomCellStyle[];
 }
 
-export function applyFormatSnapshot(store: SpreadsheetStore, snap: Map<string, CellFormat>): void {
-  store.setState((s) => ({ ...s, format: { formats: new Map(snap) } }));
+const cloneCustomCellStyle = (style: CustomCellStyle): CustomCellStyle => ({
+  ...style,
+  format: { ...style.format },
+});
+
+export function captureFormatSnapshot(state: State): FormatSnapshot {
+  return {
+    formats: new Map(state.format.formats),
+    customCellStyles: (state.format.customCellStyles ?? []).map(cloneCustomCellStyle),
+  };
 }
 
-const formatSnapshotKey = (snap: Map<string, CellFormat>): string =>
-  JSON.stringify([...snap.entries()].sort(([a], [b]) => a.localeCompare(b)));
+export function applyFormatSnapshot(store: SpreadsheetStore, snap: FormatSnapshot): void {
+  store.setState((s) => ({
+    ...s,
+    format: {
+      formats: new Map(snap.formats),
+      customCellStyles: snap.customCellStyles.map(cloneCustomCellStyle),
+    },
+  }));
+}
 
-const sameFormatSnapshot = (a: Map<string, CellFormat>, b: Map<string, CellFormat>): boolean =>
-  a.size === b.size && formatSnapshotKey(a) === formatSnapshotKey(b);
+const formatSnapshotKey = (snap: FormatSnapshot): string =>
+  JSON.stringify({
+    formats: [...snap.formats.entries()].sort(([a], [b]) => a.localeCompare(b)),
+    customCellStyles: snap.customCellStyles,
+  });
+
+const sameFormatSnapshot = (a: FormatSnapshot, b: FormatSnapshot): boolean =>
+  a.formats.size === b.formats.size &&
+  a.customCellStyles.length === b.customCellStyles.length &&
+  formatSnapshotKey(a) === formatSnapshotKey(b);
 
 const mapSnapshotKey = <T>(snap: Map<string, T>): string =>
   JSON.stringify([...snap.entries()].sort(([a], [b]) => a.localeCompare(b)));
@@ -172,17 +203,47 @@ const cloneTableOverlay = (table: TableOverlay): TableOverlay => ({
   range: { ...table.range },
 });
 
-export function captureTableOverlaysSnapshot(state: State): TableOverlay[] {
-  return state.tables.tables.map(cloneTableOverlay);
+export interface TablesSnapshot {
+  tables: TableOverlay[];
+  customTableStyles: CustomTableStyle[];
+  customPivotTableStyles: CustomTableStyle[];
+  pivotTableStyles: PivotTableStyleAssignment[];
+}
+
+const cloneCustomTableStyle = (style: CustomTableStyle): CustomTableStyle => ({ ...style });
+const clonePivotTableStyle = (style: PivotTableStyleAssignment): PivotTableStyleAssignment => ({
+  ...style,
+});
+
+export function captureTableOverlaysSnapshot(state: State): TablesSnapshot {
+  return {
+    tables: state.tables.tables.map(cloneTableOverlay),
+    customTableStyles: (state.tables.customTableStyles ?? []).map(cloneCustomTableStyle),
+    customPivotTableStyles: (state.tables.customPivotTableStyles ?? []).map(cloneCustomTableStyle),
+    pivotTableStyles: (state.tables.pivotTableStyles ?? []).map(clonePivotTableStyle),
+  };
 }
 
 export function applyTableOverlaysSnapshot(
   store: SpreadsheetStore,
-  snap: readonly TableOverlay[],
+  snap: TablesSnapshot | readonly TableOverlay[],
 ): void {
+  const normalized: TablesSnapshot = Array.isArray(snap)
+    ? {
+        tables: (snap as readonly TableOverlay[]).map(cloneTableOverlay),
+        customTableStyles: [],
+        customPivotTableStyles: [],
+        pivotTableStyles: [],
+      }
+    : (snap as TablesSnapshot);
   store.setState((s) => ({
     ...s,
-    tables: { tables: snap.map(cloneTableOverlay) },
+    tables: {
+      tables: normalized.tables.map(cloneTableOverlay),
+      customTableStyles: normalized.customTableStyles.map(cloneCustomTableStyle),
+      customPivotTableStyles: normalized.customPivotTableStyles.map(cloneCustomTableStyle),
+      pivotTableStyles: normalized.pivotTableStyles.map(clonePivotTableStyle),
+    },
   }));
 }
 
@@ -198,7 +259,7 @@ export function recordTablesChange(
   const before = captureTableOverlaysSnapshot(store.getState());
   mutate();
   const after = captureTableOverlaysSnapshot(store.getState());
-  if (sameJsonSnapshot(before, after)) return;
+  if (JSON.stringify(before) === JSON.stringify(after)) return;
   history.push({
     undo: () => applyTableOverlaysSnapshot(store, before),
     redo: () => applyTableOverlaysSnapshot(store, after),
@@ -237,6 +298,41 @@ export function recordChartsChange(
   history.push({
     undo: () => applyChartsSnapshot(store, before),
     redo: () => applyChartsSnapshot(store, after),
+  });
+}
+
+const cloneSessionIllustration = (item: SessionIllustration): SessionIllustration => ({ ...item });
+
+export function captureIllustrationsSnapshot(state: State): SessionIllustration[] {
+  return state.illustrations.illustrations.map(cloneSessionIllustration);
+}
+
+export function applyIllustrationsSnapshot(
+  store: SpreadsheetStore,
+  snap: readonly SessionIllustration[],
+): void {
+  store.setState((s) => ({
+    ...s,
+    illustrations: { illustrations: snap.map(cloneSessionIllustration) },
+  }));
+}
+
+export function recordIllustrationsChange(
+  history: History | null,
+  store: SpreadsheetStore,
+  mutate: () => void,
+): void {
+  if (!history || history.isReplaying()) {
+    mutate();
+    return;
+  }
+  const before = captureIllustrationsSnapshot(store.getState());
+  mutate();
+  const after = captureIllustrationsSnapshot(store.getState());
+  if (sameJsonSnapshot(before, after)) return;
+  history.push({
+    undo: () => applyIllustrationsSnapshot(store, before),
+    redo: () => applyIllustrationsSnapshot(store, after),
   });
 }
 
@@ -459,7 +555,8 @@ const sameStringMap = (a: Map<string, string>, b: Map<string, string>): boolean 
   a.size === b.size && [...a].every(([key, value]) => b.get(key) === value);
 
 const sameRangeMap = (a: Map<string, Range>, b: Map<string, Range>): boolean =>
-  a.size === b.size && [...a].every(([key, range]) => {
+  a.size === b.size &&
+  [...a].every(([key, range]) => {
     const other = b.get(key);
     return other !== undefined && rangeKey(range) === rangeKey(other);
   });
@@ -560,6 +657,7 @@ export function capturePageSetupSnapshot(state: State): Map<number, PageSetup> {
     out.set(k, {
       ...v,
       margins: { ...v.margins },
+      printableBounds: v.printableBounds ? { ...v.printableBounds } : undefined,
       manualPageBreakRows: v.manualPageBreakRows ? [...v.manualPageBreakRows] : undefined,
       manualPageBreakCols: v.manualPageBreakCols ? [...v.manualPageBreakCols] : undefined,
     });
@@ -576,6 +674,7 @@ export function applyPageSetupSnapshot(
     next.set(k, {
       ...v,
       margins: { ...v.margins },
+      printableBounds: v.printableBounds ? { ...v.printableBounds } : undefined,
       manualPageBreakRows: v.manualPageBreakRows ? [...v.manualPageBreakRows] : undefined,
       manualPageBreakCols: v.manualPageBreakCols ? [...v.manualPageBreakCols] : undefined,
     });
@@ -589,6 +688,12 @@ const sameOptionalArray = (a: readonly number[] | undefined, b: readonly number[
   return a.every((value, index) => value === b[index]);
 };
 
+const sameOptionalMargins = (a: PageMargins | undefined, b: PageMargins | undefined): boolean => {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return a.top === b.top && a.right === b.right && a.bottom === b.bottom && a.left === b.left;
+};
+
 const samePageSetup = (a: PageSetup, b: PageSetup): boolean =>
   a.orientation === b.orientation &&
   a.paperSize === b.paperSize &&
@@ -596,6 +701,7 @@ const samePageSetup = (a: PageSetup, b: PageSetup): boolean =>
   a.margins.right === b.margins.right &&
   a.margins.bottom === b.margins.bottom &&
   a.margins.left === b.margins.left &&
+  sameOptionalMargins(a.printableBounds, b.printableBounds) &&
   a.headerMargin === b.headerMargin &&
   a.footerMargin === b.footerMargin &&
   a.centerHorizontally === b.centerHorizontally &&

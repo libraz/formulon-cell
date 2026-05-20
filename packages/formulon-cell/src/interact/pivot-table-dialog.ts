@@ -1,14 +1,23 @@
 import {
   createPivotTableFromRange,
+  inferPivotFieldItems,
   inferPivotSourceFields,
   type PivotSourceField,
 } from '../commands/pivot-table.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
-import { PivotAggregation } from '../engine/types.js';
+import { PivotAggregation, type PivotFilterSpec } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { createDialogShell } from './dialog-shell.js';
+import {
+  type PivotAreaKind,
+  type PivotFieldSettingsActive,
+  type PivotFilterConditionKind,
+  type PivotFilterConditionState,
+  pivotFilterConditionToSpec,
+  renderPivotFieldSettingsPanel,
+} from './pivot-field-settings.js';
 
 export interface PivotTableDialogDeps {
   host: HTMLElement;
@@ -66,6 +75,12 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   let wb = deps.wb;
   let strings = deps.strings ?? defaultStrings;
   let open = false;
+  let selectedFilterFields: string[] = [];
+  let selectedValueFields: string[] = [];
+  let selectedFilterItemVisibility = new Map<string, Map<string, boolean>>();
+  let selectedFilterConditions = new Map<string, PivotFilterConditionState>();
+  let activeFieldSettings: PivotFieldSettingsActive | null = null;
+  let draggedPivotField = '';
 
   const shell = createDialogShell({
     host,
@@ -104,6 +119,8 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   rowSelect.className = 'fc-fmtdlg__select';
   const colSelect = document.createElement('select');
   colSelect.className = 'fc-fmtdlg__select';
+  const filterSelect = document.createElement('select');
+  filterSelect.className = 'fc-fmtdlg__select';
   const valueSelect = document.createElement('select');
   valueSelect.className = 'fc-fmtdlg__select';
   const aggSelect = document.createElement('select');
@@ -129,6 +146,8 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   const colTotals = document.createElement('input');
   colTotals.type = 'checkbox';
   colTotals.checked = true;
+  const fieldList = document.createElement('div');
+  fieldList.className = 'fc-pivotdlg__field-list';
   const error = document.createElement('div');
   error.className = 'fc-namedlg__error';
   error.setAttribute('role', 'alert');
@@ -170,6 +189,394 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   const fieldSelect = (select: HTMLSelectElement, fields: readonly PivotSourceField[]): void => {
     select.replaceChildren();
     for (const f of fields) appendOption(select, f.name, f.name);
+  };
+
+  const optionValues = (select: HTMLSelectElement): Set<string> =>
+    new Set(Array.from(select.options).map((option) => option.value));
+
+  const fieldCanBeValue = (fieldName: string): boolean => optionValues(valueSelect).has(fieldName);
+
+  const normalizeSelectedFilters = (): void => {
+    const filterNames = optionValues(filterSelect);
+    selectedFilterFields = Array.from(
+      new Set(
+        selectedFilterFields.filter(
+          (name) =>
+            name &&
+            filterNames.has(name) &&
+            name !== rowSelect.value &&
+            name !== colSelect.value &&
+            !selectedValueFields.includes(name),
+        ),
+      ),
+    );
+    if (
+      filterSelect.value &&
+      filterSelect.value !== rowSelect.value &&
+      filterSelect.value !== colSelect.value &&
+      !selectedValueFields.includes(filterSelect.value) &&
+      !selectedFilterFields.includes(filterSelect.value)
+    ) {
+      selectedFilterFields.unshift(filterSelect.value);
+    }
+    filterSelect.value = selectedFilterFields[0] ?? '';
+  };
+
+  const normalizeSelectedValues = (fields: readonly PivotSourceField[]): void => {
+    const valueNames = optionValues(valueSelect);
+    selectedValueFields = selectedValueFields.filter((name) => valueNames.has(name));
+    if (valueSelect.value && !selectedValueFields.includes(valueSelect.value)) {
+      selectedValueFields.unshift(valueSelect.value);
+    }
+    if (selectedValueFields.length === 0) {
+      const fallback =
+        fields.find((field) => field.numericCount > 0 && valueNames.has(field.name)) ??
+        fields.find((field) => valueNames.has(field.name));
+      if (fallback) selectedValueFields = [fallback.name];
+    }
+    valueSelect.value = selectedValueFields[0] ?? '';
+  };
+
+  const addSelectedFilter = (fieldName: string): void => {
+    if (
+      !fieldName ||
+      fieldName === rowSelect.value ||
+      fieldName === colSelect.value ||
+      selectedValueFields.includes(fieldName) ||
+      selectedFilterFields.includes(fieldName)
+    )
+      return;
+    selectedFilterFields = [...selectedFilterFields, fieldName];
+    filterSelect.value = selectedFilterFields[0] ?? fieldName;
+  };
+
+  const removeSelectedFilter = (fieldName: string): void => {
+    selectedFilterFields = selectedFilterFields.filter((name) => name !== fieldName);
+    selectedFilterItemVisibility.delete(fieldName);
+    selectedFilterConditions.delete(fieldName);
+    filterSelect.value = selectedFilterFields[0] ?? '';
+  };
+
+  const addSelectedValue = (fieldName: string): void => {
+    if (!fieldCanBeValue(fieldName) || selectedValueFields.includes(fieldName)) return;
+    selectedValueFields = [...selectedValueFields, fieldName];
+    valueSelect.value = selectedValueFields[0] ?? fieldName;
+  };
+
+  const removeSelectedValue = (fieldName: string): void => {
+    selectedValueFields = selectedValueFields.filter((name) => name !== fieldName);
+    valueSelect.value = selectedValueFields[0] ?? '';
+  };
+
+  const setFirstDifferent = (select: HTMLSelectElement, fieldName: string): void => {
+    const next = Array.from(select.options).find(
+      (option) => option.value && option.value !== fieldName,
+    );
+    select.value = next?.value ?? '';
+  };
+
+  const replaceFilterField = (previous: string, next: string): void => {
+    if (
+      !next ||
+      next === rowSelect.value ||
+      next === colSelect.value ||
+      selectedValueFields.includes(next)
+    ) {
+      return;
+    }
+    selectedFilterFields = selectedFilterFields.map((field) => (field === previous ? next : field));
+    selectedFilterFields = Array.from(new Set(selectedFilterFields));
+    if (previous !== next) {
+      selectedFilterItemVisibility.delete(previous);
+      selectedFilterItemVisibility.delete(next);
+      selectedFilterConditions.delete(previous);
+      selectedFilterConditions.delete(next);
+    }
+    filterSelect.value = selectedFilterFields[0] ?? '';
+    activeFieldSettings = { kind: 'filters', fieldName: next };
+  };
+
+  const filterItemVisibility = (fieldName: string, itemName: string): boolean =>
+    selectedFilterItemVisibility.get(fieldName)?.get(itemName) ?? true;
+
+  const setFilterItemVisibility = (fieldName: string, itemName: string, visible: boolean): void => {
+    const byField = new Map(selectedFilterItemVisibility);
+    const items = new Map(byField.get(fieldName) ?? []);
+    items.set(itemName, visible);
+    byField.set(fieldName, items);
+    selectedFilterItemVisibility = byField;
+  };
+
+  const flattenFilterItems = (): { fieldName: string; itemName: string; visible: boolean }[] =>
+    selectedFilterFields.flatMap((fieldName) =>
+      Array.from(selectedFilterItemVisibility.get(fieldName)?.entries() ?? []).map(
+        ([itemName, visible]) => ({
+          fieldName,
+          itemName,
+          visible,
+        }),
+      ),
+    );
+
+  const setFilterCondition = (fieldName: string, condition: PivotFilterConditionState): void => {
+    const byField = new Map(selectedFilterConditions);
+    if (condition.kind === 'none' || !condition.value.trim()) byField.delete(fieldName);
+    else byField.set(fieldName, condition);
+    selectedFilterConditions = byField;
+  };
+
+  const flattenPivotFilters = (): PivotFilterSpec[] =>
+    selectedFilterFields.flatMap<PivotFilterSpec>((fieldName) => {
+      const spec = pivotFilterConditionToSpec(fieldName, selectedFilterConditions.get(fieldName));
+      return spec ? [spec] : [];
+    });
+
+  const removeFieldAssignment = (fieldName: string): void => {
+    if (rowSelect.value === fieldName) rowSelect.value = '';
+    if (colSelect.value === fieldName) colSelect.value = '';
+    selectedFilterFields = selectedFilterFields.filter((name) => name !== fieldName);
+    selectedValueFields = selectedValueFields.filter((name) => name !== fieldName);
+    selectedFilterItemVisibility.delete(fieldName);
+    selectedFilterConditions.delete(fieldName);
+  };
+
+  const assignFieldToArea = (
+    fieldName: string,
+    kind: PivotAreaKind,
+    fields: readonly PivotSourceField[],
+  ): void => {
+    if (!fields.some((field) => field.name === fieldName)) return;
+    removeFieldAssignment(fieldName);
+    if (kind === 'filters') addSelectedFilter(fieldName);
+    else if (kind === 'columns') colSelect.value = fieldName;
+    else if (kind === 'rows') rowSelect.value = fieldName;
+    else if (fieldCanBeValue(fieldName)) addSelectedValue(fieldName);
+    normalizeSelectedValues(fields);
+    normalizeSelectedFilters();
+  };
+
+  const pivotDragData = (event: DragEvent): string =>
+    event.dataTransfer?.getData('text/plain') ||
+    event.dataTransfer?.getData('application/x-fc-pivot-field') ||
+    draggedPivotField;
+
+  const setPivotDragData = (event: DragEvent, fieldName: string): void => {
+    draggedPivotField = fieldName;
+    event.dataTransfer?.setData('text/plain', fieldName);
+    event.dataTransfer?.setData('application/x-fc-pivot-field', fieldName);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  };
+
+  const clearPivotDragData = (): void => {
+    draggedPivotField = '';
+  };
+
+  const renderFieldSettingsPanel = (
+    panelEl: HTMLDivElement,
+    fields: readonly PivotSourceField[],
+  ): void => {
+    renderPivotFieldSettingsPanel({
+      panelEl,
+      active: activeFieldSettings,
+      strings: strings.pivotTableDialog,
+      fields,
+      controls: {
+        rowSelect,
+        colSelect,
+        rowSortSelect,
+        colSortSelect,
+        aggSelect,
+        numberFormatInput,
+        rowSubtotalTop,
+        colSubtotalTop,
+      },
+      selectedValueFields,
+      selectedFilterFields,
+      fieldCanBeValue,
+      replaceFilterField,
+      normalizeSelectedFilters,
+      refreshFieldList: () => updateFieldList(fields),
+      filterItemVisibility,
+      setFilterItemVisibility,
+      selectedFilterCondition: (fieldName) => selectedFilterConditions.get(fieldName),
+      setFilterCondition: (fieldName, condition) =>
+        setFilterCondition(fieldName, {
+          kind: condition.kind as PivotFilterConditionKind,
+          value: condition.value,
+        }),
+      inferFilterItems: (fieldName) => {
+        const range = rangeFromSourceInput();
+        return range ? inferPivotFieldItems(wb, range, fieldName) : [];
+      },
+    });
+  };
+
+  const updateFieldList = (fields: readonly PivotSourceField[]): void => {
+    const t = strings.pivotTableDialog;
+    const assigned = new Set(
+      [rowSelect.value, colSelect.value, ...selectedFilterFields, ...selectedValueFields].filter(
+        Boolean,
+      ),
+    );
+    fieldList.replaceChildren();
+
+    const title = document.createElement('div');
+    title.className = 'fc-pivotdlg__field-list-title';
+    title.textContent = t.fieldList;
+    const available = document.createElement('div');
+    available.className = 'fc-pivotdlg__field-list-available';
+    const availableLabel = document.createElement('div');
+    availableLabel.className = 'fc-pivotdlg__field-list-label';
+    availableLabel.textContent = t.availableFields;
+    const fieldGrid = document.createElement('div');
+    fieldGrid.className = 'fc-pivotdlg__field-list-grid';
+    for (const field of fields) {
+      const label = document.createElement('label');
+      label.className = 'fc-pivotdlg__field-chip';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = assigned.has(field.name);
+      input.dataset.pivotFieldListField = field.name;
+      input.addEventListener('change', () => {
+        if (input.checked) {
+          if (fieldCanBeValue(field.name)) addSelectedValue(field.name);
+          else if (!rowSelect.value) rowSelect.value = field.name;
+          else if (
+            !colSelect.value &&
+            rowSelect.value !== field.name &&
+            valueSelect.value !== field.name
+          )
+            colSelect.value = field.name;
+          else if (
+            !filterSelect.value &&
+            rowSelect.value !== field.name &&
+            colSelect.value !== field.name &&
+            valueSelect.value !== field.name
+          )
+            addSelectedFilter(field.name);
+          else if (
+            !fieldCanBeValue(field.name) &&
+            rowSelect.value !== field.name &&
+            colSelect.value !== field.name
+          )
+            addSelectedFilter(field.name);
+        } else if (selectedFilterFields.includes(field.name)) {
+          removeSelectedFilter(field.name);
+        } else if (colSelect.value === field.name) {
+          colSelect.value = '';
+        } else if (rowSelect.value === field.name) {
+          setFirstDifferent(rowSelect, field.name);
+        } else if (selectedValueFields.includes(field.name)) {
+          removeSelectedValue(field.name);
+          if (selectedValueFields.length === 0) setFirstDifferent(valueSelect, field.name);
+        }
+        normalizeSelectedValues(fields);
+        normalizeSelectedFilters();
+        updateFieldList(fields);
+      });
+      const name = document.createElement('span');
+      name.textContent = field.name;
+      label.draggable = true;
+      label.addEventListener('dragstart', (event) => setPivotDragData(event, field.name));
+      label.addEventListener('dragend', clearPivotDragData);
+      label.append(input, name);
+      fieldGrid.appendChild(label);
+    }
+    available.append(availableLabel, fieldGrid);
+
+    const areas = document.createElement('div');
+    areas.className = 'fc-pivotdlg__areas';
+    const areasLabel = document.createElement('div');
+    areasLabel.className = 'fc-pivotdlg__field-list-label';
+    areasLabel.textContent = t.fieldAreas;
+    const areaGrid = document.createElement('div');
+    areaGrid.className = 'fc-pivotdlg__area-grid';
+    const settingsPanel = document.createElement('div');
+    settingsPanel.className = 'fc-pivotdlg__area-settings-panel';
+    settingsPanel.hidden = true;
+    settingsPanel.setAttribute('role', 'status');
+    settingsPanel.setAttribute('aria-live', 'polite');
+    const showFieldSettings = (kind: PivotAreaKind, fieldName: string): void => {
+      activeFieldSettings = { kind, fieldName };
+      renderFieldSettingsPanel(settingsPanel, fields);
+      settingsPanel.querySelector<HTMLElement>('select, input')?.focus();
+    };
+    const area = (
+      label: string,
+      values: readonly string[],
+      kind: PivotAreaKind,
+    ): HTMLDivElement => {
+      const wrap = document.createElement('div');
+      wrap.className = 'fc-pivotdlg__area';
+      wrap.dataset.pivotArea = kind;
+      wrap.addEventListener('dragover', (event) => {
+        const fieldName = pivotDragData(event);
+        if (!fieldName) return;
+        if (kind === 'values' && !fieldCanBeValue(fieldName)) return;
+        event.preventDefault();
+        wrap.dataset.pivotDragOver = 'true';
+      });
+      wrap.addEventListener('dragleave', () => {
+        delete wrap.dataset.pivotDragOver;
+      });
+      wrap.addEventListener('drop', (event) => {
+        const fieldName = pivotDragData(event);
+        if (!fieldName) return;
+        event.preventDefault();
+        delete wrap.dataset.pivotDragOver;
+        assignFieldToArea(fieldName, kind, fields);
+        updateFieldList(fields);
+      });
+      const heading = document.createElement('span');
+      heading.textContent = label;
+      const list = document.createElement('div');
+      list.className = 'fc-pivotdlg__area-fields';
+      const present = values.filter(Boolean);
+      if (present.length === 0) {
+        const none = document.createElement('strong');
+        none.textContent = t.none;
+        list.appendChild(none);
+      } else {
+        for (const value of present) {
+          const chip = document.createElement('div');
+          chip.className = 'fc-pivotdlg__area-field';
+          chip.draggable = true;
+          chip.addEventListener('dragstart', (event) => setPivotDragData(event, value));
+          chip.addEventListener('dragend', clearPivotDragData);
+          const name = document.createElement('strong');
+          name.textContent = value;
+          const settings = document.createElement('button');
+          settings.type = 'button';
+          settings.className = 'fc-pivotdlg__area-settings';
+          settings.textContent = t.fieldSettings;
+          settings.setAttribute('aria-label', t.fieldSettingsFor.replace('{field}', value));
+          settings.addEventListener('click', () => showFieldSettings(kind, value));
+          chip.append(name, settings);
+          list.appendChild(chip);
+        }
+      }
+      wrap.append(heading, list);
+      return wrap;
+    };
+    areaGrid.append(
+      area(t.filtersArea, selectedFilterFields, 'filters'),
+      area(t.columnField, [colSelect.value], 'columns'),
+      area(t.rowField, [rowSelect.value], 'rows'),
+      area(t.valueField, selectedValueFields, 'values'),
+    );
+    const activeIsPresent =
+      activeFieldSettings &&
+      (activeFieldSettings.kind === 'filters'
+        ? selectedFilterFields.includes(activeFieldSettings.fieldName)
+        : activeFieldSettings.kind === 'columns'
+          ? colSelect.value === activeFieldSettings.fieldName
+          : activeFieldSettings.kind === 'rows'
+            ? rowSelect.value === activeFieldSettings.fieldName
+            : selectedValueFields.includes(activeFieldSettings.fieldName));
+    if (!activeIsPresent) activeFieldSettings = null;
+    renderFieldSettingsPanel(settingsPanel, fields);
+    areas.append(areasLabel, areaGrid, settingsPanel);
+    fieldList.append(title, available, areas);
   };
 
   const labeled = (label: string, input: HTMLElement): HTMLLabelElement => {
@@ -221,17 +628,58 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       okBtn.disabled = true;
       return;
     }
+    const prevRow = rowSelect.value;
+    const prevCol = colSelect.value;
+    const prevFilters =
+      selectedFilterFields.length > 0 ? selectedFilterFields : [filterSelect.value];
+    const prevValues = selectedValueFields.length > 0 ? selectedValueFields : [valueSelect.value];
     okBtn.disabled = false;
     fieldSelect(rowSelect, fields);
     fieldSelect(colSelect, fields);
+    fieldSelect(filterSelect, fields);
     fieldSelect(valueSelect, numeric.length > 0 ? numeric : fields);
-    const noneOpt = document.createElement('option');
-    noneOpt.value = '';
-    noneOpt.textContent = t.none;
-    colSelect.insertBefore(noneOpt, colSelect.firstChild);
-    rowSelect.value = fields[0]?.name ?? '';
-    valueSelect.value = (numeric[0] ?? fields[fields.length - 1])?.name ?? '';
-    colSelect.value = fields[1]?.name === valueSelect.value ? '' : (fields[1]?.name ?? '');
+    for (const select of [colSelect, filterSelect]) {
+      const noneOpt = document.createElement('option');
+      noneOpt.value = '';
+      noneOpt.textContent = t.none;
+      select.insertBefore(noneOpt, select.firstChild);
+    }
+    const rowValues = optionValues(rowSelect);
+    const colValues = optionValues(colSelect);
+    const filterValues = optionValues(filterSelect);
+    const valueValues = optionValues(valueSelect);
+    rowSelect.value = rowValues.has(prevRow) ? prevRow : (fields[0]?.name ?? '');
+    selectedValueFields = prevValues.filter((name) => valueValues.has(name));
+    valueSelect.value = selectedValueFields[0]
+      ? selectedValueFields[0]
+      : ((numeric[0] ?? fields[fields.length - 1])?.name ?? '');
+    normalizeSelectedValues(fields);
+    colSelect.value = colValues.has(prevCol)
+      ? prevCol
+      : fields[1]?.name === selectedValueFields[0]
+        ? ''
+        : (fields[1]?.name ?? '');
+    selectedFilterFields = prevFilters.filter(
+      (name) =>
+        name &&
+        filterValues.has(name) &&
+        name !== rowSelect.value &&
+        name !== colSelect.value &&
+        !selectedValueFields.includes(name),
+    );
+    selectedFilterItemVisibility = new Map(
+      Array.from(selectedFilterItemVisibility.entries()).filter(([fieldName]) =>
+        selectedFilterFields.includes(fieldName),
+      ),
+    );
+    selectedFilterConditions = new Map(
+      Array.from(selectedFilterConditions.entries()).filter(([fieldName]) =>
+        selectedFilterFields.includes(fieldName),
+      ),
+    );
+    filterSelect.value = selectedFilterFields[0] ?? '';
+    normalizeSelectedFilters();
+    updateFieldList(fields);
   };
 
   const render = (): void => {
@@ -268,7 +716,9 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     body.append(
       section(labeled(t.source, sourceInput), labeled(t.name, nameInput)),
       section(labeled(t.destination, destInput)),
+      fieldList,
       section(
+        labeled(t.filtersArea, filterSelect),
         labeled(t.rowField, rowSelect),
         labeled(t.columnField, colSelect),
         labeled(t.valueField, valueSelect),
@@ -315,7 +765,12 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       name: nameInput.value,
       rowField: rowSelect.value,
       columnField: colSelect.value || undefined,
+      filterField: filterSelect.value || undefined,
+      filterFields: selectedFilterFields,
+      filterItems: flattenFilterItems(),
+      pivotFilters: flattenPivotFilters(),
       valueField: valueSelect.value,
+      valueFields: selectedValueFields,
       aggregation: Number(aggSelect.value) as PivotAggregation,
       rowSort: rowSortSelect.value as 'none' | 'asc' | 'desc',
       columnSort: colSortSelect.value as 'none' | 'asc' | 'desc',
@@ -349,6 +804,21 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
 
   shell.on(body, 'submit', onSubmit as EventListener);
   shell.on(sourceInput, 'input', configureForSource as EventListener);
+  const onValueSelectChange = (): void => {
+    selectedValueFields = valueSelect.value ? [valueSelect.value] : [];
+    configureForSource();
+  };
+
+  const onFilterSelectChange = (): void => {
+    selectedFilterFields = filterSelect.value ? [filterSelect.value] : [];
+    configureForSource();
+  };
+
+  for (const select of [rowSelect, colSelect]) {
+    shell.on(select, 'change', configureForSource as EventListener);
+  }
+  shell.on(filterSelect, 'change', onFilterSelectChange as EventListener);
+  shell.on(valueSelect, 'change', onValueSelectChange as EventListener);
   shell.on(okBtn, 'click', onOk);
   shell.on(cancelBtn, 'click', close);
   shell.on(overlay, 'keydown', onKey as EventListener);

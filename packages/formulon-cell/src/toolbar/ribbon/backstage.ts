@@ -17,7 +17,12 @@ export interface BackstageText {
   open: string;
   save: string;
   saveAs: string;
+  share: string;
+  exportLabel: string;
+  pageSetup: string;
+  editLinks: string;
   options: string;
+  close: string;
   subtitle: string;
   workbookInfo: string;
   protect: string;
@@ -31,6 +36,16 @@ export interface BackstageText {
   saveBody: string;
   saveAsBody: string;
   printBody: string;
+  printPreviewTitle: string;
+  printNow: string;
+  printToPdf: string;
+  printSettings: string;
+  printPreviewPage: string;
+  printPreviewHint: string;
+  shareBody: string;
+  exportBody: string;
+  pageSetupBody: string;
+  editLinksBody: string;
   optionsBody: string;
 }
 
@@ -45,6 +60,8 @@ export interface BackstageDeps {
   shellSavedText: string;
   /** The current document name (`docName` in main.ts). Captured at call-time. */
   docName: () => string;
+  /** Optional host-supplied printable document HTML for the Backstage Print preview. */
+  printPreviewHtml?: () => string | undefined;
   /** The doc-state DOM element used to derive a fallback status string. */
   docState: HTMLElement | null;
 }
@@ -69,11 +86,69 @@ export interface BackstageFactories {
     action?: string,
   ) => HTMLButtonElement;
   createBackstageProperties: () => HTMLElement;
-  createBackstageView: () => HTMLElement;
+  createBackstagePrintView: () => HTMLElement;
+  createBackstageView: (active?: BackstageAction) => HTMLElement;
 }
 
+export type BackstageAction =
+  | 'back'
+  | 'info'
+  | 'new'
+  | 'open'
+  | 'save'
+  | 'save-as'
+  | 'print'
+  | 'share'
+  | 'export'
+  | 'options'
+  | 'close'
+  | 'page-setup'
+  | 'edit-links'
+  | 'protect-workbook'
+  | 'inspect-workbook';
+
+export interface BackstageItem {
+  label: string;
+  action: BackstageAction;
+  body?: string;
+  active?: boolean;
+}
+
+export const backstageNavItems = (
+  backstageText: BackstageText,
+  ribbonText: BackstageRibbonText,
+  active: BackstageAction = 'info',
+): readonly BackstageItem[] => [
+  { label: backstageText.info, action: 'info', active: active === 'info' },
+  { label: backstageText.newLabel, action: 'new' },
+  { label: backstageText.open, action: 'open' },
+  { label: backstageText.save, action: 'save' },
+  { label: backstageText.saveAs, action: 'save-as' },
+  { label: ribbonText.print, action: 'print', active: active === 'print' },
+  { label: backstageText.share, action: 'share' },
+  { label: backstageText.exportLabel, action: 'export' },
+  { label: backstageText.options, action: 'options' },
+  { label: backstageText.close, action: 'close' },
+];
+
+export const backstageCardItems = (
+  backstageText: BackstageText,
+  ribbonText: BackstageRibbonText,
+): readonly BackstageItem[] => [
+  { label: backstageText.newLabel, action: 'new', body: backstageText.newBody },
+  { label: backstageText.open, action: 'open', body: backstageText.openBody },
+  { label: backstageText.save, action: 'save', body: backstageText.saveBody },
+  { label: backstageText.saveAs, action: 'save-as', body: backstageText.saveAsBody },
+  { label: ribbonText.print, action: 'print', body: backstageText.printBody },
+  { label: backstageText.pageSetup, action: 'page-setup', body: backstageText.pageSetupBody },
+  { label: backstageText.editLinks, action: 'edit-links', body: backstageText.editLinksBody },
+  { label: backstageText.share, action: 'share', body: backstageText.shareBody },
+  { label: backstageText.exportLabel, action: 'export', body: backstageText.exportBody },
+  { label: backstageText.options, action: 'options', body: backstageText.optionsBody },
+];
+
 export const createBackstageFactories = (deps: BackstageDeps): BackstageFactories => {
-  const { backstageText, ribbonText, shellSavedText, docName, docState } = deps;
+  const { backstageText, ribbonText, shellSavedText, docName, printPreviewHtml, docState } = deps;
 
   const createBackstageButton = (
     label: string,
@@ -161,7 +236,66 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     return props;
   };
 
-  const createBackstageView = (): HTMLElement => {
+  const createBackstagePrintView = (): HTMLElement => {
+    const wrap = document.createElement('div');
+    wrap.className = 'demo__print-preview';
+    wrap.dataset.backstagePrintPreview = 'true';
+
+    const settings = document.createElement('section');
+    settings.className = 'demo__print-settings';
+    settings.setAttribute('aria-label', backstageText.printSettings);
+    const title = document.createElement('h2');
+    title.textContent = backstageText.printPreviewTitle;
+    const subtitle = document.createElement('p');
+    subtitle.textContent = docName();
+    const print = document.createElement('button');
+    print.type = 'button';
+    print.className = 'demo__print-action demo__print-action--primary';
+    print.dataset.backstageAction = 'print';
+    print.textContent = backstageText.printNow;
+    const pdf = document.createElement('button');
+    pdf.type = 'button';
+    pdf.className = 'demo__print-action';
+    pdf.dataset.backstageAction = 'export';
+    pdf.textContent = backstageText.printToPdf;
+    const pageSetup = document.createElement('button');
+    pageSetup.type = 'button';
+    pageSetup.className = 'demo__print-action';
+    pageSetup.dataset.backstageAction = 'page-setup';
+    pageSetup.textContent = backstageText.pageSetup;
+    settings.append(title, subtitle, print, pdf, pageSetup);
+
+    const paper = document.createElement('section');
+    paper.className = 'demo__print-paper';
+    paper.setAttribute('aria-label', backstageText.printPreviewPage);
+    const previewHtml = printPreviewHtml?.();
+    if (previewHtml) {
+      const frame = document.createElement('iframe');
+      frame.className = 'demo__print-frame';
+      frame.setAttribute('sandbox', '');
+      frame.setAttribute('title', backstageText.printPreviewPage);
+      frame.srcdoc = previewHtml;
+      paper.appendChild(frame);
+    } else {
+      const page = document.createElement('div');
+      page.className = 'demo__print-page';
+      const pageTitle = document.createElement('strong');
+      pageTitle.textContent = `${backstageText.printPreviewPage} 1`;
+      const lines = document.createElement('div');
+      lines.className = 'demo__print-sheet-lines';
+      lines.setAttribute('aria-hidden', 'true');
+      for (let i = 0; i < 12; i += 1) lines.appendChild(document.createElement('span'));
+      page.append(pageTitle, lines);
+      paper.appendChild(page);
+    }
+    const hint = document.createElement('p');
+    hint.textContent = backstageText.printPreviewHint;
+    paper.appendChild(hint);
+    wrap.append(settings, paper);
+    return wrap;
+  };
+
+  const createBackstageView = (active: BackstageAction = 'info'): HTMLElement => {
     const view = document.createElement('div');
     view.className = 'demo__backstage app__backstage';
     view.setAttribute('role', 'dialog');
@@ -173,17 +307,10 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     nav.setAttribute('aria-label', ribbonText.tabs.file);
     const title = document.createElement('strong');
     title.textContent = ribbonText.tabs.file;
-    nav.append(
-      createBackstageButton('←', 'back', false, backstageText.back),
-      title,
-      createBackstageButton(backstageText.info, 'info', true),
-      createBackstageButton(backstageText.newLabel, 'new'),
-      createBackstageButton(backstageText.open, 'open'),
-      createBackstageButton(backstageText.save, 'save'),
-      createBackstageButton(backstageText.saveAs, 'save-as'),
-      createBackstageButton(ribbonText.print, 'print'),
-      createBackstageButton(backstageText.options, 'options'),
-    );
+    nav.append(createBackstageButton('←', 'back', false, backstageText.back), title);
+    for (const item of backstageNavItems(backstageText, ribbonText, active)) {
+      nav.appendChild(createBackstageButton(item.label, item.action, item.active));
+    }
 
     const main = document.createElement('main');
     main.className = 'demo__backstage-main';
@@ -228,16 +355,12 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
 
     const grid = document.createElement('div');
     grid.className = 'demo__backstage-grid';
-    grid.append(
-      createBackstageCard(backstageText.newLabel, backstageText.newBody, 'new'),
-      createBackstageCard(backstageText.open, backstageText.openBody, 'open'),
-      createBackstageCard(backstageText.save, backstageText.saveBody, 'save'),
-      createBackstageCard(backstageText.saveAs, backstageText.saveAsBody, 'save-as'),
-      createBackstageCard(ribbonText.print, backstageText.printBody, 'print'),
-      createBackstageCard(backstageText.options, backstageText.optionsBody, 'options'),
-    );
+    for (const item of backstageCardItems(backstageText, ribbonText)) {
+      grid.appendChild(createBackstageCard(item.label, item.body ?? '', item.action));
+    }
 
-    main.append(heading, info, grid);
+    if (active === 'print') main.append(heading, createBackstagePrintView());
+    else main.append(heading, info, grid);
     view.append(nav, main);
     return view;
   };
@@ -247,6 +370,7 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     createBackstageCard,
     createBackstageCommand,
     createBackstageProperties,
+    createBackstagePrintView,
     createBackstageView,
   };
 };

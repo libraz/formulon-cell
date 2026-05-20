@@ -28,7 +28,7 @@ const setFormat = (store: SpreadsheetStore, row: number, col: number, format: Ce
   store.setState((s) => {
     const formats = new Map(s.format.formats);
     formats.set(addrKey({ sheet: 0, row, col }), format);
-    return { ...s, format: { formats } };
+    return { ...s, format: { ...s.format, formats } };
   });
 };
 

@@ -73,7 +73,7 @@ export function textToColumns(
     store.setState((s) => {
       const formats = new Map(s.format.formats);
       for (const write of formatWrites) formats.set(write.key, { ...write.format });
-      return { ...s, format: { formats } };
+      return { ...s, format: { ...s.format, formats } };
     });
   }
   wb.recalc();

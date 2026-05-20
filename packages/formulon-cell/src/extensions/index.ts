@@ -21,6 +21,7 @@ export {
   goToSpecialDialog,
   hoverComment,
   hyperlinkDialog,
+  illustrations,
   iterativeDialog,
   namedRangeDialog,
   pageSetupDialog,

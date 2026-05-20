@@ -451,7 +451,7 @@ export function insertRows(
     recordFormatChange(history, store, () => {
       store.setState((s) => ({
         ...s,
-        format: { formats: shiftFormatsByRow(s.format.formats, sheet, atRow, count) },
+        format: { ...s.format, formats: shiftFormatsByRow(s.format.formats, sheet, atRow, count) },
       }));
     });
 
@@ -497,7 +497,7 @@ export function deleteRows(
     recordFormatChange(history, store, () => {
       store.setState((s) => ({
         ...s,
-        format: { formats: shiftFormatsByRow(s.format.formats, sheet, atRow, -n) },
+        format: { ...s.format, formats: shiftFormatsByRow(s.format.formats, sheet, atRow, -n) },
       }));
     });
 
@@ -540,7 +540,7 @@ export function insertCols(
     recordFormatChange(history, store, () => {
       store.setState((s) => ({
         ...s,
-        format: { formats: shiftFormatsByCol(s.format.formats, sheet, atCol, count) },
+        format: { ...s.format, formats: shiftFormatsByCol(s.format.formats, sheet, atCol, count) },
       }));
     });
 
@@ -584,7 +584,7 @@ export function deleteCols(
     recordFormatChange(history, store, () => {
       store.setState((s) => ({
         ...s,
-        format: { formats: shiftFormatsByCol(s.format.formats, sheet, atCol, -n) },
+        format: { ...s.format, formats: shiftFormatsByCol(s.format.formats, sheet, atCol, -n) },
       }));
     });
 

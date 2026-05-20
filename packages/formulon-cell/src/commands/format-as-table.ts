@@ -1,5 +1,6 @@
 import type { Range } from '../engine/types.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { type History, recordTablesChange } from './history.js';
 import { isSheetProtected } from './protection.js';
 
 /** UI-only "Format As Table" overlay. Native workbook tables have a full
@@ -48,6 +49,26 @@ export interface TableStyleSwatch {
   header: string;
   headerText: string;
   band: string;
+}
+
+export interface CustomTableStyle {
+  id: string;
+  label: string;
+  style: TableStyle;
+  color?: string;
+  variant: 'plain' | 'banded' | 'firstCol' | 'bandedFirstCol';
+}
+
+export interface PivotTableStyleAssignment {
+  sheetIndex: number;
+  pivotIndex: number;
+  styleId: string;
+}
+
+export interface CreateCustomTableStyleOptions {
+  style?: TableStyle;
+  color?: string;
+  variant?: CustomTableStyle['variant'];
 }
 
 /** Derive the header / banded-row fills for a `(style, color)` pair. */
@@ -115,6 +136,81 @@ export interface FormatAsTableOptions {
   lastCol?: boolean;
 }
 
+const CUSTOM_TABLE_STYLE_PREFIX = 'custom-table:';
+const CUSTOM_PIVOT_TABLE_STYLE_PREFIX = 'custom-pivot-table:';
+
+export function customTableStyleId(name: string): string {
+  return `${CUSTOM_TABLE_STYLE_PREFIX}${name.trim()}`;
+}
+
+export function customPivotTableStyleId(name: string): string {
+  return `${CUSTOM_PIVOT_TABLE_STYLE_PREFIX}${name.trim()}`;
+}
+
+export function listCustomTableStyles(state: {
+  tables: { customTableStyles?: readonly CustomTableStyle[] };
+}): readonly CustomTableStyle[] {
+  return state.tables.customTableStyles ?? [];
+}
+
+export function listCustomPivotTableStyles(state: {
+  tables: { customPivotTableStyles?: readonly CustomTableStyle[] };
+}): readonly CustomTableStyle[] {
+  return state.tables.customPivotTableStyles ?? [];
+}
+
+export function customTableStyleById(
+  state: { tables: { customTableStyles?: readonly CustomTableStyle[] } },
+  id: string,
+): CustomTableStyle | null {
+  return (state.tables.customTableStyles ?? []).find((style) => style.id === id) ?? null;
+}
+
+export function customPivotTableStyleById(
+  state: { tables: { customPivotTableStyles?: readonly CustomTableStyle[] } },
+  id: string,
+): CustomTableStyle | null {
+  return (state.tables.customPivotTableStyles ?? []).find((style) => style.id === id) ?? null;
+}
+
+export function pivotTableStyleAssignment(
+  state: { tables: { pivotTableStyles?: readonly PivotTableStyleAssignment[] } },
+  sheetIndex: number,
+  pivotIndex: number,
+): PivotTableStyleAssignment | null {
+  return (
+    (state.tables.pivotTableStyles ?? []).find(
+      (style) => style.sheetIndex === sheetIndex && style.pivotIndex === pivotIndex,
+    ) ?? null
+  );
+}
+
+export function tableVariantFromOptions(input: {
+  banded?: boolean;
+  firstCol?: boolean;
+}): CustomTableStyle['variant'] {
+  if (input.banded && input.firstCol) return 'bandedFirstCol';
+  if (input.firstCol) return 'firstCol';
+  if (input.banded === false) return 'plain';
+  return 'banded';
+}
+
+export function tableVariantOptions(variant: CustomTableStyle['variant']): {
+  banded: boolean;
+  firstCol: boolean;
+} {
+  switch (variant) {
+    case 'plain':
+      return { banded: false, firstCol: false };
+    case 'firstCol':
+      return { banded: false, firstCol: true };
+    case 'bandedFirstCol':
+      return { banded: true, firstCol: true };
+    default:
+      return { banded: true, firstCol: false };
+  }
+}
+
 export type TableOverlayPatch = Partial<
   Pick<
     TableOverlay,
@@ -164,6 +260,110 @@ export function formatAsTable(
   };
   mutators.upsertTableOverlay(store, overlay);
   return overlay;
+}
+
+export function formatAsTableByStyleId(
+  store: SpreadsheetStore,
+  range: Range,
+  styleId: string,
+  color?: string,
+  variant: CustomTableStyle['variant'] = 'banded',
+): TableOverlay | null {
+  const custom = customTableStyleById(store.getState(), styleId);
+  if (custom) {
+    return formatAsTable(store, range, {
+      style: custom.style,
+      color: custom.color,
+      ...tableVariantOptions(custom.variant),
+    });
+  }
+  return formatAsTable(store, range, {
+    style: styleId as TableStyle,
+    color,
+    ...tableVariantOptions(variant),
+  });
+}
+
+export function createTableStyleFromActiveTable(
+  store: SpreadsheetStore,
+  history: History | null,
+  name: string,
+  options: CreateCustomTableStyleOptions = {},
+): boolean {
+  const label = name.trim();
+  if (!label) return false;
+  recordTablesChange(history, store, () => {
+    const state = store.getState();
+    const active = state.selection.active;
+    const source = tableOverlayAt(state, active.sheet, active.row, active.col);
+    mutators.upsertCustomTableStyle(store, {
+      id: customTableStyleId(label),
+      label,
+      style: options.style ?? source?.style ?? 'medium',
+      color: options.color ?? source?.color ?? DEFAULT_TABLE_COLOR,
+      variant:
+        options.variant ??
+        tableVariantFromOptions({
+          banded: source?.banded ?? true,
+          firstCol: source?.firstCol ?? false,
+        }),
+    });
+  });
+  return true;
+}
+
+export function createPivotTableStyleFromActivePivot(
+  store: SpreadsheetStore,
+  history: History | null,
+  name: string,
+  pivot?: { sheetIndex: number; pivotIndex: number } | null,
+  options: CreateCustomTableStyleOptions = {},
+): boolean {
+  const label = name.trim();
+  if (!label) return false;
+  recordTablesChange(history, store, () => {
+    const state = store.getState();
+    const activeTable = tableOverlayAt(
+      state,
+      state.selection.active.sheet,
+      state.selection.active.row,
+      state.selection.active.col,
+    );
+    const style = {
+      id: customPivotTableStyleId(label),
+      label,
+      style: options.style ?? activeTable?.style ?? 'medium',
+      color: options.color ?? activeTable?.color ?? DEFAULT_TABLE_COLOR,
+      variant:
+        options.variant ??
+        tableVariantFromOptions({
+          banded: activeTable?.banded ?? true,
+          firstCol: activeTable?.firstCol ?? false,
+        }),
+    };
+    mutators.upsertCustomPivotTableStyle(store, style);
+    if (pivot) {
+      mutators.upsertPivotTableStyle(store, {
+        sheetIndex: pivot.sheetIndex,
+        pivotIndex: pivot.pivotIndex,
+        styleId: style.id,
+      });
+    }
+  });
+  return true;
+}
+
+export function applyPivotTableStyleById(
+  store: SpreadsheetStore,
+  history: History | null,
+  pivot: { sheetIndex: number; pivotIndex: number },
+  styleId: string,
+): boolean {
+  if (!customPivotTableStyleById(store.getState(), styleId)) return false;
+  recordTablesChange(history, store, () => {
+    mutators.upsertPivotTableStyle(store, { ...pivot, styleId });
+  });
+  return true;
 }
 
 export function listTableOverlays(state: {

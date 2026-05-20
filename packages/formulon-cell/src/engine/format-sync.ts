@@ -54,7 +54,7 @@ export function hydrateCommentsAndHyperlinksFromEngine(
       const prev = formats.get(u.key) ?? {};
       formats.set(u.key, { ...prev, ...u.patch });
     }
-    return { ...s, format: { formats } };
+    return { ...s, format: { ...s.format, formats } };
   });
 }
 

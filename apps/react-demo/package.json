@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test:e2e": "../../node_modules/.bin/playwright test",
+    "test:e2e:visual": "FC_VISUAL=1 ../../node_modules/.bin/playwright test e2e/visual/excel-chrome.visual.spec.ts --project=chromium",
+    "test:e2e:visual:update": "FC_VISUAL=1 ../../node_modules/.bin/playwright test e2e/visual/excel-chrome.visual.spec.ts --project=chromium --update-snapshots",
     "test:e2e:ui": "../../node_modules/.bin/playwright test --ui",
     "test:e2e:install": "../../node_modules/.bin/playwright install --with-deps chromium webkit"
   },

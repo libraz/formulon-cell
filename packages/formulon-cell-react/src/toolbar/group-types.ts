@@ -81,7 +81,6 @@ export interface BuildRibbonGroupsOptions {
   dataSortMenu: ReactElement;
   dataValidationMenu: ReactElement;
   definedNamesMenu: ReactElement;
-  definedNamesInsertMenu: ReactElement;
   deleteCommentMenu: ReactElement;
   errorCheckingMenu: ReactElement;
   freezeMenu: ReactElement;

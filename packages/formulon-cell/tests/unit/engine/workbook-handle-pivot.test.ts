@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { FormulonModule, Value, Workbook } from '../../../src/engine/types.js';
 import {
   PivotAggregation,
+  PivotAxis,
   PivotCalendar,
   PivotDateGrouping,
+  PivotFilterType,
+  PivotFilterValueKind,
   ValueKind,
 } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -34,7 +37,7 @@ const blankValue = (): Value => ({
   errorCode: 0,
 });
 
-const makeHandle = (): WorkbookHandle => {
+const makeHandle = (overrides: Record<string, unknown> = {}): WorkbookHandle => {
   const wb = {
     sheetCount: () => 1,
     cellCount: (_sheet: number) => 1,
@@ -82,8 +85,8 @@ const makeHandle = (): WorkbookHandle => {
         },
       ],
     }),
-    pivotCacheCount: () => 1,
-    pivotCacheIdAt: (_idx: number) => ({ status: ok, index: 7 }),
+    pivotCacheCount: () => 2,
+    pivotCacheIdAt: (idx: number) => ({ status: ok, index: idx === 0 ? 7 : 9 }),
     pivotCacheCreate: (requestedId: number) => {
       return { status: ok, index: requestedId || 8 };
     },
@@ -98,7 +101,12 @@ const makeHandle = (): WorkbookHandle => {
       return { status: ok, index: 2 };
     },
     pivotCacheFieldClear: (_cacheId: number) => ok,
-    pivotCacheFieldSharedItemCount: () => 0,
+    pivotCacheFieldSharedItemCount: (_cacheId: number, fieldIdx: number) =>
+      fieldIdx === 0 ? 2 : 0,
+    pivotCacheFieldSharedItemValue: (cacheId: number, _fieldIdx: number, itemIdx: number) => ({
+      status: ok,
+      value: textValue(cacheId === 7 ? (itemIdx === 0 ? 'East' : 'West') : 'Wrong cache'),
+    }),
     pivotCacheFieldAddSharedItemNumber: () => ok,
     pivotCacheFieldAddSharedItemText: () => ok,
     pivotCacheFieldAddSharedItemBool: () => ok,
@@ -119,6 +127,7 @@ const makeHandle = (): WorkbookHandle => {
       void col;
       return { status: ok, index: 3 };
     },
+    pivotCacheId: () => ({ status: ok, index: 7 }),
     pivotRemove: () => ok,
     pivotSetName: () => ok,
     pivotSetAnchor: () => ok,
@@ -149,6 +158,7 @@ const makeHandle = (): WorkbookHandle => {
     pivotFilterAdd: () => ok,
     pivotFilterClear: () => ok,
     pivotFilterRemoveAt: () => ok,
+    ...overrides,
   } as unknown as Workbook;
 
   const module = { versionString: () => 'test' } as unknown as FormulonModule;
@@ -183,6 +193,7 @@ describe('WorkbookHandle PivotTable projection', () => {
         formula: null,
         kind: 0,
         numberFormat: '',
+        pivotIndex: 0,
       },
       {
         addr: { sheet: 0, row: 1, col: 1 },
@@ -190,6 +201,7 @@ describe('WorkbookHandle PivotTable projection', () => {
         formula: null,
         kind: 3,
         numberFormat: '#,##0',
+        pivotIndex: 0,
       },
     ]);
   });
@@ -207,6 +219,64 @@ describe('WorkbookHandle PivotTable projection', () => {
         cols: 2,
         cells: 3,
         fields: ['Region', 'Sales'],
+        fieldItems: {
+          Region: ['East', 'West'],
+          Sales: ['42'],
+        },
+      },
+    ]);
+  });
+
+  it('includes readable PivotTable filter specs in object summaries when engine hooks exist', () => {
+    const wb = makeHandle({
+      pivotFilterCount: () => 2,
+      pivotFilterSpec: (_sheet: number, _pivot: number, filterIdx: number) => {
+        if (filterIdx === 0) {
+          return {
+            status: ok,
+            spec: {
+              axis: PivotAxis.Page,
+              fieldName: ' Region ',
+              type: PivotFilterType.LabelContains,
+              valueKind: PivotFilterValueKind.Text,
+              valueText: 'East',
+            },
+          };
+        }
+        return {
+          status: { ok: false, code: 1, message: 'fallback' },
+          spec: {
+            axis: PivotAxis.Page,
+            fieldName: 'Ignored',
+            type: PivotFilterType.LabelBeginsWith,
+          },
+        };
+      },
+      pivotFilterAxis: () => ({ status: ok, value: PivotAxis.Value }),
+      pivotFilterFieldName: () => ({ status: ok, value: 'Sales' }),
+      pivotFilterType: () => ({ status: ok, value: PivotFilterType.ValueBetween }),
+      pivotFilterValueKind: () => ({ status: ok, value: PivotFilterValueKind.Double }),
+      pivotFilterValueDouble: () => ({ status: ok, value: -10 }),
+      pivotFilterValueHighKind: () => ({ status: ok, value: PivotFilterValueKind.Double }),
+      pivotFilterValueHighDouble: () => ({ status: ok, value: 20 }),
+    });
+
+    expect(wb.getPivotTables()[0]?.pivotFilters).toEqual([
+      {
+        axis: PivotAxis.Page,
+        fieldName: 'Region',
+        type: PivotFilterType.LabelContains,
+        valueKind: PivotFilterValueKind.Text,
+        valueText: 'East',
+      },
+      {
+        axis: PivotAxis.Value,
+        fieldName: 'Sales',
+        type: PivotFilterType.ValueBetween,
+        valueKind: PivotFilterValueKind.Double,
+        valueDouble: -10,
+        valueHighKind: PivotFilterValueKind.Double,
+        valueHighDouble: 20,
       },
     ]);
   });
@@ -215,10 +285,15 @@ describe('WorkbookHandle PivotTable projection', () => {
     const wb = makeHandle();
 
     expect(wb.capabilities.pivotTableMutate).toBe(true);
-    expect(wb.pivotCacheIds()).toEqual([7]);
+    expect(wb.pivotCacheIds()).toEqual([7, 9]);
     expect(wb.createPivotCache()).toBe(8);
     expect(wb.addPivotCacheField(8, 'Channel')).toBe(2);
     expect(wb.pivotCacheFieldNames(8)).toEqual(['Region', 'Sales']);
+    expect(wb.pivotTableCacheId(0, 3)).toBe(7);
+    expect(wb.pivotCacheSharedItems(7, 0)).toEqual([
+      { kind: 'text', value: 'East' },
+      { kind: 'text', value: 'West' },
+    ]);
     expect(wb.addPivotCacheRecord(8)).toBe(0);
     expect(
       wb.setPivotCacheRecordValue(8, 0, 1, {

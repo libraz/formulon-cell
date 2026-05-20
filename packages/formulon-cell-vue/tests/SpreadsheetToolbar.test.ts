@@ -44,6 +44,7 @@ interface AdapterProps {
   onDrawEraser?: () => void;
   onTranslate?: () => void;
   onAddIn?: () => void;
+  onToolbarReady?: (toolbar: ToolbarInstance | null) => void;
   dropdownActions?: Partial<DynamicDropdownsCtx>;
 }
 
@@ -62,6 +63,10 @@ const AdapterComponent = defineComponent({
     onDrawEraser: { type: Function as unknown as () => () => void, default: undefined },
     onTranslate: { type: Function as unknown as () => () => void, default: undefined },
     onAddIn: { type: Function as unknown as () => () => void, default: undefined },
+    onToolbarReady: {
+      type: Function as unknown as () => (toolbar: ToolbarInstance | null) => void,
+      default: undefined,
+    },
     dropdownActions: {
       type: Object as () => Partial<DynamicDropdownsCtx> | undefined,
       default: undefined,
@@ -75,6 +80,7 @@ const AdapterComponent = defineComponent({
     const mountToolbarFor = (instance: SpreadsheetInstance): void => {
       const host = hostEl.value;
       if (!host) return;
+      if (toolbar) props.onToolbarReady?.(null);
       toolbar?.dispose();
       const dropdownOverrides: Partial<DynamicDropdownsCtx> = {
         applyScriptAction: (action) => {
@@ -104,6 +110,7 @@ const AdapterComponent = defineComponent({
           },
         },
       });
+      props.onToolbarReady?.(toolbar);
     };
 
     onMounted(() => {
@@ -116,6 +123,7 @@ const AdapterComponent = defineComponent({
         if (!hostEl.value) return;
         if (instance) mountToolbarFor(instance);
         else {
+          props.onToolbarReady?.(null);
           toolbar?.dispose();
           toolbar = null;
         }
@@ -132,6 +140,7 @@ const AdapterComponent = defineComponent({
     );
 
     onBeforeUnmount(() => {
+      props.onToolbarReady?.(null);
       toolbar?.dispose();
       toolbar = null;
     });
@@ -208,10 +217,15 @@ describe('<SpreadsheetToolbar> Vue adapter (thin)', () => {
   });
 
   it('mounts the core ribbon DOM into the wrapping host element', async () => {
-    const harness = await mountAdapter(mounted.instance);
+    const onToolbarReady = vi.fn();
+    const harness = await mountAdapter(mounted.instance, { onToolbarReady });
     expect(harness.host.querySelectorAll('[data-ribbon-tab]').length).toBeGreaterThan(0);
     expect(harness.host.querySelector('[data-ribbon-panel="home"]:not([hidden])')).toBeTruthy();
+    expect(onToolbarReady).toHaveBeenCalledWith(
+      expect.objectContaining({ applyCommand: expect.any(Function) }),
+    );
     await harness.unmount();
+    expect(onToolbarReady).toHaveBeenLastCalledWith(null);
   });
 
   it('forwards tab-button clicks via tabChange emit', async () => {

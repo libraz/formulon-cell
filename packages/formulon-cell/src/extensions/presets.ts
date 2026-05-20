@@ -32,6 +32,7 @@ export const minimal = (): FeatureFlags => ({
   pasteSpecial: false,
   quickAnalysis: false,
   charts: false,
+  illustrations: false,
   pivotTableDialog: false,
   validation: false,
   autocomplete: false,

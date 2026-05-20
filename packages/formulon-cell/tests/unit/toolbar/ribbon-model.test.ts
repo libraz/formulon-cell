@@ -5,7 +5,9 @@ import {
   backstageMenuText,
   buildRibbonModel,
   conditionalMenuText,
+  EXCEL365_STANDARD_RIBBON_TABS,
   fluentIconPaths,
+  OPTIONAL_RIBBON_TABS,
   pageScaleMenuText,
   ribbonDisplayText,
   toolbarMenuText,
@@ -70,7 +72,6 @@ const reactRibbonControls = (): RibbonControl[] => {
     dataFilterMenu: { id: 'filter', kind: 'tool' },
     dataSortMenu: { id: 'sortData', kind: 'tool' },
     dataValidationMenu: { id: 'dataValidation', kind: 'tool' },
-    definedNamesInsertMenu: { id: 'namedRangesInsert', kind: 'tool' },
     definedNamesMenu: { id: 'namedRanges', kind: 'tool' },
     deleteCommentMenu: { id: 'deleteCommentReview', kind: 'tool' },
     errorCheckingMenu: { id: 'errorChecking', kind: 'tool' },
@@ -135,7 +136,68 @@ const modelControls = (): RibbonControl[] =>
 
 describe('toolbar/ribbon-model', () => {
   it('keeps the shared ribbon command surface aligned with the React toolbar', () => {
-    expect(modelControls()).toEqual(reactRibbonControls());
+    const byId = (a: RibbonControl, b: RibbonControl): number => a.id.localeCompare(b.id);
+
+    expect([...modelControls()].sort(byId)).toEqual([...reactRibbonControls()].sort(byId));
+  });
+
+  it('can project the Excel 365 standard tab surface without optional add-in tabs', () => {
+    const tabs = buildRibbonModel('en', { tabs: EXCEL365_STANDARD_RIBBON_TABS }).map(
+      (tab) => tab.id,
+    );
+
+    expect(tabs).toEqual([
+      'file',
+      'home',
+      'insert',
+      'pageLayout',
+      'formulas',
+      'data',
+      'review',
+      'view',
+      'help',
+    ]);
+    expect(tabs).not.toEqual(expect.arrayContaining([...OPTIONAL_RIBBON_TABS]));
+  });
+
+  it('keeps Excel 365 command placement for names, duplicates, and links', () => {
+    const tabs = new Map(buildRibbonModel('en').map((tab) => [tab.id, tab]));
+    const commandIds = (tab: string): string[] =>
+      tabs
+        .get(tab as never)
+        ?.groups.flatMap((group) => group.commands.map((command) => command.id)) ?? [];
+
+    expect(commandIds('insert')).not.toEqual(
+      expect.arrayContaining(['namedRangesInsert', 'removeDupesInsert', 'linksInsert']),
+    );
+    expect(commandIds('formulas')).toEqual(expect.arrayContaining(['namedRanges']));
+    expect(commandIds('data')).toEqual(expect.arrayContaining(['removeDupes', 'linksData']));
+    expect(commandIds('insert')).toEqual(expect.arrayContaining(['hyperlinkInsert']));
+    expect(commandIds('pageLayout')).toEqual(
+      expect.arrayContaining(['arrangeObjectsPageLayout', 'selectionPanePageLayout']),
+    );
+    const commands = new Map(
+      buildRibbonModel('en')
+        .flatMap((tab) => tab.groups)
+        .flatMap((group) => group.commands)
+        .map((command) => [command.id, command]),
+    );
+    expect(commands.get('formatTableInsert')).toMatchObject({
+      label: 'Table',
+      title: 'Table',
+    });
+    expect(commands.get('formatTableHome')).toMatchObject({
+      label: 'Format as Table',
+      title: 'Format as Table',
+    });
+    expect(tabs.get('review')?.groups.map((group) => group.title)).toEqual([
+      'Proofing',
+      'Accessibility',
+      'Language',
+      'Comments',
+      'Find',
+      'Protection',
+    ]);
   });
 
   it('has Fluent SVG paths for every icon used by the ribbon model', () => {
@@ -273,6 +335,8 @@ describe('toolbar/ribbon-model', () => {
     expect(conditionalMenuText('en').iconStars3).toBe('3 Stars');
     expect(ribbonDisplayText('ja').label).toBe('リボンの表示オプション');
     expect(ribbonDisplayText('en').collapsed).toBe('Show tabs only');
+    expect(ribbonDisplayText('en').singleLine).toBe('Single Line Ribbon');
+    expect(ribbonDisplayText('en').autoHide).toBe('Auto-hide Ribbon');
     expect(backstageMenuText('ja').back).toBe('戻る');
     expect(backstageMenuText('en').workbookInfo).toBe('Workbook Information');
     expect(pageScaleMenuText('ja').automatic).toBe('自動');

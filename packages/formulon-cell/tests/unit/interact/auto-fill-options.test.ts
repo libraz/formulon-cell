@@ -118,7 +118,7 @@ describe('auto fill options', () => {
     store.setState((s) => {
       const formats = new Map(s.format.formats);
       formats.set('0:0:0', { numFmt: { kind: 'date', pattern: 'yyyy-mm-dd' } });
-      return { ...s, format: { formats } };
+      return { ...s, format: { ...s.format, formats } };
     });
     const handle = attachAutoFillOptions({
       host,

@@ -109,12 +109,12 @@ describe('engine/cell-format-sync — roundtrip', () => {
     const original: CellFormat = {
       numFmt: { kind: 'percent', decimals: 2 },
     };
-    store.setState((s) => ({ ...s, format: { formats: new Map([[key, original]]) } }));
+    store.setState((s) => ({ ...s, format: { ...s.format, formats: new Map([[key, original]]) } }));
 
     syncCellFormatsToEngine(wb, store, 0);
 
     // Wipe the store so hydrate can repopulate from engine state alone.
-    store.setState((s) => ({ ...s, format: { formats: new Map() } }));
+    store.setState((s) => ({ ...s, format: { ...s.format, formats: new Map() } }));
     hydrateCellFormatsFromEngine(wb, store, 0);
 
     const back = store.getState().format.formats.get(key);
@@ -132,10 +132,10 @@ describe('engine/cell-format-sync — roundtrip', () => {
       italic: true,
       color: '#ff0000',
     };
-    store.setState((s) => ({ ...s, format: { formats: new Map([[key, original]]) } }));
+    store.setState((s) => ({ ...s, format: { ...s.format, formats: new Map([[key, original]]) } }));
 
     syncCellFormatsToEngine(wb, store, 0);
-    store.setState((s) => ({ ...s, format: { formats: new Map() } }));
+    store.setState((s) => ({ ...s, format: { ...s.format, formats: new Map() } }));
     hydrateCellFormatsFromEngine(wb, store, 0);
 
     const back = store.getState().format.formats.get(key);
@@ -152,11 +152,11 @@ describe('engine/cell-format-sync — roundtrip', () => {
     const key = addrKey({ sheet: 0, row: 0, col: 0 });
     store.setState((s) => ({
       ...s,
-      format: { formats: new Map([[key, { fill: '#ffff00' } as CellFormat]]) },
+      format: { ...s.format, formats: new Map([[key, { fill: '#ffff00' } as CellFormat]]) },
     }));
 
     syncCellFormatsToEngine(wb, store, 0);
-    store.setState((s) => ({ ...s, format: { formats: new Map() } }));
+    store.setState((s) => ({ ...s, format: { ...s.format, formats: new Map() } }));
     hydrateCellFormatsFromEngine(wb, store, 0);
 
     expect(store.getState().format.formats.get(key)?.fill).toBe('#ffff00');
@@ -174,7 +174,7 @@ describe('engine/cell-format-sync — roundtrip', () => {
     }));
 
     syncCellFormatsToEngine(wb, store, 0);
-    store.setState((s) => ({ ...s, format: { formats: new Map() } }));
+    store.setState((s) => ({ ...s, format: { ...s.format, formats: new Map() } }));
     hydrateCellFormatsFromEngine(wb, store, 0);
 
     const back = store.getState().format.formats.get(key);
@@ -197,7 +197,7 @@ describe('engine/cell-format-sync — roundtrip', () => {
     }));
 
     syncCellFormatsToEngine(wb, store, 0);
-    store.setState((s) => ({ ...s, format: { formats: new Map() } }));
+    store.setState((s) => ({ ...s, format: { ...s.format, formats: new Map() } }));
     hydrateCellFormatsFromEngine(wb, store, 0);
 
     expect(store.getState().format.formats.get(key)?.numFmt).toMatchObject({
@@ -223,7 +223,7 @@ describe('engine/cell-format-sync — roundtrip', () => {
     }));
 
     syncCellFormatsToEngine(wb, store, 0);
-    store.setState((s) => ({ ...s, format: { formats: new Map() } }));
+    store.setState((s) => ({ ...s, format: { ...s.format, formats: new Map() } }));
     hydrateCellFormatsFromEngine(wb, store, 0);
 
     const a = store.getState().format.formats.get(k1);
@@ -240,7 +240,7 @@ describe('engine/cell-format-sync — roundtrip', () => {
     const key = addrKey({ sheet: 0, row: 0, col: 0 });
     store.setState((s) => ({
       ...s,
-      format: { formats: new Map([[key, { bold: true } as CellFormat]]) },
+      format: { ...s.format, formats: new Map([[key, { bold: true } as CellFormat]]) },
     }));
 
     syncCellFormatsToEngine(wb, store, 0);
@@ -264,11 +264,11 @@ describe('engine/cell-format-sync — roundtrip', () => {
     const key = addrKey({ sheet: 0, row: 0, col: 0 });
     store.setState((s) => ({
       ...s,
-      format: { formats: new Map([[key, { bold: true } as CellFormat]]) },
+      format: { ...s.format, formats: new Map([[key, { bold: true } as CellFormat]]) },
     }));
 
     syncCellFormatsToEngine(wb, store, 0);
-    store.setState((s) => ({ ...s, format: { formats: new Map() } }));
+    store.setState((s) => ({ ...s, format: { ...s.format, formats: new Map() } }));
     hydrateCellFormatsFromEngine(wb, store, 0);
 
     const back = store.getState().format.formats.get(key);

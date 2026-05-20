@@ -25,6 +25,32 @@ export interface StylesMenuDeps {
   ribbonLang: ToolbarLang;
   ribbonMenuText: ToolbarMenuText;
   ribbonText: ToolbarText;
+  customCellStyles?: () => readonly {
+    id: string;
+    label: string;
+    format: {
+      bold?: boolean;
+      italic?: boolean;
+      underline?: boolean;
+      color?: string;
+      fill?: string;
+      fontSize?: number;
+    };
+  }[];
+  customTableStyles?: () => readonly {
+    id: string;
+    label: string;
+    style: TableStyle;
+    color?: string;
+    variant: TableVariantId;
+  }[];
+  customPivotTableStyles?: () => readonly {
+    id: string;
+    label: string;
+    style: TableStyle;
+    color?: string;
+    variant: TableVariantId;
+  }[];
 }
 
 export interface StylesMenuFactories {
@@ -63,6 +89,8 @@ const createTableStyleSwatch = (
   color: string,
   variant: TableVariantId,
   label: string,
+  actionStyleId: string = style,
+  dataset: 'tableStyle' | 'pivotTableStyle' = 'tableStyle',
 ): HTMLButtonElement => {
   const swatch = tableStyleSwatch(style, color);
   const { banded, firstCol } = tableVariantOptions(variant);
@@ -70,7 +98,7 @@ const createTableStyleSwatch = (
   btn.type = 'button';
   btn.className = 'app__tablestyle-swatch';
   btn.setAttribute('role', 'menuitem');
-  btn.dataset.tableStyle = style;
+  btn.dataset[dataset] = actionStyleId;
   btn.dataset.tableColor = color;
   btn.dataset.tableVariant = variant;
   btn.title = label;
@@ -155,18 +183,28 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
   const cellStyleGroupLabel = (id: CellStyleGroupId): string =>
     dictionaries[ribbonLang].cellStylesGallery.groups[id];
 
-  const createCellStyleChip = (id: CellStyleId): HTMLButtonElement => {
-    const def = CELL_STYLES.find((s) => s.id === id);
+  const createCellStyleChipFromDef = (def: {
+    id: string;
+    label: string;
+    format: {
+      bold?: boolean;
+      italic?: boolean;
+      underline?: boolean;
+      color?: string;
+      fill?: string;
+      fontSize?: number;
+    };
+  }): HTMLButtonElement => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'app__menu-item app__cellstyle-chip';
     btn.setAttribute('role', 'menuitem');
-    btn.dataset.cellStyle = id;
-    const label = cellStyleGalleryLabel(id);
+    btn.dataset.cellStyle = def.id;
+    const label = def.label;
     btn.title = label;
     btn.setAttribute('aria-label', label);
     btn.textContent = label;
-    const fmt = def?.format ?? {};
+    const fmt = def.format ?? {};
     const css: string[] = [
       'display:flex;align-items:center;justify-content:center;',
       'min-width:88px;height:28px;padding:2px 8px;',
@@ -181,6 +219,14 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
     if (fmt.fontSize) css.push(`font-size:${Math.min(fmt.fontSize, 13)}px;`);
     btn.style.cssText = css.join('');
     return btn;
+  };
+  const createCellStyleChip = (id: CellStyleId): HTMLButtonElement => {
+    const def = CELL_STYLES.find((s) => s.id === id);
+    return createCellStyleChipFromDef({
+      id,
+      label: cellStyleGalleryLabel(id),
+      format: def?.format ?? {},
+    });
   };
 
   const createTableStyleMenu = (id: string): HTMLDivElement => {
@@ -213,6 +259,56 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
       }
       menu.appendChild(grid);
     }
+    const customTableStyles = deps.customTableStyles?.() ?? [];
+    if (customTableStyles.length > 0) {
+      const heading = document.createElement('div');
+      heading.textContent = ribbonLang === 'ja' ? 'ユーザー設定' : 'Custom';
+      heading.style.cssText = 'padding:6px 10px 2px;font-size:11px;font-weight:600;color:#605e5c;';
+      menu.appendChild(heading);
+      const grid = document.createElement('div');
+      grid.setAttribute('role', 'group');
+      grid.setAttribute('aria-label', heading.textContent);
+      grid.style.cssText =
+        'display:grid;grid-template-columns:repeat(7,46px);gap:4px;padding:2px 8px 6px;';
+      for (const style of customTableStyles) {
+        grid.appendChild(
+          createTableStyleSwatch(
+            style.style,
+            style.color ?? '#5b9bd5',
+            style.variant,
+            style.label,
+            style.id,
+          ),
+        );
+      }
+      menu.appendChild(grid);
+    }
+    const customPivotTableStyles = deps.customPivotTableStyles?.() ?? [];
+    if (customPivotTableStyles.length > 0) {
+      const heading = document.createElement('div');
+      heading.textContent =
+        ribbonLang === 'ja' ? 'ピボットテーブル ユーザー設定' : 'Custom PivotTable';
+      heading.style.cssText = 'padding:6px 10px 2px;font-size:11px;font-weight:600;color:#605e5c;';
+      menu.appendChild(heading);
+      const grid = document.createElement('div');
+      grid.setAttribute('role', 'group');
+      grid.setAttribute('aria-label', heading.textContent);
+      grid.style.cssText =
+        'display:grid;grid-template-columns:repeat(7,46px);gap:4px;padding:2px 8px 6px;';
+      for (const style of customPivotTableStyles) {
+        grid.appendChild(
+          createTableStyleSwatch(
+            style.style,
+            style.color ?? '#5b9bd5',
+            style.variant,
+            style.label,
+            style.id,
+            'pivotTableStyle',
+          ),
+        );
+      }
+      menu.appendChild(grid);
+    }
     menu.appendChild(menuSeparator());
     menu.appendChild(tableStyleFooterButton(t.tableStyleNew, 'new-table-style'));
     menu.appendChild(tableStyleFooterButton(t.tableStyleNewPivot, 'new-pivot-style'));
@@ -234,6 +330,20 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
       grid.style.cssText =
         'display:grid;grid-template-columns:repeat(6,minmax(88px,1fr));gap:4px;padding:2px 8px 6px;';
       for (const id of group.styleIds) grid.appendChild(createCellStyleChip(id));
+      menu.appendChild(grid);
+    }
+    const customStyles = deps.customCellStyles?.() ?? [];
+    if (customStyles.length > 0) {
+      const heading = document.createElement('div');
+      heading.textContent = ribbonLang === 'ja' ? 'ユーザー設定' : 'Custom';
+      heading.style.cssText = 'padding:6px 10px 2px;font-size:11px;font-weight:600;color:#605e5c;';
+      menu.appendChild(heading);
+      const grid = document.createElement('div');
+      grid.setAttribute('role', 'group');
+      grid.setAttribute('aria-label', heading.textContent);
+      grid.style.cssText =
+        'display:grid;grid-template-columns:repeat(6,minmax(88px,1fr));gap:4px;padding:2px 8px 6px;';
+      for (const style of customStyles) grid.appendChild(createCellStyleChipFromDef(style));
       menu.appendChild(grid);
     }
     menu.appendChild(menuSeparator());

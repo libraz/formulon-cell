@@ -1,6 +1,12 @@
 import type { History } from '../commands/history.js';
-import { addSheet, moveSheet, removeSheet, renameSheet, setSheetHidden } from '../commands/sheet-mutate.js';
 import { isWorkbookStructureProtected } from '../commands/protection.js';
+import {
+  addSheet,
+  moveSheet,
+  removeSheet,
+  renameSheet,
+  setSheetHidden,
+} from '../commands/sheet-mutate.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { inheritHostTokens } from '../interact/inherit-host-tokens.js';
@@ -25,6 +31,9 @@ const SHEET_TAB_COLORS = [
   '#7030a0',
   '#a5a5a5',
 ] as const;
+
+const SHEET_NAV_REPEAT_DELAY_MS = 350;
+const SHEET_NAV_REPEAT_INTERVAL_MS = 120;
 
 interface SheetTabsControllerInput {
   addSheetBtn: HTMLButtonElement;
@@ -70,6 +79,76 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
 
   const visible = (): number[] => visibleSheetIndexes(getWb(), store);
   const hidden = (): number[] => hiddenSheetIndexes(getWb(), store);
+  let sheetMenuRestoreFocus: HTMLElement | null = null;
+
+  const createSheetNavRepeater = (
+    button: HTMLButtonElement,
+    delta: 1 | -1,
+  ): {
+    detach(): void;
+    onClick(e: MouseEvent): void;
+  } => {
+    let delayTimer: ReturnType<typeof setTimeout> | undefined;
+    let intervalTimer: ReturnType<typeof setInterval> | undefined;
+    let suppressNextClick = false;
+
+    const clearTimers = (): void => {
+      if (delayTimer !== undefined) {
+        clearTimeout(delayTimer);
+        delayTimer = undefined;
+      }
+      if (intervalTimer !== undefined) {
+        clearInterval(intervalTimer);
+        intervalTimer = undefined;
+      }
+    };
+    const repeat = (): void => {
+      if (button.disabled || !button.isConnected) {
+        clearTimers();
+        return;
+      }
+      suppressNextClick = true;
+      switchRelative(delta);
+    };
+    const onPointerDown = (e: PointerEvent): void => {
+      if (e.button !== 0 || button.disabled) return;
+      clearTimers();
+      delayTimer = setTimeout(() => {
+        delayTimer = undefined;
+        repeat();
+        intervalTimer = setInterval(repeat, SHEET_NAV_REPEAT_INTERVAL_MS);
+      }, SHEET_NAV_REPEAT_DELAY_MS);
+    };
+    const onPointerUpOrCancel = (): void => {
+      clearTimers();
+    };
+    const onClick = (e: MouseEvent): void => {
+      if (suppressNextClick) {
+        suppressNextClick = false;
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      switchRelative(delta);
+    };
+
+    button.addEventListener('pointerdown', onPointerDown);
+    button.addEventListener('pointerup', onPointerUpOrCancel);
+    button.addEventListener('pointercancel', onPointerUpOrCancel);
+    button.addEventListener('pointerleave', onPointerUpOrCancel);
+    button.addEventListener('lostpointercapture', onPointerUpOrCancel);
+    return {
+      detach(): void {
+        clearTimers();
+        button.removeEventListener('pointerdown', onPointerDown);
+        button.removeEventListener('pointerup', onPointerUpOrCancel);
+        button.removeEventListener('pointercancel', onPointerUpOrCancel);
+        button.removeEventListener('pointerleave', onPointerUpOrCancel);
+        button.removeEventListener('lostpointercapture', onPointerUpOrCancel);
+      },
+      onClick,
+    };
+  };
 
   const refreshLabels = (): void => {
     const t = getStrings().sheetTabs;
@@ -79,9 +158,12 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     addSheetBtn.setAttribute('aria-label', t.addSheet);
   };
 
-  const closeMenu = (): void => {
+  const closeMenu = (restoreFocus = false): void => {
+    const target = restoreFocus ? sheetMenuRestoreFocus : null;
     sheetMenu.hidden = true;
     sheetMenu.replaceChildren();
+    sheetMenuRestoreFocus = null;
+    if (target?.isConnected) target.focus();
   };
 
   const switchSheet = (idx: number): void => {
@@ -153,6 +235,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
   };
 
   const showMenu = (idx: number, tab: HTMLButtonElement, x: number, y: number): void => {
+    sheetMenuRestoreFocus = tab;
     const wb = getWb();
     const strings = getStrings();
     const visibleIndexes = visible();
@@ -199,6 +282,20 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       ),
     );
     colorPalette.append(colorLabel, swatches);
+    const unhideButtons =
+      hiddenIndexes.length > 0
+        ? hiddenIndexes.map((target) =>
+            menuButton(
+              formatSheetLabel(strings.sheetTabs.unhideNamedSheet, wb.sheetName(target)),
+              () => {
+                if (!setSheetHidden(store, wb, history, target, false)) return;
+                switchSheet(target);
+                update();
+              },
+              structureProtected || !canHide,
+            ),
+          )
+        : [menuButton(strings.sheetTabs.unhideSheet, () => undefined, true)];
 
     sheetMenu.replaceChildren(
       menuButton(
@@ -251,22 +348,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
         },
         structureProtected || !canHide || visibleIndexes.length <= 1,
       ),
-      menuButton(
-        hiddenIndexes.length > 0
-          ? formatSheetLabel(
-              strings.sheetTabs.unhideNamedSheet,
-              wb.sheetName(hiddenIndexes[0] ?? 0),
-            )
-          : strings.sheetTabs.unhideSheet,
-        () => {
-          const target = hiddenIndexes[0];
-          if (target === undefined) return;
-          if (!setSheetHidden(store, wb, history, target, false)) return;
-          switchSheet(target);
-          update();
-        },
-        structureProtected || !canHide || hiddenIndexes.length === 0,
-      ),
+      ...unhideButtons,
     );
     inheritHostTokens(host, sheetMenu);
     positionSheetMenu(sheetMenu, x, y);
@@ -277,7 +359,9 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     const wb = getWb();
     const active = store.getState().data.sheetIndex;
     const visibleIndexes = visible();
+    const activePos = visibleIndexes.indexOf(active);
     refreshLabels();
+    sheetTabs.dataset.fcSheetOverflow = visibleIndexes.length > 1 ? 'true' : 'false';
     sheetTabs.replaceChildren();
     for (const idx of visibleIndexes) {
       const tab = document.createElement('button');
@@ -316,6 +400,14 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
         } else if (e.key === 'ArrowRight') {
           e.preventDefault();
           switchRelative(1);
+        } else if (e.key === 'Home') {
+          e.preventDefault();
+          const first = visible()[0];
+          if (first !== undefined) switchSheet(first);
+        } else if (e.key === 'End') {
+          e.preventDefault();
+          const last = visible().at(-1);
+          if (last !== undefined) switchSheet(last);
         }
       });
       sheetTabs.appendChild(tab);
@@ -325,14 +417,13 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
         });
       }
     }
-    const activePos = visibleIndexes.indexOf(active);
     firstSheet.disabled = activePos <= 0;
     lastSheet.disabled = activePos < 0 || activePos >= visibleIndexes.length - 1;
     addSheetBtn.disabled = isWorkbookStructureProtected(store.getState());
   };
 
-  const onFirstSheetClick = (): void => switchRelative(-1);
-  const onLastSheetClick = (): void => switchRelative(1);
+  const firstSheetRepeater = createSheetNavRepeater(firstSheet, -1);
+  const lastSheetRepeater = createSheetNavRepeater(lastSheet, 1);
   const onAddSheetClick = (): void => {
     const idx = addSheet(store, getWb(), history);
     if (idx < 0) return;
@@ -347,11 +438,39 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
   };
   const onSheetMenuKeyDown = (e: KeyboardEvent): void => {
     if (sheetMenu.hidden) return;
-    if (e.key === 'Escape') closeMenu();
+    const items = Array.from(sheetMenu.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]'));
+    const enabled = items.filter((item) => !item.disabled);
+    const active =
+      document.activeElement instanceof HTMLButtonElement ? document.activeElement : null;
+    const activeIndex = active ? enabled.indexOf(active) : -1;
+    const focusAt = (idx: number): void => {
+      if (enabled.length === 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      enabled[(idx + enabled.length) % enabled.length]?.focus();
+    };
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeMenu(true);
+    } else if (e.key === 'ArrowDown') {
+      focusAt(activeIndex < 0 ? 0 : activeIndex + 1);
+    } else if (e.key === 'ArrowUp') {
+      focusAt(activeIndex < 0 ? enabled.length - 1 : activeIndex - 1);
+    } else if (e.key === 'Home') {
+      focusAt(0);
+    } else if (e.key === 'End') {
+      focusAt(enabled.length - 1);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      if (active && sheetMenu.contains(active) && !active.disabled) {
+        e.preventDefault();
+        e.stopPropagation();
+        active.click();
+      }
+    }
   };
 
-  firstSheet.addEventListener('click', onFirstSheetClick);
-  lastSheet.addEventListener('click', onLastSheetClick);
+  firstSheet.addEventListener('click', firstSheetRepeater.onClick);
+  lastSheet.addEventListener('click', lastSheetRepeater.onClick);
   addSheetBtn.addEventListener('click', onAddSheetClick);
   document.addEventListener('pointerdown', onSheetMenuPointerDown);
   document.addEventListener('keydown', onSheetMenuKeyDown);
@@ -359,8 +478,10 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
   return {
     closeMenu,
     detach(): void {
-      firstSheet.removeEventListener('click', onFirstSheetClick);
-      lastSheet.removeEventListener('click', onLastSheetClick);
+      firstSheetRepeater.detach();
+      lastSheetRepeater.detach();
+      firstSheet.removeEventListener('click', firstSheetRepeater.onClick);
+      lastSheet.removeEventListener('click', lastSheetRepeater.onClick);
       addSheetBtn.removeEventListener('click', onAddSheetClick);
       document.removeEventListener('pointerdown', onSheetMenuPointerDown);
       document.removeEventListener('keydown', onSheetMenuKeyDown);

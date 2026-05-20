@@ -4,6 +4,7 @@ import {
   type FeatureFlags,
   type LocaleChangeEvent,
   type MountOptions,
+  type PrinterProfile,
   type RecalcEvent,
   resolveSpreadsheetUiOptions,
   type SelectionChangeEvent,
@@ -41,6 +42,18 @@ export interface SpreadsheetProps {
   functions?: MountOptions['functions'];
   /** Optional cell-seeding callback (mostly useful for demos). */
   seed?: MountOptions['seed'];
+  /** Host-provided printer profiles for the built-in print/PDF flow. */
+  printerProfiles?: readonly PrinterProfile[];
+  /** Active host printer profile id used by the built-in print/PDF flow. */
+  printerProfileId?: string;
+  /** Host refresh hook for native/Electron printer discovery. */
+  refreshPrinterProfiles?: MountOptions['refreshPrinterProfiles'];
+  /** Host capture hook for Insert > Screenshot > Screen Clipping. */
+  captureScreenClip?: MountOptions['captureScreenClip'];
+  /** Host-driven status bar Upload Status indicator. */
+  uploadStatus?: MountOptions['uploadStatus'];
+  /** Host-driven status bar Macro Recording indicator. */
+  macroRecording?: MountOptions['macroRecording'];
   /** Fires once after mount with the live instance. Use this to wire toolbars
    *  / menus that talk to the spreadsheet's imperative API. */
   onReady?: (instance: SpreadsheetInstance) => void;
@@ -93,6 +106,18 @@ const applyRuntimeProps = async (
     inst.setFeatures({ ...(ui?.features ?? {}), ...(props.features ?? {}) });
   }
   if (props.extensions !== baseline.extensions) inst.setExtensions(props.extensions);
+  if (props.printerProfiles !== baseline.printerProfiles) {
+    inst.setPrinterProfiles(props.printerProfiles);
+  }
+  if (props.printerProfileId !== baseline.printerProfileId) {
+    inst.setPrinterProfileId(props.printerProfileId);
+  }
+  if (props.uploadStatus !== baseline.uploadStatus) {
+    inst.setUploadStatus(props.uploadStatus ?? null);
+  }
+  if (props.macroRecording !== baseline.macroRecording) {
+    inst.setMacroRecording(props.macroRecording ?? null);
+  }
 };
 
 const SpreadsheetComponent = (
@@ -135,6 +160,16 @@ const SpreadsheetComponent = (
         ...(cur.extensions ? { extensions: cur.extensions } : {}),
         ...(cur.functions ? { functions: cur.functions } : {}),
         ...(cur.seed ? { seed: cur.seed } : {}),
+        ...(cur.printerProfiles ? { printerProfiles: cur.printerProfiles } : {}),
+        ...(cur.printerProfileId ? { printerProfileId: cur.printerProfileId } : {}),
+        ...(cur.refreshPrinterProfiles
+          ? { refreshPrinterProfiles: cur.refreshPrinterProfiles }
+          : {}),
+        ...(cur.captureScreenClip
+          ? { captureScreenClip: () => propsRef.current.captureScreenClip?.() }
+          : {}),
+        ...(cur.uploadStatus !== undefined ? { uploadStatus: cur.uploadStatus } : {}),
+        ...(cur.macroRecording !== undefined ? { macroRecording: cur.macroRecording } : {}),
         renderError: !cur.errorFallback,
         onError: (error) => {
           setMountError(error);
@@ -216,6 +251,30 @@ const SpreadsheetComponent = (
     if (!inst) return;
     inst.setExtensions(props.extensions);
   }, [props.extensions]);
+
+  useEffect(() => {
+    const inst = instanceRef.current;
+    if (!inst) return;
+    inst.setPrinterProfiles(props.printerProfiles);
+  }, [props.printerProfiles]);
+
+  useEffect(() => {
+    const inst = instanceRef.current;
+    if (!inst) return;
+    inst.setPrinterProfileId(props.printerProfileId);
+  }, [props.printerProfileId]);
+
+  useEffect(() => {
+    const inst = instanceRef.current;
+    if (!inst) return;
+    inst.setUploadStatus(props.uploadStatus ?? null);
+  }, [props.uploadStatus]);
+
+  useEffect(() => {
+    const inst = instanceRef.current;
+    if (!inst) return;
+    inst.setMacroRecording(props.macroRecording ?? null);
+  }, [props.macroRecording]);
 
   // Children are rendered outside the host element since the spreadsheet
   // owns the host's children (`replaceChildren` on mount). When children is

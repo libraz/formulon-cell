@@ -422,7 +422,7 @@ function applyFillFormats(state: State, store: SpreadsheetStore, src: Range, des
         changed = true;
       }
     }
-    return changed ? { ...s, format: { formats } } : s;
+    return changed ? { ...s, format: { ...s.format, formats } } : s;
   });
   return changed;
 }

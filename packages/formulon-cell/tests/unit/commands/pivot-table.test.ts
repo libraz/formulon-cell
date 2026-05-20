@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   createPivotTableFromRange,
+  inferPivotFieldItems,
   inferPivotSourceFields,
 } from '../../../src/commands/pivot-table.js';
-import { type CellValue, PivotAggregation } from '../../../src/engine/types.js';
+import {
+  type CellValue,
+  PivotAggregation,
+  PivotAxis,
+  PivotFilterType,
+  PivotFilterValueKind,
+} from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 
 const blank: CellValue = { kind: 'blank' };
@@ -65,6 +72,20 @@ const makeWb = () => {
       if (spec.subtotalTop === false) calls.push(`subtotal-top:${spec.sourceName}:false`);
       return calls.filter((c) => c.startsWith('pivot-field:')).length - 1;
     },
+    addPivotFieldItem: (
+      _sheet: number,
+      _pivot: number,
+      fieldIdx: number,
+      name: string,
+      visible: boolean,
+    ) => {
+      calls.push(`pivot-item:${fieldIdx}:${name}:${visible}`);
+      return true;
+    },
+    addPivotFilter: (_sheet: number, _pivot: number, spec: { fieldName: string; type: number }) => {
+      calls.push(`pivot-filter:${spec.fieldName}:${spec.type}`);
+      return true;
+    },
     setPivotFieldSort: (
       _sheet: number,
       _pivot: number,
@@ -99,6 +120,14 @@ describe('pivot-table command helpers', () => {
     ]);
   });
 
+  it('infers unique PivotTable field items from source values', () => {
+    const { wb } = makeWb();
+    expect(inferPivotFieldItems(wb, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 }, 'Region')).toEqual([
+      'East',
+      'West',
+    ]);
+  });
+
   it('creates a cache, records, pivot fields, and a data field from a range', () => {
     const { wb, calls } = makeWb();
     const result = createPivotTableFromRange(wb, {
@@ -128,6 +157,97 @@ describe('pivot-table command helpers', () => {
     expect(calls).toContain('pivot-field:Product:1');
     expect(calls).toContain('pivot-field:Sales:2');
     expect(calls).toContain('data-field:Sum of Sales:2:0:#,##0');
+  });
+
+  it('adds a page/filter field when requested', () => {
+    const { wb, calls } = makeWb();
+    const result = createPivotTableFromRange(wb, {
+      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
+      destination: { sheet: 0, row: 5, col: 0 },
+      rowField: 'Region',
+      filterField: 'Product',
+      valueField: 'Sales',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(calls).toContain('pivot-field:Product:3');
+  });
+
+  it('adds page/filter field item visibility when requested', () => {
+    const { wb, calls } = makeWb();
+    const result = createPivotTableFromRange(wb, {
+      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
+      destination: { sheet: 0, row: 5, col: 0 },
+      rowField: 'Region',
+      filterField: 'Product',
+      filterItems: [
+        { fieldName: 'Product', itemName: 'Desk', visible: true },
+        { fieldName: 'Product', itemName: 'Chair', visible: false },
+      ],
+      valueField: 'Sales',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(calls).toContain('pivot-field:Product:3');
+    expect(calls).toContain('pivot-item:1:Desk:true');
+    expect(calls).toContain('pivot-item:1:Chair:false');
+  });
+
+  it('adds page/filter condition specs when requested', () => {
+    const { wb, calls } = makeWb();
+    const result = createPivotTableFromRange(wb, {
+      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
+      destination: { sheet: 0, row: 5, col: 0 },
+      rowField: 'Region',
+      filterField: 'Product',
+      pivotFilters: [
+        {
+          axis: PivotAxis.Page,
+          fieldName: 'Product',
+          type: PivotFilterType.LabelContains,
+          valueKind: PivotFilterValueKind.Text,
+          valueText: 'Desk',
+        },
+      ],
+      valueField: 'Sales',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(calls).toContain('pivot-filter:Product:3');
+  });
+
+  it('adds multiple page/filter fields when requested', () => {
+    const { wb, calls } = makeWb();
+    const result = createPivotTableFromRange(wb, {
+      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
+      destination: { sheet: 0, row: 5, col: 0 },
+      rowField: 'Region',
+      filterField: 'Product',
+      filterFields: ['Product', 'Sales'],
+      valueField: 'Sales',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(calls).toContain('pivot-field:Product:3');
+    expect(calls).toContain('pivot-field:Sales:3');
+  });
+
+  it('creates multiple value/data fields when requested', () => {
+    const { wb, calls } = makeWb();
+    const result = createPivotTableFromRange(wb, {
+      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
+      destination: { sheet: 0, row: 5, col: 0 },
+      rowField: 'Region',
+      valueField: 'Sales',
+      valueFields: ['Sales', 'Product'],
+      aggregation: PivotAggregation.Count,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(calls).toContain('pivot-field:Sales:2');
+    expect(calls).toContain('pivot-field:Product:2');
+    expect(calls).toContain('data-field:Count of Sales:2:1:');
+    expect(calls).toContain('data-field:Count of Product:1:1:');
   });
 
   it('rejects duplicate row and column fields before creating a cache', () => {

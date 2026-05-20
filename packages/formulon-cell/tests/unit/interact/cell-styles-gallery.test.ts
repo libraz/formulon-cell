@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { CELL_STYLE_GROUPS, CELL_STYLES } from '../../../src/commands/cell-styles.js';
+import {
+  CELL_STYLE_GROUPS,
+  CELL_STYLES,
+  customCellStyleId,
+} from '../../../src/commands/cell-styles.js';
 import { addrKey } from '../../../src/engine/address.js';
 import { en, ja } from '../../../src/i18n/strings.js';
 import { attachCellStylesGallery } from '../../../src/interact/cell-styles-gallery.js';
@@ -97,9 +101,7 @@ describe('attachCellStylesGallery', () => {
     expect(overlay()?.getAttribute('aria-label')).toBe('Cell styles');
     expect(headings()).toContain('Themed Cell Styles');
     expect(chips().find((c) => c.dataset.fcStyle === 'normal')?.textContent).toBe('Normal');
-    expect(chips().find((c) => c.dataset.fcStyle === 'checkCell')?.textContent).toBe(
-      'Check Cell',
-    );
+    expect(chips().find((c) => c.dataset.fcStyle === 'checkCell')?.textContent).toBe('Check Cell');
     handle.detach();
   });
 
@@ -136,6 +138,32 @@ describe('attachCellStylesGallery', () => {
     expect(fmt?.color).toBe('#006100');
     expect(fmt?.fill).toBe('#c6efce');
     expect(overlay()?.hidden).toBe(true);
+    handle.detach();
+  });
+
+  it('renders session custom cell styles and reapplies them from the gallery', () => {
+    setRange(store, 3, 4, 3, 4);
+    mutators.upsertCustomCellStyle(store, {
+      id: customCellStyleId('Review OK'),
+      label: 'Review OK',
+      format: { bold: true, fill: '#c6efce', color: '#006100' },
+    });
+    const handle = attachCellStylesGallery({ host, store });
+    handle.open();
+
+    expect(headings()).toContain('Custom');
+    const customChip = chips().find((c) => c.dataset.fcStyle === customCellStyleId('Review OK'));
+    expect(customChip?.textContent).toBe('Review OK');
+    customChip?.click();
+
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 3, col: 4 })),
+    ).toMatchObject({
+      cellStyle: 'Review OK',
+      bold: true,
+      fill: '#c6efce',
+      color: '#006100',
+    });
     handle.detach();
   });
 

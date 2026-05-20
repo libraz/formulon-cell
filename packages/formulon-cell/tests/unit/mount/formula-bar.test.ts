@@ -32,6 +32,22 @@ describe('mount/formula-bar — edit lifecycle', () => {
     expect(formulabar.dataset.fcEditing).toBe('0');
   });
 
+  it('keeps the Excel-style formula bar slot order and icon buttons', () => {
+    expect(
+      Array.from(formulabar.children).map((child) => (child as HTMLElement).className),
+    ).toEqual([
+      'fc-host__formulabar-tag',
+      'fc-host__formulabar-action fc-host__formulabar-action--cancel',
+      'fc-host__formulabar-action fc-host__formulabar-action--accept',
+      'fc-host__formulabar-fx',
+      'fc-host__formulabar-input',
+      'fc-host__formulabar-expand',
+    ]);
+    expect(fxCancel.querySelector('svg')).not.toBeNull();
+    expect(fxAccept.querySelector('svg')).not.toBeNull();
+    expect(formulabar.querySelector('.fc-host__formulabar-expand svg')).not.toBeNull();
+  });
+
   it('focus starts editing — cancel enables, accept stays disabled until dirty', () => {
     fxInput.focus();
     fxInput.dispatchEvent(new FocusEvent('focus'));

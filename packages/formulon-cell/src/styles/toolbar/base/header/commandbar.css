@@ -50,6 +50,11 @@
   gap: 10px;
 }
 
+.demo__controls--panel {
+  align-items: stretch;
+  flex-direction: column;
+}
+
 .demo__seg {
   display: inline-flex;
   border: 1px solid var(--demo-line);

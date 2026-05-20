@@ -46,7 +46,7 @@ const seedNumber = (
     const formats = new Map(s.format.formats);
     cells.set(addrKey(addr), { value: { kind: 'number', value }, formula: null });
     if (format) formats.set(addrKey(addr), format);
-    return { ...s, data: { ...s.data, cells }, format: { formats } };
+    return { ...s, data: { ...s.data, cells }, format: { ...s.format, formats } };
   });
 };
 

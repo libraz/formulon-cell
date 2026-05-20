@@ -5,13 +5,17 @@ interface XfCalls {
   getIndex: { sheet: number; row: number; col: number }[];
   setIndex: { sheet: number; row: number; col: number; xfIndex: number }[];
   getXf: number[];
+  getStyleXf: number[];
 }
 
 const makeFake = (
   opts: { cellFormatting?: boolean; record?: Record<string, unknown> } = {},
 ): { wb: WorkbookHandle; calls: XfCalls } => {
-  const calls: XfCalls = { getIndex: [], setIndex: [], getXf: [] };
-  const caps = { cellFormatting: opts.cellFormatting ?? true };
+  const calls: XfCalls = { getIndex: [], setIndex: [], getXf: [], getStyleXf: [] };
+  const caps = {
+    cellFormatting: opts.cellFormatting ?? true,
+    cellStyles: opts.cellFormatting ?? true,
+  };
   const fake = {
     capabilities: caps,
     getCellXfIndex(sheet: number, row: number, col: number): number | null {
@@ -37,6 +41,19 @@ const makeFake = (
         wrapText: false,
         ...(opts.record ?? {}),
       } as ReturnType<WorkbookHandle['getCellXf']>;
+    },
+    getCellStyleXf(xfId: number): ReturnType<WorkbookHandle['getCellStyleXf']> {
+      if (!caps.cellStyles) return null;
+      calls.getStyleXf.push(xfId);
+      return {
+        fontIndex: 4,
+        fillIndex: 5,
+        borderIndex: 6,
+        numFmtId: 0,
+        horizontalAlign: 2,
+        verticalAlign: 1,
+        wrapText: true,
+      };
     },
   };
   return { wb: fake as unknown as WorkbookHandle, calls };
@@ -87,5 +104,19 @@ describe('cellFormatting wrappers', () => {
     const { wb, calls } = makeFake({ cellFormatting: false });
     expect(wb.getCellXf(0)).toBeNull();
     expect(calls.getXf).toEqual([]);
+  });
+
+  it('getCellStyleXf resolves a named-style XF record', () => {
+    const { wb, calls } = makeFake({ cellFormatting: true });
+    expect(wb.getCellStyleXf(9)).toEqual({
+      fontIndex: 4,
+      fillIndex: 5,
+      borderIndex: 6,
+      numFmtId: 0,
+      horizontalAlign: 2,
+      verticalAlign: 1,
+      wrapText: true,
+    });
+    expect(calls.getStyleXf).toEqual([9]);
   });
 });
