@@ -6,6 +6,8 @@ import {
   type AllowedEditRange,
   type CellFormat,
   mutators,
+  type SheetProtectionPasswordHash,
+  type SheetProtectionPermissions,
   type SpreadsheetStore,
   type State,
 } from '../store/store.js';
@@ -13,6 +15,8 @@ import type { History } from './history.js';
 
 export interface SheetProtectionOptions {
   password?: string;
+  passwordHash?: SheetProtectionPasswordHash;
+  permissions?: SheetProtectionPermissions;
   workbook?: WorkbookHandle;
 }
 
@@ -27,7 +31,14 @@ export interface AllowedEditRangeOptions {
 }
 
 interface ProtectionSnapshot {
-  protectedSheets: Map<number, { password?: string }>;
+  protectedSheets: Map<
+    number,
+    {
+      password?: string;
+      passwordHash?: SheetProtectionPasswordHash;
+      permissions?: SheetProtectionPermissions;
+    }
+  >;
   workbookStructure?: { password?: string };
   allowedEditRanges: AllowedEditRange[];
 }
@@ -56,9 +67,25 @@ export function setProtectedSheet(
     store,
     sheet,
     on,
-    options.password !== undefined ? { password: options.password } : undefined,
+    options.password !== undefined ||
+      options.passwordHash !== undefined ||
+      options.permissions !== undefined
+      ? {
+          password: options.password,
+          passwordHash: options.passwordHash,
+          permissions: options.permissions,
+        }
+      : undefined,
   );
-  if (options.workbook) flushProtectionToEngine(options.workbook, sheet, on, options.password);
+  if (options.workbook)
+    flushProtectionToEngine(
+      options.workbook,
+      sheet,
+      on,
+      options.password,
+      options.permissions,
+      options.passwordHash,
+    );
 }
 
 export function toggleProtectedSheet(
@@ -73,6 +100,163 @@ export function toggleProtectedSheet(
 
 export function protectedSheetPassword(state: State, sheet: number): string | undefined {
   return state.protection.protectedSheets.get(sheet)?.password;
+}
+
+export function protectedSheetPasswordHash(
+  state: State,
+  sheet: number,
+): SheetProtectionPasswordHash | undefined {
+  const passwordHash = state.protection.protectedSheets.get(sheet)?.passwordHash;
+  return passwordHash ? { ...passwordHash } : undefined;
+}
+
+const OOXML_HASH_ALGORITHMS: Readonly<Record<string, AlgorithmIdentifier>> = {
+  sha1: 'SHA-1',
+  'sha-1': 'SHA-1',
+  sha256: 'SHA-256',
+  'sha-256': 'SHA-256',
+  sha384: 'SHA-384',
+  'sha-384': 'SHA-384',
+  sha512: 'SHA-512',
+  'sha-512': 'SHA-512',
+};
+
+const normalizeOoxmlHashAlgorithm = (name: string): AlgorithmIdentifier | null =>
+  OOXML_HASH_ALGORITHMS[name.trim().toLowerCase()] ?? null;
+
+const base64ToBytes = (value: string): Uint8Array | null => {
+  try {
+    const binary = globalThis.atob(value);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  } catch {
+    return null;
+  }
+};
+
+const concatBytes = (left: Uint8Array, right: Uint8Array): Uint8Array => {
+  const out = new Uint8Array(left.length + right.length);
+  out.set(left, 0);
+  out.set(right, left.length);
+  return out;
+};
+
+const utf16LeBytes = (value: string): Uint8Array => {
+  const out = new Uint8Array(value.length * 2);
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    out[i * 2] = code & 0xff;
+    out[i * 2 + 1] = (code >>> 8) & 0xff;
+  }
+  return out;
+};
+
+const iteratorBytes = (value: number): Uint8Array => {
+  const out = new Uint8Array(4);
+  out[0] = value & 0xff;
+  out[1] = (value >>> 8) & 0xff;
+  out[2] = (value >>> 16) & 0xff;
+  out[3] = (value >>> 24) & 0xff;
+  return out;
+};
+
+const sameBytes = (left: Uint8Array, right: Uint8Array): boolean => {
+  if (left.length !== right.length) return false;
+  let diff = 0;
+  for (let i = 0; i < left.length; i += 1) diff |= (left.at(i) ?? 0) ^ (right.at(i) ?? 0);
+  return diff === 0;
+};
+
+const nodeHashAlgorithm = (algorithm: AlgorithmIdentifier): string | null => {
+  if (algorithm === 'SHA-1') return 'sha1';
+  if (algorithm === 'SHA-256') return 'sha256';
+  if (algorithm === 'SHA-384') return 'sha384';
+  if (algorithm === 'SHA-512') return 'sha512';
+  return null;
+};
+
+type NodeProcessLike = {
+  versions?: { node?: unknown };
+  getBuiltinModule?: (specifier: string) => unknown;
+};
+
+const nodeProcess = (): NodeProcessLike | undefined =>
+  (globalThis as { process?: NodeProcessLike }).process;
+
+const isNodeRuntime = (): boolean => typeof nodeProcess()?.versions?.node === 'string';
+
+type NodeHashModule = {
+  createHash: (algorithm: string) => {
+    update: (data: Uint8Array) => { digest: () => Uint8Array };
+  };
+};
+
+const getNodeHashModule = (): NodeHashModule | null => {
+  if (!isNodeRuntime()) return null;
+  try {
+    const getBuiltinModule = nodeProcess()?.getBuiltinModule;
+    const mod = getBuiltinModule?.('node:crypto') as Partial<NodeHashModule> | undefined;
+    return mod && typeof mod.createHash === 'function' ? (mod as NodeHashModule) : null;
+  } catch {
+    return null;
+  }
+};
+
+const digestBytes = async (
+  subtle: SubtleCrypto,
+  algorithm: AlgorithmIdentifier,
+  bytes: Uint8Array,
+): Promise<Uint8Array> => {
+  const input = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(input).set(bytes);
+  return new Uint8Array(await subtle.digest(algorithm, input));
+};
+
+export async function verifySheetProtectionPasswordHash(
+  password: string,
+  passwordHash: SheetProtectionPasswordHash,
+): Promise<boolean> {
+  const algorithm = normalizeOoxmlHashAlgorithm(passwordHash.algorithmName);
+  const salt = base64ToBytes(passwordHash.saltValue);
+  const expected = base64ToBytes(passwordHash.hashValue);
+  if (!algorithm || !salt || !expected || passwordHash.spinCount < 0) return false;
+
+  const nodeCrypto = getNodeHashModule();
+  const nodeAlgorithm = nodeHashAlgorithm(algorithm);
+  if (nodeCrypto && nodeAlgorithm) {
+    let hash = nodeCrypto
+      .createHash(nodeAlgorithm)
+      .update(concatBytes(salt, utf16LeBytes(password)))
+      .digest();
+    const block = new Uint8Array(hash.length + 4);
+    for (let iterator = 0; iterator < passwordHash.spinCount; iterator += 1) {
+      block.set(hash, 0);
+      block.set(iteratorBytes(iterator), hash.length);
+      hash = nodeCrypto.createHash(nodeAlgorithm).update(block).digest();
+    }
+    return sameBytes(hash, expected);
+  }
+
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) return false;
+
+  let hash = await digestBytes(subtle, algorithm, concatBytes(salt, utf16LeBytes(password)));
+  const block = new Uint8Array(hash.length + 4);
+  for (let iterator = 0; iterator < passwordHash.spinCount; iterator += 1) {
+    block.set(hash, 0);
+    block.set(iteratorBytes(iterator), hash.length);
+    hash = await digestBytes(subtle, algorithm, block);
+  }
+  return sameBytes(hash, expected);
+}
+
+export function protectedSheetPermissions(
+  state: State,
+  sheet: number,
+): SheetProtectionPermissions | undefined {
+  const permissions = state.protection.protectedSheets.get(sheet)?.permissions;
+  return permissions ? { ...permissions } : undefined;
 }
 
 export function isWorkbookStructureProtected(state: State): boolean {
@@ -136,11 +320,25 @@ const cloneAllowedEditRange = (entry: AllowedEditRange): AllowedEditRange => ({
   range: cloneRange(entry.range),
 });
 
+const cloneSheetProtectionEntry = (entry: {
+  password?: string;
+  passwordHash?: SheetProtectionPasswordHash;
+  permissions?: SheetProtectionPermissions;
+}): {
+  password?: string;
+  passwordHash?: SheetProtectionPasswordHash;
+  permissions?: SheetProtectionPermissions;
+} => ({
+  ...(entry.password !== undefined ? { password: entry.password } : {}),
+  ...(entry.passwordHash ? { passwordHash: { ...entry.passwordHash } } : {}),
+  ...(entry.permissions ? { permissions: { ...entry.permissions } } : {}),
+});
+
 const captureProtectionSnapshot = (state: State): ProtectionSnapshot => ({
   protectedSheets: new Map(
     [...state.protection.protectedSheets.entries()].map(([sheet, entry]) => [
       sheet,
-      { ...entry },
+      cloneSheetProtectionEntry(entry),
     ]),
   ),
   ...(state.protection.workbookStructure
@@ -170,7 +368,12 @@ const applyProtectionSnapshot = (
   store.setState((s) => ({
     ...s,
     protection: {
-      protectedSheets: new Map(snap.protectedSheets),
+      protectedSheets: new Map(
+        [...snap.protectedSheets.entries()].map(([sheet, entry]) => [
+          sheet,
+          cloneSheetProtectionEntry(entry),
+        ]),
+      ),
       ...(snap.workbookStructure ? { workbookStructure: { ...snap.workbookStructure } } : {}),
       allowedEditRanges: snap.allowedEditRanges.map(cloneAllowedEditRange),
     },
@@ -179,7 +382,14 @@ const applyProtectionSnapshot = (
   const sheets = new Set([...previousSheets, ...snap.protectedSheets.keys()]);
   for (const sheet of sheets) {
     const entry = snap.protectedSheets.get(sheet);
-    flushProtectionToEngine(wb, sheet, !!entry, entry?.password);
+    flushProtectionToEngine(
+      wb,
+      sheet,
+      !!entry,
+      entry?.password,
+      entry?.permissions,
+      entry?.passwordHash,
+    );
   }
 };
 
@@ -244,7 +454,10 @@ export function gateProtection(state: State, range: Range): Range | null {
   for (let r = range.r0; r <= range.r1; r += 1) {
     for (let c = range.c0; c <= range.c1; c += 1) {
       const fmt = state.format.formats.get(addrKey({ sheet: range.sheet, row: r, col: c }));
-      if (fmt?.locked === false || isAddrInAllowedEditRange(state, { sheet: range.sheet, row: r, col: c })) {
+      if (
+        fmt?.locked === false ||
+        isAddrInAllowedEditRange(state, { sheet: range.sheet, row: r, col: c })
+      ) {
         return range;
       }
     }

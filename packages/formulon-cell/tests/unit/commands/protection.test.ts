@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pasteTSV } from '../../../src/commands/clipboard/paste.js';
 import { writeInput, writeInputValidated } from '../../../src/commands/coerce-input.js';
 import { setFillColor, setNumFmt, toggleBold } from '../../../src/commands/format.js';
+import { History } from '../../../src/commands/history.js';
 import {
   addAllowedEditRange,
   allowedEditRangesForSheet,
@@ -13,15 +14,17 @@ import {
   isSheetProtected,
   isWorkbookStructureProtected,
   protectedSheetPassword,
+  protectedSheetPasswordHash,
+  protectedSheetPermissions,
   recordProtectionChange,
   setCellLocked,
   setProtectedSheet,
   setWorkbookStructureProtected,
   toggleProtectedSheet,
   toggleWorkbookStructureProtected,
+  verifySheetProtectionPasswordHash,
   workbookStructurePassword,
 } from '../../../src/commands/protection.js';
-import { History } from '../../../src/commands/history.js';
 import { deleteRows, hideRows, insertRows, showRows } from '../../../src/commands/structure.js';
 import type { Addr, Range } from '../../../src/engine/types.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -81,15 +84,52 @@ describe('protection helpers', () => {
   });
 
   it('sets, toggles, and exposes sheet protection through command helpers', () => {
-    setProtectedSheet(store, 0, true, { password: 'pw' });
+    setProtectedSheet(store, 0, true, {
+      password: 'pw',
+      passwordHash: {
+        algorithmName: 'SHA-512',
+        hashValue: 'hash',
+        saltValue: 'salt',
+        spinCount: 100000,
+      },
+      permissions: { formatCells: true, selectLockedCells: true, sort: false },
+    });
     expect(isSheetProtected(store.getState(), 0)).toBe(true);
     expect(protectedSheetPassword(store.getState(), 0)).toBe('pw');
+    expect(protectedSheetPasswordHash(store.getState(), 0)).toEqual({
+      algorithmName: 'SHA-512',
+      hashValue: 'hash',
+      saltValue: 'salt',
+      spinCount: 100000,
+    });
+    expect(protectedSheetPermissions(store.getState(), 0)).toEqual({
+      formatCells: true,
+      selectLockedCells: true,
+      sort: false,
+    });
 
     expect(toggleProtectedSheet(store, 0)).toBe(false);
     expect(isSheetProtected(store.getState(), 0)).toBe(false);
+    expect(protectedSheetPermissions(store.getState(), 0)).toBeUndefined();
 
     expect(toggleProtectedSheet(store, 0)).toBe(true);
     expect(isSheetProtected(store.getState(), 0)).toBe(true);
+  });
+
+  it('verifies OOXML strong sheet-protection password hashes', async () => {
+    const passwordHash = {
+      algorithmName: 'SHA-512',
+      hashValue:
+        'Ua4h+FTPQI0+aCSbQ1Ya9fDYsddMzCfAypD1u1TBGmNONIy6sRfJBLDoMhOfbCv0i5Q2t1JOm4okjSvC1CsJYw==',
+      saltValue: 'Furur6jnDIFaQBhHQBXzFA==',
+      spinCount: 100000,
+    };
+
+    await expect(verifySheetProtectionPasswordHash('password', passwordHash)).resolves.toBe(true);
+    await expect(verifySheetProtectionPasswordHash('wrong', passwordHash)).resolves.toBe(false);
+    await expect(
+      verifySheetProtectionPasswordHash('password', { ...passwordHash, algorithmName: 'MD5' }),
+    ).resolves.toBe(false);
   });
 
   it('sets, toggles, and exposes workbook structure protection', () => {
@@ -113,13 +153,29 @@ describe('protection helpers', () => {
       setSheetProtection,
     } as unknown as WorkbookHandle;
 
-    setProtectedSheet(store, 1, true, { workbook: wb, password: 'pw' });
+    setProtectedSheet(store, 1, true, {
+      workbook: wb,
+      password: 'pw',
+      passwordHash: {
+        algorithmName: 'SHA-512',
+        hashValue: 'hash',
+        saltValue: 'salt',
+        spinCount: 100000,
+      },
+      permissions: { formatCells: true, selectUnlockedCells: true },
+    });
     setProtectedSheet(store, 1, false, { workbook: wb });
 
     expect(setSheetProtection).toHaveBeenNthCalledWith(1, 1, {
       enabled: true,
       sheet: true,
       legacyPassword: 'pw',
+      algorithmName: 'SHA-512',
+      hashValue: 'hash',
+      saltValue: 'salt',
+      spinCount: 100000,
+      formatCells: true,
+      selectUnlockedCells: true,
     });
     expect(setSheetProtection).toHaveBeenNthCalledWith(2, 1, { enabled: false });
   });
@@ -167,13 +223,32 @@ describe('protection helpers', () => {
   it('records protection slice changes as one undoable operation', () => {
     const history = new History();
     recordProtectionChange(history, store, undefined, () => {
-      setProtectedSheet(store, 0, true, { password: 'pw' });
+      setProtectedSheet(store, 0, true, {
+        password: 'pw',
+        passwordHash: {
+          algorithmName: 'SHA-512',
+          hashValue: 'hash',
+          saltValue: 'salt',
+          spinCount: 100000,
+        },
+        permissions: { autoFilter: true, insertRows: false },
+      });
       setWorkbookStructureProtected(store, true, { password: 'book' });
       addAllowedEditRange(store, { sheet: 0, r0: 2, c0: 2, r1: 3, c1: 3 }, { title: 'Input' });
     });
 
     expect(isSheetProtected(store.getState(), 0)).toBe(true);
     expect(protectedSheetPassword(store.getState(), 0)).toBe('pw');
+    expect(protectedSheetPasswordHash(store.getState(), 0)).toEqual({
+      algorithmName: 'SHA-512',
+      hashValue: 'hash',
+      saltValue: 'salt',
+      spinCount: 100000,
+    });
+    expect(protectedSheetPermissions(store.getState(), 0)).toEqual({
+      autoFilter: true,
+      insertRows: false,
+    });
     expect(isWorkbookStructureProtected(store.getState())).toBe(true);
     expect(allowedEditRangesForSheet(store.getState(), 0)).toHaveLength(1);
 
@@ -186,6 +261,16 @@ describe('protection helpers', () => {
     expect(history.redo()).toBe(true);
     expect(isSheetProtected(store.getState(), 0)).toBe(true);
     expect(protectedSheetPassword(store.getState(), 0)).toBe('pw');
+    expect(protectedSheetPasswordHash(store.getState(), 0)).toEqual({
+      algorithmName: 'SHA-512',
+      hashValue: 'hash',
+      saltValue: 'salt',
+      spinCount: 100000,
+    });
+    expect(protectedSheetPermissions(store.getState(), 0)).toEqual({
+      autoFilter: true,
+      insertRows: false,
+    });
     expect(isWorkbookStructureProtected(store.getState())).toBe(true);
     expect(workbookStructurePassword(store.getState())).toBe('book');
     expect(allowedEditRangesForSheet(store.getState(), 0)[0]).toMatchObject({
@@ -203,7 +288,17 @@ describe('protection helpers', () => {
     } as unknown as WorkbookHandle;
 
     recordProtectionChange(history, store, wb, () => {
-      setProtectedSheet(store, 1, true, { workbook: wb, password: 'pw' });
+      setProtectedSheet(store, 1, true, {
+        workbook: wb,
+        password: 'pw',
+        passwordHash: {
+          algorithmName: 'SHA-512',
+          hashValue: 'hash',
+          saltValue: 'salt',
+          spinCount: 100000,
+        },
+        permissions: { formatCells: true, autoFilter: true },
+      });
     });
     setSheetProtection.mockClear();
 
@@ -216,6 +311,12 @@ describe('protection helpers', () => {
       enabled: true,
       sheet: true,
       legacyPassword: 'pw',
+      algorithmName: 'SHA-512',
+      hashValue: 'hash',
+      saltValue: 'salt',
+      spinCount: 100000,
+      formatCells: true,
+      autoFilter: true,
     });
   });
 
@@ -310,9 +411,10 @@ describe('format mutators on protected sheet', () => {
   });
 
   it('passes formats through normally when sheet is unprotected', () => {
-    setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
     setNumFmt(store.getState(), store, { kind: 'fixed', decimals: 2 });
     expect(fmtAt(store, 0, 0)?.numFmt).toEqual({ kind: 'fixed', decimals: 2 });
+    expect(fmtAt(store, 0, 1)?.numFmt).toEqual({ kind: 'fixed', decimals: 2 });
   });
 });
 
