@@ -1,6 +1,5 @@
 import { dictionaries, type Strings } from '../i18n/strings.js';
 import { pageScaleMenuText, toolbarMenuText, viewToggleMenuText } from './menu-text.js';
-import { localizeBorderPresets, localizeBorderStyles } from './ribbon-active-state.js';
 
 export type RibbonTab =
   | 'file'
@@ -24,6 +23,7 @@ export interface RibbonCommand {
   label: string;
   icon?: string;
   kind?: 'button' | 'large' | 'wide' | 'mono' | 'select' | 'color' | 'break';
+  layout?: 'stacked';
   disabled?: boolean;
   options?: readonly RibbonOption[];
   className?: string;
@@ -45,6 +45,10 @@ export interface RibbonTabModel {
   label: string;
   groups: RibbonGroupModel[];
 }
+
+export const HOME_TILE_LAYOUT_GROUP_VARIANTS = ['styles'] as const;
+export const HOME_STACKED_LAYOUT_GROUP_VARIANTS = ['cells'] as const;
+export const HOME_MIXED_LAYOUT_GROUP_VARIANTS = ['editing'] as const;
 
 export const EXCEL365_STANDARD_RIBBON_TABS: readonly RibbonTab[] = [
   'file',
@@ -138,6 +142,8 @@ export interface BuildRibbonModelOptions {
   tabs?: readonly RibbonTab[];
 }
 
+const COMMAND_SURFACE_LANG: ToolbarLang = 'en';
+
 const interpolate = (template: string, vars: Record<string, string>): string =>
   template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? '');
 
@@ -203,9 +209,6 @@ export function buildRibbonModel(
     commands: RibbonCommand[],
     variant: RibbonGroupModel['variant'] = 'tiles',
   ): RibbonGroupModel => ({ title, commands, variant });
-  const borderPresetOptions = localizeBorderPresets(tr);
-  const borderStyleOptions = localizeBorderStyles(tr);
-
   const allTabs = [
     tab('file', [
       group(tr.workbook, [
@@ -250,27 +253,8 @@ export function buildRibbonModel(
           cmd('underline', 'U', `${tr.underline} (⌘U)`, 'underline'),
           cmd('strike', 'S', tr.strikethrough, 'strike'),
           cmd('borders', tr.borders, tr.borders, 'borders'),
-          selectCmd(
-            'borderPreset',
-            tr.outsideBorders,
-            tr.borderPattern,
-            borderPresetOptions,
-            'demo__rb-select--border',
-          ),
-          selectCmd(
-            'borderStyle',
-            tr.thin,
-            tr.borderLineStyle,
-            borderStyleOptions,
-            'demo__rb-select--border-style',
-          ),
-          colorCmd('borderColor', tr.lineColor, tr.lineColor, 'fontColor'),
-          cmd('moreBorders', tr.moreBorders, tr.moreBorders, 'formatCells'),
-          cmd('drawBorder', tr.drawBorder, tr.drawBorder, 'pen'),
-          cmd('drawBorderGrid', tr.drawBorderGrid, tr.drawBorderGrid, 'borders'),
-          cmd('eraseBorder', tr.eraseBorder, tr.eraseBorder, 'eraser'),
-          colorCmd('fontColor', tr.fontColor, tr.fontColor, 'fontColor'),
           colorCmd('fillColor', tr.fillColor, tr.fillColor, 'fillColor'),
+          colorCmd('fontColor', tr.fontColor, tr.fontColor, 'fontColor'),
         ],
         'font',
       ),
@@ -280,26 +264,15 @@ export function buildRibbonModel(
           cmd('top', tr.top, tr.topAlign, 'top'),
           cmd('middle', tr.middle, tr.middleAlign, 'middle'),
           cmd('bottomAlign', tr.bottomAlign, tr.bottomAlign, 'bottomAlign'),
-          cmd('textOrientation', tr.textOrientation, tr.textOrientation, 'textOrientation'),
-          cmd('wrap', tr.wrapText, tr.wrapText, 'wrap', 'wide'),
-          breakCmd('alignment-row-2'),
           cmd('alignL', tr.alignLeft, tr.alignLeft, 'alignLeft'),
           cmd('alignC', tr.alignCenter, tr.alignCenter, 'alignCenter'),
           cmd('alignR', tr.alignRight, tr.alignRight, 'alignRight'),
+          breakCmd('alignment-row-2'),
+          cmd('textOrientation', tr.textOrientation, tr.textOrientation, 'textOrientation'),
+          cmd('wrap', tr.wrapText, tr.wrapText, 'wrap'),
           cmd('indentDecrease', tr.decreaseIndent, tr.decreaseIndent, 'indentDecrease'),
           cmd('indentIncrease', tr.increaseIndent, tr.increaseIndent, 'indentIncrease'),
-          selectCmd(
-            'merge',
-            tr.mergeCells,
-            tr.mergeCells,
-            [
-              { value: 'mergeCenter', label: tr.mergeAndCenter },
-              { value: 'mergeAcross', label: tr.mergeAcross },
-              { value: 'mergeCells', label: tr.mergeCells },
-              { value: 'unmergeCells', label: tr.unmergeCells },
-            ],
-            'demo__rb-select--merge',
-          ),
+          cmd('merge', tr.mergeCells, tr.mergeCells, 'merge'),
         ],
         'alignment',
       ),
@@ -327,7 +300,7 @@ export function buildRibbonModel(
             'demo__rb-select--number-format',
           ),
           breakCmd('number-row-2'),
-          cmd('currency', '$', tr.currency, 'currency', 'mono'),
+          cmd('currency', tr.currency, tr.currency, 'currency'),
           cmd('percent', '%', tr.percent, 'percent', 'mono'),
           cmd('comma', ',', tr.commaStyle, 'comma'),
           cmd('decDown', '.0', tr.decreaseDecimals, 'decDown', 'mono'),
@@ -347,18 +320,36 @@ export function buildRibbonModel(
       group(
         tr.cells,
         [
-          cmd('insertRows', tr.insert, tr.insertRows, 'insertRows', 'wide'),
-          cmd('deleteRows', tr.delete, tr.deleteRows, 'deleteRows', 'wide'),
-          cmd('formatCellsHome', tr.format, tr.formatCells, 'formatCells', 'wide'),
+          {
+            ...cmd('insertRows', tr.insert, tr.insertRows, 'insertRows', 'wide'),
+            layout: 'stacked',
+          },
+          {
+            ...cmd('deleteRows', tr.delete, tr.deleteRows, 'deleteRows', 'wide'),
+            layout: 'stacked',
+          },
+          {
+            ...cmd('formatCellsHome', tr.format, tr.formatCells, 'formatCells', 'wide'),
+            layout: 'stacked',
+          },
         ],
         'cells',
       ),
       group(
         tr.editing,
         [
-          cmd('autosum', tr.autoSum, `${tr.autoSum} (Σ)`, 'autosum', 'wide'),
-          cmd('fillHome', tr.fill, tr.fill, 'fillColor', 'wide'),
-          cmd('clearFormat', tr.clear, tr.clear, 'clear', 'wide'),
+          {
+            ...cmd('autosum', tr.autoSum, `${tr.autoSum} (Σ)`, 'autosum', 'wide'),
+            layout: 'stacked',
+          },
+          {
+            ...cmd('fillHome', tr.fill, tr.fill, 'fillColor', 'wide'),
+            layout: 'stacked',
+          },
+          {
+            ...cmd('clearFormat', tr.clear, tr.clear, 'clear', 'wide'),
+            layout: 'stacked',
+          },
           cmd('sortFilterHome', tr.sortFilter, tr.sortFilter, 'sortAsc', 'wide'),
           cmd('findHome', tr.findSelect, `${tr.findSelect} (⌘F)`, 'find', 'wide'),
         ],
@@ -675,3 +666,54 @@ export function buildRibbonModel(
   const allowed = new Set(opts.tabs ?? RIBBON_TABS);
   return allTabs.filter((tab) => allowed.has(tab.id));
 }
+
+export const ribbonCommands = (
+  input: Strings | ToolbarLang,
+  opts: BuildRibbonModelOptions = {},
+): RibbonCommand[] =>
+  buildRibbonModel(input, opts)
+    .flatMap((tab) => tab.groups)
+    .flatMap((group) => group.commands)
+    .filter((command) => command.kind !== 'break');
+
+export const isRibbonActivatableCommand = (command: RibbonCommand): boolean =>
+  command.kind !== 'break' && !['select', 'color'].includes(command.kind ?? 'button');
+
+export const ribbonActivatableCommands = (
+  input: Strings | ToolbarLang,
+  opts: BuildRibbonModelOptions = {},
+): RibbonCommand[] => ribbonCommands(input, opts).filter(isRibbonActivatableCommand);
+
+export const ribbonCommandIds = (
+  input: Strings | ToolbarLang,
+  opts: BuildRibbonModelOptions = {},
+): string[] => ribbonCommands(input, opts).map((command) => command.id);
+
+export const ribbonActivatableCommandIds = (
+  input: Strings | ToolbarLang,
+  opts: BuildRibbonModelOptions = {},
+): string[] => ribbonActivatableCommands(input, opts).map((command) => command.id);
+
+export const ribbonSurfaceCommands = (
+  opts: BuildRibbonModelOptions = {},
+): RibbonCommand[] => ribbonCommands(COMMAND_SURFACE_LANG, opts);
+
+export const ribbonSurfaceCommandIds = (opts: BuildRibbonModelOptions = {}): string[] =>
+  ribbonCommandIds(COMMAND_SURFACE_LANG, opts);
+
+export const ribbonActivatableSurfaceCommands = (
+  opts: BuildRibbonModelOptions = {},
+): RibbonCommand[] => ribbonActivatableCommands(COMMAND_SURFACE_LANG, opts);
+
+export const ribbonActivatableSurfaceCommandIds = (
+  opts: BuildRibbonModelOptions = {},
+): string[] => ribbonActivatableCommandIds(COMMAND_SURFACE_LANG, opts);
+
+export const ribbonTabCommandIds = (
+  input: Strings | ToolbarLang,
+  tabId: RibbonTab,
+  opts: BuildRibbonModelOptions = {},
+): string[] =>
+  buildRibbonModel(input, opts)
+    .find((tab) => tab.id === tabId)
+    ?.groups.flatMap((group) => group.commands.map((command) => command.id)) ?? [];

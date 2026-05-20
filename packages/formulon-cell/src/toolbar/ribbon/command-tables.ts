@@ -30,9 +30,8 @@ export type RibbonFormatMutator = (state: RibbonState, store: SpreadsheetStore) 
 export const RIBBON_DIALOG_OPENERS: Readonly<Record<string, (i: SpreadsheetInstance) => void>> = {
   pageSetup: (i) => i.openPageSetup(),
   pageSetupAdvanced: (i) => i.openPageSetup(),
-  printTitles: (i) => i.openPageSetup(),
+  printTitles: (i) => i.openPageSetup('sheet'),
   formatCells: (i) => i.openFormatDialog(),
-  formatCellsHome: (i) => i.openFormatDialog(),
   moreBorders: (i) => i.openFormatDialog(),
   windowVisibility: (i) => i.openFormatDialog('more'),
   gotoSpecial: (i) => i.openGoToSpecial(),
@@ -40,24 +39,31 @@ export const RIBBON_DIALOG_OPENERS: Readonly<Record<string, (i: SpreadsheetInsta
   hyperlinkInsert: (i) => i.openHyperlinkDialog(),
   commentInsert: (i) => i.openCommentDialog(),
   newCommentReview: (i) => i.openCommentDialog(),
+  dataValidation: (i) => i.openDataValidationDialog(),
+  namedRanges: (i) => i.openNamedRangeDialog(),
   links: (i) => i.openExternalLinksDialog(),
   linksData: (i) => i.openExternalLinksDialog(),
-  conditional: (i) => i.openConditionalDialog(),
-  cellStyles: (i) => i.openCellStylesGallery(),
   rules: (i) => i.openCfRulesDialog(),
   pivotTableInsert: (i) => i.openPivotTableDialog(),
-  namedRanges: (i) => i.openNamedRangeDialog(),
   evaluateFormula: (i) => i.openEvaluateFormulaDialog(),
   fxInsert: (i) => i.openFunctionArguments(),
   fx: (i) => i.openFunctionArguments(),
   workbookObjectsView: (i) => i.openWorkbookObjects(),
-  arrangeObjectsPageLayout: (i) => i.openWorkbookObjects(),
   selectionPanePageLayout: (i) => i.openWorkbookObjects(),
   pivotFieldListView: (i) => {
     if (!i.openActivePivotFieldList()) i.openWorkbookObjects();
   },
-  calcOptions: (i) => i.openIterativeDialog(),
 };
+
+/** Dialog openers whose ribbon button is a primary-action split button. The
+ *  primary face opens the dialog, while the secondary face keeps the related
+ *  Excel-style menu available. */
+export const RIBBON_PRIMARY_SPLIT_DIALOG_COMMANDS: ReadonlySet<string> = new Set([
+  'dataValidation',
+  'linksData',
+  'namedRanges',
+  'pivotTableInsert',
+]);
 
 /** Ribbon command id → spreadsheet function name to prefill the Function
  *  Arguments dialog with. Kept separate from [[RIBBON_DIALOG_OPENERS]] so the
@@ -72,6 +78,13 @@ export const RIBBON_FUNCTION_ARG_OPENERS: Readonly<Record<string, string>> = {
   pmtFormula: 'PMT',
   roundFormula: 'ROUND',
 };
+
+/** Dialog-classified commands whose opener is supplied by the toolbar hook
+ *  layer instead of SpreadsheetInstance or the Function Arguments table. */
+export const RIBBON_HOOK_DIALOG_COMMANDS: ReadonlySet<string> = new Set([
+  'formatTableInsert',
+  'zoomDialog',
+]);
 
 /** Format-toggle buttons. The dispatcher wraps these in `applyRibbonFormat`
  *  so the mutation lands in one undoable history entry and refocuses the

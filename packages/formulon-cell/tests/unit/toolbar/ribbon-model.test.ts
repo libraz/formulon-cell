@@ -1,144 +1,237 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   backstageMenuText,
   buildRibbonModel,
   conditionalMenuText,
   EXCEL365_STANDARD_RIBBON_TABS,
   fluentIconPaths,
+  HOME_MIXED_LAYOUT_GROUP_VARIANTS,
+  HOME_STACKED_LAYOUT_GROUP_VARIANTS,
+  HOME_TILE_LAYOUT_GROUP_VARIANTS,
   OPTIONAL_RIBBON_TABS,
   pageScaleMenuText,
+  ribbonActivatableCommandIds,
+  ribbonActivatableSurfaceCommandIds,
+  ribbonCommandIds,
+  ribbonCommands,
   ribbonDisplayText,
+  ribbonSurfaceCommandIds,
+  ribbonTabCommandIds,
   toolbarMenuText,
   viewToggleMenuText,
 } from '../../../src/index.js';
 
-type ReactRibbonControlKind = 'tool' | 'select' | 'color' | 'break';
-
-interface RibbonControl {
-  id: string;
-  kind: ReactRibbonControlKind;
-}
-
-const reactToolbarSource = (name: string): string => {
-  const sourcePath = [
-    resolve(process.cwd(), `../formulon-cell-react/src/toolbar/${name}`),
-    resolve(process.cwd(), `packages/formulon-cell-react/src/toolbar/${name}`),
-  ].find((candidate) => existsSync(candidate));
-  if (!sourcePath) throw new Error(`React toolbar source not found: ${name}`);
-  return readFileSync(sourcePath, 'utf8');
-};
-
-const reactRibbonControls = (): RibbonControl[] => {
-  const source = `${reactToolbarSource('groups.tsx')}\n${reactToolbarSource('add-in-groups.tsx')}`;
-  const controls: (RibbonControl & { index: number })[] = [];
-  const re = /\b(tool|select|optionSelect|color|rowBreak)(?:<[^>]+>)?\(\s*['"]([^'"]+)/g;
-  for (const match of source.matchAll(re)) {
-    const [, kind, id] = match;
-    if (!kind || !id) continue;
-    controls.push({
-      id,
-      index: match.index,
-      kind:
-        kind === 'rowBreak'
-          ? 'break'
-          : kind === 'optionSelect'
-            ? 'select'
-            : (kind as ReactRibbonControlKind),
-    });
-  }
-  const mergeIndex = source.lastIndexOf('mergeMenu');
-  if (mergeIndex >= 0) {
-    const insertAt = controls.findIndex((control) => control.index > mergeIndex);
-    controls.splice(insertAt >= 0 ? insertAt : controls.length, 0, {
-      id: 'merge',
-      index: mergeIndex,
-      kind: 'select',
-    });
-  }
-  const menuProps: Record<string, RibbonControl> = {
-    autosumFormulaMenu: { id: 'autosumFormula', kind: 'tool' },
-    autosumMenu: { id: 'autosum', kind: 'tool' },
-    addInMenu: { id: 'addIn', kind: 'tool' },
-    calcOptionsMenu: { id: 'calcOptions', kind: 'tool' },
-    cellDeleteMenu: { id: 'deleteRows', kind: 'tool' },
-    cellFormatMenu: { id: 'formatCellsHome', kind: 'tool' },
-    cellInsertMenu: { id: 'insertRows', kind: 'tool' },
-    cellStylesMenu: { id: 'cellStyles', kind: 'tool' },
-    chartMenu: { id: 'chartInsert', kind: 'tool' },
-    conditionalMenu: { id: 'conditional', kind: 'tool' },
-    clearArrowsMenu: { id: 'clearArrows', kind: 'tool' },
-    dataFilterMenu: { id: 'filter', kind: 'tool' },
-    dataSortMenu: { id: 'sortData', kind: 'tool' },
-    dataValidationMenu: { id: 'dataValidation', kind: 'tool' },
-    definedNamesMenu: { id: 'namedRanges', kind: 'tool' },
-    deleteCommentMenu: { id: 'deleteCommentReview', kind: 'tool' },
-    errorCheckingMenu: { id: 'errorChecking', kind: 'tool' },
-    freezeMenu: { id: 'freeze', kind: 'tool' },
-    formatTableHomeMenu: { id: 'formatTableHome', kind: 'tool' },
-    formatTableInsertMenu: { id: 'formatTableInsert', kind: 'tool' },
-    clearMenu: { id: 'clearFormat', kind: 'tool' },
-    fillMenu: { id: 'fillHome', kind: 'tool' },
-    findMenu: { id: 'findHome', kind: 'tool' },
-    pageBreaksMenu: { id: 'pageBreaks', kind: 'tool' },
-    pdfMenu: { id: 'pdf', kind: 'tool' },
-    pivotTableMenu: { id: 'pivotTableInsert', kind: 'tool' },
-    pasteMenu: { id: 'paste', kind: 'tool' },
-    pictureInsertMenu: { id: 'pictureInsert', kind: 'tool' },
-    printAreaMenu: { id: 'printArea', kind: 'tool' },
-    printTitlesMenu: { id: 'printTitles', kind: 'tool' },
-    protectionMenu: { id: 'protectionReview', kind: 'tool' },
-    sheetBackgroundMenu: { id: 'sheetBackground', kind: 'tool' },
-    shapesInsertMenu: { id: 'shapesInsert', kind: 'tool' },
-    screenshotInsertMenu: { id: 'screenshotInsert', kind: 'tool' },
-    sortMenu: { id: 'sortFilterHome', kind: 'tool' },
-    symbolMenu: { id: 'symbolInsert', kind: 'tool' },
-    themeMenu: { id: 'pageTheme', kind: 'tool' },
-    textOrientationMenu: { id: 'textOrientation', kind: 'tool' },
-    textToColumnsMenu: { id: 'textToColumns', kind: 'tool' },
-    functionLogicalMenu: { id: 'ifFormula', kind: 'tool' },
-    functionLookupMenu: { id: 'xlookupFormula', kind: 'tool' },
-    functionTextMenu: { id: 'concatFormula', kind: 'tool' },
-    functionDateTimeMenu: { id: 'todayFormula', kind: 'tool' },
-    functionFinancialMenu: { id: 'pmtFormula', kind: 'tool' },
-    functionMathTrigMenu: { id: 'roundFormula', kind: 'tool' },
-    hyperlinkMenu: { id: 'hyperlinkInsert', kind: 'tool' },
-    outlineGroupMenu: { id: 'outlineGroup', kind: 'tool' },
-    outlineUngroupMenu: { id: 'outlineUngroup', kind: 'tool' },
-    watchMenu: { id: 'watch', kind: 'tool' },
-    watchViewMenu: { id: 'watchView', kind: 'tool' },
-    windowMenu: { id: 'windowVisibility', kind: 'tool' },
-  };
-  for (const [prop, control] of Object.entries(menuProps)) {
-    const index = source.lastIndexOf(prop);
-    if (index < 0) continue;
-    const insertAt = controls.findIndex((entry) => entry.index > index);
-    controls.splice(insertAt >= 0 ? insertAt : controls.length, 0, { ...control, index });
-  }
-  return controls.map(({ id, kind }) => ({ id, kind }));
-};
-
-const modelControls = (): RibbonControl[] =>
-  buildRibbonModel('en').flatMap((tab) =>
-    tab.groups.flatMap((group) =>
-      group.commands.map((command) => ({
-        id: command.id,
-        kind:
-          command.kind === 'select' || command.kind === 'color'
-            ? command.kind
-            : command.kind === 'break'
-              ? 'break'
-              : 'tool',
-      })),
-    ),
-  );
-
 describe('toolbar/ribbon-model', () => {
-  it('keeps the shared ribbon command surface aligned with the React toolbar', () => {
-    const byId = (a: RibbonControl, b: RibbonControl): number => a.id.localeCompare(b.id);
+  const ribbonStylesDir = join(process.cwd(), 'src/styles/toolbar/ribbon');
 
-    expect([...modelControls()].sort(byId)).toEqual([...reactRibbonControls()].sort(byId));
+  it('keeps the shared core ribbon command surface unique within each tab', () => {
+    const keys = buildRibbonModel('en').flatMap((tab) =>
+      tab.groups.flatMap((group) =>
+        group.commands.map((command) => `${tab.id}:${command.id}:${command.kind}`),
+      ),
+    );
+    const duplicates = keys.filter((key, index) => keys.indexOf(key) !== index);
+
+    expect(duplicates).toEqual([]);
+  });
+
+  it('keeps command surfaces locale-independent', () => {
+    expect(ribbonCommandIds('ja')).toEqual(ribbonCommandIds('en'));
+    expect(ribbonActivatableCommandIds('ja')).toEqual(ribbonActivatableCommandIds('en'));
+    expect(ribbonSurfaceCommandIds()).toEqual(ribbonCommandIds('en'));
+    expect(ribbonActivatableSurfaceCommandIds()).toEqual(ribbonActivatableCommandIds('en'));
+    expect(
+      ribbonSurfaceCommandIds({ tabs: EXCEL365_STANDARD_RIBBON_TABS }),
+    ).toEqual(ribbonCommandIds('en', { tabs: EXCEL365_STANDARD_RIBBON_TABS }));
+    expect(
+      ribbonActivatableSurfaceCommandIds({ tabs: EXCEL365_STANDARD_RIBBON_TABS }),
+    ).toEqual(ribbonActivatableCommandIds('en', { tabs: EXCEL365_STANDARD_RIBBON_TABS }));
+  });
+
+  it('keeps the Excel 365 Home tab group and command placement explicit', () => {
+    const home = buildRibbonModel('en').find((tab) => tab.id === 'home');
+
+    expect(home?.groups.map((group) => group.variant)).toEqual([
+      'clipboard',
+      'font',
+      'alignment',
+      'number',
+      'styles',
+      'cells',
+      'editing',
+    ]);
+
+    const commandsByGroup = new Map(
+      home?.groups.map((group) => [
+        group.variant,
+        group.commands.map((command) => command.id),
+      ]) ?? [],
+    );
+
+    expect(commandsByGroup.get('clipboard')).toEqual([
+      'paste',
+      'cut',
+      'copy',
+      'formatPainter',
+    ]);
+    expect(commandsByGroup.get('font')).toEqual([
+      'fontFamily',
+      'fontSize',
+      'fontGrow',
+      'fontShrink',
+      'font-row-2',
+      'bold',
+      'italic',
+      'underline',
+      'strike',
+      'borders',
+      'fillColor',
+      'fontColor',
+    ]);
+    expect(commandsByGroup.get('alignment')).toEqual([
+      'top',
+      'middle',
+      'bottomAlign',
+      'alignL',
+      'alignC',
+      'alignR',
+      'alignment-row-2',
+      'textOrientation',
+      'wrap',
+      'indentDecrease',
+      'indentIncrease',
+      'merge',
+    ]);
+    expect(commandsByGroup.get('number')).toEqual([
+      'numberFormat',
+      'number-row-2',
+      'currency',
+      'percent',
+      'comma',
+      'decDown',
+      'decUp',
+    ]);
+    expect(commandsByGroup.get('styles')).toEqual([
+      'conditional',
+      'formatTableHome',
+      'cellStyles',
+    ]);
+    expect(commandsByGroup.get('cells')).toEqual([
+      'insertRows',
+      'deleteRows',
+      'formatCellsHome',
+    ]);
+    expect(commandsByGroup.get('editing')).toEqual([
+      'autosum',
+      'fillHome',
+      'clearFormat',
+      'sortFilterHome',
+      'findHome',
+    ]);
+  });
+
+  it('keeps Home wide-button groups on the shared tile layout CSS', () => {
+    const groupsCss = readFileSync(join(ribbonStylesDir, 'groups.css'), 'utf8');
+
+    for (const variant of HOME_TILE_LAYOUT_GROUP_VARIANTS) {
+      expect(groupsCss).toContain(`.demo__ribbon-group--${variant} .demo__ribbon-tools`);
+    }
+    expect(groupsCss).toContain('.demo__ribbon-group--tiles .demo__rb--wide');
+    expect(groupsCss).toContain('.demo__ribbon-group--tiles .demo__rb-icon');
+    expect(groupsCss).toContain('flex-wrap: nowrap;');
+    expect(groupsCss).toContain('height: 66px;');
+    expect(groupsCss).toContain('.demo__ribbon-group--tiles .demo__rb .demo__rb-split-chevron');
+    expect(groupsCss).toContain('position: absolute;');
+    expect(groupsCss).toContain('bottom: 5px;');
+  });
+
+  it('loads group-specific ribbon CSS after generic button sizing', () => {
+    for (const cssFile of ['../ribbon.css', '../../toolbar.css']) {
+      const css = readFileSync(join(ribbonStylesDir, cssFile), 'utf8');
+      const generic = css.indexOf('layout-and-buttons.css');
+      const groups = css.indexOf('groups.css');
+      expect(generic, cssFile).toBeGreaterThanOrEqual(0);
+      expect(groups, cssFile).toBeGreaterThan(generic);
+    }
+  });
+
+  it('keeps Home dense layout widths large enough to avoid hidden row wraps', () => {
+    const groupsCss = readFileSync(join(ribbonStylesDir, 'groups.css'), 'utf8');
+    const home = buildRibbonModel('en').find((tab) => tab.id === 'home');
+    const tileWidth = 74;
+    const tileGap = 4;
+    const widthFor = (variant: string): number => {
+      const match = new RegExp(
+        String.raw`\.demo__ribbon-group--${variant} \.demo__ribbon-tools\s*\{\s*width:\s*(\d+)px;`,
+        'm',
+      ).exec(groupsCss);
+      if (!match?.[1]) throw new Error(`missing ${variant} ribbon tool width`);
+      return Number(match[1]);
+    };
+
+    for (const variant of HOME_TILE_LAYOUT_GROUP_VARIANTS) {
+      const commandCount =
+        home?.groups.find((group) => group.variant === variant)?.commands.length ?? 0;
+      const requiredWidth = commandCount * tileWidth + Math.max(0, commandCount - 1) * tileGap;
+      expect(widthFor(variant)).toBeGreaterThanOrEqual(requiredWidth);
+    }
+    expect(widthFor('cells')).toBeGreaterThanOrEqual(92);
+    expect(widthFor('editing')).toBeGreaterThanOrEqual(238);
+    expect(groupsCss).toContain('.demo__ribbon-group--stacked .demo__ribbon-tools');
+    expect(groupsCss).toContain('.demo__ribbon-group--mixed .demo__ribbon-tools');
+    expect(groupsCss).toContain('grid-template-rows: repeat(3, 22px);');
+    expect(groupsCss).toContain(
+      '.demo__ribbon-group--mixed .demo__rb--wide:not(.demo__rb--stacked) .demo__rb-split-chevron',
+    );
+    expect(groupsCss).toContain(
+      '.demo__ribbon-group--stacked .demo__rb--stacked .demo__rb-split-chevron',
+    );
+    expect(groupsCss).toContain('margin: 0 0 0 auto;');
+  });
+
+  it('keeps Home tile-layout groups backed only by wide ribbon commands', () => {
+    const home = buildRibbonModel('en').find((tab) => tab.id === 'home');
+    const nonWideCommands =
+      home?.groups
+        .filter((group) =>
+          HOME_TILE_LAYOUT_GROUP_VARIANTS.includes(
+            group.variant as (typeof HOME_TILE_LAYOUT_GROUP_VARIANTS)[number],
+          ),
+        )
+        .flatMap((group) =>
+          group.commands
+            .filter((command) => command.kind !== 'wide')
+            .map((command) => `${group.variant}:${command.id}:${command.kind ?? 'button'}`),
+        ) ?? [];
+
+    expect(nonWideCommands).toEqual([]);
+  });
+
+  it('keeps Home stacked and mixed groups backed by shared layout metadata', () => {
+    const home = buildRibbonModel('en').find((tab) => tab.id === 'home');
+    const groups = new Map(home?.groups.map((group) => [group.variant, group]) ?? []);
+
+    expect(HOME_STACKED_LAYOUT_GROUP_VARIANTS).toEqual(['cells']);
+    expect(HOME_MIXED_LAYOUT_GROUP_VARIANTS).toEqual(['editing']);
+    expect(groups.get('cells')?.commands.map((command) => command.layout)).toEqual([
+      'stacked',
+      'stacked',
+      'stacked',
+    ]);
+    expect(groups.get('editing')?.commands.map((command) => command.layout ?? 'large')).toEqual([
+      'stacked',
+      'stacked',
+      'stacked',
+      'large',
+      'large',
+    ]);
+    expect(
+      [...(groups.get('cells')?.commands ?? []), ...(groups.get('editing')?.commands ?? [])].map(
+        (command) => command.className ?? '',
+      ),
+    ).toEqual(['', '', '', '', '', '', '', '']);
   });
 
   it('can project the Excel 365 standard tab surface without optional add-in tabs', () => {
@@ -162,10 +255,8 @@ describe('toolbar/ribbon-model', () => {
 
   it('keeps Excel 365 command placement for names, duplicates, and links', () => {
     const tabs = new Map(buildRibbonModel('en').map((tab) => [tab.id, tab]));
-    const commandIds = (tab: string): string[] =>
-      tabs
-        .get(tab as never)
-        ?.groups.flatMap((group) => group.commands.map((command) => command.id)) ?? [];
+    const commandIds = (tab: Parameters<typeof ribbonTabCommandIds>[1]): string[] =>
+      ribbonTabCommandIds('en', tab);
 
     expect(commandIds('insert')).not.toEqual(
       expect.arrayContaining(['namedRangesInsert', 'removeDupesInsert', 'linksInsert']),
@@ -177,10 +268,7 @@ describe('toolbar/ribbon-model', () => {
       expect.arrayContaining(['arrangeObjectsPageLayout', 'selectionPanePageLayout']),
     );
     const commands = new Map(
-      buildRibbonModel('en')
-        .flatMap((tab) => tab.groups)
-        .flatMap((group) => group.commands)
-        .map((command) => [command.id, command]),
+      ribbonCommands('en').map((command) => [command.id, command]),
     );
     expect(commands.get('formatTableInsert')).toMatchObject({
       label: 'Table',
@@ -201,9 +289,7 @@ describe('toolbar/ribbon-model', () => {
   });
 
   it('has Fluent SVG paths for every icon used by the ribbon model', () => {
-    const missing = buildRibbonModel('en')
-      .flatMap((tab) => tab.groups)
-      .flatMap((group) => group.commands)
+    const missing = ribbonCommands('en')
       .filter((command) => command.icon && !fluentIconPaths(command.icon))
       .map((command) => `${command.id}:${command.icon}`);
 
@@ -212,40 +298,47 @@ describe('toolbar/ribbon-model', () => {
 
   it('localizes ribbon model command titles for Japanese Office-like surfaces', () => {
     const commands = new Map(
-      buildRibbonModel('ja')
-        .flatMap((tab) => tab.groups)
-        .flatMap((group) => group.commands)
-        .map((command) => [command.id, command.title]),
+      ribbonCommands('ja').map((command) => [command.id, command.title]),
     );
 
     expect(commands.get('numberFormat')).toBe('数値');
+    expect(commands.get('paste')).toBe('貼り付け');
     expect(commands.get('bold')).toBe('太字 (⌘B)');
-    expect(commands.get('borderPreset')).toBe('罫線パターン');
-    expect(commands.get('borderStyle')).toBe('罫線のスタイル');
-    const borderPreset = buildRibbonModel('ja')
-      .flatMap((tab) => tab.groups)
-      .flatMap((group) => group.commands)
-      .find((command) => command.id === 'borderPreset');
-    expect(borderPreset?.options?.map((option) => option.label)).toEqual(
-      expect.arrayContaining([
-        '内側',
-        '内側横罫線',
-        '内側縦罫線',
-        '右下がり斜め罫線',
-        '右上がり斜め罫線',
-      ]),
-    );
-    expect(commands.get('moreBorders')).toBe('その他の罫線...');
-    expect(commands.get('drawBorder')).toBe('罫線の作成');
-    expect(commands.get('drawBorderGrid')).toBe('罫線グリッドの作成');
-    expect(commands.get('eraseBorder')).toBe('罫線の削除');
-    const borderStyle = buildRibbonModel('ja')
-      .flatMap((tab) => tab.groups)
-      .flatMap((group) => group.commands)
-      .find((command) => command.id === 'borderStyle');
-    expect(borderStyle?.options?.map((option) => option.label)).toEqual(
-      expect.arrayContaining(['極細線', '中太破線', '一点鎖線', '中太一点鎖線', '二点鎖線']),
-    );
+    expect(commands.get('borders')).toBe('罫線');
+    const homeFontCommands =
+      buildRibbonModel('en')
+        .find((tab) => tab.id === 'home')
+        ?.groups.find((group) => group.variant === 'font')
+        ?.commands.map((command) => command.id) ?? [];
+    expect(homeFontCommands.slice(-3)).toEqual(['borders', 'fillColor', 'fontColor']);
+    expect(commands.has('borderPreset')).toBe(false);
+    expect(commands.has('borderStyle')).toBe(false);
+    expect(commands.has('moreBorders')).toBe(false);
+    expect(commands.has('drawBorder')).toBe(false);
+    expect(commands.has('drawBorderGrid')).toBe(false);
+    expect(commands.has('eraseBorder')).toBe(false);
+    const modelCommands = ribbonCommands('en');
+    const homeAlignmentCommands = buildRibbonModel('en')
+      .find((tab) => tab.id === 'home')
+      ?.groups.find((group) => group.variant === 'alignment')
+      ?.commands.map((command) => command.id) ?? [];
+    expect(homeAlignmentCommands).toEqual([
+      'top',
+      'middle',
+      'bottomAlign',
+      'alignL',
+      'alignC',
+      'alignR',
+      'alignment-row-2',
+      'textOrientation',
+      'wrap',
+      'indentDecrease',
+      'indentIncrease',
+      'merge',
+    ]);
+    expect(modelCommands.find((command) => command.id === 'wrap')?.kind).toBe('button');
+    expect(modelCommands.find((command) => command.id === 'currency')?.kind).toBe('button');
+    expect(modelCommands.find((command) => command.id === 'merge')?.kind).toBe('button');
     expect(commands.get('pageSetupAdvanced')).toBe('ページ設定');
     expect(commands.get('sum')).toBe('SUM の引数');
     expect(commands.get('sortAsc')).toBe('昇順で並べ替え');
@@ -276,9 +369,7 @@ describe('toolbar/ribbon-model', () => {
       /^(Acrobat|PDF|R1C1|fx|SUM|AVG|AVERAGE|IF|XLOOKUP|CONCAT|TODAY|PMT|ROUND|A-Z|Z-A|\$|%|,|\.0|\.00|B|I|U|S|\d+%)$/;
     const allowedInline =
       /^(?:オートSUM \(Σ\)|(?:SUM|AVERAGE|IF|XLOOKUP|CONCAT|TODAY|PMT|ROUND) の引数)$/;
-    const untranslated = buildRibbonModel('ja')
-      .flatMap((tab) => tab.groups)
-      .flatMap((group) => group.commands)
+    const untranslated = ribbonCommands('ja')
       .filter((command) => /[A-Za-z]{3,}/.test(command.title))
       .filter((command) => !allowed.test(command.title) && !allowedInline.test(command.title))
       .map((command) => `${command.id}:${command.title}`);

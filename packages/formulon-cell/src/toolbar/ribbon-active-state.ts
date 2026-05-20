@@ -1,13 +1,14 @@
 import { commentAt } from '../commands/comment.js';
 import type { BorderPreset as CommandBorderPreset } from '../commands/format.js';
 import { tableForCell } from '../commands/format-as-table.js';
-import type { Range } from '../engine/types.js';
 import { mergeAt } from '../commands/merge.js';
 import type { MarginPreset } from '../commands/page-setup.js';
 import { marginPresetOf, pageSetupForSheet } from '../commands/page-setup.js';
 import { hiddenInSelection } from '../commands/structure.js';
+import type { Range } from '../engine/types.js';
 import type { Strings } from '../i18n/strings/types.js';
 import type { SpreadsheetInstance } from '../mount.js';
+import { formatWithPending } from '../store/pending-format.js';
 import type {
   CellBorderStyle,
   ConditionalRule,
@@ -133,6 +134,37 @@ export const EMPTY_ACTIVE_STATE: ActiveState = {
   calcMode: null,
   marginPreset: 'normal',
 };
+
+export const RIBBON_ACTIVE_COMMANDS: ReadonlyMap<string, keyof ActiveState> = new Map([
+  ['bold', 'bold'],
+  ['italic', 'italic'],
+  ['underline', 'underline'],
+  ['strike', 'strike'],
+  ['alignL', 'alignLeft'],
+  ['alignC', 'alignCenter'],
+  ['alignR', 'alignRight'],
+  ['top', 'vAlignTop'],
+  ['middle', 'vAlignMiddle'],
+  ['bottomAlign', 'vAlignBottom'],
+  ['wrap', 'wrapText'],
+  ['currency', 'currency'],
+  ['percent', 'percent'],
+  ['comma', 'commaStyle'],
+  ['conditional', 'conditionalFormatting'],
+  ['formatTableHome', 'formatAsTable'],
+  ['freeze', 'frozen'],
+  ['filter', 'filterOn'],
+  ['protect', 'protected'],
+  ['protectReview', 'protected'],
+  ['viewGridlines', 'gridlinesVisible'],
+  ['viewHeadings', 'headingsVisible'],
+  ['viewFormulas', 'formulasVisible'],
+  ['viewR1C1', 'r1c1'],
+  ['viewNormal', 'workbookView'],
+  ['viewPageLayout', 'workbookView'],
+  ['viewPageBreakPreview', 'workbookView'],
+  ['formatPainter', 'formatPainterArmed'],
+]);
 
 const numberFormatOf = (fmt: NumFmt | undefined): string => {
   if (!fmt) return 'general';
@@ -277,7 +309,7 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
   const formatAddr = activeMerge
     ? { sheet: activeMerge.sheet, row: activeMerge.r0, col: activeMerge.c0 }
     : a;
-  const f = s.format.formats.get(`${formatAddr.sheet}:${formatAddr.row}:${formatAddr.col}`);
+  const f = formatWithPending(s, formatAddr);
   const hasConditionalFormatting = s.conditional.rules.some((rule) =>
     rangesIntersect(r, rule.range),
   );

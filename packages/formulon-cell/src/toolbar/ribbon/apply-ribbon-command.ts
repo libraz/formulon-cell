@@ -34,6 +34,7 @@ import type { FeatureFlags } from '../../extensions/index.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { getPageSetup } from '../../store/store.js';
 import type { CellBorderStyle } from '../../store/types.js';
+import type { SessionShapeKind } from '../illustration-types.js';
 import type { ToolbarMenuText } from '../menu-text.js';
 import type { ToolbarText } from '../ribbon-model.js';
 import {
@@ -88,13 +89,17 @@ export interface RibbonHooks {
     openFilter?: () => void;
     removeDuplicates?: () => void;
     splitTextToColumns?: (sep: string) => void;
+    splitTextToColumnsCustom?: () => Promise<unknown> | unknown;
   };
   insert?: {
     createTable?: (variant: 'medium') => Promise<unknown> | unknown;
+    createTableDialog?: () => Promise<unknown> | unknown;
     createChart?: () => void;
+    createRecommendedChart?: () => Promise<unknown> | unknown;
     insertPicture?: (source: 'online') => Promise<unknown> | unknown;
-    insertShape?: (shape: 'rectangle') => void;
+    insertShape?: (shape: SessionShapeKind) => void;
     insertScreenshot?: () => void;
+    insertSymbol?: (symbol: string) => Promise<unknown> | unknown;
   };
   page?: {
     pageBreak?: () => void;
@@ -340,19 +345,20 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
       hooks?.review?.accessibility?.();
       return true;
     case 'formatTableInsert':
-      void hooks?.insert?.createTable?.('medium');
+      if (hooks?.insert?.createTableDialog) void hooks.insert.createTableDialog();
+      else void hooks?.insert?.createTable?.('medium');
       return true;
     case 'removeDupes':
       hooks?.sortFilter?.removeDuplicates?.();
       return true;
     case 'textToColumns':
-      hooks?.sortFilter?.splitTextToColumns?.(',');
-      return true;
-    case 'dataValidation':
-      i.openDataValidationDialog();
+      if (hooks?.sortFilter?.splitTextToColumnsCustom)
+        void hooks.sortFilter.splitTextToColumnsCustom();
+      else hooks?.sortFilter?.splitTextToColumns?.(',');
       return true;
     case 'chartInsert':
-      hooks?.insert?.createChart?.();
+      if (hooks?.insert?.createRecommendedChart) void hooks.insert.createRecommendedChart();
+      else hooks?.insert?.createChart?.();
       return true;
     case 'pictureInsert':
       void hooks?.insert?.insertPicture?.('online');
@@ -362,6 +368,9 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
       return true;
     case 'screenshotInsert':
       hooks?.insert?.insertScreenshot?.();
+      return true;
+    case 'symbolInsert':
+      void hooks?.insert?.insertSymbol?.('more');
       return true;
     case 'autosum':
     case 'autosumFormula':

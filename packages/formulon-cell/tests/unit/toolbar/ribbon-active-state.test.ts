@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { formatAsTable } from '../../../src/commands/format-as-table.js';
 import { applyCellStyle } from '../../../src/commands/cell-styles.js';
 import {
   setAlign,
@@ -10,6 +9,7 @@ import {
   toggleItalic,
   toggleWrap,
 } from '../../../src/commands/format.js';
+import { formatAsTable } from '../../../src/commands/format-as-table.js';
 import {
   setFitToPages,
   setMarginPreset,
@@ -101,6 +101,25 @@ describe('toolbar/ribbon-active-state', () => {
     toggleBold(instance.store.getState(), instance.store);
     expect(projectActiveState(instance).bold).toBe(false);
     expect(projectActiveState(instance).italic).toBe(true);
+  });
+
+  it('projects pending empty-cell format without creating a stored cell format', () => {
+    const { instance } = sheet;
+    mutators.setActive(instance.store, { sheet: 0, row: 0, col: 0 });
+
+    toggleBold(instance.store.getState(), instance.store);
+
+    expect(projectActiveState(instance).bold).toBe(true);
+    expect(instance.store.getState().ui.pendingFormat).toEqual({
+      addr: { sheet: 0, row: 0, col: 0 },
+      format: { bold: true },
+    });
+    expect(instance.store.getState().format.formats.get('0:0:0')).toBeUndefined();
+
+    mutators.setActive(instance.store, { sheet: 0, row: 1, col: 0 });
+
+    expect(projectActiveState(instance).bold).toBe(false);
+    expect(instance.store.getState().ui.pendingFormat).toBeNull();
   });
 
   it('mirrors alignment as exclusive booleans', () => {

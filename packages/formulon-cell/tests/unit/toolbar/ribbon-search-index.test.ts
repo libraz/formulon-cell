@@ -3,7 +3,12 @@ import {
   buildRibbonSearchIndex,
   queryRibbonSearchIndex,
 } from '../../../src/toolbar/ribbon/search-index.js';
-import { EXCEL365_STANDARD_RIBBON_TABS } from '../../../src/toolbar/ribbon-model.js';
+import {
+  EXCEL365_STANDARD_RIBBON_TABS,
+  OPTIONAL_RIBBON_TABS,
+  ribbonActivatableSurfaceCommandIds,
+} from '../../../src/toolbar/ribbon-model.js';
+import { ribbonActivationForCommand } from '../../../src/toolbar/ribbon/activation.js';
 
 describe('toolbar/ribbon/search-index', () => {
   it('builds Search/Tell me items from the shared ribbon model', () => {
@@ -34,7 +39,23 @@ describe('toolbar/ribbon/search-index', () => {
       label: 'Help and training',
       tab: 'help',
     });
+    expect(items.some((item) => item.tab === 'automate')).toBe(false);
     expect(items.some((item) => item.tab === 'acrobat')).toBe(false);
+    expect(items.some((item) => item.commandId === 'script')).toBe(false);
+    expect(items.some((item) => item.commandId === 'pdf')).toBe(false);
+  });
+
+  it('includes optional add-in tabs only when the caller includes that tab surface', () => {
+    const items = buildRibbonSearchIndex('en', { tabs: OPTIONAL_RIBBON_TABS });
+
+    expect(queryRibbonSearchIndex(items, 'script', 8)[0]).toMatchObject({
+      commandId: 'script',
+      tab: 'automate',
+    });
+    expect(queryRibbonSearchIndex(items, 'pdf', 8)[0]).toMatchObject({
+      commandId: 'pdf',
+      tab: 'acrobat',
+    });
   });
 
   it('queries labels, hints, groups, tab names, ids, and option labels', () => {
@@ -115,6 +136,66 @@ describe('toolbar/ribbon/search-index', () => {
       commandId: 'accessibility',
       tab: 'review',
     });
+    expect(queryRibbonSearchIndex(items, 'combine cells')[0]).toMatchObject({
+      commandId: 'merge',
+      tab: 'home',
+    });
+    expect(queryRibbonSearchIndex(items, 'unmerge cells')[0]).toMatchObject({
+      commandId: 'merge',
+      tab: 'home',
+    });
+    expect(queryRibbonSearchIndex(items, 'search and select')[0]).toMatchObject({
+      commandId: 'findHome',
+      tab: 'home',
+    });
+    expect(queryRibbonSearchIndex(items, 'show formula bar')[0]).toMatchObject({
+      commandId: 'viewFormulaBar',
+      tab: 'view',
+    });
+    expect(queryRibbonSearchIndex(items, 'show gridlines')[0]).toMatchObject({
+      commandId: 'pageLayoutGridlinesView',
+      tab: 'pageLayout',
+    });
+    expect(queryRibbonSearchIndex(items, 'page break preview')[0]).toMatchObject({
+      commandId: 'viewPageBreakPreview',
+      tab: 'view',
+    });
+    expect(queryRibbonSearchIndex(items, 'input message')[0]).toMatchObject({
+      commandId: 'dataValidation',
+      tab: 'data',
+    });
+    expect(queryRibbonSearchIndex(items, 'name manager')[0]).toMatchObject({
+      commandId: 'namedRanges',
+      tab: 'formulas',
+    });
+    expect(queryRibbonSearchIndex(items, 'edit links')[0]).toMatchObject({
+      commandId: 'linksData',
+      tab: 'data',
+    });
+    expect(queryRibbonSearchIndex(items, 'screen clipping')[0]).toMatchObject({
+      commandId: 'screenshotInsert',
+      tab: 'insert',
+    });
+    expect(queryRibbonSearchIndex(items, 'stock images')[0]).toMatchObject({
+      commandId: 'pictureInsert',
+      tab: 'insert',
+    });
+    expect(queryRibbonSearchIndex(items, 'recommended charts')[0]).toMatchObject({
+      commandId: 'chartInsert',
+      tab: 'insert',
+    });
+    expect(queryRibbonSearchIndex(items, 'manual calculation')[0]).toMatchObject({
+      commandId: 'calcOptions',
+      tab: 'formulas',
+    });
+    expect(queryRibbonSearchIndex(items, 'watch window')[0]).toMatchObject({
+      commandId: 'watch',
+      tab: 'formulas',
+    });
+    expect(queryRibbonSearchIndex(items, 'protect sheet')[0]).toMatchObject({
+      commandId: 'protectReview',
+      tab: 'review',
+    });
   });
 
   it('uses shared static popularity boosts to break close textual matches', () => {
@@ -177,6 +258,34 @@ describe('toolbar/ribbon/search-index', () => {
 
     expect(standard.some((item) => item.commandId === 'helpSearch')).toBe(false);
     expect(withDisabled.find((item) => item.commandId === 'helpSearch')).toMatchObject({
+      disabled: true,
+      disabledReason: 'Coming soon',
+      tab: 'help',
+    });
+    expect(queryRibbonSearchIndex(withDisabled, 'coming soon', 8)[0]).toMatchObject({
+      commandId: 'helpSearch',
+      disabled: true,
+      disabledReason: 'Coming soon',
+    });
+  });
+
+  it('keeps Search/Tell me disabled state aligned with activation metadata', () => {
+    const items = buildRibbonSearchIndex('en', {
+      includeDisabled: true,
+      tabs: EXCEL365_STANDARD_RIBBON_TABS,
+    });
+    const activatableCommands = new Set(
+      ribbonActivatableSurfaceCommandIds({ tabs: EXCEL365_STANDARD_RIBBON_TABS }),
+    );
+    const activationDisabledCommands = items
+      .filter((item) => item.kind === 'command' && item.commandId)
+      .filter((item) => activatableCommands.has(item.commandId ?? ''))
+      .filter((item) => ribbonActivationForCommand(item.commandId ?? '').kind === 'disabled')
+      .map((item) => item.commandId)
+      .sort();
+
+    expect(activationDisabledCommands).toEqual(['helpSearch']);
+    expect(items.find((item) => item.commandId === 'helpSearch')).toMatchObject({
       disabled: true,
       disabledReason: 'Coming soon',
       tab: 'help',

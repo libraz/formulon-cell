@@ -12,14 +12,24 @@
 
 import type { FeatureFlags } from '../../extensions/index.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
+import { projectDisabledState } from '../menu-a11y.js';
 import type { RibbonDisplayText, ToolbarMenuText } from '../menu-text.js';
 import {
   buildRibbonModel,
+  HOME_MIXED_LAYOUT_GROUP_VARIANTS,
+  HOME_STACKED_LAYOUT_GROUP_VARIANTS,
+  HOME_TILE_LAYOUT_GROUP_VARIANTS,
   RIBBON_KEYSHORTCUTS,
   type RibbonCommand,
   type RibbonTab,
   type ToolbarText,
 } from '../ribbon-model.js';
+import {
+  RIBBON_MENU_FACTORY_FOR_COMMAND,
+  RIBBON_SPLIT_BUTTON_COMMANDS,
+  ribbonActivationForCommand,
+} from './activation.js';
+import { createRibbonButton } from './button.js';
 
 export type RibbonDisplayMode = 'full' | 'singleLine' | 'tabsOnly' | 'autoHide';
 
@@ -36,6 +46,8 @@ export interface RibbonMenus {
   definedNames?: RibbonMenuFactory;
   links?: RibbonMenuFactory;
   borders?: RibbonMenuFactory;
+  underline?: RibbonMenuFactory;
+  merge?: RibbonMenuFactory;
   textOrientation?: RibbonMenuFactory;
   conditional?: RibbonMenuFactory;
   fill?: RibbonMenuFactory;
@@ -65,8 +77,6 @@ export interface RibbonMenus {
   arrange?: RibbonMenuFactory;
   printArea?: RibbonMenuFactory;
   pageBreaks?: RibbonMenuFactory;
-  sheetBackground?: RibbonMenuFactory;
-  printTitles?: RibbonMenuFactory;
   symbol?: RibbonMenuFactory;
   script?: RibbonMenuFactory;
   addIn?: RibbonMenuFactory;
@@ -114,7 +124,7 @@ export interface RenderRibbonApi {
   renderRibbon: () => void;
   playgroundFeatureFlags: () => FeatureFlags;
   legacyCommandIds: Record<string, string>;
-  RIBBON_SPLIT_BUTTON_COMMANDS: Set<string>;
+  RIBBON_SPLIT_BUTTON_COMMANDS: ReadonlySet<string>;
 }
 
 /** Legacy DOM ids stamped onto ribbon buttons that pre-date the
@@ -154,70 +164,110 @@ export const LEGACY_COMMAND_IDS: Record<string, string> = {
 /** Split-button commands that need an extra chevron, aria-haspopup, and the
  *  open/close state on the primary button. Exported so consumers can match
  *  the renderer's choice without re-listing the ids. */
-export const SPLIT_BUTTON_COMMANDS = new Set<string>([
-  'paste',
-  'autosum',
-  'autosumFormula',
-  'addIn',
-  'script',
-  'currency',
-  'pageTheme',
-  'arrangeObjectsPageLayout',
-]);
+export const SPLIT_BUTTON_COMMANDS = RIBBON_SPLIT_BUTTON_COMMANDS;
 
-// Maps a ribbon command id (with optional group variant) to the matching
-// RibbonMenus key. Lives here rather than inline so the dispatch shape is
-// readable and additions show up in one place.
-type MenuRoute = { key: keyof RibbonMenus; variant?: string };
-const MENU_ROUTES: Record<string, MenuRoute> = {
-  paste: { key: 'paste' },
-  pivotTableInsert: { key: 'pivotTable' },
-  namedRanges: { key: 'definedNames' },
-  links: { key: 'links' },
-  linksData: { key: 'links' },
-  borders: { key: 'borders' },
-  textOrientation: { key: 'textOrientation' },
-  conditional: { key: 'conditional' },
-  fillHome: { key: 'fill' },
-  insertRows: { key: 'insertCells' },
-  deleteRows: { key: 'deleteCells' },
-  formatCellsHome: { key: 'formatCells' },
-  autosum: { key: 'autoSum' },
-  freeze: { key: 'freeze' },
-  autosumFormula: { key: 'autoSum' },
-  clearArrows: { key: 'clearArrows' },
-  errorChecking: { key: 'errorChecking' },
-  watch: { key: 'watch' },
-  watchView: { key: 'watch' },
-  deleteCommentReview: { key: 'reviewComments' },
-  protectReview: { key: 'protect' },
-  protect: { key: 'protect' },
-  calcOptions: { key: 'calcOptions' },
-  filter: { key: 'sort' },
-  textToColumns: { key: 'textToColumns' },
-  dataValidation: { key: 'dataValidation' },
-  sortFilterHome: { key: 'sort' },
-  findHome: { key: 'findSelect' },
-  pictureInsert: { key: 'pictureInsert' },
-  shapesInsert: { key: 'shapesInsert' },
-  screenshotInsert: { key: 'screenshotInsert' },
-  chartInsert: { key: 'chartInsert' },
-  formatTableHome: { key: 'tableStyle' },
-  formatTableInsert: { key: 'tableStyle' },
-  cellStyles: { key: 'cellStyles' },
-  currency: { key: 'currency' },
-  pageTheme: { key: 'pageTheme' },
-  arrangeObjectsPageLayout: { key: 'arrange' },
-  printArea: { key: 'printArea' },
-  pageBreaks: { key: 'pageBreaks' },
-  sheetBackground: { key: 'sheetBackground' },
-  printTitles: { key: 'printTitles' },
-  symbolInsert: { key: 'symbol' },
-  script: { key: 'script' },
-  addIn: { key: 'addIn' },
-  pdf: { key: 'pdf' },
-  // 'clearFormat' is special: it only renders the clear menu in the
-  // editing-variant group. See ribbonSubmenuFactoryFor.
+const TILE_LAYOUT_GROUP_VARIANTS = new Set(['tiles', ...HOME_TILE_LAYOUT_GROUP_VARIANTS]);
+const STACKED_LAYOUT_GROUP_VARIANTS: ReadonlySet<string> = new Set(
+  HOME_STACKED_LAYOUT_GROUP_VARIANTS,
+);
+const MIXED_LAYOUT_GROUP_VARIANTS: ReadonlySet<string> = new Set(HOME_MIXED_LAYOUT_GROUP_VARIANTS);
+
+const createRibbonTabButton = (
+  tab: { id: RibbonTab; label: string },
+  activeRibbonTab: RibbonTab,
+): HTMLButtonElement => {
+  return createRibbonButton({
+    className: `demo__ribbon-tab${tab.id === 'file' ? ' demo__ribbon-tab--file' : ''}${
+      tab.id === activeRibbonTab ? ' demo__ribbon-tab--active' : ''
+    }`,
+    role: 'tab',
+    ariaSelected: tab.id === activeRibbonTab,
+    tabIndex: tab.id === activeRibbonTab ? 0 : -1,
+    dataset: { ribbonTab: tab.id },
+    text: tab.label,
+  });
+};
+
+const createRibbonCommandButton = (
+  command: RibbonCommand,
+  ctx: {
+    ribbonText: ToolbarText;
+    createIcon: RibbonRenderHelpers['createIcon'];
+    makeSvg: RibbonRenderHelpers['makeSvg'];
+    chevronPath: string;
+  },
+): HTMLButtonElement => {
+  const layoutClass = command.layout === 'stacked' ? ' demo__rb--stacked' : '';
+  const keyshortcuts = RIBBON_KEYSHORTCUTS[command.id];
+  const activation = ribbonActivationForCommand(command.id);
+  const legacyId = LEGACY_COMMAND_IDS[command.id];
+  const button = createRibbonButton({
+    className: `demo__rb${command.kind === 'large' ? ' demo__rb--large' : ''}${
+      command.kind === 'wide' ? ' demo__rb--wide' : ''
+    }${command.kind === 'mono' ? ' demo__rb--mono' : ''}${layoutClass}${
+      command.className ? ` ${command.className}` : ''
+    }`,
+    id: legacyId,
+    title: command.title,
+    ariaLabel: command.title,
+    ariaKeyshortcuts: keyshortcuts,
+    dataset: {
+      ribbonCommand: command.id,
+      ribbonActivation: activation.kind,
+      ...(activation.menuId ? { ribbonMenuId: activation.menuId } : {}),
+    },
+  });
+  const disabled = !!command.disabled || activation.kind === 'disabled';
+  if (disabled) {
+    const disabledReason = ctx.ribbonText.disabled;
+    projectDisabledState(button, disabled, disabledReason, {
+      datasetKey: 'ribbonDisabledReason',
+      titlePrefix: command.title,
+    });
+  }
+  const textOnly = !command.icon || command.kind === 'mono';
+  const showLabel = textOnly || command.kind === 'wide' || command.kind === 'large';
+  const icon = command.icon && command.kind !== 'mono' ? ctx.createIcon(command.icon) : null;
+  if (icon) button.appendChild(icon);
+  if (showLabel || (!icon && command.kind !== 'mono')) {
+    const label = document.createElement('span');
+    label.textContent = command.label;
+    button.appendChild(label);
+  }
+  if (activation.menuId) {
+    button.setAttribute('aria-haspopup', 'menu');
+    button.setAttribute('aria-expanded', 'false');
+    button.appendChild(ctx.makeSvg('0 0 12 12', ctx.chevronPath, 'demo__rb-split-chevron'));
+  }
+  return button;
+};
+
+const createRibbonDisplayToggleButton = (
+  text: RibbonDisplayText,
+  menuOpen: boolean,
+): HTMLButtonElement => {
+  return createRibbonButton({
+    className: 'demo__ribbon-toggle',
+    dataset: { ribbonToggle: 'true' },
+    ariaHaspopup: 'menu',
+    ariaExpanded: menuOpen,
+    ariaLabel: text.label,
+    title: text.label,
+  });
+};
+
+const createRibbonDisplayOptionButton = (
+  label: string,
+  checked: boolean,
+  option: string,
+): HTMLButtonElement => {
+  return createRibbonButton({
+    className: 'demo__ribbon-display-option',
+    dataset: { ribbonDisplayOption: option },
+    role: 'menuitemradio',
+    ariaChecked: checked,
+    text: label,
+  });
 };
 
 export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
@@ -228,19 +278,12 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
     formulaBar: ctx.state.getFormulaBarVisible(),
   });
 
-  const ribbonSubmenuFactoryFor = (
-    commandId: string,
-    groupVariant?: string,
-  ): (() => HTMLDivElement) | null => {
+  const ribbonSubmenuFactoryFor = (commandId: string): (() => HTMLDivElement) | null => {
     const menus = ctx.menus;
     if (!menus) return null;
-    if (commandId === 'clearFormat') {
-      const f = menus.clear;
-      return groupVariant === 'editing' && f ? () => f(commandId) : null;
-    }
-    const route = MENU_ROUTES[commandId];
-    if (!route) return null;
-    const factory = menus[route.key];
+    const routeKey = RIBBON_MENU_FACTORY_FOR_COMMAND[commandId] as keyof RibbonMenus | undefined;
+    if (!routeKey) return null;
+    const factory = menus[routeKey];
     return factory ? () => factory(commandId) : null;
   };
 
@@ -271,17 +314,7 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
     tabs.setAttribute('aria-label', ribbonText.ribbonTabs);
     tabs.dataset.ribbonCollapsed = ribbonCollapsed ? 'true' : 'false';
     for (const tab of model) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = `demo__ribbon-tab${tab.id === 'file' ? ' demo__ribbon-tab--file' : ''}${
-        tab.id === activeRibbonTab ? ' demo__ribbon-tab--active' : ''
-      }`;
-      btn.setAttribute('role', 'tab');
-      btn.setAttribute('aria-selected', tab.id === activeRibbonTab ? 'true' : 'false');
-      btn.tabIndex = tab.id === activeRibbonTab ? 0 : -1;
-      btn.dataset.ribbonTab = tab.id;
-      btn.textContent = tab.label;
-      tabs.appendChild(btn);
+      tabs.appendChild(createRibbonTabButton(tab, activeRibbonTab));
     }
     shell.appendChild(tabs);
 
@@ -295,7 +328,20 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
 
       for (const g of tab.groups) {
         const group = document.createElement('section');
-        group.className = `demo__ribbon-group${g.variant ? ` demo__ribbon-group--${g.variant}` : ''}`;
+        const groupClasses = ['demo__ribbon-group'];
+        if (g.variant) {
+          groupClasses.push(`demo__ribbon-group--${g.variant}`);
+          if (TILE_LAYOUT_GROUP_VARIANTS.has(g.variant) && g.variant !== 'tiles') {
+            groupClasses.push('demo__ribbon-group--tiles');
+          }
+          if (STACKED_LAYOUT_GROUP_VARIANTS.has(g.variant)) {
+            groupClasses.push('demo__ribbon-group--stacked');
+          }
+          if (MIXED_LAYOUT_GROUP_VARIANTS.has(g.variant)) {
+            groupClasses.push('demo__ribbon-group--mixed');
+          }
+        }
+        group.className = groupClasses.join(' ');
         group.setAttribute('aria-label', g.title);
 
         const tools = document.createElement('div');
@@ -316,37 +362,14 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
             tools.appendChild(createColor(c));
             continue;
           }
-          const b = document.createElement('button');
-          b.type = 'button';
-          b.className = `demo__rb${c.kind === 'large' ? ' demo__rb--large' : ''}${
-            c.kind === 'wide' ? ' demo__rb--wide' : ''
-          }${c.kind === 'mono' ? ' demo__rb--mono' : ''}`;
-          b.title = c.title;
-          b.setAttribute('aria-label', c.title);
-          const keyshortcuts = RIBBON_KEYSHORTCUTS[c.id];
-          if (keyshortcuts) b.setAttribute('aria-keyshortcuts', keyshortcuts);
-          b.dataset.ribbonCommand = c.id;
-          const legacyId = LEGACY_COMMAND_IDS[c.id];
-          if (legacyId) b.id = legacyId;
-          b.disabled = !!c.disabled;
-          const textOnly = !c.icon || c.kind === 'mono';
-          const showLabel = textOnly || c.kind === 'wide' || c.kind === 'large';
-          const icon = c.icon && c.kind !== 'mono' ? createIcon(c.icon) : null;
-          if (icon) {
-            b.appendChild(icon);
-          }
-          if (showLabel || (!icon && c.kind !== 'mono')) {
-            const label = document.createElement('span');
-            label.textContent = c.label;
-            b.appendChild(label);
-          }
-          if (SPLIT_BUTTON_COMMANDS.has(c.id)) {
-            b.setAttribute('aria-haspopup', 'menu');
-            b.setAttribute('aria-expanded', 'false');
-            b.appendChild(makeSvg('0 0 12 12', chevronPath, 'demo__rb-split-chevron'));
-          }
+          const b = createRibbonCommandButton(c, {
+            ribbonText,
+            createIcon,
+            makeSvg,
+            chevronPath,
+          });
           tools.appendChild(b);
-          const submenu = ribbonSubmenuFactoryFor(c.id, g.variant);
+          const submenu = ribbonSubmenuFactoryFor(c.id);
           if (submenu) tools.appendChild(submenu());
         }
 
@@ -364,14 +387,10 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
     if (!backstageOpen) {
       const display = document.createElement('div');
       display.className = 'demo__ribbon-display';
-      const toggle = document.createElement('button');
-      toggle.type = 'button';
-      toggle.className = 'demo__ribbon-toggle';
-      toggle.dataset.ribbonToggle = 'true';
-      toggle.setAttribute('aria-haspopup', 'menu');
-      toggle.setAttribute('aria-expanded', ribbonDisplayMenuOpen ? 'true' : 'false');
-      toggle.setAttribute('aria-label', ribbonDisplayOptionsText.label);
-      toggle.title = toggle.getAttribute('aria-label') ?? '';
+      const toggle = createRibbonDisplayToggleButton(
+        ribbonDisplayOptionsText,
+        ribbonDisplayMenuOpen,
+      );
       display.appendChild(toggle);
       if (ribbonDisplayMenuOpen) {
         const menu = document.createElement('div');
@@ -384,13 +403,7 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
           [ribbonDisplayOptionsText.autoHide, ribbonDisplayMode === 'autoHide', 'autoHide'],
         ];
         for (const [label, checked, option] of options) {
-          const item = document.createElement('button');
-          item.type = 'button';
-          item.className = 'demo__ribbon-display-option';
-          item.dataset.ribbonDisplayOption = option;
-          item.setAttribute('role', 'menuitemradio');
-          item.setAttribute('aria-checked', checked ? 'true' : 'false');
-          item.textContent = label;
+          const item = createRibbonDisplayOptionButton(label, checked, option);
           menu.appendChild(item);
         }
         display.appendChild(menu);

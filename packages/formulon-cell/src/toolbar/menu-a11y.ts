@@ -3,9 +3,51 @@ type MenuOptions = {
   restoreFocusTo?: HTMLElement | null;
 };
 
+export interface DisabledReasonProjectionOptions {
+  ariaDescription?: boolean;
+  describedById?: string | null;
+  datasetKey?: string;
+  title?: boolean;
+  titlePrefix?: string;
+}
+
+export function projectDisabledReason(
+  el: HTMLElement,
+  reason: string | null,
+  options: DisabledReasonProjectionOptions = {},
+): void {
+  const useTitle = options.title ?? true;
+  const useAriaDescription = options.ariaDescription ?? !options.describedById;
+  if (reason) {
+    if (useTitle) el.title = options.titlePrefix ? `${options.titlePrefix}\n${reason}` : reason;
+    if (options.describedById) el.setAttribute('aria-describedby', options.describedById);
+    if (useAriaDescription) el.setAttribute('aria-description', reason);
+    if (options.datasetKey) el.dataset[options.datasetKey] = reason;
+    return;
+  }
+  if (useTitle) el.title = options.titlePrefix ?? '';
+  if (options.describedById !== undefined) el.removeAttribute('aria-describedby');
+  if (useAriaDescription) el.removeAttribute('aria-description');
+  if (options.datasetKey) delete el.dataset[options.datasetKey];
+}
+
+export function projectDisabledState<T extends HTMLElement & { disabled?: boolean }>(
+  el: T,
+  disabled: boolean,
+  reason: string | null,
+  options: DisabledReasonProjectionOptions = {},
+): void {
+  if ('disabled' in el) el.disabled = disabled;
+  el.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+  projectDisabledReason(el, disabled ? reason : null, options);
+}
+
 const menuItems = (menu: HTMLElement): HTMLButtonElement[] =>
   Array.from(menu.querySelectorAll<HTMLButtonElement>('button')).filter(
-    (item) => !item.disabled && item.closest<HTMLElement>('[role="menu"]') === menu,
+    (item) =>
+      !item.disabled &&
+      item.getAttribute('aria-disabled') !== 'true' &&
+      item.closest<HTMLElement>('[role="menu"]') === menu,
   );
 
 export function prepareMenu(menu: HTMLElement, label?: string): void {
