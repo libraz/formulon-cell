@@ -21,18 +21,23 @@ import {
   type AutoSumFunction,
   addConditionalRule,
   addPrintArea,
-  applyCellFormatAction,
+  applyAdvancedFilter,
+  applyMerge,
   applyTextScriptToRange,
+  applyUnmerge,
   autoSum,
   buildRibbonAddInReport,
   type ConditionalRule,
+  cellValueIsFormulaError,
   clearPrintArea,
-  clearPrintTitles,
   clearSheetBackgroundImage,
   clearTraceArrowsByKind,
   clearValidationInRangeWithEngine,
   clearWatchedCells,
   colLetter,
+  commentAt,
+  conditionalRulesForRange,
+  copyAdvancedFilterResult,
   createDefinedNamesFromSelection,
   createRibbonChartFromSelection,
   dispatchHostClipboard,
@@ -47,18 +52,22 @@ import {
   type FreezeAction,
   fillRange,
   formatA1Range,
+  getPageSetup,
   handleDeleteCellsAction,
   handleFreezeAction,
   handleInsertCellsAction,
   handlePasteAction,
+  hiddenInSelection,
   inferAutoFilterRange,
   inferFillSeriesDirection,
   inferSortHasHeader,
   insertDefinedNameFormula,
   insertManualPageBreak,
+  listComments,
   listDefinedNames,
   mutators,
   type PasteAction,
+  parseA1Range,
   parseScriptCommand,
   type Range,
   type RibbonAddInAction,
@@ -76,10 +85,9 @@ import {
   resolveRibbonPdfAction,
   type SessionChartKind,
   type SpreadsheetInstance,
+  setAlign,
   setNumFmt,
   setPrintArea,
-  setPrintTitleCols,
-  setPrintTitleRows,
   setRotation,
   setSheetBackgroundImage,
   setWorkbookStructureProtected,
@@ -95,15 +103,27 @@ import {
   createCellStyleFromActiveFormat,
   mergeCellStylesFromWorkbook,
 } from '../commands/cell-styles.js';
+import { applyFormatPatch } from '../commands/format.js';
 import {
   applyPivotTableStyleById,
   createPivotTableStyleFromActivePivot,
   createTableStyleFromActiveTable,
   DEFAULT_TABLE_COLOR,
   formatAsTableByStyleId,
+  inferTableHasHeaders,
+  pivotTableStyleAssignment,
   tableOverlayAt,
   tableVariantFromOptions,
 } from '../commands/format-as-table.js';
+import { hyperlinkAt } from '../commands/hyperlinks.js';
+import {
+  addAllowedEditRange,
+  isWorkbookStructureProtected,
+  protectedSheetPassword,
+  protectedSheetPasswordHash,
+  protectedSheetPermissions,
+  verifySheetProtectionPasswordHash,
+} from '../commands/protection.js';
 import {
   arrangeSessionIllustration,
   createRibbonImageFromSelection,
@@ -112,15 +132,35 @@ import {
 import { cellValueViolatesValidation } from '../commands/validate.js';
 import { addrKey } from '../engine/address.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
+import { sheetTabColorActionForColor, sheetTabColorByAction } from '../sheet-tab-colors.js';
+import { formatWithPending } from '../store/pending-format.js';
+import { showAdvancedFilterDialog } from '../toolbar/dialogs/advanced-filter.js';
 import { showCellStyleDialog } from '../toolbar/dialogs/cell-style.js';
 import { showChoiceDialog } from '../toolbar/dialogs/choice.js';
+import {
+  showConditionalFormatNumberDialog,
+  showConditionalFormatTextDialog,
+} from '../toolbar/dialogs/conditional-format.js';
+import { showDefinedNamePickerDialog } from '../toolbar/dialogs/defined-name-picker.js';
+import { showFormatAsTableDialog } from '../toolbar/dialogs/format-as-table.js';
 import { pickImageFileDataUrl } from '../toolbar/dialogs/image-file.js';
-import { showMessage, showNumberPrompt, showPrompt } from '../toolbar/dialogs/prompt.js';
+import { showDimensionDialog } from '../toolbar/dialogs/dimension.js';
+import { showMessage } from '../toolbar/dialogs/prompt.js';
+import {
+  showAllowEditRangeDialog,
+  showProtectSheetDialog,
+  showUnprotectSheetDialog,
+} from '../toolbar/dialogs/protection.js';
 import { showRemoveDuplicatesDialog } from '../toolbar/dialogs/remove-duplicates.js';
-import { showReport } from '../toolbar/dialogs/report.js';
+import { showRenameSheetDialog } from '../toolbar/dialogs/rename-sheet.js';
+import { reportDialogLabels, showReport } from '../toolbar/dialogs/report.js';
+import { showScriptCommandDialog } from '../toolbar/dialogs/script-command.js';
 import { type SortDialogColumn, showSortDialog } from '../toolbar/dialogs/sort.js';
 import { showSymbolDialog } from '../toolbar/dialogs/symbol.js';
 import { showTableStyleDialog } from '../toolbar/dialogs/table-style.js';
+import { showTextToColumnsDialog } from '../toolbar/dialogs/text-to-columns.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { applyCellFormatAction } from '../toolbar/ribbon/cell-format-action.js';
 import { applyConditionalMenuAction } from '../toolbar/ribbon/conditional-menu-action.js';
 import type { DynamicDropdownsCtx } from '../toolbar/ribbon/dynamic-dropdowns.js';
 import { fillSeriesSourceRange, showFillSeriesDialog } from '../toolbar/ribbon/fill-series.js';
@@ -135,6 +175,10 @@ export interface DefaultDynamicDropdownsOptions {
    *  ctx after `mountToolbar` returns) — the ctx will lazily resolve each
    *  handler on every dispatch. */
   overrides?: Partial<DynamicDropdownsCtx> | (() => Partial<DynamicDropdownsCtx>);
+  focusSheet?: () => void;
+  projectFormatToolbar?: () => void;
+  refreshCells?: () => void;
+  renderSheetTabs?: () => void;
 }
 
 const noop = (): void => undefined;
@@ -176,13 +220,69 @@ const buildFillDirection =
     instance.host.focus();
   };
 
+const setMenuControlDisabled = (
+  button: HTMLButtonElement,
+  disabled: boolean,
+  reason?: string,
+): void => {
+  const baseTitle = button.dataset.menuBaseTitle ?? button.title;
+  button.dataset.menuBaseTitle = baseTitle;
+  projectDisabledState(button, disabled, reason ?? null, {
+    datasetKey: 'menuDisabledReason',
+    titlePrefix: baseTitle,
+  });
+};
+
+const updateFillMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateFillMenu'] =>
+  (menu) => {
+    const range = normalizedSelectionRange(instance);
+    const hasMultipleRows = range.r1 > range.r0;
+    const hasMultipleCols = range.c1 > range.c0;
+    const strings = instance.i18n.strings.ribbonMenu;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-fill]')) {
+      const action = button.dataset.fill;
+      const disabled =
+        ((action === 'down' || action === 'up') && !hasMultipleRows) ||
+        ((action === 'right' || action === 'left') && !hasMultipleCols);
+      const reason =
+        action === 'down' || action === 'up'
+          ? strings.fillRequiresMultipleRows
+          : action === 'right' || action === 'left'
+            ? strings.fillRequiresMultipleCols
+            : undefined;
+      setMenuControlDisabled(button, disabled, reason);
+    }
+  };
+
 const buildFillSeries =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyFillSeries'] =>
   async (mode) => {
     const range = normalizedSelectionRange(instance);
+    const fillSeriesDialogStrings = (
+      instance.i18n.strings as typeof instance.i18n.strings & {
+        fillSeriesDialog: {
+          title: string;
+          seriesIn: string;
+          columns: string;
+          rows: string;
+          up: string;
+          left: string;
+          type: string;
+          autoFill: string;
+          copy: string;
+          day: string;
+          weekday: string;
+          month: string;
+          year: string;
+          ok: string;
+          cancel: string;
+        };
+      }
+    ).fillSeriesDialog;
     const choice = mode
       ? { direction: inferFillSeriesDirection(range), mode }
-      : await showFillSeriesDialog(range, instance.i18n.locale === 'en' ? 'en' : 'ja');
+      : await showFillSeriesDialog(range, fillSeriesDialogStrings);
     if (!choice) return;
     const src = fillSeriesSourceRange(range, choice.direction);
     if (src.r0 === range.r0 && src.r1 === range.r1 && src.c0 === range.c0 && src.c1 === range.c1) {
@@ -234,6 +334,60 @@ const buildClearAction =
     instance.host.focus();
   };
 
+const updateClearMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateClearMenu'] =>
+  (menu) => {
+    const state = instance.store.getState();
+    const range = state.selection.range;
+    let hasContents = false;
+    let hasFormats = false;
+    let hasComments = false;
+    let hasHyperlinks = false;
+    const pending = (
+      state.ui as typeof state.ui & {
+        pendingFormat?: {
+          addr: { sheet: number; row: number; col: number };
+          format: object;
+        } | null;
+      }
+    ).pendingFormat;
+    if (
+      pending &&
+      pending.addr.sheet === range.sheet &&
+      pending.addr.row >= range.r0 &&
+      pending.addr.row <= range.r1 &&
+      pending.addr.col >= range.c0 &&
+      pending.addr.col <= range.c1 &&
+      Object.keys(pending.format).length > 0
+    ) {
+      hasFormats = true;
+    }
+    for (let row = range.r0; row <= range.r1; row += 1) {
+      for (let col = range.c0; col <= range.c1; col += 1) {
+        const key = `${range.sheet}:${row}:${col}`;
+        const addr = { sheet: range.sheet, row, col };
+        if (state.data.cells.has(key)) hasContents = true;
+        if (state.format.formats.has(key)) hasFormats = true;
+        if (commentAt(state, addr) !== null) hasComments = true;
+        if (hyperlinkAt(state, addr) !== null) hasHyperlinks = true;
+      }
+    }
+    const hasConditional = conditionalRulesForRange(state, range).length > 0;
+    const hasAny = hasContents || hasFormats || hasComments || hasHyperlinks || hasConditional;
+    const disabledReason = instance.i18n.strings.ribbon.clearRequiresTarget;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-clear]')) {
+      const action = button.dataset.clear;
+      const disabled =
+        (action === 'all' && !hasAny) ||
+        (action === 'contents' && !hasContents) ||
+        (action === 'formats' && !hasFormats) ||
+        (action === 'comments' && !hasComments) ||
+        ((action === 'hyperlinks' || action === 'remove-hyperlinks') && !hasHyperlinks) ||
+        (action === 'conditional' && !hasConditional);
+      setMenuControlDisabled(button, disabled, disabledReason);
+    }
+  };
+
 const freezeActionFromMenu = (action: string): FreezeAction | null => {
   if (action === 'row') return 'topRow';
   if (action === 'col') return 'firstColumn';
@@ -248,6 +402,65 @@ const buildFreezeAction =
     const next = freezeActionFromMenu(action);
     if (!next) return;
     handleFreezeAction(instance, next);
+    instance.host.focus();
+  };
+
+const updateFreezeMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateFreezeMenu'] =>
+  (menu) => {
+    const state = instance.store.getState();
+    const hasFreeze = state.layout.freezeRows > 0 || state.layout.freezeCols > 0;
+    const strings = instance.i18n.strings;
+    const toolbarStrings = strings.toolbar as typeof strings.toolbar & { unfreezePanes?: string };
+    const primary = menu.querySelector<HTMLButtonElement>(
+      '[data-freeze="selection"], [data-freeze="off"]',
+    );
+    if (primary) {
+      primary.dataset.freeze = hasFreeze ? 'off' : 'selection';
+      setMenuControlDisabled(primary, false);
+      const text = primary.querySelector<HTMLElement>('.app__menu-item__text');
+      if (text) {
+        text.textContent = hasFreeze
+          ? (toolbarStrings.unfreezePanes ?? strings.toolbar.unfreeze)
+          : strings.viewToolbar.freezePanes;
+      }
+      const icon = primary.querySelector<HTMLElement>('.app__menu-icon');
+      icon?.classList.toggle('app__menu-icon--freeze-panes', !hasFreeze);
+      icon?.classList.toggle('app__menu-icon--freeze-off', hasFreeze);
+    }
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-freeze]')) {
+      if (button === primary) continue;
+      setMenuControlDisabled(button, false);
+    }
+  };
+
+const buildUnderlineAction =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyUnderlineAction'] =>
+  async (action) => {
+    const strings = instance.i18n.strings;
+    const ribbonMenu = strings.ribbonMenu as typeof strings.ribbonMenu & {
+      underlineDouble: string;
+    };
+    const doubleUnderlineLabel = ribbonMenu.underlineDouble;
+    if (action === 'single') {
+      recordFormatChange(instance.history, instance.store, () => {
+        applyFormatPatch(
+          instance.store.getState(),
+          instance.store,
+          instance.store.getState().selection.range,
+          { underline: true },
+        );
+      });
+      instance.host.focus();
+      return;
+    }
+    await showInstanceReport(instance, doubleUnderlineLabel, [
+      {
+        severity: 'warning',
+        label: doubleUnderlineLabel,
+        detail: strings.workbookObjects.compatibilityDetails.cellFormatting,
+      },
+    ]);
     instance.host.focus();
   };
 
@@ -272,6 +485,64 @@ const buildTextOrientation =
       setRotation(instance.store.getState(), instance.store, rotation);
     });
     instance.host.focus();
+  };
+
+const buildMergeAction =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyMergeAction'] =>
+  (action) => {
+    const range = instance.store.getState().selection.range;
+    if (action === 'unmergeCells') {
+      applyUnmerge(instance.store, instance.workbook, instance.history, range);
+    } else if (action === 'mergeAcross') {
+      instance.history.begin();
+      try {
+        for (let row = range.r0; row <= range.r1; row += 1) {
+          applyMerge(instance.store, instance.workbook, instance.history, {
+            sheet: range.sheet,
+            r0: row,
+            c0: range.c0,
+            r1: row,
+            c1: range.c1,
+          });
+        }
+      } finally {
+        instance.history.end();
+      }
+    } else {
+      const merged = applyMerge(instance.store, instance.workbook, instance.history, range);
+      if (merged && action === 'mergeCenter') {
+        recordFormatChange(instance.history, instance.store, () => {
+          setAlign(instance.store.getState(), instance.store, 'center');
+        });
+      }
+    }
+    instance.host.focus();
+  };
+
+const updateTextOrientationMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateTextOrientationMenu'] =>
+  (menu) => {
+    const state = instance.store.getState();
+    const active = state.selection.active;
+    const rotation = formatWithPending(state, active)?.rotation ?? 0;
+    const current =
+      rotation === 45
+        ? 'ccw'
+        : rotation === -45
+          ? 'cw'
+          : rotation === 90
+            ? 'up'
+            : rotation === -90
+              ? 'down'
+              : 'horizontal';
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-text-orientation]')) {
+      const action = button.dataset.textOrientation;
+      if (action === 'format') continue;
+      const activeItem = action === current;
+      button.setAttribute('role', 'menuitemradio');
+      button.setAttribute('aria-checked', String(activeItem));
+      button.classList.toggle('app__menu-item--active', activeItem);
+    }
   };
 
 const buildAutoSumFormula =
@@ -322,6 +593,45 @@ const buildWatchAction =
     }
   };
 
+const updateReviewCommentsMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateReviewCommentsMenu'] =>
+  (menu) => {
+    const state = instance.store.getState();
+    const hasActiveComment = commentAt(state, state.selection.active) !== null;
+    const hasAnyComment = listComments(state, state.data.sheetIndex).length > 0;
+    const strings = instance.i18n.strings.ribbonMenu;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-comment-action]')) {
+      const action = button.dataset.commentAction;
+      const disabled =
+        (action === 'delete-active' && !hasActiveComment) ||
+        (action === 'delete-all' && !hasAnyComment);
+      const reason =
+        action === 'delete-active' ? strings.commentDeleteRequiresActive : strings.commentNone;
+      setMenuControlDisabled(button, disabled, reason);
+    }
+  };
+
+const updateWatchMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateWatchMenu'] =>
+  (menu) => {
+    const state = instance.store.getState();
+    const active = state.selection.active;
+    const hasWatches = state.watch.watches.length > 0;
+    const activeWatched = state.watch.watches.some(
+      (watch) =>
+        watch.sheet === active.sheet && watch.row === active.row && watch.col === active.col,
+    );
+    const strings = instance.i18n.strings.ribbonMenu;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-watch-action]')) {
+      const action = button.dataset.watchAction;
+      const disabled =
+        (action === 'delete' && !activeWatched) || (action === 'delete-all' && !hasWatches);
+      const reason =
+        action === 'delete' ? strings.watchDeleteRequiresActive : strings.watchDeleteAllRequiresAny;
+      setMenuControlDisabled(button, disabled, reason);
+    }
+  };
+
 const buildCalcOptionAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyCalcOptionAction'] =>
   (action) => {
@@ -338,6 +648,24 @@ const buildCalcOptionAction =
     }
     if (action === 'iterative') {
       instance.openIterativeDialog();
+    }
+  };
+
+const calcOptionForMode = (mode: 0 | 1 | 2 | null): 'auto' | 'manual' | 'auto-no-table' | null => {
+  if (mode === 0) return 'auto';
+  if (mode === 1) return 'manual';
+  if (mode === 2) return 'auto-no-table';
+  return null;
+};
+
+const updateCalcOptionsMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateCalcOptionsMenu'] =>
+  (menu) => {
+    const current = calcOptionForMode(instance.workbook.calcMode());
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')) {
+      const active = button.dataset.calcOption === current;
+      button.setAttribute('aria-checked', String(active));
+      button.classList.toggle('app__menu-item--active', active);
     }
   };
 
@@ -422,6 +750,46 @@ const buildFormulaAuditAction =
     instance.host.focus();
   };
 
+const updateErrorCheckingMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateErrorCheckingMenu'] =>
+  (menu) => {
+    const state = instance.store.getState();
+    const active = state.selection.active;
+    const cell = state.data.cells.get(addrKey(active));
+    const activeFormulaError = Boolean(cell?.formula && cellValueIsFormulaError(cell.value));
+    const disabledReason = instance.i18n.strings.ribbonMenu.traceErrorRequiresFormulaError;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-formula-audit-action]')) {
+      const action = button.dataset.formulaAuditAction;
+      const disabled =
+        (action === 'trace-error' || action === 'ignore-error') && !activeFormulaError;
+      setMenuControlDisabled(button, disabled, disabledReason);
+    }
+  };
+
+const updateClearArrowsMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateClearArrowsMenu'] =>
+  (menu) => {
+    const traces = instance.store.getState().traces.items;
+    const hasPrecedents = traces.some((trace) => trace.kind === 'precedent');
+    const hasDependents = traces.some((trace) => trace.kind === 'dependent');
+    const hasAny = hasPrecedents || hasDependents;
+    const strings = instance.i18n.strings.ribbonMenu;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-formula-audit-action]')) {
+      const action = button.dataset.formulaAuditAction;
+      const disabled =
+        (action === 'clear-all' && !hasAny) ||
+        (action === 'clear-precedents' && !hasPrecedents) ||
+        (action === 'clear-dependents' && !hasDependents);
+      const reason =
+        action === 'clear-precedents'
+          ? strings.removePrecedentArrowsRequiresAny
+          : action === 'clear-dependents'
+            ? strings.removeDependentArrowsRequiresAny
+            : strings.removeArrowsRequiresAny;
+      setMenuControlDisabled(button, disabled, reason);
+    }
+  };
+
 const buildPasteAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyRibbonPasteAction'] =>
   (action) => {
@@ -451,6 +819,18 @@ const buildPasteAction =
       return;
     }
     if (mapped) handlePasteAction(instance, mapped);
+  };
+
+const updatePasteMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updatePasteMenu'] =>
+  (menu) => {
+    const hasSnapshot = instance.clipboard?.getSnapshot() != null;
+    const disabledReason = instance.i18n.strings.ribbon.pasteRequiresClipboard;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-paste-action]')) {
+      const action = button.dataset.pasteAction;
+      const disabled = action !== 'all' && !hasSnapshot;
+      setMenuControlDisabled(button, disabled, disabledReason);
+    }
   };
 
 const buildCellInsertAction =
@@ -485,22 +865,14 @@ const buildCellDeleteAction =
     instance.host.focus();
   };
 
-const sheetTabColorByAction = (action: string): string | null | undefined => {
-  const colors: Record<string, string | null> = {
-    'tab-color-none': null,
-    'tab-color-red': '#c00000',
-    'tab-color-orange': '#ed7d31',
-    'tab-color-yellow': '#ffc000',
-    'tab-color-green': '#70ad47',
-    'tab-color-blue': '#4472c4',
-    'tab-color-purple': '#7030a0',
-    'tab-color-gray': '#7f7f7f',
-  };
-  return colors[action];
-};
-
 const buildCellFormatAction =
-  (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyCellFormatAction'] =>
+  (
+    instance: SpreadsheetInstance,
+    opts: Pick<
+      DefaultDynamicDropdownsOptions,
+      'projectFormatToolbar' | 'refreshCells' | 'renderSheetTabs'
+    >,
+  ): DynamicDropdownsCtx['applyCellFormatAction'] =>
   async (action) => {
     const strings = instance.i18n.strings;
     await applyCellFormatAction(action, {
@@ -513,32 +885,97 @@ const buildCellFormatAction =
       runSheetProtectionFlow: async () => {
         instance.toggleSheetProtection();
       },
-      showPrompt,
+      showRenameSheetDialog: (opts) =>
+        showRenameSheetDialog({
+          okLabel: strings.hyperlinkDialog.ok,
+          cancelLabel: strings.hyperlinkDialog.cancel,
+          ...opts,
+        }),
       promptDimension: (title, label, initial, max) =>
-        showNumberPrompt({
+        showDimensionDialog({
           title,
           label,
           initial,
-          min: 1,
           max,
           okLabel: strings.hyperlinkDialog.ok,
           cancelLabel: strings.hyperlinkDialog.cancel,
         }),
-      renderSheetTabs: noop,
+      renderSheetTabs: opts.renderSheetTabs ?? noop,
       switchSheet: (idx) => {
         mutators.setSheetIndex(instance.store, idx);
       },
-      refreshWorkbookCells: () => {
-        mutators.replaceCells(
-          instance.store,
-          instance.workbook.cells(instance.store.getState().data.sheetIndex),
-        );
-      },
+      refreshWorkbookCells:
+        opts.refreshCells ??
+        (() => {
+          mutators.replaceCells(
+            instance.store,
+            instance.workbook.cells(instance.store.getState().data.sheetIndex),
+          );
+        }),
       sheetTabColorByAction,
-      projectFormatToolbar: noop,
+      projectFormatToolbar: opts.projectFormatToolbar ?? noop,
       focusSheet: () => instance.host.focus(),
     });
     instance.host.focus();
+  };
+
+const updateFormatCellsMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateFormatCellsMenu'] =>
+  (menu) => {
+    const state = instance.store.getState();
+    const range = normalizedSelectionRange(instance);
+    const rowsHidden = hiddenInSelection(state.layout, 'row', range.r0, range.r1).length > 0;
+    const colsHidden = hiddenInSelection(state.layout, 'col', range.c0, range.c1).length > 0;
+    const sheet = state.data.sheetIndex;
+    const hiddenSheetCount = state.layout.hiddenSheets.size;
+    const visibleSheetCount = instance.workbook.sheetCount - hiddenSheetCount;
+    const canMoveSheet = instance.workbook.capabilities.sheetMutate;
+    const activeTabColorAction = sheetTabColorActionForColor(
+      state.layout.sheetTabColors.get(sheet),
+    );
+    const reasonForFormatAction = (action: string | undefined): string | undefined => {
+      const t = instance.i18n.strings.ribbonMenu;
+      if (action === 'show-rows' && !rowsHidden) return t.formatNoHiddenRows;
+      if (action === 'show-cols' && !colsHidden) return t.formatNoHiddenCols;
+      if (
+        (action === 'rename-sheet' ||
+          action === 'move-sheet-left' ||
+          action === 'move-sheet-right' ||
+          action === 'hide-sheet' ||
+          action === 'unhide-sheet') &&
+        !canMoveSheet
+      ) {
+        return t.sheetActionUnavailable;
+      }
+      if (action === 'move-sheet-left' && sheet <= 0) return t.sheetMoveAtBoundary;
+      if (action === 'move-sheet-right' && sheet >= instance.workbook.sheetCount - 1) {
+        return t.sheetMoveAtBoundary;
+      }
+      if (action === 'hide-sheet' && visibleSheetCount <= 1) return t.sheetHideRequiresVisibleSheet;
+      if (action === 'unhide-sheet' && hiddenSheetCount === 0) {
+        return t.sheetUnhideRequiresHiddenSheet;
+      }
+      return undefined;
+    };
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-cell-format]')) {
+      const action = button.dataset.cellFormat;
+      const disabled =
+        (action === 'show-rows' && !rowsHidden) ||
+        (action === 'show-cols' && !colsHidden) ||
+        (action === 'rename-sheet' && !canMoveSheet) ||
+        (action === 'move-sheet-left' && (sheet <= 0 || !canMoveSheet)) ||
+        (action === 'move-sheet-right' &&
+          (sheet >= instance.workbook.sheetCount - 1 || !canMoveSheet)) ||
+        (action === 'hide-sheet' && visibleSheetCount <= 1) ||
+        (action === 'unhide-sheet' && hiddenSheetCount === 0);
+      setMenuControlDisabled(button, disabled, reasonForFormatAction(action));
+      if (action?.startsWith('tab-color-')) {
+        const active = action === activeTabColorAction;
+        button.setAttribute('role', 'menuitemradio');
+        button.setAttribute('aria-checked', String(active));
+        button.classList.toggle('app__color-swatch--active', active);
+      }
+    }
   };
 
 const buildDefinedNameAction =
@@ -570,8 +1007,8 @@ const buildDefinedNameAction =
       return;
     }
     if (action === 'use-formula') {
-      const first = listDefinedNames(instance.workbook)[0];
-      if (!first) {
+      const names = listDefinedNames(instance.workbook);
+      if (names.length === 0) {
         await showReport({
           title: instance.i18n.strings.ribbonMenu.useInFormula,
           items: [
@@ -581,16 +1018,24 @@ const buildDefinedNameAction =
               detail: '',
             },
           ],
-          closeLabel: instance.i18n.strings.workbookObjects.close,
-          infoLabel: instance.i18n.strings.reviewReports.info,
-          warningLabel: instance.i18n.strings.reviewReports.warning,
+          ...reportDialogLabels(instance.i18n.strings),
         });
+        return;
+      }
+      const selected = await showDefinedNamePickerDialog({
+        title: instance.i18n.strings.ribbonMenu.useInFormula,
+        names,
+        okLabel: instance.i18n.strings.hyperlinkDialog.ok,
+        cancelLabel: instance.i18n.strings.hyperlinkDialog.cancel,
+      });
+      if (!selected) {
+        instance.host.focus();
         return;
       }
       insertDefinedNameFormula(
         instance.store.getState(),
         instance.workbook,
-        first.name,
+        selected,
         instance.store,
       );
       mutators.replaceCells(
@@ -598,6 +1043,24 @@ const buildDefinedNameAction =
         instance.workbook.cells(instance.store.getState().data.sheetIndex),
       );
       instance.host.focus();
+    }
+  };
+
+const updateDefinedNamesMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateDefinedNamesMenu'] =>
+  (menu) => {
+    const hasDefinedNames = listDefinedNames(instance.workbook).length > 0;
+    const canMutateNames = instance.workbook.capabilities.definedNameMutate;
+    const strings = instance.i18n.strings.ribbonMenu;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-defined-name-action]')) {
+      const action = button.dataset.definedNameAction;
+      const disabled =
+        action === 'use-formula'
+          ? !hasDefinedNames
+          : action?.startsWith('create-') === true && !canMutateNames;
+      const reason =
+        action === 'use-formula' ? strings.noDefinedNames : strings.definedNameMutationUnavailable;
+      setMenuControlDisabled(button, disabled, reason);
     }
   };
 
@@ -639,25 +1102,134 @@ const buildLinksAction =
       await showReport({
         title: result.report.title,
         items: result.report.items,
-        closeLabel: strings.workbookObjects.close,
-        infoLabel: strings.reviewReports.info,
-        warningLabel: strings.reviewReports.warning,
+        ...reportDialogLabels(strings),
       });
       return;
     }
     instance.host.focus();
   };
 
+const updateLinksMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateLinksMenu'] =>
+  (menu) => {
+    const state = instance.store.getState();
+    const hasHyperlink = hyperlinkAt(state, state.selection.active) !== null;
+    const disabledReason = instance.i18n.strings.ribbonMenu.linkNoHyperlink;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-link-action]')) {
+      const action = button.dataset.linkAction;
+      const disabled = (action === 'open' || action === 'clear') && !hasHyperlink;
+      setMenuControlDisabled(button, disabled, disabledReason);
+    }
+  };
+
 const buildProtectAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyProtectAction'] =>
   async (action) => {
-    if (action === 'protect-sheet' || action === 'unprotect-sheet') {
-      instance.setSheetProtected(action === 'protect-sheet');
+    if (action === 'protect-sheet') {
+      const strings = instance.i18n.strings;
+      const protectionStrings = strings.protection as typeof strings.protection & {
+        allowAutoFilter: string;
+        allowDeleteColumns: string;
+        allowDeleteRows: string;
+        allowEditObjects: string;
+        allowEditScenarios: string;
+        allowFormatCells: string;
+        allowFormatColumns: string;
+        allowFormatRows: string;
+        allowInsertColumns: string;
+        allowInsertHyperlinks: string;
+        allowInsertRows: string;
+        allowPivotTables: string;
+        allowSelectLockedCells: string;
+        allowSelectUnlockedCells: string;
+        allowSort: string;
+        allowUsersTo: string;
+        confirmPassword: string;
+        passwordMismatch: string;
+      };
+      const result = await showProtectSheetDialog({
+        strings: {
+          title: protectionStrings.protectSheet,
+          password: protectionStrings.password,
+          passwordPlaceholder: protectionStrings.passwordPlaceholder,
+          confirmPassword: protectionStrings.confirmPassword,
+          passwordMismatch: protectionStrings.passwordMismatch,
+          allowLabel: protectionStrings.allowUsersTo,
+          allowSelectLockedCells: protectionStrings.allowSelectLockedCells,
+          allowSelectUnlockedCells: protectionStrings.allowSelectUnlockedCells,
+          allowFormatCells: protectionStrings.allowFormatCells,
+          allowFormatColumns: protectionStrings.allowFormatColumns,
+          allowFormatRows: protectionStrings.allowFormatRows,
+          allowInsertColumns: protectionStrings.allowInsertColumns,
+          allowInsertRows: protectionStrings.allowInsertRows,
+          allowInsertHyperlinks: protectionStrings.allowInsertHyperlinks,
+          allowDeleteColumns: protectionStrings.allowDeleteColumns,
+          allowDeleteRows: protectionStrings.allowDeleteRows,
+          allowSort: protectionStrings.allowSort,
+          allowAutoFilter: protectionStrings.allowAutoFilter,
+          allowPivotTables: protectionStrings.allowPivotTables,
+          allowEditObjects: protectionStrings.allowEditObjects,
+          allowEditScenarios: protectionStrings.allowEditScenarios,
+          ok: strings.pageSetup.ok,
+          cancel: strings.pageSetup.cancel,
+        },
+        initial: protectedSheetPermissions(
+          instance.store.getState(),
+          instance.store.getState().data.sheetIndex,
+        ),
+      });
+      if (!result) {
+        instance.host.focus();
+        return;
+      }
+      (
+        instance.setSheetProtected as (
+          on: boolean,
+          password?: string,
+          permissions?: import('../store/store.js').SheetProtectionPermissions,
+        ) => void
+      )(true, result.password, result.permissions);
+      instance.host.focus();
+      return;
+    }
+    if (action === 'unprotect-sheet') {
+      const strings = instance.i18n.strings;
+      const sheet = instance.store.getState().data.sheetIndex;
+      const currentPassword = protectedSheetPassword(instance.store.getState(), sheet);
+      const currentPasswordHash = protectedSheetPasswordHash(instance.store.getState(), sheet);
+      if (currentPassword || currentPasswordHash) {
+        const password = await showUnprotectSheetDialog({
+          title: strings.protection.unprotectSheet,
+          password: strings.protection.password,
+          ok: strings.pageSetup.ok,
+          cancel: strings.pageSetup.cancel,
+        });
+        if (password === null) {
+          instance.host.focus();
+          return;
+        }
+        const matches =
+          currentPassword !== undefined
+            ? password === currentPassword
+            : currentPasswordHash
+              ? await verifySheetProtectionPasswordHash(password, currentPasswordHash)
+              : false;
+        if (!matches) {
+          await showMessage({
+            title: strings.protection.unprotectSheet,
+            message: strings.ribbonMenu.workbookIncorrectPassword,
+            okLabel: strings.pageSetup.ok,
+          });
+          instance.host.focus();
+          return;
+        }
+      }
+      instance.setSheetProtected(false);
       instance.host.focus();
       return;
     }
     if (action === 'lock-cell' || action === 'unlock-cell') {
-      await buildCellFormatAction(instance)(action);
+      await buildCellFormatAction(instance, {})(action);
       return;
     }
     if (action === 'protect-workbook' || action === 'unprotect-workbook') {
@@ -667,9 +1239,54 @@ const buildProtectAction =
     }
     if (action === 'allow-edit-ranges' || action === 'clear-allowed-edit-ranges') {
       const strings = instance.i18n.strings;
+      if (action === 'allow-edit-ranges') {
+        const selection = normalizedSelectionRange(instance);
+        const sheetName = instance.workbook.sheetName(selection.sheet);
+        const pivotStrings = strings.pivotTableDialog as typeof strings.pivotTableDialog & {
+          rangePickerSelect: string;
+        };
+        const result = await showAllowEditRangeDialog({
+          strings: {
+            title: strings.ribbonMenu.allowEditRangesDialogTitle,
+            range: strings.ribbonMenu.allowEditRangesDialogRange,
+            invalid: strings.ribbonMenu.allowEditRangesDialogInvalid,
+            rangePickerLabel: pivotStrings.rangePickerSelect,
+            ok: strings.pageSetup.ok,
+            cancel: strings.pageSetup.cancel,
+          },
+          initialRange: formatA1Range(selection),
+          pickRange: () => formatA1Range(normalizedSelectionRange(instance)),
+          validateRange: (value) => parseA1Range(value, selection.sheet, sheetName) !== null,
+          subscribeToRangeChanges: (listener) => instance.store.subscribe(listener),
+        });
+        if (result === null) {
+          instance.host.focus();
+          return;
+        }
+        const range = parseA1Range(result, selection.sheet, sheetName) ?? selection;
+        const rangeText = formatA1Range(range);
+        addAllowedEditRange(instance.store, range, { title: rangeText });
+        const report = {
+          title: strings.ribbonMenu.allowEditRangesDialogTitle,
+          items: [
+            {
+              severity: 'info' as const,
+              label: strings.ribbonMenu.allowEditRangesCommand,
+              detail: strings.ribbonMenu.allowedEditRangeAddedStatus.replace('{range}', rangeText),
+            },
+          ],
+        };
+        await showReport({
+          title: report.title,
+          items: report.items,
+          ...reportDialogLabels(strings),
+        });
+        instance.host.focus();
+        return;
+      }
       const report = executeRibbonProtectionAction({
         store: instance.store,
-        action: action === 'allow-edit-ranges' ? 'allow-edit-range' : 'clear-allowed-edit-ranges',
+        action: 'clear-allowed-edit-ranges',
         strings: {
           allowEditRangesDialogTitle: strings.ribbonMenu.allowEditRangesDialogTitle,
           allowEditRangesCommand: strings.ribbonMenu.allowEditRangesCommand,
@@ -681,10 +1298,40 @@ const buildProtectAction =
       await showReport({
         title: report.title,
         items: report.items,
-        closeLabel: strings.workbookObjects.close,
-        infoLabel: strings.reviewReports.info,
-        warningLabel: strings.reviewReports.warning,
+        ...reportDialogLabels(strings),
       });
+    }
+  };
+
+const updateProtectMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateProtectMenu'] =>
+  (menu) => {
+    const state = instance.store.getState();
+    const sheetProtected = state.protection.protectedSheets.has(state.data.sheetIndex);
+    const workbookProtected = isWorkbookStructureProtected(state);
+    const hasAllowedRanges = state.protection.allowedEditRanges.length > 0;
+    const strings = instance.i18n.strings.ribbonMenu;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-protect-action]')) {
+      const action = button.dataset.protectAction;
+      const disabled =
+        (action === 'protect-sheet' && sheetProtected) ||
+        (action === 'unprotect-sheet' && !sheetProtected) ||
+        (action === 'protect-workbook' && workbookProtected) ||
+        (action === 'unprotect-workbook' && !workbookProtected) ||
+        (action === 'clear-allowed-edit-ranges' && !hasAllowedRanges);
+      const reason =
+        action === 'protect-sheet'
+          ? strings.protectSheetAlreadyProtected
+          : action === 'unprotect-sheet'
+            ? strings.unprotectSheetRequiresProtected
+            : action === 'protect-workbook'
+              ? strings.protectWorkbookAlreadyProtected
+              : action === 'unprotect-workbook'
+                ? strings.unprotectWorkbookRequiresProtected
+                : action === 'clear-allowed-edit-ranges'
+                  ? strings.allowEditRangesClearRequiresAny
+                  : undefined;
+      setMenuControlDisabled(button, disabled, reason);
     }
   };
 
@@ -706,19 +1353,63 @@ const buildTextToColumnsCustom =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['splitTextToColumnsCustom'] =>
   async () => {
     const strings = instance.i18n.strings;
-    const delimiter = await showPrompt({
-      title: strings.ribbonMenu.textToColumnsDialogTitle,
-      label: strings.ribbonMenu.textToColumnsDialogDelimiters,
-      initial: ',',
-      okLabel: strings.hyperlinkDialog.ok,
-      cancelLabel: strings.hyperlinkDialog.cancel,
-      validate: (value) => (value ? null : strings.ribbonMenu.textToColumnsNoDelimited),
+    const range = normalizedSelectionRange(instance);
+    const previewRows: string[] = [];
+    const cells = instance.store.getState().data.cells;
+    for (let row = range.r0; row <= Math.min(range.r1, range.r0 + 6); row += 1) {
+      const value = cells.get(`${range.sheet}:${row}:${range.c0}`)?.value;
+      if (value?.kind === 'text') previewRows.push(value.value);
+    }
+    const textToColumnsStrings = strings.ribbonMenu as typeof strings.ribbonMenu & {
+      textToColumnsDataType: string;
+      textToColumnsDelimited: string;
+      textToColumnsFixedWidth: string;
+      textToColumnsFixedWidthUnavailable: string;
+      textToColumnsOther: string;
+      textToColumnsPreview: string;
+    };
+    const result = await showTextToColumnsDialog({
+      strings: {
+        title: strings.ribbonMenu.textToColumnsDialogTitle,
+        dataType: textToColumnsStrings.textToColumnsDataType,
+        delimited: textToColumnsStrings.textToColumnsDelimited,
+        fixedWidth: textToColumnsStrings.textToColumnsFixedWidth,
+        fixedWidthUnavailable: textToColumnsStrings.textToColumnsFixedWidthUnavailable,
+        delimiters: strings.ribbonMenu.textToColumnsDialogDelimiters,
+        tab: strings.ribbonMenu.textToColumnsTab,
+        semicolon: strings.ribbonMenu.textToColumnsSemicolon,
+        comma: strings.ribbonMenu.textToColumnsComma,
+        space: strings.ribbonMenu.textToColumnsSpace,
+        other: textToColumnsStrings.textToColumnsOther,
+        treatConsecutive: strings.ribbonMenu.textToColumnsTreatConsecutive,
+        preview: textToColumnsStrings.textToColumnsPreview,
+        noDelimited: strings.ribbonMenu.textToColumnsNoDelimited,
+        ok: strings.hyperlinkDialog.ok,
+        cancel: strings.hyperlinkDialog.cancel,
+      },
+      initialDelimiters: [','],
+      previewRows,
     });
-    if (delimiter === null) {
+    if (result === null) {
       instance.host.focus();
       return;
     }
-    await buildTextToColumnsAction(instance)(delimiter);
+    const selected = normalizedSelectionRange(instance);
+    instance.history.begin();
+    try {
+      textToColumns(
+        instance.store.getState(),
+        instance.store,
+        instance.workbook,
+        selected,
+        result.delimiters,
+        { collapseConsecutiveDelimiters: result.collapseConsecutiveDelimiters },
+      );
+      mutators.replaceCells(instance.store, instance.workbook.cells(selected.sheet));
+    } finally {
+      instance.history.end();
+    }
+    instance.host.focus();
   };
 
 const buildReviewCommentAction =
@@ -761,13 +1452,15 @@ const buildChartAction =
 
 const buildRecommendedChartAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['createRecommendedChartFromSelection'] =>
-  () => {
-    createRibbonChartFromSelection({
-      store: instance.store,
-      range: normalizedSelectionRange(instance),
-      action: 'recommended',
-      history: instance.history,
-    });
+  async () => {
+    const strings = instance.i18n.strings;
+    await showInstanceReport(instance, strings.ribbonMenu.recommendedCharts, [
+      {
+        severity: 'info',
+        label: strings.ribbon.chart,
+        detail: strings.workbookObjects.compatibilityDetails.chartAuthoring,
+      },
+    ]);
     instance.host.focus();
   };
 
@@ -812,10 +1505,88 @@ const buildDataValidationAction =
     instance.host.focus();
   };
 
+const updateDataValidationMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateDataValidationMenu'] =>
+  (menu) => {
+    const state = instance.store.getState();
+    const range = normalizedSelectionRange(instance);
+    let hasValidation = false;
+    for (let row = range.r0; row <= range.r1 && !hasValidation; row += 1) {
+      for (let col = range.c0; col <= range.c1; col += 1) {
+        const key = addrKey({ sheet: range.sheet, row, col });
+        if (state.format.formats.get(key)?.validation) {
+          hasValidation = true;
+          break;
+        }
+      }
+    }
+    const hasValidationCircles = state.errorIndicators.validationCircles.size > 0;
+    const strings = instance.i18n.strings.ribbonMenu;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-validation-action]')) {
+      const action = button.dataset.validationAction;
+      const disabled =
+        ((action === 'circle-invalid' || action === 'clear-rules') && !hasValidation) ||
+        (action === 'clear-circles' && !hasValidationCircles);
+      const reason =
+        action === 'clear-circles'
+          ? strings.validationClearCirclesRequiresAny
+          : strings.validationRequiresRules;
+      setMenuControlDisabled(button, disabled, reason);
+    }
+  };
+
 const buildConditionalMenuAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyConditionalMenuAction'] =>
   async (action, panel) => {
     const strings = instance.i18n.strings;
+    const conditionalMenuStrings = strings.conditionalMenu as typeof strings.conditionalMenu & {
+      ok: string;
+      cancel: string;
+      formatWith: string;
+      formatPreview: string;
+      customFormat: string;
+      customFormatTitle: string;
+      customFillColor: string;
+      customTextColor: string;
+      customBold: string;
+      customItalic: string;
+      customUnderline: string;
+      customStrike: string;
+      formatLightRed: string;
+      formatYellow: string;
+      formatGreen: string;
+      formatLightRedFill: string;
+      formatRedText: string;
+      formatRedBorder: string;
+      formatRedFill: string;
+      formatRedTextFill: string;
+      invalidNumber: string;
+      invalidText: string;
+    };
+    const conditionalDialogStrings = {
+      ok: conditionalMenuStrings.ok,
+      cancel: conditionalMenuStrings.cancel,
+      formatWith: conditionalMenuStrings.formatWith,
+      formatPreview: conditionalMenuStrings.formatPreview,
+      customFormat: conditionalMenuStrings.customFormat,
+      customFormatTitle: conditionalMenuStrings.customFormatTitle,
+      customFillColor: conditionalMenuStrings.customFillColor,
+      customTextColor: conditionalMenuStrings.customTextColor,
+      customBold: conditionalMenuStrings.customBold,
+      customItalic: conditionalMenuStrings.customItalic,
+      customUnderline: conditionalMenuStrings.customUnderline,
+      customStrike: conditionalMenuStrings.customStrike,
+      formatLightRed: conditionalMenuStrings.formatLightRed,
+      formatYellow: conditionalMenuStrings.formatYellow,
+      formatGreen: conditionalMenuStrings.formatGreen,
+      formatLightRedFill: conditionalMenuStrings.formatLightRedFill,
+      formatRedText: conditionalMenuStrings.formatRedText,
+      formatRedBorder: conditionalMenuStrings.formatRedBorder,
+      formatRedFill: conditionalMenuStrings.formatRedFill,
+      formatRedTextFill: conditionalMenuStrings.formatRedTextFill,
+      invalidNumber: conditionalMenuStrings.invalidNumber,
+      invalidText: conditionalMenuStrings.invalidText,
+    };
     const refreshWorkbookCells = (): void => {
       mutators.replaceCells(
         instance.store,
@@ -828,25 +1599,15 @@ const buildConditionalMenuAction =
         ribbonLang: instance.i18n.locale === 'ja' ? 'ja' : 'en',
         range: normalizedSelectionRange(instance),
         cfFill: { fill: '#ffc7ce', color: '#9c0006' },
-        cfTopFill: { fill: '#c6efce', color: '#006100' },
-        promptCfNumber: (title, initial, options) =>
-          showNumberPrompt({
-            title,
-            label: title,
-            initial,
-            min: options?.min,
-            max: options?.max,
-            step: options?.step,
-            okLabel: strings.hyperlinkDialog.ok,
-            cancelLabel: strings.hyperlinkDialog.cancel,
+        promptCfNumber: (spec) =>
+          showConditionalFormatNumberDialog({
+            ...spec,
+            strings: conditionalDialogStrings,
           }),
-        promptCfText: (title, label, initial) =>
-          showPrompt({
-            title,
-            label,
-            initial,
-            okLabel: strings.hyperlinkDialog.ok,
-            cancelLabel: strings.hyperlinkDialog.cancel,
+        promptCfText: (spec) =>
+          showConditionalFormatTextDialog({
+            ...spec,
+            strings: conditionalDialogStrings,
           }),
         showChoiceDialog,
         showMessage,
@@ -868,6 +1629,24 @@ const buildUiTheme =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyUiTheme'] =>
   (theme) => {
     instance.setTheme(theme as ThemeName);
+  };
+
+const currentPageThemeAction = (theme: string | undefined): 'light' | 'dark' | 'contrast' => {
+  if (theme === 'dark' || theme === 'ink') return 'dark';
+  if (theme === 'contrast') return 'contrast';
+  return 'light';
+};
+
+const updatePageThemeMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updatePageThemeMenu'] =>
+  (menu) => {
+    const current = currentPageThemeAction(instance.store.getState().ui.theme);
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-page-theme-action]')) {
+      const active = button.dataset.pageThemeAction === current;
+      button.setAttribute('role', 'menuitemradio');
+      button.setAttribute('aria-checked', String(active));
+      button.classList.toggle('app__visual-tile--active', active);
+    }
   };
 
 const buildPrintAreaAction =
@@ -892,9 +1671,28 @@ const buildPrintAreaAction =
     instance.host.focus();
   };
 
+const updatePrintAreaMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updatePrintAreaMenu'] =>
+  (menu) => {
+    const sheet = instance.store.getState().data.sheetIndex;
+    const hasPrintArea = !!getPageSetup(instance.store.getState(), sheet).printArea?.trim();
+    const disabledReason = instance.i18n.strings.ribbonMenu.printAreaRequiresExisting;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-print-area-action]')) {
+      const action = button.dataset.printAreaAction;
+      const disabled = (action === 'add' || action === 'clear') && !hasPrintArea;
+      setMenuControlDisabled(button, disabled, disabledReason);
+    }
+  };
+
 const buildPivotTableAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyPivotTableAction'] =>
   async (action) => {
+    if (action === 'new-sheet' || action === 'existing-sheet') {
+      (instance.openPivotTableDialog as (opts?: { placement?: 'new' | 'existing' }) => void)({
+        placement: action === 'new-sheet' ? 'new' : 'existing',
+      });
+      return;
+    }
     const pivotAction = (
       action === 'recommended' || action === 'new-sheet' || action === 'existing-sheet'
         ? action
@@ -922,30 +1720,99 @@ const buildPivotTableAction =
       await showReport({
         title: result.report.title,
         items: result.report.items,
-        closeLabel: strings.workbookObjects.close,
-        infoLabel: strings.reviewReports.info,
-        warningLabel: strings.reviewReports.warning,
+        ...reportDialogLabels(strings),
       });
       return;
     }
     instance.host.focus();
   };
 
+const updateCellInsertMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateCellInsertMenu'] =>
+  (menu) => {
+    const structureProtected = isWorkbookStructureProtected(instance.store.getState());
+    const disabledReason = instance.i18n.strings.ribbonMenu.workbookStructureProtectedBlocked;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-cell-insert]')) {
+      const disabled = button.dataset.cellInsert === 'sheet' && structureProtected;
+      setMenuControlDisabled(button, disabled, disabledReason);
+    }
+  };
+
+const updateCellDeleteMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateCellDeleteMenu'] =>
+  (menu) => {
+    const state = instance.store.getState();
+    const structureProtected = isWorkbookStructureProtected(state);
+    const canRemoveSheet = instance.workbook.capabilities.sheetMutate;
+    const strings = instance.i18n.strings.ribbonMenu;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-cell-delete]')) {
+      let disabledReason: string | undefined;
+      if (button.dataset.cellDelete === 'sheet') {
+        if (structureProtected) disabledReason = strings.workbookStructureProtectedBlocked;
+        else if (instance.workbook.sheetCount <= 1) {
+          disabledReason = strings.sheetDeleteRequiresAnotherSheet;
+        } else if (!canRemoveSheet) disabledReason = strings.sheetMutationUnavailable;
+      }
+      const disabled =
+        button.dataset.cellDelete === 'sheet' &&
+        (structureProtected || instance.workbook.sheetCount <= 1 || !canRemoveSheet);
+      setMenuControlDisabled(button, disabled, disabledReason);
+    }
+  };
+
 const buildPageBreakAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyPageBreakAction'] =>
   (action) => {
     const range = normalizedSelectionRange(instance);
-    if (action === 'insert-row')
+    if (action === 'insert') {
+      if (range.r0 > 0)
+        insertManualPageBreak(instance.store, range.sheet, 'row', range.r0, instance.history);
+      if (range.c0 > 0)
+        insertManualPageBreak(instance.store, range.sheet, 'col', range.c0, instance.history);
+    } else if (action === 'insert-row')
       insertManualPageBreak(instance.store, range.sheet, 'row', range.r0, instance.history);
     else if (action === 'insert-col')
       insertManualPageBreak(instance.store, range.sheet, 'col', range.c0, instance.history);
-    else if (action === 'remove-row')
+    else if (action === 'remove') {
+      removeManualPageBreak(instance.store, range.sheet, 'row', range.r0, instance.history);
+      removeManualPageBreak(instance.store, range.sheet, 'col', range.c0, instance.history);
+    } else if (action === 'remove-row')
       removeManualPageBreak(instance.store, range.sheet, 'row', range.r0, instance.history);
     else if (action === 'remove-col')
       removeManualPageBreak(instance.store, range.sheet, 'col', range.c0, instance.history);
     else if (action === 'reset-all')
       resetManualPageBreaks(instance.store, range.sheet, instance.history);
     instance.host.focus();
+  };
+
+const updatePageBreaksMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updatePageBreaksMenu'] =>
+  (menu) => {
+    const range = normalizedSelectionRange(instance);
+    const setup = getPageSetup(instance.store.getState(), range.sheet);
+    const rowBreaks = new Set(setup.manualPageBreakRows ?? []);
+    const colBreaks = new Set(setup.manualPageBreakCols ?? []);
+    const hasAnyBreak = rowBreaks.size > 0 || colBreaks.size > 0;
+    const canInsertAtSelection = range.r0 > 0 || range.c0 > 0;
+    const hasBreakAtSelection = rowBreaks.has(range.r0) || colBreaks.has(range.c0);
+    const strings = instance.i18n.strings.ribbonMenu;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-page-break-action]')) {
+      const action = button.dataset.pageBreakAction;
+      const disabled =
+        (action === 'insert' && !canInsertAtSelection) ||
+        (action === 'insert-row' && range.r0 <= 0) ||
+        (action === 'insert-col' && range.c0 <= 0) ||
+        (action === 'remove' && !hasBreakAtSelection) ||
+        (action === 'remove-row' && !rowBreaks.has(range.r0)) ||
+        (action === 'remove-col' && !colBreaks.has(range.c0)) ||
+        (action === 'reset-all' && !hasAnyBreak);
+      const reason = action?.startsWith('insert')
+        ? strings.pageBreakInsertRequiresSelection
+        : action === 'reset-all'
+          ? strings.pageBreakResetRequiresAny
+          : strings.pageBreakRemoveRequiresBreak;
+      setMenuControlDisabled(button, disabled, reason);
+    }
   };
 
 const buildSheetBackgroundAction =
@@ -957,44 +1824,12 @@ const buildSheetBackgroundAction =
       instance.host.focus();
       return;
     }
-    const strings = instance.i18n.strings;
-    const value = await showPrompt({
-      title: strings.ribbon.background,
-      label: strings.ribbonMenu.sheetBackgroundPrompt,
-      initial: instance.store.getState().ui.sheetBackgroundImages.get(sheet) ?? '',
-      okLabel: strings.hyperlinkDialog.ok,
-      cancelLabel: strings.hyperlinkDialog.cancel,
-      validate: (raw) => (raw.trim() ? null : strings.hyperlinkDialog.errorEmptyUrl),
-    });
-    if (value === null) {
+    const picked = await pickImageFileDataUrl();
+    if (!picked) {
       instance.host.focus();
       return;
     }
-    setSheetBackgroundImage(instance.store, sheet, value, instance.history);
-    instance.host.focus();
-  };
-
-const buildPrintTitlesAction =
-  (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyPrintTitlesAction'] =>
-  (action) => {
-    const range = normalizedSelectionRange(instance);
-    if (action === 'clear') {
-      clearPrintTitles(instance.store, range.sheet, instance.history);
-    } else if (action === 'rows') {
-      setPrintTitleRows(
-        instance.store,
-        range.sheet,
-        `${range.r0 + 1}:${range.r1 + 1}`,
-        instance.history,
-      );
-    } else if (action === 'cols') {
-      setPrintTitleCols(
-        instance.store,
-        range.sheet,
-        `${colLetter(range.c0)}:${colLetter(range.c1)}`,
-        instance.history,
-      );
-    }
+    setSheetBackgroundImage(instance.store, sheet, picked.src, instance.history);
     instance.host.focus();
   };
 
@@ -1026,8 +1861,14 @@ const buildSortMenuAction =
       const result = await showSortDialog({
         title: strings.sortDialogTitle,
         columnLabel: strings.sortDialogColumn,
+        thenByLabel: strings.sortThenBy,
+        noThenByLabel: strings.sortNoThenBy,
         orderLabel: strings.sortDialogOrder,
         headerLabel: strings.sortDialogHeader,
+        addLevelLabel: strings.sortAddLevel,
+        deleteLevelLabel: strings.sortDeleteLevel,
+        copyLevelLabel: strings.sortCopyLevel,
+        levelUnavailableLabel: strings.sortLevelUnavailable,
         ascendingLabel: strings.sortDialogAscending,
         descendingLabel: strings.sortDialogDescending,
         columns,
@@ -1102,6 +1943,85 @@ const buildSortMenuAction =
       instance.openNamedRangeDialog();
       return;
     }
+    if (action === 'filter-advanced') {
+      const strings = instance.i18n.strings.ribbonMenu as typeof instance.i18n.strings.ribbonMenu & {
+        advancedFilterInvalidRange: string;
+        advancedFilterRangePicker: string;
+      };
+      const range = inferAutoFilterRange(instance.store.getState());
+      const sheetName = instance.workbook.sheetName(range.sheet);
+      const invalidRange = strings.advancedFilterInvalidRange;
+      const validateRange = (value: string): string | null =>
+        parseA1Range(value.trim(), range.sheet, sheetName) ? null : invalidRange;
+      const validateAddress = (value: string): string | null =>
+        parseA1Range(value.trim(), range.sheet, sheetName) ? null : invalidRange;
+      const result = await showAdvancedFilterDialog({
+        title: strings.advancedFilterDialogTitle,
+        listRangeLabel: strings.advancedFilterListRange,
+        criteriaRangeLabel: strings.advancedFilterCriteriaRange,
+        copyToLabel: strings.advancedFilterCopyTo,
+        uniqueOnlyLabel: strings.advancedFilterUniqueOnly,
+        initialListRange: formatA1Range(range),
+        okLabel: strings.sortDialogApply,
+        cancelLabel: strings.sortDialogCancel,
+        rangePickerLabel: strings.advancedFilterRangePicker,
+        pickRange: () => formatA1Range(normalizedSelectionRange(instance)),
+        pickAddress: () => {
+          const active = instance.store.getState().selection.active;
+          return formatA1Range({
+            sheet: active.sheet,
+            r0: active.row,
+            c0: active.col,
+            r1: active.row,
+            c1: active.col,
+          });
+        },
+        subscribeToRangeChanges: (listener) => instance.store.subscribe(listener),
+        validateRange,
+        validateAddress,
+      });
+      if (!result) {
+        instance.host.focus();
+        return;
+      }
+      const listRange = parseA1Range(result.listRange, range.sheet, sheetName);
+      const criteriaRange = parseA1Range(result.criteriaRange, range.sheet, sheetName);
+      const copyToRange = result.copyTo
+        ? parseA1Range(result.copyTo, range.sheet, sheetName)
+        : null;
+      if (!listRange || !criteriaRange || (result.copyTo && !copyToRange)) {
+        instance.host.focus();
+        return;
+      }
+      instance.history.begin();
+      try {
+        if (copyToRange) {
+          const copied = copyAdvancedFilterResult(
+            instance.store.getState(),
+            instance.store,
+            listRange,
+            criteriaRange,
+            { sheet: copyToRange.sheet, row: copyToRange.r0, col: copyToRange.c0 },
+            { uniqueOnly: result.uniqueOnly },
+            instance.workbook,
+          );
+          mutators.replaceCells(instance.store, instance.workbook.cells(listRange.sheet));
+          await showInstanceReport(instance, strings.advancedFilterDialogTitle, [
+            {
+              severity: 'info',
+              label: strings.filterAdvanced,
+              detail: strings.advancedFilterCopiedStatus.replace('{count}', String(copied)),
+            },
+          ]);
+        } else {
+          applyAdvancedFilter(instance.store.getState(), instance.store, listRange, criteriaRange);
+        }
+      } finally {
+        instance.history.end();
+      }
+      instance.host.focus();
+      return;
+    }
     const filterAction =
       action === 'filter'
         ? 'toggle'
@@ -1111,9 +2031,7 @@ const buildSortMenuAction =
             ? 'reapply'
             : action === 'filter-by-value'
               ? 'filter-by-selected'
-              : action === 'filter-advanced'
-                ? 'advanced'
-                : null;
+              : null;
     if (filterAction) {
       executeRibbonFilterDataAction({
         store: instance.store,
@@ -1121,6 +2039,32 @@ const buildSortMenuAction =
         action: filterAction,
       });
       instance.host.focus();
+    }
+  };
+
+const updateSortMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateSortMenu'] =>
+  (menu) => {
+    const state = instance.store.getState();
+    const hasFilterRange = state.ui.filterRange !== null;
+    const hasFilterCriteria = state.ui.filterCriteria.length > 0;
+    const strings = instance.i18n.strings.ribbonMenu;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-sort]')) {
+      const action = button.dataset.sort;
+      const disabled =
+        (action === 'filter-clear' && !hasFilterRange) ||
+        (action === 'filter-reapply' && !hasFilterCriteria);
+      const reason =
+        action === 'filter-clear'
+          ? strings.filterClearRequiresRange
+          : action === 'filter-reapply'
+            ? strings.filterReapplyRequiresCriteria
+            : undefined;
+      setMenuControlDisabled(button, disabled, reason);
+      if (action === 'filter') {
+        button.setAttribute('aria-pressed', String(hasFilterRange));
+        button.classList.toggle('app__menu-item--active', hasFilterRange);
+      }
     }
   };
 
@@ -1134,6 +2078,85 @@ const buildTableStyleAction =
     instance.host.focus();
   };
 
+const updateTableStylesMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateTableStylesMenu'] =>
+  (menu) => {
+    const state = instance.store.getState();
+    const active = state.selection.active;
+    const activeTable = tableOverlayAt(state, active.sheet, active.row, active.col);
+    const activeTableVariant = activeTable
+      ? tableVariantFromOptions({
+          banded: activeTable.banded,
+          firstCol: activeTable.firstCol,
+        })
+      : null;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-table-style]')) {
+      const activeStyle =
+        activeTable != null &&
+        button.dataset.tableStyle === activeTable.style &&
+        button.dataset.tableColor === (activeTable.color ?? DEFAULT_TABLE_COLOR) &&
+        button.dataset.tableVariant === activeTableVariant;
+      button.setAttribute('role', 'menuitemradio');
+      button.setAttribute('aria-checked', String(activeStyle));
+      button.classList.toggle('app__menu-item--active', activeStyle);
+    }
+
+    const activePivot = findPivotTableAtCell(
+      instance.workbook as unknown as Parameters<typeof findPivotTableAtCell>[0],
+      active,
+    );
+    const activePivotStyle = activePivot
+      ? pivotTableStyleAssignment(state, activePivot.sheetIndex, activePivot.pivotIndex)?.styleId
+      : null;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-pivot-table-style]')) {
+      const activeStyle = button.dataset.pivotTableStyle === activePivotStyle;
+      button.setAttribute('role', 'menuitemradio');
+      button.setAttribute('aria-checked', String(activeStyle));
+      button.classList.toggle('app__menu-item--active', activeStyle);
+    }
+  };
+
+export const showCreateTableDialog = async (instance: SpreadsheetInstance): Promise<void> => {
+  const selection = normalizedSelectionRange(instance);
+  const sheetName = instance.workbook.sheetName(selection.sheet);
+  const pivotDialogStrings = instance.i18n.strings
+    .pivotTableDialog as typeof instance.i18n.strings.pivotTableDialog & {
+    rangePickerSelect: string;
+    createTableTitle: string;
+    createTableRangeLabel: string;
+    createTableHeadersLabel: string;
+    createTableInvalidRange: string;
+  };
+  const parsedRange = (value: string): Range | null =>
+    parseA1Range(value, selection.sheet, sheetName) as Range | null;
+  const result = await showFormatAsTableDialog({
+    title: pivotDialogStrings.createTableTitle,
+    rangeLabel: pivotDialogStrings.createTableRangeLabel,
+    headersLabel: pivotDialogStrings.createTableHeadersLabel,
+    initialRange: formatA1Range(selection),
+    initialHasHeaders: inferTableHasHeaders(instance.workbook, selection),
+    okLabel: pivotDialogStrings.ok,
+    cancelLabel: pivotDialogStrings.cancel,
+    rangePickerLabel: pivotDialogStrings.rangePickerSelect,
+    pickRange: () => formatA1Range(normalizedSelectionRange(instance)),
+    subscribeToRangeChanges: (listener) => instance.store.subscribe(listener),
+    validateRange: (value) =>
+      parsedRange(value) ? null : pivotDialogStrings.createTableInvalidRange,
+  });
+  if (!result) {
+    instance.host.focus();
+    return;
+  }
+  const range = parsedRange(result.range);
+  if (!range) return;
+  recordTablesChange(instance.history, instance.store, () => {
+    formatAsTableByStyleId(instance.store, range, 'medium', undefined, 'banded', {
+      showHeader: result.hasHeaders,
+    });
+  });
+  instance.host.focus();
+};
+
 const buildCellStyleAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyCellStyleFromRibbon'] =>
   (id) => {
@@ -1144,6 +2167,19 @@ const buildCellStyleAction =
       id,
     );
     instance.host.focus();
+  };
+
+const updateCellStylesMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateCellStylesMenu'] =>
+  (menu) => {
+    const state = instance.store.getState();
+    const current = formatWithPending(state, state.selection.active)?.cellStyle ?? null;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-cell-style]')) {
+      const active = button.dataset.cellStyle === current;
+      button.setAttribute('role', 'menuitemradio');
+      button.setAttribute('aria-checked', String(active));
+      button.classList.toggle('app__menu-item--active', active);
+    }
   };
 
 const buildCurrencyPresetAction =
@@ -1163,6 +2199,20 @@ const buildCurrencyFooterAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['openCurrencyFooterAction'] =>
   (action) => {
     if (action === 'more') instance.openFormatDialog();
+  };
+
+const updateCurrencyMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateCurrencyMenu'] =>
+  (menu) => {
+    const state = instance.store.getState();
+    const current = formatWithPending(state, state.selection.active)?.numFmt;
+    const activeSymbol = current?.kind === 'currency' ? current.symbol : null;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-currency-preset]')) {
+      const active = button.dataset.currencyPreset === activeSymbol;
+      button.setAttribute('role', 'menuitemradio');
+      button.setAttribute('aria-checked', String(active));
+      button.classList.toggle('app__menu-item--active', active);
+    }
   };
 
 const insertSymbolAtActiveCell = (instance: SpreadsheetInstance, symbol: string): void => {
@@ -1202,9 +2252,7 @@ const showInstanceReport = async (
   await showReport({
     title,
     items,
-    closeLabel: strings.workbookObjects.close,
-    infoLabel: strings.reviewReports.info,
-    warningLabel: strings.reviewReports.warning,
+    ...reportDialogLabels(strings),
   });
 };
 
@@ -1214,14 +2262,18 @@ const buildScriptAction =
     const strings = instance.i18n.strings;
     const raw =
       action === 'custom'
-        ? await showPrompt({
+        ? await showScriptCommandDialog({
             title: strings.ribbonMenu.scriptDialogTitle,
             label: strings.ribbonMenu.scriptDialogCommand,
+            options: [
+              { value: 'uppercase', label: strings.ribbonMenu.scriptCommandUppercase },
+              { value: 'lowercase', label: strings.ribbonMenu.scriptCommandLowercase },
+              { value: 'trim', label: strings.ribbonMenu.scriptCommandTrim },
+              { value: 'clear', label: strings.ribbonMenu.scriptCommandClear },
+            ],
             initial: 'uppercase',
             okLabel: strings.ribbonMenu.scriptDialogRun,
             cancelLabel: strings.hyperlinkDialog.cancel,
-            validate: (value) =>
-              parseScriptCommand(value) ? null : strings.ribbonMenu.scriptCommandInvalid,
           })
         : action;
     if (raw === null) {
@@ -1256,26 +2308,6 @@ const buildPictureAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['insertPictureFromRibbon'] =>
   async (action) => {
     const strings = instance.i18n.strings;
-    if (action === 'online') {
-      const value = await showPrompt({
-        title: strings.ribbonMenu.pictureOnline,
-        label: strings.ribbonMenu.pictureUrlPrompt,
-        initial: 'https://',
-        okLabel: strings.hyperlinkDialog.ok,
-        cancelLabel: strings.hyperlinkDialog.cancel,
-        validate: (raw) => (raw.trim() ? null : strings.hyperlinkDialog.errorEmptyUrl),
-      });
-      if (value) {
-        createRibbonImageFromSelection(
-          instance.store as unknown as Parameters<typeof createRibbonImageFromSelection>[0],
-          normalizedSelectionRange(instance),
-          value.trim(),
-          instance.history as unknown as Parameters<typeof createRibbonImageFromSelection>[3],
-        );
-      }
-      instance.host.focus();
-      return;
-    }
     if (action === 'device') {
       const result = await pickImageFileDataUrl();
       if (result) {
@@ -1290,13 +2322,22 @@ const buildPictureAction =
       instance.host.focus();
       return;
     }
+    const ribbonMenu = strings.ribbonMenu as typeof strings.ribbonMenu & { pictureStock: string };
     const label =
-      action === 'online' ? strings.ribbonMenu.pictureOnline : strings.ribbonMenu.pictureThisDevice;
+      action === 'stock'
+        ? ribbonMenu.pictureStock
+        : action === 'online'
+          ? strings.ribbonMenu.pictureOnline
+          : strings.ribbonMenu.pictureThisDevice;
+    const compatibilityDetails = strings.workbookObjects
+      .compatibilityDetails as typeof strings.workbookObjects.compatibilityDetails & {
+      mediaPickers?: string;
+    };
     await showInstanceReport(instance, strings.ribbon.pictures, [
       {
         severity: 'info',
         label,
-        detail: strings.workbookObjects.compatibilityDetails.chartsDrawings,
+        detail: compatibilityDetails.mediaPickers ?? compatibilityDetails.chartsDrawings,
       },
     ]);
     instance.host.focus();
@@ -1340,6 +2381,37 @@ const buildArrangeAction =
       );
     }
     instance.host.focus();
+  };
+
+const updateArrangeMenu =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['updateArrangeMenu'] =>
+  (menu) => {
+    const activeId = activeIllustrationId(instance);
+    const state = instance.store.getState();
+    const sheet = state.data.sheetIndex;
+    const visible = state.illustrations.illustrations.filter((item) => item.sheet === sheet);
+    const activeIndex = activeId ? visible.findIndex((candidate) => candidate.id === activeId) : -1;
+    const hasTarget = activeIndex >= 0;
+    const atBack = !hasTarget || activeIndex === 0;
+    const atFront = !hasTarget || activeIndex === visible.length - 1;
+    const strings = instance.i18n.strings.ribbonMenu;
+    for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-arrange-action]')) {
+      const action = button.dataset.arrangeAction;
+      const disabled =
+        (action === 'bring-forward' && atFront) ||
+        (action === 'bring-front' && atFront) ||
+        (action === 'send-backward' && atBack) ||
+        (action === 'send-back' && atBack) ||
+        (!hasTarget && action !== 'selection-pane');
+      const reason = !hasTarget
+        ? strings.arrangeRequiresObject
+        : action === 'bring-forward' || action === 'bring-front'
+          ? strings.arrangeAtFront
+          : action === 'send-backward' || action === 'send-back'
+            ? strings.arrangeAtBack
+            : undefined;
+      setMenuControlDisabled(button, disabled, reason);
+    }
   };
 
 const buildScreenshotAction =
@@ -1522,15 +2594,9 @@ const buildCellStyleFooterAction =
         instance.history as unknown as Parameters<typeof mergeCellStylesFromWorkbook>[1],
         instance.workbook as unknown as Parameters<typeof mergeCellStylesFromWorkbook>[2],
       );
-      const ribbonMenu = strings.ribbonMenu as typeof strings.ribbonMenu & {
-        cellStyleMergeImported?: string;
-      };
       const detail =
         result.imported > 0
-          ? (ribbonMenu.cellStyleMergeImported ?? '{count} style(s) imported.').replace(
-              '{count}',
-              String(result.imported),
-            )
+          ? strings.ribbonMenu.cellStyleMergeImported.replace('{count}', String(result.imported))
           : strings.workbookObjects.compatibilityDetails.cellFormatting;
       await showInstanceReport(instance, strings.ribbonMenu.cellStyleMerge, [
         {
@@ -1586,14 +2652,28 @@ export function createDefaultDynamicDropdownsCtx(
   instance: SpreadsheetInstance,
   opts: DefaultDynamicDropdownsOptions = {},
 ): DynamicDropdownsCtx {
-  const focusSheet = (): void => {
-    instance.host.focus();
-  };
+  const focusSheet = opts.focusSheet ?? ((): void => instance.host.focus());
 
   const base: DynamicDropdownsCtx = {
     getInst: () => instance,
-    updateCalcOptionsMenu: noop,
-    updateDefinedNamesMenu: noop,
+    updateCalcOptionsMenu: updateCalcOptionsMenu(instance),
+    updateCellDeleteMenu: updateCellDeleteMenu(instance),
+    updateCellInsertMenu: updateCellInsertMenu(instance),
+    updateClearMenu: updateClearMenu(instance),
+    updateClearArrowsMenu: updateClearArrowsMenu(instance),
+    updateCurrencyMenu: updateCurrencyMenu(instance),
+    updateDataValidationMenu: updateDataValidationMenu(instance),
+    updateDefinedNamesMenu: updateDefinedNamesMenu(instance),
+    updateErrorCheckingMenu: updateErrorCheckingMenu(instance),
+    updateFormatCellsMenu: updateFormatCellsMenu(instance),
+    updateLinksMenu: updateLinksMenu(instance),
+    updatePageBreaksMenu: updatePageBreaksMenu(instance),
+    updatePrintAreaMenu: updatePrintAreaMenu(instance),
+    updateProtectMenu: updateProtectMenu(instance),
+    updatePageThemeMenu: updatePageThemeMenu(instance),
+    updateReviewCommentsMenu: updateReviewCommentsMenu(instance),
+    updateSortMenu: updateSortMenu(instance),
+    updateWatchMenu: updateWatchMenu(instance),
     closeBorderMenu: noop,
     closeFreezeMenu: noop,
     closePrintAreaMenu: noop,
@@ -1602,12 +2682,19 @@ export function createDefaultDynamicDropdownsCtx(
     focusSheet,
 
     // Pure / instance-derivable defaults.
+    updateArrangeMenu: updateArrangeMenu(instance),
     applyRibbonPasteAction: buildPasteAction(instance),
+    updatePasteMenu: updatePasteMenu(instance),
     applyFillSeries: buildFillSeries(instance),
+    updateFillMenu: updateFillMenu(instance),
     applyFillDirection: buildFillDirection(instance),
     applyClearAction: buildClearAction(instance),
+    applyUnderlineAction: buildUnderlineAction(instance),
+    applyMergeAction: buildMergeAction(instance),
     applyFreezeAction: buildFreezeAction(instance),
+    updateFreezeMenu: updateFreezeMenu(instance),
     applyTextOrientationAction: buildTextOrientation(instance),
+    updateTextOrientationMenu: updateTextOrientationMenu(instance),
     applyAutoSumFormula: buildAutoSumFormula(instance),
     applyFormulaAuditAction: buildFormulaAuditAction(instance),
     applyWatchAction: buildWatchAction(instance),
@@ -1626,11 +2713,10 @@ export function createDefaultDynamicDropdownsCtx(
     applyLinksAction: buildLinksAction(instance),
     applyCellInsertAction: buildCellInsertAction(instance),
     applyCellDeleteAction: buildCellDeleteAction(instance),
-    applyCellFormatAction: buildCellFormatAction(instance),
+    applyCellFormatAction: buildCellFormatAction(instance, opts),
     applyPageBreakAction: buildPageBreakAction(instance),
     applySheetBackgroundAction: buildSheetBackgroundAction(instance),
     applyPrintAreaAction: buildPrintAreaAction(instance),
-    applyPrintTitlesAction: buildPrintTitlesAction(instance),
     applyArrangeAction: buildArrangeAction(instance),
     applySortMenuAction: buildSortMenuAction(instance),
     applyReviewCommentAction: buildReviewCommentAction(instance),
@@ -1645,8 +2731,10 @@ export function createDefaultDynamicDropdownsCtx(
     applyPdfAction: buildPdfAction(instance),
     createTableFromSelection: buildTableStyleAction(instance),
     openTableStyleFooterAction: buildTableStyleFooterAction(instance),
+    updateTableStylesMenu: updateTableStylesMenu(instance),
     applyPivotTableStyleFromRibbon: buildPivotTableStyleAction(instance),
     applyCellStyleFromRibbon: buildCellStyleAction(instance),
+    updateCellStylesMenu: updateCellStylesMenu(instance),
     openCellStyleFooterAction: buildCellStyleFooterAction(instance),
     applyCurrencyPreset: buildCurrencyPresetAction(instance),
     openCurrencyFooterAction: buildCurrencyFooterAction(instance),

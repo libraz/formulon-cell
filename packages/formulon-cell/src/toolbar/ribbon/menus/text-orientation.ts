@@ -5,7 +5,7 @@
 import type { ToolbarMenuText } from '@libraz/formulon-cell';
 
 import { SVG_NS } from '../border-icons.js';
-import { createMenu, menuSeparator } from './general.js';
+import { createMenu, menuPresetButton, menuSeparator } from './general.js';
 
 export type TextOrientationGlyph = 'ccw' | 'cw' | 'vertical' | 'up' | 'down' | 'format';
 
@@ -14,6 +14,7 @@ const createTextOrientationIcon = (glyph: TextOrientationGlyph): SVGSVGElement =
   svg.setAttribute('viewBox', '0 0 16 16');
   svg.setAttribute('width', '16');
   svg.setAttribute('height', '16');
+  svg.classList.add('app__text-orientation-preview');
   svg.setAttribute('focusable', 'false');
   svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('fill', 'none');
@@ -96,17 +97,7 @@ const textOrientationMenuItem = (
   label: string,
   value: string,
 ): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.className = 'app__menu-item app__menu-item--preset';
-  btn.type = 'button';
-  btn.setAttribute('role', 'menuitem');
-  btn.dataset.textOrientation = value;
-  btn.appendChild(createTextOrientationIcon(glyph));
-  const text = document.createElement('span');
-  text.className = 'app__menu-item__text';
-  text.textContent = label;
-  btn.appendChild(text);
-  return btn;
+  return menuPresetButton(label, 'textOrientation', value, createTextOrientationIcon(glyph));
 };
 
 export const createTextOrientationMenu = (t: ToolbarMenuText): HTMLDivElement => {

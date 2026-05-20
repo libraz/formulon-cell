@@ -7,6 +7,7 @@
 
 import { createColorPalette, type ToolbarText } from '@libraz/formulon-cell';
 
+import { RIBBON_BORDERS_MENU_ID } from '../activation.js';
 import {
   BORDER_PRESETS,
   type BorderPreviewSpec,
@@ -14,7 +15,17 @@ import {
   createLineSamplePreview,
   LINE_STYLES_ALL,
 } from '../border-icons.js';
-import { createMenu, menuSectionHeader, menuSeparator } from './general.js';
+import {
+  createMenu,
+  createMenuButton,
+  createSubmenu,
+  menuIconSpacer,
+  menuPresetButton,
+  menuSectionHeader,
+  menuSeparator,
+  menuSubmenuTrigger,
+  submenuItemText,
+} from './general.js';
 
 export interface BordersMenuDeps {
   ribbonText: ToolbarText;
@@ -23,23 +34,9 @@ export interface BordersMenuDeps {
 }
 
 const presetMenuItem = (presetKey: string, label: string): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.className = 'app__menu-item app__menu-item--preset';
-  btn.type = 'button';
-  btn.setAttribute('role', 'menuitem');
-  btn.dataset.borderPreset = presetKey;
   const spec = BORDER_PRESETS[presetKey];
-  if (spec) btn.appendChild(createBorderPreview(spec));
-  else {
-    const spacer = document.createElement('span');
-    spacer.className = 'app__menu-item__icon-spacer';
-    btn.appendChild(spacer);
-  }
-  const text = document.createElement('span');
-  text.className = 'app__menu-item__text';
-  text.textContent = label;
-  btn.appendChild(text);
-  return btn;
+  const leading = spec ? createBorderPreview(spec) : menuIconSpacer();
+  return menuPresetButton(label, 'borderPreset', presetKey, leading);
 };
 
 const drawActionItem = (
@@ -47,22 +44,14 @@ const drawActionItem = (
   label: string,
   icon?: BorderPreviewSpec,
 ): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.className = 'app__menu-item app__menu-item--preset';
-  btn.type = 'button';
+  const btn = menuPresetButton(
+    label,
+    'borderDraw',
+    action,
+    icon ? createBorderPreview(icon) : menuIconSpacer(),
+  );
   btn.setAttribute('role', 'menuitemcheckbox');
   btn.setAttribute('aria-checked', 'false');
-  btn.dataset.borderDraw = action;
-  if (icon) btn.appendChild(createBorderPreview(icon));
-  else {
-    const spacer = document.createElement('span');
-    spacer.className = 'app__menu-item__icon-spacer';
-    btn.appendChild(spacer);
-  }
-  const text = document.createElement('span');
-  text.className = 'app__menu-item__text';
-  text.textContent = label;
-  btn.appendChild(text);
   return btn;
 };
 
@@ -70,47 +59,29 @@ const submenuTrigger = (
   submenuKey: 'lineColor' | 'lineStyle',
   label: string,
 ): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.className = 'app__menu-item app__menu-item--preset app__menu-item--submenu';
-  btn.type = 'button';
-  btn.setAttribute('role', 'menuitem');
-  btn.setAttribute('aria-haspopup', 'menu');
-  btn.setAttribute('aria-expanded', 'false');
-  btn.dataset.borderSubmenu = submenuKey;
-  const spacer = document.createElement('span');
-  spacer.className = 'app__menu-item__icon-spacer';
-  btn.appendChild(spacer);
-  const text = document.createElement('span');
-  text.className = 'app__menu-item__text';
-  text.textContent = label;
-  btn.appendChild(text);
-  const caret = document.createElement('span');
-  caret.className = 'app__menu-item__caret';
-  caret.setAttribute('aria-hidden', 'true');
-  caret.textContent = '▶';
-  btn.appendChild(caret);
-  return btn;
+  const btn = menuPresetButton(label, 'borderSubmenu', submenuKey, menuIconSpacer());
+  return menuSubmenuTrigger(btn, undefined, { controlsId: borderSubmenuId(submenuKey) });
 };
 
+const borderSubmenuId = (submenuKey: 'lineColor' | 'lineStyle'): string =>
+  submenuKey === 'lineColor' ? 'menu-borders-line-color' : 'menu-borders-line-style';
+
 const createLineStyleSubmenu = (label: string, noneLabel: string): HTMLDivElement => {
-  const submenu = document.createElement('div');
-  submenu.className = 'app__submenu app__submenu--line-style';
-  submenu.id = 'menu-borders-line-style';
-  submenu.setAttribute('role', 'menu');
-  submenu.setAttribute('aria-label', label);
-  submenu.hidden = true;
+  const submenu = createSubmenu({
+    id: borderSubmenuId('lineStyle'),
+    className: 'app__submenu app__submenu--line-style',
+    label,
+  });
   for (const value of LINE_STYLES_ALL) {
-    const btn = document.createElement('button');
-    btn.className = 'app__submenu-item';
-    btn.type = 'button';
+    const btn = createMenuButton({
+      className: 'app__submenu-item',
+      attr: 'borderLineStyle',
+      value,
+    });
     btn.setAttribute('role', 'menuitemradio');
     btn.setAttribute('aria-checked', value === 'thin' ? 'true' : 'false');
-    btn.dataset.borderLineStyle = value;
     if (value === 'none') {
-      const span = document.createElement('span');
-      span.textContent = noneLabel;
-      span.className = 'app__submenu-item__text';
-      btn.appendChild(span);
+      btn.appendChild(submenuItemText(noneLabel));
     } else {
       btn.appendChild(createLineSamplePreview(value));
     }
@@ -120,12 +91,11 @@ const createLineStyleSubmenu = (label: string, noneLabel: string): HTMLDivElemen
 };
 
 const createLineColorSubmenu = (label: string, deps: BordersMenuDeps): HTMLDivElement => {
-  const submenu = document.createElement('div');
-  submenu.className = 'app__submenu app__submenu--line-color';
-  submenu.id = 'menu-borders-line-color';
-  submenu.setAttribute('role', 'menu');
-  submenu.setAttribute('aria-label', label);
-  submenu.hidden = true;
+  const submenu = createSubmenu({
+    id: borderSubmenuId('lineColor'),
+    className: 'app__submenu app__submenu--line-color',
+    label,
+  });
   const palette = createColorPalette({
     themeLabel: deps.ribbonText.themeColors,
     standardLabel: deps.ribbonText.standardColors,
@@ -140,7 +110,7 @@ const createLineColorSubmenu = (label: string, deps: BordersMenuDeps): HTMLDivEl
 
 export const createBordersMenu = (deps: BordersMenuDeps): HTMLDivElement => {
   const t = deps.ribbonText;
-  const menu = createMenu('menu-borders');
+  const menu = createMenu(RIBBON_BORDERS_MENU_ID);
   menu.classList.add('app__menu--borders');
   menu.append(
     // Section 1: single-side edges

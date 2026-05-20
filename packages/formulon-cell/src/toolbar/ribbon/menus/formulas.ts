@@ -1,11 +1,11 @@
 // Formulas tab menus: AutoSum, calc options, formula audit error checks. The
-// AutoSum / formula-audit dropdowns are pure label lists; calc options uses a
-// mix of menuitem/menuitemradio entries so the parent can toggle the radio
-// state after rendering.
+// factories use shared icon menu rows; calc options uses a mix of
+// menuitem/menuitemradio entries so the parent can toggle the radio state after
+// rendering.
 
 import type { ToolbarLang, ToolbarMenuText } from '@libraz/formulon-cell';
 
-import { createMenu, menuButton, menuIdForCommand, menuSeparator } from './general.js';
+import { createMenu, menuIconButton, menuIdForCommand, menuSeparator } from './general.js';
 
 export type AutoSumFormulaName = 'SUM' | 'AVERAGE' | 'COUNT' | 'MAX' | 'MIN' | 'MORE';
 
@@ -16,8 +16,17 @@ export interface FormulasMenuFactories {
   createErrorCheckingMenu: () => HTMLDivElement;
 }
 
-const calcOptionButton = (label: string, value: string): HTMLButtonElement => {
-  const button = menuButton(label, 'calcOption', value);
+type FormulasMenuText = ToolbarMenuText & {
+  calcAutomatic: string;
+  calcAutoNoTable: string;
+  calcManual: string;
+  calcCalculateNow: string;
+  calcCalculateSheet: string;
+  calcIterative: string;
+};
+
+const calcOptionButton = (label: string, value: string, icon: string): HTMLButtonElement => {
+  const button = menuIconButton(label, 'calcOption', value, icon);
   if (value === 'auto' || value === 'manual' || value === 'auto-no-table') {
     button.setAttribute('role', 'menuitemradio');
     button.setAttribute('aria-checked', 'false');
@@ -27,21 +36,20 @@ const calcOptionButton = (label: string, value: string): HTMLButtonElement => {
 
 export const createFormulasMenuFactories = (
   ribbonMenuText: ToolbarMenuText,
-  ribbonLang: ToolbarLang,
+  _ribbonLang: ToolbarLang,
 ): FormulasMenuFactories => {
-  const t = ribbonMenuText;
-  const ja = ribbonLang === 'ja';
+  const t = ribbonMenuText as FormulasMenuText;
 
   const createAutoSumMenu = (id: string): HTMLDivElement => {
     const menu = createMenu(menuIdForCommand(id));
     menu.append(
-      menuButton(t.autosumSum, 'autosumFn', 'SUM'),
-      menuButton(t.autosumAverage, 'autosumFn', 'AVERAGE'),
-      menuButton(t.autosumCount, 'autosumFn', 'COUNT'),
-      menuButton(t.autosumMax, 'autosumFn', 'MAX'),
-      menuButton(t.autosumMin, 'autosumFn', 'MIN'),
+      menuIconButton(t.autosumSum, 'autosumFn', 'SUM', 'autosum-sum'),
+      menuIconButton(t.autosumAverage, 'autosumFn', 'AVERAGE', 'autosum-average'),
+      menuIconButton(t.autosumCount, 'autosumFn', 'COUNT', 'autosum-count'),
+      menuIconButton(t.autosumMax, 'autosumFn', 'MAX', 'autosum-max'),
+      menuIconButton(t.autosumMin, 'autosumFn', 'MIN', 'autosum-min'),
       menuSeparator(),
-      menuButton(t.autosumMoreFunctions, 'autosumFn', 'MORE'),
+      menuIconButton(t.autosumMoreFunctions, 'autosumFn', 'MORE', 'autosum-more'),
     );
     return menu;
   };
@@ -49,17 +57,14 @@ export const createFormulasMenuFactories = (
   const createCalcOptionsMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-calc-options');
     menu.append(
-      calcOptionButton(ja ? '自動' : 'Automatic', 'auto'),
-      calcOptionButton(
-        ja ? 'データ テーブル以外自動' : 'Automatic Except for Data Tables',
-        'auto-no-table',
-      ),
-      calcOptionButton(ja ? '手動' : 'Manual', 'manual'),
+      calcOptionButton(t.calcAutomatic, 'auto', 'calc-auto'),
+      calcOptionButton(t.calcAutoNoTable, 'auto-no-table', 'calc-auto-no-table'),
+      calcOptionButton(t.calcManual, 'manual', 'calc-manual'),
       menuSeparator(),
-      calcOptionButton(ja ? '再計算実行' : 'Calculate Now', 'calculate-now'),
-      calcOptionButton(ja ? 'シート再計算' : 'Calculate Sheet', 'calculate-sheet'),
+      calcOptionButton(t.calcCalculateNow, 'calculate-now', 'calc-now'),
+      calcOptionButton(t.calcCalculateSheet, 'calculate-sheet', 'calc-sheet'),
       menuSeparator(),
-      calcOptionButton(ja ? '反復計算...' : 'Iterative Calculation...', 'iterative'),
+      calcOptionButton(t.calcIterative, 'iterative', 'calc-iterative'),
     );
     return menu;
   };
@@ -67,9 +72,19 @@ export const createFormulasMenuFactories = (
   const createClearArrowsMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-clear-arrows');
     menu.append(
-      menuButton(t.removeArrowsAll, 'formulaAuditAction', 'clear-all'),
-      menuButton(t.removePrecedentArrows, 'formulaAuditAction', 'clear-precedents'),
-      menuButton(t.removeDependentArrows, 'formulaAuditAction', 'clear-dependents'),
+      menuIconButton(t.removeArrowsAll, 'formulaAuditAction', 'clear-all', 'audit-clear-all'),
+      menuIconButton(
+        t.removePrecedentArrows,
+        'formulaAuditAction',
+        'clear-precedents',
+        'audit-clear-precedents',
+      ),
+      menuIconButton(
+        t.removeDependentArrows,
+        'formulaAuditAction',
+        'clear-dependents',
+        'audit-clear-dependents',
+      ),
     );
     return menu;
   };
@@ -77,10 +92,10 @@ export const createFormulasMenuFactories = (
   const createErrorCheckingMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-error-checking');
     menu.append(
-      menuButton(t.errorChecking, 'formulaAuditAction', 'error-checking'),
-      menuButton(t.traceError, 'formulaAuditAction', 'trace-error'),
+      menuIconButton(t.errorChecking, 'formulaAuditAction', 'error-checking', 'error-checking'),
+      menuIconButton(t.traceError, 'formulaAuditAction', 'trace-error', 'trace-error'),
       menuSeparator(),
-      menuButton(t.ignoreError, 'formulaAuditAction', 'ignore-error'),
+      menuIconButton(t.ignoreError, 'formulaAuditAction', 'ignore-error', 'ignore-error'),
     );
     return menu;
   };

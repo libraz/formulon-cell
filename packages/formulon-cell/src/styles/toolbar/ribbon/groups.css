@@ -18,7 +18,7 @@
 }
 
 .demo__ribbon-group--font .demo__ribbon-tools {
-  width: 410px;
+  width: 300px;
 }
 
 .demo__ribbon-group--alignment .demo__ribbon-tools {
@@ -30,15 +30,15 @@
 }
 
 .demo__ribbon-group--styles .demo__ribbon-tools {
-  width: 188px;
+  width: 230px;
 }
 
 .demo__ribbon-group--cells .demo__ribbon-tools {
-  width: 164px;
+  width: 92px;
 }
 
 .demo__ribbon-group--editing .demo__ribbon-tools {
-  width: 178px;
+  width: 238px;
 }
 
 .demo__ribbon-group--tiles .demo__ribbon-tools {
@@ -53,6 +53,7 @@
 .demo__ribbon-group--tiles .demo__rb,
 .demo__ribbon-group--tiles .demo__rb--wide,
 .demo__ribbon-group--tiles .demo__rb--mono {
+  position: relative;
   flex-direction: column;
   gap: 4px;
   width: 74px;
@@ -66,6 +67,13 @@
   line-height: 1.08;
   text-align: center;
   white-space: normal;
+}
+
+.demo__ribbon-group--tiles .demo__rb .demo__rb-split-chevron {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  margin-top: 0;
 }
 
 .demo__ribbon-group--tiles .demo__rb-icon {
@@ -84,4 +92,91 @@
 
 .demo__ribbon-group--tiles .demo__rb--mono:not(:has(.demo__rb-icon))::first-line {
   font-size: 15px;
+}
+
+.demo__ribbon-group--stacked .demo__ribbon-tools {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(3, 22px);
+  align-content: start;
+  gap: 2px;
+  min-height: 76px;
+  max-height: 76px;
+}
+
+.demo__ribbon-group--mixed .demo__ribbon-tools {
+  display: grid;
+  grid-template-columns: 84px repeat(2, 74px);
+  grid-template-rows: repeat(3, 22px);
+  align-content: start;
+  gap: 2px 4px;
+  min-height: 76px;
+  max-height: 76px;
+}
+
+.demo__ribbon-group--mixed .demo__rb--wide:not(.demo__rb--stacked) {
+  grid-row: 1 / span 3;
+}
+
+.demo__ribbon-group--stacked .demo__rb--stacked,
+.demo__ribbon-group--mixed .demo__rb--stacked {
+  justify-content: flex-start;
+  gap: 5px;
+  width: 84px;
+  min-width: 84px;
+  max-width: 84px;
+  height: 22px;
+  padding: 1px 4px;
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.demo__ribbon-group--stacked .demo__rb--stacked span,
+.demo__ribbon-group--mixed .demo__rb--stacked span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.demo__ribbon-group--stacked .demo__rb--stacked .demo__rb-icon,
+.demo__ribbon-group--mixed .demo__rb--stacked .demo__rb-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.demo__ribbon-group--stacked .demo__rb--stacked .demo__rb-split-chevron,
+.demo__ribbon-group--mixed .demo__rb--stacked .demo__rb-split-chevron {
+  margin: 0 0 0 auto;
+}
+
+.demo__ribbon-group--mixed .demo__rb--wide:not(.demo__rb--stacked) {
+  position: relative;
+  flex-direction: column;
+  gap: 4px;
+  width: 74px;
+  min-width: 74px;
+  max-width: 74px;
+  height: 66px;
+  padding: 5px 5px 4px;
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.08;
+  text-align: center;
+  white-space: normal;
+}
+
+.demo__ribbon-group--mixed .demo__rb--wide:not(.demo__rb--stacked) .demo__rb-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.demo__ribbon-group--mixed .demo__rb--wide:not(.demo__rb--stacked) .demo__rb-split-chevron {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  margin-top: 0;
 }

@@ -1,11 +1,20 @@
 // Insert tab menus: Symbol grid, PivotTable, Chart/Picture/Shapes/Screenshot,
 // Links, DataValidation, DefinedNames, Script, AddIns, PDF. Each factory is a
-// static label list extracted from main.ts so the entry file no longer has to
-// hold them inline.
+// shared icon, symbol, or visual-tile menu extracted from main.ts so the entry
+// file no longer has to hold them inline.
 
-import type { ToolbarMenuText } from '@libraz/formulon-cell';
+import type { ToolbarMenuText } from '../../menu-text.js';
 import { toolbarSymbolGroups } from '../symbols.js';
-import { createMenu, menuButton, menuIdForCommand, menuSeparator } from './general.js';
+import {
+  createMenu,
+  menuIconButton,
+  menuIdForCommand,
+  menuSectionHeader,
+  menuSeparator,
+  symbolMenuGrid,
+  visualMenuTile,
+  visualMenuTileGrid,
+} from './general.js';
 
 export interface InsertMenuFactories {
   createSymbolMenu: () => HTMLDivElement;
@@ -22,14 +31,6 @@ export interface InsertMenuFactories {
   createPdfMenu: () => HTMLDivElement;
 }
 
-const symbolMenuHeading = (label: string): HTMLDivElement => {
-  const heading = document.createElement('div');
-  heading.className = 'app__menu-heading';
-  heading.setAttribute('role', 'presentation');
-  heading.textContent = label;
-  return heading;
-};
-
 export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): InsertMenuFactories => {
   const t = ribbonMenuText;
 
@@ -37,25 +38,34 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
     const menu = createMenu(menuIdForCommand('symbolInsert'));
     menu.classList.add('app__menu--symbols');
     for (const group of toolbarSymbolGroups(t)) {
-      menu.append(symbolMenuHeading(group.label));
-      for (const symbol of group.symbols) {
-        const button = menuButton(symbol, 'symbol', symbol);
-        button.title = symbol;
-        menu.append(button);
-      }
+      menu.append(menuSectionHeader(group.label));
+      menu.append(symbolMenuGrid(group.label, group.symbols));
     }
-    menu.append(menuSeparator(), menuButton(t.symbolMore, 'symbolAction', 'more'));
+    menu.append(
+      menuSeparator(),
+      menuIconButton(t.symbolMore, 'symbolAction', 'more', 'symbol-more'),
+    );
     return menu;
   };
 
   const createPivotTableMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-pivot-table');
     menu.append(
-      menuButton(t.pivotTableFromRange, 'pivotTableAction', 'dialog'),
-      menuButton(t.recommendedPivotTables, 'pivotTableAction', 'recommended'),
+      menuIconButton(t.pivotTableFromRange, 'pivotTableAction', 'dialog', 'pivot-range'),
+      menuIconButton(
+        t.recommendedPivotTables,
+        'pivotTableAction',
+        'recommended',
+        'pivot-recommended',
+      ),
       menuSeparator(),
-      menuButton(t.pivotTableNewSheet, 'pivotTableAction', 'new-sheet'),
-      menuButton(t.pivotTableExistingSheet, 'pivotTableAction', 'existing-sheet'),
+      menuIconButton(t.pivotTableNewSheet, 'pivotTableAction', 'new-sheet', 'pivot-new-sheet'),
+      menuIconButton(
+        t.pivotTableExistingSheet,
+        'pivotTableAction',
+        'existing-sheet',
+        'pivot-existing-sheet',
+      ),
     );
     return menu;
   };
@@ -63,15 +73,35 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
   const createDefinedNamesMenu = (id: string): HTMLDivElement => {
     const menu = createMenu(menuIdForCommand(id));
     menu.append(
-      menuButton(t.defineName, 'definedNameAction', 'define'),
-      menuButton(t.nameManager, 'definedNameAction', 'manager'),
+      menuIconButton(t.defineName, 'definedNameAction', 'define', 'defined-name-define'),
+      menuIconButton(t.nameManager, 'definedNameAction', 'manager', 'defined-name-manager'),
       menuSeparator(),
-      menuButton(t.createFromSelectionTop, 'definedNameAction', 'create-top-row'),
-      menuButton(t.createFromSelectionBottom, 'definedNameAction', 'create-bottom-row'),
-      menuButton(t.createFromSelectionLeft, 'definedNameAction', 'create-left-column'),
-      menuButton(t.createFromSelectionRight, 'definedNameAction', 'create-right-column'),
+      menuIconButton(
+        t.createFromSelectionTop,
+        'definedNameAction',
+        'create-top-row',
+        'defined-name-create-top',
+      ),
+      menuIconButton(
+        t.createFromSelectionBottom,
+        'definedNameAction',
+        'create-bottom-row',
+        'defined-name-create-bottom',
+      ),
+      menuIconButton(
+        t.createFromSelectionLeft,
+        'definedNameAction',
+        'create-left-column',
+        'defined-name-create-left',
+      ),
+      menuIconButton(
+        t.createFromSelectionRight,
+        'definedNameAction',
+        'create-right-column',
+        'defined-name-create-right',
+      ),
       menuSeparator(),
-      menuButton(t.useInFormula, 'definedNameAction', 'use-formula'),
+      menuIconButton(t.useInFormula, 'definedNameAction', 'use-formula', 'defined-name-use'),
     );
     return menu;
   };
@@ -79,11 +109,11 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
   const createLinksMenu = (id: string): HTMLDivElement => {
     const menu = createMenu(menuIdForCommand(id));
     menu.append(
-      menuButton(t.linkInsertOrEdit, 'linkAction', 'hyperlink'),
-      menuButton(t.linkOpen, 'linkAction', 'open'),
-      menuButton(t.linkClear, 'linkAction', 'clear'),
+      menuIconButton(t.linkInsertOrEdit, 'linkAction', 'hyperlink', 'link-edit'),
+      menuIconButton(t.linkOpen, 'linkAction', 'open', 'link-open'),
+      menuIconButton(t.linkClear, 'linkAction', 'clear', 'link-clear'),
       menuSeparator(),
-      menuButton(t.linkExternalLinks, 'linkAction', 'external'),
+      menuIconButton(t.linkExternalLinks, 'linkAction', 'external', 'link-external'),
     );
     return menu;
   };
@@ -91,57 +121,197 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
   const createDataValidationMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-data-validation');
     menu.append(
-      menuButton(t.validationSettings, 'validationAction', 'settings'),
-      menuButton(t.validationCircleInvalid, 'validationAction', 'circle-invalid'),
-      menuButton(t.validationClearCircles, 'validationAction', 'clear-circles'),
+      menuIconButton(t.validationSettings, 'validationAction', 'settings', 'validation-settings'),
+      menuIconButton(
+        t.validationCircleInvalid,
+        'validationAction',
+        'circle-invalid',
+        'validation-circle',
+      ),
+      menuIconButton(
+        t.validationClearCircles,
+        'validationAction',
+        'clear-circles',
+        'validation-clear-circles',
+      ),
       menuSeparator(),
-      menuButton(t.validationClearRules, 'validationAction', 'clear-rules'),
+      menuIconButton(
+        t.validationClearRules,
+        'validationAction',
+        'clear-rules',
+        'validation-clear-rules',
+      ),
     );
     return menu;
   };
 
   const createChartInsertMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-chart-insert');
+    menu.classList.add('app__menu--visual', 'app__menu--charts');
+    const grid = visualMenuTileGrid('app__visual-grid--charts', [
+      {
+        label: t.chartColumn,
+        attr: 'chartInsert',
+        value: 'column',
+        icon: 'chart-column',
+      },
+      {
+        label: t.chartBar,
+        attr: 'chartInsert',
+        value: 'bar',
+        icon: 'chart-bar',
+      },
+      {
+        label: t.chartLine,
+        attr: 'chartInsert',
+        value: 'line',
+        icon: 'chart-line',
+      },
+      {
+        label: t.chartArea,
+        attr: 'chartInsert',
+        value: 'area',
+        icon: 'chart-area',
+      },
+      {
+        label: t.chartPie,
+        attr: 'chartInsert',
+        value: 'pie',
+        icon: 'chart-pie',
+      },
+      {
+        label: t.chartScatter,
+        attr: 'chartInsert',
+        value: 'scatter',
+        icon: 'chart-scatter',
+      },
+    ]);
     menu.append(
-      menuButton(t.chartColumn, 'chartInsert', 'column'),
-      menuButton(t.chartBar, 'chartInsert', 'bar'),
-      menuButton(t.chartLine, 'chartInsert', 'line'),
-      menuButton(t.chartArea, 'chartInsert', 'area'),
-      menuButton(t.chartPie, 'chartInsert', 'pie'),
-      menuButton(t.chartScatter, 'chartInsert', 'scatter'),
+      grid,
       menuSeparator(),
-      menuButton(t.recommendedCharts, 'chartInsert', 'recommended'),
+      visualMenuTile({
+        label: t.recommendedCharts,
+        attr: 'chartInsert',
+        value: 'recommended',
+        icon: 'chart-recommended',
+        className: 'app__visual-tile--wide',
+      }),
     );
     return menu;
   };
 
   const createPictureInsertMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-picture-insert');
-    menu.append(
-      menuButton(t.pictureThisDevice, 'pictureInsert', 'device'),
-      menuButton(t.pictureOnline, 'pictureInsert', 'online'),
-    );
+    menu.classList.add('app__menu--visual', 'app__menu--pictures');
+    const grid = visualMenuTileGrid('app__visual-grid--pictures', [
+      {
+        label: t.pictureThisDevice,
+        attr: 'pictureInsert',
+        value: 'device',
+        icon: 'device-picture',
+      },
+      {
+        label: t.pictureOnline,
+        attr: 'pictureInsert',
+        value: 'online',
+        icon: 'online-picture',
+      },
+      {
+        label: t.pictureStock,
+        attr: 'pictureInsert',
+        value: 'stock',
+        icon: 'stock-picture',
+      },
+    ]);
+    menu.append(grid);
     return menu;
   };
 
   const createShapesInsertMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-shapes-insert');
+    menu.classList.add('app__menu--visual', 'app__menu--shapes');
+    const lines = visualMenuTileGrid('app__visual-grid--shapes', [
+      {
+        label: t.shapeLine,
+        attr: 'shapeInsert',
+        value: 'line',
+        icon: 'shape-line',
+      },
+      {
+        label: t.shapeArrow,
+        attr: 'shapeInsert',
+        value: 'arrow',
+        icon: 'shape-arrow',
+      },
+    ]);
+    const rectangles = visualMenuTileGrid('app__visual-grid--shapes', [
+      {
+        label: t.shapeRectangle,
+        attr: 'shapeInsert',
+        value: 'rectangle',
+        icon: 'shape-rectangle',
+      },
+      {
+        label: t.shapeRoundedRectangle,
+        attr: 'shapeInsert',
+        value: 'rounded-rectangle',
+        icon: 'shape-rounded-rectangle',
+      },
+    ]);
+    const basic = visualMenuTileGrid('app__visual-grid--shapes', [
+      {
+        label: t.shapeOval,
+        attr: 'shapeInsert',
+        value: 'oval',
+        icon: 'shape-oval',
+      },
+      {
+        label: t.shapeTriangle,
+        attr: 'shapeInsert',
+        value: 'triangle',
+        icon: 'shape-triangle',
+      },
+      {
+        label: t.shapeDiamond,
+        attr: 'shapeInsert',
+        value: 'diamond',
+        icon: 'shape-diamond',
+      },
+    ]);
     menu.append(
-      menuButton(t.shapeRectangle, 'shapeInsert', 'rectangle'),
-      menuButton(t.shapeRoundedRectangle, 'shapeInsert', 'rounded-rectangle'),
-      menuButton(t.shapeOval, 'shapeInsert', 'oval'),
-      menuSeparator(),
-      menuButton(t.shapeLine, 'shapeInsert', 'line'),
-      menuButton(t.shapeArrow, 'shapeInsert', 'arrow'),
+      menuSectionHeader(t.shapeLines),
+      lines,
+      menuSectionHeader(t.shapeRectangles),
+      rectangles,
+      menuSectionHeader(t.shapeBasicShapes),
+      basic,
     );
     return menu;
   };
 
   const createScreenshotInsertMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-screenshot-insert');
+    menu.classList.add('app__menu--visual', 'app__menu--screenshots');
+    const grid = visualMenuTileGrid('app__visual-grid--screenshots', [
+      {
+        label: t.screenshotCurrentView,
+        attr: 'screenshotInsert',
+        value: 'current-view',
+        icon: 'screenshot-window',
+        className: 'app__visual-tile--screenshot-preview',
+      },
+    ]);
     menu.append(
-      menuButton(t.screenshotCurrentView, 'screenshotInsert', 'current-view'),
-      menuButton(t.screenshotScreenClipping, 'screenshotInsert', 'screen-clipping'),
+      menuSectionHeader(t.screenshotAvailableWindows),
+      grid,
+      menuSeparator(),
+      visualMenuTile({
+        label: t.screenshotScreenClipping,
+        attr: 'screenshotInsert',
+        value: 'screen-clipping',
+        icon: 'screen-clipping',
+        className: 'app__visual-tile--wide',
+      }),
     );
     return menu;
   };
@@ -149,12 +319,12 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
   const createScriptMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-script');
     menu.append(
-      menuButton(t.scriptCommandUppercase, 'scriptAction', 'uppercase'),
-      menuButton(t.scriptCommandLowercase, 'scriptAction', 'lowercase'),
-      menuButton(t.scriptCommandTrim, 'scriptAction', 'trim'),
-      menuButton(t.scriptCommandClear, 'scriptAction', 'clear'),
+      menuIconButton(t.scriptCommandUppercase, 'scriptAction', 'uppercase', 'script-uppercase'),
+      menuIconButton(t.scriptCommandLowercase, 'scriptAction', 'lowercase', 'script-lowercase'),
+      menuIconButton(t.scriptCommandTrim, 'scriptAction', 'trim', 'script-trim'),
+      menuIconButton(t.scriptCommandClear, 'scriptAction', 'clear', 'script-clear'),
       menuSeparator(),
-      menuButton(t.scriptRunCustom, 'scriptAction', 'custom'),
+      menuIconButton(t.scriptRunCustom, 'scriptAction', 'custom', 'script-custom'),
     );
     return menu;
   };
@@ -162,10 +332,10 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
   const createAddInMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-add-ins');
     menu.append(
-      menuButton(t.addInGet, 'addInAction', 'get'),
-      menuButton(t.addInMy, 'addInAction', 'my'),
+      menuIconButton(t.addInGet, 'addInAction', 'get', 'addin-get'),
+      menuIconButton(t.addInMy, 'addInAction', 'my', 'addin-my'),
       menuSeparator(),
-      menuButton(t.addInManage, 'addInAction', 'manage'),
+      menuIconButton(t.addInManage, 'addInAction', 'manage', 'addin-manage'),
     );
     return menu;
   };
@@ -173,10 +343,10 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
   const createPdfMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-pdf');
     menu.append(
-      menuButton(t.pdfCreate, 'pdfAction', 'create'),
-      menuButton(t.pdfShare, 'pdfAction', 'share'),
+      menuIconButton(t.pdfCreate, 'pdfAction', 'create', 'pdf-create'),
+      menuIconButton(t.pdfShare, 'pdfAction', 'share', 'pdf-share'),
       menuSeparator(),
-      menuButton(t.pdfPreferences, 'pdfAction', 'preferences'),
+      menuIconButton(t.pdfPreferences, 'pdfAction', 'preferences', 'pdf-preferences'),
     );
     return menu;
   };

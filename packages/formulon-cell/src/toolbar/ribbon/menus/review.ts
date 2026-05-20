@@ -1,9 +1,9 @@
 // Review tab menus: comments, watch window, sheet/workbook protection. Each
-// factory is a static label list extracted from main.ts.
+// factory builds shared icon menu rows extracted from main.ts.
 
 import type { ToolbarMenuText } from '@libraz/formulon-cell';
 
-import { createMenu, menuButton, menuIdForCommand, menuSeparator } from './general.js';
+import { createMenu, menuIconButton, menuIdForCommand, menuSeparator } from './general.js';
 
 export interface ReviewMenuFactories {
   createWatchMenu: (id: string) => HTMLDivElement;
@@ -17,11 +17,11 @@ export const createReviewMenuFactories = (ribbonMenuText: ToolbarMenuText): Revi
   const createWatchMenu = (id: string): HTMLDivElement => {
     const menu = createMenu(menuIdForCommand(id));
     menu.append(
-      menuButton(t.watchWindow, 'watchAction', 'open'),
-      menuButton(t.watchAdd, 'watchAction', 'add'),
-      menuButton(t.watchDelete, 'watchAction', 'delete'),
+      menuIconButton(t.watchWindow, 'watchAction', 'open', 'watch-open'),
+      menuIconButton(t.watchAdd, 'watchAction', 'add', 'watch-add'),
+      menuIconButton(t.watchDelete, 'watchAction', 'delete', 'watch-delete'),
       menuSeparator(),
-      menuButton(t.watchDeleteAll, 'watchAction', 'delete-all'),
+      menuIconButton(t.watchDeleteAll, 'watchAction', 'delete-all', 'watch-delete-all'),
     );
     return menu;
   };
@@ -29,25 +29,62 @@ export const createReviewMenuFactories = (ribbonMenuText: ToolbarMenuText): Revi
   const createReviewCommentsMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-review-comments');
     menu.append(
-      menuButton(t.commentDelete, 'commentAction', 'delete-active'),
-      menuButton(t.commentDeleteAll, 'commentAction', 'delete-all'),
+      menuIconButton(t.commentDelete, 'commentAction', 'delete-active', 'comment-delete'),
+      menuIconButton(t.commentDeleteAll, 'commentAction', 'delete-all', 'comment-delete-all'),
     );
     return menu;
   };
 
   const createProtectMenu = (id: string): HTMLDivElement => {
     const menu = createMenu(menuIdForCommand(id));
+    if (id === 'protect') {
+      menu.append(
+        menuIconButton(t.protectSheetCommand, 'protectAction', 'protect-sheet', 'protect-sheet'),
+        menuIconButton(
+          t.unprotectSheetCommand,
+          'protectAction',
+          'unprotect-sheet',
+          'protect-unprotect-sheet',
+        ),
+      );
+      return menu;
+    }
     menu.append(
-      menuButton(t.protectSheetCommand, 'protectAction', 'protect-sheet'),
-      menuButton(t.unprotectSheetCommand, 'protectAction', 'unprotect-sheet'),
+      menuIconButton(t.protectSheetCommand, 'protectAction', 'protect-sheet', 'protect-sheet'),
+      menuIconButton(
+        t.unprotectSheetCommand,
+        'protectAction',
+        'unprotect-sheet',
+        'protect-unprotect-sheet',
+      ),
       menuSeparator(),
-      menuButton(t.lockCell, 'protectAction', 'lock-cell'),
-      menuButton(t.unlockCell, 'protectAction', 'unlock-cell'),
+      menuIconButton(t.lockCell, 'protectAction', 'lock-cell', 'protect-lock-cell'),
+      menuIconButton(t.unlockCell, 'protectAction', 'unlock-cell', 'protect-unlock-cell'),
       menuSeparator(),
-      menuButton(t.protectWorkbookCommand, 'protectAction', 'protect-workbook'),
-      menuButton(t.unprotectWorkbookCommand, 'protectAction', 'unprotect-workbook'),
-      menuButton(t.allowEditRangesCommand, 'protectAction', 'allow-edit-ranges'),
-      menuButton(t.allowEditRangesClearCommand, 'protectAction', 'clear-allowed-edit-ranges'),
+      menuIconButton(
+        t.protectWorkbookCommand,
+        'protectAction',
+        'protect-workbook',
+        'protect-workbook',
+      ),
+      menuIconButton(
+        t.unprotectWorkbookCommand,
+        'protectAction',
+        'unprotect-workbook',
+        'protect-unprotect-workbook',
+      ),
+      menuIconButton(
+        t.allowEditRangesCommand,
+        'protectAction',
+        'allow-edit-ranges',
+        'protect-allow-ranges',
+      ),
+      menuIconButton(
+        t.allowEditRangesClearCommand,
+        'protectAction',
+        'clear-allowed-edit-ranges',
+        'protect-clear-ranges',
+      ),
     );
     return menu;
   };

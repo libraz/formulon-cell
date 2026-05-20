@@ -5,8 +5,10 @@
 // the click dispatch table.
 
 import type { SessionChartKind, SpreadsheetInstance } from '@libraz/formulon-cell';
+import { clamp, viewportSize } from '../../interact/overlay-position.js';
 import type { SessionShapeKind } from '../illustration-types.js';
 import { focusMenuItem } from '../menu-a11y.js';
+import { RIBBON_DROPDOWN_MENU_FOR_COMMAND } from './activation.js';
 import type { RibbonFillSeriesMode } from './fill-series.js';
 import type { AutoSumFormulaName } from './menus/formulas.js';
 import type { TableVariantId } from './menus/styles.js';
@@ -16,7 +18,6 @@ export type RibbonDropdownSpec = {
   command: string;
 };
 
-export type PrintTitlesAction = 'rows' | 'cols' | 'clear';
 export type PrintAreaAction = 'set' | 'add' | 'clear';
 export type ArrangeAction =
   | 'bring-forward'
@@ -30,7 +31,30 @@ export interface DynamicDropdownsCtx {
   getInst: () => SpreadsheetInstance | null;
   // Menus that need refresh just before they open.
   updateCalcOptionsMenu: (menu: HTMLElement) => void;
+  updateCellDeleteMenu: (menu: HTMLElement) => void;
+  updateCellInsertMenu: (menu: HTMLElement) => void;
+  updateCellStylesMenu: (menu: HTMLElement) => void;
+  updateClearMenu: (menu: HTMLElement) => void;
+  updateClearArrowsMenu: (menu: HTMLElement) => void;
+  updateCurrencyMenu: (menu: HTMLElement) => void;
+  updateDataValidationMenu: (menu: HTMLElement) => void;
   updateDefinedNamesMenu: (menu: HTMLElement) => void;
+  updateErrorCheckingMenu: (menu: HTMLElement) => void;
+  updateFillMenu: (menu: HTMLElement) => void;
+  updateFormatCellsMenu: (menu: HTMLElement) => void;
+  updateFreezeMenu: (menu: HTMLElement) => void;
+  updateLinksMenu: (menu: HTMLElement) => void;
+  updatePasteMenu: (menu: HTMLElement) => void;
+  updateArrangeMenu: (menu: HTMLElement) => void;
+  updatePageBreaksMenu: (menu: HTMLElement) => void;
+  updatePrintAreaMenu: (menu: HTMLElement) => void;
+  updateProtectMenu: (menu: HTMLElement) => void;
+  updatePageThemeMenu: (menu: HTMLElement) => void;
+  updateReviewCommentsMenu: (menu: HTMLElement) => void;
+  updateSortMenu: (menu: HTMLElement) => void;
+  updateTableStylesMenu: (menu: HTMLElement) => void;
+  updateTextOrientationMenu: (menu: HTMLElement) => void;
+  updateWatchMenu: (menu: HTMLElement) => void;
   // Sibling menu controllers that must close when a dynamic dropdown opens.
   closeBorderMenu: (restoreFocus?: boolean) => void;
   closeFreezeMenu: (restoreFocus?: boolean) => void;
@@ -48,6 +72,8 @@ export interface DynamicDropdownsCtx {
   applyFillSeries: (mode?: RibbonFillSeriesMode) => void | Promise<void>;
   applyFillDirection: (direction: 'down' | 'right' | 'up' | 'left') => void;
   applyClearAction: (action: string) => void | Promise<void>;
+  applyUnderlineAction: (action: string) => void | Promise<void>;
+  applyMergeAction: (action: string) => void;
   applyFreezeAction: (action: string) => void;
   applyTextOrientationAction: (action: string) => void;
   applyCellInsertAction: (action: string) => void | Promise<void>;
@@ -56,7 +82,6 @@ export interface DynamicDropdownsCtx {
   applyPageBreakAction: (action: string) => void;
   applySheetBackgroundAction: (action: 'set' | 'clear') => void | Promise<void>;
   applyPrintAreaAction: (action: PrintAreaAction) => void;
-  applyPrintTitlesAction: (action: PrintTitlesAction) => void;
   applyArrangeAction: (action: ArrangeAction) => void;
   applyUiTheme: (theme: UiTheme) => void;
   focusSheet: () => void;
@@ -106,29 +131,28 @@ export interface DynamicDropdownsApi {
   closeDynamicConditionalSubmenus: (menu: HTMLElement) => void;
   openDynamicConditionalSubmenu: (menu: HTMLElement, key: string, trigger: HTMLElement) => void;
   dynamicRibbonDropdownClick: (event: MouseEvent) => boolean;
+  dynamicRibbonDropdownPointerDown: (event: MouseEvent) => boolean;
+  dynamicRibbonDropdownFocusIn: (event: FocusEvent) => boolean;
+  dynamicRibbonDropdownHover: (event: MouseEvent) => boolean;
+  dynamicRibbonDropdownKeydown: (event: KeyboardEvent) => boolean;
 }
 
-type DynamicDropdownHandler = (
-  value: string,
-  ctx: { menu: HTMLElement; button: HTMLButtonElement },
-) => void | Promise<void>;
-
-const DYNAMIC_DROPDOWN_HANDLER_ATTRS = [
+export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS = [
   'paste-action',
   'pivot-table-action',
   'defined-name-action',
   'link-action',
   'fill',
   'clear',
+  'underline-action',
+  'merge-action',
   'freeze',
   'text-orientation',
   'cell-insert',
   'cell-delete',
   'cell-format',
   'page-break-action',
-  'sheet-background-action',
   'print-area-action',
-  'print-titles-action',
   'arrange-action',
   'page-theme-action',
   'sort',
@@ -159,114 +183,88 @@ const DYNAMIC_DROPDOWN_HANDLER_ATTRS = [
   'add-in-action',
 ] as const;
 
-type DynamicDropdownHandlerAttr = (typeof DYNAMIC_DROPDOWN_HANDLER_ATTRS)[number];
+type DynamicDropdownHandlerAttr = (typeof DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS)[number];
+
+type DynamicDropdownHandler = (
+  value: string,
+  ctx: { menu: HTMLElement; button: HTMLButtonElement },
+) => void | Promise<void>;
 
 const datasetKeyForAttr = (attr: string): string =>
   attr.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
 
+const eventElement = (event: Event): Element | null =>
+  event.target instanceof Element ? event.target : null;
+
+const isDisabledMenuControl = (element: Element | null): boolean =>
+  element instanceof HTMLButtonElement &&
+  (element.disabled || element.getAttribute('aria-disabled') === 'true');
+
+const RIBBON_DROPDOWN_VIEWPORT_PAD = 8;
+const RIBBON_DROPDOWN_MIN_SCROLL_HEIGHT = 80;
+
+const applyVerticalViewportLimit = (el: HTMLElement, contentHeight: number, maxHeight: number): void => {
+  const height = Math.round(
+    Math.max(RIBBON_DROPDOWN_MIN_SCROLL_HEIGHT, Math.min(contentHeight, maxHeight)),
+  );
+  el.style.maxHeight = `${height}px`;
+  if (contentHeight > height) {
+    el.style.overflowY = 'auto';
+    el.style.overscrollBehavior = 'contain';
+  } else {
+    el.style.overflowY = '';
+    el.style.overscrollBehavior = '';
+  }
+};
+
 export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_DATASET_KEYS: ReadonlySet<string> = new Set([
-  ...DYNAMIC_DROPDOWN_HANDLER_ATTRS.map(datasetKeyForAttr),
+  ...DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS.map(datasetKeyForAttr),
   'cfAction',
   'cfSubmenu',
 ]);
 
-const DYNAMIC_RIBBON_DROPDOWN_IDS: ReadonlySet<string> = new Set([
-  'menu-paste',
-  'menu-pivot-table',
-  'menu-defined-names',
-  'menu-links-data',
-  'menu-conditional',
-  'menu-fill',
-  'menu-clear',
-  'menu-freeze',
-  'menu-text-orientation',
-  'menu-insert-cells',
-  'menu-delete-cells',
-  'menu-format-cells',
-  'menu-page-theme',
-  'menu-page-breaks',
-  'menu-sheet-background',
-  'menu-print-area',
-  'menu-print-titles',
-  'menu-arrange-objects',
-  'menu-sort-home',
-  'menu-sort',
-  'menu-find-select',
-  'menu-autosum-home',
-  'menu-autosum-formulas',
-  'menu-clear-arrows',
-  'menu-error-checking',
-  'menu-watch-formulas',
-  'menu-watch-view',
-  'menu-review-comments',
-  'menu-protect-review',
-  'menu-protect-view',
-  'menu-calc-options',
-  'menu-chart-insert',
-  'menu-picture-insert',
-  'menu-shapes-insert',
-  'menu-screenshot-insert',
-  'menu-symbol',
-  'menu-script',
-  'menu-table-style-home',
-  'menu-table-style-insert',
-  'menu-cell-styles-home',
-  'menu-currency-home',
-  'menu-text-to-columns',
-  'menu-data-validation',
-  'menu-add-ins',
-  'menu-pdf',
-]);
+export type DynamicDropdownMenuRefresherKey = {
+  [K in keyof DynamicDropdownsCtx]: K extends `update${string}Menu` ? K : never;
+}[keyof DynamicDropdownsCtx];
 
-// Ribbon command id ↔ menu DOM id (the one-and-only inverse-mapping table).
-// Both spec lookups read this — the click-handler walks command→menuId, the
-// menu reader walks menuId→command via the derived inverse map below.
-export const RIBBON_DROPDOWN_MENU_FOR_COMMAND: Readonly<Record<string, string>> = {
-  paste: 'menu-paste',
-  pivotTableInsert: 'menu-pivot-table',
-  namedRanges: 'menu-defined-names',
-  linksData: 'menu-links-data',
-  conditional: 'menu-conditional',
-  fillHome: 'menu-fill',
-  freeze: 'menu-freeze',
-  textOrientation: 'menu-text-orientation',
-  insertRows: 'menu-insert-cells',
-  deleteRows: 'menu-delete-cells',
-  formatCellsHome: 'menu-format-cells',
-  pageTheme: 'menu-page-theme',
-  pageBreaks: 'menu-page-breaks',
-  sheetBackground: 'menu-sheet-background',
-  printArea: 'menu-print-area',
-  printTitles: 'menu-print-titles',
-  arrangeObjectsPageLayout: 'menu-arrange-objects',
-  sortFilterHome: 'menu-sort-home',
-  filter: 'menu-sort',
-  findHome: 'menu-find-select',
-  autosum: 'menu-autosum-home',
-  autosumFormula: 'menu-autosum-formulas',
-  clearArrows: 'menu-clear-arrows',
-  errorChecking: 'menu-error-checking',
-  watch: 'menu-watch-formulas',
-  watchView: 'menu-watch-view',
-  deleteCommentReview: 'menu-review-comments',
-  protectReview: 'menu-protect-review',
-  protect: 'menu-protect-view',
-  calcOptions: 'menu-calc-options',
-  chartInsert: 'menu-chart-insert',
-  pictureInsert: 'menu-picture-insert',
-  shapesInsert: 'menu-shapes-insert',
-  screenshotInsert: 'menu-screenshot-insert',
-  symbolInsert: 'menu-symbol',
-  script: 'menu-script',
-  formatTableHome: 'menu-table-style-home',
-  formatTableInsert: 'menu-table-style-insert',
-  cellStyles: 'menu-cell-styles-home',
-  currency: 'menu-currency-home',
-  textToColumns: 'menu-text-to-columns',
-  dataValidation: 'menu-data-validation',
-  addIn: 'menu-add-ins',
-  pdf: 'menu-pdf',
+export const DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS: Readonly<
+  Record<string, DynamicDropdownMenuRefresherKey>
+> = {
+  'menu-arrange-objects': 'updateArrangeMenu',
+  'menu-calc-options': 'updateCalcOptionsMenu',
+  'menu-cell-styles-home': 'updateCellStylesMenu',
+  'menu-clear': 'updateClearMenu',
+  'menu-clear-arrows': 'updateClearArrowsMenu',
+  'menu-currency-home': 'updateCurrencyMenu',
+  'menu-data-validation': 'updateDataValidationMenu',
+  'menu-defined-names': 'updateDefinedNamesMenu',
+  'menu-delete-cells': 'updateCellDeleteMenu',
+  'menu-error-checking': 'updateErrorCheckingMenu',
+  'menu-fill': 'updateFillMenu',
+  'menu-format-cells': 'updateFormatCellsMenu',
+  'menu-freeze': 'updateFreezeMenu',
+  'menu-insert-cells': 'updateCellInsertMenu',
+  'menu-links-data': 'updateLinksMenu',
+  'menu-page-breaks': 'updatePageBreaksMenu',
+  'menu-page-theme': 'updatePageThemeMenu',
+  'menu-paste': 'updatePasteMenu',
+  'menu-print-area': 'updatePrintAreaMenu',
+  'menu-protect-review': 'updateProtectMenu',
+  'menu-protect-view': 'updateProtectMenu',
+  'menu-review-comments': 'updateReviewCommentsMenu',
+  'menu-sort': 'updateSortMenu',
+  'menu-sort-home': 'updateSortMenu',
+  'menu-table-style-home': 'updateTableStylesMenu',
+  'menu-text-orientation': 'updateTextOrientationMenu',
+  'menu-watch-formulas': 'updateWatchMenu',
+  'menu-watch-view': 'updateWatchMenu',
 };
+
+const DYNAMIC_RIBBON_DROPDOWN_IDS: ReadonlySet<string> = new Set(
+  Object.values(RIBBON_DROPDOWN_MENU_FOR_COMMAND),
+);
+
+export { RIBBON_DROPDOWN_MENU_FOR_COMMAND } from './activation.js';
 
 export const ribbonDropdownMenuIdForCommand = (commandId: string): string | null =>
   RIBBON_DROPDOWN_MENU_FOR_COMMAND[commandId] ?? null;
@@ -276,29 +274,25 @@ const RIBBON_DROPDOWN_COMMAND_FOR_MENU: Readonly<Record<string, string>> = Objec
 );
 
 export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdownsApi => {
+  const menuRefreshers: Readonly<Record<string, (menu: HTMLElement) => void>> = Object.fromEntries(
+    Object.entries(DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS).map(([menuId, key]) => [
+      menuId,
+      (menu: HTMLElement) => ctx[key](menu),
+    ]),
+  );
+
   const dynamicDropdownSpecForButton = (button: HTMLButtonElement): RibbonDropdownSpec | null => {
     const command = button.dataset.ribbonCommand ?? '';
-    // `clearFormat` is dropdown only inside the Editing group — elsewhere it is
-    // a plain "clear formatting" button so we explicitly exclude those.
-    if (command === 'clearFormat' && button.closest<HTMLElement>('.demo__ribbon-group--editing')) {
-      return { command, menuId: 'menu-clear' };
-    }
     const menuId = RIBBON_DROPDOWN_MENU_FOR_COMMAND[command];
     return menuId ? { command, menuId } : null;
   };
 
   const dynamicDropdownSpecForMenu = (menu: HTMLElement): RibbonDropdownSpec | null => {
-    if (menu.id === 'menu-clear') return { command: 'clearFormat', menuId: menu.id };
     const command = RIBBON_DROPDOWN_COMMAND_FOR_MENU[menu.id];
     return command ? { command, menuId: menu.id } : null;
   };
 
   const dynamicDropdownButtonForSpec = (spec: RibbonDropdownSpec): HTMLButtonElement | null => {
-    if (spec.menuId === 'menu-clear') {
-      return document.querySelector<HTMLButtonElement>(
-        '.demo__ribbon-group--editing button[data-ribbon-command="clearFormat"]',
-      );
-    }
     return document.querySelector<HTMLButtonElement>(
       `button[data-ribbon-command="${spec.command}"]`,
     );
@@ -310,6 +304,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     });
     menu.querySelectorAll<HTMLElement>('[data-cf-submenu]').forEach((trigger) => {
       trigger.classList.remove('app__menu-item--active');
+      trigger.setAttribute('aria-expanded', 'false');
     });
   };
 
@@ -331,22 +326,51 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     }
   };
 
+  const firstOpenDynamicDropdownSpec = (): RibbonDropdownSpec | null => {
+    for (const menu of document.querySelectorAll<HTMLDivElement>('.app__menu')) {
+      if (menu.hidden || !DYNAMIC_RIBBON_DROPDOWN_IDS.has(menu.id)) continue;
+      const spec = dynamicDropdownSpecForMenu(menu);
+      if (spec) return spec;
+    }
+    return null;
+  };
+
+  const positionDynamicRibbonDropdown = (menu: HTMLElement, button: HTMLElement): void => {
+    const buttonRect = button.getBoundingClientRect();
+    const { width, height } = viewportSize();
+    const pad = RIBBON_DROPDOWN_VIEWPORT_PAD;
+    const menuWidth = menu.offsetWidth || 216;
+    const menuHeight = menu.offsetHeight || 260;
+    const left = clamp(buttonRect.left, pad, Math.max(pad, width - menuWidth - pad));
+    const gap = 3;
+    const belowTop = buttonRect.bottom + gap;
+    const belowSpace = Math.max(0, height - pad - belowTop);
+    const aboveSpace = Math.max(0, buttonRect.top - pad - gap);
+    const opensBelow = belowSpace >= menuHeight || belowSpace >= aboveSpace;
+    const availableHeight = opensBelow ? belowSpace : aboveSpace;
+    const top = opensBelow
+      ? belowTop
+      : Math.max(pad, buttonRect.top - Math.min(menuHeight, availableHeight) - gap);
+    menu.style.position = 'fixed';
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top = `${Math.round(top)}px`;
+    applyVerticalViewportLimit(menu, menuHeight, availableHeight || height - pad * 2);
+  };
+
   const openDynamicRibbonDropdown = (
     spec: RibbonDropdownSpec,
     button: HTMLButtonElement | null = dynamicDropdownButtonForSpec(spec),
   ): void => {
     const menu = document.getElementById(spec.menuId) as HTMLDivElement | null;
     if (!menu || !button) return;
-    if (spec.menuId === 'menu-calc-options') ctx.updateCalcOptionsMenu(menu);
-    if (spec.menuId === 'menu-defined-names' || spec.menuId === 'menu-defined-names-insert') {
-      ctx.updateDefinedNamesMenu(menu);
-    }
+    menuRefreshers[spec.menuId]?.(menu);
     closeAllDynamicRibbonDropdowns(spec.menuId);
     ctx.closeBorderMenu();
     ctx.closeFreezeMenu();
     ctx.closePrintAreaMenu();
     ctx.closeSymbolMenu();
     menu.hidden = false;
+    positionDynamicRibbonDropdown(menu, button);
     button.setAttribute('aria-haspopup', 'menu');
     button.setAttribute('aria-expanded', 'true');
     focusMenuItem(menu);
@@ -362,9 +386,24 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     if (!panel) return;
     const menuRect = menu.getBoundingClientRect();
     const triggerRect = trigger.getBoundingClientRect();
-    panel.style.top = `${Math.max(0, triggerRect.top - menuRect.top - 4)}px`;
+    const panelRect = panel.getBoundingClientRect();
+    const panelWidth = panelRect.width || panel.offsetWidth || 260;
+    const panelHeight = panelRect.height || panel.offsetHeight || 260;
+    const { width, height } = viewportSize();
+    const pad = RIBBON_DROPDOWN_VIEWPORT_PAD;
+    const fitsRight = menuRect.right + panelWidth <= width - pad;
+    const desiredTop = Math.max(0, triggerRect.top - menuRect.top - 4);
+    const maxTop = Math.max(0, height - pad - panelHeight - menuRect.top);
+    const top = Math.min(desiredTop, maxTop);
+    panel.style.left = fitsRight
+      ? `${Math.max(0, menuRect.width - 1)}px`
+      : `${-Math.max(panelWidth - 1, menuRect.width)}px`;
+    panel.style.right = '';
+    panel.style.top = `${Math.round(top)}px`;
+    applyVerticalViewportLimit(panel, panelHeight, height - pad - menuRect.top - top);
     panel.hidden = false;
     trigger.classList.add('app__menu-item--active');
+    trigger.setAttribute('aria-expanded', 'true');
   };
 
   // Each entry binds a `data-<attr>` button inside an open ribbon dropdown to
@@ -389,6 +428,8 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
       },
     },
     { attr: 'clear', handler: (v) => ctx.applyClearAction(v) },
+    { attr: 'underline-action', handler: (v) => ctx.applyUnderlineAction(v) },
+    { attr: 'merge-action', handler: (v) => ctx.applyMergeAction(v) },
     { attr: 'freeze', handler: (v) => ctx.applyFreezeAction(v) },
     { attr: 'text-orientation', handler: (v) => ctx.applyTextOrientationAction(v) },
     { attr: 'cell-insert', handler: (v) => ctx.applyCellInsertAction(v) },
@@ -396,17 +437,9 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     { attr: 'cell-format', handler: (v) => ctx.applyCellFormatAction(v) },
     { attr: 'page-break-action', handler: (v) => ctx.applyPageBreakAction(v) },
     {
-      attr: 'sheet-background-action',
-      handler: (v) => ctx.applySheetBackgroundAction(v === 'clear' ? 'clear' : 'set'),
-    },
-    {
       attr: 'print-area-action',
       handler: (v) =>
         ctx.applyPrintAreaAction(v === 'add' ? 'add' : v === 'clear' ? 'clear' : 'set'),
-    },
-    {
-      attr: 'print-titles-action',
-      handler: (v) => ctx.applyPrintTitlesAction(v as PrintTitlesAction),
     },
     {
       attr: 'arrange-action',
@@ -466,7 +499,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
   ];
 
   const dynamicRibbonDropdownClick = (event: MouseEvent): boolean => {
-    const target = event.target as Element | null;
+    const target = eventElement(event);
     const menu = target?.closest<HTMLElement>('.app__menu');
     if (!menu || !DYNAMIC_RIBBON_DROPDOWN_IDS.has(menu.id)) return false;
     const spec = dynamicDropdownSpecForMenu(menu);
@@ -478,6 +511,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     if (cfSubmenu && menu.id === 'menu-conditional') {
       event.preventDefault();
       event.stopPropagation();
+      if (isDisabledMenuControl(cfSubmenu)) return true;
       openDynamicConditionalSubmenu(menu, cfSubmenu.dataset.cfSubmenu ?? '', cfSubmenu);
       return true;
     }
@@ -486,6 +520,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     if (cfAction && menu.id === 'menu-conditional' && !cfAction.startsWith('submenu-')) {
       event.preventDefault();
       event.stopPropagation();
+      if (isDisabledMenuControl(cfItem)) return true;
       const panel = cfItem?.closest<HTMLElement>('[data-cf-panel]')?.dataset.cfPanel;
       closeDynamicRibbonDropdown(spec);
       void ctx.applyConditionalMenuAction(cfAction, panel);
@@ -495,6 +530,11 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     for (const entry of DYNAMIC_DROPDOWN_HANDLERS) {
       const button = target?.closest<HTMLButtonElement>(`[data-${entry.attr}]`);
       if (!button) continue;
+      if (isDisabledMenuControl(button)) {
+        event.preventDefault();
+        event.stopPropagation();
+        return true;
+      }
       const datasetKey = datasetKeyForAttr(entry.attr);
       const value = button.dataset[datasetKey];
       if (value === undefined) continue;
@@ -510,6 +550,101 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     return false;
   };
 
+  const dynamicRibbonDropdownPointerDown = (event: MouseEvent): boolean => {
+    const target = eventElement(event);
+    if (!target) return false;
+    const menu = target.closest<HTMLElement>('.app__menu');
+    if (menu && DYNAMIC_RIBBON_DROPDOWN_IDS.has(menu.id)) return false;
+    const button = target.closest<HTMLButtonElement>('[data-ribbon-command]');
+    if (button && dynamicDropdownSpecForButton(button)) return false;
+    closeAllDynamicRibbonDropdowns();
+    return true;
+  };
+
+  const dynamicRibbonDropdownFocusIn = (event: FocusEvent): boolean => {
+    const openSpec = firstOpenDynamicDropdownSpec();
+    if (!openSpec) return false;
+    const target = eventElement(event);
+    if (!target) return false;
+    const menu = target.closest<HTMLElement>('.app__menu');
+    if (menu && DYNAMIC_RIBBON_DROPDOWN_IDS.has(menu.id)) return false;
+    const button = target.closest<HTMLButtonElement>('[data-ribbon-command]');
+    if (button && dynamicDropdownSpecForButton(button)) return false;
+    closeDynamicRibbonDropdown(openSpec);
+    closeAllDynamicRibbonDropdowns();
+    return true;
+  };
+
+  const dynamicRibbonDropdownHover = (event: MouseEvent): boolean => {
+    const target = eventElement(event);
+    const menu = target?.closest<HTMLElement>('.app__menu');
+    if (!menu || menu.id !== 'menu-conditional') return false;
+    if (menu.hidden) return false;
+    const trigger = target?.closest<HTMLElement>('[data-cf-submenu]');
+    if (!trigger) return false;
+    if (isDisabledMenuControl(trigger)) return true;
+    openDynamicConditionalSubmenu(menu, trigger.dataset.cfSubmenu ?? '', trigger);
+    return true;
+  };
+
+  const dynamicRibbonDropdownKeydown = (event: KeyboardEvent): boolean => {
+    const target = eventElement(event);
+    const menu = target?.closest<HTMLElement>('.app__menu');
+    if (event.key === 'Escape') {
+      if (menu && DYNAMIC_RIBBON_DROPDOWN_IDS.has(menu.id) && !menu.hidden) {
+        event.preventDefault();
+        event.stopPropagation();
+        const spec = dynamicDropdownSpecForMenu(menu);
+        if (spec) closeDynamicRibbonDropdown(spec, true);
+        else closeAllDynamicRibbonDropdowns();
+        return true;
+      }
+      const button = target?.closest<HTMLButtonElement>('[data-ribbon-command]');
+      const spec = button ? dynamicDropdownSpecForButton(button) : null;
+      if (spec) {
+        const targetMenu = document.getElementById(spec.menuId) as HTMLElement | null;
+        if (targetMenu && !targetMenu.hidden) {
+          event.preventDefault();
+          event.stopPropagation();
+          closeDynamicRibbonDropdown(spec, true);
+          return true;
+        }
+      }
+      const openSpec = firstOpenDynamicDropdownSpec();
+      if (openSpec) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeDynamicRibbonDropdown(openSpec, true);
+        closeAllDynamicRibbonDropdowns();
+        return true;
+      }
+    }
+    if (!menu || menu.id !== 'menu-conditional' || menu.hidden) return false;
+    const trigger = target?.closest<HTMLElement>('[data-cf-submenu]');
+    if (trigger && (event.key === 'ArrowRight' || event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (isDisabledMenuControl(trigger)) return true;
+      const key = trigger.dataset.cfSubmenu ?? '';
+      openDynamicConditionalSubmenu(menu, key, trigger);
+      const panel = menu.querySelector<HTMLElement>(`[data-cf-panel="${key}"]`);
+      if (panel) focusMenuItem(panel);
+      return true;
+    }
+    const panel = target?.closest<HTMLElement>('[data-cf-panel]');
+    if (panel && event.key === 'ArrowLeft') {
+      event.preventDefault();
+      event.stopPropagation();
+      const triggerForPanel = menu.querySelector<HTMLElement>(
+        `[data-cf-submenu="${panel.dataset.cfPanel ?? ''}"]`,
+      );
+      closeDynamicConditionalSubmenus(menu);
+      triggerForPanel?.focus();
+      return true;
+    }
+    return false;
+  };
+
   return {
     DYNAMIC_RIBBON_DROPDOWN_IDS,
     dynamicDropdownSpecForButton,
@@ -521,5 +656,9 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     closeDynamicConditionalSubmenus,
     openDynamicConditionalSubmenu,
     dynamicRibbonDropdownClick,
+    dynamicRibbonDropdownPointerDown,
+    dynamicRibbonDropdownFocusIn,
+    dynamicRibbonDropdownHover,
+    dynamicRibbonDropdownKeydown,
   };
 };

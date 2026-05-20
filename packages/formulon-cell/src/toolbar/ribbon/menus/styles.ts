@@ -19,7 +19,16 @@ import {
   tableStyleSwatch,
 } from '@libraz/formulon-cell';
 
-import { createMenu, menuIdForCommand, menuSeparator } from './general.js';
+import {
+  createMenu,
+  createMenuButton,
+  menuIconButton,
+  menuIdForCommand,
+  menuLabeledGrid,
+  menuScrollBody,
+  menuSeparator,
+  menuTextChip,
+} from './general.js';
 
 export interface StylesMenuDeps {
   ribbonLang: ToolbarLang;
@@ -59,6 +68,12 @@ export interface StylesMenuFactories {
   createCurrencyMenu: () => HTMLDivElement;
 }
 
+type StylesMenuText = ToolbarMenuText & {
+  tableStyleCustom: string;
+  pivotTableStyleCustom: string;
+  cellStyleCustom: string;
+};
+
 export type TableVariantId = 'plain' | 'banded' | 'firstCol' | 'bandedFirstCol';
 
 const TABLE_VARIANTS_LIGHT_MEDIUM: TableVariantId[] = [
@@ -84,6 +99,13 @@ export const tableVariantOptions = (
   }
 };
 
+const tableStyleSwatchPart = (className: string, background?: string): HTMLDivElement => {
+  const part = document.createElement('div');
+  part.className = className;
+  if (background) part.style.background = background;
+  return part;
+};
+
 const createTableStyleSwatch = (
   style: TableStyle,
   color: string,
@@ -94,32 +116,24 @@ const createTableStyleSwatch = (
 ): HTMLButtonElement => {
   const swatch = tableStyleSwatch(style, color);
   const { banded, firstCol } = tableVariantOptions(variant);
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'app__tablestyle-swatch';
-  btn.setAttribute('role', 'menuitem');
-  btn.dataset[dataset] = actionStyleId;
+  const btn = createMenuButton({
+    className: 'app__tablestyle-swatch',
+    attr: dataset,
+    value: actionStyleId,
+    title: label,
+    ariaLabel: label,
+  });
   btn.dataset.tableColor = color;
   btn.dataset.tableVariant = variant;
-  btn.title = label;
-  btn.setAttribute('aria-label', label);
-  btn.style.cssText =
-    'display:flex;flex-direction:column;width:46px;height:34px;padding:0;' +
-    'border:1px solid #c8c6c4;border-radius:2px;overflow:hidden;cursor:pointer;background:#fff;';
-  const head = document.createElement('div');
-  head.style.cssText = `flex:0 0 9px;background:${swatch.header};`;
-  btn.appendChild(head);
+  btn.appendChild(tableStyleSwatchPart('app__tablestyle-swatch__head', swatch.header));
   for (let i = 0; i < 3; i += 1) {
-    const row = document.createElement('div');
     const rowFill = banded && i % 2 === 1 ? swatch.band : '#ffffff';
-    row.style.cssText = `flex:1;display:flex;background:${rowFill};`;
+    const row = tableStyleSwatchPart('app__tablestyle-swatch__row', rowFill);
     if (firstCol) {
-      const emphasis = document.createElement('div');
-      emphasis.style.cssText = `flex:0 0 10px;background:${swatch.header};`;
-      row.appendChild(emphasis);
-      const rest = document.createElement('div');
-      rest.style.cssText = 'flex:1;';
-      row.appendChild(rest);
+      row.append(
+        tableStyleSwatchPart('app__tablestyle-swatch__first-col', swatch.header),
+        tableStyleSwatchPart('app__tablestyle-swatch__rest'),
+      );
     }
     btn.appendChild(row);
   }
@@ -127,53 +141,50 @@ const createTableStyleSwatch = (
 };
 
 const tableStyleFooterButton = (label: string, action: string): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'app__menu-item app__tablestyle-footer';
-  btn.setAttribute('role', 'menuitem');
-  btn.dataset.tableStyleFooter = action;
-  btn.textContent = label;
-  btn.style.cssText =
-    'display:flex;width:100%;padding:6px 12px;border:0;background:transparent;cursor:pointer;text-align:left;font-size:12px;color:#1f1f1f;';
+  const btn = menuIconButton(
+    label,
+    'tableStyleFooter',
+    action,
+    action === 'new-pivot-style' ? 'pivot-style-new' : 'table-style-new',
+  );
+  btn.classList.add('app__tablestyle-footer');
   return btn;
 };
 
 const cellStyleFooterButton = (label: string, action: string): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'app__menu-item app__cellstyle-footer';
-  btn.setAttribute('role', 'menuitem');
-  btn.dataset.cellStyleFooter = action;
-  btn.textContent = label;
-  btn.style.cssText =
-    'display:flex;width:100%;padding:6px 12px;border:0;background:transparent;cursor:pointer;text-align:left;font-size:12px;color:#1f1f1f;';
+  const btn = menuIconButton(
+    label,
+    'cellStyleFooter',
+    action,
+    action === 'merge-cell-style' ? 'cell-style-merge' : 'cell-style-new',
+  );
+  btn.classList.add('app__cellstyle-footer');
   return btn;
 };
 
 const currencyFooterButton = (label: string, action: string): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'app__menu-item app__currency-footer';
-  btn.setAttribute('role', 'menuitem');
-  btn.dataset.currencyFooter = action;
-  btn.textContent = label;
-  btn.style.cssText =
-    'display:flex;width:100%;padding:6px 12px;border:0;background:transparent;cursor:pointer;text-align:left;font-size:12px;color:#1f1f1f;';
+  const btn = menuIconButton(label, 'currencyFooter', action, 'currency-more');
+  btn.classList.add('app__currency-footer');
   return btn;
 };
 
 const currencyPresetItem = (label: string, symbol: string): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'app__menu-item';
-  btn.setAttribute('role', 'menuitem');
-  btn.dataset.currencyPreset = symbol;
-  btn.textContent = label;
-  return btn;
+  const icon =
+    symbol === '¥'
+      ? 'currency-yen'
+      : symbol === '$'
+        ? 'currency-dollar'
+        : symbol === '€'
+          ? 'currency-euro'
+          : symbol === '£'
+            ? 'currency-pound'
+            : 'currency-chf';
+  return menuIconButton(label, 'currencyPreset', symbol, icon);
 };
 
 export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFactories => {
-  const { ribbonLang, ribbonMenuText: t, ribbonText } = deps;
+  const { ribbonLang, ribbonMenuText, ribbonText } = deps;
+  const t = ribbonMenuText as StylesMenuText;
 
   const cellStyleGalleryLabel = (id: CellStyleId): string => {
     const strings = dictionaries[ribbonLang].cellStylesGallery.styles;
@@ -195,29 +206,20 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
       fontSize?: number;
     };
   }): HTMLButtonElement => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'app__menu-item app__cellstyle-chip';
-    btn.setAttribute('role', 'menuitem');
-    btn.dataset.cellStyle = def.id;
     const label = def.label;
-    btn.title = label;
-    btn.setAttribute('aria-label', label);
-    btn.textContent = label;
+    const btn = menuTextChip({
+      label,
+      className: 'app__menu-item app__cellstyle-chip',
+      attr: 'cellStyle',
+      value: def.id,
+    });
     const fmt = def.format ?? {};
-    const css: string[] = [
-      'display:flex;align-items:center;justify-content:center;',
-      'min-width:88px;height:28px;padding:2px 8px;',
-      'border:1px solid #d0cfcd;border-radius:2px;cursor:pointer;',
-      'font-size:11px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;',
-      `background:${fmt.fill ?? '#ffffff'};`,
-      `color:${fmt.color ?? '#1f1f1f'};`,
-    ];
-    if (fmt.bold) css.push('font-weight:700;');
-    if (fmt.italic) css.push('font-style:italic;');
-    if (fmt.underline) css.push('text-decoration:underline;');
-    if (fmt.fontSize) css.push(`font-size:${Math.min(fmt.fontSize, 13)}px;`);
-    btn.style.cssText = css.join('');
+    btn.style.background = fmt.fill ?? '#ffffff';
+    btn.style.color = fmt.color ?? '#1f1f1f';
+    if (fmt.bold) btn.style.fontWeight = '700';
+    if (fmt.italic) btn.style.fontStyle = 'italic';
+    if (fmt.underline) btn.style.textDecoration = 'underline';
+    if (fmt.fontSize) btn.style.fontSize = `${Math.min(fmt.fontSize, 13)}px`;
     return btn;
   };
   const createCellStyleChip = (id: CellStyleId): HTMLButtonElement => {
@@ -231,8 +233,8 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
 
   const createTableStyleMenu = (id: string): HTMLDivElement => {
     const menu = createMenu(menuIdForCommand(id));
-    menu.style.width = 'auto';
-    menu.style.maxWidth = '420px';
+    menu.classList.add('app__tablestyle-menu');
+    const scrollBody = menuScrollBody('app__tablestyle-scroll', ribbonText.formatTable);
     const intensities: {
       id: TableStyle;
       label: string;
@@ -243,72 +245,61 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
       { id: 'dark', label: t.tableStyleDark, variants: TABLE_VARIANTS_DARK },
     ];
     for (const intensity of intensities) {
-      const heading = document.createElement('div');
-      heading.textContent = intensity.label;
-      heading.style.cssText = 'padding:6px 10px 2px;font-size:11px;font-weight:600;color:#605e5c;';
-      menu.appendChild(heading);
-      const grid = document.createElement('div');
-      grid.setAttribute('role', 'group');
-      grid.setAttribute('aria-label', intensity.label);
-      grid.style.cssText =
-        'display:grid;grid-template-columns:repeat(7,46px);gap:4px;padding:2px 8px 6px;';
-      for (const variant of intensity.variants) {
-        for (const color of TABLE_STYLE_COLORS) {
-          grid.appendChild(createTableStyleSwatch(intensity.id, color, variant, intensity.label));
-        }
-      }
-      menu.appendChild(grid);
+      scrollBody.append(
+        ...menuLabeledGrid({
+          label: intensity.label,
+          headingClassName: 'app__tablestyle-heading',
+          gridClassName: 'app__tablestyle-grid',
+          children: intensity.variants.flatMap((variant) =>
+            TABLE_STYLE_COLORS.map((color) =>
+              createTableStyleSwatch(intensity.id, color, variant, intensity.label),
+            ),
+          ),
+        }),
+      );
     }
     const customTableStyles = deps.customTableStyles?.() ?? [];
     if (customTableStyles.length > 0) {
-      const heading = document.createElement('div');
-      heading.textContent = ribbonLang === 'ja' ? 'ユーザー設定' : 'Custom';
-      heading.style.cssText = 'padding:6px 10px 2px;font-size:11px;font-weight:600;color:#605e5c;';
-      menu.appendChild(heading);
-      const grid = document.createElement('div');
-      grid.setAttribute('role', 'group');
-      grid.setAttribute('aria-label', heading.textContent);
-      grid.style.cssText =
-        'display:grid;grid-template-columns:repeat(7,46px);gap:4px;padding:2px 8px 6px;';
-      for (const style of customTableStyles) {
-        grid.appendChild(
-          createTableStyleSwatch(
-            style.style,
-            style.color ?? '#5b9bd5',
-            style.variant,
-            style.label,
-            style.id,
+      const label = t.tableStyleCustom;
+      scrollBody.append(
+        ...menuLabeledGrid({
+          label,
+          headingClassName: 'app__tablestyle-heading',
+          gridClassName: 'app__tablestyle-grid',
+          children: customTableStyles.map((style) =>
+            createTableStyleSwatch(
+              style.style,
+              style.color ?? '#5b9bd5',
+              style.variant,
+              style.label,
+              style.id,
+            ),
           ),
-        );
-      }
-      menu.appendChild(grid);
+        }),
+      );
     }
     const customPivotTableStyles = deps.customPivotTableStyles?.() ?? [];
     if (customPivotTableStyles.length > 0) {
-      const heading = document.createElement('div');
-      heading.textContent =
-        ribbonLang === 'ja' ? 'ピボットテーブル ユーザー設定' : 'Custom PivotTable';
-      heading.style.cssText = 'padding:6px 10px 2px;font-size:11px;font-weight:600;color:#605e5c;';
-      menu.appendChild(heading);
-      const grid = document.createElement('div');
-      grid.setAttribute('role', 'group');
-      grid.setAttribute('aria-label', heading.textContent);
-      grid.style.cssText =
-        'display:grid;grid-template-columns:repeat(7,46px);gap:4px;padding:2px 8px 6px;';
-      for (const style of customPivotTableStyles) {
-        grid.appendChild(
-          createTableStyleSwatch(
-            style.style,
-            style.color ?? '#5b9bd5',
-            style.variant,
-            style.label,
-            style.id,
-            'pivotTableStyle',
+      const label = t.pivotTableStyleCustom;
+      scrollBody.append(
+        ...menuLabeledGrid({
+          label,
+          headingClassName: 'app__tablestyle-heading',
+          gridClassName: 'app__tablestyle-grid',
+          children: customPivotTableStyles.map((style) =>
+            createTableStyleSwatch(
+              style.style,
+              style.color ?? '#5b9bd5',
+              style.variant,
+              style.label,
+              style.id,
+              'pivotTableStyle',
+            ),
           ),
-        );
-      }
-      menu.appendChild(grid);
+        }),
+      );
     }
+    menu.appendChild(scrollBody);
     menu.appendChild(menuSeparator());
     menu.appendChild(tableStyleFooterButton(t.tableStyleNew, 'new-table-style'));
     menu.appendChild(tableStyleFooterButton(t.tableStyleNewPivot, 'new-pivot-style'));
@@ -317,35 +308,32 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
 
   const createCellStylesMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-cell-styles-home');
-    menu.style.width = 'auto';
-    menu.style.maxWidth = '620px';
+    menu.classList.add('app__cellstyle-menu');
+    const scrollBody = menuScrollBody('app__cellstyle-scroll', ribbonText.cellStyles);
     for (const group of CELL_STYLE_GROUPS) {
-      const heading = document.createElement('div');
-      heading.textContent = cellStyleGroupLabel(group.id);
-      heading.style.cssText = 'padding:6px 10px 2px;font-size:11px;font-weight:600;color:#605e5c;';
-      menu.appendChild(heading);
-      const grid = document.createElement('div');
-      grid.setAttribute('role', 'group');
-      grid.setAttribute('aria-label', cellStyleGroupLabel(group.id));
-      grid.style.cssText =
-        'display:grid;grid-template-columns:repeat(6,minmax(88px,1fr));gap:4px;padding:2px 8px 6px;';
-      for (const id of group.styleIds) grid.appendChild(createCellStyleChip(id));
-      menu.appendChild(grid);
+      const label = cellStyleGroupLabel(group.id);
+      scrollBody.append(
+        ...menuLabeledGrid({
+          label,
+          headingClassName: 'app__cellstyle-heading',
+          gridClassName: 'app__cellstyle-grid',
+          children: group.styleIds.map((id) => createCellStyleChip(id)),
+        }),
+      );
     }
     const customStyles = deps.customCellStyles?.() ?? [];
     if (customStyles.length > 0) {
-      const heading = document.createElement('div');
-      heading.textContent = ribbonLang === 'ja' ? 'ユーザー設定' : 'Custom';
-      heading.style.cssText = 'padding:6px 10px 2px;font-size:11px;font-weight:600;color:#605e5c;';
-      menu.appendChild(heading);
-      const grid = document.createElement('div');
-      grid.setAttribute('role', 'group');
-      grid.setAttribute('aria-label', heading.textContent);
-      grid.style.cssText =
-        'display:grid;grid-template-columns:repeat(6,minmax(88px,1fr));gap:4px;padding:2px 8px 6px;';
-      for (const style of customStyles) grid.appendChild(createCellStyleChipFromDef(style));
-      menu.appendChild(grid);
+      const label = t.cellStyleCustom;
+      scrollBody.append(
+        ...menuLabeledGrid({
+          label,
+          headingClassName: 'app__cellstyle-heading',
+          gridClassName: 'app__cellstyle-grid',
+          children: customStyles.map((style) => createCellStyleChipFromDef(style)),
+        }),
+      );
     }
+    menu.appendChild(scrollBody);
     menu.appendChild(menuSeparator());
     menu.appendChild(cellStyleFooterButton(t.cellStyleNew, 'new-cell-style'));
     menu.appendChild(cellStyleFooterButton(t.cellStyleMerge, 'merge-cell-style'));
@@ -354,8 +342,7 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
 
   const createCurrencyMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-currency-home');
-    menu.style.width = 'auto';
-    menu.style.maxWidth = '320px';
+    menu.classList.add('app__currency-menu');
     menu.append(
       currencyPresetItem(ribbonText.currencyPresetJpy, '¥'),
       currencyPresetItem(ribbonText.currencyPresetUsd, '$'),

@@ -7,7 +7,15 @@
 
 import { conditionalMenuText, type ToolbarLang } from '@libraz/formulon-cell';
 
-import { createMenu, menuSectionHeader, menuSeparator } from './general.js';
+import {
+  createMenu,
+  createMenuButton,
+  createSubmenu,
+  menuPresetButton,
+  menuSectionHeader,
+  menuSeparator,
+  menuSubmenuTrigger,
+} from './general.js';
 
 export type CfSubmenuKey =
   | 'highlight'
@@ -19,9 +27,15 @@ export type CfSubmenuKey =
 
 type CfIconKind = 'rule' | 'top' | 'bar' | 'scale' | 'icon' | 'new' | 'clear' | 'manage';
 
-const cfIcon = (kind: CfIconKind): HTMLSpanElement => {
+const cfSpan = (className?: string, text?: string): HTMLSpanElement => {
   const span = document.createElement('span');
-  span.className = `app__cf-icon app__cf-icon--${kind}`;
+  if (className) span.className = className;
+  if (text !== undefined) span.textContent = text;
+  return span;
+};
+
+const cfIcon = (kind: CfIconKind): HTMLSpanElement => {
+  const span = cfSpan(`app__cf-icon app__cf-icon--${kind}`);
   span.setAttribute('aria-hidden', 'true');
   return span;
 };
@@ -31,17 +45,7 @@ const cfMenuItem = (
   action: string,
   icon: CfIconKind = 'rule',
 ): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.className = 'app__menu-item app__menu-item--preset';
-  btn.type = 'button';
-  btn.setAttribute('role', 'menuitem');
-  btn.dataset.cfAction = action;
-  btn.appendChild(cfIcon(icon));
-  const text = document.createElement('span');
-  text.className = 'app__menu-item__text';
-  text.textContent = label;
-  btn.appendChild(text);
-  return btn;
+  return menuPresetButton(label, 'cfAction', action, cfIcon(icon));
 };
 
 const cfSubmenuTrigger = (
@@ -50,26 +54,24 @@ const cfSubmenuTrigger = (
   icon: CfIconKind,
 ): HTMLButtonElement => {
   const btn = cfMenuItem(label, `submenu-${key}`, icon);
-  btn.classList.add('app__menu-item--submenu');
-  btn.dataset.cfSubmenu = key;
-  const caret = document.createElement('span');
-  caret.className = 'app__menu-item__caret';
-  caret.textContent = '▶';
-  btn.appendChild(caret);
-  return btn;
+  return menuSubmenuTrigger(btn, { cfSubmenu: key }, { controlsId: cfSubmenuId(key) });
+};
+
+const cfChoiceButton = (className: string, action: string, title: string): HTMLButtonElement => {
+  return createMenuButton({
+    className,
+    attr: 'cfAction',
+    value: action,
+    title,
+    ariaLabel: title,
+  });
 };
 
 const cfSwatchButton = (action: string, colors: string[], title: string): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.className = 'app__cf-choice';
-  btn.type = 'button';
-  btn.title = title;
-  btn.setAttribute('aria-label', title);
-  btn.dataset.cfAction = action;
-  const grid = document.createElement('span');
-  grid.className = 'app__cf-choice-grid';
+  const btn = cfChoiceButton('app__cf-choice', action, title);
+  const grid = cfSpan('app__cf-choice-grid');
   for (const color of colors) {
-    const cell = document.createElement('span');
+    const cell = cfSpan();
     cell.style.background = color;
     grid.appendChild(cell);
   }
@@ -78,22 +80,59 @@ const cfSwatchButton = (action: string, colors: string[], title: string): HTMLBu
 };
 
 const cfIconChoice = (action: string, glyphs: string[], title: string): HTMLButtonElement => {
-  const btn = document.createElement('button');
-  btn.className = 'app__cf-icon-choice';
-  btn.type = 'button';
-  btn.title = title;
-  btn.setAttribute('aria-label', title);
-  btn.dataset.cfAction = action;
+  const btn = cfChoiceButton('app__cf-icon-choice', action, title);
   for (const glyph of glyphs) {
-    const span = document.createElement('span');
-    span.textContent = glyph;
-    btn.appendChild(span);
+    btn.appendChild(cfSpan(undefined, glyph));
   }
   return btn;
 };
 
+const cfPanel = (className: string, children: readonly Node[] = []): HTMLDivElement => {
+  const panel = document.createElement('div');
+  panel.className = className;
+  panel.append(...children);
+  return panel;
+};
+
 export const buildCfMenuText = (ribbonLang: ToolbarLang) => {
-  const t = conditionalMenuText(ribbonLang);
+  const t = conditionalMenuText(ribbonLang) as ReturnType<typeof conditionalMenuText> & {
+    dateYesterday: string;
+    dateToday: string;
+    dateTomorrow: string;
+    dateLast7: string;
+    dateLastWeek: string;
+    dateThisWeek: string;
+    dateNextWeek: string;
+    dateLastMonth: string;
+    dateThisMonth: string;
+    dateNextMonth: string;
+    dateUnsupported: string;
+    greaterPrompt: string;
+    lessPrompt: string;
+    betweenPrompt: string;
+    betweenAndPrompt: string;
+    equalPrompt: string;
+    topBottomPrompt: string;
+    formatPreview: string;
+    customFormat: string;
+    customFormatTitle: string;
+    customFillColor: string;
+    customTextColor: string;
+    customBold: string;
+    customItalic: string;
+    customUnderline: string;
+    customStrike: string;
+    formatLightRed: string;
+    formatYellow: string;
+    formatGreen: string;
+    formatLightRedFill: string;
+    formatRedText: string;
+    formatRedBorder: string;
+    formatRedFill: string;
+    formatRedTextFill: string;
+    ok: string;
+    cancel: string;
+  };
   return {
     highlight: t.highlight,
     topBottom: t.topBottom,
@@ -118,7 +157,45 @@ export const buildCfMenuText = (ribbonLang: ToolbarLang) => {
     aboveAvg: t.aboveAvg,
     belowAvg: t.belowAvg,
     textPrompt: t.textPrompt,
+    greaterPrompt: t.greaterPrompt,
+    lessPrompt: t.lessPrompt,
+    betweenPrompt: t.betweenPrompt,
+    betweenAndPrompt: t.betweenAndPrompt,
+    equalPrompt: t.equalPrompt,
+    topBottomPrompt: t.topBottomPrompt,
+    formatPreview: t.formatPreview,
+    customFormat: t.customFormat,
+    customFormatTitle: t.customFormatTitle,
+    customFillColor: t.customFillColor,
+    customTextColor: t.customTextColor,
+    customBold: t.customBold,
+    customItalic: t.customItalic,
+    customUnderline: t.customUnderline,
+    customStrike: t.customStrike,
+    formatLightRed: t.formatLightRed,
+    formatYellow: t.formatYellow,
+    formatGreen: t.formatGreen,
+    formatLightRedFill: t.formatLightRedFill,
+    formatRedText: t.formatRedText,
+    formatRedBorder: t.formatRedBorder,
+    formatRedFill: t.formatRedFill,
+    formatRedTextFill: t.formatRedTextFill,
     datePrompt: t.datePrompt,
+    datePeriods: {
+      yesterday: t.dateYesterday,
+      today: t.dateToday,
+      tomorrow: t.dateTomorrow,
+      last7: t.dateLast7,
+      'last-week': t.dateLastWeek,
+      'this-week': t.dateThisWeek,
+      'next-week': t.dateNextWeek,
+      'last-month': t.dateLastMonth,
+      'this-month': t.dateThisMonth,
+      'next-month': t.dateNextMonth,
+    },
+    dateUnsupported: t.dateUnsupported,
+    ok: t.ok,
+    cancel: t.cancel,
     otherRules: t.otherRules,
     gradient: t.gradientFill,
     solid: t.solidFill,
@@ -201,8 +278,6 @@ const buildTopBottomSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => 
 
 const buildDataBarSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => {
   submenu.append(menuSectionHeader(t.gradient));
-  const gradient = document.createElement('div');
-  gradient.className = 'app__cf-choice-row';
   const gradientBars: readonly (readonly [string, string, string])[] = [
     ['data-blue', '#638ec6', t.dataBarGradientBlue],
     ['data-green', '#63a95c', t.dataBarGradientGreen],
@@ -211,13 +286,12 @@ const buildDataBarSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => {
     ['data-purple', '#8a74b9', t.dataBarGradientPurple],
     ['data-teal', '#4ba1a8', t.dataBarGradientTeal],
   ];
-  gradientBars.forEach(([action, color, label]) => {
-    gradient.appendChild(cfSwatchButton(action, ['#fff', color], label));
-  });
+  const gradient = cfPanel(
+    'app__cf-choice-row',
+    gradientBars.map(([action, color, label]) => cfSwatchButton(action, ['#fff', color], label)),
+  );
   submenu.appendChild(gradient);
   submenu.append(menuSectionHeader(t.solid));
-  const solid = document.createElement('div');
-  solid.className = 'app__cf-choice-row';
   const solidBars: readonly (readonly [string, string, string])[] = [
     ['data-solid-blue', '#4472c4', t.dataBarSolidBlue],
     ['data-solid-green', '#70ad47', t.dataBarSolidGreen],
@@ -226,15 +300,14 @@ const buildDataBarSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => {
     ['data-solid-purple', '#8064a2', t.dataBarSolidPurple],
     ['data-solid-gray', '#7f7f7f', t.dataBarSolidGray],
   ];
-  solidBars.forEach(([action, color, label]) => {
-    solid.appendChild(cfSwatchButton(action, [color, color], label));
-  });
+  const solid = cfPanel(
+    'app__cf-choice-row',
+    solidBars.map(([action, color, label]) => cfSwatchButton(action, [color, color], label)),
+  );
   submenu.append(solid, menuSeparator(), cfMenuItem(t.otherRules, 'new-rule', 'manage'));
 };
 
 const buildColorScaleSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => {
-  const scales = document.createElement('div');
-  scales.className = 'app__cf-choice-grid-panel';
   const colorScales: readonly (readonly [string, readonly string[], string])[] = [
     ['scale-gyr', ['#63be7b', '#ffeb84', '#f8696b'], t.colorScaleGreenYellowRed],
     ['scale-ryg', ['#f8696b', '#ffeb84', '#63be7b'], t.colorScaleRedYellowGreen],
@@ -249,47 +322,40 @@ const buildColorScaleSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void =>
     ['scale-yry', ['#ffeb84', '#f8696b', '#63be7b'], t.colorScaleYellowRedGreen],
     ['scale-gyg', ['#63be7b', '#ffeb84', '#00a651'], t.colorScaleGreenYellowGreen],
   ];
-  colorScales.forEach(([action, colors, label]) => {
-    scales.appendChild(cfSwatchButton(action, [...colors], label));
-  });
+  const scales = cfPanel(
+    'app__cf-choice-grid-panel',
+    colorScales.map(([action, colors, label]) => cfSwatchButton(action, [...colors], label)),
+  );
   submenu.append(scales, menuSeparator(), cfMenuItem(t.otherRules, 'new-rule', 'manage'));
 };
 
 const buildIconSetSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => {
   submenu.append(menuSectionHeader(t.direction));
-  const directions = document.createElement('div');
-  directions.className = 'app__cf-icon-panel';
-  directions.append(
+  const directions = cfPanel('app__cf-icon-panel', [
     cfIconChoice('icons-arrows3', ['▲', '▶', '▼'], t.iconArrows3),
     cfIconChoice('icons-arrows5', ['▲', '↗', '▶', '↘', '▼'], t.iconArrows5),
     cfIconChoice('icons-triangles3', ['▲', '▬', '▼'], t.iconTriangles3),
-  );
+  ]);
   submenu.appendChild(directions);
   submenu.append(menuSectionHeader(t.shapes));
-  const shapes = document.createElement('div');
-  shapes.className = 'app__cf-icon-panel';
-  shapes.append(
+  const shapes = cfPanel('app__cf-icon-panel', [
     cfIconChoice('icons-traffic3', ['●', '●', '●'], t.iconTraffic3),
     cfIconChoice('icons-trafficRim3', ['●', '●', '●'], t.iconTrafficRim3),
     cfIconChoice('icons-stars3', ['★', '★', '★'], t.iconStars3),
-  );
+  ]);
   submenu.append(shapes, menuSectionHeader(t.indicators));
-  const indicators = document.createElement('div');
-  indicators.className = 'app__cf-icon-panel';
-  indicators.append(
+  const indicators = cfPanel('app__cf-icon-panel', [
     cfIconChoice('icons-symbols3', ['✓', '!', '×'], t.iconSymbols3),
     cfIconChoice('icons-flags3', ['⚑', '⚑', '⚑'], t.iconFlags3),
-  );
+  ]);
   submenu.append(indicators, menuSectionHeader(t.ratings));
-  const ratings = document.createElement('div');
-  ratings.className = 'app__cf-icon-panel';
-  ratings.append(
+  const ratings = cfPanel('app__cf-icon-panel', [
     cfIconChoice('icons-stars3', ['★', '★', '★'], t.ratings),
     cfIconChoice('icons-quarters5', ['◔', '◑', '◕', '●', '●'], t.iconQuarters5),
     cfIconChoice('icons-ratings5', ['●', '●', '●', '●', '●'], t.iconRatings5),
     cfIconChoice('icons-bars5', ['▮', '▮', '▮', '▮', '▮'], t.iconBars5),
     cfIconChoice('icons-boxes5', ['■', '■', '■', '■', '■'], t.iconBoxes5),
-  );
+  ]);
   submenu.append(ratings, menuSeparator(), cfMenuItem(t.otherRules, 'new-rule', 'manage'));
 };
 
@@ -301,12 +367,12 @@ const buildClearSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => {
 };
 
 const createCfPanelSubmenu = (key: CfSubmenuKey, label: string, t: CfMenuText): HTMLDivElement => {
-  const submenu = document.createElement('div');
-  submenu.className = `app__submenu app__submenu--cf app__submenu--cf-${key}`;
-  submenu.dataset.cfPanel = key;
-  submenu.setAttribute('role', 'menu');
-  submenu.setAttribute('aria-label', label);
-  submenu.hidden = true;
+  const submenu = createSubmenu({
+    id: cfSubmenuId(key),
+    className: `app__submenu app__submenu--cf app__submenu--cf-${key}`,
+    label,
+    dataset: { cfPanel: key },
+  });
   switch (key) {
     case 'highlight':
       buildHighlightSubmenu(submenu, t);
@@ -329,6 +395,8 @@ const createCfPanelSubmenu = (key: CfSubmenuKey, label: string, t: CfMenuText): 
   }
   return submenu;
 };
+
+const cfSubmenuId = (key: CfSubmenuKey): string => `menu-conditional-${key}`;
 
 export const createConditionalMenu = (ribbonLang: ToolbarLang): HTMLDivElement => {
   const t = buildCfMenuText(ribbonLang);

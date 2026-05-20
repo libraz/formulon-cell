@@ -11,6 +11,7 @@ import {
 } from '@libraz/formulon-cell';
 
 import { focusMenuItem, handleMenuKeydown } from '../menu-a11y.js';
+import { RIBBON_BORDERS_MENU_ID } from './activation.js';
 
 export interface BorderMenuCtx {
   getInst: () => SpreadsheetInstance | null;
@@ -70,17 +71,19 @@ const MENU_TO_PRESET: Record<string, BorderPresetKey> = {
 };
 
 const BORDER_DRAW_ACTIVE_CLASS = 'app__menu-item--active';
+const BORDER_MENU_ID = RIBBON_BORDERS_MENU_ID;
+const BORDER_MENU_SELECTOR = `#${BORDER_MENU_ID}`;
 
 export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
   const borderBtn = document.getElementById('btn-borders');
-  const borderMenu = document.getElementById('menu-borders');
+  const borderMenu = document.getElementById(BORDER_MENU_ID);
   const lineStyleSubmenu =
     borderMenu?.querySelector<HTMLElement>('.app__submenu--line-style') ?? null;
 
   const getBorderBtn = (): HTMLButtonElement | null =>
     document.getElementById('btn-borders') as HTMLButtonElement | null;
   const getBorderMenu = (): HTMLDivElement | null =>
-    document.getElementById('menu-borders') as HTMLDivElement | null;
+    document.getElementById(BORDER_MENU_ID) as HTMLDivElement | null;
   const getLineColorSubmenu = (): HTMLElement | null =>
     getBorderMenu()?.querySelector<HTMLElement>('.app__submenu--line-color') ?? null;
   const getLineStyleSubmenu = (): HTMLElement | null =>
@@ -164,7 +167,7 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
   const onDocumentSubmenuKeydown = (event: KeyboardEvent): void => {
     const target = event.target as Element | null;
     if (!(target instanceof Element)) return;
-    const menu = target?.closest<HTMLDivElement>('#menu-borders');
+    const menu = target?.closest<HTMLDivElement>(BORDER_MENU_SELECTOR);
     if (!menu || menu === borderMenu) return;
     handleMenuKeydown(event, menu, { close: closeBorderMenu, restoreFocusTo: getBorderBtn() });
   };
@@ -276,7 +279,7 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
   const onDocumentClick = (event: MouseEvent): void => {
     const target = event.target as Element | null;
     if (!(target instanceof Element)) return;
-    const menu = target?.closest<HTMLElement>('#menu-borders');
+    const menu = target?.closest<HTMLElement>(BORDER_MENU_SELECTOR);
     if (!menu || menu === borderMenu) return;
     const preset = target?.closest<HTMLButtonElement>('[data-border-preset]');
     if (preset) {
@@ -320,7 +323,7 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
   const onDocumentMouseOver = (event: MouseEvent): void => {
     const target = event.target as Element | null;
     if (!(target instanceof Element)) return;
-    const menu = target?.closest<HTMLElement>('#menu-borders');
+    const menu = target?.closest<HTMLElement>(BORDER_MENU_SELECTOR);
     if (!menu || menu === borderMenu) return;
     const submenu = target?.closest<HTMLButtonElement>('[data-border-submenu]');
     if (submenu) {

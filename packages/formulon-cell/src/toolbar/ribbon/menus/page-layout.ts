@@ -1,16 +1,20 @@
 // Page-Layout tab menus: PrintArea / PageBreaks / SheetBackground / PrintTitles
-// / PageTheme. Plain static label menus extracted from main.ts; the parent wires
+// / PageTheme. Uses shared menu/icon/visual-tile primitives; the parent wires
 // up click handlers via the data-* attributes on the buttons.
 
 import type { ToolbarMenuText } from '../../menu-text.js';
 
-import { createMenu, menuButton, menuSeparator } from './general.js';
+import {
+  createMenu,
+  menuIconButton,
+  menuSeparator,
+  visualMenuTile,
+  visualMenuTileGrid,
+} from './general.js';
 
 export interface PageLayoutMenuFactories {
   createPrintAreaMenu: () => HTMLDivElement;
   createPageBreaksMenu: () => HTMLDivElement;
-  createSheetBackgroundMenu: () => HTMLDivElement;
-  createPrintTitlesMenu: () => HTMLDivElement;
   createPageThemeMenu: () => HTMLDivElement;
   createArrangeMenu: () => HTMLDivElement;
 }
@@ -23,9 +27,9 @@ export const createPageLayoutMenuFactories = (
   const createPrintAreaMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-print-area');
     menu.append(
-      menuButton(t.printAreaSet, 'printAreaAction', 'set'),
-      menuButton(t.printAreaAdd, 'printAreaAction', 'add'),
-      menuButton(t.printAreaClear, 'printAreaAction', 'clear'),
+      menuIconButton(t.printAreaSet, 'printAreaAction', 'set', 'print-area-set'),
+      menuIconButton(t.printAreaAdd, 'printAreaAction', 'add', 'print-area-add'),
+      menuIconButton(t.printAreaClear, 'printAreaAction', 'clear', 'clear'),
     );
     return menu;
   };
@@ -33,57 +37,51 @@ export const createPageLayoutMenuFactories = (
   const createPageBreaksMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-page-breaks');
     menu.append(
-      menuButton(t.pageBreakInsertRow, 'pageBreakAction', 'insert-row'),
-      menuButton(t.pageBreakInsertCol, 'pageBreakAction', 'insert-col'),
+      menuIconButton(t.pageBreakInsert, 'pageBreakAction', 'insert', 'break-page'),
+      menuIconButton(t.pageBreakRemove, 'pageBreakAction', 'remove', 'break-remove'),
       menuSeparator(),
-      menuButton(t.pageBreakRemoveRow, 'pageBreakAction', 'remove-row'),
-      menuButton(t.pageBreakRemoveCol, 'pageBreakAction', 'remove-col'),
-      menuSeparator(),
-      menuButton(t.pageBreakResetAll, 'pageBreakAction', 'reset-all'),
-    );
-    return menu;
-  };
-
-  const createSheetBackgroundMenu = (): HTMLDivElement => {
-    const menu = createMenu('menu-sheet-background');
-    menu.append(
-      menuButton(t.sheetBackgroundSet, 'sheetBackgroundAction', 'set'),
-      menuButton(t.sheetBackgroundClear, 'sheetBackgroundAction', 'clear'),
-    );
-    return menu;
-  };
-
-  const createPrintTitlesMenu = (): HTMLDivElement => {
-    const menu = createMenu('menu-print-titles');
-    menu.append(
-      menuButton(t.printTitleRowsSet, 'printTitlesAction', 'rows'),
-      menuButton(t.printTitleColsSet, 'printTitlesAction', 'cols'),
-      menuSeparator(),
-      menuButton(t.printTitlesClear, 'printTitlesAction', 'clear'),
+      menuIconButton(t.pageBreakResetAll, 'pageBreakAction', 'reset-all', 'reset'),
     );
     return menu;
   };
 
   const createPageThemeMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-page-theme');
-    menu.append(
-      menuButton(t.themePaper, 'pageThemeAction', 'light'),
-      menuButton(t.themeInk, 'pageThemeAction', 'dark'),
-      menuButton(t.themeContrast, 'pageThemeAction', 'contrast'),
-    );
+    menu.classList.add('app__menu--visual', 'app__menu--themes');
+    const grid = visualMenuTileGrid('app__visual-grid--themes', [
+      {
+        label: t.themePaper,
+        attr: 'pageThemeAction',
+        value: 'light',
+        icon: 'theme-light',
+      },
+      {
+        label: t.themeInk,
+        attr: 'pageThemeAction',
+        value: 'dark',
+        icon: 'theme-dark',
+      },
+      {
+        label: t.themeContrast,
+        attr: 'pageThemeAction',
+        value: 'contrast',
+        icon: 'theme-contrast',
+      },
+    ]);
+    menu.append(grid);
     return menu;
   };
 
   const createArrangeMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-arrange-objects');
     menu.append(
-      menuButton(t.arrangeBringForward, 'arrangeAction', 'bring-forward'),
-      menuButton(t.arrangeSendBackward, 'arrangeAction', 'send-backward'),
+      menuIconButton(t.arrangeBringForward, 'arrangeAction', 'bring-forward', 'bring-forward'),
+      menuIconButton(t.arrangeSendBackward, 'arrangeAction', 'send-backward', 'send-backward'),
       menuSeparator(),
-      menuButton(t.arrangeBringToFront, 'arrangeAction', 'bring-front'),
-      menuButton(t.arrangeSendToBack, 'arrangeAction', 'send-back'),
+      menuIconButton(t.arrangeBringToFront, 'arrangeAction', 'bring-front', 'bring-front'),
+      menuIconButton(t.arrangeSendToBack, 'arrangeAction', 'send-back', 'send-back'),
       menuSeparator(),
-      menuButton(t.arrangeSelectionPane, 'arrangeAction', 'selection-pane'),
+      menuIconButton(t.arrangeSelectionPane, 'arrangeAction', 'selection-pane', 'pane'),
     );
     return menu;
   };
@@ -91,8 +89,6 @@ export const createPageLayoutMenuFactories = (
   return {
     createPrintAreaMenu,
     createPageBreaksMenu,
-    createSheetBackgroundMenu,
-    createPrintTitlesMenu,
     createPageThemeMenu,
     createArrangeMenu,
   };

@@ -1,6 +1,6 @@
-// Home tab + cross-tab static menus: Fill/Clear/Freeze/InsertCells/DeleteCells/
-// FormatCells/TextToColumns/Sort/FindSelect. Each factory is a static label
-// list extracted from main.ts so the parent can wire `data-*` click handlers
+// Home tab + cross-tab menus: Fill/Clear/Freeze/InsertCells/DeleteCells/
+// FormatCells/TextToColumns/Sort/FindSelect. Each factory builds shared icon,
+// swatch, or submenu rows so the parent can wire `data-*` click handlers
 // without dragging the menu DOM along with it.
 //
 // Sort/FormatCells/InsertCells/DeleteCells consume more than just
@@ -9,17 +9,28 @@
 // factory takes a `HomeMenuDeps` bundle instead of just the menu dict.
 
 import type { Strings, ToolbarLang, ToolbarMenuText, ToolbarText } from '@libraz/formulon-cell';
-
-import { createMenu, menuButton, menuIdForCommand, menuSeparator } from './general.js';
+import { SHEET_TAB_COLOR_CHOICES, sheetTabColorChoiceLabel } from '../../../sheet-tab-colors.js';
+import {
+  colorSwatchButton,
+  colorSwatchGrid,
+  createMenu,
+  menuIconButton,
+  menuIdForCommand,
+  menuSectionHeader,
+  menuSeparator,
+} from './general.js';
 
 export interface HomeMenuDeps {
   ribbonLang: ToolbarLang;
   ribbonMenuText: ToolbarMenuText;
   ribbonText: ToolbarText;
   sheetTabs: Strings['sheetTabs'];
+  viewToolbar: Strings['viewToolbar'];
 }
 
 export interface HomeMenuFactories {
+  createUnderlineMenu: () => HTMLDivElement;
+  createMergeMenu: () => HTMLDivElement;
   createFreezeMenu: () => HTMLDivElement;
   createFillMenu: () => HTMLDivElement;
   createClearMenu: () => HTMLDivElement;
@@ -31,17 +42,63 @@ export interface HomeMenuFactories {
   createFindSelectMenu: () => HTMLDivElement;
 }
 
+type HomeMenuText = ToolbarMenuText & {
+  insertCells: string;
+  deleteCells: string;
+  underlineSingle: string;
+  underlineDouble: string;
+};
+
 export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories => {
-  const { ribbonLang, ribbonMenuText: t, ribbonText, sheetTabs } = deps;
-  const ja = ribbonLang === 'ja';
+  const { ribbonMenuText, ribbonText, sheetTabs, viewToolbar } = deps;
+  const t = ribbonMenuText as HomeMenuText;
+
+  const createTabColorGrid = (): HTMLDivElement => {
+    const grid = colorSwatchGrid('app__color-swatch-grid--tab-color');
+    for (const entry of SHEET_TAB_COLOR_CHOICES) {
+      grid.append(
+        colorSwatchButton({
+          label: `${sheetTabs.tabColor}: ${sheetTabColorChoiceLabel(entry, sheetTabs)}`,
+          attr: 'cellFormat',
+          value: entry.action,
+          color: entry.color,
+        }),
+      );
+    }
+    return grid;
+  };
 
   const createFreezeMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-freeze');
     menu.append(
-      menuButton(ja ? '先頭行の固定' : 'Freeze Top Row', 'freeze', 'row'),
-      menuButton(ja ? '先頭列の固定' : 'Freeze First Column', 'freeze', 'col'),
-      menuButton(ja ? 'ウィンドウ枠の固定' : 'Freeze Panes', 'freeze', 'selection'),
-      menuButton(ja ? 'ウィンドウ枠固定の解除' : 'Unfreeze Panes', 'freeze', 'off'),
+      menuIconButton(viewToolbar.freezePanes, 'freeze', 'selection', 'freeze-panes'),
+      menuIconButton(viewToolbar.freezeTopRow, 'freeze', 'row', 'freeze-row'),
+      menuIconButton(viewToolbar.freezeFirstColumn, 'freeze', 'col', 'freeze-col'),
+    );
+    return menu;
+  };
+
+  const createMergeMenu = (): HTMLDivElement => {
+    const menu = createMenu('menu-merge');
+    menu.append(
+      menuIconButton(ribbonText.mergeAndCenter, 'mergeAction', 'mergeCenter', 'merge'),
+      menuIconButton(ribbonText.mergeAcross, 'mergeAction', 'mergeAcross', 'merge'),
+      menuIconButton(ribbonText.mergeCells, 'mergeAction', 'mergeCells', 'merge'),
+      menuIconButton(ribbonText.unmergeCells, 'mergeAction', 'unmergeCells', 'merge'),
+    );
+    return menu;
+  };
+
+  const createUnderlineMenu = (): HTMLDivElement => {
+    const menu = createMenu('menu-underline');
+    menu.append(
+      menuIconButton(t.underlineSingle, 'underlineAction', 'single', 'underline-single'),
+      menuIconButton(
+        t.underlineDouble,
+        'underlineAction',
+        'double',
+        'underline-double',
+      ),
     );
     return menu;
   };
@@ -49,17 +106,17 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
   const createFillMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-fill');
     menu.append(
-      menuButton(t.fillDown, 'fill', 'down'),
-      menuButton(t.fillRight, 'fill', 'right'),
-      menuButton(t.fillUp, 'fill', 'up'),
-      menuButton(t.fillLeft, 'fill', 'left'),
+      menuIconButton(t.fillDown, 'fill', 'down', 'fill-down'),
+      menuIconButton(t.fillRight, 'fill', 'right', 'fill-right'),
+      menuIconButton(t.fillUp, 'fill', 'up', 'fill-up'),
+      menuIconButton(t.fillLeft, 'fill', 'left', 'fill-left'),
       menuSeparator(),
-      menuButton(t.series, 'fill', 'series'),
+      menuIconButton(t.series, 'fill', 'series', 'fill-series'),
       menuSeparator(),
-      menuButton(t.fillDays, 'fill', 'days'),
-      menuButton(t.fillWeekdays, 'fill', 'weekdays'),
-      menuButton(t.fillMonths, 'fill', 'months'),
-      menuButton(t.fillYears, 'fill', 'years'),
+      menuIconButton(t.fillDays, 'fill', 'days', 'fill-days'),
+      menuIconButton(t.fillWeekdays, 'fill', 'weekdays', 'fill-weekdays'),
+      menuIconButton(t.fillMonths, 'fill', 'months', 'fill-months'),
+      menuIconButton(t.fillYears, 'fill', 'years', 'fill-years'),
     );
     return menu;
   };
@@ -67,13 +124,13 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
   const createClearMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-clear');
     menu.append(
-      menuButton(t.clearAll, 'clear', 'all'),
-      menuButton(t.clearFormats, 'clear', 'formats'),
-      menuButton(t.clearContents, 'clear', 'contents'),
-      menuButton(t.clearComments, 'clear', 'comments'),
-      menuButton(t.clearHyperlinks, 'clear', 'hyperlinks'),
-      menuButton(t.removeHyperlinks, 'clear', 'remove-hyperlinks'),
-      menuButton(t.clearConditional, 'clear', 'conditional'),
+      menuIconButton(t.clearAll, 'clear', 'all', 'clear-all'),
+      menuIconButton(t.clearFormats, 'clear', 'formats', 'clear-formats'),
+      menuIconButton(t.clearContents, 'clear', 'contents', 'clear-contents'),
+      menuIconButton(t.clearComments, 'clear', 'comments', 'clear-comments'),
+      menuIconButton(t.clearHyperlinks, 'clear', 'hyperlinks', 'clear-hyperlinks'),
+      menuIconButton(t.removeHyperlinks, 'clear', 'remove-hyperlinks', 'clear-hyperlinks'),
+      menuIconButton(t.clearConditional, 'clear', 'conditional', 'clear-conditional'),
     );
     return menu;
   };
@@ -81,14 +138,14 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
   const createInsertCellsMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-insert-cells');
     menu.append(
-      menuButton(ja ? 'セルを挿入...' : 'Insert Cells...', 'cellInsert', 'cells'),
-      menuButton(t.insertShiftDown, 'cellInsert', 'shift-down'),
-      menuButton(t.insertShiftRight, 'cellInsert', 'shift-right'),
+      menuIconButton(t.insertCells, 'cellInsert', 'cells', 'insert-cells'),
+      menuIconButton(t.insertShiftDown, 'cellInsert', 'shift-down', 'insert-shift-down'),
+      menuIconButton(t.insertShiftRight, 'cellInsert', 'shift-right', 'insert-shift-right'),
       menuSeparator(),
-      menuButton(ja ? 'シートの行を挿入' : 'Insert Sheet Rows', 'cellInsert', 'rows'),
-      menuButton(ja ? 'シートの列を挿入' : 'Insert Sheet Columns', 'cellInsert', 'cols'),
+      menuIconButton(t.insertRows, 'cellInsert', 'rows', 'insert-row'),
+      menuIconButton(t.insertCols, 'cellInsert', 'cols', 'insert-col'),
       menuSeparator(),
-      menuButton(sheetTabs.insertSheet, 'cellInsert', 'sheet'),
+      menuIconButton(sheetTabs.insertSheet, 'cellInsert', 'sheet', 'insert-sheet'),
     );
     return menu;
   };
@@ -96,14 +153,14 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
   const createDeleteCellsMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-delete-cells');
     menu.append(
-      menuButton(ja ? 'セルを削除...' : 'Delete Cells...', 'cellDelete', 'cells'),
-      menuButton(t.deleteShiftUp, 'cellDelete', 'shift-up'),
-      menuButton(t.deleteShiftLeft, 'cellDelete', 'shift-left'),
+      menuIconButton(t.deleteCells, 'cellDelete', 'cells', 'delete-cells'),
+      menuIconButton(t.deleteShiftUp, 'cellDelete', 'shift-up', 'delete-shift-up'),
+      menuIconButton(t.deleteShiftLeft, 'cellDelete', 'shift-left', 'delete-shift-left'),
       menuSeparator(),
-      menuButton(ja ? 'シートの行を削除' : 'Delete Sheet Rows', 'cellDelete', 'rows'),
-      menuButton(ja ? 'シートの列を削除' : 'Delete Sheet Columns', 'cellDelete', 'cols'),
+      menuIconButton(t.deleteRows, 'cellDelete', 'rows', 'delete-row'),
+      menuIconButton(t.deleteCols, 'cellDelete', 'cols', 'delete-col'),
       menuSeparator(),
-      menuButton(sheetTabs.deleteSheet, 'cellDelete', 'sheet'),
+      menuIconButton(sheetTabs.deleteSheet, 'cellDelete', 'sheet', 'delete-sheet'),
     );
     return menu;
   };
@@ -111,60 +168,30 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
   const createFormatCellsMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-format-cells');
     menu.append(
-      menuButton(t.formatCells, 'cellFormat', 'dialog'),
+      menuIconButton(t.formatCells, 'cellFormat', 'dialog', 'format-dialog'),
       menuSeparator(),
-      menuButton(t.rowHeight, 'cellFormat', 'row-height'),
-      menuButton(t.autoFitRowHeight, 'cellFormat', 'row-autofit'),
-      menuButton(t.colWidth, 'cellFormat', 'col-width'),
-      menuButton(t.autoFitColWidth, 'cellFormat', 'col-autofit'),
+      menuIconButton(t.rowHeight, 'cellFormat', 'row-height', 'format-row-height'),
+      menuIconButton(t.autoFitRowHeight, 'cellFormat', 'row-autofit', 'format-row-autofit'),
+      menuIconButton(t.colWidth, 'cellFormat', 'col-width', 'format-col-width'),
+      menuIconButton(t.autoFitColWidth, 'cellFormat', 'col-autofit', 'format-col-autofit'),
       menuSeparator(),
-      menuButton(t.hideRows, 'cellFormat', 'hide-rows'),
-      menuButton(t.showRows, 'cellFormat', 'show-rows'),
-      menuButton(t.hideCols, 'cellFormat', 'hide-cols'),
-      menuButton(t.showCols, 'cellFormat', 'show-cols'),
+      menuIconButton(t.hideRows, 'cellFormat', 'hide-rows', 'format-hide-rows'),
+      menuIconButton(t.showRows, 'cellFormat', 'show-rows', 'format-show-rows'),
+      menuIconButton(t.hideCols, 'cellFormat', 'hide-cols', 'format-hide-cols'),
+      menuIconButton(t.showCols, 'cellFormat', 'show-cols', 'format-show-cols'),
       menuSeparator(),
-      menuButton(sheetTabs.rename, 'cellFormat', 'rename-sheet'),
-      menuButton(sheetTabs.moveLeft, 'cellFormat', 'move-sheet-left'),
-      menuButton(sheetTabs.moveRight, 'cellFormat', 'move-sheet-right'),
-      menuButton(sheetTabs.hideSheet, 'cellFormat', 'hide-sheet'),
-      menuButton(sheetTabs.unhideSheet, 'cellFormat', 'unhide-sheet'),
+      menuIconButton(sheetTabs.rename, 'cellFormat', 'rename-sheet', 'format-rename-sheet'),
+      menuIconButton(sheetTabs.moveLeft, 'cellFormat', 'move-sheet-left', 'format-move-left'),
+      menuIconButton(sheetTabs.moveRight, 'cellFormat', 'move-sheet-right', 'format-move-right'),
+      menuIconButton(sheetTabs.hideSheet, 'cellFormat', 'hide-sheet', 'format-hide-sheet'),
+      menuIconButton(sheetTabs.unhideSheet, 'cellFormat', 'unhide-sheet', 'format-unhide-sheet'),
       menuSeparator(),
-      menuButton(`${sheetTabs.tabColor}: ${sheetTabs.noColor}`, 'cellFormat', 'tab-color-none'),
-      menuButton(`${sheetTabs.tabColor}: ${sheetTabs.tabColorRed}`, 'cellFormat', 'tab-color-red'),
-      menuButton(
-        `${sheetTabs.tabColor}: ${sheetTabs.tabColorOrange}`,
-        'cellFormat',
-        'tab-color-orange',
-      ),
-      menuButton(
-        `${sheetTabs.tabColor}: ${sheetTabs.tabColorYellow}`,
-        'cellFormat',
-        'tab-color-yellow',
-      ),
-      menuButton(
-        `${sheetTabs.tabColor}: ${sheetTabs.tabColorGreen}`,
-        'cellFormat',
-        'tab-color-green',
-      ),
-      menuButton(
-        `${sheetTabs.tabColor}: ${sheetTabs.tabColorBlue}`,
-        'cellFormat',
-        'tab-color-blue',
-      ),
-      menuButton(
-        `${sheetTabs.tabColor}: ${sheetTabs.tabColorPurple}`,
-        'cellFormat',
-        'tab-color-purple',
-      ),
-      menuButton(
-        `${sheetTabs.tabColor}: ${sheetTabs.tabColorGray}`,
-        'cellFormat',
-        'tab-color-gray',
-      ),
+      menuSectionHeader(sheetTabs.tabColor),
+      createTabColorGrid(),
       menuSeparator(),
-      menuButton(t.lockCell, 'cellFormat', 'lock-cell'),
-      menuButton(t.unlockCell, 'cellFormat', 'unlock-cell'),
-      menuButton(t.protectSheet, 'cellFormat', 'protect-sheet'),
+      menuIconButton(t.lockCell, 'cellFormat', 'lock-cell', 'format-lock'),
+      menuIconButton(t.unlockCell, 'cellFormat', 'unlock-cell', 'format-unlock'),
+      menuIconButton(t.protectSheet, 'cellFormat', 'protect-sheet', 'format-protect'),
     );
     return menu;
   };
@@ -172,19 +199,19 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
   const createSortMenu = (id: string): HTMLDivElement => {
     const menu = createMenu(menuIdForCommand(id));
     menu.append(
-      menuButton(t.sortAscendingMenu, 'sort', 'asc'),
-      menuButton(t.sortDescendingMenu, 'sort', 'desc'),
-      menuButton(t.sortCustom, 'sort', 'custom'),
+      menuIconButton(t.sortAscendingMenu, 'sort', 'asc', 'sort-asc'),
+      menuIconButton(t.sortDescendingMenu, 'sort', 'desc', 'sort-desc'),
+      menuIconButton(t.sortCustom, 'sort', 'custom', 'sort-custom'),
       menuSeparator(),
-      menuButton(t.filterToggle, 'sort', 'filter'),
-      menuButton(t.filterBySelectedCellValue, 'sort', 'filter-by-value'),
-      menuButton(t.filterClearAll, 'sort', 'filter-clear'),
-      menuButton(t.filterReapply, 'sort', 'filter-reapply'),
-      menuButton(t.filterAdvanced, 'sort', 'filter-advanced'),
+      menuIconButton(t.filterToggle, 'sort', 'filter', 'filter-toggle'),
+      menuIconButton(t.filterBySelectedCellValue, 'sort', 'filter-by-value', 'filter-by-value'),
+      menuIconButton(t.filterClearAll, 'sort', 'filter-clear', 'filter-clear'),
+      menuIconButton(t.filterReapply, 'sort', 'filter-reapply', 'filter-reapply'),
+      menuIconButton(t.filterAdvanced, 'sort', 'filter-advanced', 'filter-advanced'),
       menuSeparator(),
-      menuButton(ribbonText.removeDuplicates, 'sort', 'dedupe'),
-      menuButton(ribbonText.conditionalFormatting, 'sort', 'conditional'),
-      menuButton(t.nameManager, 'sort', 'named'),
+      menuIconButton(ribbonText.removeDuplicates, 'sort', 'dedupe', 'remove-duplicates'),
+      menuIconButton(ribbonText.conditionalFormatting, 'sort', 'conditional', 'conditional'),
+      menuIconButton(t.nameManager, 'sort', 'named', 'name-manager'),
     );
     return menu;
   };
@@ -192,12 +219,22 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
   const createTextToColumnsMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-text-to-columns');
     menu.append(
-      menuButton(t.textToColumnsComma, 'textToColumnsDelimiter', ','),
-      menuButton(t.textToColumnsTab, 'textToColumnsDelimiter', '\\t'),
-      menuButton(t.textToColumnsSemicolon, 'textToColumnsDelimiter', ';'),
-      menuButton(t.textToColumnsSpace, 'textToColumnsDelimiter', ' '),
+      menuIconButton(t.textToColumnsComma, 'textToColumnsDelimiter', ',', 'text-column-comma'),
+      menuIconButton(t.textToColumnsTab, 'textToColumnsDelimiter', '\\t', 'text-column-tab'),
+      menuIconButton(
+        t.textToColumnsSemicolon,
+        'textToColumnsDelimiter',
+        ';',
+        'text-column-semicolon',
+      ),
+      menuIconButton(t.textToColumnsSpace, 'textToColumnsDelimiter', ' ', 'text-column-space'),
       menuSeparator(),
-      menuButton(t.textToColumnsCustom, 'textToColumnsDelimiter', 'custom'),
+      menuIconButton(
+        t.textToColumnsCustom,
+        'textToColumnsDelimiter',
+        'custom',
+        'text-column-custom',
+      ),
     );
     return menu;
   };
@@ -205,21 +242,28 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
   const createFindSelectMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-find-select');
     menu.append(
-      menuButton(t.find, 'findSelect', 'find'),
-      menuButton(t.replace, 'findSelect', 'replace'),
-      menuButton(t.goTo, 'findSelect', 'go-to'),
-      menuButton(t.goToSpecial, 'findSelect', 'go-to-special'),
+      menuIconButton(t.find, 'findSelect', 'find', 'find'),
+      menuIconButton(t.replace, 'findSelect', 'replace', 'replace'),
+      menuIconButton(t.goTo, 'findSelect', 'go-to', 'go-to'),
+      menuIconButton(t.goToSpecial, 'findSelect', 'go-to-special', 'go-to-special'),
       menuSeparator(),
-      menuButton(t.findFormulas, 'findSelect', 'formulas'),
-      menuButton(t.findConstants, 'findSelect', 'constants'),
-      menuButton(t.findConditionalFormatting, 'findSelect', 'conditional-format'),
-      menuButton(t.findDataValidation, 'findSelect', 'data-validation'),
-      menuButton(t.comments, 'findSelect', 'comments'),
+      menuIconButton(t.findFormulas, 'findSelect', 'formulas', 'find-formulas'),
+      menuIconButton(t.findConstants, 'findSelect', 'constants', 'find-constants'),
+      menuIconButton(
+        t.findConditionalFormatting,
+        'findSelect',
+        'conditional-format',
+        'find-conditional',
+      ),
+      menuIconButton(t.findDataValidation, 'findSelect', 'data-validation', 'find-validation'),
+      menuIconButton(t.comments, 'findSelect', 'comments', 'find-comments'),
     );
     return menu;
   };
 
   return {
+    createUnderlineMenu,
+    createMergeMenu,
     createFreezeMenu,
     createFillMenu,
     createClearMenu,

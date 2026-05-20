@@ -1,31 +1,34 @@
-// Home tab Paste split-button dropdown. Pure label-driven menuButton list, so
-// the only dep is `ribbonLang` for the inline ja/en string fork.
+// Home tab Paste split-button dropdown. Pure label-driven list backed by the
+// shared i18n dictionary so toolbar/context-menu copy stays localized in one
+// place while the primary ribbon label keeps the Office-like wording.
 
-import type { ToolbarLang } from '@libraz/formulon-cell';
+import type { Strings } from '@libraz/formulon-cell';
 
-import { createMenu, menuButton, menuSeparator } from './general.js';
+import { createMenu, menuIconButton, menuSeparator } from './general.js';
 
-export const createPasteMenu = (ribbonLang: ToolbarLang): HTMLDivElement => {
-  const ja = ribbonLang === 'ja';
+export const createPasteMenu = (t: Strings): HTMLDivElement => {
+  const pasteText = t.contextMenu;
   const menu = createMenu('menu-paste');
   menu.append(
-    menuButton(ja ? '貼り付け' : 'Paste', 'pasteAction', 'all'),
-    menuButton(ja ? '数式' : 'Formulas', 'pasteAction', 'formulas'),
-    menuButton(
-      ja ? '数式と数値の書式' : 'Formulas & Number Formatting',
+    menuIconButton(t.ribbon.paste, 'pasteAction', 'all', 'paste-all'),
+    menuIconButton(pasteText.pasteFormulas, 'pasteAction', 'formulas', 'paste-formulas'),
+    menuIconButton(
+      pasteText.pasteFormulasNumFmt,
       'pasteAction',
       'formulas-and-numfmt',
+      'paste-formulas-numfmt',
     ),
-    menuButton(ja ? '値' : 'Values', 'pasteAction', 'values'),
-    menuButton(
-      ja ? '値と数値の書式' : 'Values & Number Formatting',
+    menuIconButton(pasteText.pasteValues, 'pasteAction', 'values', 'paste-values'),
+    menuIconButton(
+      pasteText.pasteValuesNumFmt,
       'pasteAction',
       'values-and-numfmt',
+      'paste-values-numfmt',
     ),
-    menuButton(ja ? '書式設定' : 'Formatting', 'pasteAction', 'formats'),
+    menuIconButton(pasteText.pasteFormatsOnly, 'pasteAction', 'formats', 'paste-formats'),
     menuSeparator(),
-    menuButton(ja ? '行/列の入れ替え' : 'Transpose', 'pasteAction', 'transpose'),
-    menuButton(ja ? '形式を選択して貼り付け...' : 'Paste Special...', 'pasteAction', 'dialog'),
+    menuIconButton(pasteText.pasteTranspose, 'pasteAction', 'transpose', 'paste-transpose'),
+    menuIconButton(pasteText.pasteSpecialDialog, 'pasteAction', 'dialog', 'paste-special'),
   );
   return menu;
 };
