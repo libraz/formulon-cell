@@ -19,7 +19,12 @@
 // go through `renderRibbon()` once.
 
 import type { CellBorderStyle } from '../store/types.js';
+import { cancelOpenAppDialogs } from '../toolbar/dialogs/shell.js';
 import { ribbonDisplayText, type ToolbarMenuText, toolbarMenuText } from '../toolbar/menu-text.js';
+import {
+  RIBBON_BORDERS_MENU_ID,
+  RIBBON_MENU_FIRST_COMMANDS,
+} from '../toolbar/ribbon/activation.js';
 import {
   applyRibbonCommand,
   type RibbonHooks,
@@ -42,6 +47,7 @@ import {
   type RibbonMenus,
   type RibbonRenderHelpers,
 } from '../toolbar/ribbon/render-ribbon.js';
+import { projectActiveState, RIBBON_ACTIVE_COMMANDS } from '../toolbar/ribbon-active-state.js';
 import {
   type RibbonTab,
   type ToolbarLang,
@@ -62,6 +68,40 @@ export type { RibbonDisplayMode } from '../toolbar/ribbon/render-ribbon.js';
 
 const DEFAULT_BORDER_STYLE: CellBorderStyle = 'thin';
 const DEFAULT_BORDER_COLOR = '#000000';
+
+const projectDefaultRibbonActiveState = (
+  host: HTMLElement,
+  instance: SpreadsheetInstance | null,
+): void => {
+  if (!instance) return;
+  const active = projectActiveState(instance);
+  for (const [command, key] of RIBBON_ACTIVE_COMMANDS) {
+    const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-command="${command}"]`);
+    if (!button) continue;
+    let pressed = Boolean(active[key]);
+    if (command === 'viewNormal') pressed = active.workbookView === 'normal';
+    else if (command === 'viewPageLayout') pressed = active.workbookView === 'pageLayout';
+    else if (command === 'viewPageBreakPreview')
+      pressed = active.workbookView === 'pageBreakPreview';
+    button.classList.toggle('demo__rb--active', pressed);
+    button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+  }
+
+  const sheetBackground = host.querySelector<HTMLButtonElement>(
+    '[data-ribbon-command="sheetBackground"]',
+  );
+  if (sheetBackground) {
+    const state = instance.store.getState();
+    const hasBackground = state.ui.sheetBackgroundImages.has(state.data.sheetIndex);
+    const label = hasBackground
+      ? instance.i18n.strings.ribbonMenu.sheetBackgroundClear
+      : instance.i18n.strings.ribbon.background;
+    sheetBackground.title = label;
+    sheetBackground.setAttribute('aria-label', label);
+    const labelEl = sheetBackground.querySelector('span');
+    if (labelEl) labelEl.textContent = label;
+  }
+};
 
 export interface MountToolbarOptions {
   /** Language for built-in ribbon labels. Defaults to the instance locale. */
@@ -201,17 +241,6 @@ export interface ToolbarInstance {
   dispose(): void;
 }
 
-// Split buttons whose primary face dispatches an action via
-// applyRibbonCommand; their chevron-vs-main split is owned by the host.
-// mountToolbar's default dropdown handling skips them so the action still
-// fires.
-const PRIMARY_ACTION_SPLIT_DEFAULTS: ReadonlySet<string> = new Set([
-  'paste',
-  'autosum',
-  'autosumFormula',
-  'currency',
-]);
-
 const defaultApplyRibbonFormat =
   (getInstance: () => SpreadsheetInstance | null) =>
   (fn: RibbonFormatMutator): void => {
@@ -264,7 +293,10 @@ export function mountToolbar(
     });
   const refreshCells = opts.refreshCells ?? ((): void => undefined);
   const refreshZoom = opts.refreshZoom ?? ((): void => undefined);
-  const projectFormatToolbar = opts.projectFormatToolbar ?? ((): void => undefined);
+  const projectFormatToolbar = (): void => {
+    projectDefaultRibbonActiveState(host, getInstance());
+    opts.projectFormatToolbar?.();
+  };
   const showMessage = opts.showMessage ?? ((): void => undefined);
   const applyRibbonFormat = opts.applyRibbonFormat ?? defaultApplyRibbonFormat(getInstance);
   const isCollapsedMode = (): boolean => displayMode === 'tabsOnly' || displayMode === 'autoHide';
@@ -304,7 +336,7 @@ export function mountToolbar(
       })
     : {};
   const defaultHooks: RibbonHooks = defaultsInstance
-    ? createDefaultRibbonHooks(defaultsInstance, { lang })
+    ? createDefaultRibbonHooks(defaultsInstance, { lang, refreshZoom })
     : {};
 
   const mergedHelpers: RibbonRenderHelpers = {
@@ -332,6 +364,10 @@ export function mountToolbar(
   // dispatcher. We capture the unsubscribe and undo it in dispose so the
   // listener does not leak after re-mounts.
   let dynamicDropdownClickHandler: ((event: MouseEvent) => void) | null = null;
+  let dynamicDropdownPointerDownHandler: ((event: MouseEvent) => void) | null = null;
+  let dynamicDropdownFocusHandler: ((event: FocusEvent) => void) | null = null;
+  let dynamicDropdownHoverHandler: ((event: MouseEvent) => void) | null = null;
+  let dynamicDropdownKeyHandler: ((event: KeyboardEvent) => void) | null = null;
   let dropdownsApi: DynamicDropdownsApi | null = null;
   if (opts.dynamicDropdowns) {
     const hostOverrides: Partial<DynamicDropdownsCtx> | (() => Partial<DynamicDropdownsCtx>) =
@@ -363,13 +399,34 @@ export function mountToolbar(
       (defaultsInstance ?? ({} as SpreadsheetInstance)) as unknown as Parameters<
         typeof createDefaultDynamicDropdownsCtx
       >[0],
-      { overrides: overridesOpt },
+      {
+        focusSheet,
+        projectFormatToolbar,
+        refreshCells,
+        overrides: overridesOpt,
+      },
     );
     dropdownsApi = createDynamicDropdowns(dropdownsCtx);
     dynamicDropdownClickHandler = (event: MouseEvent): void => {
       dropdownsApi?.dynamicRibbonDropdownClick(event);
     };
+    dynamicDropdownPointerDownHandler = (event: MouseEvent): void => {
+      dropdownsApi?.dynamicRibbonDropdownPointerDown(event);
+    };
+    dynamicDropdownFocusHandler = (event: FocusEvent): void => {
+      dropdownsApi?.dynamicRibbonDropdownFocusIn(event);
+    };
+    dynamicDropdownHoverHandler = (event: MouseEvent): void => {
+      dropdownsApi?.dynamicRibbonDropdownHover(event);
+    };
+    dynamicDropdownKeyHandler = (event: KeyboardEvent): void => {
+      dropdownsApi?.dynamicRibbonDropdownKeydown(event);
+    };
     document.addEventListener('click', dynamicDropdownClickHandler);
+    document.addEventListener('mousedown', dynamicDropdownPointerDownHandler, true);
+    document.addEventListener('focusin', dynamicDropdownFocusHandler);
+    document.addEventListener('mouseover', dynamicDropdownHoverHandler);
+    document.addEventListener('keydown', dynamicDropdownKeyHandler);
   }
 
   const renderApi = createRenderRibbon({
@@ -398,7 +455,7 @@ export function mountToolbar(
   const wireBorderMenu = (): void => {
     borderMenuApi?.detach();
     borderMenuApi = null;
-    if (!host.querySelector('#menu-borders')) return;
+    if (!host.querySelector(`#${RIBBON_BORDERS_MENU_ID}`)) return;
     const current = getInstance();
     if (!current) return;
     borderMenuApi = createBorderMenu({
@@ -460,6 +517,22 @@ export function mountToolbar(
     return document.activeElement === tab;
   };
 
+  const closeStaticRibbonMenus = (except?: HTMLElement, restoreFocus = false): void => {
+    let restoreTarget: HTMLButtonElement | null = null;
+    for (const menu of host.querySelectorAll<HTMLDivElement>('.app__menu')) {
+      if (menu === except || menu.hidden) continue;
+      menu.hidden = true;
+      const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-menu-id="${menu.id}"]`);
+      button?.setAttribute('aria-expanded', 'false');
+      restoreTarget ??= button;
+    }
+    if (restoreFocus) restoreTarget?.focus();
+  };
+
+  const hasOpenStaticRibbonMenu = (): boolean =>
+    !dropdownsApi &&
+    Array.from(host.querySelectorAll<HTMLDivElement>('.app__menu')).some((menu) => !menu.hidden);
+
   const onClick = (e: MouseEvent): void => {
     const target = e.target;
     if (!(target instanceof Element)) return;
@@ -506,17 +579,19 @@ export function mountToolbar(
       if (opts.interceptCommand?.(id, cmdBtn, e)) return;
       // Fallback dropdown behaviour: if the button has a sibling submenu
       // attached via render-ribbon's `tools.appendChild(submenu())`, toggle
-      // it. Split buttons with a primary action (paste / autosum /
-      // currency) skip this so applyRibbonCommand can fire their primary
-      // handler — the chevron-vs-main split lives in the host.
-      if (!PRIMARY_ACTION_SPLIT_DEFAULTS.has(id)) {
+      // it. Split buttons with a primary face action skip this so
+      // applyRibbonCommand can fire their primary handler — the
+      // chevron-vs-main split lives in the host.
+      if (RIBBON_MENU_FIRST_COMMANDS.has(id)) {
+        const menuId = cmdBtn.dataset.ribbonMenuId;
+        if (dropdownsApi && menuId) {
+          dropdownsApi.openDynamicRibbonDropdown({ command: id, menuId }, cmdBtn);
+          return;
+        }
         const submenu = cmdBtn.nextElementSibling;
         if (submenu instanceof HTMLDivElement && submenu.classList.contains('app__menu')) {
           const wasOpen = !submenu.hidden;
-          // Close any other open submenus first so only one is visible.
-          for (const other of host.querySelectorAll<HTMLDivElement>('.app__menu')) {
-            if (other !== submenu && !other.hidden) other.hidden = true;
-          }
+          closeStaticRibbonMenus(submenu);
           submenu.hidden = wasOpen;
           cmdBtn.setAttribute('aria-expanded', wasOpen ? 'false' : 'true');
           return;
@@ -643,6 +718,11 @@ export function mountToolbar(
   // location — Excel-style global shortcut. Attached at document so the
   // sheet (or any other focus target) doesn't need to route the key.
   const onGlobalKey = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape' && hasOpenStaticRibbonMenu()) {
+      e.preventDefault();
+      closeStaticRibbonMenus(undefined, true);
+      return;
+    }
     if (e.ctrlKey && e.key === 'F1') {
       e.preventDefault();
       setDisplayMode(isCollapsedMode() ? 'full' : 'tabsOnly');
@@ -667,13 +747,18 @@ export function mountToolbar(
   // — Excel-style behaviour. Uses mousedown so the close happens before the
   // outside element's own click handler fires.
   const onDocumentMouseDown = (e: MouseEvent): void => {
-    if (!displayMenuOpen && !(displayMode === 'autoHide' && autoHidePeek)) return;
+    const shouldCloseStaticMenus = hasOpenStaticRibbonMenu();
+    const shouldRenderDisplayState =
+      displayMenuOpen || (displayMode === 'autoHide' && autoHidePeek);
+    if (!shouldRenderDisplayState && !shouldCloseStaticMenus)
+      return;
     const target = e.target;
     if (!(target instanceof Element)) return;
     if (host.contains(target)) return;
+    if (shouldCloseStaticMenus) closeStaticRibbonMenus();
     if (displayMenuOpen) displayMenuOpen = false;
     if (displayMode === 'autoHide') autoHidePeek = false;
-    renderToolbar();
+    if (shouldRenderDisplayState) renderToolbar();
   };
   document.addEventListener('mousedown', onDocumentMouseDown);
 
@@ -768,12 +853,29 @@ export function mountToolbar(
         document.removeEventListener('click', dynamicDropdownClickHandler);
         dynamicDropdownClickHandler = null;
       }
+      if (dynamicDropdownPointerDownHandler) {
+        document.removeEventListener('mousedown', dynamicDropdownPointerDownHandler, true);
+        dynamicDropdownPointerDownHandler = null;
+      }
+      if (dynamicDropdownFocusHandler) {
+        document.removeEventListener('focusin', dynamicDropdownFocusHandler);
+        dynamicDropdownFocusHandler = null;
+      }
+      if (dynamicDropdownHoverHandler) {
+        document.removeEventListener('mouseover', dynamicDropdownHoverHandler);
+        dynamicDropdownHoverHandler = null;
+      }
+      if (dynamicDropdownKeyHandler) {
+        document.removeEventListener('keydown', dynamicDropdownKeyHandler);
+        dynamicDropdownKeyHandler = null;
+      }
       borderMenuApi?.detach();
       borderMenuApi = null;
       dropdownsApi = null;
       unsubStore?.();
       unsubStore = null;
       subscribedInstance = null;
+      cancelOpenAppDialogs();
       host.replaceChildren();
     },
   };

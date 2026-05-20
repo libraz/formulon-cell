@@ -1,3 +1,7 @@
+import { clampPanelToViewport } from '../interact/overlay-position.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { createHostButton } from './chrome-buttons.js';
+
 export const formatSheetLabel = (template: string, name: string): string =>
   template.replace('{name}', name);
 
@@ -6,15 +10,19 @@ export function createSheetMenuButton(
   onClick: () => void,
   closeMenu: () => void,
   disabled = false,
+  disabledReason: string | null = null,
 ): HTMLButtonElement {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'fc-sheetmenu__item';
-  button.textContent = label;
-  button.disabled = disabled;
-  button.setAttribute('role', 'menuitem');
+  const button = createHostButton({
+    className: 'fc-sheetmenu__item',
+    role: 'menuitem',
+    text: label,
+  });
+  projectDisabledState(button, disabled, disabledReason, {
+    datasetKey: 'disabledReason',
+    titlePrefix: label,
+  });
   button.addEventListener('click', () => {
-    if (disabled) return;
+    if (button.disabled) return;
     closeMenu();
     onClick();
   });
@@ -28,21 +36,43 @@ export function createSheetMenuSeparator(): HTMLDivElement {
   return sep;
 }
 
+export function createSheetTabButton(input: {
+  index: number;
+  label: string;
+  selected: boolean;
+  tabColor?: string | null;
+}): HTMLButtonElement {
+  const button = createHostButton({
+    className: 'fc-host__sheetbar-tab',
+    role: 'tab',
+    dataset: { fcSheetIndex: String(input.index) },
+    ariaSelected: input.selected,
+    tabIndex: input.selected ? 0 : -1,
+    text: input.label,
+  });
+  if (input.tabColor) {
+    button.dataset.fcSheetTabColor = 'true';
+    button.style.setProperty('--fc-sheet-tab-color', input.tabColor);
+  }
+  return button;
+}
+
 export function createSheetMenuColorButton(
   label: string,
   color: string | null,
   selected: boolean,
   onClick: () => void,
 ): HTMLButtonElement {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = color
-    ? 'fc-sheetmenu__swatch'
-    : 'fc-sheetmenu__swatch fc-sheetmenu__swatch--none';
-  button.setAttribute('role', 'menuitemradio');
-  button.setAttribute('aria-label', color ? `${label} ${color}` : label);
-  button.setAttribute('aria-checked', selected ? 'true' : 'false');
-  button.title = color ? `${label} ${color}` : label;
+  const ariaLabel = color ? `${label} ${color}` : label;
+  const button = createHostButton({
+    className: color
+      ? 'fc-sheetmenu__swatch'
+      : 'fc-sheetmenu__swatch fc-sheetmenu__swatch--none',
+    role: 'menuitemradio',
+    ariaLabel,
+    ariaChecked: selected,
+    title: ariaLabel,
+  });
   if (color) button.style.setProperty('--fc-sheet-tab-color', color);
   button.addEventListener('click', () => {
     onClick();
@@ -54,14 +84,11 @@ export function positionSheetMenu(menu: HTMLElement, x: number, y: number): void
   menu.hidden = false;
   menu.style.left = '0px';
   menu.style.top = '0px';
-  const rect = menu.getBoundingClientRect();
-  const width = Math.ceil(rect.width || menu.offsetWidth || 180);
-  const height = Math.ceil(rect.height || menu.offsetHeight || 160);
-  const pad = 8;
-  const maxX = Math.max(pad, window.innerWidth - width - pad);
-  const maxY = Math.max(pad, window.innerHeight - height - pad);
-  const left = Math.min(Math.max(pad, x), maxX);
-  const top = Math.min(Math.max(pad, y), maxY);
+  const { x: left, y: top } = clampPanelToViewport(menu, x, y, {
+    pad: 8,
+    fallbackWidth: 180,
+    fallbackHeight: 160,
+  });
   menu.style.left = `${left}px`;
   menu.style.top = `${top}px`;
 }

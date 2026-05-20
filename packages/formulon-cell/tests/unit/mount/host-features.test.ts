@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { defaultStrings } from '../../../src/i18n/strings.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/index.js';
 
 /**
@@ -23,6 +24,15 @@ describe('mount/host-features — individual feature flags', () => {
   it('findReplace: false omits the find/replace handle', async () => {
     sheet = await mountStubSheet({ features: { findReplace: false } });
     expect(sheet.instance.features.findReplace).toBeFalsy();
+  });
+
+  it('fxDialog: false disables the formula-bar fx button with a reason', async () => {
+    sheet = await mountStubSheet({ features: { fxDialog: false } });
+    expect(sheet.instance.features.fxDialog).toBeFalsy();
+    const fx = sheet.host.querySelector<HTMLButtonElement>('.fc-host__formulabar-fx');
+    expect(fx?.disabled).toBe(true);
+    expect(fx?.dataset.disabledReason).toBe(defaultStrings.fxDialog.fxButtonUnavailable);
+    expect(fx?.getAttribute('aria-description')).toBe(defaultStrings.fxDialog.fxButtonUnavailable);
   });
 
   it('viewToolbar: false omits the .fc-viewbar chrome', async () => {

@@ -10,27 +10,19 @@ import {
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { inheritHostTokens } from '../interact/inherit-host-tokens.js';
+import { SHEET_TAB_COLOR_CHOICES, sheetTabColorChoiceLabel } from '../sheet-tab-colors.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { hiddenSheetIndexes, visibleSheetIndexes } from './sheet-indexes.js';
 import {
   createSheetMenuButton,
   createSheetMenuColorButton,
   createSheetMenuSeparator,
+  createSheetTabButton,
   formatSheetLabel,
   positionSheetMenu,
 } from './sheet-menu.js';
-
-const SHEET_TAB_COLORS = [
-  '#c00000',
-  '#ed7d31',
-  '#ffc000',
-  '#70ad47',
-  '#00b0f0',
-  '#4472c4',
-  '#7030a0',
-  '#a5a5a5',
-] as const;
 
 const SHEET_NAV_REPEAT_DELAY_MS = 350;
 const SHEET_NAV_REPEAT_INTERVAL_MS = 120;
@@ -158,6 +150,18 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     addSheetBtn.setAttribute('aria-label', t.addSheet);
   };
 
+  const setSheetButtonDisabled = (
+    button: HTMLButtonElement,
+    disabled: boolean,
+    reason: string | null,
+    titlePrefix: string,
+  ): void => {
+    projectDisabledState(button, disabled, reason, {
+      datasetKey: 'disabledReason',
+      titlePrefix,
+    });
+  };
+
   const closeMenu = (restoreFocus = false): void => {
     const target = restoreFocus ? sheetMenuRestoreFocus : null;
     sheetMenu.hidden = true;
@@ -250,8 +254,39 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       refreshStatusBar();
       invalidate();
     };
-    const menuButton = (label: string, onClick: () => void, disabled = false): HTMLButtonElement =>
-      createSheetMenuButton(label, onClick, closeMenu, disabled);
+    const sheetActionReason = (): string =>
+      structureProtected
+        ? strings.ribbonMenu.workbookStructureProtectedBlocked
+        : strings.ribbonMenu.sheetActionUnavailable;
+    const moveReason = (atBoundary: boolean): string =>
+      structureProtected || !canMutate
+        ? sheetActionReason()
+        : atBoundary
+          ? strings.ribbonMenu.sheetMoveAtBoundary
+          : '';
+    const deleteReason = (): string =>
+      structureProtected
+        ? strings.ribbonMenu.workbookStructureProtectedBlocked
+        : !canMutate
+          ? strings.ribbonMenu.sheetMutationUnavailable
+          : strings.ribbonMenu.sheetDeleteRequiresAnotherSheet;
+    const hideReason = (): string =>
+      structureProtected || !canHide
+        ? sheetActionReason()
+        : strings.ribbonMenu.sheetHideRequiresVisibleSheet;
+    const unhideReason = (hasHiddenTarget: boolean): string =>
+      structureProtected || !canHide
+        ? sheetActionReason()
+        : hasHiddenTarget
+          ? ''
+          : strings.ribbonMenu.sheetUnhideRequiresHiddenSheet;
+    const menuButton = (
+      label: string,
+      onClick: () => void,
+      disabled = false,
+      disabledReason: string | null = null,
+    ): HTMLButtonElement =>
+      createSheetMenuButton(label, onClick, closeMenu, disabled, disabledReason);
     const tabColor = store.getState().layout.sheetTabColors.get(idx);
     const colorPalette = document.createElement('div');
     colorPalette.className = 'fc-sheetmenu__colors';
@@ -263,18 +298,15 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     const swatches = document.createElement('div');
     swatches.className = 'fc-sheetmenu__swatches';
     swatches.append(
-      createSheetMenuColorButton(strings.sheetTabs.noColor, null, tabColor === undefined, () => {
-        mutators.setSheetTabColor(store, idx, null);
-        update();
-        closeMenu();
-      }),
-      ...SHEET_TAB_COLORS.map((color) =>
+      ...SHEET_TAB_COLOR_CHOICES.map((choice) =>
         createSheetMenuColorButton(
-          strings.sheetTabs.tabColor,
-          color,
-          tabColor?.toLowerCase() === color,
+          choice.color
+            ? `${strings.sheetTabs.tabColor}: ${sheetTabColorChoiceLabel(choice, strings.sheetTabs)}`
+            : strings.sheetTabs.noColor,
+          choice.color,
+          choice.color === null ? tabColor === undefined : tabColor?.toLowerCase() === choice.color,
           () => {
-            mutators.setSheetTabColor(store, idx, color);
+            mutators.setSheetTabColor(store, idx, choice.color);
             update();
             closeMenu();
           },
@@ -293,15 +325,24 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
                 update();
               },
               structureProtected || !canHide,
+              unhideReason(true),
             ),
           )
-        : [menuButton(strings.sheetTabs.unhideSheet, () => undefined, true)];
+        : [
+            menuButton(
+              strings.sheetTabs.unhideSheet,
+              () => undefined,
+              true,
+              unhideReason(false),
+            ),
+          ];
 
     sheetMenu.replaceChildren(
       menuButton(
         strings.sheetTabs.rename,
         () => beginRename(idx, tab),
         structureProtected || !canMutate,
+        sheetActionReason(),
       ),
       menuButton(
         strings.sheetTabs.insertSheet,
@@ -312,16 +353,19 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
           update();
         },
         structureProtected,
+        strings.ribbonMenu.workbookStructureProtectedBlocked,
       ),
       menuButton(
         strings.sheetTabs.moveLeft,
         () => moveAndRefresh(idx, idx - 1),
         structureProtected || !canMutate || idx <= 0,
+        moveReason(idx <= 0),
       ),
       menuButton(
         strings.sheetTabs.moveRight,
         () => moveAndRefresh(idx, idx + 1),
         structureProtected || !canMutate || idx >= wb.sheetCount - 1,
+        moveReason(idx >= wb.sheetCount - 1),
       ),
       createSheetMenuSeparator(),
       colorPalette,
@@ -336,6 +380,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
           invalidate();
         },
         structureProtected || !canMutate || wb.sheetCount <= 1,
+        deleteReason(),
       ),
       menuButton(
         strings.sheetTabs.hideSheet,
@@ -347,6 +392,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
           invalidate();
         },
         structureProtected || !canHide || visibleIndexes.length <= 1,
+        hideReason(),
       ),
       ...unhideButtons,
     );
@@ -364,20 +410,14 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     sheetTabs.dataset.fcSheetOverflow = visibleIndexes.length > 1 ? 'true' : 'false';
     sheetTabs.replaceChildren();
     for (const idx of visibleIndexes) {
-      const tab = document.createElement('button');
-      tab.type = 'button';
-      tab.className = 'fc-host__sheetbar-tab';
-      tab.setAttribute('role', 'tab');
-      tab.dataset.fcSheetIndex = String(idx);
       const selected = idx === active;
-      tab.setAttribute('aria-selected', selected ? 'true' : 'false');
-      tab.tabIndex = selected ? 0 : -1;
-      tab.textContent = wb.sheetName(idx);
       const tabColor = store.getState().layout.sheetTabColors.get(idx);
-      if (tabColor) {
-        tab.dataset.fcSheetTabColor = 'true';
-        tab.style.setProperty('--fc-sheet-tab-color', tabColor);
-      }
+      const tab = createSheetTabButton({
+        index: idx,
+        label: wb.sheetName(idx),
+        selected,
+        tabColor,
+      });
       tab.addEventListener('click', () => switchSheet(idx));
       tab.addEventListener('contextmenu', (e) => {
         e.preventDefault();
@@ -417,9 +457,26 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
         });
       }
     }
-    firstSheet.disabled = activePos <= 0;
-    lastSheet.disabled = activePos < 0 || activePos >= visibleIndexes.length - 1;
-    addSheetBtn.disabled = isWorkbookStructureProtected(store.getState());
+    const strings = getStrings();
+    const structureProtected = isWorkbookStructureProtected(store.getState());
+    setSheetButtonDisabled(
+      firstSheet,
+      activePos <= 0,
+      strings.sheetTabs.previousSheetUnavailable,
+      strings.sheetTabs.previousSheet,
+    );
+    setSheetButtonDisabled(
+      lastSheet,
+      activePos < 0 || activePos >= visibleIndexes.length - 1,
+      strings.sheetTabs.nextSheetUnavailable,
+      strings.sheetTabs.nextSheet,
+    );
+    setSheetButtonDisabled(
+      addSheetBtn,
+      structureProtected,
+      strings.ribbonMenu.workbookStructureProtectedBlocked,
+      strings.sheetTabs.addSheet,
+    );
   };
 
   const firstSheetRepeater = createSheetNavRepeater(firstSheet, -1);

@@ -43,6 +43,7 @@ import {
 import type { GridRenderer } from '../render/grid.js';
 import type { PageMargins, PageSetup, SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import type { ChromeSlot } from './chrome.js';
 import type { FormulaBarController } from './formula-bar.js';
 import type { SheetTabsController } from './sheet-tabs-controller.js';
@@ -82,6 +83,20 @@ const SELECTION_SEEDED_FUNCTIONS = new Set([
 
 const shouldSeedFunctionWithSelection = (functionName: string): boolean =>
   SELECTION_SEEDED_FUNCTIONS.has(functionName);
+
+const setFxDialogButtonAvailable = (
+  button: HTMLButtonElement,
+  strings: Strings,
+  available: boolean,
+): void => {
+  const label = strings.fxDialog?.fxButtonLabel ?? strings.a11y.formulaBar;
+  const reason = available ? null : strings.fxDialog.fxButtonUnavailable;
+  button.style.cursor = available ? '' : 'default';
+  projectDisabledState(button, !available, reason, {
+    datasetKey: 'disabledReason',
+    titlePrefix: label,
+  });
+};
 
 type FeatureFlags = ReturnType<typeof resolveFlags>;
 export type AutocompleteHandle = ReturnType<typeof attachAutocomplete>;
@@ -380,8 +395,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         });
         s.fxClickHandler = (): void => s.fxDialog?.open();
         input.fx.addEventListener('click', s.fxClickHandler);
-        input.fx.disabled = false;
-        input.fx.style.cursor = '';
+        setFxDialogButtonAvailable(input.fx, strings, true);
         input.featureRegistry.set(
           'fxDialog',
           input.wrapHandle(s.fxDialog, () => s.fxDialog?.detach()),
@@ -394,6 +408,8 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           wb,
           history: input.history,
           strings,
+          getSelectedRangeFormula: () => `=${a1Range(input.store.getState().selection.range)}`,
+          subscribeToRangeChanges: (listener) => input.store.subscribe(listener),
         });
         input.featureRegistry.set(
           'namedRanges',
@@ -707,8 +723,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         s.fxClickHandler = null;
         s.fxDialog?.detach();
         s.fxDialog = null;
-        input.fx.disabled = true;
-        input.fx.style.cursor = 'default';
+        setFxDialogButtonAvailable(input.fx, input.strings(), false);
         input.featureRegistry.delete('fxDialog');
         break;
       case 'namedRanges':

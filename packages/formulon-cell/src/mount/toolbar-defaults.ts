@@ -31,8 +31,10 @@ import {
   ungroupRows,
 } from '../commands/outline.js';
 import { deleteSheetView, saveSheetView } from '../commands/sheet-views.js';
+import { setSheetZoom } from '../commands/structure.js';
 import { dictionaries } from '../i18n/strings.js';
-import { showReport } from '../toolbar/dialogs/report.js';
+import { reportDialogLabels, showReport } from '../toolbar/dialogs/report.js';
+import { showZoomDialog } from '../toolbar/dialogs/zoom.js';
 import { backstageMenuText, pageScaleMenuText, toolbarMenuText } from '../toolbar/menu-text.js';
 import {
   analyzeAccessibilityCells,
@@ -59,7 +61,10 @@ import { createSelectColorRibbon } from '../toolbar/ribbon/select-color.js';
 import { toolbarText } from '../toolbar/ribbon-model.js';
 import { formatA1Range } from '../wrappers/toolbar-a1.js';
 import { dispatchHostClipboard, handleAutoSum } from '../wrappers/toolbar-actions.js';
-import { createDefaultDynamicDropdownsCtx } from './dynamic-dropdowns-defaults.js';
+import {
+  createDefaultDynamicDropdownsCtx,
+  showCreateTableDialog,
+} from './dynamic-dropdowns-defaults.js';
 import type { SpreadsheetInstance } from './types.js';
 
 /** Options shared by every default factory. */
@@ -77,6 +82,8 @@ export interface ToolbarDefaultsOptions {
   /** Called after a control change so the toolbar can re-project active
    *  state. Wired by `mountToolbar` to its own `projectFormatToolbar`. */
   projectFormatToolbar?: () => void;
+  /** Called after a zoom change so the toolbar/status indicator can refresh. */
+  refreshZoom?: () => void;
   /** Used by the borders submenu to read / write the currently picked color.
    *  Defaults to a closure over `'#000000'`. Wired by `mountToolbar` to its
    *  own borderColor state. */
@@ -156,6 +163,7 @@ export function createDefaultRibbonMenus(
     ribbonMenuText,
     ribbonText,
     sheetTabs: dictionaries[lang].sheetTabs,
+    viewToolbar: dictionaries[lang].viewToolbar,
   });
   const styleFactories = createStylesMenuFactories({
     ribbonLang: lang,
@@ -172,12 +180,14 @@ export function createDefaultRibbonMenus(
       onPickColor: setBorderColor,
     });
   const buildConditional = (): HTMLDivElement => createConditionalMenu(lang);
-  const buildPaste = (): HTMLDivElement => createPasteMenu(lang);
+  const buildPaste = (): HTMLDivElement => createPasteMenu(dictionaries[lang]);
   const buildTextOrientation = (): HTMLDivElement => createTextOrientationMenu(ribbonMenuText);
 
   return {
     paste: buildPaste,
     borders: buildBorders,
+    underline: homeFactories.createUnderlineMenu,
+    merge: homeFactories.createMergeMenu,
     textOrientation: buildTextOrientation,
     conditional: buildConditional,
 
@@ -200,8 +210,6 @@ export function createDefaultRibbonMenus(
     arrange: pageLayoutFactories.createArrangeMenu,
     printArea: pageLayoutFactories.createPrintAreaMenu,
     pageBreaks: pageLayoutFactories.createPageBreaksMenu,
-    sheetBackground: pageLayoutFactories.createSheetBackgroundMenu,
-    printTitles: pageLayoutFactories.createPrintTitlesMenu,
 
     // Formulas tab
     autoSum: formulaFactories.createAutoSumMenu,
@@ -237,10 +245,15 @@ export function createDefaultRibbonMenus(
  *  automation, …) on top because those involve app-specific dialogs. */
 export function createDefaultRibbonHooks(
   instance: SpreadsheetInstance,
-  _opts: ToolbarDefaultsOptions = {},
+  opts: ToolbarDefaultsOptions = {},
 ): RibbonHooks {
   const dropdowns = createDefaultDynamicDropdownsCtx(
     instance as unknown as Parameters<typeof createDefaultDynamicDropdownsCtx>[0],
+    {
+      focusSheet: opts.focusSheet,
+      projectFormatToolbar: opts.projectFormatToolbar,
+      refreshCells: opts.refreshCells,
+    },
   );
   const reportLang: RibbonReportLang = instance.i18n.locale === 'ja' ? 'ja' : 'en';
   const showSharedReport = async (
@@ -251,9 +264,7 @@ export function createDefaultRibbonHooks(
     await showReport({
       title,
       items,
-      closeLabel: strings.workbookObjects.close,
-      infoLabel: strings.reviewReports.info,
-      warningLabel: strings.reviewReports.warning,
+      ...reportDialogLabels(strings),
     });
     instance.host.focus();
   };
@@ -320,12 +331,16 @@ export function createDefaultRibbonHooks(
         void dropdowns.applySortMenuAction('dedupe');
       },
       splitTextToColumns: (sep) => void dropdowns.splitTextToColumns(sep),
+      splitTextToColumnsCustom: () => void dropdowns.splitTextToColumnsCustom(),
     },
     insert: {
       createTable: () => dropdowns.createTableFromSelection('medium'),
+      createTableDialog: () =>
+        showCreateTableDialog(instance as unknown as Parameters<typeof showCreateTableDialog>[0]),
       createChart: () => {
         dropdowns.createChartFromSelection('column');
       },
+      createRecommendedChart: () => dropdowns.createRecommendedChartFromSelection(),
       insertPicture: (source) => dropdowns.insertPictureFromRibbon(source),
       insertShape: (shape) => {
         dropdowns.insertShapeFromRibbon(shape);
@@ -333,12 +348,20 @@ export function createDefaultRibbonHooks(
       insertScreenshot: () => {
         dropdowns.insertScreenshotFromRibbon();
       },
+      insertSymbol: (symbol) => dropdowns.applySymbolAction(symbol),
     },
     page: {
       pageBreak: () => {
-        dropdowns.applyPageBreakAction('insert-row');
+        dropdowns.applyPageBreakAction('insert');
       },
-      sheetBackground: (action) => dropdowns.applySheetBackgroundAction(action),
+      sheetBackground: (action) => {
+        const sheet = instance.store.getState().data.sheetIndex;
+        const nextAction =
+          action === 'set' && instance.store.getState().ui.sheetBackgroundImages.has(sheet)
+            ? 'clear'
+            : action;
+        return dropdowns.applySheetBackgroundAction(nextAction);
+      },
       pdf: (action) => {
         void dropdowns.applyPdfAction(action);
       },
@@ -369,7 +392,10 @@ export function createDefaultRibbonHooks(
       selectComment: () => undefined,
     },
     protection: {
-      runSheet: () => dropdowns.applyProtectAction('protect-sheet'),
+      runSheet: () =>
+        dropdowns.applyProtectAction(
+          instance.isSheetProtected() ? 'unprotect-sheet' : 'protect-sheet',
+        ),
       runWorkbook: (protect) =>
         dropdowns.applyProtectAction(protect ? 'protect-workbook' : 'unprotect-workbook'),
       allowEditRanges: () => dropdowns.applyProtectAction('allow-edit-ranges'),
@@ -423,6 +449,22 @@ export function createDefaultRibbonHooks(
       deleteActive: () => {
         const id = instance.store.getState().sheetViews.activeViewId;
         if (id) deleteSheetView(instance.store, id, instance.history);
+        instance.host.focus();
+      },
+      zoomDialog: async () => {
+        const strings = instance.i18n.strings.ribbon;
+        const current = Math.round(instance.store.getState().viewport.zoom * 100);
+        const next = await showZoomDialog({
+          title: strings.zoomDialogTitle,
+          label: strings.zoomDialogPercent,
+          initial: current,
+          okLabel: instance.i18n.strings.formatDialog.ok,
+          cancelLabel: instance.i18n.strings.formatDialog.cancel,
+          invalidMessage: strings.zoomDialogInvalid,
+        });
+        if (next === null) return;
+        setSheetZoom(instance.store, next / 100, instance.workbook);
+        opts.refreshZoom?.();
         instance.host.focus();
       },
     },

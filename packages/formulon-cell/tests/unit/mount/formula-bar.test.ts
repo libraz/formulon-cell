@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { defaultStrings } from '../../../src/i18n/strings.js';
 import { mutators } from '../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/index.js';
 
@@ -29,6 +30,16 @@ describe('mount/formula-bar — edit lifecycle', () => {
   it('idle: cancel + accept buttons are disabled, fcEditing=0', () => {
     expect(fxCancel.disabled).toBe(true);
     expect(fxAccept.disabled).toBe(true);
+    expect(fxCancel.dataset.disabledReason).toBe(
+      defaultStrings.a11y.cancelFormulaEditUnavailable,
+    );
+    expect(fxAccept.dataset.disabledReason).toBe(defaultStrings.a11y.enterFormulaUnavailable);
+    expect(fxCancel.getAttribute('aria-description')).toBe(
+      defaultStrings.a11y.cancelFormulaEditUnavailable,
+    );
+    expect(fxAccept.title).toBe(
+      `${defaultStrings.a11y.enterFormula}\n${defaultStrings.a11y.enterFormulaUnavailable}`,
+    );
     expect(formulabar.dataset.fcEditing).toBe('0');
   });
 
@@ -54,6 +65,10 @@ describe('mount/formula-bar — edit lifecycle', () => {
     expect(formulabar.dataset.fcEditing).toBe('1');
     expect(fxCancel.disabled).toBe(false);
     expect(fxAccept.disabled).toBe(true);
+    expect(fxCancel.dataset.disabledReason).toBeUndefined();
+    expect(fxCancel.hasAttribute('aria-description')).toBe(false);
+    expect(fxCancel.title).toBe(defaultStrings.a11y.cancelFormulaEdit);
+    expect(fxAccept.dataset.disabledReason).toBe(defaultStrings.a11y.enterFormulaNoChanges);
   });
 
   it('changing the value flips accept on (dirty); Escape rolls it back', () => {
@@ -62,11 +77,15 @@ describe('mount/formula-bar — edit lifecycle', () => {
     fxInput.value = '=A1+1';
     fxInput.dispatchEvent(new Event('input'));
     expect(fxAccept.disabled).toBe(false);
+    expect(fxAccept.dataset.disabledReason).toBeUndefined();
+    expect(fxAccept.hasAttribute('aria-description')).toBe(false);
+    expect(fxAccept.title).toBe(defaultStrings.a11y.enterFormula);
 
     fxInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(fxInput.value).toBe('');
     expect(formulabar.dataset.fcEditing).toBe('0');
     expect(fxAccept.disabled).toBe(true);
+    expect(fxAccept.dataset.disabledReason).toBe(defaultStrings.a11y.enterFormulaUnavailable);
   });
 
   it('Enter commits and advances the active cell down', () => {
@@ -87,6 +106,20 @@ describe('mount/formula-bar — edit lifecycle', () => {
       col: 0,
     });
     expect(formulabar.dataset.fcEditing).toBe('0');
+  });
+
+  it('Enter applies pending empty-cell format to the committed formula-bar value', () => {
+    const addr = { sheet: 0, row: 0, col: 0 };
+    mutators.setActive(sheet.instance.store, addr);
+    mutators.setPendingFormat(sheet.instance.store, { addr, format: { bold: true } });
+    fxInput.focus();
+    fxInput.dispatchEvent(new FocusEvent('focus'));
+    fxInput.value = 'typed';
+    fxInput.dispatchEvent(new Event('input'));
+    fxInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    expect(sheet.instance.store.getState().format.formats.get('0:0:0')?.bold).toBe(true);
+    expect(sheet.instance.store.getState().ui.pendingFormat).toBeNull();
   });
 
   it('Enter preserves numeric-looking input as text for cells formatted as Text', () => {

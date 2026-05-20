@@ -1,7 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { mutators } from '../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/index.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 /**
  * Unit: chrome-sync — the small reactive bridge that keeps the name box,
@@ -180,6 +185,20 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
     expect(menu?.querySelector('[role="option"]')).toBeNull();
   });
 
+  it('uses the localized name box label for the defined-name list', async () => {
+    sheet.dispose();
+    sheet = await mountStubSheet({ locale: 'ja' });
+    tag = sheet.host.querySelector('.fc-host__formulabar-tag') as HTMLInputElement;
+
+    tag.focus();
+    tag.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true }),
+    );
+
+    const menu = document.querySelector<HTMLElement>('.fc-namebox-menu');
+    expect(menu?.getAttribute('aria-label')).toBe('名前ボックス');
+  });
+
   it('Ctrl-click in the name box list adds a defined range to the multi-selection', () => {
     const wb = sheet.workbook as unknown as {
       definedNames: () => Generator<{ name: string; formula: string }>;
@@ -324,5 +343,11 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
     tag.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     // Focus moves back to host; chrome-sync repaints the tag with the live ref.
     expect(tag.value).toBe('A1');
+  });
+
+  it('keeps name-box dropdown items on the shared host button helper', () => {
+    const source = readFileSync(join(root, 'src/mount/chrome-sync.ts'), 'utf8');
+    expect(source).toContain('createHostButton({');
+    expect(source).not.toContain("document.createElement('button')");
   });
 });

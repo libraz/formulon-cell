@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
@@ -7,6 +10,8 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const setRange = (
   store: SpreadsheetStore,
@@ -189,6 +194,11 @@ describe('attachStatusBar', () => {
 
     const items = chooser?.querySelectorAll<HTMLButtonElement>('.fc-statusbar__chooser-item');
     expect(items?.length).toBe(14);
+    const headings = Array.from(
+      chooser?.querySelectorAll<HTMLElement>('.fc-statusbar__chooser-heading') ?? [],
+    ).map((heading) => heading.textContent);
+    expect(headings).toEqual(['集計表示', 'ステータス バー項目']);
+    expect(chooser?.querySelector('[role="separator"]')).toBeTruthy();
     expect(document.activeElement).toBe(items?.[0]);
     expect(items?.[0]?.getAttribute('role')).toBe('menuitemcheckbox');
     expect(items?.[0]?.getAttribute('aria-checked')).toBe('true');
@@ -198,6 +208,35 @@ describe('attachStatusBar', () => {
     sumItem?.click();
     expect(store.getState().ui.statusAggs).not.toContain('sum');
     expect(sumItem?.getAttribute('aria-checked')).toBe('false');
+    handle.detach();
+  });
+
+  it('positions the chooser above the opener and clamps it inside the viewport', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 180 });
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      getEngineLabel: () => 'stub',
+    });
+    const chooser = document.querySelector<HTMLElement>('.fc-statusbar__chooser');
+    expect(chooser).toBeTruthy();
+    if (chooser) {
+      Object.defineProperty(chooser, 'offsetWidth', { configurable: true, value: 220 });
+      Object.defineProperty(chooser, 'offsetHeight', { configurable: true, value: 100 });
+    }
+
+    statusbar.dispatchEvent(
+      new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 310,
+        clientY: 170,
+      }),
+    );
+
+    expect(chooser?.style.left).toBe('96px');
+    expect(chooser?.style.top).toBe('62px');
     handle.detach();
   });
 
@@ -490,6 +529,30 @@ describe('attachStatusBar', () => {
     handle.detach();
   });
 
+  it('projects disabled reasons when zoom buttons hit their limits', () => {
+    mutators.setZoom(store, 0.5);
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      getEngineLabel: () => 'stub',
+    });
+    const buttons = statusbar.querySelectorAll<HTMLButtonElement>('.fc-host__statusbar-zoom-btn');
+    const minus = buttons[0];
+    const plus = buttons[1];
+    expect(minus?.disabled).toBe(true);
+    expect(minus?.dataset.disabledReason).toBe('ズーム倍率はすでに最小です。');
+    expect(plus?.disabled).toBe(false);
+    expect(plus?.dataset.disabledReason).toBeUndefined();
+
+    mutators.setZoom(store, 4);
+    handle.refresh();
+    expect(minus?.disabled).toBe(false);
+    expect(minus?.dataset.disabledReason).toBeUndefined();
+    expect(plus?.disabled).toBe(true);
+    expect(plus?.getAttribute('aria-description')).toBe('ズーム倍率はすでに最大です。');
+    handle.detach();
+  });
+
   it('renders workbook view shortcuts and switches the active view mode', () => {
     const handle = attachStatusBar({
       statusbar,
@@ -545,5 +608,21 @@ describe('attachStatusBar', () => {
     expect(calls).toEqual([1.1]);
     expect(store.getState().viewport.zoom).toBeCloseTo(1.1);
     handle.detach();
+  });
+
+  it('keeps status bar button DOM on the shared interaction primitive', () => {
+    const source = readFileSync(join(root, 'src/interact/status-bar.ts'), 'utf8');
+
+    expect(source).toContain("import { createInteractionButton } from './chip-button.js'");
+    expect(source).toContain('const createStatusBarButton');
+    expect(source).toContain('const createStatusBarCalcButton');
+    expect(source).toContain('const createStatusBarViewButton');
+    expect(source).toContain('const createStatusBarZoomButton');
+    expect(source).toContain('const createStatusBarChooserRow');
+    expect(source).toContain('const calcBadge = createStatusBarCalcButton()');
+    expect(source).toContain("normal: createStatusBarViewButton('normal'");
+    expect(source).toContain("const zoomOut = createStatusBarZoomButton('−')");
+    expect(source).toContain('const { row, check } = createStatusBarChooserRow(');
+    expect(source).not.toContain("document.createElement('button')");
   });
 });

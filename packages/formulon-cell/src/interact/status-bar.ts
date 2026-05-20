@@ -11,7 +11,10 @@ import {
   type StatusBarOptionKey,
   type WorkbookViewMode,
 } from '../store/store.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { createInteractionButton } from './chip-button.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';
+import { clampPanelToViewport, panelSize } from './overlay-position.js';
 
 export interface StatusBarDeps {
   /** The status bar element built by mount.ts. We take it over and lay
@@ -68,6 +71,51 @@ const STATUS_OPTION_KEYS: readonly StatusBarOptionKey[] = [
 const LOCK_OPTION_KEYS = ['capsLock', 'numLock', 'scrollLock'] as const;
 const VIEWPORT_PAD = 4;
 
+const createStatusBarButton = (className: string): HTMLButtonElement => {
+  return createInteractionButton({ className });
+};
+
+const createStatusBarCalcButton = (): HTMLButtonElement => {
+  const button = createStatusBarButton('fc-host__statusbar-calcmode');
+  button.style.display = 'none';
+  return button;
+};
+
+const createStatusBarViewButton = (
+  mode: WorkbookViewMode,
+  onClick: () => void,
+): HTMLButtonElement => {
+  const button = createStatusBarButton('fc-host__statusbar-view');
+  button.dataset.viewMode = mode;
+  button.addEventListener('click', onClick);
+  const icon = document.createElement('span');
+  icon.className = `fc-host__statusbar-viewicon fc-host__statusbar-viewicon--${mode}`;
+  button.appendChild(icon);
+  return button;
+};
+
+const createStatusBarZoomButton = (label: string): HTMLButtonElement => {
+  const button = createStatusBarButton('fc-host__statusbar-zoom-btn');
+  button.textContent = label;
+  return button;
+};
+
+const createStatusBarChooserRow = (
+  labelText: string,
+  checked: boolean,
+): { row: HTMLButtonElement; check: HTMLSpanElement } => {
+  const row = createStatusBarButton('fc-statusbar__chooser-item');
+  row.setAttribute('role', 'menuitemcheckbox');
+  row.setAttribute('aria-checked', checked ? 'true' : 'false');
+  const check = document.createElement('span');
+  check.className = 'fc-statusbar__chooser-check';
+  check.textContent = checked ? '✓' : '';
+  const label = document.createElement('span');
+  label.textContent = labelText;
+  row.append(check, label);
+  return { row, check };
+};
+
 const fmt = (n: number): string => {
   if (!Number.isFinite(n)) return '—';
   const abs = Math.abs(n);
@@ -95,10 +143,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   center.className = 'fc-host__statusbar-aggs';
   center.setAttribute('role', 'status');
 
-  const calcBadge = document.createElement('button');
-  calcBadge.type = 'button';
-  calcBadge.className = 'fc-host__statusbar-calcmode';
-  calcBadge.style.display = 'none';
+  const calcBadge = createStatusBarCalcButton();
   calcBadge.addEventListener('click', () => {
     // Click on the badge itself toggles the mode; double-click recalcs.
     deps.onCycleCalcMode?.();
@@ -126,43 +171,31 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   const viewShortcuts = document.createElement('span');
   viewShortcuts.className = 'fc-host__statusbar-views';
   const viewButtons: Record<WorkbookViewMode, HTMLButtonElement> = {
-    normal: document.createElement('button'),
-    pageLayout: document.createElement('button'),
-    pageBreakPreview: document.createElement('button'),
-  };
-  const viewIcon = (button: HTMLButtonElement, mode: WorkbookViewMode): void => {
-    button.type = 'button';
-    button.className = 'fc-host__statusbar-view';
-    button.dataset.viewMode = mode;
-    button.addEventListener('click', () => {
-      mutators.setWorkbookView(store, mode);
+    normal: createStatusBarViewButton('normal', () => {
+      mutators.setWorkbookView(store, 'normal');
       refresh();
-    });
-    const icon = document.createElement('span');
-    icon.className = `fc-host__statusbar-viewicon fc-host__statusbar-viewicon--${mode}`;
-    button.appendChild(icon);
+    }),
+    pageLayout: createStatusBarViewButton('pageLayout', () => {
+      mutators.setWorkbookView(store, 'pageLayout');
+      refresh();
+    }),
+    pageBreakPreview: createStatusBarViewButton('pageBreakPreview', () => {
+      mutators.setWorkbookView(store, 'pageBreakPreview');
+      refresh();
+    }),
   };
-  viewIcon(viewButtons.normal, 'normal');
-  viewIcon(viewButtons.pageLayout, 'pageLayout');
-  viewIcon(viewButtons.pageBreakPreview, 'pageBreakPreview');
   viewShortcuts.append(viewButtons.normal, viewButtons.pageLayout, viewButtons.pageBreakPreview);
 
   const zoom = document.createElement('div');
   zoom.className = 'fc-host__statusbar-zoom';
-  const zoomOut = document.createElement('button');
-  zoomOut.type = 'button';
-  zoomOut.className = 'fc-host__statusbar-zoom-btn';
-  zoomOut.textContent = '−';
+  const zoomOut = createStatusBarZoomButton('−');
   const zoomSlider = document.createElement('input');
   zoomSlider.type = 'range';
   zoomSlider.className = 'fc-host__statusbar-zoom-slider';
   zoomSlider.min = '50';
   zoomSlider.max = '400';
   zoomSlider.step = '10';
-  const zoomIn = document.createElement('button');
-  zoomIn.type = 'button';
-  zoomIn.className = 'fc-host__statusbar-zoom-btn';
-  zoomIn.textContent = '+';
+  const zoomIn = createStatusBarZoomButton('+');
   const zoomLabel = document.createElement('span');
   zoomLabel.className = 'fc-host__statusbar-zoom-label';
   zoom.append(zoomOut, zoomSlider, zoomIn, zoomLabel);
@@ -358,8 +391,16 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     const zoomPct = Math.round(s.viewport.zoom * 100);
     zoomSlider.value = String(zoomPct);
     zoomLabel.textContent = `${zoomPct}%`;
-    zoomOut.disabled = s.viewport.zoom <= 0.5;
-    zoomIn.disabled = s.viewport.zoom >= 4;
+    const atMinZoom = s.viewport.zoom <= 0.5;
+    const atMaxZoom = s.viewport.zoom >= 4;
+    projectDisabledState(zoomOut, atMinZoom, strings.statusBar.zoomOutUnavailable, {
+      datasetKey: 'disabledReason',
+      titlePrefix: strings.statusBar.zoomOut,
+    });
+    projectDisabledState(zoomIn, atMaxZoom, strings.statusBar.zoomInUnavailable, {
+      datasetKey: 'disabledReason',
+      titlePrefix: strings.statusBar.zoomIn,
+    });
     for (const [mode, button] of Object.entries(viewButtons) as [
       WorkbookViewMode,
       HTMLButtonElement,
@@ -422,27 +463,27 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
 
   const buildChooser = (): void => {
     popover.replaceChildren();
-    const heading = document.createElement('div');
-    heading.className = 'fc-statusbar__chooser-heading';
-    heading.textContent = strings.statusBar.aggregatesHeading;
-    popover.appendChild(heading);
+    const addHeading = (label: string): void => {
+      const heading = document.createElement('div');
+      heading.className = 'fc-statusbar__chooser-heading';
+      heading.textContent = label;
+      popover.appendChild(heading);
+    };
+    const addSeparator = (): void => {
+      const separator = document.createElement('div');
+      separator.className = 'fc-statusbar__chooser-separator';
+      separator.setAttribute('role', 'separator');
+      popover.appendChild(separator);
+    };
+
+    addHeading(strings.statusBar.aggregatesHeading);
 
     const addCheckboxRow = (
       labelText: string,
       checked: boolean,
       onToggle: (nextChecked: boolean) => void,
     ): void => {
-      const row = document.createElement('button');
-      row.type = 'button';
-      row.className = 'fc-statusbar__chooser-item';
-      row.setAttribute('role', 'menuitemcheckbox');
-      row.setAttribute('aria-checked', checked ? 'true' : 'false');
-      const check = document.createElement('span');
-      check.className = 'fc-statusbar__chooser-check';
-      check.textContent = checked ? '✓' : '';
-      const label = document.createElement('span');
-      label.textContent = labelText;
-      row.append(check, label);
+      const { row, check } = createStatusBarChooserRow(labelText, checked);
       row.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -460,6 +501,8 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
         mutators.toggleStatusAgg(store, key);
       });
     }
+    addSeparator();
+    addHeading(strings.statusBar.statusOptionsHeading);
     const options = store.getState().ui.statusOptions;
     for (const key of STATUS_OPTION_KEYS) {
       addCheckboxRow(optionLabelFor(key), options[key], () => {
@@ -470,12 +513,10 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   };
 
   const placeChooser = (clientX: number, clientY: number): void => {
-    const w = popover.offsetWidth;
-    const h = popover.offsetHeight;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const x = Math.max(VIEWPORT_PAD, Math.min(clientX, vw - w - VIEWPORT_PAD));
-    const y = Math.max(VIEWPORT_PAD, Math.min(clientY - h - 8, vh - h - VIEWPORT_PAD));
+    const { height } = panelSize(popover);
+    const { x, y } = clampPanelToViewport(popover, clientX, clientY - height - 8, {
+      pad: VIEWPORT_PAD,
+    });
     popover.style.left = `${x}px`;
     popover.style.top = `${y}px`;
   };

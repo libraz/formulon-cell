@@ -1,11 +1,18 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createSheetMenuButton,
+  createSheetMenuColorButton,
   createSheetMenuSeparator,
+  createSheetTabButton,
   formatSheetLabel,
   positionSheetMenu,
 } from '../../../src/mount/sheet-menu.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 describe('mount/sheet-menu', () => {
   describe('formatSheetLabel', () => {
@@ -67,6 +74,55 @@ describe('mount/sheet-menu', () => {
       expect(sep.tagName).toBe('DIV');
       expect(sep.className).toBe('fc-sheetmenu__sep');
       expect(sep.getAttribute('role')).toBe('separator');
+    });
+  });
+
+  describe('createSheetTabButton', () => {
+    it('applies the shared sheet tab button contract', () => {
+      const tab = createSheetTabButton({
+        index: 2,
+        label: 'Q3',
+        selected: true,
+        tabColor: '#70ad47',
+      });
+
+      expect(tab.type).toBe('button');
+      expect(tab.className).toBe('fc-host__sheetbar-tab');
+      expect(tab.getAttribute('role')).toBe('tab');
+      expect(tab.dataset.fcSheetIndex).toBe('2');
+      expect(tab.getAttribute('aria-selected')).toBe('true');
+      expect(tab.tabIndex).toBe(0);
+      expect(tab.textContent).toBe('Q3');
+      expect(tab.dataset.fcSheetTabColor).toBe('true');
+      expect(tab.style.getPropertyValue('--fc-sheet-tab-color')).toBe('#70ad47');
+    });
+  });
+
+  describe('createSheetMenuColorButton', () => {
+    it('applies the shared color swatch button contract', () => {
+      const onClick = vi.fn();
+      const button = createSheetMenuColorButton('Tab color', '#70ad47', true, onClick);
+
+      expect(button.type).toBe('button');
+      expect(button.className).toBe('fc-sheetmenu__swatch');
+      expect(button.getAttribute('role')).toBe('menuitemradio');
+      expect(button.getAttribute('aria-label')).toBe('Tab color #70ad47');
+      expect(button.getAttribute('aria-checked')).toBe('true');
+      expect(button.title).toBe('Tab color #70ad47');
+      expect(button.style.getPropertyValue('--fc-sheet-tab-color')).toBe('#70ad47');
+
+      button.click();
+      expect(onClick).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('DOM primitives', () => {
+    it('keeps sheet menu buttons on the shared host button primitive', () => {
+      const source = readFileSync(join(root, 'src/mount/sheet-menu.ts'), 'utf8');
+
+      expect(source).toContain("import { createHostButton } from './chrome-buttons.js'");
+      expect(source).toContain('const button = createHostButton({');
+      expect(source).not.toContain("document.createElement('button')");
     });
   });
 

@@ -21,6 +21,7 @@ import type { FormatPainterHandle } from '../interact/format-painter.js';
 import type { PasteSpecialOpenOptions } from '../interact/paste-special.js';
 import type { StatusBarUploadStatus } from '../interact/status-bar.js';
 import type { SlicerSpec, SpreadsheetStore } from '../store/store.js';
+import type { SheetProtectionPermissions } from '../store/types.js';
 
 export interface MountOptions {
   workbook?: WorkbookHandle;
@@ -119,7 +120,7 @@ export interface SpreadsheetInstance {
   openPasteSpecial(opts?: PasteSpecialOpenOptions): void;
   pasteSpecial(options: PasteSpecialOptions, opts?: PasteSpecialOpenOptions): boolean;
   openInsertCopiedCells(): void;
-  openPageSetup(): void;
+  openPageSetup(tab?: 'page' | 'margins' | 'headerFooter' | 'sheet'): void;
   print(mode?: 'print' | 'pdf'): void;
   setPrinterProfiles(next: readonly PrinterProfile[] | undefined): void;
   setPrinterProfileId(next: string | undefined): void;
@@ -135,7 +136,7 @@ export interface SpreadsheetInstance {
   openWorkbookObjects(): void;
   openPivotFieldList(sheetIndex: number, pivotIndex: number): boolean;
   openActivePivotFieldList(): boolean;
-  openPivotTableDialog(): void;
+  openPivotTableDialog(opts?: { placement?: 'new' | 'existing' }): void;
   addSlicer(input: {
     tableName: string;
     column: string;
@@ -145,7 +146,7 @@ export interface SpreadsheetInstance {
   }): SlicerSpec;
   removeSlicer(id: string): void;
   toggleSheetProtection(): void;
-  setSheetProtected(on: boolean, password?: string): void;
+  setSheetProtected(on: boolean, password?: string, permissions?: SheetProtectionPermissions): void;
   isSheetProtected(): boolean;
   tracePrecedents(): number;
   traceDependents(): number;

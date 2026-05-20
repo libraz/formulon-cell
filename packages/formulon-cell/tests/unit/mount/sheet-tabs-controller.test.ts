@@ -1,11 +1,21 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { setWorkbookStructureProtected } from '../../../src/commands/protection.js';
 import type { EngineCapabilities } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import en from '../../../src/i18n/en.js';
 import type { Strings } from '../../../src/i18n/strings.js';
 import { attachSheetTabsController } from '../../../src/mount/sheet-tabs-controller.js';
+import {
+  SHEET_TAB_COLOR_CHOICES,
+  sheetTabColorChoiceLabel,
+} from '../../../src/sheet-tab-colors.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 interface FakeWbState {
   sheets: string[];
@@ -176,6 +186,12 @@ describe('mount/sheet-tabs-controller', () => {
     it('marks single-sheet workbooks as non-overflowing', () => {
       h = mount({ sheets: ['Only'], capabilities: {} });
       expect(h.sheetTabs.dataset.fcSheetOverflow).toBe('false');
+    });
+
+    it('keeps tab button DOM on the shared sheet tab helper', () => {
+      const source = readFileSync(join(root, 'src/mount/sheet-tabs-controller.ts'), 'utf8');
+      expect(source).toContain('createSheetTabButton({');
+      expect(source).not.toContain("const tab = document.createElement('button')");
     });
   });
 
@@ -378,6 +394,13 @@ describe('mount/sheet-tabs-controller', () => {
       const enabled = items.map((b) => !b.disabled);
       // [rename, insert, moveLeft, moveRight, delete, hide, unhide]
       expect(enabled).toEqual([true, true, true, true, true, true, false]);
+      expect(items[6]?.dataset.disabledReason).toBe(en.ribbonMenu.sheetUnhideRequiresHiddenSheet);
+      expect(items[6]?.getAttribute('aria-description')).toBe(
+        en.ribbonMenu.sheetUnhideRequiresHiddenSheet,
+      );
+      expect(items[6]?.title).toBe(
+        `${en.sheetTabs.unhideSheet}\n${en.ribbonMenu.sheetUnhideRequiresHiddenSheet}`,
+      );
       expect(h.sheetMenu.querySelector('.fc-sheetmenu__colors')).not.toBeNull();
     });
 
@@ -388,7 +411,25 @@ describe('mount/sheet-tabs-controller', () => {
       h.controller.showMenu(0, tab, 0, 0);
 
       const swatches = h.sheetMenu.querySelectorAll<HTMLButtonElement>('.fc-sheetmenu__swatch');
-      expect(swatches.length).toBe(9);
+      expect(swatches.length).toBe(SHEET_TAB_COLOR_CHOICES.length);
+      expect(
+        Array.from(swatches).map((button) => ({
+          checked: button.getAttribute('aria-checked'),
+          color: button.style.getPropertyValue('--fc-sheet-tab-color') || null,
+          label: button.getAttribute('aria-label'),
+        })),
+      ).toEqual(
+        SHEET_TAB_COLOR_CHOICES.map((choice) => ({
+          checked: choice.color === null ? 'true' : 'false',
+          color: choice.color,
+          label:
+            choice.color === null
+              ? en.sheetTabs.noColor
+              : `${en.sheetTabs.tabColor}: ${sheetTabColorChoiceLabel(choice, en.sheetTabs)} ${
+                  choice.color
+                }`,
+        })),
+      );
       swatches[1]?.click();
 
       expect(h.store.getState().layout.sheetTabColors.get(0)).toBe('#c00000');
@@ -443,6 +484,36 @@ describe('mount/sheet-tabs-controller', () => {
       expect(items[4]?.disabled).toBe(true); // delete (capability)
       expect(items[5]?.disabled).toBe(true); // hide
       expect(items[6]?.disabled).toBe(true); // unhide
+      expect(items[0]?.dataset.disabledReason).toBe(en.ribbonMenu.sheetActionUnavailable);
+      expect(items[4]?.dataset.disabledReason).toBe(en.ribbonMenu.sheetMutationUnavailable);
+      expect(items[5]?.dataset.disabledReason).toBe(en.ribbonMenu.sheetActionUnavailable);
+    });
+
+    it('projects workbook protection reasons on sheet menu actions', () => {
+      h = mount({ sheets: ['A', 'B'], capabilities: {} });
+      setWorkbookStructureProtected(h.store, true);
+      h.controller.update();
+      const tab = h.sheetTabs.querySelectorAll<HTMLButtonElement>('.fc-host__sheetbar-tab')[0];
+      if (!tab) throw new Error('tab not found');
+      h.controller.showMenu(0, tab, 0, 0);
+      const items = Array.from(
+        h.sheetMenu.querySelectorAll<HTMLButtonElement>('.fc-sheetmenu__item'),
+      );
+
+      expect(items[0]?.disabled).toBe(true);
+      expect(items[1]?.disabled).toBe(true);
+      expect(items[0]?.dataset.disabledReason).toBe(
+        en.ribbonMenu.workbookStructureProtectedBlocked,
+      );
+      expect(items[1]?.dataset.disabledReason).toBe(
+        en.ribbonMenu.workbookStructureProtectedBlocked,
+      );
+      expect(items[0]?.getAttribute('aria-description')).toBe(
+        en.ribbonMenu.workbookStructureProtectedBlocked,
+      );
+      expect(items[0]?.title).toBe(
+        `${en.sheetTabs.rename}\n${en.ribbonMenu.workbookStructureProtectedBlocked}`,
+      );
     });
 
     it('closeMenu() hides the menu and clears children', () => {
@@ -524,6 +595,34 @@ describe('mount/sheet-tabs-controller', () => {
       expect(h.state.sheets.length).toBe(2);
       expect(h.store.getState().data.sheetIndex).toBe(1);
       expect(h.sheetTabs.querySelectorAll('.fc-host__sheetbar-tab').length).toBe(2);
+    });
+
+    it('projects disabled reasons on navigation and add-sheet buttons', () => {
+      h = mount({ sheets: ['A', 'B'], capabilities: {} });
+      expect(h.firstSheet.disabled).toBe(true);
+      expect(h.firstSheet.dataset.disabledReason).toBe(en.sheetTabs.previousSheetUnavailable);
+      expect(h.firstSheet.getAttribute('aria-description')).toBe(
+        en.sheetTabs.previousSheetUnavailable,
+      );
+      expect(h.firstSheet.title).toBe(
+        `${en.sheetTabs.previousSheet}\n${en.sheetTabs.previousSheetUnavailable}`,
+      );
+      expect(h.lastSheet.disabled).toBe(false);
+      expect(h.lastSheet.dataset.disabledReason).toBeUndefined();
+      expect(h.lastSheet.title).toBe(en.sheetTabs.nextSheet);
+
+      setWorkbookStructureProtected(h.store, true);
+      h.controller.update();
+      expect(h.addSheetBtn.disabled).toBe(true);
+      expect(h.addSheetBtn.dataset.disabledReason).toBe(
+        en.ribbonMenu.workbookStructureProtectedBlocked,
+      );
+      expect(h.addSheetBtn.getAttribute('aria-description')).toBe(
+        en.ribbonMenu.workbookStructureProtectedBlocked,
+      );
+      expect(h.addSheetBtn.title).toBe(
+        `${en.sheetTabs.addSheet}\n${en.ribbonMenu.workbookStructureProtectedBlocked}`,
+      );
     });
   });
 

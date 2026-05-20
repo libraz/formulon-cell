@@ -1,7 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { presets } from '../../../src/extensions/presets.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/index.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 describe('mount/chrome — preset → DOM coverage', () => {
   let sheet: MountedStubSheet;
@@ -124,5 +129,11 @@ describe('mount/chrome — lifecycle', () => {
     sheet.instance.dispose();
     expect(() => sheet.instance.dispose()).not.toThrow();
     sheet.dispose();
+  });
+
+  it('keeps host chrome buttons on the shared host button helper', () => {
+    const source = readFileSync(join(root, 'src/mount/chrome.ts'), 'utf8');
+    expect(source).toContain('createHostButton({');
+    expect(source).not.toContain("document.createElement('button')");
   });
 });

@@ -1,8 +1,11 @@
 import { writeInputValidated } from '../commands/coerce-input.js';
 import { extractRefs, rotateRefAt } from '../commands/refs.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import type { Strings } from '../i18n/strings.js';
+import { formatWithPending, sameAddr } from '../store/pending-format.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
 
 interface FormulaBarAutocomplete {
   isOpen(): boolean;
@@ -23,6 +26,7 @@ interface AttachFormulaBarInput {
   fxInput: HTMLTextAreaElement;
   getArgHelper: () => FormulaArgHelper | null;
   getAutocomplete: () => FormulaBarAutocomplete;
+  getStrings: () => Strings;
   cancelBindingEditor: () => void;
   host: HTMLElement;
   onValidation?: (outcome: {
@@ -53,6 +57,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     fxInput,
     getArgHelper,
     getAutocomplete,
+    getStrings,
     cancelBindingEditor,
     host,
     onValidation,
@@ -65,8 +70,21 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
 
   const refreshActions = (): void => {
     const dirty = fxEditing && fxInput.value !== fxBaseline;
-    fxCancel.disabled = !fxEditing;
-    fxAccept.disabled = !dirty;
+    const strings = getStrings().a11y;
+    const cancelReason = fxEditing ? null : strings.cancelFormulaEditUnavailable;
+    const acceptReason = dirty
+      ? null
+      : fxEditing
+        ? strings.enterFormulaNoChanges
+        : strings.enterFormulaUnavailable;
+    projectDisabledState(fxCancel, !fxEditing, cancelReason, {
+      datasetKey: 'disabledReason',
+      titlePrefix: strings.cancelFormulaEdit,
+    });
+    projectDisabledState(fxAccept, !dirty, acceptReason, {
+      datasetKey: 'disabledReason',
+      titlePrefix: strings.enterFormula,
+    });
     formulabar.dataset.fcEditing = fxEditing ? '1' : '0';
   };
 
@@ -88,7 +106,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     const s = store.getState();
     const a = s.selection.active;
     try {
-      const fmt = s.format.formats.get(`${a.sheet}:${a.row}:${a.col}`);
+      const fmt = formatWithPending(s, a);
       const outcome = writeInputValidated(currentWb, a, fxInput.value, fmt?.validation, store);
       if (!outcome.ok) {
         if (outcome.severity === 'stop') {
@@ -113,6 +131,11 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     } catch (err) {
       console.warn('formulon-cell: writeInput failed', err);
     }
+    const pending = store.getState().ui.pendingFormat;
+    if (pending && sameAddr(pending.addr, a)) {
+      mutators.setCellFormat(store, a, pending.format);
+      mutators.setPendingFormat(store, null);
+    }
     mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex));
     fxEditing = false;
     fxBaseline = fxInput.value;
@@ -129,6 +152,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
   const cancelFx = (): void => {
     fxInput.value = fxBaseline;
     fxEditing = false;
+    mutators.setPendingFormat(store, null);
     clearFxRefs();
     getAutocomplete().close();
     refreshActions();

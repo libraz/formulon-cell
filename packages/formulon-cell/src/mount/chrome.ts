@@ -1,5 +1,7 @@
 import type { FeatureFlags } from '../extensions/index.js';
 import type { Strings } from '../i18n/strings.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { appendHostIcon, createHostButton } from './chrome-buttons.js';
 
 export type ChromeSlot = 'formulabar' | 'viewbar' | 'sheetbar' | 'statusbar' | 'watchDock';
 
@@ -52,28 +54,44 @@ export function createMountChrome({
   tag.setAttribute('aria-label', strings.a11y.nameBox);
   tag.value = 'A1';
 
-  const fx = document.createElement('button');
-  fx.type = 'button';
-  fx.className = 'fc-host__formulabar-fx';
-  fx.textContent = 'ƒx';
-  fx.tabIndex = -1;
-  fx.setAttribute('aria-label', strings.fxDialog?.fxButtonLabel ?? strings.a11y.formulaBar);
+  const fx = createHostButton({
+    className: 'fc-host__formulabar-fx',
+    text: 'ƒx',
+    tabIndex: -1,
+    ariaLabel: strings.fxDialog?.fxButtonLabel ?? strings.a11y.formulaBar,
+  });
+  const setFxDialogAvailable = (available: boolean): void => {
+    const strings = getStrings();
+    const reason = available ? null : strings.fxDialog.fxButtonUnavailable;
+    fx.style.cursor = available ? '' : 'default';
+    projectDisabledState(fx, !available, reason, {
+      datasetKey: 'disabledReason',
+      titlePrefix: strings.fxDialog?.fxButtonLabel ?? strings.a11y.formulaBar,
+    });
+  };
+  setFxDialogAvailable(flags.fxDialog !== false);
 
-  const fxCancel = document.createElement('button');
-  fxCancel.type = 'button';
-  fxCancel.className = 'fc-host__formulabar-action fc-host__formulabar-action--cancel';
-  fxCancel.tabIndex = -1;
-  fxCancel.disabled = true;
-  fxCancel.setAttribute('aria-label', strings.a11y.cancelFormulaEdit);
-  appendHostIcon(fxCancel, ['M6 6l8 8', 'M14 6l-8 8']);
+  const fxCancel = createHostButton({
+    className: 'fc-host__formulabar-action fc-host__formulabar-action--cancel',
+    tabIndex: -1,
+    ariaLabel: strings.a11y.cancelFormulaEdit,
+    iconPaths: ['M6 6l8 8', 'M14 6l-8 8'],
+  });
+  projectDisabledState(fxCancel, true, strings.a11y.cancelFormulaEditUnavailable, {
+    datasetKey: 'disabledReason',
+    titlePrefix: strings.a11y.cancelFormulaEdit,
+  });
 
-  const fxAccept = document.createElement('button');
-  fxAccept.type = 'button';
-  fxAccept.className = 'fc-host__formulabar-action fc-host__formulabar-action--accept';
-  fxAccept.tabIndex = -1;
-  fxAccept.disabled = true;
-  fxAccept.setAttribute('aria-label', strings.a11y.enterFormula);
-  appendHostIcon(fxAccept, ['M5 10.5l3 3 7-7']);
+  const fxAccept = createHostButton({
+    className: 'fc-host__formulabar-action fc-host__formulabar-action--accept',
+    tabIndex: -1,
+    ariaLabel: strings.a11y.enterFormula,
+    iconPaths: ['M5 10.5l3 3 7-7'],
+  });
+  projectDisabledState(fxAccept, true, strings.a11y.enterFormulaUnavailable, {
+    datasetKey: 'disabledReason',
+    titlePrefix: strings.a11y.enterFormula,
+  });
 
   const fxInput = document.createElement('textarea');
   fxInput.className = 'fc-host__formulabar-input';
@@ -83,16 +101,17 @@ export function createMountChrome({
   fxInput.wrap = 'soft';
   fxInput.setAttribute('aria-label', strings.a11y.formulaBar);
 
-  const fxExpand = document.createElement('button');
-  fxExpand.type = 'button';
-  fxExpand.className = 'fc-host__formulabar-expand';
-  fxExpand.setAttribute('aria-expanded', 'false');
-  fxExpand.tabIndex = -1;
-  appendHostIcon(fxExpand, ['M5.5 7.5 10 12l4.5-4.5']);
+  const fxExpand = createHostButton({
+    className: 'fc-host__formulabar-expand',
+    ariaExpanded: false,
+    tabIndex: -1,
+    iconPaths: ['M5.5 7.5 10 12l4.5-4.5'],
+  });
 
   const refreshFormulaBarLabels = (): void => {
     const strings = getStrings();
     fx.setAttribute('aria-label', strings.fxDialog?.fxButtonLabel ?? strings.a11y.formulaBar);
+    setFxDialogAvailable(!fx.disabled);
     fxCancel.setAttribute('aria-label', strings.a11y.cancelFormulaEdit);
     fxAccept.setAttribute('aria-label', strings.a11y.enterFormula);
     fxInput.setAttribute('aria-label', strings.a11y.formulaBar);
@@ -144,23 +163,23 @@ export function createMountChrome({
   sheetbar.className = 'fc-host__sheetbar';
   const sheetNav = document.createElement('div');
   sheetNav.className = 'fc-host__sheetbar-nav';
-  const firstSheet = document.createElement('button');
-  firstSheet.type = 'button';
-  firstSheet.className = 'fc-host__sheetbar-navbtn';
-  appendHostIcon(firstSheet, ['M12.5 4.5 7 10l5.5 5.5']);
-  const lastSheet = document.createElement('button');
-  lastSheet.type = 'button';
-  lastSheet.className = 'fc-host__sheetbar-navbtn';
-  appendHostIcon(lastSheet, ['M7.5 4.5 13 10l-5.5 5.5']);
+  const firstSheet = createHostButton({
+    className: 'fc-host__sheetbar-navbtn',
+    iconPaths: ['M12.5 4.5 7 10l5.5 5.5'],
+  });
+  const lastSheet = createHostButton({
+    className: 'fc-host__sheetbar-navbtn',
+    iconPaths: ['M7.5 4.5 13 10l-5.5 5.5'],
+  });
   sheetNav.append(firstSheet, lastSheet);
 
   const sheetTabs = document.createElement('div');
   sheetTabs.className = 'fc-host__sheetbar-tabs';
   sheetTabs.setAttribute('role', 'tablist');
-  const addSheetBtn = document.createElement('button');
-  addSheetBtn.type = 'button';
-  addSheetBtn.className = 'fc-host__sheetbar-add';
-  appendHostIcon(addSheetBtn, ['M10 4.5v11', 'M4.5 10h11']);
+  const addSheetBtn = createHostButton({
+    className: 'fc-host__sheetbar-add',
+    iconPaths: ['M10 4.5v11', 'M4.5 10h11'],
+  });
   sheetbar.append(sheetNav, sheetTabs, addSheetBtn);
 
   const sheetMenu = document.createElement('div');
@@ -252,26 +271,4 @@ export function createMountChrome({
     refreshFormulaBarLabels,
     setChromeAttached,
   };
-}
-
-function appendHostIcon(
-  button: HTMLButtonElement,
-  paths: readonly string[],
-  viewBox = '0 0 20 20',
-): void {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('class', 'fc-host__icon');
-  svg.setAttribute('viewBox', viewBox);
-  svg.setAttribute('fill', 'none');
-  svg.setAttribute('stroke', 'currentColor');
-  svg.setAttribute('stroke-width', '1.5');
-  svg.setAttribute('stroke-linecap', 'round');
-  svg.setAttribute('stroke-linejoin', 'round');
-  svg.setAttribute('aria-hidden', 'true');
-  for (const d of paths) {
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', d);
-    svg.appendChild(path);
-  }
-  button.replaceChildren(svg);
 }

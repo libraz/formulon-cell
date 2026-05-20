@@ -5,6 +5,7 @@ import { type SpreadsheetEmitter, selectionEquals } from '../events.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
+import { createHostButton } from './chrome-buttons.js';
 import {
   colName,
   formatSelectionRef,
@@ -251,7 +252,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     const menu = document.createElement('div');
     menu.className = 'fc-namebox-menu';
     menu.setAttribute('role', 'listbox');
-    menu.setAttribute('aria-label', tag.getAttribute('aria-label') ?? 'Name box');
+    menu.setAttribute('aria-label', tag.getAttribute('aria-label') ?? getStrings().a11y.nameBox);
     if (rows.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'fc-namebox-menu__empty';
@@ -259,11 +260,11 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
       menu.appendChild(empty);
     }
     for (const row of rows) {
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.className = 'fc-namebox-menu__item';
+      const item = createHostButton({
+        className: 'fc-namebox-menu__item',
+        text: row.name,
+      });
       item.setAttribute('role', 'option');
-      item.textContent = row.name;
       item.title = row.formula;
       item.addEventListener('click', (e) => {
         tag.value = row.name;

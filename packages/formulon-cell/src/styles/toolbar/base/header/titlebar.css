@@ -154,6 +154,16 @@
   outline: 0;
 }
 
+.demo__command-item--disabled,
+.demo__command-item[aria-disabled="true"] {
+  cursor: default;
+}
+
+.demo__command-item--disabled strong,
+.demo__command-item[aria-disabled="true"] strong {
+  color: var(--demo-fg-soft);
+}
+
 .demo__command-item strong,
 .demo__command-item span {
   overflow: hidden;
