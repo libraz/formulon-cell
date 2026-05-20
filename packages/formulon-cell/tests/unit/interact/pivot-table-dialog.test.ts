@@ -1,9 +1,14 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CellValue } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
 import { attachPivotTableDialog } from '../../../src/interact/pivot-table-dialog.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const text = (value: string): CellValue => ({ kind: 'text', value });
 const num = (value: number): CellValue => ({ kind: 'number', value });
@@ -37,6 +42,11 @@ const makeWb = () => {
     capabilities: { pivotTableMutate: true },
     sheetCount: 1,
     sheetName: () => 'Sheet1',
+    addSheet: () => {
+      calls.push('add-sheet');
+      return 1;
+    },
+    cells: function* () {},
     getPivotTables: () => [],
     getValue: ({ row, col }: { row: number; col: number }) => {
       if (row === 0 && col === 0) return text('Region');
@@ -132,6 +142,12 @@ describe('attachPivotTableDialog', () => {
     document.body.replaceChildren();
   });
 
+  it('keeps Pivot area settings buttons on the shared helper', () => {
+    const source = readFileSync(join(root, 'src/interact/pivot-table-dialog.ts'), 'utf8');
+    expect(source).toContain('createPivotAreaSettingsButton(');
+    expect(source).not.toContain("const settings = document.createElement('button')");
+  });
+
   it('creates a PivotTable from the selected range', () => {
     const { wb, calls } = makeWb();
     const store = createSpreadsheetStore();
@@ -140,18 +156,117 @@ describe('attachPivotTableDialog', () => {
 
     handle.open();
     expect(document.body.textContent).toContain('Create PivotTable');
-    expect(document.querySelector<HTMLInputElement>('.fc-pivotdlg__field input')?.value).toBe(
-      'A1:B3',
+    const sourceInput = document.querySelector<HTMLInputElement>('.fc-pivotdlg__field input');
+    expect(sourceInput?.value).toBe('A1:B3');
+    expect(document.activeElement).toBe(sourceInput);
+    const sourcePicker = document.querySelector<HTMLButtonElement>(
+      '[data-range-picker="pivot-source"]',
     );
+    const destinationPicker = document.querySelector<HTMLButtonElement>(
+      '[data-range-picker="pivot-destination"]',
+    );
+    expect(sourcePicker).toBeTruthy();
+    expect(destinationPicker).toBeTruthy();
+    expect(sourcePicker?.getAttribute('aria-label')).toBe('Select range');
+    expect(destinationPicker?.getAttribute('aria-label')).toBe('Select range');
+    expect(document.querySelectorAll('.fc-range-picker')).toHaveLength(2);
+    expect(document.querySelector('.fc-pivotdlg__source-choice')?.textContent).toContain(
+      'Select a table or range',
+    );
+    expect(document.querySelector('.fc-pivotdlg__source-choice')?.textContent).toContain(
+      'No extracted data is available.',
+    );
+    expect(
+      document.querySelector<HTMLInputElement>('input[name="fc-pivotdlg-source-kind"]:checked')
+        ?.value,
+    ).toBe('range');
+    const externalSource = document.querySelector<HTMLInputElement>(
+      'input[name="fc-pivotdlg-source-kind"][value="external"]',
+    );
+    expect(externalSource?.disabled).toBe(true);
+    expect(externalSource?.getAttribute('aria-describedby')).toBe(
+      'fc-pivotdlg-external-unavailable',
+    );
+    expect(externalSource?.dataset.disabledReason).toBe('No extracted data is available.');
+    expect(externalSource?.title).toBe('No extracted data is available.');
+    const externalReason = document.querySelector<HTMLElement>('#fc-pivotdlg-external-unavailable');
+    expect(externalReason?.textContent).toBe('No extracted data is available.');
+    expect(externalSource?.closest('label')?.title).toBe('No extracted data is available.');
     expect(document.querySelectorAll('.fc-pivotdlg__section')).toHaveLength(4);
     expect(document.querySelector('.fc-pivotdlg__field-list')?.textContent).toContain(
       'PivotTable Fields',
     );
     expect(document.querySelectorAll('[data-pivot-field-list-field]')).toHaveLength(2);
     expect(document.querySelector('.fc-pivotdlg__area-grid')?.textContent).toContain('Region');
+    const selects = Array.from(document.querySelectorAll<HTMLSelectElement>('select'));
+    expect(selects.map((select) => select.classList.contains('fc-fmtdlg__select'))).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+    ]);
+    expect(Array.from(selects[0]?.options ?? []).map((option) => option.value)).toEqual([
+      '',
+      'Region',
+      'Sales',
+    ]);
+    expect(Array.from(selects[4]?.options ?? []).map((option) => option.textContent)).toEqual([
+      'Sum',
+      'Count',
+    ]);
+    expect(Array.from(selects[5]?.options ?? []).map((option) => option.value)).toEqual([
+      'none',
+      'asc',
+      'desc',
+    ]);
+    expect(document.querySelector('.fc-pivotdlg__placement')?.textContent).toContain(
+      'Existing worksheet',
+    );
+    expect(
+      document.querySelector<HTMLInputElement>('input[name="fc-pivotdlg-destination"]:checked')
+        ?.value,
+    ).toBe('existing');
     expect(document.querySelectorAll('.fc-pivotdlg__checkgrid .fc-pivotdlg__check')).toHaveLength(
       4,
     );
+    expect(document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.textContent).toBe(
+      'OK',
+    );
+    expect(
+      Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn')).some(
+        (button) => button.textContent === 'Cancel',
+      ),
+    ).toBe(true);
+    sourcePicker?.click();
+    expect(sourcePicker?.dataset.rangePickerActive).toBe('true');
+    expect(document.querySelector('.fc-pivotdlg')?.classList.contains('fc-fmtdlg--range-picking')).toBe(
+      true,
+    );
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 4 });
+    let rangeInputs = document.querySelectorAll<HTMLInputElement>('.fc-range-picker input');
+    expect(rangeInputs[0]?.value).toBe('A1:E3');
+    destinationPicker?.click();
+    expect(sourcePicker?.dataset.rangePickerActive).toBe('false');
+    expect(destinationPicker?.dataset.rangePickerActive).toBe('true');
+    expect(sourcePicker?.getAttribute('aria-pressed')).toBe('false');
+    expect(destinationPicker?.getAttribute('aria-pressed')).toBe('true');
+    mutators.setActive(store, { sheet: 0, row: 5, col: 2 });
+    rangeInputs = document.querySelectorAll<HTMLInputElement>('.fc-range-picker input');
+    expect(rangeInputs[0]?.value).toBe('A1:E3');
+    expect(rangeInputs[1]?.value).toBe('C6');
+    const cancelButton = Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn')).find(
+      (button) => button.textContent === 'Cancel',
+    );
+    cancelButton?.click();
+    expect(destinationPicker?.dataset.rangePickerActive).toBe('false');
+    expect(
+      document.querySelector('.fc-pivotdlg')?.classList.contains('fc-fmtdlg--range-picking'),
+    ).toBe(false);
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 });
+    handle.open({ placement: 'existing' });
 
     const form = document.querySelector('form');
     expect(form).toBeTruthy();
@@ -163,6 +278,86 @@ describe('attachPivotTableDialog', () => {
     expect(calls).toContain('pivot');
     expect(calls).toContain('grand:true:true');
     expect(document.querySelector('.fc-pivotdlg')?.hasAttribute('hidden')).toBe(true);
+    handle.detach();
+  });
+
+  it('creates a PivotTable on a new worksheet when that placement is selected', () => {
+    const { wb, calls } = makeWb();
+    const store = createSpreadsheetStore();
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 });
+    const handle = attachPivotTableDialog({ host, store, wb, strings: en });
+
+    handle.open();
+    const newSheet = document.querySelector<HTMLInputElement>(
+      'input[name="fc-pivotdlg-destination"][value="new"]',
+    );
+    expect(newSheet).toBeTruthy();
+    newSheet?.click();
+    const rangeInputs = document.querySelectorAll<HTMLInputElement>('.fc-range-picker input');
+    const destinationPicker = document.querySelector<HTMLButtonElement>(
+      '[data-range-picker="pivot-destination"]',
+    );
+    const reason = 'Select Existing worksheet to enter a location.';
+    expect(rangeInputs[0]?.disabled).toBe(false);
+    expect(rangeInputs[1]?.disabled).toBe(true);
+    expect(rangeInputs[1]?.dataset.disabledReason).toBe(reason);
+    expect(rangeInputs[1]?.getAttribute('aria-description')).toBe(reason);
+    expect(rangeInputs[1]?.title).toBe(reason);
+    expect(destinationPicker?.disabled).toBe(true);
+    expect(destinationPicker?.dataset.disabledReason).toBe(reason);
+    expect(destinationPicker?.getAttribute('aria-description')).toBe(reason);
+    expect(destinationPicker?.title).toBe(`Select range\n${reason}`);
+
+    const existingSheet = document.querySelector<HTMLInputElement>(
+      'input[name="fc-pivotdlg-destination"][value="existing"]',
+    );
+    existingSheet?.click();
+    expect(rangeInputs[1]?.disabled).toBe(false);
+    expect(rangeInputs[1]?.dataset.disabledReason).toBeUndefined();
+    expect(rangeInputs[1]?.hasAttribute('aria-description')).toBe(false);
+    expect(rangeInputs[1]?.title).toBe('');
+    expect(destinationPicker?.disabled).toBe(false);
+    expect(destinationPicker?.dataset.disabledReason).toBeUndefined();
+    expect(destinationPicker?.hasAttribute('aria-description')).toBe(false);
+    expect(destinationPicker?.title).toBe('Select range');
+    newSheet?.click();
+
+    const form = document.querySelector('form');
+    expect(form).toBeTruthy();
+    if (!form) throw new Error('missing PivotTable form');
+    form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+
+    expect(calls).toContain('add-sheet');
+    expect(calls).toContain('pivot');
+    expect(store.getState().data.sheetIndex).toBe(1);
+    expect(store.getState().selection.active).toEqual({ sheet: 1, row: 0, col: 0 });
+    handle.detach();
+  });
+
+  it('can open with the new worksheet placement preselected', () => {
+    const { wb } = makeWb();
+    const store = createSpreadsheetStore();
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 });
+    const handle = attachPivotTableDialog({ host, store, wb, strings: en });
+
+    handle.open({ placement: 'new' });
+
+    expect(
+      document.querySelector<HTMLInputElement>('input[name="fc-pivotdlg-destination"]:checked')
+        ?.value,
+    ).toBe('new');
+    const rangeInputs = document.querySelectorAll<HTMLInputElement>('.fc-range-picker input');
+    const destinationPicker = document.querySelector<HTMLButtonElement>(
+      '[data-range-picker="pivot-destination"]',
+    );
+    expect(rangeInputs[1]?.disabled).toBe(true);
+    expect(rangeInputs[1]?.dataset.disabledReason).toBe(
+      'Select Existing worksheet to enter a location.',
+    );
+    expect(destinationPicker?.disabled).toBe(true);
+    expect(destinationPicker?.dataset.disabledReason).toBe(
+      'Select Existing worksheet to enter a location.',
+    );
     handle.detach();
   });
 
@@ -240,6 +435,56 @@ describe('attachPivotTableDialog', () => {
     expect(panel?.textContent).toContain('Field Settings: Sales');
     expect(panel?.textContent).toContain('summarize-by');
     expect(document.activeElement).toBe(panel?.querySelector('select'));
+    handle.detach();
+  });
+
+  it('opens the shared PivotTable filter dialog from a creation filter field', async () => {
+    const { wb } = makeWb();
+    const store = createSpreadsheetStore();
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 4 });
+    const handle = attachPivotTableDialog({ host, store, wb, strings: en });
+
+    handle.open();
+    const segmentField = document.querySelector<HTMLInputElement>(
+      '[data-pivot-field-list-field="Segment"]',
+    );
+    if (!segmentField) throw new Error('missing Segment field checkbox');
+    segmentField.checked = true;
+    segmentField.dispatchEvent(new Event('change', { bubbles: true }));
+    const channelField = document.querySelector<HTMLInputElement>(
+      '[data-pivot-field-list-field="Channel"]',
+    );
+    if (!channelField) throw new Error('missing Channel field checkbox');
+    channelField.checked = true;
+    channelField.dispatchEvent(new Event('change', { bubbles: true }));
+
+    const settings = document.querySelector<HTMLButtonElement>(
+      '.fc-pivotdlg__area-settings[aria-label="Field Settings: Channel"]',
+    );
+    if (!settings) throw new Error('missing filter field settings button');
+    settings.click();
+    const panel = document.querySelector<HTMLElement>('.fc-pivotdlg__area-settings-panel');
+    const filterDialogButton = Array.from(
+      panel?.querySelectorAll<HTMLButtonElement>('button') ?? [],
+    ).find((button) => button.textContent === 'Filter...');
+    expect(filterDialogButton).toBeTruthy();
+    filterDialogButton?.click();
+
+    const dialog = Array.from(
+      document.body.querySelectorAll<HTMLElement>('.fc-pivotdlg[role="dialog"]:not([hidden])'),
+    ).find((el) => el.textContent?.includes('PivotTable Filter: Channel'));
+    expect(dialog?.textContent).toContain('PivotTable Filter: Channel');
+    const condition = dialog?.querySelector<HTMLSelectElement>(
+      'select[data-pivot-filter-condition="true"]',
+    );
+    expect(condition?.value).toBe('none');
+    dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn')?.click();
+    await Promise.resolve();
+    expect(
+      Array.from(document.body.querySelectorAll<HTMLElement>('.fc-pivotdlg[role="dialog"]')).some(
+        (el) => el.textContent?.includes('PivotTable Filter: Channel'),
+      ),
+    ).toBe(false);
     handle.detach();
   });
 
@@ -547,7 +792,10 @@ describe('attachPivotTableDialog', () => {
 
     handle.open();
     expect(document.body.textContent).toContain('does not support PivotTable creation');
-    expect(document.querySelector('.fc-fmtdlg__btn--primary')?.hasAttribute('disabled')).toBe(true);
+    const ok = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+    expect(ok?.hasAttribute('disabled')).toBe(true);
+    expect(ok?.dataset.disabledReason).toBe(en.pivotTableDialog.unsupported);
+    expect(ok?.getAttribute('aria-description')).toBe(en.pivotTableDialog.unsupported);
     expect(document.activeElement?.textContent).toBe('Cancel');
     handle.detach();
   });

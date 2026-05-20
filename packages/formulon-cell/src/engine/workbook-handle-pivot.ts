@@ -639,6 +639,7 @@ function readPivotFilterSpec(
       pivotIndex,
       filterIndex,
     ),
+    valueHighText: pivotFilterString(wb.pivotFilterValueHighText, sheet, pivotIndex, filterIndex),
   };
   const valueKind = pivotFilterNumber(wb.pivotFilterValueKind, sheet, pivotIndex, filterIndex);
   const valueHighKind = pivotFilterNumber(
@@ -675,6 +676,7 @@ function sanitizePivotFilterSpec(
     ...(isPivotFilterValueKind(spec.valueHighKind) ? { valueHighKind: spec.valueHighKind } : {}),
     ...(Number.isFinite(spec.valueHighInt) ? { valueHighInt: spec.valueHighInt } : {}),
     ...(Number.isFinite(spec.valueHighDouble) ? { valueHighDouble: spec.valueHighDouble } : {}),
+    ...(typeof spec.valueHighText === 'string' ? { valueHighText: spec.valueHighText } : {}),
   };
 }
 

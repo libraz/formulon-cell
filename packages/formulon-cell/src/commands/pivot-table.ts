@@ -369,8 +369,8 @@ export interface ExecuteRibbonPivotTableActionDeps {
  *    setActive` have already been applied, the host only needs to mirror its
  *    local active-state cache.
  *  - `report` — show this report dialog to the user (unsupported workbook,
- *    insufficient source data, blocked by structure protection, or engine
- *    refusal to author the pivot).
+ *    insufficient source data, Recommended PivotTables, blocked by structure
+ *    protection, or engine refusal to author the pivot).
  *
  *  Encapsulating the branching here keeps React, Vue, and the playground
  *  shells identical and removes ~100 lines of duplication per host. */
@@ -381,12 +381,22 @@ export const executeRibbonPivotTableAction = (
   if (action === 'dialog' || action === 'existing-sheet') {
     return { kind: 'open-dialog' };
   }
+  if (action === 'recommended') {
+    return {
+      kind: 'report',
+      report: {
+        title: strings.recommendedPivotTables,
+        items: [
+          { severity: 'info', label: strings.pivotTable, detail: strings.pivotAuthoringDetail },
+        ],
+      },
+    };
+  }
   if (!workbook.capabilities.pivotTableMutate) {
     return {
       kind: 'report',
       report: {
-        title:
-          action === 'recommended' ? strings.recommendedPivotTables : strings.pivotTableNewSheet,
+        title: strings.pivotTableNewSheet,
         items: [
           { severity: 'info', label: strings.pivotTable, detail: strings.pivotAuthoringDetail },
         ],
@@ -449,7 +459,7 @@ export const executeRibbonPivotTableAction = (
   return {
     kind: 'report',
     report: {
-      title: action === 'recommended' ? strings.recommendedPivotTables : strings.pivotTableNewSheet,
+      title: strings.pivotTableNewSheet,
       items: [
         { severity: 'info', label: strings.pivotTable, detail: strings.pivotAuthoringDetail },
       ],

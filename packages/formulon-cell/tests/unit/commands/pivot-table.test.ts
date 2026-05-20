@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createPivotTableFromRange,
+  executeRibbonPivotTableAction,
   inferPivotFieldItems,
   inferPivotSourceFields,
 } from '../../../src/commands/pivot-table.js';
@@ -12,6 +13,7 @@ import {
   PivotFilterValueKind,
 } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const blank: CellValue = { kind: 'blank' };
 const text = (value: string): CellValue => ({ kind: 'text', value });
@@ -273,5 +275,39 @@ describe('pivot-table command helpers', () => {
       valueField: 'Sales',
     });
     expect(result).toEqual({ ok: false, reason: 'unsupported' });
+  });
+
+  it('keeps Recommended PivotTables as a report instead of silently creating a pivot', () => {
+    const { wb, calls } = makeWb();
+    const store = createSpreadsheetStore();
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 });
+
+    const result = executeRibbonPivotTableAction({
+      store,
+      workbook: wb,
+      action: 'recommended',
+      strings: {
+        pivotTable: 'PivotTable',
+        pivotTableNewSheet: 'New Worksheet',
+        recommendedPivotTables: 'Recommended PivotTables',
+        pivotAuthoringDetail: 'Recommended PivotTables are not implemented.',
+        workbookStructureProtectedBlocked: 'Workbook structure is protected.',
+      },
+    });
+
+    expect(result).toEqual({
+      kind: 'report',
+      report: {
+        title: 'Recommended PivotTables',
+        items: [
+          {
+            severity: 'info',
+            label: 'PivotTable',
+            detail: 'Recommended PivotTables are not implemented.',
+          },
+        ],
+      },
+    });
+    expect(calls).toEqual([]);
   });
 });

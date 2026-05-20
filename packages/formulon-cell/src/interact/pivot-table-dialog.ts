@@ -9,15 +9,22 @@ import { PivotAggregation, type PivotFilterSpec } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
-import { createDialogShell } from './dialog-shell.js';
+import {
+  appendDialogSelectOptions,
+  createDialogSelect,
+} from '../toolbar/dialogs/form-controls.js';
+import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
+import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
 import {
   type PivotAreaKind,
   type PivotFieldSettingsActive,
   type PivotFilterConditionKind,
   type PivotFilterConditionState,
+  createPivotAreaSettingsButton,
   pivotFilterConditionToSpec,
   renderPivotFieldSettingsPanel,
 } from './pivot-field-settings.js';
+import { attachRangePickerButton } from './range-picker-control.js';
 
 export interface PivotTableDialogDeps {
   host: HTMLElement;
@@ -28,8 +35,12 @@ export interface PivotTableDialogDeps {
   invalidate?: () => void;
 }
 
+export interface PivotTableDialogOpenOptions {
+  placement?: 'new' | 'existing';
+}
+
 export interface PivotTableDialogHandle {
-  open(): void;
+  open(opts?: PivotTableDialogOpenOptions): void;
   close(): void;
   setStrings(next: Strings): void;
   bindWorkbook(next: WorkbookHandle): void;
@@ -63,13 +74,6 @@ const parseCellRef = (input: string): { row: number; col: number } | null => {
   return { row: Number(rows) - 1, col: col - 1 };
 };
 
-const appendOption = (select: HTMLSelectElement, value: string, label: string): void => {
-  const opt = document.createElement('option');
-  opt.value = value;
-  opt.textContent = label;
-  select.appendChild(opt);
-};
-
 export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDialogHandle {
   const { host, store } = deps;
   let wb = deps.wb;
@@ -89,22 +93,34 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     onDismiss: () => close(),
   });
   shell.overlay.classList.add('fc-fmtdlg');
-  shell.panel.classList.add('fc-fmtdlg__panel', 'fc-pivotdlg__panel');
-  const { overlay, panel } = shell;
-
-  const header = document.createElement('div');
-  header.className = 'fc-fmtdlg__header';
-  panel.appendChild(header);
-
-  const body = document.createElement('form');
-  body.className = 'fc-fmtdlg__body fc-pivotdlg__body';
-  panel.appendChild(body);
+  const { overlay } = shell;
+  const frame = appendDialogFrame(shell, {
+    title: '',
+    bodyTag: 'form',
+    panelClasses: ['fc-fmtdlg__panel', 'fc-pivotdlg__panel'],
+    bodyClass: 'fc-fmtdlg__body fc-pivotdlg__body',
+  });
+  const { header, footer } = frame;
+  const body = frame.body as HTMLFormElement;
 
   const sourceInput = document.createElement('input');
   sourceInput.type = 'text';
   sourceInput.className = 'fc-namedlg__input';
   sourceInput.autocomplete = 'off';
   sourceInput.spellcheck = false;
+  const tableRangeInput = document.createElement('input');
+  tableRangeInput.type = 'radio';
+  tableRangeInput.name = 'fc-pivotdlg-source-kind';
+  tableRangeInput.value = 'range';
+  tableRangeInput.checked = true;
+  const externalSourceInput = document.createElement('input');
+  externalSourceInput.type = 'radio';
+  externalSourceInput.name = 'fc-pivotdlg-source-kind';
+  externalSourceInput.value = 'external';
+  projectDisabledState(externalSourceInput, true, strings.pivotTableDialog.externalSourceUnavailable, {
+    describedById: 'fc-pivotdlg-external-unavailable',
+    datasetKey: 'disabledReason',
+  });
   const nameInput = document.createElement('input');
   nameInput.type = 'text';
   nameInput.className = 'fc-namedlg__input';
@@ -115,20 +131,22 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   destInput.className = 'fc-namedlg__input';
   destInput.autocomplete = 'off';
   destInput.spellcheck = false;
-  const rowSelect = document.createElement('select');
-  rowSelect.className = 'fc-fmtdlg__select';
-  const colSelect = document.createElement('select');
-  colSelect.className = 'fc-fmtdlg__select';
-  const filterSelect = document.createElement('select');
-  filterSelect.className = 'fc-fmtdlg__select';
-  const valueSelect = document.createElement('select');
-  valueSelect.className = 'fc-fmtdlg__select';
-  const aggSelect = document.createElement('select');
-  aggSelect.className = 'fc-fmtdlg__select';
-  const rowSortSelect = document.createElement('select');
-  rowSortSelect.className = 'fc-fmtdlg__select';
-  const colSortSelect = document.createElement('select');
-  colSortSelect.className = 'fc-fmtdlg__select';
+  const newWorksheetInput = document.createElement('input');
+  newWorksheetInput.type = 'radio';
+  newWorksheetInput.name = 'fc-pivotdlg-destination';
+  newWorksheetInput.value = 'new';
+  const existingWorksheetInput = document.createElement('input');
+  existingWorksheetInput.type = 'radio';
+  existingWorksheetInput.name = 'fc-pivotdlg-destination';
+  existingWorksheetInput.value = 'existing';
+  existingWorksheetInput.checked = true;
+  const rowSelect = createDialogSelect([], '', { className: 'fc-fmtdlg__select' });
+  const colSelect = createDialogSelect([], '', { className: 'fc-fmtdlg__select' });
+  const filterSelect = createDialogSelect([], '', { className: 'fc-fmtdlg__select' });
+  const valueSelect = createDialogSelect([], '', { className: 'fc-fmtdlg__select' });
+  const aggSelect = createDialogSelect([], '', { className: 'fc-fmtdlg__select' });
+  const rowSortSelect = createDialogSelect([], '', { className: 'fc-fmtdlg__select' });
+  const colSortSelect = createDialogSelect([], '', { className: 'fc-fmtdlg__select' });
   const numberFormatInput = document.createElement('input');
   numberFormatInput.type = 'text';
   numberFormatInput.className = 'fc-namedlg__input';
@@ -153,20 +171,21 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   error.setAttribute('role', 'alert');
   error.hidden = true;
 
-  const footer = document.createElement('div');
-  footer.className = 'fc-fmtdlg__footer';
-  panel.appendChild(footer);
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.className = 'fc-fmtdlg__btn';
-  const okBtn = document.createElement('button');
-  okBtn.type = 'button';
-  okBtn.className = 'fc-fmtdlg__btn fc-fmtdlg__btn--primary';
-  footer.append(cancelBtn, okBtn);
+  const { cancelBtn, okBtn } = appendDialogActions(footer, {
+    cancelLabel: '',
+    okLabel: '',
+  });
 
   const showError = (msg: string): void => {
     error.textContent = msg;
     error.hidden = false;
+  };
+
+  const setOkDisabled = (disabled: boolean, reason: string | null): void => {
+    projectDisabledState(okBtn, disabled, reason, {
+      datasetKey: 'disabledReason',
+      titlePrefix: strings.pivotTableDialog.ok,
+    });
   };
 
   const sheetIndexByName = (name: string): number => {
@@ -186,9 +205,19 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     return { sheet, r0: parsed.r0, c0: parsed.c0, r1: parsed.r1, c1: parsed.c1 };
   };
 
+  const selectedRangeLabel = (): string => rangeLabel(store.getState().selection.range);
+
+  const activeCellLabel = (): string => {
+    const active = store.getState().selection.active;
+    return `${colLetter(active.col)}${active.row + 1}`;
+  };
+
   const fieldSelect = (select: HTMLSelectElement, fields: readonly PivotSourceField[]): void => {
     select.replaceChildren();
-    for (const f of fields) appendOption(select, f.name, f.name);
+    appendDialogSelectOptions(
+      select,
+      fields.map((field) => ({ value: field.name, label: field.name })),
+    );
   };
 
   const optionValues = (select: HTMLSelectElement): Set<string> =>
@@ -376,9 +405,12 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     fields: readonly PivotSourceField[],
   ): void => {
     renderPivotFieldSettingsPanel({
+      host,
       panelEl,
       active: activeFieldSettings,
       strings: strings.pivotTableDialog,
+      okLabel: strings.pageSetup.ok,
+      cancelLabel: strings.pageSetup.cancel,
       fields,
       controls: {
         rowSelect,
@@ -545,11 +577,10 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
           chip.addEventListener('dragend', clearPivotDragData);
           const name = document.createElement('strong');
           name.textContent = value;
-          const settings = document.createElement('button');
-          settings.type = 'button';
-          settings.className = 'fc-pivotdlg__area-settings';
-          settings.textContent = t.fieldSettings;
-          settings.setAttribute('aria-label', t.fieldSettingsFor.replace('{field}', value));
+          const settings = createPivotAreaSettingsButton(
+            t.fieldSettings,
+            t.fieldSettingsFor.replace('{field}', value),
+          );
           settings.addEventListener('click', () => showFieldSettings(kind, value));
           chip.append(name, settings);
           list.appendChild(chip);
@@ -593,6 +624,41 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     row.append(input, document.createTextNode(label));
     return row;
   };
+  const sourceSelection = (): HTMLDivElement => {
+    const wrap = document.createElement('div');
+    wrap.className = 'fc-pivotdlg__source-choice';
+    const legend = document.createElement('span');
+    legend.className = 'fc-pivotdlg__placement-label';
+    legend.textContent = strings.pivotTableDialog.sourceSection;
+    const rangeChoice = checked(strings.pivotTableDialog.tableOrRange, tableRangeInput);
+    const sourceField = labeled(strings.pivotTableDialog.source, sourceInput);
+    sourceField.classList.add('fc-pivotdlg__source-field');
+    const externalChoice = checked(strings.pivotTableDialog.externalSource, externalSourceInput);
+    externalChoice.classList.add('fc-pivotdlg__check--disabled');
+    const externalUnavailable = document.createElement('span');
+    externalUnavailable.id = 'fc-pivotdlg-external-unavailable';
+    externalUnavailable.className = 'fc-pivotdlg__disabled-note';
+    externalUnavailable.textContent = strings.pivotTableDialog.externalSourceUnavailable;
+    projectDisabledReason(externalChoice, strings.pivotTableDialog.externalSourceUnavailable, {
+      ariaDescription: false,
+    });
+    wrap.append(legend, rangeChoice, sourceField, externalChoice, externalUnavailable);
+    return wrap;
+  };
+  const destinationPlacement = (): HTMLDivElement => {
+    const wrap = document.createElement('div');
+    wrap.className = 'fc-pivotdlg__placement';
+    const legend = document.createElement('span');
+    legend.className = 'fc-pivotdlg__placement-label';
+    legend.textContent = strings.pivotTableDialog.destinationSection;
+    wrap.append(
+      legend,
+      checked(strings.pivotTableDialog.newWorksheet, newWorksheetInput),
+      checked(strings.pivotTableDialog.existingWorksheet, existingWorksheetInput),
+      labeled(strings.pivotTableDialog.destination, destInput),
+    );
+    return wrap;
+  };
   const section = (...children: HTMLElement[]): HTMLDivElement => {
     const el = document.createElement('div');
     el.className = 'fc-pivotdlg__section';
@@ -613,19 +679,19 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     const range = rangeFromSourceInput();
     if (!range) {
       showError(t.invalidRange);
-      okBtn.disabled = true;
+      setOkDisabled(true, t.invalidRange);
       return;
     }
     const fields = inferPivotSourceFields(wb, range);
     const numeric = fields.filter((f) => f.numericCount > 0);
     if (!wb.capabilities.pivotTableMutate) {
       showError(t.unsupported);
-      okBtn.disabled = true;
+      setOkDisabled(true, t.unsupported);
       return;
     }
     if (fields.length < 2) {
       showError(t.invalidRange);
-      okBtn.disabled = true;
+      setOkDisabled(true, t.invalidRange);
       return;
     }
     const prevRow = rowSelect.value;
@@ -633,16 +699,18 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     const prevFilters =
       selectedFilterFields.length > 0 ? selectedFilterFields : [filterSelect.value];
     const prevValues = selectedValueFields.length > 0 ? selectedValueFields : [valueSelect.value];
-    okBtn.disabled = false;
+    setOkDisabled(false, null);
     fieldSelect(rowSelect, fields);
     fieldSelect(colSelect, fields);
     fieldSelect(filterSelect, fields);
     fieldSelect(valueSelect, numeric.length > 0 ? numeric : fields);
     for (const select of [colSelect, filterSelect]) {
-      const noneOpt = document.createElement('option');
-      noneOpt.value = '';
-      noneOpt.textContent = t.none;
-      select.insertBefore(noneOpt, select.firstChild);
+      const currentOptions = Array.from(select.options).map((option) => ({
+        value: option.value,
+        label: option.textContent ?? '',
+      }));
+      select.replaceChildren();
+      appendDialogSelectOptions(select, [{ value: '', label: t.none }, ...currentOptions]);
     }
     const rowValues = optionValues(rowSelect);
     const colValues = optionValues(colSelect);
@@ -703,19 +771,23 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     const dest = `${colLetter(range.c0)}${range.r1 + 3}`;
     destInput.value = destInput.value || dest;
     aggSelect.replaceChildren();
-    appendOption(aggSelect, String(PivotAggregation.Sum), t.sum);
-    appendOption(aggSelect, String(PivotAggregation.Count), t.count);
+    appendDialogSelectOptions(aggSelect, [
+      { value: String(PivotAggregation.Sum), label: t.sum },
+      { value: String(PivotAggregation.Count), label: t.count },
+    ]);
     rowSortSelect.replaceChildren();
     colSortSelect.replaceChildren();
     for (const select of [rowSortSelect, colSortSelect]) {
-      appendOption(select, 'none', t.sortNone);
-      appendOption(select, 'asc', t.sortAsc);
-      appendOption(select, 'desc', t.sortDesc);
+      appendDialogSelectOptions(select, [
+        { value: 'none', label: t.sortNone },
+        { value: 'asc', label: t.sortAsc },
+        { value: 'desc', label: t.sortDesc },
+      ]);
     }
 
     body.append(
-      section(labeled(t.source, sourceInput), labeled(t.name, nameInput)),
-      section(labeled(t.destination, destInput)),
+      section(sourceSelection(), labeled(t.name, nameInput)),
+      section(destinationPlacement()),
       fieldList,
       section(
         labeled(t.filtersArea, filterSelect),
@@ -737,7 +809,36 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       ),
       error,
     );
+    attachRangePickerButton(sourceInput, {
+      label: t.rangePickerSelect,
+      getValue: selectedRangeLabel,
+      subscribeToRangeChanges: (listener) => store.subscribe(listener),
+      kind: 'pivot-source',
+    });
+    attachRangePickerButton(destInput, {
+      label: t.rangePickerSelect,
+      getValue: activeCellLabel,
+      subscribeToRangeChanges: (listener) => store.subscribe(listener),
+      kind: 'pivot-destination',
+    });
+    updateDestinationPlacementState();
     configureForSource();
+  };
+
+  const updateDestinationPlacementState = (): void => {
+    const existing = existingWorksheetInput.checked;
+    const reason = existing ? null : strings.pivotTableDialog.destinationRequiresExistingWorksheet;
+    projectDisabledState(destInput, !existing, reason, { datasetKey: 'disabledReason' });
+    const destinationPicker = destInput
+      .closest('.fc-range-picker')
+      ?.querySelector<HTMLButtonElement>('.fc-range-picker__btn');
+    destinationPicker?.toggleAttribute('disabled', !existing);
+    if (destinationPicker) {
+      projectDisabledReason(destinationPicker, reason, {
+        datasetKey: 'disabledReason',
+        titlePrefix: strings.pivotTableDialog.rangePickerSelect,
+      });
+    }
   };
 
   const close = (): void => {
@@ -753,15 +854,25 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       sourceInput.focus();
       return;
     }
-    const dest = parseCellRef(destInput.value);
+    const useNewWorksheet = newWorksheetInput.checked;
+    const dest = useNewWorksheet ? { row: 0, col: 0 } : parseCellRef(destInput.value);
     if (!dest) {
       showError(strings.pivotTableDialog.invalidDestination);
       destInput.focus();
       return;
     }
+    let destinationSheet = range.sheet;
+    if (useNewWorksheet) {
+      const added = wb.addSheet();
+      if (added < 0) {
+        showError(strings.pivotTableDialog.engineFailed);
+        return;
+      }
+      destinationSheet = added;
+    }
     const result = createPivotTableFromRange(wb, {
       source: range,
-      destination: { sheet: range.sheet, row: dest.row, col: dest.col },
+      destination: { sheet: destinationSheet, row: dest.row, col: dest.col },
       name: nameInput.value,
       rowField: rowSelect.value,
       columnField: colSelect.value || undefined,
@@ -784,7 +895,11 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       showError(strings.pivotTableDialog.engineFailed);
       return;
     }
-    mutators.setActive(store, { sheet: range.sheet, row: dest.row, col: dest.col });
+    if (destinationSheet !== store.getState().data.sheetIndex) {
+      mutators.replaceCells(store, wb.cells(destinationSheet));
+      mutators.setSheetIndex(store, destinationSheet);
+    }
+    mutators.setActive(store, { sheet: destinationSheet, row: dest.row, col: dest.col });
     deps.onAfterCreate?.();
     deps.invalidate?.();
     close();
@@ -819,18 +934,28 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   }
   shell.on(filterSelect, 'change', onFilterSelectChange as EventListener);
   shell.on(valueSelect, 'change', onValueSelectChange as EventListener);
+  shell.on(newWorksheetInput, 'change', updateDestinationPlacementState as EventListener);
+  shell.on(existingWorksheetInput, 'change', updateDestinationPlacementState as EventListener);
   shell.on(okBtn, 'click', onOk);
   shell.on(cancelBtn, 'click', close);
   shell.on(overlay, 'keydown', onKey as EventListener);
 
   return {
-    open() {
+    open(opts = {}) {
       sourceInput.value = rangeLabel(store.getState().selection.range);
+      if (opts.placement === 'new') {
+        newWorksheetInput.checked = true;
+        existingWorksheetInput.checked = false;
+      } else {
+        newWorksheetInput.checked = false;
+        existingWorksheetInput.checked = true;
+      }
       render();
       shell.open();
       open = true;
-      const initial = nameInput.isConnected && !okBtn.disabled ? nameInput : cancelBtn;
+      const initial = wb.capabilities.pivotTableMutate && sourceInput.isConnected ? sourceInput : cancelBtn;
       initial.focus({ preventScroll: true });
+      if (initial === sourceInput) sourceInput.select();
     },
     close,
     setStrings(next) {

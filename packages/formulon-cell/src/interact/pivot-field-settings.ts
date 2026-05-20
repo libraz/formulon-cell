@@ -6,6 +6,16 @@ import {
   PivotFilterValueKind,
 } from '../engine/types.js';
 import type { Strings } from '../i18n/strings.js';
+import {
+  appendDialogSelectOptions,
+  createDialogSelect,
+} from '../toolbar/dialogs/form-controls.js';
+import {
+  appendDialogActions,
+  appendDialogFrame,
+  createDialogButton,
+  createDialogShell,
+} from './dialog-shell.js';
 
 export type PivotAreaKind = 'filters' | 'columns' | 'rows' | 'values';
 
@@ -14,13 +24,32 @@ export interface PivotFieldSettingsActive {
   fieldName: string;
 }
 
+export const createPivotAreaSettingsButton = (
+  label: string,
+  ariaLabel = label,
+): HTMLButtonElement => {
+  const button = createDialogButton({ label, baseClass: 'fc-pivotdlg__area-settings' });
+  button.setAttribute('aria-label', ariaLabel);
+  return button;
+};
+
 export type PivotFilterConditionKind =
   | 'none'
+  | 'label-equals'
+  | 'label-does-not-equal'
   | 'label-contains'
+  | 'label-does-not-contain'
   | 'label-begins-with'
+  | 'label-ends-with'
   | 'label-date'
+  | 'date-before'
+  | 'date-after'
+  | 'date-between'
+  | 'value-less-than'
+  | 'value-equals'
   | 'value-greater-than'
   | 'value-between'
+  | 'value-not-between'
   | 'value-top-10';
 
 export type PivotFilterConditionCategory = 'label' | 'value' | 'date';
@@ -42,9 +71,12 @@ interface PivotFieldSettingsControls {
 }
 
 export interface PivotFieldSettingsPanelOptions {
+  host?: HTMLElement;
   panelEl: HTMLDivElement;
   active: PivotFieldSettingsActive | null;
   strings: Strings['pivotTableDialog'];
+  okLabel?: string;
+  cancelLabel?: string;
   fields: readonly PivotSourceField[];
   controls: PivotFieldSettingsControls;
   selectedValueFields: readonly string[];
@@ -60,36 +92,24 @@ export interface PivotFieldSettingsPanelOptions {
   inferFilterItems(fieldName: string): readonly string[];
 }
 
-const appendOption = (select: HTMLSelectElement, value: string, label: string): void => {
-  const opt = document.createElement('option');
-  opt.value = value;
-  opt.textContent = label;
-  select.appendChild(opt);
-};
-
-const appendUnsupportedFilterOption = (
-  select: HTMLSelectElement,
-  value: string,
-  label: string,
-  strings: Strings['pivotTableDialog'],
-): void => {
-  const opt = document.createElement('option');
-  opt.value = value;
-  opt.textContent = `${label} (${strings.filterConditionUnsupportedSuffix})`;
-  opt.disabled = true;
-  opt.dataset.unsupportedPivotFilter = 'true';
-  select.appendChild(opt);
-};
-
 const cloneSelectOptions = (source: HTMLSelectElement, target: HTMLSelectElement): void => {
   target.replaceChildren();
-  for (const option of source.options) appendOption(target, option.value, option.textContent ?? '');
+  appendDialogSelectOptions(
+    target,
+    Array.from(source.options).map((option) => ({
+      value: option.value,
+      label: option.textContent ?? '',
+    })),
+  );
   target.value = source.value;
 };
 
 const fieldSelect = (select: HTMLSelectElement, fields: readonly PivotSourceField[]): void => {
   select.replaceChildren();
-  for (const f of fields) appendOption(select, f.name, f.name);
+  appendDialogSelectOptions(
+    select,
+    fields.map((field) => ({ value: field.name, label: field.name })),
+  );
 };
 
 const settingsFieldRow = (label: string, control: HTMLElement): HTMLLabelElement => {
@@ -131,8 +151,21 @@ export const splitFilterConditionRange = (value: string): [string, string] => {
 export const categoryForFilterCondition = (
   kind: PivotFilterConditionKind,
 ): PivotFilterConditionCategory => {
-  if (kind === 'label-date') return 'date';
-  if (kind === 'value-greater-than' || kind === 'value-between' || kind === 'value-top-10') {
+  if (
+    kind === 'label-date' ||
+    kind === 'date-before' ||
+    kind === 'date-after' ||
+    kind === 'date-between'
+  )
+    return 'date';
+  if (
+    kind === 'value-greater-than' ||
+    kind === 'value-less-than' ||
+    kind === 'value-equals' ||
+    kind === 'value-between' ||
+    kind === 'value-not-between' ||
+    kind === 'value-top-10'
+  ) {
     return 'value';
   }
   return 'label';
@@ -144,77 +177,36 @@ export const appendFilterConditionOptions = (
   strings: Strings['pivotTableDialog'],
 ): void => {
   select.replaceChildren();
-  appendOption(select, 'none', strings.filterConditionNone);
+  const options: Array<{ value: PivotFilterConditionKind; label: string }> = [
+    { value: 'none', label: strings.filterConditionNone },
+  ];
   if (category === 'label') {
-    appendUnsupportedFilterOption(
-      select,
-      'unsupported-label-equals',
-      strings.filterConditionLabelEquals,
-      strings,
-    );
-    appendUnsupportedFilterOption(
-      select,
-      'unsupported-label-does-not-equal',
-      strings.filterConditionLabelDoesNotEqual,
-      strings,
-    );
-    appendOption(select, 'label-contains', strings.filterConditionLabelContains);
-    appendUnsupportedFilterOption(
-      select,
-      'unsupported-label-does-not-contain',
-      strings.filterConditionLabelDoesNotContain,
-      strings,
-    );
-    appendOption(select, 'label-begins-with', strings.filterConditionLabelBeginsWith);
-    appendUnsupportedFilterOption(
-      select,
-      'unsupported-label-ends-with',
-      strings.filterConditionLabelEndsWith,
-      strings,
+    options.push(
+      { value: 'label-equals', label: strings.filterConditionLabelEquals },
+      { value: 'label-does-not-equal', label: strings.filterConditionLabelDoesNotEqual },
+      { value: 'label-contains', label: strings.filterConditionLabelContains },
+      { value: 'label-does-not-contain', label: strings.filterConditionLabelDoesNotContain },
+      { value: 'label-begins-with', label: strings.filterConditionLabelBeginsWith },
+      { value: 'label-ends-with', label: strings.filterConditionLabelEndsWith },
     );
   } else if (category === 'date') {
-    appendOption(select, 'label-date', strings.filterConditionLabelDate);
-    appendUnsupportedFilterOption(
-      select,
-      'unsupported-date-before',
-      strings.filterConditionDateBefore,
-      strings,
-    );
-    appendUnsupportedFilterOption(
-      select,
-      'unsupported-date-after',
-      strings.filterConditionDateAfter,
-      strings,
-    );
-    appendUnsupportedFilterOption(
-      select,
-      'unsupported-date-between',
-      strings.filterConditionDateBetween,
-      strings,
+    options.push(
+      { value: 'label-date', label: strings.filterConditionLabelDate },
+      { value: 'date-before', label: strings.filterConditionDateBefore },
+      { value: 'date-after', label: strings.filterConditionDateAfter },
+      { value: 'date-between', label: strings.filterConditionDateBetween },
     );
   } else {
-    appendOption(select, 'value-greater-than', strings.filterConditionValueGreaterThan);
-    appendUnsupportedFilterOption(
-      select,
-      'unsupported-value-less-than',
-      strings.filterConditionValueLessThan,
-      strings,
+    options.push(
+      { value: 'value-greater-than', label: strings.filterConditionValueGreaterThan },
+      { value: 'value-less-than', label: strings.filterConditionValueLessThan },
+      { value: 'value-equals', label: strings.filterConditionValueEquals },
+      { value: 'value-between', label: strings.filterConditionValueBetween },
+      { value: 'value-not-between', label: strings.filterConditionValueNotBetween },
+      { value: 'value-top-10', label: strings.filterConditionValueTop10 },
     );
-    appendUnsupportedFilterOption(
-      select,
-      'unsupported-value-equals',
-      strings.filterConditionValueEquals,
-      strings,
-    );
-    appendOption(select, 'value-between', strings.filterConditionValueBetween);
-    appendUnsupportedFilterOption(
-      select,
-      'unsupported-value-not-between',
-      strings.filterConditionValueNotBetween,
-      strings,
-    );
-    appendOption(select, 'value-top-10', strings.filterConditionValueTop10);
   }
+  appendDialogSelectOptions(select, options);
 };
 
 const parseFilterNumberRange = (value: string): [number, number] | null => {
@@ -226,6 +218,11 @@ const parseFilterNumberRange = (value: string): [number, number] | null => {
   return [low, high];
 };
 
+const splitFilterDateRange = (value: string): [string, string] => {
+  const parts = value.split(/\s*(?:\.\.|,|–)\s*/);
+  return [parts[0]?.trim() ?? '', parts[1]?.trim() ?? ''];
+};
+
 export const pivotFilterConditionToSpec = (
   fieldName: string,
   condition: PivotFilterConditionState | undefined,
@@ -234,34 +231,80 @@ export const pivotFilterConditionToSpec = (
   if (!condition || condition.kind === 'none') return null;
   const valueText = condition.value.trim();
   if (!valueText) return null;
-  if (condition.kind === 'label-contains' || condition.kind === 'label-begins-with') {
+  if (
+    condition.kind === 'label-equals' ||
+    condition.kind === 'label-does-not-equal' ||
+    condition.kind === 'label-contains' ||
+    condition.kind === 'label-does-not-contain' ||
+    condition.kind === 'label-begins-with' ||
+    condition.kind === 'label-ends-with'
+  ) {
+    const typeByKind: Record<
+      | 'label-equals'
+      | 'label-does-not-equal'
+      | 'label-contains'
+      | 'label-does-not-contain'
+      | 'label-begins-with'
+      | 'label-ends-with',
+      PivotFilterType
+    > = {
+      'label-equals': PivotFilterType.LabelEquals,
+      'label-does-not-equal': PivotFilterType.LabelDoesNotEqual,
+      'label-contains': PivotFilterType.LabelContains,
+      'label-does-not-contain': PivotFilterType.LabelDoesNotContain,
+      'label-begins-with': PivotFilterType.LabelBeginsWith,
+      'label-ends-with': PivotFilterType.LabelEndsWith,
+    };
     return {
       axis,
       fieldName,
-      type:
-        condition.kind === 'label-contains'
-          ? PivotFilterType.LabelContains
-          : PivotFilterType.LabelBeginsWith,
+      type: typeByKind[condition.kind],
       valueKind: PivotFilterValueKind.Text,
       valueText,
     };
   }
-  if (condition.kind === 'label-date') {
+  if (
+    condition.kind === 'label-date' ||
+    condition.kind === 'date-before' ||
+    condition.kind === 'date-after'
+  ) {
+    const type =
+      condition.kind === 'date-before'
+        ? PivotFilterType.DateBefore
+        : condition.kind === 'date-after'
+          ? PivotFilterType.DateAfter
+          : PivotFilterType.LabelDate;
     return {
       axis,
       fieldName,
-      type: PivotFilterType.LabelDate,
+      type,
       valueKind: PivotFilterValueKind.Text,
       valueText,
     };
   }
-  if (condition.kind === 'value-between') {
+  if (condition.kind === 'date-between') {
+    const [lowText, highText] = splitFilterDateRange(valueText);
+    if (!lowText || !highText) return null;
+    return {
+      axis,
+      fieldName,
+      type: PivotFilterType.DateBetween,
+      valueKind: PivotFilterValueKind.Text,
+      valueText: lowText,
+      valueHighKind: PivotFilterValueKind.Text,
+      valueHighText: highText,
+    };
+  }
+  if (condition.kind === 'value-between' || condition.kind === 'value-not-between') {
     const range = parseFilterNumberRange(valueText);
     if (!range) return null;
     return {
       axis,
       fieldName,
-      type: PivotFilterType.ValueBetween,
+      type:
+        condition.kind === 'value-between'
+          ? PivotFilterType.ValueBetween
+          : PivotFilterType.ValueNotBetween,
       valueKind: PivotFilterValueKind.Double,
       valueDouble: range[0],
       valueHighKind: PivotFilterValueKind.Double,
@@ -280,10 +323,16 @@ export const pivotFilterConditionToSpec = (
   }
   const value = Number(valueText);
   if (!Number.isFinite(value)) return null;
+  const singleValueType =
+    condition.kind === 'value-less-than'
+      ? PivotFilterType.ValueLessThan
+      : condition.kind === 'value-equals'
+        ? PivotFilterType.ValueEquals
+        : PivotFilterType.ValueGreaterThan;
   return {
     axis,
     fieldName,
-    type: PivotFilterType.ValueGreaterThan,
+    type: singleValueType,
     valueKind: PivotFilterValueKind.Double,
     valueDouble: value,
   };
@@ -299,10 +348,32 @@ export const pivotFilterSpecToCondition = (
   if (spec.type === PivotFilterType.LabelBeginsWith && spec.valueText) {
     return { kind: 'label-begins-with', value: spec.valueText };
   }
+  if (spec.type === PivotFilterType.LabelEquals && spec.valueText) {
+    return { kind: 'label-equals', value: spec.valueText };
+  }
+  if (spec.type === PivotFilterType.LabelDoesNotEqual && spec.valueText) {
+    return { kind: 'label-does-not-equal', value: spec.valueText };
+  }
+  if (spec.type === PivotFilterType.LabelDoesNotContain && spec.valueText) {
+    return { kind: 'label-does-not-contain', value: spec.valueText };
+  }
+  if (spec.type === PivotFilterType.LabelEndsWith && spec.valueText) {
+    return { kind: 'label-ends-with', value: spec.valueText };
+  }
   if (spec.type === PivotFilterType.LabelDate && spec.valueText) {
     return { kind: 'label-date', value: spec.valueText };
   }
-  if (spec.type === PivotFilterType.ValueBetween) {
+  if (spec.type === PivotFilterType.DateBefore && spec.valueText) {
+    return { kind: 'date-before', value: spec.valueText };
+  }
+  if (spec.type === PivotFilterType.DateAfter && spec.valueText) {
+    return { kind: 'date-after', value: spec.valueText };
+  }
+  if (spec.type === PivotFilterType.DateBetween) {
+    if (!spec.valueText || !spec.valueHighText) return null;
+    return { kind: 'date-between', value: `${spec.valueText}..${spec.valueHighText}` };
+  }
+  if (spec.type === PivotFilterType.ValueBetween || spec.type === PivotFilterType.ValueNotBetween) {
     if (
       typeof spec.valueDouble !== 'number' ||
       typeof spec.valueHighDouble !== 'number' ||
@@ -310,7 +381,10 @@ export const pivotFilterSpecToCondition = (
       !Number.isFinite(spec.valueHighDouble)
     )
       return null;
-    return { kind: 'value-between', value: `${spec.valueDouble}..${spec.valueHighDouble}` };
+    return {
+      kind: spec.type === PivotFilterType.ValueBetween ? 'value-between' : 'value-not-between',
+      value: `${spec.valueDouble}..${spec.valueHighDouble}`,
+    };
   }
   if (spec.type === PivotFilterType.ValueTop10) {
     const value =
@@ -322,6 +396,14 @@ export const pivotFilterSpecToCondition = (
   if (spec.type === PivotFilterType.ValueGreaterThan) {
     if (typeof spec.valueDouble !== 'number' || !Number.isFinite(spec.valueDouble)) return null;
     return { kind: 'value-greater-than', value: String(spec.valueDouble) };
+  }
+  if (spec.type === PivotFilterType.ValueLessThan) {
+    if (typeof spec.valueDouble !== 'number' || !Number.isFinite(spec.valueDouble)) return null;
+    return { kind: 'value-less-than', value: String(spec.valueDouble) };
+  }
+  if (spec.type === PivotFilterType.ValueEquals) {
+    if (typeof spec.valueDouble !== 'number' || !Number.isFinite(spec.valueDouble)) return null;
+    return { kind: 'value-equals', value: String(spec.valueDouble) };
   }
   return null;
 };
@@ -339,6 +421,15 @@ export interface PivotFilterConditionControlsOptions {
   onUserChange?(): void;
 }
 
+export interface PivotFilterDialogOptions {
+  host: HTMLElement;
+  strings: Strings['pivotTableDialog'];
+  fieldName: string;
+  condition?: PivotFilterConditionState;
+  okLabel: string;
+  cancelLabel: string;
+}
+
 const applyDataset = (element: HTMLElement, dataset?: Record<string, string>): void => {
   for (const [key, value] of Object.entries(dataset ?? {})) element.dataset[key] = value;
 };
@@ -349,16 +440,18 @@ export const createPivotFilterConditionControls = (
   const { strings: t } = options;
   const condition = options.condition ?? { kind: 'none', value: '' };
   let currentValue = condition.value;
-  const conditionCategory = document.createElement('select');
-  conditionCategory.className = options.selectClassName;
+  const conditionCategory = createDialogSelect(
+    [
+      { value: 'label', label: t.filterConditionCategoryLabel },
+      { value: 'value', label: t.filterConditionCategoryValue },
+      { value: 'date', label: t.filterConditionCategoryDate },
+    ],
+    categoryForFilterCondition(condition.kind),
+    { className: options.selectClassName },
+  );
   applyDataset(conditionCategory, options.categoryDataset);
-  appendOption(conditionCategory, 'label', t.filterConditionCategoryLabel);
-  appendOption(conditionCategory, 'value', t.filterConditionCategoryValue);
-  appendOption(conditionCategory, 'date', t.filterConditionCategoryDate);
-  conditionCategory.value = categoryForFilterCondition(condition.kind);
 
-  const conditionSelect = document.createElement('select');
-  conditionSelect.className = options.selectClassName;
+  const conditionSelect = createDialogSelect([], '', { className: options.selectClassName });
   applyDataset(conditionSelect, options.conditionDataset);
   appendFilterConditionOptions(
     conditionSelect,
@@ -383,14 +476,17 @@ export const createPivotFilterConditionControls = (
       syncCondition('');
       return;
     }
-    if (kind === 'value-between') {
-      const [lowValue, highValue] = splitFilterConditionRange(currentValue);
+    if (kind === 'value-between' || kind === 'value-not-between' || kind === 'date-between') {
+      const [lowValue, highValue] =
+        kind === 'date-between'
+          ? splitFilterDateRange(currentValue)
+          : splitFilterConditionRange(currentValue);
       const low = document.createElement('input');
-      low.type = 'number';
+      low.type = kind === 'date-between' ? 'date' : 'number';
       low.className = options.valueClassName;
       low.value = lowValue;
       const high = document.createElement('input');
-      high.type = 'number';
+      high.type = kind === 'date-between' ? 'date' : 'number';
       high.className = options.valueClassName;
       high.value = highValue;
       const syncRange = (): void => syncCondition(`${low.value}..${high.value}`);
@@ -410,7 +506,7 @@ export const createPivotFilterConditionControls = (
     const value = document.createElement('input');
     value.className = options.valueClassName;
     value.value = currentValue;
-    if (kind === 'label-date') {
+    if (kind === 'label-date' || kind === 'date-before' || kind === 'date-after') {
       value.type = 'date';
       value.placeholder = 'yyyy-mm-dd';
     } else if (kind === 'value-greater-than') {
@@ -455,6 +551,68 @@ export const createPivotFilterConditionControls = (
   ];
 };
 
+export const showPivotFilterDialog = (
+  options: PivotFilterDialogOptions,
+): Promise<PivotFilterConditionState | null> =>
+  new Promise<PivotFilterConditionState | null>((resolve) => {
+    const title = options.strings.filterDialogTitle.replace('{field}', options.fieldName);
+    let draft: PivotFilterConditionState = options.condition ?? { kind: 'none', value: '' };
+    let done = false;
+    const finish = (result: PivotFilterConditionState | null): void => {
+      if (done) return;
+      done = true;
+      shell.dispose();
+      resolve(result);
+    };
+    const shell = createDialogShell({
+      host: options.host,
+      className: 'fc-pivotdlg',
+      ariaLabel: title,
+      onDismiss: () => finish(null),
+    });
+    shell.overlay.classList.add('fc-fmtdlg');
+    shell.overlay.classList.add('fc-pivotdlg--filter');
+    const { body, footer } = appendDialogFrame(shell, {
+      title,
+      panelClasses: ['fc-fmtdlg__panel', 'fc-pivotdlg__panel'],
+      bodyClass: 'fc-fmtdlg__body fc-pivotdlg__body',
+    });
+    const grid = document.createElement('div');
+    grid.className = 'fc-pivotdlg__settings-grid';
+    grid.append(
+      ...createPivotFilterConditionControls({
+        strings: options.strings,
+        condition: draft,
+        selectClassName: 'fc-fmtdlg__select',
+        valueClassName: 'fc-namedlg__input',
+        valuesContainerClassName: 'fc-pivotdlg__settings-condition-values',
+        categoryDataset: { pivotFilterCategory: 'true' },
+        conditionDataset: { pivotFilterCondition: 'true' },
+        fieldRow: settingsFieldRow,
+        onChange: (condition) => {
+          draft = condition;
+        },
+      }),
+    );
+    body.appendChild(grid);
+    const { cancelBtn: cancel, okBtn: ok } = appendDialogActions(footer, {
+      cancelLabel: options.cancelLabel,
+      okLabel: options.okLabel,
+    });
+    shell.on(cancel, 'click', () => finish(null));
+    shell.on(ok, 'click', () => finish(draft));
+    shell.open();
+    requestAnimationFrame(() => {
+      const category = grid.querySelector<HTMLSelectElement>(
+        'select[data-pivot-filter-category="true"]',
+      );
+      const categoryButton =
+        category?.closest('.fc-select')?.querySelector<HTMLButtonElement>('.fc-select__button') ??
+        category;
+      categoryButton?.focus({ preventScroll: true });
+    });
+  });
+
 export const renderPivotFieldSettingsPanel = (options: PivotFieldSettingsPanelOptions): void => {
   const { panelEl, active, strings: t, fields, controls } = options;
   if (!active) {
@@ -471,8 +629,7 @@ export const renderPivotFieldSettingsPanel = (options: PivotFieldSettingsPanelOp
   settingsControls.className = 'fc-pivotdlg__settings-grid';
 
   if (active.kind === 'rows') {
-    const sort = document.createElement('select');
-    sort.className = 'fc-fmtdlg__select';
+    const sort = createDialogSelect([], '', { className: 'fc-fmtdlg__select' });
     cloneSelectOptions(controls.rowSortSelect, sort);
     sort.addEventListener('change', () => {
       controls.rowSortSelect.value = sort.value;
@@ -488,8 +645,7 @@ export const renderPivotFieldSettingsPanel = (options: PivotFieldSettingsPanelOp
       settingsCheckRow(t.rowSubtotalTop, subtotal),
     );
   } else if (active.kind === 'columns') {
-    const sort = document.createElement('select');
-    sort.className = 'fc-fmtdlg__select';
+    const sort = createDialogSelect([], '', { className: 'fc-fmtdlg__select' });
     cloneSelectOptions(controls.colSortSelect, sort);
     sort.addEventListener('change', () => {
       controls.colSortSelect.value = sort.value;
@@ -505,8 +661,7 @@ export const renderPivotFieldSettingsPanel = (options: PivotFieldSettingsPanelOp
       settingsCheckRow(t.columnSubtotalTop, subtotal),
     );
   } else if (active.kind === 'values') {
-    const aggregation = document.createElement('select');
-    aggregation.className = 'fc-fmtdlg__select';
+    const aggregation = createDialogSelect([], '', { className: 'fc-fmtdlg__select' });
     cloneSelectOptions(controls.aggSelect, aggregation);
     aggregation.addEventListener('change', () => {
       controls.aggSelect.value = aggregation.value;
@@ -524,8 +679,7 @@ export const renderPivotFieldSettingsPanel = (options: PivotFieldSettingsPanelOp
       settingsFieldRow(t.numberFormat, format),
     );
   } else {
-    const filter = document.createElement('select');
-    filter.className = 'fc-fmtdlg__select';
+    const filter = createDialogSelect([], '', { className: 'fc-fmtdlg__select' });
     fieldSelect(
       filter,
       fields.filter(
@@ -558,6 +712,29 @@ export const renderPivotFieldSettingsPanel = (options: PivotFieldSettingsPanelOp
         onChange: (condition) => options.setFilterCondition(active.fieldName, condition),
       }),
     );
+    if (options.host && options.okLabel && options.cancelLabel) {
+      const filterDialogButton = createPivotAreaSettingsButton(t.filterDialog);
+      filterDialogButton.addEventListener('click', () => {
+        void showPivotFilterDialog({
+          host: options.host as HTMLElement,
+          strings: t,
+          fieldName: active.fieldName,
+          condition: options.selectedFilterCondition(active.fieldName),
+          okLabel: options.okLabel as string,
+          cancelLabel: options.cancelLabel as string,
+        }).then((condition) => {
+          if (!condition) return;
+          options.setFilterCondition(active.fieldName, condition);
+          renderPivotFieldSettingsPanel(options);
+        });
+      });
+      const dialogRow = document.createElement('div');
+      dialogRow.className = 'fc-pivotdlg__settings-field';
+      const dialogLabel = document.createElement('span');
+      dialogLabel.textContent = t.filterCondition;
+      dialogRow.append(dialogLabel, filterDialogButton);
+      settingsControls.append(dialogRow);
+    }
 
     const items = options.inferFilterItems(active.fieldName);
     if (items.length > 0) {

@@ -229,7 +229,7 @@ describe('WorkbookHandle PivotTable projection', () => {
 
   it('includes readable PivotTable filter specs in object summaries when engine hooks exist', () => {
     const wb = makeHandle({
-      pivotFilterCount: () => 2,
+      pivotFilterCount: () => 3,
       pivotFilterSpec: (_sheet: number, _pivot: number, filterIdx: number) => {
         if (filterIdx === 0) {
           return {
@@ -240,6 +240,20 @@ describe('WorkbookHandle PivotTable projection', () => {
               type: PivotFilterType.LabelContains,
               valueKind: PivotFilterValueKind.Text,
               valueText: 'East',
+            },
+          };
+        }
+        if (filterIdx === 1) {
+          return {
+            status: ok,
+            spec: {
+              axis: PivotAxis.Page,
+              fieldName: 'Date',
+              type: PivotFilterType.DateBetween,
+              valueKind: PivotFilterValueKind.Text,
+              valueText: '2026-05-01',
+              valueHighKind: PivotFilterValueKind.Text,
+              valueHighText: '2026-05-31',
             },
           };
         }
@@ -254,11 +268,11 @@ describe('WorkbookHandle PivotTable projection', () => {
       },
       pivotFilterAxis: () => ({ status: ok, value: PivotAxis.Value }),
       pivotFilterFieldName: () => ({ status: ok, value: 'Sales' }),
-      pivotFilterType: () => ({ status: ok, value: PivotFilterType.ValueBetween }),
-      pivotFilterValueKind: () => ({ status: ok, value: PivotFilterValueKind.Double }),
-      pivotFilterValueDouble: () => ({ status: ok, value: -10 }),
-      pivotFilterValueHighKind: () => ({ status: ok, value: PivotFilterValueKind.Double }),
-      pivotFilterValueHighDouble: () => ({ status: ok, value: 20 }),
+      pivotFilterType: () => ({ status: ok, value: PivotFilterType.DateBetween }),
+      pivotFilterValueKind: () => ({ status: ok, value: PivotFilterValueKind.Text }),
+      pivotFilterValueText: () => ({ status: ok, value: '2026-06-01' }),
+      pivotFilterValueHighKind: () => ({ status: ok, value: PivotFilterValueKind.Text }),
+      pivotFilterValueHighText: () => ({ status: ok, value: '2026-06-30' }),
     });
 
     expect(wb.getPivotTables()[0]?.pivotFilters).toEqual([
@@ -270,13 +284,22 @@ describe('WorkbookHandle PivotTable projection', () => {
         valueText: 'East',
       },
       {
+        axis: PivotAxis.Page,
+        fieldName: 'Date',
+        type: PivotFilterType.DateBetween,
+        valueKind: PivotFilterValueKind.Text,
+        valueText: '2026-05-01',
+        valueHighKind: PivotFilterValueKind.Text,
+        valueHighText: '2026-05-31',
+      },
+      {
         axis: PivotAxis.Value,
         fieldName: 'Sales',
-        type: PivotFilterType.ValueBetween,
-        valueKind: PivotFilterValueKind.Double,
-        valueDouble: -10,
-        valueHighKind: PivotFilterValueKind.Double,
-        valueHighDouble: 20,
+        type: PivotFilterType.DateBetween,
+        valueKind: PivotFilterValueKind.Text,
+        valueText: '2026-06-01',
+        valueHighKind: PivotFilterValueKind.Text,
+        valueHighText: '2026-06-30',
       },
     ]);
   });

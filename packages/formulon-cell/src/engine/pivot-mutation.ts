@@ -238,6 +238,14 @@ export interface PivotMutationWorkbook extends Workbook {
     status: Status;
     value: number;
   };
+  pivotFilterValueHighText?(
+    sheet: number,
+    pivotIdx: number,
+    filterIdx: number,
+  ): {
+    status: Status;
+    value: string;
+  };
   pivotFilterAdd(sheet: number, pivotIdx: number, spec: PivotFilterSpec): Status;
   pivotFilterClear(sheet: number, pivotIdx: number): Status;
   pivotFilterRemoveAt(sheet: number, pivotIdx: number, filterIdx: number): Status;
