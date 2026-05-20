@@ -1,8 +1,11 @@
+import { type History, recordConditionalRulesChange } from '../commands/history.js';
+import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { type History, recordConditionalRulesChange } from '../commands/history.js';
 import { type ConditionalRule, mutators, type SpreadsheetStore } from '../store/store.js';
-import { createDialogShell } from './dialog-shell.js';
+import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { appendDialogButton, createDialogButton, createDialogShell } from './dialog-shell.js';
 
 export interface CfRulesDialogDeps {
   host: HTMLElement;
@@ -12,11 +15,15 @@ export interface CfRulesDialogDeps {
   /** Reads the active sheet at open time. The dialog scopes its rule list
    *  to a single sheet (the desktop-spreadsheet "Show formatting rules for: This Sheet"). */
   getActiveSheet: () => number;
+  /** Reads the current grid selection for the "Current Selection" scope. */
+  getSelectionRange?: () => Range | null;
   /** Called after a remove / clearAll mutation so the host can repaint the
    *  CF overlay. */
   onChanged?: () => void;
   /** Opens the companion "New Formatting Rule" dialog from Manage Rules. */
   onNewRule?: () => void;
+  /** Opens the companion "Edit Formatting Rule" dialog for session rules. */
+  onEditRule?: (ruleIndex: number) => void;
   /** Optional session-rule source. Rules created by the JS ribbon/Quick
    *  Analysis live in the store rather than the engine, but users expect the
    *  Manage Rules dialog to show the full active-sheet inventory. */
@@ -30,6 +37,12 @@ export interface CfRulesDialogHandle {
   close(): void;
   refresh(): void;
   detach(): void;
+}
+
+function createCfRulesDialogButton(className: string, label: string): HTMLButtonElement {
+  const button = createDialogButton({ label, baseClass: 'fc-cfrulesdlg__btn' });
+  button.className = className;
+  return button;
 }
 
 /** Maps the engine's CF rule type ordinal to a localized display label.
@@ -138,16 +151,25 @@ type ManagedRule =
       source: 'engine';
       index: number;
       priority: string;
-      type: string;
+      rule: string;
+      format: string;
       range: string;
+      stopIfTrue: boolean;
     }
   | {
       source: 'session';
       index: number;
       priority: string;
-      type: string;
+      rule: string;
+      format: string;
       range: string;
+      stopIfTrue: boolean;
     };
+
+const rangesIntersect = (
+  a: Range,
+  b: { firstRow: number; firstCol: number; lastRow: number; lastCol: number },
+): boolean => a.r0 <= b.lastRow && a.r1 >= b.firstRow && a.c0 <= b.lastCol && a.c1 >= b.firstCol;
 
 /**
  * Engine-driven CF rule manager. Lists every rule on the active sheet via
@@ -184,6 +206,41 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   note.textContent = t.note;
   body.appendChild(note);
 
+  const scopeRow = document.createElement('label');
+  scopeRow.className = 'fc-cfrulesdlg__scope';
+  const scopeText = document.createElement('span');
+  scopeText.textContent = t.scopeLabel;
+  const scopeSelect = createDialogSelect(
+    [
+      { value: 'selection', label: t.scopeCurrentSelection },
+      { value: 'worksheet', label: t.scopeThisWorksheet },
+    ],
+    'worksheet',
+    { className: 'fc-cfrulesdlg__scope-select' },
+  );
+  const setScopeOptionLabel = (value: string, label: string): void => {
+    const option = Array.from(scopeSelect.options).find((item) => item.value === value);
+    if (option) option.textContent = label;
+  };
+  scopeRow.append(scopeText, scopeSelect);
+  body.appendChild(scopeRow);
+
+  const commandBar = document.createElement('div');
+  commandBar.className = 'fc-cfrulesdlg__commandbar';
+  body.appendChild(commandBar);
+
+  const makeCommandButton = (className: string, label: string): HTMLButtonElement => {
+    return createCfRulesDialogButton(`fc-cfrulesdlg__cmd ${className}`, label);
+  };
+
+  const newRuleBtn = makeCommandButton('fc-cfrulesdlg__new', t.newRule);
+  const editRuleBtn = makeCommandButton('fc-cfrulesdlg__edit', t.editRule);
+  const duplicateBtn = makeCommandButton('fc-cfrulesdlg__duplicate', t.duplicate);
+  const deleteBtn = makeCommandButton('fc-cfrulesdlg__delete', t.deleteRule);
+  const moveUpBtn = makeCommandButton('fc-cfrulesdlg__move-up', t.moveUp);
+  const moveDownBtn = makeCommandButton('fc-cfrulesdlg__move-down', t.moveDown);
+  commandBar.append(newRuleBtn, editRuleBtn, duplicateBtn, deleteBtn, moveUpBtn, moveDownBtn);
+
   const tableWrap = document.createElement('div');
   tableWrap.className = 'fc-cfrulesdlg__tablewrap';
   body.appendChild(tableWrap);
@@ -198,28 +255,134 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
   footer.className = 'fc-cfrulesdlg__footer';
   panel.appendChild(footer);
 
-  const newRuleBtn = document.createElement('button');
-  newRuleBtn.type = 'button';
-  newRuleBtn.className = 'fc-cfrulesdlg__new';
-  newRuleBtn.textContent = t.newRule;
-  footer.appendChild(newRuleBtn);
+  const clearAllBtn = appendDialogButton(footer, {
+    label: t.clearAll,
+    baseClass: 'fc-cfrulesdlg__clearall',
+  });
 
-  const clearAllBtn = document.createElement('button');
-  clearAllBtn.type = 'button';
-  clearAllBtn.className = 'fc-cfrulesdlg__clearall';
-  clearAllBtn.textContent = t.clearAll;
-  footer.appendChild(clearAllBtn);
-
-  const closeBtn = document.createElement('button');
-  closeBtn.type = 'button';
-  closeBtn.className = 'fc-cfrulesdlg__close';
-  closeBtn.textContent = t.close;
-  footer.appendChild(closeBtn);
+  const closeBtn = appendDialogButton(footer, {
+    label: t.close,
+    baseClass: 'fc-cfrulesdlg__close',
+  });
   let selectedRuleIndex = 0;
+  let currentRules: ManagedRule[] = [];
+
+  const setDisabledState = (
+    button: HTMLElement & { disabled?: boolean },
+    disabled: boolean,
+    reason: string | null,
+  ): void => {
+    projectDisabledState(button, disabled, reason, { datasetKey: 'disabledReason' });
+  };
+
+  const updateCommandState = (): void => {
+    const selected = currentRules[selectedRuleIndex] ?? null;
+    const canEdit = selected?.source === 'session' && !!deps.store && !!deps.onEditRule;
+    const canMutateSession = selected?.source === 'session' && !!deps.store;
+    const engineReadOnlyReason = selected?.source === 'engine' ? t.editUnavailable : null;
+    const noSelectionReason = selected ? null : t.selectRuleActionReason;
+    const mutationUnavailableReason = selected && !deps.store ? t.note : null;
+    setDisabledState(
+      editRuleBtn,
+      !canEdit,
+      noSelectionReason ?? engineReadOnlyReason ?? mutationUnavailableReason,
+    );
+    setDisabledState(
+      duplicateBtn,
+      !canMutateSession,
+      noSelectionReason ?? engineReadOnlyReason ?? mutationUnavailableReason,
+    );
+    setDisabledState(deleteBtn, !selected, t.selectRuleActionReason);
+    const moveUpDisabled = !canMutateSession || selected.index <= 0;
+    setDisabledState(
+      moveUpBtn,
+      moveUpDisabled,
+      !selected
+        ? t.selectRuleActionReason
+        : engineReadOnlyReason ?? mutationUnavailableReason ?? (selected.index <= 0 ? t.moveUpUnavailable : null),
+    );
+    const moveDownDisabled =
+      !canMutateSession ||
+      selected.index >= (deps.store?.getState().conditional.rules.length ?? 0) - 1;
+    setDisabledState(
+      moveDownBtn,
+      moveDownDisabled,
+      !selected
+        ? t.selectRuleActionReason
+        : engineReadOnlyReason ??
+            mutationUnavailableReason ??
+            (selected.index >= (deps.store?.getState().conditional.rules.length ?? 0) - 1
+              ? t.moveDownUnavailable
+              : null),
+    );
+  };
+
+  const removeManagedRule = (managedRule: ManagedRule, visualIndex: number): void => {
+    const wb = getWb();
+    const sheet = getActiveSheet();
+    let changed = false;
+    if (managedRule.source === 'engine') {
+      if (!wb) return;
+      changed = wb.removeConditionalFormatAt(sheet, managedRule.index);
+    } else if (deps.store) {
+      const store = deps.store;
+      recordConditionalRulesChange(deps.history ?? null, store, () => {
+        mutators.removeConditionalRuleAt(store, managedRule.index);
+      });
+      changed = true;
+    }
+    if (changed) {
+      onChanged?.();
+      selectedRuleIndex = Math.min(visualIndex, Math.max(0, currentRules.length - 2));
+      renderTable();
+      requestAnimationFrame(() => focusRuleRow(selectedRuleIndex));
+    }
+  };
+
+  const duplicateManagedRule = (managedRule: ManagedRule, visualIndex: number): void => {
+    if (managedRule.source !== 'session' || !deps.store) return;
+    const store = deps.store;
+    recordConditionalRulesChange(deps.history ?? null, store, () => {
+      store.setState((state) => {
+        const nextRules = [...state.conditional.rules];
+        const source = nextRules[managedRule.index];
+        if (!source) return state;
+        nextRules.splice(managedRule.index + 1, 0, cloneSessionRule(source));
+        return { ...state, conditional: { rules: nextRules } };
+      });
+    });
+    onChanged?.();
+    selectedRuleIndex = visualIndex + 1;
+    renderTable();
+    requestAnimationFrame(() => focusRuleRow(selectedRuleIndex));
+  };
+
+  const moveManagedRule = (managedRule: ManagedRule, visualIndex: number, delta: -1 | 1): void => {
+    if (managedRule.source !== 'session' || !deps.store) return;
+    const store = deps.store;
+    const nextIndex = managedRule.index + delta;
+    if (nextIndex < 0 || nextIndex >= store.getState().conditional.rules.length) return;
+    recordConditionalRulesChange(deps.history ?? null, store, () => {
+      store.setState((state) => {
+        const nextRules = [...state.conditional.rules];
+        const [source] = nextRules.splice(managedRule.index, 1);
+        if (!source) return state;
+        nextRules.splice(nextIndex, 0, source);
+        return { ...state, conditional: { rules: nextRules } };
+      });
+    });
+    onChanged?.();
+    selectedRuleIndex = Math.max(0, Math.min(currentRules.length - 1, visualIndex + delta));
+    renderTable();
+    requestAnimationFrame(() => focusRuleRow(selectedRuleIndex));
+  };
 
   const focusRuleRow = (idx: number): void => {
     const rows = Array.from(tableWrap.querySelectorAll<HTMLTableRowElement>('tbody tr'));
-    if (rows.length === 0) return;
+    if (rows.length === 0) {
+      updateCommandState();
+      return;
+    }
     selectedRuleIndex = (idx + rows.length) % rows.length;
     for (const [rowIdx, row] of rows.entries()) {
       const selected = rowIdx === selectedRuleIndex;
@@ -228,6 +391,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       row.classList.toggle('fc-cfrulesdlg__row--selected', selected);
     }
     rows[selectedRuleIndex]?.focus({ preventScroll: true });
+    updateCommandState();
   };
 
   const onKey = (e: KeyboardEvent): void => {
@@ -242,29 +406,74 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     close();
     deps.onNewRule?.();
   });
+  shell.on(editRuleBtn, 'click', () => {
+    const selected = currentRules[selectedRuleIndex];
+    if (selected?.source !== 'session') return;
+    close();
+    deps.onEditRule?.(selected.index);
+  });
+  shell.on(duplicateBtn, 'click', () => {
+    const selected = currentRules[selectedRuleIndex];
+    if (selected) duplicateManagedRule(selected, selectedRuleIndex);
+  });
+  shell.on(deleteBtn, 'click', () => {
+    const selected = currentRules[selectedRuleIndex];
+    if (selected) removeManagedRule(selected, selectedRuleIndex);
+  });
+  shell.on(moveUpBtn, 'click', () => {
+    const selected = currentRules[selectedRuleIndex];
+    if (selected) moveManagedRule(selected, selectedRuleIndex, -1);
+  });
+  shell.on(moveDownBtn, 'click', () => {
+    const selected = currentRules[selectedRuleIndex];
+    if (selected) moveManagedRule(selected, selectedRuleIndex, 1);
+  });
   shell.on(closeBtn, 'click', () => close());
+  shell.on(scopeSelect, 'change', () => {
+    selectedRuleIndex = 0;
+    renderTable();
+  });
 
   const renderTable = (): void => {
     tableWrap.replaceChildren();
     const wb = getWb();
     const sheet = getActiveSheet();
-    const engineRules = wb?.getConditionalFormats(sheet) ?? [];
+    const scopeSelection = scopeSelect.value === 'selection' ? deps.getSelectionRange?.() : null;
+    const engineRules = (wb?.getConditionalFormats(sheet) ?? [])
+      .map((rule, index) => ({ rule, index }))
+      .filter(
+        ({ rule }) =>
+          !scopeSelection || rule.sqref.some((range) => rangesIntersect(scopeSelection, range)),
+      );
     const sessionRules = (deps.store?.getState().conditional.rules ?? [])
       .map((rule, index) => ({ rule, index }))
-      .filter(({ rule }) => rule.range.sheet === sheet);
+      .filter(
+        ({ rule }) =>
+          rule.range.sheet === sheet &&
+          (!scopeSelection ||
+            rangesIntersect(scopeSelection, {
+              firstRow: rule.range.r0,
+              firstCol: rule.range.c0,
+              lastRow: rule.range.r1,
+              lastCol: rule.range.c1,
+            })),
+      );
     const rules: ManagedRule[] = [
-      ...engineRules.map<ManagedRule>((rule, index) => ({
+      ...engineRules.map<ManagedRule>(({ rule, index }) => ({
         source: 'engine',
         index,
         priority: String(rule.priority),
-        type: ruleTypeLabel(rule.type, t),
+        rule: ruleTypeLabel(rule.type, t),
+        format: ruleTypeLabel(rule.type, t),
         range: formatSqref(rule.sqref),
+        stopIfTrue: rule.stopIfTrue,
       })),
       ...sessionRules.map<ManagedRule>(({ rule, index }, visibleIndex) => ({
         source: 'session',
         index,
         priority: String(engineRules.length + visibleIndex + 1),
-        type: sessionRuleTypeLabel(rule, t),
+        rule: sessionRuleTypeLabel(rule, t),
+        format: sessionRuleTypeLabel(rule, t),
         range: formatSqref([
           {
             firstRow: rule.range.r0,
@@ -273,20 +482,29 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
             lastCol: rule.range.c1,
           },
         ]),
+        stopIfTrue: false,
       })),
     ];
+    currentRules = rules;
     if (rules.length === 0) {
       empty.hidden = false;
-      clearAllBtn.disabled = true;
+      setDisabledState(clearAllBtn, true, t.clearAllRequiresRules);
+      updateCommandState();
       return;
     }
     empty.hidden = true;
-    clearAllBtn.disabled = false;
+    setDisabledState(clearAllBtn, false, null);
     const table = document.createElement('table');
     table.className = 'fc-cfrulesdlg__table';
     const thead = document.createElement('thead');
     const headRow = document.createElement('tr');
-    for (const label of [t.headerPriority, t.headerType, t.headerRange, t.headerActions]) {
+    for (const label of [
+      t.headerRule,
+      t.headerFormat,
+      t.headerAppliesTo,
+      t.headerStopIfTrue,
+      t.headerActions,
+    ]) {
       const th = document.createElement('th');
       th.textContent = label;
       headRow.appendChild(th);
@@ -296,114 +514,87 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     const tbody = document.createElement('tbody');
     rules.forEach((managedRule, index) => {
       const row = document.createElement('tr');
+      row.dataset.ruleSource = managedRule.source;
       row.tabIndex = index === selectedRuleIndex ? 0 : -1;
       row.setAttribute('aria-selected', index === selectedRuleIndex ? 'true' : 'false');
       row.classList.toggle('fc-cfrulesdlg__row--selected', index === selectedRuleIndex);
-      const prio = document.createElement('td');
-      prio.textContent = managedRule.priority;
+      row.classList.toggle('fc-cfrulesdlg__row--readonly', managedRule.source === 'engine');
+      row.addEventListener('click', () => focusRuleRow(index));
       const kind = document.createElement('td');
-      kind.textContent = managedRule.type;
+      kind.className = 'fc-cfrulesdlg__cell-rule';
+      kind.textContent = managedRule.rule;
+      const format = document.createElement('td');
+      format.className = 'fc-cfrulesdlg__cell-format';
+      format.textContent = managedRule.format;
+      if (managedRule.source === 'engine') {
+        const badge = document.createElement('span');
+        badge.className = 'fc-cfrulesdlg__readonly-badge';
+        badge.textContent = t.readOnlyRule;
+        badge.title = t.editUnavailable;
+        badge.setAttribute('aria-label', t.editUnavailable);
+        format.append(' ', badge);
+      }
       const range = document.createElement('td');
       range.className = 'fc-cfrulesdlg__cell-range';
       range.textContent = managedRule.range;
+      const stop = document.createElement('td');
+      stop.className = 'fc-cfrulesdlg__cell-stop';
+      const stopCheckbox = document.createElement('input');
+      stopCheckbox.type = 'checkbox';
+      stopCheckbox.checked = managedRule.stopIfTrue;
+      setDisabledState(stopCheckbox, true, t.stopIfTrueUnavailable);
+      stop.setAttribute('aria-label', t.headerStopIfTrue);
+      stop.appendChild(stopCheckbox);
       const actions = document.createElement('td');
-      const moveUp = document.createElement('button');
-      moveUp.type = 'button';
-      moveUp.className = 'fc-cfrulesdlg__move-up';
-      moveUp.textContent = t.moveUp;
-      moveUp.disabled = managedRule.source !== 'session' || !deps.store || managedRule.index <= 0;
+      actions.className = 'fc-cfrulesdlg__cell-actions';
+      const moveUp = createCfRulesDialogButton('fc-cfrulesdlg__row-move-up', t.moveUp);
+      setDisabledState(
+        moveUp,
+        managedRule.source !== 'session' || !deps.store || managedRule.index <= 0,
+        managedRule.source === 'engine'
+          ? t.editUnavailable
+          : !deps.store
+            ? t.note
+            : managedRule.index <= 0
+              ? t.moveUpUnavailable
+              : null,
+      );
       moveUp.dataset.ruleIndex = String(index);
       moveUp.addEventListener('click', () => {
-        if (managedRule.source !== 'session' || !deps.store || managedRule.index <= 0) return;
-        recordConditionalRulesChange(deps.history ?? null, deps.store, () => {
-          deps.store!.setState((state) => {
-            const nextRules = [...state.conditional.rules];
-            const [source] = nextRules.splice(managedRule.index, 1);
-            if (!source) return state;
-            nextRules.splice(managedRule.index - 1, 0, source);
-            return { ...state, conditional: { rules: nextRules } };
-          });
-        });
-        onChanged?.();
-        selectedRuleIndex = Math.max(0, index - 1);
-        renderTable();
-        requestAnimationFrame(() => focusRuleRow(selectedRuleIndex));
+        moveManagedRule(managedRule, index, -1);
       });
-      const moveDown = document.createElement('button');
-      moveDown.type = 'button';
-      moveDown.className = 'fc-cfrulesdlg__move-down';
-      moveDown.textContent = t.moveDown;
-      moveDown.disabled =
+      const moveDown = createCfRulesDialogButton('fc-cfrulesdlg__row-move-down', t.moveDown);
+      setDisabledState(
+        moveDown,
         managedRule.source !== 'session' ||
-        !deps.store ||
-        managedRule.index >= deps.store.getState().conditional.rules.length - 1;
+          !deps.store ||
+          managedRule.index >= deps.store.getState().conditional.rules.length - 1,
+        managedRule.source === 'engine'
+          ? t.editUnavailable
+          : !deps.store
+            ? t.note
+            : managedRule.index >= deps.store.getState().conditional.rules.length - 1
+              ? t.moveDownUnavailable
+              : null,
+      );
       moveDown.dataset.ruleIndex = String(index);
       moveDown.addEventListener('click', () => {
-        if (
-          managedRule.source !== 'session' ||
-          !deps.store ||
-          managedRule.index >= deps.store.getState().conditional.rules.length - 1
-        ) {
-          return;
-        }
-        recordConditionalRulesChange(deps.history ?? null, deps.store, () => {
-          deps.store!.setState((state) => {
-            const nextRules = [...state.conditional.rules];
-            const [source] = nextRules.splice(managedRule.index, 1);
-            if (!source) return state;
-            nextRules.splice(managedRule.index + 1, 0, source);
-            return { ...state, conditional: { rules: nextRules } };
-          });
-        });
-        onChanged?.();
-        selectedRuleIndex = Math.min(rules.length - 1, index + 1);
-        renderTable();
-        requestAnimationFrame(() => focusRuleRow(selectedRuleIndex));
+        moveManagedRule(managedRule, index, 1);
       });
-      const dup = document.createElement('button');
-      dup.type = 'button';
-      dup.className = 'fc-cfrulesdlg__duplicate';
-      dup.textContent = t.duplicate;
-      dup.disabled = managedRule.source !== 'session' || !deps.store;
+      const dup = createCfRulesDialogButton('fc-cfrulesdlg__row-duplicate', t.duplicate);
+      setDisabledState(
+        dup,
+        managedRule.source !== 'session' || !deps.store,
+        managedRule.source === 'engine' ? t.editUnavailable : !deps.store ? t.note : null,
+      );
       dup.dataset.ruleIndex = String(index);
       dup.addEventListener('click', () => {
-        if (managedRule.source !== 'session' || !deps.store) return;
-        recordConditionalRulesChange(deps.history ?? null, deps.store, () => {
-          deps.store!.setState((state) => {
-            const nextRules = [...state.conditional.rules];
-            const source = nextRules[managedRule.index];
-            if (!source) return state;
-            nextRules.splice(managedRule.index + 1, 0, cloneSessionRule(source));
-            return { ...state, conditional: { rules: nextRules } };
-          });
-        });
-        onChanged?.();
-        selectedRuleIndex = index + 1;
-        renderTable();
-        requestAnimationFrame(() => focusRuleRow(selectedRuleIndex));
+        duplicateManagedRule(managedRule, index);
       });
-      const rm = document.createElement('button');
-      rm.type = 'button';
-      rm.className = 'fc-cfrulesdlg__remove';
-      rm.textContent = t.remove;
+      const rm = createCfRulesDialogButton('fc-cfrulesdlg__remove', t.remove);
       rm.dataset.ruleIndex = String(index);
       rm.addEventListener('click', () => {
-        let changed = false;
-        if (managedRule.source === 'engine') {
-          if (!wb) return;
-          changed = wb.removeConditionalFormatAt(sheet, managedRule.index);
-        } else if (deps.store) {
-          recordConditionalRulesChange(deps.history ?? null, deps.store, () => {
-            mutators.removeConditionalRuleAt(deps.store!, managedRule.index);
-          });
-          changed = true;
-        }
-        if (changed) {
-          onChanged?.();
-          selectedRuleIndex = Math.min(index, Math.max(0, rules.length - 2));
-          renderTable();
-          requestAnimationFrame(() => focusRuleRow(selectedRuleIndex));
-        }
+        removeManagedRule(managedRule, index);
       });
       row.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowDown') {
@@ -427,7 +618,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
         }
       });
       actions.append(moveUp, moveDown, dup, rm);
-      row.append(prio, kind, range, actions);
+      row.append(kind, format, range, stop, actions);
       tbody.appendChild(row);
     });
     table.appendChild(tbody);
@@ -463,16 +654,17 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     resetArmed();
     let changed = wb?.clearConditionalFormats(sheet) ?? false;
     if (deps.store) {
-      recordConditionalRulesChange(deps.history ?? null, deps.store, () => {
-        const before = deps.store!.getState().conditional.rules.length;
-        mutators.clearConditionalRulesInRange(deps.store!, {
+      const store = deps.store;
+      recordConditionalRulesChange(deps.history ?? null, store, () => {
+        const before = store.getState().conditional.rules.length;
+        mutators.clearConditionalRulesInRange(store, {
           sheet,
           r0: 0,
           c0: 0,
           r1: Number.MAX_SAFE_INTEGER,
           c1: Number.MAX_SAFE_INTEGER,
         });
-        changed = changed || deps.store!.getState().conditional.rules.length !== before;
+        changed = changed || store.getState().conditional.rules.length !== before;
       });
     }
     if (changed) {
@@ -483,6 +675,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
 
   const open = (): void => {
     resetArmed();
+    scopeSelect.value = 'worksheet';
     renderTable();
     shell.open();
   };
@@ -499,7 +692,15 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     header.textContent = t.title;
     note.textContent = t.note;
     empty.textContent = t.empty;
+    scopeText.textContent = t.scopeLabel;
+    setScopeOptionLabel('selection', t.scopeCurrentSelection);
+    setScopeOptionLabel('worksheet', t.scopeThisWorksheet);
     newRuleBtn.textContent = t.newRule;
+    editRuleBtn.textContent = t.editRule;
+    duplicateBtn.textContent = t.duplicate;
+    deleteBtn.textContent = t.deleteRule;
+    moveUpBtn.textContent = t.moveUp;
+    moveDownBtn.textContent = t.moveDown;
     closeBtn.textContent = t.close;
     if (!armed) clearAllBtn.textContent = t.clearAll;
     if (!overlay.hidden) renderTable();

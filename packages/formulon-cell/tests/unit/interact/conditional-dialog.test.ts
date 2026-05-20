@@ -1,12 +1,24 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { en, ja } from '../../../src/i18n/strings.js';
+import {
+  appendConditionalApplyFormatControls,
+  attachRangePickerButton,
+  applyPatchToConditionalApplyControls,
+  collectConditionalApplyPatch,
+  updateRangePickerLabel,
+} from '../../../src/index.js';
 import { attachConditionalDialog } from '../../../src/interact/conditional-dialog.js';
 import {
   createSpreadsheetStore,
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const setRange = (
   store: SpreadsheetStore,
@@ -55,6 +67,61 @@ describe('attachConditionalDialog', () => {
     handle.detach();
   });
 
+  it('updates the applies-to range through the shared range picker', () => {
+    setRange(store, 0, 0, 4, 2);
+    const handle = attachConditionalDialog({ host, store, strings: en });
+    handle.open();
+
+    const rangeInput = document.querySelector<HTMLInputElement>(
+      '.fc-conddlg__form input[type="text"]',
+    );
+    const picker = document.querySelector<HTMLButtonElement>(
+      '[data-range-picker="conditional-format-range"]',
+    );
+    expect(rangeInput?.closest('.fc-range-picker')).toBeTruthy();
+    expect(picker?.getAttribute('aria-label')).toBe('Select range');
+
+    picker?.click();
+    expect(picker?.dataset.rangePickerActive).toBe('true');
+    expect(document.querySelector('.fc-conddlg')?.classList.contains('fc-fmtdlg--range-picking')).toBe(
+      true,
+    );
+    setRange(store, 1, 1, 5, 3);
+    expect(rangeInput?.value).toBe('B2:D6');
+
+    handle.close();
+    expect(picker?.dataset.rangePickerActive).toBe('false');
+    expect(document.querySelector('.fc-conddlg')?.classList.contains('fc-fmtdlg--range-picking')).toBe(
+      false,
+    );
+    handle.detach();
+  });
+
+  it('exposes shared range picker controls through the public entrypoint', () => {
+    const input = document.createElement('input');
+    host.appendChild(input);
+
+    const button = attachRangePickerButton(input, {
+      label: 'Select range',
+      getValue: () => 'C3:D4',
+      kind: 'public-range',
+    });
+
+    expect(button.dataset.rangePicker).toBe('public-range');
+    expect(input.closest('.fc-range-picker')).toBeTruthy();
+    button.click();
+    expect(input.value).toBe('C3:D4');
+
+    updateRangePickerLabel(button, 'Pick cells');
+    expect(button.title).toBe('Pick cells');
+    expect(button.getAttribute('aria-label')).toBe('Pick cells');
+
+    const source = readFileSync(join(root, 'src/interact/range-picker-control.ts'), 'utf8');
+    expect(source).toContain("import { createInteractionButton } from './chip-button.js'");
+    expect(source).toContain('const button = createInteractionButton({');
+    expect(source).not.toContain("document.createElement('button')");
+  });
+
   it('localizes conditional format preview sample text', () => {
     const jaHandle = attachConditionalDialog({ host, store, strings: ja });
     jaHandle.open();
@@ -72,6 +139,30 @@ describe('attachConditionalDialog', () => {
       'AaBbCcYyZz',
     );
     enHandle.detach();
+  });
+
+  it('uses shared controls for conditional rule apply format patches', () => {
+    const controls = appendConditionalApplyFormatControls(host, en.conditionalDialog);
+
+    applyPatchToConditionalApplyControls(controls, {
+      fill: '#ffc7ce',
+      color: '#9c0006',
+      bold: true,
+      underline: true,
+    });
+
+    expect(controls.fillToggle.checked).toBe(true);
+    expect(controls.fillInput.value).toBe('#ffc7ce');
+    expect(controls.fontToggle.checked).toBe(true);
+    expect(controls.fontInput.value).toBe('#9c0006');
+    expect(controls.bold.checked).toBe(true);
+    expect(controls.underline.checked).toBe(true);
+    expect(collectConditionalApplyPatch(controls)).toEqual({
+      fill: '#ffc7ce',
+      color: '#9c0006',
+      bold: true,
+      underline: true,
+    });
   });
 
   it('localizes conditional rule summaries in the manager list', () => {
@@ -179,6 +270,53 @@ describe('attachConditionalDialog', () => {
     handle.detach();
   });
 
+  it('edits an existing session rule through the shared rule dialog', () => {
+    const history = new History();
+    mutators.addConditionalRule(store, {
+      kind: 'cell-value',
+      range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+      op: '>',
+      a: 10,
+      apply: { fill: '#ffc7ce', color: '#9c0006' },
+    });
+    const handle = attachConditionalDialog({ host, store, history });
+    handle.open({ mode: 'edit', editIndex: 0 });
+
+    expect(document.querySelector<HTMLElement>('.fc-fmtdlg__header')?.textContent).toBe(
+      ja.conditionalDialog.editRuleTitle,
+    );
+    const rangeInput = document.querySelector<HTMLInputElement>(
+      '.fc-conddlg__form input[type="text"]',
+    );
+    const valueInput = document.querySelector<HTMLInputElement>(
+      '.fc-conddlg__sub input[type="number"]',
+    );
+    expect(rangeInput?.value).toBe('A1:A1');
+    expect(valueInput?.value).toBe('10');
+    if (!rangeInput || !valueInput) throw new Error('missing edit inputs');
+    rangeInput.value = 'B2:B3';
+    valueInput.value = '25';
+
+    document
+      .querySelector<HTMLButtonElement>('.fc-conddlg__addrow .fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(store.getState().conditional.rules).toHaveLength(1);
+    expect(store.getState().conditional.rules[0]).toMatchObject({
+      kind: 'cell-value',
+      range: { sheet: 0, r0: 1, c0: 1, r1: 2, c1: 1 },
+      op: '>',
+      a: 25,
+    });
+    expect(history.undo()).toBe(true);
+    expect(store.getState().conditional.rules[0]).toMatchObject({
+      range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+      a: 10,
+    });
+
+    handle.detach();
+  });
+
   it('accepts a single-cell reference in the applies-to field', () => {
     setRange(store, 0, 0, 4, 2);
     const handle = attachConditionalDialog({ host, store });
@@ -251,20 +389,43 @@ describe('attachConditionalDialog', () => {
     ) as HTMLSelectElement;
     const iconSelect = Array.from(
       document.querySelectorAll<HTMLSelectElement>('.fc-conddlg__form select'),
-    ).find((select) =>
-      Array.from(select.options).some((option) => option.value === 'symbols3'),
-    );
+    ).find((select) => Array.from(select.options).some((option) => option.value === 'symbols3'));
     expect(iconSelect).toBeTruthy();
     expect(Array.from(iconSelect?.options ?? []).some((option) => option.value === 'boxes5')).toBe(
       true,
     );
-    expect(
-      Array.from(kindSelect.options).some((option) => option.value === 'average'),
-    ).toBe(true);
+    expect(Array.from(kindSelect.options).some((option) => option.value === 'average')).toBe(true);
     kindSelect.value = 'data-bar';
     kindSelect.dispatchEvent(new Event('change', { bubbles: true }));
     expect(subs[0]?.hidden).toBe(true);
     expect(subs[2]?.hidden).toBe(false);
+
+    handle.detach();
+  });
+
+  it('renders classic rule selects with the shared option contract', () => {
+    const handle = attachConditionalDialog({ host, store, strings: en });
+    handle.open({ kind: 'icon-set' });
+
+    const selects = Array.from(
+      document.querySelectorAll<HTMLSelectElement>('.fc-conddlg__form select'),
+    );
+    const styleSelect = selects.find((select) =>
+      Array.from(select.options).some((option) => option.value === 'classic'),
+    );
+    const kindSelect = selects.find((select) =>
+      Array.from(select.options).some((option) => option.value === 'cell-value'),
+    );
+    const iconSelect = selects.find((select) =>
+      Array.from(select.options).some((option) => option.value === 'traffic3'),
+    );
+    expect(
+      Array.from(styleSelect?.options ?? [], (option) => [option.value, option.textContent]),
+    ).toEqual([['classic', 'Classic']]);
+    expect(Array.from(kindSelect?.options ?? [], (option) => option.value)).toContain(
+      'date-occurring',
+    );
+    expect(Array.from(iconSelect?.options ?? [], (option) => option.value)).toContain('boxes5');
 
     handle.detach();
   });
@@ -363,7 +524,10 @@ describe('attachConditionalDialog', () => {
     expect(store.getState().conditional.rules[0]).toMatchObject({
       kind: 'color-scale',
       range: { sheet: 0, r0: 0, c0: 1, r1: 5, c1: 1 },
-      thresholds: [{ kind: 'number', value: 10 }, { kind: 'percent', value: 90 }],
+      thresholds: [
+        { kind: 'number', value: 10 },
+        { kind: 'percent', value: 90 },
+      ],
     });
     handle.detach();
   });
@@ -384,7 +548,9 @@ describe('attachConditionalDialog', () => {
     const checks = Array.from(
       document.querySelectorAll<HTMLInputElement>('.fc-conddlg__sub input[type="checkbox"]'),
     );
-    const reverse = checks.find((input) => input.nextElementSibling?.textContent === 'Reverse order');
+    const reverse = checks.find(
+      (input) => input.nextElementSibling?.textContent === 'Reverse order',
+    );
     const iconOnly = checks.find(
       (input) => input.nextElementSibling?.textContent === 'Show icon only',
     );
@@ -397,8 +563,10 @@ describe('attachConditionalDialog', () => {
       ),
     ).filter((input) => !input.closest('label')?.hidden);
     expect(thresholdValues).toHaveLength(2);
-    thresholdValues[0]!.value = '25';
-    thresholdValues[1]!.value = '75';
+    const [firstThreshold, secondThreshold] = thresholdValues;
+    if (!firstThreshold || !secondThreshold) throw new Error('missing icon-set thresholds');
+    firstThreshold.value = '25';
+    secondThreshold.value = '75';
 
     document
       .querySelector<HTMLButtonElement>('.fc-conddlg__addrow .fc-fmtdlg__btn--primary')

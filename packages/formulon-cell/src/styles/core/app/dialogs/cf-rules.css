@@ -53,6 +53,51 @@
     font-size: 12px;
     color: var(--fc-fg-mute);
   }
+  .fc-cfrulesdlg__scope {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .fc-cfrulesdlg__scope-select {
+    min-width: 170px;
+    min-height: 26px;
+    padding: 2px 24px 2px 8px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: 2px;
+    background: var(--fc-bg-elev);
+    color: inherit;
+    font: inherit;
+    font-size: 12px;
+  }
+  .fc-cfrulesdlg__commandbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .fc-cfrulesdlg__cmd {
+    min-height: 27px;
+    padding: 4px 10px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    border-radius: 2px;
+    background: var(--fc-bg-elev);
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+  }
+  .fc-cfrulesdlg__cmd:hover:not(:disabled) {
+    background: var(--fc-bg-rail);
+    border-color: var(--fc-rule-strong, color-mix(in srgb, CanvasText 28%, transparent));
+  }
+  .fc-cfrulesdlg__cmd:disabled {
+    opacity: 0.48;
+    cursor: not-allowed;
+  }
   .fc-cfrulesdlg__empty {
     padding: 24px;
     text-align: center;
@@ -76,9 +121,13 @@
   .fc-cfrulesdlg__table th {
     font-weight: 600;
     color: var(--fc-fg-mute);
+    background: var(--fc-bg-hover);
   }
   .fc-cfrulesdlg__table tbody tr[aria-selected="true"] {
     background: var(--fc-accent-soft, color-mix(in srgb, Highlight 14%, transparent));
+  }
+  .fc-cfrulesdlg__row--readonly {
+    color: color-mix(in srgb, var(--fc-fg, CanvasText) 82%, var(--fc-fg-mute, GrayText));
   }
   .fc-cfrulesdlg__table tbody tr:focus-visible {
     outline: 1px solid var(--fc-accent, Highlight);
@@ -86,11 +135,42 @@
   }
   .fc-cfrulesdlg__cell-range {
     word-break: break-all;
-    max-width: 280px;
+    max-width: 210px;
   }
+  .fc-cfrulesdlg__cell-format {
+    color: var(--fc-fg-mute);
+  }
+  .fc-cfrulesdlg__readonly-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 18px;
+    margin-inline-start: 6px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    border: var(--fc-hairline, 1px) solid
+      var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
+    background: var(--fc-bg-rail);
+    color: var(--fc-fg-mute);
+    font-size: 11px;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .fc-cfrulesdlg__cell-stop {
+    text-align: center;
+    width: 92px;
+  }
+  .fc-cfrulesdlg__cell-actions {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    min-width: 180px;
+  }
+  .fc-cfrulesdlg__row-move-up,
+  .fc-cfrulesdlg__row-move-down,
+  .fc-cfrulesdlg__row-duplicate,
   .fc-cfrulesdlg__remove {
     min-height: 26px;
-    padding: 3px 10px;
+    padding: 3px 8px;
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
     border-radius: 2px;
@@ -100,9 +180,18 @@
     font: inherit;
     font-size: 12px;
   }
+  .fc-cfrulesdlg__row-move-up:hover:not(:disabled),
+  .fc-cfrulesdlg__row-move-down:hover:not(:disabled),
+  .fc-cfrulesdlg__row-duplicate:hover:not(:disabled),
   .fc-cfrulesdlg__remove:hover {
     background: var(--fc-bg-rail);
     border-color: var(--fc-rule-strong, color-mix(in srgb, CanvasText 28%, transparent));
+  }
+  .fc-cfrulesdlg__row-move-up:disabled,
+  .fc-cfrulesdlg__row-move-down:disabled,
+  .fc-cfrulesdlg__row-duplicate:disabled {
+    opacity: 0.48;
+    cursor: not-allowed;
   }
   .fc-cfrulesdlg__footer {
     padding: 10px 16px 12px;
@@ -133,6 +222,11 @@
   }
   .fc-cfrulesdlg__clearall:focus-visible,
   .fc-cfrulesdlg__close:focus-visible,
+  .fc-cfrulesdlg__cmd:focus-visible,
+  .fc-cfrulesdlg__scope-select:focus-visible,
+  .fc-cfrulesdlg__row-move-up:focus-visible,
+  .fc-cfrulesdlg__row-move-down:focus-visible,
+  .fc-cfrulesdlg__row-duplicate:focus-visible,
   .fc-cfrulesdlg__remove:focus-visible {
     outline: 2px solid var(--fc-accent, currentColor);
     outline-offset: 1px;
