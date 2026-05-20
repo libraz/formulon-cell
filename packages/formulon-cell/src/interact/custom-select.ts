@@ -1,3 +1,6 @@
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { createInteractionButton } from './chip-button.js';
+
 const ENHANCED = 'fcCustomSelectEnhanced';
 const HANDLES = new WeakMap<HTMLSelectElement, CustomSelectHandle>();
 
@@ -17,20 +20,14 @@ function selectValue(select: HTMLSelectElement, value: string): void {
   select.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-export function enhanceCustomSelect(select: HTMLSelectElement): CustomSelectHandle | null {
-  if ((select.dataset as DOMStringMap)[ENHANCED] === '1') return null;
-  (select.dataset as DOMStringMap)[ENHANCED] = '1';
-
-  const wrap = document.createElement('span');
-  wrap.className = 'fc-select';
-
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'fc-select__button';
+function createCustomSelectButton(select: HTMLSelectElement): HTMLButtonElement {
+  const button = createInteractionButton({
+    className: 'fc-select__button',
+    role: 'combobox',
+    ariaLabel: select.getAttribute('aria-label') ?? '',
+  });
   button.setAttribute('aria-haspopup', 'listbox');
   button.setAttribute('aria-expanded', 'false');
-  button.setAttribute('role', 'combobox');
-  button.setAttribute('aria-label', select.getAttribute('aria-label') ?? '');
 
   const value = document.createElement('span');
   value.className = 'fc-select__value';
@@ -38,6 +35,32 @@ export function enhanceCustomSelect(select: HTMLSelectElement): CustomSelectHand
   arrow.className = 'fc-select__arrow';
   arrow.setAttribute('aria-hidden', 'true');
   button.append(value, arrow);
+  return button;
+}
+
+function createCustomSelectOptionRow(opt: HTMLOptionElement): HTMLButtonElement {
+  const row = createInteractionButton({
+    className: 'fc-select__option',
+    role: 'option',
+    dataset: { value: opt.value },
+    text: opt.textContent ?? '',
+  });
+  projectDisabledState(row, opt.disabled, opt.dataset.disabledReason ?? null, {
+    datasetKey: 'disabledReason',
+  });
+  return row;
+}
+
+export function enhanceCustomSelect(select: HTMLSelectElement): CustomSelectHandle | null {
+  if ((select.dataset as DOMStringMap)[ENHANCED] === '1') return null;
+  (select.dataset as DOMStringMap)[ENHANCED] = '1';
+
+  const wrap = document.createElement('span');
+  wrap.className = 'fc-select';
+
+  const button = createCustomSelectButton(select);
+  const value = button.querySelector<HTMLElement>('.fc-select__value');
+  if (!value) return null;
 
   const list = document.createElement('div');
   list.className = 'fc-select__list';
@@ -93,13 +116,7 @@ export function enhanceCustomSelect(select: HTMLSelectElement): CustomSelectHand
   function renderOptions(): void {
     list.replaceChildren();
     for (const [i, opt] of options().entries()) {
-      const row = document.createElement('button');
-      row.type = 'button';
-      row.className = 'fc-select__option';
-      row.setAttribute('role', 'option');
-      row.dataset.value = opt.value;
-      row.textContent = opt.textContent;
-      row.disabled = opt.disabled;
+      const row = createCustomSelectOptionRow(opt);
       row.addEventListener('click', () => {
         selectValue(select, opt.value);
         activeIndex = i;
