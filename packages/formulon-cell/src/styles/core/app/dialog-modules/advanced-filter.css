@@ -1,0 +1,47 @@
+@layer fc.app {
+  .fc-advfilter__ranges {
+    display: grid;
+    gap: 8px;
+    min-width: min(460px, calc(100vw - 72px));
+    padding: 8px;
+    border: 1px solid var(--fc-fmtdlg-input-border, transparent);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--fc-fmtdlg-input-bg) 84%, transparent);
+  }
+
+  .fc-advfilter__row {
+    display: grid;
+    grid-template-columns: minmax(130px, 0.8fr) minmax(180px, 1.2fr);
+    gap: 8px;
+    align-items: center;
+  }
+
+  .fc-advfilter__row > span {
+    color: var(--fc-fmtdlg-panel-fg, CanvasText);
+    font-size: 12px;
+  }
+
+  .fc-advfilter__row .fc-range-picker,
+  .fc-advfilter__row > input {
+    min-width: 0;
+  }
+
+  .fc-advfilter__option {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px;
+    align-items: center;
+    min-width: min(460px, calc(100vw - 72px));
+  }
+
+  @media (max-width: 520px) {
+    .fc-advfilter__ranges,
+    .fc-advfilter__option {
+      min-width: 0;
+    }
+
+    .fc-advfilter__row {
+      grid-template-columns: 1fr;
+    }
+  }
+}

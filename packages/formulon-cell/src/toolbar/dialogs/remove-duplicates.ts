@@ -1,9 +1,12 @@
 import {
   appendDialogActions,
+  appendDialogButton,
   appendErrorRow,
+  clearDialogError,
   createDialogShell,
   installDialogLifecycle,
   mountDialog,
+  showDialogError,
 } from './shell.js';
 import type { SortDialogColumn } from './sort.js';
 
@@ -17,8 +20,8 @@ export interface RemoveDuplicatesDialogOptions {
   columns: readonly SortDialogColumn[];
   initialColumns: readonly string[];
   initialHasHeader: boolean;
-  okLabel?: string;
-  cancelLabel?: string;
+  okLabel: string;
+  cancelLabel: string;
 }
 
 export interface RemoveDuplicatesDialogResult {
@@ -30,10 +33,10 @@ export const showRemoveDuplicatesDialog = (
   opts: RemoveDuplicatesDialogOptions,
 ): Promise<RemoveDuplicatesDialogResult | null> =>
   new Promise<RemoveDuplicatesDialogResult | null>((resolve) => {
-    const shell = createDialogShell({ title: opts.title });
+    const shell = createDialogShell({ title: opts.title, bodyVariant: 'app' });
 
     const headerRow = document.createElement('label');
-    headerRow.className = 'fc-fmtdlg__row app__dlg__label';
+    headerRow.className = 'fc-fmtdlg__row app__dlg__label fc-dedupedlg__header';
     const hasHeader = document.createElement('input');
     hasHeader.type = 'checkbox';
     hasHeader.checked = opts.initialHasHeader;
@@ -41,43 +44,43 @@ export const showRemoveDuplicatesDialog = (
     shell.body.appendChild(headerRow);
 
     const actionRow = document.createElement('div');
-    actionRow.className = 'fc-fmtdlg__row';
-    const selectAllBtn = document.createElement('button');
-    selectAllBtn.type = 'button';
-    selectAllBtn.className = 'fc-fmtdlg__btn';
-    selectAllBtn.textContent = opts.selectAllLabel;
-    const unselectAllBtn = document.createElement('button');
-    unselectAllBtn.type = 'button';
-    unselectAllBtn.className = 'fc-fmtdlg__btn';
-    unselectAllBtn.textContent = opts.unselectAllLabel;
-    actionRow.append(selectAllBtn, unselectAllBtn);
+    actionRow.className = 'fc-dedupedlg__actions';
+    const selectAllBtn = appendDialogButton(actionRow, { label: opts.selectAllLabel });
+    const unselectAllBtn = appendDialogButton(actionRow, { label: opts.unselectAllLabel });
     shell.body.appendChild(actionRow);
 
     const fieldset = document.createElement('fieldset');
-    fieldset.className = 'fc-fmtdlg__row fc-fmtdlg__row--block';
+    fieldset.className = 'fc-dedupedlg__columns';
     const legend = document.createElement('legend');
-    legend.className = 'app__dlg__label';
+    legend.className = 'fc-dedupedlg__legend';
     legend.textContent = opts.columnsLabel;
     fieldset.appendChild(legend);
+    const list = document.createElement('div');
+    list.className = 'fc-dedupedlg__column-list';
+    list.setAttribute('role', 'group');
+    list.setAttribute('aria-label', opts.columnsLabel);
+    fieldset.appendChild(list);
     const checks: HTMLInputElement[] = [];
     const initialColumns = new Set(opts.initialColumns);
     for (const item of opts.columns) {
       const label = document.createElement('label');
-      label.className = 'app__dlg__label';
+      label.className = 'fc-dedupedlg__column';
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.value = item.value;
       checkbox.checked = initialColumns.has(item.value);
       checks.push(checkbox);
-      label.append(checkbox, document.createTextNode(` ${item.label}`));
-      fieldset.appendChild(label);
+      const text = document.createElement('span');
+      text.textContent = item.label;
+      label.append(checkbox, text);
+      list.appendChild(label);
     }
     shell.body.appendChild(fieldset);
 
     const errorRow = appendErrorRow(shell.body);
     const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
-      cancelLabel: opts.cancelLabel ?? 'Cancel',
-      okLabel: opts.okLabel ?? 'OK',
+      cancelLabel: opts.cancelLabel,
+      okLabel: opts.okLabel,
     });
 
     const lifecycle = installDialogLifecycle<RemoveDuplicatesDialogResult | null>({
@@ -91,15 +94,14 @@ export const showRemoveDuplicatesDialog = (
         .filter((checkbox) => checkbox.checked)
         .map((checkbox) => checkbox.value);
       if (selected.length === 0) {
-        errorRow.textContent = opts.noColumnsLabel;
-        errorRow.hidden = false;
+        showDialogError(errorRow, opts.noColumnsLabel);
         return;
       }
       lifecycle.finish({ columns: selected, hasHeader: hasHeader.checked });
     };
     selectAllBtn.addEventListener('click', () => {
       for (const checkbox of checks) checkbox.checked = true;
-      errorRow.hidden = true;
+      clearDialogError(errorRow);
     });
     unselectAllBtn.addEventListener('click', () => {
       for (const checkbox of checks) checkbox.checked = false;

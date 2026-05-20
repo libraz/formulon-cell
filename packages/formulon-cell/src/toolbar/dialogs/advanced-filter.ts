@@ -6,6 +6,7 @@ import {
   mountDialog,
   showInputError,
 } from './shell.js';
+import { attachRangePickerButton } from '../../interact/range-picker-control.js';
 
 export interface AdvancedFilterDialogOptions {
   title: string;
@@ -14,11 +15,16 @@ export interface AdvancedFilterDialogOptions {
   copyToLabel: string;
   uniqueOnlyLabel: string;
   initialListRange: string;
-  okLabel?: string;
-  cancelLabel?: string;
-  validateListRange: (value: string) => string | null;
-  validateCriteriaRange: (value: string) => string | null;
-  validateCopyTo: (value: string) => string | null;
+  initialCriteriaRange?: string;
+  initialCopyTo?: string;
+  okLabel: string;
+  cancelLabel: string;
+  rangePickerLabel?: string;
+  pickRange?: () => string;
+  pickAddress?: () => string;
+  subscribeToRangeChanges?: (listener: () => void) => () => void;
+  validateRange: (value: string) => string | null;
+  validateAddress: (value: string) => string | null;
 }
 
 export interface AdvancedFilterDialogResult {
@@ -28,45 +34,90 @@ export interface AdvancedFilterDialogResult {
   uniqueOnly: boolean;
 }
 
+const appendTextRow = (
+  parent: HTMLElement,
+  labelText: string,
+  initial: string,
+  className: string,
+): HTMLInputElement => {
+  const label = document.createElement('label');
+  label.className = `fc-advfilter__row app__dlg__label ${className}`;
+  const span = document.createElement('span');
+  span.textContent = labelText;
+  const input = document.createElement('input');
+  input.className = 'fc-namedlg__input';
+  input.type = 'text';
+  input.value = initial;
+  label.append(span, input);
+  parent.appendChild(label);
+  return input;
+};
+
 export const showAdvancedFilterDialog = (
   opts: AdvancedFilterDialogOptions,
 ): Promise<AdvancedFilterDialogResult | null> =>
   new Promise<AdvancedFilterDialogResult | null>((resolve) => {
     const shell = createDialogShell({ title: opts.title, bodyVariant: 'app' });
 
-    const makeInput = (labelText: string, value = ''): HTMLInputElement => {
-      const row = document.createElement('div');
-      row.className = 'fc-fmtdlg__row fc-fmtdlg__row--block';
-      const label = document.createElement('label');
-      label.className = 'app__dlg__label';
-      label.textContent = labelText;
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.className = 'app__dlg__input';
-      input.value = value;
-      label.appendChild(input);
-      row.appendChild(label);
-      shell.body.appendChild(row);
-      return input;
-    };
+    const rangeGroup = document.createElement('div');
+    rangeGroup.className = 'fc-advfilter__ranges';
+    shell.body.appendChild(rangeGroup);
 
-    const listInput = makeInput(opts.listRangeLabel, opts.initialListRange);
-    const criteriaInput = makeInput(opts.criteriaRangeLabel);
-    const copyInput = makeInput(opts.copyToLabel);
+    const listRange = appendTextRow(
+      rangeGroup,
+      opts.listRangeLabel,
+      opts.initialListRange,
+      'fc-advfilter__row--list',
+    );
+    if (opts.rangePickerLabel && opts.pickRange) {
+      attachRangePickerButton(listRange, {
+        label: opts.rangePickerLabel,
+        getValue: opts.pickRange,
+        subscribeToRangeChanges: opts.subscribeToRangeChanges,
+        kind: 'advanced-filter-list-range',
+      });
+    }
+    const criteriaRange = appendTextRow(
+      rangeGroup,
+      opts.criteriaRangeLabel,
+      opts.initialCriteriaRange ?? '',
+      'fc-advfilter__row--criteria',
+    );
+    if (opts.rangePickerLabel && opts.pickRange) {
+      attachRangePickerButton(criteriaRange, {
+        label: opts.rangePickerLabel,
+        getValue: opts.pickRange,
+        subscribeToRangeChanges: opts.subscribeToRangeChanges,
+        kind: 'advanced-filter-criteria-range',
+      });
+    }
+    const copyTo = appendTextRow(
+      rangeGroup,
+      opts.copyToLabel,
+      opts.initialCopyTo ?? '',
+      'fc-advfilter__row--copy-to',
+    );
+    const pickCopyTo = opts.pickAddress ?? opts.pickRange;
+    if (opts.rangePickerLabel && pickCopyTo) {
+      attachRangePickerButton(copyTo, {
+        label: opts.rangePickerLabel,
+        getValue: pickCopyTo,
+        subscribeToRangeChanges: opts.subscribeToRangeChanges,
+        kind: 'advanced-filter-copy-to',
+      });
+    }
 
-    const uniqueLabel = document.createElement('label');
-    uniqueLabel.className = 'fc-fmtdlg__check app__dlg__check';
-    const uniqueInput = document.createElement('input');
-    uniqueInput.type = 'checkbox';
-    const uniqueText = document.createElement('span');
-    uniqueText.textContent = opts.uniqueOnlyLabel;
-    uniqueLabel.append(uniqueInput, uniqueText);
-    shell.body.appendChild(uniqueLabel);
+    const uniqueRow = document.createElement('label');
+    uniqueRow.className = 'fc-advfilter__option app__dlg__label';
+    const uniqueOnly = document.createElement('input');
+    uniqueOnly.type = 'checkbox';
+    uniqueRow.append(uniqueOnly, document.createTextNode(` ${opts.uniqueOnlyLabel}`));
+    shell.body.appendChild(uniqueRow);
 
     const errorRow = appendErrorRow(shell.body);
     const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
-      cancelLabel: opts.cancelLabel ?? 'Cancel',
-      okLabel: opts.okLabel ?? 'OK',
+      cancelLabel: opts.cancelLabel,
+      okLabel: opts.okLabel,
     });
 
     const lifecycle = installDialogLifecycle<AdvancedFilterDialogResult | null>({
@@ -75,32 +126,33 @@ export const showAdvancedFilterDialog = (
       onCancel: () => null,
       onSubmit: () => onOk(),
     });
+
     const onOk = (): void => {
-      const listRange = listInput.value.trim();
-      const criteriaRange = criteriaInput.value.trim();
-      const copyTo = copyInput.value.trim();
-      const listError = opts.validateListRange(listRange);
+      const listError = opts.validateRange(listRange.value);
+      const criteriaError = opts.validateRange(criteriaRange.value);
+      const copyError = copyTo.value.trim() ? opts.validateAddress(copyTo.value) : null;
       if (listError) {
-        showInputError(errorRow, listInput, listError);
+        showInputError(errorRow, listRange, listError);
         return;
       }
-      const criteriaError = opts.validateCriteriaRange(criteriaRange);
       if (criteriaError) {
-        showInputError(errorRow, criteriaInput, criteriaError);
+        showInputError(errorRow, criteriaRange, criteriaError);
         return;
       }
-      const copyError = opts.validateCopyTo(copyTo);
       if (copyError) {
-        showInputError(errorRow, copyInput, copyError);
+        showInputError(errorRow, copyTo, copyError);
         return;
       }
-      lifecycle.finish({ listRange, criteriaRange, copyTo, uniqueOnly: uniqueInput.checked });
+      lifecycle.finish({
+        listRange: listRange.value.trim(),
+        criteriaRange: criteriaRange.value.trim(),
+        copyTo: copyTo.value.trim(),
+        uniqueOnly: uniqueOnly.checked,
+      });
     };
+
     okBtn.addEventListener('click', onOk);
     cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
-    mountDialog(shell, () => {
-      listInput.focus();
-      listInput.select();
-    });
+    mountDialog(shell, listRange);
   });
