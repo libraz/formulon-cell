@@ -138,12 +138,39 @@ export const appendDialogActions = (
   return { cancelBtn, okBtn };
 };
 
+export interface DialogChoiceButtonOptions {
+  label: string;
+  className?: string;
+  title?: string;
+  ariaLabel?: string;
+}
+
+export const createDialogChoiceButton = (
+  opts: DialogChoiceButtonOptions,
+): HTMLButtonElement => {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = opts.className ?? 'app__cf-choice';
+  button.textContent = opts.label;
+  if (opts.title) button.title = opts.title;
+  button.setAttribute('aria-label', opts.ariaLabel ?? opts.label);
+  return button;
+};
+
 export interface DialogLifecycleHooks<T> {
   shell: DialogShell;
   resolve: (value: T) => void;
   onSubmit?: () => void;
   onCancel: () => T;
 }
+
+type DialogCanceller = () => void;
+
+const activeDialogCancellers = new Set<DialogCanceller>();
+
+export const cancelOpenAppDialogs = (): void => {
+  for (const cancel of Array.from(activeDialogCancellers)) cancel();
+};
 
 /** Wires up the common close/keyboard flow. Returns a `finish` closure that
  *  cleans up listeners, restores focus, removes the overlay, and resolves
@@ -156,9 +183,13 @@ export const installDialogLifecycle = <T>(
 } => {
   const { shell, resolve, onSubmit, onCancel } = hooks;
   let done = false;
+  const cancel = (): void => {
+    finish(onCancel());
+  };
   const finish = (value: T): void => {
     if (done) return;
     done = true;
+    activeDialogCancellers.delete(cancel);
     shell.overlay.removeEventListener('keydown', onKey);
     restoreDialogFocus(shell.overlay, shell.opener);
     shell.overlay.remove();
@@ -179,6 +210,7 @@ export const installDialogLifecycle = <T>(
     if (event.target === shell.overlay) finish(onCancel());
   });
   shell.overlay.addEventListener('keydown', onKey);
+  activeDialogCancellers.add(cancel);
   return { finish, onKey };
 };
 
@@ -235,13 +267,53 @@ export const appendErrorRow = (body: HTMLElement): HTMLDivElement => {
   return errorRow;
 };
 
+export const focusAndSelectInput = (input: HTMLInputElement): void => {
+  input.focus({ preventScroll: true });
+  input.select();
+};
+
+export const showDialogError = (errorRow: HTMLElement, message: string): void => {
+  errorRow.textContent = message;
+  errorRow.hidden = false;
+};
+
+export const clearDialogError = (errorRow: HTMLElement): void => {
+  errorRow.hidden = true;
+  errorRow.textContent = '';
+};
+
 export const showInputError = (
   errorRow: HTMLElement,
   input: HTMLInputElement,
   message: string,
 ): void => {
-  errorRow.textContent = message;
-  errorRow.hidden = false;
-  input.focus();
-  input.select();
+  showDialogError(errorRow, message);
+  focusAndSelectInput(input);
+};
+
+export interface DialogNameField {
+  input: HTMLInputElement;
+  focus: () => void;
+  valueOrError: (errorRow: HTMLElement, message: string) => string | null;
+}
+
+export const appendDialogNameField = (
+  body: HTMLElement,
+  labelText: string,
+  initial: string,
+): DialogNameField => {
+  const input = appendInputRow(body, labelText, { initial });
+  input.dataset.dialogField = 'name';
+  return {
+    input,
+    focus: () => focusAndSelectInput(input),
+    valueOrError: (errorRow, message) => {
+      const value = input.value.trim();
+      if (!value) {
+        showInputError(errorRow, input, message);
+        return null;
+      }
+      return value;
+    },
+  };
 };

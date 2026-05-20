@@ -43,6 +43,87 @@ export interface DialogShell {
   isOpen(): boolean;
 }
 
+export interface DialogFrameOptions {
+  title: string;
+  bodyTag?: 'div' | 'form';
+  panelClasses?: readonly string[];
+  headerClass?: string;
+  bodyClass?: string;
+  footerClass?: string;
+}
+
+export interface DialogFrame {
+  header: HTMLDivElement;
+  body: HTMLDivElement | HTMLFormElement;
+  footer: HTMLDivElement;
+}
+
+export interface DialogButtonOptions {
+  label: string;
+  variant?: 'primary' | 'secondary';
+  baseClass?: string;
+  primaryClass?: string;
+  secondaryClass?: string;
+}
+
+export interface DialogIconButtonOptions {
+  label: string;
+  ariaLabel: string;
+  baseClass: string;
+  title?: string;
+  html?: string;
+}
+
+export interface DialogTabPairOptions {
+  id: string;
+  label: string;
+  tabId: string;
+  panelId: string;
+  tabClass?: string;
+  panelClass?: string;
+  tabDatasetKey?: string;
+  panelDatasetKey?: string;
+}
+
+export interface DialogTabPair {
+  button: HTMLButtonElement;
+  panel: HTMLDivElement;
+}
+
+export interface DialogOptionButtonOptions {
+  label: string;
+  baseClass: string;
+  datasetKey: string;
+  value: string;
+  selected?: boolean;
+  extraClass?: string;
+}
+
+export interface DialogToggleButtonOptions {
+  label: string;
+  baseClass: string;
+  pressed?: boolean;
+  title?: string;
+  datasetKey?: string;
+  value?: string;
+  extraClass?: string;
+}
+
+export function focusAndSelectInput(input: HTMLInputElement | HTMLTextAreaElement): void {
+  input.focus({ preventScroll: true });
+  input.select();
+}
+
+export function showDialogError(errorRow: HTMLElement, message: string): void {
+  errorRow.textContent = message;
+  errorRow.hidden = false;
+}
+
+export function clearDialogError(errorRow: HTMLElement): void {
+  errorRow.hidden = true;
+  errorRow.textContent = '';
+}
+
 interface BoundListener {
   target: EventTarget;
   event: string;
@@ -214,6 +295,7 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
         !overlay.hidden &&
         !!restoreFocusEl &&
         (overlay.contains(document.activeElement) || document.activeElement === document.body);
+      overlay.dispatchEvent(new CustomEvent('fc-range-picker-stop-all'));
       overlay.hidden = true;
       if (shouldRestore) {
         restoreFocusEl?.focus({ preventScroll: true });
@@ -240,4 +322,144 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
       return !overlay.hidden;
     },
   };
+}
+
+export function appendDialogFrame(shell: DialogShell, opts: DialogFrameOptions): DialogFrame {
+  if (opts.panelClasses) shell.panel.classList.add(...opts.panelClasses);
+
+  const header = document.createElement('div');
+  header.className = opts.headerClass ?? 'fc-fmtdlg__header';
+  header.textContent = opts.title;
+  shell.panel.appendChild(header);
+
+  const body = document.createElement(opts.bodyTag ?? 'div');
+  body.className = opts.bodyClass ?? 'fc-fmtdlg__body';
+  shell.panel.appendChild(body);
+
+  const footer = document.createElement('div');
+  footer.className = opts.footerClass ?? 'fc-fmtdlg__footer';
+  shell.panel.appendChild(footer);
+
+  return { header, body, footer };
+}
+
+export function createDialogButton(
+  opts: DialogButtonOptions,
+): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  const classes = [opts.baseClass ?? 'fc-fmtdlg__btn'];
+  if (opts.variant === 'primary') {
+    classes.push(opts.primaryClass ?? `${opts.baseClass ?? 'fc-fmtdlg__btn'}--primary`);
+  } else if (opts.variant === 'secondary' && opts.secondaryClass) {
+    classes.push(opts.secondaryClass);
+  }
+  button.className = classes.join(' ');
+  button.textContent = opts.label;
+  return button;
+}
+
+export function appendDialogButton(
+  footer: HTMLElement,
+  opts: DialogButtonOptions,
+): HTMLButtonElement {
+  const button = createDialogButton(opts);
+  footer.appendChild(button);
+  return button;
+}
+
+export function appendDialogIconButton(
+  parent: HTMLElement,
+  opts: DialogIconButtonOptions,
+): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = opts.baseClass;
+  button.setAttribute('aria-label', opts.ariaLabel);
+  if (opts.title) button.title = opts.title;
+  if (opts.html) button.innerHTML = opts.html;
+  else button.textContent = opts.label;
+  parent.appendChild(button);
+  return button;
+}
+
+export function appendDialogTabPair(
+  tabsStrip: HTMLElement,
+  body: HTMLElement,
+  opts: DialogTabPairOptions,
+): DialogTabPair {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = opts.tabClass ?? 'fc-fmtdlg__tab';
+  button.textContent = opts.label;
+  button.setAttribute('role', 'tab');
+  button.setAttribute('aria-selected', 'false');
+  button.setAttribute('aria-controls', opts.panelId);
+  button.tabIndex = -1;
+  button.id = opts.tabId;
+  if (opts.tabDatasetKey) button.dataset[opts.tabDatasetKey] = opts.id;
+  tabsStrip.appendChild(button);
+
+  const panel = document.createElement('div');
+  panel.className = opts.panelClass ?? 'fc-fmtdlg__panel-tab';
+  panel.id = opts.panelId;
+  panel.setAttribute('role', 'tabpanel');
+  panel.setAttribute('aria-labelledby', opts.tabId);
+  panel.hidden = true;
+  if (opts.panelDatasetKey) panel.dataset[opts.panelDatasetKey] = opts.id;
+  body.appendChild(panel);
+
+  return { button, panel };
+}
+
+export function appendDialogOptionButton(
+  parent: HTMLElement,
+  opts: DialogOptionButtonOptions,
+): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = opts.extraClass ? `${opts.baseClass} ${opts.extraClass}` : opts.baseClass;
+  button.textContent = opts.label;
+  button.setAttribute('role', 'option');
+  button.setAttribute('aria-selected', opts.selected ? 'true' : 'false');
+  button.tabIndex = -1;
+  button.dataset[opts.datasetKey] = opts.value;
+  parent.appendChild(button);
+  return button;
+}
+
+export function createDialogToggleButton(opts: DialogToggleButtonOptions): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = opts.extraClass ? `${opts.baseClass} ${opts.extraClass}` : opts.baseClass;
+  button.setAttribute('aria-label', opts.label);
+  button.setAttribute('aria-pressed', opts.pressed ? 'true' : 'false');
+  if (opts.title) button.title = opts.title;
+  if (opts.datasetKey && opts.value !== undefined) button.dataset[opts.datasetKey] = opts.value;
+  return button;
+}
+
+export function appendDialogActions(
+  footer: HTMLElement,
+  opts: {
+    cancelLabel: string;
+    okLabel: string;
+    buttonBaseClass?: string;
+    buttonPrimaryClass?: string;
+    buttonSecondaryClass?: string;
+  },
+): { cancelBtn: HTMLButtonElement; okBtn: HTMLButtonElement } {
+  const cancelBtn = appendDialogButton(footer, {
+    label: opts.cancelLabel,
+    variant: 'secondary',
+    baseClass: opts.buttonBaseClass,
+    secondaryClass: opts.buttonSecondaryClass,
+  });
+  const okBtn = appendDialogButton(footer, {
+    label: opts.okLabel,
+    variant: 'primary',
+    baseClass: opts.buttonBaseClass,
+    primaryClass: opts.buttonPrimaryClass,
+  });
+  return { cancelBtn, okBtn };
 }

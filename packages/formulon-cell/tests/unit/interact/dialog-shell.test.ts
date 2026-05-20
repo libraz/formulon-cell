@@ -1,5 +1,20 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createDialogShell } from '../../../src/interact/dialog-shell.js';
+import {
+  appendDialogActions,
+  appendDialogButton,
+  appendDialogFrame,
+  appendDialogIconButton,
+  appendDialogOptionButton,
+  appendDialogTabPair,
+  createDialogButton,
+  createDialogShell,
+  createDialogToggleButton,
+  clearDialogError,
+  focusAndSelectInput,
+  showDialogError,
+} from '../../../src/interact/dialog-shell.js';
 
 describe('interact/dialog-shell', () => {
   let host: HTMLElement;
@@ -251,6 +266,303 @@ describe('interact/dialog-shell', () => {
     shell.setAriaLabel('New');
     expect(shell.overlay.getAttribute('aria-label')).toBe('New');
     shell.dispose();
+  });
+
+  it('builds shared dialog frame and action button contracts', () => {
+    const shell = createDialogShell({ host, className: 'fc-x', ariaLabel: 'X' });
+    const frame = appendDialogFrame(shell, {
+      title: 'Title',
+      panelClasses: ['fc-fmtdlg__panel', 'fc-x__panel'],
+      bodyClass: 'fc-fmtdlg__body fc-x__body',
+    });
+
+    expect(shell.panel.classList.contains('fc-fmtdlg__panel')).toBe(true);
+    expect(shell.panel.classList.contains('fc-x__panel')).toBe(true);
+    expect(frame.header.className).toBe('fc-fmtdlg__header');
+    expect(frame.header.textContent).toBe('Title');
+    expect(frame.body.className).toBe('fc-fmtdlg__body fc-x__body');
+    expect(frame.footer.className).toBe('fc-fmtdlg__footer');
+
+    const { cancelBtn, okBtn } = appendDialogActions(frame.footer, {
+      cancelLabel: 'Cancel',
+      okLabel: 'OK',
+    });
+    expect(cancelBtn.type).toBe('button');
+    expect(cancelBtn.className).toBe('fc-fmtdlg__btn');
+    expect(cancelBtn.textContent).toBe('Cancel');
+    expect(okBtn.type).toBe('button');
+    expect(okBtn.className).toBe('fc-fmtdlg__btn fc-fmtdlg__btn--primary');
+    expect(okBtn.textContent).toBe('OK');
+
+    const standalone = createDialogButton({ label: 'Apply', variant: 'primary' });
+    expect(standalone.type).toBe('button');
+    expect(standalone.className).toBe('fc-fmtdlg__btn fc-fmtdlg__btn--primary');
+    expect(standalone.textContent).toBe('Apply');
+
+    const custom = appendDialogButton(frame.footer, {
+      label: 'Close',
+      variant: 'primary',
+      baseClass: 'fc-custom__btn',
+    });
+    expect(custom.className).toBe('fc-custom__btn fc-custom__btn--primary');
+    expect(custom.textContent).toBe('Close');
+
+    const customSecondary = appendDialogButton(frame.footer, {
+      label: 'Cancel',
+      variant: 'secondary',
+      baseClass: 'fc-custom__btn',
+      secondaryClass: 'fc-custom__btn--secondary',
+    });
+    expect(customSecondary.className).toBe('fc-custom__btn fc-custom__btn--secondary');
+
+    const icon = appendDialogIconButton(frame.header, {
+      label: '×',
+      ariaLabel: 'Close',
+      title: 'Close',
+      baseClass: 'fc-x__close',
+    });
+    expect(icon.type).toBe('button');
+    expect(icon.className).toBe('fc-x__close');
+    expect(icon.textContent).toBe('×');
+    expect(icon.getAttribute('aria-label')).toBe('Close');
+    expect(icon.title).toBe('Close');
+
+    const tabs = document.createElement('div');
+    const { button: tab, panel: tabPanel } = appendDialogTabPair(tabs, frame.body, {
+      id: 'page',
+      label: 'Page',
+      tabId: 'tab-page',
+      panelId: 'panel-page',
+      tabDatasetKey: 'testTab',
+      panelDatasetKey: 'testTab',
+    });
+    expect(tab.type).toBe('button');
+    expect(tab.className).toBe('fc-fmtdlg__tab');
+    expect(tab.getAttribute('role')).toBe('tab');
+    expect(tab.getAttribute('aria-selected')).toBe('false');
+    expect(tab.getAttribute('aria-controls')).toBe('panel-page');
+    expect(tab.dataset.testTab).toBe('page');
+    expect(tabPanel.className).toBe('fc-fmtdlg__panel-tab');
+    expect(tabPanel.getAttribute('role')).toBe('tabpanel');
+    expect(tabPanel.getAttribute('aria-labelledby')).toBe('tab-page');
+    expect(tabPanel.dataset.testTab).toBe('page');
+    expect(tabPanel.hidden).toBe(true);
+
+    const option = appendDialogOptionButton(frame.body, {
+      label: 'Fixed',
+      baseClass: 'fc-test__option',
+      datasetKey: 'testOption',
+      value: 'fixed',
+      selected: true,
+      extraClass: 'fc-test__option--accent',
+    });
+    expect(option.type).toBe('button');
+    expect(option.className).toBe('fc-test__option fc-test__option--accent');
+    expect(option.textContent).toBe('Fixed');
+    expect(option.getAttribute('role')).toBe('option');
+    expect(option.getAttribute('aria-selected')).toBe('true');
+    expect(option.tabIndex).toBe(-1);
+    expect(option.dataset.testOption).toBe('fixed');
+
+    const toggle = createDialogToggleButton({
+      label: 'Top border',
+      baseClass: 'fc-test__toggle',
+      extraClass: 'fc-test__toggle--top',
+      datasetKey: 'borderSide',
+      value: 'top',
+      title: 'Top border',
+    });
+    expect(toggle.type).toBe('button');
+    expect(toggle.className).toBe('fc-test__toggle fc-test__toggle--top');
+    expect(toggle.getAttribute('aria-label')).toBe('Top border');
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    expect(toggle.dataset.borderSide).toBe('top');
+    expect(toggle.title).toBe('Top border');
+    shell.dispose();
+  });
+
+  it('can build a shared dialog frame with a form body', () => {
+    const shell = createDialogShell({ host, className: 'fc-x', ariaLabel: 'X' });
+    const frame = appendDialogFrame(shell, { title: 'Form', bodyTag: 'form' });
+
+    expect(frame.body).toBeInstanceOf(HTMLFormElement);
+    expect(frame.body.className).toBe('fc-fmtdlg__body');
+    shell.dispose();
+  });
+
+  it('centralizes input focus/select and inline error row updates', () => {
+    const input = document.createElement('input');
+    input.value = 'Sheet1!A1';
+    document.body.appendChild(input);
+    focusAndSelectInput(input);
+    expect(document.activeElement).toBe(input);
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe(input.value.length);
+
+    const errorRow = document.createElement('div');
+    errorRow.hidden = true;
+    showDialogError(errorRow, 'Required');
+    expect(errorRow.hidden).toBe(false);
+    expect(errorRow.textContent).toBe('Required');
+    clearDialogError(errorRow);
+    expect(errorRow.hidden).toBe(true);
+    expect(errorRow.textContent).toBe('');
+
+    input.remove();
+  });
+
+  it('keeps migrated dialog error/focus handling centralized in dialog-shell', () => {
+    for (const file of ['src/interact/hyperlink-dialog.ts', 'src/interact/named-range-dialog.ts']) {
+      const source = readFileSync(join(process.cwd(), file), 'utf8');
+      expect(source).toContain('showDialogError(');
+      expect(source).toContain('clearDialogError(');
+      expect(source).toContain('focusAndSelectInput(');
+      expect(source).not.toContain('errorRow.textContent');
+      expect(source).not.toContain('errorRow.hidden = false');
+      expect(source).not.toContain('.select();');
+    }
+  });
+
+  it('keeps migrated dialog frame/action DOM centralized in dialog-shell', () => {
+    for (const file of [
+      'src/interact/paste-special.ts',
+      'src/interact/goto-dialog.ts',
+      'src/interact/evaluate-formula-dialog.ts',
+      'src/interact/pivot-table-dialog.ts',
+      'src/interact/iterative-dialog.ts',
+      'src/interact/hyperlink-dialog.ts',
+      'src/interact/fx-dialog.ts',
+      'src/interact/pivot-field-settings.ts',
+    ]) {
+      const source = readFileSync(join(process.cwd(), file), 'utf8');
+      expect(source).toContain('appendDialogFrame(');
+      expect(source).not.toContain("const footer = document.createElement('div')");
+      expect(source).not.toContain("const cancelBtn = document.createElement('button')");
+      expect(source).not.toContain("const okBtn = document.createElement('button')");
+      expect(source).not.toContain("const insertBtn = document.createElement('button')");
+    }
+  });
+
+  it('keeps migrated action buttons centralized even when dialogs own custom footer placement', () => {
+    for (const file of [
+      'src/interact/page-setup-dialog.ts',
+      'src/interact/comment-dialog.ts',
+      'src/interact/insert-copied-cells-dialog.ts',
+    ]) {
+      const source = readFileSync(join(process.cwd(), file), 'utf8');
+      expect(source).toContain('appendDialogActions(footer');
+      expect(source).not.toContain("const cancelBtn = document.createElement('button')");
+      expect(source).not.toContain("const okBtn = document.createElement('button')");
+    }
+  });
+
+  it('keeps migrated single action buttons centralized in dialog-shell', () => {
+    for (const file of ['src/interact/external-links-dialog.ts', 'src/interact/validation.ts']) {
+      const source = readFileSync(join(process.cwd(), file), 'utf8');
+      expect(source).toContain('appendDialogButton(footer');
+      expect(source).not.toContain("const closeBtn = document.createElement('button')");
+      expect(source).not.toContain("const okBtn = document.createElement('button')");
+    }
+  });
+
+  it('keeps migrated mixed footer/action buttons centralized in dialog-shell', () => {
+    for (const file of [
+      'src/interact/conditional-dialog.ts',
+      'src/interact/cf-rules-dialog.ts',
+      'src/interact/named-range-dialog.ts',
+    ]) {
+      const source = readFileSync(join(process.cwd(), file), 'utf8');
+      expect(source).toContain('appendDialogButton(');
+      expect(source).not.toContain("const closeBtn = document.createElement('button')");
+      expect(source).not.toContain("const clearAllBtn = document.createElement('button')");
+      expect(source).not.toContain("const editorOkBtn = document.createElement('button')");
+      expect(source).not.toContain("const editorCancelBtn = document.createElement('button')");
+      expect(source).not.toContain("const deleteOkBtn = document.createElement('button')");
+      expect(source).not.toContain("const deleteCancelBtn = document.createElement('button')");
+      expect(source).not.toContain("const addBtn = document.createElement('button')");
+      expect(source).not.toContain("const newBtn = document.createElement('button')");
+      expect(source).not.toContain("const editBtn = document.createElement('button')");
+      expect(source).not.toContain("const deleteBtn = document.createElement('button')");
+      expect(source).not.toContain("const filterBtn = document.createElement('button')");
+    }
+    const conditionalSource = readFileSync(
+      join(process.cwd(), 'src/interact/conditional-dialog.ts'),
+      'utf8',
+    );
+    expect(conditionalSource).not.toContain("const removeBtn = document.createElement('button')");
+  });
+
+  it('keeps migrated panel action buttons centralized in dialog-shell', () => {
+    for (const file of ['src/interact/slicer.ts', 'src/interact/watch-panel.ts']) {
+      const source = readFileSync(join(process.cwd(), file), 'utf8');
+      expect(source).toContain('appendDialogButton(');
+      expect(source).not.toContain("const addBtn = document.createElement('button')");
+      expect(source).not.toContain("const clearBtn = document.createElement('button')");
+      expect(source).not.toContain("const closeBtn = document.createElement('button')");
+      expect(source).not.toContain("const removeBtn = document.createElement('button')");
+    }
+  });
+
+  it('keeps migrated icon buttons centralized in dialog-shell', () => {
+    for (const file of [
+      'src/interact/comment-dialog.ts',
+      'src/interact/format-dialog-view.ts',
+      'src/interact/named-range-dialog.ts',
+      'src/interact/page-setup-dialog.ts',
+      'src/interact/workbook-objects.ts',
+    ]) {
+      const source = readFileSync(join(process.cwd(), file), 'utf8');
+      expect(source).toContain('appendDialogIconButton(');
+      expect(source).not.toContain("const closeBtn = document.createElement('button')");
+      expect(source).not.toContain("const headerCloseBtn = document.createElement('button')");
+      expect(source).not.toContain("const removeBtn = document.createElement('button')");
+      expect(source).not.toContain("const quickCommitBtn = document.createElement('button')");
+      expect(source).not.toContain("const quickCancelBtn = document.createElement('button')");
+    }
+  });
+
+  it('keeps migrated shared dialog tabs centralized in dialog-shell', () => {
+    for (const file of [
+      'src/interact/format-dialog-view.ts',
+      'src/interact/page-setup-dialog.ts',
+    ]) {
+      const source = readFileSync(join(process.cwd(), file), 'utf8');
+      expect(source).toContain('appendDialogTabPair(');
+      expect(source).not.toContain("className = 'fc-fmtdlg__tab'");
+      expect(source).not.toContain("setAttribute('role', 'tab')");
+      expect(source).not.toContain("setAttribute('role', 'tabpanel')");
+    }
+  });
+
+  it('keeps migrated option buttons centralized in dialog-shell', () => {
+    const source = readFileSync(
+      join(process.cwd(), 'src/interact/format-dialog-view.ts'),
+      'utf8',
+    );
+    expect(source).toContain('appendDialogOptionButton(');
+    expect(source).not.toContain("className = 'fc-fmtdlg__cat-item'");
+    expect(source).not.toContain("className = 'fc-fmtdlg__negative-item'");
+    expect(source).not.toContain("setAttribute('role', 'option')");
+  });
+
+  it('keeps migrated format dialog action button helpers centralized in dialog-shell', () => {
+    const source = readFileSync(
+      join(process.cwd(), 'src/interact/format-dialog-dom.ts'),
+      'utf8',
+    );
+    expect(source).toContain('createDialogButton(');
+    expect(source).not.toContain("className = primary ? 'fc-fmtdlg__btn fc-fmtdlg__btn--primary'");
+  });
+
+  it('keeps migrated format dialog toggle buttons centralized in dialog-shell', () => {
+    for (const file of [
+      'src/interact/format-dialog-dom.ts',
+      'src/interact/format-dialog-tabs/border.ts',
+    ]) {
+      const source = readFileSync(join(process.cwd(), file), 'utf8');
+      expect(source).toContain('createDialogToggleButton(');
+      expect(source).not.toContain("setAttribute('aria-pressed', 'false')");
+    }
   });
 
   it('does not leak document keydown listeners across many dispose cycles', () => {

@@ -1,8 +1,10 @@
 import {
   appendDialogActions,
+  appendDialogButton,
   appendErrorRow,
   appendInputRow,
   createDialogShell,
+  focusAndSelectInput,
   installDialogLifecycle,
   mountDialog,
   showInputError,
@@ -13,8 +15,8 @@ export interface PromptOptions {
   label: string;
   initial?: string;
   placeholder?: string;
-  okLabel?: string;
-  cancelLabel?: string;
+  okLabel: string;
+  cancelLabel: string;
   validate?: (value: string) => string | null;
 }
 
@@ -25,23 +27,23 @@ export interface NumberPromptOptions {
   min?: number;
   max?: number;
   step?: number;
-  okLabel?: string;
-  cancelLabel?: string;
-  invalidMessage?: string;
+  okLabel: string;
+  cancelLabel: string;
+  invalidMessage: string;
 }
 
 export interface ConfirmOptions {
   title: string;
   message: string;
-  okLabel?: string;
-  cancelLabel?: string;
+  okLabel: string;
+  cancelLabel: string;
   destructive?: boolean;
 }
 
 export interface MessageOptions {
   title: string;
   message: string;
-  okLabel?: string;
+  okLabel: string;
 }
 
 /** Excel 365-styled modal prompt. Returns the entered value, or `null`
@@ -55,8 +57,8 @@ export const showPrompt = (opts: PromptOptions): Promise<string | null> =>
     });
     const errorRow = appendErrorRow(shell.body);
     const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
-      cancelLabel: opts.cancelLabel ?? 'Cancel',
-      okLabel: opts.okLabel ?? 'OK',
+      cancelLabel: opts.cancelLabel,
+      okLabel: opts.okLabel,
     });
 
     const lifecycle = installDialogLifecycle<string | null>({
@@ -77,10 +79,7 @@ export const showPrompt = (opts: PromptOptions): Promise<string | null> =>
     okBtn.addEventListener('click', onOk);
     cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
-    mountDialog(shell, () => {
-      input.focus();
-      input.select();
-    });
+    mountDialog(shell, () => focusAndSelectInput(input));
   });
 
 /** Excel-styled numeric prompt. Returns a number, or `null` on cancel. */
@@ -96,8 +95,8 @@ export const showNumberPrompt = (opts: NumberPromptOptions): Promise<number | nu
     });
     const errorRow = appendErrorRow(shell.body);
     const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
-      cancelLabel: opts.cancelLabel ?? 'Cancel',
-      okLabel: opts.okLabel ?? 'OK',
+      cancelLabel: opts.cancelLabel,
+      okLabel: opts.okLabel,
     });
 
     const readValue = (): number | null => {
@@ -116,7 +115,7 @@ export const showNumberPrompt = (opts: NumberPromptOptions): Promise<number | nu
     const onOk = (): void => {
       const n = readValue();
       if (n === null) {
-        showInputError(errorRow, input, opts.invalidMessage ?? 'Enter a valid number.');
+        showInputError(errorRow, input, opts.invalidMessage);
         return;
       }
       lifecycle.finish(n);
@@ -124,10 +123,7 @@ export const showNumberPrompt = (opts: NumberPromptOptions): Promise<number | nu
     okBtn.addEventListener('click', onOk);
     cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
-    mountDialog(shell, () => {
-      input.focus();
-      input.select();
-    });
+    mountDialog(shell, () => focusAndSelectInput(input));
   });
 
 /** Excel 365-styled modal confirm. Returns true on accept, false on
@@ -145,8 +141,8 @@ export const showConfirm = (opts: ConfirmOptions): Promise<boolean> =>
     shell.body.appendChild(msg);
 
     const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
-      cancelLabel: opts.cancelLabel ?? 'Cancel',
-      okLabel: opts.okLabel ?? 'OK',
+      cancelLabel: opts.cancelLabel,
+      okLabel: opts.okLabel,
       destructive: opts.destructive,
     });
     const lifecycle = installDialogLifecycle<boolean>({
@@ -175,11 +171,10 @@ export const showMessage = (opts: MessageOptions): Promise<void> =>
     msg.textContent = opts.message;
     shell.body.appendChild(msg);
 
-    const okBtn = document.createElement('button');
-    okBtn.type = 'button';
-    okBtn.className = 'fc-fmtdlg__btn fc-fmtdlg__btn--primary';
-    okBtn.textContent = opts.okLabel ?? 'OK';
-    shell.footer.appendChild(okBtn);
+    const okBtn = appendDialogButton(shell.footer, {
+      label: opts.okLabel,
+      variant: 'primary',
+    });
 
     const lifecycle = installDialogLifecycle<void>({
       shell,

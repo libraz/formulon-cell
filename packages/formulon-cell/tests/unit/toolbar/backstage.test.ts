@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { dictionaries } from '../../../src/i18n/strings.js';
 import {
@@ -86,6 +88,80 @@ describe('toolbar/ribbon/backstage', () => {
     ]);
     expect(view.textContent).toContain('Workbook Information');
     expect(view.textContent).toContain('Saved');
+  });
+
+  it('projects disabled reasons for unavailable Backstage card and command controls', () => {
+    const { createBackstageCard, createBackstageCommand } = createBackstageFactories({
+      backstageText,
+      ribbonText,
+      shellSavedText: 'Ready',
+      docName: () => 'Book1',
+      docState: null,
+    });
+
+    const card = createBackstageCard('Host only', 'Requires integration', 'host-only', true);
+    expect(card.disabled).toBe(true);
+    expect(card.dataset.disabledReason).toBe(backstageText.commandUnavailable);
+    expect(card.getAttribute('aria-description')).toBe(backstageText.commandUnavailable);
+
+    const command = createBackstageCommand('Host command', 'Requires integration', 'H');
+    expect(command.disabled).toBe(true);
+    expect(command.dataset.disabledReason).toBe(backstageText.commandUnavailable);
+  });
+
+  it('centralizes Backstage action button creation', () => {
+    const { createBackstagePrintAction, createBackstageButton, createBackstageCard } =
+      createBackstageFactories({
+        backstageText,
+        ribbonText,
+        shellSavedText: 'Ready',
+        docName: () => 'Book1',
+        docState: null,
+      });
+
+    const nav = createBackstageButton('Info', 'info', true, 'Workbook info');
+    expect(nav.type).toBe('button');
+    expect(nav.className).toBe('demo__backstage-navitem demo__backstage-navitem--active');
+    expect(nav.dataset.backstageAction).toBe('info');
+    expect(nav.getAttribute('aria-label')).toBe('Workbook info');
+
+    const card = createBackstageCard('Open', 'Open file', 'open');
+    expect(card.type).toBe('button');
+    expect(card.className).toBe('demo__backstage-card');
+    expect(card.dataset.backstageAction).toBe('open');
+
+    const primary = createBackstagePrintAction('Print', 'print', true);
+    expect(primary.type).toBe('button');
+    expect(primary.className).toBe('demo__print-action demo__print-action--primary');
+    expect(primary.dataset.backstageAction).toBe('print');
+    expect(primary.textContent).toBe('Print');
+
+    const secondary = createBackstagePrintAction('Page setup', 'page-setup');
+    expect(secondary.type).toBe('button');
+    expect(secondary.className).toBe('demo__print-action');
+    expect(secondary.dataset.backstageAction).toBe('page-setup');
+    expect(secondary.textContent).toBe('Page setup');
+  });
+
+  it('keeps Backstage Print action button DOM centralized', () => {
+    const source = readFileSync(join(process.cwd(), 'src/toolbar/ribbon/backstage.ts'), 'utf8');
+
+    expect(source).toContain("import { createRibbonButton } from './button.js'");
+    expect(source).toContain('const createBackstageActionButton');
+    expect(source).toContain("createBackstageActionButton('demo__backstage-navitem'");
+    expect(source).toContain("createBackstageActionButton('demo__backstage-card'");
+    expect(source).toContain("'demo__backstage-command'");
+    expect(source).toContain("createBackstageActionButton('demo__print-action'");
+    expect(source).toContain('const createBackstagePrintAction');
+    expect(source).toContain("createBackstagePrintAction(backstageText.printNow, 'print', true)");
+    expect(source).toContain("createBackstagePrintAction(backstageText.printToPdf, 'export')");
+    expect(source).toContain("createBackstagePrintAction(backstageText.pageSetup, 'page-setup')");
+    expect(source).not.toContain("const card = document.createElement('button')");
+    expect(source).not.toContain("const command = document.createElement('button')");
+    expect(source).not.toContain("const print = document.createElement('button')");
+    expect(source).not.toContain("const pdf = document.createElement('button')");
+    expect(source).not.toContain("const pageSetup = document.createElement('button')");
+    expect(source).not.toContain("document.createElement('button')");
   });
 
   it('renders a dedicated Backstage Print view with command handoff attributes', () => {

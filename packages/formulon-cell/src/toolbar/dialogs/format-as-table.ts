@@ -1,8 +1,10 @@
+import { attachRangePickerButton } from '../../interact/range-picker-control.js';
 import {
   appendDialogActions,
   appendErrorRow,
   appendInputRow,
   createDialogShell,
+  focusAndSelectInput,
   installDialogLifecycle,
   mountDialog,
   showInputError,
@@ -14,9 +16,12 @@ export interface FormatAsTableDialogOptions {
   headersLabel: string;
   initialRange: string;
   initialHasHeaders: boolean;
-  okLabel?: string;
-  cancelLabel?: string;
+  okLabel: string;
+  cancelLabel: string;
   validateRange: (value: string) => string | null;
+  rangePickerLabel?: string;
+  pickRange?: () => string;
+  subscribeToRangeChanges?: (listener: () => void) => () => void;
 }
 
 export interface FormatAsTableDialogResult {
@@ -30,6 +35,14 @@ export const showFormatAsTableDialog = (
   new Promise<FormatAsTableDialogResult | null>((resolve) => {
     const shell = createDialogShell({ title: opts.title, bodyVariant: 'app' });
     const rangeInput = appendInputRow(shell.body, opts.rangeLabel, { initial: opts.initialRange });
+    if (opts.pickRange) {
+      attachRangePickerButton(rangeInput, {
+        label: opts.rangePickerLabel ?? opts.rangeLabel,
+        getValue: opts.pickRange,
+        subscribeToRangeChanges: opts.subscribeToRangeChanges,
+        kind: 'table-range',
+      });
+    }
 
     const headersLabel = document.createElement('label');
     headersLabel.className = 'fc-fmtdlg__check app__dlg__check';
@@ -43,8 +56,8 @@ export const showFormatAsTableDialog = (
 
     const errorRow = appendErrorRow(shell.body);
     const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
-      cancelLabel: opts.cancelLabel ?? 'Cancel',
-      okLabel: opts.okLabel ?? 'OK',
+      cancelLabel: opts.cancelLabel,
+      okLabel: opts.okLabel,
     });
 
     const lifecycle = installDialogLifecycle<FormatAsTableDialogResult | null>({
@@ -65,8 +78,5 @@ export const showFormatAsTableDialog = (
     okBtn.addEventListener('click', onOk);
     cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
-    mountDialog(shell, () => {
-      rangeInput.focus();
-      rangeInput.select();
-    });
+    mountDialog(shell, () => focusAndSelectInput(rangeInput));
   });

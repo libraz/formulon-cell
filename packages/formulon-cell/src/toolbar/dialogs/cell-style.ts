@@ -2,12 +2,11 @@ import type { CellStyleIncludeOptions } from '../../commands/cell-styles.js';
 import { appendCheckboxRow } from './form-controls.js';
 import {
   appendDialogActions,
+  appendDialogNameField,
   appendErrorRow,
-  appendInputRow,
   createDialogShell,
   installDialogLifecycle,
   mountDialog,
-  showInputError,
 } from './shell.js';
 
 export interface CellStyleDialogResult {
@@ -16,7 +15,17 @@ export interface CellStyleDialogResult {
 }
 
 interface CellStyleDialogStrings {
-  ribbonMenu: { [key: string]: string | undefined };
+  ribbonMenu: {
+    cellStyleName: string;
+    cellStyleNormal: string;
+    cellStyleIncludes: string;
+    cellStyleIncludeNumber: string;
+    cellStyleIncludeAlignment: string;
+    cellStyleIncludeFont: string;
+    cellStyleIncludeBorder: string;
+    cellStyleIncludeFill: string;
+    cellStyleIncludeProtection: string;
+  };
   hyperlinkDialog: { cancel: string; ok: string };
   namedRangeDialog: { errorEmptyName: string };
 }
@@ -37,12 +46,6 @@ const DEFAULT_INCLUDE: Required<CellStyleIncludeOptions> = {
   protection: true,
 };
 
-const menuText = (
-  strings: CellStyleDialogStrings['ribbonMenu'],
-  key: string,
-  fallback: string,
-): string => strings[key] ?? fallback;
-
 export const showCellStyleDialog = (
   opts: CellStyleDialogOptions,
 ): Promise<CellStyleDialogResult | null> =>
@@ -50,49 +53,50 @@ export const showCellStyleDialog = (
     const t = opts.strings.ribbonMenu;
     const include = { ...DEFAULT_INCLUDE, ...opts.initialInclude };
     const shell = createDialogShell({ title: opts.title });
-    const name = appendInputRow(shell.body, menuText(t, 'cellStyleName', 'Style name'), {
-      initial: opts.initialName ?? menuText(t, 'cellStyleNormal', 'Normal'),
-    });
-    name.dataset.dialogField = 'name';
+    const name = appendDialogNameField(
+      shell.body,
+      t.cellStyleName,
+      opts.initialName ?? t.cellStyleNormal,
+    );
 
     const legend = document.createElement('div');
     legend.className = 'app__dlg__label';
-    legend.textContent = menuText(t, 'cellStyleIncludes', 'Style includes');
+    legend.textContent = t.cellStyleIncludes;
     shell.body.appendChild(legend);
 
     const number = appendCheckboxRow(
       shell.body,
-      menuText(t, 'cellStyleIncludeNumber', 'Number'),
+      t.cellStyleIncludeNumber,
       include.number,
       'number',
     );
     const alignment = appendCheckboxRow(
       shell.body,
-      menuText(t, 'cellStyleIncludeAlignment', 'Alignment'),
+      t.cellStyleIncludeAlignment,
       include.alignment,
       'alignment',
     );
     const font = appendCheckboxRow(
       shell.body,
-      menuText(t, 'cellStyleIncludeFont', 'Font'),
+      t.cellStyleIncludeFont,
       include.font,
       'font',
     );
     const border = appendCheckboxRow(
       shell.body,
-      menuText(t, 'cellStyleIncludeBorder', 'Border'),
+      t.cellStyleIncludeBorder,
       include.border,
       'border',
     );
     const fill = appendCheckboxRow(
       shell.body,
-      menuText(t, 'cellStyleIncludeFill', 'Fill'),
+      t.cellStyleIncludeFill,
       include.fill,
       'fill',
     );
     const protection = appendCheckboxRow(
       shell.body,
-      menuText(t, 'cellStyleIncludeProtection', 'Protection'),
+      t.cellStyleIncludeProtection,
       include.protection,
       'protection',
     );
@@ -109,9 +113,8 @@ export const showCellStyleDialog = (
       onSubmit: () => onOk(),
     });
     const onOk = (): CellStyleDialogResult | null => {
-      const label = name.value.trim();
-      if (!label) {
-        showInputError(errorRow, name, opts.strings.namedRangeDialog.errorEmptyName);
+      const label = name.valueOrError(errorRow, opts.strings.namedRangeDialog.errorEmptyName);
+      if (label === null) {
         return null;
       }
       const result: CellStyleDialogResult = {
@@ -133,8 +136,5 @@ export const showCellStyleDialog = (
     });
     cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
-    mountDialog(shell, () => {
-      name.focus();
-      name.select();
-    });
+    mountDialog(shell, name.focus);
   });

@@ -5,7 +5,9 @@ import {
   appendDialogActions,
   appendErrorRow,
   appendInputRow,
+  createDialogChoiceButton,
   createDialogShell,
+  focusAndSelectInput,
   installDialogLifecycle,
   mountDialog,
   showInputError,
@@ -39,16 +41,10 @@ export const showSymbolDialog = (opts: SymbolDialogOptions): Promise<string | nu
       const row = document.createElement('div');
       row.className = 'app__symbol-dialog__row';
       for (const symbol of group.symbols) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'app__cf-choice';
-        button.textContent = symbol;
-        button.title = symbol;
-        button.setAttribute('aria-label', symbol);
+        const button = createDialogChoiceButton({ label: symbol, title: symbol });
         button.addEventListener('click', () => {
           input.value = symbol;
-          input.focus();
-          input.select();
+          focusAndSelectInput(input);
         });
         row.appendChild(button);
       }
@@ -78,7 +74,5 @@ export const showSymbolDialog = (opts: SymbolDialogOptions): Promise<string | nu
     okBtn.addEventListener('click', onOk);
     cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
-    mountDialog(shell, () => {
-      input.focus();
-    });
+    mountDialog(shell, input);
   });

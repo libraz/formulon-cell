@@ -9,12 +9,11 @@ import {
 import { appendCheckboxRow, appendSelectRow } from './form-controls.js';
 import {
   appendDialogActions,
+  appendDialogNameField,
   appendErrorRow,
-  appendInputRow,
   createDialogShell,
   installDialogLifecycle,
   mountDialog,
-  showInputError,
 } from './shell.js';
 
 export interface TableStyleDialogResult {
@@ -25,7 +24,16 @@ export interface TableStyleDialogResult {
 }
 
 interface TableStyleDialogStrings {
-  ribbonMenu: { [key: string]: string | undefined };
+  ribbonMenu: {
+    tableStyleName: string;
+    tableStyleMedium: string;
+    tableStyleType: string;
+    tableStyleLight: string;
+    tableStyleDark: string;
+    tableStyleColor: string;
+    tableStyleBandedRows: string;
+    tableStyleFirstColumn: string;
+  };
   hyperlinkDialog: { cancel: string; ok: string };
   namedRangeDialog: { errorEmptyName: string };
 }
@@ -36,12 +44,6 @@ export interface TableStyleDialogOptions {
   initial?: Partial<TableStyleDialogResult>;
 }
 
-const menuText = (
-  strings: TableStyleDialogStrings['ribbonMenu'],
-  key: string,
-  fallback: string,
-): string => strings[key] ?? fallback;
-
 export const showTableStyleDialog = (
   opts: TableStyleDialogOptions,
 ): Promise<TableStyleDialogResult | null> =>
@@ -50,37 +52,38 @@ export const showTableStyleDialog = (
     const t = strings.ribbonMenu;
     const initialVariant = tableVariantOptions(opts.initial?.variant ?? 'banded');
     const shell = createDialogShell({ title: opts.title });
-    const name = appendInputRow(shell.body, menuText(t, 'tableStyleName', 'Style name'), {
-      initial: opts.initial?.name ?? menuText(t, 'tableStyleMedium', 'Medium'),
-    });
-    name.dataset.dialogField = 'name';
+    const name = appendDialogNameField(
+      shell.body,
+      t.tableStyleName,
+      opts.initial?.name ?? t.tableStyleMedium,
+    );
     const style = appendSelectRow(
       shell.body,
-      menuText(t, 'tableStyleType', 'Style type'),
+      t.tableStyleType,
       [
-        { value: 'light', label: menuText(t, 'tableStyleLight', 'Light') },
-        { value: 'medium', label: menuText(t, 'tableStyleMedium', 'Medium') },
-        { value: 'dark', label: menuText(t, 'tableStyleDark', 'Dark') },
+        { value: 'light', label: t.tableStyleLight },
+        { value: 'medium', label: t.tableStyleMedium },
+        { value: 'dark', label: t.tableStyleDark },
       ],
       opts.initial?.style ?? 'medium',
       'style',
     );
     const color = appendSelectRow(
       shell.body,
-      menuText(t, 'tableStyleColor', 'Accent color'),
+      t.tableStyleColor,
       TABLE_STYLE_COLORS.map((value) => ({ value, label: value })),
       opts.initial?.color ?? DEFAULT_TABLE_COLOR,
       'color',
     );
     const bandedRows = appendCheckboxRow(
       shell.body,
-      menuText(t, 'tableStyleBandedRows', 'Banded rows'),
+      t.tableStyleBandedRows,
       initialVariant.banded,
       'bandedRows',
     );
     const firstColumn = appendCheckboxRow(
       shell.body,
-      menuText(t, 'tableStyleFirstColumn', 'First column emphasis'),
+      t.tableStyleFirstColumn,
       initialVariant.firstCol,
       'firstColumn',
     );
@@ -97,9 +100,8 @@ export const showTableStyleDialog = (
       onSubmit: () => onOk(),
     });
     const onOk = (): TableStyleDialogResult | null => {
-      const label = name.value.trim();
-      if (!label) {
-        showInputError(errorRow, name, strings.namedRangeDialog.errorEmptyName);
+      const label = name.valueOrError(errorRow, strings.namedRangeDialog.errorEmptyName);
+      if (label === null) {
         return null;
       }
       const result: TableStyleDialogResult = {
@@ -119,8 +121,5 @@ export const showTableStyleDialog = (
     });
     cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
-    mountDialog(shell, () => {
-      name.focus();
-      name.select();
-    });
+    mountDialog(shell, name.focus);
   });

@@ -15,8 +15,8 @@ export interface ChoiceDialogOptions<T extends string = string> {
   label?: string;
   options: readonly ChoiceDialogOption<T>[];
   initial?: T;
-  okLabel?: string;
-  cancelLabel?: string;
+  okLabel: string;
+  cancelLabel: string;
 }
 
 /** Excel-style modal radio-choice dialog. Used for commands like Insert/Delete
@@ -55,8 +55,8 @@ export const showChoiceDialog = <T extends string>(
     shell.body.appendChild(group);
 
     const { cancelBtn, okBtn } = appendDialogActions(shell.footer, {
-      cancelLabel: opts.cancelLabel ?? 'Cancel',
-      okLabel: opts.okLabel ?? 'OK',
+      cancelLabel: opts.cancelLabel,
+      okLabel: opts.okLabel,
     });
 
     const selected = (): T | null =>
