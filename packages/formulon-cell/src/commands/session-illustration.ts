@@ -16,6 +16,7 @@ export interface CreateSessionShapeOptions {
   w?: number;
   h?: number;
   color?: string;
+  radius?: number;
 }
 
 export interface CreateSessionImageOptions {
@@ -57,6 +58,7 @@ export function createSessionShape(
     w: options.w,
     h: options.h,
     color: options.color,
+    radius: options.radius,
   };
   recordIllustrationsChange(history, store, () => {
     mutators.upsertIllustration(store, item);

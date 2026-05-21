@@ -89,7 +89,7 @@ const renderShape = (svg: SVGSVGElement, item: SessionIllustration): void => {
     y: 12,
     width: 136,
     height: 72,
-    rx: item.shape === 'rounded-rectangle' ? 12 : 2,
+    rx: item.radius ?? (item.shape === 'rounded-rectangle' ? 12 : 2),
     fill: color,
     'fill-opacity': 0.16,
     stroke: color,
@@ -246,9 +246,7 @@ export function attachSessionIllustrations(deps: {
         panel.setAttribute('role', 'group');
         panel.setAttribute(
           'aria-roledescription',
-          item.kind === 'image'
-            ? (deps.pictureLabel ?? item.kind)
-            : (deps.shapeLabel ?? item.kind),
+          item.kind === 'image' ? (deps.pictureLabel ?? item.kind) : (deps.shapeLabel ?? item.kind),
         );
         panel.setAttribute('aria-selected', item.id === selectedId ? 'true' : 'false');
         panel.setAttribute(

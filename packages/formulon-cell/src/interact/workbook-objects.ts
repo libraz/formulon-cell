@@ -117,6 +117,12 @@ export interface WorkbookObjectsPanelDeps {
   strings?: Strings;
   onOpenPivotTableDialog?: () => void;
   onAfterPivotEdit?: () => void;
+  onSelectSessionIllustration?: (id: string) => void;
+  onClearSessionIllustration?: (id: string) => void;
+  onUpdateSessionIllustration?: (
+    id: string,
+    patch: Partial<Omit<SessionIllustration, 'id'>>,
+  ) => void;
   listSessionIllustrations?: () => readonly SessionIllustration[];
   subscribeSessionObjects?: (listener: () => void) => () => void;
 }
@@ -265,6 +271,59 @@ export function attachWorkbookObjectsPanel(
     return row;
   };
 
+  const appendIllustrationActions = (
+    li: HTMLLIElement,
+    illustration: SessionIllustration,
+  ): void => {
+    const actions = document.createElement('div');
+    actions.className = 'fc-objects__actions fc-objects__illustration-actions';
+    const select = createWorkbookObjectsActionButton(strings.workbookObjects.objectSelect);
+    select.addEventListener('click', () => deps.onSelectSessionIllustration?.(illustration.id));
+    actions.appendChild(select);
+    if (deps.onClearSessionIllustration) {
+      const remove = createWorkbookObjectsActionButton(strings.workbookObjects.objectDelete);
+      remove.addEventListener('click', () => deps.onClearSessionIllustration?.(illustration.id));
+      actions.appendChild(remove);
+    }
+    li.appendChild(actions);
+  };
+
+  const renderIllustrationEditForm = (illustration: SessionIllustration): HTMLFormElement => {
+    const t = strings.workbookObjects;
+    const form = document.createElement('form');
+    form.className = 'fc-objects__pivot-edit fc-objects__illustration-edit';
+    const color = document.createElement('input');
+    color.className = 'fc-objects__input fc-objects__color-input';
+    color.type = 'color';
+    color.value = illustration.color ?? '#0f6cbd';
+    const radius = document.createElement('input');
+    radius.className = 'fc-objects__input';
+    radius.type = 'number';
+    radius.min = '0';
+    radius.max = '48';
+    radius.step = '1';
+    radius.value = String(
+      illustration.radius ?? (illustration.shape === 'rounded-rectangle' ? 12 : 0),
+    );
+    const actions = document.createElement('div');
+    actions.className = 'fc-objects__actions';
+    const apply = createWorkbookObjectsActionButton(t.apply, { primary: true, type: 'submit' });
+    actions.appendChild(apply);
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      deps.onUpdateSessionIllustration?.(illustration.id, {
+        color: color.value,
+        radius: Math.max(0, Math.min(48, Number(radius.value) || 0)),
+      });
+    });
+    form.append(
+      pivotEditField(t.shapeColor, color),
+      pivotEditField(t.shapeRadius, radius),
+      actions,
+    );
+    return form;
+  };
+
   const renderPivotEditForm = (
     pivot: {
       sheetIndex: number;
@@ -368,11 +427,9 @@ export function attachWorkbookObjectsPanel(
       const row = document.createElement('div');
       row.className = 'fc-objects__pivot-field-row';
       row.appendChild(pivotEditField(field, select));
-      const aggregation = createDialogSelect(
-        aggregationOptions,
-        String(PivotAggregation.Sum),
-        { className: 'fc-objects__input' },
-      );
+      const aggregation = createDialogSelect(aggregationOptions, String(PivotAggregation.Sum), {
+        className: 'fc-objects__input',
+      });
       aggregation.dataset.pivotAggregationFieldIndex = String(index);
       const numberFormat = document.createElement('input');
       numberFormat.className = 'fc-objects__input';
@@ -892,6 +949,8 @@ export function attachWorkbookObjectsPanel(
           illustration.id || `${strings.ribbon.illustrations} ${index + 1}`,
         ].join(' · ');
         if (illustration.src) li.title = illustration.src;
+        appendIllustrationActions(li, illustration);
+        if (illustration.kind === 'shape') li.appendChild(renderIllustrationEditForm(illustration));
         list.appendChild(li);
       }
       section.appendChild(list);

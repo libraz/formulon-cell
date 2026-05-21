@@ -18,6 +18,10 @@
 // replacement registered under the same id participates correctly.
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import type { History } from '../commands/history.js';
+import {
+  clearSessionIllustration,
+  updateSessionIllustration,
+} from '../commands/session-illustration.js';
 import { setSheetZoom } from '../commands/structure.js';
 import { attachBorderDraw } from '../interact/border-draw.js';
 import { attachClipboard } from '../interact/clipboard.js';
@@ -244,6 +248,15 @@ export const workbookObjects = (): Extension => ({
       wb: ctx.getWb(),
       strings: ctx.i18n.strings,
       listSessionIllustrations: () => ctx.store.getState().illustrations.illustrations,
+      onSelectSessionIllustration: (id) => {
+        const panel = Array.from(ctx.host.querySelectorAll<HTMLElement>('.fc-illustration')).find(
+          (candidate) => candidate.dataset.illustrationId === id,
+        );
+        panel?.focus();
+      },
+      onClearSessionIllustration: (id) => clearSessionIllustration(ctx.store, id, ctx.history),
+      onUpdateSessionIllustration: (id, patch) =>
+        updateSessionIllustration(ctx.store, id, patch, ctx.history),
       subscribeSessionObjects: (listener) => ctx.store.subscribe(listener),
     });
     return {

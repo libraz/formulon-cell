@@ -60,7 +60,8 @@ export const ja: Strings = {
     noHiddenRows: '選択した行範囲に非表示の行はありません。',
     noHiddenColumns: '選択した列範囲に非表示の列はありません。',
     clipboardUnavailable: 'この環境ではクリップボードから貼り付けできません。',
-    pasteSpecialRequiresCopiedCells: 'この貼り付けオプションを使うには、先にセルをコピーまたは切り取ってください。',
+    pasteSpecialRequiresCopiedCells:
+      'この貼り付けオプションを使うには、先にセルをコピーまたは切り取ってください。',
   },
   cellStylesGallery: {
     title: 'セル スタイル',
@@ -576,7 +577,8 @@ export const ja: Strings = {
     existingWorksheet: '既存のワークシート',
     destination: '配置場所',
     destinationPlaceholder: '例: A10',
-    destinationRequiresExistingWorksheet: '配置場所を入力するには、既存のワークシートを選択してください。',
+    destinationRequiresExistingWorksheet:
+      '配置場所を入力するには、既存のワークシートを選択してください。',
     fieldList: 'ピボットテーブルのフィールド',
     availableFields: 'レポートに追加するフィールドを選択',
     fieldAreas: '下のエリア間でフィールドを配置',
@@ -748,6 +750,10 @@ export const ja: Strings = {
     pivotFilterItemsPlaceholder: '1 行に 1 項目',
     rowGrandTotals: '行の総計',
     columnGrandTotals: '列の総計',
+    objectSelect: '選択',
+    objectDelete: '削除',
+    shapeColor: '図形の色',
+    shapeRadius: '角丸半径',
     apply: '適用',
     deletePivotTable: '削除',
     invalidPivotAnchor: 'A1 のような有効なアンカー セルを入力してください。',
@@ -1255,7 +1261,8 @@ export const ja: Strings = {
     inspect: '検査',
     clipboard: 'クリップボード',
     paste: '貼り付け',
-    pasteRequiresClipboard: 'この貼り付けオプションを使うには、先にセルをコピーまたは切り取ってください。',
+    pasteRequiresClipboard:
+      'この貼り付けオプションを使うには、先にセルをコピーまたは切り取ってください。',
     cut: '切り取り',
     copy: 'コピー',
     formatPainter: '書式のコピー',
@@ -1589,7 +1596,8 @@ export const ja: Strings = {
     sheetNameRequired: 'シート名を入力してください。',
     formatNoHiddenRows: '選択範囲に非表示の行がありません。',
     formatNoHiddenCols: '選択範囲に非表示の列がありません。',
-    sheetActionUnavailable: 'このブック エンジンではシート名の変更、移動、非表示、再表示を実行できません。',
+    sheetActionUnavailable:
+      'このブック エンジンではシート名の変更、移動、非表示、再表示を実行できません。',
     sheetMoveAtBoundary: 'この方向にはこれ以上シートを移動できません。',
     sheetHideRequiresVisibleSheet: 'ブックには少なくとも 1 つの表示シートが必要です。',
     sheetUnhideRequiresHiddenSheet: '再表示できる非表示シートがありません。',

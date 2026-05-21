@@ -1,6 +1,10 @@
 import type { History } from '../commands/history.js';
 import type { PrinterProfile } from '../commands/printer-profile.js';
 import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
+import {
+  clearSessionIllustration,
+  updateSessionIllustration,
+} from '../commands/session-illustration.js';
 import { setSheetZoom } from '../commands/structure.js';
 import { tracePrecedents as tracePrecedentArrows } from '../commands/traces.js';
 import { formatCellForEdit } from '../engine/edit-seed.js';
@@ -520,6 +524,16 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           wb,
           strings,
           listSessionIllustrations: () => input.store.getState().illustrations.illustrations,
+          onSelectSessionIllustration: (id) => {
+            const panel = Array.from(
+              input.host.querySelectorAll<HTMLElement>('.fc-illustration'),
+            ).find((candidate) => candidate.dataset.illustrationId === id);
+            panel?.focus();
+          },
+          onClearSessionIllustration: (id) =>
+            clearSessionIllustration(input.store, id, input.history),
+          onUpdateSessionIllustration: (id, patch) =>
+            updateSessionIllustration(input.store, id, patch, input.history),
           subscribeSessionObjects: (listener) => input.store.subscribe(listener),
           onOpenPivotTableDialog: () => s.pivotTableDialog?.open(),
           onAfterPivotEdit: () => {

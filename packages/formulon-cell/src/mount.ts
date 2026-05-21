@@ -1062,6 +1062,7 @@ export const Spreadsheet = {
           Math.max(0, wb.sheetCount - 1),
         );
         mutators.setSheetIndex(store, nextSheet);
+        mutators.clearIllustrations(store);
         hydrateActiveSheet();
         hydrateWorkbookMetadataFromEngine(wb, store);
         dispatchPassthroughSummary();

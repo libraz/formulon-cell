@@ -581,6 +581,7 @@ export interface SessionIllustration {
   w?: number;
   h?: number;
   color?: string;
+  radius?: number;
 }
 
 export interface IllustrationsSlice {

@@ -225,6 +225,73 @@ describe('attachWorkbookObjectsPanel', () => {
     handle.detach();
   });
 
+  it('updates editable session shape appearance from the illustrations section', () => {
+    const onUpdateSessionIllustration = vi.fn();
+    const handle = attachWorkbookObjectsPanel({
+      host,
+      wb: emptyWb(),
+      strings: en,
+      listSessionIllustrations: () => [
+        {
+          id: 'shape-a',
+          kind: 'shape',
+          shape: 'rounded-rectangle',
+          sheet: 0,
+          color: '#0f6cbd',
+          radius: 8,
+        },
+      ],
+      onUpdateSessionIllustration,
+    });
+    handle.open();
+
+    const color = host.querySelector<HTMLInputElement>('input[type="color"]');
+    const radius = host.querySelector<HTMLInputElement>('input[type="number"]');
+    expect(color?.value).toBe('#0f6cbd');
+    expect(radius?.value).toBe('8');
+    expect(color).not.toBeNull();
+    expect(radius).not.toBeNull();
+    if (!color || !radius) throw new Error('Expected editable shape controls');
+    color.value = '#ff0000';
+    radius.value = '18';
+    radius.form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    expect(onUpdateSessionIllustration).toHaveBeenCalledWith('shape-a', {
+      color: '#ff0000',
+      radius: 18,
+    });
+    handle.detach();
+  });
+
+  it('routes session illustration select and delete actions from the list', () => {
+    const onSelectSessionIllustration = vi.fn();
+    const onClearSessionIllustration = vi.fn();
+    const handle = attachWorkbookObjectsPanel({
+      host,
+      wb: emptyWb(),
+      strings: en,
+      listSessionIllustrations: () => [
+        {
+          id: 'shape-a',
+          kind: 'shape',
+          shape: 'rectangle',
+          sheet: 0,
+        },
+      ],
+      onSelectSessionIllustration,
+      onClearSessionIllustration,
+    });
+    handle.open();
+
+    const buttons = Array.from(host.querySelectorAll<HTMLButtonElement>('.fc-objects__action'));
+    buttons.find((button) => button.textContent === 'Select')?.click();
+    buttons.find((button) => button.textContent === 'Delete')?.click();
+
+    expect(onSelectSessionIllustration).toHaveBeenCalledWith('shape-a');
+    expect(onClearSessionIllustration).toHaveBeenCalledWith('shape-a');
+    handle.detach();
+  });
+
   it('refreshes open session illustration details from the shared subscription', () => {
     let illustrations: SessionIllustration[] = [];
     const listeners = new Set<() => void>();
@@ -338,12 +405,14 @@ describe('attachWorkbookObjectsPanel', () => {
     expect(fieldSelects).toHaveLength(2);
     const [regionField, salesField] = fieldSelects as [HTMLSelectElement, HTMLSelectElement];
     expect(regionField.classList.contains('fc-objects__input')).toBe(true);
-    expect(Array.from(regionField.options, (option) => [option.value, option.textContent])).toEqual([
-      ['0', 'Rows'],
-      ['1', 'Columns'],
-      ['3', 'Filters'],
-      ['2', 'Values'],
-    ]);
+    expect(Array.from(regionField.options, (option) => [option.value, option.textContent])).toEqual(
+      [
+        ['0', 'Rows'],
+        ['1', 'Columns'],
+        ['3', 'Filters'],
+        ['2', 'Values'],
+      ],
+    );
     const salesAggregation = form?.querySelector<HTMLSelectElement>(
       '[data-pivot-aggregation-field-index="1"]',
     );
@@ -660,7 +729,9 @@ describe('attachWorkbookObjectsPanel', () => {
   it('keeps workbook object action buttons on the shared dialog primitive', () => {
     const source = readFileSync(join(root, 'src/interact/workbook-objects.ts'), 'utf8');
     expect(source).toContain('function createWorkbookObjectsActionButton(');
-    expect(source).toContain("createDialogButton({\n    label,\n    baseClass: 'fc-objects__action'");
+    expect(source).toContain(
+      "createDialogButton({\n    label,\n    baseClass: 'fc-objects__action'",
+    );
     expect(source).not.toContain("document.createElement('button')");
   });
 });

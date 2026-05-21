@@ -35,6 +35,7 @@ describe('session illustration commands', () => {
       w: undefined,
       h: undefined,
       color: undefined,
+      radius: undefined,
     });
     expect(image).toEqual({
       id: 'image-0-2-1',
@@ -100,11 +101,21 @@ describe('session illustration commands', () => {
     expect(sessionIllustrationById(store.getState(), 'missing')).toBeNull();
     expect(updateSessionIllustration(store, 'missing', { x: 10 })).toBeNull();
 
-    expect(updateSessionIllustration(store, 'shape-a', { x: 24, y: 40, w: 160 })).toMatchObject({
+    expect(
+      updateSessionIllustration(store, 'shape-a', {
+        x: 24,
+        y: 40,
+        w: 160,
+        color: '#ff0000',
+        radius: 16,
+      }),
+    ).toMatchObject({
       id: 'shape-a',
       x: 24,
       y: 40,
       w: 160,
+      color: '#ff0000',
+      radius: 16,
     });
     expect(clearSessionIllustration(store, 'missing')).toBe(false);
     expect(clearSessionIllustration(store, 'image-a')).toBe(true);

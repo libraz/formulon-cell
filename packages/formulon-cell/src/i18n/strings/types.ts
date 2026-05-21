@@ -769,6 +769,10 @@ export interface Strings {
     pivotFilterItemsPlaceholder: string;
     rowGrandTotals: string;
     columnGrandTotals: string;
+    objectSelect: string;
+    objectDelete: string;
+    shapeColor: string;
+    shapeRadius: string;
     apply: string;
     deletePivotTable: string;
     invalidPivotAnchor: string;

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { createSessionShape } from '../../../src/commands/session-illustration.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { presets } from '../../../src/extensions/presets.js';
 import { mutators } from '../../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/index.js';
@@ -154,6 +156,31 @@ describe('mount/engine-binding — grid double-click begins inline edit', () => 
     grid.dispatchEvent(new MouseEvent('dblclick', { button: 0, bubbles: true }));
     const editors = sheet.host.querySelectorAll('.fc-host__editor');
     expect(editors.length).toBe(1);
+  });
+});
+
+describe('mount/engine-binding — workbook replacement clears session objects', () => {
+  let sheet: MountedStubSheet;
+
+  beforeEach(async () => {
+    sheet = await mountStubSheet();
+  });
+
+  afterEach(() => sheet.dispose());
+
+  it('drops session illustrations when a new workbook is bound', async () => {
+    createSessionShape(
+      sheet.instance.store,
+      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+      { id: 'shape-a', shape: 'rounded-rectangle', color: '#0f6cbd', radius: 12 },
+      sheet.instance.history,
+    );
+    expect(sheet.instance.store.getState().illustrations.illustrations).toHaveLength(1);
+
+    const next = await WorkbookHandle.createDefault({ preferStub: true });
+    await sheet.instance.setWorkbook(next);
+
+    expect(sheet.instance.store.getState().illustrations.illustrations).toEqual([]);
   });
 });
 

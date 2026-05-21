@@ -739,6 +739,14 @@ export const mutators = {
     });
   },
 
+  clearIllustrations(store: SpreadsheetStore): void {
+    store.setState((s) =>
+      s.illustrations.illustrations.length === 0
+        ? s
+        : { ...s, illustrations: { illustrations: [] } },
+    );
+  },
+
   updateIllustration(
     store: SpreadsheetStore,
     id: string,
