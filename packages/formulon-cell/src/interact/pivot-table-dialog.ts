@@ -9,18 +9,15 @@ import { PivotAggregation, type PivotFilterSpec } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
-import {
-  appendDialogSelectOptions,
-  createDialogSelect,
-} from '../toolbar/dialogs/form-controls.js';
+import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
 import {
+  createPivotAreaSettingsButton,
   type PivotAreaKind,
   type PivotFieldSettingsActive,
   type PivotFilterConditionKind,
   type PivotFilterConditionState,
-  createPivotAreaSettingsButton,
   pivotFilterConditionToSpec,
   renderPivotFieldSettingsPanel,
 } from './pivot-field-settings.js';
@@ -117,10 +114,15 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   externalSourceInput.type = 'radio';
   externalSourceInput.name = 'fc-pivotdlg-source-kind';
   externalSourceInput.value = 'external';
-  projectDisabledState(externalSourceInput, true, strings.pivotTableDialog.externalSourceUnavailable, {
-    describedById: 'fc-pivotdlg-external-unavailable',
-    datasetKey: 'disabledReason',
-  });
+  projectDisabledState(
+    externalSourceInput,
+    true,
+    strings.pivotTableDialog.externalSourceUnavailable,
+    {
+      describedById: 'fc-pivotdlg-external-unavailable',
+      datasetKey: 'disabledReason',
+    },
+  );
   const nameInput = document.createElement('input');
   nameInput.type = 'text';
   nameInput.className = 'fc-namedlg__input';
@@ -953,7 +955,8 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       render();
       shell.open();
       open = true;
-      const initial = wb.capabilities.pivotTableMutate && sourceInput.isConnected ? sourceInput : cancelBtn;
+      const initial =
+        wb.capabilities.pivotTableMutate && sourceInput.isConnected ? sourceInput : cancelBtn;
       initial.focus({ preventScroll: true });
       if (initial === sourceInput) sourceInput.select();
     },

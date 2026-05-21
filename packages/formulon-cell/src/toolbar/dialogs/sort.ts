@@ -1,3 +1,5 @@
+import { projectDisabledState } from '../menu-a11y.js';
+import { createDialogSelect } from './form-controls.js';
 import {
   appendDialogActions,
   appendDialogButton,
@@ -5,8 +7,6 @@ import {
   installDialogLifecycle,
   mountDialog,
 } from './shell.js';
-import { projectDisabledState } from '../menu-a11y.js';
-import { createDialogSelect } from './form-controls.js';
 
 export interface SortDialogColumn {
   value: string;
@@ -146,12 +146,9 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
         opts.levelUnavailableLabel,
         { datasetKey: 'disabledReason' },
       );
-      projectDisabledState(
-        copyLevelBtn,
-        !hasSelected,
-        opts.levelUnavailableLabel,
-        { datasetKey: 'disabledReason' },
-      );
+      projectDisabledState(copyLevelBtn, !hasSelected, opts.levelUnavailableLabel, {
+        datasetKey: 'disabledReason',
+      });
     };
 
     const refreshLabels = (): void => {

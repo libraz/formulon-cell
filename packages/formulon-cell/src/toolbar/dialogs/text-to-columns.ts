@@ -1,3 +1,4 @@
+import { projectDisabledReason, projectDisabledState } from '../menu-a11y.js';
 import {
   appendDialogActions,
   appendErrorRow,
@@ -7,7 +8,6 @@ import {
   mountDialog,
   showDialogError,
 } from './shell.js';
-import { projectDisabledReason, projectDisabledState } from '../menu-a11y.js';
 
 export interface TextToColumnsDialogStrings {
   title: string;
@@ -176,7 +176,9 @@ export const showTextToColumnsDialog = (
     });
 
     const selectedDelimiters = (): string[] => {
-      const values = checks.filter((checkbox) => checkbox.checked).map((checkbox) => checkbox.value);
+      const values = checks
+        .filter((checkbox) => checkbox.checked)
+        .map((checkbox) => checkbox.value);
       if (otherInput.value) values.push(otherInput.value);
       return values;
     };

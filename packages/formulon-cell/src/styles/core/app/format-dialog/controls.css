@@ -43,7 +43,7 @@
     background: var(--fc-fmtdlg-input-bg);
     color: var(--fc-fmtdlg-input-fg, inherit);
     overflow: auto;
-    font: 12px/1.45 var(--fc-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+    font: 12px / 1.45 var(--fc-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
     white-space: pre;
   }
 

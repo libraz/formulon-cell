@@ -20,10 +20,10 @@ export {
 } from './conditional-format.js';
 export {
   applyConditionalStylePreview,
-  conditionalStyleFromValue,
-  conditionalStyleOptions,
   type ConditionalFormatStyleOption,
   type ConditionalFormatStyleStrings,
+  conditionalStyleFromValue,
+  conditionalStyleOptions,
   showConditionalFormatCustomStyleDialog,
 } from './conditional-format-style.js';
 export {
@@ -36,6 +36,7 @@ export {
   type FormatAsTableDialogResult,
   showFormatAsTableDialog,
 } from './format-as-table.js';
+export { type PageScaleDialogOptions, showPageScaleDialog } from './page-scale.js';
 export {
   type ConfirmOptions,
   type MessageOptions,
@@ -46,7 +47,16 @@ export {
   showNumberPrompt,
   showPrompt,
 } from './prompt.js';
-export { type PageScaleDialogOptions, showPageScaleDialog } from './page-scale.js';
+export {
+  type AllowEditRangeDialogOptions,
+  type AllowEditRangeDialogStrings,
+  type ProtectSheetDialogResult,
+  type ProtectSheetDialogStrings,
+  showAllowEditRangeDialog,
+  showProtectSheetDialog,
+  showUnprotectSheetDialog,
+  type UnprotectSheetDialogStrings,
+} from './protection.js';
 export {
   type RemoveDuplicatesDialogOptions,
   type RemoveDuplicatesDialogResult,
@@ -72,19 +82,9 @@ export {
   showSortDialog,
 } from './sort.js';
 export {
+  showTextToColumnsDialog,
   type TextToColumnsDialogOptions,
   type TextToColumnsDialogResult,
   type TextToColumnsDialogStrings,
-  showTextToColumnsDialog,
 } from './text-to-columns.js';
-export { type ZoomDialogOptions, showZoomDialog } from './zoom.js';
-export {
-  type AllowEditRangeDialogOptions,
-  type AllowEditRangeDialogStrings,
-  type ProtectSheetDialogResult,
-  type ProtectSheetDialogStrings,
-  type UnprotectSheetDialogStrings,
-  showAllowEditRangeDialog,
-  showProtectSheetDialog,
-  showUnprotectSheetDialog,
-} from './protection.js';
+export { showZoomDialog, type ZoomDialogOptions } from './zoom.js';

@@ -202,7 +202,9 @@ describe('attachGoToDialog', () => {
     const handle = attachGoToDialog({ host, store, getWb: () => wb });
     handle.open('go-to');
 
-    const picker = document.querySelector<HTMLButtonElement>('[data-range-picker="go-to-reference"]');
+    const picker = document.querySelector<HTMLButtonElement>(
+      '[data-range-picker="go-to-reference"]',
+    );
     const input = referenceInput();
     expect(picker?.getAttribute('aria-label')).toBe('範囲の選択');
     picker?.click();

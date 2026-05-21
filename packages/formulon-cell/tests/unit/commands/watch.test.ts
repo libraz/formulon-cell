@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { History } from '../../../src/commands/history.js';
 import {
   clearWatchedCells,
   isWatched,
@@ -11,7 +12,6 @@ import {
   watchRanges,
 } from '../../../src/commands/watch.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
-import { History } from '../../../src/commands/history.js';
 
 describe('watch commands', () => {
   it('adds a watched cell and ignores duplicates through the store mutator', () => {

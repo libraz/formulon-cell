@@ -6,10 +6,7 @@ import {
   PivotFilterValueKind,
 } from '../engine/types.js';
 import type { Strings } from '../i18n/strings.js';
-import {
-  appendDialogSelectOptions,
-  createDialogSelect,
-} from '../toolbar/dialogs/form-controls.js';
+import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import {
   appendDialogActions,
   appendDialogFrame,

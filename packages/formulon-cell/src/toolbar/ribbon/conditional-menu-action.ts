@@ -5,10 +5,10 @@
 // host-agnostic.
 
 import type {
+  CellFormat,
   ConditionalDialogOpenOptions,
   ConditionalPresetAction,
   ConditionalRule,
-  CellFormat,
   Range,
   SpreadsheetInstance,
 } from '@libraz/formulon-cell';

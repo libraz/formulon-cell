@@ -1,8 +1,8 @@
 import {
   applyConditionFilter,
   applyValueFilter,
-  clearFilter,
   type ConditionFilterOp,
+  clearFilter,
   distinctValues,
   filterValueKey,
   recordFilterChange,
@@ -34,10 +34,7 @@ export interface FilterDropdownHandle {
   detach(): void;
 }
 
-const createFilterDropdownActionButton = (
-  className: string,
-  label: string,
-): HTMLButtonElement => {
+const createFilterDropdownActionButton = (className: string, label: string): HTMLButtonElement => {
   return createInteractionButton({
     className,
     text: label,

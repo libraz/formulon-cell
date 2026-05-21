@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { coerceInput } from '../../../src/commands/coerce-input.js';
 import { History } from '../../../src/commands/history.js';
+import { setCellLocked, setProtectedSheet } from '../../../src/commands/protection.js';
 import {
   clearValidationInRange,
   clearValidationInRangeWithEngine,
@@ -9,7 +10,6 @@ import {
   validateAgainst,
 } from '../../../src/commands/validate.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { setCellLocked, setProtectedSheet } from '../../../src/commands/protection.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const coerce = (raw: string): ReturnType<typeof coerceInput> => coerceInput(raw);
@@ -286,7 +286,9 @@ describe('clearValidationInRange', () => {
       { sheet: 0, row: 0, col: 0 },
       { validation: { kind: 'list', source: ['A', 'B'] } },
     );
-    const calls: Array<{ kind: 'clear'; sheet: number } | { kind: 'add'; sheet: number; count: number }> = [];
+    const calls: Array<
+      { kind: 'clear'; sheet: number } | { kind: 'add'; sheet: number; count: number }
+    > = [];
     const wb = {
       capabilities: { dataValidation: true },
       clearValidations: (sheet: number) => {
@@ -300,12 +302,13 @@ describe('clearValidationInRange', () => {
     } as unknown as WorkbookHandle;
     const history = new History();
 
-    const count = clearValidationInRangeWithEngine(
-      store,
-      history,
-      wb,
-      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-    );
+    const count = clearValidationInRangeWithEngine(store, history, wb, {
+      sheet: 0,
+      r0: 0,
+      c0: 0,
+      r1: 0,
+      c1: 0,
+    });
 
     expect(count).toBe(1);
     expect(calls).toEqual([{ kind: 'clear', sheet: 0 }]);
@@ -344,12 +347,13 @@ describe('clearValidationInRange', () => {
     } as unknown as WorkbookHandle;
     const history = new History();
 
-    const count = clearValidationInRangeWithEngine(
-      store,
-      history,
-      wb,
-      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-    );
+    const count = clearValidationInRangeWithEngine(store, history, wb, {
+      sheet: 0,
+      r0: 0,
+      c0: 0,
+      r1: 0,
+      c1: 0,
+    });
 
     expect(count).toBe(0);
     expect(calls).toEqual([]);

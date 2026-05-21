@@ -119,11 +119,14 @@ export const printerProfilesFromHostDevices = (
     papers.forEach((paper, paperIndex) => {
       const paperSize = hostPaperSize(paper.paperSize);
       const orientation = hostOrientation(paper.orientation);
-      const deviceId = normalizePrinterProfileId(device.id) ?? normalizePrinterProfileId(device.name);
+      const deviceId =
+        normalizePrinterProfileId(device.id) ?? normalizePrinterProfileId(device.name);
       const paperOption = paper === device ? undefined : (paper as HostPrinterPaperOption);
       const paperId =
         normalizePrinterProfileId(paperOption?.id) ?? normalizePrinterProfileId(paperOption?.label);
-      const fallbackId = [deviceIndex, paperIndex, paperSize, orientation].filter(Boolean).join(':');
+      const fallbackId = [deviceIndex, paperIndex, paperSize, orientation]
+        .filter(Boolean)
+        .join(':');
       profiles.push({
         id: [deviceId, paperId ?? fallbackId].filter(Boolean).join(':') || undefined,
         name: printerProfileName(device, paper),

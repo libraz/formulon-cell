@@ -136,9 +136,10 @@ export const showFillSeriesDialog = (
         mode: selectedFillSeriesRadio<RibbonFillSeriesMode>(shell.overlay, modeName, 'auto'),
       });
     };
-    ({ finish } = installDialogLifecycle<
-      { direction: RibbonFillDirection; mode: RibbonFillSeriesMode } | null
-    >({
+    ({ finish } = installDialogLifecycle<{
+      direction: RibbonFillDirection;
+      mode: RibbonFillSeriesMode;
+    } | null>({
       shell,
       resolve,
       onSubmit: apply,

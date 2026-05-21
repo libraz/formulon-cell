@@ -76,24 +76,14 @@ export const showCellStyleDialog = (
       include.alignment,
       'alignment',
     );
-    const font = appendCheckboxRow(
-      shell.body,
-      t.cellStyleIncludeFont,
-      include.font,
-      'font',
-    );
+    const font = appendCheckboxRow(shell.body, t.cellStyleIncludeFont, include.font, 'font');
     const border = appendCheckboxRow(
       shell.body,
       t.cellStyleIncludeBorder,
       include.border,
       'border',
     );
-    const fill = appendCheckboxRow(
-      shell.body,
-      t.cellStyleIncludeFill,
-      include.fill,
-      'fill',
-    );
+    const fill = appendCheckboxRow(shell.body, t.cellStyleIncludeFill, include.fill, 'fill');
     const protection = appendCheckboxRow(
       shell.body,
       t.cellStyleIncludeProtection,

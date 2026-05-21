@@ -143,8 +143,8 @@ describe('attachExternalLinksDialog', () => {
     expect(rows[1]?.getAttribute('aria-selected')).toBe('true');
     expect(document.activeElement).toBe(rows[1]);
     expect(
-      document.querySelector<HTMLButtonElement>('[data-external-link-action="breakLink"]')
-        ?.dataset.disabledReason,
+      document.querySelector<HTMLButtonElement>('[data-external-link-action="breakLink"]')?.dataset
+        .disabledReason,
     ).toBe(defaultStrings.externalLinksDialog.readOnlyActionReason);
     handle.detach();
   });

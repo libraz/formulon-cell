@@ -61,7 +61,11 @@ export async function runMultiCellPasteUndoScenario(page: Page): Promise<void> {
     page.evaluate(
       ([r, c]: [number, number]) => {
         const inst = (window as Window & { __fcInst?: unknown }).__fcInst as
-          | { workbook: { getValue: (addr: { sheet: number; row: number; col: number }) => unknown } }
+          | {
+              workbook: {
+                getValue: (addr: { sheet: number; row: number; col: number }) => unknown;
+              };
+            }
           | undefined;
         return inst?.workbook.getValue({ sheet: 0, row: r, col: c });
       },
@@ -73,7 +77,10 @@ export async function runMultiCellPasteUndoScenario(page: Page): Promise<void> {
         const inst = (window as Window & { __fcInst?: unknown }).__fcInst as
           | {
               workbook: {
-                setNumber: (addr: { sheet: number; row: number; col: number }, value: number) => void;
+                setNumber: (
+                  addr: { sheet: number; row: number; col: number },
+                  value: number,
+                ) => void;
                 setText: (addr: { sheet: number; row: number; col: number }, value: string) => void;
                 recalc: () => void;
               };
@@ -111,65 +118,89 @@ export async function runMultiCellPasteUndoScenario(page: Page): Promise<void> {
     }));
   });
 
-  await expect.poll(() => readCell(0, 0), { timeout: 2_000 }).toEqual({
-    kind: 'text',
-    value: 'old-a',
-  });
-  await expect.poll(() => readCell(1, 1), { timeout: 2_000 }).toEqual({
-    kind: 'number',
-    value: 20,
-  });
+  await expect
+    .poll(() => readCell(0, 0), { timeout: 2_000 })
+    .toEqual({
+      kind: 'text',
+      value: 'old-a',
+    });
+  await expect
+    .poll(() => readCell(1, 1), { timeout: 2_000 })
+    .toEqual({
+      kind: 'number',
+      value: 20,
+    });
 
   await page.evaluate(() => navigator.clipboard.writeText('foo\t42\r\nbar\t99'));
   await sp.focusHost();
   await sp.shortcut('v');
 
-  await expect.poll(() => readCell(0, 0), { timeout: 2_000 }).toEqual({
-    kind: 'text',
-    value: 'foo',
-  });
-  await expect.poll(() => readCell(1, 1), { timeout: 2_000 }).toEqual({
-    kind: 'number',
-    value: 99,
-  });
+  await expect
+    .poll(() => readCell(0, 0), { timeout: 2_000 })
+    .toEqual({
+      kind: 'text',
+      value: 'foo',
+    });
+  await expect
+    .poll(() => readCell(1, 1), { timeout: 2_000 })
+    .toEqual({
+      kind: 'number',
+      value: 99,
+    });
 
   await sp.shortcut('z');
 
-  await expect.poll(() => readCell(0, 0), { timeout: 2_000 }).toEqual({
-    kind: 'text',
-    value: 'old-a',
-  });
-  await expect.poll(() => readCell(0, 1), { timeout: 2_000 }).toEqual({
-    kind: 'number',
-    value: 10,
-  });
-  await expect.poll(() => readCell(1, 0), { timeout: 2_000 }).toEqual({
-    kind: 'text',
-    value: 'old-b',
-  });
-  await expect.poll(() => readCell(1, 1), { timeout: 2_000 }).toEqual({
-    kind: 'number',
-    value: 20,
-  });
+  await expect
+    .poll(() => readCell(0, 0), { timeout: 2_000 })
+    .toEqual({
+      kind: 'text',
+      value: 'old-a',
+    });
+  await expect
+    .poll(() => readCell(0, 1), { timeout: 2_000 })
+    .toEqual({
+      kind: 'number',
+      value: 10,
+    });
+  await expect
+    .poll(() => readCell(1, 0), { timeout: 2_000 })
+    .toEqual({
+      kind: 'text',
+      value: 'old-b',
+    });
+  await expect
+    .poll(() => readCell(1, 1), { timeout: 2_000 })
+    .toEqual({
+      kind: 'number',
+      value: 20,
+    });
 
   await sp.shortcut('y');
 
-  await expect.poll(() => readCell(0, 0), { timeout: 2_000 }).toEqual({
-    kind: 'text',
-    value: 'foo',
-  });
-  await expect.poll(() => readCell(0, 1), { timeout: 2_000 }).toEqual({
-    kind: 'number',
-    value: 42,
-  });
-  await expect.poll(() => readCell(1, 0), { timeout: 2_000 }).toEqual({
-    kind: 'text',
-    value: 'bar',
-  });
-  await expect.poll(() => readCell(1, 1), { timeout: 2_000 }).toEqual({
-    kind: 'number',
-    value: 99,
-  });
+  await expect
+    .poll(() => readCell(0, 0), { timeout: 2_000 })
+    .toEqual({
+      kind: 'text',
+      value: 'foo',
+    });
+  await expect
+    .poll(() => readCell(0, 1), { timeout: 2_000 })
+    .toEqual({
+      kind: 'number',
+      value: 42,
+    });
+  await expect
+    .poll(() => readCell(1, 0), { timeout: 2_000 })
+    .toEqual({
+      kind: 'text',
+      value: 'bar',
+    });
+  await expect
+    .poll(() => readCell(1, 1), { timeout: 2_000 })
+    .toEqual({
+      kind: 'number',
+      value: 99,
+    });
 }
 
 /** C05 — ribbon Paste must use the same transaction semantics as Mod+V. */
@@ -182,7 +213,11 @@ export async function runRibbonPasteUndoScenario(page: Page): Promise<void> {
     page.evaluate(
       ([r, c]: [number, number]) => {
         const inst = (window as Window & { __fcInst?: unknown }).__fcInst as
-          | { workbook: { getValue: (addr: { sheet: number; row: number; col: number }) => unknown } }
+          | {
+              workbook: {
+                getValue: (addr: { sheet: number; row: number; col: number }) => unknown;
+              };
+            }
           | undefined;
         return inst?.workbook.getValue({ sheet: 0, row: r, col: c });
       },
@@ -194,7 +229,10 @@ export async function runRibbonPasteUndoScenario(page: Page): Promise<void> {
         const inst = (window as Window & { __fcInst?: unknown }).__fcInst as
           | {
               workbook: {
-                setNumber: (addr: { sheet: number; row: number; col: number }, value: number) => void;
+                setNumber: (
+                  addr: { sheet: number; row: number; col: number },
+                  value: number,
+                ) => void;
                 setText: (addr: { sheet: number; row: number; col: number }, value: string) => void;
                 recalc: () => void;
               };
@@ -238,50 +276,70 @@ export async function runRibbonPasteUndoScenario(page: Page): Promise<void> {
   await page.evaluate(() => navigator.clipboard.writeText('foo\t42\r\nbar\t99'));
   await page.locator('[data-ribbon-command="paste"]').click();
 
-  await expect.poll(() => readCell(0, 0), { timeout: 2_000 }).toEqual({
-    kind: 'text',
-    value: 'foo',
-  });
-  await expect.poll(() => readCell(1, 1), { timeout: 2_000 }).toEqual({
-    kind: 'number',
-    value: 99,
-  });
+  await expect
+    .poll(() => readCell(0, 0), { timeout: 2_000 })
+    .toEqual({
+      kind: 'text',
+      value: 'foo',
+    });
+  await expect
+    .poll(() => readCell(1, 1), { timeout: 2_000 })
+    .toEqual({
+      kind: 'number',
+      value: 99,
+    });
 
   await sp.shortcut('z');
 
-  await expect.poll(() => readCell(0, 0), { timeout: 2_000 }).toEqual({
-    kind: 'text',
-    value: 'old-a',
-  });
-  await expect.poll(() => readCell(0, 1), { timeout: 2_000 }).toEqual({
-    kind: 'number',
-    value: 10,
-  });
-  await expect.poll(() => readCell(1, 0), { timeout: 2_000 }).toEqual({
-    kind: 'text',
-    value: 'old-b',
-  });
-  await expect.poll(() => readCell(1, 1), { timeout: 2_000 }).toEqual({
-    kind: 'number',
-    value: 20,
-  });
+  await expect
+    .poll(() => readCell(0, 0), { timeout: 2_000 })
+    .toEqual({
+      kind: 'text',
+      value: 'old-a',
+    });
+  await expect
+    .poll(() => readCell(0, 1), { timeout: 2_000 })
+    .toEqual({
+      kind: 'number',
+      value: 10,
+    });
+  await expect
+    .poll(() => readCell(1, 0), { timeout: 2_000 })
+    .toEqual({
+      kind: 'text',
+      value: 'old-b',
+    });
+  await expect
+    .poll(() => readCell(1, 1), { timeout: 2_000 })
+    .toEqual({
+      kind: 'number',
+      value: 20,
+    });
 
   await sp.shortcut('y');
 
-  await expect.poll(() => readCell(0, 0), { timeout: 2_000 }).toEqual({
-    kind: 'text',
-    value: 'foo',
-  });
-  await expect.poll(() => readCell(0, 1), { timeout: 2_000 }).toEqual({
-    kind: 'number',
-    value: 42,
-  });
-  await expect.poll(() => readCell(1, 0), { timeout: 2_000 }).toEqual({
-    kind: 'text',
-    value: 'bar',
-  });
-  await expect.poll(() => readCell(1, 1), { timeout: 2_000 }).toEqual({
-    kind: 'number',
-    value: 99,
-  });
+  await expect
+    .poll(() => readCell(0, 0), { timeout: 2_000 })
+    .toEqual({
+      kind: 'text',
+      value: 'foo',
+    });
+  await expect
+    .poll(() => readCell(0, 1), { timeout: 2_000 })
+    .toEqual({
+      kind: 'number',
+      value: 42,
+    });
+  await expect
+    .poll(() => readCell(1, 0), { timeout: 2_000 })
+    .toEqual({
+      kind: 'text',
+      value: 'bar',
+    });
+  await expect
+    .poll(() => readCell(1, 1), { timeout: 2_000 })
+    .toEqual({
+      kind: 'number',
+      value: 99,
+    });
 }

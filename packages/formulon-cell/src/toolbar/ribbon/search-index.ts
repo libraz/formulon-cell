@@ -78,10 +78,10 @@ const COMMAND_SEARCH_ALIASES: Readonly<Record<string, string>> = {
   wrap: 'wrap text line break multiline text 折り返し 折り返して全体を表示',
   conditional: 'conditional format highlight rules color scale data bars 条件付き書式',
   viewGridlines: 'show gridlines hide gridlines sheet grid grid lines グリッド線 枠線 表示 非表示',
-  viewHeadings: 'show headings hide headings row column headers headings 見出し 行列番号 表示 非表示',
+  viewHeadings:
+    'show headings hide headings row column headers headings 見出し 行列番号 表示 非表示',
   viewFormulaBar: 'show formula bar hide formula bar fx bar 数式バー 表示 非表示',
-  viewPageBreakPreview:
-    'page break preview preview page breaks 改ページプレビュー 改ページ 表示',
+  viewPageBreakPreview: 'page break preview preview page breaks 改ページプレビュー 改ページ 表示',
   pictureInsert:
     'insert pictures picture image this device stock images stock image online pictures online image 画像 写真 挿入',
   shapesInsert: 'insert shapes lines rectangles arrows triangle diamond 図形 線 矢印 挿入',

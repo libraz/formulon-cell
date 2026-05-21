@@ -50,7 +50,10 @@ const cellText = (state: State, sheet: number, row: number, col: number): string
 };
 
 const sanitizeName = (raw: string, fallback: string): string => {
-  const compact = raw.trim().replace(/\s+/g, '_').replace(/[^A-Za-z0-9_.\\]/g, '_');
+  const compact = raw
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[^A-Za-z0-9_.\\]/g, '_');
   const base = compact || fallback;
   return /^[A-Za-z_\\]/.test(base) ? base : `_${base}`;
 };
@@ -69,10 +72,7 @@ const uniqueName = (base: string, used: Set<string>): string => {
 const captureDefinedNamesSnapshot = (wb: WorkbookHandle): DefinedNamesSnapshot =>
   new Map([...wb.definedNames()].map((entry) => [entry.name, entry.formula]));
 
-const sameDefinedNamesSnapshot = (
-  a: DefinedNamesSnapshot,
-  b: DefinedNamesSnapshot,
-): boolean => {
+const sameDefinedNamesSnapshot = (a: DefinedNamesSnapshot, b: DefinedNamesSnapshot): boolean => {
   if (a.size !== b.size) return false;
   for (const [name, formula] of a) {
     if (b.get(name) !== formula) return false;
@@ -139,7 +139,9 @@ export function createDefinedNamesFromSelection(
   state: State,
   wb: WorkbookHandle,
   source: CreateDefinedNamesSource,
-): CreateDefinedNamesResult | { ok: false; reason: 'unsupported' | 'empty-selection' | 'engine-failed' } {
+):
+  | CreateDefinedNamesResult
+  | { ok: false; reason: 'unsupported' | 'empty-selection' | 'engine-failed' } {
   if (!wb.capabilities.definedNameMutate) return { ok: false, reason: 'unsupported' };
   const sheet = state.selection.range.sheet;
   const r = state.selection.range;

@@ -143,7 +143,10 @@ function shiftFormats(
   recordFormatChange(history, store, () => {
     store.setState((s) => ({
       ...s,
-      format: { ...s.format, formats: shiftFormatMap(s.format.formats, affected, direction, delta) },
+      format: {
+        ...s.format,
+        formats: shiftFormatMap(s.format.formats, affected, direction, delta),
+      },
     }));
   });
 }

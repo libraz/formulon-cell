@@ -25,7 +25,8 @@ const sameTrace = (a: TraceArrow, b: TraceArrow): boolean =>
   a.kind === b.kind && sameAddr(a.from, b.from) && sameAddr(a.to, b.to);
 
 const sameTraceSnapshot = (a: readonly TraceArrow[], b: readonly TraceArrow[]): boolean =>
-  a.length === b.length && a.every((arrow, index) => {
+  a.length === b.length &&
+  a.every((arrow, index) => {
     const other = b[index];
     return other ? sameTrace(arrow, other) : false;
   });

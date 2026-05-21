@@ -21,7 +21,8 @@ const splitText = (
     (delimiter) => delimiter !== '',
   );
   if (list.length === 0) return [value];
-  if (list.length === 1 && !options.collapseConsecutiveDelimiters) return value.split(list[0] ?? '');
+  if (list.length === 1 && !options.collapseConsecutiveDelimiters)
+    return value.split(list[0] ?? '');
   const pattern = new RegExp(
     `(?:${list.map((delimiter) => delimiter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})${
       options.collapseConsecutiveDelimiters ? '+' : ''

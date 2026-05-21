@@ -98,12 +98,12 @@
        picker buttons. */
     min-height: 24px;
     padding: 3px 10px;
+    font: inherit;
     line-height: 18px;
     background: transparent;
     border: 0;
     color: inherit;
     cursor: pointer;
-    font: inherit;
     text-align: left;
   }
 

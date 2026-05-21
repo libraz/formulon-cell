@@ -199,9 +199,7 @@ describe('attachCfRulesDialog', () => {
     expect(commandMoveUp?.dataset.disabledReason).toBe(
       defaultStrings.cfRulesDialog.moveUpUnavailable,
     );
-    expect(rowMoveUp?.dataset.disabledReason).toBe(
-      defaultStrings.cfRulesDialog.moveUpUnavailable,
-    );
+    expect(rowMoveUp?.dataset.disabledReason).toBe(defaultStrings.cfRulesDialog.moveUpUnavailable);
 
     const rows = document.querySelectorAll<HTMLTableRowElement>('.fc-cfrulesdlg__table tbody tr');
     rows[1]?.click();
@@ -251,7 +249,9 @@ describe('attachCfRulesDialog', () => {
     const deleteRule = document.querySelector<HTMLButtonElement>('.fc-cfrulesdlg__delete');
     expect(edit?.disabled).toBe(true);
     expect(edit?.title).toBe(defaultStrings.cfRulesDialog.editUnavailable);
-    expect(edit?.getAttribute('aria-description')).toBe(defaultStrings.cfRulesDialog.editUnavailable);
+    expect(edit?.getAttribute('aria-description')).toBe(
+      defaultStrings.cfRulesDialog.editUnavailable,
+    );
     expect(edit?.dataset.disabledReason).toBe(defaultStrings.cfRulesDialog.editUnavailable);
     expect(duplicate?.disabled).toBe(true);
     expect(duplicate?.getAttribute('aria-description')).toBe(

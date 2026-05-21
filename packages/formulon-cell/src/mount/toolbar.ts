@@ -750,8 +750,7 @@ export function mountToolbar(
     const shouldCloseStaticMenus = hasOpenStaticRibbonMenu();
     const shouldRenderDisplayState =
       displayMenuOpen || (displayMode === 'autoHide' && autoHidePeek);
-    if (!shouldRenderDisplayState && !shouldCloseStaticMenus)
-      return;
+    if (!shouldRenderDisplayState && !shouldCloseStaticMenus) return;
     const target = e.target;
     if (!(target instanceof Element)) return;
     if (host.contains(target)) return;

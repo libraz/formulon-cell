@@ -304,10 +304,7 @@ export function attachSessionCharts(deps: {
           'aria-keyshortcuts',
           'ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown Delete Backspace',
         );
-        panel.setAttribute(
-          'aria-label',
-          chartLabel(chart, labels),
-        );
+        panel.setAttribute('aria-label', chartLabel(chart, labels));
         panel.style.left = `${chart.x ?? 320 + idx * 24}px`;
         panel.style.top = `${chart.y ?? 72 + idx * 24}px`;
         panel.style.width = `${chart.w ?? 360}px`;

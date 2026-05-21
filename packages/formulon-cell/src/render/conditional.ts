@@ -564,7 +564,8 @@ function excelSerialToDate(serial: number): Date {
 }
 
 function cellDateDay(v: CellValue): number | null {
-  if (v.kind === 'number' && Number.isFinite(v.value)) return normalizeDate(excelSerialToDate(v.value));
+  if (v.kind === 'number' && Number.isFinite(v.value))
+    return normalizeDate(excelSerialToDate(v.value));
   if (v.kind === 'text') {
     const time = Date.parse(v.value);
     if (Number.isFinite(time)) return normalizeDate(new Date(time));
@@ -583,7 +584,10 @@ function monthKey(day: number): number {
   return d.getUTCFullYear() * 12 + d.getUTCMonth();
 }
 
-function datePeriodMatches(day: number, period: Extract<ConditionalRule, { kind: 'date-occurring' }>['period']): boolean {
+function datePeriodMatches(
+  day: number,
+  period: Extract<ConditionalRule, { kind: 'date-occurring' }>['period'],
+): boolean {
   const today = normalizeDate(new Date());
   switch (period) {
     case 'yesterday':

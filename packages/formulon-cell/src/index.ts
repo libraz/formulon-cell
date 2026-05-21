@@ -88,12 +88,6 @@ export {
   listConditionalRules,
   removeConditionalRuleAt,
 } from './commands/conditional-format.js';
-export type {
-  ReportDialogLabels,
-  ReportItem,
-  ReportOptions,
-} from './toolbar/dialogs/report.js';
-export { reportDialogLabels, showReport } from './toolbar/dialogs/report.js';
 export {
   cellValueIsFormulaError,
   circleInvalidValidationData,
@@ -335,12 +329,12 @@ export {
   ungroupRows,
 } from './commands/outline.js';
 export type {
+  HostPrinterDevice,
+  HostPrinterPaperOption,
   MarginPreset,
   PageBreakAxis,
   PageSetupEntry,
   PageSetupPatch,
-  HostPrinterDevice,
-  HostPrinterPaperOption,
   PrinterProfile,
 } from './commands/page-setup.js';
 export {
@@ -356,8 +350,8 @@ export {
   normalizePrinterProfile,
   normalizePrinterProfileId,
   normalizePrinterProfiles,
-  printerProfilesFromHostDevices,
   pageSetupForSheet,
+  printerProfilesFromHostDevices,
   removeManualPageBreak,
   resetManualPageBreaks,
   resetPageSetup,
@@ -852,17 +846,6 @@ export {
   collectConditionalApplyPatch,
 } from './interact/conditional-apply-controls.js';
 export type {
-  ConditionalFormatDialogStyle,
-  ConditionalFormatStyleOption,
-  ConditionalFormatStyleStrings,
-} from './toolbar/dialogs/conditional-format-style.js';
-export {
-  applyConditionalStylePreview,
-  conditionalStyleFromValue,
-  conditionalStyleOptions,
-  showConditionalFormatCustomStyleDialog,
-} from './toolbar/dialogs/conditional-format-style.js';
-export type {
   ConditionalDialogDeps,
   ConditionalDialogHandle,
   ConditionalDialogOpenOptions,
@@ -887,11 +870,6 @@ export type { FindReplaceDeps, FindReplaceHandle } from './interact/find-replace
 export { attachFindReplace } from './interact/find-replace.js';
 export type { FormatDialogDeps, FormatDialogHandle } from './interact/format-dialog.js';
 export { attachFormatDialog } from './interact/format-dialog.js';
-export type { RangePickerControlOptions } from './interact/range-picker-control.js';
-export {
-  attachRangePickerButton,
-  updateRangePickerLabel,
-} from './interact/range-picker-control.js';
 export type { FormatPainterDeps, FormatPainterHandle } from './interact/format-painter.js';
 export { attachFormatPainter } from './interact/format-painter.js';
 export type { FxDialogDeps, FxDialogHandle } from './interact/fx-dialog.js';
@@ -919,6 +897,11 @@ export type { PasteSpecialDeps, PasteSpecialHandle } from './interact/paste-spec
 export { attachPasteSpecial } from './interact/paste-special.js';
 export type { QuickAnalysisDeps, QuickAnalysisHandle } from './interact/quick-analysis.js';
 export { attachQuickAnalysis } from './interact/quick-analysis.js';
+export type { RangePickerControlOptions } from './interact/range-picker-control.js';
+export {
+  attachRangePickerButton,
+  updateRangePickerLabel,
+} from './interact/range-picker-control.js';
 export type {
   BuildRibbonAddInReportStrings,
   RibbonAddInAction,
@@ -1060,10 +1043,28 @@ export type {
 export { createSpreadsheetStore, defaultPageSetup, getPageSetup, mutators } from './store/store.js';
 export type { ResolvedTheme } from './theme/resolve.js';
 export { resolveTheme } from './theme/resolve.js';
+export type {
+  ConditionalFormatDialogStyle,
+  ConditionalFormatStyleOption,
+  ConditionalFormatStyleStrings,
+} from './toolbar/dialogs/conditional-format-style.js';
+export {
+  applyConditionalStylePreview,
+  conditionalStyleFromValue,
+  conditionalStyleOptions,
+  showConditionalFormatCustomStyleDialog,
+} from './toolbar/dialogs/conditional-format-style.js';
+export type {
+  ReportDialogLabels,
+  ReportItem,
+  ReportOptions,
+} from './toolbar/dialogs/report.js';
+export { reportDialogLabels, showReport } from './toolbar/dialogs/report.js';
 export type { FluentIconName } from './toolbar/fluent-icons.js';
 export { FLUENT_ICON_PATHS, fluentIconPaths } from './toolbar/fluent-icons.js';
 export type { IconName } from './toolbar/icon-paths.js';
 export { ICON_PATHS } from './toolbar/icon-paths.js';
+export type { DisabledReasonProjectionOptions } from './toolbar/menu-a11y.js';
 export {
   focusMenuItem,
   handleMenuKeydown,
@@ -1071,7 +1072,6 @@ export {
   projectDisabledReason,
   projectDisabledState,
 } from './toolbar/menu-a11y.js';
-export type { DisabledReasonProjectionOptions } from './toolbar/menu-a11y.js';
 export {
   type BackstageMenuText,
   backstageMenuText,
@@ -1104,6 +1104,11 @@ export {
   parseScriptCommand,
   reviewCellsFromState,
 } from './toolbar/review-tools.js';
+export type {
+  RibbonActivationEntry,
+  RibbonActivationKind,
+  RibbonActivationSpec,
+} from './toolbar/ribbon/activation.js';
 export {
   RIBBON_BORDERS_MENU_ID,
   RIBBON_DIALOG_COMMANDS,
@@ -1111,16 +1116,16 @@ export {
   RIBBON_DROPDOWN_COMMANDS,
   RIBBON_DROPDOWN_MENU_FOR_COMMAND,
   RIBBON_DYNAMIC_MENU_FIRST_COMMANDS,
-  RIBBON_EXTERNAL_MENU_FOR_COMMAND,
   RIBBON_EXTERNAL_MENU_FIRST_COMMANDS,
+  RIBBON_EXTERNAL_MENU_FOR_COMMAND,
   RIBBON_GALLERY_COMMANDS,
   RIBBON_MENU_FACTORY_FOR_COMMAND,
   RIBBON_MENU_FACTORY_KEYS,
-  RIBBON_MENU_FOR_COMMAND,
   RIBBON_MENU_FIRST_COMMANDS,
-  RIBBON_PRIMARY_FACE_MENU_COMMANDS,
+  RIBBON_MENU_FOR_COMMAND,
   RIBBON_PRIMARY_ACTION_COMMANDS,
   RIBBON_PRIMARY_ACTION_SPLIT_COMMANDS,
+  RIBBON_PRIMARY_FACE_MENU_COMMANDS,
   RIBBON_SPLIT_BUTTON_COMMANDS,
   RIBBON_SPLIT_TOGGLE_COMMANDS,
   RIBBON_TOGGLE_COMMANDS,
@@ -1129,11 +1134,6 @@ export {
   ribbonActivationEntries,
   ribbonActivationEntriesForCommands,
   ribbonActivationForCommand,
-} from './toolbar/ribbon/activation.js';
-export type {
-  RibbonActivationEntry,
-  RibbonActivationKind,
-  RibbonActivationSpec,
 } from './toolbar/ribbon/activation.js';
 export type {
   ApplyRibbonCommandDeps,
@@ -1184,8 +1184,8 @@ export {
   RIBBON_DIALOG_OPENERS,
   RIBBON_FORMAT_MUTATORS,
   RIBBON_FUNCTION_ARG_OPENERS,
-  RIBBON_VIEW_MODES,
   RIBBON_PRIMARY_SPLIT_DIALOG_COMMANDS,
+  RIBBON_VIEW_MODES,
   RIBBON_ZOOM_PRESETS,
 } from './toolbar/ribbon/command-tables.js';
 export type {
@@ -1329,8 +1329,8 @@ export {
   ribbonActivatableCommands,
   ribbonActivatableSurfaceCommandIds,
   ribbonActivatableSurfaceCommands,
-  ribbonCommands,
   ribbonCommandIds,
+  ribbonCommands,
   ribbonSurfaceCommandIds,
   ribbonSurfaceCommands,
   ribbonTabCommandIds,

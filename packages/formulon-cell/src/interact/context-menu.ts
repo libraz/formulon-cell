@@ -439,11 +439,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     buildMenu(kind);
     if (pasteBtnRef) {
       const canPaste = canReadClipboard();
-      setContextMenuItemDisabled(
-        pasteBtnRef,
-        !canPaste,
-        strings.contextMenu.clipboardUnavailable,
-      );
+      setContextMenuItemDisabled(pasteBtnRef, !canPaste, strings.contextMenu.clipboardUnavailable);
     }
     root.style.display = 'block';
     root.style.left = '-9999px';

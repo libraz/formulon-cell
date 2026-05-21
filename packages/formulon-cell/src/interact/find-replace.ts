@@ -374,15 +374,10 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     replaceAllBtn.hidden = activeTab === 'find';
     findAllBtn.hidden = activeTab === 'replace';
     const lookInDisabled = activeTab === 'replace';
-    projectDisabledState(
-      lookInSelect,
-      lookInDisabled,
-      t.lookInRequiresFindTab,
-      {
-        datasetKey: 'disabledReason',
-        titlePrefix: t.lookIn,
-      },
-    );
+    projectDisabledState(lookInSelect, lookInDisabled, t.lookInRequiresFindTab, {
+      datasetKey: 'disabledReason',
+      titlePrefix: t.lookIn,
+    });
     projectDisabledReason(lookInRow.label, lookInDisabled ? t.lookInRequiresFindTab : null, {
       ariaDescription: false,
       titlePrefix: t.lookIn,

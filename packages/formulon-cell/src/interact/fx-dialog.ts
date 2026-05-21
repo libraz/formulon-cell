@@ -1,10 +1,7 @@
 import { FUNCTION_SIGNATURES } from '../commands/refs.js';
 import { defaultStrings, en as enStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import {
-  appendDialogSelectOptions,
-  createDialogSelect,
-} from '../toolbar/dialogs/form-controls.js';
+import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import {
   appendDialogActions,
@@ -32,7 +29,10 @@ type FunctionCategory =
   | 'financial'
   | 'dynamicArray';
 
-const FUNCTION_CATEGORY_NAMES: Record<Exclude<FunctionCategory, 'all' | 'recent'>, readonly string[]> = {
+const FUNCTION_CATEGORY_NAMES: Record<
+  Exclude<FunctionCategory, 'all' | 'recent'>,
+  readonly string[]
+> = {
   logical: ['IF', 'IFS', 'IFERROR', 'IFNA', 'AND', 'OR', 'NOT', 'XOR', 'TRUE', 'FALSE'],
   lookup: [
     'VLOOKUP',
@@ -427,7 +427,10 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   const categoryNames = (): string[] => {
     if (selectedCategory === 'all') return [...allNames];
     if (selectedCategory === 'recent')
-      return recentNames.filter((name) => name in FUNCTION_SIGNATURES).slice().sort();
+      return recentNames
+        .filter((name) => name in FUNCTION_SIGNATURES)
+        .slice()
+        .sort();
     return FUNCTION_CATEGORY_NAMES[selectedCategory]
       .filter((name) => name in FUNCTION_SIGNATURES)
       .slice()

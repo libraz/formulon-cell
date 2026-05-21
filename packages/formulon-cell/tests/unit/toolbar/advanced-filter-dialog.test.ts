@@ -39,7 +39,9 @@ describe('showAdvancedFilterDialog', () => {
     const criteriaRange = document.querySelector<HTMLInputElement>(
       '[data-range-picker="advanced-filter-criteria-range"]',
     );
-    const copyTo = document.querySelector<HTMLInputElement>('[data-range-picker="advanced-filter-copy-to"]');
+    const copyTo = document.querySelector<HTMLInputElement>(
+      '[data-range-picker="advanced-filter-copy-to"]',
+    );
     const inputs = document.querySelectorAll<HTMLInputElement>('.fc-range-picker input');
     const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
     expect(dialog?.querySelector('.fc-advfilter__ranges')).toBeTruthy();
@@ -56,21 +58,21 @@ describe('showAdvancedFilterDialog', () => {
     listRange?.click();
     expect(listRange?.dataset.rangePickerActive).toBe('true');
     pickedRange = 'B2:D8';
-    listeners.forEach((listener) => listener());
+    for (const listener of listeners) listener();
     expect(inputs[0]?.value).toBe('B2:D8');
 
     criteriaRange?.click();
     expect(listRange?.dataset.rangePickerActive).toBe('false');
     expect(criteriaRange?.dataset.rangePickerActive).toBe('true');
     pickedRange = 'F1:G2';
-    listeners.forEach((listener) => listener());
+    for (const listener of listeners) listener();
     expect(inputs[1]?.value).toBe('F1:G2');
 
     copyTo?.click();
     expect(criteriaRange?.dataset.rangePickerActive).toBe('false');
     expect(copyTo?.dataset.rangePickerActive).toBe('true');
     pickedAddress = 'J4';
-    listeners.forEach((listener) => listener());
+    for (const listener of listeners) listener();
     expect(inputs[2]?.value).toBe('J4');
 
     document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
@@ -106,7 +108,9 @@ describe('showAdvancedFilterDialog', () => {
     expect(inputs[1]?.selectionStart).toBe(0);
     expect(inputs[1]?.selectionEnd).toBe(inputs[1]?.value.length);
 
-    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary)')?.click();
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary)')
+      ?.click();
     await expect(pending).resolves.toBeNull();
   });
 });

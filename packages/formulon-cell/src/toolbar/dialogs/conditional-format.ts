@@ -1,4 +1,12 @@
 import {
+  applyConditionalStylePreview,
+  type ConditionalFormatDialogStyle,
+  conditionalStyleFromValue,
+  conditionalStyleOptions,
+  showConditionalFormatCustomStyleDialog,
+} from './conditional-format-style.js';
+import { createDialogSelect } from './form-controls.js';
+import {
   appendDialogActions,
   appendErrorRow,
   appendInputRow,
@@ -8,14 +16,6 @@ import {
   mountDialog,
   showInputError,
 } from './shell.js';
-import { createDialogSelect } from './form-controls.js';
-import {
-  applyConditionalStylePreview,
-  conditionalStyleFromValue,
-  conditionalStyleOptions,
-  type ConditionalFormatDialogStyle,
-  showConditionalFormatCustomStyleDialog,
-} from './conditional-format-style.js';
 
 export type { ConditionalFormatDialogStyle } from './conditional-format-style.js';
 export {

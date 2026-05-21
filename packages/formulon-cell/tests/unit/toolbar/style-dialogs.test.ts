@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { ja } from '../../../src/i18n/strings.js';
 import { showCellStyleDialog } from '../../../src/toolbar/dialogs/cell-style.js';
@@ -10,7 +10,9 @@ const sourcePath = (relative: string): string =>
   join(process.cwd(), 'src/toolbar/dialogs', relative);
 
 const closeDialog = async (): Promise<void> => {
-  document.body.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary)')?.click();
+  document.body
+    .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary)')
+    ?.click();
   await Promise.resolve();
 };
 

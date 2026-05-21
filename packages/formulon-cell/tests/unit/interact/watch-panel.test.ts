@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { History } from '../../../src/commands/history.js';
 import type { CellValue } from '../../../src/engine/types.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachWatchPanel } from '../../../src/interact/watch-panel.js';
-import { History } from '../../../src/commands/history.js';
 import {
   createSpreadsheetStore,
   mutators,

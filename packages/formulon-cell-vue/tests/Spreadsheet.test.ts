@@ -1,8 +1,8 @@
 import * as Core from '@libraz/formulon-cell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
-import * as VuePackage from '../src';
 import type { ScreenClipCapture, ScreenClipResult } from '../src';
+import * as VuePackage from '../src';
 import { type MountedVueSpreadsheet, mountVueSpreadsheet } from './test-utils/mount';
 
 const flush = async (): Promise<void> => {

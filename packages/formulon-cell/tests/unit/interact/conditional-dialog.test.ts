@@ -6,8 +6,8 @@ import { History } from '../../../src/commands/history.js';
 import { en, ja } from '../../../src/i18n/strings.js';
 import {
   appendConditionalApplyFormatControls,
-  attachRangePickerButton,
   applyPatchToConditionalApplyControls,
+  attachRangePickerButton,
   collectConditionalApplyPatch,
   updateRangePickerLabel,
 } from '../../../src/index.js';
@@ -83,17 +83,17 @@ describe('attachConditionalDialog', () => {
 
     picker?.click();
     expect(picker?.dataset.rangePickerActive).toBe('true');
-    expect(document.querySelector('.fc-conddlg')?.classList.contains('fc-fmtdlg--range-picking')).toBe(
-      true,
-    );
+    expect(
+      document.querySelector('.fc-conddlg')?.classList.contains('fc-fmtdlg--range-picking'),
+    ).toBe(true);
     setRange(store, 1, 1, 5, 3);
     expect(rangeInput?.value).toBe('B2:D6');
 
     handle.close();
     expect(picker?.dataset.rangePickerActive).toBe('false');
-    expect(document.querySelector('.fc-conddlg')?.classList.contains('fc-fmtdlg--range-picking')).toBe(
-      false,
-    );
+    expect(
+      document.querySelector('.fc-conddlg')?.classList.contains('fc-fmtdlg--range-picking'),
+    ).toBe(false);
     handle.detach();
   });
 

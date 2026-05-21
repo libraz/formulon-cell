@@ -8,10 +8,10 @@ import {
   appendDialogIconButton,
   appendDialogOptionButton,
   appendDialogTabPair,
+  clearDialogError,
   createDialogButton,
   createDialogShell,
   createDialogToggleButton,
-  clearDialogError,
   focusAndSelectInput,
   showDialogError,
 } from '../../../src/interact/dialog-shell.js';
@@ -535,10 +535,7 @@ describe('interact/dialog-shell', () => {
   });
 
   it('keeps migrated option buttons centralized in dialog-shell', () => {
-    const source = readFileSync(
-      join(process.cwd(), 'src/interact/format-dialog-view.ts'),
-      'utf8',
-    );
+    const source = readFileSync(join(process.cwd(), 'src/interact/format-dialog-view.ts'), 'utf8');
     expect(source).toContain('appendDialogOptionButton(');
     expect(source).not.toContain("className = 'fc-fmtdlg__cat-item'");
     expect(source).not.toContain("className = 'fc-fmtdlg__negative-item'");
@@ -546,10 +543,7 @@ describe('interact/dialog-shell', () => {
   });
 
   it('keeps migrated format dialog action button helpers centralized in dialog-shell', () => {
-    const source = readFileSync(
-      join(process.cwd(), 'src/interact/format-dialog-dom.ts'),
-      'utf8',
-    );
+    const source = readFileSync(join(process.cwd(), 'src/interact/format-dialog-dom.ts'), 'utf8');
     expect(source).toContain('createDialogButton(');
     expect(source).not.toContain("className = primary ? 'fc-fmtdlg__btn fc-fmtdlg__btn--primary'");
   });

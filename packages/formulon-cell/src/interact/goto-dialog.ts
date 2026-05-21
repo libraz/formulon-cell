@@ -1,9 +1,9 @@
 import {
   findMatchingCells,
-  selectionFromMatches,
   type GoToScope,
   type GoToSpecialKind,
   type GoToSpecialValueFilters,
+  selectionFromMatches,
 } from '../commands/goto-special.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -172,10 +172,7 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
   valueFilters.appendChild(valueLegend);
   body.appendChild(valueFilters);
 
-  const makeValueFilter = (
-    key: keyof GoToSpecialValueFilters,
-    label: string,
-  ): HTMLInputElement => {
+  const makeValueFilter = (key: keyof GoToSpecialValueFilters, label: string): HTMLInputElement => {
     const wrap = document.createElement('label');
     wrap.className = 'fc-goto__check';
     const input = document.createElement('input');

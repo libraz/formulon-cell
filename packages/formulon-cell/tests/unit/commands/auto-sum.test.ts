@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { autoSum } from '../../../src/commands/auto-sum.js';
 import type { Addr } from '../../../src/engine/types.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { createSpreadsheetStore, mutators, type SpreadsheetStore } from '../../../src/store/store.js';
+import {
+  createSpreadsheetStore,
+  mutators,
+  type SpreadsheetStore,
+} from '../../../src/store/store.js';
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 

@@ -549,7 +549,9 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const source = readFileSync(join(root, 'src/interact/named-range-dialog.ts'), 'utf8');
     expect(source).toContain('function createNameManagerButton(');
     expect(source).toContain("createNameManagerButton(label, 'fc-namedlg__sort')");
-    expect(source).toContain("createNameManagerButton(filterLabel(filter), 'fc-namedlg__filter-item'");
+    expect(source).toContain(
+      "createNameManagerButton(filterLabel(filter), 'fc-namedlg__filter-item'",
+    );
     expect(source).not.toContain("document.createElement('button')");
   });
 });

@@ -11,18 +11,18 @@ import {
   RIBBON_DIALOG_COMMANDS,
   RIBBON_DROPDOWN_COMMANDS,
   RIBBON_DROPDOWN_MENU_FOR_COMMAND,
-  RIBBON_GALLERY_COMMANDS,
   RIBBON_DYNAMIC_MENU_FIRST_COMMANDS,
   RIBBON_EXTERNAL_MENU_FIRST_COMMANDS,
   RIBBON_EXTERNAL_MENU_FOR_COMMAND,
+  RIBBON_GALLERY_COMMANDS,
   RIBBON_INTENTIONAL_NON_RENDERED_COMMANDS,
   RIBBON_MENU_FACTORY_FOR_COMMAND,
   RIBBON_MENU_FACTORY_KEYS,
-  RIBBON_MENU_FOR_COMMAND,
   RIBBON_MENU_FIRST_COMMANDS,
-  RIBBON_PRIMARY_FACE_MENU_COMMANDS,
-  RIBBON_PRIMARY_ACTION_SPLIT_COMMANDS,
+  RIBBON_MENU_FOR_COMMAND,
   RIBBON_PRIMARY_ACTION_COMMANDS,
+  RIBBON_PRIMARY_ACTION_SPLIT_COMMANDS,
+  RIBBON_PRIMARY_FACE_MENU_COMMANDS,
   RIBBON_SPLIT_TOGGLE_COMMANDS,
   RIBBON_TOGGLE_COMMANDS,
   ribbonActivationCategories,
@@ -41,17 +41,15 @@ import {
   RIBBON_VIEW_MODES,
   RIBBON_ZOOM_PRESETS,
 } from '../../../src/toolbar/ribbon/command-tables.js';
+import { RIBBON_ACTIVE_COMMANDS } from '../../../src/toolbar/ribbon-active-state.js';
 import {
-  buildRibbonModel,
   EXCEL365_STANDARD_RIBBON_TABS,
   OPTIONAL_RIBBON_TABS,
   ribbonActivatableSurfaceCommandIds,
   ribbonActivatableSurfaceCommands,
-  ribbonCommands,
   ribbonSurfaceCommandIds,
   ribbonSurfaceCommands,
 } from '../../../src/toolbar/ribbon-model.js';
-import { RIBBON_ACTIVE_COMMANDS } from '../../../src/toolbar/ribbon-active-state.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -132,9 +130,7 @@ describe('toolbar/ribbon shared data', () => {
   it('keeps top-level disabled reason projection on the shared helper', () => {
     const renderRibbonSource = source('src/toolbar/ribbon/render-ribbon.ts');
 
-    expect(renderRibbonSource).toContain(
-      'projectDisabledState(button, disabled, disabledReason',
-    );
+    expect(renderRibbonSource).toContain('projectDisabledState(button, disabled, disabledReason');
     expect(renderRibbonSource).not.toContain("b.setAttribute('aria-description'");
     expect(renderRibbonSource).not.toContain('b.dataset.ribbonDisabledReason');
   });
@@ -162,7 +158,9 @@ describe('toolbar/ribbon shared data', () => {
 
   it('keeps menu factory keys shared between activation metadata and renderer slots', () => {
     const renderRibbonSource = source('src/toolbar/ribbon/render-ribbon.ts');
-    const menusBlock = renderRibbonSource.match(/export interface RibbonMenus \{([\s\S]*?)\n\}/)?.[1];
+    const menusBlock = renderRibbonSource.match(
+      /export interface RibbonMenus \{([\s\S]*?)\n\}/,
+    )?.[1];
     expect(menusBlock, 'RibbonMenus block').toBeDefined();
     const menuSlots = Array.from(menusBlock?.matchAll(/^\s*([A-Za-z0-9]+)\?:/gm) ?? [])
       .flatMap((match) => (match[1] ? [match[1]] : []))
@@ -286,7 +284,9 @@ describe('toolbar/ribbon shared data', () => {
   it('keeps mount toolbar using the shared active-state command map', () => {
     const toolbarSource = source('src/mount/toolbar.ts');
 
-    expect(toolbarSource).toContain("RIBBON_ACTIVE_COMMANDS } from '../toolbar/ribbon-active-state.js'");
+    expect(toolbarSource).toContain(
+      "RIBBON_ACTIVE_COMMANDS } from '../toolbar/ribbon-active-state.js'",
+    );
     expect(toolbarSource).not.toContain('const RIBBON_ACTIVE_COMMANDS');
   });
 
@@ -363,9 +363,7 @@ describe('toolbar/ribbon shared data', () => {
       Array.from(new Set(optionalCommandIds)).sort(),
     );
     expect(
-      standardEntries
-        .filter((entry) => entry.kind === 'disabled')
-        .map((entry) => entry.command),
+      standardEntries.filter((entry) => entry.kind === 'disabled').map((entry) => entry.command),
     ).toEqual(['helpSearch']);
     expect(optionalEntries.filter((entry) => entry.kind === 'disabled')).toEqual([]);
   });

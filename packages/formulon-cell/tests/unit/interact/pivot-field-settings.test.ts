@@ -41,15 +41,13 @@ describe('pivot-field-settings shared filter condition model', () => {
         valueText: 'East',
       },
     );
-    expect(pivotFilterConditionToSpec('Region', { kind: 'label-equals', value: 'East' })).toEqual(
-      {
-        axis: PivotAxis.Page,
-        fieldName: 'Region',
-        type: PivotFilterType.LabelEquals,
-        valueKind: PivotFilterValueKind.Text,
-        valueText: 'East',
-      },
-    );
+    expect(pivotFilterConditionToSpec('Region', { kind: 'label-equals', value: 'East' })).toEqual({
+      axis: PivotAxis.Page,
+      fieldName: 'Region',
+      type: PivotFilterType.LabelEquals,
+      valueKind: PivotFilterValueKind.Text,
+      valueText: 'East',
+    });
     expect(
       pivotFilterConditionToSpec('Region', { kind: 'label-does-not-contain', value: 'East' }),
     ).toEqual({
@@ -98,16 +96,17 @@ describe('pivot-field-settings shared filter condition model', () => {
       valueHighKind: PivotFilterValueKind.Double,
       valueHighDouble: -25,
     });
-    expect(pivotFilterConditionToSpec('Sales', { kind: 'value-not-between', value: '10..20' }))
-      .toEqual({
-        axis: PivotAxis.Page,
-        fieldName: 'Sales',
-        type: PivotFilterType.ValueNotBetween,
-        valueKind: PivotFilterValueKind.Double,
-        valueDouble: 10,
-        valueHighKind: PivotFilterValueKind.Double,
-        valueHighDouble: 20,
-      });
+    expect(
+      pivotFilterConditionToSpec('Sales', { kind: 'value-not-between', value: '10..20' }),
+    ).toEqual({
+      axis: PivotAxis.Page,
+      fieldName: 'Sales',
+      type: PivotFilterType.ValueNotBetween,
+      valueKind: PivotFilterValueKind.Double,
+      valueDouble: 10,
+      valueHighKind: PivotFilterValueKind.Double,
+      valueHighDouble: 20,
+    });
   });
 
   it('drops empty and invalid numeric filter conditions', () => {
@@ -154,14 +153,15 @@ describe('pivot-field-settings shared filter condition model', () => {
         valueText: '2026-05-19',
       },
     );
-    expect(pivotFilterConditionToSpec('Date', { kind: 'date-before', value: '2026-05-19' }))
-      .toEqual({
-        axis: PivotAxis.Page,
-        fieldName: 'Date',
-        type: PivotFilterType.DateBefore,
-        valueKind: PivotFilterValueKind.Text,
-        valueText: '2026-05-19',
-      });
+    expect(
+      pivotFilterConditionToSpec('Date', { kind: 'date-before', value: '2026-05-19' }),
+    ).toEqual({
+      axis: PivotAxis.Page,
+      fieldName: 'Date',
+      type: PivotFilterType.DateBefore,
+      valueKind: PivotFilterValueKind.Text,
+      valueText: '2026-05-19',
+    });
     expect(
       pivotFilterConditionToSpec('Date', { kind: 'date-between', value: '2026-05-01..2026-05-31' }),
     ).toEqual({
@@ -293,7 +293,10 @@ describe('pivot-field-settings shared filter condition model', () => {
     for (const kind of ['label-date', 'date-before', 'date-after', 'date-between'] as const) {
       const controls = createPivotFilterConditionControls({
         strings: en.pivotTableDialog,
-        condition: { kind, value: kind === 'date-between' ? '2026-05-01..2026-05-31' : '2026-05-19' },
+        condition: {
+          kind,
+          value: kind === 'date-between' ? '2026-05-01..2026-05-31' : '2026-05-19',
+        },
         selectClassName: 'select',
         valueClassName: 'input',
         valuesContainerClassName: 'values',
@@ -348,13 +351,13 @@ describe('pivot-field-settings shared filter condition model', () => {
     if (!category || !condition || !value) throw new Error('missing condition controls');
     expect(category.className).toBe('select');
     expect(condition.className).toBe('select');
-    expect(Array.from(category.options).map((option) => [option.value, option.textContent])).toEqual(
-      [
-        ['label', 'Label Filters'],
-        ['value', 'Value Filters'],
-        ['date', 'Date Filters'],
-      ],
-    );
+    expect(
+      Array.from(category.options).map((option) => [option.value, option.textContent]),
+    ).toEqual([
+      ['label', 'Label Filters'],
+      ['value', 'Value Filters'],
+      ['date', 'Date Filters'],
+    ]);
     expect(category.value).toBe('label');
     expect(condition.value).toBe('label-contains');
     expect(value.value).toBe('East');
@@ -430,13 +433,7 @@ describe('pivot-field-settings shared filter condition model', () => {
       Array.from(condition.options)
         .filter((option) => !option.disabled)
         .map((option) => option.value),
-    ).toEqual([
-      'none',
-      'label-date',
-      'date-before',
-      'date-after',
-      'date-between',
-    ]);
+    ).toEqual(['none', 'label-date', 'date-before', 'date-after', 'date-between']);
     expect(Array.from(condition.options).filter((option) => option.disabled)).toEqual([]);
   });
 

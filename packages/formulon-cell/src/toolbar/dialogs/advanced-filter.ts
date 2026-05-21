@@ -1,3 +1,4 @@
+import { attachRangePickerButton } from '../../interact/range-picker-control.js';
 import {
   appendDialogActions,
   appendErrorRow,
@@ -6,7 +7,6 @@ import {
   mountDialog,
   showInputError,
 } from './shell.js';
-import { attachRangePickerButton } from '../../interact/range-picker-control.js';
 
 export interface AdvancedFilterDialogOptions {
   title: string;

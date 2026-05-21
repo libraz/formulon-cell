@@ -89,7 +89,8 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       const applied = result as { writtenRange: Range } | null;
       return {
         result: applied,
-        activation: applied && before ? { source, before, range: { ...applied.writtenRange } } : null,
+        activation:
+          applied && before ? { source, before, range: { ...applied.writtenRange } } : null,
       };
     }
     snapshot = null;

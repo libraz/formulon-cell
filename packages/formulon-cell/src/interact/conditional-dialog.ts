@@ -7,6 +7,13 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../store/store.js';
+import { createDialogSelect, type DialogSelectOption } from '../toolbar/dialogs/form-controls.js';
+import {
+  appendConditionalApplyFormatControls,
+  applyPatchToConditionalApplyControls,
+  applyPresetPatchToConditionalApplyControls,
+  collectConditionalApplyPatch,
+} from './conditional-apply-controls.js';
 import {
   type AverageMode,
   type CellValueOp,
@@ -17,13 +24,6 @@ import {
   parseRange,
   type RuleKind,
 } from './conditional-dialog-spec.js';
-import { createDialogSelect, type DialogSelectOption } from '../toolbar/dialogs/form-controls.js';
-import {
-  appendConditionalApplyFormatControls,
-  applyPatchToConditionalApplyControls,
-  applyPresetPatchToConditionalApplyControls,
-  collectConditionalApplyPatch,
-} from './conditional-apply-controls.js';
 import { appendDialogButton, createDialogShell } from './dialog-shell.js';
 import { attachRangePickerButton } from './range-picker-control.js';
 

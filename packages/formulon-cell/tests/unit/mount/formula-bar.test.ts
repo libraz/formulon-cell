@@ -30,9 +30,7 @@ describe('mount/formula-bar — edit lifecycle', () => {
   it('idle: cancel + accept buttons are disabled, fcEditing=0', () => {
     expect(fxCancel.disabled).toBe(true);
     expect(fxAccept.disabled).toBe(true);
-    expect(fxCancel.dataset.disabledReason).toBe(
-      defaultStrings.a11y.cancelFormulaEditUnavailable,
-    );
+    expect(fxCancel.dataset.disabledReason).toBe(defaultStrings.a11y.cancelFormulaEditUnavailable);
     expect(fxAccept.dataset.disabledReason).toBe(defaultStrings.a11y.enterFormulaUnavailable);
     expect(fxCancel.getAttribute('aria-description')).toBe(
       defaultStrings.a11y.cancelFormulaEditUnavailable,

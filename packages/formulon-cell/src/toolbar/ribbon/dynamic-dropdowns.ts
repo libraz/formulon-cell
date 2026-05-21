@@ -203,7 +203,11 @@ const isDisabledMenuControl = (element: Element | null): boolean =>
 const RIBBON_DROPDOWN_VIEWPORT_PAD = 8;
 const RIBBON_DROPDOWN_MIN_SCROLL_HEIGHT = 80;
 
-const applyVerticalViewportLimit = (el: HTMLElement, contentHeight: number, maxHeight: number): void => {
+const applyVerticalViewportLimit = (
+  el: HTMLElement,
+  contentHeight: number,
+  maxHeight: number,
+): void => {
   const height = Math.round(
     Math.max(RIBBON_DROPDOWN_MIN_SCROLL_HEIGHT, Math.min(contentHeight, maxHeight)),
   );

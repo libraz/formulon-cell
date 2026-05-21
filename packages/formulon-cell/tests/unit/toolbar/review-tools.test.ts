@@ -74,12 +74,7 @@ describe('toolbar/review-tools', () => {
 
   it('includes comments as reviewable text entries', () => {
     const store = createSpreadsheetStore();
-    mutators.setCell(
-      store,
-      { sheet: 0, row: 0, col: 0 },
-      { kind: 'text', value: 'ok' },
-      null,
-    );
+    mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'text', value: 'ok' }, null);
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { comment: 'teh note note' });
 
     const cells = reviewCellsFromState(store.getState());

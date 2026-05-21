@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { History } from '../../../src/commands/history.js';
 import {
   createDefinedNamesFromSelection,
   deleteDefinedName,
@@ -7,10 +8,13 @@ import {
   recordDefinedNamesChange,
   upsertDefinedName,
 } from '../../../src/commands/named-ranges.js';
-import { History } from '../../../src/commands/history.js';
 import type { Addr } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { createSpreadsheetStore, mutators, type SpreadsheetStore } from '../../../src/store/store.js';
+import {
+  createSpreadsheetStore,
+  mutators,
+  type SpreadsheetStore,
+} from '../../../src/store/store.js';
 
 interface MutableWb {
   capabilities: { definedNameMutate: boolean };
@@ -22,7 +26,11 @@ interface MutableWb {
 const makeWb = (
   canMutate = true,
   writeOk = true,
-): { wb: WorkbookHandle; calls: { name: string; formula: string }[]; formulas: Map<string, string> } => {
+): {
+  wb: WorkbookHandle;
+  calls: { name: string; formula: string }[];
+  formulas: Map<string, string>;
+} => {
   const registry = new Map([['TaxRate', '=Sheet1!$A$1']]);
   const calls: { name: string; formula: string }[] = [];
   const formulas = new Map<string, string>();

@@ -107,11 +107,7 @@ describe('sparkline history snapshots', () => {
   it('recordSparklineChange skips unchanged snapshots', () => {
     const store = createSpreadsheetStore();
     const h = new History();
-    mutators.setSparkline(
-      store,
-      { sheet: 0, row: 0, col: 0 },
-      { kind: 'column', source: 'A1:A5' },
-    );
+    mutators.setSparkline(store, { sheet: 0, row: 0, col: 0 }, { kind: 'column', source: 'A1:A5' });
     recordSparklineChange(h, store, () => {
       mutators.setSparkline(
         store,

@@ -1,5 +1,5 @@
-import type { SheetProtectionPermissions } from '../../store/store.js';
 import { attachRangePickerButton } from '../../interact/range-picker-control.js';
+import type { SheetProtectionPermissions } from '../../store/store.js';
 import {
   appendDialogActions,
   appendErrorRow,

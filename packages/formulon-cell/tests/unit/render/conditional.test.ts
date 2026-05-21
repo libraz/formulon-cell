@@ -223,11 +223,7 @@ describe('evaluateConditional', () => {
             kind: 'color-scale',
             range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
             stops: ['#000000', '#808080', '#ffffff'],
-            thresholds: [
-              { kind: 'min' },
-              { kind: 'percentile', value: 50 },
-              { kind: 'max' },
-            ],
+            thresholds: [{ kind: 'min' }, { kind: 'percentile', value: 50 }, { kind: 'max' }],
           },
         ],
       },

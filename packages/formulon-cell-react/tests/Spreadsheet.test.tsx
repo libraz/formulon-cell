@@ -1,7 +1,7 @@
 import * as Core from '@libraz/formulon-cell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import * as ReactPackage from '../src';
 import type { ScreenClipCapture, ScreenClipResult } from '../src';
+import * as ReactPackage from '../src';
 import { type MountedReactSpreadsheet, mountReactSpreadsheet } from './test-utils/mount';
 
 /**

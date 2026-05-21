@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import {
   backstageMenuText,
   buildRibbonModel,
@@ -42,12 +42,12 @@ describe('toolbar/ribbon-model', () => {
     expect(ribbonActivatableCommandIds('ja')).toEqual(ribbonActivatableCommandIds('en'));
     expect(ribbonSurfaceCommandIds()).toEqual(ribbonCommandIds('en'));
     expect(ribbonActivatableSurfaceCommandIds()).toEqual(ribbonActivatableCommandIds('en'));
-    expect(
-      ribbonSurfaceCommandIds({ tabs: EXCEL365_STANDARD_RIBBON_TABS }),
-    ).toEqual(ribbonCommandIds('en', { tabs: EXCEL365_STANDARD_RIBBON_TABS }));
-    expect(
-      ribbonActivatableSurfaceCommandIds({ tabs: EXCEL365_STANDARD_RIBBON_TABS }),
-    ).toEqual(ribbonActivatableCommandIds('en', { tabs: EXCEL365_STANDARD_RIBBON_TABS }));
+    expect(ribbonSurfaceCommandIds({ tabs: EXCEL365_STANDARD_RIBBON_TABS })).toEqual(
+      ribbonCommandIds('en', { tabs: EXCEL365_STANDARD_RIBBON_TABS }),
+    );
+    expect(ribbonActivatableSurfaceCommandIds({ tabs: EXCEL365_STANDARD_RIBBON_TABS })).toEqual(
+      ribbonActivatableCommandIds('en', { tabs: EXCEL365_STANDARD_RIBBON_TABS }),
+    );
   });
 
   it('keeps the Excel 365 Home tab group and command placement explicit', () => {
@@ -64,18 +64,11 @@ describe('toolbar/ribbon-model', () => {
     ]);
 
     const commandsByGroup = new Map(
-      home?.groups.map((group) => [
-        group.variant,
-        group.commands.map((command) => command.id),
-      ]) ?? [],
+      home?.groups.map((group) => [group.variant, group.commands.map((command) => command.id)]) ??
+        [],
     );
 
-    expect(commandsByGroup.get('clipboard')).toEqual([
-      'paste',
-      'cut',
-      'copy',
-      'formatPainter',
-    ]);
+    expect(commandsByGroup.get('clipboard')).toEqual(['paste', 'cut', 'copy', 'formatPainter']);
     expect(commandsByGroup.get('font')).toEqual([
       'fontFamily',
       'fontSize',
@@ -113,16 +106,8 @@ describe('toolbar/ribbon-model', () => {
       'decDown',
       'decUp',
     ]);
-    expect(commandsByGroup.get('styles')).toEqual([
-      'conditional',
-      'formatTableHome',
-      'cellStyles',
-    ]);
-    expect(commandsByGroup.get('cells')).toEqual([
-      'insertRows',
-      'deleteRows',
-      'formatCellsHome',
-    ]);
+    expect(commandsByGroup.get('styles')).toEqual(['conditional', 'formatTableHome', 'cellStyles']);
+    expect(commandsByGroup.get('cells')).toEqual(['insertRows', 'deleteRows', 'formatCellsHome']);
     expect(commandsByGroup.get('editing')).toEqual([
       'autosum',
       'fillHome',
@@ -267,9 +252,7 @@ describe('toolbar/ribbon-model', () => {
     expect(commandIds('pageLayout')).toEqual(
       expect.arrayContaining(['arrangeObjectsPageLayout', 'selectionPanePageLayout']),
     );
-    const commands = new Map(
-      ribbonCommands('en').map((command) => [command.id, command]),
-    );
+    const commands = new Map(ribbonCommands('en').map((command) => [command.id, command]));
     expect(commands.get('formatTableInsert')).toMatchObject({
       label: 'Table',
       title: 'Table',
@@ -297,9 +280,7 @@ describe('toolbar/ribbon-model', () => {
   });
 
   it('localizes ribbon model command titles for Japanese Office-like surfaces', () => {
-    const commands = new Map(
-      ribbonCommands('ja').map((command) => [command.id, command.title]),
-    );
+    const commands = new Map(ribbonCommands('ja').map((command) => [command.id, command.title]));
 
     expect(commands.get('numberFormat')).toBe('数値');
     expect(commands.get('paste')).toBe('貼り付け');
@@ -318,10 +299,11 @@ describe('toolbar/ribbon-model', () => {
     expect(commands.has('drawBorderGrid')).toBe(false);
     expect(commands.has('eraseBorder')).toBe(false);
     const modelCommands = ribbonCommands('en');
-    const homeAlignmentCommands = buildRibbonModel('en')
-      .find((tab) => tab.id === 'home')
-      ?.groups.find((group) => group.variant === 'alignment')
-      ?.commands.map((command) => command.id) ?? [];
+    const homeAlignmentCommands =
+      buildRibbonModel('en')
+        .find((tab) => tab.id === 'home')
+        ?.groups.find((group) => group.variant === 'alignment')
+        ?.commands.map((command) => command.id) ?? [];
     expect(homeAlignmentCommands).toEqual([
       'top',
       'middle',

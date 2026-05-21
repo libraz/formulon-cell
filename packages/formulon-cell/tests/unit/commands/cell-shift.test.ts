@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deleteCells, insertCells } from '../../../src/commands/cell-shift.js';
-import { undo, History } from '../../../src/commands/history.js';
+import { History, undo } from '../../../src/commands/history.js';
 import { addrKey } from '../../../src/engine/address.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';

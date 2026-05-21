@@ -1,5 +1,5 @@
-import { listExternalLinks } from '../commands/external-links.js';
 import type { ExternalLinkKind } from '../commands/external-links.js';
+import { listExternalLinks } from '../commands/external-links.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -232,12 +232,21 @@ export function attachExternalLinksDialog(
       note.textContent = t.note;
       empty.textContent = t.empty;
       closeBtn.textContent = t.close;
-      actionButtons.get('updateValues')!.textContent = t.updateValues;
-      actionButtons.get('changeSource')!.textContent = t.changeSource;
-      actionButtons.get('openSource')!.textContent = t.openSource;
-      actionButtons.get('breakLink')!.textContent = t.breakLink;
-      actionButtons.get('checkStatus')!.textContent = t.checkStatus;
-      actionButtons.get('startupPrompt')!.textContent = t.startupPrompt;
+      const actionLabels: Record<ExternalLinkAction, string> = {
+        updateValues: t.updateValues,
+        changeSource: t.changeSource,
+        openSource: t.openSource,
+        breakLink: t.breakLink,
+        checkStatus: t.checkStatus,
+        startupPrompt: t.startupPrompt,
+      };
+      for (const [action, label] of Object.entries(actionLabels) as [
+        ExternalLinkAction,
+        string,
+      ][]) {
+        const button = actionButtons.get(action);
+        if (button) button.textContent = label;
+      }
       updateActionButtons();
       if (shell.isOpen()) renderTable();
     },

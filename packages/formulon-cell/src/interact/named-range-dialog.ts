@@ -7,7 +7,7 @@ import {
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
-import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import {
   appendDialogButton,
   appendDialogIconButton,
@@ -667,7 +667,9 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       focusAndSelectInput(nameInput);
       return;
     }
-    const result = recordDefinedNamesChange(history, wb, () => upsertDefinedName(wb, name, formula));
+    const result = recordDefinedNamesChange(history, wb, () =>
+      upsertDefinedName(wb, name, formula),
+    );
     if (!result.ok) {
       showError(result.reason === 'empty-formula' ? t.errorEmptyFormula : t.errorEngineFailed);
       return;

@@ -31,7 +31,9 @@ describe('showRemoveDuplicatesDialog', () => {
     expect(dialog?.querySelectorAll('.fc-dedupedlg__column')).toHaveLength(2);
 
     dialog?.querySelector<HTMLButtonElement>('.fc-dedupedlg__actions button:nth-child(2)')?.click();
-    for (const checkbox of Array.from(dialog?.querySelectorAll<HTMLInputElement>('fieldset input') ?? [])) {
+    for (const checkbox of Array.from(
+      dialog?.querySelectorAll<HTMLInputElement>('fieldset input') ?? [],
+    )) {
       expect(checkbox.checked).toBe(false);
     }
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();

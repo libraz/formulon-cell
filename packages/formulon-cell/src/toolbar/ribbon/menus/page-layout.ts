@@ -4,13 +4,7 @@
 
 import type { ToolbarMenuText } from '../../menu-text.js';
 
-import {
-  createMenu,
-  menuIconButton,
-  menuSeparator,
-  visualMenuTile,
-  visualMenuTileGrid,
-} from './general.js';
+import { createMenu, menuIconButton, menuSeparator, visualMenuTileGrid } from './general.js';
 
 export interface PageLayoutMenuFactories {
   createPrintAreaMenu: () => HTMLDivElement;

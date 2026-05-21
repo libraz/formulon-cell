@@ -22,6 +22,10 @@ import {
   type ValidationErrorStyle,
   type ValidationOp,
 } from '../store/store.js';
+import { appendDialogSelectOptions } from '../toolbar/dialogs/form-controls.js';
+import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
+import { formatA1Range } from '../wrappers/toolbar-a1.js';
+import { appendDialogOptionButton } from './dialog-shell.js';
 import {
   type BorderStyleKey,
   type DraftState,
@@ -34,7 +38,6 @@ import {
   type TabId,
   type ValidationKind,
 } from './format-dialog-model.js';
-import { attachRangePickerButton } from './range-picker-control.js';
 import {
   activeDraftSide,
   computeDialogNumFmt,
@@ -46,10 +49,7 @@ import {
   setDraftSide,
 } from './format-dialog-state.js';
 import { createFormatDialogView } from './format-dialog-view.js';
-import { appendDialogSelectOptions } from '../toolbar/dialogs/form-controls.js';
-import { formatA1Range } from '../wrappers/toolbar-a1.js';
-import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
-import { appendDialogOptionButton } from './dialog-shell.js';
+import { attachRangePickerButton } from './range-picker-control.js';
 
 export interface FormatDialogDeps {
   host: HTMLElement;
@@ -114,7 +114,6 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     localeRow,
     localeSelect,
     calendarRow,
-    calendarSelect,
     negativeList,
     negativeOptions,
     numberSummaryTitle,
@@ -401,7 +400,6 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       'accounting',
     ]);
     const symbolCats = new Set<NumberCategory>(['currency', 'accounting']);
-    const patternCats = new Set<NumberCategory>(['date', 'time', 'datetime', 'special', 'custom']);
     const listboxCats = new Set<NumberCategory>(['date', 'time', 'datetime', 'special']);
     decimalsRow.hidden = !decimalsCats.has(cat);
     thousandsCk.wrap.hidden = cat !== 'fixed';
@@ -439,7 +437,6 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
           return `(${body})`;
         case 'red':
           return `${symbol}${grouped}`;
-        case 'minus':
         default:
           return `${symbol}-${grouped}`;
       }

@@ -207,7 +207,13 @@ describe('comment commands', () => {
     const calls: { row: number; col: number; text: string }[] = [];
     const wb = {
       capabilities: { comments: true },
-      setCommentEntry: (_sheet: number, row: number, col: number, _author: string, text: string) => {
+      setCommentEntry: (
+        _sheet: number,
+        row: number,
+        col: number,
+        _author: string,
+        text: string,
+      ) => {
         calls.push({ row, col, text });
         return true;
       },

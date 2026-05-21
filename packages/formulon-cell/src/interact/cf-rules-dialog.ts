@@ -299,7 +299,9 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       moveUpDisabled,
       !selected
         ? t.selectRuleActionReason
-        : engineReadOnlyReason ?? mutationUnavailableReason ?? (selected.index <= 0 ? t.moveUpUnavailable : null),
+        : (engineReadOnlyReason ??
+            mutationUnavailableReason ??
+            (selected.index <= 0 ? t.moveUpUnavailable : null)),
     );
     const moveDownDisabled =
       !canMutateSession ||
@@ -309,11 +311,11 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       moveDownDisabled,
       !selected
         ? t.selectRuleActionReason
-        : engineReadOnlyReason ??
+        : (engineReadOnlyReason ??
             mutationUnavailableReason ??
             (selected.index >= (deps.store?.getState().conditional.rules.length ?? 0) - 1
               ? t.moveDownUnavailable
-              : null),
+              : null)),
     );
   };
 

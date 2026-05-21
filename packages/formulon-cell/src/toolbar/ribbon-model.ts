@@ -694,9 +694,8 @@ export const ribbonActivatableCommandIds = (
   opts: BuildRibbonModelOptions = {},
 ): string[] => ribbonActivatableCommands(input, opts).map((command) => command.id);
 
-export const ribbonSurfaceCommands = (
-  opts: BuildRibbonModelOptions = {},
-): RibbonCommand[] => ribbonCommands(COMMAND_SURFACE_LANG, opts);
+export const ribbonSurfaceCommands = (opts: BuildRibbonModelOptions = {}): RibbonCommand[] =>
+  ribbonCommands(COMMAND_SURFACE_LANG, opts);
 
 export const ribbonSurfaceCommandIds = (opts: BuildRibbonModelOptions = {}): string[] =>
   ribbonCommandIds(COMMAND_SURFACE_LANG, opts);
@@ -705,9 +704,8 @@ export const ribbonActivatableSurfaceCommands = (
   opts: BuildRibbonModelOptions = {},
 ): RibbonCommand[] => ribbonActivatableCommands(COMMAND_SURFACE_LANG, opts);
 
-export const ribbonActivatableSurfaceCommandIds = (
-  opts: BuildRibbonModelOptions = {},
-): string[] => ribbonActivatableCommandIds(COMMAND_SURFACE_LANG, opts);
+export const ribbonActivatableSurfaceCommandIds = (opts: BuildRibbonModelOptions = {}): string[] =>
+  ribbonActivatableCommandIds(COMMAND_SURFACE_LANG, opts);
 
 export const ribbonTabCommandIds = (
   input: Strings | ToolbarLang,

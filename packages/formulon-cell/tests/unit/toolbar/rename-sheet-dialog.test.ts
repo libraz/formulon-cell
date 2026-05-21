@@ -43,7 +43,9 @@ describe('showRenameSheetDialog', () => {
     input.value = '   ';
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
     expect(dialog?.textContent).toContain('Enter a sheet name.');
-    dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary)')?.click();
+    dialog
+      ?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary)')
+      ?.click();
 
     await expect(pending).resolves.toBeNull();
   });

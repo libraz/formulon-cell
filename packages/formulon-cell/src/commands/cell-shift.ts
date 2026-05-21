@@ -72,7 +72,8 @@ function shiftCellBand(
 
   if (history) history.begin();
   try {
-    const beforeCells = history && !history.isReplaying() ? collectSheetCells(wb, affected.sheet) : null;
+    const beforeCells =
+      history && !history.isReplaying() ? collectSheetCells(wb, affected.sheet) : null;
     shiftCells(wb, affected, axis, delta);
     if (history && beforeCells) {
       const afterCells = collectSheetCells(wb, affected.sheet);
@@ -129,7 +130,9 @@ function shiftCells(
         ? { ...cell.addr, row: cell.addr.row + delta }
         : { ...cell.addr, col: cell.addr.col + delta };
     if (!inShiftTarget(next, affected, axis)) continue;
-    const formula = cell.formula ? shiftFormulaRefsInBand(cell.formula, affected, axis, delta) : null;
+    const formula = cell.formula
+      ? shiftFormulaRefsInBand(cell.formula, affected, axis, delta)
+      : null;
     writeCell(wb, next, cell.value, formula);
   }
 
@@ -219,7 +222,8 @@ function shiftFormatMap(
       next.set(key, fmt);
       continue;
     }
-    const shifted = axis === 'down' ? { ...addr, row: addr.row + delta } : { ...addr, col: addr.col + delta };
+    const shifted =
+      axis === 'down' ? { ...addr, row: addr.row + delta } : { ...addr, col: addr.col + delta };
     if (inShiftTarget(shifted, affected, axis)) next.set(addrKey(shifted), fmt);
   }
   return next;
@@ -325,7 +329,13 @@ function shiftFormulaRefsInBand(
     const row = Number.parseInt(m.rowStr, 10) - 1;
     let nextRow = row;
     let nextCol = col;
-    if (axis === 'down' && !m.absRow && row >= affected.r0 && col >= affected.c0 && col <= affected.c1) {
+    if (
+      axis === 'down' &&
+      !m.absRow &&
+      row >= affected.r0 &&
+      col >= affected.c0 &&
+      col <= affected.c1
+    ) {
       nextRow = row + delta;
     } else if (
       axis === 'right' &&
@@ -337,7 +347,8 @@ function shiftFormulaRefsInBand(
       nextCol = col + delta;
     }
     if (nextRow < 0 || nextCol < 0) out += '#REF!';
-    else out += `${m.absCol ? '$' : ''}${colIndexToLabel(nextCol)}${m.absRow ? '$' : ''}${nextRow + 1}`;
+    else
+      out += `${m.absCol ? '$' : ''}${colIndexToLabel(nextCol)}${m.absRow ? '$' : ''}${nextRow + 1}`;
     i = m.end;
   }
   return out;

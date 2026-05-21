@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { createCommandPalette } from '../../../../apps/demo-shared/command-palette.ts';
 import {
   buildDemoPrintPreviewModel,
   buildDemoSearchItems,
@@ -11,7 +12,6 @@ import {
   refreshDemoPrinterProfiles,
   saveDemoWorkbookToDownload,
 } from '../../../../apps/demo-shared/index.ts';
-import { createCommandPalette } from '../../../../apps/demo-shared/command-palette.ts';
 import { createSpreadsheetStore, mutators, WorkbookHandle } from '../../src/index.ts';
 
 const repoRoot = join(import.meta.dirname, '../../../..');

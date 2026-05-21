@@ -65,9 +65,7 @@ export function createSheetMenuColorButton(
 ): HTMLButtonElement {
   const ariaLabel = color ? `${label} ${color}` : label;
   const button = createHostButton({
-    className: color
-      ? 'fc-sheetmenu__swatch'
-      : 'fc-sheetmenu__swatch fc-sheetmenu__swatch--none',
+    className: color ? 'fc-sheetmenu__swatch' : 'fc-sheetmenu__swatch fc-sheetmenu__swatch--none',
     role: 'menuitemradio',
     ariaLabel,
     ariaChecked: selected,

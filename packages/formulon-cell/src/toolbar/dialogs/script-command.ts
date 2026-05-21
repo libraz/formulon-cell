@@ -1,10 +1,10 @@
+import { createDialogSelect } from './form-controls.js';
 import {
   appendDialogActions,
   createDialogShell,
   installDialogLifecycle,
   mountDialog,
 } from './shell.js';
-import { createDialogSelect } from './form-controls.js';
 
 export interface ScriptCommandDialogOption<T extends string> {
   value: T;

@@ -57,11 +57,8 @@ const r1c1Axis = (prefix: 'R' | 'C', target: number, base: number): string => {
   const delta = target - base;
   return delta === 0 ? prefix : `${prefix}[${delta}]`;
 };
-const r1c1RefOf = (
-  row: number,
-  col: number,
-  base: { row: number; col: number },
-): string => `${r1c1Axis('R', row, base.row)}${r1c1Axis('C', col, base.col)}`;
+const r1c1RefOf = (row: number, col: number, base: { row: number; col: number }): string =>
+  `${r1c1Axis('R', row, base.row)}${r1c1Axis('C', col, base.col)}`;
 const refOf = (
   row: number,
   col: number,

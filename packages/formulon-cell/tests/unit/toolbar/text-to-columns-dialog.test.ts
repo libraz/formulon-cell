@@ -55,9 +55,7 @@ describe('showTextToColumnsDialog', () => {
     expect(fixedWidth?.closest('label')?.title).toBe('Fixed-width splitting is not available yet.');
     expect(fixedWidth?.title).toBe('Fixed-width splitting is not available yet.');
 
-    const semicolon = dialog?.querySelector<HTMLInputElement>(
-      '[data-dialog-field="delimiter-;"]',
-    );
+    const semicolon = dialog?.querySelector<HTMLInputElement>('[data-dialog-field="delimiter-;"]');
     const comma = dialog?.querySelector<HTMLInputElement>('[data-dialog-field="delimiter-,"]');
     const collapse = dialog?.querySelector<HTMLInputElement>(
       '[data-dialog-field="collapse-consecutive"]',
@@ -76,7 +74,11 @@ describe('showTextToColumnsDialog', () => {
   });
 
   it('requires at least one delimiter', async () => {
-    const promise = showTextToColumnsDialog({ strings, initialDelimiters: [], previewRows: ['a,b'] });
+    const promise = showTextToColumnsDialog({
+      strings,
+      initialDelimiters: [],
+      previewRows: ['a,b'],
+    });
     const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
     expect(dialog?.textContent).toContain('No delimited text found');

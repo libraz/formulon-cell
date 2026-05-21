@@ -213,10 +213,7 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     icon: string,
     action?: string,
   ): HTMLButtonElement => {
-    const command = createBackstageActionButton(
-      'demo__backstage-command',
-      action ?? 'unavailable',
-    );
+    const command = createBackstageActionButton('demo__backstage-command', action ?? 'unavailable');
     if (!action) {
       delete command.dataset.backstageAction;
       projectDisabledState(command, true, backstageText.commandUnavailable, {

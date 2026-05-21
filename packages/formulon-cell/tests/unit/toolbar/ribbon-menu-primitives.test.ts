@@ -3,10 +3,6 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import {
-  RIBBON_BORDERS_MENU_ID,
-  RIBBON_DROPDOWN_MENU_FOR_COMMAND,
-} from '../../../src/toolbar/ribbon/activation.js';
-import {
   focusMenuItem,
   handleMenuKeydown,
   prepareMenu,
@@ -14,14 +10,18 @@ import {
   projectDisabledState,
 } from '../../../src/toolbar/menu-a11y.js';
 import {
+  RIBBON_BORDERS_MENU_ID,
+  RIBBON_DROPDOWN_MENU_FOR_COMMAND,
+} from '../../../src/toolbar/ribbon/activation.js';
+import {
   DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS,
   DYNAMIC_RIBBON_DROPDOWN_HANDLER_DATASET_KEYS,
   DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS,
   type DynamicDropdownsCtx,
 } from '../../../src/toolbar/ribbon/dynamic-dropdowns.js';
 import {
-  colorSwatchGrid,
   colorSwatchButton,
+  colorSwatchGrid,
   createMenu,
   createMenuButton,
   createSubmenu,
@@ -369,8 +369,8 @@ describe('toolbar/ribbon menu primitives', () => {
 
     expect(backstageTitleSource).toContain('findNoMatches: string');
     expect(backstageTitleSource).toContain("shellText.findNoMatches.replace('{query}', query)");
-    expect(backstageTitleSource).not.toContain("ribbonLang === 'ja' ? `「${query}」");
-    expect(backstageTitleSource).not.toContain('No matches for "${query}"');
+    expect(backstageTitleSource).not.toContain(`ribbonLang === 'ja' ? \`「\${query}」`);
+    expect(backstageTitleSource).not.toContain(`No matches for "\${query}"`);
   });
 
   it('uses shared localized labels for report dialogs from default toolbar glue', () => {
@@ -439,11 +439,15 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(dynamicDefaultsSource).toContain('deleteLevelLabel: strings.sortDeleteLevel');
     expect(dynamicDefaultsSource).toContain('copyLevelLabel: strings.sortCopyLevel');
     expect(dynamicDefaultsSource).toContain('levelUnavailableLabel: strings.sortLevelUnavailable');
-    expect(dynamicDefaultsSource).toContain('const invalidRange = strings.advancedFilterInvalidRange');
+    expect(dynamicDefaultsSource).toContain(
+      'const invalidRange = strings.advancedFilterInvalidRange',
+    );
     expect(dynamicDefaultsSource).toContain('showRenameSheetDialog: (opts) =>');
     expect(dynamicDefaultsSource).toContain('okLabel: strings.hyperlinkDialog.ok');
     expect(dynamicDefaultsSource).toContain('cancelLabel: strings.hyperlinkDialog.cancel');
-    expect(dynamicDefaultsSource).toContain('projectFormatToolbar: opts.projectFormatToolbar ?? noop');
+    expect(dynamicDefaultsSource).toContain(
+      'projectFormatToolbar: opts.projectFormatToolbar ?? noop',
+    );
     expect(dynamicDefaultsSource).toContain('refreshWorkbookCells:');
     expect(dynamicDefaultsSource).toContain('opts.refreshCells ??');
     expect(toolbarDefaultsSource).toContain('showZoomDialog({');
@@ -459,7 +463,7 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(choiceSource).not.toContain("?? 'Cancel'");
     expect(promptSource).not.toContain("?? 'OK'");
     expect(promptSource).not.toContain("?? 'Cancel'");
-    expect(promptSource).not.toContain("Enter a valid number.");
+    expect(promptSource).not.toContain('Enter a valid number.');
   });
 
   it('keeps toolbar dialog input focus/select centralized in the shared shell helper', () => {
@@ -563,7 +567,7 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(generalSource).toContain('opts: { controlsId?: string } = {}');
     expect(generalSource).toContain("button.setAttribute('aria-controls', opts.controlsId)");
     expect(sources.get('conditional.ts')).toContain(
-      "menuSubmenuTrigger(btn, { cfSubmenu: key }, { controlsId: cfSubmenuId(key) })",
+      'menuSubmenuTrigger(btn, { cfSubmenu: key }, { controlsId: cfSubmenuId(key) })',
     );
     expect(sources.get('conditional.ts')).toContain('id: cfSubmenuId(key)');
     expect(sources.get('borders.ts')).toContain(
@@ -617,9 +621,9 @@ describe('toolbar/ribbon menu primitives', () => {
       .map(({ name }) => name);
 
     expect(directLabeledGridDom).toEqual([]);
-    expect(new Map(menuSources().map(({ name, source }) => [name, source])).get('styles.ts')).toContain(
-      'menuLabeledGrid(',
-    );
+    expect(
+      new Map(menuSources().map(({ name, source }) => [name, source])).get('styles.ts'),
+    ).toContain('menuLabeledGrid(');
   });
 
   it('keeps gallery scroll bodies centralized in menuScrollBody', () => {
@@ -801,8 +805,9 @@ describe('toolbar/ribbon menu primitives', () => {
     const updateHooks = Object.keys(noopCtx)
       .filter((key) => /^update[A-Za-z0-9]+Menu$/.test(key))
       .sort();
-    const routedHooks = Array.from(new Set(Object.values(DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS)))
-      .sort();
+    const routedHooks = Array.from(
+      new Set(Object.values(DYNAMIC_RIBBON_DROPDOWN_MENU_REFRESHERS)),
+    ).sort();
 
     expect(routedHooks).toEqual(updateHooks);
   });
@@ -853,7 +858,7 @@ describe('toolbar/ribbon menu primitives', () => {
   it('keeps dynamic dropdown dispatcher attrs aligned with registered handlers', () => {
     const dynamicDropdownsSource = readFileSync(join(ribbonDir, 'dynamic-dropdowns.ts'), 'utf8');
     const handlersBlock = dynamicDropdownsSource.match(
-      /const DYNAMIC_DROPDOWN_HANDLERS:[\s\S]*?= \[([\s\S]*?)\n  \];/,
+      /const DYNAMIC_DROPDOWN_HANDLERS:[\s\S]*?= \[([\s\S]*?)\n {2}\];/,
     )?.[1];
     const handlerAttrs = Array.from(handlersBlock?.matchAll(/attr: '([^']+)'/g) ?? []).flatMap(
       (match) => (match[1] ? [match[1]] : []),
@@ -867,12 +872,12 @@ describe('toolbar/ribbon menu primitives', () => {
 
     expect(dynamicDropdownsSource).toContain('const eventElement');
     expect(dynamicDropdownsSource).toContain('const isDisabledMenuControl');
-    expect(dynamicDropdownsSource.split('\n').filter((line) => line.includes('event.target'))).toHaveLength(
-      1,
-    );
-    expect(dynamicDropdownsSource.split('\n').filter((line) => line.includes('.disabled'))).toHaveLength(
-      1,
-    );
+    expect(
+      dynamicDropdownsSource.split('\n').filter((line) => line.includes('event.target')),
+    ).toHaveLength(1);
+    expect(
+      dynamicDropdownsSource.split('\n').filter((line) => line.includes('.disabled')),
+    ).toHaveLength(1);
   });
 
   it('keeps dynamic dropdown viewport clamp and scroll projection centralized', () => {
@@ -1151,7 +1156,10 @@ describe('toolbar/ribbon menu primitives', () => {
     leading.className = 'test-leading';
     const buttons = [
       { button: menuIconButton('Clear', 'clear', 'formats', 'clear-formats'), key: 'clear' },
-      { button: menuPresetButton('Bottom', 'borderPreset', 'bottom', leading), key: 'borderPreset' },
+      {
+        button: menuPresetButton('Bottom', 'borderPreset', 'bottom', leading),
+        key: 'borderPreset',
+      },
       {
         button: menuPresetButton('No icon', 'borderPreset', 'none', menuIconSpacer()),
         key: 'borderPreset',
@@ -1276,7 +1284,12 @@ describe('toolbar/ribbon menu primitives', () => {
   });
 
   it('decorates submenu triggers with caret and shared accessibility attributes', () => {
-    const button = menuPresetButton('Highlight Cells Rules', 'cfAction', 'submenu-highlight', document.createElement('span'));
+    const button = menuPresetButton(
+      'Highlight Cells Rules',
+      'cfAction',
+      'submenu-highlight',
+      document.createElement('span'),
+    );
     const trigger = menuSubmenuTrigger(
       button,
       { cfSubmenu: 'highlight' },

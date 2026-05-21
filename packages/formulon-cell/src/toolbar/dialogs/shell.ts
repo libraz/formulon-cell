@@ -145,9 +145,7 @@ export interface DialogChoiceButtonOptions {
   ariaLabel?: string;
 }
 
-export const createDialogChoiceButton = (
-  opts: DialogChoiceButtonOptions,
-): HTMLButtonElement => {
+export const createDialogChoiceButton = (opts: DialogChoiceButtonOptions): HTMLButtonElement => {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = opts.className ?? 'app__cf-choice';

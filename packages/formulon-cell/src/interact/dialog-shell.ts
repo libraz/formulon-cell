@@ -343,9 +343,7 @@ export function appendDialogFrame(shell: DialogShell, opts: DialogFrameOptions):
   return { header, body, footer };
 }
 
-export function createDialogButton(
-  opts: DialogButtonOptions,
-): HTMLButtonElement {
+export function createDialogButton(opts: DialogButtonOptions): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
   const classes = [opts.baseClass ?? 'fc-fmtdlg__btn'];

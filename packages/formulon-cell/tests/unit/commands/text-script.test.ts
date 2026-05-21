@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { applyTextScriptToRange } from '../../../src/commands/text-script.js';
-import { mutators } from '../../../src/store/store.js';
-import { createSpreadsheetStore } from '../../../src/store/store.js';
-import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import type { Addr } from '../../../src/engine/types.js';
+import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const key = (addr: Addr): string => `${addr.sheet}:${addr.row}:${addr.col}`;
 

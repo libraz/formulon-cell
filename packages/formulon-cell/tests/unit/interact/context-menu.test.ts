@@ -690,7 +690,9 @@ describe('attachContextMenu', () => {
       fireContextMenu(host, 200, 70);
       miniItem('bold')?.click();
       expect(store.getState().ui.pendingFormat?.format.bold).toBe(true);
-      expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toBeUndefined();
+      expect(
+        store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 })),
+      ).toBeUndefined();
 
       fireContextMenu(host, 200, 70);
       miniItem('italic')?.click();
@@ -707,7 +709,9 @@ describe('attachContextMenu', () => {
       fireContextMenu(host, 200, 70);
       miniItem('alignLeft')?.click();
       expect(store.getState().ui.pendingFormat?.format.align).toBe('left');
-      expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toBeUndefined();
+      expect(
+        store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 })),
+      ).toBeUndefined();
 
       fireContextMenu(host, 200, 70);
       miniItem('alignCenter')?.click();
@@ -724,7 +728,9 @@ describe('attachContextMenu', () => {
       fireContextMenu(host, 200, 70);
       miniItem('borders')?.click();
       expect(store.getState().ui.pendingFormat?.format.borders).toBeDefined();
-      expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toBeUndefined();
+      expect(
+        store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 })),
+      ).toBeUndefined();
     });
 
     it('Format Cells… triggers the onFormatDialog callback', () => {

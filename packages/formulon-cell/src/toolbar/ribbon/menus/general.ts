@@ -3,8 +3,8 @@
 // building blocks without dragging the whole playground entry along with them.
 
 import { prepareMenu } from '../../menu-a11y.js';
-import { ribbonDropdownMenuIdForCommand } from '../dynamic-dropdowns.js';
 import { createRibbonButton } from '../button.js';
+import { ribbonDropdownMenuIdForCommand } from '../dynamic-dropdowns.js';
 
 const menuDiv = (
   className: string,

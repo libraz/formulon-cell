@@ -242,9 +242,9 @@ describe('attachPivotTableDialog', () => {
     ).toBe(true);
     sourcePicker?.click();
     expect(sourcePicker?.dataset.rangePickerActive).toBe('true');
-    expect(document.querySelector('.fc-pivotdlg')?.classList.contains('fc-fmtdlg--range-picking')).toBe(
-      true,
-    );
+    expect(
+      document.querySelector('.fc-pivotdlg')?.classList.contains('fc-fmtdlg--range-picking'),
+    ).toBe(true);
     mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 4 });
     let rangeInputs = document.querySelectorAll<HTMLInputElement>('.fc-range-picker input');
     expect(rangeInputs[0]?.value).toBe('A1:E3');
@@ -257,9 +257,9 @@ describe('attachPivotTableDialog', () => {
     rangeInputs = document.querySelectorAll<HTMLInputElement>('.fc-range-picker input');
     expect(rangeInputs[0]?.value).toBe('A1:E3');
     expect(rangeInputs[1]?.value).toBe('C6');
-    const cancelButton = Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn')).find(
-      (button) => button.textContent === 'Cancel',
-    );
+    const cancelButton = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'),
+    ).find((button) => button.textContent === 'Cancel');
     cancelButton?.click();
     expect(destinationPicker?.dataset.rangePickerActive).toBe('false');
     expect(

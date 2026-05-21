@@ -21,7 +21,10 @@ const rangeOnSheet = (
   c1: number,
 ): ConditionalRule['range'] => ({ sheet, r0, c0, r1, c1 });
 
-const cellRule = (id: number, r: ConditionalRule['range'] = range(0, 0, 1, 1)): ConditionalRule => ({
+const cellRule = (
+  id: number,
+  r: ConditionalRule['range'] = range(0, 0, 1, 1),
+): ConditionalRule => ({
   kind: 'cell-value',
   range: r,
   op: '>',

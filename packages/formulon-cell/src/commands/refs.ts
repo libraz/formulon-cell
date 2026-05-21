@@ -152,10 +152,7 @@ const colToLetters = (col: number): string => {
 
 const R1C1_REF_RE = /R(?:\[(-?\d+)\]|([1-9]\d*))?C(?:\[(-?\d+)\]|([1-9]\d*))?/iy;
 
-const r1c1AtomToA1 = (
-  raw: string,
-  base: { row: number; col: number },
-): string => {
+const r1c1AtomToA1 = (raw: string, base: { row: number; col: number }): string => {
   const m = /^R(?:\[(-?\d+)\]|([1-9]\d*))?C(?:\[(-?\d+)\]|([1-9]\d*))?$/i.exec(raw);
   if (!m) return raw;
   const row =
@@ -173,10 +170,7 @@ const r1c1AtomToA1 = (
 /** Convert R1C1 references in a user-authored formula into A1 references for
  *  the workbook engine. This keeps the public R1C1 editing surface while
  *  preserving the existing A1 formula backend. */
-export function normalizeR1C1Formula(
-  formula: string,
-  base: { row: number; col: number },
-): string {
+export function normalizeR1C1Formula(formula: string, base: { row: number; col: number }): string {
   if (!formula.startsWith('=')) return formula;
   let out = '';
   let i = 0;
@@ -198,7 +192,7 @@ export function normalizeR1C1Formula(
         if (m && m.index === i) {
           const raw = m[0];
           const next = formula[i + raw.length] ?? '';
-          if (!/[A-Za-z0-9_\[]/.test(next)) {
+          if (!/[A-Za-z0-9_[]/.test(next)) {
             out += r1c1AtomToA1(raw, base);
             i += raw.length;
             continue;
@@ -212,10 +206,7 @@ export function normalizeR1C1Formula(
   return out;
 }
 
-const a1AtomToR1C1 = (
-  raw: string,
-  base: { row: number; col: number },
-): string => {
+const a1AtomToR1C1 = (raw: string, base: { row: number; col: number }): string => {
   const m = /^(\$?)([A-Za-z]+)(\$?)(\d+)$/.exec(raw);
   if (!m) return raw;
   const colAbs = m[1] === '$';
@@ -230,10 +221,7 @@ const a1AtomToR1C1 = (
 
 /** Format stored A1 formulas as R1C1 for formula-bar / inline-editor display.
  *  The workbook still stores A1 formulas; this is a presentation transform. */
-export function formatA1FormulaAsR1C1(
-  formula: string,
-  base: { row: number; col: number },
-): string {
+export function formatA1FormulaAsR1C1(formula: string, base: { row: number; col: number }): string {
   if (!formula.startsWith('=')) return formula;
   let out = '';
   let i = 0;

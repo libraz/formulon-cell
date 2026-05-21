@@ -93,12 +93,7 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
     const menu = createMenu('menu-underline');
     menu.append(
       menuIconButton(t.underlineSingle, 'underlineAction', 'single', 'underline-single'),
-      menuIconButton(
-        t.underlineDouble,
-        'underlineAction',
-        'double',
-        'underline-double',
-      ),
+      menuIconButton(t.underlineDouble, 'underlineAction', 'double', 'underline-double'),
     );
     return menu;
   };

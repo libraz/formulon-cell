@@ -163,7 +163,14 @@ describe('render/painters — paintConditionalIcon', () => {
   });
 
   it('paints expanded icon families without external assets', () => {
-    for (const kind of ['triangles3', 'symbols3', 'flags3', 'quarters5', 'bars5', 'boxes5'] as const) {
+    for (const kind of [
+      'triangles3',
+      'symbols3',
+      'flags3',
+      'quarters5',
+      'bars5',
+      'boxes5',
+    ] as const) {
       const spy = makeFillSpy();
       paintConditionalIcon(spy.ctx, { x: 0, y: 0, w: 20, h: 20 }, kind, 1);
       expect(spy.rects.length).toBeGreaterThan(0);

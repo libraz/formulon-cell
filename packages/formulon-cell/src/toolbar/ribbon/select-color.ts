@@ -6,12 +6,12 @@
 import { createColorPalette } from '../../components/color-palette.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import type { RibbonCommand } from '../ribbon-model.js';
+import { createRibbonButton } from './button.js';
 import {
   FONT_SUBMENU_FAMILIES,
   RECENT_FONT_VALUES,
   THEME_FONT_VALUES,
 } from './font-availability.js';
-import { createRibbonButton } from './button.js';
 
 export interface SelectColorRibbonText {
   numberFormatNoSpecific: string;

@@ -27,7 +27,9 @@ describe('showScriptCommandDialog', () => {
     const select = dialog?.querySelector<HTMLSelectElement>('[data-script-command-select]');
     expect(select?.value).toBe('uppercase');
     expect(select?.className).toBe('app__dlg__select');
-    expect(Array.from(select?.options ?? []).map((option) => [option.value, option.textContent])).toEqual([
+    expect(
+      Array.from(select?.options ?? []).map((option) => [option.value, option.textContent]),
+    ).toEqual([
       ['uppercase', 'Uppercase'],
       ['lowercase', 'Lowercase'],
       ['trim', 'Trim whitespace'],

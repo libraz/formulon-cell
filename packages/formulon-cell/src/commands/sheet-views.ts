@@ -162,10 +162,7 @@ const captureSheetViewsSnapshot = (store: SpreadsheetStore): SheetViewsSnapshot 
   };
 };
 
-const applySheetViewsSnapshot = (
-  store: SpreadsheetStore,
-  snapshot: SheetViewsSnapshot,
-): void => {
+const applySheetViewsSnapshot = (store: SpreadsheetStore, snapshot: SheetViewsSnapshot): void => {
   store.setState((s) => ({
     ...s,
     sheetViews: {

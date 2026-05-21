@@ -9,14 +9,9 @@ import {
 import { hyperlinkAt, setHyperlink } from '../../../src/commands/hyperlinks.js';
 import { setWorkbookStructureProtected } from '../../../src/commands/protection.js';
 import { addrKey } from '../../../src/engine/address.js';
+import { createDefaultRibbonMenus } from '../../../src/mount/toolbar-defaults.js';
 import { Spreadsheet } from '../../../src/mount.js';
 import { getPageSetup, mutators } from '../../../src/store/store.js';
-import {
-  HOME_MIXED_LAYOUT_GROUP_VARIANTS,
-  HOME_STACKED_LAYOUT_GROUP_VARIANTS,
-  HOME_TILE_LAYOUT_GROUP_VARIANTS,
-  ribbonActivatableSurfaceCommandIds,
-} from '../../../src/toolbar/ribbon-model.js';
 import {
   RIBBON_AUDITED_DROPDOWN_COMMANDS,
   RIBBON_AUDITED_GALLERY_COMMANDS,
@@ -27,18 +22,17 @@ import {
   RIBBON_DISABLED_COMMANDS,
   RIBBON_DROPDOWN_COMMANDS,
   RIBBON_DYNAMIC_MENU_FIRST_COMMANDS,
-  RIBBON_EXTERNAL_MENU_FOR_COMMAND,
   RIBBON_EXTERNAL_MENU_FIRST_COMMANDS,
+  RIBBON_EXTERNAL_MENU_FOR_COMMAND,
   RIBBON_GALLERY_COMMANDS,
   RIBBON_MENU_FACTORY_FOR_COMMAND,
   RIBBON_MENU_FACTORY_KEYS,
   RIBBON_MENU_FOR_COMMAND,
-  RIBBON_MENU_FIRST_COMMANDS,
-  RIBBON_PRIMARY_FACE_MENU_COMMANDS,
   RIBBON_PRIMARY_ACTION_COMMANDS,
   RIBBON_PRIMARY_ACTION_SPLIT_COMMANDS,
-  RIBBON_SPLIT_TOGGLE_COMMANDS,
+  RIBBON_PRIMARY_FACE_MENU_COMMANDS,
   RIBBON_SPLIT_BUTTON_COMMANDS,
+  RIBBON_SPLIT_TOGGLE_COMMANDS,
   RIBBON_TOGGLE_COMMANDS,
   ribbonActivationCategories,
   ribbonActivationForCommand,
@@ -56,7 +50,12 @@ import {
   RIBBON_DROPDOWN_MENU_FOR_COMMAND,
 } from '../../../src/toolbar/ribbon/dynamic-dropdowns.js';
 import type { RibbonRenderHelpers } from '../../../src/toolbar/ribbon/render-ribbon.js';
-import { createDefaultRibbonMenus } from '../../../src/mount/toolbar-defaults.js';
+import {
+  HOME_MIXED_LAYOUT_GROUP_VARIANTS,
+  HOME_STACKED_LAYOUT_GROUP_VARIANTS,
+  HOME_TILE_LAYOUT_GROUP_VARIANTS,
+  ribbonActivatableSurfaceCommandIds,
+} from '../../../src/toolbar/ribbon-model.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
 
 // Minimal helpers stub: enough for the renderer to emit a shell, no real
@@ -402,9 +401,9 @@ describe('Spreadsheet.mountToolbar', () => {
 
     host.querySelector<HTMLButtonElement>('[data-ribbon-command="formatTableHome"]')?.click();
     expect(
-      Array.from(host.querySelectorAll<HTMLElement>('#menu-table-style-home .app__tablestyle-heading')).map(
-        (heading) => heading.textContent,
-      ),
+      Array.from(
+        host.querySelectorAll<HTMLElement>('#menu-table-style-home .app__tablestyle-heading'),
+      ).map((heading) => heading.textContent),
     ).toEqual(['淡色', '中間', '濃色']);
     expect(menuTexts('#menu-table-style-home > .app__tablestyle-footer')).toEqual([
       '新しい表スタイル…',
@@ -2584,9 +2583,9 @@ describe('Spreadsheet.mountToolbar', () => {
     rangePicker?.click();
     expect(rangePicker?.dataset.rangePickerActive).toBe('true');
     expect(rangePicker?.getAttribute('aria-pressed')).toBe('true');
-    expect(rangeInput?.closest('.fc-range-picker')?.classList.contains('fc-range-picker--picking')).toBe(
-      true,
-    );
+    expect(
+      rangeInput?.closest('.fc-range-picker')?.classList.contains('fc-range-picker--picking'),
+    ).toBe(true);
     expect(dialog?.closest('.fc-fmtdlg')?.classList.contains('fc-fmtdlg--range-picking')).toBe(
       true,
     );
@@ -2665,9 +2664,9 @@ describe('Spreadsheet.mountToolbar', () => {
       'Themed Cell Styles',
       'Number Format',
     ]);
-    expect(
-      menu?.querySelector<HTMLElement>(':scope > .app__cellstyle-footer')?.parentElement,
-    ).toBe(menu);
+    expect(menu?.querySelector<HTMLElement>(':scope > .app__cellstyle-footer')?.parentElement).toBe(
+      menu,
+    );
     const goodButton = host.querySelector<HTMLButtonElement>('[data-cell-style="good"]');
     expect(goodButton).toBeTruthy();
     const event = new MouseEvent('click', { bubbles: true });
@@ -3683,7 +3682,9 @@ describe('Spreadsheet.mountToolbar', () => {
     document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
     await waitFor(() => sheet.instance.store.getState().protection.allowedEditRanges.length === 1);
     await waitFor(() =>
-      Boolean(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent?.includes('Allowed')),
+      Boolean(
+        document.body.querySelector<HTMLElement>('.app__dlg')?.textContent?.includes('Allowed'),
+      ),
     );
     document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
 
@@ -5279,9 +5280,7 @@ describe('Spreadsheet.mountToolbar', () => {
       ?.click();
 
     expect(
-      sheet.instance.store
-        .getState()
-        .format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 })),
+      sheet.instance.store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 })),
     ).toBeUndefined();
     expect(sheet.instance.store.getState().ui.pendingFormat).toEqual({
       addr: { sheet: 0, row: 0, col: 0 },

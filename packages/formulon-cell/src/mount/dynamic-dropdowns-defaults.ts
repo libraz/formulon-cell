@@ -142,9 +142,9 @@ import {
   showConditionalFormatTextDialog,
 } from '../toolbar/dialogs/conditional-format.js';
 import { showDefinedNamePickerDialog } from '../toolbar/dialogs/defined-name-picker.js';
+import { showDimensionDialog } from '../toolbar/dialogs/dimension.js';
 import { showFormatAsTableDialog } from '../toolbar/dialogs/format-as-table.js';
 import { pickImageFileDataUrl } from '../toolbar/dialogs/image-file.js';
-import { showDimensionDialog } from '../toolbar/dialogs/dimension.js';
 import { showMessage } from '../toolbar/dialogs/prompt.js';
 import {
   showAllowEditRangeDialog,
@@ -1944,7 +1944,8 @@ const buildSortMenuAction =
       return;
     }
     if (action === 'filter-advanced') {
-      const strings = instance.i18n.strings.ribbonMenu as typeof instance.i18n.strings.ribbonMenu & {
+      const strings = instance.i18n.strings
+        .ribbonMenu as typeof instance.i18n.strings.ribbonMenu & {
         advancedFilterInvalidRange: string;
         advancedFilterRangePicker: string;
       };

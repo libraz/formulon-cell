@@ -11,10 +11,7 @@ import {
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import {
-  appendDialogSelectOptions,
-  createDialogSelect,
-} from '../toolbar/dialogs/form-controls.js';
+import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
 
@@ -265,15 +262,10 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
     ]);
     sheetViewsSelect.value = s.sheetViews.activeViewId ?? CURRENT_VIEW_VALUE;
     const canDeleteView = !!s.sheetViews.activeViewId;
-    projectDisabledState(
-      deleteView,
-      !canDeleteView,
-      strings.viewToolbar.deleteViewRequiresActive,
-      {
-        datasetKey: 'disabledReason',
-        titlePrefix: strings.viewToolbar.deleteView,
-      },
-    );
+    projectDisabledState(deleteView, !canDeleteView, strings.viewToolbar.deleteViewRequiresActive, {
+      datasetKey: 'disabledReason',
+      titlePrefix: strings.viewToolbar.deleteView,
+    });
   }
 
   const unsub = store.subscribe(refresh);

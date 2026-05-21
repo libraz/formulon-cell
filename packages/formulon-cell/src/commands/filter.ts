@@ -441,7 +441,9 @@ function buildAdvancedCriteriaRows(
 function advancedRowKey(state: State, range: Range, row: number): string {
   const parts: string[] = [];
   for (let col = range.c0; col <= range.c1; col += 1) {
-    parts.push(filterValueKey(state.data.cells.get(addrKey({ sheet: range.sheet, row, col }))?.value));
+    parts.push(
+      filterValueKey(state.data.cells.get(addrKey({ sheet: range.sheet, row, col }))?.value),
+    );
   }
   return parts.join('\u001f');
 }

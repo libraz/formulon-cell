@@ -1,16 +1,11 @@
-import type { RangeResolver } from '../engine/range-resolver.js';
 import { addrKey } from '../engine/address.js';
+import type { RangeResolver } from '../engine/range-resolver.js';
 import type { CellValue, Range } from '../engine/types.js';
 import { syncValidationsToEngine } from '../engine/validation-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { CellValidation, ValidationOp } from '../store/store.js';
-import type { SpreadsheetStore } from '../store/store.js';
+import type { CellValidation, SpreadsheetStore, ValidationOp } from '../store/store.js';
 import type { CoercedInput } from './coerce-input.js';
-import {
-  applyFormatSnapshot,
-  captureFormatSnapshot,
-  type History,
-} from './history.js';
+import { applyFormatSnapshot, captureFormatSnapshot, type History } from './history.js';
 import { isCellWritable } from './protection.js';
 
 export type ValidationOutcome =

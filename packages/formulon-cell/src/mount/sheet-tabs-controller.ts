@@ -328,14 +328,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
               unhideReason(true),
             ),
           )
-        : [
-            menuButton(
-              strings.sheetTabs.unhideSheet,
-              () => undefined,
-              true,
-              unhideReason(false),
-            ),
-          ];
+        : [menuButton(strings.sheetTabs.unhideSheet, () => undefined, true, unhideReason(false))];
 
     sheetMenu.replaceChildren(
       menuButton(

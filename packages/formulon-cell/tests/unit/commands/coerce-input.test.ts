@@ -142,10 +142,7 @@ describe('writeInput', () => {
 
     writeInput(wb, { sheet: 0, row: 3, col: 3 }, '=SUM(R[-2]C[-2]:R[-1]C[-1])');
 
-    expect(wb.setFormula).toHaveBeenCalledWith(
-      { sheet: 0, row: 3, col: 3 },
-      '=SUM(B2:C3)',
-    );
+    expect(wb.setFormula).toHaveBeenCalledWith({ sheet: 0, row: 3, col: 3 }, '=SUM(B2:C3)');
   });
 
   it('normalizes R1C1 formula input before workbook calculation', async () => {

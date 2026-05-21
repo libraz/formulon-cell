@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ribbonActivationForCommand } from '../../../src/toolbar/ribbon/activation.js';
 import {
   buildRibbonSearchIndex,
   queryRibbonSearchIndex,
@@ -8,7 +9,6 @@ import {
   OPTIONAL_RIBBON_TABS,
   ribbonActivatableSurfaceCommandIds,
 } from '../../../src/toolbar/ribbon-model.js';
-import { ribbonActivationForCommand } from '../../../src/toolbar/ribbon/activation.js';
 
 describe('toolbar/ribbon/search-index', () => {
   it('builds Search/Tell me items from the shared ribbon model', () => {

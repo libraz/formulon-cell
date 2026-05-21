@@ -92,7 +92,8 @@ export const attachRangePickerButton = (
     });
     if (document.body) observer.observe(document.body, { childList: true, subtree: true });
     const dlg = activeDialog ?? dialog();
-    if (dlg) observer.observe(dlg, { attributes: true, attributeFilter: ['hidden', 'aria-hidden'] });
+    if (dlg)
+      observer.observe(dlg, { attributes: true, attributeFilter: ['hidden', 'aria-hidden'] });
   };
   button.addEventListener('click', () => {
     applyPickedValue();

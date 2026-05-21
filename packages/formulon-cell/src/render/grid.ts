@@ -14,7 +14,6 @@ import {
   buildColLayout,
   buildRowLayout,
   cellRectIn,
-  colLabel,
   colWidth,
   frozenColsWidth,
   frozenRowsHeight,

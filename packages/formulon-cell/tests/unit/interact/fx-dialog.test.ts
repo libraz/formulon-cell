@@ -207,7 +207,9 @@ describe('attachFxDialog', () => {
     const firstActive = search.getAttribute('aria-activedescendant');
     expect(firstActive).toBeTruthy();
     expect(document.getElementById(firstActive ?? '')?.getAttribute('aria-selected')).toBe('true');
-    const firstName = document.querySelector<HTMLElement>('.fc-fxdialog__summary-name')?.textContent;
+    const firstName = document.querySelector<HTMLElement>(
+      '.fc-fxdialog__summary-name',
+    )?.textContent;
     expect(firstName).toContain('(');
 
     search.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
@@ -263,7 +265,8 @@ describe('attachFxDialog', () => {
     const ifInputs = document.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input');
     expect(ifInputs).toHaveLength(3);
     const [logicalTest, valueIfTrue, valueIfFalse] = Array.from(ifInputs);
-    if (!logicalTest || !valueIfTrue || !valueIfFalse) throw new Error('expected IF argument inputs');
+    if (!logicalTest || !valueIfTrue || !valueIfFalse)
+      throw new Error('expected IF argument inputs');
     logicalTest.value = 'A1>5';
     logicalTest.dispatchEvent(new Event('input'));
     valueIfTrue.value = '"yes"';
@@ -311,9 +314,9 @@ describe('attachFxDialog', () => {
     expect(document.querySelector<HTMLElement>('.fc-fmtdlg__header')?.textContent).toBe(
       '関数の引数',
     );
-    expect(document.querySelector<HTMLElement>('.fc-fxdialog__category-row')?.textContent).toContain(
-      'カテゴリを選択',
-    );
+    expect(
+      document.querySelector<HTMLElement>('.fc-fxdialog__category-row')?.textContent,
+    ).toContain('カテゴリを選択');
     expect(document.querySelector<HTMLInputElement>('.fc-fxdialog__search')?.placeholder).toBe(
       '関数を検索…',
     );
