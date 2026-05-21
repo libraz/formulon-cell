@@ -507,6 +507,10 @@ describe('Spreadsheet.mountToolbar', () => {
     });
 
     expect(tb.applyCommand('formatTableHome')).toBe(true);
+    await Promise.resolve();
+    expect(document.body.textContent).toContain('Create Table');
+    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    await Promise.resolve();
     expect(sheet.instance.store.getState().tables.tables).toMatchObject([
       { style: 'medium', range: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 } },
     ]);
@@ -2467,7 +2471,7 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
-  it('creates a session table through the Home Format as Table dropdown', () => {
+  it('opens Create Table before applying a Home Format as Table style', async () => {
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 2 });
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
       dynamicDropdowns: true,
@@ -2519,6 +2523,15 @@ describe('Spreadsheet.mountToolbar', () => {
     const event = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(event, 'target', { value: styleButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
+    await Promise.resolve();
+
+    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const rangeInput = dialog?.querySelector<HTMLInputElement>('input[type="text"]');
+    expect(document.body.textContent).toContain('Create Table');
+    expect(rangeInput?.value).toBe('A1:C4');
+    expect(sheet.instance.store.getState().tables.tables).toEqual([]);
+    dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    await Promise.resolve();
 
     expect(sheet.instance.store.getState().tables.tables).toMatchObject([
       {
@@ -2533,9 +2546,12 @@ describe('Spreadsheet.mountToolbar', () => {
       { command: 'formatTableHome', menuId: 'menu-table-style-home' },
       tableButton,
     );
-    expect(styleButton?.getAttribute('role')).toBe('menuitemradio');
-    expect(styleButton?.getAttribute('aria-checked')).toBe('true');
-    expect(styleButton?.classList.contains('app__menu-item--active')).toBe(true);
+    const activeStyleButton = host.querySelector<HTMLButtonElement>(
+      '[data-table-style="dark"][data-table-color="#4472c4"][data-table-variant="banded"]',
+    );
+    expect(activeStyleButton?.getAttribute('role')).toBe('menuitemradio');
+    expect(activeStyleButton?.getAttribute('aria-checked')).toBe('true');
+    expect(activeStyleButton?.classList.contains('app__menu-item--active')).toBe(true);
 
     tb.dispose();
   });

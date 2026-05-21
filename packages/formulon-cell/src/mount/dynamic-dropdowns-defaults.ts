@@ -108,6 +108,7 @@ import {
   applyPivotTableStyleById,
   createPivotTableStyleFromActivePivot,
   createTableStyleFromActiveTable,
+  type CustomTableStyle,
   DEFAULT_TABLE_COLOR,
   formatAsTableByStyleId,
   inferTableHasHeaders,
@@ -2072,11 +2073,7 @@ const updateSortMenu =
 const buildTableStyleAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['createTableFromSelection'] =>
   (style = 'medium', color, variant = 'banded') => {
-    const range = normalizedSelectionRange(instance);
-    recordTablesChange(instance.history, instance.store, () => {
-      formatAsTableByStyleId(instance.store, range, style, color, variant);
-    });
-    instance.host.focus();
+    void showCreateTableDialog(instance, { style, color, variant });
   };
 
 const updateTableStylesMenu =
@@ -2117,7 +2114,14 @@ const updateTableStylesMenu =
     }
   };
 
-export const showCreateTableDialog = async (instance: SpreadsheetInstance): Promise<void> => {
+export const showCreateTableDialog = async (
+  instance: SpreadsheetInstance,
+  options: {
+    style?: string;
+    color?: string;
+    variant?: CustomTableStyle['variant'];
+  } = {},
+): Promise<void> => {
   const selection = normalizedSelectionRange(instance);
   const sheetName = instance.workbook.sheetName(selection.sheet);
   const pivotDialogStrings = instance.i18n.strings
@@ -2151,9 +2155,16 @@ export const showCreateTableDialog = async (instance: SpreadsheetInstance): Prom
   const range = parsedRange(result.range);
   if (!range) return;
   recordTablesChange(instance.history, instance.store, () => {
-    formatAsTableByStyleId(instance.store, range, 'medium', undefined, 'banded', {
-      showHeader: result.hasHeaders,
-    });
+    formatAsTableByStyleId(
+      instance.store,
+      range,
+      options.style ?? 'medium',
+      options.color,
+      options.variant ?? 'banded',
+      {
+        showHeader: result.hasHeaders,
+      },
+    );
   });
   instance.host.focus();
 };
