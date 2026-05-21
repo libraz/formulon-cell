@@ -118,6 +118,7 @@ export interface WorkbookObjectsPanelDeps {
   onOpenPivotTableDialog?: () => void;
   onAfterPivotEdit?: () => void;
   onSelectSessionIllustration?: (id: string) => void;
+  onDuplicateSessionIllustration?: (id: string) => void;
   onClearSessionIllustration?: (id: string) => void;
   onUpdateSessionIllustration?: (
     id: string,
@@ -280,6 +281,13 @@ export function attachWorkbookObjectsPanel(
     const select = createWorkbookObjectsActionButton(strings.workbookObjects.objectSelect);
     select.addEventListener('click', () => deps.onSelectSessionIllustration?.(illustration.id));
     actions.appendChild(select);
+    if (deps.onDuplicateSessionIllustration) {
+      const duplicate = createWorkbookObjectsActionButton(strings.workbookObjects.objectDuplicate);
+      duplicate.addEventListener('click', () =>
+        deps.onDuplicateSessionIllustration?.(illustration.id),
+      );
+      actions.appendChild(duplicate);
+    }
     if (deps.onClearSessionIllustration) {
       const remove = createWorkbookObjectsActionButton(strings.workbookObjects.objectDelete);
       remove.addEventListener('click', () => deps.onClearSessionIllustration?.(illustration.id));
@@ -305,6 +313,20 @@ export function attachWorkbookObjectsPanel(
     radius.value = String(
       illustration.radius ?? (illustration.shape === 'rounded-rectangle' ? 12 : 0),
     );
+    const lineWidth = document.createElement('input');
+    lineWidth.className = 'fc-objects__input';
+    lineWidth.type = 'number';
+    lineWidth.min = '1';
+    lineWidth.max = '16';
+    lineWidth.step = '1';
+    lineWidth.value = String(illustration.lineWidth ?? 3);
+    const opacity = document.createElement('input');
+    opacity.className = 'fc-objects__input';
+    opacity.type = 'range';
+    opacity.min = '0';
+    opacity.max = '1';
+    opacity.step = '0.05';
+    opacity.value = String(illustration.opacity ?? 0.16);
     const actions = document.createElement('div');
     actions.className = 'fc-objects__actions';
     const apply = createWorkbookObjectsActionButton(t.apply, { primary: true, type: 'submit' });
@@ -314,11 +336,15 @@ export function attachWorkbookObjectsPanel(
       deps.onUpdateSessionIllustration?.(illustration.id, {
         color: color.value,
         radius: Math.max(0, Math.min(48, Number(radius.value) || 0)),
+        lineWidth: Math.max(1, Math.min(16, Number(lineWidth.value) || 1)),
+        opacity: Math.max(0, Math.min(1, Number(opacity.value) || 0)),
       });
     });
     form.append(
       pivotEditField(t.shapeColor, color),
       pivotEditField(t.shapeRadius, radius),
+      pivotEditField(t.shapeLineWidth, lineWidth),
+      pivotEditField(t.shapeOpacity, opacity),
       actions,
     );
     return form;

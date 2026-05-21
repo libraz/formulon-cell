@@ -770,9 +770,12 @@ export interface Strings {
     rowGrandTotals: string;
     columnGrandTotals: string;
     objectSelect: string;
+    objectDuplicate: string;
     objectDelete: string;
     shapeColor: string;
     shapeRadius: string;
+    shapeLineWidth: string;
+    shapeOpacity: string;
     apply: string;
     deletePivotTable: string;
     invalidPivotAnchor: string;

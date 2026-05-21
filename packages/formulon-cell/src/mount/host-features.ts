@@ -3,6 +3,7 @@ import type { PrinterProfile } from '../commands/printer-profile.js';
 import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
 import {
   clearSessionIllustration,
+  duplicateSessionIllustration,
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
 import { setSheetZoom } from '../commands/structure.js';
@@ -532,6 +533,8 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           },
           onClearSessionIllustration: (id) =>
             clearSessionIllustration(input.store, id, input.history),
+          onDuplicateSessionIllustration: (id) =>
+            duplicateSessionIllustration(input.store, id, input.history),
           onUpdateSessionIllustration: (id, patch) =>
             updateSessionIllustration(input.store, id, patch, input.history),
           subscribeSessionObjects: (listener) => input.store.subscribe(listener),

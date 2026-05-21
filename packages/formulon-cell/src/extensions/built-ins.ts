@@ -20,6 +20,7 @@ import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import type { History } from '../commands/history.js';
 import {
   clearSessionIllustration,
+  duplicateSessionIllustration,
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
 import { setSheetZoom } from '../commands/structure.js';
@@ -255,6 +256,8 @@ export const workbookObjects = (): Extension => ({
         panel?.focus();
       },
       onClearSessionIllustration: (id) => clearSessionIllustration(ctx.store, id, ctx.history),
+      onDuplicateSessionIllustration: (id) =>
+        duplicateSessionIllustration(ctx.store, id, ctx.history),
       onUpdateSessionIllustration: (id, patch) =>
         updateSessionIllustration(ctx.store, id, patch, ctx.history),
       subscribeSessionObjects: (listener) => ctx.store.subscribe(listener),

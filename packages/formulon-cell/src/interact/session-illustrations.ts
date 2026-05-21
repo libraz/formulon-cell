@@ -30,6 +30,8 @@ const appendSvg = <K extends keyof SVGElementTagNameMap>(
 const renderShape = (svg: SVGSVGElement, item: SessionIllustration): void => {
   svg.replaceChildren();
   const color = item.color ?? '#0f6cbd';
+  const opacity = item.opacity ?? 0.16;
+  const lineWidth = item.lineWidth ?? 3;
   if (!item.shape) return;
   if (item.shape === 'line' || item.shape === 'arrow') {
     appendSvg(svg, 'line', {
@@ -38,7 +40,7 @@ const renderShape = (svg: SVGSVGElement, item: SessionIllustration): void => {
       x2: 148,
       y2: 20,
       stroke: color,
-      'stroke-width': 5,
+      'stroke-width': Math.max(1, item.lineWidth ?? 5),
       'stroke-linecap': 'round',
     });
     if (item.shape === 'arrow') {
@@ -56,9 +58,9 @@ const renderShape = (svg: SVGSVGElement, item: SessionIllustration): void => {
       rx: 68,
       ry: 36,
       fill: color,
-      'fill-opacity': 0.16,
+      'fill-opacity': opacity,
       stroke: color,
-      'stroke-width': 3,
+      'stroke-width': lineWidth,
     });
     return;
   }
@@ -66,9 +68,9 @@ const renderShape = (svg: SVGSVGElement, item: SessionIllustration): void => {
     appendSvg(svg, 'polygon', {
       points: '80,12 148,84 12,84',
       fill: color,
-      'fill-opacity': 0.16,
+      'fill-opacity': opacity,
       stroke: color,
-      'stroke-width': 3,
+      'stroke-width': lineWidth,
       'stroke-linejoin': 'round',
     });
     return;
@@ -77,9 +79,9 @@ const renderShape = (svg: SVGSVGElement, item: SessionIllustration): void => {
     appendSvg(svg, 'polygon', {
       points: '80,10 150,48 80,86 10,48',
       fill: color,
-      'fill-opacity': 0.16,
+      'fill-opacity': opacity,
       stroke: color,
-      'stroke-width': 3,
+      'stroke-width': lineWidth,
       'stroke-linejoin': 'round',
     });
     return;
@@ -91,9 +93,9 @@ const renderShape = (svg: SVGSVGElement, item: SessionIllustration): void => {
     height: 72,
     rx: item.radius ?? (item.shape === 'rounded-rectangle' ? 12 : 2),
     fill: color,
-    'fill-opacity': 0.16,
+    'fill-opacity': opacity,
     stroke: color,
-    'stroke-width': 3,
+    'stroke-width': lineWidth,
   });
 };
 

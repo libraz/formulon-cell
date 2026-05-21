@@ -239,6 +239,8 @@ describe('attachWorkbookObjectsPanel', () => {
           sheet: 0,
           color: '#0f6cbd',
           radius: 8,
+          lineWidth: 4,
+          opacity: 0.25,
         },
       ],
       onUpdateSessionIllustration,
@@ -246,25 +248,41 @@ describe('attachWorkbookObjectsPanel', () => {
     handle.open();
 
     const color = host.querySelector<HTMLInputElement>('input[type="color"]');
-    const radius = host.querySelector<HTMLInputElement>('input[type="number"]');
+    const numberInputs = Array.from(
+      host.querySelectorAll<HTMLInputElement>('input[type="number"]'),
+    );
+    const radius = numberInputs[0];
+    const lineWidth = numberInputs[1];
+    const opacity = host.querySelector<HTMLInputElement>('input[type="range"]');
     expect(color?.value).toBe('#0f6cbd');
     expect(radius?.value).toBe('8');
+    expect(lineWidth?.value).toBe('4');
+    expect(opacity?.value).toBe('0.25');
     expect(color).not.toBeNull();
     expect(radius).not.toBeNull();
-    if (!color || !radius) throw new Error('Expected editable shape controls');
+    expect(lineWidth).not.toBeNull();
+    expect(opacity).not.toBeNull();
+    if (!color || !radius || !lineWidth || !opacity) {
+      throw new Error('Expected editable shape controls');
+    }
     color.value = '#ff0000';
     radius.value = '18';
+    lineWidth.value = '7';
+    opacity.value = '0.45';
     radius.form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
     expect(onUpdateSessionIllustration).toHaveBeenCalledWith('shape-a', {
       color: '#ff0000',
       radius: 18,
+      lineWidth: 7,
+      opacity: 0.45,
     });
     handle.detach();
   });
 
-  it('routes session illustration select and delete actions from the list', () => {
+  it('routes session illustration select, duplicate, and delete actions from the list', () => {
     const onSelectSessionIllustration = vi.fn();
+    const onDuplicateSessionIllustration = vi.fn();
     const onClearSessionIllustration = vi.fn();
     const handle = attachWorkbookObjectsPanel({
       host,
@@ -279,15 +297,18 @@ describe('attachWorkbookObjectsPanel', () => {
         },
       ],
       onSelectSessionIllustration,
+      onDuplicateSessionIllustration,
       onClearSessionIllustration,
     });
     handle.open();
 
     const buttons = Array.from(host.querySelectorAll<HTMLButtonElement>('.fc-objects__action'));
     buttons.find((button) => button.textContent === 'Select')?.click();
+    buttons.find((button) => button.textContent === 'Duplicate')?.click();
     buttons.find((button) => button.textContent === 'Delete')?.click();
 
     expect(onSelectSessionIllustration).toHaveBeenCalledWith('shape-a');
+    expect(onDuplicateSessionIllustration).toHaveBeenCalledWith('shape-a');
     expect(onClearSessionIllustration).toHaveBeenCalledWith('shape-a');
     handle.detach();
   });

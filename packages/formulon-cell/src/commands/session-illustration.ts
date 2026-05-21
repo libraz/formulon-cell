@@ -17,6 +17,8 @@ export interface CreateSessionShapeOptions {
   h?: number;
   color?: string;
   radius?: number;
+  lineWidth?: number;
+  opacity?: number;
 }
 
 export interface CreateSessionImageOptions {
@@ -59,6 +61,8 @@ export function createSessionShape(
     h: options.h,
     color: options.color,
     radius: options.radius,
+    lineWidth: options.lineWidth,
+    opacity: options.opacity,
   };
   recordIllustrationsChange(history, store, () => {
     mutators.upsertIllustration(store, item);
@@ -177,6 +181,41 @@ export function updateSessionIllustration(
     mutators.updateIllustration(store, id, patch);
   });
   return sessionIllustrationById(store.getState(), id);
+}
+
+const duplicateId = (
+  state: { illustrations: { illustrations: readonly SessionIllustration[] } },
+  id: string,
+): string => {
+  const ids = new Set(state.illustrations.illustrations.map((item) => item.id));
+  let index = 1;
+  let next = `${id}-copy`;
+  while (ids.has(next)) {
+    index += 1;
+    next = `${id}-copy-${index}`;
+  }
+  return next;
+};
+
+export function duplicateSessionIllustration(
+  store: SpreadsheetStore,
+  id: string,
+  history: History | null = null,
+): SessionIllustration | null {
+  const state = store.getState();
+  const item = sessionIllustrationById(state, id);
+  if (!item) return null;
+  if (isSheetProtected(state, item.sheet)) return null;
+  const copy: SessionIllustration = {
+    ...item,
+    id: duplicateId(state, id),
+    x: (item.x ?? 300) + 24,
+    y: (item.y ?? 88) + 24,
+  };
+  recordIllustrationsChange(history, store, () => {
+    mutators.upsertIllustration(store, copy);
+  });
+  return copy;
 }
 
 const reorderIllustrations = (

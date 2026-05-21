@@ -582,6 +582,8 @@ export interface SessionIllustration {
   h?: number;
   color?: string;
   radius?: number;
+  lineWidth?: number;
+  opacity?: number;
 }
 
 export interface IllustrationsSlice {

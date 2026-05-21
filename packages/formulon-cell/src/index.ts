@@ -513,6 +513,7 @@ export {
   createRibbonShapeFromSelection,
   createSessionImage,
   createSessionShape,
+  duplicateSessionIllustration,
   listSessionIllustrations,
   sessionIllustrationById,
   updateSessionIllustration,

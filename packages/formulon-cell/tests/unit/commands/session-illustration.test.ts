@@ -8,6 +8,7 @@ import {
   createRibbonShapeFromSelection,
   createSessionImage,
   createSessionShape,
+  duplicateSessionIllustration,
   listSessionIllustrations,
   sessionIllustrationById,
   updateSessionIllustration,
@@ -36,6 +37,8 @@ describe('session illustration commands', () => {
       h: undefined,
       color: undefined,
       radius: undefined,
+      lineWidth: undefined,
+      opacity: undefined,
     });
     expect(image).toEqual({
       id: 'image-0-2-1',
@@ -108,6 +111,8 @@ describe('session illustration commands', () => {
         w: 160,
         color: '#ff0000',
         radius: 16,
+        lineWidth: 6,
+        opacity: 0.35,
       }),
     ).toMatchObject({
       id: 'shape-a',
@@ -116,6 +121,8 @@ describe('session illustration commands', () => {
       w: 160,
       color: '#ff0000',
       radius: 16,
+      lineWidth: 6,
+      opacity: 0.35,
     });
     expect(clearSessionIllustration(store, 'missing')).toBe(false);
     expect(clearSessionIllustration(store, 'image-a')).toBe(true);
@@ -133,8 +140,47 @@ describe('session illustration commands', () => {
     ).toBeNull();
     expect(createSessionImage(store, range(1, 0, 1, 0), { id: 'image-a', src: 'x' })).toBeNull();
     expect(updateSessionIllustration(store, 'shape-a', { x: 32 })).toBeNull();
+    expect(duplicateSessionIllustration(store, 'shape-a')).toBeNull();
     expect(clearSessionIllustration(store, 'shape-a')).toBe(false);
     expect(listSessionIllustrations(store.getState())).toEqual([shape]);
+  });
+
+  it('duplicates session illustrations with offset, appearance, and history', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    createSessionShape(
+      store,
+      range(0, 0, 0, 0),
+      {
+        id: 'shape-a',
+        shape: 'rectangle',
+        x: 10,
+        y: 20,
+        color: '#111111',
+        radius: 4,
+        lineWidth: 5,
+        opacity: 0.4,
+      },
+      history,
+    );
+
+    const copy = duplicateSessionIllustration(store, 'shape-a', history);
+
+    expect(copy).toMatchObject({
+      id: 'shape-a-copy',
+      x: 34,
+      y: 44,
+      color: '#111111',
+      radius: 4,
+      lineWidth: 5,
+      opacity: 0.4,
+    });
+    expect(listSessionIllustrations(store.getState()).map((item) => item.id)).toEqual([
+      'shape-a',
+      'shape-a-copy',
+    ]);
+    expect(history.undo()).toBe(true);
+    expect(listSessionIllustrations(store.getState()).map((item) => item.id)).toEqual(['shape-a']);
   });
 
   it('records create, update, and clear in history', () => {
