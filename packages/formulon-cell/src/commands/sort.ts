@@ -158,6 +158,7 @@ export function inferSortHasHeader(state: State, range: Range): boolean {
   let comparableColumns = 0;
   let typeMismatch = 0;
   let distinctHeaderFormats = 0;
+  let bothText = 0;
 
   for (let col = range.c0; col <= range.c1; col += 1) {
     const headerKind = cellKindAt(state, range.sheet, range.r0, col);
@@ -167,6 +168,7 @@ export function inferSortHasHeader(state: State, range: Range): boolean {
     const dataKind = cellKindAt(state, range.sheet, range.r0 + 1, col);
     if (headerKind !== 'blank' && dataKind !== 'blank') comparableColumns += 1;
     if (headerKind === 'text' && dataKind !== 'blank' && dataKind !== 'text') typeMismatch += 1;
+    if (headerKind === 'text' && dataKind === 'text') bothText += 1;
     if (hasDistinctHeaderFormat(state, range.sheet, range.r0, range.r0 + 1, col)) {
       distinctHeaderFormats += 1;
     }
@@ -174,7 +176,13 @@ export function inferSortHasHeader(state: State, range: Range): boolean {
 
   if (firstRowNonBlank === 0 || firstRowText === 0) return false;
   if (typeMismatch > 0) return true;
-  return comparableColumns > 0 && distinctHeaderFormats > 0 && firstRowText >= comparableColumns;
+  if (distinctHeaderFormats > 0 && firstRowText >= comparableColumns) return true;
+  // All-text table with no numeric or format contrast: the spreadsheet's Sort
+  // dialog still defaults to "my data has headers", so keep the label row out of
+  // the sort rather than mixing it into the data (H-18).
+  return (
+    comparableColumns > 0 && bothText === comparableColumns && firstRowText >= comparableColumns
+  );
 }
 
 /** Sort the rows of `range` in place by the values in `byCol`. Writes the

@@ -162,12 +162,8 @@ const SpreadsheetComponent = (
         ...(cur.seed ? { seed: cur.seed } : {}),
         ...(cur.printerProfiles ? { printerProfiles: cur.printerProfiles } : {}),
         ...(cur.printerProfileId ? { printerProfileId: cur.printerProfileId } : {}),
-        ...(cur.refreshPrinterProfiles
-          ? { refreshPrinterProfiles: cur.refreshPrinterProfiles }
-          : {}),
-        ...(cur.captureScreenClip
-          ? { captureScreenClip: () => propsRef.current.captureScreenClip?.() }
-          : {}),
+        refreshPrinterProfiles: () => propsRef.current.refreshPrinterProfiles?.(),
+        captureScreenClip: () => propsRef.current.captureScreenClip?.(),
         ...(cur.uploadStatus !== undefined ? { uploadStatus: cur.uploadStatus } : {}),
         ...(cur.macroRecording !== undefined ? { macroRecording: cur.macroRecording } : {}),
         renderError: !cur.errorFallback,

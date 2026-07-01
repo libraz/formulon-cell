@@ -5,6 +5,8 @@ export type {
   CellEntry,
   CellResult,
   CellXf,
+  ConditionalFormatEntry,
+  ConditionalFormatInput,
   DataValidationEntry,
   DataValidationInput,
   DataValidationRange,

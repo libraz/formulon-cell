@@ -74,6 +74,18 @@ describe('mount/host', () => {
       expect(host.dataset.fcEngineState).toBeUndefined();
     });
 
+    it('removes mount-owned accessibility and theme attributes', () => {
+      const id = prepareMountHost(host, en as Strings, 'ink');
+
+      releaseMountHost(host, id);
+
+      expect(host.hasAttribute('tabindex')).toBe(false);
+      expect(host.hasAttribute('role')).toBe(false);
+      expect(host.hasAttribute('aria-roledescription')).toBe(false);
+      expect(host.hasAttribute('aria-label')).toBe(false);
+      expect(host.dataset.fcTheme).toBeUndefined();
+    });
+
     it('is a no-op when the instance id no longer matches', () => {
       const id = prepareMountHost(host, en as Strings, 'paper');
       host.appendChild(document.createElement('div'));

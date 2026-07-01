@@ -21,10 +21,10 @@ import {
   insertCells,
   insertCols,
   insertRows,
+  mergeWillLoseData,
   mutators,
   recordConditionalRulesChange,
   recordFormatChange,
-  recordMergesChangeWithEngine,
   removeSheet,
   setAlign,
   setFreezePanes,
@@ -32,6 +32,7 @@ import {
   showRowsAroundSelection,
 } from '../index.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
+import { confirmMergeLoseData } from '../toolbar/dialogs/merge-confirm.js';
 
 export type AutoSumAction = AutoSumFunction | 'MORE';
 
@@ -139,36 +140,34 @@ export const handlePasteAction = (
   if (preset) instance.pasteSpecial(preset);
 };
 
-export const handleMergeAction = (
+export const handleMergeAction = async (
   instance: SpreadsheetInstance | null,
   action: MergeAction,
-): void => {
+): Promise<void> => {
   if (!instance) return;
-  const s = instance.store.getState();
-  const r = s.selection.range;
+  const r = instance.store.getState().selection.range;
   if (action === 'unmergeCells') {
     applyUnmerge(instance.store, instance.workbook, instance.history, r);
     return;
   }
+  const state = instance.store.getState();
+  if (mergeWillLoseData(state, r) && !(await confirmMergeLoseData(instance.i18n.strings, state, r)))
+    return;
   if (action === 'mergeAcross') {
-    recordMergesChangeWithEngine(
-      instance.history,
-      instance.store,
-      instance.workbook,
-      r.sheet,
-      () => {
-        for (let row = r.r0; row <= r.r1; row += 1) {
-          if (r.c0 === r.c1) continue;
-          mutators.mergeRange(instance.store, {
-            sheet: r.sheet,
-            r0: row,
-            c0: r.c0,
-            r1: row,
-            c1: r.c1,
-          });
-        }
-      },
-    );
+    instance.history.begin();
+    try {
+      for (let row = r.r0; row <= r.r1; row += 1) {
+        applyMerge(instance.store, instance.workbook, instance.history, {
+          sheet: r.sheet,
+          r0: row,
+          c0: r.c0,
+          r1: row,
+          c1: r.c1,
+        });
+      }
+    } finally {
+      instance.history.end();
+    }
     return;
   }
   applyMerge(instance.store, instance.workbook, instance.history, r);

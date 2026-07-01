@@ -6,8 +6,10 @@ import {
   expandRangeWithMerges,
   mergeAnchorOf,
   mergeAt,
+  mergeWillLoseData,
   stepWithMerge,
 } from '../../../src/commands/merge.js';
+import { setCellLocked, setProtectedSheet } from '../../../src/commands/protection.js';
 import type { Range } from '../../../src/engine/types.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
@@ -160,6 +162,86 @@ describe('applyUnmerge', () => {
     expect(applyUnmerge(store, wb, history, r)).toBe(true);
     expect(store.getState().merges.byAnchor.size).toBe(0);
     history.undo();
+    expect(store.getState().merges.byAnchor.size).toBe(1);
+  });
+});
+
+describe('mergeWillLoseData', () => {
+  let store: SpreadsheetStore;
+  let wb: WorkbookHandle;
+
+  beforeEach(async () => {
+    store = createSpreadsheetStore();
+    wb = await newWb();
+  });
+
+  it('is false when only the anchor holds content', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 'keep' }]);
+    expect(mergeWillLoseData(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 })).toBe(
+      false,
+    );
+  });
+
+  it('is true when a non-anchor cell holds content', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 'keep' },
+      { row: 1, col: 1, value: 'drop' },
+    ]);
+    expect(mergeWillLoseData(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 })).toBe(
+      true,
+    );
+  });
+
+  it('counts a non-anchor formula as content', () => {
+    store.setState((s) => {
+      const cells = new Map(s.data.cells);
+      cells.set('0:0:1', { value: { kind: 'blank' }, formula: '=1+1' });
+      return { ...s, data: { ...s.data, cells } };
+    });
+    expect(mergeWillLoseData(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 })).toBe(
+      true,
+    );
+  });
+});
+
+describe('merge protection gate (H-32)', () => {
+  let store: SpreadsheetStore;
+  let wb: WorkbookHandle;
+  let history: History;
+
+  beforeEach(async () => {
+    store = createSpreadsheetStore();
+    wb = await newWb();
+    history = new History();
+    wb.attachHistory(history);
+  });
+
+  it('refuses to merge when a covered cell is locked on a protected sheet', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 'a' },
+      { row: 0, col: 1, value: 'b' },
+    ]);
+    setProtectedSheet(store, 0, true);
+    const r: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 };
+    expect(applyMerge(store, wb, history, r)).toBe(false);
+    expect(store.getState().merges.byAnchor.size).toBe(0);
+    // The locked non-anchor value must survive (no silent clear).
+    expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'text', value: 'b' });
+  });
+
+  it('merges when the covered cells are explicitly unlocked on a protected sheet', () => {
+    const r: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 };
+    setCellLocked(store, r, false);
+    setProtectedSheet(store, 0, true);
+    expect(applyMerge(store, wb, history, r)).toBe(true);
+    expect(store.getState().merges.byAnchor.size).toBe(1);
+  });
+
+  it('refuses to unmerge a locked region on a protected sheet', () => {
+    const r: Range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
+    applyMerge(store, wb, history, r);
+    setProtectedSheet(store, 0, true);
+    expect(applyUnmerge(store, wb, history, r)).toBe(false);
     expect(store.getState().merges.byAnchor.size).toBe(1);
   });
 });

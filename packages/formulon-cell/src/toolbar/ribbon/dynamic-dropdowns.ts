@@ -582,7 +582,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
   const dynamicRibbonDropdownHover = (event: MouseEvent): boolean => {
     const target = eventElement(event);
     const menu = target?.closest<HTMLElement>('.app__menu');
-    if (!menu || menu.id !== 'menu-conditional') return false;
+    if (menu?.id !== 'menu-conditional') return false;
     if (menu.hidden) return false;
     const trigger = target?.closest<HTMLElement>('[data-cf-submenu]');
     if (!trigger) return false;
@@ -623,7 +623,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
         return true;
       }
     }
-    if (!menu || menu.id !== 'menu-conditional' || menu.hidden) return false;
+    if (menu?.id !== 'menu-conditional' || menu.hidden) return false;
     const trigger = target?.closest<HTMLElement>('[data-cf-submenu]');
     if (trigger && (event.key === 'ArrowRight' || event.key === 'Enter' || event.key === ' ')) {
       event.preventDefault();

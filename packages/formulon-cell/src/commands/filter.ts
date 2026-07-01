@@ -36,6 +36,7 @@ const cloneCriteria = (criteria: readonly ValueFilterCriteria[]): ValueFilterCri
     range: { ...c.range },
     byCol: c.byCol,
     hiddenValues: [...c.hiddenValues],
+    ...(c.condition ? { condition: { ...c.condition } } : {}),
   }));
 
 function captureFilterSnapshot(state: State): FilterSnapshot {
@@ -85,6 +86,8 @@ function sameCriteriaList(
       !!right &&
       left.byCol === right.byCol &&
       sameRange(left.range, right.range) &&
+      left.condition?.op === right.condition?.op &&
+      left.condition?.value === right.condition?.value &&
       left.hiddenValues.length === right.hiddenValues.length &&
       left.hiddenValues.every((value, index) => value === right.hiddenValues[index])
     );
@@ -146,30 +149,18 @@ export function applyValueFilter(
   byCol: number,
   hiddenValues: readonly string[],
 ): number {
-  const hiddenSet = new Set(hiddenValues);
-  const nextHidden = new Set(state.layout.hiddenRows);
-  for (let r = range.r0 + 1; r <= range.r1; r += 1) nextHidden.delete(r);
-  let hiddenCount = 0;
-  for (let r = range.r0 + 1; r <= range.r1; r += 1) {
-    const cell = state.data.cells.get(addrKey({ sheet: range.sheet, row: r, col: byCol }));
-    if (!hiddenSet.has(filterValueKey(cell?.value))) continue;
-    nextHidden.add(r);
-    hiddenCount += 1;
-  }
+  const criteria = upsertCriteria(state.ui.filterCriteria, {
+    range,
+    byCol,
+    hiddenValues: Array.from(new Set(hiddenValues)).sort(),
+  });
+  const { hidden, count } = recomputeHiddenFromCriteria(state, criteria);
   store.setState((s) => ({
     ...s,
-    layout: { ...s.layout, hiddenRows: nextHidden },
-    ui: {
-      ...s.ui,
-      filterRange: { ...range },
-      filterCriteria: upsertCriteria(s.ui.filterCriteria, {
-        range,
-        byCol,
-        hiddenValues: Array.from(hiddenSet).sort(),
-      }),
-    },
+    layout: { ...s.layout, hiddenRows: hidden },
+    ui: { ...s.ui, filterRange: { ...range }, filterCriteria: criteria },
   }));
-  return hiddenCount;
+  return count;
 }
 
 export function applyConditionFilter(
@@ -179,24 +170,49 @@ export function applyConditionFilter(
   byCol: number,
   condition: ConditionFilterOptions,
 ): number {
-  const nextHidden = new Set(state.layout.hiddenRows);
-  for (let r = range.r0 + 1; r <= range.r1; r += 1) nextHidden.delete(r);
-  let hiddenCount = 0;
-  for (let r = range.r0 + 1; r <= range.r1; r += 1) {
-    const cell = state.data.cells.get(addrKey({ sheet: range.sheet, row: r, col: byCol }));
-    if (conditionMatches(cell, condition)) continue;
-    nextHidden.add(r);
-    hiddenCount += 1;
-  }
+  const criteria = upsertCriteria(state.ui.filterCriteria, {
+    range,
+    byCol,
+    hiddenValues: [],
+    condition: { op: condition.op, value: condition.value },
+  });
+  const { hidden, count } = recomputeHiddenFromCriteria(state, criteria);
   store.setState((s) => ({
     ...s,
-    layout: { ...s.layout, hiddenRows: nextHidden },
-    ui: {
-      ...s.ui,
-      filterRange: { ...range },
-    },
+    layout: { ...s.layout, hiddenRows: hidden },
+    ui: { ...s.ui, filterRange: { ...range }, filterCriteria: criteria },
   }));
-  return hiddenCount;
+  return count;
+}
+
+/**
+ * Recompute the hidden-row set from the full criteria list, ANDing across
+ * every filtered column the way Excel's AutoFilter does: a row survives only
+ * when it passes *all* active column criteria. Rows inside the criteria ranges
+ * are re-evaluated from scratch (so replacing one column's filter never leaves
+ * another column's hides stale), while hides outside the ranges are preserved.
+ */
+function recomputeHiddenFromCriteria(
+  state: State,
+  criteria: readonly ValueFilterCriteria[],
+): { hidden: Set<number>; count: number } {
+  const baseline = new Set(state.layout.hiddenRows);
+  for (const c of criteria) {
+    for (let r = c.range.r0 + 1; r <= c.range.r1; r += 1) baseline.delete(r);
+  }
+  const next = new Set(baseline);
+  for (const c of criteria) {
+    const hiddenSet = c.condition ? null : new Set(c.hiddenValues);
+    for (let r = c.range.r0 + 1; r <= c.range.r1; r += 1) {
+      if (next.has(r)) continue;
+      const cell = state.data.cells.get(addrKey({ sheet: c.range.sheet, row: r, col: c.byCol }));
+      const hide = c.condition
+        ? !conditionMatches(cell, c.condition)
+        : (hiddenSet as Set<string>).has(filterValueKey(cell?.value));
+      if (hide) next.add(r);
+    }
+  }
+  return { hidden: next, count: next.size - baseline.size };
 }
 
 /** Apply an Excel-style "Filter by Selected Cell's Value" action. The active
@@ -584,24 +600,9 @@ function rowsAfterReapply(
   criteria: readonly ValueFilterCriteria[],
   setHiddenCount: (count: number) => void,
 ): Set<number> {
-  const next = new Set(state.layout.hiddenRows);
-  let count = 0;
-  for (const criterion of criteria) {
-    for (let r = criterion.range.r0 + 1; r <= criterion.range.r1; r += 1) next.delete(r);
-  }
-  for (const criterion of criteria) {
-    const hiddenSet = new Set(criterion.hiddenValues);
-    for (let r = criterion.range.r0 + 1; r <= criterion.range.r1; r += 1) {
-      const cell = state.data.cells.get(
-        addrKey({ sheet: criterion.range.sheet, row: r, col: criterion.byCol }),
-      );
-      if (!hiddenSet.has(filterValueKey(cell?.value))) continue;
-      next.add(r);
-      count += 1;
-    }
-  }
+  const { hidden, count } = recomputeHiddenFromCriteria(state, criteria);
   setHiddenCount(count);
-  return next;
+  return hidden;
 }
 
 function upsertCriteria(
@@ -609,10 +610,17 @@ function upsertCriteria(
   next: ValueFilterCriteria,
 ): ValueFilterCriteria[] {
   const out = existing.filter((c) => !(sameRange(c.range, next.range) && c.byCol === next.byCol));
-  if (next.hiddenValues.length === 0) return out;
+  // A value filter that hides nothing clears the column; a condition filter is
+  // always meaningful, so it is kept even though hiddenValues is empty.
+  if (!next.condition && next.hiddenValues.length === 0) return out;
   return [
     ...out,
-    { range: { ...next.range }, byCol: next.byCol, hiddenValues: [...next.hiddenValues] },
+    {
+      range: { ...next.range },
+      byCol: next.byCol,
+      hiddenValues: [...next.hiddenValues],
+      ...(next.condition ? { condition: { ...next.condition } } : {}),
+    },
   ];
 }
 

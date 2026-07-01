@@ -6,7 +6,7 @@ import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { cellRect } from '../render/geometry.js';
 import { formatWithPending, sameAddr } from '../store/pending-format.js';
-import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { type CellFormat, mutators, type SpreadsheetStore } from '../store/store.js';
 import { type ArgHelperHandle, type ArgHelperLabels, attachArgHelper } from './arg-helper.js';
 import {
   type AutocompleteHandle,
@@ -240,12 +240,40 @@ export class InlineEditor {
    *  relative-ref deltas. After committing, the active cell stays put. */
   commitMulti(): void {
     if (!this.input || !this.editingAddr) return;
-    const raw = this.input.value;
+    const input = this.input;
+    const raw = input.value;
     const anchor = this.editingAddr;
     const s = this.deps.store.getState();
     const ranges = [s.selection.range, ...(s.selection.extraRanges ?? [])];
     const sheet = s.data.sheetIndex;
     const isFormula = raw.startsWith('=');
+    // Validated write that mirrors the anchor's stop-rejection handling. Returns
+    // true when a `stop` rule blocked the entry (the whole fill aborts) so DV
+    // bites on every filled cell, not just the anchor (M-16).
+    const writeValidatedOrAbort = (
+      target: Addr,
+      text: string,
+      fmt: CellFormat | undefined,
+    ): boolean => {
+      const outcome = writeInputValidated(
+        this.deps.wb,
+        target,
+        text,
+        fmt?.validation,
+        this.deps.store,
+      );
+      if (!outcome.ok && outcome.severity === 'stop') {
+        this.deps.onValidation?.({
+          severity: outcome.severity,
+          title: fmt?.validation?.errorTitle,
+          message: outcome.message,
+        });
+        input.focus();
+        input.select();
+        return true;
+      }
+      return false;
+    };
     for (const r of ranges) {
       for (let row = r.r0; row <= r.r1; row += 1) {
         for (let col = r.c0; col <= r.c1; col += 1) {
@@ -255,68 +283,20 @@ export class InlineEditor {
               ? formatWithPending(this.deps.store.getState(), target)
               : s.format.formats.get(addrKey(target));
           const forceText = fmt?.numFmt?.kind === 'text';
-          if (forceText) {
-            if (row === anchor.row && col === anchor.col) {
-              const outcome = writeInputValidated(
-                this.deps.wb,
-                target,
-                raw,
-                fmt?.validation,
-                this.deps.store,
-              );
-              if (!outcome.ok && outcome.severity === 'stop') {
-                if (this.deps.onValidation) {
-                  this.deps.onValidation({
-                    severity: outcome.severity,
-                    title: fmt?.validation?.errorTitle,
-                    message: outcome.message,
-                  });
-                }
-                this.input.focus();
-                this.input.select();
-                return;
-              }
-            } else {
-              try {
-                writeCoerced(this.deps.wb, target, coerceInput(raw, { forceText: true }));
-              } catch (err) {
-                console.warn('formulon-cell: writeCoerced failed', err);
-              }
-            }
-          } else if (isFormula) {
+          if (isFormula && !forceText) {
+            // Formula fill: relative refs shift by the paste offset. Formula
+            // results aren't run through DV here (Excel validates the typed
+            // entry, not the recomputed result).
             const shifted = shiftFormulaRefs(raw, row - anchor.row, col - anchor.col);
             try {
               writeCoerced(this.deps.wb, target, { kind: 'formula', text: shifted });
             } catch (err) {
               console.warn('formulon-cell: writeCoerced failed', err);
             }
-          } else if (row === anchor.row && col === anchor.col) {
-            // Anchor goes through the validated path so DV stop-rejections still bite.
-            const outcome = writeInputValidated(
-              this.deps.wb,
-              target,
-              raw,
-              fmt?.validation,
-              this.deps.store,
-            );
-            if (!outcome.ok && outcome.severity === 'stop') {
-              if (this.deps.onValidation) {
-                this.deps.onValidation({
-                  severity: outcome.severity,
-                  title: fmt?.validation?.errorTitle,
-                  message: outcome.message,
-                });
-              }
-              this.input.focus();
-              this.input.select();
-              return;
-            }
           } else {
-            try {
-              writeCoerced(this.deps.wb, target, coerceInput(raw));
-            } catch (err) {
-              console.warn('formulon-cell: writeCoerced failed', err);
-            }
+            // Value fill (including text-formatted cells): every target validates
+            // against its own rule via the store-aware coercion path.
+            if (writeValidatedOrAbort(target, raw, fmt)) return;
           }
         }
       }

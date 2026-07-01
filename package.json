@@ -21,6 +21,7 @@
     "build": "yarn workspaces foreach -A --topological-dev --exclude formulon-cell-monorepo --exclude '@formulon-cell/*' run build",
     "build:all": "yarn workspaces foreach -A --topological-dev --exclude formulon-cell-monorepo run build",
     "lint": "biome check .",
+    "lint:fix": "biome check --write .",
     "format": "biome check --write .",
     "typecheck": "yarn workspaces foreach -A --exclude formulon-cell-monorepo run typecheck",
     "test": "yarn workspace @libraz/formulon-cell test",
@@ -31,10 +32,11 @@
     "prepublish:libs": "cp LICENSE packages/formulon-cell/ && cp LICENSE packages/formulon-cell-react/ 2>/dev/null || true && cp LICENSE packages/formulon-cell-vue/ 2>/dev/null || true"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.11.3",
-    "@biomejs/biome": "2.4.15",
-    "@playwright/test": "^1.59.1",
+    "@axe-core/playwright": "^4.12.1",
+    "@biomejs/biome": "2.5.1",
+    "@playwright/test": "^1.61.1",
     "typescript": "6.0.3",
-    "vite": "8.0.11"
+    "vite": "8.1.2",
+    "vitest": "^4.1.9"
   }
 }

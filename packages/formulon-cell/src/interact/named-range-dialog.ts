@@ -26,6 +26,9 @@ export interface NamedRangeDialogDeps {
   strings?: Strings;
   getSelectedRangeFormula?: () => string;
   subscribeToRangeChanges?: (listener: () => void) => () => void;
+  /** Called after a defined-name mutation writes through to the engine so the
+   *  host can re-project recalculated cells into the store (H-38). */
+  onAfterMutate?: () => void;
 }
 
 export interface NamedRangeDialogHandle {
@@ -52,6 +55,17 @@ function createNameManagerButton(
 
 const hasFormulaError = (formula: string): boolean =>
   /#(?:REF|NAME|VALUE|DIV\/0|N\/A|NULL|NUM)!?/i.test(formula);
+
+/** Map a defined-name mutation failure to its inline message. */
+function errorMessageFor(
+  reason: 'empty-name' | 'invalid-name' | 'empty-formula' | 'unsupported' | 'engine-failed',
+  t: Strings['namedRangeDialog'],
+): string {
+  if (reason === 'invalid-name') return t.errorInvalidName;
+  if (reason === 'empty-name') return t.errorEmptyName;
+  if (reason === 'empty-formula') return t.errorEmptyFormula;
+  return t.errorEngineFailed;
+}
 
 /**
  * Name Manager: list of defined names plus Excel-like child dialogs for
@@ -630,6 +644,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       return;
     }
     clearMainError();
+    deps.onAfterMutate?.();
     closeDeleteConfirm();
     selectedNameIndex = Math.min(selectedNameIndex, Math.max(0, currentRows.length - 2));
     renderList();
@@ -643,10 +658,11 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       upsertDefinedName(wb, entry.name, quickInput.value),
     );
     if (!result.ok) {
-      showMainError(result.reason === 'empty-formula' ? t.errorEmptyFormula : t.errorEngineFailed);
+      showMainError(errorMessageFor(result.reason, t));
       return;
     }
     clearMainError();
+    deps.onAfterMutate?.();
     renderList();
     focusNameRow(selectedNameIndex);
   };
@@ -671,11 +687,12 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       upsertDefinedName(wb, name, formula),
     );
     if (!result.ok) {
-      showError(result.reason === 'empty-formula' ? t.errorEmptyFormula : t.errorEngineFailed);
+      showError(errorMessageFor(result.reason, t));
       return;
     }
     clearError();
     clearMainError();
+    deps.onAfterMutate?.();
     nameInput.value = '';
     formulaInput.value = '';
     commentInput.value = '';

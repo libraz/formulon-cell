@@ -40,4 +40,44 @@ describe('resolveSpreadsheetUiOptions', () => {
     expect(resolved.print).toBe(false);
     expect(resolved.features.pageSetup).toBe(true);
   });
+
+  it('applies profile defaults before advanced and friendly feature overrides', () => {
+    const resolved = resolveSpreadsheetUiOptions({
+      profile: 'minimal',
+      advancedFeatures: {
+        quickAnalysis: true,
+        charts: true,
+        validation: false,
+      },
+      features: {
+        quickAnalysis: false,
+        validation: true,
+        contextMenu: true,
+      },
+    });
+
+    expect(resolved.profile).toBe('minimal');
+    expect(resolved.features.charts).toBe(true);
+    expect(resolved.features.quickAnalysis).toBe(false);
+    expect(resolved.features.validation).toBe(true);
+    expect(resolved.features.contextMenu).toBe(true);
+    expect(resolved.features.sheetTabs).toBe(false);
+  });
+
+  it('preserves theme and lockTheme host options independently from feature flags', () => {
+    const resolved = resolveSpreadsheetUiOptions({
+      profile: 'standard',
+      theme: 'ink',
+      lockTheme: true,
+      features: {
+        ribbon: false,
+      },
+    });
+
+    expect(resolved.profile).toBe('standard');
+    expect(resolved.theme).toBe('ink');
+    expect(resolved.lockTheme).toBe(true);
+    expect(resolved.ribbon).toBe(false);
+    expect(resolved.features.formatDialog).toBe(false);
+  });
 });

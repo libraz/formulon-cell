@@ -34,7 +34,8 @@ const partial = (
   errorStyle: 0,
   allowBlank: true,
   showInputMessage: false,
-  showErrorMessage: false,
+  // Desktop default: the error alert is enabled unless explicitly disabled.
+  showErrorMessage: true,
   formula1: '',
   formula2: '',
   errorTitle: '',
@@ -147,6 +148,41 @@ describe('hydrateValidationsFromEngine', () => {
     expect(fmt?.bold).toBe(true);
     expect(fmt?.fill).toBe('#ffe');
     expect(fmt?.validation).toEqual({ kind: 'list', source: ['A', 'B'] });
+  });
+
+  it('preserves an explicitly disabled error alert on decode (H-29)', () => {
+    const wb = makeFake({
+      entries: [
+        partial({
+          ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }],
+          type: DV_TYPE_LIST,
+          formula1: 'A,B',
+          showErrorMessage: false,
+        }),
+      ],
+    });
+    const store = createSpreadsheetStore();
+    hydrateValidationsFromEngine(wb, store, 0);
+    const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
+    expect(fmt?.validation).toEqual({ kind: 'list', source: ['A', 'B'], showErrorMessage: false });
+  });
+
+  it('omits showErrorMessage when the alert is enabled (default) on decode (H-29)', () => {
+    const wb = makeFake({
+      entries: [
+        partial({
+          ranges: [{ sheet: 0, r0: 2, c0: 0, r1: 2, c1: 0 }],
+          type: DV_TYPE_LIST,
+          formula1: 'A,B',
+          showErrorMessage: true,
+        }),
+      ],
+    });
+    const store = createSpreadsheetStore();
+    hydrateValidationsFromEngine(wb, store, 0);
+    const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 2, col: 0 }));
+    expect(fmt?.validation).toEqual({ kind: 'list', source: ['A', 'B'] });
+    expect(fmt?.validation && 'showErrorMessage' in fmt.validation).toBe(false);
   });
 
   it('no-op when capability is off', () => {

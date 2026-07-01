@@ -258,7 +258,7 @@ function paintCellValue(
     for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
       const key = addrKey({ sheet, row: r, col: c });
       const cell = state.data.cells.get(key);
-      if (!cell || cell.value.kind !== 'number') continue;
+      if (cell?.value.kind !== 'number') continue;
       if (!inRange(sheet, r, c, rule.range)) continue;
       if (testCellValue(cell.value.value, rule.op, rule.a, rule.b)) {
         const overlay = out.get(key) ?? {};
@@ -279,7 +279,7 @@ function paintColorScale(
   for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
     for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
       const cell = state.data.cells.get(addrKey({ sheet, row: r, col: c }));
-      if (!cell || cell.value.kind !== 'number') continue;
+      if (cell?.value.kind !== 'number') continue;
       values.push(cell.value.value);
     }
   }
@@ -290,7 +290,7 @@ function paintColorScale(
     for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
       const key = addrKey({ sheet, row: r, col: c });
       const cell = state.data.cells.get(key);
-      if (!cell || cell.value.kind !== 'number') continue;
+      if (cell?.value.kind !== 'number') continue;
       const v = cell.value.value;
       const t = colorScalePosition(v, scale);
       const overlay = out.get(key) ?? {};
@@ -371,7 +371,7 @@ function paintDataBar(
   for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
     for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
       const cell = state.data.cells.get(addrKey({ sheet, row: r, col: c }));
-      if (!cell || cell.value.kind !== 'number') continue;
+      if (cell?.value.kind !== 'number') continue;
       const v = cell.value.value;
       if (v < min) min = v;
       if (v > max) max = v;
@@ -383,7 +383,7 @@ function paintDataBar(
     for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
       const key = addrKey({ sheet, row: r, col: c });
       const cell = state.data.cells.get(key);
-      if (!cell || cell.value.kind !== 'number') continue;
+      if (cell?.value.kind !== 'number') continue;
       const v = cell.value.value;
       const overlay = out.get(key) ?? {};
       overlay.bar = Math.max(0, Math.min(1, Math.abs(v) / denom));
@@ -405,7 +405,7 @@ function paintIconSet(
   for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
     for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
       const cell = state.data.cells.get(addrKey({ sheet, row: r, col: c }));
-      if (!cell || cell.value.kind !== 'number') continue;
+      if (cell?.value.kind !== 'number') continue;
       values.push(cell.value.value);
     }
   }
@@ -422,7 +422,7 @@ function paintIconSet(
     for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
       const key = addrKey({ sheet, row: r, col: c });
       const cell = state.data.cells.get(key);
-      if (!cell || cell.value.kind !== 'number') continue;
+      if (cell?.value.kind !== 'number') continue;
       const v = cell.value.value;
       const t = max === min ? 0.5 : (v - min) / (max - min);
       let slot =
@@ -471,7 +471,7 @@ function paintTopBottom(
     for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
       const key = addrKey({ sheet, row: r, col: c });
       const cell = state.data.cells.get(key);
-      if (!cell || cell.value.kind !== 'number') continue;
+      if (cell?.value.kind !== 'number') continue;
       const v = cell.value.value;
       const passes = rule.mode === 'top' ? v >= cutoff : v <= cutoff;
       if (!passes) continue;
@@ -503,7 +503,7 @@ function paintAverage(
     for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
       const key = addrKey({ sheet, row: r, col: c });
       const cell = state.data.cells.get(key);
-      if (!cell || cell.value.kind !== 'number') continue;
+      if (cell?.value.kind !== 'number') continue;
       const v = cell.value.value;
       const passes =
         rule.mode === 'above'

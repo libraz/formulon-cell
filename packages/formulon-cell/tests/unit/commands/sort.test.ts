@@ -184,6 +184,21 @@ describe('sortRange', () => {
     );
   });
 
+  it('infers a header for an all-text table even without format contrast (H-18)', () => {
+    // Region / Product columns, no bold header, no numeric column — the old
+    // heuristic dropped the label row into the sort.
+    seedText(store, wb, 0, 0, 'Region');
+    seedText(store, wb, 0, 1, 'Product');
+    seedText(store, wb, 1, 0, 'West');
+    seedText(store, wb, 1, 1, 'Paper');
+    seedText(store, wb, 2, 0, 'East');
+    seedText(store, wb, 2, 1, 'Ink');
+
+    expect(inferSortHasHeader(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 })).toBe(
+      true,
+    );
+  });
+
   it('moves cell formatting with sorted rows while leaving the header format in place', () => {
     seedText(store, wb, 0, 0, 'item');
     seedText(store, wb, 1, 0, 'banana');

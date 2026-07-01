@@ -112,10 +112,18 @@ export function resolveListValues(
  * the same; the constraint is on the literal user-typed value, not on
  * downstream calculation results.
  */
+/**
+ * Evaluates a custom-validation formula for the cell under test and returns
+ * whether it is satisfied. Returns `null` when evaluation is unavailable (e.g.
+ * the stub engine), in which case the validator accepts the input for parity.
+ */
+export type CustomValidationEvaluator = (formula: string) => boolean | null;
+
 export function validateAgainst(
   validation: CellValidation,
   input: CoercedInput,
   resolveRange?: RangeResolver,
+  evalCustom?: CustomValidationEvaluator,
 ): ValidationOutcome {
   if (input.kind === 'formula') return { ok: true };
   if (input.kind === 'blank') {
@@ -147,8 +155,17 @@ export function validateAgainst(
       const len = inputAsText(input).length;
       return checkBounded(len, validation, 'length');
     }
-    case 'custom':
-      return { ok: true };
+    case 'custom': {
+      // Excel evaluates the custom formula and rejects when it is not TRUE.
+      // Without an evaluator (renderers) or when the engine can't evaluate
+      // (stub → null), accept for parity rather than block silently.
+      if (!validation.formula || !evalCustom) return { ok: true };
+      const satisfied = evalCustom(validation.formula);
+      if (satisfied === null) return { ok: true };
+      return satisfied
+        ? { ok: true }
+        : reject(validation, 'value does not satisfy the custom rule');
+    }
     default:
       return { ok: true };
   }

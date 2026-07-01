@@ -2,6 +2,7 @@ import { addrKey } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
+import { adjustFormulaForCellBandShift } from './formula-refs.js';
 import { type History, recordFormatChange, recordMergesChangeWithEngine } from './history.js';
 import { isSheetProtected } from './protection.js';
 
@@ -131,14 +132,14 @@ function shiftCells(
         : { ...cell.addr, col: cell.addr.col + delta };
     if (!inShiftTarget(next, affected, axis)) continue;
     const formula = cell.formula
-      ? shiftFormulaRefsInBand(cell.formula, affected, axis, delta)
+      ? adjustFormulaForCellBandShift(cell.formula, affected, axis, delta)
       : null;
     writeCell(wb, next, cell.value, formula);
   }
 
   for (const cell of all) {
     if (cell.formula && !inRange(cell.addr, affected)) {
-      const nextFormula = shiftFormulaRefsInBand(cell.formula, affected, axis, delta);
+      const nextFormula = adjustFormulaForCellBandShift(cell.formula, affected, axis, delta);
       if (nextFormula !== cell.formula) wb.setFormula(cell.addr, nextFormula);
     }
   }
@@ -298,120 +299,6 @@ function addMergeToMaps(byAnchor: Map<string, Range>, byCell: Map<string, string
   }
 }
 
-function shiftFormulaRefsInBand(
-  src: string,
-  affected: Range,
-  axis: InsertCellsDirection,
-  delta: number,
-): string {
-  let out = '';
-  let i = 0;
-  while (i < src.length) {
-    if (src[i] === '"') {
-      const literal = consumeStringLiteral(src, i);
-      out += literal.text;
-      i = literal.end;
-      continue;
-    }
-    const m = matchRef(src, i);
-    if (!m) {
-      out += src[i] ?? '';
-      i += 1;
-      continue;
-    }
-    const prev = i > 0 ? src[i - 1] : '';
-    if (prev && /[A-Za-z0-9_]/.test(prev)) {
-      out += src[i] ?? '';
-      i += 1;
-      continue;
-    }
-    const col = colLabelToIndex(m.label);
-    const row = Number.parseInt(m.rowStr, 10) - 1;
-    let nextRow = row;
-    let nextCol = col;
-    if (
-      axis === 'down' &&
-      !m.absRow &&
-      row >= affected.r0 &&
-      col >= affected.c0 &&
-      col <= affected.c1
-    ) {
-      nextRow = row + delta;
-    } else if (
-      axis === 'right' &&
-      !m.absCol &&
-      col >= affected.c0 &&
-      row >= affected.r0 &&
-      row <= affected.r1
-    ) {
-      nextCol = col + delta;
-    }
-    if (nextRow < 0 || nextCol < 0) out += '#REF!';
-    else
-      out += `${m.absCol ? '$' : ''}${colIndexToLabel(nextCol)}${m.absRow ? '$' : ''}${nextRow + 1}`;
-    i = m.end;
-  }
-  return out;
-}
-
-function consumeStringLiteral(src: string, start: number): { text: string; end: number } {
-  let i = start + 1;
-  while (i < src.length) {
-    if (src[i] === '"') {
-      if (src[i + 1] === '"') {
-        i += 2;
-        continue;
-      }
-      i += 1;
-      break;
-    }
-    i += 1;
-  }
-  return { text: src.slice(start, i), end: i };
-}
-
-interface RefMatch {
-  absCol: boolean;
-  label: string;
-  absRow: boolean;
-  rowStr: string;
-  end: number;
-}
-
-function matchRef(src: string, start: number): RefMatch | null {
-  let i = start;
-  let absCol = false;
-  if (src[i] === '$') {
-    absCol = true;
-    i += 1;
-  }
-  const lettersStart = i;
-  while (i < src.length && /[A-Za-z]/.test(src[i] ?? '')) i += 1;
-  if (i === lettersStart) return null;
-  const label = src.slice(lettersStart, i).toUpperCase();
-  let absRow = false;
-  if (src[i] === '$') {
-    absRow = true;
-    i += 1;
-  }
-  const digitsStart = i;
-  while (i < src.length && /[0-9]/.test(src[i] ?? '')) i += 1;
-  if (i === digitsStart || src[i] === '(') return null;
-  return { absCol, label, absRow, rowStr: src.slice(digitsStart, i), end: i };
-}
-
-function colLabelToIndex(label: string): number {
-  let n = 0;
-  for (let i = 0; i < label.length; i += 1) n = n * 26 + (label.charCodeAt(i) - 64);
-  return n - 1;
-}
-
-function colIndexToLabel(col: number): string {
-  let n = col;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (n % 26)) + out;
-    n = Math.floor(n / 26) - 1;
-  } while (n >= 0);
-  return out;
-}
+// Reference shifting for cell-band inserts/deletes is delegated to the shared
+// `adjustFormulaForCellBandShift` (see commands/formula-refs.ts), which handles
+// sheet qualifiers, function names, ranges, and grid bounds uniformly.

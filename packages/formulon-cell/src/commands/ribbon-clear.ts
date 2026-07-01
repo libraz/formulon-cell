@@ -4,6 +4,7 @@
 // host wrappers stay thin: they read the active range from the store, call
 // here, and let the helper own the history/transaction wiring.
 
+import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { clearComment } from './comment.js';
@@ -39,6 +40,9 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
   };
   if (action === 'formats') {
     recordFormatChange(history, store, () => clearVisualFormat(store.getState(), store));
+    // Reset the engine XF for the cleared cells so the format does not
+    // resurrect on the next save (H-37).
+    flushFormatToEngine(workbook, store, range.sheet);
     return;
   }
   if (action === 'conditional') {
@@ -72,6 +76,10 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
       recordConditionalRulesChange(history, store, () => {
         clearConditionalRulesInRange(store, range);
       });
+    }
+    if (action === 'all') {
+      // Flush the cleared formats to the engine so the XF resets (H-37).
+      flushFormatToEngine(workbook, store, range.sheet);
     }
   } finally {
     history.end();

@@ -60,6 +60,8 @@ export class CellRegistry {
 
   /** Register a formatter. Returns a disposer. Last-wins on duplicate id. */
   registerFormatter(entry: CellFormatterEntry): () => void {
+    const existing = this.formatters.findIndex((e) => e.id === entry.id);
+    if (existing >= 0) this.formatters.splice(existing, 1);
     this.formatters.push(entry);
     this.formatters.sort((a, b) => (a.priority ?? 50) - (b.priority ?? 50));
     this.notify();

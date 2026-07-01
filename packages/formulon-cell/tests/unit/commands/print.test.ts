@@ -460,6 +460,32 @@ describe('buildPrintDocument', () => {
     wb.dispose();
   });
 
+  it('expands header/footer field codes into @page margin boxes (C-6)', async () => {
+    const wb = await newWb();
+    const store = createSpreadsheetStore();
+    setNumber(store, wb, 0, 0, 1);
+    mutators.setPageSetup(store, 0, {
+      headerCenter: 'Page &P of &N',
+      headerLeft: '&D',
+      footerRight: '&A',
+    });
+
+    const doc = buildPrintDocument(wb, store, 0, 'Budget.xlsx');
+    // Page-relative codes become CSS counters inside the margin boxes.
+    expect(doc.html).toContain(
+      '@top-center { content: "Page " counter(page) " of " counter(pages)',
+    );
+    // Static codes resolve: &A → the sheet name.
+    expect(doc.html).toContain('@bottom-right { content: "Sheet1"');
+    // The raw &P / &N / &A codes never reach the output verbatim.
+    expect(doc.html).not.toContain('&P');
+    expect(doc.html).not.toContain('&N');
+    expect(doc.html).not.toContain('&amp;P');
+    // No legacy body-flow header strip that duplicated the header.
+    expect(doc.html).not.toContain('class="fc-print__header"');
+    wb.dispose();
+  });
+
   it('lets fit-to-pages override explicit print scaling', async () => {
     const wb = await newWb();
     const store = createSpreadsheetStore();

@@ -442,7 +442,7 @@ export function updateTableOverlay(
   patch: TableOverlayPatch,
 ): TableOverlay | null {
   const current = tableOverlayById(store.getState(), id);
-  if (!current || current.source !== 'session') return null;
+  if (current?.source !== 'session') return null;
   if (blockedByProtection(store, current.range.sheet, 'updateTableOverlay')) return null;
   const next: TableOverlay = { ...current, ...patch, id: current.id, source: 'session' };
   mutators.upsertTableOverlay(store, next);

@@ -120,7 +120,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
   const onCut = (e: ClipboardEvent): void => {
     const s = store.getState();
     if (s.ui.editor.kind !== 'idle') return;
-    snapshot = captureSnapshot(s, s.selection.range);
+    snapshot = captureSnapshot(s, s.selection.range, 'cut');
     if (history) history.begin();
     let r: ReturnType<typeof cut> = null;
     try {
@@ -213,7 +213,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       return;
     }
     if (kind === 'cut') {
-      snapshot = captureSnapshot(s, s.selection.range);
+      snapshot = captureSnapshot(s, s.selection.range, 'cut');
       if (history) history.begin();
       let r: ReturnType<typeof cut> = null;
       try {

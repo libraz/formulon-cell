@@ -3,6 +3,7 @@ import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { type History, recordMergesChangeWithEngine } from './history.js';
+import { isCellWritable, isSheetProtected, warnProtected } from './protection.js';
 
 /** Look up the merge that covers `addr`, if any. Returns the full merge range
  *  (anchor on top-left, opposite corner on bottom-right). */
@@ -101,6 +102,40 @@ const hasContent = (
 };
 
 /**
+ * Whether merging `range` would discard data. Merging keeps only the top-left
+ * value and clears the rest, so this is true when any non-anchor cell in the
+ * range holds content. Callers use it to gate a confirm prompt (Excel warns
+ * before the merge silently drops the other values).
+ */
+export function mergeWillLoseData(state: State, range: Range): boolean {
+  const sheet = range.sheet;
+  for (let r = range.r0; r <= range.r1; r += 1) {
+    for (let c = range.c0; c <= range.c1; c += 1) {
+      if (r === range.r0 && c === range.c0) continue;
+      if (hasContent(state.data.cells.get(addrKey({ sheet, row: r, col: c })))) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Whether sheet protection should block a merge/unmerge over `range`. Merging
+ * writes to (clears) the covered cells, so on a protected sheet the operation
+ * is refused unless every cell in the range is writable — matching Excel, which
+ * disables the merge controls on a protected sheet.
+ */
+function mergeBlockedByProtection(state: State, range: Range): boolean {
+  const sheet = range.sheet;
+  if (!isSheetProtected(state, sheet)) return false;
+  for (let r = range.r0; r <= range.r1; r += 1) {
+    for (let c = range.c0; c <= range.c1; c += 1) {
+      if (!isCellWritable(state, { sheet, row: r, col: c })) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Merge `range` into a single visual cell. spreadsheet parity: the top-left value is
  * preserved; non-anchor cells are cleared. The clearing writes go through `wb`
  * (so they get individual undo entries via WorkbookHandle), and the
@@ -118,6 +153,12 @@ export function applyMerge(
 ): boolean {
   if (range.r0 === range.r1 && range.c0 === range.c1) return false;
   const sheet = range.sheet;
+
+  // Sheet protection: refuse to clear locked cells (no silent backdoor).
+  if (mergeBlockedByProtection(store.getState(), range)) {
+    warnProtected({ sheet, row: range.r0, col: range.c0 });
+    return false;
+  }
 
   if (history) history.begin();
   try {
@@ -151,7 +192,13 @@ export function applyUnmerge(
   history: History | null,
   range: Range,
 ): boolean {
-  const before = store.getState().merges.byAnchor;
+  const state = store.getState();
+  // Sheet protection: unmerging is a structural edit — refuse on locked cells.
+  if (mergeBlockedByProtection(state, range)) {
+    warnProtected({ sheet: range.sheet, row: range.r0, col: range.c0 });
+    return false;
+  }
+  const before = state.merges.byAnchor;
   let touched = false;
   for (const r of before.values()) {
     if (r.sheet !== range.sheet) continue;

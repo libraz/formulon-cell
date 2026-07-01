@@ -60,7 +60,7 @@ const makeCfWb = (cellLookup: CellMap): WorkbookHandle => {
       for (let r = firstRow; r <= lastRow; r += 1) {
         for (let c = firstCol; c <= lastCol; c += 1) {
           const cell = cellLookup.get(addrKey({ sheet: 0, row: r, col: c }));
-          if (!cell || cell.value.kind !== 'number') continue;
+          if (cell?.value.kind !== 'number') continue;
           if (cell.value.value < 5) continue;
           out.push({
             row: r,

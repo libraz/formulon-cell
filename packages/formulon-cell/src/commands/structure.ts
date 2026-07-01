@@ -1,21 +1,27 @@
 import { addrKey } from '../engine/address.js';
-import type { Addr, CellValue } from '../engine/types.js';
+import type { Addr, CellValue, Range } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import {
   type CellFormat,
+  type ConditionalRule,
   type LayoutSlice,
   mutators,
   type SpreadsheetStore,
   type State,
+  type ValueFilterCriteria,
 } from '../store/store.js';
+import { recordFilterChange } from './filter.js';
 import { formatNumber } from './format.js';
+import { adjustFormulaForRowColEdit } from './formula-refs.js';
 import {
   captureLayoutSnapshot,
   type History,
+  recordConditionalRulesChange,
   recordFormatChange,
   recordLayoutChange,
   recordLayoutChangeWithEngine,
+  recordMergesChangeWithEngine,
 } from './history.js';
 import { isSheetProtected } from './protection.js';
 
@@ -80,7 +86,7 @@ function applyAxisShiftToCells(
         : { ...c.addr, col: k + delta }
       : c.addr;
 
-    const newFormula = c.formula ? shiftFormulaRefs(c.formula, axis, split, delta) : null;
+    const newFormula = c.formula ? adjustFormulaForRowColEdit(c.formula, axis, split, delta) : null;
 
     if (inMovedBand) {
       // Cells in the moved band were blanked above; rewrite at new addr.
@@ -111,157 +117,6 @@ function writeCell(wb: WorkbookHandle, addr: Addr, value: CellValue, formula: st
     default:
       wb.setBlank(addr);
   }
-}
-
-/** Convert an A1 col label to a 0-indexed column. "A" → 0, "Z" → 25, "AA" → 26. */
-function colLabelToIndex(label: string): number {
-  let n = 0;
-  for (let i = 0; i < label.length; i += 1) {
-    n = n * 26 + (label.charCodeAt(i) - 64);
-  }
-  return n - 1;
-}
-
-/** Convert a 0-indexed column to its A1 label. */
-function colIndexToLabel(col: number): string {
-  let n = col;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (n % 26)) + out;
-    n = Math.floor(n / 26) - 1;
-  } while (n >= 0);
-  return out;
-}
-
-/**
- * Rewrite cell references in `src` for a row or column shift on the active
- * sheet. Absolute references (`$A$1`, `A$1`, `$A1`) keep their pinned axis.
- * References that fall inside a deleted band become `#REF!` per the spreadsheet's
- * convention.
- *
- * String literals (`"..."`) and `#REF!` tokens are left untouched. Sheet
- * qualifiers (`Sheet2!A1`, `'X'!A1`) are preserved by tokenization — the
- * shift only rewrites the trailing A1 part since refs inside the body of
- * another sheet still need to follow the current sheet's geometry; for v0.9
- * the stub doesn't model cross-sheet refs anyway.
- */
-function shiftFormulaRefs(src: string, axis: 'row' | 'col', split: number, delta: number): string {
-  if (delta === 0) return src;
-  let out = '';
-  let i = 0;
-
-  while (i < src.length) {
-    const ch = src[i] ?? '';
-
-    // Pass through string literals untouched. Spreadsheets use `""` to escape a
-    // double quote inside a string.
-    if (ch === '"') {
-      out += ch;
-      i += 1;
-      while (i < src.length) {
-        const c = src[i] ?? '';
-        out += c;
-        i += 1;
-        if (c === '"') {
-          if (src[i] === '"') {
-            out += '"';
-            i += 1;
-            continue;
-          }
-          break;
-        }
-      }
-      continue;
-    }
-
-    // Try to match a cell reference at this position.
-    // Pattern: optional `$`, letters, optional `$`, digits.
-    const refMatch = matchRef(src, i);
-    if (refMatch) {
-      const { absCol, label, absRow, rowStr, end } = refMatch;
-      // Skip if previous char makes this look like part of an identifier
-      // (e.g. function name "SIN10" — won't happen for valid desktop spreadsheets, but be
-      // defensive; underscores aren't allowed in refs).
-      const prev = i > 0 ? src[i - 1] : '';
-      if (prev && /[A-Za-z0-9_]/.test(prev)) {
-        out += ch;
-        i += 1;
-        continue;
-      }
-      const col = colLabelToIndex(label);
-      const row = Number.parseInt(rowStr, 10) - 1;
-
-      let nextCol = col;
-      let nextRow = row;
-      let invalid = false;
-
-      if (axis === 'row' && !absRow) {
-        if (row >= split) {
-          if (delta < 0 && row < split - delta) invalid = true;
-          else nextRow = row + delta;
-        }
-      } else if (axis === 'col' && !absCol) {
-        if (col >= split) {
-          if (delta < 0 && col < split - delta) invalid = true;
-          else nextCol = col + delta;
-        }
-      }
-
-      if (invalid) out += '#REF!';
-      else
-        out += `${absCol ? '$' : ''}${colIndexToLabel(nextCol)}${absRow ? '$' : ''}${nextRow + 1}`;
-
-      i = end;
-      continue;
-    }
-
-    out += ch;
-    i += 1;
-  }
-
-  return out;
-}
-
-interface RefMatch {
-  absCol: boolean;
-  label: string;
-  absRow: boolean;
-  rowStr: string;
-  end: number;
-}
-
-function matchRef(src: string, start: number): RefMatch | null {
-  let i = start;
-  let absCol = false;
-  if (src[i] === '$') {
-    absCol = true;
-    i += 1;
-  }
-  const lettersStart = i;
-  while (i < src.length) {
-    const c = src[i] ?? '';
-    if (c >= 'A' && c <= 'Z') i += 1;
-    else if (c >= 'a' && c <= 'z') i += 1;
-    else break;
-  }
-  if (i === lettersStart) return null;
-  const label = src.slice(lettersStart, i).toUpperCase();
-  let absRow = false;
-  if (src[i] === '$') {
-    absRow = true;
-    i += 1;
-  }
-  const digitsStart = i;
-  while (i < src.length) {
-    const c = src[i] ?? '';
-    if (c >= '0' && c <= '9') i += 1;
-    else break;
-  }
-  if (i === digitsStart) return null;
-  // Reject if followed by `(` — that's a function call, not a reference.
-  // (`A1()` is invalid desktop spreadsheets anyway, but be safe.)
-  if (src[i] === '(') return null;
-  return { absCol, label, absRow, rowStr: src.slice(digitsStart, i), end: i };
 }
 
 /** Shift indices in a sparse Map keyed by integer index. Indices >= split move
@@ -353,6 +208,142 @@ function shiftFormatsByCol(
 
 function applyLayoutPatch(store: SpreadsheetStore, patch: Partial<LayoutSlice>): void {
   store.setState((s) => ({ ...s, layout: { ...s.layout, ...patch } }));
+}
+
+/** Map a 1-D interval [lo,hi] through a row/col insert (delta>0) or delete
+ *  (delta<0) at `split`. Returns null when a deletion consumes the whole
+ *  interval. Inserting inside a span widens it — matching how spreadsheets grow
+ *  a merge / conditional-format / filter region when rows or cols are added
+ *  within it. */
+function adjustInterval(
+  lo: number,
+  hi: number,
+  split: number,
+  delta: number,
+): [number, number] | null {
+  if (delta > 0) {
+    return [lo >= split ? lo + delta : lo, hi >= split ? hi + delta : hi];
+  }
+  const count = -delta;
+  const bandHi = split + count - 1;
+  const nlo = lo < split ? lo : lo > bandHi ? lo - count : split;
+  const nhi = hi < split ? hi : hi > bandHi ? hi - count : split - 1;
+  return nlo > nhi ? null : [nlo, nhi];
+}
+
+/** Shift a range's row or col span for a structure edit. Returns null when a
+ *  deletion removes the whole span. */
+function shiftRangeAxis(
+  range: Range,
+  axis: 'row' | 'col',
+  split: number,
+  delta: number,
+): Range | null {
+  const lo = axis === 'row' ? range.r0 : range.c0;
+  const hi = axis === 'row' ? range.r1 : range.c1;
+  const res = adjustInterval(lo, hi, split, delta);
+  if (!res) return null;
+  const [a, b] = res;
+  return axis === 'row' ? { ...range, r0: a, r1: b } : { ...range, c0: a, c1: b };
+}
+
+function shiftFilterCriteria(
+  criteria: readonly ValueFilterCriteria[],
+  sheet: number,
+  axis: 'row' | 'col',
+  split: number,
+  delta: number,
+): ValueFilterCriteria[] {
+  const out: ValueFilterCriteria[] = [];
+  for (const c of criteria) {
+    if (c.range.sheet !== sheet) {
+      out.push(c);
+      continue;
+    }
+    const shifted = shiftRangeAxis(c.range, axis, split, delta);
+    if (!shifted) continue; // filtered column removed
+    let byCol = c.byCol;
+    if (axis === 'col') {
+      const mapped = adjustInterval(byCol, byCol, split, delta);
+      if (!mapped) continue; // this column was deleted
+      byCol = mapped[0];
+    }
+    out.push({ ...c, range: shifted, byCol });
+  }
+  return out;
+}
+
+/** Re-point merges, conditional-format ranges, and the autofilter region after
+ *  a row/col insert or delete so they track the cells they annotate (H-2). Each
+ *  concern records its own history entry inside the surrounding transaction. */
+function shiftAnchoredRanges(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  history: History | null,
+  sheet: number,
+  axis: 'row' | 'col',
+  split: number,
+  delta: number,
+): void {
+  // Merges: rebuild both lookup maps from the shifted anchors. A merge fully
+  // inside a deleted band, or collapsed to a single cell, is dropped.
+  recordMergesChangeWithEngine(history, store, wb, sheet, () => {
+    store.setState((s) => {
+      const byAnchor = new Map<string, Range>();
+      const byCell = new Map<string, string>();
+      for (const merge of s.merges.byAnchor.values()) {
+        const shifted = merge.sheet === sheet ? shiftRangeAxis(merge, axis, split, delta) : merge;
+        if (!shifted) continue;
+        if (shifted.r0 === shifted.r1 && shifted.c0 === shifted.c1) continue;
+        const ak = addrKey({ sheet: shifted.sheet, row: shifted.r0, col: shifted.c0 });
+        byAnchor.set(ak, shifted);
+        for (let row = shifted.r0; row <= shifted.r1; row += 1) {
+          for (let col = shifted.c0; col <= shifted.c1; col += 1) {
+            if (row === shifted.r0 && col === shifted.c0) continue;
+            byCell.set(addrKey({ sheet: shifted.sheet, row, col }), ak);
+          }
+        }
+      }
+      return { ...s, merges: { byAnchor, byCell } };
+    });
+  });
+
+  // Conditional formats: shift each rule's range; drop rules whose range is
+  // fully consumed by a deletion.
+  recordConditionalRulesChange(history, store, () => {
+    store.setState((s) => {
+      const rules: ConditionalRule[] = [];
+      for (const rule of s.conditional.rules) {
+        if (rule.range.sheet !== sheet) {
+          rules.push(rule);
+          continue;
+        }
+        const shifted = shiftRangeAxis(rule.range, axis, split, delta);
+        if (!shifted) continue;
+        rules.push({ ...rule, range: shifted });
+      }
+      return { ...s, conditional: { rules } };
+    });
+  });
+
+  // Autofilter region + per-column criteria.
+  recordFilterChange(history, store, () => {
+    store.setState((s) => {
+      const fr = s.ui.filterRange;
+      if (!fr || fr.sheet !== sheet) return s;
+      const shifted = shiftRangeAxis(fr, axis, split, delta);
+      return {
+        ...s,
+        ui: {
+          ...s.ui,
+          filterRange: shifted,
+          filterCriteria: shifted
+            ? shiftFilterCriteria(s.ui.filterCriteria, sheet, axis, split, delta)
+            : [],
+        },
+      };
+    });
+  });
 }
 
 /**
@@ -466,6 +457,9 @@ export function insertRows(
         freezeRows: fr,
       });
     });
+
+    // 4. re-point merges, conditional formats, and the autofilter region.
+    shiftAnchoredRanges(store, wb, history, sheet, 'row', atRow, count);
   } finally {
     if (history) history.end();
   }
@@ -512,6 +506,8 @@ export function deleteRows(
         freezeRows: fr,
       });
     });
+
+    shiftAnchoredRanges(store, wb, history, sheet, 'row', atRow, -n);
   } finally {
     if (history) history.end();
   }
@@ -554,6 +550,8 @@ export function insertCols(
         freezeCols: fc,
       });
     });
+
+    shiftAnchoredRanges(store, wb, history, sheet, 'col', atCol, count);
   } finally {
     if (history) history.end();
   }
@@ -599,6 +597,8 @@ export function deleteCols(
         freezeCols: fc,
       });
     });
+
+    shiftAnchoredRanges(store, wb, history, sheet, 'col', atCol, -n);
   } finally {
     if (history) history.end();
   }
@@ -992,5 +992,5 @@ export const __testing = {
   shiftIndexedSet,
   shiftFormatsByRow,
   shiftFormatsByCol,
-  shiftFormulaRefs,
+  shiftFormulaRefs: adjustFormulaForRowColEdit,
 };

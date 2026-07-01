@@ -136,6 +136,34 @@ describe('React <Spreadsheet>', () => {
     expect(secondCapture).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the printer profile refresh hook current without remounting', async () => {
+    const firstProfile = {
+      id: 'react-first',
+      paperSize: 'A4' as const,
+      orientation: 'portrait' as const,
+      printableBounds: { top: 0.1, right: 0.1, bottom: 0.1, left: 0.1 },
+    };
+    const secondProfile = {
+      id: 'react-second',
+      paperSize: 'letter' as const,
+      orientation: 'landscape' as const,
+      printableBounds: { top: 0.2, right: 0.3, bottom: 0.2, left: 0.3 },
+    };
+    const firstRefresh = vi.fn(() => [firstProfile]);
+    const secondRefresh = vi.fn(() => [secondProfile]);
+    mounted = await mountReactSpreadsheet({ refreshPrinterProfiles: firstRefresh });
+    const original = mounted.instance;
+
+    await expect(mounted.instance.refreshPrinterProfiles()).resolves.toEqual([firstProfile]);
+
+    await mounted.rerender({ refreshPrinterProfiles: secondRefresh });
+
+    expect(mounted.instance).toBe(original);
+    await expect(mounted.instance.refreshPrinterProfiles()).resolves.toEqual([secondProfile]);
+    expect(firstRefresh).toHaveBeenCalledTimes(1);
+    expect(secondRefresh).toHaveBeenCalledTimes(1);
+  });
+
   it('applies printer profile prop updates to the built-in print flow without remounting', async () => {
     const fallback = {
       id: 'fallback',

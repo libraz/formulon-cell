@@ -254,72 +254,11 @@ export function formatA1FormulaAsR1C1(formula: string, base: { row: number; col:
   return out;
 }
 
-/**
- * Shift every relative cell reference in `formula` by (dRow, dCol). Refs
- * locked with `$` on either axis stay put on that axis. Sheet-qualified refs
- * (e.g. `Sheet1!A1`) and ranges are handled atom-by-atom.
- *
- * Skips matches inside string literals (text bracketed by `"`). Returns the
- * input verbatim when the result would point outside the grid (spreadsheet parity:
- * those refs become `#REF!` — we leave that to the engine).
- */
-export function shiftFormulaRefs(formula: string, dRow: number, dCol: number): string {
-  if (!formula.startsWith('=') || (dRow === 0 && dCol === 0)) return formula;
-
-  let out = '';
-  let i = 0;
-  let inString = false;
-  // Atom = optional $ + letters + optional $ + digits.
-  const atomRe = /\$?[A-Za-z]+\$?\d+/y;
-  while (i < formula.length) {
-    const ch = formula[i] ?? '';
-    if (ch === '"') {
-      inString = !inString;
-      out += ch;
-      i += 1;
-      continue;
-    }
-    if (inString) {
-      out += ch;
-      i += 1;
-      continue;
-    }
-    // Only attempt a ref match when the previous char isn't an identifier
-    // continuation (so we skip function names like SIN1).
-    const prev = i > 0 ? (formula[i - 1] ?? '') : '';
-    const prevIsIdent = /[A-Za-z0-9_]/.test(prev);
-    if (!prevIsIdent) {
-      atomRe.lastIndex = i;
-      const m = atomRe.exec(formula);
-      if (m && m.index === i) {
-        const raw = m[0];
-        const parsed = /^(\$?)([A-Za-z]+)(\$?)(\d+)$/.exec(raw);
-        if (parsed) {
-          const colAbs = parsed[1] === '$';
-          const letters = parsed[2] ?? '';
-          const rowAbs = parsed[3] === '$';
-          const digits = parsed[4] ?? '';
-          const col = lettersToCol(letters);
-          const row = Number.parseInt(digits, 10) - 1;
-          const newCol = colAbs ? col : col + dCol;
-          const newRow = rowAbs ? row : row + dRow;
-          if (newCol < 0 || newRow < 0 || newCol > 16383 || newRow > 1048575) {
-            // Out-of-range ref — leave the original text in place; engine will
-            // surface #REF! when it parses.
-            out += raw;
-          } else {
-            out += `${colAbs ? '$' : ''}${colToLetters(newCol)}${rowAbs ? '$' : ''}${newRow + 1}`;
-          }
-          i += raw.length;
-          continue;
-        }
-      }
-    }
-    out += ch;
-    i += 1;
-  }
-  return out;
-}
+// `shiftFormulaRefs` (relative-offset shifting for fill/paste/ctrl-enter) now
+// lives in the shared reference-rewriting module alongside the structural-edit
+// transforms, so all three share one tokenizer (function-name, sheet-qualifier,
+// range, and grid-bound handling). Re-exported here for existing import sites.
+export { shiftFormulaRefs } from './formula-refs.js';
 
 /** Common spreadsheet function names — used for editor autocomplete. */
 export const FUNCTION_NAMES: readonly string[] = [

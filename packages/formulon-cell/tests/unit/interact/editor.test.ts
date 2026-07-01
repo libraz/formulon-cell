@@ -301,4 +301,82 @@ describe('InlineEditor', () => {
     editor.cancel();
     expect(editor.isActive()).toBe(false);
   });
+
+  describe('commitMulti (Ctrl+Enter selection fill)', () => {
+    const selectRange = (r0: number, c0: number, r1: number, c1: number): void => {
+      store.setState((s) => ({
+        ...s,
+        selection: {
+          active: { sheet: 0, row: r0, col: c0 },
+          anchor: { sheet: 0, row: r0, col: c0 },
+          range: { sheet: 0, r0, c0, r1, c1 },
+          extraRanges: [],
+        },
+      }));
+    };
+
+    it('fills every selected cell with the typed value', () => {
+      selectRange(0, 0, 0, 2);
+      editor.begin('7');
+      editor.commitMulti();
+      wb.recalc();
+      for (let col = 0; col <= 2; col += 1) {
+        expect(wb.getValue({ sheet: 0, row: 0, col })).toEqual({ kind: 'number', value: 7 });
+      }
+    });
+
+    it('validates NON-anchor cells too, aborting on a stop rule (M-16)', () => {
+      const onValidation = vi.fn();
+      const validatedEditor = new InlineEditor({
+        host,
+        grid,
+        store,
+        wb,
+        onAfterCommit,
+        onValidation,
+      });
+      // B1 restricts entries to a list; the anchor A1 is unrestricted.
+      mutators.setCellFormat(
+        store,
+        { sheet: 0, row: 0, col: 1 },
+        {
+          validation: { kind: 'list', source: ['X'] },
+        },
+      );
+      selectRange(0, 0, 0, 1);
+      validatedEditor.begin('Y'); // not in B1's list
+      validatedEditor.commitMulti();
+      wb.recalc();
+      // The stop rule fired for B1: the fill aborted and B1 kept no value.
+      expect(onValidation).toHaveBeenCalledTimes(1);
+      expect(wb.getValue({ sheet: 0, row: 0, col: 1 }).kind).toBe('blank');
+      validatedEditor.cancel();
+    });
+
+    it('fills all cells when every value satisfies its rule', () => {
+      const onValidation = vi.fn();
+      const validatedEditor = new InlineEditor({
+        host,
+        grid,
+        store,
+        wb,
+        onAfterCommit,
+        onValidation,
+      });
+      mutators.setCellFormat(
+        store,
+        { sheet: 0, row: 0, col: 1 },
+        {
+          validation: { kind: 'list', source: ['X'] },
+        },
+      );
+      selectRange(0, 0, 0, 1);
+      validatedEditor.begin('X'); // valid for B1
+      validatedEditor.commitMulti();
+      wb.recalc();
+      expect(onValidation).not.toHaveBeenCalled();
+      expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'text', value: 'X' });
+      validatedEditor.cancel();
+    });
+  });
 });

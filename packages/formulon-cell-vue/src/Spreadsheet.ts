@@ -162,10 +162,8 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
       if (props.extensions) opts.extensions = props.extensions;
       if (props.printerProfiles) opts.printerProfiles = props.printerProfiles;
       if (props.printerProfileId) opts.printerProfileId = props.printerProfileId;
-      if (props.refreshPrinterProfiles) opts.refreshPrinterProfiles = props.refreshPrinterProfiles;
-      if (props.captureScreenClip) {
-        opts.captureScreenClip = () => props.captureScreenClip?.();
-      }
+      opts.refreshPrinterProfiles = () => props.refreshPrinterProfiles?.();
+      opts.captureScreenClip = () => props.captureScreenClip?.();
       if (props.uploadStatus !== undefined) opts.uploadStatus = props.uploadStatus;
       if (props.macroRecording !== undefined) opts.macroRecording = props.macroRecording;
       if (props.functions) opts.functions = props.functions;

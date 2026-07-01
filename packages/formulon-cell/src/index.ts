@@ -296,6 +296,7 @@ export {
   expandRangeWithMerges,
   mergeAnchorOf,
   mergeAt,
+  mergeWillLoseData,
   stepWithMerge,
 } from './commands/merge.js';
 export type {
@@ -308,6 +309,7 @@ export {
   createDefinedNamesFromSelection,
   deleteDefinedName,
   insertDefinedNameFormula,
+  isValidDefinedName,
   listDefinedNames,
   recordDefinedNamesChange,
   upsertDefinedName,

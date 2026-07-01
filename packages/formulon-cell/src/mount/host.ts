@@ -25,6 +25,11 @@ export function releaseMountHost(host: HTMLElement, instanceId: string): void {
   if (host.dataset.fcInstId !== instanceId) return;
   host.replaceChildren();
   host.classList.remove('fc-host');
+  host.removeAttribute('tabindex');
+  host.removeAttribute('role');
+  host.removeAttribute('aria-roledescription');
+  host.removeAttribute('aria-label');
   delete host.dataset.fcInstId;
   delete host.dataset.fcEngineState;
+  delete host.dataset.fcTheme;
 }

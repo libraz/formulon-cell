@@ -1,4 +1,4 @@
-import { upsertDefinedName } from '../commands/named-ranges.js';
+import { isValidDefinedName, upsertDefinedName } from '../commands/named-ranges.js';
 import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { type SpreadsheetEmitter, selectionEquals } from '../events.js';
@@ -33,14 +33,6 @@ export interface ChromeSyncController {
   detach(): void;
   updateChrome(): void;
 }
-
-const isValidNameBoxDefinedName = (raw: string): boolean => {
-  const name = raw.trim();
-  if (!/^[A-Za-z_\\][A-Za-z0-9_.\\]*$/.test(name)) return false;
-  if (/^[RC]$/i.test(name)) return false;
-  if (parseCellRef(name) || parseRangeRef(name)) return false;
-  return true;
-};
 
 const quoteSheetName = (name: string): string => {
   if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) return name;
@@ -183,7 +175,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
   };
 
   const defineNameBoxValue = (raw: string): boolean => {
-    if (!isValidNameBoxDefinedName(raw)) return false;
+    if (!isValidDefinedName(raw)) return false;
     const wb = getWb();
     const state = store.getState();
     const formula = selectionFormula(wb.sheetName(state.data.sheetIndex), state.selection.range);

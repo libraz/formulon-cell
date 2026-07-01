@@ -588,6 +588,30 @@ describe('deleteRows: formula ref shifting and #REF!', () => {
   });
 });
 
+describe('cross-sheet refs are preserved across structural edits (C-2)', () => {
+  it('leaves a Sheet2!-qualified ref untouched while shifting local refs', async () => {
+    const store = createSpreadsheetStore();
+    const wb = await newWb();
+    // Stationary formula on sheet 0 referencing both the current sheet and Sheet2.
+    wb.setFormula({ sheet: 0, row: 0, col: 0 }, '=A6+Sheet2!A6');
+    wb.recalc();
+
+    insertRows(store, wb, null, 3, 2); // insert 2 rows at row 3 on the active sheet
+    // Local A6 shifts to A8; the cross-sheet Sheet2!A6 must NOT move.
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 0 })).toBe('=A8+Sheet2!A6');
+  });
+
+  it('does not corrupt the sheet name on column inserts', async () => {
+    const store = createSpreadsheetStore();
+    const wb = await newWb();
+    wb.setFormula({ sheet: 0, row: 0, col: 0 }, '=Sheet2!B2');
+    wb.recalc();
+    insertCols(store, wb, null, 0, 1);
+    // Formula moved from col 0 → col 1; the Sheet2 ref stays verbatim.
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 1 })).toBe('=Sheet2!B2');
+  });
+});
+
 describe('insertCols / deleteCols: formula ref shifting', () => {
   it('insertCols shifts col refs', async () => {
     const store = createSpreadsheetStore();
@@ -883,5 +907,116 @@ describe('setSheetZoom engine sync', () => {
     // through — what matters is that real workbooks short-circuit. Verify the
     // store was updated regardless.
     expect(store.getState().viewport.zoom).toBe(1.25);
+  });
+});
+
+describe('H-2: structure edits re-point merges / conditional formats / filter', () => {
+  let store: SpreadsheetStore;
+  let wb: WorkbookHandle;
+
+  beforeEach(async () => {
+    store = createSpreadsheetStore();
+    wb = await newWb();
+  });
+
+  it('shifts a merge down when rows are inserted above it', () => {
+    mutators.mergeRange(store, { sheet: 0, r0: 3, c0: 1, r1: 4, c1: 2 });
+    insertRows(store, wb, null, 1, 2);
+    const anchors = Array.from(store.getState().merges.byAnchor.values());
+    expect(anchors).toEqual([{ sheet: 0, r0: 5, c0: 1, r1: 6, c1: 2 }]);
+    // byCell remap follows the new anchor.
+    expect(store.getState().merges.byCell.get('0:6:2')).toBe('0:5:1');
+  });
+
+  it('drops a merge fully inside a deleted row band', () => {
+    mutators.mergeRange(store, { sheet: 0, r0: 2, c0: 0, r1: 3, c1: 1 });
+    deleteRows(store, wb, null, 2, 2); // removes rows 2..3
+    expect(store.getState().merges.byAnchor.size).toBe(0);
+  });
+
+  it('shrinks a merge partially covered by a column delete', () => {
+    mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 4 });
+    deleteCols(store, wb, null, 3, 1); // removes col 3
+    const anchors = Array.from(store.getState().merges.byAnchor.values());
+    expect(anchors).toEqual([{ sheet: 0, r0: 0, c0: 1, r1: 0, c1: 3 }]);
+  });
+
+  it('shifts conditional-format ranges with a row insert', () => {
+    mutators.addConditionalRule(store, {
+      kind: 'cell-value',
+      range: { sheet: 0, r0: 2, c0: 0, r1: 5, c1: 0 },
+      op: '>',
+      a: 10,
+      apply: { bold: true },
+    });
+    insertRows(store, wb, null, 1, 3);
+    expect(store.getState().conditional.rules[0]?.range).toEqual({
+      sheet: 0,
+      r0: 5,
+      c0: 0,
+      r1: 8,
+      c1: 0,
+    });
+  });
+
+  it('shifts the autofilter region and per-column criteria on column insert', () => {
+    store.setState((s) => ({
+      ...s,
+      ui: {
+        ...s.ui,
+        filterRange: { sheet: 0, r0: 0, c0: 1, r1: 4, c1: 3 },
+        filterCriteria: [
+          { range: { sheet: 0, r0: 0, c0: 1, r1: 4, c1: 3 }, byCol: 2, hiddenValues: ['x'] },
+        ],
+      },
+    }));
+    insertCols(store, wb, null, 0, 1); // insert one col at 0 → everything shifts right
+    const ui = store.getState().ui;
+    expect(ui.filterRange).toEqual({ sheet: 0, r0: 0, c0: 2, r1: 4, c1: 4 });
+    expect(ui.filterCriteria[0]?.byCol).toBe(3);
+    expect(ui.filterCriteria[0]?.range).toEqual({ sheet: 0, r0: 0, c0: 2, r1: 4, c1: 4 });
+  });
+
+  it('clears the autofilter when its whole region is deleted', () => {
+    store.setState((s) => ({
+      ...s,
+      ui: { ...s.ui, filterRange: { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 1 }, filterCriteria: [] },
+    }));
+    deleteRows(store, wb, null, 0, 5); // removes rows 0..4
+    expect(store.getState().ui.filterRange).toBeNull();
+  });
+
+  it('drops a filter criterion whose column is deleted and shrinks the region', () => {
+    store.setState((s) => ({
+      ...s,
+      ui: {
+        ...s.ui,
+        filterRange: { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 3 },
+        filterCriteria: [
+          { range: { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 3 }, byCol: 2, hiddenValues: [] },
+        ],
+      },
+    }));
+    deleteCols(store, wb, null, 2, 1); // removes col 2 (the criterion's column)
+    expect(store.getState().ui.filterCriteria).toHaveLength(0);
+    expect(store.getState().ui.filterRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 4, c1: 2 });
+  });
+
+  it('round-trips merge + conditional shifts through history undo/redo', () => {
+    const h = new History();
+    wb.attachHistory(h);
+    mutators.mergeRange(store, { sheet: 0, r0: 2, c0: 0, r1: 2, c1: 1 });
+    insertRows(store, wb, h, 0, 1);
+    expect(Array.from(store.getState().merges.byAnchor.values())).toEqual([
+      { sheet: 0, r0: 3, c0: 0, r1: 3, c1: 1 },
+    ]);
+    h.undo();
+    expect(Array.from(store.getState().merges.byAnchor.values())).toEqual([
+      { sheet: 0, r0: 2, c0: 0, r1: 2, c1: 1 },
+    ]);
+    h.redo();
+    expect(Array.from(store.getState().merges.byAnchor.values())).toEqual([
+      { sheet: 0, r0: 3, c0: 0, r1: 3, c1: 1 },
+    ]);
   });
 });

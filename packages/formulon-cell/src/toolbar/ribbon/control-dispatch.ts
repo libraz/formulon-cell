@@ -7,7 +7,7 @@
 
 import { setAlign, setFillColor, setFont, setFontColor, setNumFmt } from '../../commands/format.js';
 import { recordFormatChange, recordPageSetupChange } from '../../commands/history.js';
-import { applyMerge, applyUnmerge } from '../../commands/merge.js';
+import { applyMerge, applyUnmerge, mergeWillLoseData } from '../../commands/merge.js';
 import {
   type MarginPreset,
   marginPresetOf,
@@ -19,6 +19,7 @@ import { activateSheetView } from '../../commands/sheet-views.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { getPageSetup, mutators } from '../../store/store.js';
 import type { NumFmt, PageOrientation, PaperSize } from '../../store/types.js';
+import { confirmMergeLoseData } from '../dialogs/merge-confirm.js';
 import { showPageScaleDialog } from '../dialogs.js';
 import { fluentIconPaths } from '../fluent-icons.js';
 import type { PageScaleMenuText } from '../menu-text.js';
@@ -189,13 +190,19 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
     focusSheet();
   };
 
-  const applyMergeControl = (value: string): void => {
+  const applyMergeControl = async (value: string): Promise<void> => {
     const i = getInst();
     if (!i) return;
     const range = i.store.getState().selection.range;
     if (value === 'unmergeCells') {
       applyUnmerge(i.store, i.workbook, i.history, range);
     } else if (value === 'mergeAcross') {
+      const state = i.store.getState();
+      if (
+        mergeWillLoseData(state, range) &&
+        !(await confirmMergeLoseData(i.i18n.strings, state, range))
+      )
+        return;
       i.history.begin();
       try {
         for (let row = range.r0; row <= range.r1; row += 1) {
@@ -211,9 +218,15 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
         i.history.end();
       }
     } else {
+      const state = i.store.getState();
+      if (
+        mergeWillLoseData(state, range) &&
+        !(await confirmMergeLoseData(i.i18n.strings, state, range))
+      )
+        return;
       const merged = applyMerge(i.store, i.workbook, i.history, range);
       if (merged && value === 'mergeCenter') {
-        applyRibbonFormat((state, store) => setAlign(state, store, 'center'));
+        applyRibbonFormat((s, store) => setAlign(s, store, 'center'));
       }
     }
     refreshWorkbookCells();
@@ -238,7 +251,7 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
       const fmt = numberFormatForAction(value);
       if (fmt) applyRibbonFormat((state, store) => setNumFmt(state, store, fmt));
     } else if (id === 'merge') {
-      applyMergeControl(value);
+      void applyMergeControl(value);
     } else if (id === 'marginsPreset') {
       const i = getInst();
       if (!i) return;

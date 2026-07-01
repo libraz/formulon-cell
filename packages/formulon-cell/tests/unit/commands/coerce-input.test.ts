@@ -44,29 +44,121 @@ describe('coerceInput', () => {
     expect(coerceInput('①')).toEqual({ kind: 'text', value: '①' });
   });
 
-  it('parses percent input as a numeric fraction', () => {
-    expect(coerceInput('12%')).toEqual({ kind: 'number', value: 0.12 });
-    expect(coerceInput('１２．５％')).toEqual({ kind: 'number', value: 0.125 });
+  it('parses percent input as a numeric fraction with an implicit percent format (H-35)', () => {
+    expect(coerceInput('12%')).toEqual({
+      kind: 'number',
+      value: 0.12,
+      implicitFormat: { kind: 'percent', decimals: 0 },
+    });
+    expect(coerceInput('１２．５％')).toEqual({
+      kind: 'number',
+      value: 0.125,
+      implicitFormat: { kind: 'percent', decimals: 1 },
+    });
   });
 
-  it('parses common currency-prefixed numeric input', () => {
-    expect(coerceInput('$1,234.50')).toEqual({ kind: 'number', value: 1234.5 });
-    expect(coerceInput('￥１，２３４')).toEqual({ kind: 'number', value: 1234 });
-    expect(coerceInput('¥ 12%')).toEqual({ kind: 'number', value: 0.12 });
+  it('parses common currency-prefixed numeric input with an implicit currency format (H-35)', () => {
+    expect(coerceInput('$1,234.50')).toEqual({
+      kind: 'number',
+      value: 1234.5,
+      implicitFormat: { kind: 'currency', decimals: 2, symbol: '$' },
+    });
+    expect(coerceInput('￥１，２３４')).toEqual({
+      kind: 'number',
+      value: 1234,
+      implicitFormat: { kind: 'currency', decimals: 2, symbol: '¥' },
+    });
+    // Percent wins over the currency symbol when both are present.
+    expect(coerceInput('¥ 12%')).toEqual({
+      kind: 'number',
+      value: 0.12,
+      implicitFormat: { kind: 'percent', decimals: 0 },
+    });
   });
 
   it('parses accounting-style parenthesized negatives', () => {
     expect(coerceInput('(123)')).toEqual({ kind: 'number', value: -123 });
-    expect(coerceInput('(￥１，２３４)')).toEqual({ kind: 'number', value: -1234 });
-    expect(coerceInput('(12%)')).toEqual({ kind: 'number', value: -0.12 });
+    expect(coerceInput('(￥１，２３４)')).toEqual({
+      kind: 'number',
+      value: -1234,
+      implicitFormat: { kind: 'currency', decimals: 2, symbol: '¥' },
+    });
+    expect(coerceInput('(12%)')).toEqual({
+      kind: 'number',
+      value: -0.12,
+      implicitFormat: { kind: 'percent', decimals: 0 },
+    });
   });
 
-  it('parses time input as an spreadsheet serial-day fraction', () => {
-    expect(coerceInput('12:00')).toEqual({ kind: 'number', value: 0.5 });
-    expect(coerceInput('1:30:00')).toEqual({ kind: 'number', value: 1.5 / 24 });
-    expect(coerceInput('２５：００')).toEqual({ kind: 'number', value: 25 / 24 });
-    expect(coerceInput('1:30 PM')).toEqual({ kind: 'number', value: 13.5 / 24 });
-    expect(coerceInput('12:00 AM')).toEqual({ kind: 'number', value: 0 });
+  it('parses time input as a serial-day fraction with an implicit time format (H-35)', () => {
+    expect(coerceInput('12:00')).toEqual({
+      kind: 'number',
+      value: 0.5,
+      implicitFormat: { kind: 'time', pattern: 'h:mm' },
+    });
+    expect(coerceInput('1:30:00')).toEqual({
+      kind: 'number',
+      value: 1.5 / 24,
+      implicitFormat: { kind: 'time', pattern: 'h:mm:ss' },
+    });
+    expect(coerceInput('２５：００')).toEqual({
+      kind: 'number',
+      value: 25 / 24,
+      implicitFormat: { kind: 'time', pattern: 'h:mm' },
+    });
+    expect(coerceInput('1:30 PM')).toEqual({
+      kind: 'number',
+      value: 13.5 / 24,
+      implicitFormat: { kind: 'time', pattern: 'h:mm AM/PM' },
+    });
+    expect(coerceInput('12:00 AM')).toEqual({
+      kind: 'number',
+      value: 0,
+      implicitFormat: { kind: 'time', pattern: 'h:mm AM/PM' },
+    });
+  });
+
+  it('parses date literals into serials with an implicit date format (H-36)', () => {
+    // US numeric M/D/Y.
+    expect(coerceInput('12/25/2024')).toEqual({
+      kind: 'number',
+      value: 45651,
+      implicitFormat: { kind: 'date', pattern: 'm/d/yyyy' },
+    });
+    // ISO Y-M-D keeps an ISO pattern.
+    expect(coerceInput('2024-12-25')).toEqual({
+      kind: 'number',
+      value: 45651,
+      implicitFormat: { kind: 'date', pattern: 'yyyy-mm-dd' },
+    });
+    // Dash-separated US date.
+    expect(coerceInput('12-25-2024')).toEqual({
+      kind: 'number',
+      value: 45651,
+      implicitFormat: { kind: 'date', pattern: 'm/d/yyyy' },
+    });
+    // Textual month, both orderings.
+    expect(coerceInput('25-Dec-2024')).toEqual({
+      kind: 'number',
+      value: 45651,
+      implicitFormat: { kind: 'date', pattern: 'd-mmm-yyyy' },
+    });
+    expect(coerceInput('Dec 25, 2024')).toEqual({
+      kind: 'number',
+      value: 45651,
+      implicitFormat: { kind: 'date', pattern: 'd-mmm-yyyy' },
+    });
+    // Two-digit year window: 05 → 2005.
+    expect(coerceInput('1/2/05')).toEqual({
+      kind: 'number',
+      value: 38354,
+      implicitFormat: { kind: 'date', pattern: 'm/d/yyyy' },
+    });
+  });
+
+  it('rejects impossible dates, leaving them as text', () => {
+    expect(coerceInput('13/45/2024')).toEqual({ kind: 'text', value: '13/45/2024' });
+    expect(coerceInput('2024-02-30')).toEqual({ kind: 'text', value: '2024-02-30' });
   });
 
   it('uses a leading apostrophe to force text input', () => {
@@ -159,6 +251,28 @@ describe('writeInput', () => {
     expect(wb.getValue({ sheet: 0, row: 3, col: 3 })).toEqual({ kind: 'number', value: 14 });
   });
 
+  it('applies the implicit number format to the store on typed input (H-35)', () => {
+    const wb = stubHandle();
+    const store = createSpreadsheetStore();
+    writeInput(wb, addr, '10%', store);
+    expect(wb.setNumber).toHaveBeenCalledWith(addr, 0.1);
+    expect(store.getState().format.formats.get('0:0:0')?.numFmt).toEqual({
+      kind: 'percent',
+      decimals: 0,
+    });
+  });
+
+  it('does not override an explicit non-General cell format (H-35)', () => {
+    const wb = stubHandle();
+    const store = createSpreadsheetStore();
+    mutators.setCellFormat(store, addr, { numFmt: { kind: 'fixed', decimals: 3 } });
+    writeInput(wb, addr, '10%', store);
+    expect(store.getState().format.formats.get('0:0:0')?.numFmt).toEqual({
+      kind: 'fixed',
+      decimals: 3,
+    });
+  });
+
   it('writes numeric and formula-looking input as text when the cell format is Text', () => {
     const wb = stubHandle();
     const store = createSpreadsheetStore();
@@ -188,7 +302,7 @@ describe('writeInputValidated', () => {
     expect(wb.setText).not.toHaveBeenCalled();
   });
 
-  it('writes invalid input when the validation error alert is disabled', () => {
+  it('writes invalid input silently and reports success when the error alert is disabled (H-30)', () => {
     const wb = stubHandle();
 
     const outcome = writeInputValidated(wb, addr, 'Closed', {
@@ -198,7 +312,8 @@ describe('writeInputValidated', () => {
       showErrorMessage: false,
     });
 
-    expect(outcome.ok).toBe(false);
+    // No blocking dialog: the caller must see success so the editor closes.
+    expect(outcome.ok).toBe(true);
     expect(wb.setText).toHaveBeenCalledWith(addr, 'Closed');
   });
 });

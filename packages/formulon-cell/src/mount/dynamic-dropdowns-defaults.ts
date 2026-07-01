@@ -65,6 +65,7 @@ import {
   insertManualPageBreak,
   listComments,
   listDefinedNames,
+  mergeWillLoseData,
   mutators,
   type PasteAction,
   parseA1Range,
@@ -106,9 +107,9 @@ import {
 import { applyFormatPatch } from '../commands/format.js';
 import {
   applyPivotTableStyleById,
+  type CustomTableStyle,
   createPivotTableStyleFromActivePivot,
   createTableStyleFromActiveTable,
-  type CustomTableStyle,
   DEFAULT_TABLE_COLOR,
   formatAsTableByStyleId,
   inferTableHasHeaders,
@@ -146,6 +147,7 @@ import { showDefinedNamePickerDialog } from '../toolbar/dialogs/defined-name-pic
 import { showDimensionDialog } from '../toolbar/dialogs/dimension.js';
 import { showFormatAsTableDialog } from '../toolbar/dialogs/format-as-table.js';
 import { pickImageFileDataUrl } from '../toolbar/dialogs/image-file.js';
+import { confirmMergeLoseData } from '../toolbar/dialogs/merge-confirm.js';
 import { showMessage } from '../toolbar/dialogs/prompt.js';
 import {
   showAllowEditRangeDialog,
@@ -490,11 +492,18 @@ const buildTextOrientation =
 
 const buildMergeAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyMergeAction'] =>
-  (action) => {
+  async (action) => {
     const range = instance.store.getState().selection.range;
     if (action === 'unmergeCells') {
       applyUnmerge(instance.store, instance.workbook, instance.history, range);
     } else if (action === 'mergeAcross') {
+      const state = instance.store.getState();
+      if (
+        mergeWillLoseData(state, range) &&
+        !(await confirmMergeLoseData(instance.i18n.strings, state, range))
+      ) {
+        return;
+      }
       instance.history.begin();
       try {
         for (let row = range.r0; row <= range.r1; row += 1) {
@@ -510,6 +519,13 @@ const buildMergeAction =
         instance.history.end();
       }
     } else {
+      const state = instance.store.getState();
+      if (
+        mergeWillLoseData(state, range) &&
+        !(await confirmMergeLoseData(instance.i18n.strings, state, range))
+      ) {
+        return;
+      }
       const merged = applyMerge(instance.store, instance.workbook, instance.history, range);
       if (merged && action === 'mergeCenter') {
         recordFormatChange(instance.history, instance.store, () => {

@@ -158,7 +158,10 @@ function decodeValidation(v: EngineValidationEntry): CellValidation | null {
     ...(v.allowBlank === false ? { allowBlank: false } : {}),
     ...(errorStyle !== 'stop' ? { errorStyle } : {}),
     ...(v.showInputMessage === true ? { showInputMessage: true } : {}),
-    ...(v.showErrorMessage === true ? { showErrorMessage: true } : {}),
+    // Preserve an explicit `false` (error alert disabled). The store convention
+    // omits the field when enabled (the default) and only records the disabled
+    // case, so decoding `true` must NOT emit the field (H-29).
+    ...(v.showErrorMessage === false ? { showErrorMessage: false } : {}),
     ...(v.errorTitle ? { errorTitle: v.errorTitle } : {}),
     ...(v.errorMessage ? { errorMessage: v.errorMessage } : {}),
     ...(v.promptTitle ? { promptTitle: v.promptTitle } : {}),

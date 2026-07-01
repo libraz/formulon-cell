@@ -156,14 +156,31 @@ describe('validateAgainst', () => {
     expect(validateAgainst(v, coerce('=SUM(A1:A2)')).ok).toBe(true);
   });
 
-  it('custom kind always returns ok (engine evaluates the formula elsewhere)', () => {
+  describe('custom (C-5)', () => {
     const v = {
       kind: 'custom' as const,
-      formula: '=ISNUMBER(A1)',
+      formula: '=A1>0',
       allowBlank: true,
       errorStyle: 'stop' as const,
     };
-    expect(validateAgainst(v, coerce('123')).ok).toBe(true);
+
+    it('accepts when no evaluator is supplied (parity for renderers)', () => {
+      expect(validateAgainst(v, coerce('123')).ok).toBe(true);
+    });
+
+    it('accepts when the evaluator reports unavailable (null → parity)', () => {
+      expect(validateAgainst(v, coerce('123'), undefined, () => null).ok).toBe(true);
+    });
+
+    it('rejects when the custom formula evaluates falsey', () => {
+      const outcome = validateAgainst(v, coerce('-5'), undefined, () => false);
+      expect(outcome.ok).toBe(false);
+      if (!outcome.ok) expect(outcome.severity).toBe('stop');
+    });
+
+    it('accepts when the custom formula evaluates truthy', () => {
+      expect(validateAgainst(v, coerce('7'), undefined, () => true).ok).toBe(true);
+    });
   });
 
   describe('outcome severity passes through', () => {

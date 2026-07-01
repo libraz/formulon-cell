@@ -11,7 +11,10 @@ export interface DefinedNameEntry {
 
 export type DefinedNameMutationResult =
   | { ok: true; entry: DefinedNameEntry }
-  | { ok: false; reason: 'empty-name' | 'empty-formula' | 'unsupported' | 'engine-failed' };
+  | {
+      ok: false;
+      reason: 'empty-name' | 'invalid-name' | 'empty-formula' | 'unsupported' | 'engine-failed';
+    };
 
 export type DefinedNameDeleteResult =
   | { ok: true; entry: DefinedNameEntry }
@@ -36,6 +39,48 @@ const colLetter = (n: number): string => {
   return out;
 };
 
+const colIndexFromLetters = (letters: string): number => {
+  let col = 0;
+  for (let i = 0; i < letters.length; i += 1) {
+    col = col * 26 + (letters.charCodeAt(i) - 64);
+  }
+  return col;
+};
+
+/**
+ * Whether `name` collides with a cell reference and so may not be used as a
+ * defined name. Covers A1-style addresses within the sheet grid (up to column
+ * XFD / row 1048576) and R1C1-style tokens (R, C, RC, R1C1, …).
+ */
+const looksLikeCellRef = (name: string): boolean => {
+  const up = name.toUpperCase();
+  const a1 = up.match(/^([A-Z]{1,3})([0-9]{1,7})$/);
+  if (a1) {
+    const col = colIndexFromLetters(a1[1] ?? '');
+    const row = Number.parseInt(a1[2] ?? '', 10);
+    if (col >= 1 && col <= 16384 && row >= 1 && row <= 1048576) return true;
+  }
+  if (/^R[0-9]*C[0-9]*$/.test(up)) return true;
+  return false;
+};
+
+/**
+ * Validate a workbook-scoped defined name against spreadsheet naming rules:
+ * the first character must be a letter, underscore, or backslash; the rest may
+ * add digits and periods; and the name may not be a cell reference (A1 or R1C1
+ * style), a bare `R`/`C`, contain spaces/illegal characters, or exceed 255
+ * characters.
+ */
+export function isValidDefinedName(raw: string): boolean {
+  const name = raw.trim();
+  if (!name || name.length > 255) return false;
+  if (!/^[A-Za-z_\\][A-Za-z0-9_.\\]*$/.test(name)) return false;
+  // Bare R/C are reserved for row/column shorthand in R1C1 mode.
+  if (/^[RC]$/i.test(name)) return false;
+  if (looksLikeCellRef(name)) return false;
+  return true;
+}
+
 const absRef = (row: number, col: number): string => `$${colLetter(col)}$${row + 1}`;
 
 const absRangeRef = (r0: number, c0: number, r1: number, c1: number): string =>
@@ -55,7 +100,11 @@ const sanitizeName = (raw: string, fallback: string): string => {
     .replace(/\s+/g, '_')
     .replace(/[^A-Za-z0-9_.\\]/g, '_');
   const base = compact || fallback;
-  return /^[A-Za-z_\\]/.test(base) ? base : `_${base}`;
+  const prefixed = /^[A-Za-z_\\]/.test(base) ? base : `_${base}`;
+  // A label like "A1" sanitizes to a valid identifier but collides with a cell
+  // reference, which the engine (and spreadsheets) reject as a name — prefix it
+  // so "Create from Selection" always yields a usable name.
+  return looksLikeCellRef(prefixed) ? `_${prefixed}` : prefixed;
 };
 
 const uniqueName = (base: string, used: Set<string>): string => {
@@ -85,6 +134,8 @@ const applyDefinedNamesSnapshot = (wb: WorkbookHandle, snap: DefinedNamesSnapsho
     if (!snap.has(entry.name)) wb.setDefinedNameEntry(entry.name, '');
   }
   for (const [name, formula] of snap) wb.setDefinedNameEntry(name, formula);
+  // Undo/redo of a name change must recompute dependents too (H-38).
+  wb.recalc();
 };
 
 export function recordDefinedNamesChange<T>(
@@ -118,11 +169,15 @@ export function upsertDefinedName(
   const trimmedName = name.trim();
   const trimmedFormula = formula.trim();
   if (!trimmedName) return { ok: false, reason: 'empty-name' };
+  if (!isValidDefinedName(trimmedName)) return { ok: false, reason: 'invalid-name' };
   if (!trimmedFormula) return { ok: false, reason: 'empty-formula' };
   if (!wb.capabilities.definedNameMutate) return { ok: false, reason: 'unsupported' };
   if (!wb.setDefinedNameEntry(trimmedName, trimmedFormula)) {
     return { ok: false, reason: 'engine-failed' };
   }
+  // Defining/redefining a name changes what `=MyRange` resolves to — recompute
+  // so dependent cells and a subsequent save reflect the new target (H-38).
+  wb.recalc();
   return { ok: true, entry: { name: trimmedName, formula: trimmedFormula } };
 }
 
@@ -132,6 +187,9 @@ export function deleteDefinedName(wb: WorkbookHandle, name: string): DefinedName
   if (!trimmedName) return { ok: false, reason: 'empty-name' };
   if (!wb.capabilities.definedNameMutate) return { ok: false, reason: 'unsupported' };
   if (!wb.setDefinedNameEntry(trimmedName, '')) return { ok: false, reason: 'engine-failed' };
+  // Removing a name usually turns `=MyRange` into #NAME? — recompute so the
+  // change is reflected in dependents and on save (H-38).
+  wb.recalc();
   return { ok: true, entry: { name: trimmedName, formula: '' } };
 }
 

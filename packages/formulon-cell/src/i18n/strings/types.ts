@@ -560,6 +560,8 @@ export interface Strings {
     valueUnavailable: string;
     /** Inline error: empty or invalid name. */
     errorEmptyName: string;
+    /** Inline error: name violates spreadsheet naming rules. */
+    errorInvalidName: string;
     /** Inline error: empty formula/ref. */
     errorEmptyFormula: string;
     /** Inline error: engine refused the write. */
@@ -1363,6 +1365,14 @@ export interface Strings {
     mergeAcross: string;
     mergeCells: string;
     unmergeCells: string;
+    /** Confirm dialog title shown before a merge discards data. */
+    mergeLoseDataTitle: string;
+    /** Confirm dialog body: merging keeps only the top-left value. */
+    mergeLoseDataMessage: string;
+    /** Confirm button that proceeds with a data-losing merge. */
+    mergeLoseDataConfirm: string;
+    /** Cancel button that aborts a data-losing merge. */
+    mergeLoseDataCancel: string;
     wrapText: string;
     cells: string;
     insert: string;

@@ -14,9 +14,12 @@ import type {
   BorderRecord,
   CellValue,
   CellXf,
+  ConditionalFormatInput,
   EngineCapabilities,
+  EvalResult,
   FillRecord,
   FontRecord,
+  FormulonModule,
   Range,
   SpreadsheetProfileId,
   Workbook,
@@ -26,6 +29,7 @@ import type { WorkbookHandle } from './workbook-handle.js';
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
 type WorkbookHandleInternals = {
   wb: Workbook;
+  module: FormulonModule;
   capabilities: EngineCapabilities;
   assertAlive(): void;
 };
@@ -44,6 +48,10 @@ function assertAlive(handle: unknown): void {
 
 function wb(handle: unknown): Workbook {
   return internals(handle).wb;
+}
+
+function moduleOf(handle: unknown): FormulonModule {
+  return internals(handle).module;
 }
 
 export abstract class WorkbookHandleFeatureMethods {
@@ -444,6 +452,16 @@ export abstract class WorkbookHandleFeatureMethods {
     return s.ok;
   }
 
+  /** Evaluate a self-contained formula string (references already substituted
+   *  with literal values) in a fresh engine workbook and return its
+   *  `{ status, value }` result. Callers that need live-cell context must
+   *  substitute refs first (see the custom data-validation evaluator and the
+   *  F9 / evaluate-formula surfaces). */
+  evalFormula(formula: string): EvalResult {
+    assertAlive(this);
+    return moduleOf(this).evalFormula(formula);
+  }
+
   /** Evaluate every CF block on `sheet` against the inclusive viewport rect.
    *  Returns a sparse list — only cells with at least one match appear. The
    *  underlying embind vectors are released before this method returns, so
@@ -825,6 +843,21 @@ export abstract class WorkbookHandleFeatureMethods {
     assertAlive(this);
     if (!this.capabilities.conditionalFormatMutate) return false;
     return wb(this).clearConditionalFormats(sheet).ok;
+  }
+
+  /** Adds one non-visual conditional-format rule to `sheet` so it round-trips
+   *  through .xlsx. `rule.type` mirrors `formulon::cf::RuleType` (0 expression,
+   *  1 cellIs, 5 top10, 6 aboveAverage, 7 containsText, …). Visual kinds
+   *  (colorScale / dataBar / iconSet) are rejected by the engine — their
+   *  sub-specs aren't creatable through this API. The applied differential
+   *  format is referenced by `dxfId`; there is no TS-side dxf-creation API yet,
+   *  so callers can persist a rule's predicate and range but not the fill/font
+   *  it applies. Returns `false` (no-op) under stub mode and older engine
+   *  builds. */
+  addConditionalFormat(sheet: number, rule: ConditionalFormatInput): boolean {
+    assertAlive(this);
+    if (!this.capabilities.conditionalFormatMutate) return false;
+    return wb(this).addConditionalFormat(sheet, rule).ok;
   }
 
   /** Reads the round-trip `<sheetProtection>` flags. Returns `null` when

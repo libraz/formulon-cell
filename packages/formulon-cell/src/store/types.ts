@@ -333,7 +333,28 @@ export interface UiSlice {
 export interface ValueFilterCriteria {
   range: Range;
   byCol: number;
+  /** Value filter: rows whose column value key is in this set are hidden. */
   hiddenValues: string[];
+  /** Condition filter (number/text comparison). When present the criterion is
+   *  evaluated per row and `hiddenValues` is ignored. Persisting it lets
+   *  Reapply, sheet-view snapshots, and cross-column AND recompute honour
+   *  condition filters the same way as value filters. */
+  condition?: FilterConditionSpec;
+}
+
+/** A number/text comparison used by an AutoFilter condition filter. Mirrors
+ *  the operator set of the filter dropdown. */
+export interface FilterConditionSpec {
+  op:
+    | 'equals'
+    | 'notEquals'
+    | 'contains'
+    | 'notContains'
+    | 'greaterThan'
+    | 'greaterThanOrEqual'
+    | 'lessThan'
+    | 'lessThanOrEqual';
+  value: string;
 }
 
 export type WorkbookViewMode = 'normal' | 'pageLayout' | 'pageBreakPreview';

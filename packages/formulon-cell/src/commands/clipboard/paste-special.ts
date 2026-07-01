@@ -121,24 +121,36 @@ export function pasteSpecial(
       // Sheet protection — silently skip locked destinations (spreadsheet parity).
       if (!isCellWritable(state, addr)) continue;
 
-      // Layer 1: values / formulas
-      const shouldPasteFormula = Boolean(src.formula && wantsFormulas(opt.what));
-      if (wantsValues(opt.what) && !shouldPasteFormula) {
+      // Layer 1: values / formulas.
+      // A Paste Special arithmetic operation always combines by VALUE. When one
+      // is active it takes precedence over formula-pasting, using the source's
+      // computed number even if the source cell is a formula — otherwise an
+      // "Add" over a formula source silently pastes the formula and drops the
+      // operation (M-10). Formats-only pastes carry no value, so they never
+      // operate.
+      const operating =
+        opt.operation !== 'none' && (wantsValues(opt.what) || wantsFormulas(opt.what));
+      const shouldPasteFormula = Boolean(src.formula && wantsFormulas(opt.what) && !operating);
+      if (operating) {
         const srcNum = numericValue(src);
-        if (opt.operation !== 'none' && srcNum !== null) {
+        if (srcNum !== null) {
           const dest = existingNumeric(state, sheet, row, col);
           const result = combine(opt.operation, dest, srcNum);
           if (Number.isFinite(result)) wb.setNumber(addr, result);
-        } else if (opt.operation !== 'none') {
-          // Desktop spreadsheets Paste Special arithmetic operations ignore non-numeric
-          // source cells instead of overwriting the destination with text.
-        } else {
-          if (src.value.kind !== 'blank' || !isBlankSrc) writeClipboardValue(wb, addr, src);
         }
+        // Non-numeric source cells leave the destination unchanged (parity).
       } else if (shouldPasteFormula && src.formula) {
-        const sourceRow = snap.range.r0 + sr;
-        const sourceCol = snap.range.c0 + sc;
-        wb.setFormula(addr, shiftFormulaRefs(src.formula, row - sourceRow, col - sourceCol));
+        // Cut moves cells: paste formulas verbatim (Excel keeps references
+        // intact on a move). Copy re-anchors relative refs by the paste offset.
+        if (snap.mode === 'cut') {
+          wb.setFormula(addr, src.formula);
+        } else {
+          const sourceRow = snap.range.r0 + sr;
+          const sourceCol = snap.range.c0 + sc;
+          wb.setFormula(addr, shiftFormulaRefs(src.formula, row - sourceRow, col - sourceCol));
+        }
+      } else if (wantsValues(opt.what)) {
+        if (src.value.kind !== 'blank' || !isBlankSrc) writeClipboardValue(wb, addr, src);
       }
 
       // Layer 2: formats

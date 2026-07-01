@@ -1,0 +1,111 @@
+import { describe, expect, it } from 'vitest';
+import {
+  adjustFormulaForCellBandShift,
+  adjustFormulaForRowColEdit,
+  shiftFormulaRefs,
+} from '../../../src/commands/formula-refs.js';
+
+describe('shiftFormulaRefs — relative offset (fill / paste)', () => {
+  it('shifts relative refs by row/col delta', () => {
+    expect(shiftFormulaRefs('=A1+B1', 1, 0)).toBe('=A2+B2');
+    expect(shiftFormulaRefs('=A1', 0, 1)).toBe('=B1');
+    expect(shiftFormulaRefs('=A1+B1', 2, 3)).toBe('=D3+E3');
+  });
+
+  it('keeps $-anchored axes pinned', () => {
+    expect(shiftFormulaRefs('=$A$1', 3, 3)).toBe('=$A$1');
+    expect(shiftFormulaRefs('=$A1', 2, 5)).toBe('=$A3');
+    expect(shiftFormulaRefs('=A$1', 2, 5)).toBe('=F$1');
+  });
+
+  it('does NOT mangle function names ending in digits (C-1)', () => {
+    expect(shiftFormulaRefs('=LOG10(A1)', 1, 0)).toBe('=LOG10(A2)');
+    expect(shiftFormulaRefs('=ATAN2(A1,B1)', 1, 0)).toBe('=ATAN2(A2,B2)');
+    expect(shiftFormulaRefs('=LOG10(A1)', 0, 1)).toBe('=LOG10(B1)');
+  });
+
+  it('preserves sheet name while shifting the qualified ref (C-2 for fill)', () => {
+    expect(shiftFormulaRefs('=Sheet2!A1', 1, 0)).toBe('=Sheet2!A2');
+    expect(shiftFormulaRefs("='My Sheet'!A1", 1, 0)).toBe("='My Sheet'!A2");
+    expect(shiftFormulaRefs('=Data!A5', 2, 0)).toBe('=Data!A7');
+  });
+
+  it('shifts both endpoints of a range', () => {
+    expect(shiftFormulaRefs('=SUM(A1:A3)', 1, 0)).toBe('=SUM(A2:A4)');
+    expect(shiftFormulaRefs('=SUM(A1:B2)', 0, 1)).toBe('=SUM(B1:C2)');
+  });
+
+  it('ignores refs inside string literals', () => {
+    expect(shiftFormulaRefs('="A1"&A1', 1, 0)).toBe('="A1"&A2');
+  });
+
+  it('leaves out-of-grid shifts as the original text', () => {
+    expect(shiftFormulaRefs('=A1', -5, 0)).toBe('=A1');
+  });
+});
+
+describe('adjustFormulaForRowColEdit — insert/delete rows/cols', () => {
+  it('shifts refs at/after an inserted row', () => {
+    // insert 1 row at index 2 (split=2, delta=+1)
+    expect(adjustFormulaForRowColEdit('=A3', 'row', 2, 1)).toBe('=A4');
+    expect(adjustFormulaForRowColEdit('=A1', 'row', 2, 1)).toBe('=A1');
+  });
+
+  it('shifts refs at/after an inserted column', () => {
+    expect(adjustFormulaForRowColEdit('=C1', 'col', 1, 1)).toBe('=D1');
+    expect(adjustFormulaForRowColEdit('=A1', 'col', 1, 1)).toBe('=A1');
+  });
+
+  it('turns a single ref inside a deleted band into #REF!', () => {
+    // delete row index 2 (split=2, delta=-1) → A3 (row idx2) is deleted
+    expect(adjustFormulaForRowColEdit('=A3', 'row', 2, -1)).toBe('=#REF!');
+    // A4 (row idx3) shifts up to A3
+    expect(adjustFormulaForRowColEdit('=A4', 'row', 2, -1)).toBe('=A3');
+  });
+
+  it('clamps a range whose top endpoint is deleted rather than #REF! mid-range (H-1)', () => {
+    // =SUM(A5:A20): delete rows 4..5 (split=4 [A5], delta=-1 removes only idx4)
+    // A5 (idx4) deleted → clamp to boundary; A20 (idx19) shifts to idx18 → A19
+    expect(adjustFormulaForRowColEdit('=SUM(A5:A20)', 'row', 4, -1)).toBe('=SUM(A5:A19)');
+  });
+
+  it('#REF!s a range only when both endpoints are deleted', () => {
+    // =SUM(A5:A6): delete rows idx4..idx5 (split=4, delta=-2) → Excel: =SUM(#REF!)
+    expect(adjustFormulaForRowColEdit('=SUM(A5:A6)', 'row', 4, -2)).toBe('=SUM(#REF!)');
+  });
+
+  it('leaves cross-sheet refs untouched (C-2)', () => {
+    expect(adjustFormulaForRowColEdit('=Sheet2!A1', 'row', 0, 1)).toBe('=Sheet2!A1');
+    expect(adjustFormulaForRowColEdit("='My Sheet'!A5", 'row', 0, 1)).toBe("='My Sheet'!A5");
+    expect(adjustFormulaForRowColEdit('=Data!A5*2', 'row', 0, 5)).toBe('=Data!A5*2');
+  });
+
+  it('does not mistake function names / name-like tokens for refs', () => {
+    expect(adjustFormulaForRowColEdit('=LOG10(A3)', 'row', 2, 1)).toBe('=LOG10(A4)');
+    expect(adjustFormulaForRowColEdit('=Year2024*2', 'row', 0, 1)).toBe('=Year2024*2');
+  });
+
+  it('keeps $-anchored refs on the pinned axis', () => {
+    expect(adjustFormulaForRowColEdit('=A$3', 'row', 0, 5)).toBe('=A$3');
+    expect(adjustFormulaForRowColEdit('=$C1', 'col', 0, 5)).toBe('=$C1');
+  });
+});
+
+describe('adjustFormulaForCellBandShift — insert/delete cells', () => {
+  it('shifts refs inside the band down', () => {
+    const affected = { r0: 2, c0: 0, r1: 1048575, c1: 0 };
+    expect(adjustFormulaForCellBandShift('=A3', affected, 'down', 1)).toBe('=A4');
+    // outside the column band → untouched
+    expect(adjustFormulaForCellBandShift('=B3', affected, 'down', 1)).toBe('=B3');
+  });
+
+  it('does not mangle sheet names on cell-band shift', () => {
+    const affected = { r0: 2, c0: 0, r1: 1048575, c1: 0 };
+    expect(adjustFormulaForCellBandShift('=Sheet2!A3', affected, 'down', 1)).toBe('=Sheet2!A3');
+  });
+
+  it('does not mangle function names ending in digits', () => {
+    const affected = { r0: 0, c0: 0, r1: 1048575, c1: 0 };
+    expect(adjustFormulaForCellBandShift('=LOG10(A3)', affected, 'down', 1)).toBe('=LOG10(A4)');
+  });
+});

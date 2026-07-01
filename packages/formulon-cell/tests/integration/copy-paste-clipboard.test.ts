@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { copy } from '../../src/commands/clipboard/copy.js';
 import { pasteTSV } from '../../src/commands/clipboard/paste.js';
+import { pasteSpecial } from '../../src/commands/clipboard/paste-special.js';
+import { captureSnapshot } from '../../src/commands/clipboard/snapshot.js';
 import { addrKey } from '../../src/engine/workbook-handle.js';
 import { mutators } from '../../src/store/store.js';
 import { type MountedStubSheet, mountStubSheet } from '../test-utils/index.js';
@@ -88,5 +90,54 @@ describe('integration: clipboard copy → paste', () => {
     expect(cp?.tsv).toBe('=A1*2');
     // Suppress unused-var lint in addrKey import.
     expect(addrKey({ sheet: 0, row: 1, col: 0 })).toBe('0:1:0');
+  });
+
+  it('copy re-anchors relative refs by the paste offset', () => {
+    const { instance, workbook } = sheet;
+    workbook.setFormula({ sheet: 0, row: 0, col: 2 }, '=A1+B1');
+    workbook.recalc();
+    syncToStore();
+    const snap = captureSnapshot(instance.store.getState(), {
+      sheet: 0,
+      r0: 0,
+      c0: 2,
+      r1: 0,
+      c1: 2,
+    });
+    expect(snap?.mode).toBe('copy');
+    // Paste at C5 (row 4): copy shifts refs down by 4 rows.
+    mutators.setActive(instance.store, { sheet: 0, row: 4, col: 2 });
+    // biome-ignore lint/style/noNonNullAssertion: snapshot asserted above
+    pasteSpecial(instance.store.getState(), instance.store, workbook, snap!, {
+      what: 'all',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+    expect(workbook.cellFormula({ sheet: 0, row: 4, col: 2 })).toBe('=A5+B5');
+  });
+
+  it('cut pastes formulas verbatim — no re-relativization (C-4)', () => {
+    const { instance, workbook } = sheet;
+    workbook.setFormula({ sheet: 0, row: 0, col: 2 }, '=A1+B1');
+    workbook.recalc();
+    syncToStore();
+    // Snapshot captured with cut mode (as the cut handler does).
+    const snap = captureSnapshot(
+      instance.store.getState(),
+      { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+      'cut',
+    );
+    expect(snap?.mode).toBe('cut');
+    mutators.setActive(instance.store, { sheet: 0, row: 4, col: 2 });
+    // biome-ignore lint/style/noNonNullAssertion: snapshot asserted above
+    pasteSpecial(instance.store.getState(), instance.store, workbook, snap!, {
+      what: 'all',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+    // Excel keeps the formula intact on a move.
+    expect(workbook.cellFormula({ sheet: 0, row: 4, col: 2 })).toBe('=A1+B1');
   });
 });

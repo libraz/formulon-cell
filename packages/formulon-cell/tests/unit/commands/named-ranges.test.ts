@@ -4,6 +4,7 @@ import {
   createDefinedNamesFromSelection,
   deleteDefinedName,
   insertDefinedNameFormula,
+  isValidDefinedName,
   listDefinedNames,
   recordDefinedNamesChange,
   upsertDefinedName,
@@ -21,6 +22,7 @@ interface MutableWb {
   definedNames(): IterableIterator<{ name: string; formula: string }>;
   setDefinedNameEntry(name: string, formula: string): boolean;
   setFormula?(addr: Addr, formula: string): void;
+  recalc(): void;
 }
 
 const makeWb = (
@@ -30,10 +32,12 @@ const makeWb = (
   wb: WorkbookHandle;
   calls: { name: string; formula: string }[];
   formulas: Map<string, string>;
+  recalcs: () => number;
 } => {
   const registry = new Map([['TaxRate', '=Sheet1!$A$1']]);
   const calls: { name: string; formula: string }[] = [];
   const formulas = new Map<string, string>();
+  let recalcCount = 0;
   const fake: MutableWb = {
     capabilities: { definedNameMutate: canMutate },
     *definedNames() {
@@ -49,8 +53,11 @@ const makeWb = (
     setFormula(addr, formula) {
       formulas.set(`${addr.sheet}:${addr.row}:${addr.col}`, formula);
     },
+    recalc() {
+      recalcCount += 1;
+    },
   };
-  return { wb: fake as unknown as WorkbookHandle, calls, formulas };
+  return { wb: fake as unknown as WorkbookHandle, calls, formulas, recalcs: () => recalcCount };
 };
 
 const seedText = (store: SpreadsheetStore, row: number, col: number, value: string): void => {
@@ -92,6 +99,21 @@ describe('named range commands', () => {
     expect(calls).toEqual([{ name: 'Total', formula: '=Sheet1!$B$1' }]);
   });
 
+  it('recalculates dependents after add/delete so values are not stale (H-38)', () => {
+    const added = makeWb();
+    upsertDefinedName(added.wb, 'Total', '=Sheet1!$B$1');
+    expect(added.recalcs()).toBe(1);
+
+    const removed = makeWb();
+    deleteDefinedName(removed.wb, 'TaxRate');
+    expect(removed.recalcs()).toBe(1);
+
+    // Failed / no-op mutations must not recalc.
+    const failed = makeWb(true, false);
+    upsertDefinedName(failed.wb, 'X', '=A1');
+    expect(failed.recalcs()).toBe(0);
+  });
+
   it('validates empty names and references before calling the engine', () => {
     const { wb, calls } = makeWb();
 
@@ -101,6 +123,58 @@ describe('named range commands', () => {
       reason: 'empty-formula',
     });
     expect(calls).toEqual([]);
+  });
+
+  it('rejects names that break spreadsheet naming rules before the engine (H-33)', () => {
+    const { wb, calls } = makeWb();
+
+    // Cell-reference collisions (A1 and R1C1 style) and reserved single letters.
+    for (const bad of ['A1', '$A$1', 'XFD1', 'B$2', 'R1C1', 'RC', 'R', 'C']) {
+      expect(upsertDefinedName(wb, bad, '=Sheet1!$A$1')).toEqual({
+        ok: false,
+        reason: 'invalid-name',
+      });
+    }
+    // Illegal leading character / illegal body characters / spaces.
+    for (const bad of ['1Name', 'a-b', 'a b', 'a!']) {
+      expect(upsertDefinedName(wb, bad, '=Sheet1!$A$1')).toEqual({
+        ok: false,
+        reason: 'invalid-name',
+      });
+    }
+    expect(calls).toEqual([]);
+  });
+
+  it('accepts valid names that merely resemble references', () => {
+    const { wb } = makeWb();
+    // Trailing letters keep these out of the A1 grid, so they are valid names.
+    for (const good of ['Sales', '_2026', 'Revenue', 'Q1_2026', 'C3PO', 'Region.North']) {
+      expect(upsertDefinedName(wb, good, '=Sheet1!$A$1').ok).toBe(true);
+    }
+  });
+
+  it('isValidDefinedName mirrors the engine-facing rules', () => {
+    expect(isValidDefinedName('Sales')).toBe(true);
+    expect(isValidDefinedName('_hidden')).toBe(true);
+    expect(isValidDefinedName('A1')).toBe(false);
+    expect(isValidDefinedName('R')).toBe(false);
+    expect(isValidDefinedName('a b')).toBe(false);
+    expect(isValidDefinedName('a'.repeat(256))).toBe(false);
+  });
+
+  it('sanitizes header labels that collide with cell references (H-33)', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeWb();
+    // A header of "A1" would sanitize to the valid identifier "A1", which is a
+    // cell reference — the create path must prefix it so the write succeeds.
+    seedText(store, 0, 0, 'A1');
+    setRange(store, 0, 0, 2, 0);
+
+    const result = createDefinedNamesFromSelection(store.getState(), wb, 'top-row');
+    expect(result).toEqual({
+      ok: true,
+      entries: [{ name: '_A1', formula: '=$A$2:$A$3' }],
+    });
   });
 
   it('reports unsupported and failed writes', () => {
@@ -236,6 +310,7 @@ describe('named range commands', () => {
         else registry.set(name, formula);
         return true;
       },
+      recalc() {},
     } as unknown as WorkbookHandle;
     const history = new History();
 

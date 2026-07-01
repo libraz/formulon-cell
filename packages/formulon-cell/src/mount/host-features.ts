@@ -415,6 +415,8 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           strings,
           getSelectedRangeFormula: () => `=${a1Range(input.store.getState().selection.range)}`,
           subscribeToRangeChanges: (listener) => input.store.subscribe(listener),
+          onAfterMutate: () =>
+            mutators.replaceCells(input.store, wb.cells(input.store.getState().data.sheetIndex)),
         });
         input.featureRegistry.set(
           'namedRanges',

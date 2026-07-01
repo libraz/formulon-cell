@@ -172,6 +172,26 @@ describe('syncCellFormatsToEngine', () => {
     expect(log.setCellXf[0]).toMatchObject({ sheet: 0, row: 0, col: 0 });
   });
 
+  it('resets the engine XF to 0 when a cell format is cleared (H-37)', () => {
+    const { wb, log } = makeFake();
+    const store = createSpreadsheetStore();
+    const key = addrKey({ sheet: 0, row: 0, col: 0 });
+    store.setState((s) => ({
+      ...s,
+      format: { formats: new Map([[key, { bold: true } as CellFormat]]) },
+    }));
+    syncCellFormatsToEngine(wb, store, 0);
+    expect(log.setCellXf).toHaveLength(1);
+    expect(log.setCellXf[0]?.xfIndex).toBeGreaterThan(0);
+
+    // Clear the format and re-sync — the engine XF must be reset to 0 so the
+    // cleared format does not resurrect on save.
+    store.setState((s) => ({ ...s, format: { formats: new Map() } }));
+    syncCellFormatsToEngine(wb, store, 0);
+    expect(log.setCellXf).toHaveLength(2);
+    expect(log.setCellXf[1]).toMatchObject({ sheet: 0, row: 0, col: 0, xfIndex: 0 });
+  });
+
   it('skips cells on other sheets', () => {
     const { wb, log } = makeFake();
     const store = createSpreadsheetStore();

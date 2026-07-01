@@ -22,6 +22,10 @@ export interface ClipboardSnapshot {
   /** rows × cols matrix in row-major order. Empty source cells are present
    *  but with `value = { kind: 'blank' }` and undefined format. */
   cells: ClipboardCell[][];
+  /** Whether the snapshot originated from a cut or a copy. Excel moves cut
+   *  cells: their formulas are pasted verbatim (no relative re-anchoring),
+   *  unlike a copy which shifts relative references by the paste offset. */
+  mode: 'copy' | 'cut';
 }
 
 const blankCell = (): ClipboardCell => ({
@@ -30,7 +34,11 @@ const blankCell = (): ClipboardCell => ({
   format: undefined,
 });
 
-export function captureSnapshot(state: State, range: Range): ClipboardSnapshot | null {
+export function captureSnapshot(
+  state: State,
+  range: Range,
+  mode: 'copy' | 'cut' = 'copy',
+): ClipboardSnapshot | null {
   const rows = range.r1 - range.r0 + 1;
   const cols = range.c1 - range.c0 + 1;
   if (rows <= 0 || cols <= 0) return null;
@@ -57,5 +65,5 @@ export function captureSnapshot(state: State, range: Range): ClipboardSnapshot |
     }
     grid.push(line);
   }
-  return { range, rows, cols, cells: grid };
+  return { range, rows, cols, cells: grid, mode };
 }

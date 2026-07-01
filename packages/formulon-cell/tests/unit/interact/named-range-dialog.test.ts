@@ -85,6 +85,7 @@ interface MutableWb {
   capabilities: { definedNameMutate: boolean };
   definedNames(): IterableIterator<{ name: string; formula: string }>;
   setDefinedNameEntry(name: string, formula: string): boolean;
+  recalc(): void;
 }
 
 const makeMutableWb = (): {
@@ -105,6 +106,7 @@ const makeMutableWb = (): {
       else registry.set(name, formula);
       return true;
     },
+    recalc() {},
   };
   return { wb: fake as unknown as WorkbookHandle, calls, registry };
 };

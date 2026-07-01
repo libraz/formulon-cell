@@ -652,7 +652,15 @@ export function formatNumber(value: number, fmt: NumFmt | undefined, locale = 'e
     }).format(value);
   }
   if (fmt.kind === 'scientific') {
-    return value.toExponential(fmt.decimals).replace('e', 'E');
+    // Excel's built-in Scientific format is `0.00E+00` — the exponent is
+    // zero-padded to at least two digits. `toExponential` emits a bare `e+4`,
+    // so re-pad to match (H-4).
+    return value
+      .toExponential(fmt.decimals)
+      .replace(
+        /e([+-])(\d+)/i,
+        (_m, sign: string, digits: string) => `E${sign}${digits.padStart(2, '0')}`,
+      );
   }
   if (fmt.kind === 'accounting') {
     const symbol = fmt.symbol ?? '$';
@@ -902,6 +910,12 @@ function renderDateTimePattern(serial: number, pattern: string, locale: string):
   const hh = d.getUTCHours();
   const mi = d.getUTCMinutes();
   const ss = d.getUTCSeconds();
+  // Elapsed-time tokens ([h]/[m]/[s]) accumulate past the 24h/60m wrap and are
+  // measured from the serial value directly rather than the wall-clock fields.
+  const totalSeconds = Math.round(serial * 86_400);
+  const elapsedHours = Math.floor(totalSeconds / 3600);
+  const elapsedMinutes = Math.floor(totalSeconds / 60);
+  const elapsedSeconds = totalSeconds;
   const has12h = /a\/?p|am\/pm/i.test(pattern);
   const hh12 = ((hh + 11) % 12) + 1;
   const ampm = hh < 12 ? 'AM' : 'PM';
@@ -945,6 +959,32 @@ function renderDateTimePattern(serial: number, pattern: string, locale: string):
       i += 2;
       continue;
     }
+    // Elapsed-time tokens in square brackets: [h]/[hh] total hours, [m]/[mm]
+    // total minutes, [s]/[ss] total seconds. They do not wrap at 24h/60.
+    if (pattern[i] === '[') {
+      const close = pattern.indexOf(']', i + 1);
+      if (close > i) {
+        const inner = pattern.slice(i + 1, close);
+        if (/^h+$/i.test(inner)) {
+          out += String(elapsedHours).padStart(inner.length, '0');
+          i = close + 1;
+          prevWasH = true;
+          continue;
+        }
+        if (/^m+$/i.test(inner)) {
+          out += String(elapsedMinutes).padStart(inner.length, '0');
+          i = close + 1;
+          prevWasH = false;
+          continue;
+        }
+        if (/^s+$/i.test(inner)) {
+          out += String(elapsedSeconds).padStart(inner.length, '0');
+          i = close + 1;
+          prevWasH = false;
+          continue;
+        }
+      }
+    }
     // Token matching, longest first. After hours, an "m"/"mm" token is
     //  minutes, not month — track prevWasH to disambiguate.
     let tok = '';
@@ -966,9 +1006,10 @@ function renderDateTimePattern(serial: number, pattern: string, locale: string):
     else if (rest[0] === 's') tok = 's';
 
     if (!tok) {
+      // Preserve the hour context across time separators (`:`, spaces): in
+      // `hh:mm` the `mm` is minutes even though a literal sits between them.
       out += pattern[i];
       i += 1;
-      prevWasH = false;
       continue;
     }
     switch (tok) {
@@ -1027,7 +1068,118 @@ function renderDateTimePattern(serial: number, pattern: string, locale: string):
   return out;
 }
 
+/** Best rational approximation of `x` in [0,1) with denominator ≤ maxDen. */
+function bestFraction(x: number, maxDen: number): [number, number] {
+  let bestNum = 0;
+  let bestDen = 1;
+  let bestErr = Number.POSITIVE_INFINITY;
+  for (let d = 1; d <= maxDen; d += 1) {
+    const n = Math.round(x * d);
+    const err = Math.abs(x - n / d);
+    if (err < bestErr - 1e-12) {
+      bestErr = err;
+      bestNum = n;
+      bestDen = d;
+    }
+    if (err < 1e-12) break;
+  }
+  return [bestNum, bestDen];
+}
+
+/** Render Excel fraction formats (`# ?/?`, `??/??`, `# ?/8`). Returns null when
+ *  `pattern` is not a fraction format. */
+function renderFractionPattern(value: number, pattern: string): string | null {
+  const m = pattern.match(/^(.*?)([#0?]+)?\s*([#0?]+)\/([#0?]+|\d+)(.*?)$/);
+  if (!m?.[3] || !m[4]) return null;
+  // Reject when there's no `?`/`#`/`0` around the slash beyond a bare literal.
+  const [, prefix, intPh, , denSpec, suffix] = m;
+  const hasInt = !!intPh && intPh.length > 0;
+  const sign = value < 0 ? '-' : '';
+  let x = Math.abs(value);
+  let whole = 0;
+  if (hasInt) {
+    whole = Math.floor(x);
+    x -= whole;
+  }
+  let numer: number;
+  let denom: number;
+  if (/^\d+$/.test(denSpec)) {
+    denom = Number.parseInt(denSpec, 10) || 1;
+    numer = Math.round(x * denom);
+  } else {
+    const maxDen = 10 ** denSpec.length - 1;
+    [numer, denom] = bestFraction(x, maxDen);
+  }
+  // Rounded up to a whole unit.
+  if (numer === denom) {
+    whole += 1;
+    numer = 0;
+  }
+  const pre = normalizeFormatSection(prefix ?? '');
+  const suf = normalizeFormatSection(suffix ?? '');
+  if (numer === 0) {
+    const wholeTxt = hasInt ? String(whole) : '0';
+    return `${sign}${pre}${wholeTxt}${suf}`;
+  }
+  if (!hasInt) numer += whole * denom; // improper fraction
+  const wholeTxt = hasInt && whole > 0 ? `${whole} ` : '';
+  return `${sign}${pre}${wholeTxt}${numer}/${denom}${suf}`;
+}
+
+/** Render scientific / engineering notation (`0.00E+00`, `##0.0E+0`). The number
+ *  of integer placeholders in the mantissa sets the exponent step, so `##0.0E+0`
+ *  yields engineering notation (exponent stepped in multiples of 3). Returns null
+ *  when `pattern` is not a scientific format. */
+function renderScientificPattern(value: number, pattern: string, locale: string): string | null {
+  const m = pattern.match(/^(.*?)([0#?][0#?,]*(?:\.[0#?]+)?)[eE]([+-]?)([0#?]+)(.*)$/);
+  if (!m) return null;
+  const prefix = normalizeFormatSection(m[1] ?? '');
+  const mantissaPat = m[2] ?? '';
+  const expSignSpec = m[3] ?? '';
+  const expPat = m[4] ?? '';
+  const suffix = normalizeFormatSection(m[5] ?? '');
+  const dot = mantissaPat.indexOf('.');
+  const intPat = dot >= 0 ? mantissaPat.slice(0, dot) : mantissaPat;
+  const fracPat = dot >= 0 ? mantissaPat.slice(dot + 1) : '';
+  const step = Math.max(1, (intPat.match(/[0#?]/g) ?? []).length);
+  const minIntDigits = (intPat.match(/0/g) ?? []).length;
+  const minFracDigits = (fracPat.match(/0/g) ?? []).length;
+  const maxFracDigits = (fracPat.match(/[0#?]/g) ?? []).length;
+  const sign = value < 0 ? '-' : '';
+  const av = Math.abs(value);
+  let exp = av === 0 ? 0 : Math.floor(Math.floor(Math.log10(av)) / step) * step;
+  let mantissa = av === 0 ? 0 : av / 10 ** exp;
+  // Rounding at the requested precision can push the mantissa past the step
+  // boundary (e.g. 999.6 → 1000 for a 3-digit step); bump the exponent so the
+  // integer part stays within `step` digits.
+  if (av !== 0 && Number(mantissa.toFixed(maxFracDigits)) >= 10 ** step) {
+    exp += step;
+    mantissa = av / 10 ** exp;
+  }
+  const mantissaText = new Intl.NumberFormat(locale, {
+    minimumIntegerDigits: Math.max(1, minIntDigits),
+    minimumFractionDigits: minFracDigits,
+    maximumFractionDigits: maxFracDigits,
+    useGrouping: false,
+  }).format(mantissa);
+  const expDigits = String(Math.abs(exp)).padStart(expPat.length, '0');
+  const expSign = exp < 0 ? '-' : expSignSpec === '+' ? '+' : '';
+  return `${sign}${prefix}${mantissaText}E${expSign}${expDigits}${suffix}`;
+}
+
 function renderNumericPattern(value: number, pattern: string, locale: string): string {
+  // Scientific / engineering notation (`0.00E+00`, `##0.0E+0`) is solved into a
+  // mantissa and exponent rather than printing the `E+0` placeholders verbatim.
+  if (/[eE][+-]?[0#?]/.test(pattern)) {
+    const sci = renderScientificPattern(value, pattern, locale);
+    if (sci !== null) return sci;
+  }
+  // Fraction formats (`# ?/?`) are solved into integer + numerator/denominator
+  // rather than printing the placeholders verbatim (H-3).
+  if (pattern.includes('/')) {
+    const frac = renderFractionPattern(value, pattern);
+    if (frac !== null) return frac;
+  }
   // Detect trailing thousand-scaling commas (e.g. "0,," divides by 1e6).
   let scale = 1;
   let body = pattern;
@@ -1043,6 +1195,17 @@ function renderNumericPattern(value: number, pattern: string, locale: string): s
   const isPercent = body.includes('%');
   let scaled = value / scale;
   if (isPercent) scaled *= 100;
+
+  // Multi-run integer patterns (phone `000-000-0000`, SSN `000-00-0000`) spread
+  // the digits across each placeholder run right-to-left. The single-block path
+  // below only fills the first run, so delegate whole-number distribution to the
+  // special renderer (M-1).
+  if (!isPercent && !/\.[#0?]/.test(body)) {
+    const runs = body.match(/[#0?][#0?,]*/g) ?? [];
+    if (runs.length > 1 && !runs.some((r) => r.includes(','))) {
+      return formatSpecialPattern(scaled, body);
+    }
+  }
 
   // Find the digit-placeholder block surrounding (and including) the decimal.
   const placeholderMatch = body.match(/[#0?][#0?,]*(?:\.[#0?]+)?|\.[#0?]+/);

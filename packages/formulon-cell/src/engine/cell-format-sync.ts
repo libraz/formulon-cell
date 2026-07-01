@@ -33,15 +33,49 @@ const PIVOT_KIND = {
 } as const;
 
 /**
+ * High-water mark of cells we have assigned a non-default XF to, per workbook
+ * and sheet. Lets a later sync reset the XF of a cell whose format entry was
+ * removed (Clear Formats) back to 0 — otherwise the engine keeps the stale XF
+ * and the cleared format resurrects on the next save (H-37).
+ */
+const syncedFormatKeys = new WeakMap<WorkbookHandle, Map<number, Set<string>>>();
+
+function formattedKeySet(wb: WorkbookHandle, sheet: number): Set<string> {
+  let perSheet = syncedFormatKeys.get(wb);
+  if (!perSheet) {
+    perSheet = new Map();
+    syncedFormatKeys.set(wb, perSheet);
+  }
+  let set = perSheet.get(sheet);
+  if (!set) {
+    set = new Set();
+    perSheet.set(sheet, set);
+  }
+  return set;
+}
+
+/** Record that `keys` currently carry a non-default XF on `sheet`, so a later
+ *  sync knows to reset any that disappear. Used both after a writeback and
+ *  after hydrating XFs from a loaded workbook. */
+export function seedSyncedFormatKeys(
+  wb: WorkbookHandle,
+  sheet: number,
+  keys: Iterable<string>,
+): void {
+  const set = formattedKeySet(wb, sheet);
+  for (const key of keys) set.add(key);
+}
+
+/**
  * Push every format entry on `sheet` from FormatSlice into the engine's XF
  * table. For each cell the writeback ensures a font / fill / border / numFmt
  * record exists (the engine dedups against existing rows), assembles an XF,
  * and pins the cell's `xfIndex`. No-op when `capabilities.cellFormatting`
  * is off.
  *
- * The sync is "FormatSlice → engine"; entries that have been deleted from the
- * store reset to xfIndex 0 (the workbook default). Stub engines bypass the
- * whole walk because every wrapper short-circuits on the capability flag.
+ * Cells whose entry was removed from the store since the last sync (Clear
+ * Formats) are reset to xfIndex 0 (the workbook default) via a high-water
+ * mark, so a cleared format does not survive into a subsequent save.
  */
 export function syncCellFormatsToEngine(
   wb: WorkbookHandle,
@@ -50,12 +84,8 @@ export function syncCellFormatsToEngine(
 ): void {
   if (!wb.capabilities.cellFormatting) return;
   const formats = store.getState().format.formats;
-  // Track which cells we wrote so we can clear stale XF assignments on cells
-  // whose entry was removed since the last sync. We do not currently track
-  // a high-water mark of previously-formatted cells, so on first sync after
-  // a clear the store-side delete already drove the entry away — the engine
-  // keeps its old xfIndex unless the user re-formats. This matches the spreadsheet convention:
-  // "Clear Formats" sets xf to 0; that path lives in the future.
+  const previous = formattedKeySet(wb, sheet);
+  const current = new Set<string>();
   for (const [key, fmt] of formats) {
     const [sStr, rStr, cStr] = key.split(':');
     if (sStr === undefined || rStr === undefined || cStr === undefined) continue;
@@ -65,7 +95,18 @@ export function syncCellFormatsToEngine(
     const xfIndex = resolveXfForFormat(wb, fmt);
     if (xfIndex < 0) continue;
     wb.setCellXfIndex(sheet, row, col, xfIndex);
+    current.add(key);
   }
+  // Reset cells that were formatted before but no longer are — the cleared
+  // format must not linger in the engine XF table (H-37).
+  for (const key of previous) {
+    if (current.has(key)) continue;
+    const [, rStr, cStr] = key.split(':');
+    if (rStr === undefined || cStr === undefined) continue;
+    wb.setCellXfIndex(sheet, Number.parseInt(rStr, 10), Number.parseInt(cStr, 10), 0);
+  }
+  previous.clear();
+  for (const key of current) previous.add(key);
 }
 
 /**
@@ -112,6 +153,13 @@ export function hydrateCellFormatsFromEngine(
     }
   }
   if (updates.length === 0) return;
+  // Seed the high-water mark so that clearing a format that was loaded from the
+  // workbook (not authored in-session) still resets the engine XF (H-37).
+  seedSyncedFormatKeys(
+    wb,
+    sheet,
+    updates.map((u) => u.key),
+  );
   store.setState((s) => {
     const formats = new Map(s.format.formats);
     for (const u of updates) {
