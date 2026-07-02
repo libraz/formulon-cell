@@ -280,6 +280,7 @@ export interface Strings {
     validationListSourceLiteral: string;
     validationListSourceRange: string;
     validationListRangePlaceholder: string;
+    validationShowDropdown: string;
     validationLegend: string;
     validationKind: string;
     validationKindNone: string;

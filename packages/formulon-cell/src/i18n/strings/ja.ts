@@ -273,6 +273,7 @@ export const ja: Strings = {
     validationListSourceLiteral: '値を直接入力',
     validationListSourceRange: 'セル範囲を参照',
     validationListRangePlaceholder: '例: Sheet1!$A$1:$A$10',
+    validationShowDropdown: 'セル内ドロップダウンを表示する',
     validationLegend: '入力規則',
     validationKind: '種類',
     validationKindNone: 'なし',

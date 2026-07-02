@@ -392,6 +392,179 @@ describe('attachFormatDialog', () => {
     return select;
   };
 
+  const findValidationDropdownToggle = (): HTMLInputElement => {
+    const label = Array.from(document.querySelectorAll<HTMLLabelElement>('label')).find((el) =>
+      el.textContent?.includes('セル内ドロップダウンを表示する'),
+    );
+    const input = label?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    if (!input) throw new Error('validation dropdown toggle missing');
+    return input;
+  };
+
+  it('lets list validation hide the in-cell dropdown', () => {
+    const handle = attachFormatDialog({ host, store });
+    try {
+      handle.open('more', { mode: 'dataValidation', focus: 'validation' });
+
+      const kind = findValidationKindSelect();
+      kind.value = 'list';
+      kind.dispatchEvent(new Event('change', { bubbles: true }));
+
+      const dropdownToggle = findValidationDropdownToggle();
+      expect(dropdownToggle.parentElement?.hidden).toBe(false);
+      expect(dropdownToggle.checked).toBe(true);
+      dropdownToggle.checked = false;
+      dropdownToggle.dispatchEvent(new Event('change', { bubbles: true }));
+
+      const listArea = document.querySelector<HTMLTextAreaElement>(
+        'textarea[aria-label="値を直接入力"]',
+      );
+      if (!listArea) throw new Error('validation list textarea missing');
+      listArea.value = 'A\nB';
+      listArea.dispatchEvent(new Event('input', { bubbles: true }));
+
+      const ok = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__footer button'),
+      ).find((b) => b.textContent === 'OK');
+      ok?.click();
+
+      const validation = store
+        .getState()
+        .format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.validation;
+      expect(validation).toEqual({ kind: 'list', source: ['A', 'B'], showDropdown: false });
+    } finally {
+      handle.detach();
+    }
+  });
+
+  it('hydrates hidden in-cell dropdown state into the list validation checkbox', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      { validation: { kind: 'list', source: ['A', 'B'], showDropdown: false } },
+    );
+    const handle = attachFormatDialog({ host, store });
+    try {
+      handle.open('more', { mode: 'dataValidation', focus: 'validation' });
+      const dropdownToggle = findValidationDropdownToggle();
+      expect(dropdownToggle.parentElement?.hidden).toBe(false);
+      expect(dropdownToggle.checked).toBe(false);
+    } finally {
+      handle.detach();
+    }
+  });
+
+  it('preserves hyperlink display and tooltip metadata when applying Format Cells', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        hyperlink: 'https://example.test',
+        hyperlinkDisplay: 'Example',
+        hyperlinkTooltip: 'Open example',
+      },
+    );
+    const handle = attachFormatDialog({ host, store });
+    try {
+      handle.open('more');
+      const ok = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__footer button'),
+      ).find((b) => b.textContent === 'OK');
+      ok?.click();
+
+      const format = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
+      expect(format).toMatchObject({
+        hyperlink: 'https://example.test',
+        hyperlinkDisplay: 'Example',
+        hyperlinkTooltip: 'Open example',
+      });
+    } finally {
+      handle.detach();
+    }
+  });
+
+  it('drops stale hyperlink display and tooltip metadata when the URL changes', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        hyperlink: 'https://old.example.test',
+        hyperlinkDisplay: 'Old target',
+        hyperlinkTooltip: 'Open old target',
+      },
+    );
+    const handle = attachFormatDialog({ host, store });
+    try {
+      handle.open('more');
+      const input = document.querySelector<HTMLInputElement>('input[aria-label="ハイパーリンク"]');
+      if (!input) throw new Error('hyperlink input missing');
+      input.value = 'https://new.example.test';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+
+      const ok = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__footer button'),
+      ).find((b) => b.textContent === 'OK');
+      ok?.click();
+
+      const format = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
+      expect(format?.hyperlink).toBe('https://new.example.test');
+      expect(format?.hyperlinkDisplay).toBeUndefined();
+      expect(format?.hyperlinkTooltip).toBeUndefined();
+    } finally {
+      handle.detach();
+    }
+  });
+
+  it('preserves comment author metadata when applying Format Cells without clearing comments', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      { comment: 'Keep this note', commentAuthor: 'Alice' },
+    );
+    const handle = attachFormatDialog({ host, store });
+    try {
+      handle.open('more');
+      const ok = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__footer button'),
+      ).find((b) => b.textContent === 'OK');
+      ok?.click();
+
+      const format = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
+      expect(format).toMatchObject({ comment: 'Keep this note', commentAuthor: 'Alice' });
+    } finally {
+      handle.detach();
+    }
+  });
+
+  it('clears comment author metadata when Format Cells clears the comment', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      { comment: 'Delete this note', commentAuthor: 'Alice' },
+    );
+    const handle = attachFormatDialog({ host, store });
+    try {
+      handle.open('more');
+      const comment = document.querySelector<HTMLTextAreaElement>(
+        'textarea[aria-label="コメント"]',
+      );
+      if (!comment) throw new Error('comment textarea missing');
+      comment.value = '';
+      comment.dispatchEvent(new Event('input', { bubbles: true }));
+
+      const ok = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__footer button'),
+      ).find((b) => b.textContent === 'OK');
+      ok?.click();
+
+      const format = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
+      expect(format?.comment).toBeUndefined();
+      expect(format?.commentAuthor).toBeUndefined();
+    } finally {
+      handle.detach();
+    }
+  });
+
   it('date validation exposes date pickers for bounds and stores serials', () => {
     const handle = attachFormatDialog({ host, store });
     try {
@@ -1318,6 +1491,23 @@ describe('attachFormatDialog', () => {
     expect(topRight).toMatchObject({ top: thinSide, right: thinSide });
     expect(bottomLeft).toMatchObject({ bottom: thinSide, left: thinSide });
     expect(bottomRight).toMatchObject({ bottom: thinSide, right: thinSide });
+    handle.detach();
+  });
+
+  it('border Outline preset does not materialize huge selections', () => {
+    setRange(store, 0, 0, 100_000, 0);
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+
+    const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'));
+    const presetOutline = buttons.find((b) => b.textContent === '外枠') as HTMLButtonElement;
+    presetOutline.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(store.getState().format.formats.size).toBe(0);
     handle.detach();
   });
 

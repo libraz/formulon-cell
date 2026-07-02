@@ -8,6 +8,7 @@ import {
 import { applyMerge, applyUnmerge, mergeAt } from '../commands/merge.js';
 import { addrKey } from '../engine/address.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
+import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
@@ -78,6 +79,10 @@ export interface FormatDialogHandle {
   close(): void;
   detach(): void;
 }
+
+const MAX_OUTLINE_BORDER_CELLS = 100_000;
+
+const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
 
 /** Convert a spreadsheet date serial to a native `<input type="date">` value
  *  (`yyyy-mm-dd`, UTC). Returns '' for non-finite serials. */
@@ -238,6 +243,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     validationClear,
     validationListRangeRow,
     validationListRangeInput,
+    validationShowDropdownRow,
+    validationShowDropdownInput,
     validationAllowBlankRow,
     validationAllowBlankInput,
     validationErrorStyleRow,
@@ -394,6 +401,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     validationListRangeInput.value = draft.validationListRange;
     validationListLiteralRadio.input.checked = draft.validationListSourceKind === 'literal';
     validationListRangeRadio.input.checked = draft.validationListSourceKind === 'range';
+    validationShowDropdownInput.checked = draft.validationShowDropdown;
     validationKindSelect.value = draft.validationKind;
     validationOpSelect.value = draft.validationOp;
     applyBoundInputMode(draft.validationKind);
@@ -440,6 +448,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     validationListSourceKindRow.hidden = !isListLike;
     validationRow.hidden = !isListLike || draft.validationListSourceKind !== 'literal';
     validationListRangeRow.hidden = !isListLike || draft.validationListSourceKind !== 'range';
+    validationShowDropdownRow.hidden = !isListLike;
     validationAllowBlankRow.hidden = !isActive;
     validationErrorStyleRow.hidden = !isActive;
     validationShowInputMessageRow.hidden = !isActive;
@@ -864,6 +873,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       pendingBorderPreset === 'outline' && (range.r0 !== range.r1 || range.c0 !== range.c1);
 
     const validation = computeDialogValidation(draft, validationLines);
+    const hyperlink = draft.hyperlink.trim();
+    const preserveHyperlinkMetadata = hyperlink.length > 0 && hyperlink === draft.originalHyperlink;
 
     const patch: Partial<CellFormat> = {
       numFmt: computeDialogNumFmt(draft, defaultPatternFor),
@@ -885,8 +896,11 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       fillPattern: draft.fillPattern,
       fillPatternColor: draft.fillPattern ? draft.fillPatternColor : undefined,
       ...(useRangeOutline ? {} : { borders: explicitBorders }),
-      hyperlink: draft.hyperlink.trim() ? draft.hyperlink.trim() : undefined,
+      hyperlink: hyperlink ? hyperlink : undefined,
+      hyperlinkDisplay: preserveHyperlinkMetadata ? draft.hyperlinkDisplay : undefined,
+      hyperlinkTooltip: preserveHyperlinkMetadata ? draft.hyperlinkTooltip : undefined,
       comment: draft.comment ? draft.comment : undefined,
+      ...(draft.comment ? {} : { commentAuthor: undefined }),
       validation,
       locked: draft.locked,
       formulaHidden: draft.formulaHidden ? true : undefined,
@@ -894,6 +908,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
 
     const liveWb = getWb();
     const applyOutlineToRange = (): void => {
+      if (rangeArea(range) > MAX_OUTLINE_BORDER_CELLS) return;
       const side = activeSide();
       for (let row = range.r0; row <= range.r1; row += 1) {
         for (let col = range.c0; col <= range.c1; col += 1) {
@@ -1423,6 +1438,9 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     else if (validationListRangeRadio.input.checked) draft.validationListSourceKind = 'range';
     syncValidationVisibility();
   };
+  const onValidationShowDropdownChange = (): void => {
+    draft.validationShowDropdown = validationShowDropdownInput.checked;
+  };
   const onValidationKindChange = (): void => {
     draft.validationKind = validationKindSelect.value as ValidationKind;
     // Switching between numeric / date / time kinds swaps the bound-input type,
@@ -1558,6 +1576,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   shell.on(validationListRangeInput, 'input', onValidationListRangeInput);
   shell.on(validationListLiteralRadio.input, 'change', onValidationListSourceKindChange);
   shell.on(validationListRangeRadio.input, 'change', onValidationListSourceKindChange);
+  shell.on(validationShowDropdownInput, 'change', onValidationShowDropdownChange);
   shell.on(validationKindSelect, 'change', onValidationKindChange);
   shell.on(validationOpSelect, 'change', onValidationOpChange);
   shell.on(validationAInput, 'input', onValidationAInput);

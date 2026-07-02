@@ -271,6 +271,7 @@ export const en: Strings = {
     validationListSourceLiteral: 'Literal values',
     validationListSourceRange: 'Cell range',
     validationListRangePlaceholder: 'e.g. Sheet1!$A$1:$A$10',
+    validationShowDropdown: 'Show in-cell dropdown',
     validationLegend: 'Data validation',
     validationKind: 'Kind',
     validationKindNone: 'None',

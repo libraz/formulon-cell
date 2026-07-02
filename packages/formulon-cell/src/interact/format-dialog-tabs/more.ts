@@ -33,6 +33,8 @@ export interface MoreTabRefs {
   validationClear: HTMLButtonElement;
   validationListRangeRow: HTMLLabelElement;
   validationListRangeInput: HTMLInputElement;
+  validationShowDropdownRow: HTMLLabelElement;
+  validationShowDropdownInput: HTMLInputElement;
   validationAllowBlankRow: HTMLLabelElement;
   validationAllowBlankInput: HTMLInputElement;
   validationErrorStyleRow: HTMLLabelElement;
@@ -204,6 +206,15 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   validationListRangeRow.append(validationListRangeLabel, validationListRangeInput);
   validationSection.appendChild(validationListRangeRow);
 
+  const validationShowDropdownRow = document.createElement('label');
+  validationShowDropdownRow.className = 'fc-fmtdlg__check';
+  const validationShowDropdownInput = document.createElement('input');
+  validationShowDropdownInput.type = 'checkbox';
+  const validationShowDropdownSpan = document.createElement('span');
+  validationShowDropdownSpan.textContent = t.validationShowDropdown;
+  validationShowDropdownRow.append(validationShowDropdownInput, validationShowDropdownSpan);
+  validationSection.appendChild(validationShowDropdownRow);
+
   // Allow-blank checkbox + error-style selector.
   const validationAllowBlankRow = document.createElement('label');
   validationAllowBlankRow.className = 'fc-fmtdlg__check';
@@ -317,6 +328,8 @@ export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog'])
     validationClear,
     validationListRangeRow,
     validationListRangeInput,
+    validationShowDropdownRow,
+    validationShowDropdownInput,
     validationAllowBlankRow,
     validationAllowBlankInput,
     validationErrorStyleRow,

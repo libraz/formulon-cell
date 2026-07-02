@@ -43,6 +43,9 @@ export function makeEmptyDraft(formatLocale: string): DraftState {
     borderStyle: 'thin',
     borderColor: undefined,
     hyperlink: '',
+    originalHyperlink: '',
+    hyperlinkDisplay: undefined,
+    hyperlinkTooltip: undefined,
     comment: '',
     validationList: '',
     validationListSourceKind: 'literal',
@@ -60,6 +63,7 @@ export function makeEmptyDraft(formatLocale: string): DraftState {
     validationShowErrorMessage: true,
     validationErrorTitle: '',
     validationErrorMessage: '',
+    validationShowDropdown: true,
     locked: true,
     formulaHidden: false,
   };
@@ -167,6 +171,9 @@ export function hydrateDraftFromFormat(
   draft.borderColor = inheritedColor;
 
   draft.hyperlink = fmt.hyperlink ?? '';
+  draft.originalHyperlink = draft.hyperlink;
+  draft.hyperlinkDisplay = fmt.hyperlinkDisplay;
+  draft.hyperlinkTooltip = fmt.hyperlinkTooltip;
   draft.comment = fmt.comment ?? '';
   hydrateValidationDraft(draft, fmt.validation);
   draft.locked = fmt.locked !== false;
@@ -271,6 +278,7 @@ export function computeDialogValidation(
     ...(draft.validationErrorMessage.trim()
       ? { errorMessage: draft.validationErrorMessage.trim() }
       : {}),
+    ...(draft.validationShowDropdown ? {} : { showDropdown: false }),
   };
   switch (k) {
     case 'list':
@@ -320,6 +328,7 @@ function hydrateValidationDraft(draft: DraftState, validation: CellValidation | 
     draft.validationShowErrorMessage = true;
     draft.validationErrorTitle = '';
     draft.validationErrorMessage = '';
+    draft.validationShowDropdown = true;
     return;
   }
 
@@ -332,6 +341,7 @@ function hydrateValidationDraft(draft: DraftState, validation: CellValidation | 
   draft.validationShowErrorMessage = v.showErrorMessage !== false;
   draft.validationErrorTitle = v.errorTitle ?? '';
   draft.validationErrorMessage = v.errorMessage ?? '';
+  draft.validationShowDropdown = v.showDropdown !== false;
   if (v.kind === 'list') {
     if (Array.isArray(v.source)) {
       draft.validationListSourceKind = 'literal';

@@ -19,6 +19,7 @@ describe('interact/format-dialog-state', () => {
       expect(en.numberCategory).toBe('general');
       expect(en.currencySymbol).toBe('$');
       expect(en.validationKind).toBe('none');
+      expect(en.validationShowDropdown).toBe(true);
       expect(en.locked).toBe(true);
 
       const ja = makeEmptyDraft('ja');
@@ -108,6 +109,42 @@ describe('interact/format-dialog-state', () => {
       expect(draft.validationShowErrorMessage).toBe(false);
       expect(draft.validationErrorTitle).toBe('Wrong number');
       expect(draft.validationErrorMessage).toBe('Only five is allowed.');
+    });
+
+    it('hydrates hyperlink display and tooltip metadata', () => {
+      const draft = makeEmptyDraft('en');
+      hydrateDraftFromFormat(
+        draft,
+        {
+          hyperlink: 'https://example.test',
+          hyperlinkDisplay: 'Example',
+          hyperlinkTooltip: 'Open example',
+        },
+        'en',
+      );
+
+      expect(draft.hyperlink).toBe('https://example.test');
+      expect(draft.originalHyperlink).toBe('https://example.test');
+      expect(draft.hyperlinkDisplay).toBe('Example');
+      expect(draft.hyperlinkTooltip).toBe('Open example');
+    });
+
+    it('hydrates hidden list-dropdown metadata', () => {
+      const draft = makeEmptyDraft('en');
+      hydrateDraftFromFormat(
+        draft,
+        {
+          validation: {
+            kind: 'list',
+            source: ['A', 'B'],
+            showDropdown: false,
+          },
+        },
+        'en',
+      );
+
+      expect(draft.validationKind).toBe('list');
+      expect(draft.validationShowDropdown).toBe(false);
     });
   });
 
@@ -274,6 +311,18 @@ describe('interact/format-dialog-state', () => {
         showErrorMessage: false,
         errorTitle: 'Invalid status',
         errorMessage: 'Choose Open, Closed, or Hold.',
+      });
+    });
+
+    it('preserves hidden list-dropdown metadata when rebuilding validation', () => {
+      const draft = makeEmptyDraft('en');
+      draft.validationKind = 'list';
+      draft.validationShowDropdown = false;
+
+      expect(computeDialogValidation(draft, ['A', 'B'])).toEqual({
+        kind: 'list',
+        source: ['A', 'B'],
+        showDropdown: false,
       });
     });
   });

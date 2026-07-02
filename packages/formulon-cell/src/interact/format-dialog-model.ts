@@ -67,6 +67,9 @@ export interface DraftState {
   /** "Active" line color in #rrggbb form, or undefined for theme default. */
   borderColor: string | undefined;
   hyperlink: string;
+  originalHyperlink: string;
+  hyperlinkDisplay: string | undefined;
+  hyperlinkTooltip: string | undefined;
   comment: string;
   validationList: string;
   /** When kind === 'list', selects between inline string array and a range
@@ -86,6 +89,9 @@ export interface DraftState {
   validationShowErrorMessage: boolean;
   validationErrorTitle: string;
   validationErrorMessage: string;
+  /** In-cell list dropdown arrow visibility. Excel/OOXML stores the hidden
+   *  state inverted as `showDropDown=true`; the draft keeps the UI meaning. */
+  validationShowDropdown: boolean;
   /** Sheet-protection lock flag. desktop default is `true` (locked); the
    *  Protection tab exposes a single checkbox. */
   locked: boolean;
