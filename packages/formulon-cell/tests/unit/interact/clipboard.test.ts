@@ -165,6 +165,64 @@ describe('attachClipboard', () => {
     handle.detach();
   });
 
+  it('copy uses the trimmed payload for whole-column HTML and structured snapshots', () => {
+    seedAndMirror(store, wb, [
+      { row: 4, col: 2, value: 'top' },
+      { row: 6, col: 2, value: 'bottom' },
+    ]);
+    setRange(store, 0, 2, 1048575, 2);
+    const handle = attachClipboard({ host, store, wb, onAfterCommit });
+
+    const { transfer } = fireClipboard(host, 'copy');
+
+    expect(transfer.getData('text/plain')).toBe('top\r\n\r\nbottom');
+    expect(transfer.getData('text/html')).toContain('<table>');
+    expect(transfer.getData('text/html')).toContain('top');
+    expect(transfer.getData('text/html')).toContain('bottom');
+    expect(handle.getSnapshot()?.range).toEqual({ sheet: 0, r0: 4, c0: 2, r1: 6, c1: 2 });
+    expect(handle.getSnapshot()?.rows).toBe(3);
+    expect(handle.getSnapshot()?.cols).toBe(1);
+    expect(store.getState().ui.copyRange).toEqual({ sheet: 0, r0: 0, c0: 2, r1: 1048575, c1: 2 });
+    handle.detach();
+  });
+
+  it('copy keeps format-only cells in trimmed whole-column HTML and snapshots', () => {
+    setFormat(store, 9, 2, { hyperlink: 'https://example.test', bold: true });
+    setRange(store, 0, 2, 1048575, 2);
+    const handle = attachClipboard({ host, store, wb, onAfterCommit });
+
+    const { transfer } = fireClipboard(host, 'copy');
+
+    expect(transfer.getData('text/plain')).toBe('');
+    expect(transfer.getData('text/html')).toContain('href="https://example.test"');
+    expect(transfer.getData('text/html')).toContain('font-weight:bold');
+    expect(handle.getSnapshot()?.range).toEqual({ sheet: 0, r0: 9, c0: 2, r1: 9, c1: 2 });
+    expect(handle.getSnapshot()?.cells[0]?.[0]?.format).toMatchObject({
+      hyperlink: 'https://example.test',
+      bold: true,
+    });
+    handle.detach();
+  });
+
+  it('pastes the internal snapshot for format-only copies with empty plain text', () => {
+    setFormat(store, 9, 2, { hyperlink: 'https://example.test', bold: true });
+    setRange(store, 0, 2, 1048575, 2);
+    const handle = attachClipboard({ host, store, wb, onAfterCommit });
+
+    const { transfer } = fireClipboard(host, 'copy');
+    setRange(store, 4, 4, 4, 4);
+    const { event } = fireClipboard(host, 'paste', transfer.getData('text/plain'));
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(formatAt(store, 4, 4)).toMatchObject({
+      hyperlink: 'https://example.test',
+      bold: true,
+    });
+    expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 4, c0: 4, r1: 4, c1: 4 });
+    expect(onAfterCommit).toHaveBeenCalledTimes(1);
+    handle.detach();
+  });
+
   it('cut writes TSV, snapshots, blanks the source, and notifies onAfterCommit', () => {
     seedAndMirror(store, wb, [
       { row: 0, col: 0, value: 5 },
@@ -186,6 +244,31 @@ describe('attachClipboard', () => {
     expect(formatAt(store, 0, 0)).toBeUndefined();
     expect(formatAt(store, 0, 1)).toBeUndefined();
     expect(onAfterCommit).toHaveBeenCalledTimes(1);
+    handle.detach();
+  });
+
+  it('cut uses the trimmed payload for whole-column structured snapshots', () => {
+    seedAndMirror(store, wb, [
+      { row: 4, col: 2, value: 'top' },
+      { row: 6, col: 2, value: 'bottom' },
+    ]);
+    setFormat(store, 4, 2, { bold: true });
+    setFormat(store, 6, 2, { italic: true });
+    setRange(store, 0, 2, 1048575, 2);
+    const handle = attachClipboard({ host, store, wb, onAfterCommit });
+
+    const { transfer } = fireClipboard(host, 'cut');
+
+    expect(transfer.getData('text/plain')).toBe('top\r\n\r\nbottom');
+    expect(handle.getSnapshot()?.range).toEqual({ sheet: 0, r0: 4, c0: 2, r1: 6, c1: 2 });
+    expect(handle.getSnapshot()?.rows).toBe(3);
+    expect(handle.getSnapshot()?.cols).toBe(1);
+    wb.recalc();
+    expect(wb.getValue({ sheet: 0, row: 4, col: 2 }).kind).toBe('blank');
+    expect(wb.getValue({ sheet: 0, row: 6, col: 2 }).kind).toBe('blank');
+    expect(formatAt(store, 4, 2)).toBeUndefined();
+    expect(formatAt(store, 6, 2)).toBeUndefined();
+    expect(store.getState().ui.copyRange).toEqual({ sheet: 0, r0: 0, c0: 2, r1: 1048575, c1: 2 });
     handle.detach();
   });
 

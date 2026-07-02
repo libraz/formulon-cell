@@ -113,6 +113,9 @@ function makeTextSpy(): {
     beginPath(): void {},
     rect(): void {},
     clip(): void {},
+    moveTo(): void {},
+    lineTo(): void {},
+    stroke(): void {},
     measureText(): TextMetrics {
       const bold = font.startsWith('700 ');
       return {
@@ -356,6 +359,22 @@ describe('paintCellText font strictness', () => {
     });
 
     expect(spy.directions).toContain('rtl');
+  });
+
+  it('uses hyperlink display text for blank hyperlinked cells', () => {
+    const spy = makeTextSpy();
+    paintCellText({
+      ctx: spy.ctx,
+      bounds: { x: 0, y: 0, w: 80, h: 20 },
+      theme: theme({ textCell: 13, accent: '#0078d4' }),
+      value: { kind: 'blank' },
+      formula: null,
+      isActive: false,
+      isInRange: false,
+      format: { hyperlink: 'https://example.test', hyperlinkDisplay: 'Example' },
+    });
+
+    expect(spy.fills[0]?.text).toBe('Example');
   });
 
   it('applies Excel-style indent as left text inset', () => {

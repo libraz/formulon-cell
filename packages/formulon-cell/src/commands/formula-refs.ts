@@ -351,6 +351,39 @@ export function adjustFormulaForCellBandShift(
   });
 }
 
+/**
+ * Update formulas outside a cut/paste payload so references that pointed at
+ * the moved cells follow them to the destination. Unlike copy/fill shifting,
+ * absolute markers do not pin a moved-cell reference: `$A$1` should become
+ * `$C$3` when the cell it points at is cut from A1 to C3.
+ */
+export function adjustFormulaForCutPasteMove(
+  formula: string,
+  source: { r0: number; c0: number; r1: number; c1: number },
+  dest: { r0: number; c0: number },
+): string {
+  const dRow = dest.r0 - source.r0;
+  const dCol = dest.c0 - source.c0;
+  if (dRow === 0 && dCol === 0) return formula;
+  const moveAtom = (at: Atom): string | null => {
+    const col = colLabelToIndex(at.label);
+    const row = Number.parseInt(at.rowStr, 10) - 1;
+    if (row < source.r0 || row > source.r1 || col < source.c0 || col > source.c1) {
+      return renderAtomRaw(at);
+    }
+    return renderAtom(at.absCol, col + dCol, at.absRow, row + dRow);
+  };
+  return rewriteRefs(formula, (tok) => {
+    if (tok.sheetQual) return renderToken(tok);
+    const aTxt = moveAtom(tok.a);
+    if (aTxt === null) return null;
+    if (!tok.b) return aTxt;
+    const bTxt = moveAtom(tok.b);
+    if (bTxt === null) return null;
+    return `${aTxt}:${bTxt}`;
+  });
+}
+
 /** Re-render a token verbatim from its parsed parts (used to pass through
  *  cross-sheet refs unchanged while keeping normalization consistent). */
 function renderToken(tok: RefToken): string {

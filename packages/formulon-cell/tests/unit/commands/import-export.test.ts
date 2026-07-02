@@ -200,7 +200,58 @@ describe('exportCSV', () => {
     expect(exportCSV(store.getState())).toBe('tl,,\r\n,,\r\n,,br');
   });
 
+  it('exports hyperlink display text from hyperlink-only cells', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 4, col: 2 },
+      {
+        hyperlink: 'https://example.test',
+        hyperlinkDisplay: 'Example',
+      },
+    );
+
+    expect(exportCSV(store.getState())).toBe('Example');
+    expect(exportCSV(store.getState(), { range: { sheet: 0, r0: 4, c0: 2, r1: 4, c1: 2 } })).toBe(
+      'Example',
+    );
+  });
+
   it('returns empty string when sheet is empty and no range is selected', () => {
+    expect(exportCSV(store.getState())).toBe('');
+  });
+
+  it('trims huge selections to the materialized used span before exporting', () => {
+    seedAndMirror(store, wb, [
+      { row: 8, col: 2, value: 'top' },
+      { row: 10, col: 2, value: 'bottom' },
+      { row: 9, col: 3, value: 'outside' },
+    ]);
+    store.setState((s) => ({
+      ...s,
+      selection: {
+        active: { sheet: 0, row: 0, col: 2 },
+        anchor: { sheet: 0, row: 0, col: 2 },
+        range: { sheet: 0, r0: 0, c0: 2, r1: 1_048_575, c1: 2 },
+      },
+    }));
+
+    expect(exportCSV(store.getState())).toBe('top\r\n\r\nbottom');
+  });
+
+  it('refuses sparse huge used spans after trimming oversized exports', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 2, value: 'top' },
+      { row: 200_000, col: 2, value: 'bottom' },
+    ]);
+    store.setState((s) => ({
+      ...s,
+      selection: {
+        active: { sheet: 0, row: 0, col: 2 },
+        anchor: { sheet: 0, row: 0, col: 2 },
+        range: { sheet: 0, r0: 0, c0: 2, r1: 1_048_575, c1: 2 },
+      },
+    }));
+
     expect(exportCSV(store.getState())).toBe('');
   });
 

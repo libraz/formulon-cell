@@ -1,4 +1,4 @@
-import { copy } from '../commands/clipboard/copy.js';
+import { type CopyResult, copy } from '../commands/clipboard/copy.js';
 import { cut } from '../commands/clipboard/cut.js';
 import { encodeHtml } from '../commands/clipboard/html.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
@@ -69,6 +69,25 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       return { ...s, format: { ...s.format, formats } };
     });
   };
+  const materializedRanges = (result: CopyResult): Range[] =>
+    result.payloadRanges ?? [result.range];
+  const captureMaterializedSnapshot = (
+    state: State,
+    result: CopyResult,
+    mode: 'copy' | 'cut',
+  ): ClipboardSnapshot | null => {
+    const ranges = materializedRanges(result);
+    if (ranges.length !== 1) return null;
+    const range = ranges[0];
+    if (!range) return null;
+    return captureSnapshot(state, range, mode);
+  };
+  const encodeMaterializedHtml = (state: State, result: CopyResult): string =>
+    materializedRanges(result)
+      .map((range) => encodeHtml(state, range))
+      .join('');
+  const hasPastePayload = (text: string): boolean =>
+    text.length > 0 || (snapshot !== null && snapshotText === text);
 
   const pasteFromClipboardText = (
     state: State,
@@ -109,8 +128,8 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       return;
     }
     e.clipboardData.setData('text/plain', r.tsv);
-    e.clipboardData.setData('text/html', encodeHtml(s, r.range));
-    snapshot = captureSnapshot(s, r.range);
+    e.clipboardData.setData('text/html', encodeMaterializedHtml(s, r));
+    snapshot = captureMaterializedSnapshot(s, r, 'copy');
     snapshotText = r.tsv;
     if (r.ranges) mutators.setCopyRanges(store, r.ranges);
     else mutators.setCopyRange(store, r.range);
@@ -120,7 +139,6 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
   const onCut = (e: ClipboardEvent): void => {
     const s = store.getState();
     if (s.ui.editor.kind !== 'idle') return;
-    snapshot = captureSnapshot(s, s.selection.range, 'cut');
     if (history) history.begin();
     let r: ReturnType<typeof cut> = null;
     try {
@@ -138,7 +156,8 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       return;
     }
     e.clipboardData.setData('text/plain', r.tsv);
-    e.clipboardData.setData('text/html', encodeHtml(s, r.range));
+    e.clipboardData.setData('text/html', encodeMaterializedHtml(s, r));
+    snapshot = captureMaterializedSnapshot(s, r, 'cut');
     snapshotText = r.tsv;
     mutators.setCopyRange(store, r.range);
     e.preventDefault();
@@ -149,14 +168,14 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     const s = store.getState();
     if (s.ui.editor.kind !== 'idle') return;
     const text = e.clipboardData?.getData('text/plain') ?? '';
-    if (!text) return;
+    if (!hasPastePayload(text)) return;
     if (history) history.begin();
     let r: { writtenRange: Range } | null = null;
     let activation: PasteOptionsActivation | null = null;
     try {
       // Spreadsheet parity: any merge that intersects the destination range gets
       // unmerged before the paste — a textual paste cannot tear merged cells.
-      const rows = parseTSV(text);
+      const rows = text ? parseTSV(text) : [];
       if (rows.length > 0) {
         const origin = s.selection.active;
         let maxCols = 0;
@@ -205,7 +224,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
         mutators.setCopyRange(store, null);
         return;
       }
-      snapshot = captureSnapshot(s, r.range);
+      snapshot = captureMaterializedSnapshot(s, r, 'copy');
       snapshotText = r.tsv;
       if (r.ranges) mutators.setCopyRanges(store, r.ranges);
       else mutators.setCopyRange(store, r.range);
@@ -213,7 +232,6 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       return;
     }
     if (kind === 'cut') {
-      snapshot = captureSnapshot(s, s.selection.range, 'cut');
       if (history) history.begin();
       let r: ReturnType<typeof cut> = null;
       try {
@@ -230,6 +248,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
         snapshotText = null;
         return;
       }
+      snapshot = captureMaterializedSnapshot(s, r, 'cut');
       snapshotText = r.tsv;
       mutators.setCopyRange(store, r.range);
       await writeClipboardText(r.tsv);
@@ -244,12 +263,12 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       console.warn('formulon-cell: clipboard read failed', err);
       return;
     }
-    if (!text) return;
+    if (!hasPastePayload(text)) return;
     if (history) history.begin();
     let r: { writtenRange: Range } | null = null;
     let activation: PasteOptionsActivation | null = null;
     try {
-      const rows = parseTSV(text);
+      const rows = text ? parseTSV(text) : [];
       if (rows.length > 0) {
         const origin = s.selection.active;
         let maxCols = 0;

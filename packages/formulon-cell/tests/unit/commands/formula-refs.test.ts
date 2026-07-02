@@ -1,11 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import {
   adjustFormulaForCellBandShift,
+  adjustFormulaForCutPasteMove,
   adjustFormulaForRowColEdit,
   shiftFormulaRefs,
 } from '../../../src/commands/formula-refs.js';
 
 describe('shiftFormulaRefs — relative offset (fill / paste)', () => {
+  it.each([
+    ['=A1+B1', 2, 3, '=D3+E3'],
+    ['=$A1+A$1+$A$1', 2, 5, '=$A3+F$1+$A$1'],
+    ['=SUM(A1:B2,LOG10(C3),ATAN2(D4,E5))', 1, 1, '=SUM(B2:C3,LOG10(D4),ATAN2(E5,F6))'],
+    ['="A1"&A1&"Sheet2!B2"', 1, 1, '="A1"&B2&"Sheet2!B2"'],
+    ['=Sheet2!A1+Data!B2', 1, 1, '=Sheet2!B2+Data!C3'],
+    ["='My Sheet'!A1:A3", 2, 0, "='My Sheet'!A3:A5"],
+    ['=XFE1+A1048577+XFD1048576', 1, 1, '=XFE1+A1048577+XFD1048576'],
+  ])('matches golden relative shift %#', (input, dRow, dCol, expected) => {
+    expect(shiftFormulaRefs(input, dRow, dCol)).toBe(expected);
+  });
+
   it('shifts relative refs by row/col delta', () => {
     expect(shiftFormulaRefs('=A1+B1', 1, 0)).toBe('=A2+B2');
     expect(shiftFormulaRefs('=A1', 0, 1)).toBe('=B1');
@@ -45,6 +58,18 @@ describe('shiftFormulaRefs — relative offset (fill / paste)', () => {
 });
 
 describe('adjustFormulaForRowColEdit — insert/delete rows/cols', () => {
+  it.each([
+    ['=A3+B$3+$C3+$D$3', 'row', 2, 1, '=A4+B$3+$C4+$D$3'],
+    ['=A3:B5', 'row', 3, -1, '=A3:B4'],
+    ['=A3:B5', 'row', 2, -3, '=#REF!'],
+    ['=B1:D1', 'col', 2, -1, '=B1:C1'],
+    ['=LOG10(A3)+Year2024', 'row', 2, 1, '=LOG10(A4)+Year2024'],
+    ['=Sheet2!A3+Local!B4+A3', 'row', 2, 1, '=Sheet2!A3+Local!B4+A4'],
+    ["='My Sheet'!A3+A3", 'row', 2, 1, "='My Sheet'!A3+A4"],
+  ])('matches golden structural edit %#', (input, axis, split, delta, expected) => {
+    expect(adjustFormulaForRowColEdit(input, axis as 'row' | 'col', split, delta)).toBe(expected);
+  });
+
   it('shifts refs at/after an inserted row', () => {
     // insert 1 row at index 2 (split=2, delta=+1)
     expect(adjustFormulaForRowColEdit('=A3', 'row', 2, 1)).toBe('=A4');
@@ -107,5 +132,28 @@ describe('adjustFormulaForCellBandShift — insert/delete cells', () => {
   it('does not mangle function names ending in digits', () => {
     const affected = { r0: 0, c0: 0, r1: 1048575, c1: 0 };
     expect(adjustFormulaForCellBandShift('=LOG10(A3)', affected, 'down', 1)).toBe('=LOG10(A4)');
+  });
+});
+
+describe('adjustFormulaForCutPasteMove — external refs follow moved cells', () => {
+  const source = { r0: 0, c0: 0, r1: 1, c1: 1 };
+  const dest = { r0: 4, c0: 3 };
+
+  it('moves references inside the cut source range to the pasted destination', () => {
+    expect(adjustFormulaForCutPasteMove('=A1+B2+C3', source, dest)).toBe('=D5+E6+C3');
+  });
+
+  it('moves absolute references because the referenced cell moved', () => {
+    expect(adjustFormulaForCutPasteMove('=$A$1+A$2+$B1', source, dest)).toBe('=$D$5+D$6+$E5');
+  });
+
+  it('moves range endpoints that overlap the cut source range', () => {
+    expect(adjustFormulaForCutPasteMove('=SUM(A1:B2)', source, dest)).toBe('=SUM(D5:E6)');
+  });
+
+  it('leaves string literals, function names, out-of-range refs, and sheet-qualified refs alone', () => {
+    expect(adjustFormulaForCutPasteMove('="A1"&LOG10(A1)+C3+Sheet2!A1', source, dest)).toBe(
+      '="A1"&LOG10(D5)+C3+Sheet2!A1',
+    );
   });
 });

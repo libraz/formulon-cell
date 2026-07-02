@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { pasteSpecial } from '../../../../src/commands/clipboard/paste-special.js';
 import { captureSnapshot } from '../../../../src/commands/clipboard/snapshot.js';
 import { addrKey, WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
@@ -135,6 +135,51 @@ describe('pasteSpecial', () => {
     expect(wb.cellFormula({ sheet: 0, row: 3, col: 4 })).toBe('=C4+D$1');
   });
 
+  it('keeps cut formulas verbatim and moves external refs to the pasted range (C-4)', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 10 },
+      { row: 0, col: 1, value: 20 },
+      { row: 0, col: 2, value: 30, formula: '=A1+B1' },
+      { row: 0, col: 3, value: 30, formula: '=C1' },
+      { row: 1, col: 0, value: 30, formula: '=A1+B1' },
+    ]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 }, 'cut');
+    setActive(store, 4, 4);
+    assertSnap(snap);
+    pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'all',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+
+    expect(wb.cellFormula({ sheet: 0, row: 4, col: 4 })).toBe('=A1+B1');
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 3 })).toBe('=E5');
+    expect(wb.cellFormula({ sheet: 0, row: 1, col: 0 })).toBe('=A1+B1');
+  });
+
+  it('updates formulas that referenced a cut source cell after paste (C-4)', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 10 },
+      { row: 0, col: 1, value: 20, formula: '=A1*2' },
+      { row: 0, col: 2, value: 10, formula: '=A1' },
+      { row: 1, col: 0, value: 10, formula: '=$A$1' },
+    ]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, 'cut');
+    setActive(store, 4, 3);
+    assertSnap(snap);
+    pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'all',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 1 })).toBe('=D5*2');
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 2 })).toBe('=D5');
+    expect(wb.cellFormula({ sheet: 0, row: 1, col: 0 })).toBe('=$D$5');
+  });
+
   it('arithmetic operations combine src and dest numerics', () => {
     // Dest cell pre-existing value.
     seedAndMirror(store, wb, [
@@ -213,6 +258,7 @@ describe('pasteSpecial', () => {
   });
 
   it('divide by zero produces NaN result, which is skipped', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     seedAndMirror(store, wb, [
       { row: 5, col: 5, value: 50 },
       { row: 0, col: 0, value: 0 },
@@ -220,7 +266,7 @@ describe('pasteSpecial', () => {
     const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     setActive(store, 5, 5);
     assertSnap(snap);
-    pasteSpecial(store.getState(), store, wb, snap, {
+    const result = pasteSpecial(store.getState(), store, wb, snap, {
       what: 'values',
       operation: 'divide',
       skipBlanks: false,
@@ -228,7 +274,12 @@ describe('pasteSpecial', () => {
     });
     wb.recalc();
     // Source value of 0 → divide-by-zero → result skipped, dest unchanged.
+    expect(result?.skippedNonFiniteOperations).toBe(1);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('static error values require engine setError support'),
+    );
     expect(num(wb, 5, 5)).toBe(50);
+    warn.mockRestore();
   });
 
   it('skipBlanks leaves destination cells untouched when source is blank', () => {

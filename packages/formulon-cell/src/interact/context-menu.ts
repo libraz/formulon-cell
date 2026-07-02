@@ -576,14 +576,20 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   const boundRowsToData = (range: Range): Range => {
     if (range.r1 - range.r0 < 50_000) return range;
     let maxRow = range.r0;
-    for (const key of store.getState().data.cells.keys()) {
+    const state = store.getState();
+    const visitKey = (key: string): void => {
       const parts = key.split(':');
-      if (parts.length !== 3 || Number(parts[0]) !== range.sheet) continue;
+      if (parts.length !== 3 || Number(parts[0]) !== range.sheet) return;
       const row = Number(parts[1]);
       const col = Number(parts[2]);
-      if (row < range.r0 || row > range.r1) continue;
-      if (col < range.c0 || col > range.c1) continue;
+      if (row < range.r0 || row > range.r1) return;
+      if (col < range.c0 || col > range.c1) return;
       if (row > maxRow) maxRow = row;
+    };
+    for (const key of state.data.cells.keys()) visitKey(key);
+    for (const [key, format] of state.format.formats) {
+      if (Object.keys(format).length === 0) continue;
+      visitKey(key);
     }
     return { ...range, r1: maxRow };
   };
@@ -606,6 +612,9 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     }
     deps.onAfterCommit?.();
   }
+
+  const hasPastePayload = (text: string, snap: ClipboardSnapshot | null | undefined): boolean =>
+    text.length > 0 || snap != null;
 
   function run(id: ItemId): void {
     const state = store.getState();
@@ -650,11 +659,21 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           return;
         }
         void readClipboard().then((text) => {
-          if (!text) return;
+          const snap = deps.getClipboardSnapshot?.();
+          if (!hasPastePayload(text, snap)) return;
           if (history) history.begin();
-          let r: ReturnType<typeof pasteTSV> = null;
+          let r: ReturnType<typeof pasteTSV> | ReturnType<typeof pasteSpecial> = null;
           try {
-            r = pasteTSV(store.getState(), wb, text);
+            r = text
+              ? pasteTSV(store.getState(), wb, text)
+              : snap
+                ? pasteSpecial(store.getState(), store, wb, snap, {
+                    what: 'all',
+                    operation: 'none',
+                    skipBlanks: false,
+                    transpose: false,
+                  })
+                : null;
           } finally {
             if (history) history.end();
           }
@@ -696,8 +715,9 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           strings,
           onSubmit: (direction) => {
             void readClipboard().then((text) => {
-              if (!text) return;
-              const r = insertCopiedCellsFromTSV(store, wb, history, text, direction);
+              const snap = deps.getClipboardSnapshot?.();
+              if (!hasPastePayload(text, snap)) return;
+              const r = insertCopiedCellsFromTSV(store, wb, history, text, direction, snap);
               if (r) {
                 mutators.setCopyRange(store, null);
                 mutators.setRange(store, r.writtenRange);

@@ -11,6 +11,8 @@ import { coerceInputForCell, writeCoerced } from './coerce-input.js';
 import type { History } from './history.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
+const MAX_EXACT_EXPORT_CELLS = 100_000;
+
 export interface ImportResult {
   /** Range that received writes. r0/c0 = anchor; r1/c1 = far corner. */
   writtenRange: Range;
@@ -87,8 +89,13 @@ export interface ExportOptions extends CSVEncodeOptions {
  * covers the bounding box of populated cells on the active sheet.
  */
 export function exportCSV(state: State, opts: ExportOptions = {}): string {
-  const range = opts.range ?? selectionOrUsed(state);
+  const selected = opts.range ?? selectionOrUsed(state);
+  const range =
+    selected && rangeArea(selected) > MAX_EXACT_EXPORT_CELLS
+      ? usedRangeInRange(state, selected)
+      : selected;
   if (!range) return '';
+  if (rangeArea(range) > MAX_EXACT_EXPORT_CELLS) return '';
   const { sheet } = range;
 
   const grid: string[][] = [];
@@ -102,6 +109,11 @@ export function exportCSV(state: State, opts: ExportOptions = {}): string {
   return encodeCSV(grid, { eol: opts.eol, bom: opts.bom });
 }
 
+function rangeArea(range: Range): number {
+  if (range.r1 < range.r0 || range.c1 < range.c0) return 0;
+  return (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
+}
+
 function selectionOrUsed(state: State): Range | null {
   const sel = state.selection.range;
   const isSingle = sel.r0 === sel.r1 && sel.c0 === sel.c1;
@@ -113,31 +125,62 @@ function selectionOrUsed(state: State): Range | null {
  *  when the sheet is empty. */
 function usedRange(state: State): Range | null {
   const sheet = state.data.sheetIndex;
+  return usedRangeInRange(state, {
+    sheet,
+    r0: Number.NEGATIVE_INFINITY,
+    c0: Number.NEGATIVE_INFINITY,
+    r1: Number.POSITIVE_INFINITY,
+    c1: Number.POSITIVE_INFINITY,
+  });
+}
+
+function usedRangeInRange(state: State, range: Range): Range | null {
+  const sheet = range.sheet;
   let r0 = Number.POSITIVE_INFINITY;
   let r1 = Number.NEGATIVE_INFINITY;
   let c0 = Number.POSITIVE_INFINITY;
   let c1 = Number.NEGATIVE_INFINITY;
   let any = false;
+  const visit = (key: string): void => {
+    const addr = addrFromKey(key);
+    if (!addr) return;
+    if (addr.sheet !== sheet) return;
+    if (addr.row < range.r0 || addr.row > range.r1) return;
+    if (addr.col < range.c0 || addr.col > range.c1) return;
+    if (addr.row < r0) r0 = addr.row;
+    if (addr.row > r1) r1 = addr.row;
+    if (addr.col < c0) c0 = addr.col;
+    if (addr.col > c1) c1 = addr.col;
+    any = true;
+  };
   for (const [key, cell] of state.data.cells) {
     if (cell.value.kind === 'blank' && !cell.formula) continue;
-    const parts = key.split(':');
-    if (parts.length !== 3) continue;
-    if (Number(parts[0]) !== sheet) continue;
-    const row = Number(parts[1]);
-    const col = Number(parts[2]);
-    if (row < r0) r0 = row;
-    if (row > r1) r1 = row;
-    if (col < c0) c0 = col;
-    if (col > c1) c1 = col;
-    any = true;
+    visit(key);
+  }
+  for (const [key, format] of state.format.formats) {
+    if (typeof format.hyperlinkDisplay !== 'string' || format.hyperlinkDisplay.length === 0)
+      continue;
+    visit(key);
   }
   if (!any) return null;
   return { sheet, r0, c0, r1, c1 };
 }
 
+function addrFromKey(key: string): Addr | null {
+  const parts = key.split(':');
+  if (parts.length !== 3) return null;
+  const sheet = Number(parts[0]);
+  const row = Number(parts[1]);
+  const col = Number(parts[2]);
+  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
+  return { sheet, row, col };
+}
+
 function displayValue(state: State, sheet: number, row: number, col: number): string {
-  const cell = state.data.cells.get(`${sheet}:${row}:${col}`);
-  if (!cell) return '';
+  const key = `${sheet}:${row}:${col}`;
+  const cell = state.data.cells.get(key);
+  const hyperlinkDisplay = state.format.formats.get(key)?.hyperlinkDisplay;
+  if (!cell) return hyperlinkDisplay ?? '';
   switch (cell.value.kind) {
     case 'number':
       return String(cell.value.value);
@@ -148,6 +191,6 @@ function displayValue(state: State, sheet: number, row: number, col: number): st
     case 'error':
       return cell.value.text;
     default:
-      return '';
+      return hyperlinkDisplay ?? '';
   }
 }

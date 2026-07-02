@@ -138,6 +138,62 @@ describe('copy', () => {
     expect(got?.payloadRanges).toEqual([{ sheet: 0, r0: 2, c0: 3, r1: 2, c1: 5 }]);
   });
 
+  it('includes format-only cells when trimming whole-row copies', () => {
+    mutators.setCellFormat(store, { sheet: 0, row: 2, col: 7 }, { comment: 'note only' });
+    setRange(store, 2, 0, 2, 16383);
+
+    const got = copy(store.getState());
+
+    expect(got?.tsv).toBe('');
+    expect(got?.range).toEqual({ sheet: 0, r0: 2, c0: 0, r1: 2, c1: 16383 });
+    expect(got?.payloadRanges).toEqual([{ sheet: 0, r0: 2, c0: 7, r1: 2, c1: 7 }]);
+  });
+
+  it('trims whole-column copies to the used row span while preserving source range', () => {
+    seedAndMirror(store, wb, [
+      { row: 4, col: 2, value: 'top' },
+      { row: 6, col: 2, value: 'bottom' },
+    ]);
+    setRange(store, 0, 2, 1048575, 2);
+
+    const got = copy(store.getState());
+    expect(got?.tsv).toBe('top\r\n\r\nbottom');
+    expect(got?.range).toEqual({ sheet: 0, r0: 0, c0: 2, r1: 1048575, c1: 2 });
+    expect(got?.payloadRanges).toEqual([{ sheet: 0, r0: 4, c0: 2, r1: 6, c1: 2 }]);
+  });
+
+  it('includes format-only cells when trimming whole-column copies', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 9, col: 2 },
+      { hyperlink: 'https://example.test' },
+    );
+    setRange(store, 0, 2, 1048575, 2);
+
+    const got = copy(store.getState());
+
+    expect(got?.tsv).toBe('');
+    expect(got?.range).toEqual({ sheet: 0, r0: 0, c0: 2, r1: 1048575, c1: 2 });
+    expect(got?.payloadRanges).toEqual([{ sheet: 0, r0: 9, c0: 2, r1: 9, c1: 2 }]);
+  });
+
+  it('emits hyperlink display text for hyperlink-only cells', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 9, col: 2 },
+      {
+        hyperlink: 'https://example.test',
+        hyperlinkDisplay: 'Example',
+      },
+    );
+    setRange(store, 0, 2, 1048575, 2);
+
+    const got = copy(store.getState());
+
+    expect(got?.tsv).toBe('Example');
+    expect(got?.payloadRanges).toEqual([{ sheet: 0, r0: 9, c0: 2, r1: 9, c1: 2 }]);
+  });
+
   it('refuses ragged disjoint ranges', () => {
     setRange(store, 0, 0, 0, 1);
     store.setState((s) => ({
@@ -171,6 +227,22 @@ describe('cut', () => {
     wb.recalc();
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
     expect(wb.getValue({ sheet: 0, row: 0, col: 1 }).kind).toBe('blank');
+  });
+
+  it('cuts whole-column selections through the trimmed payload instead of the full sheet height', () => {
+    seedAndMirror(store, wb, [
+      { row: 4, col: 2, value: 'top' },
+      { row: 6, col: 2, value: 'bottom' },
+    ]);
+    setRange(store, 0, 2, 1048575, 2);
+
+    const got = cut(store.getState(), wb);
+
+    expect(got?.tsv).toBe('top\r\n\r\nbottom');
+    expect(got?.payloadRanges).toEqual([{ sheet: 0, r0: 4, c0: 2, r1: 6, c1: 2 }]);
+    wb.recalc();
+    expect(wb.getValue({ sheet: 0, row: 4, col: 2 }).kind).toBe('blank');
+    expect(wb.getValue({ sheet: 0, row: 6, col: 2 }).kind).toBe('blank');
   });
 
   it('returns null when the underlying copy fails (inverted range)', () => {

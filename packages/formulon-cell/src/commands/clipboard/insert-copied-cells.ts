@@ -6,6 +6,8 @@ import { coerceInputForCell, writeCoerced } from '../coerce-input.js';
 import { adjustFormulaForCellBandShift } from '../formula-refs.js';
 import { type History, recordFormatChange, recordMergesChangeWithEngine } from '../history.js';
 import { isCellWritable, isSheetProtected } from '../protection.js';
+import { shiftFormulaRefs } from '../refs.js';
+import type { ClipboardSnapshot } from './snapshot.js';
 import { parseTSV } from './tsv.js';
 
 export type InsertCopiedCellsDirection = 'right' | 'down';
@@ -22,6 +24,7 @@ interface CellRecord {
 
 const MAX_ROW = 1048575;
 const MAX_COL = 16383;
+const MAX_INSERT_COPIED_CELLS = 100_000;
 
 export function insertCopiedCellsFromTSV(
   store: SpreadsheetStore,
@@ -29,13 +32,15 @@ export function insertCopiedCellsFromTSV(
   history: History | null,
   text: string,
   direction: InsertCopiedCellsDirection,
+  snapshot?: ClipboardSnapshot | null,
 ): InsertCopiedCellsResult | null {
-  if (!text) return null;
-  const rows = parseTSV(text);
-  if (rows.length === 0) return null;
-  const height = rows.length;
-  const width = rows.reduce((max, row) => Math.max(max, row.length), 0);
+  if (!text && !snapshot) return null;
+  const rows = snapshot ? [] : parseTSV(text);
+  if (!snapshot && rows.length === 0) return null;
+  const height = snapshot?.rows ?? rows.length;
+  const width = snapshot?.cols ?? rows.reduce((max, row) => Math.max(max, row.length), 0);
   if (width <= 0) return null;
+  if (height * width > MAX_INSERT_COPIED_CELLS) return null;
 
   const state = store.getState();
   const origin = state.selection.active;
@@ -70,12 +75,16 @@ export function insertCopiedCellsFromTSV(
     shiftFormats(store, history, affected, direction, direction === 'down' ? height : width);
     shiftMerges(store, wb, history, affected, direction, direction === 'down' ? height : width);
 
-    for (let r = 0; r < rows.length; r += 1) {
-      const cells = rows[r] ?? [];
-      for (let c = 0; c < cells.length; c += 1) {
-        const addr: Addr = { sheet, row: origin.row + r, col: origin.col + c };
-        if (!isCellWritable(store.getState(), addr)) continue;
-        writeCoerced(wb, addr, coerceInputForCell(store.getState(), addr, cells[c] ?? ''));
+    if (snapshot) {
+      writeSnapshotIntoInsertedRange(store, wb, history, snapshot, origin);
+    } else {
+      for (let r = 0; r < rows.length; r += 1) {
+        const cells = rows[r] ?? [];
+        for (let c = 0; c < cells.length; c += 1) {
+          const addr: Addr = { sheet, row: origin.row + r, col: origin.col + c };
+          if (!isCellWritable(store.getState(), addr)) continue;
+          writeCoerced(wb, addr, coerceInputForCell(store.getState(), addr, cells[c] ?? ''));
+        }
       }
     }
     copySourceMerges(store, wb, history, origin, height, width);
@@ -93,6 +102,54 @@ export function insertCopiedCellsFromTSV(
       c1: origin.col + width - 1,
     },
   };
+}
+
+function writeSnapshotIntoInsertedRange(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  history: History | null,
+  snapshot: ClipboardSnapshot,
+  origin: Addr,
+): void {
+  const formatWrites: { key: string; format: CellFormat | null }[] = [];
+  for (let r = 0; r < snapshot.rows; r += 1) {
+    for (let c = 0; c < snapshot.cols; c += 1) {
+      const src = snapshot.cells[r]?.[c];
+      if (!src) continue;
+      const addr: Addr = { sheet: origin.sheet, row: origin.row + r, col: origin.col + c };
+      if (!isCellWritable(store.getState(), addr)) continue;
+      if (src.formula) {
+        const formula =
+          snapshot.mode === 'cut'
+            ? src.formula
+            : shiftFormulaRefs(
+                src.formula,
+                addr.row - (snapshot.range.r0 + r),
+                addr.col - (snapshot.range.c0 + c),
+              );
+        wb.setFormula(addr, formula);
+      } else {
+        writeCell(wb, addr, src.value, null);
+      }
+      formatWrites.push({
+        key: addrKey(addr),
+        format: src.format
+          ? { ...src.format, borders: src.format.borders ? { ...src.format.borders } : undefined }
+          : null,
+      });
+    }
+  }
+  if (formatWrites.length === 0) return;
+  recordFormatChange(history, store, () => {
+    store.setState((s) => {
+      const formats = new Map(s.format.formats);
+      for (const { key, format } of formatWrites) {
+        if (format) formats.set(key, format);
+        else formats.delete(key);
+      }
+      return { ...s, format: { ...s.format, formats } };
+    });
+  });
 }
 
 function shiftCells(

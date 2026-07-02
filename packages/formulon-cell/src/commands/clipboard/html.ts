@@ -13,6 +13,8 @@ import { formatNumber } from '../format.js';
 const escapeHtml = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+const MAX_HTML_CLIPBOARD_CELLS = 1_000_000;
+
 const styleOf = (fmt: CellFormat | undefined): string => {
   if (!fmt) return '';
   const parts: string[] = [];
@@ -32,6 +34,11 @@ const styleOf = (fmt: CellFormat | undefined): string => {
 
 /** Render the range as an HTML `<table>` with inline styles. */
 export function encodeHtml(state: State, range: Range): string {
+  const rowsCount = range.r1 - range.r0 + 1;
+  const colsCount = range.c1 - range.c0 + 1;
+  if (rowsCount <= 0 || colsCount <= 0) return '<table></table>';
+  if (rowsCount * colsCount > MAX_HTML_CLIPBOARD_CELLS) return '';
+
   const rows: string[] = [];
   for (let r = range.r0; r <= range.r1; r += 1) {
     const cells: string[] = [];
@@ -43,12 +50,14 @@ export function encodeHtml(state: State, range: Range): string {
       //  Sheets parse `=`-prefixed cell content on paste and rebuild the
       //  formula rather than freezing the last computed value.
       const text = !cell
-        ? ''
+        ? (fmt?.hyperlinkDisplay ?? '')
         : cell.formula != null
           ? cell.formula
-          : cell.value.kind === 'number' && fmt?.numFmt
-            ? formatNumber(cell.value.value, fmt.numFmt)
-            : formatCell(cell.value);
+          : cell.value.kind === 'blank'
+            ? (fmt?.hyperlinkDisplay ?? '')
+            : cell.value.kind === 'number' && fmt?.numFmt
+              ? formatNumber(cell.value.value, fmt.numFmt)
+              : formatCell(cell.value);
       const style = styleOf(fmt);
       const styleAttr = style ? ` style="${style}"` : '';
       const body = fmt?.hyperlink

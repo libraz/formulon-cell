@@ -2,6 +2,7 @@ import { addrKey } from '../../engine/address.js';
 import type { Addr, Range } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../../store/store.js';
+import { adjustFormulaForCutPasteMove } from '../formula-refs.js';
 import { isCellWritable } from '../protection.js';
 import { shiftFormulaRefs } from '../refs.js';
 import type { ClipboardCell, ClipboardSnapshot } from './snapshot.js';
@@ -25,6 +26,9 @@ export interface PasteSpecialOptions {
 
 export interface PasteSpecialResult {
   writtenRange: Range;
+  /** Arithmetic operations that produced NaN/Infinity and could not be written
+   *  until the engine exposes a static error-value setter. */
+  skippedNonFiniteOperations: number;
 }
 
 const numericValue = (cell: ClipboardCell | undefined): number | null => {
@@ -105,6 +109,7 @@ export function pasteSpecial(
 
   // Pre-compute format patches we'll merge into the format slice in one pass.
   const formatWrites: { key: string; format: CellFormat | null }[] = [];
+  let skippedNonFiniteOperations = 0;
 
   for (let dr = 0; dr < destRows; dr += 1) {
     for (let dc = 0; dc < destCols; dc += 1) {
@@ -137,6 +142,7 @@ export function pasteSpecial(
           const dest = existingNumeric(state, sheet, row, col);
           const result = combine(opt.operation, dest, srcNum);
           if (Number.isFinite(result)) wb.setNumber(addr, result);
+          else skippedNonFiniteOperations += 1;
         }
         // Non-numeric source cells leave the destination unchanged (parity).
       } else if (shouldPasteFormula && src.formula) {
@@ -187,6 +193,11 @@ export function pasteSpecial(
       return { ...s, format: { ...s.format, formats } };
     });
   }
+  if (skippedNonFiniteOperations > 0) {
+    console.warn(
+      `formulon-cell: paste special skipped ${skippedNonFiniteOperations} non-finite arithmetic result(s); static error values require engine setError support`,
+    );
+  }
 
   // Move active selection to the written range.
   const writtenRange: Range = {
@@ -200,5 +211,29 @@ export function pasteSpecial(
   if (writtenRange.r0 !== writtenRange.r1 || writtenRange.c0 !== writtenRange.c1) {
     mutators.extendRangeTo(store, { sheet, row: writtenRange.r1, col: writtenRange.c1 });
   }
-  return { writtenRange };
+  if (snap.mode === 'cut') {
+    updateExternalRefsForCutPaste(wb, snap.range, writtenRange);
+  }
+  return { writtenRange, skippedNonFiniteOperations };
+}
+
+function updateExternalRefsForCutPaste(
+  wb: WorkbookHandle,
+  source: Range,
+  writtenRange: Range,
+): void {
+  if (source.sheet !== writtenRange.sheet) return;
+  for (const entry of Array.from(wb.cells(writtenRange.sheet))) {
+    if (!entry.formula) continue;
+    if (
+      entry.addr.row >= writtenRange.r0 &&
+      entry.addr.row <= writtenRange.r1 &&
+      entry.addr.col >= writtenRange.c0 &&
+      entry.addr.col <= writtenRange.c1
+    ) {
+      continue;
+    }
+    const next = adjustFormulaForCutPasteMove(entry.formula, source, writtenRange);
+    if (next !== entry.formula) wb.setFormula(entry.addr, next);
+  }
 }

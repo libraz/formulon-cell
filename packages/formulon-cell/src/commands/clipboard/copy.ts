@@ -85,10 +85,10 @@ function trimWholeBandsToUsedSpan(state: State, ranges: Range[]): Range[] {
 
   let min = Number.POSITIVE_INFINITY;
   let max = -1;
-  for (const key of state.data.cells.keys()) {
+  const visitKey = (key: string): void => {
     const [sheetRaw, rowRaw, colRaw] = key.split(':');
     const sheet = Number(sheetRaw);
-    if (sheet !== state.data.sheetIndex) continue;
+    if (sheet !== state.data.sheetIndex) return;
     const row = Number(rowRaw);
     const col = Number(colRaw);
     if (wholeRows && ranges.some((r) => row >= r.r0 && row <= r.r1)) {
@@ -98,6 +98,11 @@ function trimWholeBandsToUsedSpan(state: State, ranges: Range[]): Range[] {
       min = Math.min(min, row);
       max = Math.max(max, row);
     }
+  };
+  for (const key of state.data.cells.keys()) visitKey(key);
+  for (const [key, fmt] of state.format.formats) {
+    if (Object.keys(fmt).length === 0) continue;
+    visitKey(key);
   }
   if (max < 0) {
     min = 0;
@@ -119,8 +124,10 @@ function sameRange(a: Range | undefined, b: Range | undefined): boolean {
 }
 
 function displayValue(state: State, sheet: number, row: number, col: number): string {
-  const cell = state.data.cells.get(`${sheet}:${row}:${col}`);
-  if (!cell) return '';
+  const key = `${sheet}:${row}:${col}`;
+  const cell = state.data.cells.get(key);
+  const hyperlinkDisplay = state.format.formats.get(key)?.hyperlinkDisplay;
+  if (!cell) return hyperlinkDisplay ?? '';
   // Formula cells emit the formula text (already `=`-prefixed) so a paste
   //  into Excel / Sheets reconstructs the formula instead of freezing the
   //  last computed value.
@@ -135,6 +142,6 @@ function displayValue(state: State, sheet: number, row: number, col: number): st
     case 'error':
       return cell.value.text;
     default:
-      return '';
+      return hyperlinkDisplay ?? '';
   }
 }

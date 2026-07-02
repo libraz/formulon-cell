@@ -122,7 +122,8 @@ export function paintCellText({
   displayOverride,
   locale,
 }: CellPaintCtx): void {
-  if (value.kind === 'blank' && !formula && displayOverride == null) return;
+  const hyperlinkDisplay = format?.hyperlinkDisplay ?? '';
+  if (value.kind === 'blank' && !formula && displayOverride == null && !hyperlinkDisplay) return;
 
   const padX = 3;
   const padY = 3;
@@ -131,6 +132,8 @@ export function paintCellText({
     text = displayOverride;
   } else if (showFormulas && formula) {
     text = formula;
+  } else if (value.kind === 'blank' && hyperlinkDisplay) {
+    text = hyperlinkDisplay;
   } else {
     text =
       value.kind === 'number' && format?.numFmt

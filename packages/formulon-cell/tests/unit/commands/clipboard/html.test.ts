@@ -121,6 +121,12 @@ describe('commands/clipboard/encodeHtml', () => {
     expect(html).toBe('<table><tr><td>a</td><td></td></tr></table>');
   });
 
+  it('refuses to materialize huge direct HTML ranges', () => {
+    const store = createSpreadsheetStore();
+    const html = encodeHtml(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 1000, c1: 999 });
+    expect(html).toBe('');
+  });
+
   it('wraps cells with hyperlinks in <a href>', async () => {
     const store = await seed([
       {
@@ -132,6 +138,22 @@ describe('commands/clipboard/encodeHtml', () => {
     ]);
     const html = encodeHtml(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     expect(html).toContain('<a href="https://example.com">Click</a>');
+  });
+
+  it('uses hyperlink display text when the linked cell has no materialized value', () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => {
+      const formats = new Map(s.format.formats);
+      formats.set(addrKey({ sheet: 0, row: 0, col: 0 }), {
+        hyperlink: 'https://example.com',
+        hyperlinkDisplay: 'Example',
+      });
+      return { ...s, format: { ...s.format, formats } };
+    });
+
+    const html = encodeHtml(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+
+    expect(html).toContain('<a href="https://example.com">Example</a>');
   });
 
   it('escapes the hyperlink href + text', async () => {

@@ -1,8 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import { insertCopiedCellsFromTSV } from '../../../src/commands/clipboard/insert-copied-cells.js';
+import {
+  type ClipboardSnapshot,
+  captureSnapshot,
+} from '../../../src/commands/clipboard/snapshot.js';
 import { addrKey } from '../../../src/engine/address.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
+import {
+  createSpreadsheetStore,
+  mutators,
+  type SpreadsheetStore,
+} from '../../../src/store/store.js';
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
@@ -21,6 +29,26 @@ const setActive = (
     },
   }));
 };
+
+const seedFormula = (
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  row: number,
+  col: number,
+  formula: string,
+): void => {
+  const addr = { sheet: 0, row, col };
+  wb.setFormula(addr, formula);
+  store.setState((s) => {
+    const cells = new Map(s.data.cells);
+    cells.set(addrKey(addr), { value: { kind: 'number', value: 1 }, formula });
+    return { ...s, data: { ...s.data, cells } };
+  });
+};
+
+function assertSnap<T>(snap: T | null): asserts snap is T {
+  if (snap === null) throw new Error('expected clipboard snapshot');
+}
 
 describe('insertCopiedCellsFromTSV', () => {
   it('shifts only the target columns down before writing the copied cells', async () => {
@@ -82,5 +110,52 @@ describe('insertCopiedCellsFromTSV', () => {
       r1: 2,
       c1: 1,
     });
+  });
+
+  it('uses clipboard snapshots so copied formulas re-anchor when inserted', async () => {
+    const store = createSpreadsheetStore();
+    const wb = await newWb();
+    seedFormula(store, wb, 0, 0, '=B1');
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { bold: true });
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    assertSnap(snap);
+    setActive(store, 2, 2);
+
+    insertCopiedCellsFromTSV(store, wb, null, '=B1', 'down', snap);
+
+    expect(wb.cellFormula({ sheet: 0, row: 2, col: 2 })).toBe('=D3');
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 2, col: 2 }))?.bold).toBe(
+      true,
+    );
+  });
+
+  it('keeps cut formulas verbatim when inserting cut cells', async () => {
+    const store = createSpreadsheetStore();
+    const wb = await newWb();
+    seedFormula(store, wb, 0, 0, '=B1');
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, 'cut');
+    assertSnap(snap);
+    setActive(store, 2, 2);
+
+    insertCopiedCellsFromTSV(store, wb, null, '=B1', 'down', snap);
+
+    expect(wb.cellFormula({ sheet: 0, row: 2, col: 2 })).toBe('=B1');
+  });
+
+  it('refuses huge clipboard payloads before shifting cells', async () => {
+    const store = createSpreadsheetStore();
+    const wb = await newWb();
+    wb.setText({ sheet: 0, row: 1, col: 0 }, 'keep');
+    setActive(store, 0, 0);
+    const hugeSnapshot: ClipboardSnapshot = {
+      range: { sheet: 0, r0: 0, c0: 0, r1: 100_000, c1: 0 },
+      rows: 100_001,
+      cols: 1,
+      cells: [],
+      mode: 'copy',
+    };
+
+    expect(insertCopiedCellsFromTSV(store, wb, null, '', 'down', hugeSnapshot)).toBeNull();
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'keep' });
   });
 });

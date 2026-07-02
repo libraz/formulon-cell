@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import type { ClipboardSnapshot } from '../../../src/commands/clipboard/snapshot.js';
 import { History } from '../../../src/commands/history.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings/en.js';
@@ -11,6 +12,7 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+import type { CellFormat } from '../../../src/store/types.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -54,6 +56,14 @@ const setRange = (
       range: { sheet: 0, r0, c0, r1, c1 },
     },
   }));
+};
+
+const setFormat = (store: SpreadsheetStore, row: number, col: number, format: CellFormat): void => {
+  store.setState((s) => {
+    const formats = new Map(s.format.formats);
+    formats.set(addrKey({ sheet: 0, row, col }), format);
+    return { ...s, format: { ...s.format, formats } };
+  });
 };
 
 const fireContextMenu = (
@@ -582,6 +592,47 @@ describe('attachContextMenu', () => {
       expect(onAfterCommit).not.toHaveBeenCalled();
     });
 
+    it('Paste uses the internal snapshot when clipboard text is empty', async () => {
+      vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('');
+      const snap: ClipboardSnapshot = {
+        mode: 'copy',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        rows: 1,
+        cols: 1,
+        cells: [
+          [
+            {
+              value: { kind: 'blank' },
+              formula: null,
+              format: { hyperlink: 'https://example.test', bold: true },
+            },
+          ],
+        ],
+      };
+      setRange(store, 4, 4, 4, 4);
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        onAfterCommit,
+        getClipboardSnapshot: () => snap,
+      });
+
+      fireContextMenu(host, 200, 70);
+      item('paste')?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(
+        store.getState().format.formats.get(addrKey({ sheet: 0, row: 4, col: 4 })),
+      ).toMatchObject({
+        hyperlink: 'https://example.test',
+        bold: true,
+      });
+      expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 4, c0: 4, r1: 4, c1: 4 });
+      expect(onAfterCommit).toHaveBeenCalled();
+    });
+
     it('Paste Special triggers the onPasteSpecial callback', () => {
       detach = attachContextMenu({ host, store, wb, onPasteSpecial });
       fireContextMenu(host, 200, 70);
@@ -659,6 +710,52 @@ describe('attachContextMenu', () => {
       wb.recalc();
       expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'text', value: 'new' });
       expect(wb.getValue({ sheet: 0, row: 2, col: 1 })).toEqual({ kind: 'text', value: 'old' });
+      expect(store.getState().ui.copyRange).toBeNull();
+      expect(onAfterCommit).toHaveBeenCalled();
+    });
+
+    it('Insert Copied Cells accepts an internal snapshot when clipboard text is empty', async () => {
+      vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('');
+      const snap: ClipboardSnapshot = {
+        mode: 'copy',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        rows: 1,
+        cols: 1,
+        cells: [
+          [
+            {
+              value: { kind: 'blank' },
+              formula: null,
+              format: { hyperlink: 'https://example.test', bold: true },
+            },
+          ],
+        ],
+      };
+      seed(store, wb, [{ row: 1, col: 1, value: 'old' }]);
+      setRange(store, 1, 1, 1, 1);
+      mutators.setCopyRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        onAfterCommit,
+        getClipboardSnapshot: () => snap,
+      });
+
+      fireContextMenu(host, 200, 70);
+      item('insertCopiedCells')?.click();
+      document.querySelector<HTMLButtonElement>('.fc-insertcopied__button--primary')?.click();
+
+      await Promise.resolve();
+      await Promise.resolve();
+      wb.recalc();
+      expect(wb.getValue({ sheet: 0, row: 2, col: 1 })).toEqual({ kind: 'text', value: 'old' });
+      expect(
+        store.getState().format.formats.get(addrKey({ sheet: 0, row: 1, col: 1 })),
+      ).toMatchObject({
+        hyperlink: 'https://example.test',
+        bold: true,
+      });
       expect(store.getState().ui.copyRange).toBeNull();
       expect(onAfterCommit).toHaveBeenCalled();
     });
@@ -747,6 +844,24 @@ describe('attachContextMenu', () => {
       const r = store.getState().selection.range;
       expect(r.r1).toBe(1048575);
       expect(r.c1).toBe(16383);
+    });
+  });
+
+  describe('sort/filter items', () => {
+    it('bounds whole-column sort ranges to format-only used rows', () => {
+      setRange(store, 0, 0, 1048575, 0);
+      setFormat(store, 50000, 0, { hyperlink: 'https://example.test' });
+      const setBlank = vi.spyOn(wb, 'setBlank');
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+
+      fireContextMenu(host, 200, 70);
+      document
+        .querySelector<HTMLButtonElement>('[data-fc-submenu="sortMenu"]')
+        ?.dispatchEvent(new MouseEvent('mouseenter'));
+      item('sortAsc')?.click();
+
+      expect(setBlank).toHaveBeenCalledWith({ sheet: 0, row: 50000, col: 0 });
+      expect(onAfterCommit).toHaveBeenCalled();
     });
   });
 
