@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
@@ -211,6 +211,36 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     // Listing re-renders to reflect the new entry.
     const items = document.querySelectorAll('.fc-namedlg__item');
     expect(items.length).toBe(1);
+    handle.detach();
+  });
+
+  it('notifies the host after defined-name mutations so recalculated cells can re-project', () => {
+    const { wb, registry } = makeMutableWb();
+    registry.set('TaxRate', '=Sheet1!$A$1');
+    const afterMutate = vi.fn();
+    const handle = attachNamedRangeDialog({ host, wb, onAfterMutate: afterMutate });
+    handle.open();
+
+    document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button')?.click();
+    const nameField = document.querySelector<HTMLInputElement>(
+      '.fc-namedlg-editor__input[aria-label="名前"]',
+    );
+    const formulaField = document.querySelector<HTMLInputElement>(
+      '.fc-namedlg-editor__input[aria-label="参照"]',
+    );
+    if (nameField) nameField.value = 'Discount';
+    if (formulaField) formulaField.value = '=Sheet1!$B$1';
+    document.querySelector<HTMLFormElement>('.fc-namedlg-editor__form')?.requestSubmit();
+
+    expect(afterMutate).toHaveBeenCalledTimes(1);
+
+    const firstRow = document.querySelector<HTMLButtonElement>('.fc-namedlg__item');
+    firstRow?.click();
+    const quickInput = document.querySelector<HTMLInputElement>('.fc-namedlg__refers-input');
+    if (quickInput) quickInput.value = '=Sheet1!$C$3';
+    document.querySelector<HTMLButtonElement>('.fc-namedlg__refers-icon')?.click();
+
+    expect(afterMutate).toHaveBeenCalledTimes(2);
     handle.detach();
   });
 
