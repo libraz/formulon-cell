@@ -33,6 +33,10 @@ type WorkbookHandleInternals = {
   capabilities: EngineCapabilities;
   assertAlive(): void;
 };
+type EngineCommentEntry = { row: number; col: number; author: string; text: string };
+type CommentEnumerableWorkbook = Workbook & {
+  getComments?: (sheet: number) => EngineCommentEntry[];
+};
 
 declare module './workbook-handle.js' {
   interface WorkbookHandle extends WorkbookHandleFeatureMethods {}
@@ -441,6 +445,21 @@ export abstract class WorkbookHandleFeatureMethods {
     if (!this.capabilities.comments) return null;
     const e = wb(this).getComment(sheet, row, col);
     return e ? { author: e.author, text: e.text } : null;
+  }
+
+  /** Snapshot every comment on `sheet` when the engine exposes a sheet-wide
+   *  enumerator. Empty under stub or older engines. */
+  getComments(sheet: number): { row: number; col: number; author: string; text: string }[] {
+    assertAlive(this);
+    if (!this.capabilities.commentsEnumerable) return [];
+    const getComments = (wb(this) as CommentEnumerableWorkbook).getComments;
+    if (typeof getComments !== 'function') return [];
+    return getComments(sheet).map((e) => ({
+      row: e.row,
+      col: e.col,
+      author: e.author,
+      text: e.text,
+    }));
   }
 
   /** Persist a cell comment. Empty `text` removes it. No-op (returns false)

@@ -15,6 +15,7 @@ const makeFake = (opts: {
   hyperlinks?: boolean;
   cells?: FakeCell[];
   comments_data?: Record<string, { author: string; text: string }>;
+  comments_list?: { row: number; col: number; author: string; text: string }[];
   hyperlinks_data?: {
     row: number;
     col: number;
@@ -25,10 +26,12 @@ const makeFake = (opts: {
 }): WorkbookHandle => {
   const cells = opts.cells ?? [];
   const commentsData = opts.comments_data ?? {};
+  const commentsList = opts.comments_list;
   const hyperlinksData = opts.hyperlinks_data ?? [];
-  return {
+  const fake = {
     capabilities: {
       comments: opts.comments ?? false,
+      commentsEnumerable: commentsList !== undefined,
       hyperlinks: opts.hyperlinks ?? false,
     },
     cells: function* (sheet: number) {
@@ -37,7 +40,14 @@ const makeFake = (opts: {
     getComment: (sheet: number, row: number, col: number) =>
       commentsData[`${sheet}:${row}:${col}`] ?? null,
     getHyperlinks: (_sheet: number) => hyperlinksData,
-  } as unknown as WorkbookHandle;
+  };
+  if (commentsList) {
+    return {
+      ...fake,
+      getComments: (_sheet: number) => commentsList,
+    } as unknown as WorkbookHandle;
+  }
+  return fake as unknown as WorkbookHandle;
 };
 
 describe('hydrateCommentsAndHyperlinksFromEngine', () => {
@@ -135,6 +145,18 @@ describe('hydrateCommentsAndHyperlinksFromEngine', () => {
     hydrateCommentsAndHyperlinksFromEngine(wb, store, 0);
     const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 1, col: 2 }));
     expect(fmt?.comment).toBe('hello');
+    expect(fmt?.commentAuthor).toBe('Alice');
+  });
+
+  it('hydrates comments on otherwise-empty cells when the engine can enumerate comments', () => {
+    const store = createSpreadsheetStore();
+    const wb = makeFake({
+      comments: true,
+      comments_list: [{ row: 9, col: 4, author: 'Alice', text: 'blank-cell note' }],
+    });
+    hydrateCommentsAndHyperlinksFromEngine(wb, store, 0);
+    const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 9, col: 4 }));
+    expect(fmt?.comment).toBe('blank-cell note');
     expect(fmt?.commentAuthor).toBe('Alice');
   });
 });

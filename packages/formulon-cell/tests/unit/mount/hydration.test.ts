@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { addrKey } from '../../../src/engine/address.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
   dispatchWorkbookObjectSummaries,
@@ -31,6 +32,33 @@ describe('mount/hydration', () => {
     const a2 = cells.get('0:1:0');
     expect(a1?.value).toEqual({ kind: 'number', value: 42 });
     expect(a2?.value).toEqual({ kind: 'number', value: 7 });
+  });
+
+  it('hydrates enumerated comments on otherwise-empty cells through the active sheet path', () => {
+    const wb = {
+      capabilities: {
+        cellFormatting: false,
+        comments: true,
+        commentsEnumerable: true,
+        conditionalFormatMutate: false,
+        dataValidation: false,
+        merges: false,
+        sheetView: false,
+      },
+      sheetCount: 1,
+      cells: function* () {},
+      getColumnLayouts: () => [],
+      getRowLayouts: () => [],
+      getSheetView: () => null,
+      getComments: () => [{ row: 4, col: 2, author: 'Formulon', text: 'empty cell note' }],
+      getHyperlinks: () => [],
+    } as unknown as WorkbookHandle;
+    const store = createSpreadsheetStore();
+
+    hydrateActiveSheetFromEngine(wb, store);
+
+    const format = store.getState().format.formats.get(addrKey({ sheet: 0, row: 4, col: 2 }));
+    expect(format).toMatchObject({ comment: 'empty cell note', commentAuthor: 'Formulon' });
   });
 
   it('hydrates workbook-level metadata without touching cell data', async () => {

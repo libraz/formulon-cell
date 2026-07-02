@@ -45,6 +45,7 @@ export function detectCapabilities(wb: Workbook): EngineCapabilities {
     sheetTabHidden: has('setSheetTabHidden'),
     outlines: all('setColumnOutline', 'setRowOutline'),
     comments: all('getComment', 'setComment'),
+    commentsEnumerable: has('getComments'),
     hyperlinks: all('getHyperlinks', 'addHyperlink', 'clearHyperlinks'),
     definedNameMutate: has('setDefinedName'),
     partialRecalc: has('partialRecalc'),

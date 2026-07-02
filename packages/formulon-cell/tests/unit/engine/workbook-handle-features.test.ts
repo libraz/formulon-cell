@@ -47,4 +47,10 @@ describe('engine/workbook-handle-features (stub) — capability gates', () => {
     expect(wb.capabilities).toBeDefined();
     expect(typeof wb.capabilities).toBe('object');
   });
+
+  it('getComments returns [] on stub', async () => {
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    expect(wb.capabilities.commentsEnumerable).toBe(false);
+    expect(wb.getComments(0)).toEqual([]);
+  });
 });

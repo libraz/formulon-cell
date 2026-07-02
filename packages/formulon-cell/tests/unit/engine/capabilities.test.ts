@@ -46,6 +46,16 @@ describe('detectCapabilities', () => {
     expect(detectCapabilities(full).hyperlinks).toBe(true);
   });
 
+  it('comment enumeration is independent from point comment read/write', () => {
+    const pointOnly = makeWb(['getComment', 'setComment']);
+    expect(detectCapabilities(pointOnly).comments).toBe(true);
+    expect(detectCapabilities(pointOnly).commentsEnumerable).toBe(false);
+
+    const enumerable = makeWb(['getComment', 'setComment', 'getComments']);
+    expect(detectCapabilities(enumerable).comments).toBe(true);
+    expect(detectCapabilities(enumerable).commentsEnumerable).toBe(true);
+  });
+
   it('every flag is false for an empty wb', () => {
     const empty = makeWb([]);
     const caps = detectCapabilities(empty);
@@ -63,6 +73,7 @@ describe('detectCapabilities', () => {
     expect(caps.sheetTabHidden).toBe(false);
     expect(caps.outlines).toBe(false);
     expect(caps.comments).toBe(false);
+    expect(caps.commentsEnumerable).toBe(false);
     expect(caps.definedNameMutate).toBe(false);
     expect(caps.partialRecalc).toBe(false);
     expect(caps.iterativeProgress).toBe(false);

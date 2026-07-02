@@ -2,6 +2,11 @@ import type { CellFormat, SpreadsheetStore } from '../store/store.js';
 import { addrKey } from './address.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
+type EngineCommentEntry = { row: number; col: number; author: string; text: string };
+type CommentEnumerableWorkbook = WorkbookHandle & {
+  getComments?: (sheet: number) => EngineCommentEntry[];
+};
+
 /**
  * Seed cell-level comment and hyperlink fields from engine state for `sheet`.
  * Called after a workbook loads (and inside `setWorkbook`) so notes / links
@@ -9,9 +14,9 @@ import type { WorkbookHandle } from './workbook-handle.js';
  *
  * No-op for unsupported engines (the stub doesn't implement either method).
  *
- * Comments: the engine has no sheet-wide enumerator, so we probe `getComment`
- * for every populated cell. Comments on otherwise-empty cells are not picked
- * up — acceptable for now.
+ * Comments: when the engine exposes a sheet-wide enumerator we use it so
+ * comments on otherwise-empty cells survive. Older engines only expose
+ * `getComment(row,col)`, so we fall back to probing populated cells.
  */
 export function hydrateCommentsAndHyperlinksFromEngine(
   wb: WorkbookHandle,
@@ -23,18 +28,29 @@ export function hydrateCommentsAndHyperlinksFromEngine(
   const updates: Array<{ key: string; patch: Partial<CellFormat> }> = [];
 
   if (wb.capabilities.comments) {
-    const cells =
-      typeof (wb as WorkbookHandle & { physicalCells?: WorkbookHandle['cells'] }).physicalCells ===
-      'function'
-        ? wb.physicalCells(sheet)
-        : wb.cells(sheet);
-    for (const c of cells) {
-      const e = wb.getComment(sheet, c.addr.row, c.addr.col);
-      if (e && e.text.length > 0) {
+    const commentEnumerable = wb as CommentEnumerableWorkbook;
+    if (wb.capabilities.commentsEnumerable && typeof commentEnumerable.getComments === 'function') {
+      for (const e of commentEnumerable.getComments(sheet)) {
+        if (e.text.length === 0) continue;
         updates.push({
-          key: addrKey(c.addr),
+          key: addrKey({ sheet, row: e.row, col: e.col }),
           patch: { comment: e.text, commentAuthor: e.author },
         });
+      }
+    } else {
+      const cells =
+        typeof (wb as WorkbookHandle & { physicalCells?: WorkbookHandle['cells'] })
+          .physicalCells === 'function'
+          ? wb.physicalCells(sheet)
+          : wb.cells(sheet);
+      for (const c of cells) {
+        const e = wb.getComment(sheet, c.addr.row, c.addr.col);
+        if (e && e.text.length > 0) {
+          updates.push({
+            key: addrKey(c.addr),
+            patch: { comment: e.text, commentAuthor: e.author },
+          });
+        }
       }
     }
   }

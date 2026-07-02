@@ -131,7 +131,7 @@ export function summarizeSpreadsheetCompatibility(
       label: 'Data validation',
       status: c.dataValidation ? 'writable' : 'session',
       reason: c.dataValidation
-        ? 'Validation ranges can be read and written.'
+        ? 'Validation ranges can be read and written; dropdown visibility depends on engine showDropDown round-trip support.'
         : 'Validation dropdown UI can be hosted, but engine writeback is unavailable.',
     },
     {
@@ -147,7 +147,9 @@ export function summarizeSpreadsheetCompatibility(
       label: 'Comments',
       status: c.comments ? 'writable' : 'session',
       reason: c.comments
-        ? 'Cell comments can be read and written.'
+        ? c.commentsEnumerable
+          ? 'Cell comments can be enumerated, read, and written.'
+          : 'Cell comments can be read and written for known cells; blank-cell comment hydration needs sheet-wide enumeration.'
         : 'Comment UI can be hosted for the session, but engine writeback is unavailable.',
     },
     {
@@ -155,7 +157,7 @@ export function summarizeSpreadsheetCompatibility(
       label: 'Defined names',
       status: c.definedNameMutate ? 'writable' : 'read-only',
       reason: c.definedNameMutate
-        ? 'Defined names can be listed and updated.'
+        ? 'Workbook-scoped defined names can be listed and updated; sheet-scoped names need engine scope support.'
         : 'Defined names can be listed when present, but mutation is unavailable.',
     },
     {

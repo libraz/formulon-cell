@@ -23,6 +23,7 @@ const baseCaps = {
   externalLinks: false,
   hyperlinks: false,
   comments: false,
+  commentsEnumerable: false,
   definedNameMutate: false,
   sheetProtectionRoundtrip: false,
 };
@@ -34,11 +35,13 @@ describe('summarizeSpreadsheetCompatibility', () => {
         ...baseCaps,
         cellFormatting: true,
         conditionalFormat: true,
+        dataValidation: true,
         pivotTables: true,
         pivotTableMutate: true,
         externalLinks: true,
         hyperlinks: true,
         comments: true,
+        commentsEnumerable: true,
         definedNameMutate: true,
         sheetProtectionRoundtrip: true,
       },
@@ -71,10 +74,13 @@ describe('summarizeSpreadsheetCompatibility', () => {
       status: 'read-only',
       count: 1,
     });
+    expect(summary.items.find((i) => i.id === 'data-validation')?.reason).toContain('showDropDown');
     expect(summary.items.find((i) => i.id === 'format-as-table')?.status).toBe('session');
     expect(summary.items.find((i) => i.id === 'hyperlinks')?.status).toBe('writable');
     expect(summary.items.find((i) => i.id === 'comments')?.status).toBe('writable');
+    expect(summary.items.find((i) => i.id === 'comments')?.reason).toContain('enumerated');
     expect(summary.items.find((i) => i.id === 'defined-names')?.status).toBe('writable');
+    expect(summary.items.find((i) => i.id === 'defined-names')?.reason).toContain('sheet-scoped');
     expect(summary.items.find((i) => i.id === 'sheet-protection')?.status).toBe('writable');
     expect(summary.items.find((i) => i.id === 'sheet-views')?.status).toBe('session');
     expect(summary.items.find((i) => i.id === 'session-charts')?.status).toBe('session');
@@ -94,5 +100,23 @@ describe('summarizeSpreadsheetCompatibility', () => {
     expect(summary.byStatus['read-only']).toBeGreaterThan(0);
     expect(summary.byStatus.session).toBeGreaterThan(0);
     expect(summary.byStatus.unsupported).toBeGreaterThan(0);
+  });
+
+  it('surfaces point-only comment support as missing blank-cell enumeration', () => {
+    const wb = {
+      capabilities: {
+        ...baseCaps,
+        comments: true,
+        commentsEnumerable: false,
+      },
+      getPassthroughs: () => [],
+      getTables: () => [],
+      getPivotTables: () => [],
+    } as unknown as WorkbookHandle;
+
+    const summary = summarizeSpreadsheetCompatibility(wb);
+
+    expect(summary.byId.comments.status).toBe('writable');
+    expect(summary.byId.comments.reason).toContain('blank-cell comment hydration');
   });
 });

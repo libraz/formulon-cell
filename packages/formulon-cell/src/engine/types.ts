@@ -230,6 +230,9 @@ export interface EngineCapabilities {
   readonly outlines: boolean;
   /** `getComment` + `setComment`. */
   readonly comments: boolean;
+  /** Optional sheet-wide comment enumerator. Enables comments on blank cells
+   *  to hydrate without probing physical cells. */
+  readonly commentsEnumerable?: boolean;
   /** Full hyperlink round-trip: `getHyperlinks`, `addHyperlink`, and
    *  `clearHyperlinks`. */
   readonly hyperlinks: boolean;
