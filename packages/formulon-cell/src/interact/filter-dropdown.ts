@@ -4,14 +4,12 @@ import {
   type ConditionFilterOp,
   clearFilter,
   distinctFilterItems,
-  filterValueKey,
   recordFilterChange,
 } from '../commands/filter.js';
 import type { History } from '../commands/history.js';
-import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import type { SpreadsheetStore } from '../store/store.js';
+import type { SpreadsheetStore, ValueFilterCriteria } from '../store/store.js';
 import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { createInteractionButton } from './chip-button.js';
 import { inheritHostTokens } from './inherit-host-tokens.js';
@@ -43,6 +41,16 @@ const createFilterDropdownActionButton = (className: string, label: string): HTM
     text: label,
   });
 };
+
+const sameRange = (a: Range, b: Range): boolean =>
+  a.sheet === b.sheet && a.r0 === b.r0 && a.r1 === b.r1 && a.c0 === b.c0 && a.c1 === b.c1;
+
+const findColumnCriteria = (
+  criteria: readonly ValueFilterCriteria[],
+  range: Range,
+  col: number,
+): ValueFilterCriteria | undefined =>
+  criteria.find((c) => sameRange(c.range, range) && c.byCol === col);
 
 /**
  * Lightweight column-filter popover. Lists distinct values in the column with
@@ -123,16 +131,13 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
 
     const state = deps.store.getState();
     const distinct = distinctFilterItems(state, range, col, deps.locale ?? 'en-US');
-    const hidden = new Set<string>();
+    const activeCriteria = findColumnCriteria(state.ui.filterCriteria, range, col);
+    const hidden = new Set<string>(
+      activeCriteria && !activeCriteria.condition && !activeCriteria.color
+        ? activeCriteria.hiddenValues
+        : [],
+    );
     activeHidden = hidden;
-    // Pre-mark currently-hidden values as unchecked so the dropdown reflects
-    //  the live filter state.
-    for (let r = range.r0 + 1; r <= range.r1; r += 1) {
-      if (!state.layout.hiddenRows.has(r)) continue;
-      const cell = state.data.cells.get(addrKey({ sheet: range.sheet, row: r, col }));
-      const key = filterValueKey(cell?.value);
-      hidden.add(key);
-    }
 
     const r = document.createElement('div');
     r.className = 'fc-filter-dropdown';
@@ -170,11 +175,13 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       ariaLabel: t.condition,
       className: 'fc-filter-dropdown__condition-op',
     });
+    if (activeCriteria?.condition) conditionSelect.value = activeCriteria.condition.op;
     const conditionInput = document.createElement('input');
     conditionInput.type = 'text';
     conditionInput.className = 'fc-filter-dropdown__condition-value';
     conditionInput.placeholder = t.conditionValue;
     conditionInput.setAttribute('aria-label', t.conditionValue);
+    if (activeCriteria?.condition) conditionInput.value = activeCriteria.condition.value;
     conditionLabel.appendChild(conditionSelect);
     conditionPanel.append(conditionLabel, conditionInput);
 

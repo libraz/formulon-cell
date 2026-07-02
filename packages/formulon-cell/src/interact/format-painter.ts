@@ -29,6 +29,13 @@ interface Snapshot {
   pattern: (CellFormat | undefined)[][];
 }
 
+const MAX_FORMAT_PAINTER_CELLS = 100_000;
+
+const rangeArea = (range: Range): number =>
+  range.r1 < range.r0 || range.c1 < range.c0
+    ? 0
+    : (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
+
 /**
  * Spreadsheet-style "Format Painter" interaction.
  *
@@ -69,7 +76,7 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
     if (rows <= 0 || cols <= 0) return null;
     // Spreadsheets cap Format Painter source at the visible used range. We accept
     // anything up to ~10000 cells; beyond that the snapshot grows too large.
-    if (rows * cols > 100_000) return null;
+    if (rows * cols > MAX_FORMAT_PAINTER_CELLS) return null;
     const pattern: (CellFormat | undefined)[][] = [];
     for (let dr = 0; dr < rows; dr += 1) {
       const row: (CellFormat | undefined)[] = [];
@@ -111,6 +118,7 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
     const rows = pattern.length;
     const cols = pattern[0]?.length ?? 0;
     if (!rows || !cols) return;
+    if (rangeArea(dest) > MAX_FORMAT_PAINTER_CELLS) return;
 
     // Operate directly on the format map for atomicity. Wrap in history so
     // Cmd+Z reverts the entire paste.

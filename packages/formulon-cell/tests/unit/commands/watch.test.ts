@@ -68,6 +68,26 @@ describe('watch commands', () => {
     ]);
   });
 
+  it('ignores huge ranges instead of materializing millions of watches', () => {
+    const store = createSpreadsheetStore();
+
+    watchRange(store, { sheet: 0, r0: 0, c0: 2, r1: 1048575, c1: 2 });
+
+    expect(store.getState().watch.watches).toEqual([]);
+  });
+
+  it('does not record history when a huge watch range is ignored', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+
+    recordWatchesChange(history, store, () => {
+      watchRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 0 });
+    });
+
+    expect(store.getState().watch.watches).toEqual([]);
+    expect(history.canUndo()).toBe(false);
+  });
+
   it('toggles and clears watched cells', () => {
     const store = createSpreadsheetStore();
     const addr = { sheet: 1, row: 2, col: 3 };

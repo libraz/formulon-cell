@@ -352,6 +352,11 @@ describe('hideRows / showRows / hideCols / showCols', () => {
     expect(Array.from(store.getState().layout.hiddenRows).sort()).toEqual([2, 3, 4]);
   });
 
+  it('hideRows refuses huge row ranges instead of materializing every row', () => {
+    hideRows(store, null, 0, 1_048_575);
+    expect(store.getState().layout.hiddenRows.size).toBe(0);
+  });
+
   it('showRows clears entries inside the range', () => {
     store.setState((s) => ({
       ...s,
@@ -359,6 +364,17 @@ describe('hideRows / showRows / hideCols / showCols', () => {
     }));
     showRows(store, null, 2, 3);
     expect(Array.from(store.getState().layout.hiddenRows).sort()).toEqual([1, 5]);
+  });
+
+  it('showRows clears huge ranges by visiting existing hidden rows only', () => {
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, hiddenRows: new Set([1, 250_000, 900_000]) },
+    }));
+
+    showRows(store, null, 0, 1_048_575);
+
+    expect(store.getState().layout.hiddenRows.size).toBe(0);
   });
 
   it('showRowsAroundSelection clears hidden rows directly adjacent to the selection', () => {
@@ -412,6 +428,13 @@ describe('hideRows / showRows / hideCols / showCols', () => {
     expect(store.getState().layout.rowHeights.size).toBe(0);
   });
 
+  it('refuses huge row height and row autofit ranges', () => {
+    setRowsHeight(store, null, 0, 1_048_575, 32);
+    autofitRowsHeight(store, null, 0, 1_048_575);
+
+    expect(store.getState().layout.rowHeights.size).toBe(0);
+  });
+
   it('autofits selected rows and columns through history', () => {
     const h = new History();
     store.setState((s) => ({
@@ -461,6 +484,13 @@ describe('hiddenInSelection', () => {
   it('returns empty when nothing is hidden', () => {
     const layout = createSpreadsheetStore().getState().layout;
     expect(hiddenInSelection(layout, 'row', 0, 100)).toEqual([]);
+  });
+
+  it('scans hidden metadata rather than the whole selected row span', () => {
+    const layout = createSpreadsheetStore().getState().layout;
+    const customLayout = { ...layout, hiddenRows: new Set([5, 500_000, 1_000_000]) };
+
+    expect(hiddenInSelection(customLayout, 'row', 0, 1_048_575)).toEqual([5, 500_000, 1_000_000]);
   });
 });
 

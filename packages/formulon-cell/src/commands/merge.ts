@@ -101,6 +101,28 @@ const hasContent = (
   return cell.value.kind !== 'blank';
 };
 
+const MAX_MERGE_CELLS = 100_000;
+
+const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
+
+const canMaterializeMergeRange = (range: Range): boolean => rangeArea(range) <= MAX_MERGE_CELLS;
+
+const addrFromKey = (key: string): Addr | null => {
+  const [sheetRaw, rowRaw, colRaw] = key.split(':');
+  const sheet = Number(sheetRaw);
+  const row = Number(rowRaw);
+  const col = Number(colRaw);
+  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
+  return { sheet, row, col };
+};
+
+const addrInRange = (addr: Addr, range: Range): boolean =>
+  addr.sheet === range.sheet &&
+  addr.row >= range.r0 &&
+  addr.row <= range.r1 &&
+  addr.col >= range.c0 &&
+  addr.col <= range.c1;
+
 /**
  * Whether merging `range` would discard data. Merging keeps only the top-left
  * value and clears the rest, so this is true when any non-anchor cell in the
@@ -108,12 +130,11 @@ const hasContent = (
  * before the merge silently drops the other values).
  */
 export function mergeWillLoseData(state: State, range: Range): boolean {
-  const sheet = range.sheet;
-  for (let r = range.r0; r <= range.r1; r += 1) {
-    for (let c = range.c0; c <= range.c1; c += 1) {
-      if (r === range.r0 && c === range.c0) continue;
-      if (hasContent(state.data.cells.get(addrKey({ sheet, row: r, col: c })))) return true;
-    }
+  for (const [key, cell] of state.data.cells) {
+    const addr = addrFromKey(key);
+    if (!addr || !addrInRange(addr, range)) continue;
+    if (addr.row === range.r0 && addr.col === range.c0) continue;
+    if (hasContent(cell)) return true;
   }
   return false;
 }
@@ -127,6 +148,7 @@ export function mergeWillLoseData(state: State, range: Range): boolean {
 function mergeBlockedByProtection(state: State, range: Range): boolean {
   const sheet = range.sheet;
   if (!isSheetProtected(state, sheet)) return false;
+  if (!canMaterializeMergeRange(range)) return true;
   for (let r = range.r0; r <= range.r1; r += 1) {
     for (let c = range.c0; c <= range.c1; c += 1) {
       if (!isCellWritable(state, { sheet, row: r, col: c })) return true;
@@ -152,6 +174,7 @@ export function applyMerge(
   range: Range,
 ): boolean {
   if (range.r0 === range.r1 && range.c0 === range.c1) return false;
+  if (!canMaterializeMergeRange(range)) return false;
   const sheet = range.sheet;
 
   // Sheet protection: refuse to clear locked cells (no silent backdoor).
@@ -193,11 +216,6 @@ export function applyUnmerge(
   range: Range,
 ): boolean {
   const state = store.getState();
-  // Sheet protection: unmerging is a structural edit — refuse on locked cells.
-  if (mergeBlockedByProtection(state, range)) {
-    warnProtected({ sheet: range.sheet, row: range.r0, col: range.c0 });
-    return false;
-  }
   const before = state.merges.byAnchor;
   let touched = false;
   for (const r of before.values()) {
@@ -207,6 +225,11 @@ export function applyUnmerge(
     break;
   }
   if (!touched) return false;
+  // Sheet protection: unmerging is a structural edit — refuse on locked cells.
+  if (mergeBlockedByProtection(state, range)) {
+    warnProtected({ sheet: range.sheet, row: range.r0, col: range.c0 });
+    return false;
+  }
   recordMergesChangeWithEngine(history, store, wb, range.sheet, () => {
     mutators.unmergeRange(store, range);
   });

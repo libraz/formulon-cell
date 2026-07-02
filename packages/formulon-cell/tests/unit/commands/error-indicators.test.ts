@@ -101,6 +101,33 @@ describe('error indicator commands', () => {
     expect(store.getState().errorIndicators.validationCircles.size).toBe(0);
   });
 
+  it('marks huge whole-column invalid validation ranges by visiting only validation formats', () => {
+    const store = createSpreadsheetStore();
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 4, col: 2 },
+      { validation: { kind: 'whole', op: 'between', a: 1, b: 10 } },
+    );
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 4, col: 3 },
+      { validation: { kind: 'whole', op: 'between', a: 1, b: 10 } },
+    );
+    mutators.setCell(store, { sheet: 0, row: 4, col: 2 }, { kind: 'number', value: 99 });
+    mutators.setCell(store, { sheet: 0, row: 4, col: 3 }, { kind: 'number', value: 99 });
+
+    const count = circleInvalidValidationData(store, {
+      sheet: 0,
+      r0: 0,
+      c0: 2,
+      r1: 1048575,
+      c1: 2,
+    });
+
+    expect(count).toBe(1);
+    expect([...store.getState().errorIndicators.validationCircles]).toEqual(['0:4:2']);
+  });
+
   it('records validation circle changes as undoable visual actions', () => {
     const store = createSpreadsheetStore();
     const history = new History();
@@ -189,6 +216,41 @@ describe('error indicator commands', () => {
       row: 1,
       col: 0,
     });
+  });
+
+  it('finds formula errors in huge whole-column ranges by visiting only materialized cells', () => {
+    const store = createSpreadsheetStore();
+    mutators.setCell(
+      store,
+      { sheet: 0, row: 10, col: 2 },
+      { kind: 'error', code: 7, text: '#DIV/0!' },
+      '=1/0',
+    );
+    mutators.setCell(
+      store,
+      { sheet: 0, row: 5, col: 2 },
+      { kind: 'text', value: '#REF!' },
+      '=A999',
+    );
+    mutators.setCell(
+      store,
+      { sheet: 0, row: 5, col: 3 },
+      { kind: 'error', code: 4, text: '#REF!' },
+      '=Z99',
+    );
+
+    expect(
+      formulaErrorCellsInRange(store, {
+        sheet: 0,
+        r0: 0,
+        c0: 2,
+        r1: 1048575,
+        c1: 2,
+      }),
+    ).toEqual([
+      { sheet: 0, row: 5, col: 2 },
+      { sheet: 0, row: 10, col: 2 },
+    ]);
   });
 
   it('skips ignored formula errors when selecting the next error cell', () => {

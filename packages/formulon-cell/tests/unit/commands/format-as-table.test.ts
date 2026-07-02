@@ -82,6 +82,19 @@ describe('inferTableHasHeaders', () => {
       ),
     ).toBe(false);
   });
+
+  it('does not scan huge ranges while inferring headers', () => {
+    expect(
+      inferTableHasHeaders(
+        headerWorkbook({
+          '0:0': 'Region',
+          '0:1': 'Sales',
+          '1:0': 'East',
+        }),
+        range(0, 0, 1048575, 1),
+      ),
+    ).toBe(false);
+  });
 });
 
 describe('row classification', () => {

@@ -154,6 +154,17 @@ describe('findAll', () => {
     expect(findAll(store.getState(), { query: '1+1', lookIn: 'formulas' })).toHaveLength(1);
     expect(findAll(store.getState(), { query: 'needle', lookIn: 'comments' })).toHaveLength(1);
   });
+
+  it('finds comments on cells without materialized values', () => {
+    store.setState((s) => {
+      const formats = new Map(s.format.formats);
+      formats.set(addrKey({ sheet: 0, row: 4, col: 2 }), { comment: 'needle on blank' });
+      return { ...s, format: { ...s.format, formats } };
+    });
+
+    const got = findAll(store.getState(), { query: 'needle', lookIn: 'comments' });
+    expect(got).toEqual([{ addr: { sheet: 0, row: 4, col: 2 } }]);
+  });
 });
 
 describe('findNext', () => {

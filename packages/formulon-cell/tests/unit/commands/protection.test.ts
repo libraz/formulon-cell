@@ -335,6 +335,39 @@ describe('protection helpers', () => {
     addAllowedEditRange(store, { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 });
     expect(gateProtection(store.getState(), range)).toEqual(range);
   });
+
+  it('gateProtection handles huge protected ranges from sparse unlock metadata', () => {
+    mutators.setSheetProtected(store, 0, true);
+    const range: Range = { sheet: 0, r0: 0, c0: 2, r1: 1048575, c1: 2 };
+
+    expect(gateProtection(store.getState(), range)).toBeNull();
+
+    mutators.setCellFormat(store, { sheet: 0, row: 500000, col: 2 }, { locked: false });
+    expect(gateProtection(store.getState(), range)).toEqual(range);
+
+    mutators.setCellFormat(store, { sheet: 0, row: 500000, col: 2 }, null);
+    addAllowedEditRange(store, { sheet: 0, r0: 900000, c0: 2, r1: 900000, c1: 2 });
+    expect(gateProtection(store.getState(), range)).toEqual(range);
+  });
+
+  it('setCellLocked relocks huge ranges by clearing sparse unlock metadata', () => {
+    const range: Range = { sheet: 0, r0: 0, c0: 2, r1: 1048575, c1: 2 };
+    mutators.setCellFormat(store, { sheet: 0, row: 500000, col: 2 }, { locked: false });
+    mutators.setCellFormat(store, { sheet: 0, row: 500000, col: 3 }, { locked: false });
+
+    setCellLocked(store, range, true);
+
+    expect(fmtAt(store, 500000, 2)).toBeUndefined();
+    expect(fmtAt(store, 500000, 3)).toEqual({ locked: false });
+  });
+
+  it('setCellLocked refuses to unlock huge ranges instead of materializing every cell', () => {
+    const range: Range = { sheet: 0, r0: 0, c0: 2, r1: 1048575, c1: 2 };
+
+    setCellLocked(store, range, false);
+
+    expect(store.getState().format.formats.size).toBe(0);
+  });
 });
 
 describe('writeInput protection gate', () => {

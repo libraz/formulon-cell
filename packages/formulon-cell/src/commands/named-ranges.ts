@@ -29,6 +29,8 @@ export interface CreateDefinedNamesResult {
 
 type DefinedNamesSnapshot = Map<string, string>;
 
+const MAX_CREATE_DEFINED_NAMES = 10_000;
+
 const colLetter = (n: number): string => {
   let v = n;
   let out = '';
@@ -199,7 +201,7 @@ export function createDefinedNamesFromSelection(
   source: CreateDefinedNamesSource,
 ):
   | CreateDefinedNamesResult
-  | { ok: false; reason: 'unsupported' | 'empty-selection' | 'engine-failed' } {
+  | { ok: false; reason: 'unsupported' | 'empty-selection' | 'too-large' | 'engine-failed' } {
   if (!wb.capabilities.definedNameMutate) return { ok: false, reason: 'unsupported' };
   const sheet = state.selection.range.sheet;
   const r = state.selection.range;
@@ -208,6 +210,9 @@ export function createDefinedNamesFromSelection(
 
   if (source === 'top-row') {
     if (r.r0 >= r.r1) return { ok: false, reason: 'empty-selection' };
+    if (r.c1 - r.c0 + 1 > MAX_CREATE_DEFINED_NAMES) {
+      return { ok: false, reason: 'too-large' };
+    }
     for (let col = r.c0; col <= r.c1; col += 1) {
       const label = cellText(state, sheet, r.r0, col);
       const name = uniqueName(sanitizeName(label, `Column_${colLetter(col)}`), used);
@@ -221,6 +226,9 @@ export function createDefinedNamesFromSelection(
 
   if (source === 'bottom-row') {
     if (r.r0 >= r.r1) return { ok: false, reason: 'empty-selection' };
+    if (r.c1 - r.c0 + 1 > MAX_CREATE_DEFINED_NAMES) {
+      return { ok: false, reason: 'too-large' };
+    }
     for (let col = r.c0; col <= r.c1; col += 1) {
       const label = cellText(state, sheet, r.r1, col);
       const name = uniqueName(sanitizeName(label, `Column_${colLetter(col)}`), used);
@@ -234,6 +242,9 @@ export function createDefinedNamesFromSelection(
 
   if (source === 'left-column') {
     if (r.c0 >= r.c1) return { ok: false, reason: 'empty-selection' };
+    if (r.r1 - r.r0 + 1 > MAX_CREATE_DEFINED_NAMES) {
+      return { ok: false, reason: 'too-large' };
+    }
     for (let row = r.r0; row <= r.r1; row += 1) {
       const label = cellText(state, sheet, row, r.c0);
       const name = uniqueName(sanitizeName(label, `Row_${row + 1}`), used);
@@ -246,6 +257,9 @@ export function createDefinedNamesFromSelection(
   }
 
   if (r.c0 >= r.c1) return { ok: false, reason: 'empty-selection' };
+  if (r.r1 - r.r0 + 1 > MAX_CREATE_DEFINED_NAMES) {
+    return { ok: false, reason: 'too-large' };
+  }
   for (let row = r.r0; row <= r.r1; row += 1) {
     const label = cellText(state, sheet, row, r.c1);
     const name = uniqueName(sanitizeName(label, `Row_${row + 1}`), used);

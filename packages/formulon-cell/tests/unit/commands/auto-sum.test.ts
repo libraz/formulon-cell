@@ -214,6 +214,14 @@ describe('autoSum', () => {
     expect(wb.cellFormula({ sheet: 0, row: 2, col: 2 })).toBe('=SUM(C1:C2)');
   });
 
+  it('refuses huge multi-cell selections before scanning or writing formulas', () => {
+    seedNumber(store, wb, 0, 0, 1);
+    setRangeOnly(store, 0, 0, 100_000, 0);
+
+    expect(autoSum(store.getState(), wb)).toBeNull();
+    expect(wb.cellFormula({ sheet: 0, row: 1, col: 0 })).toBeNull();
+  });
+
   it('skips locked protected targets in a multi-cell totals row', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     seedNumber(store, wb, 0, 0, 1);

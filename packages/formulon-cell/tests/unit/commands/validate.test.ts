@@ -302,6 +302,31 @@ describe('clearValidationInRange', () => {
     expect(store.getState().format.formats.get('0:0:1')).toEqual({ locked: false });
   });
 
+  it('clears huge whole-column validation ranges by visiting only formatted validation cells', () => {
+    const store = createSpreadsheetStore();
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 4, col: 2 },
+      { bold: true, validation: { kind: 'list', source: ['A', 'B'] } },
+    );
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 4, col: 3 },
+      { validation: { kind: 'whole', op: 'between', a: 1, b: 10 } },
+    );
+
+    const count = clearValidationInRange(store, { sheet: 0, r0: 0, c0: 2, r1: 1048575, c1: 2 });
+
+    expect(count).toBe(1);
+    expect(store.getState().format.formats.get('0:4:2')).toEqual({ bold: true });
+    expect(store.getState().format.formats.get('0:4:3')?.validation).toEqual({
+      kind: 'whole',
+      op: 'between',
+      a: 1,
+      b: 10,
+    });
+  });
+
   it('syncs validation clearing to the engine and replays sync on undo/redo', () => {
     const store = createSpreadsheetStore();
     mutators.setCellFormat(

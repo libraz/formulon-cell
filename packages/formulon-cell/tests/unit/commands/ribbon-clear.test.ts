@@ -64,6 +64,33 @@ describe('executeRibbonClearAction', () => {
     expect(store.getState().data.cells.has(key(b1))).toBe(false);
   });
 
+  it('clears whole-column contents by visiting only materialized workbook cells', () => {
+    const inColumn = { sheet: 0, row: 4, col: 2 };
+    const outside = { sheet: 0, row: 4, col: 3 };
+    const store = createSpreadsheetStore();
+    const workbook = makeWorkbook([
+      { addr: inColumn, value: { kind: 'text', value: 'clear' }, formula: null },
+      { addr: outside, value: { kind: 'text', value: 'keep' }, formula: null },
+    ]);
+    mutators.replaceCells(store, workbook.cells(0));
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 2, r1: 1048575, c1: 2 });
+
+    executeRibbonClearAction({
+      store,
+      workbook,
+      history: new History(),
+      action: 'contents',
+    });
+
+    expect(workbook.setBlank).toHaveBeenCalledTimes(1);
+    expect(workbook.setBlank).toHaveBeenCalledWith(inColumn);
+    expect(store.getState().data.cells.has(key(inColumn))).toBe(false);
+    expect(store.getState().data.cells.get(key(outside))?.value).toEqual({
+      kind: 'text',
+      value: 'keep',
+    });
+  });
+
   it('clears comments in the selected range without touching comments outside it and supports undo', () => {
     const store = createSpreadsheetStore();
     const workbook = makeWorkbook();
@@ -89,6 +116,29 @@ describe('executeRibbonClearAction', () => {
     expect(history.undo()).toBe(true);
     expect(commentAt(store.getState(), inside)).toBe('inside');
     expect(commentAt(store.getState(), outside)).toBe('outside');
+  });
+
+  it('clears whole-column comments by visiting only formatted cells with comments', () => {
+    const store = createSpreadsheetStore();
+    const workbook = makeWorkbook();
+    const inside = { sheet: 0, row: 4, col: 2 };
+    const outside = { sheet: 0, row: 4, col: 3 };
+    setComment(store, inside, 'inside', workbook);
+    setComment(store, outside, 'outside', workbook);
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 2, r1: 1048575, c1: 2 });
+    workbook.setCommentEntry.mockClear();
+
+    executeRibbonClearAction({
+      store,
+      workbook,
+      history: new History(),
+      action: 'comments',
+    });
+
+    expect(commentAt(store.getState(), inside)).toBeNull();
+    expect(commentAt(store.getState(), outside)).toBe('outside');
+    expect(workbook.setCommentEntry).toHaveBeenCalledTimes(1);
+    expect(workbook.setCommentEntry).toHaveBeenCalledWith(0, 4, 2, '', '');
   });
 
   it('clears only visual format properties for formats action and leaves comments intact', () => {

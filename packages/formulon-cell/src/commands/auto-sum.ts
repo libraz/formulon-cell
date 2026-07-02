@@ -16,6 +16,10 @@ const colLetter = (n: number): string => {
 const rangeRef = (r: Range): string =>
   `${colLetter(r.c0)}${r.r0 + 1}:${colLetter(r.c1)}${r.r1 + 1}`;
 
+const MAX_AUTOSUM_SELECTION_CELLS = 100_000;
+
+const rangeArea = (r: Range): number => (r.r1 - r.r0 + 1) * (r.c1 - r.c0 + 1);
+
 const isNum = (state: State, sheet: number, row: number, col: number): boolean => {
   if (row < 0 || col < 0) return false;
   const cell = state.data.cells.get(`${sheet}:${row}:${col}`);
@@ -68,6 +72,8 @@ export function autoSum(
   const isSingle = r.r0 === r.r1 && r.c0 === r.c1;
   const a = state.selection.active;
   const fn = functionName;
+
+  if (!isSingle && rangeArea(r) > MAX_AUTOSUM_SELECTION_CELLS) return null;
 
   if (isSingle) {
     if (isEmpty(state, sheet, a.row, a.col)) {

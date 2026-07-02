@@ -41,6 +41,35 @@ const cloneCriteria = (criteria: readonly ValueFilterCriteria[]): ValueFilterCri
     ...(c.color ? { color: { ...c.color } } : {}),
   }));
 
+const MAX_EXACT_FILTER_ROWS = 100_000;
+
+const dataRowCount = (range: Range): number => Math.max(0, range.r1 - range.r0);
+
+const canEvaluateFilterRange = (range: Range): boolean =>
+  dataRowCount(range) <= MAX_EXACT_FILTER_ROWS;
+
+const rowInRange = (row: number, range: Range): boolean => row > range.r0 && row <= range.r1;
+
+const clearHiddenRowsInRange = (hiddenRows: Set<number>, range: Range): Set<number> => {
+  const next = new Set(hiddenRows);
+  for (const row of hiddenRows) {
+    if (rowInRange(row, range)) next.delete(row);
+  }
+  return next;
+};
+
+function stampFilterRangeWithoutCriteria(store: SpreadsheetStore, range: Range): void {
+  store.setState((s) => ({
+    ...s,
+    layout: { ...s.layout, hiddenRows: clearHiddenRowsInRange(s.layout.hiddenRows, range) },
+    ui: {
+      ...s.ui,
+      filterRange: { ...range },
+      filterCriteria: filterCriteriaAfterClear(s.ui.filterCriteria, range),
+    },
+  }));
+}
+
 function captureFilterSnapshot(state: State): FilterSnapshot {
   return {
     hiddenRows: new Set(state.layout.hiddenRows),
@@ -141,8 +170,16 @@ export function applyFilterColumns(
   range: Range,
   columns: ReadonlyArray<{ byCol: number; predicate: FilterPredicate }>,
 ): number {
-  const newHidden = new Set<number>(state.layout.hiddenRows);
-  for (let r = range.r0 + 1; r <= range.r1; r += 1) newHidden.delete(r);
+  if (!canEvaluateFilterRange(range)) {
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, hiddenRows: clearHiddenRowsInRange(s.layout.hiddenRows, range) },
+      ui: { ...s.ui, filterRange: { ...range } },
+    }));
+    return 0;
+  }
+
+  const newHidden = clearHiddenRowsInRange(state.layout.hiddenRows, range);
   let hiddenCount = 0;
   for (let r = range.r0 + 1; r <= range.r1; r += 1) {
     const survives = columns.every(({ byCol, predicate }) =>
@@ -168,6 +205,10 @@ export function applyValueFilter(
   byCol: number,
   hiddenValues: readonly string[],
 ): number {
+  if (!canEvaluateFilterRange(range)) {
+    stampFilterRangeWithoutCriteria(store, range);
+    return 0;
+  }
   const criteria = upsertCriteria(state.ui.filterCriteria, {
     range,
     byCol,
@@ -189,6 +230,10 @@ export function applyConditionFilter(
   byCol: number,
   condition: ConditionFilterOptions,
 ): number {
+  if (!canEvaluateFilterRange(range)) {
+    stampFilterRangeWithoutCriteria(store, range);
+    return 0;
+  }
   const criteria = upsertCriteria(state.ui.filterCriteria, {
     range,
     byCol,
@@ -211,6 +256,10 @@ export function applyColorFilter(
   byCol: number,
   color: { kind: 'cellColor' | 'fontColor'; color: string },
 ): number {
+  if (!canEvaluateFilterRange(range)) {
+    stampFilterRangeWithoutCriteria(store, range);
+    return 0;
+  }
   const criteria = upsertCriteria(state.ui.filterCriteria, {
     range,
     byCol,
@@ -239,10 +288,13 @@ function recomputeHiddenFromCriteria(
 ): { hidden: Set<number>; count: number } {
   const baseline = new Set(state.layout.hiddenRows);
   for (const c of criteria) {
-    for (let r = c.range.r0 + 1; r <= c.range.r1; r += 1) baseline.delete(r);
+    for (const row of state.layout.hiddenRows) {
+      if (rowInRange(row, c.range)) baseline.delete(row);
+    }
   }
   const next = new Set(baseline);
   for (const c of criteria) {
+    if (!canEvaluateFilterRange(c.range)) continue;
     const hiddenSet = c.condition || c.color ? null : new Set(c.hiddenValues);
     for (let r = c.range.r0 + 1; r <= c.range.r1; r += 1) {
       if (next.has(r)) continue;
@@ -400,6 +452,10 @@ export function applyAdvancedFilter(
   listRange: Range,
   criteriaRange: Range,
 ): number {
+  if (!canEvaluateFilterRange(listRange)) {
+    stampFilterRangeWithoutCriteria(store, listRange);
+    return 0;
+  }
   const criteriaRows = buildAdvancedCriteriaRows(state, listRange, criteriaRange);
   if (criteriaRows.length === 0) {
     setAutoFilter(store, listRange);
@@ -445,6 +501,7 @@ export function copyAdvancedFilterResult(
   options: AdvancedFilterCopyOptions = {},
   wb?: WorkbookHandle | null,
 ): number {
+  if (!canEvaluateFilterRange(listRange)) return 0;
   const criteriaRows = buildAdvancedCriteriaRows(state, listRange, criteriaRange);
   const width = listRange.c1 - listRange.c0 + 1;
   const rowIndexes: number[] = [listRange.r0];
@@ -735,12 +792,7 @@ export function setAutoFilter(store: SpreadsheetStore, range: Range | null): voi
  *  `ui.filterRange` when `range` matches the active autofilter region (or when
  *  no range is supplied). */
 export function clearFilter(state: State, store: SpreadsheetStore, range?: Range): void {
-  const next = new Set<number>(state.layout.hiddenRows);
-  if (!range) {
-    next.clear();
-  } else {
-    for (let r = range.r0; r <= range.r1; r += 1) next.delete(r);
-  }
+  const next = range ? clearHiddenRowsInRange(state.layout.hiddenRows, range) : new Set<number>();
   store.setState((s) => {
     const fr = s.ui.filterRange;
     const clearFr =
@@ -811,15 +863,30 @@ export function distinctFilterItems(
   locale = 'en-US',
 ): FilterValueItem[] {
   const items = new Map<string, { label: string; kind: FilterItemKind; num: number }>();
-  for (let r = range.r0 + 1; r <= range.r1; r += 1) {
-    const addr = { sheet: range.sheet, row: r, col: byCol };
-    const value = state.data.cells.get(addrKey(addr))?.value;
+  const visitValue = (row: number, value: CellValue | undefined): void => {
+    const addr = { sheet: range.sheet, row, col: byCol };
     const key = filterValueKey(value);
-    if (items.has(key)) continue;
+    if (items.has(key)) return;
     const kind = key === '' ? 'blank' : classifyFilterValue(value);
     const num = value?.kind === 'number' ? value.value : 0;
     const label = key === '' || !value ? '' : filterItemLabel(state, addr, value, locale);
     items.set(key, { label, kind, num });
+  };
+
+  if (canEvaluateFilterRange(range)) {
+    for (let r = range.r0 + 1; r <= range.r1; r += 1) {
+      const addr = { sheet: range.sheet, row: r, col: byCol };
+      visitValue(r, state.data.cells.get(addrKey(addr))?.value);
+    }
+  } else {
+    for (const [key, cell] of state.data.cells) {
+      const [sheetRaw, rowRaw, colRaw] = key.split(':');
+      const sheet = Number(sheetRaw);
+      const row = Number(rowRaw);
+      const col = Number(colRaw);
+      if (sheet !== range.sheet || col !== byCol || !rowInRange(row, range)) continue;
+      visitValue(row, cell.value);
+    }
   }
   return Array.from(items, ([key, meta]) => ({ key, meta }))
     .sort((a, b) => {

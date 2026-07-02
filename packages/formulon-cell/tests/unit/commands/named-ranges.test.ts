@@ -268,6 +268,27 @@ describe('named range commands', () => {
     });
   });
 
+  it('refuses to create defined names from huge whole-row or whole-column selections', () => {
+    const store = createSpreadsheetStore();
+    const top = makeWb();
+    setRange(store, 0, 0, 1, 16_383);
+
+    expect(createDefinedNamesFromSelection(store.getState(), top.wb, 'top-row')).toEqual({
+      ok: false,
+      reason: 'too-large',
+    });
+    expect(top.calls).toEqual([]);
+
+    const left = makeWb();
+    setRange(store, 0, 0, 1_048_575, 1);
+
+    expect(createDefinedNamesFromSelection(store.getState(), left.wb, 'left-column')).toEqual({
+      ok: false,
+      reason: 'too-large',
+    });
+    expect(left.calls).toEqual([]);
+  });
+
   it('records defined-name mutations as one undoable history action', () => {
     const store = createSpreadsheetStore();
     const { wb } = makeWb();

@@ -62,6 +62,33 @@ describe('groupRows / ungroupRows', () => {
     expect(store.getState().layout.outlineRows.size).toBe(0);
   });
 
+  it('refuses huge row groups instead of materializing every row', () => {
+    const store = createSpreadsheetStore();
+
+    groupRows(store, null, 0, 1_048_575);
+
+    expect(store.getState().layout.outlineRows.size).toBe(0);
+  });
+
+  it('ungroupRows clears huge ranges by visiting existing outline metadata only', () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      layout: {
+        ...s.layout,
+        outlineRows: new Map([
+          [2, 1],
+          [500_000, 2],
+          [1_000_000, 1],
+        ]),
+      },
+    }));
+
+    ungroupRows(store, null, 0, 1_048_575);
+
+    expect(store.getState().layout.outlineRows).toEqual(new Map([[500_000, 1]]));
+  });
+
   it('records a single layout history entry for the group operation', () => {
     const store = createSpreadsheetStore();
     const h = new History();
@@ -147,6 +174,20 @@ describe('collapse / expand', () => {
     expect(store.getState().layout.hiddenRows.size).toBe(0);
   });
 
+  it('refuses huge row group collapse and expands huge ranges sparsely', () => {
+    const store = createSpreadsheetStore();
+
+    collapseRowGroup(store, null, 0, 1_048_575);
+    expect(store.getState().layout.hiddenRows.size).toBe(0);
+
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, hiddenRows: new Set([3, 500_000, 1_000_000]) },
+    }));
+    expandRowGroup(store, null, 0, 1_048_575);
+    expect(store.getState().layout.hiddenRows.size).toBe(0);
+  });
+
   it('rejects detail collapse on a protected sheet', () => {
     const store = createSpreadsheetStore();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -180,6 +221,17 @@ describe('collapse / expand', () => {
     });
     expect(isRowGroupCollapsed(store.getState().layout, 1, 5)).toBe(true);
     expect(isRowGroupCollapsed(store.getState().layout, 6, 8)).toBe(false);
+  });
+
+  it('isRowGroupCollapsed checks hidden metadata for huge ranges', () => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, hiddenRows: new Set([1_000_000]) },
+    }));
+
+    expect(isRowGroupCollapsed(store.getState().layout, 0, 1_048_575)).toBe(true);
+    expect(isRowGroupCollapsed(store.getState().layout, 0, 999_999)).toBe(false);
   });
 });
 

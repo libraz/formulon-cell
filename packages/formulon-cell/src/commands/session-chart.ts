@@ -28,6 +28,13 @@ export interface SessionChartSeriesPoint {
   value: number;
 }
 
+const MAX_SESSION_CHART_SERIES_CELLS = 10_000;
+
+const rangeArea = (range: Range): number =>
+  range.r1 < range.r0 || range.c1 < range.c0
+    ? 0
+    : (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
+
 function defaultChartId(range: Range, kind: SessionChartKind): string {
   return `chart-${range.sheet}-${range.r0}-${range.c0}-${range.r1}-${range.c1}-${kind}`;
 }
@@ -193,6 +200,7 @@ export function sessionChartSeries(
 ): readonly SessionChartSeriesPoint[] {
   const range = 'source' in chartOrRange ? chartOrRange.source : chartOrRange;
   if (range.sheet !== state.data.sheetIndex) return [];
+  if (rangeArea(range) > MAX_SESSION_CHART_SERIES_CELLS) return [];
   const out: SessionChartSeriesPoint[] = [];
   if (range.r0 === range.r1) {
     for (let col = range.c0; col <= range.c1; col += 1) {

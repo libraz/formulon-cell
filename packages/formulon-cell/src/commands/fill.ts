@@ -24,6 +24,10 @@ interface SourceCell {
   blank: boolean;
 }
 
+const MAX_FILL_RANGE_CELLS = 100_000;
+
+const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
+
 const FULLWIDTH_ZERO = '０'.codePointAt(0) ?? 0xff10;
 
 const toAsciiDigits = (s: string): string =>
@@ -475,6 +479,9 @@ export function fillRange(
   if (dest.r0 === src.r0 && dest.r1 === src.r1 && dest.c0 === src.c0 && dest.c1 === src.c1) {
     return false;
   }
+  if (rangeArea(src) > MAX_FILL_RANGE_CELLS || rangeArea(dest) > MAX_FILL_RANGE_CELLS) {
+    return false;
+  }
   const dir = opts?.copyOnly ? 'copy' : detectDirection(src, dest);
   const sheet = src.sheet;
   const source = readSource(state, src);
@@ -661,6 +668,8 @@ const cellValueAsText = (value: ReturnType<WorkbookHandle['getValue']>): string 
   return '';
 };
 
+const MAX_FLASH_FILL_ROWS = 100_000;
+
 const flashFillInputCandidates = (
   workbook: WorkbookHandle,
   sheet: number,
@@ -691,6 +700,7 @@ const executeRibbonFlashFill = (
   range: Range,
 ): boolean => {
   if (range.c0 !== range.c1) return false;
+  if (range.r1 - range.r0 + 1 > MAX_FLASH_FILL_ROWS) return false;
   const candidates = flashFillInputCandidates(workbook, range.sheet, range);
   for (const inputCol of candidates) {
     const examples: { input: string; output: string }[] = [];

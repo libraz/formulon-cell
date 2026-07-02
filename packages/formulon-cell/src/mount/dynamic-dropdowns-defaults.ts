@@ -197,6 +197,24 @@ const normalizedSelectionRange = (instance: SpreadsheetInstance): Range => {
   };
 };
 
+const addrFromKey = (key: string): { sheet: number; row: number; col: number } | null => {
+  const [sheetRaw, rowRaw, colRaw] = key.split(':');
+  const sheet = Number(sheetRaw);
+  const row = Number(rowRaw);
+  const col = Number(colRaw);
+  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
+  return { sheet, row, col };
+};
+
+const addrInRange = (addr: { sheet: number; row: number; col: number }, range: Range): boolean =>
+  addr.sheet === range.sheet &&
+  addr.row >= range.r0 &&
+  addr.row <= range.r1 &&
+  addr.col >= range.c0 &&
+  addr.col <= range.c1;
+
+const MAX_MERGE_ACROSS_ROWS = 100_000;
+
 const buildFillDirection =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyFillDirection'] =>
   (direction) => {
@@ -314,6 +332,32 @@ const buildFillSeries =
     instance.host.focus();
   };
 
+const visualClearFormatKeys = new Set([
+  'cellStyle',
+  'numFmt',
+  'bold',
+  'italic',
+  'underline',
+  'strike',
+  'align',
+  'vAlign',
+  'wrap',
+  'shrinkToFit',
+  'indent',
+  'rotation',
+  'textDirection',
+  'borders',
+  'color',
+  'fill',
+  'fillPattern',
+  'fillPatternColor',
+  'fontFamily',
+  'fontSize',
+]);
+
+const hasClearableVisualFormat = (format: object): boolean =>
+  Object.keys(format).some((key) => visualClearFormatKeys.has(key));
+
 const buildClearAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyClearAction'] =>
   (action) => {
@@ -365,15 +409,22 @@ const updateClearMenu =
     ) {
       hasFormats = true;
     }
-    for (let row = range.r0; row <= range.r1; row += 1) {
-      for (let col = range.c0; col <= range.c1; col += 1) {
-        const key = `${range.sheet}:${row}:${col}`;
-        const addr = { sheet: range.sheet, row, col };
-        if (state.data.cells.has(key)) hasContents = true;
-        if (state.format.formats.has(key)) hasFormats = true;
-        if (commentAt(state, addr) !== null) hasComments = true;
-        if (hyperlinkAt(state, addr) !== null) hasHyperlinks = true;
+    for (const key of state.data.cells.keys()) {
+      const addr = addrFromKey(key);
+      if (addr && addrInRange(addr, range)) {
+        hasContents = true;
+        break;
       }
+    }
+    for (const [key, format] of state.format.formats) {
+      const addr = addrFromKey(key);
+      if (!addr || !addrInRange(addr, range)) continue;
+      if (typeof format.comment === 'string' && format.comment.length > 0) hasComments = true;
+      if (typeof format.hyperlink === 'string' && format.hyperlink.length > 0) {
+        hasHyperlinks = true;
+      }
+      if (hasClearableVisualFormat(format)) hasFormats = true;
+      if (hasFormats && hasComments && hasHyperlinks) break;
     }
     const hasConditional = conditionalRulesForRange(state, range).length > 0;
     const hasAny = hasContents || hasFormats || hasComments || hasHyperlinks || hasConditional;
@@ -497,6 +548,7 @@ const buildMergeAction =
     if (action === 'unmergeCells') {
       applyUnmerge(instance.store, instance.workbook, instance.history, range);
     } else if (action === 'mergeAcross') {
+      if (range.c0 === range.c1 || range.r1 - range.r0 + 1 > MAX_MERGE_ACROSS_ROWS) return;
       const state = instance.store.getState();
       if (
         mergeWillLoseData(state, range) &&
@@ -1508,15 +1560,12 @@ const buildDataValidationAction =
     const state = instance.store.getState();
     const range = normalizedSelectionRange(instance);
     const invalid = new Set<string>();
-    for (let row = range.r0; row <= range.r1; row += 1) {
-      for (let col = range.c0; col <= range.c1; col += 1) {
-        const addr = { sheet: range.sheet, row, col };
-        const key = addrKey(addr);
-        const validation = state.format.formats.get(key)?.validation;
-        if (!validation) continue;
-        const value = instance.workbook.getValue(addr);
-        if (cellValueViolatesValidation(value, validation)) invalid.add(key);
-      }
+    for (const [key, format] of state.format.formats) {
+      if (!format.validation) continue;
+      const addr = addrFromKey(key);
+      if (!addr || !addrInRange(addr, range)) continue;
+      const value = instance.workbook.getValue(addr);
+      if (cellValueViolatesValidation(value, format.validation)) invalid.add(key);
     }
     mutators.setValidationCircles(instance.store, invalid);
     instance.host.focus();
@@ -1528,13 +1577,12 @@ const updateDataValidationMenu =
     const state = instance.store.getState();
     const range = normalizedSelectionRange(instance);
     let hasValidation = false;
-    for (let row = range.r0; row <= range.r1 && !hasValidation; row += 1) {
-      for (let col = range.c0; col <= range.c1; col += 1) {
-        const key = addrKey({ sheet: range.sheet, row, col });
-        if (state.format.formats.get(key)?.validation) {
-          hasValidation = true;
-          break;
-        }
+    for (const [key, format] of state.format.formats) {
+      if (!format.validation) continue;
+      const addr = addrFromKey(key);
+      if (addr && addrInRange(addr, range)) {
+        hasValidation = true;
+        break;
       }
     }
     const hasValidationCircles = state.errorIndicators.validationCircles.size > 0;

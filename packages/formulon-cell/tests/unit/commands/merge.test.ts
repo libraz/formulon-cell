@@ -68,6 +68,21 @@ describe('applyMerge', () => {
     );
   });
 
+  it('refuses huge merge ranges instead of materializing every covered cell', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 'keep' },
+      { row: 200_000, col: 0, value: 'drop' },
+    ]);
+    const range: Range = { sheet: 0, r0: 0, c0: 0, r1: 200_000, c1: 0 };
+
+    expect(applyMerge(store, wb, history, range)).toBe(false);
+    expect(store.getState().merges.byAnchor.size).toBe(0);
+    expect(wb.getValue({ sheet: 0, row: 200_000, col: 0 })).toEqual({
+      kind: 'text',
+      value: 'drop',
+    });
+  });
+
   it('clears non-anchor cell values (spreadsheets keep only top-left)', () => {
     seedAndMirror(store, wb, [
       { row: 0, col: 0, value: 'keep' },
@@ -192,6 +207,17 @@ describe('mergeWillLoseData', () => {
     );
   });
 
+  it('checks materialized content only for huge ranges', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 'keep' },
+      { row: 900_000, col: 0, value: 'drop' },
+    ]);
+
+    expect(
+      mergeWillLoseData(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 0 }),
+    ).toBe(true);
+  });
+
   it('counts a non-anchor formula as content', () => {
     store.setState((s) => {
       const cells = new Map(s.data.cells);
@@ -243,6 +269,15 @@ describe('merge protection gate (H-32)', () => {
     setProtectedSheet(store, 0, true);
     expect(applyUnmerge(store, wb, history, r)).toBe(false);
     expect(store.getState().merges.byAnchor.size).toBe(1);
+  });
+
+  it('checks existing merges before protection for huge unmerge no-ops', () => {
+    setProtectedSheet(store, 0, true);
+
+    expect(applyUnmerge(store, wb, history, { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 0 })).toBe(
+      false,
+    );
+    expect(store.getState().merges.byAnchor.size).toBe(0);
   });
 });
 

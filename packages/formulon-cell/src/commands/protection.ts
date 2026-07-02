@@ -50,6 +50,18 @@ const rangeContainsAddr = (range: Range, addr: Addr): boolean =>
   addr.col >= range.c0 &&
   addr.col <= range.c1;
 
+const MAX_MATERIALIZED_LOCK_CELLS = 100_000;
+
+const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
+
+const addrFromKey = (key: string): Addr | null => {
+  const parts = key.split(':').map(Number);
+  if (parts.length !== 3) return null;
+  const [sheet, row, col] = parts as [number, number, number];
+  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
+  return { sheet, row, col };
+};
+
 /** Whether `sheet` is currently flagged protected on the workbook. Mirrors
  *  the protection slice as a pure helper so call sites don't reach into the
  *  Map shape directly. */
@@ -167,6 +179,13 @@ const sameBytes = (left: Uint8Array, right: Uint8Array): boolean => {
   for (let i = 0; i < left.length; i += 1) diff |= (left.at(i) ?? 0) ^ (right.at(i) ?? 0);
   return diff === 0;
 };
+
+const rangeOverlaps = (left: Range, right: Range): boolean =>
+  left.sheet === right.sheet &&
+  left.r0 <= right.r1 &&
+  left.r1 >= right.r0 &&
+  left.c0 <= right.c1 &&
+  left.c1 >= right.c0;
 
 const nodeHashAlgorithm = (algorithm: AlgorithmIdentifier): string | null => {
   if (algorithm === 'SHA-1') return 'sha1';
@@ -451,18 +470,24 @@ export function warnProtected(addr: Addr): void {
  *  `gateProtectionAddr` check applied per-cell by the mutator. */
 export function gateProtection(state: State, range: Range): Range | null {
   if (!isSheetProtected(state, range.sheet)) return range;
-  for (let r = range.r0; r <= range.r1; r += 1) {
-    for (let c = range.c0; c <= range.c1; c += 1) {
-      const fmt = state.format.formats.get(addrKey({ sheet: range.sheet, row: r, col: c }));
-      if (
-        fmt?.locked === false ||
-        isAddrInAllowedEditRange(state, { sheet: range.sheet, row: r, col: c })
-      ) {
-        return range;
-      }
+  for (const [key, fmt] of state.format.formats) {
+    if (fmt.locked !== false) continue;
+    const [sheet, row, col] = key.split(':').map(Number);
+    if (
+      sheet === range.sheet &&
+      row !== undefined &&
+      col !== undefined &&
+      row >= range.r0 &&
+      row <= range.r1 &&
+      col >= range.c0 &&
+      col <= range.c1
+    ) {
+      return range;
     }
   }
-  return null;
+  return state.protection.allowedEditRanges.some((entry) => rangeOverlaps(entry.range, range))
+    ? range
+    : null;
 }
 
 /** Subset of `range` that survives the per-cell protection gate. Yields
@@ -486,6 +511,22 @@ export function* writableAddrs(state: State, range: Range): IterableIterator<Add
  *  `true` to make the lock explicit. NOT gated by sheet protection — the
  *  whole point of this mutator is to configure protection up front. */
 export function setCellLocked(store: SpreadsheetStore, range: Range, locked: boolean): void {
+  if (rangeArea(range) > MAX_MATERIALIZED_LOCK_CELLS) {
+    if (!locked) return;
+    store.setState((s) => {
+      const formats = new Map(s.format.formats);
+      for (const [key, current] of s.format.formats) {
+        const addr = addrFromKey(key);
+        if (!addr || !rangeContainsAddr(range, addr) || current.locked !== false) continue;
+        const next: CellFormat = { ...current };
+        delete next.locked;
+        if (Object.keys(next).length > 0) formats.set(key, next);
+        else formats.delete(key);
+      }
+      return { ...s, format: { ...s.format, formats } };
+    });
+    return;
+  }
   const patch: Partial<CellFormat> = { locked };
   mutators.setRangeFormat(store, range, patch);
 }

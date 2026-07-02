@@ -1,4 +1,3 @@
-import { addrKey } from '../engine/address.js';
 import type { RangeResolver } from '../engine/range-resolver.js';
 import type { CellValue, Range } from '../engine/types.js';
 import { syncValidationsToEngine } from '../engine/validation-sync.js';
@@ -16,22 +15,24 @@ type BoundedKind = 'whole' | 'decimal' | 'date' | 'time' | 'textLength';
 type BoundedValidation = Extract<CellValidation, { kind: BoundedKind }>;
 type ListValidation = Extract<CellValidation, { kind: 'list' }>;
 
+const rangeContains = (range: Range, row: number, col: number): boolean =>
+  row >= range.r0 && row <= range.r1 && col >= range.c0 && col <= range.c1;
+
 export function clearValidationInRange(store: SpreadsheetStore, range: Range): number {
   let cleared = 0;
   store.setState((s) => {
     const formats = new Map(s.format.formats);
-    for (let row = range.r0; row <= range.r1; row += 1) {
-      for (let col = range.c0; col <= range.c1; col += 1) {
-        const addr = { sheet: range.sheet, row, col };
-        if (!isCellWritable(s, addr)) continue;
-        const key = addrKey(addr);
-        const current = formats.get(key);
-        if (!current?.validation) continue;
-        const { validation: _validation, ...next } = current;
-        if (Object.keys(next).length === 0) formats.delete(key);
-        else formats.set(key, next);
-        cleared += 1;
-      }
+    for (const [key, current] of s.format.formats) {
+      if (!current.validation) continue;
+      const [sheet, row, col] = key.split(':').map(Number);
+      if (sheet !== range.sheet || row === undefined || col === undefined) continue;
+      if (!rangeContains(range, row, col)) continue;
+      const addr = { sheet, row, col };
+      if (!isCellWritable(s, addr)) continue;
+      const { validation: _validation, ...next } = current;
+      if (Object.keys(next).length === 0) formats.delete(key);
+      else formats.set(key, next);
+      cleared += 1;
     }
     return { ...s, format: { ...s.format, formats } };
   });

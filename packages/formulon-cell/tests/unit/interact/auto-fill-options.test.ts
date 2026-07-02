@@ -169,6 +169,37 @@ describe('auto fill options', () => {
     expect(num(wb, 2, 0)).toBe(dateSerial(2024, 3, 31));
   });
 
+  it('detects date fill choices in huge sources from materialized formats only', () => {
+    seedAndMirror(store, wb, [{ row: 100_000, col: 0, value: dateSerial(2024, 1, 31) }]);
+    store.setState((s) => {
+      const formats = new Map(s.format.formats);
+      formats.set('0:100000:0', { numFmt: { kind: 'date', pattern: 'yyyy-mm-dd' } });
+      return { ...s, format: { ...s.format, formats } };
+    });
+    const handle = attachAutoFillOptions({
+      host,
+      store,
+      wb,
+      strings: en,
+    });
+    detach = () => handle.detach();
+
+    host.dispatchEvent(
+      new CustomEvent('fc:autofilloptions', {
+        detail: {
+          src: { sheet: 0, r0: 0, c0: 0, r1: 100_000, c1: 0 },
+          dest: { sheet: 0, r0: 0, c0: 0, r1: 100_001, c1: 0 },
+          mode: 'series',
+          clientX: 120,
+          clientY: 90,
+        },
+      }),
+    );
+
+    document.querySelector<HTMLButtonElement>('.fc-autofill-options__button')?.click();
+    expect(visibleLabels()).toContain('Fill Months');
+  });
+
   it('keeps the smart button and menu within the viewport', () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 180 });

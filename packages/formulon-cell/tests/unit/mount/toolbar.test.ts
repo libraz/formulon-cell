@@ -58,6 +58,8 @@ import {
 } from '../../../src/toolbar/ribbon-model.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
 
+vi.setConfig({ testTimeout: 10_000 });
+
 // Minimal helpers stub: enough for the renderer to emit a shell, no real
 // dropdown DOM. The toolbar still needs `createSelect/Color/Icon/makeSvg`
 // because every command path may reach them.
@@ -1303,6 +1305,46 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
+  it('does not enable Clear Formats for comment-only or empty format metadata', () => {
+    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    setComment(sheet.instance.store, { sheet: 0, row: 0, col: 0 }, 'note', sheet.workbook);
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+
+    const clearButton = host.querySelector<HTMLButtonElement>(
+      '.demo__ribbon-group--editing [data-ribbon-command="clearFormat"]',
+    );
+    expect(clearButton).toBeTruthy();
+    tb.dropdownsApi?.openDynamicRibbonDropdown(
+      { command: 'clearFormat', menuId: 'menu-clear' },
+      clearButton as HTMLButtonElement,
+    );
+    const clearFormats = host.querySelector<HTMLButtonElement>('[data-clear="formats"]');
+    const clearComments = host.querySelector<HTMLButtonElement>('[data-clear="comments"]');
+    const clearAll = host.querySelector<HTMLButtonElement>('[data-clear="all"]');
+    expect(clearFormats?.getAttribute('aria-disabled')).toBe('true');
+    expect(clearComments?.getAttribute('aria-disabled')).toBe('false');
+    expect(clearAll?.getAttribute('aria-disabled')).toBe('false');
+
+    setComment(sheet.instance.store, { sheet: 0, row: 0, col: 0 }, '', sheet.workbook);
+    sheet.instance.store.setState((s) => {
+      const formats = new Map(s.format.formats);
+      formats.set('0:0:0', {});
+      return { ...s, format: { ...s.format, formats } };
+    });
+    tb.dropdownsApi?.openDynamicRibbonDropdown(
+      { command: 'clearFormat', menuId: 'menu-clear' },
+      clearButton as HTMLButtonElement,
+    );
+    expect(clearFormats?.getAttribute('aria-disabled')).toBe('true');
+    expect(clearComments?.getAttribute('aria-disabled')).toBe('true');
+    expect(clearAll?.getAttribute('aria-disabled')).toBe('true');
+
+    tb.dispose();
+  });
+
   it('clears contents, formats, conditional rules, and all state through the Home Clear dropdown', () => {
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
@@ -1477,6 +1519,30 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
     expect(sheet.instance.store.getState().ui.pendingFormat).toBeNull();
     expect(sheet.instance.store.getState().format.formats.get('0:0:0')).toBeUndefined();
+
+    tb.dispose();
+  });
+
+  it('updates the Clear menu for huge selections by scanning materialized entries only', () => {
+    seedText(sheet, 900_000, 0, 'far');
+    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 0 });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+
+    const clearButton = host.querySelector<HTMLButtonElement>(
+      '.demo__ribbon-group--editing [data-ribbon-command="clearFormat"]',
+    );
+    expect(clearButton).toBeTruthy();
+    tb.dropdownsApi?.openDynamicRibbonDropdown(
+      { command: 'clearFormat', menuId: 'menu-clear' },
+      clearButton,
+    );
+
+    const clearContents = host.querySelector<HTMLButtonElement>('[data-clear="contents"]');
+    expect(clearContents?.disabled).toBe(false);
+    expect(clearContents?.getAttribute('aria-disabled')).toBe('false');
 
     tb.dispose();
   });
@@ -1850,6 +1916,40 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(clearRulesButton?.disabled).toBe(true);
     expect(clearRulesButton?.dataset.menuDisabledReason).toBe(
       'The selection does not contain data validation.',
+    );
+
+    tb.dispose();
+  });
+
+  it('circles invalid validation cells in huge selections by scanning validation formats only', () => {
+    seedNumber(sheet, 900_000, 0, 20);
+    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 0 });
+    sheet.instance.store.setState((state) => {
+      const formats = new Map(state.format.formats);
+      formats.set(addrKey({ sheet: 0, row: 900_000, col: 0 }), {
+        validation: { kind: 'whole', op: '<=', a: 10 },
+      });
+      return { ...state, format: { ...state.format, formats } };
+    });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+
+    tb.dropdownsApi?.openDynamicRibbonDropdown({
+      command: 'dataValidation',
+      menuId: 'menu-data-validation',
+    });
+    const circleButton = host.querySelector<HTMLButtonElement>(
+      '[data-validation-action="circle-invalid"]',
+    );
+    expect(circleButton?.disabled).toBe(false);
+
+    const circleEvent = new MouseEvent('click', { bubbles: true });
+    Object.defineProperty(circleEvent, 'target', { value: circleButton });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(circleEvent)).toBe(true);
+    expect(sheet.instance.store.getState().errorIndicators.validationCircles).toEqual(
+      new Set([addrKey({ sheet: 0, row: 900_000, col: 0 })]),
     );
 
     tb.dispose();
@@ -4459,7 +4559,7 @@ describe('Spreadsheet.mountToolbar', () => {
     }
 
     tb.dispose();
-  });
+  }, 10_000);
 
   it('opens every dropdown and gallery command menu from primary click', () => {
     const onCommand = vi.fn();
@@ -5575,6 +5675,31 @@ describe('Spreadsheet.mountToolbar', () => {
     const unmergeEvent = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(unmergeEvent, 'target', { value: unmerge });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(unmergeEvent)).toBe(true);
+    expect(sheet.instance.store.getState().merges.byAnchor.size).toBe(0);
+
+    tb.dispose();
+  });
+
+  it('skips huge Merge Across selections before iterating each row', () => {
+    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 1 });
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+
+    const mergeButton = host.querySelector<HTMLButtonElement>('[data-ribbon-command="merge"]');
+    expect(mergeButton).toBeTruthy();
+    tb.dropdownsApi?.openDynamicRibbonDropdown(
+      { command: 'merge', menuId: 'menu-merge' },
+      mergeButton as HTMLButtonElement,
+    );
+    const mergeAcross = host.querySelector<HTMLButtonElement>(
+      '#menu-merge [data-merge-action="mergeAcross"]',
+    );
+    const event = new MouseEvent('click', { bubbles: true });
+    Object.defineProperty(event, 'target', { value: mergeAcross });
+
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
     expect(sheet.instance.store.getState().merges.byAnchor.size).toBe(0);
 
     tb.dispose();

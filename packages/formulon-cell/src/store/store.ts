@@ -34,6 +34,9 @@ export { defaultPageSetup } from './types.js';
 
 const initialAddr = (sheet = 0): Addr => ({ sheet, row: 0, col: 0 });
 const initialRange = (sheet = 0): Range => ({ sheet, r0: 0, c0: 0, r1: 0, c1: 0 });
+const MAX_WATCH_RANGE_CELLS = 10_000;
+
+const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
 
 function rangesIntersect(a: Range, b: Range): boolean {
   return a.sheet === b.sheet && !(a.r1 < b.r0 || a.r0 > b.r1 || a.c1 < b.c0 || a.c0 > b.c1);
@@ -788,6 +791,7 @@ export const mutators = {
   /** Pin every cell in each range to the Watch Window, preserving row-major
    *  order across ranges while de-duplicating already watched addresses. */
   addWatchRanges(store: SpreadsheetStore, ranges: readonly Range[]): void {
+    if (ranges.some((range) => rangeArea(range) > MAX_WATCH_RANGE_CELLS)) return;
     store.setState((s) => {
       const seen = new Set(s.watch.watches.map((w) => `${w.sheet}:${w.row}:${w.col}`));
       const next: Addr[] = [...s.watch.watches];

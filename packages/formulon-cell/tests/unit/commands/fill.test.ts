@@ -434,6 +434,33 @@ describe('fillRange', () => {
     expect(text(wb, 0, 1, 1)).toBe('left-b!');
   });
 
+  it('flash fill refuses huge whole-column selections', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 'John' },
+      { row: 0, col: 1, value: 'John Smith' },
+      { row: 1, col: 1, value: 'Jane Doe' },
+    ]);
+    store.setState((s) => ({
+      ...s,
+      selection: {
+        ...s.selection,
+        range: { sheet: 0, r0: 0, c0: 0, r1: 1_048_575, c1: 0 },
+        active: { sheet: 0, row: 0, col: 0 },
+        anchor: { sheet: 0, row: 0, col: 0 },
+      },
+    }));
+
+    expect(
+      executeRibbonFillAction({
+        store,
+        workbook: wb,
+        history: new History(),
+        action: 'flash',
+      }),
+    ).toBe(false);
+    expect(text(wb, 0, 1, 0)).toBe('');
+  });
+
   it('copies source formatting by default when a store is supplied', () => {
     seedAndMirror(store, wb, [
       { row: 0, col: 0, value: 1 },
@@ -448,6 +475,19 @@ describe('fillRange', () => {
 
     expect(getFormat(store, 2, 0)).toEqual({ fill: '#ff0000', bold: true });
     expect(getFormat(store, 3, 0)).toEqual({ fill: '#00ff00', italic: true });
+  });
+
+  it('refuses huge fill destinations before materializing values or formats', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 1 }]);
+    setFormat(store, 0, 0, { fill: '#ff0000', bold: true });
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 100_000, c1: 0 };
+
+    expect(fillRange(store.getState(), wb, src, dest, { formatting: 'with', store })).toBe(false);
+    wb.recalc();
+
+    expect(wb.getValue({ sheet: 0, row: 100_000, col: 0 }).kind).toBe('blank');
+    expect(getFormat(store, 100_000, 0)).toBeUndefined();
   });
 
   it('can fill values without overwriting destination formatting', () => {
@@ -577,5 +617,27 @@ describe('fillRange', () => {
     fillRange(store.getState(), wb, src, dest);
     expect(wb.cellFormula({ sheet: 0, row: 1, col: 1 })).toBe('=$A2+A$1');
     expect(wb.cellFormula({ sheet: 0, row: 2, col: 1 })).toBe('=$A3+A$1');
+  });
+
+  it('keeps function names, sheet qualifiers, and anchored axes intact when filling formulas', () => {
+    wb.setFormula({ sheet: 0, row: 0, col: 2 }, '=LOG10(A1)+Sheet2!B$1+$A1');
+    store.setState((s) => {
+      const map = new Map(s.data.cells);
+      map.set('0:0:2', {
+        value: { kind: 'number', value: 0 },
+        formula: '=LOG10(A1)+Sheet2!B$1+$A1',
+      });
+      return { ...s, data: { ...s.data, cells: map } };
+    });
+
+    fillRange(
+      store.getState(),
+      wb,
+      { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+      { sheet: 0, r0: 0, c0: 2, r1: 2, c1: 2 },
+    );
+
+    expect(wb.cellFormula({ sheet: 0, row: 1, col: 2 })).toBe('=LOG10(A2)+Sheet2!B$1+$A2');
+    expect(wb.cellFormula({ sheet: 0, row: 2, col: 2 })).toBe('=LOG10(A3)+Sheet2!B$1+$A3');
   });
 });

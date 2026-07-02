@@ -57,6 +57,11 @@ const inRange = (addr: Addr, range: Range): boolean =>
   addr.col >= range.c0 &&
   addr.col <= range.c1;
 
+const MAX_MATERIALIZED_BLANK_CELLS = 100_000;
+
+const rangeArea = (r0: number, c0: number, r1: number, c1: number): number =>
+  (r1 - r0 + 1) * (c1 - c0 + 1);
+
 /** Walk every populated cell on the sheet (or only those inside the current
  *  selection) and return matches for the given kind. Output is row-major
  *  ordered — the dialog uses the first match as the new active cell.
@@ -199,6 +204,7 @@ const findBlanks = (wb: WorkbookHandle, selection: Range | null, sheet: number):
   const c0 = selection ? selection.c0 : Number.isFinite(minCol) ? minCol : 0;
   const c1 = selection ? selection.c1 : Number.isFinite(maxCol) ? maxCol : -1;
   if (r1 < r0 || c1 < c0) return [];
+  if (rangeArea(r0, c0, r1, c1) > MAX_MATERIALIZED_BLANK_CELLS) return [];
 
   const matches: Addr[] = [];
   for (let r = r0; r <= r1; r += 1) {

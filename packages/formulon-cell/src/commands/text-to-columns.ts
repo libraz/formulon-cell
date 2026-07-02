@@ -1,5 +1,5 @@
 import { addrKey } from '../engine/address.js';
-import type { Range } from '../engine/types.js';
+import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
 import { coerceInputForCell, writeCoerced } from './coerce-input.js';
@@ -7,6 +7,31 @@ import { isCellWritable, warnProtected } from './protection.js';
 
 const cloneFormat = (fmt: CellFormat | undefined): CellFormat | undefined =>
   fmt ? { ...fmt } : undefined;
+
+const addrFromKey = (key: string): Addr | null => {
+  const parts = key.split(':').map(Number);
+  const sheet = parts[0];
+  const row = parts[1];
+  const col = parts[2];
+  if (
+    typeof sheet !== 'number' ||
+    typeof row !== 'number' ||
+    typeof col !== 'number' ||
+    !Number.isInteger(sheet) ||
+    !Number.isInteger(row) ||
+    !Number.isInteger(col)
+  ) {
+    return null;
+  }
+  return { sheet, row, col };
+};
+
+const inRange = (addr: Addr, range: Range): boolean =>
+  addr.sheet === range.sheet &&
+  addr.row >= range.r0 &&
+  addr.row <= range.r1 &&
+  addr.col >= range.c0 &&
+  addr.col <= range.c1;
 
 export interface TextToColumnsOptions {
   collapseConsecutiveDelimiters?: boolean;
@@ -44,29 +69,29 @@ export function textToColumns(
 ): number {
   let maxTokens = 0;
   const formatWrites: Array<{ key: string; format: CellFormat }> = [];
+  const candidates = [...state.data.cells.entries()]
+    .map(([key, cell]) => ({ key, cell, addr: addrFromKey(key) }))
+    .filter((entry): entry is typeof entry & { addr: Addr } => !!entry.addr)
+    .filter((entry) => inRange(entry.addr, range))
+    .sort((left, right) => left.addr.col - right.addr.col || left.addr.row - right.addr.row);
   // Operate column by column so consecutive runs land in the same target columns.
-  for (let c = range.c0; c <= range.c1; c += 1) {
-    for (let r = range.r0; r <= range.r1; r += 1) {
-      const sourceKey = addrKey({ sheet: range.sheet, row: r, col: c });
-      const cell = state.data.cells.get(sourceKey);
-      if (!cell) continue;
-      const v = cell.value;
-      if (v.kind !== 'text') continue;
-      const tokens = splitText(v.value, delimiter, options);
-      if (tokens.length < 2) continue;
-      maxTokens = Math.max(maxTokens, tokens.length);
-      const sourceFormat = cloneFormat(state.format.formats.get(sourceKey));
-      for (let t = 0; t < tokens.length; t += 1) {
-        const tok = tokens[t] ?? '';
-        const dst = { sheet: range.sheet, row: r, col: c + t };
-        if (!isCellWritable(state, dst)) {
-          warnProtected(dst);
-          continue;
-        }
-        writeCoerced(wb, dst, coerceInputForCell(state, dst, tok));
-        if (sourceFormat) {
-          formatWrites.push({ key: addrKey(dst), format: sourceFormat });
-        }
+  for (const { key: sourceKey, cell, addr: sourceAddr } of candidates) {
+    const v = cell.value;
+    if (v.kind !== 'text') continue;
+    const tokens = splitText(v.value, delimiter, options);
+    if (tokens.length < 2) continue;
+    maxTokens = Math.max(maxTokens, tokens.length);
+    const sourceFormat = cloneFormat(state.format.formats.get(sourceKey));
+    for (let t = 0; t < tokens.length; t += 1) {
+      const tok = tokens[t] ?? '';
+      const dst = { sheet: range.sheet, row: sourceAddr.row, col: sourceAddr.col + t };
+      if (!isCellWritable(state, dst)) {
+        warnProtected(dst);
+        continue;
+      }
+      writeCoerced(wb, dst, coerceInputForCell(state, dst, tok));
+      if (sourceFormat) {
+        formatWrites.push({ key: addrKey(dst), format: sourceFormat });
       }
     }
   }

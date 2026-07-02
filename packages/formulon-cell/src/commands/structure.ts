@@ -44,6 +44,9 @@ interface CellRecord {
 
 const MAX_ROW = 1048575;
 const MAX_COL = 16383;
+const MAX_MATERIALIZED_LAYOUT_ROWS = 100_000;
+
+const spanSize = (start: number, end: number): number => (end >= start ? end - start + 1 : 0);
 
 function collectAllCells(wb: WorkbookHandle, sheet: number): CellRecord[] {
   const out: CellRecord[] = [];
@@ -616,6 +619,7 @@ export function hideRows(
 ): void {
   const sheet = store.getState().data.sheetIndex;
   if (blockedByProtection(store, sheet, 'hideRows')) return;
+  if (spanSize(r0, r1) > MAX_MATERIALIZED_LAYOUT_ROWS) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
       const next = new Set(s.layout.hiddenRows);
@@ -637,7 +641,9 @@ export function showRows(
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
       const next = new Set(s.layout.hiddenRows);
-      for (let r = r0; r <= r1; r += 1) next.delete(r);
+      for (const row of s.layout.hiddenRows) {
+        if (row >= r0 && row <= r1) next.delete(row);
+      }
       return { ...s, layout: { ...s.layout, hiddenRows: next } };
     });
   });
@@ -718,6 +724,7 @@ export function setRowsHeight(
   wb?: WorkbookHandle,
 ): void {
   if (!Number.isFinite(px)) return;
+  if (spanSize(r0, r1) > MAX_MATERIALIZED_LAYOUT_ROWS) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     for (let row = r0; row <= r1; row += 1) mutators.setRowHeight(store, row, px);
   });
@@ -744,6 +751,7 @@ export function autofitRowsHeight(
   r1: number,
   wb?: WorkbookHandle,
 ): void {
+  if (spanSize(r0, r1) > MAX_MATERIALIZED_LAYOUT_ROWS) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     const ctx = createAutofitMeasureContext();
     for (let row = r0; row <= r1; row += 1) {
@@ -951,8 +959,10 @@ export function hiddenInSelection(
   const hi = Math.max(a, b);
   const set = axis === 'row' ? layout.hiddenRows : layout.hiddenCols;
   const out: number[] = [];
-  for (let i = lo; i <= hi; i += 1) if (set.has(i)) out.push(i);
-  return out;
+  for (const index of set) {
+    if (index >= lo && index <= hi) out.push(index);
+  }
+  return out.sort((left, right) => left - right);
 }
 
 /** Pin `rows` rows / `cols` cols. One Cmd+Z reverts the freeze change.

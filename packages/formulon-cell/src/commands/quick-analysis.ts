@@ -2,7 +2,6 @@ import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SparklineKind, type SpreadsheetStore } from '../store/store.js';
 import type { SelectionStats } from './aggregate.js';
-import { applyFormatPatch } from './format.js';
 import { formatAsTable as applyFormatAsTable } from './format-as-table.js';
 import {
   type History,
@@ -99,6 +98,8 @@ export type QuickAnalysisExecuteResult =
 
 const MAX_COL = 16383;
 const MAX_ROW = 1048575;
+const MAX_QUICK_ANALYSIS_FORMULA_WRITES = 100_000;
+const MAX_EXACT_PROTECTION_SCAN_CELLS = 100_000;
 
 const colLetter = (n: number): string => {
   let v = n;
@@ -112,6 +113,33 @@ const colLetter = (n: number): string => {
 
 const rangeRef = (r: Range): string =>
   `${colLetter(r.c0)}${r.r0 + 1}:${colLetter(r.c1)}${r.r1 + 1}`;
+
+const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
+
+const rangeContainsRange = (outer: Range, inner: Range): boolean =>
+  outer.sheet === inner.sheet &&
+  outer.r0 <= inner.r0 &&
+  outer.r1 >= inner.r1 &&
+  outer.c0 <= inner.c0 &&
+  outer.c1 >= inner.c1;
+
+const addrFromKey = (key: string): { sheet: number; row: number; col: number } | null => {
+  const parts = key.split(':').map(Number);
+  if (parts.length !== 3) return null;
+  const [sheet, row, col] = parts as [number, number, number];
+  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
+  return { sheet, row, col };
+};
+
+const rangeContainsAddr = (
+  range: Range,
+  addr: { sheet: number; row: number; col: number },
+): boolean =>
+  addr.sheet === range.sheet &&
+  addr.row >= range.r0 &&
+  addr.row <= range.r1 &&
+  addr.col >= range.c0 &&
+  addr.col <= range.c1;
 
 /** True when the range covers more than a single cell. */
 function isMulti(range: Range): boolean {
@@ -308,6 +336,12 @@ export function enabledQuickAnalysisActions(input: QuickAnalysisInput): QuickAna
 function firstLockedProtectedAddr(input: QuickAnalysisExecuteInput, range: Range) {
   const state = input.store.getState();
   if (!isSheetProtected(state, range.sheet)) return null;
+  if (state.protection.allowedEditRanges.some((entry) => rangeContainsRange(entry.range, range))) {
+    return null;
+  }
+  if (rangeArea(range) > MAX_EXACT_PROTECTION_SCAN_CELLS) {
+    return { sheet: range.sheet, row: range.r0, col: range.c0 };
+  }
   for (let row = range.r0; row <= range.r1; row += 1) {
     for (let col = range.c0; col <= range.c1; col += 1) {
       const addr = { sheet: range.sheet, row, col };
@@ -400,6 +434,9 @@ function writeTotalFormulas(input: QuickAnalysisExecuteInput): QuickAnalysisExec
   ) {
     const row = range.r1 + 1;
     if (row > MAX_ROW) return { ok: false, reason: 'out-of-bounds' };
+    if (range.c1 - range.c0 + 1 > MAX_QUICK_ANALYSIS_FORMULA_WRITES) {
+      return { ok: false, reason: 'out-of-bounds' };
+    }
     const writes: Array<{ addr: { sheet: number; row: number; col: number }; formula: string }> =
       [];
     for (let col = range.c0; col <= range.c1; col += 1) {
@@ -427,6 +464,9 @@ function writeTotalFormulas(input: QuickAnalysisExecuteInput): QuickAnalysisExec
   if (actionId === 'totals-sum-col') {
     const col = range.c1 + 1;
     if (col > MAX_COL) return { ok: false, reason: 'out-of-bounds' };
+    if (range.r1 - range.r0 + 1 > MAX_QUICK_ANALYSIS_FORMULA_WRITES) {
+      return { ok: false, reason: 'out-of-bounds' };
+    }
     const writes: Array<{ addr: { sheet: number; row: number; col: number }; formula: string }> =
       [];
     for (let row = range.r0; row <= range.r1; row += 1) {
@@ -514,10 +554,24 @@ function formatAsTable(input: QuickAnalysisExecuteInput): QuickAnalysisExecuteRe
 function clearAnalysisFormatting(input: QuickAnalysisExecuteInput): QuickAnalysisExecuteResult {
   const { store, range } = input;
   const history = input.history ?? null;
+  const locked = firstLockedProtectedAddr(input, range);
+  if (locked) {
+    warnProtected(locked);
+    return { ok: false, reason: 'protected' };
+  }
   if (history) history.begin();
   try {
     recordFormatChange(history, store, () => {
-      applyFormatPatch(store.getState(), store, range, null);
+      store.setState((s) => {
+        const formats = new Map(s.format.formats);
+        for (const key of s.format.formats.keys()) {
+          const addr = addrFromKey(key);
+          if (!addr || !rangeContainsAddr(range, addr)) continue;
+          if (!isCellWritable(s, addr)) continue;
+          formats.delete(key);
+        }
+        return { ...s, format: { ...s.format, formats } };
+      });
     });
     if (!isSheetProtected(store.getState(), range.sheet)) {
       recordConditionalRulesChange(history, store, () => {

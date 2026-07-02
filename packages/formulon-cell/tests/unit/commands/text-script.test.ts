@@ -82,4 +82,21 @@ describe('commands/text-script', () => {
     expect(count).toBe(1);
     expect(writes).toEqual(new Map([['0:0:1', null]]));
   });
+
+  it('applies huge whole-column text scripts by visiting only materialized cells', () => {
+    const store = createSpreadsheetStore();
+    mutators.setCell(store, { sheet: 0, row: 8, col: 2 }, { kind: 'text', value: ' Mixed ' }, null);
+    mutators.setCell(store, { sheet: 0, row: 8, col: 3 }, { kind: 'text', value: 'Outside' }, null);
+    const writes = new Map<string, string | null>();
+
+    const count = applyTextScriptToRange(
+      store.getState(),
+      fakeWorkbook(writes),
+      { sheet: 0, r0: 0, c0: 2, r1: 1048575, c1: 2 },
+      'trim',
+    );
+
+    expect(count).toBe(1);
+    expect(writes).toEqual(new Map([['0:8:2', 'Mixed']]));
+  });
 });

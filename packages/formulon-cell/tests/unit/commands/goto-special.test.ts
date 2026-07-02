@@ -152,6 +152,22 @@ describe('findMatchingCells', () => {
     expect(got).not.toContainEqual({ sheet: 0, row: 2, col: 2 });
   });
 
+  it('blanks — refuses to materialize huge whole-column selections', () => {
+    wb.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
+    wb.recalc();
+    sync(store, wb);
+    store.setState((s) => ({
+      ...s,
+      selection: {
+        active: { sheet: 0, row: 0, col: 0 },
+        anchor: { sheet: 0, row: 0, col: 0 },
+        range: { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 0 },
+      },
+    }));
+
+    expect(findMatchingCells(wb, store, 'selection', 'blanks')).toEqual([]);
+  });
+
   it('non-blanks — every populated cell', () => {
     wb.setText({ sheet: 0, row: 0, col: 0 }, 'a');
     wb.setNumber({ sheet: 0, row: 1, col: 1 }, 2);

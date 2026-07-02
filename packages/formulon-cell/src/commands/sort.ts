@@ -87,6 +87,16 @@ export interface RemoveDuplicatesOptions {
 const cloneFormat = (fmt: CellFormat | undefined): CellFormat | undefined =>
   fmt ? { ...fmt } : undefined;
 
+const MAX_SORT_CELLS = 100_000;
+
+const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
+
+const sortArea = (range: Range, startRow: number): number =>
+  Math.max(0, range.r1 - startRow + 1) * (range.c1 - range.c0 + 1);
+
+const canRewriteExactRange = (range: Range, startRow = range.r0): boolean =>
+  sortArea(range, startRow) <= MAX_SORT_CELLS;
+
 const normalizedSortKeys = (opts: SortOptions): SortKey[] => {
   const keys = opts.keys?.length ? opts.keys : [{ byCol: opts.byCol, direction: opts.direction }];
   const out: SortKey[] = [];
@@ -275,6 +285,7 @@ export function sortRange(
   const sortKeys = normalizedSortKeys(opts);
   if (sortKeys.length === 0) return false;
   if (sortKeys.some((key) => key.byCol < range.c0 || key.byCol > range.c1)) return false;
+  if (!canRewriteExactRange(range, start)) return false;
   if (rangeIntersectsMerges(state, range)) return false;
   if (!ensureWritableRange(state, { ...range, r0: start })) return false;
 
@@ -368,6 +379,7 @@ export function removeDuplicates(
   range: Range,
   options: RemoveDuplicatesOptions = {},
 ): number {
+  if (rangeArea(range) > MAX_SORT_CELLS) return 0;
   if (rangeIntersectsMerges(state, range)) return 0;
   if (!ensureWritableRange(state, range)) return 0;
   const columns = (options.columns?.length ? options.columns : undefined)?.filter(

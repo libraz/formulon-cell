@@ -27,34 +27,51 @@ interface CellEntry {
   display: string;
 }
 
+function addrFromKey(key: string): Addr | null {
+  const parts = key.split(':');
+  if (parts.length !== 3) return null;
+  const sheet = Number(parts[0]);
+  const row = Number(parts[1]);
+  const col = Number(parts[2]);
+  if (!Number.isFinite(sheet) || !Number.isFinite(row) || !Number.isFinite(col)) return null;
+  return { sheet, row, col };
+}
+
 function cellsForSearch(state: State, opts: FindOptions): CellEntry[] {
   const sheet = state.data.sheetIndex;
   const out: CellEntry[] = [];
-  for (const [key, cell] of state.data.cells) {
-    const parts = key.split(':');
-    if (parts.length !== 3) continue;
-    const sh = Number(parts[0]);
-    if ((opts.within ?? 'sheet') === 'sheet' && sh !== sheet) continue;
-    const row = Number(parts[1]);
-    const col = Number(parts[2]);
-    if (!Number.isFinite(row) || !Number.isFinite(col)) continue;
-    const lookIn = opts.lookIn ?? 'values';
-    const display =
-      lookIn === 'formulas'
-        ? (cell.formula ?? formatCell(cell.value))
-        : lookIn === 'comments' || lookIn === 'notes'
-          ? (state.format.formats.get(key)?.comment ?? '')
-          : formatCell(cell.value);
-    out.push({ addr: { sheet: sh, row, col }, display });
+  const lookIn = opts.lookIn ?? 'values';
+  if (lookIn === 'comments' || lookIn === 'notes') {
+    for (const [key, fmt] of state.format.formats) {
+      const addr = addrFromKey(key);
+      if (!addr) continue;
+      if ((opts.within ?? 'sheet') === 'sheet' && addr.sheet !== sheet) continue;
+      if (!fmt.comment) continue;
+      out.push({ addr, display: fmt.comment });
+    }
+    return sortCellEntries(out, opts);
   }
+
+  for (const [key, cell] of state.data.cells) {
+    const addr = addrFromKey(key);
+    if (!addr) continue;
+    if ((opts.within ?? 'sheet') === 'sheet' && addr.sheet !== sheet) continue;
+    const display =
+      lookIn === 'formulas' ? (cell.formula ?? formatCell(cell.value)) : formatCell(cell.value);
+    out.push({ addr, display });
+  }
+  return sortCellEntries(out, opts);
+}
+
+function sortCellEntries(entries: CellEntry[], opts: FindOptions): CellEntry[] {
   const byRows = opts.searchBy !== 'columns';
-  out.sort((a, b) => {
+  entries.sort((a, b) => {
     if (a.addr.sheet !== b.addr.sheet) return a.addr.sheet - b.addr.sheet;
     return byRows
       ? a.addr.row - b.addr.row || a.addr.col - b.addr.col
       : a.addr.col - b.addr.col || a.addr.row - b.addr.row;
   });
-  return out;
+  return entries;
 }
 
 function isMatch(display: string, opts: FindOptions): boolean {

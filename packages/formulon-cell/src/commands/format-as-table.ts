@@ -142,6 +142,9 @@ export interface TableHeaderInferenceWorkbook {
 
 const CUSTOM_TABLE_STYLE_PREFIX = 'custom-table:';
 const CUSTOM_PIVOT_TABLE_STYLE_PREFIX = 'custom-pivot-table:';
+const MAX_TABLE_HEADER_INFERENCE_CELLS = 100_000;
+
+const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
 
 const isNonEmptyTextValue = (value: CellValue): boolean =>
   value.kind === 'text' && value.value.trim().length > 0;
@@ -155,6 +158,7 @@ export function inferTableHasHeaders(
   range: Range,
 ): boolean {
   if (range.r1 <= range.r0) return false;
+  if (rangeArea(range) > MAX_TABLE_HEADER_INFERENCE_CELLS) return false;
   let headerTextCount = 0;
   for (let col = range.c0; col <= range.c1; col += 1) {
     const value = workbook.getValue({ sheet: range.sheet, row: range.r0, col });

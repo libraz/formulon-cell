@@ -374,6 +374,23 @@ describe('sortRange', () => {
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 30 });
   });
 
+  it('refuses huge sort ranges before scanning every cell', () => {
+    seedNumber(store, wb, 0, 0, 30);
+    seedNumber(store, wb, 1, 0, 10);
+
+    const ok = sortRange(
+      store.getState(),
+      store,
+      wb,
+      { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 0 },
+      { byCol: 0, direction: 'asc' },
+    );
+
+    expect(ok).toBe(false);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 30 });
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'number', value: 10 });
+  });
+
   it('integrates with the workbook engine: recalc preserves sorted ordering', () => {
     seedNumber(store, wb, 0, 0, 5);
     seedNumber(store, wb, 1, 0, 3);
@@ -581,5 +598,22 @@ describe('removeDuplicates', () => {
     } finally {
       warn.mockRestore();
     }
+  });
+
+  it('refuses huge duplicate-removal ranges before rewriting the tail', () => {
+    seedText(store, wb, 0, 0, 'alpha');
+    seedText(store, wb, 1, 0, 'alpha');
+
+    const removed = removeDuplicates(store.getState(), store, wb, {
+      sheet: 0,
+      r0: 0,
+      c0: 0,
+      r1: 1048575,
+      c1: 0,
+    });
+
+    expect(removed).toBe(0);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'alpha' });
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'alpha' });
   });
 });

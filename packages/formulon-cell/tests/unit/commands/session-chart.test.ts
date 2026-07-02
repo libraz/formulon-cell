@@ -162,6 +162,14 @@ describe('session chart commands', () => {
     ]);
   });
 
+  it('returns an empty series for huge chart source ranges', () => {
+    const store = createSpreadsheetStore();
+    seedNumbers(store, [{ row: 0, col: 0, value: 1 }]);
+
+    expect(sessionChartSeries(store.getState(), range(0, 0, 0, 10_000))).toEqual([]);
+    expect(sessionChartSeries(store.getState(), range(0, 0, 10_000, 1))).toEqual([]);
+  });
+
   it('rejects create, update, and clear on protected sheets', () => {
     const store = createSpreadsheetStore();
     const chart = createSessionChart(store, range(0, 0, 3, 1), { id: 'a' });

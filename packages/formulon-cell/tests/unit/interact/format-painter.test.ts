@@ -277,6 +277,34 @@ describe('attachFormatPainter', () => {
     handle.detach();
   });
 
+  it('does not paint destinations larger than 100k cells', () => {
+    store.setState((s) => ({
+      ...s,
+      layout: {
+        ...s.layout,
+        defaultRowHeight: 1,
+      },
+      viewport: {
+        ...s.viewport,
+        rowCount: 100_002,
+      },
+    }));
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { bold: true });
+    setRange(store, 0, 0, 0, 0);
+
+    const handle = attachFormatPainter({ host, store });
+    handle.activate();
+
+    fireDown(host, 100, 31); // row 1, col 0
+    fireMove(host, 100, 100_031); // row 100001, col 0
+    fireUp(host, 100, 100_031);
+
+    expect(store.getState().format.formats.size).toBe(1);
+    expect(formatAt(store, 1, 0)).toBeUndefined();
+    expect(handle.isActive()).toBe(false);
+    handle.detach();
+  });
+
   it('Escape key deactivates the painter', () => {
     setRange(store, 0, 0, 0, 0);
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { bold: true });

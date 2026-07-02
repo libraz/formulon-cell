@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SelectionStats } from '../../../src/commands/aggregate.js';
 import { History } from '../../../src/commands/history.js';
-import { setProtectedSheet } from '../../../src/commands/protection.js';
+import { addAllowedEditRange, setProtectedSheet } from '../../../src/commands/protection.js';
 import {
   buildQuickAnalysisActions,
   enabledQuickAnalysisActions,
@@ -292,6 +292,21 @@ describe('executeQuickAnalysisAction', () => {
     ]);
   });
 
+  it('refuses Quick Analysis column totals that would write too many formulas', () => {
+    const store = createSpreadsheetStore();
+    const { wb, formulas } = makeWb();
+    const result = executeQuickAnalysisAction({
+      store,
+      wb,
+      actionId: 'totals-sum-col',
+      range: range(0, 0, 1_048_575, 0),
+      stats: mkStats({ numericCount: 2 }),
+    });
+
+    expect(result).toEqual({ ok: false, reason: 'out-of-bounds' });
+    expect(formulas).toEqual([]);
+  });
+
   it('adds a sparkline in the adjacent cell for horizontal ranges', () => {
     const store = createSpreadsheetStore();
     const { wb } = makeWb();
@@ -343,6 +358,49 @@ describe('executeQuickAnalysisAction', () => {
 
     expect(result).toEqual({ ok: false, reason: 'protected' });
     expect(store.getState().conditional.rules).toEqual([]);
+  });
+
+  it('rejects huge protected conditional-format ranges without scanning every cell', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeWb();
+    setProtectedSheet(store, 0, true);
+
+    const result = executeQuickAnalysisAction({
+      store,
+      wb,
+      actionId: 'format-data-bar',
+      range: range(0, 2, 1_048_575, 2),
+      stats: mkStats({ numericCount: 5 }),
+    });
+
+    expect(result).toEqual({ ok: false, reason: 'protected' });
+    expect(store.getState().conditional.rules).toEqual([]);
+  });
+
+  it('allows huge protected conditional-format ranges fully covered by an allowed edit range', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeWb();
+    const r = range(0, 2, 1_048_575, 2);
+    setProtectedSheet(store, 0, true);
+    addAllowedEditRange(store, r);
+
+    const result = executeQuickAnalysisAction({
+      store,
+      wb,
+      actionId: 'format-data-bar',
+      range: r,
+      stats: mkStats({ numericCount: 5 }),
+    });
+
+    expect(result).toEqual({ ok: true, kind: 'conditional-format', count: 1 });
+    expect(store.getState().conditional.rules).toEqual([
+      {
+        kind: 'data-bar',
+        range: r,
+        color: '#5b9bd5',
+        showValue: true,
+      },
+    ]);
   });
 
   it('adds a session chart overlay for chart actions', () => {
@@ -484,6 +542,26 @@ describe('executeQuickAnalysisAction', () => {
     expect(store.getState().sparkline.sparklines.size).toBe(0);
     expect(store.getState().charts.charts).toHaveLength(0);
     expect(store.getState().tables.tables).toHaveLength(0);
+  });
+
+  it('clears huge selected ranges by visiting only existing format entries', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeWb();
+    const r = range(0, 2, 1_048_575, 2);
+    mutators.setCellFormat(store, { sheet: 0, row: 500_000, col: 2 }, { fill: '#ffff00' });
+    mutators.setCellFormat(store, { sheet: 0, row: 500_000, col: 3 }, { fill: '#00ff00' });
+
+    const result = executeQuickAnalysisAction({
+      store,
+      wb,
+      actionId: 'format-clear',
+      range: r,
+      stats: mkStats({ numericCount: 6 }),
+    });
+
+    expect(result).toEqual({ ok: true, kind: 'clear-format', count: 1 });
+    expect(store.getState().format.formats.get('0:500000:2')).toBeUndefined();
+    expect(store.getState().format.formats.get('0:500000:3')).toEqual({ fill: '#00ff00' });
   });
 
   it('does not execute disabled or unsupported actions', () => {

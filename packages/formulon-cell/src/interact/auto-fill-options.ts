@@ -1,7 +1,6 @@
 import type { FillFormattingMode } from '../commands/fill.js';
 import { fillRange } from '../commands/fill.js';
 import type { History } from '../commands/history.js';
-import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
@@ -45,6 +44,23 @@ export interface AutoFillOptionsDeps {
 }
 
 const VIEWPORT_PAD = 4;
+
+const addrFromKey = (key: string): { sheet: number; row: number; col: number } | null => {
+  const parts = key.split(':').map(Number);
+  if (parts.length !== 3) return null;
+  const [sheet, row, col] = parts as [number, number, number];
+  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) {
+    return null;
+  }
+  return { sheet, row, col };
+};
+
+const addrInRange = (addr: { sheet: number; row: number; col: number }, range: Range): boolean =>
+  addr.sheet === range.sheet &&
+  addr.row >= range.r0 &&
+  addr.row <= range.r1 &&
+  addr.col >= range.c0 &&
+  addr.col <= range.c1;
 
 export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOptionsHandle {
   const { host, store, wb } = deps;
@@ -94,15 +110,12 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
   const isDateFillCandidate = (): boolean => {
     if (!detail) return false;
     const state = store.getState();
-    for (let r = detail.src.r0; r <= detail.src.r1; r += 1) {
-      for (let c = detail.src.c0; c <= detail.src.c1; c += 1) {
-        const key = addrKey({ sheet: detail.src.sheet, row: r, col: c });
-        const fmt = state.format.formats.get(key)?.numFmt;
-        const cell = state.data.cells.get(key);
-        if ((fmt?.kind === 'date' || fmt?.kind === 'datetime') && cell?.value.kind === 'number') {
-          return true;
-        }
-      }
+    for (const [key, format] of state.format.formats) {
+      const fmt = format.numFmt;
+      if (fmt?.kind !== 'date' && fmt?.kind !== 'datetime') continue;
+      const addr = addrFromKey(key);
+      if (!addr || !addrInRange(addr, detail.src)) continue;
+      if (state.data.cells.get(key)?.value.kind === 'number') return true;
     }
     return false;
   };

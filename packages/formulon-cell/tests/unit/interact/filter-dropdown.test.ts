@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { applyValueFilter } from '../../../src/commands/filter.js';
 import { History } from '../../../src/commands/history.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
@@ -178,6 +179,83 @@ describe('attachFilterDropdown', () => {
     history.undo();
     expect(store.getState().layout.hiddenRows.has(2)).toBe(true);
     expect(store.getState().ui.filterRange).toEqual(range);
+    handle.detach();
+  });
+
+  it('restores checklist state from column criteria instead of hidden rows from other columns', () => {
+    store.setState((s) => {
+      const cells = new Map(s.data.cells);
+      cells.set(addrKey({ sheet: 0, row: 0, col: 0 }), {
+        value: { kind: 'text', value: 'Region' },
+        formula: null,
+      });
+      cells.set(addrKey({ sheet: 0, row: 0, col: 1 }), {
+        value: { kind: 'text', value: 'Type' },
+        formula: null,
+      });
+      cells.set(addrKey({ sheet: 0, row: 1, col: 0 }), {
+        value: { kind: 'text', value: 'West' },
+        formula: null,
+      });
+      cells.set(addrKey({ sheet: 0, row: 1, col: 1 }), {
+        value: { kind: 'text', value: 'A' },
+        formula: null,
+      });
+      cells.set(addrKey({ sheet: 0, row: 2, col: 0 }), {
+        value: { kind: 'text', value: 'East' },
+        formula: null,
+      });
+      cells.set(addrKey({ sheet: 0, row: 2, col: 1 }), {
+        value: { kind: 'text', value: 'B' },
+        formula: null,
+      });
+      cells.set(addrKey({ sheet: 0, row: 3, col: 0 }), {
+        value: { kind: 'text', value: 'East' },
+        formula: null,
+      });
+      cells.set(addrKey({ sheet: 0, row: 3, col: 1 }), {
+        value: { kind: 'text', value: 'A' },
+        formula: null,
+      });
+      return { ...s, data: { ...s.data, cells } };
+    });
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 };
+    applyValueFilter(store.getState(), store, range, 1, ['B']);
+
+    const handle = attachFilterDropdown({ store, strings: en });
+    handle.open(range, 0, { x: 10, y: 20, h: 24 });
+    document.querySelector<HTMLButtonElement>('.fc-filter-dropdown__apply')?.click();
+
+    expect(store.getState().ui.filterCriteria).toEqual([{ range, byCol: 1, hiddenValues: ['B'] }]);
+    expect(store.getState().layout.hiddenRows.has(2)).toBe(true);
+    expect(store.getState().layout.hiddenRows.has(3)).toBe(false);
+    handle.detach();
+  });
+
+  it('restores active condition criteria into the condition controls', () => {
+    store.setState((s) => ({
+      ...s,
+      ui: {
+        ...s.ui,
+        filterCriteria: [
+          {
+            range: { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 },
+            byCol: 0,
+            hiddenValues: [],
+            condition: { op: 'contains', value: 'pen' },
+          },
+        ],
+      },
+    }));
+    const handle = attachFilterDropdown({ store, strings: en });
+    handle.open({ sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 }, 0, { x: 10, y: 20, h: 24 });
+
+    expect(
+      document.querySelector<HTMLSelectElement>('.fc-filter-dropdown__condition-op')?.value,
+    ).toBe('contains');
+    expect(
+      document.querySelector<HTMLInputElement>('.fc-filter-dropdown__condition-value')?.value,
+    ).toBe('pen');
     handle.detach();
   });
 

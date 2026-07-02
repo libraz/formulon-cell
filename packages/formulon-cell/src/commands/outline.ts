@@ -9,6 +9,9 @@ export const MAX_OUTLINE_LEVEL = 7;
 /** Width of one bracket slot in CSS pixels. The gutter widens by this amount
  *  per outline level so each level has its own visual track. */
 export const OUTLINE_GUTTER_PER_LEVEL = 14;
+const MAX_MATERIALIZED_OUTLINE_ROWS = 100_000;
+
+const spanSize = (start: number, end: number): number => (end >= start ? end - start + 1 : 0);
 
 const recomputeRowGutter = (levels: Map<number, number>): number => {
   let max = 0;
@@ -62,6 +65,7 @@ export function groupRows(
 ): void {
   if (r0 > r1) return;
   if (blockedByProtection(store, 'groupRows')) return;
+  if (spanSize(r0, r1) > MAX_MATERIALIZED_OUTLINE_ROWS) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     const cur = store.getState().layout.outlineRows;
     const next = new Map(cur);
@@ -87,8 +91,8 @@ export function ungroupRows(
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     const cur = store.getState().layout.outlineRows;
     const next = new Map(cur);
-    for (let r = r0; r <= r1; r += 1) {
-      const lvl = next.get(r) ?? 0;
+    for (const [r, lvl] of cur) {
+      if (r < r0 || r > r1) continue;
       if (lvl <= 1) next.delete(r);
       else next.set(r, lvl - 1);
     }
@@ -178,6 +182,7 @@ export function collapseRowGroup(
   wb?: WorkbookHandle,
 ): void {
   if (blockedByProtection(store, 'collapseRowGroup')) return;
+  if (spanSize(r0, r1) > MAX_MATERIALIZED_OUTLINE_ROWS) return;
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
       const next = new Set(s.layout.hiddenRows);
@@ -198,7 +203,9 @@ export function expandRowGroup(
   recordLayoutChangeWithEngine(history, store, wb ?? null, () => {
     store.setState((s) => {
       const next = new Set(s.layout.hiddenRows);
-      for (let r = r0; r <= r1; r += 1) next.delete(r);
+      for (const row of s.layout.hiddenRows) {
+        if (row >= r0 && row <= r1) next.delete(row);
+      }
       return { ...s, layout: { ...s.layout, hiddenRows: next } };
     });
   });
@@ -241,11 +248,15 @@ export function expandColGroup(
 /** True when at least one row in `[r0, r1]` is hidden — used to decide which
  *  glyph (+ vs −) to paint on the toggle. */
 export function isRowGroupCollapsed(layout: LayoutSlice, r0: number, r1: number): boolean {
-  for (let r = r0; r <= r1; r += 1) if (layout.hiddenRows.has(r)) return true;
+  for (const row of layout.hiddenRows) {
+    if (row >= r0 && row <= r1) return true;
+  }
   return false;
 }
 
 export function isColGroupCollapsed(layout: LayoutSlice, c0: number, c1: number): boolean {
-  for (let c = c0; c <= c1; c += 1) if (layout.hiddenCols.has(c)) return true;
+  for (const col of layout.hiddenCols) {
+    if (col >= c0 && col <= c1) return true;
+  }
   return false;
 }

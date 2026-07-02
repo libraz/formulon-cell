@@ -1,7 +1,7 @@
 import { addrKey } from '../engine/address.js';
 import type { RangeResolver } from '../engine/range-resolver.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
-import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { type CellValidation, mutators, type SpreadsheetStore } from '../store/store.js';
 import type { History } from './history.js';
 import { cellValueViolatesValidation } from './validate.js';
 
@@ -83,20 +83,45 @@ export function clearIgnoredCellErrors(store: SpreadsheetStore): void {
   mutators.clearIgnoredErrors(store);
 }
 
+const rangeContainsAddr = (range: Range, addr: Addr): boolean =>
+  addr.sheet === range.sheet &&
+  addr.row >= range.r0 &&
+  addr.row <= range.r1 &&
+  addr.col >= range.c0 &&
+  addr.col <= range.c1;
+
+const addrFromKey = (key: string): Addr | null => {
+  const parts = key.split(':').map(Number);
+  const sheet = parts[0];
+  const row = parts[1];
+  const col = parts[2];
+  if (
+    typeof sheet !== 'number' ||
+    typeof row !== 'number' ||
+    typeof col !== 'number' ||
+    !Number.isInteger(sheet) ||
+    !Number.isInteger(row) ||
+    !Number.isInteger(col)
+  ) {
+    return null;
+  }
+  return { sheet, row, col };
+};
+
+const rowMajor = (left: Addr, right: Addr): number =>
+  left.row - right.row || left.col - right.col || left.sheet - right.sheet;
+
 export function formulaErrorCellsInRange(store: SpreadsheetStore, range?: Range): Addr[] {
   const state = store.getState();
   const target = range ?? state.selection.range;
   const out: Addr[] = [];
-  for (let row = target.r0; row <= target.r1; row += 1) {
-    for (let col = target.c0; col <= target.c1; col += 1) {
-      const addr = { sheet: target.sheet, row, col };
-      if (state.errorIndicators.ignoredErrors.has(addrKey(addr))) continue;
-      const cell = state.data.cells.get(addrKey(addr));
-      if (!cell?.formula) continue;
-      if (cellValueIsFormulaError(cell.value)) out.push(addr);
-    }
+  for (const [key, cell] of state.data.cells) {
+    if (!cell.formula || !cellValueIsFormulaError(cell.value)) continue;
+    if (state.errorIndicators.ignoredErrors.has(key)) continue;
+    const addr = addrFromKey(key);
+    if (addr && rangeContainsAddr(target, addr)) out.push(addr);
   }
-  return out;
+  return out.sort(rowMajor);
 }
 
 export function selectNextFormulaError(store: SpreadsheetStore, range?: Range): Addr | null {
@@ -121,16 +146,23 @@ export function circleInvalidValidationData(
   const state = store.getState();
   const keys = new Set(state.errorIndicators.validationCircles);
   let marked = 0;
-  for (let row = range.r0; row <= range.r1; row += 1) {
-    for (let col = range.c0; col <= range.c1; col += 1) {
-      const addr = { sheet: range.sheet, row, col };
-      const key = addrKey(addr);
-      const validation = state.format.formats.get(key)?.validation;
-      const value = state.data.cells.get(key)?.value ?? { kind: 'blank' as const };
-      if (!cellValueViolatesValidation(value, validation, resolveRange)) continue;
-      keys.add(key);
-      marked += 1;
-    }
+  const candidates: Array<{ key: string; validation: CellValidation }> = [];
+  for (const [key, format] of state.format.formats) {
+    if (!format.validation) continue;
+    const addr = addrFromKey(key);
+    if (!addr || !rangeContainsAddr(range, addr)) continue;
+    candidates.push({ key, validation: format.validation });
+  }
+  candidates.sort((left, right) => {
+    const leftAddr = addrFromKey(left.key);
+    const rightAddr = addrFromKey(right.key);
+    return leftAddr && rightAddr ? rowMajor(leftAddr, rightAddr) : 0;
+  });
+  for (const { key, validation } of candidates) {
+    const value = state.data.cells.get(key)?.value ?? { kind: 'blank' as const };
+    if (!cellValueViolatesValidation(value, validation, resolveRange)) continue;
+    keys.add(key);
+    marked += 1;
   }
   mutators.setValidationCircles(store, keys);
   return marked;

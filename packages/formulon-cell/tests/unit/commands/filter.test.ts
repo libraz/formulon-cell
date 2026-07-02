@@ -109,6 +109,34 @@ describe('filter commands', () => {
     expect(store.getState().layout.hiddenRows.has(3)).toBe(false);
   });
 
+  it('stores condition filter criteria and reapplies them after data changes', () => {
+    seedText(store, 0, 0, 'Item');
+    seedText(store, 1, 0, 'paper');
+    seedText(store, 2, 0, 'ink');
+    seedText(store, 3, 0, 'pencil');
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 };
+
+    expect(
+      applyConditionFilter(store.getState(), store, range, 0, {
+        op: 'contains',
+        value: 'p',
+      }),
+    ).toBe(1);
+    expect(store.getState().ui.filterCriteria).toEqual([
+      {
+        range,
+        byCol: 0,
+        hiddenValues: [],
+        condition: { op: 'contains', value: 'p' },
+      },
+    ]);
+
+    seedText(store, 3, 0, 'ink');
+    expect(reapplyFilters(store.getState(), store)).toBe(2);
+    expect(store.getState().layout.hiddenRows.has(2)).toBe(true);
+    expect(store.getState().layout.hiddenRows.has(3)).toBe(true);
+  });
+
   it('filters rows by selected cell fill color and reapplies the color criterion', () => {
     seedText(store, 0, 0, 'Status');
     seedText(store, 1, 0, 'Open');
@@ -514,6 +542,68 @@ describe('filter commands', () => {
     expect(hidden).toBe(1);
     expect(store.getState().layout.hiddenRows.has(1)).toBe(false);
     expect(store.getState().layout.hiddenRows.has(2)).toBe(true);
+  });
+
+  it('applyFilterColumns refuses huge ranges without materializing hidden rows', () => {
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 0 };
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, hiddenRows: new Set([10, 200_000]) },
+    }));
+
+    const hidden = applyFilterColumns(store.getState(), store, range, [
+      { byCol: 0, predicate: () => false },
+    ]);
+
+    const state = store.getState();
+    expect(hidden).toBe(0);
+    expect(state.ui.filterRange).toEqual(range);
+    expect(state.layout.hiddenRows.size).toBe(0);
+  });
+
+  it('value filters on huge ranges stamp autofilter without storing massive criteria', () => {
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 0 };
+    seedText(store, 1, 0, 'keep');
+
+    const hidden = applyValueFilter(store.getState(), store, range, 0, ['keep']);
+
+    const state = store.getState();
+    expect(hidden).toBe(0);
+    expect(state.ui.filterRange).toEqual(range);
+    expect(state.ui.filterCriteria).toEqual([]);
+    expect(state.layout.hiddenRows.size).toBe(0);
+  });
+
+  it('distinctFilterItems scans materialized cells for huge ranges', () => {
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 0 };
+    seedText(store, 1, 0, 'b');
+    seedText(store, 500_000, 0, 'a');
+
+    const items = distinctFilterItems(store.getState(), range, 0);
+
+    expect(items).toEqual([
+      { key: 'a', label: 'a' },
+      { key: 'b', label: 'b' },
+    ]);
+  });
+
+  it('advanced filter refuses huge list ranges without materializing hidden rows', () => {
+    const listRange = { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 0 };
+    const criteriaRange = { sheet: 0, r0: 5, c0: 0, r1: 6, c1: 0 };
+    seedText(store, 5, 0, 'Name');
+    seedText(store, 6, 0, 'x');
+
+    const hidden = applyAdvancedFilter(store.getState(), store, listRange, criteriaRange);
+    const copied = copyAdvancedFilterResult(store.getState(), store, listRange, criteriaRange, {
+      sheet: 0,
+      row: 10,
+      col: 0,
+    });
+
+    expect(hidden).toBe(0);
+    expect(copied).toBe(0);
+    expect(store.getState().ui.filterRange).toEqual(listRange);
+    expect(store.getState().layout.hiddenRows.size).toBe(0);
   });
 
   it('copies advanced filter results to another location with unique records', () => {

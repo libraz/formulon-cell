@@ -1,5 +1,5 @@
 import { addrKey } from '../engine/address.js';
-import type { Range } from '../engine/types.js';
+import type { Addr, Range } from '../engine/types.js';
 import { normalizeFormatLocale } from '../format/locale.js';
 import { formatWithPending, sameAddr } from '../store/pending-format.js';
 import {
@@ -17,6 +17,35 @@ import {
 import { gateProtection, isCellWritable } from './protection.js';
 
 type ToggleKey = 'bold' | 'italic' | 'underline' | 'strike';
+
+const MAX_MATERIALIZED_FORMAT_CELLS = 100_000;
+
+const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
+
+const rangeContainsAddr = (range: Range, addr: Addr): boolean =>
+  addr.sheet === range.sheet &&
+  addr.row >= range.r0 &&
+  addr.row <= range.r1 &&
+  addr.col >= range.c0 &&
+  addr.col <= range.c1;
+
+const addrFromKey = (key: string): Addr | null => {
+  const parts = key.split(':').map(Number);
+  const sheet = parts[0];
+  const row = parts[1];
+  const col = parts[2];
+  if (
+    typeof sheet !== 'number' ||
+    typeof row !== 'number' ||
+    typeof col !== 'number' ||
+    !Number.isInteger(sheet) ||
+    !Number.isInteger(row) ||
+    !Number.isInteger(col)
+  ) {
+    return null;
+  }
+  return { sheet, row, col };
+};
 
 function eachKey(range: Range, fn: (key: string) => void): void {
   for (let r = range.r0; r <= range.r1; r += 1) {
@@ -115,6 +144,7 @@ function allHave(
   ) {
     return predicate(formatWithPending(state, pendingAddr));
   }
+  if (rangeArea(range) > MAX_MATERIALIZED_FORMAT_CELLS) return false;
   let all = true;
   eachKey(range, (key) => {
     if (!predicate(state.format.formats.get(key))) all = false;
@@ -136,6 +166,7 @@ function anyHave(
   ) {
     return predicate(formatWithPending(state, pendingAddr));
   }
+  if (rangeArea(range) > MAX_MATERIALIZED_FORMAT_CELLS) return false;
   let any = false;
   eachKey(range, (key) => {
     if (predicate(state.format.formats.get(key))) any = true;
@@ -193,6 +224,7 @@ export function bumpIndent(state: State, store: SpreadsheetStore, delta: 1 | -1)
     applyFormatPatch(state, store, range, { indent: Math.max(0, Math.min(15, cur + delta)) });
     return;
   }
+  if (rangeArea(range) > MAX_MATERIALIZED_FORMAT_CELLS) return;
   if (state.ui.pendingFormat) mutators.setPendingFormat(store, null);
   const sheet = range.sheet;
   for (let r = range.r0; r <= range.r1; r += 1) {
@@ -240,6 +272,7 @@ const clampDecimals = (n: number): number => Math.max(0, Math.min(10, n));
 export function bumpDecimals(state: State, store: SpreadsheetStore, delta: 1 | -1): void {
   const range = state.selection.range;
   if (gateProtection(state, range) === null) return;
+  if (rangeArea(range) > MAX_MATERIALIZED_FORMAT_CELLS) return;
   const sheet = range.sheet;
   for (let r = range.r0; r <= range.r1; r += 1) {
     for (let c = range.c0; c <= range.c1; c += 1) {
@@ -357,6 +390,7 @@ export function setBorderPreset(
   } else if (state.ui.pendingFormat) {
     mutators.setPendingFormat(store, null);
   }
+  if (rangeArea(range) > MAX_MATERIALIZED_FORMAT_CELLS) return;
   if (preset === 'all') {
     applyFormatPatch(state, store, range, {
       borders: { top: side, right: side, bottom: side, left: side },
@@ -475,6 +509,7 @@ export function cycleBorders(state: State, store: SpreadsheetStore): void {
       return;
     }
     if (state.ui.pendingFormat) mutators.setPendingFormat(store, null);
+    if (rangeArea(range) > MAX_MATERIALIZED_FORMAT_CELLS) return;
     // Outline: paint only the perimeter sides.
     const sheet = range.sheet;
     for (let r = range.r0; r <= range.r1; r += 1) {
@@ -513,19 +548,16 @@ export function clearFormat(state: State, store: SpreadsheetStore): void {
   const range = state.selection.range;
   if (gateProtection(state, range) === null) return;
   if (state.ui.pendingFormat) mutators.setPendingFormat(store, null);
-  if (!state.protection.protectedSheets.has(range.sheet)) {
-    mutators.setRangeFormat(store, range, null);
-    return;
-  }
-  // Per-cell loop respecting individual lock flags.
-  const sheet = range.sheet;
-  for (let r = range.r0; r <= range.r1; r += 1) {
-    for (let c = range.c0; c <= range.c1; c += 1) {
-      const addr = { sheet, row: r, col: c };
-      if (!isCellWritable(state, addr)) continue;
-      mutators.setCellFormat(store, addr, null);
+  store.setState((s) => {
+    const formats = new Map(s.format.formats);
+    for (const key of s.format.formats.keys()) {
+      const addr = addrFromKey(key);
+      if (!addr || !rangeContainsAddr(range, addr)) continue;
+      if (!isCellWritable(s, addr)) continue;
+      formats.delete(key);
     }
-  }
+    return { ...s, format: { ...s.format, formats } };
+  });
 }
 
 const visualFormatKeys: readonly (keyof CellFormat)[] = [
@@ -567,17 +599,13 @@ export function clearVisualFormat(state: State, store: SpreadsheetStore): void {
   if (state.ui.pendingFormat) mutators.setPendingFormat(store, null);
   store.setState((s) => {
     const formats = new Map(s.format.formats);
-    for (let r = range.r0; r <= range.r1; r += 1) {
-      for (let c = range.c0; c <= range.c1; c += 1) {
-        const addr = { sheet: range.sheet, row: r, col: c };
-        if (!isCellWritable(state, addr)) continue;
-        const key = addrKey(addr);
-        const current = formats.get(key);
-        if (!current) continue;
-        const next = stripVisualFormat(current);
-        if (next) formats.set(key, next);
-        else formats.delete(key);
-      }
+    for (const [key, current] of s.format.formats) {
+      const addr = addrFromKey(key);
+      if (!addr || !rangeContainsAddr(range, addr)) continue;
+      if (!isCellWritable(s, addr)) continue;
+      const next = stripVisualFormat(current);
+      if (next) formats.set(key, next);
+      else formats.delete(key);
     }
     return { ...s, format: { ...s.format, formats } };
   });
