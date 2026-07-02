@@ -4,7 +4,7 @@ import {
   renderCellValueForF9,
   replaceFormulaSelectionWithF9Preview,
 } from '../../../src/commands/f9-preview.js';
-import type { CellValue } from '../../../src/engine/types.js';
+import { type CellValue, type EvalResult, ValueKind } from '../../../src/engine/types.js';
 
 const numCell = (value: number): { value: CellValue; formula: string | null } => ({
   value: { kind: 'number', value },
@@ -15,6 +15,16 @@ const txtCell = (value: string): { value: CellValue; formula: string | null } =>
   value: { kind: 'text', value },
   formula: null,
 });
+
+const evalNumber =
+  (expectedFormula: string, value: number) =>
+  (formula: string): EvalResult => {
+    expect(formula).toBe(expectedFormula);
+    return {
+      status: { status: 0 },
+      value: { kind: ValueKind.Number, number: value },
+    } as EvalResult;
+  };
 
 describe('renderCellValueForF9', () => {
   it('renders number as decimal string', () => {
@@ -107,6 +117,101 @@ describe('computeF9Preview', () => {
       substitutable: false,
     });
     expect(computeF9Preview('=A1+B1', 'A1+B1', 0, new Map())).toEqual({
+      display: '',
+      substitutable: false,
+    });
+  });
+
+  it('evaluates a single-cell-ref expression when an engine evaluator is supplied', () => {
+    const cells = new Map([
+      ['0:0:0', numCell(7)],
+      ['0:0:1', numCell(5)],
+    ]);
+    expect(computeF9Preview('=A1+B1', 'A1+B1', 0, cells, undefined, evalNumber('7+5', 12))).toEqual(
+      {
+        display: '12',
+        substitutable: true,
+      },
+    );
+  });
+
+  it('substitutes sheet-qualified refs before engine-backed F9 evaluation', () => {
+    const cells = new Map([
+      ['0:0:0', numCell(7)],
+      ['1:0:0', numCell(5)],
+    ]);
+    const sheetByName = (n: string): number => (n === 'Other' ? 1 : -1);
+    expect(
+      computeF9Preview('=A1+Other!A1', 'A1+Other!A1', 0, cells, sheetByName, evalNumber('7+5', 12)),
+    ).toEqual({
+      display: '12',
+      substitutable: true,
+    });
+  });
+
+  it('does not treat digit-suffixed function names as refs during engine-backed evaluation', () => {
+    const cells = new Map([['0:0:0', numCell(100)]]);
+    expect(
+      computeF9Preview('=LOG10(A1)', 'LOG10(A1)', 0, cells, undefined, evalNumber('LOG10(100)', 2)),
+    ).toEqual({
+      display: '2',
+      substitutable: true,
+    });
+  });
+
+  it('expands range refs before engine-backed F9 evaluation', () => {
+    const cells = new Map([
+      ['0:0:0', numCell(7)],
+      ['0:1:0', numCell(5)],
+      ['0:2:0', numCell(3)],
+    ]);
+    expect(
+      computeF9Preview(
+        '=SUM(A1:A3)',
+        'SUM(A1:A3)',
+        0,
+        cells,
+        undefined,
+        evalNumber('SUM(7,5,3)', 15),
+      ),
+    ).toEqual({
+      display: '15',
+      substitutable: true,
+    });
+  });
+
+  it('expands sheet-qualified range refs before engine-backed F9 evaluation', () => {
+    const cells = new Map([
+      ['1:0:0', numCell(2)],
+      ['1:0:1', numCell(4)],
+    ]);
+    const sheetByName = (n: string): number => (n === 'Other' ? 1 : -1);
+    expect(
+      computeF9Preview(
+        '=SUM(Other!A1:B1)',
+        'SUM(Other!A1:B1)',
+        0,
+        cells,
+        sheetByName,
+        evalNumber('SUM(2,4)', 6),
+      ),
+    ).toEqual({
+      display: '6',
+      substitutable: true,
+    });
+  });
+
+  it('keeps oversized ranges unsupported even when an engine evaluator is supplied', () => {
+    expect(
+      computeF9Preview(
+        '=SUM(A1:A10001)',
+        'SUM(A1:A10001)',
+        0,
+        new Map(),
+        undefined,
+        evalNumber('', 0),
+      ),
+    ).toEqual({
       display: '',
       substitutable: false,
     });

@@ -223,6 +223,35 @@ describe('InlineEditor', () => {
     expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 0 });
   });
 
+  it('does not commit Enter while IME composition is active', () => {
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    editor.begin('');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.value = 'に';
+    input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+
+    const composingEnter = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      cancelable: true,
+      bubbles: true,
+    });
+    input.dispatchEvent(composingEnter);
+
+    expect(composingEnter.defaultPrevented).toBe(false);
+    expect(onAfterCommit).not.toHaveBeenCalled();
+    expect(editor.isActive()).toBe(true);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
+
+    input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true });
+    input.dispatchEvent(enter);
+
+    expect(enter.defaultPrevented).toBe(true);
+    wb.recalc();
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'に' });
+    expect(editor.isActive()).toBe(false);
+  });
+
   it('Escape cancels without writing', () => {
     mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
     editor.begin('');
@@ -234,6 +263,38 @@ describe('InlineEditor', () => {
     expect(onAfterCommit).not.toHaveBeenCalled();
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
     expect(editor.isActive()).toBe(false);
+  });
+
+  it('does not cancel Escape while IME composition is active', () => {
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    editor.begin('');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.value = '変換中';
+    input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+
+    const composingEscape = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      cancelable: true,
+      bubbles: true,
+    });
+    input.dispatchEvent(composingEscape);
+
+    expect(composingEscape.defaultPrevented).toBe(false);
+    expect(onAfterCommit).not.toHaveBeenCalled();
+    expect(editor.isActive()).toBe(true);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
+
+    input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+    const escapeKey = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      cancelable: true,
+      bubbles: true,
+    });
+    input.dispatchEvent(escapeKey);
+
+    expect(escapeKey.defaultPrevented).toBe(true);
+    expect(editor.isActive()).toBe(false);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
   });
 
   it('Tab commits and advances right; Shift+Tab commits in place', () => {
@@ -323,6 +384,17 @@ describe('InlineEditor', () => {
       for (let col = 0; col <= 2; col += 1) {
         expect(wb.getValue({ sheet: 0, row: 0, col })).toEqual({ kind: 'number', value: 7 });
       }
+    });
+
+    it('does not materialize huge selections', () => {
+      selectRange(0, 0, 100_000, 0);
+      editor.begin('7');
+      editor.commitMulti();
+      wb.recalc();
+
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
+      expect(onAfterCommit).not.toHaveBeenCalled();
+      expect(editor.isActive()).toBe(true);
     });
 
     it('validates NON-anchor cells too, aborting on a stop rule (M-16)', () => {

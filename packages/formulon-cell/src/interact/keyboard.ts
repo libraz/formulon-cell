@@ -22,8 +22,22 @@ const clamp = (a: Addr, row: number, col: number): Addr => ({
   col: Math.max(0, Math.min(MAX_COL, col)),
 });
 
-const isPopulated = (s: State, sheet: number, row: number, col: number): boolean =>
-  s.data.cells.has(addrKey({ sheet, row, col }));
+const formatHasContent = (format: object | undefined): boolean =>
+  format !== undefined && Object.keys(format).length > 0;
+
+const addrFromKey = (key: string): Addr | null => {
+  const [sheetRaw, rowRaw, colRaw] = key.split(':');
+  const sheet = Number(sheetRaw);
+  const row = Number(rowRaw);
+  const col = Number(colRaw);
+  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
+  return { sheet, row, col };
+};
+
+const isPopulated = (s: State, sheet: number, row: number, col: number): boolean => {
+  const key = addrKey({ sheet, row, col });
+  return s.data.cells.has(key) || formatHasContent(s.format.formats.get(key));
+};
 
 /**
  * Spreadsheet-style Ctrl+Arrow jump. Three behaviors based on neighbor state:
@@ -74,16 +88,45 @@ function jumpEdge(s: State, a: Addr, dRow: number, dCol: number): Addr {
 function lastUsedCell(s: State, sheet: number): { row: number; col: number } {
   let maxRow = 0;
   let maxCol = 0;
-  for (const key of s.data.cells.keys()) {
-    const parts = key.split(':');
-    if (parts.length !== 3) continue;
-    if (Number(parts[0]) !== sheet) continue;
-    const r = Number(parts[1]);
-    const c = Number(parts[2]);
-    if (r > maxRow) maxRow = r;
-    if (c > maxCol) maxCol = c;
+  const visit = (key: string): void => {
+    const addr = addrFromKey(key);
+    if (!addr || addr.sheet !== sheet) return;
+    if (addr.row > maxRow) maxRow = addr.row;
+    if (addr.col > maxCol) maxCol = addr.col;
+  };
+  for (const key of s.data.cells.keys()) visit(key);
+  for (const [key, format] of s.format.formats) {
+    if (formatHasContent(format)) visit(key);
   }
   return { row: maxRow, col: maxCol };
+}
+
+function scrollActiveIntoView(store: SpreadsheetStore, addr: Addr): void {
+  store.setState((s) => {
+    if (addr.sheet !== s.data.sheetIndex) return s;
+    const rowStartMin = s.layout.freezeRows;
+    const colStartMin = s.layout.freezeCols;
+    const maxRowStart = Math.max(rowStartMin, MAX_ROW + 1 - s.viewport.rowCount);
+    const maxColStart = Math.max(colStartMin, MAX_COL + 1 - s.viewport.colCount);
+    let rowStart = s.viewport.rowStart;
+    let colStart = s.viewport.colStart;
+    const visibleRowStart = Math.max(rowStart, s.layout.freezeRows);
+    const visibleColStart = Math.max(colStart, s.layout.freezeCols);
+    const visibleRowEnd = rowStart + s.viewport.rowCount - 1;
+    const visibleColEnd = colStart + s.viewport.colCount - 1;
+    if (addr.row >= s.layout.freezeRows) {
+      if (addr.row < visibleRowStart) rowStart = addr.row;
+      else if (addr.row > visibleRowEnd) rowStart = addr.row - s.viewport.rowCount + 1;
+    }
+    if (addr.col >= s.layout.freezeCols) {
+      if (addr.col < visibleColStart) colStart = addr.col;
+      else if (addr.col > visibleColEnd) colStart = addr.col - s.viewport.colCount + 1;
+    }
+    rowStart = Math.min(maxRowStart, Math.max(rowStartMin, rowStart));
+    colStart = Math.min(maxColStart, Math.max(colStartMin, colStart));
+    if (rowStart === s.viewport.rowStart && colStart === s.viewport.colStart) return s;
+    return { ...s, viewport: { ...s.viewport, rowStart, colStart } };
+  });
 }
 
 export interface KeyboardDeps {
@@ -142,6 +185,12 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       return;
     }
 
+    if (meta && k === 'Backspace') {
+      e.preventDefault();
+      scrollActiveIntoView(store, a);
+      return;
+    }
+
     if (meta && (k === 'a' || k === 'A')) {
       e.preventDefault();
       mutators.selectAll(store);
@@ -167,6 +216,12 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
         e.preventDefault();
         deps.onClipboardShortcut('paste');
       }
+      return;
+    }
+
+    if (meta && shift && k === ' ') {
+      e.preventDefault();
+      mutators.selectAll(store);
       return;
     }
 
@@ -224,8 +279,14 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     else if (k === 'End' && meta) {
       const { row, col } = lastUsedCell(s, a.sheet);
       target = clamp(a, row, col);
-    } else if (k === 'PageDown') target = move(a, Math.max(1, s.viewport.rowCount - 1), 0);
-    else if (k === 'PageUp') target = move(a, -Math.max(1, s.viewport.rowCount - 1), 0);
+    } else if (k === 'PageDown')
+      target = e.altKey
+        ? move(a, 0, Math.max(1, s.viewport.colCount - 1))
+        : move(a, Math.max(1, s.viewport.rowCount - 1), 0);
+    else if (k === 'PageUp')
+      target = e.altKey
+        ? move(a, 0, -Math.max(1, s.viewport.colCount - 1))
+        : move(a, -Math.max(1, s.viewport.rowCount - 1), 0);
     else if (k === 'Tab') target = stepWithMerge(s, a, 0, shift ? -1 : 1, MAX_ROW, MAX_COL);
     else if (k === 'Enter' && !meta) {
       target = stepWithMerge(s, a, shift ? -1 : 1, 0, MAX_ROW, MAX_COL);
@@ -297,8 +358,10 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       ) {
         mutators.setRange(store, grown);
       }
+      scrollActiveIntoView(store, target);
     } else {
       mutators.setActive(store, target);
+      scrollActiveIntoView(store, target);
     }
   };
 

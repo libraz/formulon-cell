@@ -3,7 +3,7 @@ import { replaceFormulaSelectionWithF9Preview } from '../commands/f9-preview.js'
 import { stepWithMerge } from '../commands/merge.js';
 import { dblClickRange, extractRefs, rotateRefAt, shiftFormulaRefs } from '../commands/refs.js';
 import { addrKey } from '../engine/address.js';
-import type { Addr } from '../engine/types.js';
+import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { cellRect } from '../render/geometry.js';
 import { formatWithPending, sameAddr } from '../store/pending-format.js';
@@ -17,6 +17,9 @@ import {
 
 const MAX_ROW = 1_048_575;
 const MAX_COL = 16_383;
+const MAX_MULTI_COMMIT_CELLS = 100_000;
+
+const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
 
 const syncEditorRefs = (store: SpreadsheetStore, text: string): void => {
   const refs = extractRefs(text).map((r) => ({
@@ -67,6 +70,8 @@ export class InlineEditor {
   private autocomplete: AutocompleteHandle | null = null;
 
   private argHelper: ArgHelperHandle | null = null;
+
+  private composing = false;
 
   constructor(deps: EditorDeps) {
     this.deps = deps;
@@ -137,6 +142,8 @@ export class InlineEditor {
     input.addEventListener('keydown', this.onKey);
     input.addEventListener('keyup', this.onKeyUp);
     input.addEventListener('input', this.onInput);
+    input.addEventListener('compositionstart', this.onCompositionStart);
+    input.addEventListener('compositionend', this.onCompositionEnd);
     input.addEventListener('blur', this.onBlur);
     input.addEventListener('dblclick', this.onDblClick);
     input.addEventListener('click', this.onClick);
@@ -164,12 +171,15 @@ export class InlineEditor {
     this.input.removeEventListener('keydown', this.onKey);
     this.input.removeEventListener('keyup', this.onKeyUp);
     this.input.removeEventListener('input', this.onInput);
+    this.input.removeEventListener('compositionstart', this.onCompositionStart);
+    this.input.removeEventListener('compositionend', this.onCompositionEnd);
     this.input.removeEventListener('blur', this.onBlur);
     this.input.removeEventListener('dblclick', this.onDblClick);
     this.input.removeEventListener('click', this.onClick);
     this.input.remove();
     this.input = null;
     this.editingAddr = null;
+    this.composing = false;
     mutators.setEditor(this.deps.store, { kind: 'idle' });
     mutators.setPendingFormat(this.deps.store, null);
     mutators.setEditorRefs(this.deps.store, []);
@@ -248,6 +258,8 @@ export class InlineEditor {
     const anchor = this.editingAddr;
     const s = this.deps.store.getState();
     const ranges = [s.selection.range, ...(s.selection.extraRanges ?? [])];
+    const totalCells = ranges.reduce((sum, r) => sum + rangeArea(r), 0);
+    if (totalCells > MAX_MULTI_COMMIT_CELLS) return;
     const sheet = s.data.sheetIndex;
     const isFormula = raw.startsWith('=');
     // Validated write that mirrors the anchor's stop-rejection handling. Returns
@@ -318,6 +330,9 @@ export class InlineEditor {
   }
 
   private readonly onKey = (e: KeyboardEvent): void => {
+    if (this.composing || e.isComposing || e.key === 'Process') {
+      return;
+    }
     // When the autocomplete is open, intercept arrow/enter/tab/escape so they
     //  drive the popover instead of the surrounding editor.
     if (this.autocomplete?.isOpen()) {
@@ -403,6 +418,7 @@ export class InlineEditor {
         this.deps.store.getState().data.sheetIndex,
         this.deps.store.getState().data.cells,
         sheetByName,
+        (formula) => this.deps.wb.evalFormula(formula),
       );
       if (result) {
         e.preventDefault();
@@ -440,6 +456,15 @@ export class InlineEditor {
     }
     this.autocomplete?.refresh();
     this.argHelper?.refresh();
+  };
+
+  private readonly onCompositionStart = (): void => {
+    this.composing = true;
+  };
+
+  private readonly onCompositionEnd = (): void => {
+    this.composing = false;
+    this.onInput();
   };
 
   /** Double-click inside a formula edit selects a semantic token rather than

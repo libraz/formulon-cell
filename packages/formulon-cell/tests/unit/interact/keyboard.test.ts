@@ -7,6 +7,7 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+import type { CellFormat } from '../../../src/store/types.js';
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
@@ -44,6 +45,14 @@ const seed = (
     return { ...s, data: { ...s.data, cells: map } };
   });
   wb.recalc();
+};
+
+const setFormat = (store: SpreadsheetStore, row: number, col: number, format: CellFormat): void => {
+  store.setState((s) => {
+    const formats = new Map(s.format.formats);
+    formats.set(addrKey({ sheet: 0, row, col }), format);
+    return { ...s, format: { ...s.format, formats } };
+  });
 };
 
 const fire = (
@@ -171,6 +180,17 @@ describe('attachKeyboard', () => {
       expect(store.getState().selection.active).toEqual({ sheet: 0, row: 5, col: 9 });
     });
 
+    it('Ctrl+End includes format-only cells in the used range', () => {
+      setup();
+      seed(store, wb, [{ row: 2, col: 2, value: 1 }]);
+      setFormat(store, 8, 5, { comment: 'note only' });
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+
+      fire(host, 'End', { ctrlKey: true });
+
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 8, col: 5 });
+    });
+
     it('PageDown/PageUp jump by viewport.rowCount-1', () => {
       setup();
       // viewport defaults to rowCount: 40.
@@ -181,6 +201,71 @@ describe('attachKeyboard', () => {
       expect(store.getState().selection.active.row).toBe(50);
     });
 
+    it('Alt+PageDown/PageUp jump horizontally by viewport.colCount-1', () => {
+      setup();
+      store.setState((s) => ({
+        ...s,
+        viewport: { ...s.viewport, colStart: 8, colCount: 4 },
+      }));
+      mutators.setActive(store, { sheet: 0, row: 2, col: 10 });
+
+      const down = fire(host, 'PageDown', { altKey: true });
+      expect(down.defaultPrevented).toBe(true);
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 2, col: 13 });
+      expect(store.getState().viewport.colStart).toBe(10);
+
+      fire(host, 'PageUp', { altKey: true });
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 2, col: 10 });
+    });
+
+    it('Shift+Alt+PageDown extends horizontally and scrolls the active edge into view', () => {
+      setup();
+      store.setState((s) => ({
+        ...s,
+        viewport: { ...s.viewport, colStart: 8, colCount: 4 },
+      }));
+      mutators.setActive(store, { sheet: 0, row: 2, col: 10 });
+
+      fire(host, 'PageDown', { altKey: true, shiftKey: true });
+
+      const s = store.getState();
+      expect(s.selection.active).toEqual({ sheet: 0, row: 2, col: 13 });
+      expect(s.selection.range).toEqual({ sheet: 0, r0: 2, c0: 10, r1: 2, c1: 13 });
+      expect(s.viewport.colStart).toBe(10);
+    });
+
+    it('keyboard navigation scrolls the viewport enough to keep the active cell visible', () => {
+      setup();
+      store.setState((s) => ({
+        ...s,
+        viewport: { ...s.viewport, rowStart: 0, rowCount: 5, colStart: 0, colCount: 4 },
+      }));
+      mutators.setActive(store, { sheet: 0, row: 4, col: 3 });
+
+      fire(host, 'ArrowDown');
+      fire(host, 'ArrowRight');
+
+      const s = store.getState();
+      expect(s.selection.active).toEqual({ sheet: 0, row: 5, col: 4 });
+      expect(s.viewport.rowStart).toBe(1);
+      expect(s.viewport.colStart).toBe(1);
+    });
+
+    it('Shift+Arrow range extension also scrolls the active edge into view', () => {
+      setup();
+      store.setState((s) => ({
+        ...s,
+        viewport: { ...s.viewport, rowStart: 0, rowCount: 5, colStart: 0, colCount: 4 },
+      }));
+      mutators.setActive(store, { sheet: 0, row: 4, col: 3 });
+
+      fire(host, 'ArrowDown', { shiftKey: true });
+
+      const s = store.getState();
+      expect(s.selection.range).toEqual({ sheet: 0, r0: 4, c0: 3, r1: 5, c1: 3 });
+      expect(s.viewport.rowStart).toBe(1);
+    });
+
     it('Ctrl+PageUp/PageDown switches sheets through the chrome callback', () => {
       setup();
       fire(host, 'PageDown', { ctrlKey: true });
@@ -189,10 +274,18 @@ describe('attachKeyboard', () => {
       expect(onSwitchSheet).toHaveBeenNthCalledWith(2, -1);
     });
 
-    it('Ctrl+A, Ctrl+Space, and Shift+Space select all, column, and row', () => {
+    it('Ctrl+A, Ctrl+Shift+Space, Ctrl+Space, and Shift+Space select all, column, and row', () => {
       setup();
       mutators.setActive(store, { sheet: 0, row: 3, col: 2 });
       fire(host, 'a', { ctrlKey: true });
+      expect(store.getState().selection.range).toMatchObject({
+        r0: 0,
+        c0: 0,
+        r1: 1048575,
+        c1: 16383,
+      });
+      mutators.setActive(store, { sheet: 0, row: 3, col: 2 });
+      fire(host, ' ', { ctrlKey: true, shiftKey: true });
       expect(store.getState().selection.range).toMatchObject({
         r0: 0,
         c0: 0,
@@ -228,6 +321,26 @@ describe('attachKeyboard', () => {
       mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
       fire(host, 'ArrowDown', { ctrlKey: true });
       expect(store.getState().selection.active.row).toBe(5);
+    });
+
+    it('empty origin + format-only cells skips blanks to the next used cell', () => {
+      setup();
+      setFormat(store, 5, 0, { hyperlink: 'https://example.test' });
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+
+      fire(host, 'ArrowDown', { ctrlKey: true });
+
+      expect(store.getState().selection.active.row).toBe(5);
+    });
+
+    it('empty format entries do not stop Ctrl+Arrow navigation', () => {
+      setup();
+      setFormat(store, 5, 0, {});
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+
+      fire(host, 'ArrowDown', { ctrlKey: true });
+
+      expect(store.getState().selection.active.row).toBe(1_048_575);
     });
 
     it('populated origin + populated neighbor walks to the end of the run', () => {
@@ -383,6 +496,25 @@ describe('attachKeyboard', () => {
       fire(host, 'Backspace');
       wb.recalc();
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
+    });
+
+    it('Ctrl+Backspace scrolls the active cell into view without clearing it', () => {
+      setup();
+      seed(store, wb, [{ row: 50, col: 10, value: 7 }]);
+      store.setState((s) => ({
+        ...s,
+        viewport: { ...s.viewport, rowStart: 0, rowCount: 5, colStart: 0, colCount: 4 },
+      }));
+      mutators.setActive(store, { sheet: 0, row: 50, col: 10 });
+
+      const e = fire(host, 'Backspace', { ctrlKey: true });
+
+      expect(e.defaultPrevented).toBe(true);
+      expect(store.getState().viewport.rowStart).toBe(46);
+      expect(store.getState().viewport.colStart).toBe(7);
+      wb.recalc();
+      expect(wb.getValue({ sheet: 0, row: 50, col: 10 })).toEqual({ kind: 'number', value: 7 });
+      expect(onClearActive).not.toHaveBeenCalled();
     });
   });
 
