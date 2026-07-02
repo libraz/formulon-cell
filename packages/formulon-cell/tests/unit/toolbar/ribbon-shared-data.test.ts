@@ -554,14 +554,34 @@ describe('toolbar/ribbon shared data', () => {
     const vueToolbarFiles = sourceFilesUnder('../formulon-cell-vue/src/toolbar');
     const reactToolbarSource = source('../formulon-cell-react/src/SpreadsheetToolbar.tsx');
     const vueToolbarSource = source('../formulon-cell-vue/src/SpreadsheetToolbar.vue');
+    const vueToolbarDts = source('../formulon-cell-vue/src/SpreadsheetToolbar.vue.d.ts');
     const vueToolbarExports = source('../formulon-cell-vue/src/toolbar.ts');
+    const reactIndexSource = source('../formulon-cell-react/src/index.ts');
+    const vueIndexSource = source('../formulon-cell-vue/src/index.ts');
 
     expect(reactToolbarFiles).toEqual(['../formulon-cell-react/src/toolbar/model.ts']);
     expect(vueToolbarFiles).toEqual([]);
     expect(reactToolbarSource).toContain('Spreadsheet.mountToolbar');
     expect(vueToolbarSource).toContain('Spreadsheet.mountToolbar');
-    expect(vueToolbarExports.trim()).toBe(
-      "export type { RibbonTab, ToolbarInstance } from '@libraz/formulon-cell';",
-    );
+    expect(reactToolbarSource).toContain('callbacksRef.current.onError?.(error)');
+    expect(vueToolbarSource).toContain("emit('error', error)");
+    expect(reactToolbarSource).toContain('export const Toolbar = SpreadsheetToolbar');
+    expect(vueToolbarSource).toContain('export const Toolbar = SpreadsheetToolbar');
+    expect(vueToolbarDts).toContain('export const Toolbar: typeof SpreadsheetToolbar');
+    for (const symbol of ['DynamicDropdownsCtx', 'RibbonTab', 'ToolbarInstance']) {
+      expect(vueToolbarExports).toContain(symbol);
+      expect(reactIndexSource).toContain(symbol);
+      expect(vueIndexSource).toContain(symbol);
+    }
+    for (const symbol of [
+      'EXCEL365_STANDARD_RIBBON_TABS',
+      'OPTIONAL_RIBBON_TABS',
+      'RIBBON_TAB_LABELS',
+      'RIBBON_TABS',
+    ]) {
+      expect(reactIndexSource).toContain(symbol);
+      expect(vueIndexSource).toContain(symbol);
+    }
+    expect(vueIndexSource).toContain('SpreadsheetToolbarProps');
   });
 });

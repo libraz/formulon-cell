@@ -35,6 +35,8 @@ export interface SpreadsheetToolbarProps {
   onDrawEraser?: () => void;
   onTranslate?: () => void;
   onAddIn?: () => void;
+  /** Called when the core toolbar fails to mount. */
+  onError?: (error: unknown) => void;
   /** Receives the mounted core toolbar instance so hosts can dispatch shared
    *  commands from titlebar search / Tell me without querying DOM buttons. */
   onToolbarReady?: (toolbar: ToolbarInstance | null) => void;

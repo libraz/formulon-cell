@@ -28,6 +28,7 @@ type CallbackBag = {
   onDrawEraser?: () => void;
   onTranslate?: () => void;
   onAddIn?: () => void;
+  onError?: (error: unknown) => void;
   onToolbarReady?: (toolbar: ToolbarInstance | null) => void;
   onTabChange: (tab: import('./toolbar/model.js').RibbonTab) => void;
 };
@@ -44,6 +45,7 @@ export const SpreadsheetToolbar = ({
   onDrawEraser,
   onTranslate,
   onAddIn,
+  onError,
   onToolbarReady,
   dropdownActions,
   ribbonTabs,
@@ -74,6 +76,7 @@ export const SpreadsheetToolbar = ({
     onDrawEraser,
     onTranslate,
     onAddIn,
+    onError,
     onToolbarReady,
   };
 
@@ -98,29 +101,36 @@ export const SpreadsheetToolbar = ({
       },
       ...dropdownActions,
     };
-    const tb = Spreadsheet.mountToolbar(host as HTMLElement, instance as SpreadsheetInstance, {
-      lang: locale === 'en' ? 'en' : 'ja',
-      activeTab,
-      ribbonTabs,
-      onTabChange: (tab) => callbacksRef.current.onTabChange(tab),
-      // Opt into core's default dropdown-menu click delegator so Fill / Clear
-      // / AutoSum / etc. work without each consumer reimplementing the
-      // playground's `createDynamicDropdowns` wiring.
-      dynamicDropdowns: dropdownOverrides,
-      hooks: {
-        review: {
-          spelling: () => callbacksRef.current.onSpellingReview?.(),
-          accessibility: () => callbacksRef.current.onAccessibilityCheck?.(),
-          translate: () => callbacksRef.current.onTranslate?.(),
-        },
-        drawing: {
-          setInkMode: (mode) => {
-            if (mode === 'pen') callbacksRef.current.onDrawPen?.();
-            else callbacksRef.current.onDrawEraser?.();
+    let tb: ToolbarInstance;
+    try {
+      tb = Spreadsheet.mountToolbar(host as HTMLElement, instance as SpreadsheetInstance, {
+        lang: locale === 'en' ? 'en' : 'ja',
+        activeTab,
+        ribbonTabs,
+        onTabChange: (tab) => callbacksRef.current.onTabChange(tab),
+        // Opt into core's default dropdown-menu click delegator so Fill / Clear
+        // / AutoSum / etc. work without each consumer reimplementing the
+        // playground's `createDynamicDropdowns` wiring.
+        dynamicDropdowns: dropdownOverrides,
+        hooks: {
+          review: {
+            spelling: () => callbacksRef.current.onSpellingReview?.(),
+            accessibility: () => callbacksRef.current.onAccessibilityCheck?.(),
+            translate: () => callbacksRef.current.onTranslate?.(),
+          },
+          drawing: {
+            setInkMode: (mode) => {
+              if (mode === 'pen') callbacksRef.current.onDrawPen?.();
+              else callbacksRef.current.onDrawEraser?.();
+            },
           },
         },
-      },
-    });
+      });
+    } catch (error) {
+      callbacksRef.current.onToolbarReady?.(null);
+      callbacksRef.current.onError?.(error);
+      return undefined;
+    }
     toolbarRef.current = tb;
     callbacksRef.current.onToolbarReady?.(tb);
     return () => {

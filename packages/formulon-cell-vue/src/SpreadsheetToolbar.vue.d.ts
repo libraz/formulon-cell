@@ -1,25 +1,7 @@
-import type {
-  DynamicDropdownsCtx,
-  RibbonTab,
-  SpreadsheetInstance,
-  ToolbarInstance,
-} from '@libraz/formulon-cell';
 import type { DefineComponent } from 'vue';
+import type { SpreadsheetToolbarProps } from './toolbar.js';
 
-declare const SpreadsheetToolbar: DefineComponent<{
-  instance: SpreadsheetInstance | null;
-  activeTab: RibbonTab;
-  locale: string;
-  onSpellingReview?: () => void;
-  onAccessibilityCheck?: () => void;
-  onRunScript?: () => void;
-  onDrawPen?: () => void;
-  onDrawEraser?: () => void;
-  onTranslate?: () => void;
-  onAddIn?: () => void;
-  onToolbarReady?: (toolbar: ToolbarInstance | null) => void;
-  dropdownActions?: Partial<DynamicDropdownsCtx>;
-  ribbonTabs?: readonly RibbonTab[];
-}>;
+declare const SpreadsheetToolbar: DefineComponent<SpreadsheetToolbarProps>;
 
+export const Toolbar: typeof SpreadsheetToolbar;
 export default SpreadsheetToolbar;

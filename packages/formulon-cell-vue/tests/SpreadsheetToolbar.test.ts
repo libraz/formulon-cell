@@ -44,6 +44,7 @@ interface AdapterProps {
   onDrawEraser?: () => void;
   onTranslate?: () => void;
   onAddIn?: () => void;
+  onError?: (error: unknown) => void;
   onToolbarReady?: (toolbar: ToolbarInstance | null) => void;
   dropdownActions?: Partial<DynamicDropdownsCtx>;
 }
@@ -63,6 +64,10 @@ const AdapterComponent = defineComponent({
     onDrawEraser: { type: Function as unknown as () => () => void, default: undefined },
     onTranslate: { type: Function as unknown as () => () => void, default: undefined },
     onAddIn: { type: Function as unknown as () => () => void, default: undefined },
+    onError: {
+      type: Function as unknown as () => (error: unknown) => void,
+      default: undefined,
+    },
     onToolbarReady: {
       type: Function as unknown as () => (toolbar: ToolbarInstance | null) => void,
       default: undefined,
@@ -72,7 +77,7 @@ const AdapterComponent = defineComponent({
       default: undefined,
     },
   },
-  emits: ['tabChange'],
+  emits: ['tabChange', 'error'],
   setup(props: AdapterProps, { emit }) {
     const hostEl = ref<HTMLDivElement | null>(null);
     let toolbar: ToolbarInstance | null = null;
@@ -91,25 +96,32 @@ const AdapterComponent = defineComponent({
         },
         ...props.dropdownActions,
       };
-      toolbar = Spreadsheet.mountToolbar(host, instance, {
-        lang: props.locale === 'en' ? 'en' : 'ja',
-        activeTab: props.activeTab,
-        onTabChange: (tab) => emit('tabChange', tab),
-        dynamicDropdowns: dropdownOverrides,
-        hooks: {
-          review: {
-            spelling: () => props.onSpellingReview?.(),
-            accessibility: () => props.onAccessibilityCheck?.(),
-            translate: () => props.onTranslate?.(),
-          },
-          drawing: {
-            setInkMode: (mode) => {
-              if (mode === 'pen') props.onDrawPen?.();
-              else props.onDrawEraser?.();
+      try {
+        toolbar = Spreadsheet.mountToolbar(host, instance, {
+          lang: props.locale === 'en' ? 'en' : 'ja',
+          activeTab: props.activeTab,
+          onTabChange: (tab) => emit('tabChange', tab),
+          dynamicDropdowns: dropdownOverrides,
+          hooks: {
+            review: {
+              spelling: () => props.onSpellingReview?.(),
+              accessibility: () => props.onAccessibilityCheck?.(),
+              translate: () => props.onTranslate?.(),
+            },
+            drawing: {
+              setInkMode: (mode) => {
+                if (mode === 'pen') props.onDrawPen?.();
+                else props.onDrawEraser?.();
+              },
             },
           },
-        },
-      });
+        });
+      } catch (error) {
+        props.onToolbarReady?.(null);
+        props.onError?.(error);
+        emit('error', error);
+        return;
+      }
       props.onToolbarReady?.(toolbar);
     };
 
@@ -157,6 +169,7 @@ const flush = async (): Promise<void> => {
 interface Harness {
   host: HTMLElement;
   tabChange: ReturnType<typeof vi.fn>;
+  error: ReturnType<typeof vi.fn>;
   setActiveTab: (tab: RibbonTab) => Promise<void>;
   unmount: () => Promise<void>;
 }
@@ -170,6 +183,7 @@ async function mountAdapter(
   document.body.appendChild(host);
   const activeTabRef = ref<RibbonTab>(initialTab);
   const tabChange = vi.fn();
+  const error = vi.fn();
 
   const root = defineComponent({
     setup() {
@@ -180,6 +194,10 @@ async function mountAdapter(
           locale: 'en',
           ...callbacks,
           onTabChange: (tab: RibbonTab) => tabChange(tab),
+          onError: (err: unknown) => {
+            callbacks.onError?.(err);
+            error(err);
+          },
         });
     },
   });
@@ -191,6 +209,7 @@ async function mountAdapter(
   return {
     host,
     tabChange,
+    error,
     setActiveTab: async (tab) => {
       activeTabRef.value = tab;
       await flush();
@@ -229,6 +248,23 @@ describe('<SpreadsheetToolbar> Vue adapter (thin)', () => {
     );
     await harness.unmount();
     expect(onToolbarReady).toHaveBeenLastCalledWith(null);
+  });
+
+  it('forwards core toolbar mount failures to onError and error emit', async () => {
+    const err = new Error('toolbar mount failed');
+    const onError = vi.fn();
+    const onToolbarReady = vi.fn();
+    const spy = vi.spyOn(Spreadsheet, 'mountToolbar').mockImplementationOnce(() => {
+      throw err;
+    });
+    const harness = await mountAdapter(mounted.instance, { onError, onToolbarReady });
+
+    expect(onToolbarReady).toHaveBeenCalledWith(null);
+    expect(onError).toHaveBeenCalledWith(err);
+    expect(harness.error).toHaveBeenCalledWith(err);
+    expect(harness.host.querySelector('[data-ribbon-tab]')).toBeNull();
+    await harness.unmount();
+    spy.mockRestore();
   });
 
   it('forwards tab-button clicks via tabChange emit', async () => {

@@ -21,6 +21,7 @@ export type {
   DefinedNameEntry,
   DefinedNameMutationResult,
   DisabledReasonProjectionOptions,
+  DynamicDropdownsCtx,
   Extension,
   ExtensionContext,
   ExtensionHandle,
@@ -36,6 +37,7 @@ export type {
   I18nController,
   LocaleChangeEvent,
   MountOptions,
+  MountToolbarOptions,
   PageSetupEntry,
   PageSetupPatch,
   PivotCell,
@@ -89,6 +91,8 @@ export type {
   TableStyle,
   ThemeChangeEvent,
   ThemeName,
+  ToolbarInstance,
+  ToolbarInstanceRef,
   WorkbookChangeEvent,
   WorkbookObjectKind,
   WorkbookObjectRecord,
@@ -139,6 +143,7 @@ export {
   defaultTableOverlay,
   deleteDefinedName,
   deleteSheetView,
+  EXCEL365_STANDARD_RIBBON_TABS,
   enabledQuickAnalysisActions,
   engineTableOverlays,
   findReplace,
@@ -181,6 +186,7 @@ export {
   listWorkbookObjects,
   minimal,
   namedRangeDialog,
+  OPTIONAL_RIBBON_TABS,
   PIVOT_SHOW_AS_BASE_NEXT,
   PIVOT_SHOW_AS_BASE_PREVIOUS,
   PivotAggregation,
@@ -200,6 +206,9 @@ export {
   protectedSheetPassword,
   quickAnalysis,
   quickAnalysisActionById,
+  RIBBON_KEYSHORTCUTS,
+  RIBBON_TAB_LABELS,
+  RIBBON_TABS,
   recomputeSlicerFilters,
   removeConditionalRuleAt,
   removeSlicer,
@@ -288,4 +297,4 @@ export {
 } from './composables.js';
 export type { SpreadsheetExposed } from './Spreadsheet.js';
 export { Spreadsheet } from './Spreadsheet.js';
-export type { RibbonTab } from './toolbar.js';
+export type { RibbonTab, SpreadsheetToolbarProps } from './toolbar.js';

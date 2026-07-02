@@ -5,6 +5,8 @@
 // host, forwards tab switches in both directions, and dispatches the
 // optional review / automation / drawing callbacks as `RibbonHooks` so a
 // click on the matching ribbon command lands on the host callback.
+
+import { Spreadsheet } from '@libraz/formulon-cell';
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -91,6 +93,32 @@ describe('<SpreadsheetToolbar> (thin adapter)', () => {
     );
     await harness.unmount();
     expect(onToolbarReady).toHaveBeenLastCalledWith(null);
+  });
+
+  it('forwards core toolbar mount failures to onError', async () => {
+    const err = new Error('toolbar mount failed');
+    const onError = vi.fn();
+    const onToolbarReady = vi.fn();
+    const spy = vi.spyOn(Spreadsheet, 'mountToolbar').mockImplementationOnce(() => {
+      throw err;
+    });
+    const harness = await mountToolbar(
+      mounted,
+      <SpreadsheetToolbar
+        instance={mounted.instance}
+        activeTab="home"
+        onTabChange={() => {}}
+        locale="en"
+        onToolbarReady={onToolbarReady}
+        onError={onError}
+      />,
+    );
+
+    expect(onToolbarReady).toHaveBeenCalledWith(null);
+    expect(onError).toHaveBeenCalledWith(err);
+    expect(harness.host.querySelector('[data-ribbon-tab]')).toBeNull();
+    await harness.unmount();
+    spy.mockRestore();
   });
 
   it('forwards tab-button clicks via onTabChange', async () => {

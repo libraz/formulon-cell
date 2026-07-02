@@ -11,35 +11,12 @@ import {
   type ToolbarInstance,
 } from '@libraz/formulon-cell';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import type { SpreadsheetToolbarProps } from './toolbar.js';
 
-interface Props {
-  instance: SpreadsheetInstance | null;
-  activeTab: RibbonTab;
-  locale: string;
-  onSpellingReview?: () => void;
-  onAccessibilityCheck?: () => void;
-  onRunScript?: () => void;
-  onDrawPen?: () => void;
-  onDrawEraser?: () => void;
-  onTranslate?: () => void;
-  onAddIn?: () => void;
-  /** Receives the mounted core toolbar instance so hosts can dispatch shared
-   *  commands from titlebar search / Tell me without querying DOM buttons. */
-  onToolbarReady?: (toolbar: ToolbarInstance | null) => void;
-  /** Override one or more entries in the core's default dynamic-dropdowns
-   *  context. Use for dialog-opening handlers (sort, protect, file picker,
-   *  etc.) that the wrapper can't represent as a named prop. Handlers
-   *  supplied here win over the wrapper's built-in script/addIn wiring. */
-  dropdownActions?: Partial<DynamicDropdownsCtx>;
-  /** Shared tab surface. Use `EXCEL365_STANDARD_RIBBON_TABS` for the
-   *  baseline Excel profile; append optional tabs only when those
-   *  add-in/automation surfaces are intentionally exposed. */
-  ribbonTabs?: readonly RibbonTab[];
-}
-
-const props = defineProps<Props>();
+const props = defineProps<SpreadsheetToolbarProps>();
 const emit = defineEmits<{
   tabChange: [tab: RibbonTab];
+  error: [error: unknown];
 }>();
 
 const hostEl = ref<HTMLDivElement | null>(null);
@@ -61,29 +38,36 @@ const mountToolbarFor = (instance: SpreadsheetInstance): void => {
     },
     ...props.dropdownActions,
   };
-  toolbar = Spreadsheet.mountToolbar(host, instance, {
-    lang: props.locale === 'en' ? 'en' : 'ja',
-    activeTab: props.activeTab,
-    ribbonTabs: props.ribbonTabs,
-    onTabChange: (tab) => emit('tabChange', tab),
-    // Opt into core's default dropdown-menu click delegator so Fill / Clear
-    // / AutoSum / etc. work without each consumer reimplementing the
-    // playground's `createDynamicDropdowns` wiring.
-    dynamicDropdowns: dropdownOverrides,
-    hooks: {
-      review: {
-        spelling: () => props.onSpellingReview?.(),
-        accessibility: () => props.onAccessibilityCheck?.(),
-        translate: () => props.onTranslate?.(),
-      },
-      drawing: {
-        setInkMode: (mode) => {
-          if (mode === 'pen') props.onDrawPen?.();
-          else props.onDrawEraser?.();
+  try {
+    toolbar = Spreadsheet.mountToolbar(host, instance, {
+      lang: props.locale === 'en' ? 'en' : 'ja',
+      activeTab: props.activeTab,
+      ribbonTabs: props.ribbonTabs,
+      onTabChange: (tab) => emit('tabChange', tab),
+      // Opt into core's default dropdown-menu click delegator so Fill / Clear
+      // / AutoSum / etc. work without each consumer reimplementing the
+      // playground's `createDynamicDropdowns` wiring.
+      dynamicDropdowns: dropdownOverrides,
+      hooks: {
+        review: {
+          spelling: () => props.onSpellingReview?.(),
+          accessibility: () => props.onAccessibilityCheck?.(),
+          translate: () => props.onTranslate?.(),
+        },
+        drawing: {
+          setInkMode: (mode) => {
+            if (mode === 'pen') props.onDrawPen?.();
+            else props.onDrawEraser?.();
+          },
         },
       },
-    },
-  });
+    });
+  } catch (error) {
+    props.onToolbarReady?.(null);
+    props.onError?.(error);
+    emit('error', error);
+    return;
+  }
   props.onToolbarReady?.(toolbar);
 };
 
@@ -129,3 +113,9 @@ onBeforeUnmount(() => {
        sibling sheet element collapses to zero height. -->
   <div ref="hostEl" style="display: contents"></div>
 </template>
+
+<script lang="ts">
+import SpreadsheetToolbar from './SpreadsheetToolbar.vue';
+
+export const Toolbar = SpreadsheetToolbar;
+</script>
