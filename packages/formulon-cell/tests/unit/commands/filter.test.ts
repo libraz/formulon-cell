@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   applyAdvancedFilter,
+  applyColorFilter,
   applyConditionFilter,
   applyFilter,
   applyFilterColumns,
@@ -106,6 +107,37 @@ describe('filter commands', () => {
     expect(store.getState().layout.hiddenRows.has(1)).toBe(false);
     expect(store.getState().layout.hiddenRows.has(2)).toBe(true);
     expect(store.getState().layout.hiddenRows.has(3)).toBe(false);
+  });
+
+  it('filters rows by selected cell fill color and reapplies the color criterion', () => {
+    seedText(store, 0, 0, 'Status');
+    seedText(store, 1, 0, 'Open');
+    seedText(store, 2, 0, 'Closed');
+    seedText(store, 3, 0, 'Pending');
+    mutators.setCellFormat(store, { sheet: 0, row: 1, col: 0 }, { fill: '#ff0000' });
+    mutators.setCellFormat(store, { sheet: 0, row: 2, col: 0 }, { fill: '#00ff00' });
+    mutators.setCellFormat(store, { sheet: 0, row: 3, col: 0 }, { fill: '#ff0000' });
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 };
+
+    expect(
+      applyColorFilter(store.getState(), store, range, 0, {
+        kind: 'cellColor',
+        color: '#FF0000',
+      }),
+    ).toBe(1);
+    expect(store.getState().layout.hiddenRows.has(2)).toBe(true);
+    expect(store.getState().ui.filterCriteria).toEqual([
+      {
+        range,
+        byCol: 0,
+        hiddenValues: [],
+        color: { kind: 'cellColor', color: '#ff0000' },
+      },
+    ]);
+
+    mutators.setCellFormat(store, { sheet: 0, row: 3, col: 0 }, { fill: '#00ff00' });
+    expect(reapplyFilters(store.getState(), store)).toBe(2);
+    expect(store.getState().layout.hiddenRows.has(3)).toBe(true);
   });
 
   it('setAutoFilter stamps the range without filtering any rows', () => {
@@ -232,6 +264,32 @@ describe('filter commands', () => {
     expect(s.layout.hiddenRows.has(3)).toBe(true);
     expect(s.layout.hiddenRows.has(4)).toBe(false);
     expect(s.ui.filterCriteria).toEqual([{ range, byCol: 0, hiddenValues: ['10'] }]);
+  });
+
+  it("filters by the selected cell's displayed value instead of only the raw key", () => {
+    seedText(store, 0, 0, 'Value');
+    seedNumber(store, 1, 0, 1);
+    seedText(store, 2, 0, '1.00');
+    seedNumber(store, 3, 0, 2);
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 1, col: 0 },
+      {
+        numFmt: { kind: 'fixed', decimals: 2 },
+      },
+    );
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 };
+    mutators.setRange(store, range);
+    mutators.setActive(store, { sheet: 0, row: 1, col: 0 });
+
+    const hidden = filterBySelectedCellValue(store.getState(), store, range);
+
+    expect(hidden).toBe(1);
+    const s = store.getState();
+    expect(s.layout.hiddenRows.has(1)).toBe(false);
+    expect(s.layout.hiddenRows.has(2)).toBe(false);
+    expect(s.layout.hiddenRows.has(3)).toBe(true);
+    expect(s.ui.filterCriteria).toEqual([{ range, byCol: 0, hiddenValues: ['2'] }]);
   });
 
   it('filters by selected cell value using the inferred current region when no filter exists', () => {

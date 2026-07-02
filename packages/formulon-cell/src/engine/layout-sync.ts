@@ -24,7 +24,7 @@ export function hydrateLayoutFromEngine(
   // hiddenSheets is workbook-scoped — walk every sheet so the set is correct
   // regardless of which sheet `hydrateLayoutFromEngine` is called for.
   const hiddenSheets = new Set<number>();
-  if (wb.capabilities.sheetTabHidden) {
+  if (wb.capabilities.sheetView) {
     const n = wb.sheetCount;
     for (let i = 0; i < n; i += 1) {
       const v = wb.getSheetView(i);

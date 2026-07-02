@@ -517,6 +517,17 @@ describe('formatNumber', () => {
     expect(formatNumber(5 / 24, { kind: 'custom', pattern: '[hh]:mm' })).toBe('05:00');
   });
 
+  it('renders five-m month tokens as a single month initial', () => {
+    expect(formatNumber(45651, { kind: 'custom', pattern: 'mmmm' }, 'en-US')).toBe('December');
+    expect(formatNumber(45651, { kind: 'custom', pattern: 'mmmmm' }, 'en-US')).toBe('D');
+  });
+
+  it('matches Excel 1900 date serials before the leap-year bug boundary', () => {
+    expect(formatNumber(1, { kind: 'custom', pattern: 'yyyy-mm-dd' })).toBe('1900-01-01');
+    expect(formatNumber(59, { kind: 'custom', pattern: 'yyyy-mm-dd' })).toBe('1900-02-28');
+    expect(formatNumber(61, { kind: 'custom', pattern: 'yyyy-mm-dd' })).toBe('1900-03-01');
+  });
+
   it('renders scientific and engineering notation instead of E+0 verbatim (H-6)', () => {
     // Engineering: 3 integer placeholders → exponent stepped in multiples of 3.
     expect(formatNumber(12345, { kind: 'custom', pattern: '##0.0E+0' })).toBe('12.3E+3');
@@ -563,6 +574,11 @@ describe('formatNumber', () => {
   it('renders percent values', () => {
     expect(formatNumber(0.25, { kind: 'percent', decimals: 0 })).toBe('25%');
     expect(formatNumber(0.1234, { kind: 'percent', decimals: 2 })).toBe('12.34%');
+  });
+
+  it('does not scale for percent signs inside quoted custom literals', () => {
+    expect(formatNumber(0.25, { kind: 'custom', pattern: '0%' })).toBe('25%');
+    expect(formatNumber(0.25, { kind: 'custom', pattern: '0"%"' })).toBe('0%');
   });
 
   it('renders spreadsheet locale-tagged currency custom formats', () => {

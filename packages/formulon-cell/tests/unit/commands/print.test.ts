@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildPrintDocument,
+  computeFitToPagesScale,
   effectivePrintMargins,
   parsePrintArea,
   parsePrintAreas,
@@ -12,6 +13,7 @@ import {
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
   createSpreadsheetStore,
+  defaultPageSetup,
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
@@ -118,6 +120,89 @@ describe('parsePrintArea', () => {
   });
 });
 
+describe('computeFitToPagesScale', () => {
+  const layout = {
+    colWidths: new Map<number, number>(),
+    rowHeights: new Map<number, number>(),
+    defaultColWidth: 64,
+    defaultRowHeight: 20,
+  };
+  const emptyRows = new Set<number>();
+  const emptyCols = new Set<number>();
+
+  it('returns the explicit scale when no fit-to-pages constraint is set', () => {
+    const setup = { ...defaultPageSetup(), fitWidth: 0, fitHeight: 0, scale: 0.5 };
+    expect(computeFitToPagesScale(setup, [], layout, emptyRows, emptyCols)).toBe(0.5);
+  });
+
+  it('scales down so wide content fits the requested page count', () => {
+    const setup = {
+      ...defaultPageSetup(),
+      paperSize: 'A4' as const,
+      orientation: 'portrait' as const,
+      margins: { top: 1, right: 1, bottom: 1, left: 1 },
+      fitWidth: 1,
+      fitHeight: 0,
+    };
+    // 10 cols × 64px = 640px = 6.667in of content; printable width = 8.27 − 2 =
+    // 6.27in. scale = 6.27 / 6.667 = 0.94 (floored to whole percent).
+    const regions = [{ row0: 0, col0: 0, row1: 0, col1: 9 }];
+    expect(computeFitToPagesScale(setup, regions, layout, emptyRows, emptyCols)).toBe(0.94);
+  });
+
+  it('uses host-provided printable bounds when deriving fit-to-pages scale', () => {
+    const setup = {
+      ...defaultPageSetup(),
+      paperSize: 'A4' as const,
+      orientation: 'portrait' as const,
+      margins: { top: 1, right: 1, bottom: 1, left: 1 },
+      printableBounds: { top: 1, right: 1.5, bottom: 1, left: 1.5 },
+      fitWidth: 1,
+      fitHeight: 0,
+    };
+    // Effective width is reduced by the printer's minimum left/right bounds:
+    // 8.27 - 3 = 5.27in. 5.27 / 6.667 floors to 0.79.
+    const regions = [{ row0: 0, col0: 0, row1: 0, col1: 9 }];
+    expect(computeFitToPagesScale(setup, regions, layout, emptyRows, emptyCols)).toBe(0.79);
+  });
+
+  it('never scales content up to fill the page (caps at 100%)', () => {
+    const setup = {
+      ...defaultPageSetup(),
+      paperSize: 'A4' as const,
+      orientation: 'portrait' as const,
+      margins: { top: 1, right: 1, bottom: 1, left: 1 },
+      fitWidth: 1,
+      fitHeight: 0,
+    };
+    const regions = [{ row0: 0, col0: 0, row1: 0, col1: 0 }];
+    expect(computeFitToPagesScale(setup, regions, layout, emptyRows, emptyCols)).toBe(1);
+  });
+
+  it('uses the smaller of the width and height fit factors', () => {
+    const setup = {
+      ...defaultPageSetup(),
+      paperSize: 'A4' as const,
+      orientation: 'portrait' as const,
+      margins: { top: 1, right: 1, bottom: 1, left: 1 },
+      fitWidth: 1,
+      fitHeight: 1,
+    };
+    // Tall content (100 rows × 20px = 2000px ≈ 20.83in) drives a smaller factor
+    // than the width, so the height constraint wins.
+    const regions = [{ row0: 0, col0: 0, row1: 99, col1: 9 }];
+    const scale = computeFitToPagesScale(setup, regions, layout, emptyRows, emptyCols);
+    const widthOnly = computeFitToPagesScale(
+      { ...setup, fitHeight: 0 },
+      regions,
+      layout,
+      emptyRows,
+      emptyCols,
+    );
+    expect(scale).toBeLessThan(widthOnly);
+  });
+});
+
 describe('buildPrintDocument', () => {
   it('uses an escaped localized document title when provided', async () => {
     const wb = await newWb();
@@ -182,6 +267,28 @@ describe('buildPrintDocument', () => {
     expect(doc.html).toMatch(/font-weight:600/);
     expect(doc.html).toMatch(/background:#ffeecc/);
     expect(doc.html).toMatch(/color:#222222/);
+    wb.dispose();
+  });
+
+  it('applies a fit-to-pages transform scale instead of ignoring it', async () => {
+    const wb = await newWb();
+    const store = createSpreadsheetStore();
+    // Wide content: 30 populated columns far exceed one A4 page width.
+    for (let c = 0; c < 30; c += 1) setNumber(store, wb, 0, c, c);
+    mutators.setPageSetup(store, 0, { fitWidth: 1, fitHeight: 0 });
+
+    const doc = buildPrintDocument(wb, store, 0);
+    expect(doc.html).toMatch(/transform:scale\(0\.\d+\)/);
+    wb.dispose();
+  });
+
+  it('emits no transform when printing at 100% with no fit constraint', async () => {
+    const wb = await newWb();
+    const store = createSpreadsheetStore();
+    setNumber(store, wb, 0, 0, 1);
+
+    const doc = buildPrintDocument(wb, store, 0);
+    expect(doc.html).not.toContain('transform:scale(');
     wb.dispose();
   });
 
@@ -457,6 +564,7 @@ describe('buildPrintDocument', () => {
     expect(doc.cssVars['--fc-print-header-footer-scale']).toBe('1');
     expect(doc.html).toContain('counter-reset: page 2');
     expect(doc.html).toContain('class="fc-print--center-h fc-print--center-v fc-print--hf-free"');
+    expect(doc.html).toContain('.fc-print--center-v .fc-print__area');
     wb.dispose();
   });
 

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { computeF9Preview, renderCellValueForF9 } from '../../../src/commands/f9-preview.js';
+import {
+  computeF9Preview,
+  renderCellValueForF9,
+  replaceFormulaSelectionWithF9Preview,
+} from '../../../src/commands/f9-preview.js';
 import type { CellValue } from '../../../src/engine/types.js';
 
 const numCell = (value: number): { value: CellValue; formula: string | null } => ({
@@ -113,5 +117,31 @@ describe('computeF9Preview', () => {
       display: '',
       substitutable: false,
     });
+  });
+});
+
+describe('replaceFormulaSelectionWithF9Preview', () => {
+  it('replaces a selected reference with its F9 value and moves the caret after it', () => {
+    const cells = new Map([['0:0:0', numCell(7)]]);
+    expect(replaceFormulaSelectionWithF9Preview('=A1+1', 1, 3, 0, cells)).toEqual({
+      text: '=7+1',
+      start: 2,
+      end: 2,
+      preview: { display: '7', substitutable: true },
+    });
+  });
+
+  it('does not replace unsupported expressions but returns the preview outcome', () => {
+    expect(replaceFormulaSelectionWithF9Preview('=A1+B1', 1, 6, 0, new Map())).toEqual({
+      text: '=A1+B1',
+      start: 1,
+      end: 6,
+      preview: { display: '', substitutable: false },
+    });
+  });
+
+  it('ignores non-formula text and collapsed selections', () => {
+    expect(replaceFormulaSelectionWithF9Preview('A1', 0, 2, 0, new Map())).toBeNull();
+    expect(replaceFormulaSelectionWithF9Preview('=A1', 1, 1, 0, new Map())).toBeNull();
   });
 });

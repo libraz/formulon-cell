@@ -47,4 +47,24 @@ describe('engine/loader', () => {
     expect(onFallback).toHaveBeenCalledWith('preferStub set — using stub engine');
     expect(createFormulon).not.toHaveBeenCalled();
   });
+
+  it('does not let an explicit stub load poison the normal WASM cache or module checks', async () => {
+    const realModule = { versionString: () => 'wasm' };
+    const createFormulon = vi.fn(() => Promise.resolve(realModule));
+    vi.doMock('@libraz/formulon', () => ({ default: createFormulon }));
+    vi.stubGlobal('SharedArrayBuffer', class FakeSharedArrayBuffer {});
+    vi.resetModules();
+
+    const { isUsingStub, loadFormulon } = await import('../../../src/engine/loader.js');
+
+    const stubModule = await loadFormulon({ preferStub: true });
+    const loadedRealModule = await loadFormulon();
+
+    expect(stubModule.versionString()).toBe('stub');
+    expect(loadedRealModule).toBe(realModule);
+    expect(createFormulon).toHaveBeenCalledTimes(1);
+    expect(isUsingStub(stubModule)).toBe(true);
+    expect(isUsingStub(loadedRealModule)).toBe(false);
+    expect(isUsingStub()).toBe(false);
+  });
 });

@@ -38,6 +38,7 @@ import {
   setErrorTriangleHits,
   setFillHandleRect,
   setValidationChevron,
+  shouldShowValidationChevron,
   VALIDATION_TRIANGLE_COLOR,
 } from './grid/hit-state.js';
 import { paintFreezeDividers, paintGridLines } from './grid/lines.js';
@@ -781,7 +782,7 @@ export class GridRenderer {
       const bounds: Rect = cellRectIn(layout, cols, rows, a.row, a.col);
       paintActiveCellOutline(this.ctx, bounds, theme);
       const fmt = format.formats.get(addrKey({ sheet: data.sheetIndex, row: a.row, col: a.col }));
-      if (fmt?.validation?.kind === 'list') {
+      if (shouldShowValidationChevron(fmt?.validation)) {
         const rect = paintValidationChevron(this.ctx, bounds, theme);
         setValidationChevron({ rect, row: a.row, col: a.col });
       }

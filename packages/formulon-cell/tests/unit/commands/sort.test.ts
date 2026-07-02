@@ -227,6 +227,70 @@ describe('sortRange', () => {
     });
   });
 
+  it('sorts by cell fill color while moving whole rows', () => {
+    seedText(store, wb, 0, 0, 'Item');
+    seedText(store, wb, 0, 1, 'Status');
+    seedText(store, wb, 1, 0, 'blue row');
+    seedText(store, wb, 1, 1, 'later');
+    seedText(store, wb, 2, 0, 'red row');
+    seedText(store, wb, 2, 1, 'first');
+    seedText(store, wb, 3, 0, 'plain row');
+    seedText(store, wb, 3, 1, 'last');
+    mutators.setCellFormat(store, { sheet: 0, row: 1, col: 0 }, { fill: '#0000ff' });
+    mutators.setCellFormat(store, { sheet: 0, row: 2, col: 0 }, { fill: '#ff0000' });
+
+    const ok = sortRange(
+      store.getState(),
+      store,
+      wb,
+      { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 },
+      {
+        byCol: 0,
+        direction: 'asc',
+        hasHeader: true,
+        keys: [{ byCol: 0, direction: 'asc', sortOn: 'cellColor', color: '#FF0000' }],
+      },
+    );
+
+    expect(ok).toBe(true);
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({
+      kind: 'text',
+      value: 'red row',
+    });
+    expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({
+      kind: 'text',
+      value: 'first',
+    });
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 1, col: 0 }))).toEqual({
+      fill: '#ff0000',
+    });
+  });
+
+  it('sorts by built-in custom list order', () => {
+    seedText(store, wb, 0, 0, 'Month');
+    seedText(store, wb, 1, 0, 'Mar');
+    seedText(store, wb, 2, 0, 'Jan');
+    seedText(store, wb, 3, 0, 'Feb');
+
+    const ok = sortRange(
+      store.getState(),
+      store,
+      wb,
+      { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 },
+      {
+        byCol: 0,
+        direction: 'asc',
+        hasHeader: true,
+        keys: [{ byCol: 0, direction: 'asc', sortOn: 'customList' }],
+      },
+    );
+
+    expect(ok).toBe(true);
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'Jan' });
+    expect(wb.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'text', value: 'Feb' });
+    expect(wb.getValue({ sheet: 0, row: 3, col: 0 })).toEqual({ kind: 'text', value: 'Mar' });
+  });
+
   it('mixed numeric + text rows place numbers before text under ascending sort', () => {
     seedText(store, wb, 0, 0, 'banana');
     seedNumber(store, wb, 1, 0, 99);
@@ -245,6 +309,24 @@ describe('sortRange', () => {
     expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'number', value: 99 });
     expect(wb.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'text', value: 'apple' });
     expect(wb.getValue({ sheet: 0, row: 3, col: 0 })).toEqual({ kind: 'text', value: 'banana' });
+  });
+
+  it('sorts text case-insensitively with numeric collation', () => {
+    seedText(store, wb, 0, 0, 'item10');
+    seedText(store, wb, 1, 0, 'Item2');
+    seedText(store, wb, 2, 0, 'item1');
+
+    sortRange(
+      store.getState(),
+      store,
+      wb,
+      { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 },
+      { byCol: 0, direction: 'asc' },
+    );
+
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'item1' });
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'Item2' });
+    expect(wb.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'text', value: 'item10' });
   });
 
   it('header-only range (single row, hasHeader: true) is a no-op (returns false)', () => {

@@ -93,6 +93,7 @@ describe('hydrateCommentsAndHyperlinksFromEngine', () => {
       'https://example.com',
     );
     expect(formats.get(addrKey({ sheet: 0, row: 5, col: 1 }))?.hyperlink).toBe('mailto:foo@bar');
+    expect(formats.get(addrKey({ sheet: 0, row: 5, col: 1 }))?.hyperlinkDisplay).toBe('Foo');
   });
 
   it('skips hyperlinks with empty target', () => {
@@ -120,5 +121,20 @@ describe('hydrateCommentsAndHyperlinksFromEngine', () => {
     const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
     expect(fmt?.bold).toBe(true);
     expect(fmt?.hyperlink).toBe('https://x');
+  });
+
+  it('seeds comment author for round-trip writeback', () => {
+    const store = createSpreadsheetStore();
+    const wb = makeFake({
+      comments: true,
+      cells: [{ addr: { sheet: 0, row: 1, col: 2 }, value: { kind: 'blank' }, formula: null }],
+      comments_data: {
+        '0:1:2': { author: 'Alice', text: 'hello' },
+      },
+    });
+    hydrateCommentsAndHyperlinksFromEngine(wb, store, 0);
+    const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 1, col: 2 }));
+    expect(fmt?.comment).toBe('hello');
+    expect(fmt?.commentAuthor).toBe('Alice');
   });
 });

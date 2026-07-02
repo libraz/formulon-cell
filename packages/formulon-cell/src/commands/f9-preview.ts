@@ -25,6 +25,13 @@ export interface F9Preview {
   substitutable: boolean;
 }
 
+export interface F9Replacement {
+  text: string;
+  start: number;
+  end: number;
+  preview: F9Preview;
+}
+
 const REF_RE = /^(?:'([^']+)'|([A-Za-z_][A-Za-z0-9_]*))?!?(\$?)([A-Za-z]+)(\$?)(\d+)$/;
 const NUMBER_RE = /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/;
 const STRING_RE = /^"([^"]*)"$/;
@@ -97,4 +104,23 @@ export function computeF9Preview(
   // without invoking the engine. Report unsupported — the caller surfaces a
   // hint and leaves the formula text intact.
   return { display: '', substitutable: false };
+}
+
+export function replaceFormulaSelectionWithF9Preview(
+  formula: string,
+  start: number,
+  end: number,
+  activeSheet: number,
+  cells: ReadonlyMap<string, { value: CellValue; formula: string | null }>,
+  sheetByName?: (name: string) => number,
+): F9Replacement | null {
+  if (!formula.startsWith('=') || start === end) return null;
+  const left = Math.max(0, Math.min(start, end));
+  const right = Math.min(formula.length, Math.max(start, end));
+  const selection = formula.slice(left, right);
+  const preview = computeF9Preview(formula, selection, activeSheet, cells, sheetByName);
+  if (!preview.substitutable) return { text: formula, start: left, end: right, preview };
+  const text = `${formula.slice(0, left)}${preview.display}${formula.slice(right)}`;
+  const caret = left + preview.display.length;
+  return { text, start: caret, end: caret, preview };
 }

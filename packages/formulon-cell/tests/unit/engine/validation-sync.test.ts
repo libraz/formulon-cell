@@ -19,6 +19,7 @@ interface FakeValidationEntry {
   allowBlank: boolean;
   showInputMessage: boolean;
   showErrorMessage: boolean;
+  showDropDown?: boolean;
   formula1: string;
   formula2: string;
   errorTitle: string;
@@ -185,6 +186,27 @@ describe('hydrateValidationsFromEngine', () => {
     expect(fmt?.validation && 'showErrorMessage' in fmt.validation).toBe(false);
   });
 
+  it('decodes hidden in-cell dropdown arrows for list validations', () => {
+    const wb = makeFake({
+      entries: [
+        partial({
+          ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }],
+          type: DV_TYPE_LIST,
+          formula1: 'A,B',
+          showDropDown: true,
+        }),
+      ],
+    });
+    const store = createSpreadsheetStore();
+    hydrateValidationsFromEngine(wb, store, 0);
+    const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
+    expect(fmt?.validation).toEqual({
+      kind: 'list',
+      source: ['A', 'B'],
+      showDropdown: false,
+    });
+  });
+
   it('no-op when capability is off', () => {
     const wb = makeFake({
       dataValidation: false,
@@ -335,5 +357,38 @@ describe('syncValidationsToEngine', () => {
     syncValidationsToEngine(wb, store, 0);
     expect(adds).toHaveLength(1);
     expect(adds[0]?.input.formula1).toBe('=Sheet1!$A$1:$A$10');
+  });
+
+  it('encodes hidden in-cell dropdown arrows using OOXML showDropDown=true', () => {
+    type AddCall = { sheet: number; input: { showDropDown?: boolean } };
+    const adds: AddCall[] = [];
+    const wb = makeFake({
+      onClear: () => true,
+      onAdd: (sheet, input) => {
+        adds.push({ sheet, input: input as { showDropDown?: boolean } });
+        return true;
+      },
+    });
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      format: {
+        formats: new Map([
+          [
+            addrKey({ sheet: 0, row: 0, col: 0 }),
+            {
+              validation: {
+                kind: 'list' as const,
+                source: ['A', 'B'],
+                showDropdown: false,
+              },
+            },
+          ],
+        ]),
+      },
+    }));
+    syncValidationsToEngine(wb, store, 0);
+    expect(adds).toHaveLength(1);
+    expect(adds[0]?.input.showDropDown).toBe(true);
   });
 });

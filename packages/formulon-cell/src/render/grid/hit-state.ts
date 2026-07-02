@@ -118,3 +118,7 @@ export function getValidationChevron(): { rect: Rect; row: number; col: number }
 export function setValidationChevron(v: { rect: Rect; row: number; col: number } | null): void {
   cachedValidationChevron = v;
 }
+
+export function shouldShowValidationChevron(validation: CellValidation | undefined): boolean {
+  return validation?.kind === 'list' && validation.showDropdown !== false;
+}

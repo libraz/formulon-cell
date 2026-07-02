@@ -2,6 +2,7 @@ import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import { CUSTOM_LISTS } from './fill.js';
 import { inferAutoFilterRange } from './filter.js';
 import type { History } from './history.js';
 import { isCellWritable, warnProtected } from './protection.js';
@@ -57,6 +58,12 @@ export interface SortKey {
   /** Column to sort by, in absolute sheet coords. Must lie within `range`. */
   byCol: number;
   direction: SortDirection;
+  /** Sort by values by default, or by cell/font color when specified. */
+  sortOn?: 'value' | 'cellColor' | 'fontColor' | 'customList';
+  /** Target color for color sorts. Matching rows sort first for asc, last for desc. */
+  color?: string;
+  /** Custom list order for `sortOn: "customList"`. Built-in lists are used when omitted. */
+  customList?: readonly string[];
 }
 
 export interface SortOptions {
@@ -86,20 +93,60 @@ const normalizedSortKeys = (opts: SortOptions): SortKey[] => {
   for (const key of keys) {
     if (!Number.isInteger(key.byCol)) continue;
     const direction = key.direction === 'desc' ? 'desc' : 'asc';
-    out.push({ byCol: key.byCol, direction });
+    const sortOn = key.sortOn ?? 'value';
+    out.push({
+      byCol: key.byCol,
+      direction,
+      ...(sortOn !== 'value' ? { sortOn } : {}),
+      ...(key.color ? { color: key.color } : {}),
+      ...(key.customList ? { customList: [...key.customList] } : {}),
+    });
   }
   return out;
+};
+
+const normalizeColorKey = (color: string): string => color.trim().toLocaleLowerCase();
+const normalizeListKey = (value: string): string => value.trim().toLocaleLowerCase();
+
+const customListIndex = (value: string, list?: readonly string[]): number | null => {
+  const lists = list ? [list] : CUSTOM_LISTS;
+  const key = normalizeListKey(value);
+  for (const candidate of lists) {
+    const idx = candidate.findIndex((item) => normalizeListKey(item) === key);
+    if (idx >= 0) return idx;
+  }
+  return null;
 };
 
 const sortKeyForCell = (
   state: State,
   sheet: number,
   row: number,
-  col: number,
-): { kind: 'number' | 'text' | 'blank'; n?: number; s?: string } => {
+  key: SortKey,
+): {
+  kind: 'number' | 'text' | 'blank' | 'color' | 'custom';
+  n?: number;
+  s?: string;
+  match?: boolean;
+  customIndex?: number | null;
+} => {
+  const sortOn = key.sortOn ?? 'value';
+  if (sortOn === 'cellColor' || sortOn === 'fontColor') {
+    const fmt = state.format.formats.get(addrKey({ sheet, row, col: key.byCol }));
+    const actual = sortOn === 'cellColor' ? fmt?.fill : fmt?.color;
+    return {
+      kind: 'color',
+      match: !!actual && !!key.color && normalizeColorKey(actual) === normalizeColorKey(key.color),
+    };
+  }
+  const col = key.byCol;
   const keyCell = state.data.cells.get(addrKey({ sheet, row, col }));
   if (!keyCell) return { kind: 'blank' };
   const v = keyCell.value;
+  if (sortOn === 'customList') {
+    const value = v.kind === 'text' ? v.value : v.kind === 'number' ? String(v.value) : '';
+    return { kind: 'custom', customIndex: value ? customListIndex(value, key.customList) : null };
+  }
   if (v.kind === 'number') return { kind: 'number', n: v.value };
   if (v.kind === 'text') return { kind: 'text', s: v.value };
   if (v.kind === 'bool') return { kind: 'number', n: v.value ? 1 : 0 };
@@ -107,17 +154,45 @@ const sortKeyForCell = (
 };
 
 const compareSortKeys = (
-  a: { kind: 'number' | 'text' | 'blank'; n?: number; s?: string },
-  b: { kind: 'number' | 'text' | 'blank'; n?: number; s?: string },
+  a: {
+    kind: 'number' | 'text' | 'blank' | 'color' | 'custom';
+    n?: number;
+    s?: string;
+    match?: boolean;
+    customIndex?: number | null;
+  },
+  b: {
+    kind: 'number' | 'text' | 'blank' | 'color' | 'custom';
+    n?: number;
+    s?: string;
+    match?: boolean;
+    customIndex?: number | null;
+  },
   direction: SortDirection,
 ): number => {
   const dir = direction === 'desc' ? -1 : 1;
+  if (a.kind === 'color' || b.kind === 'color') {
+    const av = a.kind === 'color' && a.match === true ? 0 : 1;
+    const bv = b.kind === 'color' && b.match === true ? 0 : 1;
+    return dir * (av - bv);
+  }
+  if (a.kind === 'custom' || b.kind === 'custom') {
+    const av =
+      a.kind === 'custom' && a.customIndex != null ? a.customIndex : Number.POSITIVE_INFINITY;
+    const bv =
+      b.kind === 'custom' && b.customIndex != null ? b.customIndex : Number.POSITIVE_INFINITY;
+    return dir * (av - bv);
+  }
   // Blanks sink to bottom regardless of direction, matching spreadsheet sort.
   if (a.kind === 'blank' && b.kind === 'blank') return 0;
   if (a.kind === 'blank') return 1;
   if (b.kind === 'blank') return -1;
   if (a.kind === 'number' && b.kind === 'number') return dir * ((a.n ?? 0) - (b.n ?? 0));
-  if (a.kind === 'text' && b.kind === 'text') return dir * (a.s ?? '').localeCompare(b.s ?? '');
+  if (a.kind === 'text' && b.kind === 'text') {
+    return (
+      dir * (a.s ?? '').localeCompare(b.s ?? '', undefined, { numeric: true, sensitivity: 'base' })
+    );
+  }
   // Mixed types: numbers before text in ascending order.
   return a.kind === 'number' ? -1 * dir : 1 * dir;
 };
@@ -211,7 +286,13 @@ export function sortRange(
       col: number;
       format?: CellFormat;
     }>;
-    sortKeys: Array<{ kind: 'number' | 'text' | 'blank'; n?: number; s?: string }>;
+    sortKeys: Array<{
+      kind: 'number' | 'text' | 'blank' | 'color' | 'custom';
+      n?: number;
+      s?: string;
+      match?: boolean;
+      customIndex?: number | null;
+    }>;
   }
   const snaps: { row: number; snap: RowSnap }[] = [];
   for (let r = start; r <= range.r1; r += 1) {
@@ -230,7 +311,7 @@ export function sortRange(
       row: r,
       snap: {
         cells,
-        sortKeys: sortKeys.map((key) => sortKeyForCell(state, range.sheet, r, key.byCol)),
+        sortKeys: sortKeys.map((key) => sortKeyForCell(state, range.sheet, r, key)),
       },
     });
   }

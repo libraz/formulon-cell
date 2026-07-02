@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   clearComment,
   commentAt,
+  commentAuthorAt,
   listComments,
   recordCommentChange,
   setComment,
@@ -129,6 +130,43 @@ describe('comment commands', () => {
     } as unknown as WorkbookHandle;
     setComment(store, { sheet: 0, row: 1, col: 2 }, 'note', wb);
     expect(calls).toEqual([{ row: 1, col: 2, author: '', text: 'note' }]);
+  });
+
+  it('preserves loaded comment author when editing and clearing', () => {
+    const store = createSpreadsheetStore();
+    const calls: { author: string; text: string }[] = [];
+    const addr = { sheet: 0, row: 1, col: 2 };
+    store.setState((s) => ({
+      ...s,
+      format: {
+        formats: new Map([[addrKey(addr), { comment: 'old', commentAuthor: 'Alice' }]]),
+      },
+    }));
+    const wb = {
+      capabilities: { comments: true },
+      setCommentEntry: (
+        _sheet: number,
+        _row: number,
+        _col: number,
+        author: string,
+        text: string,
+      ) => {
+        calls.push({ author, text });
+        return true;
+      },
+    } as unknown as WorkbookHandle;
+
+    setComment(store, addr, 'new', wb);
+    expect(commentAt(store.getState(), addr)).toBe('new');
+    expect(commentAuthorAt(store.getState(), addr)).toBe('Alice');
+
+    clearComment(store, addr, wb);
+    expect(commentAt(store.getState(), addr)).toBeNull();
+    expect(commentAuthorAt(store.getState(), addr)).toBeNull();
+    expect(calls).toEqual([
+      { author: 'Alice', text: 'new' },
+      { author: 'Alice', text: '' },
+    ]);
   });
 
   it('mirrors setComment with empty text to the engine (engine treats empty as remove)', () => {

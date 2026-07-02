@@ -129,9 +129,15 @@ export interface CellFormat {
   /** Hyperlink URL. When set, the cell paints text underlined+blue and
    *  Ctrl/Cmd+click opens the link. */
   hyperlink?: string;
+  /** Optional hyperlink display text from the engine. Preserved for xlsx round-trip. */
+  hyperlinkDisplay?: string;
+  /** Optional hyperlink tooltip from the engine. Preserved for xlsx round-trip. */
+  hyperlinkTooltip?: string;
   /** Free-form note attached to the cell. Surfaced as a small triangle
    *  marker + hover tooltip; not exported to .xlsx for now. */
   comment?: string;
+  /** Optional comment author from the engine. Preserved for xlsx round-trip. */
+  commentAuthor?: string;
   /** Data validation. When kind === 'list', the cell paints a small ▼ on its
    *  right edge; clicking it opens a dropdown of `source` values. Other
    *  kinds (whole/decimal/date/time/textLength/custom) constrain typed input
@@ -179,6 +185,8 @@ export interface ValidationMeta {
   showInputMessage?: boolean;
   /** Suppress the error dialog on invalid entry. Default true. */
   showErrorMessage?: boolean;
+  /** Show the in-cell dropdown affordance for list validations. Default true. */
+  showDropdown?: boolean;
 }
 
 /** A list-source can be either an inline literal array of strings or a range
@@ -340,6 +348,14 @@ export interface ValueFilterCriteria {
    *  Reapply, sheet-view snapshots, and cross-column AND recompute honour
    *  condition filters the same way as value filters. */
   condition?: FilterConditionSpec;
+  /** Color filter. When present, rows survive only when the target cell's fill
+   *  or font color matches `color`. */
+  color?: FilterColorSpec;
+}
+
+export interface FilterColorSpec {
+  kind: 'cellColor' | 'fontColor';
+  color: string;
 }
 
 /** A number/text comparison used by an AutoFilter condition filter. Mirrors

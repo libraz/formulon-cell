@@ -352,11 +352,12 @@ function colorScalePosition(value: number, thresholds: ColorScaleThresholds): nu
     if (high === low) return 0.5;
     return Math.max(0, Math.min(1, (value - low) / (high - low)));
   }
+  if (high === low) return 0.5;
   if (value <= mid) {
-    if (mid === low) return value <= low ? 0 : 0.5;
+    if (mid === low) return 0.5;
     return Math.max(0, Math.min(0.5, ((value - low) / (mid - low)) * 0.5));
   }
-  if (high === mid) return value >= high ? 1 : 0.5;
+  if (high === mid) return 0.5;
   return Math.max(0.5, Math.min(1, 0.5 + ((value - mid) / (high - mid)) * 0.5));
 }
 
@@ -556,7 +557,7 @@ function paintTextContains(
 const DAY_MS = 86_400_000;
 
 function normalizeDate(d: Date): number {
-  return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY_MS);
+  return Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / DAY_MS);
 }
 
 function excelSerialToDate(serial: number): Date {
@@ -575,7 +576,7 @@ function cellDateDay(v: CellValue): number | null {
 
 function weekStart(day: number): number {
   const d = new Date(day * DAY_MS);
-  const dow = d.getUTCDay();
+  const dow = (d.getUTCDay() + 6) % 7;
   return day - dow;
 }
 

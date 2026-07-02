@@ -4,6 +4,7 @@ import {
   recordDefinedNamesChange,
   upsertDefinedName,
 } from '../commands/named-ranges.js';
+import { resolveRangeRef } from '../engine/range-resolver.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
@@ -413,7 +414,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       name.textContent = entry.name;
       const value = document.createElement('span');
       value.className = 'fc-namedlg__row-value';
-      value.textContent = t.valueUnavailable;
+      value.textContent = definedNameValueText(entry.formula);
       const formulaCell = document.createElement('span');
       formulaCell.className = 'fc-namedlg__row-formula';
       formulaCell.textContent = entry.formula;
@@ -489,12 +490,17 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       case 'scope':
         return t.workbookScope;
       case 'value':
-        return t.valueUnavailable;
+        return definedNameValueText(entry.formula);
       case 'comment':
         return '';
       default:
         return entry.name;
     }
+  };
+
+  const definedNameValueText = (formula: string): string => {
+    const values = resolveRangeRef(wb, formula, 0);
+    return values.length > 0 ? values.join(', ') : t.valueUnavailable;
   };
 
   const filterLabel = (filter: NameFilter): string => {

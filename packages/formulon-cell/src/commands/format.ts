@@ -714,7 +714,8 @@ function applyNegative(
 /** Spreadsheet serial date → JS Date. spreadsheet epoch is 1899-12-30 (with Lotus 123
  *  1900-leap-year bug compensation already baked in for serials > 60). */
 function spreadsheetSerialToDate(serial: number): Date {
-  const ms = (serial - 25569) * 86_400_000;
+  const excel1900Offset = serial > 0 && serial < 60 ? 1 : 0;
+  const ms = (serial + excel1900Offset - 25569) * 86_400_000;
   return new Date(ms);
 }
 
@@ -724,9 +725,9 @@ const pad2 = (n: number): string => (n < 10 ? `0${n}` : `${n}`);
  *  (pos;neg;zero;text), `0`/`#`/`?` digit placeholders, `.` decimal, `,`
  *  thousands & scaling, `%`, `\\X` escape, `"text"` literals, `[Red]`-style
  *  color tags (stripped — color is applied at paint time), and date tokens
- *  `yyyy`/`yy`/`mmmm`/`mmm`/`mm`/`m`/`dddd`/`ddd`/`dd`/`d`/`hh`/`h`/`ss`/`s`
- *  plus `am/pm`. Not exhaustive but covers the patterns spreadsheets ship in its
- *  built-in format codes. */
+ *  `yyyy`/`yy`/`mmmmm`/`mmmm`/`mmm`/`mm`/`m`/`dddd`/`ddd`/`dd`/`d`/`hh`/`h`/
+ *  `ss`/`s` plus `am/pm`. Not exhaustive but covers the patterns spreadsheets
+ *  ship in its built-in format codes. */
 function formatCustomPattern(value: number, pattern: string, locale: string): string {
   // Split into up to four sections on ';' that aren't inside a quoted literal
   //  or a bracketed tag. Spreadsheets allow: positive;negative;zero;text. When any
@@ -765,8 +766,9 @@ function formatCustomPattern(value: number, pattern: string, locale: string): st
     }
   }
 
-  // Strip color tags. Color application belongs to the painter, not here.
-  active = normalizeFormatSection(active);
+  // Strip style-only directives. Quoted literals must stay quoted until the
+  // numeric/date renderer decides whether a token is active or literal.
+  active = stripFormatDirectives(active);
 
   // If the section contains date/time tokens, render as date.
   if (/y|m|d|h|s/.test(stripLiterals(active))) {
@@ -814,6 +816,10 @@ function formatSpecialPattern(value: number, pattern: string): string {
 }
 
 function normalizeFormatSection(section: string): string {
+  return stripFormatDirectives(section).replace(/"([^"]*)"/g, '$1');
+}
+
+function stripFormatDirectives(section: string): string {
   return (
     section
       // Locale/currency tags: [$¥-411]#,##0 → ¥#,##0; [$-ja-JP] is locale-only.
@@ -821,7 +827,6 @@ function normalizeFormatSection(section: string): string {
       .replace(/\[\$-[^\]]+\]/g, '')
       // Color tags are a style concern; the formatter returns text only.
       .replace(/\[(?:Red|Green|Blue|Black|White|Yellow|Magenta|Cyan|Color\d+)\]/gi, '')
-      .replace(/"([^"]*)"/g, '$1')
       // Alignment/fill directives. `_x` reserves one char width; `*x`
       // repeats a fill char. Canvas text output should not show either.
       .replace(/_.|\\ /g, '')
@@ -899,6 +904,32 @@ function splitSections(s: string): string[] {
  *  for unescaped tokens (e.g. detecting `m` as a month token). */
 function stripLiterals(s: string): string {
   return s.replace(/"[^"]*"/g, '').replace(/\\./g, '');
+}
+
+function hasUnquotedPercent(s: string): boolean {
+  let inQuote = false;
+  let inBracket = false;
+  for (let i = 0; i < s.length; i += 1) {
+    const ch = s[i];
+    if (ch === '\\' && i + 1 < s.length) {
+      i += 1;
+      continue;
+    }
+    if (!inBracket && ch === '"') {
+      inQuote = !inQuote;
+      continue;
+    }
+    if (!inQuote && ch === '[') {
+      inBracket = true;
+      continue;
+    }
+    if (inBracket && ch === ']') {
+      inBracket = false;
+      continue;
+    }
+    if (!inQuote && !inBracket && ch === '%') return true;
+  }
+  return false;
 }
 
 function renderDateTimePattern(serial: number, pattern: string, locale: string): string {
@@ -990,6 +1021,7 @@ function renderDateTimePattern(serial: number, pattern: string, locale: string):
     let tok = '';
     if (rest.startsWith('yyyy')) tok = 'yyyy';
     else if (rest.startsWith('yy')) tok = 'yy';
+    else if (rest.startsWith('mmmmm')) tok = 'mmmmm';
     else if (rest.startsWith('mmmm')) tok = 'mmmm';
     else if (rest.startsWith('mmm')) tok = 'mmm';
     else if (rest.startsWith('mm')) tok = 'mm';
@@ -1018,6 +1050,9 @@ function renderDateTimePattern(serial: number, pattern: string, locale: string):
         break;
       case 'yy':
         out += String(yyyy).slice(-2);
+        break;
+      case 'mmmmm':
+        out += Array.from(MONTHS_LONG[mm - 1] ?? '')[0] ?? '';
         break;
       case 'mmmm':
         out += MONTHS_LONG[mm - 1] ?? '';
@@ -1192,7 +1227,7 @@ function renderNumericPattern(value: number, pattern: string, locale: string): s
     const i = body.lastIndexOf(commas);
     if (i >= 0) body = body.slice(0, i) + body.slice(i + commas.length);
   }
-  const isPercent = body.includes('%');
+  const isPercent = hasUnquotedPercent(body);
   let scaled = value / scale;
   if (isPercent) scaled *= 100;
 
@@ -1227,5 +1262,5 @@ function renderNumericPattern(value: number, pattern: string, locale: string): s
     useGrouping: grouping,
   }).format(scaled);
 
-  return body.replace(block, formatted);
+  return normalizeFormatSection(body.replace(block, formatted));
 }

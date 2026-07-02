@@ -14,6 +14,7 @@ import {
   setFillHandleRect,
   setOutlineToggles,
   setValidationChevron,
+  shouldShowValidationChevron,
   VALIDATION_TRIANGLE_COLOR,
 } from '../../../../src/render/grid/hit-state.js';
 
@@ -95,6 +96,19 @@ describe('render/grid/hit-state', () => {
         { kind: 'whole', op: 'between', a: 0, b: 10 },
       );
       expect(out).toBe(false);
+    });
+  });
+
+  describe('shouldShowValidationChevron', () => {
+    it('shows only list-validation chevrons whose in-cell dropdown is enabled', () => {
+      expect(shouldShowValidationChevron({ kind: 'list', source: ['A', 'B'] })).toBe(true);
+      expect(
+        shouldShowValidationChevron({ kind: 'list', source: ['A', 'B'], showDropdown: false }),
+      ).toBe(false);
+      expect(shouldShowValidationChevron({ kind: 'whole', op: 'between', a: 1, b: 10 })).toBe(
+        false,
+      );
+      expect(shouldShowValidationChevron(undefined)).toBe(false);
     });
   });
 

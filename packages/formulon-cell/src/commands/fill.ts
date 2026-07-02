@@ -77,7 +77,7 @@ const numericFromText = (
 /** Custom-list series — spreadsheets ship these by default. Each list represents
  *  a closed cycle that auto-fill steps through. Casing of the source is
  *  preserved by matching against the lowercased list. */
-const CUSTOM_LISTS: readonly string[][] = [
+export const CUSTOM_LISTS: readonly string[][] = [
   ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
   ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
   ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
@@ -213,6 +213,7 @@ interface SeriesProjection {
 
 /**
  * Inspect a 1D source line and produce a series projector. the spreadsheet heuristic:
+ *  - all-numeric, length >= 3 and constant non-zero ratio → growth extrapolation
  *  - all-numeric, length >= 2 → linear extrapolation (step = avg consecutive diff)
  *  - all-numeric, length 1   → copy
  *  - "Item 1", "Item 2"      → increment trailing integer
@@ -288,6 +289,22 @@ function buildProjection(line: SourceCell[], dateUnit?: DateFillUnit): SeriesPro
       const v = line[0]?.numeric ?? 0;
       return { at: () => ({ kind: 'number', value: v }) };
     }
+    if (line.length >= 3 && line.every((c) => c.numeric !== 0)) {
+      const first = line[0]?.numeric ?? 0;
+      const second = line[1]?.numeric ?? 0;
+      const ratio = second / first;
+      const isGrowth =
+        Number.isFinite(ratio) &&
+        line.slice(1).every((c, i) => {
+          const prev = line[i]?.numeric ?? 0;
+          const current = c.numeric ?? 0;
+          return Math.abs(current / prev - ratio) <= 1e-10;
+        });
+      if (isGrowth) {
+        const last = line[line.length - 1]?.numeric ?? 0;
+        return { at: (i) => ({ kind: 'number', value: last * ratio ** i }) };
+      }
+    }
     let stepSum = 0;
     for (let i = 1; i < line.length; i += 1) {
       stepSum += (line[i]?.numeric ?? 0) - (line[i - 1]?.numeric ?? 0);
@@ -308,7 +325,7 @@ function buildProjection(line: SourceCell[], dateUnit?: DateFillUnit): SeriesPro
         lm.indices.length >= 2
           ? (lastIdx - (lm.indices[0] ?? 0)) / Math.max(1, lm.indices.length - 1)
           : 1;
-      const stepInt = Math.round(step) || 1;
+      const stepInt = lm.indices.length >= 2 ? Math.round(step) : 1;
       return {
         at: (i) => {
           const target = lastIdx + stepInt * i;
@@ -644,47 +661,74 @@ const cellValueAsText = (value: ReturnType<WorkbookHandle['getValue']>): string 
   return '';
 };
 
+const flashFillInputCandidates = (
+  workbook: WorkbookHandle,
+  sheet: number,
+  range: Range,
+): number[] => {
+  const cols = new Set<number>();
+  for (const cell of workbook.cells(sheet)) {
+    if (cell.addr.row < range.r0 || cell.addr.row > range.r1) continue;
+    if (cell.addr.col === range.c0) continue;
+    if (cellValueAsText(cell.value).length === 0) continue;
+    cols.add(cell.addr.col);
+  }
+  return [...cols].sort((a, b) => {
+    const da = Math.abs(a - range.c0);
+    const db = Math.abs(b - range.c0);
+    if (da !== db) return da - db;
+    const aLeft = a < range.c0;
+    const bLeft = b < range.c0;
+    if (aLeft !== bLeft) return aLeft ? -1 : 1;
+    return a - b;
+  });
+};
+
 const executeRibbonFlashFill = (
   store: SpreadsheetStore,
   workbook: WorkbookHandle,
   history: History,
   range: Range,
 ): boolean => {
-  if (range.c0 !== range.c1 || range.c0 === 0) return false;
-  const examples: { input: string; output: string }[] = [];
-  const pending: { row: number; input: string }[] = [];
-  for (let row = range.r0; row <= range.r1; row += 1) {
-    const inputValue = workbook.getValue({ sheet: range.sheet, row, col: range.c0 - 1 });
-    const outputValue = workbook.getValue({ sheet: range.sheet, row, col: range.c0 });
-    const input = cellValueAsText(inputValue);
-    if (input.length === 0) continue;
-    if (outputValue.kind === 'text' && outputValue.value.length > 0) {
-      examples.push({ input, output: outputValue.value });
-    } else if (
-      outputValue.kind === 'blank' &&
-      isCellWritable(store.getState(), { sheet: range.sheet, row, col: range.c0 })
-    ) {
-      pending.push({ row, input });
+  if (range.c0 !== range.c1) return false;
+  const candidates = flashFillInputCandidates(workbook, range.sheet, range);
+  for (const inputCol of candidates) {
+    const examples: { input: string; output: string }[] = [];
+    const pending: { row: number; input: string }[] = [];
+    for (let row = range.r0; row <= range.r1; row += 1) {
+      const inputValue = workbook.getValue({ sheet: range.sheet, row, col: inputCol });
+      const outputValue = workbook.getValue({ sheet: range.sheet, row, col: range.c0 });
+      const input = cellValueAsText(inputValue);
+      if (input.length === 0) continue;
+      if (outputValue.kind === 'text' && outputValue.value.length > 0) {
+        examples.push({ input, output: outputValue.value });
+      } else if (
+        outputValue.kind === 'blank' &&
+        isCellWritable(store.getState(), { sheet: range.sheet, row, col: range.c0 })
+      ) {
+        pending.push({ row, input });
+      }
     }
+    const pattern = inferFlashFillPattern(examples);
+    if (!pattern || pending.length === 0) continue;
+    const filled = applyFlashFill(
+      pattern,
+      pending.map((entry) => entry.input),
+    );
+    history.begin();
+    try {
+      pending.forEach((entry, index) => {
+        const value = filled[index];
+        if (value != null)
+          workbook.setText({ sheet: range.sheet, row: entry.row, col: range.c0 }, value);
+      });
+    } finally {
+      history.end();
+    }
+    mutators.replaceCells(store, workbook.cells(range.sheet));
+    return true;
   }
-  const pattern = inferFlashFillPattern(examples);
-  if (!pattern || pending.length === 0) return false;
-  const filled = applyFlashFill(
-    pattern,
-    pending.map((entry) => entry.input),
-  );
-  history.begin();
-  try {
-    pending.forEach((entry, index) => {
-      const value = filled[index];
-      if (value != null)
-        workbook.setText({ sheet: range.sheet, row: entry.row, col: range.c0 }, value);
-    });
-  } finally {
-    history.end();
-  }
-  mutators.replaceCells(store, workbook.cells(range.sheet));
-  return true;
+  return false;
 };
 
 const DATE_SERIES_ACTIONS = new Set(['days', 'weekdays', 'months', 'years']);

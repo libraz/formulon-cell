@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CellValue } from '../../../src/engine/types.js';
 import {
   _resetConditionalCache,
@@ -23,6 +23,9 @@ const seedNumber = (state: State, row: number, col: number, value: number): Stat
   return { ...state, data: { ...state.data, cells } };
 };
 
+const dateSerial = (year: number, month: number, day: number): number =>
+  Date.UTC(year, month - 1, day) / 86_400_000 + 25569;
+
 const cellValueRule = (range: ConditionalRule['range']): ConditionalRule => ({
   kind: 'cell-value',
   range,
@@ -34,6 +37,7 @@ const cellValueRule = (range: ConditionalRule['range']): ConditionalRule => ({
 describe('evaluateConditional', () => {
   afterEach(() => {
     _resetConditionalCache();
+    vi.useRealTimers();
   });
 
   it('returns empty overlay when no rules are configured', () => {
@@ -188,6 +192,43 @@ describe('evaluateConditional', () => {
     expect(b.size).toBe(0);
   });
 
+  it('evaluates date-occurring week periods with Monday week boundaries', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(Date.UTC(2026, 6, 8, 12))); // Wednesday, 2026-07-08.
+    const store = createSpreadsheetStore();
+    const rule: ConditionalRule = {
+      kind: 'date-occurring',
+      range: { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 },
+      period: 'this-week',
+      apply: { fill: '#00ff00' },
+    };
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, dateSerial(2026, 7, 12)); // Sunday in the current Mon-Sun week.
+    s = seedNumber(s, 1, 0, dateSerial(2026, 7, 5)); // Sunday in the previous Mon-Sun week.
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [rule],
+      },
+    };
+    const thisWeek = evaluateConditional(s);
+    expect(thisWeek.get('0:0:0')?.fill).toBe('#00ff00');
+    expect(thisWeek.get('0:1:0')?.fill).toBeUndefined();
+
+    _resetConditionalCache();
+    const lastWeekState: State = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [{ ...rule, period: 'last-week' }],
+      },
+    };
+    const lastWeek = evaluateConditional(lastWeekState);
+    expect(lastWeek.get('0:0:0')?.fill).toBeUndefined();
+    expect(lastWeek.get('0:1:0')?.fill).toBe('#00ff00');
+  });
+
   it('honors color-scale threshold metadata for number and percentile stops', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
@@ -229,6 +270,31 @@ describe('evaluateConditional', () => {
       },
     };
     expect(evaluateConditional(s2).get('0:0:1')?.fill).toBe('rgb(128, 128, 128)');
+  });
+
+  it('uses the midpoint color when a three-color scale has degenerate thresholds', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 5);
+    s = seedNumber(s, 0, 1, 5);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'color-scale',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+            stops: ['#000000', '#808080', '#ffffff'],
+            thresholds: [{ kind: 'min' }, { kind: 'percentile', value: 50 }, { kind: 'max' }],
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+    expect(overlay.get('0:0:0')?.fill).toBe('rgb(128, 128, 128)');
+    expect(overlay.get('0:0:1')?.fill).toBe('rgb(128, 128, 128)');
   });
 
   it('icon-set classifies cells by percentile and forwards reverseOrder', () => {

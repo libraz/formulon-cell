@@ -265,12 +265,16 @@ export function insertDefinedNameFormula(
 ): { addr: Addr; formula: string } | null {
   const trimmed = name.trim();
   if (!trimmed) return null;
+  const entry = [...wb.definedNames()].find(
+    (definedName) => definedName.name.toLowerCase() === trimmed.toLowerCase(),
+  );
+  if (!entry) return null;
   const addr = state.selection.active;
   if (store && !isCellWritable(store.getState(), addr)) {
     warnProtected(addr);
     return null;
   }
-  const formula = `=${trimmed}`;
+  const formula = `=${entry.name}`;
   wb.setFormula(addr, formula);
   return { addr, formula };
 }

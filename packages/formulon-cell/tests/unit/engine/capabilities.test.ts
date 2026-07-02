@@ -58,6 +58,7 @@ describe('detectCapabilities', () => {
     expect(caps.hiddenRowsCols).toBe(false);
     expect(caps.colRowSize).toBe(false);
     expect(caps.freeze).toBe(false);
+    expect(caps.sheetView).toBe(false);
     expect(caps.sheetZoom).toBe(false);
     expect(caps.sheetTabHidden).toBe(false);
     expect(caps.outlines).toBe(false);
@@ -78,6 +79,15 @@ describe('detectCapabilities', () => {
     expect(caps.conditionalFormatMutate).toBe(false);
     expect(caps.pivotTables).toBe(false);
     expect(caps.pivotTableMutate).toBe(false);
+  });
+
+  it('sheet view readback is independent from zoom writeback', () => {
+    const readOnly = makeWb(['getSheetView']);
+    const caps = detectCapabilities(readOnly);
+    expect(caps.sheetView).toBe(true);
+    expect(caps.sheetZoom).toBe(false);
+    expect(caps.freeze).toBe(false);
+    expect(caps.sheetTabHidden).toBe(false);
   });
 
   it('traceArrows requires both precedents and dependents', () => {

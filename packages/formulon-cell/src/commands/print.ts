@@ -295,6 +295,28 @@ const PAPER_DIMENSIONS: Record<string, string> = {
   tabloid: 'tabloid',
 };
 
+/** Physical paper dimensions in inches (portrait). Used to derive a
+ *  fit-to-pages scale — the `@page size` keyword tells the browser the sheet
+ *  but gives us no numbers to scale content against. */
+const PAPER_INCHES: Record<string, { w: number; h: number }> = {
+  A3: { w: 11.69, h: 16.54 },
+  A4: { w: 8.27, h: 11.69 },
+  A5: { w: 5.83, h: 8.27 },
+  letter: { w: 8.5, h: 11 },
+  legal: { w: 8.5, h: 14 },
+  tabloid: { w: 11, h: 17 },
+};
+
+/** CSS reference pixel density — column widths / row heights are stored in px. */
+const PRINT_PX_PER_INCH = 96;
+
+interface PrintLayoutMetrics {
+  colWidths: Map<number, number>;
+  rowHeights: Map<number, number>;
+  defaultColWidth: number;
+  defaultRowHeight: number;
+}
+
 export function effectivePrintMargins(setup: PageSetup): PageMargins {
   const printable = setup.printableBounds;
   if (!printable) return { ...setup.margins };
@@ -426,6 +448,75 @@ function buildPageRule(setup: PageSetup, ctx: HeaderFooterContext): string {
     .join(' ');
   const base = `@page { size: ${size}; margin: ${m.top}in ${m.right}in ${m.bottom}in ${m.left}in;`;
   return marginBoxes ? `${base} ${marginBoxes} }` : `${base} }`;
+}
+
+/** Natural size of the print regions in inches, from column widths / row
+ *  heights. Width is the widest single region (regions break onto their own
+ *  page); height is the stacked total. */
+function printContentInches(
+  regions: readonly PrintAreaBounds[],
+  layout: PrintLayoutMetrics,
+  hiddenRows: ReadonlySet<number>,
+  hiddenCols: ReadonlySet<number>,
+): { width: number; height: number } {
+  let width = 0;
+  let height = 0;
+  for (const region of regions) {
+    let regionW = 0;
+    for (let c = region.col0; c <= region.col1; c += 1) {
+      if (hiddenCols.has(c)) continue;
+      regionW += layout.colWidths.get(c) ?? layout.defaultColWidth;
+    }
+    let regionH = 0;
+    for (let r = region.row0; r <= region.row1; r += 1) {
+      if (hiddenRows.has(r)) continue;
+      regionH += layout.rowHeights.get(r) ?? layout.defaultRowHeight;
+    }
+    width = Math.max(width, regionW);
+    height += regionH;
+  }
+  return { width: width / PRINT_PX_PER_INCH, height: height / PRINT_PX_PER_INCH };
+}
+
+/**
+ * Resolve the document scale. When Fit-to-pages is set (`fitWidth`/`fitHeight`)
+ * the requested page count is honoured by estimating the content's natural size
+ * against the printable page area and deriving the largest scale that fits —
+ * Excel never scales *up*, so the result is capped at 100% and floored to whole
+ * percent. With no fit constraint the explicit `scale` (default 100%) is used.
+ */
+export function computeFitToPagesScale(
+  setup: PageSetup,
+  regions: readonly PrintAreaBounds[],
+  layout: PrintLayoutMetrics,
+  hiddenRows: ReadonlySet<number>,
+  hiddenCols: ReadonlySet<number>,
+): number {
+  const fitWidth = setup.fitWidth ?? 0;
+  const fitHeight = setup.fitHeight ?? 0;
+  if (fitWidth <= 0 && fitHeight <= 0) {
+    return setup.scale && setup.scale > 0 ? setup.scale : 1;
+  }
+  const portrait = PAPER_INCHES[setup.paperSize] ?? { w: 8.27, h: 11.69 };
+  const page =
+    setup.orientation === 'landscape'
+      ? { w: portrait.h, h: portrait.w }
+      : { w: portrait.w, h: portrait.h };
+  const m = effectivePrintMargins(setup);
+  const printableW = Math.max(0.1, page.w - m.left - m.right);
+  const printableH = Math.max(0.1, page.h - m.top - m.bottom);
+  const content = printContentInches(regions, layout, hiddenRows, hiddenCols);
+
+  const candidates: number[] = [];
+  if (fitWidth > 0 && content.width > 0) candidates.push((fitWidth * printableW) / content.width);
+  if (fitHeight > 0 && content.height > 0) {
+    candidates.push((fitHeight * printableH) / content.height);
+  }
+  if (candidates.length === 0) return 1;
+  const raw = Math.min(1, ...candidates);
+  // Excel's minimum print scale is 10%; floor to whole percent so the content
+  // never overflows the requested page count by a rounding sliver.
+  return Math.max(0.1, Math.floor(raw * 100) / 100);
 }
 
 /** Snapshot of one cell ready to render. We collect into an intermediate map
@@ -722,8 +813,9 @@ export function buildPrintDocument(
           .join('')}</tbody></table></section>`
       : '';
 
-  const hasFitToPages = (setup.fitWidth ?? 0) > 0 || (setup.fitHeight ?? 0) > 0;
-  const scale = hasFitToPages ? 1 : setup.scale && setup.scale > 0 ? setup.scale : 1;
+  // Fit-to-pages now derives a real scale from the content's natural size
+  // instead of being ignored (which silently printed at 100%).
+  const scale = computeFitToPagesScale(setup, printRegions, state.layout, hiddenRows, hiddenCols);
   const tableTransform =
     scale === 1 ? '' : ` style="transform:scale(${scale});transform-origin:top left;"`;
 
@@ -763,7 +855,7 @@ export function buildPrintDocument(
     setup.centerVertically ? 'fc-print--center-v' : '',
     setup.blackAndWhite ? 'fc-print--black-white' : '',
     setup.draftQuality ? 'fc-print--draft' : '',
-    hasFitToPages ? 'fc-print--fit-to-pages' : '',
+    (setup.fitWidth ?? 0) > 0 || (setup.fitHeight ?? 0) > 0 ? 'fc-print--fit-to-pages' : '',
     setup.alignHeaderFooterWithMargins === false ? 'fc-print--hf-free' : '',
   ]
     .filter(Boolean)
@@ -784,7 +876,7 @@ export function buildPrintDocument(
     '.fc-print__header > :nth-child(2), .fc-print__footer > :nth-child(2) { text-align: center; }',
     '.fc-print__header > :nth-child(3), .fc-print__footer > :nth-child(3) { text-align: right; }',
     '.fc-print--center-h .fc-print__table { margin-left: auto; margin-right: auto; width: auto; }',
-    '.fc-print--center-v { min-height: calc(100vh - var(--fc-print-margin-top) - var(--fc-print-margin-bottom)); display: flex; flex-direction: column; justify-content: center; }',
+    '.fc-print--center-v .fc-print__area { min-height: calc(100vh - var(--fc-print-effective-margin-top) - var(--fc-print-effective-margin-bottom)); display: flex; flex-direction: column; justify-content: center; }',
     '.fc-print--black-white { filter: grayscale(1); }',
     '.fc-print--draft * { box-shadow: none !important; text-shadow: none !important; }',
     '.fc-print--fit-to-pages .fc-print__table { width: 100%; max-width: 100%; }',

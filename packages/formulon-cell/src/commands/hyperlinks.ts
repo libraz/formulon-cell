@@ -12,6 +12,11 @@ export interface HyperlinkEntry {
   tooltip?: string;
 }
 
+export interface SetHyperlinkOptions {
+  display?: string;
+  tooltip?: string;
+}
+
 export function hyperlinkAt(state: State, addr: Addr): string | null {
   const target = state.format.formats.get(addrKey(addr))?.hyperlink;
   return target && target.length > 0 ? target : null;
@@ -26,7 +31,10 @@ export function listHyperlinks(state: State, sheet = state.data.sheetIndex): Hyp
     const row = parts[1] ?? -1;
     const col = parts[2] ?? -1;
     if (s !== sheet) continue;
-    out.push({ addr: { sheet: s, row, col }, target: fmt.hyperlink });
+    const entry: HyperlinkEntry = { addr: { sheet: s, row, col }, target: fmt.hyperlink };
+    if (fmt.hyperlinkDisplay) entry.display = fmt.hyperlinkDisplay;
+    if (fmt.hyperlinkTooltip) entry.tooltip = fmt.hyperlinkTooltip;
+    out.push(entry);
   }
   return out.sort((a, b) => a.addr.row - b.addr.row || a.addr.col - b.addr.col);
 }
@@ -45,6 +53,7 @@ export function setHyperlink(
   addr: Addr,
   target: string,
   workbook?: WorkbookHandle,
+  options: SetHyperlinkOptions = {},
 ): void {
   if (!isCellWritable(store.getState(), addr)) {
     warnProtected(addr);
@@ -52,7 +61,14 @@ export function setHyperlink(
   }
   const range = { sheet: addr.sheet, r0: addr.row, c0: addr.col, r1: addr.row, c1: addr.col };
   const next = target.trim();
-  mutators.setRangeFormat(store, range, { hyperlink: next.length > 0 ? next : undefined });
+  const prev = store.getState().format.formats.get(addrKey(addr));
+  const display = options.display ?? prev?.hyperlinkDisplay;
+  const tooltip = options.tooltip ?? prev?.hyperlinkTooltip;
+  mutators.setRangeFormat(store, range, {
+    hyperlink: next.length > 0 ? next : undefined,
+    hyperlinkDisplay: next.length > 0 ? display : undefined,
+    hyperlinkTooltip: next.length > 0 ? tooltip : undefined,
+  });
   if (workbook) flushFormatToEngine(workbook, store, addr.sheet);
 }
 
@@ -67,6 +83,10 @@ export function clearHyperlink(
   }
   if (hyperlinkAt(store.getState(), addr) === null) return;
   const range = { sheet: addr.sheet, r0: addr.row, c0: addr.col, r1: addr.row, c1: addr.col };
-  mutators.setRangeFormat(store, range, { hyperlink: undefined });
+  mutators.setRangeFormat(store, range, {
+    hyperlink: undefined,
+    hyperlinkDisplay: undefined,
+    hyperlinkTooltip: undefined,
+  });
   if (workbook) flushFormatToEngine(workbook, store, addr.sheet);
 }

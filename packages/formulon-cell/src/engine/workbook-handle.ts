@@ -104,7 +104,7 @@ export class WorkbookHandle {
 
   /** True when the JS fallback stub is providing the engine surface. */
   get isStub(): boolean {
-    return isUsingStub();
+    return isUsingStub(this.module);
   }
 
   get version(): string {
@@ -497,6 +497,7 @@ export class WorkbookHandle {
     allowBlank: boolean;
     showInputMessage: boolean;
     showErrorMessage: boolean;
+    showDropDown?: boolean;
     formula1: string;
     formula2: string;
     errorTitle: string;
@@ -521,6 +522,8 @@ export class WorkbookHandle {
       allowBlank: v.allowBlank,
       showInputMessage: v.showInputMessage,
       showErrorMessage: v.showErrorMessage,
+      showDropDown:
+        'showDropDown' in v && typeof v.showDropDown === 'boolean' ? v.showDropDown : undefined,
       formula1: v.formula1,
       formula2: v.formula2,
       errorTitle: v.errorTitle,
@@ -543,6 +546,7 @@ export class WorkbookHandle {
       allowBlank?: boolean;
       showInputMessage?: boolean;
       showErrorMessage?: boolean;
+      showDropDown?: boolean;
       formula1?: string;
       formula2?: string;
       errorTitle?: string;
@@ -566,6 +570,7 @@ export class WorkbookHandle {
       ...(input.allowBlank !== undefined ? { allowBlank: input.allowBlank } : {}),
       ...(input.showInputMessage !== undefined ? { showInputMessage: input.showInputMessage } : {}),
       ...(input.showErrorMessage !== undefined ? { showErrorMessage: input.showErrorMessage } : {}),
+      ...(input.showDropDown !== undefined ? { showDropDown: input.showDropDown } : {}),
       ...(input.formula1 !== undefined ? { formula1: input.formula1 } : {}),
       ...(input.formula2 !== undefined ? { formula2: input.formula2 } : {}),
       ...(input.errorTitle !== undefined ? { errorTitle: input.errorTitle } : {}),

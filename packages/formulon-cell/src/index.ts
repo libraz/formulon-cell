@@ -402,6 +402,7 @@ export type {
 export {
   buildPrintDocument,
   colLetter,
+  computeFitToPagesScale,
   parsePrintArea,
   parsePrintAreas,
   parsePrintTitleCols,

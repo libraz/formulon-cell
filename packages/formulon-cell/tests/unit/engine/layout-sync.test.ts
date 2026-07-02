@@ -75,12 +75,18 @@ interface FakeWb {
 const makeFake = (opts: {
   colRowSize: boolean;
   freeze?: boolean;
+  sheetView?: boolean;
   sheetZoom?: boolean;
   hiddenRowsCols?: boolean;
   outlines?: boolean;
+  sheetCount?: number;
   cols?: FakeColLayout[];
   rows?: FakeRowLayout[];
   view?: { zoomScale: number; freezeRows: number; freezeCols: number; tabHidden: boolean } | null;
+  views?: Record<
+    number,
+    { zoomScale: number; freezeRows: number; freezeCols: number; tabHidden: boolean }
+  >;
 }): FakeWb => {
   const colCalls: SetColCall[] = [];
   const rowCalls: SetRowCall[] = [];
@@ -93,13 +99,15 @@ const makeFake = (opts: {
     capabilities: {
       colRowSize: opts.colRowSize,
       freeze: opts.freeze ?? false,
+      sheetView: opts.sheetView ?? (opts.view !== undefined || opts.views !== undefined),
       sheetZoom: opts.sheetZoom ?? false,
       hiddenRowsCols: opts.hiddenRowsCols ?? false,
       outlines: opts.outlines ?? false,
     },
+    sheetCount: opts.sheetCount ?? 1,
     getColumnLayouts: () => opts.cols ?? [],
     getRowLayouts: () => opts.rows ?? [],
-    getSheetView: () => opts.view ?? null,
+    getSheetView: (sheet: number) => opts.views?.[sheet] ?? opts.view ?? null,
     setColumnWidth: (sheet: number, first: number, last: number, width: number) => {
       colCalls.push({ sheet, first, last, width });
       return opts.colRowSize;
@@ -189,6 +197,7 @@ describe('hydrateLayoutFromEngine', () => {
     const store = createSpreadsheetStore();
     const { wb } = makeFake({
       colRowSize: false,
+      sheetView: true,
       sheetZoom: true,
       view: { zoomScale: 150, freezeRows: 1, freezeCols: 2, tabHidden: false },
     });
@@ -199,11 +208,33 @@ describe('hydrateLayoutFromEngine', () => {
     expect(s.viewport.zoom).toBeCloseTo(1.5);
   });
 
+  it('hydrates freeze and hidden sheet readback even without sheet view write capabilities', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeFake({
+      colRowSize: false,
+      sheetCount: 3,
+      sheetView: true,
+      sheetZoom: false,
+      freeze: false,
+      views: {
+        0: { zoomScale: 100, freezeRows: 1, freezeCols: 2, tabHidden: false },
+        1: { zoomScale: 100, freezeRows: 0, freezeCols: 0, tabHidden: true },
+        2: { zoomScale: 100, freezeRows: 0, freezeCols: 0, tabHidden: false },
+      },
+    });
+    hydrateLayoutFromEngine(wb, store, 0);
+    const s = store.getState();
+    expect(s.layout.freezeRows).toBe(1);
+    expect(s.layout.freezeCols).toBe(2);
+    expect(s.layout.hiddenSheets.has(1)).toBe(true);
+  });
+
   it('leaves zoom at 1.0 when engine reports the default 100%', () => {
     const store = createSpreadsheetStore();
     const initialZoom = store.getState().viewport.zoom;
     const { wb } = makeFake({
       colRowSize: false,
+      sheetView: true,
       sheetZoom: true,
       view: { zoomScale: 100, freezeRows: 0, freezeCols: 0, tabHidden: false },
     });
@@ -215,6 +246,7 @@ describe('hydrateLayoutFromEngine', () => {
     const store = createSpreadsheetStore();
     const { wb } = makeFake({
       colRowSize: false,
+      sheetView: true,
       sheetZoom: true,
       view: { zoomScale: 400, freezeRows: 0, freezeCols: 0, tabHidden: false },
     });

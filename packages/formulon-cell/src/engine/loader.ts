@@ -12,8 +12,9 @@ import createFormulon from '@libraz/formulon';
 import { createStubModule } from './stub-engine.js';
 import type { FormulonModule } from './types.js';
 
-let cached: Promise<FormulonModule> | null = null;
-let usedStub = false;
+let cachedWasm: Promise<FormulonModule> | null = null;
+let cachedStub: Promise<FormulonModule> | null = null;
+const stubModules = new WeakSet<FormulonModule>();
 
 export interface LoadOptions {
   /** Force the JS stub even if the WASM could load. Useful for tests and
@@ -24,14 +25,17 @@ export interface LoadOptions {
 }
 
 export function loadFormulon(opts: LoadOptions = {}): Promise<FormulonModule> {
-  if (cached) return cached;
-
   if (opts.preferStub) {
-    usedStub = true;
     opts.onFallback?.('preferStub set — using stub engine');
-    cached = Promise.resolve(createStubModule());
-    return cached;
+    if (!cachedStub) {
+      const module = createStubModule();
+      stubModules.add(module);
+      cachedStub = Promise.resolve(module);
+    }
+    return cachedStub;
   }
+
+  if (cachedWasm) return cachedWasm;
 
   const unavailableReason = wasmUnavailableReason();
   if (unavailableReason) {
@@ -41,13 +45,14 @@ export function loadFormulon(opts: LoadOptions = {}): Promise<FormulonModule> {
   const promise: Promise<FormulonModule> = createFormulon().catch((reason: unknown) => {
     throw new Error(`formulon WASM init failed: ${String(reason)}`);
   });
-  cached = promise;
+  cachedWasm = promise;
 
   return promise;
 }
 
-export function isUsingStub(): boolean {
-  return usedStub;
+export function isUsingStub(module?: FormulonModule): boolean {
+  if (module) return stubModules.has(module);
+  return cachedStub !== null && cachedWasm === null;
 }
 
 function wasmUnavailableReason(): string | null {

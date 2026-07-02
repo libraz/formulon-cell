@@ -4,6 +4,7 @@ import { formatCellForEdit } from '../engine/edit-seed.js';
 import type { ChangeEvent, WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetEmitter } from '../events.js';
 import type { ExtensionHandle, resolveFlags } from '../extensions/index.js';
+import type { FormulaRegistry } from '../formula.js';
 import type { Strings } from '../i18n/strings.js';
 import { attachAutoFillOptions } from '../interact/auto-fill-options.js';
 import { attachClipboard } from '../interact/clipboard.js';
@@ -43,6 +44,7 @@ export interface EngineBinding {
 interface AttachEngineBindingInput {
   emitter: SpreadsheetEmitter;
   flags: FeatureFlags;
+  formulaRegistry: FormulaRegistry;
   getCommentDialog: () => { open(): void } | null;
   getFormatDialog: () => { open(): void } | null;
   getFormatPainter: () => { isActive(): boolean } | null;
@@ -76,6 +78,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
   const {
     emitter,
     flags,
+    formulaRegistry,
     getCommentDialog,
     getFormatDialog,
     getFormatPainter,
@@ -121,6 +124,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
       autocomplete: strings.autocomplete,
       argHelper: strings.argHelper,
     }),
+    getCustomFunctions: () => formulaRegistry.list(),
     onValidation: (outcome) => validationAlert?.show(outcome),
     onAfterCommit: refreshCells,
   });

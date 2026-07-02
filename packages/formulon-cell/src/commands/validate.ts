@@ -136,7 +136,9 @@ export function validateAgainst(
       // Range-backed list with no resolver / empty resolution: accept anything
       // (spreadsheet parity — it just disables the constraint silently).
       if (!Array.isArray(validation.source) && values.length === 0) return { ok: true };
-      return values.includes(text) ? { ok: true } : reject(validation, listMessage(values));
+      return listValueMatches(values, text)
+        ? { ok: true }
+        : reject(validation, listMessage(values));
     }
     case 'whole':
     case 'decimal': {
@@ -182,6 +184,15 @@ function inputAsText(input: Exclude<CoercedInput, { kind: 'formula' }>): string 
     case 'text':
       return input.value;
   }
+}
+
+function normalizeListText(value: string): string {
+  return value.toLocaleLowerCase();
+}
+
+function listValueMatches(values: readonly string[], text: string): boolean {
+  const normalized = normalizeListText(text);
+  return values.some((value) => normalizeListText(value) === normalized);
 }
 
 const NUMERIC = /^[+-]?(?:(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;

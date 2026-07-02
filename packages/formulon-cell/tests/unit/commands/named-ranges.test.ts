@@ -331,10 +331,19 @@ describe('named range commands', () => {
     const { wb, formulas } = makeWb();
     setRange(store, 4, 2, 4, 2);
 
-    const result = insertDefinedNameFormula(store.getState(), wb, 'TaxRate');
+    const result = insertDefinedNameFormula(store.getState(), wb, ' taxrate ');
 
     expect(result).toEqual({ addr: { sheet: 0, row: 4, col: 2 }, formula: '=TaxRate' });
     expect(formulas.get('0:4:2')).toBe('=TaxRate');
+  });
+
+  it('does not insert formulas for names that do not exist in the workbook', () => {
+    const store = createSpreadsheetStore();
+    const { wb, formulas } = makeWb();
+    setRange(store, 4, 2, 4, 2);
+
+    expect(insertDefinedNameFormula(store.getState(), wb, 'MissingName')).toBeNull();
+    expect(formulas.size).toBe(0);
   });
 
   it('blocks defined-name formula insertion into locked protected cells', () => {

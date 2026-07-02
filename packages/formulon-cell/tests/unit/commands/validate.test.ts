@@ -27,6 +27,11 @@ describe('validateAgainst', () => {
       expect(validateAgainst(inlineList, coerce('Yes')).ok).toBe(true);
     });
 
+    it('matches inline list values case-insensitively like Excel', () => {
+      expect(validateAgainst(inlineList, coerce('yes')).ok).toBe(true);
+      expect(validateAgainst(inlineList, coerce('NO')).ok).toBe(true);
+    });
+
     it('rejects a value not in the inline list', () => {
       const out = validateAgainst(inlineList, coerce('Perhaps'));
       expect(out.ok).toBe(false);
@@ -52,6 +57,7 @@ describe('validateAgainst', () => {
       };
       const resolver = () => ['Red', 'Green', 'Blue'];
       expect(validateAgainst(rangeList, coerce('Green'), resolver).ok).toBe(true);
+      expect(validateAgainst(rangeList, coerce('green'), resolver).ok).toBe(true);
       expect(validateAgainst(rangeList, coerce('Yellow'), resolver).ok).toBe(false);
     });
   });

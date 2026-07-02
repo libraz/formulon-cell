@@ -40,6 +40,7 @@ export function detectCapabilities(wb: Workbook): EngineCapabilities {
     hiddenRowsCols: all('setRowHidden', 'setColumnHidden'),
     colRowSize: all('setColumnWidth', 'setRowHeight'),
     freeze: has('setSheetFreeze'),
+    sheetView: has('getSheetView'),
     sheetZoom: has('setSheetZoom'),
     sheetTabHidden: has('setSheetTabHidden'),
     outlines: all('setColumnOutline', 'setRowOutline'),

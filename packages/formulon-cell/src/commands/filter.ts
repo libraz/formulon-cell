@@ -38,6 +38,7 @@ const cloneCriteria = (criteria: readonly ValueFilterCriteria[]): ValueFilterCri
     byCol: c.byCol,
     hiddenValues: [...c.hiddenValues],
     ...(c.condition ? { condition: { ...c.condition } } : {}),
+    ...(c.color ? { color: { ...c.color } } : {}),
   }));
 
 function captureFilterSnapshot(state: State): FilterSnapshot {
@@ -89,6 +90,8 @@ function sameCriteriaList(
       sameRange(left.range, right.range) &&
       left.condition?.op === right.condition?.op &&
       left.condition?.value === right.condition?.value &&
+      left.color?.kind === right.color?.kind &&
+      left.color?.color === right.color?.color &&
       left.hiddenValues.length === right.hiddenValues.length &&
       left.hiddenValues.every((value, index) => value === right.hiddenValues[index])
     );
@@ -201,6 +204,28 @@ export function applyConditionFilter(
   return count;
 }
 
+export function applyColorFilter(
+  state: State,
+  store: SpreadsheetStore,
+  range: Range,
+  byCol: number,
+  color: { kind: 'cellColor' | 'fontColor'; color: string },
+): number {
+  const criteria = upsertCriteria(state.ui.filterCriteria, {
+    range,
+    byCol,
+    hiddenValues: [],
+    color: { kind: color.kind, color: normalizeColorKey(color.color) },
+  });
+  const { hidden, count } = recomputeHiddenFromCriteria(state, criteria);
+  store.setState((s) => ({
+    ...s,
+    layout: { ...s.layout, hiddenRows: hidden },
+    ui: { ...s.ui, filterRange: { ...range }, filterCriteria: criteria },
+  }));
+  return count;
+}
+
 /**
  * Recompute the hidden-row set from the full criteria list, ANDing across
  * every filtered column the way Excel's AutoFilter does: a row survives only
@@ -218,17 +243,33 @@ function recomputeHiddenFromCriteria(
   }
   const next = new Set(baseline);
   for (const c of criteria) {
-    const hiddenSet = c.condition ? null : new Set(c.hiddenValues);
+    const hiddenSet = c.condition || c.color ? null : new Set(c.hiddenValues);
     for (let r = c.range.r0 + 1; r <= c.range.r1; r += 1) {
       if (next.has(r)) continue;
       const cell = state.data.cells.get(addrKey({ sheet: c.range.sheet, row: r, col: c.byCol }));
-      const hide = c.condition
-        ? !conditionMatches(cell, c.condition)
-        : (hiddenSet as Set<string>).has(filterValueKey(cell?.value));
+      const hide = c.color
+        ? !colorMatches(state, c.range.sheet, r, c.byCol, c.color)
+        : c.condition
+          ? !conditionMatches(cell, c.condition)
+          : (hiddenSet as Set<string>).has(filterValueKey(cell?.value));
       if (hide) next.add(r);
     }
   }
   return { hidden: next, count: next.size - baseline.size };
+}
+
+const normalizeColorKey = (color: string): string => color.trim().toLocaleLowerCase();
+
+function colorMatches(
+  state: State,
+  sheet: number,
+  row: number,
+  col: number,
+  color: { kind: 'cellColor' | 'fontColor'; color: string },
+): boolean {
+  const fmt = state.format.formats.get(addrKey({ sheet, row, col }));
+  const actual = color.kind === 'cellColor' ? fmt?.fill : fmt?.color;
+  return !!actual && normalizeColorKey(actual) === color.color;
 }
 
 /** Apply an Excel-style "Filter by Selected Cell's Value" action. The active
@@ -251,10 +292,11 @@ export function filterBySelectedCellValue(
     return 0;
   }
   const selected = state.data.cells.get(addrKey(active));
-  const selectedKey = filterValueKey(selected?.value);
-  const hiddenValues = distinctValues(state, range, active.col).filter(
-    (value) => value !== selectedKey,
-  );
+  const selectedValue = selected?.value ?? { kind: 'blank' as const };
+  const selectedLabel = filterItemLabel(state, active, selectedValue, 'en-US');
+  const hiddenValues = distinctFilterItems(state, range, active.col)
+    .filter((item) => item.label !== selectedLabel)
+    .map((item) => item.key);
   if (hiddenValues.length === 0) {
     setAutoFilter(store, range);
     return 0;
@@ -667,9 +709,9 @@ function upsertCriteria(
   next: ValueFilterCriteria,
 ): ValueFilterCriteria[] {
   const out = existing.filter((c) => !(sameRange(c.range, next.range) && c.byCol === next.byCol));
-  // A value filter that hides nothing clears the column; a condition filter is
-  // always meaningful, so it is kept even though hiddenValues is empty.
-  if (!next.condition && next.hiddenValues.length === 0) return out;
+  // A value filter that hides nothing clears the column; condition/color
+  // filters are meaningful even though hiddenValues is empty.
+  if (!next.condition && !next.color && next.hiddenValues.length === 0) return out;
   return [
     ...out,
     {
@@ -677,6 +719,7 @@ function upsertCriteria(
       byCol: next.byCol,
       hiddenValues: [...next.hiddenValues],
       ...(next.condition ? { condition: { ...next.condition } } : {}),
+      ...(next.color ? { color: { ...next.color } } : {}),
     },
   ];
 }

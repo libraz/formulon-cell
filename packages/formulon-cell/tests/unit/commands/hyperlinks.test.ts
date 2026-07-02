@@ -74,7 +74,35 @@ describe('hyperlink commands', () => {
     setHyperlink(store, { sheet: 0, row: 1, col: 1 }, 'https://x', wb);
 
     expect(clearHyperlinks).toHaveBeenCalledWith(0);
-    expect(addHyperlink).toHaveBeenCalledWith(0, 1, 1, 'https://x');
+    expect(addHyperlink).toHaveBeenCalledWith(0, 1, 1, 'https://x', '', '');
+  });
+
+  it('preserves display text and tooltip when only the URL is edited', () => {
+    const store = createSpreadsheetStore();
+    const clearHyperlinks = vi.fn(() => true);
+    const addHyperlink = vi.fn(() => true);
+    const wb = {
+      capabilities: { hyperlinks: true },
+      clearHyperlinks,
+      addHyperlink,
+    } as unknown as WorkbookHandle;
+    const addr = { sheet: 0, row: 1, col: 1 };
+
+    setHyperlink(store, addr, 'https://old', wb, {
+      display: 'Display',
+      tooltip: 'Tooltip',
+    });
+    setHyperlink(store, addr, 'https://new', wb);
+
+    expect(listHyperlinks(store.getState(), 0)).toEqual([
+      {
+        addr,
+        target: 'https://new',
+        display: 'Display',
+        tooltip: 'Tooltip',
+      },
+    ]);
+    expect(addHyperlink).toHaveBeenLastCalledWith(0, 1, 1, 'https://new', 'Display', 'Tooltip');
   });
 
   it('skips setHyperlink on locked cells in protected sheets', () => {

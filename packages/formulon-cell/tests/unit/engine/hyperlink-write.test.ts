@@ -59,6 +59,37 @@ describe('syncHyperlinksToEngine', () => {
     expect(adds.map((a) => a.target).sort()).toEqual(['https://a.example', 'https://b.example']);
   });
 
+  it('writes hyperlink display text and tooltip when present', () => {
+    const { wb, adds } = makeFake();
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      format: {
+        formats: new Map([
+          [
+            addrKey({ sheet: 0, row: 2, col: 3 }),
+            {
+              hyperlink: 'https://example.com',
+              hyperlinkDisplay: 'Example',
+              hyperlinkTooltip: 'Open Example',
+            },
+          ],
+        ]),
+      },
+    }));
+    syncHyperlinksToEngine(wb, store, 0);
+    expect(adds).toEqual([
+      {
+        sheet: 0,
+        row: 2,
+        col: 3,
+        target: 'https://example.com',
+        display: 'Example',
+        tooltip: 'Open Example',
+      },
+    ]);
+  });
+
   it('skips cells on other sheets', () => {
     const { wb, adds } = makeFake();
     const store = createSpreadsheetStore();

@@ -63,6 +63,14 @@ describe('inferFlashFillPattern', () => {
     expect(p).toEqual({ kind: 'case', mode: 'title' });
   });
 
+  it('detects Unicode title-case transforms', () => {
+    const p = inferFlashFillPattern([
+      ex('élise dupont', 'Élise Dupont'),
+      ex('mårten åberg', 'Mårten Åberg'),
+    ]);
+    expect(p).toEqual({ kind: 'case', mode: 'title' });
+  });
+
   it('returns null when no single pattern explains every example', () => {
     expect(
       inferFlashFillPattern([
@@ -105,6 +113,9 @@ describe('applyFlashFillPattern', () => {
     expect(applyFlashFillPattern({ kind: 'case', mode: 'lower' }, 'HI')).toBe('hi');
     expect(applyFlashFillPattern({ kind: 'case', mode: 'title' }, 'hello world')).toBe(
       'Hello World',
+    );
+    expect(applyFlashFillPattern({ kind: 'case', mode: 'title' }, 'élise dupont')).toBe(
+      'Élise Dupont',
     );
   });
 });

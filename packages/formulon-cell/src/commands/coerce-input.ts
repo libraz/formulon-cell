@@ -98,13 +98,18 @@ const parseTimeValue = (raw: string): ParsedNumber | null => {
     else hours = hours === 12 ? 12 : hours + 12;
   }
   const value = (sign * (hours * 3600 + minutes * 60 + seconds)) / 86_400;
-  const pattern = meridiem
+  const elapsed = !meridiem && hours >= 24;
+  const pattern = elapsed
     ? hasSeconds
-      ? 'h:mm:ss AM/PM'
-      : 'h:mm AM/PM'
-    : hasSeconds
-      ? 'h:mm:ss'
-      : 'h:mm';
+      ? '[h]:mm:ss'
+      : '[h]:mm'
+    : meridiem
+      ? hasSeconds
+        ? 'h:mm:ss AM/PM'
+        : 'h:mm AM/PM'
+      : hasSeconds
+        ? 'h:mm:ss'
+        : 'h:mm';
   return { value, format: { kind: 'time', pattern } };
 };
 
@@ -193,7 +198,7 @@ export function coerceInput(raw: string, options?: CoerceInputOptions): CoercedI
   if (trimmed.startsWith("'")) return { kind: 'text', value: trimmed.slice(1) };
   if (options?.forceText === true) return { kind: 'text', value: raw };
   if (trimmed.startsWith('=')) return { kind: 'formula', text: trimmed };
-  const boolText = numericTrimmed.toUpperCase();
+  const boolText = trimmed.toUpperCase();
   if (boolText === 'TRUE' || boolText === 'FALSE') {
     return { kind: 'bool', value: boolText === 'TRUE' };
   }

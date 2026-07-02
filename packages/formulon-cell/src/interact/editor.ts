@@ -1,4 +1,5 @@
 import { coerceInput, writeCoerced, writeInputValidated } from '../commands/coerce-input.js';
+import { replaceFormulaSelectionWithF9Preview } from '../commands/f9-preview.js';
 import { stepWithMerge } from '../commands/merge.js';
 import { dblClickRange, extractRefs, rotateRefAt, shiftFormulaRefs } from '../commands/refs.js';
 import { addrKey } from '../engine/address.js';
@@ -48,6 +49,7 @@ export interface EditorDeps {
     autocomplete?: Partial<AutocompleteLabels>;
     argHelper?: Partial<ArgHelperLabels>;
   };
+  getCustomFunctions?: () => readonly string[];
 }
 
 /**
@@ -144,6 +146,7 @@ export class InlineEditor {
       getTables: () => this.deps.wb.getTables(),
       editingAddr: a,
       getColumnValues: (sheet, col, beforeRow) => this.collectColumnHistory(sheet, col, beforeRow),
+      getCustomFunctions: () => this.deps.getCustomFunctions?.() ?? [],
       getFunctionNames: () => this.deps.wb.functionNames(),
       labels: this.deps.getLabels?.().autocomplete,
     });
@@ -383,6 +386,32 @@ export class InlineEditor {
         this.input.value = r.text;
         this.input.setSelectionRange(r.caret, r.caret);
         syncEditorRefs(this.deps.store, this.input.value);
+      }
+    } else if (e.key === 'F9' && this.input) {
+      const start = this.input.selectionStart ?? 0;
+      const end = this.input.selectionEnd ?? start;
+      const sheetByName = (name: string): number => {
+        for (let i = 0; i < this.deps.wb.sheetCount; i += 1) {
+          if (this.deps.wb.sheetName(i) === name) return i;
+        }
+        return -1;
+      };
+      const result = replaceFormulaSelectionWithF9Preview(
+        this.input.value,
+        start,
+        end,
+        this.deps.store.getState().data.sheetIndex,
+        this.deps.store.getState().data.cells,
+        sheetByName,
+      );
+      if (result) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.input.value = result.text;
+        this.input.setSelectionRange(result.start, result.end);
+        syncEditorRefs(this.deps.store, this.input.value);
+        this.autocomplete?.refresh();
+        this.argHelper?.refresh();
       }
     }
   };

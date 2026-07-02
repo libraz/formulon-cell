@@ -36,9 +36,12 @@ export interface FlashFillExample {
 }
 
 const TITLE_CASE = (s: string): string =>
-  s.replace(/\w\S*/g, (w) =>
-    w.length > 0 ? (w[0] ?? '').toUpperCase() + w.slice(1).toLowerCase() : w,
-  );
+  s.replace(/\p{L}[\p{L}\p{M}\p{N}'’-]*/gu, (word) => {
+    const chars = Array.from(word);
+    return chars.length > 0
+      ? (chars[0] ?? '').toUpperCase() + chars.slice(1).join('').toLowerCase()
+      : word;
+  });
 
 /** Apply a single pattern to one input. Returns null when the pattern
  *  cannot be applied (for example, slice bounds beyond the input). */

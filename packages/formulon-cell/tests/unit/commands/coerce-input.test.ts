@@ -28,7 +28,11 @@ describe('coerceInput', () => {
     expect(coerceInput('TRUE')).toEqual({ kind: 'bool', value: true });
     expect(coerceInput('FALSE')).toEqual({ kind: 'bool', value: false });
     expect(coerceInput('true')).toEqual({ kind: 'bool', value: true });
-    expect(coerceInput('ｆａｌｓｅ')).toEqual({ kind: 'bool', value: false });
+  });
+
+  it('keeps full-width TRUE/FALSE text instead of coercing it to boolean', () => {
+    expect(coerceInput('ｔｒｕｅ')).toEqual({ kind: 'text', value: 'ｔｒｕｅ' });
+    expect(coerceInput('ＦＡＬＳＥ')).toEqual({ kind: 'text', value: 'ＦＡＬＳＥ' });
   });
 
   it('parses integers and decimals as numbers', () => {
@@ -104,7 +108,12 @@ describe('coerceInput', () => {
     expect(coerceInput('２５：００')).toEqual({
       kind: 'number',
       value: 25 / 24,
-      implicitFormat: { kind: 'time', pattern: 'h:mm' },
+      implicitFormat: { kind: 'time', pattern: '[h]:mm' },
+    });
+    expect(coerceInput('25:00:30')).toEqual({
+      kind: 'number',
+      value: (25 * 3600 + 30) / 86_400,
+      implicitFormat: { kind: 'time', pattern: '[h]:mm:ss' },
     });
     expect(coerceInput('1:30 PM')).toEqual({
       kind: 'number',

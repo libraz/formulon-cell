@@ -83,22 +83,41 @@ describe('attachNamedRangeDialog', () => {
 
 interface MutableWb {
   capabilities: { definedNameMutate: boolean };
+  readonly sheetCount: number;
   definedNames(): IterableIterator<{ name: string; formula: string }>;
+  sheetName(index: number): string;
+  getValue(addr: { sheet: number; row: number; col: number }): FakeCellValue;
   setDefinedNameEntry(name: string, formula: string): boolean;
   recalc(): void;
 }
+
+type FakeCellValue =
+  | { kind: 'blank' }
+  | { kind: 'number'; value: number }
+  | { kind: 'text'; value: string };
 
 const makeMutableWb = (): {
   wb: WorkbookHandle;
   calls: { name: string; formula: string }[];
   registry: Map<string, string>;
+  values: Map<string, FakeCellValue>;
 } => {
   const calls: { name: string; formula: string }[] = [];
   const registry = new Map<string, string>();
+  const values = new Map<string, FakeCellValue>();
   const fake: MutableWb = {
     capabilities: { definedNameMutate: true },
+    get sheetCount() {
+      return 1;
+    },
     *definedNames() {
       for (const [name, formula] of registry) yield { name, formula };
+    },
+    sheetName(index: number): string {
+      return index === 0 ? 'Sheet1' : `Sheet${index + 1}`;
+    },
+    getValue(addr) {
+      return values.get(`${addr.sheet}:${addr.row}:${addr.col}`) ?? { kind: 'blank' };
     },
     setDefinedNameEntry(name: string, formula: string): boolean {
       calls.push({ name, formula });
@@ -108,7 +127,7 @@ const makeMutableWb = (): {
     },
     recalc() {},
   };
-  return { wb: fake as unknown as WorkbookHandle, calls, registry };
+  return { wb: fake as unknown as WorkbookHandle, calls, registry, values };
 };
 
 describe('attachNamedRangeDialog (mutate enabled)', () => {
@@ -259,6 +278,17 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       document.querySelectorAll<HTMLElement>('.fc-namedlg__item span'),
     ).map((cell) => cell.textContent);
     expect(rowCells).toEqual(['TaxRate', '-', '=Sheet1!$A$1', 'ブック', '']);
+    handle.detach();
+  });
+
+  it('renders simple defined-name reference values in the Value column', () => {
+    const { wb, registry, values } = makeMutableWb();
+    registry.set('TaxRate', '=Sheet1!$A$1');
+    values.set('0:0:0', { kind: 'number', value: 0.08 });
+    const handle = attachNamedRangeDialog({ host, wb });
+    handle.open();
+
+    expect(document.querySelector<HTMLElement>('.fc-namedlg__row-value')?.textContent).toBe('0.08');
     handle.detach();
   });
 

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { fillDestFor, fillRange } from '../../../src/commands/fill.js';
+import { executeRibbonFillAction, fillDestFor, fillRange } from '../../../src/commands/fill.js';
+import { History } from '../../../src/commands/history.js';
 import { addrKey } from '../../../src/engine/address.js';
 import type { Range } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -122,6 +123,20 @@ describe('fillRange', () => {
     expect(num(wb, 0, 4, 0)).toBe(50);
   });
 
+  it('extrapolates a numeric growth series downward when the source has a stable ratio', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 2 },
+      { row: 1, col: 0, value: 4 },
+      { row: 2, col: 0, value: 8 },
+    ]);
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 0 };
+    expect(fillRange(store.getState(), wb, src, dest)).toBe(true);
+    wb.recalc();
+    expect(num(wb, 0, 3, 0)).toBe(16);
+    expect(num(wb, 0, 4, 0)).toBe(32);
+  });
+
   it('copies a single numeric source cell', () => {
     seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
     const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
@@ -217,6 +232,20 @@ describe('fillRange', () => {
     expect(text(wb, 0, 2, 0)).toBe('Mar');
     expect(text(wb, 0, 3, 0)).toBe('Apr');
     expect(text(wb, 0, 4, 0)).toBe('May');
+  });
+
+  it('copies repeated custom-list source values instead of forcing a one-step series', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 'Mon' },
+      { row: 1, col: 0, value: 'Mon' },
+    ]);
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 0 };
+    fillRange(store.getState(), wb, src, dest);
+    wb.recalc();
+    expect(text(wb, 0, 2, 0)).toBe('Mon');
+    expect(text(wb, 0, 3, 0)).toBe('Mon');
+    expect(text(wb, 0, 4, 0)).toBe('Mon');
   });
 
   it('preserves source casing for English custom lists', () => {
@@ -343,6 +372,66 @@ describe('fillRange', () => {
     expect(num(wb, 0, 3, 0)).toBe(2);
     expect(num(wb, 0, 4, 0)).toBe(1);
     expect(num(wb, 0, 5, 0)).toBe(2);
+  });
+
+  it('flash fill can infer from the nearest populated column on the right', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 'John' },
+      { row: 0, col: 1, value: 'John Smith' },
+      { row: 1, col: 1, value: 'Jane Doe' },
+      { row: 2, col: 1, value: 'Ada Lovelace' },
+    ]);
+    store.setState((s) => ({
+      ...s,
+      selection: {
+        ...s.selection,
+        range: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 },
+        active: { sheet: 0, row: 0, col: 0 },
+        anchor: { sheet: 0, row: 0, col: 0 },
+      },
+    }));
+
+    expect(
+      executeRibbonFillAction({
+        store,
+        workbook: wb,
+        history: new History(),
+        action: 'flash',
+      }),
+    ).toBe(true);
+    wb.recalc();
+    expect(text(wb, 0, 1, 0)).toBe('Jane');
+    expect(text(wb, 0, 2, 0)).toBe('Ada');
+  });
+
+  it('flash fill prefers the nearest left candidate over an equally near right candidate', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 'left-a' },
+      { row: 1, col: 0, value: 'left-b' },
+      { row: 0, col: 1, value: 'left-a!' },
+      { row: 0, col: 2, value: 'right-a' },
+      { row: 1, col: 2, value: 'right-b' },
+    ]);
+    store.setState((s) => ({
+      ...s,
+      selection: {
+        ...s.selection,
+        range: { sheet: 0, r0: 0, c0: 1, r1: 1, c1: 1 },
+        active: { sheet: 0, row: 0, col: 1 },
+        anchor: { sheet: 0, row: 0, col: 1 },
+      },
+    }));
+
+    expect(
+      executeRibbonFillAction({
+        store,
+        workbook: wb,
+        history: new History(),
+        action: 'flash',
+      }),
+    ).toBe(true);
+    wb.recalc();
+    expect(text(wb, 0, 1, 1)).toBe('left-b!');
   });
 
   it('copies source formatting by default when a store is supplied', () => {

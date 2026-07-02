@@ -31,7 +31,10 @@ export function hydrateCommentsAndHyperlinksFromEngine(
     for (const c of cells) {
       const e = wb.getComment(sheet, c.addr.row, c.addr.col);
       if (e && e.text.length > 0) {
-        updates.push({ key: addrKey(c.addr), patch: { comment: e.text } });
+        updates.push({
+          key: addrKey(c.addr),
+          patch: { comment: e.text, commentAuthor: e.author },
+        });
       }
     }
   }
@@ -41,7 +44,11 @@ export function hydrateCommentsAndHyperlinksFromEngine(
       if (h.target.length === 0) continue;
       updates.push({
         key: addrKey({ sheet, row: h.row, col: h.col }),
-        patch: { hyperlink: h.target },
+        patch: {
+          hyperlink: h.target,
+          hyperlinkDisplay: h.display || undefined,
+          hyperlinkTooltip: h.tooltip || undefined,
+        },
       });
     }
   }
@@ -61,9 +68,8 @@ export function hydrateCommentsAndHyperlinksFromEngine(
 /**
  * Replace the engine's hyperlink set on `sheet` with whatever FormatSlice
  * currently asserts. Each cell with a non-empty `.hyperlink` becomes a single
- * engine hyperlink entry whose `target` carries the URL; `display` and
- * `tooltip` stay default since the UI does not surface them yet. No-op when
- * `capabilities.hyperlinks` is off.
+ * engine hyperlink entry. Existing display text / tooltip metadata is passed
+ * through so loaded workbooks do not lose it during save.
  */
 export function syncHyperlinksToEngine(
   wb: WorkbookHandle,
@@ -80,6 +86,13 @@ export function syncHyperlinksToEngine(
     if (Number.parseInt(sStr, 10) !== sheet) continue;
     const row = Number.parseInt(rStr, 10);
     const col = Number.parseInt(cStr, 10);
-    wb.addHyperlink(sheet, row, col, fmt.hyperlink);
+    wb.addHyperlink(
+      sheet,
+      row,
+      col,
+      fmt.hyperlink,
+      fmt.hyperlinkDisplay ?? '',
+      fmt.hyperlinkTooltip ?? '',
+    );
   }
 }

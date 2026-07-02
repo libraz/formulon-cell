@@ -142,6 +142,7 @@ interface EngineValidationEntry {
   allowBlank: boolean;
   showInputMessage: boolean;
   showErrorMessage: boolean;
+  showDropDown?: boolean;
   formula1: string;
   formula2: string;
   errorTitle: string;
@@ -162,6 +163,8 @@ function decodeValidation(v: EngineValidationEntry): CellValidation | null {
     // omits the field when enabled (the default) and only records the disabled
     // case, so decoding `true` must NOT emit the field.
     ...(v.showErrorMessage === false ? { showErrorMessage: false } : {}),
+    // OOXML `showDropDown=true` means "hide the in-cell dropdown arrow".
+    ...(v.showDropDown === true ? { showDropdown: false } : {}),
     ...(v.errorTitle ? { errorTitle: v.errorTitle } : {}),
     ...(v.errorMessage ? { errorMessage: v.errorMessage } : {}),
     ...(v.promptTitle ? { promptTitle: v.promptTitle } : {}),
@@ -216,6 +219,7 @@ function encodeValidation(
   allowBlank?: boolean;
   showInputMessage?: boolean;
   showErrorMessage?: boolean;
+  showDropDown?: boolean;
   formula1?: string;
   formula2?: string;
   errorTitle?: string;
@@ -263,6 +267,7 @@ function encodeMeta(validation: ValidationMeta): {
   allowBlank?: boolean;
   showInputMessage?: boolean;
   showErrorMessage?: boolean;
+  showDropDown?: boolean;
   errorTitle?: string;
   errorMessage?: string;
   promptTitle?: string;
@@ -281,6 +286,7 @@ function encodeMeta(validation: ValidationMeta): {
     ...(validation.showErrorMessage !== undefined
       ? { showErrorMessage: validation.showErrorMessage }
       : { showErrorMessage: true }),
+    ...(validation.showDropdown === false ? { showDropDown: true } : {}),
     ...(validation.errorTitle ? { errorTitle: validation.errorTitle } : {}),
     ...(validation.errorMessage ? { errorMessage: validation.errorMessage } : {}),
     ...(validation.promptTitle ? { promptTitle: validation.promptTitle } : {}),

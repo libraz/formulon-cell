@@ -180,7 +180,7 @@ export abstract class WorkbookHandleFeatureMethods {
     sheet: number,
   ): { zoomScale: number; freezeRows: number; freezeCols: number; tabHidden: boolean } | null {
     assertAlive(this);
-    if (!this.capabilities.sheetZoom) return null;
+    if (!this.capabilities.sheetView) return null;
     const r = wb(this).getSheetView(sheet);
     if (!r.status.ok) return null;
     return {

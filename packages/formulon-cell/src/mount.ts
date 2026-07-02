@@ -414,6 +414,7 @@ export const Spreadsheet = {
       attachEngineBinding({
         emitter,
         flags,
+        formulaRegistry,
         getCommentDialog: () => featureState.commentDialog,
         getFormatDialog: () => featureState.formatDialog,
         getFormatPainter: () => featureState.formatPainter,

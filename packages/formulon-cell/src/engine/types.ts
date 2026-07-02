@@ -220,6 +220,8 @@ export interface EngineCapabilities {
   readonly colRowSize: boolean;
   /** `setSheetFreeze`. */
   readonly freeze: boolean;
+  /** `getSheetView` readback for zoom, frozen panes, and tab-hidden state. */
+  readonly sheetView?: boolean;
   /** `setSheetZoom`. */
   readonly sheetZoom: boolean;
   /** `setSheetTabHidden`. */
