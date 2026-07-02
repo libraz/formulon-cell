@@ -310,7 +310,12 @@ export const Spreadsheet = {
     // Filter dropdown — opens when the pointer dispatches `fc:openfilter`
     // from a clicked column-filter chevron. Rebuilt on locale change so its
     // captured strings stay fresh; no public toggle.
-    let filterDropdown: FilterDropdownHandle = attachFilterDropdown({ store, history, strings });
+    let filterDropdown: FilterDropdownHandle = attachFilterDropdown({
+      store,
+      history,
+      strings,
+      locale: i18n.locale,
+    });
     interface OpenFilterDetail {
       range: import('./engine/types.js').Range;
       col: number;
@@ -663,7 +668,7 @@ export const Spreadsheet = {
         strings,
       });
       filterDropdown.detach();
-      filterDropdown = attachFilterDropdown({ store, history, strings });
+      filterDropdown = attachFilterDropdown({ store, history, strings, locale: i18n.locale });
 
       // Toggleable host features: prefer setStrings when the handle exposes
       // it, otherwise fall back to detach+reattach.

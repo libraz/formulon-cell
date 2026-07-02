@@ -312,6 +312,26 @@ describe('pasteSpecial', () => {
     expect(wb.getValue({ sheet: 0, row: 5, col: 5 }).kind).toBe('blank');
   });
 
+  it('"formats" mode clears a stale destination format when the source is unformatted (M-11)', () => {
+    // Source A1 carries a value but no format.
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 1 }]);
+    // Destination F6 already has bold formatting that must be overwritten.
+    mutators.setCellFormat(store, { sheet: 0, row: 5, col: 5 }, { bold: true });
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    setActive(store, 5, 5);
+    assertSnap(snap);
+    pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'formats',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+    // Excel copies the source's *absence* of formatting, clearing the stale bold.
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 5, col: 5 })),
+    ).toBeUndefined();
+  });
+
   it('"values-and-numfmt" cherry-picks numFmt without bold', () => {
     mutators.setCellFormat(
       store,

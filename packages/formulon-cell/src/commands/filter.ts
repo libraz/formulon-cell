@@ -3,6 +3,7 @@ import type { Addr, CellValue, Range } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore, State, ValueFilterCriteria } from '../store/store.js';
+import { formatNumber } from './format.js';
 import type { History } from './history.js';
 
 export type FilterPredicate = (
@@ -113,7 +114,9 @@ export function recordFilterChange<T>(
 
 /** Hide rows in `range` whose `byCol` value fails `predicate`. The first
  *  row of the range is treated as a header and stays visible.
- *  Hidden rows are added to `layout.hiddenRows` (UI-only — engine state is
+ *  Excel-style replace semantics: rows previously hidden inside `range` are
+ *  revealed first, so re-filtering the same range never accumulates stale
+ *  hides. Hidden rows live in `layout.hiddenRows` (UI-only — engine state is
  *  untouched). The range is also stamped onto `ui.filterRange` so the column
  *  headers paint the autofilter chevron. */
 export function applyFilter(
@@ -123,15 +126,28 @@ export function applyFilter(
   byCol: number,
   predicate: FilterPredicate,
 ): number {
+  return applyFilterColumns(state, store, range, [{ byCol, predicate }]);
+}
+
+/** Multi-column variant of {@link applyFilter}: a row survives only when it
+ *  passes *every* column predicate, the way Excel ANDs filtered columns. Prior
+ *  hides inside `range` are cleared first so the result is a full replace. */
+export function applyFilterColumns(
+  state: State,
+  store: SpreadsheetStore,
+  range: Range,
+  columns: ReadonlyArray<{ byCol: number; predicate: FilterPredicate }>,
+): number {
   const newHidden = new Set<number>(state.layout.hiddenRows);
+  for (let r = range.r0 + 1; r <= range.r1; r += 1) newHidden.delete(r);
   let hiddenCount = 0;
   for (let r = range.r0 + 1; r <= range.r1; r += 1) {
-    const cell = state.data.cells.get(addrKey({ sheet: range.sheet, row: r, col: byCol }));
-    if (!predicate(cell)) {
-      if (!newHidden.has(r)) {
-        newHidden.add(r);
-        hiddenCount += 1;
-      }
+    const survives = columns.every(({ byCol, predicate }) =>
+      predicate(state.data.cells.get(addrKey({ sheet: range.sheet, row: r, col: byCol }))),
+    );
+    if (!survives) {
+      newHidden.add(r);
+      hiddenCount += 1;
     }
   }
   store.setState((s) => ({
@@ -315,10 +331,19 @@ export function inferAutoFilterRange(state: State, range: Range = state.selectio
   return { sheet, r0, c0, r1, c1 };
 }
 
+type ComparisonOp = '=' | '<>' | '>' | '>=' | '<' | '<=';
+
 type AdvancedCriterion =
-  | { kind: 'text'; value: string }
-  | { kind: 'number'; op: '=' | '<>' | '>' | '>=' | '<' | '<='; value: number }
-  | { kind: 'notText'; value: string };
+  /** Bare text: Excel matches entries that *begin with* the pattern (wildcards
+   *  honoured), case-insensitively. */
+  | { kind: 'beginsWith'; value: string }
+  /** Operator-prefixed text, e.g. `=Smith` (exact), `<>Smith`, `>M` (lexical). */
+  | { kind: 'text'; op: ComparisonOp; value: string }
+  | { kind: 'number'; op: ComparisonOp; value: number }
+  /** `=` alone → is blank. */
+  | { kind: 'blank' }
+  /** `<>` alone → is not blank. */
+  | { kind: 'nonBlank' };
 
 export interface AdvancedFilterCopyOptions {
   uniqueOnly?: boolean;
@@ -493,14 +518,19 @@ function writeCellRecord(
 
 function parseAdvancedCriterion(raw: string): AdvancedCriterion {
   const match = /^(<=|>=|<>|=|<|>)(.*)$/.exec(raw);
-  const op = (match?.[1] ?? '=') as AdvancedCriterion extends { kind: 'number'; op: infer Op }
-    ? Op
-    : never;
-  const body = (match?.[2] ?? raw).trim();
-  const numeric = Number(body);
-  if (body !== '' && Number.isFinite(numeric)) return { kind: 'number', op, value: numeric };
-  if (op === '<>') return { kind: 'notText', value: body };
-  return { kind: 'text', value: body };
+  if (match) {
+    const op = match[1] as ComparisonOp;
+    const body = (match[2] ?? '').trim();
+    // A bare operator means blank / non-blank (Excel: `=` → is blank).
+    if (body === '') return op === '<>' ? { kind: 'nonBlank' } : { kind: 'blank' };
+    const numeric = Number(body);
+    if (Number.isFinite(numeric)) return { kind: 'number', op, value: numeric };
+    return { kind: 'text', op, value: body };
+  }
+  // No operator: bare numbers match by equality, bare text is "begins with".
+  const numeric = Number(raw);
+  if (raw !== '' && Number.isFinite(numeric)) return { kind: 'number', op: '=', value: numeric };
+  return { kind: 'beginsWith', value: raw };
 }
 
 function advancedCriterionMatches(
@@ -508,30 +538,57 @@ function advancedCriterionMatches(
   criterion: AdvancedCriterion,
 ): boolean {
   const text = filterValueKey(cell?.value);
-  if (criterion.kind === 'text') return textMatchesAdvancedCriterion(text, criterion.value);
-  if (criterion.kind === 'notText') return !textMatchesAdvancedCriterion(text, criterion.value);
-  const value = cellNumber(cell?.value);
-  if (value == null) return false;
-  switch (criterion.op) {
-    case '<>':
-      return value !== criterion.value;
-    case '>':
-      return value > criterion.value;
-    case '>=':
-      return value >= criterion.value;
-    case '<':
-      return value < criterion.value;
-    case '<=':
-      return value <= criterion.value;
-    default:
-      return value === criterion.value;
+  switch (criterion.kind) {
+    case 'blank':
+      return text === '';
+    case 'nonBlank':
+      return text !== '';
+    case 'beginsWith':
+      return textLikeMatch(text, criterion.value, false);
+    case 'text': {
+      switch (criterion.op) {
+        case '=':
+          return textLikeMatch(text, criterion.value, true);
+        case '<>':
+          return !textLikeMatch(text, criterion.value, true);
+        default: {
+          const a = text.toLowerCase();
+          const b = criterion.value.toLowerCase();
+          if (criterion.op === '>') return a > b;
+          if (criterion.op === '>=') return a >= b;
+          if (criterion.op === '<') return a < b;
+          return a <= b;
+        }
+      }
+    }
+    default: {
+      const value = cellNumber(cell?.value);
+      if (value == null) return false;
+      switch (criterion.op) {
+        case '<>':
+          return value !== criterion.value;
+        case '>':
+          return value > criterion.value;
+        case '>=':
+          return value >= criterion.value;
+        case '<':
+          return value < criterion.value;
+        case '<=':
+          return value <= criterion.value;
+        default:
+          return value === criterion.value;
+      }
+    }
   }
 }
 
-function textMatchesAdvancedCriterion(text: string, pattern: string): boolean {
-  if (!pattern.includes('*') && !pattern.includes('?')) return text === pattern;
+/** Case-insensitive wildcard match. `*`/`?` are Excel wildcards; when
+ *  `anchorEnd` is false the pattern only has to match the start of `text`
+ *  (Excel's "begins with" semantics for bare-text criteria). */
+function textLikeMatch(text: string, pattern: string, anchorEnd: boolean): boolean {
   const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(`^${escaped.replace(/\*/g, '.*').replace(/\?/g, '.')}$`, 'i');
+  const body = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
+  const regex = new RegExp(`^${body}${anchorEnd ? '$' : ''}`, 'i');
   return regex.test(text);
 }
 
@@ -671,19 +728,73 @@ function filterCriteriaAfterClear(
   return criteria.filter((c) => !sameRange(c.range, range));
 }
 
-/** Distinct (string-coerced) values found in `byCol` of `range`, excluding
- *  the header row. Useful for building a dropdown of filter options. */
-export function distinctValues(state: State, range: Range, byCol: number): string[] {
-  const out = new Set<string>();
-  for (let r = range.r0 + 1; r <= range.r1; r += 1) {
-    const cell = state.data.cells.get(addrKey({ sheet: range.sheet, row: r, col: byCol }));
-    if (!cell) {
-      out.add('');
-      continue;
-    }
-    out.add(filterValueKey(cell.value));
+type FilterItemKind = 'number' | 'text' | 'blank';
+
+export interface FilterValueItem {
+  /** Matching key — identical to `filterValueKey(cell.value)`, so it can be fed
+   *  straight back into the hidden-value set that {@link applyValueFilter}
+   *  matches against. */
+  key: string;
+  /** Display label honouring the column's number format (dates render as dates,
+   *  currency keeps its symbol) so the checklist mirrors the grid rather than
+   *  showing a raw serial. */
+  label: string;
+}
+
+const classifyFilterValue = (value: CellValue | undefined): FilterItemKind => {
+  if (!value || value.kind === 'blank' || value.kind === 'error') return 'blank';
+  if (value.kind === 'number') return 'number';
+  return 'text';
+};
+
+const filterItemLabel = (state: State, addr: Addr, value: CellValue, locale: string): string => {
+  if (value.kind === 'number') {
+    const fmt = state.format.formats.get(addrKey(addr));
+    if (fmt?.numFmt) return formatNumber(value.value, fmt.numFmt, locale);
   }
-  return Array.from(out).sort();
+  return formatCell(value, locale);
+};
+
+const FILTER_GROUP_ORDER: Record<FilterItemKind, number> = { number: 0, text: 1, blank: 2 };
+
+/** Distinct values of `byCol` in `range` (excluding the header row) as
+ *  {@link FilterValueItem}s. De-duplicated by filter key and ordered the way the
+ *  AutoFilter checklist orders them — numbers ascending numerically, then text
+ *  ascending, with blanks last — instead of a raw lexical sort of serials. */
+export function distinctFilterItems(
+  state: State,
+  range: Range,
+  byCol: number,
+  locale = 'en-US',
+): FilterValueItem[] {
+  const items = new Map<string, { label: string; kind: FilterItemKind; num: number }>();
+  for (let r = range.r0 + 1; r <= range.r1; r += 1) {
+    const addr = { sheet: range.sheet, row: r, col: byCol };
+    const value = state.data.cells.get(addrKey(addr))?.value;
+    const key = filterValueKey(value);
+    if (items.has(key)) continue;
+    const kind = key === '' ? 'blank' : classifyFilterValue(value);
+    const num = value?.kind === 'number' ? value.value : 0;
+    const label = key === '' || !value ? '' : filterItemLabel(state, addr, value, locale);
+    items.set(key, { label, kind, num });
+  }
+  return Array.from(items, ([key, meta]) => ({ key, meta }))
+    .sort((a, b) => {
+      const groupDelta = FILTER_GROUP_ORDER[a.meta.kind] - FILTER_GROUP_ORDER[b.meta.kind];
+      if (groupDelta !== 0) return groupDelta;
+      if (a.meta.kind === 'number') {
+        return a.meta.num - b.meta.num || a.meta.label.localeCompare(b.meta.label);
+      }
+      if (a.meta.kind === 'text') return a.meta.label.localeCompare(b.meta.label);
+      return 0;
+    })
+    .map(({ key, meta }) => ({ key, label: meta.label }));
+}
+
+/** Distinct (string-coerced) filter keys found in `byCol` of `range`, excluding
+ *  the header row, ordered like the AutoFilter checklist. */
+export function distinctValues(state: State, range: Range, byCol: number): string[] {
+  return distinctFilterItems(state, range, byCol).map((item) => item.key);
 }
 
 export const filterValueKey = (v: unknown): string => {

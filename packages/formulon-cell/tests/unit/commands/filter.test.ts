@@ -3,9 +3,11 @@ import {
   applyAdvancedFilter,
   applyConditionFilter,
   applyFilter,
+  applyFilterColumns,
   applyValueFilter,
   clearFilter,
   copyAdvancedFilterResult,
+  distinctFilterItems,
   filterBySelectedCellValue,
   inferAutoFilterRange,
   reapplyFilters,
@@ -303,6 +305,157 @@ describe('filter commands', () => {
     expect(s.layout.hiddenRows.has(1)).toBe(false);
     expect(s.layout.hiddenRows.has(2)).toBe(false);
     expect(s.layout.hiddenRows.has(3)).toBe(true);
+  });
+
+  it('distinctFilterItems orders numbers numerically, text next, blanks last', () => {
+    seedText(store, 0, 0, 'Header');
+    seedNumber(store, 1, 0, 10);
+    seedText(store, 2, 0, 'apple');
+    seedNumber(store, 3, 0, 2);
+    // row 4 left blank
+    seedNumber(store, 5, 0, 1);
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 5, c1: 0 };
+
+    const items = distinctFilterItems(store.getState(), range, 0);
+    expect(items.map((i) => i.key)).toEqual(['1', '2', '10', 'apple', '']);
+  });
+
+  it('distinctFilterItems labels numbers through the column number format', () => {
+    seedText(store, 0, 0, 'Header');
+    seedNumber(store, 1, 0, 1000);
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 1, col: 0 },
+      {
+        numFmt: { kind: 'currency', decimals: 2, symbol: '$' },
+      },
+    );
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 };
+
+    const items = distinctFilterItems(store.getState(), range, 0);
+    // Matching key stays the raw value; label mirrors the formatted grid text.
+    expect(items).toEqual([{ key: '1000', label: '$1,000.00' }]);
+  });
+
+  it('advanced filter treats bare text as begins-with (case-insensitive)', () => {
+    seedText(store, 0, 0, 'Name');
+    seedText(store, 1, 0, 'Smith');
+    seedText(store, 2, 0, 'Smart');
+    seedText(store, 3, 0, 'Jones');
+    seedText(store, 5, 0, 'Name');
+    seedText(store, 6, 0, 'sm');
+
+    const hidden = applyAdvancedFilter(
+      store.getState(),
+      store,
+      { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 },
+      { sheet: 0, r0: 5, c0: 0, r1: 6, c1: 0 },
+    );
+
+    const s = store.getState();
+    expect(hidden).toBe(1);
+    expect(s.layout.hiddenRows.has(1)).toBe(false);
+    expect(s.layout.hiddenRows.has(2)).toBe(false);
+    expect(s.layout.hiddenRows.has(3)).toBe(true);
+  });
+
+  it('advanced filter honors =exact, comparison, and blank/non-blank criteria', () => {
+    // Exact match: `=Smith` must reject `Smart`.
+    seedText(store, 0, 0, 'Name');
+    seedText(store, 1, 0, 'Smith');
+    seedText(store, 2, 0, 'Smart');
+    seedText(store, 5, 0, 'Name');
+    seedText(store, 6, 0, '=smith');
+    const exactHidden = applyAdvancedFilter(
+      store.getState(),
+      store,
+      { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 },
+      { sheet: 0, r0: 5, c0: 0, r1: 6, c1: 0 },
+    );
+    expect(exactHidden).toBe(1);
+    expect(store.getState().layout.hiddenRows.has(2)).toBe(true);
+
+    // Text comparison operator: `>m` keeps only names lexically after "m".
+    clearFilter(store.getState(), store);
+    store.setState((st) => ({ ...st, data: { ...st.data, cells: new Map() } }));
+    seedText(store, 0, 0, 'Name');
+    seedText(store, 1, 0, 'apple');
+    seedText(store, 2, 0, 'mango');
+    seedText(store, 3, 0, 'zebra');
+    seedText(store, 5, 0, 'Name');
+    seedText(store, 6, 0, '>m');
+    const cmpHidden = applyAdvancedFilter(
+      store.getState(),
+      store,
+      { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 },
+      { sheet: 0, r0: 5, c0: 0, r1: 6, c1: 0 },
+    );
+    expect(cmpHidden).toBe(1);
+    expect(store.getState().layout.hiddenRows.has(1)).toBe(true);
+    expect(store.getState().layout.hiddenRows.has(2)).toBe(false);
+
+    // Blank criterion `=` keeps only empty cells; `<>` keeps only non-empty.
+    clearFilter(store.getState(), store);
+    store.setState((st) => ({ ...st, data: { ...st.data, cells: new Map() } }));
+    seedText(store, 0, 0, 'Name');
+    seedText(store, 1, 0, 'x');
+    // row 2 blank
+    seedText(store, 3, 0, 'y');
+    seedText(store, 5, 0, 'Name');
+    seedText(store, 6, 0, '=');
+    const blankHidden = applyAdvancedFilter(
+      store.getState(),
+      store,
+      { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 },
+      { sheet: 0, r0: 5, c0: 0, r1: 6, c1: 0 },
+    );
+    expect(blankHidden).toBe(2);
+    expect(store.getState().layout.hiddenRows.has(2)).toBe(false);
+  });
+
+  it('applyFilter replaces prior hides in the range on re-filter (no accumulation)', () => {
+    seedNumber(store, 0, 0, 0);
+    seedNumber(store, 1, 0, 10);
+    seedNumber(store, 2, 0, 20);
+    seedNumber(store, 3, 0, 30);
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 };
+    const num = (cell: unknown): number => {
+      const v = (cell as { value?: { kind: string; value: number } } | undefined)?.value;
+      return v?.kind === 'number' ? v.value : Number.NaN;
+    };
+
+    applyFilter(store.getState(), store, range, 0, (cell) => num(cell) >= 20);
+    expect(store.getState().layout.hiddenRows.has(1)).toBe(true);
+
+    // Re-filter the same range with the opposite predicate: the old hide on
+    // row 1 must be revealed rather than left behind.
+    applyFilter(store.getState(), store, range, 0, (cell) => num(cell) <= 20);
+    const s = store.getState();
+    expect(s.layout.hiddenRows.has(1)).toBe(false);
+    expect(s.layout.hiddenRows.has(3)).toBe(true);
+  });
+
+  it('applyFilterColumns ANDs every column predicate in a single pass', () => {
+    seedNumber(store, 0, 0, 0);
+    seedNumber(store, 0, 1, 0);
+    seedNumber(store, 1, 0, 10);
+    seedNumber(store, 1, 1, 4);
+    seedNumber(store, 2, 0, 20);
+    seedNumber(store, 2, 1, 5);
+    const range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 };
+    const num = (cell: unknown): number => {
+      const v = (cell as { value?: { kind: string; value: number } } | undefined)?.value;
+      return v?.kind === 'number' ? v.value : Number.NaN;
+    };
+
+    const hidden = applyFilterColumns(store.getState(), store, range, [
+      { byCol: 0, predicate: (cell) => num(cell) >= 10 },
+      { byCol: 1, predicate: (cell) => num(cell) % 2 === 0 },
+    ]);
+    // Row 1 passes both (10>=10, 4 even); row 2 fails the even test (5).
+    expect(hidden).toBe(1);
+    expect(store.getState().layout.hiddenRows.has(1)).toBe(false);
+    expect(store.getState().layout.hiddenRows.has(2)).toBe(true);
   });
 
   it('copies advanced filter results to another location with unique records', () => {

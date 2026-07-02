@@ -155,16 +155,17 @@ export function pasteSpecial(
 
       // Layer 2: formats
       const fmt = src.format;
-      if (fmt) {
-        if (wantsFormats(opt.what)) {
-          formatWrites.push({
-            key: addrKey(addr),
-            format: { ...fmt, borders: fmt.borders ? { ...fmt.borders } : undefined },
-          });
-        } else if (wantsNumFmt(opt.what) && fmt.numFmt) {
-          // Number format only — cherry-pick.
-          formatWrites.push({ key: addrKey(addr), format: { numFmt: fmt.numFmt } });
-        }
+      if (wantsFormats(opt.what)) {
+        // A full "Formats" paste copies the source's *absence* of formatting
+        // too: an unformatted source cell clears the destination format rather
+        // than leaving a stale one behind (spreadsheet parity).
+        formatWrites.push({
+          key: addrKey(addr),
+          format: fmt ? { ...fmt, borders: fmt.borders ? { ...fmt.borders } : undefined } : null,
+        });
+      } else if (wantsNumFmt(opt.what) && fmt?.numFmt) {
+        // Number format only — cherry-pick.
+        formatWrites.push({ key: addrKey(addr), format: { numFmt: fmt.numFmt } });
       }
     }
   }

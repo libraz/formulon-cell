@@ -3,7 +3,7 @@ import {
   applyValueFilter,
   type ConditionFilterOp,
   clearFilter,
-  distinctValues,
+  distinctFilterItems,
   filterValueKey,
   recordFilterChange,
 } from '../commands/filter.js';
@@ -21,6 +21,9 @@ export interface FilterDropdownDeps {
   store: SpreadsheetStore;
   history?: History | null;
   strings?: Strings;
+  /** Locale used to format the checklist labels (dates, currency). Defaults to
+   *  `en-US`. */
+  locale?: string;
   /** Where to anchor the popover. When omitted the popover is centred. */
   anchorRect?: { x: number; y: number; w: number; h: number };
 }
@@ -119,7 +122,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     activeCol = col;
 
     const state = deps.store.getState();
-    const distinct = distinctValues(state, range, col);
+    const distinct = distinctFilterItems(state, range, col, deps.locale ?? 'en-US');
     const hidden = new Set<string>();
     activeHidden = hidden;
     // Pre-mark currently-hidden values as unchecked so the dropdown reflects
@@ -216,14 +219,14 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       allRow.className = 'fc-filter-dropdown__row fc-filter-dropdown__row--all';
       const allCb = document.createElement('input');
       allCb.type = 'checkbox';
-      allCb.checked = distinct.every((v) => !hidden.has(v));
-      allCb.indeterminate = !allCb.checked && distinct.some((v) => !hidden.has(v));
+      allCb.checked = distinct.every((v) => !hidden.has(v.key));
+      allCb.indeterminate = !allCb.checked && distinct.some((v) => !hidden.has(v.key));
       allCb.addEventListener('keydown', handleRowKey);
       allCb.addEventListener('change', () => {
         if (allCb.checked) {
           hidden.clear();
         } else {
-          for (const v of distinct) hidden.add(v);
+          for (const v of distinct) hidden.add(v.key);
         }
         renderRows(search.value);
         requestAnimationFrame(() => focusCheckbox(0));
@@ -233,22 +236,22 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       allRow.append(allCb, allLabel);
       list.appendChild(allRow);
 
-      for (const v of distinct) {
-        const display = v === '' ? t.blanks : v;
+      for (const item of distinct) {
+        const display = item.key === '' ? t.blanks : item.label;
         if (f && !display.toLowerCase().includes(f)) continue;
         const row = document.createElement('label');
         row.className = 'fc-filter-dropdown__row';
         const cb = document.createElement('input');
         cb.type = 'checkbox';
-        cb.value = v;
-        cb.checked = !hidden.has(v);
+        cb.value = item.key;
+        cb.checked = !hidden.has(item.key);
         cb.addEventListener('keydown', handleRowKey);
         cb.addEventListener('change', () => {
-          if (cb.checked) hidden.delete(v);
-          else hidden.add(v);
+          if (cb.checked) hidden.delete(item.key);
+          else hidden.add(item.key);
           // Refresh select-all indeterminate state without rebuilding rows.
-          allCb.checked = distinct.every((vv) => !hidden.has(vv));
-          allCb.indeterminate = !allCb.checked && distinct.some((vv) => !hidden.has(vv));
+          allCb.checked = distinct.every((vv) => !hidden.has(vv.key));
+          allCb.indeterminate = !allCb.checked && distinct.some((vv) => !hidden.has(vv.key));
         });
         const text = document.createElement('span');
         text.textContent = display;

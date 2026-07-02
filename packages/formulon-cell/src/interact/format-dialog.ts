@@ -1,3 +1,4 @@
+import { coerceInput } from '../commands/coerce-input.js';
 import { applyFormatPatch, formatNumber } from '../commands/format.js';
 import {
   type History,
@@ -77,6 +78,51 @@ export interface FormatDialogHandle {
   close(): void;
   detach(): void;
 }
+
+/** Convert a spreadsheet date serial to a native `<input type="date">` value
+ *  (`yyyy-mm-dd`, UTC). Returns '' for non-finite serials. */
+const serialToDateInputValue = (serial: number): string => {
+  if (!Number.isFinite(serial)) return '';
+  const ms = Math.round((serial - 25569) * 86_400_000);
+  const d = new Date(ms);
+  const y = String(d.getUTCFullYear()).padStart(4, '0');
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+/** Convert a day-fraction time serial to a native `<input type="time">` value
+ *  (`HH:mm`, or `HH:mm:ss` when the serial carries seconds). */
+const serialToTimeInputValue = (serial: number): string => {
+  if (!Number.isFinite(serial)) return '';
+  let total = Math.round((serial % 1) * 86_400);
+  total = ((total % 86_400) + 86_400) % 86_400;
+  const hh = String(Math.floor(total / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
+  const ss = total % 60;
+  return ss ? `${hh}:${mm}:${String(ss).padStart(2, '0')}` : `${hh}:${mm}`;
+};
+
+/** Format a stored bound (serial or plain number) for the bound `<input>` value,
+ *  matching the input type chosen for the validation kind. */
+const boundInputValue = (kind: ValidationKind, value: number): string => {
+  if (kind === 'date') return serialToDateInputValue(value);
+  if (kind === 'time') return serialToTimeInputValue(value);
+  return String(value);
+};
+
+/** Parse a bound `<input>` value back into a stored number. Date/time kinds
+ *  route the string through `coerceInput` so `yyyy-mm-dd` / `HH:mm` become the
+ *  matching spreadsheet serial; other kinds parse a plain number. Returns null
+ *  when the field is empty or unparseable so the previous bound is kept. */
+const parseBoundInputValue = (kind: ValidationKind, raw: string): number | null => {
+  if (kind === 'date' || kind === 'time') {
+    const coerced = coerceInput(raw);
+    return coerced.kind === 'number' ? coerced.value : null;
+  }
+  const n = Number.parseFloat(raw);
+  return Number.isFinite(n) ? n : null;
+};
 
 export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const { host, store } = deps;
@@ -350,8 +396,9 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     validationListRangeRadio.input.checked = draft.validationListSourceKind === 'range';
     validationKindSelect.value = draft.validationKind;
     validationOpSelect.value = draft.validationOp;
-    validationAInput.value = String(draft.validationA);
-    validationBInput.value = String(draft.validationB);
+    applyBoundInputMode(draft.validationKind);
+    validationAInput.value = boundInputValue(draft.validationKind, draft.validationA);
+    validationBInput.value = boundInputValue(draft.validationKind, draft.validationB);
     validationFormulaInput.value = draft.validationFormula;
     validationAllowBlankInput.checked = draft.validationAllowBlank;
     validationErrorStyleSelect.value = draft.validationErrorStyle;
@@ -364,8 +411,22 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     syncValidationVisibility();
   };
 
+  /** Switch the A/B bound inputs to a native date/time picker for date/time
+   *  validation (so bounds are pickable instead of raw serials) and back to a
+   *  number field otherwise. */
+  const applyBoundInputMode = (kind: ValidationKind): void => {
+    const type = kind === 'date' ? 'date' : kind === 'time' ? 'time' : 'number';
+    for (const input of [validationAInput, validationBInput]) {
+      if (input.type !== type) input.type = type;
+      if (type === 'time') input.step = '1';
+      else if (type === 'number') input.step = 'any';
+      else input.removeAttribute('step');
+    }
+  };
+
   const syncValidationVisibility = (): void => {
     const k = draft.validationKind;
+    applyBoundInputMode(k);
     const isBounded =
       k === 'whole' || k === 'decimal' || k === 'date' || k === 'time' || k === 'textLength';
     const isListLike = k === 'list';
@@ -1364,6 +1425,11 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
   const onValidationKindChange = (): void => {
     draft.validationKind = validationKindSelect.value as ValidationKind;
+    // Switching between numeric / date / time kinds swaps the bound-input type,
+    // so re-render the stored bounds in the new type's value format.
+    applyBoundInputMode(draft.validationKind);
+    validationAInput.value = boundInputValue(draft.validationKind, draft.validationA);
+    validationBInput.value = boundInputValue(draft.validationKind, draft.validationB);
     syncValidationVisibility();
   };
   const onValidationOpChange = (): void => {
@@ -1371,12 +1437,12 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     syncValidationVisibility();
   };
   const onValidationAInput = (): void => {
-    const n = Number.parseFloat(validationAInput.value);
-    if (Number.isFinite(n)) draft.validationA = n;
+    const n = parseBoundInputValue(draft.validationKind, validationAInput.value);
+    if (n !== null) draft.validationA = n;
   };
   const onValidationBInput = (): void => {
-    const n = Number.parseFloat(validationBInput.value);
-    if (Number.isFinite(n)) draft.validationB = n;
+    const n = parseBoundInputValue(draft.validationKind, validationBInput.value);
+    if (n !== null) draft.validationB = n;
   };
   const onValidationFormulaInput = (): void => {
     draft.validationFormula = validationFormulaInput.value;

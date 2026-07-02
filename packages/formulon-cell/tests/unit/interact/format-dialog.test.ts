@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { coerceInput } from '../../../src/commands/coerce-input.js';
 import { History } from '../../../src/commands/history.js';
 import { setCellLocked, setProtectedSheet } from '../../../src/commands/protection.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
@@ -370,6 +371,122 @@ describe('attachFormatDialog', () => {
       expect(
         document.querySelector('.fc-fmtdlg')?.classList.contains('fc-fmtdlg--range-picking'),
       ).toBe(false);
+    } finally {
+      handle.detach();
+    }
+  });
+
+  const serialOf = (raw: string): number => {
+    const coerced = coerceInput(raw);
+    if (coerced.kind !== 'number') throw new Error(`expected serial for ${raw}`);
+    return coerced.value;
+  };
+
+  // The Number tab also carries a `種類` select, so pick the validation-kind
+  // select by an option only it owns.
+  const findValidationKindSelect = (): HTMLSelectElement => {
+    const select = Array.from(
+      document.querySelectorAll<HTMLSelectElement>('select[aria-label="種類"]'),
+    ).find((s) => Array.from(s.options).some((o) => o.value === 'textLength'));
+    if (!select) throw new Error('validation kind select missing');
+    return select;
+  };
+
+  it('date validation exposes date pickers for bounds and stores serials', () => {
+    const handle = attachFormatDialog({ host, store });
+    try {
+      handle.open('more', { mode: 'dataValidation', focus: 'validation' });
+
+      const kind = findValidationKindSelect();
+      kind.value = 'date';
+      kind.dispatchEvent(new Event('change', { bubbles: true }));
+
+      const aInput = document.querySelector<HTMLInputElement>('input[aria-label="値"]');
+      const bInput = document.querySelector<HTMLInputElement>('input[aria-label="上限値"]');
+      if (!aInput || !bInput) throw new Error('bound inputs missing');
+      // A raw serial field would read `number`; the date picker reads `date`.
+      expect(aInput.type).toBe('date');
+      expect(bInput.type).toBe('date');
+
+      aInput.value = '2026-01-01';
+      aInput.dispatchEvent(new Event('input', { bubbles: true }));
+      bInput.value = '2026-12-31';
+      bInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+      const ok = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__footer button'),
+      ).find((b) => b.textContent === 'OK');
+      ok?.click();
+
+      const validation = store
+        .getState()
+        .format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.validation;
+      expect(validation).toMatchObject({
+        kind: 'date',
+        op: 'between',
+        a: serialOf('2026-01-01'),
+        b: serialOf('2026-12-31'),
+      });
+    } finally {
+      handle.detach();
+    }
+  });
+
+  it('time validation uses a time picker for bounds', () => {
+    const handle = attachFormatDialog({ host, store });
+    try {
+      handle.open('more', { mode: 'dataValidation', focus: 'validation' });
+
+      const kind = findValidationKindSelect();
+      const op = document.querySelector<HTMLSelectElement>('select[aria-label="条件"]');
+      if (!op) throw new Error('validation op select missing');
+      kind.value = 'time';
+      kind.dispatchEvent(new Event('change', { bubbles: true }));
+      op.value = '>';
+      op.dispatchEvent(new Event('change', { bubbles: true }));
+
+      const aInput = document.querySelector<HTMLInputElement>('input[aria-label="値"]');
+      if (!aInput) throw new Error('bound input missing');
+      expect(aInput.type).toBe('time');
+
+      aInput.value = '09:30';
+      aInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+      const ok = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__footer button'),
+      ).find((b) => b.textContent === 'OK');
+      ok?.click();
+
+      const validation = store
+        .getState()
+        .format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.validation;
+      expect(validation).toMatchObject({ kind: 'time', op: '>', a: serialOf('09:30') });
+    } finally {
+      handle.detach();
+    }
+  });
+
+  it('hydrates date validation bounds back into the date picker', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        validation: {
+          kind: 'date',
+          op: 'between',
+          a: serialOf('2026-03-10'),
+          b: serialOf('2026-03-20'),
+        },
+      },
+    );
+    const handle = attachFormatDialog({ host, store });
+    try {
+      handle.open('more', { mode: 'dataValidation', focus: 'validation' });
+      const aInput = document.querySelector<HTMLInputElement>('input[aria-label="値"]');
+      const bInput = document.querySelector<HTMLInputElement>('input[aria-label="上限値"]');
+      expect(aInput?.type).toBe('date');
+      expect(aInput?.value).toBe('2026-03-10');
+      expect(bInput?.value).toBe('2026-03-20');
     } finally {
       handle.detach();
     }

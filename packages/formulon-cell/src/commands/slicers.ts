@@ -2,7 +2,7 @@ import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SlicerSpec, type SpreadsheetStore } from '../store/store.js';
-import { applyFilter, clearFilter, distinctValues } from './filter.js';
+import { applyFilterColumns, clearFilter, distinctValues, type FilterPredicate } from './filter.js';
 
 export interface CreateSlicerOptions {
   id?: string;
@@ -126,21 +126,38 @@ export function recomputeSlicerFilters(store: SpreadsheetStore, workbook: Workbo
         entry !== null,
     );
 
-  const cleared = new Set<string>();
+  // Group every slicer by its range so each range's columns are ANDed in a
+  // single pass. A range with no active selection is fully revealed.
+  const groups = new Map<
+    string,
+    { range: Range; cols: Array<{ byCol: number; predicate: FilterPredicate }> }
+  >();
+  const order: string[] = [];
   for (const entry of resolved) {
     const key = rangeKey(entry.range);
-    if (cleared.has(key)) continue;
-    clearFilter(store.getState(), store, entry.range);
-    cleared.add(key);
+    let group = groups.get(key);
+    if (!group) {
+      group = { range: entry.range, cols: [] };
+      groups.set(key, group);
+      order.push(key);
+    }
+    if (entry.selected.length === 0) continue;
+    const wanted = new Set(entry.selected);
+    group.cols.push({
+      byCol: entry.byCol,
+      predicate: (cell) => wanted.has(cellToKey(cell?.value)),
+    });
   }
 
   let hiddenCount = 0;
-  for (const entry of resolved) {
-    if (entry.selected.length === 0) continue;
-    const wanted = new Set(entry.selected);
-    hiddenCount += applyFilter(store.getState(), store, entry.range, entry.byCol, (cell) =>
-      wanted.has(cellToKey(cell?.value)),
-    );
+  for (const key of order) {
+    const group = groups.get(key);
+    if (!group) continue;
+    if (group.cols.length === 0) {
+      clearFilter(store.getState(), store, group.range);
+      continue;
+    }
+    hiddenCount += applyFilterColumns(store.getState(), store, group.range, group.cols);
   }
   return hiddenCount;
 }
