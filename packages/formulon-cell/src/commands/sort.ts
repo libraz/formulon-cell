@@ -179,7 +179,7 @@ export function inferSortHasHeader(state: State, range: Range): boolean {
   if (distinctHeaderFormats > 0 && firstRowText >= comparableColumns) return true;
   // All-text table with no numeric or format contrast: the spreadsheet's Sort
   // dialog still defaults to "my data has headers", so keep the label row out of
-  // the sort rather than mixing it into the data (H-18).
+  // the sort rather than mixing it into the data.
   return (
     comparableColumns > 0 && bothText === comparableColumns && firstRowText >= comparableColumns
   );

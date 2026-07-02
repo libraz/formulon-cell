@@ -274,7 +274,7 @@ function shiftFilterCriteria(
 }
 
 /** Re-point merges, conditional-format ranges, and the autofilter region after
- *  a row/col insert or delete so they track the cells they annotate (H-2). Each
+ *  a row/col insert or delete so they track the cells they annotate. Each
  *  concern records its own history entry inside the surrounding transaction. */
 function shiftAnchoredRanges(
   store: SpreadsheetStore,

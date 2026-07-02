@@ -246,7 +246,7 @@ export function writeCoerced(wb: WorkbookHandle, a: Addr, c: CoercedInput): void
 
 /** Attach a spreadsheet-style implicit number format (percent, currency, time,
  *  date) to a freshly-typed cell — but only while the cell is still on General
- *  format, so an explicit user format is never clobbered (H-35/H-36). */
+ *  format, so an explicit user format is never clobbered. */
 function applyImplicitFormat(store: SpreadsheetStore, a: Addr, c: CoercedInput): void {
   if (c.kind !== 'number' || !c.implicitFormat) return;
   const current = formatWithPending(store.getState(), a)?.numFmt;
@@ -312,7 +312,7 @@ export function writeInputValidated(
   const outcome = validateAgainst(validation, coerced, makeRangeResolver(wb, a.sheet), evalCustom);
   // A `stop` rule with the error alert disabled records the invalid value
   // silently — no blocking dialog — so it must report success to the caller
-  // rather than a `stop` rejection that keeps the editor open (H-30).
+  // rather than a `stop` rejection that keeps the editor open.
   const silentStop =
     !outcome.ok && outcome.severity === 'stop' && validation.showErrorMessage === false;
   if (outcome.ok || outcome.severity !== 'stop' || silentStop) {

@@ -41,7 +41,7 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
   if (action === 'formats') {
     recordFormatChange(history, store, () => clearVisualFormat(store.getState(), store));
     // Reset the engine XF for the cleared cells so the format does not
-    // resurrect on the next save (H-37).
+    // resurrect on the next save.
     flushFormatToEngine(workbook, store, range.sheet);
     return;
   }
@@ -78,7 +78,7 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
       });
     }
     if (action === 'all') {
-      // Flush the cleared formats to the engine so the XF resets (H-37).
+      // Flush the cleared formats to the engine so the XF resets.
       flushFormatToEngine(workbook, store, range.sheet);
     }
   } finally {

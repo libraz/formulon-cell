@@ -654,7 +654,7 @@ export function formatNumber(value: number, fmt: NumFmt | undefined, locale = 'e
   if (fmt.kind === 'scientific') {
     // Excel's built-in Scientific format is `0.00E+00` — the exponent is
     // zero-padded to at least two digits. `toExponential` emits a bare `e+4`,
-    // so re-pad to match (H-4).
+    // so re-pad to match.
     return value
       .toExponential(fmt.decimals)
       .replace(
@@ -1175,7 +1175,7 @@ function renderNumericPattern(value: number, pattern: string, locale: string): s
     if (sci !== null) return sci;
   }
   // Fraction formats (`# ?/?`) are solved into integer + numerator/denominator
-  // rather than printing the placeholders verbatim (H-3).
+  // rather than printing the placeholders verbatim.
   if (pattern.includes('/')) {
     const frac = renderFractionPattern(value, pattern);
     if (frac !== null) return frac;
@@ -1199,7 +1199,7 @@ function renderNumericPattern(value: number, pattern: string, locale: string): s
   // Multi-run integer patterns (phone `000-000-0000`, SSN `000-00-0000`) spread
   // the digits across each placeholder run right-to-left. The single-block path
   // below only fills the first run, so delegate whole-number distribution to the
-  // special renderer (M-1).
+  // special renderer.
   if (!isPercent && !/\.[#0?]/.test(body)) {
     const runs = body.match(/[#0?][#0?,]*/g) ?? [];
     if (runs.length > 1 && !runs.some((r) => r.includes(','))) {

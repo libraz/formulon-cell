@@ -27,7 +27,7 @@ export interface NamedRangeDialogDeps {
   getSelectedRangeFormula?: () => string;
   subscribeToRangeChanges?: (listener: () => void) => () => void;
   /** Called after a defined-name mutation writes through to the engine so the
-   *  host can re-project recalculated cells into the store (H-38). */
+   *  host can re-project recalculated cells into the store. */
   onAfterMutate?: () => void;
 }
 

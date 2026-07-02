@@ -134,7 +134,7 @@ const applyDefinedNamesSnapshot = (wb: WorkbookHandle, snap: DefinedNamesSnapsho
     if (!snap.has(entry.name)) wb.setDefinedNameEntry(entry.name, '');
   }
   for (const [name, formula] of snap) wb.setDefinedNameEntry(name, formula);
-  // Undo/redo of a name change must recompute dependents too (H-38).
+  // Undo/redo of a name change must recompute dependents too.
   wb.recalc();
 };
 
@@ -176,7 +176,7 @@ export function upsertDefinedName(
     return { ok: false, reason: 'engine-failed' };
   }
   // Defining/redefining a name changes what `=MyRange` resolves to — recompute
-  // so dependent cells and a subsequent save reflect the new target (H-38).
+  // so dependent cells and a subsequent save reflect the new target.
   wb.recalc();
   return { ok: true, entry: { name: trimmedName, formula: trimmedFormula } };
 }
@@ -188,7 +188,7 @@ export function deleteDefinedName(wb: WorkbookHandle, name: string): DefinedName
   if (!wb.capabilities.definedNameMutate) return { ok: false, reason: 'unsupported' };
   if (!wb.setDefinedNameEntry(trimmedName, '')) return { ok: false, reason: 'engine-failed' };
   // Removing a name usually turns `=MyRange` into #NAME? — recompute so the
-  // change is reflected in dependents and on save (H-38).
+  // change is reflected in dependents and on save.
   wb.recalc();
   return { ok: true, entry: { name: trimmedName, formula: '' } };
 }

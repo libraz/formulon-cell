@@ -126,7 +126,7 @@ export function pasteSpecial(
       // is active it takes precedence over formula-pasting, using the source's
       // computed number even if the source cell is a formula — otherwise an
       // "Add" over a formula source silently pastes the formula and drops the
-      // operation (M-10). Formats-only pastes carry no value, so they never
+      // operation. Formats-only pastes carry no value, so they never
       // operate.
       const operating =
         opt.operation !== 'none' && (wantsValues(opt.what) || wantsFormulas(opt.what));

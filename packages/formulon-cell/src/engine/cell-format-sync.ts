@@ -36,7 +36,7 @@ const PIVOT_KIND = {
  * High-water mark of cells we have assigned a non-default XF to, per workbook
  * and sheet. Lets a later sync reset the XF of a cell whose format entry was
  * removed (Clear Formats) back to 0 — otherwise the engine keeps the stale XF
- * and the cleared format resurrects on the next save (H-37).
+ * and the cleared format resurrects on the next save.
  */
 const syncedFormatKeys = new WeakMap<WorkbookHandle, Map<number, Set<string>>>();
 
@@ -98,7 +98,7 @@ export function syncCellFormatsToEngine(
     current.add(key);
   }
   // Reset cells that were formatted before but no longer are — the cleared
-  // format must not linger in the engine XF table (H-37).
+  // format must not linger in the engine XF table.
   for (const key of previous) {
     if (current.has(key)) continue;
     const [, rStr, cStr] = key.split(':');
@@ -154,7 +154,7 @@ export function hydrateCellFormatsFromEngine(
   }
   if (updates.length === 0) return;
   // Seed the high-water mark so that clearing a format that was loaded from the
-  // workbook (not authored in-session) still resets the engine XF (H-37).
+  // workbook (not authored in-session) still resets the engine XF.
   seedSyncedFormatKeys(
     wb,
     sheet,

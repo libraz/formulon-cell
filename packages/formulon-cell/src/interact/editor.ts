@@ -249,7 +249,7 @@ export class InlineEditor {
     const isFormula = raw.startsWith('=');
     // Validated write that mirrors the anchor's stop-rejection handling. Returns
     // true when a `stop` rule blocked the entry (the whole fill aborts) so DV
-    // bites on every filled cell, not just the anchor (M-16).
+    // bites on every filled cell, not just the anchor.
     const writeValidatedOrAbort = (
       target: Addr,
       text: string,
