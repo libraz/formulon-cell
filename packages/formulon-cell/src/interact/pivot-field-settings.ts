@@ -1,9 +1,12 @@
 import type { PivotSourceField } from '../commands/pivot-table.js';
 import {
+  type PivotAggregation,
   PivotAxis,
   type PivotFilterSpec,
   PivotFilterType,
   PivotFilterValueKind,
+  PivotShowValuesAs,
+  type PivotShowValuesAs as PivotShowValuesAsValue,
 } from '../engine/types.js';
 import type { Strings } from '../i18n/strings.js';
 import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
@@ -78,6 +81,19 @@ export interface PivotFieldSettingsPanelOptions {
   controls: PivotFieldSettingsControls;
   selectedValueFields: readonly string[];
   selectedFilterFields: readonly string[];
+  selectedValueSetting(fieldName: string): {
+    aggregation?: PivotAggregation;
+    numberFormat?: string;
+    showValuesAs?: PivotShowValuesAsValue;
+  };
+  setValueFieldSetting(
+    fieldName: string,
+    setting: {
+      aggregation?: PivotAggregation;
+      numberFormat?: string;
+      showValuesAs?: PivotShowValuesAsValue;
+    },
+  ): void;
   fieldCanBeValue(fieldName: string): boolean;
   replaceFilterField(previous: string, next: string): void;
   normalizeSelectedFilters(): void;
@@ -658,21 +674,56 @@ export const renderPivotFieldSettingsPanel = (options: PivotFieldSettingsPanelOp
       settingsCheckRow(t.columnSubtotalTop, subtotal),
     );
   } else if (active.kind === 'values') {
+    const setting = options.selectedValueSetting(active.fieldName);
     const aggregation = createDialogSelect([], '', { className: 'fc-fmtdlg__select' });
     cloneSelectOptions(controls.aggSelect, aggregation);
+    aggregation.value =
+      setting.aggregation === undefined ? controls.aggSelect.value : String(setting.aggregation);
     aggregation.addEventListener('change', () => {
-      controls.aggSelect.value = aggregation.value;
+      options.setValueFieldSetting(active.fieldName, {
+        ...options.selectedValueSetting(active.fieldName),
+        aggregation: Number(aggregation.value) as PivotAggregation,
+      });
+    });
+    const showValuesAs = createDialogSelect(
+      [
+        { value: String(PivotShowValuesAs.Normal), label: t.showValuesAsNormal },
+        { value: String(PivotShowValuesAs.PercentOfRow), label: t.showValuesAsPercentOfRow },
+        { value: String(PivotShowValuesAs.PercentOfCol), label: t.showValuesAsPercentOfColumn },
+        { value: String(PivotShowValuesAs.PercentOfTotal), label: t.showValuesAsPercentOfTotal },
+        {
+          value: String(PivotShowValuesAs.RunningTotalInRow),
+          label: t.showValuesAsRunningTotalInRow,
+        },
+        {
+          value: String(PivotShowValuesAs.RunningTotalInCol),
+          label: t.showValuesAsRunningTotalInColumn,
+        },
+        { value: String(PivotShowValuesAs.Index), label: t.showValuesAsIndex },
+      ],
+      String(setting.showValuesAs ?? PivotShowValuesAs.Normal),
+      { className: 'fc-fmtdlg__select' },
+    );
+    showValuesAs.addEventListener('change', () => {
+      options.setValueFieldSetting(active.fieldName, {
+        ...options.selectedValueSetting(active.fieldName),
+        showValuesAs: Number(showValuesAs.value) as PivotShowValuesAsValue,
+      });
     });
     const format = document.createElement('input');
     format.type = 'text';
     format.className = 'fc-namedlg__input';
     format.placeholder = t.numberFormatPlaceholder;
-    format.value = controls.numberFormatInput.value;
+    format.value = setting.numberFormat ?? controls.numberFormatInput.value;
     format.addEventListener('input', () => {
-      controls.numberFormatInput.value = format.value;
+      options.setValueFieldSetting(active.fieldName, {
+        ...options.selectedValueSetting(active.fieldName),
+        numberFormat: format.value,
+      });
     });
     settingsControls.append(
       settingsFieldRow(t.aggregation, aggregation),
+      settingsFieldRow(t.showValuesAs, showValuesAs),
       settingsFieldRow(t.numberFormat, format),
     );
   } else {

@@ -1,4 +1,4 @@
-import type { CellValue, PivotFilterSpec, Range } from '../engine/types.js';
+import type { CellValue, PivotFilterSpec, PivotShowValuesAs, Range } from '../engine/types.js';
 import { PivotAggregation, PivotAxis } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
@@ -19,6 +19,13 @@ export interface PivotFieldItemVisibility {
   visible: boolean;
 }
 
+export interface PivotValueFieldSettings {
+  fieldName: string;
+  aggregation?: PivotAggregation;
+  numberFormat?: string;
+  showValuesAs?: PivotShowValuesAs;
+}
+
 export interface CreatePivotTableOptions {
   source: Range;
   destination: { sheet: number; row: number; col: number };
@@ -31,6 +38,7 @@ export interface CreatePivotTableOptions {
   pivotFilters?: readonly PivotFilterSpec[];
   valueField: string;
   valueFields?: readonly string[];
+  valueFieldSettings?: readonly PivotValueFieldSettings[];
   aggregation?: PivotAggregation;
   rowSort?: PivotSortDirection;
   columnSort?: PivotSortDirection;
@@ -46,6 +54,25 @@ export type CreatePivotTableResult =
   | {
       ok: false;
       reason: 'unsupported' | 'invalid-range' | 'invalid-field' | 'engine-failed';
+      step?: string;
+    };
+
+export interface RefreshPivotCacheOptions {
+  cacheId: number;
+  source: Range;
+}
+
+export interface RefreshPivotTableOptions {
+  sheet: number;
+  pivotIndex: number;
+  source: Range;
+}
+
+export type RefreshPivotCacheResult =
+  | { ok: true; cacheId: number }
+  | {
+      ok: false;
+      reason: 'unsupported' | 'invalid-range' | 'invalid-field' | 'invalid-pivot' | 'engine-failed';
       step?: string;
     };
 
@@ -71,8 +98,24 @@ const valueKey = (value: CellValue): string => {
   return 'blank';
 };
 
+const pivotAggregationName = (aggregation: PivotAggregation): string => {
+  if (aggregation === PivotAggregation.Count) return 'Count';
+  if (aggregation === PivotAggregation.Average) return 'Average';
+  if (aggregation === PivotAggregation.Max) return 'Max';
+  if (aggregation === PivotAggregation.Min) return 'Min';
+  return 'Sum';
+};
+
+const MAX_PIVOT_SOURCE_CELLS = 100_000;
+
+const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
+
+const canMaterializePivotSource = (range: Range): boolean =>
+  rangeArea(range) <= MAX_PIVOT_SOURCE_CELLS;
+
 export function inferPivotSourceFields(wb: WorkbookHandle, range: Range): PivotSourceField[] {
   if (range.r1 <= range.r0 || range.c1 < range.c0) return [];
+  if (!canMaterializePivotSource(range)) return [];
   const seen = new Map<string, number>();
   const fields: PivotSourceField[] = [];
   for (let c = range.c0; c <= range.c1; c += 1) {
@@ -145,6 +188,9 @@ export function createPivotTableFromRange(
     ),
   );
   const valueFields = valueFieldNames.map((name) => byName.get(name));
+  const valueFieldSettings = new Map(
+    (opts.valueFieldSettings ?? []).map((settings) => [settings.fieldName, settings]),
+  );
   const filterItemFields = new Set((opts.filterItems ?? []).map((item) => item.fieldName));
   if (
     !rowField ||
@@ -309,20 +355,90 @@ export function createPivotTableFromRange(
       axis: PivotAxis.Value,
     });
     if (valuePivotField < 0) return failAfterPivot('value-field');
+    const settings = valueFieldSettings.get(valueField.name);
     const aggregation =
+      settings?.aggregation ??
       opts.aggregation ??
       (valueField.numericCount > 0 ? PivotAggregation.Sum : PivotAggregation.Count);
+    const numberFormat = settings?.numberFormat?.trim() || opts.valueNumberFormat?.trim();
 
     const dataField = wb.addPivotDataField(opts.destination.sheet, pivotIndex, {
-      name: `${aggregation === PivotAggregation.Count ? 'Count' : 'Sum'} of ${valueField.name}`,
+      name: `${pivotAggregationName(aggregation)} of ${valueField.name}`,
       fieldIndex: valueField.index,
       aggregation,
-      numberFormat: opts.valueNumberFormat?.trim() || undefined,
+      numberFormat: numberFormat || undefined,
+      showValuesAs: settings?.showValuesAs,
     });
     if (dataField < 0) return failAfterPivot('data-field');
   }
 
   return { ok: true, cacheId, pivotIndex };
+}
+
+export function refreshPivotCacheFromRange(
+  wb: WorkbookHandle,
+  opts: RefreshPivotCacheOptions,
+): RefreshPivotCacheResult {
+  if (!wb.capabilities.pivotTableMutate) return { ok: false, reason: 'unsupported' };
+
+  const fields = inferPivotSourceFields(wb, opts.source);
+  if (fields.length < 2) return { ok: false, reason: 'invalid-range' };
+  const cacheFields = wb.pivotCacheFieldNames(opts.cacheId);
+  if (
+    cacheFields.length !== fields.length ||
+    fields.some((field, index) => field.name !== cacheFields[index])
+  ) {
+    return { ok: false, reason: 'invalid-field' };
+  }
+
+  for (const field of fields) {
+    if (!wb.clearPivotCacheSharedItems(opts.cacheId, field.index)) {
+      return { ok: false, reason: 'engine-failed', step: 'shared-item-clear' };
+    }
+    const seen = new Set<string>();
+    for (let r = opts.source.r0 + 1; r <= opts.source.r1; r += 1) {
+      const value = wb.getValue({
+        sheet: opts.source.sheet,
+        row: r,
+        col: opts.source.c0 + field.index,
+      });
+      const key = valueKey(value);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (!wb.addPivotCacheSharedItem(opts.cacheId, field.index, value)) {
+        return { ok: false, reason: 'engine-failed', step: 'shared-item' };
+      }
+    }
+  }
+
+  if (!wb.clearPivotCacheRecords(opts.cacheId)) {
+    return { ok: false, reason: 'engine-failed', step: 'cache-record-clear' };
+  }
+  for (let r = opts.source.r0 + 1; r <= opts.source.r1; r += 1) {
+    const recordIdx = wb.addPivotCacheRecord(opts.cacheId);
+    if (recordIdx < 0) return { ok: false, reason: 'engine-failed', step: 'cache-record' };
+    for (let c = opts.source.c0; c <= opts.source.c1; c += 1) {
+      const ok = wb.setPivotCacheRecordValue(
+        opts.cacheId,
+        recordIdx,
+        c - opts.source.c0,
+        wb.getValue({ sheet: opts.source.sheet, row: r, col: c }),
+      );
+      if (!ok) return { ok: false, reason: 'engine-failed', step: 'cache-record-value' };
+    }
+  }
+
+  return { ok: true, cacheId: opts.cacheId };
+}
+
+export function refreshPivotTableFromRange(
+  wb: WorkbookHandle,
+  opts: RefreshPivotTableOptions,
+): RefreshPivotCacheResult {
+  if (!wb.capabilities.pivotTableMutate) return { ok: false, reason: 'unsupported' };
+  const cacheId = wb.pivotTableCacheId(opts.sheet, opts.pivotIndex);
+  if (cacheId < 0) return { ok: false, reason: 'invalid-pivot' };
+  return refreshPivotCacheFromRange(wb, { cacheId, source: opts.source });
 }
 
 export type RibbonPivotTableAction = 'dialog' | 'recommended' | 'new-sheet' | 'existing-sheet';

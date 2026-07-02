@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { CellValue } from '../../../src/engine/types.js';
+import { type CellValue, PivotShowValuesAs } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
 import { attachPivotTableDialog } from '../../../src/interact/pivot-table-dialog.js';
@@ -122,8 +122,15 @@ const makeWb = () => {
       return true;
     },
     setPivotFieldSort: () => true,
-    addPivotDataField: (_sheet: number, _pivot: number, spec: { name: string }) => {
+    addPivotDataField: (
+      _sheet: number,
+      _pivot: number,
+      spec: { name: string; aggregation: number; numberFormat?: string; showValuesAs?: number },
+    ) => {
       calls.push(`data-field:${spec.name}`);
+      calls.push(`data-field-agg:${spec.aggregation}`);
+      calls.push(`data-field-format:${spec.name}:${spec.numberFormat ?? ''}`);
+      calls.push(`data-field-show:${spec.name}:${spec.showValuesAs ?? ''}`);
       return 0;
     },
   } as unknown as WorkbookHandle;
@@ -216,6 +223,9 @@ describe('attachPivotTableDialog', () => {
     expect(Array.from(selects[4]?.options ?? []).map((option) => option.textContent)).toEqual([
       'Sum',
       'Count',
+      'Average',
+      'Max',
+      'Min',
     ]);
     expect(Array.from(selects[5]?.options ?? []).map((option) => option.value)).toEqual([
       'none',
@@ -510,6 +520,72 @@ describe('attachPivotTableDialog', () => {
       ?.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
 
     expect(calls).toContain('data-field:Count of Sales');
+    expect(calls).toContain('data-field-agg:1');
+    handle.detach();
+  });
+
+  it('keeps Values field settings scoped to the selected field', () => {
+    const { wb, calls } = makeWb();
+    const store = createSpreadsheetStore();
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 });
+    const handle = attachPivotTableDialog({ host, store, wb, strings: en });
+
+    handle.open();
+    const qtyField = document.querySelector<HTMLInputElement>(
+      '[data-pivot-field-list-field="Qty"]',
+    );
+    if (!qtyField) throw new Error('missing Qty field checkbox');
+    qtyField.checked = true;
+    qtyField.dispatchEvent(new Event('change', { bubbles: true }));
+    document
+      .querySelector<HTMLButtonElement>(
+        '.fc-pivotdlg__area-settings[aria-label="Field Settings: Qty"]',
+      )
+      ?.click();
+    const panel = document.querySelector<HTMLElement>('.fc-pivotdlg__area-settings-panel');
+    const selects = Array.from(panel?.querySelectorAll<HTMLSelectElement>('select') ?? []);
+    const aggregation = selects[0];
+    const showValuesAs = selects[1];
+    const format = panel?.querySelector<HTMLInputElement>('input[type="text"]');
+    if (!aggregation || !showValuesAs || !format)
+      throw new Error('missing field settings controls');
+    aggregation.value = '2';
+    aggregation.dispatchEvent(new Event('change', { bubbles: true }));
+    showValuesAs.value = String(PivotShowValuesAs.PercentOfTotal);
+    showValuesAs.dispatchEvent(new Event('change', { bubbles: true }));
+    format.value = '0.00';
+    format.dispatchEvent(new Event('input', { bubbles: true }));
+    document
+      .querySelector('form')
+      ?.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+
+    expect(calls).toContain('data-field:Sum of Sales');
+    expect(calls).toContain('data-field:Average of Qty');
+    expect(calls).toContain('data-field-format:Average of Qty:0.00');
+    expect(calls).toContain('data-field-format:Sum of Sales:');
+    expect(calls).toContain('data-field-show:Average of Qty:3');
+    expect(calls).toContain('data-field-show:Sum of Sales:');
+    handle.detach();
+  });
+
+  it('submits Average aggregation from the creation dialog dropdown', () => {
+    const { wb, calls } = makeWb();
+    const store = createSpreadsheetStore();
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 });
+    const handle = attachPivotTableDialog({ host, store, wb, strings: en });
+
+    handle.open();
+    const aggregation = Array.from(document.querySelectorAll<HTMLSelectElement>('select')).find(
+      (select) => Array.from(select.options).some((option) => option.textContent === 'Average'),
+    );
+    if (!aggregation) throw new Error('missing aggregation select');
+    aggregation.value = '2';
+    aggregation.dispatchEvent(new Event('change', { bubbles: true }));
+    document
+      .querySelector('form')
+      ?.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+
+    expect(calls).toContain('data-field-agg:2');
     handle.detach();
   });
 

@@ -35,6 +35,7 @@ export interface PivotMutationWorkbook extends Workbook {
   pivotCacheFieldAddSharedItemText(cacheId: number, fieldIdx: number, value: string): Status;
   pivotCacheFieldAddSharedItemBool(cacheId: number, fieldIdx: number, value: boolean): Status;
   pivotCacheFieldAddSharedItemBlank(cacheId: number, fieldIdx: number): Status;
+  pivotCacheFieldAddSharedItemError?(cacheId: number, fieldIdx: number, code: number): Status;
   pivotCacheFieldClearSharedItems(cacheId: number, fieldIdx: number): Status;
   pivotCacheRecordAdd(cacheId: number): IndexResult;
   pivotCacheRecordClear(cacheId: number): Status;

@@ -381,6 +381,9 @@ export type {
   ExecuteRibbonPivotTableActionDeps,
   PivotFieldItemVisibility,
   PivotSourceField,
+  RefreshPivotCacheOptions,
+  RefreshPivotCacheResult,
+  RefreshPivotTableOptions,
   RibbonPivotTableAction,
   RibbonPivotTableActionResult,
   RibbonPivotTableActionStrings,
@@ -392,6 +395,8 @@ export {
   executeRibbonPivotTableAction,
   inferPivotFieldItems,
   inferPivotSourceFields,
+  refreshPivotCacheFromRange,
+  refreshPivotTableFromRange,
 } from './commands/pivot-table.js';
 export type {
   BuildPrintDocumentOptions,

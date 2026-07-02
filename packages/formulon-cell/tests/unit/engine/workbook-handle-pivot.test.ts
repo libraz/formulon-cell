@@ -227,6 +227,34 @@ describe('WorkbookHandle PivotTable projection', () => {
     ]);
   });
 
+  it('adds PivotCache shared error items without aborting cache construction', () => {
+    const calls: string[] = [];
+    const wb = makeHandle({
+      pivotCacheFieldAddSharedItemError: (_cacheId: number, _fieldIdx: number, code: number) => {
+        calls.push(`error:${code}`);
+        return ok;
+      },
+    });
+
+    expect(wb.addPivotCacheSharedItem(7, 0, { kind: 'error', code: 7, text: '#DIV/0!' })).toBe(
+      true,
+    );
+    expect(calls).toEqual(['error:7']);
+  });
+
+  it('falls back to shared item text when the engine lacks a shared-error hook', () => {
+    const calls: string[] = [];
+    const wb = makeHandle({
+      pivotCacheFieldAddSharedItemText: (_cacheId: number, _fieldIdx: number, value: string) => {
+        calls.push(`text:${value}`);
+        return ok;
+      },
+    });
+
+    expect(wb.addPivotCacheSharedItem(7, 0, { kind: 'error', code: 4, text: '#REF!' })).toBe(true);
+    expect(calls).toEqual(['text:#REF!']);
+  });
+
   it('includes readable PivotTable filter specs in object summaries when engine hooks exist', () => {
     const wb = makeHandle({
       pivotFilterCount: () => 3,

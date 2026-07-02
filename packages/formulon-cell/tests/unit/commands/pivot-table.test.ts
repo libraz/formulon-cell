@@ -4,6 +4,8 @@ import {
   executeRibbonPivotTableAction,
   inferPivotFieldItems,
   inferPivotSourceFields,
+  refreshPivotCacheFromRange,
+  refreshPivotTableFromRange,
 } from '../../../src/commands/pivot-table.js';
 import {
   type CellValue,
@@ -11,6 +13,7 @@ import {
   PivotAxis,
   PivotFilterType,
   PivotFilterValueKind,
+  PivotShowValuesAs,
 } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
@@ -56,6 +59,16 @@ const makeWb = () => {
       calls.push(`value:${record}:${field}:${value.kind}`);
       return true;
     },
+    pivotCacheFieldNames: () => ['Region', 'Product', 'Sales'],
+    clearPivotCacheSharedItems: (_cache: number, field: number) => {
+      calls.push(`clear-shared:${field}`);
+      return true;
+    },
+    clearPivotCacheRecords: (_cache: number) => {
+      calls.push('clear-records');
+      return true;
+    },
+    pivotTableCacheId: (_sheet: number, pivotIndex: number) => (pivotIndex === 2 ? 4 : -1),
     createPivotTable: (_sheet: number, name: string, cacheId: number, anchor: unknown) => {
       calls.push(`pivot:${name}:${cacheId}:${JSON.stringify(anchor)}`);
       return 2;
@@ -104,7 +117,14 @@ const makeWb = () => {
       spec: { name: string; fieldIndex: number; aggregation: number; numberFormat?: string },
     ) => {
       calls.push(
-        `data-field:${spec.name}:${spec.fieldIndex}:${spec.aggregation}:${spec.numberFormat ?? ''}`,
+        [
+          'data-field',
+          spec.name,
+          String(spec.fieldIndex),
+          String(spec.aggregation),
+          spec.numberFormat ?? '',
+          String((spec as { showValuesAs?: number }).showValuesAs ?? ''),
+        ].join(':'),
       );
       return 0;
     },
@@ -122,12 +142,26 @@ describe('pivot-table command helpers', () => {
     ]);
   });
 
+  it('refuses huge pivot source inference before scanning every cell', () => {
+    const { wb } = makeWb();
+
+    expect(inferPivotSourceFields(wb, { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 2 })).toEqual([]);
+  });
+
   it('infers unique PivotTable field items from source values', () => {
     const { wb } = makeWb();
     expect(inferPivotFieldItems(wb, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 }, 'Region')).toEqual([
       'East',
       'West',
     ]);
+  });
+
+  it('refuses huge pivot field item inference', () => {
+    const { wb } = makeWb();
+
+    expect(
+      inferPivotFieldItems(wb, { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 2 }, 'Region'),
+    ).toEqual([]);
   });
 
   it('creates a cache, records, pivot fields, and a data field from a range', () => {
@@ -158,7 +192,20 @@ describe('pivot-table command helpers', () => {
     expect(calls).toContain('sort:1:false:');
     expect(calls).toContain('pivot-field:Product:1');
     expect(calls).toContain('pivot-field:Sales:2');
-    expect(calls).toContain('data-field:Sum of Sales:2:0:#,##0');
+    expect(calls).toContain('data-field:Sum of Sales:2:0:#,##0:');
+  });
+
+  it('refuses huge pivot creation before creating a cache', () => {
+    const { wb, calls } = makeWb();
+    const result = createPivotTableFromRange(wb, {
+      source: { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 2 },
+      destination: { sheet: 0, row: 5, col: 0 },
+      rowField: 'Region',
+      valueField: 'Sales',
+    });
+
+    expect(result).toEqual({ ok: false, reason: 'invalid-range' });
+    expect(calls).toEqual([]);
   });
 
   it('adds a page/filter field when requested', () => {
@@ -248,8 +295,102 @@ describe('pivot-table command helpers', () => {
     expect(result.ok).toBe(true);
     expect(calls).toContain('pivot-field:Sales:2');
     expect(calls).toContain('pivot-field:Product:2');
-    expect(calls).toContain('data-field:Count of Sales:2:1:');
-    expect(calls).toContain('data-field:Count of Product:1:1:');
+    expect(calls).toContain('data-field:Count of Sales:2:1::');
+    expect(calls).toContain('data-field:Count of Product:1:1::');
+  });
+
+  it('applies value field aggregation and number format per field', () => {
+    const { wb, calls } = makeWb();
+    const result = createPivotTableFromRange(wb, {
+      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
+      destination: { sheet: 0, row: 5, col: 0 },
+      rowField: 'Region',
+      valueField: 'Sales',
+      valueFields: ['Sales', 'Product'],
+      aggregation: PivotAggregation.Sum,
+      valueNumberFormat: '#,##0',
+      valueFieldSettings: [
+        {
+          fieldName: 'Sales',
+          aggregation: PivotAggregation.Average,
+          numberFormat: '#,##0.00',
+          showValuesAs: PivotShowValuesAs.PercentOfTotal,
+        },
+        { fieldName: 'Product', aggregation: PivotAggregation.Count },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(calls).toContain('data-field:Average of Sales:2:2:#,##0.00:3');
+    expect(calls).toContain('data-field:Count of Product:1:1:#,##0:');
+    expect(calls).not.toContain('data-field:Average of Product:1:2:#,##0.00:3');
+  });
+
+  it('refreshes an existing pivot cache from a matching source range', () => {
+    const { wb, calls } = makeWb();
+    const result = refreshPivotCacheFromRange(wb, {
+      cacheId: 4,
+      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
+    });
+
+    expect(result).toEqual({ ok: true, cacheId: 4 });
+    expect(calls).toContain('clear-shared:0');
+    expect(calls).toContain('clear-shared:1');
+    expect(calls).toContain('clear-shared:2');
+    expect(calls).toContain('clear-records');
+    expect(calls).toContain('shared:0:text');
+    expect(calls).toContain('shared:2:number');
+    expect(calls).toContain('record');
+    expect(calls).toContain('value:0:2:number');
+  });
+
+  it('refuses huge pivot cache refresh before clearing records', () => {
+    const { wb, calls } = makeWb();
+    const result = refreshPivotCacheFromRange(wb, {
+      cacheId: 4,
+      source: { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 2 },
+    });
+
+    expect(result).toEqual({ ok: false, reason: 'invalid-range' });
+    expect(calls).not.toContain('clear-records');
+    expect(calls).not.toContain('clear-shared:0');
+  });
+
+  it('refreshes an existing pivot table by resolving its cache id', () => {
+    const { wb, calls } = makeWb();
+    const result = refreshPivotTableFromRange(wb, {
+      sheet: 0,
+      pivotIndex: 2,
+      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
+    });
+
+    expect(result).toEqual({ ok: true, cacheId: 4 });
+    expect(calls).toContain('clear-records');
+    expect(calls).toContain('value:0:2:number');
+  });
+
+  it('rejects pivot table refresh when the pivot cache id is unavailable', () => {
+    const { wb, calls } = makeWb();
+    const result = refreshPivotTableFromRange(wb, {
+      sheet: 0,
+      pivotIndex: 99,
+      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
+    });
+
+    expect(result).toEqual({ ok: false, reason: 'invalid-pivot' });
+    expect(calls).not.toContain('clear-records');
+  });
+
+  it('refuses to refresh a pivot cache when source headers no longer match', () => {
+    const { wb, calls } = makeWb();
+    wb.pivotCacheFieldNames = () => ['Region', 'Sales'];
+    const result = refreshPivotCacheFromRange(wb, {
+      cacheId: 4,
+      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
+    });
+
+    expect(result).toEqual({ ok: false, reason: 'invalid-field' });
+    expect(calls).not.toContain('clear-records');
   });
 
   it('rejects duplicate row and column fields before creating a cache', () => {

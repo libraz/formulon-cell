@@ -11,7 +11,12 @@ import {
   WORKBOOK_OBJECT_KINDS,
   workbookObjectKindCounts,
 } from '../engine/passthrough-sync.js';
-import { PivotAggregation, PivotAxis, type PivotFilterSpec } from '../engine/types.js';
+import {
+  PivotAggregation,
+  PivotAxis,
+  type PivotDataFieldSpec,
+  type PivotFilterSpec,
+} from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SessionIllustration } from '../store/store.js';
@@ -608,30 +613,22 @@ export function attachWorkbookObjectsPanel(
           Number(select.value) as PivotAxis,
         ),
       );
+      const dataFieldCount = wb.pivotDataFieldCount(pivot.sheetIndex, pivot.pivotIndex);
+      let nextDataFieldIndex = 0;
       const valueFieldsUpdated = valueFieldSettings.every((field) => {
-        const cleared = wb.clearPivotFieldAggregations(
-          pivot.sheetIndex,
-          pivot.pivotIndex,
-          field.fieldIndex,
-        );
-        if (!cleared) return false;
         if (field.axisSelect.value !== String(PivotAxis.Value)) return true;
-        const aggregated = wb.addPivotFieldAggregation(
-          pivot.sheetIndex,
-          pivot.pivotIndex,
-          field.fieldIndex,
-          Number(field.aggregationSelect.value) as PivotAggregation,
-        );
         const format = field.numberFormatInput.value.trim();
-        const formatted =
-          format.length === 0 ||
-          wb.setPivotFieldNumberFormat(
-            pivot.sheetIndex,
-            pivot.pivotIndex,
-            field.fieldIndex,
-            format,
-          );
-        return aggregated && formatted;
+        const spec: PivotDataFieldSpec = {
+          fieldIndex: field.fieldIndex,
+          aggregation: Number(field.aggregationSelect.value) as PivotAggregation,
+          ...(format.length > 0 ? { numberFormat: format } : {}),
+        };
+        const dataFieldIndex = nextDataFieldIndex;
+        nextDataFieldIndex += 1;
+        if (dataFieldIndex < dataFieldCount) {
+          return wb.setPivotDataField(pivot.sheetIndex, pivot.pivotIndex, dataFieldIndex, spec);
+        }
+        return wb.addPivotDataField(pivot.sheetIndex, pivot.pivotIndex, spec) >= 0;
       });
       const filterItemsUpdated = valueFieldSettings.every((field) => {
         if (field.axisSelect.value !== String(PivotAxis.Page)) return true;

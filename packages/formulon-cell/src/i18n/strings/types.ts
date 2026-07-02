@@ -654,6 +654,17 @@ export interface Strings {
     aggregation: string;
     sum: string;
     count: string;
+    average: string;
+    max: string;
+    min: string;
+    showValuesAs: string;
+    showValuesAsNormal: string;
+    showValuesAsPercentOfRow: string;
+    showValuesAsPercentOfColumn: string;
+    showValuesAsPercentOfTotal: string;
+    showValuesAsRunningTotalInRow: string;
+    showValuesAsRunningTotalInColumn: string;
+    showValuesAsIndex: string;
     rowSort: string;
     columnSort: string;
     sortNone: string;

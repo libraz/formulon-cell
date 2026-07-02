@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { PivotAxis, PivotFilterType, PivotFilterValueKind } from '../../../src/engine/types.js';
+import {
+  PivotAggregation,
+  PivotAxis,
+  type PivotDataFieldSpec,
+  PivotFilterType,
+  PivotFilterValueKind,
+} from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en, ja } from '../../../src/i18n/strings.js';
 import { attachWorkbookObjectsPanel } from '../../../src/interact/workbook-objects.js';
@@ -96,6 +102,27 @@ const wbWithObjects = () => {
     },
     addPivotFieldAggregation: (sheet: number, pivot: number, field: number, agg: number) => {
       calls.push(`add-agg:${sheet}:${pivot}:${field}:${agg}`);
+      return true;
+    },
+    pivotDataFieldCount: (sheet: number, pivot: number) => {
+      calls.push(`data-count:${sheet}:${pivot}`);
+      return 1;
+    },
+    addPivotDataField: (sheet: number, pivot: number, spec: PivotDataFieldSpec) => {
+      calls.push(
+        `data-add:${sheet}:${pivot}:${spec.fieldIndex}:${spec.aggregation}:${spec.numberFormat ?? ''}`,
+      );
+      return 1;
+    },
+    setPivotDataField: (
+      sheet: number,
+      pivot: number,
+      dataField: number,
+      spec: PivotDataFieldSpec,
+    ) => {
+      calls.push(
+        `data-set:${sheet}:${pivot}:${dataField}:${spec.fieldIndex}:${spec.aggregation}:${spec.numberFormat ?? ''}`,
+      );
       return true;
     },
     setPivotFieldNumberFormat: (sheet: number, pivot: number, field: number, format: string) => {
@@ -404,9 +431,9 @@ describe('attachWorkbookObjectsPanel', () => {
     expect(calls).toContain('totals:0:0:true:true');
     expect(calls).toContain('field-axis:0:0:0:0');
     expect(calls).toContain('field-axis:0:0:1:2');
-    expect(calls).toContain('clear-agg:0:0:0');
-    expect(calls).toContain('clear-agg:0:0:1');
-    expect(calls).toContain('add-agg:0:0:1:0');
+    expect(calls).toContain(`data-set:0:0:0:1:${PivotAggregation.Sum}:`);
+    expect(calls).not.toContain('clear-agg:0:0:1');
+    expect(calls).not.toContain('add-agg:0:0:1:0');
     expect(onAfterPivotEdit).toHaveBeenCalledTimes(1);
     handle.detach();
   });
@@ -554,9 +581,10 @@ describe('attachWorkbookObjectsPanel', () => {
     format.value = '#,##0.00';
     form?.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
 
-    expect(calls).toContain('clear-agg:0:0:1');
-    expect(calls).toContain('add-agg:0:0:1:2');
-    expect(calls).toContain('format:0:0:1:#,##0.00');
+    expect(calls).toContain(`data-set:0:0:0:1:${PivotAggregation.Average}:#,##0.00`);
+    expect(calls).not.toContain('clear-agg:0:0:1');
+    expect(calls).not.toContain('add-agg:0:0:1:2');
+    expect(calls).not.toContain('format:0:0:1:#,##0.00');
     handle.detach();
   });
 

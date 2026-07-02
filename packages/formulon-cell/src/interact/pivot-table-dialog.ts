@@ -5,7 +5,7 @@ import {
   type PivotSourceField,
 } from '../commands/pivot-table.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
-import { PivotAggregation, type PivotFilterSpec } from '../engine/types.js';
+import { PivotAggregation, type PivotFilterSpec, type PivotShowValuesAs } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
@@ -80,6 +80,10 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   let selectedValueFields: string[] = [];
   let selectedFilterItemVisibility = new Map<string, Map<string, boolean>>();
   let selectedFilterConditions = new Map<string, PivotFilterConditionState>();
+  let selectedValueSettings = new Map<
+    string,
+    { aggregation?: PivotAggregation; numberFormat?: string; showValuesAs?: PivotShowValuesAs }
+  >();
   let activeFieldSettings: PivotFieldSettingsActive | null = null;
   let draggedPivotField = '';
 
@@ -296,6 +300,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
 
   const removeSelectedValue = (fieldName: string): void => {
     selectedValueFields = selectedValueFields.filter((name) => name !== fieldName);
+    selectedValueSettings.delete(fieldName);
     valueSelect.value = selectedValueFields[0] ?? '';
   };
 
@@ -367,9 +372,60 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     if (colSelect.value === fieldName) colSelect.value = '';
     selectedFilterFields = selectedFilterFields.filter((name) => name !== fieldName);
     selectedValueFields = selectedValueFields.filter((name) => name !== fieldName);
+    selectedValueSettings.delete(fieldName);
     selectedFilterItemVisibility.delete(fieldName);
     selectedFilterConditions.delete(fieldName);
   };
+
+  const selectedValueSetting = (
+    fieldName: string,
+  ): { aggregation?: PivotAggregation; numberFormat?: string; showValuesAs?: PivotShowValuesAs } =>
+    selectedValueSettings.get(fieldName) ?? {};
+
+  const setValueFieldSetting = (
+    fieldName: string,
+    setting: {
+      aggregation?: PivotAggregation;
+      numberFormat?: string;
+      showValuesAs?: PivotShowValuesAs;
+    },
+  ): void => {
+    selectedValueSettings = new Map(selectedValueSettings);
+    const numberFormat = setting.numberFormat?.trim() ?? '';
+    const next = {
+      ...(setting.aggregation === undefined ? {} : { aggregation: setting.aggregation }),
+      ...(numberFormat.length > 0 ? { numberFormat } : {}),
+      ...(setting.showValuesAs === undefined ? {} : { showValuesAs: setting.showValuesAs }),
+    };
+    if (
+      next.aggregation === undefined &&
+      next.numberFormat === undefined &&
+      next.showValuesAs === undefined
+    ) {
+      selectedValueSettings.delete(fieldName);
+    } else {
+      selectedValueSettings.set(fieldName, next);
+    }
+  };
+
+  const flattenValueFieldSettings = (): {
+    fieldName: string;
+    aggregation?: PivotAggregation;
+    numberFormat?: string;
+    showValuesAs?: PivotShowValuesAs;
+  }[] =>
+    selectedValueFields.map((fieldName) => {
+      const setting = selectedValueSetting(fieldName);
+      return {
+        fieldName,
+        aggregation:
+          setting.aggregation === undefined
+            ? (Number(aggSelect.value) as PivotAggregation)
+            : setting.aggregation,
+        numberFormat: setting.numberFormat ?? numberFormatInput.value,
+        showValuesAs: setting.showValuesAs,
+      };
+    });
 
   const assignFieldToArea = (
     fieldName: string,
@@ -426,6 +482,8 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       },
       selectedValueFields,
       selectedFilterFields,
+      selectedValueSetting,
+      setValueFieldSetting,
       fieldCanBeValue,
       replaceFilterField,
       normalizeSelectedFilters,
@@ -724,6 +782,11 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       ? selectedValueFields[0]
       : ((numeric[0] ?? fields[fields.length - 1])?.name ?? '');
     normalizeSelectedValues(fields);
+    selectedValueSettings = new Map(
+      Array.from(selectedValueSettings.entries()).filter(([fieldName]) =>
+        selectedValueFields.includes(fieldName),
+      ),
+    );
     colSelect.value = colValues.has(prevCol)
       ? prevCol
       : fields[1]?.name === selectedValueFields[0]
@@ -776,6 +839,9 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     appendDialogSelectOptions(aggSelect, [
       { value: String(PivotAggregation.Sum), label: t.sum },
       { value: String(PivotAggregation.Count), label: t.count },
+      { value: String(PivotAggregation.Average), label: t.average },
+      { value: String(PivotAggregation.Max), label: t.max },
+      { value: String(PivotAggregation.Min), label: t.min },
     ]);
     rowSortSelect.replaceChildren();
     colSortSelect.replaceChildren();
@@ -884,6 +950,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       pivotFilters: flattenPivotFilters(),
       valueField: valueSelect.value,
       valueFields: selectedValueFields,
+      valueFieldSettings: flattenValueFieldSettings(),
       aggregation: Number(aggSelect.value) as PivotAggregation,
       rowSort: rowSortSelect.value as 'none' | 'asc' | 'desc',
       columnSort: colSortSelect.value as 'none' | 'asc' | 'desc',
@@ -923,6 +990,11 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
   shell.on(sourceInput, 'input', configureForSource as EventListener);
   const onValueSelectChange = (): void => {
     selectedValueFields = valueSelect.value ? [valueSelect.value] : [];
+    selectedValueSettings = new Map(
+      Array.from(selectedValueSettings.entries()).filter(([fieldName]) =>
+        selectedValueFields.includes(fieldName),
+      ),
+    );
     configureForSource();
   };
 

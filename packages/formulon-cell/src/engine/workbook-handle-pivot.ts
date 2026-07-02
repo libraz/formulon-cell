@@ -237,7 +237,11 @@ export abstract class WorkbookHandlePivotMethods {
     }
     if (value.kind === 'blank')
       return pivotWb(this).pivotCacheFieldAddSharedItemBlank(cacheId, fieldIdx).ok;
-    return false;
+    const wb = pivotWb(this);
+    if (wb.pivotCacheFieldAddSharedItemError) {
+      return wb.pivotCacheFieldAddSharedItemError(cacheId, fieldIdx, value.code).ok;
+    }
+    return wb.pivotCacheFieldAddSharedItemText(cacheId, fieldIdx, value.text).ok;
   }
 
   clearPivotCacheSharedItems(cacheId: number, fieldIdx: number): boolean {
