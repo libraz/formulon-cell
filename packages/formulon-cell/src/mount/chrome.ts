@@ -108,6 +108,7 @@ export function createMountChrome({
     iconPaths: ['M5.5 7.5 10 12l4.5-4.5'],
   });
 
+  let refreshGridLabels = (): void => {};
   const refreshFormulaBarLabels = (): void => {
     const strings = getStrings();
     fx.setAttribute('aria-label', strings.fxDialog?.fxButtonLabel ?? strings.a11y.formulaBar);
@@ -120,6 +121,7 @@ export function createMountChrome({
       'aria-label',
       expanded ? strings.a11y.collapseFormulaBar : strings.a11y.expandFormulaBar,
     );
+    refreshGridLabels();
   };
   refreshFormulaBarLabels();
 
@@ -147,14 +149,24 @@ export function createMountChrome({
 
   const grid = document.createElement('div');
   grid.className = 'fc-host__grid';
+  grid.setAttribute('role', 'grid');
+  grid.tabIndex = -1;
   const canvas = document.createElement('canvas');
   canvas.className = 'fc-host__canvas';
+  canvas.setAttribute('aria-hidden', 'true');
   grid.appendChild(canvas);
 
   const a11y = document.createElement('div');
   a11y.className = 'fc-host__a11y';
+  a11y.id = `${host.dataset.fcInstId ?? 'fc'}-a11y`;
   a11y.setAttribute('aria-live', 'polite');
+  a11y.setAttribute('aria-atomic', 'true');
+  grid.setAttribute('aria-describedby', a11y.id);
   grid.appendChild(a11y);
+  refreshGridLabels = (): void => {
+    grid.setAttribute('aria-label', getStrings().a11y.grid);
+  };
+  refreshGridLabels();
 
   const statusbar = document.createElement('div');
   statusbar.className = 'fc-host__statusbar';

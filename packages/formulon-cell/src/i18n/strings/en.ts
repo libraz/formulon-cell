@@ -1270,6 +1270,7 @@ export const en: Strings = {
     expandFormulaBar: 'Expand formula bar',
     collapseFormulaBar: 'Collapse formula bar',
     spreadsheet: 'Spreadsheet',
+    grid: 'Worksheet grid',
   },
   mountError: {
     title: 'Spreadsheet engine unavailable',

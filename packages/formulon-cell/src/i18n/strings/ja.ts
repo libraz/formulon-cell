@@ -1272,6 +1272,7 @@ export const ja: Strings = {
     expandFormulaBar: '数式バーを展開',
     collapseFormulaBar: '数式バーを折りたたむ',
     spreadsheet: 'スプレッドシート',
+    grid: 'ワークシート グリッド',
   },
   mountError: {
     title: 'スプレッドシート エンジンを利用できません',

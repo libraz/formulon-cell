@@ -3,7 +3,7 @@ import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { type SpreadsheetEmitter, selectionEquals } from '../events.js';
 import type { Strings } from '../i18n/strings.js';
-import type { SpreadsheetStore } from '../store/store.js';
+import type { SpreadsheetStore, State } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import { createHostButton } from './chrome-buttons.js';
 import {
@@ -22,6 +22,7 @@ interface AttachChromeSyncInput {
   getSheetTabs: () => SheetTabsController | null;
   getStrings: () => Strings;
   getWb: () => WorkbookHandle;
+  grid: HTMLElement;
   host: HTMLElement;
   invalidate: () => void;
   store: SpreadsheetStore;
@@ -40,6 +41,8 @@ const quoteSheetName = (name: string): string => {
 };
 
 const absoluteCellRef = (row: number, col: number): string => `$${colName(col)}$${row + 1}`;
+const MAX_A11Y_VIEWPORT_ROWS = 20;
+const MAX_A11Y_VIEWPORT_COLS = 10;
 
 const selectionFormula = (
   sheetName: string,
@@ -51,6 +54,40 @@ const selectionFormula = (
   return `=${quoteSheetName(sheetName)}!${ref}`;
 };
 
+const cellDisplayText = (
+  state: State,
+  wb: WorkbookHandle,
+  addr: { sheet: number; row: number; col: number },
+): string => {
+  const key = `${addr.sheet}:${addr.row}:${addr.col}`;
+  const cell = state.data.cells.get(key);
+  const fmt = state.format.formats.get(key);
+  const formula = cell?.formula ?? '';
+  if (formula && fmt?.formulaHidden === true && state.protection.protectedSheets.has(addr.sheet)) {
+    return '';
+  }
+  if (formula) return state.ui.r1c1 ? formatA1FormulaAsR1C1(formula, addr) : formula;
+  if (!cell) {
+    const lambda = wb.getLambdaText(addr);
+    return lambda ? `=${lambda}` : '';
+  }
+  const v = cell.value;
+  switch (v.kind) {
+    case 'number':
+      return String(v.value);
+    case 'bool':
+      return v.value ? 'TRUE' : 'FALSE';
+    case 'text':
+      return v.value;
+    case 'error':
+      return v.text;
+    default: {
+      const lambda = wb.getLambdaText(addr);
+      return lambda ? `=${lambda}` : '';
+    }
+  }
+};
+
 export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncController {
   const {
     a11y,
@@ -60,11 +97,24 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     getSheetTabs,
     getStrings,
     getWb,
+    grid,
     host,
     invalidate,
     store,
     tag,
   } = input;
+  const activeCellMirror = document.createElement('div');
+  activeCellMirror.id = `${a11y.id || 'fc-a11y'}-active-cell`;
+  activeCellMirror.setAttribute('role', 'gridcell');
+  activeCellMirror.setAttribute('aria-selected', 'true');
+  const viewportMirror = document.createElement('div');
+  viewportMirror.id = `${a11y.id || 'fc-a11y'}-viewport`;
+  viewportMirror.setAttribute('role', 'rowgroup');
+  a11y.replaceChildren(activeCellMirror, viewportMirror);
+  grid.setAttribute('aria-activedescendant', activeCellMirror.id);
+  grid.setAttribute('aria-rowcount', String(1_048_576));
+  grid.setAttribute('aria-colcount', String(16_384));
+  grid.setAttribute('aria-multiselectable', 'true');
 
   const updateChrome = (): void => {
     const wb = getWb();
@@ -73,39 +123,41 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     const a = s.selection.active;
     const ref = formatSelectionRef(s.selection.range, a, s.ui.r1c1 === true);
     if (document.activeElement !== tag) tag.value = ref;
-    const key = `${a.sheet}:${a.row}:${a.col}`;
-    const cell = s.data.cells.get(key);
-    const fmt = s.format.formats.get(key);
-    const formula = cell?.formula ?? '';
-    const hideFormula =
-      formula && fmt?.formulaHidden === true && s.protection.protectedSheets.has(a.sheet);
-    let display = '';
-    if (hideFormula) display = '';
-    else if (formula) display = s.ui.r1c1 ? formatA1FormulaAsR1C1(formula, a) : formula;
-    else if (cell) {
-      const v = cell.value;
-      switch (v.kind) {
-        case 'number':
-          display = String(v.value);
-          break;
-        case 'bool':
-          display = v.value ? 'TRUE' : 'FALSE';
-          break;
-        case 'text':
-          display = v.value;
-          break;
-        case 'error':
-          display = v.text;
-          break;
-        default: {
-          const lambda = wb.getLambdaText(a);
-          display = lambda ? `=${lambda}` : '';
-          break;
-        }
+    const display = cellDisplayText(s, wb, a);
+    if (!getFormulaEditing()) fxInput.value = display;
+    activeCellMirror.setAttribute('aria-rowindex', String(a.row + 1));
+    activeCellMirror.setAttribute('aria-colindex', String(a.col + 1));
+    activeCellMirror.setAttribute('aria-label', display ? `${ref} ${display}` : ref);
+    activeCellMirror.textContent = `${ref} ${display}`;
+    const ownedIds = [activeCellMirror.id];
+    const cells: HTMLElement[] = [];
+    const rowEnd = Math.min(
+      1_048_575,
+      s.viewport.rowStart + Math.max(1, Math.min(s.viewport.rowCount, MAX_A11Y_VIEWPORT_ROWS)) - 1,
+    );
+    const colEnd = Math.min(
+      16_383,
+      s.viewport.colStart + Math.max(1, Math.min(s.viewport.colCount, MAX_A11Y_VIEWPORT_COLS)) - 1,
+    );
+    for (let row = s.viewport.rowStart; row <= rowEnd; row += 1) {
+      for (let col = s.viewport.colStart; col <= colEnd; col += 1) {
+        if (row === a.row && col === a.col) continue;
+        const cellMirror = document.createElement('div');
+        const cellRef = `${colName(col)}${row + 1}`;
+        const cellDisplay = cellDisplayText(s, wb, { sheet: s.data.sheetIndex, row, col });
+        cellMirror.id = `${viewportMirror.id}-cell-${row}-${col}`;
+        cellMirror.setAttribute('role', 'gridcell');
+        cellMirror.setAttribute('aria-rowindex', String(row + 1));
+        cellMirror.setAttribute('aria-colindex', String(col + 1));
+        cellMirror.setAttribute('aria-selected', 'false');
+        cellMirror.setAttribute('aria-label', cellDisplay ? `${cellRef} ${cellDisplay}` : cellRef);
+        cellMirror.textContent = `${cellRef} ${cellDisplay}`;
+        ownedIds.push(cellMirror.id);
+        cells.push(cellMirror);
       }
     }
-    if (!getFormulaEditing()) fxInput.value = display;
-    a11y.textContent = `${ref} ${display}`;
+    viewportMirror.replaceChildren(...cells);
+    grid.setAttribute('aria-owns', ownedIds.join(' '));
   };
 
   let nameMenu: HTMLDivElement | null = null;

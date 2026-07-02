@@ -20,12 +20,14 @@ describe('mount/chrome-sync — name box and formula bar reflect store state', (
   let tag: HTMLInputElement;
   let fxInput: HTMLTextAreaElement;
   let a11y: HTMLDivElement;
+  let grid: HTMLDivElement;
 
   beforeEach(async () => {
     sheet = await mountStubSheet();
     tag = sheet.host.querySelector('.fc-host__formulabar-tag') as HTMLInputElement;
     fxInput = sheet.host.querySelector('.fc-host__formulabar-input') as HTMLTextAreaElement;
     a11y = sheet.host.querySelector('.fc-host__a11y') as HTMLDivElement;
+    grid = sheet.host.querySelector('.fc-host__grid') as HTMLDivElement;
   });
 
   afterEach(() => sheet.dispose());
@@ -33,13 +35,45 @@ describe('mount/chrome-sync — name box and formula bar reflect store state', (
   it('initial state is A1, empty formula, a11y echoing both', () => {
     expect(tag.value).toBe('A1');
     expect(fxInput.value).toBe('');
-    expect(a11y.textContent?.trim()).toBe('A1');
+    const activeCell = a11y.querySelector<HTMLElement>('[role="gridcell"]');
+    expect(activeCell?.textContent?.trim()).toBe('A1');
+    expect(grid.getAttribute('aria-activedescendant')).toBe(activeCell?.id);
+    expect(grid.getAttribute('aria-rowcount')).toBe('1048576');
+    expect(grid.getAttribute('aria-colcount')).toBe('16384');
+    expect(grid.getAttribute('aria-multiselectable')).toBe('true');
+    expect(activeCell?.getAttribute('aria-rowindex')).toBe('1');
+    expect(activeCell?.getAttribute('aria-colindex')).toBe('1');
+    expect(activeCell?.getAttribute('aria-selected')).toBe('true');
+    expect(activeCell?.getAttribute('aria-label')).toBe('A1');
+    expect(grid.getAttribute('aria-owns')?.split(' ')).toContain(activeCell?.id);
   });
 
   it('moving the active cell updates the name box', () => {
     mutators.setActive(sheet.instance.store, { sheet: 0, row: 2, col: 3 });
     expect(tag.value).toBe('D3');
     expect(a11y.textContent?.trim().startsWith('D3')).toBe(true);
+    const activeCell = a11y.querySelector<HTMLElement>('[role="gridcell"]');
+    expect(activeCell?.getAttribute('aria-rowindex')).toBe('3');
+    expect(activeCell?.getAttribute('aria-colindex')).toBe('4');
+  });
+
+  it('mirrors a bounded visible viewport for screen readers', () => {
+    sheet.workbook.setText({ sheet: 0, row: 1, col: 1 }, 'visible');
+    sheet.workbook.recalc();
+    mutators.replaceCells(sheet.instance.store, sheet.workbook.cells(0));
+    sheet.instance.store.setState((s) => ({
+      ...s,
+      viewport: { ...s.viewport, rowStart: 0, rowCount: 100, colStart: 0, colCount: 100 },
+    }));
+
+    const viewport = a11y.querySelector<HTMLElement>('[role="rowgroup"]');
+    const mirrors = viewport?.querySelectorAll<HTMLElement>('[role="gridcell"]');
+    expect(mirrors?.length).toBe(199);
+    const b2 = a11y.querySelector<HTMLElement>('[aria-label="B2 visible"]');
+    expect(b2?.getAttribute('aria-rowindex')).toBe('2');
+    expect(b2?.getAttribute('aria-colindex')).toBe('2');
+    expect(b2?.getAttribute('aria-selected')).toBe('false');
+    expect(grid.getAttribute('aria-owns')?.split(' ')).toContain(b2?.id);
   });
 
   it('a range selection formats as A1:B3', () => {

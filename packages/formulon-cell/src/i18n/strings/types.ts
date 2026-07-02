@@ -1334,6 +1334,7 @@ export interface Strings {
     expandFormulaBar: string;
     collapseFormulaBar: string;
     spreadsheet: string;
+    grid: string;
   };
   mountError: {
     title: string;
