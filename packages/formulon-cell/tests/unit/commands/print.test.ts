@@ -3,6 +3,7 @@ import {
   buildPrintDocument,
   computeFitToPagesScale,
   effectivePrintMargins,
+  orderPrintRegionsForPageOrder,
   parsePrintArea,
   parsePrintAreas,
   parsePrintTitleCols,
@@ -120,6 +121,32 @@ describe('parsePrintArea', () => {
   });
 });
 
+describe('orderPrintRegionsForPageOrder', () => {
+  const regions = [
+    { row0: 1, col0: 0, row1: 1, col1: 0 },
+    { row0: 0, col0: 1, row1: 0, col1: 1 },
+    { row0: 0, col0: 0, row1: 0, col1: 0 },
+  ];
+
+  it('orders areas down each column before moving over by default', () => {
+    expect(orderPrintRegionsForPageOrder(regions).map((r) => [r.row0, r.col0])).toEqual([
+      [0, 0],
+      [1, 0],
+      [0, 1],
+    ]);
+  });
+
+  it('orders areas across each row before moving down when requested', () => {
+    expect(
+      orderPrintRegionsForPageOrder(regions, 'overThenDown').map((r) => [r.row0, r.col0]),
+    ).toEqual([
+      [0, 0],
+      [0, 1],
+      [1, 0],
+    ]);
+  });
+});
+
 describe('computeFitToPagesScale', () => {
   const layout = {
     colWidths: new Map<number, number>(),
@@ -164,6 +191,22 @@ describe('computeFitToPagesScale', () => {
     // 8.27 - 3 = 5.27in. 5.27 / 6.667 floors to 0.79.
     const regions = [{ row0: 0, col0: 0, row1: 0, col1: 9 }];
     expect(computeFitToPagesScale(setup, regions, layout, emptyRows, emptyCols)).toBe(0.79);
+  });
+
+  it('includes print-title columns when deriving fit-to-pages scale', () => {
+    const setup = {
+      ...defaultPageSetup(),
+      paperSize: 'A4' as const,
+      orientation: 'portrait' as const,
+      margins: { top: 1, right: 1, bottom: 1, left: 1 },
+      fitWidth: 1,
+      fitHeight: 0,
+      printTitleCols: 'A:B',
+    };
+    const wideLayout = { ...layout, defaultColWidth: 200 };
+    const regions = [{ row0: 0, col0: 4, row1: 0, col1: 5 }];
+
+    expect(computeFitToPagesScale(setup, regions, wideLayout, emptyRows, emptyCols)).toBe(0.75);
   });
 
   it('never scales content up to fill the page (caps at 100%)', () => {
@@ -440,6 +483,28 @@ describe('buildPrintDocument', () => {
     wb.dispose();
   });
 
+  it('orders multiple print areas according to pageOrder', async () => {
+    const wb = await newWb();
+    const store = createSpreadsheetStore();
+    setNumber(store, wb, 0, 0, 11);
+    setNumber(store, wb, 0, 1, 12);
+    setNumber(store, wb, 1, 0, 21);
+    mutators.setPageSetup(store, 0, {
+      printArea: 'A2:A2,B1:B1,A1:A1',
+      pageOrder: 'downThenOver',
+    });
+
+    const downThenOver = buildPrintDocument(wb, store, 0).html;
+    expect(downThenOver.indexOf('>11<')).toBeLessThan(downThenOver.indexOf('>21<'));
+    expect(downThenOver.indexOf('>21<')).toBeLessThan(downThenOver.indexOf('>12<'));
+
+    mutators.setPageSetup(store, 0, { pageOrder: 'overThenDown' });
+    const overThenDown = buildPrintDocument(wb, store, 0).html;
+    expect(overThenDown.indexOf('>11<')).toBeLessThan(overThenDown.indexOf('>12<'));
+    expect(overThenDown.indexOf('>12<')).toBeLessThan(overThenDown.indexOf('>21<'));
+    wb.dispose();
+  });
+
   it('prints comments as displayed or at the end of the sheet', async () => {
     const wb = await newWb();
     const store = createSpreadsheetStore();
@@ -478,6 +543,23 @@ describe('buildPrintDocument', () => {
     wb.dispose();
   });
 
+  it('prints comments on blank cells', async () => {
+    const wb = await newWb();
+    const store = createSpreadsheetStore();
+    mutators.setCellFormat(store, { sheet: 0, row: 3, col: 2 }, { comment: 'Blank cell note' });
+
+    mutators.setPageSetup(store, 0, { comments: 'asDisplayed' });
+    const displayed = buildPrintDocument(wb, store, 0).html;
+    expect(displayed).toContain('Blank cell note');
+    expect(displayed).toContain('<div class="fc-print__comment-note">');
+
+    mutators.setPageSetup(store, 0, { comments: 'endOfSheet' });
+    const endOfSheet = buildPrintDocument(wb, store, 0).html;
+    expect(endOfSheet).toContain('<th>C4</th>');
+    expect(endOfSheet).toContain('Blank cell note');
+    wb.dispose();
+  });
+
   it('repeats print-title rows inside <thead>', async () => {
     const wb = await newWb();
     const store = createSpreadsheetStore();
@@ -498,6 +580,98 @@ describe('buildPrintDocument', () => {
     const body = doc.html.slice(tbodyIdx);
     expect(body).not.toContain('Title');
     expect(body).toContain('100');
+    wb.dispose();
+  });
+
+  it('prepends print-title columns to each print area without duplicating overlap', async () => {
+    const wb = await newWb();
+    const store = createSpreadsheetStore();
+    setText(store, wb, 0, 0, 'Title A');
+    setText(store, wb, 0, 1, 'Title B');
+    setText(store, wb, 0, 2, 'Body C');
+    setText(store, wb, 0, 3, 'Body D');
+    mutators.setPageSetup(store, 0, {
+      printArea: 'C1:D1',
+      printTitleCols: 'A:B',
+    });
+
+    const doc = buildPrintDocument(wb, store, 0);
+
+    expect(doc.html).toContain(
+      '<col class="fc-print__title-col"><col class="fc-print__title-col"><col><col>',
+    );
+    expect(doc.html).toMatch(
+      /<tbody><tr><td class="fc-print__title-col-cell">Title A<\/td><td class="fc-print__title-col-cell">Title B<\/td><td>Body C<\/td><td>Body D<\/td><\/tr><\/tbody>/,
+    );
+
+    mutators.setPageSetup(store, 0, {
+      printArea: 'A1:C1',
+      printTitleCols: 'A:B',
+    });
+    const overlapping = buildPrintDocument(wb, store, 0);
+    const body = overlapping.html.slice(overlapping.html.indexOf('<tbody>'));
+    expect((body.match(/Title A/g) ?? []).length).toBe(1);
+    expect((body.match(/Title B/g) ?? []).length).toBe(1);
+    expect(body).toMatch(
+      /<tbody><tr><td class="fc-print__title-col-cell">Title A<\/td><td class="fc-print__title-col-cell">Title B<\/td><td>Body C<\/td><\/tr><\/tbody>/,
+    );
+    wb.dispose();
+  });
+
+  it('splits wide print areas into horizontal pages and repeats title columns', async () => {
+    const wb = await newWb();
+    const store = createSpreadsheetStore();
+    setText(store, wb, 0, 0, 'Title A');
+    setText(store, wb, 0, 1, 'Body B');
+    setText(store, wb, 0, 2, 'Body C');
+    setText(store, wb, 0, 3, 'Body D');
+    mutators.setColWidth(store, 0, 100);
+    mutators.setColWidth(store, 1, 300);
+    mutators.setColWidth(store, 2, 300);
+    mutators.setColWidth(store, 3, 300);
+    mutators.setPageSetup(store, 0, {
+      printArea: 'B1:D1',
+      printTitleCols: 'A:A',
+      fitWidth: 0,
+      fitHeight: 0,
+    });
+
+    const doc = buildPrintDocument(wb, store, 0);
+    const sections = doc.html.match(/<section class="fc-print__area/g) ?? [];
+
+    expect(sections.length).toBe(3);
+    expect((doc.html.match(/Title A/g) ?? []).length).toBe(3);
+    expect(doc.html.indexOf('Body B')).toBeLessThan(doc.html.indexOf('Body C'));
+    expect(doc.html.indexOf('Body C')).toBeLessThan(doc.html.indexOf('Body D'));
+    wb.dispose();
+  });
+
+  it('splits tall print areas into vertical pages and repeats title rows', async () => {
+    const wb = await newWb();
+    const store = createSpreadsheetStore();
+    setText(store, wb, 0, 0, 'Title row');
+    setText(store, wb, 1, 0, 'Body 1');
+    setText(store, wb, 2, 0, 'Body 2');
+    setText(store, wb, 3, 0, 'Body 3');
+    mutators.setRowHeight(store, 0, 100);
+    mutators.setRowHeight(store, 1, 500);
+    mutators.setRowHeight(store, 2, 500);
+    mutators.setRowHeight(store, 3, 500);
+    mutators.setPageSetup(store, 0, {
+      printArea: 'A2:A4',
+      printTitleRows: '1:1',
+      margins: { top: 3.8, right: 1, bottom: 3.8, left: 1 },
+      fitWidth: 0,
+      fitHeight: 0,
+    });
+
+    const doc = buildPrintDocument(wb, store, 0);
+    const sections = doc.html.match(/<section class="fc-print__area/g) ?? [];
+
+    expect(sections.length).toBe(3);
+    expect((doc.html.match(/Title row/g) ?? []).length).toBe(3);
+    expect(doc.html.indexOf('Body 1')).toBeLessThan(doc.html.indexOf('Body 2'));
+    expect(doc.html.indexOf('Body 2')).toBeLessThan(doc.html.indexOf('Body 3'));
     wb.dispose();
   });
 

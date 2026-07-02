@@ -144,6 +144,37 @@ export function parsePrintAreas(raw?: string): PrintAreaBounds[] | null {
   return areas as PrintAreaBounds[];
 }
 
+export function orderPrintRegionsForPageOrder(
+  regions: readonly PrintAreaBounds[],
+  pageOrder: PageSetup['pageOrder'] = 'downThenOver',
+): PrintAreaBounds[] {
+  const ordered = [...regions];
+  ordered.sort((a, b) =>
+    pageOrder === 'overThenDown'
+      ? a.row0 - b.row0 || a.col0 - b.col0 || a.row1 - b.row1 || a.col1 - b.col1
+      : a.col0 - b.col0 || a.row0 - b.row0 || a.col1 - b.col1 || a.row1 - b.row1,
+  );
+  return ordered;
+}
+
+function printColumnsForRegion(
+  region: PrintAreaBounds,
+  titleColRange: [number, number] | null,
+): number[] {
+  const cols: number[] = [];
+  const seen = new Set<number>();
+  const add = (col: number): void => {
+    if (seen.has(col)) return;
+    seen.add(col);
+    cols.push(col);
+  };
+  if (titleColRange) {
+    for (let c = titleColRange[0]; c <= titleColRange[1]; c += 1) add(c);
+  }
+  for (let c = region.col0; c <= region.col1; c += 1) add(c);
+  return cols;
+}
+
 const escapeHtml = (s: string): string =>
   s
     .replace(/&/g, '&amp;')
@@ -458,12 +489,13 @@ function printContentInches(
   layout: PrintLayoutMetrics,
   hiddenRows: ReadonlySet<number>,
   hiddenCols: ReadonlySet<number>,
+  titleColRange: [number, number] | null = null,
 ): { width: number; height: number } {
   let width = 0;
   let height = 0;
   for (const region of regions) {
     let regionW = 0;
-    for (let c = region.col0; c <= region.col1; c += 1) {
+    for (const c of printColumnsForRegion(region, titleColRange)) {
       if (hiddenCols.has(c)) continue;
       regionW += layout.colWidths.get(c) ?? layout.defaultColWidth;
     }
@@ -476,6 +508,110 @@ function printContentInches(
     height += regionH;
   }
   return { width: width / PRINT_PX_PER_INCH, height: height / PRINT_PX_PER_INCH };
+}
+
+function printablePagePixels(setup: PageSetup, scale: number): { width: number; height: number } {
+  const portrait = PAPER_INCHES[setup.paperSize] ?? { w: 8.27, h: 11.69 };
+  const page =
+    setup.orientation === 'landscape'
+      ? { w: portrait.h, h: portrait.w }
+      : { w: portrait.w, h: portrait.h };
+  const m = effectivePrintMargins(setup);
+  const factor = Math.max(scale, 0.1);
+  return {
+    width: (Math.max(0.1, page.w - m.left - m.right) * PRINT_PX_PER_INCH) / factor,
+    height: (Math.max(0.1, page.h - m.top - m.bottom) * PRINT_PX_PER_INCH) / factor,
+  };
+}
+
+function measuredColumnWidth(
+  col: number,
+  layout: PrintLayoutMetrics,
+  hiddenCols: ReadonlySet<number>,
+): number {
+  return hiddenCols.has(col) ? 0 : (layout.colWidths.get(col) ?? layout.defaultColWidth);
+}
+
+function measuredRowHeight(
+  row: number,
+  layout: PrintLayoutMetrics,
+  hiddenRows: ReadonlySet<number>,
+): number {
+  return hiddenRows.has(row) ? 0 : (layout.rowHeights.get(row) ?? layout.defaultRowHeight);
+}
+
+function splitPrintRegionIntoTiles(
+  region: PrintAreaBounds,
+  setup: PageSetup,
+  layout: PrintLayoutMetrics,
+  hiddenRows: ReadonlySet<number>,
+  hiddenCols: ReadonlySet<number>,
+  titleRowRange: [number, number] | null,
+  titleColRange: [number, number] | null,
+  scale: number,
+): PrintAreaBounds[] {
+  const page = printablePagePixels(setup, scale);
+  const titleWidth = titleColRange
+    ? printColumnsForRegion(
+        { row0: region.row0, row1: region.row0, col0: region.col0, col1: region.col0 - 1 },
+        titleColRange,
+      ).reduce((sum, col) => sum + measuredColumnWidth(col, layout, hiddenCols), 0)
+    : 0;
+  const titleHeight = titleRowRange
+    ? Array.from(
+        { length: titleRowRange[1] - titleRowRange[0] + 1 },
+        (_, i) => titleRowRange[0] + i,
+      )
+        .filter((row) => row < region.row0 || row > region.row1)
+        .reduce((sum, row) => sum + measuredRowHeight(row, layout, hiddenRows), 0)
+    : 0;
+  const colBudget = Math.max(layout.defaultColWidth, page.width - titleWidth);
+  const rowBudget = Math.max(layout.defaultRowHeight, page.height - titleHeight);
+
+  const colChunks: [number, number][] = [];
+  let c = region.col0;
+  while (c <= region.col1) {
+    const start = c;
+    let end = c;
+    let width = 0;
+    while (end <= region.col1) {
+      const next = measuredColumnWidth(end, layout, hiddenCols);
+      if (end > start && width + next > colBudget) break;
+      width += next;
+      end += 1;
+    }
+    colChunks.push([start, Math.max(start, end - 1)]);
+    c = Math.max(start + 1, end);
+  }
+
+  const rowChunks: [number, number][] = [];
+  let r = region.row0;
+  while (r <= region.row1) {
+    const start = r;
+    let end = r;
+    let height = 0;
+    while (end <= region.row1) {
+      const inTitle = titleRowRange && end >= titleRowRange[0] && end <= titleRowRange[1];
+      const next = inTitle ? 0 : measuredRowHeight(end, layout, hiddenRows);
+      if (end > start && height + next > rowBudget) break;
+      height += next;
+      end += 1;
+    }
+    rowChunks.push([start, Math.max(start, end - 1)]);
+    r = Math.max(start + 1, end);
+  }
+
+  const tiles: PrintAreaBounds[] = [];
+  if (setup.pageOrder === 'overThenDown') {
+    for (const [row0, row1] of rowChunks) {
+      for (const [col0, col1] of colChunks) tiles.push({ row0, row1, col0, col1 });
+    }
+  } else {
+    for (const [col0, col1] of colChunks) {
+      for (const [row0, row1] of rowChunks) tiles.push({ row0, row1, col0, col1 });
+    }
+  }
+  return tiles;
 }
 
 /**
@@ -505,7 +641,13 @@ export function computeFitToPagesScale(
   const m = effectivePrintMargins(setup);
   const printableW = Math.max(0.1, page.w - m.left - m.right);
   const printableH = Math.max(0.1, page.h - m.top - m.bottom);
-  const content = printContentInches(regions, layout, hiddenRows, hiddenCols);
+  const content = printContentInches(
+    regions,
+    layout,
+    hiddenRows,
+    hiddenCols,
+    parsePrintTitleCols(setup.printTitleCols),
+  );
 
   const candidates: number[] = [];
   if (fitWidth > 0 && content.width > 0) candidates.push((fitWidth * printableW) / content.width);
@@ -614,22 +756,27 @@ export function buildPrintDocument(
   const manualRowBreaks = new Set(setup.manualPageBreakRows ?? []);
   const manualColBreaks = new Set(setup.manualPageBreakCols ?? []);
   const printAreas = parsePrintAreas(setup.printArea);
-  const printRegions: PrintAreaBounds[] = (
-    printAreas ?? [{ row0: 0, col0: 0, row1: maxRow, col1: maxCol }]
-  ).map((area) => {
-    const row1 = Math.min(maxRow, area.row1);
-    const col1 = Math.min(maxCol, area.col1);
-    return {
-      row0: area.row0,
-      col0: area.col0,
-      row1: row1 < area.row0 ? area.row0 : row1,
-      col1: col1 < area.col0 ? area.col0 : col1,
-    };
-  });
+  const printRegions: PrintAreaBounds[] = orderPrintRegionsForPageOrder(
+    (printAreas ?? [{ row0: 0, col0: 0, row1: maxRow, col1: maxCol }]).map((area) => {
+      const row1 = Math.min(maxRow, area.row1);
+      const col1 = Math.min(maxCol, area.col1);
+      return {
+        row0: area.row0,
+        col0: area.col0,
+        row1: row1 < area.row0 ? area.row0 : row1,
+        col1: col1 < area.col0 ? area.col0 : col1,
+      };
+    }),
+    setup.pageOrder,
+  );
   const cellInPrintRegions = (row: number, col: number): boolean =>
     printRegions.some(
       (area) => row >= area.row0 && row <= area.row1 && col >= area.col0 && col <= area.col1,
     );
+  const columnsForRegion = (region: PrintAreaBounds): number[] =>
+    printColumnsForRegion(region, titleColRange);
+  const isTitleCol = (col: number): boolean =>
+    titleColRange !== null && col >= titleColRange[0] && col <= titleColRange[1];
 
   const commentEntries: PrintCommentSnap[] =
     setup.comments === 'none'
@@ -709,7 +856,11 @@ export function buildPrintDocument(
     const commentHtml = comment
       ? `<div class="fc-print__comment-note">${escapeHtml(comment.text)}</div>`
       : '';
-    const classAttr = manualColBreaks.has(col) ? ' class="fc-print__manual-break-col"' : '';
+    const classes = [
+      manualColBreaks.has(col) ? 'fc-print__manual-break-col' : '',
+      isTitleCol(col) ? 'fc-print__title-col-cell' : '',
+    ].filter(Boolean);
+    const classAttr = classes.length ? ` class="${classes.join(' ')}"` : '';
     return `<${tag}${classAttr}${rowspanAttr}${colspanAttr}${styleAttr}>${escapeHtml(text)}${commentHtml}</${tag}>`;
   };
 
@@ -724,9 +875,11 @@ export function buildPrintDocument(
     if (setup.showHeadings) {
       cells.push(`<th class="fc-print__rowhead">${row + 1}</th>`);
     }
-    for (let c = region.col0; c <= region.col1; c += 1) {
+    const cols = columnsForRegion(region);
+    const regionMaxCol = Math.max(...cols, region.col1);
+    for (const c of cols) {
       if (hiddenCols.has(c)) continue;
-      cells.push(renderCell(row, c, isTitle ? 'th' : 'td', region.col1, renderedSkipKeys));
+      cells.push(renderCell(row, c, isTitle ? 'th' : 'td', regionMaxCol, renderedSkipKeys));
     }
     const cls = manualRowBreaks.has(row) && !isTitle ? ' class="fc-print__manual-break-row"' : '';
     return `<tr${cls}>${cells.join('')}</tr>`;
@@ -737,7 +890,7 @@ export function buildPrintDocument(
   const headingRow = (region: PrintAreaBounds): string => {
     if (!setup.showHeadings) return '';
     const cells: string[] = [`<th class="fc-print__corner"></th>`];
-    for (let c = region.col0; c <= region.col1; c += 1) {
+    for (const c of columnsForRegion(region)) {
       if (hiddenCols.has(c)) continue;
       const cls = manualColBreaks.has(c)
         ? 'fc-print__colhead fc-print__manual-break-col'
@@ -776,10 +929,9 @@ export function buildPrintDocument(
       if (!titleColRange) return '';
       const cols: string[] = [];
       if (setup.showHeadings) cols.push('<col>');
-      for (let c = region.col0; c <= region.col1; c += 1) {
+      for (const c of columnsForRegion(region)) {
         if (hiddenCols.has(c)) continue;
-        const isTitle = c >= titleColRange[0] && c <= titleColRange[1];
-        cols.push(isTitle ? '<col class="fc-print__title-col">' : '<col>');
+        cols.push(isTitleCol(c) ? '<col class="fc-print__title-col">' : '<col>');
       }
       return `<colgroup>${cols.join('')}</colgroup>`;
     })();
@@ -819,7 +971,20 @@ export function buildPrintDocument(
   const tableTransform =
     scale === 1 ? '' : ` style="transform:scale(${scale});transform-origin:top left;"`;
 
-  const tablesHtml = printRegions
+  const paginatedRegions = printRegions.flatMap((region) =>
+    splitPrintRegionIntoTiles(
+      region,
+      setup,
+      state.layout,
+      hiddenRows,
+      hiddenCols,
+      titleRowRange,
+      titleColRange,
+      scale,
+    ),
+  );
+
+  const tablesHtml = paginatedRegions
     .map((region, index) => renderTableSection(region, index))
     .join('');
 
@@ -867,6 +1032,7 @@ export function buildPrintDocument(
     'table.fc-print__table { border-collapse: collapse; width: 100%; table-layout: auto; }',
     'table.fc-print__table td, table.fc-print__table th { padding: 2px 6px; vertical-align: bottom; box-sizing: border-box; }',
     'table.fc-print__table thead th { background: #f5f5f5; }',
+    'table.fc-print__table .fc-print__title-col-cell { background: #f8f8f8; }',
     '.fc-print__rowhead, .fc-print__colhead, .fc-print__corner { background: #f0f0f0; color: #555; font-weight: 500; text-align: center; min-width: 24px; }',
     '.fc-print__header, .fc-print__footer { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 4px 0; font-size: 9pt; color: #555; }',
     '.fc-print__header, .fc-print__footer { transform: scale(var(--fc-print-header-footer-scale, 1)); transform-origin: top left; }',
