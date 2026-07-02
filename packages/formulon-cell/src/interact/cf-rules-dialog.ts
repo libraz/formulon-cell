@@ -379,6 +379,28 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
     requestAnimationFrame(() => focusRuleRow(selectedRuleIndex));
   };
 
+  const setManagedRuleStopIfTrue = (
+    managedRule: ManagedRule,
+    visualIndex: number,
+    stopIfTrue: boolean,
+  ): void => {
+    if (managedRule.source !== 'session' || !deps.store) return;
+    const store = deps.store;
+    recordConditionalRulesChange(deps.history ?? null, store, () => {
+      store.setState((state) => {
+        const source = state.conditional.rules[managedRule.index];
+        if (!source) return state;
+        const nextRules = [...state.conditional.rules];
+        nextRules[managedRule.index] = { ...source, stopIfTrue };
+        return { ...state, conditional: { rules: nextRules } };
+      });
+    });
+    onChanged?.();
+    selectedRuleIndex = visualIndex;
+    renderTable();
+    requestAnimationFrame(() => focusRuleRow(selectedRuleIndex));
+  };
+
   const focusRuleRow = (idx: number): void => {
     const rows = Array.from(tableWrap.querySelectorAll<HTMLTableRowElement>('tbody tr'));
     if (rows.length === 0) {
@@ -452,6 +474,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       .filter(
         ({ rule }) =>
           rule.range.sheet === sheet &&
+          !rule.engineId &&
           (!scopeSelection ||
             rangesIntersect(scopeSelection, {
               firstRow: rule.range.r0,
@@ -484,7 +507,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
             lastCol: rule.range.c1,
           },
         ]),
-        stopIfTrue: false,
+        stopIfTrue: rule.stopIfTrue === true,
       })),
     ];
     currentRules = rules;
@@ -544,7 +567,14 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       const stopCheckbox = document.createElement('input');
       stopCheckbox.type = 'checkbox';
       stopCheckbox.checked = managedRule.stopIfTrue;
-      setDisabledState(stopCheckbox, true, t.stopIfTrueUnavailable);
+      setDisabledState(
+        stopCheckbox,
+        managedRule.source !== 'session' || !deps.store,
+        managedRule.source === 'engine' ? t.stopIfTrueUnavailable : !deps.store ? t.note : null,
+      );
+      stopCheckbox.addEventListener('change', () => {
+        setManagedRuleStopIfTrue(managedRule, index, stopCheckbox.checked);
+      });
       stop.setAttribute('aria-label', t.headerStopIfTrue);
       stop.appendChild(stopCheckbox);
       const actions = document.createElement('td');

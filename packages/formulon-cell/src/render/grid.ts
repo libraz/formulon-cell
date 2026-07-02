@@ -595,7 +595,9 @@ export class GridRenderer {
           }
           ctx.globalAlpha = 0.45;
           const w = bounds.w * overlay.bar;
-          ctx.fillRect(bounds.x, bounds.y + 1, w, bounds.h - 2);
+          const axisX = bounds.x + bounds.w * (overlay.barAxis ?? 0);
+          const x = overlay.barDirection === 'left' ? axisX - w : axisX;
+          ctx.fillRect(x, bounds.y + 1, w, bounds.h - 2);
           ctx.restore();
         }
         const hideConditionalValue =

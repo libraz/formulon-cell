@@ -38,6 +38,86 @@ const sqrefOf = (rule: ConditionalRule): ConditionalFormatInput['sqref'] => [
   },
 ];
 
+const conditionalFormatKey = (sheet: number, input: ConditionalFormatInput): string =>
+  JSON.stringify([sheet, input]);
+
+type ConditionalFormatEntry = ReturnType<WorkbookHandle['getConditionalFormats']>[number];
+
+export interface SyncedConditionalRule {
+  readonly sheet: number;
+  index: number;
+  readonly id?: string;
+  readonly input: ConditionalFormatInput;
+}
+
+export type SyncedConditionalRuleMap = Map<string, SyncedConditionalRule>;
+
+function sameSqref(
+  a: ConditionalFormatInput['sqref'],
+  b: ConditionalFormatEntry['sqref'],
+): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((left, i) => {
+    const right = b[i];
+    return (
+      right !== undefined &&
+      left.firstRow === right.firstRow &&
+      left.firstCol === right.firstCol &&
+      left.lastRow === right.lastRow &&
+      left.lastCol === right.lastCol
+    );
+  });
+}
+
+function entryMatchesInput(
+  entry: ConditionalFormatEntry | undefined,
+  input: ConditionalFormatInput,
+): boolean {
+  if (!entry) return false;
+  return (
+    entry.type === input.type &&
+    sameSqref(input.sqref, entry.sqref) &&
+    entry.formula1 === input.formula1 &&
+    entry.formula2 === input.formula2 &&
+    entry.op === input.op &&
+    entry.rank === input.rank &&
+    entry.percent === input.percent &&
+    entry.bottom === input.bottom &&
+    entry.aboveAverage === input.aboveAverage &&
+    entry.equalAverage === input.equalAverage &&
+    entry.stdDev === input.stdDev &&
+    entry.text === input.text &&
+    entry.timePeriod === input.timePeriod
+  );
+}
+
+function trackedEntryIndex(
+  currentFormats: readonly ConditionalFormatEntry[],
+  tracked: SyncedConditionalRule,
+): number {
+  const indexed = currentFormats[tracked.index];
+  if (tracked.id && indexed?.id === tracked.id && entryMatchesInput(indexed, tracked.input)) {
+    return tracked.index;
+  }
+  if (tracked.id) {
+    const byId = currentFormats.findIndex(
+      (entry) => entry.id === tracked.id && entryMatchesInput(entry, tracked.input),
+    );
+    if (byId >= 0) return byId;
+  }
+  return entryMatchesInput(indexed, tracked.input) ? tracked.index : -1;
+}
+
+function decrementTrackedIndexesAfterRemoval(
+  tracked: SyncedConditionalRuleMap,
+  sheet: number,
+  removedIndex: number,
+): void {
+  for (const value of tracked.values()) {
+    if (value.sheet === sheet && value.index > removedIndex) value.index -= 1;
+  }
+}
+
 /**
  * Translate a store conditional-format rule into the engine's
  * `addConditionalFormat` input so its predicate and range round-trip through
@@ -78,6 +158,7 @@ export function conditionalRuleToEngineInput(rule: ConditionalRule): Conditional
       return { sqref, type: RULE_TYPE.expression, formula1: rule.formula.slice(1) };
     }
     case 'text-contains':
+      if (rule.mode && rule.mode !== 'contains') return null;
       return { sqref, type: RULE_TYPE.containsText, text: rule.text };
     case 'duplicates':
       return { sqref, type: RULE_TYPE.duplicateValues };
@@ -103,8 +184,12 @@ export function conditionalRuleToEngineInput(rule: ConditionalRule): Conditional
       return {
         sqref,
         type: RULE_TYPE.aboveAverage,
-        aboveAverage: rule.mode === 'above' || rule.mode === 'equal-or-above',
+        aboveAverage:
+          rule.mode === 'above' || rule.mode === 'equal-or-above' || rule.mode === 'above-std-dev',
         equalAverage: rule.mode === 'equal-or-above' || rule.mode === 'equal-or-below',
+        ...(rule.mode === 'above-std-dev' || rule.mode === 'below-std-dev'
+          ? { stdDev: rule.stdDev ?? 1 }
+          : {}),
       };
     default:
       // color-scale / data-bar / icon-set / date-occurring
@@ -127,19 +212,102 @@ export function syncConditionalRulesToEngine(
   wb: WorkbookHandle,
   rules: readonly ConditionalRule[],
   sheet: number,
+  opts: { seenKeys?: Set<string> } = {},
 ): { written: number; skipped: number } {
   if (!wb.capabilities.conditionalFormatMutate) return { written: 0, skipped: 0 };
   let written = 0;
   let skipped = 0;
   for (const rule of rules) {
     if (rule.range.sheet !== sheet) continue;
+    if (rule.engineId) continue;
     const input = conditionalRuleToEngineInput(rule);
     if (!input) {
       skipped += 1;
       continue;
     }
+    const key = conditionalFormatKey(sheet, input);
+    if (opts.seenKeys?.has(key)) continue;
     if (wb.addConditionalFormat(sheet, input)) written += 1;
-    else skipped += 1;
+    else {
+      skipped += 1;
+      continue;
+    }
+    opts.seenKeys?.add(key);
   }
   return { written, skipped };
+}
+
+/**
+ * Reconcile the engine with the session-created, engine-representable subset
+ * of store CF rules. Unlike {@link syncConditionalRulesToEngine}, this removes
+ * only rules whose engine index was tracked after this mount added them; it
+ * never clears imported/untracked CF blocks.
+ */
+export function syncTrackedConditionalRulesToEngine(
+  wb: WorkbookHandle,
+  rules: readonly ConditionalRule[],
+  sheet: number,
+  opts: { tracked: SyncedConditionalRuleMap },
+): { written: number; skipped: number; removed: number } {
+  if (!wb.capabilities.conditionalFormatMutate) return { written: 0, skipped: 0, removed: 0 };
+
+  let written = 0;
+  let skipped = 0;
+  let removed = 0;
+  const desired = new Map<string, ConditionalFormatInput>();
+
+  for (const rule of rules) {
+    if (rule.range.sheet !== sheet) continue;
+    if (rule.engineId) continue;
+    const input = conditionalRuleToEngineInput(rule);
+    if (!input) {
+      skipped += 1;
+      continue;
+    }
+    desired.set(conditionalFormatKey(sheet, input), input);
+  }
+
+  const stale = [...opts.tracked.entries()]
+    .filter(([key, value]) => value.sheet === sheet && !desired.has(key))
+    .sort((a, b) => b[1].index - a[1].index);
+
+  let currentFormats = stale.length > 0 ? wb.getConditionalFormats(sheet) : [];
+  for (const [key, value] of stale) {
+    const removeIndex = trackedEntryIndex(currentFormats, value);
+    if (removeIndex < 0) {
+      skipped += 1;
+      opts.tracked.delete(key);
+      continue;
+    }
+    if (wb.removeConditionalFormatAt(sheet, removeIndex)) {
+      removed += 1;
+      opts.tracked.delete(key);
+      decrementTrackedIndexesAfterRemoval(opts.tracked, sheet, removeIndex);
+      currentFormats = currentFormats.filter((_, index) => index !== removeIndex);
+    } else {
+      skipped += 1;
+    }
+  }
+
+  for (const [key, input] of desired) {
+    if (opts.tracked.has(key)) continue;
+    const beforeCount = wb.getConditionalFormats(sheet).length;
+    if (!wb.addConditionalFormat(sheet, input)) {
+      skipped += 1;
+      continue;
+    }
+    const afterFormats = wb.getConditionalFormats(sheet);
+    const afterCount = afterFormats.length;
+    const index = Math.max(beforeCount, afterCount - 1);
+    const id = afterFormats[index]?.id;
+    written += 1;
+    opts.tracked.set(key, {
+      sheet,
+      index,
+      ...(id ? { id } : {}),
+      input,
+    });
+  }
+
+  return { written, skipped, removed };
 }

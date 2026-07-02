@@ -224,6 +224,7 @@ interface HostFeatureControllerInput {
   refreshPrinterProfiles: () => Promise<readonly PrinterProfile[] | undefined>;
   getUploadStatus: StatusBarDeps['getUploadStatus'];
   getMacroRecording: StatusBarDeps['getMacroRecording'];
+  onConditionalRulesChanged?: () => void;
   getSheetTabs: () => SheetTabsController | null;
   grid: HTMLElement;
   history: History;
@@ -353,6 +354,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           store: input.store,
           history: input.history,
           strings,
+          onChanged: input.onConditionalRulesChanged,
         });
         input.featureRegistry.set(
           'conditional',

@@ -32,6 +32,7 @@ export interface ConditionalDialogDeps {
   store: SpreadsheetStore;
   history?: History | null;
   strings?: Strings;
+  onChanged?: () => void;
 }
 
 export interface ConditionalDialogOpenOptions {
@@ -192,8 +193,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   const valueALabel = document.createElement('span');
   valueALabel.textContent = t.valueA;
   const valueAInput = document.createElement('input');
-  valueAInput.type = 'number';
-  valueAInput.step = 'any';
+  valueAInput.type = 'text';
   valueAInput.value = '0';
   valueARow.append(valueALabel, valueAInput);
   cellValueGroup.appendChild(valueARow);
@@ -203,8 +203,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   const valueBLabel = document.createElement('span');
   valueBLabel.textContent = t.valueB;
   const valueBInput = document.createElement('input');
-  valueBInput.type = 'number';
-  valueBInput.step = 'any';
+  valueBInput.type = 'text';
   valueBInput.value = '0';
   valueBRow.append(valueBLabel, valueBInput);
   cellValueGroup.appendChild(valueBRow);
@@ -481,6 +480,8 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     { id: 'below', label: t.averageBelow },
     { id: 'equal-or-above', label: t.averageEqualOrAbove },
     { id: 'equal-or-below', label: t.averageEqualOrBelow },
+    { id: 'above-std-dev', label: t.averageAboveStdDev },
+    { id: 'below-std-dev', label: t.averageBelowStdDev },
   ];
   const averageModeSelect = makeSelect(
     averageModeOptions.map((o) => ({ value: o.id, label: o.label })),
@@ -489,6 +490,17 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   averageGroup.appendChild(averageModeRow);
   const averageModeLabelFor = (id: AverageMode): string =>
     averageModeOptions.find((option) => option.id === id)?.label ?? id;
+  const averageStdDevRow = document.createElement('label');
+  averageStdDevRow.className = 'fc-fmtdlg__row';
+  const averageStdDevLabel = document.createElement('span');
+  averageStdDevLabel.textContent = t.averageStdDevTier;
+  const averageStdDevSelect = makeSelect([
+    { value: '1', label: '1' },
+    { value: '2', label: '2' },
+    { value: '3', label: '3' },
+  ]);
+  averageStdDevRow.append(averageStdDevLabel, averageStdDevSelect);
+  averageGroup.appendChild(averageStdDevRow);
 
   // ── Formula subform ────────────────────────────────────────────────────
   const formulaGroup = document.createElement('div');
@@ -511,6 +523,19 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   const textContainsGroup = document.createElement('div');
   textContainsGroup.className = 'fc-conddlg__sub';
   form.appendChild(textContainsGroup);
+
+  const textContainsModeRow = document.createElement('label');
+  textContainsModeRow.className = 'fc-fmtdlg__row';
+  const textContainsModeLabel = document.createElement('span');
+  textContainsModeLabel.textContent = t.textContainsMode;
+  const textContainsModeSelect = makeSelect([
+    { value: 'contains', label: t.textContainsContains },
+    { value: 'not-contains', label: t.textContainsNotContains },
+    { value: 'begins-with', label: t.textContainsBeginsWith },
+    { value: 'ends-with', label: t.textContainsEndsWith },
+  ]);
+  textContainsModeRow.append(textContainsModeLabel, textContainsModeSelect);
+  textContainsGroup.appendChild(textContainsModeRow);
 
   const textContainsRow = document.createElement('label');
   textContainsRow.className = 'fc-fmtdlg__row';
@@ -627,11 +652,15 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     textContainsGroup.hidden = kind !== 'text-contains';
     dateOccurringGroup.hidden = kind !== 'date-occurring';
     applyGroup.hidden = !APPLY_KINDS.has(kind);
+    averageStdDevRow.hidden =
+      kind !== 'average' ||
+      (averageModeSelect.value !== 'above-std-dev' && averageModeSelect.value !== 'below-std-dev');
   };
   const syncCellValueOp = (): void => {
     const op = opSelect.value as CellValueOp;
     valueBRow.hidden = op !== 'between' && op !== 'not-between';
   };
+  averageModeSelect.addEventListener('change', syncSubforms);
   const syncThreeStops = (): void => {
     stopMidRow.hidden = !useThreeCk.checked;
     scaleMid.row.hidden = !useThreeCk.checked;
@@ -703,6 +732,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
         recordConditionalRulesChange(history, store, () => {
           mutators.removeConditionalRuleAt(store, idx);
         });
+        deps.onChanged?.();
         renderRules();
       });
       item.prepend(summary);
@@ -818,11 +848,13 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       applyPatchToConditionalApplyControls(sharedApplyControls, rule.apply);
     } else if (rule.kind === 'average') {
       averageModeSelect.value = rule.mode;
+      averageStdDevSelect.value = String(rule.stdDev ?? 1);
       applyPatchToConditionalApplyControls(sharedApplyControls, rule.apply);
     } else if (rule.kind === 'formula') {
       formulaInput.value = rule.formula;
       applyPatchToConditionalApplyControls(sharedApplyControls, rule.apply);
     } else if (rule.kind === 'text-contains') {
+      textContainsModeSelect.value = rule.mode ?? 'contains';
       textContainsInput.value = rule.text;
       caseSensitiveCk.checked = rule.caseSensitive === true;
       applyPatchToConditionalApplyControls(sharedApplyControls, rule.apply);
@@ -848,16 +880,23 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     let rule: ConditionalRule | null = null;
     if (kind === 'cell-value') {
       const op = opSelect.value as CellValueOp;
-      const a = Number.parseFloat(valueAInput.value);
-      const b = Number.parseFloat(valueBInput.value);
-      if (!Number.isFinite(a)) return;
+      const parseCellValueBoundary = (raw: string): number | string | null => {
+        const text = raw.trim();
+        if (text === '') return null;
+        const num = Number(text);
+        return Number.isFinite(num) ? num : text;
+      };
+      const a = parseCellValueBoundary(valueAInput.value);
+      const b = parseCellValueBoundary(valueBInput.value);
+      if (a === null) return;
+      if ((op === 'between' || op === 'not-between') && b === null) return;
       const applyPatch = collectConditionalApplyPatch(cellValueApplyControls);
       rule = {
         kind: 'cell-value',
         range,
         op,
         a,
-        ...(op === 'between' || op === 'not-between' ? { b } : {}),
+        ...(op === 'between' || op === 'not-between' ? { b: b as number | string } : {}),
         apply: applyPatch,
       };
     } else if (kind === 'color-scale') {
@@ -907,10 +946,14 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
         apply: collectConditionalApplyPatch(sharedApplyControls),
       };
     } else if (kind === 'average') {
+      const averageMode = averageModeSelect.value as AverageMode;
       rule = {
         kind: 'average',
         range,
-        mode: averageModeSelect.value as AverageMode,
+        mode: averageMode,
+        ...(averageMode === 'above-std-dev' || averageMode === 'below-std-dev'
+          ? { stdDev: Number(averageStdDevSelect.value) as 1 | 2 | 3 }
+          : {}),
         apply: collectConditionalApplyPatch(sharedApplyControls),
       };
     } else if (kind === 'formula') {
@@ -929,6 +972,11 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
         kind: 'text-contains',
         range,
         text,
+        mode: textContainsModeSelect.value as
+          | 'contains'
+          | 'not-contains'
+          | 'begins-with'
+          | 'ends-with',
         caseSensitive: caseSensitiveCk.checked,
         apply: collectConditionalApplyPatch(sharedApplyControls),
       };
@@ -968,6 +1016,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
         mutators.addConditionalRule(store, newRule);
       }
     });
+    deps.onChanged?.();
     renderRules();
     if (currentMode === 'new' || currentMode === 'edit') api.close();
   };
@@ -976,6 +1025,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     recordConditionalRulesChange(history, store, () => {
       mutators.clearConditionalRules(store);
     });
+    deps.onChanged?.();
     renderRules();
   };
   const onClose = (): void => api.close();
@@ -1030,6 +1080,8 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       tbModeSelect.value = options.topBottomMode ?? 'top';
       tbPercentCk.checked = options.topBottomPercent ?? false;
       averageModeSelect.value = options.averageMode ?? 'above';
+      averageStdDevSelect.value = '1';
+      textContainsModeSelect.value = 'contains';
       textContainsInput.value = options.text ?? '';
       caseSensitiveCk.checked = false;
       datePeriodSelect.value = options.datePeriod ?? 'today';

@@ -65,6 +65,34 @@ describe('evaluateConditional', () => {
     expect(overlay.get('0:0:1')?.fill).toBeUndefined();
   });
 
+  it('cell-value rules compare text cells case-insensitively', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedCell(s, 0, 0, { kind: 'text', value: 'Alpha' });
+    s = seedCell(s, 0, 1, { kind: 'text', value: 'Beta' });
+    s = seedCell(s, 0, 2, { kind: 'text', value: 'Delta' });
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'cell-value',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+            op: 'between',
+            a: 'b',
+            b: 'dzz',
+            apply: { fill: '#text' },
+          },
+        ],
+      },
+    };
+    const overlay = evaluateConditional(s);
+    expect(overlay.get('0:0:0')?.fill).toBeUndefined();
+    expect(overlay.get('0:0:1')?.fill).toBe('#text');
+    expect(overlay.get('0:0:2')?.fill).toBe('#text');
+  });
+
   it('preserves data-bar gradient versus solid rendering metadata', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
@@ -98,6 +126,36 @@ describe('evaluateConditional', () => {
       showValue: false,
     });
     expect(overlay.get('0:0:1')).toMatchObject({ barColor: '#70ad47', barGradient: false });
+  });
+
+  it('data-bar overlays expose a zero axis and signed direction', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, -10);
+    s = seedNumber(s, 0, 1, 0);
+    s = seedNumber(s, 0, 2, 20);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'data-bar',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+            color: '#70ad47',
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:0')?.barAxis).toBeCloseTo(1 / 3);
+    expect(overlay.get('0:0:0')?.barDirection).toBe('left');
+    expect(overlay.get('0:0:0')?.bar).toBeCloseTo(1 / 3);
+    expect(overlay.get('0:0:1')?.bar).toBe(0);
+    expect(overlay.get('0:0:2')?.barDirection).toBe('right');
+    expect(overlay.get('0:0:2')?.bar).toBeCloseTo(2 / 3);
   });
 
   it('returns the same Map reference when called twice with identical state', () => {
@@ -190,6 +248,73 @@ describe('evaluateConditional', () => {
     expect(b).not.toBe(a);
     // Rule range targets sheet 0, so on sheet 1 nothing applies.
     expect(b.size).toBe(0);
+  });
+
+  it('keeps higher-priority rule attributes when lower-priority rules also match', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 10);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'cell-value',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+            op: '>',
+            a: 0,
+            apply: { fill: '#high' },
+          },
+          {
+            kind: 'cell-value',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+            op: '>',
+            a: 0,
+            apply: { fill: '#low', color: '#low-text' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:0')?.fill).toBe('#high');
+    expect(overlay.get('0:0:0')?.color).toBe('#low-text');
+  });
+
+  it('honors stopIfTrue by skipping lower-priority rules for matched cells', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 10);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'cell-value',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+            op: '>',
+            a: 0,
+            apply: { fill: '#stop' },
+            stopIfTrue: true,
+          },
+          {
+            kind: 'cell-value',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+            op: '>',
+            a: 0,
+            apply: { color: '#blocked' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:0')?.fill).toBe('#stop');
+    expect(overlay.get('0:0:0')?.color).toBeUndefined();
   });
 
   it('evaluates date-occurring week periods with Monday week boundaries', () => {
@@ -410,6 +535,27 @@ describe('evaluateConditional', () => {
     expect(overlay.get('0:0:2')?.fill).toBe('#avg');
   });
 
+  it('average std-dev rules compare against average plus or minus the selected tier', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    [-10, 0, 10, 30].forEach((v, i) => {
+      s = seedNumber(s, 0, i, v);
+    });
+    const rule: ConditionalRule = {
+      kind: 'average',
+      range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 3 },
+      mode: 'above-std-dev',
+      stdDev: 1,
+      apply: { fill: '#std' },
+    };
+    s = { ...s, conditional: { ...s.conditional, rules: [rule] } };
+    const overlay = evaluateConditional(s);
+    expect(overlay.get('0:0:0')?.fill).toBeUndefined();
+    expect(overlay.get('0:0:1')?.fill).toBeUndefined();
+    expect(overlay.get('0:0:2')?.fill).toBeUndefined();
+    expect(overlay.get('0:0:3')?.fill).toBe('#std');
+  });
+
   it('text-contains rule matches text case-insensitively by default', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
@@ -425,6 +571,48 @@ describe('evaluateConditional', () => {
     const overlay = evaluateConditional(s);
     expect(overlay.get('0:0:0')?.fill).toBe('#txt');
     expect(overlay.get('0:0:1')?.fill).toBeUndefined();
+  });
+
+  it('text rules support begins-with, ends-with, and not-contains modes', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedCell(s, 0, 0, { kind: 'text', value: 'Alpha' });
+    s = seedCell(s, 0, 1, { kind: 'text', value: 'Beta' });
+    s = seedCell(s, 0, 2, { kind: 'text', value: 'Gamma' });
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'text-contains',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+            text: 'a',
+            mode: 'ends-with',
+            apply: { fill: '#end' },
+          },
+          {
+            kind: 'text-contains',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+            text: 'g',
+            mode: 'begins-with',
+            apply: { color: '#begin' },
+          },
+          {
+            kind: 'text-contains',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+            text: 'm',
+            mode: 'not-contains',
+            apply: { bold: true },
+          },
+        ],
+      },
+    };
+    const overlay = evaluateConditional(s);
+    expect(overlay.get('0:0:0')?.fill).toBe('#end');
+    expect(overlay.get('0:0:1')?.bold).toBe(true);
+    expect(overlay.get('0:0:2')?.fill).toBe('#end');
+    expect(overlay.get('0:0:2')?.color).toBe('#begin');
   });
 
   it('duplicates fires on values that appear more than once in range', () => {
@@ -497,6 +685,509 @@ describe('evaluateConditional', () => {
     expect(parseFormulaPredicate('=42')).toBeNull();
     // `==42` after stripping the leading `=` becomes `=42` which matches.
     expect(parseFormulaPredicate('==42')?.test({ kind: 'number', value: 42 })).toBe(true);
+  });
+
+  it('formula rules evaluate A1 references relative to the rule range anchor', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 1);
+    s = seedNumber(s, 1, 0, -1);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 1, r1: 1, c1: 1 },
+            formula: '=A1>0',
+            apply: { fill: '#ref' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:1')?.fill).toBe('#ref');
+    expect(overlay.get('0:1:1')?.fill).toBeUndefined();
+  });
+
+  it('formula rules honor absolute rows and columns in A1 references', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 1);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 1, r1: 1, c1: 1 },
+            formula: '=$A$1>0',
+            apply: { fill: '#abs' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:1')?.fill).toBe('#abs');
+    expect(overlay.get('0:1:1')?.fill).toBe('#abs');
+  });
+
+  it('formula rules combine simple comparisons with AND/OR/NOT', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 7);
+    s = seedNumber(s, 0, 1, 1);
+    s = seedNumber(s, 1, 0, 3);
+    s = seedNumber(s, 1, 1, 1);
+    s = seedNumber(s, 2, 0, 7);
+    s = seedNumber(s, 2, 1, 9);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 2, r1: 2, c1: 2 },
+            formula: '=AND(A1>5,OR(B1=1,NOT(A1<5)))',
+            apply: { fill: '#logic' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:2')?.fill).toBe('#logic');
+    expect(overlay.get('0:1:2')?.fill).toBeUndefined();
+    expect(overlay.get('0:2:2')?.fill).toBe('#logic');
+  });
+
+  it('formula rules evaluate aggregate ranges relative to the rule range anchor', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 1);
+    s = seedNumber(s, 1, 0, 2);
+    s = seedNumber(s, 2, 0, 3);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 2, r1: 1, c1: 2 },
+            formula: '=SUM(A1:A3)>5',
+            apply: { fill: '#sum' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:2')?.fill).toBe('#sum');
+    expect(overlay.get('0:1:2')?.fill).toBeUndefined();
+  });
+
+  it('formula rules support absolute aggregate ranges and aggregate operands', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 1);
+    s = seedNumber(s, 1, 0, 2);
+    s = seedNumber(s, 2, 0, 3);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 2, r1: 1, c1: 2 },
+            formula: '=AND(AVERAGE($A$1:$A$3)=2,MAX($A$1:$A$3)=COUNT($A$1:$A$3))',
+            apply: { fill: '#agg' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:2')?.fill).toBe('#agg');
+    expect(overlay.get('0:1:2')?.fill).toBe('#agg');
+  });
+
+  it('formula rules evaluate COUNTIF with relative criteria references', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 7);
+    s = seedNumber(s, 1, 0, 3);
+    s = seedNumber(s, 2, 0, 7);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 1, r1: 2, c1: 1 },
+            formula: '=COUNTIF($A$1:$A$3,A1)>1',
+            apply: { fill: '#countif-ref' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:1')?.fill).toBe('#countif-ref');
+    expect(overlay.get('0:1:1')?.fill).toBeUndefined();
+    expect(overlay.get('0:2:1')?.fill).toBe('#countif-ref');
+  });
+
+  it('formula rules evaluate COUNTIF with comparator criteria', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 1);
+    s = seedNumber(s, 1, 0, 2);
+    s = seedNumber(s, 2, 0, 3);
+    s = seedCell(s, 0, 1, { kind: 'text', value: 'North' });
+    s = seedCell(s, 1, 1, { kind: 'text', value: 'north' });
+    s = seedCell(s, 2, 1, { kind: 'text', value: 'South' });
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+            formula: '=AND(COUNTIF($A$1:$A$3,">1")=2,COUNTIF($B$1:$B$3,"north")=2)',
+            apply: { fill: '#countif-criteria' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:2')?.fill).toBe('#countif-criteria');
+  });
+
+  it('formula rules evaluate COUNTIF wildcard criteria with tilde escapes', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedCell(s, 0, 0, { kind: 'text', value: 'North' });
+    s = seedCell(s, 1, 0, { kind: 'text', value: 'Northeast' });
+    s = seedCell(s, 2, 0, { kind: 'text', value: 'N* literal' });
+    s = seedCell(s, 3, 0, { kind: 'text', value: 'South' });
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+            formula: '=AND(COUNTIF($A$1:$A$4,"Nor*")=2,COUNTIF($A$1:$A$4,"N~* literal")=1)',
+            apply: { fill: '#countif-wild' },
+          },
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 },
+            formula: '=COUNTIF($A$1:$A$4,"<>S*")=3',
+            apply: { fill: '#countif-not-wild' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:1')?.fill).toBe('#countif-wild');
+    expect(overlay.get('0:1:1')?.fill).toBe('#countif-not-wild');
+  });
+
+  it('formula rules evaluate COUNTIFS with multiple criteria ranges', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedCell(s, 0, 0, { kind: 'text', value: 'North' });
+    s = seedCell(s, 1, 0, { kind: 'text', value: 'Northwest' });
+    s = seedCell(s, 2, 0, { kind: 'text', value: 'South' });
+    s = seedNumber(s, 0, 1, 12);
+    s = seedNumber(s, 1, 1, 8);
+    s = seedNumber(s, 2, 1, 15);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+            formula: '=COUNTIFS($A$1:$A$3,"North*",$B$1:$B$3,">10")=1',
+            apply: { fill: '#countifs' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:2')?.fill).toBe('#countifs');
+  });
+
+  it('formula rules leave mismatched COUNTIFS ranges unapplied', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedCell(s, 0, 0, { kind: 'text', value: 'North' });
+    s = seedNumber(s, 0, 1, 12);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+            formula: '=COUNTIFS($A$1:$A$2,"North*",$B$1:$B$3,">10")=1',
+            apply: { fill: '#countifs-mismatch' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:2')?.fill).toBeUndefined();
+  });
+
+  it('formula rules evaluate simple arithmetic expressions', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 4);
+    s = seedNumber(s, 0, 1, 3);
+    s = seedNumber(s, 1, 0, 2);
+    s = seedNumber(s, 1, 1, 3);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 2, r1: 1, c1: 2 },
+            formula: '=A1+B1*2>8',
+            apply: { fill: '#math' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:2')?.fill).toBe('#math');
+    expect(overlay.get('0:1:2')?.fill).toBeUndefined();
+  });
+
+  it('formula rules evaluate arithmetic over aggregate operands', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 1);
+    s = seedNumber(s, 1, 0, 2);
+    s = seedNumber(s, 2, 0, 3);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+            formula: '=SUM($A$1:$A$3)/COUNT($A$1:$A$3)=2',
+            apply: { fill: '#math-agg' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:2')?.fill).toBe('#math-agg');
+  });
+
+  it('formula arithmetic keeps negative numeric literals attached to the operand', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 4);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+            formula: '=A1*-1=-4',
+            apply: { fill: '#negative' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:1')?.fill).toBe('#negative');
+  });
+
+  it('formula rules evaluate exponent arithmetic', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 3);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 2 },
+            formula: '=$A$1^2=9',
+            apply: { fill: '#pow' },
+          },
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 2 },
+            formula: '=2^3^2=512',
+            apply: { fill: '#pow-right' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:1')?.fill).toBe('#pow');
+    expect(overlay.get('0:0:2')?.fill).toBe('#pow');
+    expect(overlay.get('0:1:1')?.fill).toBe('#pow-right');
+    expect(overlay.get('0:1:2')?.fill).toBe('#pow-right');
+  });
+
+  it('formula rules accept explicit current-sheet A1 references', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 1);
+    s = seedNumber(s, 1, 0, -1);
+    s = seedNumber(s, 2, 0, 3);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 2, r1: 1, c1: 2 },
+            formula: "=AND(Sheet1!A1>0,SUM('Sheet1'!$A$1:$A$3)>2)",
+            apply: { fill: '#sheet' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:2')?.fill).toBe('#sheet');
+    expect(overlay.get('0:1:2')?.fill).toBeUndefined();
+  });
+
+  it('formula rules evaluate IF with boolean branches', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 7);
+    s = seedNumber(s, 0, 1, 3);
+    s = seedNumber(s, 1, 0, 7);
+    s = seedNumber(s, 1, 1, 1);
+    s = seedNumber(s, 2, 0, 2);
+    s = seedNumber(s, 2, 1, 9);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 2, r1: 2, c1: 2 },
+            formula: '=IF(A1>5,B1>2,FALSE)',
+            apply: { fill: '#if' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:2')?.fill).toBe('#if');
+    expect(overlay.get('0:1:2')?.fill).toBeUndefined();
+    expect(overlay.get('0:2:2')?.fill).toBeUndefined();
+  });
+
+  it('formula rules evaluate ISBLANK/ISERROR/ISNUMBER/ISTEXT predicates', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedCell(s, 0, 0, { kind: 'text', value: 'label' });
+    s = seedNumber(s, 1, 0, 42);
+    s = seedCell(s, 2, 0, { kind: 'error', code: 1, text: '#DIV/0!' });
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 1, r1: 3, c1: 1 },
+            formula: '=OR(ISTEXT(A1),ISNUMBER(A1),ISERROR(A1),ISBLANK(A1))',
+            apply: { fill: '#is' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:1')?.fill).toBe('#is');
+    expect(overlay.get('0:1:1')?.fill).toBe('#is');
+    expect(overlay.get('0:2:1')?.fill).toBe('#is');
+    expect(overlay.get('0:3:1')?.fill).toBe('#is');
+  });
+
+  it('formula rules leave unsupported sheet-qualified references unapplied', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 1);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'formula',
+            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+            formula: '=Sheet2!A1>0',
+            apply: { fill: '#sheet2' },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:1')?.fill).toBeUndefined();
   });
 
   it('iconSetSlotFor honors the family threshold table', () => {

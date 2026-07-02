@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   conditionalRuleToEngineInput,
+  type SyncedConditionalRuleMap,
   syncConditionalRulesToEngine,
+  syncTrackedConditionalRulesToEngine,
 } from '../../../src/engine/cf-writeback.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import type { ConditionalRule } from '../../../src/store/types.js';
@@ -24,6 +26,15 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
       op: 5,
       formula1: '10',
     });
+    expect(
+      conditionalRuleToEngineInput({
+        kind: 'cell-value',
+        range,
+        op: '=',
+        a: 'Done',
+        apply: {},
+      }),
+    ).toEqual({ sqref, type: 1, op: 2, formula1: 'Done' });
   });
 
   it('emits formula2 for a between rule', () => {
@@ -62,6 +73,15 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
     expect(
       conditionalRuleToEngineInput({ kind: 'text-contains', range, text: 'hi', apply: {} }),
     ).toEqual({ sqref, type: 7, text: 'hi' });
+    expect(
+      conditionalRuleToEngineInput({
+        kind: 'text-contains',
+        range,
+        text: 'hi',
+        mode: 'begins-with',
+        apply: {},
+      }),
+    ).toBeNull();
     expect(conditionalRuleToEngineInput({ kind: 'blanks', range, apply: {} })).toEqual({
       sqref,
       type: 11,
@@ -99,6 +119,15 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
         apply: {},
       }),
     ).toEqual({ sqref, type: 6, aboveAverage: true, equalAverage: true });
+    expect(
+      conditionalRuleToEngineInput({
+        kind: 'average',
+        range,
+        mode: 'below-std-dev',
+        stdDev: 2,
+        apply: {},
+      }),
+    ).toEqual({ sqref, type: 6, aboveAverage: false, equalAverage: false, stdDev: 2 });
   });
 
   it('returns null for visual and date-occurring rules the engine cannot author', () => {
@@ -155,5 +184,172 @@ describe('syncConditionalRulesToEngine (H-13)', () => {
     );
     expect(result).toEqual({ written: 0, skipped: 0 });
     expect(added).toHaveLength(0);
+  });
+
+  it('can skip rules already synced by a mounted session', () => {
+    const { wb, added } = fakeWb(true);
+    const seenKeys = new Set<string>();
+    const rules: ConditionalRule[] = [{ kind: 'cell-value', range, op: '>', a: 10, apply: {} }];
+
+    expect(syncConditionalRulesToEngine(wb, rules, 0, { seenKeys })).toEqual({
+      written: 1,
+      skipped: 0,
+    });
+    expect(syncConditionalRulesToEngine(wb, rules, 0, { seenKeys })).toEqual({
+      written: 0,
+      skipped: 0,
+    });
+    expect(added).toHaveLength(1);
+  });
+
+  it('does not add rules hydrated from existing engine conditional formats', () => {
+    const { wb, added } = fakeWb(true);
+    const rules: ConditionalRule[] = [
+      { engineId: 'imported', kind: 'cell-value', range, op: '>', a: 10, apply: {} },
+      { kind: 'text-contains', range, text: 'x', apply: {} },
+    ];
+
+    expect(syncConditionalRulesToEngine(wb, rules, 0)).toEqual({ written: 1, skipped: 0 });
+    expect(added).toEqual([{ sheet: 0, type: 7 }]);
+  });
+});
+
+describe('syncTrackedConditionalRulesToEngine (H-13)', () => {
+  const trackedWb = () => {
+    const formats: Array<{
+      id: string;
+      type: number;
+      priority: number;
+      stopIfTrue: boolean;
+      sqref: typeof sqref;
+      formula1?: string;
+      formula2?: string;
+      op?: number;
+      text?: string;
+    }> = [
+      {
+        id: 'imported',
+        type: 1,
+        priority: 1,
+        stopIfTrue: false,
+        sqref,
+        op: 0,
+        formula1: '0',
+      },
+    ];
+    const wb = {
+      capabilities: { conditionalFormatMutate: true },
+      getConditionalFormats: vi.fn(() => formats.map((entry) => ({ ...entry }))),
+      addConditionalFormat: vi.fn(
+        (_: number, rule: { type: number; op?: number; formula1?: string; text?: string }) => {
+          formats.push({
+            id: `added-${formats.length}`,
+            type: rule.type,
+            priority: formats.length + 1,
+            stopIfTrue: false,
+            sqref,
+            ...(rule.op !== undefined ? { op: rule.op } : {}),
+            ...(rule.formula1 !== undefined ? { formula1: rule.formula1 } : {}),
+            ...(rule.text !== undefined ? { text: rule.text } : {}),
+          });
+          return true;
+        },
+      ),
+      removeConditionalFormatAt: vi.fn((_: number, index: number) => {
+        if (index < 0 || index >= formats.length) return false;
+        formats.splice(index, 1);
+        return true;
+      }),
+    } as unknown as WorkbookHandle;
+    return { wb, formats };
+  };
+
+  it('removes only session-tracked engine rules that disappeared from the store', () => {
+    const { wb, formats } = trackedWb();
+    const tracked: SyncedConditionalRuleMap = new Map();
+    const rules: ConditionalRule[] = [
+      { kind: 'cell-value', range, op: '>', a: 10, apply: {} },
+      { kind: 'text-contains', range, text: 'x', apply: {} },
+    ];
+    const remainingRules = rules.slice(1);
+
+    expect(syncTrackedConditionalRulesToEngine(wb, rules, 0, { tracked })).toEqual({
+      written: 2,
+      skipped: 0,
+      removed: 0,
+    });
+    expect(formats.map((entry) => entry.id)).toEqual(['imported', 'added-1', 'added-2']);
+
+    expect(syncTrackedConditionalRulesToEngine(wb, remainingRules, 0, { tracked })).toEqual({
+      written: 0,
+      skipped: 0,
+      removed: 1,
+    });
+    expect(formats.map((entry) => entry.id)).toEqual(['imported', 'added-2']);
+    expect(wb.removeConditionalFormatAt).toHaveBeenCalledWith(0, 1);
+  });
+
+  it('clears session-tracked engine rules while leaving imported rules intact', () => {
+    const { wb, formats } = trackedWb();
+    const tracked: SyncedConditionalRuleMap = new Map();
+    const rules: ConditionalRule[] = [
+      { kind: 'cell-value', range, op: '>', a: 10, apply: {} },
+      { kind: 'text-contains', range, text: 'x', apply: {} },
+    ];
+
+    syncTrackedConditionalRulesToEngine(wb, rules, 0, { tracked });
+    expect(syncTrackedConditionalRulesToEngine(wb, [], 0, { tracked })).toEqual({
+      written: 0,
+      skipped: 0,
+      removed: 2,
+    });
+    expect(formats.map((entry) => entry.id)).toEqual(['imported']);
+    expect(wb.clearConditionalFormats).toBeUndefined();
+  });
+
+  it('uses the read-back engine id when a tracked index shifts before removal', () => {
+    const { wb, formats } = trackedWb();
+    const tracked: SyncedConditionalRuleMap = new Map();
+    const rules: ConditionalRule[] = [
+      { kind: 'cell-value', range, op: '>', a: 10, apply: {} },
+      { kind: 'text-contains', range, text: 'x', apply: {} },
+    ];
+    const remainingRules = rules.slice(1);
+
+    syncTrackedConditionalRulesToEngine(wb, rules, 0, { tracked });
+    formats.unshift({
+      id: 'external-prepend',
+      type: 1,
+      priority: 0,
+      stopIfTrue: false,
+      sqref,
+      op: 2,
+      formula1: '999',
+    });
+
+    expect(syncTrackedConditionalRulesToEngine(wb, remainingRules, 0, { tracked })).toEqual({
+      written: 0,
+      skipped: 0,
+      removed: 1,
+    });
+    expect(formats.map((entry) => entry.id)).toEqual(['external-prepend', 'imported', 'added-2']);
+    expect(wb.removeConditionalFormatAt).toHaveBeenCalledWith(0, 2);
+  });
+
+  it('does not track or duplicate imported engine-hydrated store rules', () => {
+    const { wb, formats } = trackedWb();
+    const tracked: SyncedConditionalRuleMap = new Map();
+    const rules: ConditionalRule[] = [
+      { engineId: 'imported', kind: 'cell-value', range, op: '<', a: 0, apply: {} },
+      { kind: 'text-contains', range, text: 'x', apply: {} },
+    ];
+
+    expect(syncTrackedConditionalRulesToEngine(wb, rules, 0, { tracked })).toEqual({
+      written: 1,
+      skipped: 0,
+      removed: 0,
+    });
+    expect(formats.map((entry) => entry.id)).toEqual(['imported', 'added-1']);
+    expect(tracked.size).toBe(1);
   });
 });

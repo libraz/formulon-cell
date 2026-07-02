@@ -281,6 +281,32 @@ describe('attachCfRulesDialog', () => {
     handle.detach();
   });
 
+  it('does not duplicate engine-hydrated store rules in the rules table', () => {
+    const { wb } = fakeWb([rule({ id: 'engine', priority: 1, type: 1 })]);
+    const store = createSpreadsheetStore();
+    mutators.addConditionalRule(store, {
+      engineId: 'engine',
+      kind: 'cell-value',
+      range: { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 0 },
+      op: '>',
+      a: 10,
+      apply: {},
+    });
+    const handle = attachCfRulesDialog({
+      host,
+      getWb: () => wb,
+      getActiveSheet: () => 0,
+      store,
+    });
+    handle.open();
+
+    const rows = document.querySelectorAll<HTMLTableRowElement>('.fc-cfrulesdlg__table tbody tr');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.dataset.ruleSource).toBe('engine');
+
+    handle.detach();
+  });
+
   it('filters engine and session rules when Show formatting rules for is Current Selection', () => {
     const { wb } = fakeWb([
       rule({
@@ -512,6 +538,40 @@ describe('attachCfRulesDialog', () => {
       'data-bar',
       'color-scale',
     ]);
+    handle.detach();
+  });
+
+  it('toggles Stop If True for session conditional rules through undoable store history', () => {
+    const { wb } = fakeWb([]);
+    const store = createSpreadsheetStore();
+    const history = new History();
+    mutators.addConditionalRule(store, {
+      kind: 'cell-value',
+      range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+      op: '>',
+      a: 0,
+      apply: { fill: '#ffc7ce' },
+    });
+    const handle = attachCfRulesDialog({
+      host,
+      getWb: () => wb,
+      getActiveSheet: () => 0,
+      store,
+      history,
+    });
+    handle.open();
+
+    const stop = document.querySelector<HTMLInputElement>(
+      '.fc-cfrulesdlg__table tbody tr:first-child .fc-cfrulesdlg__cell-stop input',
+    );
+    expect(stop?.disabled).toBe(false);
+    stop?.click();
+
+    expect(store.getState().conditional.rules[0]?.stopIfTrue).toBe(true);
+    expect(history.undo()).toBe(true);
+    expect(store.getState().conditional.rules[0]?.stopIfTrue).toBeUndefined();
+    expect(history.redo()).toBe(true);
+    expect(store.getState().conditional.rules[0]?.stopIfTrue).toBe(true);
     handle.detach();
   });
 

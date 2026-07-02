@@ -18,6 +18,10 @@ import {
   traceDependents as traceDependentArrows,
   tracePrecedents as tracePrecedentArrows,
 } from './commands/traces.js';
+import {
+  type SyncedConditionalRuleMap,
+  syncTrackedConditionalRulesToEngine,
+} from './engine/cf-writeback.js';
 import { findPivotTableAtCell } from './engine/passthrough-sync.js';
 import { WorkbookHandle } from './engine/workbook-handle.js';
 import { SpreadsheetEmitter } from './events.js';
@@ -287,7 +291,10 @@ export const Spreadsheet = {
       getWb: () => wb,
       getActiveSheet: () => store.getState().data.sheetIndex,
       getSelectionRange: () => store.getState().selection.range,
-      onChanged: () => renderer.invalidate(),
+      onChanged: () => {
+        syncSessionConditionalRules();
+        renderer.invalidate();
+      },
       onNewRule: () => featureState.conditionalDialog?.open({ mode: 'new' }),
       onEditRule: (editIndex) => featureState.conditionalDialog?.open({ mode: 'edit', editIndex }),
       store,
@@ -506,6 +513,7 @@ export const Spreadsheet = {
       getSheetTabs: () => sheetTabsController,
       getStrings: () => strings,
       getWb: () => wb,
+      grid,
       host,
       invalidate: () => renderer.invalidate(),
       store,
@@ -566,6 +574,13 @@ export const Spreadsheet = {
       for (const [k, v] of featureRegistry) featuresView[k] = v;
       for (const [k, v] of userHandles) featuresView[k] = v;
     };
+    let syncedSessionCfRules: SyncedConditionalRuleMap = new Map();
+    const syncSessionConditionalRules = (): void => {
+      const rules = store.getState().conditional.rules;
+      for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) {
+        syncTrackedConditionalRulesToEngine(wb, rules, sheet, { tracked: syncedSessionCfRules });
+      }
+    };
     const hostFeatures = createHostFeatureController({
       autocompleteStub,
       canvas,
@@ -594,6 +609,7 @@ export const Spreadsheet = {
       refreshPrinterProfiles,
       getUploadStatus: () => uploadStatus,
       getMacroRecording: () => macroRecording,
+      onConditionalRulesChanged: syncSessionConditionalRules,
       getSheetTabs: () => sheetTabsController,
       grid,
       history,
@@ -653,7 +669,10 @@ export const Spreadsheet = {
         getWb: () => wb,
         getActiveSheet: () => store.getState().data.sheetIndex,
         getSelectionRange: () => store.getState().selection.range,
-        onChanged: () => renderer.invalidate(),
+        onChanged: () => {
+          syncSessionConditionalRules();
+          renderer.invalidate();
+        },
         onNewRule: () => featureState.conditionalDialog?.open({ mode: 'new' }),
         onEditRule: (editIndex) =>
           featureState.conditionalDialog?.open({ mode: 'edit', editIndex }),
@@ -1059,6 +1078,7 @@ export const Spreadsheet = {
         binding.unbind();
         if (ownsWb) wb.dispose();
         wb = next;
+        syncedSessionCfRules = new Map();
         ownsWb = true; // we now own the next handle and will dispose it
         wb.attachHistory(history);
         wb.clearViewportHint();

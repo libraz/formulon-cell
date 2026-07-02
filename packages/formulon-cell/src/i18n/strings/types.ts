@@ -490,9 +490,17 @@ export interface Strings {
     averageBelow: string;
     averageEqualOrAbove: string;
     averageEqualOrBelow: string;
+    averageAboveStdDev: string;
+    averageBelowStdDev: string;
+    averageStdDevTier: string;
     topN: string;
     usePercent: string;
     textContainsLabel: string;
+    textContainsMode: string;
+    textContainsContains: string;
+    textContainsNotContains: string;
+    textContainsBeginsWith: string;
+    textContainsEndsWith: string;
     textContainsPlaceholder: string;
     caseSensitive: string;
     datePeriodLabel: string;

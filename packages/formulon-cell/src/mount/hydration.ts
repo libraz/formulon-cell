@@ -1,4 +1,5 @@
 import { hydrateCellFormatsFromEngine } from '../engine/cell-format-sync.js';
+import { hydrateConditionalRulesFromEngine } from '../engine/cf-sync.js';
 import { hydrateCommentsAndHyperlinksFromEngine } from '../engine/format-sync.js';
 import { hydrateLayoutFromEngine } from '../engine/layout-sync.js';
 import { hydrateMergesFromEngine } from '../engine/merges-sync.js';
@@ -17,6 +18,7 @@ export function hydrateActiveSheetFromEngine(wb: WorkbookHandle, store: Spreadsh
   hydrateMergesFromEngine(wb, store, sheet);
   hydrateValidationsFromEngine(wb, store, sheet);
   hydrateCellFormatsFromEngine(wb, store, sheet);
+  hydrateConditionalRulesFromEngine(wb, store, sheet);
 }
 
 export function hydrateWorkbookMetadataFromEngine(

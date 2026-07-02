@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import { en, ja } from '../../../src/i18n/strings.js';
 import {
@@ -226,11 +226,12 @@ describe('attachConditionalDialog', () => {
   it('adds a cell-value rule then removes it', () => {
     setRange(store, 0, 0, 1, 0);
     const history = new History();
-    const handle = attachConditionalDialog({ host, store, history });
+    const onChanged = vi.fn();
+    const handle = attachConditionalDialog({ host, store, history, onChanged });
     handle.open();
 
     const valueA = document.querySelector<HTMLInputElement>(
-      '.fc-conddlg__sub input[type="number"]',
+      '.fc-conddlg__sub input[type="text"]',
     ) as HTMLInputElement;
     valueA.value = '50';
     valueA.dispatchEvent(new Event('input', { bubbles: true }));
@@ -248,12 +249,14 @@ describe('attachConditionalDialog', () => {
       expect(rules[0].op).toBe('>');
     }
     expect(history.canUndo()).toBe(true);
+    expect(onChanged).toHaveBeenCalledTimes(1);
 
     const removeBtn = document.querySelector<HTMLButtonElement>(
       '.fc-conddlg__item .fc-fmtdlg__btn',
     );
     removeBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(store.getState().conditional.rules).toHaveLength(0);
+    expect(onChanged).toHaveBeenCalledTimes(2);
 
     history.undo();
     expect(store.getState().conditional.rules).toHaveLength(1);
@@ -267,6 +270,28 @@ describe('attachConditionalDialog', () => {
     history.redo();
     expect(store.getState().conditional.rules).toHaveLength(0);
 
+    handle.detach();
+  });
+
+  it('adds a text cell-value rule from the classic dialog', () => {
+    setRange(store, 0, 0, 1, 0);
+    const handle = attachConditionalDialog({ host, store });
+    handle.open({ kind: 'cell-value', cellValueOp: '=' });
+
+    const valueA = document.querySelector<HTMLInputElement>(
+      '.fc-conddlg__sub input[type="text"]',
+    ) as HTMLInputElement;
+    valueA.value = 'Done';
+
+    document
+      .querySelector<HTMLButtonElement>('.fc-conddlg__addrow .fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(store.getState().conditional.rules[0]).toMatchObject({
+      kind: 'cell-value',
+      op: '=',
+      a: 'Done',
+    });
     handle.detach();
   });
 
@@ -289,7 +314,7 @@ describe('attachConditionalDialog', () => {
       '.fc-conddlg__form input[type="text"]',
     );
     const valueInput = document.querySelector<HTMLInputElement>(
-      '.fc-conddlg__sub input[type="number"]',
+      '.fc-conddlg__sub input[type="text"]',
     );
     expect(rangeInput?.value).toBe('A1:A1');
     expect(valueInput?.value).toBe('10');
@@ -618,6 +643,38 @@ describe('attachConditionalDialog', () => {
     handle.detach();
   });
 
+  it('adds standard-deviation average rules from the classic dialog', () => {
+    setRange(store, 2, 1, 5, 1);
+    const handle = attachConditionalDialog({ host, store });
+    handle.open({ kind: 'average', averageMode: 'above-std-dev' });
+
+    const averageSelect = Array.from(
+      document.querySelectorAll<HTMLSelectElement>('.fc-conddlg__form select'),
+    ).find((select) =>
+      Array.from(select.options).some((option) => option.value === 'above-std-dev'),
+    ) as HTMLSelectElement;
+    expect(averageSelect.value).toBe('above-std-dev');
+    const stdDevSelect = Array.from(
+      document.querySelectorAll<HTMLSelectElement>('.fc-conddlg__form select'),
+    ).find((select) => Array.from(select.options).some((option) => option.value === '3')) as
+      | HTMLSelectElement
+      | undefined;
+    expect(stdDevSelect?.parentElement?.hidden).toBe(false);
+    if (stdDevSelect) stdDevSelect.value = '2';
+
+    document
+      .querySelector<HTMLButtonElement>('.fc-conddlg__addrow .fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(store.getState().conditional.rules[0]).toMatchObject({
+      kind: 'average',
+      mode: 'above-std-dev',
+      stdDev: 2,
+      range: { sheet: 0, r0: 2, c0: 1, r1: 5, c1: 1 },
+    });
+    handle.detach();
+  });
+
   it('opens a New Formatting Rule mode with OK/Cancel and no rule manager list', () => {
     setRange(store, 0, 0, 1, 0);
     const handle = attachConditionalDialog({ host, store, strings: en });
@@ -647,6 +704,12 @@ describe('attachConditionalDialog', () => {
     setRange(store, 1, 1, 2, 2);
     const handle = attachConditionalDialog({ host, store });
     handle.open({ kind: 'text-contains', text: 'due' });
+    const textModeSelect = Array.from(
+      document.querySelectorAll<HTMLSelectElement>('.fc-conddlg__form select'),
+    ).find((select) =>
+      Array.from(select.options).some((option) => option.value === 'not-contains'),
+    );
+    if (textModeSelect) textModeSelect.value = 'begins-with';
 
     document
       .querySelector<HTMLButtonElement>('.fc-conddlg__addrow .fc-fmtdlg__btn--primary')
@@ -655,6 +718,7 @@ describe('attachConditionalDialog', () => {
       kind: 'text-contains',
       range: { sheet: 0, r0: 1, c0: 1, r1: 2, c1: 2 },
       text: 'due',
+      mode: 'begins-with',
     });
 
     handle.open({ kind: 'date-occurring', datePeriod: 'last7' });
