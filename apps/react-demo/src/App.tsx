@@ -114,15 +114,18 @@ const DemoIcon = ({ name }: { name: DemoIconName }): ReactElement => (
   <svg
     className="demo__rb-icon"
     viewBox="0 0 20 20"
-    fill="none"
-    stroke="currentColor"
     strokeWidth="1.45"
     strokeLinecap="round"
     strokeLinejoin="round"
     aria-hidden="true"
   >
-    {DEMO_ICONS[name].map((path) => (
-      <path key={path} d={path} />
+    {DEMO_ICONS[name].map((segment) => (
+      <path
+        key={segment.d}
+        d={segment.d}
+        fill={segment.fill ?? 'none'}
+        stroke={segment.stroke ?? 'currentColor'}
+      />
     ))}
   </svg>
 );
@@ -281,18 +284,21 @@ export const App = (): ReactElement => {
   const onSpellingReview = useCallback(() => {
     if (!instance) return;
     setReviewDialog({
-      title: 'Spelling Review',
-      items: analyzeSpellingCells(reviewCellsForInstance(instance)),
+      title: commandText.spellingReview,
+      items: analyzeSpellingCells(reviewCellsForInstance(instance), locale === 'ja' ? 'ja' : 'en'),
     });
-  }, [instance]);
+  }, [commandText.spellingReview, instance, locale]);
 
   const onAccessibilityCheck = useCallback(() => {
     if (!instance) return;
     setReviewDialog({
       title: commandText.accessibilityCheck,
-      items: analyzeAccessibilityCells(reviewCellsForInstance(instance)),
+      items: analyzeAccessibilityCells(
+        reviewCellsForInstance(instance),
+        locale === 'ja' ? 'ja' : 'en',
+      ),
     });
-  }, [commandText.accessibilityCheck, instance]);
+  }, [commandText.accessibilityCheck, instance, locale]);
 
   const onRunScript = useCallback(() => {
     if (!instance) return;
@@ -544,7 +550,7 @@ export const App = (): ReactElement => {
             <code>{loadError}</code>
           </div>
         ) : (
-          'Loading engine…'
+          ui.loadingEngine
         )}
       </div>
     );
@@ -558,18 +564,23 @@ export const App = (): ReactElement => {
             ref={quickAccessRef}
             className="demo__quick"
             role="toolbar"
-            aria-label="Quick access toolbar"
+            aria-label={ui.quickAccessToolbar}
           >
             <span className="demo__brand-mark" aria-hidden="true">
               <DemoIcon name="app" />
             </span>
-            <button type="button" className="demo__title-icon" aria-label="Save" onClick={onSave}>
+            <button
+              type="button"
+              className="demo__title-icon"
+              aria-label={ui.save}
+              onClick={onSave}
+            >
               <DemoIcon name="save" />
             </button>
             <button
               type="button"
               className="demo__title-icon"
-              aria-label="Undo"
+              aria-label={ui.undo}
               onClick={() => instance?.undo()}
             >
               <DemoIcon name="undo" />
@@ -577,7 +588,7 @@ export const App = (): ReactElement => {
             <button
               type="button"
               className="demo__title-icon"
-              aria-label="Redo"
+              aria-label={ui.redo}
               onClick={() => instance?.redo()}
             >
               <DemoIcon name="redo" />
@@ -721,6 +732,8 @@ export const App = (): ReactElement => {
               onAddIn={() => showRibbonNotice(commandText.addIns, commandText.addInsHostCallbacks)}
               onToolbarReady={(toolbar) => {
                 toolbarRef.current = toolbar;
+                (window as unknown as { __fcToolbar?: ToolbarInstance | null }).__fcToolbar =
+                  toolbar;
               }}
             />
           ) : null}
@@ -846,9 +859,9 @@ export const App = (): ReactElement => {
             </div>
           ) : null}
         </div>
-        <aside className="demo__panel" aria-label="Options panel" hidden={!showPanel}>
+        <aside className="demo__panel" aria-label={ui.optionsPanel} hidden={!showPanel}>
           <section className="demo__card">
-            <h2>Demo chrome</h2>
+            <h2>{ui.demoChrome}</h2>
             <div className="demo__controls demo__controls--panel">
               <div className="demo__seg" role="group" aria-label={ui.theme}>
                 {THEMES.map((t) => (
@@ -859,7 +872,7 @@ export const App = (): ReactElement => {
                     onClick={() => setTheme(t.value)}
                     aria-pressed={t.value === theme}
                   >
-                    {t.label}
+                    {ui.themeLabels[t.value] ?? t.label}
                   </button>
                 ))}
               </div>
@@ -880,11 +893,8 @@ export const App = (): ReactElement => {
           </section>
 
           <section className="demo__card">
-            <h2>Preset</h2>
-            <p className="demo__hint">
-              Toggle entire feature bundles, or override individual flags below. Changes flow
-              through <code>inst.setFeatures()</code> live — edits survive.
-            </p>
+            <h2>{ui.preset}</h2>
+            <p className="demo__hint">{ui.presetHint}</p>
             <div className="demo__preset">
               {PRESETS.map((p) => (
                 <button
@@ -896,22 +906,21 @@ export const App = (): ReactElement => {
                   onClick={() => onPresetChange(p.value)}
                   aria-pressed={p.value === preset}
                 >
-                  <span className="demo__preset-name">{p.label}</span>
-                  <span className="demo__preset-hint">{p.hint}</span>
+                  <span className="demo__preset-name">{ui.presets[p.value]?.label ?? p.label}</span>
+                  <span className="demo__preset-hint">{ui.presets[p.value]?.hint ?? p.hint}</span>
                 </button>
               ))}
             </div>
           </section>
 
           <section className="demo__card">
-            <h2>Features</h2>
-            <p className="demo__hint">
-              Live-toggle individual <code>FeatureFlags</code>. Disabled flags skip their
-              <code>attach*</code> in <code>mount.ts</code>.
-            </p>
+            <h2>{ui.features}</h2>
+            <p className="demo__hint">{ui.featuresHint}</p>
             {FEATURE_GROUPS.map((group) => (
               <div key={group.title} className="demo__feat-group">
-                <h3 className="demo__feat-title">{group.title}</h3>
+                <h3 className="demo__feat-title">
+                  {ui.featureGroupLabels[group.title] ?? group.title}
+                </h3>
                 <div className="demo__feat-grid">
                   {group.features.map((f) => {
                     // `watchWindow` and `slicer` ship default-off; everything else is opt-out.
@@ -924,7 +933,7 @@ export const App = (): ReactElement => {
                           checked={enabled}
                           onChange={() => onFeatureToggle(f.id)}
                         />
-                        <span>{f.label}</span>
+                        <span>{ui.featureLabels[f.id] ?? f.label}</span>
                       </label>
                     );
                   })}
@@ -935,7 +944,7 @@ export const App = (): ReactElement => {
                         checked={resolvedUi.ribbon}
                         onChange={(e) => setShowRibbon(e.target.checked)}
                       />
-                      <span>Spreadsheet ribbon</span>
+                      <span>{ui.spreadsheetRibbon}</span>
                     </label>
                   ) : null}
                 </div>
@@ -949,17 +958,15 @@ export const App = (): ReactElement => {
           </section>
 
           <section className="demo__card">
-            <h2>Cell renderers</h2>
-            <p className="demo__hint">
-              Wired via <code>inst.cells.registerFormatter</code>.
-            </p>
+            <h2>{ui.cellRenderers}</h2>
+            <p className="demo__hint">{ui.cellRenderersHint}</p>
             <label className="demo__check">
               <input
                 type="checkbox"
                 checked={formatters.uppercase}
                 onChange={(e) => setFormatters((f) => ({ ...f, uppercase: e.target.checked }))}
               />
-              Uppercase column A
+              {ui.uppercaseColumnA}
             </label>
             <label className="demo__check">
               <input
@@ -967,23 +974,21 @@ export const App = (): ReactElement => {
                 checked={formatters.arrows}
                 onChange={(e) => setFormatters((f) => ({ ...f, arrows: e.target.checked }))}
               />
-              Arrow-prefix negatives
+              {ui.arrowPrefixNegatives}
             </label>
           </section>
 
           <section className="demo__card">
-            <h2>Custom functions</h2>
-            <p className="demo__hint">
-              Registered via the <code>functions</code> prop. Probe the host-side registry directly:
-            </p>
+            <h2>{ui.customFunctions}</h2>
+            <p className="demo__hint">{ui.customFunctionsHint}</p>
             <div className="demo__probe">
               <button
                 type="button"
                 className="demo__btn demo__btn--ghost"
-                onClick={() => runProbe('GREET', [{ kind: 'text', value: 'React' }])}
+                onClick={() => runProbe('GREET', [{ kind: 'text', value: 'Workbook' }])}
                 disabled={!instance}
               >
-                GREET("React")
+                GREET("Workbook")
               </button>
               <button
                 type="button"
@@ -1002,12 +1007,10 @@ export const App = (): ReactElement => {
           </section>
 
           <section className="demo__card demo__card--log">
-            <h2>Cell change log</h2>
-            <p className="demo__hint">
-              Mirrors <code>onCellChange</code> events into React state.
-            </p>
+            <h2>{ui.cellChangeLog}</h2>
+            <p className="demo__hint">{ui.cellChangeLogHint}</p>
             {log.length === 0 ? (
-              <p className="demo__empty">Edit a cell to see events stream in.</p>
+              <p className="demo__empty">{ui.editCellToSeeEvents}</p>
             ) : (
               <ul className="demo__log">
                 {log.map((entry) => (
@@ -1036,7 +1039,7 @@ export const App = (): ReactElement => {
               <button
                 type="button"
                 className="demo__modal-x"
-                aria-label="Close"
+                aria-label={ui.close}
                 onClick={closeReviewDialog}
               >
                 ×
@@ -1044,7 +1047,7 @@ export const App = (): ReactElement => {
             </header>
             <div className="demo__modal-body">
               {reviewDialog.items.length === 0 ? (
-                <p className="demo__modal-empty">No issues found.</p>
+                <p className="demo__modal-empty">{ui.noIssuesFound}</p>
               ) : (
                 <ul className="demo__modal-list">
                   {reviewDialog.items.map((item) => (
@@ -1058,7 +1061,7 @@ export const App = (): ReactElement => {
             </div>
             <footer className="demo__modal-footer">
               <button type="button" className="demo__btn" onClick={closeReviewDialog}>
-                OK
+                {ui.ok}
               </button>
             </footer>
           </section>
@@ -1070,7 +1073,7 @@ export const App = (): ReactElement => {
           className="demo__modal"
           role="dialog"
           aria-modal="true"
-          aria-label="Script"
+          aria-label={commandText.script}
         >
           <form
             className="demo__modal-panel demo__modal-panel--narrow"
@@ -1080,11 +1083,11 @@ export const App = (): ReactElement => {
             }}
           >
             <header className="demo__modal-header">
-              <h2>Script</h2>
+              <h2>{commandText.script}</h2>
               <button
                 type="button"
                 className="demo__modal-x"
-                aria-label="Close"
+                aria-label={ui.close}
                 onClick={closeScriptDialog}
               >
                 ×
@@ -1092,7 +1095,7 @@ export const App = (): ReactElement => {
             </header>
             <div className="demo__modal-body">
               <label className="demo__modal-field">
-                <span>Command</span>
+                <span>{ui.command}</span>
                 <input
                   value={scriptCommand}
                   onChange={(ev) => {
@@ -1105,10 +1108,10 @@ export const App = (): ReactElement => {
             </div>
             <footer className="demo__modal-footer">
               <button type="button" className="demo__btn" onClick={closeScriptDialog}>
-                Cancel
+                {ui.cancel}
               </button>
               <button type="submit" className="demo__btn demo__btn--active">
-                Run
+                {ui.run}
               </button>
             </footer>
           </form>

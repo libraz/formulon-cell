@@ -125,21 +125,46 @@ export const saveDemoWorkbookToDownload = ({
   }
 };
 
-export const DEMO_ICONS = {
-  app: ['M4 5.2 10 3.4l6 1.8v9.6l-6 1.8-6-1.8z', 'M10 3.4v13.2', 'M4 8.6h12', 'M4 11.4h12'],
-  save: ['M4 4h10l2 2v10H4z', 'M7 4v5h6V4', 'M7 13h6'],
+export type DemoIconName = 'app' | 'save' | 'undo' | 'redo' | 'search';
+
+export type DemoIconSegment = {
+  d: string;
+  fill?: string;
+  stroke?: string;
+};
+
+export const DEMO_ICONS: Record<DemoIconName, readonly DemoIconSegment[]> = {
+  app: [
+    { d: 'M4.5 4.5h11v11h-11z', stroke: '#ffffff' },
+    { d: 'M4.5 10h11M10 4.5v11', stroke: '#ffffff' },
+    { d: 'M5.3 5.3h4.2v4.2h-4.2z', fill: '#ffffff' },
+  ],
+  save: [
+    { d: 'M4 4h10l2 2v10H4z', fill: '#ffffff', stroke: '#1f1f1f' },
+    { d: 'M7 4v5h6V4', fill: '#2f75b5', stroke: '#1f4e79' },
+    { d: 'M7 12.6h6v3H7z', fill: '#eef6ee', stroke: '#8a8f98' },
+    { d: 'M8.5 14h3', stroke: '#8a8f98' },
+  ],
   undo: [
-    'M7.2 5.2H3.8v-3.4',
-    'M4 5.2c2.2-2.1 5.7-2.3 8.1-.5 2.7 2.1 3 6.1.7 8.6-1.8 1.9-4.8 2.4-7.1 1.2',
+    { d: 'M7.2 5.2H3.8v-3.4', stroke: '#107c41' },
+    {
+      d: 'M4 5.2c2.2-2.1 5.7-2.3 8.1-.5 2.7 2.1 3 6.1.7 8.6-1.8 1.9-4.8 2.4-7.1 1.2',
+      stroke: '#1f1f1f',
+    },
   ],
   redo: [
-    'M12.8 5.2h3.4v-3.4',
-    'M16 5.2c-2.2-2.1-5.7-2.3-8.1-.5-2.7 2.1-3 6.1-.7 8.6 1.8 1.9 4.8 2.4 7.1 1.2',
+    { d: 'M12.8 5.2h3.4v-3.4', stroke: '#107c41' },
+    {
+      d: 'M16 5.2c-2.2-2.1-5.7-2.3-8.1-.5-2.7 2.1-3 6.1-.7 8.6 1.8 1.9 4.8 2.4 7.1 1.2',
+      stroke: '#1f1f1f',
+    },
   ],
-  search: ['M8.5 14a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11z', 'M12.5 12.5L17 17'],
-} as const;
-
-export type DemoIconName = keyof typeof DEMO_ICONS;
+  search: [
+    { d: 'M8.5 14a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11z', fill: '#ffffff', stroke: '#1f1f1f' },
+    { d: 'M12.5 12.5L17 17', stroke: '#107c41' },
+    { d: 'M6.2 8.5h4.6', stroke: '#2f75b5' },
+  ],
+};
 
 export type DemoLocale = (typeof LOCALES)[number]['value'];
 
@@ -343,21 +368,49 @@ export const formatLoadError = (err: unknown): string =>
 
 export interface DemoUiStrings {
   saved: string;
+  quickAccessToolbar: string;
   search: string;
   searchCommands: string;
   share: string;
   workbook: string;
   demoPane: string;
+  demoChrome: string;
+  optionsPanel: string;
   open: string;
   save: string;
+  undo: string;
+  redo: string;
   file: string;
   info: string;
   print: string;
   pageSetup: string;
   theme: string;
+  themeLabels: Partial<Record<ThemeName, string>>;
   locale: string;
   signedInUser: string;
   close: string;
+  ok: string;
+  cancel: string;
+  run: string;
+  command: string;
+  noIssuesFound: string;
+  preset: string;
+  presetHint: string;
+  presets: Record<PresetKey, { label: string; hint: string }>;
+  features: string;
+  featuresHint: string;
+  featureGroupLabels: Record<string, string>;
+  featureLabels: Partial<Record<FeatureId, string>>;
+  spreadsheetRibbon: string;
+  cellRenderers: string;
+  cellRenderersHint: string;
+  uppercaseColumnA: string;
+  arrowPrefixNegatives: string;
+  customFunctions: string;
+  customFunctionsHint: string;
+  cellChangeLog: string;
+  cellChangeLogHint: string;
+  editCellToSeeEvents: string;
   backstageSub: string;
   newWorkbook: string;
   newWorkbookDesc: string;
@@ -373,6 +426,8 @@ export interface DemoUiStrings {
   printSettings: string;
   printPreviewSheet: string;
   printPreviewOrientation: string;
+  printPreviewOrientPortrait: string;
+  printPreviewOrientLandscape: string;
   printPreviewPaper: string;
   printPreviewPrinter: string;
   printPreviewPrinterMargins: string;
@@ -392,6 +447,7 @@ export interface DemoUiStrings {
   options: string;
   optionsDesc: string;
   noCommands: string;
+  loadingEngine: string;
   engineUnavailable: string;
   engineSetup: string;
 }
@@ -407,6 +463,7 @@ export interface DemoCommandStrings {
   openFailed: string;
   script: string;
   scriptCommandError: string;
+  spellingReview: string;
   accessibilityCheck: string;
   inkNotPersisted: string;
   selectInkFirst: string;
@@ -916,7 +973,13 @@ export const buildDemoPrintPreviewModel = (
     previewHtml: printDocument.html,
     settings: [
       { label: ui.printPreviewSheet, value: String(sheet + 1) },
-      { label: ui.printPreviewOrientation, value: setup.orientation },
+      {
+        label: ui.printPreviewOrientation,
+        value:
+          setup.orientation === 'portrait'
+            ? ui.printPreviewOrientPortrait
+            : ui.printPreviewOrientLandscape,
+      },
       { label: ui.printPreviewPaper, value: setup.paperSize },
       ...printerSettings,
       { label: ui.printPreviewMargins, value: formatMarginSummary(setup.margins) },
@@ -955,35 +1018,101 @@ export const buildDemoBackstageCards = (ui: DemoUiStrings): readonly DemoBacksta
   { action: 'options', label: ui.options, desc: ui.optionsDesc },
 ];
 
-const JA_FRAMEWORK: Record<DemoFramework, string> = {
-  React: 'React',
-  Vue: 'Vue',
-};
-
-/** Build the UI string table for a demo. The English/Japanese tables are
- *  identical between React and Vue except for the framework label embedded
- *  in `workbook` and `backstageSub`. */
-export function createDemoStrings(framework: DemoFramework): DemoStrings {
-  const ja = JA_FRAMEWORK[framework];
+/** Build the UI string table for a demo. The visible workbook chrome is kept
+ *  framework-neutral so the React and Vue wrappers share the same Excel-style
+ *  surface. */
+export function createDemoStrings(_framework: DemoFramework): DemoStrings {
   return {
     en: {
       saved: 'Saved to this device',
+      quickAccessToolbar: 'Quick Access Toolbar',
       search: 'Search',
       searchCommands: 'Search commands',
       share: 'Share',
-      workbook: `${framework} workbook`,
+      workbook: 'Workbook',
       demoPane: 'Options',
+      demoChrome: 'Demo chrome',
+      optionsPanel: 'Options panel',
       open: 'Open xlsx…',
       save: 'Save',
+      undo: 'Undo',
+      redo: 'Redo',
       file: 'File',
       info: 'Info',
       print: 'Print',
       pageSetup: 'Page Setup',
       theme: 'Theme',
+      themeLabels: {
+        paper: 'Light',
+        ink: 'Dark',
+        contrast: 'Contrast',
+      },
       locale: 'Locale',
       signedInUser: 'Signed in user',
       close: 'Close',
-      backstageSub: `${framework} workbook · full spreadsheet layout`,
+      ok: 'OK',
+      cancel: 'Cancel',
+      run: 'Run',
+      command: 'Command',
+      noIssuesFound: 'No issues found.',
+      preset: 'Preset',
+      presetHint:
+        'Toggle entire feature bundles, or override individual flags below. Changes apply live.',
+      presets: {
+        minimal: { label: 'Minimal', hint: 'bare spreadsheet chrome' },
+        standard: { label: 'Standard', hint: 'lightweight editing chrome' },
+        full: { label: 'Full', hint: 'complete spreadsheet chrome' },
+      },
+      features: 'Features',
+      featuresHint: 'Live-toggle individual feature flags.',
+      featureGroupLabels: {
+        Chrome: 'Chrome',
+        Editing: 'Editing',
+        'Dialogs & overlays': 'Dialogs & overlays',
+      },
+      featureLabels: {
+        formulaBar: 'Formula bar',
+        viewToolbar: 'View toolbar',
+        sheetTabs: 'Sheet tabs',
+        statusBar: 'Status bar',
+        workbookObjects: 'Workbook objects',
+        contextMenu: 'Context menu',
+        charts: 'Charts',
+        watchWindow: 'Watch window',
+        slicer: 'Slicer',
+        clipboard: 'Clipboard',
+        pasteSpecial: 'Paste special',
+        quickAnalysis: 'Quick Analysis',
+        formatPainter: 'Format painter',
+        autocomplete: 'Autocomplete',
+        shortcuts: 'Shortcuts',
+        wheel: 'Wheel scroll',
+        findReplace: 'Find & replace',
+        gotoSpecial: 'Go To Special',
+        formatDialog: 'Format dialog',
+        fxDialog: 'Function dialog',
+        pageSetup: 'Page setup',
+        iterative: 'Iterative calc',
+        conditional: 'Conditional formatting',
+        namedRanges: 'Named ranges',
+        hyperlink: 'Hyperlink',
+        commentDialog: 'Comment popover',
+        pivotTableDialog: 'PivotTable dialog',
+        validation: 'Data validation',
+        hoverComment: 'Hover comment',
+        errorIndicators: 'Error indicators',
+      },
+      spreadsheetRibbon: 'Spreadsheet ribbon',
+      cellRenderers: 'Cell renderers',
+      cellRenderersHint: 'Wired through the host formatter registry.',
+      uppercaseColumnA: 'Uppercase column A',
+      arrowPrefixNegatives: 'Arrow-prefix negatives',
+      customFunctions: 'Custom functions',
+      customFunctionsHint: 'Probe the host-side function registry directly.',
+      cellChangeLog: 'Cell change log',
+      cellChangeLogHint: 'Mirrors cell edits into the demo log.',
+      editCellToSeeEvents: 'Edit a cell to see events stream in.',
+      backstageSub: 'Workbook · spreadsheet layout',
       newWorkbook: 'New',
       newWorkbookDesc: 'Start from a blank workbook in this demo session.',
       openTitle: 'Open',
@@ -998,6 +1127,8 @@ export function createDemoStrings(framework: DemoFramework): DemoStrings {
       printSettings: 'Settings',
       printPreviewSheet: 'Active sheet',
       printPreviewOrientation: 'Orientation',
+      printPreviewOrientPortrait: 'Portrait Orientation',
+      printPreviewOrientLandscape: 'Landscape Orientation',
       printPreviewPaper: 'Paper size',
       printPreviewPrinter: 'Printer',
       printPreviewPrinterMargins: 'Minimum margins',
@@ -1017,28 +1148,101 @@ export function createDemoStrings(framework: DemoFramework): DemoStrings {
       options: 'Options',
       optionsDesc: 'Show the integration panel and feature toggles.',
       noCommands: 'No commands found',
+      loadingEngine: 'Loading engine...',
       engineUnavailable: 'Spreadsheet engine unavailable',
       engineSetup:
         'Serve this demo with COOP: same-origin and COEP: require-corp so SharedArrayBuffer is available.',
     },
     ja: {
       saved: 'このデバイスに保存済み',
+      quickAccessToolbar: 'クイック アクセス ツール バー',
       search: '検索',
       searchCommands: 'コマンドの検索',
       share: '共有',
-      workbook: `${ja} ブック`,
+      workbook: 'ブック',
       demoPane: 'オプション',
+      demoChrome: 'デモ表示',
+      optionsPanel: 'オプション パネル',
       open: 'xlsx を開く…',
       save: '保存',
+      undo: '元に戻す',
+      redo: 'やり直し',
       file: 'ファイル',
       info: '情報',
       print: '印刷',
       pageSetup: 'ページ設定',
       theme: 'テーマ',
+      themeLabels: {
+        paper: 'ライト',
+        ink: 'ダーク',
+        contrast: 'コントラスト',
+      },
       locale: '表示言語',
       signedInUser: 'サインイン中のユーザー',
       close: '閉じる',
-      backstageSub: `${ja} ブック · スプレッドシート レイアウト`,
+      ok: 'OK',
+      cancel: 'キャンセル',
+      run: '実行',
+      command: 'コマンド',
+      noIssuesFound: '問題は見つかりませんでした。',
+      preset: 'プリセット',
+      presetHint:
+        '機能セット全体を切り替えるか、下の個別フラグで上書きします。変更はすぐに反映されます。',
+      presets: {
+        minimal: { label: '最小', hint: '最小限のスプレッドシート表示' },
+        standard: { label: '標準', hint: '軽量な編集用表示' },
+        full: { label: 'フル', hint: '完全なスプレッドシート表示' },
+      },
+      features: '機能',
+      featuresHint: '個別の機能フラグをライブ切り替えします。',
+      featureGroupLabels: {
+        Chrome: '表示',
+        Editing: '編集',
+        'Dialogs & overlays': 'ダイアログとオーバーレイ',
+      },
+      featureLabels: {
+        formulaBar: '数式バー',
+        viewToolbar: '表示ツール バー',
+        sheetTabs: 'シート タブ',
+        statusBar: 'ステータス バー',
+        workbookObjects: 'ブック オブジェクト',
+        contextMenu: 'コンテキスト メニュー',
+        charts: 'グラフ',
+        watchWindow: 'ウォッチ ウィンドウ',
+        slicer: 'スライサー',
+        clipboard: 'クリップボード',
+        pasteSpecial: '形式を選択して貼り付け',
+        quickAnalysis: 'クイック分析',
+        formatPainter: '書式のコピー/貼り付け',
+        autocomplete: 'オートコンプリート',
+        shortcuts: 'ショートカット',
+        wheel: 'ホイール スクロール',
+        findReplace: '検索と置換',
+        gotoSpecial: 'ジャンプ',
+        formatDialog: 'セルの書式設定',
+        fxDialog: '関数ダイアログ',
+        pageSetup: 'ページ設定',
+        iterative: '反復計算',
+        conditional: '条件付き書式',
+        namedRanges: '名前付き範囲',
+        hyperlink: 'ハイパーリンク',
+        commentDialog: 'コメント ポップアップ',
+        pivotTableDialog: 'ピボットテーブル ダイアログ',
+        validation: 'データの入力規則',
+        hoverComment: 'ホバー コメント',
+        errorIndicators: 'エラー インジケーター',
+      },
+      spreadsheetRibbon: 'スプレッドシート リボン',
+      cellRenderers: 'セル レンダラー',
+      cellRenderersHint: 'ホスト側のフォーマッター登録を通じて適用されます。',
+      uppercaseColumnA: '列 A を大文字にする',
+      arrowPrefixNegatives: '負の値に矢印を付ける',
+      customFunctions: 'カスタム関数',
+      customFunctionsHint: 'ホスト側の関数レジストリを直接確認します。',
+      cellChangeLog: 'セル変更ログ',
+      cellChangeLogHint: 'セル編集をデモログに反映します。',
+      editCellToSeeEvents: 'セルを編集するとイベントが表示されます。',
+      backstageSub: 'ブック · スプレッドシート レイアウト',
       newWorkbook: '新規',
       newWorkbookDesc: 'このデモセッションで空のブックを開始します。',
       openTitle: '開く',
@@ -1053,6 +1257,8 @@ export function createDemoStrings(framework: DemoFramework): DemoStrings {
       printSettings: '設定',
       printPreviewSheet: 'アクティブ シート',
       printPreviewOrientation: '印刷の向き',
+      printPreviewOrientPortrait: '縦方向',
+      printPreviewOrientLandscape: '横方向',
       printPreviewPaper: '用紙サイズ',
       printPreviewPrinter: 'プリンター',
       printPreviewPrinterMargins: '最小余白',
@@ -1072,6 +1278,7 @@ export function createDemoStrings(framework: DemoFramework): DemoStrings {
       options: 'オプション',
       optionsDesc: '統合パネルと機能トグルを表示します。',
       noCommands: 'コマンドが見つかりません',
+      loadingEngine: 'エンジンを読み込んでいます...',
       engineUnavailable: 'スプレッドシートエンジンを起動できません',
       engineSetup:
         'SharedArrayBuffer を有効にするため、COOP: same-origin と COEP: require-corp 付きで配信してください。',
@@ -1092,6 +1299,7 @@ export const demoCommandText = (locale: string): DemoCommandStrings =>
         openFailed: 'ファイルを開けませんでした',
         script: 'スクリプト',
         scriptCommandError: '次のいずれかを使用してください: uppercase, lowercase, trim, clear.',
+        spellingReview: 'スペル チェック',
         accessibilityCheck: 'アクセシビリティ チェック',
         inkNotPersisted: 'このデモ ブックではインク ストロークは保存されません。',
         selectInkFirst: '消しゴムを使うには、先にインク ストロークを選択してください。',
@@ -1134,6 +1342,7 @@ export const demoCommandText = (locale: string): DemoCommandStrings =>
         openFailed: 'Open failed',
         script: 'Script',
         scriptCommandError: 'Use one of: uppercase, lowercase, trim, clear.',
+        spellingReview: 'Spelling Review',
         accessibilityCheck: 'Accessibility Check',
         inkNotPersisted: 'Ink strokes are not persisted in this demo workbook.',
         selectInkFirst: 'Select an ink stroke first to use the eraser.',

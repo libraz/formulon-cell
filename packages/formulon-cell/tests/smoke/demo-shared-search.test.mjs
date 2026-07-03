@@ -6,8 +6,10 @@ import {
   buildDemoPrintPreviewModel,
   buildDemoSearchItems,
   createDemoStrings,
+  DEMO_ICONS,
   DEMO_PRINTER_PROFILE_ID,
   DEMO_PRINTER_PROFILES,
+  demoCommandText,
   queryDemoSearchItems,
   refreshDemoPrinterProfiles,
   saveDemoWorkbookToDownload,
@@ -17,6 +19,81 @@ import { createSpreadsheetStore, mutators, WorkbookHandle } from '../../src/inde
 const repoRoot = join(import.meta.dirname, '../../../..');
 
 describe('demo-shared Search/Tell me items', () => {
+  it('keeps visible workbook chrome framework-neutral for the Excel baseline', () => {
+    const react = createDemoStrings('React');
+    const vue = createDemoStrings('Vue');
+
+    expect(react.en.workbook).toBe('Workbook');
+    expect(vue.en.workbook).toBe('Workbook');
+    expect(react.ja.workbook).toBe('ブック');
+    expect(vue.ja.workbook).toBe('ブック');
+    expect(react.en.quickAccessToolbar).toBe('Quick Access Toolbar');
+    expect(react.ja.quickAccessToolbar).toBe('クイック アクセス ツール バー');
+    expect(react.en.optionsPanel).toBe('Options panel');
+    expect(react.ja.optionsPanel).toBe('オプション パネル');
+    expect(react.en.undo).toBe('Undo');
+    expect(react.en.redo).toBe('Redo');
+    expect(react.ja.undo).toBe('元に戻す');
+    expect(react.ja.redo).toBe('やり直し');
+    expect(react.en.demoChrome).toBe('Demo chrome');
+    expect(react.ja.demoChrome).toBe('デモ表示');
+    expect(react.en.themeLabels.paper).toBe('Light');
+    expect(react.ja.themeLabels.paper).toBe('ライト');
+    expect(react.en.presets.full.label).toBe('Full');
+    expect(react.ja.presets.full.label).toBe('フル');
+    expect(react.en.featureGroupLabels.Editing).toBe('Editing');
+    expect(react.ja.featureGroupLabels.Editing).toBe('編集');
+    expect(react.en.featureLabels.formulaBar).toBe('Formula bar');
+    expect(react.ja.featureLabels.formulaBar).toBe('数式バー');
+    expect(react.en.featureLabels.pasteSpecial).toBe('Paste special');
+    expect(react.ja.featureLabels.pasteSpecial).toBe('形式を選択して貼り付け');
+    expect(react.en.spreadsheetRibbon).toBe('Spreadsheet ribbon');
+    expect(react.ja.spreadsheetRibbon).toBe('スプレッドシート リボン');
+    expect(react.en.cellChangeLog).toBe('Cell change log');
+    expect(react.ja.cellChangeLog).toBe('セル変更ログ');
+    expect(react.en.noIssuesFound).toBe('No issues found.');
+    expect(react.ja.noIssuesFound).toBe('問題は見つかりませんでした。');
+    expect(react.en.loadingEngine).toBe('Loading engine...');
+    expect(react.ja.loadingEngine).toBe('エンジンを読み込んでいます...');
+    expect(react.en.command).toBe('Command');
+    expect(react.ja.command).toBe('コマンド');
+    expect(demoCommandText('en').spellingReview).toBe('Spelling Review');
+    expect(demoCommandText('ja').spellingReview).toBe('スペル チェック');
+    expect(react.en.cancel).toBe('Cancel');
+    expect(react.ja.cancel).toBe('キャンセル');
+    expect(react.en.run).toBe('Run');
+    expect(react.ja.run).toBe('実行');
+    expect(react.en.backstageSub).toBe('Workbook · spreadsheet layout');
+    expect(vue.en.backstageSub).toBe('Workbook · spreadsheet layout');
+    expect(react.ja.backstageSub).toBe('ブック · スプレッドシート レイアウト');
+    expect(vue.ja.backstageSub).toBe('ブック · スプレッドシート レイアウト');
+    expect(`${react.en.workbook} ${react.en.backstageSub}`).not.toMatch(/React|Vue/);
+    expect(`${react.ja.workbook} ${react.ja.backstageSub}`).not.toMatch(/React|Vue/);
+  });
+
+  it('keeps demo Quick Access and search icons on semantic colored SVG segments', () => {
+    for (const iconName of ['app', 'save', 'undo', 'redo', 'search']) {
+      const segments = DEMO_ICONS[iconName];
+
+      expect(segments.length, iconName).toBeGreaterThan(1);
+      expect(segments.some((segment) => segment.stroke && segment.stroke !== 'currentColor')).toBe(
+        true,
+      );
+    }
+
+    expect(DEMO_ICONS.app.some((segment) => segment.fill === '#107c41')).toBe(true);
+    expect(DEMO_ICONS.save.some((segment) => segment.fill === '#2f75b5')).toBe(true);
+    expect(DEMO_ICONS.search.some((segment) => segment.stroke === '#107c41')).toBe(true);
+
+    const reactSource = readFileSync(join(repoRoot, 'apps/react-demo/src/App.tsx'), 'utf8');
+    const vueSource = readFileSync(join(repoRoot, 'apps/vue-demo/src/App.vue'), 'utf8');
+
+    expect(reactSource).toContain("fill={segment.fill ?? 'none'}");
+    expect(reactSource).toContain("stroke={segment.stroke ?? 'currentColor'}");
+    expect(vueSource).toContain(':fill="segment.fill ?? \'none\'"');
+    expect(vueSource).toContain(':stroke="segment.stroke ?? \'currentColor\'"');
+  });
+
   it('keeps disabled ribbon command reasons visible through the shared demo search model', () => {
     const setRibbonTab = vi.fn();
     const applyRibbonCommand = vi.fn(() => false);
@@ -210,9 +287,52 @@ describe('demo-shared Search/Tell me items', () => {
       label: 'Minimum margins',
       value: '0.16" / 0.14" / 0.18" / 0.14"',
     });
+    expect(model.settings).toContainEqual({
+      label: 'Orientation',
+      value: 'Portrait Orientation',
+    });
     expect(model.previewHtml).toContain(
       '@page { size: A4 portrait; margin: 0.16in 0.14in 0.18in 0.14in; }',
     );
+  });
+
+  it('localizes the Backstage print preview model for Japanese Excel chrome', async () => {
+    const store = createSpreadsheetStore();
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    const ui = createDemoStrings('React').ja;
+
+    const model = buildDemoPrintPreviewModel(ui, { store, workbook }, 'ブック');
+
+    expect(model.title).toBe('印刷');
+    expect(model.subtitle).toBe('ブック');
+    expect(model.printLabel).toBe('印刷');
+    expect(model.pdfLabel).toBe('PDF にエクスポート');
+    expect(model.pageSetupLabel).toBe('ページ設定');
+    expect(model.previewTitle).toBe('ページ 1');
+    expect(model.previewHint).toBe('プレビューはアクティブ シートのページ設定を反映します。');
+    expect(model.settings).toEqual(
+      expect.arrayContaining([
+        { label: 'アクティブ シート', value: '1' },
+        { label: '印刷の向き', value: '縦方向' },
+        { label: '用紙サイズ', value: 'A4' },
+        { label: 'プリンター', value: 'Demo Office Printer - A4' },
+        { label: '余白', value: '0.75" / 0.7" / 0.75" / 0.7"' },
+        { label: '拡大縮小', value: '100%' },
+        { label: '印刷範囲', value: '印刷範囲なし' },
+      ]),
+    );
+    expect(
+      [
+        model.title,
+        model.subtitle,
+        model.printLabel,
+        model.pdfLabel,
+        model.pageSetupLabel,
+        model.previewTitle,
+        model.previewHint,
+        ...model.settings.flatMap((setting) => [setting.label, setting.value]),
+      ].join('\n'),
+    ).not.toMatch(/React|Vue|portrait|landscape|Orientation|Print area|Active sheet/);
   });
 
   it('drives demo Save download and status bar upload state through the shared helper', () => {

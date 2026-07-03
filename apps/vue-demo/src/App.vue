@@ -238,8 +238,8 @@ const onSpellingReview = (): void => {
   const inst = instance.value;
   if (!inst) return;
   reviewDialog.value = {
-    title: 'Spelling Review',
-    items: analyzeSpellingCells(reviewCellsForInstance(inst)),
+    title: commandText.value.spellingReview,
+    items: analyzeSpellingCells(reviewCellsForInstance(inst), locale.value === 'ja' ? 'ja' : 'en'),
   };
 };
 
@@ -248,7 +248,10 @@ const onAccessibilityCheck = (): void => {
   if (!inst) return;
   reviewDialog.value = {
     title: commandText.value.accessibilityCheck,
-    items: analyzeAccessibilityCells(reviewCellsForInstance(inst)),
+    items: analyzeAccessibilityCells(
+      reviewCellsForInstance(inst),
+      locale.value === 'ja' ? 'ja' : 'en',
+    ),
   };
 };
 
@@ -512,6 +515,11 @@ const runCommand = (cmd: DemoSearchItem): void => {
   searchActiveIndex.value = -1;
 };
 
+const onToolbarReady = (next: ToolbarInstance | null): void => {
+  toolbar.value = next;
+  (window as unknown as { __fcToolbar?: ToolbarInstance | null }).__fcToolbar = next;
+};
+
 const onSearchKeydown = (ev: KeyboardEvent): void => {
   if (ev.key === 'Escape') {
     searchOpen.value = false;
@@ -574,7 +582,7 @@ onBeforeUnmount(() => {
       <span>{{ ui.engineSetup }}</span>
       <code>{{ loadError }}</code>
     </div>
-    <template v-else>Loading engine…</template>
+    <template v-else>{{ ui.loadingEngine }}</template>
   </div>
   <div v-else class="demo" :data-theme="theme">
     <header class="demo__head">
@@ -583,26 +591,26 @@ onBeforeUnmount(() => {
           ref="quickAccess"
           class="demo__quick"
           role="toolbar"
-          aria-label="Quick access toolbar"
+          :aria-label="ui.quickAccessToolbar"
         >
           <span class="demo__brand-mark" aria-hidden="true">
-            <svg class="demo__rb-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path v-for="path in DEMO_ICONS.app" :key="path" :d="path" />
+            <svg class="demo__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path v-for="segment in DEMO_ICONS.app" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
             </svg>
           </span>
-          <button type="button" class="demo__title-icon" aria-label="Save" @click="onSave">
-            <svg class="demo__rb-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path v-for="path in DEMO_ICONS.save" :key="path" :d="path" />
+          <button type="button" class="demo__title-icon" :aria-label="ui.save" @click="onSave">
+            <svg class="demo__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path v-for="segment in DEMO_ICONS.save" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
             </svg>
           </button>
-          <button type="button" class="demo__title-icon" aria-label="Undo" @click="instance?.undo()">
-            <svg class="demo__rb-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path v-for="path in DEMO_ICONS.undo" :key="path" :d="path" />
+          <button type="button" class="demo__title-icon" :aria-label="ui.undo" @click="instance?.undo()">
+            <svg class="demo__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path v-for="segment in DEMO_ICONS.undo" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
             </svg>
           </button>
-          <button type="button" class="demo__title-icon" aria-label="Redo" @click="instance?.redo()">
-            <svg class="demo__rb-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path v-for="path in DEMO_ICONS.redo" :key="path" :d="path" />
+          <button type="button" class="demo__title-icon" :aria-label="ui.redo" @click="instance?.redo()">
+            <svg class="demo__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path v-for="segment in DEMO_ICONS.redo" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
             </svg>
           </button>
         </div>
@@ -611,8 +619,8 @@ onBeforeUnmount(() => {
           <span>{{ ui.saved }}</span>
         </div>
         <div class="demo__search">
-          <svg class="demo__rb-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path v-for="path in DEMO_ICONS.search" :key="path" :d="path" />
+          <svg class="demo__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path v-for="segment in DEMO_ICONS.search" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
           </svg>
           <input
             ref="searchInput"
@@ -700,7 +708,7 @@ onBeforeUnmount(() => {
           :on-add-in="
             () => showRibbonNotice(commandText.addIns, commandText.addInsHostCallbacks)
           "
-          :on-toolbar-ready="(next) => { toolbar = next }"
+          :on-toolbar-ready="onToolbarReady"
           @tab-change="ribbonTab = $event"
         />
         <Spreadsheet
@@ -738,8 +746,8 @@ onBeforeUnmount(() => {
           <div class="demo__backstage-main">
             <div class="demo__backstage-title">
               <span class="demo__backstage-xl" aria-hidden="true">
-                <svg class="demo__rb-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path v-for="path in DEMO_ICONS.app" :key="path" :d="path" />
+                <svg class="demo__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path v-for="segment in DEMO_ICONS.app" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
                 </svg>
               </span>
               <div>
@@ -815,9 +823,9 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </div>
-      <aside class="demo__panel" aria-label="Options panel" :hidden="!showPanel">
+      <aside class="demo__panel" :aria-label="ui.optionsPanel" :hidden="!showPanel">
         <section class="demo__card">
-          <h2>Demo chrome</h2>
+          <h2>{{ ui.demoChrome }}</h2>
           <div class="demo__controls demo__controls--panel">
             <div class="demo__seg" role="group" :aria-label="ui.theme">
               <button
@@ -828,7 +836,7 @@ onBeforeUnmount(() => {
                 :aria-pressed="theme === t.value"
                 @click="theme = t.value"
               >
-                {{ t.label }}
+                {{ ui.themeLabels[t.value] ?? t.label }}
               </button>
             </div>
             <div class="demo__seg" role="group" :aria-label="ui.locale">
@@ -847,11 +855,8 @@ onBeforeUnmount(() => {
         </section>
 
         <section class="demo__card">
-          <h2>Preset</h2>
-          <p class="demo__hint">
-            Toggle entire feature bundles, or override individual flags below. Changes
-            flow through <code>inst.setFeatures()</code> live — edits survive.
-          </p>
+          <h2>{{ ui.preset }}</h2>
+          <p class="demo__hint">{{ ui.presetHint }}</p>
           <div class="demo__preset">
             <button
               v-for="p in PRESETS"
@@ -861,20 +866,17 @@ onBeforeUnmount(() => {
               :aria-pressed="preset === p.value"
               @click="onPresetChange(p.value)"
             >
-              <span class="demo__preset-name">{{ p.label }}</span>
-              <span class="demo__preset-hint">{{ p.hint }}</span>
+              <span class="demo__preset-name">{{ ui.presets[p.value]?.label ?? p.label }}</span>
+              <span class="demo__preset-hint">{{ ui.presets[p.value]?.hint ?? p.hint }}</span>
             </button>
           </div>
         </section>
 
         <section class="demo__card">
-          <h2>Features</h2>
-          <p class="demo__hint">
-            Live-toggle individual <code>FeatureFlags</code>. Disabled flags skip their
-            <code>attach*</code> in <code>mount.ts</code>.
-          </p>
+          <h2>{{ ui.features }}</h2>
+          <p class="demo__hint">{{ ui.featuresHint }}</p>
           <div v-for="group in FEATURE_GROUPS" :key="group.title" class="demo__feat-group">
-            <h3 class="demo__feat-title">{{ group.title }}</h3>
+            <h3 class="demo__feat-title">{{ ui.featureGroupLabels[group.title] ?? group.title }}</h3>
             <div class="demo__feat-grid">
               <label
                 v-for="f in group.features"
@@ -886,14 +888,14 @@ onBeforeUnmount(() => {
                   :checked="isFeatureOn(f.id)"
                   @change="onFeatureToggle(f.id)"
                 />
-                <span>{{ f.label }}</span>
+                <span>{{ ui.featureLabels[f.id] ?? f.label }}</span>
               </label>
               <label
                 v-if="group.title === 'Chrome'"
                 :class="['demo__feat', { 'demo__feat--on': resolvedUi.ribbon }]"
               >
                 <input type="checkbox" v-model="showRibbon" />
-                <span>Spreadsheet ribbon</span>
+                <span>{{ ui.spreadsheetRibbon }}</span>
               </label>
             </div>
           </div>
@@ -905,34 +907,29 @@ onBeforeUnmount(() => {
         </section>
 
         <section class="demo__card">
-          <h2>Cell renderers</h2>
-          <p class="demo__hint">
-            Wired via <code>inst.cells.registerFormatter</code>.
-          </p>
+          <h2>{{ ui.cellRenderers }}</h2>
+          <p class="demo__hint">{{ ui.cellRenderersHint }}</p>
           <label class="demo__check">
             <input type="checkbox" v-model="formatters.uppercase" />
-            Uppercase column A
+            {{ ui.uppercaseColumnA }}
           </label>
           <label class="demo__check">
             <input type="checkbox" v-model="formatters.arrows" />
-            Arrow-prefix negatives
+            {{ ui.arrowPrefixNegatives }}
           </label>
         </section>
 
         <section class="demo__card">
-          <h2>Custom functions</h2>
-          <p class="demo__hint">
-            Registered via the <code>functions</code> prop. Probe the host-side
-            registry directly:
-          </p>
+          <h2>{{ ui.customFunctions }}</h2>
+          <p class="demo__hint">{{ ui.customFunctionsHint }}</p>
           <div class="demo__probe">
             <button
               type="button"
               class="demo__btn demo__btn--ghost"
               :disabled="!instance"
-              @click="runProbe('GREET', [{ kind: 'text', value: 'Vue' }])"
+              @click="runProbe('GREET', [{ kind: 'text', value: 'Workbook' }])"
             >
-              GREET("Vue")
+              GREET("Workbook")
             </button>
             <button
               type="button"
@@ -949,12 +946,10 @@ onBeforeUnmount(() => {
         </section>
 
         <section class="demo__card demo__card--log">
-          <h2>Cell change log</h2>
-          <p class="demo__hint">
-            Mirrors the <code>cell-change</code> emit into Vue refs.
-          </p>
+          <h2>{{ ui.cellChangeLog }}</h2>
+          <p class="demo__hint">{{ ui.cellChangeLogHint }}</p>
           <p v-if="log.length === 0" class="demo__empty">
-            Edit a cell to see events stream in.
+            {{ ui.editCellToSeeEvents }}
           </p>
           <ul v-else class="demo__log">
             <li v-for="entry in log" :key="entry.id">
@@ -980,7 +975,7 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="demo__modal-x"
-            aria-label="Close"
+            :aria-label="ui.close"
             @click="closeReviewDialog"
           >
             ×
@@ -988,7 +983,7 @@ onBeforeUnmount(() => {
         </header>
         <div class="demo__modal-body">
           <p v-if="reviewDialog.items.length === 0" class="demo__modal-empty">
-            No issues found.
+            {{ ui.noIssuesFound }}
           </p>
           <ul v-else class="demo__modal-list">
             <li v-for="(item, index) in reviewDialog.items" :key="`${item.label}-${index}`">
@@ -998,7 +993,7 @@ onBeforeUnmount(() => {
           </ul>
         </div>
         <footer class="demo__modal-footer">
-          <button type="button" class="demo__btn" @click="closeReviewDialog">OK</button>
+          <button type="button" class="demo__btn" @click="closeReviewDialog">{{ ui.ok }}</button>
         </footer>
       </section>
     </div>
@@ -1008,15 +1003,15 @@ onBeforeUnmount(() => {
       class="demo__modal"
       role="dialog"
       aria-modal="true"
-      aria-label="Script"
+      :aria-label="commandText.script"
     >
       <form class="demo__modal-panel demo__modal-panel--narrow" @submit.prevent="applyScriptCommand">
         <header class="demo__modal-header">
-          <h2>Script</h2>
+          <h2>{{ commandText.script }}</h2>
           <button
             type="button"
             class="demo__modal-x"
-            aria-label="Close"
+            :aria-label="ui.close"
             @click="closeScriptDialog"
           >
             ×
@@ -1024,14 +1019,14 @@ onBeforeUnmount(() => {
         </header>
         <div class="demo__modal-body">
           <label class="demo__modal-field">
-            <span>Command</span>
+            <span>{{ ui.command }}</span>
             <input v-model="scriptCommand" autofocus @input="scriptError = null" />
           </label>
           <p v-if="scriptError" class="demo__modal-error">{{ scriptError }}</p>
         </div>
         <footer class="demo__modal-footer">
-          <button type="button" class="demo__btn" @click="closeScriptDialog">Cancel</button>
-          <button type="submit" class="demo__btn demo__btn--active">Run</button>
+          <button type="button" class="demo__btn" @click="closeScriptDialog">{{ ui.cancel }}</button>
+          <button type="submit" class="demo__btn demo__btn--active">{{ ui.run }}</button>
         </footer>
       </form>
     </div>

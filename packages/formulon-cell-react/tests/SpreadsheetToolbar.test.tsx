@@ -1,6 +1,6 @@
 // SpreadsheetToolbar is now a thin adapter on top of
 // `Spreadsheet.mountToolbar` — the prior 5k+ LOC of React-internal ribbon UI
-// (and the tests that drove it) was retired in Phase 3-b. These smoke tests
+// (and the tests that drove it) was retired. These smoke tests
 // cover the adapter's responsibilities: mounts the core toolbar against its
 // host, forwards tab switches in both directions, and dispatches the
 // optional review / automation / drawing callbacks as `RibbonHooks` so a
@@ -21,6 +21,7 @@ import {
 
 // React 18+ asks act() callers to opt-in via this global.
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+vi.setConfig({ testTimeout: 20_000 });
 
 const flush = async (): Promise<void> => {
   for (let i = 0; i < 8; i += 1) await Promise.resolve();

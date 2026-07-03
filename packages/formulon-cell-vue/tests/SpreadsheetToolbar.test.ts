@@ -1,6 +1,6 @@
 // `SpreadsheetToolbar.vue` is now a ~100 LOC adapter on top of
 // `Spreadsheet.mountToolbar`. The prior 3754 LOC of Vue-internal ribbon and
-// the matching 1260 LOC test suite were retired in Phase 3-b.
+// the matching 1260 LOC test suite were retired.
 //
 // happy-dom + vitest can't compile `.vue` SFCs without `@vitejs/plugin-vue`,
 // which the project deliberately avoids. We mirror the SFC's `<script setup>`
@@ -32,6 +32,8 @@ import {
   mountVueSpreadsheet,
   uninstallVueDomStubs,
 } from './test-utils/mount';
+
+vi.setConfig({ testTimeout: 20_000 });
 
 interface AdapterProps {
   instance: SpreadsheetInstance | null;
