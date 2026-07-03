@@ -21,8 +21,10 @@
   color: var(--demo-fg);
   background: var(--demo-card);
   border: 1px solid var(--demo-line);
-  border-radius: 4px;
-  box-shadow: var(--fc-shadow-16);
+  border-radius: 2px;
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.18),
+    0 1px 4px rgba(0, 0, 0, 0.14);
   font: 13px / 1.35 var(--demo-font);
 }
 
@@ -82,7 +84,7 @@
   padding: 8px 10px;
   background: var(--demo-bg);
   border: 1px solid var(--demo-line);
-  border-radius: 3px;
+  border-radius: 2px;
 }
 
 .demo__modal-list strong {
@@ -162,7 +164,7 @@
   padding: 8px;
   background: var(--demo-panel-bg);
   border: 1px solid var(--demo-ribbon-line);
-  border-radius: 4px;
+  border-radius: 2px;
   font-size: 12px;
 }
 

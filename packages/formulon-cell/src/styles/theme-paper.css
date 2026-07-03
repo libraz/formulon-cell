@@ -11,7 +11,7 @@
     --fc-bg-elev: #ffffff;
     --fc-bg-rail: #faf9f8;
     --fc-bg-hover: #f3f2f1;
-    --fc-bg-header: #cfcfcf; /* gray fill for selected row/column headers */
+    --fc-bg-header: #e6e6e6; /* light gray fill for selected row/column headers */
 
     /* Foreground — Fluent neutralPrimary scale */
     --fc-fg: #201f1e;
@@ -20,37 +20,37 @@
     --fc-fg-faint: #8a8886;
 
     /* Rules — Fluent neutralLighter → neutralTertiaryAlt */
-    --fc-rule: #d2d0ce;
-    --fc-rule-strong: #a19f9d;
+    --fc-rule: #d9d9d9;
+    --fc-rule-strong: #bfbfbf;
 
     /* Accent — Excel 365 selection green. */
-    --fc-accent: #217346;
-    --fc-accent-strong: #185c37;
+    --fc-accent: #107c41;
+    --fc-accent-strong: #0b5f31;
     --fc-accent-soft: rgba(0, 0, 0, 0.2);
     --fc-accent-fg: #ffffff;
 
     /* Cell-state tints */
     --fc-cell-error-fg: #a4262c;
     --fc-cell-formula-fg: #201f1e;
-    --fc-cell-bool-fg: #217346;
+    --fc-cell-bool-fg: #107c41;
     --fc-cell-num-fg: var(--fc-fg-strong);
 
     /* Header — spreadsheet uses cool gray rail with darker active text */
     --fc-header-fg: #605e5c;
-    --fc-header-fg-active: #217346;
+    --fc-header-fg-active: #107c41;
     --fc-header-bg: var(--fc-bg-rail);
     --fc-header-rule: var(--fc-rule);
 
     --fc-sheetbar-bg: #f3f2f1;
-    --fc-sheetbar-tab-hover: #faf9f8;
+    --fc-sheetbar-tab-hover: #e9e9e9;
     --fc-sheetbar-tab-active: var(--fc-bg);
-    --fc-sheetbar-tab-rule: #edebe9;
+    --fc-sheetbar-tab-rule: #d9d9d9;
 
-    --fc-statusbar-bg: var(--fc-accent);
-    --fc-statusbar-border: var(--fc-accent-strong);
-    --fc-statusbar-fg: color-mix(in srgb, var(--fc-accent-fg) 76%, transparent);
-    --fc-statusbar-fg-strong: var(--fc-accent-fg);
-    --fc-statusbar-control: color-mix(in srgb, var(--fc-accent-fg) 36%, transparent);
+    --fc-statusbar-bg: #f3f2f1;
+    --fc-statusbar-border: #d9d9d9;
+    --fc-statusbar-fg: #605e5c;
+    --fc-statusbar-fg-strong: #201f1e;
+    --fc-statusbar-control: #c8c6c4;
 
     /* Hover row/column tints */
     --fc-hover-stripe: rgba(16, 124, 65, 0.025);
@@ -73,8 +73,8 @@
 
     /* === FORMAT-CELLS DIALOG (light) ===
      * Spreadsheet-Properties-dialog look, light variant. Panel + body stay
-     * white; the active tab carries a thin green underline; list panes get a
-     * 2px green focus ring; primary action button is solid spreadsheet green. */
+     * white; the active tab is a compact green Excel 365 pill; list panes get
+     * a green focus edge; primary action button is solid spreadsheet green. */
     --fc-fmtdlg-panel-bg: #ffffff;
     --fc-fmtdlg-panel-fg: #1f2328;
     --fc-fmtdlg-header-bg: #ffffff;
@@ -85,16 +85,16 @@
     --fc-fmtdlg-section-fg: #222222;
     --fc-fmtdlg-hint-fg: #424242;
 
-    /* Tabs — light keeps the underline indicator (Excel-365 light). */
-    --fc-fmtdlg-tab-bg: transparent;
-    --fc-fmtdlg-tab-border: #dedede;
+    /* Tabs — Japanese Excel 365 desktop uses a compact green selected pill. */
+    --fc-fmtdlg-tab-bg: #f3f3f3;
+    --fc-fmtdlg-tab-border: #e8e8e8;
     --fc-fmtdlg-tab-color: #1f1f1f;
     --fc-fmtdlg-tab-hover: #ececec;
     --fc-fmtdlg-tab-hover-color: #111;
-    --fc-fmtdlg-tab-active-bg: transparent;
-    --fc-fmtdlg-tab-active-color: #111;
-    --fc-fmtdlg-tab-active-underline: block;
-    --fc-fmtdlg-tab-radius: 0;
+    --fc-fmtdlg-tab-active-bg: #107c41;
+    --fc-fmtdlg-tab-active-color: #ffffff;
+    --fc-fmtdlg-tab-active-underline: none;
+    --fc-fmtdlg-tab-radius: 5px;
 
     /* Sample preview cell */
     --fc-fmtdlg-preview-bg: #f3f3f3;
@@ -104,13 +104,13 @@
     /* Listbox panes (number categories, negative samples, pattern list, …) */
     --fc-fmtdlg-list-bg: #ffffff;
     --fc-fmtdlg-list-fg: #1f2328;
-    --fc-fmtdlg-list-border: #d8d8d8;
-    --fc-fmtdlg-list-focus-border: #1f5f31;
-    --fc-fmtdlg-list-hover-bg: #f1f7f3;
+    --fc-fmtdlg-list-border: #86aa8f;
+    --fc-fmtdlg-list-focus-border: #6f9e7c;
+    --fc-fmtdlg-list-hover-bg: #eeeeee;
     --fc-fmtdlg-list-selected-bg: #d6d6d6;
     --fc-fmtdlg-list-selected-fg: inherit;
-    --fc-fmtdlg-list-selected-bar: #1f5f31;
-    --fc-fmtdlg-cat-selected-bg: #1f5f31;
+    --fc-fmtdlg-list-selected-bar: #107c41;
+    --fc-fmtdlg-cat-selected-bg: #107c41;
     --fc-fmtdlg-cat-selected-fg: #ffffff;
 
     /* Inputs */
@@ -120,14 +120,14 @@
     --fc-fmtdlg-input-hover-border: #d3d3d3;
 
     /* Action buttons */
-    --fc-fmtdlg-btn-bg: #ffffff;
+    --fc-fmtdlg-btn-bg: #f3f3f3;
     --fc-fmtdlg-btn-fg: #1f2328;
-    --fc-fmtdlg-btn-border: #c8c8c8;
-    --fc-fmtdlg-btn-hover-bg: #f3f3f3;
-    --fc-fmtdlg-btn-hover-border: #8a8886;
-    --fc-fmtdlg-btn-primary-bg: #1f5f31;
+    --fc-fmtdlg-btn-border: transparent;
+    --fc-fmtdlg-btn-hover-bg: #e9e9e9;
+    --fc-fmtdlg-btn-hover-border: transparent;
+    --fc-fmtdlg-btn-primary-bg: #107c41;
     --fc-fmtdlg-btn-primary-fg: #ffffff;
-    --fc-fmtdlg-btn-primary-hover-bg: #25753c;
+    --fc-fmtdlg-btn-primary-hover-bg: #0b5f31;
 
     /* Chip-style choice grid items */
     --fc-fmtdlg-chip-bg: #eeeeee;

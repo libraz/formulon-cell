@@ -6,8 +6,7 @@
     min-width: 138px;
     min-height: 330px;
     padding: 4px;
-    /* Idle border is invisible by default — focus-within reveals the
-       2px Excel-365 green ring around the active listbox. */
+    /* Idle border keeps layout stable; focus-within adds the Excel green edge. */
     border: 2px solid var(--fc-fmtdlg-list-border, transparent);
     border-radius: 2px;
     background: var(--fc-fmtdlg-list-bg);
@@ -16,6 +15,7 @@
   }
   .fc-fmtdlg__cat:focus-within {
     border-color: var(--fc-fmtdlg-list-focus-border);
+    box-shadow: inset 0 0 0 1px var(--fc-fmtdlg-list-focus-border);
   }
   .fc-fmtdlg__number-layout {
     display: grid;
@@ -88,6 +88,7 @@
   }
   .fc-fmtdlg__negative-list:focus-within {
     border-color: var(--fc-fmtdlg-list-focus-border);
+    box-shadow: inset 0 0 0 1px var(--fc-fmtdlg-list-focus-border);
   }
 
   .fc-fmtdlg__negative-item {
@@ -156,6 +157,7 @@
   }
   .fc-fmtdlg__pattern-list:focus-within {
     border-color: var(--fc-fmtdlg-list-focus-border);
+    box-shadow: inset 0 0 0 1px var(--fc-fmtdlg-list-focus-border);
   }
 
   .fc-fmtdlg__pattern-item {

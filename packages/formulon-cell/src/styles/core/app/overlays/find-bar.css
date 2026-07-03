@@ -17,7 +17,7 @@
     color: var(--fc-fg, CanvasText);
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 24%, transparent));
-    border-radius: 4px;
+    border-radius: 2px;
     box-shadow:
       0 14px 36px rgba(0, 0, 0, 0.2),
       0 1px 3px rgba(0, 0, 0, 0.12);
@@ -207,7 +207,7 @@
 
   .fc-find__results-table tr:hover,
   .fc-find__results-table tr:focus-visible {
-    background: var(--fc-accent-soft, color-mix(in srgb, Highlight 18%, transparent));
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 6%, transparent));
     outline: 0;
   }
 
@@ -243,7 +243,7 @@
   }
 
   .fc-find__btn:hover {
-    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 6%, transparent));
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 6%, transparent));
   }
 
   .fc-find__btn:disabled {
@@ -256,14 +256,30 @@
     outline-offset: 1px;
   }
   .fc-find__btn--icon {
+    position: relative;
     min-width: 22px;
     width: 22px;
     height: 22px;
     padding: 0;
     border-color: transparent;
     background: transparent;
-    font-size: 16px;
-    line-height: 1;
+  }
+  .fc-find__btn--icon::before,
+  .fc-find__btn--icon::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 11px;
+    height: 1.4px;
+    border-radius: 1px;
+    background: currentColor;
+    content: "";
+  }
+  .fc-find__btn--icon::before {
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+  .fc-find__btn--icon::after {
+    transform: translate(-50%, -50%) rotate(-45deg);
   }
 
   .fc-find__options-btn {

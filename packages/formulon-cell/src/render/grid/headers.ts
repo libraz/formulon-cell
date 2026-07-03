@@ -28,11 +28,11 @@ export function paintHeaders(
   ctx.fillRect(0, 0, ox, oy);
   ctx.save();
   ctx.fillStyle = theme.headerFg;
-  ctx.globalAlpha = 0.42;
+  ctx.globalAlpha = 0.34;
   ctx.beginPath();
-  ctx.moveTo(labelLeftX + 10, labelTopY + layout.headerRowHeight - 7);
-  ctx.lineTo(ox - 7, labelTopY + 7);
-  ctx.lineTo(ox - 7, labelTopY + layout.headerRowHeight - 7);
+  ctx.moveTo(labelLeftX + 12, labelTopY + layout.headerRowHeight - 6);
+  ctx.lineTo(ox - 7, labelTopY + 8);
+  ctx.lineTo(ox - 7, labelTopY + layout.headerRowHeight - 6);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
@@ -54,7 +54,6 @@ export function paintHeaders(
   const firstRow = rows.visible[0] ?? 0;
   const firstCol = cols.visible[0] ?? 0;
 
-  ctx.font = `500 ${theme.textHeader}px ${theme.fontUi}`;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'center';
   const r1c1 = state.ui.r1c1 === true;
@@ -87,6 +86,7 @@ export function paintHeaders(
       : isSelectedCol
         ? theme.headerFgActive
         : theme.headerFg;
+    ctx.font = `${isActiveCol || isSelectedCol ? 600 : 400} ${theme.textHeader}px ${theme.fontUi}`;
     const label = r1c1 ? `C${c + 1}` : colLabel(c);
     ctx.fillText(label, rect.x + w / 2, labelTopY + layout.headerRowHeight / 2 + 0.5);
     if (isActiveCol) {
@@ -162,6 +162,7 @@ export function paintHeaders(
       : isSelectedRow
         ? theme.headerFgActive
         : theme.headerFg;
+    ctx.font = `${isActiveRow || isSelectedRow ? 600 : 400} ${theme.textHeader}px ${theme.fontUi}`;
     const rowLabel = r1c1 ? `R${r + 1}` : String(r + 1);
     ctx.fillText(rowLabel, ox - 8, rect.y + h / 2 + 0.5);
     if (isActiveRow) {

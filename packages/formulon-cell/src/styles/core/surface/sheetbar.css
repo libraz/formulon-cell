@@ -1,13 +1,13 @@
 @layer fc.surface {
   .fc-host__sheetbar {
-    --fc-sheetbar-height: 30px;
-    --fc-sheetbar-button-size: 24px;
-    --fc-sheetbar-button-height: 22px;
-    --fc-sheetbar-tab-height: 28px;
-    --fc-sheetbar-tab-min-width: 96px;
-    --fc-sheetbar-tab-max-width: 180px;
-    --fc-sheetbar-rename-width: 136px;
-    --fc-sheetbar-rename-height: 24px;
+    --fc-sheetbar-height: 28px;
+    --fc-sheetbar-button-size: 22px;
+    --fc-sheetbar-button-height: 20px;
+    --fc-sheetbar-tab-height: 26px;
+    --fc-sheetbar-tab-min-width: 78px;
+    --fc-sheetbar-tab-max-width: 160px;
+    --fc-sheetbar-rename-width: 124px;
+    --fc-sheetbar-rename-height: 22px;
     display: flex;
     align-items: stretch;
     gap: 0;
@@ -20,7 +20,7 @@
   .fc-host__sheetbar-nav {
     display: flex;
     align-items: center;
-    padding: 2px 4px 2px 6px;
+    padding: 1px 4px 1px 6px;
     border-right: var(--fc-hairline) solid var(--fc-rule);
   }
 
@@ -55,8 +55,8 @@
 
   .fc-host__sheetbar-navbtn:hover:not(:disabled),
   .fc-host__sheetbar-add:hover:not(:disabled) {
-    background: var(--fc-accent-soft);
-    color: var(--fc-accent);
+    background: var(--fc-bg-hover);
+    color: var(--fc-fg-strong);
   }
 
   .fc-host__sheetbar-navbtn:disabled,
@@ -79,11 +79,14 @@
 
   .fc-host__sheetbar-tab {
     position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex: 0 0 auto;
     min-width: var(--fc-sheetbar-tab-min-width);
     max-width: var(--fc-sheetbar-tab-max-width);
     height: var(--fc-sheetbar-tab-height);
-    padding: 0 18px;
+    padding: 0 16px;
     overflow: hidden;
     border: 0;
     border-right: var(--fc-hairline) solid var(--fc-sheetbar-tab-rule, var(--fc-rule));
@@ -110,12 +113,12 @@
     color: var(--fc-fg);
     font-family: var(--fc-font-ui);
     font-size: 12px;
-    box-shadow: 0 0 0 2px var(--fc-accent-soft);
+    box-shadow: none;
   }
 
   .fc-host__sheetbar-rename[aria-invalid="true"] {
     border-color: var(--fc-cell-error-fg);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--fc-cell-error-fg) 18%, transparent);
+    box-shadow: none;
   }
 
   .fc-host__sheetbar-tab:hover {
@@ -134,8 +137,8 @@
 
   .fc-host__sheetbar-tab[aria-selected="true"] {
     background: var(--fc-sheetbar-tab-active, var(--fc-bg));
-    color: var(--fc-fg-strong);
-    font-weight: 500;
+    color: var(--fc-accent);
+    font-weight: 400;
   }
 
   .fc-host__sheetbar-tab[data-fc-sheet-tab-color="true"][aria-selected="true"] {
@@ -147,7 +150,7 @@
     right: 14px;
     bottom: 0;
     left: 14px;
-    height: 2px;
+    height: 3px;
     background: var(--fc-accent);
     content: "";
   }
@@ -166,9 +169,15 @@
   .fc-host__sheetbar-add {
     flex: 0 0 auto;
     align-self: center;
-    margin: 3px 8px;
-    border: 0;
+    margin: 2px 8px;
+    border: var(--fc-hairline) solid var(--fc-statusbar-control, var(--fc-rule));
+    border-radius: 50%;
     background: transparent;
     line-height: 1;
+  }
+
+  .fc-host__sheetbar-add .fc-host__icon {
+    width: 14px;
+    height: 14px;
   }
 }

@@ -27,10 +27,15 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: 2px;
-  background: var(--demo-title-strong);
-  color: var(--demo-title-fg);
+  border-radius: 4px;
+  background: var(--demo-brand);
+  color: #ffffff;
   font-size: 14px;
+}
+
+.demo__brand-mark .demo__rb-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .demo__brand-sep,
@@ -80,7 +85,7 @@
 }
 
 .demo__seg-btn:hover {
-  background: var(--demo-accent-soft);
+  background: var(--demo-ribbon-hover);
   color: var(--demo-fg);
 }
 
@@ -106,8 +111,8 @@
 }
 
 .demo__btn:hover:not(:disabled) {
-  background: var(--demo-accent-soft);
-  border-color: var(--demo-accent);
+  background: var(--demo-ribbon-hover);
+  border-color: var(--demo-ribbon-line);
 }
 
 .demo__btn--active {

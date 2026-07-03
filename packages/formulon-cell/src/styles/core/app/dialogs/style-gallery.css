@@ -25,7 +25,7 @@
     color: var(--fc-fg, CanvasText);
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: 4px;
+    border-radius: 2px;
     box-shadow:
       0 18px 48px rgba(0, 0, 0, 0.22),
       0 2px 8px rgba(0, 0, 0, 0.16);
@@ -69,7 +69,7 @@
     transition: filter 80ms ease;
   }
   .fc-stylegallery__chip:hover {
-    background: #faf9f8;
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 6%, transparent));
     border-color: var(--fc-rule-strong, color-mix(in srgb, CanvasText 28%, transparent));
   }
   .fc-stylegallery__chip:focus-visible {

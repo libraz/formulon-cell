@@ -12,8 +12,10 @@
     color: var(--fc-fg, CanvasText);
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: var(--fc-radius-md, 6px);
-    box-shadow: 0 6px 18px color-mix(in srgb, CanvasText 18%, transparent);
+    border-radius: 2px;
+    box-shadow:
+      0 8px 18px rgba(0, 0, 0, 0.15),
+      0 1px 4px rgba(0, 0, 0, 0.12);
     font-family: var(--fc-font-ui, system-ui);
     font-size: 12px;
     display: flex;
@@ -31,9 +33,8 @@
   }
   .fc-slicer__title {
     font-weight: 600;
-    font-size: 11px;
-    letter-spacing: var(--fc-tracking-wide, 0.04em);
-    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 0;
     color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
     white-space: nowrap;
     overflow: hidden;
@@ -49,7 +50,7 @@
     background: transparent;
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: var(--fc-radius-sm, 4px);
+    border-radius: 2px;
     padding: 2px 8px;
     font: inherit;
     font-size: 11px;
@@ -57,12 +58,29 @@
     cursor: pointer;
   }
   .fc-slicer__btn:hover {
-    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 6%, transparent));
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 6%, transparent));
   }
   .fc-slicer__close {
-    padding: 2px 6px;
-    font-size: 14px;
-    line-height: 1;
+    position: relative;
+    width: 22px;
+    padding: 0;
+  }
+  .fc-slicer__close::before,
+  .fc-slicer__close::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 1.4px;
+    border-radius: 1px;
+    background: currentColor;
+    content: "";
+  }
+  .fc-slicer__close::before {
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+  .fc-slicer__close::after {
+    transform: translate(-50%, -50%) rotate(-45deg);
   }
   .fc-slicer__body {
     display: flex;
@@ -90,7 +108,7 @@
     text-overflow: ellipsis;
   }
   .fc-slicer__chip:hover {
-    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 6%, transparent));
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 6%, transparent));
     color: var(--fc-fg, CanvasText);
   }
   .fc-slicer__chip--on {

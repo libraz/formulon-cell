@@ -7,27 +7,30 @@
   .fc-validation-list {
     background: var(--fc-bg-elev, Canvas);
     border: var(--fc-hairline, 1px) solid var(--fc-rule);
-    border-radius: var(--fc-radius-sm, 3px);
-    box-shadow: var(--fc-shadow-8);
+    border-radius: 0;
+    box-shadow:
+      0 2px 5px rgba(0, 0, 0, 0.18),
+      0 0 0 1px rgba(0, 0, 0, 0.04);
     z-index: var(--fc-z-popover, 2147483040);
     pointer-events: auto;
     max-height: 220px;
     overflow-y: auto;
     min-width: 120px;
     font-family: var(--fc-font-ui, system-ui);
-    font-size: var(--fc-text-cell, 13px);
+    font-size: 12px;
     color: var(--fc-fg, currentColor);
     user-select: none;
   }
   .fc-validation-list__item {
-    padding: 5px 12px;
+    min-height: 22px;
+    padding: 3px 8px;
     cursor: pointer;
   }
   .fc-validation-list__item:hover,
   .fc-validation-list__item:focus-visible,
   .fc-validation-list__item[aria-selected="true"] {
-    background: var(--fc-accent-soft, rgba(30, 122, 224, 0.14));
-    color: var(--fc-accent, dodgerblue);
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 8%, transparent));
+    color: var(--fc-fg, CanvasText);
   }
   .fc-validation-list__item:focus-visible {
     outline: 1px solid var(--fc-accent, dodgerblue);
@@ -40,11 +43,13 @@
     z-index: var(--fc-z-tooltip, 2147483030);
     pointer-events: none;
     max-width: 280px;
-    padding: 8px 10px;
+    padding: 7px 9px;
     border: var(--fc-hairline, 1px) solid var(--fc-rule);
-    border-radius: var(--fc-radius-sm, 3px);
+    border-radius: 1px;
     background: var(--fc-bg-elev, Canvas);
-    box-shadow: var(--fc-shadow-8);
+    box-shadow:
+      0 2px 5px rgba(0, 0, 0, 0.16),
+      0 0 0 1px rgba(0, 0, 0, 0.03);
     color: var(--fc-fg, currentColor);
     font-family: var(--fc-font-ui, system-ui);
     font-size: var(--fc-text-cell, 13px);
@@ -56,56 +61,103 @@
     margin-bottom: 4px;
   }
 
+  .fc-valdlg__panel {
+    width: min(360px, calc(100vw - 48px));
+    min-height: 0;
+    border-radius: 2px;
+  }
+
+  .fc-valdlg__panel .fc-fmtdlg__header {
+    min-height: 30px;
+    padding: 7px 12px 6px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .fc-valdlg__panel .fc-fmtdlg__body {
+    padding: 12px 14px 10px;
+  }
+
+  .fc-valdlg__panel .app__dlg__message {
+    margin: 0;
+    color: var(--fc-fg, CanvasText);
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .fc-valdlg__panel .fc-fmtdlg__footer {
+    min-height: 38px;
+    padding: 6px 12px 10px;
+  }
+
   /* Status bar aggregate chooser — popover above the statusbar with
      checkmark rows for each Sum/Avg/Count/Min/Max readout. */
   .fc-statusbar__chooser {
     position: fixed;
     z-index: var(--fc-z-popover, 2147483040);
     pointer-events: auto;
-    min-width: 200px;
-    padding: 4px;
+    min-width: 232px;
+    padding: 5px 0;
     background: var(--fc-bg-elev, Canvas);
     color: var(--fc-fg, CanvasText);
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: var(--fc-radius-md, 6px);
-    box-shadow: var(--fc-shadow-8);
+    border-radius: 2px;
+    box-shadow:
+      0 8px 18px rgba(0, 0, 0, 0.15),
+      0 1px 4px rgba(0, 0, 0, 0.12);
     font-family: var(--fc-font-ui, system-ui);
-    font-size: 12.5px;
+    font-size: 12px;
   }
   .fc-statusbar__chooser-heading {
-    padding: 6px 10px 4px;
-    font-size: 10.5px;
-    text-transform: uppercase;
-    letter-spacing: var(--fc-tracking-wide, 0.04em);
+    padding: 5px 12px 3px 28px;
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 0;
     color: var(--fc-fg-mute, currentColor);
   }
   .fc-statusbar__chooser-separator {
     height: 1px;
-    margin: 4px 2px;
+    margin: 4px 0;
     background: var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
   }
   .fc-statusbar__chooser-item {
     display: flex;
+    box-sizing: border-box;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     width: 100%;
-    padding: 6px 10px;
+    min-height: 25px;
+    padding: 3px 12px 3px 4px;
     background: transparent;
     border: 0;
     color: inherit;
     cursor: pointer;
     text-align: left;
     font: inherit;
-    border-radius: var(--fc-radius-sm, 4px);
+    border-radius: 0;
   }
   .fc-statusbar__chooser-item:hover {
-    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 8%, transparent));
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 8%, transparent));
   }
   .fc-statusbar__chooser-check {
+    position: relative;
     display: inline-block;
-    width: 14px;
+    flex: 0 0 18px;
+    width: 18px;
+    height: 16px;
     color: var(--fc-accent, currentColor);
     text-align: center;
+  }
+  .fc-statusbar__chooser-item[aria-checked="true"] .fc-statusbar__chooser-check::before {
+    position: absolute;
+    top: 3px;
+    left: 5px;
+    width: 8px;
+    height: 4px;
+    border-bottom: 1.7px solid currentColor;
+    border-left: 1.7px solid currentColor;
+    content: "";
+    transform: rotate(-45deg);
   }
 }

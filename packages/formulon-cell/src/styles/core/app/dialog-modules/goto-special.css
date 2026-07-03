@@ -20,13 +20,13 @@
     font-weight: 600;
   }
   .fc-goto__reference input {
-    min-height: 28px;
+    min-height: 24px;
     padding: 3px 6px;
     color: var(--fc-fg, CanvasText);
     background: var(--fc-bg, Canvas);
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: var(--fc-radius-sm, 4px);
+    border-radius: 2px;
     font: inherit;
   }
   .fc-goto__reference .fc-range-picker {
@@ -38,19 +38,19 @@
     gap: 2px 12px;
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: var(--fc-radius-sm, 4px);
-    padding: 8px 10px;
+    border-radius: 2px;
+    padding: 6px 8px;
   }
   .fc-goto__radio {
     display: flex;
     align-items: center;
     gap: 6px;
     padding: 2px 4px;
-    border-radius: var(--fc-radius-sm, 4px);
+    border-radius: 0;
     cursor: pointer;
   }
   .fc-goto__radio:hover {
-    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 6%, transparent));
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 6%, transparent));
   }
   .fc-goto__value-filters {
     display: grid;
@@ -60,7 +60,7 @@
     padding: 8px 10px;
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: var(--fc-radius-sm, 4px);
+    border-radius: 2px;
   }
   .fc-goto__value-filters[hidden] {
     display: none;
@@ -75,11 +75,11 @@
     align-items: center;
     gap: 6px;
     padding: 2px 4px;
-    border-radius: var(--fc-radius-sm, 4px);
+    border-radius: 0;
     cursor: pointer;
   }
   .fc-goto__check:hover {
-    background: var(--fc-accent-soft, color-mix(in srgb, CanvasText 6%, transparent));
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 6%, transparent));
   }
   .fc-goto__status {
     min-height: 18px;

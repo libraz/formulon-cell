@@ -9,6 +9,16 @@ import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
  * and the multi-range extra-cell flow.
  */
 describe('store mutators — UI flags', () => {
+  it('starts with Excel 365-like sheet density defaults', () => {
+    const store = createSpreadsheetStore();
+    const { layout } = store.getState();
+
+    expect(layout.defaultColWidth).toBe(64);
+    expect(layout.defaultRowHeight).toBe(20);
+    expect(layout.headerColWidth).toBe(32);
+    expect(layout.headerRowHeight).toBe(20);
+  });
+
   it('setTheme updates ui.theme', () => {
     const store = createSpreadsheetStore();
     mutators.setTheme(store, 'ink');
@@ -52,6 +62,22 @@ describe('store mutators — UI flags', () => {
 });
 
 describe('store mutators — status aggregates', () => {
+  it('starts with the Excel-style status bar defaults used by the desktop baseline', () => {
+    const store = createSpreadsheetStore();
+
+    expect(store.getState().ui.statusAggs).toEqual(['average', 'count', 'sum']);
+    expect(store.getState().ui.statusOptions).toEqual({
+      capsLock: true,
+      numLock: true,
+      scrollLock: true,
+      uploadStatus: false,
+      macroRecording: false,
+      viewShortcuts: true,
+      zoom: true,
+      zoomSlider: true,
+    });
+  });
+
   it('toggleStatusAgg adds/removes a key', () => {
     const store = createSpreadsheetStore();
     expect(store.getState().ui.statusAggs).toContain('sum');

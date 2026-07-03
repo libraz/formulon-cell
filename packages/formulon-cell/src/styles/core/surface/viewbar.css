@@ -48,7 +48,7 @@
   .fc-viewbar__select {
     min-height: 24px;
     border: var(--fc-hairline) solid var(--fc-rule);
-    border-radius: var(--fc-radius-sm);
+    border-radius: 2px;
     background: var(--fc-bg);
     color: var(--fc-fg);
     font: inherit;
@@ -64,14 +64,15 @@
   .fc-viewbar__toggle[aria-pressed="true"],
   .fc-viewbar__button[aria-pressed="true"] {
     border-color: var(--fc-accent);
-    background: var(--fc-accent-soft, color-mix(in srgb, var(--fc-accent) 14%, var(--fc-bg)));
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 8%, transparent));
     color: var(--fc-accent-strong, var(--fc-accent));
   }
 
   .fc-viewbar__toggle:hover,
   .fc-viewbar__button:hover,
   .fc-viewbar__select:hover {
-    border-color: var(--fc-accent);
+    border-color: var(--fc-rule-strong, var(--fc-rule));
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 8%, transparent));
   }
 
   .fc-viewbar__toggle:focus-visible,

@@ -5,7 +5,7 @@
     min-height: 24px;
     padding: 2px 8px;
     border: 1px solid var(--fc-fmtdlg-input-border, transparent);
-    border-radius: 6px;
+    border-radius: 4px;
     background: var(--fc-fmtdlg-input-bg);
     color: var(--fc-fmtdlg-input-fg, inherit);
     font: inherit;
@@ -21,7 +21,7 @@
   .fc-fmtdlg input[type="number"]:focus,
   .fc-fmtdlg select:focus {
     border-color: var(--fc-fmtdlg-list-focus-border);
-    box-shadow: 0 0 0 2px var(--fc-accent-soft);
+    box-shadow: 0 0 0 1px var(--fc-fmtdlg-list-focus-border);
   }
 
   .fc-fmtdlg input[type="number"] {
@@ -39,7 +39,7 @@
     margin: 0;
     padding: 8px;
     border: 1px solid var(--fc-fmtdlg-input-border, transparent);
-    border-radius: 6px;
+    border-radius: 4px;
     background: var(--fc-fmtdlg-input-bg);
     color: var(--fc-fmtdlg-input-fg, inherit);
     overflow: auto;
@@ -84,7 +84,7 @@
     min-height: 24px;
     border: 1px solid var(--fc-fmtdlg-input-border, transparent);
     border-left: 0;
-    border-radius: 0 6px 6px 0;
+    border-radius: 0 4px 4px 0;
     background: var(--fc-fmtdlg-input-bg);
     color: #185abd;
     cursor: pointer;
@@ -98,12 +98,12 @@
 
   .fc-range-picker--picking > input {
     border-color: var(--fc-fmtdlg-list-focus-border);
-    box-shadow: 0 0 0 2px var(--fc-accent-soft);
+    box-shadow: 0 0 0 1px var(--fc-fmtdlg-list-focus-border);
   }
 
   .fc-range-picker--picking .fc-range-picker__btn {
     border-color: var(--fc-fmtdlg-list-focus-border);
-    background: var(--fc-accent-soft);
+    background: var(--fc-fmtdlg-input-bg);
   }
 
   .fc-range-picker__btn::before {
@@ -123,9 +123,12 @@
     position: absolute;
     right: 3px;
     bottom: 2px;
-    color: #185abd;
-    font-size: 10px;
-    line-height: 1;
-    content: "↗";
+    width: 8px;
+    height: 8px;
+    background:
+      linear-gradient(#185abd 0 0) 5px 1px / 3px 2px no-repeat,
+      linear-gradient(90deg, #185abd 0 0) 6px 1px / 2px 5px no-repeat,
+      linear-gradient(45deg, transparent 0 42%, #185abd 43% 57%, transparent 58%);
+    content: "";
   }
 }

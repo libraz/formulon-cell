@@ -32,11 +32,10 @@
 
 .demo__card h2 {
   margin: 0 0 8px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--demo-fg-soft);
+  letter-spacing: 0;
+  color: var(--demo-fg);
 }
 
 .demo__hint {
@@ -50,10 +49,10 @@
 .demo__mono code {
   font-family: var(--demo-mono);
   font-size: 11px;
-  background: var(--demo-accent-soft);
-  color: var(--demo-accent);
+  background: var(--demo-ribbon-hover);
+  color: var(--demo-fg);
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: 2px;
 }
 
 .demo__mono {
@@ -81,12 +80,13 @@
   color: var(--demo-fg);
   background: var(--demo-card);
   border: 1px solid var(--demo-line);
-  border-radius: 6px;
+  border-radius: 2px;
   cursor: pointer;
 }
 
 .demo__preset-btn:hover:not(:disabled) {
-  border-color: var(--demo-accent);
+  border-color: var(--demo-ribbon-line);
+  background: var(--demo-ribbon-hover);
 }
 
 .demo__preset-btn:disabled {
@@ -121,11 +121,10 @@
 
 .demo__feat-title {
   margin: 0 0 6px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--demo-fg-soft);
+  letter-spacing: 0;
+  color: var(--demo-fg);
 }
 
 .demo__feat-grid {
@@ -218,9 +217,9 @@
   display: inline-block;
   min-width: 36px;
   padding: 1px 5px;
-  background: var(--demo-accent-soft);
-  color: var(--demo-accent);
-  border-radius: 3px;
+  background: var(--demo-ribbon-hover);
+  color: var(--demo-fg);
+  border-radius: 2px;
   text-align: center;
 }
 

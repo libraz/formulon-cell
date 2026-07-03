@@ -8,34 +8,36 @@
     background: var(--fc-bg-elev, Canvas);
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: var(--fc-radius-sm, 4px);
-    box-shadow: var(--fc-shadow-8);
+    border-radius: 2px;
+    box-shadow:
+      0 8px 18px rgba(0, 0, 0, 0.15),
+      0 1px 4px rgba(0, 0, 0, 0.12);
     color: var(--fc-fg, currentColor);
     font-family: var(--fc-font-ui, system-ui);
-    font-size: var(--fc-text-cell, 13px);
+    font-size: 12px;
     width: 240px;
     display: flex;
     flex-direction: column;
     user-select: none;
   }
   .fc-filter-dropdown__search {
-    margin: 8px;
-    padding: 6px 8px;
+    margin: 7px 8px 6px;
+    padding: 4px 7px;
     background: var(--fc-bg, Canvas);
     border: var(--fc-hairline, 1px) solid var(--fc-rule);
-    border-radius: var(--fc-radius-sm, 3px);
+    border-radius: 2px;
     font: inherit;
     color: inherit;
     outline: none;
   }
   .fc-filter-dropdown__search:focus {
     border-color: var(--fc-accent, dodgerblue);
-    box-shadow: 0 0 0 2px var(--fc-accent-soft);
+    box-shadow: inset 0 0 0 1px var(--fc-accent, dodgerblue);
   }
   .fc-filter-dropdown__condition {
     display: grid;
     gap: 4px;
-    padding: 8px 8px 0;
+    padding: 6px 8px 0;
   }
   .fc-filter-dropdown__condition-label {
     display: grid;
@@ -47,35 +49,36 @@
   .fc-filter-dropdown__condition-value {
     width: 100%;
     box-sizing: border-box;
-    padding: 5px 7px;
+    padding: 4px 7px;
     background: var(--fc-bg, Canvas);
     border: var(--fc-hairline, 1px) solid var(--fc-rule);
-    border-radius: var(--fc-radius-sm, 3px);
+    border-radius: 2px;
     font: inherit;
     color: var(--fc-fg, currentColor);
   }
   .fc-filter-dropdown__list {
     max-height: 220px;
     overflow-y: auto;
-    padding: 0 4px 4px;
+    padding: 0 4px 3px;
     outline: none;
   }
   .fc-filter-dropdown__row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 4px 8px;
+    gap: 6px;
+    min-height: 24px;
+    padding: 2px 8px;
     cursor: pointer;
     border-radius: 2px;
     line-height: 1.3;
   }
   .fc-filter-dropdown__row:hover {
-    background: var(--fc-accent-soft, rgba(30, 122, 224, 0.1));
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 8%, transparent));
   }
   .fc-filter-dropdown__row--all {
     border-bottom: var(--fc-hairline, 1px) solid var(--fc-rule);
-    margin-bottom: 4px;
-    padding-bottom: 6px;
+    margin-bottom: 3px;
+    padding-bottom: 5px;
     font-weight: 500;
   }
   .fc-filter-dropdown__row input[type="checkbox"] {
@@ -91,15 +94,15 @@
     display: flex;
     justify-content: flex-end;
     gap: 6px;
-    padding: 8px;
+    padding: 7px 8px;
     border-top: var(--fc-hairline, 1px) solid var(--fc-rule);
   }
   .fc-filter-dropdown__actions button {
     font: inherit;
-    padding: 4px 12px;
+    padding: 3px 12px;
     background: var(--fc-bg, Canvas);
     border: var(--fc-hairline, 1px) solid var(--fc-rule);
-    border-radius: var(--fc-radius-sm, 3px);
+    border-radius: 2px;
     color: inherit;
     cursor: pointer;
   }

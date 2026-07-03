@@ -39,10 +39,10 @@
     background: var(--fc-fmtdlg-panel-bg);
     color: var(--fc-fmtdlg-panel-fg, var(--fc-fg, CanvasText));
     border: 1px solid var(--fc-fmtdlg-rule);
-    border-radius: 8px;
+    border-radius: 4px;
     box-shadow:
-      0 18px 38px rgba(0, 0, 0, 0.42),
-      0 2px 6px rgba(0, 0, 0, 0.18);
+      0 18px 34px rgba(0, 0, 0, 0.26),
+      0 2px 7px rgba(0, 0, 0, 0.14);
     overflow: hidden;
   }
   .fc-fmtdlg--range-picking .fc-fmtdlg__panel {
@@ -85,6 +85,7 @@
     font-size: 13px;
   }
   .fc-fmtdlg__close {
+    position: relative;
     width: 32px;
     height: 24px;
     border: 0;
@@ -93,8 +94,23 @@
     color: var(--fc-fmtdlg-panel-fg);
     cursor: pointer;
     font: inherit;
-    font-size: 18px;
-    line-height: 1;
+  }
+  .fc-fmtdlg__close::before,
+  .fc-fmtdlg__close::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 11px;
+    height: 1.4px;
+    border-radius: 1px;
+    background: currentColor;
+    content: "";
+  }
+  .fc-fmtdlg__close::before {
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+  .fc-fmtdlg__close::after {
+    transform: translate(-50%, -50%) rotate(-45deg);
   }
   .fc-fmtdlg__close:hover {
     background: #e81123;
@@ -130,7 +146,7 @@
     padding: 8px 12px;
     background: var(--fc-fmtdlg-preview-bg);
     border: 1px solid var(--fc-fmtdlg-preview-border);
-    border-radius: 6px;
+    border-radius: 3px;
     box-sizing: border-box;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -140,14 +156,14 @@
   }
   .fc-fmtdlg__tabs {
     display: flex;
-    gap: 0;
-    align-self: stretch;
+    gap: 2px;
+    align-self: center;
     justify-content: center;
-    margin: 0 22px;
-    padding: 0;
-    border: 0;
-    border-bottom: 1px solid var(--fc-fmtdlg-tab-border);
-    border-radius: 0;
+    max-width: calc(100% - 44px);
+    margin: 0 auto;
+    padding: 0 2px;
+    border: 1px solid var(--fc-fmtdlg-tab-border);
+    border-radius: 5px;
     overflow-x: auto;
     scrollbar-width: none;
     background: var(--fc-fmtdlg-tab-bg, transparent);
@@ -158,7 +174,7 @@
   .fc-fmtdlg__tab {
     position: relative;
     min-width: 64px;
-    min-height: 31px;
+    min-height: 26px;
     padding: 0 12px;
     background: transparent;
     border: 0;
@@ -191,7 +207,7 @@
     display: var(--fc-fmtdlg-tab-active-underline, block);
     position: absolute;
     right: 10px;
-    bottom: -1px;
+    bottom: 0;
     left: 10px;
     height: 2px;
     background: var(--fc-accent);
@@ -199,15 +215,15 @@
   }
   .fc-fmtdlg__tab[aria-selected="true"]:hover {
     background: var(--fc-fmtdlg-tab-active-bg, var(--fc-fmtdlg-tab-hover));
-    filter: brightness(1.06);
+    filter: none;
   }
   .fc-fmtdlg__body {
     flex: 1;
     overflow-y: auto;
-    margin: 0 22px;
-    padding: 12px 4px 8px;
-    border: 0;
-    border-radius: 0;
+    margin: 0 18px;
+    padding: 12px 16px 8px;
+    border: 1px solid var(--fc-fmtdlg-rule);
+    border-radius: 4px;
     background: var(--fc-fmtdlg-body-bg);
   }
   .fc-fmtdlg__panel-tab[hidden] {

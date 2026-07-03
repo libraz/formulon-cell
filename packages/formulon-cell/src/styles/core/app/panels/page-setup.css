@@ -40,7 +40,7 @@
     padding: 2px 8px;
     border: var(--fc-hairline, 1px) solid
       var(--fc-border, color-mix(in srgb, CanvasText 20%, transparent));
-    border-radius: 4px;
+    border-radius: 2px;
     background: var(--fc-control-bg, Canvas);
     color: var(--fc-fg, CanvasText);
     font: inherit;
@@ -84,8 +84,8 @@
     width: 100%;
   }
   .fc-pgsetup__text[aria-invalid="true"] {
-    outline: 2px solid color-mix(in srgb, #c50f1f 75%, CanvasText);
-    outline-offset: 1px;
+    outline: 1px solid color-mix(in srgb, #c50f1f 75%, CanvasText);
+    outline-offset: -1px;
   }
   .fc-pgsetup__error {
     margin: 4px 16px 8px 188px;

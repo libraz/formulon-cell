@@ -10,8 +10,10 @@
     pointer-events: auto;
     background: var(--fc-bg-elev, Canvas);
     border: var(--fc-hairline, 1px) solid var(--fc-rule-strong, var(--fc-rule));
-    border-radius: 3px;
-    box-shadow: var(--fc-shadow-8);
+    border-radius: 2px;
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.18),
+      0 1px 3px rgba(0, 0, 0, 0.14);
     max-height: 292px;
     overflow-y: auto;
     font-family: var(--fc-font-ui, system-ui);
@@ -21,12 +23,12 @@
   }
   .fc-autocomplete__item {
     display: grid;
-    grid-template-columns: 32px minmax(0, 1fr);
+    grid-template-columns: 26px minmax(0, 1fr);
     align-items: center;
     gap: 8px;
     width: 100%;
-    min-height: 42px;
-    padding: 5px 10px;
+    min-height: 32px;
+    padding: 3px 8px;
     border: 0;
     border-bottom: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 10%, transparent));
@@ -35,7 +37,7 @@
     font: inherit;
     text-align: left;
     cursor: pointer;
-    line-height: 1.4;
+    line-height: 1.25;
   }
   .fc-autocomplete__item:last-child {
     border-bottom: 0;
@@ -49,16 +51,15 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 22px;
+    width: 23px;
+    height: 18px;
     border: 1px solid var(--fc-rule, color-mix(in srgb, CanvasText 12%, transparent));
     border-radius: 2px;
-    background: var(--fc-bg-rail, color-mix(in srgb, CanvasText 4%, Canvas));
-    color: var(--fc-accent, currentColor);
+    background: var(--fc-bg, Canvas);
+    color: var(--fc-fg-mute, currentColor);
     font-family: var(--fc-font-mono, monospace);
     font-size: 10px;
     font-weight: 600;
-    text-transform: uppercase;
   }
   .fc-autocomplete__main {
     display: flex;
@@ -89,9 +90,11 @@
     z-index: var(--fc-z-popover, 2147483040);
     background: var(--fc-bg-elev, Canvas);
     border: var(--fc-hairline, 1px) solid var(--fc-rule);
-    border-radius: var(--fc-radius-sm, 3px);
-    box-shadow: var(--fc-shadow-4);
-    padding: 4px 10px;
+    border-radius: 2px;
+    box-shadow:
+      0 6px 16px rgba(0, 0, 0, 0.14),
+      0 1px 3px rgba(0, 0, 0, 0.12);
+    padding: 3px 8px;
     font-family: var(--fc-font-mono, monospace);
     font-size: 12px;
     color: var(--fc-fg, currentColor);
@@ -109,7 +112,7 @@
     color: var(--fc-fg-mute);
   }
   .fc-arghelper__arg--active {
-    color: var(--fc-accent, dodgerblue);
+    color: var(--fc-fg-strong, CanvasText);
     font-weight: 600;
   }
 }

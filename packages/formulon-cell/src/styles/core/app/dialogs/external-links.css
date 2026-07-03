@@ -25,7 +25,7 @@
     color: var(--fc-fg, CanvasText);
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: 4px;
+    border-radius: 2px;
     box-shadow:
       0 18px 48px rgba(0, 0, 0, 0.22),
       0 2px 8px rgba(0, 0, 0, 0.16);
@@ -108,7 +108,7 @@
     color: var(--fc-fg-mute);
   }
   .fc-extlinkdlg__table tbody tr[aria-selected="true"] {
-    background: var(--fc-accent-soft, color-mix(in srgb, Highlight 14%, transparent));
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 8%, transparent));
   }
   .fc-extlinkdlg__table tbody tr:focus-visible {
     outline: 1px solid var(--fc-accent, Highlight);

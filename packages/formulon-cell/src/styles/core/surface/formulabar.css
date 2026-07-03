@@ -1,20 +1,20 @@
 @layer fc.surface {
   .fc-host__formulabar {
-    --fc-formulabar-namebox-width: 110px;
-    --fc-formulabar-action-size: 24px;
-    --fc-formulabar-fx-width: 28px;
-    --fc-formulabar-height: 32px;
-    --fc-formulabar-control-height: 24px;
-    --fc-formulabar-namebox-height: 23px;
+    --fc-formulabar-namebox-width: 86px;
+    --fc-formulabar-action-size: 22px;
+    --fc-formulabar-fx-width: 26px;
+    --fc-formulabar-height: 28px;
+    --fc-formulabar-control-height: 20px;
+    --fc-formulabar-namebox-height: 20px;
     display: grid;
     grid-template-columns:
       var(--fc-formulabar-namebox-width) var(--fc-formulabar-action-size)
       var(--fc-formulabar-action-size) var(--fc-formulabar-fx-width) minmax(0, 1fr)
       var(--fc-formulabar-action-size);
     align-items: center;
-    gap: 6px;
+    gap: 3px;
     min-height: var(--fc-formulabar-height);
-    padding: 3px 8px;
+    padding: 3px 5px;
     border-bottom: var(--fc-hairline) solid var(--fc-rule);
     background: var(--fc-bg-rail);
     font-family: var(--fc-font-ui);
@@ -30,9 +30,17 @@
     width: 100%;
     min-width: 0;
     height: var(--fc-formulabar-namebox-height);
-    padding: 2px 8px;
+    padding: 1px 17px 1px 6px;
     border-radius: 2px;
-    background: var(--fc-bg);
+    background-color: var(--fc-bg);
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--fc-fg-mute) 50%),
+      linear-gradient(135deg, var(--fc-fg-mute) 50%, transparent 50%);
+    background-position:
+      calc(100% - 10px) 50%,
+      calc(100% - 6px) 50%;
+    background-repeat: no-repeat;
+    background-size: 4px 4px;
     border: var(--fc-hairline) solid var(--fc-rule);
     color: var(--fc-fg);
     font-family: var(--fc-font-ui);
@@ -47,7 +55,7 @@
   }
   .fc-host__formulabar-tag:focus {
     border-color: var(--fc-accent);
-    box-shadow: 0 0 0 2px var(--fc-accent-soft);
+    box-shadow: inset 0 0 0 1px var(--fc-accent);
   }
 
   .fc-host__formulabar-fx {
@@ -88,6 +96,11 @@
     cursor: default;
   }
 
+  .fc-host__formulabar-action:not(:disabled):hover,
+  .fc-host__formulabar-fx:hover {
+    background: var(--fc-bg-hover);
+  }
+
   .fc-host__formulabar-action--cancel:not(:disabled):hover {
     color: var(--fc-cell-error-fg);
   }
@@ -108,7 +121,7 @@
       "tnum" 1,
       "zero" 1;
     min-height: var(--fc-formulabar-control-height);
-    padding: 2px 6px;
+    padding: 1px 6px;
     border: var(--fc-hairline) solid var(--fc-rule);
     border-radius: 2px;
     background: var(--fc-bg);
@@ -118,6 +131,10 @@
     overflow: hidden;
     white-space: pre-wrap;
     word-break: break-word;
+  }
+
+  .fc-host__formulabar-input:focus {
+    border-color: var(--fc-accent);
   }
 
   .fc-host__formulabar[data-fc-expanded="1"] .fc-host__formulabar-input {
@@ -130,8 +147,9 @@
     height: var(--fc-formulabar-control-height);
     padding: 0;
     background: transparent;
-    border: var(--fc-hairline) solid var(--fc-rule);
-    border-radius: var(--fc-radius-sm);
+    border: 0;
+    border-left: var(--fc-hairline) solid var(--fc-rule);
+    border-radius: 0;
     color: var(--fc-fg-mute);
     cursor: pointer;
     font-size: 12px;
@@ -141,12 +159,12 @@
     justify-content: center;
   }
   .fc-host__formulabar-expand:hover {
-    border-color: var(--fc-accent);
-    color: var(--fc-accent);
+    background: var(--fc-bg-hover);
+    color: var(--fc-fg);
   }
   .fc-host__formulabar-expand:focus-visible {
-    outline: 2px solid var(--fc-accent);
-    outline-offset: 1px;
+    outline: 1px solid var(--fc-accent);
+    outline-offset: -1px;
   }
 
   .fc-namebox-menu {
@@ -156,11 +174,13 @@
     flex-direction: column;
     max-height: 240px;
     overflow-y: auto;
-    padding: 3px;
+    padding: 3px 0;
     border: var(--fc-hairline) solid var(--fc-rule);
     border-radius: 2px;
     background: var(--fc-bg-elev, Canvas);
-    box-shadow: var(--fc-shadow-8);
+    box-shadow:
+      0 6px 14px rgba(0, 0, 0, 0.13),
+      0 1px 3px rgba(0, 0, 0, 0.12);
     color: var(--fc-fg, CanvasText);
     font-family: var(--fc-font-ui);
     font-size: 12px;
@@ -168,9 +188,9 @@
 
   .fc-namebox-menu__item {
     min-height: 24px;
-    padding: 4px 8px;
+    padding: 4px 10px;
     border: 0;
-    border-radius: 2px;
+    border-radius: 0;
     background: transparent;
     color: inherit;
     font: inherit;
@@ -180,7 +200,7 @@
 
   .fc-namebox-menu__empty {
     min-height: 24px;
-    padding: 4px 8px;
+    padding: 4px 10px;
     color: var(--fc-fg-mute);
     cursor: default;
     white-space: nowrap;
@@ -188,7 +208,7 @@
 
   .fc-namebox-menu__item:hover,
   .fc-namebox-menu__item:focus-visible {
-    background: var(--fc-accent-soft);
+    background: var(--fc-bg-hover);
     outline: 0;
   }
 }

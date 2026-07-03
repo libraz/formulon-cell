@@ -4,12 +4,23 @@
 
 @layer fc.app {
   .fc-fmtdlg__panel-tab[data-fc-tab="align"] {
+    position: relative;
     display: grid;
-    grid-template-columns: minmax(250px, 1fr) 222px;
+    grid-template-columns: minmax(320px, 1fr) 222px;
     grid-auto-rows: max-content;
-    gap: 13px 26px;
+    gap: 10px 26px;
     align-content: start;
     padding-top: 4px;
+  }
+
+  .fc-fmtdlg__panel-tab[data-fc-tab="align"]::before {
+    position: absolute;
+    top: 1px;
+    bottom: 166px;
+    left: calc(100% - 248px);
+    width: 1px;
+    background: var(--fc-fmtdlg-rule);
+    content: "";
   }
 
   .fc-fmtdlg__panel-tab[data-fc-tab="align"] > div:not([class]),
@@ -20,11 +31,11 @@
   .fc-fmtdlg__align-select-row {
     grid-column: 1;
     display: grid;
-    grid-template-columns: 124px 128px;
-    gap: 8px;
-    align-items: center;
+    grid-template-columns: 216px;
+    gap: 5px;
+    align-items: start;
     max-width: none;
-    min-height: 40px;
+    min-height: 48px;
   }
 
   .fc-fmtdlg__align-select-row > span:first-child {
@@ -33,16 +44,20 @@
 
   .fc-fmtdlg__align-select-row .fc-select,
   .fc-fmtdlg__align-select-row select {
-    width: 128px;
+    width: 216px;
   }
 
   .fc-fmtdlg__panel-tab[data-fc-tab="align"] .fc-fmtdlg__row:has(input[type="number"]) {
     grid-column: 1;
+    grid-row: 1;
     display: grid;
-    grid-template-columns: 124px 58px;
+    grid-template-columns: 72px 52px;
     gap: 8px;
     align-items: center;
-    min-height: 40px;
+    justify-self: end;
+    margin-top: 22px;
+    margin-right: 8px;
+    min-height: 24px;
   }
 
   .fc-fmtdlg__panel-tab[data-fc-tab="align"] > .fc-fmtdlg__rotation-row {
@@ -63,6 +78,7 @@
     grid-template-columns: 1fr;
     gap: 9px;
     justify-self: start;
+    padding-left: 1px;
   }
 
   .fc-fmtdlg__align-preview-title,
@@ -73,10 +89,10 @@
 
   .fc-fmtdlg__align-preview-box {
     display: grid;
-    grid-template-columns: 38px 132px;
-    gap: 15px;
+    grid-template-columns: 32px 100px;
+    gap: 12px;
     align-items: center;
-    min-height: 132px;
+    min-height: 152px;
   }
 
   .fc-fmtdlg__align-preview-vertical {
@@ -84,7 +100,7 @@
     align-items: center;
     justify-content: center;
     width: 31px;
-    height: 132px;
+    height: 150px;
     border: 1px solid var(--fc-fmtdlg-dial-border);
     background: var(--fc-fmtdlg-dial-bg);
     line-height: 1.05;
@@ -95,7 +111,7 @@
   .fc-fmtdlg__align-preview-dial {
     position: relative;
     width: 132px;
-    height: 132px;
+    height: 150px;
     border: 1px solid var(--fc-fmtdlg-dial-border);
     background: var(--fc-fmtdlg-dial-bg);
     overflow: hidden;
@@ -104,7 +120,7 @@
   .fc-fmtdlg__align-preview-arc {
     position: absolute;
     top: 10px;
-    left: -56px;
+    left: -54px;
     width: 112px;
     height: 112px;
     border: 1px dashed var(--fc-fmtdlg-dial-arc);
@@ -163,7 +179,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    margin-left: 49px;
+    margin-left: 27px;
     margin-top: -2px;
   }
 
@@ -181,7 +197,7 @@
     display: flex;
     flex-direction: column;
     gap: 5px;
-    margin-top: 18px;
+    margin-top: 16px;
     padding: 14px 0 0 14px;
     border-top: 1px solid var(--fc-fmtdlg-rule);
   }

@@ -89,8 +89,7 @@
   .fc-cmtnote__title {
     font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
+    letter-spacing: 0;
     color: #5b4a00;
   }
   .fc-cmtnote__icon {

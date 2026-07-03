@@ -2,9 +2,9 @@
   .fc-textcols__section {
     min-width: min(460px, calc(100vw - 72px));
     margin: 0;
-    padding: 8px;
+    padding: 6px 8px;
     border: 1px solid var(--fc-fmtdlg-input-border, transparent);
-    border-radius: 6px;
+    border-radius: 2px;
   }
 
   .fc-textcols__section legend {
@@ -16,12 +16,12 @@
 
   .fc-textcols__types {
     display: grid;
-    gap: 6px;
+    gap: 4px;
   }
 
   .fc-textcols__delimiters {
     display: grid;
-    gap: 8px;
+    gap: 6px;
   }
 
   .fc-textcols__delimiter-grid {

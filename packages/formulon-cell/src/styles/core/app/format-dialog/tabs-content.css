@@ -4,10 +4,11 @@
 @layer fc.app {
   .fc-fmtdlg__panel-tab[data-fc-tab="font"] {
     display: grid;
-    grid-template-columns: 1.1fr 0.72fr 0.52fr;
+    grid-template-columns: 260px 128px 100px;
     grid-auto-rows: max-content;
-    gap: 8px 18px;
+    gap: 8px 20px;
     align-content: start;
+    padding: 20px 22px 0;
   }
 
   .fc-fmtdlg__panel-tab[data-fc-tab="border"],
@@ -19,9 +20,42 @@
     align-content: start;
   }
 
-  .fc-fmtdlg__panel-tab[data-fc-tab="protection"] .fc-fmtdlg__section {
-    min-height: 420px;
+  .fc-fmtdlg__panel-tab[data-fc-tab="protection"] {
+    padding: 26px 18px 0;
   }
+
+  .fc-fmtdlg__panel-tab[data-fc-tab="protection"] .fc-fmtdlg__section {
+    gap: 10px;
+    min-height: 420px;
+    padding: 0;
+  }
+
+  .fc-fmtdlg__panel-tab[data-fc-tab="protection"] .fc-fmtdlg__section-title {
+    display: none;
+  }
+
+  .fc-fmtdlg__protection-hint {
+    max-width: 520px;
+    margin: 8px 0 4px;
+    color: var(--fc-fmtdlg-panel-fg, inherit);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.45;
+  }
+
+  .fc-fmtdlg__protection-checks {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2px;
+    align-items: start;
+    min-height: auto;
+  }
+
+  .fc-fmtdlg__protection-checks .fc-fmtdlg__check {
+    min-height: 20px;
+    gap: 7px;
+  }
+
   .fc-fmtdlg__row {
     display: flex;
     gap: 8px;
@@ -46,15 +80,28 @@
     align-self: flex-end;
   }
 
-  .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__choice-grid {
-    grid-column: 1 / -1;
-    order: 20;
-    padding-top: 10px;
-    border-top: 1px solid var(--fc-fmtdlg-rule);
+  .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__font-effects {
+    grid-column: 1;
+    grid-row: 5;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1px;
+    align-items: start;
+    padding: 0 0 0 12px;
+    border-top: 0;
+  }
+
+  .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__font-effects .fc-fmtdlg__check {
+    min-height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
   }
 
   .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__row:has([data-fc-input="family"]) {
     grid-column: 1;
+    grid-row: 1;
     display: grid;
     grid-template-columns: 1fr;
     gap: 4px;
@@ -62,18 +109,52 @@
 
   .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__row:has(input[type="number"]) {
     grid-column: 3;
+    grid-row: 1;
     display: grid;
     grid-template-columns: 1fr;
     gap: 4px;
   }
 
   .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__row:has([data-fc-color="font"]) {
-    grid-column: 2 / -1;
+    grid-column: 2;
+    grid-row: 4;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+    margin-top: 2px;
+  }
+
+  .fc-fmtdlg__font-family-row input[type="text"] {
+    width: 260px;
+    border-radius: 7px;
+  }
+
+  .fc-fmtdlg__font-size-row input[type="number"] {
+    width: 100px;
+    border-radius: 7px;
+  }
+
+  .fc-fmtdlg__font-color-row input[type="color"] {
+    width: 128px;
+    border-radius: 7px;
+  }
+
+  .fc-fmtdlg__font-color-row .fc-fmtdlg__btn {
+    display: none;
+  }
+
+  .fc-fmtdlg__normal-font {
+    grid-column: 3;
+    grid-row: 4;
+    align-self: end;
+    margin-top: 24px;
+    min-height: 24px;
   }
 
   /* ── Font listbox (family / style / size) ──────────────────────────── */
   .fc-fmtdlg__font-list {
-    min-height: 92px;
+    height: 110px;
+    min-height: 110px;
     border: 1px solid var(--fc-fmtdlg-list-border);
     background: var(--fc-fmtdlg-list-bg);
     color: var(--fc-fmtdlg-list-fg, inherit);
@@ -83,22 +164,25 @@
       box-shadow 80ms ease;
   }
   .fc-fmtdlg__font-list:focus-within {
-    border: 2px solid var(--fc-fmtdlg-list-focus-border);
+    border-color: var(--fc-fmtdlg-list-focus-border);
+    box-shadow: inset 0 0 0 1px var(--fc-fmtdlg-list-focus-border);
   }
 
   .fc-fmtdlg__font-list--family {
     grid-column: 1;
+    grid-row: 2;
   }
 
   .fc-fmtdlg__font-list--style {
     grid-column: 2;
-    grid-row: 1 / span 2;
-    margin-top: 45px;
+    grid-row: 2;
+    margin-top: 0;
   }
 
   .fc-fmtdlg__font-list--size {
     grid-column: 3;
-    margin-top: -8px;
+    grid-row: 2;
+    margin-top: 0;
   }
 
   .fc-fmtdlg__font-list-item {
@@ -114,7 +198,10 @@
     text-align: left;
   }
 
-  .fc-fmtdlg__font-list-item:hover,
+  .fc-fmtdlg__font-list-item:hover {
+    background: var(--fc-fmtdlg-list-hover-bg);
+  }
+
   .fc-fmtdlg__font-list-item[aria-selected="true"] {
     background: var(--fc-fmtdlg-list-selected-bg);
     color: var(--fc-fmtdlg-list-selected-fg, inherit);
@@ -123,12 +210,13 @@
   /* ── Font preview box ──────────────────────────────────────────────── */
   .fc-fmtdlg__font-preview {
     grid-column: 2 / -1;
+    grid-row: 5;
     display: grid;
     grid-template-columns: 1fr;
     gap: 8px;
-    margin-top: 4px;
-    padding-top: 8px;
-    border-top: 1px solid var(--fc-fmtdlg-rule);
+    margin-top: 0;
+    padding: 0 4px 0 6px;
+    border-top: 0;
   }
 
   .fc-fmtdlg__font-preview-label {
@@ -140,10 +228,11 @@
     align-items: center;
     justify-content: center;
     min-height: 46px;
+    max-width: 216px;
     background: var(--fc-fmtdlg-preview-bg);
     color: var(--fc-fmtdlg-preview-fg);
-    border: 1px solid var(--fc-fmtdlg-preview-border, transparent);
-    border-radius: 4px;
+    border: 0;
+    border-radius: 0;
   }
 
   .fc-fmtdlg__font-preview-box::before,
@@ -155,9 +244,18 @@
   }
 
   .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__swatches {
-    grid-column: 1 / -1;
-    order: 21;
+    grid-column: 2 / -1;
+    grid-row: 6;
     margin-left: 0;
+  }
+
+  .fc-fmtdlg__panel-tab[data-fc-tab="font"]::before {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    height: 1px;
+    margin: 1px 0 0;
+    background: var(--fc-fmtdlg-rule);
+    content: "";
   }
 
   /* ── Border / Fill grid placement ──────────────────────────────────── */
@@ -184,7 +282,7 @@
     padding: 6px 8px;
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 18%, transparent));
-    border-radius: 5px;
+    border-radius: 4px;
     background: var(--fc-fmtdlg-input-bg);
     color: var(--fc-fmtdlg-input-fg, inherit);
     font: inherit;
@@ -192,6 +290,6 @@
   }
   .fc-fmtdlg__textarea:focus {
     border-color: var(--fc-accent, currentColor);
-    box-shadow: 0 0 0 2px var(--fc-accent-soft, transparent);
+    box-shadow: 0 0 0 1px var(--fc-fmtdlg-list-focus-border);
   }
 }

@@ -91,7 +91,7 @@
     padding: 2px 6px;
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: 4px;
+    border-radius: 2px;
     font-size: 12px;
     min-width: 0;
   }
@@ -116,8 +116,8 @@
     padding: 6px 8px;
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: 4px;
-    background: color-mix(in srgb, Canvas 92%, CanvasText 8%);
+    border-radius: 2px;
+    background: var(--fc-bg, Canvas);
   }
   .fc-pivotdlg__area > span {
     font-size: 11px;
@@ -148,7 +148,7 @@
     padding: 0 6px;
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: 3px;
+    border-radius: 2px;
     background: var(--fc-bg, Canvas);
     color: var(--fc-fg, CanvasText);
     font: inherit;
@@ -166,8 +166,8 @@
     padding: 6px 8px;
     border: var(--fc-hairline, 1px) solid
       var(--fc-rule, color-mix(in srgb, CanvasText 14%, transparent));
-    border-radius: 4px;
-    background: color-mix(in srgb, Canvas 96%, var(--fc-accent, #217346) 4%);
+    border-radius: 2px;
+    background: var(--fc-bg, Canvas);
     font-size: 12px;
   }
   .fc-pivotdlg__area-settings-panel[hidden] {

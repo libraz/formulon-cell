@@ -2,9 +2,9 @@
   .fc-host__statusbar {
     display: flex;
     align-items: center;
-    gap: 14px;
-    min-height: 26px;
-    padding: 3px 12px;
+    gap: 12px;
+    min-height: 24px;
+    padding: 2px 10px;
     border-top: var(--fc-hairline) solid
       var(--fc-statusbar-border, var(--fc-accent-strong, var(--fc-accent)));
     background: var(--fc-statusbar-bg, var(--fc-accent));
@@ -13,7 +13,7 @@
     font-family: var(--fc-font-ui);
     font-feature-settings: "tnum" 1;
     letter-spacing: 0;
-    text-transform: uppercase;
+    text-transform: none;
     flex: 0 0 auto;
   }
 
@@ -88,11 +88,11 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 22px;
-    height: 20px;
+    width: 24px;
+    height: 22px;
     padding: 0;
     border: var(--fc-hairline) solid transparent;
-    border-radius: 2px;
+    border-radius: 3px;
     background: transparent;
     color: inherit;
     cursor: pointer;
@@ -100,25 +100,25 @@
 
   .fc-host__statusbar-view:hover,
   .fc-host__statusbar-view--active {
-    border-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
-    background: color-mix(in srgb, var(--fc-accent-fg) 12%, transparent);
+    border-color: var(--fc-statusbar-control, var(--fc-rule));
+    background: color-mix(in srgb, var(--fc-statusbar-fg-strong, CanvasText) 8%, transparent);
     color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
   }
 
   .fc-host__statusbar-viewicon {
     position: relative;
-    width: 13px;
-    height: 13px;
+    width: 16px;
+    height: 16px;
     border: 1px solid currentColor;
     opacity: 0.9;
   }
 
   .fc-host__statusbar-viewicon--normal {
     background:
-      linear-gradient(currentColor 0 0) 0 4px / 100% 1px no-repeat,
-      linear-gradient(currentColor 0 0) 0 8px / 100% 1px no-repeat,
-      linear-gradient(currentColor 0 0) 4px 0 / 1px 100% no-repeat,
-      linear-gradient(currentColor 0 0) 8px 0 / 1px 100% no-repeat;
+      linear-gradient(currentColor 0 0) 0 5px / 100% 1px no-repeat,
+      linear-gradient(currentColor 0 0) 0 10px / 100% 1px no-repeat,
+      linear-gradient(currentColor 0 0) 5px 0 / 1px 100% no-repeat,
+      linear-gradient(currentColor 0 0) 10px 0 / 1px 100% no-repeat;
   }
 
   .fc-host__statusbar-viewicon--pageLayout::before {
@@ -131,8 +131,8 @@
   .fc-host__statusbar-viewicon--pageBreakPreview {
     border-style: dashed;
     background:
-      linear-gradient(currentColor 0 0) 0 6px / 100% 1px no-repeat,
-      linear-gradient(currentColor 0 0) 6px 0 / 1px 100% no-repeat;
+      linear-gradient(currentColor 0 0) 0 7px / 100% 1px no-repeat,
+      linear-gradient(currentColor 0 0) 7px 0 / 1px 100% no-repeat;
   }
 
   .fc-host__statusbar-zoom {
@@ -166,7 +166,7 @@
   }
 
   .fc-host__statusbar-zoom-btn:hover:not(:disabled) {
-    border-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
+    border-color: var(--fc-statusbar-fg, var(--fc-fg-mute));
     color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
   }
 
@@ -204,17 +204,13 @@
   }
 
   .fc-host__statusbar-calcmode[data-calc-mode="1"] {
-    background: color-mix(
-      in srgb,
-      var(--fc-statusbar-fg-strong, var(--fc-accent-fg)) 18%,
-      transparent
-    );
+    background: color-mix(in srgb, var(--fc-statusbar-fg-strong, CanvasText) 8%, transparent);
     color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
-    border-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
+    border-color: var(--fc-statusbar-control, var(--fc-rule));
   }
 
   .fc-host__statusbar-calcmode:hover {
-    border-color: var(--fc-statusbar-fg-strong, var(--fc-accent-fg));
+    border-color: var(--fc-statusbar-fg, var(--fc-fg-mute));
   }
 
   .fc-host__statusbar-dot {
@@ -222,8 +218,9 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--fc-accent-fg);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--fc-accent-fg) 18%, transparent);
+    background: var(--fc-statusbar-fg-strong, var(--fc-fg-strong));
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--fc-statusbar-fg-strong, CanvasText) 10%, transparent);
     margin-right: 8px;
     vertical-align: 1px;
   }

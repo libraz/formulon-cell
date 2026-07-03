@@ -1,6 +1,6 @@
 .demo__ribbon-group--clipboard .demo__ribbon-tools {
   display: grid;
-  grid-template-columns: 58px repeat(2, 28px);
+  grid-template-columns: 58px repeat(2, 30px);
   grid-auto-rows: 26px;
   gap: 2px;
   min-height: 76px;
@@ -22,7 +22,12 @@
 }
 
 .demo__ribbon-group--alignment .demo__ribbon-tools {
-  width: 184px;
+  width: 190px;
+}
+
+.demo__ribbon-group--alignment .demo__rb-icon {
+  width: 22px;
+  height: 22px;
 }
 
 .demo__ribbon-group--number .demo__ribbon-tools {
@@ -143,9 +148,15 @@
 
 .demo__ribbon-group--stacked .demo__rb--stacked .demo__rb-icon,
 .demo__ribbon-group--mixed .demo__rb--stacked .demo__rb-icon {
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
   flex: 0 0 auto;
+}
+
+.demo__ribbon-group--alignment.demo__ribbon-group--stacked .demo__rb--stacked .demo__rb-icon,
+.demo__ribbon-group--alignment.demo__ribbon-group--mixed .demo__rb--stacked .demo__rb-icon {
+  width: 22px;
+  height: 22px;
 }
 
 .demo__ribbon-group--stacked .demo__rb--stacked .demo__rb-split-chevron,

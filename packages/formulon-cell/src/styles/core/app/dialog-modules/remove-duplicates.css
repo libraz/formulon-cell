@@ -26,11 +26,11 @@
 
   .fc-dedupedlg__column-list {
     display: grid;
-    gap: 2px;
+    gap: 0;
     max-height: min(280px, 45vh);
-    padding: 4px;
+    padding: 0;
     border: 1px solid var(--fc-fmtdlg-input-border, transparent);
-    border-radius: 6px;
+    border-radius: 2px;
     background: var(--fc-fmtdlg-input-bg);
     overflow: auto;
   }
@@ -41,15 +41,15 @@
     gap: 8px;
     align-items: center;
     min-height: 28px;
-    padding: 3px 6px;
-    border: 1px solid transparent;
-    border-radius: 4px;
+    padding: 3px 8px;
+    border: 0;
+    border-bottom: 1px solid var(--fc-rule-subtle, color-mix(in srgb, CanvasText 10%, transparent));
+    border-radius: 0;
   }
 
   .fc-dedupedlg__column:hover,
   .fc-dedupedlg__column:focus-within {
-    border-color: var(--fc-fmtdlg-list-focus-border);
-    background: var(--fc-accent-soft);
+    background: var(--fc-bg-hover, color-mix(in srgb, CanvasText 6%, transparent));
   }
 
   @media (max-width: 520px) {
