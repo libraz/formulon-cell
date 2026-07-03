@@ -137,7 +137,7 @@ export const DEMO_ICONS: Record<DemoIconName, readonly DemoIconSegment[]> = {
   app: [
     { d: 'M4.5 4.5h11v11h-11z', stroke: '#ffffff' },
     { d: 'M4.5 10h11M10 4.5v11', stroke: '#ffffff' },
-    { d: 'M5.3 5.3h4.2v4.2h-4.2z', fill: '#ffffff' },
+    { d: 'M5.3 5.3h4.2v4.2h-4.2z', fill: '#107c41' },
   ],
   save: [
     { d: 'M4 4h10l2 2v10H4z', fill: '#ffffff', stroke: '#1f1f1f' },
