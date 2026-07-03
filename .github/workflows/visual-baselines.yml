@@ -8,16 +8,17 @@ jobs:
     name: generate Excel chrome visual baselines
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
+          package-manager-cache: false
 
       - run: corepack enable
       - run: corepack prepare yarn@4.5.0 --activate
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             .yarn/cache
@@ -39,7 +40,7 @@ jobs:
 
       - name: Upload generated baselines and reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: excel-chrome-visual-baselines
           path: |
