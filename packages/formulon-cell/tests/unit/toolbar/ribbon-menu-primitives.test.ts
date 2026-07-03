@@ -2392,6 +2392,7 @@ describe('toolbar/ribbon menu primitives', () => {
       ...DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS.map(datasetKeyForAttr),
       'cfAction',
       'cfSubmenu',
+      'formatSubmenu',
     ]);
 
     expect(DYNAMIC_RIBBON_DROPDOWN_HANDLER_DATASET_KEYS).toEqual(expected);

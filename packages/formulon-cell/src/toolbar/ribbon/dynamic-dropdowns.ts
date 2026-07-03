@@ -232,6 +232,7 @@ export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_DATASET_KEYS: ReadonlySet<string> =
   ...DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS.map(datasetKeyForAttr),
   'cfAction',
   'cfSubmenu',
+  'formatSubmenu',
 ]);
 
 export type DynamicDropdownMenuRefresherKey = {
