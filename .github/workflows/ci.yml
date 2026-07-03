@@ -66,12 +66,12 @@ jobs:
       - name: Run unit tests with coverage (shard 1/2)
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
-        run: yarn workspace @libraz/formulon-cell test:coverage -- --shard=1/2 --coverage.reportsDirectory=coverage-shard1
+        run: yarn workspace @libraz/formulon-cell test:coverage --shard=1/2 --coverage.reportsDirectory=coverage-shard1
 
       - name: Run unit tests with coverage (shard 2/2)
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
-        run: yarn workspace @libraz/formulon-cell test:coverage -- --shard=2/2 --coverage.reportsDirectory=coverage-shard2
+        run: yarn workspace @libraz/formulon-cell test:coverage --shard=2/2 --coverage.reportsDirectory=coverage-shard2
 
       - name: Upload coverage to Codecov
         if: matrix.node-version == '22'
