@@ -1,5 +1,6 @@
 import type { History } from '../commands/history.js';
 import {
+  type DefinedNameEntry,
   deleteDefinedName,
   recordDefinedNamesChange,
   upsertDefinedName,
@@ -7,7 +8,7 @@ import {
 import { resolveRangeRef } from '../engine/range-resolver.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
+import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import {
   appendDialogButton,
@@ -153,7 +154,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   quickRow.className = 'fc-namedlg__refers';
   const quickLabel = document.createElement('label');
   quickLabel.className = 'fc-namedlg__refers-label';
-  quickLabel.textContent = t.formulaHeader;
+  quickLabel.textContent = t.quickRefersLabel;
   const quickInput = document.createElement('input');
   quickInput.type = 'text';
   quickInput.className = 'fc-namedlg__refers-input';
@@ -169,15 +170,17 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   }
   quickRow.appendChild(quickLabel);
   const quickCommitBtn = appendDialogIconButton(quickRow, {
-    label: '✓',
+    label: '',
     ariaLabel: t.commitButton,
     baseClass: 'fc-namedlg__refers-icon',
   });
+  quickCommitBtn.classList.add('fc-namedlg__refers-icon--commit');
   const quickCancelBtn = appendDialogIconButton(quickRow, {
-    label: '×',
+    label: '',
     ariaLabel: t.cancelButton,
     baseClass: 'fc-namedlg__refers-icon',
   });
+  quickCancelBtn.classList.add('fc-namedlg__refers-icon--cancel');
   body.appendChild(quickRow);
 
   const editorShell = createDialogShell({
@@ -212,14 +215,9 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   nameInput.setAttribute('aria-label', t.nameHeader);
   nameInput.autocomplete = 'off';
   nameInput.spellcheck = false;
-  const scopeSelect = createDialogSelect(
-    [{ value: 'workbook', label: t.workbookScope }],
-    'workbook',
-    { className: 'fc-namedlg-editor__input', ariaLabel: t.scopeHeader },
-  );
-  projectDisabledState(scopeSelect, true, t.scopeWorkbookOnly, {
-    datasetKey: 'disabledReason',
-    titlePrefix: t.scopeHeader,
+  const scopeSelect = createDialogSelect([], '-1', {
+    className: 'fc-namedlg-editor__input',
+    ariaLabel: t.scopeHeader,
   });
   const commentInput = document.createElement('textarea');
   commentInput.className = 'fc-namedlg-editor__input';
@@ -307,13 +305,13 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     clearDialogError(mainErrorRow);
   };
   let selectedNameIndex = 0;
-  let currentRows: { name: string; formula: string }[] = [];
+  let currentRows: DefinedNameEntry[] = [];
   let activeFilter: NameFilter = 'all';
   let sortKey: NameSortKey = 'name';
   let sortDir: 'asc' | 'desc' = 'asc';
   let filterMenu: HTMLDivElement | null = null;
   let editorMode: 'new' | 'edit' = 'new';
-  let pendingDeleteName: string | null = null;
+  let pendingDeleteName: DefinedNameEntry | null = null;
 
   const setReadOnlyState = (
     el: HTMLElement & { disabled?: boolean },
@@ -393,6 +391,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     currentRows = allRows.filter((entry) => {
       if (activeFilter === 'errors') return hasFormulaError(entry.formula);
       if (activeFilter === 'noErrors') return !hasFormulaError(entry.formula);
+      if (activeFilter === 'workbook') return entry.localSheetId < 0;
       return true;
     });
     currentRows.sort((a, b) => {
@@ -420,7 +419,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       formulaCell.textContent = entry.formula;
       const scope = document.createElement('span');
       scope.className = 'fc-namedlg__row-scope';
-      scope.textContent = t.workbookScope;
+      scope.textContent = scopeLabel(entry.localSheetId);
       const comment = document.createElement('span');
       comment.className = 'fc-namedlg__row-comment';
       comment.textContent = '';
@@ -483,12 +482,12 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       activeFilter === 'all' ? t.filterButton : `${t.filterButton}: ${filterLabel(activeFilter)}`;
   };
 
-  const sortValue = (entry: { name: string; formula: string }, key: NameSortKey): string => {
+  const sortValue = (entry: DefinedNameEntry, key: NameSortKey): string => {
     switch (key) {
       case 'formula':
         return entry.formula;
       case 'scope':
-        return t.workbookScope;
+        return scopeLabel(entry.localSheetId);
       case 'value':
         return definedNameValueText(entry.formula);
       case 'comment':
@@ -501,6 +500,22 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   const definedNameValueText = (formula: string): string => {
     const values = resolveRangeRef(wb, formula, 0);
     return values.length > 0 ? values.join(', ') : t.valueUnavailable;
+  };
+
+  const scopeLabel = (localSheetId: number): string =>
+    localSheetId < 0 ? t.workbookScope : wb.sheetName(localSheetId);
+
+  const scopeOptions = (): { value: string; label: string }[] => [
+    { value: '-1', label: t.workbookScope },
+    ...Array.from({ length: wb.sheetCount }, (_, sheet) => ({
+      value: String(sheet),
+      label: wb.sheetName(sheet),
+    })),
+  ];
+
+  const selectedScopeId = (): number => {
+    const value = Number(scopeSelect.value);
+    return Number.isInteger(value) && value >= -1 ? value : -1;
   };
 
   const filterLabel = (filter: NameFilter): string => {
@@ -608,8 +623,10 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     const title = mode === 'new' ? t.newNameTitle : t.editNameTitle;
     editorTitle.textContent = title;
     editorShell.setAriaLabel(title);
+    scopeSelect.replaceChildren();
+    appendDialogSelectOptions(scopeSelect, scopeOptions());
     nameInput.value = entry?.name ?? '';
-    scopeSelect.value = 'workbook';
+    scopeSelect.value = String(entry?.localSheetId ?? -1);
     commentInput.value = '';
     formulaInput.value = entry?.formula ?? '';
     clearError();
@@ -634,7 +651,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
   const requestDeleteSelectedName = (): void => {
     const entry = currentRows[selectedNameIndex];
     if (!entry) return;
-    pendingDeleteName = entry.name;
+    pendingDeleteName = entry;
     deleteMessage.textContent = t.confirmDeleteMessage.replace('{name}', entry.name);
     deleteShell.open();
     requestAnimationFrame(() => deleteOkBtn.focus());
@@ -642,8 +659,10 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
 
   const confirmDeleteSelectedName = (): void => {
     if (!pendingDeleteName) return;
-    const name = pendingDeleteName;
-    const result = recordDefinedNamesChange(history, wb, () => deleteDefinedName(wb, name));
+    const entry = pendingDeleteName;
+    const result = recordDefinedNamesChange(history, wb, () =>
+      deleteDefinedName(wb, entry.name, entry.localSheetId),
+    );
     if (!result.ok) {
       showMainError(t.errorEngineFailed);
       closeDeleteConfirm();
@@ -661,7 +680,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
     const entry = currentRows[selectedNameIndex];
     if (!entry) return;
     const result = recordDefinedNamesChange(history, wb, () =>
-      upsertDefinedName(wb, entry.name, quickInput.value),
+      upsertDefinedName(wb, entry.name, quickInput.value, entry.localSheetId),
     );
     if (!result.ok) {
       showMainError(errorMessageFor(result.reason, t));
@@ -690,7 +709,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       return;
     }
     const result = recordDefinedNamesChange(history, wb, () =>
-      upsertDefinedName(wb, name, formula),
+      upsertDefinedName(wb, name, formula, selectedScopeId()),
     );
     if (!result.ok) {
       showError(errorMessageFor(result.reason, t));

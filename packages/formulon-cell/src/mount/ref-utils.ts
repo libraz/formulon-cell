@@ -35,19 +35,27 @@ export function formatSelectionRef(
   return `${cellRef(range.r0, range.c0, r1c1)}:${cellRef(range.r1, range.c1, r1c1)}`;
 }
 
-/** Case-insensitive defined-name lookup. Returns the formula text stripped
- *  of any leading `=`, sheet qualifier, and `$` anchors so it can be parsed
- *  by `parseRangeRef` / `parseCellRef`. */
-export function lookupDefinedName(wb: WorkbookHandle, query: string): string | null {
+/** Case-insensitive defined-name lookup. Sheet-scoped names for `sheetIndex`
+ *  shadow workbook-scoped names. Returns the formula text stripped of any
+ *  leading `=`, sheet qualifier, and `$` anchors so it can be parsed by
+ *  `parseRangeRef` / `parseCellRef`. */
+export function lookupDefinedName(
+  wb: WorkbookHandle,
+  query: string,
+  sheetIndex = -1,
+): string | null {
   if (!query) return null;
   const q = query.toLowerCase();
+  let workbookScoped: string | null = null;
   for (const dn of wb.definedNames()) {
     if (dn.name.toLowerCase() !== q) continue;
     const eq = dn.formula.replace(/^=/, '');
     const bang = eq.lastIndexOf('!');
-    return (bang >= 0 ? eq.slice(bang + 1) : eq).replace(/\$/g, '');
+    const normalized = (bang >= 0 ? eq.slice(bang + 1) : eq).replace(/\$/g, '');
+    if (dn.localSheetId === sheetIndex) return normalized;
+    if (dn.localSheetId === -1 && workbookScoped === null) workbookScoped = normalized;
   }
-  return null;
+  return workbookScoped;
 }
 
 export function parseCellRef(raw: string): { row: number; col: number } | null {

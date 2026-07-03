@@ -161,10 +161,19 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
   };
 
   let nameMenu: HTMLDivElement | null = null;
-  const definedNameRows = (): { name: string; formula: string }[] =>
-    [...getWb().definedNames()]
-      .filter((dn) => dn.name.trim() && dn.formula.trim())
-      .sort((a, b) => a.name.localeCompare(b.name));
+  const definedNameRows = (): { name: string; formula: string; localSheetId: number }[] => {
+    const activeSheet = store.getState().data.sheetIndex;
+    const rows = new Map<string, { name: string; formula: string; localSheetId: number }>();
+    for (const dn of getWb().definedNames()) {
+      if (!dn.name.trim() || !dn.formula.trim()) continue;
+      if (dn.localSheetId !== -1 && dn.localSheetId !== activeSheet) continue;
+      const key = dn.name.toLowerCase();
+      const existing = rows.get(key);
+      if (existing && existing.localSheetId === activeSheet) continue;
+      rows.set(key, { name: dn.name, formula: dn.formula, localSheetId: dn.localSheetId });
+    }
+    return [...rows.values()].sort((a, b) => a.name.localeCompare(b.name));
+  };
 
   const closeNameMenu = (): void => {
     nameMenu?.remove();
@@ -192,7 +201,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     if (range) return asRange(range);
     const parsed = parseCellRef(raw);
     if (parsed) return asCell(parsed);
-    const dn = lookupDefinedName(getWb(), raw.trim());
+    const dn = lookupDefinedName(getWb(), raw.trim(), sheetIdx);
     if (!dn) return null;
     const subRange = parseRangeRef(dn);
     if (subRange) return asRange(subRange);

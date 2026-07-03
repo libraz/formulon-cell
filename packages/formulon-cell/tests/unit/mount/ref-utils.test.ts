@@ -127,9 +127,11 @@ describe('mount/ref-utils', () => {
   });
 
   describe('lookupDefinedName', () => {
-    const fakeWb = (rows: { name: string; formula: string }[]): WorkbookHandle =>
+    const fakeWb = (
+      rows: { name: string; formula: string; localSheetId?: number }[],
+    ): WorkbookHandle =>
       ({
-        definedNames: () => rows,
+        definedNames: () => rows.map((row) => ({ ...row, localSheetId: row.localSheetId ?? -1 })),
       }) as unknown as WorkbookHandle;
 
     it('returns null when the query is empty', () => {
@@ -150,6 +152,18 @@ describe('mount/ref-utils', () => {
     it('returns null when the name is not registered', () => {
       const wb = fakeWb([{ name: 'Foo', formula: '=A1' }]);
       expect(lookupDefinedName(wb, 'bar')).toBeNull();
+    });
+
+    it('prefers the active sheet scoped name over a workbook scoped name', () => {
+      const wb = fakeWb([
+        { name: 'Sales', formula: '=Sheet1!$A$1:$A$3', localSheetId: -1 },
+        { name: 'Sales', formula: '=Sheet1!$B$1:$B$3', localSheetId: 0 },
+        { name: 'Sales', formula: '=Sheet2!$C$1:$C$3', localSheetId: 1 },
+      ]);
+
+      expect(lookupDefinedName(wb, 'Sales', 0)).toBe('B1:B3');
+      expect(lookupDefinedName(wb, 'Sales', 1)).toBe('C1:C3');
+      expect(lookupDefinedName(wb, 'Sales', 2)).toBe('A1:A3');
     });
   });
 });

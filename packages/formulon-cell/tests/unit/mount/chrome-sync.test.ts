@@ -185,10 +185,10 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
 
   it('Alt+ArrowDown opens the Excel-like defined-name list and selecting one jumps there', () => {
     const wb = sheet.workbook as unknown as {
-      definedNames: () => Generator<{ name: string; formula: string }>;
+      definedNames: () => Generator<{ name: string; formula: string; localSheetId: number }>;
     };
     wb.definedNames = function* () {
-      yield { name: 'Sales', formula: 'Sheet1!$B$2:$C$4' };
+      yield { name: 'Sales', formula: 'Sheet1!$B$2:$C$4', localSheetId: -1 };
     };
 
     tag.focus();
@@ -205,6 +205,48 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
     const sel = sheet.instance.store.getState().selection;
     expect(sel.range).toEqual({ sheet: 0, r0: 1, c0: 1, r1: 3, c1: 2 });
     expect(document.querySelector('.fc-namebox-menu')).toBeNull();
+  });
+
+  it('Enter on a defined name prefers the active sheet scoped name', () => {
+    const wb = sheet.workbook as unknown as {
+      definedNames: () => Generator<{ name: string; formula: string; localSheetId: number }>;
+    };
+    wb.definedNames = function* () {
+      yield { name: 'Sales', formula: 'Sheet1!$A$1:$A$3', localSheetId: -1 };
+      yield { name: 'Sales', formula: 'Sheet1!$B$2:$B$4', localSheetId: 0 };
+    };
+
+    tag.focus();
+    tag.value = 'Sales';
+    tag.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    const sel = sheet.instance.store.getState().selection;
+    expect(sel.range).toEqual({ sheet: 0, r0: 1, c0: 1, r1: 3, c1: 1 });
+  });
+
+  it('defined-name list shadows workbook names with active sheet scoped names', () => {
+    const wb = sheet.workbook as unknown as {
+      definedNames: () => Generator<{ name: string; formula: string; localSheetId: number }>;
+    };
+    wb.definedNames = function* () {
+      yield { name: 'Sales', formula: 'Sheet1!$A$1:$A$3', localSheetId: -1 };
+      yield { name: 'Sales', formula: 'Sheet1!$B$2:$B$4', localSheetId: 0 };
+      yield { name: 'OtherSheetOnly', formula: 'Sheet2!$C$1:$C$3', localSheetId: 1 };
+    };
+
+    tag.focus();
+    tag.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true }),
+    );
+
+    const items = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('.fc-namebox-menu [role="option"]'),
+    );
+    expect(items.map((item) => item.textContent)).toEqual(['Sales']);
+    items[0]?.click();
+
+    const sel = sheet.instance.store.getState().selection;
+    expect(sel.range).toEqual({ sheet: 0, r0: 1, c0: 1, r1: 3, c1: 1 });
   });
 
   it('Alt+ArrowDown shows an empty defined-name menu when no names exist', () => {
@@ -235,11 +277,11 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
 
   it('Ctrl-click in the name box list adds a defined range to the multi-selection', () => {
     const wb = sheet.workbook as unknown as {
-      definedNames: () => Generator<{ name: string; formula: string }>;
+      definedNames: () => Generator<{ name: string; formula: string; localSheetId: number }>;
     };
     wb.definedNames = function* () {
-      yield { name: 'North', formula: 'Sheet1!$B$2:$B$4' };
-      yield { name: 'South', formula: 'Sheet1!$D$2:$D$4' };
+      yield { name: 'North', formula: 'Sheet1!$B$2:$B$4', localSheetId: -1 };
+      yield { name: 'South', formula: 'Sheet1!$D$2:$D$4', localSheetId: -1 };
     };
 
     tag.focus();
@@ -262,12 +304,12 @@ describe('mount/chrome-sync — name box (tag) keyboard handling', () => {
 
   it('defined-name list supports Arrow/Home/End navigation and Enter activation', () => {
     const wb = sheet.workbook as unknown as {
-      definedNames: () => Generator<{ name: string; formula: string }>;
+      definedNames: () => Generator<{ name: string; formula: string; localSheetId: number }>;
     };
     wb.definedNames = function* () {
-      yield { name: 'North', formula: 'Sheet1!$B$2:$B$4' };
-      yield { name: 'South', formula: 'Sheet1!$D$2:$D$4' };
-      yield { name: 'West', formula: 'Sheet1!$F$2:$F$4' };
+      yield { name: 'North', formula: 'Sheet1!$B$2:$B$4', localSheetId: -1 };
+      yield { name: 'South', formula: 'Sheet1!$D$2:$D$4', localSheetId: -1 };
+      yield { name: 'West', formula: 'Sheet1!$F$2:$F$4', localSheetId: -1 };
     };
 
     tag.focus();

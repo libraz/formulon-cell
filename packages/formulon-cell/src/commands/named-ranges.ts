@@ -7,6 +7,8 @@ import { isCellWritable, warnProtected } from './protection.js';
 export interface DefinedNameEntry {
   name: string;
   formula: string;
+  /** -1 means workbook scope; otherwise a 0-based sheet index. */
+  localSheetId: number;
 }
 
 export type DefinedNameMutationResult =
@@ -27,7 +29,7 @@ export interface CreateDefinedNamesResult {
   entries: DefinedNameEntry[];
 }
 
-type DefinedNamesSnapshot = Map<string, string>;
+type DefinedNamesSnapshot = Map<string, DefinedNameEntry>;
 
 const MAX_CREATE_DEFINED_NAMES = 10_000;
 
@@ -121,21 +123,37 @@ const uniqueName = (base: string, used: Set<string>): string => {
 };
 
 const captureDefinedNamesSnapshot = (wb: WorkbookHandle): DefinedNamesSnapshot =>
-  new Map([...wb.definedNames()].map((entry) => [entry.name, entry.formula]));
+  new Map(
+    [...wb.definedNames()].map((entry) => [
+      `${entry.localSheetId}:${entry.name.toLowerCase()}`,
+      { name: entry.name, formula: entry.formula, localSheetId: entry.localSheetId },
+    ]),
+  );
 
 const sameDefinedNamesSnapshot = (a: DefinedNamesSnapshot, b: DefinedNamesSnapshot): boolean => {
   if (a.size !== b.size) return false;
-  for (const [name, formula] of a) {
-    if (b.get(name) !== formula) return false;
+  for (const [key, entry] of a) {
+    const other = b.get(key);
+    if (
+      !other ||
+      other.name !== entry.name ||
+      other.formula !== entry.formula ||
+      other.localSheetId !== entry.localSheetId
+    ) {
+      return false;
+    }
   }
   return true;
 };
 
 const applyDefinedNamesSnapshot = (wb: WorkbookHandle, snap: DefinedNamesSnapshot): void => {
   for (const entry of [...wb.definedNames()]) {
-    if (!snap.has(entry.name)) wb.setDefinedNameEntry(entry.name, '');
+    const key = `${entry.localSheetId}:${entry.name.toLowerCase()}`;
+    if (!snap.has(key)) wb.setDefinedNameEntry(entry.name, '', entry.localSheetId);
   }
-  for (const [name, formula] of snap) wb.setDefinedNameEntry(name, formula);
+  for (const entry of snap.values()) {
+    wb.setDefinedNameEntry(entry.name, entry.formula, entry.localSheetId);
+  }
   // Undo/redo of a name change must recompute dependents too.
   wb.recalc();
 };
@@ -157,16 +175,17 @@ export function recordDefinedNamesChange<T>(
   return result;
 }
 
-/** Snapshot workbook-scoped defined names into a stable array. */
+/** Snapshot workbook- and sheet-scoped defined names into a stable array. */
 export function listDefinedNames(wb: WorkbookHandle): DefinedNameEntry[] {
   return [...wb.definedNames()];
 }
 
-/** Add or replace a workbook-scoped defined name. */
+/** Add or replace a workbook- or sheet-scoped defined name. */
 export function upsertDefinedName(
   wb: WorkbookHandle,
   name: string,
   formula: string,
+  localSheetId = -1,
 ): DefinedNameMutationResult {
   const trimmedName = name.trim();
   const trimmedFormula = formula.trim();
@@ -174,25 +193,31 @@ export function upsertDefinedName(
   if (!isValidDefinedName(trimmedName)) return { ok: false, reason: 'invalid-name' };
   if (!trimmedFormula) return { ok: false, reason: 'empty-formula' };
   if (!wb.capabilities.definedNameMutate) return { ok: false, reason: 'unsupported' };
-  if (!wb.setDefinedNameEntry(trimmedName, trimmedFormula)) {
+  if (!wb.setDefinedNameEntry(trimmedName, trimmedFormula, localSheetId)) {
     return { ok: false, reason: 'engine-failed' };
   }
   // Defining/redefining a name changes what `=MyRange` resolves to — recompute
   // so dependent cells and a subsequent save reflect the new target.
   wb.recalc();
-  return { ok: true, entry: { name: trimmedName, formula: trimmedFormula } };
+  return { ok: true, entry: { name: trimmedName, formula: trimmedFormula, localSheetId } };
 }
 
-/** Remove a workbook-scoped defined name. */
-export function deleteDefinedName(wb: WorkbookHandle, name: string): DefinedNameDeleteResult {
+/** Remove a workbook- or sheet-scoped defined name. */
+export function deleteDefinedName(
+  wb: WorkbookHandle,
+  name: string,
+  localSheetId = -1,
+): DefinedNameDeleteResult {
   const trimmedName = name.trim();
   if (!trimmedName) return { ok: false, reason: 'empty-name' };
   if (!wb.capabilities.definedNameMutate) return { ok: false, reason: 'unsupported' };
-  if (!wb.setDefinedNameEntry(trimmedName, '')) return { ok: false, reason: 'engine-failed' };
+  if (!wb.setDefinedNameEntry(trimmedName, '', localSheetId)) {
+    return { ok: false, reason: 'engine-failed' };
+  }
   // Removing a name usually turns `=MyRange` into #NAME? — recompute so the
   // change is reflected in dependents and on save.
   wb.recalc();
-  return { ok: true, entry: { name: trimmedName, formula: '' } };
+  return { ok: true, entry: { name: trimmedName, formula: '', localSheetId } };
 }
 
 export function createDefinedNamesFromSelection(
@@ -279,9 +304,18 @@ export function insertDefinedNameFormula(
 ): { addr: Addr; formula: string } | null {
   const trimmed = name.trim();
   if (!trimmed) return null;
-  const entry = [...wb.definedNames()].find(
-    (definedName) => definedName.name.toLowerCase() === trimmed.toLowerCase(),
-  );
+  const activeSheet = state.selection.active.sheet;
+  let entry: DefinedNameEntry | null = null;
+  let workbookScoped: DefinedNameEntry | null = null;
+  for (const definedName of wb.definedNames()) {
+    if (definedName.name.toLowerCase() !== trimmed.toLowerCase()) continue;
+    if (definedName.localSheetId === activeSheet) {
+      entry = definedName;
+      break;
+    }
+    if (definedName.localSheetId === -1 && workbookScoped === null) workbookScoped = definedName;
+  }
+  entry ??= workbookScoped;
   if (!entry) return null;
   const addr = state.selection.active;
   if (store && !isCellWritable(store.getState(), addr)) {

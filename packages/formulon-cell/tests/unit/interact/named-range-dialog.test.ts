@@ -72,6 +72,8 @@ describe('attachNamedRangeDialog', () => {
     );
     const quickInput = document.querySelector<HTMLInputElement>('.fc-namedlg__refers-input');
     const quickCommit = document.querySelector<HTMLButtonElement>('.fc-namedlg__refers-icon');
+    expect(quickCommit?.textContent).toBe('');
+    expect(quickCommit?.classList.contains('fc-namedlg__refers-icon--commit')).toBe(true);
     for (const control of [newBtn, editBtn, deleteBtn, quickInput, quickCommit]) {
       expect(control?.disabled).toBe(true);
       expect(control?.getAttribute('aria-describedby')).toBe('fc-namedlg-readonly-note');
@@ -82,12 +84,12 @@ describe('attachNamedRangeDialog', () => {
 });
 
 interface MutableWb {
-  capabilities: { definedNameMutate: boolean };
+  capabilities: { definedNameMutate: boolean; definedNameScopes: boolean };
   readonly sheetCount: number;
-  definedNames(): IterableIterator<{ name: string; formula: string }>;
+  definedNames(): IterableIterator<{ name: string; formula: string; localSheetId: number }>;
   sheetName(index: number): string;
   getValue(addr: { sheet: number; row: number; col: number }): FakeCellValue;
-  setDefinedNameEntry(name: string, formula: string): boolean;
+  setDefinedNameEntry(name: string, formula: string, localSheetId?: number): boolean;
   recalc(): void;
 }
 
@@ -98,20 +100,20 @@ type FakeCellValue =
 
 const makeMutableWb = (): {
   wb: WorkbookHandle;
-  calls: { name: string; formula: string }[];
+  calls: { name: string; formula: string; localSheetId: number }[];
   registry: Map<string, string>;
   values: Map<string, FakeCellValue>;
 } => {
-  const calls: { name: string; formula: string }[] = [];
+  const calls: { name: string; formula: string; localSheetId: number }[] = [];
   const registry = new Map<string, string>();
   const values = new Map<string, FakeCellValue>();
   const fake: MutableWb = {
-    capabilities: { definedNameMutate: true },
+    capabilities: { definedNameMutate: true, definedNameScopes: true },
     get sheetCount() {
       return 1;
     },
     *definedNames() {
-      for (const [name, formula] of registry) yield { name, formula };
+      for (const [name, formula] of registry) yield { name, formula, localSheetId: -1 };
     },
     sheetName(index: number): string {
       return index === 0 ? 'Sheet1' : `Sheet${index + 1}`;
@@ -119,8 +121,8 @@ const makeMutableWb = (): {
     getValue(addr) {
       return values.get(`${addr.sheet}:${addr.row}:${addr.col}`) ?? { kind: 'blank' };
     },
-    setDefinedNameEntry(name: string, formula: string): boolean {
-      calls.push({ name, formula });
+    setDefinedNameEntry(name: string, formula: string, localSheetId = -1): boolean {
+      calls.push({ name, formula, localSheetId });
       if (formula === '') registry.delete(name);
       else registry.set(name, formula);
       return true;
@@ -156,6 +158,10 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       document.querySelectorAll<HTMLButtonElement>('.fc-namedlg__refers-icon'),
     )[1];
 
+    expect(quickCommit?.textContent).toBe('');
+    expect(quickCancel?.textContent).toBe('');
+    expect(quickCommit?.classList.contains('fc-namedlg__refers-icon--commit')).toBe(true);
+    expect(quickCancel?.classList.contains('fc-namedlg__refers-icon--cancel')).toBe(true);
     expect(newBtn?.disabled).toBe(false);
     expect(editBtn?.disabled).toBe(true);
     expect(deleteBtn?.disabled).toBe(true);
@@ -193,24 +199,51 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       '.fc-namedlg-editor__input[aria-label="名前"]',
     );
     const formulaField = document.querySelector<HTMLInputElement>(
-      '.fc-namedlg-editor__input[aria-label="参照"]',
+      '.fc-namedlg-editor__input[aria-label="参照先"]',
     );
     expect(nameField?.getAttribute('aria-label')).toBeTruthy();
     expect(formulaField?.getAttribute('aria-label')).toBeTruthy();
     const scopeField = document.querySelector<HTMLSelectElement>(
       '.fc-namedlg-editor__input[aria-label="範囲"]',
     );
-    expect(scopeField?.value).toBe('workbook');
+    expect(scopeField?.value).toBe('-1');
     expect(
       Array.from(scopeField?.options ?? [], (option) => [option.value, option.textContent]),
-    ).toEqual([['workbook', 'ブック']]);
+    ).toEqual([
+      ['-1', 'ブック'],
+      ['0', 'Sheet1'],
+    ]);
     if (nameField) nameField.value = 'TaxRate';
     if (formulaField) formulaField.value = '=Sheet1!$A$1';
     form?.requestSubmit();
-    expect(calls).toEqual([{ name: 'TaxRate', formula: '=Sheet1!$A$1' }]);
+    expect(calls).toEqual([{ name: 'TaxRate', formula: '=Sheet1!$A$1', localSheetId: -1 }]);
     // Listing re-renders to reflect the new entry.
     const items = document.querySelectorAll('.fc-namedlg__item');
     expect(items.length).toBe(1);
+    handle.detach();
+  });
+
+  it('passes the selected sheet scope when creating a defined name', () => {
+    const { wb, calls } = makeMutableWb();
+    const handle = attachNamedRangeDialog({ host, wb });
+    handle.open();
+    document.querySelector<HTMLButtonElement>('.fc-namedlg__actions button')?.click();
+    const nameField = document.querySelector<HTMLInputElement>(
+      '.fc-namedlg-editor__input[aria-label="名前"]',
+    );
+    const scopeField = document.querySelector<HTMLSelectElement>(
+      '.fc-namedlg-editor__input[aria-label="範囲"]',
+    );
+    const formulaField = document.querySelector<HTMLInputElement>(
+      '.fc-namedlg-editor__input[aria-label="参照先"]',
+    );
+
+    if (nameField) nameField.value = 'LocalRate';
+    if (scopeField) scopeField.value = '0';
+    if (formulaField) formulaField.value = '=Sheet1!$A$1';
+    document.querySelector<HTMLFormElement>('.fc-namedlg-editor__form')?.requestSubmit();
+
+    expect(calls).toEqual([{ name: 'LocalRate', formula: '=Sheet1!$A$1', localSheetId: 0 }]);
     handle.detach();
   });
 
@@ -226,7 +259,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       '.fc-namedlg-editor__input[aria-label="名前"]',
     );
     const formulaField = document.querySelector<HTMLInputElement>(
-      '.fc-namedlg-editor__input[aria-label="参照"]',
+      '.fc-namedlg-editor__input[aria-label="参照先"]',
     );
     if (nameField) nameField.value = 'Discount';
     if (formulaField) formulaField.value = '=Sheet1!$B$1';
@@ -268,7 +301,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       '.fc-namedlg-editor__input[aria-label="名前"]',
     );
     const formulaField = document.querySelector<HTMLInputElement>(
-      '.fc-namedlg-editor__input[aria-label="参照"]',
+      '.fc-namedlg-editor__input[aria-label="参照先"]',
     );
     if (nameField) nameField.value = 'TaxRate';
     if (formulaField) formulaField.value = '=Sheet1!$A$1';
@@ -295,7 +328,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       document.querySelectorAll<HTMLButtonElement>('.fc-namedlg__actions button'),
     );
     expect(actions.map((button) => button.textContent)).toEqual([
-      '新規作成...',
+      '新規...',
       '編集...',
       '削除',
       'フィルター',
@@ -303,7 +336,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     const headers = Array.from(
       document.querySelectorAll<HTMLElement>('.fc-namedlg__head span'),
     ).map((cell) => cell.textContent);
-    expect(headers).toEqual(['名前', '値', '参照', '範囲', 'コメント']);
+    expect(headers).toEqual(['名前', '値', '参照先', '範囲', 'コメント']);
     const rowCells = Array.from(
       document.querySelectorAll<HTMLElement>('.fc-namedlg__item span'),
     ).map((cell) => cell.textContent);
@@ -365,13 +398,13 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       '.fc-namedlg-editor__input[aria-label="名前"]',
     );
     const formulaField = document.querySelector<HTMLInputElement>(
-      '.fc-namedlg-editor__input[aria-label="参照"]',
+      '.fc-namedlg-editor__input[aria-label="参照先"]',
     );
     expect(nameField?.value).toBe('TaxRate');
     expect(formulaField?.value).toBe('=Sheet1!$A$1');
     if (formulaField) formulaField.value = '=Sheet1!$B$2';
     document.querySelector<HTMLFormElement>('.fc-namedlg-editor__form')?.requestSubmit();
-    expect(calls).toEqual([{ name: 'TaxRate', formula: '=Sheet1!$B$2' }]);
+    expect(calls).toEqual([{ name: 'TaxRate', formula: '=Sheet1!$B$2', localSheetId: -1 }]);
     expect(editor?.hidden).toBe(true);
     handle.detach();
   });
@@ -389,12 +422,12 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     expect(quick?.value).toBe('=Sheet1!$A$1');
     if (quick) quick.value = '=Sheet1!$C$3';
     commit?.click();
-    expect(calls).toEqual([{ name: 'TaxRate', formula: '=Sheet1!$C$3' }]);
+    expect(calls).toEqual([{ name: 'TaxRate', formula: '=Sheet1!$C$3', localSheetId: -1 }]);
     expect(quick?.value).toBe('=Sheet1!$C$3');
 
     if (quick) quick.value = '=Sheet1!$D$4';
     cancel?.click();
-    expect(calls).toEqual([{ name: 'TaxRate', formula: '=Sheet1!$C$3' }]);
+    expect(calls).toEqual([{ name: 'TaxRate', formula: '=Sheet1!$C$3', localSheetId: -1 }]);
     expect(quick?.value).toBe('=Sheet1!$C$3');
     handle.detach();
   });
@@ -433,7 +466,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       '[data-range-picker="named-range-editor-refers-to"]',
     );
     const editorInput = document.querySelector<HTMLInputElement>(
-      '.fc-namedlg-editor__input[aria-label="参照"]',
+      '.fc-namedlg-editor__input[aria-label="参照先"]',
     );
     editorButton?.click();
     expect(quickButton?.getAttribute('aria-pressed')).toBe('false');
@@ -528,7 +561,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       document.querySelectorAll<HTMLButtonElement>('.fc-namedlg-confirm button'),
     ).find((button) => button.textContent === 'OK');
     ok?.click();
-    expect(calls).toEqual([{ name: 'TaxRate', formula: '' }]);
+    expect(calls).toEqual([{ name: 'TaxRate', formula: '', localSheetId: -1 }]);
     // List should now be empty.
     expect(document.querySelector<HTMLElement>('.fc-namedlg__empty')?.textContent).toBeTruthy();
     handle.detach();
@@ -599,7 +632,7 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
     ).find((button) => button.textContent === 'OK');
     ok?.click();
 
-    expect(calls).toEqual([{ name: 'Budget', formula: '' }]);
+    expect(calls).toEqual([{ name: 'Budget', formula: '', localSheetId: -1 }]);
     const rows = Array.from(document.querySelectorAll<HTMLElement>('.fc-namedlg__item'));
     expect(rows).toHaveLength(1);
     expect(rows[0]?.textContent).toContain('TaxRate');
@@ -615,5 +648,69 @@ describe('attachNamedRangeDialog (mutate enabled)', () => {
       "createNameManagerButton(filterLabel(filter), 'fc-namedlg__filter-item'",
     );
     expect(source).not.toContain("document.createElement('button')");
+  });
+
+  it('keeps Name Manager list and filter menu close to Excel 365 desktop geometry', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/dialog-modules/conditional-and-names.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(
+      /\.fc-namedlg__filter-menu\s*\{[\s\S]*?min-width: 210px;[\s\S]*?border-radius: 2px;[\s\S]*?box-shadow:[\s\S]*?padding: 4px 0;/,
+    );
+    expect(css).toMatch(
+      /\.fc-namedlg__filter-item\s*\{[\s\S]*?min-height: 24px;[\s\S]*?padding: 3px 26px 3px 24px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-namedlg__filter-item\[aria-checked="true"\]::before\s*\{[\s\S]*?border-bottom: 2px solid var\(--fc-accent, #107c41\);[\s\S]*?border-left: 2px solid var\(--fc-accent, #107c41\);[\s\S]*?content: "";[\s\S]*?transform: rotate\(-45deg\);/,
+    );
+    expect(css).toMatch(
+      /\.fc-namedlg__sort--active::after\s*\{[\s\S]*?border: solid currentColor;[\s\S]*?content: "";/,
+    );
+    expect(css).toMatch(
+      /\.fc-namedlg__sort\[data-sort-dir="asc"\]::after\s*\{[\s\S]*?rotate\(-45deg\);/,
+    );
+    expect(css).toMatch(
+      /\.fc-namedlg__sort\[data-sort-dir="desc"\]::after\s*\{[\s\S]*?rotate\(135deg\);/,
+    );
+    expect(css).not.toContain('content: attr(data-sort-dir)');
+    expect(css).toMatch(
+      /\.fc-namedlg__refers-icon--commit::before\s*\{[\s\S]*?border-bottom: 2px solid currentColor;[\s\S]*?border-left: 2px solid currentColor;/,
+    );
+    expect(css).toMatch(
+      /\.fc-namedlg__refers-icon::before,[\s\S]*?\.fc-namedlg__refers-icon::after\s*\{[\s\S]*?content: "";/,
+    );
+    expect(css).toMatch(
+      /\.fc-namedlg__refers-icon--cancel::before,[\s\S]*?\.fc-namedlg__refers-icon--cancel::after\s*\{[\s\S]*?background: currentColor;/,
+    );
+    expect(css).not.toContain('content: "✓"');
+    expect(css).toMatch(
+      /\.fc-conddlg__item:hover,[\s\S]*?\.fc-namedlg__item:hover\s*\{[\s\S]*?background: var\(--fc-bg-hover/,
+    );
+    expect(css).toMatch(
+      /\.fc-namedlg__item\[aria-selected="true"\],[\s\S]*?\.fc-namedlg__item--selected\s*\{[\s\S]*?background: var\(--fc-bg-hover/,
+    );
+    expect(css).not.toContain(
+      '.fc-namedlg__item--selected {\n    background: var(--fc-accent-soft',
+    );
+  });
+
+  it('keeps New/Edit Name child dialogs on compact desktop form geometry', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/dialog-modules/conditional-and-names.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(/\.fc-namedlg-editor__body\s*\{[\s\S]*?padding: 12px 14px 14px;/);
+    expect(css).toMatch(/\.fc-namedlg-editor__form\s*\{[\s\S]*?gap: 6px;/);
+    expect(css).toMatch(
+      /\.fc-namedlg-editor__row\s*\{[\s\S]*?grid-template-columns: 72px minmax\(0, 1fr\);[\s\S]*?gap: 8px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-namedlg-editor__buttons\s*\{[\s\S]*?gap: 6px;[\s\S]*?margin-top: 6px;/,
+    );
+    expect(css).toMatch(/\.fc-namedlg-confirm__body\s*\{[\s\S]*?gap: 12px;[\s\S]*?padding: 14px;/);
+    expect(css).toMatch(/\.fc-namedlg-confirm__buttons\s*\{[\s\S]*?gap: 6px;/);
   });
 });

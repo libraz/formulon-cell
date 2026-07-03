@@ -19,8 +19,8 @@ import {
 
 interface MutableWb {
   capabilities: { definedNameMutate: boolean };
-  definedNames(): IterableIterator<{ name: string; formula: string }>;
-  setDefinedNameEntry(name: string, formula: string): boolean;
+  definedNames(): IterableIterator<{ name: string; formula: string; localSheetId: number }>;
+  setDefinedNameEntry(name: string, formula: string, localSheetId?: number): boolean;
   setFormula?(addr: Addr, formula: string): void;
   recalc(): void;
 }
@@ -30,24 +30,28 @@ const makeWb = (
   writeOk = true,
 ): {
   wb: WorkbookHandle;
-  calls: { name: string; formula: string }[];
+  calls: { name: string; formula: string; localSheetId: number }[];
   formulas: Map<string, string>;
   recalcs: () => number;
 } => {
-  const registry = new Map([['TaxRate', '=Sheet1!$A$1']]);
-  const calls: { name: string; formula: string }[] = [];
+  const registry = new Map([['-1:TaxRate', { name: 'TaxRate', formula: '=Sheet1!$A$1' }]]);
+  const calls: { name: string; formula: string; localSheetId: number }[] = [];
   const formulas = new Map<string, string>();
   let recalcCount = 0;
   const fake: MutableWb = {
     capabilities: { definedNameMutate: canMutate },
     *definedNames() {
-      for (const [name, formula] of registry) yield { name, formula };
+      for (const [key, entry] of registry) {
+        const localSheetId = Number.parseInt(key.split(':', 1)[0] ?? '-1', 10);
+        yield { name: entry.name, formula: entry.formula, localSheetId };
+      }
     },
-    setDefinedNameEntry(name, formula) {
-      calls.push({ name, formula });
+    setDefinedNameEntry(name, formula, localSheetId = -1) {
+      calls.push({ name, formula, localSheetId });
       if (!writeOk) return false;
-      if (formula === '') registry.delete(name);
-      else registry.set(name, formula);
+      const key = `${localSheetId}:${name}`;
+      if (formula === '') registry.delete(key);
+      else registry.set(key, { name, formula });
       return true;
     },
     setFormula(addr, formula) {
@@ -88,15 +92,20 @@ const setRange = (
 describe('named range commands', () => {
   it('lists defined names from the workbook handle', () => {
     const { wb } = makeWb();
-    expect(listDefinedNames(wb)).toEqual([{ name: 'TaxRate', formula: '=Sheet1!$A$1' }]);
+    expect(listDefinedNames(wb)).toEqual([
+      { name: 'TaxRate', formula: '=Sheet1!$A$1', localSheetId: -1 },
+    ]);
   });
 
   it('adds or replaces a defined name', () => {
     const { wb, calls } = makeWb();
     const result = upsertDefinedName(wb, ' Total ', ' =Sheet1!$B$1 ');
 
-    expect(result).toEqual({ ok: true, entry: { name: 'Total', formula: '=Sheet1!$B$1' } });
-    expect(calls).toEqual([{ name: 'Total', formula: '=Sheet1!$B$1' }]);
+    expect(result).toEqual({
+      ok: true,
+      entry: { name: 'Total', formula: '=Sheet1!$B$1', localSheetId: -1 },
+    });
+    expect(calls).toEqual([{ name: 'Total', formula: '=Sheet1!$B$1', localSheetId: -1 }]);
   });
 
   it('recalculates dependents after add/delete so values are not stale (H-38)', () => {
@@ -173,7 +182,7 @@ describe('named range commands', () => {
     const result = createDefinedNamesFromSelection(store.getState(), wb, 'top-row');
     expect(result).toEqual({
       ok: true,
-      entries: [{ name: '_A1', formula: '=$A$2:$A$3' }],
+      entries: [{ name: '_A1', formula: '=$A$2:$A$3', localSheetId: -1 }],
     });
   });
 
@@ -192,8 +201,11 @@ describe('named range commands', () => {
     const { wb, calls } = makeWb();
     const result = deleteDefinedName(wb, ' TaxRate ');
 
-    expect(result).toEqual({ ok: true, entry: { name: 'TaxRate', formula: '' } });
-    expect(calls).toEqual([{ name: 'TaxRate', formula: '' }]);
+    expect(result).toEqual({
+      ok: true,
+      entry: { name: 'TaxRate', formula: '', localSheetId: -1 },
+    });
+    expect(calls).toEqual([{ name: 'TaxRate', formula: '', localSheetId: -1 }]);
   });
 
   it('creates defined names from the top row of the selection', () => {
@@ -208,13 +220,13 @@ describe('named range commands', () => {
     expect(result).toEqual({
       ok: true,
       entries: [
-        { name: 'Sales_Total', formula: '=$A$2:$A$3' },
-        { name: '_2026_Rate', formula: '=$B$2:$B$3' },
+        { name: 'Sales_Total', formula: '=$A$2:$A$3', localSheetId: -1 },
+        { name: '_2026_Rate', formula: '=$B$2:$B$3', localSheetId: -1 },
       ],
     });
     expect(calls).toEqual([
-      { name: 'Sales_Total', formula: '=$A$2:$A$3' },
-      { name: '_2026_Rate', formula: '=$B$2:$B$3' },
+      { name: 'Sales_Total', formula: '=$A$2:$A$3', localSheetId: -1 },
+      { name: '_2026_Rate', formula: '=$B$2:$B$3', localSheetId: -1 },
     ]);
   });
 
@@ -230,13 +242,13 @@ describe('named range commands', () => {
     expect(result).toEqual({
       ok: true,
       entries: [
-        { name: 'Sales_Total', formula: '=$A$1:$A$2' },
-        { name: 'Tax_Rate', formula: '=$B$1:$B$2' },
+        { name: 'Sales_Total', formula: '=$A$1:$A$2', localSheetId: -1 },
+        { name: 'Tax_Rate', formula: '=$B$1:$B$2', localSheetId: -1 },
       ],
     });
     expect(calls).toEqual([
-      { name: 'Sales_Total', formula: '=$A$1:$A$2' },
-      { name: 'Tax_Rate', formula: '=$B$1:$B$2' },
+      { name: 'Sales_Total', formula: '=$A$1:$A$2', localSheetId: -1 },
+      { name: 'Tax_Rate', formula: '=$B$1:$B$2', localSheetId: -1 },
     ]);
   });
 
@@ -250,8 +262,8 @@ describe('named range commands', () => {
     expect(createDefinedNamesFromSelection(store.getState(), left.wb, 'left-column')).toEqual({
       ok: true,
       entries: [
-        { name: 'North', formula: '=$B$1:$C$1' },
-        { name: 'South', formula: '=$B$2:$C$2' },
+        { name: 'North', formula: '=$B$1:$C$1', localSheetId: -1 },
+        { name: 'South', formula: '=$B$2:$C$2', localSheetId: -1 },
       ],
     });
 
@@ -262,8 +274,8 @@ describe('named range commands', () => {
     expect(createDefinedNamesFromSelection(store.getState(), right.wb, 'right-column')).toEqual({
       ok: true,
       entries: [
-        { name: 'West', formula: '=$A$1:$B$1' },
-        { name: 'East', formula: '=$A$2:$B$2' },
+        { name: 'West', formula: '=$A$1:$B$1', localSheetId: -1 },
+        { name: 'East', formula: '=$A$2:$B$2', localSheetId: -1 },
       ],
     });
   });
@@ -309,7 +321,9 @@ describe('named range commands', () => {
     expect(history.canUndo()).toBe(true);
 
     history.undo();
-    expect([...wb.definedNames()]).toEqual([{ name: 'TaxRate', formula: '=Sheet1!$A$1' }]);
+    expect([...wb.definedNames()]).toEqual([
+      { name: 'TaxRate', formula: '=Sheet1!$A$1', localSheetId: -1 },
+    ]);
 
     history.redo();
     expect([...wb.definedNames()].map((entry) => entry.name)).toEqual([
@@ -324,7 +338,7 @@ describe('named range commands', () => {
     const wb = {
       capabilities: { definedNameMutate: true },
       *definedNames() {
-        for (const [name, formula] of registry) yield { name, formula };
+        for (const [name, formula] of registry) yield { name, formula, localSheetId: -1 };
       },
       setDefinedNameEntry(name: string, formula: string) {
         if (formula === '') registry.delete(name);
@@ -356,6 +370,23 @@ describe('named range commands', () => {
 
     expect(result).toEqual({ addr: { sheet: 0, row: 4, col: 2 }, formula: '=TaxRate' });
     expect(formulas.get('0:4:2')).toBe('=TaxRate');
+  });
+
+  it('prefers sheet-scoped defined names over workbook-scoped names when inserting formulas', () => {
+    const store = createSpreadsheetStore();
+    const { wb, formulas } = makeWb();
+    wb.setDefinedNameEntry('taxrate', '=Sheet1!$B$2', 0);
+    setRange(store, 4, 2, 4, 2);
+
+    const result = insertDefinedNameFormula(store.getState(), wb, ' taxrate ');
+
+    expect(result).toEqual({ addr: { sheet: 0, row: 4, col: 2 }, formula: '=taxrate' });
+    expect(formulas.get('0:4:2')).toBe('=taxrate');
+    expect([...wb.definedNames()]).toContainEqual({
+      name: 'taxrate',
+      formula: '=Sheet1!$B$2',
+      localSheetId: 0,
+    });
   });
 
   it('does not insert formulas for names that do not exist in the workbook', () => {
