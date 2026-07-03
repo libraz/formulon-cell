@@ -203,4 +203,19 @@ describe('attachViewToolbar', () => {
     expect(source).not.toContain('function makeButton');
     expect(source).not.toContain("document.createElement('button')");
   });
+
+  it('keeps view toolbar pressed and hover states neutral like Excel desktop chrome', () => {
+    const css = readFileSync(join(root, 'src/styles/core/surface/viewbar.css'), 'utf8');
+
+    expect(css).toMatch(
+      /\.fc-viewbar__toggle,[\s\S]*?\.fc-viewbar__select\s*\{[\s\S]*?border-radius: 2px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-viewbar__toggle\[aria-pressed="true"\],[\s\S]*?\.fc-viewbar__button\[aria-pressed="true"\]\s*\{[\s\S]*?background: var\(--fc-bg-hover, color-mix\(in srgb, CanvasText 8%, transparent\)\);/,
+    );
+    expect(css).toMatch(
+      /\.fc-viewbar__toggle:hover,[\s\S]*?\.fc-viewbar__select:hover\s*\{[\s\S]*?border-color: var\(--fc-rule-strong, var\(--fc-rule\)\);[\s\S]*?background: var\(--fc-bg-hover, color-mix\(in srgb, CanvasText 8%, transparent\)\);/,
+    );
+    expect(css).not.toContain('background: var(--fc-accent-soft');
+  });
 });

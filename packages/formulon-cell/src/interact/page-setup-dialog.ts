@@ -142,7 +142,7 @@ export function attachPageSetupDialog(deps: PageSetupDialogDeps): PageSetupDialo
     : 'Close';
   header.appendChild(headerTitle);
   const headerCloseBtn = appendDialogIconButton(header, {
-    label: '×',
+    label: '',
     ariaLabel: closeLabel,
     baseClass: 'fc-fmtdlg__close',
   });

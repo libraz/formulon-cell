@@ -766,4 +766,21 @@ describe('attachConditionalDialog', () => {
     expect(overlay.hidden).toBe(true);
     handle.detach();
   });
+
+  it('keeps the conditional format manager on compact desktop dialog geometry', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/dialog-modules/conditional-and-names.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(
+      /\.fc-conddlg__list\s*\{[\s\S]*?gap: 0;[\s\S]*?border-radius: 0;[\s\S]*?padding: 0;/,
+    );
+    expect(css).toMatch(
+      /\.fc-conddlg__item\s*\{[\s\S]*?min-height: 28px;[\s\S]*?padding: 4px 8px;[\s\S]*?border-bottom: 1px solid var\(--fc-rule-subtle\);[\s\S]*?border-radius: 0;/,
+    );
+    expect(css).toMatch(
+      /\.fc-conddlg__form\s*\{[\s\S]*?border-radius: 2px;[\s\S]*?background: var\(--fc-bg, Canvas\);[\s\S]*?padding: 10px 12px;/,
+    );
+  });
 });

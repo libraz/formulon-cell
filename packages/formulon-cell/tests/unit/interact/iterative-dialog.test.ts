@@ -1,6 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachIterativeDialog } from '../../../src/interact/iterative-dialog.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 interface FakeWb {
   handle: WorkbookHandle;
@@ -184,5 +189,15 @@ describe('attachIterativeDialog', () => {
     const handle = attachIterativeDialog({ host, getWb: () => fake.handle });
     handle.detach();
     expect(overlay()).toBeNull();
+  });
+
+  it('keeps Iterative Calculation on compact desktop dialog geometry', () => {
+    const css = readFileSync(join(root, 'src/styles/core/app/dialogs/iterative.css'), 'utf8');
+
+    expect(css).toMatch(/\.fc-iterdlg__panel\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(css).toMatch(
+      /\.fc-iterdlg__row input\[type="number"\]:focus,[\s\S]*?\.fc-iterdlg__row input\[type="text"\]:focus\s*\{[\s\S]*?box-shadow: inset 0 0 0 1px var\(--fc-accent, currentColor\);/,
+    );
+    expect(css).not.toContain('box-shadow: 0 0 0 2px var(--fc-accent-soft');
   });
 });

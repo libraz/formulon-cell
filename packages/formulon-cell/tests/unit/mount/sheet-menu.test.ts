@@ -124,6 +124,23 @@ describe('mount/sheet-menu', () => {
       expect(source).toContain('const button = createHostButton({');
       expect(source).not.toContain("document.createElement('button')");
     });
+
+    it('keeps the sheet tab menu close to Excel 365 desktop menu geometry', () => {
+      const css = readFileSync(join(root, 'src/styles/core/app/overlays/sheet-menu.css'), 'utf8');
+
+      expect(css).toMatch(
+        /\.fc-sheetmenu\s*\{[\s\S]*?min-width: 184px;[\s\S]*?padding: 5px 0;[\s\S]*?border-radius: 2px;[\s\S]*?box-shadow:/,
+      );
+      expect(css).toMatch(
+        /\.fc-sheetmenu__item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 28px;[\s\S]*?border-radius: 0;/,
+      );
+      expect(css).toMatch(/\.fc-sheetmenu__colors\s*\{[\s\S]*?padding: 5px 10px 7px 28px;/);
+      expect(css).toMatch(
+        /\.fc-sheetmenu__swatches\s*\{[\s\S]*?grid-template-columns: repeat\(4, 18px\);[\s\S]*?gap: 4px;/,
+      );
+      expect(css).toMatch(/\.fc-sheetmenu__swatch\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/);
+      expect(css).not.toContain('background: var(--fc-accent-soft');
+    });
   });
 
   describe('positionSheetMenu', () => {

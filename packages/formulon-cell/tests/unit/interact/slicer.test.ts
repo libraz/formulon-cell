@@ -227,11 +227,12 @@ describe('attachSlicer', () => {
     handle.detach();
   });
 
-  it('the panel header × removes the slicer and tears down the panel', () => {
+  it('the panel header close button removes the slicer and tears down the panel', () => {
     const handle = attachSlicer({ host, store, getWb: () => wb });
     handle.addSlicer({ tableName: 'Sales', column: 'Region' });
     expect(host.querySelector('.fc-slicer')).not.toBeNull();
     const close = host.querySelector<HTMLButtonElement>('.fc-slicer__close');
+    expect(close?.textContent).toBe('');
     close?.click();
     expect(store.getState().slicers.slicers).toHaveLength(0);
     expect(host.querySelector('.fc-slicer')).toBeNull();
@@ -312,5 +313,24 @@ describe('attachSlicer', () => {
     const source = readFileSync(join(root, 'src/interact/slicer.ts'), 'utf8');
     expect(source).toContain('createInteractionChipButton({');
     expect(source).not.toContain("const chip = document.createElement('button')");
+  });
+
+  it('keeps slicer panels aligned with compact desktop panel chrome', () => {
+    const css = readFileSync(join(root, 'src/styles/core/app/panels/slicer.css'), 'utf8');
+
+    expect(css).toMatch(
+      /\.fc-slicer\s*\{[\s\S]*?border-radius: 2px;[\s\S]*?box-shadow:[\s\S]*?0 8px 18px rgba\(0, 0, 0, 0\.15\)/,
+    );
+    expect(css).toMatch(
+      /\.fc-slicer__title\s*\{[\s\S]*?font-size: 12px;[\s\S]*?letter-spacing: 0;/,
+    );
+    expect(css).toMatch(/\.fc-slicer__btn\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(css).toMatch(/\.fc-slicer__btn:hover\s*\{[\s\S]*?background: var\(--fc-bg-hover/);
+    expect(css).toMatch(
+      /\.fc-slicer__close::before,[\s\S]*?\.fc-slicer__close::after\s*\{[\s\S]*?background: currentColor;[\s\S]*?content: "";/,
+    );
+    expect(css).toMatch(/\.fc-slicer__chip:hover\s*\{[\s\S]*?background: var\(--fc-bg-hover/);
+    expect(css).not.toContain('background: var(--fc-accent-soft');
+    expect(css).not.toContain('text-transform: uppercase');
   });
 });

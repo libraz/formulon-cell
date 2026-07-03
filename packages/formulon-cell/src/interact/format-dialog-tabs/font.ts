@@ -19,11 +19,12 @@ export interface FontTabRefs {
   colorInput: HTMLInputElement;
   colorReset: HTMLButtonElement;
   fontSwatches: ReturnType<typeof makeSwatches>;
+  fontPreviewBox: HTMLDivElement;
 }
 
 export function createFontTab(panel: HTMLDivElement, t: Strings['formatDialog']): FontTabRefs {
   const styleRow = document.createElement('div');
-  styleRow.className = 'fc-fmtdlg__choice-grid';
+  styleRow.className = 'fc-fmtdlg__choice-grid fc-fmtdlg__font-effects';
   panel.appendChild(styleRow);
 
   const boldCk = makeCheckbox(t.fontBold);
@@ -38,11 +39,12 @@ export function createFontTab(panel: HTMLDivElement, t: Strings['formatDialog'])
 
   const normalFontCk = makeCheckbox(t.normalFont);
   normalFontCk.input.dataset.fcCheck = 'normalFont';
+  normalFontCk.wrap.classList.add('fc-fmtdlg__normal-font');
   panel.appendChild(normalFontCk.wrap);
 
   // Font family
   const familyRow = document.createElement('label');
-  familyRow.className = 'fc-fmtdlg__row';
+  familyRow.className = 'fc-fmtdlg__row fc-fmtdlg__font-family-row';
   const familyLabel = document.createElement('span');
   familyLabel.textContent = t.fontFamily;
   const familyInput = document.createElement('input');
@@ -101,7 +103,7 @@ export function createFontTab(panel: HTMLDivElement, t: Strings['formatDialog'])
 
   // Font size
   const sizeRow = document.createElement('label');
-  sizeRow.className = 'fc-fmtdlg__row';
+  sizeRow.className = 'fc-fmtdlg__row fc-fmtdlg__font-size-row';
   const sizeLabel = document.createElement('span');
   sizeLabel.textContent = t.fontSize;
   const sizeInput = document.createElement('input');
@@ -134,7 +136,7 @@ export function createFontTab(panel: HTMLDivElement, t: Strings['formatDialog'])
 
   // Font color
   const colorRow = document.createElement('div');
-  colorRow.className = 'fc-fmtdlg__row';
+  colorRow.className = 'fc-fmtdlg__row fc-fmtdlg__font-color-row';
   const colorLabel = document.createElement('span');
   colorLabel.textContent = t.color;
   const colorInput = document.createElement('input');
@@ -170,5 +172,6 @@ export function createFontTab(panel: HTMLDivElement, t: Strings['formatDialog'])
     colorInput,
     colorReset,
     fontSwatches,
+    fontPreviewBox,
   };
 }

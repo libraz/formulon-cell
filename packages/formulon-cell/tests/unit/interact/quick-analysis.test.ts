@@ -370,4 +370,34 @@ describe('attachQuickAnalysis', () => {
     expect(source).toContain('projectDisabledState(button, disabled');
     expect(source).not.toContain("document.createElement('button')");
   });
+
+  it('keeps Quick Analysis close to Excel 365 desktop gallery geometry', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/overlays/quick-analysis-and-charts.css'),
+      'utf8',
+    );
+    const quickCss = css.slice(css.indexOf('.fc-quick {'), css.indexOf('.fc-charts {'));
+
+    expect(css).toMatch(
+      /\.fc-quick__button\s*\{[\s\S]*?width: 22px;[\s\S]*?height: 22px;[\s\S]*?border-radius: 2px;[\s\S]*?0 3px 8px rgba\(0, 0, 0, 0\.16\)/,
+    );
+    expect(quickCss).toMatch(
+      /\.fc-quick\s*\{[\s\S]*?padding: 6px;[\s\S]*?border-radius: 2px;[\s\S]*?box-shadow:/,
+    );
+    expect(quickCss).toMatch(
+      /\.fc-quick__tab\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 4px 8px 5px;/,
+    );
+    expect(quickCss).toMatch(
+      /\.fc-quick__tab:hover,[\s\S]*?\.fc-quick__tab:focus-visible\s*\{[\s\S]*?background: var\(--fc-bg-hover/,
+    );
+    expect(quickCss).toMatch(
+      /\.fc-quick__action\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 7px;[\s\S]*?border-radius: 2px;/,
+    );
+    expect(quickCss).toMatch(
+      /\.fc-quick__action:hover:not\(:disabled\),[\s\S]*?\.fc-quick__action:focus-visible:not\(:disabled\)\s*\{[\s\S]*?background: var\(--fc-bg-hover/,
+    );
+    expect(quickCss).not.toContain('border-radius: var(--fc-radius-md, 6px);');
+    expect(quickCss).not.toContain('background: var(--fc-accent-soft');
+    expect(css).not.toContain('box-shadow: var(--fc-shadow-2)');
+  });
 });

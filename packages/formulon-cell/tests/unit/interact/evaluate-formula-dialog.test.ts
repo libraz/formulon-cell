@@ -1,9 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
 import { attachEvaluateFormulaDialog } from '../../../src/interact/evaluate-formula-dialog.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const overlay = (): HTMLElement | null => document.querySelector<HTMLElement>('.fc-evaldlg');
 const boxes = (): HTMLElement[] =>
   Array.from(document.querySelectorAll<HTMLElement>('.fc-evaldlg__box'));
@@ -99,5 +103,26 @@ describe('attachEvaluateFormulaDialog', () => {
       'The formula has no cell references to evaluate.',
     );
     handle.detach();
+  });
+
+  it('keeps Evaluate Formula on compact desktop dialog geometry', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/dialogs/evaluate-formula.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(/\.fc-evaldlg__panel\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(css).toMatch(
+      /\.fc-evaldlg__header\s*\{[\s\S]*?min-height: 34px;[\s\S]*?padding: 8px 14px;/,
+    );
+    expect(css).toMatch(/\.fc-evaldlg__body\s*\{[\s\S]*?gap: 6px;[\s\S]*?padding: 12px 14px;/);
+    expect(css).toMatch(
+      /\.fc-evaldlg__box\s*\{[\s\S]*?padding: 6px 8px;[\s\S]*?border-radius: 2px;[\s\S]*?background: var\(--fc-bg, Canvas\);/,
+    );
+    expect(css).toMatch(
+      /\.fc-evaldlg__footer\s*\{[\s\S]*?gap: 6px;[\s\S]*?padding: 10px 14px 12px;/,
+    );
+    expect(css).toMatch(/\.fc-evaldlg__btn\s*\{[\s\S]*?height: 28px;[\s\S]*?border-radius: 2px;/);
+    expect(css).not.toContain('box-shadow: var(--fc-shadow-16)');
   });
 });

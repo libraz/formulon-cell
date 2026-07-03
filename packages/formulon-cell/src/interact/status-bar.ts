@@ -109,7 +109,6 @@ const createStatusBarChooserRow = (
   row.setAttribute('aria-checked', checked ? 'true' : 'false');
   const check = document.createElement('span');
   check.className = 'fc-statusbar__chooser-check';
-  check.textContent = checked ? '✓' : '';
   const label = document.createElement('span');
   label.textContent = labelText;
   row.append(check, label);
@@ -154,7 +153,7 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
 
   const right = document.createElement('span');
   right.className = 'fc-host__statusbar-right';
-  right.textContent = '—';
+  right.textContent = '';
 
   const lockIndicators = document.createElement('span');
   lockIndicators.className = 'fc-host__statusbar-locks';
@@ -483,13 +482,12 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
       checked: boolean,
       onToggle: (nextChecked: boolean) => void,
     ): void => {
-      const { row, check } = createStatusBarChooserRow(labelText, checked);
+      const { row } = createStatusBarChooserRow(labelText, checked);
       row.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         const nextChecked = row.getAttribute('aria-checked') !== 'true';
         onToggle(nextChecked);
-        check.textContent = nextChecked ? '✓' : '';
         row.setAttribute('aria-checked', nextChecked ? 'true' : 'false');
       });
       popover.appendChild(row);

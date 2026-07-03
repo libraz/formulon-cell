@@ -54,7 +54,6 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
   const title = document.createElement('div');
   title.className = 'fc-find__title';
   const closeBtn = makeBtn('fc-find__btn--icon');
-  closeBtn.textContent = '×';
   titlebar.append(title, closeBtn);
 
   const tabs = document.createElement('div');

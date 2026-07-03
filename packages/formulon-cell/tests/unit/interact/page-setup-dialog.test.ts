@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setMarginPreset } from '../../../src/commands/page-setup.js';
 import { defaultStrings, en } from '../../../src/i18n/strings.js';
@@ -9,6 +12,8 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const dialog = (): HTMLElement | null => document.querySelector<HTMLElement>('.fc-pgsetup');
 const selects = (): HTMLSelectElement[] =>
@@ -468,7 +473,9 @@ describe('attachPageSetupDialog', () => {
     handle.open();
     const [orientSelect] = selects();
     if (orientSelect) orientSelect.value = 'landscape';
-    document.querySelector<HTMLButtonElement>('.fc-pgsetup .fc-fmtdlg__close')?.click();
+    const close = document.querySelector<HTMLButtonElement>('.fc-pgsetup .fc-fmtdlg__close');
+    expect(close?.textContent).toBe('');
+    close?.click();
 
     expect(getPageSetup(store.getState(), 0)).toEqual(before);
     expect(dialog()?.hidden).toBe(true);
@@ -807,5 +814,15 @@ describe('attachPageSetupDialog', () => {
     const handle = attachPageSetupDialog({ host, store });
     handle.detach();
     expect(dialog()).toBeNull();
+  });
+
+  it('keeps Page Setup controls on compact desktop dialog geometry', () => {
+    const css = readFileSync(join(root, 'src/styles/core/app/panels/page-setup.css'), 'utf8');
+
+    expect(css).toMatch(/\.fc-pgsetup__mini-btn\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(css).toMatch(
+      /\.fc-pgsetup__text\[aria-invalid="true"\]\s*\{[\s\S]*?outline: 1px solid[\s\S]*?outline-offset: -1px;/,
+    );
+    expect(css).not.toContain('outline: 2px solid color-mix(in srgb, #c50f1f');
   });
 });

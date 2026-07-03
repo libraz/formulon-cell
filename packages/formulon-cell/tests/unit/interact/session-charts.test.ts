@@ -216,4 +216,34 @@ describe('attachSessionCharts', () => {
     expect(source).toContain('const close = createSessionChartCloseButton(labels.close)');
     expect(source).not.toContain("document.createElement('button')");
   });
+
+  it('keeps session charts close to Excel 365 desktop object geometry', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/overlays/quick-analysis-and-charts.css'),
+      'utf8',
+    );
+    const chartCss = css.slice(css.indexOf('.fc-chart {'));
+
+    expect(chartCss).toMatch(/\.fc-chart\s*\{[\s\S]*?border-radius: 2px;[\s\S]*?box-shadow:/);
+    expect(chartCss).toMatch(
+      /\.fc-chart:focus-visible\s*\{[\s\S]*?0 0 0 1px var\(--fc-accent, Highlight\)/,
+    );
+    expect(chartCss).toMatch(
+      /\.fc-chart--selected::after\s*\{[\s\S]*?inset: -2px;[\s\S]*?border: 1px solid var\(--fc-accent, Highlight\);[\s\S]*?border-radius: 2px;/,
+    );
+    expect(chartCss).toMatch(
+      /\.fc-chart__header\s*\{[\s\S]*?min-height: 30px;[\s\S]*?padding: 0 6px 0 10px;/,
+    );
+    expect(chartCss).toMatch(
+      /\.fc-chart__close\s*\{[\s\S]*?width: 22px;[\s\S]*?height: 22px;[\s\S]*?border-radius: 2px;/,
+    );
+    expect(chartCss).toMatch(
+      /\.fc-chart__resize\s*\{[\s\S]*?right: 2px;[\s\S]*?bottom: 2px;[\s\S]*?width: 12px;[\s\S]*?height: 12px;/,
+    );
+    expect(chartCss).toMatch(
+      /\.fc-chart__resize::before\s*\{[\s\S]*?width: 7px;[\s\S]*?height: 7px;[\s\S]*?border-right: 1px solid/,
+    );
+    expect(chartCss).not.toContain('border-radius: var(--fc-radius-md, 6px);');
+    expect(chartCss).not.toContain('border: 1px dashed var(--fc-accent');
+  });
 });

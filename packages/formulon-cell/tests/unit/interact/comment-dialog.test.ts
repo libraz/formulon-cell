@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { commentAt, setComment } from '../../../src/commands/comment.js';
 import { attachCommentDialog } from '../../../src/interact/comment-dialog.js';
@@ -7,6 +10,7 @@ import {
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
 
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const wrap = (): HTMLElement | null => document.querySelector<HTMLElement>('.fc-cmtnote');
 const textarea = (): HTMLTextAreaElement | null =>
   document.querySelector<HTMLTextAreaElement>('.fc-cmtnote__textarea');
@@ -114,5 +118,15 @@ describe('attachCommentDialog', () => {
     expect(wrap()).not.toBeNull();
     handle.detach();
     expect(wrap()).toBeNull();
+  });
+
+  it('keeps the note title in normal desktop note casing', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/format-dialog/comment-note.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(/\.fc-cmtnote__title\s*\{[\s\S]*?letter-spacing: 0;/);
+    expect(css).not.toContain('text-transform: uppercase');
   });
 });

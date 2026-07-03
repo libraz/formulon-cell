@@ -411,6 +411,7 @@ export class InlineEditor {
         }
         return -1;
       };
+      const active = this.deps.store.getState().selection.active;
       const result = replaceFormulaSelectionWithF9Preview(
         this.input.value,
         start,
@@ -418,7 +419,8 @@ export class InlineEditor {
         this.deps.store.getState().data.sheetIndex,
         this.deps.store.getState().data.cells,
         sheetByName,
-        (formula) => this.deps.wb.evalFormula(formula),
+        (formula) => this.deps.wb.evaluateFormulaText(active, formula),
+        true,
       );
       if (result) {
         e.preventDefault();

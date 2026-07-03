@@ -8,10 +8,14 @@ import {
   type PivotDataFieldSpec,
   PivotFilterType,
   PivotFilterValueKind,
+  PivotReportLayout,
 } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en, ja } from '../../../src/i18n/strings.js';
-import { attachWorkbookObjectsPanel } from '../../../src/interact/workbook-objects.js';
+import {
+  attachWorkbookObjectsPanel,
+  buildSpreadsheetCompatibilityReport,
+} from '../../../src/interact/workbook-objects.js';
 import type { SessionIllustration } from '../../../src/store/store.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -26,6 +30,7 @@ const wbWithObjects = () => {
       freeze: true,
       pivotTables: true,
       pivotTableMutate: true,
+      pivotReportLayout: true,
       externalLinks: true,
     },
     getPassthroughs: () => [
@@ -86,6 +91,11 @@ const wbWithObjects = () => {
       colsEnabled: boolean,
     ) => {
       calls.push(`totals:${sheet}:${pivot}:${rowsEnabled}:${colsEnabled}`);
+      return true;
+    },
+    getPivotReportLayout: () => PivotReportLayout.Compact,
+    setPivotReportLayout: (sheet: number, pivot: number, layout: PivotReportLayout) => {
+      calls.push(`layout:${sheet}:${pivot}:${layout}`);
       return true;
     },
     removePivotTable: (sheet: number, pivot: number) => {
@@ -220,6 +230,15 @@ describe('attachWorkbookObjectsPanel', () => {
     expect(host.textContent).toContain('Writable');
     expect(host.textContent).toContain('Unsupported');
     handle.detach();
+  });
+
+  it('uses current compatibility details in workbook object reports', () => {
+    const { wb } = wbWithObjects();
+    const report = buildSpreadsheetCompatibilityReport(wb, en.workbookObjects);
+
+    expect(report.some((entry) => entry.detail.includes('hidden dropdown-arrow state'))).toBe(true);
+    expect(report.some((entry) => entry.detail.includes('sheet-scoped defined names'))).toBe(true);
+    expect(report.some((entry) => entry.detail.includes('comments on blank cells'))).toBe(true);
   });
 
   it('lists session illustrations supplied by the host feature', () => {
@@ -429,12 +448,35 @@ describe('attachWorkbookObjectsPanel', () => {
     expect(calls).toContain('rename:0:0:Sales Pivot');
     expect(calls).toContain('anchor:0:0:6:2:6:3');
     expect(calls).toContain('totals:0:0:true:true');
+    expect(calls).toContain(`layout:0:0:${PivotReportLayout.Compact}`);
     expect(calls).toContain('field-axis:0:0:0:0');
     expect(calls).toContain('field-axis:0:0:1:2');
     expect(calls).toContain(`data-set:0:0:0:1:${PivotAggregation.Sum}:`);
     expect(calls).not.toContain('clear-agg:0:0:1');
     expect(calls).not.toContain('add-agg:0:0:1:0');
     expect(onAfterPivotEdit).toHaveBeenCalledTimes(1);
+    handle.detach();
+  });
+
+  it('updates the PivotTable report layout from workbook object details', () => {
+    const { wb, calls } = wbWithObjects();
+    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    handle.open();
+
+    const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
+      el.textContent?.includes('Edit'),
+    );
+    edit?.click();
+    const form = host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit');
+    const layout = Array.from(form?.querySelectorAll<HTMLSelectElement>('select') ?? []).find(
+      (select) =>
+        Array.from(select.options).some((option) => option.textContent === 'Tabular form'),
+    );
+    if (!form || !layout) throw new Error('missing pivot layout controls');
+    layout.value = String(PivotReportLayout.Tabular);
+    form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+
+    expect(calls).toContain(`layout:0:0:${PivotReportLayout.Tabular}`);
     handle.detach();
   });
 
@@ -781,6 +823,22 @@ describe('attachWorkbookObjectsPanel', () => {
     expect(source).toContain(
       "createDialogButton({\n    label,\n    baseClass: 'fc-objects__action'",
     );
+    expect(source).not.toContain("label: '×'");
     expect(source).not.toContain("document.createElement('button')");
+  });
+
+  it('keeps workbook objects panel on compact desktop pane chrome', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/overlays/workbook-objects.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(/\.fc-objects\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(css).toMatch(/\.fc-objects__close\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(css).toMatch(
+      /\.fc-objects__close::before,[\s\S]*?\.fc-objects__close::after\s*\{[\s\S]*?background: currentColor;[\s\S]*?content: "";/,
+    );
+    expect(css).toMatch(/\.fc-objects__close:hover\s*\{[\s\S]*?background: var\(--fc-bg-hover/);
+    expect(css).not.toContain('background: var(--fc-accent-soft');
   });
 });

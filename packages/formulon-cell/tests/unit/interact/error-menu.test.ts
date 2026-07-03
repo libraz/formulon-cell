@@ -162,4 +162,20 @@ describe('attachErrorMenu', () => {
     expect(source).toContain("role: 'menuitem'");
     expect(source).not.toContain("document.createElement('button')");
   });
+
+  it('keeps the error menu on compact desktop menu geometry', () => {
+    const css = readFileSync(join(root, 'src/styles/core/app/panels/error-menu.css'), 'utf8');
+
+    expect(css).toMatch(
+      /\.fc-errmenu\s*\{[\s\S]*?padding: 4px 0;[\s\S]*?border-radius: 2px;[\s\S]*?box-shadow:[\s\S]*?0 8px 18px rgba\(0, 0, 0, 0\.15\)/,
+    );
+    expect(css).toMatch(/\.fc-errmenu__heading\s*\{[\s\S]*?padding: 5px 10px;/);
+    expect(css).toMatch(
+      /\.fc-errmenu__item\s*\{[\s\S]*?min-height: 24px;[\s\S]*?padding: 3px 10px;[\s\S]*?border-radius: 0;/,
+    );
+    expect(css).toMatch(
+      /\.fc-errmenu__item:hover,[\s\S]*?\.fc-errmenu__item:focus-visible\s*\{[\s\S]*?background: var\(--fc-bg-hover/,
+    );
+    expect(css).not.toContain('background: var(--fc-accent-soft');
+  });
 });

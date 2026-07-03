@@ -16,6 +16,7 @@ import {
   PivotAxis,
   type PivotDataFieldSpec,
   type PivotFilterSpec,
+  PivotReportLayout,
 } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -387,6 +388,17 @@ export function attachWorkbookObjectsPanel(
     const colTotals = document.createElement('input');
     colTotals.type = 'checkbox';
     colTotals.checked = true;
+    const layoutSelect = createDialogSelect(
+      [
+        { value: String(PivotReportLayout.Compact), label: t.pivotReportLayoutCompact },
+        { value: String(PivotReportLayout.Outline), label: t.pivotReportLayoutOutline },
+        { value: String(PivotReportLayout.Tabular), label: t.pivotReportLayoutTabular },
+      ],
+      String(
+        wb.getPivotReportLayout(pivot.sheetIndex, pivot.pivotIndex) ?? PivotReportLayout.Compact,
+      ),
+      { className: 'fc-objects__input' },
+    );
     const fieldAreaSelects: HTMLSelectElement[] = [];
     const fieldAreas = document.createElement('div');
     fieldAreas.className = 'fc-objects__pivot-field-areas';
@@ -605,6 +617,13 @@ export function attachWorkbookObjectsPanel(
           rowTotals.checked,
           colTotals.checked,
         );
+      const layoutUpdated =
+        fieldListOnly ||
+        wb.setPivotReportLayout(
+          pivot.sheetIndex,
+          pivot.pivotIndex,
+          Number(layoutSelect.value) as PivotReportLayout,
+        );
       const fieldsUpdated = fieldAreaSelects.every((select) =>
         wb.setPivotFieldAxis(
           pivot.sheetIndex,
@@ -680,6 +699,7 @@ export function attachWorkbookObjectsPanel(
         !renamed ||
         !moved ||
         !totaled ||
+        !layoutUpdated ||
         !fieldsUpdated ||
         !valueFieldsUpdated ||
         !filterItemsUpdated ||
@@ -700,6 +720,7 @@ export function attachWorkbookObjectsPanel(
       form.append(
         pivotEditField(t.pivotName, name),
         pivotEditField(t.pivotAnchorCell, anchor),
+        pivotEditField(t.pivotReportLayout, layoutSelect),
         fieldAreas,
         pivotEditCheck(t.rowGrandTotals, rowTotals),
         pivotEditCheck(t.columnGrandTotals, colTotals),
@@ -745,7 +766,7 @@ export function attachWorkbookObjectsPanel(
       headerActions.appendChild(back);
     }
     const closeBtn = appendDialogIconButton(headerActions, {
-      label: '×',
+      label: '',
       ariaLabel: t.close,
       baseClass: 'fc-objects__close',
     });

@@ -92,11 +92,14 @@ export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog'
 
   // Presets
   const presetRow = document.createElement('div');
-  presetRow.className = 'fc-fmtdlg__row';
+  presetRow.className = 'fc-fmtdlg__row fc-fmtdlg__border-presets';
   panel.appendChild(presetRow);
   const presetNone = makeButton(t.borderPresetNone);
   const presetOutline = makeButton(t.borderPresetOutline);
   const presetAll = makeButton(t.borderPresetAll);
+  presetNone.classList.add('fc-fmtdlg__border-preset', 'fc-fmtdlg__border-preset--none');
+  presetOutline.classList.add('fc-fmtdlg__border-preset', 'fc-fmtdlg__border-preset--outline');
+  presetAll.classList.add('fc-fmtdlg__border-preset', 'fc-fmtdlg__border-preset--inside');
   presetRow.append(presetNone, presetOutline, presetAll);
 
   // Per-side checkboxes

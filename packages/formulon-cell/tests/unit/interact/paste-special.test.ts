@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { captureSnapshot } from '../../../src/commands/clipboard/snapshot.js';
 import { History } from '../../../src/commands/history.js';
@@ -8,6 +11,8 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
@@ -395,6 +400,24 @@ describe('attachPasteSpecial', () => {
     expect(document.querySelector('.fc-pastesp')).toBeNull();
     // No leftover listener: pressing Escape after detach is harmless.
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+  });
+
+  it('keeps Paste Special close to Excel 365 desktop dialog group geometry', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/dialog-modules/paste-special.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(/\.fc-pastesp__body\s*\{[\s\S]*?padding: 12px 14px;/);
+    expect(css).toMatch(/\.fc-pastesp__cols\s*\{[\s\S]*?gap: 12px;[\s\S]*?margin-bottom: 12px;/);
+    expect(css).toMatch(
+      /\.fc-pastesp__group\s*\{[\s\S]*?gap: 3px;[\s\S]*?padding: 8px 10px;[\s\S]*?border-radius: 2px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-pastesp__legend\s*\{[\s\S]*?font-size: 12px;[\s\S]*?letter-spacing: 0;[\s\S]*?text-transform: none;/,
+    );
+    expect(css).toMatch(/\.fc-pastesp__list\s*\{[\s\S]*?gap: 2px;/);
+    expect(css).toMatch(/\.fc-pastesp__bottomrow\s*\{[\s\S]*?gap: 20px;[\s\S]*?padding-top: 10px;/);
   });
 
   it('apply with no snapshot at apply-time falls through to close', () => {

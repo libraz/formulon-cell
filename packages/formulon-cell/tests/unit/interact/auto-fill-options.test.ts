@@ -250,4 +250,22 @@ describe('auto fill options', () => {
     expect(helperSource).toContain("import { createInteractionButton } from './chip-button.js'");
     expect(helperSource).not.toContain("document.createElement('button')");
   });
+
+  it('keeps AutoFill Options on compact desktop smart-tag geometry', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/overlays/auto-fill-options.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(
+      /\.fc-autofill-options__button\s*\{[\s\S]*?box-shadow:[\s\S]*?0 3px 8px rgba\(0, 0, 0, 0\.16\)/,
+    );
+    expect(css).toMatch(
+      /\.fc-autofill-options__menu\s*\{[\s\S]*?border-radius: 2px;[\s\S]*?font-size: 12px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-autofill-options__item\s*\{[\s\S]*?min-height: 24px;[\s\S]*?padding: 3px 12px 3px 8px;/,
+    );
+    expect(css).not.toContain('box-shadow: var(--fc-shadow-2)');
+  });
 });

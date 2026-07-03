@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import type { CellValue } from '../../../src/engine/types.js';
@@ -8,6 +11,8 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
@@ -130,6 +135,7 @@ describe('attachWatchPanel', () => {
     await new Promise((resolve) => requestAnimationFrame(resolve));
     const root = host.querySelector<HTMLElement>('.fc-watch');
     const closeBtn = host.querySelector<HTMLButtonElement>('.fc-watch__close');
+    expect(closeBtn?.textContent).toBe('');
     closeBtn?.focus();
     closeBtn?.click();
 
@@ -187,13 +193,14 @@ describe('attachWatchPanel', () => {
     handle.detach();
   });
 
-  it('per-row × button removes the watch without changing selection', () => {
+  it('per-row remove button removes the watch without changing selection', () => {
     mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
     mutators.setWatchPanelOpen(store, true);
     mutators.addWatch(store, { sheet: 0, row: 7, col: 8 });
     const handle = attachWatchPanel({ host, store, getWb: () => wb });
     const removeBtn = host.querySelector<HTMLButtonElement>('.fc-watch__remove');
     expect(removeBtn).not.toBeNull();
+    expect(removeBtn?.textContent).toBe('');
     removeBtn?.click();
     expect(store.getState().watch.watches).toEqual([]);
     expect(store.getState().selection.active).toEqual({ sheet: 0, row: 0, col: 0 });
@@ -294,5 +301,26 @@ describe('attachWatchPanel', () => {
     expect(host.querySelector('.fc-watch')).toBeNull();
     // Mutating state after detach should not crash.
     mutators.addWatch(store, { sheet: 0, row: 0, col: 0 });
+  });
+
+  it('keeps Watch Window on compact desktop table geometry', () => {
+    const css = readFileSync(join(root, 'src/styles/core/app/panels/watch.css'), 'utf8');
+
+    expect(css).toMatch(/\.fc-watch__title\s*\{[\s\S]*?font-size: 12px;[\s\S]*?letter-spacing: 0;/);
+    expect(css).toMatch(/\.fc-watch__btn\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(css).toMatch(/\.fc-watch__btn:hover\s*\{[\s\S]*?background: var\(--fc-bg-hover/);
+    expect(css).toMatch(
+      /\.fc-watch__close::before,[\s\S]*?\.fc-watch__close::after\s*\{[\s\S]*?background: currentColor;[\s\S]*?content: "";/,
+    );
+    expect(css).toMatch(
+      /\.fc-watch__remove::before,[\s\S]*?\.fc-watch__remove::after\s*\{[\s\S]*?background: currentColor;[\s\S]*?content: "";/,
+    );
+    expect(css).toMatch(
+      /\.fc-watch__table th\s*\{[\s\S]*?font-size: 11px;[\s\S]*?letter-spacing: 0;/,
+    );
+    expect(css).toMatch(/\.fc-watch__row:hover\s*\{[\s\S]*?background: var\(--fc-bg-hover/);
+    expect(css).toMatch(/\.fc-watch__row--selected\s*\{[\s\S]*?background: var\(--fc-bg-hover/);
+    expect(css).not.toContain('background: var(--fc-accent-soft');
+    expect(css).not.toContain('text-transform: uppercase');
   });
 });

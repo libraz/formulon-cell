@@ -1,6 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { attachArgHelper } from '../../../src/interact/arg-helper.js';
 
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const tooltip = (): HTMLElement | null => document.querySelector<HTMLElement>('.fc-arghelper');
 const args = (): HTMLElement[] =>
   Array.from(document.querySelectorAll<HTMLElement>('.fc-arghelper__arg'));
@@ -99,5 +103,17 @@ describe('attachArgHelper', () => {
     handle.detach();
     expect(tooltip()).toBeNull();
     expect(input.hasAttribute('aria-describedby')).toBe(false);
+  });
+
+  it('keeps the argument helper tooltip rectangular and compact', () => {
+    const css = readFileSync(join(root, 'src/styles/core/app/popups/formula-helpers.css'), 'utf8');
+
+    expect(css).toMatch(
+      /\.fc-arghelper\s*\{[\s\S]*?border-radius: 2px;[\s\S]*?0 6px 16px rgba\(0, 0, 0, 0\.14\),[\s\S]*?padding: 3px 8px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-arghelper__arg--active\s*\{[\s\S]*?color: var\(--fc-fg-strong, CanvasText\);/,
+    );
+    expect(css).not.toContain('box-shadow: var(--fc-shadow-4)');
   });
 });

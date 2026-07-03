@@ -45,14 +45,14 @@ describe('attachWheel', () => {
   });
 
   it('vertical wheel scrolls rows by delta / defaultRowHeight', () => {
-    const rh = store.getState().layout.defaultRowHeight; // 24
+    const rh = store.getState().layout.defaultRowHeight; // 20
     fire(grid, { deltaY: rh * 3 });
     expect(store.getState().viewport.rowStart).toBe(3);
     expect(store.getState().viewport.colStart).toBe(0);
   });
 
   it('horizontal wheel scrolls cols by delta / defaultColWidth', () => {
-    const cw = store.getState().layout.defaultColWidth; // 80
+    const cw = store.getState().layout.defaultColWidth; // 64
     fire(grid, { deltaX: cw * 2 });
     expect(store.getState().viewport.colStart).toBe(2);
     expect(store.getState().viewport.rowStart).toBe(0);

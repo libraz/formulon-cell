@@ -172,7 +172,9 @@ describe('attachFormatDialog', () => {
     boldInput.checked = true;
     boldInput.dispatchEvent(new Event('change', { bubbles: true }));
 
-    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__close')?.click();
+    const close = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__close');
+    expect(close?.textContent).toBe('');
+    close?.click();
 
     expect(document.querySelector<HTMLElement>('.fc-fmtdlg')?.hidden).toBe(true);
     expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toBe(
@@ -706,6 +708,186 @@ describe('attachFormatDialog', () => {
     handle.detach();
   });
 
+  it('keeps Format Cells tabs visually aligned with Japanese Excel 365 desktop', () => {
+    const frameCss = readFileSync(
+      join(root, 'src/styles/core/app/format-dialog/frame.css'),
+      'utf8',
+    );
+    const paperThemeCss = readFileSync(join(root, 'src/styles/theme-paper.css'), 'utf8');
+
+    expect(frameCss).toMatch(/\.fc-fmtdlg__panel\s*\{[\s\S]*?border-radius: 4px;/);
+    expect(frameCss).toMatch(/\.fc-fmtdlg__preview-cell\s*\{[\s\S]*?border-radius: 3px;/);
+    expect(frameCss).toMatch(/\.fc-fmtdlg__tabs\s*\{[\s\S]*?align-self: center;/);
+    expect(frameCss).toMatch(/\.fc-fmtdlg__tabs\s*\{[\s\S]*?border-radius: 5px;/);
+    expect(frameCss).toMatch(/\.fc-fmtdlg__tab\s*\{[\s\S]*?min-height: 26px;/);
+    expect(frameCss).toMatch(
+      /\.fc-fmtdlg__close::before,[\s\S]*?\.fc-fmtdlg__close::after\s*\{[\s\S]*?background: currentColor;[\s\S]*?content: "";/,
+    );
+    expect(frameCss).toMatch(/\.fc-fmtdlg__close::after\s*\{[\s\S]*?rotate\(-45deg\);/);
+    expect(frameCss).toMatch(
+      /\.fc-fmtdlg__body\s*\{[\s\S]*?border: 1px solid var\(--fc-fmtdlg-rule\);/,
+    );
+    expect(paperThemeCss).toContain('--fc-fmtdlg-tab-bg: #f3f3f3;');
+    expect(paperThemeCss).toContain('--fc-fmtdlg-tab-active-bg: #107c41;');
+  });
+
+  it('keeps Format Cells footer buttons and category list close to Japanese Excel 365 desktop', () => {
+    const footerCss = readFileSync(
+      join(root, 'src/styles/core/app/format-dialog/footer.css'),
+      'utf8',
+    );
+    const paperThemeCss = readFileSync(join(root, 'src/styles/theme-paper.css'), 'utf8');
+
+    expect(footerCss).toMatch(/\.fc-fmtdlg__footer\s*\{[\s\S]*?gap: 12px;/);
+    expect(footerCss).toMatch(/\.fc-fmtdlg__btn\s*\{[\s\S]*?min-height: 24px;/);
+    expect(footerCss).toMatch(/\.fc-fmtdlg__btn\s*\{[\s\S]*?border-radius: 7px;/);
+    expect(paperThemeCss).toContain('--fc-fmtdlg-btn-bg: #f3f3f3;');
+    expect(paperThemeCss).toContain('--fc-fmtdlg-btn-border: transparent;');
+    expect(paperThemeCss).toContain('--fc-fmtdlg-btn-primary-bg: #107c41;');
+    expect(paperThemeCss).toContain('--fc-fmtdlg-list-border: #86aa8f;');
+    expect(paperThemeCss).toContain('--fc-fmtdlg-cat-selected-bg: #107c41;');
+  });
+
+  it('keeps Format Cells Alignment tab close to Japanese Excel 365 desktop', () => {
+    const alignCss = readFileSync(
+      join(root, 'src/styles/core/app/format-dialog/align-tab.css'),
+      'utf8',
+    );
+
+    expect(alignCss).toMatch(
+      /\.fc-fmtdlg__panel-tab\[data-fc-tab="align"\]\s*\{[\s\S]*?grid-template-columns: minmax\(320px, 1fr\) 222px;/,
+    );
+    expect(alignCss).toMatch(
+      /\.fc-fmtdlg__panel-tab\[data-fc-tab="align"\]::before\s*\{[\s\S]*?background: var\(--fc-fmtdlg-rule\);/,
+    );
+    expect(alignCss).toMatch(
+      /\.fc-fmtdlg__align-select-row\s*\{[\s\S]*?grid-template-columns: 216px;[\s\S]*?min-height: 48px;/,
+    );
+    expect(alignCss).toMatch(
+      /\.fc-fmtdlg__panel-tab\[data-fc-tab="align"\] \.fc-fmtdlg__row:has\(input\[type="number"\]\)\s*\{[\s\S]*?grid-row: 1;[\s\S]*?justify-self: end;/,
+    );
+    expect(alignCss).toMatch(
+      /\.fc-fmtdlg__align-preview-box\s*\{[\s\S]*?grid-template-columns: 32px 100px;[\s\S]*?min-height: 152px;/,
+    );
+    expect(alignCss).toMatch(/\.fc-fmtdlg__align-preview-vertical\s*\{[\s\S]*?height: 150px;/);
+  });
+
+  it('keeps Format Cells Border tab close to Japanese Excel 365 desktop', () => {
+    const borderCss = readFileSync(
+      join(root, 'src/styles/core/app/format-dialog/borders.css'),
+      'utf8',
+    );
+
+    expect(borderCss).toMatch(
+      /\.fc-fmtdlg__border-visual\s*\{[\s\S]*?padding-top: 12px;[\s\S]*?border-top: 1px solid var\(--fc-fmtdlg-rule\);/,
+    );
+    expect(borderCss).toMatch(/\.fc-fmtdlg__border-stage\s*\{[\s\S]*?height: 160px;/);
+    expect(borderCss).toMatch(
+      /\.fc-fmtdlg__border-preview\s*\{[\s\S]*?inset: 28px 52px 28px 54px;/,
+    );
+    expect(borderCss).toMatch(
+      /\.fc-fmtdlg__border-presets\s*\{[\s\S]*?grid-template-columns: repeat\(3, 54px\);[\s\S]*?min-height: 64px;/,
+    );
+    expect(borderCss).toMatch(
+      /\.fc-fmtdlg__btn\.fc-fmtdlg__border-preset\s*\{[\s\S]*?grid-template-rows: 38px 16px;[\s\S]*?min-width: 54px;/,
+    );
+    expect(borderCss).toMatch(
+      /\.fc-fmtdlg__btn\.fc-fmtdlg__border-preset::before\s*\{[\s\S]*?width: 38px;[\s\S]*?height: 38px;/,
+    );
+    expect(borderCss).toMatch(
+      /\.fc-fmtdlg__border-preset--outline::after\s*\{[\s\S]*?border: 2px solid #7f7f7f;/,
+    );
+    expect(borderCss).toMatch(
+      /\.fc-fmtdlg__border-preset--inside::after\s*\{[\s\S]*?linear-gradient\(#7f7f7f 0 0\) 50% 0 \/ 1px 100% no-repeat,/,
+    );
+    expect(borderCss).toMatch(/\.fc-fmtdlg__border-hit\s*\{[\s\S]*?border-radius: 5px;/);
+    expect(borderCss).toMatch(/\.fc-fmtdlg__border-hit--top\s*\{[\s\S]*?top: 4px;/);
+    expect(borderCss).toMatch(/\.fc-fmtdlg__border-hit--left\s*\{[\s\S]*?top: 58px;/);
+  });
+
+  it('keeps Format Cells Fill tab close to Japanese Excel 365 desktop', () => {
+    const swatchCss = readFileSync(
+      join(root, 'src/styles/core/app/format-dialog/swatches-and-lines.css'),
+      'utf8',
+    );
+
+    expect(swatchCss).toMatch(
+      /\.fc-fmtdlg__panel-tab\[data-fc-tab="fill"\]\s*\{[\s\S]*?grid-template-columns: minmax\(240px, 1fr\) minmax\(240px, 1fr\);/,
+    );
+    expect(swatchCss).toMatch(
+      /\.fc-fmtdlg__panel-tab\[data-fc-tab="fill"\]::before\s*\{[\s\S]*?left: 50%;[\s\S]*?background: var\(--fc-fmtdlg-rule\);/,
+    );
+    expect(swatchCss).toMatch(
+      /\.fc-fmtdlg__fill-bg-row\s*\{[\s\S]*?grid-column: 1;[\s\S]*?padding: 28px 0 0 14px;/,
+    );
+    expect(swatchCss).toMatch(
+      /\.fc-fmtdlg__fill-pattern-color-row\s*\{[\s\S]*?grid-column: 2;[\s\S]*?padding: 28px 26px 0 10px;/,
+    );
+    expect(swatchCss).toMatch(
+      /\.fc-fmtdlg__fill-sample\s*\{[\s\S]*?grid-column: 1 \/ -1;[\s\S]*?border-top: 1px solid var\(--fc-fmtdlg-rule\);/,
+    );
+    expect(swatchCss).toMatch(
+      /\.fc-fmtdlg__fill-sample-box\s*\{[\s\S]*?max-width: 510px;[\s\S]*?height: 76px;/,
+    );
+    expect(swatchCss).toMatch(
+      /\.fc-fmtdlg__swatches\s*\{[\s\S]*?grid-template-columns: repeat\(12, 18px\);/,
+    );
+    expect(swatchCss).toMatch(
+      /\.fc-fmtdlg__panel-tab\[data-fc-tab="fill"\] \.fc-fmtdlg__swatches\s*\{[\s\S]*?width: 156px;[\s\S]*?grid-template-columns: repeat\(6, 18px\);/,
+    );
+    expect(swatchCss).toMatch(/\.fc-fmtdlg__swatch\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/);
+  });
+
+  it('keeps Format Cells Font tab close to Japanese Excel 365 desktop', () => {
+    const tabsCss = readFileSync(
+      join(root, 'src/styles/core/app/format-dialog/tabs-content.css'),
+      'utf8',
+    );
+
+    expect(tabsCss).toMatch(
+      /\.fc-fmtdlg__panel-tab\[data-fc-tab="font"\]\s*\{[\s\S]*?grid-template-columns: 260px 128px 100px;[\s\S]*?padding: 20px 22px 0;/,
+    );
+    expect(tabsCss).toMatch(
+      /\.fc-fmtdlg__font-list\s*\{[\s\S]*?height: 110px;[\s\S]*?min-height: 110px;/,
+    );
+    expect(tabsCss).toMatch(
+      /\.fc-fmtdlg__font-list--style\s*\{[\s\S]*?grid-column: 2;[\s\S]*?grid-row: 2;/,
+    );
+    expect(tabsCss).toMatch(
+      /\.fc-fmtdlg__normal-font\s*\{[\s\S]*?grid-column: 3;[\s\S]*?grid-row: 4;/,
+    );
+    expect(tabsCss).toMatch(
+      /\.fc-fmtdlg__panel-tab\[data-fc-tab="font"\]::before\s*\{[\s\S]*?grid-row: 3;[\s\S]*?background: var\(--fc-fmtdlg-rule\);/,
+    );
+    expect(tabsCss).toMatch(
+      /\.fc-fmtdlg__font-preview-box\s*\{[\s\S]*?max-width: 216px;[\s\S]*?border: 0;/,
+    );
+  });
+
+  it('keeps Format Cells Protection tab close to Japanese Excel 365 desktop', () => {
+    const tabsCss = readFileSync(
+      join(root, 'src/styles/core/app/format-dialog/tabs-content.css'),
+      'utf8',
+    );
+    const jaStrings = readFileSync(join(root, 'src/i18n/strings/ja.ts'), 'utf8');
+
+    expect(tabsCss).toMatch(
+      /\.fc-fmtdlg__panel-tab\[data-fc-tab="protection"\]\s*\{[\s\S]*?padding: 26px 18px 0;/,
+    );
+    expect(tabsCss).toMatch(
+      /\.fc-fmtdlg__panel-tab\[data-fc-tab="protection"\] \.fc-fmtdlg__section-title\s*\{[\s\S]*?display: none;/,
+    );
+    expect(tabsCss).toMatch(
+      /\.fc-fmtdlg__protection-hint\s*\{[\s\S]*?max-width: 520px;[\s\S]*?line-height: 1\.45;/,
+    );
+    expect(tabsCss).toMatch(
+      /\.fc-fmtdlg__protection-checks\s*\{[\s\S]*?display: grid;[\s\S]*?grid-template-columns: 1fr;/,
+    );
+    expect(jaStrings).toContain(
+      'セルをロックするか、数式を非表示にするには、ワークシートを保護します。',
+    );
+  });
+
   it('clicking number category updates draft and visibility', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
@@ -1118,6 +1300,14 @@ describe('attachFormatDialog', () => {
 
     const hidden = document.querySelector<HTMLInputElement>('input[data-fc-check="formulaHidden"]');
     if (!hidden) throw new Error('formula hidden checkbox missing');
+    const panel = document.querySelector<HTMLDivElement>('div[data-fc-tab="protection"]');
+    const hint = panel?.querySelector<HTMLDivElement>('.fc-fmtdlg__protection-hint');
+    const checks = panel?.querySelector<HTMLDivElement>('.fc-fmtdlg__protection-checks');
+    expect(hint?.textContent).toContain('ワークシートを保護します');
+    expect(checks?.children.length).toBe(2);
+    expect(hint && checks ? hint.compareDocumentPosition(checks) : 0).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
     hidden.checked = true;
     hidden.dispatchEvent(new Event('change', { bubbles: true }));
 
@@ -1223,6 +1413,38 @@ describe('attachFormatDialog', () => {
     const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
     expect(fmt?.bold).toBe(true);
     expect(fmt?.italic).toBe(true);
+    handle.detach();
+  });
+
+  it('Font tab preview follows font family, size, style, and color draft', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open('font');
+
+    const familyInput = document.querySelector<HTMLInputElement>('input[data-fc-input="family"]');
+    const sizeInput = document.querySelector<HTMLInputElement>('input[type="number"][min="8"]');
+    const colorInput = document.querySelector<HTMLInputElement>('input[data-fc-color="font"]');
+    const boldItalic = document.querySelector<HTMLButtonElement>(
+      'button[data-fc-font-style="boldItalic"]',
+    );
+    const preview = document.querySelector<HTMLDivElement>('.fc-fmtdlg__font-preview-box');
+    if (!familyInput || !sizeInput || !colorInput || !boldItalic || !preview) {
+      throw new Error('font preview controls missing');
+    }
+
+    familyInput.value = 'Georgia';
+    familyInput.dispatchEvent(new Event('input', { bubbles: true }));
+    sizeInput.value = '18';
+    sizeInput.dispatchEvent(new Event('input', { bubbles: true }));
+    colorInput.value = '#cc0000';
+    colorInput.dispatchEvent(new Event('input', { bubbles: true }));
+    boldItalic.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(preview.style.fontFamily).toBe('Georgia');
+    expect(preview.style.fontSize).toBe('18px');
+    expect(preview.style.color).toBe('#cc0000');
+    expect(preview.style.fontWeight).toBe('bold');
+    expect(preview.style.fontStyle).toBe('italic');
+
     handle.detach();
   });
 
@@ -1418,6 +1640,12 @@ describe('attachFormatDialog', () => {
     const presetOutline = buttons.find((b) => b.textContent === '外枠') as HTMLButtonElement;
     const presetNone = buttons.find((b) => b.textContent === 'なし') as HTMLButtonElement;
     const presetAll = buttons.find((b) => b.textContent === '格子') as HTMLButtonElement;
+    const presetRow = presetOutline.parentElement;
+
+    expect(presetRow?.classList.contains('fc-fmtdlg__border-presets')).toBe(true);
+    expect(presetNone.classList.contains('fc-fmtdlg__border-preset--none')).toBe(true);
+    expect(presetOutline.classList.contains('fc-fmtdlg__border-preset--outline')).toBe(true);
+    expect(presetAll.classList.contains('fc-fmtdlg__border-preset--inside')).toBe(true);
 
     presetOutline.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     let okBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
@@ -1630,11 +1858,22 @@ describe('attachFormatDialog', () => {
     const patternColor = document.querySelector<HTMLInputElement>(
       'input[data-fc-color="fillPattern"]',
     );
+    const sample = document.querySelector<HTMLDivElement>('.fc-fmtdlg__fill-sample-box');
     if (!pattern || !patternColor) throw new Error('fill pattern controls missing');
+    if (!sample) throw new Error('fill sample missing');
+    const fillInput = document.querySelector<HTMLInputElement>(
+      'input[data-fc-color="fill"]',
+    ) as HTMLInputElement;
+    fillInput.value = '#123456';
+    fillInput.dispatchEvent(new Event('input', { bubbles: true }));
     pattern.value = 'horizontal';
     pattern.dispatchEvent(new Event('change', { bubbles: true }));
     patternColor.value = '#336699';
     patternColor.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(sample.style.backgroundColor).toBe('#123456');
+    expect(sample.style.backgroundImage).toContain('repeating-linear-gradient');
+    expect(sample.style.backgroundImage).toContain('#336699');
 
     document
       .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')

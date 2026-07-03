@@ -226,7 +226,7 @@ describe('attachContextMenu', () => {
 
     it('right-click on the row header opens the row menu and promotes selection', () => {
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
-      fireContextMenu(host, 10, 40); // row 0 header
+      fireContextMenu(host, 10, 30); // row 0 header
       expect(item('rowInsertAbove')).not.toBeNull();
       expect(item('rowDelete')).not.toBeNull();
       const sel = store.getState().selection.range;
@@ -235,7 +235,7 @@ describe('attachContextMenu', () => {
 
     it('right-click on the col header opens the col menu and promotes selection', () => {
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
-      fireContextMenu(host, 100, 10); // col 0 header
+      fireContextMenu(host, 60, 10); // col 0 header
       expect(item('colInsertLeft')).not.toBeNull();
       expect(item('colDelete')).not.toBeNull();
       const sel = store.getState().selection.range;
@@ -246,7 +246,7 @@ describe('attachContextMenu', () => {
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
       mutators.selectRow(store, 0);
       const before = store.getState().selection.range;
-      fireContextMenu(host, 10, 40);
+      fireContextMenu(host, 10, 30);
       // Range unchanged.
       expect(store.getState().selection.range).toEqual(before);
     });
@@ -293,7 +293,7 @@ describe('attachContextMenu', () => {
       });
       detach = attachContextMenu({ host, grid, store, wb, onAfterCommit });
       mutators.selectRow(store, 1);
-      fireContextMenu(host, 10, 260); // grid-local y=60 => row 1 header
+      fireContextMenu(host, 10, 240); // grid-local y=40 => row 1 header
 
       expect(item('rowInsertAbove')).not.toBeNull();
       expect(store.getState().selection.range).toEqual({
@@ -408,13 +408,13 @@ describe('attachContextMenu', () => {
       document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
       expect(visibleMenu()).toBeNull();
 
-      fireContextMenu(host, 10, 40);
+      fireContextMenu(host, 10, 30);
       expect(visibleMenu()).not.toBeNull();
       expect(item('rowInsertAbove')).not.toBeNull();
       expect(document.querySelector('.fc-ctxmenu__mini')).toBeNull();
 
       document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-      fireContextMenu(host, 100, 10);
+      fireContextMenu(host, 60, 10);
       expect(item('colInsertLeft')).not.toBeNull();
       expect(document.querySelector('.fc-ctxmenu__mini')).toBeNull();
     });
@@ -476,7 +476,7 @@ describe('attachContextMenu', () => {
   describe('row and column action availability', () => {
     it('disables row unhide when the selected row band has no hidden rows', () => {
       detach = attachContextMenu({ host, store, wb, onAfterCommit, strings: en });
-      fireContextMenu(host, 10, 40);
+      fireContextMenu(host, 10, 30);
 
       expect(item('rowUnhide')?.disabled).toBe(true);
       expect(item('rowUnhide')?.dataset.disabledReason).toBe(
@@ -494,7 +494,7 @@ describe('attachContextMenu', () => {
         layout: { ...s.layout, hiddenRows: new Set([1]) },
       }));
       detach = attachContextMenu({ host, store, wb, onAfterCommit, strings: en });
-      fireContextMenu(host, 10, 40);
+      fireContextMenu(host, 10, 30);
 
       expect(item('rowUnhide')?.disabled).toBe(false);
       expect(item('rowUnhide')?.dataset.disabledReason).toBeUndefined();
@@ -760,6 +760,21 @@ describe('attachContextMenu', () => {
       expect(onAfterCommit).toHaveBeenCalled();
     });
 
+    it('keeps the Insert Copied Cells dialog chrome rectangular and compact', () => {
+      const css = readFileSync(
+        join(root, 'src/styles/core/app/dialog-modules/insert-copied-cells.css'),
+        'utf8',
+      );
+
+      expect(css).toMatch(
+        /\.fc-insertcopied__panel\s*\{[\s\S]*?padding: 10px 12px 12px;[\s\S]*?border-radius: 2px;[\s\S]*?background: var\(--fc-bg-elev, Canvas\);/,
+      );
+      expect(css).toMatch(
+        /\.fc-insertcopied__button\s*\{[\s\S]*?min-height: 26px;[\s\S]*?border: 1px solid var\(--fc-fmtdlg-input-hover-border, var\(--fc-rule-strong\)\);[\s\S]*?border-radius: 2px;/,
+      );
+      expect(css).toMatch(/\.fc-insertcopied__footer\s*\{[\s\S]*?gap: 6px;/);
+    });
+
     it('Clear blanks every populated cell within the selection range', () => {
       seed(store, wb, [
         { row: 0, col: 0, value: 1 },
@@ -870,7 +885,7 @@ describe('attachContextMenu', () => {
       seed(store, wb, [{ row: 0, col: 0, value: 'a' }]);
       setRange(store, 0, 0, 0, 0);
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
-      fireContextMenu(host, 10, 40); // row 0 header
+      fireContextMenu(host, 10, 30); // row 0 header
       item('rowInsertAbove')?.click();
       wb.recalc();
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
@@ -885,7 +900,7 @@ describe('attachContextMenu', () => {
       ]);
       setRange(store, 0, 0, 0, 0);
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
-      fireContextMenu(host, 10, 40);
+      fireContextMenu(host, 10, 30);
       item('rowInsertBelow')?.click();
       wb.recalc();
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'a' });
@@ -900,7 +915,7 @@ describe('attachContextMenu', () => {
       ]);
       setRange(store, 0, 0, 0, 0);
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
-      fireContextMenu(host, 10, 40);
+      fireContextMenu(host, 10, 30);
       item('rowDelete')?.click();
       wb.recalc();
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'b' });
@@ -909,14 +924,14 @@ describe('attachContextMenu', () => {
     it('Hide Row records the row as hidden, Unhide restores it', () => {
       setRange(store, 0, 0, 0, 0);
       detach = attachContextMenu({ host, store, wb });
-      fireContextMenu(host, 10, 40);
+      fireContextMenu(host, 10, 30);
       item('rowHide')?.click();
       expect(store.getState().layout.hiddenRows.has(0)).toBe(true);
       // Span rows 0-1 so the next contextmenu's promotion-check sees the row
-      // band as already-selected. Row 0 is hidden, so y=40 hits row 1 header,
+      // band as already-selected. Row 0 is hidden, so y=30 hits row 1 header,
       // but inSel=true keeps the (0..1) band intact.
       setRange(store, 0, 0, 1, 16383);
-      fireContextMenu(host, 10, 40);
+      fireContextMenu(host, 10, 30);
       item('rowUnhide')?.click();
       expect(store.getState().layout.hiddenRows.has(0)).toBe(false);
     });
@@ -924,7 +939,7 @@ describe('attachContextMenu', () => {
     it('Unhide is a no-op when no hidden rows are in the selection', () => {
       setRange(store, 0, 0, 0, 0);
       detach = attachContextMenu({ host, store, wb });
-      fireContextMenu(host, 10, 40);
+      fireContextMenu(host, 10, 30);
       item('rowUnhide')?.click();
       expect(store.getState().layout.hiddenRows.size).toBe(0);
     });
@@ -935,7 +950,7 @@ describe('attachContextMenu', () => {
       seed(store, wb, [{ row: 0, col: 0, value: 'a' }]);
       setRange(store, 0, 0, 0, 0);
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
-      fireContextMenu(host, 100, 10);
+      fireContextMenu(host, 60, 10);
       item('colInsertLeft')?.click();
       wb.recalc();
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
@@ -949,7 +964,7 @@ describe('attachContextMenu', () => {
       ]);
       setRange(store, 0, 0, 0, 0);
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
-      fireContextMenu(host, 100, 10);
+      fireContextMenu(host, 60, 10);
       item('colInsertRight')?.click();
       wb.recalc();
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'a' });
@@ -964,7 +979,7 @@ describe('attachContextMenu', () => {
       ]);
       setRange(store, 0, 0, 0, 0);
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
-      fireContextMenu(host, 100, 10);
+      fireContextMenu(host, 60, 10);
       item('colDelete')?.click();
       wb.recalc();
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'b' });
@@ -973,14 +988,14 @@ describe('attachContextMenu', () => {
     it('Hide / Unhide Col toggles layout.hiddenCols', () => {
       setRange(store, 0, 0, 0, 0);
       detach = attachContextMenu({ host, store, wb });
-      fireContextMenu(host, 100, 10);
+      fireContextMenu(host, 60, 10);
       item('colHide')?.click();
       expect(store.getState().layout.hiddenCols.has(0)).toBe(true);
       // Span cols 0-1 so the next contextmenu's promotion-check sees the col
-      // band as already-selected. Col 0 is hidden, so x=100 hits col 1 header,
+      // band as already-selected. Col 0 is hidden, so x=60 hits col 1 header,
       // but inSel=true keeps the (0..1) band intact.
       setRange(store, 0, 0, 1048575, 1);
-      fireContextMenu(host, 100, 10);
+      fireContextMenu(host, 60, 10);
       item('colUnhide')?.click();
       expect(store.getState().layout.hiddenCols.has(0)).toBe(false);
     });
@@ -1045,6 +1060,142 @@ describe('attachContextMenu', () => {
       expect(source).toContain('const btn = createContextMenuItemButton(entry)');
       expect(source).toContain('const btn = createContextMiniToolbarButton(item)');
       expect(source).not.toContain("document.createElement('button')");
+      expect(source).not.toContain("arrow.textContent = '›'");
+    });
+
+    it('renders context submenu chevrons as fixed CSS glyphs, not text arrows', () => {
+      const css = readFileSync(join(root, 'src/styles/core/app/overlays/context-menu.css'), 'utf8');
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+
+      fireContextMenu(host, 200, 70);
+
+      const arrow = document.querySelector<HTMLElement>('.fc-ctxmenu__arrow');
+      expect(arrow).toBeTruthy();
+      expect(arrow?.textContent).toBe('');
+      expect(arrow?.getAttribute('aria-hidden')).toBe('true');
+      expect(css).toMatch(/\.fc-ctxmenu__arrow\s*\{[\s\S]*?width: 8px;[\s\S]*?height: 12px;/);
+      expect(css).toMatch(
+        /\.fc-ctxmenu__arrow::before\s*\{[\s\S]*?border: solid currentColor;[\s\S]*?transform: translateY\(-50%\) rotate\(45deg\);/,
+      );
+    });
+
+    it('uses colored Excel-like SVG backgrounds for high-frequency context menu icons', () => {
+      const css = readFileSync(join(root, 'src/styles/core/app/overlays/context-menu.css'), 'utf8');
+
+      expect(css).toMatch(
+        /\.fc-ctxmenu\s*\{[\s\S]*?padding: 2px 0;[\s\S]*?border-radius: 2px;[\s\S]*?font-size: 12px;/,
+      );
+      expect(css).toMatch(
+        /\.fc-ctxmenu\s*\{[\s\S]*?0 8px 24px rgba\(0, 0, 0, 0\.18\),[\s\S]*?0 1px 3px rgba\(0, 0, 0, 0\.14\);/,
+      );
+      expect(css).toContain('--fc-menu-icon-image');
+      expect(css).toMatch(
+        /\.fc-ctxmenu__item\s*\{[\s\S]*?grid-template-columns: 26px minmax\(0, 1fr\) auto;[\s\S]*?min-height: 26px;[\s\S]*?padding: 3px 18px 3px 12px;/,
+      );
+      expect(css).toMatch(
+        /\.fc-ctxmenu__item::before\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;[\s\S]*?background-size: 18px 18px;/,
+      );
+      expect(css).toMatch(
+        /\.fc-ctxmenu__item\[data-fc-action="copy"\]::before,[\s\S]*?\.fc-ctxmenu__item\[data-fc-action="sort"\]::before,[\s\S]*?\{[\s\S]*?-webkit-mask: none;[\s\S]*?mask: none;/,
+      );
+      const cutIconCss =
+        /\.fc-ctxmenu__item\[data-fc-action="cut"\]\s*\{(?<body>[\s\S]*?)\n {2}\}/.exec(css)?.groups
+          ?.body ?? '';
+      expect(cutIconCss).toContain("cx='5.2' cy='15.2' r='2.35' fill='%232f75b5'");
+      expect(cutIconCss).toContain("cx='14.8' cy='15.2' r='2.35' fill='%232f75b5'");
+      expect(cutIconCss).toContain("cx='5.2' cy='15.2' r='1.12' fill='%23fff'");
+      expect(cutIconCss).toContain("cx='14.8' cy='15.2' r='1.12' fill='%23fff'");
+      expect(cutIconCss).toContain("cx='10' cy='10.7'");
+      expect(cutIconCss).toContain('%232f75b5');
+      expect(cutIconCss).toContain('%23107c41');
+      expect(css).toMatch(
+        /\.fc-ctxmenu__item\[data-fc-action="formatCells"\]\s*\{[\s\S]*?%23107c41[\s\S]*?%232f75b5/,
+      );
+      expect(css).toMatch(/\.fc-ctxmenu__item\[data-fc-action="clear"\],[\s\S]*?%23c00000/);
+    });
+
+    it('uses colored SVG backgrounds for remaining semantic context menu row icons', () => {
+      const css = readFileSync(join(root, 'src/styles/core/app/overlays/context-menu.css'), 'utf8');
+      const actions = [
+        'pasteAll',
+        'pasteFormulas',
+        'pasteFormulasNumFmt',
+        'pasteValues',
+        'pasteValuesNumFmt',
+        'pasteFormatsOnly',
+        'pasteTranspose',
+        'insertCopiedCells',
+        'rowInsertAbove',
+        'rowInsertBelow',
+        'colInsertLeft',
+        'colInsertRight',
+        'rowDelete',
+        'colDelete',
+        'rowHide',
+        'colHide',
+        'rowUnhide',
+        'colUnhide',
+        'rowHeight',
+        'colWidth',
+        'defineName',
+        'filterClear',
+        'filterReapply',
+        'filterByValue',
+        'sortAsc',
+        'sortDesc',
+        'selectAll',
+        'insertComment',
+        'insertHyperlink',
+        'toggleWatch',
+      ];
+
+      for (const action of actions) {
+        expect(css).toContain(`.fc-ctxmenu__item[data-fc-action="${action}"]::before`);
+        expect(css).toMatch(
+          new RegExp(
+            `\\.fc-ctxmenu__item\\[data-fc-action="${action}"\\][\\s\\S]*?--fc-menu-icon-image: url`,
+          ),
+        );
+      }
+      expect(css).toMatch(/\.fc-ctxmenu__item\[data-fc-action="rowDelete"\],[\s\S]*?%23c00000/);
+      expect(css).toMatch(/\.fc-ctxmenu__item\[data-fc-action="rowHide"\],[\s\S]*?%23c00000/);
+      expect(css).toMatch(
+        /\.fc-ctxmenu__item\[data-fc-action="insertHyperlink"\]\s*\{[\s\S]*?%232f75b5[\s\S]*?%23107c41/,
+      );
+    });
+
+    it('uses colored SVG backgrounds for the context mini toolbar icons', () => {
+      const css = readFileSync(join(root, 'src/styles/core/app/overlays/context-menu.css'), 'utf8');
+
+      expect(css).toContain('--fc-mini-icon-image');
+      expect(css).toMatch(
+        /\.fc-ctxmenu__mini-btn\[data-fc-action="bold"\]::before,[\s\S]*?\.fc-ctxmenu__mini-btn\[data-fc-action="formatCells"\]::before\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;[\s\S]*?background-size: 18px 18px;/,
+      );
+      for (const action of [
+        'bold',
+        'italic',
+        'underline',
+        'alignLeft',
+        'alignCenter',
+        'alignRight',
+        'borders',
+        'formatCells',
+      ]) {
+        expect(css).toMatch(
+          new RegExp(
+            `\\.fc-ctxmenu__mini-btn\\[data-fc-action="${action}"\\]::before\\s*\\{[\\s\\S]*?--fc-mini-icon-image: url`,
+          ),
+        );
+      }
+      expect(css).toMatch(
+        /\.fc-ctxmenu__mini-btn\[data-fc-action="underline"\]::before\s*\{[\s\S]*?%23107c41/,
+      );
+      expect(css).toMatch(
+        /\.fc-ctxmenu__mini-btn\[data-fc-action="borders"\]::before\s*\{[\s\S]*?%23107c41/,
+      );
+      expect(css).toMatch(
+        /\.fc-ctxmenu__mini-btn\[data-fc-action="formatCells"\]::before\s*\{[\s\S]*?%23107c41[\s\S]*?%232f75b5/,
+      );
     });
   });
 });

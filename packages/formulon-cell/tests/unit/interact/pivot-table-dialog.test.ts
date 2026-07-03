@@ -875,4 +875,19 @@ describe('attachPivotTableDialog', () => {
     expect(document.activeElement?.textContent).toBe('Cancel');
     handle.detach();
   });
+
+  it('keeps PivotTable field layout on compact desktop dialog geometry', () => {
+    const css = readFileSync(join(root, 'src/styles/core/app/dialog-modules/pivot.css'), 'utf8');
+
+    expect(css).toMatch(/\.fc-pivotdlg__field-chip\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(css).toMatch(
+      /\.fc-pivotdlg__area\s*\{[\s\S]*?border-radius: 2px;[\s\S]*?background: var\(--fc-bg, Canvas\);/,
+    );
+    expect(css).toMatch(/\.fc-pivotdlg__area-settings\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(css).toMatch(
+      /\.fc-pivotdlg__area-settings-panel\s*\{[\s\S]*?border-radius: 2px;[\s\S]*?background: var\(--fc-bg, Canvas\);/,
+    );
+    expect(css).not.toContain('background: color-mix(in srgb, Canvas 92%');
+    expect(css).not.toContain('background: color-mix(in srgb, Canvas 96%');
+  });
 });

@@ -38,7 +38,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   headerTitle.textContent = t.title;
   header.appendChild(headerTitle);
   const closeBtn = appendDialogIconButton(header, {
-    label: '×',
+    label: '',
     ariaLabel: t.cancel,
     baseClass: 'fc-fmtdlg__close',
   });
@@ -325,6 +325,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     colorInput,
     colorReset,
     fontSwatches,
+    fontPreviewBox,
   } = fontTab;
 
   // ── Border tab ─────────────────────────────────────────────────────────
@@ -352,7 +353,14 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
 
   // ── Fill tab ───────────────────────────────────────────────────────────
   const fillTab = createFillTab(tabPanels.get('fill') as HTMLDivElement, t);
-  const { fillInput, fillReset, fillSwatches, fillPatternSelect, fillPatternColorInput } = fillTab;
+  const {
+    fillInput,
+    fillReset,
+    fillSwatches,
+    fillPatternSelect,
+    fillPatternColorInput,
+    fillSample,
+  } = fillTab;
 
   // ── Protection tab ─────────────────────────────────────────────────────
   const protectionPanel = tabPanels.get('protection') as HTMLDivElement;
@@ -363,18 +371,18 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   protectionSectionTitle.textContent = strings.protection.tabProtection;
   protectionSection.appendChild(protectionSectionTitle);
   protectionPanel.appendChild(protectionSection);
+  const lockedHint = document.createElement('div');
+  lockedHint.className = 'fc-fmtdlg__hint fc-fmtdlg__protection-hint';
+  lockedHint.textContent = strings.protection.lockedHint;
+  protectionSection.appendChild(lockedHint);
   const lockedRow = document.createElement('div');
-  lockedRow.className = 'fc-fmtdlg__row';
+  lockedRow.className = 'fc-fmtdlg__row fc-fmtdlg__protection-checks';
   const lockedCk = makeCheckbox(strings.protection.locked);
   lockedCk.input.dataset.fcCheck = 'locked';
   const hiddenFormulaCk = makeCheckbox(strings.protection.hiddenFormula);
   hiddenFormulaCk.input.dataset.fcCheck = 'formulaHidden';
   lockedRow.append(lockedCk.wrap, hiddenFormulaCk.wrap);
   protectionSection.appendChild(lockedRow);
-  const lockedHint = document.createElement('div');
-  lockedHint.className = 'fc-fmtdlg__hint';
-  lockedHint.textContent = strings.protection.lockedHint;
-  protectionSection.appendChild(lockedHint);
 
   // ── More tab (hyperlink / comment / validation) ────────────────────────
   const moreTab = createMoreTab(tabPanels.get('more') as HTMLDivElement, t);
@@ -485,6 +493,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     colorInput,
     colorReset,
     fontSwatches,
+    fontPreviewBox,
     borderStyleSelect,
     borderStyleButtons,
     borderStyleGallery,
@@ -508,6 +517,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     fillSwatches,
     fillPatternSelect,
     fillPatternColorInput,
+    fillSample,
     lockedCk,
     hiddenFormulaCk,
     hyperlinkSection,

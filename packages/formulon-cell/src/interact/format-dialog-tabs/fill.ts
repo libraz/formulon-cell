@@ -12,6 +12,7 @@ export interface FillTabRefs {
   fillSwatches: ReturnType<typeof makeSwatches>;
   fillPatternSelect: HTMLSelectElement;
   fillPatternColorInput: HTMLInputElement;
+  fillSample: HTMLDivElement;
 }
 
 export function createFillTab(panel: HTMLDivElement, t: Strings['formatDialog']): FillTabRefs {
@@ -23,7 +24,7 @@ export function createFillTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   fillSection.appendChild(fillSectionTitle);
   panel.appendChild(fillSection);
   const fillRow = document.createElement('div');
-  fillRow.className = 'fc-fmtdlg__row';
+  fillRow.className = 'fc-fmtdlg__row fc-fmtdlg__fill-bg-row';
   const fillLabel = document.createElement('span');
   fillLabel.textContent = t.fill;
   const fillInput = document.createElement('input');
@@ -35,8 +36,18 @@ export function createFillTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   fillSection.appendChild(fillRow);
   const fillSwatches = makeSwatches('fill', t.themeColors, t.standardColors);
   fillSection.appendChild(fillSwatches.el);
+  const fillPatternColorRow = document.createElement('div');
+  fillPatternColorRow.className = 'fc-fmtdlg__row fc-fmtdlg__fill-pattern-color-row';
+  const fillPatternColorLabel = document.createElement('span');
+  fillPatternColorLabel.textContent = t.fillPatternColor;
+  const fillPatternColorInput = document.createElement('input');
+  fillPatternColorInput.type = 'color';
+  fillPatternColorInput.setAttribute('aria-label', t.fillPatternColor);
+  fillPatternColorInput.dataset.fcColor = 'fillPattern';
+  fillPatternColorRow.append(fillPatternColorLabel, fillPatternColorInput);
+  fillSection.appendChild(fillPatternColorRow);
   const fillPatternRow = document.createElement('label');
-  fillPatternRow.className = 'fc-fmtdlg__row';
+  fillPatternRow.className = 'fc-fmtdlg__row fc-fmtdlg__fill-pattern-row';
   const fillPatternLabel = document.createElement('span');
   fillPatternLabel.textContent = t.fillPatternStyle;
   const fillPatternOptions: Array<{ value: '' | FillPattern; label: string }> = [
@@ -56,16 +67,16 @@ export function createFillTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   fillPatternSelect.dataset.fcSelect = 'fillPattern';
   fillPatternRow.append(fillPatternLabel, fillPatternSelect);
   fillSection.appendChild(fillPatternRow);
-  const fillPatternColorRow = document.createElement('div');
-  fillPatternColorRow.className = 'fc-fmtdlg__row';
-  const fillPatternColorLabel = document.createElement('span');
-  fillPatternColorLabel.textContent = t.fillPatternColor;
-  const fillPatternColorInput = document.createElement('input');
-  fillPatternColorInput.type = 'color';
-  fillPatternColorInput.setAttribute('aria-label', t.fillPatternColor);
-  fillPatternColorInput.dataset.fcColor = 'fillPattern';
-  fillPatternColorRow.append(fillPatternColorLabel, fillPatternColorInput);
-  fillSection.appendChild(fillPatternColorRow);
+
+  const sample = document.createElement('div');
+  sample.className = 'fc-fmtdlg__fill-sample';
+  const sampleLabel = document.createElement('div');
+  sampleLabel.className = 'fc-fmtdlg__fill-sample-label';
+  sampleLabel.textContent = t.preview;
+  const fillSample = document.createElement('div');
+  fillSample.className = 'fc-fmtdlg__fill-sample-box';
+  sample.append(sampleLabel, fillSample);
+  panel.appendChild(sample);
 
   return {
     fillInput,
@@ -73,5 +84,6 @@ export function createFillTab(panel: HTMLDivElement, t: Strings['formatDialog'])
     fillSwatches,
     fillPatternSelect,
     fillPatternColorInput,
+    fillSample,
   };
 }

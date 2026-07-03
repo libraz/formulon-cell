@@ -228,4 +228,14 @@ describe('attachExternalLinksDialog', () => {
     expect(source).toContain('appendDialogButton(parent');
     expect(source).not.toContain("document.createElement('button')");
   });
+
+  it('keeps External Links on compact desktop table geometry', () => {
+    const css = readFileSync(join(root, 'src/styles/core/app/dialogs/external-links.css'), 'utf8');
+
+    expect(css).toMatch(/\.fc-extlinkdlg__panel\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(css).toMatch(
+      /\.fc-extlinkdlg__table tbody tr\[aria-selected="true"\]\s*\{[\s\S]*?background: var\(--fc-bg-hover/,
+    );
+    expect(css).not.toContain('background: var(--fc-accent-soft');
+  });
 });

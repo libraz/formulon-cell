@@ -1,9 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { defaultStrings } from '../../../src/i18n/strings.js';
 import { attachGoToDialog } from '../../../src/interact/goto-dialog.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
 
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
 const overlay = (): HTMLElement | null => document.querySelector<HTMLElement>('.fc-goto');
@@ -246,5 +250,25 @@ describe('attachGoToDialog', () => {
     const handle = attachGoToDialog({ host, store, getWb: () => wb });
     handle.detach();
     expect(overlay()).toBeNull();
+  });
+
+  it('keeps Go To Special controls on compact desktop dialog geometry', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/dialog-modules/goto-special.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(
+      /\.fc-goto__reference input\s*\{[\s\S]*?min-height: 24px;[\s\S]*?border-radius: 2px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-goto__kinds\s*\{[\s\S]*?border-radius: 2px;[\s\S]*?padding: 6px 8px;/,
+    );
+    expect(css).toMatch(/\.fc-goto__radio\s*\{[\s\S]*?padding: 2px 4px;[\s\S]*?border-radius: 0;/);
+    expect(css).toMatch(/\.fc-goto__radio:hover\s*\{[\s\S]*?background: var\(--fc-bg-hover/);
+    expect(css).toMatch(/\.fc-goto__value-filters\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(css).toMatch(/\.fc-goto__check\s*\{[\s\S]*?padding: 2px 4px;[\s\S]*?border-radius: 0;/);
+    expect(css).toMatch(/\.fc-goto__check:hover\s*\{[\s\S]*?background: var\(--fc-bg-hover/);
+    expect(css).not.toContain('background: var(--fc-accent-soft');
   });
 });

@@ -83,7 +83,7 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
     label: strings.watchPanel.clearAll,
     baseClass: 'fc-watch__btn',
   });
-  const closeBtn = appendDialogButton(actions, { label: '×', baseClass: 'fc-watch__btn' });
+  const closeBtn = appendDialogButton(actions, { label: '', baseClass: 'fc-watch__btn' });
   closeBtn.classList.add('fc-watch__close');
   closeBtn.setAttribute('aria-label', strings.watchPanel.close);
   header.append(title, actions);
@@ -110,7 +110,7 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
     th.textContent = strings.watchPanel[key];
     headRow.appendChild(th);
   }
-  // Trailing column for the per-row remove (×) button. No header label.
+  // Trailing column for the per-row remove button. No header label.
   const thRemove = document.createElement('th');
   thRemove.scope = 'col';
   thRemove.dataset.fcCol = 'remove';
@@ -233,7 +233,7 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
       const tdRemove = document.createElement('td');
       tdRemove.className = 'fc-watch__remove-cell';
       const removeBtn = appendDialogButton(tdRemove, {
-        label: '×',
+        label: '',
         baseClass: 'fc-watch__remove',
       });
       removeBtn.setAttribute('aria-label', strings.watchPanel.removeWatch);

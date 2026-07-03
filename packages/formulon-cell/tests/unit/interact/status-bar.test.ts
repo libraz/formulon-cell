@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
-import { en } from '../../../src/i18n/strings.js';
+import { en, ja } from '../../../src/i18n/strings.js';
 import { attachStatusBar } from '../../../src/interact/status-bar.js';
 import {
   createSpreadsheetStore,
@@ -202,6 +202,8 @@ describe('attachStatusBar', () => {
     expect(document.activeElement).toBe(items?.[0]);
     expect(items?.[0]?.getAttribute('role')).toBe('menuitemcheckbox');
     expect(items?.[0]?.getAttribute('aria-checked')).toBe('true');
+    const firstCheck = items?.[0]?.querySelector<HTMLElement>('.fc-statusbar__chooser-check');
+    expect(firstCheck?.textContent).toBe('');
     // Toggle "sum" off from the Excel default Average, Count, Sum set.
     const sumItem = Array.from(items ?? []).find((b) => b.textContent?.includes('合計'));
     expect(sumItem).toBeDefined();
@@ -209,6 +211,34 @@ describe('attachStatusBar', () => {
     expect(store.getState().ui.statusAggs).not.toContain('sum');
     expect(sumItem?.getAttribute('aria-checked')).toBe('false');
     handle.detach();
+  });
+
+  it('keeps the status bar chooser close to Excel 365 desktop menu geometry', () => {
+    const source = readFileSync(join(root, 'src/interact/status-bar.ts'), 'utf8');
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/popups/validation-and-chooser.css'),
+      'utf8',
+    );
+    const chooserCss = css.slice(css.indexOf('.fc-statusbar__chooser {'));
+
+    expect(chooserCss).toMatch(
+      /\.fc-statusbar__chooser\s*\{[\s\S]*?min-width: 232px;[\s\S]*?padding: 5px 0;[\s\S]*?border-radius: 2px;[\s\S]*?box-shadow:/,
+    );
+    expect(chooserCss).toMatch(
+      /\.fc-statusbar__chooser-heading\s*\{[\s\S]*?padding: 5px 12px 3px 28px;[\s\S]*?text-transform: none;[\s\S]*?letter-spacing: 0;/,
+    );
+    expect(chooserCss).toMatch(
+      /\.fc-statusbar__chooser-item\s*\{[\s\S]*?box-sizing: border-box;[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 4px;[\s\S]*?border-radius: 0;/,
+    );
+    expect(chooserCss).toMatch(
+      /\.fc-statusbar__chooser-check\s*\{[\s\S]*?flex: 0 0 18px;[\s\S]*?width: 18px;[\s\S]*?height: 16px;/,
+    );
+    expect(chooserCss).toMatch(
+      /\.fc-statusbar__chooser-item\[aria-checked="true"\] \.fc-statusbar__chooser-check::before\s*\{[\s\S]*?border-bottom: 1\.7px solid currentColor;[\s\S]*?content: "";/,
+    );
+    expect(chooserCss).not.toContain('text-transform: uppercase;');
+    expect(chooserCss).not.toContain('background: var(--fc-accent-soft');
+    expect(source).not.toContain("right.textContent = '—'");
   });
 
   it('positions the chooser above the opener and clamps it inside the viewport', () => {
@@ -303,6 +333,44 @@ describe('attachStatusBar', () => {
     expect(uploadEl?.textContent).toBe('Upload failed');
     expect(uploadEl?.dataset.uploadStatus).toBe('error');
     expect(macroEl?.textContent).toBe('Recording Macro');
+    expect(macroEl?.dataset.macroRecording).toBe('true');
+    handle.detach();
+  });
+
+  it('localizes host-driven upload status and macro recording indicators in Japanese', () => {
+    let upload: 'saved' | 'saving' | 'error' | null = 'saved';
+    let recording = false;
+    store.setState((s) => ({
+      ...s,
+      ui: {
+        ...s.ui,
+        statusOptions: { ...s.ui.statusOptions, uploadStatus: true, macroRecording: true },
+      },
+    }));
+    const handle = attachStatusBar({
+      statusbar,
+      store,
+      strings: ja,
+      getEngineLabel: () => 'stub',
+      getUploadStatus: () => upload,
+      getMacroRecording: () => recording,
+    });
+
+    const uploadEl = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-upload');
+    const macroEl = statusbar.querySelector<HTMLElement>('.fc-host__statusbar-macro');
+    expect(uploadEl?.textContent).toBe('保存済み');
+    expect(macroEl?.textContent).toBe('マクロの記録');
+
+    upload = 'saving';
+    recording = true;
+    handle.refresh();
+    expect(uploadEl?.textContent).toBe('保存中...');
+    expect(macroEl?.textContent).toBe('マクロ記録中');
+
+    upload = 'error';
+    handle.refresh();
+    expect(uploadEl?.textContent).toBe('アップロード失敗');
+    expect(uploadEl?.dataset.uploadStatus).toBe('error');
     expect(macroEl?.dataset.macroRecording).toBe('true');
     handle.detach();
   });

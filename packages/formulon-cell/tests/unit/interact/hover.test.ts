@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { attachHover } from '../../../src/interact/hover.js';
 import {
@@ -6,6 +9,7 @@ import {
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
 
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const tip = (): HTMLElement | null => document.querySelector<HTMLElement>('.fc-hover-tip');
 
 const stubGridRect = (grid: HTMLElement): void => {
@@ -13,13 +17,15 @@ const stubGridRect = (grid: HTMLElement): void => {
     ({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600, x: 0, y: 0 }) as DOMRect;
 };
 
-/** Default layout puts cell (0,0) starting at x=46, y=22 (header sizes). Row
- *  height defaults to 20, col width 64 — so (60,30) lands on cell (0,0). */
-const cellPoint = (row: number, col: number): { x: number; y: number } => {
-  const headerW = 46;
-  const headerH = 22;
-  const colW = 64;
-  const rowH = 20;
+/** Uses the store's default layout so this helper stays aligned with the
+ *  Excel-like sheet density. */
+const cellPoint = (store: SpreadsheetStore, row: number, col: number): { x: number; y: number } => {
+  const {
+    headerColWidth: headerW,
+    headerRowHeight: headerH,
+    defaultColWidth: colW,
+    defaultRowHeight: rowH,
+  } = store.getState().layout;
   return {
     x: headerW + col * colW + Math.floor(colW / 2),
     y: headerH + row * rowH + Math.floor(rowH / 2),
@@ -51,7 +57,7 @@ describe('attachHover', () => {
   it('pointermove over a comment cell reveals the tooltip with the comment text', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { comment: 'a sticky note' });
     const handle = attachHover({ grid, store });
-    const { x, y } = cellPoint(0, 0);
+    const { x, y } = cellPoint(store, 0, 0);
     grid.dispatchEvent(
       new PointerEvent('pointermove', {
         clientX: x,
@@ -68,7 +74,7 @@ describe('attachHover', () => {
   it('pointerleave hides the tooltip', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { comment: 'note' });
     const handle = attachHover({ grid, store });
-    const { x, y } = cellPoint(0, 0);
+    const { x, y } = cellPoint(store, 0, 0);
     grid.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y, pointerId: 1 }));
     expect(tip()?.hidden).toBe(false);
     grid.dispatchEvent(new PointerEvent('pointerleave', { pointerId: 1 }));
@@ -79,13 +85,13 @@ describe('attachHover', () => {
   it('pointermove over a cell without comment hides the tooltip', () => {
     mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { comment: 'first' });
     const handle = attachHover({ grid, store });
-    let p = cellPoint(0, 0);
+    let p = cellPoint(store, 0, 0);
     grid.dispatchEvent(
       new PointerEvent('pointermove', { clientX: p.x, clientY: p.y, pointerId: 1 }),
     );
     expect(tip()?.hidden).toBe(false);
     // Hover a different cell with no format.
-    p = cellPoint(2, 2);
+    p = cellPoint(store, 2, 2);
     grid.dispatchEvent(
       new PointerEvent('pointermove', { clientX: p.x, clientY: p.y, pointerId: 1 }),
     );
@@ -101,7 +107,7 @@ describe('attachHover', () => {
     );
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
     const handle = attachHover({ grid, store });
-    const { x, y } = cellPoint(1, 1);
+    const { x, y } = cellPoint(store, 1, 1);
     const evt = new MouseEvent('click', {
       clientX: x,
       clientY: y,
@@ -125,7 +131,7 @@ describe('attachHover', () => {
     );
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
     const handle = attachHover({ grid, store });
-    const { x, y } = cellPoint(1, 1);
+    const { x, y } = cellPoint(store, 1, 1);
     grid.dispatchEvent(
       new MouseEvent('click', { clientX: x, clientY: y, bubbles: true, cancelable: true }),
     );
@@ -139,5 +145,14 @@ describe('attachHover', () => {
     expect(tip()).not.toBeNull();
     handle.detach();
     expect(tip()).toBeNull();
+  });
+
+  it('keeps cell hover notes as compact rectangular Excel-style tips', () => {
+    const css = readFileSync(join(root, 'src/styles/core/app/panels/hover-tip.css'), 'utf8');
+
+    expect(css).toMatch(
+      /\.fc-hover-tip\s*\{[\s\S]*?box-shadow:[\s\S]*?0 4px 12px rgba\(0, 0, 0, 0\.14\),[\s\S]*?padding: 5px 8px;[\s\S]*?border-radius: 2px;/,
+    );
+    expect(css).not.toContain('box-shadow: var(--fc-shadow-4)');
   });
 });

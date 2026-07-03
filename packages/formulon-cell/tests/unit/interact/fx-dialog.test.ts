@@ -1,7 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { en, ja } from '../../../src/i18n/strings.js';
 import { attachFxDialog, FUNCTION_DESCRIPTIONS } from '../../../src/interact/fx-dialog.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 describe('attachFxDialog', () => {
   let host: HTMLElement;
@@ -420,5 +425,23 @@ describe('attachFxDialog', () => {
     // Stale reference should be inert.
     insertBtn?.click();
     expect(inserted).toBe(0);
+  });
+
+  it('keeps Function Arguments on compact desktop dialog geometry', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/dialog-modules/fx-dialog.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(/\.fc-fxdialog__item--active\s*\{[\s\S]*?background: var\(--fc-bg-hover/);
+    expect(css).toMatch(
+      /\.fc-fxdialog__item--active\s*\{[\s\S]*?box-shadow: inset 0 0 0 1px var\(--fc-fmtdlg-list-focus-border/,
+    );
+    expect(css).toMatch(/\.fc-fxdialog__args-header\s*\{[\s\S]*?border-radius: 2px 2px 0 0;/);
+    expect(css).toMatch(/\.fc-fxdialog__args-fields\s*\{[\s\S]*?border-radius: 0 0 2px 2px;/);
+    expect(css).toMatch(/\.fc-fxdialog__preview-label\s*\{[\s\S]*?letter-spacing: 0;/);
+    expect(css).toMatch(/\.fc-fxdialog__preview\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(css).not.toContain('background: #e7f6ed');
+    expect(css).not.toContain('letter-spacing: 0.04em');
   });
 });

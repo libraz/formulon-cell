@@ -113,12 +113,14 @@ describe('attachFindReplace', () => {
     expect(closeBtn?.getAttribute('aria-label')).toBeTruthy();
     expect(closeBtn?.title).toBe(closeBtn?.getAttribute('aria-label'));
     expect(closeBtn?.classList.contains('fc-find__btn--icon')).toBe(true);
+    expect(closeBtn?.textContent).toBe('');
     handle.detach();
   });
 
   it('keeps Find/Replace buttons on the shared dialog button primitive', () => {
     const source = readFileSync(join(root, 'src/interact/find-replace.ts'), 'utf8');
     expect(source).toContain("createDialogButton({ label: '', baseClass: 'fc-find__btn' })");
+    expect(source).not.toContain("closeBtn.textContent = '×'");
     expect(source).not.toContain("document.createElement('button')");
   });
 
@@ -467,5 +469,20 @@ describe('attachFindReplace', () => {
     overlay.dispatchEvent(e);
     expect(bubbled).toBe(false);
     handle.detach();
+  });
+
+  it('keeps the Find/Replace floating panel on compact desktop geometry', () => {
+    const css = readFileSync(join(root, 'src/styles/core/app/overlays/find-bar.css'), 'utf8');
+
+    expect(css).toMatch(/\.fc-find\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(css).toMatch(
+      /\.fc-find__results-table tr:hover,[\s\S]*?\.fc-find__results-table tr:focus-visible\s*\{[\s\S]*?background: var\(--fc-bg-hover/,
+    );
+    expect(css).toMatch(/\.fc-find__btn:hover\s*\{[\s\S]*?background: var\(--fc-bg-hover/);
+    expect(css).toMatch(
+      /\.fc-find__btn--icon::before,[\s\S]*?\.fc-find__btn--icon::after\s*\{[\s\S]*?background: currentColor;[\s\S]*?content: "";/,
+    );
+    expect(css).toMatch(/\.fc-find__btn--icon::after\s*\{[\s\S]*?rotate\(-45deg\);/);
+    expect(css).not.toContain('background: var(--fc-accent-soft');
   });
 });

@@ -194,6 +194,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     colorInput,
     colorReset,
     fontSwatches,
+    fontPreviewBox,
     borderStyleSelect,
     borderStyleButtons,
     borderStyleGallery,
@@ -217,6 +218,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     fillSwatches,
     fillPatternSelect,
     fillPatternColorInput,
+    fillSample,
     lockedCk,
     hiddenFormulaCk,
     hyperlinkSection,
@@ -592,25 +594,37 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
 
   const renderPreview = (): void => {
+    const applyFontPreview = (el: HTMLElement): void => {
+      el.style.fontWeight = draft.bold ? 'bold' : 'normal';
+      el.style.fontStyle = draft.italic ? 'italic' : 'normal';
+      const decos: string[] = [];
+      if (draft.underline) decos.push('underline');
+      if (draft.strike) decos.push('line-through');
+      el.style.textDecoration = decos.length > 0 ? decos.join(' ') : 'none';
+      el.style.fontFamily = draft.fontFamily || '';
+      el.style.fontSize = draft.fontSize !== undefined ? `${draft.fontSize}px` : '';
+      el.style.color = draft.color ?? '';
+    };
+    const applyFillPreview = (el: HTMLElement): void => {
+      el.style.backgroundColor = draft.fill ?? '';
+      el.style.backgroundImage = fillPatternImage(draft.fillPattern, draft.fillPatternColor);
+      el.style.backgroundSize =
+        draft.fillPattern === 'gray125' || draft.fillPattern === 'gray25' ? '4px 4px' : '';
+    };
+
     preview.style.fontWeight = draft.bold ? 'bold' : 'normal';
     preview.style.fontStyle = draft.italic ? 'italic' : 'normal';
-    previewCell.style.fontWeight = draft.bold ? 'bold' : 'normal';
-    previewCell.style.fontStyle = draft.italic ? 'italic' : 'normal';
     const decos: string[] = [];
     if (draft.underline) decos.push('underline');
     if (draft.strike) decos.push('line-through');
     preview.style.textDecoration = decos.length > 0 ? decos.join(' ') : 'none';
     preview.style.textAlign = cssHorizontalAlign(draft.align);
-    previewCell.style.textDecoration = decos.length > 0 ? decos.join(' ') : 'none';
+    applyFontPreview(previewCell);
+    applyFontPreview(fontPreviewBox);
     previewCell.style.textAlign = cssHorizontalAlign(draft.align);
     previewCell.style.direction = draft.textDirection === 'context' ? '' : draft.textDirection;
-    previewCell.style.fontFamily = draft.fontFamily || '';
-    previewCell.style.fontSize = draft.fontSize !== undefined ? `${draft.fontSize}px` : '';
-    previewCell.style.color = draft.color ?? '';
-    previewCell.style.backgroundColor = draft.fill ?? '';
-    previewCell.style.backgroundImage = fillPatternImage(draft.fillPattern, draft.fillPatternColor);
-    previewCell.style.backgroundSize =
-      draft.fillPattern === 'gray125' || draft.fillPattern === 'gray25' ? '4px 4px' : '';
+    applyFillPreview(previewCell);
+    applyFillPreview(fillSample);
     previewCell.style.whiteSpace = draft.wrap ? 'pre-wrap' : 'nowrap';
     previewCell.style.fontSize = draft.shrinkToFit
       ? `${Math.max(8, Math.round((draft.fontSize ?? 13) * 0.85))}px`

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -12,6 +15,8 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
@@ -258,6 +263,26 @@ describe('attachValidationList', () => {
     expect(popover()).toBeNull();
     handle.detach();
   });
+
+  it('keeps the validation list close to Excel 365 desktop dropdown geometry', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/popups/validation-and-chooser.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(
+      /\.fc-validation-list\s*\{[\s\S]*?border-radius: 0;[\s\S]*?box-shadow:[\s\S]*?font-size: 12px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-validation-list__item\s*\{[\s\S]*?min-height: 22px;[\s\S]*?padding: 3px 8px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-validation-list__item:hover,[\s\S]*?\.fc-validation-list__item\[aria-selected="true"\]\s*\{[\s\S]*?background: var\(--fc-bg-hover/,
+    );
+    expect(css).not.toContain(
+      '.fc-validation-list__item[aria-selected="true"] {\n    background: var(--fc-accent-soft',
+    );
+  });
 });
 
 describe('attachValidationPrompt', () => {
@@ -336,6 +361,20 @@ describe('attachValidationPrompt', () => {
     expect(prompt()?.hidden).toBe(true);
     handle.detach();
   });
+
+  it('keeps the validation input prompt on a restrained desktop popover surface', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/popups/validation-and-chooser.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(
+      /\.fc-validation-prompt\s*\{[\s\S]*?padding: 7px 9px;[\s\S]*?border-radius: 1px;[\s\S]*?box-shadow:/,
+    );
+    expect(css).toMatch(
+      /\.fc-validation-prompt__title\s*\{[\s\S]*?font-weight: 600;[\s\S]*?margin-bottom: 4px;/,
+    );
+  });
 });
 
 describe('attachValidationAlert', () => {
@@ -366,7 +405,28 @@ describe('attachValidationAlert', () => {
     expect(dialog).not.toBeNull();
     expect(dialog?.hidden).toBe(false);
     expect(dialog?.getAttribute('aria-label')).toBe('Invalid status');
+    expect(dialog?.querySelector('.fc-valdlg__panel')).not.toBeNull();
     expect(dialog?.textContent).toContain('Use Open, Closed, or Hold.');
     handle.detach();
+  });
+
+  it('keeps the validation alert on a compact desktop dialog surface', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/popups/validation-and-chooser.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(
+      /\.fc-valdlg__panel\s*\{[\s\S]*?width: min\(360px, calc\(100vw - 48px\)\);[\s\S]*?border-radius: 2px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-valdlg__panel \.fc-fmtdlg__header\s*\{[\s\S]*?min-height: 30px;[\s\S]*?padding: 7px 12px 6px;[\s\S]*?font-size: 12px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-valdlg__panel \.app__dlg__message\s*\{[\s\S]*?margin: 0;[\s\S]*?font-size: 12px;[\s\S]*?line-height: 1.35;/,
+    );
+    expect(css).toMatch(
+      /\.fc-valdlg__panel \.fc-fmtdlg__footer\s*\{[\s\S]*?min-height: 38px;[\s\S]*?padding: 6px 12px 10px;/,
+    );
   });
 });

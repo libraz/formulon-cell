@@ -695,4 +695,14 @@ describe('attachCfRulesDialog', () => {
     handle.detach();
     expect(document.querySelector('.fc-cfrulesdlg')).toBeNull();
   });
+
+  it('keeps Conditional Formatting Rules Manager on compact desktop table geometry', () => {
+    const css = readFileSync(join(root, 'src/styles/core/app/dialogs/cf-rules.css'), 'utf8');
+
+    expect(css).toMatch(/\.fc-cfrulesdlg__panel\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(css).toMatch(
+      /\.fc-cfrulesdlg__table tbody tr\[aria-selected="true"\]\s*\{[\s\S]*?background: var\(--fc-bg-hover/,
+    );
+    expect(css).not.toContain('background: var(--fc-accent-soft');
+  });
 });

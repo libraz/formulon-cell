@@ -327,6 +327,33 @@ describe('attachFilterDropdown', () => {
     handle.detach();
   });
 
+  it('keeps the filter dropdown close to Excel 365 desktop AutoFilter geometry', () => {
+    const css = readFileSync(join(root, 'src/styles/core/app/popups/filter-dropdown.css'), 'utf8');
+
+    expect(css).toMatch(
+      /\.fc-filter-dropdown\s*\{[\s\S]*?border-radius: 2px;[\s\S]*?box-shadow:[\s\S]*?font-size: 12px;[\s\S]*?width: 240px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-filter-dropdown__search\s*\{[\s\S]*?margin: 7px 8px 6px;[\s\S]*?padding: 4px 7px;[\s\S]*?border-radius: 2px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-filter-dropdown__search:focus\s*\{[\s\S]*?box-shadow: inset 0 0 0 1px var\(--fc-accent/,
+    );
+    expect(css).toMatch(
+      /\.fc-filter-dropdown__condition-op,[\s\S]*?\.fc-filter-dropdown__condition-value\s*\{[\s\S]*?padding: 4px 7px;[\s\S]*?border-radius: 2px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-filter-dropdown__row\s*\{[\s\S]*?gap: 6px;[\s\S]*?min-height: 24px;[\s\S]*?padding: 2px 8px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-filter-dropdown__row:hover\s*\{[\s\S]*?background: var\(--fc-bg-hover/,
+    );
+    expect(css).toMatch(
+      /\.fc-filter-dropdown__actions button\s*\{[\s\S]*?padding: 3px 12px;[\s\S]*?border-radius: 2px;/,
+    );
+    expect(css).not.toContain('background: var(--fc-accent-soft, rgba(30, 122, 224, 0.1))');
+  });
+
   it('keeps action button DOM on the shared interaction primitive', () => {
     const source = readFileSync(join(root, 'src/interact/filter-dropdown.ts'), 'utf8');
 

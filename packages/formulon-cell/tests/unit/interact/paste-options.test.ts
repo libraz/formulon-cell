@@ -228,4 +228,22 @@ describe('attachPasteOptions', () => {
     expect(helperSource).toContain("import { createInteractionButton } from './chip-button.js'");
     expect(helperSource).not.toContain("document.createElement('button')");
   });
+
+  it('keeps Paste Options close to Excel 365 desktop smart tag geometry', () => {
+    const css = readFileSync(join(root, 'src/styles/core/app/overlays/paste-options.css'), 'utf8');
+
+    expect(css).toMatch(
+      /\.fc-paste-options__button\s*\{[\s\S]*?width: 22px;[\s\S]*?height: 22px;[\s\S]*?border-radius: 2px;[\s\S]*?0 3px 8px rgba\(0, 0, 0, 0\.16\)/,
+    );
+    expect(css).toMatch(
+      /\.fc-paste-options__menu\s*\{[\s\S]*?min-width: 192px;[\s\S]*?border-radius: 2px;[\s\S]*?font-size: 12px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-paste-options__item\s*\{[\s\S]*?grid-template-columns: 18px minmax\(0, 1fr\);[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 8px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-paste-options__item::before\s*\{[\s\S]*?width: 16px;[\s\S]*?height: 16px;/,
+    );
+    expect(css).not.toContain('box-shadow: var(--fc-shadow-2)');
+  });
 });

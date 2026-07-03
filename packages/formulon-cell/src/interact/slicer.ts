@@ -96,7 +96,7 @@ export function attachSlicer(deps: SlicerDeps): SlicerHandle {
       baseClass: 'fc-slicer__btn',
     });
     clearBtn.classList.add('fc-slicer__clear');
-    const closeBtn = appendDialogButton(actions, { label: '×', baseClass: 'fc-slicer__btn' });
+    const closeBtn = appendDialogButton(actions, { label: '', baseClass: 'fc-slicer__btn' });
     closeBtn.classList.add('fc-slicer__close');
     closeBtn.setAttribute('aria-label', strings.slicer.close);
     header.append(title, actions);

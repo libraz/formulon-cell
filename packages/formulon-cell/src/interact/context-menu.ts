@@ -150,7 +150,6 @@ const createContextSubmenuButton = (
   appendContextMenuLabel(button, entry.label);
   const arrow = document.createElement('span');
   arrow.className = 'fc-ctxmenu__arrow';
-  arrow.textContent = '›';
   arrow.setAttribute('aria-hidden', 'true');
   button.appendChild(arrow);
   return button;

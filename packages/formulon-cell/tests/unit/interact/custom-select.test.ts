@@ -51,4 +51,16 @@ describe('enhanceCustomSelect', () => {
     expect(source).toContain('projectDisabledState(row, opt.disabled');
     expect(source).not.toContain("document.createElement('button')");
   });
+
+  it('keeps the popup select chrome compact like Excel desktop controls', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/dialog-modules/custom-select.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(/\.fc-select__button\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(css).toMatch(/\.fc-select__list\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(css).toMatch(/\.fc-select__option\s*\{[\s\S]*?border-radius: 0;/);
+    expect(css).toMatch(/\.fc-select__list\s*\{[\s\S]*?0 6px 16px rgba\(0, 0, 0, 0\.14\)/);
+  });
 });

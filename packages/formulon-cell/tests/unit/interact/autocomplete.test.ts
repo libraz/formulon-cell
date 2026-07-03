@@ -179,4 +179,20 @@ describe('attachAutocomplete labels', () => {
     expect(source).toContain('createAutocompleteItemButton({');
     expect(source).not.toContain("document.createElement('button')");
   });
+
+  it('keeps the formula autocomplete popup compact like Excel desktop', () => {
+    const css = readFileSync(join(root, 'src/styles/core/app/popups/formula-helpers.css'), 'utf8');
+
+    expect(css).toMatch(
+      /\.fc-autocomplete\s*\{[\s\S]*?border-radius: 2px;[\s\S]*?0 8px 24px rgba\(0, 0, 0, 0\.18\)/,
+    );
+    expect(css).toMatch(
+      /\.fc-autocomplete__item\s*\{[\s\S]*?grid-template-columns: 26px minmax\(0, 1fr\);[\s\S]*?min-height: 32px;[\s\S]*?padding: 3px 8px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-autocomplete__badge\s*\{[\s\S]*?width: 23px;[\s\S]*?height: 18px;[\s\S]*?background: var\(--fc-bg, Canvas\);/,
+    );
+    expect(css).not.toContain('text-transform: uppercase');
+    expect(css).not.toContain('box-shadow: var(--fc-shadow-8)');
+  });
 });
