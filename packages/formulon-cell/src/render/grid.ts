@@ -145,6 +145,8 @@ export class GridRenderer {
 
   private rafId = 0;
 
+  private marqueeRafId = 0;
+
   private readonly sheetBackgroundImages = new Map<
     string,
     { image: HTMLImageElement; status: 'loading' | 'loaded' | 'error' }
@@ -213,6 +215,8 @@ export class GridRenderer {
   dispose(): void {
     if (this.rafId) cancelAnimationFrame(this.rafId);
     this.rafId = 0;
+    if (this.marqueeRafId) cancelAnimationFrame(this.marqueeRafId);
+    this.marqueeRafId = 0;
   }
 
   private paint(): void {
@@ -816,7 +820,14 @@ export class GridRenderer {
         const rects = rangeRects(layout, viewport, copyRange);
         for (const r of rects) paintCopyMarquee(this.ctx, r, phase);
       }
-      requestAnimationFrame(() => this.invalidate());
+      // Keep the marquee animating, but track the handle so dispose() can cancel
+      // it — otherwise the self-scheduling loop pins the renderer after teardown.
+      if (!this.marqueeRafId) {
+        this.marqueeRafId = requestAnimationFrame(() => {
+          this.marqueeRafId = 0;
+          this.invalidate();
+        });
+      }
     }
 
     if (isRowVisible(layout, viewport, r.r1) && isColVisible(layout, viewport, r.c1)) {
