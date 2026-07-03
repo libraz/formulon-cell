@@ -24,7 +24,7 @@ export default defineConfig({
       provider: 'v8',
       include: ['src/**/*.ts'],
       exclude: ['src/**/*.d.ts', 'src/**/index.ts', 'src/vite-env.d.ts'],
-      reporter: ['text', 'html', 'lcov'],
+      reporter: process.env.CI ? ['text', 'lcov'] : ['text', 'html', 'lcov'],
     },
   },
 });
