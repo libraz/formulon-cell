@@ -194,7 +194,10 @@ describe('toolbar/ribbon/backstage', () => {
       /\.demo__backstage-navitem--back::after\s*\{[\s\S]*?border: solid currentColor;[\s\S]*?transform: translate\(-70%, -50%\) rotate\(45deg\);/,
     );
     expect(css).toMatch(
-      /\.demo__backstage-xl::before,[\s\S]*?\.demo__backstage-xl::after\s*\{[\s\S]*?background: currentColor;[\s\S]*?content: "";/,
+      /\.demo__backstage-xl\s*\{[\s\S]*?background: var\(--demo-brand\);[\s\S]*?color: var\(--demo-title-fg\);/,
+    );
+    expect(css).toMatch(
+      /\.demo__backstage-xl \.demo__rb-icon\s*\{[\s\S]*?width: 30px;[\s\S]*?height: 30px;/,
     );
     expect(css).toMatch(
       /\.demo__backstage-command-icon--protect::before\s*\{[\s\S]*?border: 2px solid currentColor;/,

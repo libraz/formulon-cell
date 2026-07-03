@@ -218,7 +218,7 @@ describe('toolbar/ribbon-model', () => {
     expect(titlebarCss).toContain('.demo__account .demo__share:first-child');
     expect(titlebarCss).toContain('background: var(--demo-title-strong);');
     expect(commandbarCss).toMatch(
-      /\.demo__brand-mark\s*\{[\s\S]*?background: var\(--demo-title-strong\);[\s\S]*?color: #ffffff;/,
+      /\.demo__brand-mark\s*\{[\s\S]*?background: var\(--demo-brand\);[\s\S]*?color: #ffffff;/,
     );
     expect(commandbarCss).toMatch(
       /\.demo__seg-btn:hover\s*\{[\s\S]*?background: var\(--demo-ribbon-hover\);[\s\S]*?color: var\(--demo-fg\);/,

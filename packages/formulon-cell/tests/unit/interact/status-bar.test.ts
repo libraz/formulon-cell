@@ -690,7 +690,7 @@ describe('attachStatusBar', () => {
     expect(source).toContain('const calcBadge = createStatusBarCalcButton()');
     expect(source).toContain("normal: createStatusBarViewButton('normal'");
     expect(source).toContain("const zoomOut = createStatusBarZoomButton('−')");
-    expect(source).toContain('const { row, check } = createStatusBarChooserRow(');
+    expect(source).toContain('const { row } = createStatusBarChooserRow(');
     expect(source).not.toContain("document.createElement('button')");
   });
 });

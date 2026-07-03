@@ -49,9 +49,9 @@ describe('toolbar/ribbon control dispatch icons', () => {
     expect(handleHolePaths).toHaveLength(2);
     expect(bladePaths.length).toBeGreaterThanOrEqual(2);
     expect(svg?.querySelector('path[fill="#107c41"]')).toBeTruthy();
-    expect(handlePaths.every((path) => path.getAttribute('d')?.includes('a2.75'))).toBe(true);
-    expect(handleHolePaths.every((path) => path.getAttribute('d')?.includes('a1.22'))).toBe(true);
-    expect(paths.some((path) => path.getAttribute('stroke') === '#6b6b6b')).toBe(true);
+    expect(handlePaths.every((path) => path.getAttribute('d')?.includes('a2.6'))).toBe(true);
+    expect(handleHolePaths.every((path) => path.getAttribute('d')?.includes('a1.25'))).toBe(true);
+    expect(paths.some((path) => path.getAttribute('stroke') === '#1f1f1f')).toBe(true);
   });
 
   it('keeps Copy and Format Painter icons readable as their source figures', () => {
@@ -128,7 +128,7 @@ describe('toolbar/ribbon control dispatch icons', () => {
     const commaPaths = Array.from(createIcon()('comma')?.querySelectorAll('path') ?? []);
     expect(commaPaths.some((path) => path.getAttribute('fill') === '#1f1f1f')).toBe(true);
     expect(
-      commaPaths.some((path) => path.getAttribute('d')?.includes('c0 2.1-1.1 3.9-3.1 5.1')),
+      commaPaths.some((path) => path.getAttribute('d')?.includes('c.5 2-.4 3.6-2.5 4.6')),
     ).toBe(true);
     expect(commaPaths.some((path) => path.getAttribute('fill') === '#2f75b5')).toBe(false);
 
@@ -182,9 +182,9 @@ describe('toolbar/ribbon control dispatch icons', () => {
       const guide = paths.find((path) => path.getAttribute('fill') === '#107c41');
       const textRows = paths.find((path) => path.getAttribute('fill') === '#1f1f1f');
 
-      expect(paths.some((path) => path.getAttribute('stroke') === '#8a8f98')).toBe(true);
-      expect(guide?.getAttribute('d')).toMatch(/h2\.2|v11\.6/);
-      expect(textRows?.getAttribute('d')).toContain('v2.3');
+      expect(paths).toHaveLength(2);
+      expect(guide?.getAttribute('d')).toMatch(/h3v15\.4/);
+      expect(textRows?.getAttribute('d')).toContain('v2.8');
       expect(textRows?.getAttribute('stroke')).toBeNull();
     }
 
@@ -365,10 +365,10 @@ describe('toolbar/ribbon control dispatch icons', () => {
       pageBreakPaths.some(
         (path) =>
           path.getAttribute('stroke') === '#2f75b5' &&
-          path.getAttribute('stroke-dasharray') === '1.8 1.4',
+          path.getAttribute('stroke-dasharray') === '2 1.4',
       ),
     ).toBe(true);
-    expect(pageBreakPaths.some((path) => path.getAttribute('stroke') === '#107c41')).toBe(true);
+    expect(pageBreakPaths.filter((path) => path.getAttribute('stroke-dasharray')).length).toBe(2);
   });
 
   it('renders Excel-like Data tab SVGs with semantic data operation shapes', () => {
@@ -521,7 +521,9 @@ describe('toolbar/ribbon control dispatch icons', () => {
 
     const optionsPaths = Array.from(createIcon()('options')?.querySelectorAll('path') ?? []);
     expect(optionsPaths.some((path) => path.getAttribute('stroke') === '#2f75b5')).toBe(true);
-    expect(optionsPaths.some((path) => path.getAttribute('fill') === '#107c41')).toBe(true);
+    expect(optionsPaths.some((path) => path.getAttribute('stroke-dasharray') === '1.9 3.05')).toBe(
+      true,
+    );
 
     expect(createIcon()('pdf')?.querySelector('path[fill="#c00000"]')).toBeTruthy();
     expect(createIcon()('save')?.querySelector('path[fill="#2f75b5"]')).toBeTruthy();
@@ -649,9 +651,9 @@ describe('toolbar/ribbon control dispatch icons', () => {
 
       expect(guidePath).toBeTruthy();
       expect(blackPath).toBeTruthy();
-      expect(paths.some((path) => path.getAttribute('stroke') === '#8a8f98')).toBe(true);
-      expect(guidePath?.getAttribute('d')).toMatch(/v2\.1|V13/);
-      expect(blackPath?.getAttribute('d')).toMatch(/2\.3/);
+      expect(paths.some((path) => path.getAttribute('fill') === '#8a8f98')).toBe(true);
+      expect(guidePath?.getAttribute('d')).toMatch(/v3H4\.2/);
+      expect(blackPath?.getAttribute('d')).toContain('v2.8');
     }
 
     for (const icon of ['alignLeft', 'alignCenter', 'alignRight']) {
@@ -662,9 +664,9 @@ describe('toolbar/ribbon control dispatch icons', () => {
 
       expect(guidePath).toBeTruthy();
       expect(textRows).toBeTruthy();
-      expect(paths.some((path) => path.getAttribute('stroke') === '#8a8f98')).toBe(true);
-      expect(guidePath?.getAttribute('d')).toMatch(/v11\.6|h2\.2/);
-      expect(textRows?.getAttribute('d')).toContain('v2.3');
+      expect(paths).toHaveLength(2);
+      expect(guidePath?.getAttribute('d')).toMatch(/h3v15\.4/);
+      expect(textRows?.getAttribute('d')).toContain('v2.8');
       expect(textRows?.getAttribute('stroke')).toBeNull();
     }
   });
