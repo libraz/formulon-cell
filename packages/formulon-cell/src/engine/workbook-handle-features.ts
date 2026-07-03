@@ -14,7 +14,9 @@ import type {
   BorderRecord,
   CellValue,
   CellXf,
+  ConditionalFormatEntry,
   ConditionalFormatInput,
+  DxfRecord,
   EngineCapabilities,
   EvalResult,
   FillRecord,
@@ -452,9 +454,9 @@ export abstract class WorkbookHandleFeatureMethods {
   getComments(sheet: number): { row: number; col: number; author: string; text: string }[] {
     assertAlive(this);
     if (!this.capabilities.commentsEnumerable) return [];
-    const getComments = (wb(this) as CommentEnumerableWorkbook).getComments;
-    if (typeof getComments !== 'function') return [];
-    return getComments(sheet).map((e) => ({
+    const engineWb = wb(this) as CommentEnumerableWorkbook;
+    if (typeof engineWb.getComments !== 'function') return [];
+    return engineWb.getComments(sheet).map((e) => ({
       row: e.row,
       col: e.col,
       author: e.author,
@@ -479,6 +481,29 @@ export abstract class WorkbookHandleFeatureMethods {
   evalFormula(formula: string): EvalResult {
     assertAlive(this);
     return moduleOf(this).evalFormula(formula);
+  }
+
+  evaluateFormulaText(addr: Addr, formula: string): EvalResult {
+    assertAlive(this);
+    if (!this.capabilities.formulaTextEvaluation) return moduleOf(this).evalFormula(formula);
+    return wb(this).evaluateFormulaText(addr.sheet, addr.row, addr.col, formula);
+  }
+
+  evaluateConditionalFormula(
+    addr: Addr,
+    anchor: Pick<Addr, 'row' | 'col'>,
+    formula: string,
+  ): EvalResult {
+    assertAlive(this);
+    if (!this.capabilities.conditionalFormulaEvaluation) return moduleOf(this).evalFormula(formula);
+    return wb(this).evaluateConditionalFormula(
+      addr.sheet,
+      addr.row,
+      addr.col,
+      anchor.row,
+      anchor.col,
+      formula,
+    );
   }
 
   /** Evaluate every CF block on `sheet` against the inclusive viewport rect.
@@ -799,52 +824,10 @@ export abstract class WorkbookHandleFeatureMethods {
    *  Returns `[]` when the engine doesn't expose `getConditionalFormats`
    *  or when there are no rules. The entries borrow rule ids from the
    *  engine's storage; treat them as immutable view objects. */
-  getConditionalFormats(sheet: number): ReadonlyArray<{
-    id: string;
-    type: number;
-    priority: number;
-    stopIfTrue: boolean;
-    sqref: ReadonlyArray<{ firstRow: number; firstCol: number; lastRow: number; lastCol: number }>;
-    dxfId?: number;
-    formula1?: string;
-    formula2?: string;
-    op?: number;
-    rank?: number;
-    percent?: boolean;
-    bottom?: boolean;
-    aboveAverage?: boolean;
-    equalAverage?: boolean;
-    stdDev?: number;
-    text?: string;
-    timePeriod?: number;
-  }> {
+  getConditionalFormats(sheet: number): readonly ConditionalFormatEntry[] {
     assertAlive(this);
     if (!this.capabilities.conditionalFormatMutate) return [];
-    const arr = wb(this).getConditionalFormats(sheet);
-    return arr.map((e) => ({
-      id: e.id,
-      type: e.type,
-      priority: e.priority,
-      stopIfTrue: e.stopIfTrue,
-      sqref: e.sqref.map((r) => ({
-        firstRow: r.firstRow,
-        firstCol: r.firstCol,
-        lastRow: r.lastRow,
-        lastCol: r.lastCol,
-      })),
-      ...(e.dxfId !== undefined ? { dxfId: e.dxfId } : {}),
-      ...(e.formula1 !== undefined ? { formula1: e.formula1 } : {}),
-      ...(e.formula2 !== undefined ? { formula2: e.formula2 } : {}),
-      ...(e.op !== undefined ? { op: e.op } : {}),
-      ...(e.rank !== undefined ? { rank: e.rank } : {}),
-      ...(e.percent !== undefined ? { percent: e.percent } : {}),
-      ...(e.bottom !== undefined ? { bottom: e.bottom } : {}),
-      ...(e.aboveAverage !== undefined ? { aboveAverage: e.aboveAverage } : {}),
-      ...(e.equalAverage !== undefined ? { equalAverage: e.equalAverage } : {}),
-      ...(e.stdDev !== undefined ? { stdDev: e.stdDev } : {}),
-      ...(e.text !== undefined ? { text: e.text } : {}),
-      ...(e.timePeriod !== undefined ? { timePeriod: e.timePeriod } : {}),
-    }));
+    return wb(this).getConditionalFormats(sheet);
   }
 
   /** Removes the CF rule at `index` (flattened priority order). When the
@@ -864,19 +847,39 @@ export abstract class WorkbookHandleFeatureMethods {
     return wb(this).clearConditionalFormats(sheet).ok;
   }
 
-  /** Adds one non-visual conditional-format rule to `sheet` so it round-trips
-   *  through .xlsx. `rule.type` mirrors `formulon::cf::RuleType` (0 expression,
-   *  1 cellIs, 5 top10, 6 aboveAverage, 7 containsText, …). Visual kinds
-   *  (colorScale / dataBar / iconSet) are rejected by the engine — their
-   *  sub-specs aren't creatable through this API. The applied differential
-   *  format is referenced by `dxfId`; there is no TS-side dxf-creation API yet,
-   *  so callers can persist a rule's predicate and range but not the fill/font
-   *  it applies. Returns `false` (no-op) under stub mode and older engine
-   *  builds. */
-  addConditionalFormat(sheet: number, rule: ConditionalFormatInput): boolean {
+  /** Adds one conditional-format rule to `sheet` so it round-trips through
+   *  .xlsx. `rule.type` mirrors `formulon::cf::RuleType` (0 expression,
+   *  1 cellIs, 2 colorScale, 3 dataBar, 4 iconSet, 5 top10, 6 aboveAverage,
+   *  7 containsText, 8 notContainsText, 9 beginsWith, 10 endsWith, …). The
+   *  applied differential format is referenced by `dxfId`. Returns the
+   *  flattened rule index, or -1 when the engine refuses the write. */
+  addConditionalFormat(sheet: number, rule: ConditionalFormatInput): number {
     assertAlive(this);
-    if (!this.capabilities.conditionalFormatMutate) return false;
-    return wb(this).addConditionalFormat(sheet, rule).ok;
+    if (!this.capabilities.conditionalFormatMutate) return -1;
+    const r = wb(this).addConditionalFormat(sheet, rule);
+    return r.status.ok ? r.index : -1;
+  }
+
+  getDxf(index: number): DxfRecord | null {
+    assertAlive(this);
+    if (!this.capabilities.conditionalFormatDxf) return null;
+    const r = wb(this).getDxf(index);
+    if (!r.status.ok) return null;
+    const { status: _status, ...record } = r;
+    return record;
+  }
+
+  addDxf(record: DxfRecord): number {
+    assertAlive(this);
+    if (!this.capabilities.conditionalFormatDxf) return -1;
+    const r = wb(this).addDxf(record);
+    return r.status.ok ? r.index : -1;
+  }
+
+  dxfCount(): number {
+    assertAlive(this);
+    if (!this.capabilities.conditionalFormatDxf) return 0;
+    return wb(this).dxfCount();
   }
 
   /** Reads the round-trip `<sheetProtection>` flags. Returns `null` when

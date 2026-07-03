@@ -10,6 +10,8 @@ import type {
   PivotDateGrouping,
   PivotFieldSpec,
   PivotFilterSpec,
+  PivotReportLayout,
+  PivotWorksheetSource,
   Workbook,
 } from './types.js';
 import { PivotAxis, PivotFilterType, PivotFilterValueKind } from './types.js';
@@ -178,6 +180,25 @@ export abstract class WorkbookHandlePivotMethods {
     return pivotWb(this).pivotCacheRemove(cacheId).ok;
   }
 
+  getPivotCacheWorksheetSource(cacheId: number): PivotWorksheetSource | null {
+    assertAlive(this);
+    if (!this.capabilities.pivotCacheSource) return null;
+    const r = pivotWb(this).pivotCacheGetWorksheetSource(cacheId);
+    if (!r.status.ok) return null;
+    return {
+      present: r.present,
+      ...(r.ref ? { ref: r.ref } : {}),
+      ...(r.sheet ? { sheet: r.sheet } : {}),
+      ...(r.name ? { name: r.name } : {}),
+    };
+  }
+
+  setPivotCacheWorksheetSource(cacheId: number, source: PivotWorksheetSource): boolean {
+    assertAlive(this);
+    if (!this.capabilities.pivotCacheSource) return false;
+    return pivotWb(this).pivotCacheSetWorksheetSource(cacheId, source).ok;
+  }
+
   pivotCacheFieldCount(cacheId: number): number {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return 0;
@@ -237,11 +258,7 @@ export abstract class WorkbookHandlePivotMethods {
     }
     if (value.kind === 'blank')
       return pivotWb(this).pivotCacheFieldAddSharedItemBlank(cacheId, fieldIdx).ok;
-    const wb = pivotWb(this);
-    if (wb.pivotCacheFieldAddSharedItemError) {
-      return wb.pivotCacheFieldAddSharedItemError(cacheId, fieldIdx, value.code).ok;
-    }
-    return wb.pivotCacheFieldAddSharedItemText(cacheId, fieldIdx, value.text).ok;
+    return pivotWb(this).pivotCacheFieldAddSharedItemError(cacheId, fieldIdx, value.code).ok;
   }
 
   clearPivotCacheSharedItems(cacheId: number, fieldIdx: number): boolean {
@@ -344,6 +361,19 @@ export abstract class WorkbookHandlePivotMethods {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
     return pivotWb(this).pivotSetGrandTotals(sheet, pivotIdx, rowsEnabled, colsEnabled).ok;
+  }
+
+  getPivotReportLayout(sheet: number, pivotIdx: number): PivotReportLayout | null {
+    assertAlive(this);
+    if (!this.capabilities.pivotReportLayout) return null;
+    const r = pivotWb(this).pivotGetLayout(sheet, pivotIdx);
+    return r.status.ok ? r.layout : null;
+  }
+
+  setPivotReportLayout(sheet: number, pivotIdx: number, layout: PivotReportLayout): boolean {
+    assertAlive(this);
+    if (!this.capabilities.pivotReportLayout) return false;
+    return pivotWb(this).pivotSetLayout(sheet, pivotIdx, layout).ok;
   }
 
   pivotFieldCount(sheet: number, pivotIdx: number): number {

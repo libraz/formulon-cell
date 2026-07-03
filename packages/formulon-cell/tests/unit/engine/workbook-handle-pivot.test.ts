@@ -7,6 +7,7 @@ import {
   PivotDateGrouping,
   PivotFilterType,
   PivotFilterValueKind,
+  PivotReportLayout,
   ValueKind,
 } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -91,6 +92,14 @@ const makeHandle = (overrides: Record<string, unknown> = {}): WorkbookHandle => 
       return { status: ok, index: requestedId || 8 };
     },
     pivotCacheRemove: (_cacheId: number) => ok,
+    pivotCacheGetWorksheetSource: (_cacheId: number) => ({
+      status: ok,
+      present: true,
+      ref: 'A1:C3',
+      sheet: 'Data',
+      name: '',
+    }),
+    pivotCacheSetWorksheetSource: () => ok,
     pivotCacheFieldCount: (_cacheId: number) => 2,
     pivotCacheFieldName: (_cacheId: number, fieldIdx: number) => ({
       status: ok,
@@ -132,6 +141,8 @@ const makeHandle = (overrides: Record<string, unknown> = {}): WorkbookHandle => 
     pivotSetName: () => ok,
     pivotSetAnchor: () => ok,
     pivotSetGrandTotals: () => ok,
+    pivotGetLayout: () => ({ status: ok, layout: PivotReportLayout.Tabular }),
+    pivotSetLayout: () => ok,
     pivotFieldCount: () => 0,
     pivotFieldAdd: () => ({ status: ok, index: 0 }),
     pivotFieldClear: () => ok,
@@ -242,19 +253,6 @@ describe('WorkbookHandle PivotTable projection', () => {
     expect(calls).toEqual(['error:7']);
   });
 
-  it('falls back to shared item text when the engine lacks a shared-error hook', () => {
-    const calls: string[] = [];
-    const wb = makeHandle({
-      pivotCacheFieldAddSharedItemText: (_cacheId: number, _fieldIdx: number, value: string) => {
-        calls.push(`text:${value}`);
-        return ok;
-      },
-    });
-
-    expect(wb.addPivotCacheSharedItem(7, 0, { kind: 'error', code: 4, text: '#REF!' })).toBe(true);
-    expect(calls).toEqual(['text:#REF!']);
-  });
-
   it('includes readable PivotTable filter specs in object summaries when engine hooks exist', () => {
     const wb = makeHandle({
       pivotFilterCount: () => 3,
@@ -338,6 +336,18 @@ describe('WorkbookHandle PivotTable projection', () => {
     expect(wb.capabilities.pivotTableMutate).toBe(true);
     expect(wb.pivotCacheIds()).toEqual([7, 9]);
     expect(wb.createPivotCache()).toBe(8);
+    expect(wb.getPivotCacheWorksheetSource(8)).toEqual({
+      present: true,
+      ref: 'A1:C3',
+      sheet: 'Data',
+    });
+    expect(
+      wb.setPivotCacheWorksheetSource(8, {
+        present: true,
+        ref: 'B2:D10',
+        sheet: 'Sheet1',
+      }),
+    ).toBe(true);
     expect(wb.addPivotCacheField(8, 'Channel')).toBe(2);
     expect(wb.pivotCacheFieldNames(8)).toEqual(['Region', 'Sales']);
     expect(wb.pivotTableCacheId(0, 3)).toBe(7);
@@ -353,6 +363,8 @@ describe('WorkbookHandle PivotTable projection', () => {
       }),
     ).toBe(true);
     expect(wb.createPivotTable(0, 'Pivot1', 8, { row: 4, col: 1 })).toBe(3);
+    expect(wb.getPivotReportLayout(0, 3)).toBe(PivotReportLayout.Tabular);
+    expect(wb.setPivotReportLayout(0, 3, PivotReportLayout.Outline)).toBe(true);
     expect(wb.setPivotFieldSort(0, 3, 0, true, 'Sales')).toBe(true);
     expect(wb.setPivotFieldSubtotalTop(0, 3, 0, false)).toBe(true);
     expect(wb.addPivotFieldItem(0, 3, 0, 'East', true)).toBe(true);

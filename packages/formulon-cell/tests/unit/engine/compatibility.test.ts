@@ -25,6 +25,9 @@ const baseCaps = {
   comments: false,
   commentsEnumerable: false,
   definedNameMutate: false,
+  definedNameScopes: false,
+  formulaTextEvaluation: false,
+  conditionalFormulaEvaluation: false,
   sheetProtectionRoundtrip: false,
 };
 
@@ -43,6 +46,7 @@ describe('summarizeSpreadsheetCompatibility', () => {
         comments: true,
         commentsEnumerable: true,
         definedNameMutate: true,
+        definedNameScopes: true,
         sheetProtectionRoundtrip: true,
       },
       getPassthroughs: () => [
@@ -74,13 +78,17 @@ describe('summarizeSpreadsheetCompatibility', () => {
       status: 'read-only',
       count: 1,
     });
-    expect(summary.items.find((i) => i.id === 'data-validation')?.reason).toContain('showDropDown');
+    expect(summary.items.find((i) => i.id === 'data-validation')?.reason).toContain(
+      'dropdown visibility',
+    );
     expect(summary.items.find((i) => i.id === 'format-as-table')?.status).toBe('session');
     expect(summary.items.find((i) => i.id === 'hyperlinks')?.status).toBe('writable');
     expect(summary.items.find((i) => i.id === 'comments')?.status).toBe('writable');
     expect(summary.items.find((i) => i.id === 'comments')?.reason).toContain('enumerated');
     expect(summary.items.find((i) => i.id === 'defined-names')?.status).toBe('writable');
-    expect(summary.items.find((i) => i.id === 'defined-names')?.reason).toContain('sheet-scoped');
+    expect(summary.items.find((i) => i.id === 'defined-names')?.reason).toContain(
+      'Workbook- and sheet-scoped',
+    );
     expect(summary.items.find((i) => i.id === 'sheet-protection')?.status).toBe('writable');
     expect(summary.items.find((i) => i.id === 'sheet-views')?.status).toBe('session');
     expect(summary.items.find((i) => i.id === 'session-charts')?.status).toBe('session');
@@ -100,6 +108,24 @@ describe('summarizeSpreadsheetCompatibility', () => {
     expect(summary.byStatus['read-only']).toBeGreaterThan(0);
     expect(summary.byStatus.session).toBeGreaterThan(0);
     expect(summary.byStatus.unsupported).toBeGreaterThan(0);
+  });
+
+  it('surfaces scoped defined names as an engine capability', () => {
+    const wb = {
+      capabilities: {
+        ...baseCaps,
+        definedNameMutate: true,
+        definedNameScopes: false,
+      },
+      getPassthroughs: () => [],
+      getTables: () => [],
+      getPivotTables: () => [],
+    } as unknown as WorkbookHandle;
+
+    const summary = summarizeSpreadsheetCompatibility(wb);
+
+    expect(summary.byId['defined-names'].status).toBe('writable');
+    expect(summary.byId['defined-names'].reason).toContain('sheet-scoped names need engine');
   });
 
   it('surfaces point-only comment support as missing blank-cell enumeration', () => {

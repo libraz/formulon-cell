@@ -1,14 +1,29 @@
+import { iconSetSlotCount } from '../render/conditional.js';
+import type { CellFormat } from '../store/store.js';
 import type { ConditionalRule } from '../store/types.js';
-import type { ConditionalFormatInput } from './types.js';
+import {
+  borderRecordFromFormat,
+  cssColorToArgb,
+  fillRecordFromFormat,
+  fontRecordFromFormat,
+  numFmtToFormatCode,
+} from './format-writeback.js';
+import type { ConditionalFormatInput, DxfRecord } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 /** `formulon::cf::RuleType` ordinals. */
 const RULE_TYPE = {
   expression: 0,
   cellIs: 1,
+  colorScale: 2,
+  dataBar: 3,
+  iconSet: 4,
   top10: 5,
   aboveAverage: 6,
   containsText: 7,
+  notContainsText: 8,
+  beginsWith: 9,
+  endsWith: 10,
   containsBlanks: 11,
   notContainsBlanks: 12,
   containsErrors: 13,
@@ -16,6 +31,29 @@ const RULE_TYPE = {
   duplicateValues: 16,
   uniqueValues: 17,
 } as const;
+
+const VALUE_OBJECT_TYPE = {
+  number: 0,
+  percent: 1,
+  percentile: 2,
+  min: 3,
+  max: 4,
+} as const;
+
+const ENGINE_ICON_SETS = [
+  'arrows3',
+  'arrows5',
+  'triangles3',
+  'traffic3',
+  'trafficRim3',
+  'symbols3',
+  'flags3',
+  'stars3',
+  'quarters5',
+  'ratings5',
+  'bars5',
+  'boxes5',
+] as const;
 
 /** `formulon::cf::CellIsOperator` ordinals. */
 const CELL_IS_OP: Record<string, number> = {
@@ -42,6 +80,12 @@ const conditionalFormatKey = (sheet: number, input: ConditionalFormatInput): str
   JSON.stringify([sheet, input]);
 
 type ConditionalFormatEntry = ReturnType<WorkbookHandle['getConditionalFormats']>[number];
+type CfColor = NonNullable<ConditionalFormatInput['colorScale']>['colors'][number];
+type CfValueObjectInput = NonNullable<ConditionalFormatInput['colorScale']>['thresholds'][number];
+type DesiredConditionalRule = {
+  readonly input: ConditionalFormatInput;
+  readonly rule: ConditionalRule;
+};
 
 export interface SyncedConditionalRule {
   readonly sheet: number;
@@ -87,7 +131,10 @@ function entryMatchesInput(
     entry.equalAverage === input.equalAverage &&
     entry.stdDev === input.stdDev &&
     entry.text === input.text &&
-    entry.timePeriod === input.timePeriod
+    entry.timePeriod === input.timePeriod &&
+    JSON.stringify(entry.colorScale ?? null) === JSON.stringify(input.colorScale ?? null) &&
+    JSON.stringify(entry.dataBar ?? null) === JSON.stringify(input.dataBar ?? null) &&
+    JSON.stringify(entry.iconSet ?? null) === JSON.stringify(input.iconSet ?? null)
   );
 }
 
@@ -118,22 +165,97 @@ function decrementTrackedIndexesAfterRemoval(
   }
 }
 
+function cssColorToCfColor(color: string): CfColor | null {
+  const argb = cssColorToArgb(color);
+  if (argb === null) return null;
+  return {
+    a: (argb >>> 24) & 0xff,
+    r: (argb >>> 16) & 0xff,
+    g: (argb >>> 8) & 0xff,
+    b: argb & 0xff,
+  };
+}
+
+function scalePointToCfValueObject(
+  point: NonNullable<Extract<ConditionalRule, { kind: 'color-scale' }>['thresholds']>[number],
+): CfValueObjectInput {
+  if (!('value' in point)) return { type: VALUE_OBJECT_TYPE[point.kind] };
+  return { type: VALUE_OBJECT_TYPE[point.kind], value: String(point.value) };
+}
+
+function defaultColorScaleThresholds(
+  stops: Extract<ConditionalRule, { kind: 'color-scale' }>['stops'],
+): CfValueObjectInput[] {
+  return stops.length === 2
+    ? [{ type: VALUE_OBJECT_TYPE.min }, { type: VALUE_OBJECT_TYPE.max }]
+    : [
+        { type: VALUE_OBJECT_TYPE.min },
+        { type: VALUE_OBJECT_TYPE.percentile, value: '50' },
+        { type: VALUE_OBJECT_TYPE.max },
+      ];
+}
+
+function defaultIconThresholds(slots: number): CfValueObjectInput[] {
+  return Array.from({ length: slots }, (_, index) => ({
+    type: VALUE_OBJECT_TYPE.percent,
+    value: String(Math.round((index * 100) / slots)),
+  }));
+}
+
+function iconSetOrdinal(icons: Extract<ConditionalRule, { kind: 'icon-set' }>['icons']): number {
+  return ENGINE_ICON_SETS.indexOf(icons);
+}
+
+function ruleApply(rule: ConditionalRule): Partial<CellFormat> {
+  return 'apply' in rule ? rule.apply : {};
+}
+
+function hasFontDxfFields(apply: Partial<CellFormat>): boolean {
+  return (
+    apply.fontFamily !== undefined ||
+    apply.fontSize !== undefined ||
+    apply.bold !== undefined ||
+    apply.italic !== undefined ||
+    apply.strike !== undefined ||
+    apply.underline !== undefined ||
+    apply.color !== undefined
+  );
+}
+
+function dxfRecordFromApply(apply: Partial<CellFormat>): DxfRecord | null {
+  const dxf: DxfRecord = {};
+  if (hasFontDxfFields(apply)) dxf.font = fontRecordFromFormat(apply);
+  if (apply.fill !== undefined) dxf.fill = fillRecordFromFormat(apply);
+  if (apply.borders !== undefined) dxf.border = borderRecordFromFormat(apply);
+  const formatCode = numFmtToFormatCode(apply.numFmt);
+  if (formatCode) dxf.numFmt = { numFmtId: 0, formatCode };
+  return Object.keys(dxf).length > 0 ? dxf : null;
+}
+
+function inputWithDxf(
+  wb: WorkbookHandle,
+  input: ConditionalFormatInput,
+  rule: ConditionalRule,
+): ConditionalFormatInput {
+  if (!wb.capabilities.conditionalFormatDxf) return input;
+  const dxf = dxfRecordFromApply(ruleApply(rule));
+  if (!dxf) return input;
+  const dxfId = wb.addDxf(dxf);
+  return dxfId >= 0 ? { ...input, dxfId } : input;
+}
+
 /**
  * Translate a store conditional-format rule into the engine's
  * `addConditionalFormat` input so its predicate and range round-trip through
  * .xlsx. Returns `null` for rules the engine cannot author:
  *
- * - Visual kinds (`color-scale` / `data-bar` / `icon-set`) — the engine rejects
- *   creating their visual sub-specs (they still round-trip verbatim when read
- *   from an imported file).
  * - `date-occurring` — the `timePeriod` ordinal set isn't stable in this API.
  * - `formula` rules that carry a comparator-prefix predicate (`>10`) rather
  *   than a full `=`-expression.
  *
- * NOTE: the *applied* differential format (fill / font / border in `rule.apply`)
- * is referenced in OOXML by a `dxfId` into the differential-format table. There
- * is no TS-side dxf-creation API yet, so the translated rule persists its
- * predicate and range but not the formatting it applies.
+ * This pure translator intentionally leaves `rule.apply` out of the returned
+ * input. The sync path attaches a `dxfId` after allocating a differential
+ * format record through the workbook handle.
  */
 export function conditionalRuleToEngineInput(rule: ConditionalRule): ConditionalFormatInput | null {
   const sqref = sqrefOf(rule);
@@ -158,8 +280,18 @@ export function conditionalRuleToEngineInput(rule: ConditionalRule): Conditional
       return { sqref, type: RULE_TYPE.expression, formula1: rule.formula.slice(1) };
     }
     case 'text-contains':
-      if (rule.mode && rule.mode !== 'contains') return null;
-      return { sqref, type: RULE_TYPE.containsText, text: rule.text };
+      return {
+        sqref,
+        type:
+          rule.mode === 'not-contains'
+            ? RULE_TYPE.notContainsText
+            : rule.mode === 'begins-with'
+              ? RULE_TYPE.beginsWith
+              : rule.mode === 'ends-with'
+                ? RULE_TYPE.endsWith
+                : RULE_TYPE.containsText,
+        text: rule.text,
+      };
     case 'duplicates':
       return { sqref, type: RULE_TYPE.duplicateValues };
     case 'unique':
@@ -191,8 +323,60 @@ export function conditionalRuleToEngineInput(rule: ConditionalRule): Conditional
           ? { stdDev: rule.stdDev ?? 1 }
           : {}),
       };
+    case 'color-scale': {
+      const colors = rule.stops.map(cssColorToCfColor);
+      if (colors.some((color) => color === null)) return null;
+      const thresholds = rule.thresholds
+        ? rule.thresholds.map(scalePointToCfValueObject)
+        : defaultColorScaleThresholds(rule.stops);
+      if (thresholds.length !== colors.length) return null;
+      return {
+        sqref,
+        type: RULE_TYPE.colorScale,
+        colorScale: {
+          thresholds,
+          colors: colors as CfColor[],
+        },
+      };
+    }
+    case 'data-bar': {
+      const fill = cssColorToCfColor(rule.color);
+      if (!fill) return null;
+      return {
+        sqref,
+        type: RULE_TYPE.dataBar,
+        dataBar: {
+          min: { type: VALUE_OBJECT_TYPE.min },
+          max: { type: VALUE_OBJECT_TYPE.max },
+          fill,
+          showValue: rule.showValue !== false,
+        },
+      };
+    }
+    case 'icon-set': {
+      const name = iconSetOrdinal(rule.icons);
+      if (name < 0) return null;
+      const slots = iconSetSlotCount(rule.icons);
+      const thresholds = rule.thresholds
+        ? [
+            { type: VALUE_OBJECT_TYPE.percent, value: '0' },
+            ...rule.thresholds.map(scalePointToCfValueObject),
+          ]
+        : defaultIconThresholds(slots);
+      return {
+        sqref,
+        type: RULE_TYPE.iconSet,
+        iconSet: {
+          name,
+          thresholds: thresholds.slice(0, slots),
+          reverse: rule.reverseOrder === true,
+          showValue: rule.showValue !== false,
+          percent: true,
+        },
+      };
+    }
     default:
-      // color-scale / data-bar / icon-set / date-occurring
+      // date-occurring
       return null;
   }
 }
@@ -204,9 +388,8 @@ export function conditionalRuleToEngineInput(rule: ConditionalRule): Conditional
  * elsewhere). Returns the counts written and skipped. No-op — `{written:0,
  * skipped:0}` — when the engine can't author CF rules (stub / older builds).
  *
- * The applied differential format is not persisted (see
- * {@link conditionalRuleToEngineInput}); callers wiring this into a save
- * lifecycle should surface that limitation.
+ * Applied differential formatting is persisted as `dxfId` when the engine
+ * exposes the dxf table.
  */
 export function syncConditionalRulesToEngine(
   wb: WorkbookHandle,
@@ -227,7 +410,8 @@ export function syncConditionalRulesToEngine(
     }
     const key = conditionalFormatKey(sheet, input);
     if (opts.seenKeys?.has(key)) continue;
-    if (wb.addConditionalFormat(sheet, input)) written += 1;
+    const writeInput = inputWithDxf(wb, input, rule);
+    if (wb.addConditionalFormat(sheet, writeInput) >= 0) written += 1;
     else {
       skipped += 1;
       continue;
@@ -254,7 +438,7 @@ export function syncTrackedConditionalRulesToEngine(
   let written = 0;
   let skipped = 0;
   let removed = 0;
-  const desired = new Map<string, ConditionalFormatInput>();
+  const desired = new Map<string, DesiredConditionalRule>();
 
   for (const rule of rules) {
     if (rule.range.sheet !== sheet) continue;
@@ -264,7 +448,7 @@ export function syncTrackedConditionalRulesToEngine(
       skipped += 1;
       continue;
     }
-    desired.set(conditionalFormatKey(sheet, input), input);
+    desired.set(conditionalFormatKey(sheet, input), { input, rule });
   }
 
   const stale = [...opts.tracked.entries()]
@@ -289,16 +473,16 @@ export function syncTrackedConditionalRulesToEngine(
     }
   }
 
-  for (const [key, input] of desired) {
+  for (const [key, { input, rule }] of desired) {
     if (opts.tracked.has(key)) continue;
-    const beforeCount = wb.getConditionalFormats(sheet).length;
-    if (!wb.addConditionalFormat(sheet, input)) {
+    const writeInput = inputWithDxf(wb, input, rule);
+    const addedIndex = wb.addConditionalFormat(sheet, writeInput);
+    if (addedIndex < 0) {
       skipped += 1;
       continue;
     }
     const afterFormats = wb.getConditionalFormats(sheet);
-    const afterCount = afterFormats.length;
-    const index = Math.max(beforeCount, afterCount - 1);
+    const index = Math.min(addedIndex, Math.max(0, afterFormats.length - 1));
     const id = afterFormats[index]?.id;
     written += 1;
     opts.tracked.set(key, {

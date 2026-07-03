@@ -113,6 +113,10 @@ class StubWorkbook {
     return this.put(sheet, row, col, { literal: boolValue(value) });
   }
 
+  setError(sheet: number, row: number, col: number, errorCode: number): Status {
+    return this.put(sheet, row, col, { literal: errorValue(errorCode) });
+  }
+
   setText(sheet: number, row: number, col: number, text: string): Status {
     return this.put(sheet, row, col, { literal: textValue(text) });
   }
@@ -473,6 +477,10 @@ class StubModule implements FormulonModule {
 
   versionString(): string {
     return 'stub';
+  }
+
+  version(): string {
+    return this.versionString();
   }
 
   statusString(): string {

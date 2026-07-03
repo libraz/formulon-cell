@@ -81,7 +81,25 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
         mode: 'begins-with',
         apply: {},
       }),
-    ).toBeNull();
+    ).toEqual({ sqref, type: 9, text: 'hi' });
+    expect(
+      conditionalRuleToEngineInput({
+        kind: 'text-contains',
+        range,
+        text: 'hi',
+        mode: 'ends-with',
+        apply: {},
+      }),
+    ).toEqual({ sqref, type: 10, text: 'hi' });
+    expect(
+      conditionalRuleToEngineInput({
+        kind: 'text-contains',
+        range,
+        text: 'hi',
+        mode: 'not-contains',
+        apply: {},
+      }),
+    ).toEqual({ sqref, type: 8, text: 'hi' });
     expect(conditionalRuleToEngineInput({ kind: 'blanks', range, apply: {} })).toEqual({
       sqref,
       type: 11,
@@ -130,11 +148,72 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
     ).toEqual({ sqref, type: 6, aboveAverage: false, equalAverage: false, stdDev: 2 });
   });
 
-  it('returns null for visual and date-occurring rules the engine cannot author', () => {
+  it('translates visual rules into engine payloads', () => {
     expect(
-      conditionalRuleToEngineInput({ kind: 'color-scale', range, stops: ['#fff', '#000'] }),
-    ).toBeNull();
-    expect(conditionalRuleToEngineInput({ kind: 'data-bar', range, color: '#0078d4' })).toBeNull();
+      conditionalRuleToEngineInput({
+        kind: 'color-scale',
+        range,
+        stops: ['#fff', '#000'],
+        thresholds: [{ kind: 'min' }, { kind: 'max' }],
+      }),
+    ).toEqual({
+      sqref,
+      type: 2,
+      colorScale: {
+        thresholds: [{ type: 3 }, { type: 4 }],
+        colors: [
+          { a: 255, r: 255, g: 255, b: 255 },
+          { a: 255, r: 0, g: 0, b: 0 },
+        ],
+      },
+    });
+    expect(
+      conditionalRuleToEngineInput({
+        kind: 'data-bar',
+        range,
+        color: '#0078d4',
+        showValue: false,
+      }),
+    ).toEqual({
+      sqref,
+      type: 3,
+      dataBar: {
+        min: { type: 3 },
+        max: { type: 4 },
+        fill: { a: 255, r: 0, g: 120, b: 212 },
+        showValue: false,
+      },
+    });
+    expect(
+      conditionalRuleToEngineInput({
+        kind: 'icon-set',
+        range,
+        icons: 'traffic3',
+        thresholds: [
+          { kind: 'percent', value: 33 },
+          { kind: 'percent', value: 67 },
+        ],
+        reverseOrder: true,
+        showValue: false,
+      }),
+    ).toEqual({
+      sqref,
+      type: 4,
+      iconSet: {
+        name: 3,
+        thresholds: [
+          { type: 1, value: '0' },
+          { type: 1, value: '33' },
+          { type: 1, value: '67' },
+        ],
+        reverse: true,
+        showValue: false,
+        percent: true,
+      },
+    });
+  });
+
+  it('returns null for date-occurring rules the engine cannot author', () => {
     expect(
       conditionalRuleToEngineInput({
         kind: 'date-occurring',
@@ -148,12 +227,16 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
 
 describe('syncConditionalRulesToEngine (H-13)', () => {
   const fakeWb = (mutate: boolean) => {
-    const added: Array<{ sheet: number; type: number }> = [];
+    const added: Array<{ sheet: number; type: number; dxfId?: number }> = [];
     const wb = {
       capabilities: { conditionalFormatMutate: mutate },
-      addConditionalFormat: vi.fn((sheet: number, rule: { type: number }) => {
-        added.push({ sheet, type: rule.type });
-        return true;
+      addConditionalFormat: vi.fn((sheet: number, rule: { type: number; dxfId?: number }) => {
+        added.push({
+          sheet,
+          type: rule.type,
+          ...(rule.dxfId !== undefined ? { dxfId: rule.dxfId } : {}),
+        });
+        return added.length - 1;
       }),
     } as unknown as WorkbookHandle;
     return { wb, added };
@@ -163,14 +246,15 @@ describe('syncConditionalRulesToEngine (H-13)', () => {
     const { wb, added } = fakeWb(true);
     const rules: ConditionalRule[] = [
       { kind: 'cell-value', range, op: '>', a: 10, apply: {} },
-      { kind: 'data-bar', range, color: '#0078d4' }, // visual → skipped
+      { kind: 'data-bar', range, color: '#0078d4' },
       { kind: 'text-contains', range, text: 'x', apply: {} },
       { kind: 'cell-value', range: { ...range, sheet: 1 }, op: '<', a: 0, apply: {} }, // other sheet
     ];
     const result = syncConditionalRulesToEngine(wb, rules, 0);
-    expect(result).toEqual({ written: 2, skipped: 1 });
+    expect(result).toEqual({ written: 3, skipped: 0 });
     expect(added).toEqual([
       { sheet: 0, type: 1 },
+      { sheet: 0, type: 3 },
       { sheet: 0, type: 7 },
     ]);
   });
@@ -212,6 +296,43 @@ describe('syncConditionalRulesToEngine (H-13)', () => {
     expect(syncConditionalRulesToEngine(wb, rules, 0)).toEqual({ written: 1, skipped: 0 });
     expect(added).toEqual([{ sheet: 0, type: 7 }]);
   });
+
+  it('persists apply formatting through a dxfId when the engine supports dxfs', () => {
+    const addedDxf: unknown[] = [];
+    const addedRules: unknown[] = [];
+    const wb = {
+      capabilities: { conditionalFormatMutate: true, conditionalFormatDxf: true },
+      addDxf: vi.fn((record: unknown) => {
+        addedDxf.push(record);
+        return 7;
+      }),
+      addConditionalFormat: vi.fn((_: number, rule: unknown) => {
+        addedRules.push(rule);
+        return addedRules.length - 1;
+      }),
+    } as unknown as WorkbookHandle;
+
+    const result = syncConditionalRulesToEngine(
+      wb,
+      [
+        {
+          kind: 'cell-value',
+          range,
+          op: '>',
+          a: 10,
+          apply: { fill: '#e2f0d9', color: '#006100', bold: true },
+        },
+      ],
+      0,
+    );
+
+    expect(result).toEqual({ written: 1, skipped: 0 });
+    expect(addedRules[0]).toMatchObject({ type: 1, op: 5, formula1: '10', dxfId: 7 });
+    expect(addedDxf[0]).toMatchObject({
+      fill: { pattern: 1, fgArgb: 0xffe2f0d9 },
+      font: { bold: true, colorArgb: 0xff006100 },
+    });
+  });
 });
 
 describe('syncTrackedConditionalRulesToEngine (H-13)', () => {
@@ -226,6 +347,7 @@ describe('syncTrackedConditionalRulesToEngine (H-13)', () => {
       formula2?: string;
       op?: number;
       text?: string;
+      dxfId?: number;
     }> = [
       {
         id: 'imported',
@@ -238,10 +360,14 @@ describe('syncTrackedConditionalRulesToEngine (H-13)', () => {
       },
     ];
     const wb = {
-      capabilities: { conditionalFormatMutate: true },
+      capabilities: { conditionalFormatMutate: true, conditionalFormatDxf: true },
+      addDxf: vi.fn(() => formats.length + 10),
       getConditionalFormats: vi.fn(() => formats.map((entry) => ({ ...entry }))),
       addConditionalFormat: vi.fn(
-        (_: number, rule: { type: number; op?: number; formula1?: string; text?: string }) => {
+        (
+          _: number,
+          rule: { type: number; op?: number; formula1?: string; text?: string; dxfId?: number },
+        ) => {
           formats.push({
             id: `added-${formats.length}`,
             type: rule.type,
@@ -251,8 +377,9 @@ describe('syncTrackedConditionalRulesToEngine (H-13)', () => {
             ...(rule.op !== undefined ? { op: rule.op } : {}),
             ...(rule.formula1 !== undefined ? { formula1: rule.formula1 } : {}),
             ...(rule.text !== undefined ? { text: rule.text } : {}),
+            ...(rule.dxfId !== undefined ? { dxfId: rule.dxfId } : {}),
           });
-          return true;
+          return formats.length - 1;
         },
       ),
       removeConditionalFormatAt: vi.fn((_: number, index: number) => {
@@ -351,5 +478,28 @@ describe('syncTrackedConditionalRulesToEngine (H-13)', () => {
     });
     expect(formats.map((entry) => entry.id)).toEqual(['imported', 'added-1']);
     expect(tracked.size).toBe(1);
+  });
+
+  it('attaches dxf only when adding a new tracked rule', () => {
+    const { wb, formats } = trackedWb();
+    const tracked: SyncedConditionalRuleMap = new Map();
+    const rules: ConditionalRule[] = [
+      { kind: 'cell-value', range, op: '>', a: 10, apply: { fill: '#e2f0d9' } },
+    ];
+
+    expect(syncTrackedConditionalRulesToEngine(wb, rules, 0, { tracked })).toEqual({
+      written: 1,
+      skipped: 0,
+      removed: 0,
+    });
+    expect(formats[1]).toMatchObject({ id: 'added-1', dxfId: 11 });
+    expect(wb.addDxf).toHaveBeenCalledTimes(1);
+
+    expect(syncTrackedConditionalRulesToEngine(wb, rules, 0, { tracked })).toEqual({
+      written: 0,
+      skipped: 0,
+      removed: 0,
+    });
+    expect(wb.addDxf).toHaveBeenCalledTimes(1);
   });
 });

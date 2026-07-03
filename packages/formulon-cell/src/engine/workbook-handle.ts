@@ -223,6 +223,15 @@ export class WorkbookHandle {
     });
   }
 
+  setError(a: Addr, errorCode: number): void {
+    this.assertAlive();
+    this.withJournal(a, () => {
+      const s = this.wb.setError(a.sheet, a.row, a.col, errorCode);
+      if (!s.ok) throw new Error(`setError: ${s.message}`);
+      this.emit({ kind: 'value', addr: a, next: this.getValue(a) });
+    });
+  }
+
   setBlank(a: Addr): void {
     this.assertAlive();
     this.withJournal(a, () => {
@@ -414,26 +423,25 @@ export class WorkbookHandle {
     return null;
   }
 
-  /** Iterate over defined names (workbook-scope). Useful for the name box
-   *  drop-down. Each entry's `formula` text is what `definedNameAt` returns
-   *  from the engine — typically a reference like `Sheet1!$A$1:$B$2`. */
-  *definedNames(): Generator<{ name: string; formula: string }> {
+  /** Iterate over defined names. `localSheetId === -1` means workbook scope;
+   *  otherwise it is the 0-based sheet index for a sheet-scoped name. */
+  *definedNames(): Generator<{ name: string; formula: string; localSheetId: number }> {
     this.assertAlive();
     const n = this.wb.definedNameCount();
     for (let i = 0; i < n; i += 1) {
       const e = this.wb.definedNameAt(i);
       if (!e.status.ok) continue;
-      yield { name: e.name, formula: e.formula };
+      yield { name: e.name, formula: e.formula, localSheetId: e.localSheetId };
     }
   }
 
-  /** Add or replace a workbook-scoped defined name. Pass an empty `formula`
+  /** Add or replace a workbook/sheet-scoped defined name. Pass an empty `formula`
    *  to remove the name (engine convention). Returns false on engine failure
-   *  or when the engine doesn't expose `setDefinedName` (stub or older bundle). */
-  setDefinedNameEntry(name: string, formula: string): boolean {
+   *  or when the engine doesn't expose scoped names. */
+  setDefinedNameEntry(name: string, formula: string, localSheetId = -1): boolean {
     this.assertAlive();
     if (!this.capabilities.definedNameMutate) return false;
-    const s = this.wb.setDefinedName(name, formula);
+    const s = this.wb.setDefinedNameScoped(name, formula, localSheetId);
     return s.ok;
   }
 
@@ -812,6 +820,9 @@ export class WorkbookHandle {
           return;
         case 'bool':
           this.setBool(snap.addr, snap.value.value);
+          return;
+        case 'error':
+          this.setError(snap.addr, snap.value.code);
           return;
         default:
           this.setBlank(snap.addr);

@@ -6,6 +6,10 @@ import type {
   PivotDateGrouping,
   PivotFieldSpec,
   PivotFilterSpec,
+  PivotReportLayout,
+  PivotReportLayoutResult,
+  PivotWorksheetSource,
+  PivotWorksheetSourceResult,
   Status,
   Value,
   Workbook,
@@ -21,6 +25,8 @@ export interface PivotMutationWorkbook extends Workbook {
   pivotCacheIdAt(index: number): IndexResult;
   pivotCacheCreate(requestedId: number): IndexResult;
   pivotCacheRemove(cacheId: number): Status;
+  pivotCacheGetWorksheetSource(cacheId: number): PivotWorksheetSourceResult;
+  pivotCacheSetWorksheetSource(cacheId: number, source: PivotWorksheetSource): Status;
   pivotCacheFieldCount(cacheId: number): number;
   pivotCacheFieldName(cacheId: number, fieldIdx: number): { status: Status; value: string };
   pivotCacheFieldAdd(cacheId: number, name: string): IndexResult;
@@ -35,7 +41,7 @@ export interface PivotMutationWorkbook extends Workbook {
   pivotCacheFieldAddSharedItemText(cacheId: number, fieldIdx: number, value: string): Status;
   pivotCacheFieldAddSharedItemBool(cacheId: number, fieldIdx: number, value: boolean): Status;
   pivotCacheFieldAddSharedItemBlank(cacheId: number, fieldIdx: number): Status;
-  pivotCacheFieldAddSharedItemError?(cacheId: number, fieldIdx: number, code: number): Status;
+  pivotCacheFieldAddSharedItemError(cacheId: number, fieldIdx: number, code: number): Status;
   pivotCacheFieldClearSharedItems(cacheId: number, fieldIdx: number): Status;
   pivotCacheRecordAdd(cacheId: number): IndexResult;
   pivotCacheRecordClear(cacheId: number): Status;
@@ -82,6 +88,8 @@ export interface PivotMutationWorkbook extends Workbook {
     rowsEnabled: boolean,
     colsEnabled: boolean,
   ): Status;
+  pivotGetLayout(sheet: number, pivotIdx: number): PivotReportLayoutResult;
+  pivotSetLayout(sheet: number, pivotIdx: number, layout: PivotReportLayout): Status;
   pivotFieldCount(sheet: number, pivotIdx: number): number;
   pivotFieldAdd(sheet: number, pivotIdx: number, spec: PivotFieldSpec): IndexResult;
   pivotFieldClear(sheet: number, pivotIdx: number): Status;

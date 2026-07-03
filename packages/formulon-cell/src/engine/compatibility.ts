@@ -131,7 +131,7 @@ export function summarizeSpreadsheetCompatibility(
       label: 'Data validation',
       status: c.dataValidation ? 'writable' : 'session',
       reason: c.dataValidation
-        ? 'Validation ranges can be read and written; dropdown visibility depends on engine showDropDown round-trip support.'
+        ? 'Validation ranges, messages, and in-cell dropdown visibility can be read and written.'
         : 'Validation dropdown UI can be hosted, but engine writeback is unavailable.',
     },
     {
@@ -157,7 +157,9 @@ export function summarizeSpreadsheetCompatibility(
       label: 'Defined names',
       status: c.definedNameMutate ? 'writable' : 'read-only',
       reason: c.definedNameMutate
-        ? 'Workbook-scoped defined names can be listed and updated; sheet-scoped names need engine scope support.'
+        ? c.definedNameScopes
+          ? 'Workbook- and sheet-scoped defined names can be listed, updated, and round-tripped.'
+          : 'Workbook-scoped defined names can be listed and updated; sheet-scoped names need engine scope support.'
         : 'Defined names can be listed when present, but mutation is unavailable.',
     },
     {

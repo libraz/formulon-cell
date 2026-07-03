@@ -10,12 +10,17 @@ export type {
   DataValidationEntry,
   DataValidationInput,
   DataValidationRange,
+  DxfRecord,
+  DxfResult,
   EvalResult,
   FillRecord,
   FontRecord,
   FormulonModule,
   PivotCell,
   PivotLayoutResult,
+  PivotReportLayoutResult,
+  PivotWorksheetSource,
+  PivotWorksheetSourceResult,
   SaveResult,
   Status,
   StringResult,
@@ -128,6 +133,14 @@ export const PivotCalendar = {
 } as const;
 export type PivotCalendar = (typeof PivotCalendar)[keyof typeof PivotCalendar];
 
+/** Pivot report layout form. Mirrors `fm_pivot_layout_t`. */
+export const PivotReportLayout = {
+  Compact: 0,
+  Tabular: 1,
+  Outline: 2,
+} as const;
+export type PivotReportLayout = (typeof PivotReportLayout)[keyof typeof PivotReportLayout];
+
 /** Discriminator ordinals for PivotTable filter payload values. */
 export const PivotFilterValueKind = {
   None: -1,
@@ -236,9 +249,12 @@ export interface EngineCapabilities {
   /** Full hyperlink round-trip: `getHyperlinks`, `addHyperlink`, and
    *  `clearHyperlinks`. */
   readonly hyperlinks: boolean;
-  /** `setDefinedName` (no remove yet — pass empty formula to clear via
-   *  the engine convention). */
+  /** `setDefinedNameScoped` for workbook and sheet-scoped names. */
   readonly definedNameMutate: boolean;
+  /** `setDefinedNameScoped` plus `DefinedNameEntry.localSheetId`. */
+  readonly definedNameScopes: boolean;
+  /** `setError` static error-value authoring. */
+  readonly staticErrorValues: boolean;
   /** `partialRecalc` viewport-scoped recalculation. */
   readonly partialRecalc: boolean;
   /** `setIterativeProgress` callback for cancellable iterative solves. */
@@ -264,6 +280,10 @@ export interface EngineCapabilities {
   readonly externalLinks: boolean;
   /** `getLambdaText` rendering of lambda values back to formula text. */
   readonly lambdaText: boolean;
+  /** Read-only formula evaluation anchored at a workbook cell. */
+  readonly formulaTextEvaluation: boolean;
+  /** Read-only conditional-format predicate evaluation with a range anchor. */
+  readonly conditionalFormulaEvaluation: boolean;
   /** `cellStyleCount` + `getCellStyle` + `getCellStyleXf` named-style
    *  enumeration. */
   readonly cellStyles: boolean;
@@ -271,9 +291,17 @@ export interface EngineCapabilities {
    *  `removeConditionalFormatAt` + `clearConditionalFormats` authoring
    *  surface. Read-only `evaluateCfRange` is gated by `conditionalFormat`. */
   readonly conditionalFormatMutate: boolean;
+  /** `getDxf` + `addDxf` + `dxfCount` differential-format authoring. */
+  readonly conditionalFormatDxf: boolean;
+  /** Visual CF payload authoring for color scales, data bars, and icon sets. */
+  readonly conditionalFormatVisualMutate: boolean;
   /** `pivotCount` + `pivotLayout` projection of loaded workbook PivotTables. */
   readonly pivotTables: boolean;
   /** PivotCache + PivotTable mutation APIs. Enables low-level PivotTable
    *  authoring; UI wizards can layer on top of `WorkbookHandle` wrappers. */
   readonly pivotTableMutate: boolean;
+  /** Pivot cache worksheet source metadata read/write. */
+  readonly pivotCacheSource: boolean;
+  /** Pivot compact / tabular / outline report layout read/write. */
+  readonly pivotReportLayout: boolean;
 }

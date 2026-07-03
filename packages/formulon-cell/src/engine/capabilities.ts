@@ -47,7 +47,9 @@ export function detectCapabilities(wb: Workbook): EngineCapabilities {
     comments: all('getComment', 'setComment'),
     commentsEnumerable: has('getComments'),
     hyperlinks: all('getHyperlinks', 'addHyperlink', 'clearHyperlinks'),
-    definedNameMutate: has('setDefinedName'),
+    definedNameMutate: has('setDefinedNameScoped'),
+    definedNameScopes: all('definedNameAt', 'setDefinedNameScoped'),
+    staticErrorValues: has('setError'),
     partialRecalc: has('partialRecalc'),
     iterativeProgress: has('setIterativeProgress'),
     spillInfo: has('spillInfo'),
@@ -59,6 +61,8 @@ export function detectCapabilities(wb: Workbook): EngineCapabilities {
     sheetProtectionRoundtrip: all('getSheetProtection', 'setSheetProtection'),
     externalLinks: has('getExternalLinks'),
     lambdaText: has('getLambdaText'),
+    formulaTextEvaluation: has('evaluateFormulaText'),
+    conditionalFormulaEvaluation: has('evaluateConditionalFormula'),
     cellStyles: all('cellStyleCount', 'cellStyleXfCount', 'getCellStyle', 'getCellStyleXf'),
     conditionalFormatMutate: all(
       'getConditionalFormats',
@@ -66,6 +70,8 @@ export function detectCapabilities(wb: Workbook): EngineCapabilities {
       'removeConditionalFormatAt',
       'clearConditionalFormats',
     ),
+    conditionalFormatDxf: all('getDxf', 'addDxf', 'dxfCount'),
+    conditionalFormatVisualMutate: has('addConditionalFormat'),
     pivotTables: all('pivotCount', 'pivotLayout'),
     pivotTableMutate: all(
       'pivotCacheCount',
@@ -111,5 +117,7 @@ export function detectCapabilities(wb: Workbook): EngineCapabilities {
       'pivotFilterClear',
       'pivotFilterRemoveAt',
     ),
+    pivotCacheSource: all('pivotCacheGetWorksheetSource', 'pivotCacheSetWorksheetSource'),
+    pivotReportLayout: all('pivotGetLayout', 'pivotSetLayout'),
   });
 }
