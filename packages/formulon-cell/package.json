@@ -72,17 +72,17 @@
     "test:coverage": "vitest run --coverage --config vitest.config.ts"
   },
   "dependencies": {
-    "@libraz/formulon": "0.9.0"
+    "@libraz/formulon": "0.9.4"
   },
   "peerDependencies": {
     "zustand": "^5"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "4.1.9",
-    "happy-dom": "20.9.0",
+    "happy-dom": "20.10.6",
     "typescript": "6.0.3",
-    "unplugin-dts": "1.0.0",
-    "vite": "8.0.10",
+    "unplugin-dts": "1.0.3",
+    "vite": "8.1.3",
     "vitest": "4.1.9",
     "zustand": "^5"
   }

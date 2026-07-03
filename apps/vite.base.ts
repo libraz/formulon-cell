@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import type { Alias, UserConfig } from 'vite';
+import type { Alias, Plugin, UserConfig } from 'vite';
 
 /**
  * Shared Vite settings for the framework demo apps. Each app's own
@@ -21,6 +21,21 @@ import type { Alias, UserConfig } from 'vite';
  * framework-specific subpath aliases (e.g. `…/styles/contrast.css`) that
  * MUST match before the broad `@libraz/formulon-cell` rewrite.
  */
+function formulonWorkerOptionsPlugin(): Plugin {
+  return {
+    name: 'formulon-worker-options-vite-ignore',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!id.includes('@libraz/formulon/dist/formulon.js')) return null;
+      const patched = code.replace(
+        'new Worker(new URL("formulon.js",import.meta.url),workerOptions)',
+        'new Worker(new URL("formulon.js",import.meta.url),{type:"module",name:"em-pthread"})',
+      );
+      return patched === code ? null : { code: patched, map: null };
+    },
+  };
+}
+
 export function baseConfig(rootDir: string): UserConfig {
   const corePkg = resolve(rootDir, '../../packages/formulon-cell');
   const nodeShimDir = resolve(rootDir, '../vite-shims');
@@ -59,6 +74,7 @@ export function baseConfig(rootDir: string): UserConfig {
   ];
 
   return {
+    plugins: [formulonWorkerOptionsPlugin()],
     resolve: { alias },
     server: {
       // formulon ships a pthread-enabled WASM that uses SharedArrayBuffer.
@@ -84,6 +100,7 @@ export function baseConfig(rootDir: string): UserConfig {
     },
     worker: {
       format: 'es',
+      plugins: () => [formulonWorkerOptionsPlugin()],
     },
   };
 }
