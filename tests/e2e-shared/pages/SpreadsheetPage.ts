@@ -17,13 +17,13 @@ export class SpreadsheetPage {
    *  the demo app's normal boot seed would otherwise leave cells under the
    *  click target and bleed into edit / undo assertions. Pass `fixture: null`
    *  to opt back into the default seed (e.g. for "with real data" scenarios). */
-  async mount(opts: { fixture?: string | null } = {}): Promise<void> {
+  async mount(opts: { fixture?: string | null; locale?: string } = {}): Promise<void> {
     const fixture = opts.fixture === undefined ? 'empty' : opts.fixture;
     // Default to `?locale=en` so cross-app scenarios start consistently.
     // Tests that need ja go through `page.goto('/?locale=ja')` directly
     // (see I01).
     const params = new URLSearchParams();
-    params.set('locale', 'en');
+    params.set('locale', opts.locale ?? 'en');
     if (fixture) params.set('fixture', fixture);
     await this.page.goto(`/?${params.toString()}`);
     await this.waitForReady();
