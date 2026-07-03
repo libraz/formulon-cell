@@ -1,6 +1,6 @@
 {
   "name": "@libraz/formulon-cell-react",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "React 18+ component + hooks for @libraz/formulon-cell.",
   "type": "module",
   "license": "Apache-2.0",
