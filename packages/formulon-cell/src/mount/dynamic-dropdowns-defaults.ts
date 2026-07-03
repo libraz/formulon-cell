@@ -12,6 +12,41 @@
 //      doesn't supply a real implementation. Overriding via `overrides` lets
 //      hosts plug in their own UI without re-wiring the click delegator.
 
+import {
+  applyCellStyleByName,
+  createCellStyleFromActiveFormat,
+  mergeCellStylesFromWorkbook,
+} from '../commands/cell-styles.js';
+import { applyFormatPatch } from '../commands/format.js';
+import {
+  applyPivotTableStyleById,
+  type CustomTableStyle,
+  createPivotTableStyleFromActivePivot,
+  createTableStyleFromActiveTable,
+  DEFAULT_TABLE_COLOR,
+  formatAsTableByStyleId,
+  inferTableHasHeaders,
+  pivotTableStyleAssignment,
+  tableOverlayAt,
+  tableVariantFromOptions,
+} from '../commands/format-as-table.js';
+import { hyperlinkAt } from '../commands/hyperlinks.js';
+import {
+  addAllowedEditRange,
+  isWorkbookStructureProtected,
+  protectedSheetPassword,
+  protectedSheetPasswordHash,
+  protectedSheetPermissions,
+  verifySheetProtectionPasswordHash,
+} from '../commands/protection.js';
+import {
+  arrangeSessionIllustration,
+  createRibbonImageFromSelection,
+  createRibbonShapeFromSelection,
+} from '../commands/session-illustration.js';
+import { cellValueViolatesValidation } from '../commands/validate.js';
+import { addrKey } from '../engine/address.js';
+import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 // Imports use the `@libraz/formulon-cell` self-alias instead of relative
 // paths because `dynamic-dropdowns.ts` and other ribbon modules already do.
 // That keeps the type identity for `SpreadsheetInstance`, `History`,
@@ -100,42 +135,7 @@ import {
   textToColumns,
   unwatchCell,
   watchRange,
-} from '@libraz/formulon-cell';
-import {
-  applyCellStyleByName,
-  createCellStyleFromActiveFormat,
-  mergeCellStylesFromWorkbook,
-} from '../commands/cell-styles.js';
-import { applyFormatPatch } from '../commands/format.js';
-import {
-  applyPivotTableStyleById,
-  type CustomTableStyle,
-  createPivotTableStyleFromActivePivot,
-  createTableStyleFromActiveTable,
-  DEFAULT_TABLE_COLOR,
-  formatAsTableByStyleId,
-  inferTableHasHeaders,
-  pivotTableStyleAssignment,
-  tableOverlayAt,
-  tableVariantFromOptions,
-} from '../commands/format-as-table.js';
-import { hyperlinkAt } from '../commands/hyperlinks.js';
-import {
-  addAllowedEditRange,
-  isWorkbookStructureProtected,
-  protectedSheetPassword,
-  protectedSheetPasswordHash,
-  protectedSheetPermissions,
-  verifySheetProtectionPasswordHash,
-} from '../commands/protection.js';
-import {
-  arrangeSessionIllustration,
-  createRibbonImageFromSelection,
-  createRibbonShapeFromSelection,
-} from '../commands/session-illustration.js';
-import { cellValueViolatesValidation } from '../commands/validate.js';
-import { addrKey } from '../engine/address.js';
-import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
+} from '../index.js';
 import { sheetTabColorActionForColor, sheetTabColorByAction } from '../sheet-tab-colors.js';
 import { formatWithPending } from '../store/pending-format.js';
 import { showAdvancedFilterDialog } from '../toolbar/dialogs/advanced-filter.js';

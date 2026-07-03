@@ -1,4 +1,4 @@
-import type { ToolbarMenuText } from '@libraz/formulon-cell';
+import type { ToolbarMenuText } from '../../index.js';
 
 const SYMBOL_GROUP_DEFS = [
   {

@@ -4,11 +4,7 @@
 // the grid) and exposes two submenus for the line color & line style
 // brush settings.
 
-import {
-  type CellBorderStyle,
-  type SpreadsheetInstance,
-  setBorderPreset,
-} from '@libraz/formulon-cell';
+import { type CellBorderStyle, type SpreadsheetInstance, setBorderPreset } from '../../index.js';
 
 import { focusMenuItem, handleMenuKeydown } from '../menu-a11y.js';
 import { RIBBON_BORDERS_MENU_ID } from './activation.js';

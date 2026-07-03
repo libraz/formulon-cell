@@ -3,7 +3,7 @@
 // has no dependency on the playground's runtime state — only the
 // surrounding menu factory in main.ts wires these into the actual DOM.
 
-import type { CellBorderStyle } from '@libraz/formulon-cell';
+import type { CellBorderStyle } from '../../index.js';
 
 export type BorderPreviewSide = 'thin' | 'thick' | 'double' | null;
 

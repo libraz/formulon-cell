@@ -10,7 +10,7 @@ import {
   type RibbonReportItem,
   type RibbonTab,
   type SpreadsheetInstance,
-} from '@libraz/formulon-cell';
+} from '../../index.js';
 
 import { focusMenuItem, handleMenuKeydown } from '../menu-a11y.js';
 import { createMenu, menuIconButton, menuSeparator } from './menus/general.js';

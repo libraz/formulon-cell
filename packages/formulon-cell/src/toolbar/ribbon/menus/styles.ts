@@ -17,7 +17,7 @@ import {
   type ToolbarMenuText,
   type ToolbarText,
   tableStyleSwatch,
-} from '@libraz/formulon-cell';
+} from '../../../index.js';
 
 import {
   createMenu,

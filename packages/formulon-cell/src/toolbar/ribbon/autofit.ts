@@ -1,10 +1,12 @@
-// Off-screen canvas-based autofit measurement. Used by the playground
-// when the user picks the "AutoFit row height" / "AutoFit column width"
-// menu items. The default rendering pipeline doesn't lay out cells to
-// pixel widths so we re-measure here with the same fonts the renderer
-// would use.
+// Off-screen canvas-based autofit measurement. Used when the user picks the
+// "AutoFit row height" / "AutoFit column width" menu items. The default
+// rendering pipeline doesn't lay out cells to pixel widths so we re-measure
+// here with the same fonts the renderer would use.
 
-import { formatCell, formatNumber, type SpreadsheetInstance } from '@libraz/formulon-cell';
+import { formatNumber } from '../../commands/format.js';
+import { formatCell } from '../../engine/value.js';
+import type { SpreadsheetInstance } from '../../mount/types.js';
+import type { NumFmt } from '../../store/types.js';
 
 const autofitMeasureCanvas = document.createElement('canvas');
 const autofitMeasureCtx = autofitMeasureCanvas.getContext('2d');
@@ -14,7 +16,7 @@ export interface AutofitCellFormat {
   fontFamily?: string;
   bold?: boolean;
   italic?: boolean;
-  numFmt?: import('@libraz/formulon-cell').NumFmt;
+  numFmt?: NumFmt;
   wrap?: boolean;
 }
 

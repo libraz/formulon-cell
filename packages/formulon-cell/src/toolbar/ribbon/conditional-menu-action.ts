@@ -11,8 +11,8 @@ import type {
   ConditionalRule,
   Range,
   SpreadsheetInstance,
-} from '@libraz/formulon-cell';
-import { applyConditionalPresetAction, recordConditionalRulesChange } from '@libraz/formulon-cell';
+} from '../../index.js';
+import { applyConditionalPresetAction, recordConditionalRulesChange } from '../../index.js';
 
 import { buildCfMenuText } from './menus/conditional.js';
 

@@ -8,7 +8,7 @@
 // `dictionaries[lang].sheetTabs` for the sheet-management entries — so the
 // factory takes a `HomeMenuDeps` bundle instead of just the menu dict.
 
-import type { Strings, ToolbarLang, ToolbarMenuText, ToolbarText } from '@libraz/formulon-cell';
+import type { Strings, ToolbarLang, ToolbarMenuText, ToolbarText } from '../../../index.js';
 import { SHEET_TAB_COLOR_CHOICES, sheetTabColorChoiceLabel } from '../../../sheet-tab-colors.js';
 import {
   colorSwatchButton,

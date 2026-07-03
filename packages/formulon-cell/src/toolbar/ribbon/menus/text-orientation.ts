@@ -2,7 +2,7 @@
 // inline SVG glyph showing the orientation effect (counter-clockwise, vertical,
 // rotate up/down, etc.) plus the localized label.
 
-import type { ToolbarMenuText } from '@libraz/formulon-cell';
+import type { ToolbarMenuText } from '../../../index.js';
 
 import { SVG_NS } from '../border-icons.js';
 import { createMenu, menuPresetButton, menuSeparator } from './general.js';

@@ -3,7 +3,7 @@
 // menuitem/menuitemradio entries so the parent can toggle the radio state after
 // rendering.
 
-import type { ToolbarLang, ToolbarMenuText } from '@libraz/formulon-cell';
+import type { ToolbarLang, ToolbarMenuText } from '../../../index.js';
 
 import {
   createMenu,

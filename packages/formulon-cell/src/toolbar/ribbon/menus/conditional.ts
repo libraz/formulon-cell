@@ -5,7 +5,7 @@
 // sets, plain menu items for highlight rules. All clicks emit a `data-cf-*`
 // attribute the playground main dispatcher reads.
 
-import { conditionalMenuText, type ToolbarLang } from '@libraz/formulon-cell';
+import { conditionalMenuText, type ToolbarLang } from '../../../index.js';
 
 import {
   createMenu,

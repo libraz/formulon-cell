@@ -18,7 +18,7 @@ import {
   showCols,
   showRows,
   type ToolbarMenuText,
-} from '@libraz/formulon-cell';
+} from '../../index.js';
 import { autofitColWidth, autofitRowHeight } from './autofit.js';
 
 type CellFormatMenuText = ToolbarMenuText & {

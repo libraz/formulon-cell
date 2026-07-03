@@ -4,8 +4,8 @@
 // callback through the factory; this module owns DOM open/close, focus, and
 // the click dispatch table.
 
-import type { SessionChartKind, SpreadsheetInstance } from '@libraz/formulon-cell';
 import type { RibbonFillAction } from '../../commands/fill.js';
+import type { SessionChartKind, SpreadsheetInstance } from '../../index.js';
 import { clamp, viewportSize } from '../../interact/overlay-position.js';
 import type { SessionShapeKind } from '../illustration-types.js';
 import { focusMenuItem } from '../menu-a11y.js';

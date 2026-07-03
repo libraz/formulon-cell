@@ -3,8 +3,8 @@
 // user pick direction + series type. Kept self-contained so main.ts only
 // owns the imperative `runFillSeries` / `applyFillSeries` glue.
 
-import type { Range } from '@libraz/formulon-cell';
 import { dictionaries, type Strings } from '../../i18n/strings.js';
+import type { Range } from '../../index.js';
 import {
   appendDialogActions,
   createDialogShell,
