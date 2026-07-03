@@ -59,6 +59,8 @@ jobs:
       - run: yarn build:all
       - run: yarn typecheck
       - name: Run unit tests with coverage
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
         run: yarn workspace @libraz/formulon-cell test:coverage
 
       - name: Upload coverage to Codecov

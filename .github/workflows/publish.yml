@@ -37,7 +37,10 @@ jobs:
       - run: yarn lint
       - run: yarn build
       - run: yarn typecheck
-      - run: yarn test --run
+      - name: Run unit tests
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
+        run: yarn test --run
 
       - name: Prepare packages for publish
         run: |
