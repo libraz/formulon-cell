@@ -383,6 +383,7 @@ export type {
   PivotSourceField,
   RefreshPivotCacheOptions,
   RefreshPivotCacheResult,
+  RefreshPivotTableFromStoredSourceOptions,
   RefreshPivotTableOptions,
   RibbonPivotTableAction,
   RibbonPivotTableActionResult,
@@ -396,6 +397,7 @@ export {
   inferPivotFieldItems,
   inferPivotSourceFields,
   refreshPivotCacheFromRange,
+  refreshPivotTable,
   refreshPivotTableFromRange,
 } from './commands/pivot-table.js';
 export type {
@@ -1072,6 +1074,16 @@ export type {
   ReportOptions,
 } from './toolbar/dialogs/report.js';
 export { reportDialogLabels, showReport } from './toolbar/dialogs/report.js';
+export type {
+  ExcelRibbonIconDefinition,
+  ExcelRibbonIconName,
+  ExcelRibbonIconSegment,
+} from './toolbar/excel-ribbon-icons.js';
+export {
+  createExcelRibbonSvg,
+  EXCEL_RIBBON_ICON_PATHS,
+  excelRibbonIconPaths,
+} from './toolbar/excel-ribbon-icons.js';
 export type { FluentIconName } from './toolbar/fluent-icons.js';
 export { FLUENT_ICON_PATHS, fluentIconPaths } from './toolbar/fluent-icons.js';
 export type { IconName } from './toolbar/icon-paths.js';
@@ -1177,6 +1189,9 @@ export type {
 export { createBackstageTitle } from './toolbar/ribbon/backstage-title.js';
 export type { BorderPreviewSide, BorderPreviewSpec } from './toolbar/ribbon/border-icons.js';
 export {
+  createBorderEraserPreview,
+  createBorderLineColorPreview,
+  createBorderLineStylePreview,
   createBorderPreview,
   createLineSamplePreview,
   LINE_STYLES_ALL,

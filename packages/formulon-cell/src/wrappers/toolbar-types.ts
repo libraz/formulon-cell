@@ -141,7 +141,12 @@ export type FormulaAuditingAction =
 
 export type ClearArrowsAction = 'clear-all' | 'clear-precedents' | 'clear-dependents';
 
-export type PivotTableAction = 'dialog' | 'recommended' | 'new-sheet' | 'existing-sheet';
+export type PivotTableAction =
+  | 'dialog'
+  | 'recommended'
+  | 'new-sheet'
+  | 'existing-sheet'
+  | 'refresh';
 export type ChartAction = SessionChartKind | 'recommended';
 export type PictureAction = 'device' | 'stock' | 'online';
 export type ShapeAction =

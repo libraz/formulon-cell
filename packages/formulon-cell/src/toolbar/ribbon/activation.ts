@@ -27,11 +27,13 @@ export type RibbonActivationEntry = RibbonActivationSpec & {
 
 export const RIBBON_MENU_FACTORY_KEYS = [
   'paste',
+  'copy',
   'pivotTable',
   'definedNames',
   'links',
   'borders',
   'underline',
+  'wrap',
   'merge',
   'textOrientation',
   'conditional',
@@ -79,6 +81,7 @@ export const RIBBON_EXTERNAL_MENU_FOR_COMMAND: Readonly<Record<string, string>> 
 
 export const RIBBON_DROPDOWN_MENU_FOR_COMMAND: Readonly<Record<string, string>> = {
   paste: 'menu-paste',
+  copy: 'menu-copy',
   pivotTableInsert: 'menu-pivot-table',
   namedRanges: 'menu-defined-names',
   linksData: 'menu-links-data',
@@ -86,6 +89,7 @@ export const RIBBON_DROPDOWN_MENU_FOR_COMMAND: Readonly<Record<string, string>> 
   fillHome: 'menu-fill',
   clearFormat: 'menu-clear',
   underline: 'menu-underline',
+  wrap: 'menu-wrap',
   merge: 'menu-merge',
   freeze: 'menu-freeze',
   textOrientation: 'menu-text-orientation',
@@ -131,11 +135,13 @@ export const RIBBON_MENU_FOR_COMMAND: Readonly<Record<string, string>> = {
 
 export const RIBBON_MENU_FACTORY_FOR_COMMAND: Readonly<Record<string, RibbonMenuFactoryKey>> = {
   paste: 'paste',
+  copy: 'copy',
   pivotTableInsert: 'pivotTable',
   namedRanges: 'definedNames',
   linksData: 'links',
   borders: 'borders',
   underline: 'underline',
+  wrap: 'wrap',
   merge: 'merge',
   textOrientation: 'textOrientation',
   conditional: 'conditional',
@@ -182,6 +188,7 @@ export const RIBBON_AUDITED_PRIMARY_ACTION_SPLIT_COMMANDS = [
   'pivotTableInsert',
   'autosum',
   'autosumFormula',
+  'copy',
   'addIn',
   'chartInsert',
   'currency',
@@ -230,6 +237,7 @@ export const RIBBON_AUDITED_DROPDOWN_COMMANDS = [
   'printArea',
   'sortFilterHome',
   'textOrientation',
+  'wrap',
 ] as const;
 
 /** Commands intentionally classified in the activation model even though no
@@ -288,7 +296,6 @@ export const RIBBON_PRIMARY_ACTION_COMMANDS: ReadonlySet<string> = new Set([
   'allScripts',
   'bottomAlign',
   'comma',
-  'copy',
   'cut',
   'decDown',
   'decUp',
@@ -379,7 +386,6 @@ export const RIBBON_TOGGLE_COMMANDS: ReadonlySet<string> = new Set([
   'bold',
   'italic',
   'strike',
-  'wrap',
   'formatPainter',
   'drawBorder',
   'drawBorderGrid',

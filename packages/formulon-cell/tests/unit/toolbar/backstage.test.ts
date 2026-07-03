@@ -52,6 +52,12 @@ describe('toolbar/ribbon/backstage', () => {
     });
 
     const view = createBackstageView();
+    const titleMark = view.querySelector<HTMLElement>('.demo__backstage-xl');
+    const preview = view.querySelector<HTMLElement>('.demo__backstage-preview');
+    const backButton = view.querySelector<HTMLElement>('[data-backstage-action="back"]');
+    const commandIcons = Array.from(
+      view.querySelectorAll<HTMLElement>('.demo__backstage-command-icon'),
+    );
 
     expect(
       Array.from(view.querySelectorAll<HTMLElement>('.demo__backstage-navitem')).map(
@@ -88,6 +94,23 @@ describe('toolbar/ribbon/backstage', () => {
     ]);
     expect(view.textContent).toContain('Workbook Information');
     expect(view.textContent).toContain('Saved');
+    expect(backButton?.textContent).toBe('');
+    expect(backButton?.classList.contains('demo__backstage-navitem--back')).toBe(true);
+    expect(backButton?.getAttribute('aria-label')).toBe('Back');
+    expect(backButton?.title).toBe('Back');
+    expect(titleMark?.textContent).toBe('');
+    expect(preview?.textContent).toBe('');
+    expect(commandIcons.map((icon) => icon.textContent)).toEqual(['', '', '']);
+    expect(commandIcons.map((icon) => icon.getAttribute('aria-hidden'))).toEqual([
+      'true',
+      'true',
+      'true',
+    ]);
+    expect(commandIcons.map((icon) => icon.className)).toEqual([
+      'demo__backstage-command-icon demo__backstage-command-icon--protect',
+      'demo__backstage-command-icon demo__backstage-command-icon--inspect',
+      'demo__backstage-command-icon demo__backstage-command-icon--manage',
+    ]);
   });
 
   it('projects disabled reasons for unavailable Backstage card and command controls', () => {
@@ -145,6 +168,7 @@ describe('toolbar/ribbon/backstage', () => {
 
   it('keeps Backstage Print action button DOM centralized', () => {
     const source = readFileSync(join(process.cwd(), 'src/toolbar/ribbon/backstage.ts'), 'utf8');
+    const css = readFileSync(join(process.cwd(), 'src/styles/toolbar/base/backstage.css'), 'utf8');
 
     expect(source).toContain("import { createRibbonButton } from './button.js'");
     expect(source).toContain('const createBackstageActionButton');
@@ -162,6 +186,25 @@ describe('toolbar/ribbon/backstage', () => {
     expect(source).not.toContain("const pdf = document.createElement('button')");
     expect(source).not.toContain("const pageSetup = document.createElement('button')");
     expect(source).not.toContain("document.createElement('button')");
+    expect(source).not.toContain("preview.textContent = 'X'");
+    expect(source).not.toContain("mark.textContent = 'X'");
+    expect(source).not.toContain('mark.textContent = icon');
+    expect(source).not.toContain("createBackstageButton('←'");
+    expect(css).toMatch(
+      /\.demo__backstage-navitem--back::after\s*\{[\s\S]*?border: solid currentColor;[\s\S]*?transform: translate\(-70%, -50%\) rotate\(45deg\);/,
+    );
+    expect(css).toMatch(
+      /\.demo__backstage-xl::before,[\s\S]*?\.demo__backstage-xl::after\s*\{[\s\S]*?background: currentColor;[\s\S]*?content: "";/,
+    );
+    expect(css).toMatch(
+      /\.demo__backstage-command-icon--protect::before\s*\{[\s\S]*?border: 2px solid currentColor;/,
+    );
+    expect(css).toMatch(
+      /\.demo__backstage-command-icon--inspect::before\s*\{[\s\S]*?background: #a4262c;/,
+    );
+    expect(css).toMatch(
+      /\.demo__backstage-command-icon--manage::before\s*\{[\s\S]*?linear-gradient\(currentColor 0 0\)/,
+    );
   });
 
   it('renders a dedicated Backstage Print view with command handoff attributes', () => {

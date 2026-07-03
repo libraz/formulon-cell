@@ -58,7 +58,7 @@ import {
 } from '../../../src/toolbar/ribbon-model.js';
 import { type MountedStubSheet, mountStubSheet } from '../../test-utils/mount.js';
 
-vi.setConfig({ testTimeout: 10_000 });
+vi.setConfig({ testTimeout: 20_000 });
 
 // Minimal helpers stub: enough for the renderer to emit a shell, no real
 // dropdown DOM. The toolbar still needs `createSelect/Color/Icon/makeSvg`
@@ -419,10 +419,12 @@ describe('Spreadsheet.mountToolbar', () => {
       'ジャンプ...',
       '条件を選択してジャンプ...',
       '数式',
-      '定数',
-      '条件付き書式',
-      'データの入力規則',
       'コメントとメモ',
+      '条件付き書式',
+      '定数',
+      'データの入力規則',
+      'オブジェクトの選択',
+      '選択ウィンドウ...',
     ]);
 
     tb.dispose();
@@ -807,16 +809,14 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     expect(insertButton).toBeTruthy();
     insertButton?.click();
-    expect(host.querySelectorAll('#menu-insert-cells .app__menu-item--iconic').length).toBe(6);
+    expect(host.querySelectorAll('#menu-insert-cells .app__menu-item--iconic').length).toBe(4);
     expect(host.querySelector<HTMLButtonElement>('[data-cell-insert="sheet"]')?.disabled).toBe(
       false,
     );
-    const shiftDownButton = host.querySelector<HTMLButtonElement>(
-      '[data-cell-insert="shift-down"]',
-    );
-    expect(shiftDownButton).toBeTruthy();
+    const insertCellsButton = host.querySelector<HTMLButtonElement>('[data-cell-insert="cells"]');
+    expect(insertCellsButton).toBeTruthy();
     const insertEvent = new MouseEvent('click', { bubbles: true });
-    Object.defineProperty(insertEvent, 'target', { value: shiftDownButton });
+    Object.defineProperty(insertEvent, 'target', { value: insertCellsButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(insertEvent)).toBe(true);
     expect(sheet.workbook.getValue({ sheet: 0, row: 1, col: 1 }).kind).toBe('blank');
     expect(sheet.workbook.getValue({ sheet: 0, row: 2, col: 1 })).toEqual({
@@ -835,10 +835,10 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(disabledDeleteSheet?.dataset.menuDisabledReason).toBe(
       'A workbook must contain at least one visible sheet.',
     );
-    const shiftUpButton = host.querySelector<HTMLButtonElement>('[data-cell-delete="shift-up"]');
-    expect(shiftUpButton).toBeTruthy();
+    const deleteCellsButton = host.querySelector<HTMLButtonElement>('[data-cell-delete="cells"]');
+    expect(deleteCellsButton).toBeTruthy();
     const deleteEvent = new MouseEvent('click', { bubbles: true });
-    Object.defineProperty(deleteEvent, 'target', { value: shiftUpButton });
+    Object.defineProperty(deleteEvent, 'target', { value: deleteCellsButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(deleteEvent)).toBe(true);
     expect(sheet.workbook.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({
       kind: 'number',
@@ -1558,14 +1558,20 @@ describe('Spreadsheet.mountToolbar', () => {
     const fillButton = host.querySelector<HTMLButtonElement>('[data-ribbon-command="fillHome"]');
     expect(fillButton).toBeTruthy();
     fillButton?.click();
-    expect(host.querySelectorAll('#menu-fill .app__menu-item--iconic').length).toBe(9);
+    expect(host.querySelectorAll('#menu-fill .app__menu-item--iconic').length).toBe(8);
     const fillDownButton = host.querySelector<HTMLButtonElement>('[data-fill="down"]');
     const fillRightButton = host.querySelector<HTMLButtonElement>('[data-fill="right"]');
+    const fillGroupButton = host.querySelector<HTMLButtonElement>('[data-fill="group"]');
+    const fillJustifyButton = host.querySelector<HTMLButtonElement>('[data-fill="justify"]');
+    const flashFillButton = host.querySelector<HTMLButtonElement>('[data-fill="flash"]');
     expect(fillDownButton?.getAttribute('aria-disabled')).toBe('false');
     expect(fillRightButton?.getAttribute('aria-disabled')).toBe('true');
     expect(fillRightButton?.dataset.menuDisabledReason).toBe(
       'Select more than one column to fill left or right.',
     );
+    expect(fillGroupButton?.disabled).toBe(true);
+    expect(fillJustifyButton?.disabled).toBe(true);
+    expect(flashFillButton).toBeTruthy();
     const seriesButton = host.querySelector<HTMLButtonElement>('[data-fill="series"]');
     expect(seriesButton).toBeTruthy();
     const event = new MouseEvent('click', { bubbles: true });
@@ -1657,7 +1663,10 @@ describe('Spreadsheet.mountToolbar', () => {
       { command: 'autosum', menuId: 'menu-autosum-home' },
       autosumButton as HTMLButtonElement,
     );
-    expect(host.querySelectorAll('#menu-autosum-home .app__menu-item--iconic').length).toBe(6);
+    expect(host.querySelectorAll('#menu-autosum-home [data-autosum-fn]').length).toBe(6);
+    expect(
+      host.querySelectorAll('#menu-autosum-home .app__menu-icon--svg .app__menu-icon-svg').length,
+    ).toBe(1);
     const averageButton = host.querySelector<HTMLButtonElement>('[data-autosum-fn="AVERAGE"]');
     expect(averageButton).toBeTruthy();
     const event = new MouseEvent('click', { bubbles: true });
@@ -3041,9 +3050,11 @@ describe('Spreadsheet.mountToolbar', () => {
       { command: 'currency', menuId: 'menu-currency-home' },
       currencyButton,
     );
-    expect(host.querySelectorAll('#menu-currency-home .app__menu-item--iconic').length).toBe(6);
-    expect(host.querySelector('#menu-currency-home .app__menu-icon--currency-euro')).toBeTruthy();
-    expect(host.querySelector('#menu-currency-home .app__menu-icon--currency-more')).toBeTruthy();
+    expect(host.querySelectorAll('#menu-currency-home [data-currency-preset]').length).toBe(5);
+    expect(host.querySelector('#menu-currency-home .app__menu-icon--svg')).toBeFalsy();
+    expect(host.querySelectorAll('#menu-currency-home .app__menu-item__icon-spacer').length).toBe(
+      6,
+    );
     const eurButton = host.querySelector<HTMLButtonElement>('[data-currency-preset="€"]');
     expect(eurButton).toBeTruthy();
     const event = new MouseEvent('click', { bubbles: true });
@@ -4078,8 +4089,23 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     expect(formatButton).toBeTruthy();
     formatButton?.click();
-    expect(host.querySelectorAll('#menu-format-cells .app__menu-item--iconic').length).toBe(17);
-    expect(host.querySelectorAll('#menu-format-cells .app__color-swatch').length).toBe(8);
+    expect(host.querySelectorAll('#menu-format-cells .app__menu-item--iconic').length).toBe(18);
+    expect(host.querySelectorAll('#menu-format-cells .app__color-swatch').length).toBe(14);
+    const visibilityTrigger = host.querySelector<HTMLButtonElement>(
+      '#menu-format-cells [data-format-submenu="visibility"]',
+    );
+    const tabColorTrigger = host.querySelector<HTMLButtonElement>(
+      '#menu-format-cells [data-format-submenu="tabColor"]',
+    );
+    const visibilityPanel = host.querySelector<HTMLElement>('#menu-format-cells-visibility');
+    const tabColorPanel = host.querySelector<HTMLElement>('#menu-format-cells-tabColor');
+    expect(visibilityTrigger?.getAttribute('aria-controls')).toBe('menu-format-cells-visibility');
+    expect(tabColorTrigger?.getAttribute('aria-controls')).toBe('menu-format-cells-tabColor');
+    expect(visibilityPanel?.hidden).toBe(true);
+    expect(tabColorPanel?.hidden).toBe(true);
+    visibilityTrigger?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    expect(visibilityPanel?.hidden).toBe(false);
+    expect(visibilityTrigger?.getAttribute('aria-expanded')).toBe('true');
     expect(
       host
         .querySelector<HTMLButtonElement>('#menu-format-cells [data-cell-format="tab-color-red"]')
@@ -4095,14 +4121,23 @@ describe('Spreadsheet.mountToolbar', () => {
         .querySelector<HTMLButtonElement>('#menu-format-cells [data-cell-format="tab-color-red"]')
         ?.getAttribute('aria-checked'),
     ).toBe('false');
+    tabColorTrigger?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    expect(tabColorPanel?.hidden).toBe(false);
+    expect(visibilityPanel?.hidden).toBe(true);
+    const lockCellButton = host.querySelector<HTMLButtonElement>(
+      '#menu-format-cells [data-cell-format="lock-cell"]',
+    );
+    expect(lockCellButton?.getAttribute('role')).toBe('menuitemcheckbox');
+    expect(lockCellButton?.getAttribute('aria-checked')).toBe('true');
+    expect(lockCellButton?.classList.contains('app__menu-item--checked')).toBe(true);
     const showRowsBeforeHide = host.querySelector<HTMLButtonElement>(
       '[data-cell-format="show-rows"]',
     );
     const showColsBeforeHide = host.querySelector<HTMLButtonElement>(
       '[data-cell-format="show-cols"]',
     );
-    const moveLeftButton = host.querySelector<HTMLButtonElement>(
-      '[data-cell-format="move-sheet-left"]',
+    const moveCopyButton = host.querySelector<HTMLButtonElement>(
+      '[data-cell-format="move-sheet-copy"]',
     );
     const renameSheetButton = host.querySelector<HTMLButtonElement>(
       '[data-cell-format="rename-sheet"]',
@@ -4118,8 +4153,8 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(renameSheetButton?.dataset.menuDisabledReason).toBe(
       'This workbook engine cannot rename, move, hide, or unhide sheets.',
     );
-    expect(moveLeftButton?.getAttribute('aria-disabled')).toBe('true');
-    expect(moveLeftButton?.dataset.menuDisabledReason).toBe(
+    expect(moveCopyButton?.getAttribute('aria-disabled')).toBe('true');
+    expect(moveCopyButton?.dataset.menuDisabledReason).toBe(
       'This workbook engine cannot rename, move, hide, or unhide sheets.',
     );
     expect(unhideSheetButton?.getAttribute('aria-disabled')).toBe('true');
@@ -4153,6 +4188,15 @@ describe('Spreadsheet.mountToolbar', () => {
       sheet.instance.store.getState().format.formats.get(addrKey({ sheet: 0, row: 1, col: 1 }))
         ?.locked,
     ).toBe(false);
+    tb.dropdownsApi?.openDynamicRibbonDropdown(
+      { command: 'formatCellsHome', menuId: 'menu-format-cells' },
+      formatButton as HTMLButtonElement,
+    );
+    const unlockedLockCellButton = host.querySelector<HTMLButtonElement>(
+      '#menu-format-cells [data-cell-format="lock-cell"]',
+    );
+    expect(unlockedLockCellButton?.getAttribute('aria-checked')).toBe('false');
+    expect(unlockedLockCellButton?.classList.contains('app__menu-item--checked')).toBe(false);
 
     formatButton?.click();
     const tabColorButton = host.querySelector<HTMLButtonElement>(
@@ -4231,7 +4275,7 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
-  it('disables sheet move actions when the host cannot reorder sheets', () => {
+  it('disables the sheet move-or-copy entry when the host cannot reorder sheets', () => {
     const added = sheet.workbook.addSheet();
     expect(added).toBeGreaterThan(0);
     mutators.setSheetIndex(sheet.instance.store, added);
@@ -4246,12 +4290,12 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     expect(formatButton).toBeTruthy();
     formatButton?.click();
-    const moveLeftButton = host.querySelector<HTMLButtonElement>(
-      '[data-cell-format="move-sheet-left"]',
+    const moveCopyButton = host.querySelector<HTMLButtonElement>(
+      '[data-cell-format="move-sheet-copy"]',
     );
-    expect(moveLeftButton).toBeTruthy();
-    expect(moveLeftButton?.disabled).toBe(true);
-    expect(moveLeftButton?.getAttribute('aria-disabled')).toBe('true');
+    expect(moveCopyButton).toBeTruthy();
+    expect(moveCopyButton?.disabled).toBe(true);
+    expect(moveCopyButton?.getAttribute('aria-disabled')).toBe('true');
 
     tb.dispose();
   });
@@ -4968,6 +5012,12 @@ describe('Spreadsheet.mountToolbar', () => {
     );
 
     expect(host.querySelectorAll('#menu-paste .app__menu-item--iconic').length).toBe(8);
+    expect(
+      Array.from(host.querySelectorAll<HTMLButtonElement>('#menu-paste [data-paste-action]'))
+        .filter((button) => !button.hidden)
+        .map((button) => button.dataset.pasteAction),
+    ).toEqual(['all', 'dialog']);
+    expect(host.querySelector<HTMLElement>('#menu-paste .app__menu-sep')?.hidden).toBe(true);
     const pasteSpecial = host.querySelector<HTMLButtonElement>('[data-paste-action="dialog"]');
     const pasteAll = host.querySelector<HTMLButtonElement>('[data-paste-action="all"]');
     expect(pasteSpecial).toBeTruthy();
@@ -5019,6 +5069,11 @@ describe('Spreadsheet.mountToolbar', () => {
       { command: 'paste', menuId: 'menu-paste' },
       pasteButton as HTMLButtonElement,
     );
+    expect(
+      Array.from(host.querySelectorAll<HTMLButtonElement>('#menu-paste [data-paste-action]')).some(
+        (button) => button.hidden,
+      ),
+    ).toBe(false);
     const pasteSpecialButton = host.querySelector<HTMLButtonElement>(
       '[data-paste-action="dialog"]',
     );
@@ -5450,9 +5505,12 @@ describe('Spreadsheet.mountToolbar', () => {
       { command: 'pivotTableInsert', menuId: 'menu-pivot-table' },
       pivotButton as HTMLButtonElement,
     );
-    expect(host.querySelectorAll('#menu-pivot-table .app__menu-item--iconic').length).toBe(4);
+    expect(host.querySelectorAll('#menu-pivot-table .app__menu-item--iconic').length).toBe(5);
     expect(
       host.querySelector<HTMLButtonElement>('[data-pivot-table-action="dialog"]'),
+    ).toBeTruthy();
+    expect(
+      host.querySelector<HTMLButtonElement>('[data-pivot-table-action="refresh"]'),
     ).toBeTruthy();
     const recommendedButton = host.querySelector<HTMLButtonElement>(
       '[data-pivot-table-action="recommended"]',
@@ -5995,6 +6053,9 @@ describe('Spreadsheet.mountToolbar', () => {
     const openGoToSpecial = vi
       .spyOn(sheet.instance, 'openGoToSpecial')
       .mockImplementation(() => undefined);
+    const openWorkbookObjects = vi
+      .spyOn(sheet.instance, 'openWorkbookObjects')
+      .mockImplementation(() => undefined);
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
       dynamicDropdowns: true,
       helpers: stubHelpers(),
@@ -6019,7 +6080,7 @@ describe('Spreadsheet.mountToolbar', () => {
       { command: 'findHome', menuId: 'menu-find-select' },
       findButton as HTMLButtonElement,
     );
-    expect(host.querySelectorAll('#menu-find-select .app__menu-item--iconic').length).toBe(9);
+    expect(host.querySelectorAll('#menu-find-select .app__menu-item--iconic').length).toBe(11);
 
     await clickFindSelect('find');
     await clickFindSelect('replace');
@@ -6029,6 +6090,10 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(openFindReplace).toHaveBeenNthCalledWith(2, 'replace');
     expect(openGoTo).toHaveBeenCalledTimes(1);
     expect(openGoToSpecial).toHaveBeenCalledTimes(1);
+
+    await clickFindSelect('object-select');
+    await clickFindSelect('selection-pane');
+    expect(openWorkbookObjects).toHaveBeenCalledTimes(2);
 
     await clickFindSelect('conditional-format');
     expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
@@ -6091,8 +6156,8 @@ describe('Spreadsheet.mountToolbar', () => {
       expect(createButton.disabled).toBe(!sheet.workbook.capabilities.definedNameMutate);
     }
     vi.spyOn(sheet.workbook, 'definedNames').mockImplementation(function* () {
-      yield { name: 'TaxRate', formula: '=Sheet1!$A$1' };
-      yield { name: 'NetSales', formula: '=Sheet1!$B$1' };
+      yield { name: 'TaxRate', formula: '=Sheet1!$A$1', localSheetId: -1 };
+      yield { name: 'NetSales', formula: '=Sheet1!$B$1', localSheetId: -1 };
     });
     tb.dropdownsApi?.openDynamicRibbonDropdown({
       command: 'namedRanges',

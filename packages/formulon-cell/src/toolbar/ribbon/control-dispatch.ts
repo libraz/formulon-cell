@@ -21,6 +21,7 @@ import { getPageSetup, mutators } from '../../store/store.js';
 import type { NumFmt, PageOrientation, PaperSize } from '../../store/types.js';
 import { confirmMergeLoseData } from '../dialogs/merge-confirm.js';
 import { showPageScaleDialog } from '../dialogs.js';
+import { createExcelRibbonSvg } from '../excel-ribbon-icons.js';
 import { fluentIconPaths } from '../fluent-icons.js';
 import type { PageScaleMenuText } from '../menu-text.js';
 import {
@@ -67,15 +68,17 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
   } = ctx;
 
   const createRibbonIcon = (name: string): SVGSVGElement | null => {
-    const paths = fluentIconPaths(name);
-    if (!paths) return null;
+    const excelSvg = createExcelRibbonSvg(name, 'demo__rb-icon');
+    const fluentPaths = fluentIconPaths(name);
+    if (excelSvg) return excelSvg;
+    if (!fluentPaths) return null;
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.classList.add('demo__rb-icon');
     svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('fill', 'currentColor');
     svg.setAttribute('focusable', 'false');
     svg.setAttribute('aria-hidden', 'true');
-    for (const d of paths) {
+    svg.setAttribute('fill', 'currentColor');
+    for (const d of fluentPaths) {
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       path.setAttribute('d', d);
       svg.appendChild(path);

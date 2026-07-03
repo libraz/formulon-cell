@@ -2,7 +2,7 @@
 //
 // `Spreadsheet.mountToolbar(host, instance, opts)` only requires `helpers`,
 // `menus`, and `hooks` because those used to be host-specific (the playground
-// owned them). After Phase 3-b the core ships sensible defaults so React/Vue
+// owned them). Now the core ships sensible defaults so React/Vue
 // adapters can mount the ribbon with two lines of code; they merge their own
 // app-specific overrides on top (e.g. a custom review-comment flow).
 //
@@ -162,6 +162,7 @@ export function createDefaultRibbonMenus(
     ribbonLang: lang,
     ribbonMenuText,
     ribbonText,
+    formatDialog: dictionaries[lang].formatDialog,
     sheetTabs: dictionaries[lang].sheetTabs,
     viewToolbar: dictionaries[lang].viewToolbar,
   });
@@ -185,8 +186,10 @@ export function createDefaultRibbonMenus(
 
   return {
     paste: buildPaste,
+    copy: homeFactories.createCopyMenu,
     borders: buildBorders,
     underline: homeFactories.createUnderlineMenu,
+    wrap: homeFactories.createWrapMenu,
     merge: homeFactories.createMergeMenu,
     textOrientation: buildTextOrientation,
     conditional: buildConditional,

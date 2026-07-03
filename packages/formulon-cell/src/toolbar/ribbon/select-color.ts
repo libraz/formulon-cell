@@ -18,6 +18,7 @@ export interface SelectColorRibbonText {
   themeColors: string;
   standardColors: string;
   moreColors: string;
+  highContrastOnly: string;
   automatic: string;
   marginsCustomDialog: string;
   marginTop: string;
@@ -345,7 +346,6 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
             const arrow = document.createElement('span');
             arrow.className = 'demo__rb-dd__submenu';
             arrow.setAttribute('aria-hidden', 'true');
-            arrow.textContent = '›';
             item.appendChild(arrow);
           }
         } else if (command.id === 'numberFormat' && numberFormatHasSubtitle(option.value)) {
@@ -488,6 +488,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
         moreColorsLabel: ribbonText.moreColors,
         ariaLabel: command.title,
         value: currentRibbonControlValue(command.id),
+        highContrastOnlyLabel: command.id === 'fillColor' ? ribbonText.highContrastOnly : null,
         automatic:
           command.id === 'fontColor' ? { label: ribbonText.automatic, color: '#000000' } : null,
         onPick: (color) => {

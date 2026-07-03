@@ -42,11 +42,13 @@ export type RibbonMenuFactory = (commandId: string) => HTMLDivElement;
  *  split-button still renders but its menu is empty until the host wires it. */
 export interface RibbonMenus {
   paste?: RibbonMenuFactory;
+  copy?: RibbonMenuFactory;
   pivotTable?: RibbonMenuFactory;
   definedNames?: RibbonMenuFactory;
   links?: RibbonMenuFactory;
   borders?: RibbonMenuFactory;
   underline?: RibbonMenuFactory;
+  wrap?: RibbonMenuFactory;
   merge?: RibbonMenuFactory;
   textOrientation?: RibbonMenuFactory;
   conditional?: RibbonMenuFactory;

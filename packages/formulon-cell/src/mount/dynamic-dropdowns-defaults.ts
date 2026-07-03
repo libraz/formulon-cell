@@ -43,6 +43,7 @@ import {
   dispatchHostClipboard,
   executeRibbonClearAction,
   executeRibbonCommentAction,
+  executeRibbonFillAction,
   executeRibbonFilterDataAction,
   executeRibbonFindAction,
   executeRibbonFormulaAuditingAction,
@@ -72,6 +73,7 @@ import {
   parseScriptCommand,
   type Range,
   type RibbonAddInAction,
+  type RibbonFillAction,
   type RibbonFillSeriesMode,
   type RibbonPdfAction,
   type RibbonPivotTableAction,
@@ -218,6 +220,16 @@ const MAX_MERGE_ACROSS_ROWS = 100_000;
 const buildFillDirection =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyFillDirection'] =>
   (direction) => {
+    if (direction === 'flash') {
+      executeRibbonFillAction({
+        store: instance.store,
+        workbook: instance.workbook,
+        history: instance.history,
+        action: direction satisfies RibbonFillAction,
+      });
+      instance.host.focus();
+      return;
+    }
     const range = normalizedSelectionRange(instance);
     let src: Range = range;
     if (direction === 'down') src = { ...range, r1: range.r0 };
@@ -264,14 +276,18 @@ const updateFillMenu =
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-fill]')) {
       const action = button.dataset.fill;
       const disabled =
+        action === 'group' ||
+        action === 'justify' ||
         ((action === 'down' || action === 'up') && !hasMultipleRows) ||
         ((action === 'right' || action === 'left') && !hasMultipleCols);
       const reason =
-        action === 'down' || action === 'up'
-          ? strings.fillRequiresMultipleRows
-          : action === 'right' || action === 'left'
-            ? strings.fillRequiresMultipleCols
-            : undefined;
+        action === 'group' || action === 'justify'
+          ? button.textContent?.trim()
+          : action === 'down' || action === 'up'
+            ? strings.fillRequiresMultipleRows
+            : action === 'right' || action === 'left'
+              ? strings.fillRequiresMultipleCols
+              : undefined;
       setMenuControlDisabled(button, disabled, reason);
     }
   };
@@ -515,6 +531,47 @@ const buildUnderlineAction =
         detail: strings.workbookObjects.compatibilityDetails.cellFormatting,
       },
     ]);
+    instance.host.focus();
+  };
+
+const buildCopyAction =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyCopyAction'] =>
+  async (action) => {
+    if (action === 'picture') {
+      const ribbonMenu = instance.i18n.strings
+        .ribbonMenu as typeof instance.i18n.strings.ribbonMenu & {
+        copyAsPicture: string;
+      };
+      const title = ribbonMenu.copyAsPicture;
+      await showInstanceReport(instance, title, [
+        {
+          severity: 'warning',
+          label: title,
+          detail: instance.i18n.strings.workbookObjects.compatibilityDetails.cellFormatting,
+        },
+      ]);
+      instance.host.focus();
+      return;
+    }
+    dispatchHostClipboard(instance, 'copy');
+    instance.host.focus();
+  };
+
+const buildWrapAction =
+  (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyWrapAction'] =>
+  (action) => {
+    const patch =
+      action === 'shrinkToFit'
+        ? { shrinkToFit: true, wrap: false }
+        : { wrap: true, shrinkToFit: false };
+    recordFormatChange(instance.history, instance.store, () => {
+      applyFormatPatch(
+        instance.store.getState(),
+        instance.store,
+        instance.store.getState().selection.range,
+        patch,
+      );
+    });
     instance.host.focus();
   };
 
@@ -764,6 +821,10 @@ const buildFindSelectAction =
       instance.openGoToSpecial();
       return;
     }
+    if (result.kind === 'open-objects') {
+      instance.openWorkbookObjects();
+      return;
+    }
     if (result.kind === 'report') {
       await showInstanceReport(instance, result.report.title, result.report.items);
       return;
@@ -871,7 +932,7 @@ const buildPasteAction =
     //   all | formulas | formulas-and-numfmt | values | values-and-numfmt |
     //   formats | transpose | dialog
     // Map them onto handlePasteAction's PasteAction string so we route
-    // through the same `instance.pasteSpecial` / clipboard glue Phase 1.5
+    // through the same `instance.pasteSpecial` / clipboard glue already
     // wired up — that takes care of snapshot fallback for `all` / `values`.
     const map: Record<string, PasteAction> = {
       all: 'paste',
@@ -897,8 +958,12 @@ const updatePasteMenu =
     const disabledReason = instance.i18n.strings.ribbon.pasteRequiresClipboard;
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-paste-action]')) {
       const action = button.dataset.pasteAction;
+      button.hidden = !hasSnapshot && action !== 'all' && action !== 'dialog';
       const disabled = action !== 'all' && !hasSnapshot;
       setMenuControlDisabled(button, disabled, disabledReason);
+    }
+    for (const separator of menu.querySelectorAll<HTMLElement>('.app__menu-sep')) {
+      separator.hidden = !hasSnapshot;
     }
   };
 
@@ -906,6 +971,7 @@ const buildCellInsertAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyCellInsertAction'] =>
   (action) => {
     const mapped: Record<string, Parameters<typeof handleInsertCellsAction>[1]> = {
+      cells: 'shiftDown',
       'shift-down': 'shiftDown',
       'shift-right': 'shiftRight',
       rows: 'rows',
@@ -922,10 +988,13 @@ const buildCellDeleteAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyCellDeleteAction'] =>
   (action) => {
     const mapped: Record<string, Parameters<typeof handleDeleteCellsAction>[1]> = {
+      cells: 'shiftUp',
       'shift-up': 'shiftUp',
       'shift-left': 'shiftLeft',
       rows: 'rows',
       cols: 'cols',
+      row: 'rows',
+      col: 'cols',
       sheet: 'sheet',
     };
     const next = mapped[action];
@@ -993,6 +1062,10 @@ const updateFormatCellsMenu =
   (menu) => {
     const state = instance.store.getState();
     const range = normalizedSelectionRange(instance);
+    const representativeFormat = state.format.formats.get(
+      addrKey({ sheet: range.sheet, row: range.r0, col: range.c0 }),
+    );
+    const activeLocked = representativeFormat?.locked !== false;
     const rowsHidden = hiddenInSelection(state.layout, 'row', range.r0, range.r1).length > 0;
     const colsHidden = hiddenInSelection(state.layout, 'col', range.c0, range.c1).length > 0;
     const sheet = state.data.sheetIndex;
@@ -1008,6 +1081,7 @@ const updateFormatCellsMenu =
       if (action === 'show-cols' && !colsHidden) return t.formatNoHiddenCols;
       if (
         (action === 'rename-sheet' ||
+          action === 'move-sheet-copy' ||
           action === 'move-sheet-left' ||
           action === 'move-sheet-right' ||
           action === 'hide-sheet' ||
@@ -1019,6 +1093,10 @@ const updateFormatCellsMenu =
       if (action === 'move-sheet-left' && sheet <= 0) return t.sheetMoveAtBoundary;
       if (action === 'move-sheet-right' && sheet >= instance.workbook.sheetCount - 1) {
         return t.sheetMoveAtBoundary;
+      }
+      if (action === 'move-sheet-copy') return t.sheetActionUnavailable;
+      if (action === 'tab-color-high-contrast' || action === 'tab-color-more') {
+        return t.sheetActionUnavailable;
       }
       if (action === 'hide-sheet' && visibleSheetCount <= 1) return t.sheetHideRequiresVisibleSheet;
       if (action === 'unhide-sheet' && hiddenSheetCount === 0) {
@@ -1032,12 +1110,20 @@ const updateFormatCellsMenu =
         (action === 'show-rows' && !rowsHidden) ||
         (action === 'show-cols' && !colsHidden) ||
         (action === 'rename-sheet' && !canMoveSheet) ||
+        action === 'move-sheet-copy' ||
         (action === 'move-sheet-left' && (sheet <= 0 || !canMoveSheet)) ||
         (action === 'move-sheet-right' &&
           (sheet >= instance.workbook.sheetCount - 1 || !canMoveSheet)) ||
         (action === 'hide-sheet' && visibleSheetCount <= 1) ||
-        (action === 'unhide-sheet' && hiddenSheetCount === 0);
+        (action === 'unhide-sheet' && hiddenSheetCount === 0) ||
+        action === 'tab-color-high-contrast' ||
+        action === 'tab-color-more';
       setMenuControlDisabled(button, disabled, reasonForFormatAction(action));
+      if (action === 'lock-cell') {
+        button.setAttribute('role', 'menuitemcheckbox');
+        button.setAttribute('aria-checked', String(activeLocked));
+        button.classList.toggle('app__menu-item--checked', activeLocked);
+      }
       if (action?.startsWith('tab-color-')) {
         const active = action === activeTabColorAction;
         button.setAttribute('role', 'menuitemradio');
@@ -1759,7 +1845,10 @@ const buildPivotTableAction =
       return;
     }
     const pivotAction = (
-      action === 'recommended' || action === 'new-sheet' || action === 'existing-sheet'
+      action === 'recommended' ||
+      action === 'new-sheet' ||
+      action === 'existing-sheet' ||
+      action === 'refresh'
         ? action
         : 'dialog'
     ) as RibbonPivotTableAction;
@@ -1772,6 +1861,8 @@ const buildPivotTableAction =
       strings: {
         pivotTable: strings.ribbon.pivotTable,
         pivotTableNewSheet: strings.ribbonMenu.pivotTableNewSheet,
+        pivotTableRefreshData: strings.ribbonMenu.pivotTableRefreshData,
+        pivotTableRefreshUnavailable: strings.ribbonMenu.pivotTableRefreshUnavailable,
         recommendedPivotTables: strings.ribbonMenu.recommendedPivotTables,
         pivotAuthoringDetail: strings.workbookObjects.compatibilityDetails.pivotAuthoring,
         workbookStructureProtectedBlocked: strings.ribbonMenu.workbookStructureProtectedBlocked,
@@ -2759,6 +2850,7 @@ export function createDefaultDynamicDropdownsCtx(
 
     // Pure / instance-derivable defaults.
     updateArrangeMenu: updateArrangeMenu(instance),
+    applyCopyAction: buildCopyAction(instance),
     applyRibbonPasteAction: buildPasteAction(instance),
     updatePasteMenu: updatePasteMenu(instance),
     applyFillSeries: buildFillSeries(instance),
@@ -2766,6 +2858,7 @@ export function createDefaultDynamicDropdownsCtx(
     applyFillDirection: buildFillDirection(instance),
     applyClearAction: buildClearAction(instance),
     applyUnderlineAction: buildUnderlineAction(instance),
+    applyWrapAction: buildWrapAction(instance),
     applyMergeAction: buildMergeAction(instance),
     applyFreezeAction: buildFreezeAction(instance),
     updateFreezeMenu: updateFreezeMenu(instance),

@@ -98,6 +98,76 @@ export const createBorderPreview = (spec: BorderPreviewSpec): SVGSVGElement => {
   return svg;
 };
 
+const createBorderToolIcon = (className: string): SVGSVGElement => {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('width', '16');
+  svg.setAttribute('height', '16');
+  svg.setAttribute('focusable', 'false');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.classList.add('app__border-preview', className);
+  return svg;
+};
+
+const appendPath = (
+  svg: SVGSVGElement,
+  d: string,
+  opts: { fill?: string; stroke?: string; strokeWidth?: string; strokeLinecap?: string } = {},
+): void => {
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('d', d);
+  path.setAttribute('fill', opts.fill ?? 'none');
+  if (opts.stroke) path.setAttribute('stroke', opts.stroke);
+  if (opts.strokeWidth) path.setAttribute('stroke-width', opts.strokeWidth);
+  if (opts.strokeLinecap) path.setAttribute('stroke-linecap', opts.strokeLinecap);
+  svg.appendChild(path);
+};
+
+export const createBorderEraserPreview = (): SVGSVGElement => {
+  const svg = createBorderToolIcon('app__border-preview--eraser');
+  appendPath(svg, 'M3 10 9.5 3.5l3 3L6 13H3v-3Z', {
+    fill: '#f4b6d2',
+    stroke: '#8a1f5a',
+    strokeWidth: '1',
+  });
+  appendPath(svg, 'M8.2 4.8l3 3', { stroke: '#ffffff', strokeWidth: '1' });
+  return svg;
+};
+
+export const createBorderLineColorPreview = (): SVGSVGElement => {
+  const svg = createBorderToolIcon('app__border-preview--line-color');
+  appendPath(svg, 'M3 12h10', { stroke: '#1f1f1f', strokeWidth: '1.5', strokeLinecap: 'square' });
+  appendPath(svg, 'M4 8.5 9.8 2.7l2.1 2.1L6.1 10.6 3.5 11.2 4 8.5Z', {
+    fill: '#ffffff',
+    stroke: '#2f75b5',
+    strokeWidth: '1',
+  });
+  appendPath(svg, 'M2 14h12', { stroke: '#ed7d31', strokeWidth: '2', strokeLinecap: 'square' });
+  return svg;
+};
+
+export const createBorderLineStylePreview = (): SVGSVGElement => {
+  const svg = createBorderToolIcon('app__border-preview--line-style');
+  const styles: [number, string | null, string][] = [
+    [4, null, '1'],
+    [8, '3 2', '1'],
+    [12, null, '2'],
+  ];
+  for (const [y, dash, width] of styles) {
+    const line = document.createElementNS(SVG_NS, 'line');
+    line.setAttribute('x1', '2');
+    line.setAttribute('y1', String(y));
+    line.setAttribute('x2', '14');
+    line.setAttribute('y2', String(y));
+    line.setAttribute('stroke', 'currentColor');
+    line.setAttribute('stroke-width', width);
+    line.setAttribute('stroke-linecap', 'square');
+    if (dash) line.setAttribute('stroke-dasharray', dash);
+    svg.appendChild(line);
+  }
+  return svg;
+};
+
 export const BORDER_PRESETS: Record<string, BorderPreviewSpec> = {
   bottom: { bottom: 'thin' },
   top: { top: 'thin' },
@@ -131,6 +201,14 @@ export const BORDER_PRESETS: Record<string, BorderPreviewSpec> = {
   topAndBottom: { top: 'thin', bottom: 'thin' },
   topAndThickBottom: { top: 'thin', bottom: 'thick' },
   topAndDoubleBottom: { top: 'thin', bottom: 'double' },
+  format: {
+    top: 'thin',
+    right: 'thin',
+    bottom: 'thin',
+    left: 'thin',
+    innerGrid: true,
+    showBase: false,
+  },
 };
 
 /** Wide horizontal sample for the "線のスタイル / Line style" submenu so

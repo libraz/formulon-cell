@@ -222,8 +222,8 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
       });
     }
     const mark = document.createElement('span');
-    mark.className = 'demo__backstage-command-icon';
-    mark.textContent = icon;
+    mark.className = `demo__backstage-command-icon demo__backstage-command-icon--${icon}`;
+    mark.setAttribute('aria-hidden', 'true');
     const copy = document.createElement('span');
     const heading = document.createElement('strong');
     heading.textContent = title;
@@ -253,7 +253,6 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     title.textContent = backstageText.properties;
     const preview = document.createElement('div');
     preview.className = 'demo__backstage-preview';
-    preview.textContent = 'X';
     const list = document.createElement('dl');
     list.className = 'demo__backstage-prop-list';
     const pairs: [string, string][] = [
@@ -332,7 +331,10 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     nav.setAttribute('aria-label', ribbonText.tabs.file);
     const title = document.createElement('strong');
     title.textContent = ribbonText.tabs.file;
-    nav.append(createBackstageButton('←', 'back', false, backstageText.back), title);
+    const backButton = createBackstageButton('', 'back', false, backstageText.back);
+    backButton.classList.add('demo__backstage-navitem--back');
+    backButton.title = backstageText.back;
+    nav.append(backButton, title);
     for (const item of backstageNavItems(backstageText, ribbonText, active)) {
       nav.appendChild(createBackstageButton(item.label, item.action, item.active));
     }
@@ -343,7 +345,7 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     heading.className = 'demo__backstage-title';
     const mark = document.createElement('span');
     mark.className = 'demo__backstage-xl';
-    mark.textContent = 'X';
+    mark.setAttribute('aria-hidden', 'true');
     const copy = document.createElement('div');
     const h1 = document.createElement('h1');
     h1.textContent = docName();
@@ -364,16 +366,16 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
       createBackstageCommand(
         backstageText.protect,
         backstageText.protectBody,
-        'P',
+        'protect',
         'protect-workbook',
       ),
       createBackstageCommand(
         backstageText.inspect,
         backstageText.inspectBody,
-        '!',
+        'inspect',
         'inspect-workbook',
       ),
-      createBackstageCommand(backstageText.manage, backstageText.manageBody, 'S', 'save-as'),
+      createBackstageCommand(backstageText.manage, backstageText.manageBody, 'manage', 'save-as'),
     );
     manage.append(manageTitle, commands);
     info.append(manage, createBackstageProperties());

@@ -79,10 +79,10 @@ const cfSwatchButton = (action: string, colors: string[], title: string): HTMLBu
   return btn;
 };
 
-const cfIconChoice = (action: string, glyphs: string[], title: string): HTMLButtonElement => {
-  const btn = cfChoiceButton('app__cf-icon-choice', action, title);
-  for (const glyph of glyphs) {
-    btn.appendChild(cfSpan(undefined, glyph));
+const cfIconChoice = (action: string, count: number, title: string): HTMLButtonElement => {
+  const btn = cfChoiceButton(`app__cf-icon-choice app__cf-icon-choice--${action}`, action, title);
+  for (let index = 0; index < count; index += 1) {
+    btn.appendChild(cfSpan());
   }
   return btn;
 };
@@ -332,29 +332,29 @@ const buildColorScaleSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void =>
 const buildIconSetSubmenu = (submenu: HTMLDivElement, t: CfMenuText): void => {
   submenu.append(menuSectionHeader(t.direction));
   const directions = cfPanel('app__cf-icon-panel', [
-    cfIconChoice('icons-arrows3', ['▲', '▶', '▼'], t.iconArrows3),
-    cfIconChoice('icons-arrows5', ['▲', '↗', '▶', '↘', '▼'], t.iconArrows5),
-    cfIconChoice('icons-triangles3', ['▲', '▬', '▼'], t.iconTriangles3),
+    cfIconChoice('icons-arrows3', 3, t.iconArrows3),
+    cfIconChoice('icons-arrows5', 5, t.iconArrows5),
+    cfIconChoice('icons-triangles3', 3, t.iconTriangles3),
   ]);
   submenu.appendChild(directions);
   submenu.append(menuSectionHeader(t.shapes));
   const shapes = cfPanel('app__cf-icon-panel', [
-    cfIconChoice('icons-traffic3', ['●', '●', '●'], t.iconTraffic3),
-    cfIconChoice('icons-trafficRim3', ['●', '●', '●'], t.iconTrafficRim3),
-    cfIconChoice('icons-stars3', ['★', '★', '★'], t.iconStars3),
+    cfIconChoice('icons-traffic3', 3, t.iconTraffic3),
+    cfIconChoice('icons-trafficRim3', 3, t.iconTrafficRim3),
+    cfIconChoice('icons-stars3', 3, t.iconStars3),
   ]);
   submenu.append(shapes, menuSectionHeader(t.indicators));
   const indicators = cfPanel('app__cf-icon-panel', [
-    cfIconChoice('icons-symbols3', ['✓', '!', '×'], t.iconSymbols3),
-    cfIconChoice('icons-flags3', ['⚑', '⚑', '⚑'], t.iconFlags3),
+    cfIconChoice('icons-symbols3', 3, t.iconSymbols3),
+    cfIconChoice('icons-flags3', 3, t.iconFlags3),
   ]);
   submenu.append(indicators, menuSectionHeader(t.ratings));
   const ratings = cfPanel('app__cf-icon-panel', [
-    cfIconChoice('icons-stars3', ['★', '★', '★'], t.ratings),
-    cfIconChoice('icons-quarters5', ['◔', '◑', '◕', '●', '●'], t.iconQuarters5),
-    cfIconChoice('icons-ratings5', ['●', '●', '●', '●', '●'], t.iconRatings5),
-    cfIconChoice('icons-bars5', ['▮', '▮', '▮', '▮', '▮'], t.iconBars5),
-    cfIconChoice('icons-boxes5', ['■', '■', '■', '■', '■'], t.iconBoxes5),
+    cfIconChoice('icons-stars3', 3, t.ratings),
+    cfIconChoice('icons-quarters5', 5, t.iconQuarters5),
+    cfIconChoice('icons-ratings5', 5, t.iconRatings5),
+    cfIconChoice('icons-bars5', 5, t.iconBars5),
+    cfIconChoice('icons-boxes5', 5, t.iconBoxes5),
   ]);
   submenu.append(ratings, menuSeparator(), cfMenuItem(t.otherRules, 'new-rule', 'manage'));
 };

@@ -6,6 +6,7 @@ import {
   buildRibbonModel,
   conditionalMenuText,
   EXCEL365_STANDARD_RIBBON_TABS,
+  excelRibbonIconPaths,
   fluentIconPaths,
   HOME_MIXED_LAYOUT_GROUP_VARIANTS,
   HOME_STACKED_LAYOUT_GROUP_VARIANTS,
@@ -25,6 +26,7 @@ import {
 
 describe('toolbar/ribbon-model', () => {
   const ribbonStylesDir = join(process.cwd(), 'src/styles/toolbar/ribbon');
+  const toolbarBaseDir = join(process.cwd(), 'src/styles/toolbar/base');
 
   it('keeps the shared core ribbon command surface unique within each tab', () => {
     const keys = buildRibbonModel('en').flatMap((tab) =>
@@ -127,9 +129,13 @@ describe('toolbar/ribbon-model', () => {
     expect(groupsCss).toContain('.demo__ribbon-group--tiles .demo__rb-icon');
     expect(groupsCss).toContain('flex-wrap: nowrap;');
     expect(groupsCss).toContain('height: 66px;');
+    expect(groupsCss).toContain('grid-template-columns: 58px repeat(2, 30px);');
     expect(groupsCss).toContain('.demo__ribbon-group--tiles .demo__rb .demo__rb-split-chevron');
     expect(groupsCss).toContain('position: absolute;');
     expect(groupsCss).toContain('bottom: 5px;');
+    expect(groupsCss).toMatch(
+      /\.demo__ribbon-group--stacked \.demo__rb--stacked \.demo__rb-icon,[\s\S]*?width: 17px;[\s\S]*?height: 17px;/,
+    );
   });
 
   it('loads group-specific ribbon CSS after generic button sizing', () => {
@@ -140,6 +146,202 @@ describe('toolbar/ribbon-model', () => {
       expect(generic, cssFile).toBeGreaterThanOrEqual(0);
       expect(groups, cssFile).toBeGreaterThan(generic);
     }
+  });
+
+  it('keeps ribbon chrome close to the Excel 365 white desktop surface', () => {
+    const tokensCss = readFileSync(join(ribbonStylesDir, '../base/tokens.css'), 'utf8');
+    const layoutCss = readFileSync(join(ribbonStylesDir, 'layout-and-buttons.css'), 'utf8');
+
+    expect(tokensCss).toContain('--demo-ribbon-bg: #ffffff;');
+    expect(tokensCss).toContain('--demo-ribbon-rail: #faf9f8;');
+    expect(tokensCss).toContain('--demo-ribbon-hover: #f3f2f1;');
+    expect(tokensCss).toContain('--demo-ribbon-pressed: #edebe9;');
+    expect(tokensCss).toContain('--demo-ribbon-line: #e1dfdd;');
+    expect(layoutCss).toContain('.demo__ribbon-tabs');
+    expect(layoutCss).toContain('background: var(--demo-ribbon-bg);');
+    expect(layoutCss).toMatch(
+      /\.demo__ribbon:not\(\[hidden\]\)\s*\{[\s\S]*?min-height: 96px;[\s\S]*?padding: 3px 6px 2px;/,
+    );
+    expect(layoutCss).toMatch(
+      /\.demo__ribbon-tab\s*\{[\s\S]*?font-weight: 400;[\s\S]*?line-height: 31px;/,
+    );
+    expect(layoutCss).toMatch(/\.demo__ribbon-tab--active\s*\{[\s\S]*?font-weight: 600;/);
+    expect(layoutCss).toMatch(
+      /\.demo__ribbon-label\s*\{[\s\S]*?height: 14px;[\s\S]*?color: color-mix\(in srgb, var\(--demo-fg-soft\) 82%, var\(--demo-ribbon-bg\)\);[\s\S]*?line-height: 14px;/,
+    );
+    expect(layoutCss).toMatch(
+      /\.demo__ribbon-group\s*\{[\s\S]*?padding: 0 6px;[\s\S]*?border-right: 1px solid var\(--demo-ribbon-line\);/,
+    );
+    expect(layoutCss).toContain('height: 3px;');
+    expect(layoutCss).toContain(
+      'background: var(--demo-ribbon-pressed, var(--demo-ribbon-hover));',
+    );
+    expect(layoutCss).toMatch(
+      /\.demo__rb--active\s*\{[\s\S]*?background: var\(--demo-ribbon-pressed, var\(--demo-ribbon-hover\)\);[\s\S]*?border-color: var\(--demo-ribbon-line\);/,
+    );
+    expect(layoutCss).toMatch(
+      /\.demo__rb\s*\{[\s\S]*?width: 30px;[\s\S]*?height: 26px;[\s\S]*?border-radius: 2px;/,
+    );
+    expect(layoutCss).toMatch(/\.demo__rb-icon\s*\{[\s\S]*?width: 20px;[\s\S]*?height: 20px;/);
+    expect(layoutCss).toMatch(/\.demo__rb--mono\s*\{[\s\S]*?min-width: 30px;/);
+    expect(layoutCss).toMatch(
+      /\.demo__ribbon-display-option\[aria-checked="true"\]::before\s*\{[\s\S]*?border-bottom: 2px solid var\(--demo-accent\);[\s\S]*?border-left: 2px solid var\(--demo-accent\);[\s\S]*?content: "";[\s\S]*?transform: rotate\(-45deg\);/,
+    );
+    expect(layoutCss).toMatch(
+      /\.demo__ribbon-toggle::before\s*\{[\s\S]*?width: 7px;[\s\S]*?border-top: 1\.6px solid currentColor;[\s\S]*?border-left: 1\.6px solid currentColor;[\s\S]*?content: "";[\s\S]*?rotate\(45deg\);/,
+    );
+    expect(layoutCss).toMatch(
+      /\.demo__ribbon-shell--tabsOnly \.demo__ribbon-toggle::before,[\s\S]*?\.demo__ribbon-shell--autoHide \.demo__ribbon-toggle::before\s*\{[\s\S]*?rotate\(-135deg\);/,
+    );
+    expect(layoutCss).not.toContain('content: "✓"');
+    expect(layoutCss).not.toContain('content: "⌃"');
+    expect(layoutCss).not.toContain('content: "⌄"');
+    expect(layoutCss).not.toContain(
+      'background: var(--demo-ribbon-pressed, var(--demo-accent-soft));',
+    );
+  });
+
+  it('keeps the titlebar on the neutral Excel 365 desktop surface', () => {
+    const tokensCss = readFileSync(join(toolbarBaseDir, 'tokens.css'), 'utf8');
+    const titlebarCss = readFileSync(join(toolbarBaseDir, 'header/titlebar.css'), 'utf8');
+    const commandbarCss = readFileSync(join(toolbarBaseDir, 'header/commandbar.css'), 'utf8');
+    const sidePanelCss = readFileSync(join(toolbarBaseDir, '../panels/side.css'), 'utf8');
+    const modalCss = readFileSync(join(toolbarBaseDir, '../panels/modal.css'), 'utf8');
+    const backstageCss = readFileSync(join(toolbarBaseDir, 'backstage.css'), 'utf8');
+
+    expect(tokensCss).toContain('--demo-title: #f3f2f1;');
+    expect(tokensCss).toContain('--demo-title-fg: #201f1e;');
+    expect(titlebarCss).toContain('min-height: 36px;');
+    expect(titlebarCss).toContain('background: var(--demo-title);');
+    expect(titlebarCss).toContain('background: transparent;');
+    expect(titlebarCss).toContain('.demo__search:hover,');
+    expect(titlebarCss).toContain('.demo__account .demo__share:first-child');
+    expect(titlebarCss).toContain('background: var(--demo-title-strong);');
+    expect(commandbarCss).toMatch(
+      /\.demo__brand-mark\s*\{[\s\S]*?background: var\(--demo-title-strong\);[\s\S]*?color: #ffffff;/,
+    );
+    expect(commandbarCss).toMatch(
+      /\.demo__seg-btn:hover\s*\{[\s\S]*?background: var\(--demo-ribbon-hover\);[\s\S]*?color: var\(--demo-fg\);/,
+    );
+    expect(commandbarCss).toMatch(
+      /\.demo__btn:hover:not\(:disabled\)\s*\{[\s\S]*?background: var\(--demo-ribbon-hover\);[\s\S]*?border-color: var\(--demo-ribbon-line\);/,
+    );
+    expect(commandbarCss).not.toContain('background: var(--demo-accent-soft)');
+    expect(sidePanelCss).toMatch(
+      /\.demo__card h2\s*\{[\s\S]*?font-size: 12px;[\s\S]*?letter-spacing: 0;[\s\S]*?color: var\(--demo-fg\);/,
+    );
+    expect(sidePanelCss).toMatch(/\.demo__preset-btn\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(sidePanelCss).toMatch(
+      /\.demo__preset-btn:hover:not\(:disabled\)\s*\{[\s\S]*?border-color: var\(--demo-ribbon-line\);[\s\S]*?background: var\(--demo-ribbon-hover\);/,
+    );
+    expect(sidePanelCss).toMatch(
+      /\.demo__feat-title\s*\{[\s\S]*?font-size: 11px;[\s\S]*?letter-spacing: 0;[\s\S]*?color: var\(--demo-fg\);/,
+    );
+    expect(sidePanelCss).toMatch(
+      /\.demo__log-cell\s*\{[\s\S]*?background: var\(--demo-ribbon-hover\);[\s\S]*?border-radius: 2px;/,
+    );
+    expect(sidePanelCss).not.toContain('text-transform: uppercase');
+    expect(modalCss).toMatch(
+      /\.demo__modal-panel\s*\{[\s\S]*?border-radius: 2px;[\s\S]*?0 12px 32px rgba\(0, 0, 0, 0\.18\),[\s\S]*?0 1px 4px rgba\(0, 0, 0, 0\.14\);/,
+    );
+    expect(modalCss).toMatch(/\.demo__modal-list li\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(modalCss).toMatch(/\.demo__report-item\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(modalCss).not.toContain('box-shadow: var(--fc-shadow-16)');
+    expect(backstageCss).toMatch(
+      /\.demo__backstage-command--active\s*\{[\s\S]*?border-color: var\(--demo-accent\);[\s\S]*?background: var\(--demo-ribbon-pressed, var\(--demo-ribbon-bg\)\);/,
+    );
+    expect(backstageCss).not.toContain(
+      'background: var(--demo-accent-soft, color-mix(in srgb, var(--demo-accent) 12%, transparent));',
+    );
+  });
+
+  it('keeps ribbon menus on the Excel 365 neutral popup surface', () => {
+    const menusCss = readFileSync(join(ribbonStylesDir, 'menus.css'), 'utf8');
+    const dropdownsCss = readFileSync(join(ribbonStylesDir, 'dropdowns.css'), 'utf8');
+    const colorControlsCss = readFileSync(join(ribbonStylesDir, 'color-controls.css'), 'utf8');
+
+    expect(menusCss).toContain('background: var(--demo-ribbon-bg, #ffffff);');
+    expect(menusCss).toContain('border-radius: 2px;');
+    expect(menusCss).toMatch(
+      /\.app__menu-icon\s*\{[\s\S]*?flex: 0 0 18px;[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
+    );
+    expect(menusCss).toMatch(
+      /\.app__menu-item__icon-spacer\s*\{[\s\S]*?flex: 0 0 18px;[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
+    );
+    expect(menusCss).toMatch(
+      /\.app__menu-item:hover,[\s\S]*?\.app__submenu-item:focus-visible\s*\{[\s\S]*?background: var\(--demo-ribbon-hover\);/,
+    );
+    expect(menusCss).toMatch(
+      /\.demo__merge-menu__item:hover,[\s\S]*?\.demo__merge-menu__item:focus-visible\s*\{[\s\S]*?background: var\(--demo-ribbon-hover\);/,
+    );
+    expect(menusCss).toMatch(
+      /\.app__symbol-tile:hover,[\s\S]*?\.app__symbol-tile:focus-visible\s*\{[\s\S]*?border-color: var\(--demo-ribbon-line\);[\s\S]*?background: var\(--demo-ribbon-hover\);/,
+    );
+    expect(menusCss).toMatch(
+      /\.app__visual-tile:hover,[\s\S]*?\.app__visual-tile:focus-visible\s*\{[\s\S]*?border-color: var\(--demo-ribbon-line\);[\s\S]*?background: var\(--demo-ribbon-hover\);/,
+    );
+    expect(menusCss).toMatch(
+      /\.app__cf-choice:hover,[\s\S]*?\.app__cellstyle-chip:focus-visible\s*\{[\s\S]*?border-color: var\(--demo-ribbon-line\);[\s\S]*?background: var\(--demo-ribbon-hover\);/,
+    );
+    expect(menusCss).toMatch(
+      /\.app__color-swatch--active,[\s\S]*?\.app__color-swatch\[aria-checked="true"\]\s*\{[\s\S]*?border-color: var\(--demo-accent\);[\s\S]*?background: var\(--demo-ribbon-pressed, var\(--demo-ribbon-hover\)\);/,
+    );
+    expect(menusCss).toMatch(
+      /\.app__visual-tile--active,[\s\S]*?\.app__visual-tile\[aria-checked="true"\]\s*\{[\s\S]*?border-color: var\(--demo-accent\);[\s\S]*?background: var\(--demo-ribbon-pressed, var\(--demo-ribbon-hover\)\);/,
+    );
+    expect(menusCss).toMatch(
+      /\.demo__cf-menu__swatch:hover,[\s\S]*?\.demo__cf-menu__iconset:focus-visible\s*\{[\s\S]*?border-color: var\(--demo-ribbon-line\);[\s\S]*?background: var\(--demo-ribbon-hover\);/,
+    );
+    expect(menusCss).toContain('.app__cf-icon-choice--icons-arrows5 span:nth-child(2)');
+    expect(menusCss).toContain('.app__cf-icon-choice--icons-traffic3 span:first-child');
+    expect(menusCss).toContain('.app__cf-icon-choice--icons-flags3 span:last-child');
+    expect(dropdownsCss).toContain('background: var(--demo-ribbon-bg, var(--demo-input-bg));');
+    expect(dropdownsCss).toContain('border-radius: 2px;');
+    expect(dropdownsCss).toMatch(
+      /\.demo__rb-dd__check\s*\{[\s\S]*?width: 18px;[\s\S]*?min-width: 18px;/,
+    );
+    expect(dropdownsCss).toContain(
+      'background: var(--demo-ribbon-pressed, var(--demo-ribbon-hover));',
+    );
+    expect(dropdownsCss).toMatch(
+      /\.demo__rb-select--font \.demo__rb-dd__list\s*\{[\s\S]*?min-width: 360px;[\s\S]*?padding: 7px 0;[\s\S]*?border-radius: 2px;[\s\S]*?background: var\(--demo-ribbon-bg, #ffffff\);[\s\S]*?box-shadow:/,
+    );
+    expect(dropdownsCss).toMatch(
+      /\.demo__rb-select--font \.demo__rb-dd__section\s*\{[\s\S]*?color: #b5b5b5;/,
+    );
+    expect(dropdownsCss).toMatch(
+      /\.demo__rb-select--font \.demo__rb-dd__opt:hover,[\s\S]*?\.demo__rb-select--font \.demo__rb-dd__opt:focus-visible\s*\{[\s\S]*?background: var\(--demo-ribbon-hover\);/,
+    );
+    expect(dropdownsCss).toMatch(
+      /\.demo__rb-select--number-format\.demo__rb-dd--open > \.demo__rb-dd__btn,[\s\S]*?\.demo__rb-select--number-format > \.demo__rb-dd__btn:focus-visible\s*\{[\s\S]*?border-color: var\(--demo-ribbon-line\);[\s\S]*?background: var\(--demo-ribbon-hover\);/,
+    );
+    expect(dropdownsCss).toMatch(
+      /\.demo__rb-select--number-format \.demo__rb-dd__list\s*\{[\s\S]*?min-width: 148px;[\s\S]*?padding: 6px 0;[\s\S]*?border-radius: 2px;[\s\S]*?background: var\(--demo-ribbon-bg, #ffffff\);[\s\S]*?box-shadow:/,
+    );
+    const numberFormatCss = dropdownsCss.slice(
+      dropdownsCss.indexOf('.demo__rb-select--number-format .demo__rb-dd__opt'),
+      dropdownsCss.indexOf('/* ── Margins picker variant'),
+    );
+    expect(numberFormatCss).toContain('min-height: 25px;');
+    expect(numberFormatCss).toContain('background: #f3f2f1;');
+    expect(numberFormatCss).toContain('data:image/svg+xml');
+    expect(numberFormatCss).toContain('data-fc-value="percent"');
+    expect(numberFormatCss).toContain('%23107c41');
+    expect(numberFormatCss).not.toContain('content: "%"');
+    expect(numberFormatCss).not.toContain('content: "1/2"');
+    expect(numberFormatCss).not.toContain('content: "10²"');
+    expect(colorControlsCss).toMatch(
+      /\.demo__rb-color__btn:hover,[\s\S]*?\.demo__rb-color--open \.demo__rb-color__btn\s*\{[\s\S]*?background: var\(--demo-ribbon-hover\);[\s\S]*?border-color: var\(--demo-ribbon-line\);/,
+    );
+    expect(colorControlsCss).toMatch(
+      /\.demo__rb-color\s*\{[\s\S]*?width: 30px;[\s\S]*?height: 26px;/,
+    );
+    expect(colorControlsCss).toMatch(
+      /\.demo__rb-color__btn\s*\{[\s\S]*?width: 30px;[\s\S]*?height: 26px;/,
+    );
+    expect(colorControlsCss).toMatch(
+      /\.demo__color-flyout,[\s\S]*?\.demo__merge-menu\s*\{[\s\S]*?border-radius: 3px;[\s\S]*?background: var\(--demo-ribbon-bg, #ffffff\);[\s\S]*?0 8px 18px rgba\(0, 0, 0, 0\.15\)/,
+    );
   });
 
   it('keeps Home dense layout widths large enough to avoid hidden row wraps', () => {
@@ -164,6 +366,13 @@ describe('toolbar/ribbon-model', () => {
     }
     expect(widthFor('cells')).toBeGreaterThanOrEqual(92);
     expect(widthFor('editing')).toBeGreaterThanOrEqual(238);
+    expect(widthFor('alignment')).toBeGreaterThanOrEqual(190);
+    expect(groupsCss).toMatch(
+      /\.demo__ribbon-group--alignment \.demo__rb-icon\s*\{[\s\S]*?width: 22px;[\s\S]*?height: 22px;/,
+    );
+    expect(groupsCss).toMatch(
+      /\.demo__ribbon-group--alignment\.demo__ribbon-group--stacked \.demo__rb--stacked \.demo__rb-icon,[\s\S]*?width: 22px;[\s\S]*?height: 22px;/,
+    );
     expect(groupsCss).toContain('.demo__ribbon-group--stacked .demo__ribbon-tools');
     expect(groupsCss).toContain('.demo__ribbon-group--mixed .demo__ribbon-tools');
     expect(groupsCss).toContain('grid-template-rows: repeat(3, 22px);');
@@ -212,6 +421,13 @@ describe('toolbar/ribbon-model', () => {
       'large',
       'large',
     ]);
+    expect(groups.get('editing')?.commands.map((command) => command.icon)).toEqual([
+      'autosum',
+      'fill',
+      'clear',
+      'sortFilter',
+      'find',
+    ]);
     expect(
       [...(groups.get('cells')?.commands ?? []), ...(groups.get('editing')?.commands ?? [])].map(
         (command) => command.className ?? '',
@@ -256,11 +472,40 @@ describe('toolbar/ribbon-model', () => {
     expect(commands.get('formatTableInsert')).toMatchObject({
       label: 'Table',
       title: 'Table',
+      icon: 'table',
     });
     expect(commands.get('formatTableHome')).toMatchObject({
       label: 'Format as Table',
       title: 'Format as Table',
     });
+    expect(commands.get('pivotTableInsert')).toMatchObject({
+      label: 'PivotTable',
+      title: 'PivotTable',
+      icon: 'pivotTable',
+    });
+    expect(commands.get('pictureInsert')).toMatchObject({ icon: 'picture' });
+    expect(commands.get('shapesInsert')).toMatchObject({ icon: 'shapes' });
+    expect(commands.get('screenshotInsert')).toMatchObject({ icon: 'screenshot' });
+    expect(commands.get('chartInsert')).toMatchObject({ icon: 'chart' });
+    expect(commands.get('hyperlinkInsert')).toMatchObject({ icon: 'link' });
+    expect(commands.get('commentInsert')).toMatchObject({ icon: 'commentAdd' });
+    expect(commands.get('symbolInsert')).toMatchObject({ icon: 'function' });
+    expect(commands.get('pageTheme')).toMatchObject({ icon: 'pageTheme' });
+    expect(commands.get('pageSetupAdvanced')).toMatchObject({ icon: 'pageSetup' });
+    expect(commands.get('printArea')).toMatchObject({ icon: 'printArea' });
+    expect(commands.get('pageBreaks')).toMatchObject({ icon: 'pageBreaks' });
+    expect(commands.get('sheetBackground')).toMatchObject({ icon: 'sheetBackground' });
+    expect(commands.get('printTitles')).toMatchObject({ icon: 'printTitles' });
+    expect(commands.get('filter')).toMatchObject({ icon: 'filter' });
+    expect(commands.get('textToColumns')).toMatchObject({ icon: 'textToColumns' });
+    expect(commands.get('removeDupes')).toMatchObject({ icon: 'removeDuplicates' });
+    expect(commands.get('dataValidation')).toMatchObject({ icon: 'dataValidation' });
+    expect(commands.get('outlineGroup')).toMatchObject({ icon: 'outlineGroup' });
+    expect(commands.get('outlineUngroup')).toMatchObject({ icon: 'outlineUngroup' });
+    expect(commands.get('outlineShowDetail')).toMatchObject({ icon: 'outlineShow' });
+    expect(commands.get('outlineHideDetail')).toMatchObject({ icon: 'outlineHide' });
+    expect(commands.get('errorChecking')).toMatchObject({ icon: 'errorChecking' });
+    expect(commands.get('calcOptions')).toMatchObject({ icon: 'calcOptions' });
     expect(tabs.get('review')?.groups.map((group) => group.title)).toEqual([
       'Proofing',
       'Accessibility',
@@ -271,12 +516,119 @@ describe('toolbar/ribbon-model', () => {
     ]);
   });
 
-  it('has Fluent SVG paths for every icon used by the ribbon model', () => {
+  it('has SVG paths for every icon used by the ribbon model', () => {
     const missing = ribbonCommands('en')
-      .filter((command) => command.icon && !fluentIconPaths(command.icon))
+      .filter(
+        (command) =>
+          command.icon && !fluentIconPaths(command.icon) && !excelRibbonIconPaths(command.icon),
+      )
       .map((command) => `${command.id}:${command.icon}`);
 
     expect(missing).toEqual([]);
+  });
+
+  it('has Excel-like SVG paths for every visible ribbon model icon', () => {
+    const missingExcelIcon = ribbonCommands('en')
+      .filter((command) => command.icon && !excelRibbonIconPaths(command.icon))
+      .map((command) => `${command.id}:${command.icon}`);
+
+    expect(missingExcelIcon).toEqual([]);
+  });
+
+  it('overrides high-value cell formatting icons with Excel-like SVG definitions', () => {
+    expect(
+      [
+        'paste',
+        'cut',
+        'copy',
+        'paint',
+        'pasteFormulas',
+        'pasteValues',
+        'pasteTranspose',
+        'pasteSpecial',
+        'fontGrow',
+        'fontShrink',
+        'currency',
+        'percent',
+        'comma',
+        'decDown',
+        'decUp',
+        'autosum',
+        'fill',
+        'clear',
+        'sortAsc',
+        'sortDesc',
+        'sortFilter',
+        'find',
+        'top',
+        'middle',
+        'bottomAlign',
+        'alignLeft',
+        'alignCenter',
+        'alignRight',
+        'textOrientation',
+        'wrap',
+        'indentDecrease',
+        'indentIncrease',
+        'merge',
+        'table',
+        'pivotTable',
+        'picture',
+        'shapes',
+        'screenshot',
+        'chart',
+        'link',
+        'commentAdd',
+        'function',
+        'pageTheme',
+        'pageSetup',
+        'printArea',
+        'pageBreaks',
+        'sheetBackground',
+        'printTitles',
+        'filter',
+        'textToColumns',
+        'removeDuplicates',
+        'dataValidation',
+        'outlineGroup',
+        'outlineUngroup',
+        'outlineShow',
+        'outlineHide',
+        'names',
+        'trace',
+        'dependents',
+        'clearArrows',
+        'errorChecking',
+        'calcOptions',
+        'watch',
+        'spelling',
+        'accessibility',
+        'translate',
+        'protect',
+        'print',
+        'freeze',
+        'zoom',
+        'page',
+        'goTo',
+        'options',
+        'pen',
+        'eraser',
+        'script',
+        'addIn',
+        'pdf',
+        'borders',
+        'fillColor',
+        'fontColor',
+        'insertRows',
+        'insertCols',
+        'deleteRows',
+        'deleteCols',
+        'formatCells',
+        'conditional',
+        'tableStyle',
+        'cellStyles',
+      ].filter((name) => !excelRibbonIconPaths(name)),
+    ).toEqual([]);
   });
 
   it('localizes ribbon model command titles for Japanese Office-like surfaces', () => {
@@ -284,7 +636,7 @@ describe('toolbar/ribbon-model', () => {
 
     expect(commands.get('numberFormat')).toBe('数値');
     expect(commands.get('paste')).toBe('貼り付け');
-    expect(commands.get('bold')).toBe('太字 (⌘B)');
+    expect(commands.get('bold')).toBe('太字 (Ctrl+B)');
     expect(commands.get('borders')).toBe('罫線');
     const homeFontCommands =
       buildRibbonModel('en')
@@ -318,6 +670,25 @@ describe('toolbar/ribbon-model', () => {
       'indentIncrease',
       'merge',
     ]);
+    expect(
+      buildRibbonModel('en')
+        .find((tab) => tab.id === 'home')
+        ?.groups.find((group) => group.variant === 'alignment')
+        ?.commands.filter((command) => command.kind !== 'break')
+        .map((command) => command.icon),
+    ).toEqual([
+      'top',
+      'middle',
+      'bottomAlign',
+      'alignLeft',
+      'alignCenter',
+      'alignRight',
+      'textOrientation',
+      'wrap',
+      'indentDecrease',
+      'indentIncrease',
+      'merge',
+    ]);
     expect(modelCommands.find((command) => command.id === 'wrap')?.kind).toBe('button');
     expect(modelCommands.find((command) => command.id === 'currency')?.kind).toBe('button');
     expect(modelCommands.find((command) => command.id === 'merge')?.kind).toBe('button');
@@ -337,6 +708,22 @@ describe('toolbar/ribbon-model', () => {
     expect(commands.get('protect')).toBe('保護');
   });
 
+  it('uses Windows-style shortcut labels for the Japanese Excel 365 desktop baseline', () => {
+    const titled = ribbonCommands('ja').filter((command) => command.title);
+    const macShortcutTitles = titled
+      .filter((command) => command.title.includes('⌘'))
+      .map((command) => `${command.id}:${command.title}`);
+    const commands = new Map(titled.map((command) => [command.id, command.title]));
+
+    expect(macShortcutTitles).toEqual([]);
+    expect(commands.get('bold')).toBe('太字 (Ctrl+B)');
+    expect(commands.get('italic')).toBe('斜体 (Ctrl+I)');
+    expect(commands.get('underline')).toBe('下線 (Ctrl+U)');
+    expect(commands.get('findHome')).toBe('検索と選択 (Ctrl+F)');
+    expect(commands.get('findReview')).toBe('検索 (Ctrl+F)');
+    expect(commands.get('hyperlinkInsert')).toBe('リンク (Ctrl+K)');
+  });
+
   it('does not expose internal row-break ids as command titles', () => {
     const breaks = buildRibbonModel('ja')
       .flatMap((tab) => tab.groups)
@@ -350,7 +737,7 @@ describe('toolbar/ribbon-model', () => {
     const allowed =
       /^(Acrobat|PDF|R1C1|fx|SUM|AVG|AVERAGE|IF|XLOOKUP|CONCAT|TODAY|PMT|ROUND|A-Z|Z-A|\$|%|,|\.0|\.00|B|I|U|S|\d+%)$/;
     const allowedInline =
-      /^(?:オートSUM \(Σ\)|(?:SUM|AVERAGE|IF|XLOOKUP|CONCAT|TODAY|PMT|ROUND) の引数)$/;
+      /^(?:オートSUM \(Σ\)|.* \(Ctrl\+[A-Z]\)|(?:SUM|AVERAGE|IF|XLOOKUP|CONCAT|TODAY|PMT|ROUND) の引数)$/;
     const untranslated = ribbonCommands('ja')
       .filter((command) => /[A-Za-z]{3,}/.test(command.title))
       .filter((command) => !allowed.test(command.title) && !allowedInline.test(command.title))

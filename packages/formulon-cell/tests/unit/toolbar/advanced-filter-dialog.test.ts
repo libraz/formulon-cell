@@ -1,5 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { showAdvancedFilterDialog } from '../../../src/toolbar/dialogs/advanced-filter.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 describe('showAdvancedFilterDialog', () => {
   afterEach(() => {
@@ -112,5 +117,22 @@ describe('showAdvancedFilterDialog', () => {
       .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn:not(.fc-fmtdlg__btn--primary)')
       ?.click();
     await expect(pending).resolves.toBeNull();
+  });
+
+  it('keeps Advanced Filter close to Excel 365 desktop range dialog geometry', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/dialog-modules/advanced-filter.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(
+      /\.fc-advfilter__ranges\s*\{[\s\S]*?gap: 6px;[\s\S]*?padding: 8px 10px;[\s\S]*?border-radius: 2px;[\s\S]*?background: var\(--fc-bg, Canvas\);/,
+    );
+    expect(css).toMatch(
+      /\.fc-advfilter__row\s*\{[\s\S]*?grid-template-columns: minmax\(130px, 0\.8fr\) minmax\(180px, 1\.2fr\);[\s\S]*?gap: 10px;/,
+    );
+    expect(css).toMatch(/\.fc-advfilter__option\s*\{[\s\S]*?gap: 6px;[\s\S]*?padding: 2px 0;/);
+    expect(css).not.toContain('border-radius: 6px;');
+    expect(css).not.toContain('color-mix(in srgb, var(--fc-fmtdlg-input-bg) 84%, transparent)');
   });
 });

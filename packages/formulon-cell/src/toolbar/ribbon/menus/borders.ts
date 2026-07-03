@@ -11,6 +11,9 @@ import { RIBBON_BORDERS_MENU_ID } from '../activation.js';
 import {
   BORDER_PRESETS,
   type BorderPreviewSpec,
+  createBorderEraserPreview,
+  createBorderLineColorPreview,
+  createBorderLineStylePreview,
   createBorderPreview,
   createLineSamplePreview,
   LINE_STYLES_ALL,
@@ -43,12 +46,13 @@ const drawActionItem = (
   action: string,
   label: string,
   icon?: BorderPreviewSpec,
+  leading?: Node,
 ): HTMLButtonElement => {
   const btn = menuPresetButton(
     label,
     'borderDraw',
     action,
-    icon ? createBorderPreview(icon) : menuIconSpacer(),
+    leading ?? (icon ? createBorderPreview(icon) : menuIconSpacer()),
   );
   btn.setAttribute('role', 'menuitemcheckbox');
   btn.setAttribute('aria-checked', 'false');
@@ -58,8 +62,9 @@ const drawActionItem = (
 const submenuTrigger = (
   submenuKey: 'lineColor' | 'lineStyle',
   label: string,
+  leading: Node = menuIconSpacer(),
 ): HTMLButtonElement => {
-  const btn = menuPresetButton(label, 'borderSubmenu', submenuKey, menuIconSpacer());
+  const btn = menuPresetButton(label, 'borderSubmenu', submenuKey, leading);
   return menuSubmenuTrigger(btn, undefined, { controlsId: borderSubmenuId(submenuKey) });
 };
 
@@ -81,6 +86,7 @@ const createLineStyleSubmenu = (label: string, noneLabel: string): HTMLDivElemen
     btn.setAttribute('role', 'menuitemradio');
     btn.setAttribute('aria-checked', value === 'thin' ? 'true' : 'false');
     if (value === 'none') {
+      btn.classList.add('app__submenu-item--line-style-none');
       btn.appendChild(submenuItemText(noneLabel));
     } else {
       btn.appendChild(createLineSamplePreview(value));
@@ -142,9 +148,9 @@ export const createBordersMenu = (deps: BordersMenuDeps): HTMLDivElement => {
       innerGrid: true,
       showBase: false,
     }),
-    drawActionItem('erase', t.eraseBorder),
-    submenuTrigger('lineColor', t.lineColor),
-    submenuTrigger('lineStyle', t.lineStyle),
+    drawActionItem('erase', t.eraseBorder, undefined, createBorderEraserPreview()),
+    submenuTrigger('lineColor', t.lineColor, createBorderLineColorPreview()),
+    submenuTrigger('lineStyle', t.lineStyle, createBorderLineStylePreview()),
     menuSeparator(),
     // Footer
     presetMenuItem('format', t.moreBorders),

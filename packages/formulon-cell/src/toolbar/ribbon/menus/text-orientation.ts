@@ -9,6 +9,46 @@ import { createMenu, menuPresetButton, menuSeparator } from './general.js';
 
 export type TextOrientationGlyph = 'ccw' | 'cw' | 'vertical' | 'up' | 'down' | 'format';
 
+const ink = '#1f1f1f';
+const grid = '#8a8f98';
+const gridLight = '#d9d9d9';
+const excelGreen = '#107c41';
+const excelBlue = '#2f75b5';
+
+type TextOrientationPathAttrs = {
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: string;
+  strokeLinecap?: 'butt' | 'round' | 'square';
+  strokeLinejoin?: 'bevel' | 'miter' | 'round';
+  transform?: string;
+};
+
+const appendPath = (
+  svg: SVGSVGElement,
+  d: string,
+  {
+    fill = 'none',
+    stroke,
+    strokeWidth = '1.25',
+    strokeLinecap = 'round',
+    strokeLinejoin = 'round',
+    transform,
+  }: TextOrientationPathAttrs = {},
+): void => {
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('d', d);
+  path.setAttribute('fill', fill);
+  if (stroke) {
+    path.setAttribute('stroke', stroke);
+    path.setAttribute('stroke-width', strokeWidth);
+    path.setAttribute('stroke-linecap', strokeLinecap);
+    path.setAttribute('stroke-linejoin', strokeLinejoin);
+  }
+  if (transform) path.setAttribute('transform', transform);
+  svg.appendChild(path);
+};
+
 const createTextOrientationIcon = (glyph: TextOrientationGlyph): SVGSVGElement => {
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('viewBox', '0 0 16 16');
@@ -17,77 +57,48 @@ const createTextOrientationIcon = (glyph: TextOrientationGlyph): SVGSVGElement =
   svg.classList.add('app__text-orientation-preview');
   svg.setAttribute('focusable', 'false');
   svg.setAttribute('aria-hidden', 'true');
-  svg.setAttribute('fill', 'none');
-  svg.setAttribute('stroke', 'currentColor');
-  svg.setAttribute('stroke-width', '1.2');
-  svg.setAttribute('stroke-linecap', 'round');
-  svg.setAttribute('stroke-linejoin', 'round');
-  const baseline = document.createElementNS(SVG_NS, 'line');
-  baseline.setAttribute('x1', '2');
-  baseline.setAttribute('y1', '13');
-  baseline.setAttribute('x2', '14');
-  baseline.setAttribute('y2', '13');
-  svg.appendChild(baseline);
+  appendPath(svg, 'M2 13h12', { stroke: grid, strokeWidth: '1.25' });
   if (glyph === 'ccw' || glyph === 'cw') {
     const angle = glyph === 'ccw' ? -35 : 35;
-    const text = document.createElementNS(SVG_NS, 'text');
-    text.setAttribute('x', '4');
-    text.setAttribute('y', '11');
-    text.setAttribute('transform', `rotate(${angle} 8 11)`);
-    text.setAttribute('font-family', 'system-ui, sans-serif');
-    text.setAttribute('font-size', '7');
-    text.setAttribute('font-weight', '700');
-    text.setAttribute('fill', 'currentColor');
-    text.setAttribute('stroke', 'none');
-    text.textContent = 'ab';
-    svg.appendChild(text);
+    appendPath(svg, 'M4.2 9.8h5.6M4.2 7.7h4.2M10.5 7.1v5.1', {
+      stroke: ink,
+      strokeWidth: '1.45',
+      transform: `rotate(${angle} 8 10)`,
+    });
+    appendPath(
+      svg,
+      glyph === 'ccw'
+        ? 'M5.1 5.4 3.3 7.2l1.8 1.8M3.4 7.2h5.4'
+        : 'M10.9 5.4l1.8 1.8-1.8 1.8M7.2 7.2h5.4',
+      { stroke: excelGreen, strokeWidth: '1.45' },
+    );
   } else if (glyph === 'vertical') {
-    for (let i = 0; i < 3; i += 1) {
-      const ch = document.createElementNS(SVG_NS, 'text');
-      ch.setAttribute('x', '8');
-      ch.setAttribute('y', String(4 + i * 3));
-      ch.setAttribute('text-anchor', 'middle');
-      ch.setAttribute('font-family', 'system-ui, sans-serif');
-      ch.setAttribute('font-size', '3');
-      ch.setAttribute('font-weight', '700');
-      ch.setAttribute('fill', 'currentColor');
-      ch.setAttribute('stroke', 'none');
-      ch.textContent = 'a';
-      svg.appendChild(ch);
-    }
+    appendPath(svg, 'M7.2 3.2h1.6v1.6H7.2zM7.2 6.2h1.6v1.6H7.2zM7.2 9.2h1.6v1.6H7.2z', {
+      fill: ink,
+    });
+    appendPath(svg, 'M5.2 3v8M10.8 3v8', { stroke: excelGreen, strokeWidth: '1.15' });
   } else if (glyph === 'up' || glyph === 'down') {
-    const text = document.createElementNS(SVG_NS, 'text');
-    text.setAttribute('x', '0');
-    text.setAttribute('y', '0');
     const rotate = glyph === 'up' ? -90 : 90;
-    text.setAttribute('transform', `translate(8 11) rotate(${rotate})`);
-    text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('font-family', 'system-ui, sans-serif');
-    text.setAttribute('font-size', '7');
-    text.setAttribute('font-weight', '700');
-    text.setAttribute('fill', 'currentColor');
-    text.setAttribute('stroke', 'none');
-    text.textContent = 'ab';
-    svg.appendChild(text);
+    appendPath(svg, 'M4.3 10h5.9M4.3 7.9h4.4M10.8 7.4v5', {
+      stroke: ink,
+      strokeWidth: '1.45',
+      transform: `translate(8 10) rotate(${rotate}) translate(-8 -10)`,
+    });
+    appendPath(
+      svg,
+      glyph === 'up'
+        ? 'M12 10.8V4.2M9.9 6.3 12 4.2l2.1 2.1'
+        : 'M12 4.2v6.6M9.9 8.7l2.1 2.1 2.1-2.1',
+      {
+        stroke: excelGreen,
+        strokeWidth: '1.45',
+      },
+    );
   } else if (glyph === 'format') {
-    const grid = document.createElementNS(SVG_NS, 'rect');
-    grid.setAttribute('x', '2.5');
-    grid.setAttribute('y', '3.5');
-    grid.setAttribute('width', '11');
-    grid.setAttribute('height', '7');
-    svg.appendChild(grid);
-    const hLine = document.createElementNS(SVG_NS, 'line');
-    hLine.setAttribute('x1', '2.5');
-    hLine.setAttribute('y1', '7');
-    hLine.setAttribute('x2', '13.5');
-    hLine.setAttribute('y2', '7');
-    svg.appendChild(hLine);
-    const vLine = document.createElementNS(SVG_NS, 'line');
-    vLine.setAttribute('x1', '8');
-    vLine.setAttribute('y1', '3.5');
-    vLine.setAttribute('x2', '8');
-    vLine.setAttribute('y2', '10.5');
-    svg.appendChild(vLine);
+    appendPath(svg, 'M2.5 3.5h11v7h-11z', { fill: '#ffffff', stroke: ink, strokeWidth: '1.05' });
+    appendPath(svg, 'M2.5 7h11M8 3.5v7', { stroke: gridLight, strokeWidth: '1' });
+    appendPath(svg, 'M4.2 5.3h2.2M9.7 8.7h2.1', { stroke: excelBlue, strokeWidth: '1.2' });
+    appendPath(svg, 'M11.4 4.3 13.2 2.5v3.4', { stroke: excelGreen, strokeWidth: '1.25' });
   }
   return svg;
 };

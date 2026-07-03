@@ -248,9 +248,9 @@ export function buildRibbonModel(
           cmd('fontGrow', '', tr.increaseFontSize, 'fontGrow'),
           cmd('fontShrink', '', tr.decreaseFontSize, 'fontShrink'),
           breakCmd('font-row-2'),
-          cmd('bold', 'B', `${tr.bold} (⌘B)`, 'bold'),
-          cmd('italic', 'I', `${tr.italic} (⌘I)`, 'italic'),
-          cmd('underline', 'U', `${tr.underline} (⌘U)`, 'underline'),
+          cmd('bold', 'B', `${tr.bold} (Ctrl+B)`, 'bold'),
+          cmd('italic', 'I', `${tr.italic} (Ctrl+I)`, 'italic'),
+          cmd('underline', 'U', `${tr.underline} (Ctrl+U)`, 'underline'),
           cmd('strike', 'S', tr.strikethrough, 'strike'),
           cmd('borders', tr.borders, tr.borders, 'borders'),
           colorCmd('fillColor', tr.fillColor, tr.fillColor, 'fillColor'),
@@ -313,7 +313,7 @@ export function buildRibbonModel(
         [
           cmd('conditional', tr.conditional, tr.conditionalFormatting, 'conditional', 'wide'),
           cmd('formatTableHome', tr.formatTable, tr.formatTable, 'tableStyle', 'wide'),
-          cmd('cellStyles', tr.cellStyles, tr.cellStyles, 'tableStyle', 'wide'),
+          cmd('cellStyles', tr.cellStyles, tr.cellStyles, 'cellStyles', 'wide'),
         ],
         'styles',
       ),
@@ -343,32 +343,32 @@ export function buildRibbonModel(
             layout: 'stacked',
           },
           {
-            ...cmd('fillHome', tr.fill, tr.fill, 'fillColor', 'wide'),
+            ...cmd('fillHome', tr.fill, tr.fill, 'fill', 'wide'),
             layout: 'stacked',
           },
           {
             ...cmd('clearFormat', tr.clear, tr.clear, 'clear', 'wide'),
             layout: 'stacked',
           },
-          cmd('sortFilterHome', tr.sortFilter, tr.sortFilter, 'sortAsc', 'wide'),
-          cmd('findHome', tr.findSelect, `${tr.findSelect} (⌘F)`, 'find', 'wide'),
+          cmd('sortFilterHome', tr.sortFilter, tr.sortFilter, 'sortFilter', 'wide'),
+          cmd('findHome', tr.findSelect, `${tr.findSelect} (Ctrl+F)`, 'find', 'wide'),
         ],
         'editing',
       ),
     ]),
     tab('insert', [
       group(tr.tables, [
-        cmd('pivotTableInsert', tr.pivotTable, tr.pivotTable, 'table', 'wide'),
+        cmd('pivotTableInsert', tr.pivotTable, tr.pivotTable, 'pivotTable', 'wide'),
         cmd('formatTableInsert', tr.table, tr.table, 'table', 'wide'),
       ]),
       group(tr.illustrations, [
-        cmd('pictureInsert', tr.pictures, tr.pictures, 'page', 'wide'),
-        cmd('shapesInsert', tr.shapes, tr.shapes, 'scale', 'wide'),
-        cmd('screenshotInsert', tr.screenshot, tr.screenshot, 'goTo', 'wide'),
+        cmd('pictureInsert', tr.pictures, tr.pictures, 'picture', 'wide'),
+        cmd('shapesInsert', tr.shapes, tr.shapes, 'shapes', 'wide'),
+        cmd('screenshotInsert', tr.screenshot, tr.screenshot, 'screenshot', 'wide'),
       ]),
       group(tr.charts, [cmd('chartInsert', tr.chart, tr.chart, 'chart', 'wide')]),
       group(tr.links, [
-        cmd('hyperlinkInsert', tr.hyperlink, `${tr.hyperlink} (⌘K)`, 'link', 'wide'),
+        cmd('hyperlinkInsert', tr.hyperlink, `${tr.hyperlink} (Ctrl+K)`, 'link', 'wide'),
       ]),
       group(tr.comments, [
         cmd('commentInsert', tr.newComment, tr.newComment, 'commentAdd', 'wide'),
@@ -376,7 +376,9 @@ export function buildRibbonModel(
       group(tr.symbols, [cmd('symbolInsert', tr.symbol, tr.symbol, 'function', 'wide')]),
     ]),
     tab('pageLayout', [
-      group(menuText.theme, [cmd('pageTheme', menuText.theme, menuText.theme, 'options', 'wide')]),
+      group(menuText.theme, [
+        cmd('pageTheme', menuText.theme, menuText.theme, 'pageTheme', 'wide'),
+      ]),
       group(tr.pageSetup, [
         selectCmd(
           'marginsPreset',
@@ -414,17 +416,17 @@ export function buildRibbonModel(
           ],
           'demo__rb-select--border',
         ),
-        cmd('pageSetupAdvanced', tr.pageSetup, tr.pageSetup, 'options', 'wide'),
+        cmd('pageSetupAdvanced', tr.pageSetup, tr.pageSetup, 'pageSetup', 'wide'),
         cmd(
           'printArea',
           tr.printArea,
           `${tr.printArea}: ${menuText.printAreaSet}/${menuText.printAreaAdd}/${menuText.printAreaClear}`,
-          'table',
+          'printArea',
           'wide',
         ),
-        cmd('pageBreaks', tr.breaks, tr.breaks, 'page', 'wide'),
-        cmd('sheetBackground', tr.background, tr.background, 'page', 'wide'),
-        cmd('printTitles', tr.printTitles, tr.printTitles, 'table', 'wide'),
+        cmd('pageBreaks', tr.breaks, tr.breaks, 'pageBreaks', 'wide'),
+        cmd('sheetBackground', tr.background, tr.background, 'sheetBackground', 'wide'),
+        cmd('printTitles', tr.printTitles, tr.printTitles, 'printTitles', 'wide'),
       ]),
       group(tr.scale, [
         selectCmd(
@@ -525,13 +527,13 @@ export function buildRibbonModel(
         cmd('precedents', tr.tracePrecedents, tr.tracePrecedents, 'trace', 'wide'),
         cmd('dependents', tr.traceDependents, tr.traceDependents, 'dependents', 'wide'),
         cmd('clearArrows', tr.removeArrows, tr.removeArrows, 'clearArrows', 'wide'),
-        cmd('errorChecking', tr.errorChecking, tr.errorChecking, 'options', 'wide'),
+        cmd('errorChecking', tr.errorChecking, tr.errorChecking, 'errorChecking', 'wide'),
         cmd('showFormulasFormula', viewText.formulas, viewText.formulas, 'function', 'wide'),
         cmd('evaluateFormula', tr.evaluateFormula, tr.evaluateFormula, 'function', 'wide'),
       ]),
       group(tr.calculation, [
         cmd('recalcNow', tr.recalc, `${tr.recalc} (F9)`, 'autosum', 'wide'),
-        cmd('calcOptions', tr.options, tr.options, 'options', 'wide'),
+        cmd('calcOptions', tr.options, tr.options, 'calcOptions', 'wide'),
         cmd('watch', tr.watch, tr.watch, 'watch', 'wide'),
       ]),
     ]),
@@ -543,16 +545,22 @@ export function buildRibbonModel(
         cmd('sortData', menuText.sortCustom, menuText.sortCustom, 'sortAsc', 'wide'),
       ]),
       group(tr.dataTools, [
-        cmd('textToColumns', menuText.textToColumns, menuText.textToColumns, 'table', 'wide'),
+        cmd(
+          'textToColumns',
+          menuText.textToColumns,
+          menuText.textToColumns,
+          'textToColumns',
+          'wide',
+        ),
         cmd('removeDupes', tr.removeDuplicates, tr.removeDuplicates, 'removeDuplicates', 'wide'),
-        cmd('dataValidation', tr.dataValidation, tr.dataValidation, 'options', 'wide'),
+        cmd('dataValidation', tr.dataValidation, tr.dataValidation, 'dataValidation', 'wide'),
         cmd('linksData', tr.links, tr.links, 'link', 'wide'),
       ]),
       group(tr.outline, [
-        cmd('outlineGroup', tr.groupOutline, outlineTitle('group'), 'table', 'wide'),
-        cmd('outlineUngroup', tr.ungroupOutline, outlineTitle('ungroup'), 'table', 'wide'),
-        cmd('outlineShowDetail', tr.showDetail, outlineTitle('show'), 'table', 'wide'),
-        cmd('outlineHideDetail', tr.hideDetail, outlineTitle('hide'), 'table', 'wide'),
+        cmd('outlineGroup', tr.groupOutline, outlineTitle('group'), 'outlineGroup', 'wide'),
+        cmd('outlineUngroup', tr.ungroupOutline, outlineTitle('ungroup'), 'outlineUngroup', 'wide'),
+        cmd('outlineShowDetail', tr.showDetail, outlineTitle('show'), 'outlineShow', 'wide'),
+        cmd('outlineHideDetail', tr.hideDetail, outlineTitle('hide'), 'outlineHide', 'wide'),
       ]),
     ]),
     tab('review', [
@@ -567,7 +575,7 @@ export function buildRibbonModel(
         cmd('previousCommentReview', tr.previousComment, commentTitle('previous'), 'goTo', 'wide'),
         cmd('nextCommentReview', tr.nextComment, commentTitle('next'), 'goTo', 'wide'),
       ]),
-      group(tr.find, [cmd('findReview', tr.find, `${tr.find} (⌘F)`, 'find', 'wide')]),
+      group(tr.find, [cmd('findReview', tr.find, `${tr.find} (Ctrl+F)`, 'find', 'wide')]),
       group(tr.protection, [
         cmd('protectReview', tr.protect, tr.protect, 'protect', 'wide'),
         cmd(

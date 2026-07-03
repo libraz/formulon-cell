@@ -5,6 +5,7 @@
 // the click dispatch table.
 
 import type { SessionChartKind, SpreadsheetInstance } from '@libraz/formulon-cell';
+import type { RibbonFillAction } from '../../commands/fill.js';
 import { clamp, viewportSize } from '../../interact/overlay-position.js';
 import type { SessionShapeKind } from '../illustration-types.js';
 import { focusMenuItem } from '../menu-a11y.js';
@@ -65,14 +66,18 @@ export interface DynamicDropdownsCtx {
   getConditionalMenu: () => HTMLElement | null;
   // Action handlers used by DYNAMIC_DROPDOWN_HANDLERS, kept loosely typed so
   // each host can return either void or Promise<void>.
+  applyCopyAction: (action: string) => void | Promise<void>;
   applyRibbonPasteAction: (action: string) => void | Promise<void>;
   applyPivotTableAction: (action: string) => void | Promise<void>;
   applyDefinedNameAction: (action: string) => void | Promise<void>;
   applyLinksAction: (action: string) => void | Promise<void>;
   applyFillSeries: (mode?: RibbonFillSeriesMode) => void | Promise<void>;
-  applyFillDirection: (direction: 'down' | 'right' | 'up' | 'left') => void;
+  applyFillDirection: (
+    direction: Extract<RibbonFillAction, 'down' | 'right' | 'up' | 'left' | 'flash'>,
+  ) => void;
   applyClearAction: (action: string) => void | Promise<void>;
   applyUnderlineAction: (action: string) => void | Promise<void>;
+  applyWrapAction: (action: string) => void | Promise<void>;
   applyMergeAction: (action: string) => void;
   applyFreezeAction: (action: string) => void;
   applyTextOrientationAction: (action: string) => void;
@@ -138,6 +143,7 @@ export interface DynamicDropdownsApi {
 }
 
 export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS = [
+  'copy-action',
   'paste-action',
   'pivot-table-action',
   'defined-name-action',
@@ -145,6 +151,7 @@ export const DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS = [
   'fill',
   'clear',
   'underline-action',
+  'wrap-action',
   'merge-action',
   'freeze',
   'text-orientation',
@@ -302,14 +309,26 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     );
   };
 
-  const closeDynamicConditionalSubmenus = (menu: HTMLElement): void => {
-    menu.querySelectorAll<HTMLElement>('[data-cf-panel]').forEach((panel) => {
+  const closeDynamicSubmenus = (
+    menu: HTMLElement,
+    panelSelector: string,
+    triggerSelector: string,
+  ): void => {
+    menu.querySelectorAll<HTMLElement>(panelSelector).forEach((panel) => {
       panel.hidden = true;
     });
-    menu.querySelectorAll<HTMLElement>('[data-cf-submenu]').forEach((trigger) => {
+    menu.querySelectorAll<HTMLElement>(triggerSelector).forEach((trigger) => {
       trigger.classList.remove('app__menu-item--active');
       trigger.setAttribute('aria-expanded', 'false');
     });
+  };
+
+  const closeDynamicConditionalSubmenus = (menu: HTMLElement): void => {
+    closeDynamicSubmenus(menu, '[data-cf-panel]', '[data-cf-submenu]');
+  };
+
+  const closeDynamicFormatSubmenus = (menu: HTMLElement): void => {
+    closeDynamicSubmenus(menu, '[data-format-panel]', '[data-format-submenu]');
   };
 
   const closeDynamicRibbonDropdown = (spec: RibbonDropdownSpec, restoreFocus = false): void => {
@@ -318,6 +337,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     if (!menu) return;
     menu.hidden = true;
     if (menu.id === 'menu-conditional') closeDynamicConditionalSubmenus(menu);
+    if (menu.id === 'menu-format-cells') closeDynamicFormatSubmenus(menu);
     button?.setAttribute('aria-expanded', 'false');
     if (restoreFocus) button?.focus();
   };
@@ -380,19 +400,25 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     focusMenuItem(menu);
   };
 
-  const openDynamicConditionalSubmenu = (
+  const openDynamicSubmenu = (
     menu: HTMLElement,
     key: string,
     trigger: HTMLElement,
+    options: {
+      close: (menu: HTMLElement) => void;
+      panelAttr: string;
+      fallbackWidth: number;
+      fallbackHeight: number;
+    },
   ): void => {
-    closeDynamicConditionalSubmenus(menu);
-    const panel = menu.querySelector<HTMLElement>(`[data-cf-panel="${key}"]`);
+    options.close(menu);
+    const panel = menu.querySelector<HTMLElement>(`[data-${options.panelAttr}="${key}"]`);
     if (!panel) return;
     const menuRect = menu.getBoundingClientRect();
     const triggerRect = trigger.getBoundingClientRect();
     const panelRect = panel.getBoundingClientRect();
-    const panelWidth = panelRect.width || panel.offsetWidth || 260;
-    const panelHeight = panelRect.height || panel.offsetHeight || 260;
+    const panelWidth = panelRect.width || panel.offsetWidth || options.fallbackWidth;
+    const panelHeight = panelRect.height || panel.offsetHeight || options.fallbackHeight;
     const { width, height } = viewportSize();
     const pad = RIBBON_DROPDOWN_VIEWPORT_PAD;
     const fitsRight = menuRect.right + panelWidth <= width - pad;
@@ -410,6 +436,28 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     trigger.setAttribute('aria-expanded', 'true');
   };
 
+  const openDynamicConditionalSubmenu = (
+    menu: HTMLElement,
+    key: string,
+    trigger: HTMLElement,
+  ): void => {
+    openDynamicSubmenu(menu, key, trigger, {
+      close: closeDynamicConditionalSubmenus,
+      panelAttr: 'cf-panel',
+      fallbackWidth: 260,
+      fallbackHeight: 260,
+    });
+  };
+
+  const openDynamicFormatSubmenu = (menu: HTMLElement, key: string, trigger: HTMLElement): void => {
+    openDynamicSubmenu(menu, key, trigger, {
+      close: closeDynamicFormatSubmenus,
+      panelAttr: 'format-panel',
+      fallbackWidth: 178,
+      fallbackHeight: 180,
+    });
+  };
+
   // Each entry binds a `data-<attr>` button inside an open ribbon dropdown to
   // the matching action helper. The dispatcher closes the dropdown and calls
   // the handler with the attribute's value — handlers that need other dataset
@@ -418,6 +466,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     attr: DynamicDropdownHandlerAttr;
     handler: DynamicDropdownHandler;
   }> = [
+    { attr: 'copy-action', handler: (v) => ctx.applyCopyAction(v) },
     { attr: 'paste-action', handler: (v) => ctx.applyRibbonPasteAction(v) },
     { attr: 'pivot-table-action', handler: (v) => ctx.applyPivotTableAction(v) },
     { attr: 'defined-name-action', handler: (v) => ctx.applyDefinedNameAction(v) },
@@ -428,11 +477,13 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
         if (v === 'series') return ctx.applyFillSeries();
         if (v === 'days' || v === 'weekdays' || v === 'months' || v === 'years')
           return ctx.applyFillSeries(v);
-        ctx.applyFillDirection(v as 'down' | 'right' | 'up' | 'left');
+        if (v === 'down' || v === 'right' || v === 'up' || v === 'left' || v === 'flash')
+          ctx.applyFillDirection(v);
       },
     },
     { attr: 'clear', handler: (v) => ctx.applyClearAction(v) },
     { attr: 'underline-action', handler: (v) => ctx.applyUnderlineAction(v) },
+    { attr: 'wrap-action', handler: (v) => ctx.applyWrapAction(v) },
     { attr: 'merge-action', handler: (v) => ctx.applyMergeAction(v) },
     { attr: 'freeze', handler: (v) => ctx.applyFreezeAction(v) },
     { attr: 'text-orientation', handler: (v) => ctx.applyTextOrientationAction(v) },
@@ -531,6 +582,15 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
       return true;
     }
 
+    const formatSubmenu = target?.closest<HTMLElement>('[data-format-submenu]');
+    if (formatSubmenu && menu.id === 'menu-format-cells') {
+      event.preventDefault();
+      event.stopPropagation();
+      if (isDisabledMenuControl(formatSubmenu)) return true;
+      openDynamicFormatSubmenu(menu, formatSubmenu.dataset.formatSubmenu ?? '', formatSubmenu);
+      return true;
+    }
+
     for (const entry of DYNAMIC_DROPDOWN_HANDLERS) {
       const button = target?.closest<HTMLButtonElement>(`[data-${entry.attr}]`);
       if (!button) continue;
@@ -582,8 +642,15 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
   const dynamicRibbonDropdownHover = (event: MouseEvent): boolean => {
     const target = eventElement(event);
     const menu = target?.closest<HTMLElement>('.app__menu');
-    if (menu?.id !== 'menu-conditional') return false;
+    if (menu?.id !== 'menu-conditional' && menu?.id !== 'menu-format-cells') return false;
     if (menu.hidden) return false;
+    if (menu.id === 'menu-format-cells') {
+      const trigger = target?.closest<HTMLElement>('[data-format-submenu]');
+      if (!trigger) return false;
+      if (isDisabledMenuControl(trigger)) return true;
+      openDynamicFormatSubmenu(menu, trigger.dataset.formatSubmenu ?? '', trigger);
+      return true;
+    }
     const trigger = target?.closest<HTMLElement>('[data-cf-submenu]');
     if (!trigger) return false;
     if (isDisabledMenuControl(trigger)) return true;
@@ -623,7 +690,34 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
         return true;
       }
     }
-    if (menu?.id !== 'menu-conditional' || menu.hidden) return false;
+    if ((menu?.id !== 'menu-conditional' && menu?.id !== 'menu-format-cells') || menu.hidden) {
+      return false;
+    }
+    if (menu.id === 'menu-format-cells') {
+      const trigger = target?.closest<HTMLElement>('[data-format-submenu]');
+      if (trigger && (event.key === 'ArrowRight' || event.key === 'Enter' || event.key === ' ')) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (isDisabledMenuControl(trigger)) return true;
+        const key = trigger.dataset.formatSubmenu ?? '';
+        openDynamicFormatSubmenu(menu, key, trigger);
+        const panel = menu.querySelector<HTMLElement>(`[data-format-panel="${key}"]`);
+        if (panel) focusMenuItem(panel);
+        return true;
+      }
+      const panel = target?.closest<HTMLElement>('[data-format-panel]');
+      if (panel && event.key === 'ArrowLeft') {
+        event.preventDefault();
+        event.stopPropagation();
+        const triggerForPanel = menu.querySelector<HTMLElement>(
+          `[data-format-submenu="${panel.dataset.formatPanel ?? ''}"]`,
+        );
+        closeDynamicFormatSubmenus(menu);
+        triggerForPanel?.focus();
+        return true;
+      }
+      return false;
+    }
     const trigger = target?.closest<HTMLElement>('[data-cf-submenu]');
     if (trigger && (event.key === 'ArrowRight' || event.key === 'Enter' || event.key === ' ')) {
       event.preventDefault();

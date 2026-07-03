@@ -5,7 +5,14 @@
 
 import type { ToolbarLang, ToolbarMenuText } from '@libraz/formulon-cell';
 
-import { createMenu, menuIconButton, menuIdForCommand, menuSeparator } from './general.js';
+import {
+  createMenu,
+  menuIconButton,
+  menuIconSpacer,
+  menuIdForCommand,
+  menuPresetButton,
+  menuSeparator,
+} from './general.js';
 
 export type AutoSumFormulaName = 'SUM' | 'AVERAGE' | 'COUNT' | 'MAX' | 'MIN' | 'MORE';
 
@@ -44,12 +51,12 @@ export const createFormulasMenuFactories = (
     const menu = createMenu(menuIdForCommand(id));
     menu.append(
       menuIconButton(t.autosumSum, 'autosumFn', 'SUM', 'autosum-sum'),
-      menuIconButton(t.autosumAverage, 'autosumFn', 'AVERAGE', 'autosum-average'),
-      menuIconButton(t.autosumCount, 'autosumFn', 'COUNT', 'autosum-count'),
-      menuIconButton(t.autosumMax, 'autosumFn', 'MAX', 'autosum-max'),
-      menuIconButton(t.autosumMin, 'autosumFn', 'MIN', 'autosum-min'),
+      menuPresetButton(t.autosumAverage, 'autosumFn', 'AVERAGE', menuIconSpacer()),
+      menuPresetButton(t.autosumCount, 'autosumFn', 'COUNT', menuIconSpacer()),
+      menuPresetButton(t.autosumMax, 'autosumFn', 'MAX', menuIconSpacer()),
+      menuPresetButton(t.autosumMin, 'autosumFn', 'MIN', menuIconSpacer()),
       menuSeparator(),
-      menuIconButton(t.autosumMoreFunctions, 'autosumFn', 'MORE', 'autosum-more'),
+      menuPresetButton(t.autosumMoreFunctions, 'autosumFn', 'MORE', menuIconSpacer()),
     );
     return menu;
   };

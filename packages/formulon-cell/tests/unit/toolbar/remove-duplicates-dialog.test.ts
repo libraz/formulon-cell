@@ -1,5 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { showRemoveDuplicatesDialog } from '../../../src/toolbar/dialogs/remove-duplicates.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 describe('showRemoveDuplicatesDialog', () => {
   afterEach(() => {
@@ -47,5 +52,23 @@ describe('showRemoveDuplicatesDialog', () => {
       columns: ['0', '1'],
       hasHeader: true,
     });
+  });
+
+  it('keeps Remove Duplicates checklist on compact desktop list geometry', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/dialog-modules/remove-duplicates.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(
+      /\.fc-dedupedlg__column-list\s*\{[\s\S]*?gap: 0;[\s\S]*?padding: 0;[\s\S]*?border-radius: 2px;/,
+    );
+    expect(css).toMatch(
+      /\.fc-dedupedlg__column\s*\{[\s\S]*?min-height: 28px;[\s\S]*?padding: 3px 8px;[\s\S]*?border-bottom: 1px solid var\(--fc-rule-subtle/,
+    );
+    expect(css).toMatch(
+      /\.fc-dedupedlg__column:hover,[\s\S]*?\.fc-dedupedlg__column:focus-within\s*\{[\s\S]*?background: var\(--fc-bg-hover/,
+    );
+    expect(css).not.toContain('background: var(--fc-accent-soft');
   });
 });

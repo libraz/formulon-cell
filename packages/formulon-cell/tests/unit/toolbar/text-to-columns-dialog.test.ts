@@ -1,5 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { showTextToColumnsDialog } from '../../../src/toolbar/dialogs/text-to-columns.js';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const strings = {
   title: 'Convert Text to Columns',
@@ -84,5 +89,19 @@ describe('showTextToColumnsDialog', () => {
     expect(dialog?.textContent).toContain('No delimited text found');
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn')?.click();
     await expect(promise).resolves.toBeNull();
+  });
+
+  it('keeps Text to Columns on compact desktop wizard geometry', () => {
+    const css = readFileSync(
+      join(root, 'src/styles/core/app/dialog-modules/text-to-columns.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(
+      /\.fc-textcols__section\s*\{[\s\S]*?padding: 6px 8px;[\s\S]*?border-radius: 2px;/,
+    );
+    expect(css).toMatch(/\.fc-textcols__types\s*\{[\s\S]*?gap: 4px;/);
+    expect(css).toMatch(/\.fc-textcols__delimiters\s*\{[\s\S]*?gap: 6px;/);
+    expect(css).not.toContain('border-radius: 6px');
   });
 });

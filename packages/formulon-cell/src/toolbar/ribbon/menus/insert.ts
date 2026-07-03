@@ -58,6 +58,7 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
         'recommended',
         'pivot-recommended',
       ),
+      menuIconButton(t.pivotTableRefreshData, 'pivotTableAction', 'refresh', 'pivot-refresh'),
       menuSeparator(),
       menuIconButton(t.pivotTableNewSheet, 'pivotTableAction', 'new-sheet', 'pivot-new-sheet'),
       menuIconButton(

@@ -23,8 +23,10 @@ import {
   createMenu,
   createMenuButton,
   menuIconButton,
+  menuIconSpacer,
   menuIdForCommand,
   menuLabeledGrid,
+  menuPresetButton,
   menuScrollBody,
   menuSeparator,
   menuTextChip,
@@ -163,23 +165,13 @@ const cellStyleFooterButton = (label: string, action: string): HTMLButtonElement
 };
 
 const currencyFooterButton = (label: string, action: string): HTMLButtonElement => {
-  const btn = menuIconButton(label, 'currencyFooter', action, 'currency-more');
+  const btn = menuPresetButton(label, 'currencyFooter', action, menuIconSpacer());
   btn.classList.add('app__currency-footer');
   return btn;
 };
 
 const currencyPresetItem = (label: string, symbol: string): HTMLButtonElement => {
-  const icon =
-    symbol === '¥'
-      ? 'currency-yen'
-      : symbol === '$'
-        ? 'currency-dollar'
-        : symbol === '€'
-          ? 'currency-euro'
-          : symbol === '£'
-            ? 'currency-pound'
-            : 'currency-chf';
-  return menuIconButton(label, 'currencyPreset', symbol, icon);
+  return menuPresetButton(label, 'currencyPreset', symbol, menuIconSpacer());
 };
 
 export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFactories => {
