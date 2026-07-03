@@ -334,7 +334,7 @@ describe('<SpreadsheetToolbar> (thin adapter)', () => {
       Array.from(harness.host.querySelectorAll<HTMLButtonElement>('#menu-fill [data-fill]')).map(
         (item) => item.dataset.fill,
       ),
-    ).toEqual(['down', 'right', 'up', 'left', 'series', 'days', 'weekdays', 'months', 'years']);
+    ).toEqual(['down', 'right', 'up', 'left', 'group', 'series', 'justify', 'flash']);
 
     await harness.unmount();
   });
