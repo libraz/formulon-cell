@@ -80,6 +80,29 @@ describe('dictionaries', () => {
       expect(badLeaves).toEqual([]);
     }
   });
+
+  it('keeps Japanese desktop-facing object and rule labels localized', () => {
+    expect(ja.pivotTableDialog.fieldSettingsFiltersHelp).toBe(
+      'フィルター フィールドはページ軸として作成されます。',
+    );
+    expect(ja.workbookObjects.backToWorkbookObjects).toBe('ブック オブジェクトに戻る');
+    expect(ja.workbookObjects.compatibilityDetails.loadedTables).toBe(
+      'エンジンから報告された読み込み済みテーブルを一覧し、保存時に保持します。',
+    );
+    expect(ja.workbookObjects.compatibilityDetails.formatAsTable).toBe(
+      'UI ではセッション内のテーブル オーバーレイを作成できます。永続的なテーブル作成にはエンジン対応が必要です。',
+    );
+    expect(ja.workbookObjects.compatibilityDetails.dataValidation).toContain(
+      'ドロップダウン矢印の非表示状態',
+    );
+    expect(ja.workbookObjects.compatibilityDetails.comments).toContain('コメント列挙 API');
+    expect(ja.workbookObjects.compatibilityDetails.definedNames).toContain(
+      'シート スコープの名前定義',
+    );
+    expect(ja.cfRulesDialog.stopIfTrueUnavailable).toBe(
+      'ここでは「条件を満たす場合は停止」の編集はまだ使用できません。',
+    );
+  });
 });
 
 describe('mergeStrings', () => {

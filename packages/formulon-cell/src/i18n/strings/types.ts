@@ -539,7 +539,10 @@ export interface Strings {
     nameHeader: string;
     /** Name Manager column header. */
     valueHeader: string;
+    /** Name Manager reference column header. */
     formulaHeader: string;
+    /** Name Manager quick reference edit label. */
+    quickRefersLabel: string;
     /** Name Manager column header. */
     scopeHeader: string;
     /** Name Manager column header. */
@@ -789,6 +792,10 @@ export interface Strings {
     pivotNumberFormatPlaceholder: string;
     pivotFilterItems: string;
     pivotFilterItemsPlaceholder: string;
+    pivotReportLayout: string;
+    pivotReportLayoutCompact: string;
+    pivotReportLayoutOutline: string;
+    pivotReportLayoutTabular: string;
     rowGrandTotals: string;
     columnGrandTotals: string;
     objectSelect: string;
@@ -1643,6 +1650,7 @@ export interface Strings {
   };
   /** Drop-down menu copy that hangs off ribbon command groups. */
   ribbonMenu: {
+    copyAsPicture: string;
     insert: string;
     delete: string;
     format: string;
@@ -1656,7 +1664,17 @@ export interface Strings {
     deleteShiftLeft: string;
     deleteRows: string;
     deleteCols: string;
+    deleteRow: string;
+    deleteCol: string;
+    deleteSheet: string;
     formatCells: string;
+    formatCellSize: string;
+    formatVisibility: string;
+    formatHideUnhide: string;
+    formatSheetOrganization: string;
+    formatSheetTabColor: string;
+    formatHighContrastOnly: string;
+    formatProtection: string;
     rowHeight: string;
     autoFitRowHeight: string;
     colWidth: string;
@@ -1667,6 +1685,10 @@ export interface Strings {
     colWidthLabel: string;
     sheetNameLabel: string;
     sheetNameRequired: string;
+    renameSheet: string;
+    moveOrCopySheet: string;
+    hideSheet: string;
+    showSheet: string;
     formatNoHiddenRows: string;
     formatNoHiddenCols: string;
     sheetActionUnavailable: string;
@@ -1687,6 +1709,8 @@ export interface Strings {
     fillRight: string;
     fillUp: string;
     fillLeft: string;
+    fillGroup: string;
+    fillJustify: string;
     flashFill: string;
     series: string;
     fillDays: string;
@@ -1740,6 +1764,8 @@ export interface Strings {
     findConditionalFormatting: string;
     findDataValidation: string;
     comments: string;
+    objectSelect: string;
+    selectionPane: string;
     findNoMatches: string;
     commentDelete: string;
     commentDeleteAll: string;
@@ -1748,6 +1774,8 @@ export interface Strings {
     commentsDeleted: string;
     pivotTableFromRange: string;
     recommendedPivotTables: string;
+    pivotTableRefreshData: string;
+    pivotTableRefreshUnavailable: string;
     pivotTableExistingSheet: string;
     pivotTableNewSheet: string;
     pivotTableCreated: string;
