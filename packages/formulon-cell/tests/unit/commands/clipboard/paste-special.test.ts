@@ -257,7 +257,7 @@ describe('pasteSpecial', () => {
     expect(num(wb, 5, 5)).toBe(100);
   });
 
-  it('divide by zero produces NaN result, which is skipped', () => {
+  it('divide by zero writes a static #DIV/0! error value', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     seedAndMirror(store, wb, [
       { row: 5, col: 5, value: 50 },
@@ -273,12 +273,14 @@ describe('pasteSpecial', () => {
       transpose: false,
     });
     wb.recalc();
-    // Source value of 0 → divide-by-zero → result skipped, dest unchanged.
+    // Source value of 0 -> divide-by-zero -> static spreadsheet error.
     expect(result?.skippedNonFiniteOperations).toBe(1);
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('static error values require engine setError support'),
-    );
-    expect(num(wb, 5, 5)).toBe(50);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('static error value'));
+    expect(wb.getValue({ sheet: 0, row: 5, col: 5 })).toMatchObject({
+      kind: 'error',
+      code: 1,
+      text: '#DIV/0!',
+    });
     warn.mockRestore();
   });
 

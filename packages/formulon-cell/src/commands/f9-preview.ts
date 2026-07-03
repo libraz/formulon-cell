@@ -12,12 +12,11 @@ import { fromEngineValue } from '../engine/value.js';
  *     sheet-prefixed) — look the cell up in the supplied cell map and
  *     return its current value.
  *
- * When the host supplies `evalFormula`, we also substitute cell references in
- * the selection with literals and ask the engine to evaluate the resulting
- * self-contained expression. Rectangular ranges are expanded to a comma-
- * separated literal list so common aggregate selections such as `SUM(A1:A3)`
- * can be previewed without a context-aware engine evaluator. Structured refs,
- * 3-D refs, and unresolved sheet refs remain unsupported.
+ * When the host supplies an evaluator, we first ask it to evaluate the
+ * selected expression as-is. Modern engines use the active cell context for
+ * names, sheet-qualified refs, and range anchors. If that fails, we fall back
+ * to substituting cell references with literals and evaluating the resulting
+ * self-contained expression.
  */
 export interface F9Preview {
   /** Resolved display string (`"3.14"`, `"Hello"`, `"true"`, `"#REF!"`). */
@@ -81,6 +80,7 @@ export function computeF9Preview(
   cells: ReadonlyMap<string, { value: CellValue; formula: string | null }>,
   sheetByName?: (name: string) => number,
   evalFormula?: F9FormulaEvaluator,
+  preferContextualEvaluation = false,
 ): F9Preview {
   const trimmed = selection.trim();
   if (!trimmed) {
@@ -115,6 +115,15 @@ export function computeF9Preview(
     }
     const cell = cells.get(addrKey({ sheet, row, col }));
     return { display: renderCellValueForF9(cell?.value), substitutable: true };
+  }
+  if (evalFormula && preferContextualEvaluation) {
+    const contextual = evalFormula(trimmed.startsWith('=') ? trimmed : `=${trimmed}`);
+    if (contextual.status.status === 0) {
+      return {
+        display: renderCellValueForF9(fromEngineValue(contextual.value)),
+        substitutable: true,
+      };
+    }
   }
   const literalFormula = evalFormula
     ? substituteSingleCellRefs(trimmed, activeSheet, cells, sheetByName)
@@ -248,6 +257,7 @@ export function replaceFormulaSelectionWithF9Preview(
   cells: ReadonlyMap<string, { value: CellValue; formula: string | null }>,
   sheetByName?: (name: string) => number,
   evalFormula?: F9FormulaEvaluator,
+  preferContextualEvaluation = false,
 ): F9Replacement | null {
   if (!formula.startsWith('=') || start === end) return null;
   const left = Math.max(0, Math.min(start, end));
@@ -260,6 +270,7 @@ export function replaceFormulaSelectionWithF9Preview(
     cells,
     sheetByName,
     evalFormula,
+    preferContextualEvaluation,
   );
   if (!preview.substitutable) return { text: formula, start: left, end: right, preview };
   const text = `${formula.slice(0, left)}${preview.display}${formula.slice(right)}`;

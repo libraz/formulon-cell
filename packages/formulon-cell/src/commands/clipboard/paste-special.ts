@@ -26,8 +26,8 @@ export interface PasteSpecialOptions {
 
 export interface PasteSpecialResult {
   writtenRange: Range;
-  /** Arithmetic operations that produced NaN/Infinity and could not be written
-   *  until the engine exposes a static error-value setter. */
+  /** Arithmetic operations that produced NaN/Infinity and were written as
+   *  static spreadsheet error values. */
   skippedNonFiniteOperations: number;
 }
 
@@ -51,7 +51,7 @@ const writeClipboardValue = (wb: WorkbookHandle, addr: Addr, src: ClipboardCell)
       wb.setBlank(addr);
       break;
     case 'error':
-      // No public way to write an error; skip — pasting errors is rare.
+      wb.setError(addr, src.value.code);
       break;
   }
 };
@@ -77,6 +77,8 @@ const combine = (op: PasteOperation, dest: number, src: number): number => {
       return src;
   }
 };
+
+const errorCodeForNonFiniteOperation = (op: PasteOperation): number => (op === 'divide' ? 1 : 5); // #DIV/0! for divide, #NUM! for arithmetic overflow.
 
 const wantsValues = (what: PasteWhat): boolean =>
   what === 'all' || what === 'values' || what === 'values-and-numfmt';
@@ -141,8 +143,12 @@ export function pasteSpecial(
         if (srcNum !== null) {
           const dest = existingNumeric(state, sheet, row, col);
           const result = combine(opt.operation, dest, srcNum);
-          if (Number.isFinite(result)) wb.setNumber(addr, result);
-          else skippedNonFiniteOperations += 1;
+          if (Number.isFinite(result)) {
+            wb.setNumber(addr, result);
+          } else {
+            wb.setError(addr, errorCodeForNonFiniteOperation(opt.operation));
+            skippedNonFiniteOperations += 1;
+          }
         }
         // Non-numeric source cells leave the destination unchanged (parity).
       } else if (shouldPasteFormula && src.formula) {
@@ -195,7 +201,7 @@ export function pasteSpecial(
   }
   if (skippedNonFiniteOperations > 0) {
     console.warn(
-      `formulon-cell: paste special skipped ${skippedNonFiniteOperations} non-finite arithmetic result(s); static error values require engine setError support`,
+      `formulon-cell: paste special wrote ${skippedNonFiniteOperations} non-finite arithmetic result(s) as static error value(s)`,
     );
   }
 

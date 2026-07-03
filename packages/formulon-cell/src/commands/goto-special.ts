@@ -273,7 +273,9 @@ export type RibbonFindAction =
   | 'errors'
   | 'conditional-format'
   | 'data-validation'
-  | 'comments';
+  | 'comments'
+  | 'object-select'
+  | 'selection-pane';
 
 export interface RibbonFindActionReportItem {
   severity: 'info' | 'warning';
@@ -290,6 +292,7 @@ export type RibbonFindActionResult =
   | { kind: 'open-find'; mode: 'find' | 'replace' }
   | { kind: 'open-go-to' }
   | { kind: 'open-go-to-special' }
+  | { kind: 'open-objects' }
   | { kind: 'selected' }
   | { kind: 'report'; report: RibbonFindActionReport }
   | { kind: 'noop' };
@@ -330,16 +333,9 @@ export const executeRibbonFindAction = (
   if (action === 'replace') return { kind: 'open-find', mode: 'replace' };
   if (action === 'go-to') return { kind: 'open-go-to' };
   if (action === 'go-to-special') return { kind: 'open-go-to-special' };
+  if (action === 'object-select' || action === 'selection-pane') return { kind: 'open-objects' };
   if (SPECIAL_FIND_KINDS.has(action)) {
-    const matches = findMatchingCells(
-      workbook,
-      store,
-      'sheet',
-      action as Exclude<
-        RibbonFindAction,
-        'find' | 'replace' | 'go-to' | 'go-to-special' | 'comments'
-      >,
-    );
+    const matches = findMatchingCells(workbook, store, 'sheet', action as GoToSpecialKind);
     if (!matches[0]) {
       return {
         kind: 'report',

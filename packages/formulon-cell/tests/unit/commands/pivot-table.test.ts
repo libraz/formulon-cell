@@ -5,6 +5,7 @@ import {
   inferPivotFieldItems,
   inferPivotSourceFields,
   refreshPivotCacheFromRange,
+  refreshPivotTable,
   refreshPivotTableFromRange,
 } from '../../../src/commands/pivot-table.js';
 import {
@@ -36,13 +37,22 @@ const makeWb = () => {
   ]);
   const calls: string[] = [];
   const wb = {
-    capabilities: { pivotTableMutate: true },
+    capabilities: { pivotTableMutate: true, pivotCacheSource: true },
+    sheetCount: 1,
+    sheetName: (sheet: number) => (sheet === 0 ? 'Sheet1' : `Sheet${sheet + 1}`),
     getValue: ({ row, col }: { row: number; col: number }) => values.get(`${row}:${col}`) ?? blank,
     createPivotCache: () => {
       calls.push('cache');
       return 4;
     },
     removePivotCache: () => true,
+    setPivotCacheWorksheetSource: (
+      _cache: number,
+      source: { present: boolean; ref?: string; sheet?: string; name?: string },
+    ) => {
+      calls.push(`cache-source:${source.present}:${source.sheet ?? ''}:${source.ref ?? ''}`);
+      return true;
+    },
     addPivotCacheField: (_cache: number, name: string) => {
       calls.push(`cache-field:${name}`);
       return calls.filter((c) => c.startsWith('cache-field:')).length - 1;
@@ -56,7 +66,13 @@ const makeWb = () => {
       return calls.filter((c) => c === 'record').length - 1;
     },
     setPivotCacheRecordValue: (_cache: number, record: number, field: number, value: CellValue) => {
-      calls.push(`value:${record}:${field}:${value.kind}`);
+      const payload =
+        value.kind === 'number'
+          ? String(value.value)
+          : value.kind === 'text'
+            ? value.value
+            : value.kind;
+      calls.push(`value:${record}:${field}:${value.kind}:${payload}`);
       return true;
     },
     pivotCacheFieldNames: () => ['Region', 'Product', 'Sales'],
@@ -69,6 +85,24 @@ const makeWb = () => {
       return true;
     },
     pivotTableCacheId: (_sheet: number, pivotIndex: number) => (pivotIndex === 2 ? 4 : -1),
+    getPivotTables: () => [
+      {
+        sheetIndex: 0,
+        pivotIndex: 2,
+        top: 5,
+        left: 0,
+        rows: 3,
+        cols: 3,
+        cells: 9,
+        fields: ['Region', 'Product', 'Sales'],
+      },
+    ],
+    cells: () => [],
+    getPivotCacheWorksheetSource: (_cache: number) => ({
+      present: true,
+      sheet: 'Sheet1',
+      ref: 'A1:C3',
+    }),
     createPivotTable: (_sheet: number, name: string, cacheId: number, anchor: unknown) => {
       calls.push(`pivot:${name}:${cacheId}:${JSON.stringify(anchor)}`);
       return 2;
@@ -182,9 +216,12 @@ describe('pivot-table command helpers', () => {
     });
 
     expect(result).toEqual({ ok: true, cacheId: 4, pivotIndex: 2 });
+    expect(calls).toContain('cache-source:true:Sheet1:A1:C3');
     expect(calls).toContain('cache-field:Region');
     expect(calls).toContain('shared:2:number');
     expect(calls).toContain('record');
+    expect(calls).toContain('value:0:2:number:0');
+    expect(calls).toContain('value:1:2:number:1');
     expect(calls).toContain('pivot-field:Region:0');
     expect(calls).toContain('grand:false:true');
     expect(calls).toContain('subtotal-top:Region:false');
@@ -334,6 +371,7 @@ describe('pivot-table command helpers', () => {
     });
 
     expect(result).toEqual({ ok: true, cacheId: 4 });
+    expect(calls).toContain('cache-source:true:Sheet1:A1:C3');
     expect(calls).toContain('clear-shared:0');
     expect(calls).toContain('clear-shared:1');
     expect(calls).toContain('clear-shared:2');
@@ -341,7 +379,8 @@ describe('pivot-table command helpers', () => {
     expect(calls).toContain('shared:0:text');
     expect(calls).toContain('shared:2:number');
     expect(calls).toContain('record');
-    expect(calls).toContain('value:0:2:number');
+    expect(calls).toContain('value:0:2:number:0');
+    expect(calls).toContain('value:1:2:number:1');
   });
 
   it('refuses huge pivot cache refresh before clearing records', () => {
@@ -366,7 +405,31 @@ describe('pivot-table command helpers', () => {
 
     expect(result).toEqual({ ok: true, cacheId: 4 });
     expect(calls).toContain('clear-records');
-    expect(calls).toContain('value:0:2:number');
+    expect(calls).toContain('value:0:2:number:0');
+  });
+
+  it('refreshes an existing pivot table from stored worksheet source metadata', () => {
+    const { wb, calls } = makeWb();
+    const result = refreshPivotTable(wb, {
+      sheet: 0,
+      pivotIndex: 2,
+    });
+
+    expect(result).toEqual({ ok: true, cacheId: 4 });
+    expect(calls).toContain('clear-records');
+    expect(calls).toContain('value:0:2:number:0');
+  });
+
+  it('rejects stored-source pivot refresh when metadata is unavailable', () => {
+    const { wb, calls } = makeWb();
+    wb.getPivotCacheWorksheetSource = () => ({ present: false });
+    const result = refreshPivotTable(wb, {
+      sheet: 0,
+      pivotIndex: 2,
+    });
+
+    expect(result).toEqual({ ok: false, reason: 'invalid-range' });
+    expect(calls).not.toContain('clear-records');
   });
 
   it('rejects pivot table refresh when the pivot cache id is unavailable', () => {
@@ -430,6 +493,8 @@ describe('pivot-table command helpers', () => {
       strings: {
         pivotTable: 'PivotTable',
         pivotTableNewSheet: 'New Worksheet',
+        pivotTableRefreshData: 'Refresh Data',
+        pivotTableRefreshUnavailable: 'Select a PivotTable before refreshing.',
         recommendedPivotTables: 'Recommended PivotTables',
         pivotAuthoringDetail: 'Recommended PivotTables are not implemented.',
         workbookStructureProtectedBlocked: 'Workbook structure is protected.',
@@ -445,6 +510,67 @@ describe('pivot-table command helpers', () => {
             severity: 'info',
             label: 'PivotTable',
             detail: 'Recommended PivotTables are not implemented.',
+          },
+        ],
+      },
+    });
+    expect(calls).toEqual([]);
+  });
+
+  it('refreshes the active PivotTable from stored source metadata', () => {
+    const { wb, calls } = makeWb();
+    const store = createSpreadsheetStore();
+    mutators.setActive(store, { sheet: 0, row: 5, col: 1 });
+
+    const result = executeRibbonPivotTableAction({
+      store,
+      workbook: wb,
+      action: 'refresh',
+      strings: {
+        pivotTable: 'PivotTable',
+        pivotTableNewSheet: 'New Worksheet',
+        pivotTableRefreshData: 'Refresh Data',
+        pivotTableRefreshUnavailable: 'Select a PivotTable before refreshing.',
+        recommendedPivotTables: 'Recommended PivotTables',
+        pivotAuthoringDetail: 'Recommended PivotTables are not implemented.',
+        workbookStructureProtectedBlocked: 'Workbook structure is protected.',
+      },
+    });
+
+    expect(result).toEqual({ kind: 'refreshed', sheet: 0 });
+    expect(calls).toContain('clear-records');
+    expect(calls).toContain('cache-source:true:Sheet1:A1:C3');
+  });
+
+  it('reports Refresh Data when the active cell is outside a PivotTable', () => {
+    const { wb, calls } = makeWb();
+    const store = createSpreadsheetStore();
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+
+    const result = executeRibbonPivotTableAction({
+      store,
+      workbook: wb,
+      action: 'refresh',
+      strings: {
+        pivotTable: 'PivotTable',
+        pivotTableNewSheet: 'New Worksheet',
+        pivotTableRefreshData: 'Refresh Data',
+        pivotTableRefreshUnavailable: 'Select a PivotTable before refreshing.',
+        recommendedPivotTables: 'Recommended PivotTables',
+        pivotAuthoringDetail: 'Recommended PivotTables are not implemented.',
+        workbookStructureProtectedBlocked: 'Workbook structure is protected.',
+      },
+    });
+
+    expect(result).toEqual({
+      kind: 'report',
+      report: {
+        title: 'Refresh Data',
+        items: [
+          {
+            severity: 'warning',
+            label: 'PivotTable',
+            detail: 'Select a PivotTable before refreshing.',
           },
         ],
       },

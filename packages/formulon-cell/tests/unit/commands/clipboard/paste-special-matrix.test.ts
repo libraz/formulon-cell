@@ -186,7 +186,7 @@ describe('paste-special — what × operation × transpose × skipBlanks matrix'
       });
     }
 
-    it('divide by zero leaves destination untouched (NaN is skipped)', () => {
+    it('divide by zero writes a static #DIV/0! error value', () => {
       seed(store, wb, [
         { row: 0, col: 0, value: 0 },
         { row: 5, col: 5, value: 9 },
@@ -196,7 +196,7 @@ describe('paste-special — what × operation × transpose × skipBlanks matrix'
       setActive(store, 5, 5);
       pasteSpecial(store.getState(), store, wb, snap, opt({ operation: 'divide' }));
       wb.recalc();
-      expect(cellAt(wb, 5, 5)).toMatchObject({ kind: 'number', value: 9 });
+      expect(cellAt(wb, 5, 5)).toMatchObject({ kind: 'error', code: 1, text: '#DIV/0!' });
     });
   });
 

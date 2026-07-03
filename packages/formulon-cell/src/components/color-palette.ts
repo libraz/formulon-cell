@@ -122,6 +122,8 @@ export interface ColorPaletteOptions {
   readonly value?: string | null;
   /** When set, renders an "Automatic" button above the theme grid. */
   readonly automatic?: AutomaticColorOption | null;
+  /** Optional disabled Excel compatibility row shown above fill-color palettes. */
+  readonly highContrastOnlyLabel?: string | null;
   /** When set, renders a "More Colors…" trigger below the standard row. */
   readonly moreColorsLabel?: string | null;
   /** Accessible label for the whole palette group. */
@@ -248,6 +250,20 @@ export function createColorPalette(options: ColorPaletteOptions): ColorPaletteHa
     swatches.push(swatch);
     return swatch;
   };
+
+  // ── Automatic ─────────────────────────────────────────────────────────
+  if (options.highContrastOnlyLabel) {
+    const highContrast = document.createElement('label');
+    highContrast.className = 'fc-colorpalette__contrast';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.setAttribute('disabled', '');
+    input.tabIndex = -1;
+    const text = document.createElement('span');
+    text.textContent = options.highContrastOnlyLabel;
+    highContrast.append(input, text);
+    root.appendChild(highContrast);
+  }
 
   // ── Automatic ─────────────────────────────────────────────────────────
   if (options.automatic) {

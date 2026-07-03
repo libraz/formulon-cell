@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -11,6 +14,7 @@ import {
 const swatches = (root: HTMLElement): HTMLButtonElement[] => [
   ...root.querySelectorAll<HTMLButtonElement>('.fc-colorpalette__swatch'),
 ];
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 describe('color palette', () => {
   it('normalizes hex strings for stable equality', () => {
@@ -120,5 +124,52 @@ describe('color palette', () => {
     expect(onPick).toHaveBeenCalledWith('#000000');
     expect(onMoreColors).toHaveBeenCalledTimes(1);
     expect(swatches(palette.el).filter((button) => button.tabIndex === 0)).toHaveLength(1);
+  });
+
+  it('can render the Excel fill-color high contrast row without making it focusable', () => {
+    const palette = createColorPalette({
+      themeLabel: 'テーマの色',
+      standardLabel: '標準の色',
+      value: '#ffffff',
+      highContrastOnlyLabel: 'ハイ コントラストのみ',
+      onPick: vi.fn(),
+    });
+
+    const contrast = palette.el.querySelector<HTMLLabelElement>('.fc-colorpalette__contrast');
+    const input = contrast?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+
+    expect(contrast?.textContent).toContain('ハイ コントラストのみ');
+    expect(input?.disabled).toBe(true);
+    expect(input?.tabIndex).toBe(-1);
+    expect(swatches(palette.el)).toHaveLength(
+      THEME_COLOR_COLUMNS.length * 6 + STANDARD_COLORS.length,
+    );
+  });
+
+  it('keeps the shared color palette close to Japanese Excel 365 desktop geometry', () => {
+    const paletteCss = readFileSync(join(root, 'src/styles/core/app/color-palette.css'), 'utf8');
+
+    expect(paletteCss).toMatch(/\.fc-colorpalette\s*\{[\s\S]*?padding: 7px 10px 8px;/);
+    expect(paletteCss).toMatch(
+      /\.fc-colorpalette__contrast\s*\{[\s\S]*?min-height: 20px;[\s\S]*?white-space: nowrap;/,
+    );
+    expect(paletteCss).toMatch(/\.fc-colorpalette__heading\s*\{[\s\S]*?font-size: 12px;/);
+    expect(paletteCss).toMatch(
+      /\.fc-colorpalette__grid\s*\{[\s\S]*?grid-template-columns: repeat\(10, 18px\);/,
+    );
+    expect(paletteCss).toMatch(
+      /\.fc-colorpalette__swatch\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
+    );
+    expect(paletteCss).toMatch(
+      /\.fc-colorpalette__action--automatic\s*\{[\s\S]*?justify-content: center;[\s\S]*?border-color: var\(--fc-accent\);/,
+    );
+    expect(paletteCss).toMatch(
+      /\.fc-colorpalette__action:hover,[\s\S]*?\.fc-colorpalette__action:focus-visible\s*\{[\s\S]*?background: var\(--fc-bg-hover, color-mix\(in srgb, CanvasText 8%, transparent\)\);/,
+    );
+    expect(paletteCss).toMatch(
+      /\.fc-colorpalette__wheel\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
+    );
+    expect(paletteCss).toMatch(/\.fc-colorpalette__action--more\s*\{[\s\S]*?margin: 6px -4px 0;/);
+    expect(paletteCss).not.toContain('background: var(--fc-accent-soft');
   });
 });
