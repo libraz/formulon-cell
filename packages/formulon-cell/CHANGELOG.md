@@ -4,6 +4,23 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
+## 0.3.1 — 2026-07-04
+
+### Added
+
+- Upgraded to the formulon 0.9.5 calc engine.
+- Array-aware F9 formula preview: an array- or spill-returning selection now
+  renders as a spreadsheet array constant (`{a,b;c,d}`) instead of collapsing
+  to its top-left value, backed by the engine's ad-hoc `evaluateFormulaArray`.
+  Exposed as `WorkbookHandle.evaluateFormulaArray` behind the new
+  `arrayFormulaEvaluation` capability, with a scalar fallback when the engine
+  does not provide it.
+- Host-injectable function metadata: `WorkbookHandle.setFunctionMetadataProvider`
+  merges localized signature / description / alias overrides over the engine's
+  structural function catalog, resolved by locale-override → entry-default →
+  engine-value precedence. Ships the pure `mergeFunctionMetadata` helper and
+  re-exports the `EvalArrayResult` and `FunctionMetadata*` types.
+
 ## 0.3.0 — 2026-07-04
 
 ### Added
@@ -130,6 +147,7 @@ Initial public release.
   so the package works under any modern bundler. Falls back to an
   in-memory stub when `crossOriginIsolated` is unavailable.
 
+[0.3.1]: https://github.com/libraz/formulon-cell/releases/tag/v0.3.1
 [0.3.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.3.0
 [0.2.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.2.0
 [0.1.1]: https://github.com/libraz/formulon-cell/releases/tag/v0.1.1
