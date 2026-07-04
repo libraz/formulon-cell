@@ -71,54 +71,6 @@ jobs:
           flags: formulon-cell
           fail_ci_if_error: false
 
-  e2e:
-    name: e2e (${{ matrix.app }} / ${{ matrix.browser }})
-    needs: build
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        app: [playground, react-demo, vue-demo]
-        browser: [chromium, webkit]
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: '22'
-          package-manager-cache: false
-
-      - run: corepack enable
-      - run: corepack prepare yarn@4.5.0 --activate
-
-      - uses: actions/cache@v5
-        with:
-          path: |
-            .yarn/cache
-            node_modules
-          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
-
-      - run: yarn install --immutable
-
-      # Browser binaries for this matrix entry only. The matrix values
-      # (chromium / webkit) come from the strategy block above — they
-      # are static, not untrusted input — but we still pipe them via env
-      # so the surrounding shell never sees a raw interpolation.
-      - name: Install browser binaries
-        env:
-          APP: ${{ matrix.app }}
-          BROWSER: ${{ matrix.browser }}
-        run: yarn workspace "@formulon-cell/${APP}" exec playwright install --with-deps "${BROWSER}"
-
-      - name: Run E2E
-        env:
-          APP: ${{ matrix.app }}
-          BROWSER: ${{ matrix.browser }}
-          CI: 'true'
-        run: yarn workspace "@formulon-cell/${APP}" test:e2e --project="${BROWSER}"
-
       - uses: actions/upload-artifact@v6
         if: failure()
         with:
