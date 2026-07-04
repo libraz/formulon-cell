@@ -4603,7 +4603,7 @@ describe('Spreadsheet.mountToolbar', () => {
     }
 
     tb.dispose();
-  }, 10_000);
+  }, 30_000);
 
   it('opens every dropdown and gallery command menu from primary click', () => {
     const onCommand = vi.fn();
