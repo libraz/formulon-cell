@@ -6,6 +6,18 @@ versioning is [SemVer](https://semver.org/).
 
 ## Unreleased
 
+### Added
+
+- `Spreadsheet.mount(host, { toolbar: true })` builds the ribbon toolbar inside
+  the host in a single call — no separate `mountToolbar` wiring — and exposes it
+  as `instance.toolbar` (`null` when not requested). The ribbon shell is
+  inserted at the top of `.fc-host` through a `display: contents` host, so it
+  becomes the first item in the host's flex column with the grid filling the
+  rest, and it shares the host's `data-fc-theme`. `instance.dispose()` tears the
+  toolbar down with everything else. Embeds that need custom ribbon hooks, tabs,
+  or dropdown overrides can still call `Spreadsheet.mountToolbar` against their
+  own element.
+
 ### Changed
 
 - All floating UI (context menus, dialogs, tooltips, dropdowns, popovers) now
@@ -23,6 +35,12 @@ versioning is [SemVer](https://semver.org/).
   toolbar + all three palettes). The individual `styles/paper.css`,
   `styles/ink.css`, `styles/contrast.css`, and `styles/toolbar.css` exports
   remain for granular setups.
+- The ribbon toolbar's overridable theme tokens are renamed from `--demo-*` to
+  `--fc-tb-*` (e.g. `--demo-ribbon-bg` → `--fc-tb-ribbon-bg`), so the public
+  override surface no longer ships under a `demo` name and cannot collide with
+  the grid's `--fc-*` tokens. Embedders that overrode `--demo-*` must switch to
+  the `--fc-tb-*` names. Internal ribbon class names are unchanged; hosts should
+  target the `data-ribbon-*` attributes rather than class names.
 - One theme vocabulary across grid and toolbar. The ribbon toolbar now reads
   the same `paper` / `ink` / `contrast` values off the shared `data-fc-theme`
   attribute, instead of a separate `light` / `dark` / `contrast` vocabulary on

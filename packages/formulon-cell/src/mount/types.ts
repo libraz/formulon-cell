@@ -22,11 +22,18 @@ import type { PasteSpecialOpenOptions } from '../interact/paste-special.js';
 import type { StatusBarUploadStatus } from '../interact/status-bar.js';
 import type { SlicerSpec, SpreadsheetStore } from '../store/store.js';
 import type { SheetProtectionPermissions } from '../store/types.js';
+import type { ToolbarInstance } from './toolbar.js';
 
 export interface MountOptions {
   workbook?: WorkbookHandle;
   ui?: SpreadsheetUiOptions;
   theme?: ThemeName;
+  /** Mount the ribbon toolbar inside `host`, above the formula bar, in one
+   *  call. The toolbar shares the host's `data-fc-theme`, so grid and toolbar
+   *  theme together. Access it afterwards via `instance.toolbar`. For richer
+   *  wiring (custom ribbon hooks, tabs, dropdown overrides) call
+   *  `Spreadsheet.mountToolbar` against a host element you own instead. */
+  toolbar?: boolean;
   seed?: (wb: WorkbookHandle) => void;
   locale?: Locale | (string & {});
   strings?: DeepPartial<Strings>;
@@ -93,6 +100,10 @@ export interface SpreadsheetInstance {
   readonly borderDraw: BorderDrawHandle | undefined;
   readonly formula: FormulaRegistry;
   readonly cells: CellRegistry;
+  /** Ribbon toolbar mounted inside `host` when `mount({ toolbar: true })` was
+   *  used, else `null`. Lower-level embeds that call `Spreadsheet.mountToolbar`
+   *  themselves keep their own reference and this stays `null`. */
+  readonly toolbar: ToolbarInstance | null;
   use(ext: ExtensionInput): void;
   remove(id: string): boolean;
   setFeatures(next: FeatureFlags): void;

@@ -194,7 +194,7 @@ describe('toolbar/ribbon/backstage', () => {
       /\.demo__backstage-navitem--back::after\s*\{[\s\S]*?border: solid currentColor;[\s\S]*?transform: translate\(-70%, -50%\) rotate\(45deg\);/,
     );
     expect(css).toMatch(
-      /\.demo__backstage-xl\s*\{[\s\S]*?background: var\(--demo-brand\);[\s\S]*?color: var\(--demo-title-fg\);/,
+      /\.demo__backstage-xl\s*\{[\s\S]*?background: var\(--fc-tb-brand\);[\s\S]*?color: var\(--fc-tb-title-fg\);/,
     );
     expect(css).toMatch(
       /\.demo__backstage-xl \.demo__rb-icon\s*\{[\s\S]*?width: 30px;[\s\S]*?height: 30px;/,

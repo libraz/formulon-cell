@@ -8,8 +8,8 @@
   bottom: 0;
   z-index: 35;
   width: min(360px, 38vw);
-  border-left: 1px solid var(--demo-line);
-  background: var(--demo-bg);
+  border-left: 1px solid var(--fc-tb-line);
+  background: var(--fc-tb-bg);
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -24,8 +24,8 @@
 
 /* ── Cards ──────────────────────────────────────────────────────────── */
 .demo__card {
-  background: var(--demo-card);
-  border: 1px solid var(--demo-line);
+  background: var(--fc-tb-card);
+  border: 1px solid var(--fc-tb-line);
   border-radius: 4px;
   padding: 14px 14px 12px;
 }
@@ -35,29 +35,29 @@
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0;
-  color: var(--demo-fg);
+  color: var(--fc-tb-fg);
 }
 
 .demo__hint {
   margin: 0 0 10px;
   font-size: 12px;
-  color: var(--demo-fg-soft);
+  color: var(--fc-tb-fg-soft);
   line-height: 1.5;
 }
 
 .demo__hint code,
 .demo__mono code {
-  font-family: var(--demo-mono);
+  font-family: var(--fc-tb-mono);
   font-size: 11px;
-  background: var(--demo-ribbon-hover);
-  color: var(--demo-fg);
+  background: var(--fc-tb-ribbon-hover);
+  color: var(--fc-tb-fg);
   padding: 1px 5px;
   border-radius: 2px;
 }
 
 .demo__mono {
   margin: 0;
-  font-family: var(--demo-mono);
+  font-family: var(--fc-tb-mono);
   font-size: 14px;
   font-feature-settings: "tnum";
 }
@@ -77,16 +77,16 @@
   font: inherit;
   font-size: 12px;
   text-align: left;
-  color: var(--demo-fg);
-  background: var(--demo-card);
-  border: 1px solid var(--demo-line);
+  color: var(--fc-tb-fg);
+  background: var(--fc-tb-card);
+  border: 1px solid var(--fc-tb-line);
   border-radius: 2px;
   cursor: pointer;
 }
 
 .demo__preset-btn:hover:not(:disabled) {
-  border-color: var(--demo-ribbon-line);
-  background: var(--demo-ribbon-hover);
+  border-color: var(--fc-tb-ribbon-line);
+  background: var(--fc-tb-ribbon-hover);
 }
 
 .demo__preset-btn:disabled {
@@ -95,9 +95,9 @@
 }
 
 .demo__preset-btn--active {
-  background: var(--demo-accent);
-  color: var(--demo-title-fg);
-  border-color: var(--demo-accent);
+  background: var(--fc-tb-accent);
+  color: var(--fc-tb-title-fg);
+  border-color: var(--fc-tb-accent);
 }
 
 .demo__preset-btn--active .demo__preset-hint {
@@ -111,7 +111,7 @@
 
 .demo__preset-hint {
   font-size: 11px;
-  color: var(--demo-fg-soft);
+  color: var(--fc-tb-fg-soft);
 }
 
 /* ── Feature toggles ───────────────────────────────────────────────── */
@@ -124,7 +124,7 @@
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0;
-  color: var(--demo-fg);
+  color: var(--fc-tb-fg);
 }
 
 .demo__feat-grid {
@@ -139,16 +139,16 @@
   gap: 6px;
   padding: 3px 0;
   font-size: 12px;
-  color: var(--demo-fg-soft);
+  color: var(--fc-tb-fg-soft);
   cursor: pointer;
 }
 
 .demo__feat input {
-  accent-color: var(--demo-accent);
+  accent-color: var(--fc-tb-accent);
 }
 
 .demo__feat--on {
-  color: var(--demo-fg);
+  color: var(--fc-tb-fg);
 }
 
 /* ── Checkboxes ─────────────────────────────────────────────────────── */
@@ -162,7 +162,7 @@
 }
 
 .demo__check input {
-  accent-color: var(--demo-accent);
+  accent-color: var(--fc-tb-accent);
 }
 
 /* ── Probe panel ────────────────────────────────────────────────────── */
@@ -176,13 +176,13 @@
   flex-basis: 100%;
   margin: 6px 0 0;
   font-size: 12px;
-  color: var(--demo-fg-soft);
+  color: var(--fc-tb-fg-soft);
 }
 
 .demo__probe-out code {
-  font-family: var(--demo-mono);
+  font-family: var(--fc-tb-mono);
   font-size: 12px;
-  color: var(--demo-fg);
+  color: var(--fc-tb-fg);
   background: transparent;
   padding: 0;
 }
@@ -204,8 +204,8 @@
   align-items: center;
   gap: 8px;
   padding: 4px 0;
-  border-bottom: 1px dashed var(--demo-line);
-  font-family: var(--demo-mono);
+  border-bottom: 1px dashed var(--fc-tb-line);
+  font-family: var(--fc-tb-mono);
   font-size: 12px;
 }
 
@@ -217,19 +217,19 @@
   display: inline-block;
   min-width: 36px;
   padding: 1px 5px;
-  background: var(--demo-ribbon-hover);
-  color: var(--demo-fg);
+  background: var(--fc-tb-ribbon-hover);
+  color: var(--fc-tb-fg);
   border-radius: 2px;
   text-align: center;
 }
 
 .demo__log-arrow {
-  color: var(--demo-fg-soft);
+  color: var(--fc-tb-fg-soft);
 }
 
 .demo__empty {
   margin: 0;
   font-size: 12px;
-  color: var(--demo-fg-soft);
+  color: var(--fc-tb-fg-soft);
   font-style: italic;
 }

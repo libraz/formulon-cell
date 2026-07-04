@@ -5,8 +5,8 @@
   gap: 14px;
   min-height: 36px;
   padding: 4px 12px;
-  background: var(--demo-ribbon-bg);
-  border-bottom: 1px solid var(--demo-line-soft);
+  background: var(--fc-tb-ribbon-bg);
+  border-bottom: 1px solid var(--fc-tb-line-soft);
 }
 
 .demo__brand {
@@ -28,7 +28,7 @@
   width: 24px;
   height: 24px;
   border-radius: 4px;
-  background: var(--demo-brand);
+  background: var(--fc-tb-brand);
   color: #ffffff;
   font-size: 14px;
 }
@@ -40,11 +40,11 @@
 
 .demo__brand-sep,
 .demo__brand-tag {
-  color: var(--demo-fg-soft);
+  color: var(--fc-tb-fg-soft);
 }
 
 .demo__brand-tag {
-  font-family: var(--demo-mono);
+  font-family: var(--fc-tb-mono);
   font-size: 12px;
   letter-spacing: 0;
 }
@@ -62,20 +62,20 @@
 
 .demo__seg {
   display: inline-flex;
-  border: 1px solid var(--demo-line);
+  border: 1px solid var(--fc-tb-line);
   border-radius: 2px;
   overflow: hidden;
-  background: var(--demo-card);
+  background: var(--fc-tb-card);
 }
 
 .demo__seg-btn {
   padding: 5px 11px;
   font: inherit;
   font-size: 12px;
-  color: var(--demo-fg-soft);
+  color: var(--fc-tb-fg-soft);
   background: transparent;
   border: 0;
-  border-left: 1px solid var(--demo-line);
+  border-left: 1px solid var(--fc-tb-line);
   cursor: pointer;
   letter-spacing: 0.02em;
 }
@@ -85,40 +85,40 @@
 }
 
 .demo__seg-btn:hover {
-  background: var(--demo-ribbon-hover);
-  color: var(--demo-fg);
+  background: var(--fc-tb-ribbon-hover);
+  color: var(--fc-tb-fg);
 }
 
 .demo__seg-btn--active {
-  background: var(--demo-accent);
-  color: var(--demo-title-fg);
+  background: var(--fc-tb-accent);
+  color: var(--fc-tb-title-fg);
 }
 
 .demo__seg-btn--active:hover {
-  background: var(--demo-accent);
-  color: var(--demo-title-fg);
+  background: var(--fc-tb-accent);
+  color: var(--fc-tb-title-fg);
 }
 
 .demo__btn {
   padding: 5px 11px;
   font: inherit;
   font-size: 12px;
-  color: var(--demo-fg);
-  background: var(--demo-card);
-  border: 1px solid var(--demo-line);
+  color: var(--fc-tb-fg);
+  background: var(--fc-tb-card);
+  border: 1px solid var(--fc-tb-line);
   border-radius: 2px;
   cursor: pointer;
 }
 
 .demo__btn:hover:not(:disabled) {
-  background: var(--demo-ribbon-hover);
-  border-color: var(--demo-ribbon-line);
+  background: var(--fc-tb-ribbon-hover);
+  border-color: var(--fc-tb-ribbon-line);
 }
 
 .demo__btn--active {
-  background: var(--demo-accent);
-  border-color: var(--demo-accent);
-  color: var(--demo-title-fg);
+  background: var(--fc-tb-accent);
+  border-color: var(--fc-tb-accent);
+  color: var(--fc-tb-title-fg);
 }
 
 .demo__btn:disabled {
@@ -127,7 +127,7 @@
 }
 
 .demo__btn--ghost {
-  font-family: var(--demo-mono);
+  font-family: var(--fc-tb-mono);
   font-size: 11px;
   padding: 5px 10px;
 }

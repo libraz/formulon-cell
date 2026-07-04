@@ -38,10 +38,11 @@ const sheet = await Spreadsheet.mount(host, {
   workbook: wb,
   features: presets.full(),
   locale: 'ja',
+  toolbar: true,                 // 同じ呼び出しでリボンも → sheet.toolbar
 });
 
 sheet.i18n.setLocale('en');     // 実行時にロケールを切り替え
-sheet.setTheme('ink');           // ダークテーマへ切り替え
+sheet.setTheme('ink');           // ダークテーマ — グリッドとツールバーが同時に切り替わる
 ```
 
 ## プリセット

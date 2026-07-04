@@ -1863,7 +1863,7 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(selectColorSource).toContain('ribbonText.marginTop');
     expect(selectColorSource).not.toContain("arrow.textContent = '›'");
     expect(dropdownCss).toMatch(
-      /\.demo__rb-dd__submenu\s*\{[\s\S]*?border-top: 4px solid transparent;[\s\S]*?border-bottom: 4px solid transparent;[\s\S]*?border-left: 5px solid var\(--demo-fg\);/,
+      /\.demo__rb-dd__submenu\s*\{[\s\S]*?border-top: 4px solid transparent;[\s\S]*?border-bottom: 4px solid transparent;[\s\S]*?border-left: 5px solid var\(--fc-tb-fg\);/,
     );
     expect(selectColorSource).not.toContain('テーマのフォント');
     expect(selectColorSource).not.toContain('Theme Fonts');
@@ -2951,7 +2951,7 @@ describe('toolbar/ribbon menu primitives', () => {
 
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
     expect(menusCss).toMatch(
-      /\.app__menu-item__caret\s*\{[\s\S]*?border-top: 4px solid transparent;[\s\S]*?border-bottom: 4px solid transparent;[\s\S]*?border-left: 5px solid var\(--demo-fg-soft\);/,
+      /\.app__menu-item__caret\s*\{[\s\S]*?border-top: 4px solid transparent;[\s\S]*?border-bottom: 4px solid transparent;[\s\S]*?border-left: 5px solid var\(--fc-tb-fg-soft\);/,
     );
   });
 

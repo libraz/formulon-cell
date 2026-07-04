@@ -49,12 +49,12 @@ set of theme names.
 | Prefix          | Where defined                           | Purpose                                                          |
 | --------------- | --------------------------------------- | ---------------------------------------------------------------- |
 | `--fc-*`        | `tokens.css` + `theme-*.css`            | the **public** override surface for the spreadsheet itself.       |
-| `--demo-*`      | `toolbar/base/tokens.css`               | the **public** override surface for the ribbon toolbar bundle.    |
+| `--fc-tb-*`      | `toolbar/base/tokens.css`               | the **public** override surface for the ribbon toolbar bundle.    |
 | `--fc-z-*`      | `tokens.css`                            | stacking floors (set on `:where(html)`, not on `.fc-host`).       |
 
 When in doubt:
 - adding a color used by the spreadsheet body / dialogs → `--fc-*`
-- adding a color used by the ribbon toolbar             → `--demo-*`
+- adding a color used by the ribbon toolbar             → `--fc-tb-*`
 - nothing about the spreadsheet engine changes between themes → use literals
   inside the leaf stylesheet, not a new token.
 

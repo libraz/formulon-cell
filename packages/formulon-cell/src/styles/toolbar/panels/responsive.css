@@ -61,7 +61,7 @@
     left: 0;
     width: auto;
     max-height: 42vh;
-    border-top: 1px solid var(--demo-line);
+    border-top: 1px solid var(--fc-tb-line);
     border-left: 0;
     padding: 12px;
     box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.14);

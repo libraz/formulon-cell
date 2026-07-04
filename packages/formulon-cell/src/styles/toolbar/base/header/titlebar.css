@@ -4,8 +4,8 @@
   flex-direction: column;
   gap: 0;
   padding: 0;
-  background: var(--demo-card);
-  border-bottom: 1px solid var(--demo-line-soft);
+  background: var(--fc-tb-card);
+  border-bottom: 1px solid var(--fc-tb-line-soft);
 }
 
 .demo__titlebar {
@@ -18,8 +18,8 @@
   gap: 10px;
   min-height: 36px;
   padding: 0 10px;
-  background: var(--demo-title);
-  color: var(--demo-title-fg);
+  background: var(--fc-tb-title);
+  color: var(--fc-tb-title-fg);
 }
 
 .demo__quick,
@@ -45,7 +45,7 @@
 }
 
 .demo__title span {
-  color: var(--demo-fg-soft);
+  color: var(--fc-tb-fg-soft);
   white-space: nowrap;
 }
 
@@ -59,7 +59,7 @@
   border: 1px solid transparent;
   border-radius: 3px;
   background: transparent;
-  color: var(--demo-title-fg);
+  color: var(--fc-tb-title-fg);
   font: inherit;
   font-size: 14px;
   cursor: pointer;
@@ -67,13 +67,13 @@
 
 .demo__title-icon:hover:not(:disabled),
 .demo__share:hover {
-  background: var(--demo-ribbon-hover);
-  border-color: var(--demo-ribbon-line);
+  background: var(--fc-tb-ribbon-hover);
+  border-color: var(--fc-tb-ribbon-line);
 }
 
 .demo__share--active {
-  background: var(--demo-ribbon-pressed);
-  border-color: var(--demo-ribbon-line);
+  background: var(--fc-tb-ribbon-pressed);
+  border-color: var(--fc-tb-ribbon-line);
 }
 
 .demo__search {
@@ -87,14 +87,14 @@
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
-  color: var(--demo-fg-soft);
+  color: var(--fc-tb-fg-soft);
   box-shadow: none;
 }
 
 .demo__search:hover,
 .demo__search:focus-within {
-  border-color: var(--demo-ribbon-line);
-  background: var(--demo-input-bg);
+  border-color: var(--fc-tb-ribbon-line);
+  background: var(--fc-tb-input-bg);
 }
 
 .demo__search .demo__rb-icon {
@@ -107,7 +107,7 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--demo-input-fg);
+  color: var(--fc-tb-input-fg);
   font: inherit;
   font-size: 12px;
 }
@@ -119,10 +119,10 @@
   left: 0;
   z-index: 40;
   overflow: hidden;
-  border: 1px solid var(--demo-ribbon-line);
+  border: 1px solid var(--fc-tb-ribbon-line);
   border-radius: 4px;
-  background: var(--demo-ribbon-bg);
-  color: var(--demo-input-fg);
+  background: var(--fc-tb-ribbon-bg);
+  color: var(--fc-tb-input-fg);
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.18),
     0 2px 6px rgba(0, 0, 0, 0.12);
@@ -137,8 +137,8 @@
   min-height: 34px;
   padding: 6px 10px;
   border: 0;
-  border-bottom: 1px solid var(--demo-line-soft);
-  background: var(--demo-ribbon-bg);
+  border-bottom: 1px solid var(--fc-tb-line-soft);
+  background: var(--fc-tb-ribbon-bg);
   color: inherit;
   font: inherit;
   font-size: 12px;
@@ -154,7 +154,7 @@
 .demo__command-item--active,
 .demo__command-item[aria-selected="true"],
 .demo__command-item:focus-visible {
-  background: var(--demo-ribbon-rail);
+  background: var(--fc-tb-ribbon-rail);
   outline: 0;
 }
 
@@ -165,7 +165,7 @@
 
 .demo__command-item--disabled strong,
 .demo__command-item[aria-disabled="true"] strong {
-  color: var(--demo-fg-soft);
+  color: var(--fc-tb-fg-soft);
 }
 
 .demo__command-item strong,
@@ -181,7 +181,7 @@
 
 .demo__command-item span,
 .demo__command-empty {
-  color: var(--demo-fg-soft);
+  color: var(--fc-tb-fg-soft);
 }
 
 .demo__command-empty {
@@ -197,24 +197,24 @@
 .demo__share {
   height: 26px;
   padding: 0 11px;
-  border: 1px solid var(--demo-ribbon-line);
+  border: 1px solid var(--fc-tb-ribbon-line);
   border-radius: 4px;
-  background: var(--demo-ribbon-bg);
-  color: var(--demo-fg);
+  background: var(--fc-tb-ribbon-bg);
+  color: var(--fc-tb-fg);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
 }
 
 .demo__account .demo__share:first-child {
-  border-color: var(--demo-title-strong);
-  background: var(--demo-title-strong);
+  border-color: var(--fc-tb-title-strong);
+  background: var(--fc-tb-title-strong);
   color: #ffffff;
 }
 
 .demo__account .demo__share:first-child:hover {
-  border-color: var(--demo-accent-strong);
-  background: var(--demo-accent);
+  border-color: var(--fc-tb-accent-strong);
+  background: var(--fc-tb-accent);
   color: #ffffff;
 }
 
@@ -225,8 +225,8 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: var(--demo-input-bg);
-  color: var(--demo-title-strong);
+  background: var(--fc-tb-input-bg);
+  color: var(--fc-tb-title-strong);
   font-size: 11px;
   font-weight: 600;
 }

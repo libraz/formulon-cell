@@ -6,7 +6,7 @@
   display: inline-flex;
   width: 30px;
   height: 26px;
-  color: var(--demo-fg);
+  color: var(--fc-tb-fg);
   font: inherit;
   font-size: 11px;
   align-items: center;
@@ -17,8 +17,8 @@
 }
 
 .demo__rb-color:hover {
-  background: var(--demo-ribbon-hover);
-  border-color: var(--demo-ribbon-line);
+  background: var(--fc-tb-ribbon-hover);
+  border-color: var(--fc-tb-ribbon-line);
 }
 
 .demo__rb-color input[type="color"] {
@@ -69,8 +69,8 @@
 
 .demo__rb-color__btn:hover,
 .demo__rb-color--open .demo__rb-color__btn {
-  background: var(--demo-ribbon-hover);
-  border-color: var(--demo-ribbon-line);
+  background: var(--fc-tb-ribbon-hover);
+  border-color: var(--fc-tb-ribbon-line);
 }
 
 .demo__rb-color__icon {
@@ -92,7 +92,7 @@
   bottom: 6px;
   width: 9px;
   height: 9px;
-  color: var(--demo-fg-soft);
+  color: var(--fc-tb-fg-soft);
 }
 
 .demo__rb-color__btn:disabled {
@@ -108,12 +108,12 @@
   z-index: 90;
   border: 1px solid #c8c8c8;
   border-radius: 3px;
-  background: var(--demo-ribbon-bg, #ffffff);
-  color: var(--demo-fg);
+  background: var(--fc-tb-ribbon-bg, #ffffff);
+  color: var(--fc-tb-fg);
   box-shadow:
     0 8px 18px rgba(0, 0, 0, 0.15),
     0 1px 4px rgba(0, 0, 0, 0.12);
-  font-family: var(--demo-font);
+  font-family: var(--fc-tb-font);
   font-size: 12px;
 }
 

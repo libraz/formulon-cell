@@ -725,7 +725,10 @@ export const Spreadsheet = {
 
     host.dataset.fcEngineState = wb.isStub ? 'ready-stub' : 'ready';
 
-    return {
+    let toolbarHandle: ToolbarInstance | null = null;
+    let ribbonHost: HTMLElement | null = null;
+
+    const instance: SpreadsheetInstance = {
       host,
       get workbook() {
         return wb;
@@ -734,6 +737,9 @@ export const Spreadsheet = {
       history,
       i18n,
       features: featuresView,
+      get toolbar() {
+        return toolbarHandle;
+      },
       get clipboard() {
         return binding.clipboardH;
       },
@@ -1118,6 +1124,10 @@ export const Spreadsheet = {
       dispose() {
         if (disposed) return;
         disposed = true;
+        toolbarHandle?.dispose();
+        toolbarHandle = null;
+        ribbonHost?.remove();
+        ribbonHost = null;
         emitter.dispose();
         ro.disconnect();
         binding.unbind();
@@ -1143,6 +1153,23 @@ export const Spreadsheet = {
         releaseMountHost(host, instanceId);
       },
     };
+
+    // Single-call ribbon: mount the toolbar into a `display: contents` host at
+    // the top of `.fc-host` so its shell participates in the host flex column
+    // directly (grid fills the rest). The toolbar reads the same
+    // `data-fc-theme`, so grid and toolbar theme together via the cascade.
+    if (opts.toolbar) {
+      ribbonHost = document.createElement('div');
+      ribbonHost.className = 'fc-host__ribbon';
+      ribbonHost.style.display = 'contents';
+      host.insertBefore(ribbonHost, host.firstChild);
+      toolbarHandle = mountToolbar(ribbonHost, instance, {
+        lang: i18n.locale === 'en' ? 'en' : 'ja',
+        dynamicDropdowns: true,
+      });
+    }
+
+    return instance;
   },
 };
 

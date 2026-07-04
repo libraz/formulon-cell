@@ -35,10 +35,11 @@ const sheet = await Spreadsheet.mount(host, {
   workbook: wb,
   features: presets.full(),
   locale: 'en',
+  toolbar: true,                 // ribbon in the same call → sheet.toolbar
 });
 
 sheet.i18n.setLocale('ja');     // runtime locale swap
-sheet.setTheme('ink');           // dark mode
+sheet.setTheme('ink');           // dark mode — themes grid and toolbar together
 ```
 
 ## Host Integrations

@@ -15,9 +15,9 @@ body,
 }
 
 body {
-  background: var(--demo-bg);
-  color: var(--demo-fg);
-  font-family: var(--demo-font);
+  background: var(--fc-tb-bg);
+  color: var(--fc-tb-fg);
+  font-family: var(--fc-tb-font);
   font-size: 14px;
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
@@ -35,8 +35,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--demo-mono);
-  color: var(--demo-fg-soft);
+  font-family: var(--fc-tb-mono);
+  color: var(--fc-tb-fg-soft);
 }
 
 .demo__load-error {
