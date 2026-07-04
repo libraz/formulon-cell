@@ -3,6 +3,7 @@ import {
   ENGINE_SPREADSHEET_PROFILE_SETTER,
 } from './capabilities.js';
 import { computeNamedCellStyles, type NamedCellStyle } from './cell-styles-meta.js';
+import { localeTag, mergeFunctionMetadata } from './function-metadata.js';
 import { computeEngineSpillRanges } from './spill.js';
 import {
   type EngineSpreadsheetProfileId,
@@ -18,10 +19,12 @@ import type {
   ConditionalFormatInput,
   DxfRecord,
   EngineCapabilities,
+  EvalArrayResult,
   EvalResult,
   FillRecord,
   FontRecord,
   FormulonModule,
+  FunctionMetadataProvider,
   Range,
   SpreadsheetProfileId,
   Workbook,
@@ -33,6 +36,7 @@ type WorkbookHandleInternals = {
   wb: Workbook;
   module: FormulonModule;
   capabilities: EngineCapabilities;
+  functionMetadataProvider: FunctionMetadataProvider | null;
   assertAlive(): void;
 };
 type EngineCommentEntry = { row: number; col: number; author: string; text: string };
@@ -489,6 +493,20 @@ export abstract class WorkbookHandleFeatureMethods {
     return wb(this).evaluateFormulaText(addr.sheet, addr.row, addr.col, formula);
   }
 
+  /** Ad-hoc evaluation that returns the *whole* dynamic-array / spilled
+   *  result of `formula` anchored at `addr`, without mutating the workbook.
+   *  The `cells` grid is row-major (`cells[r][c]`); a scalar is reported as a
+   *  1x1 array. Falls back to a 1x1 wrapper around `evaluateFormulaText` when
+   *  the engine doesn't expose `evaluateFormulaArray`. */
+  evaluateFormulaArray(addr: Addr, formula: string): EvalArrayResult {
+    assertAlive(this);
+    if (!this.capabilities.arrayFormulaEvaluation) {
+      const single = this.evaluateFormulaText(addr, formula);
+      return { status: single.status, rows: 1, cols: 1, cells: [[single.value]] };
+    }
+    return wb(this).evaluateFormulaArray(addr.sheet, addr.row, addr.col, formula);
+  }
+
   evaluateConditionalFormula(
     addr: Addr,
     anchor: Pick<Addr, 'row' | 'col'>,
@@ -651,33 +669,51 @@ export abstract class WorkbookHandleFeatureMethods {
     return wb(this).functionNames();
   }
 
-  /** Engine metadata for `name` (case-insensitive). `locale`: 0 = en-US,
-   *  1 = ja-JP. The engine guarantees `minArity` / `maxArity` whenever
-   *  the function is known; `signatureTemplate` and `description` come
-   *  from the per-locale metadata table and are absent until that table
-   *  is populated upstream. Returns `null` when the engine doesn't
-   *  expose `functionMetadata` or the function is unknown. `maxArity`
-   *  may be `0xFFFFFFFF` to denote unbounded variadic. */
+  /** Register a host-supplied function-metadata provider — a map of canonical
+   *  UPPERCASE function name to localized signature/description/alias overrides
+   *  — that `functionMetadata` merges over the engine's structural catalog.
+   *  Pass `null` to clear. Display-only: it never affects parsing or
+   *  evaluation. See `docs/function-metadata-schema.md`. */
+  setFunctionMetadataProvider(provider: FunctionMetadataProvider | null): void {
+    internals(this).functionMetadataProvider = provider;
+  }
+
+  /** Engine metadata for `name` (case-insensitive), with any host-registered
+   *  provider entry merged over it (see `setFunctionMetadataProvider`).
+   *  `locale`: 0 = en-US, 1 = ja-JP. The engine guarantees `minArity` /
+   *  `maxArity` whenever the function is known; `signatureTemplate` and
+   *  `description` come from the per-locale metadata table or a provider
+   *  override, and are absent until either is populated. `localizedName`
+   *  carries the provider's locale alias when present. Returns `null` when the
+   *  engine doesn't expose `functionMetadata` or the function is unknown.
+   *  `maxArity` may be `null` to denote an unbounded variadic or a lazy /
+   *  special form whose upper arity is unknown. */
   functionMetadata(
     name: string,
     locale = 0,
   ): {
     name: string;
     minArity: number;
-    maxArity: number;
+    maxArity: number | null;
     signatureTemplate?: string;
     description?: string;
+    localizedName?: string;
   } | null {
     assertAlive(this);
     if (!this.capabilities.functionMetadata) return null;
     const m = wb(this).functionMetadata(name, locale);
     if (!m.ok) return null;
+    const provider = internals(this).functionMetadataProvider;
+    const canonical = m.name ?? name;
+    const entry = provider?.[canonical.toUpperCase()];
+    const merged = mergeFunctionMetadata(m, entry, localeTag(locale));
     return {
-      name: m.name ?? name,
-      minArity: m.minArity ?? 0,
-      maxArity: m.maxArity ?? 0,
-      ...(m.signatureTemplate ? { signatureTemplate: m.signatureTemplate } : {}),
-      ...(m.description ? { description: m.description } : {}),
+      name: canonical,
+      minArity: merged.minArity ?? 0,
+      maxArity: merged.maxArity ?? null,
+      ...(merged.signatureTemplate ? { signatureTemplate: merged.signatureTemplate } : {}),
+      ...(merged.description ? { description: merged.description } : {}),
+      ...(merged.localizedName ? { localizedName: merged.localizedName } : {}),
     };
   }
 

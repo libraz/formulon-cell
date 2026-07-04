@@ -12,10 +12,16 @@ export type {
   DataValidationRange,
   DxfRecord,
   DxfResult,
+  EvalArrayResult,
   EvalResult,
   FillRecord,
   FontRecord,
   FormulonModule,
+  FunctionMetadataEntry,
+  FunctionMetadataLocalized,
+  FunctionMetadataProvider,
+  FunctionMetadataResult,
+  MergedFunctionMetadataResult,
   PivotCell,
   PivotLayoutResult,
   PivotReportLayoutResult,
@@ -282,6 +288,11 @@ export interface EngineCapabilities {
   readonly lambdaText: boolean;
   /** Read-only formula evaluation anchored at a workbook cell. */
   readonly formulaTextEvaluation: boolean;
+  /** Read-only ad-hoc evaluation that returns the whole dynamic-array /
+   *  spilled result via `evaluateFormulaArray` instead of reducing to the
+   *  top-left element. When off, array-returning F9 previews collapse to a
+   *  single value. */
+  readonly arrayFormulaEvaluation: boolean;
   /** Read-only conditional-format predicate evaluation with a range anchor. */
   readonly conditionalFormulaEvaluation: boolean;
   /** `cellStyleCount` + `getCellStyle` + `getCellStyleXf` named-style

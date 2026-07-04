@@ -11,6 +11,7 @@ import type {
   DataValidationInput,
   EngineCapabilities,
   FormulonModule,
+  FunctionMetadataProvider,
   Range,
   Workbook,
 } from './types.js';
@@ -67,6 +68,11 @@ export class WorkbookHandle {
    *  snapshot pair and pushes a closure entry instead of using the local
    *  stack. */
   private history: History | null = null;
+
+  /** Host-injected localized function documentation, merged over the
+   *  engine's structural `functionMetadata()` result. `null` until a host
+   *  calls `setFunctionMetadataProvider`. */
+  private functionMetadataProvider: FunctionMetadataProvider | null = null;
 
   /** Inclusive rect of cells currently visible to the user, supplied by the
    *  renderer via `setViewportHint`. Drives partial recalc on `setFormula`.

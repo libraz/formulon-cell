@@ -1,5 +1,5 @@
 import { addrKey } from '../engine/address.js';
-import type { CellValue, EvalResult } from '../engine/types.js';
+import type { CellValue, EvalArrayResult, EvalResult } from '../engine/types.js';
 import { fromEngineValue } from '../engine/value.js';
 
 /**
@@ -39,7 +39,38 @@ const REF_RE = /^(?:'([^']+)'|([A-Za-z_][A-Za-z0-9_]*))?!?(\$?)([A-Za-z]+)(\$?)(
 const NUMBER_RE = /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/;
 const STRING_RE = /^"([^"]*)"$/;
 type F9FormulaEvaluator = (formula: string) => EvalResult;
+type F9ArrayEvaluator = (formula: string) => EvalArrayResult;
 const MAX_RANGE_EXPANSION_CELLS = 10_000;
+/** Upper bound on cells rendered into an F9 array constant. Beyond this the
+ *  preview collapses to the array's top-left element rather than pasting an
+ *  unwieldy literal into the formula bar. */
+const MAX_ARRAY_PREVIEW_CELLS = 4_096;
+
+/** Render an `evaluateFormulaArray` result as a spreadsheet-style array
+ *  constant (`{a,b;c,d}` — columns by `,`, rows by `;`). A 1x1 result renders as the
+ *  bare scalar. Returns `null` when the result is too large to inline. */
+function renderArrayCell(v: EvalArrayResult['cells'][number][number] | undefined): string {
+  return renderCellValueForF9(v === undefined ? { kind: 'blank' } : fromEngineValue(v));
+}
+
+function renderArrayForF9(result: EvalArrayResult): string | null {
+  const { rows, cols, cells } = result;
+  if (rows <= 0 || cols <= 0) return null;
+  if (rows === 1 && cols === 1) {
+    return renderArrayCell(cells[0]?.[0]);
+  }
+  if (rows * cols > MAX_ARRAY_PREVIEW_CELLS) return null;
+  const rowLiterals: string[] = [];
+  for (let r = 0; r < rows; r += 1) {
+    const row = cells[r] ?? [];
+    const colLiterals: string[] = [];
+    for (let c = 0; c < cols; c += 1) {
+      colLiterals.push(renderArrayCell(row[c]));
+    }
+    rowLiterals.push(colLiterals.join(','));
+  }
+  return `{${rowLiterals.join(';')}}`;
+}
 
 const lettersToCol = (letters: string): number => {
   let col = 0;
@@ -81,6 +112,7 @@ export function computeF9Preview(
   sheetByName?: (name: string) => number,
   evalFormula?: F9FormulaEvaluator,
   preferContextualEvaluation = false,
+  evalFormulaArray?: F9ArrayEvaluator,
 ): F9Preview {
   const trimmed = selection.trim();
   if (!trimmed) {
@@ -115,6 +147,13 @@ export function computeF9Preview(
     }
     const cell = cells.get(addrKey({ sheet, row, col }));
     return { display: renderCellValueForF9(cell?.value), substitutable: true };
+  }
+  if (evalFormulaArray && preferContextualEvaluation) {
+    const arr = evalFormulaArray(trimmed.startsWith('=') ? trimmed : `=${trimmed}`);
+    if (arr.status.status === 0) {
+      const display = renderArrayForF9(arr);
+      if (display !== null) return { display, substitutable: true };
+    }
   }
   if (evalFormula && preferContextualEvaluation) {
     const contextual = evalFormula(trimmed.startsWith('=') ? trimmed : `=${trimmed}`);
@@ -258,6 +297,7 @@ export function replaceFormulaSelectionWithF9Preview(
   sheetByName?: (name: string) => number,
   evalFormula?: F9FormulaEvaluator,
   preferContextualEvaluation = false,
+  evalFormulaArray?: F9ArrayEvaluator,
 ): F9Replacement | null {
   if (!formula.startsWith('=') || start === end) return null;
   const left = Math.max(0, Math.min(start, end));
@@ -271,6 +311,7 @@ export function replaceFormulaSelectionWithF9Preview(
     sheetByName,
     evalFormula,
     preferContextualEvaluation,
+    evalFormulaArray,
   );
   if (!preview.substitutable) return { text: formula, start: left, end: right, preview };
   const text = `${formula.slice(0, left)}${preview.display}${formula.slice(right)}`;

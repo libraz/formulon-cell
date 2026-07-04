@@ -62,6 +62,7 @@ export function detectCapabilities(wb: Workbook): EngineCapabilities {
     externalLinks: has('getExternalLinks'),
     lambdaText: has('getLambdaText'),
     formulaTextEvaluation: has('evaluateFormulaText'),
+    arrayFormulaEvaluation: has('evaluateFormulaArray'),
     conditionalFormulaEvaluation: has('evaluateConditionalFormula'),
     cellStyles: all('cellStyleCount', 'cellStyleXfCount', 'getCellStyle', 'getCellStyleXf'),
     conditionalFormatMutate: all(

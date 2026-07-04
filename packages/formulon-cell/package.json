@@ -72,7 +72,7 @@
     "test:coverage": "vitest run --coverage --config vitest.config.ts"
   },
   "dependencies": {
-    "@libraz/formulon": "0.9.4"
+    "@libraz/formulon": "0.9.5"
   },
   "peerDependencies": {
     "zustand": "^5"

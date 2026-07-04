@@ -4,7 +4,13 @@ import {
   renderCellValueForF9,
   replaceFormulaSelectionWithF9Preview,
 } from '../../../src/commands/f9-preview.js';
-import { type CellValue, type EvalResult, ValueKind } from '../../../src/engine/types.js';
+import {
+  type CellValue,
+  type EvalArrayResult,
+  type EvalResult,
+  type Value,
+  ValueKind,
+} from '../../../src/engine/types.js';
 
 const numCell = (value: number): { value: CellValue; formula: string | null } => ({
   value: { kind: 'number', value },
@@ -24,6 +30,21 @@ const evalNumber =
       status: { status: 0 },
       value: { kind: ValueKind.Number, number: value },
     } as EvalResult;
+  };
+
+const numV = (n: number): Value => ({ kind: ValueKind.Number, number: n }) as Value;
+const txtV = (t: string): Value => ({ kind: ValueKind.Text, text: t }) as Value;
+
+const evalArray =
+  (expectedFormula: string, cells: Value[][]) =>
+  (formula: string): EvalArrayResult => {
+    expect(formula).toBe(expectedFormula);
+    return {
+      status: { status: 0 },
+      rows: cells.length,
+      cols: cells[0]?.length ?? 0,
+      cells,
+    } as EvalArrayResult;
   };
 
 describe('renderCellValueForF9', () => {
@@ -222,6 +243,76 @@ describe('computeF9Preview', () => {
       display: '',
       substitutable: false,
     });
+  });
+
+  it('renders a multi-cell array result as a spreadsheet array constant', () => {
+    expect(
+      computeF9Preview(
+        '=SEQUENCE(2,2)',
+        'SEQUENCE(2,2)',
+        0,
+        new Map(),
+        undefined,
+        undefined,
+        true,
+        evalArray('=SEQUENCE(2,2)', [
+          [numV(1), numV(2)],
+          [numV(3), numV(4)],
+        ]),
+      ),
+    ).toEqual({ display: '{1,2;3,4}', substitutable: true });
+  });
+
+  it('quotes text cells inside an array constant', () => {
+    expect(
+      computeF9Preview(
+        '={"a","b"}',
+        '{"a","b"}',
+        0,
+        new Map(),
+        undefined,
+        undefined,
+        true,
+        evalArray('={"a","b"}', [[txtV('a'), txtV('b')]]),
+      ),
+    ).toEqual({ display: '{"a","b"}', substitutable: true });
+  });
+
+  it('collapses a 1x1 array result to the bare scalar', () => {
+    expect(
+      computeF9Preview(
+        '=A1',
+        'A1+0',
+        0,
+        new Map(),
+        undefined,
+        undefined,
+        true,
+        evalArray('=A1+0', [[numV(42)]]),
+      ),
+    ).toEqual({ display: '42', substitutable: true });
+  });
+
+  it('falls back to the scalar evaluator when array evaluation errors', () => {
+    const arrErr =
+      () =>
+      (_formula: string): EvalArrayResult =>
+        ({ status: { status: 1 }, rows: 0, cols: 0, cells: [] as Value[][] }) as EvalArrayResult;
+    expect(
+      computeF9Preview(
+        '=A1+B1',
+        'A1+B1',
+        0,
+        new Map([
+          ['0:0:0', numCell(7)],
+          ['0:0:1', numCell(5)],
+        ]),
+        undefined,
+        evalNumber('=A1+B1', 12),
+        true,
+        arrErr(),
+      ),
+    ).toEqual({ display: '12', substitutable: true });
   });
 });
 

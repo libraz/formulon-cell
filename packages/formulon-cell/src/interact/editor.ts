@@ -421,6 +421,7 @@ export class InlineEditor {
         sheetByName,
         (formula) => this.deps.wb.evaluateFormulaText(active, formula),
         true,
+        (formula) => this.deps.wb.evaluateFormulaArray(active, formula),
       );
       if (result) {
         e.preventDefault();

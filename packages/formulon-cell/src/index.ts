@@ -680,6 +680,7 @@ export {
 } from './engine/compatibility.js';
 export type { LocaleOrdinal } from './engine/function-locale.js';
 export { canonicalizeFormula, localizeFormula } from './engine/function-locale.js';
+export { LOCALE_TAGS, localeTag, mergeFunctionMetadata } from './engine/function-metadata.js';
 export type { LoadOptions } from './engine/loader.js';
 export { isUsingStub } from './engine/loader.js';
 export type {
@@ -718,6 +719,13 @@ export type {
   Addr,
   CellValue,
   EngineCapabilities,
+  EvalArrayResult,
+  EvalResult,
+  FunctionMetadataEntry,
+  FunctionMetadataLocalized,
+  FunctionMetadataProvider,
+  FunctionMetadataResult,
+  MergedFunctionMetadataResult,
   PivotCell,
   PivotDataFieldSpec,
   PivotFieldSpec,

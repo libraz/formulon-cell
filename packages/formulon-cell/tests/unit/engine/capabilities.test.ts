@@ -81,6 +81,7 @@ describe('detectCapabilities', () => {
     expect(caps.traceArrows).toBe(false);
     expect(caps.functionMetadata).toBe(false);
     expect(caps.functionLocale).toBe(false);
+    expect(caps.arrayFormulaEvaluation).toBe(false);
     expect(caps.calcMode).toBe(false);
     expect(caps.spreadsheetProfile).toBe(false);
     expect(caps.sheetProtectionRoundtrip).toBe(false);
@@ -99,6 +100,15 @@ describe('detectCapabilities', () => {
     expect(caps.sheetZoom).toBe(false);
     expect(caps.freeze).toBe(false);
     expect(caps.sheetTabHidden).toBe(false);
+  });
+
+  it('arrayFormulaEvaluation is independent from scalar formula evaluation', () => {
+    const scalarOnly = makeWb(['evaluateFormulaText']);
+    expect(detectCapabilities(scalarOnly).formulaTextEvaluation).toBe(true);
+    expect(detectCapabilities(scalarOnly).arrayFormulaEvaluation).toBe(false);
+
+    const both = makeWb(['evaluateFormulaText', 'evaluateFormulaArray']);
+    expect(detectCapabilities(both).arrayFormulaEvaluation).toBe(true);
   });
 
   it('traceArrows requires both precedents and dependents', () => {
