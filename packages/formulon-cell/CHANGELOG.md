@@ -75,6 +75,10 @@ versioning is [SemVer](https://semver.org/).
 - Range-scanning commands (formula preview, reference rewriting, and
   similar bulk operations) now guard against unbounded selections to avoid
   slowdowns on very large ranges.
+- The format submenu is registered in the dynamic-dropdown dispatch keys so
+  its ribbon dropdown opens correctly.
+- Self-package imports resolve to relative paths, producing clean library
+  builds without unresolved import warnings.
 
 ## 0.2.0 — 2026-05-11
 
