@@ -93,10 +93,11 @@ preview; browser-only hosts can omit them. `uploadStatus` accepts `saved`,
 | `@libraz/formulon-cell/extensions/*` | Individual extensions (`statusBar`, `findReplace`, `contextMenu`, …) |
 | `@libraz/formulon-cell/i18n/ja` | Japanese locale dictionary |
 | `@libraz/formulon-cell/i18n/en` | English locale dictionary |
-| `@libraz/formulon-cell/styles.css` | Default styles bundle |
-| `@libraz/formulon-cell/styles/paper.css` | Paper (light) theme |
-| `@libraz/formulon-cell/styles/ink.css` | Ink (dark) theme |
-| `@libraz/formulon-cell/styles/contrast.css` | High-contrast theme |
+| `@libraz/formulon-cell/styles.css` | All-in-one bundle: grid, dialogs, overlays, ribbon toolbar, and all three palettes. This is the only stylesheet most embedders need |
+| `@libraz/formulon-cell/styles/toolbar.css` | Ribbon styles only — for granular setups that don't want the all-in-one bundle |
+| `@libraz/formulon-cell/styles/paper.css` | Paper (light) theme only |
+| `@libraz/formulon-cell/styles/ink.css` | Ink (dark) theme only |
+| `@libraz/formulon-cell/styles/contrast.css` | High-contrast theme only |
 | `@libraz/formulon-cell/styles/tokens.css` | Theme tokens only |
 
 ## Key APIs

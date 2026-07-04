@@ -61,10 +61,11 @@ sheet.setTheme('ink');           // ダークテーマへ切り替え
 | `@libraz/formulon-cell/extensions/*` | 個別の拡張 (`statusBar`、`findReplace`、`contextMenu` など) |
 | `@libraz/formulon-cell/i18n/ja` | 日本語ロケール辞書 |
 | `@libraz/formulon-cell/i18n/en` | 英語ロケール辞書 |
-| `@libraz/formulon-cell/styles.css` | デフォルトスタイル束 |
-| `@libraz/formulon-cell/styles/paper.css` | paper (ライト) テーマ |
-| `@libraz/formulon-cell/styles/ink.css` | ink (ダーク) テーマ |
-| `@libraz/formulon-cell/styles/contrast.css` | ハイコントラストテーマ |
+| `@libraz/formulon-cell/styles.css` | 全部入り束: グリッド・ダイアログ・オーバーレイ・リボンツールバー・3 テーマすべて。多くの利用者はこの 1 本だけで足りる |
+| `@libraz/formulon-cell/styles/toolbar.css` | リボン用スタイルのみ — 全部入り束を使わない細粒度構成向け |
+| `@libraz/formulon-cell/styles/paper.css` | paper (ライト) テーマのみ |
+| `@libraz/formulon-cell/styles/ink.css` | ink (ダーク) テーマのみ |
+| `@libraz/formulon-cell/styles/contrast.css` | ハイコントラストテーマのみ |
 | `@libraz/formulon-cell/styles/tokens.css` | テーマトークンのみ |
 
 ## 主な API

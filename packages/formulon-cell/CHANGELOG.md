@@ -4,6 +4,43 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
+## Unreleased
+
+### Changed
+
+- All floating UI (context menus, dialogs, tooltips, dropdowns, popovers) now
+  mounts into a single per-instance overlay portal appended to `<body>` and
+  tagged with the host's `data-fc-theme`, instead of being teleported directly
+  onto `<body>` with theme tokens hand-copied onto each overlay. Overlays now
+  inherit paper / ink / contrast tokens through normal CSS cascade, so a new
+  theme token reaches every overlay automatically — no per-overlay forwarding
+  list to keep in sync. Removed the `inheritHostTokens` helper and its
+  hard-coded token allow-list. This also fixes the dark-theme context-menu
+  glyph regression structurally: `--fc-menu-icon-filter` now flows to the menu
+  like any other token.
+- Single CSS entry: `@libraz/formulon-cell/styles.css` now includes the ribbon
+  toolbar styles, so it is the only stylesheet an embedder needs (grid +
+  toolbar + all three palettes). The individual `styles/paper.css`,
+  `styles/ink.css`, `styles/contrast.css`, and `styles/toolbar.css` exports
+  remain for granular setups.
+
+### Fixed
+
+- Picking a palette from the ribbon's Page Layout → Themes gallery now actually
+  re-themes the grid. The tiles speak the toolbar's `light/dark/contrast`
+  vocabulary, which was written straight through to the grid as
+  `data-fc-theme="dark"` — a value no theme stylesheet matches — leaving the
+  grid unstyled. The value is now mapped to the grid's `paper/ink/contrast`
+  `ThemeName` before it is applied.
+- The distributed toolbar stylesheet no longer ships demo-page globals
+  (`* { box-sizing }`, `html, body, #root` sizing, and a `body { background }`
+  rule). Embedding the toolbar previously restyled the host page's `<body>`;
+  those rules now live in the demo apps where they belong.
+- Context-menu item padding is still re-asserted unlayered, so an aggressive
+  host `button { padding: 0 }` reset (as shipped by VitePress, Tailwind
+  preflight, or normalize.css) cannot collapse it and clip the keyboard-shortcut
+  hints against the menu's right edge.
+
 ## 0.3.1 — 2026-07-04
 
 ### Added
