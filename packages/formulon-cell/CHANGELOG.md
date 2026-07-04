@@ -4,7 +4,7 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
-## Unreleased
+## 0.4.0 — 2026-07-05
 
 ### Added
 
@@ -233,6 +233,7 @@ Initial public release.
   so the package works under any modern bundler. Falls back to an
   in-memory stub when `crossOriginIsolated` is unavailable.
 
+[0.4.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.4.0
 [0.3.1]: https://github.com/libraz/formulon-cell/releases/tag/v0.3.1
 [0.3.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.3.0
 [0.2.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.2.0
