@@ -26,7 +26,7 @@
   --demo-backstage-rail: #f3f2f1;
 }
 
-[data-theme="ink"] {
+[data-fc-theme="ink"] {
   --demo-bg: #14171b;
   --demo-card: #1e2228;
   --demo-fg: #ecedef;
@@ -51,7 +51,7 @@
   --demo-backstage-rail: #181c22;
 }
 
-[data-theme="contrast"] {
+[data-fc-theme="contrast"] {
   --demo-bg: #ffffff;
   --demo-card: #ffffff;
   --demo-fg: #000000;

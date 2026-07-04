@@ -62,7 +62,7 @@ import {
 } from './toolbar-defaults.js';
 import type { SpreadsheetInstance } from './types.js';
 
-type UiTheme = 'light' | 'dark' | 'contrast';
+type UiTheme = 'paper' | 'ink' | 'contrast';
 
 export type { RibbonDisplayMode } from '../toolbar/ribbon/render-ribbon.js';
 
@@ -282,7 +282,7 @@ export function mountToolbar(
   let backstageOpen = false;
   let displayMenuOpen = false;
   let formulaBarVisible = opts.formulaBarVisible ?? true;
-  let theme: UiTheme = opts.theme ?? 'light';
+  let theme: UiTheme = opts.theme ?? 'paper';
   let borderStyle: CellBorderStyle = opts.borderStyle ?? DEFAULT_BORDER_STYLE;
   let borderColor = opts.borderColor ?? DEFAULT_BORDER_COLOR;
 

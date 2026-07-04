@@ -46,13 +46,13 @@ export const createPageLayoutMenuFactories = (
       {
         label: t.themePaper,
         attr: 'pageThemeAction',
-        value: 'light',
+        value: 'paper',
         icon: 'theme-light',
       },
       {
         label: t.themeInk,
         attr: 'pageThemeAction',
-        value: 'dark',
+        value: 'ink',
         icon: 'theme-dark',
       },
       {

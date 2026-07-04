@@ -23,15 +23,21 @@ versioning is [SemVer](https://semver.org/).
   toolbar + all three palettes). The individual `styles/paper.css`,
   `styles/ink.css`, `styles/contrast.css`, and `styles/toolbar.css` exports
   remain for granular setups.
+- One theme vocabulary across grid and toolbar. The ribbon toolbar now reads
+  the same `paper` / `ink` / `contrast` values off the shared `data-fc-theme`
+  attribute, instead of a separate `light` / `dark` / `contrast` vocabulary on
+  its own `data-theme` attribute. Put `data-fc-theme` on a common ancestor of
+  the grid and toolbar — or just drive `instance.setTheme(name)` — and both
+  surfaces theme together through CSS cascade. `MountToolbarOptions.theme`,
+  `ToolbarInstance.getTheme()` / `setTheme()`, and the `onThemeChange` callback
+  now speak `ThemeName` (`paper` / `ink` / `contrast`).
 
 ### Fixed
 
 - Picking a palette from the ribbon's Page Layout → Themes gallery now actually
-  re-themes the grid. The tiles speak the toolbar's `light/dark/contrast`
-  vocabulary, which was written straight through to the grid as
-  `data-fc-theme="dark"` — a value no theme stylesheet matches — leaving the
-  grid unstyled. The value is now mapped to the grid's `paper/ink/contrast`
-  `ThemeName` before it is applied.
+  re-themes the grid. The tiles emit the grid's `ThemeName` directly, so a
+  selection reaches `setTheme()` instead of stamping an unmatched
+  `data-fc-theme="dark"` that left the grid unstyled.
 - The distributed toolbar stylesheet no longer ships demo-page globals
   (`* { box-sizing }`, `html, body, #root` sizing, and a `body { background }`
   rule). Embedding the toolbar previously restyled the host page's `<body>`;

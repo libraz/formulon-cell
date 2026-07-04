@@ -584,7 +584,7 @@ onBeforeUnmount(() => {
     </div>
     <template v-else>{{ ui.loadingEngine }}</template>
   </div>
-  <div v-else class="demo" :data-theme="theme">
+  <div v-else class="demo" :data-fc-theme="theme">
     <header class="demo__head">
       <div class="demo__titlebar">
         <div

@@ -48,7 +48,7 @@ import {
 } from './command-tables.js';
 import type { AutoSumFormulaName } from './menus/formulas.js';
 
-type UiTheme = 'light' | 'dark' | 'contrast';
+type UiTheme = 'paper' | 'ink' | 'contrast';
 
 /** Toolbar-owned UI state read on each dispatch. Kept as plain values rather
  *  than getters because the dispatcher only reads them once per call. */
@@ -206,7 +206,7 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
       hooks?.page?.pageBreak?.();
       return true;
     case 'pageTheme':
-      runtime.applyUiTheme(ui.theme === 'dark' ? 'light' : 'dark');
+      runtime.applyUiTheme(ui.theme === 'ink' ? 'paper' : 'ink');
       runtime.focusSheet();
       return true;
     case 'sheetBackground':

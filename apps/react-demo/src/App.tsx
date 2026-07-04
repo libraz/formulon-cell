@@ -557,7 +557,7 @@ export const App = (): ReactElement => {
   }
 
   return (
-    <div className="demo" data-theme={theme}>
+    <div className="demo" data-fc-theme={theme}>
       <header className="demo__head">
         <div className="demo__titlebar">
           <div

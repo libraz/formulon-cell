@@ -38,11 +38,11 @@ To add a brand theme: copy one of these files, change the data-attribute, and
 override only the tokens you need.
 
 The host instance API (`inst.setTheme('paper' | 'ink' | 'contrast' | …)`)
-writes `data-fc-theme` on `.fc-host` for you. Shell wrappers (playground,
-react-demo, vue-demo) commonly expose this through a separate user-facing
-vocabulary on `<html>` (e.g. `data-theme="light|dark|contrast"`) and translate
-on toggle. The two attributes are intentionally decoupled — the shell owns its
-own UI palette and labels, the host owns the spreadsheet palette.
+writes `data-fc-theme` on `.fc-host` for you. The ribbon toolbar bundle reads
+the same `data-fc-theme` attribute and the same `paper` / `ink` / `contrast`
+vocabulary, so putting `data-fc-theme` on a common ancestor of the grid and the
+toolbar themes both surfaces together through the cascade — one attribute, one
+set of theme names.
 
 ## Token namespaces
 

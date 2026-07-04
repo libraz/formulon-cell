@@ -202,7 +202,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(tb.getActiveTab()).toBe('home');
     expect(tb.getCollapsed()).toBe(false);
     expect(tb.getFormulaBarVisible()).toBe(true);
-    expect(tb.getTheme()).toBe('light');
+    expect(tb.getTheme()).toBe('paper');
 
     tb.dispose();
     expect(host.children.length).toBe(0);
@@ -767,25 +767,24 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(menu?.classList.contains('app__menu--visual')).toBe(true);
     expect(menu?.querySelectorAll('.app__visual-tile')).toHaveLength(3);
 
-    const lightButton = host.querySelector<HTMLButtonElement>('[data-page-theme-action="light"]');
-    const darkButton = host.querySelector<HTMLButtonElement>('[data-page-theme-action="dark"]');
-    expect(lightButton?.getAttribute('role')).toBe('menuitemradio');
-    expect(lightButton?.getAttribute('aria-checked')).toBe('true');
-    expect(lightButton?.classList.contains('app__visual-tile--active')).toBe(true);
-    expect(darkButton?.getAttribute('aria-checked')).toBe('false');
-    expect(darkButton).toBeTruthy();
+    const paperButton = host.querySelector<HTMLButtonElement>('[data-page-theme-action="paper"]');
+    const inkButton = host.querySelector<HTMLButtonElement>('[data-page-theme-action="ink"]');
+    expect(paperButton?.getAttribute('role')).toBe('menuitemradio');
+    expect(paperButton?.getAttribute('aria-checked')).toBe('true');
+    expect(paperButton?.classList.contains('app__visual-tile--active')).toBe(true);
+    expect(inkButton?.getAttribute('aria-checked')).toBe('false');
+    expect(inkButton).toBeTruthy();
     const event = new MouseEvent('click', { bubbles: true });
-    Object.defineProperty(event, 'target', { value: darkButton });
+    Object.defineProperty(event, 'target', { value: inkButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
-    // The "Dark" tile maps to the grid's `ink` ThemeName (not the raw UiTheme
-    // 'dark', which matches no theme stylesheet). The menu still highlights the
-    // Dark tile because currentPageThemeAction normalizes ink → dark.
+    // The Ink tile applies the grid's `ink` ThemeName directly — tiles and the
+    // grid share the single paper/ink/contrast vocabulary.
     expect(sheet.instance.store.getState().ui.theme).toBe('ink');
 
     themeButton?.click();
-    expect(lightButton?.getAttribute('aria-checked')).toBe('false');
-    expect(darkButton?.getAttribute('aria-checked')).toBe('true');
-    expect(darkButton?.classList.contains('app__visual-tile--active')).toBe(true);
+    expect(paperButton?.getAttribute('aria-checked')).toBe('false');
+    expect(inkButton?.getAttribute('aria-checked')).toBe('true');
+    expect(inkButton?.classList.contains('app__visual-tile--active')).toBe(true);
     const contrastButton = host.querySelector<HTMLButtonElement>(
       '[data-page-theme-action="contrast"]',
     );

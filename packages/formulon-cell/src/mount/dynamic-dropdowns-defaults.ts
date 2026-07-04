@@ -1776,27 +1776,19 @@ const buildConditionalMenuAction =
     instance.host.focus();
   };
 
-/** The page-theme menu tiles speak the toolbar's UiTheme vocabulary
- *  (light/dark/contrast), but the grid's `setTheme` expects a `ThemeName`
- *  (paper/ink/contrast). Map across — mirror of `currentPageThemeAction`, which
- *  normalizes the read direction — so picking "Ink" actually themes the grid
- *  instead of stamping an unmatched `data-fc-theme="dark"`. */
-const uiThemeToName = (theme: string): ThemeName => {
-  if (theme === 'dark' || theme === 'ink') return 'ink';
-  if (theme === 'contrast') return 'contrast';
-  return 'paper';
-};
-
 const buildUiTheme =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyUiTheme'] =>
   (theme) => {
-    instance.setTheme(uiThemeToName(theme));
+    instance.setTheme(theme);
   };
 
-const currentPageThemeAction = (theme: string | undefined): 'light' | 'dark' | 'contrast' => {
-  if (theme === 'dark' || theme === 'ink') return 'dark';
+/** Normalize the grid's stored theme to the `ThemeName` vocabulary the
+ *  page-theme tiles carry in `data-page-theme-action`, so the active tile is
+ *  highlighted. Anything unrecognized falls back to the default `paper`. */
+const currentPageThemeAction = (theme: string | undefined): ThemeName => {
+  if (theme === 'ink') return 'ink';
   if (theme === 'contrast') return 'contrast';
-  return 'light';
+  return 'paper';
 };
 
 const updatePageThemeMenu =

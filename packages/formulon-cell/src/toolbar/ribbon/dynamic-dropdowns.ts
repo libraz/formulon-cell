@@ -26,7 +26,7 @@ export type ArrangeAction =
   | 'bring-front'
   | 'send-back'
   | 'selection-pane';
-export type UiTheme = 'light' | 'dark' | 'contrast';
+export type UiTheme = 'paper' | 'ink' | 'contrast';
 
 export interface DynamicDropdownsCtx {
   getInst: () => SpreadsheetInstance | null;
