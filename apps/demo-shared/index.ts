@@ -274,7 +274,7 @@ export const installDemoF6Navigation = ({
     const active = document.activeElement;
     if (
       active instanceof Element &&
-      active.closest('.app__dlg, .fc-fmtdlg, .app__menu, .fc-statusbar__chooser')
+      active.closest('.fc-tb__dlg, .fc-fmtdlg, .fc-tb__menu, .fc-statusbar__chooser')
     )
       return;
     event.preventDefault();

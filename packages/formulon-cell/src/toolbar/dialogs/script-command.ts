@@ -28,10 +28,10 @@ export const showScriptCommandDialog = <T extends string>(
     const row = document.createElement('div');
     row.className = 'fc-fmtdlg__row fc-fmtdlg__row--block';
     const label = document.createElement('label');
-    label.className = 'app__dlg__label';
+    label.className = 'fc-tb__dlg__label';
     label.textContent = opts.label;
     const select = createDialogSelect(opts.options, opts.initial ?? opts.options[0]?.value ?? '', {
-      className: 'app__dlg__select',
+      className: 'fc-tb__dlg__select',
     });
     select.dataset.scriptCommandSelect = 'true';
     label.appendChild(select);

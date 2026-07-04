@@ -19,7 +19,7 @@ describe('toolbar/ribbon control dispatch icons', () => {
   it('renders Excel-like multi-color SVG segments before Fluent paths', () => {
     const svg = createIcon()('fillColor');
 
-    expect(svg?.classList.contains('demo__rb-icon')).toBe(true);
+    expect(svg?.classList.contains('fc-tb__rb-icon')).toBe(true);
     expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24');
     expect(svg?.getAttribute('fill')).toBeNull();
 

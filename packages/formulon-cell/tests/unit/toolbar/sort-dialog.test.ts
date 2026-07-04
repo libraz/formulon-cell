@@ -40,7 +40,7 @@ describe('showSortDialog', () => {
       initialHasHeader: true,
     });
 
-    const dialog = document.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('Add Level');
     expect(dialog?.textContent).toContain('Delete Level');
     expect(dialog?.textContent).toContain('Copy Level');

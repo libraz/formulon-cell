@@ -2,7 +2,7 @@
    Differs from the format dialog: smaller frame, no tab strip, no scrollbar
    in the header. */
 
-.demo__modal {
+.fc-tb__modal {
   position: fixed;
   inset: 0;
   z-index: var(--fc-z-dialog, 2147483020);
@@ -12,7 +12,7 @@
   background: rgba(0, 0, 0, 0.22);
 }
 
-.demo__modal-panel {
+.fc-tb__modal-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   width: min(560px, 100%);
@@ -28,11 +28,11 @@
   font: 13px / 1.35 var(--fc-tb-font);
 }
 
-.demo__modal-panel--narrow {
+.fc-tb__modal-panel--narrow {
   width: min(420px, 100%);
 }
 
-.demo__modal-header {
+.fc-tb__modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -41,13 +41,13 @@
   border-bottom: 1px solid var(--fc-tb-line);
 }
 
-.demo__modal-header h2 {
+.fc-tb__modal-header h2 {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
 }
 
-.demo__modal-x {
+.fc-tb__modal-x {
   display: grid;
   place-items: center;
   width: 28px;
@@ -61,16 +61,16 @@
   cursor: pointer;
 }
 
-.demo__modal-x:hover {
+.fc-tb__modal-x:hover {
   background: var(--fc-tb-ribbon-hover);
 }
 
-.demo__modal-body {
+.fc-tb__modal-body {
   overflow: auto;
   padding: 16px;
 }
 
-.demo__modal-list {
+.fc-tb__modal-list {
   display: grid;
   gap: 8px;
   margin: 0;
@@ -78,7 +78,7 @@
   list-style: none;
 }
 
-.demo__modal-list li {
+.fc-tb__modal-list li {
   display: grid;
   gap: 2px;
   padding: 8px 10px;
@@ -87,44 +87,44 @@
   border-radius: 2px;
 }
 
-.demo__modal-list strong {
+.fc-tb__modal-list strong {
   font-size: 12px;
 }
 
-.demo__modal-list span,
-.demo__modal-empty,
-.demo__modal-error {
+.fc-tb__modal-list span,
+.fc-tb__modal-empty,
+.fc-tb__modal-error {
   color: var(--fc-tb-fg-soft);
 }
 
-.demo__modal-empty,
-.demo__modal-error {
+.fc-tb__modal-empty,
+.fc-tb__modal-error {
   margin: 0;
 }
 
-.demo__modal-error {
+.fc-tb__modal-error {
   color: var(--fc-tb-error);
 }
 
-.demo__modal-field {
+.fc-tb__modal-field {
   display: grid;
   gap: 6px;
 }
 
-.demo__modal-field span {
+.fc-tb__modal-field span {
   font-size: 12px;
   font-weight: 600;
 }
 
-.demo__modal-field legend {
+.fc-tb__modal-field legend {
   margin-bottom: 6px;
   padding: 0;
   font-size: 12px;
   font-weight: 600;
 }
 
-.demo__modal-field input,
-.demo__modal-field select {
+.fc-tb__modal-field input,
+.fc-tb__modal-field select {
   height: 30px;
   padding: 0 8px;
   color: var(--fc-tb-fg);
@@ -134,31 +134,31 @@
   font: inherit;
 }
 
-.demo__modal-field input:focus,
-.demo__modal-field select:focus {
+.fc-tb__modal-field input:focus,
+.fc-tb__modal-field select:focus {
   outline: 2px solid var(--fc-tb-accent);
   outline-offset: 1px;
 }
 
-.demo__modal-note {
+.fc-tb__modal-note {
   margin: 0;
   font-size: 13px;
 }
 
-.demo__modal-actions {
+.fc-tb__modal-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.demo__report-list {
+.fc-tb__report-list {
   display: grid;
   gap: 8px;
   max-height: 280px;
   overflow: auto;
 }
 
-.demo__report-item {
+.fc-tb__report-item {
   display: grid;
   gap: 3px;
   padding: 8px;
@@ -168,25 +168,25 @@
   font-size: 12px;
 }
 
-.demo__sort-dialog {
+.fc-tb__sort-dialog {
   display: grid;
   gap: 12px;
 }
 
-.demo__sort-dialog__check {
+.fc-tb__sort-dialog__check {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 12px;
 }
 
-.demo__btn--primary {
+.fc-tb__btn--primary {
   color: var(--fc-tb-title-fg);
   background: var(--fc-tb-accent);
   border-color: var(--fc-tb-accent);
 }
 
-.demo__modal-footer {
+.fc-tb__modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 8px;

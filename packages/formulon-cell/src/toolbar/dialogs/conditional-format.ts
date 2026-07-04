@@ -90,18 +90,18 @@ const appendFormatRow = (
   getStyle: () => ConditionalFormatDialogStyle;
 } => {
   const row = document.createElement('div');
-  row.className = 'fc-fmtdlg__row fc-fmtdlg__row--block app__dlg__format-choice';
+  row.className = 'fc-fmtdlg__row fc-fmtdlg__row--block fc-tb__dlg__format-choice';
   const label = document.createElement('label');
-  label.className = 'app__dlg__label';
+  label.className = 'fc-tb__dlg__label';
   label.textContent = strings.formatWith;
   const select = createDialogSelect(
     conditionalStyleOptions(strings),
     initialStyle ?? 'light-red-dark-red',
-    { className: 'app__dlg__select' },
+    { className: 'fc-tb__dlg__select' },
   );
   let customStyle: ConditionalFormatDialogStyle | null = null;
   const preview = document.createElement('span');
-  preview.className = 'app__dlg__format-preview';
+  preview.className = 'fc-tb__dlg__format-preview';
   preview.dataset.conditionalFormatPreview = 'true';
   preview.textContent = 'AaBbCcYyZz';
   preview.title = strings.formatPreview;

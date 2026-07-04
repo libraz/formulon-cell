@@ -82,7 +82,7 @@ export const showTextToColumnsDialog = (
     const typeFieldset = document.createElement('fieldset');
     typeFieldset.className = 'fc-textcols__section fc-textcols__types';
     const typeLegend = document.createElement('legend');
-    typeLegend.className = 'app__dlg__label';
+    typeLegend.className = 'fc-tb__dlg__label';
     typeLegend.textContent = strings.dataType;
     const delimitedLabel = document.createElement('label');
     delimitedLabel.className = 'fc-fmtdlg__radio';
@@ -104,7 +104,7 @@ export const showTextToColumnsDialog = (
     fixedLabel.append(fixed, document.createTextNode(strings.fixedWidth));
     const fixedNote = document.createElement('div');
     fixedNote.id = 'fc-textcols-fixed-width-unavailable';
-    fixedNote.className = 'app__dlg__hint';
+    fixedNote.className = 'fc-tb__dlg__hint';
     fixedNote.textContent = strings.fixedWidthUnavailable;
     typeFieldset.append(typeLegend, delimitedLabel, fixedLabel, fixedNote);
     shell.body.appendChild(typeFieldset);
@@ -112,7 +112,7 @@ export const showTextToColumnsDialog = (
     const delimiterFieldset = document.createElement('fieldset');
     delimiterFieldset.className = 'fc-textcols__section fc-textcols__delimiters';
     const delimiterLegend = document.createElement('legend');
-    delimiterLegend.className = 'app__dlg__label';
+    delimiterLegend.className = 'fc-tb__dlg__label';
     delimiterLegend.textContent = strings.delimiters;
     delimiterFieldset.appendChild(delimiterLegend);
     const delimiterGrid = document.createElement('div');
@@ -141,7 +141,7 @@ export const showTextToColumnsDialog = (
     otherText.textContent = strings.other;
     const otherInput = document.createElement('input');
     otherInput.type = 'text';
-    otherInput.className = 'app__dlg__input';
+    otherInput.className = 'fc-tb__dlg__input';
     otherInput.maxLength = 8;
     otherInput.dataset.dialogField = 'delimiter-other';
     const customInitial = [...initial].find(
@@ -162,10 +162,10 @@ export const showTextToColumnsDialog = (
     const previewWrap = document.createElement('section');
     previewWrap.className = 'fc-textcols__preview';
     const previewLabel = document.createElement('div');
-    previewLabel.className = 'fc-textcols__preview-label app__dlg__label';
+    previewLabel.className = 'fc-textcols__preview-label fc-tb__dlg__label';
     previewLabel.textContent = strings.preview;
     const preview = document.createElement('pre');
-    preview.className = 'app__dlg__preview';
+    preview.className = 'fc-tb__dlg__preview';
     previewWrap.append(previewLabel, preview);
     shell.body.appendChild(previewWrap);
 

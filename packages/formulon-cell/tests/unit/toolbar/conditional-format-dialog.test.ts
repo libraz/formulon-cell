@@ -49,13 +49,13 @@ describe('conditional-format rule dialogs', () => {
       strings,
     });
 
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('Format cells that are GREATER THAN:');
     expect(dialog?.textContent).toContain('Yellow Fill with Dark Yellow Text');
     expect(dialog?.textContent).toContain('Red Text and Red Fill');
 
     const input = dialog?.querySelector<HTMLInputElement>('input[type="number"]');
-    const select = dialog?.querySelector<HTMLSelectElement>('select.app__dlg__select');
+    const select = dialog?.querySelector<HTMLSelectElement>('select.fc-tb__dlg__select');
     const preview = dialog?.querySelector<HTMLElement>('[data-conditional-format-preview]');
     expect(select?.options).toHaveLength(9);
     expect(select?.value).toBe('light-red-dark-red');
@@ -117,9 +117,9 @@ describe('conditional-format rule dialogs', () => {
       strings,
     });
 
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     const input = dialog?.querySelector<HTMLInputElement>('input[type="number"]');
-    const select = dialog?.querySelector<HTMLSelectElement>('select.app__dlg__select');
+    const select = dialog?.querySelector<HTMLSelectElement>('select.fc-tb__dlg__select');
     const preview = dialog?.querySelector<HTMLElement>('[data-conditional-format-preview]');
     if (!input || !select || !preview) {
       throw new Error('Expected number input, style select, and preview.');
@@ -144,9 +144,9 @@ describe('conditional-format rule dialogs', () => {
       strings,
     });
 
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     const input = dialog?.querySelector<HTMLInputElement>('input[type="text"]');
-    const select = dialog?.querySelector<HTMLSelectElement>('select.app__dlg__select');
+    const select = dialog?.querySelector<HTMLSelectElement>('select.fc-tb__dlg__select');
     const preview = dialog?.querySelector<HTMLElement>('[data-conditional-format-preview]');
     if (!input || !select || !preview) {
       throw new Error('Expected text input, style select, and preview.');
@@ -171,15 +171,15 @@ describe('conditional-format rule dialogs', () => {
       strings,
     });
 
-    const parent = document.body.querySelector<HTMLElement>('.app__dlg');
-    const select = parent?.querySelector<HTMLSelectElement>('select.app__dlg__select');
+    const parent = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
+    const select = parent?.querySelector<HTMLSelectElement>('select.fc-tb__dlg__select');
     const preview = parent?.querySelector<HTMLElement>('[data-conditional-format-preview]');
     if (!select || !preview) throw new Error('Expected parent style select and preview.');
     select.value = 'custom';
     select.dispatchEvent(new Event('change', { bubbles: true }));
     await Promise.resolve();
 
-    const dialogs = Array.from(document.body.querySelectorAll<HTMLElement>('.app__dlg'));
+    const dialogs = Array.from(document.body.querySelectorAll<HTMLElement>('.fc-tb__dlg'));
     const customDialog = dialogs.find((dialog) => dialog.textContent?.includes('Format Cells'));
     expect(customDialog?.textContent).toContain('Fill color');
     expect(customDialog?.textContent).toContain('Strikethrough');
@@ -211,7 +211,7 @@ describe('conditional-format rule dialogs', () => {
       color: '#222222',
       italic: true,
     });
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('Format Cells');
 
     const fill = dialog?.querySelector<HTMLInputElement>('input[placeholder="#ffc7ce"]');

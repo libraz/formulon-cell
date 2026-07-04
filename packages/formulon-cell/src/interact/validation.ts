@@ -341,9 +341,9 @@ export function attachValidationAlert(deps: ValidationAlertDeps): ValidationAler
   shell.panel.appendChild(header);
 
   const body = document.createElement('div');
-  body.className = 'fc-fmtdlg__body app__dlg__body';
+  body.className = 'fc-fmtdlg__body fc-tb__dlg__body';
   const messageEl = document.createElement('p');
-  messageEl.className = 'app__dlg__message';
+  messageEl.className = 'fc-tb__dlg__message';
   body.appendChild(messageEl);
   shell.panel.appendChild(body);
 

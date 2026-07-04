@@ -45,7 +45,7 @@ export const showFormatAsTableDialog = (
     }
 
     const headersLabel = document.createElement('label');
-    headersLabel.className = 'fc-fmtdlg__check app__dlg__check';
+    headersLabel.className = 'fc-fmtdlg__check fc-tb__dlg__check';
     const headersInput = document.createElement('input');
     headersInput.type = 'checkbox';
     headersInput.checked = opts.initialHasHeaders;

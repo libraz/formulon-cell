@@ -1,5 +1,5 @@
 // Dynamic ribbon dropdown system: looks up which ribbon button owns which
-// `.app__menu` panel via a single inverse map, then dispatches clicks inside
+// `.fc-tb__menu` panel via a single inverse map, then dispatches clicks inside
 // open menus to the matching action handler. The host wires in every action
 // callback through the factory; this module owns DOM open/close, focus, and
 // the click dispatch table.
@@ -319,7 +319,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
       panel.hidden = true;
     });
     menu.querySelectorAll<HTMLElement>(triggerSelector).forEach((trigger) => {
-      trigger.classList.remove('app__menu-item--active');
+      trigger.classList.remove('fc-tb__menu-item--active');
       trigger.setAttribute('aria-expanded', 'false');
     });
   };
@@ -344,7 +344,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
   };
 
   const closeAllDynamicRibbonDropdowns = (exceptMenuId?: string): void => {
-    for (const menu of document.querySelectorAll<HTMLDivElement>('.app__menu')) {
+    for (const menu of document.querySelectorAll<HTMLDivElement>('.fc-tb__menu')) {
       if (!DYNAMIC_RIBBON_DROPDOWN_IDS.has(menu.id) || menu.id === exceptMenuId) continue;
       const spec = dynamicDropdownSpecForMenu(menu);
       if (spec) closeDynamicRibbonDropdown(spec);
@@ -352,7 +352,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
   };
 
   const firstOpenDynamicDropdownSpec = (): RibbonDropdownSpec | null => {
-    for (const menu of document.querySelectorAll<HTMLDivElement>('.app__menu')) {
+    for (const menu of document.querySelectorAll<HTMLDivElement>('.fc-tb__menu')) {
       if (menu.hidden || !DYNAMIC_RIBBON_DROPDOWN_IDS.has(menu.id)) continue;
       const spec = dynamicDropdownSpecForMenu(menu);
       if (spec) return spec;
@@ -433,7 +433,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     panel.style.top = `${Math.round(top)}px`;
     applyVerticalViewportLimit(panel, panelHeight, height - pad - menuRect.top - top);
     panel.hidden = false;
-    trigger.classList.add('app__menu-item--active');
+    trigger.classList.add('fc-tb__menu-item--active');
     trigger.setAttribute('aria-expanded', 'true');
   };
 
@@ -556,7 +556,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
 
   const dynamicRibbonDropdownClick = (event: MouseEvent): boolean => {
     const target = eventElement(event);
-    const menu = target?.closest<HTMLElement>('.app__menu');
+    const menu = target?.closest<HTMLElement>('.fc-tb__menu');
     if (!menu || !DYNAMIC_RIBBON_DROPDOWN_IDS.has(menu.id)) return false;
     const spec = dynamicDropdownSpecForMenu(menu);
     if (!spec) return false;
@@ -618,7 +618,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
   const dynamicRibbonDropdownPointerDown = (event: MouseEvent): boolean => {
     const target = eventElement(event);
     if (!target) return false;
-    const menu = target.closest<HTMLElement>('.app__menu');
+    const menu = target.closest<HTMLElement>('.fc-tb__menu');
     if (menu && DYNAMIC_RIBBON_DROPDOWN_IDS.has(menu.id)) return false;
     const button = target.closest<HTMLButtonElement>('[data-ribbon-command]');
     if (button && dynamicDropdownSpecForButton(button)) return false;
@@ -631,7 +631,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
     if (!openSpec) return false;
     const target = eventElement(event);
     if (!target) return false;
-    const menu = target.closest<HTMLElement>('.app__menu');
+    const menu = target.closest<HTMLElement>('.fc-tb__menu');
     if (menu && DYNAMIC_RIBBON_DROPDOWN_IDS.has(menu.id)) return false;
     const button = target.closest<HTMLButtonElement>('[data-ribbon-command]');
     if (button && dynamicDropdownSpecForButton(button)) return false;
@@ -642,7 +642,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
 
   const dynamicRibbonDropdownHover = (event: MouseEvent): boolean => {
     const target = eventElement(event);
-    const menu = target?.closest<HTMLElement>('.app__menu');
+    const menu = target?.closest<HTMLElement>('.fc-tb__menu');
     if (menu?.id !== 'menu-conditional' && menu?.id !== 'menu-format-cells') return false;
     if (menu.hidden) return false;
     if (menu.id === 'menu-format-cells') {
@@ -661,7 +661,7 @@ export const createDynamicDropdowns = (ctx: DynamicDropdownsCtx): DynamicDropdow
 
   const dynamicRibbonDropdownKeydown = (event: KeyboardEvent): boolean => {
     const target = eventElement(event);
-    const menu = target?.closest<HTMLElement>('.app__menu');
+    const menu = target?.closest<HTMLElement>('.fc-tb__menu');
     if (event.key === 'Escape') {
       if (menu && DYNAMIC_RIBBON_DROPDOWN_IDS.has(menu.id) && !menu.hidden) {
         event.preventDefault();

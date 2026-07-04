@@ -11,7 +11,7 @@ export async function runExcelChromeBackstageSearchScenario(page: Page): Promise
   await expect(fileTab).toBeVisible();
   await fileTab.click();
 
-  const backstage = page.locator('.demo__backstage[role="dialog"]').first();
+  const backstage = page.locator('.fc-tb__backstage[role="dialog"]').first();
   await expect(backstage).toBeVisible();
   await expect(backstage.getByRole('button', { name: 'Info', exact: true })).toBeVisible();
   await expect(backstage.getByRole('button', { name: 'New', exact: true })).toBeVisible();
@@ -44,7 +44,7 @@ export async function runExcelChromeBackstageSearchScenario(page: Page): Promise
 
   await backstage.getByRole('button', { name: 'Print', exact: true }).first().click();
   await expect(backstage.locator('[data-demo-print-preview]')).toBeVisible();
-  await expect(backstage.frameLocator('.demo__print-frame').locator('body')).toContainText(
+  await expect(backstage.frameLocator('.fc-tb__print-frame').locator('body')).toContainText(
     'Preview Cell',
   );
   await expect(backstage.getByRole('button', { name: 'Export to PDF', exact: true })).toBeVisible();
@@ -108,7 +108,7 @@ export async function runExcelChromeBackstageSearchScenario(page: Page): Promise
   await search.fill('training');
 
   const helpResult = page
-    .locator('.demo__command-item')
+    .locator('.fc-tb__command-item')
     .filter({ hasText: 'Help and training' })
     .first();
   await expect(helpResult).toBeVisible();
@@ -121,7 +121,7 @@ export async function runExcelChromeBackstageSearchScenario(page: Page): Promise
 
   await search.fill('coming soon');
   const disabledHelpResult = page
-    .locator('.demo__command-item')
+    .locator('.fc-tb__command-item')
     .filter({ hasText: 'Coming soon' })
     .first();
   await expect(disabledHelpResult).toBeVisible();
@@ -149,8 +149,8 @@ export async function runExcelChromeTableStyleGalleryScenario(page: Page): Promi
   const menu = page.locator('#menu-table-style-home').first();
   await expect(menu).toBeVisible();
   await expect(tableButton).toHaveAttribute('aria-expanded', 'true');
-  await expect(menu.locator('.app__tablestyle-heading')).toHaveCount(3);
-  await expect(menu.locator('.app__tablestyle-swatch')).toHaveCount(63);
+  await expect(menu.locator('.fc-tb__tablestyle-heading')).toHaveCount(3);
+  await expect(menu.locator('.fc-tb__tablestyle-swatch')).toHaveCount(63);
 
   const layout = await menu.evaluate((el) => {
     const rect = el.getBoundingClientRect();
@@ -283,15 +283,15 @@ export async function runExcelChromeConditionalFormattingMenuScenario(page: Page
 
   const topLevel = await menu.evaluate((el) =>
     Array.from(el.children)
-      .filter((child) => child.classList.contains('app__menu-item'))
+      .filter((child) => child.classList.contains('fc-tb__menu-item'))
       .map((child) => {
         const button = child as HTMLElement;
         return {
           text: button.textContent?.trim() ?? '',
           submenu: button.dataset.cfSubmenu ?? null,
           action: button.dataset.cfAction ?? null,
-          hasIcon: button.querySelector('.app__cf-icon') !== null,
-          hasCaret: button.querySelector('.app__menu-item__caret') !== null,
+          hasIcon: button.querySelector('.fc-tb__cf-icon') !== null,
+          hasCaret: button.querySelector('.fc-tb__menu-item__caret') !== null,
         };
       }),
   );
@@ -358,11 +358,11 @@ export async function runExcelChromeConditionalFormattingMenuScenario(page: Page
   await dataBarsTrigger.hover();
   const dataBarsPanel = menu.locator('[data-cf-panel="dataBar"]').first();
   await expect(dataBarsPanel).toBeVisible();
-  await expect(dataBarsPanel.locator('.app__menu-heading')).toHaveText([
+  await expect(dataBarsPanel.locator('.fc-tb__menu-heading')).toHaveText([
     'Gradient Fill',
     'Solid Fill',
   ]);
-  await expect(dataBarsPanel.locator('.app__cf-choice')).toHaveCount(12);
+  await expect(dataBarsPanel.locator('.fc-tb__cf-choice')).toHaveCount(12);
   await expect(dataBarsPanel.locator('[data-cf-action="new-rule"]')).toBeVisible();
 
   await page.keyboard.press('Escape');
@@ -380,26 +380,26 @@ export async function runExcelChromeHomeDenseRibbonScenario(page: Page): Promise
   const homePanel = page.locator('[data-ribbon-panel="home"]').first();
   await expect(homePanel).toBeVisible();
 
-  const stylesGroup = homePanel.locator('.demo__ribbon-group--styles').first();
-  const cellsGroup = homePanel.locator('.demo__ribbon-group--cells').first();
-  const editingGroup = homePanel.locator('.demo__ribbon-group--editing').first();
-  await expect(stylesGroup).toHaveClass(/demo__ribbon-group--tiles/);
-  await expect(cellsGroup).toHaveClass(/demo__ribbon-group--stacked/);
-  await expect(editingGroup).toHaveClass(/demo__ribbon-group--mixed/);
+  const stylesGroup = homePanel.locator('.fc-tb__ribbon-group--styles').first();
+  const cellsGroup = homePanel.locator('.fc-tb__ribbon-group--cells').first();
+  const editingGroup = homePanel.locator('.fc-tb__ribbon-group--editing').first();
+  await expect(stylesGroup).toHaveClass(/fc-tb__ribbon-group--tiles/);
+  await expect(cellsGroup).toHaveClass(/fc-tb__ribbon-group--stacked/);
+  await expect(editingGroup).toHaveClass(/fc-tb__ribbon-group--mixed/);
 
   for (const command of ['insertRows', 'deleteRows', 'formatCellsHome']) {
     await expect(cellsGroup.locator(`[data-ribbon-command="${command}"]`)).toHaveClass(
-      /demo__rb--stacked/,
+      /fc-tb__rb--stacked/,
     );
   }
   for (const command of ['autosum', 'fillHome', 'clearFormat']) {
     await expect(editingGroup.locator(`[data-ribbon-command="${command}"]`)).toHaveClass(
-      /demo__rb--stacked/,
+      /fc-tb__rb--stacked/,
     );
   }
   for (const command of ['sortFilterHome', 'findHome']) {
     await expect(editingGroup.locator(`[data-ribbon-command="${command}"]`)).not.toHaveClass(
-      /demo__rb--stacked/,
+      /fc-tb__rb--stacked/,
     );
   }
 

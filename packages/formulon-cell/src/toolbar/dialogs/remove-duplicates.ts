@@ -36,7 +36,7 @@ export const showRemoveDuplicatesDialog = (
     const shell = createDialogShell({ title: opts.title, bodyVariant: 'app' });
 
     const headerRow = document.createElement('label');
-    headerRow.className = 'fc-fmtdlg__row app__dlg__label fc-dedupedlg__header';
+    headerRow.className = 'fc-fmtdlg__row fc-tb__dlg__label fc-dedupedlg__header';
     const hasHeader = document.createElement('input');
     hasHeader.type = 'checkbox';
     hasHeader.checked = opts.initialHasHeader;

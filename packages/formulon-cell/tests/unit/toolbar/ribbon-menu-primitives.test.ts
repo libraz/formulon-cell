@@ -156,7 +156,7 @@ describe('toolbar/ribbon menu primitives', () => {
 
   it('keeps preset menu row DOM centralized in menuPresetButton', () => {
     const directPresetRows = sourcesOutsidePrimitives()
-      .filter(({ source }) => source.includes('app__menu-item app__menu-item--preset'))
+      .filter(({ source }) => source.includes('fc-tb__menu-item fc-tb__menu-item--preset'))
       .map(({ name }) => name);
 
     expect(directPresetRows).toEqual([]);
@@ -166,8 +166,8 @@ describe('toolbar/ribbon menu primitives', () => {
     const directIconicRows = sourcesOutsidePrimitives()
       .filter(
         ({ source }) =>
-          source.includes('app__menu-item app__menu-item--iconic') ||
-          source.includes('app__menu-icon app__menu-icon--'),
+          source.includes('fc-tb__menu-item fc-tb__menu-item--iconic') ||
+          source.includes('fc-tb__menu-icon fc-tb__menu-icon--'),
       )
       .map(({ name }) => name);
 
@@ -246,10 +246,10 @@ describe('toolbar/ribbon menu primitives', () => {
       'title-share',
     ]) {
       const button = menuIconButton('セルの書式設定...', 'cellFormat', 'dialog', iconSlug);
-      const icon = button.querySelector('.app__menu-icon');
+      const icon = button.querySelector('.fc-tb__menu-icon');
 
-      expect(icon?.classList.contains('app__menu-icon--svg')).toBe(true);
-      expect(icon?.querySelector('.app__menu-icon-svg')).toBeTruthy();
+      expect(icon?.classList.contains('fc-tb__menu-icon--svg')).toBe(true);
+      expect(icon?.querySelector('.fc-tb__menu-icon-svg')).toBeTruthy();
       expect(icon?.querySelectorAll('path').length).toBeGreaterThan(1);
     }
   });
@@ -261,17 +261,17 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(slugs.length).toBeGreaterThan(100);
     for (const iconSlug of slugs) {
       const button = menuIconButton(iconSlug, 'auditAction', iconSlug, iconSlug);
-      const icon = button.querySelector('.app__menu-icon');
+      const icon = button.querySelector('.fc-tb__menu-icon');
 
-      expect(icon?.classList.contains('app__menu-icon--svg'), iconSlug).toBe(true);
-      expect(icon?.querySelector('.app__menu-icon-svg'), iconSlug).toBeTruthy();
+      expect(icon?.classList.contains('fc-tb__menu-icon--svg'), iconSlug).toBe(true);
+      expect(icon?.querySelector('.fc-tb__menu-icon-svg'), iconSlug).toBeTruthy();
       expect(icon?.querySelectorAll('path').length, iconSlug).toBeGreaterThan(0);
     }
     expect(menusCss).toMatch(
-      /\.app__menu-item__icon-spacer\s*\{[\s\S]*?flex: 0 0 18px;[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
+      /\.fc-tb__menu-item__icon-spacer\s*\{[\s\S]*?flex: 0 0 18px;[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
     );
     expect(menusCss).toMatch(
-      /\.app__menu-icon\s*\{[\s\S]*?flex: 0 0 18px;[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
+      /\.fc-tb__menu-icon\s*\{[\s\S]*?flex: 0 0 18px;[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
     );
   });
 
@@ -279,9 +279,9 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     for (const selector of [
-      '.app__menu-icon--format-rename-sheet::after',
-      '.app__menu-icon--link-edit::after',
-      '.app__menu-icon--title-save-as::after',
+      '.fc-tb__menu-icon--format-rename-sheet::after',
+      '.fc-tb__menu-icon--link-edit::after',
+      '.fc-tb__menu-icon--title-save-as::after',
     ]) {
       const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       expect(menusCss).toMatch(
@@ -297,13 +297,13 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     for (const selector of [
-      '.app__menu-icon--clear::after',
-      '.app__menu-icon--delete-sheet::after',
-      '.app__menu-icon--filter-clear::after',
-      '.app__menu-icon--validation-clear-rules::after',
-      '.app__menu-icon--link-clear::after',
-      '.app__menu-icon--comment-delete::after',
-      '.app__menu-icon--protect-clear-ranges::after',
+      '.fc-tb__menu-icon--clear::after',
+      '.fc-tb__menu-icon--delete-sheet::after',
+      '.fc-tb__menu-icon--filter-clear::after',
+      '.fc-tb__menu-icon--validation-clear-rules::after',
+      '.fc-tb__menu-icon--link-clear::after',
+      '.fc-tb__menu-icon--comment-delete::after',
+      '.fc-tb__menu-icon--protect-clear-ranges::after',
     ]) {
       const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       expect(menusCss).toMatch(
@@ -319,8 +319,8 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     for (const selector of [
-      '.app__menu-icon--sort-asc::after',
-      '.app__menu-icon--sort-desc::after',
+      '.fc-tb__menu-icon--sort-asc::after',
+      '.fc-tb__menu-icon--sort-desc::after',
     ]) {
       const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       expect(menusCss).toMatch(
@@ -330,11 +330,11 @@ describe('toolbar/ribbon menu primitives', () => {
       );
     }
     expect(menusCss).toMatch(
-      /\.app__menu-icon--sort-custom::after\s*\{[\s\S]*?width: 13px;[\s\S]*?height: 13px;[\s\S]*?background-image: url\("data:image\/svg\+xml,[\s\S]*?stroke='%23185abd'[\s\S]*?background-size: 13px 13px;[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--sort-custom::after\s*\{[\s\S]*?width: 13px;[\s\S]*?height: 13px;[\s\S]*?background-image: url\("data:image\/svg\+xml,[\s\S]*?stroke='%23185abd'[\s\S]*?background-size: 13px 13px;[\s\S]*?content: "";/,
     );
     const sortCss = menusCss.slice(
-      menusCss.indexOf('.app__menu-icon--sort-asc::after'),
-      menusCss.indexOf('.app__menu-icon--sort-custom::after'),
+      menusCss.indexOf('.fc-tb__menu-icon--sort-asc::after'),
+      menusCss.indexOf('.fc-tb__menu-icon--sort-custom::after'),
     );
     expect(sortCss).not.toContain('content: "A"');
     expect(sortCss).not.toContain('content: "Z"');
@@ -345,10 +345,10 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     for (const selector of [
-      '.app__menu-icon--fill-down::after',
-      '.app__menu-icon--fill-up::after',
-      '.app__menu-icon--fill-right::after',
-      '.app__menu-icon--fill-left::after',
+      '.fc-tb__menu-icon--fill-down::after',
+      '.fc-tb__menu-icon--fill-up::after',
+      '.fc-tb__menu-icon--fill-right::after',
+      '.fc-tb__menu-icon--fill-left::after',
     ]) {
       const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       expect(menusCss).toMatch(
@@ -363,11 +363,11 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     expect(menusCss).toMatch(
-      /\.app__menu-icon--format-move-left::after,[\s\S]*?\.app__menu-icon--format-move-right::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?background-size: 12px 12px;[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--format-move-left::after,[\s\S]*?\.fc-tb__menu-icon--format-move-right::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?background-size: 12px 12px;[\s\S]*?content: "";/,
     );
     for (const selector of [
-      '.app__menu-icon--format-move-left::after',
-      '.app__menu-icon--format-move-right::after',
+      '.fc-tb__menu-icon--format-move-left::after',
+      '.fc-tb__menu-icon--format-move-right::after',
     ]) {
       const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       expect(menusCss).toMatch(
@@ -382,7 +382,7 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     expect(menusCss).toMatch(
-      /\.app__menu-icon--go-to::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?background-image: url\("data:image\/svg\+xml,[\s\S]*?stroke='%23185abd'[\s\S]*?background-size: 12px 12px;[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--go-to::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?background-image: url\("data:image\/svg\+xml,[\s\S]*?stroke='%23185abd'[\s\S]*?background-size: 12px 12px;[\s\S]*?content: "";/,
     );
     expect(menusCss).not.toContain('content: "➜"');
   });
@@ -391,10 +391,10 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     expect(menusCss).toMatch(
-      /\.app__menu-icon--filter-by-value::after\s*\{[\s\S]*?width: 10px;[\s\S]*?height: 8px;[\s\S]*?linear-gradient\(#107c41 0 0\) 1px 2px \/ 8px 2px no-repeat,[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--filter-by-value::after\s*\{[\s\S]*?width: 10px;[\s\S]*?height: 8px;[\s\S]*?linear-gradient\(#107c41 0 0\) 1px 2px \/ 8px 2px no-repeat,[\s\S]*?content: "";/,
     );
     expect(menusCss).toMatch(
-      /\.app__menu-icon--filter-advanced::after\s*\{[\s\S]*?width: 11px;[\s\S]*?height: 5px;[\s\S]*?radial-gradient\(circle at 2px 50%, #605e5c[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--filter-advanced::after\s*\{[\s\S]*?width: 11px;[\s\S]*?height: 5px;[\s\S]*?radial-gradient\(circle at 2px 50%, #605e5c[\s\S]*?content: "";/,
     );
     expect(menusCss).not.toContain('content: "="');
     expect(menusCss).not.toContain('content: "⋯"');
@@ -404,11 +404,11 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     for (const selector of [
-      '.app__menu-icon--text-column-comma::after',
-      '.app__menu-icon--text-column-tab::after',
-      '.app__menu-icon--text-column-semicolon::after',
-      '.app__menu-icon--text-column-space::after',
-      '.app__menu-icon--text-column-custom::after',
+      '.fc-tb__menu-icon--text-column-comma::after',
+      '.fc-tb__menu-icon--text-column-tab::after',
+      '.fc-tb__menu-icon--text-column-semicolon::after',
+      '.fc-tb__menu-icon--text-column-space::after',
+      '.fc-tb__menu-icon--text-column-custom::after',
     ]) {
       const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       expect(menusCss).toMatch(
@@ -417,8 +417,8 @@ describe('toolbar/ribbon menu primitives', () => {
     }
 
     const textColumnCss = menusCss.slice(
-      menusCss.indexOf('.app__menu-icon--text-column-comma::before'),
-      menusCss.indexOf('.app__menu-icon--link-clear::before'),
+      menusCss.indexOf('.fc-tb__menu-icon--text-column-comma::before'),
+      menusCss.indexOf('.fc-tb__menu-icon--link-clear::before'),
     );
     for (const glyph of ['","', '"Tab"', '";"', '"␠"', '"…"']) {
       expect(textColumnCss).not.toContain(`content: ${glyph}`);
@@ -429,7 +429,7 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     expect(menusCss).toMatch(
-      /\.app__menu-icon--remove-duplicates::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?linear-gradient\(#ffffff 0 0\) 3px 1px \/ 7px 7px no-repeat,[\s\S]*?border: 1px solid #a4262c;[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--remove-duplicates::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?linear-gradient\(#ffffff 0 0\) 3px 1px \/ 7px 7px no-repeat,[\s\S]*?border: 1px solid #a4262c;[\s\S]*?content: "";/,
     );
     expect(menusCss).not.toContain('content: "2"');
   });
@@ -438,29 +438,29 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     expect(menusCss).toMatch(
-      /\.app__menu-icon--find-formulas::after\s*\{[\s\S]*?background-image: url\("data:image\/svg\+xml,[\s\S]*?stroke='%238764b8'[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--find-formulas::after\s*\{[\s\S]*?background-image: url\("data:image\/svg\+xml,[\s\S]*?stroke='%238764b8'[\s\S]*?content: "";/,
     );
     expect(menusCss).toMatch(
-      /\.app__menu-icon--calc-auto::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?background-image: url\("data:image\/svg\+xml,[\s\S]*?stroke='%23107c41'[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--calc-auto::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?background-image: url\("data:image\/svg\+xml,[\s\S]*?stroke='%23107c41'[\s\S]*?content: "";/,
     );
     expect(menusCss).toMatch(
-      /\.app__menu-icon--calc-auto-no-table::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?linear-gradient\(45deg,[\s\S]*?#a4262c[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--calc-auto-no-table::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?linear-gradient\(45deg,[\s\S]*?#a4262c[\s\S]*?content: "";/,
     );
     expect(menusCss).toMatch(
-      /\.app__menu-icon--calc-manual::after\s*\{[\s\S]*?width: 11px;[\s\S]*?height: 11px;[\s\S]*?linear-gradient\(#605e5c 0 0\) 2px 4\.5px \/ 7px 2px no-repeat,[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--calc-manual::after\s*\{[\s\S]*?width: 11px;[\s\S]*?height: 11px;[\s\S]*?linear-gradient\(#605e5c 0 0\) 2px 4\.5px \/ 7px 2px no-repeat,[\s\S]*?content: "";/,
     );
     expect(menusCss).toMatch(
-      /\.app__menu-icon--calc-sheet::after\s*\{[\s\S]*?width: 11px;[\s\S]*?height: 11px;[\s\S]*?linear-gradient\(#185abd 0 0\) 0 50% \/ 100% 1\.4px no-repeat,[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--calc-sheet::after\s*\{[\s\S]*?width: 11px;[\s\S]*?height: 11px;[\s\S]*?linear-gradient\(#185abd 0 0\) 0 50% \/ 100% 1\.4px no-repeat,[\s\S]*?content: "";/,
     );
     expect(menusCss).toMatch(
-      /\.app__menu-icon--calc-iterative::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 10px;[\s\S]*?background-image: url\("data:image\/svg\+xml,[\s\S]*?stroke='%238764b8'[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--calc-iterative::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 10px;[\s\S]*?background-image: url\("data:image\/svg\+xml,[\s\S]*?stroke='%238764b8'[\s\S]*?content: "";/,
     );
     expect(menusCss).not.toContain('content: "ƒ"');
     expect(menusCss).not.toContain('content: "▦"');
     expect(menusCss).not.toContain('content: "∞"');
     const calcCss = menusCss.slice(
-      menusCss.indexOf('.app__menu-icon--calc-auto-no-table::before'),
-      menusCss.indexOf('.app__menu-item[role="menuitemradio"][aria-checked="true"]'),
+      menusCss.indexOf('.fc-tb__menu-icon--calc-auto-no-table::before'),
+      menusCss.indexOf('.fc-tb__menu-item[role="menuitemradio"][aria-checked="true"]'),
     );
     expect(calcCss).not.toContain('content: "A"');
     expect(calcCss).not.toContain('content: "A*"');
@@ -471,7 +471,7 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     expect(menusCss).toMatch(
-      /\.app__menu-icon--bring-front::after,[\s\S]*?\.app__menu-icon--send-back::after\s*\{[\s\S]*?width: 7px;[\s\S]*?height: 7px;[\s\S]*?border: 1px solid #0b5a2f;[\s\S]*?background: #107c41;[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--bring-front::after,[\s\S]*?\.fc-tb__menu-icon--send-back::after\s*\{[\s\S]*?width: 7px;[\s\S]*?height: 7px;[\s\S]*?border: 1px solid #0b5a2f;[\s\S]*?background: #107c41;[\s\S]*?content: "";/,
     );
     expect(menusCss).not.toContain('content: "1"');
   });
@@ -480,17 +480,17 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     expect(menusCss).toMatch(
-      /\.demo__cf-icon--symbol\.demo__cf-icon--check-green::before\s*\{[\s\S]*?border-bottom: 2px solid currentColor;[\s\S]*?border-left: 2px solid currentColor;[\s\S]*?transform: rotate\(-45deg\);/,
+      /\.fc-tb__cf-icon--symbol\.fc-tb__cf-icon--check-green::before\s*\{[\s\S]*?border-bottom: 2px solid currentColor;[\s\S]*?border-left: 2px solid currentColor;[\s\S]*?transform: rotate\(-45deg\);/,
     );
     expect(menusCss).toMatch(
-      /\.demo__cf-icon--symbol\.demo__cf-icon--bang-yellow::before\s*\{[\s\S]*?width: 2px;[\s\S]*?height: 7px;[\s\S]*?background: currentColor;/,
+      /\.fc-tb__cf-icon--symbol\.fc-tb__cf-icon--bang-yellow::before\s*\{[\s\S]*?width: 2px;[\s\S]*?height: 7px;[\s\S]*?background: currentColor;/,
     );
     expect(menusCss).toMatch(
-      /\.demo__cf-icon--symbol\.demo__cf-icon--x-red::before,[\s\S]*?\.demo__cf-icon--symbol\.demo__cf-icon--x-red::after\s*\{[\s\S]*?width: 2px;[\s\S]*?height: 10px;[\s\S]*?background: currentColor;/,
+      /\.fc-tb__cf-icon--symbol\.fc-tb__cf-icon--x-red::before,[\s\S]*?\.fc-tb__cf-icon--symbol\.fc-tb__cf-icon--x-red::after\s*\{[\s\S]*?width: 2px;[\s\S]*?height: 10px;[\s\S]*?background: currentColor;/,
     );
     const symbolCss = menusCss.slice(
-      menusCss.indexOf('.demo__cf-icon--symbol::before'),
-      menusCss.indexOf('.demo__cf-icon--flag::before'),
+      menusCss.indexOf('.fc-tb__cf-icon--symbol::before'),
+      menusCss.indexOf('.fc-tb__cf-icon--flag::before'),
     );
     expect(symbolCss).not.toContain('content: "✓"');
     expect(symbolCss).not.toContain('content: "!"');
@@ -501,9 +501,9 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     for (const selector of [
-      '.app__menu-icon--script-uppercase::after',
-      '.app__menu-icon--script-lowercase::after',
-      '.app__menu-icon--script-trim::after',
+      '.fc-tb__menu-icon--script-uppercase::after',
+      '.fc-tb__menu-icon--script-lowercase::after',
+      '.fc-tb__menu-icon--script-trim::after',
     ]) {
       const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       expect(menusCss).toMatch(
@@ -513,14 +513,14 @@ describe('toolbar/ribbon menu primitives', () => {
       );
     }
     expect(menusCss).toMatch(
-      /\.app__menu-icon--script-custom::after\s*\{[\s\S]*?width: 13px;[\s\S]*?height: 12px;[\s\S]*?background-image: url\("data:image\/svg\+xml,[\s\S]*?stroke='%238764b8'[\s\S]*?background-size: 13px 12px;[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--script-custom::after\s*\{[\s\S]*?width: 13px;[\s\S]*?height: 12px;[\s\S]*?background-image: url\("data:image\/svg\+xml,[\s\S]*?stroke='%238764b8'[\s\S]*?background-size: 13px 12px;[\s\S]*?content: "";/,
     );
     expect(menusCss).toMatch(
-      /\.app__menu-icon--symbol-more::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?background-image: url\("data:image\/svg\+xml,[\s\S]*?stroke='%23185abd'[\s\S]*?background-size: 12px 12px;[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--symbol-more::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?background-image: url\("data:image\/svg\+xml,[\s\S]*?stroke='%23185abd'[\s\S]*?background-size: 12px 12px;[\s\S]*?content: "";/,
     );
     const scriptCss = menusCss.slice(
-      menusCss.indexOf('.app__menu-icon--script-clear::after'),
-      menusCss.indexOf('.app__menu-icon--addin-get::before'),
+      menusCss.indexOf('.fc-tb__menu-icon--script-clear::after'),
+      menusCss.indexOf('.fc-tb__menu-icon--addin-get::before'),
     );
     expect(scriptCss).not.toContain('content: "A"');
     expect(scriptCss).not.toContain('content: "a"');
@@ -533,11 +533,11 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     expect(menusCss).toMatch(
-      /\.app__menu-icon--watch-open::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 9px;[\s\S]*?radial-gradient\(circle at 50% 50%, #185abd[\s\S]*?radial-gradient\(ellipse at 50% 50%[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--watch-open::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 9px;[\s\S]*?radial-gradient\(circle at 50% 50%, #185abd[\s\S]*?radial-gradient\(ellipse at 50% 50%[\s\S]*?content: "";/,
     );
     const watchOpenCss = menusCss.slice(
-      menusCss.indexOf('.app__menu-icon--watch-open::after'),
-      menusCss.indexOf('.app__menu-icon--protect-allow-ranges::before'),
+      menusCss.indexOf('.fc-tb__menu-icon--watch-open::after'),
+      menusCss.indexOf('.fc-tb__menu-icon--protect-allow-ranges::before'),
     );
     expect(watchOpenCss).not.toContain('content: "W"');
   });
@@ -546,8 +546,8 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     for (const selector of [
-      '.app__menu-icon--name-manager::after',
-      '.app__menu-icon--defined-name-define::after',
+      '.fc-tb__menu-icon--name-manager::after',
+      '.fc-tb__menu-icon--defined-name-define::after',
     ]) {
       const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       expect(menusCss).toMatch(
@@ -558,16 +558,16 @@ describe('toolbar/ribbon menu primitives', () => {
     }
 
     expect(menusCss).toMatch(
-      /\.app__menu-icon--defined-name-manager::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 11px;[\s\S]*?border: 1px solid #185abd;[\s\S]*?linear-gradient\(#185abd 0 0\)[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--defined-name-manager::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 11px;[\s\S]*?border: 1px solid #185abd;[\s\S]*?linear-gradient\(#185abd 0 0\)[\s\S]*?content: "";/,
     );
     expect(menusCss).toMatch(
-      /\.app__menu-icon--defined-name-use::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 11px;[\s\S]*?background-image: url\("data:image\/svg\+xml,[\s\S]*?stroke='%238764b8'[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--defined-name-use::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 11px;[\s\S]*?background-image: url\("data:image\/svg\+xml,[\s\S]*?stroke='%238764b8'[\s\S]*?content: "";/,
     );
     for (const selector of [
-      '.app__menu-icon--defined-name-create-top::after',
-      '.app__menu-icon--defined-name-create-bottom::after',
-      '.app__menu-icon--defined-name-create-left::after',
-      '.app__menu-icon--defined-name-create-right::after',
+      '.fc-tb__menu-icon--defined-name-create-top::after',
+      '.fc-tb__menu-icon--defined-name-create-bottom::after',
+      '.fc-tb__menu-icon--defined-name-create-left::after',
+      '.fc-tb__menu-icon--defined-name-create-right::after',
     ]) {
       const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       expect(menusCss).toMatch(
@@ -578,12 +578,12 @@ describe('toolbar/ribbon menu primitives', () => {
     }
 
     const nameCss = menusCss.slice(
-      menusCss.indexOf('.app__menu-icon--name-manager::after'),
-      menusCss.indexOf('.app__menu-icon--find-comments::before'),
+      menusCss.indexOf('.fc-tb__menu-icon--name-manager::after'),
+      menusCss.indexOf('.fc-tb__menu-icon--find-comments::before'),
     );
     const definedNameCss = menusCss.slice(
-      menusCss.indexOf('.app__menu-icon--defined-name-define::after'),
-      menusCss.indexOf('.app__menu-sep'),
+      menusCss.indexOf('.fc-tb__menu-icon--defined-name-define::after'),
+      menusCss.indexOf('.fc-tb__menu-sep'),
     );
     expect(`${nameCss}\n${definedNameCss}`).not.toContain('content: "N"');
     expect(definedNameCss).not.toContain('content: "fx"');
@@ -597,11 +597,11 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     expect(menusCss).toMatch(
-      /\.app__menu-icon--format-dialog::after\s*\{[\s\S]*?width: 11px;[\s\S]*?height: 8px;[\s\S]*?background: #185abd;[\s\S]*?box-shadow: -2px 0 0 #f4b183;[\s\S]*?content: "";[\s\S]*?transform: rotate\(-35deg\);/,
+      /\.fc-tb__menu-icon--format-dialog::after\s*\{[\s\S]*?width: 11px;[\s\S]*?height: 8px;[\s\S]*?background: #185abd;[\s\S]*?box-shadow: -2px 0 0 #f4b183;[\s\S]*?content: "";[\s\S]*?transform: rotate\(-35deg\);/,
     );
     const formatDialogCss = menusCss.slice(
-      menusCss.indexOf('.app__menu-icon--format-dialog::after'),
-      menusCss.indexOf('.app__menu-icon--format-row-height::after'),
+      menusCss.indexOf('.fc-tb__menu-icon--format-dialog::after'),
+      menusCss.indexOf('.fc-tb__menu-icon--format-row-height::after'),
     );
     expect(formatDialogCss).not.toContain('content: "A"');
   });
@@ -610,11 +610,11 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     expect(menusCss).toMatch(
-      /\.app__menu-icon--addin-my::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?linear-gradient\(#185abd 0 0\)[\s\S]*?linear-gradient\(#8764b8 0 0\)[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--addin-my::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?linear-gradient\(#185abd 0 0\)[\s\S]*?linear-gradient\(#8764b8 0 0\)[\s\S]*?content: "";/,
     );
     const addinMyCss = menusCss.slice(
-      menusCss.indexOf('.app__menu-icon--addin-my::after'),
-      menusCss.indexOf('.app__menu-icon--addin-manage::after'),
+      menusCss.indexOf('.fc-tb__menu-icon--addin-my::after'),
+      menusCss.indexOf('.fc-tb__menu-icon--addin-manage::after'),
     );
     expect(addinMyCss).not.toContain('content: "M"');
   });
@@ -623,11 +623,11 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     expect(menusCss).toMatch(
-      /\.app__menu-icon--pivot-existing-sheet::after\s*\{[\s\S]*?width: 11px;[\s\S]*?height: 11px;[\s\S]*?border: 2px solid #185abd;[\s\S]*?linear-gradient\(#185abd 0 0\) 3px 3px \/ 3px 3px no-repeat,[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--pivot-existing-sheet::after\s*\{[\s\S]*?width: 11px;[\s\S]*?height: 11px;[\s\S]*?border: 2px solid #185abd;[\s\S]*?linear-gradient\(#185abd 0 0\) 3px 3px \/ 3px 3px no-repeat,[\s\S]*?content: "";/,
     );
     const pivotExistingCss = menusCss.slice(
-      menusCss.indexOf('.app__menu-icon--pivot-existing-sheet::after'),
-      menusCss.indexOf('.app__menu-icon--script-clear::before'),
+      menusCss.indexOf('.fc-tb__menu-icon--pivot-existing-sheet::after'),
+      menusCss.indexOf('.fc-tb__menu-icon--script-clear::before'),
     );
     expect(pivotExistingCss).not.toContain('content: "D"');
   });
@@ -636,11 +636,11 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     for (const selector of [
-      '.app__menu-icon--insert-sheet::after',
-      '.app__menu-icon--pivot-new-sheet::after',
-      '.app__menu-icon--fill-series::after',
-      '.app__menu-icon--addin-get::after',
-      '.app__cellstyle-footer:not(.app__menu-item--iconic)::before',
+      '.fc-tb__menu-icon--insert-sheet::after',
+      '.fc-tb__menu-icon--pivot-new-sheet::after',
+      '.fc-tb__menu-icon--fill-series::after',
+      '.fc-tb__menu-icon--addin-get::after',
+      '.fc-tb__cellstyle-footer:not(.fc-tb__menu-item--iconic)::before',
     ]) {
       const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       expect(menusCss).toMatch(
@@ -651,10 +651,10 @@ describe('toolbar/ribbon menu primitives', () => {
     }
 
     for (const selector of [
-      '.app__menu-icon--link-open::after',
-      '.app__menu-icon--pdf-share::after',
-      '.app__menu-icon--title-share::after',
-      '.app__menu-icon--trace-error::after',
+      '.fc-tb__menu-icon--link-open::after',
+      '.fc-tb__menu-icon--pdf-share::after',
+      '.fc-tb__menu-icon--title-share::after',
+      '.fc-tb__menu-icon--trace-error::after',
     ]) {
       const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       expect(menusCss).toMatch(
@@ -665,8 +665,8 @@ describe('toolbar/ribbon menu primitives', () => {
     }
 
     for (const selector of [
-      '.app__menu-icon--addin-manage::after',
-      '.app__menu-icon--pdf-preferences::after',
+      '.fc-tb__menu-icon--addin-manage::after',
+      '.fc-tb__menu-icon--pdf-preferences::after',
     ]) {
       const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       expect(menusCss).toMatch(
@@ -684,10 +684,10 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     expect(menusCss).toMatch(
-      /\.app__menu-icon--go-to-special::after,[\s\S]*?\.app__menu-icon--pivot-recommended::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?background: #d83b01;[\s\S]*?clip-path: polygon\([\s\S]*?50% 0,[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--go-to-special::after,[\s\S]*?\.fc-tb__menu-icon--pivot-recommended::after\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?background: #d83b01;[\s\S]*?clip-path: polygon\([\s\S]*?50% 0,[\s\S]*?content: "";/,
     );
     expect(menusCss).toMatch(
-      /\.app__menu-icon--go-to-special::after\s*\{[\s\S]*?background: #8764b8;/,
+      /\.fc-tb__menu-icon--go-to-special::after\s*\{[\s\S]*?background: #8764b8;/,
     );
     expect(menusCss).not.toContain('content: "★"');
   });
@@ -695,10 +695,10 @@ describe('toolbar/ribbon menu primitives', () => {
   it('uses semantic SVGs for underline variant menu icons', () => {
     for (const iconSlug of ['underline-single', 'underline-double']) {
       const button = menuIconButton('下線', 'underlineAction', 'single', iconSlug);
-      const icon = button.querySelector('.app__menu-icon');
+      const icon = button.querySelector('.fc-tb__menu-icon');
 
-      expect(icon?.classList.contains('app__menu-icon--svg')).toBe(true);
-      expect(icon?.querySelector('.app__menu-icon-svg')).toBeTruthy();
+      expect(icon?.classList.contains('fc-tb__menu-icon--svg')).toBe(true);
+      expect(icon?.querySelector('.fc-tb__menu-icon-svg')).toBeTruthy();
       expect(icon?.querySelector('path[fill="#107c41"]')).toBeTruthy();
     }
   });
@@ -719,14 +719,14 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(menu.id).toBe('menu-underline');
     expect(items.map((item) => item.dataset.underlineAction)).toEqual(['single', 'double']);
     expect(items.map((item) => item.textContent)).toEqual(['下線', '二重下線']);
-    expect(menu.querySelectorAll('.app__menu-icon--svg .app__menu-icon-svg')).toHaveLength(2);
+    expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(2);
 
     expect(menusCss).toMatch(/#menu-underline\s*\{[\s\S]*?min-width: 118px;/);
     expect(menusCss).toMatch(
-      /#menu-underline \.app__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
+      /#menu-underline \.fc-tb__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
     );
     expect(menusCss).toMatch(
-      /#menu-underline \.app__menu-icon,[\s\S]*?#menu-underline \.app__menu-icon-svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
+      /#menu-underline \.fc-tb__menu-icon,[\s\S]*?#menu-underline \.fc-tb__menu-icon-svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
     );
   });
 
@@ -746,14 +746,14 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(menu.id).toBe('menu-copy');
     expect(items.map((item) => item.dataset.copyAction)).toEqual(['copy', 'picture']);
     expect(items.map((item) => item.textContent)).toEqual(['コピー', '図としてコピー...']);
-    expect(menu.querySelectorAll('.app__menu-icon--svg .app__menu-icon-svg')).toHaveLength(2);
+    expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(2);
 
     expect(menusCss).toMatch(/#menu-copy\s*\{[\s\S]*?min-width: 144px;/);
     expect(menusCss).toMatch(
-      /#menu-copy \.app__menu-item\s*\{[\s\S]*?min-height: 27px;[\s\S]*?padding: 3px 12px 3px 20px;/,
+      /#menu-copy \.fc-tb__menu-item\s*\{[\s\S]*?min-height: 27px;[\s\S]*?padding: 3px 12px 3px 20px;/,
     );
     expect(menusCss).toMatch(
-      /#menu-copy \.app__menu-icon,[\s\S]*?#menu-copy \.app__menu-icon-svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
+      /#menu-copy \.fc-tb__menu-icon,[\s\S]*?#menu-copy \.fc-tb__menu-icon-svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
     );
   });
 
@@ -762,10 +762,10 @@ describe('toolbar/ribbon menu primitives', () => {
 
     expect(menusCss).toMatch(/#menu-paste\s*\{[\s\S]*?min-width: 198px;/);
     expect(menusCss).toMatch(
-      /#menu-paste \.app__menu-item\s*\{[\s\S]*?min-height: 27px;[\s\S]*?padding: 3px 12px 3px 20px;/,
+      /#menu-paste \.fc-tb__menu-item\s*\{[\s\S]*?min-height: 27px;[\s\S]*?padding: 3px 12px 3px 20px;/,
     );
     expect(menusCss).toMatch(
-      /#menu-paste \.app__menu-icon,[\s\S]*?#menu-paste \.app__menu-icon-svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
+      /#menu-paste \.fc-tb__menu-icon,[\s\S]*?#menu-paste \.fc-tb__menu-icon-svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
     );
   });
 
@@ -801,17 +801,17 @@ describe('toolbar/ribbon menu primitives', () => {
       'ハイパーリンクの削除',
       '条件付き書式のクリア',
     ]);
-    expect(menu.querySelectorAll('.app__menu-icon--svg .app__menu-icon-svg')).toHaveLength(7);
+    expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(7);
     expect(menu.querySelector('path[fill="#f7e1ff"]')).toBeTruthy();
     expect(menu.querySelector('path[stroke="#2f75b5"]')).toBeTruthy();
     expect(menu.querySelector('path[stroke="#c00000"]')).toBeTruthy();
 
     expect(menusCss).toMatch(/#menu-clear\s*\{[\s\S]*?min-width: 194px;/);
     expect(menusCss).toMatch(
-      /#menu-clear \.app__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
+      /#menu-clear \.fc-tb__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
     );
     expect(menusCss).toMatch(
-      /#menu-clear \.app__menu-icon,[\s\S]*?#menu-clear \.app__menu-icon-svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
+      /#menu-clear \.fc-tb__menu-icon,[\s\S]*?#menu-clear \.fc-tb__menu-icon-svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
     );
   });
 
@@ -852,17 +852,17 @@ describe('toolbar/ribbon menu primitives', () => {
       '再適用',
       '詳細設定...',
     ]);
-    expect(menu.querySelectorAll('.app__menu-icon--svg .app__menu-icon-svg')).toHaveLength(11);
+    expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(11);
     expect(menu.querySelector('path[stroke="#c00000"]')).toBeTruthy();
     expect(menu.querySelector('path[stroke="#107c41"]')).toBeTruthy();
     expect(menu.querySelector('path[stroke="#2f75b5"]')).toBeTruthy();
 
     expect(menusCss).toMatch(/#menu-sort-home,[\s\S]*?#menu-sort\s*\{[\s\S]*?min-width: 218px;/);
     expect(menusCss).toMatch(
-      /#menu-sort-home \.app__menu-item,[\s\S]*?#menu-sort \.app__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
+      /#menu-sort-home \.fc-tb__menu-item,[\s\S]*?#menu-sort \.fc-tb__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
     );
     expect(menusCss).toMatch(
-      /#menu-sort-home \.app__menu-icon,[\s\S]*?#menu-sort \.app__menu-icon-svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
+      /#menu-sort-home \.fc-tb__menu-icon,[\s\S]*?#menu-sort \.fc-tb__menu-icon-svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
     );
   });
 
@@ -906,17 +906,17 @@ describe('toolbar/ribbon menu primitives', () => {
       'オブジェクトの選択',
       '選択ウィンドウ...',
     ]);
-    expect(menu.querySelectorAll('.app__menu-icon--svg .app__menu-icon-svg')).toHaveLength(11);
+    expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(11);
     expect(menu.querySelector('path[stroke="#8764b8"]')).toBeTruthy();
     expect(menu.querySelector('path[stroke="#107c41"]')).toBeTruthy();
     expect(menu.querySelector('path[fill="#fff8cc"]')).toBeTruthy();
 
     expect(menusCss).toMatch(/#menu-find-select\s*\{[\s\S]*?min-width: 182px;/);
     expect(menusCss).toMatch(
-      /#menu-find-select \.app__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
+      /#menu-find-select \.fc-tb__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
     );
     expect(menusCss).toMatch(
-      /#menu-find-select \.app__menu-icon,[\s\S]*?#menu-find-select \.app__menu-icon-svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
+      /#menu-find-select \.fc-tb__menu-icon,[\s\S]*?#menu-find-select \.fc-tb__menu-icon-svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
     );
   });
 
@@ -954,23 +954,23 @@ describe('toolbar/ribbon menu primitives', () => {
       '文字の割付',
       'フラッシュ フィル',
     ]);
-    expect(menu.querySelectorAll('.app__menu-icon--svg .app__menu-icon-svg')).toHaveLength(8);
+    expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(8);
     expect(menu.querySelector('path[stroke="#2f75b5"]')).toBeTruthy();
     expect(menu.querySelector('path[stroke="#107c41"]')).toBeTruthy();
     expect(menu.querySelector('path[fill="#ed7d31"]')).toBeTruthy();
 
     expect(menusCss).toMatch(/#menu-fill\s*\{[\s\S]*?min-width: 178px;/);
     expect(menusCss).toMatch(
-      /#menu-fill \.app__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
+      /#menu-fill \.fc-tb__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
     );
     expect(menusCss).toMatch(
-      /#menu-fill \.app__menu-icon,[\s\S]*?#menu-fill \.app__menu-icon-svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
+      /#menu-fill \.fc-tb__menu-icon,[\s\S]*?#menu-fill \.fc-tb__menu-icon-svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
     );
     for (const selector of [
-      '.app__menu-icon--fill-days::after',
-      '.app__menu-icon--fill-weekdays::after',
-      '.app__menu-icon--fill-months::after',
-      '.app__menu-icon--fill-years::after',
+      '.fc-tb__menu-icon--fill-days::after',
+      '.fc-tb__menu-icon--fill-weekdays::after',
+      '.fc-tb__menu-icon--fill-months::after',
+      '.fc-tb__menu-icon--fill-years::after',
     ]) {
       const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       expect(menusCss).toMatch(
@@ -978,8 +978,8 @@ describe('toolbar/ribbon menu primitives', () => {
       );
     }
     const fillDateCss = menusCss.slice(
-      menusCss.indexOf('.app__menu-icon--fill-days::before'),
-      menusCss.indexOf('.app__menu-icon--freeze-col::before'),
+      menusCss.indexOf('.fc-tb__menu-icon--fill-days::before'),
+      menusCss.indexOf('.fc-tb__menu-icon--freeze-col::before'),
     );
     for (const glyph of ['"D"', '"W"', '"M"', '"Y"']) {
       expect(fillDateCss).not.toContain(`content: ${glyph}`);
@@ -1012,18 +1012,20 @@ describe('toolbar/ribbon menu primitives', () => {
       '最小値',
       'その他の関数...',
     ]);
-    expect(homeMenu.querySelectorAll('.app__menu-icon--svg .app__menu-icon-svg')).toHaveLength(1);
-    expect(homeMenu.querySelector('[data-autosum-fn="SUM"] .app__menu-icon--svg')).toBeTruthy();
-    expect(homeMenu.querySelectorAll('.app__menu-item__icon-spacer')).toHaveLength(5);
+    expect(homeMenu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(
+      1,
+    );
+    expect(homeMenu.querySelector('[data-autosum-fn="SUM"] .fc-tb__menu-icon--svg')).toBeTruthy();
+    expect(homeMenu.querySelectorAll('.fc-tb__menu-item__icon-spacer')).toHaveLength(5);
 
     expect(menusCss).toMatch(
       /#menu-autosum-home,[\s\S]*?#menu-autosum-formulas\s*\{[\s\S]*?min-width: 128px;/,
     );
     expect(menusCss).toMatch(
-      /#menu-autosum-home \.app__menu-item,[\s\S]*?#menu-autosum-formulas \.app__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
+      /#menu-autosum-home \.fc-tb__menu-item,[\s\S]*?#menu-autosum-formulas \.fc-tb__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
     );
-    expect(menusCss).not.toContain('.app__menu-icon--autosum-average::before');
-    expect(menusCss).not.toContain('.app__menu-icon--autosum-more::after');
+    expect(menusCss).not.toContain('.fc-tb__menu-icon--autosum-average::before');
+    expect(menusCss).not.toContain('.fc-tb__menu-icon--autosum-more::after');
   });
 
   it('keeps Currency dropdown compact and close to Japanese Excel 365 desktop', () => {
@@ -1055,18 +1057,18 @@ describe('toolbar/ribbon menu primitives', () => {
       'CHF フランス語 (スイス)',
     ]);
     expect(footer?.textContent).toBe('その他の通貨表示形式…');
-    expect(menu.querySelectorAll('.app__menu-icon--svg .app__menu-icon-svg')).toHaveLength(0);
-    expect(menu.querySelectorAll('.app__menu-item__icon-spacer')).toHaveLength(6);
+    expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(0);
+    expect(menu.querySelectorAll('.fc-tb__menu-item__icon-spacer')).toHaveLength(6);
 
-    expect(menusCss).toMatch(/\.app__currency-menu\s*\{[\s\S]*?min-width: 190px;/);
+    expect(menusCss).toMatch(/\.fc-tb__currency-menu\s*\{[\s\S]*?min-width: 190px;/);
     expect(menusCss).toMatch(
-      /\.app__currency-menu \.app__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
+      /\.fc-tb__currency-menu \.fc-tb__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
     );
     expect(menusCss).toMatch(
-      /\.app__currency-menu \.app__menu-item__icon-spacer\s*\{[\s\S]*?width: 0;/,
+      /\.fc-tb__currency-menu \.fc-tb__menu-item__icon-spacer\s*\{[\s\S]*?width: 0;/,
     );
-    expect(menusCss).not.toContain('.app__menu-icon--currency-yen::before');
-    expect(menusCss).not.toContain('.app__menu-icon--currency-more::before');
+    expect(menusCss).not.toContain('.fc-tb__menu-icon--currency-yen::before');
+    expect(menusCss).not.toContain('.fc-tb__menu-icon--currency-more::before');
   });
 
   it('keeps Cell Styles gallery geometry close to Japanese Excel 365 desktop', () => {
@@ -1077,16 +1079,16 @@ describe('toolbar/ribbon menu primitives', () => {
       ribbonMenuText: ja.ribbonMenu,
       ribbonText: ja.ribbon,
     }).createCellStylesMenu();
-    const scrollBody = menu.querySelector<HTMLElement>(':scope > .app__cellstyle-scroll');
+    const scrollBody = menu.querySelector<HTMLElement>(':scope > .fc-tb__cellstyle-scroll');
     const headings = Array.from(
-      scrollBody?.querySelectorAll<HTMLElement>(':scope > .app__cellstyle-heading') ?? [],
+      scrollBody?.querySelectorAll<HTMLElement>(':scope > .fc-tb__cellstyle-heading') ?? [],
     ).map((heading) => heading.textContent);
     const grids = Array.from(
-      scrollBody?.querySelectorAll<HTMLElement>(':scope > .app__cellstyle-grid') ?? [],
+      scrollBody?.querySelectorAll<HTMLElement>(':scope > .fc-tb__cellstyle-grid') ?? [],
     );
 
     expect(menu.id).toBe('menu-cell-styles-home');
-    expect(menu.classList.contains('app__cellstyle-menu')).toBe(true);
+    expect(menu.classList.contains('fc-tb__cellstyle-menu')).toBe(true);
     expect(headings).toEqual([
       '良い、悪い、標準',
       'データとモデル',
@@ -1097,20 +1099,20 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(grids.length).toBeGreaterThanOrEqual(5);
     expect(menu.querySelector('[data-cell-style="normal"]')?.textContent).toBe('標準');
     expect(menu.querySelector('[data-cell-style="good"]')?.textContent).toBe('良い');
-    expect(menu.querySelectorAll('.app__cellstyle-footer')).toHaveLength(2);
+    expect(menu.querySelectorAll('.fc-tb__cellstyle-footer')).toHaveLength(2);
 
-    expect(menusCss).toMatch(/\.app__cellstyle-menu\s*\{[\s\S]*?width: 566px;/);
+    expect(menusCss).toMatch(/\.fc-tb__cellstyle-menu\s*\{[\s\S]*?width: 566px;/);
     expect(menusCss).toMatch(
-      /\.app__cellstyle-scroll\s*\{[\s\S]*?max-height: min\(388px, calc\(100vh - 244px\)\);/,
+      /\.fc-tb__cellstyle-scroll\s*\{[\s\S]*?max-height: min\(388px, calc\(100vh - 244px\)\);/,
     );
     expect(menusCss).toMatch(
-      /\.app__cellstyle-grid\s*\{[\s\S]*?grid-template-columns: repeat\(6, 82px\);[\s\S]*?gap: 7px 11px;/,
+      /\.fc-tb__cellstyle-grid\s*\{[\s\S]*?grid-template-columns: repeat\(6, 82px\);[\s\S]*?gap: 7px 11px;/,
     );
     expect(menusCss).toMatch(
-      /\.app__cellstyle-heading\s*\{[\s\S]*?background: #f3f2f1;[\s\S]*?font-weight: 400;/,
+      /\.fc-tb__cellstyle-heading\s*\{[\s\S]*?background: #f3f2f1;[\s\S]*?font-weight: 400;/,
     );
     expect(menusCss).toMatch(
-      /\.app__cellstyle-chip\s*\{[\s\S]*?min-width: 82px;[\s\S]*?height: 22px;[\s\S]*?border-radius: 0;/,
+      /\.fc-tb__cellstyle-chip\s*\{[\s\S]*?min-width: 82px;[\s\S]*?height: 22px;[\s\S]*?border-radius: 0;/,
     );
   });
 
@@ -1122,34 +1124,34 @@ describe('toolbar/ribbon menu primitives', () => {
       ribbonMenuText: ja.ribbonMenu,
       ribbonText: ja.ribbon,
     }).createTableStyleMenu('formatTableHome');
-    const scrollBody = menu.querySelector<HTMLElement>(':scope > .app__tablestyle-scroll');
+    const scrollBody = menu.querySelector<HTMLElement>(':scope > .fc-tb__tablestyle-scroll');
     const headings = Array.from(
-      scrollBody?.querySelectorAll<HTMLElement>(':scope > .app__tablestyle-heading') ?? [],
+      scrollBody?.querySelectorAll<HTMLElement>(':scope > .fc-tb__tablestyle-heading') ?? [],
     ).map((heading) => heading.textContent);
     const grids = Array.from(
-      scrollBody?.querySelectorAll<HTMLElement>(':scope > .app__tablestyle-grid') ?? [],
+      scrollBody?.querySelectorAll<HTMLElement>(':scope > .fc-tb__tablestyle-grid') ?? [],
     );
 
     expect(menu.id).toBe('menu-table-style-home');
-    expect(menu.classList.contains('app__tablestyle-menu')).toBe(true);
+    expect(menu.classList.contains('fc-tb__tablestyle-menu')).toBe(true);
     expect(headings).toEqual(['淡色', '中間', '濃色']);
-    expect(grids.map((grid) => grid.querySelectorAll('.app__tablestyle-swatch').length)).toEqual([
+    expect(grids.map((grid) => grid.querySelectorAll('.fc-tb__tablestyle-swatch').length)).toEqual([
       28, 28, 7,
     ]);
-    expect(menu.querySelectorAll('.app__tablestyle-footer')).toHaveLength(2);
+    expect(menu.querySelectorAll('.fc-tb__tablestyle-footer')).toHaveLength(2);
 
-    expect(menusCss).toMatch(/\.app__tablestyle-menu\s*\{[\s\S]*?width: 515px;/);
+    expect(menusCss).toMatch(/\.fc-tb__tablestyle-menu\s*\{[\s\S]*?width: 515px;/);
     expect(menusCss).toMatch(
-      /\.app__tablestyle-scroll\s*\{[\s\S]*?max-height: min\(496px, calc\(100vh - 116px\)\);/,
+      /\.fc-tb__tablestyle-scroll\s*\{[\s\S]*?max-height: min\(496px, calc\(100vh - 116px\)\);/,
     );
     expect(menusCss).toMatch(
-      /\.app__tablestyle-grid\s*\{[\s\S]*?grid-template-columns: repeat\(7, 62px\);[\s\S]*?gap: 8px 9px;/,
+      /\.fc-tb__tablestyle-grid\s*\{[\s\S]*?grid-template-columns: repeat\(7, 62px\);[\s\S]*?gap: 8px 9px;/,
     );
     expect(menusCss).toMatch(
-      /\.app__tablestyle-heading\s*\{[\s\S]*?background: #f3f2f1;[\s\S]*?font-weight: 400;/,
+      /\.fc-tb__tablestyle-heading\s*\{[\s\S]*?background: #f3f2f1;[\s\S]*?font-weight: 400;/,
     );
     expect(menusCss).toMatch(
-      /\.app__tablestyle-swatch\s*\{[\s\S]*?width: 62px;[\s\S]*?height: 47px;[\s\S]*?border-radius: 0;/,
+      /\.fc-tb__tablestyle-swatch\s*\{[\s\S]*?width: 62px;[\s\S]*?height: 47px;[\s\S]*?border-radius: 0;/,
     );
   });
 
@@ -1203,8 +1205,12 @@ describe('toolbar/ribbon menu primitives', () => {
       '列の削除',
       'シートの削除',
     ]);
-    expect(insertMenu.querySelectorAll('.app__menu-icon--svg .app__menu-icon-svg')).toHaveLength(4);
-    expect(deleteMenu.querySelectorAll('.app__menu-icon--svg .app__menu-icon-svg')).toHaveLength(6);
+    expect(
+      insertMenu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg'),
+    ).toHaveLength(4);
+    expect(
+      deleteMenu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg'),
+    ).toHaveLength(6);
     expect(insertMenu.querySelector('path[stroke="#107c41"]')).toBeTruthy();
     expect(deleteMenu.querySelector('path[stroke="#c00000"]')).toBeTruthy();
 
@@ -1212,10 +1218,10 @@ describe('toolbar/ribbon menu primitives', () => {
       /#menu-insert-cells,[\s\S]*?#menu-delete-cells\s*\{[\s\S]*?min-width: 166px;/,
     );
     expect(menusCss).toMatch(
-      /#menu-insert-cells \.app__menu-item,[\s\S]*?#menu-delete-cells \.app__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
+      /#menu-insert-cells \.fc-tb__menu-item,[\s\S]*?#menu-delete-cells \.fc-tb__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
     );
     expect(menusCss).toMatch(
-      /#menu-insert-cells \.app__menu-icon,[\s\S]*?#menu-delete-cells \.app__menu-icon-svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
+      /#menu-insert-cells \.fc-tb__menu-icon,[\s\S]*?#menu-delete-cells \.fc-tb__menu-icon-svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
     );
   });
 
@@ -1232,7 +1238,7 @@ describe('toolbar/ribbon menu primitives', () => {
     }).createFormatCellsMenu();
     const headings = Array.from(menu.children)
       .filter((child): child is HTMLElement => child instanceof HTMLElement)
-      .filter((child) => child.classList.contains('app__menu-heading'))
+      .filter((child) => child.classList.contains('fc-tb__menu-heading'))
       .map((heading) => heading.textContent);
     const items = Array.from(menu.querySelectorAll<HTMLButtonElement>('[data-cell-format]'));
     const submenuTriggers = Array.from(
@@ -1243,7 +1249,7 @@ describe('toolbar/ribbon menu primitives', () => {
     );
     const tabColorMenu = menu.querySelector<HTMLElement>('#menu-format-cells-tabColor');
     const tabColorHeadings = Array.from(
-      tabColorMenu?.querySelectorAll<HTMLElement>('.app__menu-heading') ?? [],
+      tabColorMenu?.querySelectorAll<HTMLElement>('.fc-tb__menu-heading') ?? [],
     ).map((heading) => heading.textContent);
 
     expect(menu.id).toBe('menu-format-cells');
@@ -1287,32 +1293,32 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(tabColorMenu?.querySelector('[data-cell-format="tab-color-more"]')?.textContent).toBe(
       'その他の色…',
     );
-    expect(tabColorMenu?.querySelectorAll('.app__color-swatch')).toHaveLength(14);
+    expect(tabColorMenu?.querySelectorAll('.fc-tb__color-swatch')).toHaveLength(14);
     expect(items.at(-1)?.dataset.cellFormat).toBe('dialog');
     expect(items.at(-1)?.textContent).toBe('セルの書式設定...');
     expect(items.map((item) => item.dataset.cellFormat)).toContain('lock-cell');
     expect(
-      menu.querySelectorAll('.app__menu-icon--svg .app__menu-icon-svg').length,
+      menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg').length,
     ).toBeGreaterThan(10);
 
     expect(menusCss).toMatch(/#menu-format-cells\s*\{[\s\S]*?min-width: 208px;/);
     expect(menusCss).toMatch(
-      /#menu-format-cells \.app__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
+      /#menu-format-cells \.fc-tb__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
     );
     expect(menusCss).toMatch(
-      /#menu-format-cells \.app__menu-heading\s*\{[\s\S]*?color: #808080;[\s\S]*?font-weight: 400;/,
+      /#menu-format-cells \.fc-tb__menu-heading\s*\{[\s\S]*?color: #808080;[\s\S]*?font-weight: 400;/,
     );
     expect(menusCss).toMatch(
-      /#menu-format-cells \.app__menu-item--checked \.app__menu-item__text::before\s*\{[\s\S]*?border-bottom: 2px solid #107c41;[\s\S]*?border-left: 2px solid #107c41;[\s\S]*?content: "";[\s\S]*?transform: rotate\(-45deg\);/,
+      /#menu-format-cells \.fc-tb__menu-item--checked \.fc-tb__menu-item__text::before\s*\{[\s\S]*?border-bottom: 2px solid #107c41;[\s\S]*?border-left: 2px solid #107c41;[\s\S]*?content: "";[\s\S]*?transform: rotate\(-45deg\);/,
     );
     expect(menusCss).toMatch(
-      /#menu-format-cells \.app__submenu--format\s*\{[\s\S]*?min-width: 172px;/,
+      /#menu-format-cells \.fc-tb__submenu--format\s*\{[\s\S]*?min-width: 172px;/,
     );
     expect(menusCss).toMatch(
-      /#menu-format-cells \.app__submenu--format-tab-color\s*\{[\s\S]*?min-width: 206px;/,
+      /#menu-format-cells \.fc-tb__submenu--format-tab-color\s*\{[\s\S]*?min-width: 206px;/,
     );
     expect(menusCss).toMatch(
-      /#menu-format-cells \.app__submenu--format-tab-color \.app__color-swatch-grid\s*\{[\s\S]*?grid-template-columns: repeat\(7, 18px\);/,
+      /#menu-format-cells \.fc-tb__submenu--format-tab-color \.fc-tb__color-swatch-grid\s*\{[\s\S]*?grid-template-columns: repeat\(7, 18px\);/,
     );
   });
 
@@ -1320,10 +1326,10 @@ describe('toolbar/ribbon menu primitives', () => {
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
 
     for (const selector of [
-      '.app__menu-icon--format-unhide-sheet::after',
-      '.app__menu-icon--find-validation::after',
-      '.app__menu-icon--ignore-error::after',
-      '.app__menu-icon--validation-settings::after',
+      '.fc-tb__menu-icon--format-unhide-sheet::after',
+      '.fc-tb__menu-icon--find-validation::after',
+      '.fc-tb__menu-icon--ignore-error::after',
+      '.fc-tb__menu-icon--validation-settings::after',
     ]) {
       const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       expect(menusCss).toMatch(
@@ -1335,8 +1341,8 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(menusCss).not.toContain('content: "✓"');
 
     for (const selector of [
-      '.app__menu-icon--filter-reapply::after',
-      '.app__menu-icon--calc-now::after',
+      '.fc-tb__menu-icon--filter-reapply::after',
+      '.fc-tb__menu-icon--calc-now::after',
     ]) {
       const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       expect(menusCss).toMatch(
@@ -1348,7 +1354,7 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(menusCss).not.toContain('content: "↻"');
 
     expect(menusCss).toMatch(
-      /\.app__menu-icon--error-checking::after[\s\S]*?\{[\s\S]*?width: 9px;[\s\S]*?height: 12px;[\s\S]*?radial-gradient\(circle at 5px 11px,[\s\S]*?content: "";/,
+      /\.fc-tb__menu-icon--error-checking::after[\s\S]*?\{[\s\S]*?width: 9px;[\s\S]*?height: 12px;[\s\S]*?radial-gradient\(circle at 5px 11px,[\s\S]*?content: "";/,
     );
   });
 
@@ -1378,14 +1384,14 @@ describe('toolbar/ribbon menu primitives', () => {
       'セルの結合',
       'セル結合の解除',
     ]);
-    expect(menu.querySelectorAll('.app__menu-icon--svg .app__menu-icon-svg')).toHaveLength(4);
+    expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(4);
 
     expect(menusCss).toMatch(/#menu-merge\s*\{[\s\S]*?min-width: 206px;/);
     expect(menusCss).toMatch(
-      /#menu-merge \.app__menu-item\s*\{[\s\S]*?min-height: 27px;[\s\S]*?padding: 3px 12px 3px 20px;/,
+      /#menu-merge \.fc-tb__menu-item\s*\{[\s\S]*?min-height: 27px;[\s\S]*?padding: 3px 12px 3px 20px;/,
     );
     expect(menusCss).toMatch(
-      /#menu-merge \.app__menu-icon,[\s\S]*?#menu-merge \.app__menu-icon-svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
+      /#menu-merge \.fc-tb__menu-icon,[\s\S]*?#menu-merge \.fc-tb__menu-icon-svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
     );
   });
 
@@ -1408,15 +1414,15 @@ describe('toolbar/ribbon menu primitives', () => {
       '折り返して全体を表示',
       '縮小して全体を表示する',
     ]);
-    expect(menu.querySelectorAll('.app__menu-icon--svg .app__menu-icon-svg')).toHaveLength(1);
-    expect(menu.querySelectorAll('.app__menu-item__icon-spacer')).toHaveLength(1);
+    expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(1);
+    expect(menu.querySelectorAll('.fc-tb__menu-item__icon-spacer')).toHaveLength(1);
 
     expect(menusCss).toMatch(/#menu-wrap\s*\{[\s\S]*?min-width: 220px;/);
     expect(menusCss).toMatch(
-      /#menu-wrap \.app__menu-item\s*\{[\s\S]*?min-height: 27px;[\s\S]*?padding: 3px 12px 3px 20px;/,
+      /#menu-wrap \.fc-tb__menu-item\s*\{[\s\S]*?min-height: 27px;[\s\S]*?padding: 3px 12px 3px 20px;/,
     );
     expect(menusCss).toMatch(
-      /#menu-wrap \.app__menu-icon,[\s\S]*?#menu-wrap \.app__menu-icon-svg,[\s\S]*?#menu-wrap \.app__menu-item__icon-spacer\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
+      /#menu-wrap \.fc-tb__menu-icon,[\s\S]*?#menu-wrap \.fc-tb__menu-icon-svg,[\s\S]*?#menu-wrap \.fc-tb__menu-item__icon-spacer\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
     );
   });
 
@@ -1427,9 +1433,9 @@ describe('toolbar/ribbon menu primitives', () => {
     const flags = menu.querySelector<HTMLElement>('[data-cf-action="icons-flags3"]');
     const symbols = menu.querySelector<HTMLElement>('[data-cf-action="icons-symbols3"]');
 
-    expect(arrows?.classList.contains('app__cf-icon-choice--icons-arrows5')).toBe(true);
-    expect(traffic?.classList.contains('app__cf-icon-choice--icons-traffic3')).toBe(true);
-    expect(flags?.classList.contains('app__cf-icon-choice--icons-flags3')).toBe(true);
+    expect(arrows?.classList.contains('fc-tb__cf-icon-choice--icons-arrows5')).toBe(true);
+    expect(traffic?.classList.contains('fc-tb__cf-icon-choice--icons-traffic3')).toBe(true);
+    expect(flags?.classList.contains('fc-tb__cf-icon-choice--icons-flags3')).toBe(true);
     expect(arrows?.querySelectorAll('span')).toHaveLength(5);
     expect(traffic?.querySelectorAll('span')).toHaveLength(3);
     expect(symbols?.querySelectorAll('span')).toHaveLength(3);
@@ -1476,10 +1482,10 @@ describe('toolbar/ribbon menu primitives', () => {
         value: iconSlug,
         icon: iconSlug,
       });
-      const icon = button.querySelector('.app__visual-tile__icon');
+      const icon = button.querySelector('.fc-tb__visual-tile__icon');
 
-      expect(icon?.classList.contains('app__visual-tile__icon--svg')).toBe(true);
-      expect(icon?.querySelector('.app__visual-tile__icon-svg')).toBeTruthy();
+      expect(icon?.classList.contains('fc-tb__visual-tile__icon--svg')).toBe(true);
+      expect(icon?.querySelector('.fc-tb__visual-tile__icon-svg')).toBeTruthy();
       expect(icon?.querySelectorAll('path').length).toBeGreaterThan(0);
     }
   });
@@ -1495,10 +1501,10 @@ describe('toolbar/ribbon menu primitives', () => {
         value: iconSlug,
         icon: iconSlug,
       });
-      const icon = button.querySelector('.app__visual-tile__icon');
+      const icon = button.querySelector('.fc-tb__visual-tile__icon');
 
-      expect(icon?.classList.contains('app__visual-tile__icon--svg'), iconSlug).toBe(true);
-      expect(icon?.querySelector('.app__visual-tile__icon-svg'), iconSlug).toBeTruthy();
+      expect(icon?.classList.contains('fc-tb__visual-tile__icon--svg'), iconSlug).toBe(true);
+      expect(icon?.querySelector('.fc-tb__visual-tile__icon-svg'), iconSlug).toBeTruthy();
       expect(icon?.querySelectorAll('path').length, iconSlug).toBeGreaterThan(0);
     }
   });
@@ -1535,15 +1541,15 @@ describe('toolbar/ribbon menu primitives', () => {
       onPickColor: vi.fn(),
     });
 
-    expect(menu.querySelector('[data-border-preset="format"] .app__border-preview')).toBeTruthy();
+    expect(menu.querySelector('[data-border-preset="format"] .fc-tb__border-preview')).toBeTruthy();
     expect(
-      menu.querySelector('[data-border-draw="erase"] .app__border-preview--eraser'),
+      menu.querySelector('[data-border-draw="erase"] .fc-tb__border-preview--eraser'),
     ).toBeTruthy();
     expect(
-      menu.querySelector('[data-border-submenu="lineColor"] .app__border-preview--line-color'),
+      menu.querySelector('[data-border-submenu="lineColor"] .fc-tb__border-preview--line-color'),
     ).toBeTruthy();
     expect(
-      menu.querySelector('[data-border-submenu="lineStyle"] .app__border-preview--line-style'),
+      menu.querySelector('[data-border-submenu="lineStyle"] .fc-tb__border-preview--line-style'),
     ).toBeTruthy();
   });
 
@@ -1580,33 +1586,35 @@ describe('toolbar/ribbon menu primitives', () => {
       onPickColor: vi.fn(),
     });
 
-    expect(menu.classList.contains('app__menu--borders')).toBe(true);
+    expect(menu.classList.contains('fc-tb__menu--borders')).toBe(true);
     expect(menu.querySelectorAll('[role="separator"]')).toHaveLength(3);
-    expect(menu.querySelector('.app__menu-heading')?.textContent).toBe('罫線の作成');
+    expect(menu.querySelector('.fc-tb__menu-heading')?.textContent).toBe('罫線の作成');
     expect(menu.querySelectorAll('[data-border-preset]')).toHaveLength(14);
     expect(menu.querySelectorAll('[data-border-draw]')).toHaveLength(3);
     expect(menu.querySelectorAll('[data-border-submenu]')).toHaveLength(2);
     expect(
-      menu.querySelector('.app__submenu--line-style .app__submenu-item--line-style-none')
+      menu.querySelector('.fc-tb__submenu--line-style .fc-tb__submenu-item--line-style-none')
         ?.textContent,
     ).toBe('なし');
-    expect(menu.querySelectorAll('.app__submenu--line-style .app__line-sample')).toHaveLength(11);
+    expect(menu.querySelectorAll('.fc-tb__submenu--line-style .fc-tb__line-sample')).toHaveLength(
+      11,
+    );
 
-    expect(menuCss).toMatch(/\.app__menu--borders\s*\{[\s\S]*?min-width: 186px;/);
+    expect(menuCss).toMatch(/\.fc-tb__menu--borders\s*\{[\s\S]*?min-width: 186px;/);
     expect(menuCss).toMatch(
-      /\.app__menu--borders \.app__menu-item\s*\{[\s\S]*?min-height: 24px;[\s\S]*?padding: 2px 12px 2px 18px;/,
+      /\.fc-tb__menu--borders \.fc-tb__menu-item\s*\{[\s\S]*?min-height: 24px;[\s\S]*?padding: 2px 12px 2px 18px;/,
     );
     expect(menuCss).toMatch(
-      /\.app__menu--borders \.app__menu-item\[aria-expanded="true"\]\s*\{[\s\S]*?background: #107c41;/,
+      /\.fc-tb__menu--borders \.fc-tb__menu-item\[aria-expanded="true"\]\s*\{[\s\S]*?background: #107c41;/,
     );
     expect(menuCss).toMatch(
-      /\.app__menu--borders \.app__submenu--line-style\s*\{[\s\S]*?min-width: 101px;/,
+      /\.fc-tb__menu--borders \.fc-tb__submenu--line-style\s*\{[\s\S]*?min-width: 101px;/,
     );
     expect(menuCss).toMatch(
-      /\.app__submenu--line-style \.app__line-sample\s*\{[\s\S]*?width: 74px;/,
+      /\.fc-tb__submenu--line-style \.fc-tb__line-sample\s*\{[\s\S]*?width: 74px;/,
     );
     expect(menuCss).toMatch(
-      /\.app__submenu--line-color \.fc-colorpalette__action--automatic\s*\{[\s\S]*?border-color: #107c41;/,
+      /\.fc-tb__submenu--line-color \.fc-colorpalette__action--automatic\s*\{[\s\S]*?border-color: #107c41;/,
     );
   });
 
@@ -1863,7 +1871,7 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(selectColorSource).toContain('ribbonText.marginTop');
     expect(selectColorSource).not.toContain("arrow.textContent = '›'");
     expect(dropdownCss).toMatch(
-      /\.demo__rb-dd__submenu\s*\{[\s\S]*?border-top: 4px solid transparent;[\s\S]*?border-bottom: 4px solid transparent;[\s\S]*?border-left: 5px solid var\(--fc-tb-fg\);/,
+      /\.fc-tb__rb-dd__submenu\s*\{[\s\S]*?border-top: 4px solid transparent;[\s\S]*?border-bottom: 4px solid transparent;[\s\S]*?border-left: 5px solid var\(--fc-tb-fg\);/,
     );
     expect(selectColorSource).not.toContain('テーマのフォント');
     expect(selectColorSource).not.toContain('Theme Fonts');
@@ -2041,11 +2049,11 @@ describe('toolbar/ribbon menu primitives', () => {
     const directVisualRows = sourcesOutsidePrimitives()
       .filter(
         ({ source }) =>
-          /className\s*=\s*['"][^'"]*app__visual-tile/.test(source) ||
-          /className\s*=\s*['"][^'"]*app__visual-grid/.test(source) ||
-          /className\s*=\s*['"][^'"]*app__color-swatch/.test(source) ||
-          /className\s*=\s*['"][^'"]*app__symbol-tile/.test(source) ||
-          /className\s*=\s*['"][^'"]*app__symbol-grid/.test(source),
+          /className\s*=\s*['"][^'"]*fc-tb__visual-tile/.test(source) ||
+          /className\s*=\s*['"][^'"]*fc-tb__visual-grid/.test(source) ||
+          /className\s*=\s*['"][^'"]*fc-tb__color-swatch/.test(source) ||
+          /className\s*=\s*['"][^'"]*fc-tb__symbol-tile/.test(source) ||
+          /className\s*=\s*['"][^'"]*fc-tb__symbol-grid/.test(source),
       )
       .map(({ name }) => name);
 
@@ -2062,7 +2070,7 @@ describe('toolbar/ribbon menu primitives', () => {
 
   it('keeps menu section headings centralized in menuSectionHeader', () => {
     const directHeadings = sourcesOutsidePrimitives()
-      .filter(({ source }) => source.includes("className = 'app__menu-heading'"))
+      .filter(({ source }) => source.includes("className = 'fc-tb__menu-heading'"))
       .map(({ name }) => name);
 
     expect(directHeadings).toEqual([]);
@@ -2072,8 +2080,8 @@ describe('toolbar/ribbon menu primitives', () => {
     const directSubmenuTriggers = sourcesOutsidePrimitives()
       .filter(
         ({ source }) =>
-          source.includes('app__menu-item--submenu') ||
-          source.includes('app__menu-item__caret') ||
+          source.includes('fc-tb__menu-item--submenu') ||
+          source.includes('fc-tb__menu-item__caret') ||
           source.includes("aria-haspopup', 'menu'") ||
           source.includes("aria-expanded', 'false'") ||
           source.includes("setAttribute('aria-controls'"),
@@ -2102,7 +2110,7 @@ describe('toolbar/ribbon menu primitives', () => {
 
   it('keeps preset icon spacer DOM centralized in menuIconSpacer', () => {
     const directSpacers = sourcesOutsidePrimitives()
-      .filter(({ source }) => source.includes('app__menu-item__icon-spacer'))
+      .filter(({ source }) => source.includes('fc-tb__menu-item__icon-spacer'))
       .map(({ name }) => name);
 
     expect(directSpacers).toEqual([]);
@@ -2110,7 +2118,7 @@ describe('toolbar/ribbon menu primitives', () => {
 
   it('keeps submenu item text DOM centralized in submenuItemText', () => {
     const directSubmenuText = sourcesOutsidePrimitives()
-      .filter(({ source }) => source.includes('app__submenu-item__text'))
+      .filter(({ source }) => source.includes('fc-tb__submenu-item__text'))
       .map(({ name }) => name);
 
     expect(directSubmenuText).toEqual([]);
@@ -2138,8 +2146,8 @@ describe('toolbar/ribbon menu primitives', () => {
     const directLabeledGridDom = sourcesOutsidePrimitives()
       .filter(
         ({ source }) =>
-          /className\s*=\s*['"]app__(?:table|cell)style-heading['"]/.test(source) ||
-          /className\s*=\s*['"]app__(?:table|cell)style-grid['"]/.test(source),
+          /className\s*=\s*['"]fc-tb__(?:table|cell)style-heading['"]/.test(source) ||
+          /className\s*=\s*['"]fc-tb__(?:table|cell)style-grid['"]/.test(source),
       )
       .map(({ name }) => name);
 
@@ -2155,7 +2163,7 @@ describe('toolbar/ribbon menu primitives', () => {
     );
 
     expect(stylesSource).toContain('menuScrollBody(');
-    expect(stylesSource).not.toMatch(/className\s*=\s*['"]app__tablestyle-scroll['"]/);
+    expect(stylesSource).not.toMatch(/className\s*=\s*['"]fc-tb__tablestyle-scroll['"]/);
   });
 
   it('keeps table style swatch preview div creation centralized', () => {
@@ -2183,7 +2191,7 @@ describe('toolbar/ribbon menu primitives', () => {
 
     expect(conditionalSource).toContain('cfPanel(');
     expect(conditionalSource).not.toMatch(
-      /className\s*=\s*['"]app__cf-(?:choice-row|choice-grid-panel|icon-panel)['"]/,
+      /className\s*=\s*['"]fc-tb__cf-(?:choice-row|choice-grid-panel|icon-panel)['"]/,
     );
   });
 
@@ -2215,7 +2223,7 @@ describe('toolbar/ribbon menu primitives', () => {
       orientationFormatAlignment: 'セルの配置の設定',
     } as Parameters<typeof createTextOrientationMenu>[0]);
     const previews = Array.from(
-      menu.querySelectorAll<SVGSVGElement>('.app__text-orientation-preview'),
+      menu.querySelectorAll<SVGSVGElement>('.fc-tb__text-orientation-preview'),
     );
     const items = Array.from(menu.querySelectorAll<HTMLButtonElement>('[data-text-orientation]'));
 
@@ -2245,10 +2253,10 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(previews.some((preview) => preview.querySelector('path[stroke="#2f75b5"]'))).toBe(true);
     expect(menusCss).toMatch(/#menu-text-orientation\s*\{[\s\S]*?min-width: 168px;/);
     expect(menusCss).toMatch(
-      /#menu-text-orientation \.app__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
+      /#menu-text-orientation \.fc-tb__menu-item\s*\{[\s\S]*?min-height: 25px;[\s\S]*?padding: 3px 12px 3px 20px;/,
     );
     expect(menusCss).toMatch(
-      /#menu-text-orientation \.app__text-orientation-preview\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
+      /#menu-text-orientation \.fc-tb__text-orientation-preview\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
     );
   });
 
@@ -2732,10 +2740,10 @@ describe('toolbar/ribbon menu primitives', () => {
     const symbolSource = readFileSync(join(root, 'src/toolbar/dialogs/symbol.ts'), 'utf8');
 
     expect(shellSource).toContain('createDialogChoiceButton');
-    expect(shellSource).toContain("button.className = opts.className ?? 'app__cf-choice'");
+    expect(shellSource).toContain("button.className = opts.className ?? 'fc-tb__cf-choice'");
     expect(symbolSource).toContain('createDialogChoiceButton({ label: symbol');
     expect(symbolSource).not.toContain("const button = document.createElement('button')");
-    expect(symbolSource).not.toContain("button.className = 'app__cf-choice'");
+    expect(symbolSource).not.toContain("button.className = 'fc-tb__cf-choice'");
   });
 
   it('keeps Text to Columns wizard styling in a shared dialog module', () => {
@@ -2822,7 +2830,7 @@ describe('toolbar/ribbon menu primitives', () => {
           label: 'Good',
           attr: 'cellStyle',
           value: 'good',
-          className: 'app__menu-item app__cellstyle-chip',
+          className: 'fc-tb__menu-item fc-tb__cellstyle-chip',
         }),
         key: 'cellStyle',
         label: 'Good',
@@ -2853,14 +2861,14 @@ describe('toolbar/ribbon menu primitives', () => {
 
   it('creates the base menu button contract used by specialized primitives', () => {
     const button = createMenuButton({
-      className: 'app__menu-item app__menu-item--custom',
+      className: 'fc-tb__menu-item fc-tb__menu-item--custom',
       attr: 'sampleAction',
       value: 'run',
       title: 'Run sample',
       ariaLabel: 'Run sample',
     });
 
-    expect(button.className).toBe('app__menu-item app__menu-item--custom');
+    expect(button.className).toBe('fc-tb__menu-item fc-tb__menu-item--custom');
     expect(button.type).toBe('button');
     expect(button.getAttribute('role')).toBe('menuitem');
     expect(button.dataset.sampleAction).toBe('run');
@@ -2871,41 +2879,41 @@ describe('toolbar/ribbon menu primitives', () => {
   it('creates menu div primitives with shared class and accessibility contracts', () => {
     const menu = createMenu('menu-test');
     expect(menu.id).toBe('menu-test');
-    expect(menu.className).toBe('app__menu');
+    expect(menu.className).toBe('fc-tb__menu');
     expect(menu.hidden).toBe(true);
 
     const colorGrid = colorSwatchGrid('test-colors');
-    expect(colorGrid.className).toBe('app__color-swatch-grid test-colors');
+    expect(colorGrid.className).toBe('fc-tb__color-swatch-grid test-colors');
     expect(colorGrid.getAttribute('role')).toBe('presentation');
 
     const symbolGrid = symbolMenuGrid('Greek', ['π']);
-    expect(symbolGrid.className).toBe('app__symbol-grid');
+    expect(symbolGrid.className).toBe('fc-tb__symbol-grid');
     expect(symbolGrid.getAttribute('role')).toBe('presentation');
     expect(symbolGrid.getAttribute('aria-label')).toBe('Greek');
     expect(symbolGrid.querySelectorAll('button')).toHaveLength(1);
 
     const visualGrid = visualMenuGrid('test-visuals');
-    expect(visualGrid.className).toBe('app__visual-grid test-visuals');
+    expect(visualGrid.className).toBe('fc-tb__visual-grid test-visuals');
     expect(visualGrid.getAttribute('role')).toBe('presentation');
 
     const separator = menuSeparator();
-    expect(separator.className).toBe('app__menu-sep');
+    expect(separator.className).toBe('fc-tb__menu-sep');
     expect(separator.getAttribute('role')).toBe('separator');
 
     const heading = menuSectionHeader('Styles');
-    expect(heading.className).toBe('app__menu-heading');
+    expect(heading.className).toBe('fc-tb__menu-heading');
     expect(heading.getAttribute('role')).toBe('presentation');
     expect(heading.textContent).toBe('Styles');
 
     const [labeledHeading, labeledGrid] = menuLabeledGrid({
       label: 'Light',
-      headingClassName: 'app__tablestyle-heading',
-      gridClassName: 'app__tablestyle-grid',
+      headingClassName: 'fc-tb__tablestyle-heading',
+      gridClassName: 'fc-tb__tablestyle-grid',
       children: [],
     });
-    expect(labeledHeading.className).toBe('app__tablestyle-heading');
+    expect(labeledHeading.className).toBe('fc-tb__tablestyle-heading');
     expect(labeledHeading.textContent).toBe('Light');
-    expect(labeledGrid.className).toBe('app__tablestyle-grid');
+    expect(labeledGrid.className).toBe('fc-tb__tablestyle-grid');
     expect(labeledGrid.getAttribute('role')).toBe('group');
     expect(labeledGrid.getAttribute('aria-label')).toBe('Light');
   });
@@ -2913,13 +2921,13 @@ describe('toolbar/ribbon menu primitives', () => {
   it('creates nested submenus with the shared menu contract', () => {
     const submenu = createSubmenu({
       id: 'menu-test-submenu',
-      className: 'app__submenu app__submenu--test',
+      className: 'fc-tb__submenu fc-tb__submenu--test',
       label: 'Test submenu',
       dataset: { cfPanel: 'highlight' },
     });
 
     expect(submenu.id).toBe('menu-test-submenu');
-    expect(submenu.className).toBe('app__submenu app__submenu--test');
+    expect(submenu.className).toBe('fc-tb__submenu fc-tb__submenu--test');
     expect(submenu.getAttribute('role')).toBe('menu');
     expect(submenu.getAttribute('aria-label')).toBe('Test submenu');
     expect(submenu.hidden).toBe(true);
@@ -2940,18 +2948,18 @@ describe('toolbar/ribbon menu primitives', () => {
     );
 
     expect(trigger).toBe(button);
-    expect(trigger.classList.contains('app__menu-item--submenu')).toBe(true);
+    expect(trigger.classList.contains('fc-tb__menu-item--submenu')).toBe(true);
     expect(trigger.getAttribute('aria-haspopup')).toBe('menu');
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
     expect(trigger.getAttribute('aria-controls')).toBe('menu-conditional-highlight');
     expect(trigger.dataset.cfSubmenu).toBe('highlight');
-    const caret = trigger.querySelector<HTMLElement>('.app__menu-item__caret');
+    const caret = trigger.querySelector<HTMLElement>('.fc-tb__menu-item__caret');
     expect(caret?.textContent).toBe('');
     expect(caret?.getAttribute('aria-hidden')).toBe('true');
 
     const menusCss = readFileSync(join(root, 'src/styles/toolbar/ribbon/menus.css'), 'utf8');
     expect(menusCss).toMatch(
-      /\.app__menu-item__caret\s*\{[\s\S]*?border-top: 4px solid transparent;[\s\S]*?border-bottom: 4px solid transparent;[\s\S]*?border-left: 5px solid var\(--fc-tb-fg-soft\);/,
+      /\.fc-tb__menu-item__caret\s*\{[\s\S]*?border-top: 4px solid transparent;[\s\S]*?border-bottom: 4px solid transparent;[\s\S]*?border-left: 5px solid var\(--fc-tb-fg-soft\);/,
     );
   });
 
@@ -2959,14 +2967,14 @@ describe('toolbar/ribbon menu primitives', () => {
     const spacer = menuIconSpacer();
 
     expect(spacer.tagName).toBe('SPAN');
-    expect(spacer.className).toBe('app__menu-item__icon-spacer');
+    expect(spacer.className).toBe('fc-tb__menu-item__icon-spacer');
   });
 
   it('creates shared submenu item text labels', () => {
     const text = submenuItemText('None');
 
     expect(text.tagName).toBe('SPAN');
-    expect(text.className).toBe('app__submenu-item__text');
+    expect(text.className).toBe('fc-tb__submenu-item__text');
     expect(text.textContent).toBe('None');
   });
 });

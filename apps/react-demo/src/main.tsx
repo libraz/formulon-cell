@@ -1,6 +1,7 @@
 import '@libraz/formulon-cell/styles.css';
 import '@libraz/formulon-cell/styles/contrast.css';
 import './styles.css';
+import '../../demo-shared/shell.css';
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';

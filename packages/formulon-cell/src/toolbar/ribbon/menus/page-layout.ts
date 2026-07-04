@@ -41,8 +41,8 @@ export const createPageLayoutMenuFactories = (
 
   const createPageThemeMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-page-theme');
-    menu.classList.add('app__menu--visual', 'app__menu--themes');
-    const grid = visualMenuTileGrid('app__visual-grid--themes', [
+    menu.classList.add('fc-tb__menu--visual', 'fc-tb__menu--themes');
+    const grid = visualMenuTileGrid('fc-tb__visual-grid--themes', [
       {
         label: t.themePaper,
         attr: 'pageThemeAction',

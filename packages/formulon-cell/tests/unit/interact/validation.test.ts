@@ -423,7 +423,7 @@ describe('attachValidationAlert', () => {
       /\.fc-valdlg__panel \.fc-fmtdlg__header\s*\{[\s\S]*?min-height: 30px;[\s\S]*?padding: 7px 12px 6px;[\s\S]*?font-size: 12px;/,
     );
     expect(css).toMatch(
-      /\.fc-valdlg__panel \.app__dlg__message\s*\{[\s\S]*?margin: 0;[\s\S]*?font-size: 12px;[\s\S]*?line-height: 1.35;/,
+      /\.fc-valdlg__panel \.fc-tb__dlg__message\s*\{[\s\S]*?margin: 0;[\s\S]*?font-size: 12px;[\s\S]*?line-height: 1.35;/,
     );
     expect(css).toMatch(
       /\.fc-valdlg__panel \.fc-fmtdlg__footer\s*\{[\s\S]*?min-height: 38px;[\s\S]*?padding: 6px 12px 10px;/,

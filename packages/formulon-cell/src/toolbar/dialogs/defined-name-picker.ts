@@ -19,7 +19,7 @@ export const showDefinedNamePickerDialog = (
   new Promise<string | null>((resolve) => {
     const shell = createDialogShell({ title: opts.title, bodyVariant: 'app' });
     const list = document.createElement('div');
-    list.className = 'app__dlg__list';
+    list.className = 'fc-tb__dlg__list';
     list.setAttribute('role', 'radiogroup');
     list.setAttribute('aria-label', opts.title);
 
@@ -27,7 +27,7 @@ export const showDefinedNamePickerDialog = (
     const radios: HTMLInputElement[] = [];
     for (const [index, entry] of opts.names.entries()) {
       const label = document.createElement('label');
-      label.className = 'fc-fmtdlg__row fc-fmtdlg__row--block app__dlg__check';
+      label.className = 'fc-fmtdlg__row fc-fmtdlg__row--block fc-tb__dlg__check';
 
       const radio = document.createElement('input');
       radio.type = 'radio';
@@ -43,7 +43,7 @@ export const showDefinedNamePickerDialog = (
       const name = document.createElement('strong');
       name.textContent = entry.name;
       const formula = document.createElement('span');
-      formula.className = 'app__dlg__note';
+      formula.className = 'fc-tb__dlg__note';
       formula.textContent = entry.formula;
       body.append(name, formula);
 

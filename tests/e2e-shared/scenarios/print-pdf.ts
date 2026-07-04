@@ -59,15 +59,15 @@ export async function runPrintPdfSmokeScenario(page: Page): Promise<void> {
   });
 
   await page.locator('[data-ribbon-tab="file"]').first().click();
-  const backstage = page.locator('.demo__backstage[role="dialog"]').first();
+  const backstage = page.locator('.fc-tb__backstage[role="dialog"]').first();
   await expect(backstage).toBeVisible();
   await backstage.getByRole('button', { name: 'Print', exact: true }).first().click();
   await expect(backstage.locator('[data-demo-print-preview]')).toBeVisible();
-  await expect(backstage.frameLocator('.demo__print-frame').locator('body')).toContainText(
+  await expect(backstage.frameLocator('.fc-tb__print-frame').locator('body')).toContainText(
     'PDF Body 1',
   );
 
-  const srcdoc = await backstage.locator('.demo__print-frame').getAttribute('srcdoc');
+  const srcdoc = await backstage.locator('.fc-tb__print-frame').getAttribute('srcdoc');
   expect(srcdoc).toContain('PDF Title Row');
   expect(srcdoc).toContain('PDF Title Col');
   expect(srcdoc).toContain('PDF Body 1');

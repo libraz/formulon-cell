@@ -1,0 +1,448 @@
+/* Demo page-frame styles shared by the React and Vue demo apps.
+ *
+ * These rules style the demo's own page shell — the brand/command/title bars,
+ * the settings side panel (presets, feature toggles, probes, event log), and
+ * the responsive layout of that shell. They are NOT part of the published
+ * @libraz/formulon-cell package; the demos own these `demo__*` classes.
+ *
+ * The rules read `--fc-tb-*` tokens defined by the package stylesheet, so this
+ * file must be imported AFTER `@libraz/formulon-cell/styles.css`.
+ */
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+.demo__head {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  background: var(--fc-tb-card);
+  border-bottom: 1px solid var(--fc-tb-line-soft);
+}
+
+.demo__quick,
+.demo__account {
+  display: flex;
+  align-items: center;
+}
+
+.demo__quick {
+  gap: 2px;
+}
+
+.demo__title-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--fc-tb-title-fg);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.demo__title-icon:hover:not(:disabled),
+.demo__share:hover {
+  background: var(--fc-tb-ribbon-hover);
+  border-color: var(--fc-tb-ribbon-line);
+}
+
+.demo__share--active {
+  background: var(--fc-tb-ribbon-pressed);
+  border-color: var(--fc-tb-ribbon-line);
+}
+
+.demo__account {
+  justify-content: end;
+  gap: 8px;
+}
+
+.demo__share {
+  height: 26px;
+  padding: 0 11px;
+  border: 1px solid var(--fc-tb-ribbon-line);
+  border-radius: 4px;
+  background: var(--fc-tb-ribbon-bg);
+  color: var(--fc-tb-fg);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.demo__account .demo__share:first-child {
+  border-color: var(--fc-tb-title-strong);
+  background: var(--fc-tb-title-strong);
+  color: #ffffff;
+}
+
+.demo__account .demo__share:first-child:hover {
+  border-color: var(--fc-tb-accent-strong);
+  background: var(--fc-tb-accent);
+  color: #ffffff;
+}
+
+.demo__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--fc-tb-input-bg);
+  color: var(--fc-tb-title-strong);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ── Command bar / brand ────────────────────────────────────────────── */
+.demo__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.demo__brand strong {
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.demo__brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: var(--fc-tb-brand);
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.demo__brand-mark .fc-tb__rb-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.demo__brand-sep,
+.demo__brand-tag {
+  color: var(--fc-tb-fg-soft);
+}
+
+.demo__brand-tag {
+  font-family: var(--fc-tb-mono);
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.demo__controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.demo__controls--panel {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.demo__seg {
+  display: inline-flex;
+  border: 1px solid var(--fc-tb-line);
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--fc-tb-card);
+}
+
+.demo__seg-btn {
+  padding: 5px 11px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--fc-tb-fg-soft);
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--fc-tb-line);
+  cursor: pointer;
+  letter-spacing: 0.02em;
+}
+
+.demo__seg-btn:first-child {
+  border-left: 0;
+}
+
+.demo__seg-btn:hover {
+  background: var(--fc-tb-ribbon-hover);
+  color: var(--fc-tb-fg);
+}
+
+.demo__seg-btn--active {
+  background: var(--fc-tb-accent);
+  color: var(--fc-tb-title-fg);
+}
+
+.demo__seg-btn--active:hover {
+  background: var(--fc-tb-accent);
+  color: var(--fc-tb-title-fg);
+}
+
+/* ── Body layout ────────────────────────────────────────────────────── */
+.demo__body {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 0;
+}
+
+.demo__body--panel {
+  grid-template-columns: 1fr;
+}
+
+.demo__sheet {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+/* ── Side panel (right-edge settings drawer) ────────────────────────── */
+.demo__panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 35;
+  width: min(360px, 38vw);
+  border-left: 1px solid var(--fc-tb-line);
+  background: var(--fc-tb-bg);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
+}
+
+.demo__panel[hidden] {
+  display: none;
+}
+
+/* ── Cards ──────────────────────────────────────────────────────────── */
+.demo__card {
+  background: var(--fc-tb-card);
+  border: 1px solid var(--fc-tb-line);
+  border-radius: 4px;
+  padding: 14px 14px 12px;
+}
+
+.demo__card h2 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fc-tb-fg);
+}
+
+.demo__hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--fc-tb-fg-soft);
+  line-height: 1.5;
+}
+
+.demo__hint code,
+.demo__mono code {
+  font-family: var(--fc-tb-mono);
+  font-size: 11px;
+  background: var(--fc-tb-ribbon-hover);
+  color: var(--fc-tb-fg);
+  padding: 1px 5px;
+  border-radius: 2px;
+}
+
+.demo__mono {
+  margin: 0;
+  font-family: var(--fc-tb-mono);
+  font-size: 14px;
+  font-feature-settings: "tnum";
+}
+
+/* ── Preset selector ────────────────────────────────────────────────── */
+.demo__preset {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.demo__preset-btn {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  color: var(--fc-tb-fg);
+  background: var(--fc-tb-card);
+  border: 1px solid var(--fc-tb-line);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.demo__preset-btn:hover:not(:disabled) {
+  border-color: var(--fc-tb-ribbon-line);
+  background: var(--fc-tb-ribbon-hover);
+}
+
+.demo__preset-btn:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.demo__preset-btn--active {
+  background: var(--fc-tb-accent);
+  color: var(--fc-tb-title-fg);
+  border-color: var(--fc-tb-accent);
+}
+
+.demo__preset-btn--active .demo__preset-hint {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.demo__preset-name {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.demo__preset-hint {
+  font-size: 11px;
+  color: var(--fc-tb-fg-soft);
+}
+
+/* ── Feature toggles ───────────────────────────────────────────────── */
+.demo__feat-group + .demo__feat-group {
+  margin-top: 10px;
+}
+
+.demo__feat-title {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fc-tb-fg);
+}
+
+.demo__feat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+}
+
+.demo__feat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 12px;
+  color: var(--fc-tb-fg-soft);
+  cursor: pointer;
+}
+
+.demo__feat input {
+  accent-color: var(--fc-tb-accent);
+}
+
+.demo__feat--on {
+  color: var(--fc-tb-fg);
+}
+
+/* ── Probe panel ────────────────────────────────────────────────────── */
+.demo__probe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.demo__probe-out {
+  flex-basis: 100%;
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--fc-tb-fg-soft);
+}
+
+.demo__probe-out code {
+  font-family: var(--fc-tb-mono);
+  font-size: 12px;
+  color: var(--fc-tb-fg);
+  background: transparent;
+  padding: 0;
+}
+
+/* ── Log ────────────────────────────────────────────────────────────── */
+.demo__log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.demo__log li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--fc-tb-line);
+  font-family: var(--fc-tb-mono);
+  font-size: 12px;
+}
+
+.demo__log li:last-child {
+  border-bottom: 0;
+}
+
+.demo__log-cell {
+  display: inline-block;
+  min-width: 36px;
+  padding: 1px 5px;
+  background: var(--fc-tb-ribbon-hover);
+  color: var(--fc-tb-fg);
+  border-radius: 2px;
+  text-align: center;
+}
+
+.demo__log-arrow {
+  color: var(--fc-tb-fg-soft);
+}
+
+/* ── Narrow-viewport adjustments (≤900px) ───────────────────────────── */
+@media (max-width: 900px) {
+  .demo__controls {
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .demo__body {
+    grid-template-columns: 1fr;
+  }
+
+  .demo__body--panel {
+    grid-template-rows: 1fr;
+  }
+
+  .demo__panel {
+    top: auto;
+    left: 0;
+    width: auto;
+    max-height: 42vh;
+    border-top: 1px solid var(--fc-tb-line);
+    border-left: 0;
+    padding: 12px;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.14);
+  }
+}

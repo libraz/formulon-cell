@@ -156,12 +156,12 @@ export const showProtectSheetDialog = (opts: {
     confirm.type = 'password';
 
     const allowLabel = document.createElement('div');
-    allowLabel.className = 'app__dlg__label';
+    allowLabel.className = 'fc-tb__dlg__label';
     allowLabel.textContent = strings.allowLabel;
     shell.body.appendChild(allowLabel);
 
     const choices = document.createElement('div');
-    choices.className = 'fc-fmtdlg__choice-grid app__dlg__choices';
+    choices.className = 'fc-fmtdlg__choice-grid fc-tb__dlg__choices';
     const inputs = new Map<keyof SheetProtectionPermissions, HTMLInputElement>();
     for (const key of permissionOrder) {
       const row = document.createElement('label');

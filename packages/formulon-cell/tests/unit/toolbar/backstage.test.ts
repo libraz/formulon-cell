@@ -52,15 +52,15 @@ describe('toolbar/ribbon/backstage', () => {
     });
 
     const view = createBackstageView();
-    const titleMark = view.querySelector<HTMLElement>('.demo__backstage-xl');
-    const preview = view.querySelector<HTMLElement>('.demo__backstage-preview');
+    const titleMark = view.querySelector<HTMLElement>('.fc-tb__backstage-xl');
+    const preview = view.querySelector<HTMLElement>('.fc-tb__backstage-preview');
     const backButton = view.querySelector<HTMLElement>('[data-backstage-action="back"]');
     const commandIcons = Array.from(
-      view.querySelectorAll<HTMLElement>('.demo__backstage-command-icon'),
+      view.querySelectorAll<HTMLElement>('.fc-tb__backstage-command-icon'),
     );
 
     expect(
-      Array.from(view.querySelectorAll<HTMLElement>('.demo__backstage-navitem')).map(
+      Array.from(view.querySelectorAll<HTMLElement>('.fc-tb__backstage-navitem')).map(
         (item) => item.dataset.backstageAction,
       ),
     ).toEqual([
@@ -77,7 +77,7 @@ describe('toolbar/ribbon/backstage', () => {
       'close',
     ]);
     expect(
-      Array.from(view.querySelectorAll<HTMLElement>('.demo__backstage-card')).map(
+      Array.from(view.querySelectorAll<HTMLElement>('.fc-tb__backstage-card')).map(
         (item) => item.dataset.backstageAction,
       ),
     ).toEqual([
@@ -95,7 +95,7 @@ describe('toolbar/ribbon/backstage', () => {
     expect(view.textContent).toContain('Workbook Information');
     expect(view.textContent).toContain('Saved');
     expect(backButton?.textContent).toBe('');
-    expect(backButton?.classList.contains('demo__backstage-navitem--back')).toBe(true);
+    expect(backButton?.classList.contains('fc-tb__backstage-navitem--back')).toBe(true);
     expect(backButton?.getAttribute('aria-label')).toBe('Back');
     expect(backButton?.title).toBe('Back');
     expect(titleMark?.textContent).toBe('');
@@ -107,9 +107,9 @@ describe('toolbar/ribbon/backstage', () => {
       'true',
     ]);
     expect(commandIcons.map((icon) => icon.className)).toEqual([
-      'demo__backstage-command-icon demo__backstage-command-icon--protect',
-      'demo__backstage-command-icon demo__backstage-command-icon--inspect',
-      'demo__backstage-command-icon demo__backstage-command-icon--manage',
+      'fc-tb__backstage-command-icon fc-tb__backstage-command-icon--protect',
+      'fc-tb__backstage-command-icon fc-tb__backstage-command-icon--inspect',
+      'fc-tb__backstage-command-icon fc-tb__backstage-command-icon--manage',
     ]);
   });
 
@@ -144,24 +144,24 @@ describe('toolbar/ribbon/backstage', () => {
 
     const nav = createBackstageButton('Info', 'info', true, 'Workbook info');
     expect(nav.type).toBe('button');
-    expect(nav.className).toBe('demo__backstage-navitem demo__backstage-navitem--active');
+    expect(nav.className).toBe('fc-tb__backstage-navitem fc-tb__backstage-navitem--active');
     expect(nav.dataset.backstageAction).toBe('info');
     expect(nav.getAttribute('aria-label')).toBe('Workbook info');
 
     const card = createBackstageCard('Open', 'Open file', 'open');
     expect(card.type).toBe('button');
-    expect(card.className).toBe('demo__backstage-card');
+    expect(card.className).toBe('fc-tb__backstage-card');
     expect(card.dataset.backstageAction).toBe('open');
 
     const primary = createBackstagePrintAction('Print', 'print', true);
     expect(primary.type).toBe('button');
-    expect(primary.className).toBe('demo__print-action demo__print-action--primary');
+    expect(primary.className).toBe('fc-tb__print-action fc-tb__print-action--primary');
     expect(primary.dataset.backstageAction).toBe('print');
     expect(primary.textContent).toBe('Print');
 
     const secondary = createBackstagePrintAction('Page setup', 'page-setup');
     expect(secondary.type).toBe('button');
-    expect(secondary.className).toBe('demo__print-action');
+    expect(secondary.className).toBe('fc-tb__print-action');
     expect(secondary.dataset.backstageAction).toBe('page-setup');
     expect(secondary.textContent).toBe('Page setup');
   });
@@ -172,10 +172,10 @@ describe('toolbar/ribbon/backstage', () => {
 
     expect(source).toContain("import { createRibbonButton } from './button.js'");
     expect(source).toContain('const createBackstageActionButton');
-    expect(source).toContain("createBackstageActionButton('demo__backstage-navitem'");
-    expect(source).toContain("createBackstageActionButton('demo__backstage-card'");
-    expect(source).toContain("'demo__backstage-command'");
-    expect(source).toContain("createBackstageActionButton('demo__print-action'");
+    expect(source).toContain("createBackstageActionButton('fc-tb__backstage-navitem'");
+    expect(source).toContain("createBackstageActionButton('fc-tb__backstage-card'");
+    expect(source).toContain("'fc-tb__backstage-command'");
+    expect(source).toContain("createBackstageActionButton('fc-tb__print-action'");
     expect(source).toContain('const createBackstagePrintAction');
     expect(source).toContain("createBackstagePrintAction(backstageText.printNow, 'print', true)");
     expect(source).toContain("createBackstagePrintAction(backstageText.printToPdf, 'export')");
@@ -191,22 +191,22 @@ describe('toolbar/ribbon/backstage', () => {
     expect(source).not.toContain('mark.textContent = icon');
     expect(source).not.toContain("createBackstageButton('←'");
     expect(css).toMatch(
-      /\.demo__backstage-navitem--back::after\s*\{[\s\S]*?border: solid currentColor;[\s\S]*?transform: translate\(-70%, -50%\) rotate\(45deg\);/,
+      /\.fc-tb__backstage-navitem--back::after\s*\{[\s\S]*?border: solid currentColor;[\s\S]*?transform: translate\(-70%, -50%\) rotate\(45deg\);/,
     );
     expect(css).toMatch(
-      /\.demo__backstage-xl\s*\{[\s\S]*?background: var\(--fc-tb-brand\);[\s\S]*?color: var\(--fc-tb-title-fg\);/,
+      /\.fc-tb__backstage-xl\s*\{[\s\S]*?background: var\(--fc-tb-brand\);[\s\S]*?color: var\(--fc-tb-title-fg\);/,
     );
     expect(css).toMatch(
-      /\.demo__backstage-xl \.demo__rb-icon\s*\{[\s\S]*?width: 30px;[\s\S]*?height: 30px;/,
+      /\.fc-tb__backstage-xl \.fc-tb__rb-icon\s*\{[\s\S]*?width: 30px;[\s\S]*?height: 30px;/,
     );
     expect(css).toMatch(
-      /\.demo__backstage-command-icon--protect::before\s*\{[\s\S]*?border: 2px solid currentColor;/,
+      /\.fc-tb__backstage-command-icon--protect::before\s*\{[\s\S]*?border: 2px solid currentColor;/,
     );
     expect(css).toMatch(
-      /\.demo__backstage-command-icon--inspect::before\s*\{[\s\S]*?background: #a4262c;/,
+      /\.fc-tb__backstage-command-icon--inspect::before\s*\{[\s\S]*?background: #a4262c;/,
     );
     expect(css).toMatch(
-      /\.demo__backstage-command-icon--manage::before\s*\{[\s\S]*?linear-gradient\(currentColor 0 0\)/,
+      /\.fc-tb__backstage-command-icon--manage::before\s*\{[\s\S]*?linear-gradient\(currentColor 0 0\)/,
     );
   });
 
@@ -225,12 +225,12 @@ describe('toolbar/ribbon/backstage', () => {
     expect(view.textContent).toContain('Export to PDF');
     expect(view.textContent).toContain('Page 1');
     expect(
-      Array.from(view.querySelectorAll<HTMLButtonElement>('.demo__print-action')).map(
+      Array.from(view.querySelectorAll<HTMLButtonElement>('.fc-tb__print-action')).map(
         (button) => button.dataset.backstageAction,
       ),
     ).toEqual(['print', 'export', 'page-setup']);
     const activePrint = Array.from(
-      view.querySelectorAll<HTMLElement>('.demo__backstage-navitem--active'),
+      view.querySelectorAll<HTMLElement>('.fc-tb__backstage-navitem--active'),
     ).map((button) => button.dataset.backstageAction);
     expect(activePrint).toEqual(['print']);
   });
@@ -246,11 +246,11 @@ describe('toolbar/ribbon/backstage', () => {
     });
 
     const view = createBackstageView('print');
-    const frame = view.querySelector<HTMLIFrameElement>('.demo__print-frame');
+    const frame = view.querySelector<HTMLIFrameElement>('.fc-tb__print-frame');
 
     expect(frame).toBeTruthy();
     expect(frame?.getAttribute('sandbox')).toBe('');
     expect(frame?.srcdoc).toContain('Preview Cell');
-    expect(view.querySelector('.demo__print-page')).toBeNull();
+    expect(view.querySelector('.fc-tb__print-page')).toBeNull();
   });
 });

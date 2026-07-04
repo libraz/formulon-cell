@@ -54,7 +54,7 @@ const createTextOrientationIcon = (glyph: TextOrientationGlyph): SVGSVGElement =
   svg.setAttribute('viewBox', '0 0 16 16');
   svg.setAttribute('width', '16');
   svg.setAttribute('height', '16');
-  svg.classList.add('app__text-orientation-preview');
+  svg.classList.add('fc-tb__text-orientation-preview');
   svg.setAttribute('focusable', 'false');
   svg.setAttribute('aria-hidden', 'true');
   appendPath(svg, 'M2 13h12', { stroke: grid, strokeWidth: '1.25' });

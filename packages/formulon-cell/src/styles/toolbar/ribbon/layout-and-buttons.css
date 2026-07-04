@@ -1,4 +1,4 @@
-.demo__ribbon-shell {
+.fc-tb__ribbon-shell {
   position: relative;
   flex: 0 0 auto;
   background: var(--fc-tb-ribbon-bg);
@@ -6,11 +6,11 @@
   box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.8);
 }
 
-.demo__ribbon-shell--collapsed {
+.fc-tb__ribbon-shell--collapsed {
   box-shadow: none;
 }
 
-.demo__ribbon-tabs {
+.fc-tb__ribbon-tabs {
   display: flex;
   align-items: end;
   height: 31px;
@@ -19,7 +19,7 @@
   border-bottom: 1px solid var(--fc-tb-ribbon-line);
 }
 
-.demo__ribbon-tab {
+.fc-tb__ribbon-tab {
   position: relative;
   height: 31px;
   padding: 0 10px;
@@ -33,23 +33,23 @@
   cursor: pointer;
 }
 
-.demo__ribbon-tab:hover:not(:disabled) {
+.fc-tb__ribbon-tab:hover:not(:disabled) {
   background: var(--fc-tb-ribbon-hover);
   color: var(--fc-tb-fg);
 }
 
-.demo__ribbon-tab--file:hover {
+.fc-tb__ribbon-tab--file:hover {
   background: var(--fc-tb-ribbon-hover);
   color: var(--fc-tb-fg);
 }
 
-.demo__ribbon-tab--active {
+.fc-tb__ribbon-tab--active {
   background: var(--fc-tb-ribbon-bg);
   color: var(--fc-tb-fg);
   font-weight: 600;
 }
 
-.demo__ribbon-tab--active::after {
+.fc-tb__ribbon-tab--active::after {
   position: absolute;
   right: 10px;
   bottom: -1px;
@@ -59,7 +59,7 @@
   content: "";
 }
 
-.demo__ribbon-tab:disabled {
+.fc-tb__ribbon-tab:disabled {
   cursor: default;
   opacity: 0.62;
 }
@@ -69,7 +69,7 @@
  * stay laid out and stack vertically, breaking the sheet height. The
  * playground worked around this with an `!important` override but consumers
  * shouldn't need to know about that. */
-.demo__ribbon:not([hidden]) {
+.fc-tb__ribbon:not([hidden]) {
   display: flex;
   align-items: stretch;
   gap: 0;
@@ -79,12 +79,12 @@
   overflow: visible;
 }
 
-.demo__ribbon-shell--tabsOnly .demo__ribbon,
-.demo__ribbon-shell--autoHide:not(.demo__ribbon-shell--autoHidePeek) .demo__ribbon {
+.fc-tb__ribbon-shell--tabsOnly .fc-tb__ribbon,
+.fc-tb__ribbon-shell--autoHide:not(.fc-tb__ribbon-shell--autoHidePeek) .fc-tb__ribbon {
   display: none;
 }
 
-.demo__ribbon-shell--autoHide:not(.demo__ribbon-shell--autoHidePeek) .demo__ribbon-tabs {
+.fc-tb__ribbon-shell--autoHide:not(.fc-tb__ribbon-shell--autoHidePeek) .fc-tb__ribbon-tabs {
   height: 0;
   padding-top: 0;
   padding-bottom: 0;
@@ -92,46 +92,46 @@
   border-bottom: 0;
 }
 
-.demo__ribbon-shell--autoHide:not(.demo__ribbon-shell--autoHidePeek) {
+.fc-tb__ribbon-shell--autoHide:not(.fc-tb__ribbon-shell--autoHidePeek) {
   min-height: 31px;
 }
 
-.demo__ribbon-shell--singleLine .demo__ribbon:not([hidden]) {
+.fc-tb__ribbon-shell--singleLine .fc-tb__ribbon:not([hidden]) {
   min-height: 42px;
   padding: 3px 36px 2px 6px;
   overflow-x: auto;
 }
 
-.demo__ribbon-shell--singleLine .demo__ribbon-group {
+.fc-tb__ribbon-shell--singleLine .fc-tb__ribbon-group {
   grid-template-rows: 1fr;
 }
 
-.demo__ribbon-shell--singleLine .demo__ribbon-tools {
+.fc-tb__ribbon-shell--singleLine .fc-tb__ribbon-tools {
   flex-wrap: nowrap;
   min-height: 32px;
   max-height: 32px;
   align-items: center;
 }
 
-.demo__ribbon-shell--singleLine .demo__ribbon-label,
-.demo__ribbon-shell--singleLine .demo__rb-break {
+.fc-tb__ribbon-shell--singleLine .fc-tb__ribbon-label,
+.fc-tb__ribbon-shell--singleLine .fc-tb__rb-break {
   display: none;
 }
 
-.demo__ribbon-display {
+.fc-tb__ribbon-display {
   position: absolute;
   right: 7px;
   bottom: 5px;
   z-index: 2;
 }
 
-.demo__ribbon-shell--tabsOnly .demo__ribbon-display,
-.demo__ribbon-shell--autoHide .demo__ribbon-display {
+.fc-tb__ribbon-shell--tabsOnly .fc-tb__ribbon-display,
+.fc-tb__ribbon-shell--autoHide .fc-tb__ribbon-display {
   top: 4px;
   bottom: auto;
 }
 
-.demo__ribbon-toggle {
+.fc-tb__ribbon-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -148,15 +148,15 @@
   line-height: 1;
 }
 
-.demo__ribbon-toggle:hover,
-.demo__ribbon-toggle:focus-visible {
+.fc-tb__ribbon-toggle:hover,
+.fc-tb__ribbon-toggle:focus-visible {
   background: var(--fc-tb-ribbon-hover);
   border-color: var(--fc-tb-ribbon-line);
   color: var(--fc-tb-fg);
   outline: 0;
 }
 
-.demo__ribbon-toggle::before {
+.fc-tb__ribbon-toggle::before {
   width: 7px;
   height: 7px;
   border-top: 1.6px solid currentColor;
@@ -165,12 +165,12 @@
   transform: translateY(2px) rotate(45deg);
 }
 
-.demo__ribbon-shell--tabsOnly .demo__ribbon-toggle::before,
-.demo__ribbon-shell--autoHide .demo__ribbon-toggle::before {
+.fc-tb__ribbon-shell--tabsOnly .fc-tb__ribbon-toggle::before,
+.fc-tb__ribbon-shell--autoHide .fc-tb__ribbon-toggle::before {
   transform: translateY(-2px) rotate(-135deg);
 }
 
-.demo__ribbon-display-menu {
+.fc-tb__ribbon-display-menu {
   position: absolute;
   right: 0;
   bottom: calc(100% + 4px);
@@ -184,13 +184,13 @@
     0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
-.demo__ribbon-shell--tabsOnly .demo__ribbon-display-menu,
-.demo__ribbon-shell--autoHide .demo__ribbon-display-menu {
+.fc-tb__ribbon-shell--tabsOnly .fc-tb__ribbon-display-menu,
+.fc-tb__ribbon-shell--autoHide .fc-tb__ribbon-display-menu {
   top: calc(100% + 4px);
   bottom: auto;
 }
 
-.demo__ribbon-display-option {
+.fc-tb__ribbon-display-option {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);
   gap: 8px;
@@ -208,13 +208,13 @@
   white-space: nowrap;
 }
 
-.demo__ribbon-display-option:hover,
-.demo__ribbon-display-option:focus-visible {
+.fc-tb__ribbon-display-option:hover,
+.fc-tb__ribbon-display-option:focus-visible {
   background: var(--fc-tb-ribbon-hover);
   outline: 0;
 }
 
-.demo__ribbon-display-option[aria-checked="true"]::before {
+.fc-tb__ribbon-display-option[aria-checked="true"]::before {
   width: 9px;
   height: 5px;
   border-bottom: 2px solid var(--fc-tb-accent);
@@ -223,7 +223,7 @@
   transform: rotate(-45deg);
 }
 
-.demo__ribbon-group {
+.fc-tb__ribbon-group {
   display: grid;
   grid-template-rows: 1fr auto;
   align-items: end;
@@ -233,15 +233,15 @@
   border-right: 1px solid var(--fc-tb-ribbon-line);
 }
 
-.demo__ribbon-group:first-child {
+.fc-tb__ribbon-group:first-child {
   padding-left: 0;
 }
 
-.demo__ribbon-group:last-child {
+.fc-tb__ribbon-group:last-child {
   border-right: 0;
 }
 
-.demo__ribbon-tools {
+.fc-tb__ribbon-tools {
   display: flex;
   align-items: flex-start;
   align-content: flex-start;
@@ -252,7 +252,7 @@
   max-height: 76px;
 }
 
-.demo__ribbon-label {
+.fc-tb__ribbon-label {
   height: 14px;
   color: color-mix(in srgb, var(--fc-tb-fg-soft) 82%, var(--fc-tb-ribbon-bg));
   font-size: 10px;
@@ -261,7 +261,7 @@
   white-space: nowrap;
 }
 
-.demo__rb {
+.fc-tb__rb {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -279,34 +279,34 @@
     border-color 80ms ease,
     color 80ms ease;
 }
-.demo__rb:hover:not(:disabled) {
+.fc-tb__rb:hover:not(:disabled) {
   background: var(--fc-tb-ribbon-hover);
   border-color: var(--fc-tb-ribbon-line);
 }
-.demo__rb:active:not(:disabled) {
+.fc-tb__rb:active:not(:disabled) {
   background: var(--fc-tb-ribbon-pressed, var(--fc-tb-ribbon-hover));
   border-color: var(--fc-tb-ribbon-line);
 }
-.demo__rb:focus-visible {
+.fc-tb__rb:focus-visible {
   outline: 2px solid var(--fc-tb-accent);
   outline-offset: -2px;
 }
-.demo__rb:disabled {
+.fc-tb__rb:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
-.demo__rb--active {
+.fc-tb__rb--active {
   background: var(--fc-tb-ribbon-pressed, var(--fc-tb-ribbon-hover));
   border-color: var(--fc-tb-ribbon-line);
   color: var(--fc-tb-fg);
 }
-.demo__rb-icon {
+.fc-tb__rb-icon {
   width: 20px;
   height: 20px;
   display: block;
   vector-effect: non-scaling-stroke;
 }
-.demo__rb--large {
+.fc-tb__rb--large {
   flex-direction: column;
   gap: 3px;
   width: 58px;
@@ -315,24 +315,24 @@
   font-size: 11px;
   line-height: 1.1;
 }
-.demo__rb--large .demo__rb-icon {
+.fc-tb__rb--large .fc-tb__rb-icon {
   width: 32px;
   height: 32px;
 }
-.demo__rb--large span {
+.fc-tb__rb--large span {
   display: block;
   max-width: 52px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.demo__rb-split-chevron {
+.fc-tb__rb-split-chevron {
   width: 10px;
   height: 7px;
   margin-top: -2px;
   pointer-events: auto;
 }
-.demo__rb--mono {
+.fc-tb__rb--mono {
   font-family: var(--fc-tb-mono);
   font-size: 11px;
   font-weight: 500;
@@ -341,7 +341,7 @@
   padding: 0 6px;
 }
 
-.demo__rb--wide {
+.fc-tb__rb--wide {
   width: auto;
   min-width: 58px;
   max-width: 120px;
@@ -351,16 +351,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.demo__rb--bold {
+.fc-tb__rb--bold {
   font-weight: 700;
 }
-.demo__rb--italic {
+.fc-tb__rb--italic {
   font-style: italic;
 }
-.demo__rb--underline {
+.fc-tb__rb--underline {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.demo__rb--strike {
+.fc-tb__rb--strike {
   text-decoration: line-through;
 }

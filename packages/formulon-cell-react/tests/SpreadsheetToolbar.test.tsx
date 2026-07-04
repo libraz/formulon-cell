@@ -68,7 +68,7 @@ describe('<SpreadsheetToolbar> (thin adapter)', () => {
 
   afterEach(async () => {
     await mounted.dispose();
-    document.body.querySelectorAll('.app__dlg').forEach((el) => {
+    document.body.querySelectorAll('.fc-tb__dlg').forEach((el) => {
       el.remove();
     });
     uninstallReactDomStubs();
@@ -260,10 +260,10 @@ describe('<SpreadsheetToolbar> (thin adapter)', () => {
       expect(toolbar?.applyCommand('formatTableInsert')).toBe(true);
       await flush();
     });
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'Create Table',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn')?.click();
     await flush();
 
     await act(async () => {
@@ -272,7 +272,7 @@ describe('<SpreadsheetToolbar> (thin adapter)', () => {
     });
     const pictureMenu = harness.host.querySelector<HTMLElement>('#menu-picture-insert');
     expect(pictureMenu?.hidden).toBe(false);
-    expect(pictureMenu?.classList.contains('app__menu--visual')).toBe(true);
+    expect(pictureMenu?.classList.contains('fc-tb__menu--visual')).toBe(true);
     expect(
       pictureMenu?.querySelector<HTMLButtonElement>('[data-picture-insert="stock"]'),
     ).toBeTruthy();
@@ -321,7 +321,9 @@ describe('<SpreadsheetToolbar> (thin adapter)', () => {
     expect(underlineMenu?.hidden).toBe(false);
     expect(
       Array.from(
-        harness.host.querySelectorAll<HTMLButtonElement>('#menu-underline .app__menu-item--iconic'),
+        harness.host.querySelectorAll<HTMLButtonElement>(
+          '#menu-underline .fc-tb__menu-item--iconic',
+        ),
       ).map((item) => item.textContent),
     ).toEqual(['Underline', 'Double Underline']);
 

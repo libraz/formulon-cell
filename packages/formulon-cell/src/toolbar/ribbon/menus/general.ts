@@ -234,7 +234,7 @@ export const menuIdForCommand = (commandId: string): string =>
   ribbonDropdownMenuIdForCommand(commandId) ?? commandId;
 
 export const createMenu = (id: string): HTMLDivElement => {
-  const menu = menuDiv('app__menu', { id, hidden: true });
+  const menu = menuDiv('fc-tb__menu', { id, hidden: true });
   prepareMenu(menu);
   return menu;
 };
@@ -275,19 +275,19 @@ export const menuIconButton = (
   icon: string,
 ): HTMLButtonElement => {
   const button = createMenuButton({
-    className: 'app__menu-item app__menu-item--iconic',
+    className: 'fc-tb__menu-item fc-tb__menu-item--iconic',
     attr,
     value,
   });
 
-  const iconSpan = menuSpan(`app__menu-icon app__menu-icon--${icon}`, { ariaHidden: true });
-  const svg = createExcelRibbonSvg(MENU_EXCEL_ICON_OVERRIDES[icon] ?? '', 'app__menu-icon-svg');
+  const iconSpan = menuSpan(`fc-tb__menu-icon fc-tb__menu-icon--${icon}`, { ariaHidden: true });
+  const svg = createExcelRibbonSvg(MENU_EXCEL_ICON_OVERRIDES[icon] ?? '', 'fc-tb__menu-icon-svg');
   if (svg) {
-    iconSpan.classList.add('app__menu-icon--svg');
+    iconSpan.classList.add('fc-tb__menu-icon--svg');
     iconSpan.append(svg);
   }
 
-  button.append(iconSpan, menuSpan('app__menu-item__text', { text: label }));
+  button.append(iconSpan, menuSpan('fc-tb__menu-item__text', { text: label }));
   return button;
 };
 
@@ -298,12 +298,12 @@ export const menuPresetButton = (
   leading: Node,
 ): HTMLButtonElement => {
   const button = createMenuButton({
-    className: 'app__menu-item app__menu-item--preset',
+    className: 'fc-tb__menu-item fc-tb__menu-item--preset',
     attr,
     value,
   });
 
-  button.append(leading, menuSpan('app__menu-item__text', { text: label }));
+  button.append(leading, menuSpan('fc-tb__menu-item__text', { text: label }));
   return button;
 };
 
@@ -324,13 +324,13 @@ export const menuTextChip = (opts: MenuTextChipOptions): HTMLButtonElement => {
     ariaLabel: opts.label,
   });
   button.append(
-    menuSpan(opts.labelClassName ?? 'app__menu-text-chip__label', { text: opts.label }),
+    menuSpan(opts.labelClassName ?? 'fc-tb__menu-text-chip__label', { text: opts.label }),
   );
   return button;
 };
 
 export const menuIconSpacer = (): HTMLSpanElement => {
-  return menuSpan('app__menu-item__icon-spacer');
+  return menuSpan('fc-tb__menu-item__icon-spacer');
 };
 
 export const menuSubmenuTrigger = (
@@ -338,13 +338,13 @@ export const menuSubmenuTrigger = (
   dataset?: Record<string, string>,
   opts: { controlsId?: string } = {},
 ): HTMLButtonElement => {
-  button.classList.add('app__menu-item--submenu');
+  button.classList.add('fc-tb__menu-item--submenu');
   button.setAttribute('aria-haspopup', 'menu');
   button.setAttribute('aria-expanded', 'false');
   if (opts.controlsId) button.setAttribute('aria-controls', opts.controlsId);
   for (const [key, value] of Object.entries(dataset ?? {})) button.dataset[key] = value;
 
-  button.appendChild(menuSpan('app__menu-item__caret', { ariaHidden: true }));
+  button.appendChild(menuSpan('fc-tb__menu-item__caret', { ariaHidden: true }));
   return button;
 };
 
@@ -357,7 +357,7 @@ export type ColorSwatchButtonOptions = {
 
 export const colorSwatchButton = (opts: ColorSwatchButtonOptions): HTMLButtonElement => {
   const button = createMenuButton({
-    className: ['app__color-swatch', opts.color === null ? 'app__color-swatch--none' : '']
+    className: ['fc-tb__color-swatch', opts.color === null ? 'fc-tb__color-swatch--none' : '']
       .filter(Boolean)
       .join(' '),
     attr: opts.attr,
@@ -367,31 +367,31 @@ export const colorSwatchButton = (opts: ColorSwatchButtonOptions): HTMLButtonEle
   });
   if (opts.color !== null) button.style.setProperty('--app-menu-swatch-color', opts.color);
 
-  button.append(menuSpan('app__color-swatch__chip', { ariaHidden: true }));
+  button.append(menuSpan('fc-tb__color-swatch__chip', { ariaHidden: true }));
   return button;
 };
 
 export const colorSwatchGrid = (className?: string): HTMLDivElement => {
-  return menuDiv(['app__color-swatch-grid', className].filter(Boolean).join(' '), {
+  return menuDiv(['fc-tb__color-swatch-grid', className].filter(Boolean).join(' '), {
     role: 'presentation',
   });
 };
 
 export const symbolMenuTile = (symbol: string): HTMLButtonElement => {
   const button = createMenuButton({
-    className: 'app__symbol-tile',
+    className: 'fc-tb__symbol-tile',
     attr: 'symbol',
     value: symbol,
     title: symbol,
     ariaLabel: symbol,
   });
 
-  button.append(menuSpan('app__symbol-tile__glyph', { text: symbol, ariaHidden: true }));
+  button.append(menuSpan('fc-tb__symbol-tile__glyph', { text: symbol, ariaHidden: true }));
   return button;
 };
 
 export const symbolMenuGrid = (groupLabel: string, symbols: readonly string[]): HTMLDivElement => {
-  const grid = menuDiv('app__symbol-grid', { role: 'presentation', ariaLabel: groupLabel });
+  const grid = menuDiv('fc-tb__symbol-grid', { role: 'presentation', ariaLabel: groupLabel });
   grid.append(...symbols.map((symbol) => symbolMenuTile(symbol)));
   return grid;
 };
@@ -406,30 +406,30 @@ export type VisualMenuTileOptions = {
 
 export const visualMenuTile = (opts: VisualMenuTileOptions): HTMLButtonElement => {
   const button = createMenuButton({
-    className: ['app__visual-tile', opts.className].filter(Boolean).join(' '),
+    className: ['fc-tb__visual-tile', opts.className].filter(Boolean).join(' '),
     attr: opts.attr,
     value: opts.value,
     title: opts.label,
     ariaLabel: opts.label,
   });
-  const iconSpan = menuSpan(`app__visual-tile__icon app__visual-tile__icon--${opts.icon}`, {
+  const iconSpan = menuSpan(`fc-tb__visual-tile__icon fc-tb__visual-tile__icon--${opts.icon}`, {
     ariaHidden: true,
   });
   const svg = createExcelRibbonSvg(
     VISUAL_TILE_EXCEL_ICON_OVERRIDES[opts.icon] ?? '',
-    'app__visual-tile__icon-svg',
+    'fc-tb__visual-tile__icon-svg',
   );
   if (svg) {
-    iconSpan.classList.add('app__visual-tile__icon--svg');
+    iconSpan.classList.add('fc-tb__visual-tile__icon--svg');
     iconSpan.append(svg);
   }
 
-  button.append(iconSpan, menuSpan('app__visual-tile__label', { text: opts.label }));
+  button.append(iconSpan, menuSpan('fc-tb__visual-tile__label', { text: opts.label }));
   return button;
 };
 
 export const visualMenuGrid = (className?: string): HTMLDivElement => {
-  return menuDiv(['app__visual-grid', className].filter(Boolean).join(' '), {
+  return menuDiv(['fc-tb__visual-grid', className].filter(Boolean).join(' '), {
     role: 'presentation',
   });
 };
@@ -444,7 +444,7 @@ export const visualMenuTileGrid = (
 };
 
 export const menuSeparator = (): HTMLDivElement => {
-  return menuDiv('app__menu-sep', { role: 'separator' });
+  return menuDiv('fc-tb__menu-sep', { role: 'separator' });
 };
 
 export const menuScrollBody = (className: string, ariaLabel?: string): HTMLDivElement => {
@@ -452,7 +452,7 @@ export const menuScrollBody = (className: string, ariaLabel?: string): HTMLDivEl
 };
 
 export const menuSectionHeader = (label: string): HTMLDivElement => {
-  return menuDiv('app__menu-heading', { role: 'presentation', text: label });
+  return menuDiv('fc-tb__menu-heading', { role: 'presentation', text: label });
 };
 
 export type MenuLabeledGridOptions = {
@@ -489,5 +489,5 @@ export const createSubmenu = (opts: SubmenuOptions): HTMLDivElement => {
 };
 
 export const submenuItemText = (text: string): HTMLSpanElement => {
-  return menuSpan('app__submenu-item__text', { text });
+  return menuSpan('fc-tb__submenu-item__text', { text });
 };

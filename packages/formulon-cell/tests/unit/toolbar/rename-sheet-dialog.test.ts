@@ -17,7 +17,7 @@ describe('showRenameSheetDialog', () => {
       cancelLabel: 'Cancel',
     });
 
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('Sheet name');
     const input = dialog?.querySelector<HTMLInputElement>('input');
     if (!input) throw new Error('Expected sheet name input.');
@@ -37,7 +37,7 @@ describe('showRenameSheetDialog', () => {
       cancelLabel: 'Cancel',
     });
 
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     const input = dialog?.querySelector<HTMLInputElement>('input');
     if (!input) throw new Error('Expected sheet name input.');
     input.value = '   ';

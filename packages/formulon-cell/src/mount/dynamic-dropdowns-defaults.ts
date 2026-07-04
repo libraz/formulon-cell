@@ -488,15 +488,15 @@ const updateFreezeMenu =
     if (primary) {
       primary.dataset.freeze = hasFreeze ? 'off' : 'selection';
       setMenuControlDisabled(primary, false);
-      const text = primary.querySelector<HTMLElement>('.app__menu-item__text');
+      const text = primary.querySelector<HTMLElement>('.fc-tb__menu-item__text');
       if (text) {
         text.textContent = hasFreeze
           ? (toolbarStrings.unfreezePanes ?? strings.toolbar.unfreeze)
           : strings.viewToolbar.freezePanes;
       }
-      const icon = primary.querySelector<HTMLElement>('.app__menu-icon');
-      icon?.classList.toggle('app__menu-icon--freeze-panes', !hasFreeze);
-      icon?.classList.toggle('app__menu-icon--freeze-off', hasFreeze);
+      const icon = primary.querySelector<HTMLElement>('.fc-tb__menu-icon');
+      icon?.classList.toggle('fc-tb__menu-icon--freeze-panes', !hasFreeze);
+      icon?.classList.toggle('fc-tb__menu-icon--freeze-off', hasFreeze);
     }
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-freeze]')) {
       if (button === primary) continue;
@@ -667,7 +667,7 @@ const updateTextOrientationMenu =
       const activeItem = action === current;
       button.setAttribute('role', 'menuitemradio');
       button.setAttribute('aria-checked', String(activeItem));
-      button.classList.toggle('app__menu-item--active', activeItem);
+      button.classList.toggle('fc-tb__menu-item--active', activeItem);
     }
   };
 
@@ -791,7 +791,7 @@ const updateCalcOptionsMenu =
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')) {
       const active = button.dataset.calcOption === current;
       button.setAttribute('aria-checked', String(active));
-      button.classList.toggle('app__menu-item--active', active);
+      button.classList.toggle('fc-tb__menu-item--active', active);
     }
   };
 
@@ -962,7 +962,7 @@ const updatePasteMenu =
       const disabled = action !== 'all' && !hasSnapshot;
       setMenuControlDisabled(button, disabled, disabledReason);
     }
-    for (const separator of menu.querySelectorAll<HTMLElement>('.app__menu-sep')) {
+    for (const separator of menu.querySelectorAll<HTMLElement>('.fc-tb__menu-sep')) {
       separator.hidden = !hasSnapshot;
     }
   };
@@ -1122,13 +1122,13 @@ const updateFormatCellsMenu =
       if (action === 'lock-cell') {
         button.setAttribute('role', 'menuitemcheckbox');
         button.setAttribute('aria-checked', String(activeLocked));
-        button.classList.toggle('app__menu-item--checked', activeLocked);
+        button.classList.toggle('fc-tb__menu-item--checked', activeLocked);
       }
       if (action?.startsWith('tab-color-')) {
         const active = action === activeTabColorAction;
         button.setAttribute('role', 'menuitemradio');
         button.setAttribute('aria-checked', String(active));
-        button.classList.toggle('app__color-swatch--active', active);
+        button.classList.toggle('fc-tb__color-swatch--active', active);
       }
     }
   };
@@ -1799,7 +1799,7 @@ const updatePageThemeMenu =
       const active = button.dataset.pageThemeAction === current;
       button.setAttribute('role', 'menuitemradio');
       button.setAttribute('aria-checked', String(active));
-      button.classList.toggle('app__visual-tile--active', active);
+      button.classList.toggle('fc-tb__visual-tile--active', active);
     }
   };
 
@@ -2223,7 +2223,7 @@ const updateSortMenu =
       setMenuControlDisabled(button, disabled, reason);
       if (action === 'filter') {
         button.setAttribute('aria-pressed', String(hasFilterRange));
-        button.classList.toggle('app__menu-item--active', hasFilterRange);
+        button.classList.toggle('fc-tb__menu-item--active', hasFilterRange);
       }
     }
   };
@@ -2254,7 +2254,7 @@ const updateTableStylesMenu =
         button.dataset.tableVariant === activeTableVariant;
       button.setAttribute('role', 'menuitemradio');
       button.setAttribute('aria-checked', String(activeStyle));
-      button.classList.toggle('app__menu-item--active', activeStyle);
+      button.classList.toggle('fc-tb__menu-item--active', activeStyle);
     }
 
     const activePivot = findPivotTableAtCell(
@@ -2268,7 +2268,7 @@ const updateTableStylesMenu =
       const activeStyle = button.dataset.pivotTableStyle === activePivotStyle;
       button.setAttribute('role', 'menuitemradio');
       button.setAttribute('aria-checked', String(activeStyle));
-      button.classList.toggle('app__menu-item--active', activeStyle);
+      button.classList.toggle('fc-tb__menu-item--active', activeStyle);
     }
   };
 
@@ -2348,7 +2348,7 @@ const updateCellStylesMenu =
       const active = button.dataset.cellStyle === current;
       button.setAttribute('role', 'menuitemradio');
       button.setAttribute('aria-checked', String(active));
-      button.classList.toggle('app__menu-item--active', active);
+      button.classList.toggle('fc-tb__menu-item--active', active);
     }
   };
 
@@ -2381,7 +2381,7 @@ const updateCurrencyMenu =
       const active = button.dataset.currencyPreset === activeSymbol;
       button.setAttribute('role', 'menuitemradio');
       button.setAttribute('aria-checked', String(active));
-      button.classList.toggle('app__menu-item--active', active);
+      button.classList.toggle('fc-tb__menu-item--active', active);
     }
   };
 

@@ -75,30 +75,30 @@ body {
   display: none;
 }
 
-.demo__ribbon-group--clipboard {
+.fc-tb__ribbon-group--clipboard {
   order: 1;
 }
 
-.demo__ribbon-group--font {
+.fc-tb__ribbon-group--font {
   order: 2;
 }
 
-.demo__ribbon-group--alignment {
+.fc-tb__ribbon-group--alignment {
   order: 3;
 }
 
-.demo__ribbon-group--number {
+.fc-tb__ribbon-group--number {
   order: 4;
 }
 
-.demo__ribbon-group--styles {
+.fc-tb__ribbon-group--styles {
   order: 5;
 }
 
-.demo__ribbon-group--cells {
+.fc-tb__ribbon-group--cells {
   order: 6;
 }
 
-.demo__ribbon-group--editing {
+.fc-tb__ribbon-group--editing {
   order: 7;
 }

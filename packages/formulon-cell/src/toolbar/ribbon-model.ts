@@ -237,7 +237,7 @@ export function buildRibbonModel(
             tr.font,
             tr.font,
             tr.fontFamilies.map((font) => ({ value: font, label: font })),
-            'demo__rb-select--font',
+            'fc-tb__rb-select--font',
           ),
           selectCmd(
             'fontSize',
@@ -297,7 +297,7 @@ export function buildRibbonModel(
               { value: 'text', label: tr.textFormat },
               { value: 'more', label: tr.moreNumberFormats },
             ],
-            'demo__rb-select--number-format',
+            'fc-tb__rb-select--number-format',
           ),
           breakCmd('number-row-2'),
           cmd('currency', tr.currency, tr.currency, 'currency'),
@@ -390,7 +390,7 @@ export function buildRibbonModel(
             { value: 'narrow', label: tr.marginsNarrow },
             { value: 'custom', label: tr.marginsCustom },
           ],
-          'demo__rb-select--margins',
+          'fc-tb__rb-select--margins',
         ),
         selectCmd(
           'orientationPreset',
@@ -400,7 +400,7 @@ export function buildRibbonModel(
             { value: 'portrait', label: tr.portrait },
             { value: 'landscape', label: tr.landscape },
           ],
-          'demo__rb-select--border',
+          'fc-tb__rb-select--border',
         ),
         selectCmd(
           'paperSizePreset',
@@ -414,7 +414,7 @@ export function buildRibbonModel(
             { value: 'legal', label: tr.paperLegal },
             { value: 'tabloid', label: tr.paperTabloid },
           ],
-          'demo__rb-select--border',
+          'fc-tb__rb-select--border',
         ),
         cmd('pageSetupAdvanced', tr.pageSetup, tr.pageSetup, 'pageSetup', 'wide'),
         cmd(
@@ -440,7 +440,7 @@ export function buildRibbonModel(
             { value: '3', label: scalePageOption('3') },
             { value: 'custom', label: pageScaleText.custom },
           ],
-          'demo__rb-select--border',
+          'fc-tb__rb-select--border',
         ),
         selectCmd(
           'scaleHeight',
@@ -453,7 +453,7 @@ export function buildRibbonModel(
             { value: '3', label: scalePageOption('3') },
             { value: 'custom', label: pageScaleText.custom },
           ],
-          'demo__rb-select--border',
+          'fc-tb__rb-select--border',
         ),
         selectCmd(
           'scalePercent',
@@ -470,7 +470,7 @@ export function buildRibbonModel(
             { value: '400', label: '400%' },
             { value: 'custom', label: pageScaleText.custom },
           ],
-          'demo__rb-select--border',
+          'fc-tb__rb-select--border',
         ),
       ]),
       group(tr.sheetOptions, [
@@ -607,7 +607,7 @@ export function buildRibbonModel(
           strings.viewToolbar.currentView,
           strings.viewToolbar.views,
           [{ value: 'current', label: strings.viewToolbar.currentView }],
-          'demo__rb-select--border',
+          'fc-tb__rb-select--border',
         ),
         cmd('sheetViewSave', strings.viewToolbar.saveView, strings.viewToolbar.saveView, 'options'),
         cmd(

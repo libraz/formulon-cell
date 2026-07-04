@@ -41,7 +41,7 @@ const appendTextRow = (
   className: string,
 ): HTMLInputElement => {
   const label = document.createElement('label');
-  label.className = `fc-advfilter__row app__dlg__label ${className}`;
+  label.className = `fc-advfilter__row fc-tb__dlg__label ${className}`;
   const span = document.createElement('span');
   span.textContent = labelText;
   const input = document.createElement('input');
@@ -108,7 +108,7 @@ export const showAdvancedFilterDialog = (
     }
 
     const uniqueRow = document.createElement('label');
-    uniqueRow.className = 'fc-advfilter__option app__dlg__label';
+    uniqueRow.className = 'fc-advfilter__option fc-tb__dlg__label';
     const uniqueOnly = document.createElement('input');
     uniqueOnly.type = 'checkbox';
     uniqueRow.append(uniqueOnly, document.createTextNode(` ${opts.uniqueOnlyLabel}`));

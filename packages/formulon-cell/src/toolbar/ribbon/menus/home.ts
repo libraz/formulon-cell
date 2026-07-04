@@ -75,7 +75,7 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
   const t = ribbonMenuText as HomeMenuText;
 
   const createTabColorGrid = (): HTMLDivElement => {
-    const grid = colorSwatchGrid('app__color-swatch-grid--tab-color');
+    const grid = colorSwatchGrid('fc-tb__color-swatch-grid--tab-color');
     for (const entry of SHEET_TAB_COLOR_CHOICES.filter((choice) => choice.color !== null)) {
       grid.append(
         colorSwatchButton({
@@ -91,28 +91,28 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
 
   const createTabColorPalette = (): HTMLDivElement => {
     const palette = document.createElement('div');
-    palette.className = 'app__format-tab-color-palette';
+    palette.className = 'fc-tb__format-tab-color-palette';
     const highContrast = menuPresetButton(
       t.formatHighContrastOnly,
       'cellFormat',
       'tab-color-high-contrast',
       menuIconSpacer(),
     );
-    highContrast.classList.add('app__format-tab-color-high-contrast');
+    highContrast.classList.add('fc-tb__format-tab-color-high-contrast');
     const noColor = menuPresetButton(
       sheetTabs.noColor,
       'cellFormat',
       'tab-color-none',
       menuIconSpacer(),
     );
-    noColor.classList.add('app__format-tab-color-none');
+    noColor.classList.add('fc-tb__format-tab-color-none');
     const moreColors = menuPresetButton(
       formatDialog.moreColors,
       'cellFormat',
       'tab-color-more',
       menuIconSpacer(),
     );
-    moreColors.classList.add('app__format-tab-color-more');
+    moreColors.classList.add('fc-tb__format-tab-color-more');
     palette.append(
       highContrast,
       noColor,
@@ -236,7 +236,7 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
     const menu = createMenu('menu-format-cells');
     const visibilitySubmenu = createSubmenu({
       id: formatSubmenuId('visibility'),
-      className: 'app__submenu app__submenu--format app__submenu--format-visibility',
+      className: 'fc-tb__submenu fc-tb__submenu--format fc-tb__submenu--format-visibility',
       label: t.formatHideUnhide,
       dataset: { formatPanel: 'visibility' },
     });
@@ -251,7 +251,7 @@ export const createHomeMenuFactories = (deps: HomeMenuDeps): HomeMenuFactories =
     );
     const tabColorSubmenu = createSubmenu({
       id: formatSubmenuId('tabColor'),
-      className: 'app__submenu app__submenu--format app__submenu--format-tab-color',
+      className: 'fc-tb__submenu fc-tb__submenu--format fc-tb__submenu--format-tab-color',
       label: t.formatSheetTabColor,
       dataset: { formatPanel: 'tabColor' },
     });

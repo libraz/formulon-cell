@@ -148,7 +148,7 @@ describe('demo-shared Search/Tell me items', () => {
 
     input.value = 'coming soon';
     input.dispatchEvent(new Event('input', { bubbles: true }));
-    const disabled = container.querySelector('.demo__command-item');
+    const disabled = container.querySelector('.fc-tb__command-item');
     expect(disabled?.textContent).toContain('Coming soon');
     expect(disabled?.getAttribute('aria-disabled')).toBe('true');
     expect(disabled?.dataset.disabledReason).toBe('Coming soon');

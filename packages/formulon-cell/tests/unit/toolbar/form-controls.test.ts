@@ -15,13 +15,13 @@ describe('toolbar/dialogs/form-controls', () => {
       'b',
       {
         ariaLabel: 'Sort by',
-        className: 'app__dlg__select',
+        className: 'fc-tb__dlg__select',
         fieldName: 'sortColumn',
         role: 'cell',
       },
     );
 
-    expect(select.className).toBe('app__dlg__select');
+    expect(select.className).toBe('fc-tb__dlg__select');
     expect(select.dataset.dialogField).toBe('sortColumn');
     expect(select.getAttribute('aria-label')).toBe('Sort by');
     expect(select.getAttribute('role')).toBe('cell');
@@ -47,7 +47,7 @@ describe('toolbar/dialogs/form-controls', () => {
     appendDialogSelectOptions(select, [{ value: 'custom', label: 'Custom List...' }]);
 
     expect(body.querySelector('.fc-fmtdlg__row--block')).not.toBeNull();
-    expect(body.querySelector('.app__dlg__label')?.textContent).toContain('Order');
+    expect(body.querySelector('.fc-tb__dlg__label')?.textContent).toContain('Order');
     expect(select.dataset.dialogField).toBe('sortOrder');
     expect(Array.from(select.options).map((option) => option.value)).toEqual([
       'asc',

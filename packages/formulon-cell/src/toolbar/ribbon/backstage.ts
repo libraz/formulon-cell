@@ -180,9 +180,9 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     active = false,
     ariaLabel?: string,
   ): HTMLButtonElement => {
-    return createBackstageActionButton('demo__backstage-navitem', action, label, {
+    return createBackstageActionButton('fc-tb__backstage-navitem', action, label, {
       active,
-      activeClassName: 'demo__backstage-navitem--active',
+      activeClassName: 'fc-tb__backstage-navitem--active',
       ariaLabel,
     });
   };
@@ -194,7 +194,7 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     disabled = false,
     disabledReason = backstageText.commandUnavailable,
   ): HTMLButtonElement => {
-    const card = createBackstageActionButton('demo__backstage-card', action);
+    const card = createBackstageActionButton('fc-tb__backstage-card', action);
     projectDisabledState(card, disabled, disabledReason, {
       datasetKey: 'disabledReason',
       titlePrefix: title,
@@ -213,7 +213,10 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     icon: string,
     action?: string,
   ): HTMLButtonElement => {
-    const command = createBackstageActionButton('demo__backstage-command', action ?? 'unavailable');
+    const command = createBackstageActionButton(
+      'fc-tb__backstage-command',
+      action ?? 'unavailable',
+    );
     if (!action) {
       delete command.dataset.backstageAction;
       projectDisabledState(command, true, backstageText.commandUnavailable, {
@@ -222,7 +225,7 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
       });
     }
     const mark = document.createElement('span');
-    mark.className = `demo__backstage-command-icon demo__backstage-command-icon--${icon}`;
+    mark.className = `fc-tb__backstage-command-icon fc-tb__backstage-command-icon--${icon}`;
     mark.setAttribute('aria-hidden', 'true');
     const copy = document.createElement('span');
     const heading = document.createElement('strong');
@@ -239,22 +242,22 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     action: BackstageAction,
     primary = false,
   ): HTMLButtonElement => {
-    return createBackstageActionButton('demo__print-action', action, label, {
+    return createBackstageActionButton('fc-tb__print-action', action, label, {
       active: primary,
-      activeClassName: 'demo__print-action--primary',
+      activeClassName: 'fc-tb__print-action--primary',
     });
   };
 
   const createBackstageProperties = (): HTMLElement => {
     const props = document.createElement('aside');
-    props.className = 'demo__backstage-properties';
+    props.className = 'fc-tb__backstage-properties';
     const title = document.createElement('h2');
-    title.className = 'demo__backstage-section-title';
+    title.className = 'fc-tb__backstage-section-title';
     title.textContent = backstageText.properties;
     const preview = document.createElement('div');
-    preview.className = 'demo__backstage-preview';
+    preview.className = 'fc-tb__backstage-preview';
     const list = document.createElement('dl');
-    list.className = 'demo__backstage-prop-list';
+    list.className = 'fc-tb__backstage-prop-list';
     const pairs: [string, string][] = [
       [backstageText.name, docName()],
       [backstageText.type, backstageText.typeValue],
@@ -274,11 +277,11 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
 
   const createBackstagePrintView = (): HTMLElement => {
     const wrap = document.createElement('div');
-    wrap.className = 'demo__print-preview';
+    wrap.className = 'fc-tb__print-preview';
     wrap.dataset.backstagePrintPreview = 'true';
 
     const settings = document.createElement('section');
-    settings.className = 'demo__print-settings';
+    settings.className = 'fc-tb__print-settings';
     settings.setAttribute('aria-label', backstageText.printSettings);
     const title = document.createElement('h2');
     title.textContent = backstageText.printPreviewTitle;
@@ -290,23 +293,23 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     settings.append(title, subtitle, print, pdf, pageSetup);
 
     const paper = document.createElement('section');
-    paper.className = 'demo__print-paper';
+    paper.className = 'fc-tb__print-paper';
     paper.setAttribute('aria-label', backstageText.printPreviewPage);
     const previewHtml = printPreviewHtml?.();
     if (previewHtml) {
       const frame = document.createElement('iframe');
-      frame.className = 'demo__print-frame';
+      frame.className = 'fc-tb__print-frame';
       frame.setAttribute('sandbox', '');
       frame.setAttribute('title', backstageText.printPreviewPage);
       frame.srcdoc = previewHtml;
       paper.appendChild(frame);
     } else {
       const page = document.createElement('div');
-      page.className = 'demo__print-page';
+      page.className = 'fc-tb__print-page';
       const pageTitle = document.createElement('strong');
       pageTitle.textContent = `${backstageText.printPreviewPage} 1`;
       const lines = document.createElement('div');
-      lines.className = 'demo__print-sheet-lines';
+      lines.className = 'fc-tb__print-sheet-lines';
       lines.setAttribute('aria-hidden', 'true');
       for (let i = 0; i < 12; i += 1) lines.appendChild(document.createElement('span'));
       page.append(pageTitle, lines);
@@ -321,18 +324,18 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
 
   const createBackstageView = (active: BackstageAction = 'info'): HTMLElement => {
     const view = document.createElement('div');
-    view.className = 'demo__backstage app__backstage';
+    view.className = 'fc-tb__backstage';
     view.setAttribute('role', 'dialog');
     view.setAttribute('aria-modal', 'true');
     view.setAttribute('aria-label', ribbonText.tabs.file);
 
     const nav = document.createElement('nav');
-    nav.className = 'demo__backstage-nav';
+    nav.className = 'fc-tb__backstage-nav';
     nav.setAttribute('aria-label', ribbonText.tabs.file);
     const title = document.createElement('strong');
     title.textContent = ribbonText.tabs.file;
     const backButton = createBackstageButton('', 'back', false, backstageText.back);
-    backButton.classList.add('demo__backstage-navitem--back');
+    backButton.classList.add('fc-tb__backstage-navitem--back');
     backButton.title = backstageText.back;
     nav.append(backButton, title);
     for (const item of backstageNavItems(backstageText, ribbonText, active)) {
@@ -340,11 +343,11 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     }
 
     const main = document.createElement('main');
-    main.className = 'demo__backstage-main';
+    main.className = 'fc-tb__backstage-main';
     const heading = document.createElement('div');
-    heading.className = 'demo__backstage-title';
+    heading.className = 'fc-tb__backstage-title';
     const mark = document.createElement('span');
-    mark.className = 'demo__backstage-xl';
+    mark.className = 'fc-tb__backstage-xl';
     mark.setAttribute('aria-hidden', 'true');
     const copy = document.createElement('div');
     const h1 = document.createElement('h1');
@@ -355,13 +358,13 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     heading.append(mark, copy);
 
     const info = document.createElement('section');
-    info.className = 'demo__backstage-info';
+    info.className = 'fc-tb__backstage-info';
     const manage = document.createElement('div');
     const manageTitle = document.createElement('h2');
-    manageTitle.className = 'demo__backstage-section-title';
+    manageTitle.className = 'fc-tb__backstage-section-title';
     manageTitle.textContent = backstageText.workbookInfo;
     const commands = document.createElement('div');
-    commands.className = 'demo__backstage-command-list';
+    commands.className = 'fc-tb__backstage-command-list';
     commands.append(
       createBackstageCommand(
         backstageText.protect,
@@ -381,7 +384,7 @@ export const createBackstageFactories = (deps: BackstageDeps): BackstageFactorie
     info.append(manage, createBackstageProperties());
 
     const grid = document.createElement('div');
-    grid.className = 'demo__backstage-grid';
+    grid.className = 'fc-tb__backstage-grid';
     for (const item of backstageCardItems(backstageText, ribbonText)) {
       grid.appendChild(createBackstageCard(item.label, item.body ?? '', item.action));
     }

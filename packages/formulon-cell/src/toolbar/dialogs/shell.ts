@@ -54,7 +54,7 @@ export interface DialogShellOptions {
   role?: 'dialog' | 'alertdialog';
   /** Override aria-label when the visible title differs from the accessible name. */
   ariaLabel?: string;
-  /** Body class names. Some dialogs use the extra `app__dlg__body` modifier; opt
+  /** Body class names. Some dialogs use the extra `fc-tb__dlg__body` modifier; opt
    *  in by passing `{ bodyVariant: 'app' }`. Defaults to the bare base class so
    *  existing visual snapshots stay byte-identical. */
   bodyVariant?: 'base' | 'app';
@@ -76,13 +76,13 @@ export interface DialogShell {
 export const createDialogShell = (opts: DialogShellOptions): DialogShell => {
   const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const overlay = document.createElement('div');
-  overlay.className = 'fc-fmtdlg app__dlg';
+  overlay.className = 'fc-fmtdlg fc-tb__dlg';
   overlay.setAttribute('role', opts.role ?? 'dialog');
   overlay.setAttribute('aria-modal', 'true');
   overlay.setAttribute('aria-label', opts.ariaLabel ?? opts.title);
 
   const panel = document.createElement('div');
-  panel.className = 'fc-fmtdlg__panel app__dlg__panel';
+  panel.className = 'fc-fmtdlg__panel fc-tb__dlg__panel';
   overlay.appendChild(panel);
 
   const header = document.createElement('div');
@@ -92,7 +92,7 @@ export const createDialogShell = (opts: DialogShellOptions): DialogShell => {
 
   const body = document.createElement('div');
   body.className =
-    opts.bodyVariant === 'app' ? 'fc-fmtdlg__body app__dlg__body' : 'fc-fmtdlg__body';
+    opts.bodyVariant === 'app' ? 'fc-fmtdlg__body fc-tb__dlg__body' : 'fc-fmtdlg__body';
   panel.appendChild(body);
 
   const footer = document.createElement('div');
@@ -116,7 +116,7 @@ export const appendDialogButton = (
   button.type = 'button';
   const classes = ['fc-fmtdlg__btn'];
   if (opts.variant === 'primary') classes.push('fc-fmtdlg__btn--primary');
-  if (opts.destructive) classes.push('app__dlg__btn--danger');
+  if (opts.destructive) classes.push('fc-tb__dlg__btn--danger');
   button.className = classes.join(' ');
   button.textContent = opts.label;
   footer.appendChild(button);
@@ -148,7 +148,7 @@ export interface DialogChoiceButtonOptions {
 export const createDialogChoiceButton = (opts: DialogChoiceButtonOptions): HTMLButtonElement => {
   const button = document.createElement('button');
   button.type = 'button';
-  button.className = opts.className ?? 'app__cf-choice';
+  button.className = opts.className ?? 'fc-tb__cf-choice';
   button.textContent = opts.label;
   if (opts.title) button.title = opts.title;
   button.setAttribute('aria-label', opts.ariaLabel ?? opts.label);
@@ -240,11 +240,11 @@ export const appendInputRow = (
   const row = document.createElement('div');
   row.className = 'fc-fmtdlg__row fc-fmtdlg__row--block';
   const label = document.createElement('label');
-  label.className = 'app__dlg__label';
+  label.className = 'fc-tb__dlg__label';
   label.textContent = labelText;
   const input = document.createElement('input');
   input.type = config.type ?? 'text';
-  input.className = 'app__dlg__input';
+  input.className = 'fc-tb__dlg__input';
   if (config.initial !== undefined) input.value = config.initial;
   if (config.placeholder) input.placeholder = config.placeholder;
   if (typeof config.min === 'number') input.min = String(config.min);
@@ -258,7 +258,7 @@ export const appendInputRow = (
 
 export const appendErrorRow = (body: HTMLElement): HTMLDivElement => {
   const errorRow = document.createElement('div');
-  errorRow.className = 'app__dlg__error';
+  errorRow.className = 'fc-tb__dlg__error';
   errorRow.setAttribute('role', 'alert');
   errorRow.hidden = true;
   body.appendChild(errorRow);

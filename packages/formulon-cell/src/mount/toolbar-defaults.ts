@@ -478,7 +478,7 @@ export function createDefaultRibbonHooks(
  *  pass their own `createBackstageView` to `mountToolbar`. */
 export function createDefaultBackstageView(_instance: SpreadsheetInstance): HTMLElement {
   const placeholder = document.createElement('div');
-  placeholder.className = 'demo__backstage demo__backstage--placeholder';
+  placeholder.className = 'fc-tb__backstage fc-tb__backstage--placeholder';
   return placeholder;
 }
 

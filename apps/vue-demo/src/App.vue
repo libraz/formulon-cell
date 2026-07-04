@@ -586,7 +586,7 @@ onBeforeUnmount(() => {
   </div>
   <div v-else class="demo" :data-fc-theme="theme">
     <header class="demo__head">
-      <div class="demo__titlebar">
+      <div class="fc-tb__titlebar">
         <div
           ref="quickAccess"
           class="demo__quick"
@@ -594,32 +594,32 @@ onBeforeUnmount(() => {
           :aria-label="ui.quickAccessToolbar"
         >
           <span class="demo__brand-mark" aria-hidden="true">
-            <svg class="demo__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg class="fc-tb__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path v-for="segment in DEMO_ICONS.app" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
             </svg>
           </span>
           <button type="button" class="demo__title-icon" :aria-label="ui.save" @click="onSave">
-            <svg class="demo__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg class="fc-tb__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path v-for="segment in DEMO_ICONS.save" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
             </svg>
           </button>
           <button type="button" class="demo__title-icon" :aria-label="ui.undo" @click="instance?.undo()">
-            <svg class="demo__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg class="fc-tb__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path v-for="segment in DEMO_ICONS.undo" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
             </svg>
           </button>
           <button type="button" class="demo__title-icon" :aria-label="ui.redo" @click="instance?.redo()">
-            <svg class="demo__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg class="fc-tb__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path v-for="segment in DEMO_ICONS.redo" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
             </svg>
           </button>
         </div>
-        <div class="demo__title">
+        <div class="fc-tb__title">
           <strong>{{ bookName }}</strong>
           <span>{{ ui.saved }}</span>
         </div>
-        <div class="demo__search">
-          <svg class="demo__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <div class="fc-tb__search">
+          <svg class="fc-tb__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path v-for="segment in DEMO_ICONS.search" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
           </svg>
           <input
@@ -637,8 +637,8 @@ onBeforeUnmount(() => {
             @keydown="onSearchKeydown"
             @blur="searchOpen = false"
           />
-          <div v-if="searchOpen" id="demo-search-results" class="demo__command-menu" role="listbox">
-            <div v-if="filteredCommands.length === 0" class="demo__command-empty">
+          <div v-if="searchOpen" id="demo-search-results" class="fc-tb__command-menu" role="listbox">
+            <div v-if="filteredCommands.length === 0" class="fc-tb__command-empty">
               {{ ui.noCommands }}
             </div>
             <button
@@ -652,10 +652,10 @@ onBeforeUnmount(() => {
               :aria-disabled="cmd.disabled ? 'true' : undefined"
               :data-disabled-reason="cmd.disabledReason"
               :class="[
-                'demo__command-item',
+                'fc-tb__command-item',
                 {
-                  'demo__command-item--active': index === searchActiveIndex,
-                  'demo__command-item--disabled': cmd.disabled,
+                  'fc-tb__command-item--active': index === searchActiveIndex,
+                  'fc-tb__command-item--disabled': cmd.disabled,
                 },
               ]"
               @mousedown.prevent
@@ -686,7 +686,7 @@ onBeforeUnmount(() => {
     <input ref="fileInput" type="file" accept=".xlsx,.xlsm" hidden @change="onOpenFiles" />
 
     <main :class="['demo__body', { 'demo__body--panel': showPanel }]">
-      <div class="demo__sheet-col">
+      <div class="fc-tb__sheet-col">
         <SpreadsheetToolbar
           v-if="resolvedUi.ribbon"
           :instance="instance"
@@ -726,16 +726,16 @@ onBeforeUnmount(() => {
           @ready="onReady"
           @cell-change="onCellChange"
         />
-        <div v-if="ribbonTab === 'file'" class="demo__backstage" role="dialog" :aria-label="ui.file">
-          <nav class="demo__backstage-nav" :aria-label="ui.file">
+        <div v-if="ribbonTab === 'file'" class="fc-tb__backstage" role="dialog" :aria-label="ui.file">
+          <nav class="fc-tb__backstage-nav" :aria-label="ui.file">
             <strong>{{ ui.file }}</strong>
             <button
               v-for="item in backstageNav"
               :key="item.action"
               type="button"
               :class="[
-                'demo__backstage-navitem',
-                item.active ? 'demo__backstage-navitem--active' : '',
+                'fc-tb__backstage-navitem',
+                item.active ? 'fc-tb__backstage-navitem--active' : '',
               ]"
               :disabled="backstageActionDisabled(item.action)"
               @click="runBackstageAction(item.action)"
@@ -743,10 +743,10 @@ onBeforeUnmount(() => {
               {{ item.label }}
             </button>
           </nav>
-          <div class="demo__backstage-main">
-            <div class="demo__backstage-title">
-              <span class="demo__backstage-xl" aria-hidden="true">
-                <svg class="demo__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <div class="fc-tb__backstage-main">
+            <div class="fc-tb__backstage-title">
+              <span class="fc-tb__backstage-xl" aria-hidden="true">
+                <svg class="fc-tb__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path v-for="segment in DEMO_ICONS.app" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
                 </svg>
               </span>
@@ -755,13 +755,13 @@ onBeforeUnmount(() => {
                 <p>{{ ui.backstageSub }}</p>
               </div>
             </div>
-            <div v-if="backstageAction === 'print'" class="demo__print-preview" data-demo-print-preview>
-              <section class="demo__print-settings" :aria-label="ui.printSettings">
+            <div v-if="backstageAction === 'print'" class="fc-tb__print-preview" data-demo-print-preview>
+              <section class="fc-tb__print-settings" :aria-label="ui.printSettings">
                 <h2>{{ printPreview.title }}</h2>
                 <p>{{ printPreview.subtitle }}</p>
                 <button
                   type="button"
-                  class="demo__print-action demo__print-action--primary"
+                  class="fc-tb__print-action fc-tb__print-action--primary"
                   :disabled="!instance"
                   @click="instance?.print('print')"
                 >
@@ -769,7 +769,7 @@ onBeforeUnmount(() => {
                 </button>
                 <button
                   type="button"
-                  class="demo__print-action"
+                  class="fc-tb__print-action"
                   :disabled="!instance"
                   @click="instance?.print('pdf')"
                 >
@@ -777,42 +777,42 @@ onBeforeUnmount(() => {
                 </button>
                 <button
                   type="button"
-                  class="demo__print-action"
+                  class="fc-tb__print-action"
                   :disabled="!instance"
                   @click="instance?.openPageSetup()"
                 >
                   {{ printPreview.pageSetupLabel }}
                 </button>
-                <dl class="demo__print-meta">
+                <dl class="fc-tb__print-meta">
                   <div v-for="row in printPreview.settings" :key="row.label">
                     <dt>{{ row.label }}</dt>
                     <dd>{{ row.value }}</dd>
                   </div>
                 </dl>
               </section>
-              <section class="demo__print-paper" :aria-label="printPreview.previewTitle">
+              <section class="fc-tb__print-paper" :aria-label="printPreview.previewTitle">
                 <iframe
                   v-if="printPreview.previewHtml"
-                  class="demo__print-frame"
+                  class="fc-tb__print-frame"
                   :title="printPreview.previewTitle"
                   sandbox=""
                   :srcdoc="printPreview.previewHtml"
                 />
-                <div v-else class="demo__print-page">
+                <div v-else class="fc-tb__print-page">
                   <strong>{{ printPreview.previewTitle }}</strong>
-                  <div aria-hidden="true" class="demo__print-sheet-lines">
+                  <div aria-hidden="true" class="fc-tb__print-sheet-lines">
                     <span v-for="line in DEMO_PRINT_PREVIEW_LINES" :key="line" />
                   </div>
                 </div>
                 <p>{{ printPreview.previewHint }}</p>
               </section>
             </div>
-            <div v-else class="demo__backstage-grid">
+            <div v-else class="fc-tb__backstage-grid">
               <button
                 v-for="item in backstageCards"
                 :key="item.action"
                 type="button"
-                class="demo__backstage-card"
+                class="fc-tb__backstage-card"
                 :disabled="backstageActionDisabled(item.action)"
                 @click="runBackstageAction(item.action)"
               >
@@ -909,11 +909,11 @@ onBeforeUnmount(() => {
         <section class="demo__card">
           <h2>{{ ui.cellRenderers }}</h2>
           <p class="demo__hint">{{ ui.cellRenderersHint }}</p>
-          <label class="demo__check">
+          <label class="fc-tb__check">
             <input type="checkbox" v-model="formatters.uppercase" />
             {{ ui.uppercaseColumnA }}
           </label>
-          <label class="demo__check">
+          <label class="fc-tb__check">
             <input type="checkbox" v-model="formatters.arrows" />
             {{ ui.arrowPrefixNegatives }}
           </label>
@@ -925,7 +925,7 @@ onBeforeUnmount(() => {
           <div class="demo__probe">
             <button
               type="button"
-              class="demo__btn demo__btn--ghost"
+              class="fc-tb__btn fc-tb__btn--ghost"
               :disabled="!instance"
               @click="runProbe('GREET', [{ kind: 'text', value: 'Workbook' }])"
             >
@@ -933,7 +933,7 @@ onBeforeUnmount(() => {
             </button>
             <button
               type="button"
-              class="demo__btn demo__btn--ghost"
+              class="fc-tb__btn fc-tb__btn--ghost"
               :disabled="!instance"
               @click="runProbe('FAHRENHEIT', [{ kind: 'number', value: 100 }])"
             >
@@ -948,7 +948,7 @@ onBeforeUnmount(() => {
         <section class="demo__card demo__card--log">
           <h2>{{ ui.cellChangeLog }}</h2>
           <p class="demo__hint">{{ ui.cellChangeLogHint }}</p>
-          <p v-if="log.length === 0" class="demo__empty">
+          <p v-if="log.length === 0" class="fc-tb__empty">
             {{ ui.editCellToSeeEvents }}
           </p>
           <ul v-else class="demo__log">
@@ -964,69 +964,69 @@ onBeforeUnmount(() => {
     <div
       v-if="reviewDialog"
       ref="reviewModalEl"
-      class="demo__modal"
+      class="fc-tb__modal"
       role="dialog"
       aria-modal="true"
       :aria-label="reviewDialog.title"
     >
-      <section class="demo__modal-panel">
-        <header class="demo__modal-header">
+      <section class="fc-tb__modal-panel">
+        <header class="fc-tb__modal-header">
           <h2>{{ reviewDialog.title }}</h2>
           <button
             type="button"
-            class="demo__modal-x"
+            class="fc-tb__modal-x"
             :aria-label="ui.close"
             @click="closeReviewDialog"
           >
             ×
           </button>
         </header>
-        <div class="demo__modal-body">
-          <p v-if="reviewDialog.items.length === 0" class="demo__modal-empty">
+        <div class="fc-tb__modal-body">
+          <p v-if="reviewDialog.items.length === 0" class="fc-tb__modal-empty">
             {{ ui.noIssuesFound }}
           </p>
-          <ul v-else class="demo__modal-list">
+          <ul v-else class="fc-tb__modal-list">
             <li v-for="(item, index) in reviewDialog.items" :key="`${item.label}-${index}`">
               <strong>{{ item.label }}</strong>
               <span>{{ item.detail }}</span>
             </li>
           </ul>
         </div>
-        <footer class="demo__modal-footer">
-          <button type="button" class="demo__btn" @click="closeReviewDialog">{{ ui.ok }}</button>
+        <footer class="fc-tb__modal-footer">
+          <button type="button" class="fc-tb__btn" @click="closeReviewDialog">{{ ui.ok }}</button>
         </footer>
       </section>
     </div>
     <div
       v-if="scriptOpen"
       ref="scriptModalEl"
-      class="demo__modal"
+      class="fc-tb__modal"
       role="dialog"
       aria-modal="true"
       :aria-label="commandText.script"
     >
-      <form class="demo__modal-panel demo__modal-panel--narrow" @submit.prevent="applyScriptCommand">
-        <header class="demo__modal-header">
+      <form class="fc-tb__modal-panel fc-tb__modal-panel--narrow" @submit.prevent="applyScriptCommand">
+        <header class="fc-tb__modal-header">
           <h2>{{ commandText.script }}</h2>
           <button
             type="button"
-            class="demo__modal-x"
+            class="fc-tb__modal-x"
             :aria-label="ui.close"
             @click="closeScriptDialog"
           >
             ×
           </button>
         </header>
-        <div class="demo__modal-body">
-          <label class="demo__modal-field">
+        <div class="fc-tb__modal-body">
+          <label class="fc-tb__modal-field">
             <span>{{ ui.command }}</span>
             <input v-model="scriptCommand" autofocus @input="scriptError = null" />
           </label>
-          <p v-if="scriptError" class="demo__modal-error">{{ scriptError }}</p>
+          <p v-if="scriptError" class="fc-tb__modal-error">{{ scriptError }}</p>
         </div>
-        <footer class="demo__modal-footer">
-          <button type="button" class="demo__btn" @click="closeScriptDialog">{{ ui.cancel }}</button>
-          <button type="submit" class="demo__btn demo__btn--active">{{ ui.run }}</button>
+        <footer class="fc-tb__modal-footer">
+          <button type="button" class="fc-tb__btn" @click="closeScriptDialog">{{ ui.cancel }}</button>
+          <button type="submit" class="fc-tb__btn fc-tb__btn--active">{{ ui.run }}</button>
         </footer>
       </form>
     </div>

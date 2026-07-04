@@ -30,7 +30,7 @@ describe('showAllowEditRangeDialog', () => {
       },
     });
 
-    const input = document.querySelector<HTMLInputElement>('.app__dlg__input');
+    const input = document.querySelector<HTMLInputElement>('.fc-tb__dlg__input');
     const picker = document.querySelector<HTMLButtonElement>(
       '[data-range-picker="allow-edit-ranges-range"]',
     );
@@ -64,7 +64,7 @@ describe('showUnprotectSheetDialog', () => {
       cancel: 'Cancel',
     });
 
-    const dialog = document.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('Unprotect Sheet');
     const input = dialog?.querySelector<HTMLInputElement>('input[type="password"]');
     expect(input).toBeTruthy();

@@ -198,7 +198,7 @@ describe('Spreadsheet.mountToolbar', () => {
 
     expect(tb.host).toBe(host);
     expect(tb.instance).toBe(sheet.instance);
-    expect(host.querySelector('.demo__ribbon-shell')).toBeTruthy();
+    expect(host.querySelector('.fc-tb__ribbon-shell')).toBeTruthy();
     expect(tb.getActiveTab()).toBe('home');
     expect(tb.getCollapsed()).toBe(false);
     expect(tb.getFormulaBarVisible()).toBe(true);
@@ -235,11 +235,11 @@ describe('Spreadsheet.mountToolbar', () => {
 
     const bold = host.querySelector<HTMLButtonElement>('[data-ribbon-command="bold"]');
     expect(bold).toBeTruthy();
-    expect(bold?.classList.contains('demo__rb--active')).toBe(true);
+    expect(bold?.classList.contains('fc-tb__rb--active')).toBe(true);
     expect(bold?.getAttribute('aria-pressed')).toBe('true');
 
     mutators.setActive(sheet.instance.store, { sheet: 0, row: 1, col: 0 });
-    expect(bold?.classList.contains('demo__rb--active')).toBe(false);
+    expect(bold?.classList.contains('fc-tb__rb--active')).toBe(false);
     expect(bold?.getAttribute('aria-pressed')).toBe('false');
 
     tb.dispose();
@@ -254,7 +254,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(bold?.getAttribute('aria-pressed')).toBe('false');
     bold?.click();
 
-    expect(bold?.classList.contains('demo__rb--active')).toBe(true);
+    expect(bold?.classList.contains('fc-tb__rb--active')).toBe(true);
     expect(bold?.getAttribute('aria-pressed')).toBe('true');
     expect(sheet.instance.store.getState().ui.pendingFormat).toEqual({
       addr: { sheet: 0, row: 0, col: 0 },
@@ -285,7 +285,7 @@ describe('Spreadsheet.mountToolbar', () => {
       underline,
     );
     const underlineItems = Array.from(
-      host.querySelectorAll<HTMLButtonElement>('#menu-underline .app__menu-item--iconic'),
+      host.querySelectorAll<HTMLButtonElement>('#menu-underline .fc-tb__menu-item--iconic'),
     );
     expect(underlineItems.map((item) => item.textContent)).toEqual([
       'Underline',
@@ -314,10 +314,10 @@ describe('Spreadsheet.mountToolbar', () => {
     Object.defineProperty(doubleEvent, 'target', { value: double });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(doubleEvent)).toBe(true);
     await Promise.resolve();
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'Double Underline',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     tb.dispose();
   });
@@ -342,7 +342,7 @@ describe('Spreadsheet.mountToolbar', () => {
 
     expect(
       Array.from(
-        host.querySelectorAll<HTMLButtonElement>('#menu-underline .app__menu-item--iconic'),
+        host.querySelectorAll<HTMLButtonElement>('#menu-underline .fc-tb__menu-item--iconic'),
       ).map((item) => item.textContent),
     ).toEqual(['下線', '二重下線']);
 
@@ -353,10 +353,10 @@ describe('Spreadsheet.mountToolbar', () => {
     Object.defineProperty(event, 'target', { value: double });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
     await Promise.resolve();
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       '二重下線',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     tb.dispose();
   });
@@ -378,7 +378,7 @@ describe('Spreadsheet.mountToolbar', () => {
       );
 
     host.querySelector<HTMLButtonElement>('[data-ribbon-command="paste"]')?.click();
-    expect(menuTexts('#menu-paste .app__menu-item--iconic')).toEqual([
+    expect(menuTexts('#menu-paste .fc-tb__menu-item--iconic')).toEqual([
       '貼り付け',
       '数式',
       '数式と数値の書式',
@@ -390,7 +390,7 @@ describe('Spreadsheet.mountToolbar', () => {
     ]);
 
     host.querySelector<HTMLButtonElement>('[data-ribbon-command="conditional"]')?.click();
-    expect(menuTexts('#menu-conditional > .app__menu-item')).toEqual([
+    expect(menuTexts('#menu-conditional > .fc-tb__menu-item')).toEqual([
       'セルの強調表示ルール',
       '上位/下位ルール',
       'データ バー',
@@ -404,16 +404,16 @@ describe('Spreadsheet.mountToolbar', () => {
     host.querySelector<HTMLButtonElement>('[data-ribbon-command="formatTableHome"]')?.click();
     expect(
       Array.from(
-        host.querySelectorAll<HTMLElement>('#menu-table-style-home .app__tablestyle-heading'),
+        host.querySelectorAll<HTMLElement>('#menu-table-style-home .fc-tb__tablestyle-heading'),
       ).map((heading) => heading.textContent),
     ).toEqual(['淡色', '中間', '濃色']);
-    expect(menuTexts('#menu-table-style-home > .app__tablestyle-footer')).toEqual([
+    expect(menuTexts('#menu-table-style-home > .fc-tb__tablestyle-footer')).toEqual([
       '新しい表スタイル…',
       '新しいピボットテーブル スタイル…',
     ]);
 
     host.querySelector<HTMLButtonElement>('[data-ribbon-command="findHome"]')?.click();
-    expect(menuTexts('#menu-find-select .app__menu-item--iconic')).toEqual([
+    expect(menuTexts('#menu-find-select .fc-tb__menu-item--iconic')).toEqual([
       '検索...',
       '置換...',
       'ジャンプ...',
@@ -443,7 +443,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(zoomButton?.dataset.ribbonActivation).toBe('dialog');
     zoomButton?.click();
 
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     const input = dialog?.querySelector<HTMLInputElement>('input');
     expect(input).toBeTruthy();
     if (!input) throw new Error('Expected Zoom dialog input.');
@@ -513,7 +513,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(tb.applyCommand('formatTableHome')).toBe(true);
     await Promise.resolve();
     expect(document.body.textContent).toContain('Create Table');
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
     await Promise.resolve();
     expect(sheet.instance.store.getState().tables.tables).toMatchObject([
       { style: 'medium', range: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 } },
@@ -521,17 +521,17 @@ describe('Spreadsheet.mountToolbar', () => {
 
     expect(tb.applyCommand('recordActions')).toBe(true);
     await Promise.resolve();
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'Recorded selected range action',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     expect(tb.applyCommand('allScripts')).toBe(true);
     await Promise.resolve();
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'Built-in scripts',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     expect(tb.applyCommand('outlineGroup')).toBe(true);
     expect(sheet.instance.store.getState().layout.outlineRows.get(0)).toBe(1);
@@ -552,10 +552,10 @@ describe('Spreadsheet.mountToolbar', () => {
 
     expect(tb.applyCommand('spellingReview')).toBe(true);
     await Promise.resolve();
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'Possible typo',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     expect(tb.applyCommand('filter')).toBe(true);
     expect(sheet.instance.store.getState().ui.filterRange).toEqual({
@@ -613,11 +613,11 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(
       host
         .querySelector('[data-ribbon-panel="home"]')
-        ?.classList.contains('demo__ribbon--office365-home'),
+        ?.classList.contains('fc-tb__ribbon--office365-home'),
     ).toBe(false);
     expect(
       Array.from(
-        host.querySelectorAll<HTMLElement>('[data-ribbon-panel="home"] .demo__ribbon-label'),
+        host.querySelectorAll<HTMLElement>('[data-ribbon-panel="home"] .fc-tb__ribbon-label'),
       )
         .map((label) => label.textContent)
         .filter(Boolean),
@@ -626,13 +626,13 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.setDisplayMode('singleLine');
     expect(tb.getDisplayMode()).toBe('singleLine');
     expect(tb.getCollapsed()).toBe(false);
-    expect(host.querySelector('.demo__ribbon-shell--singleLine')).toBeTruthy();
+    expect(host.querySelector('.fc-tb__ribbon-shell--singleLine')).toBeTruthy();
     expect(onDisplayModeChange).toHaveBeenLastCalledWith('singleLine');
 
     tb.setCollapsed(true);
     expect(tb.getDisplayMode()).toBe('tabsOnly');
     expect(tb.getCollapsed()).toBe(true);
-    expect(host.querySelector('.demo__ribbon-shell--tabsOnly')).toBeTruthy();
+    expect(host.querySelector('.fc-tb__ribbon-shell--tabsOnly')).toBeTruthy();
     expect(onCollapsedChange).toHaveBeenLastCalledWith(true);
 
     tb.setDisplayMenuOpen(true);
@@ -643,16 +643,16 @@ describe('Spreadsheet.mountToolbar', () => {
     autoHideButton?.click();
     expect(tb.getDisplayMode()).toBe('autoHide');
     expect(tb.getCollapsed()).toBe(true);
-    expect(host.querySelector('.demo__ribbon-shell--autoHide')).toBeTruthy();
+    expect(host.querySelector('.fc-tb__ribbon-shell--autoHide')).toBeTruthy();
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', bubbles: true }));
-    expect(host.querySelector('.demo__ribbon-shell--autoHidePeek')).toBeTruthy();
+    expect(host.querySelector('.fc-tb__ribbon-shell--autoHidePeek')).toBeTruthy();
     expect(
-      host.querySelector('.demo__ribbon-shell')?.getAttribute('data-ribbon-auto-hide-peek'),
+      host.querySelector('.fc-tb__ribbon-shell')?.getAttribute('data-ribbon-auto-hide-peek'),
     ).toBe('true');
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(host.querySelector('.demo__ribbon-shell--autoHidePeek')).toBeFalsy();
+    expect(host.querySelector('.fc-tb__ribbon-shell--autoHidePeek')).toBeFalsy();
 
     tb.dispose();
   });
@@ -703,7 +703,7 @@ describe('Spreadsheet.mountToolbar', () => {
       'No print area has been set.',
     );
     expect(
-      host.querySelector<HTMLElement>('#menu-print-area .app__menu-icon--print-area-set'),
+      host.querySelector<HTMLElement>('#menu-print-area .fc-tb__menu-icon--print-area-set'),
     ).toBeTruthy();
     const setEvent = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(setEvent, 'target', { value: setPrintAreaButton });
@@ -764,14 +764,14 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(themeButton?.dataset.ribbonActivation).toBe('gallery');
     themeButton?.click();
     const menu = host.querySelector<HTMLElement>('#menu-page-theme');
-    expect(menu?.classList.contains('app__menu--visual')).toBe(true);
-    expect(menu?.querySelectorAll('.app__visual-tile')).toHaveLength(3);
+    expect(menu?.classList.contains('fc-tb__menu--visual')).toBe(true);
+    expect(menu?.querySelectorAll('.fc-tb__visual-tile')).toHaveLength(3);
 
     const paperButton = host.querySelector<HTMLButtonElement>('[data-page-theme-action="paper"]');
     const inkButton = host.querySelector<HTMLButtonElement>('[data-page-theme-action="ink"]');
     expect(paperButton?.getAttribute('role')).toBe('menuitemradio');
     expect(paperButton?.getAttribute('aria-checked')).toBe('true');
-    expect(paperButton?.classList.contains('app__visual-tile--active')).toBe(true);
+    expect(paperButton?.classList.contains('fc-tb__visual-tile--active')).toBe(true);
     expect(inkButton?.getAttribute('aria-checked')).toBe('false');
     expect(inkButton).toBeTruthy();
     const event = new MouseEvent('click', { bubbles: true });
@@ -784,7 +784,7 @@ describe('Spreadsheet.mountToolbar', () => {
     themeButton?.click();
     expect(paperButton?.getAttribute('aria-checked')).toBe('false');
     expect(inkButton?.getAttribute('aria-checked')).toBe('true');
-    expect(inkButton?.classList.contains('app__visual-tile--active')).toBe(true);
+    expect(inkButton?.classList.contains('fc-tb__visual-tile--active')).toBe(true);
     const contrastButton = host.querySelector<HTMLButtonElement>(
       '[data-page-theme-action="contrast"]',
     );
@@ -811,7 +811,7 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     expect(insertButton).toBeTruthy();
     insertButton?.click();
-    expect(host.querySelectorAll('#menu-insert-cells .app__menu-item--iconic').length).toBe(4);
+    expect(host.querySelectorAll('#menu-insert-cells .fc-tb__menu-item--iconic').length).toBe(4);
     expect(host.querySelector<HTMLButtonElement>('[data-cell-insert="sheet"]')?.disabled).toBe(
       false,
     );
@@ -831,7 +831,7 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     expect(deleteButton).toBeTruthy();
     deleteButton?.click();
-    expect(host.querySelectorAll('#menu-delete-cells .app__menu-item--iconic').length).toBe(6);
+    expect(host.querySelectorAll('#menu-delete-cells .fc-tb__menu-item--iconic').length).toBe(6);
     const disabledDeleteSheet = host.querySelector<HTMLButtonElement>('[data-cell-delete="sheet"]');
     expect(disabledDeleteSheet?.disabled).toBe(true);
     expect(disabledDeleteSheet?.dataset.menuDisabledReason).toBe(
@@ -982,7 +982,7 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     expect(sortButton).toBeTruthy();
     sortButton?.click();
-    expect(host.querySelectorAll('#menu-sort-home .app__menu-item--iconic').length).toBe(11);
+    expect(host.querySelectorAll('#menu-sort-home .fc-tb__menu-item--iconic').length).toBe(11);
     const ascendingButton = host.querySelector<HTMLButtonElement>('[data-sort="asc"]');
     expect(ascendingButton).toBeTruthy();
     const event = new MouseEvent('click', { bubbles: true });
@@ -1033,7 +1033,7 @@ describe('Spreadsheet.mountToolbar', () => {
     mutators.setFilterRange(sheet.instance.store, range);
     sortButton?.click();
     expect(filterButton?.getAttribute('aria-pressed')).toBe('true');
-    expect(filterButton?.classList.contains('app__menu-item--active')).toBe(true);
+    expect(filterButton?.classList.contains('fc-tb__menu-item--active')).toBe(true);
     expect(clearButton?.disabled).toBe(false);
     expect(clearButton?.dataset.menuDisabledReason).toBeUndefined();
     expect(reapplyButton?.disabled).toBe(true);
@@ -1110,7 +1110,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(sheet.instance.store.getState().layout.hiddenRows.has(1)).toBe(false);
 
     await clickSort('filter-advanced');
-    const advancedDialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const advancedDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(advancedDialog?.textContent).toContain('Advanced Filter');
     expect(advancedDialog?.querySelector('.fc-advfilter__ranges')).toBeTruthy();
     const inputs = Array.from(advancedDialog?.querySelectorAll<HTMLInputElement>('input') ?? []);
@@ -1155,7 +1155,7 @@ describe('Spreadsheet.mountToolbar', () => {
     Object.defineProperty(customEvent, 'target', { value: customButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(customEvent)).toBe(true);
 
-    const sortDialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const sortDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(sortDialog?.textContent).toContain('Sort by');
     expect(sortDialog?.textContent).toContain('Add Level');
     expect(sortDialog?.querySelectorAll('.fc-sortdlg__level')).toHaveLength(1);
@@ -1175,7 +1175,7 @@ describe('Spreadsheet.mountToolbar', () => {
     Object.defineProperty(dedupeEvent, 'target', { value: dedupeButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(dedupeEvent)).toBe(true);
 
-    const dedupeDialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dedupeDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dedupeDialog?.textContent).toContain('Remove Duplicates');
     expect(dedupeDialog?.querySelectorAll('.fc-dedupedlg__column')).toHaveLength(1);
     dedupeDialog?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
@@ -1201,7 +1201,7 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     expect(textToColumnsButton).toBeTruthy();
     textToColumnsButton?.click();
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('Convert Text to Columns');
     expect(dialog?.textContent).toContain('Original data type');
     expect(dialog?.textContent).toContain('Data preview');
@@ -1225,7 +1225,7 @@ describe('Spreadsheet.mountToolbar', () => {
       command: 'textToColumns',
       menuId: 'menu-text-to-columns',
     });
-    expect(host.querySelectorAll('#menu-text-to-columns .app__menu-item--iconic').length).toBe(5);
+    expect(host.querySelectorAll('#menu-text-to-columns .fc-tb__menu-item--iconic').length).toBe(5);
     const commaButton = host.querySelector<HTMLButtonElement>(
       '[data-text-to-columns-delimiter=","]',
     );
@@ -1261,13 +1261,13 @@ describe('Spreadsheet.mountToolbar', () => {
     });
 
     const clearButton = host.querySelector<HTMLButtonElement>(
-      '.demo__ribbon-group--editing [data-ribbon-command="clearFormat"]',
+      '.fc-tb__ribbon-group--editing [data-ribbon-command="clearFormat"]',
     );
     expect(clearButton).toBeTruthy();
     expect(clearButton?.dataset.ribbonActivation).toBe('dropdown');
     expect(clearButton?.dataset.ribbonMenuId).toBe('menu-clear');
     clearButton?.click();
-    expect(host.querySelectorAll('#menu-clear .app__menu-item--iconic').length).toBe(7);
+    expect(host.querySelectorAll('#menu-clear .fc-tb__menu-item--iconic').length).toBe(7);
     const clearCommentsButton = host.querySelector<HTMLButtonElement>('[data-clear="comments"]');
     expect(clearCommentsButton).toBeTruthy();
     expect(clearCommentsButton?.getAttribute('aria-disabled')).toBe('false');
@@ -1316,7 +1316,7 @@ describe('Spreadsheet.mountToolbar', () => {
     });
 
     const clearButton = host.querySelector<HTMLButtonElement>(
-      '.demo__ribbon-group--editing [data-ribbon-command="clearFormat"]',
+      '.fc-tb__ribbon-group--editing [data-ribbon-command="clearFormat"]',
     );
     expect(clearButton).toBeTruthy();
     tb.dropdownsApi?.openDynamicRibbonDropdown(
@@ -1354,7 +1354,7 @@ describe('Spreadsheet.mountToolbar', () => {
       helpers: stubHelpers(),
     });
     const clearButton = host.querySelector<HTMLButtonElement>(
-      '.demo__ribbon-group--editing [data-ribbon-command="clearFormat"]',
+      '.fc-tb__ribbon-group--editing [data-ribbon-command="clearFormat"]',
     );
     expect(clearButton).toBeTruthy();
     const clickClear = (action: string): void => {
@@ -1426,7 +1426,7 @@ describe('Spreadsheet.mountToolbar', () => {
     });
 
     const clearButton = host.querySelector<HTMLButtonElement>(
-      '.demo__ribbon-group--editing [data-ribbon-command="clearFormat"]',
+      '.fc-tb__ribbon-group--editing [data-ribbon-command="clearFormat"]',
     );
     expect(clearButton).toBeTruthy();
     tb.dropdownsApi?.openDynamicRibbonDropdown(
@@ -1462,7 +1462,7 @@ describe('Spreadsheet.mountToolbar', () => {
     });
 
     const clearButton = host.querySelector<HTMLButtonElement>(
-      '.demo__ribbon-group--editing [data-ribbon-command="clearFormat"]',
+      '.fc-tb__ribbon-group--editing [data-ribbon-command="clearFormat"]',
     );
     expect(clearButton).toBeTruthy();
     tb.dropdownsApi?.openDynamicRibbonDropdown(
@@ -1492,7 +1492,7 @@ describe('Spreadsheet.mountToolbar', () => {
     });
 
     const borders = host.querySelector<HTMLButtonElement>(
-      '.demo__ribbon-group--font [data-ribbon-command="borders"]',
+      '.fc-tb__ribbon-group--font [data-ribbon-command="borders"]',
     );
     expect(borders).toBeTruthy();
     borders?.click();
@@ -1506,7 +1506,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(sheet.instance.store.getState().format.formats.get('0:0:0')).toBeUndefined();
 
     const clearButton = host.querySelector<HTMLButtonElement>(
-      '.demo__ribbon-group--editing [data-ribbon-command="clearFormat"]',
+      '.fc-tb__ribbon-group--editing [data-ribbon-command="clearFormat"]',
     );
     expect(clearButton).toBeTruthy();
     tb.dropdownsApi?.openDynamicRibbonDropdown(
@@ -1534,7 +1534,7 @@ describe('Spreadsheet.mountToolbar', () => {
     });
 
     const clearButton = host.querySelector<HTMLButtonElement>(
-      '.demo__ribbon-group--editing [data-ribbon-command="clearFormat"]',
+      '.fc-tb__ribbon-group--editing [data-ribbon-command="clearFormat"]',
     );
     expect(clearButton).toBeTruthy();
     tb.dropdownsApi?.openDynamicRibbonDropdown(
@@ -1560,7 +1560,7 @@ describe('Spreadsheet.mountToolbar', () => {
     const fillButton = host.querySelector<HTMLButtonElement>('[data-ribbon-command="fillHome"]');
     expect(fillButton).toBeTruthy();
     fillButton?.click();
-    expect(host.querySelectorAll('#menu-fill .app__menu-item--iconic').length).toBe(8);
+    expect(host.querySelectorAll('#menu-fill .fc-tb__menu-item--iconic').length).toBe(8);
     const fillDownButton = host.querySelector<HTMLButtonElement>('[data-fill="down"]');
     const fillRightButton = host.querySelector<HTMLButtonElement>('[data-fill="right"]');
     const fillGroupButton = host.querySelector<HTMLButtonElement>('[data-fill="group"]');
@@ -1581,7 +1581,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
     await new Promise((resolve) => requestAnimationFrame(resolve));
 
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('Series');
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
     await Promise.resolve();
@@ -1667,7 +1667,8 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     expect(host.querySelectorAll('#menu-autosum-home [data-autosum-fn]').length).toBe(6);
     expect(
-      host.querySelectorAll('#menu-autosum-home .app__menu-icon--svg .app__menu-icon-svg').length,
+      host.querySelectorAll('#menu-autosum-home .fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')
+        .length,
     ).toBe(1);
     const averageButton = host.querySelector<HTMLButtonElement>('[data-autosum-fn="AVERAGE"]');
     expect(averageButton).toBeTruthy();
@@ -1729,7 +1730,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(calcButton).toBeTruthy();
     calcButton?.click();
     const menu = host.querySelector<HTMLElement>('#menu-calc-options');
-    expect(menu?.querySelectorAll('.app__menu-item--iconic').length).toBe(6);
+    expect(menu?.querySelectorAll('.fc-tb__menu-item--iconic').length).toBe(6);
     const radios = Array.from(
       menu?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? [],
     );
@@ -1770,7 +1771,7 @@ describe('Spreadsheet.mountToolbar', () => {
     const autoNoTable = host.querySelector<HTMLButtonElement>('[data-calc-option="auto-no-table"]');
     expect(auto?.getAttribute('aria-checked')).toBe('false');
     expect(manual?.getAttribute('aria-checked')).toBe('true');
-    expect(manual?.classList.contains('app__menu-item--active')).toBe(true);
+    expect(manual?.classList.contains('fc-tb__menu-item--active')).toBe(true);
     expect(autoNoTable?.getAttribute('aria-checked')).toBe('false');
 
     const event = new MouseEvent('click', { bubbles: true });
@@ -1849,7 +1850,7 @@ describe('Spreadsheet.mountToolbar', () => {
       command: 'dataValidation',
       menuId: 'menu-data-validation',
     });
-    expect(host.querySelectorAll('#menu-data-validation .app__menu-item--iconic').length).toBe(4);
+    expect(host.querySelectorAll('#menu-data-validation .fc-tb__menu-item--iconic').length).toBe(4);
     const circleButton = host.querySelector<HTMLButtonElement>(
       '[data-validation-action="circle-invalid"]',
     );
@@ -1985,11 +1986,11 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
 
     await Promise.resolve();
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('Format cells that are GREATER THAN:');
     expect(dialog?.textContent).toContain('Light Red Fill with Dark Red Text');
     expect(dialog?.textContent).toContain('Yellow Fill with Dark Yellow Text');
-    const formatSelect = dialog?.querySelector<HTMLSelectElement>('select.app__dlg__select');
+    const formatSelect = dialog?.querySelector<HTMLSelectElement>('select.fc-tb__dlg__select');
     expect(formatSelect?.value).toBe('light-red-dark-red');
     const formatPreview = dialog?.querySelector<HTMLElement>('[data-conditional-format-preview]');
     expect(formatPreview?.style.background).toBe('#ffc7ce');
@@ -2048,7 +2049,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(menu?.querySelector<HTMLElement>('[data-cf-panel="highlight"]')?.hidden).toBe(true);
     expect(highlight?.getAttribute('aria-expanded')).toBe('false');
     expect(menu?.querySelector<HTMLElement>('[data-cf-panel="topBottom"]')?.hidden).toBe(false);
-    expect(topBottom?.classList.contains('app__menu-item--active')).toBe(true);
+    expect(topBottom?.classList.contains('fc-tb__menu-item--active')).toBe(true);
     expect(topBottom?.getAttribute('aria-expanded')).toBe('true');
 
     tb.dispose();
@@ -2257,9 +2258,9 @@ describe('Spreadsheet.mountToolbar', () => {
 
     expect(topLevelButtons).toHaveLength(8);
     for (const button of topLevelButtons) {
-      expect(button.classList.contains('app__menu-item--preset')).toBe(true);
-      expect(button.querySelector('.app__cf-icon')).toBeTruthy();
-      expect(button.querySelector('.app__menu-item__text')?.textContent?.trim()).not.toBe('');
+      expect(button.classList.contains('fc-tb__menu-item--preset')).toBe(true);
+      expect(button.querySelector('.fc-tb__cf-icon')).toBeTruthy();
+      expect(button.querySelector('.fc-tb__menu-item__text')?.textContent?.trim()).not.toBe('');
     }
     const submenuButtons = topLevelButtons.filter((button) => button.dataset.cfSubmenu);
     expect(submenuButtons.map((button) => button.dataset.cfSubmenu)).toEqual([
@@ -2270,9 +2271,9 @@ describe('Spreadsheet.mountToolbar', () => {
       'iconSet',
       'clear',
     ]);
-    expect(submenuButtons.every((button) => !!button.querySelector('.app__menu-item__caret'))).toBe(
-      true,
-    );
+    expect(
+      submenuButtons.every((button) => !!button.querySelector('.fc-tb__menu-item__caret')),
+    ).toBe(true);
     expect(submenuButtons.every((button) => button.getAttribute('aria-haspopup') === 'menu')).toBe(
       true,
     );
@@ -2286,7 +2287,7 @@ describe('Spreadsheet.mountToolbar', () => {
         button.dataset.cfSubmenu,
       );
     }
-    expect(menu?.querySelectorAll<HTMLElement>('.app__submenu--cf')).toHaveLength(6);
+    expect(menu?.querySelectorAll<HTMLElement>('.fc-tb__submenu--cf')).toHaveLength(6);
 
     tb.dispose();
   });
@@ -2312,14 +2313,14 @@ describe('Spreadsheet.mountToolbar', () => {
         trigger as HTMLElement,
       );
       expect(panel?.hidden).toBe(false);
-      expect(panel?.classList.contains('app__submenu--cf')).toBe(true);
+      expect(panel?.classList.contains('fc-tb__submenu--cf')).toBe(true);
       return panel as HTMLElement;
     };
 
     const highlightPanel = openPanel('highlight');
     expect(
       Array.from(
-        highlightPanel.querySelectorAll<HTMLButtonElement>(':scope > .app__menu-item--preset'),
+        highlightPanel.querySelectorAll<HTMLButtonElement>(':scope > .fc-tb__menu-item--preset'),
       ).map((button) => button.dataset.cfAction),
     ).toEqual([
       'cell-gt',
@@ -2333,18 +2334,18 @@ describe('Spreadsheet.mountToolbar', () => {
       'new-rule',
     ]);
     expect(
-      highlightPanel.querySelectorAll(':scope > .app__menu-item--preset .app__cf-icon'),
+      highlightPanel.querySelectorAll(':scope > .fc-tb__menu-item--preset .fc-tb__cf-icon'),
     ).toHaveLength(9);
 
     const dataBarPanel = openPanel('dataBar');
     expect(
-      Array.from(dataBarPanel.querySelectorAll<HTMLElement>(':scope > .app__menu-heading')).map(
+      Array.from(dataBarPanel.querySelectorAll<HTMLElement>(':scope > .fc-tb__menu-heading')).map(
         (heading) => heading.textContent,
       ),
     ).toEqual(['Gradient Fill', 'Solid Fill']);
     expect(
-      Array.from(dataBarPanel.querySelectorAll<HTMLElement>(':scope > .app__cf-choice-row')).map(
-        (row) => row.querySelectorAll('.app__cf-choice').length,
+      Array.from(dataBarPanel.querySelectorAll<HTMLElement>(':scope > .fc-tb__cf-choice-row')).map(
+        (row) => row.querySelectorAll('.fc-tb__cf-choice').length,
       ),
     ).toEqual([6, 6]);
     expect(
@@ -2352,32 +2353,32 @@ describe('Spreadsheet.mountToolbar', () => {
     ).toBeTruthy();
 
     const colorScalePanel = openPanel('colorScale');
-    expect(colorScalePanel.querySelector('.app__cf-choice-grid-panel')).toBeTruthy();
-    expect(colorScalePanel.querySelectorAll('.app__cf-choice')).toHaveLength(12);
+    expect(colorScalePanel.querySelector('.fc-tb__cf-choice-grid-panel')).toBeTruthy();
+    expect(colorScalePanel.querySelectorAll('.fc-tb__cf-choice')).toHaveLength(12);
     expect(
-      Array.from(colorScalePanel.querySelectorAll<HTMLButtonElement>('.app__cf-choice')).every(
+      Array.from(colorScalePanel.querySelectorAll<HTMLButtonElement>('.fc-tb__cf-choice')).every(
         (button) =>
-          !!button.getAttribute('aria-label') && !!button.querySelector('.app__cf-choice-grid'),
+          !!button.getAttribute('aria-label') && !!button.querySelector('.fc-tb__cf-choice-grid'),
       ),
     ).toBe(true);
 
     const iconSetPanel = openPanel('iconSet');
     expect(
-      Array.from(iconSetPanel.querySelectorAll<HTMLElement>(':scope > .app__menu-heading')).map(
+      Array.from(iconSetPanel.querySelectorAll<HTMLElement>(':scope > .fc-tb__menu-heading')).map(
         (heading) => heading.textContent,
       ),
     ).toEqual(['Directional', 'Shapes', 'Indicators', 'Ratings']);
-    expect(iconSetPanel.querySelectorAll(':scope > .app__cf-icon-panel')).toHaveLength(4);
-    expect(iconSetPanel.querySelectorAll('.app__cf-icon-choice')).toHaveLength(13);
+    expect(iconSetPanel.querySelectorAll(':scope > .fc-tb__cf-icon-panel')).toHaveLength(4);
+    expect(iconSetPanel.querySelectorAll('.fc-tb__cf-icon-choice')).toHaveLength(13);
 
     const clearPanel = openPanel('clear');
     expect(
-      Array.from(clearPanel.querySelectorAll<HTMLButtonElement>(':scope > .app__menu-item')).map(
+      Array.from(clearPanel.querySelectorAll<HTMLButtonElement>(':scope > .fc-tb__menu-item')).map(
         (button) => button.dataset.cfAction,
       ),
     ).toEqual(['clear-selection', 'clear-sheet']);
     expect(
-      clearPanel.querySelectorAll(':scope > .app__menu-item .app__cf-icon--clear'),
+      clearPanel.querySelectorAll(':scope > .fc-tb__menu-item .fc-tb__cf-icon--clear'),
     ).toHaveLength(2);
 
     tb.dispose();
@@ -2595,16 +2596,16 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(tableButton).toBeTruthy();
     tableButton?.click();
     const menu = host.querySelector<HTMLElement>('#menu-table-style-home');
-    expect(menu?.classList.contains('app__tablestyle-menu')).toBe(true);
-    const scrollBody = menu?.querySelector<HTMLElement>(':scope > .app__tablestyle-scroll');
+    expect(menu?.classList.contains('fc-tb__tablestyle-menu')).toBe(true);
+    const scrollBody = menu?.querySelector<HTMLElement>(':scope > .fc-tb__tablestyle-scroll');
     expect(scrollBody?.getAttribute('role')).toBe('group');
     expect(scrollBody?.getAttribute('aria-label')).toBe('Format as Table');
     const headings = Array.from(
-      scrollBody?.querySelectorAll<HTMLElement>(':scope > .app__tablestyle-heading') ?? [],
+      scrollBody?.querySelectorAll<HTMLElement>(':scope > .fc-tb__tablestyle-heading') ?? [],
     ).map((heading) => heading.textContent);
     expect(headings).toEqual(['Light', 'Medium', 'Dark']);
     const grids = Array.from(
-      scrollBody?.querySelectorAll<HTMLElement>(':scope > .app__tablestyle-grid') ?? [],
+      scrollBody?.querySelectorAll<HTMLElement>(':scope > .fc-tb__tablestyle-grid') ?? [],
     );
     expect(grids).toHaveLength(3);
     expect(grids.map((grid) => grid.getAttribute('aria-label'))).toEqual([
@@ -2612,21 +2613,21 @@ describe('Spreadsheet.mountToolbar', () => {
       'Medium',
       'Dark',
     ]);
-    expect(grids.map((grid) => grid.querySelectorAll('.app__tablestyle-swatch').length)).toEqual([
+    expect(grids.map((grid) => grid.querySelectorAll('.fc-tb__tablestyle-swatch').length)).toEqual([
       28, 28, 7,
     ]);
     const footerActions = Array.from(
-      menu?.querySelectorAll<HTMLButtonElement>(':scope > .app__tablestyle-footer') ?? [],
+      menu?.querySelectorAll<HTMLButtonElement>(':scope > .fc-tb__tablestyle-footer') ?? [],
     );
     expect(footerActions.map((button) => button.dataset.tableStyleFooter)).toEqual([
       'new-table-style',
       'new-pivot-style',
     ]);
     expect(
-      footerActions.every((button) => button.classList.contains('app__menu-item--iconic')),
+      footerActions.every((button) => button.classList.contains('fc-tb__menu-item--iconic')),
     ).toBe(true);
-    expect(menu?.querySelector('.app__menu-icon--table-style-new')).toBeTruthy();
-    expect(menu?.querySelector('.app__menu-icon--pivot-style-new')).toBeTruthy();
+    expect(menu?.querySelector('.fc-tb__menu-icon--table-style-new')).toBeTruthy();
+    expect(menu?.querySelector('.fc-tb__menu-icon--pivot-style-new')).toBeTruthy();
     const styleButton = host.querySelector<HTMLButtonElement>(
       '[data-table-style="dark"][data-table-color="#4472c4"][data-table-variant="banded"]',
     );
@@ -2636,7 +2637,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
     await Promise.resolve();
 
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     const rangeInput = dialog?.querySelector<HTMLInputElement>('input[type="text"]');
     expect(document.body.textContent).toContain('Create Table');
     expect(rangeInput?.value).toBe('A1:C4');
@@ -2662,7 +2663,7 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     expect(activeStyleButton?.getAttribute('role')).toBe('menuitemradio');
     expect(activeStyleButton?.getAttribute('aria-checked')).toBe('true');
-    expect(activeStyleButton?.classList.contains('app__menu-item--active')).toBe(true);
+    expect(activeStyleButton?.classList.contains('fc-tb__menu-item--active')).toBe(true);
 
     tb.dispose();
   });
@@ -2689,7 +2690,7 @@ describe('Spreadsheet.mountToolbar', () => {
     await Promise.resolve();
 
     expect(document.body.textContent).toContain('Create Table');
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     const rangeInput = dialog?.querySelector<HTMLInputElement>('input[type="text"]');
     expect(rangeInput?.value).toBe('A1:C4');
     await waitFor(() => document.activeElement === rangeInput);
@@ -2754,7 +2755,7 @@ describe('Spreadsheet.mountToolbar', () => {
     host.querySelector<HTMLButtonElement>('[data-ribbon-command="formatTableInsert"]')?.click();
     await Promise.resolve();
 
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     const rangeInput = dialog?.querySelector<HTMLInputElement>('input[type="text"]');
     await waitFor(() => document.activeElement === rangeInput);
     expect(rangeInput?.value).toBe('E5');
@@ -2777,12 +2778,12 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(stylesButton).toBeTruthy();
     stylesButton?.click();
     const menu = host.querySelector<HTMLElement>('#menu-cell-styles-home');
-    const scrollBody = menu?.querySelector<HTMLElement>(':scope > .app__cellstyle-scroll');
+    const scrollBody = menu?.querySelector<HTMLElement>(':scope > .fc-tb__cellstyle-scroll');
     expect(scrollBody?.getAttribute('role')).toBe('group');
     expect(scrollBody?.getAttribute('aria-label')).toBe('Cell styles');
     expect(
       Array.from(
-        scrollBody?.querySelectorAll<HTMLElement>(':scope > .app__cellstyle-heading') ?? [],
+        scrollBody?.querySelectorAll<HTMLElement>(':scope > .fc-tb__cellstyle-heading') ?? [],
       ).map((heading) => heading.textContent),
     ).toEqual([
       'Good, Bad and Neutral',
@@ -2791,9 +2792,9 @@ describe('Spreadsheet.mountToolbar', () => {
       'Themed Cell Styles',
       'Number Format',
     ]);
-    expect(menu?.querySelector<HTMLElement>(':scope > .app__cellstyle-footer')?.parentElement).toBe(
-      menu,
-    );
+    expect(
+      menu?.querySelector<HTMLElement>(':scope > .fc-tb__cellstyle-footer')?.parentElement,
+    ).toBe(menu);
     const goodButton = host.querySelector<HTMLButtonElement>('[data-cell-style="good"]');
     expect(goodButton).toBeTruthy();
     const event = new MouseEvent('click', { bubbles: true });
@@ -2810,7 +2811,7 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     expect(goodButton?.getAttribute('role')).toBe('menuitemradio');
     expect(goodButton?.getAttribute('aria-checked')).toBe('true');
-    expect(goodButton?.classList.contains('app__menu-item--active')).toBe(true);
+    expect(goodButton?.classList.contains('fc-tb__menu-item--active')).toBe(true);
 
     tb.dispose();
   });
@@ -2856,7 +2857,7 @@ describe('Spreadsheet.mountToolbar', () => {
     Object.defineProperty(tableEvent, 'target', { value: newTableStyleButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(tableEvent)).toBe(true);
     await Promise.resolve();
-    const tableStyleDialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const tableStyleDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(tableStyleDialog?.textContent).toContain('New Table Style');
     const tableStyleName = tableStyleDialog?.querySelector<HTMLInputElement>('input');
     expect(tableStyleName).toBeTruthy();
@@ -2928,7 +2929,7 @@ describe('Spreadsheet.mountToolbar', () => {
     Object.defineProperty(pivotEvent, 'target', { value: newPivotStyleButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(pivotEvent)).toBe(true);
     await Promise.resolve();
-    const pivotStyleDialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const pivotStyleDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(pivotStyleDialog?.textContent).toContain('New PivotTable Style');
     const pivotStyleName = pivotStyleDialog?.querySelector<HTMLInputElement>('input');
     expect(pivotStyleName).toBeTruthy();
@@ -2973,7 +2974,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(customPivotStyleButton?.title).toBe('Review Pivot');
     expect(customPivotStyleButton?.getAttribute('role')).toBe('menuitemradio');
     expect(customPivotStyleButton?.getAttribute('aria-checked')).toBe('true');
-    expect(customPivotStyleButton?.classList.contains('app__menu-item--active')).toBe(true);
+    expect(customPivotStyleButton?.classList.contains('fc-tb__menu-item--active')).toBe(true);
 
     const stylesButton = host.querySelector<HTMLButtonElement>(
       '[data-ribbon-command="cellStyles"]',
@@ -2981,10 +2982,10 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(stylesButton).toBeTruthy();
     stylesButton?.click();
     expect(
-      host.querySelector('#menu-cell-styles-home .app__menu-icon--cell-style-new'),
+      host.querySelector('#menu-cell-styles-home .fc-tb__menu-icon--cell-style-new'),
     ).toBeTruthy();
     expect(
-      host.querySelector('#menu-cell-styles-home .app__menu-icon--cell-style-merge'),
+      host.querySelector('#menu-cell-styles-home .fc-tb__menu-icon--cell-style-merge'),
     ).toBeTruthy();
     const newCellStyleButton = host.querySelector<HTMLButtonElement>(
       '[data-cell-style-footer="new-cell-style"]',
@@ -2994,7 +2995,7 @@ describe('Spreadsheet.mountToolbar', () => {
     Object.defineProperty(cellEvent, 'target', { value: newCellStyleButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(cellEvent)).toBe(true);
     await Promise.resolve();
-    const cellStyleDialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const cellStyleDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(cellStyleDialog?.textContent).toContain('New Cell Style');
     const styleName = cellStyleDialog?.querySelector<HTMLInputElement>('input');
     expect(styleName).toBeTruthy();
@@ -3053,8 +3054,8 @@ describe('Spreadsheet.mountToolbar', () => {
       currencyButton,
     );
     expect(host.querySelectorAll('#menu-currency-home [data-currency-preset]').length).toBe(5);
-    expect(host.querySelector('#menu-currency-home .app__menu-icon--svg')).toBeFalsy();
-    expect(host.querySelectorAll('#menu-currency-home .app__menu-item__icon-spacer').length).toBe(
+    expect(host.querySelector('#menu-currency-home .fc-tb__menu-icon--svg')).toBeFalsy();
+    expect(host.querySelectorAll('#menu-currency-home .fc-tb__menu-item__icon-spacer').length).toBe(
       6,
     );
     const eurButton = host.querySelector<HTMLButtonElement>('[data-currency-preset="€"]');
@@ -3079,7 +3080,7 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     expect(activeEurButton?.getAttribute('role')).toBe('menuitemradio');
     expect(activeEurButton?.getAttribute('aria-checked')).toBe('true');
-    expect(activeEurButton?.classList.contains('app__menu-item--active')).toBe(true);
+    expect(activeEurButton?.classList.contains('fc-tb__menu-item--active')).toBe(true);
     expect(inactiveUsdButton?.getAttribute('aria-checked')).toBe('false');
 
     tb.dispose();
@@ -3099,7 +3100,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(scriptButton?.dataset.ribbonActivation).toBe('splitPrimary');
     scriptButton?.click();
     expect(host.querySelector<HTMLDivElement>('#menu-script')?.hidden).toBe(true);
-    const scriptDialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const scriptDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(scriptDialog?.textContent).toContain('Script');
     expect(scriptDialog?.textContent).toContain('Trim whitespace');
     const select = scriptDialog?.querySelector<HTMLSelectElement>('[data-script-command-select]');
@@ -3114,7 +3115,7 @@ describe('Spreadsheet.mountToolbar', () => {
       kind: 'text',
       value: 'alpha',
     });
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     seedText(sheet, 1, 0, ' BETA ');
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 1, c0: 0, r1: 1, c1: 0 });
@@ -3122,7 +3123,7 @@ describe('Spreadsheet.mountToolbar', () => {
       { command: 'script', menuId: 'menu-script' },
       scriptButton as HTMLButtonElement,
     );
-    expect(host.querySelectorAll('#menu-script .app__menu-item--iconic').length).toBe(5);
+    expect(host.querySelectorAll('#menu-script .fc-tb__menu-item--iconic').length).toBe(5);
     const trimButton = host.querySelector<HTMLButtonElement>('[data-script-action="trim"]');
     expect(trimButton).toBeTruthy();
     const event = new MouseEvent('click', { bubbles: true });
@@ -3134,10 +3135,10 @@ describe('Spreadsheet.mountToolbar', () => {
       kind: 'text',
       value: 'BETA',
     });
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       '1 cell(s) changed',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     tb.dispose();
   });
@@ -3157,16 +3158,16 @@ describe('Spreadsheet.mountToolbar', () => {
     await Promise.resolve();
     expect(host.querySelector<HTMLDivElement>('#menu-pdf')?.hidden).toBe(true);
     expect(print).toHaveBeenCalledWith('pdf');
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'PDF export has been sent',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     tb.dropdownsApi?.openDynamicRibbonDropdown(
       { command: 'pdf', menuId: 'menu-pdf' },
       pdfButton as HTMLButtonElement,
     );
-    expect(host.querySelectorAll('#menu-pdf .app__menu-item--iconic').length).toBe(3);
+    expect(host.querySelectorAll('#menu-pdf .fc-tb__menu-item--iconic').length).toBe(3);
     const createPdfButton = host.querySelector<HTMLButtonElement>('[data-pdf-action="create"]');
     expect(createPdfButton).toBeTruthy();
     const createPdfEvent = new MouseEvent('click', { bubbles: true });
@@ -3174,10 +3175,10 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(createPdfEvent)).toBe(true);
     await Promise.resolve();
     expect(print).toHaveBeenCalledWith('pdf');
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'PDF export has been sent',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     tb.dropdownsApi?.openDynamicRibbonDropdown(
       { command: 'pdf', menuId: 'menu-pdf' },
@@ -3190,10 +3191,10 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(shareEvent)).toBe(true);
     await Promise.resolve();
     expect(print).toHaveBeenCalledWith('pdf');
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'PDF export is ready',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     tb.dropdownsApi?.openDynamicRibbonDropdown(
       { command: 'pdf', menuId: 'menu-pdf' },
@@ -3217,29 +3218,29 @@ describe('Spreadsheet.mountToolbar', () => {
     addInButton?.click();
     await Promise.resolve();
     expect(host.querySelector<HTMLDivElement>('#menu-add-ins')?.hidden).toBe(true);
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'Add-in management',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     tb.dropdownsApi?.openDynamicRibbonDropdown(
       { command: 'addIn', menuId: 'menu-add-ins' },
       addInButton as HTMLButtonElement,
     );
-    expect(host.querySelectorAll('#menu-add-ins .app__menu-item--iconic').length).toBe(3);
+    expect(host.querySelectorAll('#menu-add-ins .fc-tb__menu-item--iconic').length).toBe(3);
     const getButton = host.querySelector<HTMLButtonElement>('[data-add-in-action="get"]');
     expect(getButton).toBeTruthy();
     const getAddInEvent = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(getAddInEvent, 'target', { value: getButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(getAddInEvent)).toBe(true);
     await Promise.resolve();
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'Get Add-ins',
     );
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'Office Add-ins',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     tb.dropdownsApi?.openDynamicRibbonDropdown(
       { command: 'addIn', menuId: 'menu-add-ins' },
@@ -3251,10 +3252,10 @@ describe('Spreadsheet.mountToolbar', () => {
     Object.defineProperty(addInEvent, 'target', { value: myButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(addInEvent)).toBe(true);
     await Promise.resolve();
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'External add-ins',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     tb.dropdownsApi?.openDynamicRibbonDropdown(
       { command: 'addIn', menuId: 'menu-add-ins' },
@@ -3266,10 +3267,10 @@ describe('Spreadsheet.mountToolbar', () => {
     Object.defineProperty(manageEvent, 'target', { value: manageButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(manageEvent)).toBe(true);
     await Promise.resolve();
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'Add-in management',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     tb.dispose();
     print.mockRestore();
@@ -3288,21 +3289,21 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(pictureButton).toBeTruthy();
     pictureButton?.click();
     const pictureMenu = host.querySelector<HTMLElement>('#menu-picture-insert');
-    expect(pictureMenu?.classList.contains('app__menu--visual')).toBe(true);
-    expect(pictureMenu?.querySelectorAll('.app__visual-tile')).toHaveLength(3);
+    expect(pictureMenu?.classList.contains('fc-tb__menu--visual')).toBe(true);
+    expect(pictureMenu?.querySelectorAll('.fc-tb__visual-tile')).toHaveLength(3);
     const stockButton = host.querySelector<HTMLButtonElement>('[data-picture-insert="stock"]');
     expect(stockButton).toBeTruthy();
     const stockEvent = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(stockEvent, 'target', { value: stockButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(stockEvent)).toBe(true);
     await Promise.resolve();
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'Stock Images',
     );
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'host-provided media picker',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     pictureButton?.click();
     const onlineButton = host.querySelector<HTMLButtonElement>('[data-picture-insert="online"]');
@@ -3311,7 +3312,7 @@ describe('Spreadsheet.mountToolbar', () => {
     Object.defineProperty(pictureEvent, 'target', { value: onlineButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(pictureEvent)).toBe(true);
     await Promise.resolve();
-    const pictureDialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const pictureDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(pictureDialog?.textContent).toContain('Online Pictures');
     expect(pictureDialog?.textContent).toContain('host-provided media picker');
     expect(pictureDialog?.querySelector('input')).toBeNull();
@@ -3327,16 +3328,16 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(screenshotButton).toBeTruthy();
     screenshotButton?.click();
     const screenshotMenu = host.querySelector<HTMLElement>('#menu-screenshot-insert');
-    expect(screenshotMenu?.classList.contains('app__menu--visual')).toBe(true);
-    expect(screenshotMenu?.querySelectorAll('.app__visual-tile')).toHaveLength(2);
-    expect(screenshotMenu?.querySelector('.app__menu-heading')?.textContent).toBe(
+    expect(screenshotMenu?.classList.contains('fc-tb__menu--visual')).toBe(true);
+    expect(screenshotMenu?.querySelectorAll('.fc-tb__visual-tile')).toHaveLength(2);
+    expect(screenshotMenu?.querySelector('.fc-tb__menu-heading')?.textContent).toBe(
       'Available Windows',
     );
     const currentViewButton = host.querySelector<HTMLButtonElement>(
       '[data-screenshot-insert="current-view"]',
     );
     expect(currentViewButton).toBeTruthy();
-    expect(currentViewButton?.classList.contains('app__visual-tile--screenshot-preview')).toBe(
+    expect(currentViewButton?.classList.contains('fc-tb__visual-tile--screenshot-preview')).toBe(
       true,
     );
     const screenshotEvent = new MouseEvent('click', { bubbles: true });
@@ -3418,10 +3419,10 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(shapeButton).toBeTruthy();
     shapeButton?.click();
     const shapesMenu = host.querySelector<HTMLElement>('#menu-shapes-insert');
-    expect(shapesMenu?.classList.contains('app__menu--visual')).toBe(true);
-    expect(shapesMenu?.querySelectorAll('.app__visual-tile')).toHaveLength(7);
+    expect(shapesMenu?.classList.contains('fc-tb__menu--visual')).toBe(true);
+    expect(shapesMenu?.querySelectorAll('.fc-tb__visual-tile')).toHaveLength(7);
     expect(
-      Array.from(shapesMenu?.querySelectorAll<HTMLElement>('.app__menu-heading') ?? []).map(
+      Array.from(shapesMenu?.querySelectorAll<HTMLElement>('.fc-tb__menu-heading') ?? []).map(
         (heading) => heading.textContent,
       ),
     ).toEqual(['Lines', 'Rectangles', 'Basic Shapes']);
@@ -3521,7 +3522,7 @@ describe('Spreadsheet.mountToolbar', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('Screen Clipping');
     expect(dialog?.textContent).toContain('captureScreenClip');
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
@@ -3552,7 +3553,7 @@ describe('Spreadsheet.mountToolbar', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('Current Sheet View');
     expect(dialog?.textContent).toContain('mounted grid canvas');
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
@@ -3670,7 +3671,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(protectButton?.dataset.ribbonActivation).toBe('splitPrimary');
     protectButton?.click();
     expect(host.querySelector<HTMLDivElement>('#menu-protect-review')?.hidden).toBe(true);
-    const protectDialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const protectDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(protectDialog?.textContent).toContain('Protect Sheet');
     expect(protectDialog?.textContent).toContain('Allow all users of this worksheet to:');
     for (const label of [
@@ -3723,7 +3724,7 @@ describe('Spreadsheet.mountToolbar', () => {
     });
 
     protectButton?.click();
-    const unprotectDialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const unprotectDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(unprotectDialog?.textContent).toContain('Unprotect Sheet');
     const unprotectInput = unprotectDialog?.querySelector<HTMLInputElement>('input');
     expect(unprotectInput).toBeTruthy();
@@ -3731,15 +3732,15 @@ describe('Spreadsheet.mountToolbar', () => {
     unprotectInput.value = 'bad';
     unprotectDialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
     await Promise.resolve();
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'The password is incorrect.',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
     await Promise.resolve();
     expect(sheet.instance.store.getState().protection.protectedSheets.has(0)).toBe(true);
 
     protectButton?.click();
-    const unprotectRetryDialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const unprotectRetryDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     const unprotectRetryInput = unprotectRetryDialog?.querySelector<HTMLInputElement>('input');
     expect(unprotectRetryInput).toBeTruthy();
     if (!unprotectRetryInput) throw new Error('Expected retry password input.');
@@ -3753,7 +3754,7 @@ describe('Spreadsheet.mountToolbar', () => {
       protectButton as HTMLButtonElement,
     );
     const reviewProtectMenu = host.querySelector<HTMLElement>('#menu-protect-review');
-    expect(reviewProtectMenu?.querySelectorAll('.app__menu-item--iconic').length).toBe(8);
+    expect(reviewProtectMenu?.querySelectorAll('.fc-tb__menu-item--iconic').length).toBe(8);
     expect(
       reviewProtectMenu?.querySelector<HTMLButtonElement>('[data-protect-action="protect-sheet"]')
         ?.disabled,
@@ -3803,19 +3804,19 @@ describe('Spreadsheet.mountToolbar', () => {
     const allowEvent = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(allowEvent, 'target', { value: allowRangeButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(allowEvent)).toBe(true);
-    await waitFor(() => Boolean(document.body.querySelector<HTMLElement>('.app__dlg')));
-    const allowDialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    await waitFor(() => Boolean(document.body.querySelector<HTMLElement>('.fc-tb__dlg')));
+    const allowDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(allowDialog?.textContent).toContain('Range');
     const allowRangeInput = allowDialog?.querySelector<HTMLInputElement>('input');
     expect(allowRangeInput?.value).toBeTruthy();
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
     await waitFor(() => sheet.instance.store.getState().protection.allowedEditRanges.length === 1);
     await waitFor(() =>
       Boolean(
-        document.body.querySelector<HTMLElement>('.app__dlg')?.textContent?.includes('Allowed'),
+        document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent?.includes('Allowed'),
       ),
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     tb.dropdownsApi?.openDynamicRibbonDropdown(
       { command: 'protectReview', menuId: 'menu-protect-review' },
@@ -3827,10 +3828,10 @@ describe('Spreadsheet.mountToolbar', () => {
     Object.defineProperty(clearAllowedEvent, 'target', { value: clearAllowedRangesButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(clearAllowedEvent)).toBe(true);
     expect(sheet.instance.store.getState().protection.allowedEditRanges).toEqual([]);
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'Cleared allowed edit ranges',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     tb.dispose();
   });
@@ -3848,7 +3849,7 @@ describe('Spreadsheet.mountToolbar', () => {
     protectButton?.click();
 
     expect(host.querySelector<HTMLDivElement>('#menu-protect-view')?.hidden).toBe(true);
-    const protectDialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const protectDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(protectDialog?.textContent).toContain('Protect Sheet');
     protectDialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
     await Promise.resolve();
@@ -3879,7 +3880,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(protectButton).toBeTruthy();
     protectButton?.click();
 
-    let unprotectDialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    let unprotectDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(unprotectDialog?.textContent).toContain('Unprotect Sheet');
     let input = unprotectDialog?.querySelector<HTMLInputElement>('input');
     expect(input).toBeTruthy();
@@ -3889,17 +3890,17 @@ describe('Spreadsheet.mountToolbar', () => {
     await waitFor(
       () =>
         document.body
-          .querySelector<HTMLElement>('.app__dlg')
+          .querySelector<HTMLElement>('.fc-tb__dlg')
           ?.textContent?.includes('The password is incorrect.') === true,
     );
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'The password is incorrect.',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
     expect(sheet.instance.store.getState().protection.protectedSheets.has(0)).toBe(true);
 
     protectButton?.click();
-    unprotectDialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    unprotectDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     input = unprotectDialog?.querySelector<HTMLInputElement>('input');
     expect(input).toBeTruthy();
     if (!input) throw new Error('Expected retry password input.');
@@ -3924,7 +3925,7 @@ describe('Spreadsheet.mountToolbar', () => {
       protectButton as HTMLButtonElement,
     );
     const menu = host.querySelector<HTMLDivElement>('#menu-protect-view');
-    expect(menu?.querySelectorAll('.app__menu-item--iconic').length).toBe(2);
+    expect(menu?.querySelectorAll('.fc-tb__menu-item--iconic').length).toBe(2);
     const protectSheet = menu?.querySelector<HTMLButtonElement>(
       '[data-protect-action="protect-sheet"]',
     );
@@ -3977,7 +3978,7 @@ describe('Spreadsheet.mountToolbar', () => {
       { command: 'deleteCommentReview', menuId: 'menu-review-comments' },
       commentsButton as HTMLButtonElement,
     );
-    expect(host.querySelectorAll('#menu-review-comments .app__menu-item--iconic').length).toBe(2);
+    expect(host.querySelectorAll('#menu-review-comments .fc-tb__menu-item--iconic').length).toBe(2);
     const deleteActiveButton = host.querySelector<HTMLButtonElement>(
       '[data-comment-action="delete-active"]',
     );
@@ -4031,14 +4032,14 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(chartButton).toBeTruthy();
     chartButton?.click();
     await Promise.resolve();
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'Recommended Charts',
     );
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'Persisted chart creation and editing',
     );
     expect(sheet.instance.store.getState().charts.charts).toEqual([]);
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 });
     tb.dropdownsApi?.openDynamicRibbonDropdown({
@@ -4046,8 +4047,8 @@ describe('Spreadsheet.mountToolbar', () => {
       menuId: 'menu-chart-insert',
     });
     const chartMenu = host.querySelector<HTMLDivElement>('#menu-chart-insert');
-    expect(chartMenu?.classList.contains('app__menu--visual')).toBe(true);
-    expect(chartMenu?.querySelectorAll('.app__visual-tile[data-chart-insert]').length).toBe(7);
+    expect(chartMenu?.classList.contains('fc-tb__menu--visual')).toBe(true);
+    expect(chartMenu?.querySelectorAll('.fc-tb__visual-tile[data-chart-insert]').length).toBe(7);
     const recommendedButton = host.querySelector<HTMLButtonElement>(
       '[data-chart-insert="recommended"]',
     );
@@ -4056,11 +4057,11 @@ describe('Spreadsheet.mountToolbar', () => {
     Object.defineProperty(recommendedEvent, 'target', { value: recommendedButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(recommendedEvent)).toBe(true);
     await Promise.resolve();
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'Recommended Charts',
     );
     expect(sheet.instance.store.getState().charts.charts).toEqual([]);
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     tb.dropdownsApi?.openDynamicRibbonDropdown({
       command: 'chartInsert',
@@ -4091,8 +4092,8 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     expect(formatButton).toBeTruthy();
     formatButton?.click();
-    expect(host.querySelectorAll('#menu-format-cells .app__menu-item--iconic').length).toBe(18);
-    expect(host.querySelectorAll('#menu-format-cells .app__color-swatch').length).toBe(14);
+    expect(host.querySelectorAll('#menu-format-cells .fc-tb__menu-item--iconic').length).toBe(18);
+    expect(host.querySelectorAll('#menu-format-cells .fc-tb__color-swatch').length).toBe(14);
     const visibilityTrigger = host.querySelector<HTMLButtonElement>(
       '#menu-format-cells [data-format-submenu="visibility"]',
     );
@@ -4111,7 +4112,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(
       host
         .querySelector<HTMLButtonElement>('#menu-format-cells [data-cell-format="tab-color-red"]')
-        ?.classList.contains('app__color-swatch'),
+        ?.classList.contains('fc-tb__color-swatch'),
     ).toBe(true);
     expect(
       host
@@ -4131,7 +4132,7 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     expect(lockCellButton?.getAttribute('role')).toBe('menuitemcheckbox');
     expect(lockCellButton?.getAttribute('aria-checked')).toBe('true');
-    expect(lockCellButton?.classList.contains('app__menu-item--checked')).toBe(true);
+    expect(lockCellButton?.classList.contains('fc-tb__menu-item--checked')).toBe(true);
     const showRowsBeforeHide = host.querySelector<HTMLButtonElement>(
       '[data-cell-format="show-rows"]',
     );
@@ -4198,7 +4199,7 @@ describe('Spreadsheet.mountToolbar', () => {
       '#menu-format-cells [data-cell-format="lock-cell"]',
     );
     expect(unlockedLockCellButton?.getAttribute('aria-checked')).toBe('false');
-    expect(unlockedLockCellButton?.classList.contains('app__menu-item--checked')).toBe(false);
+    expect(unlockedLockCellButton?.classList.contains('fc-tb__menu-item--checked')).toBe(false);
 
     formatButton?.click();
     const tabColorButton = host.querySelector<HTMLButtonElement>(
@@ -4218,7 +4219,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(
       host
         .querySelector<HTMLButtonElement>('#menu-format-cells [data-cell-format="tab-color-red"]')
-        ?.classList.contains('app__color-swatch--active'),
+        ?.classList.contains('fc-tb__color-swatch--active'),
     ).toBe(true);
 
     formatButton?.click();
@@ -4229,7 +4230,7 @@ describe('Spreadsheet.mountToolbar', () => {
     const rowHeightEvent = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(rowHeightEvent, 'target', { value: rowHeightButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(rowHeightEvent)).toBe(true);
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     const input = dialog?.querySelector<HTMLInputElement>('input');
     expect(input).toBeTruthy();
     if (!input) throw new Error('Row height prompt input was not rendered');
@@ -4264,7 +4265,7 @@ describe('Spreadsheet.mountToolbar', () => {
     const colWidthEvent = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(colWidthEvent, 'target', { value: colWidthButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(colWidthEvent)).toBe(true);
-    const colDialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const colDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     const colInput = colDialog?.querySelector<HTMLInputElement>('input');
     expect(colInput).toBeTruthy();
     if (!colInput) throw new Error('Column width prompt input was not rendered');
@@ -4315,7 +4316,7 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     expect(breaksButton).toBeTruthy();
     breaksButton?.click();
-    expect(host.querySelectorAll('#menu-page-breaks .app__menu-item--iconic')).toHaveLength(3);
+    expect(host.querySelectorAll('#menu-page-breaks .fc-tb__menu-item--iconic')).toHaveLength(3);
     const insertButton = host.querySelector<HTMLButtonElement>('[data-page-break-action="insert"]');
     const removeButton = host.querySelector<HTMLButtonElement>('[data-page-break-action="remove"]');
     const resetButton = host.querySelector<HTMLButtonElement>(
@@ -4324,7 +4325,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(insertButton).toBeTruthy();
     expect(removeButton).toBeTruthy();
     expect(
-      host.querySelector<HTMLElement>('#menu-page-breaks .app__menu-icon--break-page'),
+      host.querySelector<HTMLElement>('#menu-page-breaks .fc-tb__menu-icon--break-page'),
     ).toBeTruthy();
     expect(insertButton?.textContent).toContain('Insert Page Break');
     expect(removeButton?.textContent).toContain('Remove Page Break');
@@ -4420,7 +4421,7 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     expect(ccwButton?.getAttribute('role')).toBe('menuitemradio');
     expect(ccwButton?.getAttribute('aria-checked')).toBe('true');
-    expect(ccwButton?.classList.contains('app__menu-item--active')).toBe(true);
+    expect(ccwButton?.classList.contains('fc-tb__menu-item--active')).toBe(true);
 
     tb.dispose();
   });
@@ -4449,7 +4450,7 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     expect(clearArrowsButton).toBeTruthy();
     clearArrowsButton?.click();
-    expect(host.querySelectorAll('#menu-clear-arrows .app__menu-item--iconic').length).toBe(3);
+    expect(host.querySelectorAll('#menu-clear-arrows .fc-tb__menu-item--iconic').length).toBe(3);
     const clearAllButton = host.querySelector<HTMLButtonElement>(
       '[data-formula-audit-action="clear-all"]',
     );
@@ -4528,7 +4529,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(sheet.instance.store.getState().ui.sheetBackgroundImages.has(0)).toBe(false);
     expect(backgroundButton?.textContent).toContain('Background');
     expect(backgroundButton?.getAttribute('aria-label')).toBe('Background');
-    expect(document.body.querySelector('.app__dlg')).toBeNull();
+    expect(document.body.querySelector('.fc-tb__dlg')).toBeNull();
 
     tb.dispose();
   });
@@ -4585,7 +4586,7 @@ describe('Spreadsheet.mountToolbar', () => {
       expect(button?.dataset.ribbonMenuId, `${command} menu id metadata`).toBe(menuId);
       expect(button?.getAttribute('aria-haspopup'), `${command} aria-haspopup`).toBe('menu');
       expect(
-        button?.querySelector('.demo__rb-split-chevron'),
+        button?.querySelector('.fc-tb__rb-split-chevron'),
         `${command} renders dropdown affordance`,
       ).toBeTruthy();
       expect(tb.dropdownsApi?.dynamicDropdownSpecForButton(button as HTMLButtonElement)).toEqual({
@@ -4877,7 +4878,7 @@ describe('Spreadsheet.mountToolbar', () => {
 
   it('does not classify ribbon layout row breaks as primary actions', () => {
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, { helpers: stubHelpers() });
-    const rowBreaks = Array.from(host.querySelectorAll<HTMLElement>('.demo__rb-break')).map(
+    const rowBreaks = Array.from(host.querySelectorAll<HTMLElement>('.fc-tb__rb-break')).map(
       (el) => el.dataset.ribbonCommand,
     );
 
@@ -5013,13 +5014,13 @@ describe('Spreadsheet.mountToolbar', () => {
       pasteButton as HTMLButtonElement,
     );
 
-    expect(host.querySelectorAll('#menu-paste .app__menu-item--iconic').length).toBe(8);
+    expect(host.querySelectorAll('#menu-paste .fc-tb__menu-item--iconic').length).toBe(8);
     expect(
       Array.from(host.querySelectorAll<HTMLButtonElement>('#menu-paste [data-paste-action]'))
         .filter((button) => !button.hidden)
         .map((button) => button.dataset.pasteAction),
     ).toEqual(['all', 'dialog']);
-    expect(host.querySelector<HTMLElement>('#menu-paste .app__menu-sep')?.hidden).toBe(true);
+    expect(host.querySelector<HTMLElement>('#menu-paste .fc-tb__menu-sep')?.hidden).toBe(true);
     const pasteSpecial = host.querySelector<HTMLButtonElement>('[data-paste-action="dialog"]');
     const pasteAll = host.querySelector<HTMLButtonElement>('[data-paste-action="all"]');
     expect(pasteSpecial).toBeTruthy();
@@ -5152,17 +5153,17 @@ describe('Spreadsheet.mountToolbar', () => {
     await Promise.resolve();
 
     expect(host.querySelector<HTMLDivElement>('#menu-error-checking')?.hidden).toBe(true);
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'Error Checking',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     tb.dropdownsApi?.openDynamicRibbonDropdown(
       { command: 'errorChecking', menuId: 'menu-error-checking' },
       errorButton as HTMLButtonElement,
     );
     expect(host.querySelector<HTMLDivElement>('#menu-error-checking')?.hidden).toBe(false);
-    expect(host.querySelectorAll('#menu-error-checking .app__menu-item--iconic').length).toBe(3);
+    expect(host.querySelectorAll('#menu-error-checking .fc-tb__menu-item--iconic').length).toBe(3);
     expect(
       host.querySelector<HTMLButtonElement>('[data-formula-audit-action="trace-error"]'),
     ).toBeTruthy();
@@ -5236,7 +5237,7 @@ describe('Spreadsheet.mountToolbar', () => {
       watchButton as HTMLButtonElement,
     );
     expect(host.querySelector<HTMLDivElement>('#menu-watch-formulas')?.hidden).toBe(false);
-    expect(host.querySelectorAll('#menu-watch-formulas .app__menu-item--iconic').length).toBe(4);
+    expect(host.querySelectorAll('#menu-watch-formulas .fc-tb__menu-item--iconic').length).toBe(4);
     const addButton = host.querySelector<HTMLButtonElement>('[data-watch-action="add"]');
     expect(addButton).toBeTruthy();
     const deleteButton = host.querySelector<HTMLButtonElement>('[data-watch-action="delete"]');
@@ -5296,7 +5297,7 @@ describe('Spreadsheet.mountToolbar', () => {
       helpers: stubHelpers(),
     });
     const externallyWiredMenuIds = new Set(Object.values(RIBBON_EXTERNAL_MENU_FOR_COMMAND));
-    const unowned = Array.from(host.querySelectorAll<HTMLDivElement>('.app__menu'))
+    const unowned = Array.from(host.querySelectorAll<HTMLDivElement>('.fc-tb__menu'))
       .map((menu) => menu.id)
       .filter(
         (menuId) =>
@@ -5371,23 +5372,23 @@ describe('Spreadsheet.mountToolbar', () => {
     const plainItems: string[] = [];
 
     const isStructuredMenuButton = (item: HTMLButtonElement): boolean =>
-      item.classList.contains('app__menu-item--iconic') ||
-      item.classList.contains('app__menu-item--preset') ||
-      item.classList.contains('app__cellstyle-chip') ||
-      item.classList.contains('app__tablestyle-swatch') ||
-      item.classList.contains('app__visual-tile') ||
-      item.classList.contains('app__symbol-tile') ||
-      item.classList.contains('app__color-swatch') ||
-      item.classList.contains('app__cf-choice') ||
-      item.classList.contains('app__cf-icon-choice') ||
-      item.classList.contains('app__submenu-item') ||
+      item.classList.contains('fc-tb__menu-item--iconic') ||
+      item.classList.contains('fc-tb__menu-item--preset') ||
+      item.classList.contains('fc-tb__cellstyle-chip') ||
+      item.classList.contains('fc-tb__tablestyle-swatch') ||
+      item.classList.contains('fc-tb__visual-tile') ||
+      item.classList.contains('fc-tb__symbol-tile') ||
+      item.classList.contains('fc-tb__color-swatch') ||
+      item.classList.contains('fc-tb__cf-choice') ||
+      item.classList.contains('fc-tb__cf-icon-choice') ||
+      item.classList.contains('fc-tb__submenu-item') ||
       item.classList.contains('fc-colorpalette__swatch') ||
       item.classList.contains('fc-colorpalette__action') ||
       !!item.querySelector(
-        '.app__border-preview, .app__cf-icon, .app__menu-item__icon-spacer, .app__text-orientation-preview',
+        '.fc-tb__border-preview, .fc-tb__cf-icon, .fc-tb__menu-item__icon-spacer, .fc-tb__text-orientation-preview',
       );
 
-    for (const menu of host.querySelectorAll<HTMLElement>('.app__menu')) {
+    for (const menu of host.querySelectorAll<HTMLElement>('.fc-tb__menu')) {
       for (const item of menu.querySelectorAll<HTMLButtonElement>('button')) {
         if (!isStructuredMenuButton(item)) {
           plainItems.push(`${menu.id}:${item.textContent?.trim() ?? ''}`);
@@ -5502,12 +5503,12 @@ describe('Spreadsheet.mountToolbar', () => {
     pivotButton?.click();
 
     expect(document.body.textContent).toContain('Create PivotTable');
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn')?.click();
     tb.dropdownsApi?.openDynamicRibbonDropdown(
       { command: 'pivotTableInsert', menuId: 'menu-pivot-table' },
       pivotButton as HTMLButtonElement,
     );
-    expect(host.querySelectorAll('#menu-pivot-table .app__menu-item--iconic').length).toBe(5);
+    expect(host.querySelectorAll('#menu-pivot-table .fc-tb__menu-item--iconic').length).toBe(5);
     expect(
       host.querySelector<HTMLButtonElement>('[data-pivot-table-action="dialog"]'),
     ).toBeTruthy();
@@ -5521,13 +5522,13 @@ describe('Spreadsheet.mountToolbar', () => {
     const recommendedEvent = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(recommendedEvent, 'target', { value: recommendedButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(recommendedEvent)).toBe(true);
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'Recommended PivotTables',
     );
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'Creating or editing PivotTable definitions',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     tb.dropdownsApi?.openDynamicRibbonDropdown(
       { command: 'pivotTableInsert', menuId: 'menu-pivot-table' },
@@ -5563,7 +5564,7 @@ describe('Spreadsheet.mountToolbar', () => {
     symbolButton?.click();
 
     await Promise.resolve();
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('More Symbols');
     const input = dialog?.querySelector<HTMLInputElement>('input');
     expect(input).toBeTruthy();
@@ -5604,16 +5605,16 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     const menu = host.querySelector<HTMLDivElement>('#menu-symbol');
     expect(menu?.hidden).toBe(false);
-    expect(menu?.classList.contains('app__menu--symbols')).toBe(true);
-    expect(menu?.querySelectorAll('.app__symbol-grid').length).toBeGreaterThan(0);
-    expect(menu?.querySelectorAll('button.app__menu-item[data-symbol]').length).toBe(0);
-    expect(menu?.querySelectorAll('.app__menu-item--iconic').length).toBe(1);
+    expect(menu?.classList.contains('fc-tb__menu--symbols')).toBe(true);
+    expect(menu?.querySelectorAll('.fc-tb__symbol-grid').length).toBeGreaterThan(0);
+    expect(menu?.querySelectorAll('button.fc-tb__menu-item[data-symbol]').length).toBe(0);
+    expect(menu?.querySelectorAll('.fc-tb__menu-item--iconic').length).toBe(1);
     const piButton = Array.from(
       menu?.querySelectorAll<HTMLButtonElement>('[data-symbol]') ?? [],
     ).find((button) => button.dataset.symbol === 'π');
     expect(piButton).toBeTruthy();
-    expect(piButton?.classList.contains('app__symbol-tile')).toBe(true);
-    expect(piButton?.querySelector('.app__symbol-tile__glyph')?.textContent).toBe('π');
+    expect(piButton?.classList.contains('fc-tb__symbol-tile')).toBe(true);
+    expect(piButton?.querySelector('.fc-tb__symbol-tile__glyph')?.textContent).toBe('π');
     const event = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(event, 'target', { value: piButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
@@ -5647,7 +5648,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
 
     await Promise.resolve();
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('More Symbols');
     const input = dialog?.querySelector<HTMLInputElement>('input');
     expect(input).toBeTruthy();
@@ -5675,7 +5676,7 @@ describe('Spreadsheet.mountToolbar', () => {
         ...helpers,
         createIcon: (name) => {
           const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-          icon.setAttribute('class', 'demo__rb-icon');
+          icon.setAttribute('class', 'fc-tb__rb-icon');
           icon.dataset.icon = name;
           return icon;
         },
@@ -5687,11 +5688,11 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(mergeButton?.dataset.ribbonActivation).toBe('splitPrimary');
     expect(mergeButton?.dataset.ribbonMenuId).toBe('menu-merge');
     expect(mergeButton?.getAttribute('aria-haspopup')).toBe('menu');
-    expect(mergeButton?.querySelector('.demo__rb-icon')).toBeTruthy();
+    expect(mergeButton?.querySelector('.fc-tb__rb-icon')).toBeTruthy();
     const textLabels = Array.from(mergeButton?.querySelectorAll('span') ?? []).filter(
       (span) =>
-        !span.classList.contains('demo__rb-icon') &&
-        !span.classList.contains('demo__rb-split-chevron'),
+        !span.classList.contains('fc-tb__rb-icon') &&
+        !span.classList.contains('fc-tb__rb-split-chevron'),
     );
     expect(textLabels).toEqual([]);
 
@@ -5700,7 +5701,7 @@ describe('Spreadsheet.mountToolbar', () => {
       mergeButton as HTMLButtonElement,
     );
     const mergeItems = Array.from(
-      host.querySelectorAll<HTMLButtonElement>('#menu-merge .app__menu-item--iconic'),
+      host.querySelectorAll<HTMLButtonElement>('#menu-merge .fc-tb__menu-item--iconic'),
     );
     expect(mergeItems.map((item) => item.textContent)).toEqual([
       'Merge & Center',
@@ -5773,7 +5774,7 @@ describe('Spreadsheet.mountToolbar', () => {
         ...helpers,
         createIcon: (name) => {
           const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-          icon.setAttribute('class', 'demo__rb-icon');
+          icon.setAttribute('class', 'fc-tb__rb-icon');
           icon.dataset.icon = name;
           return icon;
         },
@@ -5782,29 +5783,29 @@ describe('Spreadsheet.mountToolbar', () => {
 
     const mergeButton = host.querySelector<HTMLButtonElement>('[data-ribbon-command="merge"]');
     expect(mergeButton).toBeTruthy();
-    expect(mergeButton?.closest('.demo__ribbon-group')?.classList).toContain(
-      'demo__ribbon-group--alignment',
+    expect(mergeButton?.closest('.fc-tb__ribbon-group')?.classList).toContain(
+      'fc-tb__ribbon-group--alignment',
     );
-    expect(mergeButton?.classList.contains('demo__rb--wide')).toBe(false);
+    expect(mergeButton?.classList.contains('fc-tb__rb--wide')).toBe(false);
     expect(mergeButton?.dataset.ribbonActivation).toBe('splitPrimary');
-    expect(mergeButton?.querySelector('.demo__rb-icon')?.getAttribute('data-icon')).toBe('merge');
+    expect(mergeButton?.querySelector('.fc-tb__rb-icon')?.getAttribute('data-icon')).toBe('merge');
     expect(
       Array.from(mergeButton?.querySelectorAll('span') ?? []).filter(
-        (span) => !span.classList.contains('demo__rb-split-chevron'),
+        (span) => !span.classList.contains('fc-tb__rb-split-chevron'),
       ),
     ).toEqual([]);
 
     const findButton = host.querySelector<HTMLButtonElement>('[data-ribbon-command="findHome"]');
     expect(findButton).toBeTruthy();
-    expect(findButton?.closest('.demo__ribbon-group')?.classList).toContain(
-      'demo__ribbon-group--editing',
+    expect(findButton?.closest('.fc-tb__ribbon-group')?.classList).toContain(
+      'fc-tb__ribbon-group--editing',
     );
-    expect(findButton?.classList.contains('demo__rb--wide')).toBe(true);
+    expect(findButton?.classList.contains('fc-tb__rb--wide')).toBe(true);
     expect(findButton?.dataset.ribbonActivation).toBe('dropdown');
     expect(findButton?.dataset.ribbonMenuId).toBe('menu-find-select');
-    expect(findButton?.querySelector('.demo__rb-icon')?.getAttribute('data-icon')).toBe('find');
+    expect(findButton?.querySelector('.fc-tb__rb-icon')?.getAttribute('data-icon')).toBe('find');
     expect(findButton?.querySelector('span')?.textContent).toBe('Find & Select');
-    expect(findButton?.querySelector('.demo__rb-split-chevron')).toBeTruthy();
+    expect(findButton?.querySelector('.fc-tb__rb-split-chevron')).toBeTruthy();
 
     tb.dispose();
   });
@@ -5813,34 +5814,34 @@ describe('Spreadsheet.mountToolbar', () => {
     const tb = Spreadsheet.mountToolbar(host, sheet.instance, { helpers: stubHelpers() });
 
     for (const variant of HOME_TILE_LAYOUT_GROUP_VARIANTS) {
-      const group = host.querySelector<HTMLElement>(`.demo__ribbon-group--${variant}`);
+      const group = host.querySelector<HTMLElement>(`.fc-tb__ribbon-group--${variant}`);
       expect(group, variant).toBeTruthy();
-      expect(group?.classList.contains('demo__ribbon-group--tiles'), variant).toBe(true);
+      expect(group?.classList.contains('fc-tb__ribbon-group--tiles'), variant).toBe(true);
       const nonWideCommands = Array.from(
         group?.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]') ?? [],
       )
-        .filter((button) => !button.classList.contains('demo__rb--wide'))
+        .filter((button) => !button.classList.contains('fc-tb__rb--wide'))
         .map((button) => button.dataset.ribbonCommand);
       expect(nonWideCommands, variant).toEqual([]);
     }
     for (const variant of HOME_STACKED_LAYOUT_GROUP_VARIANTS) {
-      const group = host.querySelector<HTMLElement>(`.demo__ribbon-group--${variant}`);
+      const group = host.querySelector<HTMLElement>(`.fc-tb__ribbon-group--${variant}`);
       expect(group, variant).toBeTruthy();
-      expect(group?.classList.contains('demo__ribbon-group--stacked'), variant).toBe(true);
+      expect(group?.classList.contains('fc-tb__ribbon-group--stacked'), variant).toBe(true);
       expect(
         Array.from(group?.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]') ?? []).map(
-          (button) => button.classList.contains('demo__rb--stacked'),
+          (button) => button.classList.contains('fc-tb__rb--stacked'),
         ),
         variant,
       ).toEqual([true, true, true]);
     }
     for (const variant of HOME_MIXED_LAYOUT_GROUP_VARIANTS) {
-      const group = host.querySelector<HTMLElement>(`.demo__ribbon-group--${variant}`);
+      const group = host.querySelector<HTMLElement>(`.fc-tb__ribbon-group--${variant}`);
       expect(group, variant).toBeTruthy();
-      expect(group?.classList.contains('demo__ribbon-group--mixed'), variant).toBe(true);
+      expect(group?.classList.contains('fc-tb__ribbon-group--mixed'), variant).toBe(true);
       expect(
         Array.from(group?.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]') ?? []).map(
-          (button) => button.classList.contains('demo__rb--stacked'),
+          (button) => button.classList.contains('fc-tb__rb--stacked'),
         ),
         variant,
       ).toEqual([true, true, true, false, false]);
@@ -5884,7 +5885,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(freezeMenu?.hidden).toBe(true);
     freezeButton?.click();
     const freezeItems = Array.from(
-      host.querySelectorAll<HTMLButtonElement>('#menu-freeze .app__menu-item--iconic'),
+      host.querySelectorAll<HTMLButtonElement>('#menu-freeze .fc-tb__menu-item--iconic'),
     );
     expect(freezeItems).toHaveLength(3);
     expect(freezeItems.map((item) => item.textContent)).toEqual([
@@ -5906,7 +5907,7 @@ describe('Spreadsheet.mountToolbar', () => {
     freezeButton?.click();
     const unfreeze = host.querySelector<HTMLButtonElement>('#menu-freeze [data-freeze="off"]');
     expect(unfreeze).toBeTruthy();
-    expect(host.querySelectorAll('#menu-freeze .app__menu-item--iconic').length).toBe(3);
+    expect(host.querySelectorAll('#menu-freeze .fc-tb__menu-item--iconic').length).toBe(3);
     expect(unfreeze?.textContent).toBe('Unfreeze Panes');
     expect(unfreeze?.disabled).toBe(false);
     expect(unfreeze?.getAttribute('aria-disabled')).toBe('false');
@@ -5998,7 +5999,7 @@ describe('Spreadsheet.mountToolbar', () => {
       menuId: 'menu-links-data',
     });
     const linksMenu = host.querySelector<HTMLElement>('#menu-links-data');
-    expect(linksMenu?.querySelectorAll('.app__menu-item--iconic').length).toBe(4);
+    expect(linksMenu?.querySelectorAll('.fc-tb__menu-item--iconic').length).toBe(4);
     const openButton = linksMenu?.querySelector<HTMLButtonElement>('[data-link-action="open"]');
     const clearButton = linksMenu?.querySelector<HTMLButtonElement>('[data-link-action="clear"]');
     expect(openButton?.disabled).toBe(false);
@@ -6082,7 +6083,7 @@ describe('Spreadsheet.mountToolbar', () => {
       { command: 'findHome', menuId: 'menu-find-select' },
       findButton as HTMLButtonElement,
     );
-    expect(host.querySelectorAll('#menu-find-select .app__menu-item--iconic').length).toBe(11);
+    expect(host.querySelectorAll('#menu-find-select .fc-tb__menu-item--iconic').length).toBe(11);
 
     await clickFindSelect('find');
     await clickFindSelect('replace');
@@ -6098,16 +6099,16 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(openWorkbookObjects).toHaveBeenCalledTimes(2);
 
     await clickFindSelect('conditional-format');
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'No matching cells were found.',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     await clickFindSelect('comments');
-    expect(document.body.querySelector<HTMLElement>('.app__dlg')?.textContent).toContain(
+    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
       'No comments or notes were found.',
     );
-    document.body.querySelector<HTMLButtonElement>('.app__dlg .fc-fmtdlg__btn--primary')?.click();
+    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
 
     await clickFindSelect('formulas');
 
@@ -6147,7 +6148,7 @@ describe('Spreadsheet.mountToolbar', () => {
       menuId: 'menu-defined-names',
     });
     const namesMenu = host.querySelector<HTMLElement>('#menu-defined-names');
-    expect(namesMenu?.querySelectorAll('.app__menu-item--iconic').length).toBe(7);
+    expect(namesMenu?.querySelectorAll('.fc-tb__menu-item--iconic').length).toBe(7);
     expect(
       namesMenu?.querySelector<HTMLButtonElement>('[data-defined-name-action="use-formula"]')
         ?.disabled,
@@ -6173,7 +6174,7 @@ describe('Spreadsheet.mountToolbar', () => {
     Object.defineProperty(useFormulaEvent, 'target', { value: useFormulaButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(useFormulaEvent)).toBe(true);
     await Promise.resolve();
-    const useFormulaDialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const useFormulaDialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(useFormulaDialog?.textContent).toContain('Use in Formula');
     expect(useFormulaDialog?.textContent).toContain('TaxRate');
     expect(useFormulaDialog?.textContent).toContain('NetSales');

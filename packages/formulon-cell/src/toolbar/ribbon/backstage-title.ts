@@ -112,7 +112,7 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
     const activeRibbonTab = getActiveRibbonTab();
     for (const item of ribbonRoot.querySelectorAll<HTMLButtonElement>('[data-ribbon-tab]')) {
       const isActive = item.dataset.ribbonTab === activeRibbonTab;
-      item.classList.toggle('demo__ribbon-tab--active', isActive);
+      item.classList.toggle('fc-tb__ribbon-tab--active', isActive);
       item.setAttribute('aria-selected', isActive ? 'true' : 'false');
       item.tabIndex = isActive ? 0 : -1;
       if (focusTab && isActive) item.focus({ preventScroll: true });
@@ -120,7 +120,7 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
     for (const panel of ribbonRoot.querySelectorAll<HTMLElement>('[data-ribbon-panel]')) {
       panel.hidden = panel.dataset.ribbonPanel !== activeRibbonTab;
     }
-    ribbonRoot.querySelector('.demo__ribbon-display-menu')?.remove();
+    ribbonRoot.querySelector('.fc-tb__ribbon-display-menu')?.remove();
     ribbonRoot
       .querySelector<HTMLButtonElement>('[data-ribbon-toggle]')
       ?.setAttribute('aria-expanded', 'false');
@@ -129,10 +129,10 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
   const setRibbonCollapsedExternal = (next: boolean): void => {
     setRibbonCollapsedState(next);
     const ribbonCollapsed = getRibbonCollapsed();
-    for (const shell of ribbonRoot?.querySelectorAll<HTMLElement>('.demo__ribbon-shell') ?? []) {
-      shell.classList.toggle('demo__ribbon-shell--collapsed', ribbonCollapsed);
+    for (const shell of ribbonRoot?.querySelectorAll<HTMLElement>('.fc-tb__ribbon-shell') ?? []) {
+      shell.classList.toggle('fc-tb__ribbon-shell--collapsed', ribbonCollapsed);
     }
-    for (const tabs of ribbonRoot?.querySelectorAll<HTMLElement>('.demo__ribbon-tabs') ?? []) {
+    for (const tabs of ribbonRoot?.querySelectorAll<HTMLElement>('.fc-tb__ribbon-tabs') ?? []) {
       tabs.dataset.ribbonCollapsed = ribbonCollapsed ? 'true' : 'false';
     }
     for (const item of ribbonRoot?.querySelectorAll<HTMLButtonElement>(
@@ -173,7 +173,7 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
   };
 
   const titleActionButton = (label: string): HTMLButtonElement | null =>
-    document.querySelector<HTMLButtonElement>(`.app__title [data-shell-i18n-label="${label}"]`);
+    document.querySelector<HTMLButtonElement>(`.fc-tb__title [data-shell-i18n-label="${label}"]`);
 
   titleActionButton('home')?.addEventListener('click', () => {
     closeBackstage();
@@ -269,7 +269,7 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
 
   const titleMoreButton = titleActionButton('more');
   const titleMoreMenu = createMenu('menu-title-more');
-  titleMoreMenu.classList.add('app__title-more-menu');
+  titleMoreMenu.classList.add('fc-tb__title-more-menu');
   titleMoreMenu.append(
     menuIconButton(shellText.save, 'titleMoreAction', 'save', 'title-save'),
     menuIconButton(shellText.saveAs, 'titleMoreAction', 'save-as', 'title-save-as'),

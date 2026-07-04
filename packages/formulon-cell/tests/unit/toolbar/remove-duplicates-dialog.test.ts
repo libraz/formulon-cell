@@ -29,7 +29,7 @@ describe('showRemoveDuplicatesDialog', () => {
       cancelLabel: 'Cancel',
     });
 
-    const dialog = document.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.querySelector<HTMLElement>('.fc-tb__dlg');
     const list = dialog?.querySelector<HTMLElement>('.fc-dedupedlg__column-list');
     expect(list?.getAttribute('role')).toBe('group');
     expect(list?.getAttribute('aria-label')).toBe('Columns');
@@ -42,7 +42,7 @@ describe('showRemoveDuplicatesDialog', () => {
       expect(checkbox.checked).toBe(false);
     }
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
-    expect(dialog?.querySelector<HTMLElement>('.app__dlg__error')?.textContent).toBe(
+    expect(dialog?.querySelector<HTMLElement>('.fc-tb__dlg__error')?.textContent).toBe(
       'Select at least one column.',
     );
 

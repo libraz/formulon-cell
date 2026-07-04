@@ -16,7 +16,7 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
   await expect(page.getByRole('tab', { name: 'ホーム', exact: true })).toBeVisible();
   await expect(page.getByRole('tab', { name: '挿入', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '貼り付け', exact: true }).first()).toBeVisible();
-  const searchBox = page.locator('.demo__search input').first();
+  const searchBox = page.locator('.fc-tb__search input').first();
   await expect(searchBox).toHaveAttribute('aria-label', 'コマンドの検索');
   await searchBox.fill('貼り付け');
   const searchResults = page.locator('#demo-search-results');
@@ -29,7 +29,7 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
   const ribbonDisplayToggle = page.locator('[data-ribbon-toggle]').first();
   await expect(ribbonDisplayToggle).toHaveAttribute('aria-label', 'リボンの表示オプション');
   await ribbonDisplayToggle.click();
-  const ribbonDisplayMenu = page.locator('.demo__ribbon-display-menu');
+  const ribbonDisplayMenu = page.locator('.fc-tb__ribbon-display-menu');
   await expect(ribbonDisplayMenu).toBeVisible();
   for (const label of [
     'リボンを常に表示',
@@ -718,7 +718,7 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
   await expect(zoomDialog).toHaveCount(0);
 
   await page.locator('[data-ribbon-tab="file"]').click();
-  const backstage = page.locator('.demo__backstage[role="dialog"]').first();
+  const backstage = page.locator('.fc-tb__backstage[role="dialog"]').first();
   await expect(backstage).toBeVisible();
   await expect(backstage).toHaveAttribute('aria-label', 'ファイル');
   await expect(backstage.getByText('ブック · スプレッドシート レイアウト')).toBeVisible();

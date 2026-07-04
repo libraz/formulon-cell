@@ -39,7 +39,7 @@ export const createDialogSelect = (
   opts: DialogSelectOptions = {},
 ): HTMLSelectElement => {
   const select = document.createElement('select');
-  select.className = opts.className ?? 'app__dlg__input';
+  select.className = opts.className ?? 'fc-tb__dlg__input';
   if (opts.fieldName) {
     select.dataset.dialogField = opts.fieldName;
   }
@@ -64,7 +64,7 @@ export const appendSelectRow = (
   const row = document.createElement('div');
   row.className = 'fc-fmtdlg__row fc-fmtdlg__row--block';
   const label = document.createElement('label');
-  label.className = 'app__dlg__label';
+  label.className = 'fc-tb__dlg__label';
   label.textContent = labelText;
   const select = createDialogSelect(options, initial, { fieldName });
   label.appendChild(select);

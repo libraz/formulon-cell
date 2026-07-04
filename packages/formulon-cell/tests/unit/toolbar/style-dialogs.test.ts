@@ -32,7 +32,7 @@ describe('style dialogs i18n', () => {
       strings: ja,
     });
 
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('新しい表スタイル');
     expect(dialog?.textContent).toContain('スタイル名');
     expect(dialog?.textContent).toContain('スタイルの種類');
@@ -68,7 +68,7 @@ describe('style dialogs i18n', () => {
       strings: ja,
     });
 
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('新しいセルのスタイル');
     expect(dialog?.textContent).toContain('スタイル名');
     expect(dialog?.textContent).toContain('スタイルに含めるもの');

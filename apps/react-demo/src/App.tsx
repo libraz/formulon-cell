@@ -112,7 +112,7 @@ const seed = seedDemoWorkbook;
 
 const DemoIcon = ({ name }: { name: DemoIconName }): ReactElement => (
   <svg
-    className="demo__rb-icon"
+    className="fc-tb__rb-icon"
     viewBox="0 0 20 20"
     strokeWidth="1.45"
     strokeLinecap="round"
@@ -559,7 +559,7 @@ export const App = (): ReactElement => {
   return (
     <div className="demo" data-fc-theme={theme}>
       <header className="demo__head">
-        <div className="demo__titlebar">
+        <div className="fc-tb__titlebar">
           <div
             ref={quickAccessRef}
             className="demo__quick"
@@ -594,11 +594,11 @@ export const App = (): ReactElement => {
               <DemoIcon name="redo" />
             </button>
           </div>
-          <div className="demo__title">
+          <div className="fc-tb__title">
             <strong>{bookName}</strong>
             <span>{ui.saved}</span>
           </div>
-          <div className="demo__search">
+          <div className="fc-tb__search">
             <DemoIcon name="search" />
             <input
               ref={searchInputRef}
@@ -654,9 +654,9 @@ export const App = (): ReactElement => {
               onBlur={() => setSearchOpen(false)}
             />
             {searchOpen ? (
-              <div id="demo-search-results" className="demo__command-menu" role="listbox">
+              <div id="demo-search-results" className="fc-tb__command-menu" role="listbox">
                 {filteredCommands.length === 0 ? (
-                  <div className="demo__command-empty">{ui.noCommands}</div>
+                  <div className="fc-tb__command-empty">{ui.noCommands}</div>
                 ) : (
                   filteredCommands.map((cmd, index) => (
                     <button
@@ -667,9 +667,9 @@ export const App = (): ReactElement => {
                       aria-selected={index === searchActiveIndex}
                       aria-disabled={cmd.disabled ? 'true' : undefined}
                       data-disabled-reason={cmd.disabledReason}
-                      className={`demo__command-item${
-                        index === searchActiveIndex ? ' demo__command-item--active' : ''
-                      }${cmd.disabled ? ' demo__command-item--disabled' : ''}`}
+                      className={`fc-tb__command-item${
+                        index === searchActiveIndex ? ' fc-tb__command-item--active' : ''
+                      }${cmd.disabled ? ' fc-tb__command-item--disabled' : ''}`}
                       onMouseDown={(e) => e.preventDefault()}
                       onMouseEnter={() => setSearchActiveIndex(index)}
                       onClick={() => runCommand(cmd)}
@@ -713,7 +713,7 @@ export const App = (): ReactElement => {
       />
 
       <main className={`demo__body${showPanel ? ' demo__body--panel' : ''}`}>
-        <div className="demo__sheet-col">
+        <div className="fc-tb__sheet-col">
           {resolvedUi.ribbon ? (
             <SpreadsheetToolbar
               instance={instance}
@@ -753,15 +753,15 @@ export const App = (): ReactElement => {
             onCellChange={onCellChange}
           />
           {ribbonTab === 'file' ? (
-            <div className="demo__backstage" role="dialog" aria-label={ui.file}>
-              <nav className="demo__backstage-nav" aria-label={ui.file}>
+            <div className="fc-tb__backstage" role="dialog" aria-label={ui.file}>
+              <nav className="fc-tb__backstage-nav" aria-label={ui.file}>
                 <strong>{ui.file}</strong>
                 {backstageNav.map((item) => (
                   <button
                     key={item.action}
                     type="button"
-                    className={`demo__backstage-navitem${
-                      item.active ? ' demo__backstage-navitem--active' : ''
+                    className={`fc-tb__backstage-navitem${
+                      item.active ? ' fc-tb__backstage-navitem--active' : ''
                     }`}
                     onClick={() => runBackstageAction(item.action)}
                     disabled={backstageActionDisabled(item.action)}
@@ -770,9 +770,9 @@ export const App = (): ReactElement => {
                   </button>
                 ))}
               </nav>
-              <div className="demo__backstage-main">
-                <div className="demo__backstage-title">
-                  <span className="demo__backstage-xl" aria-hidden="true">
+              <div className="fc-tb__backstage-main">
+                <div className="fc-tb__backstage-title">
+                  <span className="fc-tb__backstage-xl" aria-hidden="true">
                     <DemoIcon name="app" />
                   </span>
                   <div>
@@ -781,13 +781,13 @@ export const App = (): ReactElement => {
                   </div>
                 </div>
                 {backstageAction === 'print' ? (
-                  <div className="demo__print-preview" data-demo-print-preview>
-                    <section className="demo__print-settings" aria-label={ui.printSettings}>
+                  <div className="fc-tb__print-preview" data-demo-print-preview>
+                    <section className="fc-tb__print-settings" aria-label={ui.printSettings}>
                       <h2>{printPreview.title}</h2>
                       <p>{printPreview.subtitle}</p>
                       <button
                         type="button"
-                        className="demo__print-action demo__print-action--primary"
+                        className="fc-tb__print-action fc-tb__print-action--primary"
                         onClick={() => instance?.print('print')}
                         disabled={!instance}
                       >
@@ -795,7 +795,7 @@ export const App = (): ReactElement => {
                       </button>
                       <button
                         type="button"
-                        className="demo__print-action"
+                        className="fc-tb__print-action"
                         onClick={() => instance?.print('pdf')}
                         disabled={!instance}
                       >
@@ -803,13 +803,13 @@ export const App = (): ReactElement => {
                       </button>
                       <button
                         type="button"
-                        className="demo__print-action"
+                        className="fc-tb__print-action"
                         onClick={() => instance?.openPageSetup()}
                         disabled={!instance}
                       >
                         {printPreview.pageSetupLabel}
                       </button>
-                      <dl className="demo__print-meta">
+                      <dl className="fc-tb__print-meta">
                         {printPreview.settings.map((row) => (
                           <div key={row.label}>
                             <dt>{row.label}</dt>
@@ -818,18 +818,18 @@ export const App = (): ReactElement => {
                         ))}
                       </dl>
                     </section>
-                    <section className="demo__print-paper" aria-label={printPreview.previewTitle}>
+                    <section className="fc-tb__print-paper" aria-label={printPreview.previewTitle}>
                       {printPreview.previewHtml ? (
                         <iframe
-                          className="demo__print-frame"
+                          className="fc-tb__print-frame"
                           title={printPreview.previewTitle}
                           sandbox=""
                           srcDoc={printPreview.previewHtml}
                         />
                       ) : (
-                        <div className="demo__print-page">
+                        <div className="fc-tb__print-page">
                           <strong>{printPreview.previewTitle}</strong>
-                          <div aria-hidden="true" className="demo__print-sheet-lines">
+                          <div aria-hidden="true" className="fc-tb__print-sheet-lines">
                             {DEMO_PRINT_PREVIEW_LINES.map((line) => (
                               <span key={line} />
                             ))}
@@ -840,12 +840,12 @@ export const App = (): ReactElement => {
                     </section>
                   </div>
                 ) : (
-                  <div className="demo__backstage-grid">
+                  <div className="fc-tb__backstage-grid">
                     {backstageCards.map((item) => (
                       <button
                         key={item.action}
                         type="button"
-                        className="demo__backstage-card"
+                        className="fc-tb__backstage-card"
                         onClick={() => runBackstageAction(item.action)}
                         disabled={backstageActionDisabled(item.action)}
                       >
@@ -960,7 +960,7 @@ export const App = (): ReactElement => {
           <section className="demo__card">
             <h2>{ui.cellRenderers}</h2>
             <p className="demo__hint">{ui.cellRenderersHint}</p>
-            <label className="demo__check">
+            <label className="fc-tb__check">
               <input
                 type="checkbox"
                 checked={formatters.uppercase}
@@ -968,7 +968,7 @@ export const App = (): ReactElement => {
               />
               {ui.uppercaseColumnA}
             </label>
-            <label className="demo__check">
+            <label className="fc-tb__check">
               <input
                 type="checkbox"
                 checked={formatters.arrows}
@@ -984,7 +984,7 @@ export const App = (): ReactElement => {
             <div className="demo__probe">
               <button
                 type="button"
-                className="demo__btn demo__btn--ghost"
+                className="fc-tb__btn fc-tb__btn--ghost"
                 onClick={() => runProbe('GREET', [{ kind: 'text', value: 'Workbook' }])}
                 disabled={!instance}
               >
@@ -992,7 +992,7 @@ export const App = (): ReactElement => {
               </button>
               <button
                 type="button"
-                className="demo__btn demo__btn--ghost"
+                className="fc-tb__btn fc-tb__btn--ghost"
                 onClick={() => runProbe('FAHRENHEIT', [{ kind: 'number', value: 100 }])}
                 disabled={!instance}
               >
@@ -1010,7 +1010,7 @@ export const App = (): ReactElement => {
             <h2>{ui.cellChangeLog}</h2>
             <p className="demo__hint">{ui.cellChangeLogHint}</p>
             {log.length === 0 ? (
-              <p className="demo__empty">{ui.editCellToSeeEvents}</p>
+              <p className="fc-tb__empty">{ui.editCellToSeeEvents}</p>
             ) : (
               <ul className="demo__log">
                 {log.map((entry) => (
@@ -1028,28 +1028,28 @@ export const App = (): ReactElement => {
       {reviewDialog ? (
         <div
           ref={reviewModalRef}
-          className="demo__modal"
+          className="fc-tb__modal"
           role="dialog"
           aria-modal="true"
           aria-label={reviewDialog.title}
         >
-          <section className="demo__modal-panel">
-            <header className="demo__modal-header">
+          <section className="fc-tb__modal-panel">
+            <header className="fc-tb__modal-header">
               <h2>{reviewDialog.title}</h2>
               <button
                 type="button"
-                className="demo__modal-x"
+                className="fc-tb__modal-x"
                 aria-label={ui.close}
                 onClick={closeReviewDialog}
               >
                 ×
               </button>
             </header>
-            <div className="demo__modal-body">
+            <div className="fc-tb__modal-body">
               {reviewDialog.items.length === 0 ? (
-                <p className="demo__modal-empty">{ui.noIssuesFound}</p>
+                <p className="fc-tb__modal-empty">{ui.noIssuesFound}</p>
               ) : (
-                <ul className="demo__modal-list">
+                <ul className="fc-tb__modal-list">
                   {reviewDialog.items.map((item) => (
                     <li key={`${item.label}-${item.detail}`}>
                       <strong>{item.label}</strong>
@@ -1059,8 +1059,8 @@ export const App = (): ReactElement => {
                 </ul>
               )}
             </div>
-            <footer className="demo__modal-footer">
-              <button type="button" className="demo__btn" onClick={closeReviewDialog}>
+            <footer className="fc-tb__modal-footer">
+              <button type="button" className="fc-tb__btn" onClick={closeReviewDialog}>
                 {ui.ok}
               </button>
             </footer>
@@ -1070,31 +1070,31 @@ export const App = (): ReactElement => {
       {scriptOpen ? (
         <div
           ref={scriptModalRef}
-          className="demo__modal"
+          className="fc-tb__modal"
           role="dialog"
           aria-modal="true"
           aria-label={commandText.script}
         >
           <form
-            className="demo__modal-panel demo__modal-panel--narrow"
+            className="fc-tb__modal-panel fc-tb__modal-panel--narrow"
             onSubmit={(ev) => {
               ev.preventDefault();
               applyScriptCommand();
             }}
           >
-            <header className="demo__modal-header">
+            <header className="fc-tb__modal-header">
               <h2>{commandText.script}</h2>
               <button
                 type="button"
-                className="demo__modal-x"
+                className="fc-tb__modal-x"
                 aria-label={ui.close}
                 onClick={closeScriptDialog}
               >
                 ×
               </button>
             </header>
-            <div className="demo__modal-body">
-              <label className="demo__modal-field">
+            <div className="fc-tb__modal-body">
+              <label className="fc-tb__modal-field">
                 <span>{ui.command}</span>
                 <input
                   value={scriptCommand}
@@ -1104,13 +1104,13 @@ export const App = (): ReactElement => {
                   }}
                 />
               </label>
-              {scriptError ? <p className="demo__modal-error">{scriptError}</p> : null}
+              {scriptError ? <p className="fc-tb__modal-error">{scriptError}</p> : null}
             </div>
-            <footer className="demo__modal-footer">
-              <button type="button" className="demo__btn" onClick={closeScriptDialog}>
+            <footer className="fc-tb__modal-footer">
+              <button type="button" className="fc-tb__btn" onClick={closeScriptDialog}>
                 {ui.cancel}
               </button>
-              <button type="submit" className="demo__btn demo__btn--active">
+              <button type="submit" className="fc-tb__btn fc-tb__btn--active">
                 {ui.run}
               </button>
             </footer>

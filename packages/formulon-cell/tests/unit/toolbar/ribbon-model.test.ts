@@ -123,18 +123,18 @@ describe('toolbar/ribbon-model', () => {
     const groupsCss = readFileSync(join(ribbonStylesDir, 'groups.css'), 'utf8');
 
     for (const variant of HOME_TILE_LAYOUT_GROUP_VARIANTS) {
-      expect(groupsCss).toContain(`.demo__ribbon-group--${variant} .demo__ribbon-tools`);
+      expect(groupsCss).toContain(`.fc-tb__ribbon-group--${variant} .fc-tb__ribbon-tools`);
     }
-    expect(groupsCss).toContain('.demo__ribbon-group--tiles .demo__rb--wide');
-    expect(groupsCss).toContain('.demo__ribbon-group--tiles .demo__rb-icon');
+    expect(groupsCss).toContain('.fc-tb__ribbon-group--tiles .fc-tb__rb--wide');
+    expect(groupsCss).toContain('.fc-tb__ribbon-group--tiles .fc-tb__rb-icon');
     expect(groupsCss).toContain('flex-wrap: nowrap;');
     expect(groupsCss).toContain('height: 66px;');
     expect(groupsCss).toContain('grid-template-columns: 58px repeat(2, 30px);');
-    expect(groupsCss).toContain('.demo__ribbon-group--tiles .demo__rb .demo__rb-split-chevron');
+    expect(groupsCss).toContain('.fc-tb__ribbon-group--tiles .fc-tb__rb .fc-tb__rb-split-chevron');
     expect(groupsCss).toContain('position: absolute;');
     expect(groupsCss).toContain('bottom: 5px;');
     expect(groupsCss).toMatch(
-      /\.demo__ribbon-group--stacked \.demo__rb--stacked \.demo__rb-icon,[\s\S]*?width: 17px;[\s\S]*?height: 17px;/,
+      /\.fc-tb__ribbon-group--stacked \.fc-tb__rb--stacked \.fc-tb__rb-icon,[\s\S]*?width: 17px;[\s\S]*?height: 17px;/,
     );
   });
 
@@ -157,41 +157,41 @@ describe('toolbar/ribbon-model', () => {
     expect(tokensCss).toContain('--fc-tb-ribbon-hover: #f3f2f1;');
     expect(tokensCss).toContain('--fc-tb-ribbon-pressed: #edebe9;');
     expect(tokensCss).toContain('--fc-tb-ribbon-line: #e1dfdd;');
-    expect(layoutCss).toContain('.demo__ribbon-tabs');
+    expect(layoutCss).toContain('.fc-tb__ribbon-tabs');
     expect(layoutCss).toContain('background: var(--fc-tb-ribbon-bg);');
     expect(layoutCss).toMatch(
-      /\.demo__ribbon:not\(\[hidden\]\)\s*\{[\s\S]*?min-height: 96px;[\s\S]*?padding: 3px 6px 2px;/,
+      /\.fc-tb__ribbon:not\(\[hidden\]\)\s*\{[\s\S]*?min-height: 96px;[\s\S]*?padding: 3px 6px 2px;/,
     );
     expect(layoutCss).toMatch(
-      /\.demo__ribbon-tab\s*\{[\s\S]*?font-weight: 400;[\s\S]*?line-height: 31px;/,
+      /\.fc-tb__ribbon-tab\s*\{[\s\S]*?font-weight: 400;[\s\S]*?line-height: 31px;/,
     );
-    expect(layoutCss).toMatch(/\.demo__ribbon-tab--active\s*\{[\s\S]*?font-weight: 600;/);
+    expect(layoutCss).toMatch(/\.fc-tb__ribbon-tab--active\s*\{[\s\S]*?font-weight: 600;/);
     expect(layoutCss).toMatch(
-      /\.demo__ribbon-label\s*\{[\s\S]*?height: 14px;[\s\S]*?color: color-mix\(in srgb, var\(--fc-tb-fg-soft\) 82%, var\(--fc-tb-ribbon-bg\)\);[\s\S]*?line-height: 14px;/,
+      /\.fc-tb__ribbon-label\s*\{[\s\S]*?height: 14px;[\s\S]*?color: color-mix\(in srgb, var\(--fc-tb-fg-soft\) 82%, var\(--fc-tb-ribbon-bg\)\);[\s\S]*?line-height: 14px;/,
     );
     expect(layoutCss).toMatch(
-      /\.demo__ribbon-group\s*\{[\s\S]*?padding: 0 6px;[\s\S]*?border-right: 1px solid var\(--fc-tb-ribbon-line\);/,
+      /\.fc-tb__ribbon-group\s*\{[\s\S]*?padding: 0 6px;[\s\S]*?border-right: 1px solid var\(--fc-tb-ribbon-line\);/,
     );
     expect(layoutCss).toContain('height: 3px;');
     expect(layoutCss).toContain(
       'background: var(--fc-tb-ribbon-pressed, var(--fc-tb-ribbon-hover));',
     );
     expect(layoutCss).toMatch(
-      /\.demo__rb--active\s*\{[\s\S]*?background: var\(--fc-tb-ribbon-pressed, var\(--fc-tb-ribbon-hover\)\);[\s\S]*?border-color: var\(--fc-tb-ribbon-line\);/,
+      /\.fc-tb__rb--active\s*\{[\s\S]*?background: var\(--fc-tb-ribbon-pressed, var\(--fc-tb-ribbon-hover\)\);[\s\S]*?border-color: var\(--fc-tb-ribbon-line\);/,
     );
     expect(layoutCss).toMatch(
-      /\.demo__rb\s*\{[\s\S]*?width: 30px;[\s\S]*?height: 26px;[\s\S]*?border-radius: 2px;/,
+      /\.fc-tb__rb\s*\{[\s\S]*?width: 30px;[\s\S]*?height: 26px;[\s\S]*?border-radius: 2px;/,
     );
-    expect(layoutCss).toMatch(/\.demo__rb-icon\s*\{[\s\S]*?width: 20px;[\s\S]*?height: 20px;/);
-    expect(layoutCss).toMatch(/\.demo__rb--mono\s*\{[\s\S]*?min-width: 30px;/);
+    expect(layoutCss).toMatch(/\.fc-tb__rb-icon\s*\{[\s\S]*?width: 20px;[\s\S]*?height: 20px;/);
+    expect(layoutCss).toMatch(/\.fc-tb__rb--mono\s*\{[\s\S]*?min-width: 30px;/);
     expect(layoutCss).toMatch(
-      /\.demo__ribbon-display-option\[aria-checked="true"\]::before\s*\{[\s\S]*?border-bottom: 2px solid var\(--fc-tb-accent\);[\s\S]*?border-left: 2px solid var\(--fc-tb-accent\);[\s\S]*?content: "";[\s\S]*?transform: rotate\(-45deg\);/,
-    );
-    expect(layoutCss).toMatch(
-      /\.demo__ribbon-toggle::before\s*\{[\s\S]*?width: 7px;[\s\S]*?border-top: 1\.6px solid currentColor;[\s\S]*?border-left: 1\.6px solid currentColor;[\s\S]*?content: "";[\s\S]*?rotate\(45deg\);/,
+      /\.fc-tb__ribbon-display-option\[aria-checked="true"\]::before\s*\{[\s\S]*?border-bottom: 2px solid var\(--fc-tb-accent\);[\s\S]*?border-left: 2px solid var\(--fc-tb-accent\);[\s\S]*?content: "";[\s\S]*?transform: rotate\(-45deg\);/,
     );
     expect(layoutCss).toMatch(
-      /\.demo__ribbon-shell--tabsOnly \.demo__ribbon-toggle::before,[\s\S]*?\.demo__ribbon-shell--autoHide \.demo__ribbon-toggle::before\s*\{[\s\S]*?rotate\(-135deg\);/,
+      /\.fc-tb__ribbon-toggle::before\s*\{[\s\S]*?width: 7px;[\s\S]*?border-top: 1\.6px solid currentColor;[\s\S]*?border-left: 1\.6px solid currentColor;[\s\S]*?content: "";[\s\S]*?rotate\(45deg\);/,
+    );
+    expect(layoutCss).toMatch(
+      /\.fc-tb__ribbon-shell--tabsOnly \.fc-tb__ribbon-toggle::before,[\s\S]*?\.fc-tb__ribbon-shell--autoHide \.fc-tb__ribbon-toggle::before\s*\{[\s\S]*?rotate\(-135deg\);/,
     );
     expect(layoutCss).not.toContain('content: "✓"');
     expect(layoutCss).not.toContain('content: "⌃"');
@@ -205,7 +205,6 @@ describe('toolbar/ribbon-model', () => {
     const tokensCss = readFileSync(join(toolbarBaseDir, 'tokens.css'), 'utf8');
     const titlebarCss = readFileSync(join(toolbarBaseDir, 'header/titlebar.css'), 'utf8');
     const commandbarCss = readFileSync(join(toolbarBaseDir, 'header/commandbar.css'), 'utf8');
-    const sidePanelCss = readFileSync(join(toolbarBaseDir, '../panels/side.css'), 'utf8');
     const modalCss = readFileSync(join(toolbarBaseDir, '../panels/modal.css'), 'utf8');
     const backstageCss = readFileSync(join(toolbarBaseDir, 'backstage.css'), 'utf8');
 
@@ -214,41 +213,18 @@ describe('toolbar/ribbon-model', () => {
     expect(titlebarCss).toContain('min-height: 36px;');
     expect(titlebarCss).toContain('background: var(--fc-tb-title);');
     expect(titlebarCss).toContain('background: transparent;');
-    expect(titlebarCss).toContain('.demo__search:hover,');
-    expect(titlebarCss).toContain('.demo__account .demo__share:first-child');
-    expect(titlebarCss).toContain('background: var(--fc-tb-title-strong);');
     expect(commandbarCss).toMatch(
-      /\.demo__brand-mark\s*\{[\s\S]*?background: var\(--fc-tb-brand\);[\s\S]*?color: #ffffff;/,
-    );
-    expect(commandbarCss).toMatch(
-      /\.demo__seg-btn:hover\s*\{[\s\S]*?background: var\(--fc-tb-ribbon-hover\);[\s\S]*?color: var\(--fc-tb-fg\);/,
-    );
-    expect(commandbarCss).toMatch(
-      /\.demo__btn:hover:not\(:disabled\)\s*\{[\s\S]*?background: var\(--fc-tb-ribbon-hover\);[\s\S]*?border-color: var\(--fc-tb-ribbon-line\);/,
+      /\.fc-tb__btn:hover:not\(:disabled\)\s*\{[\s\S]*?background: var\(--fc-tb-ribbon-hover\);[\s\S]*?border-color: var\(--fc-tb-ribbon-line\);/,
     );
     expect(commandbarCss).not.toContain('background: var(--fc-tb-accent-soft)');
-    expect(sidePanelCss).toMatch(
-      /\.demo__card h2\s*\{[\s\S]*?font-size: 12px;[\s\S]*?letter-spacing: 0;[\s\S]*?color: var\(--fc-tb-fg\);/,
-    );
-    expect(sidePanelCss).toMatch(/\.demo__preset-btn\s*\{[\s\S]*?border-radius: 2px;/);
-    expect(sidePanelCss).toMatch(
-      /\.demo__preset-btn:hover:not\(:disabled\)\s*\{[\s\S]*?border-color: var\(--fc-tb-ribbon-line\);[\s\S]*?background: var\(--fc-tb-ribbon-hover\);/,
-    );
-    expect(sidePanelCss).toMatch(
-      /\.demo__feat-title\s*\{[\s\S]*?font-size: 11px;[\s\S]*?letter-spacing: 0;[\s\S]*?color: var\(--fc-tb-fg\);/,
-    );
-    expect(sidePanelCss).toMatch(
-      /\.demo__log-cell\s*\{[\s\S]*?background: var\(--fc-tb-ribbon-hover\);[\s\S]*?border-radius: 2px;/,
-    );
-    expect(sidePanelCss).not.toContain('text-transform: uppercase');
     expect(modalCss).toMatch(
-      /\.demo__modal-panel\s*\{[\s\S]*?border-radius: 2px;[\s\S]*?0 12px 32px rgba\(0, 0, 0, 0\.18\),[\s\S]*?0 1px 4px rgba\(0, 0, 0, 0\.14\);/,
+      /\.fc-tb__modal-panel\s*\{[\s\S]*?border-radius: 2px;[\s\S]*?0 12px 32px rgba\(0, 0, 0, 0\.18\),[\s\S]*?0 1px 4px rgba\(0, 0, 0, 0\.14\);/,
     );
-    expect(modalCss).toMatch(/\.demo__modal-list li\s*\{[\s\S]*?border-radius: 2px;/);
-    expect(modalCss).toMatch(/\.demo__report-item\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(modalCss).toMatch(/\.fc-tb__modal-list li\s*\{[\s\S]*?border-radius: 2px;/);
+    expect(modalCss).toMatch(/\.fc-tb__report-item\s*\{[\s\S]*?border-radius: 2px;/);
     expect(modalCss).not.toContain('box-shadow: var(--fc-shadow-16)');
     expect(backstageCss).toMatch(
-      /\.demo__backstage-command--active\s*\{[\s\S]*?border-color: var\(--fc-tb-accent\);[\s\S]*?background: var\(--fc-tb-ribbon-pressed, var\(--fc-tb-ribbon-bg\)\);/,
+      /\.fc-tb__backstage-command--active\s*\{[\s\S]*?border-color: var\(--fc-tb-accent\);[\s\S]*?background: var\(--fc-tb-ribbon-pressed, var\(--fc-tb-ribbon-bg\)\);/,
     );
     expect(backstageCss).not.toContain(
       'background: var(--fc-tb-accent-soft, color-mix(in srgb, var(--fc-tb-accent) 12%, transparent));',
@@ -263,63 +239,63 @@ describe('toolbar/ribbon-model', () => {
     expect(menusCss).toContain('background: var(--fc-tb-ribbon-bg, #ffffff);');
     expect(menusCss).toContain('border-radius: 2px;');
     expect(menusCss).toMatch(
-      /\.app__menu-icon\s*\{[\s\S]*?flex: 0 0 18px;[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
+      /\.fc-tb__menu-icon\s*\{[\s\S]*?flex: 0 0 18px;[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
     );
     expect(menusCss).toMatch(
-      /\.app__menu-item__icon-spacer\s*\{[\s\S]*?flex: 0 0 18px;[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
+      /\.fc-tb__menu-item__icon-spacer\s*\{[\s\S]*?flex: 0 0 18px;[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
     );
     expect(menusCss).toMatch(
-      /\.app__menu-item:hover,[\s\S]*?\.app__submenu-item:focus-visible\s*\{[\s\S]*?background: var\(--fc-tb-ribbon-hover\);/,
+      /\.fc-tb__menu-item:hover,[\s\S]*?\.fc-tb__submenu-item:focus-visible\s*\{[\s\S]*?background: var\(--fc-tb-ribbon-hover\);/,
     );
     expect(menusCss).toMatch(
-      /\.demo__merge-menu__item:hover,[\s\S]*?\.demo__merge-menu__item:focus-visible\s*\{[\s\S]*?background: var\(--fc-tb-ribbon-hover\);/,
+      /\.fc-tb__merge-menu__item:hover,[\s\S]*?\.fc-tb__merge-menu__item:focus-visible\s*\{[\s\S]*?background: var\(--fc-tb-ribbon-hover\);/,
     );
     expect(menusCss).toMatch(
-      /\.app__symbol-tile:hover,[\s\S]*?\.app__symbol-tile:focus-visible\s*\{[\s\S]*?border-color: var\(--fc-tb-ribbon-line\);[\s\S]*?background: var\(--fc-tb-ribbon-hover\);/,
+      /\.fc-tb__symbol-tile:hover,[\s\S]*?\.fc-tb__symbol-tile:focus-visible\s*\{[\s\S]*?border-color: var\(--fc-tb-ribbon-line\);[\s\S]*?background: var\(--fc-tb-ribbon-hover\);/,
     );
     expect(menusCss).toMatch(
-      /\.app__visual-tile:hover,[\s\S]*?\.app__visual-tile:focus-visible\s*\{[\s\S]*?border-color: var\(--fc-tb-ribbon-line\);[\s\S]*?background: var\(--fc-tb-ribbon-hover\);/,
+      /\.fc-tb__visual-tile:hover,[\s\S]*?\.fc-tb__visual-tile:focus-visible\s*\{[\s\S]*?border-color: var\(--fc-tb-ribbon-line\);[\s\S]*?background: var\(--fc-tb-ribbon-hover\);/,
     );
     expect(menusCss).toMatch(
-      /\.app__cf-choice:hover,[\s\S]*?\.app__cellstyle-chip:focus-visible\s*\{[\s\S]*?border-color: var\(--fc-tb-ribbon-line\);[\s\S]*?background: var\(--fc-tb-ribbon-hover\);/,
+      /\.fc-tb__cf-choice:hover,[\s\S]*?\.fc-tb__cellstyle-chip:focus-visible\s*\{[\s\S]*?border-color: var\(--fc-tb-ribbon-line\);[\s\S]*?background: var\(--fc-tb-ribbon-hover\);/,
     );
     expect(menusCss).toMatch(
-      /\.app__color-swatch--active,[\s\S]*?\.app__color-swatch\[aria-checked="true"\]\s*\{[\s\S]*?border-color: var\(--fc-tb-accent\);[\s\S]*?background: var\(--fc-tb-ribbon-pressed, var\(--fc-tb-ribbon-hover\)\);/,
+      /\.fc-tb__color-swatch--active,[\s\S]*?\.fc-tb__color-swatch\[aria-checked="true"\]\s*\{[\s\S]*?border-color: var\(--fc-tb-accent\);[\s\S]*?background: var\(--fc-tb-ribbon-pressed, var\(--fc-tb-ribbon-hover\)\);/,
     );
     expect(menusCss).toMatch(
-      /\.app__visual-tile--active,[\s\S]*?\.app__visual-tile\[aria-checked="true"\]\s*\{[\s\S]*?border-color: var\(--fc-tb-accent\);[\s\S]*?background: var\(--fc-tb-ribbon-pressed, var\(--fc-tb-ribbon-hover\)\);/,
+      /\.fc-tb__visual-tile--active,[\s\S]*?\.fc-tb__visual-tile\[aria-checked="true"\]\s*\{[\s\S]*?border-color: var\(--fc-tb-accent\);[\s\S]*?background: var\(--fc-tb-ribbon-pressed, var\(--fc-tb-ribbon-hover\)\);/,
     );
     expect(menusCss).toMatch(
-      /\.demo__cf-menu__swatch:hover,[\s\S]*?\.demo__cf-menu__iconset:focus-visible\s*\{[\s\S]*?border-color: var\(--fc-tb-ribbon-line\);[\s\S]*?background: var\(--fc-tb-ribbon-hover\);/,
+      /\.fc-tb__cf-menu__swatch:hover,[\s\S]*?\.fc-tb__cf-menu__iconset:focus-visible\s*\{[\s\S]*?border-color: var\(--fc-tb-ribbon-line\);[\s\S]*?background: var\(--fc-tb-ribbon-hover\);/,
     );
-    expect(menusCss).toContain('.app__cf-icon-choice--icons-arrows5 span:nth-child(2)');
-    expect(menusCss).toContain('.app__cf-icon-choice--icons-traffic3 span:first-child');
-    expect(menusCss).toContain('.app__cf-icon-choice--icons-flags3 span:last-child');
+    expect(menusCss).toContain('.fc-tb__cf-icon-choice--icons-arrows5 span:nth-child(2)');
+    expect(menusCss).toContain('.fc-tb__cf-icon-choice--icons-traffic3 span:first-child');
+    expect(menusCss).toContain('.fc-tb__cf-icon-choice--icons-flags3 span:last-child');
     expect(dropdownsCss).toContain('background: var(--fc-tb-ribbon-bg, var(--fc-tb-input-bg));');
     expect(dropdownsCss).toContain('border-radius: 2px;');
     expect(dropdownsCss).toMatch(
-      /\.demo__rb-dd__check\s*\{[\s\S]*?width: 18px;[\s\S]*?min-width: 18px;/,
+      /\.fc-tb__rb-dd__check\s*\{[\s\S]*?width: 18px;[\s\S]*?min-width: 18px;/,
     );
     expect(dropdownsCss).toContain(
       'background: var(--fc-tb-ribbon-pressed, var(--fc-tb-ribbon-hover));',
     );
     expect(dropdownsCss).toMatch(
-      /\.demo__rb-select--font \.demo__rb-dd__list\s*\{[\s\S]*?min-width: 360px;[\s\S]*?padding: 7px 0;[\s\S]*?border-radius: 2px;[\s\S]*?background: var\(--fc-tb-ribbon-bg, #ffffff\);[\s\S]*?box-shadow:/,
+      /\.fc-tb__rb-select--font \.fc-tb__rb-dd__list\s*\{[\s\S]*?min-width: 360px;[\s\S]*?padding: 7px 0;[\s\S]*?border-radius: 2px;[\s\S]*?background: var\(--fc-tb-ribbon-bg, #ffffff\);[\s\S]*?box-shadow:/,
     );
     expect(dropdownsCss).toMatch(
-      /\.demo__rb-select--font \.demo__rb-dd__section\s*\{[\s\S]*?color: #b5b5b5;/,
+      /\.fc-tb__rb-select--font \.fc-tb__rb-dd__section\s*\{[\s\S]*?color: #b5b5b5;/,
     );
     expect(dropdownsCss).toMatch(
-      /\.demo__rb-select--font \.demo__rb-dd__opt:hover,[\s\S]*?\.demo__rb-select--font \.demo__rb-dd__opt:focus-visible\s*\{[\s\S]*?background: var\(--fc-tb-ribbon-hover\);/,
+      /\.fc-tb__rb-select--font \.fc-tb__rb-dd__opt:hover,[\s\S]*?\.fc-tb__rb-select--font \.fc-tb__rb-dd__opt:focus-visible\s*\{[\s\S]*?background: var\(--fc-tb-ribbon-hover\);/,
     );
     expect(dropdownsCss).toMatch(
-      /\.demo__rb-select--number-format\.demo__rb-dd--open > \.demo__rb-dd__btn,[\s\S]*?\.demo__rb-select--number-format > \.demo__rb-dd__btn:focus-visible\s*\{[\s\S]*?border-color: var\(--fc-tb-ribbon-line\);[\s\S]*?background: var\(--fc-tb-ribbon-hover\);/,
+      /\.fc-tb__rb-select--number-format\.fc-tb__rb-dd--open > \.fc-tb__rb-dd__btn,[\s\S]*?\.fc-tb__rb-select--number-format > \.fc-tb__rb-dd__btn:focus-visible\s*\{[\s\S]*?border-color: var\(--fc-tb-ribbon-line\);[\s\S]*?background: var\(--fc-tb-ribbon-hover\);/,
     );
     expect(dropdownsCss).toMatch(
-      /\.demo__rb-select--number-format \.demo__rb-dd__list\s*\{[\s\S]*?min-width: 148px;[\s\S]*?padding: 6px 0;[\s\S]*?border-radius: 2px;[\s\S]*?background: var\(--fc-tb-ribbon-bg, #ffffff\);[\s\S]*?box-shadow:/,
+      /\.fc-tb__rb-select--number-format \.fc-tb__rb-dd__list\s*\{[\s\S]*?min-width: 148px;[\s\S]*?padding: 6px 0;[\s\S]*?border-radius: 2px;[\s\S]*?background: var\(--fc-tb-ribbon-bg, #ffffff\);[\s\S]*?box-shadow:/,
     );
     const numberFormatCss = dropdownsCss.slice(
-      dropdownsCss.indexOf('.demo__rb-select--number-format .demo__rb-dd__opt'),
+      dropdownsCss.indexOf('.fc-tb__rb-select--number-format .fc-tb__rb-dd__opt'),
       dropdownsCss.indexOf('/* ── Margins picker variant'),
     );
     expect(numberFormatCss).toContain('min-height: 25px;');
@@ -331,16 +307,16 @@ describe('toolbar/ribbon-model', () => {
     expect(numberFormatCss).not.toContain('content: "1/2"');
     expect(numberFormatCss).not.toContain('content: "10²"');
     expect(colorControlsCss).toMatch(
-      /\.demo__rb-color__btn:hover,[\s\S]*?\.demo__rb-color--open \.demo__rb-color__btn\s*\{[\s\S]*?background: var\(--fc-tb-ribbon-hover\);[\s\S]*?border-color: var\(--fc-tb-ribbon-line\);/,
+      /\.fc-tb__rb-color__btn:hover,[\s\S]*?\.fc-tb__rb-color--open \.fc-tb__rb-color__btn\s*\{[\s\S]*?background: var\(--fc-tb-ribbon-hover\);[\s\S]*?border-color: var\(--fc-tb-ribbon-line\);/,
     );
     expect(colorControlsCss).toMatch(
-      /\.demo__rb-color\s*\{[\s\S]*?width: 30px;[\s\S]*?height: 26px;/,
+      /\.fc-tb__rb-color\s*\{[\s\S]*?width: 30px;[\s\S]*?height: 26px;/,
     );
     expect(colorControlsCss).toMatch(
-      /\.demo__rb-color__btn\s*\{[\s\S]*?width: 30px;[\s\S]*?height: 26px;/,
+      /\.fc-tb__rb-color__btn\s*\{[\s\S]*?width: 30px;[\s\S]*?height: 26px;/,
     );
     expect(colorControlsCss).toMatch(
-      /\.demo__color-flyout,[\s\S]*?\.demo__merge-menu\s*\{[\s\S]*?border-radius: 3px;[\s\S]*?background: var\(--fc-tb-ribbon-bg, #ffffff\);[\s\S]*?0 8px 18px rgba\(0, 0, 0, 0\.15\)/,
+      /\.fc-tb__color-flyout,[\s\S]*?\.fc-tb__merge-menu\s*\{[\s\S]*?border-radius: 3px;[\s\S]*?background: var\(--fc-tb-ribbon-bg, #ffffff\);[\s\S]*?0 8px 18px rgba\(0, 0, 0, 0\.15\)/,
     );
   });
 
@@ -351,7 +327,7 @@ describe('toolbar/ribbon-model', () => {
     const tileGap = 4;
     const widthFor = (variant: string): number => {
       const match = new RegExp(
-        String.raw`\.demo__ribbon-group--${variant} \.demo__ribbon-tools\s*\{\s*width:\s*(\d+)px;`,
+        String.raw`\.fc-tb__ribbon-group--${variant} \.fc-tb__ribbon-tools\s*\{\s*width:\s*(\d+)px;`,
         'm',
       ).exec(groupsCss);
       if (!match?.[1]) throw new Error(`missing ${variant} ribbon tool width`);
@@ -368,19 +344,19 @@ describe('toolbar/ribbon-model', () => {
     expect(widthFor('editing')).toBeGreaterThanOrEqual(238);
     expect(widthFor('alignment')).toBeGreaterThanOrEqual(190);
     expect(groupsCss).toMatch(
-      /\.demo__ribbon-group--alignment \.demo__rb-icon\s*\{[\s\S]*?width: 22px;[\s\S]*?height: 22px;/,
+      /\.fc-tb__ribbon-group--alignment \.fc-tb__rb-icon\s*\{[\s\S]*?width: 22px;[\s\S]*?height: 22px;/,
     );
     expect(groupsCss).toMatch(
-      /\.demo__ribbon-group--alignment\.demo__ribbon-group--stacked \.demo__rb--stacked \.demo__rb-icon,[\s\S]*?width: 22px;[\s\S]*?height: 22px;/,
+      /\.fc-tb__ribbon-group--alignment\.fc-tb__ribbon-group--stacked \.fc-tb__rb--stacked \.fc-tb__rb-icon,[\s\S]*?width: 22px;[\s\S]*?height: 22px;/,
     );
-    expect(groupsCss).toContain('.demo__ribbon-group--stacked .demo__ribbon-tools');
-    expect(groupsCss).toContain('.demo__ribbon-group--mixed .demo__ribbon-tools');
+    expect(groupsCss).toContain('.fc-tb__ribbon-group--stacked .fc-tb__ribbon-tools');
+    expect(groupsCss).toContain('.fc-tb__ribbon-group--mixed .fc-tb__ribbon-tools');
     expect(groupsCss).toContain('grid-template-rows: repeat(3, 22px);');
     expect(groupsCss).toContain(
-      '.demo__ribbon-group--mixed .demo__rb--wide:not(.demo__rb--stacked) .demo__rb-split-chevron',
+      '.fc-tb__ribbon-group--mixed .fc-tb__rb--wide:not(.fc-tb__rb--stacked) .fc-tb__rb-split-chevron',
     );
     expect(groupsCss).toContain(
-      '.demo__ribbon-group--stacked .demo__rb--stacked .demo__rb-split-chevron',
+      '.fc-tb__ribbon-group--stacked .fc-tb__rb--stacked .fc-tb__rb-split-chevron',
     );
     expect(groupsCss).toContain('margin: 0 0 0 auto;');
   });

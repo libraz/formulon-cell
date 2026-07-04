@@ -29,13 +29,13 @@ export const showChoiceDialog = <T extends string>(
 
     if (opts.label) {
       const label = document.createElement('p');
-      label.className = 'app__dlg__message';
+      label.className = 'fc-tb__dlg__message';
       label.textContent = opts.label;
       shell.body.appendChild(label);
     }
 
     const group = document.createElement('div');
-    group.className = 'fc-fmtdlg__choice-grid app__dlg__choices';
+    group.className = 'fc-fmtdlg__choice-grid fc-tb__dlg__choices';
     group.setAttribute('role', 'radiogroup');
     group.setAttribute('aria-label', opts.label ?? opts.title);
     const name = `app-choice-${Math.random().toString(36).slice(2)}`;

@@ -21,12 +21,12 @@ describe('showScriptCommandDialog', () => {
       cancelLabel: 'Cancel',
     });
 
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('Script');
     expect(dialog?.textContent).toContain('Trim whitespace');
     const select = dialog?.querySelector<HTMLSelectElement>('[data-script-command-select]');
     expect(select?.value).toBe('uppercase');
-    expect(select?.className).toBe('app__dlg__select');
+    expect(select?.className).toBe('fc-tb__dlg__select');
     expect(
       Array.from(select?.options ?? []).map((option) => [option.value, option.textContent]),
     ).toEqual([

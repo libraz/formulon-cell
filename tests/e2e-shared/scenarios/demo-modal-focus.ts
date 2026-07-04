@@ -30,7 +30,7 @@ export async function runDemoModalFocusScenario(page: Page): Promise<void> {
   await accessibility.click();
 
   const reviewDialog = page
-    .locator('.demo__modal[role="dialog"][aria-modal="true"]')
+    .locator('.fc-tb__modal[role="dialog"][aria-modal="true"]')
     .filter({ hasText: /Accessibility Check|No issues found/i });
   await expect(reviewDialog).toBeVisible();
 
@@ -54,7 +54,7 @@ export async function runDemoModalFocusScenario(page: Page): Promise<void> {
   await page.locator('#menu-script [data-script-action="custom"]').click();
 
   const scriptDialog = page
-    .locator('.demo__modal[role="dialog"][aria-modal="true"]')
+    .locator('.fc-tb__modal[role="dialog"][aria-modal="true"]')
     .filter({ hasText: /^Script/ });
   await expect(scriptDialog).toBeVisible();
 
@@ -88,7 +88,7 @@ export async function runDemoStatusBarHostStateScenario(page: Page): Promise<voi
   await page.locator('#menu-script [data-script-action="custom"]').click();
 
   const scriptDialog = page
-    .locator('.demo__modal[role="dialog"][aria-modal="true"]')
+    .locator('.fc-tb__modal[role="dialog"][aria-modal="true"]')
     .filter({ hasText: /^Script/ });
   await expect(scriptDialog).toBeVisible();
   await expect(macro).toBeVisible();

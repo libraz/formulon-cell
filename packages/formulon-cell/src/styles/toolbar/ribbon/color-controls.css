@@ -1,7 +1,7 @@
 /* Ribbon color controls — font/fill color buttons and the shared flyout
    that hosts the spreadsheet "Office" color palette. */
 
-.demo__rb-color {
+.fc-tb__rb-color {
   position: relative;
   display: inline-flex;
   width: 30px;
@@ -16,12 +16,12 @@
   cursor: pointer;
 }
 
-.demo__rb-color:hover {
+.fc-tb__rb-color:hover {
   background: var(--fc-tb-ribbon-hover);
   border-color: var(--fc-tb-ribbon-line);
 }
 
-.demo__rb-color input[type="color"] {
+.fc-tb__rb-color input[type="color"] {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -30,7 +30,7 @@
   cursor: pointer;
 }
 
-.demo__rb-color::after {
+.fc-tb__rb-color::after {
   position: absolute;
   right: 5px;
   bottom: 3px;
@@ -40,17 +40,17 @@
   content: "";
 }
 
-.demo__rb-color[data-ribbon-command="fontColor"]::after {
+.fc-tb__rb-color[data-ribbon-command="fontColor"]::after {
   background: #c00000;
 }
 
-.demo__rb-color[data-ribbon-command="fillColor"]::after {
+.fc-tb__rb-color[data-ribbon-command="fillColor"]::after {
   background: #fff200;
   border: 1px solid rgba(0, 0, 0, 0.18);
   height: 4px;
 }
 
-.demo__rb-color__btn {
+.fc-tb__rb-color__btn {
   appearance: none;
   -webkit-appearance: none;
   position: relative;
@@ -67,17 +67,17 @@
   cursor: pointer;
 }
 
-.demo__rb-color__btn:hover,
-.demo__rb-color--open .demo__rb-color__btn {
+.fc-tb__rb-color__btn:hover,
+.fc-tb__rb-color--open .fc-tb__rb-color__btn {
   background: var(--fc-tb-ribbon-hover);
   border-color: var(--fc-tb-ribbon-line);
 }
 
-.demo__rb-color__icon {
+.fc-tb__rb-color__icon {
   transform: translateY(-2px);
 }
 
-.demo__rb-color__swatch {
+.fc-tb__rb-color__swatch {
   position: absolute;
   right: 4px;
   bottom: 3px;
@@ -86,7 +86,7 @@
   border: 1px solid rgba(0, 0, 0, 0.18);
 }
 
-.demo__rb-color__chev {
+.fc-tb__rb-color__chev {
   position: absolute;
   right: 0;
   bottom: 6px;
@@ -95,15 +95,15 @@
   color: var(--fc-tb-fg-soft);
 }
 
-.demo__rb-color__btn:disabled {
+.fc-tb__rb-color__btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
 /* Flyout shell hosting the shared color palette (createColorPalette).
    The palette element supplies its own padding and grid layout. */
-.demo__color-flyout,
-.demo__merge-menu {
+.fc-tb__color-flyout,
+.fc-tb__merge-menu {
   position: fixed;
   z-index: 90;
   border: 1px solid #c8c8c8;
@@ -117,12 +117,12 @@
   font-size: 12px;
 }
 
-.demo__color-flyout {
+.fc-tb__color-flyout {
   width: max-content;
   overflow: hidden;
 }
 
-.demo__color-flyout__native {
+.fc-tb__color-flyout__native {
   position: absolute;
   width: 1px;
   height: 1px;

@@ -50,7 +50,7 @@
     font-size: 12px;
   }
 
-  .fc-sortdlg__level .app__dlg__input {
+  .fc-sortdlg__level .fc-tb__dlg__input {
     width: 100%;
     min-width: 0;
   }

@@ -104,7 +104,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
 
   const createMarginPresetIcon = (value: string): HTMLSpanElement => {
     const icon = document.createElement('span');
-    icon.className = `demo__rb-dd__margin-icon demo__rb-dd__margin-icon--${value}`;
+    icon.className = `fc-tb__rb-dd__margin-icon fc-tb__rb-dd__margin-icon--${value}`;
     icon.setAttribute('aria-hidden', 'true');
     icon.append(document.createElement('span'), document.createElement('span'));
     return icon;
@@ -165,21 +165,21 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     'M2.15 4.65a.5.5 0 0 1 .7 0L6 7.79l3.15-3.14a.5.5 0 1 1 .7.7l-3.5 3.5a.5.5 0 0 1-.7 0l-3.5-3.5a.5.5 0 0 1 0-.7Z';
 
   const closeOpenRibbonDropdowns = (except?: HTMLElement): void => {
-    for (const open of document.querySelectorAll<HTMLElement>('.demo__rb-dd--open')) {
+    for (const open of document.querySelectorAll<HTMLElement>('.fc-tb__rb-dd--open')) {
       if (except && open === except) continue;
-      open.classList.remove('demo__rb-dd--open');
+      open.classList.remove('fc-tb__rb-dd--open');
       open
-        .querySelector<HTMLButtonElement>('.demo__rb-dd__btn')
+        .querySelector<HTMLButtonElement>('.fc-tb__rb-dd__btn')
         ?.setAttribute('aria-expanded', 'false');
-      open.querySelector('.demo__rb-dd__list')?.remove();
+      open.querySelector('.fc-tb__rb-dd__list')?.remove();
     }
-    for (const open of document.querySelectorAll<HTMLElement>('.demo__rb-color--open')) {
+    for (const open of document.querySelectorAll<HTMLElement>('.fc-tb__rb-color--open')) {
       if (except && open === except) continue;
-      open.classList.remove('demo__rb-color--open');
+      open.classList.remove('fc-tb__rb-color--open');
       open
-        .querySelector<HTMLButtonElement>('.demo__rb-color__btn')
+        .querySelector<HTMLButtonElement>('.fc-tb__rb-color__btn')
         ?.setAttribute('aria-expanded', 'false');
-      open.querySelector('.demo__color-flyout')?.remove();
+      open.querySelector('.fc-tb__color-flyout')?.remove();
     }
   };
 
@@ -188,7 +188,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     const option = ribbonOptionsForCommand(command, current).find(
       (candidate) => candidate.value === current,
     );
-    const value = wrap.querySelector<HTMLElement>('.demo__rb-dd__value');
+    const value = wrap.querySelector<HTMLElement>('.fc-tb__rb-dd__value');
     if (value) {
       const base = option?.label ?? current;
       const role = command.id === 'fontFamily' ? ribbonFontRole(current) : null;
@@ -222,13 +222,13 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
 
   const createRibbonSelect = (command: RibbonCommand): HTMLDivElement => {
     const wrap = document.createElement('div');
-    wrap.className = `demo__rb-dd${command.className ? ` ${command.className}` : ''}`;
+    wrap.className = `fc-tb__rb-dd${command.className ? ` ${command.className}` : ''}`;
     wrap.dataset.ribbonCommand = command.id;
     wrap.dataset.ribbonSelect = command.id;
     wrap.dataset.ribbonOptions = JSON.stringify(command.options ?? []);
 
     const button = createRibbonControlButton({
-      className: 'demo__rb-dd__btn',
+      className: 'fc-tb__rb-dd__btn',
       title: command.title,
       ariaLabel: command.title,
       ariaHaspopup: 'listbox',
@@ -236,22 +236,22 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     });
 
     const value = document.createElement('span');
-    value.className = 'demo__rb-dd__value';
+    value.className = 'fc-tb__rb-dd__value';
     button.append(
       value,
       makeSvg(
         '0 0 12 12',
         'M2.15 4.65a.5.5 0 0 1 .7 0L6 7.79l3.15-3.14a.5.5 0 1 1 .7.7l-3.5 3.5a.5.5 0 0 1-.7 0l-3.5-3.5a.5.5 0 0 1 0-.7Z',
-        'demo__rb-dd__chev',
+        'fc-tb__rb-dd__chev',
       ),
     );
     wrap.appendChild(button);
 
     let detachDocDown: (() => void) | null = null;
     const close = (): void => {
-      wrap.classList.remove('demo__rb-dd--open');
+      wrap.classList.remove('fc-tb__rb-dd--open');
       button.setAttribute('aria-expanded', 'false');
-      wrap.querySelector('.demo__rb-dd__list')?.remove();
+      wrap.querySelector('.fc-tb__rb-dd__list')?.remove();
       detachDocDown?.();
       detachDocDown = null;
     };
@@ -267,17 +267,17 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
       const nextValue = option.dataset.value;
       if (nextValue == null) return;
       applyRibbonControl(command.id, nextValue);
-      const label = option.querySelector<HTMLElement>('.demo__rb-dd__label')?.textContent;
+      const label = option.querySelector<HTMLElement>('.fc-tb__rb-dd__label')?.textContent;
       if (label) value.textContent = label;
       close();
       button.focus({ preventScroll: true });
     };
     const open = (): void => {
       closeOpenRibbonDropdowns(wrap);
-      wrap.classList.add('demo__rb-dd--open');
+      wrap.classList.add('fc-tb__rb-dd--open');
       button.setAttribute('aria-expanded', 'true');
       const list = document.createElement('div');
-      list.className = 'demo__rb-dd__list';
+      list.className = 'fc-tb__rb-dd__list';
       list.setAttribute('role', 'listbox');
       list.setAttribute('aria-label', command.title);
       list.tabIndex = -1;
@@ -292,50 +292,50 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
           command.id === 'fontFamily' ? ribbonFontSection(option.value, options) : null;
         if (section) {
           const heading = document.createElement('div');
-          heading.className = 'demo__rb-dd__section';
+          heading.className = 'fc-tb__rb-dd__section';
           heading.setAttribute('role', 'presentation');
           heading.textContent = section;
           list.appendChild(heading);
         }
         const selected = option.value === current;
         const item = createRibbonControlButton({
-          className: `demo__rb-dd__opt${selected ? ' demo__rb-dd__opt--selected' : ''}`,
+          className: `fc-tb__rb-dd__opt${selected ? ' fc-tb__rb-dd__opt--selected' : ''}`,
           role: 'option',
           selected,
           tabIndex: -1,
           dataset: { value: option.value, fcValue: option.value },
         });
         const check = document.createElement('span');
-        check.className = 'demo__rb-dd__check';
+        check.className = 'fc-tb__rb-dd__check';
         check.setAttribute('aria-hidden', 'true');
         if (selected) {
           check.appendChild(
             makeSvg(
               '0 0 16 16',
               'M13.36 3.74c.29.28.29.77 0 1.05l-7.01 7.01a.75.75 0 0 1-1.06 0L2.64 9.15a.75.75 0 1 1 1.06-1.06l2.12 2.12 6.48-6.47a.75.75 0 0 1 1.06 0Z',
-              'demo__rb-dd__check-icon',
+              'fc-tb__rb-dd__check-icon',
             ),
           );
         }
         const label = document.createElement('span');
-        label.className = 'demo__rb-dd__label';
+        label.className = 'fc-tb__rb-dd__label';
         label.textContent = option.label;
         if (command.id === 'marginsPreset') {
           const text = document.createElement('span');
-          text.className = 'demo__rb-dd__margin-text';
+          text.className = 'fc-tb__rb-dd__margin-text';
           const detail = document.createElement('span');
-          detail.className = 'demo__rb-dd__detail';
+          detail.className = 'fc-tb__rb-dd__detail';
           detail.textContent = ribbonMarginDetail(option.value) ?? '';
           text.append(label, detail);
           item.append(check, createMarginPresetIcon(option.value), text);
         } else if (command.id === 'fontFamily') {
           const preview = document.createElement('span');
-          preview.className = 'demo__rb-dd__font-preview';
+          preview.className = 'fc-tb__rb-dd__font-preview';
           preview.style.fontFamily = `"${option.value}", sans-serif`;
           const role = ribbonFontRole(option.value);
           if (role) {
             const detail = document.createElement('span');
-            detail.className = 'demo__rb-dd__font-role';
+            detail.className = 'fc-tb__rb-dd__font-role';
             detail.textContent = role;
             preview.append(label, detail);
           } else {
@@ -344,15 +344,15 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
           item.append(check, preview);
           if (FONT_SUBMENU_FAMILIES.has(option.value)) {
             const arrow = document.createElement('span');
-            arrow.className = 'demo__rb-dd__submenu';
+            arrow.className = 'fc-tb__rb-dd__submenu';
             arrow.setAttribute('aria-hidden', 'true');
             item.appendChild(arrow);
           }
         } else if (command.id === 'numberFormat' && numberFormatHasSubtitle(option.value)) {
           const text = document.createElement('span');
-          text.className = 'demo__rb-dd__numfmt-text';
+          text.className = 'fc-tb__rb-dd__numfmt-text';
           const detail = document.createElement('span');
-          detail.className = 'demo__rb-dd__numfmt-subtitle';
+          detail.className = 'fc-tb__rb-dd__numfmt-subtitle';
           detail.textContent = numberFormatSubtitle(option.value);
           text.append(label, detail);
           item.append(check, text);
@@ -409,7 +409,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     };
 
     button.addEventListener('click', () => {
-      if (wrap.classList.contains('demo__rb-dd--open')) close();
+      if (wrap.classList.contains('fc-tb__rb-dd--open')) close();
       else open();
     });
     button.addEventListener('keydown', (event) => {
@@ -431,11 +431,11 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
   // "More Colors…" hands off to the native picker).
   const createRibbonColor = (command: RibbonCommand): HTMLDivElement => {
     const wrap = document.createElement('div');
-    wrap.className = 'demo__rb-color';
+    wrap.className = 'fc-tb__rb-color';
     wrap.dataset.ribbonCommand = command.id;
 
     const button = createRibbonControlButton({
-      className: 'demo__rb-color__btn',
+      className: 'fc-tb__rb-color__btn',
       title: command.title,
       ariaLabel: command.title,
       ariaHaspopup: 'true',
@@ -444,29 +444,29 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     if (command.icon) {
       const icon = createRibbonIcon(command.icon);
       if (icon) {
-        icon.classList.add('demo__rb-color__icon');
+        icon.classList.add('fc-tb__rb-color__icon');
         button.appendChild(icon);
       }
     }
     const swatch = document.createElement('span');
-    swatch.className = 'demo__rb-color__swatch';
+    swatch.className = 'fc-tb__rb-color__swatch';
     swatch.style.background = currentRibbonControlValue(command.id);
-    button.append(swatch, makeSvg('0 0 12 12', RIBBON_CHEVRON_PATH, 'demo__rb-color__chev'));
+    button.append(swatch, makeSvg('0 0 12 12', RIBBON_CHEVRON_PATH, 'fc-tb__rb-color__chev'));
     wrap.appendChild(button);
 
     // Hidden native picker, reached through the palette's "More Colors…" row.
     const native = document.createElement('input');
     native.type = 'color';
-    native.className = 'demo__color-flyout__native';
+    native.className = 'fc-tb__color-flyout__native';
     native.tabIndex = -1;
     native.setAttribute('aria-hidden', 'true');
     wrap.appendChild(native);
 
     let detachDocDown: (() => void) | null = null;
     const close = (): void => {
-      wrap.classList.remove('demo__rb-color--open');
+      wrap.classList.remove('fc-tb__rb-color--open');
       button.setAttribute('aria-expanded', 'false');
-      wrap.querySelector('.demo__color-flyout')?.remove();
+      wrap.querySelector('.fc-tb__color-flyout')?.remove();
       detachDocDown?.();
       detachDocDown = null;
     };
@@ -478,10 +478,10 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
 
     const open = (): void => {
       closeOpenRibbonDropdowns(wrap);
-      wrap.classList.add('demo__rb-color--open');
+      wrap.classList.add('fc-tb__rb-color--open');
       button.setAttribute('aria-expanded', 'true');
       const flyout = document.createElement('div');
-      flyout.className = 'demo__color-flyout';
+      flyout.className = 'fc-tb__color-flyout';
       const palette = createColorPalette({
         themeLabel: ribbonText.themeColors,
         standardLabel: ribbonText.standardColors,
@@ -525,7 +525,7 @@ export const createSelectColorRibbon = (ctx: SelectColorCtx): SelectColorApi => 
     };
 
     button.addEventListener('click', () => {
-      if (wrap.classList.contains('demo__rb-color--open')) close();
+      if (wrap.classList.contains('fc-tb__rb-color--open')) close();
       else open();
     });
     button.addEventListener('keydown', (event) => {

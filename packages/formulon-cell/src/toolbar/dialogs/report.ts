@@ -39,10 +39,10 @@ export const showReport = (opts: ReportOptions): Promise<void> =>
     const shell = createDialogShell({ title: opts.title, bodyVariant: 'app' });
 
     const list = document.createElement('div');
-    list.className = 'app__dlg__list';
+    list.className = 'fc-tb__dlg__list';
     if (opts.items.length === 0) {
       const empty = document.createElement('p');
-      empty.className = 'app__dlg__note';
+      empty.className = 'fc-tb__dlg__note';
       empty.textContent = opts.emptyLabel;
       list.appendChild(empty);
     } else {

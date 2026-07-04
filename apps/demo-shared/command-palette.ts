@@ -66,14 +66,14 @@ export const createCommandPalette = (opts: CommandPaletteOptions): { dispose: ()
     const visible = queryRibbonSearchIndex(commands, query, 8, { usagePrior });
     if (!menu) {
       menu = document.createElement('div');
-      menu.className = 'demo__command-menu';
+      menu.className = 'fc-tb__command-menu';
       container.appendChild(menu);
     } else {
       menu.replaceChildren();
     }
     if (visible.length === 0) {
       const empty = document.createElement('div');
-      empty.className = 'demo__command-empty';
+      empty.className = 'fc-tb__command-empty';
       empty.textContent = noCommandsLabel(ribbonLang);
       menu.appendChild(empty);
       return;
@@ -82,7 +82,7 @@ export const createCommandPalette = (opts: CommandPaletteOptions): { dispose: ()
       const paletteItem = toPaletteItem(cmd);
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'demo__command-item';
+      btn.className = 'fc-tb__command-item';
       if (cmd.disabled) btn.setAttribute('aria-disabled', 'true');
       projectDisabledReason(btn, cmd.disabledReason ?? null, {
         datasetKey: 'disabledReason',

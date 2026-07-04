@@ -78,7 +78,7 @@
     padding: 12px 14px 10px;
   }
 
-  .fc-valdlg__panel .app__dlg__message {
+  .fc-valdlg__panel .fc-tb__dlg__message {
     margin: 0;
     color: var(--fc-fg, CanvasText);
     font-size: 12px;

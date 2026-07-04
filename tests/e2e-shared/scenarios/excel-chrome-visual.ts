@@ -195,14 +195,14 @@ const seedMultiSelection = async (page: Page): Promise<void> => {
 const setRibbonDisplayMode = async (page: Page, mode: string): Promise<void> => {
   await page.locator('[data-ribbon-toggle]').click();
   await page.locator(`[data-ribbon-display-option="${mode}"]`).click();
-  await expect(page.locator(`.demo__ribbon-shell--${mode}`)).toHaveCount(1);
+  await expect(page.locator(`.fc-tb__ribbon-shell--${mode}`)).toHaveCount(1);
 };
 
 const snapshotRibbonDisplayOptionsMenu = async (page: Page): Promise<void> => {
   const toggle = page.locator('[data-ribbon-toggle]').first();
   await expect(toggle).toHaveAttribute('aria-label', 'リボンの表示オプション');
   await toggle.click();
-  const menu = page.locator('.demo__ribbon-display-menu');
+  const menu = page.locator('.fc-tb__ribbon-display-menu');
   await expect(menu).toBeVisible();
   await expect(menu.getByRole('menuitemradio', { name: 'リボンを常に表示' })).toHaveAttribute(
     'aria-checked',
@@ -273,7 +273,9 @@ export async function runExcelChromeVisualScenario(page: Page): Promise<void> {
   await search.fill('ヘルプ');
   const searchResults = page.locator('#demo-search-results');
   await expect(searchResults).toBeVisible();
-  const disabledResult = searchResults.locator('.demo__command-item[aria-disabled="true"]').first();
+  const disabledResult = searchResults
+    .locator('.fc-tb__command-item[aria-disabled="true"]')
+    .first();
   await expect(disabledResult).toBeVisible();
   await expect(disabledResult).toHaveAttribute('aria-disabled', 'true');
   await snapshotPage(page, 'excel-chrome-search-disabled-result-1440');
@@ -754,11 +756,14 @@ export async function runExcelChromeVisualScenario(page: Page): Promise<void> {
   await switchRibbonTab(page, 'help');
   await snapshotDemo(page, 'excel-chrome-help-full-1440');
   await switchRibbonTab(page, 'file');
-  await expect(page.locator('.demo__backstage[role="dialog"]')).toBeVisible();
+  await expect(page.locator('.fc-tb__backstage[role="dialog"]')).toBeVisible();
   await snapshotDemo(page, 'excel-chrome-backstage-info-1440');
-  await page.locator('.demo__backstage').getByRole('button', { name: '印刷', exact: true }).click();
+  await page
+    .locator('.fc-tb__backstage')
+    .getByRole('button', { name: '印刷', exact: true })
+    .click();
   await snapshotDemo(page, 'excel-chrome-backstage-print-1440');
-  await page.locator('.demo__backstage').getByRole('button', { name: 'ページ設定' }).click();
+  await page.locator('.fc-tb__backstage').getByRole('button', { name: 'ページ設定' }).click();
   const backstagePageSetup = page.getByRole('dialog', { name: 'ページ設定' });
   await expect(backstagePageSetup).toBeVisible();
   await backstagePageSetup.getByRole('tab', { name: '余白', exact: true }).click();
@@ -767,7 +772,7 @@ export async function runExcelChromeVisualScenario(page: Page): Promise<void> {
   await backstagePageSetup.getByRole('button', { name: 'キャンセル', exact: true }).click();
   await expect(backstagePageSetup).toBeHidden();
   await page
-    .locator('.demo__backstage')
+    .locator('.fc-tb__backstage')
     .getByRole('button', { name: '閉じる', exact: true })
     .click();
   await expect(page.locator('[data-ribbon-tab="home"][aria-selected="true"]')).toHaveCount(1);
@@ -786,7 +791,7 @@ export async function runExcelChromeVisualScenario(page: Page): Promise<void> {
   await snapshotDemo(page, 'excel-chrome-home-tabs-only-1024');
   await setRibbonDisplayMode(page, 'autoHide');
   await page.keyboard.press('Alt');
-  await expect(page.locator('.demo__ribbon-shell--autoHidePeek')).toHaveCount(1);
+  await expect(page.locator('.fc-tb__ribbon-shell--autoHidePeek')).toHaveCount(1);
   await snapshotDemo(page, 'excel-chrome-home-auto-hide-peek-1024');
 
   await page.setViewportSize({ width: 390, height: 844 });

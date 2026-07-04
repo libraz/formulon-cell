@@ -48,7 +48,7 @@ describe('showAdvancedFilterDialog', () => {
       '[data-range-picker="advanced-filter-copy-to"]',
     );
     const inputs = document.querySelectorAll<HTMLInputElement>('.fc-range-picker input');
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.querySelector('.fc-advfilter__ranges')).toBeTruthy();
     expect(dialog?.querySelector('.fc-advfilter__row--list')).toBeTruthy();
     expect(dialog?.querySelector('.fc-advfilter__row--criteria')).toBeTruthy();
@@ -106,7 +106,7 @@ describe('showAdvancedFilterDialog', () => {
     const inputs = document.querySelectorAll<HTMLInputElement>('.fc-advfilter__row input');
     document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
 
-    expect(document.querySelector<HTMLElement>('.app__dlg__error')?.textContent).toBe(
+    expect(document.querySelector<HTMLElement>('.fc-tb__dlg__error')?.textContent).toBe(
       'Enter a valid range.',
     );
     expect(document.activeElement).toBe(inputs[1]);

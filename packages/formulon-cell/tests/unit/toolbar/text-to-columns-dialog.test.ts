@@ -37,7 +37,7 @@ describe('showTextToColumnsDialog', () => {
       previewRows: ['alpha,beta', 'one,two'],
     });
 
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('Original data type');
     expect(dialog?.textContent).toContain('Delimited');
     expect(dialog?.textContent).toContain('Fixed width');
@@ -84,7 +84,7 @@ describe('showTextToColumnsDialog', () => {
       initialDelimiters: [],
       previewRows: ['a,b'],
     });
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
     expect(dialog?.textContent).toContain('No delimited text found');
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn')?.click();

@@ -17,7 +17,7 @@ describe('showZoomDialog', () => {
       invalidMessage: 'Enter a zoom percentage from 50 to 400.',
     });
 
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('Magnification');
     const input = dialog?.querySelector<HTMLInputElement>('input[type="number"]');
     expect(input?.min).toBe('50');
@@ -40,7 +40,7 @@ describe('showZoomDialog', () => {
       invalidMessage: 'Enter a zoom percentage from 50 to 400.',
     });
 
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     const input = dialog?.querySelector<HTMLInputElement>('input[type="number"]');
     if (!input) throw new Error('Expected zoom input.');
     input.value = '401';

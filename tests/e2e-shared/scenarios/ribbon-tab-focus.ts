@@ -23,23 +23,23 @@ export async function runRibbonInactiveFocusScenario(page: Page): Promise<void> 
   // and unmount the others, so there are no `[hidden]` siblings to check.
   // That's a stronger focus guarantee than `[hidden]`, so we just verify
   // the demo ribbon root exists and skip the rest in that case.
-  const hiddenPanels = page.locator('.demo__ribbon[hidden]');
+  const hiddenPanels = page.locator('.fc-tb__ribbon[hidden]');
   const hasHiddenPanels = (await hiddenPanels.count()) > 0;
   if (!hasHiddenPanels) {
     // Wrappers unmount inactive panels — focus can never leak into them.
-    await expect(page.locator('.demo__ribbon').first()).toBeAttached();
+    await expect(page.locator('.fc-tb__ribbon').first()).toBeAttached();
     return;
   }
 
   // Playground renders all panels and toggles [hidden]; assert the contract.
-  await expect(page.locator('.demo__ribbon[data-ribbon-panel="home"]:not([hidden])')).toHaveCount(
+  await expect(page.locator('.fc-tb__ribbon[data-ribbon-panel="home"]:not([hidden])')).toHaveCount(
     1,
   );
 
   // Buttons inside a hidden panel must NOT match the focus selector. Browsers
   // skip elements with [hidden] ancestors entirely during Tab navigation.
   const focusableInHidden = await page.evaluate(() => {
-    const panels = Array.from(document.querySelectorAll<HTMLElement>('.demo__ribbon[hidden]'));
+    const panels = Array.from(document.querySelectorAll<HTMLElement>('.fc-tb__ribbon[hidden]'));
     let count = 0;
     for (const panel of panels) {
       // Mirror the focus-selector heuristic browsers use for Tab order:
@@ -63,12 +63,12 @@ export async function runRibbonInactiveFocusScenario(page: Page): Promise<void> 
 
   // Switching to a different tab moves the focus capability over.
   await page.getByRole('tab', { name: 'Insert', exact: true }).click();
-  await expect(page.locator('.demo__ribbon[data-ribbon-panel="insert"]:not([hidden])')).toHaveCount(
-    1,
-  );
+  await expect(
+    page.locator('.fc-tb__ribbon[data-ribbon-panel="insert"]:not([hidden])'),
+  ).toHaveCount(1);
   // Now Home is hidden — its buttons should also no longer be tabbable.
   const homeFocusableNow = await page.evaluate(() => {
-    const panel = document.querySelector<HTMLElement>('.demo__ribbon[data-ribbon-panel="home"]');
+    const panel = document.querySelector<HTMLElement>('.fc-tb__ribbon[data-ribbon-panel="home"]');
     return panel?.hidden ? 'hidden' : 'visible';
   });
   expect(homeFocusableNow).toBe('hidden');

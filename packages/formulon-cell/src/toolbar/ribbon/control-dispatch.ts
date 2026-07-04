@@ -68,12 +68,12 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
   } = ctx;
 
   const createRibbonIcon = (name: string): SVGSVGElement | null => {
-    const excelSvg = createExcelRibbonSvg(name, 'demo__rb-icon');
+    const excelSvg = createExcelRibbonSvg(name, 'fc-tb__rb-icon');
     const fluentPaths = fluentIconPaths(name);
     if (excelSvg) return excelSvg;
     if (!fluentPaths) return null;
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.classList.add('demo__rb-icon');
+    svg.classList.add('fc-tb__rb-icon');
     svg.setAttribute('viewBox', '0 0 24 24');
     svg.setAttribute('focusable', 'false');
     svg.setAttribute('aria-hidden', 'true');

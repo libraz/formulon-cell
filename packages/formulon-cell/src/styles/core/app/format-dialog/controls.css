@@ -28,12 +28,12 @@
     width: 58px;
   }
 
-  .app__dlg__hint {
+  .fc-tb__dlg__hint {
     color: color-mix(in srgb, var(--fc-fmtdlg-panel-fg, CanvasText) 68%, transparent);
     font-size: 11px;
   }
 
-  .app__dlg__preview {
+  .fc-tb__dlg__preview {
     min-height: 74px;
     max-height: 150px;
     margin: 0;
@@ -47,11 +47,11 @@
     white-space: pre;
   }
 
-  .app__dlg__format-choice .app__dlg__label {
+  .fc-tb__dlg__format-choice .fc-tb__dlg__label {
     gap: 6px;
   }
 
-  .app__dlg__format-preview {
+  .fc-tb__dlg__format-preview {
     display: inline-flex;
     align-items: center;
     justify-content: center;

@@ -54,7 +54,7 @@
     min-width: min(460px, calc(100vw - 72px));
   }
 
-  .fc-textcols__preview .app__dlg__preview {
+  .fc-textcols__preview .fc-tb__dlg__preview {
     min-height: 88px;
   }
 

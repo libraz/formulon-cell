@@ -60,7 +60,7 @@ export const showCellStyleDialog = (
     );
 
     const legend = document.createElement('div');
-    legend.className = 'app__dlg__label';
+    legend.className = 'fc-tb__dlg__label';
     legend.textContent = t.cellStyleIncludes;
     shell.body.appendChild(legend);
 

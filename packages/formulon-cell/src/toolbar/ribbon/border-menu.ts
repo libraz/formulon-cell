@@ -66,7 +66,7 @@ const MENU_TO_PRESET: Record<string, BorderPresetKey> = {
   topAndDoubleBottom: 'topAndDoubleBottom',
 };
 
-const BORDER_DRAW_ACTIVE_CLASS = 'app__menu-item--active';
+const BORDER_DRAW_ACTIVE_CLASS = 'fc-tb__menu-item--active';
 const BORDER_MENU_ID = RIBBON_BORDERS_MENU_ID;
 const BORDER_MENU_SELECTOR = `#${BORDER_MENU_ID}`;
 
@@ -74,16 +74,16 @@ export const createBorderMenu = (ctx: BorderMenuCtx): BorderMenuApi => {
   const borderBtn = document.getElementById('btn-borders');
   const borderMenu = document.getElementById(BORDER_MENU_ID);
   const lineStyleSubmenu =
-    borderMenu?.querySelector<HTMLElement>('.app__submenu--line-style') ?? null;
+    borderMenu?.querySelector<HTMLElement>('.fc-tb__submenu--line-style') ?? null;
 
   const getBorderBtn = (): HTMLButtonElement | null =>
     document.getElementById('btn-borders') as HTMLButtonElement | null;
   const getBorderMenu = (): HTMLDivElement | null =>
     document.getElementById(BORDER_MENU_ID) as HTMLDivElement | null;
   const getLineColorSubmenu = (): HTMLElement | null =>
-    getBorderMenu()?.querySelector<HTMLElement>('.app__submenu--line-color') ?? null;
+    getBorderMenu()?.querySelector<HTMLElement>('.fc-tb__submenu--line-color') ?? null;
   const getLineStyleSubmenu = (): HTMLElement | null =>
-    getBorderMenu()?.querySelector<HTMLElement>('.app__submenu--line-style') ?? null;
+    getBorderMenu()?.querySelector<HTMLElement>('.fc-tb__submenu--line-style') ?? null;
 
   const closeBorderSubmenus = (): void => {
     const lineColor = getLineColorSubmenu();

@@ -15,7 +15,7 @@ describe('integration: single-call ribbon toolbar', () => {
     sheet = undefined;
   });
 
-  const shellOf = (host: HTMLElement) => host.querySelector<HTMLElement>('.app__ribbon-shell');
+  const shellOf = (host: HTMLElement) => host.querySelector<HTMLElement>('.fc-tb__ribbon-shell');
 
   it('mounts the ribbon inside the host and exposes instance.toolbar', async () => {
     sheet = await mountStubSheet({ toolbar: true, theme: 'ink' });

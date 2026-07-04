@@ -29,17 +29,17 @@ export const showSymbolDialog = (opts: SymbolDialogOptions): Promise<string | nu
     const errorRow = appendErrorRow(shell.body);
 
     const picker = document.createElement('div');
-    picker.className = 'app__symbol-dialog';
+    picker.className = 'fc-tb__symbol-dialog';
     picker.setAttribute('role', 'group');
     picker.setAttribute('aria-label', opts.text.symbol);
     for (const group of toolbarSymbolGroups(opts.text)) {
       const heading = document.createElement('div');
-      heading.className = 'app__menu-heading';
+      heading.className = 'fc-tb__menu-heading';
       heading.textContent = group.label;
       picker.appendChild(heading);
 
       const row = document.createElement('div');
-      row.className = 'app__symbol-dialog__row';
+      row.className = 'fc-tb__symbol-dialog__row';
       for (const symbol of group.symbols) {
         const button = createDialogChoiceButton({ label: symbol, title: symbol });
         button.addEventListener('click', () => {

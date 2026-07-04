@@ -74,19 +74,19 @@ const borderSubmenuId = (submenuKey: 'lineColor' | 'lineStyle'): string =>
 const createLineStyleSubmenu = (label: string, noneLabel: string): HTMLDivElement => {
   const submenu = createSubmenu({
     id: borderSubmenuId('lineStyle'),
-    className: 'app__submenu app__submenu--line-style',
+    className: 'fc-tb__submenu fc-tb__submenu--line-style',
     label,
   });
   for (const value of LINE_STYLES_ALL) {
     const btn = createMenuButton({
-      className: 'app__submenu-item',
+      className: 'fc-tb__submenu-item',
       attr: 'borderLineStyle',
       value,
     });
     btn.setAttribute('role', 'menuitemradio');
     btn.setAttribute('aria-checked', value === 'thin' ? 'true' : 'false');
     if (value === 'none') {
-      btn.classList.add('app__submenu-item--line-style-none');
+      btn.classList.add('fc-tb__submenu-item--line-style-none');
       btn.appendChild(submenuItemText(noneLabel));
     } else {
       btn.appendChild(createLineSamplePreview(value));
@@ -99,7 +99,7 @@ const createLineStyleSubmenu = (label: string, noneLabel: string): HTMLDivElemen
 const createLineColorSubmenu = (label: string, deps: BordersMenuDeps): HTMLDivElement => {
   const submenu = createSubmenu({
     id: borderSubmenuId('lineColor'),
-    className: 'app__submenu app__submenu--line-color',
+    className: 'fc-tb__submenu fc-tb__submenu--line-color',
     label,
   });
   const palette = createColorPalette({
@@ -117,7 +117,7 @@ const createLineColorSubmenu = (label: string, deps: BordersMenuDeps): HTMLDivEl
 export const createBordersMenu = (deps: BordersMenuDeps): HTMLDivElement => {
   const t = deps.ribbonText;
   const menu = createMenu(RIBBON_BORDERS_MENU_ID);
-  menu.classList.add('app__menu--borders');
+  menu.classList.add('fc-tb__menu--borders');
   menu.append(
     // Section 1: single-side edges
     presetMenuItem('bottom', t.bottomBorder),

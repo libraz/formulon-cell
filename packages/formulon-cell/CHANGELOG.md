@@ -35,6 +35,15 @@ versioning is [SemVer](https://semver.org/).
   toolbar + all three palettes). The individual `styles/paper.css`,
   `styles/ink.css`, `styles/contrast.css`, and `styles/toolbar.css` exports
   remain for granular setups.
+- The ribbon toolbar's CSS class prefixes are unified from `demo__*` / `app__*`
+  to a single `fc-tb__*` (e.g. `demo__ribbon-shell` / `app__menu-item` →
+  `fc-tb__ribbon-shell` / `fc-tb__menu-item`), matching the grid's `fc-*` /
+  `fc-host__*` convention. Hosts that styled or queried ribbon markup by class
+  should update the prefix or, preferably, target the stable `data-ribbon-*`
+  attributes instead. The published toolbar stylesheet also no longer ships the
+  reference demo app's own page-shell styling (brand bar, options panel, preset
+  picker, feature toggles, event log); that CSS moved to the demo apps, so the
+  bundle now contains only genuine toolbar chrome.
 - The ribbon toolbar's overridable theme tokens are renamed from `--demo-*` to
   `--fc-tb-*` (e.g. `--demo-ribbon-bg` → `--fc-tb-ribbon-bg`), so the public
   override surface no longer ships under a `demo` name and cannot collide with

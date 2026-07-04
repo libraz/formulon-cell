@@ -119,7 +119,7 @@ const createTableStyleSwatch = (
   const swatch = tableStyleSwatch(style, color);
   const { banded, firstCol } = tableVariantOptions(variant);
   const btn = createMenuButton({
-    className: 'app__tablestyle-swatch',
+    className: 'fc-tb__tablestyle-swatch',
     attr: dataset,
     value: actionStyleId,
     title: label,
@@ -127,14 +127,14 @@ const createTableStyleSwatch = (
   });
   btn.dataset.tableColor = color;
   btn.dataset.tableVariant = variant;
-  btn.appendChild(tableStyleSwatchPart('app__tablestyle-swatch__head', swatch.header));
+  btn.appendChild(tableStyleSwatchPart('fc-tb__tablestyle-swatch__head', swatch.header));
   for (let i = 0; i < 3; i += 1) {
     const rowFill = banded && i % 2 === 1 ? swatch.band : '#ffffff';
-    const row = tableStyleSwatchPart('app__tablestyle-swatch__row', rowFill);
+    const row = tableStyleSwatchPart('fc-tb__tablestyle-swatch__row', rowFill);
     if (firstCol) {
       row.append(
-        tableStyleSwatchPart('app__tablestyle-swatch__first-col', swatch.header),
-        tableStyleSwatchPart('app__tablestyle-swatch__rest'),
+        tableStyleSwatchPart('fc-tb__tablestyle-swatch__first-col', swatch.header),
+        tableStyleSwatchPart('fc-tb__tablestyle-swatch__rest'),
       );
     }
     btn.appendChild(row);
@@ -149,7 +149,7 @@ const tableStyleFooterButton = (label: string, action: string): HTMLButtonElemen
     action,
     action === 'new-pivot-style' ? 'pivot-style-new' : 'table-style-new',
   );
-  btn.classList.add('app__tablestyle-footer');
+  btn.classList.add('fc-tb__tablestyle-footer');
   return btn;
 };
 
@@ -160,13 +160,13 @@ const cellStyleFooterButton = (label: string, action: string): HTMLButtonElement
     action,
     action === 'merge-cell-style' ? 'cell-style-merge' : 'cell-style-new',
   );
-  btn.classList.add('app__cellstyle-footer');
+  btn.classList.add('fc-tb__cellstyle-footer');
   return btn;
 };
 
 const currencyFooterButton = (label: string, action: string): HTMLButtonElement => {
   const btn = menuPresetButton(label, 'currencyFooter', action, menuIconSpacer());
-  btn.classList.add('app__currency-footer');
+  btn.classList.add('fc-tb__currency-footer');
   return btn;
 };
 
@@ -201,7 +201,7 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
     const label = def.label;
     const btn = menuTextChip({
       label,
-      className: 'app__menu-item app__cellstyle-chip',
+      className: 'fc-tb__menu-item fc-tb__cellstyle-chip',
       attr: 'cellStyle',
       value: def.id,
     });
@@ -225,8 +225,8 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
 
   const createTableStyleMenu = (id: string): HTMLDivElement => {
     const menu = createMenu(menuIdForCommand(id));
-    menu.classList.add('app__tablestyle-menu');
-    const scrollBody = menuScrollBody('app__tablestyle-scroll', ribbonText.formatTable);
+    menu.classList.add('fc-tb__tablestyle-menu');
+    const scrollBody = menuScrollBody('fc-tb__tablestyle-scroll', ribbonText.formatTable);
     const intensities: {
       id: TableStyle;
       label: string;
@@ -240,8 +240,8 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
       scrollBody.append(
         ...menuLabeledGrid({
           label: intensity.label,
-          headingClassName: 'app__tablestyle-heading',
-          gridClassName: 'app__tablestyle-grid',
+          headingClassName: 'fc-tb__tablestyle-heading',
+          gridClassName: 'fc-tb__tablestyle-grid',
           children: intensity.variants.flatMap((variant) =>
             TABLE_STYLE_COLORS.map((color) =>
               createTableStyleSwatch(intensity.id, color, variant, intensity.label),
@@ -256,8 +256,8 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
       scrollBody.append(
         ...menuLabeledGrid({
           label,
-          headingClassName: 'app__tablestyle-heading',
-          gridClassName: 'app__tablestyle-grid',
+          headingClassName: 'fc-tb__tablestyle-heading',
+          gridClassName: 'fc-tb__tablestyle-grid',
           children: customTableStyles.map((style) =>
             createTableStyleSwatch(
               style.style,
@@ -276,8 +276,8 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
       scrollBody.append(
         ...menuLabeledGrid({
           label,
-          headingClassName: 'app__tablestyle-heading',
-          gridClassName: 'app__tablestyle-grid',
+          headingClassName: 'fc-tb__tablestyle-heading',
+          gridClassName: 'fc-tb__tablestyle-grid',
           children: customPivotTableStyles.map((style) =>
             createTableStyleSwatch(
               style.style,
@@ -300,15 +300,15 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
 
   const createCellStylesMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-cell-styles-home');
-    menu.classList.add('app__cellstyle-menu');
-    const scrollBody = menuScrollBody('app__cellstyle-scroll', ribbonText.cellStyles);
+    menu.classList.add('fc-tb__cellstyle-menu');
+    const scrollBody = menuScrollBody('fc-tb__cellstyle-scroll', ribbonText.cellStyles);
     for (const group of CELL_STYLE_GROUPS) {
       const label = cellStyleGroupLabel(group.id);
       scrollBody.append(
         ...menuLabeledGrid({
           label,
-          headingClassName: 'app__cellstyle-heading',
-          gridClassName: 'app__cellstyle-grid',
+          headingClassName: 'fc-tb__cellstyle-heading',
+          gridClassName: 'fc-tb__cellstyle-grid',
           children: group.styleIds.map((id) => createCellStyleChip(id)),
         }),
       );
@@ -319,8 +319,8 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
       scrollBody.append(
         ...menuLabeledGrid({
           label,
-          headingClassName: 'app__cellstyle-heading',
-          gridClassName: 'app__cellstyle-grid',
+          headingClassName: 'fc-tb__cellstyle-heading',
+          gridClassName: 'fc-tb__cellstyle-grid',
           children: customStyles.map((style) => createCellStyleChipFromDef(style)),
         }),
       );
@@ -334,7 +334,7 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
 
   const createCurrencyMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-currency-home');
-    menu.classList.add('app__currency-menu');
+    menu.classList.add('fc-tb__currency-menu');
     menu.append(
       currencyPresetItem(ribbonText.currencyPresetJpy, '¥'),
       currencyPresetItem(ribbonText.currencyPresetUsd, '$'),

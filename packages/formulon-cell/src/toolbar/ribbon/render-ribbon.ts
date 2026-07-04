@@ -179,8 +179,8 @@ const createRibbonTabButton = (
   activeRibbonTab: RibbonTab,
 ): HTMLButtonElement => {
   return createRibbonButton({
-    className: `demo__ribbon-tab${tab.id === 'file' ? ' demo__ribbon-tab--file' : ''}${
-      tab.id === activeRibbonTab ? ' demo__ribbon-tab--active' : ''
+    className: `fc-tb__ribbon-tab${tab.id === 'file' ? ' fc-tb__ribbon-tab--file' : ''}${
+      tab.id === activeRibbonTab ? ' fc-tb__ribbon-tab--active' : ''
     }`,
     role: 'tab',
     ariaSelected: tab.id === activeRibbonTab,
@@ -199,14 +199,14 @@ const createRibbonCommandButton = (
     chevronPath: string;
   },
 ): HTMLButtonElement => {
-  const layoutClass = command.layout === 'stacked' ? ' demo__rb--stacked' : '';
+  const layoutClass = command.layout === 'stacked' ? ' fc-tb__rb--stacked' : '';
   const keyshortcuts = RIBBON_KEYSHORTCUTS[command.id];
   const activation = ribbonActivationForCommand(command.id);
   const legacyId = LEGACY_COMMAND_IDS[command.id];
   const button = createRibbonButton({
-    className: `demo__rb${command.kind === 'large' ? ' demo__rb--large' : ''}${
-      command.kind === 'wide' ? ' demo__rb--wide' : ''
-    }${command.kind === 'mono' ? ' demo__rb--mono' : ''}${layoutClass}${
+    className: `fc-tb__rb${command.kind === 'large' ? ' fc-tb__rb--large' : ''}${
+      command.kind === 'wide' ? ' fc-tb__rb--wide' : ''
+    }${command.kind === 'mono' ? ' fc-tb__rb--mono' : ''}${layoutClass}${
       command.className ? ` ${command.className}` : ''
     }`,
     id: legacyId,
@@ -239,7 +239,7 @@ const createRibbonCommandButton = (
   if (activation.menuId) {
     button.setAttribute('aria-haspopup', 'menu');
     button.setAttribute('aria-expanded', 'false');
-    button.appendChild(ctx.makeSvg('0 0 12 12', ctx.chevronPath, 'demo__rb-split-chevron'));
+    button.appendChild(ctx.makeSvg('0 0 12 12', ctx.chevronPath, 'fc-tb__rb-split-chevron'));
   }
   return button;
 };
@@ -249,7 +249,7 @@ const createRibbonDisplayToggleButton = (
   menuOpen: boolean,
 ): HTMLButtonElement => {
   return createRibbonButton({
-    className: 'demo__ribbon-toggle',
+    className: 'fc-tb__ribbon-toggle',
     dataset: { ribbonToggle: 'true' },
     ariaHaspopup: 'menu',
     ariaExpanded: menuOpen,
@@ -264,7 +264,7 @@ const createRibbonDisplayOptionButton = (
   option: string,
 ): HTMLButtonElement => {
   return createRibbonButton({
-    className: 'demo__ribbon-display-option',
+    className: 'fc-tb__ribbon-display-option',
     dataset: { ribbonDisplayOption: option },
     role: 'menuitemradio',
     ariaChecked: checked,
@@ -304,14 +304,14 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
     const { createSelect, createColor, createIcon, makeSvg, chevronPath } = ctx.helpers;
     const model = buildRibbonModel(ctx.ribbonLang, { tabs: ctx.ribbonTabs });
     const shell = document.createElement('div');
-    shell.className = `demo__ribbon-shell app__ribbon-shell demo__ribbon-shell--${ribbonDisplayMode}${
-      ribbonAutoHidePeek ? ' demo__ribbon-shell--autoHidePeek' : ''
-    }${ribbonCollapsed ? ' demo__ribbon-shell--collapsed' : ''}`;
+    shell.className = `fc-tb__ribbon-shell fc-tb__ribbon-shell--${ribbonDisplayMode}${
+      ribbonAutoHidePeek ? ' fc-tb__ribbon-shell--autoHidePeek' : ''
+    }${ribbonCollapsed ? ' fc-tb__ribbon-shell--collapsed' : ''}`;
     shell.dataset.ribbonDisplayMode = ribbonDisplayMode;
     if (ribbonAutoHidePeek) shell.dataset.ribbonAutoHidePeek = 'true';
 
     const tabs = document.createElement('div');
-    tabs.className = 'demo__ribbon-tabs';
+    tabs.className = 'fc-tb__ribbon-tabs';
     tabs.setAttribute('role', 'tablist');
     tabs.setAttribute('aria-label', ribbonText.ribbonTabs);
     tabs.dataset.ribbonCollapsed = ribbonCollapsed ? 'true' : 'false';
@@ -322,7 +322,7 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
 
     for (const tab of model) {
       const panel = document.createElement('div');
-      panel.className = 'demo__ribbon';
+      panel.className = 'fc-tb__ribbon';
       panel.setAttribute('role', 'toolbar');
       panel.setAttribute('aria-label', `${tab.label} ${ribbonText.ribbon}`);
       panel.dataset.ribbonPanel = tab.id;
@@ -330,28 +330,28 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
 
       for (const g of tab.groups) {
         const group = document.createElement('section');
-        const groupClasses = ['demo__ribbon-group'];
+        const groupClasses = ['fc-tb__ribbon-group'];
         if (g.variant) {
-          groupClasses.push(`demo__ribbon-group--${g.variant}`);
+          groupClasses.push(`fc-tb__ribbon-group--${g.variant}`);
           if (TILE_LAYOUT_GROUP_VARIANTS.has(g.variant) && g.variant !== 'tiles') {
-            groupClasses.push('demo__ribbon-group--tiles');
+            groupClasses.push('fc-tb__ribbon-group--tiles');
           }
           if (STACKED_LAYOUT_GROUP_VARIANTS.has(g.variant)) {
-            groupClasses.push('demo__ribbon-group--stacked');
+            groupClasses.push('fc-tb__ribbon-group--stacked');
           }
           if (MIXED_LAYOUT_GROUP_VARIANTS.has(g.variant)) {
-            groupClasses.push('demo__ribbon-group--mixed');
+            groupClasses.push('fc-tb__ribbon-group--mixed');
           }
         }
         group.className = groupClasses.join(' ');
         group.setAttribute('aria-label', g.title);
 
         const tools = document.createElement('div');
-        tools.className = 'demo__ribbon-tools';
+        tools.className = 'fc-tb__ribbon-tools';
         for (const c of g.commands) {
           if (c.kind === 'break') {
             const rowBreak = document.createElement('div');
-            rowBreak.className = 'demo__rb-break';
+            rowBreak.className = 'fc-tb__rb-break';
             rowBreak.dataset.ribbonCommand = c.id;
             tools.appendChild(rowBreak);
             continue;
@@ -376,7 +376,7 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
         }
 
         const label = document.createElement('div');
-        label.className = 'demo__ribbon-label';
+        label.className = 'fc-tb__ribbon-label';
         label.textContent = g.title;
         group.appendChild(tools);
         group.appendChild(label);
@@ -388,7 +388,7 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
 
     if (!backstageOpen) {
       const display = document.createElement('div');
-      display.className = 'demo__ribbon-display';
+      display.className = 'fc-tb__ribbon-display';
       const toggle = createRibbonDisplayToggleButton(
         ribbonDisplayOptionsText,
         ribbonDisplayMenuOpen,
@@ -396,7 +396,7 @@ export const createRenderRibbon = (ctx: RenderRibbonCtx): RenderRibbonApi => {
       display.appendChild(toggle);
       if (ribbonDisplayMenuOpen) {
         const menu = document.createElement('div');
-        menu.className = 'demo__ribbon-display-menu';
+        menu.className = 'fc-tb__ribbon-display-menu';
         menu.setAttribute('role', 'menu');
         const options: [string, boolean, string][] = [
           [ribbonDisplayOptionsText.expanded, ribbonDisplayMode === 'full', 'full'],

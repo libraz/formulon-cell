@@ -203,7 +203,7 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
     });
 
     const dataHeaderRow = document.createElement('label');
-    dataHeaderRow.className = 'fc-fmtdlg__row app__dlg__label';
+    dataHeaderRow.className = 'fc-fmtdlg__row fc-tb__dlg__label';
     const hasHeader = document.createElement('input');
     hasHeader.type = 'checkbox';
     hasHeader.checked = opts.initialHasHeader;

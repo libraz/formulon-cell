@@ -83,7 +83,7 @@ const projectDefaultRibbonActiveState = (
     else if (command === 'viewPageLayout') pressed = active.workbookView === 'pageLayout';
     else if (command === 'viewPageBreakPreview')
       pressed = active.workbookView === 'pageBreakPreview';
-    button.classList.toggle('demo__rb--active', pressed);
+    button.classList.toggle('fc-tb__rb--active', pressed);
     button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
   }
 
@@ -360,7 +360,7 @@ export function mountToolbar(
 
   // Auto-wire the default dynamic-dropdowns click delegator when the host
   // opts in. The handler is attached to `document` (matching the playground
-  // wiring) so clicks anywhere inside an open `.app__menu` reach the
+  // wiring) so clicks anywhere inside an open `.fc-tb__menu` reach the
   // dispatcher. We capture the unsubscribe and undo it in dispose so the
   // listener does not leak after re-mounts.
   let dynamicDropdownClickHandler: ((event: MouseEvent) => void) | null = null;
@@ -519,7 +519,7 @@ export function mountToolbar(
 
   const closeStaticRibbonMenus = (except?: HTMLElement, restoreFocus = false): void => {
     let restoreTarget: HTMLButtonElement | null = null;
-    for (const menu of host.querySelectorAll<HTMLDivElement>('.app__menu')) {
+    for (const menu of host.querySelectorAll<HTMLDivElement>('.fc-tb__menu')) {
       if (menu === except || menu.hidden) continue;
       menu.hidden = true;
       const button = host.querySelector<HTMLButtonElement>(`[data-ribbon-menu-id="${menu.id}"]`);
@@ -531,7 +531,7 @@ export function mountToolbar(
 
   const hasOpenStaticRibbonMenu = (): boolean =>
     !dropdownsApi &&
-    Array.from(host.querySelectorAll<HTMLDivElement>('.app__menu')).some((menu) => !menu.hidden);
+    Array.from(host.querySelectorAll<HTMLDivElement>('.fc-tb__menu')).some((menu) => !menu.hidden);
 
   const onClick = (e: MouseEvent): void => {
     const target = e.target;
@@ -589,7 +589,7 @@ export function mountToolbar(
           return;
         }
         const submenu = cmdBtn.nextElementSibling;
-        if (submenu instanceof HTMLDivElement && submenu.classList.contains('app__menu')) {
+        if (submenu instanceof HTMLDivElement && submenu.classList.contains('fc-tb__menu')) {
           const wasOpen = !submenu.hidden;
           closeStaticRibbonMenus(submenu);
           submenu.hidden = wasOpen;

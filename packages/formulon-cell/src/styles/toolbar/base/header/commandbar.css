@@ -1,4 +1,4 @@
-.demo__commandbar {
+.fc-tb__commandbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -9,97 +9,7 @@
   border-bottom: 1px solid var(--fc-tb-line-soft);
 }
 
-.demo__brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-}
-
-.demo__brand strong {
-  font-weight: 600;
-  letter-spacing: 0;
-}
-
-.demo__brand-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  background: var(--fc-tb-brand);
-  color: #ffffff;
-  font-size: 14px;
-}
-
-.demo__brand-mark .demo__rb-icon {
-  width: 16px;
-  height: 16px;
-}
-
-.demo__brand-sep,
-.demo__brand-tag {
-  color: var(--fc-tb-fg-soft);
-}
-
-.demo__brand-tag {
-  font-family: var(--fc-tb-mono);
-  font-size: 12px;
-  letter-spacing: 0;
-}
-
-.demo__controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.demo__controls--panel {
-  align-items: stretch;
-  flex-direction: column;
-}
-
-.demo__seg {
-  display: inline-flex;
-  border: 1px solid var(--fc-tb-line);
-  border-radius: 2px;
-  overflow: hidden;
-  background: var(--fc-tb-card);
-}
-
-.demo__seg-btn {
-  padding: 5px 11px;
-  font: inherit;
-  font-size: 12px;
-  color: var(--fc-tb-fg-soft);
-  background: transparent;
-  border: 0;
-  border-left: 1px solid var(--fc-tb-line);
-  cursor: pointer;
-  letter-spacing: 0.02em;
-}
-
-.demo__seg-btn:first-child {
-  border-left: 0;
-}
-
-.demo__seg-btn:hover {
-  background: var(--fc-tb-ribbon-hover);
-  color: var(--fc-tb-fg);
-}
-
-.demo__seg-btn--active {
-  background: var(--fc-tb-accent);
-  color: var(--fc-tb-title-fg);
-}
-
-.demo__seg-btn--active:hover {
-  background: var(--fc-tb-accent);
-  color: var(--fc-tb-title-fg);
-}
-
-.demo__btn {
+.fc-tb__btn {
   padding: 5px 11px;
   font: inherit;
   font-size: 12px;
@@ -110,23 +20,23 @@
   cursor: pointer;
 }
 
-.demo__btn:hover:not(:disabled) {
+.fc-tb__btn:hover:not(:disabled) {
   background: var(--fc-tb-ribbon-hover);
   border-color: var(--fc-tb-ribbon-line);
 }
 
-.demo__btn--active {
+.fc-tb__btn--active {
   background: var(--fc-tb-accent);
   border-color: var(--fc-tb-accent);
   color: var(--fc-tb-title-fg);
 }
 
-.demo__btn:disabled {
+.fc-tb__btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.demo__btn--ghost {
+.fc-tb__btn--ghost {
   font-family: var(--fc-tb-mono);
   font-size: 11px;
   padding: 5px 10px;

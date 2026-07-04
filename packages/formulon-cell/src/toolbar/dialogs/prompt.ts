@@ -136,7 +136,7 @@ export const showConfirm = (opts: ConfirmOptions): Promise<boolean> =>
       bodyVariant: 'app',
     });
     const msg = document.createElement('p');
-    msg.className = 'app__dlg__message';
+    msg.className = 'fc-tb__dlg__message';
     msg.textContent = opts.message;
     shell.body.appendChild(msg);
 
@@ -167,7 +167,7 @@ export const showMessage = (opts: MessageOptions): Promise<void> =>
       bodyVariant: 'app',
     });
     const msg = document.createElement('p');
-    msg.className = 'app__dlg__message';
+    msg.className = 'fc-tb__dlg__message';
     msg.textContent = opts.message;
     shell.body.appendChild(msg);
 

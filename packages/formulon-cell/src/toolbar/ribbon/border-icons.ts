@@ -59,7 +59,7 @@ export const createBorderPreview = (spec: BorderPreviewSpec): SVGSVGElement => {
   svg.setAttribute('height', '16');
   svg.setAttribute('focusable', 'false');
   svg.setAttribute('aria-hidden', 'true');
-  svg.classList.add('app__border-preview');
+  svg.classList.add('fc-tb__border-preview');
   const { x, y, w, h } = BORDER_ICON_BOX;
   if (spec.showBase !== false) {
     const base = document.createElementNS(SVG_NS, 'rect');
@@ -105,7 +105,7 @@ const createBorderToolIcon = (className: string): SVGSVGElement => {
   svg.setAttribute('height', '16');
   svg.setAttribute('focusable', 'false');
   svg.setAttribute('aria-hidden', 'true');
-  svg.classList.add('app__border-preview', className);
+  svg.classList.add('fc-tb__border-preview', className);
   return svg;
 };
 
@@ -124,7 +124,7 @@ const appendPath = (
 };
 
 export const createBorderEraserPreview = (): SVGSVGElement => {
-  const svg = createBorderToolIcon('app__border-preview--eraser');
+  const svg = createBorderToolIcon('fc-tb__border-preview--eraser');
   appendPath(svg, 'M3 10 9.5 3.5l3 3L6 13H3v-3Z', {
     fill: '#f4b6d2',
     stroke: '#8a1f5a',
@@ -135,7 +135,7 @@ export const createBorderEraserPreview = (): SVGSVGElement => {
 };
 
 export const createBorderLineColorPreview = (): SVGSVGElement => {
-  const svg = createBorderToolIcon('app__border-preview--line-color');
+  const svg = createBorderToolIcon('fc-tb__border-preview--line-color');
   appendPath(svg, 'M3 12h10', { stroke: '#1f1f1f', strokeWidth: '1.5', strokeLinecap: 'square' });
   appendPath(svg, 'M4 8.5 9.8 2.7l2.1 2.1L6.1 10.6 3.5 11.2 4 8.5Z', {
     fill: '#ffffff',
@@ -147,7 +147,7 @@ export const createBorderLineColorPreview = (): SVGSVGElement => {
 };
 
 export const createBorderLineStylePreview = (): SVGSVGElement => {
-  const svg = createBorderToolIcon('app__border-preview--line-style');
+  const svg = createBorderToolIcon('fc-tb__border-preview--line-style');
   const styles: [number, string | null, string][] = [
     [4, null, '1'],
     [8, '3 2', '1'],
@@ -220,7 +220,7 @@ export const createLineSamplePreview = (style: CellBorderStyle | 'none'): SVGSVG
   svg.setAttribute('height', '12');
   svg.setAttribute('focusable', 'false');
   svg.setAttribute('aria-hidden', 'true');
-  svg.classList.add('app__line-sample');
+  svg.classList.add('fc-tb__line-sample');
   if (style === 'none') return svg;
   const draw = (yOffset: number, w: number, d: string | null): void => {
     const line = document.createElementNS(SVG_NS, 'line');

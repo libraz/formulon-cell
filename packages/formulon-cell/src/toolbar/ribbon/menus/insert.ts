@@ -36,7 +36,7 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
 
   const createSymbolMenu = (): HTMLDivElement => {
     const menu = createMenu(menuIdForCommand('symbolInsert'));
-    menu.classList.add('app__menu--symbols');
+    menu.classList.add('fc-tb__menu--symbols');
     for (const group of toolbarSymbolGroups(t)) {
       menu.append(menuSectionHeader(group.label));
       menu.append(symbolMenuGrid(group.label, group.symbols));
@@ -148,8 +148,8 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
 
   const createChartInsertMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-chart-insert');
-    menu.classList.add('app__menu--visual', 'app__menu--charts');
-    const grid = visualMenuTileGrid('app__visual-grid--charts', [
+    menu.classList.add('fc-tb__menu--visual', 'fc-tb__menu--charts');
+    const grid = visualMenuTileGrid('fc-tb__visual-grid--charts', [
       {
         label: t.chartColumn,
         attr: 'chartInsert',
@@ -195,7 +195,7 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
         attr: 'chartInsert',
         value: 'recommended',
         icon: 'chart-recommended',
-        className: 'app__visual-tile--wide',
+        className: 'fc-tb__visual-tile--wide',
       }),
     );
     return menu;
@@ -203,8 +203,8 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
 
   const createPictureInsertMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-picture-insert');
-    menu.classList.add('app__menu--visual', 'app__menu--pictures');
-    const grid = visualMenuTileGrid('app__visual-grid--pictures', [
+    menu.classList.add('fc-tb__menu--visual', 'fc-tb__menu--pictures');
+    const grid = visualMenuTileGrid('fc-tb__visual-grid--pictures', [
       {
         label: t.pictureThisDevice,
         attr: 'pictureInsert',
@@ -230,8 +230,8 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
 
   const createShapesInsertMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-shapes-insert');
-    menu.classList.add('app__menu--visual', 'app__menu--shapes');
-    const lines = visualMenuTileGrid('app__visual-grid--shapes', [
+    menu.classList.add('fc-tb__menu--visual', 'fc-tb__menu--shapes');
+    const lines = visualMenuTileGrid('fc-tb__visual-grid--shapes', [
       {
         label: t.shapeLine,
         attr: 'shapeInsert',
@@ -245,7 +245,7 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
         icon: 'shape-arrow',
       },
     ]);
-    const rectangles = visualMenuTileGrid('app__visual-grid--shapes', [
+    const rectangles = visualMenuTileGrid('fc-tb__visual-grid--shapes', [
       {
         label: t.shapeRectangle,
         attr: 'shapeInsert',
@@ -259,7 +259,7 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
         icon: 'shape-rounded-rectangle',
       },
     ]);
-    const basic = visualMenuTileGrid('app__visual-grid--shapes', [
+    const basic = visualMenuTileGrid('fc-tb__visual-grid--shapes', [
       {
         label: t.shapeOval,
         attr: 'shapeInsert',
@@ -292,14 +292,14 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
 
   const createScreenshotInsertMenu = (): HTMLDivElement => {
     const menu = createMenu('menu-screenshot-insert');
-    menu.classList.add('app__menu--visual', 'app__menu--screenshots');
-    const grid = visualMenuTileGrid('app__visual-grid--screenshots', [
+    menu.classList.add('fc-tb__menu--visual', 'fc-tb__menu--screenshots');
+    const grid = visualMenuTileGrid('fc-tb__visual-grid--screenshots', [
       {
         label: t.screenshotCurrentView,
         attr: 'screenshotInsert',
         value: 'current-view',
         icon: 'screenshot-window',
-        className: 'app__visual-tile--screenshot-preview',
+        className: 'fc-tb__visual-tile--screenshot-preview',
       },
     ]);
     menu.append(
@@ -311,7 +311,7 @@ export const createInsertMenuFactories = (ribbonMenuText: ToolbarMenuText): Inse
         attr: 'screenshotInsert',
         value: 'screen-clipping',
         icon: 'screen-clipping',
-        className: 'app__visual-tile--wide',
+        className: 'fc-tb__visual-tile--wide',
       }),
     );
     return menu;

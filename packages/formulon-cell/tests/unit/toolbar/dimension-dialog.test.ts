@@ -17,7 +17,7 @@ describe('showDimensionDialog', () => {
       cancelLabel: 'Cancel',
     });
 
-    const dialog = document.body.querySelector<HTMLElement>('.app__dlg');
+    const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     expect(dialog?.textContent).toContain('Height (px)');
     const input = dialog?.querySelector<HTMLInputElement>('input[type="number"]');
     expect(input?.min).toBe('1');
