@@ -777,7 +777,10 @@ describe('Spreadsheet.mountToolbar', () => {
     const event = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(event, 'target', { value: darkButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
-    expect(sheet.instance.store.getState().ui.theme).toBe('dark');
+    // The "Dark" tile maps to the grid's `ink` ThemeName (not the raw UiTheme
+    // 'dark', which matches no theme stylesheet). The menu still highlights the
+    // Dark tile because currentPageThemeAction normalizes ink → dark.
+    expect(sheet.instance.store.getState().ui.theme).toBe('ink');
 
     themeButton?.click();
     expect(lightButton?.getAttribute('aria-checked')).toBe('false');
