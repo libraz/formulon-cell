@@ -14,7 +14,6 @@ import { rangeRects } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface QuickAnalysisDeps {
   host: HTMLElement;
@@ -140,7 +139,6 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
 
   const button = createQuickAnalysisLauncher();
   host.appendChild(button);
-  inheritHostTokens(host, button);
 
   const root = document.createElement('div');
   root.className = 'fc-quick';
@@ -149,7 +147,6 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
   root.hidden = true;
   root.tabIndex = -1;
   host.appendChild(root);
-  inheritHostTokens(host, root);
 
   const isMultiSelection = (): boolean => {
     const r = store.getState().selection.range;

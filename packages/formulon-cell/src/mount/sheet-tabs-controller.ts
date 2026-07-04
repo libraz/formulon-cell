@@ -9,7 +9,6 @@ import {
 } from '../commands/sheet-mutate.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
-import { inheritHostTokens } from '../interact/inherit-host-tokens.js';
 import { SHEET_TAB_COLOR_CHOICES, sheetTabColorChoiceLabel } from '../sheet-tab-colors.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
@@ -33,7 +32,6 @@ interface SheetTabsControllerInput {
   getStrings: () => Strings;
   getWb: () => WorkbookHandle;
   history: History;
-  host: HTMLElement;
   hydrateActiveSheet: () => void;
   invalidate: () => void;
   lastSheet: HTMLButtonElement;
@@ -59,7 +57,6 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     getStrings,
     getWb,
     history,
-    host,
     hydrateActiveSheet,
     invalidate,
     lastSheet,
@@ -389,7 +386,6 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
       ),
       ...unhideButtons,
     );
-    inheritHostTokens(host, sheetMenu);
     positionSheetMenu(sheetMenu, x, y);
     sheetMenu.querySelector<HTMLButtonElement>('.fc-sheetmenu__item:not([disabled])')?.focus();
   };

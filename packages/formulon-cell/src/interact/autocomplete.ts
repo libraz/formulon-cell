@@ -1,6 +1,6 @@
 import { FUNCTION_SIGNATURES, suggestFunctions } from '../commands/refs.js';
 import { createInteractionButton } from './chip-button.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
+import { overlayPortalFor } from './overlay-portal.js';
 
 let autocompleteSeq = 0;
 
@@ -171,11 +171,10 @@ export function attachAutocomplete(deps: AutocompleteDeps): AutocompleteHandle {
       root.id = rootId;
       root.className = 'fc-autocomplete';
       root.setAttribute('role', 'listbox');
-      document.body.appendChild(root);
+      overlayPortalFor(input).appendChild(root);
     }
     input.setAttribute('aria-expanded', 'true');
     input.setAttribute('aria-controls', root.id);
-    inheritHostTokens(input, root);
     root.replaceChildren();
     for (let i = 0; i < ctx.matches.length; i += 1) {
       const pick = ctx.matches[i] ?? '';

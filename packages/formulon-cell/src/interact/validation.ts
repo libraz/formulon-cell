@@ -8,7 +8,7 @@ import { cellRect } from '../render/geometry.js';
 import { getValidationChevron } from '../render/grid.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { appendDialogButton, createDialogShell } from './dialog-shell.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
+import { overlayPortalFor } from './overlay-portal.js';
 
 export interface ValidationListDeps {
   /** The grid surface that paints the chevron and receives clicks. */
@@ -184,8 +184,7 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
       }
     });
 
-    inheritHostTokens(grid, div);
-    document.body.appendChild(div);
+    overlayPortalFor(grid).appendChild(div);
     popover = div;
     focusItem(selectedIndex);
     document.addEventListener('mousedown', onDocMouseDown, true);
@@ -263,8 +262,7 @@ export function attachValidationPrompt(deps: ValidationPromptDeps): ValidationPr
     const body = document.createElement('div');
     body.className = 'fc-validation-prompt__body';
     div.append(title, body);
-    inheritHostTokens(grid, div);
-    document.body.appendChild(div);
+    overlayPortalFor(grid).appendChild(div);
     prompt = div;
     return div;
   };

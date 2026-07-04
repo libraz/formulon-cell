@@ -1,7 +1,7 @@
 import { addrKey } from '../engine/address.js';
 import { hitTest } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
+import { overlayPortalFor } from './overlay-portal.js';
 
 export interface HoverDeps {
   /** The grid surface hosting pointer events. */
@@ -28,7 +28,7 @@ export function attachHover(deps: HoverDeps): HoverHandle {
   tip.style.position = 'fixed';
   tip.style.pointerEvents = 'none';
   tip.hidden = true;
-  document.body.appendChild(tip);
+  overlayPortalFor(grid).appendChild(tip);
 
   let modifier = false;
 
@@ -53,7 +53,6 @@ export function attachHover(deps: HoverDeps): HoverHandle {
     const at = cellAt(e);
     const fmt = at ? cellFormatAt(at.row, at.col) : null;
     if (fmt?.comment) {
-      inheritHostTokens(grid, tip);
       tip.textContent = fmt.comment;
       tip.style.left = `${e.clientX + 12}px`;
       tip.style.top = `${e.clientY + 14}px`;

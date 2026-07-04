@@ -24,7 +24,6 @@ import type { SessionIllustration } from '../store/store.js';
 import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendDialogIconButton, createDialogButton } from './dialog-shell.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
 import {
   createPivotFilterConditionControls,
   type PivotFilterConditionState,
@@ -208,7 +207,6 @@ export function attachWorkbookObjectsPanel(
   root.hidden = true;
   root.tabIndex = -1;
   host.appendChild(root);
-  inheritHostTokens(host, root);
 
   const close = (restoreFocus = false): void => {
     const wasOpen = open;

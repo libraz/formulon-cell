@@ -19,6 +19,7 @@ import {
   focusAndSelectInput,
   showDialogError,
 } from './dialog-shell.js';
+import { overlayPortalFor } from './overlay-portal.js';
 import { attachRangePickerButton } from './range-picker-control.js';
 
 export interface NamedRangeDialogDeps {
@@ -598,7 +599,7 @@ export function attachNamedRangeDialog(deps: NamedRangeDialogDeps): NamedRangeDi
       });
       menu.appendChild(item);
     }
-    document.body.appendChild(menu);
+    overlayPortalFor(host).appendChild(menu);
     const r = filterBtn.getBoundingClientRect();
     menu.style.left = `${Math.max(4, r.left)}px`;
     menu.style.top = `${r.bottom + 2}px`;

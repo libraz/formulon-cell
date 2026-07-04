@@ -2,7 +2,6 @@ import { type SessionChartSeriesPoint, sessionChartSeries } from '../commands/se
 import type { SessionChart, SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import { createInteractionButton } from './chip-button.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface SessionChartsHandle {
   refresh(): void;
@@ -196,7 +195,6 @@ export function attachSessionCharts(deps: {
   const root = document.createElement('div');
   root.className = 'fc-charts';
   host.appendChild(root);
-  inheritHostTokens(host, root);
   let selectedId: string | null = null;
 
   const updateSelectionClasses = (): void => {

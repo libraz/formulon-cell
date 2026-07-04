@@ -72,6 +72,7 @@ export class WorkbookHandle {
   /** Host-injected localized function documentation, merged over the
    *  engine's structural `functionMetadata()` result. `null` until a host
    *  calls `setFunctionMetadataProvider`. */
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: read/written via the internals() cast in workbook-handle-features.ts
   private functionMetadataProvider: FunctionMetadataProvider | null = null;
 
   /** Inclusive rect of cells currently visible to the user, supplied by the

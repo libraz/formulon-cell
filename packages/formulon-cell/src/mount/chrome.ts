@@ -1,5 +1,6 @@
 import type { FeatureFlags } from '../extensions/index.js';
 import type { Strings } from '../i18n/strings.js';
+import { overlayPortalFor } from '../interact/overlay-portal.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { appendHostIcon, createHostButton } from './chrome-buttons.js';
 
@@ -198,7 +199,7 @@ export function createMountChrome({
   sheetMenu.className = 'fc-sheetmenu';
   sheetMenu.hidden = true;
   sheetMenu.setAttribute('role', 'menu');
-  document.body.appendChild(sheetMenu);
+  overlayPortalFor(host).appendChild(sheetMenu);
   sheetbar.addEventListener(
     'contextmenu',
     (e) => {

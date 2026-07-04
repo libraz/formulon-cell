@@ -3,6 +3,7 @@ import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { type SpreadsheetEmitter, selectionEquals } from '../events.js';
 import type { Strings } from '../i18n/strings.js';
+import { overlayPortalFor } from '../interact/overlay-portal.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import { createHostButton } from './chrome-buttons.js';
@@ -331,7 +332,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
       });
       menu.appendChild(item);
     }
-    document.body.appendChild(menu);
+    overlayPortalFor(host).appendChild(menu);
     const r = tag.getBoundingClientRect();
     menu.style.left = `${Math.max(4, r.left)}px`;
     menu.style.top = `${r.bottom + 2}px`;

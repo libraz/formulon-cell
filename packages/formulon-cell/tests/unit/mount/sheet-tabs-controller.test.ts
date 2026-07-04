@@ -112,7 +112,6 @@ const mount = (state: FakeWbState, opts?: { initialIndex?: number }): Harness =>
     getStrings: () => en as Strings,
     getWb: () => wb,
     history: null as never,
-    host,
     hydrateActiveSheet,
     invalidate,
     lastSheet,

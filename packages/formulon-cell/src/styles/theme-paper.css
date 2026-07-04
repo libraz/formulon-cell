@@ -5,7 +5,9 @@
 
 @layer fc.theme {
   .fc-host[data-fc-theme="paper"],
-  .fc-host:not([data-fc-theme]) {
+  .fc-host:not([data-fc-theme]),
+  .fc-overlay-portal[data-fc-theme="paper"],
+  .fc-overlay-portal:not([data-fc-theme]) {
     /* Surfaces — neutralLighterAlt → neutralLight inspired scale */
     --fc-bg: #ffffff;
     --fc-bg-elev: #ffffff;

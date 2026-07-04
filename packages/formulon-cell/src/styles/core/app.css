@@ -1,4 +1,5 @@
 @import "./app/color-palette.css";
+@import "./app/overlays/portal.css";
 @import "./app/overlays/context-menu.css";
 @import "./app/overlays/auto-fill-options.css";
 @import "./app/overlays/paste-options.css";

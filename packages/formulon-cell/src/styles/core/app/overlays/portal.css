@@ -1,0 +1,14 @@
+/* Overlay portal — one per mounted spreadsheet, appended to <body>. All
+ * floating UI (context menus, dialogs, tooltips, dropdowns) mounts into it
+ * instead of directly onto <body>.
+ *
+ * It carries the host's `data-fc-theme` (see `theme-*.css`), so everything
+ * inside inherits paper/ink/contrast tokens through normal cascade — no
+ * per-token forwarding. Kept free of `transform` / `filter` / `contain`
+ * so descendant `position: fixed` overlays stay viewport-relative. */
+@layer fc.app {
+  .fc-overlay-portal {
+    font-family: var(--fc-font-ui, system-ui);
+    color: var(--fc-fg, CanvasText);
+  }
+}

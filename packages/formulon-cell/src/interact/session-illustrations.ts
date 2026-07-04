@@ -4,7 +4,6 @@ import {
   updateSessionIllustration,
 } from '../commands/session-illustration.js';
 import type { SessionIllustration, SpreadsheetStore } from '../store/store.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
 
 export interface SessionIllustrationsHandle {
   refresh(): void;
@@ -128,7 +127,6 @@ export function attachSessionIllustrations(deps: {
   root.className = 'fc-illustrations';
   root.style.cssText = 'position:absolute;inset:0;pointer-events:none;';
   host.appendChild(root);
-  inheritHostTokens(host, root);
   let selectedId: string | null = null;
 
   const select = (id: string, panel: HTMLElement): void => {

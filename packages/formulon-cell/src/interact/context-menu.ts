@@ -54,8 +54,8 @@ import {
   PASTE_QUICK_IDS,
   SUBMENU_ICON_ACTION,
 } from './context-menu-spec.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
 import { openInsertCopiedCellsDialog } from './insert-copied-cells-dialog.js';
+import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport, panelSize, viewportSize } from './overlay-position.js';
 
 export interface ContextMenuDeps {
@@ -155,17 +155,12 @@ const createContextSubmenuButton = (
   return button;
 };
 
-const createContextMiniToolbarButton = (item: {
-  id: ItemId;
-  label: string;
-  text?: string;
-}): HTMLButtonElement => {
+const createContextMiniToolbarButton = (item: { id: ItemId; label: string }): HTMLButtonElement => {
   return createInteractionButton({
     className: 'fc-ctxmenu__mini-btn',
     dataset: { fcAction: item.id },
     ariaLabel: item.label,
     tabIndex: -1,
-    text: item.text,
   });
 };
 
@@ -191,7 +186,8 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   root.setAttribute('aria-label', strings.contextMenu.title);
   root.style.display = 'none';
   root.tabIndex = -1;
-  document.body.appendChild(root);
+  const portal = overlayPortalFor(host);
+  portal.appendChild(root);
 
   // Single reusable child panel — the context menu is one level deep.
   const sub = document.createElement('div');
@@ -199,7 +195,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   sub.setAttribute('role', 'menu');
   sub.style.display = 'none';
   sub.tabIndex = -1;
-  document.body.appendChild(sub);
+  portal.appendChild(sub);
 
   let visible = false;
   let pasteBtnRef: HTMLButtonElement | null = null;
@@ -279,7 +275,6 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     }
     sub.replaceChildren();
     for (const child of children) appendEntry('sub', sub, child, disabled);
-    inheritHostTokens(host, sub);
     sub.style.display = 'block';
     sub.style.left = '-9999px';
     sub.style.top = '-9999px';
@@ -352,10 +347,10 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     toolbar.setAttribute('role', 'toolbar');
     toolbar.setAttribute('aria-label', strings.contextMenu.title);
 
-    const buttons: readonly { id: ItemId; label: string; text?: string }[] = [
-      { id: 'bold', label: strings.contextMenu.bold, text: 'B' },
-      { id: 'italic', label: strings.contextMenu.italic, text: 'I' },
-      { id: 'underline', label: strings.contextMenu.underline, text: 'U' },
+    const buttons: readonly { id: ItemId; label: string }[] = [
+      { id: 'bold', label: strings.contextMenu.bold },
+      { id: 'italic', label: strings.contextMenu.italic },
+      { id: 'underline', label: strings.contextMenu.underline },
       { id: 'alignLeft', label: strings.contextMenu.alignLeft },
       { id: 'alignCenter', label: strings.contextMenu.alignCenter },
       { id: 'alignRight', label: strings.contextMenu.alignRight },
@@ -431,7 +426,6 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   };
 
   const show = (clientX: number, clientY: number, kind: MenuKind): void => {
-    inheritHostTokens(host, root);
     restoreFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : host;
     root.setAttribute('aria-label', strings.contextMenu.title);
     focusPanel = 'root';

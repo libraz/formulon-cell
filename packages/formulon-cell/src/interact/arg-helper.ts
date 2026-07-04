@@ -1,5 +1,5 @@
 import { caretInsideImplicitIntersection, findActiveSignature } from '../commands/refs.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
+import { overlayPortalFor } from './overlay-portal.js';
 
 let argHelperSeq = 0;
 
@@ -25,7 +25,7 @@ export interface ArgHelperDeps {
 /**
  * Floating tooltip that mirrors the "ScreenTip" tooltip — when the caret sits
  * inside a known function call, it shows `NAME(arg1, **arg2**, [arg3])` with
- * the active argument bolded. Hangs off `document.body`; the caller calls
+ * the active argument bolded. Hangs off the overlay portal; the caller calls
  * `refresh()` from input/keyup handlers.
  */
 export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
@@ -64,11 +64,10 @@ export function attachArgHelper(deps: ArgHelperDeps): ArgHelperHandle {
       el.id = rootId;
       el.className = 'fc-arghelper';
       el.setAttribute('role', 'tooltip');
-      document.body.appendChild(el);
+      overlayPortalFor(input).appendChild(el);
       root = el;
     }
     input.setAttribute('aria-describedby', el.id);
-    inheritHostTokens(input, el);
     el.replaceChildren();
     if (implicit) {
       const chip = document.createElement('span');

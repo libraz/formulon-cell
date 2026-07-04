@@ -4,7 +4,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { createInteractionButton } from './chip-button.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
+import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport } from './overlay-position.js';
 
 export type ErrorMenuKind = 'error' | 'validation';
@@ -43,7 +43,7 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
   root.setAttribute('role', 'menu');
   root.style.display = 'none';
   root.tabIndex = -1;
-  document.body.appendChild(root);
+  overlayPortalFor(host).appendChild(root);
 
   let visible = false;
   let currentAddr: Addr | null = null;
@@ -229,7 +229,6 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
       // Touch the workbook getter so consumers wiring Strict Mode can rely
       // on the same lazy resolution shape used elsewhere.
       void getWb();
-      inheritHostTokens(host, root);
       buildMenu(addr, kind);
       // Pre-position offscreen so we can measure offsetWidth/offsetHeight.
       root.style.display = 'block';

@@ -10,7 +10,8 @@
  * is just CSS variables on `.fc-host`. */
 
 @layer fc.theme {
-  .fc-host[data-fc-theme="contrast"] {
+  .fc-host[data-fc-theme="contrast"],
+  .fc-overlay-portal[data-fc-theme="contrast"] {
     --fc-bg: #ffffff;
     --fc-bg-elev: #ffffff;
     --fc-bg-rail: #f3f3f3;

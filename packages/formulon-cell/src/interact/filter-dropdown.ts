@@ -12,7 +12,7 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore, ValueFilterCriteria } from '../store/store.js';
 import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { createInteractionButton } from './chip-button.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
+import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport } from './overlay-position.js';
 
 export interface FilterDropdownDeps {
@@ -56,8 +56,8 @@ const findColumnCriteria = (
  * Lightweight column-filter popover. Lists distinct values in the column with
  * a checkbox each; "Apply" calls `applyFilter`, "Clear" calls `clearFilter`.
  *
- * The popover lives in `document.body` so it can escape any clipping ancestors,
- * and is positioned via fixed coordinates from the anchor rect.
+ * The popover lives in the overlay portal so it can escape any clipping
+ * ancestors, and is positioned via fixed coordinates from the anchor rect.
  */
 export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHandle {
   const strings = deps.strings ?? defaultStrings;
@@ -293,11 +293,10 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     actions.append(clear, apply);
 
     r.append(conditionPanel, search, list, actions);
-    // Borrow theme tokens from the first .fc-host on the page (filter is
-    // body-attached, so `[data-fc-theme]` doesn't cascade automatically).
+    // Attach to the first .fc-host's portal — the dropdown deps carry no host
+    // element, so this mirrors the previous first-host token borrowing.
     const host = document.querySelector('.fc-host');
-    if (host) inheritHostTokens(host, r);
-    document.body.appendChild(r);
+    overlayPortalFor(host).appendChild(r);
     root = r;
     const position = clampPanelToViewport(r, anchor.x, anchor.y + anchor.h, {
       pad: 4,

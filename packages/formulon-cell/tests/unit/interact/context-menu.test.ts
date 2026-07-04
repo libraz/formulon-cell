@@ -353,28 +353,19 @@ describe('attachContextMenu', () => {
       expect(e.defaultPrevented).toBe(false);
     });
 
-    it('copies host theme tokens onto the body-mounted menu each time it opens', () => {
-      host.style.setProperty('--fc-bg-elev', '#101820');
-      host.style.setProperty('--fc-fg', '#f6f7f8');
-      host.style.setProperty('--fc-accent', '#40c4ff');
+    it('mounts the menu into the host overlay portal so theme travels by cascade', () => {
+      host.classList.add('fc-host');
+      host.dataset.fcTheme = 'ink';
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
 
       fireContextMenu(host, 200, 70);
       const menu = visibleMenu();
-      expect(menu?.parentElement).toBe(document.body);
-      expect(menu?.style.getPropertyValue('--fc-bg-elev')).toBe('#101820');
-      expect(menu?.style.getPropertyValue('--fc-fg')).toBe('#f6f7f8');
-      expect(menu?.style.getPropertyValue('--fc-accent')).toBe('#40c4ff');
-
-      host.style.setProperty('--fc-bg-elev', '#fff7d6');
-      host.style.setProperty('--fc-fg', '#24211a');
-      host.style.setProperty('--fc-accent', '#c74700');
-      document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-      fireContextMenu(host, 200, 70);
-
-      expect(visibleMenu()?.style.getPropertyValue('--fc-bg-elev')).toBe('#fff7d6');
-      expect(visibleMenu()?.style.getPropertyValue('--fc-fg')).toBe('#24211a');
-      expect(visibleMenu()?.style.getPropertyValue('--fc-accent')).toBe('#c74700');
+      const portal = menu?.closest<HTMLElement>('.fc-overlay-portal');
+      // The menu lives in the host's themed overlay portal, which carries the
+      // host's data-fc-theme — no per-open inline token copying anymore.
+      expect(portal).not.toBeNull();
+      expect(portal?.dataset.fcTheme).toBe('ink');
+      expect(menu?.style.getPropertyValue('--fc-bg-elev')).toBe('');
     });
 
     it('closes the open menu and rebuilds labels from the next string dictionary', () => {

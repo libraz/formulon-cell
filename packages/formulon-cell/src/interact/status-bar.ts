@@ -13,7 +13,7 @@ import {
 } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
+import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport, panelSize } from './overlay-position.js';
 
 export interface StatusBarDeps {
@@ -436,13 +436,13 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     refreshLockIndicators();
   };
 
-  // Chooser popover. Lives in document.body so it escapes any clipping
+  // Chooser popover. Lives in the overlay portal so it escapes any clipping
   // ancestor and survives statusbar layout changes.
   const popover = document.createElement('div');
   popover.className = 'fc-statusbar__chooser';
   popover.setAttribute('role', 'menu');
   popover.style.display = 'none';
-  document.body.appendChild(popover);
+  overlayPortalFor(statusbar).appendChild(popover);
 
   let popoverVisible = false;
   let popoverActiveIndex = -1;
@@ -520,7 +520,6 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
   };
 
   const showChooser = (clientX: number, clientY: number): void => {
-    inheritHostTokens(statusbar, popover);
     restoreFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     buildChooser();
     popover.style.display = 'block';

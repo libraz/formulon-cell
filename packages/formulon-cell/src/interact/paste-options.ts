@@ -14,6 +14,7 @@ import {
   createFloatingOptionsButton,
   createFloatingOptionsMenuItem,
 } from './floating-options-menu.js';
+import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport } from './overlay-position.js';
 
 export type PasteOptionsMode = 'source' | 'values' | 'formatting';
@@ -68,7 +69,7 @@ export function attachPasteOptions(deps: PasteOptionsDeps): PasteOptionsHandle {
   const valuesItem = makeItem('values');
   const formattingItem = makeItem('formatting');
   menu.append(sourceItem, valuesItem, formattingItem);
-  document.body.append(button, menu);
+  overlayPortalFor(host).append(button, menu);
 
   const applyLabels = (): void => {
     const t = strings.pasteOptions;

@@ -1,6 +1,7 @@
 import type { InsertCopiedCellsDirection } from '../commands/clipboard/insert-copied-cells.js';
 import type { Strings } from '../i18n/strings.js';
 import { appendDialogActions } from './dialog-shell.js';
+import { overlayPortalFor } from './overlay-portal.js';
 
 export interface InsertCopiedCellsDialogDeps {
   strings: Strings;
@@ -59,7 +60,8 @@ export function openInsertCopiedCellsDialog(deps: InsertCopiedCellsDialogDeps): 
 
   panel.append(title, choices, footer);
   root.append(panel);
-  document.body.appendChild(root);
+  // The deps carry no host element, so anchor on the first .fc-host.
+  overlayPortalFor(document.querySelector('.fc-host')).appendChild(root);
   ok.focus({ preventScroll: true });
 }
 

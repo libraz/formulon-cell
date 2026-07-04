@@ -9,6 +9,7 @@ import {
   createFloatingOptionsButton,
   createFloatingOptionsMenuItem,
 } from './floating-options-menu.js';
+import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport } from './overlay-position.js';
 
 type AutoFillMode =
@@ -90,7 +91,7 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
   const dayItems = (['days', 'weekdays', 'months', 'years'] as const).map(createAutoFillItem);
 
   menu.append(copyItem, seriesItem, formattingOnlyItem, withoutFormattingItem, ...dayItems);
-  document.body.append(button, menu);
+  overlayPortalFor(host).append(button, menu);
 
   const applyLabels = (): void => {
     const t = strings.autoFillOptions;

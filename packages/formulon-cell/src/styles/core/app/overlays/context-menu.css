@@ -1,3 +1,14 @@
+/* This menu is teleported into the host page's <body>, so it is exposed to the
+ * host's own unlayered element resets. A rule like `button { padding: 0 }`
+ * (VitePress, Tailwind preflight, normalize.css) is unlayered and therefore
+ * outranks our @layer-scoped layout, which would collapse the item padding and
+ * clip the keyboard-shortcut hints against the right edge. Re-assert the
+ * structural padding unlayered so class specificity wins it back. */
+.fc-ctxmenu__item {
+  box-sizing: border-box;
+  padding: 3px 18px 3px 12px;
+}
+
 @layer fc.app {
   .fc-ctxmenu {
     position: fixed;
@@ -335,12 +346,6 @@
     outline: none;
   }
 
-  .fc-ctxmenu__mini-btn[data-fc-action="bold"],
-  .fc-ctxmenu__mini-btn[data-fc-action="italic"],
-  .fc-ctxmenu__mini-btn[data-fc-action="underline"] {
-    color: transparent;
-  }
-
   .fc-ctxmenu__mini-btn[data-fc-action="bold"]::before,
   .fc-ctxmenu__mini-btn[data-fc-action="italic"]::before,
   .fc-ctxmenu__mini-btn[data-fc-action="underline"]::before,
@@ -354,6 +359,9 @@
     background-position: center;
     background-size: 18px 18px;
     background-repeat: no-repeat;
+    /* The glyphs are baked with light-theme (near-black) fills; dark themes set
+     * --fc-menu-icon-filter to flip them so they stay legible on a dark menu. */
+    filter: var(--fc-menu-icon-filter, none);
   }
 
   .fc-ctxmenu__mini-btn[data-fc-action="bold"]::before {

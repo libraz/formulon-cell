@@ -4,12 +4,17 @@
  * accent for AA contrast against the dark background. */
 
 @layer fc.theme {
-  .fc-host[data-fc-theme="ink"] {
+  .fc-host[data-fc-theme="ink"],
+  .fc-overlay-portal[data-fc-theme="ink"] {
     --fc-bg: #1b1a19;
     --fc-bg-elev: #252423;
     --fc-bg-rail: #201f1e;
     --fc-bg-hover: #2b2a29;
     --fc-bg-header: #1f3a2a;
+
+    /* Flip the light-baked context-menu mini-toolbar glyphs so they stay
+     * legible on the dark elevated surface. */
+    --fc-menu-icon-filter: invert(1) hue-rotate(180deg);
 
     --fc-fg: #f3f2f1;
     --fc-fg-strong: #ffffff;

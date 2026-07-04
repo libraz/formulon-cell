@@ -44,6 +44,11 @@ import { attachEvaluateFormulaDialog } from './interact/evaluate-formula-dialog.
 import { attachExternalLinksDialog } from './interact/external-links-dialog.js';
 import { attachFilterDropdown, type FilterDropdownHandle } from './interact/filter-dropdown.js';
 import { openInsertCopiedCellsDialog } from './interact/insert-copied-cells-dialog.js';
+import {
+  disposeOverlayPortal,
+  ensureOverlayPortal,
+  syncOverlayPortalTheme,
+} from './interact/overlay-portal.js';
 import { createMountChrome } from './mount/chrome.js';
 import { attachChromeSync, type ChromeSyncController } from './mount/chrome-sync.js';
 import {
@@ -165,6 +170,7 @@ export const Spreadsheet = {
     }
 
     const instanceId = prepareMountHost(host, strings, initialTheme);
+    ensureOverlayPortal(host);
     host.dataset.fcEngineState = 'loading';
 
     let sheetTabsController: SheetTabsController | null = null;
@@ -266,7 +272,6 @@ export const Spreadsheet = {
       getStrings: () => strings,
       getWb: () => wb,
       history,
-      host,
       hydrateActiveSheet,
       invalidate: () => renderer.invalidate(),
       lastSheet,
@@ -1050,6 +1055,7 @@ export const Spreadsheet = {
       },
       setTheme(t) {
         host.dataset.fcTheme = t;
+        syncOverlayPortalTheme(host);
         mutators.setTheme(store, t);
         renderer.invalidate();
         emitter.emit('themeChange', { theme: t });
@@ -1133,6 +1139,7 @@ export const Spreadsheet = {
         i18n.dispose();
         renderer.dispose();
         if (ownsWb) wb.dispose();
+        disposeOverlayPortal(host);
         releaseMountHost(host, instanceId);
       },
     };

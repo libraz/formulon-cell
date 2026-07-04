@@ -1,9 +1,10 @@
 import { enhanceCustomSelect, syncCustomSelects } from './custom-select.js';
-import { inheritHostTokens } from './inherit-host-tokens.js';
+import { overlayPortalFor } from './overlay-portal.js';
 
 export interface DialogShellDeps {
-  /** Element the dialog inherits CSS variables from. The overlay itself is
-   *  body-portaled so it escapes any `contain: strict` parents. */
+  /** Any element inside the target `.fc-host`. The overlay is mounted into that
+   *  host's themed overlay portal, so it escapes any `contain: strict` parents
+   *  yet still inherits theme tokens through cascade. */
   host: HTMLElement;
   /** Root class on the overlay (e.g. `fc-iterdlg`). */
   className: string;
@@ -156,10 +157,11 @@ function focusableInside(root: HTMLElement): HTMLElement[] {
  * single largest source of pre-existing listener leaks (e.g. `fx-dialog`
  * tracked 9 add / 7 remove). This helper centralizes the pattern:
  *
- *  1. Mounts a body-portaled `<div role=dialog aria-modal>` with the requested
- *     class, marked `hidden` so callers control reveal timing.
- *  2. Inherits host CSS tokens so themed colors/shadows render outside the
- *     `.fc-host` `contain: strict` boundary.
+ *  1. Mounts a `<div role=dialog aria-modal>` with the requested class into the
+ *     host's themed overlay portal, marked `hidden` so callers control reveal
+ *     timing.
+ *  2. Inherits theme tokens through the portal's cascade, so themed
+ *     colors/shadows render outside the `.fc-host` `contain: strict` boundary.
  *  3. Keeps Tab / Shift+Tab focus inside the visible dialog, matching desktop
  *     modal behavior.
  *  4. Hooks Escape (document keydown, gated on `!hidden`) and backdrop click
@@ -214,8 +216,7 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
   });
   selectObserver.observe(panel, { childList: true, subtree: true });
 
-  inheritHostTokens(host, overlay);
-  document.body.appendChild(overlay);
+  overlayPortalFor(host).appendChild(overlay);
 
   function on(
     target: EventTarget,
@@ -277,9 +278,6 @@ export function createDialogShell(deps: DialogShellDeps): DialogShell {
       if (disposed) return;
       enhanceSelects(panel);
       syncCustomSelects(panel);
-      // Re-snapshot host theme tokens so paper↔ink swaps applied since the
-      // shell was constructed are reflected on this open.
-      inheritHostTokens(host, overlay);
       if (!overlay.contains(document.activeElement)) {
         restoreFocusEl =
           document.activeElement instanceof HTMLElement ? document.activeElement : host;
