@@ -148,6 +148,24 @@ describe('toolbar/ribbon-model', () => {
     }
   });
 
+  it('bridges the ribbon accent to the grid accent so one --fc-accent brands both', () => {
+    const tokensCss = readFileSync(join(toolbarBaseDir, 'tokens.css'), 'utf8');
+
+    // Co-mounted under `.fc-host`, the toolbar accent falls back to the grid's
+    // `--fc-accent`, so a single brand override themes grid + ribbon together.
+    expect(tokensCss).toMatch(
+      /\.fc-host\s*\{[\s\S]*?--fc-tb-accent: var\(--fc-accent, #107c41\);[\s\S]*?--fc-tb-accent-strong: var\(--fc-accent-strong, #0b5f31\);/,
+    );
+    // Each dark / contrast theme picks up the grid accent through its own
+    // fallback rather than an independent literal.
+    expect(tokensCss).toContain('--fc-tb-accent: var(--fc-accent, #4cc26b);');
+    expect(tokensCss).toContain('--fc-tb-accent: var(--fc-accent, #0033cc);');
+    // Soft accent tracks the resolved accent so overrides flow through it.
+    expect(tokensCss).toContain(
+      '--fc-tb-accent-soft: color-mix(in srgb, var(--fc-tb-accent) 10%, transparent);',
+    );
+  });
+
   it('keeps ribbon chrome close to the Excel 365 white desktop surface', () => {
     const tokensCss = readFileSync(join(ribbonStylesDir, '../base/tokens.css'), 'utf8');
     const layoutCss = readFileSync(join(ribbonStylesDir, 'layout-and-buttons.css'), 'utf8');

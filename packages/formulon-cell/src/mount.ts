@@ -1163,9 +1163,15 @@ export const Spreadsheet = {
       ribbonHost.className = 'fc-host__ribbon';
       ribbonHost.style.display = 'contents';
       host.insertBefore(ribbonHost, host.firstChild);
+      // `toolbar: true` wires only defaults; an options object lets the embed
+      // add backstage content / hooks / menus / tabs / callbacks without
+      // dropping to a manual `mountToolbar` call. Host-supplied fields override
+      // the defaults below.
+      const toolbarOpts = opts.toolbar === true ? {} : opts.toolbar;
       toolbarHandle = mountToolbar(ribbonHost, instance, {
         lang: i18n.locale === 'en' ? 'en' : 'ja',
         dynamicDropdowns: true,
+        ...toolbarOpts,
       });
     }
 

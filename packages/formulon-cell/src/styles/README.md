@@ -58,6 +58,39 @@ When in doubt:
 - nothing about the spreadsheet engine changes between themes → use literals
   inside the leaf stylesheet, not a new token.
 
+### Brand accent — one override, both surfaces
+
+When the toolbar is mounted **inside** `.fc-host` (either `mount({ toolbar: true })`
+or any `SpreadsheetToolbar` whose host descends from the grid host), the ribbon's
+`--fc-tb-accent` / `--fc-tb-accent-strong` fall back to the grid's `--fc-accent` /
+`--fc-accent-strong`. So a single brand-accent override themes both surfaces:
+
+```css
+.my-spreadsheet .fc-host { --fc-accent: #d63384; }
+```
+
+A **standalone** `SpreadsheetToolbar` (mounted on a bare element, not under
+`.fc-host`) has no grid tokens to inherit, so it keeps the `--fc-tb-*` literals.
+Override `--fc-tb-accent` directly to brand a standalone toolbar.
+
+## Styling host-supplied ribbon content
+
+Content you inject through `mountToolbar` options — a `createBackstageView()`
+panel, a custom dialog, a bespoke menu — is **not** styled for you. Reuse the
+ribbon chrome classes so it inherits the toolbar's tokens and matches the built-in
+surfaces. The current chrome families (all under the `fc-tb__` prefix):
+
+| Surface           | Container classes                                                   |
+| ----------------- | ------------------------------------------------------------------- |
+| Backstage (File)  | `fc-tb__backstage`, `fc-tb__backstage-nav`, `fc-tb__backstage-main`, `fc-tb__backstage-card`, `fc-tb__backstage-section-title` |
+| Modal dialog      | `fc-tb__modal`, `fc-tb__modal-panel`, `fc-tb__modal-header`, `fc-tb__modal-body`, `fc-tb__modal-footer`, `fc-tb__modal-field` |
+| Buttons           | `fc-tb__btn`, `fc-tb__btn--primary`                                  |
+
+To **query or observe** ribbon markup (active tab, command buttons), target the
+stable `data-ribbon-*` attributes (`[data-ribbon-tab]`, `[data-ribbon-command]`,
+`[data-ribbon-menu-id]`) rather than class names — attributes are the supported
+contract; `fc-tb__*` class names are chrome styling and may change.
+
 ## When to add a new token vs. a literal hex
 
 Add a new token when **at least one** of these is true:

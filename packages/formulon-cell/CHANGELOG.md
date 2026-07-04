@@ -14,9 +14,15 @@ versioning is [SemVer](https://semver.org/).
   inserted at the top of `.fc-host` through a `display: contents` host, so it
   becomes the first item in the host's flex column with the grid filling the
   rest, and it shares the host's `data-fc-theme`. `instance.dispose()` tears the
-  toolbar down with everything else. Embeds that need custom ribbon hooks, tabs,
-  or dropdown overrides can still call `Spreadsheet.mountToolbar` against their
-  own element.
+  toolbar down with everything else.
+- `mount`'s `toolbar` option now also accepts a `MountToolbarOptions` object, not
+  just `true`. Pass one to add backstage content (`createBackstageView`), custom
+  hooks, submenu factories, a ribbon-tab profile, or lifecycle callbacks while
+  keeping the single-call mount — the fields you set are merged over (and
+  override) the built-in defaults (locale-derived language, dynamic dropdowns),
+  and the toolbar is still wired against the freshly mounted instance for you.
+  Embeds that need a fully separate toolbar host can still call
+  `Spreadsheet.mountToolbar` directly.
 
 ### Changed
 
@@ -50,6 +56,16 @@ versioning is [SemVer](https://semver.org/).
   the grid's `--fc-*` tokens. Embedders that overrode `--demo-*` must switch to
   the `--fc-tb-*` names. Internal ribbon class names are unchanged; hosts should
   target the `data-ribbon-*` attributes rather than class names.
+- One brand accent across grid and toolbar. When the ribbon is mounted inside
+  `.fc-host` (single-call `mount({ toolbar })`, or any `SpreadsheetToolbar` whose
+  host descends from the grid host), `--fc-tb-accent` / `--fc-tb-accent-strong`
+  now fall back to the grid's `--fc-accent` / `--fc-accent-strong`, and
+  `--fc-tb-accent-soft` derives from the resolved accent. A single
+  `.fc-host { --fc-accent: … }` override now themes both surfaces — no more
+  setting the grid and toolbar accents separately. Standalone toolbars (host not
+  under `.fc-host`) keep the `--fc-tb-*` literals, which now match the grid's
+  per-theme accent so both mount modes look identical (the ink ribbon accent
+  moves from its former independent value to the shared theme accent).
 - One theme vocabulary across grid and toolbar. The ribbon toolbar now reads
   the same `paper` / `ink` / `contrast` values off the shared `data-fc-theme`
   attribute, instead of a separate `light` / `dark` / `contrast` vocabulary on

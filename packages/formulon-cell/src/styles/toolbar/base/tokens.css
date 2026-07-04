@@ -8,8 +8,8 @@
   --fc-tb-line: #d9dadd;
   --fc-tb-line-soft: #edebe9;
   --fc-tb-accent: #107c41;
-  --fc-tb-accent-strong: #0e6b39;
-  --fc-tb-accent-soft: rgba(16, 124, 65, 0.1);
+  --fc-tb-accent-strong: #0b5f31;
+  --fc-tb-accent-soft: color-mix(in srgb, var(--fc-tb-accent) 10%, transparent);
   --fc-tb-error: #a4262c;
   --fc-tb-title: #f3f2f1;
   --fc-tb-title-strong: #0b5f31;
@@ -26,6 +26,18 @@
   --fc-tb-backstage-rail: #f3f2f1;
 }
 
+/* Co-mounted inside a themed grid host (`mount({ toolbar: true })`, or any
+ * toolbar mounted under `.fc-host`), the ribbon accent tracks the grid's
+ * `--fc-accent` so a single brand-color override themes both surfaces at once.
+ * Standalone `SpreadsheetToolbar` mounts — whose host is not `.fc-host` — keep
+ * the `:root` literals above. Theme blocks below still win their own specificity
+ * ties, so ink / contrast pick up the grid accent through their own fallbacks. */
+.fc-host {
+  --fc-tb-accent: var(--fc-accent, #107c41);
+  --fc-tb-accent-strong: var(--fc-accent-strong, #0b5f31);
+  --fc-tb-accent-soft: color-mix(in srgb, var(--fc-tb-accent) 10%, transparent);
+}
+
 [data-fc-theme="ink"] {
   --fc-tb-bg: #14171b;
   --fc-tb-card: #1e2228;
@@ -33,8 +45,8 @@
   --fc-tb-fg-soft: #8d949c;
   --fc-tb-line: #2e333a;
   --fc-tb-line-soft: #323841;
-  --fc-tb-accent: #f4a36c;
-  --fc-tb-accent-soft: rgba(244, 163, 108, 0.12);
+  --fc-tb-accent: var(--fc-accent, #4cc26b);
+  --fc-tb-accent-soft: color-mix(in srgb, var(--fc-tb-accent) 12%, transparent);
   --fc-tb-error: #f1707b;
   --fc-tb-title: #0f6b3c;
   --fc-tb-title-strong: #0a4b2a;
@@ -58,7 +70,7 @@
   --fc-tb-fg-soft: #1a1a1a;
   --fc-tb-line: #000000;
   --fc-tb-line-soft: #000000;
-  --fc-tb-accent: #0000ff;
+  --fc-tb-accent: var(--fc-accent, #0033cc);
   --fc-tb-accent-soft: #ffff00;
   --fc-tb-error: #cc0000;
   --fc-tb-title: #000000;

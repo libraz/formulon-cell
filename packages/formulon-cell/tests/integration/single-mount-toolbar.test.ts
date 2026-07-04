@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type MountedStubSheet, mountStubSheet } from '../test-utils/index.js';
 
@@ -42,6 +42,23 @@ describe('integration: single-call ribbon toolbar', () => {
     sheet = await mountStubSheet();
     expect(sheet.instance.toolbar).toBeNull();
     expect(shellOf(sheet.host)).toBeNull();
+  });
+
+  it('forwards a toolbar options object while keeping the single-call defaults', async () => {
+    const onTabChange = vi.fn();
+    sheet = await mountStubSheet({ toolbar: { activeTab: 'insert', onTabChange } });
+    const tb = sheet.instance.toolbar;
+    expect(tb).not.toBeNull();
+
+    // Host-supplied options reach mountToolbar…
+    expect(tb?.getActiveTab()).toBe('insert');
+    // …and the single-call defaults survive the merge (dynamicDropdowns: true
+    // is applied under the spread, so the dropdown api is wired).
+    expect(tb?.dropdownsApi).not.toBeNull();
+
+    // Lifecycle callbacks passed through fire on the matching state change.
+    tb?.setActiveTab('home');
+    expect(onTabChange).toHaveBeenCalledWith('home');
   });
 
   it('disposes the toolbar and removes the ribbon host on dispose()', async () => {
