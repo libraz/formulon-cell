@@ -1,5 +1,44 @@
 @import "@libraz/formulon-cell/styles/toolbar.css";
 
+/* Full-viewport demo-page scaffolding. These globals belong to the demo host
+ * page, not the embeddable library, so they live here rather than in the
+ * distributed `@libraz/formulon-cell` CSS. */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--demo-bg);
+  color: var(--demo-fg);
+  font-family: var(--demo-font);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+.demo {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.demo--loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--demo-mono);
+  color: var(--demo-fg-soft);
+}
+
 .demo__load-error {
   display: grid;
   gap: 10px;
