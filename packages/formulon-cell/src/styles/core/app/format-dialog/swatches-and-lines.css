@@ -21,6 +21,12 @@
   .fc-fmtdlg__section--standalone > .fc-fmtdlg__section-title {
     display: none;
   }
+  .fc-fmtdlg__more-hint {
+    margin: 10px 10px 0;
+    color: var(--fc-fmtdlg-section-fg);
+    font-size: 12px;
+    line-height: 1.4;
+  }
   .fc-fmtdlg__section .fc-fmtdlg__swatches {
     margin-left: 0;
   }
@@ -77,9 +83,94 @@
   }
 
   .fc-fmtdlg__fill-pattern-row {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .fc-fmtdlg__fill-pattern-gallery {
     grid-column: 2;
     grid-row: 2;
-    padding: 0 26px 0 10px;
+    display: grid;
+    grid-template-columns: repeat(6, 28px);
+    gap: 4px;
+    align-self: start;
+    padding: 4px;
+  }
+
+  .fc-fmtdlg__fill-pattern-option {
+    display: grid;
+    width: 28px;
+    height: 24px;
+    padding: 3px;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    background: var(--fc-fmtdlg-list-bg);
+    cursor: pointer;
+  }
+
+  .fc-fmtdlg__fill-pattern-option:hover,
+  .fc-fmtdlg__fill-pattern-option:focus-visible,
+  .fc-fmtdlg__fill-pattern-option[aria-pressed="true"] {
+    border-color: var(--fc-fmtdlg-chip-checked-border);
+    background: var(--fc-fmtdlg-list-selected-bg);
+    outline: none;
+  }
+
+  .fc-fmtdlg__fill-pattern-option-sample {
+    display: block;
+    min-width: 0;
+    background-color: #fff;
+  }
+
+  .fc-fmtdlg__fill-pattern-option-sample[data-fc-fill-pattern-sample="gray0625"] {
+    background-image: radial-gradient(#202020 0.4px, transparent 0.4px);
+    background-size: 4px 4px;
+  }
+  .fc-fmtdlg__fill-pattern-option-sample[data-fc-fill-pattern-sample="gray125"] {
+    background-image: radial-gradient(#202020 0.6px, transparent 0.6px);
+    background-size: 4px 4px;
+  }
+  .fc-fmtdlg__fill-pattern-option-sample[data-fc-fill-pattern-sample="gray25"] {
+    background-image: radial-gradient(#202020 1px, transparent 1px);
+    background-size: 4px 4px;
+  }
+  .fc-fmtdlg__fill-pattern-option-sample[data-fc-fill-pattern-sample="gray50"] {
+    background-image: repeating-linear-gradient(45deg, #202020 0 2px, transparent 2px 4px);
+  }
+  .fc-fmtdlg__fill-pattern-option-sample[data-fc-fill-pattern-sample="gray75"] {
+    background-image: repeating-linear-gradient(45deg, #202020 0 3px, transparent 3px 4px);
+  }
+  .fc-fmtdlg__fill-pattern-option-sample[data-fc-fill-pattern-sample="darkHorizontal"],
+  .fc-fmtdlg__fill-pattern-option-sample[data-fc-fill-pattern-sample="lightHorizontal"] {
+    background-image: repeating-linear-gradient(0deg, #202020 0 1px, transparent 1px 4px);
+  }
+  .fc-fmtdlg__fill-pattern-option-sample[data-fc-fill-pattern-sample="darkVertical"],
+  .fc-fmtdlg__fill-pattern-option-sample[data-fc-fill-pattern-sample="lightVertical"] {
+    background-image: repeating-linear-gradient(90deg, #202020 0 1px, transparent 1px 4px);
+  }
+  .fc-fmtdlg__fill-pattern-option-sample[data-fc-fill-pattern-sample="darkDown"],
+  .fc-fmtdlg__fill-pattern-option-sample[data-fc-fill-pattern-sample="lightDown"] {
+    background-image: repeating-linear-gradient(45deg, #202020 0 1px, transparent 1px 5px);
+  }
+  .fc-fmtdlg__fill-pattern-option-sample[data-fc-fill-pattern-sample="darkUp"],
+  .fc-fmtdlg__fill-pattern-option-sample[data-fc-fill-pattern-sample="lightUp"] {
+    background-image: repeating-linear-gradient(135deg, #202020 0 1px, transparent 1px 5px);
+  }
+  .fc-fmtdlg__fill-pattern-option-sample[data-fc-fill-pattern-sample="darkGrid"],
+  .fc-fmtdlg__fill-pattern-option-sample[data-fc-fill-pattern-sample="lightGrid"] {
+    background-image:
+      repeating-linear-gradient(0deg, #202020 0 1px, transparent 1px 4px),
+      repeating-linear-gradient(90deg, #202020 0 1px, transparent 1px 4px);
+  }
+  .fc-fmtdlg__fill-pattern-option-sample[data-fc-fill-pattern-sample="darkTrellis"],
+  .fc-fmtdlg__fill-pattern-option-sample[data-fc-fill-pattern-sample="lightTrellis"] {
+    background-image:
+      repeating-linear-gradient(45deg, #202020 0 1px, transparent 1px 5px),
+      repeating-linear-gradient(135deg, #202020 0 1px, transparent 1px 5px);
   }
 
   .fc-fmtdlg__panel-tab[data-fc-tab="fill"] .fc-fmtdlg__row > span:first-child {
@@ -197,6 +288,10 @@
     display: block;
     width: 100%;
     border-top: 1px solid currentColor;
+  }
+  .fc-fmtdlg__line-sample-svg {
+    display: block;
+    width: 100%;
   }
   .fc-fmtdlg__line-style--medium .fc-fmtdlg__line-sample {
     border-top-width: 2px;

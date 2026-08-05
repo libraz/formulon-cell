@@ -9,6 +9,7 @@ import {
   type BorderStyleKey,
   type DraftState,
   defaultCurrencySymbolFor,
+  FRACTION_PATTERNS,
   type NumberCategory,
   type SideKey,
 } from './format-dialog-model.js';
@@ -111,7 +112,7 @@ export function hydrateDraftFromFormat(
         draft.pattern = fmt.numFmt.pattern;
         break;
       case 'datetime':
-        draft.numberCategory = 'datetime';
+        draft.numberCategory = 'custom';
         draft.pattern = fmt.numFmt.pattern;
         break;
       case 'special':
@@ -122,7 +123,11 @@ export function hydrateDraftFromFormat(
         draft.numberCategory = 'text';
         break;
       case 'custom':
-        draft.numberCategory = 'custom';
+        draft.numberCategory = FRACTION_PATTERNS.includes(
+          fmt.numFmt.pattern as (typeof FRACTION_PATTERNS)[number],
+        )
+          ? 'fraction'
+          : 'custom';
         draft.pattern = fmt.numFmt.pattern;
         break;
       default:
@@ -147,7 +152,7 @@ export function hydrateDraftFromFormat(
   draft.textDirection = fmt.textDirection ?? 'context';
   draft.bold = !!fmt.bold;
   draft.italic = !!fmt.italic;
-  draft.underline = !!fmt.underline;
+  draft.underline = fmt.underline === true ? 'single' : (fmt.underline ?? false);
   draft.strike = !!fmt.strike;
   draft.fontFamily = fmt.fontFamily ?? '';
   draft.fontSize = fmt.fontSize;
@@ -189,17 +194,19 @@ export function activeDraftSide(draft: DraftState): CellBorderSide {
 
 export function setDraftSide(draft: DraftState, key: SideKey, on: boolean): CellBorders {
   const next: CellBorders = { ...draft.borders };
+  if (key === 'diagonalDown' || key === 'diagonalUp') {
+    if (!on) {
+      next[key] = false;
+      return next;
+    }
+    const otherKey = key === 'diagonalDown' ? 'diagonalUp' : 'diagonalDown';
+    const shared = next[otherKey] || activeDraftSide(draft);
+    next.diagonalDown = shared;
+    next.diagonalUp = shared;
+    return next;
+  }
   if (on) next[key] = activeDraftSide(draft);
   else next[key] = false;
-  return next;
-}
-
-export function restyleDraftBorders(draft: DraftState): CellBorders {
-  const next: CellBorders = {};
-  const sides: SideKey[] = ['top', 'right', 'bottom', 'left', 'diagonalDown', 'diagonalUp'];
-  for (const k of sides) {
-    if (draft.borders[k]) next[k] = activeDraftSide(draft);
-  }
   return next;
 }
 
@@ -250,8 +257,8 @@ export function computeDialogNumFmt(
       return { kind: 'date', pattern: draft.pattern || defaultPatternFor('date') };
     case 'time':
       return { kind: 'time', pattern: draft.pattern || defaultPatternFor('time') };
-    case 'datetime':
-      return { kind: 'datetime', pattern: draft.pattern || defaultPatternFor('datetime') };
+    case 'fraction':
+      return { kind: 'custom', pattern: draft.pattern || defaultPatternFor('fraction') };
     case 'custom':
       return { kind: 'custom', pattern: draft.pattern || defaultPatternFor('custom') };
   }
@@ -377,28 +384,7 @@ function hydrateValidationDraft(draft: DraftState, validation: CellValidation | 
 
 function sideStyle(s: CellBorderSide | undefined): BorderStyleKey | null {
   if (!s) return null;
-  if (typeof s === 'object') {
-    switch (s.style) {
-      case 'thin':
-      case 'medium':
-      case 'thick':
-      case 'dashed':
-      case 'dotted':
-      case 'double':
-        return s.style;
-      case 'hair':
-        return 'thin';
-      case 'mediumDashed':
-      case 'dashDot':
-      case 'mediumDashDot':
-      case 'dashDotDot':
-      case 'mediumDashDotDot':
-      case 'slantDashDot':
-        return 'dashed';
-      default:
-        return 'thin';
-    }
-  }
+  if (typeof s === 'object') return s.style;
   return 'thin';
 }
 

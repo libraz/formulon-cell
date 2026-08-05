@@ -85,6 +85,26 @@ describe('fontRecordFromFormat / fontRecordToFormat', () => {
     expect(rec.colorArgb).toBe(0xffff0000);
   });
 
+  it.each([
+    ['single', 1],
+    ['double', 2],
+    ['singleAccounting', 3],
+    ['doubleAccounting', 4],
+  ] as const)('round-trips the %s OOXML underline ordinal', (underline, ordinal) => {
+    expect(fontRecordFromFormat({ underline }).underline).toBe(ordinal);
+    expect(
+      fontRecordToFormat({
+        name: 'Calibri',
+        size: 11,
+        bold: false,
+        italic: false,
+        strike: false,
+        underline: ordinal,
+        colorArgb: 0xff000000,
+      }).underline,
+    ).toBe(underline);
+  });
+
   it('round-trips font fields back to CellFormat', () => {
     const rec = fontRecordFromFormat({ bold: true, fontSize: 16, color: '#0000ff' });
     const fmt = fontRecordToFormat(rec);
@@ -106,6 +126,23 @@ describe('fontRecordFromFormat / fontRecordToFormat', () => {
     expect(fmt.fontFamily).toBeUndefined();
     expect(fmt.fontSize).toBeUndefined();
   });
+
+  it('uses the workbook default font rather than assuming Calibri', () => {
+    const fmt = fontRecordToFormat(
+      {
+        name: '游ゴシック',
+        size: 11,
+        bold: false,
+        italic: false,
+        strike: false,
+        underline: 0,
+        colorArgb: 0xff000000,
+      },
+      { name: '游ゴシック', size: 11 },
+    );
+    expect(fmt.fontFamily).toBeUndefined();
+    expect(fmt.fontSize).toBeUndefined();
+  });
 });
 
 describe('fillRecordFromFormat / fillRecordToFormat', () => {
@@ -122,6 +159,56 @@ describe('fillRecordFromFormat / fillRecordToFormat', () => {
   it('round-trips back to CellFormat', () => {
     const rec = fillRecordFromFormat({ fill: '#abcdef' });
     expect(fillRecordToFormat(rec)).toEqual({ fill: '#abcdef' });
+  });
+
+  it.each([
+    ['gray50', 2],
+    ['gray75', 3],
+    ['gray25', 4],
+    ['darkHorizontal', 5],
+    ['darkVertical', 6],
+    ['darkDown', 7],
+    ['darkUp', 8],
+    ['darkGrid', 9],
+    ['darkTrellis', 10],
+    ['lightHorizontal', 11],
+    ['lightVertical', 12],
+    ['lightDown', 13],
+    ['lightUp', 14],
+    ['lightGrid', 15],
+    ['lightTrellis', 16],
+    ['gray125', 17],
+    ['gray0625', 18],
+  ] as const)('round-trips %s pattern using OOXML ordinal %i', (fillPattern, ordinal) => {
+    const rec = fillRecordFromFormat({
+      fill: '#abcdef',
+      fillPattern,
+      fillPatternColor: '#123456',
+    });
+    expect(rec).toEqual({ pattern: ordinal, fgArgb: 0xff123456, bgArgb: 0xffabcdef });
+    expect(fillRecordToFormat(rec)).toEqual({
+      fill: '#abcdef',
+      fillPattern,
+      fillPatternColor: '#123456',
+    });
+  });
+
+  it.each([
+    ['horizontal', 5, 'darkHorizontal'],
+    ['vertical', 6, 'darkVertical'],
+    ['diagonalDown', 7, 'darkDown'],
+    ['diagonalUp', 8, 'darkUp'],
+  ] as const)('keeps legacy %s input writable and hydrates canonical %s', (fillPattern, ordinal, canonical) => {
+    expect(fillRecordFromFormat({ fillPattern }).pattern).toBe(ordinal);
+    expect(fillRecordToFormat({ pattern: ordinal, fgArgb: 0, bgArgb: 0 }).fillPattern).toBe(
+      canonical,
+    );
+  });
+
+  it('preserves a colour but does not mislabel an unsupported pattern ordinal', () => {
+    expect(fillRecordToFormat({ pattern: 19, fgArgb: 0xff123456, bgArgb: 0xffabcdef })).toEqual({
+      fill: '#abcdef',
+    });
   });
 
   it('hydrate produces empty fmt when pattern=0', () => {
@@ -167,6 +254,43 @@ describe('numFmtToFormatCode / formatCodeToNumFmt', () => {
     });
   });
 
+  it.each([
+    ['minus', '#,##0.00'],
+    ['parens', '#,##0.00;(#,##0.00)'],
+    ['red', '#,##0.00;[Red]-#,##0.00'],
+    ['red-parens', '#,##0.00;[Red](#,##0.00)'],
+  ] as const)('fixed negative style %s round-trips', (negativeStyle, expectedCode) => {
+    const code = numFmtToFormatCode({
+      kind: 'fixed',
+      decimals: 2,
+      thousands: true,
+      negativeStyle,
+    });
+    expect(code).toBe(expectedCode);
+    expect(formatCodeToNumFmt(code ?? '')).toEqual({
+      kind: 'fixed',
+      decimals: 2,
+      thousands: true,
+      ...(negativeStyle === 'minus' ? {} : { negativeStyle }),
+    });
+  });
+
+  it.each([
+    ['minus', '[$¥-411]#,##0'],
+    ['parens', '[$¥-411]#,##0;([$¥-411]#,##0)'],
+    ['red', '[$¥-411]#,##0;[Red]-[$¥-411]#,##0'],
+    ['red-parens', '[$¥-411]#,##0;[Red]([$¥-411]#,##0)'],
+  ] as const)('currency negative style %s round-trips', (negativeStyle, expectedCode) => {
+    const code = numFmtToFormatCode({ kind: 'currency', decimals: 0, symbol: '¥', negativeStyle });
+    expect(code).toBe(expectedCode);
+    expect(formatCodeToNumFmt(code ?? '')).toEqual({
+      kind: 'currency',
+      decimals: 0,
+      symbol: '¥',
+      ...(negativeStyle === 'minus' ? {} : { negativeStyle }),
+    });
+  });
+
   it('percent round-trip', () => {
     expect(numFmtToFormatCode({ kind: 'percent', decimals: 2 })).toBe('0.00%');
     expect(formatCodeToNumFmt('0.00%')).toEqual({ kind: 'percent', decimals: 2 });
@@ -206,6 +330,7 @@ describe('numFmtToFormatCode / formatCodeToNumFmt', () => {
       kind: 'currency',
       decimals: 0,
       symbol: '¥',
+      negativeStyle: 'red',
     });
   });
 
@@ -242,5 +367,27 @@ describe('buildXfRecord', () => {
     expect(xf.horizontalAlign).toBe(0);
     expect(xf.verticalAlign).toBe(2);
     expect(xf.wrapText).toBe(false);
+  });
+
+  it.each([
+    ['left', 1],
+    ['center', 2],
+    ['right', 3],
+    ['fill', 4],
+    ['justify', 5],
+    ['centerContinuous', 6],
+    ['distributed', 7],
+  ] as const)('maps horizontal alignment %s to ordinal %i', (align, ordinal) => {
+    expect(buildXfRecord(0, 0, 0, 0, { align }).horizontalAlign).toBe(ordinal);
+  });
+
+  it.each([
+    ['top', 0],
+    ['middle', 1],
+    ['bottom', 2],
+    ['justify', 3],
+    ['distributed', 4],
+  ] as const)('maps vertical alignment %s to ordinal %i', (vAlign, ordinal) => {
+    expect(buildXfRecord(0, 0, 0, 0, { vAlign }).verticalAlign).toBe(ordinal);
   });
 });

@@ -11,7 +11,14 @@ export type RuleKind = ConditionalRule['kind'];
 export type CellValueOp = '>' | '<' | '>=' | '<=' | '=' | '<>' | 'between' | 'not-between';
 export type DatePeriod = Extract<ConditionalRule, { kind: 'date-occurring' }>['period'];
 export type AverageMode = Extract<ConditionalRule, { kind: 'average' }>['mode'];
-export type FormatPreset = 'red-fill' | 'yellow-fill' | 'green-fill' | 'red-text' | 'plain';
+export type FormatPreset =
+  | 'red-fill'
+  | 'yellow-fill'
+  | 'green-fill'
+  | 'light-red-fill'
+  | 'red-text'
+  | 'red-border'
+  | 'custom';
 
 export const formatPresetPatch = (preset: FormatPreset): Partial<CellFormat> => {
   switch (preset) {
@@ -23,7 +30,18 @@ export const formatPresetPatch = (preset: FormatPreset): Partial<CellFormat> => 
       return { color: '#006100', fill: '#c6efce' };
     case 'red-text':
       return { color: '#c00000' };
-    case 'plain':
+    case 'light-red-fill':
+      return { fill: '#ffc7ce' };
+    case 'red-border':
+      return {
+        borders: {
+          top: { style: 'thin', color: '#ff0000' },
+          right: { style: 'thin', color: '#ff0000' },
+          bottom: { style: 'thin', color: '#ff0000' },
+          left: { style: 'thin', color: '#ff0000' },
+        },
+      };
+    case 'custom':
       return {};
   }
 };

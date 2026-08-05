@@ -263,7 +263,9 @@ export const LINE_STYLES_ALL: (CellBorderStyle | 'none')[] = [
   'dashDotDot',
   'mediumDashed',
   'mediumDashDot',
+  'mediumDashDotDot',
   'medium',
   'double',
   'thick',
+  'slantDashDot',
 ];

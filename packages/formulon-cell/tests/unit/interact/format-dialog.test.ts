@@ -6,8 +6,10 @@ import { coerceInput } from '../../../src/commands/coerce-input.js';
 import { History } from '../../../src/commands/history.js';
 import { setCellLocked, setProtectedSheet } from '../../../src/commands/protection.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
+import { en } from '../../../src/i18n/strings/en.js';
 import { attachFormatDialog } from '../../../src/interact/format-dialog.js';
 import {
+  type CellFormat,
   createSpreadsheetStore,
   mutators,
   type SpreadsheetStore,
@@ -124,6 +126,33 @@ describe('attachFormatDialog', () => {
     await flushRaf();
     expect(document.activeElement).toBe(validationKind);
 
+    handle.detach();
+  });
+
+  it('returns number formats and borders through dxf mode without mutating the active cell', () => {
+    const handle = attachFormatDialog({ host, store, strings: en });
+    let applied: Partial<CellFormat> | null = null;
+    handle.open('number', {
+      mode: 'dxf',
+      onApplyDxf: (format) => {
+        applied = format;
+      },
+    });
+    document.querySelector<HTMLButtonElement>('button[data-fc-cat="fixed"]')?.click();
+    document.querySelector<HTMLButtonElement>('button[data-fc-tab="border"]')?.click();
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__border-preset--outline')?.click();
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+
+    expect(applied).toMatchObject({
+      numFmt: { kind: 'fixed', decimals: 2 },
+      borders: {
+        top: { style: 'thin' },
+        right: { style: 'thin' },
+        bottom: { style: 'thin' },
+        left: { style: 'thin' },
+      },
+    });
+    expect(store.getState().format.formats).toHaveLength(0);
     handle.detach();
   });
 
@@ -698,6 +727,15 @@ describe('attachFormatDialog', () => {
     handle.detach();
   });
 
+  it('describes the More tab as a secondary entry point', () => {
+    const handle = attachFormatDialog({ host, store, strings: en });
+    handle.open('more');
+    expect(document.querySelector<HTMLElement>('.fc-fmtdlg__more-hint')?.textContent).toContain(
+      'secondary editor',
+    );
+    handle.detach();
+  });
+
   it('clicking tab strip outside button does nothing', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
@@ -919,6 +957,79 @@ describe('attachFormatDialog', () => {
     expect(decimalsRow?.hidden).toBe(false);
     expect(thousands?.closest('label')?.hidden).toBe(true);
 
+    handle.detach();
+  });
+
+  it('lists number categories in Excel order without the custom Date & Time category', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+
+    expect(
+      Array.from(document.querySelectorAll<HTMLButtonElement>('button[data-fc-cat]')).map(
+        (button) => button.dataset.fcCat,
+      ),
+    ).toEqual([
+      'general',
+      'fixed',
+      'currency',
+      'accounting',
+      'date',
+      'time',
+      'percent',
+      'fraction',
+      'scientific',
+      'text',
+      'special',
+      'custom',
+    ]);
+    expect(document.querySelector('button[data-fc-cat="datetime"]')).toBeNull();
+    handle.detach();
+  });
+
+  it('persists and reopens all nine Excel fraction presets as Fraction', () => {
+    const patterns = [
+      '# ?/?',
+      '# ??/??',
+      '# ???/???',
+      '# ?/2',
+      '# ?/4',
+      '# ?/8',
+      '# ?/16',
+      '# ?/10',
+      '# ?/100',
+    ];
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+    document
+      .querySelector<HTMLButtonElement>('button[data-fc-cat="fraction"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const options = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('button[data-fc-pattern]'),
+    );
+    expect(options.map((button) => button.dataset.fcPattern)).toEqual(patterns);
+    const selectedPattern = '# ?/16';
+    options
+      .find((button) => button.dataset.fcPattern === selectedPattern)
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.numFmt,
+    ).toEqual({ kind: 'custom', pattern: selectedPattern });
+
+    handle.open();
+    expect(
+      document
+        .querySelector<HTMLButtonElement>('button[data-fc-cat="fraction"]')
+        ?.getAttribute('aria-selected'),
+    ).toBe('true');
+    expect(
+      Array.from(document.querySelectorAll<HTMLButtonElement>('button[data-fc-pattern]'))
+        .find((button) => button.dataset.fcPattern === selectedPattern)
+        ?.getAttribute('aria-selected'),
+    ).toBe('true');
     handle.detach();
   });
 
@@ -1352,7 +1463,7 @@ describe('attachFormatDialog', () => {
     handle.detach();
   });
 
-  it('font style checkboxes wire to draft', () => {
+  it('font style controls wire the selected underline style to draft', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
 
@@ -1362,9 +1473,9 @@ describe('attachFormatDialog', () => {
     const italic = document.querySelector<HTMLInputElement>(
       'input[data-fc-check="italic"]',
     ) as HTMLInputElement;
-    const underline = document.querySelector<HTMLInputElement>(
-      'input[data-fc-check="underline"]',
-    ) as HTMLInputElement;
+    const underline = document.querySelector<HTMLSelectElement>(
+      'select[data-fc-input="underline"]',
+    ) as HTMLSelectElement;
     const strike = document.querySelector<HTMLInputElement>(
       'input[data-fc-check="strike"]',
     ) as HTMLInputElement;
@@ -1372,7 +1483,7 @@ describe('attachFormatDialog', () => {
     bold.dispatchEvent(new Event('change', { bubbles: true }));
     italic.checked = true;
     italic.dispatchEvent(new Event('change', { bubbles: true }));
-    underline.checked = true;
+    underline.value = 'doubleAccounting';
     underline.dispatchEvent(new Event('change', { bubbles: true }));
     strike.checked = true;
     strike.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1383,7 +1494,7 @@ describe('attachFormatDialog', () => {
     const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
     expect(fmt?.bold).toBe(true);
     expect(fmt?.italic).toBe(true);
-    expect(fmt?.underline).toBe(true);
+    expect(fmt?.underline).toBe('doubleAccounting');
     expect(fmt?.strike).toBe(true);
     handle.detach();
   });
@@ -1764,6 +1875,79 @@ describe('attachFormatDialog', () => {
     handle.detach();
   });
 
+  it('keeps existing per-side styles and colors when the active border pen changes', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        borders: {
+          top: { style: 'thick', color: '#112233' },
+          bottom: { style: 'hair', color: '#445566' },
+        },
+      },
+    );
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+
+    document
+      .querySelector<HTMLButtonElement>('button[data-border-style="double"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    document
+      .querySelector<HTMLButtonElement>('[data-swatches="border"] button[data-color="#c00000"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    document
+      .querySelector<HTMLButtonElement>('button[data-border-side="left"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.borders,
+    ).toMatchObject({
+      top: { style: 'thick', color: '#112233' },
+      bottom: { style: 'hair', color: '#445566' },
+      left: { style: 'double', color: '#c00000' },
+    });
+    handle.detach();
+  });
+
+  it('reopens all OOXML border styles without collapsing the selected pen', () => {
+    const styles = [
+      'thin',
+      'medium',
+      'thick',
+      'dashed',
+      'dotted',
+      'double',
+      'hair',
+      'mediumDashed',
+      'dashDot',
+      'mediumDashDot',
+      'dashDotDot',
+      'mediumDashDotDot',
+      'slantDashDot',
+    ] as const;
+
+    for (const style of styles) {
+      mutators.setCellFormat(
+        store,
+        { sheet: 0, row: 0, col: 0 },
+        {
+          borders: { top: { style } },
+        },
+      );
+      const handle = attachFormatDialog({ host, store });
+      handle.open();
+      expect(
+        document.querySelector<HTMLSelectElement>(
+          '.fc-fmtdlg__panel-tab[data-fc-tab="border"] select',
+        )?.value,
+      ).toBe(style);
+      handle.detach();
+    }
+  });
+
   it('visual border preview buttons toggle sides', () => {
     const handle = attachFormatDialog({ host, store });
     handle.open();
@@ -1866,7 +2050,7 @@ describe('attachFormatDialog', () => {
     ) as HTMLInputElement;
     fillInput.value = '#123456';
     fillInput.dispatchEvent(new Event('input', { bubbles: true }));
-    pattern.value = 'horizontal';
+    pattern.value = 'darkTrellis';
     pattern.dispatchEvent(new Event('change', { bubbles: true }));
     patternColor.value = '#336699';
     patternColor.dispatchEvent(new Event('input', { bubbles: true }));
@@ -1880,8 +2064,27 @@ describe('attachFormatDialog', () => {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
-    expect(fmt?.fillPattern).toBe('horizontal');
+    expect(fmt?.fillPattern).toBe('darkTrellis');
     expect(fmt?.fillPatternColor).toBe('#336699');
+    handle.detach();
+  });
+
+  it('uses the 6 by 3 pattern gallery to update the fill pattern', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open('fill');
+    const gallery = document.querySelector<HTMLDivElement>('.fc-fmtdlg__fill-pattern-gallery');
+    const darkGrid = document.querySelector<HTMLButtonElement>(
+      'button[data-fc-fill-pattern="darkGrid"]',
+    );
+    expect(gallery?.querySelectorAll('button[data-fc-fill-pattern]')).toHaveLength(18);
+    darkGrid?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(darkGrid?.getAttribute('aria-pressed')).toBe('true');
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.fillPattern,
+    ).toBe('darkGrid');
     handle.detach();
   });
 
@@ -1926,9 +2129,10 @@ describe('attachFormatDialog', () => {
       'select[data-fc-select="fillPattern"]',
     );
     expect(fillPattern?.getAttribute('aria-label')).toBe('パターンの種類');
-    expect(Array.from(fillPattern?.options ?? []).map((option) => option.value)).toContain(
-      'diagonalUp',
+    expect(Array.from(fillPattern?.options ?? []).map((option) => option.value)).toEqual(
+      expect.arrayContaining(['darkUp', 'lightTrellis', 'gray0625']),
     );
+    expect(fillPattern?.options).toHaveLength(18);
 
     document
       .querySelector<HTMLButtonElement>('button[data-fc-tab="border"]')
@@ -1939,11 +2143,18 @@ describe('attachFormatDialog', () => {
     expect(borderStyle?.getAttribute('aria-label')).toBe('スタイル');
     expect(Array.from(borderStyle?.options ?? []).map((option) => option.value)).toEqual([
       'thin',
-      'medium',
-      'thick',
-      'dashed',
+      'hair',
       'dotted',
+      'dashed',
+      'dashDot',
+      'dashDotDot',
+      'mediumDashed',
+      'mediumDashDot',
+      'mediumDashDotDot',
+      'medium',
       'double',
+      'thick',
+      'slantDashDot',
     ]);
 
     handle.detach();
@@ -2168,9 +2379,9 @@ describe('attachFormatDialog', () => {
     const italic = document.querySelector<HTMLInputElement>(
       'input[data-fc-check="italic"]',
     ) as HTMLInputElement;
-    const underline = document.querySelector<HTMLInputElement>(
-      'input[data-fc-check="underline"]',
-    ) as HTMLInputElement;
+    const underline = document.querySelector<HTMLSelectElement>(
+      'select[data-fc-input="underline"]',
+    ) as HTMLSelectElement;
     const strike = document.querySelector<HTMLInputElement>(
       'input[data-fc-check="strike"]',
     ) as HTMLInputElement;
@@ -2182,7 +2393,7 @@ describe('attachFormatDialog', () => {
     italic.dispatchEvent(new Event('change', { bubbles: true }));
     expect(preview.style.fontStyle).toBe('italic');
 
-    underline.checked = true;
+    underline.value = 'double';
     underline.dispatchEvent(new Event('change', { bubbles: true }));
     strike.checked = true;
     strike.dispatchEvent(new Event('change', { bubbles: true }));

@@ -409,8 +409,10 @@ describe('attachConditionalDialog', () => {
 
     const kindSelect = Array.from(
       document.querySelectorAll<HTMLSelectElement>('.fc-conddlg__form select'),
-    ).find((select) =>
-      Array.from(select.options).some((option) => option.value === 'data-bar'),
+    ).find(
+      (select) =>
+        Array.from(select.options).some((option) => option.value === 'data-bar') &&
+        Array.from(select.options).some((option) => option.value === 'cell-value'),
     ) as HTMLSelectElement;
     const iconSelect = Array.from(
       document.querySelectorAll<HTMLSelectElement>('.fc-conddlg__form select'),
@@ -446,12 +448,99 @@ describe('attachConditionalDialog', () => {
     );
     expect(
       Array.from(styleSelect?.options ?? [], (option) => [option.value, option.textContent]),
-    ).toEqual([['classic', 'Classic']]);
+    ).toEqual([
+      ['two-color-scale', '2-Color Scale'],
+      ['three-color-scale', '3-Color Scale'],
+      ['data-bar', 'Data bar'],
+      ['icon-set', 'Icon set'],
+      ['classic', 'Classic'],
+    ]);
     expect(Array.from(kindSelect?.options ?? [], (option) => option.value)).toContain(
       'date-occurring',
     );
     expect(Array.from(iconSelect?.options ?? [], (option) => option.value)).toContain('boxes5');
 
+    handle.detach();
+  });
+
+  it('switches the five Excel rule styles into their matching form kinds', () => {
+    const handle = attachConditionalDialog({ host, store });
+    handle.open();
+    const selects = Array.from(
+      document.querySelectorAll<HTMLSelectElement>('.fc-conddlg__form select'),
+    );
+    const style = selects.find((select) =>
+      Array.from(select.options).some((option) => option.value === 'two-color-scale'),
+    ) as HTMLSelectElement;
+    const kind = selects.find((select) =>
+      Array.from(select.options).some((option) => option.value === 'cell-value'),
+    ) as HTMLSelectElement;
+    for (const [value, expected] of [
+      ['two-color-scale', 'color-scale'],
+      ['three-color-scale', 'color-scale'],
+      ['data-bar', 'data-bar'],
+      ['icon-set', 'icon-set'],
+    ] as const) {
+      style.value = value;
+      style.dispatchEvent(new Event('change', { bubbles: true }));
+      expect(kind.value).toBe(expected);
+    }
+    style.value = 'classic';
+    style.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(kind.hidden).toBe(false);
+    handle.detach();
+  });
+
+  it('opens Format Cells in dxf mode from the classic Custom format and applies its patch', () => {
+    const handle = attachConditionalDialog({ host, store, strings: en });
+    handle.open({ mode: 'new', kind: 'cell-value' });
+    const preset = Array.from(
+      document.querySelectorAll<HTMLSelectElement>('.fc-conddlg__form select'),
+    ).find((select) => Array.from(select.options).some((option) => option.value === 'red-border'));
+    if (!preset) throw new Error('missing conditional format preset select');
+    preset.value = 'custom';
+    preset.dispatchEvent(new Event('change', { bubbles: true }));
+
+    const dxf = Array.from(document.querySelectorAll<HTMLElement>('.fc-fmtdlg__panel')).find(
+      (panel) => !panel.classList.contains('fc-conddlg__panel'),
+    );
+    const fillTab = dxf?.querySelector<HTMLButtonElement>('button[data-fc-tab="fill"]');
+    const fontTab = dxf?.querySelector<HTMLButtonElement>('button[data-fc-tab="font"]');
+    const fill = dxf?.querySelector<HTMLInputElement>('input[data-fc-color="fill"]');
+    const bold = dxf?.querySelector<HTMLInputElement>('input[data-fc-check="bold"]');
+    if (!dxf || !fillTab || !fontTab || !fill || !bold)
+      throw new Error('missing dxf format controls');
+    expect(dxf.querySelector('button[data-fc-tab="align"]')).toHaveProperty('hidden', true);
+    fillTab.click();
+    fill.value = '#ddeeff';
+    fill.dispatchEvent(new Event('input', { bubbles: true }));
+    fontTab.click();
+    bold.checked = true;
+    bold.dispatchEvent(new Event('change', { bubbles: true }));
+    dxf.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+
+    document
+      .querySelector<HTMLButtonElement>('.fc-conddlg__addrow .fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(store.getState().conditional.rules[0]).toMatchObject({
+      kind: 'cell-value',
+      apply: { fill: '#ddeeff', bold: true },
+    });
+    handle.detach();
+  });
+
+  it('selects the matching Excel style when editing a non-classic rule', () => {
+    mutators.addConditionalRule(store, {
+      kind: 'color-scale',
+      range: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 },
+      stops: ['#f8696b', '#ffeb84', '#63be7b'],
+    });
+    const handle = attachConditionalDialog({ host, store });
+    handle.open({ mode: 'edit', editIndex: 0 });
+    const style = Array.from(
+      document.querySelectorAll<HTMLSelectElement>('.fc-conddlg__form select'),
+    ).find((select) => Array.from(select.options).some((option) => option.value === 'classic'));
+    expect(style?.value).toBe('three-color-scale');
     handle.detach();
   });
 

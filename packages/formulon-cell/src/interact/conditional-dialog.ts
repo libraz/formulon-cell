@@ -1,6 +1,7 @@
 import { type History, recordConditionalRulesChange } from '../commands/history.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
+  type CellFormat,
   type ConditionalIconSet,
   type ConditionalRule,
   type ConditionalScalePoint,
@@ -25,6 +26,7 @@ import {
   type RuleKind,
 } from './conditional-dialog-spec.js';
 import { appendDialogButton, createDialogShell } from './dialog-shell.js';
+import { attachFormatDialog, type FormatDialogHandle } from './format-dialog.js';
 import { attachRangePickerButton } from './range-picker-control.js';
 
 export interface ConditionalDialogDeps {
@@ -117,7 +119,16 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   ruleStyleRow.className = 'fc-fmtdlg__row fc-conddlg__style-row';
   const styleLabel = document.createElement('span');
   styleLabel.textContent = t.styleLabel;
-  const styleSelect = makeSelect([{ value: 'classic', label: t.styleClassic }]);
+  const styleSelect = makeSelect(
+    [
+      { value: 'two-color-scale', label: t.styleTwoColorScale },
+      { value: 'three-color-scale', label: t.styleThreeColorScale },
+      { value: 'data-bar', label: t.kindDataBar },
+      { value: 'icon-set', label: t.kindIconSet },
+      { value: 'classic', label: t.styleClassic },
+    ],
+    'classic',
+  );
   ruleStyleRow.append(styleLabel, styleSelect);
   form.appendChild(ruleStyleRow);
 
@@ -219,8 +230,10 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     { id: 'red-fill', label: t.formatRedFill },
     { id: 'yellow-fill', label: t.formatYellowFill },
     { id: 'green-fill', label: t.formatGreenFill },
+    { id: 'light-red-fill', label: t.formatLightRedFill },
     { id: 'red-text', label: t.formatRedText },
-    { id: 'plain', label: t.formatPlain },
+    { id: 'red-border', label: t.formatRedBorder },
+    { id: 'custom', label: t.formatCustom },
   ];
   const cellPresetSelect = makeSelect(
     formatPresetOptions.map((o) => ({ value: o.id, label: o.label })),
@@ -656,6 +669,17 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       kind !== 'average' ||
       (averageModeSelect.value !== 'above-std-dev' && averageModeSelect.value !== 'below-std-dev');
   };
+  const syncRuleStyle = (): void => {
+    const style = styleSelect.value;
+    if (style === 'two-color-scale' || style === 'three-color-scale') {
+      kindSelect.value = 'color-scale';
+      useThreeCk.checked = style === 'three-color-scale';
+    } else if (style === 'data-bar' || style === 'icon-set') {
+      kindSelect.value = style;
+    }
+    kindRow.hidden = style !== 'classic';
+    syncSubforms();
+  };
   const syncCellValueOp = (): void => {
     const op = opSelect.value as CellValueOp;
     valueBRow.hidden = op !== 'between' && op !== 'not-between';
@@ -676,21 +700,57 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       }
     }
   };
-  const syncPresetPreview = (preview: HTMLElement, preset: FormatPreset): void => {
-    const patch = formatPresetPatch(preset);
+  let dxfFormatDialog: FormatDialogHandle | null = null;
+  const getDxfFormatDialog = (): FormatDialogHandle => {
+    if (!dxfFormatDialog) dxfFormatDialog = attachFormatDialog({ host, store, strings, history });
+    return dxfFormatDialog;
+  };
+  let cellCustomStyle: Partial<CellFormat> | null = null;
+  let sharedCustomStyle: Partial<CellFormat> | null = null;
+  const syncPresetPreview = (
+    preview: HTMLElement,
+    preset: FormatPreset,
+    customStyle: Partial<CellFormat> | null,
+  ): void => {
+    const patch = preset === 'custom' && customStyle ? customStyle : formatPresetPatch(preset);
     preview.style.color = patch.color ?? '#201f1e';
     preview.style.background = patch.fill ?? 'transparent';
   };
   const syncCellPreset = (): void => {
-    const patch = formatPresetPatch(cellPresetSelect.value as FormatPreset);
-    applyPresetPatchToConditionalApplyControls(cellValueApplyControls, patch);
-    syncPresetPreview(cellPresetPreview, cellPresetSelect.value as FormatPreset);
+    const preset = cellPresetSelect.value as FormatPreset;
+    const patch =
+      preset === 'custom' && cellCustomStyle ? cellCustomStyle : formatPresetPatch(preset);
+    if (preset === 'custom') applyPatchToConditionalApplyControls(cellValueApplyControls, patch);
+    else applyPresetPatchToConditionalApplyControls(cellValueApplyControls, patch);
+    syncPresetPreview(cellPresetPreview, preset, cellCustomStyle);
   };
   const syncSharedPreset = (): void => {
-    const patch = formatPresetPatch(sharedPresetSelect.value as FormatPreset);
-    applyPresetPatchToConditionalApplyControls(sharedApplyControls, patch);
-    syncPresetPreview(sharedPresetPreview, sharedPresetSelect.value as FormatPreset);
+    const preset = sharedPresetSelect.value as FormatPreset;
+    const patch =
+      preset === 'custom' && sharedCustomStyle ? sharedCustomStyle : formatPresetPatch(preset);
+    if (preset === 'custom') applyPatchToConditionalApplyControls(sharedApplyControls, patch);
+    else applyPresetPatchToConditionalApplyControls(sharedApplyControls, patch);
+    syncPresetPreview(sharedPresetPreview, preset, sharedCustomStyle);
   };
+  const editCustomPreset = (
+    controls: Parameters<typeof collectConditionalApplyPatch>[0],
+    customStyle: Partial<CellFormat> | null,
+    setCustomStyle: (style: Partial<CellFormat>) => void,
+    sync: () => void,
+  ): void => {
+    getDxfFormatDialog().open('number', {
+      mode: 'dxf',
+      initialFormat: { ...collectConditionalApplyPatch(controls), ...customStyle },
+      onApplyDxf: (style) => {
+        setCustomStyle(style);
+        sync();
+      },
+    });
+  };
+  const collectSharedApplyPatch = (): Partial<CellFormat> =>
+    sharedPresetSelect.value === 'custom'
+      ? { ...sharedCustomStyle, ...collectConditionalApplyPatch(sharedApplyControls) }
+      : collectConditionalApplyPatch(sharedApplyControls);
 
   let currentMode: 'manage' | 'new' | 'edit' = 'manage';
   let currentEditIndex: number | null = null;
@@ -800,6 +860,14 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
 
   const populateRuleForm = (rule: ConditionalRule): void => {
     rangeInput.value = formatRange(rule.range);
+    styleSelect.value =
+      rule.kind === 'color-scale'
+        ? rule.stops.length === 3
+          ? 'three-color-scale'
+          : 'two-color-scale'
+        : rule.kind === 'data-bar' || rule.kind === 'icon-set'
+          ? rule.kind
+          : 'classic';
     kindSelect.value = rule.kind;
     if (rule.kind === 'cell-value') {
       opSelect.value = rule.op;
@@ -864,7 +932,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     } else {
       applyPatchToConditionalApplyControls(sharedApplyControls, rule.apply);
     }
-    syncSubforms();
+    syncRuleStyle();
     syncCellValueOp();
     syncThreeStops();
     syncIconThresholds();
@@ -890,7 +958,14 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       const b = parseCellValueBoundary(valueBInput.value);
       if (a === null) return;
       if ((op === 'between' || op === 'not-between') && b === null) return;
-      const applyPatch = collectConditionalApplyPatch(cellValueApplyControls);
+      const preset = cellPresetSelect.value as FormatPreset;
+      const applyPatch =
+        preset === 'custom'
+          ? { ...cellCustomStyle, ...collectConditionalApplyPatch(cellValueApplyControls) }
+          : {
+              ...collectConditionalApplyPatch(cellValueApplyControls),
+              ...formatPresetPatch(preset),
+            };
       rule = {
         kind: 'cell-value',
         range,
@@ -943,7 +1018,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
         mode: tbModeSelect.value as 'top' | 'bottom',
         n,
         percent: tbPercentCk.checked,
-        apply: collectConditionalApplyPatch(sharedApplyControls),
+        apply: collectSharedApplyPatch(),
       };
     } else if (kind === 'average') {
       const averageMode = averageModeSelect.value as AverageMode;
@@ -954,7 +1029,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
         ...(averageMode === 'above-std-dev' || averageMode === 'below-std-dev'
           ? { stdDev: Number(averageStdDevSelect.value) as 1 | 2 | 3 }
           : {}),
-        apply: collectConditionalApplyPatch(sharedApplyControls),
+        apply: collectSharedApplyPatch(),
       };
     } else if (kind === 'formula') {
       const f = formulaInput.value.trim();
@@ -963,7 +1038,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
         kind: 'formula',
         range,
         formula: f,
-        apply: collectConditionalApplyPatch(sharedApplyControls),
+        apply: collectSharedApplyPatch(),
       };
     } else if (kind === 'text-contains') {
       const text = textContainsInput.value.trim();
@@ -978,14 +1053,14 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
           | 'begins-with'
           | 'ends-with',
         caseSensitive: caseSensitiveCk.checked,
-        apply: collectConditionalApplyPatch(sharedApplyControls),
+        apply: collectSharedApplyPatch(),
       };
     } else if (kind === 'date-occurring') {
       rule = {
         kind: 'date-occurring',
         range,
         period: datePeriodSelect.value as DatePeriod,
-        apply: collectConditionalApplyPatch(sharedApplyControls),
+        apply: collectSharedApplyPatch(),
       };
     } else if (
       kind === 'duplicates' ||
@@ -998,7 +1073,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       rule = {
         kind,
         range,
-        apply: collectConditionalApplyPatch(sharedApplyControls),
+        apply: collectSharedApplyPatch(),
       };
     }
     if (!rule) return;
@@ -1042,11 +1117,36 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   };
 
   shell.on(kindSelect, 'change', syncSubforms);
+  shell.on(styleSelect, 'change', syncRuleStyle);
   shell.on(opSelect, 'change', syncCellValueOp);
   shell.on(useThreeCk, 'change', syncThreeStops);
   shell.on(iconSetSelect, 'change', syncIconThresholds);
-  shell.on(cellPresetSelect, 'change', syncCellPreset);
-  shell.on(sharedPresetSelect, 'change', syncSharedPreset);
+  shell.on(cellPresetSelect, 'change', () => {
+    syncCellPreset();
+    if (cellPresetSelect.value === 'custom') {
+      editCustomPreset(
+        cellValueApplyControls,
+        cellCustomStyle,
+        (style) => {
+          cellCustomStyle = style;
+        },
+        syncCellPreset,
+      );
+    }
+  });
+  shell.on(sharedPresetSelect, 'change', () => {
+    syncSharedPreset();
+    if (sharedPresetSelect.value === 'custom') {
+      editCustomPreset(
+        sharedApplyControls,
+        sharedCustomStyle,
+        (style) => {
+          sharedCustomStyle = style;
+        },
+        syncSharedPreset,
+      );
+    }
+  });
   shell.on(addBtn, 'click', onAdd);
   shell.on(clearAllBtn, 'click', onClearAll);
   shell.on(closeBtn, 'click', onClose);
@@ -1087,7 +1187,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       datePeriodSelect.value = options.datePeriod ?? 'today';
       cellPresetSelect.value = 'red-fill';
       sharedPresetSelect.value = 'red-fill';
-      syncSubforms();
+      syncRuleStyle();
       syncCellValueOp();
       syncThreeStops();
       syncIconThresholds();
@@ -1117,6 +1217,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       host.focus();
     },
     detach(): void {
+      dxfFormatDialog?.detach();
       shell.dispose();
     },
   };

@@ -54,10 +54,13 @@ export interface MoreTabRefs {
 }
 
 export function createMoreTab(panel: HTMLDivElement, t: Strings['formatDialog']): MoreTabRefs {
+  const hint = document.createElement('p');
+  hint.className = 'fc-fmtdlg__more-hint';
+  hint.textContent = t.moreHint;
   const hyperlinkSection = makeSection(t.hyperlink);
   const commentSection = makeSection(t.comment);
   const validationSection = makeSection(t.validationLegend);
-  panel.append(hyperlinkSection, commentSection, validationSection);
+  panel.append(hint, hyperlinkSection, commentSection, validationSection);
 
   const hlRow = document.createElement('div');
   hlRow.className = 'fc-fmtdlg__row';

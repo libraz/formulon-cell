@@ -1,7 +1,9 @@
 import { normalizeFormatLocale } from '../format/locale.js';
 import type {
   CellAlign,
+  CellBorderStyle,
   CellBorders,
+  CellFormat,
   CellVAlign,
   CellValidation,
   FillPattern,
@@ -28,11 +30,11 @@ export type NumberCategory =
   | 'accounting'
   | 'date'
   | 'time'
-  | 'datetime'
   | 'text'
+  | 'fraction'
   | 'special'
   | 'custom';
-export type BorderStyleKey = 'thin' | 'medium' | 'thick' | 'dashed' | 'dotted' | 'double';
+export type BorderStyleKey = CellBorderStyle;
 export type SideKey = 'top' | 'right' | 'bottom' | 'left' | 'diagonalDown' | 'diagonalUp';
 
 export interface DraftState {
@@ -42,7 +44,7 @@ export interface DraftState {
   thousands: boolean;
   negativeStyle: NegativeStyle;
   currencySymbol: string;
-  /** Pattern for date/time/datetime/custom categories. */
+  /** Pattern for date/time/fraction/custom categories. */
   pattern: string;
   align: CellAlign | undefined;
   vAlign: CellVAlign | undefined;
@@ -53,7 +55,7 @@ export interface DraftState {
   textDirection: TextDirection;
   bold: boolean;
   italic: boolean;
-  underline: boolean;
+  underline: CellFormat['underline'];
   strike: boolean;
   fontFamily: string;
   fontSize: number | undefined;
@@ -99,23 +101,25 @@ export interface DraftState {
   formulaHidden: boolean;
 }
 
-export const COMMON_FONTS = [
-  'system-ui',
-  'Helvetica',
-  'Arial',
-  'Georgia',
-  'Times New Roman',
-  'Courier New',
-  'monospace',
-];
 export const CURRENCY_SYMBOLS = ['$', '¥', '€', '£'];
+export const FRACTION_PATTERNS = [
+  '# ?/?',
+  '# ??/??',
+  '# ???/???',
+  '# ?/2',
+  '# ?/4',
+  '# ?/8',
+  '# ?/16',
+  '# ?/10',
+  '# ?/100',
+] as const;
 
 export const defaultCurrencySymbolFor = (locale: string): string =>
   normalizeFormatLocale(locale).startsWith('ja') ? '¥' : '$';
 
 export const patternPresetsFor = (
   locale: string,
-): Record<'date' | 'time' | 'datetime' | 'special' | 'custom', string[]> => {
+): Record<'date' | 'time' | 'fraction' | 'special' | 'custom', string[]> => {
   if (normalizeFormatLocale(locale).startsWith('ja')) {
     return {
       date: [
@@ -126,7 +130,7 @@ export const patternPresetsFor = (
         'yyyy"年"m"月"d"日" ddd',
       ],
       time: ['HH:MM', 'HH:MM:SS', 'h:MM AM/PM', 'h:MM:SS AM/PM'],
-      datetime: ['yyyy"年"m"月"d"日" HH:MM', 'yyyy/m/d HH:MM', 'yyyy-mm-dd HH:MM'],
+      fraction: [...FRACTION_PATTERNS],
       special: [
         '000',
         '[<=9999999]000-0000;000-0000',
@@ -142,7 +146,7 @@ export const patternPresetsFor = (
   return {
     date: ['m/d/yyyy', 'mmmm d, yyyy', 'd-mmm-yy', 'yyyy-mm-dd', 'dddd, mmmm d, yyyy'],
     time: ['h:MM AM/PM', 'h:MM:SS AM/PM', 'HH:MM', 'HH:MM:SS'],
-    datetime: ['m/d/yyyy h:MM AM/PM', 'mmmm d, yyyy h:MM AM/PM', 'yyyy-mm-dd HH:MM'],
+    fraction: [...FRACTION_PATTERNS],
     special: ['00000', '00000-0000', '[<=9999999]000-0000;(000) 000-0000', '000-00-0000'],
     custom: ['0.00', '#,##0', '#,##0.00', '0%', '0.00%', '$#,##0;[Red]-$#,##0', '0.00E+00'],
   };

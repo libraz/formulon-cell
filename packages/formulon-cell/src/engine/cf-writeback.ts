@@ -225,7 +225,13 @@ function hasFontDxfFields(apply: Partial<CellFormat>): boolean {
 function dxfRecordFromApply(apply: Partial<CellFormat>): DxfRecord | null {
   const dxf: DxfRecord = {};
   if (hasFontDxfFields(apply)) dxf.font = fontRecordFromFormat(apply);
-  if (apply.fill !== undefined) dxf.fill = fillRecordFromFormat(apply);
+  if (
+    apply.fill !== undefined ||
+    apply.fillPattern !== undefined ||
+    apply.fillPatternColor !== undefined
+  ) {
+    dxf.fill = fillRecordFromFormat(apply);
+  }
   if (apply.borders !== undefined) dxf.border = borderRecordFromFormat(apply);
   const formatCode = numFmtToFormatCode(apply.numFmt);
   if (formatCode) dxf.numFmt = { numFmtId: 0, formatCode };

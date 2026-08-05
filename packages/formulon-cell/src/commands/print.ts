@@ -203,20 +203,46 @@ const cellDisplay = (
 
 const fillPatternCss = (pattern: CellFormat['fillPattern'], color = '#000000'): string => {
   switch (pattern) {
+    case 'gray0625':
+      return `radial-gradient(${color} 0.4px, transparent 0.4px)`;
     case 'gray125':
       return `radial-gradient(${color} 0.6px, transparent 0.6px)`;
     case 'gray25':
       return `radial-gradient(${color} 1px, transparent 1px)`;
     case 'gray50':
       return `repeating-linear-gradient(45deg, ${color} 0 2px, transparent 2px 4px)`;
+    case 'gray75':
+      return `repeating-linear-gradient(45deg, ${color} 0 3px, transparent 3px 4px)`;
     case 'horizontal':
+    case 'darkHorizontal':
       return `repeating-linear-gradient(0deg, ${color} 0 1px, transparent 1px 4px)`;
+    case 'lightHorizontal':
+      return `repeating-linear-gradient(0deg, ${color} 0 1px, transparent 1px 7px)`;
     case 'vertical':
+    case 'darkVertical':
       return `repeating-linear-gradient(90deg, ${color} 0 1px, transparent 1px 4px)`;
+    case 'lightVertical':
+      return `repeating-linear-gradient(90deg, ${color} 0 1px, transparent 1px 7px)`;
     case 'diagonalDown':
+    case 'darkDown':
       return `repeating-linear-gradient(45deg, ${color} 0 1px, transparent 1px 5px)`;
     case 'diagonalUp':
+    case 'darkUp':
       return `repeating-linear-gradient(135deg, ${color} 0 1px, transparent 1px 5px)`;
+    case 'lightDown':
+      return `repeating-linear-gradient(45deg, ${color} 0 1px, transparent 1px 9px)`;
+    case 'lightUp':
+      return `repeating-linear-gradient(135deg, ${color} 0 1px, transparent 1px 9px)`;
+    case 'darkGrid':
+    case 'lightGrid': {
+      const step = pattern === 'darkGrid' ? 4 : 7;
+      return `repeating-linear-gradient(0deg, ${color} 0 1px, transparent 1px ${step}px), repeating-linear-gradient(90deg, ${color} 0 1px, transparent 1px ${step}px)`;
+    }
+    case 'darkTrellis':
+    case 'lightTrellis': {
+      const step = pattern === 'darkTrellis' ? 6 : 9;
+      return `repeating-linear-gradient(45deg, ${color} 0 1px, transparent 1px ${step}px), repeating-linear-gradient(135deg, ${color} 0 1px, transparent 1px ${step}px)`;
+    }
     default:
       return '';
   }

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { dictionaries } from '../../../src/i18n/strings.js';
 import { createFormatDialogView } from '../../../src/interact/format-dialog-view.js';
+import { FONT_FAMILIES, FONT_SIZES } from '../../../src/toolbar/ribbon-model.js';
 
 const en = dictionaries.en;
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -65,7 +66,8 @@ describe('interact/format-dialog-view', () => {
     const view = createFormatDialogView({ host, strings: en, t: en.formatDialog });
     expect(view.boldCk.input.dataset.fcCheck).toBe('bold');
     expect(view.italicCk.input.dataset.fcCheck).toBe('italic');
-    expect(view.underlineCk.input.dataset.fcCheck).toBe('underline');
+    expect(view.underlineSelect.dataset.fcInput).toBe('underline');
+    expect(view.underlineSelect.options).toHaveLength(5);
     expect(view.strikeCk.input.dataset.fcCheck).toBe('strike');
     expect(view.wrapCk.input.dataset.fcCheck).toBe('wrap');
     expect(view.lockedCk.input.dataset.fcCheck).toBe('locked');
@@ -80,17 +82,52 @@ describe('interact/format-dialog-view', () => {
     expect(Array.from(datalist?.options ?? [], (option) => option.value)).toContain('Arial');
   });
 
+  it('uses the ribbon font collections and Japanese locale filtering in the Font tab', () => {
+    const view = createFormatDialogView({
+      host,
+      strings: en,
+      t: en.formatDialog,
+      fontLocale: 'ja',
+    });
+    const datalist = document.getElementById(
+      view.familyInput.getAttribute('list') ?? '',
+    ) as HTMLDataListElement;
+    expect(Array.from(datalist.options, (option) => option.value)).toEqual(
+      expect.arrayContaining(FONT_FAMILIES as unknown as string[]),
+    );
+    expect(
+      Array.from(
+        view.panel.querySelectorAll<HTMLButtonElement>('button[data-fc-font-size]'),
+        (button) => Number(button.dataset.fcFontSize),
+      ),
+    ).toEqual([...FONT_SIZES]);
+  });
+
   it('appends the overlay to document.body so it escapes `.fc-host` contain:strict / isolation:isolate', () => {
     const view = createFormatDialogView({ host, strings: en, t: en.formatDialog });
     expect(document.body.contains(view.overlay)).toBe(true);
     expect(host.contains(view.overlay)).toBe(false);
   });
 
-  it('renders 6 border-style buttons with the right data attribute', () => {
+  it('renders all 13 border-style buttons with the right data attribute', () => {
     const view = createFormatDialogView({ host, strings: en, t: en.formatDialog });
-    expect(view.borderStyleButtons.size).toBe(6);
+    expect(view.borderStyleButtons.size).toBe(13);
     const ids = Array.from(view.borderStyleButtons.keys()).sort();
-    expect(ids).toEqual(['dashed', 'dotted', 'double', 'medium', 'thick', 'thin']);
+    expect(ids).toEqual([
+      'dashDot',
+      'dashDotDot',
+      'dashed',
+      'dotted',
+      'double',
+      'hair',
+      'medium',
+      'mediumDashDot',
+      'mediumDashDotDot',
+      'mediumDashed',
+      'slantDashDot',
+      'thick',
+      'thin',
+    ]);
     for (const [id, btn] of view.borderStyleButtons.entries()) {
       expect(btn.dataset.borderStyle).toBe(id);
       expect(btn.getAttribute('aria-pressed')).toBe('false');

@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  activeDraftSide,
   computeDialogNumFmt,
   computeDialogValidation,
   explicitDraftBorders,
   hydrateDraftFromFormat,
   makeEmptyDraft,
-  restyleDraftBorders,
   setDraftSide,
 } from '../../../src/interact/format-dialog-state.js';
 import type { CellFormat } from '../../../src/store/store.js';
@@ -46,6 +44,24 @@ describe('interact/format-dialog-state', () => {
       expect(draft.pattern).toBe('yyyy-mm-dd');
     });
 
+    it('maps known fraction custom formats into the fraction category', () => {
+      const draft = makeEmptyDraft('en');
+      hydrateDraftFromFormat(draft, { numFmt: { kind: 'custom', pattern: '# ?/16' } }, 'en');
+      expect(draft.numberCategory).toBe('fraction');
+      expect(draft.pattern).toBe('# ?/16');
+    });
+
+    it('maps combined datetime formats into Custom without changing the pattern', () => {
+      const draft = makeEmptyDraft('en');
+      hydrateDraftFromFormat(
+        draft,
+        { numFmt: { kind: 'datetime', pattern: 'yyyy-mm-dd HH:MM' } },
+        'en',
+      );
+      expect(draft.numberCategory).toBe('custom');
+      expect(draft.pattern).toBe('yyyy-mm-dd HH:MM');
+    });
+
     it('falls back to general when no numFmt is present', () => {
       const draft = makeEmptyDraft('en');
       hydrateDraftFromFormat(draft, {}, 'en');
@@ -53,7 +69,7 @@ describe('interact/format-dialog-state', () => {
       expect(draft.numFmt).toEqual({ kind: 'general' });
     });
 
-    it('preserves font flags as booleans', () => {
+    it('preserves font flags and normalizes legacy underline to single', () => {
       const draft = makeEmptyDraft('en');
       hydrateDraftFromFormat(
         draft,
@@ -62,23 +78,43 @@ describe('interact/format-dialog-state', () => {
       );
       expect(draft.bold).toBe(true);
       expect(draft.italic).toBe(false);
-      expect(draft.underline).toBe(true);
+      expect(draft.underline).toBe('single');
       expect(draft.strike).toBe(false);
     });
 
-    it('inherits borderStyle / borderColor from the first border side', () => {
+    it('preserves the full underline style', () => {
+      const draft = makeEmptyDraft('en');
+      hydrateDraftFromFormat(draft, { underline: 'doubleAccounting' }, 'en');
+      expect(draft.underline).toBe('doubleAccounting');
+    });
+
+    it.each([
+      'thin',
+      'medium',
+      'thick',
+      'dashed',
+      'dotted',
+      'double',
+      'hair',
+      'mediumDashed',
+      'dashDot',
+      'mediumDashDot',
+      'dashDotDot',
+      'mediumDashDotDot',
+      'slantDashDot',
+    ] as const)('inherits %s borderStyle without collapsing it', (style) => {
       const draft = makeEmptyDraft('en');
       hydrateDraftFromFormat(
         draft,
         {
           borders: {
-            top: { style: 'thick', color: '#aabbcc' },
+            top: { style, color: '#aabbcc' },
             right: { style: 'thin' },
           },
         },
         'en',
       );
-      expect(draft.borderStyle).toBe('thick');
+      expect(draft.borderStyle).toBe(style);
       expect(draft.borderColor).toBe('#aabbcc');
     });
 
@@ -162,13 +198,13 @@ describe('interact/format-dialog-state', () => {
       expect(off.top).toBe(false);
     });
 
-    it('restyleDraftBorders applies the current active style to already-set sides', () => {
+    it('uses one shared style for both diagonal directions', () => {
       const draft = makeEmptyDraft('en');
-      draft.borders = { top: { style: 'thin' } as never, bottom: false };
-      draft.borderStyle = 'thick';
-      const next = restyleDraftBorders(draft);
-      expect(next.top).toEqual(activeDraftSide(draft));
-      expect(next.bottom).toBeUndefined();
+      draft.borderStyle = 'double';
+      draft.borderColor = '#ff0000';
+      const both = setDraftSide(draft, 'diagonalDown', true);
+      expect(both.diagonalDown).toEqual({ style: 'double', color: '#ff0000' });
+      expect(both.diagonalUp).toEqual({ style: 'double', color: '#ff0000' });
     });
 
     it('explicitDraftBorders surfaces all 6 sides with false fallbacks', () => {
@@ -219,6 +255,16 @@ describe('interact/format-dialog-state', () => {
       expect(computeDialogNumFmt(draft, fallback)).toEqual({
         kind: 'custom',
         pattern: '#,##0.00',
+      });
+    });
+
+    it('emits the selected fraction preset as a custom number format', () => {
+      const draft = makeEmptyDraft('en');
+      draft.numberCategory = 'fraction';
+      draft.pattern = '# ??/??';
+      expect(computeDialogNumFmt(draft, fallback)).toEqual({
+        kind: 'custom',
+        pattern: '# ??/??',
       });
     });
   });

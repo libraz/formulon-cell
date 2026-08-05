@@ -268,11 +268,22 @@ export function paintCellFill({ ctx, bounds, format }: CellPaintCtx): void {
   ctx.fillStyle = color;
   ctx.lineWidth = 1;
   switch (pattern) {
+    case 'gray0625':
     case 'gray125':
     case 'gray25':
-    case 'gray50': {
-      const step = pattern === 'gray125' ? 6 : pattern === 'gray25' ? 4 : 3;
-      const size = pattern === 'gray50' ? 1.5 : 1;
+    case 'gray50':
+    case 'gray75': {
+      const step =
+        pattern === 'gray0625'
+          ? 8
+          : pattern === 'gray125'
+            ? 6
+            : pattern === 'gray25'
+              ? 4
+              : pattern === 'gray50'
+                ? 3
+                : 2;
+      const size = pattern === 'gray50' ? 1.5 : pattern === 'gray75' ? 2 : 1;
       for (let y = bounds.y + 2; y < bounds.y + bounds.h; y += step) {
         for (let x = bounds.x + 2; x < bounds.x + bounds.w; x += step) {
           ctx.fillRect(x, y, size, size);
@@ -281,29 +292,73 @@ export function paintCellFill({ ctx, bounds, format }: CellPaintCtx): void {
       break;
     }
     case 'horizontal':
-      for (let y = bounds.y + 3; y < bounds.y + bounds.h; y += 4) {
+    case 'darkHorizontal':
+    case 'lightHorizontal': {
+      const step = pattern === 'lightHorizontal' ? 7 : 4;
+      for (let y = bounds.y + step - 1; y < bounds.y + bounds.h; y += step) {
         ctx.beginPath();
         ctx.moveTo(bounds.x, y);
         ctx.lineTo(bounds.x + bounds.w, y);
         ctx.stroke();
       }
       break;
+    }
     case 'vertical':
-      for (let x = bounds.x + 3; x < bounds.x + bounds.w; x += 4) {
+    case 'darkVertical':
+    case 'lightVertical': {
+      const step = pattern === 'lightVertical' ? 7 : 4;
+      for (let x = bounds.x + step - 1; x < bounds.x + bounds.w; x += step) {
         ctx.beginPath();
         ctx.moveTo(x, bounds.y);
         ctx.lineTo(x, bounds.y + bounds.h);
         ctx.stroke();
       }
       break;
+    }
     case 'diagonalDown':
-    case 'diagonalUp': {
-      const direction = pattern === 'diagonalDown' ? 1 : -1;
-      for (let x = bounds.x - bounds.h; x < bounds.x + bounds.w; x += 6) {
+    case 'diagonalUp':
+    case 'darkDown':
+    case 'darkUp':
+    case 'lightDown':
+    case 'lightUp': {
+      const direction =
+        pattern === 'diagonalDown' || pattern === 'darkDown' || pattern === 'lightDown' ? 1 : -1;
+      const step = pattern === 'lightDown' || pattern === 'lightUp' ? 9 : 6;
+      for (let x = bounds.x - bounds.h; x < bounds.x + bounds.w; x += step) {
         ctx.beginPath();
         ctx.moveTo(x, direction > 0 ? bounds.y : bounds.y + bounds.h);
         ctx.lineTo(x + bounds.h, direction > 0 ? bounds.y + bounds.h : bounds.y);
         ctx.stroke();
+      }
+      break;
+    }
+    case 'darkGrid':
+    case 'lightGrid': {
+      const step = pattern === 'lightGrid' ? 7 : 4;
+      for (let y = bounds.y + step - 1; y < bounds.y + bounds.h; y += step) {
+        ctx.beginPath();
+        ctx.moveTo(bounds.x, y);
+        ctx.lineTo(bounds.x + bounds.w, y);
+        ctx.stroke();
+      }
+      for (let x = bounds.x + step - 1; x < bounds.x + bounds.w; x += step) {
+        ctx.beginPath();
+        ctx.moveTo(x, bounds.y);
+        ctx.lineTo(x, bounds.y + bounds.h);
+        ctx.stroke();
+      }
+      break;
+    }
+    case 'darkTrellis':
+    case 'lightTrellis': {
+      const step = pattern === 'lightTrellis' ? 9 : 6;
+      for (const direction of [1, -1]) {
+        for (let x = bounds.x - bounds.h; x < bounds.x + bounds.w; x += step) {
+          ctx.beginPath();
+          ctx.moveTo(x, direction > 0 ? bounds.y : bounds.y + bounds.h);
+          ctx.lineTo(x + bounds.h, direction > 0 ? bounds.y + bounds.h : bounds.y);
+          ctx.stroke();
+        }
       }
       break;
     }

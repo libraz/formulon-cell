@@ -18,7 +18,7 @@ import {
   formatCodeToNumFmt,
   numFmtToFormatCode,
 } from './format-writeback.js';
-import type { CellXf } from './types.js';
+import type { CellXf, FontRecord } from './types.js';
 import { syncValidationsToEngine } from './validation-sync.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -127,6 +127,7 @@ export function hydrateCellFormatsFromEngine(
   sheet: number,
 ): void {
   if (!wb.capabilities.cellFormatting) return;
+  const workbookDefaultFont = wb.getFontRecord(0);
   const updates: Array<{ key: string; patch: Partial<CellFormat> }> = [];
   const physicalCells = wb.physicalCells ? wb.physicalCells(sheet) : wb.cells(sheet);
   for (const c of physicalCells) {
@@ -134,7 +135,7 @@ export function hydrateCellFormatsFromEngine(
     if (xfIndex === null || xfIndex <= 0) continue;
     const xf = wb.getCellXf(xfIndex);
     if (!xf) continue;
-    const patch = cellFormatFromXf(wb, xf);
+    const patch = cellFormatFromXf(wb, xf, workbookDefaultFont);
     if (Object.keys(patch).length > 0) {
       updates.push({ key: addrKey(c.addr), patch });
     }
@@ -206,10 +207,14 @@ function pivotFormatPatch(
   return patch;
 }
 
-export function cellFormatFromXf(wb: WorkbookHandle, xf: CellXf): Partial<CellFormat> {
+export function cellFormatFromXf(
+  wb: WorkbookHandle,
+  xf: CellXf,
+  workbookDefaultFont: Pick<FontRecord, 'name' | 'size'> | null = null,
+): Partial<CellFormat> {
   const patch: Partial<CellFormat> = {};
   const font = wb.getFontRecord(xf.fontIndex);
-  if (font) Object.assign(patch, fontRecordToFormat(font));
+  if (font) Object.assign(patch, fontRecordToFormat(font, workbookDefaultFont));
   const fill = wb.getFillRecord(xf.fillIndex);
   if (fill) Object.assign(patch, fillRecordToFormat(fill));
   const border = wb.getBorderRecord(xf.borderIndex);
@@ -224,8 +229,14 @@ export function cellFormatFromXf(wb: WorkbookHandle, xf: CellXf): Partial<CellFo
   if (xf.horizontalAlign === 1) patch.align = 'left';
   else if (xf.horizontalAlign === 2) patch.align = 'center';
   else if (xf.horizontalAlign === 3) patch.align = 'right';
+  else if (xf.horizontalAlign === 4) patch.align = 'fill';
+  else if (xf.horizontalAlign === 5) patch.align = 'justify';
+  else if (xf.horizontalAlign === 6) patch.align = 'centerContinuous';
+  else if (xf.horizontalAlign === 7) patch.align = 'distributed';
   if (xf.verticalAlign === 0) patch.vAlign = 'top';
   else if (xf.verticalAlign === 1) patch.vAlign = 'middle';
+  else if (xf.verticalAlign === 3) patch.vAlign = 'justify';
+  else if (xf.verticalAlign === 4) patch.vAlign = 'distributed';
   // the desktop default vertical alignment is bottom; do not surface it.
   if (xf.wrapText) patch.wrap = true;
   return patch;

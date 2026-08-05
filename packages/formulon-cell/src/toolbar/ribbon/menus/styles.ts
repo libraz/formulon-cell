@@ -18,6 +18,7 @@ import {
   type ToolbarText,
   tableStyleSwatch,
 } from '../../../index.js';
+import type { CellFormat } from '../../../store/types.js';
 
 import {
   createMenu,
@@ -42,7 +43,7 @@ export interface StylesMenuDeps {
     format: {
       bold?: boolean;
       italic?: boolean;
-      underline?: boolean;
+      underline?: CellFormat['underline'];
       color?: string;
       fill?: string;
       fontSize?: number;
@@ -192,7 +193,7 @@ export const createStylesMenuFactories = (deps: StylesMenuDeps): StylesMenuFacto
     format: {
       bold?: boolean;
       italic?: boolean;
-      underline?: boolean;
+      underline?: CellFormat['underline'];
       color?: string;
       fill?: string;
       fontSize?: number;

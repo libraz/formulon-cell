@@ -162,6 +162,27 @@ describe('engine/cell-format-sync — roundtrip', () => {
     expect(store.getState().format.formats.get(key)?.fill).toBe('#ffff00');
   });
 
+  it('fill: pattern foreground and background colours round-trip', () => {
+    const { wb } = makeEngine();
+    const store = createSpreadsheetStore();
+    const key = addrKey({ sheet: 0, row: 0, col: 0 });
+    const original: CellFormat = {
+      fill: '#abcdef',
+      fillPattern: 'diagonalDown',
+      fillPatternColor: '#123456',
+    };
+    store.setState((s) => ({ ...s, format: { ...s.format, formats: new Map([[key, original]]) } }));
+
+    syncCellFormatsToEngine(wb, store, 0);
+    store.setState((s) => ({ ...s, format: { ...s.format, formats: new Map() } }));
+    hydrateCellFormatsFromEngine(wb, store, 0);
+
+    expect(store.getState().format.formats.get(key)).toMatchObject({
+      ...original,
+      fillPattern: 'darkDown',
+    });
+  });
+
   it('alignment: horizontal/vertical/wrap round-trip', () => {
     const { wb } = makeEngine();
     const store = createSpreadsheetStore();
@@ -181,6 +202,62 @@ describe('engine/cell-format-sync — roundtrip', () => {
     expect(back?.align).toBe('center');
     expect(back?.vAlign).toBe('middle');
     expect(back?.wrap).toBe(true);
+  });
+
+  it.each(
+    (
+      ['left', 'center', 'right', 'fill', 'justify', 'centerContinuous', 'distributed'] as const
+    ).flatMap((align) =>
+      (['top', 'middle', 'bottom', 'justify', 'distributed'] as const).map(
+        (vAlign) => [align, vAlign] as const,
+      ),
+    ),
+  )('alignment: %s/%s survives push → hydrate', (align, vAlign) => {
+    const { wb } = makeEngine();
+    const store = createSpreadsheetStore();
+    const key = addrKey({ sheet: 0, row: 0, col: 0 });
+    store.setState((s) => ({
+      ...s,
+      format: { ...s.format, formats: new Map([[key, { align, vAlign } as CellFormat]]) },
+    }));
+
+    syncCellFormatsToEngine(wb, store, 0);
+    store.setState((s) => ({ ...s, format: { ...s.format, formats: new Map() } }));
+    hydrateCellFormatsFromEngine(wb, store, 0);
+
+    const back = store.getState().format.formats.get(key);
+    expect(back?.align).toBe(align);
+    expect(back?.vAlign ?? 'bottom').toBe(vAlign);
+  });
+
+  it.each([
+    'parens',
+    'red',
+    'red-parens',
+  ] as const)('numFmt: fixed negative style %s survives push → hydrate', (negativeStyle) => {
+    const { wb } = makeEngine();
+    const store = createSpreadsheetStore();
+    const key = addrKey({ sheet: 0, row: 0, col: 0 });
+    store.setState((s) => ({
+      ...s,
+      format: {
+        ...s.format,
+        formats: new Map([
+          [
+            key,
+            {
+              numFmt: { kind: 'fixed', decimals: 2, thousands: true, negativeStyle },
+            } as CellFormat,
+          ],
+        ]),
+      },
+    }));
+
+    syncCellFormatsToEngine(wb, store, 0);
+    store.setState((s) => ({ ...s, format: { ...s.format, formats: new Map() } }));
+    hydrateCellFormatsFromEngine(wb, store, 0);
+
+    expect(store.getState().format.formats.get(key)?.numFmt).toMatchObject({ negativeStyle });
   });
 
   it('numFmt: currency(2) survives roundtrip', () => {

@@ -1,7 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
+import {
+  hydrateCellFormatsFromEngine,
+  syncCellFormatsToEngine,
+} from '../../../src/engine/cell-format-sync.js';
+import { syncConditionalRulesToEngine } from '../../../src/engine/cf-writeback.js';
 import { PivotAggregation, PivotReportLayout } from '../../../src/engine/types.js';
-import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { formatPresetPatch } from '../../../src/interact/conditional-dialog-spec.js';
+import {
+  type CellAlign,
+  type CellFormat,
+  type CellVAlign,
+  type ConditionalRule,
+  createSpreadsheetStore,
+  type FillPattern,
+  type NegativeStyle,
+  type UnderlineStyle,
+} from '../../../src/store/store.js';
 
 const canLoadWasm = (): boolean =>
   typeof WebAssembly !== 'undefined' && typeof SharedArrayBuffer !== 'undefined';
@@ -34,6 +50,34 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
         });
       } finally {
         cleared.dispose();
+      }
+    } finally {
+      first.dispose();
+    }
+  });
+
+  it('round-trips sheet display flags through the real engine', async () => {
+    const first = await WorkbookHandle.createDefault();
+
+    try {
+      expect(first.isStub).toBe(false);
+      if (!first.capabilities.sheetViewFlags) return;
+
+      expect(first.setSheetShowGridLines(0, false)).toBe(true);
+      expect(first.setSheetShowRowColHeaders(0, false)).toBe(true);
+      expect(first.setSheetShowZeros(0, false)).toBe(true);
+      expect(first.setSheetRightToLeft(0, true)).toBe(true);
+
+      const reloaded = await WorkbookHandle.loadBytes(first.save());
+      try {
+        expect(reloaded.getSheetView(0)).toMatchObject({
+          showGridLines: false,
+          showRowColHeaders: false,
+          showZeros: false,
+          rightToLeft: true,
+        });
+      } finally {
+        reloaded.dispose();
       }
     } finally {
       first.dispose();
@@ -220,6 +264,133 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
           verticalAlign: 1,
           wrapText: true,
         });
+      } finally {
+        reloaded.dispose();
+      }
+    } finally {
+      first.dispose();
+    }
+  });
+
+  it('preserves extended alignment, negative styles, and pattern fills through real xlsx', async () => {
+    const first = await WorkbookHandle.createDefault();
+
+    try {
+      expect(first.isStub).toBe(false);
+      if (!first.capabilities.cellFormatting) return;
+
+      const source = createSpreadsheetStore();
+      const formats = new Map<string, CellFormat>();
+      const horizontal: CellAlign[] = [
+        'left',
+        'center',
+        'right',
+        'fill',
+        'justify',
+        'centerContinuous',
+        'distributed',
+      ];
+      const vertical: CellVAlign[] = ['top', 'middle', 'bottom', 'justify', 'distributed'];
+      for (const [row, align] of horizontal.entries()) {
+        for (const [col, vAlign] of vertical.entries()) {
+          first.setText({ sheet: 0, row, col }, `${align}/${vAlign}`);
+          formats.set(addrKey({ sheet: 0, row, col }), { align, vAlign });
+        }
+      }
+
+      const negativeStyles: NegativeStyle[] = ['minus', 'parens', 'red', 'red-parens'];
+      for (const [offset, negativeStyle] of negativeStyles.entries()) {
+        const row = 10 + offset;
+        first.setNumber({ sheet: 0, row, col: 0 }, -1234.5);
+        formats.set(addrKey({ sheet: 0, row, col: 0 }), {
+          numFmt: { kind: 'fixed', decimals: 2, thousands: true, negativeStyle },
+        });
+        first.setNumber({ sheet: 0, row, col: 1 }, -1234.5);
+        formats.set(addrKey({ sheet: 0, row, col: 1 }), {
+          numFmt: { kind: 'currency', decimals: 2, symbol: '¥', negativeStyle },
+        });
+      }
+
+      const patterns: FillPattern[] = [
+        'gray50',
+        'gray75',
+        'gray25',
+        'darkHorizontal',
+        'darkVertical',
+        'darkDown',
+        'darkUp',
+        'darkGrid',
+        'darkTrellis',
+        'lightHorizontal',
+        'lightVertical',
+        'lightDown',
+        'lightUp',
+        'lightGrid',
+        'lightTrellis',
+        'gray125',
+        'gray0625',
+      ];
+      for (const [col, fillPattern] of patterns.entries()) {
+        first.setText({ sheet: 0, row: 20, col }, fillPattern);
+        formats.set(addrKey({ sheet: 0, row: 20, col }), {
+          fill: '#abcdef',
+          fillPattern,
+          fillPatternColor: '#123456',
+        });
+      }
+
+      const underlines: UnderlineStyle[] = [
+        'single',
+        'double',
+        'singleAccounting',
+        'doubleAccounting',
+      ];
+      for (const [col, underline] of underlines.entries()) {
+        first.setText({ sheet: 0, row: 21, col }, underline);
+        formats.set(addrKey({ sheet: 0, row: 21, col }), { underline });
+      }
+
+      source.setState((state) => ({
+        ...state,
+        format: { ...state.format, formats },
+      }));
+      syncCellFormatsToEngine(first, source, 0);
+
+      const bytes = first.save();
+      expect(bytes.length).toBeGreaterThan(0);
+
+      const reloaded = await WorkbookHandle.loadBytes(bytes);
+      try {
+        const target = createSpreadsheetStore();
+        hydrateCellFormatsFromEngine(reloaded, target, 0);
+        const roundTripped = target.getState().format.formats;
+
+        for (const [row, align] of horizontal.entries()) {
+          for (const [col, vAlign] of vertical.entries()) {
+            const format = roundTripped.get(addrKey({ sheet: 0, row, col }));
+            expect(format?.align).toBe(align);
+            expect(format?.vAlign ?? 'bottom').toBe(vAlign);
+          }
+        }
+        for (const [offset, negativeStyle] of negativeStyles.entries()) {
+          for (const col of [0, 1]) {
+            const numFmt = roundTripped.get(addrKey({ sheet: 0, row: 10 + offset, col }))?.numFmt;
+            expect(numFmt?.kind).toBe(col === 0 ? 'fixed' : 'currency');
+            if (numFmt?.kind === 'fixed' || numFmt?.kind === 'currency') {
+              expect(numFmt.negativeStyle ?? 'minus').toBe(negativeStyle);
+            }
+          }
+        }
+        for (const [col, fillPattern] of patterns.entries()) {
+          expect(roundTripped.get(addrKey({ sheet: 0, row: 20, col }))).toMatchObject({
+            fill: '#abcdef',
+            fillPattern,
+            fillPatternColor: '#123456',
+          });
+        }
+        for (const [col, underline] of underlines.entries()) {
+          expect(roundTripped.get(addrKey({ sheet: 0, row: 21, col }))?.underline).toBe(underline);
+        }
       } finally {
         reloaded.dispose();
       }
@@ -416,6 +587,66 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
             ),
           ).toBe(true);
         }
+      } finally {
+        reloaded.dispose();
+      }
+    } finally {
+      first.dispose();
+    }
+  });
+
+  it('round-trips every classic conditional-format preset dxf through the real engine', async () => {
+    const first = await WorkbookHandle.createDefault();
+    try {
+      expect(first.isStub).toBe(false);
+      if (!first.capabilities.conditionalFormatMutate || !first.capabilities.conditionalFormatDxf)
+        return;
+
+      const presets = [
+        'red-fill',
+        'yellow-fill',
+        'green-fill',
+        'light-red-fill',
+        'red-text',
+        'red-border',
+      ] as const;
+      const rules: ConditionalRule[] = presets.map((preset, row) => ({
+        kind: 'cell-value',
+        range: { sheet: 0, r0: row, c0: 0, r1: row, c1: 0 },
+        op: '>',
+        a: row,
+        apply: formatPresetPatch(preset),
+      }));
+      rules.push({
+        kind: 'cell-value',
+        range: { sheet: 0, r0: presets.length, c0: 0, r1: presets.length, c1: 0 },
+        op: '>',
+        a: presets.length,
+        apply: { numFmt: { kind: 'percent', decimals: 0 }, bold: true },
+      });
+
+      expect(syncConditionalRulesToEngine(first, rules, 0)).toEqual({ written: 7, skipped: 0 });
+      const reloaded = await WorkbookHandle.loadBytes(first.save());
+      try {
+        const formats = reloaded.getConditionalFormats(0);
+        expect(formats).toHaveLength(7);
+        const dxfs = formats.map((format) => reloaded.getDxf(format.dxfId ?? -1));
+        expect(dxfs[0]).toMatchObject({
+          fill: { fgArgb: 0xffffc7ce },
+          font: { colorArgb: 0xff9c0006 },
+        });
+        expect(dxfs[1]).toMatchObject({
+          fill: { fgArgb: 0xffffeb9c },
+          font: { colorArgb: 0xff9c6500 },
+        });
+        expect(dxfs[2]).toMatchObject({
+          fill: { fgArgb: 0xffc6efce },
+          font: { colorArgb: 0xff006100 },
+        });
+        expect(dxfs[3]).toMatchObject({ fill: { fgArgb: 0xffffc7ce } });
+        expect(dxfs[4]).toMatchObject({ font: { colorArgb: 0xffc00000 } });
+        expect(dxfs[5]).toMatchObject({ border: { top: { style: 1, colorArgb: 0xffff0000 } } });
+        expect(dxfs[6]).toMatchObject({ numFmt: { formatCode: '0%' }, font: { bold: true } });
       } finally {
         reloaded.dispose();
       }

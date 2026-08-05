@@ -84,10 +84,12 @@ function makeTextSpy(): {
   fonts: string[];
   fills: Array<{ text: string; x: number; y: number; font: string }>;
   directions: string[];
+  strokeCount: () => number;
 } {
   const fonts: string[] = [];
   const fills: Array<{ text: string; x: number; y: number; font: string }> = [];
   const directions: string[] = [];
+  let strokes = 0;
   let font = '';
   let direction = 'inherit';
   const ctx = {
@@ -115,7 +117,9 @@ function makeTextSpy(): {
     clip(): void {},
     moveTo(): void {},
     lineTo(): void {},
-    stroke(): void {},
+    stroke(): void {
+      strokes += 1;
+    },
     measureText(): TextMetrics {
       const bold = font.startsWith('700 ');
       return {
@@ -128,7 +132,7 @@ function makeTextSpy(): {
       fills.push({ text, x, y, font });
     },
   } as unknown as CanvasRenderingContext2D;
-  return { ctx, fonts, fills, directions };
+  return { ctx, fonts, fills, directions, strokeCount: () => strokes };
 }
 
 const theme = (over: Partial<ResolvedTheme> = {}): ResolvedTheme =>
@@ -321,6 +325,22 @@ describe('paintCellText font strictness', () => {
     });
 
     expect(spy.fonts.at(-1)).toBe('400 13px Aptos');
+  });
+
+  it('suppresses numeric zero text when the sheet hides zero values', () => {
+    const spy = makeTextSpy();
+    paintCellText({
+      ctx: spy.ctx,
+      bounds: { x: 0, y: 0, w: 80, h: 20 },
+      theme: theme({ textCell: 13 }),
+      value: { kind: 'number', value: 0 },
+      formula: null,
+      isActive: false,
+      isInRange: false,
+      showZeros: false,
+    });
+
+    expect(spy.fills).toEqual([]);
   });
 
   it('centers logical and error values by default', () => {
@@ -552,6 +572,23 @@ describe('paintCellText font strictness', () => {
     expect(normal.fonts.at(-1)).toBe('400 13px "Times New Roman"');
     expect(bold.fonts.at(-1)).toBe('700 13px "Times New Roman"');
     expect(bold.fills[0]?.y).toBe(normal.fills[0]?.y);
+  });
+
+  it('draws two lines for double and accounting-double underlines', () => {
+    for (const underline of ['double', 'doubleAccounting'] as const) {
+      const spy = makeTextSpy();
+      paintCellText({
+        ctx: spy.ctx,
+        bounds: { x: 0, y: 0, w: 80, h: 20 },
+        theme: theme({ textCell: 13 }),
+        value: { kind: 'text', value: 'ABC' },
+        formula: null,
+        isActive: false,
+        isInRange: false,
+        format: { underline },
+      });
+      expect(spy.strokeCount()).toBe(2);
+    }
   });
 
   it('uses stable text metrics for vertical placement', () => {

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  COMMON_FONTS,
   CURRENCY_SYMBOLS,
   defaultCurrencySymbolFor,
   isHexColor,
@@ -43,6 +42,7 @@ describe('interact/format-dialog-model', () => {
     it('returns Japanese date/time presets for ja locales', () => {
       const presets = patternPresetsFor('ja');
       expect(presets.date[0]).toContain('"年"');
+      expect(presets.fraction).toHaveLength(9);
       expect(presets.custom).toContain('¥#,##0;[Red]-¥#,##0');
     });
 
@@ -60,7 +60,7 @@ describe('interact/format-dialog-model', () => {
     it('exposes the number-pattern category keys for every locale', () => {
       for (const loc of ['en', 'ja', 'fr-CA', 'pt-BR']) {
         const p = patternPresetsFor(loc);
-        expect(Object.keys(p).sort()).toEqual(['custom', 'date', 'datetime', 'special', 'time']);
+        expect(Object.keys(p).sort()).toEqual(['custom', 'date', 'fraction', 'special', 'time']);
         for (const arr of Object.values(p)) expect(arr.length).toBeGreaterThan(0);
       }
     });
@@ -83,11 +83,6 @@ describe('interact/format-dialog-model', () => {
   });
 
   describe('canonical option lists', () => {
-    it('exposes a non-empty COMMON_FONTS list', () => {
-      expect(COMMON_FONTS).toContain('Helvetica');
-      expect(COMMON_FONTS).toContain('monospace');
-    });
-
     it('exposes the 4 baseline currency symbols', () => {
       expect(CURRENCY_SYMBOLS).toEqual(['$', '¥', '€', '£']);
     });

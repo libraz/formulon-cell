@@ -2,15 +2,19 @@
 // checkboxes plus family/size/color pickers and swatch grids.
 
 import type { Strings } from '../../i18n/strings.js';
-import { appendDialogDatalistOptions } from '../../toolbar/dialogs/form-controls.js';
+import {
+  appendDialogDatalistOptions,
+  createDialogSelect,
+} from '../../toolbar/dialogs/form-controls.js';
+import { shouldShowFontOption } from '../../toolbar/ribbon/font-availability.js';
+import { FONT_FAMILIES, FONT_SIZES } from '../../toolbar/ribbon-model.js';
 import { appendDialogOptionButton } from '../dialog-shell.js';
 import { makeButton, makeCheckbox, makeSwatches } from '../format-dialog-dom.js';
-import { COMMON_FONTS } from '../format-dialog-model.js';
 
 export interface FontTabRefs {
   boldCk: ReturnType<typeof makeCheckbox>;
   italicCk: ReturnType<typeof makeCheckbox>;
-  underlineCk: ReturnType<typeof makeCheckbox>;
+  underlineSelect: HTMLSelectElement;
   strikeCk: ReturnType<typeof makeCheckbox>;
   normalFontCk: ReturnType<typeof makeCheckbox>;
   fontStyleList: HTMLDivElement;
@@ -20,9 +24,14 @@ export interface FontTabRefs {
   colorReset: HTMLButtonElement;
   fontSwatches: ReturnType<typeof makeSwatches>;
   fontPreviewBox: HTMLDivElement;
+  syncFontFamilyOptions: (current: string) => void;
 }
 
-export function createFontTab(panel: HTMLDivElement, t: Strings['formatDialog']): FontTabRefs {
+export function createFontTab(
+  panel: HTMLDivElement,
+  t: Strings['formatDialog'],
+  locale: 'ja' | 'en',
+): FontTabRefs {
   const styleRow = document.createElement('div');
   styleRow.className = 'fc-fmtdlg__choice-grid fc-fmtdlg__font-effects';
   panel.appendChild(styleRow);
@@ -31,11 +40,25 @@ export function createFontTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   boldCk.input.dataset.fcCheck = 'bold';
   const italicCk = makeCheckbox(t.fontItalic);
   italicCk.input.dataset.fcCheck = 'italic';
-  const underlineCk = makeCheckbox(t.fontUnderline);
-  underlineCk.input.dataset.fcCheck = 'underline';
+  const underlineLabel = document.createElement('label');
+  underlineLabel.className = 'fc-fmtdlg__font-underline';
+  underlineLabel.textContent = t.fontUnderline;
+  const underlineSelect = createDialogSelect(
+    [
+      { value: '', label: t.fontUnderlineNone },
+      { value: 'single', label: t.fontUnderlineSingle },
+      { value: 'double', label: t.fontUnderlineDouble },
+      { value: 'singleAccounting', label: t.fontUnderlineSingleAccounting },
+      { value: 'doubleAccounting', label: t.fontUnderlineDoubleAccounting },
+    ],
+    '',
+    { ariaLabel: t.fontUnderline },
+  );
+  underlineSelect.dataset.fcInput = 'underline';
+  underlineLabel.appendChild(underlineSelect);
   const strikeCk = makeCheckbox(t.fontStrike);
   strikeCk.input.dataset.fcCheck = 'strike';
-  styleRow.append(boldCk.wrap, italicCk.wrap, underlineCk.wrap, strikeCk.wrap);
+  styleRow.append(boldCk.wrap, italicCk.wrap, underlineLabel, strikeCk.wrap);
 
   const normalFontCk = makeCheckbox(t.normalFont);
   normalFontCk.input.dataset.fcCheck = 'normalFont';
@@ -57,7 +80,6 @@ export function createFontTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   familyInput.setAttribute('list', familyListId);
   const familyDatalist = document.createElement('datalist');
   familyDatalist.id = familyListId;
-  appendDialogDatalistOptions(familyDatalist, COMMON_FONTS);
   familyRow.append(familyLabel, familyInput, familyDatalist);
   panel.appendChild(familyRow);
 
@@ -65,20 +87,29 @@ export function createFontTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   familyList.className = 'fc-fmtdlg__font-list fc-fmtdlg__font-list--family';
   familyList.setAttribute('role', 'listbox');
   familyList.setAttribute('aria-label', t.fontFamily);
-  for (const [index, family] of COMMON_FONTS.slice(0, 8).entries()) {
-    const item = appendDialogOptionButton(familyList, {
-      label: family,
-      baseClass: 'fc-fmtdlg__font-list-item',
-      datasetKey: 'fcFontFamily',
-      value: family,
-      selected: index === 0,
-    });
-    item.addEventListener('click', () => {
-      familyInput.value = family;
-      familyInput.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-  }
   panel.appendChild(familyList);
+
+  const syncFontFamilyOptions = (current: string): void => {
+    const families = FONT_FAMILIES.filter((family) =>
+      shouldShowFontOption(family, current, locale),
+    );
+    appendDialogDatalistOptions(familyDatalist, families);
+    familyList.replaceChildren();
+    for (const [index, family] of families.slice(0, 8).entries()) {
+      const item = appendDialogOptionButton(familyList, {
+        label: family,
+        baseClass: 'fc-fmtdlg__font-list-item',
+        datasetKey: 'fcFontFamily',
+        value: family,
+        selected: family === current || (!current && index === 0),
+      });
+      item.addEventListener('click', () => {
+        familyInput.value = family;
+        familyInput.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    }
+  };
+  syncFontFamilyOptions('');
 
   const fontStyleList = document.createElement('div');
   fontStyleList.className = 'fc-fmtdlg__font-list fc-fmtdlg__font-list--style';
@@ -119,7 +150,7 @@ export function createFontTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   sizeList.className = 'fc-fmtdlg__font-list fc-fmtdlg__font-list--size';
   sizeList.setAttribute('role', 'listbox');
   sizeList.setAttribute('aria-label', t.fontSize);
-  for (const size of [8, 9, 10, 11, 12, 14, 16, 18]) {
+  for (const size of FONT_SIZES) {
     const item = appendDialogOptionButton(sizeList, {
       label: String(size),
       baseClass: 'fc-fmtdlg__font-list-item',
@@ -163,7 +194,7 @@ export function createFontTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   return {
     boldCk,
     italicCk,
-    underlineCk,
+    underlineSelect,
     strikeCk,
     normalFontCk,
     fontStyleList,
@@ -173,5 +204,6 @@ export function createFontTab(panel: HTMLDivElement, t: Strings['formatDialog'])
     colorReset,
     fontSwatches,
     fontPreviewBox,
+    syncFontFamilyOptions,
   };
 }

@@ -111,6 +111,40 @@ const fontCss = (family: string): string =>
     .filter(Boolean)
     .join(', ');
 
+const isDoubleUnderline = (underline: CellFormat['underline']): boolean =>
+  underline === 'double' || underline === 'doubleAccounting';
+
+const paintTextDecorations = (
+  ctx: CanvasRenderingContext2D,
+  format: CellFormat | undefined,
+  isHyperlink: boolean,
+  lineX0: number,
+  width: number,
+  baselineY: number,
+  box: TextMetricsBox,
+): void => {
+  if (!format?.underline && !format?.strike && !isHyperlink) return;
+  ctx.strokeStyle = ctx.fillStyle as string;
+  ctx.lineWidth = 1;
+  if (format?.underline || isHyperlink) {
+    const underlineY = Math.round(baselineY + Math.max(2, box.descent * 0.55)) + 0.5;
+    const ys = isDoubleUnderline(format?.underline) ? [underlineY, underlineY + 2] : [underlineY];
+    for (const y of ys) {
+      ctx.beginPath();
+      ctx.moveTo(lineX0, y);
+      ctx.lineTo(lineX0 + width, y);
+      ctx.stroke();
+    }
+  }
+  if (format?.strike) {
+    const strikeY = Math.round(baselineY - box.ascent * 0.34) + 0.5;
+    ctx.beginPath();
+    ctx.moveTo(lineX0, strikeY);
+    ctx.lineTo(lineX0 + width, strikeY);
+    ctx.stroke();
+  }
+};
+
 export function paintCellText({
   ctx,
   bounds,
@@ -119,11 +153,13 @@ export function paintCellText({
   formula,
   format,
   showFormulas,
+  showZeros,
   displayOverride,
   locale,
 }: CellPaintCtx): void {
   const hyperlinkDisplay = format?.hyperlinkDisplay ?? '';
   if (value.kind === 'blank' && !formula && displayOverride == null && !hyperlinkDisplay) return;
+  if (showZeros === false && value.kind === 'number' && value.value === 0 && !showFormulas) return;
 
   const padX = 3;
   const padY = 3;
@@ -217,7 +253,12 @@ export function paintCellText({
     else if (align === 'center') tx = bounds.x + bounds.w / 2;
     else tx = bounds.x + padX + indentPx;
     for (let i = 0; i < lines.length; i += 1) {
-      ctx.fillText(lines[i] ?? '', tx, startY + i * lineH);
+      const line = lines[i] ?? '';
+      const baselineY = startY + i * lineH;
+      ctx.fillText(line, tx, baselineY);
+      const width = ctx.measureText(line).width;
+      const lineX0 = align === 'right' ? tx - width : align === 'center' ? tx - width / 2 : tx;
+      paintTextDecorations(ctx, format, isHyperlink, lineX0, width, baselineY, measured);
     }
     ctx.restore();
     return;
@@ -267,29 +308,9 @@ export function paintCellText({
 
   ctx.fillText(text, tx, ty);
 
-  if (format?.underline || format?.strike || isHyperlink) {
-    const w = metrics.width;
-    let lineX0: number;
-    if (align === 'right') lineX0 = tx - w;
-    else if (align === 'center') lineX0 = tx - w / 2;
-    else lineX0 = tx;
-    ctx.strokeStyle = ctx.fillStyle as string;
-    ctx.lineWidth = 1;
-    if (format?.underline || isHyperlink) {
-      const uy = Math.round(ty + Math.max(2, box.descent * 0.55)) + 0.5;
-      ctx.beginPath();
-      ctx.moveTo(lineX0, uy);
-      ctx.lineTo(lineX0 + w, uy);
-      ctx.stroke();
-    }
-    if (format?.strike) {
-      const sy = Math.round(ty - box.ascent * 0.34) + 0.5;
-      ctx.beginPath();
-      ctx.moveTo(lineX0, sy);
-      ctx.lineTo(lineX0 + w, sy);
-      ctx.stroke();
-    }
-  }
+  const lineX0 =
+    align === 'right' ? tx - metrics.width : align === 'center' ? tx - metrics.width / 2 : tx;
+  paintTextDecorations(ctx, format, isHyperlink, lineX0, metrics.width, ty, box);
   ctx.restore();
 }
 

@@ -1,4 +1,11 @@
-import type { CellBorderSide, CellBorders, CellFormat, NumFmt } from '../store/store.js';
+import type {
+  CellBorderSide,
+  CellBorders,
+  CellFormat,
+  FillPattern,
+  NegativeStyle,
+  NumFmt,
+} from '../store/store.js';
 import type { BorderRecord, BorderSide, CellXf, FillRecord, FontRecord } from './types.js';
 
 /** Default font name + size used when a CellFormat omits these. Mirrors the
@@ -10,6 +17,33 @@ const DEFAULT_FONT_SIZE = 11;
 const BLACK_ARGB = 0xff000000;
 /** ARGB packed value for "auto" (transparent — caller-defined default). */
 const NO_COLOR_ARGB = 0;
+
+const UNDERLINE_ORDINALS = {
+  single: 1,
+  double: 2,
+  singleAccounting: 3,
+  doubleAccounting: 4,
+} as const;
+
+const UNDERLINE_FROM_ORDINAL = new Map<number, CellFormat['underline']>([
+  [1, 'single'],
+  [2, 'double'],
+  [3, 'singleAccounting'],
+  [4, 'doubleAccounting'],
+]);
+
+const underlineOrdinal = (underline: CellFormat['underline']): number => {
+  if (underline === true || underline === 'single') return UNDERLINE_ORDINALS.single;
+  if (underline === 'double') return UNDERLINE_ORDINALS.double;
+  if (underline === 'singleAccounting') return UNDERLINE_ORDINALS.singleAccounting;
+  if (underline === 'doubleAccounting') return UNDERLINE_ORDINALS.doubleAccounting;
+  return 0;
+};
+
+const currencyToken = (symbol: string): string => {
+  const lcid = symbol === '¥' ? '411' : symbol === '€' ? '407' : symbol === '£' ? '809' : '409';
+  return `[$${symbol}-${lcid}]`;
+};
 
 /** OOXML border-style ordinals — full repertoire. Mapping mirrors
  *  https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.borderstylevalues */
@@ -34,9 +68,62 @@ const HALIGN_GENERAL = 0;
 const HALIGN_LEFT = 1;
 const HALIGN_CENTER = 2;
 const HALIGN_RIGHT = 3;
+const HALIGN_FILL = 4;
+const HALIGN_JUSTIFY = 5;
+const HALIGN_CENTER_CONTINUOUS = 6;
+const HALIGN_DISTRIBUTED = 7;
 const VALIGN_TOP = 0;
 const VALIGN_CENTER = 1;
 const VALIGN_BOTTOM = 2;
+const VALIGN_JUSTIFY = 3;
+const VALIGN_DISTRIBUTED = 4;
+
+/** OOXML pattern ordinals for the pattern names currently exposed by the UI.
+ *  Pattern fills store the pattern colour in fgArgb and the background colour
+ *  in bgArgb; solid fills instead store their visible colour in fgArgb. */
+const FILL_PATTERN_ORDINALS: Record<FillPattern, number> = {
+  gray125: 17,
+  gray0625: 18,
+  gray25: 4,
+  gray50: 2,
+  gray75: 3,
+  darkHorizontal: 5,
+  darkVertical: 6,
+  darkDown: 7,
+  darkUp: 8,
+  darkGrid: 9,
+  darkTrellis: 10,
+  lightHorizontal: 11,
+  lightVertical: 12,
+  lightDown: 13,
+  lightUp: 14,
+  lightGrid: 15,
+  lightTrellis: 16,
+  horizontal: 5,
+  vertical: 6,
+  diagonalDown: 7,
+  diagonalUp: 8,
+};
+
+const FILL_PATTERN_FROM_ORDINAL = new Map<number, FillPattern>([
+  [2, 'gray50'],
+  [3, 'gray75'],
+  [4, 'gray25'],
+  [5, 'darkHorizontal'],
+  [6, 'darkVertical'],
+  [7, 'darkDown'],
+  [8, 'darkUp'],
+  [9, 'darkGrid'],
+  [10, 'darkTrellis'],
+  [11, 'lightHorizontal'],
+  [12, 'lightVertical'],
+  [13, 'lightDown'],
+  [14, 'lightUp'],
+  [15, 'lightGrid'],
+  [16, 'lightTrellis'],
+  [17, 'gray125'],
+  [18, 'gray0625'],
+]);
 
 /** Built-in numFmt id for "General" — every engine reserves 0 for this. */
 const BUILTIN_NUM_FMT_GENERAL = 0;
@@ -50,14 +137,22 @@ export function fontRecordFromFormat(fmt: CellFormat): FontRecord {
     bold: fmt.bold === true,
     italic: fmt.italic === true,
     strike: fmt.strike === true,
-    underline: fmt.underline === true ? 1 : 0,
+    underline: underlineOrdinal(fmt.underline),
     colorArgb: fmt.color ? (cssColorToArgb(fmt.color) ?? BLACK_ARGB) : BLACK_ARGB,
   };
 }
 
-/** Build a FillRecord from the cell's `fill` field. No fill → solid pattern
- *  with auto color (engine treats this as "no fill" in OOXML). */
+/** Build a FillRecord from the cell's fill fields. */
 export function fillRecordFromFormat(fmt: CellFormat): FillRecord {
+  if (fmt.fillPattern) {
+    return {
+      pattern: FILL_PATTERN_ORDINALS[fmt.fillPattern],
+      fgArgb: fmt.fillPatternColor
+        ? (cssColorToArgb(fmt.fillPatternColor) ?? BLACK_ARGB)
+        : BLACK_ARGB,
+      bgArgb: fmt.fill ? (cssColorToArgb(fmt.fill) ?? NO_COLOR_ARGB) : NO_COLOR_ARGB,
+    };
+  }
   if (!fmt.fill) {
     return { pattern: 0, fgArgb: NO_COLOR_ARGB, bgArgb: NO_COLOR_ARGB };
   }
@@ -135,13 +230,13 @@ export function numFmtToFormatCode(fmt: NumFmt | undefined): string | null {
     case 'fixed': {
       const dec = '0'.repeat(fmt.decimals);
       const body = dec ? `0.${dec}` : '0';
-      return fmt.thousands ? `#,##${body}` : body;
+      return withNegativeSection(fmt.thousands ? `#,##${body}` : body, fmt.negativeStyle);
     }
     case 'currency': {
       const dec = '0'.repeat(fmt.decimals);
       const body = dec ? `0.${dec}` : '0';
       const sym = fmt.symbol ?? '$';
-      return `"${sym}"#,##${body}`;
+      return withNegativeSection(`${currencyToken(sym)}#,##${body}`, fmt.negativeStyle);
     }
     case 'percent': {
       const dec = '0'.repeat(fmt.decimals);
@@ -155,7 +250,13 @@ export function numFmtToFormatCode(fmt: NumFmt | undefined): string | null {
       const dec = '0'.repeat(fmt.decimals);
       const body = dec ? `0.${dec}` : '0';
       const sym = fmt.symbol ?? '$';
-      return `_-"${sym}"* #,##${body}_-;-"${sym}"* #,##${body}_-;_-"${sym}"* "-"??_-;_-@_-`;
+      const token = currencyToken(sym);
+      return joinFormatSections(
+        `_- ${token}* #,##${body}_-`,
+        `- ${token}* #,##${body}_-`,
+        `_- ${token}* "-"??_-`,
+        '_-@_-',
+      );
     }
     case 'date':
     case 'time':
@@ -179,6 +280,14 @@ export function halignOrdinal(align: CellFormat['align']): number {
       return HALIGN_CENTER;
     case 'right':
       return HALIGN_RIGHT;
+    case 'fill':
+      return HALIGN_FILL;
+    case 'justify':
+      return HALIGN_JUSTIFY;
+    case 'centerContinuous':
+      return HALIGN_CENTER_CONTINUOUS;
+    case 'distributed':
+      return HALIGN_DISTRIBUTED;
     default:
       return HALIGN_GENERAL;
   }
@@ -192,6 +301,10 @@ export function valignOrdinal(vAlign: CellFormat['vAlign']): number {
       return VALIGN_TOP;
     case 'middle':
       return VALIGN_CENTER;
+    case 'justify':
+      return VALIGN_JUSTIFY;
+    case 'distributed':
+      return VALIGN_DISTRIBUTED;
     default:
       return VALIGN_BOTTOM;
   }
@@ -220,24 +333,41 @@ export function buildXfRecord(
 /* ---------- Inverse translators (used during hydrate) ---------- */
 
 /** Translate an engine FontRecord back into the CellFormat font fields. */
-export function fontRecordToFormat(rec: FontRecord): Partial<CellFormat> {
+export function fontRecordToFormat(
+  rec: FontRecord,
+  workbookDefault: Pick<FontRecord, 'name' | 'size'> | null = null,
+): Partial<CellFormat> {
   const out: Partial<CellFormat> = {};
-  if (rec.name !== DEFAULT_FONT_NAME) out.fontFamily = rec.name;
-  if (rec.size !== DEFAULT_FONT_SIZE) out.fontSize = rec.size;
+  const defaultName = workbookDefault?.name ?? DEFAULT_FONT_NAME;
+  const defaultSize = workbookDefault?.size ?? DEFAULT_FONT_SIZE;
+  if (rec.name !== defaultName) out.fontFamily = rec.name;
+  if (rec.size !== defaultSize) out.fontSize = rec.size;
   if (rec.bold) out.bold = true;
   if (rec.italic) out.italic = true;
   if (rec.strike) out.strike = true;
-  if (rec.underline > 0) out.underline = true;
+  const underline = UNDERLINE_FROM_ORDINAL.get(rec.underline);
+  if (underline) out.underline = underline;
   if (rec.colorArgb !== BLACK_ARGB && rec.colorArgb !== NO_COLOR_ARGB) {
     out.color = argbToCssColor(rec.colorArgb);
   }
   return out;
 }
 
-/** Translate an engine FillRecord back into the CellFormat fill field. */
+/** Translate an engine FillRecord back into the CellFormat fill fields. */
 export function fillRecordToFormat(rec: FillRecord): Partial<CellFormat> {
-  if (rec.pattern === 0 || rec.fgArgb === NO_COLOR_ARGB) return {};
-  return { fill: argbToCssColor(rec.fgArgb) };
+  if (rec.pattern === 0) return {};
+  if (rec.pattern === 1) {
+    return rec.fgArgb === NO_COLOR_ARGB ? {} : { fill: argbToCssColor(rec.fgArgb) };
+  }
+  const pattern = FILL_PATTERN_FROM_ORDINAL.get(rec.pattern);
+  if (!pattern) {
+    const preservedColor = rec.bgArgb || rec.fgArgb;
+    return preservedColor === NO_COLOR_ARGB ? {} : { fill: argbToCssColor(preservedColor) };
+  }
+  const out: Partial<CellFormat> = { fillPattern: pattern };
+  if (rec.bgArgb !== NO_COLOR_ARGB) out.fill = argbToCssColor(rec.bgArgb);
+  if (rec.fgArgb !== NO_COLOR_ARGB) out.fillPatternColor = argbToCssColor(rec.fgArgb);
+  return out;
 }
 
 /** Translate an engine BorderRecord back into the CellFormat borders field. */
@@ -299,6 +429,8 @@ export function borderRecordToFormat(rec: BorderRecord): Partial<CellFormat> {
  *  unknown patterns surface as `custom`. */
 export function formatCodeToNumFmt(code: string): NumFmt | null {
   if (!code || code === 'General') return null;
+  const rawSections = splitFormatSections(code);
+  const negativeStyle = negativeStyleFromSections(rawSections);
   const normalized = normalizeFormatCode(code);
   if (!normalized || normalized === 'General') return null;
   code = normalized;
@@ -319,7 +451,7 @@ export function formatCodeToNumFmt(code: string): NumFmt | null {
   // first section, while the original semicolon sections identify accounting.
   const accountingMatch = probe.match(/^(?:"([^"]+)"|([^#0?,.]+))?#,##0(?:\.(0+))?$/);
   if (accountingMatch && code.includes(';') && /"-"|-\?\?|;@/.test(code)) {
-    const symbol = accountingMatch[1] ?? accountingMatch[2] ?? '$';
+    const symbol = (accountingMatch[1] ?? accountingMatch[2] ?? '$').trim();
     return {
       kind: 'accounting',
       decimals: accountingMatch[3] ? accountingMatch[3].length : 0,
@@ -329,19 +461,33 @@ export function formatCodeToNumFmt(code: string): NumFmt | null {
   // Currency: "$#,##0.00", "¥#,##0", or OOXML locale-tagged [$¥-411]#,##0.
   const curMatch = probe.match(/^(?:"([^"]+)"|([^#0?,.]+))#,##0(?:\.(0+))?$/);
   if (curMatch) {
-    const symbol = curMatch[1] ?? curMatch[2] ?? '$';
-    return { kind: 'currency', decimals: curMatch[3] ? curMatch[3].length : 0, symbol };
+    const symbol = (curMatch[1] ?? curMatch[2] ?? '$').trim();
+    return {
+      kind: 'currency',
+      decimals: curMatch[3] ? curMatch[3].length : 0,
+      symbol,
+      ...(negativeStyle === 'minus' ? {} : { negativeStyle }),
+    };
   }
   // Fixed with thousands
   const tFixMatch = probe.match(/^#,##0(?:\.(0+))?$/);
   if (tFixMatch) {
-    return { kind: 'fixed', decimals: tFixMatch[1] ? tFixMatch[1].length : 0, thousands: true };
+    return {
+      kind: 'fixed',
+      decimals: tFixMatch[1] ? tFixMatch[1].length : 0,
+      thousands: true,
+      ...(negativeStyle === 'minus' ? {} : { negativeStyle }),
+    };
   }
   if (isSpecialFormatCode(code)) return { kind: 'special', pattern: code };
   // Plain fixed
   const fixMatch = probe.match(/^0(?:\.(0+))?$/);
   if (fixMatch) {
-    return { kind: 'fixed', decimals: fixMatch[1] ? fixMatch[1].length : 0 };
+    return {
+      kind: 'fixed',
+      decimals: fixMatch[1] ? fixMatch[1].length : 0,
+      ...(negativeStyle === 'minus' ? {} : { negativeStyle }),
+    };
   }
   // Date / time tokens
   if (/[ymdhs]/i.test(probe)) {
@@ -353,7 +499,7 @@ export function formatCodeToNumFmt(code: string): NumFmt | null {
 }
 
 function isSpecialFormatCode(code: string): boolean {
-  const sections = splitFormatSectionsForSpecial(code).map((section) =>
+  const sections = splitFormatSections(code).map((section) =>
     normalizeFormatCode(section.replace(/^\s*\[(?:>=|<=|<>|=|>|<)\s*-?\d+(?:\.\d+)?\s*\]/, '')),
   );
   return sections.some((section) => {
@@ -363,7 +509,7 @@ function isSpecialFormatCode(code: string): boolean {
   });
 }
 
-function splitFormatSectionsForSpecial(s: string): string[] {
+function splitFormatSections(s: string): string[] {
   const out: string[] = [];
   let buf = '';
   let inQuote = false;
@@ -399,6 +545,34 @@ function splitFormatSectionsForSpecial(s: string): string[] {
   }
   out.push(buf);
   return out;
+}
+
+function withNegativeSection(positive: string, style: NegativeStyle | undefined): string {
+  switch (style) {
+    case 'parens':
+      return joinFormatSections(positive, `(${positive})`);
+    case 'red':
+      return joinFormatSections(positive, `[Red]-${positive}`);
+    case 'red-parens':
+      return joinFormatSections(positive, `[Red](${positive})`);
+    default:
+      return positive;
+  }
+}
+
+function joinFormatSections(...sections: string[]): string {
+  return sections.join(';');
+}
+
+function negativeStyleFromSections(sections: string[]): NegativeStyle {
+  const negative = sections[1];
+  if (!negative) return 'minus';
+  const red = /\[(?:Red|Color3)\]/i.test(negative);
+  const normalized = normalizeFormatCode(negative).trim();
+  const parens = normalized.startsWith('(') && normalized.endsWith(')');
+  if (red && parens) return 'red-parens';
+  if (red) return 'red';
+  return parens ? 'parens' : 'minus';
 }
 
 function firstFormatSection(code: string): string {

@@ -19,10 +19,11 @@ interface CreateFormatDialogViewInput {
   host: HTMLElement;
   strings: Strings;
   t: Strings['formatDialog'];
+  fontLocale?: 'ja' | 'en';
 }
 
 export function createFormatDialogView(input: CreateFormatDialogViewInput) {
-  const { host, strings, t } = input;
+  const { host, strings, t, fontLocale = 'en' } = input;
   const shell = createDialogShell({
     host,
     className: 'fc-fmtdlg',
@@ -122,11 +123,11 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     { id: 'fixed', label: t.catFixed },
     { id: 'currency', label: t.catCurrency },
     { id: 'accounting', label: t.catAccounting },
-    { id: 'percent', label: t.catPercent },
-    { id: 'scientific', label: t.catScientific },
     { id: 'date', label: t.catDate },
     { id: 'time', label: t.catTime },
-    { id: 'datetime', label: t.catDateTime },
+    { id: 'percent', label: t.catPercent },
+    { id: 'fraction', label: t.catFraction },
+    { id: 'scientific', label: t.catScientific },
     { id: 'text', label: t.catText },
     { id: 'special', label: t.catOther },
     { id: 'custom', label: t.catCustom },
@@ -200,7 +201,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   numberControls.appendChild(patternPresetRow);
 
   // Pattern listbox — Office365-style clickable list of formatted example
-  // strings (shown for date/time/datetime/special). Replaces the select
+  // strings (shown for date/time/fraction/special). Replaces the select
   // dropdown above for those categories so users see the actual rendering
   // instead of cryptic pattern codes.
   const patternListWrap = document.createElement('div');
@@ -215,7 +216,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   patternListWrap.append(patternListLabel, patternList);
   numberControls.appendChild(patternListWrap);
 
-  // Pattern row — visible for date/time/datetime/custom categories.
+  // Pattern row — visible for custom categories.
   const patternRow = document.createElement('label');
   patternRow.className = 'fc-fmtdlg__row';
   const patternLabel = document.createElement('span');
@@ -312,11 +313,11 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
   } = alignTab;
 
   // ── Font tab ───────────────────────────────────────────────────────────
-  const fontTab = createFontTab(tabPanels.get('font') as HTMLDivElement, t);
+  const fontTab = createFontTab(tabPanels.get('font') as HTMLDivElement, t, fontLocale);
   const {
     boldCk,
     italicCk,
-    underlineCk,
+    underlineSelect,
     strikeCk,
     normalFontCk,
     fontStyleList,
@@ -326,6 +327,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     colorReset,
     fontSwatches,
     fontPreviewBox,
+    syncFontFamilyOptions,
   } = fontTab;
 
   // ── Border tab ─────────────────────────────────────────────────────────
@@ -358,6 +360,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     fillReset,
     fillSwatches,
     fillPatternSelect,
+    fillPatternGallery,
     fillPatternColorInput,
     fillSample,
   } = fillTab;
@@ -484,7 +487,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     alignPreviewDialText,
     boldCk,
     italicCk,
-    underlineCk,
+    underlineSelect,
     strikeCk,
     normalFontCk,
     fontStyleList,
@@ -494,6 +497,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     colorReset,
     fontSwatches,
     fontPreviewBox,
+    syncFontFamilyOptions,
     borderStyleSelect,
     borderStyleButtons,
     borderStyleGallery,
@@ -516,6 +520,7 @@ export function createFormatDialogView(input: CreateFormatDialogViewInput) {
     fillReset,
     fillSwatches,
     fillPatternSelect,
+    fillPatternGallery,
     fillPatternColorInput,
     fillSample,
     lockedCk,

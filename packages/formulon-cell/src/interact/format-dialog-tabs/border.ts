@@ -3,6 +3,7 @@
 
 import type { Strings } from '../../i18n/strings.js';
 import { createDialogSelect } from '../../toolbar/dialogs/form-controls.js';
+import { createLineSamplePreview, LINE_STYLES_ALL } from '../../toolbar/ribbon/border-icons.js';
 import { createDialogToggleButton } from '../dialog-shell.js';
 import {
   makeButton,
@@ -39,14 +40,24 @@ export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog'
   borderStyleRow.className = 'fc-fmtdlg__row';
   const borderStyleLabel = document.createElement('span');
   borderStyleLabel.textContent = t.borderStyle;
-  const styleOptions: { id: BorderStyleKey; label: string }[] = [
-    { id: 'thin', label: t.borderStyleThin },
-    { id: 'medium', label: t.borderStyleMedium },
-    { id: 'thick', label: t.borderStyleThick },
-    { id: 'dashed', label: t.borderStyleDashed },
-    { id: 'dotted', label: t.borderStyleDotted },
-    { id: 'double', label: t.borderStyleDouble },
-  ];
+  const styleLabels: Record<BorderStyleKey, string> = {
+    thin: t.borderStyleThin,
+    medium: t.borderStyleMedium,
+    thick: t.borderStyleThick,
+    dashed: t.borderStyleDashed,
+    dotted: t.borderStyleDotted,
+    double: t.borderStyleDouble,
+    hair: t.borderStyleHair,
+    mediumDashed: t.borderStyleMediumDashed,
+    dashDot: t.borderStyleDashDot,
+    mediumDashDot: t.borderStyleMediumDashDot,
+    dashDotDot: t.borderStyleDashDotDot,
+    mediumDashDotDot: t.borderStyleMediumDashDotDot,
+    slantDashDot: t.borderStyleSlantDashDot,
+  };
+  const styleOptions = LINE_STYLES_ALL.filter(
+    (style): style is BorderStyleKey => style !== 'none',
+  ).map((id) => ({ id, label: styleLabels[id] }));
   const borderStyleSelect = createDialogSelect(
     styleOptions.map((s) => ({ value: s.id, label: s.label })),
     'thin',
@@ -66,8 +77,8 @@ export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog'
       datasetKey: 'borderStyle',
       value: s.id,
     });
-    const sample = document.createElement('span');
-    sample.className = 'fc-fmtdlg__line-sample';
+    const sample = createLineSamplePreview(s.id);
+    sample.classList.add('fc-fmtdlg__line-sample-svg');
     const label = document.createElement('span');
     label.textContent = s.label;
     btn.append(sample, label);

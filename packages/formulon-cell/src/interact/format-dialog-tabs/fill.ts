@@ -11,6 +11,7 @@ export interface FillTabRefs {
   fillReset: HTMLButtonElement;
   fillSwatches: ReturnType<typeof makeSwatches>;
   fillPatternSelect: HTMLSelectElement;
+  fillPatternGallery: HTMLDivElement;
   fillPatternColorInput: HTMLInputElement;
   fillSample: HTMLDivElement;
 }
@@ -53,12 +54,22 @@ export function createFillTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   const fillPatternOptions: Array<{ value: '' | FillPattern; label: string }> = [
     { value: '', label: t.fillPatternSolid },
     { value: 'gray125', label: t.fillPatternGray125 },
+    { value: 'gray0625', label: t.fillPatternGray0625 },
     { value: 'gray25', label: t.fillPatternGray25 },
     { value: 'gray50', label: t.fillPatternGray50 },
-    { value: 'horizontal', label: t.fillPatternHorizontal },
-    { value: 'vertical', label: t.fillPatternVertical },
-    { value: 'diagonalDown', label: t.fillPatternDiagonalDown },
-    { value: 'diagonalUp', label: t.fillPatternDiagonalUp },
+    { value: 'gray75', label: t.fillPatternGray75 },
+    { value: 'darkHorizontal', label: t.fillPatternDarkHorizontal },
+    { value: 'darkVertical', label: t.fillPatternDarkVertical },
+    { value: 'darkDown', label: t.fillPatternDarkDown },
+    { value: 'darkUp', label: t.fillPatternDarkUp },
+    { value: 'darkGrid', label: t.fillPatternDarkGrid },
+    { value: 'darkTrellis', label: t.fillPatternDarkTrellis },
+    { value: 'lightHorizontal', label: t.fillPatternLightHorizontal },
+    { value: 'lightVertical', label: t.fillPatternLightVertical },
+    { value: 'lightDown', label: t.fillPatternLightDown },
+    { value: 'lightUp', label: t.fillPatternLightUp },
+    { value: 'lightGrid', label: t.fillPatternLightGrid },
+    { value: 'lightTrellis', label: t.fillPatternLightTrellis },
   ];
   const fillPatternSelect = createDialogSelect(fillPatternOptions, '', {
     ariaLabel: t.fillPatternStyle,
@@ -67,6 +78,24 @@ export function createFillTab(panel: HTMLDivElement, t: Strings['formatDialog'])
   fillPatternSelect.dataset.fcSelect = 'fillPattern';
   fillPatternRow.append(fillPatternLabel, fillPatternSelect);
   fillSection.appendChild(fillPatternRow);
+  const fillPatternGallery = document.createElement('div');
+  fillPatternGallery.className = 'fc-fmtdlg__fill-pattern-gallery';
+  fillPatternGallery.setAttribute('role', 'group');
+  fillPatternGallery.setAttribute('aria-label', t.fillPatternStyle);
+  for (const option of fillPatternOptions) {
+    const button = makeButton(option.label);
+    button.className = 'fc-fmtdlg__fill-pattern-option';
+    button.textContent = '';
+    button.dataset.fcFillPattern = option.value;
+    button.setAttribute('aria-label', option.label);
+    button.setAttribute('aria-pressed', option.value === '' ? 'true' : 'false');
+    const sample = document.createElement('span');
+    sample.className = 'fc-fmtdlg__fill-pattern-option-sample';
+    sample.dataset.fcFillPatternSample = option.value;
+    button.appendChild(sample);
+    fillPatternGallery.appendChild(button);
+  }
+  fillSection.appendChild(fillPatternGallery);
 
   const sample = document.createElement('div');
   sample.className = 'fc-fmtdlg__fill-sample';
@@ -83,6 +112,7 @@ export function createFillTab(panel: HTMLDivElement, t: Strings['formatDialog'])
     fillReset,
     fillSwatches,
     fillPatternSelect,
+    fillPatternGallery,
     fillPatternColorInput,
     fillSample,
   };

@@ -1597,7 +1597,7 @@ describe('toolbar/ribbon menu primitives', () => {
         ?.textContent,
     ).toBe('なし');
     expect(menu.querySelectorAll('.fc-tb__submenu--line-style .fc-tb__line-sample')).toHaveLength(
-      11,
+      13,
     );
 
     expect(menuCss).toMatch(/\.fc-tb__menu--borders\s*\{[\s\S]*?min-width: 186px;/);

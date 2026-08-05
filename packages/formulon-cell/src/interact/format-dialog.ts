@@ -47,7 +47,6 @@ import {
   explicitDraftBorders,
   hydrateDraftFromFormat,
   makeEmptyDraft,
-  restyleDraftBorders,
   setDraftSide,
 } from './format-dialog-state.js';
 import { createFormatDialogView } from './format-dialog-view.js';
@@ -70,8 +69,13 @@ export interface FormatDialogDeps {
 }
 
 export interface FormatDialogOpenOptions {
-  mode?: 'format' | 'dataValidation';
+  mode?: 'format' | 'dataValidation' | 'dxf';
   focus?: 'activeTab' | 'validation';
+  /** Initial differential format when editing a conditional-format rule. */
+  initialFormat?: Partial<CellFormat>;
+  /** Receives the editable differential-format dimensions instead of writing
+   *  to the active cell. Used by conditional-format Custom Format. */
+  onApplyDxf?: (format: Partial<CellFormat>) => void;
 }
 
 export interface FormatDialogHandle {
@@ -137,7 +141,12 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const strings = deps.strings ?? defaultStrings;
   const t = strings.formatDialog;
 
-  const view = createFormatDialogView({ host, strings, t });
+  const view = createFormatDialogView({
+    host,
+    strings,
+    t,
+    fontLocale: getFormatLocale().startsWith('ja') ? 'ja' : 'en',
+  });
   const {
     shell,
     overlay,
@@ -185,7 +194,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     alignPreviewDialText,
     boldCk,
     italicCk,
-    underlineCk,
+    underlineSelect,
     strikeCk,
     normalFontCk,
     fontStyleList,
@@ -195,6 +204,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     colorReset,
     fontSwatches,
     fontPreviewBox,
+    syncFontFamilyOptions,
     borderStyleSelect,
     borderStyleButtons,
     borderStyleGallery,
@@ -217,6 +227,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     fillReset,
     fillSwatches,
     fillPatternSelect,
+    fillPatternGallery,
     fillPatternColorInput,
     fillSample,
     lockedCk,
@@ -278,12 +289,13 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   // ── State ──────────────────────────────────────────────────────────────
   let activeTab: TabId = 'number';
   let pendingBorderPreset: 'none' | 'outline' | 'all' | null = null;
+  let applyDxf: ((format: Partial<CellFormat>) => void) | null = null;
   const draft: DraftState = makeEmptyDraft(getFormatLocale());
 
   // ── Hydration ──────────────────────────────────────────────────────────
-  const hydrateFromActive = (): void => {
+  const hydrateFromActive = (initialFormat?: Partial<CellFormat>): void => {
     const state = store.getState();
-    const fmt = state.format.formats.get(addrKey(state.selection.active)) ?? {};
+    const fmt = initialFormat ?? state.format.formats.get(addrKey(state.selection.active)) ?? {};
     hydrateDraftFromFormat(draft, fmt, getFormatLocale());
     pendingBorderPreset = null;
 
@@ -350,7 +362,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     // Font
     boldCk.input.checked = draft.bold;
     italicCk.input.checked = draft.italic;
-    underlineCk.input.checked = draft.underline;
+    underlineSelect.value = draft.underline === true ? 'single' : draft.underline || '';
     strikeCk.input.checked = draft.strike;
     normalFontCk.input.checked =
       !draft.bold &&
@@ -362,6 +374,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       draft.color === undefined;
     syncFontStyleList();
     familyInput.value = draft.fontFamily;
+    syncFontFamilyOptions(draft.fontFamily);
     sizeInput.value = draft.fontSize !== undefined ? String(draft.fontSize) : '';
     colorInput.value = draft.color && isHexColor(draft.color) ? draft.color : '#000000';
     fontSwatches.setValue(draft.color && isHexColor(draft.color) ? draft.color : null);
@@ -387,6 +400,14 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     fillInput.value = draft.fill && isHexColor(draft.fill) ? draft.fill : '#ffffff';
     fillSwatches.setValue(draft.fill && isHexColor(draft.fill) ? draft.fill : null);
     fillPatternSelect.value = draft.fillPattern ?? '';
+    for (const button of fillPatternGallery.querySelectorAll<HTMLButtonElement>(
+      '[data-fc-fill-pattern]',
+    )) {
+      button.setAttribute(
+        'aria-pressed',
+        button.dataset.fcFillPattern === (draft.fillPattern ?? '') ? 'true' : 'false',
+      );
+    }
     fillPatternColorInput.value =
       draft.fillPatternColor && isHexColor(draft.fillPatternColor)
         ? draft.fillPatternColor
@@ -472,7 +493,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       'accounting',
     ]);
     const symbolCats = new Set<NumberCategory>(['currency', 'accounting']);
-    const listboxCats = new Set<NumberCategory>(['date', 'time', 'datetime', 'special']);
+    const listboxCats = new Set<NumberCategory>(['date', 'time', 'fraction', 'special']);
     decimalsRow.hidden = !decimalsCats.has(cat);
     thousandsCk.wrap.hidden = cat !== 'fixed';
     symbolRow.hidden = !symbolCats.has(cat);
@@ -482,7 +503,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     patternPresetRow.hidden = cat !== 'custom';
     patternListWrap.hidden = !listboxCats.has(cat);
     patternRow.hidden = cat !== 'custom';
-    localeRow.hidden = cat !== 'date' && cat !== 'time' && cat !== 'datetime' && cat !== 'special';
+    localeRow.hidden = cat !== 'date' && cat !== 'time' && cat !== 'special';
     localeSelect.value = normalizeFormatLocale(getFormatLocale()).startsWith('ja') ? 'ja' : 'en';
     calendarRow.hidden = cat !== 'date';
     negativeList.hidden = cat !== 'fixed' && cat !== 'currency';
@@ -536,20 +557,46 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
 
   const fillPatternImage = (pattern: FillPattern | undefined, color = '#000000'): string => {
     switch (pattern) {
+      case 'gray0625':
+        return `radial-gradient(${color} 0.4px, transparent 0.4px)`;
       case 'gray125':
         return `radial-gradient(${color} 0.6px, transparent 0.6px)`;
       case 'gray25':
         return `radial-gradient(${color} 1px, transparent 1px)`;
       case 'gray50':
         return `repeating-linear-gradient(45deg, ${color} 0 2px, transparent 2px 4px)`;
+      case 'gray75':
+        return `repeating-linear-gradient(45deg, ${color} 0 3px, transparent 3px 4px)`;
       case 'horizontal':
+      case 'darkHorizontal':
         return `repeating-linear-gradient(0deg, ${color} 0 1px, transparent 1px 4px)`;
+      case 'lightHorizontal':
+        return `repeating-linear-gradient(0deg, ${color} 0 1px, transparent 1px 7px)`;
       case 'vertical':
+      case 'darkVertical':
         return `repeating-linear-gradient(90deg, ${color} 0 1px, transparent 1px 4px)`;
+      case 'lightVertical':
+        return `repeating-linear-gradient(90deg, ${color} 0 1px, transparent 1px 7px)`;
       case 'diagonalDown':
+      case 'darkDown':
         return `repeating-linear-gradient(45deg, ${color} 0 1px, transparent 1px 5px)`;
       case 'diagonalUp':
+      case 'darkUp':
         return `repeating-linear-gradient(135deg, ${color} 0 1px, transparent 1px 5px)`;
+      case 'lightDown':
+        return `repeating-linear-gradient(45deg, ${color} 0 1px, transparent 1px 9px)`;
+      case 'lightUp':
+        return `repeating-linear-gradient(135deg, ${color} 0 1px, transparent 1px 9px)`;
+      case 'darkGrid':
+      case 'lightGrid': {
+        const step = pattern === 'darkGrid' ? 4 : 7;
+        return `repeating-linear-gradient(0deg, ${color} 0 1px, transparent 1px ${step}px), repeating-linear-gradient(90deg, ${color} 0 1px, transparent 1px ${step}px)`;
+      }
+      case 'darkTrellis':
+      case 'lightTrellis': {
+        const step = pattern === 'darkTrellis' ? 6 : 9;
+        return `repeating-linear-gradient(45deg, ${color} 0 1px, transparent 1px ${step}px), repeating-linear-gradient(135deg, ${color} 0 1px, transparent 1px ${step}px)`;
+      }
       default:
         return '';
     }
@@ -560,10 +607,6 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const setSide = (key: SideKey, on: boolean): void => {
     draft.borders = setDraftSide(draft, key, on);
   };
-  const restyleExistingSides = (): void => {
-    draft.borders = restyleDraftBorders(draft);
-  };
-
   // ── Preview rendering ──────────────────────────────────────────────────
   const cssHorizontalAlign = (align: CellAlign | undefined): CSSStyleDeclaration['textAlign'] => {
     switch (align) {
@@ -601,6 +644,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       if (draft.underline) decos.push('underline');
       if (draft.strike) decos.push('line-through');
       el.style.textDecoration = decos.length > 0 ? decos.join(' ') : 'none';
+      el.style.textDecorationStyle =
+        draft.underline === 'double' || draft.underline === 'doubleAccounting' ? 'double' : '';
       el.style.fontFamily = draft.fontFamily || '';
       el.style.fontSize = draft.fontSize !== undefined ? `${draft.fontSize}px` : '';
       el.style.color = draft.color ?? '';
@@ -618,6 +663,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     if (draft.underline) decos.push('underline');
     if (draft.strike) decos.push('line-through');
     preview.style.textDecoration = decos.length > 0 ? decos.join(' ') : 'none';
+    preview.style.textDecorationStyle =
+      draft.underline === 'double' || draft.underline === 'doubleAccounting' ? 'double' : '';
     preview.style.textAlign = cssHorizontalAlign(draft.align);
     applyFontPreview(previewCell);
     applyFontPreview(fontPreviewBox);
@@ -682,12 +729,14 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const isDateLike =
       numFmt.kind === 'date' || numFmt.kind === 'time' || numFmt.kind === 'datetime';
     const sampleValue =
-      (draft.numberCategory === 'fixed' || draft.numberCategory === 'currency') &&
-      draft.negativeStyle !== 'minus'
-        ? -1234
-        : isDateLike || draft.numberCategory === 'currency' || draft.numberCategory === 'special'
-          ? 10
-          : 12345;
+      draft.numberCategory === 'fraction'
+        ? 1.25
+        : (draft.numberCategory === 'fixed' || draft.numberCategory === 'currency') &&
+            draft.negativeStyle !== 'minus'
+          ? -1234
+          : isDateLike || draft.numberCategory === 'currency' || draft.numberCategory === 'special'
+            ? 10
+            : 12345;
     const numericText = formatNumber(sampleValue, numFmt, getFormatLocale());
     previewCell.textContent = numericText;
     if (!draft.color && sampleValue < 0) {
@@ -701,7 +750,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const presets =
       cat === 'date' ||
       cat === 'time' ||
-      cat === 'datetime' ||
+      cat === 'fraction' ||
       cat === 'special' ||
       cat === 'custom'
         ? patternPresetsFor(getFormatLocale())[cat]
@@ -712,8 +761,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
         return 'yyyy-mm-dd';
       case 'time':
         return 'HH:MM:SS';
-      case 'datetime':
-        return 'yyyy-mm-dd HH:MM';
+      case 'fraction':
+        return '# ?/?';
       case 'special':
         return '000';
       case 'custom':
@@ -729,7 +778,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const patterns =
       cat === 'date' ||
       cat === 'time' ||
-      cat === 'datetime' ||
+      cat === 'fraction' ||
       cat === 'special' ||
       cat === 'custom'
         ? [...patternPresetsFor(getFormatLocale())[cat]]
@@ -753,8 +802,9 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const patternSampleValue = (cat: NumberCategory): number => {
     switch (cat) {
       case 'date':
-      case 'datetime':
         return 41348.5625; // 2013-03-14 13:30
+      case 'fraction':
+        return 1.25;
       case 'time':
         return 0.5625; // 13:30:00
       case 'special':
@@ -770,7 +820,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     specialLabels: string[],
   ): void => {
     const cat = draft.numberCategory;
-    const isListbox = cat === 'date' || cat === 'time' || cat === 'datetime' || cat === 'special';
+    const isListbox = cat === 'date' || cat === 'time' || cat === 'fraction' || cat === 'special';
     if (!isListbox) {
       patternList.replaceChildren();
       return;
@@ -790,7 +840,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
               ? { kind: 'date', pattern }
               : cat === 'time'
                 ? { kind: 'time', pattern }
-                : { kind: 'datetime', pattern },
+                : { kind: 'custom', pattern },
             locale,
           );
         } catch {
@@ -824,8 +874,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
         return t.descDate;
       case 'time':
         return t.descTime;
-      case 'datetime':
-        return t.descDateTime;
+      case 'fraction':
+        return t.descFraction;
       case 'text':
         return t.descText;
       case 'special':
@@ -862,6 +912,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
 
   const setDialogMode = (mode: FormatDialogOpenOptions['mode'] = 'format'): void => {
     const dataValidationMode = mode === 'dataValidation';
+    const dxfMode = mode === 'dxf';
     overlay.classList.toggle('fc-fmtdlg--data-validation', dataValidationMode);
     panel.setAttribute('aria-label', dataValidationMode ? t.validationLegend : t.title);
     headerTitle.textContent = dataValidationMode ? t.validationLegend : t.title;
@@ -870,6 +921,12 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     hyperlinkSection.hidden = dataValidationMode;
     commentSection.hidden = dataValidationMode;
     validationSection.classList.toggle('fc-fmtdlg__section--standalone', dataValidationMode);
+    for (const [tabId, button] of tabButtons) {
+      button.hidden = dxfMode && (tabId === 'align' || tabId === 'protection' || tabId === 'more');
+    }
+    if (dxfMode && (activeTab === 'align' || activeTab === 'protection' || activeTab === 'more')) {
+      setActiveTab('number');
+    }
   };
 
   // ── Apply OK ───────────────────────────────────────────────────────────
@@ -919,6 +976,27 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       locked: draft.locked,
       formulaHidden: draft.formulaHidden ? true : undefined,
     };
+
+    if (applyDxf) {
+      applyDxf({
+        numFmt: patch.numFmt,
+        bold: patch.bold,
+        italic: patch.italic,
+        underline: patch.underline,
+        strike: patch.strike,
+        fontFamily: patch.fontFamily,
+        fontSize: patch.fontSize,
+        color: patch.color,
+        fill: patch.fill,
+        fillPattern: patch.fillPattern,
+        fillPatternColor: patch.fillPatternColor,
+        ...(Object.values(explicitBorders).some((side) => side !== false)
+          ? { borders: explicitBorders }
+          : {}),
+      });
+      api.close();
+      return;
+    }
 
     const liveWb = getWb();
     const applyOutlineToRange = (): void => {
@@ -1209,7 +1287,16 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     renderPreview();
   };
   const onUnderlineChange = (): void => {
-    draft.underline = underlineCk.input.checked;
+    switch (underlineSelect.value) {
+      case 'single':
+      case 'double':
+      case 'singleAccounting':
+      case 'doubleAccounting':
+        draft.underline = underlineSelect.value;
+        break;
+      default:
+        draft.underline = false;
+    }
     normalFontCk.input.checked = false;
     renderPreview();
   };
@@ -1283,7 +1370,6 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   // Border events
   const onBorderStyleChange = (): void => {
     draft.borderStyle = borderStyleSelect.value as BorderStyleKey;
-    restyleExistingSides();
     pendingBorderPreset = null;
     syncControlsFromDraft();
     renderPreview();
@@ -1294,20 +1380,17 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     if (!style) return;
     draft.borderStyle = style;
     borderStyleSelect.value = style;
-    restyleExistingSides();
     pendingBorderPreset = null;
     syncControlsFromDraft();
     renderPreview();
   };
   const onBorderColorInput = (): void => {
     draft.borderColor = borderColorInput.value;
-    restyleExistingSides();
     renderPreview();
   };
   const onBorderColorReset = (): void => {
     draft.borderColor = undefined;
     borderSwatches.setValue(null);
-    restyleExistingSides();
     renderPreview();
   };
   const onBorderSwatchClick = (e: Event): void => {
@@ -1316,7 +1399,6 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     if (!color) return;
     draft.borderColor = color;
     borderColorInput.value = color;
-    restyleExistingSides();
     renderPreview();
   };
 
@@ -1400,7 +1482,14 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
   const onFillPatternChange = (): void => {
     draft.fillPattern = (fillPatternSelect.value || undefined) as FillPattern | undefined;
+    syncControlsFromDraft();
     renderPreview();
+  };
+  const onFillPatternGalleryClick = (e: Event): void => {
+    const button = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-fc-fill-pattern]');
+    if (!button) return;
+    fillPatternSelect.value = button.dataset.fcFillPattern ?? '';
+    onFillPatternChange();
   };
   const onFillPatternColorInput = (): void => {
     draft.fillPatternColor = fillPatternColorInput.value;
@@ -1550,7 +1639,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   shell.on(alignPreviewDial, 'click', onDialClick);
   shell.on(boldCk.input, 'change', onBoldChange);
   shell.on(italicCk.input, 'change', onItalicChange);
-  shell.on(underlineCk.input, 'change', onUnderlineChange);
+  shell.on(underlineSelect, 'change', onUnderlineChange);
   shell.on(strikeCk.input, 'change', onStrikeChange);
   shell.on(normalFontCk.input, 'change', onNormalFontChange);
   shell.on(fontStyleList, 'click', onFontStyleListClick as EventListener);
@@ -1577,6 +1666,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   shell.on(fillInput, 'input', onFillInput);
   shell.on(fillReset, 'click', onFillReset);
   shell.on(fillPatternSelect, 'change', onFillPatternChange);
+  shell.on(fillPatternGallery, 'click', onFillPatternGalleryClick);
   shell.on(fillPatternColorInput, 'input', onFillPatternColorInput);
   shell.on(fillSwatches.el, 'click', onFillSwatchClick);
   shell.on(lockedCk.input, 'change', onLockedChange);
@@ -1614,7 +1704,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
 
   const api: FormatDialogHandle = {
     open(tab?: TabId, options?: FormatDialogOpenOptions): void {
-      hydrateFromActive();
+      applyDxf = options?.mode === 'dxf' ? (options.onApplyDxf ?? null) : null;
+      hydrateFromActive(options?.initialFormat);
       setDialogMode(options?.mode);
       if (tab && tabButtons.has(tab)) setActiveTab(tab);
       if (options?.mode === 'dataValidation') setActiveTab('more');
