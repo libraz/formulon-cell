@@ -93,7 +93,9 @@ export const createSpreadsheetStore = () =>
       copyRanges: null,
       showGridLines: true,
       showHeaders: true,
+      showZeros: true,
       showFormulas: false,
+      endMode: false,
       workbookView: 'normal',
       editorRefs: [],
       r1c1: false,
@@ -255,8 +257,16 @@ export const mutators = {
     store.setState((s) => ({ ...s, ui: { ...s.ui, showHeaders: on } }));
   },
 
+  setShowZeros(store: SpreadsheetStore, on: boolean): void {
+    store.setState((s) => ({ ...s, ui: { ...s.ui, showZeros: on } }));
+  },
+
   setShowFormulas(store: SpreadsheetStore, on: boolean): void {
     store.setState((s) => ({ ...s, ui: { ...s.ui, showFormulas: on } }));
+  },
+
+  setEndMode(store: SpreadsheetStore, on: boolean): void {
+    store.setState((s) => ({ ...s, ui: { ...s.ui, endMode: on } }));
   },
 
   setSheetBackgroundImage(store: SpreadsheetStore, sheet: number, url: string | undefined): void {

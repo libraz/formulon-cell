@@ -96,9 +96,11 @@ describe('dictionaries', () => {
       'ドロップダウン矢印の非表示状態',
     );
     expect(ja.workbookObjects.compatibilityDetails.comments).toContain('コメント列挙 API');
+    expect(ja.workbookObjects.compatibilityDetails.phonetic).toContain('rPh');
     expect(ja.workbookObjects.compatibilityDetails.definedNames).toContain(
       'シート スコープの名前定義',
     );
+    expect(ja.workbookObjects.compatibilityDetails.autoFilter).toContain('オートフィルター');
     expect(ja.cfRulesDialog.stopIfTrueUnavailable).toBe(
       'ここでは「条件を満たす場合は停止」の編集はまだ使用できません。',
     );

@@ -161,6 +161,7 @@ export interface Strings {
     tabBorder: string;
     tabFill: string;
     tabMore: string;
+    moreHint: string;
     catGeneral: string;
     catFixed: string;
     catCurrency: string;
@@ -169,7 +170,7 @@ export interface Strings {
     catScientific: string;
     catDate: string;
     catTime: string;
-    catDateTime: string;
+    catFraction: string;
     catText: string;
     catOther: string;
     catCustom: string;
@@ -181,7 +182,7 @@ export interface Strings {
     descScientific: string;
     descDate: string;
     descTime: string;
-    descDateTime: string;
+    descFraction: string;
     descText: string;
     descOther: string;
     descCustom: string;
@@ -229,6 +230,11 @@ export interface Strings {
     fontBold: string;
     fontItalic: string;
     fontUnderline: string;
+    fontUnderlineNone: string;
+    fontUnderlineSingle: string;
+    fontUnderlineDouble: string;
+    fontUnderlineSingleAccounting: string;
+    fontUnderlineDoubleAccounting: string;
     fontStrike: string;
     fontStyle: string;
     fontRegular: string;
@@ -255,6 +261,13 @@ export interface Strings {
     borderStyleDashed: string;
     borderStyleDotted: string;
     borderStyleDouble: string;
+    borderStyleHair: string;
+    borderStyleMediumDashed: string;
+    borderStyleDashDot: string;
+    borderStyleMediumDashDot: string;
+    borderStyleDashDotDot: string;
+    borderStyleMediumDashDotDot: string;
+    borderStyleSlantDashDot: string;
     borderPresetNone: string;
     borderPresetOutline: string;
     borderPresetAll: string;
@@ -264,12 +277,22 @@ export interface Strings {
     fillPatternColor: string;
     fillPatternSolid: string;
     fillPatternGray125: string;
+    fillPatternGray0625: string;
     fillPatternGray25: string;
     fillPatternGray50: string;
-    fillPatternHorizontal: string;
-    fillPatternVertical: string;
-    fillPatternDiagonalDown: string;
-    fillPatternDiagonalUp: string;
+    fillPatternGray75: string;
+    fillPatternDarkHorizontal: string;
+    fillPatternDarkVertical: string;
+    fillPatternDarkDown: string;
+    fillPatternDarkUp: string;
+    fillPatternDarkGrid: string;
+    fillPatternDarkTrellis: string;
+    fillPatternLightHorizontal: string;
+    fillPatternLightVertical: string;
+    fillPatternLightDown: string;
+    fillPatternLightUp: string;
+    fillPatternLightGrid: string;
+    fillPatternLightTrellis: string;
     hyperlink: string;
     hyperlinkPlaceholder: string;
     comment: string;
@@ -418,6 +441,8 @@ export interface Strings {
     editRuleTitle: string;
     styleLabel: string;
     styleClassic: string;
+    styleTwoColorScale: string;
+    styleThreeColorScale: string;
     rangeLabel: string;
     rangeAuto: string;
     addRule: string;
@@ -458,6 +483,9 @@ export interface Strings {
     formatYellowFill: string;
     formatGreenFill: string;
     formatRedText: string;
+    formatLightRedFill: string;
+    formatRedBorder: string;
+    formatCustom: string;
     formatPlain: string;
     previewText: string;
     bold: string;
@@ -689,6 +717,7 @@ export interface Strings {
   };
   statusBar: {
     ready: string;
+    endMode: string;
     enter: string;
     edit: string;
     point: string;
@@ -740,6 +769,7 @@ export interface Strings {
     pageBreakPreview: string;
     gridlines: string;
     headings: string;
+    zeros: string;
     formulas: string;
     r1c1: string;
     freezeNone: string;
@@ -835,7 +865,10 @@ export interface Strings {
       dataValidation: string;
       hyperlinks: string;
       comments: string;
+      phonetic: string;
       definedNames: string;
+      namedCellStyles: string;
+      autoFilter: string;
       sheetProtection: string;
       sheetViews: string;
       loadedTables: string;
@@ -853,7 +886,10 @@ export interface Strings {
       dataValidation: string;
       hyperlinks: string;
       comments: string;
+      phonetic: string;
       definedNames: string;
+      namedCellStyles: string;
+      autoFilter: string;
       sheetProtection: string;
       sheetViews: string;
       loadedTables: string;

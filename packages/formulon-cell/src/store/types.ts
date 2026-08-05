@@ -43,10 +43,27 @@ export type CellAlign =
   | 'distributed';
 export type CellVAlign = 'top' | 'middle' | 'bottom' | 'justify' | 'distributed';
 export type TextDirection = 'context' | 'ltr' | 'rtl';
+/** OOXML font underline variants. `true` remains a legacy alias for single. */
+export type UnderlineStyle = 'single' | 'double' | 'singleAccounting' | 'doubleAccounting';
 export type FillPattern =
   | 'gray125'
+  | 'gray0625'
   | 'gray25'
   | 'gray50'
+  | 'gray75'
+  | 'darkHorizontal'
+  | 'darkVertical'
+  | 'darkDown'
+  | 'darkUp'
+  | 'darkGrid'
+  | 'darkTrellis'
+  | 'lightHorizontal'
+  | 'lightVertical'
+  | 'lightDown'
+  | 'lightUp'
+  | 'lightGrid'
+  | 'lightTrellis'
+  /** Legacy aliases accepted on input; the UI writes the OOXML names above. */
   | 'horizontal'
   | 'vertical'
   | 'diagonalDown'
@@ -98,7 +115,7 @@ export interface CellFormat {
   numFmt?: NumFmt;
   bold?: boolean;
   italic?: boolean;
-  underline?: boolean;
+  underline?: boolean | UnderlineStyle;
   strike?: boolean;
   align?: CellAlign;
   /** Vertical alignment. Default is 'bottom'. */
@@ -307,9 +324,13 @@ export interface UiSlice {
   showGridLines: boolean;
   /** When false, the renderer hides the row-number / column-letter strips. */
   showHeaders: boolean;
+  /** When false, numeric zero values are painted as blank cells. */
+  showZeros: boolean;
   /** When true, formula cells display the formula text instead of the
    *  evaluated value. Equivalent to the desktop-spreadsheet "Show Formulas" (Ctrl+`). */
   showFormulas: boolean;
+  /** Excel End mode: the next arrow key jumps to the edge of the current data region. */
+  endMode: boolean;
   /** Workbook view mode surfaced by View > Workbook Views. The renderer keeps
    *  the grid model identical for now; chrome stamps the mode on the host so
    *  themes and wrappers can distinguish Normal, Page Layout, and Page Break Preview. */
