@@ -1,3 +1,4 @@
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import {
   mutators,
   type SpreadsheetStore,
@@ -8,13 +9,39 @@ import {
 import type { History } from './history.js';
 
 /** Toggle worksheet gridlines. */
-export function setGridlinesVisible(store: SpreadsheetStore, visible: boolean): void {
+export function setGridlinesVisible(
+  store: SpreadsheetStore,
+  visible: boolean,
+  wb: WorkbookHandle | null = null,
+): void {
   mutators.setShowGridLines(store, visible);
+  if (wb && typeof wb.setSheetShowGridLines === 'function') {
+    wb.setSheetShowGridLines(store.getState().data.sheetIndex, visible);
+  }
 }
 
 /** Toggle row/column headings. */
-export function setHeadingsVisible(store: SpreadsheetStore, visible: boolean): void {
+export function setHeadingsVisible(
+  store: SpreadsheetStore,
+  visible: boolean,
+  wb: WorkbookHandle | null = null,
+): void {
   mutators.setShowHeaders(store, visible);
+  if (wb && typeof wb.setSheetShowRowColHeaders === 'function') {
+    wb.setSheetShowRowColHeaders(store.getState().data.sheetIndex, visible);
+  }
+}
+
+/** Toggle whether numeric zero values are displayed. */
+export function setZerosVisible(
+  store: SpreadsheetStore,
+  visible: boolean,
+  wb: WorkbookHandle | null = null,
+): void {
+  mutators.setShowZeros(store, visible);
+  if (wb && typeof wb.setSheetShowZeros === 'function') {
+    wb.setSheetShowZeros(store.getState().data.sheetIndex, visible);
+  }
 }
 
 /** Toggle formula text display. */

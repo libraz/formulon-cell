@@ -43,6 +43,12 @@ export function detectCapabilities(wb: Workbook): EngineCapabilities {
     sheetView: has('getSheetView'),
     sheetZoom: has('setSheetZoom'),
     sheetTabHidden: has('setSheetTabHidden'),
+    sheetViewFlags: all(
+      'setSheetShowGridLines',
+      'setSheetShowRowColHeaders',
+      'setSheetShowZeros',
+      'setSheetRightToLeft',
+    ),
     outlines: all('setColumnOutline', 'setRowOutline'),
     comments: all('getComment', 'setComment'),
     commentsEnumerable: has('getComments'),

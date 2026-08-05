@@ -71,6 +71,7 @@ describe('detectCapabilities', () => {
     expect(caps.sheetView).toBe(false);
     expect(caps.sheetZoom).toBe(false);
     expect(caps.sheetTabHidden).toBe(false);
+    expect(caps.sheetViewFlags).toBe(false);
     expect(caps.outlines).toBe(false);
     expect(caps.comments).toBe(false);
     expect(caps.commentsEnumerable).toBe(false);
@@ -100,6 +101,19 @@ describe('detectCapabilities', () => {
     expect(caps.sheetZoom).toBe(false);
     expect(caps.freeze).toBe(false);
     expect(caps.sheetTabHidden).toBe(false);
+  });
+
+  it('sheet view display flags require every paired setter', () => {
+    const partial = makeWb(['setSheetShowGridLines', 'setSheetShowRowColHeaders']);
+    expect(detectCapabilities(partial).sheetViewFlags).toBe(false);
+
+    const full = makeWb([
+      'setSheetShowGridLines',
+      'setSheetShowRowColHeaders',
+      'setSheetShowZeros',
+      'setSheetRightToLeft',
+    ]);
+    expect(detectCapabilities(full).sheetViewFlags).toBe(true);
   });
 
   it('arrayFormulaEvaluation is independent from scalar formula evaluation', () => {

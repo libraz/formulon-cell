@@ -183,12 +183,18 @@ export abstract class WorkbookHandleFeatureMethods {
     return s.ok;
   }
 
-  /** Snapshot of `sheet`'s view: zoom percentage, frozen-pane counts, and the
-   *  tab-hidden flag. Returns null when the engine doesn't expose `getSheetView`
-   *  (i.e. the stub or an older bundle). */
-  getSheetView(
-    sheet: number,
-  ): { zoomScale: number; freezeRows: number; freezeCols: number; tabHidden: boolean } | null {
+  /** Snapshot of `sheet`'s view, including display flags. Returns null when
+   *  the engine doesn't expose `getSheetView` (i.e. the stub or an older bundle). */
+  getSheetView(sheet: number): {
+    zoomScale: number;
+    freezeRows: number;
+    freezeCols: number;
+    tabHidden: boolean;
+    showGridLines: boolean;
+    showRowColHeaders: boolean;
+    showZeros: boolean;
+    rightToLeft: boolean;
+  } | null {
     assertAlive(this);
     if (!this.capabilities.sheetView) return null;
     const r = wb(this).getSheetView(sheet);
@@ -198,7 +204,35 @@ export abstract class WorkbookHandleFeatureMethods {
       freezeRows: r.view.freezeRows,
       freezeCols: r.view.freezeCols,
       tabHidden: r.view.tabHidden !== 0,
+      showGridLines: r.view.showGridLines !== 0,
+      showRowColHeaders: r.view.showRowColHeaders !== 0,
+      showZeros: r.view.showZeros !== 0,
+      rightToLeft: r.view.rightToLeft !== 0,
     };
+  }
+
+  setSheetShowGridLines(sheet: number, show: boolean): boolean {
+    assertAlive(this);
+    if (!this.capabilities.sheetViewFlags) return false;
+    return wb(this).setSheetShowGridLines(sheet, show).ok;
+  }
+
+  setSheetShowRowColHeaders(sheet: number, show: boolean): boolean {
+    assertAlive(this);
+    if (!this.capabilities.sheetViewFlags) return false;
+    return wb(this).setSheetShowRowColHeaders(sheet, show).ok;
+  }
+
+  setSheetShowZeros(sheet: number, show: boolean): boolean {
+    assertAlive(this);
+    if (!this.capabilities.sheetViewFlags) return false;
+    return wb(this).setSheetShowZeros(sheet, show).ok;
+  }
+
+  setSheetRightToLeft(sheet: number, rightToLeft: boolean): boolean {
+    assertAlive(this);
+    if (!this.capabilities.sheetViewFlags) return false;
+    return wb(this).setSheetRightToLeft(sheet, rightToLeft).ok;
   }
 
   /** Insert `count` blank rows at `row` on `sheet`. The engine rewrites

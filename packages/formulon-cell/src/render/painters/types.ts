@@ -15,6 +15,8 @@ export interface CellPaintCtx {
   /** When true and `formula` is non-null, paint the formula text instead of
    *  the evaluated value (the desktop-spreadsheet "Show Formulas" mode). */
   showFormulas?: boolean;
+  /** Whether numeric zero values should be painted. */
+  showZeros?: boolean;
   /** Override the displayed string. Set by `paintCells` after consulting
    *  the cell registry (`inst.cells.registerFormatter`). When non-null
    *  the formatter wins over numFmt + default `formatCell`. Empty string

@@ -578,6 +578,7 @@ export class GridRenderer {
           isInRange,
           format: effectiveFmt,
           showFormulas: state.ui.showFormulas === true,
+          showZeros: state.ui.showZeros !== false,
           displayOverride,
           locale,
         };

@@ -61,6 +61,17 @@ interface SetRowOutlineCall {
   level: number;
 }
 
+interface FakeSheetView {
+  zoomScale: number;
+  freezeRows: number;
+  freezeCols: number;
+  tabHidden: boolean;
+  showGridLines?: boolean;
+  showRowColHeaders?: boolean;
+  showZeros?: boolean;
+  rightToLeft?: boolean;
+}
+
 interface FakeWb {
   wb: WorkbookHandle;
   colCalls: SetColCall[];
@@ -82,11 +93,8 @@ const makeFake = (opts: {
   sheetCount?: number;
   cols?: FakeColLayout[];
   rows?: FakeRowLayout[];
-  view?: { zoomScale: number; freezeRows: number; freezeCols: number; tabHidden: boolean } | null;
-  views?: Record<
-    number,
-    { zoomScale: number; freezeRows: number; freezeCols: number; tabHidden: boolean }
-  >;
+  view?: FakeSheetView | null;
+  views?: Record<number, FakeSheetView>;
 }): FakeWb => {
   const colCalls: SetColCall[] = [];
   const rowCalls: SetRowCall[] = [];
@@ -227,6 +235,27 @@ describe('hydrateLayoutFromEngine', () => {
     expect(s.layout.freezeRows).toBe(1);
     expect(s.layout.freezeCols).toBe(2);
     expect(s.layout.hiddenSheets.has(1)).toBe(true);
+  });
+
+  it('hydrates gridline and heading visibility from sheetView', () => {
+    const { wb } = makeFake({
+      colRowSize: false,
+      view: {
+        zoomScale: 100,
+        freezeRows: 0,
+        freezeCols: 0,
+        tabHidden: false,
+        showGridLines: false,
+        showRowColHeaders: false,
+      },
+    });
+    const store = createSpreadsheetStore();
+
+    hydrateLayoutFromEngine(wb, store, 0);
+
+    expect(store.getState().ui.showGridLines).toBe(false);
+    expect(store.getState().ui.showHeaders).toBe(false);
+    expect(store.getState().ui.showZeros).toBe(true);
   });
 
   it('leaves zoom at 1.0 when engine reports the default 100%', () => {

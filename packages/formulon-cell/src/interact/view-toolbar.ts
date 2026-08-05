@@ -7,6 +7,7 @@ import {
   setR1C1ReferenceStyle,
   setShowFormulas,
   setWorkbookView,
+  setZerosVisible,
 } from '../commands/view.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -61,9 +62,10 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
 
   const gridlines = createViewToolbarButton('fc-viewbar__toggle');
   const headings = createViewToolbarButton('fc-viewbar__toggle');
+  const zeros = createViewToolbarButton('fc-viewbar__toggle');
   const formulas = createViewToolbarButton('fc-viewbar__toggle');
   const r1c1 = createViewToolbarButton('fc-viewbar__toggle');
-  toggles.append(gridlines, headings, formulas, r1c1);
+  toggles.append(gridlines, headings, zeros, formulas, r1c1);
 
   const freeze = document.createElement('div');
   freeze.className = 'fc-viewbar__group';
@@ -109,11 +111,15 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
   };
 
   gridlines.addEventListener('click', () => {
-    setGridlinesVisible(store, !store.getState().ui.showGridLines);
+    setGridlinesVisible(store, !store.getState().ui.showGridLines, wb);
     applyChanged();
   });
   headings.addEventListener('click', () => {
-    setHeadingsVisible(store, !store.getState().ui.showHeaders);
+    setHeadingsVisible(store, !store.getState().ui.showHeaders, wb);
+    applyChanged();
+  });
+  zeros.addEventListener('click', () => {
+    setZerosVisible(store, !store.getState().ui.showZeros, wb);
     applyChanged();
   });
   formulas.addEventListener('click', () => {
@@ -193,6 +199,7 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
     pageBreakPreview.textContent = t.pageBreakPreview;
     gridlines.textContent = t.gridlines;
     headings.textContent = t.headings;
+    zeros.textContent = t.zeros;
     formulas.textContent = t.formulas;
     r1c1.textContent = t.r1c1;
     freezeNone.textContent = t.freezeNone;
@@ -211,6 +218,7 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
       pageBreakPreview,
       gridlines,
       headings,
+      zeros,
       formulas,
       r1c1,
       freezeNone,
@@ -233,6 +241,7 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
     refreshLabels();
     gridlines.setAttribute('aria-pressed', String(s.ui.showGridLines));
     headings.setAttribute('aria-pressed', String(s.ui.showHeaders));
+    zeros.setAttribute('aria-pressed', String(s.ui.showZeros));
     formulas.setAttribute('aria-pressed', String(s.ui.showFormulas));
     r1c1.setAttribute('aria-pressed', String(s.ui.r1c1));
     normalView.setAttribute('aria-pressed', String(s.ui.workbookView === 'normal'));

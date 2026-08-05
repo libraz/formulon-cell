@@ -78,7 +78,21 @@ export function hydrateLayoutFromEngine(
         ? { ...s.viewport, zoom: Math.max(0.5, Math.min(4, view.zoomScale / 100)) }
         : s.viewport;
 
-    return { ...s, layout, viewport };
+    return {
+      ...s,
+      layout,
+      viewport,
+      ui: view
+        ? {
+            ...s.ui,
+            // OOXML defaults these flags to visible. The nullish fallback
+            // also keeps older/custom WorkbookHandle adapters compatible.
+            showGridLines: view.showGridLines !== false,
+            showHeaders: view.showRowColHeaders !== false,
+            showZeros: view.showZeros !== false,
+          }
+        : s.ui,
+    };
   });
 }
 

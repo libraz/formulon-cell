@@ -245,6 +245,9 @@ export interface EngineCapabilities {
   readonly sheetZoom: boolean;
   /** `setSheetTabHidden`. */
   readonly sheetTabHidden: boolean;
+  /** Read/write display flags on `<sheetView>`: gridlines, row/column
+   *  headers, zeros, and right-to-left direction. */
+  readonly sheetViewFlags?: boolean;
   /** `setColumnOutline` + `setRowOutline`. */
   readonly outlines: boolean;
   /** `getComment` + `setComment`. */

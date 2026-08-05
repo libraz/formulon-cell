@@ -18,12 +18,19 @@ const fakeWb = () =>
       outlines: false,
       freeze: true,
       sheetTabHidden: false,
+      sheetViewFlags: true,
     },
     setSheetFreeze: vi.fn(),
     setSheetZoom: vi.fn(),
+    setSheetShowGridLines: vi.fn(),
+    setSheetShowRowColHeaders: vi.fn(),
+    setSheetShowZeros: vi.fn(),
   }) as unknown as WorkbookHandle & {
     setSheetFreeze: ReturnType<typeof vi.fn>;
     setSheetZoom: ReturnType<typeof vi.fn>;
+    setSheetShowGridLines: ReturnType<typeof vi.fn>;
+    setSheetShowRowColHeaders: ReturnType<typeof vi.fn>;
+    setSheetShowZeros: ReturnType<typeof vi.fn>;
   };
 
 describe('attachViewToolbar', () => {
@@ -51,6 +58,7 @@ describe('attachViewToolbar', () => {
     });
 
     const gridlines = toolbar.querySelector<HTMLButtonElement>('button[aria-label="Gridlines"]');
+    const zeros = toolbar.querySelector<HTMLButtonElement>('button[aria-label="Zero Values"]');
     const formulas = toolbar.querySelector<HTMLButtonElement>('button[aria-label="Formulas"]');
     const r1c1 = toolbar.querySelector<HTMLButtonElement>('button[aria-label="R1C1"]');
     const pageBreak = toolbar.querySelector<HTMLButtonElement>(
@@ -62,6 +70,7 @@ describe('attachViewToolbar', () => {
 
     pageBreak?.click();
     gridlines?.click();
+    zeros?.click();
     formulas?.click();
     r1c1?.click();
 
@@ -69,9 +78,12 @@ describe('attachViewToolbar', () => {
     expect(pageBreak?.getAttribute('aria-pressed')).toBe('true');
     expect(normal?.getAttribute('aria-pressed')).toBe('false');
     expect(store.getState().ui.showGridLines).toBe(false);
+    expect(wb.setSheetShowGridLines).toHaveBeenLastCalledWith(0, false);
+    expect(store.getState().ui.showZeros).toBe(false);
+    expect(wb.setSheetShowZeros).toHaveBeenLastCalledWith(0, false);
     expect(store.getState().ui.showFormulas).toBe(true);
     expect(store.getState().ui.r1c1).toBe(true);
-    expect(invalidate).toHaveBeenCalledTimes(4);
+    expect(invalidate).toHaveBeenCalledTimes(5);
     handle.detach();
   });
 
