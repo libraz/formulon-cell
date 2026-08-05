@@ -115,6 +115,7 @@ import {
   recordConditionalRulesChange,
   recordDefinedNamesChange,
   recordFormatChange,
+  recordRepeatableFormatChange,
   recordTablesChange,
   recordWatchesChange,
   removeDuplicates,
@@ -507,30 +508,14 @@ const updateFreezeMenu =
 const buildUnderlineAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyUnderlineAction'] =>
   async (action) => {
-    const strings = instance.i18n.strings;
-    const ribbonMenu = strings.ribbonMenu as typeof strings.ribbonMenu & {
-      underlineDouble: string;
-    };
-    const doubleUnderlineLabel = ribbonMenu.underlineDouble;
-    if (action === 'single') {
-      recordFormatChange(instance.history, instance.store, () => {
-        applyFormatPatch(
-          instance.store.getState(),
-          instance.store,
-          instance.store.getState().selection.range,
-          { underline: true },
-        );
-      });
-      instance.host.focus();
-      return;
-    }
-    await showInstanceReport(instance, doubleUnderlineLabel, [
-      {
-        severity: 'warning',
-        label: doubleUnderlineLabel,
-        detail: strings.workbookObjects.compatibilityDetails.cellFormatting,
-      },
-    ]);
+    recordRepeatableFormatChange(instance.history, instance.store, () => {
+      applyFormatPatch(
+        instance.store.getState(),
+        instance.store,
+        instance.store.getState().selection.range,
+        { underline: action === 'single' ? true : 'double' },
+      );
+    });
     instance.host.focus();
   };
 
@@ -564,7 +549,7 @@ const buildWrapAction =
       action === 'shrinkToFit'
         ? { shrinkToFit: true, wrap: false }
         : { wrap: true, shrinkToFit: false };
-    recordFormatChange(instance.history, instance.store, () => {
+    recordRepeatableFormatChange(instance.history, instance.store, () => {
       applyFormatPatch(
         instance.store.getState(),
         instance.store,
@@ -592,7 +577,7 @@ const buildTextOrientation =
     };
     const rotation = rotations[action];
     if (typeof rotation !== 'number') return;
-    recordFormatChange(instance.history, instance.store, () => {
+    recordRepeatableFormatChange(instance.history, instance.store, () => {
       setRotation(instance.store.getState(), instance.store, rotation);
     });
     instance.host.focus();
@@ -2355,7 +2340,7 @@ const updateCellStylesMenu =
 const buildCurrencyPresetAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyCurrencyPreset'] =>
   (symbol) => {
-    recordFormatChange(instance.history, instance.store, () => {
+    recordRepeatableFormatChange(instance.history, instance.store, () => {
       setNumFmt(instance.store.getState(), instance.store, {
         kind: 'currency',
         decimals: 2,

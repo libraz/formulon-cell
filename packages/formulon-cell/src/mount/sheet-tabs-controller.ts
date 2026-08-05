@@ -42,6 +42,7 @@ interface SheetTabsControllerInput {
 }
 
 export interface SheetTabsController {
+  addSheet(): void;
   closeMenu(): void;
   detach(): void;
   showMenu(idx: number, tab: HTMLButtonElement, x: number, y: number): void;
@@ -470,12 +471,13 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
 
   const firstSheetRepeater = createSheetNavRepeater(firstSheet, -1);
   const lastSheetRepeater = createSheetNavRepeater(lastSheet, 1);
-  const onAddSheetClick = (): void => {
+  const addAndSwitchSheet = (): void => {
     const idx = addSheet(store, getWb(), history);
     if (idx < 0) return;
     switchSheet(idx);
     update();
   };
+  const onAddSheetClick = (): void => addAndSwitchSheet();
   const onSheetMenuPointerDown = (e: PointerEvent): void => {
     if (sheetMenu.hidden) return;
     const target = e.target;
@@ -522,6 +524,7 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
   document.addEventListener('keydown', onSheetMenuKeyDown);
 
   return {
+    addSheet: addAndSwitchSheet,
     closeMenu,
     detach(): void {
       firstSheetRepeater.detach();

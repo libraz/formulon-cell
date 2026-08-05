@@ -6,7 +6,7 @@
 // select/color factory need it.
 
 import { setAlign, setFillColor, setFont, setFontColor, setNumFmt } from '../../commands/format.js';
-import { recordFormatChange, recordPageSetupChange } from '../../commands/history.js';
+import { recordPageSetupChange, recordRepeatableFormatChange } from '../../commands/history.js';
 import { applyMerge, applyUnmerge, mergeWillLoseData } from '../../commands/merge.js';
 import {
   type MarginPreset,
@@ -143,7 +143,7 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
   const applyRibbonFormat = (fn: RibbonFormatMutator): void => {
     const i = getInst();
     if (!i) return;
-    recordFormatChange(i.history, i.store, () => {
+    recordRepeatableFormatChange(i.history, i.store, () => {
       fn(i.store.getState(), i.store);
     });
     sheetEl.focus();

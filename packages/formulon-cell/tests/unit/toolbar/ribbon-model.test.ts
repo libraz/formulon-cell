@@ -11,6 +11,7 @@ import {
   HOME_MIXED_LAYOUT_GROUP_VARIANTS,
   HOME_STACKED_LAYOUT_GROUP_VARIANTS,
   HOME_TILE_LAYOUT_GROUP_VARIANTS,
+  matchesRibbonShortcut,
   OPTIONAL_RIBBON_TABS,
   pageScaleMenuText,
   ribbonActivatableCommandIds,
@@ -27,6 +28,33 @@ import {
 describe('toolbar/ribbon-model', () => {
   const ribbonStylesDir = join(process.cwd(), 'src/styles/toolbar/ribbon');
   const toolbarBaseDir = join(process.cwd(), 'src/styles/toolbar/base');
+
+  it('uses the ARIA shortcut declaration as the exact host-event matcher', () => {
+    expect(
+      matchesRibbonShortcut(new KeyboardEvent('keydown', { key: 'f', ctrlKey: true }), 'findHome'),
+    ).toBe(true);
+    expect(
+      matchesRibbonShortcut(
+        new KeyboardEvent('keydown', { key: 'F', metaKey: true }),
+        'findReview',
+      ),
+    ).toBe(true);
+    expect(
+      matchesRibbonShortcut(
+        new KeyboardEvent('keydown', { key: 'f', ctrlKey: true, shiftKey: true }),
+        'findHome',
+      ),
+    ).toBe(false);
+    expect(
+      matchesRibbonShortcut(
+        new KeyboardEvent('keydown', { key: 'F3', metaKey: true }),
+        'namedRanges',
+      ),
+    ).toBe(false);
+    expect(matchesRibbonShortcut(new KeyboardEvent('keydown', { key: 'F9' }), 'recalcNow')).toBe(
+      true,
+    );
+  });
 
   it('keeps the shared core ribbon command surface unique within each tab', () => {
     const keys = buildRibbonModel('en').flatMap((tab) =>

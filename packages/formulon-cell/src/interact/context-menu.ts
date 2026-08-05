@@ -1,3 +1,4 @@
+import { deleteCells, insertCells } from '../commands/cell-shift.js';
 import { copy } from '../commands/clipboard/copy.js';
 import { cut } from '../commands/clipboard/cut.js';
 import { insertCopiedCellsFromTSV } from '../commands/clipboard/insert-copied-cells.js';
@@ -21,7 +22,8 @@ import {
   toggleItalic,
   toggleUnderline,
 } from '../commands/format.js';
-import { type History, recordFormatChange } from '../commands/history.js';
+import { type History, recordRepeatableFormatChange } from '../commands/history.js';
+import { hyperlinkAt } from '../commands/hyperlinks.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
 import { inferSortHasHeader, sortRange } from '../commands/sort.js';
 import {
@@ -42,6 +44,7 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { hitZone } from '../render/geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { openCellShiftDialog } from './cell-shift-dialog.js';
 import { createInteractionButton } from './chip-button.js';
 import {
   buildCellEntries,
@@ -94,6 +97,8 @@ export interface ContextMenuDeps {
   /** Called when the user clicks "Insert hyperlink…". When omitted the menu
    *  entry is hidden. */
   onInsertHyperlink?: () => void;
+  /** Opens the active cell's hyperlink after the menu validates its target. */
+  onOpenHyperlink?: (url: string) => void;
   /** Called when the user clicks the Add/Remove Watch entry. When omitted the
    *  menu entry is hidden. */
   onToggleWatch?: (addr: Addr) => void;
@@ -178,7 +183,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   const history = deps.history ?? null;
   if (history) wb.attachHistory(history);
   let strings = deps.strings ?? defaultStrings;
-  const wrapFmt = (fn: () => void): void => recordFormatChange(history, store, fn);
+  const wrapFmt = (fn: () => void): void => recordRepeatableFormatChange(history, store, fn);
 
   const root = document.createElement('div');
   root.className = 'fc-ctxmenu';
@@ -391,6 +396,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         .filter(
           (e) => !(e.kind === 'item' && e.id === 'insertHyperlink' && !deps.onInsertHyperlink),
         )
+        .filter((e) => !(e.kind === 'item' && e.id === 'openHyperlink' && !deps.onOpenHyperlink))
         .filter((e) => !(e.kind === 'item' && e.id === 'insertCopiedCells' && !hasCopiedCells))
         .filter((e) => !(e.kind === 'item' && e.id === 'insertComment' && !deps.onEditComment))
         .filter((e) => !(e.kind === 'item' && e.id === 'toggleWatch' && !deps.onToggleWatch))
@@ -417,11 +423,20 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       hiddenInSelection(s.layout, 'col', s.selection.range.c0, s.selection.range.c1).length > 0;
     const rowUnhide = root.querySelector<HTMLButtonElement>('[data-fc-action="rowUnhide"]');
     const colUnhide = root.querySelector<HTMLButtonElement>('[data-fc-action="colUnhide"]');
+    const openHyperlink = root.querySelector<HTMLButtonElement>('[data-fc-action="openHyperlink"]');
     if (rowUnhide) {
       setContextMenuItemDisabled(rowUnhide, !rowHidden, strings.contextMenu.noHiddenRows);
     }
     if (colUnhide) {
       setContextMenuItemDisabled(colUnhide, !colHidden, strings.contextMenu.noHiddenColumns);
+    }
+    if (openHyperlink) {
+      const target = hyperlinkAt(s, s.selection.active);
+      setContextMenuItemDisabled(
+        openHyperlink,
+        target === null || !isSafeHyperlink(target),
+        strings.ribbonMenu.linkNoHyperlink,
+      );
     }
   };
 
@@ -721,6 +736,32 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         });
         return;
       }
+      case 'insertCells': {
+        openCellShiftDialog({
+          strings,
+          kind: 'insert',
+          onSubmit: (direction) => {
+            if (direction !== 'down' && direction !== 'right') return;
+            if (insertCells(store, wb, history, state.selection.range, direction)) {
+              deps.onAfterCommit?.();
+            }
+          },
+        });
+        return;
+      }
+      case 'deleteCells': {
+        openCellShiftDialog({
+          strings,
+          kind: 'delete',
+          onSubmit: (direction) => {
+            if (direction !== 'up' && direction !== 'left') return;
+            if (deleteCells(store, wb, history, state.selection.range, direction)) {
+              deps.onAfterCommit?.();
+            }
+          },
+        });
+        return;
+      }
       case 'clear': {
         const range = state.selection.range;
         const sheet = range.sheet;
@@ -911,6 +952,12 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         deps.onInsertHyperlink?.();
         return;
       }
+      case 'openHyperlink': {
+        const target = hyperlinkAt(state, state.selection.active);
+        if (!target || !isSafeHyperlink(target)) return;
+        deps.onOpenHyperlink?.(target);
+        return;
+      }
       case 'toggleWatch': {
         deps.onToggleWatch?.(state.selection.active);
         return;
@@ -943,6 +990,16 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
 
 function canReadClipboard(): boolean {
   return typeof navigator !== 'undefined' && typeof navigator.clipboard?.readText === 'function';
+}
+
+function isSafeHyperlink(url: string): boolean {
+  const lower = url.trim().toLowerCase();
+  return (
+    lower.startsWith('http://') ||
+    lower.startsWith('https://') ||
+    lower.startsWith('mailto:') ||
+    lower.startsWith('tel:')
+  );
 }
 
 function setContextMenuItemDisabled(

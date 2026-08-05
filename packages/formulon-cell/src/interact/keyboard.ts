@@ -39,6 +39,54 @@ const isPopulated = (s: State, sheet: number, row: number, col: number): boolean
   return s.data.cells.has(key) || formatHasContent(s.format.formats.get(key));
 };
 
+/** Excel's Current Region: expand from the active cell through adjacent
+ * non-empty rows and columns. It is intentionally based on model content
+ * (including format-only cells), matching the same definition Ctrl+Arrow
+ * uses in this module. */
+function currentRegion(
+  s: State,
+  a: Addr,
+): { sheet: number; r0: number; c0: number; r1: number; c1: number } | null {
+  if (!isPopulated(s, a.sheet, a.row, a.col)) return null;
+  let r0 = a.row;
+  let r1 = a.row;
+  let c0 = a.col;
+  let c1 = a.col;
+  let changed = true;
+  const rowHasContent = (row: number): boolean => {
+    for (let col = c0; col <= c1; col += 1) {
+      if (isPopulated(s, a.sheet, row, col)) return true;
+    }
+    return false;
+  };
+  const colHasContent = (col: number): boolean => {
+    for (let row = r0; row <= r1; row += 1) {
+      if (isPopulated(s, a.sheet, row, col)) return true;
+    }
+    return false;
+  };
+  while (changed) {
+    changed = false;
+    while (r0 > 0 && rowHasContent(r0 - 1)) {
+      r0 -= 1;
+      changed = true;
+    }
+    while (r1 < MAX_ROW && rowHasContent(r1 + 1)) {
+      r1 += 1;
+      changed = true;
+    }
+    while (c0 > 0 && colHasContent(c0 - 1)) {
+      c0 -= 1;
+      changed = true;
+    }
+    while (c1 < MAX_COL && colHasContent(c1 + 1)) {
+      c1 += 1;
+      changed = true;
+    }
+  }
+  return { sheet: a.sheet, r0, c0, r1, c1 };
+}
+
 /**
  * Spreadsheet-style Ctrl+Arrow jump. Three behaviors based on neighbor state:
  *  - empty origin            → jump to next populated cell (or sheet edge)
@@ -164,6 +212,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
   const { host, store } = deps;
 
   const onKey = (e: KeyboardEvent): void => {
+    if (e.isComposing || e.key === 'Process') return;
     const s = store.getState();
     if (s.ui.editor.kind !== 'idle') return; // editor handles its own keys.
 
@@ -171,6 +220,15 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     const meta = e.ctrlKey || e.metaKey;
     const shift = e.shiftKey;
     const a = s.selection.active;
+
+    if (k === 'End' && !meta) {
+      e.preventDefault();
+      mutators.setEndMode(store, true);
+      return;
+    }
+    const endModeArrow =
+      s.ui.endMode && !meta && /^(ArrowUp|ArrowDown|ArrowLeft|ArrowRight)$/.test(k);
+    if (s.ui.endMode && k !== 'End') mutators.setEndMode(store, false);
 
     // Special-case F5 / Ctrl+G — Go To.
     if (k === 'F5' || (meta && (k === 'g' || k === 'G'))) {
@@ -193,7 +251,20 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
 
     if (meta && (k === 'a' || k === 'A')) {
       e.preventDefault();
-      mutators.selectAll(store);
+      const region = currentRegion(s, a);
+      const selected = s.selection.range;
+      if (
+        region &&
+        (selected.sheet !== region.sheet ||
+          selected.r0 !== region.r0 ||
+          selected.r1 !== region.r1 ||
+          selected.c0 !== region.c0 ||
+          selected.c1 !== region.c1)
+      ) {
+        mutators.setRange(store, region);
+      } else {
+        mutators.selectAll(store);
+      }
       return;
     }
 
@@ -268,13 +339,17 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     let target: Addr | null = null;
 
     if (k === 'ArrowUp')
-      target = meta ? jumpEdge(s, a, -1, 0) : stepWithMerge(s, a, -1, 0, MAX_ROW, MAX_COL);
+      target =
+        meta || endModeArrow ? jumpEdge(s, a, -1, 0) : stepWithMerge(s, a, -1, 0, MAX_ROW, MAX_COL);
     else if (k === 'ArrowDown')
-      target = meta ? jumpEdge(s, a, 1, 0) : stepWithMerge(s, a, 1, 0, MAX_ROW, MAX_COL);
+      target =
+        meta || endModeArrow ? jumpEdge(s, a, 1, 0) : stepWithMerge(s, a, 1, 0, MAX_ROW, MAX_COL);
     else if (k === 'ArrowLeft')
-      target = meta ? jumpEdge(s, a, 0, -1) : stepWithMerge(s, a, 0, -1, MAX_ROW, MAX_COL);
+      target =
+        meta || endModeArrow ? jumpEdge(s, a, 0, -1) : stepWithMerge(s, a, 0, -1, MAX_ROW, MAX_COL);
     else if (k === 'ArrowRight')
-      target = meta ? jumpEdge(s, a, 0, 1) : stepWithMerge(s, a, 0, 1, MAX_ROW, MAX_COL);
+      target =
+        meta || endModeArrow ? jumpEdge(s, a, 0, 1) : stepWithMerge(s, a, 0, 1, MAX_ROW, MAX_COL);
     else if (k === 'Home') target = meta ? clamp(a, 0, 0) : clamp(a, a.row, 0);
     else if (k === 'End' && meta) {
       const { row, col } = lastUsedCell(s, a.sheet);
@@ -299,7 +374,15 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       deps.onBeginEdit(seed);
       e.preventDefault();
       return;
-    } else if (k === 'Backspace' || k === 'Delete') {
+    } else if (k === 'Backspace') {
+      // Backspace clears only the active cell, then enters edit mode. Delete
+      // below deliberately retains its range-clear behavior.
+      deps.wb.setBlank(a);
+      deps.onClearActive();
+      deps.onBeginEdit('');
+      e.preventDefault();
+      return;
+    } else if (k === 'Delete') {
       // Delete clears the entire selection range — spreadsheet parity.
       const range = s.selection.range;
       const sheet = range.sheet;

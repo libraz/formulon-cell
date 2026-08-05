@@ -216,6 +216,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         onFormatDialog: () => getFormatDialog()?.open(),
         onPasteSpecial: () => pasteSpecialDialog?.open(),
         onInsertHyperlink: () => getHyperlinkDialog()?.open(),
+        onOpenHyperlink: (url) => window.open(url, '_blank', 'noopener,noreferrer'),
         onEditComment: () => getCommentDialog()?.open(),
         onDefineName: () => getNamedRangeDialog()?.open(),
         getClipboardSnapshot: clipboardH ? () => clipboardH.getSnapshot() : undefined,

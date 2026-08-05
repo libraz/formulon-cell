@@ -1,4 +1,5 @@
-.fc-insertcopied {
+.fc-insertcopied,
+.fc-cellshift {
   position: fixed;
   inset: 0;
   z-index: 2147483600;
@@ -24,18 +25,21 @@
     0 1px 3px rgba(0, 0, 0, 0.14);
 }
 
-.fc-insertcopied__title {
+.fc-insertcopied__title,
+.fc-cellshift__title {
   margin-bottom: 10px;
   font-weight: 600;
 }
 
-.fc-insertcopied__choices {
+.fc-insertcopied__choices,
+.fc-cellshift__choices {
   display: grid;
   gap: 4px;
   margin-bottom: 14px;
 }
 
-.fc-insertcopied__choice {
+.fc-insertcopied__choice,
+.fc-cellshift__choice {
   display: grid;
   grid-template-columns: 16px 1fr;
   column-gap: 6px;
@@ -44,20 +48,23 @@
   cursor: default;
 }
 
-.fc-insertcopied__choice input {
+.fc-insertcopied__choice input,
+.fc-cellshift__choice input {
   position: absolute;
   opacity: 0;
   pointer-events: none;
 }
 
-.fc-insertcopied__radio {
+.fc-insertcopied__radio,
+.fc-cellshift__radio {
   width: 14px;
   height: 14px;
   border-radius: 999px;
   background: var(--fc-rule-subtle);
 }
 
-.fc-insertcopied__choice input:checked + .fc-insertcopied__radio {
+.fc-insertcopied__choice input:checked + .fc-insertcopied__radio,
+.fc-cellshift__choice input:checked + .fc-cellshift__radio {
   box-shadow: inset 0 0 0 4px var(--fc-accent);
   background: var(--fc-bg);
 }
@@ -77,12 +84,40 @@
   font: inherit;
 }
 
-.fc-insertcopied__button--secondary {
+.fc-insertcopied__button--secondary,
+.fc-cellshift__button--secondary {
   background: var(--fc-bg-hover);
   color: var(--fc-fg-strong);
 }
 
-.fc-insertcopied__button--primary {
+.fc-insertcopied__button--primary,
+.fc-cellshift__button--primary {
   background: var(--fc-accent);
   color: var(--fc-accent-fg);
+}
+
+.fc-cellshift__panel {
+  width: 224px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--fc-rule-strong, rgba(0, 0, 0, 0.28));
+  border-radius: 2px;
+  background: var(--fc-bg-elev, Canvas);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.18),
+    0 1px 3px rgba(0, 0, 0, 0.14);
+}
+
+.fc-cellshift__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.fc-cellshift__button {
+  min-width: 78px;
+  min-height: 26px;
+  padding: 3px 12px;
+  border: 1px solid var(--fc-fmtdlg-input-hover-border, var(--fc-rule-strong));
+  border-radius: 2px;
+  font: inherit;
 }

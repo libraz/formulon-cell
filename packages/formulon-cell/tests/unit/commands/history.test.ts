@@ -16,6 +16,7 @@ import {
   recordFormatChange,
   recordLayoutChange,
   recordMergesChange,
+  recordRepeatableFormatChange,
   recordTablesChange,
 } from '../../../src/commands/history.js';
 import {
@@ -82,6 +83,23 @@ describe('History stack', () => {
     });
     expect(h.canRedo()).toBe(false);
     void v;
+  });
+
+  it('repeats only an entry with an explicit selection-aware operation', () => {
+    let repeats = 0;
+    h.push({ undo: () => {}, redo: () => {} });
+    expect(h.repeatLast()).toBe(false);
+
+    h.setRepeat(() => (repeats += 1));
+    expect(h.repeatLast()).toBe(true);
+    expect(repeats).toBe(1);
+
+    h.push({ undo: () => {}, redo: () => {} });
+    expect(h.repeatLast()).toBe(false);
+
+    h.push({ undo: () => {}, redo: () => {}, repeat: () => (repeats += 1) });
+    expect(h.repeatLast()).toBe(true);
+    expect(repeats).toBe(2);
   });
 
   it('suppresses pushes during replay', () => {
@@ -284,6 +302,16 @@ describe('recordFormatChange / recordLayoutChange', () => {
     expect(store.getState().format.formats.get('0:0:0')).toBeUndefined();
     h.redo();
     expect(store.getState().format.formats.get('0:0:0')?.bold).toBe(true);
+  });
+
+  it('repeats a current-selection format command after the selection moves', () => {
+    recordRepeatableFormatChange(h, store, () => {
+      mutators.setCellFormat(store, store.getState().selection.active, { italic: true });
+    });
+    mutators.setActive(store, { sheet: 0, row: 0, col: 1 });
+
+    expect(h.repeatLast()).toBe(true);
+    expect(store.getState().format.formats.get('0:0:1')).toEqual({ italic: true });
   });
 
   it('recordFormatChange skips unchanged format snapshots', () => {

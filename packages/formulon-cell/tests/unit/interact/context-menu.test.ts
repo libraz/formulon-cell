@@ -7,6 +7,7 @@ import { History } from '../../../src/commands/history.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings/en.js';
 import { attachContextMenu, type ContextMenuHandle } from '../../../src/interact/context-menu.js';
+import { buildCellEntries } from '../../../src/interact/context-menu-spec.js';
 import {
   createSpreadsheetStore,
   mutators,
@@ -96,6 +97,32 @@ const visibleMenu = (): HTMLElement | null => {
 };
 
 describe('attachContextMenu', () => {
+  it('keeps the Excel-compatible cell menu item sequence', () => {
+    const ids = buildCellEntries(en)
+      .filter((entry) => entry.kind !== 'sep')
+      .map((entry) => entry.id);
+    expect(ids).toEqual([
+      'cut',
+      'copy',
+      'paste',
+      'pasteSpecialMenu',
+      'insertCells',
+      'deleteCells',
+      'insertCopiedCells',
+      'clear',
+      'filterMenu',
+      'sortMenu',
+      'insertComment',
+      'deleteComment',
+      'formatCells',
+      'defineName',
+      'insertHyperlink',
+      'openHyperlink',
+      'toggleWatch',
+      'selectAll',
+    ]);
+  });
+
   let host: HTMLElement;
   let store: SpreadsheetStore;
   let wb: WorkbookHandle;
@@ -705,6 +732,30 @@ describe('attachContextMenu', () => {
       expect(onAfterCommit).toHaveBeenCalled();
     });
 
+    it('opens Insert Cells and Delete Cells direction dialogs from the cell menu', () => {
+      seed(store, wb, [
+        { row: 1, col: 1, value: 'first' },
+        { row: 2, col: 1, value: 'second' },
+      ]);
+      setRange(store, 1, 1, 1, 1);
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+
+      fireContextMenu(host, 200, 70);
+      item('insertCells')?.click();
+      expect(document.querySelector('.fc-cellshift')).not.toBeNull();
+      document.querySelector<HTMLButtonElement>('.fc-cellshift__button--primary')?.click();
+      expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'blank' });
+      expect(wb.getValue({ sheet: 0, row: 2, col: 1 })).toEqual({ kind: 'text', value: 'first' });
+
+      setRange(store, 2, 1, 2, 1);
+      fireContextMenu(host, 200, 70);
+      item('deleteCells')?.click();
+      document.querySelector<HTMLButtonElement>('.fc-cellshift__button--primary')?.click();
+      expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'blank' });
+      expect(wb.getValue({ sheet: 0, row: 2, col: 1 })).toEqual({ kind: 'text', value: 'second' });
+      expect(onAfterCommit).toHaveBeenCalledTimes(2);
+    });
+
     it('Insert Copied Cells accepts an internal snapshot when clipboard text is empty', async () => {
       vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('');
       const snap: ClipboardSnapshot = {
@@ -841,6 +892,24 @@ describe('attachContextMenu', () => {
       fireContextMenu(host, 200, 70);
       item('formatCells')?.click();
       expect(onFormatDialog).toHaveBeenCalled();
+    });
+
+    it('enables Open Hyperlink only for a safe hyperlink at the active cell', () => {
+      const onOpenHyperlink = vi.fn();
+      detach = attachContextMenu({ host, store, wb, onOpenHyperlink });
+      fireContextMenu(host, 200, 70);
+      expect(item('openHyperlink')?.disabled).toBe(true);
+
+      setFormat(store, 0, 0, { hyperlink: 'https://example.test/docs' });
+      fireContextMenu(host, 200, 70);
+      item('openHyperlink')?.click();
+      expect(onOpenHyperlink).toHaveBeenCalledWith('https://example.test/docs');
+
+      setFormat(store, 0, 0, { hyperlink: 'javascript:alert(1)' });
+      fireContextMenu(host, 200, 70);
+      expect(item('openHyperlink')?.disabled).toBe(true);
+      item('openHyperlink')?.click();
+      expect(onOpenHyperlink).toHaveBeenCalledTimes(1);
     });
 
     it('Select All sets a full-sheet selection', () => {

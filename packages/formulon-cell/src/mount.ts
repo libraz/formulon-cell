@@ -451,6 +451,7 @@ export const Spreadsheet = {
     syncBindingFeatures(binding);
 
     const onHostKey = createHostShortcutHandler({
+      addSheet: () => sheetTabsController?.addSheet(),
       findReplace: () => binding.findReplace,
       formatDialog: () => featureState.formatDialog,
       formatPainter: () => featureState.formatPainter,
@@ -459,10 +460,12 @@ export const Spreadsheet = {
       hostTag: tag,
       hyperlinkDialog: () => featureState.hyperlinkDialog,
       invalidate: () => renderer.invalidate(),
+      locale: i18n.locale,
       namedRangeDialog: () => featureState.namedRangeDialog,
       pasteSpecialDialog: () => binding.pasteSpecialDialog,
       quickAnalysis: () => binding.quickAnalysis,
       store,
+      strings: () => strings,
       wb: () => wb,
     });
 

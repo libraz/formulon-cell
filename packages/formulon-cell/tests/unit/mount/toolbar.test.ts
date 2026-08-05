@@ -313,11 +313,10 @@ describe('Spreadsheet.mountToolbar', () => {
     const doubleEvent = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(doubleEvent, 'target', { value: double });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(doubleEvent)).toBe(true);
-    await Promise.resolve();
-    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
-      'Double Underline',
-    );
-    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
+    expect(sheet.instance.store.getState().ui.pendingFormat).toEqual({
+      addr: { sheet: 0, row: 0, col: 0 },
+      format: { underline: 'double' },
+    });
 
     tb.dispose();
   });
@@ -352,11 +351,10 @@ describe('Spreadsheet.mountToolbar', () => {
     const event = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(event, 'target', { value: double });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
-    await Promise.resolve();
-    expect(document.body.querySelector<HTMLElement>('.fc-tb__dlg')?.textContent).toContain(
-      '二重下線',
-    );
-    document.body.querySelector<HTMLButtonElement>('.fc-tb__dlg .fc-fmtdlg__btn--primary')?.click();
+    expect(sheet.instance.store.getState().ui.pendingFormat).toEqual({
+      addr: { sheet: 0, row: 0, col: 0 },
+      format: { underline: 'double' },
+    });
 
     tb.dispose();
   });

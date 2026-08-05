@@ -88,6 +88,27 @@ describe('attachValidationList', () => {
     handle.detach();
   });
 
+  it('Alt+Down opens the active cell validation list like Excel', () => {
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 1, col: 1 },
+      { validation: { kind: 'list', source: ['alpha', 'beta'] } },
+    );
+    mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
+    setValidationChevron({ rect: { x: 50, y: 30, w: 12, h: 12 }, row: 1, col: 1 });
+    const handle = attachValidationList({ grid, store, wb, onAfterCommit });
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowDown',
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    grid.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(items().map((item) => item.textContent)).toEqual(['alpha', 'beta']);
+    handle.detach();
+  });
+
   it('clicking an item writes the chosen value to the workbook and notifies onAfterCommit', () => {
     mutators.setCellFormat(
       store,

@@ -191,6 +191,26 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
     document.addEventListener('keydown', onDocKey, true);
   };
 
+  const openForCell = (row: number, col: number): boolean => {
+    const s = store.getState();
+    const fmt = s.format.formats.get(addrKey({ sheet: s.data.sheetIndex, row, col }));
+    if (fmt?.validation?.kind !== 'list') return false;
+    const current = s.data.cells.get(addrKey({ sheet: s.data.sheetIndex, row, col }))?.value;
+    const currentValue =
+      current?.kind === 'text'
+        ? current.value
+        : current?.kind === 'number'
+          ? String(current.value)
+          : current?.kind === 'bool'
+            ? current.value
+              ? 'TRUE'
+              : 'FALSE'
+            : '';
+    const values = resolveListValues(fmt.validation, makeRangeResolver(wb, s.data.sheetIndex));
+    open(row, col, values, currentValue);
+    return values.length > 0;
+  };
+
   const onDown = (e: PointerEvent): void => {
     if (e.button !== 0) return;
     const chevron = getValidationChevron();
@@ -216,30 +236,26 @@ export function attachValidationList(deps: ValidationListDeps): ValidationListHa
     // Re-anchor the active cell to the chevron's cell so subsequent picks
     //  hit the same target.
     mutators.setActive(store, { sheet: s.data.sheetIndex, row: chevron.row, col: chevron.col });
-    const current = s.data.cells.get(
-      addrKey({ sheet: s.data.sheetIndex, row: chevron.row, col: chevron.col }),
-    )?.value;
-    const currentValue =
-      current?.kind === 'text'
-        ? current.value
-        : current?.kind === 'number'
-          ? String(current.value)
-          : current?.kind === 'bool'
-            ? current.value
-              ? 'TRUE'
-              : 'FALSE'
-            : '';
-    const values = resolveListValues(fmt.validation, makeRangeResolver(wb, s.data.sheetIndex));
-    open(chevron.row, chevron.col, values, currentValue);
+    openForCell(chevron.row, chevron.col);
+  };
+
+  const onGridKeyDown = (e: KeyboardEvent): void => {
+    if (!e.altKey || e.key !== 'ArrowDown') return;
+    const active = store.getState().selection.active;
+    if (!openForCell(active.row, active.col)) return;
+    e.preventDefault();
+    e.stopPropagation();
   };
 
   // Capture phase so we beat the regular pointer.ts handler.
   grid.addEventListener('pointerdown', onDown, true);
+  grid.addEventListener('keydown', onGridKeyDown, true);
 
   return {
     detach() {
       close();
       grid.removeEventListener('pointerdown', onDown, true);
+      grid.removeEventListener('keydown', onGridKeyDown, true);
     },
   };
 }

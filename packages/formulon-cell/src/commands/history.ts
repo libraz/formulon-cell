@@ -28,6 +28,9 @@ const LIMIT = 200;
 export interface HistoryEntry {
   undo: () => void;
   redo: () => void;
+  /** Reapply this logical command to the *current* selection. Unlike `redo`,
+   *  this must not restore the original before/after snapshot. */
+  repeat?: () => void;
 }
 
 /**
@@ -45,6 +48,7 @@ export class History {
   private txnDepth = 0;
   private txnEntries: HistoryEntry[] = [];
   private listeners = new Set<() => void>();
+  private lastRepeat: (() => void) | null = null;
 
   push(entry: HistoryEntry): void {
     if (this.replaying) return;
@@ -86,6 +90,7 @@ export class History {
     this.undoStack.push(entry);
     if (this.undoStack.length > LIMIT) this.undoStack.shift();
     this.redoStack.length = 0;
+    this.lastRepeat = entry.repeat ?? null;
     this.notify();
   }
 
@@ -129,11 +134,28 @@ export class History {
     return this.redoStack.length > 0;
   }
 
+  /** Register a selection-aware repeat operation for an action that has no
+   *  material undo snapshot (for example a pending format on a blank cell). */
+  setRepeat(repeat: (() => void) | null): void {
+    this.lastRepeat = repeat;
+  }
+
+  /** Repeat the latest command only when it explicitly supplied a
+   *  selection-aware replay operation. Snapshot-only entries deliberately do
+   *  not fall back to `redo`, because that would write to their old range. */
+  repeatLast(): boolean {
+    const repeat = this.lastRepeat;
+    if (!repeat || this.replaying) return false;
+    repeat();
+    return true;
+  }
+
   clear(): void {
     this.undoStack.length = 0;
     this.redoStack.length = 0;
     this.txnEntries.length = 0;
     this.txnDepth = 0;
+    this.lastRepeat = null;
     this.notify();
   }
 
@@ -418,6 +440,7 @@ export function recordFormatChange(
   history: History | null,
   store: SpreadsheetStore,
   mutate: () => void,
+  opts: { repeat?: () => void } = {},
 ): void {
   if (!history || history.isReplaying()) {
     mutate();
@@ -430,7 +453,22 @@ export function recordFormatChange(
   history.push({
     undo: () => applyFormatSnapshot(store, before),
     redo: () => applyFormatSnapshot(store, after),
+    repeat: opts.repeat,
   });
+}
+
+/** Record a format command whose mutation derives its target from the current
+ *  store state. It is therefore safe to repeat with F4 after selection moves.
+ *  Callers that captured a concrete range (paste/fill) must continue using
+ *  `recordFormatChange` directly. */
+export function recordRepeatableFormatChange(
+  history: History | null,
+  store: SpreadsheetStore,
+  mutate: () => void,
+): void {
+  const repeat = (): void => recordRepeatableFormatChange(history, store, mutate);
+  recordFormatChange(history, store, mutate, { repeat });
+  history?.setRepeat(repeat);
 }
 
 export function recordLayoutChange(

@@ -180,6 +180,22 @@ describe('attachKeyboard', () => {
       expect(store.getState().selection.active).toEqual({ sheet: 0, row: 5, col: 9 });
     });
 
+    it('End arms End mode and the next arrow jumps like Ctrl+Arrow', () => {
+      setup();
+      seed(store, wb, [
+        { row: 1, col: 0, value: 1 },
+        { row: 2, col: 0, value: 2 },
+        { row: 6, col: 0, value: 3 },
+      ]);
+      mutators.setActive(store, { sheet: 0, row: 1, col: 0 });
+
+      fire(host, 'End');
+      expect(store.getState().ui.endMode).toBe(true);
+      fire(host, 'ArrowDown');
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 2, col: 0 });
+      expect(store.getState().ui.endMode).toBe(false);
+    });
+
     it('Ctrl+End includes format-only cells in the used range', () => {
       setup();
       seed(store, wb, [{ row: 2, col: 2, value: 1 }]);
@@ -189,6 +205,30 @@ describe('attachKeyboard', () => {
       fire(host, 'End', { ctrlKey: true });
 
       expect(store.getState().selection.active).toEqual({ sheet: 0, row: 8, col: 5 });
+    });
+
+    it('Ctrl+A selects the current region first, then the whole sheet', () => {
+      setup();
+      seed(store, wb, [
+        { row: 2, col: 3, value: 1 },
+        { row: 2, col: 4, value: 2 },
+        { row: 3, col: 3, value: 3 },
+        { row: 3, col: 4, value: 4 },
+        { row: 8, col: 8, value: 99 },
+      ]);
+      mutators.setActive(store, { sheet: 0, row: 2, col: 3 });
+
+      fire(host, 'a', { ctrlKey: true });
+      expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 2, c0: 3, r1: 3, c1: 4 });
+
+      fire(host, 'a', { ctrlKey: true });
+      expect(store.getState().selection.range).toEqual({
+        sheet: 0,
+        r0: 0,
+        c0: 0,
+        r1: 1048575,
+        c1: 16383,
+      });
     });
 
     it('PageDown/PageUp jump by viewport.rowCount-1', () => {
@@ -489,13 +529,33 @@ describe('attachKeyboard', () => {
       expect(onClearActive).toHaveBeenCalled();
     });
 
-    it('Backspace also clears the range', () => {
+    it('Backspace clears only the active cell and enters edit mode', () => {
       setup();
-      seed(store, wb, [{ row: 0, col: 0, value: 1 }]);
-      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      seed(store, wb, [
+        { row: 0, col: 0, value: 1 },
+        { row: 0, col: 1, value: 2 },
+      ]);
+      store.setState((s) => ({
+        ...s,
+        selection: {
+          ...s.selection,
+          active: { sheet: 0, row: 0, col: 0 },
+          anchor: { sheet: 0, row: 0, col: 0 },
+          range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+        },
+      }));
       fire(host, 'Backspace');
       wb.recalc();
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
+      expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 2 });
+      expect(onBeginEdit).toHaveBeenCalledWith('');
+    });
+
+    it('does not start editing while IME composition is active', () => {
+      setup();
+      fire(host, 'あ', { isComposing: true });
+      fire(host, 'Process');
+      expect(onBeginEdit).not.toHaveBeenCalled();
     });
 
     it('Ctrl+Backspace scrolls the active cell into view without clearing it', () => {

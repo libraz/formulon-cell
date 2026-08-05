@@ -18,6 +18,8 @@ export type ItemId =
   | 'pasteFormatsOnly'
   | 'pasteTranspose'
   | 'insertCopiedCells'
+  | 'insertCells'
+  | 'deleteCells'
   | 'clear'
   | 'bold'
   | 'italic'
@@ -53,6 +55,7 @@ export type ItemId =
   | 'insertComment'
   | 'deleteComment'
   | 'insertHyperlink'
+  | 'openHyperlink'
   | 'toggleWatch';
 
 export type MenuKind = 'cell' | 'row' | 'col';
@@ -138,6 +141,8 @@ export function buildCellEntries(s: Strings): MenuEntry[] {
     { kind: 'item', id: 'paste', label: t.paste, hint: '⌘V' },
     pasteSpecialSubmenu(s),
     { kind: 'sep', id: 'sep1' },
+    { kind: 'item', id: 'insertCells', label: s.ribbonMenu.insertCells },
+    { kind: 'item', id: 'deleteCells', label: s.ribbonMenu.deleteCells },
     { kind: 'item', id: 'insertCopiedCells', label: t.insertCopiedCells },
     { kind: 'item', id: 'clear', label: t.clear, hint: 'Del' },
     { kind: 'sep', id: 'sep2' },
@@ -151,6 +156,7 @@ export function buildCellEntries(s: Strings): MenuEntry[] {
     { kind: 'item', id: 'defineName', label: t.defineName },
     { kind: 'sep', id: 'sep5' },
     { kind: 'item', id: 'insertHyperlink', label: t.insertHyperlink, hint: '⌘K' },
+    { kind: 'item', id: 'openHyperlink', label: s.ribbonMenu.linkOpen },
     { kind: 'sep', id: 'sep6' },
     { kind: 'item', id: 'toggleWatch', label: t.addWatch },
     { kind: 'item', id: 'selectAll', label: t.selectAll, hint: '⌘A' },

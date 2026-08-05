@@ -103,6 +103,43 @@ export const RIBBON_KEYSHORTCUTS: Readonly<Record<string, string>> = {
   undoHome: 'Control+Z Meta+Z',
 };
 
+/** The same shortcut declaration drives the ribbon's ARIA metadata and the
+ *  host-level commands that own the corresponding behavior.  ARIA accepts a
+ *  space-separated list of alternatives (for example Control on Windows and
+ *  Meta on macOS), so match each alternative exactly rather than maintaining
+ *  a second modifier table in the host. */
+type ShortcutKeyboardEvent = Pick<
+  KeyboardEvent,
+  'altKey' | 'ctrlKey' | 'key' | 'metaKey' | 'shiftKey'
+>;
+
+const shortcutMatches = (event: ShortcutKeyboardEvent, shortcut: string): boolean => {
+  const parts = shortcut.split('+');
+  const key = parts.at(-1);
+  if (!key) return false;
+  const has = (modifier: 'Alt' | 'Control' | 'Meta' | 'Shift'): boolean => parts.includes(modifier);
+  return (
+    event.altKey === has('Alt') &&
+    event.ctrlKey === has('Control') &&
+    event.metaKey === has('Meta') &&
+    event.shiftKey === has('Shift') &&
+    event.key.toLowerCase() === key.toLowerCase()
+  );
+};
+
+/** Whether an event is one of the shortcut alternatives declared for a
+ *  ribbon command. Unknown commands intentionally match nothing. */
+export const matchesRibbonShortcut = (
+  event: ShortcutKeyboardEvent,
+  ...commandIds: readonly string[]
+): boolean =>
+  commandIds.some((commandId) =>
+    (RIBBON_KEYSHORTCUTS[commandId] ?? '')
+      .split(' ')
+      .filter(Boolean)
+      .some((shortcut) => shortcutMatches(event, shortcut)),
+  );
+
 export const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 36] as const;
 
 export const FONT_FAMILIES = [

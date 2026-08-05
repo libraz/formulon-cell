@@ -260,6 +260,10 @@ export function attachStatusBar(deps: StatusBarDeps): StatusBarHandle {
     const t = strings.statusBar;
     const s = store.getState();
     const formulaPointing = s.ui.editorRefs.length > 0;
+    if (s.ui.endMode) {
+      readyText.nodeValue = t.endMode;
+      return;
+    }
     if (formulaPointing) {
       readyText.nodeValue = t.point;
       return;
