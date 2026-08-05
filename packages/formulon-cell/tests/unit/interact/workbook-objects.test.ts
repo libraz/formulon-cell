@@ -239,6 +239,8 @@ describe('attachWorkbookObjectsPanel', () => {
     expect(report.some((entry) => entry.detail.includes('hidden dropdown-arrow state'))).toBe(true);
     expect(report.some((entry) => entry.detail.includes('sheet-scoped defined names'))).toBe(true);
     expect(report.some((entry) => entry.detail.includes('comments on blank cells'))).toBe(true);
+    expect(report.some((entry) => entry.detail.includes('phoneticPr'))).toBe(true);
+    expect(report.some((entry) => entry.detail.includes('AutoFilter'))).toBe(true);
   });
 
   it('lists session illustrations supplied by the host feature', () => {

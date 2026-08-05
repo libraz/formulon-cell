@@ -13,7 +13,10 @@ export type SpreadsheetCompatibilityId =
   | 'data-validation'
   | 'hyperlinks'
   | 'comments'
+  | 'phonetic'
   | 'defined-names'
+  | 'named-cell-styles'
+  | 'auto-filter'
   | 'sheet-protection'
   | 'sheet-views'
   | 'loaded-tables'
@@ -153,6 +156,12 @@ export function summarizeSpreadsheetCompatibility(
         : 'Comment UI can be hosted for the session, but engine writeback is unavailable.',
     },
     {
+      id: 'phonetic',
+      label: 'Phonetic guides',
+      status: 'unsupported',
+      reason: 'Reading or writing OOXML rPh/phoneticPr records requires engine APIs.',
+    },
+    {
       id: 'defined-names',
       label: 'Defined names',
       status: c.definedNameMutate ? 'writable' : 'read-only',
@@ -161,6 +170,20 @@ export function summarizeSpreadsheetCompatibility(
           ? 'Workbook- and sheet-scoped defined names can be listed, updated, and round-tripped.'
           : 'Workbook-scoped defined names can be listed and updated; sheet-scoped names need engine scope support.'
         : 'Defined names can be listed when present, but mutation is unavailable.',
+    },
+    {
+      id: 'named-cell-styles',
+      label: 'Named cell styles',
+      status: c.cellStyles ? 'read-only' : 'unsupported',
+      reason: c.cellStyles
+        ? 'Named cell styles can be inspected, but creating or updating cellStyle/cellStyleXf records needs engine writer APIs.'
+        : 'The engine cannot enumerate named cell styles.',
+    },
+    {
+      id: 'auto-filter',
+      label: 'AutoFilter',
+      status: 'unsupported',
+      reason: 'Reading or writing worksheet autoFilter definitions requires engine APIs.',
     },
     {
       id: 'sheet-protection',

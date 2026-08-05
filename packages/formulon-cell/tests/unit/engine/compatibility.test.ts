@@ -85,10 +85,13 @@ describe('summarizeSpreadsheetCompatibility', () => {
     expect(summary.items.find((i) => i.id === 'hyperlinks')?.status).toBe('writable');
     expect(summary.items.find((i) => i.id === 'comments')?.status).toBe('writable');
     expect(summary.items.find((i) => i.id === 'comments')?.reason).toContain('enumerated');
+    expect(summary.byId.phonetic.status).toBe('unsupported');
     expect(summary.items.find((i) => i.id === 'defined-names')?.status).toBe('writable');
     expect(summary.items.find((i) => i.id === 'defined-names')?.reason).toContain(
       'Workbook- and sheet-scoped',
     );
+    expect(summary.byId['named-cell-styles'].status).toBe('unsupported');
+    expect(summary.byId['auto-filter'].reason).toContain('autoFilter');
     expect(summary.items.find((i) => i.id === 'sheet-protection')?.status).toBe('writable');
     expect(summary.items.find((i) => i.id === 'sheet-views')?.status).toBe('session');
     expect(summary.items.find((i) => i.id === 'session-charts')?.status).toBe('session');
