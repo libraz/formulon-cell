@@ -4,11 +4,7 @@
   "type": "module",
   "description": "Monorepo for @libraz/formulon-cell — a spreadsheet UI library for the formulon WASM calc engine.",
   "license": "Apache-2.0",
-  "packageManager": "yarn@4.5.0",
-  "volta": {
-    "node": "22.12.0",
-    "yarn": "4.5.0"
-  },
+  "packageManager": "yarn@4.18.0",
   "workspaces": [
     "packages/*",
     "apps/react-demo",
