@@ -231,7 +231,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
     if (k === 't' || k === 'l') {
       e.preventDefault();
       recordTablesChange(input.history, input.store, () => {
-        formatAsTable(input.store, input.store.getState().selection.range);
+        formatAsTable(input.store, input.store.getState().selection.range, { workbook: currentWb });
       });
       input.invalidate();
       return;

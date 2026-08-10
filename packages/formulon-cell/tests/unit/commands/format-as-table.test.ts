@@ -236,6 +236,28 @@ describe('formatAsTable command helpers', () => {
     expect(store.getState().tables.tables).toEqual([overlay]);
   });
 
+  it('also creates an OOXML table when the engine exposes table authoring', () => {
+    const store = createSpreadsheetStore();
+    const createTable = vi.fn(() => 0);
+    const workbook = {
+      capabilities: { tableMutate: true },
+      createTable,
+      getTables: () => [],
+      getValue: headerWorkbook({ '0:0': 'Product', '0:1': 'Amount' }).getValue,
+    } as never;
+    formatAsTable(store, range(0, 0, 3, 1), { workbook });
+    expect(createTable).toHaveBeenCalledWith({
+      sheetIndex: 0,
+      ref: 'A1:B4',
+      name: 'Table1',
+      displayName: 'Table1',
+      columns: ['Product', 'Amount'],
+      styleName: 'TableStyleMedium2',
+      headerRow: true,
+      totalsRow: false,
+    });
+  });
+
   it('clearTable removes by id', () => {
     const store = createSpreadsheetStore();
     formatAsTable(store, range(0, 0, 3, 2), { id: 'sales' });

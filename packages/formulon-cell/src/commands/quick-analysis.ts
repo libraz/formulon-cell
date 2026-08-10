@@ -539,12 +539,13 @@ function addChart(input: QuickAnalysisExecuteInput): QuickAnalysisExecuteResult 
 }
 
 function formatAsTable(input: QuickAnalysisExecuteInput): QuickAnalysisExecuteResult {
-  const { range, store } = input;
+  const { range, store, wb } = input;
   let ok = false;
   recordTablesChange(input.history ?? null, store, () => {
     ok =
       applyFormatAsTable(store, range, {
         id: `qa-table-${range.sheet}-${range.r0}-${range.c0}-${range.r1}-${range.c1}`,
+        workbook: wb,
       }) != null;
   });
   if (!ok) return { ok: false, reason: 'protected' };

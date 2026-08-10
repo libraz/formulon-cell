@@ -2306,6 +2306,7 @@ export const showCreateTableDialog = async (
       options.variant ?? 'banded',
       {
         showHeader: result.hasHeaders,
+        workbook: instance.workbook,
       },
     );
   });

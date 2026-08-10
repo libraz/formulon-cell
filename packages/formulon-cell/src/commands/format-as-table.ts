@@ -1,4 +1,5 @@
 import type { CellValue, Range } from '../engine/types.js';
+import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { type History, recordTablesChange } from './history.js';
 import { isSheetProtected } from './protection.js';
@@ -134,6 +135,9 @@ export interface FormatAsTableOptions {
   banded?: boolean;
   firstCol?: boolean;
   lastCol?: boolean;
+  /** When the active engine supports it, persist a real OOXML ListObject in
+   * addition to the visual overlay. */
+  workbook?: WorkbookHandle;
 }
 
 export interface TableHeaderInferenceWorkbook {
@@ -150,6 +154,54 @@ const isNonEmptyTextValue = (value: CellValue): boolean =>
   value.kind === 'text' && value.value.trim().length > 0;
 
 const isNonBlankValue = (value: CellValue): boolean => value.kind !== 'blank';
+
+const a1Column = (column: number): string => {
+  let n = column + 1;
+  let result = '';
+  while (n > 0) {
+    n -= 1;
+    result = String.fromCharCode(65 + (n % 26)) + result;
+    n = Math.floor(n / 26);
+  }
+  return result;
+};
+
+const tableRef = (range: Range): string =>
+  `${a1Column(range.c0)}${range.r0 + 1}:${a1Column(range.c1)}${range.r1 + 1}`;
+
+const tableStyleName = (style: TableStyle): string =>
+  style === 'light'
+    ? 'TableStyleLight9'
+    : style === 'dark'
+      ? 'TableStyleDark1'
+      : 'TableStyleMedium2';
+
+const tableColumns = (workbook: WorkbookHandle, range: Range, hasHeaders: boolean): string[] => {
+  const used = new Set<string>();
+  const columns: string[] = [];
+  for (let col = range.c0; col <= range.c1; col += 1) {
+    const value = hasHeaders
+      ? workbook.getValue({ sheet: range.sheet, row: range.r0, col })
+      : { kind: 'blank' as const };
+    const base =
+      value.kind === 'text' && value.value.trim()
+        ? value.value.trim()
+        : `Column${col - range.c0 + 1}`;
+    let name = base;
+    let suffix = 2;
+    while (used.has(name.toLocaleLowerCase())) name = `${base}${suffix++}`;
+    used.add(name.toLocaleLowerCase());
+    columns.push(name);
+  }
+  return columns;
+};
+
+const nextTableName = (workbook: WorkbookHandle): string => {
+  const existing = new Set(workbook.getTables().map((table) => table.name.toLocaleLowerCase()));
+  let n = 1;
+  while (existing.has(`table${n}`)) n += 1;
+  return `Table${n}`;
+};
 
 /** Excel pre-checks "My table has headers" only when the selection looks like
  *  a labelled data range. Keep the heuristic shared across host surfaces. */
@@ -286,14 +338,28 @@ export function formatAsTable(
   options: FormatAsTableOptions = {},
 ): TableOverlay | null {
   if (blockedByProtection(store, range.sheet, 'formatAsTable')) return null;
+  const { workbook, ...overlayOptions } = options;
   const overlay: TableOverlay = {
-    ...defaultTableOverlay(options.id ?? defaultTableId(range), range),
-    ...options,
-    id: options.id ?? defaultTableId(range),
+    ...defaultTableOverlay(overlayOptions.id ?? defaultTableId(range), range),
+    ...overlayOptions,
+    id: overlayOptions.id ?? defaultTableId(range),
     source: 'session',
     range,
   };
   mutators.upsertTableOverlay(store, overlay);
+  if (workbook?.capabilities?.tableMutate) {
+    const name = nextTableName(workbook);
+    workbook.createTable({
+      sheetIndex: range.sheet,
+      ref: tableRef(range),
+      name,
+      displayName: name,
+      columns: tableColumns(workbook, range, overlay.showHeader),
+      styleName: tableStyleName(overlay.style),
+      headerRow: overlay.showHeader,
+      totalsRow: overlay.showTotal,
+    });
+  }
   return overlay;
 }
 
@@ -303,7 +369,10 @@ export function formatAsTableByStyleId(
   styleId: string,
   color?: string,
   variant: CustomTableStyle['variant'] = 'banded',
-  options: Pick<FormatAsTableOptions, 'showHeader' | 'showTotal' | 'firstCol' | 'lastCol'> = {},
+  options: Pick<
+    FormatAsTableOptions,
+    'showHeader' | 'showTotal' | 'firstCol' | 'lastCol' | 'workbook'
+  > = {},
 ): TableOverlay | null {
   const custom = customTableStyleById(store.getState(), styleId);
   if (custom) {
