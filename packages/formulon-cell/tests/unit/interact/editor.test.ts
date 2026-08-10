@@ -75,6 +75,85 @@ describe('InlineEditor', () => {
     expect(input.style.height).toBe('28px');
   });
 
+  it('follows its cell when the sheet scrolls mid-edit', () => {
+    mutators.setActive(store, { sheet: 0, row: 5, col: 1 });
+    editor.begin('hi');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    expect(input.style.top).toBe(`${30 + 5 * 28}px`);
+
+    mutators.scrollBy(store, 2, 0);
+    // Two rows scrolled away → the cell (and the editor) climb two rows.
+    expect(input.style.top).toBe(`${30 + 3 * 28}px`);
+    expect(input.style.left).toBe('156px');
+
+    mutators.scrollBy(store, 0, 1);
+    expect(input.style.left).toBe(`${52 + 0 * 104}px`);
+  });
+
+  it('parks the editor outside the grid once its cell scrolls off the leading edge', () => {
+    mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
+    editor.begin('hi');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+
+    mutators.scrollBy(store, 4, 0);
+    // Negative offsets: the grid clips the editor instead of letting it hang
+    // over the column headers, and it keeps its size so it can come back.
+    expect(Number.parseFloat(input.style.top)).toBeLessThan(0);
+    expect(Number.parseFloat(input.style.left)).toBeLessThan(0);
+    expect(input.style.height).toBe('28px');
+    // The edit is still live — value and editor mode survive the trip.
+    expect(input.value).toBe('hi');
+    expect(editor.isActive()).toBe(true);
+
+    mutators.scrollBy(store, -4, 0);
+    expect(input.style.top).toBe('58px');
+    expect(input.style.left).toBe('156px');
+  });
+
+  it('keeps the editor on a frozen cell in place while the body scrolls', () => {
+    mutators.setFreezePanes(store, 2, 2);
+    mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
+    editor.begin('hi');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    const top = input.style.top;
+    const left = input.style.left;
+
+    mutators.scrollBy(store, 10, 10);
+    expect(input.style.top).toBe(top);
+    expect(input.style.left).toBe(left);
+  });
+
+  it('takes the cell fill and text color so the edit reads as in-cell', () => {
+    const addr = { sheet: 0, row: 1, col: 1 };
+    mutators.setCellFormat(store, addr, { fill: '#ffeeaa', color: '#003366' });
+    mutators.setActive(store, addr);
+    editor.begin('hi');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    expect(input.style.background).toBe('#ffeeaa');
+    expect(input.style.color).toBe('#003366');
+  });
+
+  it('repaints when a format is applied mid-edit', () => {
+    const addr = { sheet: 0, row: 1, col: 1 };
+    mutators.setActive(store, addr);
+    editor.begin('hi');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    expect(input.style.background).toBe('');
+
+    mutators.setCellFormat(store, addr, { fill: '#112233' });
+    expect(input.style.background).toBe('#112233');
+  });
+
+  it('stops tracking the store once the edit ends', () => {
+    mutators.setActive(store, { sheet: 0, row: 5, col: 1 });
+    editor.begin('hi');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    editor.cancel();
+    const top = input.style.top;
+    mutators.scrollBy(store, 2, 0);
+    expect(input.style.top).toBe(top);
+  });
+
   it('mirrors spreadsheet default edit alignment for typed values', () => {
     mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
 

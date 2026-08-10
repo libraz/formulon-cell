@@ -124,6 +124,43 @@ export function cellRect(
   return { x, y, w: colWidth(layout, col, viewport), h: rowHeight(layout, row, viewport) };
 }
 
+/** Like {@link cellRect}, but returns the true (possibly negative) offset for
+ *  cells scrolled off the leading edge instead of clamping them to the data
+ *  origin. `colX` / `rowY` clamp because paint passes never draw those cells;
+ *  DOM overlays anchored to a cell — the inline editor — need the real offset
+ *  so they scroll out of view with their cell rather than sticking to the
+ *  first visible row/column. */
+export function cellRectUnclamped(
+  layout: LayoutSlice,
+  viewport: ViewportSlice,
+  row: number,
+  col: number,
+): Rect {
+  const rect = cellRect(layout, viewport, row, col);
+  const colStart = Math.max(viewport.colStart, layout.freezeCols);
+  if (col >= layout.freezeCols && col < colStart) {
+    for (let c = col; c < colStart; c += 1) rect.x -= colWidth(layout, c, viewport);
+  }
+  const rowStart = Math.max(viewport.rowStart, layout.freezeRows);
+  if (row >= layout.freezeRows && row < rowStart) {
+    for (let r = row; r < rowStart; r += 1) rect.y -= rowHeight(layout, r, viewport);
+  }
+  return rect;
+}
+
+/** Top-left of the scrollable body band — the data origin pushed past any
+ *  frozen rows/columns. Anything a non-frozen cell renders above or left of
+ *  this point has scrolled under the frozen band / headers. */
+export function bodyBandOrigin(
+  layout: LayoutSlice,
+  viewport: ViewportSlice,
+): { x: number; y: number } {
+  return {
+    x: gridOriginX(layout) + frozenColsWidth(layout, viewport),
+    y: gridOriginY(layout) + frozenRowsHeight(layout, viewport),
+  };
+}
+
 /** Hit-test a pointer position against the data area. Returns { row, col }
  *  inside the visible viewport, or null if the point is in a header / outside.
  *  Freeze-aware: a click in the frozen band resolves to a frozen row/col. */

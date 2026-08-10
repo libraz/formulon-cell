@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bodyBandOrigin,
   buildColLayout,
   buildRowLayout,
   cellRect,
   cellRectIn,
+  cellRectUnclamped,
   colLabel,
   colLeftEdge,
   colWidth,
@@ -190,6 +192,68 @@ describe('cellRect', () => {
     expect(r.y).toBe(30 + 50);
     expect(r.w).toBe(125);
     expect(r.h).toBe(25);
+  });
+});
+
+describe('cellRectUnclamped', () => {
+  it('matches cellRect for cells at or past the viewport start', () => {
+    const layout = makeLayout({ freezeCols: 1, freezeRows: 1 });
+    const viewport = makeViewport({ rowStart: 4, colStart: 3 });
+    for (const [row, col] of [
+      [0, 0],
+      [0, 5],
+      [6, 0],
+      [6, 5],
+    ] as const) {
+      expect(cellRectUnclamped(layout, viewport, row, col)).toEqual(
+        cellRect(layout, viewport, row, col),
+      );
+    }
+  });
+
+  it('returns the true negative offset for cells scrolled off the leading edge', () => {
+    const layout = makeLayout();
+    const viewport = makeViewport({ rowStart: 4, colStart: 3 });
+    // cellRect clamps both axes to the data origin — paint passes never draw
+    // these cells, so it has no reason to look past the viewport start.
+    expect(cellRect(layout, viewport, 2, 1)).toMatchObject({ x: 50, y: 30 });
+    // Two rows above rowStart → 2 * 20px up; two cols left of colStart → 2 * 100px left.
+    expect(cellRectUnclamped(layout, viewport, 2, 1)).toMatchObject({ x: 50 - 200, y: 30 - 40 });
+  });
+
+  it('skips hidden rows and columns when walking back', () => {
+    const layout = makeLayout({ hiddenRows: new Set([3]), hiddenCols: new Set([2]) });
+    const viewport = makeViewport({ rowStart: 4, colStart: 3 });
+    // Row 3 and col 2 are collapsed, so only one row / one col of travel remains.
+    expect(cellRectUnclamped(layout, viewport, 2, 1)).toMatchObject({ x: 50 - 100, y: 30 - 20 });
+  });
+
+  it('leaves frozen cells anchored regardless of scroll', () => {
+    const layout = makeLayout({ freezeCols: 2, freezeRows: 1 });
+    const viewport = makeViewport({ rowStart: 20, colStart: 20 });
+    expect(cellRectUnclamped(layout, viewport, 0, 1)).toMatchObject({ x: 150, y: 30 });
+  });
+
+  it('scales the walk-back by zoom', () => {
+    const layout = makeLayout();
+    const viewport = makeViewport({ rowStart: 2, colStart: 2, zoom: 1.25 });
+    expect(cellRectUnclamped(layout, viewport, 0, 0)).toMatchObject({ x: 50 - 250, y: 30 - 50 });
+  });
+});
+
+describe('bodyBandOrigin', () => {
+  it('is the data origin when nothing is frozen', () => {
+    expect(bodyBandOrigin(makeLayout(), makeViewport())).toEqual({ x: 50, y: 30 });
+  });
+
+  it('pushes past the frozen band', () => {
+    const layout = makeLayout({ freezeCols: 2, freezeRows: 1 });
+    expect(bodyBandOrigin(layout, makeViewport())).toEqual({ x: 50 + 200, y: 30 + 20 });
+  });
+
+  it('includes the outline gutters', () => {
+    const layout = makeLayout({ outlineRowGutter: 12, outlineColGutter: 9 });
+    expect(bodyBandOrigin(layout, makeViewport())).toEqual({ x: 62, y: 39 });
   });
 });
 

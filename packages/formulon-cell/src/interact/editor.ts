@@ -5,7 +5,7 @@ import { dblClickRange, extractRefs, rotateRefAt, shiftFormulaRefs } from '../co
 import { addrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { cellRect } from '../render/geometry.js';
+import { bodyBandOrigin, cellRectUnclamped } from '../render/geometry.js';
 import { formatWithPending, sameAddr } from '../store/pending-format.js';
 import { type CellFormat, mutators, type SpreadsheetStore } from '../store/store.js';
 import { type ArgHelperHandle, type ArgHelperLabels, attachArgHelper } from './arg-helper.js';
@@ -73,6 +73,8 @@ export class InlineEditor {
 
   private composing = false;
 
+  private unsubscribeStore: (() => void) | null = null;
+
   constructor(deps: EditorDeps) {
     this.deps = deps;
   }
@@ -127,6 +129,7 @@ export class InlineEditor {
     input.value = seed;
     this.input = input;
     this.applyTextAlignment(seed);
+    this.applyCellAppearance();
     this.position(a);
     this.deps.grid.appendChild(input);
     this.refreshSize();
@@ -160,10 +163,26 @@ export class InlineEditor {
     this.argHelper = attachArgHelper({ input, labels: this.deps.getLabels?.().argHelper });
     this.argHelper.refresh();
     syncEditorRefs(this.deps.store, seed);
+    // Scrolling / resizing / freezing moves the cell under the editor. Track
+    // the slices that decide the cell rect so the editor stays welded to its
+    // cell instead of hanging over whatever scrolled into that spot, and the
+    // format slices so a ribbon click mid-edit repaints the editor too.
+    this.unsubscribeStore = this.deps.store.subscribe((state, prev) => {
+      if (this.editingAddr && (state.viewport !== prev.viewport || state.layout !== prev.layout)) {
+        this.position(this.editingAddr);
+        this.refreshSize();
+      }
+      if (state.format !== prev.format || state.ui.pendingFormat !== prev.ui.pendingFormat) {
+        this.applyCellAppearance();
+        if (this.input) this.applyTextAlignment(this.input.value);
+      }
+    });
   }
 
   cancel(): void {
     if (!this.input) return;
+    this.unsubscribeStore?.();
+    this.unsubscribeStore = null;
     this.autocomplete?.detach();
     this.autocomplete = null;
     this.argHelper?.detach();
@@ -532,7 +551,7 @@ export class InlineEditor {
   private refreshWidth(): void {
     if (!this.input || !this.editingAddr) return;
     const s = this.deps.store.getState();
-    const r = cellRect(s.layout, s.viewport, this.editingAddr.row, this.editingAddr.col);
+    const r = cellRectUnclamped(s.layout, s.viewport, this.editingAddr.row, this.editingAddr.col);
     // Reset to the cell width first so the editor can shrink back as content
     //  is deleted, then measure the natural content width.
     this.input.style.width = `${r.w}px`;
@@ -602,12 +621,33 @@ export class InlineEditor {
     return out;
   }
 
+  /** Give the editor the cell's own fill and text color. Without this the
+   *  editor reads as a panel floating above the sheet whenever the cell
+   *  carries a fill; with it, the edit happens visually inside the cell. */
+  private applyCellAppearance(): void {
+    if (!this.input || !this.editingAddr) return;
+    const fmt = formatWithPending(this.deps.store.getState(), this.editingAddr);
+    // Empty string clears the inline style, falling back to the stylesheet's
+    // sheet-background / foreground tokens.
+    this.input.style.background = fmt?.fill ?? '';
+    this.input.style.color = fmt?.color ?? '';
+  }
+
   private position(a: Addr): void {
     const s = this.deps.store.getState();
-    const r = cellRect(s.layout, s.viewport, a.row, a.col);
+    const r = cellRectUnclamped(s.layout, s.viewport, a.row, a.col);
     if (!this.input) return;
-    this.input.style.left = `${r.x}px`;
-    this.input.style.top = `${r.y}px`;
+    // A cell scrolled off the leading edge sits behind the frozen band and the
+    // headers. Park the editor outside the grid's clip rect instead of letting
+    // it hang over that chrome — it keeps DOM focus (and the caret, and any IME
+    // composition) while its cell is out of view, the way a desktop
+    // spreadsheet does.
+    const band = bodyBandOrigin(s.layout, s.viewport);
+    const scrolledOut =
+      (a.row >= s.layout.freezeRows && r.y < band.y) ||
+      (a.col >= s.layout.freezeCols && r.x < band.x);
+    this.input.style.left = scrolledOut ? `${-r.w - 4}px` : `${r.x}px`;
+    this.input.style.top = scrolledOut ? `${-r.h - 4}px` : `${r.y}px`;
     this.input.style.width = `${r.w}px`;
     this.input.style.height = `${r.h}px`;
   }

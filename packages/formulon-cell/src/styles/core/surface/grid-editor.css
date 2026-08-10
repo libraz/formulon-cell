@@ -25,13 +25,15 @@
      * painter's padX so the caret/text doesn't jump on commit. */
     padding: 4px 1.5px;
     margin: 0;
-    background: var(--fc-bg-elev);
+    /* Sheet background by default; the editor overrides it with the cell's own
+     * fill when there is one. */
+    background: var(--fc-bg);
     color: var(--fc-fg);
+    /* The border sits inside the cell rect (border-box), so the editor covers
+     * exactly the cell it stands in for. Deliberately no radius and no drop
+     * ring: both spill past the cell edges onto the neighbours and make
+     * in-place editing read as a floating input hovering over the grid. */
     border: 1.5px solid var(--fc-accent);
-    border-radius: 2px;
-    box-shadow:
-      0 0 0 1px var(--fc-bg),
-      0 0 0 3px var(--fc-accent-soft);
     font: inherit;
     font-family: var(--fc-font-ui);
     font-size: var(--fc-text-cell);
@@ -41,15 +43,13 @@
     resize: none;
     white-space: pre;
     caret-color: var(--fc-accent);
-    transition: box-shadow var(--fc-dur-fast) var(--fc-ease-out);
   }
 
   /* When a long formula/value overflows past the editor's grown right edge,
-   * drop the right border and surrounding glow so the open edge signals the
-   * content continues — desktop spreadsheet behavior. */
+   * drop the right border so the open edge signals the content continues —
+   * desktop spreadsheet behavior. */
   .fc-host__editor--overflow {
     border-right-color: transparent;
-    box-shadow: none;
   }
 
   /* a11y mirror — visually hidden but in the a11y tree */
