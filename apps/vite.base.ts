@@ -26,7 +26,15 @@ function formulonWorkerOptionsPlugin(): Plugin {
     name: 'formulon-worker-options-vite-ignore',
     enforce: 'pre',
     transform(code, id) {
-      if (!id.includes('@libraz/formulon/dist/formulon.js')) return null;
+      // 0.9.7 split the pthread bootstrap into `formulon_core.js`; retain
+      // the same static worker options for both layouts so Vite 8 can
+      // analyse the worker import during production builds.
+      if (
+        !id.includes('@libraz/formulon/dist/formulon.js') &&
+        !id.includes('@libraz/formulon/dist/formulon_core.js')
+      ) {
+        return null;
+      }
       const patched = code.replace(
         'new Worker(new URL("formulon.js",import.meta.url),workerOptions)',
         'new Worker(new URL("formulon.js",import.meta.url),{type:"module",name:"em-pthread"})',
