@@ -158,8 +158,10 @@ export function summarizeSpreadsheetCompatibility(
     {
       id: 'phonetic',
       label: 'Phonetic guides',
-      status: 'unsupported',
-      reason: 'Reading or writing OOXML rPh/phoneticPr records requires engine APIs.',
+      status: c.phonetic ? 'writable' : 'unsupported',
+      reason: c.phonetic
+        ? 'Cell-level OOXML rPh guides can be read, edited, and round-tripped.'
+        : 'Reading or writing OOXML rPh/phoneticPr records requires engine APIs.',
     },
     {
       id: 'defined-names',
@@ -182,8 +184,10 @@ export function summarizeSpreadsheetCompatibility(
     {
       id: 'auto-filter',
       label: 'AutoFilter',
-      status: 'unsupported',
-      reason: 'Reading or writing worksheet autoFilter definitions requires engine APIs.',
+      status: c.autoFilter ? 'writable' : 'unsupported',
+      reason: c.autoFilter
+        ? 'Worksheet AutoFilter definitions can be preserved and written from the filter UI.'
+        : 'Reading or writing worksheet autoFilter definitions requires engine APIs.',
     },
     {
       id: 'sheet-protection',

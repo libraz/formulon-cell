@@ -1,3 +1,4 @@
+import { hydrateAutoFilterFromEngine } from '../engine/auto-filter-sync.js';
 import { hydrateCellFormatsFromEngine } from '../engine/cell-format-sync.js';
 import { hydrateConditionalRulesFromEngine } from '../engine/cf-sync.js';
 import { hydrateCommentsAndHyperlinksFromEngine } from '../engine/format-sync.js';
@@ -19,6 +20,7 @@ export function hydrateActiveSheetFromEngine(wb: WorkbookHandle, store: Spreadsh
   hydrateValidationsFromEngine(wb, store, sheet);
   hydrateCellFormatsFromEngine(wb, store, sheet);
   hydrateConditionalRulesFromEngine(wb, store, sheet);
+  hydrateAutoFilterFromEngine(wb, store, sheet);
 }
 
 export function hydrateWorkbookMetadataFromEngine(

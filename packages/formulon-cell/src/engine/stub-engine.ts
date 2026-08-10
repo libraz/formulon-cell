@@ -494,6 +494,10 @@ class StubModule implements FormulonModule {
   lastErrorContext(): string {
     return '';
   }
+
+  errorDisplayName(errorCode: number): string {
+    return `#ERR${errorCode}!`;
+  }
 }
 
 export function createStubModule(): FormulonModule {

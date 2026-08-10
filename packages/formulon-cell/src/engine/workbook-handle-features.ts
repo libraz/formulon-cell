@@ -27,6 +27,7 @@ import type {
   FunctionMetadataProvider,
   Range,
   SpreadsheetProfileId,
+  TableInput,
   Workbook,
 } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -42,6 +43,18 @@ type WorkbookHandleInternals = {
 type EngineCommentEntry = { row: number; col: number; author: string; text: string };
 type CommentEnumerableWorkbook = Workbook & {
   getComments?: (sheet: number) => EngineCommentEntry[];
+};
+type TableAuthoringWorkbook = Workbook & {
+  createTable?: (input: TableInput) => { status: { ok: boolean }; index: number };
+  updateTable?: (
+    index: number,
+    input: Pick<TableInput, 'ref' | 'styleName' | 'headerRow' | 'totalsRow'>,
+  ) => { ok: boolean };
+  removeTable?: (index: number) => { ok: boolean };
+};
+type AutoFilterWorkbook = Workbook & {
+  getSheetAutoFilterXml?: (sheet: number) => { status: { ok: boolean }; xml: string };
+  setSheetAutoFilterXml?: (sheet: number, xml: string) => { ok: boolean };
 };
 
 declare module './workbook-handle.js' {
@@ -106,21 +119,14 @@ export abstract class WorkbookHandleFeatureMethods {
       outlineLevel: number;
     }[] = [];
     if (!r.status.ok) return out;
-    const v = r.columns;
-    try {
-      const n = v.size();
-      for (let i = 0; i < n; i += 1) {
-        const e = v.get(i);
-        out.push({
-          first: e.first,
-          last: e.last,
-          width: e.width,
-          hidden: e.hidden !== 0,
-          outlineLevel: e.outlineLevel,
-        });
-      }
-    } finally {
-      v.delete();
+    for (const e of r.columns) {
+      out.push({
+        first: e.first,
+        last: e.last,
+        width: e.width,
+        hidden: e.hidden !== 0,
+        outlineLevel: e.outlineLevel,
+      });
     }
     return out;
   }
@@ -235,6 +241,23 @@ export abstract class WorkbookHandleFeatureMethods {
     return wb(this).setSheetRightToLeft(sheet, rightToLeft).ok;
   }
 
+  /** Returns the complete worksheet `<autoFilter>` fragment, or null when
+   * the engine does not expose the optional raw-definition seam. */
+  getSheetAutoFilterXml(sheet: number): string | null {
+    assertAlive(this);
+    if (!this.capabilities.autoFilter) return null;
+    const r = (wb(this) as AutoFilterWorkbook).getSheetAutoFilterXml?.(sheet);
+    return r?.status.ok ? r.xml : null;
+  }
+
+  /** Replaces the worksheet `<autoFilter>` fragment. Empty XML removes the
+   * definition. Returns false for old bundles and failed writes. */
+  setSheetAutoFilterXml(sheet: number, xml: string): boolean {
+    assertAlive(this);
+    if (!this.capabilities.autoFilter) return false;
+    return (wb(this) as AutoFilterWorkbook).setSheetAutoFilterXml?.(sheet, xml)?.ok === true;
+  }
+
   /** Insert `count` blank rows at `row` on `sheet`. The engine rewrites
    *  cross-workbook formula refs to follow the shift. Returns false on
    *  engines without `insertDeleteRowsCols`. NOT routed through the
@@ -297,6 +320,21 @@ export abstract class WorkbookHandleFeatureMethods {
     return s.ok;
   }
 
+  /** Read the cell's OOXML phonetic guide, if the current engine exposes it. */
+  getCellPhonetic(sheet: number, row: number, col: number): string | null {
+    assertAlive(this);
+    if (!this.capabilities.phonetic) return null;
+    const r = wb(this).getCellPhonetic(sheet, row, col);
+    return r.status.ok && r.value ? r.value : null;
+  }
+
+  /** Set (or, with an empty string, clear) the cell's phonetic guide. */
+  setCellPhonetic(sheet: number, row: number, col: number, phonetic: string): boolean {
+    assertAlive(this);
+    if (!this.capabilities.phonetic) return false;
+    return wb(this).setCellPhonetic(sheet, row, col, phonetic).ok;
+  }
+
   /** Resolve the XF record at `xfIndex` to its component table indices
    *  (font / fill / border / number-format) plus alignment + wrap flags.
    *  Note that the component indices are themselves opaque without
@@ -312,11 +350,13 @@ export abstract class WorkbookHandleFeatureMethods {
     horizontalAlign: number;
     verticalAlign: number;
     wrapText: boolean;
+    justifyLastLine?: boolean;
   } | null {
     assertAlive(this);
     if (!this.capabilities.cellFormatting) return null;
     const r = wb(this).getCellXf(xfIndex);
     if (!r.status.ok) return null;
+    const extended = r as typeof r & { justifyLastLine?: boolean };
     return {
       fontIndex: r.fontIndex,
       fillIndex: r.fillIndex,
@@ -325,6 +365,7 @@ export abstract class WorkbookHandleFeatureMethods {
       horizontalAlign: r.horizontalAlign,
       verticalAlign: r.verticalAlign,
       wrapText: r.wrapText,
+      justifyLastLine: extended.justifyLastLine,
     };
   }
 
@@ -342,6 +383,7 @@ export abstract class WorkbookHandleFeatureMethods {
       italic: r.italic,
       strike: r.strike,
       underline: r.underline,
+      vertAlign: r.vertAlign,
       colorArgb: r.colorArgb,
     };
   }
@@ -386,7 +428,7 @@ export abstract class WorkbookHandleFeatureMethods {
   addFontRecord(record: FontRecord): number {
     assertAlive(this);
     if (!this.capabilities.cellFormatting) return -1;
-    const r = wb(this).addFont(record);
+    const r = wb(this).addFont({ ...record, vertAlign: record.vertAlign ?? 0 });
     return r.status.ok ? r.index : -1;
   }
 
@@ -423,6 +465,34 @@ export abstract class WorkbookHandleFeatureMethods {
     if (!this.capabilities.cellFormatting) return -1;
     const r = wb(this).addXf(record);
     return r.status.ok ? r.index : -1;
+  }
+
+  /** Creates an OOXML worksheet table and returns its index, or -1 when the
+   * loaded engine predates table authoring support. */
+  createTable(input: TableInput): number {
+    assertAlive(this);
+    if (!this.capabilities.tableMutate) return -1;
+    const result = (wb(this) as TableAuthoringWorkbook).createTable?.(input);
+    return result?.status.ok ? result.index : -1;
+  }
+
+  updateTable(
+    index: number,
+    input: Pick<TableInput, 'ref' | 'styleName' | 'headerRow' | 'totalsRow'>,
+  ): boolean {
+    assertAlive(this);
+    return (
+      this.capabilities.tableMutate === true &&
+      (wb(this) as TableAuthoringWorkbook).updateTable?.(index, input).ok === true
+    );
+  }
+
+  removeTable(index: number): boolean {
+    assertAlive(this);
+    return (
+      this.capabilities.tableMutate === true &&
+      (wb(this) as TableAuthoringWorkbook).removeTable?.(index).ok === true
+    );
   }
 
   /** Append `range` as a merge on `sheet`. Returns false on engine failure or
@@ -596,46 +666,32 @@ export abstract class WorkbookHandleFeatureMethods {
     const r = wb(this).evaluateCfRange(sheet, firstRow, firstCol, lastRow, lastCol, todaySerial);
     if (!r.status.ok) return [];
     const out: ReturnType<WorkbookHandle['evaluateCfRange']> = [];
-    const cells = r.cells;
-    try {
-      const n = cells.size();
-      for (let i = 0; i < n; i += 1) {
-        const cell = cells.get(i);
-        const matches: ReturnType<WorkbookHandle['evaluateCfRange']>[number]['matches'] = [];
-        const mv = cell.matches;
-        try {
-          const mn = mv.size();
-          for (let j = 0; j < mn; j += 1) {
-            const m = mv.get(j);
-            matches.push({
-              kind: m.kind as number,
-              priority: m.priority,
-              dxfIdEngaged: m.dxfIdEngaged !== 0,
-              dxfId: m.dxfId,
-              color: { r: m.color.r, g: m.color.g, b: m.color.b, a: m.color.a },
-              barLengthPct: m.barLengthPct,
-              barAxisPositionPct: m.barAxisPositionPct,
-              barIsNegative: m.barIsNegative !== 0,
-              barFill: { r: m.barFill.r, g: m.barFill.g, b: m.barFill.b, a: m.barFill.a },
-              barBorderEngaged: m.barBorderEngaged !== 0,
-              barBorder: {
-                r: m.barBorder.r,
-                g: m.barBorder.g,
-                b: m.barBorder.b,
-                a: m.barBorder.a,
-              },
-              barGradient: m.barGradient !== 0,
-              iconSetName: m.iconSetName,
-              iconIndex: m.iconIndex,
-            });
-          }
-        } finally {
-          mv.delete();
-        }
-        out.push({ row: cell.row, col: cell.col, matches });
+    for (const cell of r.cells) {
+      const matches: ReturnType<WorkbookHandle['evaluateCfRange']>[number]['matches'] = [];
+      for (const m of cell.matches) {
+        matches.push({
+          kind: m.kind as number,
+          priority: m.priority,
+          dxfIdEngaged: m.dxfIdEngaged !== 0,
+          dxfId: m.dxfId,
+          color: { r: m.color.r, g: m.color.g, b: m.color.b, a: m.color.a },
+          barLengthPct: m.barLengthPct,
+          barAxisPositionPct: m.barAxisPositionPct,
+          barIsNegative: m.barIsNegative !== 0,
+          barFill: { r: m.barFill.r, g: m.barFill.g, b: m.barFill.b, a: m.barFill.a },
+          barBorderEngaged: m.barBorderEngaged !== 0,
+          barBorder: {
+            r: m.barBorder.r,
+            g: m.barBorder.g,
+            b: m.barBorder.b,
+            a: m.barBorder.a,
+          },
+          barGradient: m.barGradient !== 0,
+          iconSetName: m.iconSetName,
+          iconIndex: m.iconIndex,
+        });
       }
-    } finally {
-      cells.delete();
+      out.push({ row: cell.row, col: cell.col, matches });
     }
     return out;
   }

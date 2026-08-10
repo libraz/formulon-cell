@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { defaultFontForLocale, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 
 /**
  * Capability-gated feature methods live on the WorkbookHandle. Under the stub
@@ -46,6 +46,11 @@ describe('engine/workbook-handle-features (stub) — capability gates', () => {
     // The stub publishes a capabilities object so callers can branch.
     expect(wb.capabilities).toBeDefined();
     expect(typeof wb.capabilities).toBe('object');
+  });
+
+  it('selects a locale-appropriate default font for a new workbook', () => {
+    expect(defaultFontForLocale('ja-JP')).toEqual({ name: '游ゴシック', size: 11 });
+    expect(defaultFontForLocale('en-US')).toEqual({ name: 'Calibri', size: 11 });
   });
 
   it('getComments returns [] on stub', async () => {

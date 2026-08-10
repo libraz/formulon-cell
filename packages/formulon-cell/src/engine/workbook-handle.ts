@@ -1,5 +1,7 @@
 import type { History } from '../commands/history.js';
+import type { SpreadsheetStore, State } from '../store/store.js';
 import { addrKey } from './address.js';
+import { syncAutoFilterToEngine } from './auto-filter-sync.js';
 import { detectCapabilities } from './capabilities.js';
 import { type ExternalLinkKind, externalLinkKindLabel } from './external-links.js';
 import type { LoadOptions } from './loader.js';
@@ -10,6 +12,7 @@ import type {
   CellValue,
   DataValidationInput,
   EngineCapabilities,
+  FontRecord,
   FormulonModule,
   FunctionMetadataProvider,
   Range,
@@ -37,6 +40,28 @@ interface CellSnapshot {
 }
 
 const UNDO_LIMIT = 100;
+
+/** Excel's Japanese UI creates new workbooks with Yu Gothic while the
+ * non-Japanese baseline remains Calibri 11 for compatibility with existing
+ * formulon workbooks. */
+export const defaultFontForLocale = (
+  locale: string | undefined,
+): Pick<FontRecord, 'name' | 'size'> => ({
+  name: locale?.toLowerCase().startsWith('ja') ? '游ゴシック' : 'Calibri',
+  size: 11,
+});
+
+const autoFilterSignature = (state: State): string =>
+  JSON.stringify({
+    range: state.ui.filterRange,
+    criteria: state.ui.filterCriteria.map((entry) => ({
+      range: entry.range,
+      byCol: entry.byCol,
+      hiddenValues: entry.hiddenValues,
+      condition: entry.condition,
+      color: entry.color,
+    })),
+  });
 
 /**
  * Boundary between the WASM Workbook and the rest of the UI. Nothing else
@@ -69,6 +94,17 @@ export class WorkbookHandle {
    *  stack. */
   private history: History | null = null;
 
+  /** Optional mount store used only to persist AutoFilter mutations. Keeping
+   * this association at the adapter boundary means every React/Vue/vanilla
+   * surface gets save-safe filters without duplicating writeback calls. */
+  private autoFilterStore: SpreadsheetStore | null = null;
+
+  private unsubscribeAutoFilterStore: (() => void) | null = null;
+
+  private lastAutoFilterSignature = '';
+
+  private autoFilterSyncMuted = 0;
+
   /** Host-injected localized function documentation, merged over the
    *  engine's structural `functionMetadata()` result. `null` until a host
    *  calls `setFunctionMetadataProvider`. */
@@ -92,10 +128,15 @@ export class WorkbookHandle {
     this.capabilities = detectCapabilities(wb);
   }
 
-  static async createDefault(opts: LoadOptions = {}): Promise<WorkbookHandle> {
-    const module = await loadFormulon(opts);
+  static async createDefault(
+    opts: LoadOptions & { locale?: string } = {},
+  ): Promise<WorkbookHandle> {
+    const { locale, ...loadOptions } = opts;
+    const module = await loadFormulon(loadOptions);
     const wb = module.Workbook.createDefault();
-    return new WorkbookHandle(module, wb);
+    const handle = new WorkbookHandle(module, wb);
+    handle.installLocaleDefaultFont(locale);
+    return handle;
   }
 
   static async loadBytes(bytes: Uint8Array, opts: LoadOptions = {}): Promise<WorkbookHandle> {
@@ -116,6 +157,24 @@ export class WorkbookHandle {
 
   get version(): string {
     return this.module.versionString();
+  }
+
+  /** Seed a genuinely new workbook's style table with the locale's default
+   * font. `addFont` deduplicates and the first inserted record is font 0,
+   * which OOXML treats as the workbook default. Loaded workbooks never call
+   * this path, so their authoring font remains untouched. */
+  private installLocaleDefaultFont(locale: string | undefined): void {
+    if (!this.capabilities.cellFormatting) return;
+    const font = defaultFontForLocale(locale);
+    this.addFontRecord({
+      ...font,
+      bold: false,
+      italic: false,
+      strike: false,
+      underline: 0,
+      vertAlign: 0,
+      colorArgb: 0xff000000,
+    });
   }
 
   get sheetCount(): number {
@@ -201,6 +260,37 @@ export class WorkbookHandle {
     this.history = h;
     this.undoStack.length = 0;
     this.redoStack.length = 0;
+  }
+
+  /** Attach the owning spreadsheet store so changes to AutoFilter state are
+   * immediately mirrored to the engine before an `.xlsx` can be saved. */
+  attachStore(store: SpreadsheetStore | null): void {
+    this.unsubscribeAutoFilterStore?.();
+    this.unsubscribeAutoFilterStore = null;
+    this.autoFilterStore = store;
+    this.lastAutoFilterSignature = store ? autoFilterSignature(store.getState()) : '';
+    if (!store) return;
+    this.unsubscribeAutoFilterStore = store.subscribe((state) => {
+      const next = autoFilterSignature(state);
+      if (next === this.lastAutoFilterSignature) return;
+      this.lastAutoFilterSignature = next;
+      if (this.autoFilterSyncMuted > 0) return;
+      syncAutoFilterToEngine(this, state, state.data.sheetIndex);
+    });
+  }
+
+  /** Runs hydration without turning imported filter XML into a UI-authored
+   * replacement. The store subscription still records the new baseline. */
+  withAutoFilterSyncMuted<T>(fn: () => T): T {
+    this.autoFilterSyncMuted += 1;
+    try {
+      return fn();
+    } finally {
+      this.autoFilterSyncMuted -= 1;
+      if (this.autoFilterStore) {
+        this.lastAutoFilterSignature = autoFilterSignature(this.autoFilterStore.getState());
+      }
+    }
   }
 
   setNumber(a: Addr, value: number): void {
@@ -411,11 +501,12 @@ export class WorkbookHandle {
     const n = this.wb.cellCount(sheet);
     for (let i = 0; i < n; i += 1) {
       const e = this.wb.cellAt(sheet, i);
-      if (!e.status.ok) continue;
+      if (!e.status.ok || e.row === undefined || e.col === undefined || e.value === undefined)
+        continue;
       yield {
         addr: { sheet, row: e.row, col: e.col },
         value: fromEngineValue(e.value),
-        formula: e.formula,
+        formula: e.formula ?? null,
       };
     }
   }
@@ -425,7 +516,7 @@ export class WorkbookHandle {
     const n = this.wb.cellCount(a.sheet);
     for (let i = 0; i < n; i += 1) {
       const e = this.wb.cellAt(a.sheet, i);
-      if (e.status.ok && e.row === a.row && e.col === a.col) return e.formula;
+      if (e.status.ok && e.row === a.row && e.col === a.col) return e.formula ?? null;
     }
     return null;
   }
@@ -437,7 +528,8 @@ export class WorkbookHandle {
     const n = this.wb.definedNameCount();
     for (let i = 0; i < n; i += 1) {
       const e = this.wb.definedNameAt(i);
-      if (!e.status.ok) continue;
+      if (!e.status.ok || !e.name || e.formula === undefined || e.localSheetId === undefined)
+        continue;
       yield { name: e.name, formula: e.formula, localSheetId: e.localSheetId };
     }
   }
@@ -641,7 +733,7 @@ export class WorkbookHandle {
   ): boolean {
     this.assertAlive();
     if (!this.capabilities.hyperlinks) return false;
-    const s = this.wb.addHyperlink(sheet, row, col, target, display, tooltip);
+    const s = this.wb.addHyperlink(sheet, row, col, target, display, tooltip, '');
     return s.ok;
   }
 
@@ -679,20 +771,13 @@ export class WorkbookHandle {
     const r = this.wb.getSheetRowOverrides(sheet);
     const out: { row: number; height: number; hidden: boolean; outlineLevel: number }[] = [];
     if (!r.status.ok) return out;
-    const v = r.rows;
-    try {
-      const n = v.size();
-      for (let i = 0; i < n; i += 1) {
-        const e = v.get(i);
-        out.push({
-          row: e.row,
-          height: e.height,
-          hidden: e.hidden !== 0,
-          outlineLevel: e.outlineLevel,
-        });
-      }
-    } finally {
-      v.delete();
+    for (const e of r.rows) {
+      out.push({
+        row: e.row,
+        height: e.height,
+        hidden: e.hidden !== 0,
+        outlineLevel: e.outlineLevel,
+      });
     }
     return out;
   }
@@ -719,7 +804,8 @@ export class WorkbookHandle {
     }[] = [];
     for (let i = 0; i < n; i += 1) {
       const e = this.wb.tableAt(i);
-      if (!e.status.ok) continue;
+      if (!e.status.ok || !e.name || !e.displayName || !e.ref || e.sheetIndex === undefined)
+        continue;
       out.push({
         name: e.name,
         displayName: e.displayName,
@@ -757,7 +843,7 @@ export class WorkbookHandle {
     const out: { path: string }[] = [];
     for (let i = 0; i < n; i += 1) {
       const e = this.wb.passthroughAt(i);
-      if (!e.status.ok) continue;
+      if (!e.status.ok || !e.path) continue;
       out.push({ path: e.path });
     }
     return out;
@@ -770,6 +856,7 @@ export class WorkbookHandle {
 
   dispose(): void {
     if (this.disposed) return;
+    this.attachStore(null);
     this.disposed = true;
     this.listeners.clear();
     this.wb.delete();

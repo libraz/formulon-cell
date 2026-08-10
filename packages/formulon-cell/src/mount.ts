@@ -181,7 +181,7 @@ export const Spreadsheet = {
     let ownsWb = !opts.workbook;
     let wb: WorkbookHandle;
     try {
-      wb = opts.workbook ?? (await WorkbookHandle.createDefault());
+      wb = opts.workbook ?? (await WorkbookHandle.createDefault({ locale: i18n.locale }));
       if (opts.seed && ownsWb) opts.seed(wb);
     } catch (err) {
       host.dataset.fcEngineState = 'error';
@@ -237,6 +237,7 @@ export const Spreadsheet = {
 
     hydrateActiveSheetFromEngine(wb, store);
     hydrateWorkbookMetadataFromEngine(wb, store);
+    wb.attachStore(store);
     dispatchPassthroughSummary();
 
     function dispatchPassthroughSummary(): void {
@@ -1106,6 +1107,7 @@ export const Spreadsheet = {
         mutators.clearIllustrations(store);
         hydrateActiveSheet();
         hydrateWorkbookMetadataFromEngine(wb, store);
+        wb.attachStore(store);
         dispatchPassthroughSummary();
         binding = bindEngine(wb);
         syncBindingFeatures(binding);

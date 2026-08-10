@@ -36,6 +36,8 @@ describe('summarizeSpreadsheetCompatibility', () => {
     const wb = {
       capabilities: {
         ...baseCaps,
+        phonetic: true,
+        autoFilter: true,
         cellFormatting: true,
         conditionalFormat: true,
         dataValidation: true,
@@ -74,6 +76,8 @@ describe('summarizeSpreadsheetCompatibility', () => {
     const summary = summarizeSpreadsheetCompatibility(wb);
 
     expect(summary.items.find((i) => i.id === 'cell-formatting')?.status).toBe('writable');
+    expect(summary.items.find((i) => i.id === 'phonetic')?.status).toBe('writable');
+    expect(summary.items.find((i) => i.id === 'auto-filter')?.status).toBe('writable');
     expect(summary.items.find((i) => i.id === 'loaded-tables')).toMatchObject({
       status: 'read-only',
       count: 1,
@@ -85,13 +89,13 @@ describe('summarizeSpreadsheetCompatibility', () => {
     expect(summary.items.find((i) => i.id === 'hyperlinks')?.status).toBe('writable');
     expect(summary.items.find((i) => i.id === 'comments')?.status).toBe('writable');
     expect(summary.items.find((i) => i.id === 'comments')?.reason).toContain('enumerated');
-    expect(summary.byId.phonetic.status).toBe('unsupported');
+    expect(summary.byId.phonetic.status).toBe('writable');
     expect(summary.items.find((i) => i.id === 'defined-names')?.status).toBe('writable');
     expect(summary.items.find((i) => i.id === 'defined-names')?.reason).toContain(
       'Workbook- and sheet-scoped',
     );
     expect(summary.byId['named-cell-styles'].status).toBe('unsupported');
-    expect(summary.byId['auto-filter'].reason).toContain('autoFilter');
+    expect(summary.byId['auto-filter'].reason).toContain('AutoFilter');
     expect(summary.items.find((i) => i.id === 'sheet-protection')?.status).toBe('writable');
     expect(summary.items.find((i) => i.id === 'sheet-views')?.status).toBe('session');
     expect(summary.items.find((i) => i.id === 'session-charts')?.status).toBe('session');

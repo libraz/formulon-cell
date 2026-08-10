@@ -4,7 +4,6 @@ export type {
   BorderSide,
   CellEntry,
   CellResult,
-  CellXf,
   ConditionalFormatEntry,
   ConditionalFormatInput,
   DataValidationEntry,
@@ -15,7 +14,6 @@ export type {
   EvalArrayResult,
   EvalResult,
   FillRecord,
-  FontRecord,
   FormulonModule,
   FunctionMetadataEntry,
   FunctionMetadataLocalized,
@@ -33,6 +31,33 @@ export type {
   Value,
   Workbook,
 } from '@libraz/formulon';
+
+/** The 0.9.7 engine added vertical font alignment. Keep it optional at the
+ * adapter boundary so existing consumers' complete font literals remain
+ * source-compatible; writes normalize an omitted value to baseline. */
+export type FontRecord = Omit<import('@libraz/formulon').FontRecord, 'vertAlign'> & {
+  vertAlign?: number;
+};
+
+/** Backward-compatible XF projection. `justifyLastLine` arrived after the
+ * currently supported engine baseline, so retain it as optional here until
+ * consumers update their engine package. */
+export type CellXf = Omit<import('@libraz/formulon').CellXf, 'justifyLastLine'> & {
+  justifyLastLine?: boolean;
+};
+
+/** Writable subset of an OOXML worksheet table. Kept adapter-local until the
+ * matching upstream package version is the minimum dependency. */
+export interface TableInput {
+  sheetIndex: number;
+  ref: string;
+  name: string;
+  displayName?: string;
+  columns: string[];
+  styleName?: string;
+  headerRow?: boolean;
+  totalsRow?: boolean;
+}
 
 export type SpreadsheetProfileId = 'windows-ja_JP' | 'mac-ja_JP';
 
@@ -224,6 +249,12 @@ export interface EngineCapabilities {
    *  on the XF record carries number-format ids, so a separate `numberFormat`
    *  flag is unnecessary. */
   readonly cellFormatting: boolean;
+  /** Cell-level OOXML phonetic guide (`rPh`) read/write. */
+  readonly phonetic?: boolean;
+  /** Worksheet-level `<autoFilter>` definition read/write. */
+  readonly autoFilter?: boolean;
+  /** OOXML worksheet-table create/update/delete. */
+  readonly tableMutate?: boolean;
   /** `evaluateCfRange` (read-only evaluation). */
   readonly conditionalFormat: boolean;
   /** Full data-validation round-trip: `getValidations` + `addValidation` +
