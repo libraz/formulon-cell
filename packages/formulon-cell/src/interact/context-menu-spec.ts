@@ -56,6 +56,7 @@ export type ItemId =
   | 'deleteComment'
   | 'insertHyperlink'
   | 'openHyperlink'
+  | 'editPhonetic'
   | 'toggleWatch';
 
 export type MenuKind = 'cell' | 'row' | 'col';
@@ -157,6 +158,7 @@ export function buildCellEntries(s: Strings): MenuEntry[] {
     { kind: 'sep', id: 'sep5' },
     { kind: 'item', id: 'insertHyperlink', label: t.insertHyperlink, hint: '⌘K' },
     { kind: 'item', id: 'openHyperlink', label: s.ribbonMenu.linkOpen },
+    { kind: 'item', id: 'editPhonetic', label: t.editPhonetic },
     { kind: 'sep', id: 'sep6' },
     { kind: 'item', id: 'toggleWatch', label: t.addWatch },
     { kind: 'item', id: 'selectAll', label: t.selectAll, hint: '⌘A' },

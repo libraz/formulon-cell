@@ -95,6 +95,9 @@ export function syncCellFormatsToEngine(
     const xfIndex = resolveXfForFormat(wb, fmt);
     if (xfIndex < 0) continue;
     wb.setCellXfIndex(sheet, row, col, xfIndex);
+    if (wb.capabilities.phonetic && typeof wb.setCellPhonetic === 'function') {
+      wb.setCellPhonetic(sheet, row, col, fmt.phonetic ?? '');
+    }
     current.add(key);
   }
   // Reset cells that were formatted before but no longer are — the cleared
@@ -131,11 +134,19 @@ export function hydrateCellFormatsFromEngine(
   const updates: Array<{ key: string; patch: Partial<CellFormat> }> = [];
   const physicalCells = wb.physicalCells ? wb.physicalCells(sheet) : wb.cells(sheet);
   for (const c of physicalCells) {
+    const phonetic =
+      wb.capabilities.phonetic && typeof wb.getCellPhonetic === 'function'
+        ? wb.getCellPhonetic(c.addr.sheet, c.addr.row, c.addr.col)
+        : null;
     const xfIndex = wb.getCellXfIndex(sheet, c.addr.row, c.addr.col);
-    if (xfIndex === null || xfIndex <= 0) continue;
+    if (xfIndex === null || xfIndex <= 0) {
+      if (phonetic) updates.push({ key: addrKey(c.addr), patch: { phonetic } });
+      continue;
+    }
     const xf = wb.getCellXf(xfIndex);
     if (!xf) continue;
     const patch = cellFormatFromXf(wb, xf, workbookDefaultFont);
+    if (phonetic) patch.phonetic = phonetic;
     if (Object.keys(patch).length > 0) {
       updates.push({ key: addrKey(c.addr), patch });
     }
@@ -239,6 +250,7 @@ export function cellFormatFromXf(
   else if (xf.verticalAlign === 4) patch.vAlign = 'distributed';
   // the desktop default vertical alignment is bottom; do not surface it.
   if (xf.wrapText) patch.wrap = true;
+  if (xf.justifyLastLine) patch.justifyLastLine = true;
   return patch;
 }
 
@@ -246,7 +258,7 @@ export function cellFormatFromXf(
  *  record exists (dedup-on-add) and assembling the XF. Returns -1 on
  *  engine failure. */
 function resolveXfForFormat(wb: WorkbookHandle, fmt: CellFormat): number {
-  const fontIndex = wb.addFontRecord(fontRecordFromFormat(fmt));
+  const fontIndex = wb.addFontRecord(fontRecordFromFormat(fmt, wb.getFontRecord(0)));
   if (fontIndex < 0) return -1;
   const fillIndex = wb.addFillRecord(fillRecordFromFormat(fmt));
   if (fillIndex < 0) return -1;

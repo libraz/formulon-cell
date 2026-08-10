@@ -43,6 +43,7 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { hitZone } from '../render/geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { showPrompt } from '../toolbar/dialogs/prompt.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { openCellShiftDialog } from './cell-shift-dialog.js';
 import { createInteractionButton } from './chip-button.js';
@@ -808,6 +809,24 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       }
       case 'formatCells': {
         deps.onFormatDialog?.();
+        return;
+      }
+      case 'editPhonetic': {
+        const addr = state.selection.active;
+        if (!wb.capabilities.phonetic) return;
+        const initial = state.format.formats.get(addrKey(addr))?.phonetic ?? '';
+        void showPrompt({
+          title: strings.contextMenu.phoneticDialogTitle,
+          label: strings.contextMenu.phoneticDialogLabel,
+          initial,
+          okLabel: strings.formatDialog.ok,
+          cancelLabel: strings.formatDialog.cancel,
+        }).then((phonetic) => {
+          if (phonetic === null || !wb.setCellPhonetic(addr.sheet, addr.row, addr.col, phonetic))
+            return;
+          mutators.setCellFormat(store, addr, { phonetic: phonetic || undefined });
+          deps.onAfterCommit?.();
+        });
         return;
       }
       case 'defineName': {

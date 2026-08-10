@@ -266,9 +266,10 @@ describe('hydrateCellFormatsFromEngine', () => {
           fillIndex: 2,
           borderIndex: 3,
           numFmtId: 0,
-          horizontalAlign: 2,
+          horizontalAlign: 7,
           verticalAlign: 0,
           wrapText: true,
+          justifyLastLine: true,
         },
       ],
     ]);
@@ -315,9 +316,10 @@ describe('hydrateCellFormatsFromEngine', () => {
     const fmt = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
     expect(fmt?.bold).toBe(true);
     expect(fmt?.fill).toBe('#ff00ff');
-    expect(fmt?.align).toBe('center');
+    expect(fmt?.align).toBe('distributed');
     expect(fmt?.vAlign).toBe('top');
     expect(fmt?.wrap).toBe(true);
+    expect(fmt?.justifyLastLine).toBe(true);
   });
 
   it('skips cells whose xfIndex is 0', () => {

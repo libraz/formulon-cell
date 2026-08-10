@@ -32,8 +32,9 @@ import {
 } from '../../commands/view.js';
 import type { FeatureFlags } from '../../extensions/index.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
-import { getPageSetup } from '../../store/store.js';
+import { getPageSetup, mutators } from '../../store/store.js';
 import type { CellBorderStyle } from '../../store/types.js';
+import { showPrompt } from '../dialogs/prompt.js';
 import type { SessionShapeKind } from '../illustration-types.js';
 import type { ToolbarMenuText } from '../menu-text.js';
 import type { ToolbarText } from '../ribbon-model.js';
@@ -251,6 +252,30 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
         setFont(s, store, { fontSize: Math.max(1, (f?.fontSize ?? 11) - 1) });
       });
       return true;
+    case 'editPhonetic': {
+      if (!i.workbook?.capabilities.phonetic) return true;
+      const addr = state.selection.active;
+      const initial =
+        state.format.formats.get(`${addr.sheet}:${addr.row}:${addr.col}`)?.phonetic ?? '';
+      void showPrompt({
+        title: deps.text.phoneticDialogTitle,
+        label: deps.text.phoneticDialogLabel,
+        initial,
+        okLabel: deps.text.ok,
+        cancelLabel: deps.text.cancel,
+      }).then((phonetic) => {
+        if (
+          phonetic === null ||
+          !i.workbook?.setCellPhonetic(addr.sheet, addr.row, addr.col, phonetic)
+        ) {
+          return;
+        }
+        mutators.setCellFormat(i.store, addr, { phonetic: phonetic || undefined });
+        runtime.refreshCells();
+        runtime.focusSheet();
+      });
+      return true;
+    }
     case 'merge': {
       const anchorAt0 = state.merges.byAnchor.get(`${range.sheet}:${range.r0}:${range.c0}`);
       const isExactMerge =

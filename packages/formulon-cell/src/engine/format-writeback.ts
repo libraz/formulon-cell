@@ -128,16 +128,21 @@ const FILL_PATTERN_FROM_ORDINAL = new Map<number, FillPattern>([
 /** Built-in numFmt id for "General" — every engine reserves 0 for this. */
 const BUILTIN_NUM_FMT_GENERAL = 0;
 
-/** Build a FontRecord from the cell's UI format fields. Missing fields fall
- *  back to the workbook default font. */
-export function fontRecordFromFormat(fmt: CellFormat): FontRecord {
+/** Build a FontRecord from the cell's UI format fields. Missing family/size
+ * fall back to the supplied workbook default (or the legacy Calibri default
+ * when the caller has no workbook context, such as a differential format). */
+export function fontRecordFromFormat(
+  fmt: CellFormat,
+  workbookDefault?: Pick<FontRecord, 'name' | 'size'> | null,
+): FontRecord {
   return {
-    name: fmt.fontFamily ?? DEFAULT_FONT_NAME,
-    size: fmt.fontSize ?? DEFAULT_FONT_SIZE,
+    name: fmt.fontFamily ?? workbookDefault?.name ?? DEFAULT_FONT_NAME,
+    size: fmt.fontSize ?? workbookDefault?.size ?? DEFAULT_FONT_SIZE,
     bold: fmt.bold === true,
     italic: fmt.italic === true,
     strike: fmt.strike === true,
     underline: underlineOrdinal(fmt.underline),
+    vertAlign: fmt.fontVertAlign === 'superscript' ? 1 : fmt.fontVertAlign === 'subscript' ? 2 : 0,
     colorArgb: fmt.color ? (cssColorToArgb(fmt.color) ?? BLACK_ARGB) : BLACK_ARGB,
   };
 }
@@ -327,6 +332,7 @@ export function buildXfRecord(
     horizontalAlign: halignOrdinal(fmt.align),
     verticalAlign: valignOrdinal(fmt.vAlign),
     wrapText: fmt.wrap === true,
+    justifyLastLine: fmt.align === 'distributed' && fmt.justifyLastLine === true,
   };
 }
 
@@ -345,6 +351,8 @@ export function fontRecordToFormat(
   if (rec.bold) out.bold = true;
   if (rec.italic) out.italic = true;
   if (rec.strike) out.strike = true;
+  if (rec.vertAlign === 1) out.fontVertAlign = 'superscript';
+  else if (rec.vertAlign === 2) out.fontVertAlign = 'subscript';
   const underline = UNDERLINE_FROM_ORDINAL.get(rec.underline);
   if (underline) out.underline = underline;
   if (rec.colorArgb !== BLACK_ARGB && rec.colorArgb !== NO_COLOR_ARGB) {

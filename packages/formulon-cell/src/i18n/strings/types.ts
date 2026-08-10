@@ -70,6 +70,11 @@ export interface Strings {
     noHiddenColumns: string;
     clipboardUnavailable: string;
     pasteSpecialRequiresCopiedCells: string;
+    editPhonetic: string;
+    phoneticDialogTitle: string;
+    phoneticDialogLabel: string;
+    ok: string;
+    cancel: string;
   };
   cellStylesGallery: {
     title: string;
@@ -214,6 +219,7 @@ export interface Strings {
     vAlignJustify: string;
     vAlignDistributed: string;
     wrap: string;
+    justifyLastLine: string;
     shrinkToFit: string;
     mergeCells: string;
     mergeCellsRequiresMultiCell: string;
@@ -236,6 +242,8 @@ export interface Strings {
     fontUnderlineSingleAccounting: string;
     fontUnderlineDoubleAccounting: string;
     fontStrike: string;
+    fontSuperscript: string;
+    fontSubscript: string;
     fontStyle: string;
     fontRegular: string;
     normalFont: string;
@@ -1408,6 +1416,11 @@ export interface Strings {
     italic: string;
     underline: string;
     strikethrough: string;
+    phonetic: string;
+    phoneticDialogTitle: string;
+    phoneticDialogLabel: string;
+    ok: string;
+    cancel: string;
     fontColor: string;
     fillColor: string;
     highContrastOnly: string;

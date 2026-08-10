@@ -218,13 +218,17 @@ function hasFontDxfFields(apply: Partial<CellFormat>): boolean {
     apply.italic !== undefined ||
     apply.strike !== undefined ||
     apply.underline !== undefined ||
+    apply.fontVertAlign !== undefined ||
     apply.color !== undefined
   );
 }
 
 function dxfRecordFromApply(apply: Partial<CellFormat>): DxfRecord | null {
   const dxf: DxfRecord = {};
-  if (hasFontDxfFields(apply)) dxf.font = fontRecordFromFormat(apply);
+  if (hasFontDxfFields(apply)) {
+    const font = fontRecordFromFormat(apply);
+    dxf.font = { ...font, vertAlign: font.vertAlign ?? 0 };
+  }
   if (
     apply.fill !== undefined ||
     apply.fillPattern !== undefined ||

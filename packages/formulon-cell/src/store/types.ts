@@ -117,11 +117,17 @@ export interface CellFormat {
   italic?: boolean;
   underline?: boolean | UnderlineStyle;
   strike?: boolean;
+  /** Baseline shift for super/subscript text. */
+  fontVertAlign?: 'superscript' | 'subscript';
+  /** OOXML phonetic guide (ruby/furigana) associated with the cell text. */
+  phonetic?: string;
   align?: CellAlign;
   /** Vertical alignment. Default is 'bottom'. */
   vAlign?: CellVAlign;
   /** Wrap text within the cell — paint multi-line with hard wrapping. */
   wrap?: boolean;
+  /** With distributed horizontal alignment, justify the final text line too. */
+  justifyLastLine?: boolean;
   /** Shrink single-line text to fit the available cell width. */
   shrinkToFit?: boolean;
   /** Indent level (left-align padding in increments of ~8px). 0..15. */

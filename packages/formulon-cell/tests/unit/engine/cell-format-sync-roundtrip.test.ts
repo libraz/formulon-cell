@@ -230,35 +230,34 @@ describe('engine/cell-format-sync — roundtrip', () => {
     expect(back?.vAlign ?? 'bottom').toBe(vAlign);
   });
 
-  it.each([
-    'parens',
-    'red',
-    'red-parens',
-  ] as const)('numFmt: fixed negative style %s survives push → hydrate', (negativeStyle) => {
-    const { wb } = makeEngine();
-    const store = createSpreadsheetStore();
-    const key = addrKey({ sheet: 0, row: 0, col: 0 });
-    store.setState((s) => ({
-      ...s,
-      format: {
-        ...s.format,
-        formats: new Map([
-          [
-            key,
-            {
-              numFmt: { kind: 'fixed', decimals: 2, thousands: true, negativeStyle },
-            } as CellFormat,
-          ],
-        ]),
-      },
-    }));
+  it.each(['parens', 'red', 'red-parens'] as const)(
+    'numFmt: fixed negative style %s survives push → hydrate',
+    (negativeStyle) => {
+      const { wb } = makeEngine();
+      const store = createSpreadsheetStore();
+      const key = addrKey({ sheet: 0, row: 0, col: 0 });
+      store.setState((s) => ({
+        ...s,
+        format: {
+          ...s.format,
+          formats: new Map([
+            [
+              key,
+              {
+                numFmt: { kind: 'fixed', decimals: 2, thousands: true, negativeStyle },
+              } as CellFormat,
+            ],
+          ]),
+        },
+      }));
 
-    syncCellFormatsToEngine(wb, store, 0);
-    store.setState((s) => ({ ...s, format: { ...s.format, formats: new Map() } }));
-    hydrateCellFormatsFromEngine(wb, store, 0);
+      syncCellFormatsToEngine(wb, store, 0);
+      store.setState((s) => ({ ...s, format: { ...s.format, formats: new Map() } }));
+      hydrateCellFormatsFromEngine(wb, store, 0);
 
-    expect(store.getState().format.formats.get(key)?.numFmt).toMatchObject({ negativeStyle });
-  });
+      expect(store.getState().format.formats.get(key)?.numFmt).toMatchObject({ negativeStyle });
+    },
+  );
 
   it('numFmt: currency(2) survives roundtrip', () => {
     const { wb } = makeEngine();

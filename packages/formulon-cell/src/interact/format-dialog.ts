@@ -183,6 +183,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     vAlignRadios,
     vAlignSelect,
     wrapCk,
+    justifyLastLineCk,
     shrinkCk,
     mergeCk,
     indentInput,
@@ -196,6 +197,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     italicCk,
     underlineSelect,
     strikeCk,
+    superscriptCk,
+    subscriptCk,
     normalFontCk,
     fontStyleList,
     familyInput,
@@ -319,6 +322,14 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     setActiveTab('number');
   };
 
+  const syncJustifyLastLineAvailability = (): void => {
+    projectDisabledState(justifyLastLineCk.input, draft.align !== 'distributed', null);
+    justifyLastLineCk.wrap.classList.toggle(
+      'fc-fmtdlg__check--muted',
+      justifyLastLineCk.input.disabled,
+    );
+  };
+
   const syncControlsFromDraft = (): void => {
     // Number
     for (const [id, btn] of catButtons) {
@@ -353,6 +364,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     for (const [id, r] of vAlignRadios) r.checked = id === vKey;
     vAlignSelect.value = vKey;
     wrapCk.input.checked = draft.wrap;
+    justifyLastLineCk.input.checked = draft.justifyLastLine;
+    syncJustifyLastLineAvailability();
     shrinkCk.input.checked = draft.shrinkToFit;
     indentInput.value = String(draft.indent);
     textDirectionSelect.value = draft.textDirection;
@@ -364,11 +377,14 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     italicCk.input.checked = draft.italic;
     underlineSelect.value = draft.underline === true ? 'single' : draft.underline || '';
     strikeCk.input.checked = draft.strike;
+    superscriptCk.input.checked = draft.fontVertAlign === 'superscript';
+    subscriptCk.input.checked = draft.fontVertAlign === 'subscript';
     normalFontCk.input.checked =
       !draft.bold &&
       !draft.italic &&
       !draft.underline &&
       !draft.strike &&
+      !draft.fontVertAlign &&
       !draft.fontFamily &&
       draft.fontSize === undefined &&
       draft.color === undefined;
@@ -637,6 +653,12 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
 
   const renderPreview = (): void => {
+    const cssFontVertAlign =
+      draft.fontVertAlign === 'superscript'
+        ? 'super'
+        : draft.fontVertAlign === 'subscript'
+          ? 'sub'
+          : '';
     const applyFontPreview = (el: HTMLElement): void => {
       el.style.fontWeight = draft.bold ? 'bold' : 'normal';
       el.style.fontStyle = draft.italic ? 'italic' : 'normal';
@@ -648,6 +670,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
         draft.underline === 'double' || draft.underline === 'doubleAccounting' ? 'double' : '';
       el.style.fontFamily = draft.fontFamily || '';
       el.style.fontSize = draft.fontSize !== undefined ? `${draft.fontSize}px` : '';
+      el.style.verticalAlign = cssFontVertAlign;
       el.style.color = draft.color ?? '';
     };
     const applyFillPreview = (el: HTMLElement): void => {
@@ -665,6 +688,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     preview.style.textDecoration = decos.length > 0 ? decos.join(' ') : 'none';
     preview.style.textDecorationStyle =
       draft.underline === 'double' || draft.underline === 'doubleAccounting' ? 'double' : '';
+    preview.style.verticalAlign = cssFontVertAlign;
     preview.style.textAlign = cssHorizontalAlign(draft.align);
     applyFontPreview(previewCell);
     applyFontPreview(fontPreviewBox);
@@ -952,6 +976,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       align: draft.align,
       vAlign: draft.vAlign,
       wrap: draft.wrap,
+      justifyLastLine: draft.align === 'distributed' && draft.justifyLastLine,
       shrinkToFit: draft.shrinkToFit,
       indent: draft.indent > 0 ? draft.indent : undefined,
       rotation: draft.rotation !== 0 ? draft.rotation : undefined,
@@ -960,6 +985,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       italic: draft.italic,
       underline: draft.underline,
       strike: draft.strike,
+      fontVertAlign: draft.fontVertAlign,
       fontFamily: draft.fontFamily ? draft.fontFamily : undefined,
       fontSize: draft.fontSize,
       color: draft.color,
@@ -984,6 +1010,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
         italic: patch.italic,
         underline: patch.underline,
         strike: patch.strike,
+        fontVertAlign: patch.fontVertAlign,
         fontFamily: patch.fontFamily,
         fontSize: patch.fontSize,
         color: patch.color,
@@ -1200,6 +1227,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const r = e.target as HTMLInputElement;
     if (!r.checked) return;
     draft.align = r.value === 'default' ? undefined : (r.value as CellAlign);
+    if (draft.align !== 'distributed') draft.justifyLastLine = false;
+    syncJustifyLastLineAvailability();
     hAlignSelect.value = r.value;
     renderPreview();
   };
@@ -1213,6 +1242,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const onHAlignSelectChange = (): void => {
     const value = hAlignSelect.value as 'default' | CellAlign;
     draft.align = value === 'default' ? undefined : value;
+    if (draft.align !== 'distributed') draft.justifyLastLine = false;
+    syncJustifyLastLineAvailability();
     for (const [id, r] of hAlignRadios) r.checked = id === value;
     renderPreview();
   };
@@ -1224,6 +1255,10 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
   const onWrapChange = (): void => {
     draft.wrap = wrapCk.input.checked;
+    renderPreview();
+  };
+  const onJustifyLastLineChange = (): void => {
+    draft.justifyLastLine = justifyLastLineCk.input.checked;
     renderPreview();
   };
   const onShrinkToFitChange = (): void => {
@@ -1305,12 +1340,33 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     normalFontCk.input.checked = false;
     renderPreview();
   };
+  const onSuperscriptChange = (): void => {
+    if (superscriptCk.input.checked) {
+      draft.fontVertAlign = 'superscript';
+      subscriptCk.input.checked = false;
+    } else if (draft.fontVertAlign === 'superscript') {
+      draft.fontVertAlign = undefined;
+    }
+    normalFontCk.input.checked = false;
+    renderPreview();
+  };
+  const onSubscriptChange = (): void => {
+    if (subscriptCk.input.checked) {
+      draft.fontVertAlign = 'subscript';
+      superscriptCk.input.checked = false;
+    } else if (draft.fontVertAlign === 'subscript') {
+      draft.fontVertAlign = undefined;
+    }
+    normalFontCk.input.checked = false;
+    renderPreview();
+  };
   const onNormalFontChange = (): void => {
     if (!normalFontCk.input.checked) return;
     draft.bold = false;
     draft.italic = false;
     draft.underline = false;
     draft.strike = false;
+    draft.fontVertAlign = undefined;
     draft.fontFamily = '';
     draft.fontSize = undefined;
     draft.color = undefined;
@@ -1632,6 +1688,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   shell.on(hAlignSelect, 'change', onHAlignSelectChange);
   shell.on(vAlignSelect, 'change', onVAlignSelectChange);
   shell.on(wrapCk.input, 'change', onWrapChange);
+  shell.on(justifyLastLineCk.input, 'change', onJustifyLastLineChange);
   shell.on(shrinkCk.input, 'change', onShrinkToFitChange);
   shell.on(indentInput, 'input', onIndentInput);
   shell.on(textDirectionSelect, 'change', onTextDirectionChange);
@@ -1641,6 +1698,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   shell.on(italicCk.input, 'change', onItalicChange);
   shell.on(underlineSelect, 'change', onUnderlineChange);
   shell.on(strikeCk.input, 'change', onStrikeChange);
+  shell.on(superscriptCk.input, 'change', onSuperscriptChange);
+  shell.on(subscriptCk.input, 'change', onSubscriptChange);
   shell.on(normalFontCk.input, 'change', onNormalFontChange);
   shell.on(fontStyleList, 'click', onFontStyleListClick as EventListener);
   shell.on(familyInput, 'input', onFamilyInput);

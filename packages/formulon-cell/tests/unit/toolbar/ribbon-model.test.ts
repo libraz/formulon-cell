@@ -109,6 +109,7 @@ describe('toolbar/ribbon-model', () => {
       'italic',
       'underline',
       'strike',
+      'editPhonetic',
       'borders',
       'fillColor',
       'fontColor',

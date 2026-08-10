@@ -69,7 +69,10 @@ describe('interact/format-dialog-view', () => {
     expect(view.underlineSelect.dataset.fcInput).toBe('underline');
     expect(view.underlineSelect.options).toHaveLength(5);
     expect(view.strikeCk.input.dataset.fcCheck).toBe('strike');
+    expect(view.superscriptCk.input.dataset.fcCheck).toBe('superscript');
+    expect(view.subscriptCk.input.dataset.fcCheck).toBe('subscript');
     expect(view.wrapCk.input.dataset.fcCheck).toBe('wrap');
+    expect(view.justifyLastLineCk.input.dataset.fcCheck).toBe('justifyLastLine');
     expect(view.lockedCk.input.dataset.fcCheck).toBe('locked');
   });
 

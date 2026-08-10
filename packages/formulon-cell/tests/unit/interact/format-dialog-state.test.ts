@@ -82,6 +82,20 @@ describe('interact/format-dialog-state', () => {
       expect(draft.strike).toBe(false);
     });
 
+    it('preserves superscript and subscript font alignment', () => {
+      const draft = makeEmptyDraft('en');
+      hydrateDraftFromFormat(draft, { fontVertAlign: 'superscript' }, 'en');
+      expect(draft.fontVertAlign).toBe('superscript');
+      hydrateDraftFromFormat(draft, { fontVertAlign: 'subscript' }, 'en');
+      expect(draft.fontVertAlign).toBe('subscript');
+    });
+
+    it('hydrates the distributed-alignment final-line setting', () => {
+      const draft = makeEmptyDraft('en');
+      hydrateDraftFromFormat(draft, { align: 'distributed', justifyLastLine: true }, 'en');
+      expect(draft.justifyLastLine).toBe(true);
+    });
+
     it('preserves the full underline style', () => {
       const draft = makeEmptyDraft('en');
       hydrateDraftFromFormat(draft, { underline: 'doubleAccounting' }, 'en');

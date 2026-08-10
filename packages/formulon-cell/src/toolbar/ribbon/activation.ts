@@ -302,6 +302,7 @@ export const RIBBON_PRIMARY_ACTION_COMMANDS: ReadonlySet<string> = new Set([
   'dependents',
   'drawErase',
   'drawPen',
+  'editPhonetic',
   'findReview',
   'fontGrow',
   'fontShrink',

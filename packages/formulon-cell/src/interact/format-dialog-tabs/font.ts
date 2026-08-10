@@ -16,6 +16,8 @@ export interface FontTabRefs {
   italicCk: ReturnType<typeof makeCheckbox>;
   underlineSelect: HTMLSelectElement;
   strikeCk: ReturnType<typeof makeCheckbox>;
+  superscriptCk: ReturnType<typeof makeCheckbox>;
+  subscriptCk: ReturnType<typeof makeCheckbox>;
   normalFontCk: ReturnType<typeof makeCheckbox>;
   fontStyleList: HTMLDivElement;
   familyInput: HTMLInputElement;
@@ -58,7 +60,18 @@ export function createFontTab(
   underlineLabel.appendChild(underlineSelect);
   const strikeCk = makeCheckbox(t.fontStrike);
   strikeCk.input.dataset.fcCheck = 'strike';
-  styleRow.append(boldCk.wrap, italicCk.wrap, underlineLabel, strikeCk.wrap);
+  const superscriptCk = makeCheckbox(t.fontSuperscript);
+  superscriptCk.input.dataset.fcCheck = 'superscript';
+  const subscriptCk = makeCheckbox(t.fontSubscript);
+  subscriptCk.input.dataset.fcCheck = 'subscript';
+  styleRow.append(
+    boldCk.wrap,
+    italicCk.wrap,
+    underlineLabel,
+    strikeCk.wrap,
+    superscriptCk.wrap,
+    subscriptCk.wrap,
+  );
 
   const normalFontCk = makeCheckbox(t.normalFont);
   normalFontCk.input.dataset.fcCheck = 'normalFont';
@@ -196,6 +209,8 @@ export function createFontTab(
     italicCk,
     underlineSelect,
     strikeCk,
+    superscriptCk,
+    subscriptCk,
     normalFontCk,
     fontStyleList,
     familyInput,

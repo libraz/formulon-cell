@@ -349,6 +349,13 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
         first.setText({ sheet: 0, row: 21, col }, underline);
         formats.set(addrKey({ sheet: 0, row: 21, col }), { underline });
       }
+      const verticalFontAlignments = ['superscript', 'subscript'] as const;
+      for (const [col, fontVertAlign] of verticalFontAlignments.entries()) {
+        first.setText({ sheet: 0, row: 22, col }, fontVertAlign);
+        formats.set(addrKey({ sheet: 0, row: 22, col }), { fontVertAlign });
+      }
+      first.setText({ sheet: 0, row: 23, col: 0 }, '漢字');
+      formats.set(addrKey({ sheet: 0, row: 23, col: 0 }), { phonetic: 'かんじ' });
 
       source.setState((state) => ({
         ...state,
@@ -391,6 +398,12 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
         for (const [col, underline] of underlines.entries()) {
           expect(roundTripped.get(addrKey({ sheet: 0, row: 21, col }))?.underline).toBe(underline);
         }
+        for (const [col, fontVertAlign] of verticalFontAlignments.entries()) {
+          expect(roundTripped.get(addrKey({ sheet: 0, row: 22, col }))?.fontVertAlign).toBe(
+            fontVertAlign,
+          );
+        }
+        expect(roundTripped.get(addrKey({ sheet: 0, row: 23, col: 0 }))?.phonetic).toBe('かんじ');
       } finally {
         reloaded.dispose();
       }
@@ -530,6 +543,7 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
             italic: false,
             strike: false,
             underline: 0,
+            vertAlign: 0,
             colorArgb: 0xff006100,
           },
         });

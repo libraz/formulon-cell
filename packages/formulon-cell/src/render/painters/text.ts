@@ -189,7 +189,8 @@ export function paintCellText({
     (format.numFmt.negativeStyle === 'red' || format.numFmt.negativeStyle === 'red-parens');
   const weight = format?.bold ? 700 : 400;
   const styleSlant = format?.italic ? 'italic ' : '';
-  const fontSize = format?.fontSize ?? theme.textCell;
+  const fontVertAlign = format?.fontVertAlign;
+  const fontSize = (format?.fontSize ?? theme.textCell) * (fontVertAlign ? 0.7 : 1);
   const fontFamily = format?.fontFamily ?? (isFormulaDisplay ? theme.fontMono : theme.fontUi);
   ctx.font = `${styleSlant}${weight} ${fontSize}px ${fontCss(fontFamily)}`;
   const isHyperlink = !!format?.hyperlink;
@@ -244,6 +245,8 @@ export function paintCellText({
     const vAlign = canvasTextVAlign(format?.vAlign ?? 'bottom');
     const measured = stableTextMetricsBox(fontSize);
     let startY = textBaselineY(bounds, measured, vAlign, padY);
+    if (fontVertAlign === 'superscript') startY -= measured.ascent * 0.35;
+    else if (fontVertAlign === 'subscript') startY += measured.descent * 0.65;
     if (vAlign === 'middle') startY -= (totalH - lineH) / 2;
     else if (vAlign === 'bottom') startY -= (lines.length - 1) * lineH;
     ctx.textBaseline = 'alphabetic';
@@ -304,8 +307,24 @@ export function paintCellText({
   }
   const metrics = ctx.measureText(text);
   const box = stableTextMetricsBox(drawFontSize);
-  const ty = textBaselineY(bounds, box, vAlign, padY);
+  let ty = textBaselineY(bounds, box, vAlign, padY);
+  if (fontVertAlign === 'superscript') ty -= box.ascent * 0.35;
+  else if (fontVertAlign === 'subscript') ty += box.descent * 0.65;
 
+  // A phonetic guide (Japanese furigana/ruby) is stored separately from the
+  // cell value by OOXML. Render it as a compact, centred reading above the
+  // base text; the readback/writeback path keeps the original guide intact.
+  if (format?.phonetic && !isFormulaDisplay) {
+    const baseCenter =
+      align === 'right' ? tx - metrics.width / 2 : align === 'center' ? tx : tx + metrics.width / 2;
+    const phoneticSize = Math.max(6, Math.round(drawFontSize * 0.52));
+    ctx.save();
+    ctx.font = `${styleSlant}${weight} ${phoneticSize}px ${fontCss(fontFamily)}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(format.phonetic, baseCenter, ty - box.ascent - 1);
+    ctx.restore();
+  }
   ctx.fillText(text, tx, ty);
 
   const lineX0 =

@@ -63,7 +63,14 @@ describe('fontRecordFromFormat / fontRecordToFormat', () => {
     expect(rec.bold).toBe(false);
     expect(rec.italic).toBe(false);
     expect(rec.underline).toBe(0);
+    expect(rec.vertAlign).toBe(0);
     expect(rec.colorArgb).toBe(0xff000000);
+  });
+
+  it('uses a supplied workbook default for unspecified family and size', () => {
+    const rec = fontRecordFromFormat({}, { name: '游ゴシック', size: 11 });
+    expect(rec.name).toBe('游ゴシック');
+    expect(rec.size).toBe(11);
   });
 
   it('encodes bold/italic/underline/strike + custom font', () => {
@@ -111,6 +118,25 @@ describe('fontRecordFromFormat / fontRecordToFormat', () => {
     expect(fmt.bold).toBe(true);
     expect(fmt.fontSize).toBe(16);
     expect(fmt.color).toBe('#0000ff');
+  });
+
+  it.each([
+    ['superscript', 1],
+    ['subscript', 2],
+  ] as const)('round-trips %s vertical alignment', (fontVertAlign, ordinal) => {
+    expect(fontRecordFromFormat({ fontVertAlign }).vertAlign).toBe(ordinal);
+    expect(
+      fontRecordToFormat({
+        name: 'Calibri',
+        size: 11,
+        bold: false,
+        italic: false,
+        strike: false,
+        underline: 0,
+        vertAlign: ordinal,
+        colorArgb: 0xff000000,
+      }).fontVertAlign,
+    ).toBe(fontVertAlign);
   });
 
   it('hydrate strips workbook-default font name+size', () => {
@@ -198,12 +224,15 @@ describe('fillRecordFromFormat / fillRecordToFormat', () => {
     ['vertical', 6, 'darkVertical'],
     ['diagonalDown', 7, 'darkDown'],
     ['diagonalUp', 8, 'darkUp'],
-  ] as const)('keeps legacy %s input writable and hydrates canonical %s', (fillPattern, ordinal, canonical) => {
-    expect(fillRecordFromFormat({ fillPattern }).pattern).toBe(ordinal);
-    expect(fillRecordToFormat({ pattern: ordinal, fgArgb: 0, bgArgb: 0 }).fillPattern).toBe(
-      canonical,
-    );
-  });
+  ] as const)(
+    'keeps legacy %s input writable and hydrates canonical %s',
+    (fillPattern, ordinal, canonical) => {
+      expect(fillRecordFromFormat({ fillPattern }).pattern).toBe(ordinal);
+      expect(fillRecordToFormat({ pattern: ordinal, fgArgb: 0, bgArgb: 0 }).fillPattern).toBe(
+        canonical,
+      );
+    },
+  );
 
   it('preserves a colour but does not mislabel an unsupported pattern ordinal', () => {
     expect(fillRecordToFormat({ pattern: 19, fgArgb: 0xff123456, bgArgb: 0xffabcdef })).toEqual({
@@ -359,6 +388,7 @@ describe('buildXfRecord', () => {
       horizontalAlign: 2,
       verticalAlign: 1,
       wrapText: true,
+      justifyLastLine: false,
     });
   });
 
@@ -367,6 +397,19 @@ describe('buildXfRecord', () => {
     expect(xf.horizontalAlign).toBe(0);
     expect(xf.verticalAlign).toBe(2);
     expect(xf.wrapText).toBe(false);
+    expect(xf.justifyLastLine).toBe(false);
+  });
+
+  it('writes justify-last-line only for distributed alignment', () => {
+    expect(
+      buildXfRecord(0, 0, 0, 0, { align: 'distributed', justifyLastLine: true }),
+    ).toMatchObject({
+      horizontalAlign: 7,
+      justifyLastLine: true,
+    });
+    expect(
+      buildXfRecord(0, 0, 0, 0, { align: 'left', justifyLastLine: true }).justifyLastLine,
+    ).toBe(false);
   });
 
   it.each([

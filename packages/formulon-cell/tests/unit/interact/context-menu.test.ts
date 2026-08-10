@@ -118,6 +118,7 @@ describe('attachContextMenu', () => {
       'defineName',
       'insertHyperlink',
       'openHyperlink',
+      'editPhonetic',
       'toggleWatch',
       'selectAll',
     ]);

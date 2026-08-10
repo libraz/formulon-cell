@@ -26,6 +26,7 @@ export function makeEmptyDraft(formatLocale: string): DraftState {
     align: undefined,
     vAlign: undefined,
     wrap: false,
+    justifyLastLine: false,
     shrinkToFit: false,
     indent: 0,
     rotation: 0,
@@ -34,6 +35,7 @@ export function makeEmptyDraft(formatLocale: string): DraftState {
     italic: false,
     underline: false,
     strike: false,
+    fontVertAlign: undefined,
     fontFamily: '',
     fontSize: undefined,
     color: undefined,
@@ -146,6 +148,7 @@ export function hydrateDraftFromFormat(
   draft.align = fmt.align;
   draft.vAlign = fmt.vAlign;
   draft.wrap = !!fmt.wrap;
+  draft.justifyLastLine = !!fmt.justifyLastLine;
   draft.shrinkToFit = !!fmt.shrinkToFit;
   draft.indent = fmt.indent ?? 0;
   draft.rotation = fmt.rotation ?? 0;
@@ -154,6 +157,7 @@ export function hydrateDraftFromFormat(
   draft.italic = !!fmt.italic;
   draft.underline = fmt.underline === true ? 'single' : (fmt.underline ?? false);
   draft.strike = !!fmt.strike;
+  draft.fontVertAlign = fmt.fontVertAlign;
   draft.fontFamily = fmt.fontFamily ?? '';
   draft.fontSize = fmt.fontSize;
   draft.color = fmt.color;

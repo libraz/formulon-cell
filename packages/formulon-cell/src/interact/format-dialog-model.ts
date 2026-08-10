@@ -49,6 +49,7 @@ export interface DraftState {
   align: CellAlign | undefined;
   vAlign: CellVAlign | undefined;
   wrap: boolean;
+  justifyLastLine: boolean;
   shrinkToFit: boolean;
   indent: number;
   rotation: number;
@@ -57,6 +58,7 @@ export interface DraftState {
   italic: boolean;
   underline: CellFormat['underline'];
   strike: boolean;
+  fontVertAlign: CellFormat['fontVertAlign'];
   fontFamily: string;
   fontSize: number | undefined;
   color: string | undefined;

@@ -417,6 +417,23 @@ describe('paintCellText font strictness', () => {
     expect((indented.fills[0]?.x ?? 0) - (plain.fills[0]?.x ?? 0)).toBe(16);
   });
 
+  it('renders a phonetic guide above the base cell text', () => {
+    const spy = makeTextSpy();
+    paintCellText({
+      ctx: spy.ctx,
+      bounds: { x: 0, y: 0, w: 100, h: 24 },
+      theme: theme({ textCell: 13 }),
+      value: { kind: 'text', value: '漢字' },
+      formula: null,
+      isActive: false,
+      isInRange: false,
+      format: { phonetic: 'かんじ' },
+    });
+    expect(spy.fills.map((fill) => fill.text)).toEqual(['かんじ', '漢字']);
+    expect(spy.fills[0]?.font).toContain('7px');
+    expect(spy.fills[0]?.y).toBeLessThan(spy.fills[1]?.y ?? Infinity);
+  });
+
   it('uses the monospace font only for formula-display mode', () => {
     const spy = makeTextSpy();
     paintCellText({

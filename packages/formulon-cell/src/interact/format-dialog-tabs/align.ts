@@ -5,6 +5,7 @@
 import type { Strings } from '../../i18n/strings.js';
 import type { CellAlign, CellVAlign, TextDirection } from '../../store/store.js';
 import { createDialogSelect } from '../../toolbar/dialogs/form-controls.js';
+import { projectDisabledState } from '../../toolbar/menu-a11y.js';
 import { createDialogToggleButton } from '../dialog-shell.js';
 import { makeCheckbox } from '../format-dialog-dom.js';
 
@@ -14,6 +15,7 @@ export interface AlignTabRefs {
   vAlignRadios: Map<'default' | CellVAlign, HTMLInputElement>;
   vAlignSelect: HTMLSelectElement;
   wrapCk: ReturnType<typeof makeCheckbox>;
+  justifyLastLineCk: ReturnType<typeof makeCheckbox>;
   shrinkCk: ReturnType<typeof makeCheckbox>;
   mergeCk: ReturnType<typeof makeCheckbox>;
   indentInput: HTMLInputElement;
@@ -129,6 +131,12 @@ export function createAlignTab(panel: HTMLDivElement, t: Strings['formatDialog']
   const wrapCk = makeCheckbox(t.wrap);
   wrapCk.input.dataset.fcCheck = 'wrap';
   wrapRow.append(wrapCk.wrap);
+  const justifyLastLineCk = makeCheckbox(t.justifyLastLine);
+  justifyLastLineCk.input.dataset.fcCheck = 'justifyLastLine';
+  // Only meaningful with distributed horizontal alignment; the dialog re-enables
+  // it from the draft state.
+  projectDisabledState(justifyLastLineCk.input, true, null);
+  wrapRow.append(justifyLastLineCk.wrap);
 
   const indentRow = document.createElement('label');
   indentRow.className = 'fc-fmtdlg__row';
@@ -248,6 +256,7 @@ export function createAlignTab(panel: HTMLDivElement, t: Strings['formatDialog']
     vAlignRadios,
     vAlignSelect,
     wrapCk,
+    justifyLastLineCk,
     shrinkCk,
     mergeCk,
     indentInput,

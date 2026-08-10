@@ -1268,6 +1268,14 @@ describe('attachFormatDialog', () => {
       'distributed',
     ]);
 
+    const justifyLastLine = document.querySelector<HTMLInputElement>(
+      'input[data-fc-check="justifyLastLine"]',
+    );
+    expect(justifyLastLine?.disabled).toBe(true);
+    horizontal.value = 'distributed';
+    horizontal.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(justifyLastLine?.disabled).toBe(false);
+
     horizontal.value = 'centerContinuous';
     horizontal.dispatchEvent(new Event('change', { bubbles: true }));
     vertical.value = 'distributed';
@@ -1496,6 +1504,32 @@ describe('attachFormatDialog', () => {
     expect(fmt?.italic).toBe(true);
     expect(fmt?.underline).toBe('doubleAccounting');
     expect(fmt?.strike).toBe(true);
+    handle.detach();
+  });
+
+  it('font vertical-alignment controls are mutually exclusive and write the selected value', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open();
+
+    const superscript = document.querySelector<HTMLInputElement>(
+      'input[data-fc-check="superscript"]',
+    ) as HTMLInputElement;
+    const subscript = document.querySelector<HTMLInputElement>(
+      'input[data-fc-check="subscript"]',
+    ) as HTMLInputElement;
+    superscript.checked = true;
+    superscript.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(subscript.checked).toBe(false);
+    subscript.checked = true;
+    subscript.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(superscript.checked).toBe(false);
+
+    document
+      .querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.fontVertAlign,
+    ).toBe('subscript');
     handle.detach();
   });
 
