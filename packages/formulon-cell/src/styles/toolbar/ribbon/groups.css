@@ -18,7 +18,7 @@
 }
 
 .fc-tb__ribbon-group--font .fc-tb__ribbon-tools {
-  width: 300px;
+  width: 296px;
 }
 
 .fc-tb__ribbon-group--alignment .fc-tb__ribbon-tools {
@@ -31,7 +31,7 @@
 }
 
 .fc-tb__ribbon-group--number .fc-tb__ribbon-tools {
-  width: 188px;
+  width: 170px;
 }
 
 .fc-tb__ribbon-group--styles .fc-tb__ribbon-tools {
@@ -43,7 +43,7 @@
 }
 
 .fc-tb__ribbon-group--editing .fc-tb__ribbon-tools {
-  width: 238px;
+  width: 240px;
 }
 
 .fc-tb__ribbon-group--tiles .fc-tb__ribbon-tools {
@@ -109,8 +109,13 @@
   max-height: 76px;
 }
 
+/* Column flow keeps the stacked buttons in the 84px track: under the default
+   row flow the full-height tiles claim it first (they carry an explicit
+   `grid-row`, which auto-placement resolves before the auto-positioned
+   stacked buttons) and the 84px buttons then spill out of a 74px track. */
 .fc-tb__ribbon-group--mixed .fc-tb__ribbon-tools {
   display: grid;
+  grid-auto-flow: column;
   grid-template-columns: 84px repeat(2, 74px);
   grid-template-rows: repeat(3, 22px);
   align-content: start;
@@ -123,6 +128,11 @@
   grid-row: 1 / span 3;
 }
 
+/* The button is two pixels taller than its 22px row so it fills the row gap
+   as well: WCAG 2.2 target size wants 24px, and relying on the spacing
+   exception instead is brittle — anything that overlaps the row (the ribbon
+   display toggle floats over the last group) shrinks the usable target back
+   under the minimum. */
 .fc-tb__ribbon-group--stacked .fc-tb__rb--stacked,
 .fc-tb__ribbon-group--mixed .fc-tb__rb--stacked {
   justify-content: flex-start;
@@ -130,7 +140,7 @@
   width: 84px;
   min-width: 84px;
   max-width: 84px;
-  height: 22px;
+  height: 24px;
   padding: 1px 4px;
   font-size: 10.5px;
   font-weight: 400;

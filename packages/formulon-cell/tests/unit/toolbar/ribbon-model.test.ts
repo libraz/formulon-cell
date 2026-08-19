@@ -244,7 +244,7 @@ describe('toolbar/ribbon-model', () => {
     );
     expect(layoutCss).toMatch(/\.fc-tb__ribbon-tab--active\s*\{[\s\S]*?font-weight: 600;/);
     expect(layoutCss).toMatch(
-      /\.fc-tb__ribbon-label\s*\{[\s\S]*?height: 14px;[\s\S]*?color: color-mix\(in srgb, var\(--fc-tb-fg-soft\) 82%, var\(--fc-tb-ribbon-bg\)\);[\s\S]*?line-height: 14px;/,
+      /\.fc-tb__ribbon-label\s*\{[\s\S]*?height: 14px;[\s\S]*?color: color-mix\(in srgb, var\(--fc-tb-fg-soft\) 90%, var\(--fc-tb-ribbon-bg\)\);[\s\S]*?line-height: 14px;/,
     );
     expect(layoutCss).toMatch(
       /\.fc-tb__ribbon-group\s*\{[\s\S]*?padding: 0 6px;[\s\S]*?border-right: 1px solid var\(--fc-tb-ribbon-line\);/,

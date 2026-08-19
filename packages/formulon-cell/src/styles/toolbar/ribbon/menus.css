@@ -3458,10 +3458,16 @@
   font-size: 12px;
 }
 
+/* The gallery is a capped, scrollable panel rather than a "fill whatever the
+   viewport leaves" flyout: the dropdown positioner only narrows this cap when
+   the viewport is shorter, so the panel keeps a stable height on tall screens
+   and always leaves the sheet visible behind it. */
 .fc-tb__tablestyle-menu {
   width: 515px;
   max-width: min(515px, calc(100vw - 16px));
-  overflow: hidden;
+  max-height: 336px;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
   border-color: #c8c8c8;
   border-radius: 3px;
   box-shadow:
@@ -3469,10 +3475,14 @@
     0 1px 4px rgba(0, 0, 0, 0.12);
 }
 
+/* The swatch body keeps its own height instead of shrinking to whatever the
+   capped menu leaves, so the "New Table Style" footer stays below the fold and
+   the menu is what scrolls to it. Scroll chaining is left on here and trapped
+   on the menu instead, otherwise the footer is unreachable by wheel. */
 .fc-tb__tablestyle-scroll {
+  flex: 0 0 auto;
   max-height: min(496px, calc(100vh - 116px));
   overflow-y: auto;
-  overscroll-behavior: contain;
   scrollbar-gutter: stable;
 }
 

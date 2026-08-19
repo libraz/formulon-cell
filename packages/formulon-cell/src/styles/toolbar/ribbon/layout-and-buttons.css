@@ -131,12 +131,15 @@
   bottom: auto;
 }
 
+/* 24px square rather than the chevron's visual weight: WCAG 2.2 target size
+   is measured on the button box, and this one sits over the ribbon so it has
+   no neighbouring whitespace to fall back on. */
 .fc-tb__ribbon-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 1px solid transparent;
   border-radius: 2px;
@@ -254,7 +257,9 @@
 
 .fc-tb__ribbon-label {
   height: 14px;
-  color: color-mix(in srgb, var(--fc-tb-fg-soft) 82%, var(--fc-tb-ribbon-bg));
+  /* 10px text needs the full 4.5:1 ratio, so the label can only be washed out
+     so far before it drops under WCAG AA against the ribbon background. */
+  color: color-mix(in srgb, var(--fc-tb-fg-soft) 90%, var(--fc-tb-ribbon-bg));
   font-size: 10px;
   line-height: 14px;
   text-align: center;
