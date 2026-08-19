@@ -22,6 +22,28 @@ describe('formatSheetAbsoluteRange', () => {
     expect(formatSheetAbsoluteRange("Bob's", range(0, 0, 0, 0))).toBe("'Bob''s'!$A$1");
   });
 
+  it('quotes sheet names that would read as part of the address', () => {
+    // Bare, these come back as `A1!$A$1` / `2024!$A$1` / `R1C1!$A$1`, where the
+    // name is indistinguishable from a reference.
+    expect(formatSheetAbsoluteRange('A1', range(0, 0, 0, 0))).toBe("'A1'!$A$1");
+    expect(formatSheetAbsoluteRange('XFD1048576', range(0, 0, 0, 0))).toBe("'XFD1048576'!$A$1");
+    expect(formatSheetAbsoluteRange('2024', range(0, 0, 0, 0))).toBe("'2024'!$A$1");
+    expect(formatSheetAbsoluteRange('R1C1', range(0, 0, 0, 0))).toBe("'R1C1'!$A$1");
+  });
+
+  it('leaves identifier-shaped names bare', () => {
+    expect(formatSheetAbsoluteRange('Data_2024', range(0, 0, 0, 0))).toBe('Data_2024!$A$1');
+    expect(formatSheetAbsoluteRange('_hidden', range(0, 0, 0, 0))).toBe('_hidden!$A$1');
+    expect(formatSheetAbsoluteRange('Summary', range(0, 0, 0, 0))).toBe('Summary!$A$1');
+  });
+
+  it('round-trips every quoted form through parseA1Range', () => {
+    for (const name of ['A1', '2024', 'R1C1', 'My Sheet', 'Sheet1']) {
+      const text = formatSheetAbsoluteRange(name, range(0, 0, 2, 1));
+      expect(parseA1Range(text, 0, name), `${name} must re-parse`).toEqual(range(0, 0, 2, 1));
+    }
+  });
+
   it('drops the prefix when the workbook reports no sheet name', () => {
     expect(formatSheetAbsoluteRange('', range(0, 0, 2, 1))).toBe('$A$1:$B$3');
   });

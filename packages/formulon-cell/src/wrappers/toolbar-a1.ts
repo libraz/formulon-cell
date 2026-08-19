@@ -12,18 +12,25 @@ export const formatA1Range = (range: SheetRange): string => {
   return start === end ? start : `${start}:${end}`;
 };
 
+/** Whether a sheet name can precede `!` without quotes. Being a plain
+ *  identifier is not enough: a name shaped like a reference (`A1`, `R1C1`) or
+ *  made only of digits (`2024`) reads as part of the address once the quotes
+ *  are gone, so those keep them. */
+const isBareSheetName = (name: string): boolean =>
+  /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) &&
+  !/^[A-Za-z]{1,3}\d+$/.test(name) &&
+  !/^[Rr]\d+[Cc]\d+$/.test(name);
+
 /** Render a `SheetRange` the way a spreadsheet's Create Table / Create
  *  PivotTable dialogs show a source range: sheet-qualified and absolute
- *  (`Sheet1!$A$1:$B$3`). Sheet names that are not plain identifiers are
+ *  (`Sheet1!$A$1:$B$3`). Sheet names that cannot stand unquoted are
  *  single-quoted, matching what `parseA1Range` accepts back. */
 export const formatSheetAbsoluteRange = (sheetName: string, range: SheetRange): string => {
   const start = `$${colLetter(range.c0)}$${range.r0 + 1}`;
   const end = `$${colLetter(range.c1)}$${range.r1 + 1}`;
   const body = start === end ? start : `${start}:${end}`;
   if (!sheetName) return body;
-  const prefix = /^[A-Za-z0-9_]+$/.test(sheetName)
-    ? sheetName
-    : `'${sheetName.replace(/'/g, "''")}'`;
+  const prefix = isBareSheetName(sheetName) ? sheetName : `'${sheetName.replace(/'/g, "''")}'`;
   return `${prefix}!${body}`;
 };
 
