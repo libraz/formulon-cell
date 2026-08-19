@@ -834,6 +834,26 @@ describe('attachContextMenu', () => {
       expect(wb.getValue({ sheet: 0, row: 5, col: 5 })).toEqual({ kind: 'number', value: 99 });
       expect(onAfterCommit).toHaveBeenCalled();
     });
+
+    it('restores every cleared cell in one undo', () => {
+      const history = new History();
+      seed(store, wb, [
+        { row: 0, col: 0, value: 1 },
+        { row: 0, col: 1, value: 2 },
+        { row: 0, col: 2, value: 3 },
+      ]);
+      setRange(store, 0, 0, 0, 2);
+      detach = attachContextMenu({ host, store, wb, history, onAfterCommit });
+
+      fireContextMenu(host, 200, 70);
+      item('clear')?.click();
+      history.undo();
+      wb.recalc();
+
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 1 });
+      expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 2 });
+      expect(wb.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({ kind: 'number', value: 3 });
+    });
   });
 
   describe('format items', () => {
@@ -942,6 +962,52 @@ describe('attachContextMenu', () => {
   });
 
   describe('row structure', () => {
+    it('Insert Copied Cells opens whole rows and drops the copied band into them', async () => {
+      vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('');
+      const snap: ClipboardSnapshot = {
+        mode: 'copy',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        rows: 1,
+        cols: 1,
+        cells: [[{ value: { kind: 'text', value: 'a' }, formula: null, format: undefined }]],
+      };
+      seed(store, wb, [
+        { row: 0, col: 0, value: 'a' },
+        { row: 1, col: 0, value: 'b' },
+      ]);
+      mutators.selectRow(store, 0);
+      mutators.setCopyRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 16383 });
+      mutators.selectRow(store, 1);
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        strings: en,
+        onAfterCommit,
+        getClipboardSnapshot: () => snap,
+      });
+
+      fireContextMenu(host, 10, 59); // row 1 header
+      // The header variant needs no direction prompt, so it carries no ellipsis.
+      expect(item('insertCopiedCells')?.textContent).toBe(en.contextMenu.insertCopiedBand);
+      item('insertCopiedCells')?.click();
+
+      await Promise.resolve();
+      await Promise.resolve();
+      wb.recalc();
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'a' });
+      expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'a' });
+      expect(wb.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'text', value: 'b' });
+      expect(store.getState().ui.copyRange).toBeNull();
+      expect(onAfterCommit).toHaveBeenCalled();
+    });
+
+    it('hides Insert Copied Cells in the row menu outside copy mode', () => {
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      fireContextMenu(host, 10, 30);
+      expect(item('insertCopiedCells')).toBeNull();
+    });
+
     it('Insert Above shifts existing rows down', () => {
       seed(store, wb, [{ row: 0, col: 0, value: 'a' }]);
       setRange(store, 0, 0, 0, 0);
@@ -1007,6 +1073,46 @@ describe('attachContextMenu', () => {
   });
 
   describe('col structure', () => {
+    it('Insert Copied Cells opens whole columns and drops the copied band into them', async () => {
+      vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('');
+      const snap: ClipboardSnapshot = {
+        mode: 'copy',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        rows: 1,
+        cols: 1,
+        cells: [[{ value: { kind: 'text', value: 'a' }, formula: null, format: { bold: true } }]],
+      };
+      seed(store, wb, [
+        { row: 0, col: 0, value: 'a' },
+        { row: 0, col: 1, value: 'b' },
+      ]);
+      mutators.selectCol(store, 0);
+      mutators.setCopyRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 0 });
+      mutators.selectCol(store, 1);
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        onAfterCommit,
+        getClipboardSnapshot: () => snap,
+      });
+
+      fireContextMenu(host, 124, 10); // col 1 header
+      item('insertCopiedCells')?.click();
+
+      await Promise.resolve();
+      await Promise.resolve();
+      wb.recalc();
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'a' });
+      expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'text', value: 'a' });
+      expect(wb.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({ kind: 'text', value: 'b' });
+      expect(
+        store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 1 })),
+      ).toMatchObject({ bold: true });
+      expect(store.getState().ui.copyRange).toBeNull();
+      expect(onAfterCommit).toHaveBeenCalled();
+    });
+
     it('Insert Left shifts subsequent cols right', () => {
       seed(store, wb, [{ row: 0, col: 0, value: 'a' }]);
       setRange(store, 0, 0, 0, 0);

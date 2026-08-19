@@ -17,6 +17,9 @@ export interface Strings {
     paste: string;
     pasteSpecial: string;
     insertCopiedCells: string;
+    /** Row/column-header variant. Inserts whole rows/columns straight away, so
+     *  unlike `insertCopiedCells` it carries no dialog ellipsis. */
+    insertCopiedBand: string;
     clear: string;
     bold: string;
     italic: string;

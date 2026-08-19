@@ -204,6 +204,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   portal.appendChild(sub);
 
   let visible = false;
+  let menuKind: MenuKind = 'cell';
   let pasteBtnRef: HTMLButtonElement | null = null;
   let activeIndex = -1;
   let focusPanel: 'root' | 'sub' = 'root';
@@ -379,6 +380,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   };
 
   const buildMenu = (kind: MenuKind): void => {
+    menuKind = kind;
     root.replaceChildren();
     submenuChildren.clear();
     pasteBtnRef = null;
@@ -625,6 +627,65 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   const hasPastePayload = (text: string, snap: ClipboardSnapshot | null | undefined): boolean =>
     text.length > 0 || snap != null;
 
+  /** "Insert Copied Cells" from a row or column header. The header already
+   *  fixes the shift direction, so instead of asking which way to push cells
+   *  it opens as many whole rows/columns as the copied band is deep/wide and
+   *  drops the copy into them. */
+  function runInsertCopiedBand(kind: 'row' | 'col'): void {
+    const source = store.getState().ui.copyRange;
+    if (!source) return;
+
+    const insertBand = (snap: ClipboardSnapshot | null, text: string): void => {
+      const target = store.getState().selection.range;
+      if (history) history.begin();
+      try {
+        if (kind === 'col') {
+          insertCols(store, wb, history, target.c0, source.c1 - source.c0 + 1);
+          mutators.setActive(store, {
+            sheet: target.sheet,
+            row: snap?.range.r0 ?? 0,
+            col: target.c0,
+          });
+        } else {
+          insertRows(store, wb, history, target.r0, source.r1 - source.r0 + 1);
+          mutators.setActive(store, {
+            sheet: target.sheet,
+            row: target.r0,
+            col: snap?.range.c0 ?? 0,
+          });
+        }
+        const next = store.getState();
+        const r = snap
+          ? pasteSpecial(next, store, wb, snap, {
+              what: 'all',
+              operation: 'none',
+              skipBlanks: false,
+              transpose: false,
+            })
+          : pasteTSV(next, wb, text);
+        if (r) mutators.setRange(store, r.writtenRange);
+      } catch (err) {
+        console.warn('formulon-cell: insert copied cells failed', err);
+      } finally {
+        if (history) history.end();
+      }
+      mutators.setCopyRange(store, null);
+      deps.onAfterCommit?.();
+    };
+
+    // The internal snapshot wins over the TSV text so formats ride along, and
+    // taking it first keeps the action synchronous — no clipboard-permission
+    // round trip for a copy that came from this grid.
+    const snap = deps.getClipboardSnapshot?.() ?? null;
+    if (snap) {
+      insertBand(snap, '');
+      return;
+    }
+    void readClipboard().then((text) => {
+      if (text.length > 0) insertBand(null, text);
+    });
+  }
+
   function run(id: ItemId): void {
     const state = store.getState();
     switch (id) {
@@ -720,6 +781,10 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         runPasteSpecial('all', true);
         return;
       case 'insertCopiedCells': {
+        if (menuKind !== 'cell') {
+          runInsertCopiedBand(menuKind);
+          return;
+        }
         openInsertCopiedCellsDialog({
           strings,
           onSubmit: (direction) => {
@@ -766,15 +831,22 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       case 'clear': {
         const range = state.selection.range;
         const sheet = range.sheet;
-        for (const key of state.data.cells.keys()) {
-          const parts = key.split(':');
-          if (parts.length !== 3) continue;
-          if (Number(parts[0]) !== sheet) continue;
-          const row = Number(parts[1]);
-          const col = Number(parts[2]);
-          if (row < range.r0 || row > range.r1) continue;
-          if (col < range.c0 || col > range.c1) continue;
-          wb.setBlank({ sheet, row, col });
+        // Each setBlank journals its own inverse, so the whole range has to be
+        // one transaction for a single undo to restore it.
+        if (history) history.begin();
+        try {
+          for (const key of state.data.cells.keys()) {
+            const parts = key.split(':');
+            if (parts.length !== 3) continue;
+            if (Number(parts[0]) !== sheet) continue;
+            const row = Number(parts[1]);
+            const col = Number(parts[2]);
+            if (row < range.r0 || row > range.r1) continue;
+            if (col < range.c0 || col > range.c1) continue;
+            wb.setBlank({ sheet, row, col });
+          }
+        } finally {
+          if (history) history.end();
         }
         deps.onAfterCommit?.();
         return;
@@ -858,11 +930,18 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       case 'sortAsc':
       case 'sortDesc': {
         const range = boundRowsToData(inferAutoFilterRange(state, state.selection.range));
-        sortRange(state, store, wb, range, {
-          byCol: state.selection.active.col,
-          direction: id === 'sortAsc' ? 'asc' : 'desc',
-          hasHeader: inferSortHasHeader(state, range),
-        });
+        // A sort rewrites every cell in the range; group them so one undo
+        // restores the original order.
+        if (history) history.begin();
+        try {
+          sortRange(state, store, wb, range, {
+            byCol: state.selection.active.col,
+            direction: id === 'sortAsc' ? 'asc' : 'desc',
+            hasHeader: inferSortHasHeader(state, range),
+          });
+        } finally {
+          if (history) history.end();
+        }
         deps.onAfterCommit?.();
         return;
       }

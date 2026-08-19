@@ -42,6 +42,27 @@ describe('mount/engine-binding — feature gating against preset.full()', () => 
     expect(dialog).not.toBeNull();
     expect(dialog?.getAttribute('role')).toBe('dialog');
   });
+
+  it('hands the shared history to the context menu so its edits undo', () => {
+    const wb = sheet.workbook;
+    const store = sheet.instance.store;
+    const addr = { sheet: 0, row: 0, col: 0 };
+    wb.setText(addr, 'a');
+    wb.setText({ sheet: 0, row: 0, col: 1 }, 'b');
+    mutators.setActive(store, addr);
+
+    sheet.host.dispatchEvent(
+      new MouseEvent('contextmenu', { clientX: 10, clientY: 30, bubbles: true, cancelable: true }),
+    );
+    document
+      .querySelector<HTMLButtonElement>('.fc-ctxmenu__item[data-fc-action="rowInsertAbove"]')
+      ?.click();
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'a' });
+
+    sheet.instance.undo();
+    expect(wb.getValue(addr)).toEqual({ kind: 'text', value: 'a' });
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 }).kind).toBe('blank');
+  });
 });
 
 describe('mount/engine-binding — feature gating against preset.minimal()', () => {

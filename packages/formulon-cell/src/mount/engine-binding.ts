@@ -211,6 +211,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         store,
         wb,
         strings,
+        history,
         onAfterCommit: refreshCells,
         onClipboardShortcut: clipboardH ? (kind) => void clipboardH.runShortcut(kind) : undefined,
         onFormatDialog: () => getFormatDialog()?.open(),
