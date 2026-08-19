@@ -141,6 +141,12 @@ export function fontRecordFromFormat(
     bold: fmt.bold === true,
     italic: fmt.italic === true,
     strike: fmt.strike === true,
+    // A format that says nothing about bold leaves the `<b>` element out. For
+    // a cell font that reads the same as "not bold"; for a differential font
+    // it is the difference between "leave it alone" and "switch it off".
+    hasBold: fmt.bold !== undefined,
+    hasItalic: fmt.italic !== undefined,
+    hasStrike: fmt.strike !== undefined,
     underline: underlineOrdinal(fmt.underline),
     vertAlign: fmt.fontVertAlign === 'superscript' ? 1 : fmt.fontVertAlign === 'subscript' ? 2 : 0,
     colorArgb: fmt.color ? (cssColorToArgb(fmt.color) ?? BLACK_ARGB) : BLACK_ARGB,

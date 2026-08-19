@@ -168,9 +168,15 @@ export class WorkbookHandle {
     const font = defaultFontForLocale(locale);
     this.addFontRecord({
       ...font,
+      // The workbook default font states no weight/slant/strike at all, the
+      // same shape a spreadsheet writes, so a plain cell resolves to this
+      // record instead of a near-duplicate that only differs in the flags.
       bold: false,
       italic: false,
       strike: false,
+      hasBold: false,
+      hasItalic: false,
+      hasStrike: false,
       underline: 0,
       vertAlign: 0,
       colorArgb: 0xff000000,

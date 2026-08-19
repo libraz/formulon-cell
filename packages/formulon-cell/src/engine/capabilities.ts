@@ -74,6 +74,7 @@ export function detectCapabilities(wb: Workbook): EngineCapabilities {
     arrayFormulaEvaluation: has('evaluateFormulaArray'),
     conditionalFormulaEvaluation: has('evaluateConditionalFormula'),
     cellStyles: all('cellStyleCount', 'cellStyleXfCount', 'getCellStyle', 'getCellStyleXf'),
+    cellStyleMutate: all('addCellStyleXf', 'setCellStyle'),
     conditionalFormatMutate: all(
       'getConditionalFormats',
       'addConditionalFormat',

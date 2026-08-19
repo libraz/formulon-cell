@@ -1,19 +1,17 @@
 // Re-export of the formulon-typed surface plus our adapter shapes.
 export type {
-  BorderRecord,
-  BorderSide,
   CellEntry,
   CellResult,
+  CellXf,
+  ColorSpec,
   ConditionalFormatEntry,
   ConditionalFormatInput,
   DataValidationEntry,
   DataValidationInput,
   DataValidationRange,
-  DxfRecord,
   DxfResult,
   EvalArrayResult,
   EvalResult,
-  FillRecord,
   FormulonModule,
   FunctionMetadataEntry,
   FunctionMetadataLocalized,
@@ -28,36 +26,52 @@ export type {
   SaveResult,
   Status,
   StringResult,
+  TableInput,
   Value,
   Workbook,
 } from '@libraz/formulon';
 
-/** The 0.9.7 engine added vertical font alignment. Keep it optional at the
- * adapter boundary so existing consumers' complete font literals remain
- * source-compatible; writes normalize an omitted value to baseline. */
-export type FontRecord = Omit<import('@libraz/formulon').FontRecord, 'vertAlign'> & {
-  vertAlign?: number;
-};
+/** Marks the fields a record only carries when the engine read it back out of
+ * a workbook: the original OOXML `<color>` selector and the "was this element
+ * present in the source" flags. The cell layer authors records from UI state,
+ * where every colour is literal RGB and no such provenance exists, so these
+ * stay optional at the adapter boundary. `WorkbookHandle` fills them in on the
+ * way into the engine — see `completeFontRecord` and friends. */
+type EngineFilled<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
-/** Backward-compatible XF projection. `justifyLastLine` arrived after the
- * currently supported engine baseline, so retain it as optional here until
- * consumers update their engine package. */
-export type CellXf = Omit<import('@libraz/formulon').CellXf, 'justifyLastLine'> & {
-  justifyLastLine?: boolean;
-};
+export type FontRecord = EngineFilled<
+  import('@libraz/formulon').FontRecord,
+  | 'vertAlign'
+  | 'hasBold'
+  | 'hasItalic'
+  | 'hasStrike'
+  | 'hasFamily'
+  | 'family'
+  | 'hasCharset'
+  | 'charset'
+  | 'color'
+>;
 
-/** Writable subset of an OOXML worksheet table. Kept adapter-local until the
- * matching upstream package version is the minimum dependency. */
-export interface TableInput {
-  sheetIndex: number;
-  ref: string;
-  name: string;
-  displayName?: string;
-  columns: string[];
-  styleName?: string;
-  headerRow?: boolean;
-  totalsRow?: boolean;
+export type FillRecord = EngineFilled<import('@libraz/formulon').FillRecord, 'fg' | 'bg'>;
+
+export type BorderSide = EngineFilled<import('@libraz/formulon').BorderSide, 'color'>;
+
+export interface BorderRecord {
+  left: BorderSide;
+  right: BorderSide;
+  top: BorderSide;
+  bottom: BorderSide;
+  diagonal: BorderSide;
+  diagonalUp: boolean;
+  diagonalDown: boolean;
 }
+
+/** Differential format whose sub-records use the adapter's authoring shapes. */
+export type DxfRecord = Omit<import('@libraz/formulon').DxfRecord, 'font' | 'fill' | 'border'> & {
+  font?: FontRecord;
+  fill?: FillRecord;
+  border?: BorderRecord;
+};
 
 export type SpreadsheetProfileId = 'windows-ja_JP' | 'mac-ja_JP';
 
@@ -332,6 +346,9 @@ export interface EngineCapabilities {
   /** `cellStyleCount` + `getCellStyle` + `getCellStyleXf` named-style
    *  enumeration. */
   readonly cellStyles: boolean;
+  /** `addCellStyleXf` + `setCellStyle` named-style authoring. When off, a
+   *  style applied from the gallery is saved as direct formatting only. */
+  readonly cellStyleMutate?: boolean;
   /** `getConditionalFormats` + `addConditionalFormat` (non-visual) +
    *  `removeConditionalFormatAt` + `clearConditionalFormats` authoring
    *  surface. Read-only `evaluateCfRange` is gated by `conditionalFormat`. */

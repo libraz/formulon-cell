@@ -498,6 +498,16 @@ class StubModule implements FormulonModule {
   errorDisplayName(errorCode: number): string {
     return `#ERR${errorCode}!`;
   }
+
+  /** The stub emits no structured log records, so both knobs are accepted
+   *  and ignored rather than reported as failures. */
+  setLogMinLevel(_level: number): Status {
+    return ok;
+  }
+
+  setLogSink(_sink: ((record: Uint8Array) => void) | null): Status {
+    return ok;
+  }
 }
 
 export function createStubModule(): FormulonModule {

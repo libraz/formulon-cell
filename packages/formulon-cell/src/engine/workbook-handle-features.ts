@@ -10,6 +10,12 @@ import {
   engineProfileToPublic,
   publicProfileToEngine,
 } from './spreadsheet-profile.js';
+import {
+  completeBorderRecord,
+  completeDxfRecord,
+  completeFillRecord,
+  completeFontRecord,
+} from './style-records.js';
 import type {
   Addr,
   BorderRecord,
@@ -31,6 +37,10 @@ import type {
   Workbook,
 } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+
+/** `setCellStyle`'s sentinel for "this style has no OOXML built-in id". The
+ *  binding takes a fixed argument count, so the absence has to be a value. */
+const CUSTOM_CELL_STYLE_BUILTIN_ID = 0xffffffff;
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
 type WorkbookHandleInternals = {
@@ -342,31 +352,13 @@ export abstract class WorkbookHandleFeatureMethods {
    *  not exposed yet — so this is currently most useful as a metadata
    *  signal (e.g. "do these two cells share the same XF row?"). Returns
    *  null on engine failure or capability off. */
-  getCellXf(xfIndex: number): {
-    fontIndex: number;
-    fillIndex: number;
-    borderIndex: number;
-    numFmtId: number;
-    horizontalAlign: number;
-    verticalAlign: number;
-    wrapText: boolean;
-    justifyLastLine?: boolean;
-  } | null {
+  getCellXf(xfIndex: number): CellXf | null {
     assertAlive(this);
     if (!this.capabilities.cellFormatting) return null;
     const r = wb(this).getCellXf(xfIndex);
     if (!r.status.ok) return null;
-    const extended = r as typeof r & { justifyLastLine?: boolean };
-    return {
-      fontIndex: r.fontIndex,
-      fillIndex: r.fillIndex,
-      borderIndex: r.borderIndex,
-      numFmtId: r.numFmtId,
-      horizontalAlign: r.horizontalAlign,
-      verticalAlign: r.verticalAlign,
-      wrapText: r.wrapText,
-      justifyLastLine: extended.justifyLastLine,
-    };
+    const { status: _status, ...record } = r;
+    return record;
   }
 
   /** Resolve a font index to its plain-data record. Returns null on engine
@@ -376,16 +368,8 @@ export abstract class WorkbookHandleFeatureMethods {
     if (!this.capabilities.cellFormatting) return null;
     const r = wb(this).getFont(fontIndex);
     if (!r.status.ok) return null;
-    return {
-      name: r.name,
-      size: r.size,
-      bold: r.bold,
-      italic: r.italic,
-      strike: r.strike,
-      underline: r.underline,
-      vertAlign: r.vertAlign,
-      colorArgb: r.colorArgb,
-    };
+    const { status: _status, ...record } = r;
+    return record;
   }
 
   /** Resolve a fill index to its plain-data record. */
@@ -394,7 +378,8 @@ export abstract class WorkbookHandleFeatureMethods {
     if (!this.capabilities.cellFormatting) return null;
     const r = wb(this).getFill(fillIndex);
     if (!r.status.ok) return null;
-    return { pattern: r.pattern, fgArgb: r.fgArgb, bgArgb: r.bgArgb };
+    const { status: _status, ...record } = r;
+    return record;
   }
 
   /** Resolve a border index to its plain-data record. */
@@ -403,15 +388,8 @@ export abstract class WorkbookHandleFeatureMethods {
     if (!this.capabilities.cellFormatting) return null;
     const r = wb(this).getBorder(borderIndex);
     if (!r.status.ok) return null;
-    return {
-      left: { style: r.left.style, colorArgb: r.left.colorArgb },
-      right: { style: r.right.style, colorArgb: r.right.colorArgb },
-      top: { style: r.top.style, colorArgb: r.top.colorArgb },
-      bottom: { style: r.bottom.style, colorArgb: r.bottom.colorArgb },
-      diagonal: { style: r.diagonal.style, colorArgb: r.diagonal.colorArgb },
-      diagonalUp: r.diagonalUp,
-      diagonalDown: r.diagonalDown,
-    };
+    const { status: _status, ...record } = r;
+    return record;
   }
 
   /** Resolve a number-format id to its format-code string. */
@@ -428,7 +406,7 @@ export abstract class WorkbookHandleFeatureMethods {
   addFontRecord(record: FontRecord): number {
     assertAlive(this);
     if (!this.capabilities.cellFormatting) return -1;
-    const r = wb(this).addFont({ ...record, vertAlign: record.vertAlign ?? 0 });
+    const r = wb(this).addFont(completeFontRecord(record));
     return r.status.ok ? r.index : -1;
   }
 
@@ -436,7 +414,7 @@ export abstract class WorkbookHandleFeatureMethods {
   addFillRecord(record: FillRecord): number {
     assertAlive(this);
     if (!this.capabilities.cellFormatting) return -1;
-    const r = wb(this).addFill(record);
+    const r = wb(this).addFill(completeFillRecord(record));
     return r.status.ok ? r.index : -1;
   }
 
@@ -444,7 +422,7 @@ export abstract class WorkbookHandleFeatureMethods {
   addBorderRecord(record: BorderRecord): number {
     assertAlive(this);
     if (!this.capabilities.cellFormatting) return -1;
-    const r = wb(this).addBorder(record);
+    const r = wb(this).addBorder(completeBorderRecord(record));
     return r.status.ok ? r.index : -1;
   }
 
@@ -925,15 +903,26 @@ export abstract class WorkbookHandleFeatureMethods {
     if (!this.capabilities.cellStyles) return null;
     const r = wb(this).getCellStyleXf(xfId);
     if (!r.status.ok) return null;
-    return {
-      fontIndex: r.fontIndex,
-      fillIndex: r.fillIndex,
-      borderIndex: r.borderIndex,
-      numFmtId: r.numFmtId,
-      horizontalAlign: r.horizontalAlign,
-      verticalAlign: r.verticalAlign,
-      wrapText: r.wrapText,
-    };
+    const { status: _status, ...record } = r;
+    return record;
+  }
+
+  /** Append (deduplicating) a `<cellStyleXfs>` row and return its index, which
+   *  is what `setNamedCellStyle` and a cell XF's `xfId` reference. Returns -1
+   *  when the engine cannot author named styles. */
+  addCellStyleXfRecord(record: CellXf): number {
+    assertAlive(this);
+    if (!this.capabilities.cellStyleMutate) return -1;
+    const r = wb(this).addCellStyleXf(record);
+    return r.status.ok ? r.index : -1;
+  }
+
+  /** Add or replace the `<cellStyle>` entry named `name`. `builtinId` is an
+   *  OOXML ordinal, or null for a style with no built-in counterpart. */
+  setNamedCellStyle(name: string, xfId: number, builtinId: number | null): boolean {
+    assertAlive(this);
+    if (!this.capabilities.cellStyleMutate) return false;
+    return wb(this).setCellStyle(name, xfId, builtinId ?? CUSTOM_CELL_STYLE_BUILTIN_ID).ok;
   }
 
   /** Enumerate every named cell style on the workbook — combines
@@ -998,7 +987,7 @@ export abstract class WorkbookHandleFeatureMethods {
   addDxf(record: DxfRecord): number {
     assertAlive(this);
     if (!this.capabilities.conditionalFormatDxf) return -1;
-    const r = wb(this).addDxf(record);
+    const r = wb(this).addDxf(completeDxfRecord(record));
     return r.status.ok ? r.index : -1;
   }
 
