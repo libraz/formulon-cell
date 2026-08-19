@@ -28,9 +28,10 @@
     "prepublish:libs": "cp LICENSE packages/formulon-cell/ && cp LICENSE packages/formulon-cell-react/ 2>/dev/null || true && cp LICENSE packages/formulon-cell-vue/ 2>/dev/null || true"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.12.1",
-    "@biomejs/biome": "2.5.7",
+    "@axe-core/playwright": "^4.13.0",
+    "@biomejs/biome": "2.5.9",
     "@playwright/test": "^1.62.1",
+    "playwright-core": "^1.62.1",
     "typescript": "6.0.3",
     "vite": "8.2.1",
     "vitest": "^4.1.10"

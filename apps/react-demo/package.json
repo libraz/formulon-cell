@@ -15,7 +15,7 @@
     "test:e2e:install": "../../node_modules/.bin/playwright install --with-deps chromium webkit"
   },
   "dependencies": {
-    "@fluentui/react-icons": "^2.0.335",
+    "@fluentui/react-icons": "^2.0.337",
     "@libraz/formulon-cell": "workspace:*",
     "@libraz/formulon-cell-react": "workspace:*",
     "react": "^19",
