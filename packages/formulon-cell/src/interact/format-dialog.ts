@@ -191,7 +191,6 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const {
     shell,
     overlay,
-    panel,
     headerTitle,
     preview,
     previewCell,
@@ -1018,7 +1017,10 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const dataValidationMode = mode === 'dataValidation';
     const dxfMode = mode === 'dxf';
     overlay.classList.toggle('fc-fmtdlg--data-validation', dataValidationMode);
-    panel.setAttribute('aria-label', dataValidationMode ? t.validationLegend : t.title);
+    // `role="dialog"` sits on the overlay, so the accessible name has to be set
+    // there — labelling the panel leaves the dialog announcing the format title
+    // while the header reads Data Validation.
+    shell.setAriaLabel(dataValidationMode ? t.validationLegend : t.title);
     headerTitle.textContent = dataValidationMode ? t.validationLegend : t.title;
     tabsStrip.hidden = dataValidationMode;
     preview.hidden = dataValidationMode;

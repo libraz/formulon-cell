@@ -719,6 +719,8 @@ export function mountToolbar(
       focusDisplayOption(e.key === 'ArrowDown' ? 'first' : 'last');
       return;
     }
+    // Escape is handled by the document-level handler, which catches it from
+    // anywhere the menu can be dismissed from.
     if (!optionBtn) return;
     const items = Array.from(
       host.querySelectorAll<HTMLButtonElement>('[data-ribbon-display-option]'),
@@ -730,14 +732,7 @@ export function mountToolbar(
     else if (e.key === 'ArrowUp') next = (idx - 1 + items.length) % items.length;
     else if (e.key === 'Home') next = 0;
     else if (e.key === 'End') next = items.length - 1;
-    else if (e.key === 'Escape') {
-      e.preventDefault();
-      displayMenuOpen = false;
-      renderToolbar();
-      const reopenedToggle = host.querySelector<HTMLButtonElement>('[data-ribbon-toggle]');
-      reopenedToggle?.focus();
-      return;
-    } else return;
+    else return;
     if (next === idx) return;
     e.preventDefault();
     items[next]?.focus();
@@ -751,6 +746,18 @@ export function mountToolbar(
     if (e.key === 'Escape' && hasOpenStaticRibbonMenu()) {
       e.preventDefault();
       closeStaticRibbonMenus(undefined, true);
+      return;
+    }
+    // The display menu is reachable by click, and re-rendering the ribbon on
+    // open drops focus back to the document, so Escape has to be caught here
+    // rather than on the ribbon itself.
+    if (e.key === 'Escape' && displayMenuOpen) {
+      e.preventDefault();
+      const active = document.activeElement;
+      const focusWasLoose = active === null || active === document.body || host.contains(active);
+      displayMenuOpen = false;
+      renderToolbar();
+      if (focusWasLoose) host.querySelector<HTMLButtonElement>('[data-ribbon-toggle]')?.focus();
       return;
     }
     if (e.ctrlKey && e.key === 'F1') {

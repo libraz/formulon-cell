@@ -41,6 +41,16 @@ versioning is [SemVer](https://semver.org/).
   own SVG serializer has to honour both — otherwise the icons carrying a
   letterform land at the wrong size and position.
 
+### Fixed
+
+- The cell-format dialog announced the format title while its heading read
+  Data Validation. `role="dialog"` sits on the overlay, but the mode-specific
+  accessible name was written to the panel inside it, so assistive technology
+  never saw the name the dialog was opened under.
+- The ribbon display-options menu ignored Escape when it had been opened by
+  click. Opening the menu re-renders the ribbon, which drops focus back to the
+  document, and Escape was only handled from the menu's own options.
+
 ### Removed
 
 - `WorkbookHandle.setViewportHint()` and `clearViewportHint()`, along with the
