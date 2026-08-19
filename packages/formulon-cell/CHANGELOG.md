@@ -4,6 +4,152 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
+## 0.5.0 — 2026-08-19
+
+### Added
+
+- Page Layout and Page Break Preview are now rendered views rather than a mode
+  stamped on the host. Page gutters and ruler bands fold into the grid geometry
+  through `PagedLayout`, so cell rects, hit-testing, and the axis layouts shift
+  without every painter learning about pages. The renderer paints the desk and
+  paper, page frames, header and footer slots, rulers, break lines, the
+  out-of-print wash, and a page-number watermark. Page boundaries come from the
+  same band splitter the print path uses, so an on-screen break lands where the
+  printed document splits. Break lines and the print-area frame are draggable,
+  the Page Layout rulers set page margins, and header and footer slots are
+  editable in place. Entering Page Break Preview zooms out to fit a page and
+  restores the previous zoom on the way out. New `pageView` strings (`en` / `ja`)
+  and page-view color tokens across the `paper`, `ink`, and `contrast` themes.
+- Right-to-left sheets mirror the whole grid axis. `<sheetView rightToLeft>` is
+  hydrated on load and writable through `setSheetRightToLeft`; arrow keys,
+  `Alt+PageUp` / `Alt+PageDown`, horizontal wheel scrolling, and column-resize
+  drags follow the visual direction, while Tab stays in index order. The header
+  wedge, AutoFilter chevron, row-number strip, freeze divider, and the in-cell
+  error / validation / comment / lock affordances anchor to the mirrored side,
+  and overflow, centre-across, general alignment, and indent follow reading
+  order. `colLeftEdge` is renamed `colLeadingEdge`, and geometry functions that
+  emit or consume a screen x now take the `ViewLayout` / `ViewState` pair
+  projected by `layoutForView`.
+- Spreadsheet keyboard and interaction parity: End mode with status-bar state
+  and current-region `Ctrl+A` expansion, Backspace clearing only the active
+  cell, IME-composition-guarded shortcuts, `Alt+Down` opening a validation
+  dropdown, repeat-last-action (`F4`) for format commands, an Insert / Delete
+  Cells direction dialog, an Open Hyperlink context-menu entry with scheme
+  validation, and direct shortcuts for number formats, insert/delete cells,
+  hide/unhide rows and columns, filter, table, flash fill, and new sheet. Host
+  shortcuts are derived from the ribbon's own ARIA shortcut declarations.
+- The copy marquee has a full lifecycle. A `copyMode` (`'copy' | 'cut'`) field
+  records which command raised it, so a copy marquee stands across repeat pastes
+  while a cut marquee is consumed by its first paste. Escape and entering edit
+  mode cancel copy mode, Enter is a one-shot paste that ends it, and row/column
+  inserts and deletes shift or drop the marquee so it keeps outlining the copied
+  band. Row and column header menus gain Insert Copied Cells, which opens as
+  many whole rows or columns as the copied band is deep or wide and pastes into
+  them.
+- OOXML cell-format fidelity: the full fill-pattern repertoire with a pattern
+  gallery in the Format Cells dialog, underline variants (single / double /
+  accounting) with double-underline painting, the full border-style repertoire
+  with SVG line samples, extended horizontal and vertical alignment, negative-
+  number sections and locale-tagged currency tokens in generated format codes,
+  a Fraction number category replacing Date & Time, superscript / subscript,
+  justify-last-line for distributed alignment, and cell phonetic guides painted
+  above the base text. The dialog also has a `dxf` mode so conditional
+  formatting can edit a custom format, plus 2/3-color-scale style selection.
+- Named cell styles are written as real OOXML styles: every referenced style
+  becomes a `cellStyleXfs` + `cellStyle` pair carrying its `builtinId`, a
+  style's own formatting stays on its style-xf row, and each styled cell points
+  at it through `xfId` — so editing a style reaches every cell using it instead
+  of collapsing into direct formatting. Format as Table persists a real
+  `ListObject`, and AutoFilter definitions survive a save and are cleared on
+  removal. Named cell styles, loaded tables, Format as Table, phonetic guides,
+  and AutoFilter are reported as writable in the compatibility summary.
+- `sheetView` display flags (`showGridLines`, `showHeaders`, `showZeros`,
+  `rightToLeft`) are hydrated on load and written back, with `showZeros`
+  plumbed into the grid paint context so zero values can be blanked.
+- `DEFAULT_OFF_FEATURE_IDS` and `isFeatureDefaultOff(id)` are exported, so a
+  host rendering a feature-toggle UI reads a flag the same way `resolveFlags`
+  resolves it instead of hard-coding the default-off list.
+- `openHostMenuFirstDropdown` and `RIBBON_HOST_MENU_FIRST_COMMANDS` are
+  exported for split buttons whose menu is the entry point when the host owns
+  the actions behind it (`script`, `addIn`). Pass the helper straight through
+  as `mountToolbar`'s `interceptCommand`: it opens the dropdown for those
+  commands and returns `false` for everything else, so the default dispatch
+  still runs. Both framework adapters now use it instead of carrying their own
+  copy.
+- `formatSheetAbsoluteRange` is exported for rendering a range the way the
+  desktop dialogs present one — sheet-qualified and absolute.
+
+### Changed
+
+- The flat View toolbar (`viewToolbar`) now ships default-off, alongside
+  `watchWindow` and `slicer`, and no longer appears in `allBuiltIns()`. The
+  ribbon's View tab already carries every control it offered — Zero Values and
+  the right-to-left toggle were added there to complete it — and a second
+  always-visible strip for the same commands has no desktop counterpart. Hosts
+  that want the strip can still switch the flag on or compose the
+  `viewToolbar()` factory explicitly.
+- The engine dependency moves to `@libraz/formulon` 0.10.0 and its style-record
+  model. `getCellXf`, `getFontRecord`, `getFillRecord`, and `getBorderRecord`
+  return whole records, so indent, text rotation, shrink-to-fit, reading order,
+  `xfId`, and colour provenance survive a round trip. The adapter-local
+  `TableInput` and `CellXf` shims are gone now that the engine ships them.
+- The Format Cells dialog moves the font and border color palettes into
+  flyouts opened from a chevron beside each color input, placed as fixed panels
+  clamped to the viewport and closed on tab switch, outside mousedown, dialog
+  close, or a first Escape that no longer closes the dialog itself.
+- The ribbon icon artwork is redrawn with heavier strokes and larger glyph
+  counters so a glyph stays legible at ribbon size. The set of icon keys is
+  unchanged, so no control changes which icon it resolves to.
+- The READMEs lead with what the library is and when to reach for it, state the
+  current compatibility scope (which workbook workflows are ready and which UI
+  areas are not yet on par), add a Non-goals section, and normalize the badge
+  sets across the root and package READMEs.
+- The accessibility mirror is a valid ARIA grid. Cells were being emitted
+  straight into the live region, which made every `gridcell` parentless and
+  turned each selection change into an announcement of the whole mirror. The
+  mirror is now `grid` → `rowgroup` → `row` → `gridcell`, and the polite
+  announcer is a separate node outside the grid. Mirrored cell ids change from
+  `<id>-a11y-viewport-cell-<r>-<c>` to `<id>-a11y-cell-<r>-<c>`, rows are
+  addressable as `<id>-a11y-row-<r>`, `aria-owns` is gone from the grid, and
+  `ExtensionContext.a11y` now points at the live region rather than the mirror
+  container.
+- The Create Table and Create PivotTable range fields show sheet-qualified
+  absolute references (`Sheet1!$A$1:$B$3`), matching how the desktop dialogs
+  present them. Create PivotTable also defaults to New Worksheet instead of
+  Existing Worksheet; the destination picker stays disabled until Existing
+  Worksheet is selected.
+- Ribbon chrome meets WCAG 2.2 AA: group labels carry enough contrast at 10px,
+  the ribbon display toggle and the stacked group buttons are at least 24x24,
+  the Home tab's dense groups fit the panel without horizontal overflow, and
+  the table-style gallery is a capped scrollable panel instead of growing past
+  the viewport.
+- `@libraz/formulon-cell-vue` re-exports the `Toolbar` alias instead of
+  importing its own SFC to alias it. The self-import was a module cycle that
+  read the default binding during evaluation, which threw before the component
+  existed.
+- The toolchain is pinned through `mise.toml` (Node 22, Yarn 4.18) instead of a
+  `volta` block.
+
+### Fixed
+
+- A superseded instance can no longer tear down the live overlay portal. The
+  portal is stamped with the claiming host's instance id, and a disposing
+  instance skips removal when the portal no longer belongs to it — so a remount
+  of the same host cannot detach the container the live instance renders its
+  menus, dialogs, and dropdowns into.
+- The inline editor stays welded to its cell. It repositions and resizes from a
+  store subscription, so viewport, layout, and format changes during an edit
+  follow the cell; a cell scrolled under the frozen band or the headers parks
+  the editor outside the grid clip rect, keeping DOM focus, caret, and IME
+  composition alive. The editor also takes the cell's own fill and text color
+  and drops its radius, ring, and shadow transition so an edit reads as in
+  place.
+- Ribbon commands take focus when clicked. WebKit follows the macOS convention
+  of not focusing a `<button>` on click, so ribbon keyboard navigation and any
+  dialog that restores focus to the command that opened it both lost their
+  anchor there. Whatever the command focuses next — a menu item, a dialog
+  field, the sheet — still wins.
+
 ## 0.4.0 — 2026-07-05
 
 ### Added
@@ -233,6 +379,7 @@ Initial public release.
   so the package works under any modern bundler. Falls back to an
   in-memory stub when `crossOriginIsolated` is unavailable.
 
+[0.5.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.5.0
 [0.4.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.4.0
 [0.3.1]: https://github.com/libraz/formulon-cell/releases/tag/v0.3.1
 [0.3.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.3.0
