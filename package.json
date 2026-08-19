@@ -21,6 +21,7 @@
     "format": "biome check --write .",
     "typecheck": "yarn workspaces foreach -A --exclude formulon-cell-monorepo run typecheck",
     "test": "yarn workspace @libraz/formulon-cell test",
+    "icons:review": "node scripts/icons/render.mjs",
     "test:e2e": "yarn workspaces foreach -A --include '@formulon-cell/*' run test:e2e",
     "test:e2e:visual": "yarn workspaces foreach -A --include '@formulon-cell/*' run test:e2e:visual",
     "test:e2e:visual:update": "yarn workspaces foreach -A --include '@formulon-cell/*' run test:e2e:visual:update",
@@ -34,6 +35,6 @@
     "playwright-core": "^1.62.1",
     "typescript": "6.0.3",
     "vite": "8.2.1",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }
