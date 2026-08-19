@@ -43,7 +43,7 @@ jobs:
           package-manager-cache: false
 
       - run: corepack enable
-      - run: corepack prepare yarn@4.5.0 --activate
+      - run: corepack prepare yarn@4.18.0 --activate
 
       - uses: actions/cache@v6
         with:
@@ -70,10 +70,3 @@ jobs:
           files: packages/formulon-cell/coverage/lcov.info
           flags: formulon-cell
           fail_ci_if_error: false
-
-      - uses: actions/upload-artifact@v7
-        if: failure()
-        with:
-          name: playwright-report-${{ matrix.app }}-${{ matrix.browser }}
-          path: apps/${{ matrix.app }}/playwright-report
-          retention-days: 7
