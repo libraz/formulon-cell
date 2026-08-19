@@ -25,6 +25,16 @@ export interface ResolvedTheme {
   headerFg: string;
   headerFgActive: string;
 
+  /** Page Layout / Page Break Preview chrome. */
+  pageBackdrop: string;
+  pagePaper: string;
+  pageEdge: string;
+  pageBandFg: string;
+  pageBreakAuto: string;
+  pageBreakManual: string;
+  pageNumberFg: string;
+  pageOutside: string;
+
   fontUi: string;
   fontMono: string;
 
@@ -66,6 +76,15 @@ export function resolveTheme(host: HTMLElement): ResolvedTheme {
     hoverStripe: v('--fc-hover-stripe', 'rgba(21,23,28,0.025)'),
     headerFg: v('--fc-header-fg', '#6f6a5d'),
     headerFgActive: v('--fc-header-fg-active', '#15171c'),
+
+    pageBackdrop: v('--fc-page-backdrop', '#9b968a'),
+    pagePaper: v('--fc-page-paper', '#ffffff'),
+    pageEdge: v('--fc-page-edge', '#6f6a5d'),
+    pageBandFg: v('--fc-page-band-fg', '#8d8779'),
+    pageBreakAuto: v('--fc-page-break-auto', '#2f6fd0'),
+    pageBreakManual: v('--fc-page-break-manual', '#1a4fa0'),
+    pageNumberFg: v('--fc-page-number-fg', 'rgba(47,111,208,0.16)'),
+    pageOutside: v('--fc-page-outside', 'rgba(120,120,120,0.28)'),
 
     fontUi: v('--fc-font-ui', 'system-ui, sans-serif'),
     fontMono: v('--fc-font-mono', 'ui-monospace, monospace'),

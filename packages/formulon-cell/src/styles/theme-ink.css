@@ -52,6 +52,17 @@
 
     --fc-hover-stripe: rgba(76, 194, 107, 0.04);
 
+    /* Page views — the desk darkens rather than the paper, so a printed page
+       still reads as paper against a dark chrome. */
+    --fc-page-backdrop: #161514;
+    --fc-page-paper: #2b2a29;
+    --fc-page-edge: #5a5854;
+    --fc-page-band-fg: #8a8886;
+    --fc-page-break-auto: #6fa8ff;
+    --fc-page-break-manual: #9cc4ff;
+    --fc-page-number-fg: rgba(111, 168, 255, 0.18);
+    --fc-page-outside: rgba(0, 0, 0, 0.38);
+
     /* Elevation — deeper than paper because dark surfaces need more contrast. */
     --fc-shadow-2: 0 1px 2px rgba(0, 0, 0, 0.45);
     --fc-shadow-4: 0 3px 8px rgba(0, 0, 0, 0.5);

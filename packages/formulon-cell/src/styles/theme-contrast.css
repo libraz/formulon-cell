@@ -54,6 +54,17 @@
 
     --fc-hover-stripe: rgba(0, 51, 204, 0.06);
 
+    /* Page views — no tints; every page edge and break is a solid black or
+       accent line so the boundaries survive a high-contrast display. */
+    --fc-page-backdrop: #000000;
+    --fc-page-paper: #ffffff;
+    --fc-page-edge: #000000;
+    --fc-page-band-fg: #000000;
+    --fc-page-break-auto: #0033cc;
+    --fc-page-break-manual: #0033cc;
+    --fc-page-number-fg: rgba(0, 51, 204, 0.35);
+    --fc-page-outside: rgba(0, 0, 0, 0.45);
+
     /* === FORMAT-CELLS DIALOG (high-contrast) ===
      * Pure black/white surfaces with the accent blue serving as the focus
      * ring and primary-action color. Active tab uses a filled pill. */

@@ -688,6 +688,23 @@ describe('buildPrintDocument', () => {
     wb.dispose();
   });
 
+  it('splits the document into separate tables at a manual page break', async () => {
+    const wb = await newWb();
+    const store = createSpreadsheetStore();
+    for (let row = 0; row < 6; row += 1) setNumber(store, wb, row, 0, row);
+
+    const before = buildPrintDocument(wb, store, 0);
+    const sectionsBefore = (before.html.match(/<table/g) ?? []).length;
+
+    mutators.setPageSetup(store, 0, { manualPageBreakRows: [3] });
+    const after = buildPrintDocument(wb, store, 0);
+    const sectionsAfter = (after.html.match(/<table/g) ?? []).length;
+
+    expect(sectionsBefore).toBe(1);
+    expect(sectionsAfter).toBe(2);
+    wb.dispose();
+  });
+
   it('marks manual column page breaks in the print document', async () => {
     const wb = await newWb();
     const store = createSpreadsheetStore();

@@ -57,6 +57,26 @@
     border-left-color: transparent;
   }
 
+  /* Header / footer slot editor in Page Layout view. It stands in for text
+   * painted on the page margin rather than in a cell, so it takes the paper
+   * as its background and marks itself with a dashed frame the way the
+   * desktop app outlines an active band. */
+  .fc-pageband-editor {
+    position: absolute;
+    z-index: 2;
+    box-sizing: border-box;
+    padding: 2px 6px;
+    margin: 0;
+    background: var(--fc-page-paper);
+    color: var(--fc-fg);
+    border: 1px dashed var(--fc-accent);
+    font-family: var(--fc-font-ui);
+    font-size: 12px;
+    line-height: 1.25;
+    outline: none;
+    caret-color: var(--fc-accent);
+  }
+
   /* a11y mirror — visually hidden but in the a11y tree */
   .fc-host__a11y {
     position: absolute;

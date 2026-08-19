@@ -797,6 +797,20 @@ export interface Strings {
     deleteViewRequiresActive: string;
     objects: string;
   };
+  /** Page Layout and Page Break Preview chrome — the text painted onto the
+   *  page itself rather than into any toolbar. */
+  pageView: {
+    /** Placeholder in an empty header band. */
+    addHeader: string;
+    /** Placeholder in an empty footer band. */
+    addFooter: string;
+    /** Page-number watermark. `{n}` is the 1-based page number. */
+    pageNumber: string;
+    /** Announced when a break line is picked up for dragging. */
+    movePageBreak: string;
+    /** Unit the Page Layout rulers are marked in. */
+    rulerUnit: 'in' | 'cm';
+  };
   workbookObjects: {
     title: string;
     preservedParts: string;

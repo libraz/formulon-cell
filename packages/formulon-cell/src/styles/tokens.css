@@ -87,6 +87,24 @@
     /* Stripe painted across the hovered row + column. */
     --fc-hover-stripe: initial;
 
+    /* === PAGE VIEWS (Page Layout / Page Break Preview) === */
+    /* Desk the sheets of paper sit on, seen through the gutters. */
+    --fc-page-backdrop: initial;
+    /* Paper itself — the margin band around each page's cells. */
+    --fc-page-paper: initial;
+    /* Hairline around a sheet of paper. */
+    --fc-page-edge: initial;
+    /* Header / footer band placeholder text in Page Layout. */
+    --fc-page-band-fg: initial;
+    /* Automatic page break (dashed) in Page Break Preview. */
+    --fc-page-break-auto: initial;
+    /* Manual page break and the print-area frame (solid). */
+    --fc-page-break-manual: initial;
+    /* Page-number watermark drawn across each page in the preview. */
+    --fc-page-number-fg: initial;
+    /* Wash over cells that fall outside the printed area. */
+    --fc-page-outside: initial;
+
     /* === TYPOGRAPHY (set on the base layer, override here) === */
     /* UI font — name box, formula bar, dialog text. */
     --fc-font-ui: initial;

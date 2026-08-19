@@ -1,3 +1,4 @@
+import { pageLayoutGaps } from '../commands/pagination.js';
 import type { Range } from '../engine/types.js';
 import type { LayoutSlice, State, UiSlice, ViewportSlice } from '../store/store.js';
 
@@ -58,11 +59,50 @@ export function rowHeight(layout: LayoutSlice, row: number, viewport?: ViewportS
  *  about. Every function below that emits or consumes a screen x takes this
  *  type, so a caller cannot accidentally hand it a raw `state.layout` and get
  *  left-to-right coordinates on a right-to-left sheet. */
-export interface ViewLayout extends LayoutSlice {
+export interface ViewLayout extends PagedLayout {
   /** `<sheetView rightToLeft>`: column A sits at the right edge. */
   rtl: boolean;
   /** Grid width in CSS pixels — the axis `rtl` mirrors about. */
   viewWidth: number;
+}
+
+/** A layout that may carry Page Layout view's page gutters.
+ *
+ *  In that view the grid is interrupted by paper: each printed page is framed
+ *  by its margins and separated from the next by a gutter. Rather than teach
+ *  every paint pass about pages, the gutters are folded into the axis as extra
+ *  leading pixels before the row / column that opens a page, so all existing
+ *  geometry — cell rects, hit-testing, the inline editor's anchor — keeps
+ *  working unchanged. Both maps are absent in every other view, and their
+ *  values are already multiplied by the viewport zoom. */
+export interface PagedLayout extends LayoutSlice {
+  pageGapRows?: ReadonlyMap<number, number>;
+  pageGapCols?: ReadonlyMap<number, number>;
+  /** Height / width of the Page Layout rulers, in screen pixels. The rulers
+   *  sit outboard of the outline gutters, so reserving the band here shifts
+   *  the headers and the whole grid without any painter having to know why. */
+  rulerRowHeight?: number;
+  rulerColWidth?: number;
+}
+
+/** Height of the horizontal ruler band; zero outside Page Layout view. */
+export function rulerTop(layout: PagedLayout): number {
+  return layout.rulerRowHeight ?? 0;
+}
+
+/** Width of the vertical ruler band; zero outside Page Layout view. */
+export function rulerLeft(layout: PagedLayout): number {
+  return layout.rulerColWidth ?? 0;
+}
+
+/** Leading gutter before `col`, in screen pixels. Zero outside Page Layout. */
+export function colGap(layout: PagedLayout, col: number): number {
+  return layout.pageGapCols?.get(col) ?? 0;
+}
+
+/** Leading gutter above `row`, in screen pixels. Zero outside Page Layout. */
+export function rowGap(layout: PagedLayout, row: number): number {
+  return layout.pageGapRows?.get(row) ?? 0;
 }
 
 /** Application state as the renderer sees it: the same slices, with the layout
@@ -71,7 +111,7 @@ export interface ViewLayout extends LayoutSlice {
 export type ViewState = Omit<State, 'layout'> & { layout: ViewLayout };
 
 export function layoutForView(
-  state: { layout: LayoutSlice; ui: UiSlice; viewport: ViewportSlice },
+  state: LayoutForViewInput,
   overrides: { showHeaders?: boolean } = {},
 ): ViewLayout {
   const showHeaders = overrides.showHeaders ?? state.ui.showHeaders !== false;
@@ -79,10 +119,37 @@ export function layoutForView(
     ...state.layout,
     rtl: state.ui.rightToLeft === true,
     viewWidth: state.viewport.widthPx,
+    ...pageGapsFor(state),
   };
   if (showHeaders) return base;
   return { ...base, headerColWidth: 0, headerRowHeight: 0 };
 }
+
+/** What `layoutForView` needs. The slices beyond layout/ui/viewport are only
+ *  read in Page Layout view, so callers that never enter it — and the unit
+ *  tests — may hand over the three-slice subset. */
+export type LayoutForViewInput = {
+  layout: LayoutSlice;
+  ui: UiSlice;
+  viewport: ViewportSlice;
+} & Partial<State>;
+
+function pageGapsFor(state: LayoutForViewInput): Partial<PagedLayout> {
+  if (state.ui.workbookView !== 'pageLayout') return {};
+  if (!state.data || !state.format || !state.merges || !state.pageSetup) return {};
+  const viewport = state.viewport;
+  return {
+    ...pageLayoutGaps(state as State, state.data.sheetIndex, {
+      throughRow: viewport.rowStart + viewport.rowCount,
+      throughCol: viewport.colStart + viewport.colCount,
+    }),
+    rulerRowHeight: RULER_BAND,
+    rulerColWidth: RULER_BAND,
+  };
+}
+
+/** Thickness of either ruler band, in screen pixels. */
+export const RULER_BAND = 18;
 
 /** Screen x of a rect's trailing edge — the corner a range's bottom-corner
  *  affordances hang off, which the mirror moves to the physical left. */
@@ -106,57 +173,63 @@ export function mirrorX(layout: ViewLayout, x: number, w = 0): number {
 
 /** Total left offset before the first data column. Includes the row-outline
  *  bracket gutter (when rows are grouped) plus the row-number header strip. */
-export function gridOriginX(layout: LayoutSlice): number {
-  return layout.outlineRowGutter + layout.headerColWidth;
+export function gridOriginX(layout: PagedLayout): number {
+  return rulerLeft(layout) + layout.outlineRowGutter + layout.headerColWidth;
 }
 
 /** Total top offset before the first data row. Includes the col-outline
  *  bracket gutter plus the col-letter header strip. */
-export function gridOriginY(layout: LayoutSlice): number {
-  return layout.outlineColGutter + layout.headerRowHeight;
+export function gridOriginY(layout: PagedLayout): number {
+  return rulerTop(layout) + layout.outlineColGutter + layout.headerRowHeight;
 }
 
 /** Total width occupied by frozen columns. Zero if no freeze. */
-export function frozenColsWidth(layout: LayoutSlice, viewport?: ViewportSlice): number {
+export function frozenColsWidth(layout: PagedLayout, viewport?: ViewportSlice): number {
   let w = 0;
-  for (let c = 0; c < layout.freezeCols; c += 1) w += colWidth(layout, c, viewport);
+  for (let c = 0; c < layout.freezeCols; c += 1)
+    w += colGap(layout, c) + colWidth(layout, c, viewport);
   return w;
 }
 
 /** Total height occupied by frozen rows. Zero if no freeze. */
-export function frozenRowsHeight(layout: LayoutSlice, viewport?: ViewportSlice): number {
+export function frozenRowsHeight(layout: PagedLayout, viewport?: ViewportSlice): number {
   let h = 0;
-  for (let r = 0; r < layout.freezeRows; r += 1) h += rowHeight(layout, r, viewport);
+  for (let r = 0; r < layout.freezeRows; r += 1)
+    h += rowGap(layout, r) + rowHeight(layout, r, viewport);
   return h;
 }
 
 /** Cumulative pixel x for a column, relative to data origin (excludes header).
  *  Frozen columns are positioned from the data origin; non-frozen columns sit
  *  to the right of the frozen band, offset by the body viewport scroll. */
-export function colX(layout: LayoutSlice, viewport: ViewportSlice, col: number): number {
+export function colX(layout: PagedLayout, viewport: ViewportSlice, col: number): number {
   const fc = layout.freezeCols;
-  if (col < fc) {
-    let x = 0;
-    for (let c = 0; c < col; c += 1) x += colWidth(layout, c, viewport);
+  const walk = (from: number, base: number): number => {
+    let x = base;
+    for (let c = from; c <= col; c += 1) {
+      // The gutter that opens a page precedes its first column, so it counts
+      // towards that column's own offset as well as every later one.
+      x += colGap(layout, c);
+      if (c < col) x += colWidth(layout, c, viewport);
+    }
     return x;
-  }
-  let x = frozenColsWidth(layout, viewport);
-  const start = Math.max(viewport.colStart, fc);
-  for (let c = start; c < col; c += 1) x += colWidth(layout, c, viewport);
-  return x;
+  };
+  if (col < fc) return walk(0, 0);
+  return walk(Math.max(viewport.colStart, fc), frozenColsWidth(layout, viewport));
 }
 
-export function rowY(layout: LayoutSlice, viewport: ViewportSlice, row: number): number {
+export function rowY(layout: PagedLayout, viewport: ViewportSlice, row: number): number {
   const fr = layout.freezeRows;
-  if (row < fr) {
-    let y = 0;
-    for (let r = 0; r < row; r += 1) y += rowHeight(layout, r, viewport);
+  const walk = (from: number, base: number): number => {
+    let y = base;
+    for (let r = from; r <= row; r += 1) {
+      y += rowGap(layout, r);
+      if (r < row) y += rowHeight(layout, r, viewport);
+    }
     return y;
-  }
-  let y = frozenRowsHeight(layout, viewport);
-  const start = Math.max(viewport.rowStart, fr);
-  for (let r = start; r < row; r += 1) y += rowHeight(layout, r, viewport);
-  return y;
+  };
+  if (row < fr) return walk(0, 0);
+  return walk(Math.max(viewport.rowStart, fr), frozenRowsHeight(layout, viewport));
 }
 
 export function cellRect(
@@ -185,14 +258,20 @@ export function cellRectUnclamped(
 ): Rect {
   const rect = cellRect(layout, viewport, row, col);
   const colStart = Math.max(viewport.colStart, layout.freezeCols);
+  // Walking back past a page gutter skips the gutter of the cell being
+  // resolved: that one sits ahead of the cell, not between it and the edge.
   if (col >= layout.freezeCols && col < colStart) {
     let back = 0;
-    for (let c = col; c < colStart; c += 1) back += colWidth(layout, c, viewport);
+    for (let c = col; c < colStart; c += 1) {
+      back += colWidth(layout, c, viewport) + (c > col ? colGap(layout, c) : 0);
+    }
     rect.x += layout.rtl ? back : -back;
   }
   const rowStart = Math.max(viewport.rowStart, layout.freezeRows);
   if (row >= layout.freezeRows && row < rowStart) {
-    for (let r = row; r < rowStart; r += 1) rect.y -= rowHeight(layout, r, viewport);
+    for (let r = row; r < rowStart; r += 1) {
+      rect.y -= rowHeight(layout, r, viewport) + (r > row ? rowGap(layout, r) : 0);
+    }
   }
   return rect;
 }
@@ -230,11 +309,16 @@ export function hitTest(
   const fcw = frozenColsWidth(layout, viewport);
   const frh = frozenRowsHeight(layout, viewport);
 
+  // A pointer inside a page gutter belongs to no cell — the gutter is paper
+  // margin, not sheet — so each step charges the gap before testing the cell
+  // and bails out when the pointer never reaches the cell itself.
   let col: number;
   let cx = ox;
   if (fc > 0 && x < ox + fcw) {
     col = 0;
     while (col < fc) {
+      cx += colGap(layout, col);
+      if (x < cx) return null;
       const w = colWidth(layout, col, viewport);
       if (x < cx + w) break;
       cx += w;
@@ -246,6 +330,8 @@ export function hitTest(
     col = Math.max(viewport.colStart, fc);
     const end = viewport.colStart + viewport.colCount;
     while (col < end) {
+      cx += colGap(layout, col);
+      if (x < cx) return null;
       const w = colWidth(layout, col, viewport);
       if (x < cx + w) break;
       cx += w;
@@ -259,6 +345,8 @@ export function hitTest(
   if (fr > 0 && y < oy + frh) {
     row = 0;
     while (row < fr) {
+      cy += rowGap(layout, row);
+      if (y < cy) return null;
       const h = rowHeight(layout, row, viewport);
       if (y < cy + h) break;
       cy += h;
@@ -270,6 +358,8 @@ export function hitTest(
     row = Math.max(viewport.rowStart, fr);
     const end = viewport.rowStart + viewport.rowCount;
     while (row < end) {
+      cy += rowGap(layout, row);
+      if (y < cy) return null;
       const h = rowHeight(layout, row, viewport);
       if (y < cy + h) break;
       cy += h;
@@ -295,6 +385,7 @@ function colAtX(
   if (fc > 0 && x < ox + fcw) {
     let cx = ox;
     for (let col = 0; col < fc; col += 1) {
+      cx += colGap(layout, col);
       const w = colWidth(layout, col, viewport);
       if (x < cx + w) return { col, leftEdge: cx, rightEdge: cx + w };
       cx += w;
@@ -305,6 +396,7 @@ function colAtX(
   let col = Math.max(viewport.colStart, fc);
   const end = viewport.colStart + viewport.colCount;
   while (col < end) {
+    cx += colGap(layout, col);
     const w = colWidth(layout, col, viewport);
     if (x < cx + w) return { col, leftEdge: cx, rightEdge: cx + w };
     cx += w;
@@ -314,7 +406,7 @@ function colAtX(
 }
 
 function rowAtY(
-  layout: LayoutSlice,
+  layout: PagedLayout,
   viewport: ViewportSlice,
   y: number,
 ): { row: number; bottomEdge: number; topEdge: number } | null {
@@ -324,6 +416,7 @@ function rowAtY(
   if (fr > 0 && y < oy + frh) {
     let cy = oy;
     for (let row = 0; row < fr; row += 1) {
+      cy += rowGap(layout, row);
       const h = rowHeight(layout, row, viewport);
       if (y < cy + h) return { row, topEdge: cy, bottomEdge: cy + h };
       cy += h;
@@ -334,6 +427,7 @@ function rowAtY(
   let row = Math.max(viewport.rowStart, fr);
   const end = viewport.rowStart + viewport.rowCount;
   while (row < end) {
+    cy += rowGap(layout, row);
     const h = rowHeight(layout, row, viewport);
     if (y < cy + h) return { row, topEdge: cy, bottomEdge: cy + h };
     cy += h;
@@ -375,6 +469,10 @@ export function hitZone(
   // leftmost. `colAtX` and `hitTest` do the same, so the pointer only has to
   // cross the mirror once.
   const x = mirrorX(layout, screenX);
+  // Page Layout's rulers take the outermost band, outboard of the header
+  // rails. They belong to the page, not to any row or column, so the header
+  // fall-through below must not claim them.
+  if (y < rulerTop(layout) || x < rulerLeft(layout)) return null;
   const resizeHandles = opts?.resizeHandles !== false;
   // Outline gutters sit outboard of the row/col header strips. Treat them as
   // header zones for now — the pointer layer routes outline-toggle clicks
@@ -478,70 +576,70 @@ export interface AxisLayout {
   sizeAt: Map<number, number>;
   /** Sum of frozen-band sizes. Matches `frozenColsWidth` / `frozenRowsHeight`. */
   frozenTotal: number;
+  /** Index → leading page gutter, for the visible indices that open a page.
+   *  Empty outside Page Layout view. `positionAt` already sits past the
+   *  gutter, so painters that need to fill the paper read it from here. */
+  gapAt: Map<number, number>;
 }
 
-export function buildColLayout(layout: LayoutSlice, viewport: ViewportSlice): AxisLayout {
+export function buildColLayout(layout: PagedLayout, viewport: ViewportSlice): AxisLayout {
   const visible: number[] = [];
   const positionAt = new Map<number, number>();
   const sizeAt = new Map<number, number>();
+  const gapAt = new Map<number, number>();
 
   let x = 0;
-  for (let c = 0; c < layout.freezeCols; c += 1) {
+  const place = (c: number): void => {
+    const gap = colGap(layout, c);
+    x += gap;
     const w = colWidth(layout, c, viewport);
     if (w > 0) {
       visible.push(c);
       positionAt.set(c, x);
       sizeAt.set(c, w);
+      if (gap > 0) gapAt.set(c, gap);
     }
     x += w;
-  }
+  };
+
+  for (let c = 0; c < layout.freezeCols; c += 1) place(c);
   const frozenTotal = x;
 
   const start = Math.max(viewport.colStart, layout.freezeCols);
   const end = viewport.colStart + viewport.colCount;
-  for (let c = start; c < end; c += 1) {
-    const w = colWidth(layout, c, viewport);
-    if (w > 0) {
-      visible.push(c);
-      positionAt.set(c, x);
-      sizeAt.set(c, w);
-    }
-    x += w;
-  }
+  for (let c = start; c < end; c += 1) place(c);
 
-  return { visible, positionAt, sizeAt, frozenTotal };
+  return { visible, positionAt, sizeAt, frozenTotal, gapAt };
 }
 
-export function buildRowLayout(layout: LayoutSlice, viewport: ViewportSlice): AxisLayout {
+export function buildRowLayout(layout: PagedLayout, viewport: ViewportSlice): AxisLayout {
   const visible: number[] = [];
   const positionAt = new Map<number, number>();
   const sizeAt = new Map<number, number>();
+  const gapAt = new Map<number, number>();
 
   let y = 0;
-  for (let r = 0; r < layout.freezeRows; r += 1) {
+  const place = (r: number): void => {
+    const gap = rowGap(layout, r);
+    y += gap;
     const h = rowHeight(layout, r, viewport);
     if (h > 0) {
       visible.push(r);
       positionAt.set(r, y);
       sizeAt.set(r, h);
+      if (gap > 0) gapAt.set(r, gap);
     }
     y += h;
-  }
+  };
+
+  for (let r = 0; r < layout.freezeRows; r += 1) place(r);
   const frozenTotal = y;
 
   const start = Math.max(viewport.rowStart, layout.freezeRows);
   const end = viewport.rowStart + viewport.rowCount;
-  for (let r = start; r < end; r += 1) {
-    const h = rowHeight(layout, r, viewport);
-    if (h > 0) {
-      visible.push(r);
-      positionAt.set(r, y);
-      sizeAt.set(r, h);
-    }
-    y += h;
-  }
+  for (let r = start; r < end; r += 1) place(r);
 
-  return { visible, positionAt, sizeAt, frozenTotal };
+  return { visible, positionAt, sizeAt, frozenTotal, gapAt };
 }
 
 /** Constant-time cellRect using precomputed AxisLayouts. Caller guarantees

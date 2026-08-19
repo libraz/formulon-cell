@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { History } from '../../../src/commands/history.js';
 import {
   clearSheetBackgroundImage,
+  PAGE_BREAK_PREVIEW_ZOOM,
   setGridlinesVisible,
   setHeadingsVisible,
   setR1C1ReferenceStyle,
@@ -38,6 +39,28 @@ describe('view commands', () => {
     expect(store.getState().ui.workbookView).toBe('pageLayout');
     setWorkbookView(store, 'pageBreakPreview');
     expect(store.getState().ui.workbookView).toBe('pageBreakPreview');
+  });
+
+  it('zooms out for page break preview and restores the zoom on the way back', () => {
+    const store = createSpreadsheetStore();
+    setZoomPercent(store, 125);
+
+    setWorkbookView(store, 'pageBreakPreview');
+    expect(store.getState().viewport.zoom).toBe(PAGE_BREAK_PREVIEW_ZOOM);
+    expect(store.getState().ui.zoomBeforePreview).toBe(1.25);
+
+    setWorkbookView(store, 'normal');
+    expect(store.getState().viewport.zoom).toBe(1.25);
+    expect(store.getState().ui.zoomBeforePreview).toBeNull();
+  });
+
+  it('leaves the zoom alone for page layout', () => {
+    const store = createSpreadsheetStore();
+    setZoomPercent(store, 75);
+
+    setWorkbookView(store, 'pageLayout');
+    expect(store.getState().viewport.zoom).toBe(0.75);
+    expect(store.getState().ui.zoomBeforePreview).toBeNull();
   });
 
   it('sets and clears sheet background image URLs', () => {

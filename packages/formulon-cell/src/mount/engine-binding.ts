@@ -12,6 +12,7 @@ import { attachContextMenu } from '../interact/context-menu.js';
 import { InlineEditor } from '../interact/editor.js';
 import { attachFindReplace } from '../interact/find-replace.js';
 import { attachKeyboard } from '../interact/keyboard.js';
+import { attachPageBandEditor } from '../interact/page-band-editor.js';
 import { attachPasteOptions } from '../interact/paste-options.js';
 import { attachPasteSpecial } from '../interact/paste-special.js';
 import { attachPointer } from '../interact/pointer.js';
@@ -136,6 +137,9 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         }
       : null,
   );
+  // Header / footer slots are only reachable in Page Layout view, but the
+  // listener is cheap and stateless until one is clicked.
+  const pageBandEditor = attachPageBandEditor({ grid, store, history });
   const autoFillOptions = attachAutoFillOptions({
     host: grid,
     store,
@@ -338,6 +342,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     contextMenu,
     unbind: () => {
       detachPtr();
+      pageBandEditor.detach();
       autoFillOptions.detach();
       pasteOptions.detach();
       detachKey();

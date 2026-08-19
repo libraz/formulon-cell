@@ -83,7 +83,7 @@ import {
   type ToolbarInstanceRef,
 } from './mount/toolbar.js';
 import type { MountOptions, ScreenClipResult, SpreadsheetInstance } from './mount/types.js';
-import { cellRect, layoutForView } from './render/geometry.js';
+import { cellRect, gridOriginY, layoutForView } from './render/geometry.js';
 import { GridRenderer, getErrorTriangleHits } from './render/grid.js';
 import { createSpreadsheetStore, mutators } from './store/store.js';
 import { resolveTheme } from './theme/resolve.js';
@@ -263,6 +263,7 @@ export const Spreadsheet = {
         mutators.setViewportSize(store, rowCount, colCount, widthPx),
       getWb: () => wb,
       getLocale: () => i18n.locale,
+      getStrings: () => strings,
       getDisplay: (addr, value, formula, format) =>
         cellRegistry.resolveDisplay({ addr, value, formula, format }),
     });
@@ -943,7 +944,7 @@ export const Spreadsheet = {
         // mirror puts on the left of the cell for a right-to-left sheet.
         const cell = cellRect(layout, s.viewport, targetRange.r0, targetCol);
         const x = hostRect.left + (layout.rtl ? cell.x + 4 : cell.x + cell.w - 4);
-        const y = hostRect.top + layout.outlineColGutter + layout.headerRowHeight - 4;
+        const y = hostRect.top + gridOriginY(layout) - 4;
         filterDropdown.open(targetRange, targetCol, {
           x,
           y,

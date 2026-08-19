@@ -8,6 +8,8 @@ import {
   colLabel,
   gridOriginX,
   gridOriginY,
+  rulerLeft,
+  rulerTop,
   type ViewState,
 } from '../geometry.js';
 import { paintOutlineGutters } from '../painters/controls.js';
@@ -28,14 +30,16 @@ export function paintHeaders(
   const ox = gridOriginX(layout);
   const oy = gridOriginY(layout);
   const rtl = layout.rtl;
-  const labelTopY = layout.outlineColGutter;
+  // The ruler bands, when Page Layout is showing them, sit outboard of the
+  // outline gutters, so every rail offset starts past them.
+  const labelTopY = rulerTop(layout) + layout.outlineColGutter;
   // The whole row rail — outline gutter plus number strip — swaps to the right
   // edge on a right-to-left sheet. `railLeftX` is where that rail starts,
   // `labelLeftX` where the number strip inside it starts, and `innerX` is the
   // rail's boundary with the data area, which is the edge every row-header
   // affordance hugs.
-  const railLeftX = rtl ? cssWidth - ox : 0;
-  const labelLeftX = rtl ? cssWidth - ox : layout.outlineRowGutter;
+  const railLeftX = rtl ? cssWidth - ox : rulerLeft(layout);
+  const labelLeftX = rtl ? cssWidth - ox : rulerLeft(layout) + layout.outlineRowGutter;
   const innerX = rtl ? cssWidth - ox : ox;
 
   ctx.fillStyle = theme.bgRail;

@@ -15,17 +15,30 @@ import {
   isColGroupCollapsed,
   isRowGroupCollapsed,
 } from '../commands/outline.js';
+import { movePageBreak, resizePrintArea, setPageSetup } from '../commands/page-setup.js';
+import { paginationFor } from '../commands/pagination.js';
 import { syncLayoutSizesToEngine } from '../engine/layout-sync.js';
 import type { Range } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import {
   colLeadingEdge,
+  gridOriginY,
   hitTest,
   hitZone,
   layoutForView,
   type ViewLayout,
 } from '../render/geometry.js';
+import {
+  getPageBandHits,
+  getPageBreakHandles,
+  getRulerHandles,
+  PAGE_BREAK_GRAB,
+  type PageBandHit,
+  type PageBreakHandle,
+  RULER_GRAB,
+  type RulerHandle,
+} from '../render/grid/page-view.js';
 import { getFillHandleRect, getOutlineToggleHits } from '../render/grid.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 
@@ -45,6 +58,8 @@ type DragMode =
     }
   | { kind: 'row-resize'; row: number; topEdge: number; preLayout: LayoutSnapshot }
   | { kind: 'fill'; src: Range }
+  | { kind: 'page-break'; handle: PageBreakHandle; target: number }
+  | { kind: 'ruler-margin'; handle: RulerHandle; inches: number }
   | {
       kind: 'range-insert';
       anchor: { row: number; col: number };
@@ -129,6 +144,70 @@ export function attachPointer(
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
+  /** The page boundary under the pointer, if Page Break Preview is showing one
+   *  there. A manual break wins over an automatic one at the same position so
+   *  a stack of coincident lines still drags the one the user can move. */
+  const pageBreakHandleAt = (s: State, x: number, y: number): PageBreakHandle | null => {
+    if (s.ui.workbookView !== 'pageBreakPreview') return null;
+    let best: PageBreakHandle | null = null;
+    for (const handle of getPageBreakHandles()) {
+      const distance =
+        handle.axis === 'row' ? Math.abs(y - handle.position) : Math.abs(x - handle.position);
+      if (distance > PAGE_BREAK_GRAB) continue;
+      if (!best || (handle.kind === 'break' && best.kind === 'printArea')) best = handle;
+    }
+    return best;
+  };
+
+  /** The ruler margin boundary under the pointer in Page Layout view. Only
+   *  the ruler bands themselves are live; the same coordinate further into the
+   *  sheet belongs to a cell. */
+  const rulerHandleAt = (s: State, x: number, y: number): RulerHandle | null => {
+    if (s.ui.workbookView !== 'pageLayout') return null;
+    for (const handle of getRulerHandles()) {
+      const horizontal = handle.side === 'left' || handle.side === 'right';
+      const across = horizontal ? y : x;
+      if (across < handle.bandStart || across > handle.bandEnd) continue;
+      const distance = horizontal ? Math.abs(x - handle.position) : Math.abs(y - handle.position);
+      if (distance <= RULER_GRAB) return handle;
+    }
+    return null;
+  };
+
+  /** Margin width, in inches, implied by dropping `handle` at (x, y). The
+   *  ruler's paper origin is the page edge, so the distance from there to the
+   *  pointer is the margin — mirrored on a right-to-left sheet, where the
+   *  leading edge is physically on the right. */
+  const marginInchesFor = (handle: RulerHandle, x: number, y: number): number => {
+    const horizontal = handle.side === 'left' || handle.side === 'right';
+    const at = horizontal ? x : y;
+    const raw = Math.abs(at - handle.paperOrigin) / Math.max(1, handle.pxPerInch);
+    return Math.max(0, Math.round(raw * 100) / 100);
+  };
+
+  /** The header / footer slot under the pointer in Page Layout view. */
+  const pageBandAt = (s: State, x: number, y: number): PageBandHit | null => {
+    if (s.ui.workbookView !== 'pageLayout') return null;
+    for (const band of getPageBandHits()) {
+      if (x < band.rect.x || x > band.rect.x + band.rect.w) continue;
+      if (y < band.rect.y || y > band.rect.y + band.rect.h) continue;
+      return band;
+    }
+    return null;
+  };
+
+  /** Row / column the pointer is over, ignoring which zone it lands in — a
+   *  break dragged across the header rail still has a target. */
+  const indexAt = (s: State, x: number, y: number): { row: number; col: number } | null => {
+    const layout = geometryLayout(s);
+    const zone = hitZone(layout, s.viewport, x, y, null, { resizeHandles: false });
+    if (!zone) return null;
+    if (zone.kind === 'cell') return { row: zone.row, col: zone.col };
+    if (zone.kind === 'row-header') return { row: zone.row, col: s.selection.active.col };
+    if (zone.kind === 'col-header') return { row: s.selection.active.row, col: zone.col };
+    return null;
+  };
+
   const isFillHandleHit = (x: number, y: number): boolean => {
     const rect = getFillHandleRect();
     if (!rect) return false;
@@ -187,6 +266,47 @@ export function attachPointer(
       }
       drag = { kind: 'none' };
       onAfterCommit?.();
+      return;
+    }
+
+    // Page Layout: dragging a ruler's margin boundary sets that margin, the
+    // same affordance the desktop app puts on its rulers.
+    const ruler = rulerHandleAt(s, x, y);
+    if (ruler) {
+      e.preventDefault();
+      host.focus();
+      tryCapture();
+      drag = { kind: 'ruler-margin', handle: ruler, inches: marginInchesFor(ruler, x, y) };
+      host.style.cursor =
+        ruler.side === 'left' || ruler.side === 'right' ? 'col-resize' : 'row-resize';
+      return;
+    }
+
+    // Page Layout: the header / footer bands live in the page margins, which
+    // no cell occupies, so a click there can only mean "edit that slot".
+    const band = pageBandAt(s, x, y);
+    if (band) {
+      e.preventDefault();
+      host.dispatchEvent(
+        new CustomEvent('fc:editpageband', { bubbles: true, detail: { ...band } }),
+      );
+      drag = { kind: 'none' };
+      return;
+    }
+
+    // Page Break Preview: the blue boundaries sit on top of the cells and are
+    // the only thing in that view a drag from this position could mean.
+    const breakHandle = pageBreakHandleAt(s, x, y);
+    if (breakHandle) {
+      e.preventDefault();
+      host.focus();
+      tryCapture();
+      drag = { kind: 'page-break', handle: breakHandle, target: breakHandle.index };
+      mutators.setPageBreakDrag(store, {
+        axis: breakHandle.axis,
+        position: breakHandle.position,
+      });
+      host.style.cursor = breakHandle.axis === 'row' ? 'row-resize' : 'col-resize';
       return;
     }
 
@@ -266,7 +386,7 @@ export function attachPointer(
                 col: zone.col,
                 anchor: {
                   x: e.clientX - rect.left,
-                  y: s.layout.outlineColGutter,
+                  y: gridOriginY(geometryLayout(s)) - s.layout.headerRowHeight,
                   h: s.layout.headerRowHeight,
                   clientX: e.clientX,
                   clientY: e.clientY,
@@ -319,8 +439,7 @@ export function attachPointer(
 
       case 'row-resize': {
         const topEdge =
-          s.layout.outlineColGutter +
-          s.layout.headerRowHeight +
+          gridOriginY(geometryLayout(s)) +
           rowYFromState(
             s.layout.rowHeights,
             s.layout.defaultRowHeight,
@@ -447,6 +566,20 @@ export function attachPointer(
         host.style.cursor = 'crosshair';
         return;
       }
+      case 'ruler-margin': {
+        const horizontal = drag.handle.side === 'left' || drag.handle.side === 'right';
+        host.style.cursor = horizontal ? 'col-resize' : 'row-resize';
+        drag.inches = marginInchesFor(drag.handle, x, y);
+        return;
+      }
+      case 'page-break': {
+        const axis = drag.handle.axis;
+        host.style.cursor = axis === 'row' ? 'row-resize' : 'col-resize';
+        mutators.setPageBreakDrag(store, { axis, position: axis === 'row' ? y : x });
+        const at = indexAt(s, x, y);
+        if (at) drag.target = axis === 'row' ? at.row : at.col;
+        return;
+      }
       case 'range-insert': {
         const cell = hitTest(geometryLayout(s), s.viewport, x, y);
         if (!cell) return;
@@ -461,6 +594,29 @@ export function attachPointer(
         return;
       }
     }
+  };
+
+  /**
+   * Apply a released page-boundary drag.
+   *
+   * A break dropped where the automatic pagination would have put it anyway is
+   * removed rather than pinned, so dragging a line back to its original place
+   * undoes the override instead of freezing it. Dropping a break before the
+   * page it opens is meaningless, so that removes it too — which is how the
+   * desktop preview merges two pages.
+   */
+  const commitPageBreakDrag = (handle: PageBreakHandle, target: number): void => {
+    const s = store.getState();
+    const sheet = s.data.sheetIndex;
+    if (handle.kind === 'printArea') {
+      const pagination = paginationFor(s, sheet);
+      const origin = handle.axis === 'row' ? pagination.origin.row : pagination.origin.col;
+      if (target < origin) return;
+      resizePrintArea(store, sheet, handle.axis, target, pagination.content, history);
+      return;
+    }
+    if (target === handle.index) return;
+    movePageBreak(store, sheet, handle.axis, handle.index, target, history);
   };
 
   const onUp = (e: PointerEvent): void => {
@@ -485,6 +641,24 @@ export function attachPointer(
           },
         });
       }
+    }
+    if (drag.kind === 'ruler-margin') {
+      const { handle, inches } = drag;
+      drag = { kind: 'none' };
+      host.style.cursor = '';
+      const sheet = store.getState().data.sheetIndex;
+      setPageSetup(store, sheet, { margins: { [handle.side]: inches } }, history);
+      onAfterCommit?.();
+      return;
+    }
+    if (drag.kind === 'page-break') {
+      const { handle, target } = drag;
+      drag = { kind: 'none' };
+      mutators.setPageBreakDrag(store, null);
+      host.style.cursor = '';
+      commitPageBreakDrag(handle, target);
+      onAfterCommit?.();
+      return;
     }
     if (drag.kind === 'fill') {
       const s = store.getState();
@@ -625,6 +799,33 @@ function pushLayoutDelta(
 }
 
 function updateCursor(host: HTMLElement, store: SpreadsheetStore, x: number, y: number): void {
+  const s0 = store.getState();
+  if (s0.ui.workbookView === 'pageBreakPreview') {
+    for (const line of getPageBreakHandles()) {
+      const distance =
+        line.axis === 'row' ? Math.abs(y - line.position) : Math.abs(x - line.position);
+      if (distance > PAGE_BREAK_GRAB) continue;
+      host.style.cursor = line.axis === 'row' ? 'row-resize' : 'col-resize';
+      return;
+    }
+  }
+  if (s0.ui.workbookView === 'pageLayout') {
+    for (const handle of getRulerHandles()) {
+      const horizontal = handle.side === 'left' || handle.side === 'right';
+      const across = horizontal ? y : x;
+      if (across < handle.bandStart || across > handle.bandEnd) continue;
+      const distance = horizontal ? Math.abs(x - handle.position) : Math.abs(y - handle.position);
+      if (distance > RULER_GRAB) continue;
+      host.style.cursor = horizontal ? 'col-resize' : 'row-resize';
+      return;
+    }
+    for (const band of getPageBandHits()) {
+      if (x < band.rect.x || x > band.rect.x + band.rect.w) continue;
+      if (y < band.rect.y || y > band.rect.y + band.rect.h) continue;
+      host.style.cursor = 'text';
+      return;
+    }
+  }
   const handle = getFillHandleRect();
   if (handle) {
     const pad = 3;

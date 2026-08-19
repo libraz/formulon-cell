@@ -7,6 +7,8 @@ import {
   gridOriginY,
   mirrorX,
   type Rect,
+  rulerLeft,
+  rulerTop,
   type ViewState,
 } from '../geometry.js';
 export interface CheckboxHit {
@@ -116,17 +118,21 @@ export function paintOutlineGutters(
   // Both gutters sit outboard of their header strip, so the row gutter follows
   // the row rail to the far right on a right-to-left sheet, and its brackets
   // grow inwards from that edge.
-  const rowGutterX = rtl ? cssWidth - layout.outlineRowGutter : 0;
+  // Page Layout's rulers take the outermost band, so the gutters start past
+  // them rather than at the canvas edge.
+  const gutterLeft = rulerLeft(layout);
+  const gutterTop = rulerTop(layout);
+  const rowGutterX = rtl ? cssWidth - layout.outlineRowGutter : gutterLeft;
   const slotX = (lvl: number): number =>
     rtl
       ? cssWidth - (lvl - 1) * OUTLINE_BRACKET_SLOT - OUTLINE_BRACKET_SLOT / 2
-      : (lvl - 1) * OUTLINE_BRACKET_SLOT + OUTLINE_BRACKET_SLOT / 2;
+      : gutterLeft + (lvl - 1) * OUTLINE_BRACKET_SLOT + OUTLINE_BRACKET_SLOT / 2;
 
   // ── Row gutter (outboard of the row-number column).
   if (layout.outlineRowGutter > 0) {
     ctx.save();
     ctx.beginPath();
-    ctx.rect(rowGutterX, 0, layout.outlineRowGutter, cssHeight);
+    ctx.rect(rowGutterX, gutterTop, layout.outlineRowGutter, cssHeight);
     ctx.clip();
     let maxLvl = 0;
     for (const v of layout.outlineRows.values()) if (v > maxLvl) maxLvl = v;
@@ -180,12 +186,12 @@ export function paintOutlineGutters(
   if (layout.outlineColGutter > 0) {
     ctx.save();
     ctx.beginPath();
-    ctx.rect(0, 0, cssWidth, layout.outlineColGutter);
+    ctx.rect(gutterLeft, gutterTop, cssWidth, layout.outlineColGutter);
     ctx.clip();
     let maxLvl = 0;
     for (const v of layout.outlineCols.values()) if (v > maxLvl) maxLvl = v;
     for (let lvl = 1; lvl <= maxLvl; lvl += 1) {
-      const slotCy = (lvl - 1) * OUTLINE_BRACKET_SLOT + OUTLINE_BRACKET_SLOT / 2;
+      const slotCy = gutterTop + (lvl - 1) * OUTLINE_BRACKET_SLOT + OUTLINE_BRACKET_SLOT / 2;
       let runStartIdx = -1;
       for (let i = 0; i <= cols.visible.length; i += 1) {
         const c = cols.visible[i];

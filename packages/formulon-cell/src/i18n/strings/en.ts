@@ -770,6 +770,13 @@ export const en: Strings = {
     deleteViewRequiresActive: 'Select a saved sheet view to delete it.',
     objects: 'Objects',
   },
+  pageView: {
+    addHeader: 'Add header',
+    addFooter: 'Add footer',
+    pageNumber: 'Page {n}',
+    movePageBreak: 'Move page break',
+    rulerUnit: 'in',
+  },
   workbookObjects: {
     title: 'Workbook Objects',
     preservedParts: 'Preserved OOXML parts',

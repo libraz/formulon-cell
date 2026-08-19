@@ -353,10 +353,18 @@ export interface UiSlice {
   showFormulas: boolean;
   /** Excel End mode: the next arrow key jumps to the edge of the current data region. */
   endMode: boolean;
-  /** Workbook view mode surfaced by View > Workbook Views. The renderer keeps
-   *  the grid model identical for now; chrome stamps the mode on the host so
-   *  themes and wrappers can distinguish Normal, Page Layout, and Page Break Preview. */
+  /** Workbook view mode surfaced by View > Workbook Views. Page Layout folds
+   *  the page margins into the grid geometry and Page Break Preview overlays
+   *  the page boundaries; chrome also stamps the mode on the host so themes
+   *  and wrappers can react. */
   workbookView: WorkbookViewMode;
+  /** Zoom in force before Page Break Preview pulled the sheet out to fit a
+   *  whole page. Restored when the view closes; null outside the preview. */
+  zoomBeforePreview?: number | null;
+  /** Screen position of the page boundary currently being dragged in Page
+   *  Break Preview. Purely transient: the pages reflow only when the pointer
+   *  is released, so until then this is the whole of the drag feedback. */
+  pageBreakDrag?: { axis: 'row' | 'col'; position: number } | null;
   /** Display refs in R1C1 form instead of A1 (headers, name box). Underlying
    *  storage stays A1 — only the rendered representation changes. */
   r1c1: boolean;

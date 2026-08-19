@@ -773,6 +773,13 @@ export const ja: Strings = {
     deleteViewRequiresActive: '削除する保存済みシート ビューを選択してください。',
     objects: 'オブジェクト',
   },
+  pageView: {
+    addHeader: 'ヘッダーを追加',
+    addFooter: 'フッターを追加',
+    pageNumber: '{n} ページ',
+    movePageBreak: '改ページの移動',
+    rulerUnit: 'cm',
+  },
   workbookObjects: {
     title: 'ブック オブジェクト',
     preservedParts: '保持された OOXML 部品',

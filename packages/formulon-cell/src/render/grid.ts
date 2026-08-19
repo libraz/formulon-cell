@@ -1,4 +1,5 @@
 import { isHeaderRow, tableForCell } from '../commands/format-as-table.js';
+import { paginationFor, type SheetPagination } from '../commands/pagination.js';
 import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
 import { addrKey } from '../engine/address.js';
 import { evaluateCfFromEngine } from '../engine/cf-sync.js';
@@ -6,7 +7,9 @@ import { makeRangeResolver, type RangeResolver } from '../engine/range-resolver.
 import { findSpillBlockers, findSpillRanges, looksLikeArrayFormula } from '../engine/spill.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { CellFormat, State } from '../store/store.js';
+import { getPageSetup } from '../store/store.js';
 import type { ResolvedTheme } from '../theme/resolve.js';
 import { evaluateConditional } from './conditional.js';
 import {
@@ -14,6 +17,7 @@ import {
   buildColLayout,
   buildRowLayout,
   cellRectIn,
+  colGap,
   colWidth,
   frozenColsWidth,
   frozenRowsHeight,
@@ -24,6 +28,7 @@ import {
   layoutForView,
   type Rect,
   rangeRects,
+  rowGap,
   rowHeight,
   type ViewState,
 } from './geometry.js';
@@ -43,6 +48,12 @@ import {
   VALIDATION_TRIANGLE_COLOR,
 } from './grid/hit-state.js';
 import { paintFreezeDividers, paintGridLines } from './grid/lines.js';
+import {
+  paintPageBreakPreview,
+  paintPageLayoutBackground,
+  paintPageLayoutChrome,
+  paintPageRulers,
+} from './grid/page-view.js';
 import { tableCellFormat } from './grid/table-format.js';
 import { paintTraces } from './grid/traces.js';
 import {
@@ -103,6 +114,9 @@ export interface RendererDeps {
   /** UI/data-format locale. Short app ids like `ja` are accepted by Intl,
    *  but callers may return full tags like `ja-JP`. */
   getLocale?: () => string;
+  /** UI strings. Only the page views paint text of their own — the header /
+   *  footer placeholders and the page-number watermark. */
+  getStrings?: () => Strings;
   /** Optional formatter pipeline — `inst.cells.resolveDisplay`. Returns
    *  the displayed string for matching cells, or null to fall through
    *  to the default text. */
@@ -134,6 +148,8 @@ export class GridRenderer {
 
   private readonly getLocale: () => string;
 
+  private readonly getStrings: () => Strings;
+
   private readonly getDisplay: RendererDeps['getDisplay'];
 
   private readonly onViewportSize: RendererDeps['onViewportSize'];
@@ -163,6 +179,7 @@ export class GridRenderer {
     this.getTheme = deps.getTheme;
     this.getWb = deps.getWb ?? ((): WorkbookHandle | null => null);
     this.getLocale = deps.getLocale ?? ((): string => 'en-US');
+    this.getStrings = deps.getStrings ?? ((): Strings => defaultStrings);
     this.getDisplay = deps.getDisplay;
     this.onViewportSize = deps.onViewportSize;
   }
@@ -195,11 +212,20 @@ export class GridRenderer {
     );
     const firstRow = Math.max(viewport.rowStart, layout.freezeRows);
     const firstCol = Math.max(viewport.colStart, layout.freezeCols);
-    const rowCount = visibleCount(bodyH, firstRow, 1_048_576, (idx) =>
-      rowHeight(layout, idx, viewport),
+    // Page gutters take screen space without holding a cell, so they count
+    // against the viewport budget too — otherwise Page Layout view would
+    // under-fill the canvas by a page margin per page.
+    const rowCount = visibleCount(
+      bodyH,
+      firstRow,
+      1_048_576,
+      (idx) => rowHeight(layout, idx, viewport) + rowGap(layout, idx),
     );
-    const colCount = visibleCount(bodyW, firstCol, 16_384, (idx) =>
-      colWidth(layout, idx, viewport),
+    const colCount = visibleCount(
+      bodyW,
+      firstCol,
+      16_384,
+      (idx) => colWidth(layout, idx, viewport) + colGap(layout, idx),
     );
     this.onViewportSize(rowCount, colCount, this.cssWidth);
   }
@@ -239,12 +265,22 @@ export class GridRenderer {
     const cols = buildColLayout(state.layout, state.viewport);
     const rows = buildRowLayout(state.layout, state.viewport);
 
+    // Page views need the same pagination the print pipeline uses; it is
+    // memoised, so asking for it every paint costs a cache probe.
+    const pagination = this.paginationForView(state);
+    if (pagination && state.ui.workbookView === 'pageLayout') {
+      paintPageLayoutBackground(this.chromeCtx(), state, theme, pagination, cols, rows);
+    }
+
     this.paintSheetBackground(state);
     if (state.ui.showGridLines !== false) this.paintGridLines(state, theme, cols, rows);
     this.paintCells(state, theme, cols, rows);
     if (state.ui.showHeaders !== false) this.paintHeaders(state, theme, cols, rows);
     this.paintFreezeDividers(state, theme, cols, rows);
     this.paintBorders(state, theme, cols, rows);
+    // Page chrome covers the gutters, so it has to follow every pass that
+    // paints across the whole canvas — gridlines and freeze dividers do.
+    if (pagination) this.paintPageChrome(state, theme, pagination, cols, rows);
     this.paintSpills(state, theme, cols, rows);
     this.paintActive(state, theme, cols, rows);
     this.paintEditorRefs(state);
@@ -266,6 +302,62 @@ export class GridRenderer {
     ) {
       wb.setViewportHint(state.data.sheetIndex, firstRow, firstCol, lastRow, lastCol);
     }
+  }
+
+  /** Pagination for the active sheet, or null in Normal view. Reaches one
+   *  viewport past the visible slice so the page opening just off screen is
+   *  already laid out when the user scrolls onto it. */
+  private paginationForView(state: ViewState): SheetPagination | null {
+    if (state.ui.workbookView === 'normal') return null;
+    const { viewport } = state;
+    return paginationFor(this.getState(), state.data.sheetIndex, {
+      throughRow: viewport.rowStart + viewport.rowCount,
+      throughCol: viewport.colStart + viewport.colCount,
+    });
+  }
+
+  private paintPageChrome(
+    state: ViewState,
+    theme: ResolvedTheme,
+    pagination: SheetPagination,
+    cols: AxisLayout,
+    rows: AxisLayout,
+  ): void {
+    const setup = getPageSetup(this.getState(), state.data.sheetIndex);
+    const strings = this.getStrings();
+    if (state.ui.workbookView === 'pageLayout') {
+      paintPageLayoutChrome(
+        this.chromeCtx(),
+        state,
+        theme,
+        pagination,
+        setup,
+        { addHeader: strings.pageView.addHeader, addFooter: strings.pageView.addFooter },
+        cols,
+        rows,
+      );
+      paintPageRulers(
+        this.chromeCtx(),
+        state,
+        theme,
+        pagination,
+        strings.pageView.rulerUnit,
+        cols,
+        rows,
+      );
+      return;
+    }
+    const template = strings.pageView.pageNumber;
+    paintPageBreakPreview(
+      this.chromeCtx(),
+      state,
+      theme,
+      pagination,
+      setup,
+      (page) => template.replace('{n}', String(page)),
+      cols,
+      rows,
+    );
   }
 
   private paintSheetBackground(state: ViewState): void {

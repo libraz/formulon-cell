@@ -10,7 +10,7 @@ import {
   type State,
 } from '../store/store.js';
 import { type History, recordPageSetupChange } from './history.js';
-import { parsePrintAreas, parsePrintTitleCols, parsePrintTitleRows } from './print.js';
+import { colLetter, parsePrintAreas, parsePrintTitleCols, parsePrintTitleRows } from './print.js';
 import {
   normalizePrintableBounds,
   type PrinterProfile,
@@ -355,6 +355,60 @@ export function removeManualPageBreak(
     });
   });
   return getPageSetup(store.getState(), sheet);
+}
+
+/**
+ * Move the page boundary that currently opens at `from` so it opens at `to`
+ * instead — what dragging a break line in Page Break Preview does.
+ *
+ * A dragged automatic break becomes a manual one, since the user has just
+ * overridden where the page splits. Dropping the line on `to <= 0`, or back
+ * onto the boundary the automatic split would have chosen anyway, removes the
+ * manual break and lets the pages reflow on their own.
+ */
+export function movePageBreak(
+  store: SpreadsheetStore,
+  sheet: number,
+  axis: PageBreakAxis,
+  from: number,
+  to: number,
+  history: History | null = null,
+): PageSetup {
+  const key = axis === 'row' ? 'manualPageBreakRows' : 'manualPageBreakCols';
+  const current = getPageSetup(store.getState(), sheet);
+  const breaks = new Set(current[key] ?? []);
+  breaks.delete(Math.trunc(from));
+  const target = Math.trunc(to);
+  if (target > 0) breaks.add(target);
+  recordPageSetupChange(history, store, () => {
+    mutators.setPageSetup(store, sheet, { [key]: normalizeManualBreaks([...breaks]) });
+  });
+  return getPageSetup(store.getState(), sheet);
+}
+
+/**
+ * Resize the printed area by dragging its frame in Page Break Preview. The
+ * leading corner stays put — the frame's trailing edges are the only ones the
+ * preview draws — so this only ever moves the last printed row or column.
+ */
+export function resizePrintArea(
+  store: SpreadsheetStore,
+  sheet: number,
+  axis: PageBreakAxis,
+  last: number,
+  fallback: { row: number; col: number },
+  history: History | null = null,
+): PageSetup | null {
+  const current = getPageSetup(store.getState(), sheet);
+  const area = parsePrintAreas(current.printArea)?.[0];
+  const row0 = area?.row0 ?? 0;
+  const col0 = area?.col0 ?? 0;
+  // With no print area set the frame was tracing the used range, so the axis
+  // the drag did not touch keeps that extent rather than collapsing to A1.
+  const row1 = axis === 'row' ? Math.trunc(last) : (area?.row1 ?? fallback.row);
+  const col1 = axis === 'col' ? Math.trunc(last) : (area?.col1 ?? fallback.col);
+  const ref = `${colLetter(col0)}${row0 + 1}:${colLetter(Math.max(col0, col1))}${Math.max(row0, row1) + 1}`;
+  return setPrintArea(store, sheet, ref, history);
 }
 
 export function resetManualPageBreaks(

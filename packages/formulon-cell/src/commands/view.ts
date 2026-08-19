@@ -88,8 +88,29 @@ export function setR1C1ReferenceStyle(store: SpreadsheetStore, enabled: boolean)
   mutators.setR1C1(store, enabled);
 }
 
-/** Select the workbook view mode shown by View > Workbook Views. */
+/** Zoom Page Break Preview pulls back to, so a whole page fits on screen. */
+export const PAGE_BREAK_PREVIEW_ZOOM = 0.6;
+
+/**
+ * Select the workbook view mode shown by View > Workbook Views.
+ *
+ * Opening Page Break Preview zooms out far enough to read a whole page and
+ * remembers the zoom it replaced; leaving the preview puts that zoom back.
+ * Page Layout keeps whatever zoom is in force — its own page framing already
+ * tells the user where the paper ends.
+ */
 export function setWorkbookView(store: SpreadsheetStore, mode: WorkbookViewMode): void {
+  const previous = store.getState().ui.workbookView;
+  if (previous === mode) return;
+  if (mode === 'pageBreakPreview') {
+    const zoom = store.getState().viewport.zoom;
+    store.setState((s) => ({ ...s, ui: { ...s.ui, zoomBeforePreview: zoom } }));
+    mutators.setZoom(store, PAGE_BREAK_PREVIEW_ZOOM);
+  } else if (previous === 'pageBreakPreview') {
+    const restore = store.getState().ui.zoomBeforePreview;
+    if (restore && restore > 0) mutators.setZoom(store, restore);
+    store.setState((s) => ({ ...s, ui: { ...s.ui, zoomBeforePreview: null } }));
+  }
   mutators.setWorkbookView(store, mode);
 }
 

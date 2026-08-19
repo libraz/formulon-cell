@@ -57,6 +57,16 @@
     /* Hover row/column tints */
     --fc-hover-stripe: rgba(16, 124, 65, 0.025);
 
+    /* Page views — light desk, white paper, spreadsheet-blue break lines. */
+    --fc-page-backdrop: #a19c90;
+    --fc-page-paper: #ffffff;
+    --fc-page-edge: #8a8579;
+    --fc-page-band-fg: #8d8779;
+    --fc-page-break-auto: #2f6fd0;
+    --fc-page-break-manual: #1a4fa0;
+    --fc-page-number-fg: rgba(47, 111, 208, 0.16);
+    --fc-page-outside: rgba(120, 120, 120, 0.26);
+
     /* Elevation — Fluent depth scale (paired ambient + key light layers). */
     --fc-shadow-2: 0 1px 2px rgba(0, 0, 0, 0.18);
     --fc-shadow-4: 0 3px 8px rgba(0, 0, 0, 0.12);

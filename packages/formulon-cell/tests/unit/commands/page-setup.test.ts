@@ -8,6 +8,7 @@ import {
   clearPrintTitles,
   insertManualPageBreak,
   listPageSetups,
+  movePageBreak,
   normalizePrinterProfile,
   normalizePrinterProfileId,
   normalizePrinterProfiles,
@@ -16,6 +17,7 @@ import {
   removeManualPageBreak,
   resetManualPageBreaks,
   resetPageSetup,
+  resizePrintArea,
   resolvePrinterProfileBounds,
   setFitToPages,
   setMarginPreset,
@@ -400,5 +402,45 @@ describe('page setup commands', () => {
     expect(history.undo()).toBe(true);
     expect(pageSetupForSheet(store.getState(), 0).manualPageBreakRows).toBeUndefined();
     expect(history.undo()).toBe(false);
+  });
+
+  it('moves a page break, pinning an automatic split as a manual one', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+
+    movePageBreak(store, 0, 'row', 40, 25, history);
+    expect(pageSetupForSheet(store.getState(), 0).manualPageBreakRows).toEqual([25]);
+
+    movePageBreak(store, 0, 'row', 25, 30, history);
+    expect(pageSetupForSheet(store.getState(), 0).manualPageBreakRows).toEqual([30]);
+
+    expect(history.undo()).toBe(true);
+    expect(pageSetupForSheet(store.getState(), 0).manualPageBreakRows).toEqual([25]);
+  });
+
+  it('drops the break when it is dragged off the sheet', () => {
+    const store = createSpreadsheetStore();
+
+    movePageBreak(store, 0, 'col', 8, 4);
+    expect(pageSetupForSheet(store.getState(), 0).manualPageBreakCols).toEqual([4]);
+
+    movePageBreak(store, 0, 'col', 4, 0);
+    expect(pageSetupForSheet(store.getState(), 0).manualPageBreakCols).toBeUndefined();
+  });
+
+  it('resizes the print area from the frame, keeping the untouched axis', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+
+    // No print area yet, so the frame was tracing the used range: the axis the
+    // drag did not touch has to keep that extent.
+    resizePrintArea(store, 0, 'col', 5, { row: 9, col: 12 }, history);
+    expect(pageSetupForSheet(store.getState(), 0).printArea).toBe('A1:F10');
+
+    resizePrintArea(store, 0, 'row', 3, { row: 9, col: 12 }, history);
+    expect(pageSetupForSheet(store.getState(), 0).printArea).toBe('A1:F4');
+
+    expect(history.undo()).toBe(true);
+    expect(pageSetupForSheet(store.getState(), 0).printArea).toBe('A1:F10');
   });
 });

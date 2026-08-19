@@ -365,7 +365,58 @@ const PAPER_INCHES: Record<string, { w: number; h: number }> = {
 };
 
 /** CSS reference pixel density — column widths / row heights are stored in px. */
-const PRINT_PX_PER_INCH = 96;
+export const PRINT_PX_PER_INCH = 96;
+
+/** One page's worth of a single axis, as produced by {@link splitAxisIntoBands}. */
+export interface AxisBand {
+  /** First index on the page. */
+  start: number;
+  /** Last index on the page, inclusive. */
+  end: number;
+  /** The band opens at a user-inserted break rather than an automatic one.
+   *  False for the first band, which starts because the content does. */
+  manual: boolean;
+}
+
+export interface SplitAxisOptions {
+  /** Inclusive index range to paginate. */
+  from: number;
+  to: number;
+  /** Size of one index in unscaled sheet pixels; 0 for hidden. */
+  sizeOf: (index: number) => number;
+  /** Pixels of content one page can hold. */
+  budget: number;
+  /** Indices a page must start at. Values outside `[from, to]` are ignored. */
+  manualBreaks?: readonly number[];
+}
+
+/**
+ * Split one axis into per-page bands. A band closes when the next index would
+ * overflow the page budget, or when a manual break forces a new page. A single
+ * index wider than a whole page still gets its own band rather than looping
+ * forever — the print CSS lets it overflow, matching the desktop app.
+ */
+export function splitAxisIntoBands(opts: SplitAxisOptions): AxisBand[] {
+  const { from, to, sizeOf, budget } = opts;
+  const breaks = new Set((opts.manualBreaks ?? []).filter((i) => i > from && i <= to));
+  const bands: AxisBand[] = [];
+  let index = from;
+  while (index <= to) {
+    const start = index;
+    let used = 0;
+    let end = index;
+    while (end <= to) {
+      if (end > start && breaks.has(end)) break;
+      const next = sizeOf(end);
+      if (end > start && used + next > budget) break;
+      used += next;
+      end += 1;
+    }
+    bands.push({ start, end: Math.max(start, end - 1), manual: breaks.has(start) });
+    index = Math.max(start + 1, end);
+  }
+  return bands;
+}
 
 interface PrintLayoutMetrics {
   colWidths: Map<number, number>;
@@ -536,12 +587,23 @@ function printContentInches(
   return { width: width / PRINT_PX_PER_INCH, height: height / PRINT_PX_PER_INCH };
 }
 
-function printablePagePixels(setup: PageSetup, scale: number): { width: number; height: number } {
+/** Physical page box in inches, orientation applied. */
+export function paperInches(setup: PageSetup): { w: number; h: number } {
   const portrait = PAPER_INCHES[setup.paperSize] ?? { w: 8.27, h: 11.69 };
-  const page =
-    setup.orientation === 'landscape'
-      ? { w: portrait.h, h: portrait.w }
-      : { w: portrait.w, h: portrait.h };
+  return setup.orientation === 'landscape'
+    ? { w: portrait.h, h: portrait.w }
+    : { w: portrait.w, h: portrait.h };
+}
+
+/** Printable area of one page expressed in layout pixels — the budget a page
+ *  of content has to fit into. Dividing by `scale` converts the physical area
+ *  into unscaled sheet pixels, which is the space the splitter measures
+ *  column widths and row heights against. */
+export function printablePagePixels(
+  setup: PageSetup,
+  scale: number,
+): { width: number; height: number } {
+  const page = paperInches(setup);
   const m = effectivePrintMargins(setup);
   const factor = Math.max(scale, 0.1);
   return {
@@ -594,47 +656,48 @@ function splitPrintRegionIntoTiles(
   const colBudget = Math.max(layout.defaultColWidth, page.width - titleWidth);
   const rowBudget = Math.max(layout.defaultRowHeight, page.height - titleHeight);
 
-  const colChunks: [number, number][] = [];
-  let c = region.col0;
-  while (c <= region.col1) {
-    const start = c;
-    let end = c;
-    let width = 0;
-    while (end <= region.col1) {
-      const next = measuredColumnWidth(end, layout, hiddenCols);
-      if (end > start && width + next > colBudget) break;
-      width += next;
-      end += 1;
-    }
-    colChunks.push([start, Math.max(start, end - 1)]);
-    c = Math.max(start + 1, end);
-  }
-
-  const rowChunks: [number, number][] = [];
-  let r = region.row0;
-  while (r <= region.row1) {
-    const start = r;
-    let end = r;
-    let height = 0;
-    while (end <= region.row1) {
-      const inTitle = titleRowRange && end >= titleRowRange[0] && end <= titleRowRange[1];
-      const next = inTitle ? 0 : measuredRowHeight(end, layout, hiddenRows);
-      if (end > start && height + next > rowBudget) break;
-      height += next;
-      end += 1;
-    }
-    rowChunks.push([start, Math.max(start, end - 1)]);
-    r = Math.max(start + 1, end);
-  }
+  const colChunks = splitAxisIntoBands({
+    from: region.col0,
+    to: region.col1,
+    budget: colBudget,
+    manualBreaks: setup.manualPageBreakCols,
+    sizeOf: (col) => measuredColumnWidth(col, layout, hiddenCols),
+  });
+  const rowChunks = splitAxisIntoBands({
+    from: region.row0,
+    to: region.row1,
+    budget: rowBudget,
+    manualBreaks: setup.manualPageBreakRows,
+    // Print titles repeat on every page, so they cost nothing against the
+    // budget of the band they happen to fall inside.
+    sizeOf: (row) =>
+      titleRowRange && row >= titleRowRange[0] && row <= titleRowRange[1]
+        ? 0
+        : measuredRowHeight(row, layout, hiddenRows),
+  });
 
   const tiles: PrintAreaBounds[] = [];
   if (setup.pageOrder === 'overThenDown') {
-    for (const [row0, row1] of rowChunks) {
-      for (const [col0, col1] of colChunks) tiles.push({ row0, row1, col0, col1 });
+    for (const rowBand of rowChunks) {
+      for (const colBand of colChunks) {
+        tiles.push({
+          row0: rowBand.start,
+          row1: rowBand.end,
+          col0: colBand.start,
+          col1: colBand.end,
+        });
+      }
     }
   } else {
-    for (const [col0, col1] of colChunks) {
-      for (const [row0, row1] of rowChunks) tiles.push({ row0, row1, col0, col1 });
+    for (const colBand of colChunks) {
+      for (const rowBand of rowChunks) {
+        tiles.push({
+          row0: rowBand.start,
+          row1: rowBand.end,
+          col0: colBand.start,
+          col1: colBand.end,
+        });
+      }
     }
   }
   return tiles;
@@ -659,11 +722,7 @@ export function computeFitToPagesScale(
   if (fitWidth <= 0 && fitHeight <= 0) {
     return setup.scale && setup.scale > 0 ? setup.scale : 1;
   }
-  const portrait = PAPER_INCHES[setup.paperSize] ?? { w: 8.27, h: 11.69 };
-  const page =
-    setup.orientation === 'landscape'
-      ? { w: portrait.h, h: portrait.w }
-      : { w: portrait.w, h: portrait.h };
+  const page = paperInches(setup);
   const m = effectivePrintMargins(setup);
   const printableW = Math.max(0.1, page.w - m.left - m.right);
   const printableH = Math.max(0.1, page.h - m.top - m.bottom);

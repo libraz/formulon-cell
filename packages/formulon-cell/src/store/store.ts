@@ -100,6 +100,8 @@ export const createSpreadsheetStore = () =>
       showFormulas: false,
       endMode: false,
       workbookView: 'normal',
+      zoomBeforePreview: null,
+      pageBreakDrag: null,
       editorRefs: [],
       r1c1: false,
       statusAggs: ['average', 'count', 'sum'],
@@ -292,6 +294,15 @@ export const mutators = {
   ): void {
     store.setState((s) =>
       s.ui.workbookView === mode ? s : { ...s, ui: { ...s.ui, workbookView: mode } },
+    );
+  },
+
+  setPageBreakDrag(
+    store: SpreadsheetStore,
+    drag: { axis: 'row' | 'col'; position: number } | null,
+  ): void {
+    store.setState((s) =>
+      s.ui.pageBreakDrag === drag ? s : { ...s, ui: { ...s.ui, pageBreakDrag: drag } },
     );
   },
 
