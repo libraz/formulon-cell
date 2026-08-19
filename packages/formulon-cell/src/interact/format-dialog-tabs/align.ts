@@ -65,7 +65,8 @@ export function createAlignTab(panel: HTMLDivElement, t: Strings['formatDialog']
   }
 
   const hAlignSelectRow = document.createElement('label');
-  hAlignSelectRow.className = 'fc-fmtdlg__row fc-fmtdlg__align-select-row';
+  hAlignSelectRow.className =
+    'fc-fmtdlg__row fc-fmtdlg__align-select-row fc-fmtdlg__align-select-row--h';
   const hAlignSelectLabel = document.createElement('span');
   hAlignSelectLabel.textContent = t.horizontalAlign;
   const hAlignSelect = createDialogSelect(
@@ -112,7 +113,8 @@ export function createAlignTab(panel: HTMLDivElement, t: Strings['formatDialog']
   }
 
   const vAlignSelectRow = document.createElement('label');
-  vAlignSelectRow.className = 'fc-fmtdlg__row fc-fmtdlg__align-select-row';
+  vAlignSelectRow.className =
+    'fc-fmtdlg__row fc-fmtdlg__align-select-row fc-fmtdlg__align-select-row--v';
   const vAlignSelectLabel = document.createElement('span');
   vAlignSelectLabel.textContent = t.verticalAlign;
   const vAlignSelect = createDialogSelect(
@@ -139,7 +141,7 @@ export function createAlignTab(panel: HTMLDivElement, t: Strings['formatDialog']
   wrapRow.append(justifyLastLineCk.wrap);
 
   const indentRow = document.createElement('label');
-  indentRow.className = 'fc-fmtdlg__row';
+  indentRow.className = 'fc-fmtdlg__row fc-fmtdlg__indent-row';
   const indentLabel = document.createElement('span');
   indentLabel.textContent = t.indent;
   const indentInput = document.createElement('input');
@@ -152,7 +154,7 @@ export function createAlignTab(panel: HTMLDivElement, t: Strings['formatDialog']
   panel.appendChild(indentRow);
 
   const textDirectionRow = document.createElement('label');
-  textDirectionRow.className = 'fc-fmtdlg__row';
+  textDirectionRow.className = 'fc-fmtdlg__row fc-fmtdlg__text-direction-row';
   const textDirectionLabel = document.createElement('span');
   textDirectionLabel.textContent = t.textDirection;
   const directionDefs: Array<{ id: TextDirection; label: string }> = [

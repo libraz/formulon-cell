@@ -2,13 +2,15 @@
    listboxes (family / style / size), font preview, row layout, textarea. */
 
 @layer fc.app {
+  /* Tracks plus gutters plus padding add up to the body width exactly, so the
+     size column keeps a margin instead of running into the body border. */
   .fc-fmtdlg__panel-tab[data-fc-tab="font"] {
     display: grid;
-    grid-template-columns: 260px 128px 100px;
+    grid-template-columns: 256px 128px 104px;
     grid-auto-rows: max-content;
-    gap: 8px 20px;
+    gap: 8px 16px;
     align-content: start;
-    padding: 20px 22px 0;
+    padding: 20px 14px 0;
   }
 
   .fc-fmtdlg__panel-tab[data-fc-tab="border"],
@@ -124,19 +126,87 @@
     margin-top: 2px;
   }
 
+  /* The font tab stacks each caption over its control, so the dialog-wide
+     124px inline-label floor would push the size column past the body edge. */
+  .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__row > span:first-child {
+    min-width: 0;
+  }
+
   .fc-fmtdlg__font-family-row input[type="text"] {
-    width: 260px;
+    width: 256px;
     border-radius: 7px;
   }
 
   .fc-fmtdlg__font-size-row input[type="number"] {
-    width: 100px;
+    width: 104px;
     border-radius: 7px;
   }
 
-  .fc-fmtdlg__font-color-row input[type="color"] {
-    width: 128px;
+  .fc-fmtdlg__font-style-label {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+    color: var(--fc-fmtdlg-label-fg);
+    font-weight: 600;
+  }
+
+  .fc-fmtdlg__color-control {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .fc-fmtdlg__color-control input[type="color"] {
+    flex: 1 1 auto;
+    min-width: 0;
     border-radius: 7px;
+  }
+
+  /* Chevron trigger for the palette flyout — the color input itself opens the
+     platform picker, so the theme swatches need their own affordance. */
+  .fc-fmtdlg__color-toggle {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid var(--fc-fmtdlg-list-border);
+    border-radius: 7px;
+    background: var(--fc-fmtdlg-input-bg);
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .fc-fmtdlg__color-toggle:hover {
+    border-color: var(--fc-fmtdlg-list-focus-border);
+  }
+
+  .fc-fmtdlg__color-toggle-chevron {
+    width: 0;
+    height: 0;
+    border-right: 4px solid transparent;
+    border-left: 4px solid transparent;
+    border-top: 5px solid currentColor;
+    opacity: 0.7;
+  }
+
+  .fc-fmtdlg__color-flyout {
+    position: fixed;
+    z-index: calc(var(--fc-z-dialog, 2147483020) + 1);
+    padding: 8px;
+    border: 1px solid var(--fc-fmtdlg-rule);
+    border-radius: 4px;
+    background: var(--fc-fmtdlg-panel-bg);
+    color: var(--fc-fmtdlg-panel-fg, inherit);
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.18),
+      0 1px 3px rgba(0, 0, 0, 0.14);
+  }
+
+  .fc-fmtdlg__color-flyout[hidden] {
+    display: none;
   }
 
   .fc-fmtdlg__font-color-row .fc-fmtdlg__btn {
@@ -149,6 +219,7 @@
     align-self: end;
     margin-top: 24px;
     min-height: 24px;
+    white-space: nowrap;
   }
 
   /* ── Font listbox (family / style / size) ──────────────────────────── */
@@ -243,12 +314,6 @@
     margin: 0 24px;
   }
 
-  .fc-fmtdlg__panel-tab[data-fc-tab="font"] .fc-fmtdlg__swatches {
-    grid-column: 2 / -1;
-    grid-row: 6;
-    margin-left: 0;
-  }
-
   .fc-fmtdlg__panel-tab[data-fc-tab="font"]::before {
     grid-column: 1 / -1;
     grid-row: 3;
@@ -269,9 +334,53 @@
     grid-row: 1 / span 4;
   }
 
+  /* Every border-tab item is placed by hand: the palette lives in a flyout and
+     so leaves auto-placement, which would otherwise pull the presets into the
+     gap it vacates. */
+  .fc-fmtdlg__panel-tab[data-fc-tab="border"] .fc-fmtdlg__border-style-row {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .fc-fmtdlg__panel-tab[data-fc-tab="border"] .fc-fmtdlg__border-color-row {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .fc-fmtdlg__panel-tab[data-fc-tab="border"] .fc-fmtdlg__border-presets {
+    grid-column: 1;
+    grid-row: 5;
+  }
+
   .fc-fmtdlg__panel-tab[data-fc-tab="border"] .fc-fmtdlg__border-visual {
     grid-column: 2;
-    grid-row: 4 / span 3;
+    grid-row: 3 / span 3;
+  }
+
+  /* Both border columns have to fit inside half the body, so the labels are
+     sized to the tab's own captions instead of the dialog-wide 124px. */
+  .fc-fmtdlg__panel-tab[data-fc-tab="border"] .fc-fmtdlg__row > span:first-child {
+    min-width: 72px;
+  }
+
+  .fc-fmtdlg__border-style-row select {
+    width: 150px;
+  }
+
+  .fc-fmtdlg__border-color-row {
+    display: grid;
+    grid-template-columns: 72px max-content;
+    gap: 6px 8px;
+    align-items: center;
+  }
+
+  .fc-fmtdlg__border-color-row .fc-fmtdlg__color-control {
+    width: 174px;
+  }
+
+  .fc-fmtdlg__border-color-row .fc-fmtdlg__btn {
+    grid-column: 2;
+    justify-self: start;
   }
 
   /* ── Textarea (used by Protection note / comment) ──────────────────── */

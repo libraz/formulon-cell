@@ -51,6 +51,7 @@ import {
   setDraftSide,
 } from './format-dialog-state.js';
 import { createFormatDialogView } from './format-dialog-view.js';
+import { clampPanelToViewport } from './overlay-position.js';
 import { attachRangePickerButton } from './range-picker-control.js';
 
 export interface FormatDialogDeps {
@@ -86,6 +87,45 @@ export interface FormatDialogHandle {
 }
 
 const MAX_OUTLINE_BORDER_CELLS = 100_000;
+
+/** A swatch palette that hangs off a color control instead of sitting inline. */
+interface PaletteFlyout {
+  readonly toggle: HTMLButtonElement;
+  setOpen(open: boolean): void;
+  isOpen(): boolean;
+  /** True when `node` is inside the flyout or its trigger. */
+  owns(node: Node): boolean;
+}
+
+/** Wire a chevron trigger to a palette flyout.
+ *
+ * The font and border tabs have no room left for a palette inline, so theirs
+ * hang off the color control. The flyout is `position: fixed`, escaping the
+ * panel's clip rect, and is placed against the viewport like the grid's own
+ * menus. */
+function createPaletteFlyout(
+  toggle: HTMLButtonElement,
+  flyout: HTMLElement,
+  palette: { focus(): void },
+): PaletteFlyout {
+  return {
+    toggle,
+    setOpen(open: boolean): void {
+      flyout.hidden = !open;
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (!open) return;
+      flyout.style.left = '-9999px';
+      flyout.style.top = '-9999px';
+      const anchor = toggle.getBoundingClientRect();
+      const { x, y } = clampPanelToViewport(flyout, anchor.left, anchor.bottom + 4, { pad: 8 });
+      flyout.style.left = `${x}px`;
+      flyout.style.top = `${y}px`;
+      palette.focus();
+    },
+    isOpen: () => !flyout.hidden,
+    owns: (node: Node) => flyout.contains(node) || toggle.contains(node),
+  };
+}
 
 const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
 
@@ -207,6 +247,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     colorInput,
     colorReset,
     fontSwatches,
+    fontSwatchesToggle,
+    fontSwatchesFlyout,
     fontPreviewBox,
     syncFontFamilyOptions,
     borderStyleSelect,
@@ -215,6 +257,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     borderColorInput,
     borderColorReset,
     borderSwatches,
+    borderSwatchesToggle,
+    borderSwatchesFlyout,
     presetNone,
     presetOutline,
     presetAll,
@@ -295,6 +339,18 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   let pendingBorderPreset: 'none' | 'outline' | 'all' | null = null;
   let applyDxf: ((format: Partial<CellFormat>) => void) | null = null;
   const draft: DraftState = makeEmptyDraft(getFormatLocale());
+
+  // ── Color palette flyouts ──────────────────────────────────────────────
+  const fontPalette = createPaletteFlyout(fontSwatchesToggle, fontSwatchesFlyout, fontSwatches);
+  const borderPalette = createPaletteFlyout(
+    borderSwatchesToggle,
+    borderSwatchesFlyout,
+    borderSwatches,
+  );
+  const paletteFlyouts: readonly PaletteFlyout[] = [fontPalette, borderPalette];
+  const closePaletteFlyouts = (): void => {
+    for (const flyout of paletteFlyouts) flyout.setOpen(false);
+  };
 
   // ── Hydration ──────────────────────────────────────────────────────────
   const hydrateFromActive = (initialFormat?: Partial<CellFormat>): void => {
@@ -653,7 +709,29 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     }
   };
 
+  /** Move the dial's marker onto the selected angle and tilt its sample text to
+   *  match. Driven from `renderPreview` so typing a degree, clicking a dot and
+   *  reopening the dialog all land on the same dial state. */
+  const syncRotationDial = (rotation: number): void => {
+    for (const dot of alignPreviewDialDots) {
+      const angle = Number.parseInt(dot.dataset.fcAngle ?? '0', 10);
+      const active = angle === rotation;
+      dot.classList.toggle('fc-fmtdlg__align-preview-dot--active', active);
+      dot.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
+    const rad = (rotation * Math.PI) / 180;
+    const cx = 12;
+    const cy = 66;
+    const radius = 56;
+    const px = cx + radius * Math.cos(rad);
+    const py = cy - radius * Math.sin(rad);
+    alignPreviewDialPointer.style.left = `${px}px`;
+    alignPreviewDialPointer.style.top = `${py}px`;
+    alignPreviewDialText.style.transform = `translate(0, -50%) rotate(${-rotation}deg)`;
+  };
+
   const renderPreview = (): void => {
+    syncRotationDial(draft.rotation);
     const cssFontVertAlign =
       draft.fontVertAlign === 'superscript'
         ? 'super'
@@ -915,6 +993,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const tabOrder = Array.from(tabButtons.keys());
   const setActiveTab = (id: TabId): void => {
     activeTab = id;
+    closePaletteFlyouts();
     for (const [tabId, btn] of tabButtons) {
       btn.setAttribute('aria-selected', tabId === id ? 'true' : 'false');
       btn.tabIndex = tabId === id ? 0 : -1;
@@ -1317,24 +1396,6 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     renderPreview();
   };
 
-  const syncRotationDial = (rotation: number): void => {
-    for (const dot of alignPreviewDialDots) {
-      const angle = Number.parseInt(dot.dataset.fcAngle ?? '0', 10);
-      const active = angle === rotation;
-      dot.classList.toggle('fc-fmtdlg__align-preview-dot--active', active);
-      dot.setAttribute('aria-pressed', active ? 'true' : 'false');
-    }
-    const rad = (rotation * Math.PI) / 180;
-    const cx = 12;
-    const cy = 66;
-    const radius = 56;
-    const px = cx + radius * Math.cos(rad);
-    const py = cy - radius * Math.sin(rad);
-    alignPreviewDialPointer.style.left = `${px}px`;
-    alignPreviewDialPointer.style.top = `${py}px`;
-    alignPreviewDialText.style.transform = `translate(0, -50%) rotate(${-rotation}deg)`;
-  };
-
   const onDialClick = (event: Event): void => {
     const target = event.target as Element | null;
     const dot = target?.closest<HTMLButtonElement>('[data-fc-angle]');
@@ -1451,13 +1512,25 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     fontSwatches.setValue(null);
     renderPreview();
   };
+
+  const onFontSwatchesToggle = (): void => fontPalette.setOpen(!fontPalette.isOpen());
   const onFontSwatchClick = (e: Event): void => {
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-color]');
     const color = btn?.dataset.color;
     if (!color) return;
     draft.color = color;
     colorInput.value = color;
+    normalFontCk.input.checked = false;
     renderPreview();
+    fontPalette.setOpen(false);
+    fontSwatchesToggle.focus();
+  };
+  const onOverlayPointerDown = (e: Event): void => {
+    const target = e.target as Node | null;
+    if (!target) return;
+    for (const flyout of paletteFlyouts) {
+      if (flyout.isOpen() && !flyout.owns(target)) flyout.setOpen(false);
+    }
   };
 
   // Border events
@@ -1486,6 +1559,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     borderSwatches.setValue(null);
     renderPreview();
   };
+  const onBorderSwatchesToggle = (): void => borderPalette.setOpen(!borderPalette.isOpen());
   const onBorderSwatchClick = (e: Event): void => {
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-color]');
     const color = btn?.dataset.color;
@@ -1493,6 +1567,8 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     draft.borderColor = color;
     borderColorInput.value = color;
     renderPreview();
+    borderPalette.setOpen(false);
+    borderSwatchesToggle.focus();
   };
 
   const onPresetNone = (): void => {
@@ -1695,6 +1771,13 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     e.stopPropagation();
     if (e.key === 'Escape') {
       e.preventDefault();
+      // A flyout swallows the first Escape so the dialog itself survives it.
+      const open = paletteFlyouts.find((flyout) => flyout.isOpen());
+      if (open) {
+        open.setOpen(false);
+        open.toggle.focus();
+        return;
+      }
       api.close();
       return;
     }
@@ -1743,11 +1826,13 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   shell.on(sizeInput, 'input', onSizeInput);
   shell.on(colorInput, 'input', onColorInput);
   shell.on(colorReset, 'click', onColorReset);
+  shell.on(fontSwatchesToggle, 'click', onFontSwatchesToggle);
   shell.on(fontSwatches.el, 'click', onFontSwatchClick);
   shell.on(borderStyleSelect, 'change', onBorderStyleChange);
   shell.on(borderStyleGallery, 'click', onBorderStyleGalleryClick);
   shell.on(borderColorInput, 'input', onBorderColorInput);
   shell.on(borderColorReset, 'click', onBorderColorReset);
+  shell.on(borderSwatchesToggle, 'click', onBorderSwatchesToggle);
   shell.on(borderSwatches.el, 'click', onBorderSwatchClick);
   shell.on(presetNone, 'click', onPresetNone);
   shell.on(presetOutline, 'click', onPresetOutline);
@@ -1797,6 +1882,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     if ((e as MouseEvent).target === overlay) api.close();
   });
   shell.on(overlay, 'keydown', onOverlayKey as EventListener);
+  shell.on(overlay, 'mousedown', onOverlayPointerDown);
 
   const api: FormatDialogHandle = {
     open(tab?: TabId, options?: FormatDialogOpenOptions): void {
@@ -1816,6 +1902,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       });
     },
     close(): void {
+      closePaletteFlyouts();
       shell.close();
       host.focus();
     },

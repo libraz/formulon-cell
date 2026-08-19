@@ -1,5 +1,8 @@
 /* Format Cells dialog shell — split into three focused submodules. */
 
+/* Order matters: `align-tab.css` re-lays the alignment tab's rows and must beat
+   the generic `.fc-fmtdlg__row` rules in `tabs-content.css`, which carry the
+   same specificity. */
 @import "./frame.css";
-@import "./align-tab.css";
 @import "./tabs-content.css";
+@import "./align-tab.css";

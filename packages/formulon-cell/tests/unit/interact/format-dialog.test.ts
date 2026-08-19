@@ -212,6 +212,127 @@ describe('attachFormatDialog', () => {
     handle.detach();
   });
 
+  it('follows the rotation with the dial marker and its sample text', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open('align');
+
+    const dial = document.querySelector<HTMLElement>('.fc-fmtdlg__align-preview-dial');
+    const pointer = document.querySelector<HTMLElement>('.fc-fmtdlg__align-preview-pointer');
+    const sample = document.querySelector<HTMLElement>('.fc-fmtdlg__align-preview-text');
+    const rotationInput = document.querySelector<HTMLInputElement>(
+      '.fc-fmtdlg__align-degree input[type="number"]',
+    );
+    if (!dial || !pointer || !sample || !rotationInput) throw new Error('rotation dial missing');
+
+    expect(sample.style.transform).toBe('translate(0, -50%) rotate(0deg)');
+
+    dial.querySelector<HTMLButtonElement>('[data-fc-angle="60"]')?.click();
+    expect(rotationInput.value).toBe('60');
+    expect(sample.style.transform).toBe('translate(0, -50%) rotate(-60deg)');
+    expect(pointer.style.top).not.toBe('66px');
+    expect(
+      dial.querySelector<HTMLElement>('.fc-fmtdlg__align-preview-dot--active')?.dataset.fcAngle,
+    ).toBe('60');
+
+    rotationInput.value = '-30';
+    rotationInput.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(sample.style.transform).toBe('translate(0, -50%) rotate(30deg)');
+    expect(
+      dial.querySelector<HTMLElement>('.fc-fmtdlg__align-preview-dot--active')?.dataset.fcAngle,
+    ).toBe('-30');
+
+    handle.detach();
+  });
+
+  it('picks a font color from the palette flyout and closes it', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open('font');
+
+    const toggle = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__color-toggle');
+    const flyout = document.querySelector<HTMLElement>('.fc-fmtdlg__color-flyout');
+    const colorInput = document.querySelector<HTMLInputElement>('input[data-fc-color="font"]');
+    if (!toggle || !flyout || !colorInput) throw new Error('font color control missing');
+
+    // The palette is out of flow until opened — the tab has no room for it inline.
+    expect(flyout.hidden).toBe(true);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+
+    toggle.click();
+    expect(flyout.hidden).toBe(false);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+
+    const swatch = flyout.querySelector<HTMLButtonElement>('[data-color]');
+    const picked = swatch?.dataset.color;
+    swatch?.click();
+    expect(colorInput.value).toBe(picked);
+    expect(flyout.hidden).toBe(true);
+    expect(document.activeElement).toBe(toggle);
+
+    handle.detach();
+  });
+
+  it('picks a line color from the border palette flyout and closes it', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open('border');
+
+    const panel = document.querySelector<HTMLElement>(
+      '[data-fc-tab="border"].fc-fmtdlg__panel-tab',
+    );
+    const toggle = panel?.querySelector<HTMLButtonElement>('.fc-fmtdlg__color-toggle');
+    const flyout = panel?.querySelector<HTMLElement>('.fc-fmtdlg__color-flyout');
+    const colorInput = panel?.querySelector<HTMLInputElement>('input[data-fc-color="border"]');
+    if (!toggle || !flyout || !colorInput) throw new Error('border color control missing');
+
+    expect(flyout.hidden).toBe(true);
+    toggle.click();
+    expect(flyout.hidden).toBe(false);
+
+    const swatch = flyout.querySelector<HTMLButtonElement>('[data-color]');
+    const picked = swatch?.dataset.color;
+    swatch?.click();
+    expect(colorInput.value).toBe(picked);
+    expect(flyout.hidden).toBe(true);
+    expect(document.activeElement).toBe(toggle);
+
+    handle.detach();
+  });
+
+  it('lets Escape close the palette flyout without closing the dialog', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open('font');
+
+    const overlay = document.querySelector<HTMLElement>('.fc-fmtdlg');
+    const toggle = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__color-toggle');
+    const flyout = document.querySelector<HTMLElement>('.fc-fmtdlg__color-flyout');
+    if (!overlay || !toggle || !flyout) throw new Error('font color control missing');
+
+    toggle.click();
+    overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(flyout.hidden).toBe(true);
+    expect(overlay.hidden).toBe(false);
+
+    overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(overlay.hidden).toBe(true);
+
+    handle.detach();
+  });
+
+  it('closes the palette flyout when another tab is opened', () => {
+    const handle = attachFormatDialog({ host, store });
+    handle.open('font');
+
+    const toggle = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__color-toggle');
+    const flyout = document.querySelector<HTMLElement>('.fc-fmtdlg__color-flyout');
+    if (!toggle || !flyout) throw new Error('font color control missing');
+
+    toggle.click();
+    expect(flyout.hidden).toBe(false);
+    document.querySelector<HTMLButtonElement>('button[data-fc-tab="border"]')?.click();
+    expect(flyout.hidden).toBe(true);
+
+    handle.detach();
+  });
+
   it('detach() removes the overlay from DOM', () => {
     const handle = attachFormatDialog({ host, store });
     expect(document.querySelector('.fc-fmtdlg')).not.toBeNull();
@@ -793,16 +914,23 @@ describe('attachFormatDialog', () => {
     );
 
     expect(alignCss).toMatch(
-      /\.fc-fmtdlg__panel-tab\[data-fc-tab="align"\]\s*\{[\s\S]*?grid-template-columns: minmax\(320px, 1fr\) 222px;/,
+      /\.fc-fmtdlg__panel-tab\[data-fc-tab="align"\]\s*\{[\s\S]*?grid-template-columns: minmax\(292px, 1fr\) 222px;/,
+    );
+    // The column rule between the alignment rows and the direction dial rides
+    // on the dial block itself, so it always ends where the rows do.
+    expect(alignCss).toMatch(
+      /\.fc-fmtdlg__align-preview\s*\{[\s\S]*?border-left: 1px solid var\(--fc-fmtdlg-rule\);/,
     );
     expect(alignCss).toMatch(
-      /\.fc-fmtdlg__panel-tab\[data-fc-tab="align"\]::before\s*\{[\s\S]*?background: var\(--fc-fmtdlg-rule\);/,
+      /\.fc-fmtdlg__align-select-row,\s*\.fc-fmtdlg__text-direction-row\s*\{[\s\S]*?grid-template-columns: 216px;[\s\S]*?min-height: 48px;/,
     );
+    // Each left-column row claims its own grid row: auto-placement would push
+    // the horizontal-alignment select below the indent field beside it.
+    expect(alignCss).toMatch(/\.fc-fmtdlg__align-select-row--h\s*\{\s*grid-row: 1;/);
+    expect(alignCss).toMatch(/\.fc-fmtdlg__align-select-row--v\s*\{\s*grid-row: 2;/);
+    expect(alignCss).toMatch(/\.fc-fmtdlg__text-direction-row\s*\{\s*grid-row: 3;/);
     expect(alignCss).toMatch(
-      /\.fc-fmtdlg__align-select-row\s*\{[\s\S]*?grid-template-columns: 216px;[\s\S]*?min-height: 48px;/,
-    );
-    expect(alignCss).toMatch(
-      /\.fc-fmtdlg__panel-tab\[data-fc-tab="align"\] \.fc-fmtdlg__row:has\(input\[type="number"\]\)\s*\{[\s\S]*?grid-row: 1;[\s\S]*?justify-self: end;/,
+      /\.fc-fmtdlg__indent-row\s*\{[\s\S]*?grid-row: 1;[\s\S]*?justify-self: end;/,
     );
     expect(alignCss).toMatch(
       /\.fc-fmtdlg__align-preview-box\s*\{[\s\S]*?grid-template-columns: 32px 100px;[\s\S]*?min-height: 152px;/,
@@ -841,6 +969,28 @@ describe('attachFormatDialog', () => {
     expect(borderCss).toMatch(/\.fc-fmtdlg__border-hit\s*\{[\s\S]*?border-radius: 5px;/);
     expect(borderCss).toMatch(/\.fc-fmtdlg__border-hit--top\s*\{[\s\S]*?top: 4px;/);
     expect(borderCss).toMatch(/\.fc-fmtdlg__border-hit--left\s*\{[\s\S]*?top: 58px;/);
+
+    // Every border-tab item is placed by hand, and both columns are sized so
+    // the reset button stays inside the body instead of being clipped.
+    const tabsCss = readFileSync(
+      join(root, 'src/styles/core/app/format-dialog/tabs-content.css'),
+      'utf8',
+    );
+    expect(tabsCss).toMatch(
+      /\.fc-fmtdlg__panel-tab\[data-fc-tab="border"\] \.fc-fmtdlg__border-style-row\s*\{[\s\S]*?grid-column: 2;[\s\S]*?grid-row: 1;/,
+    );
+    expect(tabsCss).toMatch(
+      /\.fc-fmtdlg__panel-tab\[data-fc-tab="border"\] \.fc-fmtdlg__border-color-row\s*\{[\s\S]*?grid-column: 2;[\s\S]*?grid-row: 2;/,
+    );
+    expect(tabsCss).toMatch(
+      /\.fc-fmtdlg__panel-tab\[data-fc-tab="border"\] \.fc-fmtdlg__border-presets\s*\{[\s\S]*?grid-column: 1;[\s\S]*?grid-row: 5;/,
+    );
+    expect(tabsCss).toMatch(
+      /\.fc-fmtdlg__panel-tab\[data-fc-tab="border"\] \.fc-fmtdlg__row > span:first-child\s*\{[\s\S]*?min-width: 72px;/,
+    );
+    expect(tabsCss).toMatch(
+      /\.fc-fmtdlg__border-color-row\s*\{[\s\S]*?grid-template-columns: 72px max-content;/,
+    );
   });
 
   it('keeps Format Cells Fill tab close to Japanese Excel 365 desktop', () => {
@@ -867,13 +1017,10 @@ describe('attachFormatDialog', () => {
     expect(swatchCss).toMatch(
       /\.fc-fmtdlg__fill-sample-box\s*\{[\s\S]*?max-width: 510px;[\s\S]*?height: 76px;/,
     );
+    // The background-color palette is the shared widget, framed in place.
     expect(swatchCss).toMatch(
-      /\.fc-fmtdlg__swatches\s*\{[\s\S]*?grid-template-columns: repeat\(12, 18px\);/,
+      /\.fc-fmtdlg__panel-tab\[data-fc-tab="fill"\] \.fc-colorpalette\s*\{[\s\S]*?grid-column: 1;[\s\S]*?grid-row: 2;[\s\S]*?border: 1px solid var\(--fc-fmtdlg-input-hover-border\);/,
     );
-    expect(swatchCss).toMatch(
-      /\.fc-fmtdlg__panel-tab\[data-fc-tab="fill"\] \.fc-fmtdlg__swatches\s*\{[\s\S]*?width: 156px;[\s\S]*?grid-template-columns: repeat\(6, 18px\);/,
-    );
-    expect(swatchCss).toMatch(/\.fc-fmtdlg__swatch\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/);
   });
 
   it('keeps Format Cells Font tab close to Japanese Excel 365 desktop', () => {
@@ -883,7 +1030,7 @@ describe('attachFormatDialog', () => {
     );
 
     expect(tabsCss).toMatch(
-      /\.fc-fmtdlg__panel-tab\[data-fc-tab="font"\]\s*\{[\s\S]*?grid-template-columns: 260px 128px 100px;[\s\S]*?padding: 20px 22px 0;/,
+      /\.fc-fmtdlg__panel-tab\[data-fc-tab="font"\]\s*\{[\s\S]*?grid-template-columns: 256px 128px 104px;[\s\S]*?gap: 8px 16px;[\s\S]*?padding: 20px 14px 0;/,
     );
     expect(tabsCss).toMatch(
       /\.fc-fmtdlg__font-list\s*\{[\s\S]*?height: 110px;[\s\S]*?min-height: 110px;/,

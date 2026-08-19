@@ -2676,7 +2676,6 @@ describe('toolbar/ribbon menu primitives', () => {
     );
     expect(swatchesSource).toContain('border-radius: 2px');
     expect(swatchesSource).toContain('border: 1px solid var(--fc-fmtdlg-input-hover-border)');
-    expect(swatchesSource).toContain('outline: 1px solid var(--fc-accent, currentColor)');
     expect(bordersSource).toContain('border-radius: 2px');
     expect(customSelectSource).toMatch(/\.fc-select__button\s*\{[\s\S]*?border-radius: 2px;/);
     expect(customSelectSource).toContain('box-shadow: none');

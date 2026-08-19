@@ -161,6 +161,9 @@ describe('color palette', () => {
       /\.fc-colorpalette__swatch\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
     );
     expect(paletteCss).toMatch(
+      /\.fc-colorpalette__swatch:focus-visible\s*\{[\s\S]*?outline: 2px solid var\(--fc-accent\);/,
+    );
+    expect(paletteCss).toMatch(
       /\.fc-colorpalette__action--automatic\s*\{[\s\S]*?justify-content: center;[\s\S]*?border-color: var\(--fc-accent\);/,
     );
     expect(paletteCss).toMatch(

@@ -20,6 +20,8 @@ export interface BorderTabRefs {
   borderColorInput: HTMLInputElement;
   borderColorReset: HTMLButtonElement;
   borderSwatches: ReturnType<typeof makeSwatches>;
+  borderSwatchesToggle: HTMLButtonElement;
+  borderSwatchesFlyout: HTMLDivElement;
   presetNone: HTMLButtonElement;
   presetOutline: HTMLButtonElement;
   presetAll: HTMLButtonElement;
@@ -37,7 +39,7 @@ export interface BorderTabRefs {
 export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog']): BorderTabRefs {
   // Active style + color row
   const borderStyleRow = document.createElement('label');
-  borderStyleRow.className = 'fc-fmtdlg__row';
+  borderStyleRow.className = 'fc-fmtdlg__row fc-fmtdlg__border-style-row';
   const borderStyleLabel = document.createElement('span');
   borderStyleLabel.textContent = t.borderStyle;
   const styleLabels: Record<BorderStyleKey, string> = {
@@ -87,19 +89,39 @@ export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog'
   }
   panel.appendChild(borderStyleGallery);
 
+  // Line color. Like the font tab, the swatch palette hangs off the color
+  // control as a flyout — the two-column border layout has no room for it
+  // inline, and the desktop dialog shows a color dropdown here too.
   const borderColorRow = document.createElement('div');
-  borderColorRow.className = 'fc-fmtdlg__row';
+  borderColorRow.className = 'fc-fmtdlg__row fc-fmtdlg__border-color-row';
   const borderColorLabel = document.createElement('span');
   borderColorLabel.textContent = t.borderColor;
   const borderColorInput = document.createElement('input');
   borderColorInput.type = 'color';
   borderColorInput.setAttribute('aria-label', t.borderColor);
   borderColorInput.dataset.fcColor = 'border';
+  const borderSwatchesToggle = createDialogToggleButton({
+    label: t.themeColors,
+    baseClass: 'fc-fmtdlg__color-toggle',
+    title: t.themeColors,
+    popup: true,
+  });
+  const borderSwatchesChevron = document.createElement('span');
+  borderSwatchesChevron.className = 'fc-fmtdlg__color-toggle-chevron';
+  borderSwatchesChevron.setAttribute('aria-hidden', 'true');
+  borderSwatchesToggle.appendChild(borderSwatchesChevron);
+  const borderColorControl = document.createElement('span');
+  borderColorControl.className = 'fc-fmtdlg__color-control';
+  borderColorControl.append(borderColorInput, borderSwatchesToggle);
   const borderColorReset = makeButton(t.resetToDefault);
-  borderColorRow.append(borderColorLabel, borderColorInput, borderColorReset);
+  borderColorRow.append(borderColorLabel, borderColorControl, borderColorReset);
   panel.appendChild(borderColorRow);
   const borderSwatches = makeSwatches('border', t.themeColors, t.standardColors);
-  panel.appendChild(borderSwatches.el);
+  const borderSwatchesFlyout = document.createElement('div');
+  borderSwatchesFlyout.className = 'fc-fmtdlg__color-flyout';
+  borderSwatchesFlyout.hidden = true;
+  borderSwatchesFlyout.appendChild(borderSwatches.el);
+  panel.appendChild(borderSwatchesFlyout);
 
   // Presets
   const presetRow = document.createElement('div');
@@ -188,6 +210,8 @@ export function createBorderTab(panel: HTMLDivElement, t: Strings['formatDialog'
     borderColorInput,
     borderColorReset,
     borderSwatches,
+    borderSwatchesToggle,
+    borderSwatchesFlyout,
     presetNone,
     presetOutline,
     presetAll,

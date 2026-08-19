@@ -108,6 +108,9 @@ export interface DialogToggleButtonOptions {
   datasetKey?: string;
   value?: string;
   extraClass?: string;
+  /** Trigger for a popup rather than an on/off control: reports `aria-expanded`
+   *  and `aria-haspopup` instead of `aria-pressed`. */
+  popup?: boolean;
 }
 
 export function focusAndSelectInput(input: HTMLInputElement | HTMLTextAreaElement): void {
@@ -429,7 +432,12 @@ export function createDialogToggleButton(opts: DialogToggleButtonOptions): HTMLB
   button.type = 'button';
   button.className = opts.extraClass ? `${opts.baseClass} ${opts.extraClass}` : opts.baseClass;
   button.setAttribute('aria-label', opts.label);
-  button.setAttribute('aria-pressed', opts.pressed ? 'true' : 'false');
+  if (opts.popup) {
+    button.setAttribute('aria-haspopup', 'true');
+    button.setAttribute('aria-expanded', opts.pressed ? 'true' : 'false');
+  } else {
+    button.setAttribute('aria-pressed', opts.pressed ? 'true' : 'false');
+  }
   if (opts.title) button.title = opts.title;
   if (opts.datasetKey && opts.value !== undefined) button.dataset[opts.datasetKey] = opts.value;
   return button;

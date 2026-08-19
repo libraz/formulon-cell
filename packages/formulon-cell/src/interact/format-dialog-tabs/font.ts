@@ -8,7 +8,7 @@ import {
 } from '../../toolbar/dialogs/form-controls.js';
 import { shouldShowFontOption } from '../../toolbar/ribbon/font-availability.js';
 import { FONT_FAMILIES, FONT_SIZES } from '../../toolbar/ribbon-model.js';
-import { appendDialogOptionButton } from '../dialog-shell.js';
+import { appendDialogOptionButton, createDialogToggleButton } from '../dialog-shell.js';
 import { makeButton, makeCheckbox, makeSwatches } from '../format-dialog-dom.js';
 
 export interface FontTabRefs {
@@ -25,6 +25,8 @@ export interface FontTabRefs {
   colorInput: HTMLInputElement;
   colorReset: HTMLButtonElement;
   fontSwatches: ReturnType<typeof makeSwatches>;
+  fontSwatchesToggle: HTMLButtonElement;
+  fontSwatchesFlyout: HTMLDivElement;
   fontPreviewBox: HTMLDivElement;
   syncFontFamilyOptions: (current: string) => void;
 }
@@ -124,6 +126,13 @@ export function createFontTab(
   };
   syncFontFamilyOptions('');
 
+  // The style column has no free-text input of its own, so it carries a bare
+  // caption to keep the three column headings on one line.
+  const fontStyleLabel = document.createElement('div');
+  fontStyleLabel.className = 'fc-fmtdlg__font-style-label';
+  fontStyleLabel.textContent = t.fontStyle;
+  panel.appendChild(fontStyleLabel);
+
   const fontStyleList = document.createElement('div');
   fontStyleList.className = 'fc-fmtdlg__font-list fc-fmtdlg__font-list--style';
   fontStyleList.setAttribute('role', 'listbox');
@@ -178,7 +187,9 @@ export function createFontTab(
   }
   panel.appendChild(sizeList);
 
-  // Font color
+  // Font color. The swatch palette is taller than the space this tab has left,
+  // so it hangs off the color control as a flyout instead of sitting inline the
+  // way the fill tab's palette does.
   const colorRow = document.createElement('div');
   colorRow.className = 'fc-fmtdlg__row fc-fmtdlg__font-color-row';
   const colorLabel = document.createElement('span');
@@ -187,11 +198,28 @@ export function createFontTab(
   colorInput.type = 'color';
   colorInput.setAttribute('aria-label', t.color);
   colorInput.dataset.fcColor = 'font';
+  const fontSwatchesToggle = createDialogToggleButton({
+    label: t.themeColors,
+    baseClass: 'fc-fmtdlg__color-toggle',
+    title: t.themeColors,
+    popup: true,
+  });
+  const fontSwatchesChevron = document.createElement('span');
+  fontSwatchesChevron.className = 'fc-fmtdlg__color-toggle-chevron';
+  fontSwatchesChevron.setAttribute('aria-hidden', 'true');
+  fontSwatchesToggle.appendChild(fontSwatchesChevron);
+  const colorControl = document.createElement('span');
+  colorControl.className = 'fc-fmtdlg__color-control';
+  colorControl.append(colorInput, fontSwatchesToggle);
   const colorReset = makeButton(t.resetToDefault);
-  colorRow.append(colorLabel, colorInput, colorReset);
+  colorRow.append(colorLabel, colorControl, colorReset);
   panel.appendChild(colorRow);
   const fontSwatches = makeSwatches('font', t.themeColors, t.standardColors);
-  panel.appendChild(fontSwatches.el);
+  const fontSwatchesFlyout = document.createElement('div');
+  fontSwatchesFlyout.className = 'fc-fmtdlg__color-flyout';
+  fontSwatchesFlyout.hidden = true;
+  fontSwatchesFlyout.appendChild(fontSwatches.el);
+  panel.appendChild(fontSwatchesFlyout);
 
   const fontPreview = document.createElement('div');
   fontPreview.className = 'fc-fmtdlg__font-preview';
@@ -218,6 +246,8 @@ export function createFontTab(
     colorInput,
     colorReset,
     fontSwatches,
+    fontSwatchesToggle,
+    fontSwatchesFlyout,
     fontPreviewBox,
     syncFontFamilyOptions,
   };

@@ -27,17 +27,6 @@
     font-size: 12px;
     line-height: 1.4;
   }
-  .fc-fmtdlg__section .fc-fmtdlg__swatches {
-    margin-left: 0;
-  }
-  .fc-fmtdlg__swatches {
-    display: grid;
-    grid-template-columns: repeat(12, 18px);
-    gap: 3px;
-    min-height: 24px;
-    margin-left: 0;
-  }
-
   .fc-fmtdlg__panel-tab[data-fc-tab="fill"] .fc-fmtdlg__section {
     display: contents;
   }
@@ -48,12 +37,15 @@
     gap: 10px 46px;
   }
 
+  /* Column rule between the background and pattern halves. Anchored to the
+     top and sized to the two control rows so it stops above the sample's own
+     separator whatever height the panel ends up with. */
   .fc-fmtdlg__panel-tab[data-fc-tab="fill"]::before {
     position: absolute;
     top: 30px;
-    bottom: 198px;
     left: 50%;
     width: 1px;
+    height: 306px;
     background: var(--fc-fmtdlg-rule);
     content: "";
   }
@@ -200,29 +192,27 @@
     padding-inline: 10px;
   }
 
-  .fc-fmtdlg__panel-tab[data-fc-tab="fill"] .fc-fmtdlg__swatches {
+  /* The background-color palette is the one palette the desktop dialog shows
+     inline rather than behind a dropdown; the shared widget renders the swatch
+     grid, this only supplies the sunken frame around it. */
+  .fc-fmtdlg__panel-tab[data-fc-tab="fill"] .fc-colorpalette {
     grid-column: 1;
-    grid-row: 2 / span 2;
-    width: 156px;
-    grid-template-columns: repeat(6, 18px);
+    grid-row: 2;
+    align-self: start;
     margin: -2px 0 0 14px;
-    padding: 8px;
     border: 1px solid var(--fc-fmtdlg-input-hover-border);
     border-radius: 2px;
     background: var(--fc-fmtdlg-list-bg);
-    box-shadow:
-      0 8px 18px rgba(0, 0, 0, 0.16),
-      0 1px 3px rgba(0, 0, 0, 0.12);
   }
 
   .fc-fmtdlg__fill-sample {
     grid-column: 1 / -1;
+    grid-row: 3;
     display: grid;
     grid-template-columns: 1fr;
     gap: 12px;
-    min-height: 214px;
-    margin-top: 108px;
-    padding: 26px 18px 0;
+    margin-top: 8px;
+    padding: 22px 18px 0;
     border-top: 1px solid var(--fc-fmtdlg-rule);
   }
 
@@ -236,22 +226,9 @@
     max-width: 510px;
     height: 76px;
     background: var(--fc-fmtdlg-list-bg);
-    border: 0;
+    border: 1px solid var(--fc-fmtdlg-preview-border);
   }
 
-  .fc-fmtdlg__swatch {
-    width: 18px;
-    height: 18px;
-    padding: 0;
-    border: 1px solid #d0d0d0;
-    border-radius: 2px;
-    cursor: pointer;
-  }
-  .fc-fmtdlg__swatch:hover,
-  .fc-fmtdlg__swatch:focus-visible {
-    outline: 1px solid var(--fc-accent, currentColor);
-    outline-offset: 1px;
-  }
   .fc-fmtdlg__line-gallery {
     display: grid;
     grid-template-columns: 1fr 1fr;

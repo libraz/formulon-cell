@@ -6,21 +6,13 @@
   .fc-fmtdlg__panel-tab[data-fc-tab="align"] {
     position: relative;
     display: grid;
-    grid-template-columns: minmax(320px, 1fr) 222px;
+    /* The floor is what the select plus the indent spinner beside it need; any
+       wider and the two tracks plus the gutter overflow the dialog body. */
+    grid-template-columns: minmax(292px, 1fr) 222px;
     grid-auto-rows: max-content;
     gap: 10px 26px;
     align-content: start;
     padding-top: 4px;
-  }
-
-  .fc-fmtdlg__panel-tab[data-fc-tab="align"]::before {
-    position: absolute;
-    top: 1px;
-    bottom: 166px;
-    left: calc(100% - 248px);
-    width: 1px;
-    background: var(--fc-fmtdlg-rule);
-    content: "";
   }
 
   .fc-fmtdlg__panel-tab[data-fc-tab="align"] > div:not([class]),
@@ -28,7 +20,11 @@
     display: none;
   }
 
-  .fc-fmtdlg__align-select-row {
+  /* The left column stacks a caption over each control, so every row claims its
+     own grid row explicitly — auto-placement would otherwise push the first
+     select below the indent field that shares row 1 with it. */
+  .fc-fmtdlg__align-select-row,
+  .fc-fmtdlg__text-direction-row {
     grid-column: 1;
     display: grid;
     grid-template-columns: 216px;
@@ -38,47 +34,72 @@
     min-height: 48px;
   }
 
-  .fc-fmtdlg__align-select-row > span:first-child {
+  .fc-fmtdlg__align-select-row--h {
+    grid-row: 1;
+  }
+
+  .fc-fmtdlg__align-select-row--v {
+    grid-row: 2;
+  }
+
+  .fc-fmtdlg__text-direction-row {
+    grid-row: 3;
+  }
+
+  .fc-fmtdlg__align-select-row > span:first-child,
+  .fc-fmtdlg__text-direction-row > span:first-child {
     min-width: 0;
   }
 
   .fc-fmtdlg__align-select-row .fc-select,
-  .fc-fmtdlg__align-select-row select {
+  .fc-fmtdlg__align-select-row select,
+  .fc-fmtdlg__text-direction-row .fc-select,
+  .fc-fmtdlg__text-direction-row select {
     width: 216px;
   }
 
-  .fc-fmtdlg__panel-tab[data-fc-tab="align"] .fc-fmtdlg__row:has(input[type="number"]) {
+  /* Indent shares row 1 with the horizontal-alignment select and sits to its
+     right, caption over spinner so the pair fits beside the 216px control. */
+  .fc-fmtdlg__indent-row {
     grid-column: 1;
     grid-row: 1;
     display: grid;
-    grid-template-columns: 72px 52px;
-    gap: 8px;
-    align-items: center;
+    grid-template-columns: max-content;
+    gap: 5px;
+    align-items: start;
     justify-self: end;
-    margin-top: 22px;
+    max-width: none;
     margin-right: 8px;
-    min-height: 24px;
+    min-height: 48px;
+  }
+
+  .fc-fmtdlg__indent-row > span:first-child {
+    min-width: 0;
+  }
+
+  .fc-fmtdlg__indent-row input[type="number"] {
+    width: 52px;
   }
 
   .fc-fmtdlg__panel-tab[data-fc-tab="align"] > .fc-fmtdlg__rotation-row {
     display: none;
   }
 
-  .fc-fmtdlg__panel-tab[data-fc-tab="align"]
-    .fc-fmtdlg__row:has(input[type="number"])
-    > span:first-child {
-    min-width: 0;
-  }
-
   /* ── Rotation dial preview ─────────────────────────────────────────── */
+  /* The column rule rides on this block rather than a panel pseudo-element, so
+     it always ends exactly where the alignment rows do — no magic offset to
+     retune when a row is added. The negative margin pulls the border into the
+     column gutter while the padding keeps the dial in place. */
   .fc-fmtdlg__align-preview {
     grid-column: 2;
-    grid-row: 1 / span 4;
+    grid-row: 1 / span 3;
     display: grid;
     grid-template-columns: 1fr;
     gap: 9px;
     justify-self: start;
-    padding-left: 1px;
+    margin-left: -13px;
+    padding-left: 14px;
+    border-left: 1px solid var(--fc-fmtdlg-rule);
   }
 
   .fc-fmtdlg__align-preview-title,
