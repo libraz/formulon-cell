@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildColLayout, buildRowLayout } from '../../../../src/render/geometry.js';
+import { buildColLayout, buildRowLayout, layoutForView } from '../../../../src/render/geometry.js';
 import { paintHeaders } from '../../../../src/render/grid/headers.js';
 import { createSpreadsheetStore } from '../../../../src/store/store.js';
 import type { ResolvedTheme } from '../../../../src/theme/resolve.js';
@@ -110,12 +110,18 @@ describe('paintHeaders', () => {
       anchor: { sheet: 0, row: 1, col: 1 },
       extraRanges: [],
     };
-    state.viewport = { rowStart: 0, rowCount: 3, colStart: 0, colCount: 3, zoom: 1 };
+    state.viewport = { rowStart: 0, rowCount: 3, colStart: 0, colCount: 3, zoom: 1, widthPx: 260 };
     const cols = buildColLayout(state.layout, state.viewport);
     const rows = buildRowLayout(state.layout, state.viewport);
     const { ctx, texts } = makeCtxSpy();
 
-    paintHeaders({ ctx, dpr: 1, cssWidth: 260, cssHeight: 140 }, state, theme(), cols, rows);
+    paintHeaders(
+      { ctx, dpr: 1, cssWidth: 260, cssHeight: 140 },
+      { ...state, layout: layoutForView(state) },
+      theme(),
+      cols,
+      rows,
+    );
 
     expect(texts.find((entry) => entry.text === 'A')).toMatchObject({
       font: '400 11.5px Aptos, sans-serif',
@@ -131,14 +137,49 @@ describe('paintHeaders', () => {
     });
   });
 
+  it('parks the row rail and the corner chip on the right for a right-to-left sheet', () => {
+    const state = createSpreadsheetStore().getState();
+    state.ui = { ...state.ui, rightToLeft: true };
+    state.viewport = { rowStart: 0, rowCount: 3, colStart: 0, colCount: 3, zoom: 1, widthPx: 260 };
+    const layout = layoutForView(state);
+    const cols = buildColLayout(layout, state.viewport);
+    const rows = buildRowLayout(layout, state.viewport);
+    const { ctx, fills } = makeCtxSpy();
+
+    paintHeaders(
+      { ctx, dpr: 1, cssWidth: 260, cssHeight: 140 },
+      { ...state, layout },
+      theme(),
+      cols,
+      rows,
+    );
+
+    const ox = layout.outlineRowGutter + layout.headerColWidth;
+    // Corner chip: full rail width, flush with the right edge.
+    expect(fills[0]?.rect).toEqual([
+      260 - ox,
+      0,
+      ox,
+      layout.outlineColGutter + layout.headerRowHeight,
+    ]);
+    // Row rail: same left edge, running the full height below the column rail.
+    expect(fills.some((f) => f.rect?.[0] === 260 - ox && f.rect?.[2] === ox)).toBe(true);
+  });
+
   it('keeps the select-all corner marker subtle', () => {
     const state = createSpreadsheetStore().getState();
-    state.viewport = { rowStart: 0, rowCount: 1, colStart: 0, colCount: 1, zoom: 1 };
+    state.viewport = { rowStart: 0, rowCount: 1, colStart: 0, colCount: 1, zoom: 1, widthPx: 260 };
     const cols = buildColLayout(state.layout, state.viewport);
     const rows = buildRowLayout(state.layout, state.viewport);
     const { ctx, fills } = makeCtxSpy();
 
-    paintHeaders({ ctx, dpr: 1, cssWidth: 120, cssHeight: 80 }, state, theme(), cols, rows);
+    paintHeaders(
+      { ctx, dpr: 1, cssWidth: 120, cssHeight: 80 },
+      { ...state, layout: layoutForView(state) },
+      theme(),
+      cols,
+      rows,
+    );
 
     expect(fills[1]).toMatchObject({ style: '#605e5c', alpha: 0.34 });
   });

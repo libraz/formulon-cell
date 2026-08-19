@@ -1,5 +1,5 @@
 import type { ResolvedTheme } from '../../theme/resolve.js';
-import type { Rect } from '../geometry.js';
+import { mirrorInRect, type Rect } from '../geometry.js';
 
 /** Paint a small ▼ chevron at the right edge of the cell to indicate the
  *  cell has a list validation. Returned rect is the click hit-area. */
@@ -7,10 +7,11 @@ export function paintValidationChevron(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
   theme: ResolvedTheme,
+  rtl = false,
 ): Rect {
   const w = 18;
   const h = Math.min(bounds.h, 22);
-  const x = bounds.x + bounds.w - w;
+  const x = mirrorInRect(bounds, bounds.x + bounds.w - w, w, rtl);
   const y = bounds.y + (bounds.h - h) / 2;
   ctx.save();
   ctx.fillStyle = theme.bgRail;
@@ -37,9 +38,10 @@ export function paintTableHeaderChevron(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
   theme: ResolvedTheme,
+  rtl = false,
 ): Rect {
   const size = 14;
-  const x = bounds.x + bounds.w - size - 3;
+  const x = mirrorInRect(bounds, bounds.x + bounds.w - size - 3, size, rtl);
   const y = bounds.y + Math.max(2, (bounds.h - size) / 2);
   ctx.save();
   ctx.fillStyle = 'rgba(255,255,255,0.72)';
@@ -74,16 +76,18 @@ export function paintErrorTriangle(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
   color: string,
+  rtl = false,
 ): Rect {
   const size = ERROR_TRIANGLE_SIZE;
-  const x = bounds.x;
+  const x = mirrorInRect(bounds, bounds.x, size, rtl);
   const y = bounds.y;
   ctx.save();
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(x + size, y);
-  ctx.lineTo(x, y + size);
+  // Right angle at the cell's leading corner; the hypotenuse falls inwards.
+  ctx.moveTo(rtl ? x + size : x, y);
+  ctx.lineTo(rtl ? x : x + size, y);
+  ctx.lineTo(rtl ? x + size : x, y + size);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
@@ -97,8 +101,9 @@ export function paintValidationTriangle(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
   color = '#d24545',
+  rtl = false,
 ): Rect {
-  return paintErrorTriangle(ctx, bounds, color);
+  return paintErrorTriangle(ctx, bounds, color, rtl);
 }
 
 /** Excel-style "Circle Invalid Data" marker. It intentionally sits inside the
@@ -133,10 +138,11 @@ export function paintLockMarker(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
   theme: ResolvedTheme,
+  rtl = false,
 ): void {
   const w = 8;
   const h = 9;
-  const x = Math.round(bounds.x + bounds.w - w - 2);
+  const x = Math.round(mirrorInRect(bounds, bounds.x + bounds.w - w - 2, w, rtl));
   const y = Math.round(bounds.y + 2);
   const color = theme.accent || '#0078d4';
   ctx.save();
@@ -154,16 +160,17 @@ export function paintLockMarker(
 
 /** Paint a small filled triangle in the upper-right of the cell to indicate
  *  an attached comment (spreadsheet convention). */
-export function paintCommentMarker(ctx: CanvasRenderingContext2D, bounds: Rect): void {
+export function paintCommentMarker(ctx: CanvasRenderingContext2D, bounds: Rect, rtl = false): void {
   const size = 5;
-  const x = bounds.x + bounds.w - size;
+  const x = mirrorInRect(bounds, bounds.x + bounds.w - size, size, rtl);
   const y = bounds.y;
   ctx.save();
   ctx.fillStyle = '#d24545';
   ctx.beginPath();
-  ctx.moveTo(x + size, y);
-  ctx.lineTo(x + size, y + size);
-  ctx.lineTo(x, y);
+  // Right angle at the cell's trailing top corner.
+  ctx.moveTo(rtl ? x : x + size, y);
+  ctx.lineTo(rtl ? x : x + size, y + size);
+  ctx.lineTo(rtl ? x + size : x, y);
   ctx.closePath();
   ctx.fill();
   ctx.restore();

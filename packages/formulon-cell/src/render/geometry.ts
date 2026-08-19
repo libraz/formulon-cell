@@ -1,5 +1,5 @@
 import type { Range } from '../engine/types.js';
-import type { LayoutSlice, ViewportSlice } from '../store/store.js';
+import type { LayoutSlice, State, UiSlice, ViewportSlice } from '../store/store.js';
 
 export interface Rect {
   x: number;
@@ -52,10 +52,56 @@ export function rowHeight(layout: LayoutSlice, row: number, viewport?: ViewportS
  *  toggle removes the row/column header rails from the sheet viewport; the
  *  underlying layout metrics are kept intact so turning headings back on
  *  restores the original header chrome. */
-export function layoutForView(layout: LayoutSlice, showHeaders: boolean): LayoutSlice {
-  if (showHeaders) return layout;
-  if (layout.headerColWidth === 0 && layout.headerRowHeight === 0) return layout;
-  return { ...layout, headerColWidth: 0, headerRowHeight: 0 };
+/** The renderer's projection of the layout slice. Beyond the store's layout it
+ *  carries the two facts needed to place a column on screen rather than in the
+ *  abstract: whether the sheet runs right-to-left, and the width it mirrors
+ *  about. Every function below that emits or consumes a screen x takes this
+ *  type, so a caller cannot accidentally hand it a raw `state.layout` and get
+ *  left-to-right coordinates on a right-to-left sheet. */
+export interface ViewLayout extends LayoutSlice {
+  /** `<sheetView rightToLeft>`: column A sits at the right edge. */
+  rtl: boolean;
+  /** Grid width in CSS pixels — the axis `rtl` mirrors about. */
+  viewWidth: number;
+}
+
+/** Application state as the renderer sees it: the same slices, with the layout
+ *  already projected for the current view. Paint passes take this so they
+ *  cannot reach a raw `state.layout`. */
+export type ViewState = Omit<State, 'layout'> & { layout: ViewLayout };
+
+export function layoutForView(
+  state: { layout: LayoutSlice; ui: UiSlice; viewport: ViewportSlice },
+  overrides: { showHeaders?: boolean } = {},
+): ViewLayout {
+  const showHeaders = overrides.showHeaders ?? state.ui.showHeaders !== false;
+  const base = {
+    ...state.layout,
+    rtl: state.ui.rightToLeft === true,
+    viewWidth: state.viewport.widthPx,
+  };
+  if (showHeaders) return base;
+  return { ...base, headerColWidth: 0, headerRowHeight: 0 };
+}
+
+/** Screen x of a rect's trailing edge — the corner a range's bottom-corner
+ *  affordances hang off, which the mirror moves to the physical left. */
+export function trailingEdgeX(rect: Rect, rtl: boolean): number {
+  return rtl ? rect.x : rect.x + rect.w;
+}
+
+/** Mirror a horizontal span within a cell rect. Lets a painter keep writing
+ *  its offsets from the cell's left edge and still land on the trailing side
+ *  when the sheet runs right-to-left. */
+export function mirrorInRect(bounds: Rect, x: number, w: number, rtl: boolean): number {
+  return rtl ? bounds.x + bounds.w - (x - bounds.x) - w : x;
+}
+
+/** Mirror a horizontal span about the viewport's right edge; identity in a
+ *  left-to-right sheet. The transform is its own inverse, so the same call
+ *  converts a laid-out x to a screen x and a screen x back again. */
+export function mirrorX(layout: ViewLayout, x: number, w = 0): number {
+  return layout.rtl ? layout.viewWidth - x - w : x;
 }
 
 /** Total left offset before the first data column. Includes the row-outline
@@ -114,14 +160,15 @@ export function rowY(layout: LayoutSlice, viewport: ViewportSlice, row: number):
 }
 
 export function cellRect(
-  layout: LayoutSlice,
+  layout: ViewLayout,
   viewport: ViewportSlice,
   row: number,
   col: number,
 ): Rect {
   const x = gridOriginX(layout) + colX(layout, viewport, col);
   const y = gridOriginY(layout) + rowY(layout, viewport, row);
-  return { x, y, w: colWidth(layout, col, viewport), h: rowHeight(layout, row, viewport) };
+  const w = colWidth(layout, col, viewport);
+  return { x: mirrorX(layout, x, w), y, w, h: rowHeight(layout, row, viewport) };
 }
 
 /** Like {@link cellRect}, but returns the true (possibly negative) offset for
@@ -131,7 +178,7 @@ export function cellRect(
  *  so they scroll out of view with their cell rather than sticking to the
  *  first visible row/column. */
 export function cellRectUnclamped(
-  layout: LayoutSlice,
+  layout: ViewLayout,
   viewport: ViewportSlice,
   row: number,
   col: number,
@@ -139,7 +186,9 @@ export function cellRectUnclamped(
   const rect = cellRect(layout, viewport, row, col);
   const colStart = Math.max(viewport.colStart, layout.freezeCols);
   if (col >= layout.freezeCols && col < colStart) {
-    for (let c = col; c < colStart; c += 1) rect.x -= colWidth(layout, c, viewport);
+    let back = 0;
+    for (let c = col; c < colStart; c += 1) back += colWidth(layout, c, viewport);
+    rect.x += layout.rtl ? back : -back;
   }
   const rowStart = Math.max(viewport.rowStart, layout.freezeRows);
   if (row >= layout.freezeRows && row < rowStart) {
@@ -148,15 +197,17 @@ export function cellRectUnclamped(
   return rect;
 }
 
-/** Top-left of the scrollable body band — the data origin pushed past any
- *  frozen rows/columns. Anything a non-frozen cell renders above or left of
- *  this point has scrolled under the frozen band / headers. */
+/** The boundary between the frozen/header chrome and the scrollable body band,
+ *  in screen coordinates. A non-frozen cell that renders past this boundary —
+ *  above it, or leading of it on the horizontal axis — has scrolled underneath
+ *  the chrome. On a right-to-left sheet the horizontal boundary is the band's
+ *  right edge, so "leading of it" means further right. */
 export function bodyBandOrigin(
-  layout: LayoutSlice,
+  layout: ViewLayout,
   viewport: ViewportSlice,
 ): { x: number; y: number } {
   return {
-    x: gridOriginX(layout) + frozenColsWidth(layout, viewport),
+    x: mirrorX(layout, gridOriginX(layout) + frozenColsWidth(layout, viewport)),
     y: gridOriginY(layout) + frozenRowsHeight(layout, viewport),
   };
 }
@@ -165,11 +216,12 @@ export function bodyBandOrigin(
  *  inside the visible viewport, or null if the point is in a header / outside.
  *  Freeze-aware: a click in the frozen band resolves to a frozen row/col. */
 export function hitTest(
-  layout: LayoutSlice,
+  layout: ViewLayout,
   viewport: ViewportSlice,
-  x: number,
+  screenX: number,
   y: number,
 ): { row: number; col: number } | null {
+  const x = mirrorX(layout, screenX);
   const ox = gridOriginX(layout);
   const oy = gridOriginY(layout);
   if (x < ox || y < oy) return null;
@@ -233,7 +285,7 @@ export function hitTest(
  *  position of its right edge. Returns null when x is outside visible cols.
  *  Freeze-aware. */
 function colAtX(
-  layout: LayoutSlice,
+  layout: ViewLayout,
   viewport: ViewportSlice,
   x: number,
 ): { col: number; rightEdge: number; leftEdge: number } | null {
@@ -312,13 +364,17 @@ export function isRowVisible(layout: LayoutSlice, viewport: ViewportSlice, row: 
  *  When `filterRange` is supplied, a chevron hot-zone is returned for the
  *  rightmost ~18px (excluding the resize slack) of headers inside the range. */
 export function hitZone(
-  layout: LayoutSlice,
+  layout: ViewLayout,
   viewport: ViewportSlice,
-  x: number,
+  screenX: number,
   y: number,
   filterRange?: Range | null,
   opts?: { resizeHandles?: boolean },
 ): HitZone | null {
+  // Everything below reasons in laid-out space, where column A is always
+  // leftmost. `colAtX` and `hitTest` do the same, so the pointer only has to
+  // cross the mirror once.
+  const x = mirrorX(layout, screenX);
   const resizeHandles = opts?.resizeHandles !== false;
   // Outline gutters sit outboard of the row/col header strips. Treat them as
   // header zones for now — the pointer layer routes outline-toggle clicks
@@ -365,14 +421,15 @@ export function hitZone(
     return { kind: 'row-header', row: found.row };
   }
 
-  const cell = hitTest(layout, viewport, x, y);
+  const cell = hitTest(layout, viewport, screenX, y);
   if (!cell) return null;
   return { kind: 'cell', row: cell.row, col: cell.col };
 }
 
-/** Return the absolute x of a column's left edge (header-inclusive coords). */
-export function colLeftEdge(layout: LayoutSlice, viewport: ViewportSlice, col: number): number {
-  return gridOriginX(layout) + colX(layout, viewport, col);
+/** Screen x of a column's leading edge — physically its left edge on a
+ *  left-to-right sheet, its right edge on a right-to-left one. */
+export function colLeadingEdge(layout: ViewLayout, viewport: ViewportSlice, col: number): number {
+  return mirrorX(layout, gridOriginX(layout) + colX(layout, viewport, col));
 }
 
 /** Return the absolute y of a row's top edge (header-inclusive coords). */
@@ -491,16 +548,17 @@ export function buildRowLayout(layout: LayoutSlice, viewport: ViewportSlice): Ax
  *  the (row, col) pair is in `cols.visible` × `rows.visible`; otherwise the
  *  rect is anchored at the data origin with the cell's nominal size. */
 export function cellRectIn(
-  layout: LayoutSlice,
+  layout: ViewLayout,
   cols: AxisLayout,
   rows: AxisLayout,
   row: number,
   col: number,
 ): Rect {
+  const w = cols.sizeAt.get(col) ?? colWidth(layout, col);
   return {
-    x: gridOriginX(layout) + (cols.positionAt.get(col) ?? 0),
+    x: mirrorX(layout, gridOriginX(layout) + (cols.positionAt.get(col) ?? 0), w),
     y: gridOriginY(layout) + (rows.positionAt.get(row) ?? 0),
-    w: cols.sizeAt.get(col) ?? colWidth(layout, col),
+    w,
     h: rows.sizeAt.get(row) ?? rowHeight(layout, row),
   };
 }
@@ -509,7 +567,7 @@ export function cellRectIn(
  *  freeze quadrant the range overlaps. Returns an empty list if the range
  *  is entirely outside the visible area. */
 export function rangeRects(
-  layout: LayoutSlice,
+  layout: ViewLayout,
   viewport: ViewportSlice,
   range: { r0: number; r1: number; c0: number; c1: number },
 ): Rect[] {
@@ -541,7 +599,11 @@ export function rangeRects(
     for (const [c0, c1] of colSegs) {
       const tl = cellRect(layout, viewport, r0, c0);
       const br = cellRect(layout, viewport, r1, c1);
-      rects.push({ x: tl.x, y: tl.y, w: br.x + br.w - tl.x, h: br.y + br.h - tl.y });
+      // The two corner rects come back already mirrored, so on a right-to-left
+      // sheet c0's rect is the rightmost one. Span from whichever is leading.
+      const left = Math.min(tl.x, br.x);
+      const right = Math.max(tl.x + tl.w, br.x + br.w);
+      rects.push({ x: left, y: tl.y, w: right - left, h: br.y + br.h - tl.y });
     }
   }
   return rects;

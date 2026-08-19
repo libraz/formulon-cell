@@ -3,8 +3,13 @@
 // are silently skipped; partial visibility is not handled in v1 (matches the
 // spreadsheet convention of clipping against the freeze divider).
 
-import type { State } from '../../store/store.js';
-import { type AxisLayout, cellRectIn, isColVisible, isRowVisible } from '../geometry.js';
+import {
+  type AxisLayout,
+  cellRectIn,
+  isColVisible,
+  isRowVisible,
+  type ViewState,
+} from '../geometry.js';
 import {
   paintTraceArrow,
   paintTraceDot,
@@ -14,7 +19,7 @@ import {
 
 export function paintTraces(
   ctx: CanvasRenderingContext2D,
-  state: State,
+  state: ViewState,
   cols: AxisLayout,
   rows: AxisLayout,
 ): void {

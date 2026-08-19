@@ -10,7 +10,7 @@ import {
 } from '../commands/quick-analysis.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
-import { rangeRects } from '../render/geometry.js';
+import { layoutForView, rangeRects, trailingEdgeX } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createInteractionButton } from './chip-button.js';
@@ -76,11 +76,16 @@ function actionDisabledReason(strings: Strings, action: QuickAnalysisAction): st
 
 function positionPanel(host: HTMLElement, root: HTMLElement, store: SpreadsheetStore): void {
   const s = store.getState();
-  const rects = rangeRects(s.layout, s.viewport, s.selection.range);
+  const rects = rangeRects(layoutForView(s), s.viewport, s.selection.range);
   const anchor = rects[rects.length - 1];
+  const rtl = s.ui.rightToLeft === true;
   const panelW = root.offsetWidth || 280;
   const panelH = root.offsetHeight || 240;
-  const left = anchor ? anchor.x + anchor.w + 8 : host.clientWidth / 2 - panelW / 2;
+  const left = anchor
+    ? rtl
+      ? trailingEdgeX(anchor, true) - 8 - panelW
+      : trailingEdgeX(anchor, false) + 8
+    : host.clientWidth / 2 - panelW / 2;
   const top = anchor ? anchor.y + anchor.h + 8 : host.clientHeight / 2 - panelH / 2;
   root.style.left = `${Math.max(8, Math.min(host.clientWidth - panelW - 8, left))}px`;
   root.style.top = `${Math.max(8, Math.min(host.clientHeight - panelH - 8, top))}px`;
@@ -155,7 +160,7 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
 
   const positionButton = (): void => {
     const state = store.getState();
-    const rects = rangeRects(state.layout, state.viewport, state.selection.range);
+    const rects = rangeRects(layoutForView(state), state.viewport, state.selection.range);
     const anchor = rects[rects.length - 1];
     if (!anchor || !isMultiSelection() || state.ui.editor.kind !== 'idle' || open) {
       button.hidden = true;
@@ -164,7 +169,9 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
     button.hidden = false;
     button.title = strings.quickAnalysis.title;
     button.setAttribute('aria-label', strings.quickAnalysis.title);
-    button.style.left = `${Math.max(4, Math.min(host.clientWidth - 26, anchor.x + anchor.w + 3))}px`;
+    const rtl = state.ui.rightToLeft === true;
+    const anchorX = rtl ? trailingEdgeX(anchor, true) - 25 : trailingEdgeX(anchor, false) + 3;
+    button.style.left = `${Math.max(4, Math.min(host.clientWidth - 26, anchorX))}px`;
     button.style.top = `${Math.max(4, Math.min(host.clientHeight - 26, anchor.y + anchor.h + 3))}px`;
   };
 

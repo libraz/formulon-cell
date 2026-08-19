@@ -44,6 +44,18 @@ export function setZerosVisible(
   }
 }
 
+/** Toggle the sheet's right-to-left direction, mirroring the grid axis. */
+export function setSheetRightToLeft(
+  store: SpreadsheetStore,
+  rightToLeft: boolean,
+  wb: WorkbookHandle | null = null,
+): void {
+  mutators.setRightToLeft(store, rightToLeft);
+  if (wb && typeof wb.setSheetRightToLeft === 'function') {
+    wb.setSheetRightToLeft(store.getState().data.sheetIndex, rightToLeft);
+  }
+}
+
 /** Toggle formula text display. */
 export function setShowFormulas(store: SpreadsheetStore, visible: boolean): void {
   mutators.setShowFormulas(store, visible);

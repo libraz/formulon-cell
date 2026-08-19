@@ -755,6 +755,7 @@ export const en: Strings = {
     zeros: 'Zero Values',
     formulas: 'Formulas',
     r1c1: 'R1C1',
+    rightToLeft: 'Sheet Right-to-Left',
     freezeNone: 'Unfreeze',
     freezeTopRow: 'Freeze Top Row',
     freezeFirstColumn: 'Freeze First Column',

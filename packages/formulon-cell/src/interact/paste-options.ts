@@ -8,7 +8,7 @@ import { type History, recordFormatChange } from '../commands/history.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
-import { rangeRects } from '../render/geometry.js';
+import { layoutForView, rangeRects, trailingEdgeX } from '../render/geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import {
   createFloatingOptionsButton,
@@ -96,12 +96,13 @@ export function attachPasteOptions(deps: PasteOptionsDeps): PasteOptionsHandle {
 
   const position = (range: Range): void => {
     const state = store.getState();
-    const rects = rangeRects(state.layout, state.viewport, range);
+    const rects = rangeRects(layoutForView(state), state.viewport, range);
     const hostRect = grid.getBoundingClientRect();
     const anchor = rects[rects.length - 1];
-    const x = anchor ? hostRect.left + anchor.x + anchor.w : hostRect.left + 24;
+    const rtl = state.ui.rightToLeft === true;
+    const x = anchor ? hostRect.left + trailingEdgeX(anchor, rtl) : hostRect.left + 24;
     const y = anchor ? hostRect.top + anchor.y + anchor.h : hostRect.top + 24;
-    const { x: left, y: top } = clampPanelToViewport(button, x + 3, y + 3, {
+    const { x: left, y: top } = clampPanelToViewport(button, rtl ? x - 31 : x + 3, y + 3, {
       pad: VIEWPORT_PAD,
       fallbackWidth: 28,
       fallbackHeight: 28,

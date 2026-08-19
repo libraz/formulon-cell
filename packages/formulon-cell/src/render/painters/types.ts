@@ -24,6 +24,10 @@ export interface CellPaintCtx {
   displayOverride?: string | null;
   /** BCP 47 locale used for number/date formatting. */
   locale?: string;
+  /** Sheet direction. Flips the reading-order end that general alignment,
+   *  indentation and the in-cell affordances anchor to. Cell-level
+   *  `format.textDirection` is separate — it governs the run of text itself. */
+  rtl?: boolean;
 }
 
 export type TextVAlign = 'top' | 'middle' | 'bottom';

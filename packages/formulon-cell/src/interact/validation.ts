@@ -4,7 +4,7 @@ import { resolveListValues } from '../commands/validate.js';
 import { addrKey } from '../engine/address.js';
 import { makeRangeResolver } from '../engine/range-resolver.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { cellRect } from '../render/geometry.js';
+import { cellRect, layoutForView } from '../render/geometry.js';
 import { getValidationChevron } from '../render/grid.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { appendDialogButton, createDialogShell } from './dialog-shell.js';
@@ -299,7 +299,7 @@ export function attachValidationPrompt(deps: ValidationPromptDeps): ValidationPr
     }
 
     const gridBounds = grid.getBoundingClientRect();
-    const rect = cellRect(state.layout, state.viewport, addr.row, addr.col);
+    const rect = cellRect(layoutForView(state), state.viewport, addr.row, addr.col);
     const left = gridBounds.left + rect.x;
     const top = gridBounds.top + rect.y + rect.h + 4;
     if (

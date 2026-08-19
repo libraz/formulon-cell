@@ -57,7 +57,7 @@ function keyInRange(key: string, range: Range): boolean {
 
 export const createSpreadsheetStore = () =>
   createStore<State>(() => ({
-    viewport: { rowStart: 0, rowCount: 40, colStart: 0, colCount: 16, zoom: 1 },
+    viewport: { rowStart: 0, rowCount: 40, colStart: 0, colCount: 16, zoom: 1, widthPx: 0 },
     selection: {
       active: initialAddr(),
       range: initialRange(),
@@ -94,6 +94,7 @@ export const createSpreadsheetStore = () =>
       showGridLines: true,
       showHeaders: true,
       showZeros: true,
+      rightToLeft: false,
       showFormulas: false,
       endMode: false,
       workbookView: 'normal',
@@ -261,6 +262,10 @@ export const mutators = {
     store.setState((s) => ({ ...s, ui: { ...s.ui, showZeros: on } }));
   },
 
+  setRightToLeft(store: SpreadsheetStore, on: boolean): void {
+    store.setState((s) => ({ ...s, ui: { ...s.ui, rightToLeft: on } }));
+  },
+
   setShowFormulas(store: SpreadsheetStore, on: boolean): void {
     store.setState((s) => ({ ...s, ui: { ...s.ui, showFormulas: on } }));
   },
@@ -331,13 +336,20 @@ export const mutators = {
     store.setState((s) => ({ ...s, viewport: { ...s.viewport, zoom: z } }));
   },
 
-  setViewportSize(store: SpreadsheetStore, rowCount: number, colCount: number): void {
+  setViewportSize(store: SpreadsheetStore, rowCount: number, colCount: number, widthPx = 0): void {
     const rows = Math.max(1, Math.floor(rowCount));
     const cols = Math.max(1, Math.floor(colCount));
+    const width = Math.max(0, widthPx);
     const MAX_ROW = 1_048_575;
     const MAX_COL = 16_383;
     store.setState((s) => {
-      if (s.viewport.rowCount === rows && s.viewport.colCount === cols) return s;
+      if (
+        s.viewport.rowCount === rows &&
+        s.viewport.colCount === cols &&
+        s.viewport.widthPx === width
+      ) {
+        return s;
+      }
       const maxRowStart = Math.max(s.layout.freezeRows, MAX_ROW + 1 - rows);
       const maxColStart = Math.max(s.layout.freezeCols, MAX_COL + 1 - cols);
       return {
@@ -346,6 +358,7 @@ export const mutators = {
           ...s.viewport,
           rowCount: rows,
           colCount: cols,
+          widthPx: width,
           rowStart: Math.min(maxRowStart, Math.max(s.layout.freezeRows, s.viewport.rowStart)),
           colStart: Math.min(maxColStart, Math.max(s.layout.freezeCols, s.viewport.colStart)),
         },

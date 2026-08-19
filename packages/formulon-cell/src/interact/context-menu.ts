@@ -41,7 +41,7 @@ import { addrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { hitZone } from '../render/geometry.js';
+import { hitZone, layoutForView } from '../render/geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { showPrompt } from '../toolbar/dialogs/prompt.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -468,7 +468,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const s = store.getState();
-    const zone = hitZone(s.layout, s.viewport, x, y, null, { resizeHandles: false });
+    const zone = hitZone(layoutForView(s), s.viewport, x, y, null, { resizeHandles: false });
     if (!zone) return 'cell';
     const selectedRanges = [s.selection.range, ...(s.selection.extraRanges ?? [])];
     if (zone.kind === 'row-header' || zone.kind === 'row-resize') {

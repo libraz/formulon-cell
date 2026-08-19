@@ -7,11 +7,14 @@ import {
   frozenRowsHeight,
   hitTest,
   rowHeight,
+  type ViewLayout,
 } from '../../../src/render/geometry.js';
-import type { LayoutSlice, ViewportSlice } from '../../../src/store/store.js';
+import type { ViewportSlice } from '../../../src/store/store.js';
 
-function makeLayout(over: Partial<LayoutSlice> = {}): LayoutSlice {
+function makeLayout(over: Partial<ViewLayout> = {}): ViewLayout {
   return {
+    rtl: false,
+    viewWidth: 0,
     colWidths: new Map(),
     rowHeights: new Map(),
     defaultColWidth: 100,
@@ -38,6 +41,7 @@ function makeViewport(over: Partial<ViewportSlice> = {}): ViewportSlice {
     rowCount: 10,
     colStart: 0,
     colCount: 6,
+    widthPx: 0,
     zoom: 1,
     ...over,
   };

@@ -156,6 +156,7 @@ export function paintCellText({
   showZeros,
   displayOverride,
   locale,
+  rtl = false,
 }: CellPaintCtx): void {
   const hyperlinkDisplay = format?.hyperlinkDisplay ?? '';
   if (value.kind === 'blank' && !formula && displayOverride == null && !hyperlinkDisplay) return;
@@ -210,9 +211,19 @@ export function paintCellText({
 
   let align: CanvasTextAlign;
   if (format?.align) {
+    // An explicit alignment stays physical — the ribbon's left/right buttons
+    // mean the same thing whichever way the sheet runs.
     align = canvasTextAlign(format.align) ?? 'left';
   } else {
-    align = isFormulaDisplay ? 'left' : isNumeric ? 'right' : isBool || isError ? 'center' : 'left';
+    // General alignment follows reading order, so it flips with the sheet.
+    const general: CanvasTextAlign = isFormulaDisplay
+      ? 'left'
+      : isNumeric
+        ? 'right'
+        : isBool || isError
+          ? 'center'
+          : 'left';
+    align = rtl && general === 'left' ? 'right' : rtl && general === 'right' ? 'left' : general;
   }
   const indentPx = (format?.indent ?? 0) * 8;
   const rotation = format?.rotation ?? 0;
@@ -252,7 +263,7 @@ export function paintCellText({
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = align;
     let tx: number;
-    if (align === 'right') tx = bounds.x + bounds.w - padX;
+    if (align === 'right') tx = bounds.x + bounds.w - padX - (rtl ? indentPx : 0);
     else if (align === 'center') tx = bounds.x + bounds.w / 2;
     else tx = bounds.x + padX + indentPx;
     for (let i = 0; i < lines.length; i += 1) {
@@ -271,7 +282,7 @@ export function paintCellText({
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = align;
   let tx: number;
-  if (align === 'right') tx = bounds.x + bounds.w - padX;
+  if (align === 'right') tx = bounds.x + bounds.w - padX - (rtl ? indentPx : 0);
   else if (align === 'center') tx = bounds.x + bounds.w / 2;
   else tx = bounds.x + padX + indentPx;
 

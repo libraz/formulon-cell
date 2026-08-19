@@ -7,7 +7,7 @@ import {
   cellRectIn,
   cellRectUnclamped,
   colLabel,
-  colLeftEdge,
+  colLeadingEdge,
   colWidth,
   frozenColsWidth,
   frozenRowsHeight,
@@ -19,13 +19,16 @@ import {
   rangeRects,
   rowHeight,
   rowTopEdge,
+  type ViewLayout,
   visibleCols,
   visibleRows,
 } from '../../../src/render/geometry.js';
-import type { LayoutSlice, ViewportSlice } from '../../../src/store/store.js';
+import type { ViewportSlice } from '../../../src/store/store.js';
 
-function makeLayout(over: Partial<LayoutSlice> = {}): LayoutSlice {
+function makeLayout(over: Partial<ViewLayout> = {}): ViewLayout {
   return {
+    rtl: false,
+    viewWidth: 0,
     colWidths: new Map(),
     rowHeights: new Map(),
     defaultColWidth: 100,
@@ -52,6 +55,7 @@ function makeViewport(over: Partial<ViewportSlice> = {}): ViewportSlice {
     rowCount: 10,
     colStart: 0,
     colCount: 6,
+    widthPx: 0,
     zoom: 1,
     ...over,
   };
@@ -340,8 +344,11 @@ describe('hitTest', () => {
   });
 
   it('resolves cells from the top-left when row and column headings are hidden', () => {
-    const layout = layoutForView(makeLayout(), false);
     const viewport = makeViewport();
+    const layout = layoutForView(
+      { layout: makeLayout(), ui: { showHeaders: false } as never, viewport },
+      { showHeaders: false },
+    );
 
     expect(hitTest(layout, viewport, 10, 10)).toEqual({ row: 0, col: 0 });
     expect(hitZone(layout, viewport, 5, 5)).toEqual({ kind: 'cell', row: 0, col: 0 });
@@ -491,12 +498,12 @@ describe('rangeRects', () => {
   });
 });
 
-describe('colLeftEdge / rowTopEdge', () => {
+describe('colLeadingEdge / rowTopEdge', () => {
   it('matches cellRect origin', () => {
     const layout = makeLayout();
     const viewport = makeViewport();
     const r = cellRect(layout, viewport, 4, 3);
-    expect(colLeftEdge(layout, viewport, 3)).toBe(r.x);
+    expect(colLeadingEdge(layout, viewport, 3)).toBe(r.x);
     expect(rowTopEdge(layout, viewport, 4)).toBe(r.y);
   });
 });
@@ -591,6 +598,71 @@ describe('cellRectIn', () => {
         const a = cellRect(layout, viewport, r, c);
         const b = cellRectIn(layout, cols, rows, r, c);
         expect(b).toEqual(a);
+      }
+    }
+  });
+});
+
+describe('right-to-left sheet', () => {
+  const rtlLayout = () => makeLayout({ rtl: true, viewWidth: 800 });
+
+  it('places column A against the right edge and runs the rest leftwards', () => {
+    const layout = rtlLayout();
+    const viewport = makeViewport();
+
+    // Left-to-right, column 0 starts at the header width (50) and is 100 wide;
+    // mirrored about 800 that lands at 650.
+    expect(cellRect(layout, viewport, 0, 0)).toMatchObject({ x: 650, w: 100 });
+    expect(cellRect(layout, viewport, 0, 1)).toMatchObject({ x: 550, w: 100 });
+  });
+
+  it('resolves a pointer back through the mirror', () => {
+    const layout = rtlLayout();
+    const viewport = makeViewport();
+
+    expect(hitTest(layout, viewport, 700, 40)).toEqual({ row: 0, col: 0 });
+    expect(hitTest(layout, viewport, 600, 40)).toEqual({ row: 0, col: 1 });
+    // The row-number rail is now the right-hand 50px, so a point there is a
+    // header rather than a cell.
+    expect(hitTest(layout, viewport, 770, 40)).toBeNull();
+  });
+
+  it('moves the row header rail and the corner to the right edge', () => {
+    const layout = rtlLayout();
+    const viewport = makeViewport();
+
+    expect(hitZone(layout, viewport, 770, 40)).toEqual({ kind: 'row-header', row: 0 });
+    expect(hitZone(layout, viewport, 770, 10)).toEqual({ kind: 'corner' });
+    expect(hitZone(layout, viewport, 700, 10)).toEqual({ kind: 'col-header', col: 0 });
+    // The left edge of the canvas is past the last visible column.
+    expect(hitZone(layout, viewport, 5, 40)).toBeNull();
+  });
+
+  it('spans a range from whichever corner ends up leading', () => {
+    const layout = rtlLayout();
+    const viewport = makeViewport();
+
+    expect(rangeRects(layout, viewport, { r0: 0, r1: 0, c0: 0, c1: 1 })).toEqual([
+      { x: 550, y: 30, w: 200, h: 20 },
+    ]);
+  });
+
+  it('reports a column leading edge on its right', () => {
+    const layout = rtlLayout();
+    const viewport = makeViewport();
+    const r = cellRect(layout, viewport, 0, 2);
+
+    expect(colLeadingEdge(layout, viewport, 2)).toBe(r.x + r.w);
+  });
+
+  it('keeps cellRectIn and cellRect in agreement', () => {
+    const layout = rtlLayout();
+    const viewport = makeViewport();
+    const cols = buildColLayout(layout, viewport);
+    const rows = buildRowLayout(layout, viewport);
+    for (const r of rows.visible) {
+      for (const c of cols.visible) {
+        expect(cellRectIn(layout, cols, rows, r, c)).toEqual(cellRect(layout, viewport, r, c));
       }
     }
   });

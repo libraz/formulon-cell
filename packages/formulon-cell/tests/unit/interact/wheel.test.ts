@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { attachWheel } from '../../../src/interact/wheel.js';
-import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
+import {
+  createSpreadsheetStore,
+  mutators,
+  type SpreadsheetStore,
+} from '../../../src/store/store.js';
 
 // happy-dom's WheelEvent constructor only reads delta* from the init bag and
 // drops modifier keys, so we patch them on after construction.
@@ -56,6 +60,19 @@ describe('attachWheel', () => {
     fire(grid, { deltaX: cw * 2 });
     expect(store.getState().viewport.colStart).toBe(2);
     expect(store.getState().viewport.rowStart).toBe(0);
+  });
+
+  it('walks columns the other way on a right-to-left sheet', () => {
+    const cw = store.getState().layout.defaultColWidth;
+    mutators.setRightToLeft(store, true);
+    mutators.scrollBy(store, 0, 5);
+
+    // Scrolling right now uncovers lower column indices, because they sit to
+    // the right of where the view already is.
+    fire(grid, { deltaX: cw * 2 });
+    expect(store.getState().viewport.colStart).toBe(3);
+    fire(grid, { deltaX: -cw * 2 });
+    expect(store.getState().viewport.colStart).toBe(5);
   });
 
   it('shift+wheel routes deltaY into horizontal scroll', () => {

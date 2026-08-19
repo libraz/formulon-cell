@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applyValueFilter, clearFilter } from '../../../src/commands/filter.js';
 import { formatAsTable } from '../../../src/commands/format-as-table.js';
 import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
+import { setSheetRightToLeft } from '../../../src/commands/view.js';
 import {
   hydrateAutoFilterFromEngine,
   syncAutoFilterToEngine,
@@ -11,6 +12,7 @@ import {
   syncCellFormatsToEngine,
 } from '../../../src/engine/cell-format-sync.js';
 import { syncConditionalRulesToEngine } from '../../../src/engine/cf-writeback.js';
+import { hydrateLayoutFromEngine } from '../../../src/engine/layout-sync.js';
 import { tableOverlaysFromEngine } from '../../../src/engine/table-sync.js';
 import { PivotAggregation, PivotReportLayout, type Range } from '../../../src/engine/types.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -103,6 +105,30 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
           showZeros: false,
           rightToLeft: true,
         });
+      } finally {
+        reloaded.dispose();
+      }
+    } finally {
+      first.dispose();
+    }
+  });
+
+  it('round-trips the sheet direction into the store and back out', async () => {
+    const first = await WorkbookHandle.createDefault();
+
+    try {
+      if (!first.capabilities.sheetViewFlags) return;
+      const store = createSpreadsheetStore();
+      expect(store.getState().ui.rightToLeft).toBe(false);
+
+      setSheetRightToLeft(store, true, first);
+      expect(store.getState().ui.rightToLeft).toBe(true);
+
+      const reloaded = await WorkbookHandle.loadBytes(first.save());
+      try {
+        const restored = createSpreadsheetStore();
+        hydrateLayoutFromEngine(reloaded, restored, 0);
+        expect(restored.getState().ui.rightToLeft).toBe(true);
       } finally {
         reloaded.dispose();
       }

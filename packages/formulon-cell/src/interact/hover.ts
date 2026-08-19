@@ -1,5 +1,5 @@
 import { addrKey } from '../engine/address.js';
-import { hitTest } from '../render/geometry.js';
+import { hitTest, layoutForView } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { overlayPortalFor } from './overlay-portal.js';
 
@@ -37,7 +37,7 @@ export function attachHover(deps: HoverDeps): HoverHandle {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const s = store.getState();
-    return hitTest(s.layout, s.viewport, x, y);
+    return hitTest(layoutForView(s), s.viewport, x, y);
   };
 
   const cellFormatAt = (

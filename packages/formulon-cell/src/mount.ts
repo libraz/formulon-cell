@@ -83,7 +83,7 @@ import {
   type ToolbarInstanceRef,
 } from './mount/toolbar.js';
 import type { MountOptions, ScreenClipResult, SpreadsheetInstance } from './mount/types.js';
-import { colWidth, colX, gridOriginX, layoutForView } from './render/geometry.js';
+import { cellRect, layoutForView } from './render/geometry.js';
 import { GridRenderer, getErrorTriangleHits } from './render/grid.js';
 import { createSpreadsheetStore, mutators } from './store/store.js';
 import { resolveTheme } from './theme/resolve.js';
@@ -259,7 +259,8 @@ export const Spreadsheet = {
       canvas,
       getState: () => store.getState(),
       getTheme: () => resolveTheme(host),
-      onViewportSize: (rowCount, colCount) => mutators.setViewportSize(store, rowCount, colCount),
+      onViewportSize: (rowCount, colCount, widthPx) =>
+        mutators.setViewportSize(store, rowCount, colCount, widthPx),
       getWb: () => wb,
       getLocale: () => i18n.locale,
       getDisplay: (addr, value, formula, format) =>
@@ -931,19 +932,17 @@ export const Spreadsheet = {
       },
       openFilterDropdown(range, col) {
         const s = store.getState();
-        const layout = layoutForView(s.layout, s.ui.showHeaders !== false);
+        const layout = layoutForView(s);
         const targetRange = range ?? s.ui.filterRange ?? s.selection.range;
         const targetCol = Math.min(
           Math.max(col ?? s.selection.active.col, targetRange.c0),
           targetRange.c1,
         );
         const hostRect = host.getBoundingClientRect();
-        const x =
-          hostRect.left +
-          gridOriginX(layout) +
-          colX(layout, s.viewport, targetCol) +
-          colWidth(layout, targetCol, s.viewport) -
-          4;
+        // The chevron hangs off the header cell's trailing edge, which the
+        // mirror puts on the left of the cell for a right-to-left sheet.
+        const cell = cellRect(layout, s.viewport, targetRange.r0, targetCol);
+        const x = hostRect.left + (layout.rtl ? cell.x + 4 : cell.x + cell.w - 4);
         const y = hostRect.top + layout.outlineColGutter + layout.headerRowHeight - 4;
         filterDropdown.open(targetRange, targetCol, {
           x,

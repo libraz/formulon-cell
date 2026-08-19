@@ -5,6 +5,7 @@ import {
   setGridlinesVisible,
   setHeadingsVisible,
   setR1C1ReferenceStyle,
+  setSheetRightToLeft,
   setShowFormulas,
   setWorkbookView,
   setZerosVisible,
@@ -65,7 +66,8 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
   const zeros = createViewToolbarButton('fc-viewbar__toggle');
   const formulas = createViewToolbarButton('fc-viewbar__toggle');
   const r1c1 = createViewToolbarButton('fc-viewbar__toggle');
-  toggles.append(gridlines, headings, zeros, formulas, r1c1);
+  const rightToLeft = createViewToolbarButton('fc-viewbar__toggle');
+  toggles.append(gridlines, headings, zeros, formulas, r1c1, rightToLeft);
 
   const freeze = document.createElement('div');
   freeze.className = 'fc-viewbar__group';
@@ -128,6 +130,10 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
   });
   r1c1.addEventListener('click', () => {
     setR1C1ReferenceStyle(store, !store.getState().ui.r1c1);
+    applyChanged();
+  });
+  rightToLeft.addEventListener('click', () => {
+    setSheetRightToLeft(store, !store.getState().ui.rightToLeft, wb);
     applyChanged();
   });
   normalView.addEventListener('click', () => {
@@ -202,6 +208,7 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
     zeros.textContent = t.zeros;
     formulas.textContent = t.formulas;
     r1c1.textContent = t.r1c1;
+    rightToLeft.textContent = t.rightToLeft;
     freezeNone.textContent = t.freezeNone;
     freezeTop.textContent = t.freezeTopRow;
     freezeFirst.textContent = t.freezeFirstColumn;
@@ -221,6 +228,7 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
       zeros,
       formulas,
       r1c1,
+      rightToLeft,
       freezeNone,
       freezeTop,
       freezeFirst,
@@ -244,6 +252,7 @@ export function attachViewToolbar(deps: ViewToolbarDeps): ViewToolbarHandle {
     zeros.setAttribute('aria-pressed', String(s.ui.showZeros));
     formulas.setAttribute('aria-pressed', String(s.ui.showFormulas));
     r1c1.setAttribute('aria-pressed', String(s.ui.r1c1));
+    rightToLeft.setAttribute('aria-pressed', String(s.ui.rightToLeft));
     normalView.setAttribute('aria-pressed', String(s.ui.workbookView === 'normal'));
     pageLayoutView.setAttribute('aria-pressed', String(s.ui.workbookView === 'pageLayout'));
     pageBreakPreview.setAttribute('aria-pressed', String(s.ui.workbookView === 'pageBreakPreview'));

@@ -1,16 +1,22 @@
 // Row + column header bar, autofilter chevron, and outline gutters. Drawn in
 // a single pass after cell painting so headers sit above the gridlines.
 
-import type { State } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
-import { type AxisLayout, cellRectIn, colLabel, gridOriginX, gridOriginY } from '../geometry.js';
+import {
+  type AxisLayout,
+  cellRectIn,
+  colLabel,
+  gridOriginX,
+  gridOriginY,
+  type ViewState,
+} from '../geometry.js';
 import { paintOutlineGutters } from '../painters/controls.js';
 import type { ChromePaintContext } from './chrome-context.js';
 import { setOutlineToggles } from './hit-state.js';
 
 export function paintHeaders(
   pc: ChromePaintContext,
-  state: State,
+  state: ViewState,
   theme: ResolvedTheme,
   cols: AxisLayout,
   rows: AxisLayout,
@@ -21,25 +27,35 @@ export function paintHeaders(
 
   const ox = gridOriginX(layout);
   const oy = gridOriginY(layout);
+  const rtl = layout.rtl;
   const labelTopY = layout.outlineColGutter;
-  const labelLeftX = layout.outlineRowGutter;
+  // The whole row rail — outline gutter plus number strip — swaps to the right
+  // edge on a right-to-left sheet. `railLeftX` is where that rail starts,
+  // `labelLeftX` where the number strip inside it starts, and `innerX` is the
+  // rail's boundary with the data area, which is the edge every row-header
+  // affordance hugs.
+  const railLeftX = rtl ? cssWidth - ox : 0;
+  const labelLeftX = rtl ? cssWidth - ox : layout.outlineRowGutter;
+  const innerX = rtl ? cssWidth - ox : ox;
 
   ctx.fillStyle = theme.bgRail;
-  ctx.fillRect(0, 0, ox, oy);
+  ctx.fillRect(railLeftX, 0, ox, oy);
   ctx.save();
   ctx.fillStyle = theme.headerFg;
   ctx.globalAlpha = 0.34;
+  const wedgeOuter = rtl ? railLeftX + ox - 12 : labelLeftX + 12;
+  const wedgeInner = rtl ? innerX + 7 : ox - 7;
   ctx.beginPath();
-  ctx.moveTo(labelLeftX + 12, labelTopY + layout.headerRowHeight - 6);
-  ctx.lineTo(ox - 7, labelTopY + 8);
-  ctx.lineTo(ox - 7, labelTopY + layout.headerRowHeight - 6);
+  ctx.moveTo(wedgeOuter, labelTopY + layout.headerRowHeight - 6);
+  ctx.lineTo(wedgeInner, labelTopY + 8);
+  ctx.lineTo(wedgeInner, labelTopY + layout.headerRowHeight - 6);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
 
   ctx.fillStyle = theme.bgRail;
-  ctx.fillRect(ox, 0, cssWidth - ox, oy);
-  ctx.fillRect(0, oy, ox, cssHeight - oy);
+  ctx.fillRect(rtl ? 0 : ox, 0, cssWidth - ox, oy);
+  ctx.fillRect(railLeftX, oy, ox, cssHeight - oy);
 
   ctx.strokeStyle = theme.ruleStrong;
   ctx.lineWidth = 1 / dpr;
@@ -47,8 +63,8 @@ export function paintHeaders(
   ctx.beginPath();
   ctx.moveTo(0, Math.round(oy) + align);
   ctx.lineTo(cssWidth, Math.round(oy) + align);
-  ctx.moveTo(Math.round(ox) + align, 0);
-  ctx.lineTo(Math.round(ox) + align, cssHeight);
+  ctx.moveTo(Math.round(innerX) + align, 0);
+  ctx.lineTo(Math.round(innerX) + align, cssHeight);
   ctx.stroke();
 
   const firstRow = rows.visible[0] ?? 0;
@@ -97,8 +113,10 @@ export function paintHeaders(
     // Autofilter chevron — small ▼ in the right edge of the header for any
     // column inside the active filter range.
     if (fr && c >= fr.c0 && c <= fr.c1 && w >= 28) {
-      const btnRight = rect.x + w - 4;
-      const btnLeft = btnRight - 14;
+      // The chevron hugs the column's trailing edge, which the mirror puts on
+      // the physical left of the header cell for a right-to-left sheet.
+      const btnLeft = rtl ? rect.x + 4 : rect.x + w - 4 - 14;
+      const btnRight = btnLeft + 14;
       const cy = labelTopY + layout.headerRowHeight / 2;
       const filterActive = state.layout.hiddenRows.size > 0;
       ctx.save();
@@ -138,7 +156,7 @@ export function paintHeaders(
     }
   }
 
-  ctx.textAlign = 'right';
+  ctx.textAlign = rtl ? 'left' : 'right';
   for (const r of rows.visible) {
     const rect = cellRectIn(layout, cols, rows, r, firstCol);
     const h = rows.sizeAt.get(r) ?? 0;
@@ -155,7 +173,7 @@ export function paintHeaders(
     ctx.lineWidth = 1 / dpr;
     ctx.beginPath();
     ctx.moveTo(labelLeftX, Math.round(rect.y + h) + align);
-    ctx.lineTo(ox, Math.round(rect.y + h) + align);
+    ctx.lineTo(labelLeftX + layout.headerColWidth, Math.round(rect.y + h) + align);
     ctx.stroke();
     ctx.fillStyle = isActiveRow
       ? theme.headerFgActive
@@ -164,10 +182,11 @@ export function paintHeaders(
         : theme.headerFg;
     ctx.font = `${isActiveRow || isSelectedRow ? 600 : 400} ${theme.textHeader}px ${theme.fontUi}`;
     const rowLabel = r1c1 ? `R${r + 1}` : String(r + 1);
-    ctx.fillText(rowLabel, ox - 8, rect.y + h / 2 + 0.5);
+    ctx.fillText(rowLabel, rtl ? innerX + 8 : innerX - 8, rect.y + h / 2 + 0.5);
     if (isActiveRow) {
+      const barW = Math.max(2, 2 / dpr);
       ctx.fillStyle = theme.accent;
-      ctx.fillRect(ox - Math.max(2, 2 / dpr), rect.y, Math.max(2, 2 / dpr), h);
+      ctx.fillRect(rtl ? innerX : innerX - barW, rect.y, barW, h);
     }
   }
 
@@ -187,8 +206,9 @@ export function paintHeaders(
     ctx.strokeStyle = theme.accent;
     ctx.lineWidth = 1.5 / dpr;
     ctx.beginPath();
-    ctx.moveTo(ox - 0.5, aRect.y);
-    ctx.lineTo(ox - 0.5, aRect.y + h);
+    const markX = rtl ? innerX + 0.5 : innerX - 0.5;
+    ctx.moveTo(markX, aRect.y);
+    ctx.lineTo(markX, aRect.y + h);
     ctx.stroke();
   }
 

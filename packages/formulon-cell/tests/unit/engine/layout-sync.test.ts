@@ -258,6 +258,26 @@ describe('hydrateLayoutFromEngine', () => {
     expect(store.getState().ui.showZeros).toBe(true);
   });
 
+  it('hydrates the sheet direction, which defaults to left-to-right', () => {
+    const { wb } = makeFake({
+      colRowSize: true,
+      sheetView: true,
+      view: {
+        zoomScale: 100,
+        freezeRows: 0,
+        freezeCols: 0,
+        tabHidden: false,
+        rightToLeft: true,
+      },
+    });
+    const store = createSpreadsheetStore();
+    expect(store.getState().ui.rightToLeft).toBe(false);
+
+    hydrateLayoutFromEngine(wb, store, 0);
+
+    expect(store.getState().ui.rightToLeft).toBe(true);
+  });
+
   it('leaves zoom at 1.0 when engine reports the default 100%', () => {
     const store = createSpreadsheetStore();
     const initialZoom = store.getState().viewport.zoom;

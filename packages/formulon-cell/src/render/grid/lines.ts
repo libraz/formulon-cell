@@ -1,14 +1,13 @@
 // Gridline + freeze-divider painters. Both run after cell painting so they
 // sit above the cell rectangles but below the active selection outline.
 
-import type { State } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
-import { type AxisLayout, cellRectIn } from '../geometry.js';
+import { type AxisLayout, cellRectIn, gridOriginX, mirrorX, type ViewState } from '../geometry.js';
 import type { ChromePaintContext } from './chrome-context.js';
 
 export function paintGridLines(
   pc: ChromePaintContext,
-  state: State,
+  state: ViewState,
   theme: ResolvedTheme,
   cols: AxisLayout,
   rows: AxisLayout,
@@ -57,7 +56,7 @@ export function paintGridLines(
 
 export function paintFreezeDividers(
   pc: ChromePaintContext,
-  state: State,
+  state: ViewState,
   theme: ResolvedTheme,
   cols: AxisLayout,
   rows: AxisLayout,
@@ -75,7 +74,7 @@ export function paintFreezeDividers(
     ctx.lineTo(cssWidth, yy);
   }
   if (layout.freezeCols > 0) {
-    const xx = Math.round(layout.headerColWidth + cols.frozenTotal) + align;
+    const xx = Math.round(mirrorX(layout, gridOriginX(layout) + cols.frozenTotal)) + align;
     ctx.moveTo(xx, 0);
     ctx.lineTo(xx, cssHeight);
   }

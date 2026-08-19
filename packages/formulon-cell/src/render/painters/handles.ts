@@ -1,5 +1,5 @@
 import type { ResolvedTheme } from '../../theme/resolve.js';
-import type { Rect } from '../geometry.js';
+import { mirrorInRect, type Rect } from '../geometry.js';
 
 /** Active cell outline. Drawn in a separate pass after all cell text so the
  *  outline never gets clipped by neighbouring cell rects.
@@ -37,11 +37,12 @@ export function paintFillHandle(
   ctx: CanvasRenderingContext2D,
   bounds: Rect,
   theme: ResolvedTheme,
+  rtl = false,
 ): Rect {
   const hs = FILL_HANDLE_SIZE;
-  // Centre the visible square on the cell's bottom-right corner so half the
-  // handle bleeds outside the selection — matches the spreadsheet convention.
-  const x = bounds.x + bounds.w - hs / 2;
+  // Centre the visible square on the selection's trailing bottom corner so
+  // half the handle bleeds outside it — matches the spreadsheet convention.
+  const x = mirrorInRect(bounds, bounds.x + bounds.w - hs / 2, hs, rtl);
   const y = bounds.y + bounds.h - hs / 2;
   const accent = theme.accent || '#0078d4';
   ctx.fillStyle = '#ffffff';

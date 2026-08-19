@@ -5,7 +5,7 @@ import { dblClickRange, extractRefs, rotateRefAt, shiftFormulaRefs } from '../co
 import { addrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { bodyBandOrigin, cellRectUnclamped } from '../render/geometry.js';
+import { bodyBandOrigin, cellRectUnclamped, layoutForView } from '../render/geometry.js';
 import { formatWithPending, sameAddr } from '../store/pending-format.js';
 import { type CellFormat, mutators, type SpreadsheetStore } from '../store/store.js';
 import { type ArgHelperHandle, type ArgHelperLabels, attachArgHelper } from './arg-helper.js';
@@ -551,21 +551,30 @@ export class InlineEditor {
   private refreshWidth(): void {
     if (!this.input || !this.editingAddr) return;
     const s = this.deps.store.getState();
-    const r = cellRectUnclamped(s.layout, s.viewport, this.editingAddr.row, this.editingAddr.col);
+    const layout = layoutForView(s);
+    const r = cellRectUnclamped(layout, s.viewport, this.editingAddr.row, this.editingAddr.col);
     // Reset to the cell width first so the editor can shrink back as content
     //  is deleted, then measure the natural content width.
     this.input.style.width = `${r.w}px`;
     const content = this.input.scrollWidth;
     if (content <= r.w) {
       this.input.classList.remove('fc-host__editor--overflow');
+      this.input.classList.remove('fc-host__editor--overflow-rtl');
       return;
     }
-    const maxWidth = Math.max(r.w, this.deps.grid.clientWidth - r.x - 2);
+    // The editor grows away from the cell's leading edge, which is the right
+    // edge on a right-to-left sheet — so there it grows leftwards and its
+    // left offset moves with the width.
+    const room = layout.rtl ? r.x + r.w - 2 : this.deps.grid.clientWidth - r.x - 2;
+    const maxWidth = Math.max(r.w, room);
     const want = content + 2;
-    this.input.style.width = `${Math.min(want, maxWidth)}px`;
+    const width = Math.min(want, maxWidth);
+    this.input.style.width = `${width}px`;
+    if (layout.rtl) this.input.style.left = `${r.x + r.w - width}px`;
     // When the content is still wider than the editor can grow, the text
-    //  scrolls; flag the overflow so the editor drops its right border.
-    this.input.classList.toggle('fc-host__editor--overflow', want > maxWidth);
+    //  scrolls; flag the overflow so the editor drops its trailing border.
+    this.input.classList.toggle('fc-host__editor--overflow', want > maxWidth && !layout.rtl);
+    this.input.classList.toggle('fc-host__editor--overflow-rtl', want > maxWidth && layout.rtl);
   }
 
   private applyTextAlignment(raw: string): void {
@@ -635,17 +644,18 @@ export class InlineEditor {
 
   private position(a: Addr): void {
     const s = this.deps.store.getState();
-    const r = cellRectUnclamped(s.layout, s.viewport, a.row, a.col);
+    const layout = layoutForView(s);
+    const r = cellRectUnclamped(layout, s.viewport, a.row, a.col);
     if (!this.input) return;
     // A cell scrolled off the leading edge sits behind the frozen band and the
     // headers. Park the editor outside the grid's clip rect instead of letting
     // it hang over that chrome — it keeps DOM focus (and the caret, and any IME
     // composition) while its cell is out of view, the way a desktop
     // spreadsheet does.
-    const band = bodyBandOrigin(s.layout, s.viewport);
+    const band = bodyBandOrigin(layout, s.viewport);
     const scrolledOut =
       (a.row >= s.layout.freezeRows && r.y < band.y) ||
-      (a.col >= s.layout.freezeCols && r.x < band.x);
+      (a.col >= s.layout.freezeCols && (layout.rtl ? r.x + r.w > band.x : r.x < band.x));
     this.input.style.left = scrolledOut ? `${-r.w - 4}px` : `${r.x}px`;
     this.input.style.top = scrolledOut ? `${-r.h - 4}px` : `${r.y}px`;
     this.input.style.width = `${r.w}px`;

@@ -758,6 +758,7 @@ export const ja: Strings = {
     zeros: 'ゼロ値',
     formulas: '数式',
     r1c1: 'R1C1',
+    rightToLeft: 'シートを右から左へ',
     freezeNone: '固定解除',
     freezeTopRow: '先頭行を固定',
     freezeFirstColumn: '先頭列を固定',

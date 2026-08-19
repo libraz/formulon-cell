@@ -38,8 +38,11 @@ export function paintConditionalIcon(
   rect: Rect,
   kind: ConditionalIconSet,
   slot: number,
+  rtl = false,
 ): void {
-  const cx = rect.x + CONDITIONAL_ICON_GUTTER / 2;
+  const cx = rtl
+    ? rect.x + rect.w - CONDITIONAL_ICON_GUTTER / 2
+    : rect.x + CONDITIONAL_ICON_GUTTER / 2;
   const cy = rect.y + rect.h / 2;
   const r = Math.min(5, Math.floor(rect.h * 0.32));
   ctx.save();

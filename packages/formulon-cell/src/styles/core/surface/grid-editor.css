@@ -45,11 +45,16 @@
     caret-color: var(--fc-accent);
   }
 
-  /* When a long formula/value overflows past the editor's grown right edge,
-   * drop the right border so the open edge signals the content continues —
-   * desktop spreadsheet behavior. */
+  /* When a long formula/value overflows past the editor's grown trailing edge,
+   * drop that border so the open edge signals the content continues —
+   * desktop spreadsheet behavior. The trailing edge is the left one on a
+   * right-to-left sheet, where the editor grows the other way. */
   .fc-host__editor--overflow {
     border-right-color: transparent;
+  }
+
+  .fc-host__editor--overflow-rtl {
+    border-left-color: transparent;
   }
 
   /* a11y mirror — visually hidden but in the a11y tree */

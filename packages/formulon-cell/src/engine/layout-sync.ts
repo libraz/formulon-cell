@@ -90,6 +90,8 @@ export function hydrateLayoutFromEngine(
             showGridLines: view.showGridLines !== false,
             showHeaders: view.showRowColHeaders !== false,
             showZeros: view.showZeros !== false,
+            // Unlike the three above, this one defaults to off.
+            rightToLeft: view.rightToLeft === true,
           }
         : s.ui,
     };

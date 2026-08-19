@@ -685,6 +685,22 @@ describe('attachKeyboard', () => {
       expect(layout.outlineRows.size).toBe(3);
     });
 
+    it('swaps the arrow directions on a right-to-left sheet', () => {
+      setup();
+      mutators.setActive(store, { sheet: 0, row: 0, col: 3 });
+      mutators.setRightToLeft(store, true);
+
+      // Visually left is the next column along on a right-to-left sheet.
+      fire(host, 'ArrowLeft');
+      expect(store.getState().selection.active.col).toBe(4);
+      fire(host, 'ArrowRight');
+      expect(store.getState().selection.active.col).toBe(3);
+
+      // Tab reads in index order either way.
+      fire(host, 'Tab');
+      expect(store.getState().selection.active.col).toBe(4);
+    });
+
     it('Alt+Shift+Left ungroups the same selection', () => {
       setup();
       mutators.setRange(store, { sheet: 0, r0: 1, c0: 0, r1: 3, c1: 0 });

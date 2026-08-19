@@ -780,6 +780,7 @@ export interface Strings {
     zeros: string;
     formulas: string;
     r1c1: string;
+    rightToLeft: string;
     freezeNone: string;
     freezeTopRow: string;
     freezeFirstColumn: string;

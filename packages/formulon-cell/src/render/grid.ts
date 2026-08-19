@@ -25,6 +25,7 @@ import {
   type Rect,
   rangeRects,
   rowHeight,
+  type ViewState,
 } from './geometry.js';
 import type { ChromePaintContext } from './grid/chrome-context.js';
 import { paintHeaders } from './grid/headers.js';
@@ -93,7 +94,7 @@ export interface RendererDeps {
   canvas: HTMLCanvasElement;
   getState: () => State;
   getTheme: () => ResolvedTheme;
-  onViewportSize?: (rowCount: number, colCount: number) => void;
+  onViewportSize?: (rowCount: number, colCount: number, widthPx: number) => void;
   /** Optional accessor for the active workbook. When supplied and the engine
    *  exposes `evaluateCfRange`, conditional-format rules loaded from the
    *  .xlsx are evaluated alongside the JS-side rule set and overlaid on top
@@ -182,7 +183,7 @@ export class GridRenderer {
   private resizeViewport(): void {
     if (!this.onViewportSize) return;
     const state = this.getState();
-    const layout = layoutForView(state.layout, state.ui.showHeaders !== false);
+    const layout = layoutForView(state);
     const { viewport } = state;
     const bodyH = Math.max(
       0,
@@ -200,7 +201,7 @@ export class GridRenderer {
     const colCount = visibleCount(bodyW, firstCol, 16_384, (idx) =>
       colWidth(layout, idx, viewport),
     );
-    this.onViewportSize(rowCount, colCount);
+    this.onViewportSize(rowCount, colCount, this.cssWidth);
   }
 
   invalidate(): void {
@@ -223,10 +224,7 @@ export class GridRenderer {
     if (this.cssWidth === 0 || this.cssHeight === 0) return;
 
     const baseState = this.getState();
-    const state =
-      baseState.ui.showHeaders === false
-        ? { ...baseState, layout: layoutForView(baseState.layout, false) }
-        : baseState;
+    const state: ViewState = { ...baseState, layout: layoutForView(baseState) };
     const theme = this.getTheme();
     const ctx = this.ctx;
 
@@ -270,7 +268,7 @@ export class GridRenderer {
     }
   }
 
-  private paintSheetBackground(state: State): void {
+  private paintSheetBackground(state: ViewState): void {
     const url = state.ui.sheetBackgroundImages.get(state.data.sheetIndex);
     if (!url) return;
     let entry = this.sheetBackgroundImages.get(url);
@@ -307,13 +305,13 @@ export class GridRenderer {
     const pattern = ctx.createPattern(entry.image, 'repeat');
     if (pattern) {
       ctx.fillStyle = pattern;
-      ctx.translate(ox, oy);
+      ctx.translate(state.layout.rtl ? 0 : ox, oy);
       ctx.fillRect(0, 0, this.cssWidth - ox, this.cssHeight - oy);
     }
     ctx.restore();
   }
 
-  private paintEditorRefs(state: State): void {
+  private paintEditorRefs(state: ViewState): void {
     const refs = state.ui.editorRefs;
     if (!refs || refs.length === 0) return;
     const sheet = state.data.sheetIndex;
@@ -349,7 +347,7 @@ export class GridRenderer {
   }
 
   private paintGridLines(
-    state: State,
+    state: ViewState,
     theme: ResolvedTheme,
     cols: AxisLayout,
     rows: AxisLayout,
@@ -357,7 +355,12 @@ export class GridRenderer {
     paintGridLines(this.chromeCtx(), state, theme, cols, rows);
   }
 
-  private paintCells(state: State, theme: ResolvedTheme, cols: AxisLayout, rows: AxisLayout): void {
+  private paintCells(
+    state: ViewState,
+    theme: ResolvedTheme,
+    cols: AxisLayout,
+    rows: AxisLayout,
+  ): void {
     const ctx = this.ctx;
     const {
       layout,
@@ -370,6 +373,7 @@ export class GridRenderer {
       protection,
       tables,
     } = state;
+    const rtl = layout.rtl;
     const active = selection.active;
     const conditional = evaluateConditional(state);
     const sparklines = sparkline.sparklines;
@@ -459,8 +463,15 @@ export class GridRenderer {
       }
       return { x, y, w, h };
     };
+    // Overflow and centre-across both spill into the following columns, which
+    // the mirror puts to the left of the anchor on a right-to-left sheet — so
+    // the widened rect has to move its left edge as well as grow.
+    const spillRect = (base: Rect, extra: number): Rect =>
+      layout.rtl
+        ? { ...base, x: base.x - extra, w: base.w + extra }
+        : { ...base, w: base.w + extra };
     const overflowBounds = (row: number, col: number, base: Rect): Rect => {
-      let w = base.w;
+      let w = 0;
       for (let nextCol = col + 1; cols.positionAt.has(nextCol); nextCol += 1) {
         const nextKey = addrKey({ sheet: data.sheetIndex, row, col: nextCol });
         const nextCell = data.cells.get(nextKey);
@@ -478,10 +489,10 @@ export class GridRenderer {
         }
         w += cols.sizeAt.get(nextCol) ?? 0;
       }
-      return w === base.w ? base : { ...base, w };
+      return w === 0 ? base : spillRect(base, w);
     };
     const centerContinuousBounds = (row: number, col: number, base: Rect): Rect => {
-      let right = base.x + base.w;
+      let extra = 0;
       for (let nextCol = col + 1; cols.positionAt.has(nextCol); nextCol += 1) {
         const nextKey = addrKey({ sheet: data.sheetIndex, row, col: nextCol });
         const nextCell = data.cells.get(nextKey);
@@ -496,10 +507,9 @@ export class GridRenderer {
         ) {
           break;
         }
-        const r2 = cellRectIn(layout, cols, rows, row, nextCol);
-        right = r2.x + r2.w;
+        extra += cols.sizeAt.get(nextCol) ?? 0;
       }
-      return right === base.x + base.w ? base : { ...base, w: right - base.x };
+      return extra === 0 ? base : spillRect(base, extra);
     };
 
     // Single visible-cells walk paints both static format fills (for blank
@@ -581,6 +591,7 @@ export class GridRenderer {
           showZeros: state.ui.showZeros !== false,
           displayOverride,
           locale,
+          rtl,
         };
 
         // Static format fill OR overlay fill — both painted via paintCellFill,
@@ -608,14 +619,14 @@ export class GridRenderer {
         const hideConditionalValue =
           overlay?.showValue === false &&
           (overlay.bar !== undefined || (overlay.iconKind && overlay.iconSlot !== undefined));
-        // Icon-set: paint glyph in left gutter and shift text right by the
-        // gutter width so the value reads cleanly next to the icon.
+        // Icon-set: paint the glyph in the leading gutter and inset the text by
+        // the gutter width so the value reads cleanly next to the icon.
         const tableHeader = table ? isHeaderRow(table, r, c) : false;
         if (overlay?.iconKind && overlay.iconSlot !== undefined) {
-          paintConditionalIcon(ctx, bounds, overlay.iconKind, overlay.iconSlot);
+          paintConditionalIcon(ctx, bounds, overlay.iconKind, overlay.iconSlot, rtl);
           if (!hideConditionalValue) {
             const insetBounds = {
-              x: bounds.x + CONDITIONAL_ICON_GUTTER,
+              x: rtl ? bounds.x : bounds.x + CONDITIONAL_ICON_GUTTER,
               y: bounds.y,
               w: bounds.w - CONDITIONAL_ICON_GUTTER,
               h: bounds.h,
@@ -626,7 +637,14 @@ export class GridRenderer {
           // Conditional formatting's "Show Bar/Icon Only" suppresses the
           // value text while still leaving fills, bars, and icons visible.
         } else if (tableHeader) {
-          paintCellText({ ...paintCtx, bounds: { ...bounds, w: Math.max(0, bounds.w - 20) } });
+          paintCellText({
+            ...paintCtx,
+            bounds: {
+              ...bounds,
+              x: rtl ? bounds.x + 20 : bounds.x,
+              w: Math.max(0, bounds.w - 20),
+            },
+          });
         } else if (effectiveFmt?.align === 'centerContinuous' && !isMergeAnchor) {
           paintCellText({ ...paintCtx, bounds: centerContinuousBounds(r, c, bounds) });
         } else if (
@@ -645,14 +663,14 @@ export class GridRenderer {
         } else {
           paintCellText(paintCtx);
         }
-        if (tableHeader) paintTableHeaderChevron(ctx, bounds, theme);
+        if (tableHeader) paintTableHeaderChevron(ctx, bounds, theme, rtl);
         if (spark) paintCellSparkline(ctx, bounds, spark, state, this.getWb());
-        if (fmt?.comment) paintCommentMarker(ctx, bounds);
+        if (fmt?.comment) paintCommentMarker(ctx, bounds, rtl);
         if (hasValidationCircle) paintValidationCircle(ctx, bounds, VALIDATION_TRIANGLE_COLOR);
         // Lock-icon overlay — only when the sheet is protected AND the cell
         // is explicitly unlocked, signalling which cells the user can still
         // type into despite the protection flag.
-        if (sheetProtected && fmt?.locked === false) paintLockMarker(ctx, bounds, theme);
+        if (sheetProtected && fmt?.locked === false) paintLockMarker(ctx, bounds, theme, rtl);
 
         // Error / validation triangles. Error wins over validation when both
         // would apply (an error-kind value already implies the data is bad —
@@ -663,13 +681,13 @@ export class GridRenderer {
         const cellKey = key;
         if (!ignored.has(cellKey)) {
           if (detectErrorKind(value)) {
-            const hit = paintErrorTriangle(ctx, bounds, ERROR_TRIANGLE_COLOR);
+            const hit = paintErrorTriangle(ctx, bounds, ERROR_TRIANGLE_COLOR, rtl);
             triangleHits.push({ rect: hit, addr: cellAddr, kind: 'error' });
           } else if (
             fmt?.validation &&
             detectValidationViolation(value, fmt.validation, getResolver())
           ) {
-            const hit = paintValidationTriangle(ctx, bounds, VALIDATION_TRIANGLE_COLOR);
+            const hit = paintValidationTriangle(ctx, bounds, VALIDATION_TRIANGLE_COLOR, rtl);
             triangleHits.push({ rect: hit, addr: cellAddr, kind: 'validation' });
           }
         }
@@ -679,7 +697,7 @@ export class GridRenderer {
   }
 
   private paintBorders(
-    state: State,
+    state: ViewState,
     theme: ResolvedTheme,
     cols: AxisLayout,
     rows: AxisLayout,
@@ -708,7 +726,7 @@ export class GridRenderer {
   }
 
   private paintHeaders(
-    state: State,
+    state: ViewState,
     theme: ResolvedTheme,
     cols: AxisLayout,
     rows: AxisLayout,
@@ -717,7 +735,7 @@ export class GridRenderer {
   }
 
   private paintFreezeDividers(
-    state: State,
+    state: ViewState,
     theme: ResolvedTheme,
     cols: AxisLayout,
     rows: AxisLayout,
@@ -726,7 +744,7 @@ export class GridRenderer {
   }
 
   private paintSpills(
-    state: State,
+    state: ViewState,
     theme: ResolvedTheme,
     cols: AxisLayout,
     rows: AxisLayout,
@@ -774,7 +792,7 @@ export class GridRenderer {
   }
 
   private paintActive(
-    state: State,
+    state: ViewState,
     theme: ResolvedTheme,
     cols: AxisLayout,
     rows: AxisLayout,
@@ -790,7 +808,7 @@ export class GridRenderer {
       paintActiveCellOutline(this.ctx, bounds, theme);
       const fmt = format.formats.get(addrKey({ sheet: data.sheetIndex, row: a.row, col: a.col }));
       if (shouldShowValidationChevron(fmt?.validation)) {
-        const rect = paintValidationChevron(this.ctx, bounds, theme);
+        const rect = paintValidationChevron(this.ctx, bounds, theme, layout.rtl);
         setValidationChevron({ rect, row: a.row, col: a.col });
       }
     }
@@ -833,11 +851,11 @@ export class GridRenderer {
 
     if (isRowVisible(layout, viewport, r.r1) && isColVisible(layout, viewport, r.c1)) {
       const cornerCell = cellRectIn(layout, cols, rows, r.r1, r.c1);
-      setFillHandleRect(paintFillHandle(this.ctx, cornerCell, theme));
+      setFillHandleRect(paintFillHandle(this.ctx, cornerCell, theme, layout.rtl));
     }
   }
 
-  private paintTraces(state: State, cols: AxisLayout, rows: AxisLayout): void {
+  private paintTraces(state: ViewState, cols: AxisLayout, rows: AxisLayout): void {
     paintTraces(this.ctx, state, cols, rows);
   }
 }

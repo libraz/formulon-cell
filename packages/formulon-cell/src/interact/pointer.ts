@@ -19,7 +19,13 @@ import { syncLayoutSizesToEngine } from '../engine/layout-sync.js';
 import type { Range } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { hitTest, hitZone, layoutForView } from '../render/geometry.js';
+import {
+  colLeadingEdge,
+  hitTest,
+  hitZone,
+  layoutForView,
+  type ViewLayout,
+} from '../render/geometry.js';
 import { getFillHandleRect, getOutlineToggleHits } from '../render/grid.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 
@@ -30,7 +36,13 @@ type DragMode =
   | { kind: 'cell' }
   | { kind: 'col-header'; anchorCol: number }
   | { kind: 'row-header'; anchorRow: number }
-  | { kind: 'col-resize'; col: number; leftEdge: number; preLayout: LayoutSnapshot }
+  | {
+      kind: 'col-resize';
+      col: number;
+      leadingEdge: number;
+      rtl: boolean;
+      preLayout: LayoutSnapshot;
+    }
   | { kind: 'row-resize'; row: number; topEdge: number; preLayout: LayoutSnapshot }
   | { kind: 'fill'; src: Range }
   | {
@@ -81,8 +93,7 @@ const MAX_ROW = 1048575;
 const MAX_COL = 16383;
 const FILTER_DROPDOWN_RESERVED_WIDTH = 20;
 
-const geometryLayout = (state: State): State['layout'] =>
-  layoutForView(state.layout, state.ui.showHeaders !== false);
+const geometryLayout = (state: State): ViewLayout => layoutForView(state);
 
 export interface PointerDeps {
   store: SpreadsheetStore;
@@ -293,19 +304,14 @@ export function attachPointer(
       }
 
       case 'col-resize': {
-        const leftEdge =
-          s.layout.outlineRowGutter +
-          s.layout.headerColWidth +
-          colXFromState(
-            s.layout.colWidths,
-            s.layout.defaultColWidth,
-            s.viewport.colStart,
-            zone.col,
-          );
         drag = {
           kind: 'col-resize',
           col: zone.col,
-          leftEdge,
+          // The column's leading edge stays put while the trailing edge
+          // follows the pointer. On a right-to-left sheet that leading edge
+          // is physically on the right, so the drag runs the other way.
+          leadingEdge: colLeadingEdge(geometryLayout(s), s.viewport, zone.col),
+          rtl: s.ui.rightToLeft === true,
           preLayout: captureLayoutSnapshot(s),
         };
         return;
@@ -384,7 +390,7 @@ export function attachPointer(
 
     switch (drag.kind) {
       case 'col-resize': {
-        const w = x - drag.leftEdge;
+        const w = drag.rtl ? drag.leadingEdge - x : x - drag.leadingEdge;
         mutators.setColWidth(store, drag.col, w);
         host.style.cursor = 'col-resize';
         return;
@@ -642,17 +648,6 @@ function updateCursor(host: HTMLElement, store: SpreadsheetStore, x: number, y: 
   else if (zone.kind === 'row-resize') host.style.cursor = 'row-resize';
   else if (zone.kind === 'col-filter-btn') host.style.cursor = 'pointer';
   else host.style.cursor = '';
-}
-
-function colXFromState(
-  widths: Map<number, number>,
-  def: number,
-  colStart: number,
-  col: number,
-): number {
-  let x = 0;
-  for (let c = colStart; c < col; c += 1) x += widths.get(c) ?? def;
-  return x;
 }
 
 function rowYFromState(

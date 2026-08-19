@@ -1,7 +1,7 @@
 import { type History, recordFormatChange } from '../commands/history.js';
 import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
-import { hitTest } from '../render/geometry.js';
+import { hitTest, layoutForView } from '../render/geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore } from '../store/store.js';
 
 export interface FormatPainterDeps {
@@ -166,7 +166,7 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
     if (!snapshot || e.button !== 0) return;
     const { x, y } = localXY(e);
     const s = store.getState();
-    const cell = hitTest(s.layout, s.viewport, x, y);
+    const cell = hitTest(layoutForView(s), s.viewport, x, y);
     if (!cell) return;
     e.preventDefault();
     e.stopPropagation();
@@ -188,7 +188,7 @@ export function attachFormatPainter(deps: FormatPainterDeps): FormatPainterHandl
     if (!snapshot || !dragging || !dragStart) return;
     const { x, y } = localXY(e);
     const s = store.getState();
-    const cell = hitTest(s.layout, s.viewport, x, y);
+    const cell = hitTest(layoutForView(s), s.viewport, x, y);
     if (!cell) return;
     e.preventDefault();
     e.stopPropagation();

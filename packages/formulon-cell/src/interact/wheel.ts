@@ -40,10 +40,14 @@ export function attachWheel(deps: WheelDeps): () => void {
       }
       return;
     }
-    const layout = store.getState().layout;
+    const state = store.getState();
+    const layout = state.layout;
     const rh = Math.max(1, layout.defaultRowHeight);
     const cw = Math.max(1, layout.defaultColWidth);
-    const dx = e.shiftKey ? e.deltaY : e.deltaX;
+    // A right-to-left sheet advances its columns leftwards, so a rightward
+    // scroll gesture has to walk the column index backwards.
+    const dirX = state.ui.rightToLeft === true ? -1 : 1;
+    const dx = (e.shiftKey ? e.deltaY : e.deltaX) * dirX;
     const dy = e.shiftKey ? 0 : e.deltaY;
     accY += dy;
     accX += dx;

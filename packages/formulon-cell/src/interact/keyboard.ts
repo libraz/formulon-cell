@@ -337,6 +337,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     // Compute the target address, then commit either as set-active or
     // extend-range based on Shift state.
     let target: Addr | null = null;
+    const colDir = s.ui.rightToLeft === true ? -1 : 1;
 
     if (k === 'ArrowUp')
       target =
@@ -344,23 +345,31 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     else if (k === 'ArrowDown')
       target =
         meta || endModeArrow ? jumpEdge(s, a, 1, 0) : stepWithMerge(s, a, 1, 0, MAX_ROW, MAX_COL);
+    // Arrow keys move by what the user sees. A right-to-left sheet runs its
+    // columns the other way, so the visual step and the index step take
+    // opposite signs. Tab is unaffected — it advances in reading order, which
+    // is the index order either way.
     else if (k === 'ArrowLeft')
       target =
-        meta || endModeArrow ? jumpEdge(s, a, 0, -1) : stepWithMerge(s, a, 0, -1, MAX_ROW, MAX_COL);
+        meta || endModeArrow
+          ? jumpEdge(s, a, 0, -colDir)
+          : stepWithMerge(s, a, 0, -colDir, MAX_ROW, MAX_COL);
     else if (k === 'ArrowRight')
       target =
-        meta || endModeArrow ? jumpEdge(s, a, 0, 1) : stepWithMerge(s, a, 0, 1, MAX_ROW, MAX_COL);
+        meta || endModeArrow
+          ? jumpEdge(s, a, 0, colDir)
+          : stepWithMerge(s, a, 0, colDir, MAX_ROW, MAX_COL);
     else if (k === 'Home') target = meta ? clamp(a, 0, 0) : clamp(a, a.row, 0);
     else if (k === 'End' && meta) {
       const { row, col } = lastUsedCell(s, a.sheet);
       target = clamp(a, row, col);
     } else if (k === 'PageDown')
       target = e.altKey
-        ? move(a, 0, Math.max(1, s.viewport.colCount - 1))
+        ? move(a, 0, colDir * Math.max(1, s.viewport.colCount - 1))
         : move(a, Math.max(1, s.viewport.rowCount - 1), 0);
     else if (k === 'PageUp')
       target = e.altKey
-        ? move(a, 0, -Math.max(1, s.viewport.colCount - 1))
+        ? move(a, 0, -colDir * Math.max(1, s.viewport.colCount - 1))
         : move(a, -Math.max(1, s.viewport.rowCount - 1), 0);
     else if (k === 'Tab') target = stepWithMerge(s, a, 0, shift ? -1 : 1, MAX_ROW, MAX_COL);
     else if (k === 'Enter' && !meta) {

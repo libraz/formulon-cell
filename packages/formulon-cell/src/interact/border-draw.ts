@@ -1,6 +1,6 @@
 import { type History, recordFormatChange } from '../commands/history.js';
 import { addrKey } from '../engine/address.js';
-import { cellRect, hitTest } from '../render/geometry.js';
+import { cellRect, hitTest, layoutForView } from '../render/geometry.js';
 import {
   type CellBorderSide,
   type CellBorderStyle,
@@ -112,9 +112,9 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
    *  when the pointer is inside a cell with no edge within EDGE_TOL. */
   const edgeAt = (x: number, y: number): EdgeHit | null => {
     const s = store.getState();
-    const cell = hitTest(s.layout, s.viewport, x, y);
+    const cell = hitTest(layoutForView(s), s.viewport, x, y);
     if (!cell) return null;
-    const r = cellRect(s.layout, s.viewport, cell.row, cell.col);
+    const r = cellRect(layoutForView(s), s.viewport, cell.row, cell.col);
     const dx0 = x - r.x;
     const dx1 = r.x + r.w - x;
     const dy0 = y - r.y;
@@ -172,7 +172,7 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
     const { x, y } = localXY(e);
     if (mode === 'grid') {
       const s = store.getState();
-      const cell = hitTest(s.layout, s.viewport, x, y);
+      const cell = hitTest(layoutForView(s), s.viewport, x, y);
       if (!cell) return;
       e.preventDefault();
       e.stopPropagation();
@@ -216,7 +216,7 @@ export function attachBorderDraw(deps: BorderDrawDeps): BorderDrawHandle {
     if (mode === 'grid' && dragAnchor) {
       const { x, y } = localXY(e);
       const s = store.getState();
-      const cell = hitTest(s.layout, s.viewport, x, y) ?? dragAnchor;
+      const cell = hitTest(layoutForView(s), s.viewport, x, y) ?? dragAnchor;
       e.preventDefault();
       e.stopPropagation();
       const anchor = dragAnchor;

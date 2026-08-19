@@ -1,7 +1,14 @@
 import { isColGroupCollapsed, isRowGroupCollapsed } from '../../commands/outline.js';
-import type { Sparkline, State } from '../../store/store.js';
+import type { Sparkline } from '../../store/store.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
-import { type AxisLayout, gridOriginX, gridOriginY, type Rect } from '../geometry.js';
+import {
+  type AxisLayout,
+  gridOriginX,
+  gridOriginY,
+  mirrorX,
+  type Rect,
+  type ViewState,
+} from '../geometry.js';
 export interface CheckboxHit {
   rect: Rect;
 }
@@ -94,7 +101,7 @@ export interface OutlineToggleHit {
  *  the pointer layer can route clicks to collapse/expand commands. */
 export function paintOutlineGutters(
   ctx: CanvasRenderingContext2D,
-  state: State,
+  state: ViewState,
   theme: ResolvedTheme,
   cols: AxisLayout,
   rows: AxisLayout,
@@ -105,17 +112,26 @@ export function paintOutlineGutters(
   const layout = state.layout;
   const ox = gridOriginX(layout);
   const oy = gridOriginY(layout);
+  const rtl = layout.rtl;
+  // Both gutters sit outboard of their header strip, so the row gutter follows
+  // the row rail to the far right on a right-to-left sheet, and its brackets
+  // grow inwards from that edge.
+  const rowGutterX = rtl ? cssWidth - layout.outlineRowGutter : 0;
+  const slotX = (lvl: number): number =>
+    rtl
+      ? cssWidth - (lvl - 1) * OUTLINE_BRACKET_SLOT - OUTLINE_BRACKET_SLOT / 2
+      : (lvl - 1) * OUTLINE_BRACKET_SLOT + OUTLINE_BRACKET_SLOT / 2;
 
-  // ── Row gutter (left of row-number column).
+  // ── Row gutter (outboard of the row-number column).
   if (layout.outlineRowGutter > 0) {
     ctx.save();
     ctx.beginPath();
-    ctx.rect(0, 0, layout.outlineRowGutter, cssHeight);
+    ctx.rect(rowGutterX, 0, layout.outlineRowGutter, cssHeight);
     ctx.clip();
     let maxLvl = 0;
     for (const v of layout.outlineRows.values()) if (v > maxLvl) maxLvl = v;
     for (let lvl = 1; lvl <= maxLvl; lvl += 1) {
-      const slotCx = (lvl - 1) * OUTLINE_BRACKET_SLOT + OUTLINE_BRACKET_SLOT / 2;
+      const slotCx = slotX(lvl);
       let runStartIdx = -1;
       for (let i = 0; i <= rows.visible.length; i += 1) {
         const r = rows.visible[i];
@@ -137,9 +153,10 @@ export function paintOutlineGutters(
           ctx.beginPath();
           ctx.moveTo(slotCx + 0.5, top);
           ctx.lineTo(slotCx + 0.5, bottom);
-          // Foot tick on the bottom (the "summary row" side).
+          // Foot tick on the bottom (the "summary row" side), pointing at the
+          // data area.
           ctx.moveTo(slotCx + 0.5, bottom - 0.5);
-          ctx.lineTo(slotCx + 5.5, bottom - 0.5);
+          ctx.lineTo(slotCx + (rtl ? -4.5 : 5.5), bottom - 0.5);
           ctx.stroke();
           const collapsed = isRowGroupCollapsed(layout, r0, r1);
           // Toggle sits on the row that should remain visible — typically the
@@ -181,24 +198,37 @@ export function paintOutlineGutters(
             runStartIdx = -1;
             continue;
           }
-          const left = ox + (cols.positionAt.get(c0) ?? 0);
-          const rightCol = cols.positionAt.get(c1) ?? 0;
-          const rightW = cols.sizeAt.get(c1) ?? 0;
-          const right = ox + rightCol + rightW;
+          // `mirrorX` turns the run's laid-out span into a screen span, which
+          // flips which end is the trailing one the foot tick hangs from.
+          const startX = mirrorX(layout, ox + (cols.positionAt.get(c0) ?? 0));
+          const endX = mirrorX(
+            layout,
+            ox + (cols.positionAt.get(c1) ?? 0) + (cols.sizeAt.get(c1) ?? 0),
+          );
+          const left = Math.min(startX, endX);
+          const right = Math.max(startX, endX);
+          const footX = rtl ? left + 0.5 : right - 0.5;
           ctx.strokeStyle = theme.rule;
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(left, slotCy + 0.5);
           ctx.lineTo(right, slotCy + 0.5);
-          ctx.moveTo(right - 0.5, slotCy + 0.5);
-          ctx.lineTo(right - 0.5, slotCy + 5.5);
+          ctx.moveTo(footX, slotCy + 0.5);
+          ctx.lineTo(footX, slotCy + 5.5);
           ctx.stroke();
           const collapsed = isColGroupCollapsed(layout, c0, c1);
           const summaryCol = c1 + 1;
           const summaryX =
             cols.positionAt.has(summaryCol) && !layout.hiddenCols.has(summaryCol)
-              ? ox + (cols.positionAt.get(summaryCol) ?? 0) + (cols.sizeAt.get(summaryCol) ?? 0) / 2
-              : right + TOGGLE_SIZE / 2 + 2;
+              ? mirrorX(
+                  layout,
+                  ox +
+                    (cols.positionAt.get(summaryCol) ?? 0) +
+                    (cols.sizeAt.get(summaryCol) ?? 0) / 2,
+                )
+              : rtl
+                ? left - TOGGLE_SIZE / 2 - 2
+                : right + TOGGLE_SIZE / 2 + 2;
           const rect = paintToggle(ctx, theme, summaryX, slotCy, collapsed);
           hits.push({ axis: 'col', level: lvl, i0: c0, i1: c1, rect });
           runStartIdx = -1;

@@ -2,7 +2,7 @@ import { clearComment, commentAt, recordCommentChange, setComment } from '../com
 import type { History } from '../commands/history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { cellRect } from '../render/geometry.js';
+import { cellRect, layoutForView } from '../render/geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { appendDialogActions, appendDialogIconButton } from './dialog-shell.js';
 
@@ -151,7 +151,7 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
     let top = 80;
     let tailLeft: number | null = null;
     try {
-      const r = cellRect(s.layout, s.viewport, a.row, a.col);
+      const r = cellRect(layoutForView(s), s.viewport, a.row, a.col);
       const gridEl = findGrid();
       const offX = gridEl ? gridEl.offsetLeft : 0;
       const offY = gridEl ? gridEl.offsetTop : 0;
@@ -159,11 +159,14 @@ export function attachCommentDialog(deps: CommentDialogDeps): CommentDialogHandl
       const cellLeft = offX + r.x;
       const cellTop = offY + r.y;
       const cellMid = cellTop + r.h / 2;
-      // Prefer right of the cell; fall back to the left if it would overflow.
-      let leftCandidate = cellLeft + r.w + GAP;
-      const willOverflowRight = leftCandidate + NOTE_W > hostW - 8;
-      if (willOverflowRight) leftCandidate = cellLeft - GAP - NOTE_W;
-      const placedRight = !willOverflowRight;
+      // Prefer the side the sheet reads towards, and fall back to the other
+      // when the note would run off the host.
+      const rtl = s.ui.rightToLeft === true;
+      const preferred = rtl ? cellLeft - GAP - NOTE_W : cellLeft + r.w + GAP;
+      const fallback = rtl ? cellLeft + r.w + GAP : cellLeft - GAP - NOTE_W;
+      const preferredFits = rtl ? preferred >= 8 : preferred + NOTE_W <= hostW - 8;
+      const leftCandidate = preferredFits ? preferred : fallback;
+      const placedRight = rtl ? !preferredFits : preferredFits;
       left = Math.max(8, leftCandidate);
       // Keep the note vertically near the cell — the tail is positioned at
       // top:14 inside the note, so we line that up with the cell mid.

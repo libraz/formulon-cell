@@ -237,6 +237,11 @@ export interface ViewportSlice {
   colStart: number;
   colCount: number;
   zoom: number;
+  /** Grid canvas width in CSS pixels. Published by the renderer because it is
+   *  the axis a right-to-left sheet mirrors about — geometry cannot place a
+   *  column from the right edge without knowing where that edge is. Zero
+   *  before the first measure, which reads as "no mirror yet". */
+  widthPx: number;
 }
 
 export interface SelectionSlice {
@@ -332,6 +337,10 @@ export interface UiSlice {
   showHeaders: boolean;
   /** When false, numeric zero values are painted as blank cells. */
   showZeros: boolean;
+  /** Sheet direction. When true, column A sits at the right edge and columns
+   *  advance leftward — the `<sheetView rightToLeft>` flag. Governs the grid's
+   *  own axis, not the direction of text inside a cell (`CellFormat.textDirection`). */
+  rightToLeft: boolean;
   /** When true, formula cells display the formula text instead of the
    *  evaluated value. Equivalent to the desktop-spreadsheet "Show Formulas" (Ctrl+`). */
   showFormulas: boolean;
