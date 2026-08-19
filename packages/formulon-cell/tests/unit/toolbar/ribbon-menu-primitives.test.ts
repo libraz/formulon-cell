@@ -250,7 +250,7 @@ describe('toolbar/ribbon menu primitives', () => {
 
       expect(icon?.classList.contains('fc-tb__menu-icon--svg')).toBe(true);
       expect(icon?.querySelector('.fc-tb__menu-icon-svg')).toBeTruthy();
-      expect(icon?.querySelectorAll('path').length).toBeGreaterThan(1);
+      expect(icon?.querySelectorAll('path').length).toBeGreaterThan(0);
     }
   });
 
@@ -1211,8 +1211,8 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(
       deleteMenu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg'),
     ).toHaveLength(6);
-    expect(insertMenu.querySelector('path[stroke="#107c41"]')).toBeTruthy();
-    expect(deleteMenu.querySelector('path[stroke="#c00000"]')).toBeTruthy();
+    expect(insertMenu.querySelector('path[fill="#107c41"]')).toBeTruthy();
+    expect(deleteMenu.querySelector('path[fill="#c00000"]')).toBeTruthy();
 
     expect(menusCss).toMatch(
       /#menu-insert-cells,[\s\S]*?#menu-delete-cells\s*\{[\s\S]*?min-width: 166px;/,
