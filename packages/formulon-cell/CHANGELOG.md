@@ -4,6 +4,51 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
+## 0.5.1 — 2026-08-20
+
+### Added
+
+- `WorkbookHandle.withBatchedRecalc(fn)` collapses a multi-cell write into a
+  single recalc. Scopes nest, and the pass runs when the outermost one exits —
+  including when the body throws, so a partially applied write is never left
+  stale. Every bulk writer goes through it: paste, paste special, insert copied
+  cells, fill, sort, remove duplicates, filter, text to columns, structure
+  edits, find and replace, import, and undo / redo replay.
+- `WorkbookHandle.recalcAuto()` is the edit-driven recalc, kept apart from
+  `recalc()` so Calculate Now stays unconditional while the automatic passes
+  can be suppressed.
+
+### Changed
+
+- Every cell write recalcs through the handle. `setNumber`, `setText`,
+  `setBool`, `setError`, and `setBlank` schedule a pass, so dependents settle
+  after an edit without the host calling `recalc()` itself.
+- Manual calc mode is enforced here instead of being round-trip metadata the
+  engine ignores: it suppresses the automatic pass after a write, and leaving
+  Manual runs the recalc those edits were denied. `recalc()` stays
+  unconditional in every mode.
+- `RecalcEvent.dirty` carries the cells written since the previous pass — the
+  edits the recalc was answering — rather than a set reported by the engine.
+  Dependents recomputed by the pass are not listed, and the set is empty for a
+  recalc no edit triggered.
+- Ribbon icons are composed from a shared icon kit rather than written as
+  literal path data: one canvas and optical size, a five-step stroke scale, a
+  closed palette, and shared primitives for arrow heads, sheet frames, corner
+  badges, and letterforms, with the artwork split into per-category glyph
+  modules. Individual icons shift slightly as their colours and stroke widths
+  move onto the shared scale. An icon segment gained optional `fillRule` and
+  `transform`, so a host painting the exported ribbon icon paths through its
+  own SVG serializer has to honour both — otherwise the icons carrying a
+  letterform land at the wrong size and position.
+
+### Removed
+
+- `WorkbookHandle.setViewportHint()` and `clearViewportHint()`, along with the
+  partial-recalc-on-write path they fed. `partialRecalc()` is still available
+  but opt-in: dirty cells outside its rectangle keep their previous value until
+  a later pass reaches them, which is not a trade a cell write should make on
+  the host's behalf.
+
 ## 0.5.0 — 2026-08-19
 
 ### Added
@@ -379,6 +424,7 @@ Initial public release.
   so the package works under any modern bundler. Falls back to an
   in-memory stub when `crossOriginIsolated` is unavailable.
 
+[0.5.1]: https://github.com/libraz/formulon-cell/releases/tag/v0.5.1
 [0.5.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.5.0
 [0.4.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.4.0
 [0.3.1]: https://github.com/libraz/formulon-cell/releases/tag/v0.3.1
