@@ -476,6 +476,16 @@ export function fillRange(
   dest: Range,
   opts?: FillOptions,
 ): boolean {
+  return wb.withBatchedRecalc(() => applyFillRange(state, wb, src, dest, opts));
+}
+
+function applyFillRange(
+  state: State,
+  wb: WorkbookHandle,
+  src: Range,
+  dest: Range,
+  opts?: FillOptions,
+): boolean {
   if (dest.r0 === src.r0 && dest.r1 === src.r1 && dest.c0 === src.c0 && dest.c1 === src.c1) {
     return false;
   }
@@ -727,10 +737,12 @@ const executeRibbonFlashFill = (
     );
     history.begin();
     try {
-      pending.forEach((entry, index) => {
-        const value = filled[index];
-        if (value != null)
-          workbook.setText({ sheet: range.sheet, row: entry.row, col: range.c0 }, value);
+      workbook.withBatchedRecalc(() => {
+        pending.forEach((entry, index) => {
+          const value = filled[index];
+          if (value != null)
+            workbook.setText({ sheet: range.sheet, row: entry.row, col: range.c0 }, value);
+        });
       });
     } finally {
       history.end();

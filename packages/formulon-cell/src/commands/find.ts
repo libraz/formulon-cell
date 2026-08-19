@@ -192,24 +192,28 @@ export function replaceAll(
   if (opts.query === '') return 0;
   const matches = findAll(state, opts);
   let count = 0;
-  for (const m of matches) {
-    if (wb.cellFormula(m.addr) !== null) continue;
-    if (!isCellWritable(state, m.addr)) {
-      warnProtected(m.addr);
-      continue;
+  // Formula cells are skipped, so every value read below is a literal — the
+  // batched recalc can't hand back a stale computed value here.
+  wb.withBatchedRecalc(() => {
+    for (const m of matches) {
+      if (wb.cellFormula(m.addr) !== null) continue;
+      if (!isCellWritable(state, m.addr)) {
+        warnProtected(m.addr);
+        continue;
+      }
+      const cur = formatCell(wb.getValue(m.addr));
+      const next = substituteCaseAware(
+        cur,
+        opts.query,
+        replacement,
+        opts.caseSensitive ?? false,
+        opts.matchWhole ?? false,
+      );
+      if (next === cur) continue;
+      writeInput(wb, m.addr, next, store);
+      count += 1;
     }
-    const cur = formatCell(wb.getValue(m.addr));
-    const next = substituteCaseAware(
-      cur,
-      opts.query,
-      replacement,
-      opts.caseSensitive ?? false,
-      opts.matchWhole ?? false,
-    );
-    if (next === cur) continue;
-    writeInput(wb, m.addr, next, store);
-    count += 1;
-  }
+  });
   return count;
 }
 

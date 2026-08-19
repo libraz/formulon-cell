@@ -7,7 +7,7 @@ import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 const key = (addr: Addr): string => `${addr.sheet}:${addr.row}:${addr.col}`;
 
 const fakeWorkbook = (): WorkbookHandle & {
-  recalc: ReturnType<typeof vi.fn>;
+  recalcAuto: ReturnType<typeof vi.fn>;
   writes: Map<string, unknown>;
 } => {
   const writes = new Map<string, unknown>();
@@ -22,9 +22,10 @@ const fakeWorkbook = (): WorkbookHandle & {
       writes.set(key(addr), { kind: 'number', value }),
     ),
     setText: vi.fn((addr: Addr, value: string) => writes.set(key(addr), { kind: 'text', value })),
-    recalc: vi.fn(),
+    withBatchedRecalc: vi.fn(<T>(fn: () => T): T => fn()),
+    recalcAuto: vi.fn(),
   } as unknown as WorkbookHandle & {
-    recalc: ReturnType<typeof vi.fn>;
+    recalcAuto: ReturnType<typeof vi.fn>;
     writes: Map<string, unknown>;
   };
 };
@@ -64,6 +65,6 @@ describe('textToColumns', () => {
     );
     expect(store.getState().format.formats.get('0:8:2')).toEqual({ bold: true });
     expect(store.getState().format.formats.get('0:8:3')).toEqual({ bold: true });
-    expect(wb.recalc).toHaveBeenCalledTimes(1);
+    expect(wb.recalcAuto).toHaveBeenCalledTimes(1);
   });
 });

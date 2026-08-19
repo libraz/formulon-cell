@@ -85,7 +85,7 @@ function shiftCellBand(
     }
     shiftFormats(store, history, affected, axis, delta);
     shiftMerges(store, wb, history, affected, axis, delta);
-    wb.recalc();
+    wb.recalcAuto();
   } finally {
     if (history) history.end();
   }
@@ -101,12 +101,24 @@ function collectSheetCells(wb: WorkbookHandle, sheet: number): CellRecord[] {
 }
 
 function restoreSheetCells(wb: WorkbookHandle, sheet: number, cells: readonly CellRecord[]): void {
-  for (const cell of Array.from(wb.cells(sheet))) wb.setBlank(cell.addr);
-  for (const cell of cells) writeCell(wb, cell.addr, cell.value, cell.formula);
-  wb.recalc();
+  const existing = Array.from(wb.cells(sheet));
+  wb.withBatchedRecalc(() => {
+    for (const cell of existing) wb.setBlank(cell.addr);
+    for (const cell of cells) writeCell(wb, cell.addr, cell.value, cell.formula);
+  });
+  wb.recalcAuto();
 }
 
 function shiftCells(
+  wb: WorkbookHandle,
+  affected: Range,
+  axis: InsertCellsDirection,
+  delta: number,
+): void {
+  wb.withBatchedRecalc(() => writeShiftedCells(wb, affected, axis, delta));
+}
+
+function writeShiftedCells(
   wb: WorkbookHandle,
   affected: Range,
   axis: InsertCellsDirection,

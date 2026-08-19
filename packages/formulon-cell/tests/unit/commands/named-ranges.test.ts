@@ -23,6 +23,7 @@ interface MutableWb {
   setDefinedNameEntry(name: string, formula: string, localSheetId?: number): boolean;
   setFormula?(addr: Addr, formula: string): void;
   recalc(): void;
+  recalcAuto(): void;
 }
 
 const makeWb = (
@@ -58,6 +59,9 @@ const makeWb = (
       formulas.set(`${addr.sheet}:${addr.row}:${addr.col}`, formula);
     },
     recalc() {
+      recalcCount += 1;
+    },
+    recalcAuto() {
       recalcCount += 1;
     },
   };
@@ -346,6 +350,7 @@ describe('named range commands', () => {
         return true;
       },
       recalc() {},
+      recalcAuto() {},
     } as unknown as WorkbookHandle;
     const history = new History();
 

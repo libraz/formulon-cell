@@ -69,7 +69,16 @@ function applyAxisShiftToCells(
 ): void {
   if (delta === 0) return;
   const all = collectAllCells(wb, sheet);
+  wb.withBatchedRecalc(() => writeAxisShiftedCells(wb, all, axis, split, delta));
+}
 
+function writeAxisShiftedCells(
+  wb: WorkbookHandle,
+  all: readonly CellRecord[],
+  axis: 'row' | 'col',
+  split: number,
+  delta: number,
+): void {
   // Blank every cell that needs to move (or be deleted) before re-writing —
   // some target slots may overlap source slots when delta < count.
   for (const c of all) {
@@ -405,7 +414,7 @@ function applyAxisShiftViaEngine(
       if (axis === 'row') wb.engineDeleteRows(sheet, split, count);
       else wb.engineDeleteCols(sheet, split, count);
     }
-    wb.recalc();
+    wb.recalcAuto();
   };
   const invert = (): void => {
     if (positive) {
@@ -417,9 +426,11 @@ function applyAxisShiftViaEngine(
       // Restore captured cells. wb.setX runs through the per-cell journal,
       // but History.replaying short-circuits the push so no extra entries
       // are recorded.
-      for (const c of captured) writeCell(wb, c.addr, c.value, c.formula);
+      wb.withBatchedRecalc(() => {
+        for (const c of captured) writeCell(wb, c.addr, c.value, c.formula);
+      });
     }
-    wb.recalc();
+    wb.recalcAuto();
   };
 
   apply();
@@ -452,10 +463,6 @@ export function insertRows(
       applyAxisShiftViaEngine(wb, history, sheet, 'row', atRow, count);
     } else {
       applyAxisShiftToCells(wb, sheet, 'row', atRow, count);
-      // Per-cell setNumber/setText skip recalc; force one pass at the end so
-      // formulas in the shifted band see their (possibly already-restored)
-      // operands.
-      wb.recalc();
     }
 
     // 2. shift formats.
@@ -505,7 +512,6 @@ export function deleteRows(
       applyAxisShiftViaEngine(wb, history, sheet, 'row', atRow, -n);
     } else {
       applyAxisShiftToCells(wb, sheet, 'row', atRow, -n);
-      wb.recalc();
     }
 
     recordFormatChange(history, store, () => {
@@ -550,7 +556,6 @@ export function insertCols(
       applyAxisShiftViaEngine(wb, history, sheet, 'col', atCol, count);
     } else {
       applyAxisShiftToCells(wb, sheet, 'col', atCol, count);
-      wb.recalc();
     }
 
     recordFormatChange(history, store, () => {
@@ -596,7 +601,6 @@ export function deleteCols(
       applyAxisShiftViaEngine(wb, history, sheet, 'col', atCol, -n);
     } else {
       applyAxisShiftToCells(wb, sheet, 'col', atCol, -n);
-      wb.recalc();
     }
 
     recordFormatChange(history, store, () => {

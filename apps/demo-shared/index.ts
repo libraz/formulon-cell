@@ -1523,6 +1523,13 @@ export const previewCellChange = (e: CellChangeEvent): string => {
 /** Demo seed — only runs once on the initial blank workbook. Core gates
  *  `seed` on `ownsWb`, so re-mounts and Open xlsx don't re-trigger it. */
 export const seedDemoWorkbook = (wb: WorkbookHandle): void => {
+  // One recalc for the whole seed instead of one per written cell.
+  wb.withBatchedRecalc(() => {
+    seedRows(wb);
+  });
+};
+
+const seedRows = (wb: WorkbookHandle): void => {
   wb.setText({ sheet: 0, row: 0, col: 0 }, 'item');
   wb.setText({ sheet: 0, row: 0, col: 1 }, 'celsius');
   wb.setText({ sheet: 0, row: 0, col: 2 }, 'fahrenheit');
@@ -1540,7 +1547,6 @@ export const seedDemoWorkbook = (wb: WorkbookHandle): void => {
     wb.setFormula({ sheet: 0, row: r, col: 2 }, `=B${r + 1}*1.8+32`);
     wb.setFormula({ sheet: 0, row: r, col: 3 }, `=A${r + 1}&" ☼"`);
   });
-  wb.recalc();
 };
 
 /** Projects a workbook's cells for the demo review dialog. */

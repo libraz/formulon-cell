@@ -809,10 +809,12 @@ export abstract class WorkbookHandleFeatureMethods {
 
   /** Workbook calc-mode metadata mirroring `<calcPr calcMode>`. The engine
    *  itself does NOT gate evaluation on this value — every `recalc()` call
-   *  honours all dirty cells regardless of mode. The flag is preserved as
-   *  round-trip metadata and surfaced here so the UI can mirror the spreadsheet's
-   *  user-visible state. Returns `null` when the engine doesn't expose
-   *  `calcMode`. Codes: 0 = Auto, 1 = Manual, 2 = AutoNoTable. */
+   *  honours all dirty cells regardless of mode. This wrapper is what enforces
+   *  it: `Manual` suppresses the automatic recalc that follows a cell write,
+   *  leaving the cells dirty until Calculate Now. Returns `null` when the
+   *  engine doesn't expose `calcMode`. Codes: 0 = Auto, 1 = Manual,
+   *  2 = AutoNoTable (treated as Auto — data tables have no separate
+   *  evaluation path here). */
   calcMode(): 0 | 1 | 2 | null {
     assertAlive(this);
     if (!this.capabilities.calcMode) return null;
@@ -821,11 +823,18 @@ export abstract class WorkbookHandleFeatureMethods {
   }
 
   /** Sets the calc-mode metadata. Returns `false` (no-op) under stub or
-   *  older engine package builds. */
+   *  older engine package builds. Leaving Manual runs the recalc that the
+   *  edits made while in Manual were denied, so switching back to Auto
+   *  settles the sheet the way a spreadsheet does. */
   setCalcMode(mode: 0 | 1 | 2): boolean {
     assertAlive(this);
     if (!this.capabilities.calcMode) return false;
-    return wb(this).setCalcMode(mode).ok;
+    const previous = this.calcMode();
+    if (!wb(this).setCalcMode(mode).ok) return false;
+    // These methods are mixed into WorkbookHandle at runtime, so the base
+    // class's own members need the cast to be visible here.
+    if (previous === 1 && mode !== 1) (this as unknown as WorkbookHandle).recalc();
+    return true;
   }
 
   /** Formula-behaviour profile selected in the engine. Profiles model host

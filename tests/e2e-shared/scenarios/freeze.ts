@@ -53,7 +53,6 @@ export async function runFreezePanesScenario(page: Page): Promise<void> {
                 }) => unknown,
               ): void;
             };
-            workbook: { clearViewportHint(): void };
           };
         };
         const inst = w.__fcInst;
@@ -64,7 +63,6 @@ export async function runFreezePanesScenario(page: Page): Promise<void> {
           ...s,
           layout: { ...s.layout, freezeRows: r, freezeCols: c },
         }));
-        inst.workbook.clearViewportHint();
       },
       { rows, cols },
     );

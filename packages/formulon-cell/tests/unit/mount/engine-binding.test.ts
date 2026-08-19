@@ -113,6 +113,15 @@ describe('mount/engine-binding — workbook subscribe forwards events', () => {
     expect(arg?.value).toEqual({ kind: 'number', value: 5 });
   });
 
+  it('emits `recalc` with the edited cell once the pass has run', () => {
+    const onRecalc = vi.fn();
+    sheet.instance.on('recalc', onRecalc);
+    sheet.workbook.setNumber({ sheet: 0, row: 0, col: 0 }, 5);
+    expect(onRecalc).toHaveBeenCalledTimes(1);
+    const dirty = onRecalc.mock.calls[0]?.[0]?.dirty as ReadonlySet<string>;
+    expect([...dirty]).toEqual(['0:0:0']);
+  });
+
   it('cellChange payload echoes the formula text when set via wb.setFormula', () => {
     const onChange = vi.fn();
     sheet.instance.on('cellChange', onChange);

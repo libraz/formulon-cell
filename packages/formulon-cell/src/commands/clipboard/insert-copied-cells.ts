@@ -75,9 +75,11 @@ export function insertCopiedCellsFromTSV(
     shiftFormats(store, history, affected, direction, direction === 'down' ? height : width);
     shiftMerges(store, wb, history, affected, direction, direction === 'down' ? height : width);
 
-    if (snapshot) {
-      writeSnapshotIntoInsertedRange(store, wb, history, snapshot, origin);
-    } else {
+    wb.withBatchedRecalc(() => {
+      if (snapshot) {
+        writeSnapshotIntoInsertedRange(store, wb, history, snapshot, origin);
+        return;
+      }
       for (let r = 0; r < rows.length; r += 1) {
         const cells = rows[r] ?? [];
         for (let c = 0; c < cells.length; c += 1) {
@@ -86,9 +88,9 @@ export function insertCopiedCellsFromTSV(
           writeCoerced(wb, addr, coerceInputForCell(store.getState(), addr, cells[c] ?? ''));
         }
       }
-    }
+    });
     copySourceMerges(store, wb, history, origin, height, width);
-    wb.recalc();
+    wb.recalcAuto();
   } finally {
     if (history) history.end();
   }
@@ -154,6 +156,15 @@ function writeSnapshotIntoInsertedRange(
 
 function shiftCells(
   _state: State,
+  wb: WorkbookHandle,
+  affected: Range,
+  direction: InsertCopiedCellsDirection,
+  delta: number,
+): void {
+  wb.withBatchedRecalc(() => writeShiftedCells(wb, affected, direction, delta));
+}
+
+function writeShiftedCells(
   wb: WorkbookHandle,
   affected: Range,
   direction: InsertCopiedCellsDirection,

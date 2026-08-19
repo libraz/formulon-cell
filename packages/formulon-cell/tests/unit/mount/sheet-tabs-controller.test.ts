@@ -59,9 +59,6 @@ const makeFakeWb = (state: FakeWbState): WorkbookHandle => {
     setSheetTabHidden(): boolean {
       return true;
     },
-    clearViewportHint(): void {
-      /* noop in tests */
-    },
   } as unknown as WorkbookHandle;
 };
 

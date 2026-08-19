@@ -411,7 +411,6 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     const s = store.getState();
     const sheetChanged = s.data.sheetIndex !== lastSheetIdx;
     if (sheetChanged) {
-      getWb().clearViewportHint();
       lastSheetIdx = s.data.sheetIndex;
     }
     if (sheetChanged || s.layout.hiddenSheets !== lastHiddenSheets) {

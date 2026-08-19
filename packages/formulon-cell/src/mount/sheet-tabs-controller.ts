@@ -173,7 +173,6 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     if (idx < 0 || idx >= wb.sheetCount) return;
     if (store.getState().layout.hiddenSheets.has(idx)) return;
     if (idx === store.getState().data.sheetIndex) return;
-    wb.clearViewportHint();
     mutators.setSheetIndex(store, idx);
     hydrateActiveSheet();
     update();

@@ -46,19 +46,21 @@ export function importCSV(
 
   if (history) history.begin();
   try {
-    for (let r = 0; r < rows.length; r += 1) {
-      const cells = rows[r] ?? [];
-      if (cells.length > maxCols) maxCols = cells.length;
-      for (let c = 0; c < cells.length; c += 1) {
-        const addr: Addr = { sheet, row: origin.row + r, col: origin.col + c };
-        if (!isCellWritable(state, addr)) {
-          warnProtected(addr);
-          continue;
+    wb.withBatchedRecalc(() => {
+      for (let r = 0; r < rows.length; r += 1) {
+        const cells = rows[r] ?? [];
+        if (cells.length > maxCols) maxCols = cells.length;
+        for (let c = 0; c < cells.length; c += 1) {
+          const addr: Addr = { sheet, row: origin.row + r, col: origin.col + c };
+          if (!isCellWritable(state, addr)) {
+            warnProtected(addr);
+            continue;
+          }
+          writeCoerced(wb, addr, coerceInputForCell(state, addr, cells[c] ?? ''));
+          cellsWritten += 1;
         }
-        writeCoerced(wb, addr, coerceInputForCell(state, addr, cells[c] ?? ''));
-        cellsWritten += 1;
       }
-    }
+    });
   } finally {
     if (history) history.end();
   }

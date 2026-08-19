@@ -38,7 +38,11 @@ export interface ThemeChangeEvent {
 }
 
 export interface RecalcEvent {
-  /** Set of `${sheet}:${row}:${col}` keys the engine reported as dirty. */
+  /** `${sheet}:${row}:${col}` keys of the cells written since the previous
+   *  pass — the edits this recalc was answering. Dependents recomputed by the
+   *  pass are not listed: the engine reports no such set, and deriving one
+   *  would mean re-reading every cell. Empty for a recalc nobody's edit
+   *  triggered (Calculate Now on a settled sheet). */
   readonly dirty: ReadonlySet<string>;
 }
 

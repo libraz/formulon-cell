@@ -527,22 +527,28 @@ export function copyAdvancedFilterResult(
     rowIndexes.push(r);
   }
 
-  store.setState((s) => {
-    const cells = new Map(s.data.cells);
-    rowIndexes.forEach((sourceRow, outOffset) => {
-      for (let offset = 0; offset < width; offset += 1) {
-        const sourceCol = listRange.c0 + offset;
-        const target = { sheet: dest.sheet, row: dest.row + outOffset, col: dest.col + offset };
-        const source = state.data.cells.get(
-          addrKey({ sheet: listRange.sheet, row: sourceRow, col: sourceCol }),
-        );
-        if (source) cells.set(addrKey(target), cloneCellRecord(source));
-        else cells.delete(addrKey(target));
-        if (wb) writeCellRecord(wb, target, source);
-      }
+  const writeMatchedRows = (): void => {
+    store.setState((s) => {
+      const cells = new Map(s.data.cells);
+      rowIndexes.forEach((sourceRow, outOffset) => {
+        for (let offset = 0; offset < width; offset += 1) {
+          const sourceCol = listRange.c0 + offset;
+          const target = { sheet: dest.sheet, row: dest.row + outOffset, col: dest.col + offset };
+          const source = state.data.cells.get(
+            addrKey({ sheet: listRange.sheet, row: sourceRow, col: sourceCol }),
+          );
+          if (source) cells.set(addrKey(target), cloneCellRecord(source));
+          else cells.delete(addrKey(target));
+          if (wb) writeCellRecord(wb, target, source);
+        }
+      });
+      return { ...s, data: { ...s.data, cells } };
     });
-    return { ...s, data: { ...s.data, cells } };
-  });
+  };
+  // The engine writes ride along with the store update, so batch them into
+  // one recalc instead of one per copied cell.
+  if (wb) wb.withBatchedRecalc(writeMatchedRows);
+  else writeMatchedRows();
 
   return rowIndexes.length;
 }

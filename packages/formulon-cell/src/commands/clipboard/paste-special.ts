@@ -113,74 +113,76 @@ export function pasteSpecial(
   const formatWrites: { key: string; format: CellFormat | null }[] = [];
   let skippedNonFiniteOperations = 0;
 
-  for (let dr = 0; dr < destRows; dr += 1) {
-    for (let dc = 0; dc < destCols; dc += 1) {
-      const sr = opt.transpose ? dc : dr;
-      const sc = opt.transpose ? dr : dc;
-      const src = snap.cells[sr]?.[sc];
-      if (!src) continue;
-      const isBlankSrc = src.value.kind === 'blank' && !src.formula && !src.format;
-      if (opt.skipBlanks && isBlankSrc) continue;
+  wb.withBatchedRecalc(() => {
+    for (let dr = 0; dr < destRows; dr += 1) {
+      for (let dc = 0; dc < destCols; dc += 1) {
+        const sr = opt.transpose ? dc : dr;
+        const sc = opt.transpose ? dr : dc;
+        const src = snap.cells[sr]?.[sc];
+        if (!src) continue;
+        const isBlankSrc = src.value.kind === 'blank' && !src.formula && !src.format;
+        if (opt.skipBlanks && isBlankSrc) continue;
 
-      const row = origin.row + dr;
-      const col = origin.col + dc;
-      const addr: Addr = { sheet, row, col };
-      // Sheet protection — silently skip locked destinations (spreadsheet parity).
-      if (!isCellWritable(state, addr)) continue;
+        const row = origin.row + dr;
+        const col = origin.col + dc;
+        const addr: Addr = { sheet, row, col };
+        // Sheet protection — silently skip locked destinations (spreadsheet parity).
+        if (!isCellWritable(state, addr)) continue;
 
-      // Layer 1: values / formulas.
-      // A Paste Special arithmetic operation always combines by VALUE. When one
-      // is active it takes precedence over formula-pasting, using the source's
-      // computed number even if the source cell is a formula — otherwise an
-      // "Add" over a formula source silently pastes the formula and drops the
-      // operation. Formats-only pastes carry no value, so they never
-      // operate.
-      const operating =
-        opt.operation !== 'none' && (wantsValues(opt.what) || wantsFormulas(opt.what));
-      const shouldPasteFormula = Boolean(src.formula && wantsFormulas(opt.what) && !operating);
-      if (operating) {
-        const srcNum = numericValue(src);
-        if (srcNum !== null) {
-          const dest = existingNumeric(state, sheet, row, col);
-          const result = combine(opt.operation, dest, srcNum);
-          if (Number.isFinite(result)) {
-            wb.setNumber(addr, result);
-          } else {
-            wb.setError(addr, errorCodeForNonFiniteOperation(opt.operation));
-            skippedNonFiniteOperations += 1;
+        // Layer 1: values / formulas.
+        // A Paste Special arithmetic operation always combines by VALUE. When one
+        // is active it takes precedence over formula-pasting, using the source's
+        // computed number even if the source cell is a formula — otherwise an
+        // "Add" over a formula source silently pastes the formula and drops the
+        // operation. Formats-only pastes carry no value, so they never
+        // operate.
+        const operating =
+          opt.operation !== 'none' && (wantsValues(opt.what) || wantsFormulas(opt.what));
+        const shouldPasteFormula = Boolean(src.formula && wantsFormulas(opt.what) && !operating);
+        if (operating) {
+          const srcNum = numericValue(src);
+          if (srcNum !== null) {
+            const dest = existingNumeric(state, sheet, row, col);
+            const result = combine(opt.operation, dest, srcNum);
+            if (Number.isFinite(result)) {
+              wb.setNumber(addr, result);
+            } else {
+              wb.setError(addr, errorCodeForNonFiniteOperation(opt.operation));
+              skippedNonFiniteOperations += 1;
+            }
           }
+          // Non-numeric source cells leave the destination unchanged (parity).
+        } else if (shouldPasteFormula && src.formula) {
+          // Cut moves cells: paste formulas verbatim (Excel keeps references
+          // intact on a move). Copy re-anchors relative refs by the paste offset.
+          if (snap.mode === 'cut') {
+            wb.setFormula(addr, src.formula);
+          } else {
+            const sourceRow = snap.range.r0 + sr;
+            const sourceCol = snap.range.c0 + sc;
+            wb.setFormula(addr, shiftFormulaRefs(src.formula, row - sourceRow, col - sourceCol));
+          }
+        } else if (wantsValues(opt.what)) {
+          if (src.value.kind !== 'blank' || !isBlankSrc) writeClipboardValue(wb, addr, src);
         }
-        // Non-numeric source cells leave the destination unchanged (parity).
-      } else if (shouldPasteFormula && src.formula) {
-        // Cut moves cells: paste formulas verbatim (Excel keeps references
-        // intact on a move). Copy re-anchors relative refs by the paste offset.
-        if (snap.mode === 'cut') {
-          wb.setFormula(addr, src.formula);
-        } else {
-          const sourceRow = snap.range.r0 + sr;
-          const sourceCol = snap.range.c0 + sc;
-          wb.setFormula(addr, shiftFormulaRefs(src.formula, row - sourceRow, col - sourceCol));
-        }
-      } else if (wantsValues(opt.what)) {
-        if (src.value.kind !== 'blank' || !isBlankSrc) writeClipboardValue(wb, addr, src);
-      }
 
-      // Layer 2: formats
-      const fmt = src.format;
-      if (wantsFormats(opt.what)) {
-        // A full "Formats" paste copies the source's *absence* of formatting
-        // too: an unformatted source cell clears the destination format rather
-        // than leaving a stale one behind (spreadsheet parity).
-        formatWrites.push({
-          key: addrKey(addr),
-          format: fmt ? { ...fmt, borders: fmt.borders ? { ...fmt.borders } : undefined } : null,
-        });
-      } else if (wantsNumFmt(opt.what) && fmt?.numFmt) {
-        // Number format only — cherry-pick.
-        formatWrites.push({ key: addrKey(addr), format: { numFmt: fmt.numFmt } });
+        // Layer 2: formats
+        const fmt = src.format;
+        if (wantsFormats(opt.what)) {
+          // A full "Formats" paste copies the source's *absence* of formatting
+          // too: an unformatted source cell clears the destination format rather
+          // than leaving a stale one behind (spreadsheet parity).
+          formatWrites.push({
+            key: addrKey(addr),
+            format: fmt ? { ...fmt, borders: fmt.borders ? { ...fmt.borders } : undefined } : null,
+          });
+        } else if (wantsNumFmt(opt.what) && fmt?.numFmt) {
+          // Number format only — cherry-pick.
+          formatWrites.push({ key: addrKey(addr), format: { numFmt: fmt.numFmt } });
+        }
       }
     }
-  }
+  });
 
   if (formatWrites.length > 0) {
     store.setState((s) => {
@@ -229,17 +231,20 @@ function updateExternalRefsForCutPaste(
   writtenRange: Range,
 ): void {
   if (source.sheet !== writtenRange.sheet) return;
-  for (const entry of Array.from(wb.cells(writtenRange.sheet))) {
-    if (!entry.formula) continue;
-    if (
-      entry.addr.row >= writtenRange.r0 &&
-      entry.addr.row <= writtenRange.r1 &&
-      entry.addr.col >= writtenRange.c0 &&
-      entry.addr.col <= writtenRange.c1
-    ) {
-      continue;
+  const entries = Array.from(wb.cells(writtenRange.sheet));
+  wb.withBatchedRecalc(() => {
+    for (const entry of entries) {
+      if (!entry.formula) continue;
+      if (
+        entry.addr.row >= writtenRange.r0 &&
+        entry.addr.row <= writtenRange.r1 &&
+        entry.addr.col >= writtenRange.c0 &&
+        entry.addr.col <= writtenRange.c1
+      ) {
+        continue;
+      }
+      const next = adjustFormulaForCutPasteMove(entry.formula, source, writtenRange);
+      if (next !== entry.formula) wb.setFormula(entry.addr, next);
     }
-    const next = adjustFormulaForCutPasteMove(entry.formula, source, writtenRange);
-    if (next !== entry.formula) wb.setFormula(entry.addr, next);
-  }
+  });
 }

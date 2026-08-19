@@ -314,33 +314,40 @@ export class InlineEditor {
       }
       return false;
     };
-    for (const r of ranges) {
-      for (let row = r.r0; row <= r.r1; row += 1) {
-        for (let col = r.c0; col <= r.c1; col += 1) {
-          const target = { sheet, row, col };
-          const fmt =
-            target.sheet === anchor.sheet && target.row === anchor.row && target.col === anchor.col
-              ? formatWithPending(this.deps.store.getState(), target)
-              : s.format.formats.get(addrKey(target));
-          const forceText = fmt?.numFmt?.kind === 'text';
-          if (isFormula && !forceText) {
-            // Formula fill: relative refs shift by the paste offset. Formula
-            // results aren't run through DV here (Excel validates the typed
-            // entry, not the recomputed result).
-            const shifted = shiftFormulaRefs(raw, row - anchor.row, col - anchor.col);
-            try {
-              writeCoerced(this.deps.wb, target, { kind: 'formula', text: shifted });
-            } catch (err) {
-              console.warn('formulon-cell: writeCoerced failed', err);
+    // One recalc for the whole fill instead of one per written cell.
+    const aborted = this.deps.wb.withBatchedRecalc(() => {
+      for (const r of ranges) {
+        for (let row = r.r0; row <= r.r1; row += 1) {
+          for (let col = r.c0; col <= r.c1; col += 1) {
+            const target = { sheet, row, col };
+            const fmt =
+              target.sheet === anchor.sheet &&
+              target.row === anchor.row &&
+              target.col === anchor.col
+                ? formatWithPending(this.deps.store.getState(), target)
+                : s.format.formats.get(addrKey(target));
+            const forceText = fmt?.numFmt?.kind === 'text';
+            if (isFormula && !forceText) {
+              // Formula fill: relative refs shift by the paste offset. Formula
+              // results aren't run through DV here (Excel validates the typed
+              // entry, not the recomputed result).
+              const shifted = shiftFormulaRefs(raw, row - anchor.row, col - anchor.col);
+              try {
+                writeCoerced(this.deps.wb, target, { kind: 'formula', text: shifted });
+              } catch (err) {
+                console.warn('formulon-cell: writeCoerced failed', err);
+              }
+            } else {
+              // Value fill (including text-formatted cells): every target validates
+              // against its own rule via the store-aware coercion path.
+              if (writeValidatedOrAbort(target, raw, fmt)) return true;
             }
-          } else {
-            // Value fill (including text-formatted cells): every target validates
-            // against its own rule via the store-aware coercion path.
-            if (writeValidatedOrAbort(target, raw, fmt)) return;
           }
         }
       }
-    }
+      return false;
+    });
+    if (aborted) return;
     const pending = this.deps.store.getState().ui.pendingFormat;
     if (pending && sameAddr(pending.addr, anchor)) {
       mutators.setCellFormat(this.deps.store, anchor, pending.format);

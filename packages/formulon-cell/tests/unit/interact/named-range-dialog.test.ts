@@ -91,6 +91,7 @@ interface MutableWb {
   getValue(addr: { sheet: number; row: number; col: number }): FakeCellValue;
   setDefinedNameEntry(name: string, formula: string, localSheetId?: number): boolean;
   recalc(): void;
+  recalcAuto(): void;
 }
 
 type FakeCellValue =
@@ -128,6 +129,7 @@ const makeMutableWb = (): {
       return true;
     },
     recalc() {},
+    recalcAuto() {},
   };
   return { wb: fake as unknown as WorkbookHandle, calls, registry, values };
 };

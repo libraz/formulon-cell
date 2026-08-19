@@ -130,6 +130,8 @@ preview; browser-only hosts can omit them. `uploadStatus` accepts `saved`,
 | `WorkbookHandle.createDefault()` | Create a workbook backed by the WASM engine |
 | `isUsingStub()` | Detect whether the explicit stub engine is in use |
 | `presets.{minimal,standard,full}()` | Built-in feature presets |
+| `workbook.withBatchedRecalc(fn)` | Collapse a multi-cell write into one recalc |
+| `workbook.recalc()` / `recalcAuto()` | Calculate Now, and the edit-driven recalc that Manual calc mode suppresses |
 | `instance.i18n.setLocale(loc)` | Swap locale at runtime — no remount |
 | `instance.setTheme(theme)` | Swap theme at runtime |
 | `createSessionChart(store, range, options)` | Create session column/line chart overlays |

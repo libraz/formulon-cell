@@ -285,23 +285,6 @@ export class GridRenderer {
     this.paintActive(state, theme, cols, rows);
     this.paintEditorRefs(state);
     this.paintTraces(state, cols, rows);
-
-    // Hand the engine the inclusive rect of cells we just painted so the next
-    //  setFormula can run a partialRecalc bounded to what the user sees.
-    const wb = this.getWb();
-    const firstRow = rows.visible[0];
-    const lastRow = rows.visible[rows.visible.length - 1];
-    const firstCol = cols.visible[0];
-    const lastCol = cols.visible[cols.visible.length - 1];
-    if (
-      wb &&
-      firstRow !== undefined &&
-      lastRow !== undefined &&
-      firstCol !== undefined &&
-      lastCol !== undefined
-    ) {
-      wb.setViewportHint(state.data.sheetIndex, firstRow, firstCol, lastRow, lastCol);
-    }
   }
 
   /** Pagination for the active sheet, or null in Normal view. Reaches one

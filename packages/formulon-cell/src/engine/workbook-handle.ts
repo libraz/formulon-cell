@@ -41,6 +41,9 @@ interface CellSnapshot {
 
 const UNDO_LIMIT = 100;
 
+/** `<calcPr calcMode>` code for Manual. */
+const CALC_MODE_MANUAL = 1;
+
 /** Excel's Japanese UI creates new workbooks with Yu Gothic while the
  * non-Japanese baseline remains Calibri 11 for compatibility with existing
  * formulon workbooks. */
@@ -111,16 +114,14 @@ export class WorkbookHandle {
   // biome-ignore lint/correctness/noUnusedPrivateClassMembers: read/written via the internals() cast in workbook-handle-features.ts
   private functionMetadataProvider: FunctionMetadataProvider | null = null;
 
-  /** Inclusive rect of cells currently visible to the user, supplied by the
-   *  renderer via `setViewportHint`. Drives partial recalc on `setFormula`.
-   *  Cleared on sheet switch / setWorkbook so we never apply a stale rect. */
-  private viewportHint: {
-    sheet: number;
-    firstRow: number;
-    firstCol: number;
-    lastRow: number;
-    lastCol: number;
-  } | null = null;
+  /** Depth of the enclosing `withBatchedRecalc` scopes. While above zero,
+   *  writes only mark the batch dirty; one recalc runs on exit. */
+  private recalcBatchDepth = 0;
+
+  private pendingRecalc = false;
+
+  /** Cells written since the last recalc pass — the `recalc` event's payload. */
+  private dirtySinceRecalc = new Set<string>();
 
   private constructor(module: FormulonModule, wb: Workbook) {
     this.module = module;
@@ -304,6 +305,7 @@ export class WorkbookHandle {
     this.withJournal(a, () => {
       const s = this.wb.setNumber(a.sheet, a.row, a.col, value);
       if (!s.ok) throw new Error(`setNumber: ${s.message}`);
+      this.scheduleRecalc(a);
       this.emit({ kind: 'value', addr: a, next: { kind: 'number', value } });
     });
   }
@@ -313,6 +315,7 @@ export class WorkbookHandle {
     this.withJournal(a, () => {
       const s = this.wb.setText(a.sheet, a.row, a.col, value);
       if (!s.ok) throw new Error(`setText: ${s.message}`);
+      this.scheduleRecalc(a);
       this.emit({ kind: 'value', addr: a, next: { kind: 'text', value } });
     });
   }
@@ -322,6 +325,7 @@ export class WorkbookHandle {
     this.withJournal(a, () => {
       const s = this.wb.setBool(a.sheet, a.row, a.col, value);
       if (!s.ok) throw new Error(`setBool: ${s.message}`);
+      this.scheduleRecalc(a);
       this.emit({ kind: 'value', addr: a, next: { kind: 'bool', value } });
     });
   }
@@ -331,6 +335,7 @@ export class WorkbookHandle {
     this.withJournal(a, () => {
       const s = this.wb.setError(a.sheet, a.row, a.col, errorCode);
       if (!s.ok) throw new Error(`setError: ${s.message}`);
+      this.scheduleRecalc(a);
       this.emit({ kind: 'value', addr: a, next: this.getValue(a) });
     });
   }
@@ -340,6 +345,7 @@ export class WorkbookHandle {
     this.withJournal(a, () => {
       const s = this.wb.setBlank(a.sheet, a.row, a.col);
       if (!s.ok) throw new Error(`setBlank: ${s.message}`);
+      this.scheduleRecalc(a);
       this.emit({ kind: 'value', addr: a, next: { kind: 'blank' } });
     });
   }
@@ -354,56 +360,53 @@ export class WorkbookHandle {
     });
   }
 
-  /** Renderer hint — the inclusive rect of cells currently visible. Lets
-   *  `partialRecalc` collapse to just the formulas the user can actually see.
-   *  Internal: not exposed in the public API surface. */
-  setViewportHint(
-    sheet: number,
-    firstRow: number,
-    firstCol: number,
-    lastRow: number,
-    lastCol: number,
-  ): void {
-    this.viewportHint = { sheet, firstRow, firstCol, lastRow, lastCol };
+  /** Coalesce the recalcs of a multi-cell write into a single pass. Bulk
+   *  writers (paste, fill, sort, structure edits) wrap their loop in this so
+   *  an N-cell write costs one recalc instead of N. Scopes nest; the recalc
+   *  runs when the outermost one exits, including on a thrown error so a
+   *  partially-applied write is never left stale. An explicit `recalc()`
+   *  inside the scope still runs immediately and supersedes what is pending. */
+  withBatchedRecalc<T>(fn: () => T): T {
+    this.recalcBatchDepth += 1;
+    try {
+      return fn();
+    } finally {
+      this.recalcBatchDepth -= 1;
+      if (this.recalcBatchDepth === 0 && this.pendingRecalc && !this.disposed) this.recalcAuto();
+    }
   }
 
-  /** Drop the viewport hint — the next setFormula falls back to full recalc.
-   *  Called from sheet-switch and setWorkbook so we never apply a stale
-   *  rect from a previous sheet. */
-  clearViewportHint(): void {
-    this.viewportHint = null;
-  }
-
-  /** Pick the most economical recalc for a single-cell edit at `a`. When a
-   *  viewport hint exists for the same sheet AND the engine supports
-   *  partialRecalc, we recompute only formulas whose dependency closure
-   *  intersects the viewport rect plus the touched cell. Otherwise we fall
-   *  back to a full recalc (still cheap on small workbooks). */
+  /** Recompute after a write at `a`, or leave it to the enclosing batch.
+   *  Always a full pass: the engine only evaluates cells it has marked dirty,
+   *  so this is already incremental, and unlike `partialRecalc` it can't leave
+   *  an off-screen dependent holding a stale value. */
   private scheduleRecalc(a: Addr): void {
-    if (!this.capabilities.partialRecalc || !this.viewportHint) {
-      this.recalc();
+    this.dirtySinceRecalc.add(addrKey(a));
+    if (this.recalcBatchDepth > 0) {
+      this.pendingRecalc = true;
       return;
     }
-    const hint = this.viewportHint;
-    if (hint.sheet !== a.sheet) {
-      this.recalc();
+    this.recalcAuto();
+  }
+
+  /** True while the workbook sits in Manual calc mode, where edits accumulate
+   *  as engine-side dirty cells until someone asks for a recalc. */
+  private isManualCalcMode(): boolean {
+    if (!this.capabilities.calcMode) return false;
+    return this.wb.calcMode() === CALC_MODE_MANUAL;
+  }
+
+  /** Recalc triggered by an edit rather than by the user. Skipped in Manual
+   *  calc mode; `recalc()` stays unconditional so Calculate Now (F9) works
+   *  from any mode. */
+  recalcAuto(): void {
+    this.assertAlive();
+    if (this.isManualCalcMode()) {
+      // The engine keeps the dirty flags, so the next recalc still catches up.
+      this.pendingRecalc = false;
       return;
     }
-    const r0 = Math.min(hint.firstRow, a.row);
-    const c0 = Math.min(hint.firstCol, a.col);
-    const r1 = Math.max(hint.lastRow, a.row);
-    const c1 = Math.max(hint.lastCol, a.col);
-    const result = this.wb.partialRecalc({
-      sheet: hint.sheet,
-      firstRow: r0,
-      firstCol: c0,
-      lastRow: r1,
-      lastCol: c1,
-    });
-    if (!result.status.ok) {
-      // Partial failure shouldn't break the edit — fall back to full.
-      this.recalc();
-    }
+    this.recalc();
   }
 
   canUndo(): boolean {
@@ -440,15 +443,23 @@ export class WorkbookHandle {
 
   recalc(): void {
     this.assertAlive();
+    // A full pass covers whatever a batch had queued up.
+    this.pendingRecalc = false;
     const s = this.wb.recalc();
     if (!s.ok) throw new Error(`recalc: ${s.message}`);
+    this.emitRecalc();
   }
 
-  /** Recompute only formulas whose dependency closure intersects the viewport
+  /** Recompute only formulas whose dependency closure intersects the given
    *  rectangle. Returns the number of cells the engine actually evaluated, or
    *  `null` when the engine doesn't expose `partialRecalc`. Falls back to a
    *  full `recalc()` on engines without the capability so callers can use
-   *  this as a drop-in optimization. */
+   *  this as a drop-in optimization.
+   *
+   *  Opt-in only: dirty cells outside the rectangle stay dirty and keep their
+   *  previous value until a later pass reaches them, so this is for hosts that
+   *  knowingly trade freshness off screen for a faster first paint. Cell
+   *  writes never take this path. */
   partialRecalc(
     sheet: number,
     firstRow: number,
@@ -463,6 +474,7 @@ export class WorkbookHandle {
     }
     const r = this.wb.partialRecalc({ sheet, firstRow, firstCol, lastRow, lastCol });
     if (!r.status.ok) throw new Error(`partialRecalc: ${r.status.message}`);
+    this.emitRecalc();
     return r.recomputed;
   }
 
@@ -870,6 +882,13 @@ export class WorkbookHandle {
 
   private emit(e: ChangeEvent): void {
     for (const fn of this.listeners) fn(e);
+  }
+
+  /** Announce a completed recalc pass and reset the dirty accumulator. */
+  private emitRecalc(): void {
+    const dirty = this.dirtySinceRecalc;
+    this.dirtySinceRecalc = new Set();
+    this.emit({ kind: 'recalc', dirty });
   }
 
   private assertAlive(): void {

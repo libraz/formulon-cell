@@ -75,26 +75,28 @@ export function textToColumns(
     .filter((entry) => inRange(entry.addr, range))
     .sort((left, right) => left.addr.col - right.addr.col || left.addr.row - right.addr.row);
   // Operate column by column so consecutive runs land in the same target columns.
-  for (const { key: sourceKey, cell, addr: sourceAddr } of candidates) {
-    const v = cell.value;
-    if (v.kind !== 'text') continue;
-    const tokens = splitText(v.value, delimiter, options);
-    if (tokens.length < 2) continue;
-    maxTokens = Math.max(maxTokens, tokens.length);
-    const sourceFormat = cloneFormat(state.format.formats.get(sourceKey));
-    for (let t = 0; t < tokens.length; t += 1) {
-      const tok = tokens[t] ?? '';
-      const dst = { sheet: range.sheet, row: sourceAddr.row, col: sourceAddr.col + t };
-      if (!isCellWritable(state, dst)) {
-        warnProtected(dst);
-        continue;
-      }
-      writeCoerced(wb, dst, coerceInputForCell(state, dst, tok));
-      if (sourceFormat) {
-        formatWrites.push({ key: addrKey(dst), format: sourceFormat });
+  wb.withBatchedRecalc(() => {
+    for (const { key: sourceKey, cell, addr: sourceAddr } of candidates) {
+      const v = cell.value;
+      if (v.kind !== 'text') continue;
+      const tokens = splitText(v.value, delimiter, options);
+      if (tokens.length < 2) continue;
+      maxTokens = Math.max(maxTokens, tokens.length);
+      const sourceFormat = cloneFormat(state.format.formats.get(sourceKey));
+      for (let t = 0; t < tokens.length; t += 1) {
+        const tok = tokens[t] ?? '';
+        const dst = { sheet: range.sheet, row: sourceAddr.row, col: sourceAddr.col + t };
+        if (!isCellWritable(state, dst)) {
+          warnProtected(dst);
+          continue;
+        }
+        writeCoerced(wb, dst, coerceInputForCell(state, dst, tok));
+        if (sourceFormat) {
+          formatWrites.push({ key: addrKey(dst), format: sourceFormat });
+        }
       }
     }
-  }
+  });
   if (formatWrites.length > 0) {
     store.setState((s) => {
       const formats = new Map(s.format.formats);
@@ -102,6 +104,6 @@ export function textToColumns(
       return { ...s, format: { ...s.format, formats } };
     });
   }
-  wb.recalc();
+  wb.recalcAuto();
   return maxTokens;
 }

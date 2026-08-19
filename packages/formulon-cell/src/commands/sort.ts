@@ -340,15 +340,17 @@ export function sortRange(
   });
 
   // Write back into wb in sorted order.
-  for (let i = 0; i < snaps.length; i += 1) {
-    const dstRow = start + i;
-    const snap = snaps[i]?.snap;
-    if (!snap) continue;
-    for (const cell of snap.cells) {
-      const addr = { sheet: range.sheet, row: dstRow, col: cell.col };
-      writeCellSnapshot(wb, addr, cell);
+  wb.withBatchedRecalc(() => {
+    for (let i = 0; i < snaps.length; i += 1) {
+      const dstRow = start + i;
+      const snap = snaps[i]?.snap;
+      if (!snap) continue;
+      for (const cell of snap.cells) {
+        const addr = { sheet: range.sheet, row: dstRow, col: cell.col };
+        writeCellSnapshot(wb, addr, cell);
+      }
     }
-  }
+  });
   store.setState((s) => {
     const formats = new Map(s.format.formats);
     for (let r = start; r <= range.r1; r += 1) {
@@ -367,7 +369,7 @@ export function sortRange(
     }
     return { ...s, format: { ...s.format, formats } };
   });
-  wb.recalc();
+  wb.recalcAuto();
   return true;
 }
 
@@ -442,15 +444,17 @@ export function removeDuplicates(
     snaps.push({ cells });
   }
 
-  for (let i = 0; i < snaps.length; i += 1) {
-    const dstRow = range.r0 + i;
-    const snap = snaps[i];
-    if (!snap) continue;
-    for (let offset = 0; offset < snap.cells.length; offset += 1) {
-      const addr = { sheet: range.sheet, row: dstRow, col: range.c0 + offset };
-      writeCellSnapshot(wb, addr, snap.cells[offset] ?? null);
+  wb.withBatchedRecalc(() => {
+    for (let i = 0; i < snaps.length; i += 1) {
+      const dstRow = range.r0 + i;
+      const snap = snaps[i];
+      if (!snap) continue;
+      for (let offset = 0; offset < snap.cells.length; offset += 1) {
+        const addr = { sheet: range.sheet, row: dstRow, col: range.c0 + offset };
+        writeCellSnapshot(wb, addr, snap.cells[offset] ?? null);
+      }
     }
-  }
+  });
   store.setState((s) => {
     const formats = new Map(s.format.formats);
     for (let r = range.r0; r <= range.r1; r += 1) {
@@ -474,12 +478,14 @@ export function removeDuplicates(
     return { ...s, format: { ...s.format, formats } };
   });
   // Clear tail rows that were dropped.
-  for (let r = range.r0 + snaps.length; r <= range.r1; r += 1) {
-    for (let c = range.c0; c <= range.c1; c += 1) {
-      wb.setBlank({ sheet: range.sheet, row: r, col: c });
+  wb.withBatchedRecalc(() => {
+    for (let r = range.r0 + snaps.length; r <= range.r1; r += 1) {
+      for (let c = range.c0; c <= range.c1; c += 1) {
+        wb.setBlank({ sheet: range.sheet, row: r, col: c });
+      }
     }
-  }
-  wb.recalc();
+  });
+  wb.recalcAuto();
   return range.r1 - range.r0 + 1 - snaps.length;
 }
 

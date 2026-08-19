@@ -1091,22 +1091,15 @@ export const Spreadsheet = {
         emitter.emit('themeChange', { theme: t });
       },
       undo() {
-        const ok = history.undo();
-        if (ok) {
-          // Force a recalc — undo's per-cell replays may restore values without
-          // triggering recalc (setNumber/setText skip it), leaving formula cells
-          // stale. One end-of-batch recalc fixes them all.
-          wb.recalc();
-          mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
-        }
+        // Batch the replay: a multi-cell entry restores cell by cell, and each
+        // write would otherwise recalc on its own.
+        const ok = wb.withBatchedRecalc(() => history.undo());
+        if (ok) mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
         return ok;
       },
       redo() {
-        const ok = history.redo();
-        if (ok) {
-          wb.recalc();
-          mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
-        }
+        const ok = wb.withBatchedRecalc(() => history.redo());
+        if (ok) mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
         return ok;
       },
       async setWorkbook(next) {
@@ -1117,7 +1110,6 @@ export const Spreadsheet = {
         syncedSessionCfRules = new Map();
         ownsWb = true; // we now own the next handle and will dispose it
         wb.attachHistory(history);
-        wb.clearViewportHint();
         history.clear();
         const nextSheet = Math.min(
           store.getState().data.sheetIndex,

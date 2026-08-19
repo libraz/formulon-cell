@@ -224,6 +224,23 @@ describe('InlineEditor', () => {
     expect(editor.isActive()).toBe(false);
   });
 
+  it('commit recomputes formulas that depend on the edited cell', () => {
+    const a1 = { sheet: 0, row: 0, col: 0 };
+    const b1 = { sheet: 0, row: 0, col: 1 };
+    wb.setNumber(a1, 20);
+    wb.setFormula(b1, '=A1*2');
+    expect(wb.getValue(b1)).toEqual({ kind: 'number', value: 40 });
+
+    mutators.setActive(store, a1);
+    editor.begin('');
+    const input = grid.querySelector('textarea.fc-host__editor') as HTMLTextAreaElement;
+    input.value = '25';
+    editor.commit();
+
+    // No explicit recalc — committing the edit must be enough.
+    expect(wb.getValue(b1)).toEqual({ kind: 'number', value: 50 });
+  });
+
   it('commit applies pending empty-cell format to the typed cell and then clears it', () => {
     const addr = { sheet: 0, row: 0, col: 0 };
     mutators.setActive(store, addr);

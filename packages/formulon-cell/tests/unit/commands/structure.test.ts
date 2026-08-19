@@ -817,6 +817,10 @@ describe('insertRows / deleteRows / insertCols / deleteCols engine path', () => 
       recalc: () => {
         calls.recalcs += 1;
       },
+      recalcAuto: () => {
+        calls.recalcs += 1;
+      },
+      withBatchedRecalc: <T>(fn: () => T): T => fn(),
       engineInsertRows: (sheet: number, row: number, count: number) => {
         calls.insertR.push({ sheet, row, count });
         return true;

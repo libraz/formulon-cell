@@ -25,15 +25,17 @@ export function pasteTSV(state: State, wb: WorkbookHandle, text: string): PasteR
   const sheet = origin.sheet;
   let maxCols = 0;
 
-  for (let r = 0; r < rows.length; r += 1) {
-    const cells = rows[r] ?? [];
-    if (cells.length > maxCols) maxCols = cells.length;
-    for (let c = 0; c < cells.length; c += 1) {
-      const addr: Addr = { sheet, row: origin.row + r, col: origin.col + c };
-      if (!isCellWritable(state, addr)) continue;
-      writeCoerced(wb, addr, coerceInputForCell(state, addr, cells[c] ?? ''));
+  wb.withBatchedRecalc(() => {
+    for (let r = 0; r < rows.length; r += 1) {
+      const cells = rows[r] ?? [];
+      if (cells.length > maxCols) maxCols = cells.length;
+      for (let c = 0; c < cells.length; c += 1) {
+        const addr: Addr = { sheet, row: origin.row + r, col: origin.col + c };
+        if (!isCellWritable(state, addr)) continue;
+        writeCoerced(wb, addr, coerceInputForCell(state, addr, cells[c] ?? ''));
+      }
     }
-  }
+  });
 
   return {
     writtenRange: {
