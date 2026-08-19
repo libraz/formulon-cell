@@ -12,12 +12,15 @@ Spreadsheet UI library for the [formulon](https://github.com/libraz/formulon)
 WASM calc engine. Desktop-spreadsheet-style chrome, canvas-rendered grid,
 extension-based feature composition, runtime i18n.
 
-> **β (beta).** `formulon-cell` is built primarily as a demonstration host
-> for [**formulon**](https://github.com/libraz/formulon) — a headless,
-> Excel-compatible calculation engine in C++17 that ships a single WASM /
-> Python / CLI core. Engine docs live at
-> [formulon.libraz.net](https://formulon.libraz.net). The UI surface is
-> still evolving; pin a version range you can upgrade on purpose.
+> **Excel compatibility.** `formulon-cell` is being built toward an
+> Excel-compatible spreadsheet experience while exercising
+> [**formulon**](https://github.com/libraz/formulon) in a real browser. Its
+> basic workbook workflows — selection, editing, formula entry,
+> recalculation, and file handling — are ready to use. UI coverage is still
+> incomplete: detailed control behaviour, dialogs, keyboard interaction,
+> accessibility, and other UI/UX do not yet guarantee Excel-equivalent
+> behaviour, and bugs may remain. Do not present it as a drop-in Excel
+> replacement or a complete end-user spreadsheet product yet.
 
 ## Packages
 
