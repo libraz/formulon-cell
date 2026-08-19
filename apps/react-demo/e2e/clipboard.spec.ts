@@ -6,6 +6,13 @@ import {
   runRibbonPasteUndoScenario,
 } from '../../../tests/e2e-shared/scenarios/clipboard.js';
 
+// Paste routes through `navigator.clipboard.readText()` because the host is a
+// non-editable div that never receives a native paste event. WebKit rejects
+// that read with `NotAllowedError` and ignores the `clipboard-read` permission
+// Playwright grants (cf. the permission override in `playwright.shared.ts`), so
+// the paste half of these round-trips cannot run there.
+test.skip(({ browserName }) => browserName === 'webkit', 'WebKit denies clipboard reads');
+
 test('C01 (react-demo): Mod+C/V round-trips a cell value', async ({ page }) => {
   await runCopyPasteScenario(page);
 });

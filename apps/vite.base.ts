@@ -44,6 +44,40 @@ function formulonWorkerOptionsPlugin(): Plugin {
   };
 }
 
+/** Requests the pthread worker makes: its own entry, the engine modules it
+ *  imports, and Vite's dev client, which the transformed worker module pulls
+ *  in for HMR. */
+const WORKER_FETCHED_PATHS = ['worker_file', '@libraz/formulon/dist', 'vite/dist/client'];
+
+/** WebKit refuses these responses inside the worker with "Worker load was
+ *  blocked by Cross-Origin-Embedder-Policy" whenever it can answer from the
+ *  cache, even though each response carries `Cross-Origin-Embedder-Policy:
+ *  require-corp`: the reused entry no longer satisfies the check, the worker
+ *  fails to load, and the engine never finishes booting (the demo sits on
+ *  "Loading engine..."). It bites on every page load after the first, and
+ *  intermittently across fresh loads once the dep cache is warm. Keeping what
+ *  the worker fetches out of the cache sidesteps it; the rest of the app keeps
+ *  Vite's normal caching. */
+function workerScriptNoStorePlugin(): Plugin {
+  return {
+    name: 'formulon-worker-no-store',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!WORKER_FETCHED_PATHS.some((path) => req.url?.includes(path))) return next();
+        const setHeader = res.setHeader.bind(res);
+        // Vite writes its own `Cache-Control` further down the chain, so pin
+        // ours and drop later overwrites.
+        res.setHeader = ((name: string, value: Parameters<typeof setHeader>[1]) =>
+          name.toLowerCase() === 'cache-control'
+            ? res
+            : setHeader(name, value)) as typeof setHeader;
+        setHeader('Cache-Control', 'no-store');
+        next();
+      });
+    },
+  };
+}
+
 export function baseConfig(rootDir: string): UserConfig {
   const corePkg = resolve(rootDir, '../../packages/formulon-cell');
   const nodeShimDir = resolve(rootDir, '../vite-shims');
@@ -82,7 +116,7 @@ export function baseConfig(rootDir: string): UserConfig {
   ];
 
   return {
-    plugins: [formulonWorkerOptionsPlugin()],
+    plugins: [formulonWorkerOptionsPlugin(), workerScriptNoStorePlugin()],
     resolve: { alias },
     server: {
       // formulon ships a pthread-enabled WASM that uses SharedArrayBuffer.
