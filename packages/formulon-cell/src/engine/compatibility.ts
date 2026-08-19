@@ -176,10 +176,12 @@ export function summarizeSpreadsheetCompatibility(
     {
       id: 'named-cell-styles',
       label: 'Named cell styles',
-      status: c.cellStyles ? 'read-only' : 'unsupported',
-      reason: c.cellStyles
-        ? 'Named cell styles can be inspected, but creating or updating cellStyle/cellStyleXf records needs engine writer APIs.'
-        : 'The engine cannot enumerate named cell styles.',
+      status: c.cellStyleMutate ? 'writable' : c.cellStyles ? 'read-only' : 'unsupported',
+      reason: c.cellStyleMutate
+        ? 'A style applied from the gallery is written as a named cellStyle/cellStyleXf pair, so editing the style reaches every cell that uses it.'
+        : c.cellStyles
+          ? 'Named cell styles can be inspected, but creating or updating cellStyle/cellStyleXf records needs engine writer APIs.'
+          : 'The engine cannot enumerate named cell styles.',
     },
     {
       id: 'auto-filter',
@@ -209,18 +211,21 @@ export function summarizeSpreadsheetCompatibility(
     {
       id: 'loaded-tables',
       label: 'Loaded tables',
-      status: tables.count > 0 ? 'read-only' : 'unsupported',
+      status: c.tableMutate ? 'writable' : tables.count > 0 ? 'read-only' : 'unsupported',
       count: tables.count,
-      reason:
-        tables.count > 0
+      reason: c.tableMutate
+        ? 'Loaded ListObjects are visible, editable, and written back on save.'
+        : tables.count > 0
           ? 'Loaded ListObjects are visible and preserved, but not authorable.'
           : 'No loaded ListObjects were reported by the engine.',
     },
     {
       id: 'format-as-table',
       label: 'Format as Table',
-      status: 'session',
-      reason: 'The UI can create session table overlays; engine ListObject authoring is absent.',
+      status: c.tableMutate ? 'writable' : 'session',
+      reason: c.tableMutate
+        ? 'Format as Table creates a real ListObject alongside the UI overlay, so the saved workbook opens as a table.'
+        : 'The UI can create session table overlays; engine ListObject authoring is absent.',
     },
     {
       id: 'pivot-layouts',

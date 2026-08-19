@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import { applyValueFilter, clearFilter } from '../../../src/commands/filter.js';
+import { formatAsTable } from '../../../src/commands/format-as-table.js';
 import { createPivotTableFromRange } from '../../../src/commands/pivot-table.js';
+import {
+  hydrateAutoFilterFromEngine,
+  syncAutoFilterToEngine,
+} from '../../../src/engine/auto-filter-sync.js';
 import {
   hydrateCellFormatsFromEngine,
   syncCellFormatsToEngine,
 } from '../../../src/engine/cell-format-sync.js';
 import { syncConditionalRulesToEngine } from '../../../src/engine/cf-writeback.js';
-import { PivotAggregation, PivotReportLayout } from '../../../src/engine/types.js';
+import { tableOverlaysFromEngine } from '../../../src/engine/table-sync.js';
+import { PivotAggregation, PivotReportLayout, type Range } from '../../../src/engine/types.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { formatPresetPatch } from '../../../src/interact/conditional-dialog-spec.js';
 import {
@@ -16,11 +23,31 @@ import {
   createSpreadsheetStore,
   type FillPattern,
   type NegativeStyle,
+  type SpreadsheetStore,
   type UnderlineStyle,
 } from '../../../src/store/store.js';
 
 const canLoadWasm = (): boolean =>
   typeof WebAssembly !== 'undefined' && typeof SharedArrayBuffer !== 'undefined';
+
+/** A two-column header plus two data rows — the smallest grid `formatAsTable`
+ * can name every column of. */
+const seedTableCells = (wb: WorkbookHandle): void => {
+  wb.setText({ sheet: 0, row: 0, col: 0 }, 'Region');
+  wb.setText({ sheet: 0, row: 0, col: 1 }, 'Amount');
+  wb.setText({ sheet: 0, row: 1, col: 0 }, 'East');
+  wb.setNumber({ sheet: 0, row: 1, col: 1 }, 10);
+  wb.setText({ sheet: 0, row: 2, col: 0 }, 'West');
+  wb.setNumber({ sheet: 0, row: 2, col: 1 }, 20);
+};
+
+const seedStoreText = (store: SpreadsheetStore, row: number, col: number, value: string): void => {
+  store.setState((state) => {
+    const cells = new Map(state.data.cells);
+    cells.set(addrKey({ sheet: 0, row, col }), { value: { kind: 'text', value }, formula: null });
+    return { ...state, data: { ...state.data, cells } };
+  });
+};
 
 describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
   it('saves and reloads values and formulas through the real engine', async () => {
@@ -725,6 +752,192 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
           sheet: 'Sheet1',
         });
         expect(reloaded.getPivotReportLayout(0, 0)).toBe(PivotReportLayout.Tabular);
+      } finally {
+        reloaded.dispose();
+      }
+    } finally {
+      first.dispose();
+    }
+  });
+
+  it('saves gallery styles as named cell styles and rehydrates the tag', async () => {
+    const first = await WorkbookHandle.createDefault();
+
+    try {
+      if (!first.capabilities.cellStyleMutate) return;
+      const source = createSpreadsheetStore();
+      first.setText({ sheet: 0, row: 0, col: 0 }, 'styled');
+      first.setText({ sheet: 0, row: 1, col: 0 }, 'custom');
+      first.setText({ sheet: 0, row: 2, col: 0 }, 'plain');
+      source.setState((state) => ({
+        ...state,
+        format: {
+          ...state.format,
+          customCellStyles: [
+            { id: 'custom:Brand', label: 'Brand', format: { bold: true, color: '#7030a0' } },
+          ],
+          formats: new Map<string, CellFormat>([
+            [
+              addrKey({ sheet: 0, row: 0, col: 0 }),
+              { cellStyle: 'good', color: '#006100', fill: '#c6efce' },
+            ],
+            [
+              addrKey({ sheet: 0, row: 1, col: 0 }),
+              { cellStyle: 'Brand', bold: true, color: '#7030a0' },
+            ],
+            [addrKey({ sheet: 0, row: 2, col: 0 }), { italic: true }],
+          ]),
+        },
+      }));
+      syncCellFormatsToEngine(first, source, 0);
+
+      const reloaded = await WorkbookHandle.loadBytes(first.save());
+      try {
+        const named = reloaded.getNamedCellStyles();
+        expect(named.map((s) => s.name).sort()).toEqual(['Brand', 'Good', 'Normal']);
+        expect(named.find((s) => s.name === 'Good')?.builtinId).toBe(26);
+
+        const target = createSpreadsheetStore();
+        hydrateCellFormatsFromEngine(reloaded, target, 0);
+        const roundTripped = target.getState().format.formats;
+        expect(roundTripped.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.cellStyle).toBe('good');
+        expect(roundTripped.get(addrKey({ sheet: 0, row: 1, col: 0 }))?.cellStyle).toBe('Brand');
+        expect(roundTripped.get(addrKey({ sheet: 0, row: 2, col: 0 }))?.cellStyle).toBeUndefined();
+
+        // The style's own formatting lives on its <cellStyleXfs> row, which is
+        // what makes editing the style reach every cell that uses it.
+        const good = named.find((s) => s.name === 'Good');
+        const styleXf = good ? reloaded.getCellStyleXf(good.xfId) : null;
+        expect(styleXf).not.toBeNull();
+        expect(reloaded.getFillRecord(styleXf?.fillIndex ?? 0)?.pattern).toBe(1);
+      } finally {
+        reloaded.dispose();
+      }
+    } finally {
+      first.dispose();
+    }
+  });
+
+  it('writes Format as Table as a real ListObject and reads it back as an overlay', async () => {
+    const first = await WorkbookHandle.createDefault();
+
+    try {
+      if (!first.capabilities.tableMutate) return;
+      const range: Range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 };
+      seedTableCells(first);
+
+      const store = createSpreadsheetStore();
+      const overlay = formatAsTable(store, range, { workbook: first, style: 'medium' });
+      expect(overlay).not.toBeNull();
+
+      const reloaded = await WorkbookHandle.loadBytes(first.save());
+      try {
+        const tables = reloaded.getTables();
+        expect(tables).toHaveLength(1);
+        expect(tables[0]).toMatchObject({ sheetIndex: 0, ref: 'A1:B3' });
+
+        const overlays = tableOverlaysFromEngine(reloaded);
+        expect(overlays).toHaveLength(1);
+        expect(overlays[0]?.source).toBe('engine');
+        expect(overlays[0]?.range).toEqual(range);
+      } finally {
+        reloaded.dispose();
+      }
+    } finally {
+      first.dispose();
+    }
+  });
+
+  it('keeps a table across a load and save that never touches it', async () => {
+    const authored = await WorkbookHandle.createDefault();
+    let bytes: Uint8Array;
+    try {
+      if (!authored.capabilities.tableMutate) return;
+      seedTableCells(authored);
+      formatAsTable(
+        createSpreadsheetStore(),
+        { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 },
+        {
+          workbook: authored,
+        },
+      );
+      bytes = authored.save();
+    } finally {
+      authored.dispose();
+    }
+
+    const passthrough = await WorkbookHandle.loadBytes(bytes);
+    let resaved: Uint8Array;
+    try {
+      expect(passthrough.getTables()).toHaveLength(1);
+      resaved = passthrough.save();
+    } finally {
+      passthrough.dispose();
+    }
+
+    const reloaded = await WorkbookHandle.loadBytes(resaved);
+    try {
+      expect(reloaded.getTables()).toHaveLength(1);
+      expect(reloaded.getTables()[0]).toMatchObject({ sheetIndex: 0, ref: 'A1:B3' });
+    } finally {
+      reloaded.dispose();
+    }
+  });
+
+  it('round-trips an AutoFilter definition and rehydrates its range', async () => {
+    const first = await WorkbookHandle.createDefault();
+
+    try {
+      if (!first.capabilities.autoFilter) return;
+      const range: Range = { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 };
+      const store = createSpreadsheetStore();
+      seedStoreText(store, 0, 0, 'Region');
+      seedStoreText(store, 1, 0, 'East');
+      seedStoreText(store, 2, 0, 'West');
+      seedStoreText(store, 3, 0, 'North');
+      applyValueFilter(store.getState(), store, range, 0, ['West']);
+
+      expect(syncAutoFilterToEngine(first, store.getState(), 0)).toBe(true);
+
+      const reloaded = await WorkbookHandle.loadBytes(first.save());
+      try {
+        const xml = reloaded.getSheetAutoFilterXml(0) ?? '';
+        expect(xml).toContain('ref="A1:B4"');
+        expect(xml).toContain('colId="0"');
+        expect(xml).toContain('<filter val="East"/>');
+        expect(xml).not.toContain('<filter val="West"/>');
+
+        const restored = createSpreadsheetStore();
+        hydrateAutoFilterFromEngine(reloaded, restored, 0);
+        expect(restored.getState().ui.filterRange).toEqual(range);
+      } finally {
+        reloaded.dispose();
+      }
+    } finally {
+      first.dispose();
+    }
+  });
+
+  it('clears a saved AutoFilter when the user removes the filter', async () => {
+    const first = await WorkbookHandle.createDefault();
+
+    try {
+      if (!first.capabilities.autoFilter) return;
+      const range: Range = { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 1 };
+      const store = createSpreadsheetStore();
+      seedStoreText(store, 1, 0, 'East');
+      applyValueFilter(store.getState(), store, range, 0, []);
+      syncAutoFilterToEngine(first, store.getState(), 0);
+
+      clearFilter(store.getState(), store);
+      expect(syncAutoFilterToEngine(first, store.getState(), 0)).toBe(true);
+
+      const reloaded = await WorkbookHandle.loadBytes(first.save());
+      try {
+        expect(reloaded.getSheetAutoFilterXml(0) ?? '').toBe('');
+        const restored = createSpreadsheetStore();
+        hydrateAutoFilterFromEngine(reloaded, restored, 0);
+        expect(restored.getState().ui.filterRange).toBeNull();
       } finally {
         reloaded.dispose();
       }

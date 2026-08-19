@@ -5,6 +5,7 @@ import {
 } from '../commands/format-as-table.js';
 import type { CellFormat, SpreadsheetStore } from '../store/store.js';
 import { addrKey } from './address.js';
+import { cellStyleKeysByXfId, syncNamedCellStylesToEngine } from './cell-style-writeback.js';
 import { syncHyperlinksToEngine } from './format-sync.js';
 import {
   BUILTIN_NUM_FMT_GENERAL,
@@ -83,7 +84,9 @@ export function syncCellFormatsToEngine(
   sheet: number,
 ): void {
   if (!wb.capabilities.cellFormatting) return;
-  const formats = store.getState().format.formats;
+  const state = store.getState();
+  const formats = state.format.formats;
+  const styleXfIds = syncNamedCellStylesToEngine(wb, state, (format) => resolveStyleXf(wb, format));
   const previous = formattedKeySet(wb, sheet);
   const current = new Set<string>();
   for (const [key, fmt] of formats) {
@@ -92,7 +95,7 @@ export function syncCellFormatsToEngine(
     if (Number.parseInt(sStr, 10) !== sheet) continue;
     const row = Number.parseInt(rStr, 10);
     const col = Number.parseInt(cStr, 10);
-    const xfIndex = resolveXfForFormat(wb, fmt);
+    const xfIndex = resolveXfForFormat(wb, fmt, styleXfIds);
     if (xfIndex < 0) continue;
     wb.setCellXfIndex(sheet, row, col, xfIndex);
     if (wb.capabilities.phonetic && typeof wb.setCellPhonetic === 'function') {
@@ -131,6 +134,7 @@ export function hydrateCellFormatsFromEngine(
 ): void {
   if (!wb.capabilities.cellFormatting) return;
   const workbookDefaultFont = wb.getFontRecord(0);
+  const styleKeys = cellStyleKeysByXfId(wb);
   const updates: Array<{ key: string; patch: Partial<CellFormat> }> = [];
   const physicalCells = wb.physicalCells ? wb.physicalCells(sheet) : wb.cells(sheet);
   for (const c of physicalCells) {
@@ -145,7 +149,7 @@ export function hydrateCellFormatsFromEngine(
     }
     const xf = wb.getCellXf(xfIndex);
     if (!xf) continue;
-    const patch = cellFormatFromXf(wb, xf, workbookDefaultFont);
+    const patch = cellFormatFromXf(wb, xf, workbookDefaultFont, styleKeys);
     if (phonetic) patch.phonetic = phonetic;
     if (Object.keys(patch).length > 0) {
       updates.push({ key: addrKey(c.addr), patch });
@@ -222,8 +226,11 @@ export function cellFormatFromXf(
   wb: WorkbookHandle,
   xf: CellXf,
   workbookDefaultFont: Pick<FontRecord, 'name' | 'size'> | null = null,
+  styleKeysByXfId: ReadonlyMap<number, string> | null = null,
 ): Partial<CellFormat> {
   const patch: Partial<CellFormat> = {};
+  const styleKey = xf.xfId === undefined ? undefined : styleKeysByXfId?.get(xf.xfId);
+  if (styleKey !== undefined) patch.cellStyle = styleKey;
   const font = wb.getFontRecord(xf.fontIndex);
   if (font) Object.assign(patch, fontRecordToFormat(font, workbookDefaultFont));
   const fill = wb.getFillRecord(xf.fillIndex);
@@ -254,24 +261,44 @@ export function cellFormatFromXf(
   return patch;
 }
 
-/** Resolve a CellFormat to an engine xfIndex by ensuring every component
- *  record exists (dedup-on-add) and assembling the XF. Returns -1 on
- *  engine failure. */
-function resolveXfForFormat(wb: WorkbookHandle, fmt: CellFormat): number {
+/** Assemble the XF record for a CellFormat, ensuring every component record
+ *  exists first (the engine dedups on add). Returns null on engine failure. */
+function buildXfForFormat(wb: WorkbookHandle, fmt: CellFormat): CellXf | null {
   const fontIndex = wb.addFontRecord(fontRecordFromFormat(fmt, wb.getFontRecord(0)));
-  if (fontIndex < 0) return -1;
+  if (fontIndex < 0) return null;
   const fillIndex = wb.addFillRecord(fillRecordFromFormat(fmt));
-  if (fillIndex < 0) return -1;
+  if (fillIndex < 0) return null;
   const borderIndex = wb.addBorderRecord(borderRecordFromFormat(fmt));
-  if (borderIndex < 0) return -1;
+  if (borderIndex < 0) return null;
   const code = numFmtToFormatCode(fmt.numFmt);
   let numFmtId = BUILTIN_NUM_FMT_GENERAL;
   if (code !== null) {
     const id = wb.addNumFmtCode(code);
-    if (id < 0) return -1;
+    if (id < 0) return null;
     numFmtId = id;
   }
-  return wb.addXfRecord(buildXfRecord(fontIndex, fillIndex, borderIndex, numFmtId, fmt));
+  return buildXfRecord(fontIndex, fillIndex, borderIndex, numFmtId, fmt);
+}
+
+/** Resolve a CellFormat to an engine xfIndex. `styleXfIds` maps a named style
+ *  to its `<cellStyleXfs>` row, so a styled cell records which style it came
+ *  from instead of collapsing into anonymous direct formatting. Returns -1 on
+ *  engine failure. */
+function resolveXfForFormat(
+  wb: WorkbookHandle,
+  fmt: CellFormat,
+  styleXfIds: ReadonlyMap<string, number>,
+): number {
+  const record = buildXfForFormat(wb, fmt);
+  if (!record) return -1;
+  const xfId = fmt.cellStyle === undefined ? undefined : styleXfIds.get(fmt.cellStyle);
+  return wb.addXfRecord(xfId === undefined ? record : { ...record, xfId });
+}
+
+/** Resolve a named style's own formatting to a `<cellStyleXfs>` row. */
+function resolveStyleXf(wb: WorkbookHandle, format: CellFormat): number {
+  const record = buildXfForFormat(wb, format);
+  return record ? wb.addCellStyleXfRecord(record) : -1;
 }
 
 /** One-shot flush of every store-side format dimension that has an engine

@@ -135,6 +135,30 @@ describe('summarizeSpreadsheetCompatibility', () => {
     expect(summary.byId['defined-names'].reason).toContain('sheet-scoped names need engine');
   });
 
+  it('promotes tables and named cell styles to writable once the engine authors them', () => {
+    const wb = {
+      capabilities: {
+        ...baseCaps,
+        cellStyles: true,
+        cellStyleMutate: true,
+        tableMutate: true,
+      },
+      getPassthroughs: () => [],
+      getTables: () => [
+        { name: 'Table1', displayName: 'Sales', ref: 'A1:C5', sheetIndex: 0, columns: [] },
+      ],
+      getPivotTables: () => [],
+    } as unknown as WorkbookHandle;
+
+    const summary = summarizeSpreadsheetCompatibility(wb);
+
+    expect(summary.byId['named-cell-styles'].status).toBe('writable');
+    expect(summary.byId['named-cell-styles'].reason).toContain('named cellStyle');
+    expect(summary.byId['loaded-tables'].status).toBe('writable');
+    expect(summary.byId['format-as-table'].status).toBe('writable');
+    expect(summary.byId['format-as-table'].reason).toContain('ListObject');
+  });
+
   it('surfaces point-only comment support as missing blank-cell enumeration', () => {
     const wb = {
       capabilities: {
