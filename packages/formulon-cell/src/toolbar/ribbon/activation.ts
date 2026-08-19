@@ -402,6 +402,8 @@ export const RIBBON_TOGGLE_COMMANDS: ReadonlySet<string> = new Set([
   'viewFormulas',
   'viewFormulaBar',
   'viewR1C1',
+  'viewZeros',
+  'viewRightToLeft',
 ]);
 
 export const RIBBON_DISABLED_COMMANDS: ReadonlySet<string> = new Set(['helpSearch']);

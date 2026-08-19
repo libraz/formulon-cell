@@ -26,16 +26,15 @@ describe('mount/chrome — preset → DOM coverage', () => {
       expect(sheet.host.querySelector('.fc-host__grid')).not.toBeNull();
     });
 
-    it('mounts sheet tabs + view toolbar', () => {
+    it('mounts sheet tabs, and leaves the opt-in view strip out', () => {
       expect(sheet.host.querySelector('.fc-host__sheetbar-tabs')).not.toBeNull();
-      expect(sheet.host.querySelector('.fc-viewbar')).not.toBeNull();
+      expect(sheet.host.querySelector('.fc-viewbar')).toBeNull();
     });
 
     it('exposes all default features through `instance.features`', () => {
       const { features } = sheet.instance;
       for (const id of [
         'statusBar',
-        'viewToolbar',
         'workbookObjects',
         'clipboard',
         'pasteSpecial',
@@ -81,12 +80,11 @@ describe('mount/chrome — preset → DOM coverage', () => {
       sheet = await mountStubSheet({ features: presets.standard() });
     });
 
-    it('keeps clipboard / context menu / find-replace / view toolbar / charts', () => {
+    it('keeps clipboard / context menu / find-replace / charts', () => {
       const { features } = sheet.instance;
       expect(features.clipboard).toBeTruthy();
       expect(features.contextMenu).toBeTruthy();
       expect(features.findReplace).toBeTruthy();
-      expect(features.viewToolbar).toBeTruthy();
       expect(features.charts).toBeTruthy();
     });
 

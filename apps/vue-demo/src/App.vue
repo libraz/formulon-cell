@@ -8,6 +8,7 @@ import {
   analyzeAccessibilityCells,
   analyzeSpellingCells,
   applyTextScript,
+  isFeatureDefaultOff,
   mutators,
   parseScriptCommand,
   presets,
@@ -451,7 +452,7 @@ const onPresetChange = (next: PresetKey): void => {
 
 const onFeatureToggle = (id: FeatureId): void => {
   const presetFlags = presets[preset.value]();
-  const defaultOff = id === 'watchWindow' || id === 'slicer';
+  const defaultOff = isFeatureDefaultOff(id);
   const presetDefault = defaultOff ? presetFlags[id] === true : presetFlags[id] !== false;
   const currentVal = isFeatureOn(id);
   const nextVal = !currentVal;
@@ -464,11 +465,9 @@ const onFeatureToggle = (id: FeatureId): void => {
   overrides.value = nextOverrides;
 };
 
-// `watchWindow` and `slicer` ship default-off; everything else is opt-out.
+// A few features ship default-off; everything else is opt-out.
 const isFeatureOn = (id: FeatureId): boolean =>
-  id === 'watchWindow' || id === 'slicer'
-    ? features.value[id] === true
-    : features.value[id] !== false;
+  isFeatureDefaultOff(id) ? features.value[id] === true : features.value[id] !== false;
 
 const commands = computed(() =>
   buildDemoCommands({

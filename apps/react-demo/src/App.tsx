@@ -6,6 +6,7 @@ import {
   EXCEL365_STANDARD_RIBBON_TABS,
   type FeatureFlags,
   type FeatureId,
+  isFeatureDefaultOff,
   mutators,
   parseScriptCommand,
   presets,
@@ -486,7 +487,7 @@ export const App = (): ReactElement => {
       // Compute the next override map. If toggling back to the preset's
       // default, drop the override so the preset's value wins.
       const presetFlags = presets[preset]();
-      const defaultOff = id === 'watchWindow' || id === 'slicer';
+      const defaultOff = isFeatureDefaultOff(id);
       const presetDefault = defaultOff ? presetFlags[id] === true : presetFlags[id] !== false;
       const currentVal = defaultOff ? features[id] === true : features[id] !== false;
       const nextVal = !currentVal;
@@ -923,8 +924,8 @@ export const App = (): ReactElement => {
                 </h3>
                 <div className="demo__feat-grid">
                   {group.features.map((f) => {
-                    // `watchWindow` and `slicer` ship default-off; everything else is opt-out.
-                    const defaultOff = f.id === 'watchWindow' || f.id === 'slicer';
+                    // A few features ship default-off; everything else is opt-out.
+                    const defaultOff = isFeatureDefaultOff(f.id);
                     const enabled = defaultOff ? features[f.id] === true : features[f.id] !== false;
                     return (
                       <label key={f.id} className={`demo__feat${enabled ? ' demo__feat--on' : ''}`}>

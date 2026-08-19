@@ -49,7 +49,8 @@ describe('Spreadsheet feature registry', () => {
     const instance = await Spreadsheet.mount(host, { workbook });
 
     expect(instance.features.statusBar).toBeTruthy();
-    expect(instance.features.viewToolbar).toBeTruthy();
+    // The flat view strip is opt-in; the ribbon's View tab covers it.
+    expect(instance.features.viewToolbar).toBeUndefined();
     expect(instance.features.workbookObjects).toBeTruthy();
     expect(instance.features.clipboard).toBeTruthy();
     expect(instance.features.pasteSpecial).toBeTruthy();

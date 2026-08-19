@@ -37,7 +37,12 @@ export {
   workbookObjects,
 } from './built-ins.js';
 export type { FeatureFlags, FeatureId } from './features.js';
-export { ALL_FEATURE_IDS, resolveFlags } from './features.js';
+export {
+  ALL_FEATURE_IDS,
+  DEFAULT_OFF_FEATURE_IDS,
+  isFeatureDefaultOff,
+  resolveFlags,
+} from './features.js';
 export { full, minimal, presets, standard } from './presets.js';
 export type {
   Extension,

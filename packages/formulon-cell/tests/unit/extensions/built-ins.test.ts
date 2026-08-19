@@ -110,7 +110,6 @@ describe('built-in extension factories', () => {
       'pivotTableDialog',
       'statusBar',
       'workbookObjects',
-      'viewToolbar',
       'hoverComment',
       'gotoSpecial',
       'conditional',

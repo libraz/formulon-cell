@@ -103,7 +103,7 @@ preview; browser-only hosts can omit them. `uploadStatus` accepts `saved`,
 | preset | what's in it |
 |--------|--------------|
 | `presets.minimal()`  | formula bar, status bar, basic keymap |
-| `presets.standard()` | + View toolbar, Quick Analysis, context menu, find/replace, clipboard, format painter |
+| `presets.standard()` | + Quick Analysis, context menu, find/replace, clipboard, format painter |
 | `presets.full()`     | + format dialog, paste-special, conditional formatting, named ranges, hyperlink dialog, PivotTable creation, validation, autocomplete, hover comments |
 
 ## Subpath exports

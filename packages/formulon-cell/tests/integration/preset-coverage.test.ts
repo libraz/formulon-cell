@@ -17,7 +17,6 @@ describe('integration: preset coverage matrix', () => {
     const { features } = sheet.instance;
     for (const id of [
       'statusBar',
-      'viewToolbar',
       'workbookObjects',
       'clipboard',
       'pasteSpecial',
@@ -39,7 +38,6 @@ describe('integration: preset coverage matrix', () => {
     expect(features.clipboard).toBeTruthy();
     expect(features.contextMenu).toBeTruthy();
     expect(features.findReplace).toBeTruthy();
-    expect(features.viewToolbar).toBeTruthy();
     expect(features.charts).toBeTruthy();
     // dropped
     for (const id of [

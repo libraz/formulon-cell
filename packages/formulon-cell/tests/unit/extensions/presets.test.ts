@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_FEATURE_IDS, resolveFlags } from '../../../src/extensions/features.js';
+import {
+  ALL_FEATURE_IDS,
+  DEFAULT_OFF_FEATURE_IDS,
+  isFeatureDefaultOff,
+  resolveFlags,
+} from '../../../src/extensions/features.js';
 import { full, minimal, standard } from '../../../src/extensions/presets.js';
 
 describe('feature presets', () => {
@@ -38,14 +43,23 @@ describe('feature presets', () => {
     expect(full()).toEqual({});
   });
 
-  it('resolves feature defaults with only heavy panels default-off', () => {
+  it('resolves feature defaults with only heavy panels and the view strip default-off', () => {
     const flags = resolveFlags();
     expect(flags.watchWindow).toBe(false);
     expect(flags.slicer).toBe(false);
+    // The ribbon's View tab already carries the strip's commands.
+    expect(flags.viewToolbar).toBe(false);
     for (const id of ALL_FEATURE_IDS) {
-      if (id === 'watchWindow' || id === 'slicer') continue;
+      if (id === 'watchWindow' || id === 'slicer' || id === 'viewToolbar') continue;
       expect(flags[id]).toBe(true);
     }
+  });
+
+  it('reports which features start disabled so hosts read flags the same way', () => {
+    expect(isFeatureDefaultOff('viewToolbar')).toBe(true);
+    expect(isFeatureDefaultOff('watchWindow')).toBe(true);
+    expect(isFeatureDefaultOff('statusBar')).toBe(false);
+    expect([...DEFAULT_OFF_FEATURE_IDS].every((id) => resolveFlags()[id] === false)).toBe(true);
   });
 
   it('allows presets to explicitly opt out of default-on features', () => {

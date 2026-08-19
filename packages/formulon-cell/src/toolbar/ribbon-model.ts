@@ -673,6 +673,14 @@ export function buildRibbonModel(
         cmd('viewFormulas', viewText.formulas, viewText.formulas, 'function', 'wide'),
         cmd('viewFormulaBar', viewText.formulaBar, viewText.formulaBar, 'function', 'wide'),
         cmd('viewR1C1', 'R1C1', tr.r1c1, 'options', 'wide'),
+        cmd('viewZeros', strings.viewToolbar.zeros, strings.viewToolbar.zeros, 'options', 'wide'),
+        cmd(
+          'viewRightToLeft',
+          strings.viewToolbar.rightToLeft,
+          strings.viewToolbar.rightToLeft,
+          'options',
+          'wide',
+        ),
       ]),
       group(tr.window, [
         cmd('freeze', tr.freeze, tr.freeze, 'freeze', 'wide'),

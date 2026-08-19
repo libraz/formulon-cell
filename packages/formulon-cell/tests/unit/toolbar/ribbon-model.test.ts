@@ -67,6 +67,36 @@ describe('toolbar/ribbon-model', () => {
     expect(duplicates).toEqual([]);
   });
 
+  it('carries every View-strip command on the View tab', () => {
+    const view = buildRibbonModel('en').find((tab) => tab.id === 'view');
+    const ids = view?.groups.flatMap((group) => group.commands.map((c) => c.id)) ?? [];
+
+    // The flat View toolbar is opt-in, so the ribbon has to be the one place
+    // all of its commands live.
+    for (const id of [
+      'viewNormal',
+      'viewPageLayout',
+      'viewPageBreakPreview',
+      'viewGridlines',
+      'viewHeadings',
+      'viewZeros',
+      'viewFormulas',
+      'viewR1C1',
+      'viewRightToLeft',
+      'freeze',
+      'sheetViewSave',
+      'sheetViewDelete',
+    ]) {
+      expect(ids, `View tab should carry ${id}`).toContain(id);
+    }
+  });
+
+  it('treats the new View toggles as activatable so they can read as pressed', () => {
+    const activatable = ribbonActivatableCommandIds('en');
+    expect(activatable).toContain('viewZeros');
+    expect(activatable).toContain('viewRightToLeft');
+  });
+
   it('keeps command surfaces locale-independent', () => {
     expect(ribbonCommandIds('ja')).toEqual(ribbonCommandIds('en'));
     expect(ribbonActivatableCommandIds('ja')).toEqual(ribbonActivatableCommandIds('en'));

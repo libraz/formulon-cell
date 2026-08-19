@@ -82,6 +82,10 @@ const COMMAND_SEARCH_ALIASES: Readonly<Record<string, string>> = {
     'show headings hide headings row column headers headings 見出し 行列番号 表示 非表示',
   viewFormulaBar: 'show formula bar hide formula bar fx bar 数式バー 表示 非表示',
   viewPageBreakPreview: 'page break preview preview page breaks 改ページプレビュー 改ページ 表示',
+  viewPageLayout:
+    'page layout view margins header footer ruler ページ レイアウト 余白 ヘッダー フッター',
+  viewZeros: 'show zeros hide zero values zero ゼロ値 0 表示 非表示',
+  viewRightToLeft: 'sheet right to left rtl mirror シートを右から左へ 右から左 反転',
   pictureInsert:
     'insert pictures picture image this device stock images stock image online pictures online image 画像 写真 挿入',
   shapesInsert: 'insert shapes lines rectangles arrows triangle diamond 図形 線 矢印 挿入',
@@ -138,6 +142,9 @@ const COMMAND_SEARCH_BOOSTS: Readonly<Record<string, number>> = {
   viewHeadings: 30,
   viewFormulaBar: 16,
   viewPageBreakPreview: 16,
+  viewPageLayout: 16,
+  viewZeros: 16,
+  viewRightToLeft: 14,
   accessibility: 18,
   watch: 16,
   watchView: 16,

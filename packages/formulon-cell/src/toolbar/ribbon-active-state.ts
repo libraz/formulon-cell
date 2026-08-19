@@ -77,6 +77,8 @@ export interface ActiveState {
   printGridlines: boolean;
   printHeadings: boolean;
   formulasVisible: boolean;
+  zerosVisible: boolean;
+  rightToLeft: boolean;
   workbookView: WorkbookViewMode;
   r1c1: boolean;
   calcMode: 0 | 1 | 2 | null;
@@ -129,6 +131,8 @@ export const EMPTY_ACTIVE_STATE: ActiveState = {
   printGridlines: false,
   printHeadings: false,
   formulasVisible: false,
+  zerosVisible: true,
+  rightToLeft: false,
   workbookView: 'normal',
   r1c1: false,
   calcMode: null,
@@ -159,6 +163,8 @@ export const RIBBON_ACTIVE_COMMANDS: ReadonlyMap<string, keyof ActiveState> = ne
   ['viewGridlines', 'gridlinesVisible'],
   ['viewHeadings', 'headingsVisible'],
   ['viewFormulas', 'formulasVisible'],
+  ['viewZeros', 'zerosVisible'],
+  ['viewRightToLeft', 'rightToLeft'],
   ['viewR1C1', 'r1c1'],
   ['viewNormal', 'workbookView'],
   ['viewPageLayout', 'workbookView'],
@@ -368,6 +374,8 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
     printGridlines: setup.showGridlines === true,
     printHeadings: setup.showHeadings === true,
     formulasVisible: !!s.ui.showFormulas,
+    zerosVisible: s.ui.showZeros !== false,
+    rightToLeft: s.ui.rightToLeft === true,
     workbookView: s.ui.workbookView,
     r1c1: !!s.ui.r1c1,
     calcMode: inst.workbook.calcMode(),

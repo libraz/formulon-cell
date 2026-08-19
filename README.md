@@ -141,12 +141,12 @@ if (isUsingStub()) {
 ## What's inside
 
 - **Desktop-spreadsheet-style** chrome out of the box (formula bar, status bar,
-  context menu, sheet tabs, View toolbar).
+  context menu, sheet tabs, ribbon).
 - **Canvas-rendered** grid with theme tokens — `paper` (light) and `ink`
   (dark) ship in the box; bring your own with the documented CSS variables.
 - **Extension-based** API: built-ins are controlled with feature flags, and
   replaceable pieces (find/replace, format dialog, paste-special, hyperlink
-  dialog, hover comments, View toolbar, Quick Analysis, PivotTable creation,
+  dialog, hover comments, Quick Analysis, PivotTable creation,
   …) are available as extension factories you can compose into the mount call.
 - **Runtime i18n** — swap locales without re-mounting; `ja` and `en` ship
   by default, register more at runtime.
@@ -158,7 +158,7 @@ if (isUsingStub()) {
 | preset | what's in it |
 |--------|--------------|
 | `presets.minimal()`  | formula bar, status bar, basic keymap |
-| `presets.standard()` | + View toolbar, Quick Analysis, session chart overlays, workbook object inspector, context menu, find/replace, clipboard, format painter, wheel scroll |
+| `presets.standard()` | + Quick Analysis, session chart overlays, workbook object inspector, context menu, find/replace, clipboard, format painter, wheel scroll |
 | `presets.full()`     | + format dialog, paste-special, conditional formatting, iterative calculation settings, Go To Special, page setup, named ranges, hyperlink dialog, PivotTable creation, validation, autocomplete, hover comments, spreadsheet keymap |
 
 ### i18n

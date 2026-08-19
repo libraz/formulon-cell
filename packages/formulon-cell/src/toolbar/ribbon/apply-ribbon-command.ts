@@ -27,8 +27,10 @@ import {
   setGridlinesVisible,
   setHeadingsVisible,
   setR1C1ReferenceStyle,
+  setSheetRightToLeft,
   setShowFormulas,
   setWorkbookView,
+  setZerosVisible,
 } from '../../commands/view.js';
 import type { FeatureFlags } from '../../extensions/index.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
@@ -483,6 +485,16 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
       return true;
     case 'viewR1C1':
       setR1C1ReferenceStyle(i.store, !i.store.getState().ui.r1c1);
+      runtime.projectFormatToolbar();
+      runtime.focusSheet();
+      return true;
+    case 'viewZeros':
+      setZerosVisible(i.store, i.store.getState().ui.showZeros === false, i.workbook);
+      runtime.projectFormatToolbar();
+      runtime.focusSheet();
+      return true;
+    case 'viewRightToLeft':
+      setSheetRightToLeft(i.store, i.store.getState().ui.rightToLeft !== true, i.workbook);
       runtime.projectFormatToolbar();
       runtime.focusSheet();
       return true;

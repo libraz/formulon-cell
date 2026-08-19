@@ -802,7 +802,8 @@ export const wheel = (): Extension => ({
  *  one array. Pair with `features: presets.minimal()` (or pick-and-mix
  *  flags) to drop the inline built-ins, then pass this array to
  *  `extensions` for the equivalent surface composed from public factories.
- *  Default-off factories (`watchWindow`, `slicer`) stay opt-in. */
+ *  Default-off factories (`watchWindow`, `slicer`, `viewToolbar`) stay
+ *  opt-in. */
 export const allBuiltIns = (): Extension[] => [
   formatPainter(),
   borderDraw(),
@@ -812,7 +813,6 @@ export const allBuiltIns = (): Extension[] => [
   pivotTableDialog(),
   statusBar(),
   workbookObjects(),
-  viewToolbar(),
   hoverComment(),
   goToSpecialDialog(),
   conditionalDialog(),

@@ -10,8 +10,8 @@ import type { FeatureFlags } from './features.js';
 // designed so adding extensions later is purely additive.
 
 /** Bare grid + formula bar + status bar + basic shortcuts. No menus,
- *  View toolbar, floating inspectors, dialogs, or hover comments. Useful
- *  for read-mostly views. */
+ *  floating inspectors, dialogs, or hover comments. Useful for read-mostly
+ *  views. */
 export const minimal = (): FeatureFlags => ({
   viewToolbar: false,
   sheetTabs: false,
@@ -42,7 +42,7 @@ export const minimal = (): FeatureFlags => ({
   slicer: false,
 });
 
-/** Adds clipboard, context menu, find/replace, View toolbar, Quick Analysis,
+/** Adds clipboard, context menu, find/replace, Quick Analysis,
  *  workbook-object inspector, format painter, and wheel scroll. No fancy
  *  authoring dialogs (format/conditional/named-ranges/hyperlink). */
 export const standard = (): FeatureFlags => ({
