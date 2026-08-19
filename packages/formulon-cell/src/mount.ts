@@ -864,7 +864,7 @@ export const Spreadsheet = {
               if (!text) return;
               const result = insertCopiedCellsFromTSV(store, wb, history, text, direction);
               if (!result) return;
-              mutators.setCopyRange(store, null);
+              // Marquee stays up, same as the context-menu variants.
               mutators.setRange(store, result.writtenRange);
               refreshCells();
               updateChrome();

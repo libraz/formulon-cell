@@ -11,6 +11,7 @@ import { sameAddr } from './pending-format.js';
 import type {
   CellFormat,
   ConditionalRule,
+  CopyMode,
   CustomCellStyle,
   EditorMode,
   EditorRefHighlight,
@@ -91,6 +92,7 @@ export const createSpreadsheetStore = () =>
       fillPreview: null,
       copyRange: null,
       copyRanges: null,
+      copyMode: null,
       showGridLines: true,
       showHeaders: true,
       showZeros: true,
@@ -370,20 +372,26 @@ export const mutators = {
     store.setState((s) => ({ ...s, ui: { ...s.ui, fillPreview: range } }));
   },
 
-  setCopyRange(store: SpreadsheetStore, range: Range | null): void {
+  setCopyRange(store: SpreadsheetStore, range: Range | null, mode: CopyMode = 'copy'): void {
     store.setState((s) => ({
       ...s,
-      ui: { ...s.ui, copyRange: range ? { ...range } : null, copyRanges: null },
+      ui: {
+        ...s.ui,
+        copyRange: range ? { ...range } : null,
+        copyRanges: null,
+        copyMode: range ? mode : null,
+      },
     }));
   },
 
-  setCopyRanges(store: SpreadsheetStore, ranges: Range[] | null): void {
+  setCopyRanges(store: SpreadsheetStore, ranges: Range[] | null, mode: CopyMode = 'copy'): void {
     store.setState((s) => ({
       ...s,
       ui: {
         ...s.ui,
         copyRange: ranges?.[0] ? { ...ranges[0] } : null,
         copyRanges: ranges && ranges.length > 0 ? ranges.map((r) => ({ ...r })) : null,
+        copyMode: ranges?.[0] ? mode : null,
       },
     }));
   },

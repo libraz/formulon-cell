@@ -89,6 +89,14 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
   const hasPastePayload = (text: string): boolean =>
     text.length > 0 || (snapshot !== null && snapshotText === text);
 
+  /** A cut can only be pasted once, so its marquee is consumed by the paste.
+   *  A copy marquee stays up for repeat pastes, exactly like the desktop app. */
+  const consumeCutMarquee = (): void => {
+    if (store.getState().ui.copyMode !== 'cut') return;
+    mutators.setCopyRange(store, null);
+    mutators.setCopyRanges(store, null);
+  };
+
   const pasteFromClipboardText = (
     state: State,
     text: string,
@@ -159,7 +167,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     e.clipboardData.setData('text/html', encodeMaterializedHtml(s, r));
     snapshot = captureMaterializedSnapshot(s, r, 'cut');
     snapshotText = r.tsv;
-    mutators.setCopyRange(store, r.range);
+    mutators.setCopyRange(store, r.range, 'cut');
     e.preventDefault();
     deps.onAfterCommit();
   };
@@ -194,7 +202,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     }
     e.preventDefault();
     if (r) {
-      mutators.setCopyRange(store, null);
+      consumeCutMarquee();
       mutators.setRange(store, r.writtenRange);
       deps.onAfterCommit();
       if (activation) deps.onPasteOptions?.(activation);
@@ -250,7 +258,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       }
       snapshot = captureMaterializedSnapshot(s, r, 'cut');
       snapshotText = r.tsv;
-      mutators.setCopyRange(store, r.range);
+      mutators.setCopyRange(store, r.range, 'cut');
       await writeClipboardText(r.tsv);
       deps.onAfterCommit();
       return;
@@ -286,7 +294,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       if (history) history.end();
     }
     if (r) {
-      mutators.setCopyRange(store, null);
+      consumeCutMarquee();
       mutators.setRange(store, r.writtenRange);
       deps.onAfterCommit();
       if (activation) deps.onPasteOptions?.(activation);

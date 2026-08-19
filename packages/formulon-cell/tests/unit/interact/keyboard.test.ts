@@ -652,10 +652,58 @@ describe('attachKeyboard', () => {
       expect(onBeginEdit).not.toHaveBeenCalled();
     });
 
-    it('Escape with editor idle is a no-op', () => {
+    it('Escape with editor idle and no copy marquee is a no-op', () => {
       setup();
       const e = fire(host, 'Escape');
       expect(e.defaultPrevented).toBe(false);
+    });
+
+    it('Escape cancels the copy marquee', () => {
+      setup();
+      mutators.setCopyRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 0 });
+      const e = fire(host, 'Escape');
+      expect(e.defaultPrevented).toBe(true);
+      expect(store.getState().ui.copyRange).toBeNull();
+    });
+
+    it('Enter pastes and ends copy mode while a marquee is up', () => {
+      const onClipboardShortcut = vi.fn<(kind: 'copy' | 'cut' | 'paste') => void>();
+      detach = attachKeyboard({
+        host,
+        store,
+        wb,
+        onBeginEdit,
+        onClearActive,
+        onClipboardShortcut,
+      });
+      mutators.setActive(store, { sheet: 0, row: 4, col: 4 });
+      mutators.setCopyRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+
+      const e = fire(host, 'Enter');
+
+      expect(e.defaultPrevented).toBe(true);
+      expect(onClipboardShortcut).toHaveBeenCalledWith('paste');
+      expect(store.getState().ui.copyRange).toBeNull();
+      // The active cell stays put; the paste lands on the selection.
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 4, col: 4 });
+    });
+
+    it('Enter still steps down when no marquee is up', () => {
+      const onClipboardShortcut = vi.fn<(kind: 'copy' | 'cut' | 'paste') => void>();
+      detach = attachKeyboard({
+        host,
+        store,
+        wb,
+        onBeginEdit,
+        onClearActive,
+        onClipboardShortcut,
+      });
+      mutators.setActive(store, { sheet: 0, row: 4, col: 4 });
+
+      fire(host, 'Enter');
+
+      expect(onClipboardShortcut).not.toHaveBeenCalled();
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 5, col: 4 });
     });
 
     it('unrecognized keys do not preventDefault', () => {

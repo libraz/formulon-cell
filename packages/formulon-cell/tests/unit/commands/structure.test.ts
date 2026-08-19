@@ -1007,6 +1007,28 @@ describe('H-2: structure edits re-point merges / conditional formats / filter', 
     expect(ui.filterCriteria[0]?.range).toEqual({ sheet: 0, r0: 0, c0: 2, r1: 4, c1: 4 });
   });
 
+  it('shifts the copy marquee so it keeps outlining the copied band', () => {
+    mutators.setCopyRange(store, { sheet: 0, r0: 0, c0: 1, r1: 1048575, c1: 1 });
+    insertCols(store, wb, null, 0, 1);
+    expect(store.getState().ui.copyRange).toEqual({
+      sheet: 0,
+      r0: 0,
+      c0: 2,
+      r1: 1048575,
+      c1: 2,
+    });
+
+    mutators.setCopyRanges(store, [{ sheet: 0, r0: 3, c0: 0, r1: 3, c1: 16383 }]);
+    insertRows(store, wb, null, 0, 2);
+    expect(store.getState().ui.copyRanges).toEqual([{ sheet: 0, r0: 5, c0: 0, r1: 5, c1: 16383 }]);
+  });
+
+  it('drops the copy marquee when the copied band is deleted', () => {
+    mutators.setCopyRange(store, { sheet: 0, r0: 0, c0: 2, r1: 1048575, c1: 2 });
+    deleteCols(store, wb, null, 2, 1);
+    expect(store.getState().ui.copyRange).toBeNull();
+  });
+
   it('clears the autofilter when its whole region is deleted', () => {
     store.setState((s) => ({
       ...s,

@@ -61,6 +61,16 @@ export type ItemId =
 
 export type MenuKind = 'cell' | 'row' | 'col';
 
+/** Plain insert entries. While a copy is pending the desktop menus replace
+ *  these with "Insert Copied Cells" rather than listing both. */
+export const PLAIN_INSERT_IDS: readonly ItemId[] = [
+  'insertCells',
+  'rowInsertAbove',
+  'rowInsertBelow',
+  'colInsertLeft',
+  'colInsertRight',
+];
+
 export type MenuEntry =
   | { kind: 'item'; id: ItemId; label: string; hint?: string }
   | { kind: 'submenu'; id: string; label: string; children: MenuEntry[] }
@@ -143,8 +153,8 @@ export function buildCellEntries(s: Strings): MenuEntry[] {
     pasteSpecialSubmenu(s),
     { kind: 'sep', id: 'sep1' },
     { kind: 'item', id: 'insertCells', label: s.ribbonMenu.insertCells },
-    { kind: 'item', id: 'deleteCells', label: s.ribbonMenu.deleteCells },
     { kind: 'item', id: 'insertCopiedCells', label: t.insertCopiedCells },
+    { kind: 'item', id: 'deleteCells', label: s.ribbonMenu.deleteCells },
     { kind: 'item', id: 'clear', label: t.clear, hint: 'Del' },
     { kind: 'sep', id: 'sep2' },
     filterSubmenu(s),

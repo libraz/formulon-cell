@@ -329,6 +329,23 @@ function shiftAnchoredRanges(
     });
   });
 
+  // Copy marquee. Transient UI state that history never captures, so it is
+  // shifted outside the recorders — otherwise the outline would keep pointing
+  // at the source's pre-shift indices.
+  store.setState((s) => {
+    const shiftMarquee = (range: Range): Range | null =>
+      range.sheet === sheet ? shiftRangeAxis(range, axis, split, delta) : range;
+    const copyRange = s.ui.copyRange ? shiftMarquee(s.ui.copyRange) : null;
+    const copyRanges = s.ui.copyRanges
+      ? s.ui.copyRanges.map(shiftMarquee).filter((r): r is Range => r !== null)
+      : null;
+    if (copyRange === s.ui.copyRange && copyRanges === s.ui.copyRanges) return s;
+    return {
+      ...s,
+      ui: { ...s.ui, copyRange, copyRanges: copyRanges?.length ? copyRanges : null },
+    };
+  });
+
   // Autofilter region + per-column criteria.
   recordFilterChange(history, store, () => {
     store.setState((s) => {

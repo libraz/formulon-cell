@@ -117,6 +117,12 @@ export class InlineEditor {
     const s = this.deps.store.getState();
     const a = s.selection.active;
     this.editingAddr = a;
+    // Putting a cell into edit mode cancels copy mode — the marquee only
+    // survives navigation and paste-family commands.
+    if (s.ui.copyRange || s.ui.copyRanges) {
+      mutators.setCopyRange(this.deps.store, null);
+      mutators.setCopyRanges(this.deps.store, null);
+    }
     mutators.setEditor(this.deps.store, { kind: 'enter', raw: seed });
 
     const input = document.createElement('textarea');

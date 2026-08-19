@@ -62,6 +62,14 @@ describe('InlineEditor', () => {
     expect(mode.kind === 'enter' && mode.raw).toBe('hi');
   });
 
+  it('begin cancels copy mode so the marquee does not survive a cell edit', () => {
+    mutators.setActive(store, { sheet: 0, row: 2, col: 3 });
+    mutators.setCopyRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1048575, c1: 0 });
+    editor.begin('x');
+    expect(store.getState().ui.copyRange).toBeNull();
+    expect(store.getState().ui.copyRanges).toBeNull();
+  });
+
   it('begin positions the input over the active cell using cellRect', () => {
     mutators.setActive(store, { sheet: 0, row: 1, col: 1 });
     editor.begin('');

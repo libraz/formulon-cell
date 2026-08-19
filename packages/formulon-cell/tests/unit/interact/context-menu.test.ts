@@ -107,8 +107,8 @@ describe('attachContextMenu', () => {
       'paste',
       'pasteSpecialMenu',
       'insertCells',
-      'deleteCells',
       'insertCopiedCells',
+      'deleteCells',
       'clear',
       'filterMenu',
       'sortMenu',
@@ -729,7 +729,8 @@ describe('attachContextMenu', () => {
       wb.recalc();
       expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'text', value: 'new' });
       expect(wb.getValue({ sheet: 0, row: 2, col: 1 })).toEqual({ kind: 'text', value: 'old' });
-      expect(store.getState().ui.copyRange).toBeNull();
+      // The marquee outlives the insert so the same source can be reused.
+      expect(store.getState().ui.copyRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
       expect(onAfterCommit).toHaveBeenCalled();
     });
 
@@ -799,7 +800,7 @@ describe('attachContextMenu', () => {
         hyperlink: 'https://example.test',
         bold: true,
       });
-      expect(store.getState().ui.copyRange).toBeNull();
+      expect(store.getState().ui.copyRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
       expect(onAfterCommit).toHaveBeenCalled();
     });
 
@@ -990,6 +991,9 @@ describe('attachContextMenu', () => {
       fireContextMenu(host, 10, 59); // row 1 header
       // The header variant needs no direction prompt, so it carries no ellipsis.
       expect(item('insertCopiedCells')?.textContent).toBe(en.contextMenu.insertCopiedBand);
+      // A pending copy replaces the plain insert entries rather than joining them.
+      expect(item('rowInsertAbove')).toBeNull();
+      expect(item('rowInsertBelow')).toBeNull();
       item('insertCopiedCells')?.click();
 
       await Promise.resolve();
@@ -998,14 +1002,24 @@ describe('attachContextMenu', () => {
       expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'a' });
       expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'a' });
       expect(wb.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'text', value: 'b' });
-      expect(store.getState().ui.copyRange).toBeNull();
+      // The inserted row stays selected and the marquee stays up for a repeat.
+      expect(store.getState().selection.range).toEqual({
+        sheet: 0,
+        r0: 1,
+        c0: 0,
+        r1: 1,
+        c1: 16383,
+      });
+      expect(store.getState().ui.copyRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 16383 });
       expect(onAfterCommit).toHaveBeenCalled();
     });
 
-    it('hides Insert Copied Cells in the row menu outside copy mode', () => {
+    it('shows the plain row insert entries outside copy mode', () => {
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
       fireContextMenu(host, 10, 30);
       expect(item('insertCopiedCells')).toBeNull();
+      expect(item('rowInsertAbove')).not.toBeNull();
+      expect(item('rowInsertBelow')).not.toBeNull();
     });
 
     it('Insert Above shifts existing rows down', () => {
@@ -1109,7 +1123,21 @@ describe('attachContextMenu', () => {
       expect(
         store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 1 })),
       ).toMatchObject({ bold: true });
-      expect(store.getState().ui.copyRange).toBeNull();
+      // The inserted column stays selected and the marquee stays on the source.
+      expect(store.getState().selection.range).toEqual({
+        sheet: 0,
+        r0: 0,
+        c0: 1,
+        r1: 1048575,
+        c1: 1,
+      });
+      expect(store.getState().ui.copyRange).toEqual({
+        sheet: 0,
+        r0: 0,
+        c0: 0,
+        r1: 1048575,
+        c1: 0,
+      });
       expect(onAfterCommit).toHaveBeenCalled();
     });
 

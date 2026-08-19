@@ -372,7 +372,16 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
         ? move(a, 0, -colDir * Math.max(1, s.viewport.colCount - 1))
         : move(a, -Math.max(1, s.viewport.rowCount - 1), 0);
     else if (k === 'Tab') target = stepWithMerge(s, a, 0, shift ? -1 : 1, MAX_ROW, MAX_COL);
-    else if (k === 'Enter' && !meta) {
+    else if (k === 'Enter' && !meta && !shift && s.ui.copyRange && deps.onClipboardShortcut) {
+      // Enter is the one-shot paste while a marquee is up: it pastes at the
+      // selection and always ends copy mode, unlike Ctrl+V which leaves a copy
+      // marquee standing for repeat pastes.
+      mutators.setCopyRange(store, null);
+      mutators.setCopyRanges(store, null);
+      deps.onClipboardShortcut('paste');
+      e.preventDefault();
+      return;
+    } else if (k === 'Enter' && !meta) {
       target = stepWithMerge(s, a, shift ? -1 : 1, 0, MAX_ROW, MAX_COL);
     } else if (meta && k === 'Enter') {
       deps.onBeginEdit('');
@@ -410,7 +419,13 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       e.preventDefault();
       return;
     } else if (k === 'Escape') {
-      // No editor active; nothing to do.
+      // No editor active, so Escape cancels the copy marquee — the only way
+      // out of copy mode short of another copy/cut.
+      if (s.ui.copyRange || s.ui.copyRanges) {
+        mutators.setCopyRange(store, null);
+        mutators.setCopyRanges(store, null);
+        e.preventDefault();
+      }
       return;
     } else if (meta && (k === 'z' || k === 'Z')) {
       const h = deps.history;

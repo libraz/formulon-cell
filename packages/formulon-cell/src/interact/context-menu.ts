@@ -56,6 +56,7 @@ import {
   type MenuEntry,
   type MenuKind,
   PASTE_QUICK_IDS,
+  PLAIN_INSERT_IDS,
   SUBMENU_ICON_ACTION,
 } from './context-menu-spec.js';
 import { openInsertCopiedCellsDialog } from './insert-copied-cells-dialog.js';
@@ -400,7 +401,10 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           (e) => !(e.kind === 'item' && e.id === 'insertHyperlink' && !deps.onInsertHyperlink),
         )
         .filter((e) => !(e.kind === 'item' && e.id === 'openHyperlink' && !deps.onOpenHyperlink))
+        // A pending copy swaps the plain insert entries for "Insert Copied
+        // Cells" — the desktop menus never show both at once.
         .filter((e) => !(e.kind === 'item' && e.id === 'insertCopiedCells' && !hasCopiedCells))
+        .filter((e) => !(e.kind === 'item' && hasCopiedCells && PLAIN_INSERT_IDS.includes(e.id)))
         .filter((e) => !(e.kind === 'item' && e.id === 'insertComment' && !deps.onEditComment))
         .filter((e) => !(e.kind === 'item' && e.id === 'toggleWatch' && !deps.onToggleWatch))
         .filter((e) => !(e.kind === 'item' && e.id === 'defineName' && !deps.onDefineName))
@@ -627,6 +631,14 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   const hasPastePayload = (text: string, snap: ClipboardSnapshot | null | undefined): boolean =>
     text.length > 0 || snap != null;
 
+  /** A cut can only be pasted once, so its marquee is consumed by the paste.
+   *  A copy marquee stays up for repeat pastes, exactly like the desktop app. */
+  const consumeCutMarquee = (): void => {
+    if (store.getState().ui.copyMode !== 'cut') return;
+    mutators.setCopyRange(store, null);
+    mutators.setCopyRanges(store, null);
+  };
+
   /** "Insert Copied Cells" from a row or column header. The header already
    *  fixes the shift direction, so instead of asking which way to push cells
    *  it opens as many whole rows/columns as the copied band is deep/wide and
@@ -636,18 +648,26 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     if (!source) return;
 
     const insertBand = (snap: ClipboardSnapshot | null, text: string): void => {
+      // The header band the user right-clicked. It stays selected afterwards:
+      // the inserted rows/columns occupy exactly those indices, and the copy
+      // marquee stays up so the same source can be inserted again.
       const target = store.getState().selection.range;
+      const count = kind === 'col' ? source.c1 - source.c0 + 1 : source.r1 - source.r0 + 1;
+      const band: Range =
+        kind === 'col'
+          ? { ...target, c1: target.c0 + count - 1 }
+          : { ...target, r1: target.r0 + count - 1 };
       if (history) history.begin();
       try {
         if (kind === 'col') {
-          insertCols(store, wb, history, target.c0, source.c1 - source.c0 + 1);
+          insertCols(store, wb, history, target.c0, count);
           mutators.setActive(store, {
             sheet: target.sheet,
             row: snap?.range.r0 ?? 0,
             col: target.c0,
           });
         } else {
-          insertRows(store, wb, history, target.r0, source.r1 - source.r0 + 1);
+          insertRows(store, wb, history, target.r0, count);
           mutators.setActive(store, {
             sheet: target.sheet,
             row: target.r0,
@@ -655,21 +675,22 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           });
         }
         const next = store.getState();
-        const r = snap
-          ? pasteSpecial(next, store, wb, snap, {
-              what: 'all',
-              operation: 'none',
-              skipBlanks: false,
-              transpose: false,
-            })
-          : pasteTSV(next, wb, text);
-        if (r) mutators.setRange(store, r.writtenRange);
+        if (snap) {
+          pasteSpecial(next, store, wb, snap, {
+            what: 'all',
+            operation: 'none',
+            skipBlanks: false,
+            transpose: false,
+          });
+        } else {
+          pasteTSV(next, wb, text);
+        }
       } catch (err) {
         console.warn('formulon-cell: insert copied cells failed', err);
       } finally {
         if (history) history.end();
       }
-      mutators.setCopyRange(store, null);
+      mutators.setRange(store, band);
       deps.onAfterCommit?.();
     };
 
@@ -717,7 +738,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           if (history) history.end();
         }
         if (r) {
-          mutators.setCopyRange(store, r.range);
+          mutators.setCopyRange(store, r.range, 'cut');
           void writeClipboard(r.tsv);
         }
         deps.onAfterCommit?.();
@@ -748,7 +769,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
             if (history) history.end();
           }
           if (r) {
-            mutators.setCopyRange(store, null);
+            consumeCutMarquee();
             mutators.setRange(store, r.writtenRange);
           }
           deps.onAfterCommit?.();
@@ -793,7 +814,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
               if (!hasPastePayload(text, snap)) return;
               const r = insertCopiedCellsFromTSV(store, wb, history, text, direction, snap);
               if (r) {
-                mutators.setCopyRange(store, null);
+                // Marquee stays up, same as the row/column header variant.
                 mutators.setRange(store, r.writtenRange);
                 deps.onAfterCommit?.();
               }

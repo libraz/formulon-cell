@@ -321,6 +321,43 @@ describe('attachClipboard', () => {
     handle.detach();
   });
 
+  it('leaves a copy marquee standing after a paste so the source can be reused', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 'a' }]);
+    setRange(store, 0, 0, 0, 0);
+    const handle = attachClipboard({ host, store, wb, onAfterCommit });
+
+    const { transfer } = fireClipboard(host, 'copy');
+    expect(store.getState().ui.copyMode).toBe('copy');
+
+    setRange(store, 3, 3, 3, 3);
+    fireClipboard(host, 'paste', transfer.getData('text/plain'));
+    wb.recalc();
+    expect(wb.getValue({ sheet: 0, row: 3, col: 3 })).toEqual({ kind: 'text', value: 'a' });
+    expect(store.getState().ui.copyRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+
+    // Repeat paste into a second destination.
+    setRange(store, 5, 5, 5, 5);
+    fireClipboard(host, 'paste', transfer.getData('text/plain'));
+    wb.recalc();
+    expect(wb.getValue({ sheet: 0, row: 5, col: 5 })).toEqual({ kind: 'text', value: 'a' });
+    handle.detach();
+  });
+
+  it('consumes a cut marquee on the first paste', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 'a' }]);
+    setRange(store, 0, 0, 0, 0);
+    const handle = attachClipboard({ host, store, wb, onAfterCommit });
+
+    const { transfer } = fireClipboard(host, 'cut');
+    expect(store.getState().ui.copyMode).toBe('cut');
+
+    setRange(store, 3, 3, 3, 3);
+    fireClipboard(host, 'paste', transfer.getData('text/plain'));
+    expect(store.getState().ui.copyRange).toBeNull();
+    expect(store.getState().ui.copyMode).toBeNull();
+    handle.detach();
+  });
+
   it('records a multi-cell paste as one undo step when history is attached', () => {
     const history = new History();
     setRange(store, 1, 1, 1, 1);

@@ -312,6 +312,9 @@ export interface PendingFormat {
   format: Partial<CellFormat>;
 }
 
+/** Which clipboard command raised the marquee. */
+export type CopyMode = 'copy' | 'cut';
+
 export interface UiSlice {
   editor: EditorMode;
   hover: Addr | null;
@@ -331,6 +334,10 @@ export interface UiSlice {
   copyRange: Range | null;
   /** Disjoint clipboard ranges for Ctrl/Cmd multi-row or multi-column copies. */
   copyRanges?: Range[] | null;
+  /** Whether the marquee came from a copy or a cut. A copy survives pasting so
+   *  the same source can be pasted repeatedly; a cut is consumed by its first
+   *  paste. Null whenever there is no marquee. */
+  copyMode?: CopyMode | null;
   /** When false, the renderer skips drawing inter-cell hairline gridlines. */
   showGridLines: boolean;
   /** When false, the renderer hides the row-number / column-letter strips. */
