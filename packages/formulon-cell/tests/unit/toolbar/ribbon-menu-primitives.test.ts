@@ -699,7 +699,9 @@ describe('toolbar/ribbon menu primitives', () => {
 
       expect(icon?.classList.contains('fc-tb__menu-icon--svg')).toBe(true);
       expect(icon?.querySelector('.fc-tb__menu-icon-svg')).toBeTruthy();
-      expect(icon?.querySelector('path[fill="#107c41"]')).toBeTruthy();
+      // The rule under the letterform is the underline itself, so it carries
+      // the ink colour rather than an accent.
+      expect(icon?.querySelector('path[fill="#1f1f1f"]')).toBeTruthy();
     }
   });
 
@@ -804,7 +806,8 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(7);
     expect(menu.querySelector('path[fill="#f7e1ff"]')).toBeTruthy();
     expect(menu.querySelector('path[stroke="#2f75b5"]')).toBeTruthy();
-    expect(menu.querySelector('path[stroke="#c00000"]')).toBeTruthy();
+    // The destructive mark is a filled badge plate, not a stroked cross.
+    expect(menu.querySelector('path[fill="#c00000"]')).toBeTruthy();
 
     expect(menusCss).toMatch(/#menu-clear\s*\{[\s\S]*?min-width: 194px;/);
     expect(menusCss).toMatch(
@@ -907,9 +910,9 @@ describe('toolbar/ribbon menu primitives', () => {
       '選択ウィンドウ...',
     ]);
     expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(11);
-    expect(menu.querySelector('path[stroke="#8764b8"]')).toBeTruthy();
+    expect(menu.querySelector('path[stroke="#8a4fb7"]')).toBeTruthy();
     expect(menu.querySelector('path[stroke="#107c41"]')).toBeTruthy();
-    expect(menu.querySelector('path[fill="#fff8cc"]')).toBeTruthy();
+    expect(menu.querySelector('path[fill="#fdf3bf"]')).toBeTruthy();
 
     expect(menusCss).toMatch(/#menu-find-select\s*\{[\s\S]*?min-width: 182px;/);
     expect(menusCss).toMatch(
