@@ -1,13 +1,23 @@
 # @libraz/formulon-cell-vue
 
-[![npm version](https://img.shields.io/npm/v/@libraz/formulon-cell-vue.svg)](https://www.npmjs.com/package/@libraz/formulon-cell-vue)
-[![license](https://img.shields.io/npm/l/@libraz/formulon-cell-vue.svg)](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/@libraz/formulon-cell-vue)](https://bundlephobia.com/package/@libraz/formulon-cell-vue)
+[![CI](https://img.shields.io/github/actions/workflow/status/libraz/formulon-cell/ci.yml?branch=main&label=CI)](https://github.com/libraz/formulon-cell/actions)
+[![npm](https://img.shields.io/npm/v/@libraz/formulon-cell-vue)](https://www.npmjs.com/package/@libraz/formulon-cell-vue)
+[![npm — core](https://img.shields.io/npm/v/@libraz/formulon-cell?label=core)](https://www.npmjs.com/package/@libraz/formulon-cell)
+[![npm — react](https://img.shields.io/npm/v/@libraz/formulon-cell-react?label=react)](https://www.npmjs.com/package/@libraz/formulon-cell-react)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
+[![Vue](https://img.shields.io/badge/Vue-3-blue?logo=vuedotjs)](https://vuejs.org/)
 
+**Vue アプリの中に、動く表計算をそのまま置けます。** `<Spreadsheet>` と
+`SpreadsheetToolbar` は
 [`@libraz/formulon-cell`](https://www.npmjs.com/package/@libraz/formulon-cell)
-を Vue 3 向けにラップしたコンポーネントとコンポーザブル。
-[formulon](https://github.com/libraz/formulon) WASM 計算エンジン向けの
-スプレッドシート UI です。
+をラップしたもので、[formulon](https://github.com/libraz/formulon) の WASM
+計算エンジンの上に、Canvas 描画のグリッドとデスクトップ表計算ソフト風の UI 表層を
+提供します。props の変更はキャンバスを再マウントせず、コアの命令的 API を通して
+稼働中のインスタンスへ反映されます。
+
+本パッケージは薄いアダプタです。グリッド、リボン、メニュー、コマンド、
+ダイアログはすべてコアにあるため、Vue 版と React 版の実装がずれることは
+ありません。
 
 ## インストール
 
@@ -56,18 +66,19 @@ const { locale, strings } = useI18n(instance);
 
 ## ツールバー
 
-`SpreadsheetToolbar` は SFC のサブパスとして公開されており、Vue のバンドラ
-がアプリ本体のコンポーネントと同じパイプラインでコンパイルできます。
-これは core の `Spreadsheet.mountToolbar` に対する薄いアダプタで、リボン
-DOM、メニュー factory、activation model、dynamic dropdown dispatcher は
-`@libraz/formulon-cell` に集約されています。
+`SpreadsheetToolbar` は SFC のサブパスとして公開しており、Vue のバンドラが
+アプリ本体のコンポーネントと同じパイプラインでコンパイルできます。実体は
+コアの `Spreadsheet.mountToolbar` に対する薄いアダプタで、リボンの DOM、
+メニューファクトリ、アクティベーションモデル、動的ドロップダウンの
+ディスパッチャは `@libraz/formulon-cell` に集約されています。
 
-host 側の監査や独自 chrome では、`ribbonActivationEntries`、
+ホスト側の監査や独自の UI 表層では、`ribbonActivationEntries`、
 `ribbonSurfaceCommandIds`、`DYNAMIC_RIBBON_DROPDOWN_HANDLER_ATTRS`、
 `attachRangePickerButton`、`appendConditionalApplyFormatControls`、
-`conditionalStyleOptions`、`showReport`、`reportDialogLabels`、`projectDisabledReason` などの core
-export を使います。Vue 側で ribbon command set や Excel 型 dialog/report
-control、disabled/read-only reason の投影を再実装しません。
+`conditionalStyleOptions`、`showReport`、`reportDialogLabels`、
+`projectDisabledReason`、`projectDisabledState` といったコアのエクスポートを
+使ってください。リボンのコマンド一覧、Excel 風のダイアログやレポート、
+無効／読み取り専用の理由の射影を Vue 側で作り直す必要はありません。
 
 ```vue
 <script setup lang="ts">
@@ -77,15 +88,32 @@ import '@libraz/formulon-cell-vue/toolbar.css';
 </script>
 ```
 
-個別の dropdown 動作だけ差し替える場合は、リボンを fork せず
-`dropdownActions` を使います。
+個別のドロップダウンの動作だけ差し替えたい場合は、リボンをフォークせず
+`dropdownActions` を使ってください。
 
 ## 実行時の props 更新
 
-`theme`・`locale`・`strings`・`workbook`・`features`・`extensions` の各
+`theme`・`locale`・`strings`・`workbook`・`features`・`extensions`・
+`printerProfiles`・`printerProfileId`・`uploadStatus`・`macroRecording` の各
 プロパティは、コアの命令的 API を経由して稼働中のスプレッドシートに
 反映されます。コンポーネントは **再マウントを行いません** ので、
 選択範囲・フォーカス・ホスト側のイベント購読はそのまま維持されます。
+
+ホストにしか持てない機能も、リボンの挙動を Vue 側で作り直すことなく
+props として渡せます。
+
+```vue
+<template>
+  <Spreadsheet
+    :capture-screen-clip="captureScreenClip"
+    :refresh-printer-profiles="refreshPrinterProfiles"
+  />
+</template>
+```
+
+`captureScreenClip` は「挿入 > スクリーンショット > 画面の領域切り取り」を
+担い、プリンタープロファイル系の props はページ設定と印刷プレビューの
+最小余白の扱いに使われます。
 
 ## コアヘルパー
 
@@ -93,8 +121,10 @@ import '@libraz/formulon-cell-vue/toolbar.css';
 `saveSheetView`・`activateSheetView`・`listDefinedNames`・
 `upsertDefinedName`・`ribbonActivationEntries`・`attachRangePickerButton`・
 `appendConditionalApplyFormatControls`・`conditionalStyleOptions`・
-`showReport`・`reportDialogLabels`・`projectDisabledReason` など）を再エクスポートしています。Vue アプリの
-ホスト側 UI 表層に必要な型を、単一のインポート元から取り込めます。
+`showReport`・`reportDialogLabels`・`projectDisabledReason`・
+`projectDisabledState`・`ScreenClipCapture`・`ScreenClipResult` など）を
+再エクスポートしています。Vue アプリのホスト側 UI 表層に必要な型を、
+単一のインポート元から取り込めます。
 
 ## ドキュメント
 
@@ -102,6 +132,13 @@ import '@libraz/formulon-cell-vue/toolbar.css';
 [プロジェクト README](https://github.com/libraz/formulon-cell/blob/main/README_ja.md)
 を参照してください。
 
+## 併せて使えるパッケージ
+
+```sh
+npm install @libraz/formulon-cell         # Vanilla TypeScript / DOM コア
+npm install @libraz/formulon-cell-react   # React 18+ コンポーネント + フック
+```
+
 ## ライセンス
 
-[Apache License 2.0](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
+[Apache-2.0](https://github.com/libraz/formulon-cell/blob/main/LICENSE)

@@ -1,13 +1,23 @@
 # @libraz/formulon-cell
 
-[![npm version](https://img.shields.io/npm/v/@libraz/formulon-cell.svg)](https://www.npmjs.com/package/@libraz/formulon-cell)
-[![license](https://img.shields.io/npm/l/@libraz/formulon-cell.svg)](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/@libraz/formulon-cell)](https://bundlephobia.com/package/@libraz/formulon-cell)
+[![CI](https://img.shields.io/github/actions/workflow/status/libraz/formulon-cell/ci.yml?branch=main&label=CI)](https://github.com/libraz/formulon-cell/actions)
+[![npm](https://img.shields.io/npm/v/@libraz/formulon-cell)](https://www.npmjs.com/package/@libraz/formulon-cell)
+[![npm — react](https://img.shields.io/npm/v/@libraz/formulon-cell-react?label=react)](https://www.npmjs.com/package/@libraz/formulon-cell-react)
+[![npm — vue](https://img.shields.io/npm/v/@libraz/formulon-cell-vue?label=vue)](https://www.npmjs.com/package/@libraz/formulon-cell-vue)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-blue?logo=typescript)](https://www.typescriptlang.org/)
 
-[formulon](https://github.com/libraz/formulon) WASM 計算エンジン向けの
-スプレッドシート UI。デスクトップ表計算ソフト風の UI 表層、
-Canvas 描画によるグリッド、拡張ベースの機能構成、実行時ロケール切替を
-提供します。
+**フレームワーク非依存のまま、Web ページの中に表計算を組み込みます。** DOM 要素に
+マウントすると、Canvas 描画のグリッドとデスクトップ表計算ソフト風の UI 表層
+（数式バー、リボン、シートタブ、コンテキストメニュー）が手に入ります。その下では
+[formulon](https://github.com/libraz/formulon) の WASM 計算エンジンが、メイン
+スレッドの外で数式を評価します。機能はプリセットと拡張ファクトリで組み立てられ、
+ロケールは再マウントせず実行時に切り替えられます。
+
+本パッケージは Vanilla TypeScript / DOM のコアです。フレームワーク版は
+[`@libraz/formulon-cell-react`](https://www.npmjs.com/package/@libraz/formulon-cell-react)
+と [`@libraz/formulon-cell-vue`](https://www.npmjs.com/package/@libraz/formulon-cell-vue)
+にあり、どちらも同じマウント呼び出しに対する薄いアダプタです。
 
 > **Excel 互換性について。** `formulon-cell` は、実際のブラウザ上で
 > [**formulon**](https://github.com/libraz/formulon) を結合試験しながら、
@@ -54,6 +64,41 @@ sheet.i18n.setLocale('en');     // 実行時にロケールを切り替え
 sheet.setTheme('ink');           // ダークテーマ — グリッドとツールバーが同時に切り替わる
 ```
 
+## ホスト統合
+
+ブラウザの API だけでは、デスクトップ表計算ソフトの統合ポイントをすべて
+再現できません。ホスト側は `MountOptions` からその能力を差し込めるため、
+リボンや Backstage の共通挙動はコアに置いたまま拡張できます。
+
+```ts
+const sheet = await Spreadsheet.mount(host, {
+  workbook: wb,
+  captureScreenClip: async () => ({
+    src: await nativeCaptureRegionAsDataUrl(),
+    alt: '画面の領域切り取り',
+  }),
+  printerProfiles: [
+    {
+      id: 'office-printer',
+      name: 'Office Printer',
+      paperSize: 'A4',
+      orientation: 'portrait',
+      printableBounds: { top: 0.16, right: 0.16, bottom: 0.16, left: 0.16 },
+    },
+  ],
+  refreshPrinterProfiles: () => nativeListPrinterProfiles(),
+  uploadStatus: 'saving',
+  macroRecording: false,
+});
+```
+
+`captureScreenClip` は「挿入 > スクリーンショット > 画面の領域切り取り」を
+担います。省略した場合、このコマンドはネイティブの領域切り取りがホスト提供で
+あることを通知します。プリンタープロファイルは、ページ設定と印刷プレビューに
+物理プリンターの最小余白を与えるもので、ブラウザだけのホストでは省略できます。
+`uploadStatus` は `saved`・`saving`・`error`・`null`、`macroRecording` は
+`true`・`false`・`null` を受け取ります。
+
 ## プリセット
 
 | プリセット | 含まれる機能 |
@@ -91,18 +136,44 @@ sheet.setTheme('ink');           // ダークテーマ — グリッドとツー
 | `createSessionChart(store, range, options)` | セッションの縦棒／折れ線チャートを作成 |
 | `saveSheetView` / `activateSheetView` | セッション内のシートビュー管理 |
 | `listDefinedNames` / `upsertDefinedName` | ヘッドレスな名前マネージャー API |
+| `ribbonActivationEntries` / `ribbonSurfaceCommandIds` | ホスト側の監査とラッパー間の一致確認に使うリボンコマンドの共有マニフェスト |
+| `attachRangePickerButton` | Excel 風ダイアログが共通で使う範囲選択コントロール |
+| `appendConditionalApplyFormatControls` / `conditionalStyleOptions` | 条件付き書式ルール UI の共通ヘルパー |
+| `showReport` / `reportDialogLabels` | ホスト依存の互換性レポート用ダイアログとラベル対応表 |
+| `projectDisabledReason` / `projectDisabledState` | aria 属性・title・dataset・コントロール状態へ無効／読み取り専用の理由を射影する共通処理 |
 
 完全な API リファレンスは
 [プロジェクト README](https://github.com/libraz/formulon-cell/blob/main/README_ja.md)
 を参照してください。
 
-## フレームワークコンポーネント
+## 併せて使えるパッケージ
 
 | パッケージ | 説明 |
 |---------|------|
-| [`@libraz/formulon-cell-react`](https://www.npmjs.com/package/@libraz/formulon-cell-react) | `<Spreadsheet>` React コンポーネント + フック |
-| [`@libraz/formulon-cell-vue`](https://www.npmjs.com/package/@libraz/formulon-cell-vue) | `<Spreadsheet>` Vue コンポーネント + コンポーザブル |
+| [`@libraz/formulon-cell-react`](https://www.npmjs.com/package/@libraz/formulon-cell-react) | `<Spreadsheet>` React コンポーネント + フック + `SpreadsheetToolbar` リボン |
+| [`@libraz/formulon-cell-vue`](https://www.npmjs.com/package/@libraz/formulon-cell-vue) | `<Spreadsheet>` Vue コンポーネント + コンポーザブル + `SpreadsheetToolbar` リボン |
+
+React:
+
+```tsx
+import { SpreadsheetToolbar, type RibbonTab } from '@libraz/formulon-cell-react';
+import '@libraz/formulon-cell-react/toolbar.css';
+```
+
+Vue:
+
+```vue
+<script setup lang="ts">
+import { type RibbonTab } from '@libraz/formulon-cell-vue';
+import SpreadsheetToolbar from '@libraz/formulon-cell-vue/toolbar.vue';
+import '@libraz/formulon-cell-vue/toolbar.css';
+</script>
+```
+
+どちらのラッパーも、コアの `Spreadsheet.mountToolbar` に対する薄いアダプタです。
+リボンの DOM、メニューファクトリ、アクティベーションモデル、動的ドロップダウンの
+ディスパッチャは `@libraz/formulon-cell` が持ちます。
 
 ## ライセンス
 
-[Apache License 2.0](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
+[Apache-2.0](https://github.com/libraz/formulon-cell/blob/main/LICENSE)

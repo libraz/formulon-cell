@@ -1,21 +1,30 @@
 # @libraz/formulon-cell-vue
 
-[![npm version](https://img.shields.io/npm/v/@libraz/formulon-cell-vue.svg)](https://www.npmjs.com/package/@libraz/formulon-cell-vue)
-[![license](https://img.shields.io/npm/l/@libraz/formulon-cell-vue.svg)](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/@libraz/formulon-cell-vue)](https://bundlephobia.com/package/@libraz/formulon-cell-vue)
+[![CI](https://img.shields.io/github/actions/workflow/status/libraz/formulon-cell/ci.yml?branch=main&label=CI)](https://github.com/libraz/formulon-cell/actions)
+[![npm](https://img.shields.io/npm/v/@libraz/formulon-cell-vue)](https://www.npmjs.com/package/@libraz/formulon-cell-vue)
+[![npm — core](https://img.shields.io/npm/v/@libraz/formulon-cell?label=core)](https://www.npmjs.com/package/@libraz/formulon-cell)
+[![npm — react](https://img.shields.io/npm/v/@libraz/formulon-cell-react?label=react)](https://www.npmjs.com/package/@libraz/formulon-cell-react)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
+[![Vue](https://img.shields.io/badge/Vue-3-blue?logo=vuedotjs)](https://vuejs.org/)
 
-Vue 3 component + composables for
-[`@libraz/formulon-cell`](https://www.npmjs.com/package/@libraz/formulon-cell)
-— the spreadsheet UI for the [formulon](https://github.com/libraz/formulon)
-WASM calc engine.
+**Drop a working spreadsheet into a Vue app.** `<Spreadsheet>` and
+`SpreadsheetToolbar` wrap
+[`@libraz/formulon-cell`](https://www.npmjs.com/package/@libraz/formulon-cell) —
+a canvas-rendered grid with desktop-spreadsheet chrome over the
+[formulon](https://github.com/libraz/formulon) WASM calc engine. Props update
+the running instance through the core imperative API instead of re-mounting the
+canvas.
 
-## Install
+This package is a thin adapter: the grid, ribbon, menus, commands, and dialogs
+all live in core, so Vue and React hosts cannot drift apart.
+
+## Installation
 
 ```sh
 npm install @libraz/formulon-cell-vue @libraz/formulon-cell vue zustand
 ```
 
-## Quick Start
+## Quick start
 
 ```vue
 <script setup lang="ts">
@@ -117,6 +126,13 @@ apps can type host chrome from a single import.
 For the complete API reference and bundler integration notes, see the
 [project README](https://github.com/libraz/formulon-cell).
 
+## Also available
+
+```sh
+npm install @libraz/formulon-cell         # vanilla TypeScript / DOM core
+npm install @libraz/formulon-cell-react   # React 18+ component + hooks
+```
+
 ## License
 
-[Apache License 2.0](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
+[Apache-2.0](https://github.com/libraz/formulon-cell/blob/main/LICENSE)

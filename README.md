@@ -1,16 +1,27 @@
 # formulon-cell
 
 [![CI](https://img.shields.io/github/actions/workflow/status/libraz/formulon-cell/ci.yml?branch=main&label=CI)](https://github.com/libraz/formulon-cell/actions)
-[![codecov](https://codecov.io/gh/libraz/formulon-cell/branch/main/graph/badge.svg)](https://codecov.io/gh/libraz/formulon-cell)
 [![npm](https://img.shields.io/npm/v/@libraz/formulon-cell?label=%40libraz%2Fformulon-cell)](https://www.npmjs.com/package/@libraz/formulon-cell)
 [![npm — react](https://img.shields.io/npm/v/@libraz/formulon-cell-react?label=react)](https://www.npmjs.com/package/@libraz/formulon-cell-react)
 [![npm — vue](https://img.shields.io/npm/v/@libraz/formulon-cell-vue?label=vue)](https://www.npmjs.com/package/@libraz/formulon-cell-vue)
+[![codecov](https://codecov.io/gh/libraz/formulon-cell/branch/main/graph/badge.svg)](https://codecov.io/gh/libraz/formulon-cell)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-blue?logo=typescript)](https://www.typescriptlang.org/)
 
-Spreadsheet UI library for the [formulon](https://github.com/libraz/formulon)
-WASM calc engine. Desktop-spreadsheet-style chrome, canvas-rendered grid,
-extension-based feature composition, runtime i18n.
+**formulon-cell puts a working spreadsheet inside a web page.** Mount it into a
+DOM node, a React component, or a Vue component and you get a canvas-rendered
+grid with desktop-spreadsheet chrome — formula bar, ribbon, sheet tabs, context
+menu — over the [formulon](https://github.com/libraz/formulon) WASM calc engine,
+which evaluates formulas off the main thread. The core is framework-free
+TypeScript; the React and Vue packages are thin adapters over the same mount
+call.
+
+**Reach for it when you need to:**
+
+- **Embed a spreadsheet, not a data grid** — selection, editing, formula entry, recalculation, and file handling are there from the first mount.
+- **Run the calc in a real engine** — formulas go to the C++ engine compiled to WebAssembly, not to a JavaScript formula parser bolted onto the UI.
+- **Ship only the features you use** — presets and extension factories decide what mounts; drop the chrome entirely and keep the canvas plus the store.
+- **Switch languages at runtime** — `ja` and `en` ship in the box, and locales swap in place without re-mounting.
 
 > **Excel compatibility.** `formulon-cell` is being built toward an
 > Excel-compatible spreadsheet experience while exercising
@@ -30,7 +41,7 @@ extension-based feature composition, runtime i18n.
 | [`@libraz/formulon-cell-react`](./packages/formulon-cell-react) | [![npm](https://img.shields.io/npm/v/@libraz/formulon-cell-react?label=)](https://www.npmjs.com/package/@libraz/formulon-cell-react) | React 18+ component, hooks, and ribbon toolbar |
 | [`@libraz/formulon-cell-vue`](./packages/formulon-cell-vue)     | [![npm](https://img.shields.io/npm/v/@libraz/formulon-cell-vue?label=)](https://www.npmjs.com/package/@libraz/formulon-cell-vue)     | Vue 3 component, composables, and ribbon toolbar |
 
-## Install
+## Installation
 
 ```sh
 npm install @libraz/formulon-cell zustand
@@ -48,7 +59,7 @@ mounting so a host configuration issue cannot masquerade as a working
 spreadsheet. The in-memory stub engine is opt-in via `preferStub: true` for
 tests and explicit demos.
 
-## Quick Start
+## Quick start
 
 ```ts
 import { Spreadsheet, WorkbookHandle, presets } from '@libraz/formulon-cell';
@@ -127,7 +138,7 @@ if (isUsingStub()) {
 }
 ```
 
-## Features
+## What's inside
 
 - **Desktop-spreadsheet-style** chrome out of the box (formula bar, status bar,
   context menu, sheet tabs, View toolbar).
@@ -176,7 +187,7 @@ sheet.i18n.setLocale('fr');
 | `apps/react-demo`  | `yarn dev` / `yarn dev:react` | Same surface as `<Spreadsheet>` React component |
 | `apps/vue-demo`    | `yarn dev:vue`    | Same surface as `<Spreadsheet>` Vue component |
 
-## Framework Ribbon Toolbars
+## Framework ribbon toolbars
 
 The React and Vue packages publish thin adapters over the core
 `Spreadsheet.mountToolbar` ribbon. The ribbon DOM, menu factories, activation
@@ -204,6 +215,18 @@ import SpreadsheetToolbar from '@libraz/formulon-cell-vue/toolbar.vue';
 import '@libraz/formulon-cell-vue/toolbar.css';
 </script>
 ```
+
+## Non-goals
+
+formulon-cell is the UI layer, not the calculation engine and not an
+application. Formula evaluation, recalculation, and xlsx parsing belong to
+[formulon](https://github.com/libraz/formulon); this repository does not
+reimplement them. It ships no server, no persistence layer, no collaboration
+transport, and no authentication — the host owns all of those. It also refuses
+to degrade quietly: without cross-origin isolation the mount fails rather than
+falling back to the in-memory stub. The React and Vue packages stay thin
+adapters, with menus, commands, and dialogs living in core, so the three hosts
+cannot drift apart.
 
 ## Releasing
 

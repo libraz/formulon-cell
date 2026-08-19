@@ -1,12 +1,23 @@
 # @libraz/formulon-cell
 
-[![npm version](https://img.shields.io/npm/v/@libraz/formulon-cell.svg)](https://www.npmjs.com/package/@libraz/formulon-cell)
-[![license](https://img.shields.io/npm/l/@libraz/formulon-cell.svg)](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/@libraz/formulon-cell)](https://bundlephobia.com/package/@libraz/formulon-cell)
+[![CI](https://img.shields.io/github/actions/workflow/status/libraz/formulon-cell/ci.yml?branch=main&label=CI)](https://github.com/libraz/formulon-cell/actions)
+[![npm](https://img.shields.io/npm/v/@libraz/formulon-cell)](https://www.npmjs.com/package/@libraz/formulon-cell)
+[![npm — react](https://img.shields.io/npm/v/@libraz/formulon-cell-react?label=react)](https://www.npmjs.com/package/@libraz/formulon-cell-react)
+[![npm — vue](https://img.shields.io/npm/v/@libraz/formulon-cell-vue?label=vue)](https://www.npmjs.com/package/@libraz/formulon-cell-vue)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-blue?logo=typescript)](https://www.typescriptlang.org/)
 
-Spreadsheet UI for the [formulon](https://github.com/libraz/formulon) WASM
-calc engine — desktop-spreadsheet-style chrome, canvas-rendered grid,
-extension-based feature composition, runtime i18n.
+**Put a working spreadsheet inside a web page, with no framework required.**
+Mount it into a DOM element and you get a canvas-rendered grid with
+desktop-spreadsheet chrome — formula bar, ribbon, sheet tabs, context menu —
+over the [formulon](https://github.com/libraz/formulon) WASM calc engine, which
+evaluates formulas off the main thread. Features are composed from presets and
+extension factories, and locales swap at runtime without re-mounting.
+
+This is the vanilla TypeScript / DOM core. For framework bindings use
+[`@libraz/formulon-cell-react`](https://www.npmjs.com/package/@libraz/formulon-cell-react)
+or [`@libraz/formulon-cell-vue`](https://www.npmjs.com/package/@libraz/formulon-cell-vue);
+both are thin adapters over the same mount call.
 
 > **Excel compatibility.** `formulon-cell` is being built toward an
 > Excel-compatible spreadsheet experience while exercising
@@ -18,7 +29,7 @@ extension-based feature composition, runtime i18n.
 > behaviour, and bugs may remain. Do not present it as a drop-in Excel
 > replacement or a complete end-user spreadsheet product yet.
 
-## Install
+## Installation
 
 ```sh
 npm install @libraz/formulon-cell zustand
@@ -33,7 +44,7 @@ engine is opt-in via `preferStub: true` for tests and explicit demos.
 See [bundler integration](https://github.com/libraz/formulon-cell#bundler-integration)
 for Vite / webpack / esbuild setup notes.
 
-## Quick Start
+## Quick start
 
 ```ts
 import { Spreadsheet, WorkbookHandle, presets } from '@libraz/formulon-cell';
@@ -52,7 +63,7 @@ sheet.i18n.setLocale('ja');     // runtime locale swap
 sheet.setTheme('ink');           // dark mode — themes grid and toolbar together
 ```
 
-## Host Integrations
+## Host integrations
 
 Browser APIs do not expose every desktop Excel integration point. Hosts can
 provide those capabilities through `MountOptions` and keep the shared ribbon /
@@ -95,7 +106,7 @@ preview; browser-only hosts can omit them. `uploadStatus` accepts `saved`,
 | `presets.standard()` | + View toolbar, Quick Analysis, context menu, find/replace, clipboard, format painter |
 | `presets.full()`     | + format dialog, paste-special, conditional formatting, named ranges, hyperlink dialog, PivotTable creation, validation, autocomplete, hover comments |
 
-## Subpath Exports
+## Subpath exports
 
 | Import path | Description |
 |---|---|
@@ -132,7 +143,7 @@ preview; browser-only hosts can omit them. `uploadStatus` accepts `saved`,
 
 For the complete API reference, see the [project README](https://github.com/libraz/formulon-cell).
 
-## Framework Components
+## Also available
 
 | Package | Description |
 |---------|-------------|
@@ -162,4 +173,4 @@ are shared by `@libraz/formulon-cell`.
 
 ## License
 
-[Apache License 2.0](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
+[Apache-2.0](https://github.com/libraz/formulon-cell/blob/main/LICENSE)
