@@ -266,4 +266,40 @@ describe('applyCellStyle', () => {
     expect(history.undo()).toBe(true);
     expect(listCustomCellStyles(store.getState())).toEqual([]);
   });
+
+  it('repeats a gallery style onto whatever is selected when F4 fires', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    applyCellStyle(store, history, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, 'good');
+
+    mutators.setRange(store, { sheet: 0, r0: 4, c0: 2, r1: 4, c1: 2 });
+    expect(history.repeatLast()).toBe(true);
+
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 4, col: 2 })),
+    ).toMatchObject({ cellStyle: 'good' });
+  });
+
+  it('repeats a custom style by name rather than redefining it', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    mutators.setRangeFormat(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, { bold: true });
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    expect(
+      createCellStyleFromActiveFormat(
+        store,
+        history,
+        { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        'Brand',
+      ),
+    ).toBe(true);
+
+    mutators.setRange(store, { sheet: 0, r0: 2, c0: 0, r1: 2, c1: 0 });
+    expect(history.repeatLast()).toBe(true);
+
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 2, col: 0 })),
+    ).toMatchObject({ cellStyle: 'Brand', bold: true });
+    expect(listCustomCellStyles(store.getState())).toHaveLength(1);
+  });
 });

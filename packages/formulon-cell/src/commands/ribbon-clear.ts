@@ -11,7 +11,12 @@ import { type CellFormat, mutators, type SpreadsheetStore } from '../store/store
 import { clearComment } from './comment.js';
 import { clearConditionalRulesInRange } from './conditional-format.js';
 import { clearFormat, clearVisualFormat } from './format.js';
-import { type History, recordConditionalRulesChange, recordFormatChange } from './history.js';
+import {
+  type History,
+  recordConditionalRulesChange,
+  recordFormatChange,
+  recordFormatChangeWithRepeat,
+} from './history.js';
 import { clearHyperlink } from './hyperlinks.js';
 import { isCellWritable } from './protection.js';
 import { clearValidationInRangeWithEngine } from './validate.js';
@@ -89,7 +94,14 @@ export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): vo
   const { store, workbook, history, action } = deps;
   const range = store.getState().selection.range;
   if (action === 'formats') {
-    recordFormatChange(history, store, () => clearVisualFormat(store.getState(), store));
+    recordFormatChangeWithRepeat(
+      history,
+      store,
+      () => clearVisualFormat(store.getState(), store),
+      // Repeat re-enters the whole action so the engine flush below runs for
+      // the new selection too.
+      () => executeRibbonClearAction(deps),
+    );
     // Reset the engine XF for the cleared cells so the format does not
     // resurrect on the next save.
     flushFormatToEngine(workbook, store, range.sheet);

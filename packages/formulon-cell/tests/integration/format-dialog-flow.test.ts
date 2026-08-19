@@ -68,6 +68,25 @@ describe('integration: format dialog flow', () => {
     const overlay = document.querySelector(FORMAT_OVERLAY_SELECTOR) as HTMLElement;
     expect(overlay.hidden).toBe(false);
   });
+
+  it('F4 after OK repeats the dialog formatting on the new selection', () => {
+    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    formatDialogHandle(sheet).open();
+
+    const overlay = document.querySelector(FORMAT_OVERLAY_SELECTOR) as HTMLElement;
+    const bold = overlay.querySelector('[data-fc-check="bold"]') as HTMLInputElement;
+    bold.checked = true;
+    bold.dispatchEvent(new Event('change', { bubbles: true }));
+    const ok = overlay.querySelector('.fc-fmtdlg__footer .fc-fmtdlg__btn--primary');
+    (ok as HTMLButtonElement).click();
+
+    expect(sheet.instance.store.getState().format.formats.get('0:0:0')?.bold).toBe(true);
+
+    mutators.setRange(sheet.instance.store, { sheet: 0, r0: 4, c0: 2, r1: 4, c1: 2 });
+    expect(sheet.instance.history.repeatLast()).toBe(true);
+
+    expect(sheet.instance.store.getState().format.formats.get('0:4:2')?.bold).toBe(true);
+  });
 });
 
 describe('integration: format dialog opt-out', () => {

@@ -471,6 +471,20 @@ export function recordRepeatableFormatChange(
   history?.setRepeat(repeat);
 }
 
+/** Record a format command that was handed a concrete range, together with the
+ *  repeat that should run in its place when F4 fires. Use this where the
+ *  mutation cannot simply be re-run — the caller supplies a `repeat` that
+ *  re-targets the current selection itself. */
+export function recordFormatChangeWithRepeat(
+  history: History | null,
+  store: SpreadsheetStore,
+  mutate: () => void,
+  repeat: () => void,
+): void {
+  recordFormatChange(history, store, mutate, { repeat });
+  history?.setRepeat(repeat);
+}
+
 export function recordLayoutChange(
   history: History | null,
   store: SpreadsheetStore,

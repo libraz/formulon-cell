@@ -10,7 +10,7 @@ import {
 } from '../store/store.js';
 import { applyFormatPatch } from './format.js';
 import type { History } from './history.js';
-import { recordFormatChange } from './history.js';
+import { recordFormatChange, recordFormatChangeWithRepeat } from './history.js';
 
 /** Built-in named cell styles. Each style is a partial CellFormat that
  *  `applyCellStyle` merges into the active range via `setRangeFormat`. The
@@ -416,7 +416,8 @@ export function applyCellStyle(
 ): void {
   const def = STYLE_BY_ID.get(id);
   if (!def) return;
-  recordFormatChange(history, store, () => {
+  const repeat = (): void => applyCellStyle(store, history, store.getState().selection.range, id);
+  const mutate = (): void => {
     if (id === 'normal') {
       // Clear by overwriting every format field with undefined. setRangeFormat
       //  merges with `Object.assign`, so explicit `undefined`s win — matching
@@ -442,7 +443,8 @@ export function applyCellStyle(
       return;
     }
     mutators.setRangeFormat(store, range, { ...def.format, cellStyle: id });
-  });
+  };
+  recordFormatChangeWithRepeat(history, store, mutate, repeat);
 }
 
 export function applyCellStyleByName(
@@ -458,12 +460,19 @@ export function applyCellStyleByName(
   const custom = customCellStyleById(store.getState(), id);
   if (!custom) return false;
   let applied = false;
-  recordFormatChange(history, store, () => {
-    applied = applyFormatPatch(store.getState(), store, range, {
-      ...custom.format,
-      cellStyle: custom.label,
-    });
-  });
+  recordFormatChangeWithRepeat(
+    history,
+    store,
+    () => {
+      applied = applyFormatPatch(store.getState(), store, range, {
+        ...custom.format,
+        cellStyle: custom.label,
+      });
+    },
+    () => {
+      applyCellStyleByName(store, history, store.getState().selection.range, id);
+    },
+  );
   return applied;
 }
 
@@ -481,19 +490,33 @@ export function createCellStyleFromActiveFormat(
   const styleName = name.trim();
   if (!styleName) return false;
   let applied = false;
-  recordFormatChange(history, store, () => {
-    const state = store.getState();
-    const { cellStyle: _cellStyle, ...activeFormat } =
-      state.format.formats.get(addrKey(state.selection.active)) ?? {};
-    const styleFormat = filterCellStyleFormat(activeFormat, options.include);
-    const patch: Partial<CellFormat> = { ...styleFormat, cellStyle: styleName };
-    mutators.upsertCustomCellStyle(store, {
-      id: customCellStyleId(styleName),
-      label: styleName,
-      format: styleFormat,
-    });
-    applied = applyFormatPatch(state, store, range, patch);
-  });
+  recordFormatChangeWithRepeat(
+    history,
+    store,
+    () => {
+      const state = store.getState();
+      const { cellStyle: _cellStyle, ...activeFormat } =
+        state.format.formats.get(addrKey(state.selection.active)) ?? {};
+      const styleFormat = filterCellStyleFormat(activeFormat, options.include);
+      const patch: Partial<CellFormat> = { ...styleFormat, cellStyle: styleName };
+      mutators.upsertCustomCellStyle(store, {
+        id: customCellStyleId(styleName),
+        label: styleName,
+        format: styleFormat,
+      });
+      applied = applyFormatPatch(state, store, range, patch);
+    },
+    // Repeating "New Cell Style" applies the style it just created rather
+    // than defining another one from whatever is now selected.
+    () => {
+      applyCellStyleByName(
+        store,
+        history,
+        store.getState().selection.range,
+        customCellStyleId(styleName),
+      );
+    },
+  );
   return applied;
 }
 

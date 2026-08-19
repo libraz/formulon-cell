@@ -2,7 +2,7 @@ import { coerceInput } from '../commands/coerce-input.js';
 import { applyFormatPatch, formatNumber } from '../commands/format.js';
 import {
   type History,
-  recordFormatChange,
+  recordFormatChangeWithRepeat,
   recordMergesChangeWithEngine,
 } from '../commands/history.js';
 import { applyMerge, applyUnmerge, mergeAt } from '../commands/merge.js';
@@ -20,6 +20,7 @@ import {
   mutators,
   type NegativeStyle,
   type SpreadsheetStore,
+  type State,
   type TextDirection,
   type ValidationErrorStyle,
   type ValidationOp,
@@ -1026,21 +1027,21 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     }
 
     const liveWb = getWb();
-    const applyOutlineToRange = (): void => {
-      if (rangeArea(range) > MAX_OUTLINE_BORDER_CELLS) return;
-      const side = activeSide();
-      for (let row = range.r0; row <= range.r1; row += 1) {
-        for (let col = range.c0; col <= range.c1; col += 1) {
+    const outlineSide = activeSide();
+    const applyOutlineToRange = (target: State, targetRange: Range): void => {
+      if (rangeArea(targetRange) > MAX_OUTLINE_BORDER_CELLS) return;
+      for (let row = targetRange.r0; row <= targetRange.r1; row += 1) {
+        for (let col = targetRange.c0; col <= targetRange.c1; col += 1) {
           const borders: CellFormat['borders'] = {};
-          if (row === range.r0) borders.top = side;
-          if (row === range.r1) borders.bottom = side;
-          if (col === range.c0) borders.left = side;
-          if (col === range.c1) borders.right = side;
+          if (row === targetRange.r0) borders.top = outlineSide;
+          if (row === targetRange.r1) borders.bottom = outlineSide;
+          if (col === targetRange.c0) borders.left = outlineSide;
+          if (col === targetRange.c1) borders.right = outlineSide;
           if (Object.keys(borders).length > 0) {
             applyFormatPatch(
-              state,
+              target,
               store,
-              { sheet: range.sheet, r0: row, c0: col, r1: row, c1: col },
+              { sheet: targetRange.sheet, r0: row, c0: col, r1: row, c1: col },
               { borders },
               { allowPending: false },
             );
@@ -1048,12 +1049,48 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
         }
       }
     };
+    // F4 repeats the formatting the dialog produced, not the cell-identity
+    // fields it also edits: a hyperlink, comment or validation rule belongs to
+    // the cell it was authored on, and merging reshapes the range rather than
+    // formatting it.
+    const {
+      hyperlink: _hyperlink,
+      hyperlinkDisplay: _hyperlinkDisplay,
+      hyperlinkTooltip: _hyperlinkTooltip,
+      comment: _comment,
+      commentAuthor: _commentAuthor,
+      validation: _validation,
+      ...repeatablePatch
+    } = patch;
+    const repeatFormatting = (): void => {
+      const current = store.getState();
+      const target = current.selection.range;
+      const outline =
+        pendingBorderPreset === 'outline' && (target.r0 !== target.r1 || target.c0 !== target.c1);
+      recordFormatChangeWithRepeat(
+        history,
+        store,
+        () => {
+          const wrote = applyFormatPatch(current, store, target, repeatablePatch, {
+            allowPending: false,
+          });
+          if (wrote && outline) applyOutlineToRange(current, target);
+        },
+        repeatFormatting,
+      );
+      if (liveWb) flushFormatToEngine(liveWb, store, target.sheet);
+    };
     if (history) history.begin();
     try {
-      recordFormatChange(history, store, () => {
-        const wroteFormat = applyFormatPatch(state, store, range, patch, { allowPending: false });
-        if (wroteFormat && useRangeOutline) applyOutlineToRange();
-      });
+      recordFormatChangeWithRepeat(
+        history,
+        store,
+        () => {
+          const wroteFormat = applyFormatPatch(state, store, range, patch, { allowPending: false });
+          if (wroteFormat && useRangeOutline) applyOutlineToRange(state, range);
+        },
+        repeatFormatting,
+      );
       if (mergeCk.input.checked) {
         if (range.r0 !== range.r1 || range.c0 !== range.c1) {
           if (liveWb) {

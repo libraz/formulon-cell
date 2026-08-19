@@ -172,4 +172,20 @@ describe('executeRibbonClearAction', () => {
       comment: 'keep',
     });
   });
+
+  it('repeats a Clear Formats onto the selection F4 was pressed on', () => {
+    const store = createSpreadsheetStore();
+    const workbook = makeWorkbook();
+    const history = new History();
+    mutators.setRangeFormat(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, { bold: true });
+    mutators.setRangeFormat(store, { sheet: 0, r0: 5, c0: 0, r1: 5, c1: 0 }, { italic: true });
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+
+    executeRibbonClearAction({ store, workbook, history, action: 'formats' });
+    mutators.setRange(store, { sheet: 0, r0: 5, c0: 0, r1: 5, c1: 0 });
+    expect(history.repeatLast()).toBe(true);
+
+    expect(store.getState().format.formats.get('0:0:0')?.bold).toBeUndefined();
+    expect(store.getState().format.formats.get('0:5:0')?.italic).toBeUndefined();
+  });
 });
