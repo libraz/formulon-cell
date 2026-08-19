@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { WorkbookHandle } from '../../src/engine/workbook-handle.js';
+import { Spreadsheet } from '../../src/mount.js';
 import { type MountedStubSheet, mountStubSheet } from '../test-utils/index.js';
 
 /**
@@ -36,6 +38,26 @@ describe('integration: overlay portal lifecycle', () => {
     expect(portals()).toHaveLength(1);
 
     sheet.instance.dispose();
+    expect(portals()).toHaveLength(0);
+  });
+
+  it('keeps the portal alive when a superseded instance disposes late', async () => {
+    // Remounting the same host — an async mount() racing React StrictMode's
+    // double-effect — leaves the first instance disposing after the second has
+    // taken over. Its teardown must not take the live instance's overlays with
+    // it.
+    sheet = await mountStubSheet();
+    const first = sheet.instance;
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    const second = await Spreadsheet.mount(sheet.host, { workbook });
+
+    first.dispose();
+    const portal = portals()[0];
+    expect(portal).toBeDefined();
+    expect(portal?.querySelector('.fc-ctxmenu')).not.toBeNull();
+
+    second.dispose();
+    workbook.dispose();
     expect(portals()).toHaveLength(0);
   });
 });

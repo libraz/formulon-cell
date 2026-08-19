@@ -1153,7 +1153,7 @@ export const Spreadsheet = {
         i18n.dispose();
         renderer.dispose();
         if (ownsWb) wb.dispose();
-        disposeOverlayPortal(host);
+        disposeOverlayPortal(host, instanceId);
         releaseMountHost(host, instanceId);
       },
     };

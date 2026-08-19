@@ -22,16 +22,26 @@ function syncTheme(host: HTMLElement, portal: HTMLElement): void {
   else delete portal.dataset.fcTheme;
 }
 
+/** Stamp the portal with the host's current instance id. Remounting the same
+ *  host hands the portal to the newest instance — see `disposeOverlayPortal`. */
+function claimPortal(host: HTMLElement, portal: HTMLElement): void {
+  const instanceId = host.dataset.fcInstId;
+  if (instanceId) portal.dataset.fcInstId = instanceId;
+  else delete portal.dataset.fcInstId;
+}
+
 /** Create (or return the existing) overlay portal for a `.fc-host`. Called by
  *  `mount()`. The portal is appended to `<body>` and theme-synced immediately. */
 export function ensureOverlayPortal(host: HTMLElement): HTMLElement {
   const existing = portals.get(host);
   if (existing?.isConnected) {
+    claimPortal(host, existing);
     syncTheme(host, existing);
     return existing;
   }
   const portal = document.createElement('div');
   portal.className = 'fc-overlay-portal';
+  claimPortal(host, portal);
   syncTheme(host, portal);
   document.body.appendChild(portal);
   portals.set(host, portal);
@@ -60,11 +70,18 @@ export function syncOverlayPortalTheme(host: HTMLElement): void {
 }
 
 /** Remove a host's portal and its remaining overlay children. Called on
- *  `dispose()`. Idempotent. */
-export function disposeOverlayPortal(host: Element): void {
+ *  `dispose()`. Idempotent.
+ *
+ *  Pass the disposing instance's id to keep a superseded instance from tearing
+ *  the portal out from under a live one: a remount of the same host (an async
+ *  `mount()` racing React StrictMode's double-effect) reuses the portal, and
+ *  the first instance disposes only after the second has claimed it. Without
+ *  the guard the live instance keeps rendering its context menus, dialogs, and
+ *  dropdowns into a detached container. */
+export function disposeOverlayPortal(host: Element, instanceId?: string): void {
   const portal = portals.get(host);
-  if (portal) {
-    portal.remove();
-    portals.delete(host);
-  }
+  if (!portal) return;
+  if (instanceId !== undefined && portal.dataset.fcInstId !== instanceId) return;
+  portal.remove();
+  portals.delete(host);
 }
