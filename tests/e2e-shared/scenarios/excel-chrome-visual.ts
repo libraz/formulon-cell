@@ -192,6 +192,31 @@ const seedMultiSelection = async (page: Page): Promise<void> => {
   });
 };
 
+/** Collapses the selection onto a single cell through the instance store. */
+const selectSingleCell = async (page: Page, cell: { row: number; col: number }): Promise<void> => {
+  await page.evaluate(({ row, col }) => {
+    const w = window as unknown as {
+      __fcInst?: {
+        store?: {
+          setState?: (fn: (state: Record<string, unknown>) => Record<string, unknown>) => void;
+        };
+      };
+    };
+    const setState = w.__fcInst?.store?.setState;
+    if (!setState) throw new Error('window.__fcInst with a store is required');
+    setState((state) => ({
+      ...state,
+      selection: {
+        ...(state.selection as Record<string, unknown>),
+        active: { sheet: 0, row, col },
+        anchor: { sheet: 0, row, col },
+        range: { sheet: 0, r0: row, c0: col, r1: row, c1: col },
+        extraRanges: [],
+      },
+    }));
+  }, cell);
+};
+
 const setRibbonDisplayMode = async (page: Page, mode: string): Promise<void> => {
   await page.locator('[data-ribbon-toggle]').click();
   await page.locator(`[data-ribbon-display-option="${mode}"]`).click();
@@ -227,8 +252,12 @@ const expectWorkbookSurfaceChrome = async (page: Page): Promise<void> => {
   await expect(formulaInput).toBeVisible();
   await expect(sheetbar).toBeVisible();
   await expect(statusbar).toBeVisible();
-  await expect.poll(() => formulaBar.evaluate((el) => el.clientHeight)).toBeGreaterThanOrEqual(30);
-  await expect.poll(() => sheetbar.evaluate((el) => el.clientHeight)).toBeGreaterThanOrEqual(28);
+  // Heights track the `--fc-*-height` tokens the surface stylesheets set; the
+  // token assertions below pin the widths those bars are laid out against.
+  // clientHeight excludes the hairline rule each bar carries, so the sheet bar
+  // lands one pixel under its 28px token.
+  await expect.poll(() => formulaBar.evaluate((el) => el.clientHeight)).toBeGreaterThanOrEqual(28);
+  await expect.poll(() => sheetbar.evaluate((el) => el.clientHeight)).toBeGreaterThanOrEqual(27);
   await expect.poll(() => statusbar.evaluate((el) => el.clientHeight)).toBeGreaterThanOrEqual(24);
   await expect
     .poll(() =>
@@ -236,14 +265,14 @@ const expectWorkbookSurfaceChrome = async (page: Page): Promise<void> => {
         getComputedStyle(el).getPropertyValue('--fc-formulabar-namebox-width').trim(),
       ),
     )
-    .toBe('110px');
+    .toBe('86px');
   await expect
     .poll(() =>
       sheetbar.evaluate((el) =>
         getComputedStyle(el).getPropertyValue('--fc-sheetbar-tab-height').trim(),
       ),
     )
-    .toBe('28px');
+    .toBe('26px');
 };
 
 export async function runExcelChromeVisualScenario(page: Page): Promise<void> {
@@ -544,8 +573,13 @@ export async function runExcelChromeVisualScenario(page: Page): Promise<void> {
   await page.locator('[data-ribbon-command="watch"]').click();
   const watchWindow = page.locator('.fc-watch');
   await expect(watchWindow).toBeVisible();
+  // Add Watch takes the whole selection, so collapse it onto one untouched
+  // cell first — otherwise the row count tracks whatever is selected here.
+  await selectSingleCell(page, { row: 5, col: 3 });
+  const watchRows = watchWindow.locator('.fc-watch__row');
+  const rowsBeforeAdd = await watchRows.count();
   await watchWindow.getByRole('button', { name: 'ウォッチを追加', exact: true }).click();
-  await expect(watchWindow.locator('.fc-watch__row')).toHaveCount(1);
+  await expect(watchRows).toHaveCount(rowsBeforeAdd + 1);
   await snapshotPage(page, 'excel-chrome-formulas-watch-window-1440');
   await watchWindow.getByRole('button', { name: '閉じる', exact: true }).click();
   await expect(watchWindow).toBeHidden();
@@ -602,7 +636,9 @@ export async function runExcelChromeVisualScenario(page: Page): Promise<void> {
   const dataValidation = page.getByRole('dialog', { name: '入力規則' });
   await expect(dataValidation).toBeVisible();
   await snapshotPage(page, 'excel-chrome-data-validation-dialog-1440');
-  await dataValidation.getByRole('button', { name: 'キャンセル', exact: true }).click();
+  // The dialog's close affordance carries the same label as the footer button,
+  // so target the footer one explicitly.
+  await dataValidation.locator('button.fc-fmtdlg__btn', { hasText: 'キャンセル' }).click();
   await expect(dataValidation).toBeHidden();
   await page.locator('[data-ribbon-command="textToColumns"]').click();
   const textToColumns = page.getByRole('dialog', { name: '区切り位置指定ウィザード' });

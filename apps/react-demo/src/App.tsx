@@ -607,8 +607,12 @@ export const App = (): ReactElement => {
                 setSearchActiveIndex(-1);
               }}
               onChange={(e) => {
-                setSearchQuery(e.currentTarget.value);
-                setSearchOpen(true);
+                const input = e.currentTarget;
+                setSearchQuery(input.value);
+                // Escape clears a search input natively, and that clear lands
+                // as a change on an input we just blurred. Only a change the
+                // user typed reopens the list.
+                setSearchOpen(document.activeElement === input);
                 setSearchActiveIndex(-1);
               }}
               onKeyDown={(e) => {
