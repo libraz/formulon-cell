@@ -77,8 +77,9 @@
     caret-color: var(--fc-accent);
   }
 
-  /* a11y mirror — visually hidden but in the a11y tree */
-  .fc-host__a11y {
+  /* a11y mirror and live region — visually hidden but in the a11y tree */
+  .fc-host__a11y,
+  .fc-host__a11y-live {
     position: absolute;
     width: 1px;
     height: 1px;

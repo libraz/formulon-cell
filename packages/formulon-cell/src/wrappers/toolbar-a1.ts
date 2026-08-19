@@ -12,6 +12,21 @@ export const formatA1Range = (range: SheetRange): string => {
   return start === end ? start : `${start}:${end}`;
 };
 
+/** Render a `SheetRange` the way a spreadsheet's Create Table / Create
+ *  PivotTable dialogs show a source range: sheet-qualified and absolute
+ *  (`Sheet1!$A$1:$B$3`). Sheet names that are not plain identifiers are
+ *  single-quoted, matching what `parseA1Range` accepts back. */
+export const formatSheetAbsoluteRange = (sheetName: string, range: SheetRange): string => {
+  const start = `$${colLetter(range.c0)}$${range.r0 + 1}`;
+  const end = `$${colLetter(range.c1)}$${range.r1 + 1}`;
+  const body = start === end ? start : `${start}:${end}`;
+  if (!sheetName) return body;
+  const prefix = /^[A-Za-z0-9_]+$/.test(sheetName)
+    ? sheetName
+    : `'${sheetName.replace(/'/g, "''")}'`;
+  return `${prefix}!${body}`;
+};
+
 /** Parse a single A1 atom like `$A$1` or `B2`. Returns null when malformed. */
 export const parseA1Atom = (raw: string): { row: number; col: number } | null => {
   const match = /^\$?([A-Za-z]+)\$?(\d+)$/.exec(raw.trim());

@@ -4,7 +4,6 @@ import {
   type CellValue,
   type FeatureFlags,
   type FeatureId,
-  EXCEL365_STANDARD_RIBBON_TABS,
   analyzeAccessibilityCells,
   analyzeSpellingCells,
   applyTextScript,
@@ -44,6 +43,7 @@ import {
   DEMO_PRINT_PREVIEW_LINES,
   DEMO_PRINTER_PROFILE_ID,
   DEMO_PRINTER_PROFILES,
+  DEMO_RIBBON_TABS,
   demoColLabel,
   demoCommandText,
   type DemoBackstageAction,
@@ -346,6 +346,11 @@ const applyScriptCommand = (): void => {
   applyParsedScript(command);
 };
 
+// Runs the built-in script commands from `#menu-script`. The toolbar owns the
+// rest of that click: it closes the menu, moves focus back to the Script
+// command, and routes `custom` to the `onRunScript` prop — so this handler
+// neither reopens that dialog nor touches focus, which would pull focus back
+// out of the dialog the action just opened.
 const onScriptMenuClick = (e: MouseEvent): void => {
   const target = e.target;
   if (!(target instanceof Element)) return;
@@ -354,19 +359,7 @@ const onScriptMenuClick = (e: MouseEvent): void => {
   const menu = btn.closest<HTMLDivElement>('#menu-script');
   if (!menu) return;
   const action = btn.dataset.scriptAction ?? '';
-  menu.hidden = true;
-  const opener = menu.previousElementSibling;
-  if (opener instanceof HTMLElement) {
-    opener.setAttribute('aria-expanded', 'false');
-    opener.focus({ preventScroll: true });
-  }
-  if (action === 'custom') {
-    if (!instance.value) return;
-    scriptCommand.value = 'uppercase';
-    scriptError.value = null;
-    scriptOpen.value = true;
-    return;
-  }
+  if (action === 'custom') return;
   const command = parseScriptCommand(action);
   if (command) applyParsedScript(command);
 };
@@ -497,7 +490,7 @@ const searchItems = computed(() =>
       ribbonTab.value = tab;
     },
     (commandId) => toolbar.value?.applyCommand(commandId) ?? false,
-    EXCEL365_STANDARD_RIBBON_TABS,
+    DEMO_RIBBON_TABS,
   ),
 );
 
@@ -691,7 +684,7 @@ onBeforeUnmount(() => {
           :instance="instance"
           :active-tab="ribbonTab"
           :locale="locale"
-          :ribbon-tabs="EXCEL365_STANDARD_RIBBON_TABS"
+          :ribbon-tabs="DEMO_RIBBON_TABS"
           :on-spelling-review="onSpellingReview"
           :on-accessibility-check="onAccessibilityCheck"
           :on-run-script="onRunScript"
@@ -1019,7 +1012,10 @@ onBeforeUnmount(() => {
         <div class="fc-tb__modal-body">
           <label class="fc-tb__modal-field">
             <span>{{ ui.command }}</span>
-            <input v-model="scriptCommand" autofocus @input="scriptError = null" />
+            <!-- No `autofocus`: the modal's focus trap owns the initial focus,
+                 and WebKit applies autofocus after it, which breaks the
+                 Tab/Shift+Tab wrap contract (and the React demo's parity). -->
+            <input v-model="scriptCommand" @input="scriptError = null" />
           </label>
           <p v-if="scriptError" class="fc-tb__modal-error">{{ scriptError }}</p>
         </div>

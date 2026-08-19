@@ -40,6 +40,7 @@ import {
   createDynamicDropdowns,
   type DynamicDropdownsApi,
   type DynamicDropdownsCtx,
+  ribbonDropdownMenuIdForCommand,
 } from '../toolbar/ribbon/dynamic-dropdowns.js';
 import {
   createRenderRibbon,
@@ -240,6 +241,29 @@ export interface ToolbarInstance {
   readonly dropdownsApi: DynamicDropdownsApi | null;
   dispose(): void;
 }
+
+/** Split buttons whose menu is the entry point for hosts that own the actions
+ *  behind it (`applyScriptAction` / `applyAddInAction`). Core classifies them
+ *  as primary-action splits so a standalone ribbon fires its built-in dialog;
+ *  a host that supplies the menu actions wants the face click to open the
+ *  menu instead. */
+export const RIBBON_HOST_MENU_FIRST_COMMANDS: ReadonlySet<string> = new Set(['script', 'addIn']);
+
+/** `interceptCommand` implementation for the menu-first contract above. Pass
+ *  it straight through from a host's `mountToolbar` options; it returns false
+ *  for every other command so the default dispatch still runs. */
+export const openHostMenuFirstDropdown = (
+  toolbar: ToolbarInstance | null,
+  command: string,
+  button: HTMLButtonElement,
+): boolean => {
+  if (!RIBBON_HOST_MENU_FIRST_COMMANDS.has(command)) return false;
+  const menuId = ribbonDropdownMenuIdForCommand(command);
+  const api = toolbar?.dropdownsApi;
+  if (!menuId || !api) return false;
+  api.openDynamicRibbonDropdown({ command, menuId }, button);
+  return true;
+};
 
 const defaultApplyRibbonFormat =
   (getInstance: () => SpreadsheetInstance | null) =>
@@ -576,6 +600,12 @@ export function mountToolbar(
     const cmdBtn = target.closest<HTMLButtonElement>('[data-ribbon-command]');
     if (cmdBtn?.dataset.ribbonCommand) {
       const id = cmdBtn.dataset.ribbonCommand;
+      // WebKit follows the macOS convention of not focusing a <button> on
+      // click. Ribbon keyboard navigation and host dialogs that restore focus
+      // to the command that opened them both rely on the invoked command being
+      // the active element, so normalize it here. Anything the command itself
+      // focuses afterwards (menu item, dialog field, the sheet) still wins.
+      if (document.activeElement !== cmdBtn) cmdBtn.focus({ preventScroll: true });
       if (opts.interceptCommand?.(id, cmdBtn, e)) return;
       // Fallback dropdown behaviour: if the button has a sibling submenu
       // attached via render-ribbon's `tools.appendChild(submenu())`, toggle

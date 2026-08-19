@@ -10,6 +10,7 @@
 // core's `data-ribbon-*` attributes for selection.
 import {
   type DynamicDropdownsCtx,
+  openHostMenuFirstDropdown,
   Spreadsheet,
   type SpreadsheetInstance,
   type ToolbarInstance,
@@ -108,6 +109,7 @@ export const SpreadsheetToolbar = ({
         activeTab,
         ribbonTabs,
         onTabChange: (tab) => callbacksRef.current.onTabChange(tab),
+        interceptCommand: (id, button) => openHostMenuFirstDropdown(toolbarRef.current, id, button),
         // Opt into core's default dropdown-menu click delegator so Fill / Clear
         // / AutoSum / etc. work without each consumer reimplementing the
         // playground's `createDynamicDropdowns` wiring.

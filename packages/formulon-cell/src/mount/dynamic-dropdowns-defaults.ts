@@ -88,6 +88,7 @@ import {
   type FreezeAction,
   fillRange,
   formatA1Range,
+  formatSheetAbsoluteRange,
   getPageSetup,
   handleDeleteCellsAction,
   handleFreezeAction,
@@ -2281,12 +2282,15 @@ export const showCreateTableDialog = async (
     title: pivotDialogStrings.createTableTitle,
     rangeLabel: pivotDialogStrings.createTableRangeLabel,
     headersLabel: pivotDialogStrings.createTableHeadersLabel,
-    initialRange: formatA1Range(selection),
+    initialRange: formatSheetAbsoluteRange(sheetName, selection),
     initialHasHeaders: inferTableHasHeaders(instance.workbook, selection),
     okLabel: pivotDialogStrings.ok,
     cancelLabel: pivotDialogStrings.cancel,
     rangePickerLabel: pivotDialogStrings.rangePickerSelect,
-    pickRange: () => formatA1Range(normalizedSelectionRange(instance)),
+    pickRange: () => {
+      const picked = normalizedSelectionRange(instance);
+      return formatSheetAbsoluteRange(instance.workbook.sheetName(picked.sheet), picked);
+    },
     subscribeToRangeChanges: (listener) => instance.store.subscribe(listener),
     validateRange: (value) =>
       parsedRange(value) ? null : pivotDialogStrings.createTableInvalidRange,

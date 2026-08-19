@@ -225,7 +225,7 @@ export async function runExcelChromeCreateTableDialogScenario(page: Page): Promi
 
   const dialog = page.getByRole('dialog', { name: 'Create Table' });
   await expect(dialog).toBeVisible();
-  const rangePicker = dialog.locator('[data-range-picker-kind="table-range"]');
+  const rangePicker = dialog.locator('[data-range-picker="table-range"]');
   await expect(rangePicker).toBeVisible();
   await expect(dialog.getByText('Specify the data range to convert to a table.')).toBeVisible();
   await expect(dialog.getByLabel('Specify the data range to convert to a table.')).toHaveValue(

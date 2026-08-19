@@ -323,6 +323,17 @@ export const mutators = {
     store.setState((s) => ({ ...s, ui: { ...s.ui, statusAggs: [...keys] } }));
   },
 
+  setStatusOption(store: SpreadsheetStore, key: StatusBarOptionKey, on: boolean): void {
+    store.setState((s) =>
+      s.ui.statusOptions[key] === on
+        ? s
+        : {
+            ...s,
+            ui: { ...s.ui, statusOptions: { ...s.ui.statusOptions, [key]: on } },
+          },
+    );
+  },
+
   toggleStatusOption(store: SpreadsheetStore, key: StatusBarOptionKey): void {
     store.setState((s) => ({
       ...s,

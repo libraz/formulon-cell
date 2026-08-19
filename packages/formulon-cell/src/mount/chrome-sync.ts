@@ -18,6 +18,7 @@ import type { SheetTabsController } from './sheet-tabs-controller.js';
 
 interface AttachChromeSyncInput {
   a11y: HTMLElement;
+  a11yLive: HTMLElement;
   fxInput: HTMLTextAreaElement;
   getFormulaEditing: () => boolean;
   getSheetTabs: () => SheetTabsController | null;
@@ -92,6 +93,7 @@ const cellDisplayText = (
 export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncController {
   const {
     a11y,
+    a11yLive,
     emitter,
     fxInput,
     getFormulaEditing,
@@ -104,14 +106,19 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     store,
     tag,
   } = input;
+  const mirrorId = a11y.id || 'fc-a11y';
   const activeCellMirror = document.createElement('div');
-  activeCellMirror.id = `${a11y.id || 'fc-a11y'}-active-cell`;
+  activeCellMirror.id = `${mirrorId}-active-cell`;
   activeCellMirror.setAttribute('role', 'gridcell');
   activeCellMirror.setAttribute('aria-selected', 'true');
-  const viewportMirror = document.createElement('div');
-  viewportMirror.id = `${a11y.id || 'fc-a11y'}-viewport`;
-  viewportMirror.setAttribute('role', 'rowgroup');
-  a11y.replaceChildren(activeCellMirror, viewportMirror);
+  /** One `role="row"` wrapper — `gridcell` is only valid inside a row. */
+  const createRowMirror = (row: number): HTMLElement => {
+    const rowMirror = document.createElement('div');
+    rowMirror.id = `${mirrorId}-row-${row}`;
+    rowMirror.setAttribute('role', 'row');
+    rowMirror.setAttribute('aria-rowindex', String(row + 1));
+    return rowMirror;
+  };
   grid.setAttribute('aria-activedescendant', activeCellMirror.id);
   grid.setAttribute('aria-rowcount', String(1_048_576));
   grid.setAttribute('aria-colcount', String(16_384));
@@ -130,8 +137,9 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     activeCellMirror.setAttribute('aria-colindex', String(a.col + 1));
     activeCellMirror.setAttribute('aria-label', display ? `${ref} ${display}` : ref);
     activeCellMirror.textContent = `${ref} ${display}`;
-    const ownedIds = [activeCellMirror.id];
-    const cells: HTMLElement[] = [];
+    a11yLive.textContent = `${ref} ${display}`;
+    const rowMirrors: HTMLElement[] = [];
+    let activePlaced = false;
     const rowEnd = Math.min(
       1_048_575,
       s.viewport.rowStart + Math.max(1, Math.min(s.viewport.rowCount, MAX_A11Y_VIEWPORT_ROWS)) - 1,
@@ -141,24 +149,43 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
       s.viewport.colStart + Math.max(1, Math.min(s.viewport.colCount, MAX_A11Y_VIEWPORT_COLS)) - 1,
     );
     for (let row = s.viewport.rowStart; row <= rowEnd; row += 1) {
+      const cells: HTMLElement[] = [];
       for (let col = s.viewport.colStart; col <= colEnd; col += 1) {
-        if (row === a.row && col === a.col) continue;
+        if (row === a.row && col === a.col) {
+          cells.push(activeCellMirror);
+          activePlaced = true;
+          continue;
+        }
         const cellMirror = document.createElement('div');
         const cellRef = `${colName(col)}${row + 1}`;
         const cellDisplay = cellDisplayText(s, wb, { sheet: s.data.sheetIndex, row, col });
-        cellMirror.id = `${viewportMirror.id}-cell-${row}-${col}`;
+        cellMirror.id = `${mirrorId}-cell-${row}-${col}`;
         cellMirror.setAttribute('role', 'gridcell');
         cellMirror.setAttribute('aria-rowindex', String(row + 1));
         cellMirror.setAttribute('aria-colindex', String(col + 1));
         cellMirror.setAttribute('aria-selected', 'false');
         cellMirror.setAttribute('aria-label', cellDisplay ? `${cellRef} ${cellDisplay}` : cellRef);
         cellMirror.textContent = `${cellRef} ${cellDisplay}`;
-        ownedIds.push(cellMirror.id);
         cells.push(cellMirror);
       }
+      // The active cell can sit outside the mirrored column window; it still
+      // belongs to its own row so `aria-activedescendant` stays resolvable.
+      if (row === a.row && !activePlaced) {
+        if (a.col < s.viewport.colStart) cells.unshift(activeCellMirror);
+        else cells.push(activeCellMirror);
+        activePlaced = true;
+      }
+      const rowMirror = createRowMirror(row);
+      rowMirror.replaceChildren(...cells);
+      rowMirrors.push(rowMirror);
     }
-    viewportMirror.replaceChildren(...cells);
-    grid.setAttribute('aria-owns', ownedIds.join(' '));
+    if (!activePlaced) {
+      const activeRow = createRowMirror(a.row);
+      activeRow.replaceChildren(activeCellMirror);
+      if (a.row < s.viewport.rowStart) rowMirrors.unshift(activeRow);
+      else rowMirrors.push(activeRow);
+    }
+    a11y.replaceChildren(...rowMirrors);
   };
 
   let nameMenu: HTMLDivElement | null = null;

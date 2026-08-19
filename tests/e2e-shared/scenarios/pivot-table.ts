@@ -125,20 +125,30 @@ export async function runPivotTableRibbonPrimaryDialogScenario(page: Page): Prom
   const pivotDialog = page.getByRole('dialog', { name: 'Create PivotTable' });
   await expect(pivotDialog).toBeVisible();
   await expect(page.locator('#menu-pivot-table')).toBeHidden();
-  const sourcePicker = pivotDialog.locator('[data-range-picker-kind="pivot-source"]');
-  const destinationPicker = pivotDialog.locator('[data-range-picker-kind="pivot-destination"]');
+  const sourcePicker = pivotDialog.locator('[data-range-picker="pivot-source"]');
+  const destinationPicker = pivotDialog.locator('[data-range-picker="pivot-destination"]');
   await expect(sourcePicker).toBeVisible();
   await expect(destinationPicker).toBeVisible();
   await expect(pivotDialog.getByText('Choose the data that you want to analyze.')).toBeVisible();
   await expect(pivotDialog.getByLabel('Table/Range')).toHaveValue('Sheet1!$A$1:$B$3');
   await expect(pivotDialog.getByLabel('New worksheet')).toBeChecked();
   await expect(pivotDialog.getByLabel('Existing worksheet')).not.toBeChecked();
+  // A location is only editable on an existing sheet, so the destination
+  // picker stays disabled until that placement is selected.
+  await expect(destinationPicker).toBeDisabled();
+  await pivotDialog.getByLabel('Existing worksheet').check();
+  await expect(destinationPicker).toBeEnabled();
   await sourcePicker.click();
   await expect(sourcePicker).toHaveAttribute('aria-pressed', 'true');
   await expect(pivotDialog).toHaveClass(/fc-fmtdlg--range-picking/);
+  // Picking collapses the dialog down to the field being picked, so the source
+  // pick has to end before the destination field is reachable again.
+  await page.keyboard.press('Escape');
+  await expect(sourcePicker).toHaveAttribute('aria-pressed', 'false');
   await destinationPicker.click();
   await expect(sourcePicker).toHaveAttribute('aria-pressed', 'false');
   await expect(destinationPicker).toHaveAttribute('aria-pressed', 'true');
+  await expect(pivotDialog).toHaveClass(/fc-fmtdlg--range-picking/);
   const canvasBox = await page.locator('.fc-host__canvas').first().boundingBox();
   expect(canvasBox, 'canvas must be laid out').not.toBeNull();
   if (!canvasBox) throw new Error('canvas not measured');

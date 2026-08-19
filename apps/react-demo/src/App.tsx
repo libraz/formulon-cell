@@ -3,7 +3,6 @@ import {
   analyzeSpellingCells,
   applyTextScript,
   type CellChangeEvent,
-  EXCEL365_STANDARD_RIBBON_TABS,
   type FeatureFlags,
   type FeatureId,
   isFeatureDefaultOff,
@@ -44,6 +43,7 @@ import {
   DEMO_PRINT_PREVIEW_LINES,
   DEMO_PRINTER_PROFILE_ID,
   DEMO_PRINTER_PROFILES,
+  DEMO_RIBBON_TABS,
   type DemoBackstageAction,
   type DemoIconName,
   type DemoSearchItem,
@@ -369,9 +369,11 @@ export const App = (): ReactElement => {
     applyParsedScript(command);
   }, [applyParsedScript, commandText.scriptCommandError, scriptCommand]);
 
-  // Wire script-menu items. mountToolbar opens `#menu-script` for the Script
-  // split button but doesn't dispatch its `[data-script-action]` children;
-  // we handle them here so the demo's dialog/quick actions stay in App scope.
+  // Runs the built-in script commands from `#menu-script`. The toolbar owns the
+  // rest of that click: it closes the menu, moves focus back to the Script
+  // command, and routes `custom` to the `onRunScript` prop — so this handler
+  // neither reopens that dialog nor touches focus, which would pull focus back
+  // out of the dialog the action just opened.
   useEffect(() => {
     const onMenuClick = (e: MouseEvent): void => {
       const target = e.target;
@@ -381,28 +383,13 @@ export const App = (): ReactElement => {
       const menu = btn.closest<HTMLDivElement>('#menu-script');
       if (!menu) return;
       const action = btn.dataset.scriptAction ?? '';
-      menu.hidden = true;
-      const opener = menu.previousElementSibling;
-      if (opener instanceof HTMLElement) {
-        opener.setAttribute('aria-expanded', 'false');
-        // Focus the ribbon command so `activateDemoModal` captures it as the
-        // restore target; without this, Esc would try to refocus the now-
-        // hidden menu item and fail.
-        opener.focus({ preventScroll: true });
-      }
-      if (action === 'custom') {
-        if (!instance) return;
-        setScriptCommand('uppercase');
-        setScriptError(null);
-        setScriptOpen(true);
-        return;
-      }
+      if (action === 'custom') return;
       const command = parseScriptCommand(action);
       if (command) applyParsedScript(command);
     };
     document.addEventListener('click', onMenuClick);
     return () => document.removeEventListener('click', onMenuClick);
-  }, [applyParsedScript, instance]);
+  }, [applyParsedScript]);
 
   const onSave = useCallback(() => {
     saveDemoWorkbookToDownload({ instance, bookName, setUploadStatus });
@@ -523,7 +510,7 @@ export const App = (): ReactElement => {
         locale,
         setRibbonTab,
         (commandId) => toolbarRef.current?.applyCommand(commandId) ?? false,
-        EXCEL365_STANDARD_RIBBON_TABS,
+        DEMO_RIBBON_TABS,
       ),
     [commands, locale],
   );
@@ -721,7 +708,7 @@ export const App = (): ReactElement => {
               activeTab={ribbonTab}
               onTabChange={setRibbonTab}
               locale={locale}
-              ribbonTabs={EXCEL365_STANDARD_RIBBON_TABS}
+              ribbonTabs={DEMO_RIBBON_TABS}
               onSpellingReview={onSpellingReview}
               onAccessibilityCheck={onAccessibilityCheck}
               onRunScript={onRunScript}

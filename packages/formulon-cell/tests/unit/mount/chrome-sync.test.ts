@@ -20,6 +20,7 @@ describe('mount/chrome-sync — name box and formula bar reflect store state', (
   let tag: HTMLInputElement;
   let fxInput: HTMLTextAreaElement;
   let a11y: HTMLDivElement;
+  let a11yLive: HTMLDivElement;
   let grid: HTMLDivElement;
 
   beforeEach(async () => {
@@ -27,6 +28,7 @@ describe('mount/chrome-sync — name box and formula bar reflect store state', (
     tag = sheet.host.querySelector('.fc-host__formulabar-tag') as HTMLInputElement;
     fxInput = sheet.host.querySelector('.fc-host__formulabar-input') as HTMLTextAreaElement;
     a11y = sheet.host.querySelector('.fc-host__a11y') as HTMLDivElement;
+    a11yLive = sheet.host.querySelector('.fc-host__a11y-live') as HTMLDivElement;
     grid = sheet.host.querySelector('.fc-host__grid') as HTMLDivElement;
   });
 
@@ -35,26 +37,43 @@ describe('mount/chrome-sync — name box and formula bar reflect store state', (
   it('initial state is A1, empty formula, a11y echoing both', () => {
     expect(tag.value).toBe('A1');
     expect(fxInput.value).toBe('');
-    const activeCell = a11y.querySelector<HTMLElement>('[role="gridcell"]');
+    const activeCell = a11y.querySelector<HTMLElement>('[aria-selected="true"]');
     expect(activeCell?.textContent?.trim()).toBe('A1');
     expect(grid.getAttribute('aria-activedescendant')).toBe(activeCell?.id);
     expect(grid.getAttribute('aria-rowcount')).toBe('1048576');
     expect(grid.getAttribute('aria-colcount')).toBe('16384');
     expect(grid.getAttribute('aria-multiselectable')).toBe('true');
+    expect(activeCell?.getAttribute('role')).toBe('gridcell');
     expect(activeCell?.getAttribute('aria-rowindex')).toBe('1');
     expect(activeCell?.getAttribute('aria-colindex')).toBe('1');
-    expect(activeCell?.getAttribute('aria-selected')).toBe('true');
     expect(activeCell?.getAttribute('aria-label')).toBe('A1');
-    expect(grid.getAttribute('aria-owns')?.split(' ')).toContain(activeCell?.id);
+    expect(a11yLive.textContent?.trim()).toBe('A1');
+  });
+
+  it('mirrors cells as grid > rowgroup > row > gridcell', () => {
+    expect(a11y.getAttribute('role')).toBe('rowgroup');
+    expect(a11y.parentElement).toBe(grid);
+    for (const rowMirror of a11y.querySelectorAll<HTMLElement>(':scope > *')) {
+      expect(rowMirror.getAttribute('role')).toBe('row');
+      expect(rowMirror.getAttribute('aria-rowindex')).toBeTruthy();
+      for (const cell of rowMirror.querySelectorAll<HTMLElement>(':scope > *')) {
+        expect(cell.getAttribute('role')).toBe('gridcell');
+      }
+    }
+    // Every gridcell is a real descendant of the grid, so nothing is owned
+    // across the tree — `aria-owns` would re-parent them under the grid.
+    expect(grid.getAttribute('aria-owns')).toBeNull();
+    expect(a11y.querySelectorAll('[role="gridcell"]').length).toBeGreaterThan(0);
   });
 
   it('moving the active cell updates the name box', () => {
     mutators.setActive(sheet.instance.store, { sheet: 0, row: 2, col: 3 });
     expect(tag.value).toBe('D3');
-    expect(a11y.textContent?.trim().startsWith('D3')).toBe(true);
-    const activeCell = a11y.querySelector<HTMLElement>('[role="gridcell"]');
+    expect(a11yLive.textContent?.trim().startsWith('D3')).toBe(true);
+    const activeCell = a11y.querySelector<HTMLElement>('[aria-selected="true"]');
     expect(activeCell?.getAttribute('aria-rowindex')).toBe('3');
     expect(activeCell?.getAttribute('aria-colindex')).toBe('4');
+    expect(activeCell?.parentElement?.getAttribute('aria-rowindex')).toBe('3');
   });
 
   it('mirrors a bounded visible viewport for screen readers', () => {
@@ -66,14 +85,31 @@ describe('mount/chrome-sync — name box and formula bar reflect store state', (
       viewport: { ...s.viewport, rowStart: 0, rowCount: 100, colStart: 0, colCount: 100 },
     }));
 
-    const viewport = a11y.querySelector<HTMLElement>('[role="rowgroup"]');
-    const mirrors = viewport?.querySelectorAll<HTMLElement>('[role="gridcell"]');
-    expect(mirrors?.length).toBe(199);
+    const rows = a11y.querySelectorAll<HTMLElement>('[role="row"]');
+    const mirrors = a11y.querySelectorAll<HTMLElement>('[role="gridcell"]');
+    expect(rows.length).toBe(20);
+    expect(mirrors.length).toBe(200);
     const b2 = a11y.querySelector<HTMLElement>('[aria-label="B2 visible"]');
     expect(b2?.getAttribute('aria-rowindex')).toBe('2');
     expect(b2?.getAttribute('aria-colindex')).toBe('2');
     expect(b2?.getAttribute('aria-selected')).toBe('false');
-    expect(grid.getAttribute('aria-owns')?.split(' ')).toContain(b2?.id);
+    expect(b2?.parentElement?.getAttribute('aria-rowindex')).toBe('2');
+  });
+
+  it('keeps the active cell in its own row when it is outside the mirrored viewport', () => {
+    mutators.setActive(sheet.instance.store, { sheet: 0, row: 200, col: 40 });
+    sheet.instance.store.setState((s) => ({
+      ...s,
+      viewport: { ...s.viewport, rowStart: 0, rowCount: 20, colStart: 0, colCount: 10 },
+    }));
+
+    const activeCell = a11y.querySelector<HTMLElement>('[aria-selected="true"]');
+    expect(grid.getAttribute('aria-activedescendant')).toBe(activeCell?.id);
+    const activeRow = activeCell?.parentElement;
+    expect(activeRow?.getAttribute('role')).toBe('row');
+    expect(activeRow?.getAttribute('aria-rowindex')).toBe('201');
+    expect(activeRow?.parentElement).toBe(a11y);
+    expect(a11y.querySelectorAll('[role="row"]').length).toBe(21);
   });
 
   it('a range selection formats as A1:B3', () => {

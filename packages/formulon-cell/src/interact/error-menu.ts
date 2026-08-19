@@ -184,7 +184,7 @@ export function attachErrorMenu(deps: ErrorMenuDeps): ErrorMenuHandle {
       case 'showInfo': {
         // Surface the error/value detail through aria-live for non-blocking
         // feedback. The chrome layer mirrors selection updates into the
-        // host's `.fc-host__a11y` element; we re-use it implicitly by just
+        // host's `.fc-host__a11y-live` element; we re-use it implicitly by just
         // updating the heading and emitting a CustomEvent that consumers
         // can hook for richer surfaces. The default in v1 is to keep the
         // menu close + emit the event; no modal popup.

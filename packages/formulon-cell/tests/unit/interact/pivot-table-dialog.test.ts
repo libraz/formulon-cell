@@ -164,7 +164,7 @@ describe('attachPivotTableDialog', () => {
     handle.open();
     expect(document.body.textContent).toContain('Create PivotTable');
     const sourceInput = document.querySelector<HTMLInputElement>('.fc-pivotdlg__field input');
-    expect(sourceInput?.value).toBe('A1:B3');
+    expect(sourceInput?.value).toBe('Sheet1!$A$1:$B$3');
     expect(document.activeElement).toBe(sourceInput);
     const sourcePicker = document.querySelector<HTMLButtonElement>(
       '[data-range-picker="pivot-source"]',
@@ -238,7 +238,7 @@ describe('attachPivotTableDialog', () => {
     expect(
       document.querySelector<HTMLInputElement>('input[name="fc-pivotdlg-destination"]:checked')
         ?.value,
-    ).toBe('existing');
+    ).toBe('new');
     expect(document.querySelectorAll('.fc-pivotdlg__checkgrid .fc-pivotdlg__check')).toHaveLength(
       4,
     );
@@ -257,7 +257,11 @@ describe('attachPivotTableDialog', () => {
     ).toBe(true);
     mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 4 });
     let rangeInputs = document.querySelectorAll<HTMLInputElement>('.fc-range-picker input');
-    expect(rangeInputs[0]?.value).toBe('A1:E3');
+    expect(rangeInputs[0]?.value).toBe('Sheet1!$A$1:$E$3');
+    // The destination controls only accept a location on an existing sheet.
+    document
+      .querySelector<HTMLInputElement>('input[name="fc-pivotdlg-destination"][value="existing"]')
+      ?.click();
     destinationPicker?.click();
     expect(sourcePicker?.dataset.rangePickerActive).toBe('false');
     expect(destinationPicker?.dataset.rangePickerActive).toBe('true');
@@ -265,7 +269,7 @@ describe('attachPivotTableDialog', () => {
     expect(destinationPicker?.getAttribute('aria-pressed')).toBe('true');
     mutators.setActive(store, { sheet: 0, row: 5, col: 2 });
     rangeInputs = document.querySelectorAll<HTMLInputElement>('.fc-range-picker input');
-    expect(rangeInputs[0]?.value).toBe('A1:E3');
+    expect(rangeInputs[0]?.value).toBe('Sheet1!$A$1:$E$3');
     expect(rangeInputs[1]?.value).toBe('C6');
     const cancelButton = Array.from(
       document.querySelectorAll<HTMLButtonElement>('.fc-fmtdlg__btn'),
@@ -368,6 +372,27 @@ describe('attachPivotTableDialog', () => {
     expect(destinationPicker?.dataset.disabledReason).toBe(
       'Select Existing worksheet to enter a location.',
     );
+    handle.detach();
+  });
+
+  it('can open with the existing worksheet placement preselected', () => {
+    const { wb } = makeWb();
+    const store = createSpreadsheetStore();
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 });
+    const handle = attachPivotTableDialog({ host, store, wb, strings: en });
+
+    handle.open({ placement: 'existing' });
+
+    expect(
+      document.querySelector<HTMLInputElement>('input[name="fc-pivotdlg-destination"]:checked')
+        ?.value,
+    ).toBe('existing');
+    const rangeInputs = document.querySelectorAll<HTMLInputElement>('.fc-range-picker input');
+    const destinationPicker = document.querySelector<HTMLButtonElement>(
+      '[data-range-picker="pivot-destination"]',
+    );
+    expect(rangeInputs[1]?.disabled).toBe(false);
+    expect(destinationPicker?.disabled).toBe(false);
     handle.detach();
   });
 
@@ -837,6 +862,29 @@ describe('attachPivotTableDialog', () => {
     expect(form).toBeTruthy();
     if (!form) throw new Error('missing PivotTable form');
     form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+
+    expect(calls).toContain('field:Region');
+    expect(calls).toContain('field:Sales');
+    expect(calls).toContain('pivot');
+    handle.detach();
+  });
+
+  it('creates a PivotTable from the prefilled sheet-qualified source range', () => {
+    const { wb, calls } = makeWb();
+    const store = createSpreadsheetStore();
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 });
+    const handle = attachPivotTableDialog({ host, store, wb, strings: en });
+
+    handle.open();
+    const source = document.querySelector<HTMLInputElement>('.fc-pivotdlg__field input');
+    expect(source?.value).toBe('Sheet1!$A$1:$B$3');
+    expect(document.querySelector('.fc-fmtdlg__btn--primary')?.hasAttribute('disabled')).toBe(
+      false,
+    );
+
+    document
+      .querySelector('form')
+      ?.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
 
     expect(calls).toContain('field:Region');
     expect(calls).toContain('field:Sales');

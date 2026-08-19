@@ -11,6 +11,8 @@ import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
+import { formatSheetAbsoluteRange } from '../wrappers/toolbar-a1.js';
+import type { SheetRange } from '../wrappers/toolbar-types.js';
 import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
 import {
   createPivotAreaSettingsButton,
@@ -53,9 +55,6 @@ const colLetter = (n: number): string => {
   } while (v >= 0);
   return out;
 };
-
-const rangeLabel = (range: { r0: number; c0: number; r1: number; c1: number }): string =>
-  `${colLetter(range.c0)}${range.r0 + 1}:${colLetter(range.c1)}${range.r1 + 1}`;
 
 const parseCellRef = (input: string): { row: number; col: number } | null => {
   const m = input
@@ -211,7 +210,11 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     return { sheet, r0: parsed.r0, c0: parsed.c0, r1: parsed.r1, c1: parsed.c1 };
   };
 
-  const selectedRangeLabel = (): string => rangeLabel(store.getState().selection.range);
+  /** Table/Range mirrors the desktop dialog: sheet-qualified and absolute. */
+  const sourceRangeLabel = (range: SheetRange): string =>
+    formatSheetAbsoluteRange(wb.sheetName(range.sheet), range);
+
+  const selectedRangeLabel = (): string => sourceRangeLabel(store.getState().selection.range);
 
   const activeCellLabel = (): string => {
     const active = store.getState().selection.active;
@@ -831,7 +834,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
     const range = store.getState().selection.range;
     body.replaceChildren();
 
-    sourceInput.value = sourceInput.value || rangeLabel(range);
+    sourceInput.value = sourceInput.value || sourceRangeLabel(range);
     nameInput.value = nameInput.value || `PivotTable${wb.getPivotTables().length + 1}`;
     const dest = `${colLetter(range.c0)}${range.r1 + 3}`;
     destInput.value = destInput.value || dest;
@@ -1016,14 +1019,12 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
 
   return {
     open(opts = {}) {
-      sourceInput.value = rangeLabel(store.getState().selection.range);
-      if (opts.placement === 'new') {
-        newWorksheetInput.checked = true;
-        existingWorksheetInput.checked = false;
-      } else {
-        newWorksheetInput.checked = false;
-        existingWorksheetInput.checked = true;
-      }
+      sourceInput.value = selectedRangeLabel();
+      // New worksheet is the dialog's default placement; only an explicit
+      // "existing sheet" entry point starts on the other radio.
+      const placement = opts.placement ?? 'new';
+      newWorksheetInput.checked = placement === 'new';
+      existingWorksheetInput.checked = placement === 'existing';
       render();
       shell.open();
       open = true;

@@ -1010,7 +1010,11 @@ export type {
   ToolbarInstance,
   ToolbarInstanceRef,
 } from './mount.js';
-export { Spreadsheet } from './mount.js';
+export {
+  openHostMenuFirstDropdown,
+  RIBBON_HOST_MENU_FIRST_COMMANDS,
+  Spreadsheet,
+} from './mount.js';
 export type { ErrorTriangleHit, ErrorTriangleKind } from './render/grid.js';
 export {
   detectErrorKind,
@@ -1388,7 +1392,13 @@ export {
   conditionalIconSetLabel,
   TOOLBAR_INSERT_SYMBOLS,
 } from './wrappers/conditional-menu-labels.js';
-export { cellLabel, formatA1Range, parseA1Atom, parseA1Range } from './wrappers/toolbar-a1.js';
+export {
+  cellLabel,
+  formatA1Range,
+  formatSheetAbsoluteRange,
+  parseA1Atom,
+  parseA1Range,
+} from './wrappers/toolbar-a1.js';
 export type {
   AutoSumAction,
   CellDeleteAction,

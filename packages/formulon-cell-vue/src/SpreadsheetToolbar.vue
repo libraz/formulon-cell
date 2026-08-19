@@ -5,6 +5,7 @@
 // DOM, helpers, menus, and hook defaults come from core.
 import {
   type DynamicDropdownsCtx,
+  openHostMenuFirstDropdown,
   type RibbonTab,
   Spreadsheet,
   type SpreadsheetInstance,
@@ -44,6 +45,7 @@ const mountToolbarFor = (instance: SpreadsheetInstance): void => {
       activeTab: props.activeTab,
       ribbonTabs: props.ribbonTabs,
       onTabChange: (tab) => emit('tabChange', tab),
+      interceptCommand: (id, button) => openHostMenuFirstDropdown(toolbar, id, button),
       // Opt into core's default dropdown-menu click delegator so Fill / Clear
       // / AutoSum / etc. work without each consumer reimplementing the
       // playground's `createDynamicDropdowns` wiring.
@@ -115,7 +117,9 @@ onBeforeUnmount(() => {
 </template>
 
 <script lang="ts">
-import SpreadsheetToolbar from './SpreadsheetToolbar.vue';
-
-export const Toolbar = SpreadsheetToolbar;
+// `Toolbar` is the React-parity alias for this component. It has to be a
+// re-export rather than `const Toolbar = <self import>`: the SFC referencing
+// itself is a module cycle, and reading the default binding while the module
+// is still evaluating throws before the component is ever created.
+export { default as Toolbar } from './SpreadsheetToolbar.vue';
 </script>

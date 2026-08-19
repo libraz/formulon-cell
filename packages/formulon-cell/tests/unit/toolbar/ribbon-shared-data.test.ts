@@ -566,7 +566,9 @@ describe('toolbar/ribbon shared data', () => {
     expect(reactToolbarSource).toContain('callbacksRef.current.onError?.(error)');
     expect(vueToolbarSource).toContain("emit('error', error)");
     expect(reactToolbarSource).toContain('export const Toolbar = SpreadsheetToolbar');
-    expect(vueToolbarSource).toContain('export const Toolbar = SpreadsheetToolbar');
+    expect(vueToolbarSource).toContain(
+      "export { default as Toolbar } from './SpreadsheetToolbar.vue'",
+    );
     expect(vueToolbarDts).toContain('export const Toolbar: typeof SpreadsheetToolbar');
     for (const symbol of ['DynamicDropdownsCtx', 'RibbonTab', 'ToolbarInstance']) {
       expect(vueToolbarExports).toContain(symbol);

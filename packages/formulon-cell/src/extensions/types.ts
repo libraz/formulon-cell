@@ -30,6 +30,8 @@ export interface ExtensionContext {
   readonly grid: HTMLElement;
   readonly statusbar: HTMLElement;
   readonly canvas: HTMLCanvasElement;
+  /** Polite live region for announcements. Writing text here is announced by
+   *  assistive tech; the structured cell mirror lives inside the grid. */
   readonly a11y: HTMLElement;
   readonly store: SpreadsheetStore;
   readonly history: History;

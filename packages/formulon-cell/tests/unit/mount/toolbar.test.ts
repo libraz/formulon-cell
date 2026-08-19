@@ -2638,7 +2638,7 @@ describe('Spreadsheet.mountToolbar', () => {
     const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     const rangeInput = dialog?.querySelector<HTMLInputElement>('input[type="text"]');
     expect(document.body.textContent).toContain('Create Table');
-    expect(rangeInput?.value).toBe('A1:C4');
+    expect(rangeInput?.value).toBe('Sheet1!$A$1:$C$4');
     expect(sheet.instance.store.getState().tables.tables).toEqual([]);
     dialog?.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
     await Promise.resolve();
@@ -2690,7 +2690,7 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(document.body.textContent).toContain('Create Table');
     const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     const rangeInput = dialog?.querySelector<HTMLInputElement>('input[type="text"]');
-    expect(rangeInput?.value).toBe('A1:C4');
+    expect(rangeInput?.value).toBe('Sheet1!$A$1:$C$4');
     await waitFor(() => document.activeElement === rangeInput);
     expect(rangeInput?.closest('.fc-range-picker')).toBeTruthy();
     const rangePicker = dialog?.querySelector<HTMLButtonElement>(
@@ -2716,7 +2716,7 @@ describe('Spreadsheet.mountToolbar', () => {
       true,
     );
     mutators.setRange(sheet.instance.store, { sheet: 0, r0: 1, c0: 1, r1: 4, c1: 3 });
-    expect(rangeInput?.value).toBe('B2:D5');
+    expect(rangeInput?.value).toBe('Sheet1!$B$2:$D$5');
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(rangePicker?.dataset.rangePickerActive).toBe('false');
     expect(rangePicker?.getAttribute('aria-pressed')).toBe('false');
@@ -2756,7 +2756,7 @@ describe('Spreadsheet.mountToolbar', () => {
     const dialog = document.body.querySelector<HTMLElement>('.fc-tb__dlg');
     const rangeInput = dialog?.querySelector<HTMLInputElement>('input[type="text"]');
     await waitFor(() => document.activeElement === rangeInput);
-    expect(rangeInput?.value).toBe('E5');
+    expect(rangeInput?.value).toBe('Sheet1!$E$5');
     expect(dialog?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(false);
 
     tb.dispose();
@@ -5543,6 +5543,25 @@ describe('Spreadsheet.mountToolbar', () => {
       document.querySelector<HTMLInputElement>('input[name="fc-pivotdlg-destination"]:checked')
         ?.value,
     ).toBe('new');
+
+    Array.from(document.querySelectorAll<HTMLButtonElement>('.fc-pivotdlg .fc-fmtdlg__btn'))
+      .find((button) => button.textContent === 'Cancel')
+      ?.click();
+    tb.dropdownsApi?.openDynamicRibbonDropdown(
+      { command: 'pivotTableInsert', menuId: 'menu-pivot-table' },
+      pivotButton as HTMLButtonElement,
+    );
+    const existingSheetButton = host.querySelector<HTMLButtonElement>(
+      '[data-pivot-table-action="existing-sheet"]',
+    );
+    expect(existingSheetButton).toBeTruthy();
+    const existingSheetEvent = new MouseEvent('click', { bubbles: true });
+    Object.defineProperty(existingSheetEvent, 'target', { value: existingSheetButton });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(existingSheetEvent)).toBe(true);
+    expect(
+      document.querySelector<HTMLInputElement>('input[name="fc-pivotdlg-destination"]:checked')
+        ?.value,
+    ).toBe('existing');
 
     tb.dispose();
   });

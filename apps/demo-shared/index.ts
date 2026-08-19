@@ -53,6 +53,13 @@ export const LOCALES = [
   { value: 'ja', label: 'JA' },
 ] as const;
 
+/** The Microsoft 365 baseline plus the optional tabs this demo actually
+ *  wires: the Automate tab is backed by the demo's Script menu and dialog. */
+export const DEMO_RIBBON_TABS: readonly RibbonTab[] = [
+  ...EXCEL365_STANDARD_RIBBON_TABS,
+  'automate',
+];
+
 export const DEMO_PRINTER_PROFILES: readonly PrinterProfile[] = [
   {
     id: 'demo-office-a4',
@@ -1454,9 +1461,10 @@ const focusableDemoModalItems = (root: HTMLElement): HTMLElement[] =>
 export const activateDemoModal = (root: HTMLElement, onClose: () => void): (() => void) => {
   const restoreFocusEl =
     document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  const focusFirst = window.requestAnimationFrame(() => {
-    (focusableDemoModalItems(root)[0] ?? root).focus({ preventScroll: true });
-  });
+  // Focus the modal now rather than on the next frame: until focus is inside
+  // it, Escape still goes to the launcher and the modal ignores it. Callers
+  // already run this after the modal is in the DOM.
+  (focusableDemoModalItems(root)[0] ?? root).focus({ preventScroll: true });
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') {
       event.preventDefault();
@@ -1482,7 +1490,6 @@ export const activateDemoModal = (root: HTMLElement, onClose: () => void): (() =
   };
   root.addEventListener('keydown', onKeyDown);
   return () => {
-    window.cancelAnimationFrame(focusFirst);
     root.removeEventListener('keydown', onKeyDown);
     if (
       restoreFocusEl &&

@@ -18,6 +18,7 @@ export interface MountChrome {
   grid: HTMLDivElement;
   canvas: HTMLCanvasElement;
   a11y: HTMLDivElement;
+  a11yLive: HTMLDivElement;
   statusbar: HTMLDivElement;
   sheetbar: HTMLDivElement;
   firstSheet: HTMLButtonElement;
@@ -157,13 +158,22 @@ export function createMountChrome({
   canvas.setAttribute('aria-hidden', 'true');
   grid.appendChild(canvas);
 
+  // Structured mirror of the painted cells: grid > rowgroup > row > gridcell.
+  // chrome-sync fills in the rows.
   const a11y = document.createElement('div');
   a11y.className = 'fc-host__a11y';
   a11y.id = `${host.dataset.fcInstId ?? 'fc'}-a11y`;
-  a11y.setAttribute('aria-live', 'polite');
-  a11y.setAttribute('aria-atomic', 'true');
-  grid.setAttribute('aria-describedby', a11y.id);
+  a11y.setAttribute('role', 'rowgroup');
   grid.appendChild(a11y);
+
+  // The announcer is a separate node outside the grid: a live region is not a
+  // valid child of role="grid", and the grid role must not sit on the region.
+  const a11yLive = document.createElement('div');
+  a11yLive.className = 'fc-host__a11y-live';
+  a11yLive.id = `${a11y.id}-live`;
+  a11yLive.setAttribute('aria-live', 'polite');
+  a11yLive.setAttribute('aria-atomic', 'true');
+  grid.setAttribute('aria-describedby', a11yLive.id);
   refreshGridLabels = (): void => {
     grid.setAttribute('aria-label', getStrings().a11y.grid);
   };
@@ -255,6 +265,7 @@ export function createMountChrome({
   };
 
   host.appendChild(grid);
+  host.appendChild(a11yLive);
   setChromeAttached('formulabar', flags.formulaBar === true);
   setChromeAttached('viewbar', flags.viewToolbar === true);
   setChromeAttached('sheetbar', flags.sheetTabs === true);
@@ -273,6 +284,7 @@ export function createMountChrome({
     grid,
     canvas,
     a11y,
+    a11yLive,
     statusbar,
     sheetbar,
     firstSheet,

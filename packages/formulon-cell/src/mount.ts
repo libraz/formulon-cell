@@ -94,6 +94,10 @@ export type {
   ToolbarInstance,
   ToolbarInstanceRef,
 } from './mount/toolbar.js';
+export {
+  openHostMenuFirstDropdown,
+  RIBBON_HOST_MENU_FIRST_COMMANDS,
+} from './mount/toolbar.js';
 export type {
   MountOptions,
   ScreenClipCapture,
@@ -205,6 +209,7 @@ export const Spreadsheet = {
       grid,
       canvas,
       a11y,
+      a11yLive,
       statusbar,
       firstSheet,
       lastSheet,
@@ -226,6 +231,18 @@ export const Spreadsheet = {
 
     const store = createSpreadsheetStore();
     mutators.setTheme(store, initialTheme);
+
+    // Upload status / macro recording start off in the status-bar chooser
+    // because most hosts never drive them. The first value a host reports
+    // turns the item on; after that the chooser owns its visibility.
+    const declaredStatusIndicators = new Set<'uploadStatus' | 'macroRecording'>();
+    const declareStatusIndicator = (key: 'uploadStatus' | 'macroRecording'): void => {
+      if (declaredStatusIndicators.has(key)) return;
+      declaredStatusIndicators.add(key);
+      mutators.setStatusOption(store, key, true);
+    };
+    if (uploadStatus !== null) declareStatusIndicator('uploadStatus');
+    if (macroRecording !== null) declareStatusIndicator('macroRecording');
 
     // Unified undo/redo. Attach BEFORE seed-cell hydration so the seed itself
     // doesn't pollute the stack — but seed runs above on the wb. Clear the
@@ -518,6 +535,7 @@ export const Spreadsheet = {
 
     chromeSync = attachChromeSync({
       a11y,
+      a11yLive,
       emitter,
       fxInput,
       getFormulaEditing: () => formulaBar.isEditing(),
@@ -552,7 +570,7 @@ export const Spreadsheet = {
       grid,
       statusbar,
       canvas,
-      a11y,
+      a11y: a11yLive,
       store,
       history,
       i18n,
@@ -908,10 +926,12 @@ export const Spreadsheet = {
       captureScreenClip,
       setUploadStatus(next) {
         uploadStatus = next;
+        if (next !== null) declareStatusIndicator('uploadStatus');
         featureState.statusBar?.refresh();
       },
       setMacroRecording(next) {
         macroRecording = next;
+        if (next !== null) declareStatusIndicator('macroRecording');
         featureState.statusBar?.refresh();
       },
       recalc() {

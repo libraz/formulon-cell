@@ -244,20 +244,30 @@ describe('Spreadsheet feature registry', () => {
     expect(host.querySelector('[aria-label="Expand formula bar"]')).toBeTruthy();
     const grid = host.querySelector<HTMLElement>('.fc-host__grid');
     const canvas = host.querySelector<HTMLCanvasElement>('.fc-host__canvas');
-    const live = host.querySelector<HTMLElement>('.fc-host__a11y');
+    const mirror = host.querySelector<HTMLElement>('.fc-host__a11y');
+    const live = host.querySelector<HTMLElement>('.fc-host__a11y-live');
     expect(grid?.getAttribute('role')).toBe('grid');
     expect(grid?.getAttribute('aria-label')).toBe('Worksheet grid');
     expect(grid?.tabIndex).toBe(-1);
     expect(grid?.getAttribute('aria-describedby')).toBe(live?.id);
-    expect(grid?.getAttribute('aria-activedescendant')).toBe(`${live?.id}-active-cell`);
+    expect(grid?.getAttribute('aria-activedescendant')).toBe(`${mirror?.id}-active-cell`);
     expect(grid?.getAttribute('aria-rowcount')).toBe('1048576');
     expect(grid?.getAttribute('aria-colcount')).toBe('16384');
     expect(canvas?.getAttribute('aria-hidden')).toBe('true');
+    // The mirror sits inside the grid as grid > rowgroup > row > gridcell; the
+    // announcer is a separate node outside the grid.
+    expect(mirror?.getAttribute('role')).toBe('rowgroup');
+    expect(mirror?.parentElement).toBe(grid);
+    expect(mirror?.getAttribute('aria-live')).toBeNull();
     expect(live?.getAttribute('aria-live')).toBe('polite');
     expect(live?.getAttribute('aria-atomic')).toBe('true');
-    const activeCell = live?.querySelector<HTMLElement>('[role="gridcell"]');
-    expect(activeCell?.id).toBe(`${live?.id}-active-cell`);
-    expect(activeCell?.getAttribute('aria-selected')).toBe('true');
+    expect(live?.getAttribute('role')).toBeNull();
+    expect(live?.closest('.fc-host__grid')).toBeNull();
+    const activeCell = mirror?.querySelector<HTMLElement>('[aria-selected="true"]');
+    expect(activeCell?.id).toBe(`${mirror?.id}-active-cell`);
+    expect(activeCell?.getAttribute('role')).toBe('gridcell');
+    expect(activeCell?.parentElement?.getAttribute('role')).toBe('row');
+    expect(activeCell?.parentElement?.getAttribute('aria-rowindex')).toBe('1');
 
     instance.i18n.setLocale('ja');
 
