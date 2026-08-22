@@ -19,6 +19,7 @@ export type SpreadsheetCompatibilityId =
   | 'auto-filter'
   | 'sheet-protection'
   | 'sheet-views'
+  | 'page-setup'
   | 'loaded-tables'
   | 'format-as-table'
   | 'pivot-layouts'
@@ -207,6 +208,16 @@ export function summarizeSpreadsheetCompatibility(
         c.freeze || c.sheetZoom || c.hiddenRowsCols || c.outlines
           ? 'Sheet views can be captured and restored in the UI; individual view settings may still persist through engine view APIs.'
           : 'Sheet views can be captured and restored in the UI for the current session.',
+    },
+    {
+      id: 'page-setup',
+      label: 'Page setup',
+      status: c.printSettings ? 'writable' : 'session',
+      reason: c.printSettings
+        ? c.pageBreaks
+          ? 'Orientation, paper, scaling, margins, print options, header/footer, print area, print titles and manual breaks round-trip through the engine. Printer minimum margins stay session state — they describe a device, not the workbook.'
+          : 'Print settings round-trip through the engine; manual page breaks stay session state until the engine exposes the break table.'
+        : 'The Page Setup dialog drives the print document for the session, but the engine has no print-settings surface to write it back.',
     },
     {
       id: 'loaded-tables',

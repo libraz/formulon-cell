@@ -44,6 +44,7 @@ function makeLayout(over: Partial<ViewLayout> = {}): ViewLayout {
     outlineRowGutter: 0,
     outlineColGutter: 0,
     hiddenSheets: new Set(),
+    veryHiddenSheets: new Set(),
     sheetTabColors: new Map(),
     ...over,
   };

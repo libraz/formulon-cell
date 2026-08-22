@@ -1,11 +1,12 @@
 import type { History } from '../commands/history.js';
-import type { SpreadsheetStore, State } from '../store/store.js';
+import type { PageSetup, SpreadsheetStore, State } from '../store/store.js';
 import { addrKey } from './address.js';
 import { syncAutoFilterToEngine } from './auto-filter-sync.js';
 import { detectCapabilities } from './capabilities.js';
 import { type ExternalLinkKind, externalLinkKindLabel } from './external-links.js';
 import type { LoadOptions } from './loader.js';
 import { isUsingStub, loadFormulon } from './loader.js';
+import { syncPageSetupToEngine } from './print-sync.js';
 import { parseRangeRef as parseTableRef } from './range-resolver.js';
 import type {
   Addr,
@@ -97,16 +98,28 @@ export class WorkbookHandle {
    *  stack. */
   private history: History | null = null;
 
-  /** Optional mount store used only to persist AutoFilter mutations. Keeping
-   * this association at the adapter boundary means every React/Vue/vanilla
-   * surface gets save-safe filters without duplicating writeback calls. */
-  private autoFilterStore: SpreadsheetStore | null = null;
+  /** Optional mount store whose AutoFilter and page-setup slices are mirrored
+   * into the engine as they change. Keeping this association at the adapter
+   * boundary means every React/Vue/vanilla surface gets save-safe filters and
+   * print settings without duplicating writeback calls. */
+  private boundStore: SpreadsheetStore | null = null;
 
-  private unsubscribeAutoFilterStore: (() => void) | null = null;
+  private unsubscribeBoundStore: (() => void) | null = null;
 
   private lastAutoFilterSignature = '';
 
-  private autoFilterSyncMuted = 0;
+  /** Identity of the page-setup map the engine already carries. The store
+   *  replaces the map on every page-setup write and preserves it otherwise, so
+   *  comparing the reference costs nothing on the unrelated notifications that
+   *  make up almost all of them. A same-content map with a fresh identity only
+   *  costs one redundant flush, and the flush is idempotent. */
+  private lastPageSetupMap: ReadonlyMap<number, PageSetup> | null = null;
+
+  private storeSyncMuted = 0;
+
+  /** Locale default font for a workbook this handle created. Null for a
+   *  loaded workbook, whose own font 0 is the authoritative baseline. */
+  private localeDefaultFont: Pick<FontRecord, 'name' | 'size'> | null = null;
 
   /** Host-injected localized function documentation, merged over the
    *  engine's structural `functionMetadata()` result. `null` until a host
@@ -136,7 +149,7 @@ export class WorkbookHandle {
     const module = await loadFormulon(loadOptions);
     const wb = module.Workbook.createDefault();
     const handle = new WorkbookHandle(module, wb);
-    handle.installLocaleDefaultFont(locale);
+    handle.localeDefaultFont = defaultFontForLocale(locale);
     return handle;
   }
 
@@ -160,28 +173,23 @@ export class WorkbookHandle {
     return this.module.versionString();
   }
 
-  /** Seed a genuinely new workbook's style table with the locale's default
-   * font. `addFont` deduplicates and the first inserted record is font 0,
-   * which OOXML treats as the workbook default. Loaded workbooks never call
-   * this path, so their authoring font remains untouched. */
-  private installLocaleDefaultFont(locale: string | undefined): void {
-    if (!this.capabilities.cellFormatting) return;
-    const font = defaultFontForLocale(locale);
-    this.addFontRecord({
-      ...font,
-      // The workbook default font states no weight/slant/strike at all, the
-      // same shape a spreadsheet writes, so a plain cell resolves to this
-      // record instead of a near-duplicate that only differs in the flags.
-      bold: false,
-      italic: false,
-      strike: false,
-      hasBold: false,
-      hasItalic: false,
-      hasStrike: false,
-      underline: 0,
-      vertAlign: 0,
-      colorArgb: 0xff000000,
-    });
+  /**
+   * Font a cell falls back to when its format states no family or size — the
+   * baseline every authored font record is built from, and the one stripped
+   * back out when engine records are hydrated into the store.
+   *
+   * A loaded workbook's baseline is its own font 0, the record OOXML treats as
+   * the workbook default. A newly created workbook takes the locale's default
+   * instead: the engine seeds font 0 with the Calibri record a spreadsheet
+   * writes and offers no way to replace it, so the locale font is registered
+   * on first use and named explicitly on every cell that uses it. That leaves
+   * one gap the engine has to close — a cell carrying no format at all
+   * resolves to the seeded font 0, so an untouched cell in a new ja-JP
+   * workbook saves as Calibri rather than the locale font.
+   */
+  get workbookDefaultFont(): Pick<FontRecord, 'name' | 'size'> | null {
+    this.assertAlive();
+    return this.localeDefaultFont ?? this.getFontRecord(0);
   }
 
   get sheetCount(): number {
@@ -269,35 +277,47 @@ export class WorkbookHandle {
     this.redoStack.length = 0;
   }
 
-  /** Attach the owning spreadsheet store so changes to AutoFilter state are
-   * immediately mirrored to the engine before an `.xlsx` can be saved. */
+  /** Attach the owning spreadsheet store so changes to AutoFilter and
+   * page-setup state are immediately mirrored to the engine before an `.xlsx`
+   * can be saved. */
   attachStore(store: SpreadsheetStore | null): void {
-    this.unsubscribeAutoFilterStore?.();
-    this.unsubscribeAutoFilterStore = null;
-    this.autoFilterStore = store;
-    this.lastAutoFilterSignature = store ? autoFilterSignature(store.getState()) : '';
+    this.unsubscribeBoundStore?.();
+    this.unsubscribeBoundStore = null;
+    this.boundStore = store;
+    this.rebaseStoreSignatures();
     if (!store) return;
-    this.unsubscribeAutoFilterStore = store.subscribe((state) => {
-      const next = autoFilterSignature(state);
-      if (next === this.lastAutoFilterSignature) return;
-      this.lastAutoFilterSignature = next;
-      if (this.autoFilterSyncMuted > 0) return;
-      syncAutoFilterToEngine(this, state, state.data.sheetIndex);
+    this.unsubscribeBoundStore = store.subscribe((state) => {
+      const nextFilter = autoFilterSignature(state);
+      const filterChanged = nextFilter !== this.lastAutoFilterSignature;
+      if (filterChanged) this.lastAutoFilterSignature = nextFilter;
+      const nextPageSetup = state.pageSetup.setupBySheet;
+      const pageSetupChanged = nextPageSetup !== this.lastPageSetupMap;
+      if (pageSetupChanged) this.lastPageSetupMap = nextPageSetup;
+      if (this.storeSyncMuted > 0) return;
+      if (filterChanged) syncAutoFilterToEngine(this, state, state.data.sheetIndex);
+      if (pageSetupChanged) syncPageSetupToEngine(this, store, state.data.sheetIndex);
     });
   }
 
-  /** Runs hydration without turning imported filter XML into a UI-authored
-   * replacement. The store subscription still records the new baseline. */
-  withAutoFilterSyncMuted<T>(fn: () => T): T {
-    this.autoFilterSyncMuted += 1;
+  /** Runs hydration without turning imported filter XML or print settings
+   * into a UI-authored replacement. The store subscription still records the
+   * new baseline. */
+  withEngineSyncMuted<T>(fn: () => T): T {
+    this.storeSyncMuted += 1;
     try {
       return fn();
     } finally {
-      this.autoFilterSyncMuted -= 1;
-      if (this.autoFilterStore) {
-        this.lastAutoFilterSignature = autoFilterSignature(this.autoFilterStore.getState());
-      }
+      this.storeSyncMuted -= 1;
+      this.rebaseStoreSignatures();
     }
+  }
+
+  /** Re-read the bound store's mirrored slices so the next notification is
+   *  compared against what the engine already carries. */
+  private rebaseStoreSignatures(): void {
+    const state = this.boundStore?.getState();
+    this.lastAutoFilterSignature = state ? autoFilterSignature(state) : '';
+    this.lastPageSetupMap = state?.pageSetup.setupBySheet ?? null;
   }
 
   setNumber(a: Addr, value: number): void {
@@ -486,6 +506,21 @@ export class WorkbookHandle {
     if (!this.capabilities.iterativeProgress) return false;
     const s = this.wb.setIterative(enabled, maxIterations, maxChange);
     return s.ok;
+  }
+
+  /** Read back the workbook's stored iterative-calculation settings. The cap
+   *  and threshold are meaningful even while `enabled` is false, so a dialog
+   *  can open on what the workbook carries rather than on its own defaults.
+   *
+   *  Returns null when the engine has no readback, in which case the caller
+   *  keeps whatever it last wrote. Note the engine clamps `maxIterations` to
+   *  32767 on the way in, so a larger request reads back clamped. */
+  getIterative(): { enabled: boolean; maxIterations: number; maxChange: number } | null {
+    this.assertAlive();
+    if (!this.capabilities.iterativeSettings) return null;
+    const r = this.wb.getIterative();
+    if (!r.status.ok) return null;
+    return { enabled: r.enabled, maxIterations: r.maxIterations, maxChange: r.maxChange };
   }
 
   /** Install (or clear) a progress callback invoked after each iterative-solve

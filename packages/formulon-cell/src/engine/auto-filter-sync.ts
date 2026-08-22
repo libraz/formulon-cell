@@ -101,7 +101,7 @@ export function hydrateAutoFilterFromEngine(
   const xml = wb.getSheetAutoFilterXml(sheet);
   if (xml === null) return;
   const range = autoFilterRangeFromXml(xml, sheet);
-  wb.withAutoFilterSyncMuted(() => {
+  wb.withEngineSyncMuted(() => {
     store.setState((state) => ({
       ...state,
       ui: {

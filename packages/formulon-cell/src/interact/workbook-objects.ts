@@ -55,6 +55,7 @@ const COMPATIBILITY_LABEL_KEYS: Record<
   'auto-filter': 'autoFilter',
   'sheet-protection': 'sheetProtection',
   'sheet-views': 'sheetViews',
+  'page-setup': 'pageSetup',
   'loaded-tables': 'loadedTables',
   'format-as-table': 'formatAsTable',
   'pivot-layouts': 'pivotLayouts',
@@ -367,6 +368,7 @@ export function attachWorkbookObjectsPanel(
       cols: number;
       fields: readonly string[];
       fieldItems?: Record<string, readonly string[]>;
+      fieldItemIndexes?: Record<string, readonly number[]>;
     },
     opts: { fieldListOnly?: boolean } = {},
   ): HTMLFormElement => {
@@ -486,6 +488,7 @@ export function attachWorkbookObjectsPanel(
       filterItems.placeholder = t.pivotFilterItemsPlaceholder;
       filterItems.dataset.pivotFilterItemsFieldIndex = String(index);
       const inferredItems = pivot.fieldItems?.[field] ?? [];
+      const inferredIndexes = pivot.fieldItemIndexes?.[field] ?? [];
       if (fieldListOnly && inferredItems.length > 0) filterItems.value = inferredItems.join('\n');
       const syncFilterCondition = (condition: PivotFilterConditionState): void => {
         if (condition.kind === 'none' || !condition.value.trim()) filterConditions.delete(index);
@@ -524,14 +527,19 @@ export function attachWorkbookObjectsPanel(
       const filterChecklist = document.createElement('div');
       filterChecklist.className = 'fc-objects__pivot-filter-items';
       filterChecklist.dataset.pivotFilterChecklistFieldIndex = String(index);
-      for (const itemName of inferredItems) {
+      for (const [position, itemName] of inferredItems.entries()) {
         const check = document.createElement('input');
         check.type = 'checkbox';
         check.checked = true;
         check.value = itemName;
+        // The blank member has no label to be matched by, so the filter can
+        // only name it by its cache index. Carry the index for every item and
+        // the writeback never has to guess which form to use.
+        const cacheIndex = inferredIndexes[position];
+        if (cacheIndex !== undefined) check.dataset.pivotItemCacheIndex = String(cacheIndex);
         const checkLabel = document.createElement('label');
         checkLabel.className = 'fc-objects__pivot-field-list-item';
-        checkLabel.append(check, document.createTextNode(itemName));
+        checkLabel.append(check, document.createTextNode(itemName || t.pivotBlankItem));
         filterChecklist.appendChild(checkLabel);
       }
       const settings = document.createElement('div');
@@ -666,15 +674,36 @@ export function attachWorkbookObjectsPanel(
           const checkedItems = Array.from(
             checklist.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
           );
-          return checkedItems.every((item) =>
-            wb.addPivotFieldItem(
+          return checkedItems.every((item) => {
+            // A cache index states the item exactly, including the blank
+            // member; without one — a field whose items were read off the
+            // projected layout — the label is all there is.
+            const cacheIndex = Number.parseInt(item.dataset.pivotItemCacheIndex ?? '', 10);
+            if (Number.isFinite(cacheIndex)) {
+              if (
+                wb.addPivotFieldItemAt(
+                  pivot.sheetIndex,
+                  pivot.pivotIndex,
+                  field.fieldIndex,
+                  cacheIndex,
+                  item.checked,
+                )
+              ) {
+                return true;
+              }
+              // An engine without the by-index form cannot express a blank
+              // member at all; skip it rather than adding an item that
+              // filters nothing.
+              if (!item.value) return true;
+            }
+            return wb.addPivotFieldItem(
               pivot.sheetIndex,
               pivot.pivotIndex,
               field.fieldIndex,
               item.value,
               item.checked,
-            ),
-          );
+            );
+          });
         }
         return items.every((item) =>
           wb.addPivotFieldItem(pivot.sheetIndex, pivot.pivotIndex, field.fieldIndex, item, true),

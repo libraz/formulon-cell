@@ -169,9 +169,25 @@ export function attachIterativeDialog(deps: IterativeDialogDeps): IterativeDialo
     }
   });
 
+  /** Pull the workbook's stored settings into the draft. A loaded file can
+   *  carry iteration settings this dialog never wrote, and the engine clamps
+   *  the cap on the way in, so the dialog opens on what the workbook actually
+   *  has rather than on what was last typed. Engines without the readback
+   *  leave the draft alone. */
+  const refreshFromWorkbook = (): void => {
+    const workbook = getWb();
+    if (!workbook || typeof workbook.getIterative !== 'function') return;
+    const settings = workbook.getIterative();
+    if (!settings) return;
+    draft.enabled = settings.enabled;
+    if (settings.maxIterations > 0) draft.maxIterations = settings.maxIterations;
+    if (settings.maxChange > 0) draft.maxChange = settings.maxChange;
+  };
+
   const api: IterativeDialogHandle = {
     open(): void {
       status.textContent = '';
+      refreshFromWorkbook();
       syncControls();
       shell.open();
       requestAnimationFrame(() => enableInput.focus());

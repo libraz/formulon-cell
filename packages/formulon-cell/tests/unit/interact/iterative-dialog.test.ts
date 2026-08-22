@@ -15,6 +15,12 @@ interface FakeWb {
   supports: { value: boolean };
 }
 
+interface IterativeSettings {
+  enabled: boolean;
+  maxIterations: number;
+  maxChange: number;
+}
+
 const overlay = (): HTMLElement | null => document.querySelector<HTMLElement>('.fc-iterdlg');
 const enableInput = (): HTMLInputElement | null =>
   document.querySelector<HTMLInputElement>('.fc-iterdlg input[type="checkbox"]');
@@ -30,7 +36,7 @@ const cancelBtn = (): HTMLButtonElement | null =>
   ) ?? null;
 const status = (): HTMLElement | null => document.querySelector<HTMLElement>('.fc-iterdlg__status');
 
-const makeFakeWb = (supports = true): FakeWb => {
+const makeFakeWb = (supports = true, stored: IterativeSettings | null = null): FakeWb => {
   const supportsRef = { value: supports };
   const setIterative = vi.fn(() => true);
   const setIterativeProgress = vi.fn(() => true);
@@ -40,6 +46,9 @@ const makeFakeWb = (supports = true): FakeWb => {
     },
     setIterative,
     setIterativeProgress,
+    // Engines predating the readback have no such method at all, which is the
+    // shape the other cases here exercise.
+    ...(stored ? { getIterative: () => stored } : {}),
   } as unknown as WorkbookHandle;
   return { handle, setIterative, setIterativeProgress, supports: supportsRef };
 };
@@ -199,5 +208,25 @@ describe('attachIterativeDialog', () => {
       /\.fc-iterdlg__row input\[type="number"\]:focus,[\s\S]*?\.fc-iterdlg__row input\[type="text"\]:focus\s*\{[\s\S]*?box-shadow: inset 0 0 0 1px var\(--fc-accent, currentColor\);/,
     );
     expect(css).not.toContain('box-shadow: 0 0 0 2px var(--fc-accent-soft');
+  });
+
+  it('opens on the settings the workbook already carries', () => {
+    const fake = makeFakeWb(true, { enabled: true, maxIterations: 250, maxChange: 0.05 });
+    const handle = attachIterativeDialog({ host, getWb: () => fake.handle });
+    handle.open();
+    expect(enableInput()?.checked).toBe(true);
+    expect(numberInput()?.value).toBe('250');
+    expect(textInput()?.value).toBe('0.05');
+    expect(numberInput()?.disabled).toBe(false);
+    handle.detach();
+  });
+
+  it('keeps its own defaults when the engine has no readback', () => {
+    const fake = makeFakeWb();
+    const handle = attachIterativeDialog({ host, getWb: () => fake.handle });
+    handle.open();
+    expect(enableInput()?.checked).toBe(false);
+    expect(numberInput()?.value).toBe('100');
+    handle.detach();
   });
 });

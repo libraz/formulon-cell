@@ -848,6 +848,7 @@ export interface Strings {
     pivotNumberFormatPlaceholder: string;
     pivotFilterItems: string;
     pivotFilterItemsPlaceholder: string;
+    pivotBlankItem: string;
     pivotReportLayout: string;
     pivotReportLayoutCompact: string;
     pivotReportLayoutOutline: string;
@@ -897,6 +898,7 @@ export interface Strings {
       autoFilter: string;
       sheetProtection: string;
       sheetViews: string;
+      pageSetup: string;
       loadedTables: string;
       formatAsTable: string;
       pivotLayouts: string;
@@ -918,6 +920,7 @@ export interface Strings {
       autoFilter: string;
       sheetProtection: string;
       sheetViews: string;
+      pageSetup: string;
       loadedTables: string;
       formatAsTable: string;
       pivotLayouts: string;
@@ -1020,6 +1023,7 @@ export interface Strings {
     tabColorGray: string;
     deleteSheet: string;
     hideSheet: string;
+    veryHideSheet: string;
     unhideSheet: string;
     unhideNamedSheet: string;
   };

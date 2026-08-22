@@ -4,6 +4,97 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
+## Unreleased
+
+### Added
+
+- Worksheet print settings round-trip through xlsx. The Page Setup record was
+  a session-only UI model because the engine offered getters and no setters;
+  now every control that maps to an OOXML attribute is hydrated from a loaded
+  workbook and written back on save — orientation, paper size, scale,
+  fit-to-page, margins, print options, header/footer, print area, print titles,
+  manual page breaks, and the attributes beside the engine's typed setter
+  (black and white, draft quality, cell comments, cell errors, page order,
+  first page number, print quality). A sheet whose paper is outside the sizes
+  the UI names keeps its OOXML code in the new `PageSetup.paperSizeCode` and
+  saves back on that paper rather than being silently re-papered as A4.
+
+  `PageSetup.printableBounds` is the one field that stays session state, and
+  for a reason rather than a gap: it records a physical printer's minimum
+  margins, which OOXML has no concept of. `page-setup` joins the workbook
+  compatibility summary so a host can say which of the two a workbook gets.
+
+- Sheet tabs carry the three-state visibility a workbook can express, not just
+  hidden-or-not. `LayoutSlice.veryHiddenSheets` records the subset a workbook
+  marked very hidden, and the tab menu's Unhide list leaves those out — which
+  is the whole point of the state, and what a spreadsheet's own Unhide dialog
+  does. Hiding and unhiding no longer quietly demotes a very-hidden sheet to
+  plain hidden on save. The tab menu gains an entry that states it, and
+  `setSheetTabVisibility` is the command behind it; `setSheetHidden` stays the
+  two-state form and now refuses to demote a very-hidden tab, matching the
+  engine's own flag setter.
+
+- A PivotTable filter can select the blank member of a field. The filter item
+  list was built from labels alone, and the blank member has none, so it was
+  dropped from the checklist entirely and a filter could never name it. Items
+  now carry the cache index `<item x="N">` addresses them by, the blank member
+  is listed under a `(blank)` placeholder, and the writeback states each item
+  by index through `addPivotFieldItemAt`. A field whose members were inferred
+  from the projected layout rather than read out of the cache has no index, and
+  still goes by label.
+
+- The iterative-calculation dialog opens on the settings the workbook actually
+  carries. It had no way to read them back, so a file that arrived with
+  iteration switched on still showed the dialog's own defaults, and clicking OK
+  wrote those defaults over the file's.
+
+- `WorkbookHandle` gains `getIterative`, `setSheetVisibility`, the print
+  accessors (`getSheetPageSetup` / `setSheetPageSetup`, `getSheetPageMargins` /
+  `setSheetPageMargins`, `getSheetPrintOptions` / `setSheetPrintOptions`,
+  `getSheetHeaderFooter` / `setSheetHeaderFooter`, `getSheetPrintArea` /
+  `setSheetPrintArea`, `getSheetPrintTitles` / `setSheetPrintTitles`,
+  `getSheetPageBreaks` / `setSheetPageBreaks`, `getSheetPageSetupXml` /
+  `setSheetPageSetupXml`, `getSheetPageSetupExtras` / `setSheetPageSetupExtras`)
+  and the `printSettings` / `printSettingsXml` / `pageBreaks` /
+  `sheetVisibility` / `iterativeSettings` / `pivotItemByCacheIndex` capability
+  flags. `getSheetView` now reports `visibility` beside `tabHidden`, and
+  `getPivotTables` reports `fieldItemIndexes` beside `fieldItems`.
+
+  `setSheetPageSetupExtras` merges into the raw `<pageSetup>` fragment the
+  engine keeps as its writer's source of truth, so an attribute neither side
+  models — `copies`, or an `r:id` naming the sheet's printerSettings part —
+  survives the write untouched. `mergePageSetupFragment` is exported for a host
+  that needs to reach an attribute this package does not name.
+
+### Changed
+
+- The engine dependency moves to `@libraz/formulon` 0.11.0.
+
+- `WorkbookHandle.withAutoFilterSyncMuted` is now `withEngineSyncMuted`: the
+  bound store mirrors page setup as well as AutoFilter into the engine, and one
+  scope suppresses both.
+
+- A new workbook's locale default font is carried by the handle
+  (`WorkbookHandle.workbookDefaultFont`) instead of being written into the
+  engine's font table as record 0. The engine now seeds a fresh workbook's
+  style table with the records a spreadsheet writes and offers no way to
+  replace font 0, so appending the locale font only produced an unused
+  near-duplicate and left the baseline at Calibri. Every authored cell format
+  still resolves to the locale font, and a loaded workbook still takes its own
+  font 0 as the baseline.
+
+  One gap this cannot close from here: a cell in a new ja-JP workbook that
+  carries no format at all resolves to the engine's seeded font 0, so it saves
+  as Calibri rather than the locale font. Stating the workbook default font
+  needs an engine API that does not exist yet.
+
+### Fixed
+
+- Data-validation writeback keeps rejecting blank cells only where the rule
+  says so. The engine flipped `addValidation`'s `allowBlank` default from true
+  to false; the writeback already spelled the field explicitly on every rule,
+  so no stored rule changes meaning.
+
 ## 0.5.1 — 2026-08-20
 
 ### Added

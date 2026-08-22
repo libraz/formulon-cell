@@ -24,6 +24,14 @@ type WorkbookHandleInternals = {
   capabilities: WorkbookHandle['capabilities'];
   assertAlive(): void;
 };
+/** One member of a pivot field, paired with the cache index that addresses it.
+ *  The blank member's `label` is empty — it has no label of its own, and the
+ *  index is the only way to name it. */
+export interface PivotFieldItem {
+  readonly label: string;
+  readonly cacheIndex: number;
+}
+
 type MutablePivotFilterSpecDraft = {
   -readonly [K in keyof PivotFilterSpec]?: PivotFilterSpec[K];
 };
@@ -87,6 +95,11 @@ export abstract class WorkbookHandlePivotMethods {
     cells: number;
     fields: string[];
     fieldItems: Record<string, string[]>;
+    /** Cache index of each entry in `fieldItems`, positionally aligned. A
+     *  field whose items were inferred from the projected layout rather than
+     *  read out of the cache has no entry, since those labels address no
+     *  shared item. */
+    fieldItemIndexes?: Record<string, number[]>;
     pivotFilters?: readonly PivotFilterSpec[];
   }[] {
     assertAlive(this);
@@ -101,6 +114,7 @@ export abstract class WorkbookHandlePivotMethods {
       cells: number;
       fields: string[];
       fieldItems: Record<string, string[]>;
+      fieldItemIndexes?: Record<string, number[]>;
       pivotFilters?: readonly PivotFilterSpec[];
     }[] = [];
     for (let sheet = 0; sheet < this.sheetCount; sheet += 1) {
@@ -125,9 +139,17 @@ export abstract class WorkbookHandlePivotMethods {
           fields,
           this.pivotTableCacheId(sheet, pivotIndex),
         );
-        for (const [field, labels] of cacheFieldItems) {
-          if (labels.length === 0) continue;
-          fieldItems.set(field, new Set(labels));
+        // The cache is the better source: it carries every member of the
+        // field, including ones no projected cell happens to show, and the
+        // index each is addressed by.
+        const fieldItemIndexes = new Map<string, number[]>();
+        for (const [field, items] of cacheFieldItems) {
+          if (items.length === 0) continue;
+          fieldItems.set(field, new Set(items.map((item) => item.label)));
+          fieldItemIndexes.set(
+            field,
+            items.map((item) => item.cacheIndex),
+          );
         }
         const pivotFilters = pivotFilterSpecs(this, sheet, pivotIndex);
         out.push({
@@ -142,6 +164,7 @@ export abstract class WorkbookHandlePivotMethods {
           fieldItems: Object.fromEntries(
             [...fieldItems.entries()].map(([field, items]) => [field, [...items]]),
           ),
+          fieldItemIndexes: Object.fromEntries(fieldItemIndexes),
           ...(pivotFilters.length > 0 ? { pivotFilters } : {}),
         });
       }
@@ -217,6 +240,9 @@ export abstract class WorkbookHandlePivotMethods {
     return out;
   }
 
+  /** Shared items of a pivot cache field, in the index order `<item x="N">`
+   *  addresses. A value the engine refuses to read back is kept as a blank so
+   *  a caller can still use the array position as that cache index. */
   pivotCacheSharedItems(cacheId: number, fieldIdx: number): CellValue[] {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return [];
@@ -226,7 +252,7 @@ export abstract class WorkbookHandlePivotMethods {
     const n = wb.pivotCacheFieldSharedItemCount(cacheId, fieldIdx);
     for (let i = 0; i < n; i += 1) {
       const r = wb.pivotCacheFieldSharedItemValue(cacheId, fieldIdx, i);
-      if (r.status.ok) out.push(fromEngineValue(r.value));
+      out.push(r.status.ok ? fromEngineValue(r.value) : { kind: 'blank' });
     }
     return out;
   }
@@ -441,6 +467,10 @@ export abstract class WorkbookHandlePivotMethods {
     return pivotWb(this).pivotFieldClearAggregations(sheet, pivotIdx, fieldIdx).ok;
   }
 
+  /** Append a manual-filter item addressed by its rendered label. The item
+   *  carries no cache binding, so the filter engine matches source records by
+   *  comparing their label against `name`; an empty `name` therefore names
+   *  nothing. Use `addPivotFieldItemAt` for the blank member. */
   addPivotFieldItem(
     sheet: number,
     pivotIdx: number,
@@ -451,6 +481,24 @@ export abstract class WorkbookHandlePivotMethods {
     assertAlive(this);
     if (!this.capabilities.pivotTableMutate) return false;
     return pivotWb(this).pivotFieldAddItem(sheet, pivotIdx, fieldIdx, name, visible).ok;
+  }
+
+  /** Append a manual-filter item addressed by its position in the bound cache
+   *  field's shared items — the index space OOXML `<item x="N">` uses. This is
+   *  the only form that can express the blank member. Returns false on an
+   *  engine that has only the by-label form. */
+  addPivotFieldItemAt(
+    sheet: number,
+    pivotIdx: number,
+    fieldIdx: number,
+    cacheIndex: number,
+    visible: boolean,
+  ): boolean {
+    assertAlive(this);
+    if (!this.capabilities.pivotItemByCacheIndex) return false;
+    const add = pivotWb(this).pivotFieldAddItemAt;
+    if (typeof add !== 'function') return false;
+    return add.call(pivotWb(this), sheet, pivotIdx, fieldIdx, cacheIndex, visible).ok;
   }
 
   clearPivotFieldItems(sheet: number, pivotIdx: number, fieldIdx: number): boolean {
@@ -601,22 +649,38 @@ function pivotCellItemLabel(value: CellValue): string {
   return '';
 }
 
+/**
+ * Shared items of every cache field a pivot names, each paired with the index
+ * `<item x="N">` addresses it by.
+ *
+ * The blank member is kept. It carries no label of its own, so it can only be
+ * named by that index — a filter spelled from an empty label matches nothing —
+ * and dropping it here is what left it unreachable from the filter UI.
+ *
+ * Two shared items can render to the same label (`1` and `"1"`); the first
+ * wins, so the list a user sees has no visible duplicates and every entry
+ * still resolves to a real cache index.
+ */
 function pivotCacheSharedItemLabels(
   handle: WorkbookHandlePivotMethods,
   fields: ReadonlySet<string>,
   preferredCacheId: number,
-): Map<string, string[]> {
-  const out = new Map<string, string[]>();
+): Map<string, PivotFieldItem[]> {
+  const out = new Map<string, PivotFieldItem[]>();
   if (!handle.capabilities.pivotTableMutate) return out;
   const cacheIds = preferredCacheId >= 0 ? [preferredCacheId] : handle.pivotCacheIds();
   for (const cacheId of cacheIds) {
     for (const [fieldIdx, fieldName] of handle.pivotCacheFieldNames(cacheId).entries()) {
       if (!fields.has(fieldName) || out.has(fieldName)) continue;
-      const labels = handle
-        .pivotCacheSharedItems(cacheId, fieldIdx)
-        .map(pivotCellItemLabel)
-        .filter((label) => label.length > 0);
-      if (labels.length > 0) out.set(fieldName, [...new Set(labels)]);
+      const seen = new Set<string>();
+      const items: PivotFieldItem[] = [];
+      for (const [cacheIndex, value] of handle.pivotCacheSharedItems(cacheId, fieldIdx).entries()) {
+        const label = pivotCellItemLabel(value);
+        if (seen.has(label)) continue;
+        seen.add(label);
+        items.push({ label, cacheIndex });
+      }
+      if (items.length > 0) out.set(fieldName, items);
     }
   }
   return out;

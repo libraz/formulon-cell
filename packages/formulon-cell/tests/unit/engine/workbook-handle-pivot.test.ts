@@ -234,6 +234,11 @@ describe('WorkbookHandle PivotTable projection', () => {
           Region: ['East', 'West'],
           Sales: ['42'],
         },
+        // Only the cache-backed field carries indices; `Sales` was inferred
+        // from the projected layout, which addresses no shared item.
+        fieldItemIndexes: {
+          Region: [0, 1],
+        },
       },
     ]);
   });

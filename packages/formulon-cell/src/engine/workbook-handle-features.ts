@@ -25,6 +25,13 @@ import type {
   ConditionalFormatInput,
   DxfRecord,
   EngineCapabilities,
+  EngineHeaderFooter,
+  EngineOrientation,
+  EnginePageBreaks,
+  EnginePageMargins,
+  EnginePageSetup,
+  EnginePageSetupExtras,
+  EnginePrintOptions,
   EvalArrayResult,
   EvalResult,
   FillRecord,
@@ -36,11 +43,163 @@ import type {
   TableInput,
   Workbook,
 } from './types.js';
+import { SheetVisibility } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 /** `setCellStyle`'s sentinel for "this style has no OOXML built-in id". The
  *  binding takes a fixed argument count, so the absence has to be a value. */
 const CUSTOM_CELL_STYLE_BUILTIN_ID = 0xffffffff;
+
+/** Partial `<pageSetup>` update. Mirrors the engine's `PageSetupInput`: only
+ *  the keys present are applied. `fitToPage` selects the fit-to-page mode
+ *  while `fitToWidth` / `fitToHeight` state the target, so "fit onto one
+ *  page" needs all three. */
+export type EnginePageSetupInput = Partial<{
+  orientation: EngineOrientation;
+  paperSize: number;
+  scale: number;
+  fitToWidth: number;
+  fitToHeight: number;
+  fitToPage: boolean;
+}>;
+
+/** Partial `<headerFooter>` update. Every key is optional and the section
+ *  strings are tri-state — see `setSheetHeaderFooter`. */
+export type EngineHeaderFooterInput = Partial<{
+  oddHeader: string;
+  oddFooter: string;
+  differentOddEven: boolean;
+  differentFirst: boolean;
+  scaleWithDoc: boolean;
+  alignWithMargins: boolean;
+}>;
+
+/** Partial `<pageSetup>` attribute update. An omitted key is left alone;
+ *  `false`, `''` and `null` remove the attribute. */
+export type EnginePageSetupExtrasInput = Partial<{
+  blackAndWhite: boolean;
+  draft: boolean;
+  cellComments: string;
+  errors: string;
+  pageOrder: string;
+  firstPageNumber: number | null;
+  useFirstPageNumber: boolean;
+  horizontalDpi: number | null;
+  verticalDpi: number | null;
+}>;
+
+/** Wrapper element used to parse a bare fragment. It declares the
+ *  relationships prefix so a `<pageSetup r:id="...">` — which the engine hands
+ *  back without a declaration of its own, because the worksheet root carried
+ *  one — parses instead of failing as an undeclared prefix. */
+const FRAGMENT_WRAPPER = 'fc-fragment';
+const RELATIONSHIPS_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+
+/** Parse a `<pageSetup>` fragment inside the namespace-declaring wrapper.
+ *  Returns null for the empty string the engine hands back when the sheet
+ *  declares no page setup, and for a host with no XML parser. */
+function parsePageSetupFragment(xml: string): Element | null {
+  if (!xml || typeof DOMParser === 'undefined') return null;
+  const doc = new DOMParser().parseFromString(
+    `<${FRAGMENT_WRAPPER} xmlns:r="${RELATIONSHIPS_NS}">${xml}</${FRAGMENT_WRAPPER}>`,
+    'application/xml',
+  );
+  const root = doc.documentElement;
+  if (!root || root.nodeName !== FRAGMENT_WRAPPER) return null;
+  if (root.getElementsByTagName('parsererror').length > 0) return null;
+  const el = root.firstElementChild;
+  return el?.nodeName === 'pageSetup' ? el : null;
+}
+
+/**
+ * Apply `extras` to a `<pageSetup>` fragment and return the new fragment.
+ *
+ * Returns null when the fragment cannot be parsed or the host has no XML
+ * serializer, so the caller can tell "nothing to do" from "could not do it".
+ * The wrapper is serialized and then unwrapped rather than serializing the
+ * element on its own: that keeps the `xmlns:r` declaration on the wrapper,
+ * where the engine's own fragment does not carry it either.
+ */
+export function mergePageSetupFragment(
+  xml: string,
+  extras: EnginePageSetupExtrasInput,
+): string | null {
+  if (typeof DOMParser === 'undefined' || typeof XMLSerializer === 'undefined') return null;
+  const el = parsePageSetupFragment(xml || '<pageSetup/>');
+  if (!el) return null;
+  const put = (name: string, value: string | null): void => {
+    if (value === null || value === '') el.removeAttribute(name);
+    else el.setAttribute(name, value);
+  };
+  const putFlag = (name: string, value: boolean | undefined): void => {
+    if (value === undefined) return;
+    put(name, value ? '1' : null);
+  };
+  const putUint = (name: string, value: number | null | undefined): void => {
+    if (value === undefined) return;
+    put(name, value === null || !Number.isFinite(value) ? null : String(Math.trunc(value)));
+  };
+  putFlag('blackAndWhite', extras.blackAndWhite);
+  putFlag('draft', extras.draft);
+  putFlag('useFirstPageNumber', extras.useFirstPageNumber);
+  if (extras.cellComments !== undefined) put('cellComments', extras.cellComments || null);
+  if (extras.errors !== undefined) put('errors', extras.errors || null);
+  if (extras.pageOrder !== undefined) put('pageOrder', extras.pageOrder || null);
+  putUint('firstPageNumber', extras.firstPageNumber);
+  putUint('horizontalDpi', extras.horizontalDpi);
+  putUint('verticalDpi', extras.verticalDpi);
+
+  const wrapped = new XMLSerializer().serializeToString(el.parentNode as Element);
+  const open = wrapped.indexOf('>');
+  const close = wrapped.lastIndexOf(`</${FRAGMENT_WRAPPER}>`);
+  if (open < 0 || close < open) return null;
+  return wrapped.slice(open + 1, close);
+}
+
+/** Read an unsigned integer attribute; null when absent or unparseable. */
+function xmlUint(el: Element | null, name: string): number | null {
+  const raw = el?.getAttribute(name);
+  if (raw === null || raw === undefined) return null;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+/** Parse a single-element OOXML fragment. Returns null for the empty string
+ *  the engine hands back when the sheet declares no such element, for a
+ *  fragment that fails to parse, and for a host with no XML parser. */
+function parseXmlElement(xml: string): Element | null {
+  if (!xml || typeof DOMParser === 'undefined') return null;
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  const root = doc.documentElement;
+  if (!root || root.getElementsByTagName('parsererror').length > 0) return null;
+  return root.nodeName === 'parsererror' ? null : root;
+}
+
+/** Read an OOXML boolean attribute. Both spellings a schema-valid file may
+ *  use are accepted; an absent attribute falls back to the schema default. */
+function xmlFlag(el: Element | null, name: string, fallback: boolean): boolean {
+  const raw = el?.getAttribute(name);
+  if (raw === null || raw === undefined) return fallback;
+  return raw === '1' || raw === 'true';
+}
+
+/** Text of a header/footer section child. The XML parser has already decoded
+ *  the entities, which is the spelling `setSheetHeaderFooter` expects back. */
+function xmlSectionText(el: Element | null, name: string): string {
+  const child = el?.getElementsByTagName(name)[0];
+  return child?.textContent ?? '';
+}
+
+/** Resolve a sheet view's tab state. `visibility` is authoritative when the
+ *  engine reports it; an engine that carries only the two-state `tabHidden`
+ *  cannot distinguish `veryHidden`, so such a sheet reads as `Hidden`. */
+function sheetVisibilityOf(view: { tabHidden: number; visibility?: number }): SheetVisibility {
+  if (view.visibility === SheetVisibility.VeryHidden) return SheetVisibility.VeryHidden;
+  if (view.visibility === SheetVisibility.Hidden || view.tabHidden !== 0) {
+    return SheetVisibility.Hidden;
+  }
+  return SheetVisibility.Visible;
+}
 
 type WorkbookHandleCtor = { prototype: WorkbookHandle };
 type WorkbookHandleInternals = {
@@ -158,11 +317,25 @@ export abstract class WorkbookHandleFeatureMethods {
   }
 
   /** Toggle the tab-hidden flag on `sheet`. Returns false on engine failure
-   *  or when the engine doesn't expose `setSheetTabHidden`. */
+   *  or when the engine doesn't expose `setSheetTabHidden`.
+   *
+   *  This is the two-state view: `true` on an already very-hidden sheet leaves
+   *  it very-hidden, and `false` reveals it from either hidden state. Use
+   *  `setSheetVisibility` to move between the two hidden states. */
   setSheetTabHidden(sheet: number, hidden: boolean): boolean {
     assertAlive(this);
     if (!this.capabilities.sheetTabHidden) return false;
     const s = wb(this).setSheetTabHidden(sheet, hidden);
+    return s.ok;
+  }
+
+  /** Set `sheet`'s tab to one of the three OOXML visibility states. Returns
+   *  false when the engine only carries the two-state `setSheetTabHidden`,
+   *  which cannot express `veryHidden`. */
+  setSheetVisibility(sheet: number, visibility: SheetVisibility): boolean {
+    assertAlive(this);
+    if (!this.capabilities.sheetVisibility) return false;
+    const s = wb(this).setSheetVisibility(sheet, visibility as number);
     return s.ok;
   }
 
@@ -206,6 +379,7 @@ export abstract class WorkbookHandleFeatureMethods {
     freezeRows: number;
     freezeCols: number;
     tabHidden: boolean;
+    visibility: SheetVisibility;
     showGridLines: boolean;
     showRowColHeaders: boolean;
     showZeros: boolean;
@@ -220,6 +394,8 @@ export abstract class WorkbookHandleFeatureMethods {
       freezeRows: r.view.freezeRows,
       freezeCols: r.view.freezeCols,
       tabHidden: r.view.tabHidden !== 0,
+      // Engines predating three-state visibility carry only `tabHidden`.
+      visibility: sheetVisibilityOf(r.view),
       showGridLines: r.view.showGridLines !== 0,
       showRowColHeaders: r.view.showRowColHeaders !== 0,
       showZeros: r.view.showZeros !== 0,
@@ -249,6 +425,232 @@ export abstract class WorkbookHandleFeatureMethods {
     assertAlive(this);
     if (!this.capabilities.sheetViewFlags) return false;
     return wb(this).setSheetRightToLeft(sheet, rightToLeft).ok;
+  }
+
+  /** Effective page setup for `sheet`, or null when the engine carries no
+   *  print-settings surface. */
+  getSheetPageSetup(sheet: number): EnginePageSetup | null {
+    assertAlive(this);
+    if (!this.capabilities.printSettings) return null;
+    const r = wb(this).getSheetPageSetup(sheet);
+    if (!r.status.ok) return null;
+    return {
+      orientation: r.orientation,
+      paperSize: r.paperSize,
+      scale: r.scale,
+      fitToWidth: r.fitToWidth,
+      fitToHeight: r.fitToHeight,
+      fitToPage: r.fitToPage,
+      orientationStated: r.orientationStated,
+      paperSizeStated: r.paperSizeStated,
+      scaleStated: r.scaleStated,
+      fitToPageStated: r.fitToPageStated,
+    };
+  }
+
+  /** Apply a partial `<pageSetup>` update. Attributes the engine does not
+   *  model — `r:id`, `copies` — are left as they were. */
+  setSheetPageSetup(sheet: number, setup: EnginePageSetupInput): boolean {
+    assertAlive(this);
+    if (!this.capabilities.printSettings) return false;
+    return wb(this).setSheetPageSetup(sheet, setup).ok;
+  }
+
+  /** The complete worksheet `<pageSetup>` fragment, or null when the engine
+   *  does not expose the raw seam. Empty when the sheet declares no page
+   *  setup. This is the escape hatch for the attributes the typed setter does
+   *  not model — `setSheetPageSetupExtras` is the typed way in. */
+  getSheetPageSetupXml(sheet: number): string | null {
+    assertAlive(this);
+    if (!this.capabilities.printSettingsXml) return null;
+    const r = wb(this).getSheetPageSetupXml(sheet);
+    return r.status.ok ? r.xml : null;
+  }
+
+  /** Replace the worksheet `<pageSetup>` fragment. Empty removes it and
+   *  restores the defaults. The engine rejects a fragment that is malformed,
+   *  oversized, or carries an `r:id` the sheet has no printerSettings part
+   *  for, so a bad fragment fails at the call rather than on save. */
+  setSheetPageSetupXml(sheet: number, xml: string): boolean {
+    assertAlive(this);
+    if (!this.capabilities.printSettingsXml) return false;
+    return wb(this).setSheetPageSetupXml(sheet, xml).ok;
+  }
+
+  /** The `<pageSetup>` attributes beside the typed setter's own. Read from the
+   *  raw fragment, which is the only surface that carries them. */
+  getSheetPageSetupExtras(sheet: number): EnginePageSetupExtras | null {
+    assertAlive(this);
+    if (!this.capabilities.printSettingsXml) return null;
+    const r = wb(this).getSheetPageSetupXml(sheet);
+    if (!r.status.ok) return null;
+    const el = parsePageSetupFragment(r.xml);
+    return {
+      blackAndWhite: xmlFlag(el, 'blackAndWhite', false),
+      draft: xmlFlag(el, 'draft', false),
+      cellComments: el?.getAttribute('cellComments') ?? '',
+      errors: el?.getAttribute('errors') ?? '',
+      pageOrder: el?.getAttribute('pageOrder') ?? '',
+      firstPageNumber: xmlUint(el, 'firstPageNumber'),
+      useFirstPageNumber: xmlFlag(el, 'useFirstPageNumber', false),
+      horizontalDpi: xmlUint(el, 'horizontalDpi'),
+      verticalDpi: xmlUint(el, 'verticalDpi'),
+    };
+  }
+
+  /**
+   * Merge attributes into the raw `<pageSetup>` fragment. An omitted key is
+   * left alone; `false`, `''` and `null` remove the attribute, which is what a
+   * spreadsheet writes for the default rather than stating it.
+   *
+   * Everything else the fragment carries — including a `r:id` pointing at the
+   * sheet's printerSettings part — is preserved, so this is safe to run over a
+   * fragment the engine handed back.
+   */
+  setSheetPageSetupExtras(sheet: number, extras: EnginePageSetupExtrasInput): boolean {
+    assertAlive(this);
+    if (!this.capabilities.printSettingsXml) return false;
+    const current = wb(this).getSheetPageSetupXml(sheet);
+    if (!current.status.ok) return false;
+    const next = mergePageSetupFragment(current.xml, extras);
+    if (next === null || next === current.xml) return next !== null;
+    return wb(this).setSheetPageSetupXml(sheet, next).ok;
+  }
+
+  /** Effective page margins for `sheet`, in inches. */
+  getSheetPageMargins(sheet: number): EnginePageMargins | null {
+    assertAlive(this);
+    if (!this.capabilities.printSettings) return null;
+    const r = wb(this).getSheetPageMargins(sheet);
+    if (!r.status.ok) return null;
+    return {
+      left: r.left,
+      right: r.right,
+      top: r.top,
+      bottom: r.bottom,
+      header: r.header,
+      footer: r.footer,
+    };
+  }
+
+  /** Apply a partial `<pageMargins>` update, in inches. The engine rejects a
+   *  negative, infinite or NaN margin outright, so callers must not pass one. */
+  setSheetPageMargins(sheet: number, margins: Partial<EnginePageMargins>): boolean {
+    assertAlive(this);
+    if (!this.capabilities.printSettings) return false;
+    return wb(this).setSheetPageMargins(sheet, margins).ok;
+  }
+
+  /** Worksheet `<printOptions>` flags. The engine exposes this element only as
+   *  raw XML, so the fragment is parsed here rather than in the sync layer —
+   *  the raw engine surface stops at this class. Every flag defaults to false,
+   *  which is also what an absent element means. */
+  getSheetPrintOptions(sheet: number): EnginePrintOptions | null {
+    assertAlive(this);
+    if (!this.capabilities.printSettings) return null;
+    const r = wb(this).getSheetPrintOptionsXml(sheet);
+    if (!r.status.ok) return null;
+    const el = parseXmlElement(r.xml);
+    return {
+      gridLines: xmlFlag(el, 'gridLines', false),
+      headings: xmlFlag(el, 'headings', false),
+      horizontalCentered: xmlFlag(el, 'horizontalCentered', false),
+      verticalCentered: xmlFlag(el, 'verticalCentered', false),
+    };
+  }
+
+  setSheetPrintOptions(sheet: number, options: Partial<EnginePrintOptions>): boolean {
+    assertAlive(this);
+    if (!this.capabilities.printSettings) return false;
+    return wb(this).setSheetPrintOptions(sheet, options).ok;
+  }
+
+  /** Worksheet `<headerFooter>` state with the section strings decoded. Parsed
+   *  from the raw fragment for the same reason as `getSheetPrintOptions`.
+   *  `scaleWithDoc` and `alignWithMargins` default to true per OOXML. */
+  getSheetHeaderFooter(sheet: number): EngineHeaderFooter | null {
+    assertAlive(this);
+    if (!this.capabilities.printSettings) return null;
+    const r = wb(this).getSheetHeaderFooterXml(sheet);
+    if (!r.status.ok) return null;
+    const el = parseXmlElement(r.xml);
+    return {
+      oddHeader: xmlSectionText(el, 'oddHeader'),
+      oddFooter: xmlSectionText(el, 'oddFooter'),
+      differentOddEven: xmlFlag(el, 'differentOddEven', false),
+      differentFirst: xmlFlag(el, 'differentFirst', false),
+      scaleWithDoc: xmlFlag(el, 'scaleWithDoc', true),
+      alignWithMargins: xmlFlag(el, 'alignWithMargins', true),
+    };
+  }
+
+  /** Apply a partial `<headerFooter>` update. Each section is tri-state: an
+   *  omitted key is left alone, `''` clears it. Section text is decoded, so a
+   *  literal ampersand is spelled `&&` the way a spreadsheet's header syntax
+   *  does; the engine handles the XML escaping. */
+  setSheetHeaderFooter(sheet: number, headerFooter: EngineHeaderFooterInput): boolean {
+    assertAlive(this);
+    if (!this.capabilities.printSettings) return false;
+    return wb(this).setSheetHeaderFooter(sheet, headerFooter).ok;
+  }
+
+  /** `_xlnm.Print_Area` as comma-separated A1 ranges; empty when unset. */
+  getSheetPrintArea(sheet: number): string | null {
+    assertAlive(this);
+    if (!this.capabilities.printSettings) return null;
+    const r = wb(this).getSheetPrintArea(sheet);
+    return r.status.ok ? r.ranges : null;
+  }
+
+  /** Write `_xlnm.Print_Area`. An empty string removes it. */
+  setSheetPrintArea(sheet: number, rangesA1: string): boolean {
+    assertAlive(this);
+    if (!this.capabilities.printSettings) return false;
+    return wb(this).setSheetPrintArea(sheet, rangesA1).ok;
+  }
+
+  /** `_xlnm.Print_Titles` as a row span and a column span; either may be
+   *  empty when that axis has no repeat setting. */
+  getSheetPrintTitles(sheet: number): { repeatRows: string; repeatCols: string } | null {
+    assertAlive(this);
+    if (!this.capabilities.printSettings) return null;
+    const r = wb(this).getSheetPrintTitles(sheet);
+    if (!r.status.ok) return null;
+    return { repeatRows: r.repeatRows, repeatCols: r.repeatCols };
+  }
+
+  /** Write `_xlnm.Print_Titles`. Both spans empty removes it. */
+  setSheetPrintTitles(sheet: number, repeatRows: string, repeatCols: string): boolean {
+    assertAlive(this);
+    if (!this.capabilities.printSettings) return false;
+    return wb(this).setSheetPrintTitles(sheet, repeatRows, repeatCols).ok;
+  }
+
+  /** Manual page breaks on `sheet`. Breaks the engine computed rather than a
+   *  user placed are left out — only manual ones are the store's to own. */
+  getSheetPageBreaks(sheet: number): EnginePageBreaks | null {
+    assertAlive(this);
+    if (!this.capabilities.pageBreaks) return null;
+    const rows = wb(this).getSheetRowBreaks(sheet);
+    const cols = wb(this).getSheetColBreaks(sheet);
+    if (!rows.status.ok || !cols.status.ok) return null;
+    return {
+      rows: rows.breaks.filter((b) => b.manual).map((b) => b.id),
+      cols: cols.breaks.filter((b) => b.manual).map((b) => b.id),
+    };
+  }
+
+  /** Replace every manual break on `sheet` with the supplied ones. Breaks are
+   *  0-based indices of the row / column each break precedes. */
+  setSheetPageBreaks(sheet: number, breaks: EnginePageBreaks): boolean {
+    assertAlive(this);
+    if (!this.capabilities.pageBreaks) return false;
+    const w = wb(this);
+    if (!w.clearSheetBreaks(sheet).ok) return false;
+    let ok = true;
+    for (const row of breaks.rows) ok = w.addSheetRowBreak(sheet, row, true).ok && ok;
+    for (const col of breaks.cols) ok = w.addSheetColBreak(sheet, col, true).ok && ok;
+    return ok;
   }
 
   /** Returns the complete worksheet `<autoFilter>` fragment, or null when

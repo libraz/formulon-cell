@@ -65,8 +65,14 @@ const wbWithObjects = () => {
         cells: 18,
         fields: ['Region', 'Sales'],
         fieldItems: {
-          Region: ['East', 'West'],
+          // The blank member of the cache field renders as an empty label —
+          // the whole reason it needs an index to be named by.
+          Region: ['East', 'West', ''],
           Sales: ['10', '20'],
+        },
+        fieldItemIndexes: {
+          Region: [0, 1, 2],
+          Sales: [0, 1],
         },
       },
     ],
@@ -151,6 +157,16 @@ const wbWithObjects = () => {
       visible: boolean,
     ) => {
       calls.push(`add-item:${sheet}:${pivot}:${field}:${item}:${visible}`);
+      return true;
+    },
+    addPivotFieldItemAt: (
+      sheet: number,
+      pivot: number,
+      field: number,
+      cacheIndex: number,
+      visible: boolean,
+    ) => {
+      calls.push(`add-item-at:${sheet}:${pivot}:${field}:${cacheIndex}:${visible}`);
       return true;
     },
     clearPivotFilters: (sheet: number, pivot: number) => {
@@ -581,8 +597,12 @@ describe('attachWorkbookObjectsPanel', () => {
 
     expect(calls).toContain('field-axis:0:0:0:3');
     expect(calls).toContain('clear-items:0:0:0');
-    expect(calls).toContain('add-item:0:0:0:East:false');
-    expect(calls).toContain('add-item:0:0:0:West:true');
+    // Every item the cache backs is stated by index, so the blank member —
+    // which no label can name — reaches the filter like any other.
+    expect(calls).toContain('add-item-at:0:0:0:0:false');
+    expect(calls).toContain('add-item-at:0:0:0:1:true');
+    expect(calls).toContain('add-item-at:0:0:0:2:true');
+    expect(calls.some((call) => call.startsWith('add-item:'))).toBe(false);
     expect(calls.some((call) => call.startsWith('rename:'))).toBe(false);
     expect(calls.some((call) => call.startsWith('anchor:'))).toBe(false);
     handle.detach();
@@ -655,9 +675,44 @@ describe('attachWorkbookObjectsPanel', () => {
     form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
 
     expect(calls).toContain('clear-items:0:0:0');
-    expect(calls).toContain('add-item:0:0:0:East:true');
-    expect(calls).toContain('add-item:0:0:0:West:false');
+    expect(calls).toContain('add-item-at:0:0:0:0:true');
+    expect(calls).toContain('add-item-at:0:0:0:1:false');
     expect(calls).not.toContain('clear-filters:0:0');
+    handle.detach();
+  });
+
+  it('names a cache-backed item by index and falls back to its label without one', () => {
+    const { wb, calls } = wbWithObjects();
+    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    handle.open();
+    const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
+      el.textContent?.includes('Edit'),
+    );
+    edit?.click();
+    const form = host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit');
+    const regionAxis = form?.querySelector<HTMLSelectElement>('[data-pivot-field-index="0"]');
+    if (!regionAxis || !form) throw new Error('missing filter item controls');
+    regionAxis.value = '3';
+    regionAxis.dispatchEvent(new Event('change', { bubbles: true }));
+
+    const checks = Array.from(
+      form.querySelectorAll<HTMLInputElement>(
+        '[data-pivot-filter-checklist-field-index="0"] input',
+      ),
+    );
+    // The blank member renders under a placeholder rather than as an empty row.
+    expect(checks.map((check) => check.parentElement?.textContent)).toContain(
+      en.workbookObjects.pivotBlankItem,
+    );
+    // Drop the index off one item to stand in for a field whose members were
+    // read off the projected layout instead of the cache.
+    const east = checks.find((check) => check.value === 'East');
+    if (!east) throw new Error('missing East filter item');
+    delete east.dataset.pivotItemCacheIndex;
+    form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+
+    expect(calls).toContain('add-item:0:0:0:East:true');
+    expect(calls).toContain('add-item-at:0:0:0:2:true');
     handle.detach();
   });
 

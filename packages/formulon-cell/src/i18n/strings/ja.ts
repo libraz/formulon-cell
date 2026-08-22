@@ -818,6 +818,7 @@ export const ja: Strings = {
     pivotNumberFormatPlaceholder: '例: #,##0',
     pivotFilterItems: '表示するフィルター項目',
     pivotFilterItemsPlaceholder: '1 行に 1 項目',
+    pivotBlankItem: '(空白)',
     pivotReportLayout: 'レポート レイアウト',
     pivotReportLayoutCompact: 'コンパクト形式',
     pivotReportLayoutOutline: 'アウトライン形式',
@@ -867,6 +868,7 @@ export const ja: Strings = {
       autoFilter: 'オートフィルター',
       sheetProtection: 'シート保護',
       sheetViews: 'シート ビュー',
+      pageSetup: 'ページ設定',
       loadedTables: '読み込み済みテーブル',
       formatAsTable: 'テーブルとして書式設定',
       pivotLayouts: 'ピボットテーブル レイアウト',
@@ -896,6 +898,8 @@ export const ja: Strings = {
       sheetProtection:
         '保護状態は UI セッションで保持でき、エンジンにメタデータがある場合は保存時に往復できます。',
       sheetViews: 'シート ビューは現在のセッション内で保存して復元できます。',
+      pageSetup:
+        'エンジンが印刷設定を公開している場合、印刷の向き、用紙、拡大縮小、余白、印刷オプション、ヘッダー / フッター、印刷範囲、印刷タイトル、手動の改ページを保存時に往復できます。',
       loadedTables: 'エンジンから報告された読み込み済みテーブルを一覧し、保存時に保持します。',
       formatAsTable:
         'UI ではセッション内のテーブル オーバーレイを作成できます。永続的なテーブル作成にはエンジン対応が必要です。',
@@ -1005,6 +1009,7 @@ export const ja: Strings = {
     tabColorGray: 'グレー',
     deleteSheet: '削除',
     hideSheet: '非表示',
+    veryHideSheet: '再表示一覧にも出さない',
     unhideSheet: 'シートの再表示',
     unhideNamedSheet: '{name} を再表示',
   },

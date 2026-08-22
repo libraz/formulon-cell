@@ -814,6 +814,7 @@ export const en: Strings = {
     pivotNumberFormatPlaceholder: 'Example: #,##0',
     pivotFilterItems: 'Visible filter items',
     pivotFilterItemsPlaceholder: 'One item per line',
+    pivotBlankItem: '(blank)',
     pivotReportLayout: 'Report layout',
     pivotReportLayoutCompact: 'Compact form',
     pivotReportLayoutOutline: 'Outline form',
@@ -863,6 +864,7 @@ export const en: Strings = {
       autoFilter: 'AutoFilter',
       sheetProtection: 'Sheet protection',
       sheetViews: 'Sheet views',
+      pageSetup: 'Page setup',
       loadedTables: 'Loaded tables',
       formatAsTable: 'Format as Table',
       pivotLayouts: 'PivotTable layouts',
@@ -893,6 +895,8 @@ export const en: Strings = {
       sheetProtection:
         'Protection UI state can be hosted and can round-trip when engine metadata is available.',
       sheetViews: 'Sheet views can be captured and restored in the UI for the current session.',
+      pageSetup:
+        'Orientation, paper, scaling, margins, print options, header/footer, print area, print titles and manual breaks round-trip when the engine exposes print settings.',
       loadedTables: 'Loaded ListObjects are inventoried and preserved when reported by the engine.',
       formatAsTable:
         'The UI can create session table overlays; persisted ListObject authoring needs engine support.',
@@ -1003,6 +1007,7 @@ export const en: Strings = {
     tabColorGray: 'Gray',
     deleteSheet: 'Delete',
     hideSheet: 'Hide',
+    veryHideSheet: 'Hide from the Unhide list',
     unhideSheet: 'Unhide Sheet',
     unhideNamedSheet: 'Unhide {name}',
   },

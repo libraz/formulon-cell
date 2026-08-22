@@ -538,6 +538,7 @@ export {
   removeSheet,
   renameSheet,
   setSheetHidden,
+  setSheetTabVisibility,
 } from './commands/sheet-mutate.js';
 export type {
   SheetView,
@@ -705,6 +706,12 @@ export {
   workbookObjectName,
   workbookObjectsByKind,
 } from './engine/passthrough-sync.js';
+export {
+  hydratePageSetupFromEngine,
+  joinHeaderFooter,
+  splitHeaderFooter,
+  syncPageSetupToEngine,
+} from './engine/print-sync.js';
 export type { RangeResolver } from './engine/range-resolver.js';
 export {
   isRangeSource,
@@ -720,6 +727,13 @@ export type {
   Addr,
   CellValue,
   EngineCapabilities,
+  EngineHeaderFooter,
+  EngineOrientation,
+  EnginePageBreaks,
+  EnginePageMargins,
+  EnginePageSetup,
+  EnginePageSetupExtras,
+  EnginePrintOptions,
   EvalArrayResult,
   EvalResult,
   FunctionMetadataEntry,
@@ -745,11 +759,18 @@ export {
   PivotFilterType,
   PivotFilterValueKind,
   PivotShowValuesAs,
+  SheetVisibility,
 } from './engine/types.js';
 export { formatCell, fromEngineValue } from './engine/value.js';
 export type { ChangeEvent, ChangeListener } from './engine/workbook-handle.js';
 export { WorkbookHandle } from './engine/workbook-handle.js';
-export type { WorkbookHandleFeatureMethods } from './engine/workbook-handle-features.js';
+export type {
+  EngineHeaderFooterInput,
+  EnginePageSetupExtrasInput,
+  EnginePageSetupInput,
+  WorkbookHandleFeatureMethods,
+} from './engine/workbook-handle-features.js';
+export { mergePageSetupFragment } from './engine/workbook-handle-features.js';
 export type { WorkbookHandlePivotMethods } from './engine/workbook-handle-pivot.js';
 // Public event surface — adapter packages and direct consumers wire to
 // these via `inst.on(...)`.

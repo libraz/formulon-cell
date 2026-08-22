@@ -284,6 +284,11 @@ export interface LayoutSlice {
   /** Sheets whose tab is hidden (the desktop-spreadsheet "Hide Sheet"). Indexed by sheet
    *  index. Hidden sheets keep their data; only the tab is suppressed. */
   hiddenSheets: Set<number>;
+  /** The subset of `hiddenSheets` a workbook marked very hidden. A spreadsheet
+   *  leaves these out of its Unhide list as well as its tab bar, which is how
+   *  a settings or lookup sheet is kept out of a user's reach. Every member is
+   *  also in `hiddenSheets`. */
+  veryHiddenSheets: Set<number>;
   /** Sheet tab fill colors keyed by sheet index, matching Excel's Tab Color affordance. */
   sheetTabColors: Map<number, string>;
 }
@@ -764,6 +769,11 @@ export type PrintQuality = 'automatic' | '300' | '600' | '1200';
 export interface PageSetup {
   orientation: PageOrientation;
   paperSize: PaperSize;
+  /** OOXML `paperSize` code for a sheet whose paper is outside `PaperSize`
+   *  (B4, Executive, a printer-specific form). Set on hydration and written
+   *  back verbatim so loading and saving a workbook does not silently
+   *  re-paper it as A4; picking a size from the UI clears it. */
+  paperSizeCode?: number;
   margins: PageMargins;
   /** Minimum printable insets from the physical page edge, in inches. This is
    *  distinct from `printArea`: hosts may fill it from a printer profile or

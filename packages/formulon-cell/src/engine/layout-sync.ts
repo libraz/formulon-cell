@@ -1,5 +1,6 @@
 import type { LayoutSnapshot } from '../commands/history.js';
 import type { LayoutSlice, SpreadsheetStore } from '../store/store.js';
+import { SheetVisibility } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 /**
@@ -24,11 +25,21 @@ export function hydrateLayoutFromEngine(
   // hiddenSheets is workbook-scoped — walk every sheet so the set is correct
   // regardless of which sheet `hydrateLayoutFromEngine` is called for.
   const hiddenSheets = new Set<number>();
+  const veryHiddenSheets = new Set<number>();
   if (wb.capabilities.sheetView) {
     const n = wb.sheetCount;
     for (let i = 0; i < n; i += 1) {
       const v = wb.getSheetView(i);
-      if (v?.tabHidden) hiddenSheets.add(i);
+      if (!v) continue;
+      // `visibility` is authoritative; an adapter that carries only the
+      // two-state flag still resolves to hidden-or-visible.
+      const visibility =
+        v.visibility ?? (v.tabHidden ? SheetVisibility.Hidden : SheetVisibility.Visible);
+      if (visibility === SheetVisibility.Visible) continue;
+      hiddenSheets.add(i);
+      // A very-hidden sheet stays out of the tab bar *and* out of the unhide
+      // list, so the two states have to be tracked apart.
+      if (visibility === SheetVisibility.VeryHidden) veryHiddenSheets.add(i);
     }
   }
   if (cols.length === 0 && rows.length === 0 && view === null && hiddenSheets.size === 0) {
@@ -65,6 +76,7 @@ export function hydrateLayoutFromEngine(
       outlineCols,
       outlineRows,
       hiddenSheets,
+      veryHiddenSheets,
     };
     if (view) {
       layout.freezeRows = view.freezeRows;
@@ -193,14 +205,31 @@ export function syncLayoutToEngine(
     const idxs = new Set<number>();
     for (const i of before.hiddenSheets) idxs.add(i);
     for (const i of after.hiddenSheets) idxs.add(i);
+    for (const i of before.veryHiddenSheets) idxs.add(i);
+    for (const i of after.veryHiddenSheets) idxs.add(i);
     for (const i of idxs) {
-      const b = before.hiddenSheets.has(i);
-      const a = after.hiddenSheets.has(i);
+      const b = sheetVisibilityOf(before, i);
+      const a = sheetVisibilityOf(after, i);
       if (b === a) continue;
-      wb.setSheetTabHidden(i, a);
+      // `setSheetTabHidden` can neither state nor clear `veryHidden`: it
+      // refuses to demote a very-hidden sheet and cannot promote a hidden one.
+      // Route through the three-state setter whenever either side is that
+      // state. On an engine that has only the flag, hiding is the closest
+      // reachable state, and the refused demotion leaves the sheet as it was.
+      const needsThreeState = a === SheetVisibility.VeryHidden || b === SheetVisibility.VeryHidden;
+      const canStateVisibility = typeof wb.setSheetVisibility === 'function';
+      if (needsThreeState && canStateVisibility && wb.setSheetVisibility(i, a)) continue;
+      wb.setSheetTabHidden(i, a !== SheetVisibility.Visible);
     }
   }
 }
+
+const sheetVisibilityOf = (snapshot: LayoutSnapshot, sheet: number): SheetVisibility =>
+  snapshot.veryHiddenSheets.has(sheet)
+    ? SheetVisibility.VeryHidden
+    : snapshot.hiddenSheets.has(sheet)
+      ? SheetVisibility.Hidden
+      : SheetVisibility.Visible;
 
 /** Back-compat alias — the col/row size pointer-resize path still uses the
  *  narrow name. New code should use `syncLayoutToEngine`. */

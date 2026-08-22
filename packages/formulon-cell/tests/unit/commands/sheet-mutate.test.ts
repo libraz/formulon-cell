@@ -10,7 +10,9 @@ import {
   removeSheet,
   renameSheet,
   setSheetHidden,
+  setSheetTabVisibility,
 } from '../../../src/commands/sheet-mutate.js';
+import { SheetVisibility } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
   createSpreadsheetStore,
@@ -370,21 +372,24 @@ describe('moveSheet', () => {
 });
 
 interface HiddenFakeWb {
-  capabilities: { sheetTabHidden: boolean; sheetMutate: boolean };
+  capabilities: { sheetTabHidden: boolean; sheetVisibility: boolean; sheetMutate: boolean };
   sheetCount: number;
   hide: { sheet: number; hidden: boolean }[];
+  visibility: { sheet: number; visibility: SheetVisibility }[];
 }
 
 const makeHiddenFake = (
-  opts: { sheetTabHidden?: boolean; sheetCount?: number } = {},
+  opts: { sheetTabHidden?: boolean; sheetVisibility?: boolean; sheetCount?: number } = {},
 ): { wb: WorkbookHandle; fake: HiddenFakeWb } => {
   const fake: HiddenFakeWb = {
     capabilities: {
       sheetTabHidden: opts.sheetTabHidden ?? true,
+      sheetVisibility: opts.sheetVisibility ?? true,
       sheetMutate: true,
     },
     sheetCount: opts.sheetCount ?? 3,
     hide: [],
+    visibility: [],
   };
   const wb = {
     capabilities: fake.capabilities,
@@ -394,6 +399,11 @@ const makeHiddenFake = (
     setSheetTabHidden(sheet: number, hidden: boolean): boolean {
       if (!fake.capabilities.sheetTabHidden) return false;
       fake.hide.push({ sheet, hidden });
+      return true;
+    },
+    setSheetVisibility(sheet: number, visibility: SheetVisibility): boolean {
+      if (!fake.capabilities.sheetVisibility) return false;
+      fake.visibility.push({ sheet, visibility });
       return true;
     },
   } as unknown as WorkbookHandle;
@@ -466,5 +476,80 @@ describe('setSheetHidden', () => {
     expect(setSheetHidden(store, wb, null, 1, true)).toBe(false);
     expect(setSheetHidden(store, wb, null, 1, false)).toBe(false);
     expect(fake.hide).toEqual([]);
+  });
+});
+
+describe('setSheetTabVisibility', () => {
+  it('states very hidden through the three-state setter', () => {
+    const store = createSpreadsheetStore();
+    const { wb, fake } = makeHiddenFake({ sheetCount: 3 });
+    expect(setSheetTabVisibility(store, wb, null, 1, SheetVisibility.VeryHidden)).toBe(true);
+    const layout = store.getState().layout;
+    // Very hidden is a stronger hidden, so the tab is in both sets.
+    expect(layout.hiddenSheets.has(1)).toBe(true);
+    expect(layout.veryHiddenSheets.has(1)).toBe(true);
+    expect(fake.visibility).toEqual([{ sheet: 1, visibility: SheetVisibility.VeryHidden }]);
+    expect(fake.hide).toEqual([]);
+  });
+
+  it('demotes a very-hidden tab to plain hidden', () => {
+    const store = createSpreadsheetStore();
+    const { wb, fake } = makeHiddenFake({ sheetCount: 3 });
+    setSheetTabVisibility(store, wb, null, 1, SheetVisibility.VeryHidden);
+    fake.visibility.length = 0;
+    expect(setSheetTabVisibility(store, wb, null, 1, SheetVisibility.Hidden)).toBe(true);
+    const layout = store.getState().layout;
+    expect(layout.hiddenSheets.has(1)).toBe(true);
+    expect(layout.veryHiddenSheets.has(1)).toBe(false);
+    expect(fake.visibility).toEqual([{ sheet: 1, visibility: SheetVisibility.Hidden }]);
+  });
+
+  it('reveals a very-hidden tab and clears it from both sets', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeHiddenFake({ sheetCount: 3 });
+    setSheetTabVisibility(store, wb, null, 1, SheetVisibility.VeryHidden);
+    expect(setSheetTabVisibility(store, wb, null, 1, SheetVisibility.Visible)).toBe(true);
+    const layout = store.getState().layout;
+    expect(layout.hiddenSheets.has(1)).toBe(false);
+    expect(layout.veryHiddenSheets.has(1)).toBe(false);
+  });
+
+  it('refuses a state the tab is already in', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeHiddenFake({ sheetCount: 3 });
+    setSheetTabVisibility(store, wb, null, 1, SheetVisibility.VeryHidden);
+    expect(setSheetTabVisibility(store, wb, null, 1, SheetVisibility.VeryHidden)).toBe(false);
+    expect(setSheetTabVisibility(store, wb, null, 0, SheetVisibility.Visible)).toBe(false);
+  });
+
+  it('refuses to very-hide the last visible sheet', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeHiddenFake({ sheetCount: 2 });
+    setSheetTabVisibility(store, wb, null, 0, SheetVisibility.VeryHidden);
+    expect(setSheetTabVisibility(store, wb, null, 1, SheetVisibility.VeryHidden)).toBe(false);
+  });
+
+  it('setSheetHidden refuses to demote a very-hidden tab, matching the engine', () => {
+    const store = createSpreadsheetStore();
+    const { wb, fake } = makeHiddenFake({ sheetCount: 3 });
+    setSheetTabVisibility(store, wb, null, 1, SheetVisibility.VeryHidden);
+    fake.visibility.length = 0;
+    // "Hide" states nothing a very-hidden tab does not already satisfy.
+    expect(setSheetHidden(store, wb, null, 1, true)).toBe(false);
+    expect(store.getState().layout.veryHiddenSheets.has(1)).toBe(true);
+    // Unhide still reveals it from either hidden state.
+    expect(setSheetHidden(store, wb, null, 1, false)).toBe(true);
+    expect(store.getState().layout.hiddenSheets.has(1)).toBe(false);
+  });
+
+  it('undo restores the prior visibility', () => {
+    const store = createSpreadsheetStore();
+    const history = new History();
+    const { wb } = makeHiddenFake({ sheetCount: 3 });
+    expect(setSheetTabVisibility(store, wb, history, 1, SheetVisibility.VeryHidden)).toBe(true);
+    history.undo();
+    const layout = store.getState().layout;
+    expect(layout.hiddenSheets.has(1)).toBe(false);
+    expect(layout.veryHiddenSheets.has(1)).toBe(false);
   });
 });

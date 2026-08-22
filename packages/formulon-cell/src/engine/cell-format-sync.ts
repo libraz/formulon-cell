@@ -133,7 +133,7 @@ export function hydrateCellFormatsFromEngine(
   sheet: number,
 ): void {
   if (!wb.capabilities.cellFormatting) return;
-  const workbookDefaultFont = wb.getFontRecord(0);
+  const workbookDefaultFont = wb.workbookDefaultFont;
   const styleKeys = cellStyleKeysByXfId(wb);
   const updates: Array<{ key: string; patch: Partial<CellFormat> }> = [];
   const physicalCells = wb.physicalCells ? wb.physicalCells(sheet) : wb.cells(sheet);
@@ -264,7 +264,7 @@ export function cellFormatFromXf(
 /** Assemble the XF record for a CellFormat, ensuring every component record
  *  exists first (the engine dedups on add). Returns null on engine failure. */
 function buildXfForFormat(wb: WorkbookHandle, fmt: CellFormat): CellXf | null {
-  const fontIndex = wb.addFontRecord(fontRecordFromFormat(fmt, wb.getFontRecord(0)));
+  const fontIndex = wb.addFontRecord(fontRecordFromFormat(fmt, wb.workbookDefaultFont));
   if (fontIndex < 0) return null;
   const fillIndex = wb.addFillRecord(fillRecordFromFormat(fmt));
   if (fillIndex < 0) return null;

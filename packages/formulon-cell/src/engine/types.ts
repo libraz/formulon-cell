@@ -186,6 +186,103 @@ export const PivotReportLayout = {
 } as const;
 export type PivotReportLayout = (typeof PivotReportLayout)[keyof typeof PivotReportLayout];
 
+/** Worksheet page setup as the engine models it. `orientation` follows OOXML
+ *  `<pageSetup orientation>`: 0 leaves the attribute off (the printer
+ *  default), 1 is portrait, 2 is landscape. `scale` is a percentage, not the
+ *  0..1 fraction the store keeps. The `*Stated` flags say whether the sheet
+ *  declares the attribute at all, which is the only way to tell a written
+ *  `scale="100"` from an absent one. */
+export type EngineOrientation = 0 | 1 | 2;
+
+export interface EnginePageSetup {
+  readonly orientation: EngineOrientation;
+  readonly paperSize: number;
+  readonly scale: number;
+  readonly fitToWidth: number;
+  readonly fitToHeight: number;
+  readonly fitToPage: boolean;
+  readonly orientationStated: boolean;
+  readonly paperSizeStated: boolean;
+  readonly scaleStated: boolean;
+  readonly fitToPageStated: boolean;
+}
+
+/**
+ * The `<pageSetup>` attributes the engine's typed setter does not model.
+ *
+ * They survive a load and save untouched — the engine keeps the raw fragment
+ * as the writer's source of truth — but authoring one means going through that
+ * fragment. Values use OOXML's own vocabulary rather than the store's, so the
+ * translation stays in one place (`print-sync`). An empty string or `null`
+ * means the attribute is absent.
+ */
+export interface EnginePageSetupExtras {
+  readonly blackAndWhite: boolean;
+  readonly draft: boolean;
+  /** `none` | `asDisplayed` | `atEnd`. */
+  readonly cellComments: string;
+  /** `displayed` | `blank` | `dash` | `NA`. */
+  readonly errors: string;
+  /** `downThenOver` | `overThenDown`. */
+  readonly pageOrder: string;
+  readonly firstPageNumber: number | null;
+  readonly useFirstPageNumber: boolean;
+  readonly horizontalDpi: number | null;
+  readonly verticalDpi: number | null;
+}
+
+/** Worksheet page margins in inches. */
+export interface EnginePageMargins {
+  readonly left: number;
+  readonly right: number;
+  readonly top: number;
+  readonly bottom: number;
+  readonly header: number;
+  readonly footer: number;
+}
+
+/** Worksheet `<printOptions>` flags. */
+export interface EnginePrintOptions {
+  readonly gridLines: boolean;
+  readonly headings: boolean;
+  readonly horizontalCentered: boolean;
+  readonly verticalCentered: boolean;
+}
+
+/** Worksheet `<headerFooter>` state. Section strings are decoded — the
+ *  formatting codes appear plainly (`&C`, `&P`), not XML-escaped. Only the
+ *  odd (i.e. every-page) sections are surfaced; the even and first-page
+ *  sections round-trip through the engine untouched. */
+export interface EngineHeaderFooter {
+  readonly oddHeader: string;
+  readonly oddFooter: string;
+  readonly differentOddEven: boolean;
+  readonly differentFirst: boolean;
+  readonly scaleWithDoc: boolean;
+  readonly alignWithMargins: boolean;
+}
+
+/** Manual page breaks on a sheet. Each entry is the 0-based row or column the
+ *  break precedes — the same convention the store's page-setup slice uses. */
+export interface EnginePageBreaks {
+  readonly rows: readonly number[];
+  readonly cols: readonly number[];
+}
+
+/** Sheet tab visibility, mirroring OOXML `<sheet state>` and the engine's
+ *  `SheetVisibility`. Declared here rather than imported so reading a tab's
+ *  state does not pull the WASM module glue into a caller's bundle.
+ *
+ *  `VeryHidden` is the state a workbook uses to keep a settings or lookup
+ *  sheet out of reach: a spreadsheet leaves such a sheet out of its "Unhide"
+ *  list entirely. */
+export const SheetVisibility = {
+  Visible: 0,
+  Hidden: 1,
+  VeryHidden: 2,
+} as const;
+export type SheetVisibility = (typeof SheetVisibility)[keyof typeof SheetVisibility];
+
 /** Discriminator ordinals for PivotTable filter payload values. */
 export const PivotFilterValueKind = {
   None: -1,
@@ -284,12 +381,15 @@ export interface EngineCapabilities {
   readonly colRowSize: boolean;
   /** `setSheetFreeze`. */
   readonly freeze: boolean;
-  /** `getSheetView` readback for zoom, frozen panes, and tab-hidden state. */
+  /** `getSheetView` readback for zoom, frozen panes, and tab visibility. */
   readonly sheetView?: boolean;
   /** `setSheetZoom`. */
   readonly sheetZoom: boolean;
-  /** `setSheetTabHidden`. */
+  /** `setSheetTabHidden` — the two-state view of tab visibility. */
   readonly sheetTabHidden: boolean;
+  /** `setSheetVisibility` three-state tab visibility. Required to state
+   *  `veryHidden`, which `setSheetTabHidden` can neither set nor clear. */
+  readonly sheetVisibility?: boolean;
   /** Read/write display flags on `<sheetView>`: gridlines, row/column
    *  headers, zeros, and right-to-left direction. */
   readonly sheetViewFlags?: boolean;
@@ -313,6 +413,10 @@ export interface EngineCapabilities {
   readonly partialRecalc: boolean;
   /** `setIterativeProgress` callback for cancellable iterative solves. */
   readonly iterativeProgress: boolean;
+  /** `getIterative` readback of the stored iterative-calculation settings, so
+   *  the dialog can open on what the workbook actually carries instead of on
+   *  the engine defaults. */
+  readonly iterativeSettings?: boolean;
   /** `spillInfo` returns precise dynamic-array region info per cell. When
    *  off, the renderer falls back to a heuristic that walks right/down
    *  from likely anchor formulas. */
@@ -362,8 +466,24 @@ export interface EngineCapabilities {
   /** PivotCache + PivotTable mutation APIs. Enables low-level PivotTable
    *  authoring; UI wizards can layer on top of `WorkbookHandle` wrappers. */
   readonly pivotTableMutate: boolean;
+  /** `pivotFieldAddItemAt` — a manual-filter item addressed by its cache
+   *  index rather than its label. Required to express the blank member of a
+   *  pivot axis, which has no label to be named by. */
+  readonly pivotItemByCacheIndex?: boolean;
   /** Pivot cache worksheet source metadata read/write. */
   readonly pivotCacheSource: boolean;
   /** Pivot compact / tabular / outline report layout read/write. */
   readonly pivotReportLayout: boolean;
+  /** Worksheet print settings round-trip: page setup, margins, print options,
+   *  header/footer, print area and print titles. Without it the page-setup
+   *  slice stays a session-only UI record. */
+  readonly printSettings?: boolean;
+  /** Raw `<pageSetup>` fragment read/write. The typed page-setup setter models
+   *  only what the paginator needs; the attributes beside it are preserved on
+   *  a load and save but can be authored only through the fragment. */
+  readonly printSettingsXml?: boolean;
+  /** Manual page-break read/write on both axes. Separate from `printSettings`
+   *  because the break table lives on the worksheet rather than in the print
+   *  elements. */
+  readonly pageBreaks?: boolean;
 }

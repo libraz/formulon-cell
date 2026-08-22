@@ -267,7 +267,8 @@ export function setPaperSize(
   history: History | null = null,
 ): PageSetup {
   recordPageSetupChange(history, store, () => {
-    mutators.setPageSetup(store, sheet, { paperSize });
+    // A size picked here replaces whatever unmodelled paper the sheet carried.
+    mutators.setPageSetup(store, sheet, { paperSize, paperSizeCode: undefined });
   });
   return getPageSetup(store.getState(), sheet);
 }

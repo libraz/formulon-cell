@@ -6,7 +6,9 @@ import {
   removeSheet,
   renameSheet,
   setSheetHidden,
+  setSheetTabVisibility,
 } from '../commands/sheet-mutate.js';
+import { SheetVisibility } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { SHEET_TAB_COLOR_CHOICES, sheetTabColorChoiceLabel } from '../sheet-tab-colors.js';
@@ -244,6 +246,10 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
     const structureProtected = isWorkbookStructureProtected(store.getState());
     const canMutate = wb.capabilities.sheetMutate;
     const canHide = wb.capabilities.sheetTabHidden;
+    // Very-hidden is the only tab state `setSheetTabHidden` cannot express, so
+    // offering it without the three-state setter would promise a state the
+    // saved file could not carry.
+    const canVeryHide = canHide && wb.capabilities.sheetVisibility === true;
     const moveAndRefresh = (from: number, to: number): void => {
       if (!moveSheet(store, wb, from, to, history)) return;
       hydrateActiveSheet();
@@ -269,6 +275,10 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
           : strings.ribbonMenu.sheetDeleteRequiresAnotherSheet;
     const hideReason = (): string =>
       structureProtected || !canHide
+        ? sheetActionReason()
+        : strings.ribbonMenu.sheetHideRequiresVisibleSheet;
+    const veryHideReason = (): string =>
+      structureProtected || !canVeryHide
         ? sheetActionReason()
         : strings.ribbonMenu.sheetHideRequiresVisibleSheet;
     const unhideReason = (hasHiddenTarget: boolean): string =>
@@ -383,6 +393,20 @@ export function attachSheetTabsController(input: SheetTabsControllerInput): Shee
         },
         structureProtected || !canHide || visibleIndexes.length <= 1,
         hideReason(),
+      ),
+      menuButton(
+        strings.sheetTabs.veryHideSheet,
+        () => {
+          if (!setSheetTabVisibility(store, wb, history, idx, SheetVisibility.VeryHidden)) {
+            return;
+          }
+          hydrateActiveSheet();
+          update();
+          refreshStatusBar();
+          invalidate();
+        },
+        structureProtected || !canVeryHide || visibleIndexes.length <= 1,
+        veryHideReason(),
       ),
       ...unhideButtons,
     );

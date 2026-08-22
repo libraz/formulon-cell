@@ -63,7 +63,7 @@ describe('AutoFilter engine sync', () => {
       capabilities: { autoFilter: true },
       getSheetAutoFilterXml: () => '<autoFilter ref="A1:B4"/>',
       setSheetAutoFilterXml: (_sheet: number, xml: string) => xml === '<autoFilter ref="A1:B4"/>',
-      withAutoFilterSyncMuted: (fn: () => void) => {
+      withEngineSyncMuted: (fn: () => void) => {
         muted += 1;
         fn();
       },

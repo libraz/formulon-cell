@@ -8,14 +8,14 @@ function fakeWb(sheetCount: number): WorkbookHandle {
   return { sheetCount } as unknown as WorkbookHandle;
 }
 
-function storeWithHidden(hidden: number[]): SpreadsheetStore {
+function storeWithHidden(hidden: number[], veryHidden: number[] = []): SpreadsheetStore {
   const store = createSpreadsheetStore();
-  const hiddenSet = new Set(hidden);
+  const hiddenSet = new Set([...hidden, ...veryHidden]);
   // Mutate the layout slice directly. The store exposes a setState API on its
   // public surface; the field is shared with the rest of the layout slice.
   store.setState((s) => ({
     ...s,
-    layout: { ...s.layout, hiddenSheets: hiddenSet },
+    layout: { ...s.layout, hiddenSheets: hiddenSet, veryHiddenSheets: new Set(veryHidden) },
   }));
   return store;
 }
@@ -43,5 +43,13 @@ describe('mount/sheet-indexes', () => {
     const store = storeWithHidden([]);
     expect(visibleSheetIndexes(fakeWb(0), store)).toEqual([]);
     expect(hiddenSheetIndexes(fakeWb(0), store)).toEqual([]);
+  });
+
+  it('keeps a very-hidden sheet out of the unhide list but also out of the tab bar', () => {
+    const store = storeWithHidden([1], [2]);
+    expect(visibleSheetIndexes(fakeWb(4), store)).toEqual([0, 3]);
+    // A spreadsheet's own Unhide dialog omits very-hidden sheets, which is the
+    // whole point of the state.
+    expect(hiddenSheetIndexes(fakeWb(4), store)).toEqual([1]);
   });
 });

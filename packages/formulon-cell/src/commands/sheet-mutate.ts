@@ -1,3 +1,4 @@
+import { SheetVisibility } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { type LayoutSlice, mutators, type SpreadsheetStore } from '../store/store.js';
 import { type History, recordLayoutChangeWithEngine } from './history.js';
@@ -192,12 +193,81 @@ const firstVisibleSheet = (n: number, hidden: ReadonlySet<number>, skip: number)
   return 0;
 };
 
-/** Toggle the tab-hidden flag on `idx`. Refuses to hide the last visible
- *  sheet (spreadsheet parity — leaving a workbook with no visible sheets is
- *  invalid). When the active sheet becomes hidden, the active index advances
- *  to the next visible sheet. The mutation goes through
- *  `recordLayoutChangeWithEngine`, so it round-trips through engine save and
- *  is undoable. */
+/**
+ * Move `idx`'s tab to one of the three visibility states. Refuses to hide the
+ * last visible sheet (spreadsheet parity — a workbook with no visible sheets is
+ * invalid) and refuses a state the tab is already in. When the active sheet
+ * becomes hidden, the active index advances to the next visible sheet. The
+ * mutation goes through `recordLayoutChangeWithEngine`, so it round-trips
+ * through engine save and is undoable.
+ *
+ * `veryHidden` differs from `hidden` only in reach: the tab is left out of the
+ * Unhide list as well as the tab bar, which is how a workbook keeps a settings
+ * or lookup sheet away from a user. Both states keep the sheet's data.
+ */
+export function setSheetTabVisibility(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle | null,
+  history: History | null,
+  idx: number,
+  visibility: SheetVisibility,
+): boolean {
+  const toVisible = visibility === SheetVisibility.Visible;
+  if (!structureAllowed(store, toVisible ? 'unhide sheet' : 'hide sheet')) return false;
+  const state = store.getState();
+  const n = wb ? wb.sheetCount : 1;
+  const hiddenNow = new Set(state.layout.hiddenSheets);
+  const veryHiddenNow = new Set(state.layout.veryHiddenSheets);
+  const current = veryHiddenNow.has(idx)
+    ? SheetVisibility.VeryHidden
+    : hiddenNow.has(idx)
+      ? SheetVisibility.Hidden
+      : SheetVisibility.Visible;
+  if (current === visibility) return false;
+  if (!toVisible && current === SheetVisibility.Visible) {
+    // Refuse if this would hide the last visible sheet.
+    let visibleCount = 0;
+    for (let i = 0; i < n; i += 1) {
+      if (i === idx) continue;
+      if (!hiddenNow.has(i)) visibleCount += 1;
+    }
+    if (visibleCount === 0) return false;
+  }
+
+  recordLayoutChangeWithEngine(history, store, wb, () => {
+    const layout = store.getState().layout;
+    const nextHidden = new Set(layout.hiddenSheets);
+    const nextVeryHidden = new Set(layout.veryHiddenSheets);
+    if (toVisible) {
+      nextHidden.delete(idx);
+      nextVeryHidden.delete(idx);
+    } else {
+      // Every very-hidden sheet is also hidden, so the two sets stay nested.
+      nextHidden.add(idx);
+      if (visibility === SheetVisibility.VeryHidden) nextVeryHidden.add(idx);
+      else nextVeryHidden.delete(idx);
+    }
+    store.setState((s) => ({
+      ...s,
+      layout: {
+        ...s.layout,
+        hiddenSheets: nextHidden,
+        veryHiddenSheets: nextVeryHidden,
+      } as LayoutSlice,
+    }));
+  });
+
+  // After hiding the active sheet, hop to the next visible one.
+  const after = store.getState();
+  if (!toVisible && after.data.sheetIndex === idx) {
+    mutators.setSheetIndex(store, firstVisibleSheet(n, after.layout.hiddenSheets, idx));
+  }
+  return true;
+}
+
+/** Two-state view of `setSheetTabVisibility`. `false` reveals a tab from either
+ *  hidden state; `true` on an already very-hidden tab is refused, since it
+ *  states nothing that tab does not already satisfy. */
 export function setSheetHidden(
   store: SpreadsheetStore,
   wb: WorkbookHandle | null,
@@ -205,36 +275,15 @@ export function setSheetHidden(
   idx: number,
   hidden: boolean,
 ): boolean {
-  if (!structureAllowed(store, hidden ? 'hide sheet' : 'unhide sheet')) return false;
-  const state = store.getState();
-  const n = wb ? wb.sheetCount : 1;
-  const cur = new Set(state.layout.hiddenSheets);
-  if (hidden) {
-    if (cur.has(idx)) return false;
-    // Refuse if this would hide the last visible sheet.
-    let visibleCount = 0;
-    for (let i = 0; i < n; i += 1) {
-      if (i === idx) continue;
-      if (!cur.has(i)) visibleCount += 1;
-    }
-    if (visibleCount === 0) return false;
-  } else if (!cur.has(idx)) return false;
-
-  recordLayoutChangeWithEngine(history, store, wb, () => {
-    const layout = store.getState().layout;
-    const next = new Set(layout.hiddenSheets);
-    if (hidden) next.add(idx);
-    else next.delete(idx);
-    store.setState((s) => ({
-      ...s,
-      layout: { ...s.layout, hiddenSheets: next } as LayoutSlice,
-    }));
-  });
-
-  // After hiding the active sheet, hop to the next visible one.
-  const after = store.getState();
-  if (hidden && after.data.sheetIndex === idx) {
-    mutators.setSheetIndex(store, firstVisibleSheet(n, after.layout.hiddenSheets, idx));
-  }
-  return true;
+  // Hiding an already very-hidden tab would demote it, which is a state change
+  // this two-state form never asked for. The engine's own flag setter refuses
+  // the same way.
+  if (hidden && store.getState().layout.hiddenSheets.has(idx)) return false;
+  return setSheetTabVisibility(
+    store,
+    wb,
+    history,
+    idx,
+    hidden ? SheetVisibility.Hidden : SheetVisibility.Visible,
+  );
 }

@@ -34,6 +34,7 @@ const makeFakeWb = (state: FakeWbState): WorkbookHandle => {
     capabilities: {
       sheetMutate: true,
       sheetTabHidden: true,
+      sheetVisibility: true,
       ...state.capabilities,
     } as EngineCapabilities,
     addSheet(name?: string): number {
@@ -55,6 +56,9 @@ const makeFakeWb = (state: FakeWbState): WorkbookHandle => {
       if (s === undefined) return false;
       state.sheets.splice(to, 0, s);
       return true;
+    },
+    setSheetVisibility(): boolean {
+      return state.capabilities.sheetVisibility !== false;
     },
     setSheetTabHidden(): boolean {
       return true;
@@ -383,18 +387,20 @@ describe('mount/sheet-tabs-controller', () => {
       const items = Array.from(
         h.sheetMenu.querySelectorAll<HTMLButtonElement>('.fc-sheetmenu__item'),
       );
-      // 7 menu buttons: rename, insert, moveLeft, moveRight, delete, hide, unhide.
-      expect(items.length).toBe(7);
+      // 8 menu buttons: rename, insert, moveLeft, moveRight, delete, hide,
+      // very hide, unhide.
+      expect(items.length).toBe(8);
       // Active is sheet 1, so moveLeft + moveRight are both enabled, delete enabled
       // (sheetCount > 1), unhide disabled (no hidden sheets yet).
       const enabled = items.map((b) => !b.disabled);
-      // [rename, insert, moveLeft, moveRight, delete, hide, unhide]
-      expect(enabled).toEqual([true, true, true, true, true, true, false]);
-      expect(items[6]?.dataset.disabledReason).toBe(en.ribbonMenu.sheetUnhideRequiresHiddenSheet);
-      expect(items[6]?.getAttribute('aria-description')).toBe(
+      // [rename, insert, moveLeft, moveRight, delete, hide, veryHide, unhide]
+      expect(enabled).toEqual([true, true, true, true, true, true, true, false]);
+      expect(items[6]?.textContent).toBe(en.sheetTabs.veryHideSheet);
+      expect(items[7]?.dataset.disabledReason).toBe(en.ribbonMenu.sheetUnhideRequiresHiddenSheet);
+      expect(items[7]?.getAttribute('aria-description')).toBe(
         en.ribbonMenu.sheetUnhideRequiresHiddenSheet,
       );
-      expect(items[6]?.title).toBe(
+      expect(items[7]?.title).toBe(
         `${en.sheetTabs.unhideSheet}\n${en.ribbonMenu.sheetUnhideRequiresHiddenSheet}`,
       );
       expect(h.sheetMenu.querySelector('.fc-sheetmenu__colors')).not.toBeNull();
@@ -437,6 +443,42 @@ describe('mount/sheet-tabs-controller', () => {
       h.controller.showMenu(0, coloredTab as HTMLButtonElement, 0, 0);
       h.sheetMenu.querySelector<HTMLButtonElement>('.fc-sheetmenu__swatch--none')?.click();
       expect(h.store.getState().layout.sheetTabColors.has(0)).toBe(false);
+    });
+
+    it('very-hides a sheet and leaves it out of the unhide list', () => {
+      h = mount({ sheets: ['A', 'B', 'C'], capabilities: {} });
+      const tab = h.sheetTabs.querySelectorAll<HTMLButtonElement>('.fc-host__sheetbar-tab')[1];
+      if (!tab) throw new Error('tab not found');
+      h.controller.showMenu(1, tab, 0, 0);
+      Array.from(h.sheetMenu.querySelectorAll<HTMLButtonElement>('.fc-sheetmenu__item'))
+        .find((item) => item.textContent === en.sheetTabs.veryHideSheet)
+        ?.click();
+
+      const layout = h.store.getState().layout;
+      expect(layout.hiddenSheets.has(1)).toBe(true);
+      expect(layout.veryHiddenSheets.has(1)).toBe(true);
+
+      const first = h.sheetTabs.querySelectorAll<HTMLButtonElement>('.fc-host__sheetbar-tab')[0];
+      if (!first) throw new Error('tab not found');
+      h.controller.showMenu(0, first, 0, 0);
+      const labels = Array.from(
+        h.sheetMenu.querySelectorAll<HTMLButtonElement>('.fc-sheetmenu__item'),
+      ).map((item) => item.textContent);
+      // A spreadsheet's own Unhide list omits a very-hidden sheet; so does this.
+      expect(labels).not.toContain('Unhide B');
+      expect(labels).toContain(en.sheetTabs.unhideSheet);
+    });
+
+    it('offers no very-hide entry on an engine that cannot state it', () => {
+      h = mount({ sheets: ['A', 'B'], capabilities: { sheetVisibility: false } });
+      const tab = h.sheetTabs.querySelectorAll<HTMLButtonElement>('.fc-host__sheetbar-tab')[0];
+      if (!tab) throw new Error('tab not found');
+      h.controller.showMenu(0, tab, 0, 0);
+      const veryHide = Array.from(
+        h.sheetMenu.querySelectorAll<HTMLButtonElement>('.fc-sheetmenu__item'),
+      ).find((item) => item.textContent === en.sheetTabs.veryHideSheet);
+      expect(veryHide?.disabled).toBe(true);
+      expect(veryHide?.dataset.disabledReason).toBe(en.ribbonMenu.sheetActionUnavailable);
     });
 
     it('shows each hidden sheet as an unhide target in the sheet menu', () => {

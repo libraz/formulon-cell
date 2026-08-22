@@ -5,6 +5,7 @@ import { hydrateCommentsAndHyperlinksFromEngine } from '../engine/format-sync.js
 import { hydrateLayoutFromEngine } from '../engine/layout-sync.js';
 import { hydrateMergesFromEngine } from '../engine/merges-sync.js';
 import { summarizePassthroughs, summarizeTables } from '../engine/passthrough-sync.js';
+import { hydratePageSetupFromEngine } from '../engine/print-sync.js';
 import { hydrateProtectionFromEngine } from '../engine/protection-sync.js';
 import { hydrateTableOverlaysFromEngine } from '../engine/table-sync.js';
 import { hydrateValidationsFromEngine } from '../engine/validation-sync.js';
@@ -21,6 +22,7 @@ export function hydrateActiveSheetFromEngine(wb: WorkbookHandle, store: Spreadsh
   hydrateCellFormatsFromEngine(wb, store, sheet);
   hydrateConditionalRulesFromEngine(wb, store, sheet);
   hydrateAutoFilterFromEngine(wb, store, sheet);
+  hydratePageSetupFromEngine(wb, store, sheet);
 }
 
 export function hydrateWorkbookMetadataFromEngine(

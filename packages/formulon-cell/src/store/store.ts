@@ -81,6 +81,7 @@ export const createSpreadsheetStore = () =>
       outlineRowGutter: 0,
       outlineColGutter: 0,
       hiddenSheets: new Set(),
+      veryHiddenSheets: new Set(),
       sheetTabColors: new Map(),
     },
     data: { sheetIndex: 0, cells: new Map() },

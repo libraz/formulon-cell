@@ -5,6 +5,7 @@ import {
   syncLayoutSizesToEngine,
   syncLayoutToEngine,
 } from '../../../src/engine/layout-sync.js';
+import { SheetVisibility } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 
@@ -66,14 +67,26 @@ interface FakeSheetView {
   freezeRows: number;
   freezeCols: number;
   tabHidden: boolean;
+  visibility?: SheetVisibility;
   showGridLines?: boolean;
   showRowColHeaders?: boolean;
   showZeros?: boolean;
   rightToLeft?: boolean;
 }
 
+interface SetTabHiddenCall {
+  sheet: number;
+  hidden: boolean;
+}
+interface SetVisibilityCall {
+  sheet: number;
+  visibility: SheetVisibility;
+}
+
 interface FakeWb {
   wb: WorkbookHandle;
+  tabHiddenCalls: SetTabHiddenCall[];
+  visibilityCalls: SetVisibilityCall[];
   colCalls: SetColCall[];
   rowCalls: SetRowCall[];
   freezeCalls: SetFreezeCall[];
@@ -90,6 +103,8 @@ const makeFake = (opts: {
   sheetZoom?: boolean;
   hiddenRowsCols?: boolean;
   outlines?: boolean;
+  sheetTabHidden?: boolean;
+  sheetVisibility?: boolean;
   sheetCount?: number;
   cols?: FakeColLayout[];
   rows?: FakeRowLayout[];
@@ -103,6 +118,8 @@ const makeFake = (opts: {
   const rowHiddenCalls: SetRowHiddenCall[] = [];
   const colOutlineCalls: SetColOutlineCall[] = [];
   const rowOutlineCalls: SetRowOutlineCall[] = [];
+  const tabHiddenCalls: SetTabHiddenCall[] = [];
+  const visibilityCalls: SetVisibilityCall[] = [];
   const fake = {
     capabilities: {
       colRowSize: opts.colRowSize,
@@ -111,6 +128,8 @@ const makeFake = (opts: {
       sheetZoom: opts.sheetZoom ?? false,
       hiddenRowsCols: opts.hiddenRowsCols ?? false,
       outlines: opts.outlines ?? false,
+      sheetTabHidden: opts.sheetTabHidden ?? false,
+      sheetVisibility: opts.sheetVisibility ?? false,
     },
     sheetCount: opts.sheetCount ?? 1,
     getColumnLayouts: () => opts.cols ?? [],
@@ -144,9 +163,19 @@ const makeFake = (opts: {
       rowOutlineCalls.push({ sheet, row, level });
       return opts.outlines ?? false;
     },
+    setSheetTabHidden: (sheet: number, hidden: boolean) => {
+      tabHiddenCalls.push({ sheet, hidden });
+      return opts.sheetTabHidden ?? false;
+    },
+    setSheetVisibility: (sheet: number, visibility: SheetVisibility) => {
+      visibilityCalls.push({ sheet, visibility });
+      return opts.sheetVisibility ?? false;
+    },
   };
   return {
     wb: fake as unknown as WorkbookHandle,
+    tabHiddenCalls,
+    visibilityCalls,
     colCalls,
     rowCalls,
     freezeCalls,
@@ -493,5 +522,104 @@ describe('syncLayoutToEngine — freeze panes', () => {
     const { wb, freezeCalls } = makeFake({ colRowSize: false, freeze: true });
     syncLayoutToEngine(wb, store.getState().layout, 0, before, after);
     expect(freezeCalls).toEqual([]);
+  });
+});
+
+describe('syncLayoutToEngine — sheet tab visibility', () => {
+  const snapshotWith = (hidden: number[], veryHidden: number[]) => {
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      layout: {
+        ...s.layout,
+        hiddenSheets: new Set(hidden),
+        veryHiddenSheets: new Set(veryHidden),
+      },
+    }));
+    return { store, snapshot: captureLayoutSnapshot(store.getState()) };
+  };
+
+  it('hydrates a very-hidden tab into both sets', () => {
+    const store = createSpreadsheetStore();
+    const { wb } = makeFake({
+      colRowSize: false,
+      sheetCount: 3,
+      views: {
+        0: { zoomScale: 100, freezeRows: 0, freezeCols: 0, tabHidden: false },
+        1: {
+          zoomScale: 100,
+          freezeRows: 0,
+          freezeCols: 0,
+          tabHidden: true,
+          visibility: SheetVisibility.Hidden,
+        },
+        2: {
+          zoomScale: 100,
+          freezeRows: 0,
+          freezeCols: 0,
+          tabHidden: true,
+          visibility: SheetVisibility.VeryHidden,
+        },
+      },
+    });
+    hydrateLayoutFromEngine(wb, store, 0);
+    const { hiddenSheets, veryHiddenSheets } = store.getState().layout;
+    expect([...hiddenSheets]).toEqual([1, 2]);
+    expect([...veryHiddenSheets]).toEqual([2]);
+  });
+
+  it('routes a promotion to very hidden through the three-state setter', () => {
+    const before = snapshotWith([], []).snapshot;
+    const { store, snapshot: after } = snapshotWith([1], [1]);
+    const { wb, visibilityCalls, tabHiddenCalls } = makeFake({
+      colRowSize: false,
+      sheetTabHidden: true,
+      sheetVisibility: true,
+    });
+    syncLayoutToEngine(wb, store.getState().layout, 0, before, after);
+    expect(visibilityCalls).toEqual([{ sheet: 1, visibility: SheetVisibility.VeryHidden }]);
+    expect(tabHiddenCalls).toEqual([]);
+  });
+
+  it('demotes a very-hidden tab to plain hidden, which the flag cannot express', () => {
+    const before = snapshotWith([1], [1]).snapshot;
+    const { store, snapshot: after } = snapshotWith([1], []);
+    const { wb, visibilityCalls, tabHiddenCalls } = makeFake({
+      colRowSize: false,
+      sheetTabHidden: true,
+      sheetVisibility: true,
+    });
+    syncLayoutToEngine(wb, store.getState().layout, 0, before, after);
+    expect(visibilityCalls).toEqual([{ sheet: 1, visibility: SheetVisibility.Hidden }]);
+    expect(tabHiddenCalls).toEqual([]);
+  });
+
+  it('falls back to the two-state flag when the engine has no three-state setter', () => {
+    const before = snapshotWith([1], [1]).snapshot;
+    const { store, snapshot: after } = snapshotWith([], []);
+    const { wb, tabHiddenCalls } = makeFake({ colRowSize: false, sheetTabHidden: true });
+    syncLayoutToEngine(wb, store.getState().layout, 0, before, after);
+    expect(tabHiddenCalls).toEqual([{ sheet: 1, hidden: false }]);
+  });
+
+  it('hides as far as it can when only the flag exists and very hidden is asked for', () => {
+    const before = snapshotWith([], []).snapshot;
+    const { store, snapshot: after } = snapshotWith([1], [1]);
+    const { wb, tabHiddenCalls } = makeFake({ colRowSize: false, sheetTabHidden: true });
+    syncLayoutToEngine(wb, store.getState().layout, 0, before, after);
+    expect(tabHiddenCalls).toEqual([{ sheet: 1, hidden: true }]);
+  });
+
+  it('leaves an unchanged tab alone', () => {
+    const before = snapshotWith([1], [1]).snapshot;
+    const { store, snapshot: after } = snapshotWith([1], [1]);
+    const { wb, tabHiddenCalls, visibilityCalls } = makeFake({
+      colRowSize: false,
+      sheetTabHidden: true,
+      sheetVisibility: true,
+    });
+    syncLayoutToEngine(wb, store.getState().layout, 0, before, after);
+    expect(tabHiddenCalls).toEqual([]);
+    expect(visibilityCalls).toEqual([]);
   });
 });

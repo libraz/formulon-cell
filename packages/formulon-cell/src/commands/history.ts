@@ -370,6 +370,7 @@ export interface LayoutSnapshot {
   outlineRowGutter: number;
   outlineColGutter: number;
   hiddenSheets: Set<number>;
+  veryHiddenSheets: Set<number>;
   sheetTabColors: Map<number, string>;
 }
 
@@ -386,6 +387,7 @@ export function captureLayoutSnapshot(state: State): LayoutSnapshot {
     outlineRowGutter: state.layout.outlineRowGutter,
     outlineColGutter: state.layout.outlineColGutter,
     hiddenSheets: new Set(state.layout.hiddenSheets),
+    veryHiddenSheets: new Set(state.layout.veryHiddenSheets),
     sheetTabColors: new Map(state.layout.sheetTabColors),
   };
 }
@@ -406,6 +408,7 @@ export function applyLayoutSnapshot(store: SpreadsheetStore, snap: LayoutSnapsho
       outlineRowGutter: snap.outlineRowGutter,
       outlineColGutter: snap.outlineColGutter,
       hiddenSheets: new Set(snap.hiddenSheets),
+      veryHiddenSheets: new Set(snap.veryHiddenSheets),
       sheetTabColors: new Map(snap.sheetTabColors),
     } as LayoutSlice,
   }));
@@ -432,6 +435,7 @@ const sameLayoutSnapshot = (a: LayoutSnapshot, b: LayoutSnapshot): boolean =>
   a.outlineRowGutter === b.outlineRowGutter &&
   a.outlineColGutter === b.outlineColGutter &&
   sameNumberSet(a.hiddenSheets, b.hiddenSheets) &&
+  sameNumberSet(a.veryHiddenSheets, b.veryHiddenSheets) &&
   sameNumberStringMap(a.sheetTabColors, b.sheetTabColors);
 
 /** Run `mutate`, capturing the format slice before and after, pushing one
@@ -749,6 +753,7 @@ const sameOptionalMargins = (a: PageMargins | undefined, b: PageMargins | undefi
 const samePageSetup = (a: PageSetup, b: PageSetup): boolean =>
   a.orientation === b.orientation &&
   a.paperSize === b.paperSize &&
+  a.paperSizeCode === b.paperSizeCode &&
   a.margins.top === b.margins.top &&
   a.margins.right === b.margins.right &&
   a.margins.bottom === b.margins.bottom &&

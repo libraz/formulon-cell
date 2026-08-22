@@ -230,6 +230,7 @@ export {
   ribbonActivationForCommand,
   ribbonSurfaceCommandIds,
   ribbonSurfaceCommands,
+  SheetVisibility,
   STATUS_AGGREGATE_KEYS,
   saveSheetView,
   sessionChartById,
