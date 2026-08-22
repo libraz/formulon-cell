@@ -1,6 +1,6 @@
 {
   "name": "@libraz/formulon-cell-vue",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Vue 3 component + composables for @libraz/formulon-cell.",
   "type": "module",
   "license": "Apache-2.0",

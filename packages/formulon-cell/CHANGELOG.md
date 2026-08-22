@@ -4,7 +4,7 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
-## Unreleased
+## 0.6.0 — 2026-08-23
 
 ### Added
 
@@ -55,8 +55,8 @@ versioning is [SemVer](https://semver.org/).
   overwrite a guide's spans with a reading the user did not change.
 
 - `WorkbookHandle` gains `getIterative`, `setSheetVisibility`,
-  `setWorkbookDefaultFont`, the print
-  accessors (`getSheetPageSetup` / `setSheetPageSetup`, `getSheetPageMargins` /
+  `setWorkbookDefaultFont`, the print accessors (`getSheetPageSetup` /
+  `setSheetPageSetup`, `getSheetPageMargins` /
   `setSheetPageMargins`, `getSheetPrintOptions` / `setSheetPrintOptions`,
   `getSheetHeaderFooter` / `setSheetHeaderFooter`, `getSheetPrintArea` /
   `setSheetPrintArea`, `getSheetPrintTitles` / `setSheetPrintTitles`,
@@ -82,6 +82,14 @@ versioning is [SemVer](https://semver.org/).
   bound store mirrors page setup as well as AutoFilter into the engine, and one
   scope suppresses both.
 
+- A new workbook states its locale default font as font 0, through the new
+  `WorkbookHandle.setWorkbookDefaultFont`, rather than appending it to the font
+  table. The engine now seeds a fresh workbook's style table with the records a
+  spreadsheet writes, so an appended font would have left index 0 — and with it
+  every cell carrying no format at all — on the seeded Calibri. An engine that
+  cannot restate its default falls back to naming the locale font on each
+  formatted cell.
+
 - `CellFormat.phonetic` carries the guide's runs (`readonly PhoneticRun[]`)
   rather than one string. A phonetic guide annotates spans of the cell text,
   and OOXML stores one `<rPh>` block per span, so the single-string model could
@@ -103,14 +111,6 @@ versioning is [SemVer](https://semver.org/).
   the spans that cover the target cell's own text — pasting formats onto a
   shorter cell would otherwise state runs reaching past the end of the string,
   which the engine takes verbatim and writes into the file.
-
-- A cell with no format of its own is saved in the workbook's default font. A
-  new workbook resolves such a cell against font 0, which the engine seeded
-  with Calibri, so an untouched cell in a ja-JP workbook saved as Calibri no
-  matter what the locale asked for. `createDefault` now states font 0 itself;
-  `WorkbookHandle.setWorkbookDefaultFont` is the surface, and it keeps the
-  fields the caller leaves out. An engine that cannot restate its default falls
-  back to naming the locale font on each formatted cell, as before.
 
 - A font's `<scheme>` theme link survives a format edit. The link is what keeps
   a font tracking the workbook theme; records authored from UI state carried
@@ -554,6 +554,7 @@ Initial public release.
   so the package works under any modern bundler. Falls back to an
   in-memory stub when `crossOriginIsolated` is unavailable.
 
+[0.6.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.6.0
 [0.5.1]: https://github.com/libraz/formulon-cell/releases/tag/v0.5.1
 [0.5.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.5.0
 [0.4.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.4.0
