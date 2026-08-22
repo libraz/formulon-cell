@@ -19,9 +19,12 @@ export function localeTag(locale: number): string {
 
 /**
  * Merge a host-supplied {@link FunctionMetadataEntry} over the engine's
- * structural `functionMetadata()` result. This is the pure helper the WASM
- * module documents but does not ship at runtime (its generated JS exports no
- * `mergeFunctionMetadata`), reimplemented per `docs/function-metadata-schema.md`.
+ * structural `functionMetadata()` result.
+ *
+ * The engine package exports the same pure helper, but only from the entry
+ * point that also pulls in the generated WASM glue. Keeping a copy here lets a
+ * host merge metadata without dragging the engine module into its bundle; the
+ * two agree on `docs/function-metadata-schema.md`.
  *
  * Field precedence (first non-nullish wins):
  *   - `signatureTemplate`: `entry.localized[locale].signature` →
