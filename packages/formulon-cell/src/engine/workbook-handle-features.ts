@@ -38,6 +38,7 @@ import type {
   FontRecord,
   FormulonModule,
   FunctionMetadataProvider,
+  PhoneticRun,
   Range,
   SpreadsheetProfileId,
   TableInput,
@@ -740,11 +741,42 @@ export abstract class WorkbookHandleFeatureMethods {
     return r.status.ok && r.value ? r.value : null;
   }
 
-  /** Set (or, with an empty string, clear) the cell's phonetic guide. */
+  /** Set (or, with an empty string, clear) the cell's phonetic guide. The
+   *  engine spans the whole cell text, so this replaces any per-run guide the
+   *  cell carried — use `setCellPhoneticRuns` to preserve the spans. */
   setCellPhonetic(sheet: number, row: number, col: number, phonetic: string): boolean {
     assertAlive(this);
     if (!this.capabilities.phonetic) return false;
     return wb(this).setCellPhonetic(sheet, row, col, phonetic).ok;
+  }
+
+  /** Read the cell's phonetic guide span by span. Returns null when the engine
+   *  has no per-run surface, which is distinct from the empty array an
+   *  unannotated cell reports. */
+  getCellPhoneticRuns(sheet: number, row: number, col: number): PhoneticRun[] | null {
+    assertAlive(this);
+    if (!this.capabilities.phoneticRuns) return null;
+    const r = wb(this).getCellPhoneticRuns(sheet, row, col);
+    if (!r.status.ok) return null;
+    return r.runs.map((run) => ({ start: run.sb, end: run.eb, text: run.text }));
+  }
+
+  /** Replace the cell's phonetic guide with `runs`, an ordered partition of the
+   *  cell text. An empty array clears the guide. */
+  setCellPhoneticRuns(
+    sheet: number,
+    row: number,
+    col: number,
+    runs: readonly PhoneticRun[],
+  ): boolean {
+    assertAlive(this);
+    if (!this.capabilities.phoneticRuns) return false;
+    return wb(this).setCellPhoneticRuns(
+      sheet,
+      row,
+      col,
+      runs.map((run) => ({ sb: run.start, eb: run.end, text: run.text })),
+    ).ok;
   }
 
   /** Resolve the XF record at `xfIndex` to its component table indices
@@ -801,6 +833,19 @@ export abstract class WorkbookHandleFeatureMethods {
     const r = wb(this).getNumFmt(numFmtId);
     if (!r.status.ok) return null;
     return r.formatCode;
+  }
+
+  /** State font 0, the record every cell with no font of its own resolves to.
+   *  Fields the caller leaves out keep whatever the current default carries —
+   *  notably its `<scheme>` theme link, which is what keeps the font tracking
+   *  the workbook theme instead of becoming a literal name. Returns false when
+   *  the engine cannot restate its default. */
+  setWorkbookDefaultFont(record: Partial<FontRecord>): boolean {
+    assertAlive(this);
+    if (!this.capabilities.defaultFont || !this.capabilities.cellFormatting) return false;
+    const current = this.getFontRecord(0);
+    if (!current) return false;
+    return wb(this).setDefaultFont(completeFontRecord({ ...current, ...record })).ok;
   }
 
   /** Add or dedup a font record. Returns the resolved font index, or -1 on

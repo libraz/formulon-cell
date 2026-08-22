@@ -414,7 +414,18 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
         formats.set(addrKey({ sheet: 0, row: 22, col }), { fontVertAlign });
       }
       first.setText({ sheet: 0, row: 23, col: 0 }, '漢字');
-      formats.set(addrKey({ sheet: 0, row: 23, col: 0 }), { phonetic: 'かんじ' });
+      formats.set(addrKey({ sheet: 0, row: 23, col: 0 }), {
+        phonetic: [{ start: 0, end: 2, text: 'かんじ' }],
+      });
+      // A guide that annotates each kanji separately, which is what collapses
+      // into one whole-cell reading without a per-run writeback.
+      first.setText({ sheet: 0, row: 24, col: 0 }, '東京都');
+      formats.set(addrKey({ sheet: 0, row: 24, col: 0 }), {
+        phonetic: [
+          { start: 0, end: 2, text: 'とうきょう' },
+          { start: 2, end: 3, text: 'と' },
+        ],
+      });
 
       source.setState((state) => ({
         ...state,
@@ -462,7 +473,13 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
             fontVertAlign,
           );
         }
-        expect(roundTripped.get(addrKey({ sheet: 0, row: 23, col: 0 }))?.phonetic).toBe('かんじ');
+        expect(roundTripped.get(addrKey({ sheet: 0, row: 23, col: 0 }))?.phonetic).toEqual([
+          { start: 0, end: 2, text: 'かんじ' },
+        ]);
+        expect(roundTripped.get(addrKey({ sheet: 0, row: 24, col: 0 }))?.phonetic).toEqual([
+          { start: 0, end: 2, text: 'とうきょう' },
+          { start: 2, end: 3, text: 'と' },
+        ]);
       } finally {
         reloaded.dispose();
       }

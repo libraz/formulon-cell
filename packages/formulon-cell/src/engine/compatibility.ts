@@ -161,7 +161,9 @@ export function summarizeSpreadsheetCompatibility(
       label: 'Phonetic guides',
       status: c.phonetic ? 'writable' : 'unsupported',
       reason: c.phonetic
-        ? 'Cell-level OOXML rPh guides can be read, edited, and round-tripped.'
+        ? c.phoneticRuns
+          ? 'Cell-level OOXML rPh guides round-trip span by span, so a partially annotated cell keeps its spans.'
+          : 'Guides can be read and written, but only as one reading for the whole cell — editing a partially annotated cell collapses its spans.'
         : 'Reading or writing OOXML rPh/phoneticPr records requires engine APIs.',
     },
     {

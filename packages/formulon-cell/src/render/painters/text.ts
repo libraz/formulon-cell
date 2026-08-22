@@ -323,17 +323,29 @@ export function paintCellText({
   else if (fontVertAlign === 'subscript') ty += box.descent * 0.65;
 
   // A phonetic guide (Japanese furigana/ruby) is stored separately from the
-  // cell value by OOXML. Render it as a compact, centred reading above the
-  // base text; the readback/writeback path keeps the original guide intact.
-  if (format?.phonetic && !isFormulaDisplay) {
-    const baseCenter =
-      align === 'right' ? tx - metrics.width / 2 : align === 'center' ? tx : tx + metrics.width / 2;
+  // cell value by OOXML, one run per annotated span. Each reading is centred
+  // over the span it annotates, measured in the base font before the ruby font
+  // is selected; a run whose span does not land inside the drawn text — the
+  // whole-cell reading an engine without a per-run surface reports, or a guide
+  // left over from a longer value — centres over the whole text instead.
+  if (format?.phonetic?.length && !isFormulaDisplay) {
+    const textLeft =
+      align === 'right' ? tx - metrics.width : align === 'center' ? tx - metrics.width / 2 : tx;
+    const centers = format.phonetic.map((run) => {
+      const start = Math.max(0, Math.min(run.start, text.length));
+      const end = Math.max(start, Math.min(run.end, text.length));
+      if (end === start) return textLeft + metrics.width / 2;
+      const before = start === 0 ? 0 : ctx.measureText(text.slice(0, start)).width;
+      return textLeft + before + ctx.measureText(text.slice(start, end)).width / 2;
+    });
     const phoneticSize = Math.max(6, Math.round(drawFontSize * 0.52));
     ctx.save();
     ctx.font = `${styleSlant}${weight} ${phoneticSize}px ${fontCss(fontFamily)}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
-    ctx.fillText(format.phonetic, baseCenter, ty - box.ascent - 1);
+    for (const [i, run] of format.phonetic.entries()) {
+      ctx.fillText(run.text, centers[i] ?? textLeft, ty - box.ascent - 1);
+    }
     ctx.restore();
   }
   ctx.fillText(text, tx, ty);

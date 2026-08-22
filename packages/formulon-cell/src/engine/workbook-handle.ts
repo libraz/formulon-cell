@@ -117,8 +117,8 @@ export class WorkbookHandle {
 
   private storeSyncMuted = 0;
 
-  /** Locale default font for a workbook this handle created. Null for a
-   *  loaded workbook, whose own font 0 is the authoritative baseline. */
+  /** Locale default font for a workbook this handle created on an engine that
+   *  cannot state font 0. Null otherwise, since font 0 is then the baseline. */
   private localeDefaultFont: Pick<FontRecord, 'name' | 'size'> | null = null;
 
   /** Host-injected localized function documentation, merged over the
@@ -149,7 +149,11 @@ export class WorkbookHandle {
     const module = await loadFormulon(loadOptions);
     const wb = module.Workbook.createDefault();
     const handle = new WorkbookHandle(module, wb);
-    handle.localeDefaultFont = defaultFontForLocale(locale);
+    const font = defaultFontForLocale(locale);
+    // Stating font 0 is what makes an untouched cell save with the locale font;
+    // an engine that cannot restate its default falls back to naming the font
+    // on every cell that carries a format, leaving unformatted cells behind.
+    if (!handle.setWorkbookDefaultFont(font)) handle.localeDefaultFont = font;
     return handle;
   }
 
@@ -178,16 +182,12 @@ export class WorkbookHandle {
    * baseline every authored font record is built from, and the one stripped
    * back out when engine records are hydrated into the store.
    *
-   * A loaded workbook's baseline is its own font 0, the record OOXML treats as
-   * the workbook default. A newly created workbook takes the locale's default
-   * instead: the engine seeds font 0 with the Calibri record a spreadsheet
-   * writes and offers no way to replace it, so the locale font is registered
-   * on first use and named explicitly on every cell that uses it. That leaves
-   * one gap the engine has to close — a cell carrying no format at all
-   * resolves to the seeded font 0, so an untouched cell in a new ja-JP
-   * workbook saves as Calibri rather than the locale font.
+   * Font 0 is that record, for a loaded workbook and for a new one alike —
+   * `createDefault` states the locale font there. `localeDefaultFont` only
+   * holds a value on an engine that cannot restate its default, where the
+   * locale font has to be named on each cell instead.
    */
-  get workbookDefaultFont(): Pick<FontRecord, 'name' | 'size'> | null {
+  get workbookDefaultFont(): Pick<FontRecord, 'name' | 'size' | 'scheme'> | null {
     this.assertAlive();
     return this.localeDefaultFont ?? this.getFontRecord(0);
   }

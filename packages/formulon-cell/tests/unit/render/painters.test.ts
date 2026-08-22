@@ -427,11 +427,58 @@ describe('paintCellText font strictness', () => {
       formula: null,
       isActive: false,
       isInRange: false,
-      format: { phonetic: 'かんじ' },
+      format: { phonetic: [{ start: 0, end: 2, text: 'かんじ' }] },
     });
     expect(spy.fills.map((fill) => fill.text)).toEqual(['かんじ', '漢字']);
     expect(spy.fills[0]?.font).toContain('7px');
     expect(spy.fills[0]?.y).toBeLessThan(spy.fills[1]?.y ?? Infinity);
+  });
+
+  it('centres each phonetic run over the span it annotates', () => {
+    const spy = makeTextSpy();
+    paintCellText({
+      ctx: spy.ctx,
+      bounds: { x: 0, y: 0, w: 200, h: 24 },
+      theme: theme({ textCell: 13 }),
+      value: { kind: 'text', value: '東京都' },
+      formula: null,
+      isActive: false,
+      isInRange: false,
+      format: {
+        phonetic: [
+          { start: 0, end: 2, text: 'とうきょう' },
+          { start: 2, end: 3, text: 'と' },
+        ],
+      },
+    });
+    expect(spy.fills.map((fill) => fill.text)).toEqual(['とうきょう', 'と', '東京都']);
+    // The second run annotates a later span, so its reading sits to the right.
+    expect(spy.fills[0]?.x ?? 0).toBeLessThan(spy.fills[1]?.x ?? 0);
+  });
+
+  it('centres a run with no usable span over the whole text', () => {
+    const spy = makeTextSpy();
+    const bounds = { x: 0, y: 0, w: 200, h: 24 };
+    const base = {
+      bounds,
+      theme: theme({ textCell: 13 }),
+      value: { kind: 'text', value: '東京都' } as const,
+      formula: null,
+      isActive: false,
+      isInRange: false,
+    };
+    const spanned = makeTextSpy();
+    paintCellText({
+      ...base,
+      ctx: spy.ctx,
+      format: { phonetic: [{ start: 0, end: 0, text: 'とうきょうと' }] },
+    });
+    paintCellText({
+      ...base,
+      ctx: spanned.ctx,
+      format: { phonetic: [{ start: 0, end: 3, text: 'とうきょうと' }] },
+    });
+    expect(spy.fills[0]?.x).toBe(spanned.fills[0]?.x);
   });
 
   it('uses the monospace font only for formula-display mode', () => {

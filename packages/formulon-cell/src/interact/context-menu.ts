@@ -25,6 +25,7 @@ import {
 import { type History, recordRepeatableFormatChange } from '../commands/history.js';
 import { hyperlinkAt } from '../commands/hyperlinks.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
+import { phoneticReading, setPhoneticReading } from '../commands/phonetic.js';
 import { inferSortHasHeader, sortRange } from '../commands/sort.js';
 import {
   deleteCols,
@@ -907,7 +908,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       case 'editPhonetic': {
         const addr = state.selection.active;
         if (!wb.capabilities.phonetic) return;
-        const initial = state.format.formats.get(addrKey(addr))?.phonetic ?? '';
+        const initial = phoneticReading(state.format.formats.get(addrKey(addr))?.phonetic);
         void showPrompt({
           title: strings.contextMenu.phoneticDialogTitle,
           label: strings.contextMenu.phoneticDialogLabel,
@@ -915,9 +916,8 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           okLabel: strings.formatDialog.ok,
           cancelLabel: strings.formatDialog.cancel,
         }).then((phonetic) => {
-          if (phonetic === null || !wb.setCellPhonetic(addr.sheet, addr.row, addr.col, phonetic))
-            return;
-          mutators.setCellFormat(store, addr, { phonetic: phonetic || undefined });
+          if (phonetic === null) return;
+          if (!setPhoneticReading(store, wb, addr, phonetic, initial)) return;
           deps.onAfterCommit?.();
         });
         return;

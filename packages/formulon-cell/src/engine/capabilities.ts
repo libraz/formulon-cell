@@ -34,6 +34,8 @@ export function detectCapabilities(wb: Workbook): EngineCapabilities {
       'getNumFmt',
     ),
     phonetic: all('getCellPhonetic', 'setCellPhonetic'),
+    phoneticRuns: all('getCellPhoneticRuns', 'setCellPhoneticRuns'),
+    defaultFont: has('setDefaultFont'),
     autoFilter: all('getSheetAutoFilterXml', 'setSheetAutoFilterXml'),
     tableMutate: all('createTable', 'updateTable', 'removeTable'),
     conditionalFormat: has('evaluateCfRange'),

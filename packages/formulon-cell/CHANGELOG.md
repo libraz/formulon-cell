@@ -48,7 +48,14 @@ versioning is [SemVer](https://semver.org/).
   iteration switched on still showed the dialog's own defaults, and clicking OK
   wrote those defaults over the file's.
 
-- `WorkbookHandle` gains `getIterative`, `setSheetVisibility`, the print
+- Phonetic guides are addressed span by span. `WorkbookHandle` gains
+  `getCellPhoneticRuns` / `setCellPhoneticRuns`, and `commands/phonetic`
+  exports `phoneticReading`, `phoneticReadingAt` and `setPhoneticReading` —
+  the last being what a single-field editor should call, since it declines to
+  overwrite a guide's spans with a reading the user did not change.
+
+- `WorkbookHandle` gains `getIterative`, `setSheetVisibility`,
+  `setWorkbookDefaultFont`, the print
   accessors (`getSheetPageSetup` / `setSheetPageSetup`, `getSheetPageMargins` /
   `setSheetPageMargins`, `getSheetPrintOptions` / `setSheetPrintOptions`,
   `getSheetHeaderFooter` / `setSheetHeaderFooter`, `getSheetPrintArea` /
@@ -56,9 +63,10 @@ versioning is [SemVer](https://semver.org/).
   `getSheetPageBreaks` / `setSheetPageBreaks`, `getSheetPageSetupXml` /
   `setSheetPageSetupXml`, `getSheetPageSetupExtras` / `setSheetPageSetupExtras`)
   and the `printSettings` / `printSettingsXml` / `pageBreaks` /
-  `sheetVisibility` / `iterativeSettings` / `pivotItemByCacheIndex` capability
-  flags. `getSheetView` now reports `visibility` beside `tabHidden`, and
-  `getPivotTables` reports `fieldItemIndexes` beside `fieldItems`.
+  `sheetVisibility` / `iterativeSettings` / `pivotItemByCacheIndex` /
+  `phoneticRuns` / `defaultFont` capability flags. `getSheetView` now reports
+  `visibility` beside `tabHidden`, and `getPivotTables` reports
+  `fieldItemIndexes` beside `fieldItems`.
 
   `setSheetPageSetupExtras` merges into the raw `<pageSetup>` fragment the
   engine keeps as its writer's source of truth, so an attribute neither side
@@ -68,27 +76,48 @@ versioning is [SemVer](https://semver.org/).
 
 ### Changed
 
-- The engine dependency moves to `@libraz/formulon` 0.11.0.
+- The engine dependency moves to `@libraz/formulon` 0.11.1.
 
 - `WorkbookHandle.withAutoFilterSyncMuted` is now `withEngineSyncMuted`: the
   bound store mirrors page setup as well as AutoFilter into the engine, and one
   scope suppresses both.
 
-- A new workbook's locale default font is carried by the handle
-  (`WorkbookHandle.workbookDefaultFont`) instead of being written into the
-  engine's font table as record 0. The engine now seeds a fresh workbook's
-  style table with the records a spreadsheet writes and offers no way to
-  replace font 0, so appending the locale font only produced an unused
-  near-duplicate and left the baseline at Calibri. Every authored cell format
-  still resolves to the locale font, and a loaded workbook still takes its own
-  font 0 as the baseline.
-
-  One gap this cannot close from here: a cell in a new ja-JP workbook that
-  carries no format at all resolves to the engine's seeded font 0, so it saves
-  as Calibri rather than the locale font. Stating the workbook default font
-  needs an engine API that does not exist yet.
+- `CellFormat.phonetic` carries the guide's runs (`readonly PhoneticRun[]`)
+  rather than one string. A phonetic guide annotates spans of the cell text,
+  and OOXML stores one `<rPh>` block per span, so the single-string model could
+  only ever hold the readings run together — see the round-trip fix below. Read
+  the editor's view of a guide with the exported `phoneticReading`.
 
 ### Fixed
+
+- A partially annotated phonetic guide survives an edit. Every format sync
+  rewrote the cell's guide as one reading for the whole cell, so touching any
+  format on a cell whose furigana annotated its kanji separately collapsed the
+  spans into a single whole-string annotation. Guides are now read and written
+  span by span, and the phonetic editor — which offers one field, and so can
+  only state a whole-cell reading — leaves the guide alone when the reading
+  comes back unchanged. Each run is drawn centred over the span it annotates
+  instead of all of them centred over the cell.
+
+  A guide travels with the format it belongs to, so the writeback trims it to
+  the spans that cover the target cell's own text — pasting formats onto a
+  shorter cell would otherwise state runs reaching past the end of the string,
+  which the engine takes verbatim and writes into the file.
+
+- A cell with no format of its own is saved in the workbook's default font. A
+  new workbook resolves such a cell against font 0, which the engine seeded
+  with Calibri, so an untouched cell in a ja-JP workbook saved as Calibri no
+  matter what the locale asked for. `createDefault` now states font 0 itself;
+  `WorkbookHandle.setWorkbookDefaultFont` is the surface, and it keeps the
+  fields the caller leaves out. An engine that cannot restate its default falls
+  back to naming the locale font on each formatted cell, as before.
+
+- A font's `<scheme>` theme link survives a format edit. The link is what keeps
+  a font tracking the workbook theme; records authored from UI state carried
+  none, so bolding a cell rewrote its font as a literal name. The link now
+  carries while the cell stays on the workbook's body font, and is dropped only
+  when a family is named explicitly — which is the edit that genuinely picks a
+  literal typeface.
 
 - Data-validation writeback keeps rejecting blank cells only where the rule
   says so. The engine flipped `addValidation`'s `allowBlank` default from true

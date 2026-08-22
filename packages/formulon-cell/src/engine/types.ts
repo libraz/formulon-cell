@@ -49,6 +49,7 @@ export type FontRecord = EngineFilled<
   | 'family'
   | 'hasCharset'
   | 'charset'
+  | 'scheme'
   | 'color'
 >;
 
@@ -336,6 +337,18 @@ export interface Range {
   readonly c1: number;
 }
 
+/**
+ * One `<rPh>` block of a cell's phonetic guide: `text` is the reading for the
+ * half-open span `[start, end)` of the cell's text, measured in UTF-16 code
+ * units. A guide that reads the whole cell is a single run spanning all of it,
+ * which is what an engine with no per-run surface reports.
+ */
+export interface PhoneticRun {
+  readonly start: number;
+  readonly end: number;
+  readonly text: string;
+}
+
 /** Tagged value the UI displays. Mirrors the six error sentinels. */
 export type CellValue =
   | { readonly kind: 'blank' }
@@ -360,8 +373,15 @@ export interface EngineCapabilities {
    *  on the XF record carries number-format ids, so a separate `numberFormat`
    *  flag is unnecessary. */
   readonly cellFormatting: boolean;
-  /** Cell-level OOXML phonetic guide (`rPh`) read/write. */
+  /** Cell-level OOXML phonetic guide (`rPh`) read/write, as one reading for
+   *  the whole cell. */
   readonly phonetic?: boolean;
+  /** Phonetic guides read and written span by span, so a partially annotated
+   *  cell survives a round-trip instead of collapsing into one reading. */
+  readonly phoneticRuns?: boolean;
+  /** `setDefaultFont` — states font 0, the record an unstyled cell resolves
+   *  to. Without it a new workbook keeps the engine's seeded default. */
+  readonly defaultFont?: boolean;
   /** Worksheet-level `<autoFilter>` definition read/write. */
   readonly autoFilter?: boolean;
   /** OOXML worksheet-table create/update/delete. */

@@ -30,6 +30,10 @@ export function completeFontRecord(record: FontRecord): EngineFontRecord {
     family: record.family ?? 0,
     hasCharset: record.hasCharset ?? false,
     charset: record.charset ?? 0,
+    // A `<scheme>` link makes the font track the workbook theme. Only a record
+    // read back out of a file carries one; a font the cell layer authored from
+    // a family name is a literal typeface, so it stays unlinked.
+    scheme: record.scheme ?? 0,
     color: record.color ?? authoredColorSpec(),
   };
 }

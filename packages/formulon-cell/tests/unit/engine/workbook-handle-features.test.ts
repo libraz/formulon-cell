@@ -75,19 +75,37 @@ describe('engine/workbook-handle-features (stub) — capability gates', () => {
   });
 });
 
-/** The engine seeds a new workbook's style table with the record a spreadsheet
- *  writes and offers no way to replace font 0, so the locale default has to be
- *  carried by the handle rather than read back out of the table. */
+/** Font 0 is the record an unstyled cell resolves to, so a new workbook has to
+ *  state the locale default there — naming it on formatted cells alone would
+ *  still save every untouched cell as the engine's seeded font. */
 describe('engine/workbook-handle — workbook default font', () => {
-  it('reports the locale default for a workbook this handle created', async () => {
+  it('states the locale default as font 0 on a workbook this handle created', async () => {
     const wb = await WorkbookHandle.createDefault({ locale: 'ja-JP' });
     try {
       expect(wb.isStub).toBe(false);
-      expect(wb.workbookDefaultFont).toEqual({ name: '游ゴシック', size: 11 });
-      // The engine's own seeded font 0 stays what it always was.
-      expect(wb.getFontRecord(0)?.name).toBe('Calibri');
+      expect(wb.capabilities.defaultFont).toBe(true);
+      expect(wb.getFontRecord(0)?.name).toBe('游ゴシック');
+      expect(wb.workbookDefaultFont?.name).toBe('游ゴシック');
+      expect(wb.workbookDefaultFont?.size).toBe(11);
     } finally {
       wb.dispose();
+    }
+  });
+
+  it('keeps a cell with no format of its own on the locale font through a save', async () => {
+    const authored = await WorkbookHandle.createDefault({ locale: 'ja-JP' });
+    let bytes: Uint8Array;
+    try {
+      authored.setText({ sheet: 0, row: 0, col: 0 }, '無書式');
+      bytes = authored.save();
+    } finally {
+      authored.dispose();
+    }
+    const reloaded = await WorkbookHandle.loadBytes(bytes);
+    try {
+      expect(reloaded.getFontRecord(0)?.name).toBe('游ゴシック');
+    } finally {
+      reloaded.dispose();
     }
   });
 
@@ -107,6 +125,22 @@ describe('engine/workbook-handle — workbook default font', () => {
     }
   });
 
+  it('keeps the fields the caller left out of a restated default', async () => {
+    const wb = await WorkbookHandle.createDefault({ locale: 'en-US' });
+    try {
+      const before = wb.getFontRecord(0);
+      expect(before).not.toBeNull();
+      expect(wb.setWorkbookDefaultFont({ name: 'Meiryo' })).toBe(true);
+      const after = wb.getFontRecord(0);
+      expect(after?.name).toBe('Meiryo');
+      expect(after?.size).toBe(before?.size);
+      expect(after?.scheme).toBe(before?.scheme);
+      expect(after?.family).toBe(before?.family);
+    } finally {
+      wb.dispose();
+    }
+  });
+
   it('falls back to a loaded workbook’s own font 0', async () => {
     const authored = await WorkbookHandle.createDefault({ locale: 'ja-JP' });
     let bytes: Uint8Array;
@@ -121,5 +155,42 @@ describe('engine/workbook-handle — workbook default font', () => {
     } finally {
       reloaded.dispose();
     }
+  });
+});
+
+describe('engine/workbook-handle-features — phonetic guides', () => {
+  it('reads back the spans a guide was written with', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      expect(wb.capabilities.phoneticRuns).toBe(true);
+      wb.setText({ sheet: 0, row: 0, col: 0 }, '東京都');
+      const runs = [
+        { start: 0, end: 2, text: 'とうきょう' },
+        { start: 2, end: 3, text: 'と' },
+      ];
+      expect(wb.setCellPhoneticRuns(0, 0, 0, runs)).toBe(true);
+      expect(wb.getCellPhoneticRuns(0, 0, 0)).toEqual(runs);
+      // The whole-cell reader still reports the readings run together.
+      expect(wb.getCellPhonetic(0, 0, 0)).toBe('とうきょうと');
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('reports an unannotated cell as no runs rather than as no surface', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      wb.setText({ sheet: 0, row: 0, col: 0 }, '東京都');
+      expect(wb.getCellPhoneticRuns(0, 0, 0)).toEqual([]);
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('no-ops the per-run surface on stub', async () => {
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    expect(wb.capabilities.phoneticRuns).toBe(false);
+    expect(wb.getCellPhoneticRuns(0, 0, 0)).toBeNull();
+    expect(wb.setCellPhoneticRuns(0, 0, 0, [{ start: 0, end: 1, text: 'あ' }])).toBe(false);
   });
 });

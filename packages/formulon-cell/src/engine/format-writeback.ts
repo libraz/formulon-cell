@@ -133,11 +133,16 @@ const BUILTIN_NUM_FMT_GENERAL = 0;
  * when the caller has no workbook context, such as a differential format). */
 export function fontRecordFromFormat(
   fmt: CellFormat,
-  workbookDefault?: Pick<FontRecord, 'name' | 'size'> | null,
+  workbookDefault?: Pick<FontRecord, 'name' | 'size' | 'scheme'> | null,
 ): FontRecord {
+  const name = fmt.fontFamily ?? workbookDefault?.name ?? DEFAULT_FONT_NAME;
   return {
-    name: fmt.fontFamily ?? workbookDefault?.name ?? DEFAULT_FONT_NAME,
+    name,
     size: fmt.fontSize ?? workbookDefault?.size ?? DEFAULT_FONT_SIZE,
+    // A theme link belongs to the typeface, so it carries only while the cell
+    // is still on the workbook's body font. Naming a family picks a literal
+    // font, which is what unlinks it — bolding or resizing does not.
+    scheme: name === workbookDefault?.name ? workbookDefault.scheme : undefined,
     bold: fmt.bold === true,
     italic: fmt.italic === true,
     strike: fmt.strike === true,

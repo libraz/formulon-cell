@@ -13,6 +13,7 @@
 import { setFont } from '../../commands/format.js';
 import { applyMerge, applyUnmerge } from '../../commands/merge.js';
 import { setPrintGridlines, setPrintHeadings } from '../../commands/page-setup.js';
+import { phoneticReadingAt, setPhoneticReading } from '../../commands/phonetic.js';
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
 import {
   deleteCols,
@@ -34,7 +35,7 @@ import {
 } from '../../commands/view.js';
 import type { FeatureFlags } from '../../extensions/index.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
-import { getPageSetup, mutators } from '../../store/store.js';
+import { getPageSetup } from '../../store/store.js';
 import type { CellBorderStyle } from '../../store/types.js';
 import { showPrompt } from '../dialogs/prompt.js';
 import type { SessionShapeKind } from '../illustration-types.js';
@@ -257,8 +258,7 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
     case 'editPhonetic': {
       if (!i.workbook?.capabilities.phonetic) return true;
       const addr = state.selection.active;
-      const initial =
-        state.format.formats.get(`${addr.sheet}:${addr.row}:${addr.col}`)?.phonetic ?? '';
+      const initial = phoneticReadingAt(i.store, addr);
       void showPrompt({
         title: deps.text.phoneticDialogTitle,
         label: deps.text.phoneticDialogLabel,
@@ -266,13 +266,9 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
         okLabel: deps.text.ok,
         cancelLabel: deps.text.cancel,
       }).then((phonetic) => {
-        if (
-          phonetic === null ||
-          !i.workbook?.setCellPhonetic(addr.sheet, addr.row, addr.col, phonetic)
-        ) {
-          return;
-        }
-        mutators.setCellFormat(i.store, addr, { phonetic: phonetic || undefined });
+        const workbook = i.workbook;
+        if (phonetic === null || !workbook) return;
+        if (!setPhoneticReading(i.store, workbook, addr, phonetic, initial)) return;
         runtime.refreshCells();
         runtime.focusSheet();
       });

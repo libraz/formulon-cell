@@ -73,6 +73,22 @@ describe('fontRecordFromFormat / fontRecordToFormat', () => {
     expect(rec.size).toBe(11);
   });
 
+  it('keeps the default font’s theme link while the cell stays on that font', () => {
+    const wbDefault = { name: '游ゴシック', size: 11, scheme: 2 };
+    // Bolding or resizing does not change the typeface, so the link holds.
+    expect(fontRecordFromFormat({}, wbDefault).scheme).toBe(2);
+    expect(fontRecordFromFormat({ bold: true, fontSize: 18 }, wbDefault).scheme).toBe(2);
+    expect(fontRecordFromFormat({ fontFamily: '游ゴシック' }, wbDefault).scheme).toBe(2);
+  });
+
+  it('unlinks the theme when a family is named explicitly', () => {
+    const rec = fontRecordFromFormat(
+      { fontFamily: 'Arial' },
+      { name: '游ゴシック', size: 11, scheme: 2 },
+    );
+    expect(rec.scheme).toBeUndefined();
+  });
+
   it('encodes bold/italic/underline/strike + custom font', () => {
     const rec = fontRecordFromFormat({
       bold: true,

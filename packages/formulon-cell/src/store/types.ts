@@ -4,7 +4,7 @@ import type {
   TableOverlay,
 } from '../commands/format-as-table.js';
 import type { SheetView } from '../commands/sheet-views.js';
-import type { Addr, CellValue, Range } from '../engine/types.js';
+import type { Addr, CellValue, PhoneticRun, Range } from '../engine/types.js';
 
 export type EditorMode =
   | { kind: 'idle' }
@@ -119,8 +119,10 @@ export interface CellFormat {
   strike?: boolean;
   /** Baseline shift for super/subscript text. */
   fontVertAlign?: 'superscript' | 'subscript';
-  /** OOXML phonetic guide (ruby/furigana) associated with the cell text. */
-  phonetic?: string;
+  /** OOXML phonetic guide (ruby/furigana) over the cell text, one entry per
+   *  `<rPh>` block. A guide that reads the whole cell is a single run; a
+   *  partially annotated cell keeps one run per annotated span. */
+  phonetic?: readonly PhoneticRun[];
   align?: CellAlign;
   /** Vertical alignment. Default is 'bottom'. */
   vAlign?: CellVAlign;

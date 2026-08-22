@@ -19,7 +19,7 @@ import {
   formatCodeToNumFmt,
   numFmtToFormatCode,
 } from './format-writeback.js';
-import type { CellXf, FontRecord } from './types.js';
+import type { Addr, CellValue, CellXf, FontRecord, PhoneticRun } from './types.js';
 import { syncValidationsToEngine } from './validation-sync.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -67,6 +67,57 @@ export function seedSyncedFormatKeys(
   for (const key of keys) set.add(key);
 }
 
+/** Concatenate a guide's readings into the single string the whole-cell
+ *  phonetic entry points carry. */
+export const flattenPhoneticRuns = (runs: readonly PhoneticRun[] | undefined): string =>
+  runs === undefined ? '' : runs.map((run) => run.text).join('');
+
+/**
+ * Trim a guide to the spans that actually cover the cell's own text. A guide
+ * travels with the format it belongs to, so pasting formats onto a shorter
+ * cell would otherwise state runs reaching past the end of the string — the
+ * engine takes those verbatim and writes them into the file, where no reader
+ * can resolve them. A cell holding anything but text carries no guide at all.
+ */
+function boundPhoneticRuns(
+  wb: WorkbookHandle,
+  addr: Addr,
+  runs: readonly PhoneticRun[] | undefined,
+): readonly PhoneticRun[] {
+  if (runs === undefined || runs.length === 0) return [];
+  const value = wb.getValue(addr);
+  const length = value.kind === 'text' ? value.value.length : 0;
+  if (length === 0) return [];
+  const bounded: PhoneticRun[] = [];
+  for (const run of runs) {
+    const start = Math.max(0, Math.min(run.start, length));
+    const end = Math.max(start, Math.min(run.end, length));
+    if (end === start) continue;
+    bounded.push(start === run.start && end === run.end ? run : { start, end, text: run.text });
+  }
+  return bounded;
+}
+
+/** Read a cell's phonetic guide as runs, preferring the per-run surface. An
+ *  engine that carries only the whole-cell reading reports one run spanning
+ *  the cell text, which is how OOXML spells the same thing. */
+function readPhoneticRuns(
+  wb: WorkbookHandle,
+  addr: Addr,
+  value: CellValue,
+): readonly PhoneticRun[] | null {
+  if (wb.capabilities.phoneticRuns && typeof wb.getCellPhoneticRuns === 'function') {
+    const runs = wb.getCellPhoneticRuns(addr.sheet, addr.row, addr.col);
+    return runs !== null && runs.length > 0 ? runs : null;
+  }
+  if (wb.capabilities.phonetic && typeof wb.getCellPhonetic === 'function') {
+    const text = wb.getCellPhonetic(addr.sheet, addr.row, addr.col);
+    if (!text) return null;
+    return [{ start: 0, end: value.kind === 'text' ? value.value.length : 0, text }];
+  }
+  return null;
+}
+
 /**
  * Push every format entry on `sheet` from FormatSlice into the engine's XF
  * table. For each cell the writeback ensures a font / fill / border / numFmt
@@ -98,8 +149,17 @@ export function syncCellFormatsToEngine(
     const xfIndex = resolveXfForFormat(wb, fmt, styleXfIds);
     if (xfIndex < 0) continue;
     wb.setCellXfIndex(sheet, row, col, xfIndex);
-    if (wb.capabilities.phonetic && typeof wb.setCellPhonetic === 'function') {
-      wb.setCellPhonetic(sheet, row, col, fmt.phonetic ?? '');
+    // Per-run first: `setCellPhonetic` spans the whole cell, so on a partially
+    // annotated cell it would flatten every span into one reading.
+    if (wb.capabilities.phoneticRuns && typeof wb.setCellPhoneticRuns === 'function') {
+      wb.setCellPhoneticRuns(
+        sheet,
+        row,
+        col,
+        boundPhoneticRuns(wb, { sheet, row, col }, fmt.phonetic),
+      );
+    } else if (wb.capabilities.phonetic && typeof wb.setCellPhonetic === 'function') {
+      wb.setCellPhonetic(sheet, row, col, flattenPhoneticRuns(fmt.phonetic));
     }
     current.add(key);
   }
@@ -138,10 +198,7 @@ export function hydrateCellFormatsFromEngine(
   const updates: Array<{ key: string; patch: Partial<CellFormat> }> = [];
   const physicalCells = wb.physicalCells ? wb.physicalCells(sheet) : wb.cells(sheet);
   for (const c of physicalCells) {
-    const phonetic =
-      wb.capabilities.phonetic && typeof wb.getCellPhonetic === 'function'
-        ? wb.getCellPhonetic(c.addr.sheet, c.addr.row, c.addr.col)
-        : null;
+    const phonetic = readPhoneticRuns(wb, c.addr, c.value);
     const xfIndex = wb.getCellXfIndex(sheet, c.addr.row, c.addr.col);
     if (xfIndex === null || xfIndex <= 0) {
       if (phonetic) updates.push({ key: addrKey(c.addr), patch: { phonetic } });
@@ -225,7 +282,7 @@ function pivotFormatPatch(
 export function cellFormatFromXf(
   wb: WorkbookHandle,
   xf: CellXf,
-  workbookDefaultFont: Pick<FontRecord, 'name' | 'size'> | null = null,
+  workbookDefaultFont: Pick<FontRecord, 'name' | 'size' | 'scheme'> | null = null,
   styleKeysByXfId: ReadonlyMap<number, string> | null = null,
 ): Partial<CellFormat> {
   const patch: Partial<CellFormat> = {};
