@@ -8,7 +8,8 @@ import {
 import { applyMerge, applyUnmerge, mergeAt } from '../commands/merge.js';
 import { addrKey } from '../engine/address.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
-import type { Range } from '../engine/types.js';
+import type { CellValue, Range } from '../engine/types.js';
+import { formatCell, formatGeneralNumber } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
@@ -337,6 +338,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   let activeTab: TabId = 'number';
   let pendingBorderPreset: 'none' | 'outline' | 'all' | null = null;
   let applyDxf: ((format: Partial<CellFormat>) => void) | null = null;
+  let previewValue: CellValue = { kind: 'blank' };
   const draft: DraftState = makeEmptyDraft(getFormatLocale());
 
   // ── Color palette flyouts ──────────────────────────────────────────────
@@ -354,7 +356,10 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   // ── Hydration ──────────────────────────────────────────────────────────
   const hydrateFromActive = (initialFormat?: Partial<CellFormat>): void => {
     const state = store.getState();
-    const fmt = initialFormat ?? state.format.formats.get(addrKey(state.selection.active)) ?? {};
+    const active = state.selection.active;
+    const activeCell = state.data.cells.get(addrKey(active));
+    previewValue = activeCell?.value ?? getWb()?.getValue(active) ?? { kind: 'blank' };
+    const fmt = initialFormat ?? state.format.formats.get(addrKey(active)) ?? {};
     hydrateDraftFromFormat(draft, fmt, getFormatLocale());
     pendingBorderPreset = null;
 
@@ -591,25 +596,14 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const syncNegativeSamples = (): void => {
     const cat = draft.numberCategory;
     const items = negativeOptions.querySelectorAll<HTMLButtonElement>('[data-fc-negative-style]');
-    const symbol = cat === 'currency' ? (draft.currencySymbol ?? '') : '';
-    const formatSample = (value: number, style: NegativeStyle): string => {
-      const abs = Math.abs(value);
-      const grouped = abs.toLocaleString('en-US');
-      const body = `${symbol}${grouped}`;
-      switch (style) {
-        case 'parens':
-        case 'red-parens':
-          return `(${body})`;
-        case 'red':
-          return `${symbol}${grouped}`;
-        default:
-          return `${symbol}-${grouped}`;
-      }
-    };
     for (const item of items) {
       const style = item.dataset.fcNegativeStyle as NegativeStyle | undefined;
       if (!style) continue;
-      item.textContent = formatSample(-1234, style);
+      const sampleFmt = computeDialogNumFmt(
+        { ...draft, numberCategory: cat, negativeStyle: style },
+        defaultPatternFor,
+      );
+      item.textContent = formatNumber(-1234, sampleFmt, getFormatLocale());
     }
   };
 
@@ -826,11 +820,12 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     }
 
     const numFmt = computeDialogNumFmt(draft, defaultPatternFor);
-    // Pick a sample value that exercises the active category. Date/time
-    //  categories use a serial near the present (45123 ≈ 2023-07-16).
+    // Differential-format editing has no cell value to preview, so retain a
+    // representative sample there. Normal Format Cells previews the active
+    // cell, including text, booleans, errors, and blanks.
     const isDateLike =
       numFmt.kind === 'date' || numFmt.kind === 'time' || numFmt.kind === 'datetime';
-    const sampleValue =
+    const syntheticSampleValue =
       draft.numberCategory === 'fraction'
         ? 1.25
         : (draft.numberCategory === 'fixed' || draft.numberCategory === 'currency') &&
@@ -839,9 +834,16 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
           : isDateLike || draft.numberCategory === 'currency' || draft.numberCategory === 'special'
             ? 10
             : 12345;
-    const numericText = formatNumber(sampleValue, numFmt, getFormatLocale());
+    const value =
+      applyDxf !== null ? { kind: 'number' as const, value: syntheticSampleValue } : previewValue;
+    const numericText =
+      value.kind === 'number'
+        ? applyDxf !== null || numFmt.kind !== 'general'
+          ? formatNumber(value.value, numFmt, getFormatLocale())
+          : formatGeneralNumber(value.value, getFormatLocale(), { useGrouping: false })
+        : formatCell(value, getFormatLocale());
     previewCell.textContent = numericText;
-    if (!draft.color && sampleValue < 0) {
+    if (!draft.color && value.kind === 'number' && value.value < 0) {
       previewCell.style.color =
         draft.negativeStyle === 'red' || draft.negativeStyle === 'red-parens' ? '#c00000' : '';
     }
@@ -1293,11 +1295,13 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   const onDecimalsInput = (): void => {
     const n = Number.parseInt(decimalsInput.value, 10);
     if (Number.isFinite(n)) draft.decimals = Math.max(0, Math.min(10, n));
+    syncNegativeSamples();
     renderPreview();
   };
 
   const onThousandsChange = (): void => {
     draft.thousands = thousandsCk.input.checked;
+    syncNegativeSamples();
     renderPreview();
   };
 

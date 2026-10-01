@@ -23,6 +23,9 @@
   .fc-fmtdlg[hidden] {
     display: none;
   }
+  .fc-fmtdlg [hidden] {
+    display: none !important;
+  }
   .fc-fmtdlg--range-picking {
     align-items: flex-start;
     justify-content: center;
