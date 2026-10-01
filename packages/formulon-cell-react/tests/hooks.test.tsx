@@ -187,6 +187,21 @@ describe('useSpreadsheet', () => {
     await harness.unmount();
   });
 
+  it('keeps fresh object selector results from causing a snapshot loop', async () => {
+    mounted = await mountReactSpreadsheet();
+    const inst = mounted.instance;
+    const harness = renderHook(
+      (p: { instance: SpreadsheetInstance | null }) =>
+        useSpreadsheet(p.instance, (s) => ({ cells: s.data.cells.size }), { cells: -1 }),
+      { instance: inst },
+    );
+    await harness.rerender();
+
+    expect(harness.value()).toEqual({ cells: 0 });
+    expect(harness.renderCount()).toBeLessThan(5);
+    await harness.unmount();
+  });
+
   it('returns the supplied fallback while instance is null and stops listening on unmount', async () => {
     mounted = await mountReactSpreadsheet();
     const inst = mounted.instance;

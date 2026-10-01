@@ -31,11 +31,12 @@ export const useSpreadsheet = <T>(
   selector: (state: State) => T,
   fallback: T,
 ): T => {
-  return useSyncExternalStore(
+  const state = useSyncExternalStore(
     (cb) => (instance ? instance.store.subscribe(cb) : () => {}),
-    () => (instance ? selector(instance.store.getState()) : fallback),
-    () => fallback,
+    () => instance?.store.getState() ?? null,
+    () => null,
   );
+  return state ? selector(state) : fallback;
 };
 
 interface I18nSnapshot {

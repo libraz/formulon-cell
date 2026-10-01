@@ -126,6 +126,7 @@ const SpreadsheetComponent = (
 ): ReactNode => {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const instanceRef = useRef<SpreadsheetInstance | null>(null);
+  const [liveInstance, setLiveInstance] = useState<SpreadsheetInstance | null>(null);
   const [mountError, setMountError] = useState<unknown>(null);
   // Keep the latest props in a ref so the mount effect doesn't have to
   // re-run when callbacks change. Mounting is expensive (it creates the
@@ -168,6 +169,7 @@ const SpreadsheetComponent = (
         ...(cur.macroRecording !== undefined ? { macroRecording: cur.macroRecording } : {}),
         renderError: !cur.errorFallback,
         onError: (error) => {
+          if (disposed) return;
           setMountError(error);
           propsRef.current.onError?.(error);
         },
@@ -190,8 +192,9 @@ const SpreadsheetComponent = (
       );
       if (propsRef.current !== cur) {
         await applyRuntimeProps(inst, propsRef.current, cur);
-        if (disposed) return;
       }
+      if (disposed) return;
+      setLiveInstance(inst);
       propsRef.current.onReady?.(inst);
     })().catch((error: unknown) => {
       if (disposed) return;
@@ -200,8 +203,10 @@ const SpreadsheetComponent = (
     return () => {
       disposed = true;
       for (const d of eventDisposers) d();
-      instanceRef.current?.dispose();
+      const inst = instanceRef.current;
       instanceRef.current = null;
+      setLiveInstance(null);
+      inst?.dispose();
     };
     // Mount once; prop mutations land via imperative methods on `instance`
     // and event handlers re-read from propsRef on each fire.
@@ -277,8 +282,8 @@ const SpreadsheetComponent = (
   // a render prop, defer execution until the instance is available.
   const children =
     typeof props.children === 'function'
-      ? instanceRef.current
-        ? props.children(instanceRef.current)
+      ? liveInstance
+        ? props.children(liveInstance)
         : null
       : props.children;
   const errorFallback =

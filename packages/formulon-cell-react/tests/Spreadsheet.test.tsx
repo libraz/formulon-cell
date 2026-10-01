@@ -1,4 +1,5 @@
 import * as Core from '@libraz/formulon-cell';
+import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ScreenClipCapture, ScreenClipResult } from '../src';
 import * as ReactPackage from '../src';
@@ -33,6 +34,16 @@ describe('React <Spreadsheet>', () => {
     expect(typeof inst?.on).toBe('function');
     // The forwarded ref should resolve to the same instance.
     expect(mounted.refValue.instance).toBe(inst);
+  });
+
+  it('renders a render-prop child after the async instance mount completes', async () => {
+    const renderChild = vi.fn((instance: Core.SpreadsheetInstance) => (
+      <span data-testid="render-prop-child">{instance.i18n.locale}</span>
+    ));
+    mounted = await mountReactSpreadsheet({}, renderChild as unknown as ReactNode);
+
+    expect(renderChild).toHaveBeenCalledTimes(1);
+    expect(mounted.host.querySelector('[data-testid="render-prop-child"]')?.textContent).toBe('ja');
   });
 
   it('forwards cellChange events from the underlying engine to the onCellChange prop', async () => {

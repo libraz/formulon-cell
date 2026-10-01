@@ -53,4 +53,43 @@ describe('React Spreadsheet error boundary', () => {
     );
     expect(host.querySelector('[data-testid="fallback"]')?.textContent).toBe('engine failed');
   });
+
+  it('ignores a mount error delivered after the component unmounts', async () => {
+    const err = new Error('late engine failure');
+    let reportError: ((error: unknown) => void) | undefined;
+    let rejectMount: ((error: unknown) => void) | undefined;
+    mountCore.mockImplementation(
+      (_host: HTMLElement, opts: { onError?: (error: unknown) => void }) => {
+        reportError = opts.onError;
+        return new Promise((_resolve, reject) => {
+          rejectMount = reject;
+        });
+      },
+    );
+    const { Spreadsheet } = await import('../src/Spreadsheet');
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    const onError = vi.fn();
+
+    await act(async () => {
+      root?.render(<Spreadsheet onError={onError} />);
+      await Promise.resolve();
+    });
+    expect(mountCore).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      root?.unmount();
+      await Promise.resolve();
+    });
+    root = null;
+
+    reportError?.(err);
+    rejectMount?.(err);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(onError).not.toHaveBeenCalled();
+  });
 });
