@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { defaultTableOverlay } from '../../../src/commands/format-as-table.js';
 import { History } from '../../../src/commands/history.js';
 import {
   applyMerge,
+  applyMergeAcross,
   applyUnmerge,
   expandRangeWithMerges,
+  mergeAcrossWillLoseData,
   mergeAnchorOf,
   mergeAt,
   mergeWillLoseData,
@@ -12,7 +15,11 @@ import {
 import { setCellLocked, setProtectedSheet } from '../../../src/commands/protection.js';
 import type { Range } from '../../../src/engine/types.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
+import {
+  createSpreadsheetStore,
+  mutators,
+  type SpreadsheetStore,
+} from '../../../src/store/store.js';
 
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
@@ -36,6 +43,40 @@ const seedAndMirror = (
     return { ...s, data: { ...s.data, cells: map } };
   });
   wb.recalc();
+};
+
+const seedBoolAndMirror = (
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  row: number,
+  col: number,
+  value: boolean,
+): void => {
+  const addr = { sheet: 0, row, col };
+  wb.setBool(addr, value);
+  store.setState((s) => {
+    const cells = new Map(s.data.cells);
+    cells.set(addrKey(addr), { value: { kind: 'bool', value }, formula: null });
+    return { ...s, data: { ...s.data, cells } };
+  });
+  wb.recalc();
+};
+
+const seedFormulaAndMirror = (
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  row: number,
+  col: number,
+  formula: string,
+): void => {
+  const addr = { sheet: 0, row, col };
+  wb.setFormula(addr, formula);
+  wb.recalc();
+  store.setState((s) => {
+    const cells = new Map(s.data.cells);
+    cells.set(addrKey(addr), { value: wb.getValue(addr), formula });
+    return { ...s, data: { ...s.data, cells } };
+  });
 };
 
 describe('applyMerge', () => {
@@ -83,6 +124,20 @@ describe('applyMerge', () => {
     });
   });
 
+  it('rejects invalid coordinates before expanding existing merges', () => {
+    const invalid: Range[] = [
+      { sheet: 0, r0: -1, c0: 0, r1: 1, c1: 1 },
+      { sheet: 0, r0: 0.5, c0: 0, r1: 1, c1: 1 },
+      { sheet: 0, r0: 0, c0: 0, r1: Number.POSITIVE_INFINITY, c1: 1 },
+      { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 16_384 },
+    ];
+    for (const range of invalid) {
+      expect(applyMerge(store, wb, history, range)).toBe(false);
+      expect(applyMergeAcross(store, wb, history, range)).toBe(false);
+    }
+    expect(store.getState().merges.byAnchor.size).toBe(0);
+  });
+
   it('clears non-anchor cell values (spreadsheets keep only top-left)', () => {
     seedAndMirror(store, wb, [
       { row: 0, col: 0, value: 'keep' },
@@ -94,6 +149,211 @@ describe('applyMerge', () => {
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'keep' });
     expect(wb.getValue({ sheet: 0, row: 0, col: 1 }).kind).toBe('blank');
     expect(wb.getValue({ sheet: 0, row: 1, col: 0 }).kind).toBe('blank');
+  });
+
+  it('promotes the sole non-anchor typed value to the top-left cell', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 1, value: 42 }]);
+    const r: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 };
+    expect(applyMerge(store, wb, history, r)).toBe(true);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 42 });
+    expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'blank' });
+  });
+
+  it('promotes a sole non-anchor boolean and keeps false as content', () => {
+    seedBoolAndMirror(store, wb, 0, 1, false);
+    const r: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 };
+    expect(applyMerge(store, wb, history, r)).toBe(true);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'bool', value: false });
+    expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'blank' });
+  });
+
+  it('promotes a sole non-anchor formula without rewriting its text', () => {
+    seedFormulaAndMirror(store, wb, 1, 9, '=I2+10');
+    const r: Range = { sheet: 0, r0: 0, c0: 7, r1: 1, c1: 9 };
+    expect(applyMerge(store, wb, history, r)).toBe(true);
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 7 })).toBe('=I2+10');
+    expect(wb.getValue({ sheet: 0, row: 1, col: 9 })).toEqual({ kind: 'blank' });
+  });
+
+  it('copies anchor visual formatting to the merged cells and keeps it after unmerge', () => {
+    const anchor: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 };
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        align: 'right',
+        fontSize: 20,
+        numFmt: { kind: 'fixed', decimals: 2 },
+        color: 'red',
+      },
+    );
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 1 },
+      {
+        align: 'left',
+        fontSize: 9,
+        numFmt: { kind: 'percent', decimals: 0 },
+        color: 'green',
+      },
+    );
+
+    expect(applyMerge(store, wb, history, anchor)).toBe(true);
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 1 })),
+    ).toMatchObject({
+      align: 'right',
+      fontSize: 20,
+      numFmt: { kind: 'fixed', decimals: 2 },
+      color: 'red',
+    });
+
+    expect(applyUnmerge(store, wb, history, anchor)).toBe(true);
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 1 })),
+    ).toMatchObject({
+      align: 'right',
+      fontSize: 20,
+      numFmt: { kind: 'fixed', decimals: 2 },
+      color: 'red',
+    });
+  });
+
+  it('keeps a uniform perimeter border and removes internal borders', () => {
+    const range: Range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
+    const edge = { style: 'thin' as const, color: 'red' };
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        borders: { top: edge, left: edge },
+      },
+    );
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 1 },
+      {
+        borders: { top: edge, right: edge },
+      },
+    );
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 1, col: 0 },
+      {
+        borders: { bottom: edge, left: edge },
+      },
+    );
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 1, col: 1 },
+      {
+        borders: { bottom: edge, right: edge },
+      },
+    );
+
+    expect(applyMerge(store, wb, history, range)).toBe(true);
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toEqual({
+      borders: { top: edge, left: edge },
+    });
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 1 }))).toEqual({
+      borders: { top: edge, right: edge },
+    });
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 1, col: 0 }))).toEqual({
+      borders: { bottom: edge, left: edge },
+    });
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 1, col: 1 }))).toEqual({
+      borders: { bottom: edge, right: edge },
+    });
+  });
+
+  it('removes partial perimeter and internal borders, then restores them on undo', () => {
+    const range: Range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
+    const thick = { style: 'thick' as const };
+    const thin = { style: 'thin' as const };
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        borders: { top: thin, right: thick },
+      },
+    );
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 1, col: 1 },
+      {
+        borders: { right: thin },
+      },
+    );
+    const before = new Map(store.getState().format.formats);
+
+    expect(applyMerge(store, wb, history, range)).toBe(true);
+    for (const format of store.getState().format.formats.values()) {
+      expect(format.borders?.top).toBeUndefined();
+      expect(format.borders?.right).toBeUndefined();
+    }
+    expect(history.undo()).toBe(true);
+    expect(store.getState().format.formats).toEqual(before);
+  });
+
+  it('removes partial diagonals but keeps uniform diagonals through unmerge', () => {
+    const range: Range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
+    const diagonalDown = { style: 'medium' as const };
+    const diagonalUp = { style: 'dotted' as const };
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        borders: { diagonalDown },
+      },
+    );
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 1, col: 1 },
+      {
+        borders: { diagonalUp },
+      },
+    );
+    const partialBefore = new Map(store.getState().format.formats);
+
+    expect(applyMerge(store, wb, history, range)).toBe(true);
+    for (const format of store.getState().format.formats.values()) {
+      expect(format.borders?.diagonalDown).toBeUndefined();
+      expect(format.borders?.diagonalUp).toBeUndefined();
+    }
+    expect(history.undo()).toBe(true);
+    expect(store.getState().format.formats).toEqual(partialBefore);
+
+    for (let row = range.r0; row <= range.r1; row += 1) {
+      for (let col = range.c0; col <= range.c1; col += 1) {
+        mutators.setCellFormat(
+          store,
+          { sheet: 0, row, col },
+          {
+            borders: { diagonalDown, diagonalUp },
+          },
+        );
+      }
+    }
+    expect(applyMerge(store, wb, history, range)).toBe(true);
+    for (const format of store.getState().format.formats.values()) {
+      expect(format.borders?.diagonalDown).toEqual(diagonalDown);
+      expect(format.borders?.diagonalUp).toEqual(diagonalUp);
+    }
+    expect(applyUnmerge(store, wb, history, range)).toBe(true);
+    for (const format of store.getState().format.formats.values()) {
+      expect(format.borders?.diagonalDown).toEqual(diagonalDown);
+      expect(format.borders?.diagonalUp).toEqual(diagonalUp);
+    }
+  });
+
+  it('refuses a merge that intersects a structured table before writing cells', () => {
+    const tableRange: Range = { sheet: 0, r0: 0, c0: 1, r1: 2, c1: 2 };
+    mutators.upsertTableOverlay(store, defaultTableOverlay('table', tableRange));
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 'keep' }]);
+
+    expect(applyMerge(store, wb, history, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 })).toBe(false);
+    expect(store.getState().merges.byAnchor.size).toBe(0);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'keep' });
   });
 
   it('skips writes on already-blank non-anchor cells (no superfluous history entries)', () => {
@@ -121,9 +381,28 @@ describe('applyMerge', () => {
     applyMerge(store, wb, history, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
     applyMerge(store, wb, history, { sheet: 0, r0: 1, c0: 1, r1: 2, c1: 2 });
     const m = store.getState().merges;
-    // First merge's anchor was deleted because the second range overlaps it.
-    expect(m.byAnchor.has(addrKey({ sheet: 0, row: 0, col: 0 }))).toBe(false);
-    expect(m.byAnchor.has(addrKey({ sheet: 0, row: 1, col: 1 }))).toBe(true);
+    // Excel expands the second operation through the first merge, leaving one
+    // chained merge from A1 through C3.
+    expect(m.byAnchor.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toEqual({
+      sheet: 0,
+      r0: 0,
+      c0: 0,
+      r1: 2,
+      c1: 2,
+    });
+    expect(m.byAnchor.has(addrKey({ sheet: 0, row: 1, col: 1 }))).toBe(false);
+  });
+
+  it('expands a chained overlap through every intersecting merge', () => {
+    applyMerge(store, wb, history, { sheet: 0, r0: 0, c0: 3, r1: 1, c1: 4 });
+    applyMerge(store, wb, history, { sheet: 0, r0: 1, c0: 4, r1: 2, c1: 5 });
+    expect(store.getState().merges.byAnchor.get(addrKey({ sheet: 0, row: 0, col: 3 }))).toEqual({
+      sheet: 0,
+      r0: 0,
+      c0: 3,
+      r1: 2,
+      c1: 5,
+    });
   });
 
   it('is undoable as a single step (cells + merge state both reverted)', () => {
@@ -179,6 +458,101 @@ describe('applyUnmerge', () => {
     history.undo();
     expect(store.getState().merges.byAnchor.size).toBe(1);
   });
+
+  it('removes every merge intersecting a partial selection but leaves unrelated merges', () => {
+    const first: Range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
+    const second: Range = { sheet: 0, r0: 0, c0: 3, r1: 1, c1: 4 };
+    const unrelated: Range = { sheet: 0, r0: 4, c0: 0, r1: 5, c1: 1 };
+    applyMerge(store, wb, history, first);
+    applyMerge(store, wb, history, second);
+    applyMerge(store, wb, history, unrelated);
+
+    expect(applyUnmerge(store, wb, history, { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 3 })).toBe(true);
+    expect(store.getState().merges.byAnchor.has(addrKey({ sheet: 0, row: 0, col: 0 }))).toBe(false);
+    expect(store.getState().merges.byAnchor.has(addrKey({ sheet: 0, row: 0, col: 3 }))).toBe(false);
+    expect(store.getState().merges.byAnchor.get(addrKey({ sheet: 0, row: 4, col: 0 }))).toEqual(
+      unrelated,
+    );
+  });
+
+  it('checks the full intersecting merge for protection, not only the selection', () => {
+    const merged: Range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
+    applyMerge(store, wb, history, merged);
+    setCellLocked(store, { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 }, true);
+    setProtectedSheet(store, 0, true);
+
+    expect(applyUnmerge(store, wb, history, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 })).toBe(false);
+    expect(store.getState().merges.byAnchor.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toEqual(
+      merged,
+    );
+  });
+});
+
+describe('applyMergeAcross', () => {
+  let store: SpreadsheetStore;
+  let wb: WorkbookHandle;
+  let history: History;
+
+  beforeEach(async () => {
+    store = createSpreadsheetStore();
+    wb = await newWb();
+    history = new History();
+    wb.attachHistory(history);
+  });
+
+  it('retains one value per row and is undoable as one transaction', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 1, value: 'top' },
+      { row: 1, col: 0, value: 'bottom' },
+    ]);
+    seedBoolAndMirror(store, wb, 1, 2, false);
+    const range: Range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 2 };
+
+    expect(applyMergeAcross(store, wb, history, range)).toBe(true);
+    expect(store.getState().merges.byAnchor.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toEqual({
+      sheet: 0,
+      r0: 0,
+      c0: 0,
+      r1: 0,
+      c1: 2,
+    });
+    expect(store.getState().merges.byAnchor.get(addrKey({ sheet: 0, row: 1, col: 0 }))).toEqual({
+      sheet: 0,
+      r0: 1,
+      c0: 0,
+      r1: 1,
+      c1: 2,
+    });
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'top' });
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'bottom' });
+    expect(wb.getValue({ sheet: 0, row: 1, col: 2 })).toEqual({ kind: 'blank' });
+
+    expect(history.undo()).toBe(true);
+    expect(store.getState().merges.byAnchor.size).toBe(0);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'text', value: 'top' });
+    expect(wb.getValue({ sheet: 0, row: 1, col: 2 })).toEqual({ kind: 'bool', value: false });
+
+    expect(history.redo()).toBe(true);
+    expect(store.getState().merges.byAnchor.size).toBe(2);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'blank' });
+    expect(wb.getValue({ sheet: 0, row: 1, col: 2 })).toEqual({ kind: 'blank' });
+  });
+
+  it('pre-unmerges intersecting vertical merges before making row merges', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 'top' }]);
+    applyMerge(store, wb, history, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+    const range: Range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 };
+
+    expect(applyMergeAcross(store, wb, history, range)).toBe(true);
+    expect(store.getState().merges.byAnchor.size).toBe(3);
+    expect([...store.getState().merges.byAnchor.values()]).toEqual(
+      expect.arrayContaining([
+        { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+        { sheet: 0, r0: 1, c0: 0, r1: 1, c1: 2 },
+        { sheet: 0, r0: 2, c0: 0, r1: 2, c1: 2 },
+      ]),
+    );
+  });
 });
 
 describe('mergeWillLoseData', () => {
@@ -218,15 +592,37 @@ describe('mergeWillLoseData', () => {
     ).toBe(true);
   });
 
-  it('counts a non-anchor formula as content', () => {
+  it('does not warn when a sole non-anchor formula will be promoted', () => {
     store.setState((s) => {
       const cells = new Map(s.data.cells);
       cells.set('0:0:1', { value: { kind: 'blank' }, formula: '=1+1' });
       return { ...s, data: { ...s.data, cells } };
     });
     expect(mergeWillLoseData(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 })).toBe(
+      false,
+    );
+  });
+
+  it('warns only when more than one value would be retained or discarded', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 1, value: 0 },
+      { row: 1, col: 0, value: 'text' },
+    ]);
+    expect(mergeWillLoseData(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 })).toBe(
       true,
     );
+  });
+
+  it('counts false and zero as row contents for Merge Across warnings', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 1, value: 0 }]);
+    seedBoolAndMirror(store, wb, 0, 2, false);
+    expect(
+      mergeAcrossWillLoseData(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 2 }),
+    ).toBe(true);
+
+    expect(
+      mergeAcrossWillLoseData(store.getState(), { sheet: 0, r0: 1, c0: 0, r1: 1, c1: 2 }),
+    ).toBe(false);
   });
 });
 

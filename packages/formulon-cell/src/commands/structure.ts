@@ -21,6 +21,7 @@ import {
   recordFormatChange,
   recordLayoutChange,
   recordLayoutChangeWithEngine,
+  recordMergesChange,
   recordMergesChangeWithEngine,
 } from './history.js';
 import { isSheetProtected } from './protection.js';
@@ -46,6 +47,27 @@ const MAX_ROW = 1048575;
 const MAX_COL = 16383;
 const MAX_MATERIALIZED_LAYOUT_ROWS = 100_000;
 
+interface AxisEdit {
+  at: number;
+  count: number;
+}
+
+function normalizeAxisEdit(
+  at: number,
+  count: number,
+  max: number,
+  kind: 'insert' | 'delete',
+): AxisEdit | null {
+  if (!Number.isInteger(at) || !Number.isInteger(count)) return null;
+  if (!Number.isFinite(at) || !Number.isFinite(count)) return null;
+  if (at < 0 || at > max || count <= 0) return null;
+  // A row/column insertion must leave room for every cell that is moved
+  // right/down. Deletions may consume the final row/column.
+  const remaining = kind === 'insert' ? max - at : max + 1 - at;
+  const normalizedCount = Math.min(count, remaining);
+  return normalizedCount > 0 ? { at, count: normalizedCount } : null;
+}
+
 const spanSize = (start: number, end: number): number => (end >= start ? end - start + 1 : 0);
 
 function collectAllCells(wb: WorkbookHandle, sheet: number): CellRecord[] {
@@ -54,6 +76,92 @@ function collectAllCells(wb: WorkbookHandle, sheet: number): CellRecord[] {
     out.push({ addr: c.addr, value: c.value, formula: c.formula });
   }
   return out;
+}
+
+interface FormulaRecord {
+  addr: Addr;
+  formula: string;
+}
+
+function collectAllFormulas(wb: WorkbookHandle): FormulaRecord[] {
+  const out: FormulaRecord[] = [];
+  for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) {
+    for (const c of wb.cells(sheet)) {
+      if (c.formula !== null) out.push({ addr: c.addr, formula: c.formula });
+    }
+  }
+  return out;
+}
+
+function cloneInsertedFormat(format: CellFormat): CellFormat {
+  const next: CellFormat = { ...format };
+  delete next.hyperlink;
+  delete next.hyperlinkDisplay;
+  delete next.hyperlinkTooltip;
+  delete next.comment;
+  delete next.commentAuthor;
+  delete next.validation;
+  if (format.borders) next.borders = { ...format.borders };
+  if (format.numFmt) next.numFmt = { ...format.numFmt };
+  if (format.phonetic) next.phonetic = format.phonetic.map((run) => ({ ...run }));
+  return next;
+}
+
+function parseFormatKey(key: string): Addr | null {
+  const parts = key.split(':');
+  if (parts.length !== 3) return null;
+  const sheet = Number(parts[0]);
+  const row = Number(parts[1]);
+  const col = Number(parts[2]);
+  if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
+  return { sheet, row, col };
+}
+
+/** Reject an insertion that would move persisted content past the worksheet
+ *  boundary. The native engine and the JS fallback must make the same choice;
+ *  otherwise the fallback silently drops the tail cell while the native path
+ *  reports a different workbook shape. Sparse formatting/layout and merges
+ *  are included because shifting either one out of bounds would also lose
+ *  workbook state. */
+function insertionWouldOverflow(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  sheet: number,
+  axis: 'row' | 'col',
+  split: number,
+  count: number,
+): boolean {
+  const max = axis === 'row' ? MAX_ROW : MAX_COL;
+  const lastMovable = max - count;
+  const indexOf = (addr: Addr): number => (axis === 'row' ? addr.row : addr.col);
+
+  for (const cell of wb.cells(sheet)) {
+    if (indexOf(cell.addr) <= lastMovable) continue;
+    if (cell.formula !== null || cell.value.kind !== 'blank') return true;
+  }
+
+  const state = store.getState();
+  for (const key of state.format.formats.keys()) {
+    const addr = parseFormatKey(key);
+    if (addr && addr.sheet === sheet && indexOf(addr) > lastMovable) return true;
+  }
+
+  const indexedMaps =
+    axis === 'row'
+      ? [state.layout.rowHeights, state.layout.hiddenRows, state.layout.outlineRows]
+      : [state.layout.colWidths, state.layout.hiddenCols, state.layout.outlineCols];
+  for (const indexed of indexedMaps) {
+    for (const index of indexed.keys()) {
+      if (index > lastMovable) return true;
+    }
+  }
+
+  for (const merge of state.merges.byAnchor.values()) {
+    if (merge.sheet !== sheet) continue;
+    const end = axis === 'row' ? merge.r1 : merge.c1;
+    if (end > lastMovable && end >= split) return true;
+  }
+  return false;
 }
 
 /** Apply a row/col shift to all cells on `sheet`. Cells in the band are
@@ -79,6 +187,7 @@ function writeAxisShiftedCells(
   split: number,
   delta: number,
 ): void {
+  const max = axis === 'row' ? MAX_ROW : MAX_COL;
   // Blank every cell that needs to move (or be deleted) before re-writing —
   // some target slots may overlap source slots when delta < count.
   for (const c of all) {
@@ -102,6 +211,8 @@ function writeAxisShiftedCells(
 
     if (inMovedBand) {
       // Cells in the moved band were blanked above; rewrite at new addr.
+      const target = k + delta;
+      if (target < 0 || target > max) continue;
       writeCell(wb, newAddr, c.value, newFormula);
     } else if (newFormula !== c.formula && newFormula !== null) {
       // Stationary cell whose formula references the band — overwrite in place.
@@ -126,6 +237,9 @@ function writeCell(wb: WorkbookHandle, addr: Addr, value: CellValue, formula: st
     case 'bool':
       wb.setBool(addr, value.value);
       return;
+    case 'error':
+      wb.setError(addr, value.code);
+      return;
     default:
       wb.setBlank(addr);
   }
@@ -138,6 +252,7 @@ function shiftIndexedMap(
   src: Map<number, number>,
   split: number,
   delta: number,
+  max = Number.POSITIVE_INFINITY,
 ): Map<number, number> {
   const out = new Map<number, number>();
   for (const [k, v] of src) {
@@ -146,12 +261,19 @@ function shiftIndexedMap(
       continue;
     }
     if (delta < 0 && k < split - delta) continue; // dropped
-    out.set(k + delta, v);
+    const next = k + delta;
+    if (next < 0 || next > max) continue;
+    out.set(next, v);
   }
   return out;
 }
 
-function shiftIndexedSet(src: Set<number>, split: number, delta: number): Set<number> {
+function shiftIndexedSet(
+  src: Set<number>,
+  split: number,
+  delta: number,
+  max = Number.POSITIVE_INFINITY,
+): Set<number> {
   const out = new Set<number>();
   for (const k of src) {
     if (k < split) {
@@ -159,7 +281,9 @@ function shiftIndexedSet(src: Set<number>, split: number, delta: number): Set<nu
       continue;
     }
     if (delta < 0 && k < split - delta) continue;
-    out.add(k + delta);
+    const next = k + delta;
+    if (next < 0 || next > max) continue;
+    out.add(next);
   }
   return out;
 }
@@ -187,7 +311,28 @@ function shiftFormatsByRow(
       continue;
     }
     if (deltaRow < 0 && r < splitRow - deltaRow) continue; // in deleted band
-    out.set(addrKey({ sheet: s, row: r + deltaRow, col: c }), fmt);
+    const nextRow = r + deltaRow;
+    if (nextRow < 0 || nextRow > MAX_ROW) continue;
+    out.set(addrKey({ sheet: s, row: nextRow, col: c }), fmt);
+  }
+  return out;
+}
+
+function inheritFormatsByRow(
+  src: Map<string, CellFormat>,
+  shifted: Map<string, CellFormat>,
+  sheet: number,
+  splitRow: number,
+  count: number,
+): Map<string, CellFormat> {
+  if (splitRow <= 0 || count <= 0) return shifted;
+  const out = new Map(shifted);
+  for (const [key, fmt] of src) {
+    const addr = parseFormatKey(key);
+    if (!addr || addr.sheet !== sheet || addr.row !== splitRow - 1) continue;
+    for (let row = splitRow; row < splitRow + count && row <= MAX_ROW; row += 1) {
+      out.set(addrKey({ sheet, row, col: addr.col }), cloneInsertedFormat(fmt));
+    }
   }
   return out;
 }
@@ -213,13 +358,51 @@ function shiftFormatsByCol(
       continue;
     }
     if (deltaCol < 0 && c < splitCol - deltaCol) continue;
-    out.set(addrKey({ sheet: s, row: r, col: c + deltaCol }), fmt);
+    const nextCol = c + deltaCol;
+    if (nextCol < 0 || nextCol > MAX_COL) continue;
+    out.set(addrKey({ sheet: s, row: r, col: nextCol }), fmt);
+  }
+  return out;
+}
+
+function inheritFormatsByCol(
+  src: Map<string, CellFormat>,
+  shifted: Map<string, CellFormat>,
+  sheet: number,
+  splitCol: number,
+  count: number,
+): Map<string, CellFormat> {
+  if (splitCol <= 0 || count <= 0) return shifted;
+  const out = new Map(shifted);
+  for (const [key, fmt] of src) {
+    const addr = parseFormatKey(key);
+    if (!addr || addr.sheet !== sheet || addr.col !== splitCol - 1) continue;
+    for (let col = splitCol; col < splitCol + count && col <= MAX_COL; col += 1) {
+      out.set(addrKey({ sheet, row: addr.row, col }), cloneInsertedFormat(fmt));
+    }
   }
   return out;
 }
 
 function applyLayoutPatch(store: SpreadsheetStore, patch: Partial<LayoutSlice>): void {
   store.setState((s) => ({ ...s, layout: { ...s.layout, ...patch } }));
+}
+
+function shiftIndexedMapWithInheritance(
+  src: Map<number, number>,
+  split: number,
+  delta: number,
+  count: number,
+  max = Number.POSITIVE_INFINITY,
+): Map<number, number> {
+  const out = shiftIndexedMap(src, split, delta, max);
+  if (split <= 0 || count <= 0) return out;
+  const inherited = src.get(split - 1);
+  if (inherited === undefined) return out;
+  for (let index = split; index < split + count && index <= max; index += 1) {
+    out.set(index, inherited);
+  }
+  return out;
 }
 
 /** Map a 1-D interval [lo,hi] through a row/col insert (delta>0) or delete
@@ -256,6 +439,8 @@ function shiftRangeAxis(
   const res = adjustInterval(lo, hi, split, delta);
   if (!res) return null;
   const [a, b] = res;
+  const max = axis === 'row' ? MAX_ROW : MAX_COL;
+  if (a < 0 || b > max) return null;
   return axis === 'row' ? { ...range, r0: a, r1: b } : { ...range, c0: a, c1: b };
 }
 
@@ -285,6 +470,33 @@ function shiftFilterCriteria(
   return out;
 }
 
+function mergeRangesForSheet(state: State, sheet: number): Range[] {
+  return [...state.merges.byAnchor.values()]
+    .filter((range) => range.sheet === sheet)
+    .map((range) => ({ ...range }));
+}
+
+function sameMergeRanges(a: readonly Range[], b: readonly Range[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((left, index) => {
+    const right = b[index];
+    return (
+      right !== undefined &&
+      left.sheet === right.sheet &&
+      left.r0 === right.r0 &&
+      left.c0 === right.c0 &&
+      left.r1 === right.r1 &&
+      left.c1 === right.c1
+    );
+  });
+}
+
+function syncMergesToEngine(wb: WorkbookHandle, sheet: number, ranges: readonly Range[]): void {
+  if (!wb.capabilities.merges) return;
+  wb.engineClearMerges(sheet);
+  for (const range of ranges) wb.engineAddMerge(sheet, range);
+}
+
 /** Re-point merges, conditional-format ranges, and the autofilter region after
  *  a row/col insert or delete so they track the cells they annotate. Each
  *  concern records its own history entry inside the surrounding transaction. */
@@ -296,10 +508,11 @@ function shiftAnchoredRanges(
   axis: 'row' | 'col',
   split: number,
   delta: number,
+  nativeAxisOp: boolean,
 ): void {
   // Merges: rebuild both lookup maps from the shifted anchors. A merge fully
   // inside a deleted band, or collapsed to a single cell, is dropped.
-  recordMergesChangeWithEngine(history, store, wb, sheet, () => {
+  const mutateMerges = (): void => {
     store.setState((s) => {
       const byAnchor = new Map<string, Range>();
       const byCell = new Map<string, string>();
@@ -318,7 +531,30 @@ function shiftAnchoredRanges(
       }
       return { ...s, merges: { byAnchor, byCell } };
     });
-  });
+  };
+  // A native axis edit already moves merges inside the engine. During undo the
+  // merge history entry runs before the inverse axis operation, so syncing the
+  // engine here would make the native operation move the restored ranges a
+  // second time. The native axis history entry restores the exact engine merge
+  // snapshot after its inverse; the JS fallback still mirrors the store here.
+  if (nativeAxisOp) {
+    recordMergesChange(history, store, mutateMerges);
+    const afterMerges = mergeRangesForSheet(store.getState(), sheet);
+    // Native engines generally move merges correctly, but a merge reduced to
+    // one cell is still reported by some versions. Excel removes that merge,
+    // so reconcile the native result with the store's range normalization.
+    if (wb.capabilities.merges && !sameMergeRanges(wb.getMerges(sheet), afterMerges)) {
+      syncMergesToEngine(wb, sheet, afterMerges);
+      if (history && !history.isReplaying()) {
+        history.push({
+          undo: () => {},
+          redo: () => syncMergesToEngine(wb, sheet, afterMerges),
+        });
+      }
+    }
+  } else {
+    recordMergesChangeWithEngine(history, store, wb, sheet, mutateMerges);
+  }
 
   // Conditional formats: shift each rule's range; drop rules whose range is
   // fully consumed by a deletion.
@@ -340,20 +576,28 @@ function shiftAnchoredRanges(
 
   // Copy marquee. Transient UI state that history never captures, so it is
   // shifted outside the recorders — otherwise the outline would keep pointing
-  // at the source's pre-shift indices.
-  store.setState((s) => {
-    const shiftMarquee = (range: Range): Range | null =>
-      range.sheet === sheet ? shiftRangeAxis(range, axis, split, delta) : range;
-    const copyRange = s.ui.copyRange ? shiftMarquee(s.ui.copyRange) : null;
-    const copyRanges = s.ui.copyRanges
-      ? s.ui.copyRanges.map(shiftMarquee).filter((r): r is Range => r !== null)
-      : null;
-    if (copyRange === s.ui.copyRange && copyRanges === s.ui.copyRanges) return s;
-    return {
-      ...s,
-      ui: { ...s.ui, copyRange, copyRanges: copyRanges?.length ? copyRanges : null },
-    };
-  });
+  // at the source's pre-shift indices. A cut payload keeps its original source
+  // coordinates until paste; a successful structure edit invalidates that
+  // payload, so Excel cancels the cut marquee instead of shifting it.
+  const copyUi = store.getState().ui;
+  if (copyUi.copyMode === 'cut') {
+    if (copyUi.copyRanges) mutators.setCopyRanges(store, null);
+    else mutators.setCopyRange(store, null);
+  } else {
+    store.setState((s) => {
+      const shiftMarquee = (range: Range): Range | null =>
+        range.sheet === sheet ? shiftRangeAxis(range, axis, split, delta) : range;
+      const copyRange = s.ui.copyRange ? shiftMarquee(s.ui.copyRange) : null;
+      const copyRanges = s.ui.copyRanges
+        ? s.ui.copyRanges.map(shiftMarquee).filter((r): r is Range => r !== null)
+        : null;
+      if (copyRange === s.ui.copyRange && copyRanges === s.ui.copyRanges) return s;
+      return {
+        ...s,
+        ui: { ...s.ui, copyRange, copyRanges: copyRanges?.length ? copyRanges : null },
+      };
+    });
+  }
 
   // Autofilter region + per-column criteria.
   recordFilterChange(history, store, () => {
@@ -389,54 +633,88 @@ function applyAxisShiftViaEngine(
   axis: 'row' | 'col',
   split: number,
   delta: number,
-): void {
-  if (delta === 0) return;
+): boolean {
+  if (delta === 0) return true;
   const positive = delta > 0;
   const count = Math.abs(delta);
+  const record = history !== null && !history.isReplaying();
 
   // For delete (delta < 0), capture cells in the band so undo can rewrite
   // them. Insert is fully invertible by the opposite engine op alone.
   const captured: CellRecord[] = [];
-  if (!positive) {
+  const originalFormulas: FormulaRecord[] = [];
+  if (!positive && record) {
     for (const c of wb.cells(sheet)) {
       const k = axis === 'row' ? c.addr.row : c.addr.col;
       if (k >= split && k < split + count) {
         captured.push({ addr: c.addr, value: c.value, formula: c.formula });
       }
     }
+    originalFormulas.push(...collectAllFormulas(wb));
   }
 
-  const apply = (): void => {
-    if (positive) {
-      if (axis === 'row') wb.engineInsertRows(sheet, split, count);
-      else wb.engineInsertCols(sheet, split, count);
+  const canRestoreMerges = record && wb.capabilities.merges;
+  const beforeMerges = canRestoreMerges ? wb.getMerges(sheet) : [];
+  let afterMerges: Range[] = [];
+  let initialApply = true;
+
+  const runNativeOp = (insert: boolean): boolean => {
+    let ok = false;
+    if (insert) {
+      ok =
+        axis === 'row'
+          ? wb.engineInsertRows(sheet, split, count)
+          : wb.engineInsertCols(sheet, split, count);
     } else {
-      if (axis === 'row') wb.engineDeleteRows(sheet, split, count);
-      else wb.engineDeleteCols(sheet, split, count);
+      ok =
+        axis === 'row'
+          ? wb.engineDeleteRows(sheet, split, count)
+          : wb.engineDeleteCols(sheet, split, count);
     }
+    if (!ok) return false;
     wb.recalcAuto();
+    return true;
+  };
+
+  const restoreMerges = (snapshot: readonly Range[]): void => {
+    if (!canRestoreMerges) return;
+    if (!wb.engineClearMerges(sheet)) throw new Error('structure: failed to restore merges');
+    for (const merge of snapshot) {
+      if (!wb.engineAddMerge(sheet, merge)) throw new Error('structure: failed to restore merge');
+    }
+  };
+
+  const apply = (): void => {
+    if (!runNativeOp(positive)) throw new Error('structure: native axis edit failed');
+    if (canRestoreMerges) {
+      if (initialApply) afterMerges = wb.getMerges(sheet);
+      else restoreMerges(afterMerges);
+    }
+    initialApply = false;
   };
   const invert = (): void => {
-    if (positive) {
-      if (axis === 'row') wb.engineDeleteRows(sheet, split, count);
-      else wb.engineDeleteCols(sheet, split, count);
-    } else {
-      if (axis === 'row') wb.engineInsertRows(sheet, split, count);
-      else wb.engineInsertCols(sheet, split, count);
-      // Restore captured cells. wb.setX runs through the per-cell journal,
-      // but History.replaying short-circuits the push so no extra entries
-      // are recorded.
+    if (!runNativeOp(!positive)) throw new Error('structure: native axis undo failed');
+    if (canRestoreMerges) restoreMerges(beforeMerges);
+
+    if (!positive) {
+      // Restore the deleted band and every original formula. The native
+      // inverse recreates the row/column slots, but #REF! replacements made
+      // by the delete cannot be reconstructed by that inverse alone.
       wb.withBatchedRecalc(() => {
         for (const c of captured) writeCell(wb, c.addr, c.value, c.formula);
+        for (const entry of originalFormulas) wb.setFormula(entry.addr, entry.formula);
       });
     }
     wb.recalcAuto();
   };
 
-  apply();
-  if (history && !history.isReplaying()) {
+  if (!runNativeOp(positive)) return false;
+  if (canRestoreMerges) afterMerges = wb.getMerges(sheet);
+  initialApply = false;
+  if (record) {
     history.push({ undo: invert, redo: apply });
   }
+  return true;
 }
 
 /** Insert `count` blank rows at `atRow` on the active sheet. Cells, formats,
@@ -452,41 +730,55 @@ export function insertRows(
   atRow: number,
   count = 1,
 ): void {
-  if (count <= 0) return;
+  const edit = normalizeAxisEdit(atRow, count, MAX_ROW, 'insert');
+  if (!edit) return;
+  const row = edit.at;
+  const n = edit.count;
   const sheet = store.getState().data.sheetIndex;
   if (blockedByProtection(store, sheet, 'insertRows')) return;
+  if (insertionWouldOverflow(store, wb, sheet, 'row', row, n)) return;
+  const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;
 
   if (history) history.begin();
   try {
     // 1. shift cells & rewrite formula refs.
-    if (wb.capabilities.insertDeleteRowsCols) {
-      applyAxisShiftViaEngine(wb, history, sheet, 'row', atRow, count);
+    if (nativeAxisOp) {
+      if (!applyAxisShiftViaEngine(wb, history, sheet, 'row', row, n)) return;
     } else {
-      applyAxisShiftToCells(wb, sheet, 'row', atRow, count);
+      applyAxisShiftToCells(wb, sheet, 'row', row, n);
     }
 
     // 2. shift formats.
     recordFormatChange(history, store, () => {
       store.setState((s) => ({
         ...s,
-        format: { ...s.format, formats: shiftFormatsByRow(s.format.formats, sheet, atRow, count) },
+        format: {
+          ...s.format,
+          formats: inheritFormatsByRow(
+            s.format.formats,
+            shiftFormatsByRow(s.format.formats, sheet, row, n),
+            sheet,
+            row,
+            n,
+          ),
+        },
       }));
     });
 
     // 3. shift layout (rowHeights map, hiddenRows set, freezeRows count).
     recordLayoutChange(history, store, () => {
       const before = captureLayoutSnapshot(store.getState());
-      const fr = before.freezeRows > atRow ? before.freezeRows + count : before.freezeRows;
+      const fr = before.freezeRows > row ? before.freezeRows + n : before.freezeRows;
       applyLayoutPatch(store, {
-        rowHeights: shiftIndexedMap(before.rowHeights, atRow, count),
-        hiddenRows: shiftIndexedSet(before.hiddenRows, atRow, count),
-        outlineRows: shiftIndexedMap(before.outlineRows, atRow, count),
+        rowHeights: shiftIndexedMapWithInheritance(before.rowHeights, row, n, n, MAX_ROW),
+        hiddenRows: shiftIndexedSet(before.hiddenRows, row, n, MAX_ROW),
+        outlineRows: shiftIndexedMap(before.outlineRows, row, n, MAX_ROW),
         freezeRows: fr,
       });
     });
 
     // 4. re-point merges, conditional formats, and the autofilter region.
-    shiftAnchoredRanges(store, wb, history, sheet, 'row', atRow, count);
+    shiftAnchoredRanges(store, wb, history, sheet, 'row', row, n, nativeAxisOp);
   } finally {
     if (history) history.end();
   }
@@ -499,41 +791,42 @@ export function deleteRows(
   atRow: number,
   count = 1,
 ): void {
-  if (count <= 0) return;
+  const edit = normalizeAxisEdit(atRow, count, MAX_ROW, 'delete');
+  if (!edit) return;
+  const row = edit.at;
+  const n = edit.count;
   const sheet = store.getState().data.sheetIndex;
   if (blockedByProtection(store, sheet, 'deleteRows')) return;
-  // Cap count so we don't try to delete past MAX_ROW.
-  const n = Math.min(count, MAX_ROW + 1 - atRow);
-  if (n <= 0) return;
+  const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;
 
   if (history) history.begin();
   try {
-    if (wb.capabilities.insertDeleteRowsCols) {
-      applyAxisShiftViaEngine(wb, history, sheet, 'row', atRow, -n);
+    if (nativeAxisOp) {
+      if (!applyAxisShiftViaEngine(wb, history, sheet, 'row', row, -n)) return;
     } else {
-      applyAxisShiftToCells(wb, sheet, 'row', atRow, -n);
+      applyAxisShiftToCells(wb, sheet, 'row', row, -n);
     }
 
     recordFormatChange(history, store, () => {
       store.setState((s) => ({
         ...s,
-        format: { ...s.format, formats: shiftFormatsByRow(s.format.formats, sheet, atRow, -n) },
+        format: { ...s.format, formats: shiftFormatsByRow(s.format.formats, sheet, row, -n) },
       }));
     });
 
     recordLayoutChange(history, store, () => {
       const before = captureLayoutSnapshot(store.getState());
       let fr = before.freezeRows;
-      if (fr > atRow) fr = Math.max(atRow, fr - n);
+      if (fr > row) fr = Math.max(row, fr - n);
       applyLayoutPatch(store, {
-        rowHeights: shiftIndexedMap(before.rowHeights, atRow, -n),
-        hiddenRows: shiftIndexedSet(before.hiddenRows, atRow, -n),
-        outlineRows: shiftIndexedMap(before.outlineRows, atRow, -n),
+        rowHeights: shiftIndexedMap(before.rowHeights, row, -n, MAX_ROW),
+        hiddenRows: shiftIndexedSet(before.hiddenRows, row, -n, MAX_ROW),
+        outlineRows: shiftIndexedMap(before.outlineRows, row, -n, MAX_ROW),
         freezeRows: fr,
       });
     });
 
-    shiftAnchoredRanges(store, wb, history, sheet, 'row', atRow, -n);
+    shiftAnchoredRanges(store, wb, history, sheet, 'row', row, -n, nativeAxisOp);
   } finally {
     if (history) history.end();
   }
@@ -546,37 +839,51 @@ export function insertCols(
   atCol: number,
   count = 1,
 ): void {
-  if (count <= 0) return;
+  const edit = normalizeAxisEdit(atCol, count, MAX_COL, 'insert');
+  if (!edit) return;
+  const col = edit.at;
+  const n = edit.count;
   const sheet = store.getState().data.sheetIndex;
   if (blockedByProtection(store, sheet, 'insertCols')) return;
+  if (insertionWouldOverflow(store, wb, sheet, 'col', col, n)) return;
+  const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;
 
   if (history) history.begin();
   try {
-    if (wb.capabilities.insertDeleteRowsCols) {
-      applyAxisShiftViaEngine(wb, history, sheet, 'col', atCol, count);
+    if (nativeAxisOp) {
+      if (!applyAxisShiftViaEngine(wb, history, sheet, 'col', col, n)) return;
     } else {
-      applyAxisShiftToCells(wb, sheet, 'col', atCol, count);
+      applyAxisShiftToCells(wb, sheet, 'col', col, n);
     }
 
     recordFormatChange(history, store, () => {
       store.setState((s) => ({
         ...s,
-        format: { ...s.format, formats: shiftFormatsByCol(s.format.formats, sheet, atCol, count) },
+        format: {
+          ...s.format,
+          formats: inheritFormatsByCol(
+            s.format.formats,
+            shiftFormatsByCol(s.format.formats, sheet, col, n),
+            sheet,
+            col,
+            n,
+          ),
+        },
       }));
     });
 
     recordLayoutChange(history, store, () => {
       const before = captureLayoutSnapshot(store.getState());
-      const fc = before.freezeCols > atCol ? before.freezeCols + count : before.freezeCols;
+      const fc = before.freezeCols > col ? before.freezeCols + n : before.freezeCols;
       applyLayoutPatch(store, {
-        colWidths: shiftIndexedMap(before.colWidths, atCol, count),
-        hiddenCols: shiftIndexedSet(before.hiddenCols, atCol, count),
-        outlineCols: shiftIndexedMap(before.outlineCols, atCol, count),
+        colWidths: shiftIndexedMapWithInheritance(before.colWidths, col, n, n, MAX_COL),
+        hiddenCols: shiftIndexedSet(before.hiddenCols, col, n, MAX_COL),
+        outlineCols: shiftIndexedMap(before.outlineCols, col, n, MAX_COL),
         freezeCols: fc,
       });
     });
 
-    shiftAnchoredRanges(store, wb, history, sheet, 'col', atCol, count);
+    shiftAnchoredRanges(store, wb, history, sheet, 'col', col, n, nativeAxisOp);
   } finally {
     if (history) history.end();
   }
@@ -589,40 +896,42 @@ export function deleteCols(
   atCol: number,
   count = 1,
 ): void {
-  if (count <= 0) return;
+  const edit = normalizeAxisEdit(atCol, count, MAX_COL, 'delete');
+  if (!edit) return;
+  const col = edit.at;
+  const n = edit.count;
   const sheet = store.getState().data.sheetIndex;
   if (blockedByProtection(store, sheet, 'deleteCols')) return;
-  const n = Math.min(count, MAX_COL + 1 - atCol);
-  if (n <= 0) return;
+  const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;
 
   if (history) history.begin();
   try {
-    if (wb.capabilities.insertDeleteRowsCols) {
-      applyAxisShiftViaEngine(wb, history, sheet, 'col', atCol, -n);
+    if (nativeAxisOp) {
+      if (!applyAxisShiftViaEngine(wb, history, sheet, 'col', col, -n)) return;
     } else {
-      applyAxisShiftToCells(wb, sheet, 'col', atCol, -n);
+      applyAxisShiftToCells(wb, sheet, 'col', col, -n);
     }
 
     recordFormatChange(history, store, () => {
       store.setState((s) => ({
         ...s,
-        format: { ...s.format, formats: shiftFormatsByCol(s.format.formats, sheet, atCol, -n) },
+        format: { ...s.format, formats: shiftFormatsByCol(s.format.formats, sheet, col, -n) },
       }));
     });
 
     recordLayoutChange(history, store, () => {
       const before = captureLayoutSnapshot(store.getState());
       let fc = before.freezeCols;
-      if (fc > atCol) fc = Math.max(atCol, fc - n);
+      if (fc > col) fc = Math.max(col, fc - n);
       applyLayoutPatch(store, {
-        colWidths: shiftIndexedMap(before.colWidths, atCol, -n),
-        hiddenCols: shiftIndexedSet(before.hiddenCols, atCol, -n),
-        outlineCols: shiftIndexedMap(before.outlineCols, atCol, -n),
+        colWidths: shiftIndexedMap(before.colWidths, col, -n, MAX_COL),
+        hiddenCols: shiftIndexedSet(before.hiddenCols, col, -n, MAX_COL),
+        outlineCols: shiftIndexedMap(before.outlineCols, col, -n, MAX_COL),
         freezeCols: fc,
       });
     });
 
-    shiftAnchoredRanges(store, wb, history, sheet, 'col', atCol, -n);
+    shiftAnchoredRanges(store, wb, history, sheet, 'col', col, -n, nativeAxisOp);
   } finally {
     if (history) history.end();
   }

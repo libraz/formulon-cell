@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { pasteSpecial } from '../../../../src/commands/clipboard/paste-special.js';
 import { captureSnapshot } from '../../../../src/commands/clipboard/snapshot.js';
+import { History } from '../../../../src/commands/history.js';
 import { addrKey, WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
 import {
   createSpreadsheetStore,
@@ -41,13 +42,13 @@ const seedAndMirror = (
   wb.recalc();
 };
 
-const setActive = (store: SpreadsheetStore, row: number, col: number): void => {
+const setActive = (store: SpreadsheetStore, row: number, col: number, sheet = 0): void => {
   store.setState((s) => ({
     ...s,
     selection: {
-      active: { sheet: 0, row, col },
-      anchor: { sheet: 0, row, col },
-      range: { sheet: 0, r0: row, c0: col, r1: row, c1: col },
+      active: { sheet, row, col },
+      anchor: { sheet, row, col },
+      range: { sheet, r0: row, c0: col, r1: row, c1: col },
     },
   }));
 };
@@ -91,7 +92,7 @@ describe('pasteSpecial', () => {
     expect(wb.getValue({ sheet: 0, row: 5, col: 6 })).toEqual({ kind: 'text', value: 'hi' });
   });
 
-  it('"formulas" mode pastes formulas, not values', () => {
+  it('"formulas" mode preserves a formula instead of replacing it with its result', () => {
     seedAndMirror(store, wb, [{ row: 0, col: 0, value: 5, formula: '=2+3' }]);
     const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
     setActive(store, 3, 3);
@@ -104,6 +105,31 @@ describe('pasteSpecial', () => {
     });
     expect(wb.cellFormula({ sheet: 0, row: 3, col: 3 })).toBe('=2+3');
   });
+
+  it.each(['formulas', 'formulas-and-numfmt'] as const)(
+    '%s pastes numeric, text, and boolean constants',
+    (what) => {
+      seedAndMirror(store, wb, [
+        { row: 0, col: 0, value: 7 },
+        { row: 0, col: 1, value: 'text' },
+      ]);
+      wb.setBool({ sheet: 0, row: 0, col: 2 }, true);
+      wb.recalc();
+      mutators.replaceCells(store, wb.cells(0));
+      const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 });
+      assertSnap(snap);
+      setActive(store, 2, 3);
+      pasteSpecial(store.getState(), store, wb, snap, {
+        what,
+        operation: 'none',
+        skipBlanks: false,
+        transpose: false,
+      });
+      expect(wb.getValue({ sheet: 0, row: 2, col: 3 })).toEqual({ kind: 'number', value: 7 });
+      expect(wb.getValue({ sheet: 0, row: 2, col: 4 })).toEqual({ kind: 'text', value: 'text' });
+      expect(wb.getValue({ sheet: 0, row: 2, col: 5 })).toEqual({ kind: 'bool', value: true });
+    },
+  );
 
   it('"values" mode pastes a formula cell result instead of the formula', () => {
     seedAndMirror(store, wb, [{ row: 0, col: 0, value: 5, formula: '=2+3' }]);
@@ -178,6 +204,101 @@ describe('pasteSpecial', () => {
     expect(wb.cellFormula({ sheet: 0, row: 0, col: 1 })).toBe('=D5*2');
     expect(wb.cellFormula({ sheet: 0, row: 0, col: 2 })).toBe('=D5');
     expect(wb.cellFormula({ sheet: 0, row: 1, col: 0 })).toBe('=$D$5');
+  });
+
+  it('follows cut formulas across sheets and records undo/redo as one move', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 7 },
+      { row: 0, col: 1, value: 7, formula: '=A1' },
+      { row: 0, col: 2, value: 7, formula: '=B1' },
+    ]);
+    const sourceName = wb.sheetName(0);
+    expect(wb.addSheet('Target')).toBe(1);
+    expect(wb.addSheet('Other')).toBe(2);
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 1 }, { bold: true });
+    mutators.setCellFormat(store, { sheet: 1, row: 2, col: 3 }, { italic: true });
+    wb.setFormula({ sheet: 1, row: 0, col: 0 }, `=${sourceName}!B1`);
+    wb.setFormula({ sheet: 2, row: 0, col: 0 }, `=${sourceName}!B1`);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 }, 'cut');
+    assertSnap(snap);
+    // A sheet switch may leave the active-sheet cache without the source
+    // cells. The engine still owns the source payload and must be cleared.
+    store.setState((s) => ({
+      ...s,
+      data: { ...s.data, sheetIndex: 1, cells: new Map() },
+    }));
+    setActive(store, 2, 3, 1);
+
+    const history = new History();
+    wb.attachHistory(history);
+    history.begin();
+    const result = pasteSpecial(
+      store.getState(),
+      store,
+      wb,
+      snap,
+      { what: 'all', operation: 'none', skipBlanks: false, transpose: false },
+      history,
+    );
+    history.end();
+
+    expect(result?.writtenRange).toEqual({ sheet: 1, r0: 2, c0: 3, r1: 2, c1: 3 });
+    expect(wb.getValue({ sheet: 0, row: 0, col: 1 }).kind).toBe('blank');
+    expect(wb.cellFormula({ sheet: 1, row: 2, col: 3 })).toBe(`=${sourceName}!A1`);
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 2 })).toBe('=Target!D3');
+    expect(wb.cellFormula({ sheet: 1, row: 0, col: 0 })).toBe('=D3');
+    expect(wb.cellFormula({ sheet: 2, row: 0, col: 0 })).toBe('=Target!D3');
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 1 })),
+    ).toBeUndefined();
+    expect(store.getState().format.formats.get(addrKey({ sheet: 1, row: 2, col: 3 }))).toEqual({
+      bold: true,
+    });
+
+    expect(history.undo()).toBe(true);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 7 });
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 1 })).toBe('=A1');
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 2 })).toBe('=B1');
+    expect(wb.cellFormula({ sheet: 1, row: 2, col: 3 })).toBeNull();
+    expect(wb.cellFormula({ sheet: 1, row: 0, col: 0 })).toBe(`=${sourceName}!B1`);
+    expect(wb.cellFormula({ sheet: 2, row: 0, col: 0 })).toBe(`=${sourceName}!B1`);
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 1 }))).toEqual({
+      bold: true,
+    });
+    expect(store.getState().format.formats.get(addrKey({ sheet: 1, row: 2, col: 3 }))).toEqual({
+      italic: true,
+    });
+
+    expect(history.redo()).toBe(true);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 1 }).kind).toBe('blank');
+    expect(wb.cellFormula({ sheet: 1, row: 2, col: 3 })).toBe(`=${sourceName}!A1`);
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 2 })).toBe('=Target!D3');
+    expect(wb.cellFormula({ sheet: 1, row: 0, col: 0 })).toBe('=D3');
+    expect(wb.cellFormula({ sheet: 2, row: 0, col: 0 })).toBe('=Target!D3');
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 1 })),
+    ).toBeUndefined();
+    expect(store.getState().format.formats.get(addrKey({ sheet: 1, row: 2, col: 3 }))).toEqual({
+      bold: true,
+    });
+  });
+
+  it('rejects cut Paste Special variants before clearing the source', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, 'cut');
+    assertSnap(snap);
+    setActive(store, 2, 2);
+
+    for (const options of [
+      { what: 'values' as const, operation: 'none' as const, skipBlanks: false, transpose: false },
+      { what: 'all' as const, operation: 'add' as const, skipBlanks: false, transpose: false },
+      { what: 'all' as const, operation: 'none' as const, skipBlanks: true, transpose: false },
+      { what: 'all' as const, operation: 'none' as const, skipBlanks: false, transpose: true },
+    ]) {
+      expect(pasteSpecial(store.getState(), store, wb, snap, options)).toBeNull();
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 7 });
+      expect(wb.getValue({ sheet: 0, row: 2, col: 2 }).kind).toBe('blank');
+    }
   });
 
   it('arithmetic operations combine src and dest numerics', () => {
@@ -304,6 +425,73 @@ describe('pasteSpecial', () => {
     expect(num(wb, 5, 6)).toBe(99);
   });
 
+  it('All clears a destination value and comment for an unformatted blank source', () => {
+    seedAndMirror(store, wb, [{ row: 5, col: 5, value: 99 }]);
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 5, col: 5 },
+      {
+        comment: 'destination note',
+        commentAuthor: 'Bob',
+      },
+    );
+    const snap = captureSnapshot(store.getState(), {
+      sheet: 0,
+      r0: 0,
+      c0: 0,
+      r1: 0,
+      c1: 0,
+    });
+    setActive(store, 5, 5);
+    assertSnap(snap);
+
+    pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'all',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+
+    expect(wb.getValue({ sheet: 0, row: 5, col: 5 })).toEqual({ kind: 'blank' });
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 5, col: 5 }))?.comment,
+    ).toBeUndefined();
+  });
+
+  it('skipBlanks preserves a destination value and comment for a blank source', () => {
+    seedAndMirror(store, wb, [{ row: 5, col: 5, value: 99 }]);
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 5, col: 5 },
+      {
+        comment: 'destination note',
+        commentAuthor: 'Bob',
+      },
+    );
+    const snap = captureSnapshot(store.getState(), {
+      sheet: 0,
+      r0: 0,
+      c0: 0,
+      r1: 0,
+      c1: 0,
+    });
+    setActive(store, 5, 5);
+    assertSnap(snap);
+
+    pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'all',
+      operation: 'none',
+      skipBlanks: true,
+      transpose: false,
+    });
+
+    expect(wb.getValue({ sheet: 0, row: 5, col: 5 })).toEqual({ kind: 'number', value: 99 });
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 5, col: 5 }))).toEqual({
+      comment: 'destination note',
+      commentAuthor: 'Bob',
+    });
+  });
+
   it('transpose swaps rows and cols', () => {
     seedAndMirror(store, wb, [
       { row: 0, col: 0, value: 1 },
@@ -422,5 +610,409 @@ describe('pasteSpecial', () => {
     });
     const sel = store.getState().selection;
     expect(sel.range).toEqual({ sheet: 0, r0: 7, c0: 8, r1: 7, c1: 9 });
+  });
+
+  it('pastes All with source merge topology and preserves the anchor value', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
+    const sourceMerge = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
+    mutators.mergeRange(store, sourceMerge);
+    wb.engineAddMerge(0, sourceMerge);
+    const snap = captureSnapshot(store.getState(), sourceMerge);
+    setActive(store, 3, 3);
+    assertSnap(snap);
+
+    const result = pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'all',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+    wb.recalc();
+
+    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 3, c0: 3, r1: 4, c1: 4 });
+    expect(store.getState().merges.byAnchor.get(addrKey({ sheet: 0, row: 3, col: 3 }))).toEqual({
+      sheet: 0,
+      r0: 3,
+      c0: 3,
+      r1: 4,
+      c1: 4,
+    });
+    expect(wb.getValue({ sheet: 0, row: 3, col: 3 })).toEqual({ kind: 'number', value: 7 });
+  });
+
+  it('Formats pastes merge topology without values', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
+    const sourceMerge = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
+    mutators.mergeRange(store, sourceMerge);
+    wb.engineAddMerge(0, sourceMerge);
+    const snap = captureSnapshot(store.getState(), sourceMerge);
+    setActive(store, 3, 3);
+    assertSnap(snap);
+
+    pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'formats',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+    wb.recalc();
+
+    expect(store.getState().merges.byAnchor.get(addrKey({ sheet: 0, row: 3, col: 3 }))).toEqual({
+      sheet: 0,
+      r0: 3,
+      c0: 3,
+      r1: 4,
+      c1: 4,
+    });
+    expect(wb.getValue({ sheet: 0, row: 3, col: 3 }).kind).toBe('blank');
+  });
+
+  it('Values does not import source merge topology', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
+    const sourceMerge = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
+    mutators.mergeRange(store, sourceMerge);
+    wb.engineAddMerge(0, sourceMerge);
+    const snap = captureSnapshot(store.getState(), sourceMerge);
+    setActive(store, 3, 3);
+    assertSnap(snap);
+
+    pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'values',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+
+    expect(store.getState().merges.byAnchor.has(addrKey({ sheet: 0, row: 3, col: 3 }))).toBe(false);
+    expect(wb.getValue({ sheet: 0, row: 3, col: 3 })).toEqual({ kind: 'number', value: 7 });
+  });
+
+  it('rejects a partial destination merge before mutating the grid', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
+    const sourceMerge = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
+    mutators.mergeRange(store, sourceMerge);
+    wb.engineAddMerge(0, sourceMerge);
+    const destinationMerge = { sheet: 0, r0: 2, c0: 2, r1: 4, c1: 4 };
+    mutators.mergeRange(store, destinationMerge);
+    wb.engineAddMerge(0, destinationMerge);
+    const snap = captureSnapshot(store.getState(), sourceMerge);
+    setActive(store, 3, 3);
+    assertSnap(snap);
+
+    const result = pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'all',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+
+    expect(result).toBeNull();
+    expect(store.getState().merges.byAnchor.get(addrKey({ sheet: 0, row: 2, col: 2 }))).toEqual(
+      destinationMerge,
+    );
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 7 });
+  });
+
+  it('removes a fully-contained destination merge for an unmerged All paste', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
+    const destinationMerge = { sheet: 0, r0: 3, c0: 3, r1: 4, c1: 4 };
+    mutators.mergeRange(store, destinationMerge);
+    wb.engineAddMerge(0, destinationMerge);
+    const snap = captureSnapshot(store.getState(), {
+      sheet: 0,
+      r0: 0,
+      c0: 0,
+      r1: 1,
+      c1: 1,
+    });
+    setActive(store, 3, 3);
+    assertSnap(snap);
+
+    pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'all',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+
+    expect(store.getState().merges.byAnchor.has(addrKey({ sheet: 0, row: 3, col: 3 }))).toBe(false);
+    expect(wb.getValue({ sheet: 0, row: 3, col: 3 })).toEqual({ kind: 'number', value: 7 });
+  });
+
+  it('keeps a fully-contained destination merge for a Values paste', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
+    const destinationMerge = { sheet: 0, r0: 3, c0: 3, r1: 4, c1: 4 };
+    mutators.mergeRange(store, destinationMerge);
+    wb.engineAddMerge(0, destinationMerge);
+    const snap = captureSnapshot(store.getState(), {
+      sheet: 0,
+      r0: 0,
+      c0: 0,
+      r1: 1,
+      c1: 1,
+    });
+    setActive(store, 3, 3);
+    assertSnap(snap);
+
+    expect(() =>
+      pasteSpecial(store.getState(), store, wb, snap, {
+        what: 'values',
+        operation: 'none',
+        skipBlanks: false,
+        transpose: false,
+      }),
+    ).not.toThrow();
+    expect(store.getState().merges.byAnchor.get(addrKey({ sheet: 0, row: 3, col: 3 }))).toEqual(
+      destinationMerge,
+    );
+  });
+
+  it('defers cut clearing and supports an overlapping move from the snapshot', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 1 },
+      { row: 0, col: 1, value: 2 },
+    ]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 }, 'cut');
+    assertSnap(snap);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 1 });
+    setActive(store, 0, 1);
+
+    pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'all',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+    wb.recalc();
+
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
+    expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 1 });
+    expect(wb.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({ kind: 'number', value: 2 });
+  });
+
+  it('moves cut merge topology and source formatting with the payload', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { bold: true });
+    const sourceMerge = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
+    mutators.mergeRange(store, sourceMerge);
+    wb.engineAddMerge(0, sourceMerge);
+    const snap = captureSnapshot(store.getState(), sourceMerge, 'cut');
+    setActive(store, 3, 3);
+    assertSnap(snap);
+
+    pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'all',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+    wb.recalc();
+
+    expect(store.getState().merges.byAnchor.has(addrKey({ sheet: 0, row: 0, col: 0 }))).toBe(false);
+    expect(store.getState().merges.byAnchor.has(addrKey({ sheet: 0, row: 3, col: 3 }))).toBe(true);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
+    expect(wb.getValue({ sheet: 0, row: 3, col: 3 })).toEqual({ kind: 'number', value: 7 });
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 })),
+    ).toBeUndefined();
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 3, col: 3 }))?.bold).toBe(
+      true,
+    );
+  });
+
+  it('undoes a merged copy as one history action', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
+    const sourceMerge = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
+    mutators.mergeRange(store, sourceMerge);
+    wb.engineAddMerge(0, sourceMerge);
+    const snap = captureSnapshot(store.getState(), sourceMerge);
+    assertSnap(snap);
+    setActive(store, 3, 3);
+    const history = new History();
+    wb.attachHistory(history);
+    history.begin();
+    pasteSpecial(
+      store.getState(),
+      store,
+      wb,
+      snap,
+      { what: 'all', operation: 'none', skipBlanks: false, transpose: false },
+      history,
+    );
+    history.end();
+
+    expect(history.undo()).toBe(true);
+    expect(store.getState().merges.byAnchor.has(addrKey({ sheet: 0, row: 3, col: 3 }))).toBe(false);
+    expect(store.getState().merges.byAnchor.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toEqual(
+      sourceMerge,
+    );
+  });
+
+  it('copies All comments and authors with the source payload', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 7 },
+      { row: 3, col: 3, value: 11 },
+    ]);
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        bold: true,
+        comment: 'source note',
+        commentAuthor: 'Alice',
+      },
+    );
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 3, col: 3 },
+      {
+        italic: true,
+        comment: 'destination note',
+        commentAuthor: 'Bob',
+      },
+    );
+    const snap = captureSnapshot(store.getState(), {
+      sheet: 0,
+      r0: 0,
+      c0: 0,
+      r1: 0,
+      c1: 0,
+    });
+    setActive(store, 3, 3);
+    assertSnap(snap);
+
+    pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'all',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toEqual({
+      bold: true,
+      comment: 'source note',
+      commentAuthor: 'Alice',
+    });
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 3, col: 3 }))).toEqual({
+      bold: true,
+      comment: 'source note',
+      commentAuthor: 'Alice',
+    });
+  });
+
+  it('Formats paste preserves destination comment metadata', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        bold: true,
+        comment: 'source note',
+        commentAuthor: 'Alice',
+      },
+    );
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 3, col: 3 },
+      {
+        italic: true,
+        comment: 'destination note',
+        commentAuthor: 'Bob',
+      },
+    );
+    const snap = captureSnapshot(store.getState(), {
+      sheet: 0,
+      r0: 0,
+      c0: 0,
+      r1: 0,
+      c1: 0,
+    });
+    setActive(store, 3, 3);
+    assertSnap(snap);
+
+    pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'formats',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 3, col: 3 }))).toEqual({
+      bold: true,
+      comment: 'destination note',
+      commentAuthor: 'Bob',
+    });
+  });
+
+  it('cuts All comments and restores them with one undo action', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 7 },
+      { row: 3, col: 3, value: 11 },
+    ]);
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 0, col: 0 },
+      {
+        comment: 'source note',
+        commentAuthor: 'Alice',
+      },
+    );
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 3, col: 3 },
+      {
+        comment: 'destination note',
+        commentAuthor: 'Bob',
+      },
+    );
+    const snap = captureSnapshot(
+      store.getState(),
+      {
+        sheet: 0,
+        r0: 0,
+        c0: 0,
+        r1: 0,
+        c1: 0,
+      },
+      'cut',
+    );
+    setActive(store, 3, 3);
+    assertSnap(snap);
+    const history = new History();
+    history.begin();
+    pasteSpecial(
+      store.getState(),
+      store,
+      wb,
+      snap,
+      { what: 'all', operation: 'none', skipBlanks: false, transpose: false },
+      history,
+    );
+    history.end();
+
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.comment,
+    ).toBeUndefined();
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 3, col: 3 }))).toEqual({
+      comment: 'source note',
+      commentAuthor: 'Alice',
+    });
+    expect(history.undo()).toBe(true);
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toEqual({
+      comment: 'source note',
+      commentAuthor: 'Alice',
+    });
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 3, col: 3 }))).toEqual({
+      comment: 'destination note',
+      commentAuthor: 'Bob',
+    });
+    expect(history.redo()).toBe(true);
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.comment,
+    ).toBeUndefined();
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 3, col: 3 }))).toEqual({
+      comment: 'source note',
+      commentAuthor: 'Alice',
+    });
   });
 });

@@ -39,11 +39,37 @@ export function encodeHtml(state: State, range: Range): string {
   if (rowsCount <= 0 || colsCount <= 0) return '<table></table>';
   if (rowsCount * colsCount > MAX_HTML_CLIPBOARD_CELLS) return '';
 
+  // HTML tables represent Excel's merged cells with rowspan/colspan. Keep
+  // only merges fully contained by the materialized range; a partial source
+  // merge cannot be represented without changing the selected rectangle.
+  const mergeByAnchor = new Map<string, Range>();
+  const coveredByMerge = new Set<string>();
+  for (const merge of state.merges.byAnchor.values()) {
+    if (
+      merge.sheet !== range.sheet ||
+      merge.r0 < range.r0 ||
+      merge.c0 < range.c0 ||
+      merge.r1 > range.r1 ||
+      merge.c1 > range.c1
+    ) {
+      continue;
+    }
+    const anchorKey = addrKey({ sheet: merge.sheet, row: merge.r0, col: merge.c0 });
+    mergeByAnchor.set(anchorKey, merge);
+    for (let r = merge.r0; r <= merge.r1; r += 1) {
+      for (let c = merge.c0; c <= merge.c1; c += 1) {
+        if (r === merge.r0 && c === merge.c0) continue;
+        coveredByMerge.add(addrKey({ sheet: merge.sheet, row: r, col: c }));
+      }
+    }
+  }
+
   const rows: string[] = [];
   for (let r = range.r0; r <= range.r1; r += 1) {
     const cells: string[] = [];
     for (let c = range.c0; c <= range.c1; c += 1) {
       const key = addrKey({ sheet: range.sheet, row: r, col: c });
+      if (coveredByMerge.has(key)) continue;
       const cell = state.data.cells.get(key);
       const fmt = state.format.formats.get(key);
       // Formula cells emit their formula text verbatim (`=...`); Excel and
@@ -63,7 +89,11 @@ export function encodeHtml(state: State, range: Range): string {
       const body = fmt?.hyperlink
         ? `<a href="${escapeHtml(fmt.hyperlink)}">${escapeHtml(text)}</a>`
         : escapeHtml(text);
-      cells.push(`<td${styleAttr}>${body}</td>`);
+      const merge = mergeByAnchor.get(key);
+      const spanAttrs = merge
+        ? ` rowspan="${merge.r1 - merge.r0 + 1}" colspan="${merge.c1 - merge.c0 + 1}"`
+        : '';
+      cells.push(`<td${spanAttrs}${styleAttr}>${body}</td>`);
     }
     rows.push(`<tr>${cells.join('')}</tr>`);
   }

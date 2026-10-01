@@ -204,6 +204,26 @@ describe('insertRows', () => {
     expect(cellNumber(wb, 0, 1, 0)).toBe(20);
   });
 
+  it('rejects non-integer and out-of-grid insertion origins', () => {
+    wb.setNumber({ sheet: 0, row: 1_048_575, col: 0 }, 77);
+    insertRows(store, wb, null, 1_048_575, 1);
+    insertRows(store, wb, null, 1.5, 1);
+    insertRows(store, wb, null, Number.NaN, 1);
+    expect(cellNumber(wb, 0, 1_048_575, 0)).toBe(77);
+  });
+
+  it('rejects an insertion that would push a populated tail row or column off-grid', () => {
+    const h = new History();
+    wb.setText({ sheet: 0, row: 1_048_575, col: 0 }, 'tail row');
+    insertRows(store, wb, h, 1_048_574, 1);
+    expect(cellText(wb, 0, 1_048_575, 0)).toBe('tail row');
+
+    wb.setText({ sheet: 0, row: 0, col: 16_383 }, 'tail col');
+    insertCols(store, wb, h, 16_382, 1);
+    expect(cellText(wb, 0, 0, 16_383)).toBe('tail col');
+    expect(h.canUndo()).toBe(false);
+  });
+
   it('round-trips with history', () => {
     const h = new History();
     wb.attachHistory(h);
@@ -519,16 +539,16 @@ describe('shiftFormulaRefs', () => {
     expect(shift('=A1+C1', 'col', 1, 1)).toBe('=A1+D1');
   });
 
-  it('preserves absolute refs', () => {
-    expect(shift('=$A$1+B5', 'row', 0, 1)).toBe('=$A$1+B6');
-    expect(shift('=A$1+B5', 'row', 0, 1)).toBe('=A$1+B6');
+  it('shifts row and column refs, including absolute axes', () => {
+    expect(shift('=$A$1+B5', 'row', 0, 1)).toBe('=$A$2+B6');
+    expect(shift('=A$1+B5', 'row', 0, 1)).toBe('=A$2+B6');
     expect(shift('=$A1+$B5', 'row', 0, 1)).toBe('=$A2+$B6');
-    expect(shift('=$A$1+$B$5', 'col', 0, 2)).toBe('=$A$1+$B$5');
+    expect(shift('=$A$1+$B$5', 'col', 0, 2)).toBe('=$C$1+$D$5');
   });
 
   it('handles ranges', () => {
     expect(shift('=SUM(A1:A10)', 'row', 0, 2)).toBe('=SUM(A3:A12)');
-    expect(shift('=SUM($A$1:$A$10)', 'row', 0, 2)).toBe('=SUM($A$1:$A$10)');
+    expect(shift('=SUM($A$1:$A$10)', 'row', 0, 2)).toBe('=SUM($A$3:$A$12)');
   });
 
   it('produces #REF! for refs in deleted band', () => {
@@ -800,7 +820,10 @@ describe('insertRows / deleteRows / insertCols / deleteCols engine path', () => 
     recalcs: number;
     setNumberCalls: { sheet: number; row: number; col: number; value: number }[];
   }
-  const makeWb = (cells: FakeCell[] = []): { wb: WorkbookHandle; calls: FakeWb } => {
+  const makeWb = (
+    cells: FakeCell[] = [],
+    nativeOk = true,
+  ): { wb: WorkbookHandle; calls: FakeWb } => {
     const calls: FakeWb = {
       insertR: [],
       deleteR: [],
@@ -823,19 +846,19 @@ describe('insertRows / deleteRows / insertCols / deleteCols engine path', () => 
       withBatchedRecalc: <T>(fn: () => T): T => fn(),
       engineInsertRows: (sheet: number, row: number, count: number) => {
         calls.insertR.push({ sheet, row, count });
-        return true;
+        return nativeOk;
       },
       engineDeleteRows: (sheet: number, row: number, count: number) => {
         calls.deleteR.push({ sheet, row, count });
-        return true;
+        return nativeOk;
       },
       engineInsertCols: (sheet: number, col: number, count: number) => {
         calls.insertC.push({ sheet, col, count });
-        return true;
+        return nativeOk;
       },
       engineDeleteCols: (sheet: number, col: number, count: number) => {
         calls.deleteC.push({ sheet, col, count });
-        return true;
+        return nativeOk;
       },
       setNumber: (a: { sheet: number; row: number; col: number }, value: number) => {
         calls.setNumberCalls.push({ sheet: a.sheet, row: a.row, col: a.col, value });
@@ -854,6 +877,51 @@ describe('insertRows / deleteRows / insertCols / deleteCols engine path', () => 
     insertRows(store, wb, null, 2, 3);
     expect(calls.insertR).toEqual([{ sheet: 0, row: 2, count: 3 }]);
     expect(calls.deleteR).toEqual([]);
+  });
+
+  it('leaves store and history untouched when the native op refuses', () => {
+    const store = createSpreadsheetStore();
+    const { wb, calls } = makeWb([], false);
+    mutators.setCellFormat(store, { sheet: 0, row: 2, col: 0 }, { bold: true });
+    store.setState((s) => ({
+      ...s,
+      layout: { ...s.layout, rowHeights: new Map([[2, 42]]) },
+    }));
+    const cutRange = { sheet: 0, r0: 2, c0: 0, r1: 2, c1: 0 };
+    mutators.setCopyRange(store, cutRange, 'cut');
+    const copyRevision = store.getState().ui.copyRevision;
+    const before = store.getState();
+    const h = new History();
+    insertRows(store, wb, h, 2, 1);
+    expect(calls.insertR).toEqual([{ sheet: 0, row: 2, count: 1 }]);
+    expect(store.getState().format.formats).toBe(before.format.formats);
+    expect(store.getState().layout.rowHeights).toBe(before.layout.rowHeights);
+    expect(store.getState().ui.copyRange).toEqual(cutRange);
+    expect(store.getState().ui.copyMode).toBe('cut');
+    expect(store.getState().ui.copyRevision).toBe(copyRevision);
+    expect(h.canUndo()).toBe(false);
+  });
+
+  it('rejects native inserts that would push populated tail cells off-grid', () => {
+    const store = createSpreadsheetStore();
+    const { wb, calls } = makeWb([
+      {
+        addr: { sheet: 0, row: 1_048_575, col: 0 },
+        value: { kind: 'number', value: 7 },
+        formula: null,
+      },
+      {
+        addr: { sheet: 0, row: 0, col: 16_383 },
+        value: { kind: 'number', value: 8 },
+        formula: null,
+      },
+    ]);
+    const h = new History();
+    insertRows(store, wb, h, 1_048_574, 1);
+    insertCols(store, wb, h, 16_382, 1);
+    expect(calls.insertR).toEqual([]);
+    expect(calls.insertC).toEqual([]);
+    expect(h.canUndo()).toBe(false);
   });
 
   it('insertRows undo replays engineDeleteRows on the same band', () => {
@@ -962,6 +1030,28 @@ describe('H-2: structure edits re-point merges / conditional formats / filter', 
     expect(store.getState().merges.byCell.get('0:6:2')).toBe('0:5:1');
   });
 
+  it('round-trips a native column merge through insert undo and redo', async () => {
+    const nativeStore = createSpreadsheetStore();
+    const nativeWb = await WorkbookHandle.createDefault();
+    const history = new History();
+    const original = { sheet: 0, r0: 1, c0: 1, r1: 2, c1: 2 };
+    const shifted = { ...original, c1: 3 };
+    mutators.mergeRange(nativeStore, original);
+    expect(nativeWb.engineAddMerge(0, original)).toBe(true);
+
+    insertCols(nativeStore, nativeWb, history, 2, 1);
+    expect(nativeWb.getMerges(0)).toEqual([shifted]);
+    expect(Array.from(nativeStore.getState().merges.byAnchor.values())).toEqual([shifted]);
+
+    history.undo();
+    expect(nativeWb.getMerges(0)).toEqual([original]);
+    expect(Array.from(nativeStore.getState().merges.byAnchor.values())).toEqual([original]);
+
+    history.redo();
+    expect(nativeWb.getMerges(0)).toEqual([shifted]);
+    expect(Array.from(nativeStore.getState().merges.byAnchor.values())).toEqual([shifted]);
+  });
+
   it('drops a merge fully inside a deleted row band', () => {
     mutators.mergeRange(store, { sheet: 0, r0: 2, c0: 0, r1: 3, c1: 1 });
     deleteRows(store, wb, null, 2, 2); // removes rows 2..3
@@ -1021,10 +1111,64 @@ describe('H-2: structure edits re-point merges / conditional formats / filter', 
       r1: 1048575,
       c1: 2,
     });
+    expect(store.getState().ui.copyMode).toBe('copy');
 
     mutators.setCopyRanges(store, [{ sheet: 0, r0: 3, c0: 0, r1: 3, c1: 16383 }]);
     insertRows(store, wb, null, 0, 2);
     expect(store.getState().ui.copyRanges).toEqual([{ sheet: 0, r0: 5, c0: 0, r1: 5, c1: 16383 }]);
+    expect(store.getState().ui.copyMode).toBe('copy');
+  });
+
+  it('cancels a cut marquee after successful row and column edits', async () => {
+    const cases = [
+      {
+        label: 'row insert',
+        source: { sheet: 0, row: 1, col: 0 },
+        range: { sheet: 0, r0: 1, c0: 0, r1: 1, c1: 0 },
+        edit: (s: SpreadsheetStore, w: WorkbookHandle) => insertRows(s, w, null, 1, 1),
+        expected: { sheet: 0, row: 2, col: 0 },
+      },
+      {
+        label: 'row delete',
+        source: { sheet: 0, row: 1, col: 0 },
+        range: { sheet: 0, r0: 1, c0: 0, r1: 1, c1: 0 },
+        edit: (s: SpreadsheetStore, w: WorkbookHandle) => deleteRows(s, w, null, 0, 1),
+        expected: { sheet: 0, row: 0, col: 0 },
+      },
+      {
+        label: 'column insert',
+        source: { sheet: 0, row: 0, col: 1 },
+        range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+        edit: (s: SpreadsheetStore, w: WorkbookHandle) => insertCols(s, w, null, 1, 1),
+        expected: { sheet: 0, row: 0, col: 2 },
+      },
+      {
+        label: 'column delete',
+        source: { sheet: 0, row: 0, col: 1 },
+        range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+        edit: (s: SpreadsheetStore, w: WorkbookHandle) => deleteCols(s, w, null, 0, 1),
+        expected: { sheet: 0, row: 0, col: 0 },
+      },
+    ] as const;
+
+    for (const testCase of cases) {
+      const caseStore = createSpreadsheetStore();
+      const caseWb = await newWb();
+      caseWb.setText(testCase.source, 'cut source');
+      mutators.setCopyRange(caseStore, testCase.range, 'cut');
+      const revision = caseStore.getState().ui.copyRevision ?? 0;
+
+      testCase.edit(caseStore, caseWb);
+
+      expect(
+        cellText(caseWb, testCase.expected.sheet, testCase.expected.row, testCase.expected.col),
+        testCase.label,
+      ).toBe('cut source');
+      expect(caseStore.getState().ui.copyRange, testCase.label).toBeNull();
+      expect(caseStore.getState().ui.copyRanges, testCase.label).toBeNull();
+      expect(caseStore.getState().ui.copyMode, testCase.label).toBeNull();
+      expect(caseStore.getState().ui.copyRevision, testCase.label).toBe(revision + 1);
+    }
   });
 
   it('drops the copy marquee when the copied band is deleted', () => {

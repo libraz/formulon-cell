@@ -36,13 +36,50 @@ export type ChangeEvent =
   | { kind: 'sheet-move'; from: number; to: number };
 
 /** Snapshot of one cell's full state — enough to restore it on undo. */
-interface CellSnapshot {
+export interface CellSnapshot {
   addr: Addr;
   value: CellValue;
   formula: string | null;
 }
 
+/** One literal/formula write accepted by the atomic adapter boundary. A
+ * formula of `null` explicitly removes an existing formula. */
+export interface CellPatch {
+  readonly addr: Addr;
+  readonly value: CellValue;
+  readonly formula?: string | null;
+}
+
+export interface CellPatchAtomicResult {
+  readonly before: readonly CellSnapshot[];
+  readonly after: readonly CellSnapshot[];
+  readonly changed: readonly Addr[];
+}
+
 const UNDO_LIMIT = 100;
+
+const sameCellValue = (a: CellValue, b: CellValue): boolean => {
+  if (a.kind !== b.kind) return false;
+  switch (a.kind) {
+    case 'blank':
+      return true;
+    case 'number':
+      return b.kind === 'number' && Object.is(a.value, b.value);
+    case 'bool':
+      return b.kind === 'bool' && a.value === b.value;
+    case 'text':
+      return b.kind === 'text' && a.value === b.value;
+    case 'error':
+      return b.kind === 'error' && a.code === b.code && a.text === b.text;
+  }
+};
+
+const sameCellSnapshot = (a: CellSnapshot, b: CellSnapshot): boolean =>
+  a.addr.sheet === b.addr.sheet &&
+  a.addr.row === b.addr.row &&
+  a.addr.col === b.addr.col &&
+  a.formula === b.formula &&
+  sameCellValue(a.value, b.value);
 
 /** `<calcPr calcMode>` code for Manual. */
 const CALC_MODE_MANUAL = 1;
@@ -127,6 +164,7 @@ export class WorkbookHandle {
   private readonly listeners = new Set<ChangeListener>();
 
   private disposed = false;
+  private recoveryFailure: Error | null = null;
 
   /** Per-cell inverse history. Each setX pushes one entry; undo replays
    *  it back. Used as a fallback when no `History` is attached. When a
@@ -455,6 +493,110 @@ export class WorkbookHandle {
       this.scheduleRecalc(a);
       this.emit({ kind: 'value', addr: a, next: this.getValue(a) });
     });
+  }
+
+  /** Apply a set of cell writes as one adapter transaction. The raw engine is
+   * written without the ordinary per-cell journal/event path, then recalculated
+   * once. A setter or recalc failure restores touched cells and repairs
+   * dependent caches before reporting rejection. If recovery itself fails,
+   * the handle rejects subsequent reads/writes until it is replaced. */
+  applyCellPatchAtomic(patches: readonly CellPatch[]): CellPatchAtomicResult {
+    this.assertAlive();
+    const unique = new Map<string, { patch: CellPatch; before: CellSnapshot }>();
+    for (const patch of patches) {
+      const addr = patch.addr;
+      if (
+        !Number.isInteger(addr.sheet) ||
+        !Number.isInteger(addr.row) ||
+        !Number.isInteger(addr.col) ||
+        addr.sheet < 0 ||
+        addr.row < 0 ||
+        addr.col < 0
+      ) {
+        throw new Error('applyCellPatchAtomic: invalid address');
+      }
+      const key = addrKey(addr);
+      const current = unique.get(key);
+      if (current) {
+        unique.set(key, { patch, before: current.before });
+      } else {
+        unique.set(key, { patch, before: this.captureSnapshot(addr) });
+      }
+    }
+
+    const entries = [...unique.values()];
+    const before = entries.map((entry) => entry.before);
+    const changedEntries = entries.filter((entry) => {
+      const formula = entry.patch.formula ?? null;
+      return !sameCellSnapshot(entry.before, {
+        addr: entry.patch.addr,
+        value: entry.patch.value,
+        formula,
+      });
+    });
+    if (changedEntries.length === 0) {
+      return { before, after: before, changed: [] };
+    }
+
+    const pendingBefore = this.pendingRecalc;
+    const dirtyBefore = new Set(this.dirtySinceRecalc);
+    const manual = this.isManualCalcMode();
+    try {
+      for (const entry of changedEntries) {
+        this.writeRawCell(entry.patch.addr, entry.patch.value, entry.patch.formula ?? null);
+        this.dirtySinceRecalc.add(addrKey(entry.patch.addr));
+      }
+      if (!manual) {
+        const status = this.wb.recalc();
+        if (!status.ok) throw new Error(`recalc: ${status.message}`);
+        this.pendingRecalc = false;
+      } else {
+        // Match ordinary setters in manual calculation mode: engine dirty flags
+        // remain pending, but no automatic recalc event is emitted.
+        this.pendingRecalc = false;
+      }
+    } catch (error) {
+      // Restore in reverse order. Direct engine calls intentionally bypass the
+      // journal and event paths, so rollback cannot create observable events.
+      let rollbackFailure: unknown = null;
+      for (let i = changedEntries.length - 1; i >= 0; i -= 1) {
+        const entry = changedEntries[i];
+        if (!entry) continue;
+        try {
+          this.writeRawCell(entry.patch.addr, entry.before.value, entry.before.formula);
+        } catch (restoreError) {
+          rollbackFailure ??= restoreError;
+        }
+      }
+      this.pendingRecalc = pendingBefore;
+      this.dirtySinceRecalc = dirtyBefore;
+      if (!manual) {
+        try {
+          // A failed C++ recalc may have changed dependent caches before
+          // returning an error. Restore the inputs first, then force one
+          // repair pass before reporting the original transaction failure.
+          const repair = this.wb.recalc();
+          if (!repair.ok) throw new Error(`recalc repair: ${repair.message}`);
+        } catch (repairError) {
+          rollbackFailure ??= repairError;
+        }
+      }
+      if (rollbackFailure) {
+        const detail =
+          rollbackFailure instanceof Error ? rollbackFailure.message : 'engine rollback failed';
+        this.recoveryFailure = new Error(`applyCellPatchAtomic rollback failed: ${detail}`);
+        throw this.recoveryFailure;
+      }
+      throw error;
+    }
+
+    const after = entries.map((entry) => this.captureSnapshot(entry.patch.addr));
+    const changed = changedEntries.map((entry) => entry.patch.addr);
+    for (const entry of changedEntries) {
+      this.emit({ kind: 'value', addr: entry.patch.addr, next: this.getValue(entry.patch.addr) });
+    }
+    if (!manual) this.emitRecalc();
+    return { before, after, changed };
   }
 
   /** Coalesce the recalcs of a multi-cell write into a single pass. Bulk
@@ -1000,7 +1142,15 @@ export class WorkbookHandle {
   }
 
   private emit(e: ChangeEvent): void {
-    for (const fn of this.listeners) fn(e);
+    // Events are emitted only after the engine commit. Listener failures must
+    // therefore stay isolated from the committed workbook and from siblings.
+    for (const fn of [...this.listeners]) {
+      try {
+        fn(e);
+      } catch {
+        // Host/render observers are advisory and cannot roll back an engine.
+      }
+    }
   }
 
   /** Announce a completed recalc pass and reset the dirty accumulator. */
@@ -1012,10 +1162,27 @@ export class WorkbookHandle {
 
   private assertAlive(): void {
     if (this.disposed) throw new Error('WorkbookHandle is disposed');
+    if (this.recoveryFailure) throw this.recoveryFailure;
   }
 
   private captureSnapshot(a: Addr): CellSnapshot {
     return { addr: a, value: this.getValue(a), formula: this.cellFormula(a) };
+  }
+
+  private writeRawCell(a: Addr, value: CellValue, formula: string | null): void {
+    const status =
+      formula !== null
+        ? this.wb.setFormula(a.sheet, a.row, a.col, formula)
+        : value.kind === 'number'
+          ? this.wb.setNumber(a.sheet, a.row, a.col, value.value)
+          : value.kind === 'bool'
+            ? this.wb.setBool(a.sheet, a.row, a.col, value.value)
+            : value.kind === 'text'
+              ? this.wb.setText(a.sheet, a.row, a.col, value.value)
+              : value.kind === 'error'
+                ? this.wb.setError(a.sheet, a.row, a.col, value.code)
+                : this.wb.setBlank(a.sheet, a.row, a.col);
+    if (!status.ok) throw new Error(`cell patch: ${status.message}`);
   }
 
   /** Capture before/after, run the mutation, and push to the active history.

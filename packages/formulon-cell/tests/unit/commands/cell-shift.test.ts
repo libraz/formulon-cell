@@ -8,6 +8,29 @@ import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ preferStub: true });
 
 describe('cell shift commands', () => {
+  it('preserves static errors through insert, delete and undo/redo', async () => {
+    const store = createSpreadsheetStore();
+    const wb = await newWb();
+    const history = new History();
+    const source = { sheet: 0, row: 1, col: 0 };
+    const shifted = { ...source, row: 2 };
+    const range = { sheet: 0, r0: 1, c0: 0, r1: 1, c1: 0 };
+    wb.setError(source, 3);
+
+    expect(insertCells(store, wb, history, range, 'down')).toBe(true);
+    expect(wb.getValue(shifted)).toEqual({ kind: 'error', code: 3, text: '#REF!' });
+    history.undo();
+    expect(wb.getValue(source)).toEqual({ kind: 'error', code: 3, text: '#REF!' });
+    history.redo();
+    expect(wb.getValue(shifted)).toEqual({ kind: 'error', code: 3, text: '#REF!' });
+
+    expect(deleteCells(store, wb, history, range, 'up')).toBe(true);
+    expect(wb.getValue(source)).toEqual({ kind: 'error', code: 3, text: '#REF!' });
+    history.undo();
+    expect(wb.getValue(shifted)).toEqual({ kind: 'error', code: 3, text: '#REF!' });
+    wb.dispose();
+  });
+
   it('inserts cells by shifting only selected columns down', async () => {
     const store = createSpreadsheetStore();
     const wb = await newWb();

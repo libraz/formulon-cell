@@ -257,6 +257,9 @@ function writeCell(wb: WorkbookHandle, addr: Addr, value: CellValue, formula: st
     case 'bool':
       wb.setBool(addr, value.value);
       return;
+    case 'error':
+      wb.setError(addr, value.code);
+      return;
     default:
       wb.setBlank(addr);
   }

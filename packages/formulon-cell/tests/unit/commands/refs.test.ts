@@ -103,9 +103,8 @@ describe('shiftFormulaRefs', () => {
     expect(shiftFormulaRefs('=C3', -1, -1)).toBe('=B2');
   });
 
-  it('leaves out-of-range refs verbatim (engine surfaces #REF!)', () => {
-    // Shifting A1 by (-1, 0) would yield row=-1 → invalid. We keep the source.
-    expect(shiftFormulaRefs('=A1', -1, 0)).toBe('=A1');
+  it('turns out-of-range shifted refs into #REF!', () => {
+    expect(shiftFormulaRefs('=A1', -1, 0)).toBe('=#REF!');
   });
 
   it('handles a sheet-qualified ref (Sheet1!A1)', () => {

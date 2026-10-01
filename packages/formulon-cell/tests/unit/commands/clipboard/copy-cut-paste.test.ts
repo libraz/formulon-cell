@@ -216,7 +216,7 @@ describe('cut', () => {
     wb = await newWb();
   });
 
-  it('produces the same TSV as copy and blanks the source cells', () => {
+  it('produces the same TSV as copy while deferring source clearing until paste', () => {
     seedAndMirror(store, wb, [
       { row: 0, col: 0, value: 1 },
       { row: 0, col: 1, value: 2 },
@@ -225,8 +225,8 @@ describe('cut', () => {
     const got = cut(store.getState(), wb);
     expect(got?.tsv).toBe('1\t2');
     wb.recalc();
-    expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
-    expect(wb.getValue({ sheet: 0, row: 0, col: 1 }).kind).toBe('blank');
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 1 });
+    expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 2 });
   });
 
   it('cuts whole-column selections through the trimmed payload instead of the full sheet height', () => {
@@ -241,8 +241,8 @@ describe('cut', () => {
     expect(got?.tsv).toBe('top\r\n\r\nbottom');
     expect(got?.payloadRanges).toEqual([{ sheet: 0, r0: 4, c0: 2, r1: 6, c1: 2 }]);
     wb.recalc();
-    expect(wb.getValue({ sheet: 0, row: 4, col: 2 }).kind).toBe('blank');
-    expect(wb.getValue({ sheet: 0, row: 6, col: 2 }).kind).toBe('blank');
+    expect(wb.getValue({ sheet: 0, row: 4, col: 2 })).toEqual({ kind: 'text', value: 'top' });
+    expect(wb.getValue({ sheet: 0, row: 6, col: 2 })).toEqual({ kind: 'text', value: 'bottom' });
   });
 
   it('returns null when the underlying copy fails (inverted range)', () => {

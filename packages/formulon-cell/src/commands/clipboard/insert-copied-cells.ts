@@ -89,7 +89,7 @@ export function insertCopiedCellsFromTSV(
         }
       }
     });
-    copySourceMerges(store, wb, history, origin, height, width);
+    copySnapshotMerges(store, wb, history, origin, snapshot);
     wb.recalcAuto();
   } finally {
     if (history) history.end();
@@ -244,45 +244,43 @@ function shiftMerges(
   });
 }
 
-function copySourceMerges(
+function copySnapshotMerges(
   store: SpreadsheetStore,
   wb: WorkbookHandle,
   history: History | null,
   origin: Addr,
-  height: number,
-  width: number,
+  snapshot: ClipboardSnapshot | null | undefined,
 ): void {
-  const state = store.getState();
-  const source = state.ui.copyRange;
-  if (!source || source.sheet !== origin.sheet) return;
-  const copied: Range = {
-    sheet: source.sheet,
-    r0: source.r0,
-    c0: source.c0,
-    r1: Math.min(source.r0 + height - 1, source.r1),
-    c1: Math.min(source.c0 + width - 1, source.c1),
-  };
-  const sourceMerges = Array.from(state.merges.byAnchor.values()).filter(
-    (m) =>
-      m.sheet === copied.sheet &&
-      m.r0 >= copied.r0 &&
-      m.r1 <= copied.r1 &&
-      m.c0 >= copied.c0 &&
-      m.c1 <= copied.c1,
-  );
-  if (sourceMerges.length === 0) return;
+  if (!snapshot || snapshot.merges?.length === 0) return;
+  const sourceMerges = snapshot.merges ?? [];
   recordMergesChangeWithEngine(history, store, wb, origin.sheet, () => {
     store.setState((s) => {
       const byAnchor = new Map(s.merges.byAnchor);
       const byCell = new Map(s.merges.byCell);
       for (const merge of sourceMerges) {
+        if (
+          !Number.isInteger(merge.r0) ||
+          !Number.isInteger(merge.c0) ||
+          !Number.isInteger(merge.r1) ||
+          !Number.isInteger(merge.c1) ||
+          merge.r0 < 0 ||
+          merge.c0 < 0 ||
+          merge.r1 < merge.r0 ||
+          merge.c1 < merge.c0 ||
+          merge.r1 >= snapshot.rows ||
+          merge.c1 >= snapshot.cols ||
+          (merge.sheet !== undefined && merge.sheet !== snapshot.range.sheet)
+        ) {
+          continue;
+        }
         const next: Range = {
           sheet: origin.sheet,
-          r0: origin.row + (merge.r0 - copied.r0),
-          c0: origin.col + (merge.c0 - copied.c0),
-          r1: origin.row + (merge.r1 - copied.r0),
-          c1: origin.col + (merge.c1 - copied.c0),
+          r0: origin.row + merge.r0,
+          c0: origin.col + merge.c0,
+          r1: origin.row + merge.r1,
+          c1: origin.col + merge.c1,
         };
+        if (next.r1 > MAX_ROW || next.c1 > MAX_COL) continue;
         removeIntersectingMerges(byAnchor, byCell, next);
         addMergeToMaps(byAnchor, byCell, next);
       }
@@ -364,6 +362,9 @@ function writeCell(wb: WorkbookHandle, addr: Addr, value: CellValue, formula: st
       return;
     case 'bool':
       wb.setBool(addr, value.value);
+      return;
+    case 'error':
+      wb.setError(addr, value.code);
       return;
     default:
       wb.setBlank(addr);

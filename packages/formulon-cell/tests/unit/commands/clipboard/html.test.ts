@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { encodeHtml } from '../../../../src/commands/clipboard/html.js';
 import { addrKey, WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
-import { createSpreadsheetStore } from '../../../../src/store/store.js';
+import { createSpreadsheetStore, mutators } from '../../../../src/store/store.js';
 
 const seed = async (
   cells: { row: number; col: number; value: string | number; fmt?: Record<string, unknown> }[],
@@ -183,5 +183,14 @@ describe('commands/clipboard/encodeHtml', () => {
     // currency formatter should include the symbol; exact spacing varies but '$' must appear
     expect(html).toContain('$');
     expect(html).toContain('1,234.50');
+  });
+
+  it('emits rowspan/colspan for contained merges and skips covered cells', async () => {
+    const store = await seed([{ row: 0, col: 0, value: 'merged' }]);
+    mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+
+    const html = encodeHtml(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+
+    expect(html).toBe('<table><tr><td rowspan="2" colspan="2">merged</td></tr><tr></tr></table>');
   });
 });

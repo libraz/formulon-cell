@@ -3,22 +3,14 @@ import type { State } from '../../store/store.js';
 import { type CopyResult, copy } from './copy.js';
 
 /**
- * Copy the selection to the clipboard, then blank the source range. Desktop spreadsheets
- * normally defers the blank until the next paste — we apply it eagerly
- * here for v1.0 to keep the wb state visibly in sync. The dotted-marquee
- * UX is a v1.x concern.
+ * Capture the selection as a cut payload. The source stays intact until the
+ * payload is successfully pasted; this is how Excel permits Escape to cancel
+ * a cut and how overlapping cut moves preserve the captured values.
  */
 export function cut(state: State, wb: WorkbookHandle): CopyResult | null {
-  const result = copy(state);
-  if (!result) return null;
-  const ranges = result.payloadRanges ?? result.ranges ?? [result.range];
-  const sheet = state.data.sheetIndex;
-  for (const range of ranges) {
-    for (let row = range.r0; row <= range.r1; row += 1) {
-      for (let col = range.c0; col <= range.c1; col += 1) {
-        wb.setBlank({ sheet, row, col });
-      }
-    }
-  }
-  return result;
+  // `wb` remains in the signature for compatibility with command callers and
+  // future native clipboard implementations. A cut is deliberately capture
+  // only; pasteSpecial performs the deferred source clear in one transaction.
+  void wb;
+  return copy(state);
 }

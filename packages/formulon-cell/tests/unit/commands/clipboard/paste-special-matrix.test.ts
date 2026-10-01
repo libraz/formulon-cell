@@ -111,15 +111,13 @@ describe('paste-special — what × operation × transpose × skipBlanks matrix'
     }> = [
       { what: 'all', expect: { hasValue: true, hasBold: true, hasNumFmt: true } },
       { what: 'values', expect: { hasValue: true, hasBold: false, hasNumFmt: false } },
-      // No source formula → "formulas" leaves value alone. Format pieces are
-      // also not pasted because `formulas` doesn't request them.
-      { what: 'formulas', expect: { hasValue: false, hasBold: false, hasNumFmt: false } },
+      // Formula pastes include constants as well as formulas in Excel.
+      { what: 'formulas', expect: { hasValue: true, hasBold: false, hasNumFmt: false } },
       { what: 'formats', expect: { hasValue: false, hasBold: true, hasNumFmt: true } },
       { what: 'values-and-numfmt', expect: { hasValue: true, hasBold: false, hasNumFmt: true } },
-      // No source formula → no value write; numFmt still cherry-picked.
       {
         what: 'formulas-and-numfmt',
-        expect: { hasValue: false, hasBold: false, hasNumFmt: true },
+        expect: { hasValue: true, hasBold: false, hasNumFmt: true },
       },
     ];
 
@@ -261,11 +259,7 @@ describe('paste-special — what × operation × transpose × skipBlanks matrix'
       expect(cellAt(wb, 4, 3)).toMatchObject({ kind: 'number', value: 100 });
     });
 
-    it('snapshot omits unseeded blank cells, so paste leaves destination intact', () => {
-      // captureSnapshot only emits entries for cells that exist in the cells
-      // map. A truly unseeded B1 is absent from the snapshot grid, so the
-      // paste loop skips that column entirely — D5 keeps its 100 regardless
-      // of skipBlanks.
+    it('clears the destination for an unseeded blank when skipBlanks is false', () => {
       seed(store, wb, [
         { row: 0, col: 0, value: 5 },
         { row: 4, col: 2, value: 99 },
@@ -276,7 +270,7 @@ describe('paste-special — what × operation × transpose × skipBlanks matrix'
       setActive(store, 4, 2);
       pasteSpecial(store.getState(), store, wb, snap, opt({ skipBlanks: false }));
       wb.recalc();
-      expect(cellAt(wb, 4, 3)).toMatchObject({ kind: 'number', value: 100 });
+      expect(cellAt(wb, 4, 3)).toEqual({ kind: 'blank' });
     });
   });
 

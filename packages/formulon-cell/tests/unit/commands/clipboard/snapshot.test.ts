@@ -81,4 +81,25 @@ describe('captureSnapshot', () => {
     );
     expect(snap?.cells[0]?.[0]?.format?.borders).toEqual({ top: true, left: true });
   });
+
+  it('captures fully-contained merges as source-relative rectangles', () => {
+    const merge = { sheet: 0, r0: 1, c0: 2, r1: 2, c1: 3 };
+    mutators.mergeRange(store, merge);
+
+    const snap = captureSnapshot(store.getState(), {
+      sheet: 0,
+      r0: 1,
+      c0: 1,
+      r1: 3,
+      c1: 4,
+    });
+
+    expect(snap?.merges).toEqual([{ r0: 0, c0: 1, r1: 1, c1: 2 }]);
+  });
+
+  it('refuses a range that would capture only part of a merge', () => {
+    mutators.mergeRange(store, { sheet: 0, r0: 1, c0: 1, r1: 2, c1: 2 });
+
+    expect(captureSnapshot(store.getState(), { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 2 })).toBeNull();
+  });
 });

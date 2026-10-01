@@ -142,6 +142,31 @@ describe('insertCopiedCellsFromTSV', () => {
     expect(wb.cellFormula({ sheet: 0, row: 2, col: 2 })).toBe('=B1');
   });
 
+  it('recreates merge topology from the structured snapshot', async () => {
+    const store = createSpreadsheetStore();
+    const wb = await newWb();
+    mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+    const snap = captureSnapshot(store.getState(), {
+      sheet: 0,
+      r0: 0,
+      c0: 0,
+      r1: 1,
+      c1: 1,
+    });
+    assertSnap(snap);
+    setActive(store, 3, 0);
+
+    insertCopiedCellsFromTSV(store, wb, null, 'x\ty\r\nz\tw', 'down', snap);
+
+    expect(Array.from(store.getState().merges.byAnchor.values())).toContainEqual({
+      sheet: 0,
+      r0: 3,
+      c0: 0,
+      r1: 4,
+      c1: 1,
+    });
+  });
+
   it('refuses huge clipboard payloads before shifting cells', async () => {
     const store = createSpreadsheetStore();
     const wb = await newWb();
