@@ -1,6 +1,41 @@
 import { expect, type Page } from '@playwright/test';
 import { UserJourneyPage } from '../pages/UserJourneyPage.js';
 
+async function clickColumnHeader(
+  page: Page,
+  col: number,
+  button: 'left' | 'right' = 'left',
+): Promise<void> {
+  const position = await page.evaluate((targetCol) => {
+    const instance = (
+      window as Window & {
+        __fcInst?: {
+          store: {
+            getState(): {
+              layout: {
+                headerColWidth: number;
+                headerRowHeight: number;
+                defaultColWidth: number;
+                colWidths: Map<number, number>;
+              };
+              viewport: { zoom: number };
+            };
+          };
+        };
+      }
+    ).__fcInst;
+    if (!instance) throw new Error('window.__fcInst is not available');
+    const { layout, viewport } = instance.store.getState();
+    const zoom = viewport.zoom;
+    let x = layout.headerColWidth * zoom;
+    for (let index = 0; index < targetCol; index += 1)
+      x += (layout.colWidths.get(index) ?? layout.defaultColWidth) * zoom;
+    x += ((layout.colWidths.get(targetCol) ?? layout.defaultColWidth) * zoom) / 2;
+    return { x, y: (layout.headerRowHeight * zoom) / 2 };
+  }, col);
+  await page.locator('.fc-host__canvas').first().click({ position, button });
+}
+
 export async function runMergedStructureCopyScenario(page: Page): Promise<void> {
   const sp = new UserJourneyPage(page);
   await sp.mount();
@@ -252,5 +287,288 @@ export async function runRepeatedPasteScenario(page: Page): Promise<void> {
   await sp.shortcut('y');
   await expect.poll(() => sp.readValue('K2')).toEqual({ kind: 'number', value: 9 });
   expect(await sp.readMerge('K2')).toEqual(targetMerge);
+  await sp.expectNoConsoleErrors();
+}
+
+export async function runWholeColumnCopyInsertScenario(page: Page): Promise<void> {
+  const sp = new UserJourneyPage(page);
+  await sp.mount();
+  await sp.expectNoStub();
+  await sp.enter('A5', '7');
+  await sp.enter('B5', '=A5*2');
+  await sp.enter('D2', 'old');
+  await sp.goTo('A5');
+  await sp.clickRibbon('bold');
+  await clickColumnHeader(page, 0);
+  await sp.shortcut('c');
+  await clickColumnHeader(page, 3);
+  await sp.shortcut('v');
+  await expect.poll(() => sp.readValue('D5')).toEqual({ kind: 'number', value: 7 });
+  await expect.poll(() => sp.readValue('D2')).toEqual({ kind: 'blank' });
+  await expect.poll(() => sp.readFormat('D5')).toMatchObject({ bold: true });
+  await sp.shortcut('z');
+  await expect.poll(() => sp.readValue('D2')).toEqual({ kind: 'text', value: 'old' });
+  await expect.poll(() => sp.readValue('D5')).toEqual({ kind: 'blank' });
+  await page.keyboard.press('Escape');
+  await clickColumnHeader(page, 1);
+  await sp.shortcut('c');
+  await clickColumnHeader(page, 3, 'right');
+  await page.locator('.fc-ctxmenu [data-fc-action="insertCopiedCells"]').click();
+  await expect.poll(() => sp.readFormula('D5')).toBe('=C5*2');
+  await expect.poll(() => sp.readValue('D1')).toEqual({ kind: 'blank' });
+  await expect.poll(() => sp.readValue('E2')).toEqual({ kind: 'text', value: 'old' });
+  await sp.shortcut('z');
+  await expect.poll(() => sp.readValue('D2')).toEqual({ kind: 'text', value: 'old' });
+  await expect.poll(() => sp.readFormula('D5')).toBeNull();
+  await sp.shortcut('y');
+  await expect.poll(() => sp.readFormula('D5')).toBe('=C5*2');
+  await sp.expectNoConsoleErrors();
+}
+
+async function clickRowHeader(
+  page: Page,
+  row: number,
+  button: 'left' | 'right' = 'left',
+): Promise<void> {
+  const position = await page.evaluate((targetRow) => {
+    const instance = (
+      window as Window & {
+        __fcInst?: {
+          store: {
+            getState(): {
+              layout: {
+                headerColWidth: number;
+                headerRowHeight: number;
+                defaultRowHeight: number;
+                rowHeights: Map<number, number>;
+              };
+              viewport: { zoom: number };
+            };
+          };
+        };
+      }
+    ).__fcInst;
+    if (!instance) throw new Error('window.__fcInst is not available');
+    const { layout, viewport } = instance.store.getState();
+    const zoom = viewport.zoom;
+    let y = layout.headerRowHeight * zoom;
+    for (let index = 0; index < targetRow; index += 1)
+      y += (layout.rowHeights.get(index) ?? layout.defaultRowHeight) * zoom;
+    y += ((layout.rowHeights.get(targetRow) ?? layout.defaultRowHeight) * zoom) / 2;
+    return { x: (layout.headerColWidth * zoom) / 2, y };
+  }, row);
+  await page.locator('.fc-host__canvas').first().click({ position, button });
+}
+
+export async function runWholeRowCopyInsertScenario(page: Page): Promise<void> {
+  const sp = new UserJourneyPage(page);
+  await sp.mount();
+  await sp.expectNoStub();
+  await sp.enter('E1', '7');
+  await sp.enter('E2', '=E1*2');
+  await sp.enter('A4', 'old');
+  await sp.goTo('E1');
+  await sp.clickRibbon('bold');
+  await clickRowHeader(page, 0);
+  await sp.shortcut('c');
+  await clickRowHeader(page, 3);
+  await sp.shortcut('v');
+  await expect.poll(() => sp.readValue('E4')).toEqual({ kind: 'number', value: 7 });
+  await expect.poll(() => sp.readValue('A4')).toEqual({ kind: 'blank' });
+  await expect.poll(() => sp.readFormat('E4')).toMatchObject({ bold: true });
+  await sp.shortcut('z');
+  await expect.poll(() => sp.readValue('A4')).toEqual({ kind: 'text', value: 'old' });
+  await expect.poll(() => sp.readValue('E4')).toEqual({ kind: 'blank' });
+  await page.keyboard.press('Escape');
+  await clickRowHeader(page, 1);
+  await sp.shortcut('c');
+  await clickRowHeader(page, 3, 'right');
+  await page.locator('.fc-ctxmenu [data-fc-action="insertCopiedCells"]').click();
+  await expect.poll(() => sp.readFormula('E4')).toBe('=E3*2');
+  await expect.poll(() => sp.readValue('A4')).toEqual({ kind: 'blank' });
+  await expect.poll(() => sp.readValue('A5')).toEqual({ kind: 'text', value: 'old' });
+  await sp.shortcut('z');
+  await expect.poll(() => sp.readValue('A4')).toEqual({ kind: 'text', value: 'old' });
+  await expect.poll(() => sp.readFormula('E4')).toBeNull();
+  await sp.shortcut('y');
+  await expect.poll(() => sp.readFormula('E4')).toBe('=E3*2');
+  await sp.expectNoConsoleErrors();
+}
+
+export async function runWholeBandInsertDeleteScenario(page: Page): Promise<void> {
+  const sp = new UserJourneyPage(page);
+  await sp.mount();
+  await sp.expectNoStub();
+  await sp.enter('B5', '7');
+  await sp.enter('F1', '=B5');
+  await clickColumnHeader(page, 1);
+  await sp.shortcut('Shift+Equal');
+  await expect.poll(() => sp.readValue('C5')).toEqual({ kind: 'number', value: 7 });
+  await expect(page.locator('.fc-cellshift')).toHaveCount(0);
+  await expect.poll(() => sp.readFormula('G1')).toBe('=C5');
+  await sp.shortcut('z');
+  await expect.poll(() => sp.readValue('B5')).toEqual({ kind: 'number', value: 7 });
+  await clickColumnHeader(page, 1);
+  await sp.shortcut('Minus');
+  await expect.poll(() => sp.readValue('B5')).toEqual({ kind: 'blank' });
+  await expect.poll(() => sp.readFormula('E1')).toBe('=#REF!');
+  await sp.shortcut('z');
+  await expect.poll(() => sp.readFormula('F1')).toBe('=B5');
+  await clickColumnHeader(page, 1);
+  await sp.insertRowsOrColumns('cells');
+  await expect.poll(() => sp.readValue('C5')).toEqual({ kind: 'number', value: 7 });
+  await expect(page.locator('.fc-cellshift')).toHaveCount(0);
+  await sp.shortcut('z');
+
+  await sp.enter('E2', '11');
+  await clickRowHeader(page, 1);
+  await sp.shortcut('Shift+Equal');
+  await expect.poll(() => sp.readValue('E3')).toEqual({ kind: 'number', value: 11 });
+  await expect(page.locator('.fc-cellshift')).toHaveCount(0);
+  await sp.shortcut('z');
+  await expect.poll(() => sp.readValue('E2')).toEqual({ kind: 'number', value: 11 });
+  await clickRowHeader(page, 1);
+  await sp.shortcut('Minus');
+  await expect.poll(() => sp.readValue('E2')).toEqual({ kind: 'blank' });
+  await sp.shortcut('z');
+  await clickRowHeader(page, 1);
+  await sp.insertRowsOrColumns('cells');
+  await expect.poll(() => sp.readValue('E3')).toEqual({ kind: 'number', value: 11 });
+  await expect(page.locator('.fc-cellshift')).toHaveCount(0);
+  await sp.shortcut('z');
+  await expect.poll(() => sp.readValue('E2')).toEqual({ kind: 'number', value: 11 });
+  await sp.expectNoConsoleErrors();
+}
+
+export async function runCopiedBandInsertRoutesScenario(page: Page): Promise<void> {
+  const sp = new UserJourneyPage(page);
+  await sp.mount();
+  await sp.expectNoStub();
+  await sp.enter('E5', '7');
+  await sp.enter('D5', '=$E5');
+  await clickColumnHeader(page, 3);
+  await sp.shortcut('c');
+  await sp.goTo('B5');
+  await sp.shortcut('Shift+Equal');
+  await expect.poll(() => sp.readFormula('B5')).toBe('=$F5');
+  await expect.poll(() => sp.readFormula('E5')).toBe('=$F5');
+  await expect(page.locator('.fc-cellshift')).toHaveCount(0);
+  await sp.shortcut('z');
+  await expect.poll(() => sp.readFormula('D5')).toBe('=$E5');
+  await expect.poll(() => sp.readFormula('B5')).toBeNull();
+  await page.keyboard.press('Escape');
+
+  await sp.enter('J5', '11');
+  await sp.enter('J4', '=J$5');
+  await clickRowHeader(page, 3);
+  await sp.shortcut('c');
+  await sp.goTo('A2');
+  await sp.insertRowsOrColumns('cells');
+  await expect.poll(() => sp.readFormula('J2')).toBe('=J$6');
+  await expect.poll(() => sp.readFormula('J5')).toBe('=J$6');
+  await expect(page.locator('.fc-cellshift')).toHaveCount(0);
+  await sp.shortcut('z');
+  await expect.poll(() => sp.readFormula('J4')).toBe('=J$5');
+  await expect.poll(() => sp.readFormula('J2')).toBeNull();
+  await sp.shortcut('y');
+  await expect.poll(() => sp.readFormula('J2')).toBe('=J$6');
+  await sp.expectNoConsoleErrors();
+}
+
+export async function runCutBandInsertRoutesScenario(page: Page): Promise<void> {
+  const sp = new UserJourneyPage(page);
+  await sp.mount();
+  await sp.expectNoStub();
+  await sp.enter('B5', '2');
+  await sp.enter('C5', '3');
+  await sp.enter('E5', '7');
+  await sp.enter('D5', '=$E5');
+  await sp.enter('J10', '=D5');
+  await sp.goTo('D5');
+  await sp.clickRibbon('bold');
+  await clickColumnHeader(page, 3);
+  await sp.shortcut('x');
+  await sp.goTo('B5');
+  await sp.shortcut('Shift+Equal');
+  await expect.poll(() => sp.readFormula('B5')).toBe('=$E5');
+  await expect.poll(() => sp.readFormula('J10')).toBe('=B5');
+  await expect.poll(() => sp.readValue('C5')).toEqual({ kind: 'number', value: 2 });
+  await expect.poll(() => sp.readValue('D5')).toEqual({ kind: 'number', value: 3 });
+  await expect.poll(() => sp.readFormat('B5')).toMatchObject({ bold: true });
+  await expect(page.locator('.fc-cellshift')).toHaveCount(0);
+  await sp.shortcut('z');
+  await expect.poll(() => sp.readFormula('D5')).toBe('=$E5');
+  await expect.poll(() => sp.readFormula('J10')).toBe('=D5');
+  await sp.shortcut('y');
+  await expect.poll(() => sp.readFormula('B5')).toBe('=$E5');
+  await page.keyboard.press('Escape');
+
+  await sp.enter('J1', '11');
+  await sp.enter('J2', '=J$1');
+  await sp.enter('J3', '3');
+  await sp.enter('J4', '4');
+  await sp.enter('K10', '=J2');
+  await clickRowHeader(page, 1);
+  await sp.shortcut('x');
+  await sp.goTo('A5');
+  await sp.insertRowsOrColumns('cells');
+  await expect.poll(() => sp.readFormula('J4')).toBe('=J$1');
+  await expect.poll(() => sp.readValue('J2')).toEqual({ kind: 'number', value: 3 });
+  await expect.poll(() => sp.readValue('J3')).toEqual({ kind: 'number', value: 4 });
+  await expect.poll(() => sp.readFormula('K10')).toBe('=J4');
+  await sp.shortcut('z');
+  await expect.poll(() => sp.readFormula('J2')).toBe('=J$1');
+  await expect.poll(() => sp.readFormula('K10')).toBe('=J2');
+  await sp.shortcut('y');
+  await expect.poll(() => sp.readFormula('J4')).toBe('=J$1');
+  await clickRowHeader(page, 1);
+  await sp.shortcut('x');
+  await sp.shortcut('Shift+Equal');
+  await expect.poll(() => sp.readValue('J2')).toEqual({ kind: 'number', value: 3 });
+  const copyMode = () =>
+    page.evaluate(() => {
+      const inst = (
+        window as Window & {
+          __fcInst?: { store: { getState(): { ui: { copyMode: string | null } } } };
+        }
+      ).__fcInst;
+      return inst?.store.getState().ui.copyMode;
+    });
+  await expect.poll(copyMode).toBe('cut');
+  await clickRowHeader(page, 2);
+  await sp.shortcut('Shift+Equal');
+  await expect.poll(copyMode).toBeNull();
+  await expect.poll(() => sp.readValue('J2')).toEqual({ kind: 'number', value: 3 });
+  await sp.expectNoConsoleErrors();
+}
+
+export async function runCrossSheetCutBandInsertScenario(page: Page): Promise<void> {
+  const sp = new UserJourneyPage(page);
+  await sp.mount();
+  await sp.expectNoStub();
+  await sp.renameSelectedSheet('Source');
+  await page.locator('.fc-host__sheetbar-add').click();
+  await sp.renameSelectedSheet('Target');
+  await sp.enter('D5', '9');
+  await sp.chooseSheet('Source');
+  await sp.enter('B5', '7');
+  await sp.enter('C5', '8');
+  await sp.enter('J10', '=B5');
+  await clickColumnHeader(page, 1);
+  await sp.shortcut('x');
+  await sp.chooseSheet('Target');
+  await clickColumnHeader(page, 3, 'right');
+  await page.locator('.fc-ctxmenu [data-fc-action="insertCopiedCells"]').click();
+  await expect.poll(() => sp.readValue('D5', 1)).toEqual({ kind: 'number', value: 7 });
+  await expect.poll(() => sp.readValue('E5', 1)).toEqual({ kind: 'number', value: 9 });
+  await expect.poll(() => sp.readValue('B5', 0)).toEqual({ kind: 'blank' });
+  await expect.poll(() => sp.readValue('C5', 0)).toEqual({ kind: 'number', value: 8 });
+  await expect.poll(() => sp.readFormula('J10', 0)).toBe('=Target!D5');
+  await sp.shortcut('z');
+  await expect.poll(() => sp.readValue('B5', 0)).toEqual({ kind: 'number', value: 7 });
+  await expect.poll(() => sp.readValue('D5', 1)).toEqual({ kind: 'number', value: 9 });
+  await expect.poll(() => sp.readFormula('J10', 0)).toBe('=B5');
+  await sp.shortcut('y');
+  await expect.poll(() => sp.readFormula('J10', 0)).toBe('=Target!D5');
   await sp.expectNoConsoleErrors();
 }
