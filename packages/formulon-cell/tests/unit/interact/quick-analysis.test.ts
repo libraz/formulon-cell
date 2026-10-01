@@ -115,6 +115,22 @@ describe('attachQuickAnalysis', () => {
     handle.detach();
   });
 
+  it.each([
+    [0, 1, 1_048_575, 1],
+    [1, 0, 1, 16_383],
+  ])('keeps full-axis selections clear of the sheet bar (%i,%i,%i,%i)', (r0, c0, r1, c1) => {
+    setRange(store, 0, 0, 0, 1);
+    const handle = attachQuickAnalysis({ host, store, wb, strings: defaultStrings });
+    expect(host.querySelector<HTMLButtonElement>('.fc-quick__button')?.hidden).toBe(false);
+    handle.open();
+    setRange(store, r0, c0, r1, c1);
+    expect(host.querySelector<HTMLButtonElement>('.fc-quick__button')?.hidden).toBe(true);
+    expect(host.querySelector<HTMLElement>('.fc-quick')?.hidden).toBe(true);
+    handle.open();
+    expect(host.querySelector<HTMLElement>('.fc-quick')?.hidden).toBe(true);
+    handle.detach();
+  });
+
   it('hides the Quick Analysis button for a single-cell selection', () => {
     seed(store, wb, [{ row: 0, col: 0, value: 1 }]);
     setRange(store, 0, 0, 0, 0);

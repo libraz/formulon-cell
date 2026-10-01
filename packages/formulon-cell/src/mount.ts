@@ -1,5 +1,8 @@
 import { CellRegistry } from './cells.js';
-import { insertCopiedCellsFromTSV } from './commands/clipboard/insert-copied-cells.js';
+import {
+  insertCopiedBand,
+  insertCopiedCellsFromTSV,
+} from './commands/clipboard/insert-copied-cells.js';
 import { History } from './commands/history.js';
 import {
   InteractionController,
@@ -537,6 +540,7 @@ export const Spreadsheet = {
       findReplace: () => binding.findReplace,
       formatDialog: () => featureState.formatDialog,
       formatPainter: () => featureState.formatPainter,
+      getClipboardSnapshot: () => binding.clipboardH?.getSnapshot() ?? null,
       goToDialog: () => featureState.goToDialog,
       history,
       host,
@@ -1030,13 +1034,40 @@ export const Spreadsheet = {
       },
       openInsertCopiedCells() {
         if (commands.policy !== undefined) return;
+
+        // Whole-row/whole-column internal copies and cuts use the structural insert
+        // command directly. This preserves source formats, merges, formulas,
+        // and row/column dimensions; routing them through the TSV dialog
+        // would reduce the payload to values and lose the band topology.
+        const copied = binding.clipboardH?.getSnapshot() ?? null;
+        const copiedLogical = copied?.logicalRange ?? copied?.range;
+        const copiedWholeBand =
+          copiedLogical !== undefined &&
+          ((copiedLogical.c0 === 0 && copiedLogical.c1 >= 16_383) ||
+            (copiedLogical.r0 === 0 && copiedLogical.r1 >= 1_048_575));
+        if (copiedWholeBand && copied) {
+          const target = store.getState().selection.range;
+          const result = insertCopiedBand(store, wb, history, copied, target);
+          if (result) {
+            mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
+            mutators.setRange(store, result.writtenRange);
+            refreshCells();
+            updateChrome();
+            renderer.invalidate();
+          }
+          // A valid whole-band snapshot must not fall back to the direction
+          // dialog when preflight rejects it: Excel leaves the sheet intact.
+          return;
+        }
+
         openInsertCopiedCellsDialog({
           host,
           strings: i18n.strings,
           onSubmit: (direction) => {
             void readClipboardText().then((text) => {
-              if (!text) return;
-              const result = insertCopiedCellsFromTSV(store, wb, history, text, direction);
+              const snap = binding.clipboardH?.getSnapshot() ?? null;
+              if (!text && !snap) return;
+              const result = insertCopiedCellsFromTSV(store, wb, history, text, direction, snap);
               if (!result) return;
               // Marquee stays up, same as the context-menu variants.
               mutators.setRange(store, result.writtenRange);

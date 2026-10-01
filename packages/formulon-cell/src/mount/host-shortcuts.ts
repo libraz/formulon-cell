@@ -1,4 +1,6 @@
 import { deleteCells, insertCells } from '../commands/cell-shift.js';
+import { insertCopiedBand } from '../commands/clipboard/insert-copied-cells.js';
+import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import { executeRibbonFillAction } from '../commands/fill.js';
 import { clearFilter, recordFilterChange, setAutoFilter } from '../commands/filter.js';
 import {
@@ -13,8 +15,12 @@ import { formatAsTable } from '../commands/format-as-table.js';
 import { type History, recordFormatChange, recordTablesChange } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import {
+  deleteCols,
+  deleteRows,
   hideCols,
   hideRows,
+  insertCols,
+  insertRows,
   showColsAroundSelection,
   showRowsAroundSelection,
 } from '../commands/structure.js';
@@ -48,6 +54,18 @@ const DIRECT_NUMBER_FORMAT_BY_KEY: Readonly<Record<string, NumberFormatAction>> 
   '^': 'scientific',
 };
 
+const MAX_ROW = 1_048_575;
+const MAX_COL = 16_383;
+
+const isWholeRowSelection = (range: { c0: number; c1: number }): boolean =>
+  range.c0 === 0 && range.c1 >= MAX_COL;
+
+const isWholeColumnSelection = (range: { r0: number; r1: number }): boolean =>
+  range.r0 === 0 && range.r1 >= MAX_ROW;
+
+const hasActiveCopy = (state: ReturnType<SpreadsheetStore['getState']>): boolean =>
+  Boolean(state.ui.copyRange || state.ui.copyRanges?.length);
+
 const directNumberFormatAction = (e: KeyboardEvent): NumberFormatAction | null =>
   (e.shiftKey && (DIRECT_NUMBER_FORMAT_BY_CODE[e.code] ?? DIRECT_NUMBER_FORMAT_BY_KEY[e.key])) ||
   null;
@@ -60,6 +78,7 @@ type FormatToggle = (
 
 interface HostShortcutInput {
   addSheet: () => void;
+  getClipboardSnapshot?: () => ClipboardSnapshot | null;
   findReplace: () => { open(tab?: 'find' | 'replace'): void } | null;
   formatDialog: () => { open(): void } | null;
   formatPainter: () => { activate(sticky?: boolean): void } | null;
@@ -166,13 +185,58 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
     if (!meta) return;
     const k = e.key.toLowerCase();
     const insertCellsShortcut =
-      e.shiftKey && (e.key === '+' || e.code === 'Equal' || e.code === 'NumpadAdd');
+      (e.shiftKey && (e.key === '+' || e.code === 'Equal')) || e.code === 'NumpadAdd';
     const deleteCellsShortcut =
       !e.shiftKey && (e.key === '-' || e.code === 'Minus' || e.code === 'NumpadSubtract');
     if (insertCellsShortcut || deleteCellsShortcut) {
       e.preventDefault();
       if (restricted) return;
       const kind = insertCellsShortcut ? 'insert' : 'delete';
+      const state = input.store.getState();
+      const selected = state.selection.range;
+      const range = {
+        sheet: selected.sheet,
+        r0: Math.min(selected.r0, selected.r1),
+        r1: Math.max(selected.r0, selected.r1),
+        c0: Math.min(selected.c0, selected.c1),
+        c1: Math.max(selected.c0, selected.c1),
+      };
+      if (kind === 'insert' && hasActiveCopy(state)) {
+        const snapshot = input.getClipboardSnapshot?.();
+        const sourceRange = snapshot?.logicalRange ?? snapshot?.range;
+        const sourceIsWholeBand =
+          sourceRange !== undefined &&
+          (isWholeRowSelection(sourceRange) || isWholeColumnSelection(sourceRange));
+        if (snapshot && sourceIsWholeBand) {
+          const inserted = insertCopiedBand(input.store, currentWb, input.history, snapshot, range);
+          if (inserted) {
+            mutators.replaceCells(
+              input.store,
+              currentWb.cells(input.store.getState().data.sheetIndex),
+            );
+            input.invalidate();
+            return;
+          }
+          return;
+        }
+      }
+      if (
+        (kind === 'delete' || !hasActiveCopy(state)) &&
+        (isWholeRowSelection(range) || isWholeColumnSelection(range))
+      ) {
+        if (isWholeRowSelection(range)) {
+          const count = range.r1 - range.r0 + 1;
+          if (kind === 'insert') insertRows(input.store, currentWb, input.history, range.r0, count);
+          else deleteRows(input.store, currentWb, input.history, range.r0, count);
+        } else {
+          const count = range.c1 - range.c0 + 1;
+          if (kind === 'insert') insertCols(input.store, currentWb, input.history, range.c0, count);
+          else deleteCols(input.store, currentWb, input.history, range.c0, count);
+        }
+        mutators.replaceCells(input.store, currentWb.cells(input.store.getState().data.sheetIndex));
+        input.invalidate();
+        return;
+      }
       openCellShiftDialog({
         host: input.host,
         strings: input.strings(),

@@ -2,14 +2,20 @@ import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
 import { deleteCells, insertCells } from '../commands/cell-shift.js';
 import { copy } from '../commands/clipboard/copy.js';
 import { cut } from '../commands/clipboard/cut.js';
-import { insertCopiedCellsFromTSV } from '../commands/clipboard/insert-copied-cells.js';
+import {
+  insertCopiedBand,
+  insertCopiedCellsFromTSV,
+} from '../commands/clipboard/insert-copied-cells.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
 import {
   type PasteWhat,
   pasteSpecial,
   resolvePasteDestination,
 } from '../commands/clipboard/paste-special.js';
-import { type ClipboardSnapshot, captureSnapshot } from '../commands/clipboard/snapshot.js';
+import {
+  type ClipboardSnapshot,
+  captureSnapshotFromCopyResult,
+} from '../commands/clipboard/snapshot.js';
 import { parseTSV } from '../commands/clipboard/tsv.js';
 import { clearComment } from '../commands/comment.js';
 import {
@@ -159,6 +165,19 @@ type RenderMenuEntry =
   | { kind: 'sep'; id: string; source?: ContextMenuItem };
 
 type MenuTarget = { kind: MenuKind; cell: Addr };
+
+const wholeBandAxisFor = (snapshot: ClipboardSnapshot): 'row' | 'col' | null => {
+  const logical = snapshot.logicalRange ?? snapshot.range;
+  const wholeRow = logical.c0 === 0 && logical.c1 >= 16_383;
+  const wholeCol = logical.r0 === 0 && logical.r1 >= 1_048_575;
+  // A full-sheet selection satisfies both predicates but has no single header
+  // axis. Leave it on the ordinary path rather than presenting a misleading
+  // row/column-specific insert action.
+  if (wholeRow === wholeCol) return null;
+  if (wholeRow) return 'row';
+  if (wholeCol) return 'col';
+  return null;
+};
 
 const itemIdSet = new Set<ItemId>([
   'bold',
@@ -369,9 +388,9 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         selection: { ...state.selection, range: ui.copyRange, extraRanges: [] },
       };
       const materialized = copy(sourceState);
-      const ranges = materialized?.payloadRanges ?? (materialized ? [materialized.range] : []);
-      localSnapshot =
-        ranges.length === 1 && ranges[0] ? captureSnapshot(sourceState, ranges[0]) : null;
+      localSnapshot = materialized
+        ? captureSnapshotFromCopyResult(sourceState, materialized, 'copy')
+        : null;
     }
     return localSnapshot;
   };
@@ -582,10 +601,24 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     return 'object';
   };
 
-  const operationEffect = (): OperationEffect => ({
-    kind: 'range',
-    range: { ...store.getState().selection.range },
-  });
+  const operationEffect = (id: string): OperationEffect => {
+    // Row/column structure commands operate on the worksheet axis. Feeding a
+    // full row or column range into the authorization materializer would
+    // exceed its bounded cell budget before the command's own protection and
+    // overflow checks run. Treat these as workbook-structure effects; the
+    // navigation gate above still applies to embedded bounded views.
+    const structural =
+      (id === 'insertCopiedCells' && menuKind !== 'cell') ||
+      id === 'rowInsertAbove' ||
+      id === 'rowInsertBelow' ||
+      id === 'rowDelete' ||
+      id === 'colInsertLeft' ||
+      id === 'colInsertRight' ||
+      id === 'colDelete';
+    return structural
+      ? { kind: 'workbook' }
+      : { kind: 'range', range: { ...store.getState().selection.range } };
+  };
 
   const intentForBuiltIn = (id: string): OperationIntent | null => {
     const operation = operationForItem(id);
@@ -594,7 +627,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       operation,
       origin: 'contextMenu',
       commandId: id,
-      effects: [operationEffect()],
+      effects: [operationEffect(id)],
     };
   };
 
@@ -803,8 +836,19 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       e.preventDefault();
       e.stopPropagation();
       if (btn.disabled) return;
+      const menuHadFocus =
+        ownerDocument.activeElement === btn ||
+        root.contains(ownerDocument.activeElement) ||
+        sub.contains(ownerDocument.activeElement);
       runEntry(entry);
       hide(false);
+      // Context-menu buttons live in the overlay portal. Leaving focus on the
+      // now-hidden button prevents the host's keyboard undo/redo listener
+      // from seeing the next Cmd/Ctrl+Z. Dialog actions intentionally retain
+      // their focus, so only restore the grid host when no dialog owns it.
+      if (menuHadFocus && !ownerDocument.activeElement?.closest('[role="dialog"]')) {
+        host.focus({ preventScroll: true });
+      }
     });
     btn.addEventListener('mouseenter', () => {
       if (panel === 'root') {
@@ -874,6 +918,9 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           : buildCellEntries(strings);
     const activeAddr = store.getState().selection.active;
     const hasCopiedCells = !!store.getState().ui.copyRange;
+    const pendingSnapshot = hasCopiedCells ? clipboardSnapshot() : null;
+    const pendingCutBand =
+      pendingSnapshot?.mode === 'cut' && wholeBandAxisFor(pendingSnapshot) === kind;
     const watched = !!deps.isWatched?.(activeAddr);
     const entries = compactMenuEntries(
       raw
@@ -894,6 +941,9 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
               ...e,
               label: watched ? strings.contextMenu.removeWatch : strings.contextMenu.addWatch,
             };
+          }
+          if (e.kind === 'item' && e.id === 'insertCopiedCells' && pendingCutBand) {
+            return { ...e, label: strings.contextMenu.insertCutCells };
           }
           return e;
         }),
@@ -1279,7 +1329,26 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     const source = store.getState().ui.copyRange;
     if (!source) return;
 
+    const sourceAxisMatchesHeader = (snap: ClipboardSnapshot): boolean => {
+      return wholeBandAxisFor(snap) === kind;
+    };
+
     const insertBand = (snap: ClipboardSnapshot | null, text: string): void => {
+      if (snap && wholeBandAxisFor(snap) !== null) {
+        if (!sourceAxisMatchesHeader(snap)) return;
+        // The shared path performs the structural edit, dimension copy, and
+        // full-band paste as one transaction. A failed preflight must not
+        // fall through to the legacy direction-based inserter because that
+        // would leave a different shape behind.
+        const result = insertCopiedBand(store, wb, history, snap, store.getState().selection.range);
+        if (result) {
+          if (snap.mode === 'cut') consumeCutMarquee();
+          mutators.setRange(store, result.writtenRange);
+          deps.onAfterCommit?.();
+        }
+        return;
+      }
+
       // The header band the user right-clicked. It stays selected afterwards:
       // the inserted rows/columns occupy exactly those indices, and the copy
       // marquee stays up so the same source can be inserted again.
@@ -1291,21 +1360,18 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           : { ...target, r1: target.r0 + count - 1 };
       if (history) history.begin();
       try {
+        let inserted = false;
         if (kind === 'col') {
-          insertCols(store, wb, history, target.c0, count);
-          mutators.setActive(store, {
-            sheet: target.sheet,
-            row: snap?.range.r0 ?? 0,
-            col: target.c0,
-          });
+          inserted = insertCols(store, wb, history, target.c0, count);
         } else {
-          insertRows(store, wb, history, target.r0, count);
-          mutators.setActive(store, {
-            sheet: target.sheet,
-            row: target.r0,
-            col: snap?.range.c0 ?? 0,
-          });
+          inserted = insertRows(store, wb, history, target.r0, count);
         }
+        if (!inserted) return;
+        mutators.setActive(store, {
+          sheet: target.sheet,
+          row: kind === 'row' ? target.r0 : (snap?.range.r0 ?? 0),
+          col: kind === 'col' ? target.c0 : (snap?.range.c0 ?? 0),
+        });
         const next = store.getState();
         if (snap) {
           pasteSpecial(
@@ -1451,9 +1517,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         }
         const r = copy(state);
         if (r) {
-          const ranges = r.payloadRanges ?? r.ranges ?? [r.range];
-          localSnapshot =
-            ranges.length === 1 && ranges[0] ? captureSnapshot(state, ranges[0]) : null;
+          localSnapshot = captureSnapshotFromCopyResult(state, r, 'copy');
           localSnapshotText = r.tsv;
           if (r.ranges) mutators.setCopyRanges(store, r.ranges);
           else mutators.setCopyRange(store, r.range);
@@ -1472,9 +1536,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         }
         const r = cut(state, wb);
         if (r) {
-          const ranges = r.payloadRanges ?? r.ranges ?? [r.range];
-          if (ranges.length !== 1 || !ranges[0]) return;
-          localSnapshot = captureSnapshot(state, ranges[0], 'cut');
+          localSnapshot = captureSnapshotFromCopyResult(state, r, 'cut');
           if (!localSnapshot) return;
           localSnapshotText = r.tsv;
           mutators.setCopyRange(store, r.range, 'cut');

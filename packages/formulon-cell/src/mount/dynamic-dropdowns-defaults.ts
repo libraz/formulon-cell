@@ -17,6 +17,7 @@ import {
   createCellStyleFromActiveFormat,
   mergeCellStylesFromWorkbook,
 } from '../commands/cell-styles.js';
+import { insertCopiedBand } from '../commands/clipboard/insert-copied-cells.js';
 import { applyFormatPatch } from '../commands/format.js';
 import {
   applyPivotTableStyleById,
@@ -196,6 +197,18 @@ const normalizedSelectionRange = (instance: SpreadsheetInstance): Range => {
     r1: Math.max(r.r0, r.r1),
     c1: Math.max(r.c0, r.c1),
   };
+};
+
+const MAX_ROW = 1_048_575;
+const MAX_COL = 16_383;
+
+const isWholeRowSelection = (range: Range): boolean => range.c0 === 0 && range.c1 >= MAX_COL;
+
+const isWholeColumnSelection = (range: Range): boolean => range.r0 === 0 && range.r1 >= MAX_ROW;
+
+const hasActiveCopy = (instance: SpreadsheetInstance): boolean => {
+  const { copyRange, copyRanges } = instance.store.getState().ui;
+  return Boolean(copyRange || copyRanges?.length);
 };
 
 const addrFromKey = (key: string): { sheet: number; row: number; col: number } | null => {
@@ -905,6 +918,44 @@ const buildCellInsertAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyCellInsertAction'] =>
   (action) => {
     if (action === 'cells') {
+      const range = normalizedSelectionRange(instance);
+      if (hasActiveCopy(instance)) {
+        const snapshot = instance.clipboard?.getSnapshot();
+        const sourceRange = snapshot?.logicalRange ?? snapshot?.range;
+        const sourceIsWholeBand =
+          sourceRange !== undefined &&
+          (isWholeRowSelection(sourceRange) || isWholeColumnSelection(sourceRange));
+        if (snapshot && sourceIsWholeBand) {
+          const inserted = insertCopiedBand(
+            instance.store,
+            instance.workbook,
+            instance.history,
+            snapshot,
+            range,
+          );
+          if (inserted) {
+            mutators.replaceCells(
+              instance.store,
+              instance.workbook.cells(instance.store.getState().data.sheetIndex),
+            );
+            instance.host.focus();
+            return;
+          }
+          return;
+        }
+      }
+      if (
+        !hasActiveCopy(instance) &&
+        (isWholeRowSelection(range) || isWholeColumnSelection(range))
+      ) {
+        handleInsertCellsAction(instance, isWholeRowSelection(range) ? 'rows' : 'cols');
+        mutators.replaceCells(
+          instance.store,
+          instance.workbook.cells(instance.store.getState().data.sheetIndex),
+        );
+        instance.host.focus();
+        return;
+      }
       openCellShiftDialog({
         host: instance.host,
         strings: instance.i18n.strings,
@@ -938,6 +989,16 @@ const buildCellDeleteAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyCellDeleteAction'] =>
   (action) => {
     if (action === 'cells') {
+      const range = normalizedSelectionRange(instance);
+      if (isWholeRowSelection(range) || isWholeColumnSelection(range)) {
+        handleDeleteCellsAction(instance, isWholeRowSelection(range) ? 'rows' : 'cols');
+        mutators.replaceCells(
+          instance.store,
+          instance.workbook.cells(instance.store.getState().data.sheetIndex),
+        );
+        instance.host.focus();
+        return;
+      }
       openCellShiftDialog({
         host: instance.host,
         strings: instance.i18n.strings,

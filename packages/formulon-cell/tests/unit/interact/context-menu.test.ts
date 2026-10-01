@@ -1443,6 +1443,68 @@ describe('attachContextMenu', () => {
       expect(onAfterCommit).toHaveBeenCalled();
     });
 
+    it('inserts a whole-row cut at the header target and preserves surrounding rows', () => {
+      const history = new History();
+      seed(store, wb, [
+        { row: 1, col: 0, value: 'target' },
+        { row: 3, col: 0, value: 'source' },
+      ]);
+      wb.setFormula({ sheet: 0, row: 3, col: 1 }, '=A4');
+      wb.recalc();
+      mutators.replaceCells(store, wb.cells(0));
+
+      mutators.selectRow(store, 3);
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        strings: en,
+        history,
+        onAfterCommit,
+      });
+      fireContextMenu(host, 10, 90); // row 3 header
+      item('cut')?.click();
+
+      mutators.selectRow(store, 1);
+      const selectionBefore = store.getState().selection;
+      const sourceValueBefore = wb.getValue({ sheet: 0, row: 3, col: 0 });
+      const targetValueBefore = wb.getValue({ sheet: 0, row: 1, col: 0 });
+      const sourceFormulaBefore = wb.cellFormula({ sheet: 0, row: 3, col: 1 });
+
+      fireContextMenu(host, 10, 59); // row 1 header
+      const insertItem = item('insertCopiedCells');
+      expect(insertItem?.disabled).toBe(false);
+      expect(insertItem?.textContent).toBe(en.contextMenu.insertCutCells);
+      insertItem?.click();
+      wb.recalc();
+
+      expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual(sourceValueBefore);
+      expect(wb.getValue({ sheet: 0, row: 2, col: 0 })).toEqual(targetValueBefore);
+      expect(wb.getValue({ sheet: 0, row: 3, col: 0 })).toEqual({ kind: 'blank' });
+      expect(wb.cellFormula({ sheet: 0, row: 1, col: 1 })).toBe('=A2');
+      expect(wb.cellFormula({ sheet: 0, row: 3, col: 1 })).toBeNull();
+      expect(store.getState().selection.range).toEqual({
+        sheet: 0,
+        r0: 1,
+        c0: 0,
+        r1: 1,
+        c1: 16_383,
+      });
+      expect(store.getState().ui.copyRange).toBeNull();
+      expect(store.getState().ui.copyMode).toBeNull();
+      expect(history.canUndo()).toBe(true);
+      expect(onAfterCommit).toHaveBeenCalledTimes(1);
+
+      expect(history.undo()).toBe(true);
+      wb.recalc();
+      expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual(targetValueBefore);
+      expect(wb.getValue({ sheet: 0, row: 3, col: 0 })).toEqual(sourceValueBefore);
+      expect(wb.cellFormula({ sheet: 0, row: 3, col: 1 })).toBe(sourceFormulaBefore);
+      expect(store.getState().selection).toEqual(selectionBefore);
+      expect(store.getState().ui.copyRange).toBeNull();
+      expect(store.getState().ui.copyMode).toBeNull();
+    });
+
     it('shows the plain row insert entries outside copy mode', () => {
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
       fireContextMenu(host, 10, 30);
@@ -1516,6 +1578,70 @@ describe('attachContextMenu', () => {
   });
 
   describe('col structure', () => {
+    it('inserts a whole-column cut at the header target and preserves surrounding columns', () => {
+      const history = new History();
+      seed(store, wb, [
+        { row: 0, col: 1, value: 'target' },
+        { row: 0, col: 3, value: 'source' },
+      ]);
+      wb.setFormula({ sheet: 0, row: 1, col: 3 }, '=D1');
+      wb.recalc();
+      mutators.replaceCells(store, wb.cells(0));
+
+      mutators.selectCol(store, 3);
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        strings: en,
+        history,
+        onAfterCommit,
+      });
+      fireContextMenu(host, 252, 10); // col 3 header
+      item('cut')?.click();
+
+      mutators.selectCol(store, 1);
+      const selectionBefore = store.getState().selection;
+      const sourceValueBefore = wb.getValue({ sheet: 0, row: 0, col: 3 });
+      const targetValueBefore = wb.getValue({ sheet: 0, row: 0, col: 1 });
+      const sourceFormulaBefore = wb.cellFormula({ sheet: 0, row: 1, col: 3 });
+
+      fireContextMenu(host, 124, 10); // col 1 header
+
+      const insertItem = item('insertCopiedCells');
+      expect(insertItem?.disabled).toBe(false);
+      expect(insertItem?.textContent).toBe(en.contextMenu.insertCutCells);
+      insertItem?.click();
+      wb.recalc();
+
+      expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual(sourceValueBefore);
+      expect(wb.getValue({ sheet: 0, row: 0, col: 2 })).toEqual(targetValueBefore);
+      expect(wb.getValue({ sheet: 0, row: 0, col: 3 })).toEqual({ kind: 'blank' });
+      expect(wb.cellFormula({ sheet: 0, row: 1, col: 1 })).toBe('=B1');
+      expect(wb.cellFormula({ sheet: 0, row: 1, col: 3 })).toBeNull();
+      expect(store.getState().selection.range).toEqual({
+        sheet: 0,
+        r0: 0,
+        c0: 1,
+        r1: 1_048_575,
+        c1: 1,
+      });
+      expect(store.getState().ui.copyRange).toBeNull();
+      expect(store.getState().ui.copyMode).toBeNull();
+      expect(history.canUndo()).toBe(true);
+      expect(onAfterCommit).toHaveBeenCalledTimes(1);
+
+      expect(history.undo()).toBe(true);
+      wb.recalc();
+      expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual(targetValueBefore);
+      expect(wb.getValue({ sheet: 0, row: 0, col: 3 })).toEqual(sourceValueBefore);
+      expect(wb.cellFormula({ sheet: 0, row: 1, col: 3 })).toBe(sourceFormulaBefore);
+      expect(store.getState().selection).toEqual(selectionBefore);
+      expect(store.getState().ui.copyRange).toBeNull();
+      expect(store.getState().ui.copyRanges).toBeNull();
+      expect(store.getState().ui.copyMode).toBeNull();
+    });
+
     it('Insert Copied Cells opens whole columns and drops the copied band into them', async () => {
       vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('');
       const snap: ClipboardSnapshot = {

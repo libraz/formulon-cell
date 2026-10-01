@@ -9,6 +9,7 @@ export const ja: Strings = {
     pasteSpecial: '形式を選択して貼り付け…',
     insertCopiedCells: 'コピーしたセルの挿入…',
     insertCopiedBand: 'コピーしたセルの挿入',
+    insertCutCells: '切り取ったセルの挿入',
     clear: 'クリア',
     bold: '太字',
     italic: '斜体',

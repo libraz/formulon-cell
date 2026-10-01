@@ -20,6 +20,8 @@ export interface Strings {
     /** Row/column-header variant. Inserts whole rows/columns straight away, so
      *  unlike `insertCopiedCells` it carries no dialog ellipsis. */
     insertCopiedBand: string;
+    /** Row/column-header variant for a pending whole-row/column cut. */
+    insertCutCells: string;
     clear: string;
     bold: string;
     italic: string;

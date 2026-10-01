@@ -229,15 +229,21 @@ describe('attachClipboard', () => {
     const handle = attachClipboard({ host, store, wb, onAfterCommit });
 
     const { transfer } = fireClipboard(host, 'copy');
-    setRange(store, 4, 4, 4, 4);
+    setRange(store, 0, 4, 0, 4);
     const { event } = fireClipboard(host, 'paste', transfer.getData('text/plain'));
 
     expect(event.defaultPrevented).toBe(true);
-    expect(formatAt(store, 4, 4)).toMatchObject({
+    expect(formatAt(store, 9, 4)).toMatchObject({
       hyperlink: 'https://example.test',
       bold: true,
     });
-    expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 4, c0: 4, r1: 4, c1: 4 });
+    expect(store.getState().selection.range).toEqual({
+      sheet: 0,
+      r0: 0,
+      c0: 4,
+      r1: 1_048_575,
+      c1: 4,
+    });
     expect(onAfterCommit).toHaveBeenCalledTimes(1);
     handle.detach();
   });

@@ -854,6 +854,191 @@ describe('Spreadsheet.mountToolbar', () => {
     tb.dispose();
   });
 
+  it('directly inserts and deletes whole rows and columns from generic Cells actions', () => {
+    seedNumber(sheet, 2, 0, 10);
+    seedNumber(sheet, 0, 2, 20);
+    sheet.instance.history.clear();
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    const insertButton = host.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="insertRows"]',
+    );
+    const deleteButton = host.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="deleteRows"]',
+    );
+    expect(insertButton).toBeTruthy();
+    expect(deleteButton).toBeTruthy();
+
+    const clickGenericInsert = (): void => {
+      tb.dropdownsApi?.openDynamicRibbonDropdown(
+        { command: 'insertRows', menuId: 'menu-insert-cells' },
+        insertButton as HTMLButtonElement,
+      );
+      const button = host.querySelector<HTMLButtonElement>('[data-cell-insert="cells"]');
+      expect(button).toBeTruthy();
+      const event = new MouseEvent('click', { bubbles: true });
+      Object.defineProperty(event, 'target', { value: button });
+      expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
+    };
+    const clickGenericDelete = (): void => {
+      tb.dropdownsApi?.openDynamicRibbonDropdown(
+        { command: 'deleteRows', menuId: 'menu-delete-cells' },
+        deleteButton as HTMLButtonElement,
+      );
+      const button = host.querySelector<HTMLButtonElement>('[data-cell-delete="cells"]');
+      expect(button).toBeTruthy();
+      const event = new MouseEvent('click', { bubbles: true });
+      Object.defineProperty(event, 'target', { value: button });
+      expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
+    };
+
+    mutators.setRange(sheet.instance.store, {
+      sheet: 0,
+      r0: 1,
+      c0: 0,
+      r1: 1,
+      c1: 16_383,
+    });
+    clickGenericInsert();
+    expect(document.querySelector('.fc-cellshift')).toBeNull();
+    expect(sheet.workbook.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'blank' });
+    expect(sheet.workbook.getValue({ sheet: 0, row: 3, col: 0 })).toEqual({
+      kind: 'number',
+      value: 10,
+    });
+    expect(sheet.instance.history.undo()).toBe(true);
+    expect(sheet.workbook.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({
+      kind: 'number',
+      value: 10,
+    });
+    expect(sheet.instance.history.undo()).toBe(false);
+
+    mutators.setCopyRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    mutators.setRange(sheet.instance.store, {
+      sheet: 0,
+      r0: 1,
+      c0: 0,
+      r1: 1,
+      c1: 16_383,
+    });
+    clickGenericDelete();
+    expect(document.querySelector('.fc-cellshift')).toBeNull();
+    expect(sheet.workbook.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({
+      kind: 'number',
+      value: 10,
+    });
+    expect(sheet.instance.history.undo()).toBe(true);
+    expect(sheet.workbook.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({
+      kind: 'number',
+      value: 10,
+    });
+    expect(sheet.instance.history.undo()).toBe(false);
+
+    mutators.setCopyRange(sheet.instance.store, null);
+    mutators.setRange(sheet.instance.store, {
+      sheet: 0,
+      r0: 0,
+      c0: 1,
+      r1: 1_048_575,
+      c1: 1,
+    });
+    clickGenericInsert();
+    expect(document.querySelector('.fc-cellshift')).toBeNull();
+    expect(sheet.workbook.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'blank' });
+    expect(sheet.workbook.getValue({ sheet: 0, row: 0, col: 3 })).toEqual({
+      kind: 'number',
+      value: 20,
+    });
+    expect(sheet.instance.history.undo()).toBe(true);
+    expect(sheet.workbook.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({
+      kind: 'number',
+      value: 20,
+    });
+    expect(sheet.instance.history.undo()).toBe(false);
+
+    mutators.setCopyRange(sheet.instance.store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    mutators.setRange(sheet.instance.store, {
+      sheet: 0,
+      r0: 0,
+      c0: 1,
+      r1: 1_048_575,
+      c1: 1,
+    });
+    clickGenericDelete();
+    expect(document.querySelector('.fc-cellshift')).toBeNull();
+    expect(sheet.workbook.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({
+      kind: 'number',
+      value: 20,
+    });
+    expect(sheet.instance.history.undo()).toBe(true);
+    expect(sheet.workbook.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({
+      kind: 'number',
+      value: 20,
+    });
+    expect(sheet.instance.history.undo()).toBe(false);
+
+    tb.dispose();
+  });
+
+  it('routes a whole-row cut snapshot through generic Insert Cells and restores one undo', async () => {
+    seedNumber(sheet, 1, 0, 10);
+    sheet.instance.history.clear();
+    mutators.setRange(sheet.instance.store, {
+      sheet: 0,
+      r0: 1,
+      c0: 0,
+      r1: 1,
+      c1: 16_383,
+    });
+    const clipboard = sheet.instance.clipboard;
+    if (!clipboard) throw new Error('Expected mounted clipboard handle.');
+    await clipboard.runShortcut('cut');
+    expect(clipboard.getSnapshot()?.mode).toBe('cut');
+    mutators.setRange(sheet.instance.store, {
+      sheet: 0,
+      r0: 3,
+      c0: 0,
+      r1: 3,
+      c1: 0,
+    });
+
+    const tb = Spreadsheet.mountToolbar(host, sheet.instance, {
+      dynamicDropdowns: true,
+      helpers: stubHelpers(),
+    });
+    const insertButton = host.querySelector<HTMLButtonElement>(
+      '[data-ribbon-command="insertRows"]',
+    );
+    expect(insertButton).toBeTruthy();
+    tb.dropdownsApi?.openDynamicRibbonDropdown(
+      { command: 'insertRows', menuId: 'menu-insert-cells' },
+      insertButton as HTMLButtonElement,
+    );
+    const insertCellsButton = host.querySelector<HTMLButtonElement>('[data-cell-insert="cells"]');
+    expect(insertCellsButton).toBeTruthy();
+    const event = new MouseEvent('click', { bubbles: true });
+    Object.defineProperty(event, 'target', { value: insertCellsButton });
+    expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(event)).toBe(true);
+
+    expect(document.querySelector('.fc-cellshift')).toBeNull();
+    expect(sheet.workbook.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'blank' });
+    expect(sheet.workbook.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({
+      kind: 'number',
+      value: 10,
+    });
+    expect(sheet.instance.history.undo()).toBe(true);
+    expect(sheet.workbook.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({
+      kind: 'number',
+      value: 10,
+    });
+    expect(sheet.workbook.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'blank' });
+    expect(sheet.instance.history.undo()).toBe(false);
+
+    tb.dispose();
+  });
+
   it('inserts and deletes rows, columns, and sheets through the Home Cells dropdowns', () => {
     seedNumber(sheet, 1, 0, 10);
     seedNumber(sheet, 2, 0, 20);

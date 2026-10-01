@@ -158,8 +158,18 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
     return r.r1 > r.r0 || r.c1 > r.c0;
   };
 
+  const isWholeBandSelection = (): boolean => {
+    const r = store.getState().selection.range;
+    return (r.c0 === 0 && r.c1 === 16_383) || (r.r0 === 0 && r.r1 === 1_048_575);
+  };
+
   const positionButton = (): void => {
     const state = store.getState();
+    if (isWholeBandSelection()) {
+      button.hidden = true;
+      close(false);
+      return;
+    }
     const rects = rangeRects(layoutForView(state), state.viewport, state.selection.range);
     const anchor = rects[rects.length - 1];
     if (!anchor || !isMultiSelection() || state.ui.editor.kind !== 'idle' || open) {
@@ -325,6 +335,7 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
   };
 
   const openPanel = (): void => {
+    if (isWholeBandSelection()) return;
     activeGroup = 'formatting';
     render();
     restoreFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : host;

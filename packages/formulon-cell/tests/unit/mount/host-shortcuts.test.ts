@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { copy } from '../../../src/commands/clipboard/copy.js';
+import type { ClipboardSnapshot } from '../../../src/commands/clipboard/snapshot.js';
+import { captureSnapshotFromCopyResult } from '../../../src/commands/clipboard/snapshot.js';
 import { History } from '../../../src/commands/history.js';
-import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings/en.js';
 import { createHostShortcutHandler } from '../../../src/mount/host-shortcuts.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
@@ -38,18 +41,23 @@ interface Setup {
   };
 }
 
-function makeSetup(): Setup {
+function makeSetup(
+  workbook?: WorkbookHandle,
+  getClipboardSnapshot?: () => ClipboardSnapshot | null,
+): Setup {
   const addSheet = vi.fn();
   const recalc = vi.fn();
   const cells = vi.fn().mockReturnValue([]);
   const invalidate = vi.fn();
   const setNumber = vi.fn();
-  const wb = {
-    capabilities: {},
-    recalc,
-    cells,
-    setNumber,
-  } as unknown as WorkbookHandle;
+  const wb =
+    workbook ??
+    ({
+      capabilities: {},
+      recalc,
+      cells,
+      setNumber,
+    } as unknown as WorkbookHandle);
   const store = createSpreadsheetStore();
   const history = new History();
   const host = document.createElement('div');
@@ -71,6 +79,7 @@ function makeSetup(): Setup {
     findReplace: () => feature.findReplace,
     formatDialog: () => feature.formatDialog,
     formatPainter: () => feature.formatPainter,
+    getClipboardSnapshot,
     goToDialog: () => feature.goToDialog,
     history,
     host,
@@ -99,6 +108,13 @@ function makeSetup(): Setup {
     hostTag,
     feature,
   };
+}
+
+async function makeRealSetup(): Promise<Setup> {
+  const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+  const setup = makeSetup(workbook);
+  workbook.attachHistory(setup.history);
+  return setup;
 }
 
 function key(over: Partial<KeyboardEventInit & { key: string }>): KeyboardEvent {
@@ -217,6 +233,111 @@ describe('mount/host-shortcuts', () => {
       kind === 'insert' ? en.ribbonMenu.insertCells : en.ribbonMenu.deleteCells,
     );
     expect(e.defaultPrevented).toBe(true);
+  });
+
+  it('inserts selected whole rows directly and groups the shortcut into one undo', async () => {
+    document.querySelectorAll('.fc-cellshift').forEach((dialog) => {
+      dialog.remove();
+    });
+    s = await makeRealSetup();
+    s.wb.setNumber({ sheet: 0, row: 3, col: 0 }, 10);
+    mutators.setRange(s.store, {
+      sheet: 0,
+      r0: 2,
+      c0: 0,
+      r1: 3,
+      c1: 16_383,
+    });
+    s.history.clear();
+
+    const e = key({ key: '+', code: 'Equal', ctrlKey: true, shiftKey: true });
+    s.handler(e);
+
+    expect(document.querySelector('.fc-cellshift')).toBeNull();
+    expect(s.wb.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'blank' });
+    expect(s.wb.getValue({ sheet: 0, row: 3, col: 0 })).toEqual({ kind: 'blank' });
+    expect(s.wb.getValue({ sheet: 0, row: 5, col: 0 })).toEqual({ kind: 'number', value: 10 });
+    expect(s.history.undo()).toBe(true);
+    expect(s.wb.getValue({ sheet: 0, row: 3, col: 0 })).toEqual({ kind: 'number', value: 10 });
+    expect(s.history.undo()).toBe(false);
+  });
+
+  it('deletes selected whole columns directly and restores them with one undo', async () => {
+    document.querySelectorAll('.fc-cellshift').forEach((dialog) => {
+      dialog.remove();
+    });
+    s = await makeRealSetup();
+    s.wb.setNumber({ sheet: 0, row: 0, col: 3 }, 10);
+    mutators.setRange(s.store, {
+      sheet: 0,
+      r0: 0,
+      c0: 2,
+      r1: 1_048_575,
+      c1: 2,
+    });
+    mutators.setCopyRange(s.store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    s.history.clear();
+
+    const e = key({ key: '-', code: 'Minus', ctrlKey: true });
+    s.handler(e);
+
+    expect(document.querySelector('.fc-cellshift')).toBeNull();
+    expect(s.wb.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({ kind: 'number', value: 10 });
+    expect(s.wb.getValue({ sheet: 0, row: 0, col: 3 })).toEqual({ kind: 'blank' });
+    expect(s.history.undo()).toBe(true);
+    expect(s.wb.getValue({ sheet: 0, row: 0, col: 3 })).toEqual({ kind: 'number', value: 10 });
+    expect(s.history.undo()).toBe(false);
+  });
+
+  it('routes a whole-row cut snapshot through Ctrl+Plus and restores it with one undo', async () => {
+    document.querySelectorAll('.fc-cellshift').forEach((dialog) => {
+      dialog.remove();
+    });
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    let snapshot: ClipboardSnapshot | null = null;
+    s = makeSetup(workbook, () => snapshot);
+    workbook.attachHistory(s.history);
+    workbook.setNumber({ sheet: 0, row: 1, col: 0 }, 10);
+    mutators.replaceCells(s.store, workbook.cells(0));
+    const source = { sheet: 0, r0: 1, c0: 0, r1: 1, c1: 16_383 };
+    mutators.setRange(s.store, source);
+    const copied = copy(s.store.getState());
+    snapshot = copied ? captureSnapshotFromCopyResult(s.store.getState(), copied, 'cut') : null;
+    expect(snapshot?.mode).toBe('cut');
+    mutators.setCopyRange(s.store, source, 'cut');
+    mutators.setRange(s.store, { sheet: 0, r0: 3, c0: 0, r1: 3, c1: 0 });
+    s.history.clear();
+
+    s.handler(key({ key: '+', code: 'Equal', ctrlKey: true, shiftKey: true }));
+
+    expect(document.querySelector('.fc-cellshift')).toBeNull();
+    expect(workbook.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'blank' });
+    expect(workbook.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({
+      kind: 'number',
+      value: 10,
+    });
+    expect(s.history.undo()).toBe(true);
+    expect(workbook.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({
+      kind: 'number',
+      value: 10,
+    });
+    expect(workbook.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'blank' });
+    expect(s.history.undo()).toBe(false);
+  });
+
+  it('keeps whole-band shortcuts on the direction dialog while copy is active', () => {
+    mutators.setRange(s.store, {
+      sheet: 0,
+      r0: 2,
+      c0: 0,
+      r1: 2,
+      c1: 16_383,
+    });
+    mutators.setCopyRange(s.store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+
+    s.handler(key({ key: '+', code: 'Equal', ctrlKey: true, shiftKey: true }));
+
+    expect(document.querySelector('.fc-cellshift')).not.toBeNull();
   });
 
   it.each([

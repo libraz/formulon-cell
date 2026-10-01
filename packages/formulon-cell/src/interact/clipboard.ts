@@ -2,8 +2,15 @@ import { type CopyResult, copy } from '../commands/clipboard/copy.js';
 import { cut } from '../commands/clipboard/cut.js';
 import { encodeHtml } from '../commands/clipboard/html.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
-import { pasteSpecial, resolvePasteDestination } from '../commands/clipboard/paste-special.js';
-import { type ClipboardSnapshot, captureSnapshot } from '../commands/clipboard/snapshot.js';
+import {
+  materializedPasteCells,
+  pasteSpecial,
+  resolvePasteDestination,
+} from '../commands/clipboard/paste-special.js';
+import {
+  type ClipboardSnapshot,
+  captureSnapshotFromCopyResult,
+} from '../commands/clipboard/snapshot.js';
 import { encodeTSV, parseTSV } from '../commands/clipboard/tsv.js';
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
@@ -60,6 +67,8 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
   const valueOnlySnapshot = (source: ClipboardSnapshot): ClipboardSnapshot => ({
     ...source,
     mode: 'copy',
+    rowHeights: new Map(),
+    colWidths: new Map(),
     cells: source.cells.map((row) =>
       row.map((cell) => ({ formula: null, value: cell.value, format: undefined })),
     ),
@@ -112,25 +121,40 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
           )
         : undefined;
     if (internal) {
-      for (let row = 0; row < destinationRows; row += 1) {
-        const sourceRow = row % internal.rows;
-        for (let col = 0; col < destinationCols; col += 1) {
-          if (
-            scalarMerge &&
-            (destination.r0 + row !== scalarMerge.r0 || destination.c0 + col !== scalarMerge.c0)
-          ) {
+      const bandCells = materializedPasteCells(internal, destination);
+      if (bandCells) {
+        for (const cell of bandCells) {
+          if (scalarMerge && (cell.row !== scalarMerge.r0 || cell.col !== scalarMerge.c0)) {
             continue;
           }
-          const sourceCol = col % internal.cols;
-          const addr = {
-            sheet: destination.sheet,
-            row: destination.r0 + row,
-            col: destination.c0 + col,
-          };
           changes.push({
-            addr,
-            value: internal.cells[sourceRow]?.[sourceCol]?.value ?? { kind: 'blank' },
+            addr: { sheet: destination.sheet, row: cell.row, col: cell.col },
+            value: internal.cells[cell.sourceRowIndex]?.[cell.sourceColIndex]?.value ?? {
+              kind: 'blank',
+            },
           });
+        }
+      } else {
+        for (let row = 0; row < destinationRows; row += 1) {
+          const sourceRow = row % internal.rows;
+          for (let col = 0; col < destinationCols; col += 1) {
+            if (
+              scalarMerge &&
+              (destination.r0 + row !== scalarMerge.r0 || destination.c0 + col !== scalarMerge.c0)
+            ) {
+              continue;
+            }
+            const sourceCol = col % internal.cols;
+            const addr = {
+              sheet: destination.sheet,
+              row: destination.r0 + row,
+              col: destination.c0 + col,
+            };
+            changes.push({
+              addr,
+              value: internal.cells[sourceRow]?.[sourceCol]?.value ?? { kind: 'blank' },
+            });
+          }
         }
       }
     } else {
@@ -197,15 +221,52 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       for (const cell of wb.cells(sourceSheet)) {
         sourceCells.set(addrKey(cell.addr), { value: cell.value, formula: cell.formula });
       }
+      const sourceIsActive = sourceSheet === state.data.sheetIndex;
+      const sourceLogical = { ...ui.copyRange };
+      const sourceMerges = sourceIsActive
+        ? state.merges
+        : (() => {
+            const engineMerges = wb.getMerges(sourceSheet);
+            const merges =
+              engineMerges.length > 0
+                ? engineMerges
+                : (snapshot?.merges ?? []).map((merge) => ({
+                    sheet: sourceSheet,
+                    r0: (snapshot?.range.r0 ?? 0) + merge.r0,
+                    c0: (snapshot?.range.c0 ?? 0) + merge.c0,
+                    r1: (snapshot?.range.r0 ?? 0) + merge.r1,
+                    c1: (snapshot?.range.c0 ?? 0) + merge.c1,
+                  }));
+            const byAnchor = new Map<string, Range>();
+            for (const merge of merges) {
+              byAnchor.set(addrKey({ sheet: sourceSheet, row: merge.r0, col: merge.c0 }), merge);
+            }
+            return { byAnchor, byCell: new Map<string, string>() };
+          })();
+      const sourceLayout = sourceIsActive
+        ? state.layout
+        : (() => {
+            const rowHeights = new Map<number, number>();
+            const colWidths = new Map<number, number>();
+            for (const [offset, height] of snapshot?.rowHeights ?? []) {
+              rowHeights.set(sourceLogical.r0 + offset, height);
+            }
+            for (const [offset, width] of snapshot?.colWidths ?? []) {
+              colWidths.set(sourceLogical.c0 + offset, width);
+            }
+            return { ...state.layout, rowHeights, colWidths };
+          })();
       const sourceState: State = {
         ...state,
         data: { ...state.data, sheetIndex: sourceSheet, cells: sourceCells },
+        merges: sourceMerges,
+        layout: sourceLayout,
         selection: { ...state.selection, range: { ...ui.copyRange }, extraRanges: [] },
       };
       const materialized = copy(sourceState);
-      const ranges = materialized?.payloadRanges ?? (materialized ? [materialized.range] : []);
-      const refreshed =
-        ranges.length === 1 && ranges[0] ? captureSnapshot(sourceState, ranges[0], 'copy') : null;
+      const refreshed = materialized
+        ? captureSnapshotFromCopyResult(sourceState, materialized, 'copy')
+        : null;
       // Keep snapshotText untouched: it is the system clipboard token that
       // proves this is still the workbook's internal payload. Only the
       // structured cell snapshot is re-materialized.
@@ -247,11 +308,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     result: CopyResult,
     mode: 'copy' | 'cut',
   ): ClipboardSnapshot | null => {
-    const ranges = materializedRanges(result);
-    if (ranges.length !== 1) return null;
-    const range = ranges[0];
-    if (!range) return null;
-    return captureSnapshot(state, range, mode);
+    return captureSnapshotFromCopyResult(state, result, mode);
   };
   const encodeMaterializedHtml = (state: State, result: CopyResult): string =>
     materializedRanges(result)
@@ -260,6 +317,21 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
   const hasPastePayload = (text: string): boolean =>
     text.length > 0 ||
     (snapshot !== null && snapshotText === text && hasLiveInternalPayload(store.getState()));
+
+  const captureDestinationSnapshot = (state: State, range: Range): ClipboardSnapshot | null => {
+    const captureState: State = {
+      ...state,
+      selection: {
+        ...state.selection,
+        active: { sheet: range.sheet, row: range.r0, col: range.c0 },
+        anchor: { sheet: range.sheet, row: range.r0, col: range.c0 },
+        range: { ...range },
+        extraRanges: [],
+      },
+    };
+    const result = copy(captureState);
+    return result ? captureSnapshotFromCopyResult(captureState, result) : null;
+  };
 
   /** A cut can only be pasted once, so its marquee is consumed by the paste.
    *  A copy marquee stays up for repeat pastes, exactly like the desktop app. */
@@ -282,7 +354,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     if (snapshot && snapshotText === text && hasLiveInternalPayload(state)) {
       const source = snapshot;
       const beforeRange = snapshotDestRange(state, source);
-      const before = beforeRange ? captureSnapshot(state, beforeRange) : null;
+      const before = beforeRange ? captureDestinationSnapshot(state, beforeRange) : null;
       let result: { writtenRange: Range } | null = null;
       result = pasteSpecial(
         state,

@@ -9,6 +9,7 @@ export const en: Strings = {
     pasteSpecial: 'Paste Special…',
     insertCopiedCells: 'Insert Copied Cells…',
     insertCopiedBand: 'Insert Copied Cells',
+    insertCutCells: 'Insert Cut Cells',
     clear: 'Clear',
     bold: 'Bold',
     italic: 'Italic',

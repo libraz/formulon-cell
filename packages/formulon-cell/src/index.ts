@@ -43,10 +43,14 @@ export { encodeCSV, parseCSV } from './commands/clipboard/csv.js';
 export { cut } from './commands/clipboard/cut.js';
 export { encodeHtml } from './commands/clipboard/html.js';
 export type {
+  InsertCopiedBandTarget,
   InsertCopiedCellsDirection,
   InsertCopiedCellsResult,
 } from './commands/clipboard/insert-copied-cells.js';
-export { insertCopiedCellsFromTSV } from './commands/clipboard/insert-copied-cells.js';
+export {
+  insertCopiedBand,
+  insertCopiedCellsFromTSV,
+} from './commands/clipboard/insert-copied-cells.js';
 export type { PasteResult } from './commands/clipboard/paste.js';
 export { pasteTSV } from './commands/clipboard/paste.js';
 export type {
@@ -60,7 +64,10 @@ export type {
   ClipboardCell,
   ClipboardSnapshot,
 } from './commands/clipboard/snapshot.js';
-export { captureSnapshot } from './commands/clipboard/snapshot.js';
+export {
+  captureSnapshot,
+  captureSnapshotFromCopyResult,
+} from './commands/clipboard/snapshot.js';
 export { encodeTSV, parseTSV } from './commands/clipboard/tsv.js';
 export type { CoercedInput, CoerceInputOptions } from './commands/coerce-input.js';
 export {
@@ -241,6 +248,7 @@ export {
 export type {
   FormatSnapshot,
   HistoryEntry,
+  HistoryTransaction,
   LayoutSnapshot,
   MergesSnapshot,
   TablesSnapshot,
