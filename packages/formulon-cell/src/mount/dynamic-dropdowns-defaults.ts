@@ -134,6 +134,7 @@ import {
   unwatchCell,
   watchRange,
 } from '../index.js';
+import { openCellShiftDialog } from '../interact/cell-shift-dialog.js';
 import { sheetTabColorActionForColor, sheetTabColorByAction } from '../sheet-tab-colors.js';
 import { formatWithPending } from '../store/pending-format.js';
 import { showAdvancedFilterDialog } from '../toolbar/dialogs/advanced-filter.js';
@@ -216,36 +217,12 @@ const addrInRange = (addr: { sheet: number; row: number; col: number }, range: R
 const buildFillDirection =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyFillDirection'] =>
   (direction) => {
-    if (direction === 'flash') {
-      executeRibbonFillAction({
-        store: instance.store,
-        workbook: instance.workbook,
-        history: instance.history,
-        action: direction satisfies RibbonFillAction,
-      });
-      instance.host.focus();
-      return;
-    }
-    const range = normalizedSelectionRange(instance);
-    let src: Range = range;
-    if (direction === 'down') src = { ...range, r1: range.r0 };
-    else if (direction === 'up') src = { ...range, r0: range.r1 };
-    else if (direction === 'right') src = { ...range, c1: range.c0 };
-    else src = { ...range, c0: range.c1 };
-    if (src.r0 === range.r0 && src.r1 === range.r1 && src.c0 === range.c0 && src.c1 === range.c1) {
-      return;
-    }
-    instance.history.begin();
-    try {
-      recordFormatChange(instance.history, instance.store, () => {
-        fillRange(instance.store.getState(), instance.workbook, src, range, {
-          formatting: 'with',
-          store: instance.store,
-        });
-      });
-    } finally {
-      instance.history.end();
-    }
+    executeRibbonFillAction({
+      store: instance.store,
+      workbook: instance.workbook,
+      history: instance.history,
+      action: direction satisfies RibbonFillAction,
+    });
     instance.host.focus();
   };
 
@@ -927,8 +904,24 @@ const updatePasteMenu =
 const buildCellInsertAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyCellInsertAction'] =>
   (action) => {
+    if (action === 'cells') {
+      openCellShiftDialog({
+        host: instance.host,
+        strings: instance.i18n.strings,
+        kind: 'insert',
+        onSubmit: (direction) => {
+          if (direction !== 'down' && direction !== 'right') return;
+          handleInsertCellsAction(instance, direction === 'down' ? 'shiftDown' : 'shiftRight');
+          mutators.replaceCells(
+            instance.store,
+            instance.workbook.cells(instance.store.getState().data.sheetIndex),
+          );
+          instance.host.focus();
+        },
+      });
+      return;
+    }
     const mapped: Record<string, Parameters<typeof handleInsertCellsAction>[1]> = {
-      cells: 'shiftDown',
       'shift-down': 'shiftDown',
       'shift-right': 'shiftRight',
       rows: 'rows',
@@ -944,8 +937,24 @@ const buildCellInsertAction =
 const buildCellDeleteAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyCellDeleteAction'] =>
   (action) => {
+    if (action === 'cells') {
+      openCellShiftDialog({
+        host: instance.host,
+        strings: instance.i18n.strings,
+        kind: 'delete',
+        onSubmit: (direction) => {
+          if (direction !== 'up' && direction !== 'left') return;
+          handleDeleteCellsAction(instance, direction === 'up' ? 'shiftUp' : 'shiftLeft');
+          mutators.replaceCells(
+            instance.store,
+            instance.workbook.cells(instance.store.getState().data.sheetIndex),
+          );
+          instance.host.focus();
+        },
+      });
+      return;
+    }
     const mapped: Record<string, Parameters<typeof handleDeleteCellsAction>[1]> = {
-      cells: 'shiftUp',
       'shift-up': 'shiftUp',
       'shift-left': 'shiftLeft',
       rows: 'rows',

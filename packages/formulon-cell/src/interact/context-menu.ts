@@ -4,7 +4,11 @@ import { copy } from '../commands/clipboard/copy.js';
 import { cut } from '../commands/clipboard/cut.js';
 import { insertCopiedCellsFromTSV } from '../commands/clipboard/insert-copied-cells.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
-import { type PasteWhat, pasteSpecial } from '../commands/clipboard/paste-special.js';
+import {
+  type PasteWhat,
+  pasteSpecial,
+  resolvePasteDestination,
+} from '../commands/clipboard/paste-special.js';
 import { type ClipboardSnapshot, captureSnapshot } from '../commands/clipboard/snapshot.js';
 import { parseTSV } from '../commands/clipboard/tsv.js';
 import { clearComment } from '../commands/comment.js';
@@ -1236,11 +1240,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     const snap = clipboardSnapshot();
     if (!snap) return;
     const state = store.getState();
-    const destination = pasteDestinationRange(
-      state.selection.active,
-      transpose ? snap.cols : snap.rows,
-      transpose ? snap.rows : snap.cols,
-    );
+    const destination = resolvePasteDestination(state, snap, transpose);
     if (!canPasteToRange(destination)) return;
     if (history) history.begin();
     try {
@@ -1507,7 +1507,10 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           const cols = snap
             ? snap.cols
             : tsvRows.reduce((max, row) => Math.max(max, row.length), 0);
-          if (!canPasteToRange(pasteDestinationRange(pasteState.selection.active, rows, cols))) {
+          const destination = snap
+            ? resolvePasteDestination(pasteState, snap)
+            : pasteDestinationRange(pasteState.selection.active, rows, cols);
+          if (!canPasteToRange(destination)) {
             return;
           }
           if (history) history.begin();
@@ -1730,11 +1733,18 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         // restores the original order.
         if (history) history.begin();
         try {
-          sortRange(state, store, wb, range, {
-            byCol: state.selection.active.col,
-            direction: id === 'sortAsc' ? 'asc' : 'desc',
-            hasHeader: inferSortHasHeader(state, range),
-          });
+          sortRange(
+            state,
+            store,
+            wb,
+            range,
+            {
+              byCol: state.selection.active.col,
+              direction: id === 'sortAsc' ? 'asc' : 'desc',
+              hasHeader: inferSortHasHeader(state, range),
+            },
+            history,
+          );
         } finally {
           if (history) history.end();
         }

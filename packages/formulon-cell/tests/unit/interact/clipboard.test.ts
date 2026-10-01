@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
+import {
+  InteractionController,
+  registerInteractionController,
+} from '../../../src/commands/interaction-controller.js';
+import { fixedFormPolicy } from '../../../src/commands/interaction-policy.js';
 import { insertRows } from '../../../src/commands/structure.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachClipboard } from '../../../src/interact/clipboard.js';
@@ -94,6 +99,7 @@ describe('attachClipboard', () => {
   let store: SpreadsheetStore;
   let wb: WorkbookHandle;
   let onAfterCommit: Mock<() => void>;
+  let unregisterController: (() => void) | null;
 
   beforeEach(async () => {
     host = document.createElement('div');
@@ -101,9 +107,11 @@ describe('attachClipboard', () => {
     store = createSpreadsheetStore();
     wb = await newWb();
     onAfterCommit = vi.fn<() => void>();
+    unregisterController = null;
   });
 
   afterEach(() => {
+    unregisterController?.();
     document.body.innerHTML = '';
   });
 
@@ -348,6 +356,72 @@ describe('attachClipboard', () => {
     fireClipboard(host, 'paste', transfer.getData('text/plain'));
     wb.recalc();
     expect(wb.getValue({ sheet: 0, row: 5, col: 5 })).toEqual({ kind: 'text', value: 'a' });
+    handle.detach();
+  });
+
+  it('repeats a copied 2x2 matrix across a 4x4 selection with one undo step', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 1 },
+      { row: 0, col: 1, value: 2, formula: '=A1*2' },
+      { row: 1, col: 0, value: 3 },
+      { row: 1, col: 1, value: 6, formula: '=A2*2' },
+    ]);
+    setFormat(store, 1, 1, { bold: true, fill: '#fff2cc' });
+    setRange(store, 0, 0, 1, 1);
+    const history = new History();
+    const handle = attachClipboard({ host, history, store, wb, onAfterCommit });
+
+    const { transfer } = fireClipboard(host, 'copy');
+    setRange(store, 0, 3, 3, 6);
+    fireClipboard(host, 'paste', transfer.getData('text/plain'));
+    wb.recalc();
+
+    expect(wb.getValue({ sheet: 0, row: 3, col: 6 })).toEqual({ kind: 'number', value: 6 });
+    expect(wb.cellFormula({ sheet: 0, row: 3, col: 6 })).toBe('=F4*2');
+    expect(formatAt(store, 3, 6)).toMatchObject({ bold: true, fill: '#fff2cc' });
+    expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 0, c0: 3, r1: 3, c1: 6 });
+
+    expect(history.undo()).toBe(true);
+    wb.recalc();
+    for (let row = 0; row <= 3; row += 1) {
+      for (let col = 3; col <= 6; col += 1) {
+        expect(wb.getValue({ sheet: 0, row, col }).kind).toBe('blank');
+        expect(formatAt(store, row, col)).toBeUndefined();
+      }
+    }
+    expect(history.canUndo()).toBe(false);
+
+    expect(history.redo()).toBe(true);
+    wb.recalc();
+    expect(wb.cellFormula({ sheet: 0, row: 3, col: 6 })).toBe('=F4*2');
+    expect(formatAt(store, 3, 6)).toMatchObject({ bold: true, fill: '#fff2cc' });
+    handle.detach();
+  });
+
+  it('repeats internal values across a bounded fixed-form selection', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 1 },
+      { row: 0, col: 1, value: 2 },
+      { row: 1, col: 0, value: 3 },
+      { row: 1, col: 1, value: 4 },
+    ]);
+    setRange(store, 0, 0, 1, 1);
+    const history = new History();
+    const controller = new InteractionController({ store, history, getWb: () => wb });
+    controller.setPolicy(fixedFormPolicy({ ranges: [{ sheet: 0, r0: 0, c0: 3, r1: 3, c1: 6 }] }));
+    unregisterController = registerInteractionController(store, controller);
+    const handle = attachClipboard({ host, history, store, wb, onAfterCommit });
+
+    const { transfer } = fireClipboard(host, 'copy');
+    setRange(store, 0, 3, 3, 6);
+    fireClipboard(host, 'paste', transfer.getData('text/plain'));
+    wb.recalc();
+
+    expect(wb.getValue({ sheet: 0, row: 3, col: 6 })).toEqual({ kind: 'number', value: 4 });
+    expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 0, c0: 3, r1: 3, c1: 6 });
+    expect(onAfterCommit).toHaveBeenCalledTimes(1);
+    expect(history.undo()).toBe(true);
+    expect(wb.getValue({ sheet: 0, row: 3, col: 6 }).kind).toBe('blank');
     handle.detach();
   });
 

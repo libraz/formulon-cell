@@ -1,5 +1,5 @@
 import { deleteCells, insertCells } from '../commands/cell-shift.js';
-import { executeRibbonFillAction, fillRange } from '../commands/fill.js';
+import { executeRibbonFillAction } from '../commands/fill.js';
 import { clearFilter, recordFilterChange, setAutoFilter } from '../commands/filter.js';
 import {
   applyFormatPatch,
@@ -325,28 +325,38 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       if (restricted) return;
       const r = input.store.getState().selection.range;
       if (r.r1 > r.r0) {
-        fillRange(
-          input.store.getState(),
-          currentWb,
-          { sheet: r.sheet, r0: r.r0, c0: r.c0, r1: r.r0, c1: r.c1 },
-          r,
-          { formatting: 'with', store: input.store },
-        );
-        mutators.replaceCells(input.store, currentWb.cells(input.store.getState().data.sheetIndex));
+        const changed = executeRibbonFillAction({
+          store: input.store,
+          workbook: currentWb,
+          history: input.history,
+          action: 'down',
+        });
+        if (changed) {
+          mutators.replaceCells(
+            input.store,
+            currentWb.cells(input.store.getState().data.sheetIndex),
+          );
+          input.invalidate();
+        }
       }
     } else if (k === 'r') {
       e.preventDefault();
       if (restricted) return;
       const r = input.store.getState().selection.range;
       if (r.c1 > r.c0) {
-        fillRange(
-          input.store.getState(),
-          currentWb,
-          { sheet: r.sheet, r0: r.r0, c0: r.c0, r1: r.r1, c1: r.c0 },
-          r,
-          { formatting: 'with', store: input.store },
-        );
-        mutators.replaceCells(input.store, currentWb.cells(input.store.getState().data.sheetIndex));
+        const changed = executeRibbonFillAction({
+          store: input.store,
+          workbook: currentWb,
+          history: input.history,
+          action: 'right',
+        });
+        if (changed) {
+          mutators.replaceCells(
+            input.store,
+            currentWb.cells(input.store.getState().data.sheetIndex),
+          );
+          input.invalidate();
+        }
       }
     } else if (k === 'e') {
       e.preventDefault();

@@ -1003,6 +1003,84 @@ describe('attachContextMenu', () => {
       expect(onAfterCommit).toHaveBeenCalled();
     });
 
+    it('rejects a repeated internal paste outside the designated policy range', async () => {
+      vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('');
+      const snap: ClipboardSnapshot = {
+        mode: 'copy',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        rows: 1,
+        cols: 1,
+        cells: [[{ value: { kind: 'text', value: 'copied' }, formula: null, format: undefined }]],
+      };
+      const history = new History();
+      const controller = new InteractionController({
+        store,
+        history,
+        getWb: () => wb,
+      });
+      controller.setPolicy(fixedFormPolicy({ ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 }] }));
+      unregisterController = registerInteractionController(store, controller);
+      setRange(store, 0, 0, 0, 2);
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        onAfterCommit,
+        getClipboardSnapshot: () => snap,
+      });
+
+      fireContextMenu(host, 200, 70);
+      item('paste')?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'blank' });
+      expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'blank' });
+      expect(wb.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({ kind: 'blank' });
+      expect(history.canUndo()).toBe(false);
+      expect(onAfterCommit).not.toHaveBeenCalled();
+    });
+
+    it('preflights the full repeated range for Paste Special quick actions', () => {
+      const snap: ClipboardSnapshot = {
+        mode: 'copy',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        rows: 1,
+        cols: 1,
+        cells: [[{ value: { kind: 'text', value: 'copied' }, formula: null, format: undefined }]],
+      };
+      const history = new History();
+      const controller = new InteractionController({
+        store,
+        history,
+        getWb: () => wb,
+      });
+      controller.setPolicy(fixedFormPolicy({ ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 }] }));
+      unregisterController = registerInteractionController(store, controller);
+      setRange(store, 0, 0, 0, 2);
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        onAfterCommit,
+        getClipboardSnapshot: () => snap,
+      });
+
+      fireContextMenu(host, 200, 70);
+      document
+        .querySelector<HTMLButtonElement>('[data-fc-submenu="pasteSpecialMenu"]')
+        ?.dispatchEvent(new MouseEvent('mouseenter'));
+      document
+        .querySelector<HTMLButtonElement>('.fc-ctxmenu__sub [data-fc-action="pasteAll"]')
+        ?.click();
+
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'blank' });
+      expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'blank' });
+      expect(wb.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({ kind: 'blank' });
+      expect(history.canUndo()).toBe(false);
+      expect(onAfterCommit).not.toHaveBeenCalled();
+    });
+
     it('Paste Special triggers the onPasteSpecial callback', () => {
       detach = attachContextMenu({ host, store, wb, onPasteSpecial });
       fireContextMenu(host, 200, 70);

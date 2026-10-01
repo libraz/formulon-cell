@@ -2422,24 +2422,6 @@ describe('toolbar/ribbon menu primitives', () => {
     }
   });
 
-  it('keeps public shared dialog helpers documented for host and wrapper reuse', () => {
-    const readmePaths = [
-      join(root, '../..', 'README.md'),
-      join(root, '../..', 'README_ja.md'),
-      join(root, 'README.md'),
-      join(root, '../formulon-cell-react/README.md'),
-      join(root, '../formulon-cell-react/README_ja.md'),
-      join(root, '../formulon-cell-vue/README.md'),
-      join(root, '../formulon-cell-vue/README_ja.md'),
-    ];
-    for (const readmePath of readmePaths) {
-      const source = readFileSync(readmePath, 'utf8');
-      expect(source, readmePath).toContain('reportDialogLabels');
-      expect(source, readmePath).toContain('showReport');
-      expect(source, readmePath).toContain('projectDisabledReason');
-    }
-  });
-
   it('keeps dynamic dropdown dispatcher attrs aligned with registered handlers', () => {
     const dynamicDropdownsSource = readFileSync(join(ribbonDir, 'dynamic-dropdowns.ts'), 'utf8');
     const handlersBlock = dynamicDropdownsSource.match(

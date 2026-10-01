@@ -818,6 +818,9 @@ describe('Spreadsheet.mountToolbar', () => {
     const insertEvent = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(insertEvent, 'target', { value: insertCellsButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(insertEvent)).toBe(true);
+    const insertDialog = document.querySelector<HTMLElement>('.fc-cellshift');
+    expect(insertDialog).toBeTruthy();
+    insertDialog?.querySelector<HTMLButtonElement>('.fc-cellshift__button--primary')?.click();
     expect(sheet.workbook.getValue({ sheet: 0, row: 1, col: 1 }).kind).toBe('blank');
     expect(sheet.workbook.getValue({ sheet: 0, row: 2, col: 1 })).toEqual({
       kind: 'number',
@@ -840,6 +843,9 @@ describe('Spreadsheet.mountToolbar', () => {
     const deleteEvent = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(deleteEvent, 'target', { value: deleteCellsButton });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(deleteEvent)).toBe(true);
+    const deleteDialog = document.querySelector<HTMLElement>('.fc-cellshift');
+    expect(deleteDialog).toBeTruthy();
+    deleteDialog?.querySelector<HTMLButtonElement>('.fc-cellshift__button--primary')?.click();
     expect(sheet.workbook.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({
       kind: 'number',
       value: 10,

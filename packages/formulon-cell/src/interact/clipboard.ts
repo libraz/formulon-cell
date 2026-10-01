@@ -2,7 +2,7 @@ import { type CopyResult, copy } from '../commands/clipboard/copy.js';
 import { cut } from '../commands/clipboard/cut.js';
 import { encodeHtml } from '../commands/clipboard/html.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
-import { pasteSpecial } from '../commands/clipboard/paste-special.js';
+import { pasteSpecial, resolvePasteDestination } from '../commands/clipboard/paste-special.js';
 import { type ClipboardSnapshot, captureSnapshot } from '../commands/clipboard/snapshot.js';
 import { encodeTSV, parseTSV } from '../commands/clipboard/tsv.js';
 import type { History } from '../commands/history.js';
@@ -84,13 +84,13 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
   const restrictedPaste = (state: State, text: string): { writtenRange: Range } | null => {
     const controller = interactionControllerFor(store);
     if (!controller || controller.policy === undefined) return null;
-    const origin = state.selection.active;
-    if (!isWithinNavigationBounds(pasteDestinationRange(state, text))) return null;
     const internal =
       snapshot && snapshotText === text && hasLiveInternalPayload(state) ? snapshot : null;
     const parsed = internal ? null : parseTSV(text);
-    const rowCount = internal?.cells.length ?? parsed?.length ?? 0;
-    if (rowCount === 0) return null;
+    const destination = internal
+      ? resolvePasteDestination(state, internal)
+      : pasteDestinationRange(state, text);
+    if (!destination || !isWithinNavigationBounds(destination)) return null;
     const changes: Array<
       | {
           addr: { sheet: number; row: number; col: number };
@@ -98,24 +98,55 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
         }
       | { addr: { sheet: number; row: number; col: number }; input: string }
     > = [];
-    let maxCols = 0;
-    for (let row = 0; row < rowCount; row += 1) {
-      if (internal) {
-        const line = internal.cells[row] ?? [];
-        maxCols = Math.max(maxCols, line.length);
-        for (let col = 0; col < line.length; col += 1) {
-          const addr = { sheet: origin.sheet, row: origin.row + row, col: origin.col + col };
-          changes.push({ addr, value: line[col]?.value ?? { kind: 'blank' } });
+    const destinationRows = destination.r1 - destination.r0 + 1;
+    const destinationCols = destination.c1 - destination.c0 + 1;
+    const scalarMerge =
+      internal && internal.rows === 1 && internal.cols === 1
+        ? [...state.merges.byAnchor.values()].find(
+            (merge) =>
+              merge.sheet === destination.sheet &&
+              merge.r0 === destination.r0 &&
+              merge.c0 === destination.c0 &&
+              merge.r1 === destination.r1 &&
+              merge.c1 === destination.c1,
+          )
+        : undefined;
+    if (internal) {
+      for (let row = 0; row < destinationRows; row += 1) {
+        const sourceRow = row % internal.rows;
+        for (let col = 0; col < destinationCols; col += 1) {
+          if (
+            scalarMerge &&
+            (destination.r0 + row !== scalarMerge.r0 || destination.c0 + col !== scalarMerge.c0)
+          ) {
+            continue;
+          }
+          const sourceCol = col % internal.cols;
+          const addr = {
+            sheet: destination.sheet,
+            row: destination.r0 + row,
+            col: destination.c0 + col,
+          };
+          changes.push({
+            addr,
+            value: internal.cells[sourceRow]?.[sourceCol]?.value ?? { kind: 'blank' },
+          });
         }
-      } else {
+      }
+    } else {
+      for (let row = 0; row < (parsed?.length ?? 0); row += 1) {
         const line = parsed?.[row] ?? [];
-        maxCols = Math.max(maxCols, line.length);
         for (let col = 0; col < line.length; col += 1) {
-          const addr = { sheet: origin.sheet, row: origin.row + row, col: origin.col + col };
+          const addr = {
+            sheet: destination.sheet,
+            row: destination.r0 + row,
+            col: destination.c0 + col,
+          };
           changes.push({ addr, input: line[col] ?? '' });
         }
       }
     }
+    if (changes.length === 0) return null;
     const result = controller.execute({
       type: 'cellBatch',
       operation: 'paste',
@@ -128,15 +159,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       denied: controller.policy.batchDenied,
     });
     if (result.status === 'rejected' || result.status === 'noop') return null;
-    return {
-      writtenRange: {
-        sheet: origin.sheet,
-        r0: origin.row,
-        c0: origin.col,
-        r1: origin.row + rowCount - 1,
-        c1: origin.col + Math.max(0, maxCols - 1),
-      },
-    };
+    return { writtenRange: destination };
   };
 
   const hasLiveInternalPayload = (state: State): boolean => {
@@ -196,13 +219,11 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     return hasLiveInternalPayload(state) ? snapshotText : null;
   };
 
-  const snapshotDestRange = (state: State, snap: ClipboardSnapshot): Range => ({
-    sheet: state.selection.active.sheet,
-    r0: state.selection.active.row,
-    c0: state.selection.active.col,
-    r1: state.selection.active.row + snap.rows - 1,
-    c1: state.selection.active.col + snap.cols - 1,
-  });
+  const snapshotDestRange = (
+    state: State,
+    snap: ClipboardSnapshot,
+    transpose = false,
+  ): Range | null => resolvePasteDestination(state, snap, transpose);
   const pasteDestinationRange = (state: State, text: string): Range | null => {
     const internal =
       snapshot && snapshotText === text && hasLiveInternalPayload(state) ? snapshot : null;
@@ -260,7 +281,8 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
   ): { result: { writtenRange: Range } | null; activation: PasteOptionsActivation | null } => {
     if (snapshot && snapshotText === text && hasLiveInternalPayload(state)) {
       const source = snapshot;
-      const before = captureSnapshot(state, snapshotDestRange(state, source));
+      const beforeRange = snapshotDestRange(state, source);
+      const before = beforeRange ? captureSnapshot(state, beforeRange) : null;
       let result: { writtenRange: Range } | null = null;
       result = pasteSpecial(
         state,
