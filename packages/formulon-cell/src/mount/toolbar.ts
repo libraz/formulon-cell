@@ -600,6 +600,7 @@ export function mountToolbar(
     const cmdBtn = target.closest<HTMLButtonElement>('[data-ribbon-command]');
     if (cmdBtn?.dataset.ribbonCommand) {
       const id = cmdBtn.dataset.ribbonCommand;
+      if (cmdBtn.disabled || cmdBtn.getAttribute('aria-disabled') === 'true') return;
       // WebKit follows the macOS convention of not focusing a <button> on
       // click. Ribbon keyboard navigation and host dialogs that restore focus
       // to the command that opened them both rely on the invoked command being
@@ -607,11 +608,30 @@ export function mountToolbar(
       // focuses afterwards (menu item, dialog field, the sheet) still wins.
       if (document.activeElement !== cmdBtn) cmdBtn.focus({ preventScroll: true });
       if (opts.interceptCommand?.(id, cmdBtn, e)) return;
+      // The chevron is part of the command button's DOM, so delegated clicks
+      // otherwise look identical to primary-face clicks. Route it to the
+      // attached menu before the primary action; SVG paths are covered by
+      // `closest()` just like the SVG element itself.
+      if (target.closest('.fc-tb__rb-split-chevron') && cmdBtn.dataset.ribbonMenuId) {
+        const menuId = cmdBtn.dataset.ribbonMenuId;
+        if (dropdownsApi) {
+          dropdownsApi.openDynamicRibbonDropdown({ command: id, menuId }, cmdBtn);
+          return;
+        }
+        const submenu = cmdBtn.nextElementSibling;
+        if (submenu instanceof HTMLDivElement && submenu.classList.contains('fc-tb__menu')) {
+          const wasOpen = !submenu.hidden;
+          closeStaticRibbonMenus(submenu);
+          submenu.hidden = wasOpen;
+          cmdBtn.setAttribute('aria-expanded', wasOpen ? 'false' : 'true');
+        }
+        return;
+      }
       // Fallback dropdown behaviour: if the button has a sibling submenu
       // attached via render-ribbon's `tools.appendChild(submenu())`, toggle
       // it. Split buttons with a primary face action skip this so
-      // applyRibbonCommand can fire their primary handler — the
-      // chevron-vs-main split lives in the host.
+      // applyRibbonCommand can fire their primary handler; their chevron
+      // routing is handled by the branch above.
       if (RIBBON_MENU_FIRST_COMMANDS.has(id)) {
         const menuId = cmdBtn.dataset.ribbonMenuId;
         if (dropdownsApi && menuId) {
