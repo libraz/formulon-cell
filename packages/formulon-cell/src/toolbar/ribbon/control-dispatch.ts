@@ -5,9 +5,8 @@
 // the small `createRibbonIcon` SVG helper because both this module and the
 // select/color factory need it.
 
-import { setAlign, setFillColor, setFont, setFontColor, setNumFmt } from '../../commands/format.js';
+import { setFillColor, setFont, setFontColor, setNumFmt } from '../../commands/format.js';
 import { recordPageSetupChange, recordRepeatableFormatChange } from '../../commands/history.js';
-import { applyMerge, applyUnmerge, mergeWillLoseData } from '../../commands/merge.js';
 import {
   type MarginPreset,
   marginPresetOf,
@@ -19,11 +18,11 @@ import { activateSheetView } from '../../commands/sheet-views.js';
 import type { SpreadsheetInstance } from '../../mount/types.js';
 import { getPageSetup, mutators } from '../../store/store.js';
 import type { NumFmt, PageOrientation, PaperSize } from '../../store/types.js';
-import { confirmMergeLoseData } from '../dialogs/merge-confirm.js';
 import { showPageScaleDialog } from '../dialogs.js';
 import { createExcelRibbonSvg } from '../excel-ribbon-icons.js';
 import { fluentIconPaths } from '../fluent-icons.js';
 import type { PageScaleMenuText } from '../menu-text.js';
+import { applyMergeAction } from '../merge-action.js';
 import {
   type NumberFormatAction,
   numberFormatForAction as toolbarNumberFormatForAction,
@@ -193,48 +192,31 @@ export const createControlDispatch = (ctx: ControlDispatchCtx): ControlDispatchA
     focusSheet();
   };
 
-  const applyMergeControl = async (value: string): Promise<void> => {
+  const applyMergeControl = (value: string): void => {
     const i = getInst();
     if (!i) return;
-    const range = i.store.getState().selection.range;
-    if (value === 'unmergeCells') {
-      applyUnmerge(i.store, i.workbook, i.history, range);
-    } else if (value === 'mergeAcross') {
-      const state = i.store.getState();
-      if (
-        mergeWillLoseData(state, range) &&
-        !(await confirmMergeLoseData(i.i18n.strings, state, range))
-      )
-        return;
-      i.history.begin();
-      try {
-        for (let row = range.r0; row <= range.r1; row += 1) {
-          applyMerge(i.store, i.workbook, i.history, {
-            sheet: range.sheet,
-            r0: row,
-            c0: range.c0,
-            r1: row,
-            c1: range.c1,
-          });
-        }
-      } finally {
-        i.history.end();
-      }
-    } else {
-      const state = i.store.getState();
-      if (
-        mergeWillLoseData(state, range) &&
-        !(await confirmMergeLoseData(i.i18n.strings, state, range))
-      )
-        return;
-      const merged = applyMerge(i.store, i.workbook, i.history, range);
-      if (merged && value === 'mergeCenter') {
-        applyRibbonFormat((s, store) => setAlign(s, store, 'center'));
-      }
+    if (
+      value !== 'unmergeCells' &&
+      value !== 'mergeAcross' &&
+      value !== 'mergeCenter' &&
+      value !== 'mergeCells'
+    ) {
+      return;
     }
-    refreshWorkbookCells();
-    projectFormatToolbar();
-    sheetEl.focus();
+    void applyMergeAction(
+      {
+        store: i.store,
+        workbook: i.workbook,
+        history: i.history,
+        strings: i.i18n.strings,
+      },
+      value,
+    ).then((applied) => {
+      if (!applied) return;
+      refreshWorkbookCells();
+      projectFormatToolbar();
+      sheetEl.focus();
+    });
   };
 
   const applyRibbonControl = (id: string, value: string): void => {

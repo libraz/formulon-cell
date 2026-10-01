@@ -17,6 +17,7 @@ import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { createDialogSelect, type DialogSelectOption } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { createDialogButton } from './dialog-shell.js';
+import { isNavigationAddrAllowed, navigationPolicyFor } from './navigation-policy.js';
 
 export interface FindReplaceDeps {
   host: HTMLElement;
@@ -238,6 +239,39 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
         : 'values',
   });
 
+  const navigationRestricted = (): boolean => {
+    const options = navigationPolicyFor(store)?.options;
+    return !!(options?.range || options?.selectable);
+  };
+
+  const matchesForNavigation = (state: ReturnType<SpreadsheetStore['getState']>, o: FindOptions) =>
+    findAll(state, o).filter((match) => isNavigationAddrAllowed(store, match.addr));
+
+  const nextMatchForNavigation = (
+    state: ReturnType<SpreadsheetStore['getState']>,
+    o: FindOptions,
+    from: Addr | null,
+    direction: 'next' | 'prev',
+  ): FindMatch | null => {
+    if (!navigationRestricted()) return findNext(state, o, from, direction);
+    const matches = matchesForNavigation(state, o);
+    if (matches.length === 0) return null;
+    if (!from) return direction === 'next' ? (matches[0] ?? null) : (matches.at(-1) ?? null);
+    const byRows = o.searchBy !== 'columns';
+    const key = (addr: Addr): number =>
+      addr.sheet * 1_000_000_000_000 +
+      (byRows ? addr.row * 1_000_000 + addr.col : addr.col * 1_000_000 + addr.row);
+    const fromKey = key(from);
+    if (direction === 'next') {
+      return matches.find((match) => key(match.addr) > fromKey) ?? matches[0] ?? null;
+    }
+    for (let i = matches.length - 1; i >= 0; i -= 1) {
+      const match = matches[i];
+      if (match && key(match.addr) < fromKey) return match;
+    }
+    return matches.at(-1) ?? null;
+  };
+
   const clearResults = (): void => {
     resultsBody.replaceChildren();
     results.hidden = true;
@@ -246,7 +280,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
 
   const renderResults = (): void => {
     const t = strings.findReplace;
-    const all = findAll(store.getState(), opts());
+    const all = matchesForNavigation(store.getState(), opts());
     resultsBody.replaceChildren();
     for (const match of all) {
       const tr = document.createElement('tr');
@@ -277,7 +311,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
       resultsSummary.textContent = text;
       return;
     }
-    const allCount = count ?? findAll(store.getState(), opts()).length;
+    const allCount = count ?? matchesForNavigation(store.getState(), opts()).length;
     if (!opts().query) {
       resultsSummary.textContent = '0 / 0';
       return;
@@ -285,7 +319,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     const idx =
       currentMatch === null
         ? 0
-        : findAll(store.getState(), opts()).findIndex(
+        : matchesForNavigation(store.getState(), opts()).findIndex(
             (m) =>
               m.addr.sheet === currentMatch?.addr.sheet &&
               m.addr.row === currentMatch.addr.row &&
@@ -303,7 +337,7 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     }
     const state = store.getState();
     const from = currentMatch ? currentMatch.addr : state.selection.active;
-    const m = findNext(state, o, from, direction);
+    const m = nextMatchForNavigation(state, o, from, direction);
     currentMatch = m;
     if (m) mutators.setActive(store, m.addr);
     updateSummary();
@@ -319,13 +353,13 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
     if (!currentMatch) {
       const state = store.getState();
       const active = state.selection.active;
-      const matches = findAll(state, o);
+      const matches = matchesForNavigation(state, o);
       currentMatch =
         matches.find(
           (m) =>
             m.addr.sheet === active.sheet && m.addr.row === active.row && m.addr.col === active.col,
         ) ??
-        findNext(state, o, active, 'next') ??
+        nextMatchForNavigation(state, o, active, 'next') ??
         null;
       if (currentMatch) mutators.setActive(store, currentMatch.addr);
       else {
@@ -351,10 +385,23 @@ export function attachFindReplace(deps: FindReplaceDeps): FindReplaceHandle {
       return;
     }
     const history = deps.history ?? null;
+    const restricted = navigationRestricted();
     if (history) history.begin();
     let n = 0;
     try {
-      n = replaceAll(store.getState(), wb, o, replaceInput.value, store);
+      if (!restricted) {
+        n = replaceAll(store.getState(), wb, o, replaceInput.value, store);
+      } else {
+        const matches = matchesForNavigation(store.getState(), o);
+        wb.withBatchedRecalc(() => {
+          for (const match of matches) {
+            if (wb.cellFormula(match.addr) !== null) continue;
+            const current = formatCell(wb.getValue(match.addr));
+            const next = applySubstitution(current, o, replaceInput.value);
+            if (next !== current && replaceOne(wb, match, next, store)) n += 1;
+          }
+        });
+      }
     } finally {
       if (history) history.end();
     }

@@ -1,6 +1,10 @@
 import { CellRegistry } from './cells.js';
 import { insertCopiedCellsFromTSV } from './commands/clipboard/insert-copied-cells.js';
 import { History } from './commands/history.js';
+import {
+  InteractionController,
+  registerInteractionController,
+} from './commands/interaction-controller.js';
 import { printSheet } from './commands/print.js';
 import {
   normalizePrinterProfileId,
@@ -25,6 +29,7 @@ import {
 import { findPivotTableAtCell } from './engine/passthrough-sync.js';
 import { WorkbookHandle } from './engine/workbook-handle.js';
 import { SpreadsheetEmitter } from './events.js';
+import { ALL_FEATURE_IDS } from './extensions/features.js';
 import {
   dedupeById,
   type Extension,
@@ -45,8 +50,14 @@ import { attachExternalLinksDialog } from './interact/external-links-dialog.js';
 import { attachFilterDropdown, type FilterDropdownHandle } from './interact/filter-dropdown.js';
 import { openInsertCopiedCellsDialog } from './interact/insert-copied-cells-dialog.js';
 import {
+  attachNavigationPolicy,
+  navigationBoundsFor,
+  validateViewportOptions,
+} from './interact/navigation-policy.js';
+import {
   disposeOverlayPortal,
   ensureOverlayPortal,
+  setOverlayOptions,
   syncOverlayPortalTheme,
 } from './interact/overlay-portal.js';
 import { createMountChrome } from './mount/chrome.js';
@@ -134,6 +145,26 @@ function normalizeScreenClipResult(result: string | ScreenClipResult | null | un
   return result.src ? result : null;
 }
 
+// These are the routes integrated with the cell command controller. Other
+// mutation surfaces remain unavailable while an interaction policy is active.
+const RESTRICTED_FEATURES = new Set([
+  'formulaBar',
+  'clipboard',
+  'shortcuts',
+  'wheel',
+  'contextMenu',
+]);
+
+function restrictedFlags(
+  flags: ReturnType<typeof resolveFlags>,
+  restricted: boolean,
+): ReturnType<typeof resolveFlags> {
+  if (!restricted) return flags;
+  return Object.fromEntries(
+    ALL_FEATURE_IDS.map((id) => [id, RESTRICTED_FEATURES.has(id) && flags[id]]),
+  ) as ReturnType<typeof resolveFlags>;
+}
+
 /**
  * Mount a spreadsheet onto a DOM host. Returns an instance with imperative
  * controls. The host element is taken over — its existing children are
@@ -162,9 +193,13 @@ export const Spreadsheet = {
     const captureScreenClipHook = opts.captureScreenClip;
     let uploadStatus = opts.uploadStatus ?? null;
     let macroRecording = opts.macroRecording ?? null;
-    const ui = resolveSpreadsheetUiOptions(opts.ui);
+    let ui = resolveSpreadsheetUiOptions(opts.ui);
+    let requestedFeatures = { ...ui.features, ...opts.features };
+    let contextMenuOptions = opts.contextMenu;
     const initialTheme = opts.theme ?? ui.theme;
-    let flags = resolveFlags({ ...ui.features, ...opts.features });
+    let flags = restrictedFlags(resolveFlags(requestedFeatures), opts.policy !== undefined);
+    if (contextMenuOptions && contextMenuOptions.mode !== 'disabled') flags.contextMenu = true;
+    if (contextMenuOptions?.mode === 'disabled') flags.contextMenu = false;
     const emitter = new SpreadsheetEmitter();
     const formulaRegistry = new FormulaRegistry();
     if (opts.functions) {
@@ -174,7 +209,7 @@ export const Spreadsheet = {
     }
 
     const instanceId = prepareMountHost(host, strings, initialTheme);
-    ensureOverlayPortal(host);
+    ensureOverlayPortal(host, opts.overlays);
     host.dataset.fcEngineState = 'loading';
 
     let sheetTabsController: SheetTabsController | null = null;
@@ -187,8 +222,21 @@ export const Spreadsheet = {
     try {
       wb = opts.workbook ?? (await WorkbookHandle.createDefault({ locale: i18n.locale }));
       if (opts.seed && ownsWb) opts.seed(wb);
+      if (opts.viewport) {
+        try {
+          validateViewportOptions(opts.viewport, wb);
+          const preview = createSpreadsheetStore();
+          if (opts.viewport.range) mutators.setSheetIndex(preview, opts.viewport.range.sheet);
+          hydrateActiveSheetFromEngine(wb, preview);
+          validateViewportOptions(opts.viewport, wb, preview.getState());
+        } catch (err) {
+          if (ownsWb) wb.dispose();
+          throw err;
+        }
+      }
     } catch (err) {
       host.dataset.fcEngineState = 'error';
+      disposeOverlayPortal(host);
       try {
         opts.onError?.(err);
       } catch (hookErr) {
@@ -230,6 +278,7 @@ export const Spreadsheet = {
     });
 
     const store = createSpreadsheetStore();
+    if (opts.viewport?.range) mutators.setSheetIndex(store, opts.viewport.range.sheet);
     mutators.setTheme(store, initialTheme);
 
     // Upload status / macro recording start off in the status-bar chooser
@@ -255,6 +304,16 @@ export const Spreadsheet = {
     hydrateActiveSheetFromEngine(wb, store);
     hydrateWorkbookMetadataFromEngine(wb, store);
     wb.attachStore(store);
+    const navigation = attachNavigationPolicy(store, () => wb, opts.viewport);
+    const commands = new InteractionController({
+      store,
+      getWb: () => wb,
+      history,
+      getBounds: () => navigationBoundsFor(store),
+      onChanged: (result) => emitter.emit('changeBatch', result),
+    });
+    commands.setPolicy(opts.policy);
+    const unregisterCommands = registerInteractionController(store, commands);
     dispatchPassthroughSummary();
 
     function dispatchPassthroughSummary(): void {
@@ -343,6 +402,7 @@ export const Spreadsheet = {
     // from a clicked column-filter chevron. Rebuilt on locale change so its
     // captured strings stay fresh; no public toggle.
     let filterDropdown: FilterDropdownHandle = attachFilterDropdown({
+      host,
       store,
       history,
       strings,
@@ -354,6 +414,7 @@ export const Spreadsheet = {
       anchor: { x: number; y: number; h: number; clientX: number; clientY: number };
     }
     const onOpenFilter = (e: Event): void => {
+      if (commands.policy !== undefined) return;
       const detail = (e as CustomEvent<OpenFilterDetail>).detail;
       if (!detail) return;
       // The dropdown is positioned with `position: fixed`, so it expects
@@ -444,6 +505,7 @@ export const Spreadsheet = {
 
     const bindEngine = (currentWb: WorkbookHandle): EngineBinding =>
       attachEngineBinding({
+        contextMenuOptions,
         emitter,
         flags,
         formulaRegistry,
@@ -477,6 +539,7 @@ export const Spreadsheet = {
       formatPainter: () => featureState.formatPainter,
       goToDialog: () => featureState.goToDialog,
       history,
+      host,
       hostTag: tag,
       hyperlinkDialog: () => featureState.hyperlinkDialog,
       invalidate: () => renderer.invalidate(),
@@ -717,7 +780,7 @@ export const Spreadsheet = {
         strings,
       });
       filterDropdown.detach();
-      filterDropdown = attachFilterDropdown({ store, history, strings, locale: i18n.locale });
+      filterDropdown = attachFilterDropdown({ host, store, history, strings, locale: i18n.locale });
 
       // Toggleable host features: prefer setStrings when the handle exposes
       // it, otherwise fall back to detach+reattach.
@@ -751,6 +814,7 @@ export const Spreadsheet = {
 
     let toolbarHandle: ToolbarInstance | null = null;
     let ribbonHost: HTMLElement | null = null;
+    let requestedToolbar = opts.toolbar ?? (opts.ui ? ui.ribbon : false);
 
     const instance: SpreadsheetInstance = {
       host,
@@ -759,6 +823,89 @@ export const Spreadsheet = {
       },
       store,
       history,
+      commands,
+      applyChanges: (changes, options) => commands.applyChanges(changes, options),
+      setPolicy(next) {
+        if (disposed) return;
+        binding.editor.cancel();
+        formulaBar.cancelFx();
+        commands.setPolicy(next);
+        instance.setFeatures(requestedFeatures);
+        instance.setToolbar(requestedToolbar);
+      },
+      setViewportOptions(next) {
+        if (disposed) return;
+        const targetSheet = next?.range?.sheet;
+        if (targetSheet !== undefined && targetSheet !== store.getState().data.sheetIndex) {
+          validateViewportOptions(next, wb);
+          const preview = createSpreadsheetStore();
+          mutators.setSheetIndex(preview, targetSheet);
+          hydrateActiveSheetFromEngine(wb, preview);
+          validateViewportOptions(next, wb, preview.getState());
+          const previousState = store.getState();
+          const previousOptions = navigation.options;
+          binding.editor.cancel();
+          formulaBar.cancelFx();
+          wb.detachStore(store);
+          try {
+            navigation.setOptions(undefined);
+            mutators.setSheetIndex(store, targetSheet);
+            hydrateActiveSheet();
+            navigation.setOptions(next);
+          } catch (error) {
+            store.setState(() => previousState);
+            navigation.setOptions(previousOptions);
+            throw error;
+          } finally {
+            wb.attachStore(store);
+          }
+          sheetTabsController?.update();
+          updateChrome();
+        } else {
+          navigation.setOptions(next);
+        }
+        renderer.resize();
+      },
+      setContextMenu(next) {
+        if (disposed) return;
+        contextMenuOptions = next;
+        instance.setFeatures(requestedFeatures);
+        // Menu data may change without changing its feature flag.
+        binding.unbind();
+        binding = bindEngine(wb);
+        syncBindingFeatures(binding);
+        refreshFeaturesView();
+      },
+      setOverlayOptions(next) {
+        if (disposed) return;
+        setOverlayOptions(host, next);
+      },
+      setUi(next) {
+        if (disposed) return;
+        ui = resolveSpreadsheetUiOptions(next);
+        instance.setFeatures({ ...ui.features, ...opts.features });
+        instance.setTheme(opts.theme ?? ui.theme);
+        instance.setToolbar(opts.toolbar ?? (next ? ui.ribbon : false));
+      },
+      setToolbar(next) {
+        if (disposed) return;
+        requestedToolbar = next;
+        toolbarHandle?.dispose();
+        toolbarHandle = null;
+        ribbonHost?.remove();
+        ribbonHost = null;
+        if (!next) return;
+        ribbonHost = host.ownerDocument.createElement('div');
+        ribbonHost.className = 'fc-host__ribbon';
+        ribbonHost.style.display = 'contents';
+        host.insertBefore(ribbonHost, host.firstChild);
+        const toolbarOpts = next === true ? {} : next;
+        toolbarHandle = mountToolbar(ribbonHost, instance, {
+          lang: i18n.locale === 'en' ? 'en' : 'ja',
+          ...(commands.policy === undefined ? { dynamicDropdowns: true as const } : {}),
+          ...toolbarOpts,
+        });
+      },
       i18n,
       features: featuresView,
       get toolbar() {
@@ -789,8 +936,12 @@ export const Spreadsheet = {
         return true;
       },
       setFeatures(next) {
+        requestedFeatures = { ...next };
         const prevFlags = flags;
-        const nextFlags = resolveFlags(next);
+        const nextFlags = restrictedFlags(resolveFlags(next), commands.policy !== undefined);
+        if (contextMenuOptions && contextMenuOptions.mode !== 'disabled')
+          nextFlags.contextMenu = true;
+        if (contextMenuOptions?.mode === 'disabled') nextFlags.contextMenu = false;
         const shouldRebuildViewToolbarObjects =
           prevFlags.viewToolbar &&
           nextFlags.viewToolbar &&
@@ -846,9 +997,11 @@ export const Spreadsheet = {
         externalLinksDialog.open();
       },
       openCfRulesDialog() {
+        if (commands.policy !== undefined) return;
         cfRulesDialog.open();
       },
       openCellStylesGallery() {
+        if (commands.policy !== undefined) return;
         cellStylesGallery.open();
       },
       openEvaluateFormulaDialog() {
@@ -876,7 +1029,9 @@ export const Spreadsheet = {
         return binding.pasteSpecialDialog?.apply(options, opts) ?? false;
       },
       openInsertCopiedCells() {
+        if (commands.policy !== undefined) return;
         openInsertCopiedCellsDialog({
+          host,
           strings: i18n.strings,
           onSubmit: (direction) => {
             void readClipboardText().then((text) => {
@@ -902,6 +1057,15 @@ export const Spreadsheet = {
         featureState.pageSetupDialog?.open(tab);
       },
       print(mode = 'print') {
+        if (!ui.print) return;
+        if (
+          !commands.canExecute({
+            operation: mode === 'pdf' ? 'export' : 'print',
+            origin: 'instanceApi',
+            effects: [{ kind: 'workbook' }],
+          }).allowed
+        )
+          return;
         // The print command is wired through the same flag as the dialog —
         // when the feature is off, both call sites are no-ops. Skip if the
         // dialog never attached so consumers can rely on the gate.
@@ -952,6 +1116,7 @@ export const Spreadsheet = {
         featureState.goToDialog?.open('special');
       },
       openFilterDropdown(range, col) {
+        if (commands.policy !== undefined) return;
         const s = store.getState();
         const layout = layoutForView(s);
         const targetRange = range ?? s.ui.filterRange ?? s.selection.range;
@@ -972,6 +1137,7 @@ export const Spreadsheet = {
         });
       },
       openWatchWindow() {
+        if (commands.policy !== undefined) return;
         ensureWatchWindow();
         featureState.watchPanel?.open();
         refreshFeaturesView();
@@ -980,6 +1146,7 @@ export const Spreadsheet = {
         featureState.watchPanel?.close();
       },
       toggleWatchWindow() {
+        if (commands.policy !== undefined) return;
         ensureWatchWindow();
         featureState.watchPanel?.toggle();
         refreshFeaturesView();
@@ -1005,6 +1172,7 @@ export const Spreadsheet = {
         featureState.workbookObjects?.open();
       },
       openPivotFieldList(sheetIndex, pivotIndex) {
+        if (commands.policy !== undefined) return false;
         const userObjects = userHandles.get('workbookObjects') as
           | (ExtensionHandle & {
               openPivotFieldList?: (sheetIndex: number, pivotIndex: number) => boolean;
@@ -1016,6 +1184,7 @@ export const Spreadsheet = {
         return featureState.workbookObjects?.openPivotFieldList(sheetIndex, pivotIndex) ?? false;
       },
       openActivePivotFieldList() {
+        if (commands.policy !== undefined) return false;
         const pivot = findPivotTableAtCell(wb, store.getState().selection.active);
         if (!pivot) return false;
         const userObjects = userHandles.get('workbookObjects') as
@@ -1032,6 +1201,7 @@ export const Spreadsheet = {
         );
       },
       openPivotTableDialog(opts) {
+        if (commands.policy !== undefined) return;
         const userPivot = userHandles.get('pivotTableDialog') as
           | (ExtensionHandle & { open?: (opts?: { placement?: 'new' | 'existing' }) => void })
           | undefined;
@@ -1051,6 +1221,7 @@ export const Spreadsheet = {
         featureState.slicer?.removeSlicer(id);
       },
       toggleSheetProtection() {
+        if (commands.policy !== undefined) return;
         toggleProtectedSheet(store, store.getState().data.sheetIndex, { workbook: wb });
         renderer.invalidate();
       },
@@ -1059,6 +1230,7 @@ export const Spreadsheet = {
         password?: string,
         permissions?: import('./store/types.js').SheetProtectionPermissions,
       ) {
+        if (commands.policy !== undefined) return;
         setProtectedSheet(store, store.getState().data.sheetIndex, on, {
           workbook: wb,
           password,
@@ -1104,6 +1276,20 @@ export const Spreadsheet = {
       },
       async setWorkbook(next) {
         if (next === wb) return;
+        // Validate before detaching the current workbook or clearing its history.
+        if (navigation.options) {
+          validateViewportOptions(navigation.options, next);
+          const preview = createSpreadsheetStore();
+          mutators.setSheetIndex(
+            preview,
+            navigation.options.range?.sheet ??
+              Math.min(store.getState().data.sheetIndex, Math.max(0, next.sheetCount - 1)),
+          );
+          hydrateActiveSheetFromEngine(next, preview);
+          validateViewportOptions(navigation.options, next, preview.getState());
+        }
+        binding.editor.cancel();
+        formulaBar.cancelFx();
         wb.detachStore(store);
         binding.unbind();
         if (ownsWb) wb.dispose();
@@ -1112,10 +1298,9 @@ export const Spreadsheet = {
         ownsWb = true; // we now own the next handle and will dispose it
         wb.attachHistory(history);
         history.clear();
-        const nextSheet = Math.min(
-          store.getState().data.sheetIndex,
-          Math.max(0, wb.sheetCount - 1),
-        );
+        const nextSheet =
+          navigation.options?.range?.sheet ??
+          Math.min(store.getState().data.sheetIndex, Math.max(0, wb.sheetCount - 1));
         mutators.setSheetIndex(store, nextSheet);
         mutators.clearIllustrations(store);
         store.setState((state) => ({
@@ -1127,6 +1312,7 @@ export const Spreadsheet = {
         hydrateActiveSheet();
         hydrateWorkbookMetadataFromEngine(wb, store);
         wb.attachStore(store);
+        navigation.setOptions(navigation.options);
         dispatchPassthroughSummary();
         binding = bindEngine(wb);
         syncBindingFeatures(binding);
@@ -1137,8 +1323,20 @@ export const Spreadsheet = {
         featureState.statusBar?.refresh();
         sheetTabsController?.update();
         // Notify user extensions so they can rebind their wb references.
-        for (const handle of userHandles.values()) handle.rebindWorkbook?.(wb);
-        for (const fn of wbListeners) fn(wb);
+        for (const handle of [...userHandles.values()]) {
+          try {
+            handle.rebindWorkbook?.(wb);
+          } catch (error) {
+            console.warn('formulon-cell: extension workbook hook failed', error);
+          }
+        }
+        for (const fn of [...wbListeners]) {
+          try {
+            fn(wb);
+          } catch (error) {
+            console.warn('formulon-cell: workbook hook failed', error);
+          }
+        }
         updateChrome();
         renderer.invalidate();
         emitter.emit('workbookChange', { workbook: wb });
@@ -1148,6 +1346,9 @@ export const Spreadsheet = {
       dispose() {
         if (disposed) return;
         disposed = true;
+        unregisterCommands();
+        commands.dispose();
+        navigation.dispose();
         wb.detachStore(store);
         toolbarHandle?.dispose();
         toolbarHandle = null;
@@ -1183,22 +1384,7 @@ export const Spreadsheet = {
     // the top of `.fc-host` so its shell participates in the host flex column
     // directly (grid fills the rest). The toolbar reads the same
     // `data-fc-theme`, so grid and toolbar theme together via the cascade.
-    if (opts.toolbar) {
-      ribbonHost = document.createElement('div');
-      ribbonHost.className = 'fc-host__ribbon';
-      ribbonHost.style.display = 'contents';
-      host.insertBefore(ribbonHost, host.firstChild);
-      // `toolbar: true` wires only defaults; an options object lets the embed
-      // add backstage content / hooks / menus / tabs / callbacks without
-      // dropping to a manual `mountToolbar` call. Host-supplied fields override
-      // the defaults below.
-      const toolbarOpts = opts.toolbar === true ? {} : opts.toolbar;
-      toolbarHandle = mountToolbar(ribbonHost, instance, {
-        lang: i18n.locale === 'en' ? 'en' : 'ja',
-        dynamicDropdowns: true,
-        ...toolbarOpts,
-      });
-    }
+    instance.setToolbar(requestedToolbar);
 
     return instance;
   },

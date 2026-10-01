@@ -119,7 +119,7 @@ export function attachPasteOptions(deps: PasteOptionsDeps): PasteOptionsHandle {
   };
 
   const runPaste = (snap: ClipboardSnapshot, what: PasteSpecialOptions['what']) =>
-    pasteSpecial(store.getState(), store, wb, snap, defaultOptions(what));
+    pasteSpecial(store.getState(), store, wb, snap, defaultOptions(what), history);
 
   const applyMode = (mode: PasteOptionsMode): void => {
     const current = activation;

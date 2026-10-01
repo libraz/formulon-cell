@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest';
+import { ALL_FEATURE_IDS, resolveFlags } from '../../src/extensions/features.js';
 import { resolveSpreadsheetUiOptions } from '../../src/extensions/ui-options.js';
 
 describe('resolveSpreadsheetUiOptions', () => {
+  it('makes embedded chrome opt-in without inheriting default-on features', () => {
+    const resolved = resolveSpreadsheetUiOptions({ profile: 'embedded' });
+    expect(resolved.ribbon).toBe(false);
+    expect(resolved.print).toBe(false);
+    for (const id of ALL_FEATURE_IDS) expect(resolveFlags(resolved.features)[id]).toBe(false);
+    const custom = resolveSpreadsheetUiOptions({
+      profile: 'embedded',
+      features: { clipboard: true, shortcuts: true },
+    });
+    expect(custom.features.clipboard).toBe(true);
+    expect(custom.features.shortcuts).toBe(true);
+    expect(custom.features.sheetTabs).toBe(false);
+  });
   it('defaults to the Excel 365 profile with full chrome enabled', () => {
     const resolved = resolveSpreadsheetUiOptions();
 

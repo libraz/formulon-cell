@@ -294,6 +294,34 @@ export {
 } from './commands/hyperlinks.js';
 export type { ExportOptions, ImportResult } from './commands/import-export.js';
 export { exportCSV, importCSV } from './commands/import-export.js';
+export type {
+  ApplyChangesOptions,
+  InteractionControllerOptions,
+} from './commands/interaction-controller.js';
+export { InteractionController } from './commands/interaction-controller.js';
+export type {
+  BatchDeniedMode,
+  BatchRejection,
+  CellBatchCommand,
+  CellBatchOperation,
+  CellChangeInput,
+  ChangeBatchResult,
+  EditableCells,
+  EditablePredicateContext,
+  InteractionOperation,
+  InteractionOrigin,
+  InteractionPolicy,
+  InteractionRestrictionContext,
+  OperationEffect,
+  OperationIntent,
+  Origin,
+  PermissionCode,
+  PermissionDecision,
+} from './commands/interaction-policy.js';
+export {
+  fixedFormPolicy,
+  viewerPolicy,
+} from './commands/interaction-policy.js';
 export {
   applyMerge,
   applyUnmerge,
@@ -764,7 +792,13 @@ export {
   SheetVisibility,
 } from './engine/types.js';
 export { formatCell, fromEngineValue } from './engine/value.js';
-export type { ChangeEvent, ChangeListener } from './engine/workbook-handle.js';
+export type {
+  CellPatch,
+  CellPatchAtomicResult,
+  CellSnapshot,
+  ChangeEvent,
+  ChangeListener,
+} from './engine/workbook-handle.js';
 export { WorkbookHandle } from './engine/workbook-handle.js';
 export type {
   EngineHeaderFooterInput,
@@ -902,6 +936,11 @@ export { attachConditionalDialog } from './interact/conditional-dialog.js';
 export type { ContextMenuDeps } from './interact/context-menu.js';
 export { attachContextMenu } from './interact/context-menu.js';
 export type {
+  ContextMenuContext,
+  ContextMenuItem,
+  ContextMenuOptions,
+} from './interact/context-menu-options.js';
+export type {
   ErrorMenuDeps,
   ErrorMenuHandle,
   ErrorMenuKind,
@@ -936,6 +975,8 @@ export type {
   NamedRangeDialogHandle,
 } from './interact/named-range-dialog.js';
 export { attachNamedRangeDialog } from './interact/named-range-dialog.js';
+export type { ViewportOptions } from './interact/navigation-policy.js';
+export type { OverlayOptions } from './interact/overlay-portal.js';
 export type {
   PageSetupDialogDeps,
   PageSetupDialogHandle,

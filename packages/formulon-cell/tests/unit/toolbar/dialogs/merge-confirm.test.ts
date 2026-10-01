@@ -34,7 +34,8 @@ describe('confirmMergeLoseData', () => {
 
   it('resolves true when the user accepts the data-loss warning', async () => {
     const store = createSpreadsheetStore();
-    seedText(store, '0:0:1'); // non-anchor content → warning
+    seedText(store, '0:0:0');
+    seedText(store, '0:0:1'); // two contents → warning
     const pending = confirmMergeLoseData(defaultStrings, store.getState(), RANGE);
     await Promise.resolve();
     clickButton(defaultStrings.ribbon.mergeLoseDataConfirm);
@@ -43,6 +44,7 @@ describe('confirmMergeLoseData', () => {
 
   it('resolves false when the user cancels', async () => {
     const store = createSpreadsheetStore();
+    seedText(store, '0:0:0');
     seedText(store, '0:0:1');
     const pending = confirmMergeLoseData(defaultStrings, store.getState(), RANGE);
     await Promise.resolve();

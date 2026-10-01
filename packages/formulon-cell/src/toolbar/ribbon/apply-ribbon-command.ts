@@ -10,8 +10,8 @@
 //    hook → the matching command id silently no-ops so consumers can ship a
 //    minimal toolbar without every feature wired up.
 
+import { canExecuteBuiltIn } from '../../commands/built-in-command-policy.js';
 import { setFont } from '../../commands/format.js';
-import { applyMerge, applyUnmerge } from '../../commands/merge.js';
 import { setPrintGridlines, setPrintHeadings } from '../../commands/page-setup.js';
 import { phoneticReadingAt, setPhoneticReading } from '../../commands/phonetic.js';
 import { isWorkbookStructureProtected } from '../../commands/protection.js';
@@ -40,6 +40,7 @@ import type { CellBorderStyle } from '../../store/types.js';
 import { showPrompt } from '../dialogs/prompt.js';
 import type { SessionShapeKind } from '../illustration-types.js';
 import type { ToolbarMenuText } from '../menu-text.js';
+import { applyMergeAction } from '../merge-action.js';
 import type { ToolbarText } from '../ribbon-model.js';
 import {
   RIBBON_BORDER_DRAW_MODES,
@@ -163,6 +164,7 @@ export interface ApplyRibbonCommandDeps {
 export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): boolean => {
   const i = deps.inst;
   if (!i) return false;
+  if (!canExecuteBuiltIn(i.store, id, 'ribbon').allowed) return true;
   const { ui, runtime, hooks } = deps;
   const state = i.store.getState();
   const range = state.selection.range;
@@ -282,9 +284,17 @@ export const applyRibbonCommand = (id: string, deps: ApplyRibbonCommandDeps): bo
         range.c0 === anchorAt0.c0 &&
         range.r1 === anchorAt0.r1 &&
         range.c1 === anchorAt0.c1;
-      if (isExactMerge) applyUnmerge(i.store, i.workbook, i.history, range);
-      else applyMerge(i.store, i.workbook, i.history, range);
-      runtime.focusSheet();
+      void applyMergeAction(
+        {
+          store: i.store,
+          workbook: i.workbook,
+          history: i.history,
+          strings: i.i18n.strings,
+        },
+        isExactMerge ? 'unmergeCells' : 'mergeCenter',
+      ).then((applied) => {
+        if (applied) runtime.focusSheet();
+      });
       return true;
     }
     case 'formatPainter': {

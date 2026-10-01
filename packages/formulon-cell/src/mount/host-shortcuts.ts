@@ -11,6 +11,7 @@ import {
 } from '../commands/format.js';
 import { formatAsTable } from '../commands/format-as-table.js';
 import { type History, recordFormatChange, recordTablesChange } from '../commands/history.js';
+import { interactionControllerFor } from '../commands/interaction-controller.js';
 import {
   hideCols,
   hideRows,
@@ -64,6 +65,7 @@ interface HostShortcutInput {
   formatPainter: () => { activate(sticky?: boolean): void } | null;
   goToDialog: () => { open(): void } | null;
   history: History;
+  host: HTMLElement;
   hostTag: HTMLInputElement;
   hyperlinkDialog: () => { open(): void } | null;
   invalidate: () => void;
@@ -79,6 +81,7 @@ interface HostShortcutInput {
 export function createHostShortcutHandler(input: HostShortcutInput): (e: KeyboardEvent) => void {
   return (e: KeyboardEvent): void => {
     const currentWb = input.wb();
+    const restricted = interactionControllerFor(input.store)?.policy !== undefined;
     const meta = e.ctrlKey || e.metaKey;
     const applyDirectNumberFormat = (action: NumberFormatAction): void => {
       const fmt = numberFormatForAction(action, input.locale);
@@ -130,6 +133,10 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       input.invalidate();
     };
     if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'F11') {
+      if (restricted) {
+        e.preventDefault();
+        return;
+      }
       e.preventDefault();
       input.addSheet();
       return;
@@ -142,6 +149,10 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       return;
     }
     if (!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key === 'F4') {
+      if (restricted) {
+        e.preventDefault();
+        return;
+      }
       if (input.history.repeatLast()) e.preventDefault();
       return;
     }
@@ -160,8 +171,10 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       !e.shiftKey && (e.key === '-' || e.code === 'Minus' || e.code === 'NumpadSubtract');
     if (insertCellsShortcut || deleteCellsShortcut) {
       e.preventDefault();
+      if (restricted) return;
       const kind = insertCellsShortcut ? 'insert' : 'delete';
       openCellShiftDialog({
+        host: input.host,
         strings: input.strings(),
         kind,
         onSubmit: (direction) => {
@@ -187,6 +200,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
     const numberFormatAction = directNumberFormatAction(e);
     if (numberFormatAction) {
       e.preventDefault();
+      if (restricted) return;
       applyDirectNumberFormat(numberFormatAction);
       return;
     }
@@ -194,6 +208,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       const painter = input.formatPainter();
       if (!painter) return;
       e.preventDefault();
+      if (restricted) return;
       painter.activate(false);
       return;
     }
@@ -201,6 +216,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       const dialog = input.pasteSpecialDialog();
       if (!dialog) return;
       e.preventDefault();
+      if (restricted) return;
       dialog.open();
       return;
     }
@@ -208,6 +224,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       const dialog = input.pasteSpecialDialog();
       if (!dialog) return;
       e.preventDefault();
+      if (restricted) return;
       dialog.open();
       return;
     }
@@ -215,11 +232,13 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       const quick = input.quickAnalysis();
       if (!quick) return;
       e.preventDefault();
+      if (restricted) return;
       quick.open();
       return;
     }
     if (e.shiftKey && k === 'l') {
       e.preventDefault();
+      if (restricted) return;
       recordFilterChange(input.history, input.store, () => {
         const state = input.store.getState();
         if (state.ui.filterRange) clearFilter(state, input.store, state.ui.filterRange);
@@ -230,6 +249,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
     }
     if (k === 't' || k === 'l') {
       e.preventDefault();
+      if (restricted) return;
       recordTablesChange(input.history, input.store, () => {
         formatAsTable(input.store, input.store.getState().selection.range, { workbook: currentWb });
       });
@@ -238,6 +258,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
     }
     if (e.key === '9') {
       e.preventDefault();
+      if (restricted) return;
       const range = input.store.getState().selection.range;
       if (e.shiftKey)
         showRowsAroundSelection(input.store, input.history, range.r0, range.r1, currentWb);
@@ -247,6 +268,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
     }
     if (e.key === '0') {
       e.preventDefault();
+      if (restricted) return;
       const range = input.store.getState().selection.range;
       if (e.shiftKey)
         showColsAroundSelection(input.store, input.history, range.c0, range.c1, currentWb);
@@ -268,11 +290,13 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       const dialog = input.hyperlinkDialog();
       if (!dialog) return;
       e.preventDefault();
+      if (restricted) return;
       dialog.open();
     } else if (matchesRibbonShortcut(e, 'formatCells', 'formatCellsHome')) {
       const dialog = input.formatDialog();
       if (!dialog) return;
       e.preventDefault();
+      if (restricted) return;
       dialog.open();
     } else if (e.key === '`') {
       e.preventDefault();
@@ -282,6 +306,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       mutators.setR1C1(input.store, !input.store.getState().ui.r1c1);
     } else if (e.key === ';') {
       e.preventDefault();
+      if (restricted) return;
       const now = new Date();
       const utcMs = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
       const serial = utcMs / 86_400_000 + 25569;
@@ -289,6 +314,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       mutators.replaceCells(input.store, currentWb.cells(input.store.getState().data.sheetIndex));
     } else if (e.key === ':' || (e.shiftKey && e.key === ';')) {
       e.preventDefault();
+      if (restricted) return;
       const now = new Date();
       const frac =
         (now.getUTCHours() * 3600 + now.getUTCMinutes() * 60 + now.getUTCSeconds()) / 86400;
@@ -296,6 +322,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       mutators.replaceCells(input.store, currentWb.cells(input.store.getState().data.sheetIndex));
     } else if (k === 'd') {
       e.preventDefault();
+      if (restricted) return;
       const r = input.store.getState().selection.range;
       if (r.r1 > r.r0) {
         fillRange(
@@ -309,6 +336,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       }
     } else if (k === 'r') {
       e.preventDefault();
+      if (restricted) return;
       const r = input.store.getState().selection.range;
       if (r.c1 > r.c0) {
         fillRange(
@@ -322,6 +350,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       }
     } else if (k === 'e') {
       e.preventDefault();
+      if (restricted) return;
       executeRibbonFillAction({
         store: input.store,
         workbook: currentWb,
@@ -331,15 +360,19 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       input.invalidate();
     } else if (k === 'b') {
       e.preventDefault();
+      if (restricted) return;
       applyFormatToggle('bold', toggleBold);
     } else if (k === 'i') {
       e.preventDefault();
+      if (restricted) return;
       applyFormatToggle('italic', toggleItalic);
     } else if (k === 'u') {
       e.preventDefault();
+      if (restricted) return;
       applyFormatToggle('underline', toggleUnderline);
     } else if (e.key === '5') {
       e.preventDefault();
+      if (restricted) return;
       applyFormatToggle('strike', toggleStrike);
     }
   };

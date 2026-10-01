@@ -1417,7 +1417,7 @@ export const ja: Strings = {
     unmergeCells: 'セル結合の解除',
     mergeLoseDataTitle: 'セルの結合',
     mergeLoseDataMessage:
-      'セルを結合すると、左上の値のみが保持され、その他の値は破棄されます。続行しますか？',
+      '各結合範囲の最初の値だけを保持し、その他の値を削除します。続行しますか？',
     mergeLoseDataConfirm: 'OK',
     mergeLoseDataCancel: 'キャンセル',
     wrapText: '折り返して全体を表示',

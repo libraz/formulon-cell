@@ -7,6 +7,7 @@ import { History } from '../../../src/commands/history.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings.js';
 import { attachFilterDropdown } from '../../../src/interact/filter-dropdown.js';
+import { ensureOverlayPortal } from '../../../src/interact/overlay-portal.js';
 import { createSpreadsheetStore, type SpreadsheetStore } from '../../../src/store/store.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -69,6 +70,25 @@ describe('attachFilterDropdown', () => {
     expect(root?.textContent).toContain('(Select all)');
     expect(root?.textContent).toContain('Filter by condition');
     expect(root?.textContent).toContain('Apply');
+    handle.detach();
+  });
+
+  it('uses the supplied host portal when multiple spreadsheets share a document', () => {
+    const firstHost = document.createElement('div');
+    firstHost.className = 'fc-host';
+    const secondHost = document.createElement('div');
+    secondHost.className = 'fc-host';
+    const firstRoot = document.createElement('section');
+    const secondRoot = document.createElement('section');
+    document.body.append(firstHost, secondHost, firstRoot, secondRoot);
+    ensureOverlayPortal(firstHost, { root: firstRoot });
+    ensureOverlayPortal(secondHost, { root: secondRoot });
+
+    const handle = attachFilterDropdown({ store, strings: en, host: secondHost });
+    handle.open({ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 }, 0, { x: 10, y: 20, h: 24 });
+
+    expect(secondRoot.querySelector('.fc-filter-dropdown')).not.toBeNull();
+    expect(firstRoot.querySelector('.fc-filter-dropdown')).toBeNull();
     handle.detach();
   });
 

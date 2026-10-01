@@ -1413,7 +1413,7 @@ export const en: Strings = {
     unmergeCells: 'Unmerge Cells',
     mergeLoseDataTitle: 'Merge cells',
     mergeLoseDataMessage:
-      'Merging cells keeps only the upper-left value and discards the other values. Continue?',
+      'Each merged area keeps its first value and deletes the other values. Continue?',
     mergeLoseDataConfirm: 'OK',
     mergeLoseDataCancel: 'Cancel',
     wrapText: 'Wrap text',

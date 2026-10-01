@@ -5,7 +5,13 @@ import {
   recordFormatChangeWithRepeat,
   recordMergesChangeWithEngine,
 } from '../commands/history.js';
-import { applyMerge, applyUnmerge, mergeAt } from '../commands/merge.js';
+import {
+  applyMerge,
+  applyUnmerge,
+  expandRangeWithMerges,
+  mergeAt,
+  mergeWillLoseData,
+} from '../commands/merge.js';
 import { addrKey } from '../engine/address.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { CellValue, Range } from '../engine/types.js';
@@ -27,6 +33,7 @@ import {
   type ValidationOp,
 } from '../store/store.js';
 import { appendDialogSelectOptions } from '../toolbar/dialogs/form-controls.js';
+import { confirmMergeLoseData } from '../toolbar/dialogs/merge-confirm.js';
 import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { formatA1Range } from '../wrappers/toolbar-a1.js';
 import { appendDialogOptionButton } from './dialog-shell.js';
@@ -129,6 +136,50 @@ function createPaletteFlyout(
 }
 
 const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
+
+type MergeSelectionState = 'none' | 'merged' | 'mixed';
+
+const sameRange = (a: Range, b: Range): boolean =>
+  a.sheet === b.sheet && a.r0 === b.r0 && a.c0 === b.c0 && a.r1 === b.r1 && a.c1 === b.c1;
+
+const mergeSelectionState = (state: State, range: Range): MergeSelectionState => {
+  const touching = [...state.merges.byAnchor.values()].filter(
+    (merge) =>
+      merge.sheet === range.sheet &&
+      merge.r0 <= range.r1 &&
+      merge.r1 >= range.r0 &&
+      merge.c0 <= range.c1 &&
+      merge.c1 >= range.c0,
+  );
+  if (touching.length === 0) return 'none';
+  if (touching.length === 1 && touching[0] && sameRange(touching[0], range)) return 'merged';
+  return 'mixed';
+};
+
+const mergeHasNonAnchorContent = (state: State, range: Range): boolean => {
+  const effective = expandRangeWithMerges(state, range);
+  for (const [key, cell] of state.data.cells) {
+    const parts = key.split(':');
+    const sheet = Number(parts[0]);
+    const row = Number(parts[1]);
+    const col = Number(parts[2]);
+    if (
+      !Number.isInteger(sheet) ||
+      !Number.isInteger(row) ||
+      !Number.isInteger(col) ||
+      sheet !== effective.sheet ||
+      row < effective.r0 ||
+      row > effective.r1 ||
+      col < effective.c0 ||
+      col > effective.c1 ||
+      (row === effective.r0 && col === effective.c0)
+    ) {
+      continue;
+    }
+    if (cell.formula || cell.value.kind !== 'blank') return true;
+  }
+  return false;
+};
 
 /** Convert a spreadsheet date serial to a native `<input type="date">` value
  *  (`yyyy-mm-dd`, UTC). Returns '' for non-finite serials. */
@@ -338,6 +389,11 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   let activeTab: TabId = 'number';
   let pendingBorderPreset: 'none' | 'outline' | 'all' | null = null;
   let applyDxf: ((format: Partial<CellFormat>) => void) | null = null;
+  let mergeTouched = false;
+  let initialMergeChecked = false;
+  let initialMergeIndeterminate = false;
+  let submitting = false;
+  let waitingForConfirmation = false;
   let previewValue: CellValue = { kind: 'blank' };
   const draft: DraftState = makeEmptyDraft(getFormatLocale());
 
@@ -367,8 +423,16 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const range = state.selection.range;
     const activeMerge = mergeAt(state, state.selection.active);
     const multiCell = range.r0 !== range.r1 || range.c0 !== range.c1;
-    mergeCk.input.checked = activeMerge !== null;
-    const mergeDisabled = !multiCell && activeMerge === null;
+    const selectedMergeState = mergeSelectionState(state, range);
+    mergeCk.input.checked = selectedMergeState === 'merged';
+    mergeCk.input.indeterminate = selectedMergeState === 'mixed';
+    mergeTouched = false;
+    initialMergeChecked = mergeCk.input.checked;
+    initialMergeIndeterminate = mergeCk.input.indeterminate;
+    const mergeRange = expandRangeWithMerges(state, range);
+    const mergeDisabled =
+      (!multiCell && activeMerge === null) ||
+      (!getWb() && mergeHasNonAnchorContent(state, mergeRange));
     const mergeReason = mergeDisabled ? strings.formatDialog.mergeCellsRequiresMultiCell : null;
     projectDisabledState(mergeCk.input, mergeDisabled, mergeReason, {
       datasetKey: 'disabledReason',
@@ -1038,7 +1102,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   };
 
   // ── Apply OK ───────────────────────────────────────────────────────────
-  const applyAndClose = (): void => {
+  const applyAndClose = async (): Promise<void> => {
     const state = store.getState();
     const range = state.selection.range;
 
@@ -1110,6 +1174,24 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     }
 
     const liveWb = getWb();
+    const mergeRange = expandRangeWithMerges(state, range);
+    const mergeChanged =
+      !mergeCk.input.disabled &&
+      (mergeCk.input.checked !== initialMergeChecked ||
+        (mergeTouched && mergeCk.input.indeterminate !== initialMergeIndeterminate));
+    const mergeAction: 'merge' | 'unmerge' | null = mergeChanged
+      ? mergeCk.input.checked
+        ? 'merge'
+        : 'unmerge'
+      : null;
+
+    // Ask before any format, value, or merge mutation. The no-loss path does
+    // not await, preserving the synchronous behavior of existing callers.
+    if (mergeAction === 'merge' && !liveWb && mergeHasNonAnchorContent(state, mergeRange)) return;
+    if (mergeAction === 'merge' && mergeWillLoseData(state, mergeRange)) {
+      waitingForConfirmation = true;
+      if (!(await confirmMergeLoseData(strings, state, mergeRange))) return;
+    }
     const outlineSide = activeSide();
     const applyOutlineToRange = (target: State, targetRange: Range): void => {
       if (rangeArea(targetRange) > MAX_OUTLINE_BORDER_CELLS) return;
@@ -1174,17 +1256,17 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
         },
         repeatFormatting,
       );
-      if (mergeCk.input.checked) {
-        if (range.r0 !== range.r1 || range.c0 !== range.c1) {
+      if (mergeAction === 'merge') {
+        if (mergeRange.r0 !== mergeRange.r1 || mergeRange.c0 !== mergeRange.c1) {
           if (liveWb) {
-            applyMerge(store, liveWb, history, range);
+            applyMerge(store, liveWb, history, mergeRange);
           } else {
-            recordMergesChangeWithEngine(history, store, null, range.sheet, () => {
-              mutators.mergeRange(store, range);
+            recordMergesChangeWithEngine(history, store, null, mergeRange.sheet, () => {
+              mutators.mergeRange(store, mergeRange);
             });
           }
         }
-      } else {
+      } else if (mergeAction === 'unmerge') {
         applyUnmerge(store, liveWb, history, range);
       }
     } finally {
@@ -1400,6 +1482,11 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     const n = Number.parseInt(rotationInput.value, 10);
     if (Number.isFinite(n)) draft.rotation = Math.max(-90, Math.min(90, n));
     renderPreview();
+  };
+
+  const onMergeChange = (): void => {
+    mergeTouched = true;
+    mergeCk.input.indeterminate = false;
   };
 
   const onDialClick = (event: Event): void => {
@@ -1770,7 +1857,20 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
     draft.validationErrorMessage = validationErrorMessageArea.value;
   };
 
-  const onOk = (): void => applyAndClose();
+  const onOk = (): void => {
+    if (submitting) return;
+    waitingForConfirmation = false;
+    submitting = true;
+    const operation = applyAndClose();
+    if (waitingForConfirmation) {
+      void operation.finally(() => {
+        waitingForConfirmation = false;
+        submitting = false;
+      });
+    } else {
+      submitting = false;
+    }
+  };
   const onCancel = (): void => api.close();
 
   const onOverlayKey = (e: KeyboardEvent): void => {
@@ -1793,7 +1893,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
       // Don't intercept Enter inside textarea or buttons that should activate.
       if (tag === 'BUTTON' || tag === 'TEXTAREA') return;
       e.preventDefault();
-      applyAndClose();
+      onOk();
     }
   };
 
@@ -1816,6 +1916,7 @@ export function attachFormatDialog(deps: FormatDialogDeps): FormatDialogHandle {
   shell.on(wrapCk.input, 'change', onWrapChange);
   shell.on(justifyLastLineCk.input, 'change', onJustifyLastLineChange);
   shell.on(shrinkCk.input, 'change', onShrinkToFitChange);
+  shell.on(mergeCk.input, 'change', onMergeChange);
   shell.on(indentInput, 'input', onIndentInput);
   shell.on(textDirectionSelect, 'change', onTextDirectionChange);
   shell.on(rotationInput, 'input', onRotationInput);

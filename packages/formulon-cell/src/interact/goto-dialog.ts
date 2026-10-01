@@ -12,6 +12,12 @@ import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
 import { formatA1Range } from '../wrappers/toolbar-a1.js';
 import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
+import {
+  clampNavigationAddr,
+  clampNavigationRange,
+  isNavigationAddrAllowed,
+  syncNavigationViewport,
+} from './navigation-policy.js';
 import { attachRangePickerButton } from './range-picker-control.js';
 
 export interface GoToDialogDeps {
@@ -264,16 +270,37 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
       return false;
     }
     const active = { sheet, row: parsed.r0, col: parsed.c0 };
+    const end = { sheet, row: parsed.r1, col: parsed.c1 };
+    // A Go To reference is an explicit host/user target. Reject a partially
+    // out-of-bounds rectangle instead of silently selecting its last in-range
+    // corner, which is especially surprising in a fixed input form.
+    if (!isNavigationAddrAllowed(store, active) || !isNavigationAddrAllowed(store, end)) {
+      statusLine.textContent = t.invalidReference;
+      return false;
+    }
+    const range = clampNavigationRange(store, {
+      sheet,
+      r0: parsed.r0,
+      c0: parsed.c0,
+      r1: parsed.r1,
+      c1: parsed.c1,
+    });
+    const target = clampNavigationAddr(store, active);
+    if (!range || !target) {
+      statusLine.textContent = t.invalidReference;
+      return false;
+    }
     store.setState((s) => ({
       ...s,
       data: { ...s.data, sheetIndex: sheet },
       selection: {
-        active,
-        anchor: active,
-        range: { sheet, r0: parsed.r0, c0: parsed.c0, r1: parsed.r1, c1: parsed.c1 },
+        active: target,
+        anchor: target,
+        range,
         extraRanges: [],
       },
     }));
+    syncNavigationViewport(store);
     api.close();
     return true;
   };
@@ -287,7 +314,9 @@ export function attachGoToDialog(deps: GoToDialogDeps): GoToDialogHandle {
     const kind = getCheckedKind();
     const scope = getCheckedScope();
     const wb = getWb();
-    const matches = findMatchingCells(wb, store, scope, kind, getValueFilters(kind));
+    const matches = findMatchingCells(wb, store, scope, kind, getValueFilters(kind)).filter(
+      (addr) => isNavigationAddrAllowed(store, addr),
+    );
     if (matches.length === 0) {
       statusLine.textContent = t.noResults;
       return;

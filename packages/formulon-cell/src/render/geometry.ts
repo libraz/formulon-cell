@@ -28,6 +28,33 @@ function viewportZoom(viewport?: ViewportSlice): number {
   return viewport?.zoom && Number.isFinite(viewport.zoom) ? viewport.zoom : 1;
 }
 
+const MAX_LAYOUT_ROW = 1_048_575;
+const MAX_LAYOUT_COL = 16_383;
+
+function viewportRowStart(layout: LayoutSlice, viewport: ViewportSlice): number {
+  return Math.max(layout.freezeRows, viewport.rowStart, viewport.navigationRange?.r0 ?? 0);
+}
+
+function viewportColStart(layout: LayoutSlice, viewport: ViewportSlice): number {
+  return Math.max(layout.freezeCols, viewport.colStart, viewport.navigationRange?.c0 ?? 0);
+}
+
+function viewportRowEnd(viewport: ViewportSlice): number {
+  return Math.min(
+    MAX_LAYOUT_ROW,
+    viewport.rowStart + viewport.rowCount - 1,
+    viewport.navigationRange?.r1 ?? MAX_LAYOUT_ROW,
+  );
+}
+
+function viewportColEnd(viewport: ViewportSlice): number {
+  return Math.min(
+    MAX_LAYOUT_COL,
+    viewport.colStart + viewport.colCount - 1,
+    viewport.navigationRange?.c1 ?? MAX_LAYOUT_COL,
+  );
+}
+
 /** Spreadsheet-style column letter ("A", "Z", "AA", "AB", ...). */
 export function colLabel(idx: number): string {
   let n = idx;
@@ -186,16 +213,22 @@ export function gridOriginY(layout: PagedLayout): number {
 /** Total width occupied by frozen columns. Zero if no freeze. */
 export function frozenColsWidth(layout: PagedLayout, viewport?: ViewportSlice): number {
   let w = 0;
-  for (let c = 0; c < layout.freezeCols; c += 1)
+  for (let c = 0; c < layout.freezeCols; c += 1) {
+    if (viewport?.navigationRange && c < viewport.navigationRange.c0) continue;
+    if (viewport?.navigationRange && c > viewport.navigationRange.c1) break;
     w += colGap(layout, c) + colWidth(layout, c, viewport);
+  }
   return w;
 }
 
 /** Total height occupied by frozen rows. Zero if no freeze. */
 export function frozenRowsHeight(layout: PagedLayout, viewport?: ViewportSlice): number {
   let h = 0;
-  for (let r = 0; r < layout.freezeRows; r += 1)
+  for (let r = 0; r < layout.freezeRows; r += 1) {
+    if (viewport?.navigationRange && r < viewport.navigationRange.r0) continue;
+    if (viewport?.navigationRange && r > viewport.navigationRange.r1) break;
     h += rowGap(layout, r) + rowHeight(layout, r, viewport);
+  }
   return h;
 }
 
@@ -204,6 +237,7 @@ export function frozenRowsHeight(layout: PagedLayout, viewport?: ViewportSlice):
  *  to the right of the frozen band, offset by the body viewport scroll. */
 export function colX(layout: PagedLayout, viewport: ViewportSlice, col: number): number {
   const fc = layout.freezeCols;
+  const frozenStart = Math.max(0, viewport.navigationRange?.c0 ?? 0);
   const walk = (from: number, base: number): number => {
     let x = base;
     for (let c = from; c <= col; c += 1) {
@@ -214,12 +248,13 @@ export function colX(layout: PagedLayout, viewport: ViewportSlice, col: number):
     }
     return x;
   };
-  if (col < fc) return walk(0, 0);
-  return walk(Math.max(viewport.colStart, fc), frozenColsWidth(layout, viewport));
+  if (col < fc) return walk(frozenStart, 0);
+  return walk(viewportColStart(layout, viewport), frozenColsWidth(layout, viewport));
 }
 
 export function rowY(layout: PagedLayout, viewport: ViewportSlice, row: number): number {
   const fr = layout.freezeRows;
+  const frozenStart = Math.max(0, viewport.navigationRange?.r0 ?? 0);
   const walk = (from: number, base: number): number => {
     let y = base;
     for (let r = from; r <= row; r += 1) {
@@ -228,8 +263,8 @@ export function rowY(layout: PagedLayout, viewport: ViewportSlice, row: number):
     }
     return y;
   };
-  if (row < fr) return walk(0, 0);
-  return walk(Math.max(viewport.rowStart, fr), frozenRowsHeight(layout, viewport));
+  if (row < fr) return walk(frozenStart, 0);
+  return walk(viewportRowStart(layout, viewport), frozenRowsHeight(layout, viewport));
 }
 
 export function cellRect(
@@ -257,7 +292,7 @@ export function cellRectUnclamped(
   col: number,
 ): Rect {
   const rect = cellRect(layout, viewport, row, col);
-  const colStart = Math.max(viewport.colStart, layout.freezeCols);
+  const colStart = viewportColStart(layout, viewport);
   // Walking back past a page gutter skips the gutter of the cell being
   // resolved: that one sits ahead of the cell, not between it and the edge.
   if (col >= layout.freezeCols && col < colStart) {
@@ -267,7 +302,7 @@ export function cellRectUnclamped(
     }
     rect.x += layout.rtl ? back : -back;
   }
-  const rowStart = Math.max(viewport.rowStart, layout.freezeRows);
+  const rowStart = viewportRowStart(layout, viewport);
   if (row >= layout.freezeRows && row < rowStart) {
     for (let r = row; r < rowStart; r += 1) {
       rect.y -= rowHeight(layout, r, viewport) + (r > row ? rowGap(layout, r) : 0);
@@ -315,8 +350,9 @@ export function hitTest(
   let col: number;
   let cx = ox;
   if (fc > 0 && x < ox + fcw) {
-    col = 0;
-    while (col < fc) {
+    col = Math.max(0, viewport.navigationRange?.c0 ?? 0);
+    const end = Math.min(fc, (viewport.navigationRange?.c1 ?? MAX_LAYOUT_COL) + 1);
+    while (col < end) {
       cx += colGap(layout, col);
       if (x < cx) return null;
       const w = colWidth(layout, col, viewport);
@@ -324,11 +360,11 @@ export function hitTest(
       cx += w;
       col += 1;
     }
-    if (col >= fc) return null;
+    if (col >= end) return null;
   } else {
     cx = ox + fcw;
-    col = Math.max(viewport.colStart, fc);
-    const end = viewport.colStart + viewport.colCount;
+    col = viewportColStart(layout, viewport);
+    const end = viewportColEnd(viewport) + 1;
     while (col < end) {
       cx += colGap(layout, col);
       if (x < cx) return null;
@@ -343,8 +379,9 @@ export function hitTest(
   let row: number;
   let cy = oy;
   if (fr > 0 && y < oy + frh) {
-    row = 0;
-    while (row < fr) {
+    row = Math.max(0, viewport.navigationRange?.r0 ?? 0);
+    const end = Math.min(fr, (viewport.navigationRange?.r1 ?? MAX_LAYOUT_ROW) + 1);
+    while (row < end) {
       cy += rowGap(layout, row);
       if (y < cy) return null;
       const h = rowHeight(layout, row, viewport);
@@ -352,11 +389,11 @@ export function hitTest(
       cy += h;
       row += 1;
     }
-    if (row >= fr) return null;
+    if (row >= end) return null;
   } else {
     cy = oy + frh;
-    row = Math.max(viewport.rowStart, fr);
-    const end = viewport.rowStart + viewport.rowCount;
+    row = viewportRowStart(layout, viewport);
+    const end = viewportRowEnd(viewport) + 1;
     while (row < end) {
       cy += rowGap(layout, row);
       if (y < cy) return null;
@@ -384,7 +421,9 @@ function colAtX(
   const ox = gridOriginX(layout);
   if (fc > 0 && x < ox + fcw) {
     let cx = ox;
-    for (let col = 0; col < fc; col += 1) {
+    const start = Math.max(0, viewport.navigationRange?.c0 ?? 0);
+    const end = Math.min(fc, (viewport.navigationRange?.c1 ?? MAX_LAYOUT_COL) + 1);
+    for (let col = start; col < end; col += 1) {
       cx += colGap(layout, col);
       const w = colWidth(layout, col, viewport);
       if (x < cx + w) return { col, leftEdge: cx, rightEdge: cx + w };
@@ -393,8 +432,8 @@ function colAtX(
     return null;
   }
   let cx = ox + fcw;
-  let col = Math.max(viewport.colStart, fc);
-  const end = viewport.colStart + viewport.colCount;
+  let col = viewportColStart(layout, viewport);
+  const end = viewportColEnd(viewport) + 1;
   while (col < end) {
     cx += colGap(layout, col);
     const w = colWidth(layout, col, viewport);
@@ -415,7 +454,9 @@ function rowAtY(
   const oy = gridOriginY(layout);
   if (fr > 0 && y < oy + frh) {
     let cy = oy;
-    for (let row = 0; row < fr; row += 1) {
+    const start = Math.max(0, viewport.navigationRange?.r0 ?? 0);
+    const end = Math.min(fr, (viewport.navigationRange?.r1 ?? MAX_LAYOUT_ROW) + 1);
+    for (let row = start; row < end; row += 1) {
       cy += rowGap(layout, row);
       const h = rowHeight(layout, row, viewport);
       if (y < cy + h) return { row, topEdge: cy, bottomEdge: cy + h };
@@ -424,8 +465,8 @@ function rowAtY(
     return null;
   }
   let cy = oy + frh;
-  let row = Math.max(viewport.rowStart, fr);
-  const end = viewport.rowStart + viewport.rowCount;
+  let row = viewportRowStart(layout, viewport);
+  const end = viewportRowEnd(viewport) + 1;
   while (row < end) {
     cy += rowGap(layout, row);
     const h = rowHeight(layout, row, viewport);
@@ -439,18 +480,28 @@ function rowAtY(
 /** Whether `col` is currently rendered (frozen band or scrolled body). */
 export function isColVisible(layout: LayoutSlice, viewport: ViewportSlice, col: number): boolean {
   if (col < 0) return false;
+  if (
+    viewport.navigationRange &&
+    (col < viewport.navigationRange.c0 || col > viewport.navigationRange.c1)
+  )
+    return false;
   if (layout.hiddenCols.has(col)) return false;
   if (col < layout.freezeCols) return true;
-  const start = Math.max(viewport.colStart, layout.freezeCols);
-  return col >= start && col < viewport.colStart + viewport.colCount;
+  const start = viewportColStart(layout, viewport);
+  return col >= start && col <= viewportColEnd(viewport);
 }
 
 export function isRowVisible(layout: LayoutSlice, viewport: ViewportSlice, row: number): boolean {
   if (row < 0) return false;
+  if (
+    viewport.navigationRange &&
+    (row < viewport.navigationRange.r0 || row > viewport.navigationRange.r1)
+  )
+    return false;
   if (layout.hiddenRows.has(row)) return false;
   if (row < layout.freezeRows) return true;
-  const start = Math.max(viewport.rowStart, layout.freezeRows);
-  return row >= start && row < viewport.rowStart + viewport.rowCount;
+  const start = viewportRowStart(layout, viewport);
+  return row >= start && row <= viewportRowEnd(viewport);
 }
 
 /** Rich hit-test that resolves headers, resize edges, the corner chip, and
@@ -540,10 +591,15 @@ export function rowTopEdge(layout: LayoutSlice, viewport: ViewportSlice, row: nu
 export function visibleRows(layout: LayoutSlice, viewport: ViewportSlice): number[] {
   const out: number[] = [];
   for (let r = 0; r < layout.freezeRows; r += 1) {
+    if (
+      viewport.navigationRange &&
+      (r < viewport.navigationRange.r0 || r > viewport.navigationRange.r1)
+    )
+      continue;
     if (!layout.hiddenRows.has(r)) out.push(r);
   }
-  const start = Math.max(viewport.rowStart, layout.freezeRows);
-  const end = viewport.rowStart + viewport.rowCount;
+  const start = viewportRowStart(layout, viewport);
+  const end = viewportRowEnd(viewport) + 1;
   for (let r = start; r < end; r += 1) {
     if (!layout.hiddenRows.has(r)) out.push(r);
   }
@@ -553,10 +609,15 @@ export function visibleRows(layout: LayoutSlice, viewport: ViewportSlice): numbe
 export function visibleCols(layout: LayoutSlice, viewport: ViewportSlice): number[] {
   const out: number[] = [];
   for (let c = 0; c < layout.freezeCols; c += 1) {
+    if (
+      viewport.navigationRange &&
+      (c < viewport.navigationRange.c0 || c > viewport.navigationRange.c1)
+    )
+      continue;
     if (!layout.hiddenCols.has(c)) out.push(c);
   }
-  const start = Math.max(viewport.colStart, layout.freezeCols);
-  const end = viewport.colStart + viewport.colCount;
+  const start = viewportColStart(layout, viewport);
+  const end = viewportColEnd(viewport) + 1;
   for (let c = start; c < end; c += 1) {
     if (!layout.hiddenCols.has(c)) out.push(c);
   }
@@ -602,11 +663,18 @@ export function buildColLayout(layout: PagedLayout, viewport: ViewportSlice): Ax
     x += w;
   };
 
-  for (let c = 0; c < layout.freezeCols; c += 1) place(c);
+  for (let c = 0; c < layout.freezeCols; c += 1) {
+    if (
+      viewport.navigationRange &&
+      (c < viewport.navigationRange.c0 || c > viewport.navigationRange.c1)
+    )
+      continue;
+    place(c);
+  }
   const frozenTotal = x;
 
-  const start = Math.max(viewport.colStart, layout.freezeCols);
-  const end = viewport.colStart + viewport.colCount;
+  const start = viewportColStart(layout, viewport);
+  const end = viewportColEnd(viewport) + 1;
   for (let c = start; c < end; c += 1) place(c);
 
   return { visible, positionAt, sizeAt, frozenTotal, gapAt };
@@ -632,11 +700,18 @@ export function buildRowLayout(layout: PagedLayout, viewport: ViewportSlice): Ax
     y += h;
   };
 
-  for (let r = 0; r < layout.freezeRows; r += 1) place(r);
+  for (let r = 0; r < layout.freezeRows; r += 1) {
+    if (
+      viewport.navigationRange &&
+      (r < viewport.navigationRange.r0 || r > viewport.navigationRange.r1)
+    )
+      continue;
+    place(r);
+  }
   const frozenTotal = y;
 
-  const start = Math.max(viewport.rowStart, layout.freezeRows);
-  const end = viewport.rowStart + viewport.rowCount;
+  const start = viewportRowStart(layout, viewport);
+  const end = viewportRowEnd(viewport) + 1;
   for (let r = start; r < end; r += 1) place(r);
 
   return { visible, positionAt, sizeAt, frozenTotal, gapAt };
@@ -669,27 +744,33 @@ export function rangeRects(
   viewport: ViewportSlice,
   range: { r0: number; r1: number; c0: number; c1: number },
 ): Rect[] {
+  const bounded = viewport.navigationRange;
+  const r0 = Math.max(range.r0, bounded?.r0 ?? 0);
+  const r1 = Math.min(range.r1, bounded?.r1 ?? MAX_LAYOUT_ROW);
+  const c0 = Math.max(range.c0, bounded?.c0 ?? 0);
+  const c1 = Math.min(range.c1, bounded?.c1 ?? MAX_LAYOUT_COL);
+  if (r0 > r1 || c0 > c1) return [];
   const fr = layout.freezeRows;
   const fc = layout.freezeCols;
-  const lastRow = viewport.rowStart + viewport.rowCount - 1;
-  const lastCol = viewport.colStart + viewport.colCount - 1;
+  const lastRow = viewportRowEnd(viewport);
+  const lastCol = viewportColEnd(viewport);
 
   const rowSegs: [number, number][] = [];
-  if (fr > 0 && range.r0 < fr) {
-    rowSegs.push([range.r0, Math.min(range.r1, fr - 1)]);
+  if (fr > 0 && r0 < fr) {
+    rowSegs.push([r0, Math.min(r1, fr - 1)]);
   }
-  const bodyRowStart = Math.max(viewport.rowStart, fr);
-  if (range.r1 >= bodyRowStart && range.r0 <= lastRow) {
-    rowSegs.push([Math.max(range.r0, bodyRowStart), Math.min(range.r1, lastRow)]);
+  const bodyRowStart = Math.max(viewportRowStart(layout, viewport), fr);
+  if (r1 >= bodyRowStart && r0 <= lastRow) {
+    rowSegs.push([Math.max(r0, bodyRowStart), Math.min(r1, lastRow)]);
   }
 
   const colSegs: [number, number][] = [];
-  if (fc > 0 && range.c0 < fc) {
-    colSegs.push([range.c0, Math.min(range.c1, fc - 1)]);
+  if (fc > 0 && c0 < fc) {
+    colSegs.push([c0, Math.min(c1, fc - 1)]);
   }
-  const bodyColStart = Math.max(viewport.colStart, fc);
-  if (range.c1 >= bodyColStart && range.c0 <= lastCol) {
-    colSegs.push([Math.max(range.c0, bodyColStart), Math.min(range.c1, lastCol)]);
+  const bodyColStart = Math.max(viewportColStart(layout, viewport), fc);
+  if (c1 >= bodyColStart && c0 <= lastCol) {
+    colSegs.push([Math.max(c0, bodyColStart), Math.min(c1, lastCol)]);
   }
 
   const rects: Rect[] = [];

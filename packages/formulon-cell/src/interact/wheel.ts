@@ -1,5 +1,6 @@
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { navigationPolicyFor } from './navigation-policy.js';
 
 export interface WheelDeps {
   /** Element to listen on — typically the grid canvas wrapper. */
@@ -33,7 +34,13 @@ export function attachWheel(deps: WheelDeps): () => void {
       const cur = store.getState().viewport.zoom;
       const step = e.deltaY < 0 ? 0.1 : -0.1;
       mutators.setZoom(store, Math.round((cur + step) * 10) / 10);
-      if (wb) {
+      // A bounded embedded viewport owns zoom as session presentation state.
+      // Do not persist it through the workbook unless the host explicitly
+      // mounted an unrestricted navigation policy; this keeps a wheel gesture
+      // from becoming an unexpected workbook mutation.
+      const navOptions = navigationPolicyFor(store)?.options;
+      const restricted = !!(navOptions?.range || navOptions?.selectable);
+      if (wb && !restricted) {
         const sheet = store.getState().data.sheetIndex;
         const pct = Math.round(store.getState().viewport.zoom * 100);
         wb.setSheetZoom(sheet, pct);

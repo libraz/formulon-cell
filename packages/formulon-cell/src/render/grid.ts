@@ -8,7 +8,7 @@ import { findSpillBlockers, findSpillRanges, looksLikeArrayFormula } from '../en
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import type { CellFormat, State } from '../store/store.js';
+import type { CellBorderSide, CellFormat, State } from '../store/store.js';
 import { getPageSetup } from '../store/store.js';
 import type { ResolvedTheme } from '../theme/resolve.js';
 import { evaluateConditional } from './conditional.js';
@@ -83,6 +83,128 @@ import { paintCellSparkline } from './sparkline.js';
 
 const inRange = (a: Addr, r: Range): boolean =>
   a.row >= r.r0 && a.row <= r.r1 && a.col >= r.c0 && a.col <= r.c1;
+
+const mergeRangeAt = (state: State, addr: Addr): Range | null => {
+  const key = addrKey(addr);
+  const anchorKey = state.merges.byCell.get(key) ?? key;
+  return state.merges.byAnchor.get(anchorKey) ?? null;
+};
+
+const borderSideSignature = (side: CellBorderSide | undefined): string => {
+  if (side === undefined) return 'absent';
+  if (typeof side === 'boolean') return `boolean:${side}`;
+  return `style:${side.style};color:${side.color ?? ''}`;
+};
+
+/** Excel stores a uniform diagonal border on every cell covered by a merge,
+ *  but renders that border once across the merged surface. Mixed diagonal
+ *  metadata is discarded by Excel at merge time; suppress it here as well so
+ *  stale per-cell data cannot produce crossing lines inside a merge. */
+const mergedDiagonalBorders = (
+  formats: ReadonlyMap<string, CellFormat>,
+  merge: Range,
+): CellFormat['borders'] => {
+  let down: CellBorderSide | undefined;
+  let downSignature: string | null = null;
+  let up: CellBorderSide | undefined;
+  let upSignature: string | null = null;
+  for (let row = merge.r0; row <= merge.r1; row += 1) {
+    for (let col = merge.c0; col <= merge.c1; col += 1) {
+      const borders = formats.get(addrKey({ sheet: merge.sheet, row, col }))?.borders;
+      const nextDown = borders?.diagonalDown;
+      const nextUp = borders?.diagonalUp;
+      const nextDownSignature = borderSideSignature(nextDown);
+      const nextUpSignature = borderSideSignature(nextUp);
+      if (downSignature === null) {
+        down = nextDown;
+        downSignature = nextDownSignature;
+      } else if (downSignature !== 'mixed' && downSignature !== nextDownSignature) {
+        downSignature = 'mixed';
+      }
+      if (upSignature === null) {
+        up = nextUp;
+        upSignature = nextUpSignature;
+      } else if (upSignature !== 'mixed' && upSignature !== nextUpSignature) {
+        upSignature = 'mixed';
+      }
+    }
+  }
+  const result: NonNullable<CellFormat['borders']> = {};
+  if (downSignature !== null && downSignature !== 'mixed' && downSignature !== 'absent') {
+    result.diagonalDown = down;
+  }
+  if (upSignature !== null && upSignature !== 'mixed' && upSignature !== 'absent') {
+    result.diagonalUp = up;
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+};
+
+const sameRect = (a: Rect, b: Rect): boolean =>
+  a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+
+const sameRectList = (a: readonly Rect[], b: readonly Rect[]): boolean =>
+  a.length === b.length &&
+  a.every((rect, index) => {
+    const other = b[index];
+    return other !== undefined && sameRect(rect, other);
+  });
+
+const rectsTouch = (a: Rect, b: Rect): boolean => {
+  const eps = 1e-6;
+  const overlapY = a.y < b.y + b.h - eps && b.y < a.y + a.h - eps;
+  const overlapX = a.x < b.x + b.w - eps && b.x < a.x + a.w - eps;
+  const sideBySide =
+    (Math.abs(a.x + a.w - b.x) < eps || Math.abs(b.x + b.w - a.x) < eps) && overlapY;
+  const stacked = (Math.abs(a.y + a.h - b.y) < eps || Math.abs(b.y + b.h - a.y) < eps) && overlapX;
+  return (overlapX && overlapY) || sideBySide || stacked;
+};
+
+/** Join visible range rects that share an edge. Freeze quadrants are separate
+ *  for fills and outlines, but their screen coordinates are contiguous, so a
+ *  single text clip must span their union. Page-layout gutters remain
+ *  separate components and therefore do not make text cross a paper gap. */
+const connectedRects = (rects: readonly Rect[]): Rect[] => {
+  const pending = rects.map((rect) => ({ ...rect }));
+  let changed = true;
+  while (changed) {
+    changed = false;
+    outer: for (let i = 0; i < pending.length; i += 1) {
+      const first = pending[i];
+      if (!first) continue;
+      for (let j = i + 1; j < pending.length; j += 1) {
+        const second = pending[j];
+        if (!second || !rectsTouch(first, second)) continue;
+        pending[i] = {
+          x: Math.min(first.x, second.x),
+          y: Math.min(first.y, second.y),
+          w: Math.max(first.x + first.w, second.x + second.w) - Math.min(first.x, second.x),
+          h: Math.max(first.y + first.h, second.y + second.h) - Math.min(first.y, second.y),
+        };
+        pending.splice(j, 1);
+        changed = true;
+        break outer;
+      }
+    }
+  }
+  return pending;
+};
+
+/** Pick the visible rectangle at a range's logical bottom/trailing corner.
+ *  `rangeRects` returns freeze quadrants in logical row/column order, but the
+ *  physical trailing edge moves to the left on a right-to-left sheet. */
+const trailingRect = (rects: readonly Rect[], rtl: boolean): Rect | null => {
+  if (rects.length === 0) return null;
+  const bottom = Math.max(...rects.map((rect) => rect.y + rect.h));
+  const bottomRects = rects.filter((rect) => rect.y + rect.h === bottom);
+  return bottomRects.reduce(
+    (best, rect) => {
+      if (!best) return rect;
+      if (rtl) return rect.x < best.x ? rect : best;
+      return rect.x + rect.w > best.x + best.w ? rect : best;
+    },
+    null as Rect | null,
+  );
+};
 
 const visibleCount = (
   pixels: number,
@@ -211,21 +333,31 @@ export class GridRenderer {
       0,
       this.cssWidth - gridOriginX(layout) - frozenColsWidth(layout, viewport),
     );
-    const firstRow = Math.max(viewport.rowStart, layout.freezeRows);
-    const firstCol = Math.max(viewport.colStart, layout.freezeCols);
+    const firstRow = Math.max(
+      viewport.rowStart,
+      layout.freezeRows,
+      viewport.navigationRange?.r0 ?? 0,
+    );
+    const firstCol = Math.max(
+      viewport.colStart,
+      layout.freezeCols,
+      viewport.navigationRange?.c0 ?? 0,
+    );
+    const lastRow = (viewport.navigationRange?.r1 ?? 1_048_575) + 1;
+    const lastCol = (viewport.navigationRange?.c1 ?? 16_383) + 1;
     // Page gutters take screen space without holding a cell, so they count
     // against the viewport budget too — otherwise Page Layout view would
     // under-fill the canvas by a page margin per page.
     const rowCount = visibleCount(
       bodyH,
       firstRow,
-      1_048_576,
+      lastRow,
       (idx) => rowHeight(layout, idx, viewport) + rowGap(layout, idx),
     );
     const colCount = visibleCount(
       bodyW,
       firstCol,
-      16_384,
+      lastCol,
       (idx) => colWidth(layout, idx, viewport) + colGap(layout, idx),
     );
     this.onViewportSize(rowCount, colCount, this.cssWidth);
@@ -509,35 +641,70 @@ export class GridRenderer {
       }
     }
 
-    // Compute merged cell bounds (anchor cell expanded to span the full range).
-    const mergeBounds = (
-      row: number,
-      col: number,
-    ): { x: number; y: number; w: number; h: number } | null => {
-      const anchorKey = addrKey({ sheet: data.sheetIndex, row, col });
-      const range = merges.byAnchor.get(anchorKey);
-      if (!range) return null;
-      const tl = cellRectIn(layout, cols, rows, range.r0, range.c0);
-      // Sum widths/heights across the merge in a clamp-safe way.
-      let x = tl.x;
-      let y = tl.y;
-      let w = 0;
-      let h = 0;
-      for (let cc = range.c0; cc <= range.c1; cc += 1) {
-        if (cols.positionAt.has(cc)) {
-          const r2 = cellRectIn(layout, cols, rows, row, cc);
-          if (cc === range.c0) x = r2.x;
-          w = r2.x + r2.w - x;
-        }
+    // Compute merged cell bounds from the same freeze/RTL-aware projection
+    // used by selection outlines. The old local width/height summation mixed
+    // logical and screen coordinates when a merge crossed a frozen boundary.
+    const mergeRectsAt = (row: number, col: number): Rect[] => {
+      const range = merges.byAnchor.get(addrKey({ sheet: data.sheetIndex, row, col }));
+      return range ? rangeRects(layout, state.viewport, range) : [];
+    };
+    const mergeBounds = (row: number, col: number): Rect | null =>
+      connectedRects(mergeRectsAt(row, col))[0] ?? null;
+
+    // The sheet background is painted before grid lines. Repaint it inside a
+    // merge before its content so internal gridlines cannot show through. If
+    // the background image is already loaded, restore the same repeat pattern
+    // instead of replacing it with an opaque theme fill.
+    const paintMergeBase = (bounds: Rect): void => {
+      const url = state.ui.sheetBackgroundImages.get(data.sheetIndex);
+      const image = url ? this.sheetBackgroundImages.get(url) : undefined;
+      const pattern =
+        image?.status === 'loaded' &&
+        image.image.naturalWidth > 0 &&
+        image.image.naturalHeight > 0 &&
+        typeof ctx.createPattern === 'function'
+          ? ctx.createPattern(image.image, 'repeat')
+          : null;
+      if (pattern) {
+        const ox = layout.rtl ? 0 : gridOriginX(layout);
+        const oy = gridOriginY(layout);
+        ctx.save();
+        ctx.translate(ox, oy);
+        ctx.fillStyle = pattern;
+        ctx.fillRect(bounds.x - ox, bounds.y - oy, bounds.w, bounds.h);
+        ctx.restore();
+        return;
       }
-      for (let rr = range.r0; rr <= range.r1; rr += 1) {
-        if (rows.positionAt.has(rr)) {
-          const r2 = cellRectIn(layout, cols, rows, rr, col);
-          if (rr === range.r0) y = r2.y;
-          h = r2.y + r2.h - y;
-        }
+      ctx.fillStyle = theme.bg;
+      ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
+    };
+    const paintMergeSurface = (
+      bounds: Rect,
+      isActive: boolean,
+      isSelected: boolean | undefined,
+    ): void => {
+      paintMergeBase(bounds);
+      if (isActive) {
+        paintCellBackground({
+          ctx,
+          theme,
+          bounds,
+          value: { kind: 'blank' },
+          formula: null,
+          isActive: true,
+          isInRange: false,
+        });
+      } else if (isSelected) {
+        paintCellBackground({
+          ctx,
+          theme,
+          bounds,
+          value: { kind: 'blank' },
+          formula: null,
+          isActive: false,
+          isInRange: true,
+        });
       }
-      return { x, y, w, h };
     };
     // Overflow and centre-across both spill into the following columns, which
     // the mirror puts to the left of the anchor on a right-to-left sheet — so
@@ -588,6 +755,37 @@ export class GridRenderer {
       return extra === 0 ? base : spillRect(base, extra);
     };
 
+    // The anchor can be scrolled or hidden while a visible body segment of the
+    // merge remains on screen. Clear that segment here; the normal anchor walk
+    // below handles the common visible-anchor case and then paints content.
+    for (const [anchorKey, merge] of merges.byAnchor) {
+      if (merge.sheet !== data.sheetIndex) continue;
+      const rects = rangeRects(layout, state.viewport, merge);
+      const anchorVisible = rows.positionAt.has(merge.r0) && cols.positionAt.has(merge.c0);
+      if (rects.length === 0 || anchorVisible) continue;
+      const anchor = { sheet: merge.sheet, row: merge.r0, col: merge.c0 };
+      const selected =
+        inRange(anchor, rng) || extras?.some((extra) => inRange(anchor, extra)) === true;
+      const isActive =
+        active.sheet === merge.sheet && active.row === merge.r0 && active.col === merge.c0;
+      const anchorFormat = format.formats.get(anchorKey);
+      for (const rect of rects) {
+        paintMergeSurface(rect, isActive, selected);
+        if (anchorFormat?.fill || anchorFormat?.fillPattern) {
+          paintCellFill({
+            ctx,
+            theme,
+            bounds: rect,
+            value: { kind: 'blank' },
+            formula: null,
+            isActive,
+            isInRange: selected,
+            format: anchorFormat,
+          });
+        }
+      }
+    }
+
     // Single visible-cells walk paints both static format fills (for blank
     // formatted cells too) and cell content. Iterating format.formats here
     // would be O(formats), which dominates on sheets with thousands of
@@ -602,6 +800,12 @@ export class GridRenderer {
         const table = tableForCell(tables.tables, data.sheetIndex, r, c);
         const tableFmt = table ? tableCellFormat(table, r, c) : undefined;
         const isMergeAnchor = merges.byAnchor.has(key);
+        // Use the union of contiguous visible rectangles for content bounds,
+        // but retain every visible quadrant for the merged surface and static
+        // format fill. A merge crossing a frozen row/column is projected into
+        // more than one rect; painting only one leaves the other quadrants
+        // with a different background or exposed gridline.
+        const mergedRects = isMergeAnchor ? mergeRectsAt(r, c) : [];
         const spark = sparklines.get(key);
         const isActive = r === active.row && c === active.col;
         const hasValidationCircle = validationCircles.has(key);
@@ -612,13 +816,18 @@ export class GridRenderer {
           !isActive &&
           !isMergeAnchor &&
           !fmt?.fill &&
+          !fmt?.fillPattern &&
           !tableFmt?.fill &&
+          !tableFmt?.fillPattern &&
           !spark &&
           !hasValidationCircle
         )
           continue;
         const bounds = mergeBounds(r, c) ?? cellRectIn(layout, cols, rows, r, c);
         const isInRange = inRange({ sheet: data.sheetIndex, row: r, col: c }, rng);
+        const isInExtraRange = extras?.some((extra) =>
+          inRange({ sheet: data.sheetIndex, row: r, col: c }, extra),
+        );
 
         const overlay = conditional.get(key);
         const baseFmt: typeof fmt =
@@ -640,6 +849,12 @@ export class GridRenderer {
                 strike: overlay.strike || baseFmt?.strike,
               }
             : baseFmt;
+
+        if (isMergeAnchor) {
+          for (const mergedRect of mergedRects) {
+            paintMergeSurface(mergedRect, isActive, isInRange || isInExtraRange);
+          }
+        }
 
         const value: CellValue = cell?.value ?? { kind: 'blank' };
         const storedFormula = cell?.formula ?? null;
@@ -673,7 +888,15 @@ export class GridRenderer {
         // Static format fill OR overlay fill — both painted via paintCellFill,
         // which reads `format.fill`. The merged effectiveFmt already prefers
         // overlay over static, so a single call yields the right result.
-        if (effectiveFmt?.fill) paintCellFill(paintCtx);
+        if (effectiveFmt?.fill || effectiveFmt?.fillPattern) {
+          if (isMergeAnchor && mergedRects.length > 0) {
+            for (const mergedRect of mergedRects) {
+              paintCellFill({ ...paintCtx, bounds: mergedRect });
+            }
+          } else {
+            paintCellFill(paintCtx);
+          }
+        }
         if (isActive && !effectiveFmt?.fill) paintCellBackground(paintCtx);
         if (overlay) paintDataBar(ctx, bounds, overlay);
         const hideConditionalValue =
@@ -770,6 +993,23 @@ export class GridRenderer {
         const key = addrKey({ sheet: data.sheetIndex, row: r, col: c });
         const f = format.formats.get(key);
         if (!f?.borders) continue;
+        const merge = mergeRangeAt(state, { sheet: data.sheetIndex, row: r, col: c });
+        let borders = f.borders;
+        if (merge) {
+          // A loaded workbook can retain per-cell border sides even after a
+          // merge. Keep only the perimeter sides; otherwise every interior
+          // gridline is redrawn above the merge surface.
+          borders = { ...f.borders };
+          if (r > merge.r0) borders.top = undefined;
+          if (r < merge.r1) borders.bottom = undefined;
+          if (layout.rtl ? c < merge.c1 : c > merge.c0) borders.left = undefined;
+          if (layout.rtl ? c > merge.c0 : c < merge.c1) borders.right = undefined;
+          // Diagonals belong to the merged surface, not to each component
+          // cell. They are painted once below after the perimeter pass.
+          borders.diagonalDown = undefined;
+          borders.diagonalUp = undefined;
+          if (Object.values(borders).every((side) => !side)) continue;
+        }
         const bounds = cellRectIn(layout, cols, rows, r, c);
         paintCellBorders({
           ctx,
@@ -779,8 +1019,48 @@ export class GridRenderer {
           formula: null,
           isActive: false,
           isInRange: false,
-          format: f,
+          format: borders === f.borders ? f : { ...f, borders },
         });
+      }
+    }
+
+    // A uniform diagonal border survives a merge in Excel, but is rendered as
+    // one line over the visible merged rectangle. A per-cell pass would draw
+    // one diagonal per body cell and leave crossings in the merged surface;
+    // rangeRects keeps the same freeze/RTL projection as the selection path.
+    for (const merge of state.merges.byAnchor.values()) {
+      if (merge.sheet !== data.sheetIndex) continue;
+      const borders = mergedDiagonalBorders(format.formats, merge);
+      if (!borders) continue;
+      const rects = rangeRects(layout, state.viewport, merge);
+      const clips = connectedRects(rects);
+      if (clips.length === 0) continue;
+      const globalBounds = {
+        x: Math.min(...rects.map((rect) => rect.x)),
+        y: Math.min(...rects.map((rect) => rect.y)),
+        w:
+          Math.max(...rects.map((rect) => rect.x + rect.w)) -
+          Math.min(...rects.map((rect) => rect.x)),
+        h:
+          Math.max(...rects.map((rect) => rect.y + rect.h)) -
+          Math.min(...rects.map((rect) => rect.y)),
+      };
+      for (const clip of clips) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(clip.x, clip.y, clip.w, clip.h);
+        ctx.clip();
+        paintCellBorders({
+          ctx,
+          theme,
+          bounds: globalBounds,
+          value: { kind: 'blank' },
+          formula: null,
+          isActive: false,
+          isInRange: false,
+          format: { borders },
+        });
+        ctx.restore();
       }
     }
   }
@@ -854,8 +1134,8 @@ export class GridRenderer {
   private paintActive(
     state: ViewState,
     theme: ResolvedTheme,
-    cols: AxisLayout,
-    rows: AxisLayout,
+    _cols: AxisLayout,
+    _rows: AxisLayout,
   ): void {
     const { layout, viewport, selection, ui, format, data } = state;
     const a = selection.active;
@@ -863,27 +1143,45 @@ export class GridRenderer {
     setFillHandleRect(null);
     setValidationChevron(null);
 
-    if (isRowVisible(layout, viewport, a.row) && isColVisible(layout, viewport, a.col)) {
-      const bounds: Rect = cellRectIn(layout, cols, rows, a.row, a.col);
+    const activeMerge = mergeRangeAt(state, a);
+    const activeVisualRange: Range = activeMerge ?? {
+      sheet: a.sheet,
+      r0: a.row,
+      c0: a.col,
+      r1: a.row,
+      c1: a.col,
+    };
+    const activeRects = rangeRects(layout, viewport, activeVisualRange);
+    for (const bounds of activeRects) {
       paintActiveCellOutline(this.ctx, bounds, theme);
-      const fmt = format.formats.get(addrKey({ sheet: data.sheetIndex, row: a.row, col: a.col }));
-      if (shouldShowValidationChevron(fmt?.validation)) {
-        const rect = paintValidationChevron(this.ctx, bounds, theme, layout.rtl);
-        setValidationChevron({ rect, row: a.row, col: a.col });
-      }
+    }
+
+    const activeAnchor = activeMerge
+      ? { sheet: activeMerge.sheet, row: activeMerge.r0, col: activeMerge.c0 }
+      : a;
+    const fmt = format.formats.get(addrKey(activeAnchor));
+    const validationBounds = trailingRect(activeRects, layout.rtl);
+    if (validationBounds && shouldShowValidationChevron(fmt?.validation)) {
+      const rect = paintValidationChevron(this.ctx, validationBounds, theme, layout.rtl);
+      setValidationChevron({ rect, row: activeAnchor.row, col: activeAnchor.col });
     }
 
     if (r.r0 !== r.r1 || r.c0 !== r.c1) {
       const rects = rangeRects(layout, viewport, r);
-      const ctx = this.ctx;
-      ctx.save();
-      ctx.strokeStyle = theme.accent;
-      ctx.lineWidth = 2;
-      ctx.setLineDash([]);
-      for (const rect of rects) {
-        ctx.strokeRect(rect.x + 1, rect.y + 1, Math.max(0, rect.w - 2), Math.max(0, rect.h - 2));
+      // A merged selection already received its full-range active outline
+      // above. Painting the generic range outline over the same rectangle
+      // creates a darker double border, unlike desktop spreadsheets.
+      if (!sameRectList(activeRects, rects)) {
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.strokeStyle = theme.accent;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        for (const rect of rects) {
+          ctx.strokeRect(rect.x + 1, rect.y + 1, Math.max(0, rect.w - 2), Math.max(0, rect.h - 2));
+        }
+        ctx.restore();
       }
-      ctx.restore();
     }
 
     const preview = ui.fillPreview;
@@ -892,7 +1190,9 @@ export class GridRenderer {
       for (const r of rects) paintFillPreview(this.ctx, r, theme);
     }
     const copyRanges = ui.copyRanges && ui.copyRanges.length > 0 ? ui.copyRanges : null;
-    const rangesToPaint = copyRanges ?? (ui.copyRange ? [ui.copyRange] : []);
+    const rangesToPaint = (copyRanges ?? (ui.copyRange ? [ui.copyRange] : [])).filter(
+      (copyRange) => copyRange.sheet === data.sheetIndex,
+    );
     if (rangesToPaint.length > 0) {
       const phase = (performance.now() / 180) % 7;
       for (const copyRange of rangesToPaint) {
@@ -909,9 +1209,10 @@ export class GridRenderer {
       }
     }
 
-    if (isRowVisible(layout, viewport, r.r1) && isColVisible(layout, viewport, r.c1)) {
-      const cornerCell = cellRectIn(layout, cols, rows, r.r1, r.c1);
-      setFillHandleRect(paintFillHandle(this.ctx, cornerCell, theme, layout.rtl));
+    const handleRange = activeMerge && r.r0 === r.r1 && r.c0 === r.c1 ? activeVisualRange : r;
+    const handleBounds = trailingRect(rangeRects(layout, viewport, handleRange), layout.rtl);
+    if (handleBounds) {
+      setFillHandleRect(paintFillHandle(this.ctx, handleBounds, theme, layout.rtl));
     }
   }
 

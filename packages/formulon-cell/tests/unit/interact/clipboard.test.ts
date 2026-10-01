@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { History } from '../../../src/commands/history.js';
+import { insertRows } from '../../../src/commands/structure.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { attachClipboard } from '../../../src/interact/clipboard.js';
 import {
@@ -14,13 +15,22 @@ const newWb = (): Promise<WorkbookHandle> => WorkbookHandle.createDefault({ pref
 const seedAndMirror = (
   store: SpreadsheetStore,
   wb: WorkbookHandle,
-  cells: Array<{ row: number; col: number; value: number | string }>,
+  cells: Array<{ row: number; col: number; value: number | string; formula?: string }>,
 ): void => {
   store.setState((s) => {
     const map = new Map(s.data.cells);
     for (const c of cells) {
       const addr = { sheet: 0, row: c.row, col: c.col };
-      if (typeof c.value === 'number') {
+      if (c.formula) {
+        wb.setFormula(addr, c.formula);
+        map.set(addrKey(addr), {
+          value:
+            typeof c.value === 'number'
+              ? { kind: 'number', value: c.value }
+              : { kind: 'text', value: c.value },
+          formula: c.formula,
+        });
+      } else if (typeof c.value === 'number') {
         wb.setNumber(addr, c.value);
         map.set(addrKey(addr), { value: { kind: 'number', value: c.value }, formula: null });
       } else {
@@ -39,14 +49,15 @@ const setRange = (
   c0: number,
   r1: number,
   c1: number,
+  sheet = 0,
 ): void => {
   store.setState((s) => ({
     ...s,
     selection: {
       ...s.selection,
-      active: { sheet: 0, row: r0, col: c0 },
-      anchor: { sheet: 0, row: r0, col: c0 },
-      range: { sheet: 0, r0, c0, r1, c1 },
+      active: { sheet, row: r0, col: c0 },
+      anchor: { sheet, row: r0, col: c0 },
+      range: { sheet, r0, c0, r1, c1 },
     },
   }));
 };
@@ -223,7 +234,7 @@ describe('attachClipboard', () => {
     handle.detach();
   });
 
-  it('cut writes TSV, snapshots, blanks the source, and notifies onAfterCommit', () => {
+  it('cut writes TSV and snapshots while leaving the source intact', () => {
     seedAndMirror(store, wb, [
       { row: 0, col: 0, value: 5 },
       { row: 0, col: 1, value: 6 },
@@ -239,11 +250,11 @@ describe('attachClipboard', () => {
     expect(handle.getSnapshot()).not.toBeNull();
     expect(store.getState().ui.copyRange).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
     wb.recalc();
-    expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
-    expect(wb.getValue({ sheet: 0, row: 0, col: 1 }).kind).toBe('blank');
-    expect(formatAt(store, 0, 0)).toBeUndefined();
-    expect(formatAt(store, 0, 1)).toBeUndefined();
-    expect(onAfterCommit).toHaveBeenCalledTimes(1);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 5 });
+    expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 6 });
+    expect(formatAt(store, 0, 0)).toMatchObject({ bold: true, fill: '#fff2cc' });
+    expect(formatAt(store, 0, 1)).toMatchObject({ italic: true });
+    expect(onAfterCommit).not.toHaveBeenCalled();
     handle.detach();
   });
 
@@ -264,15 +275,15 @@ describe('attachClipboard', () => {
     expect(handle.getSnapshot()?.rows).toBe(3);
     expect(handle.getSnapshot()?.cols).toBe(1);
     wb.recalc();
-    expect(wb.getValue({ sheet: 0, row: 4, col: 2 }).kind).toBe('blank');
-    expect(wb.getValue({ sheet: 0, row: 6, col: 2 }).kind).toBe('blank');
-    expect(formatAt(store, 4, 2)).toBeUndefined();
-    expect(formatAt(store, 6, 2)).toBeUndefined();
+    expect(wb.getValue({ sheet: 0, row: 4, col: 2 })).toEqual({ kind: 'text', value: 'top' });
+    expect(wb.getValue({ sheet: 0, row: 6, col: 2 })).toEqual({ kind: 'text', value: 'bottom' });
+    expect(formatAt(store, 4, 2)).toMatchObject({ bold: true });
+    expect(formatAt(store, 6, 2)).toMatchObject({ italic: true });
     expect(store.getState().ui.copyRange).toEqual({ sheet: 0, r0: 0, c0: 2, r1: 1048575, c1: 2 });
     handle.detach();
   });
 
-  it('records cut values and source formats as one undo step when history is attached', () => {
+  it('does not mutate data or history until a cut is pasted', () => {
     const history = new History();
     seedAndMirror(store, wb, [{ row: 0, col: 0, value: 5 }]);
     setFormat(store, 0, 0, { bold: true, fill: '#fff2cc' });
@@ -281,13 +292,10 @@ describe('attachClipboard', () => {
 
     fireClipboard(host, 'cut');
     wb.recalc();
-    expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
-    expect(formatAt(store, 0, 0)).toBeUndefined();
-
-    expect(history.undo()).toBe(true);
-    wb.recalc();
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 5 });
     expect(formatAt(store, 0, 0)).toMatchObject({ bold: true, fill: '#fff2cc' });
+
+    expect(history.undo()).toBe(false);
     handle.detach();
   });
 
@@ -343,6 +351,47 @@ describe('attachClipboard', () => {
     handle.detach();
   });
 
+  it('refreshes a copy snapshot after a row insertion moves its source', () => {
+    seedAndMirror(store, wb, [
+      { row: 1, col: 0, value: 5, formula: '=B$2' },
+      { row: 1, col: 1, value: 5 },
+    ]);
+    expect(wb.addSheet('Target')).toBe(1);
+    setRange(store, 1, 0, 1, 0);
+    const handle = attachClipboard({ host, store, wb, onAfterCommit });
+
+    const { transfer } = fireClipboard(host, 'copy');
+    expect(handle.getSnapshot()?.range).toEqual({ sheet: 0, r0: 1, c0: 0, r1: 1, c1: 0 });
+
+    insertRows(store, wb, null, 1, 1);
+    // The structure command shifts the live marquee, while the cached cell map
+    // is refreshed by the same path the UI uses after an engine edit.
+    store.setState((s) => {
+      const cells = new Map(s.data.cells);
+      cells.delete(addrKey({ sheet: 0, row: 1, col: 0 }));
+      cells.delete(addrKey({ sheet: 0, row: 1, col: 1 }));
+      for (const cell of wb.cells(0)) {
+        cells.set(addrKey(cell.addr), { value: cell.value, formula: cell.formula });
+      }
+      return { ...s, data: { ...s.data, cells } };
+    });
+    expect(store.getState().ui.copyRange).toEqual({
+      sheet: 0,
+      r0: 2,
+      c0: 0,
+      r1: 2,
+      c1: 0,
+    });
+    expect(handle.getSnapshot()?.range).toEqual({ sheet: 0, r0: 2, c0: 0, r1: 2, c1: 0 });
+    expect(handle.getSnapshot()?.cells[0]?.[0]?.formula).toBe('=B$3');
+
+    mutators.setSheetIndex(store, 1);
+    setRange(store, 4, 3, 4, 3, 1);
+    fireClipboard(host, 'paste', transfer.getData('text/plain'));
+    expect(wb.cellFormula({ sheet: 1, row: 4, col: 3 })).toBe('=E$3');
+    handle.detach();
+  });
+
   it('consumes a cut marquee on the first paste', () => {
     seedAndMirror(store, wb, [{ row: 0, col: 0, value: 'a' }]);
     setRange(store, 0, 0, 0, 0);
@@ -355,6 +404,29 @@ describe('attachClipboard', () => {
     fireClipboard(host, 'paste', transfer.getData('text/plain'));
     expect(store.getState().ui.copyRange).toBeNull();
     expect(store.getState().ui.copyMode).toBeNull();
+    handle.detach();
+  });
+
+  it('moves a cut payload and restores source/destination in one undo step', () => {
+    const history = new History();
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 5 }]);
+    setFormat(store, 0, 0, { bold: true });
+    setRange(store, 0, 0, 0, 0);
+    const handle = attachClipboard({ host, history, store, wb, onAfterCommit });
+
+    const { transfer } = fireClipboard(host, 'cut');
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 5 });
+    setRange(store, 2, 2, 2, 2);
+    fireClipboard(host, 'paste', transfer.getData('text/plain'));
+    wb.recalc();
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
+    expect(wb.getValue({ sheet: 0, row: 2, col: 2 })).toEqual({ kind: 'number', value: 5 });
+
+    expect(history.undo()).toBe(true);
+    wb.recalc();
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 5 });
+    expect(wb.getValue({ sheet: 0, row: 2, col: 2 }).kind).toBe('blank');
+    expect(formatAt(store, 0, 0)).toMatchObject({ bold: true });
     handle.detach();
   });
 

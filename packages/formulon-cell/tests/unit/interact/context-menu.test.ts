@@ -4,10 +4,30 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type { ClipboardSnapshot } from '../../../src/commands/clipboard/snapshot.js';
 import { History } from '../../../src/commands/history.js';
+import {
+  InteractionController,
+  registerInteractionController,
+} from '../../../src/commands/interaction-controller.js';
+import type {
+  CellBatchCommand,
+  OperationIntent,
+} from '../../../src/commands/interaction-policy.js';
+import { fixedFormPolicy, viewerPolicy } from '../../../src/commands/interaction-policy.js';
+import { insertRows } from '../../../src/commands/structure.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings/en.js';
 import { attachContextMenu, type ContextMenuHandle } from '../../../src/interact/context-menu.js';
+import type {
+  ContextMenuContext,
+  ContextMenuInteractionController,
+  ContextMenuOptions,
+} from '../../../src/interact/context-menu-options.js';
 import { buildCellEntries } from '../../../src/interact/context-menu-spec.js';
+import {
+  attachNavigationPolicy,
+  navigationBoundsFor,
+} from '../../../src/interact/navigation-policy.js';
+import { disposeOverlayPortal, setOverlayOptions } from '../../../src/interact/overlay-portal.js';
 import {
   createSpreadsheetStore,
   mutators,
@@ -131,6 +151,7 @@ describe('attachContextMenu', () => {
   let onAfterCommit: Mock<() => void>;
   let onFormatDialog: Mock<() => void>;
   let onPasteSpecial: Mock<() => void>;
+  let unregisterController: (() => void) | null;
 
   beforeEach(async () => {
     host = document.createElement('div');
@@ -142,10 +163,13 @@ describe('attachContextMenu', () => {
     onFormatDialog = vi.fn<() => void>();
     onPasteSpecial = vi.fn<() => void>();
     detach = null;
+    unregisterController = null;
   });
 
   afterEach(() => {
     detach?.();
+    disposeOverlayPortal(host);
+    unregisterController?.();
     document.body.innerHTML = '';
     vi.restoreAllMocks();
   });
@@ -410,6 +434,260 @@ describe('attachContextMenu', () => {
     });
   });
 
+  describe('composed menu contract', () => {
+    it('selects built-ins and supports reordered, nested host actions', () => {
+      const customAction = vi.fn<(context: ContextMenuContext) => void>();
+      const options: ContextMenuOptions = {
+        mode: 'builtIn',
+        items: ['copy', 'clear'],
+        transform: (ctx) => [
+          { id: 'app.custom', label: 'Custom', action: customAction },
+          ...ctx.defaultItems.filter((entry) => entry.id === 'copy'),
+          {
+            id: 'app.more',
+            label: 'More',
+            children: [{ id: 'app.nested', label: 'Nested', action: customAction }],
+          },
+        ],
+      };
+      detach = attachContextMenu({ host, store, wb, options });
+
+      const event = fireContextMenu(host, 200, 70);
+      expect(event.defaultPrevented).toBe(true);
+      expect(item('copy')).not.toBeNull();
+      expect(item('clear')).toBeNull();
+      expect(item('app.custom')).not.toBeNull();
+      expect(item('cut')).toBeNull();
+
+      item('app.custom')?.click();
+      expect(customAction).toHaveBeenCalledTimes(1);
+      expect(customAction.mock.calls[0]?.[0].defaultItems.map((entry) => entry.id)).toEqual([
+        'copy',
+        'sep1',
+        'clear',
+      ]);
+
+      fireContextMenu(host, 200, 70);
+      document
+        .querySelector<HTMLButtonElement>('[data-fc-submenu="app.more"]')
+        ?.dispatchEvent(new MouseEvent('mouseenter'));
+      document
+        .querySelector<HTMLButtonElement>('.fc-ctxmenu__sub [data-fc-action="app.nested"]')
+        ?.click();
+      expect(customAction).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not let a custom item spoof a built-in ID', () => {
+      const action = vi.fn();
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        options: {
+          mode: 'builtIn',
+          transform: () => [{ id: 'clear', label: 'Spoof', action }],
+        },
+      });
+      fireContextMenu(host, 200, 70);
+      expect(item('clear')).toBeNull();
+      expect(action).not.toHaveBeenCalled();
+    });
+
+    it('routes custom commands with the context-menu origin and refreshes policy state', () => {
+      let allowed = true;
+      let refresh = (): void => {};
+      const execute = vi.fn<(command: CellBatchCommand) => void>();
+      const controller: ContextMenuInteractionController = {
+        canExecute: (_intent: OperationIntent) =>
+          allowed
+            ? { allowed: true }
+            : { allowed: false, code: 'operationDenied', reason: 'Blocked by host policy.' },
+        execute,
+        subscribe: (listener) => {
+          refresh = listener;
+          return () => {};
+        },
+      };
+      const command: CellBatchCommand = {
+        type: 'cellBatch',
+        operation: 'clear',
+        origin: 'instanceApi',
+        changes: [],
+      };
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        interactionController: controller,
+        options: {
+          mode: 'builtIn',
+          items: [],
+          transform: () => [
+            { id: 'app.command', label: 'Command', command },
+            { id: 'app.locked', label: 'Always disabled', command, disabled: true },
+          ],
+        },
+      });
+
+      fireContextMenu(host, 200, 70);
+      expect(item('app.command')?.disabled).toBe(false);
+      expect(item('app.locked')?.disabled).toBe(true);
+      item('app.command')?.click();
+      expect(execute).toHaveBeenCalledWith({ ...command, origin: 'contextMenu' });
+
+      fireContextMenu(host, 200, 70);
+      allowed = false;
+      refresh();
+      expect(item('app.command')?.disabled).toBe(true);
+      expect(item('app.locked')?.disabled).toBe(true);
+      item('app.command')?.click();
+      expect(execute).toHaveBeenCalledTimes(1);
+      allowed = true;
+      refresh();
+      expect(item('app.command')?.disabled).toBe(false);
+      expect(item('app.locked')?.disabled).toBe(true);
+    });
+
+    it('passes mouse and keyboard contexts to a host-owned menu', () => {
+      const opens: ContextMenuContext[] = [];
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        options: {
+          mode: 'host',
+          onOpen: (context) => opens.push(context),
+        },
+      });
+      setRange(store, 1, 1, 3, 3);
+      const mouse = fireContextMenu(host, 200, 70);
+      expect(mouse.defaultPrevented).toBe(true);
+      expect(visibleMenu()).toBeNull();
+      expect(opens[0]?.event).toBeInstanceOf(MouseEvent);
+      expect(opens[0]?.kind).toBe('cell');
+      expect(opens[0]?.selection).toEqual({ sheet: 0, r0: 1, c0: 1, r1: 3, c1: 3 });
+
+      host.focus();
+      host.dispatchEvent(new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true }));
+      expect(opens).toHaveLength(2);
+      expect(opens[1]?.event).toBeInstanceOf(KeyboardEvent);
+      expect(opens[1]?.cell).toEqual(store.getState().selection.active);
+    });
+
+    it('refreshes a resolver overlay root before opening from the keyboard', () => {
+      host.classList.add('fc-host');
+      const firstRoot = document.createElement('section');
+      const secondRoot = document.createElement('section');
+      document.body.append(firstRoot, secondRoot);
+      let currentRoot = firstRoot;
+      setOverlayOptions(host, { root: () => currentRoot });
+      detach = attachContextMenu({ host, store, wb, options: { mode: 'builtIn' } });
+      expect(firstRoot.querySelector('.fc-ctxmenu')).not.toBeNull();
+
+      currentRoot = secondRoot;
+      host.focus();
+      host.dispatchEvent(new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true }));
+
+      expect(firstRoot.querySelector('.fc-ctxmenu')).toBeNull();
+      expect(secondRoot.querySelector('.fc-ctxmenu')).not.toBeNull();
+    });
+
+    it('leaves the browser menu and selection untouched when disabled', () => {
+      detach = attachContextMenu({ host, store, wb, options: { mode: 'disabled' } });
+      const before = store.getState().selection;
+      const event = fireContextMenu(host, 200, 70);
+      expect(event.defaultPrevented).toBe(false);
+      expect(visibleMenu()).toBeNull();
+      expect(store.getState().selection).toEqual(before);
+    });
+  });
+
+  describe('restricted menu policy', () => {
+    const registerPolicy = (policy: Parameters<typeof fixedFormPolicy>[0] | 'viewer') => {
+      const history = new History();
+      const controller = new InteractionController({
+        store,
+        history,
+        getWb: () => wb,
+      });
+      unregisterController = registerInteractionController(store, controller);
+      controller.setPolicy(policy === 'viewer' ? viewerPolicy() : fixedFormPolicy(policy));
+      return controller;
+    };
+
+    it('disables clear, cut, and row insertion while keeping copy/paste visible', () => {
+      const controller = registerPolicy({
+        ranges: [{ sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 }],
+      });
+      const formPolicy = fixedFormPolicy({
+        ranges: [{ sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 }],
+      });
+      controller.setPolicy({
+        ...formPolicy,
+        operations: { ...formPolicy.operations, clear: false },
+      });
+      setRange(store, 1, 1, 1, 1);
+      detach = attachContextMenu({ host, store, wb, options: { mode: 'builtIn' } });
+      fireContextMenu(host, 100, 50);
+      expect(item('cut')?.disabled).toBe(true);
+      expect(item('clear')?.disabled).toBe(true);
+      expect(item('copy')?.disabled).toBe(false);
+      expect(item('paste')?.disabled).toBe(false);
+
+      controller.setPolicy(formPolicy);
+      expect(item('clear')?.disabled).toBe(false);
+
+      document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      fireContextMenu(host, 10, 30);
+      expect(item('rowInsertAbove')?.disabled).toBe(true);
+    });
+
+    it('does not move selection while selection permission is denied', () => {
+      const controller = registerPolicy('viewer');
+      controller.setPolicy({ ...viewerPolicy(), selection: false });
+      setRange(store, 0, 0, 0, 0);
+      detach = attachContextMenu({ host, store, wb, options: { mode: 'builtIn' } });
+      fireContextMenu(host, 200, 70);
+      expect(store.getState().selection.range).toEqual({
+        sheet: 0,
+        r0: 0,
+        c0: 0,
+        r1: 0,
+        c1: 0,
+      });
+    });
+
+    it('preflights a legacy paste matrix against a bounded viewport', async () => {
+      const bounds = {
+        sheet: 0,
+        r0: 0,
+        c0: 0,
+        r1: 0,
+        c1: 0,
+      };
+      const navigation = attachNavigationPolicy(store, () => wb, { range: bounds });
+      const history = new History();
+      const controller = new InteractionController({
+        store,
+        history,
+        getWb: () => wb,
+        getBounds: () => navigationBoundsFor(store),
+      });
+      unregisterController = registerInteractionController(store, controller);
+      vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('inside\toutside');
+      setRange(store, 0, 0, 0, 0);
+      detach = attachContextMenu({ host, store, wb, options: { mode: 'builtIn' } });
+      fireContextMenu(host, 200, 70);
+      item('paste')?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
+      expect(wb.getValue({ sheet: 0, row: 0, col: 1 }).kind).toBe('blank');
+      navigation.dispose();
+    });
+  });
+
   describe('dismissal', () => {
     it('clicking outside the menu hides it', () => {
       detach = attachContextMenu({ host, store, wb, onAfterCommit });
@@ -548,7 +826,7 @@ describe('attachContextMenu', () => {
       expect(store.getState().ui.copyRanges).toBeNull();
     });
 
-    it('Cut writes TSV, blanks the range, and notifies onAfterCommit', () => {
+    it('Cut writes TSV and keeps source contents until paste', () => {
       const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();
       seed(store, wb, [{ row: 0, col: 0, value: 5 }]);
       setRange(store, 0, 0, 0, 0);
@@ -557,8 +835,9 @@ describe('attachContextMenu', () => {
       item('cut')?.click();
       expect(writeText).toHaveBeenCalled();
       wb.recalc();
-      expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
-      expect(onAfterCommit).toHaveBeenCalled();
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 5 });
+      expect(store.getState().ui.copyMode).toBe('cut');
+      expect(onAfterCommit).not.toHaveBeenCalled();
     });
 
     it('Paste reads from navigator.clipboard and writes via pasteTSV', async () => {
@@ -575,6 +854,78 @@ describe('attachContextMenu', () => {
       expect(wb.getValue({ sheet: 0, row: 1, col: 2 })).toEqual({ kind: 'number', value: 42 });
       expect(store.getState().selection.range).toEqual({ sheet: 0, r0: 1, c0: 1, r1: 1, c1: 2 });
       expect(onAfterCommit).toHaveBeenCalled();
+    });
+
+    it('fallback cut moves merged cells and formats with one undo step', async () => {
+      vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();
+      vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('');
+      const history = new History();
+      seed(store, wb, [{ row: 0, col: 0, value: 5 }]);
+      setFormat(store, 0, 0, { bold: true, fill: '#ffee00' });
+      const source = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
+      mutators.mergeRange(store, source);
+      setRange(store, 0, 0, 1, 1);
+      detach = attachContextMenu({ host, store, wb, history, onAfterCommit });
+      fireContextMenu(host, 200, 70);
+      item('cut')?.click();
+      expect(history.canUndo()).toBe(false);
+      expect(store.getState().merges.byAnchor.get('0:0:0')).toEqual(source);
+
+      setRange(store, 3, 3, 3, 3);
+      fireContextMenu(host, 200, 70);
+      item('paste')?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+      wb.recalc();
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 }).kind).toBe('blank');
+      expect(wb.getValue({ sheet: 0, row: 3, col: 3 })).toEqual({ kind: 'number', value: 5 });
+      expect(store.getState().merges.byAnchor.get('0:3:3')).toEqual({
+        sheet: 0,
+        r0: 3,
+        c0: 3,
+        r1: 4,
+        c1: 4,
+      });
+      expect(store.getState().format.formats.get('0:3:3')).toEqual({ bold: true, fill: '#ffee00' });
+      expect(store.getState().ui.copyRange).toBeNull();
+
+      expect(history.undo()).toBe(true);
+      wb.recalc();
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 5 });
+      expect(wb.getValue({ sheet: 0, row: 3, col: 3 }).kind).toBe('blank');
+      expect(store.getState().merges.byAnchor.get('0:0:0')).toEqual(source);
+      expect(store.getState().merges.byAnchor.has('0:3:3')).toBe(false);
+      expect(store.getState().format.formats.get('0:0:0')).toEqual({ bold: true, fill: '#ffee00' });
+      expect(store.getState().format.formats.has('0:3:3')).toBe(false);
+      expect(history.canUndo()).toBe(false);
+      expect(history.redo()).toBe(true);
+      wb.recalc();
+      expect(wb.getValue({ sheet: 0, row: 3, col: 3 })).toEqual({ kind: 'number', value: 5 });
+      expect(store.getState().merges.byAnchor.has('0:3:3')).toBe(true);
+    });
+
+    it('fallback copy follows structural shifts before pasting absolute references', async () => {
+      vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();
+      vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('');
+      seed(store, wb, [{ row: 1, col: 1, value: 7 }]);
+      wb.setFormula({ sheet: 0, row: 1, col: 0 }, '=B$2');
+      wb.recalc();
+      mutators.replaceCells(store, wb.cells(0));
+      setFormat(store, 1, 0, { bold: true });
+      setRange(store, 1, 0, 1, 0);
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      fireContextMenu(host, 200, 70);
+      item('copy')?.click();
+      insertRows(store, wb, null, 0);
+      wb.recalc();
+      mutators.replaceCells(store, wb.cells(0));
+      setRange(store, 4, 3, 4, 3);
+      fireContextMenu(host, 200, 70);
+      item('paste')?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(wb.cellFormula({ sheet: 0, row: 4, col: 3 })).toBe('=E$3');
+      expect(store.getState().format.formats.get('0:4:3')).toMatchObject({ bold: true });
     });
 
     it('Paste bundles multi-cell writes into one undo step when history is attached', async () => {

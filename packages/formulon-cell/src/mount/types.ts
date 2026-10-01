@@ -1,6 +1,12 @@
 import type { CellRegistry } from '../cells.js';
 import type { PasteSpecialOptions } from '../commands/clipboard/paste-special.js';
 import type { History } from '../commands/history.js';
+import type { InteractionController } from '../commands/interaction-controller.js';
+import type {
+  CellChangeInput,
+  ChangeBatchResult,
+  InteractionPolicy,
+} from '../commands/interaction-policy.js';
 import type { PrinterProfile } from '../commands/printer-profile.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetEventHandler, SpreadsheetEventName } from '../events.js';
@@ -17,7 +23,10 @@ import type { DeepPartial, Locale, Strings } from '../i18n/strings.js';
 import type { BorderDrawHandle } from '../interact/border-draw.js';
 import type { ClipboardHandle } from '../interact/clipboard.js';
 import type { ConditionalDialogOpenOptions } from '../interact/conditional-dialog.js';
+import type { ContextMenuOptions } from '../interact/context-menu-options.js';
 import type { FormatPainterHandle } from '../interact/format-painter.js';
+import type { ViewportOptions } from '../interact/navigation-policy.js';
+import type { OverlayOptions } from '../interact/overlay-portal.js';
 import type { PasteSpecialOpenOptions } from '../interact/paste-special.js';
 import type { StatusBarUploadStatus } from '../interact/status-bar.js';
 import type { SlicerSpec, SpreadsheetStore } from '../store/store.js';
@@ -26,6 +35,14 @@ import type { MountToolbarOptions, ToolbarInstance } from './toolbar.js';
 
 export interface MountOptions {
   workbook?: WorkbookHandle;
+  /** Host interaction restrictions. Omitted operations deny when a policy is supplied. */
+  policy?: InteractionPolicy;
+  /** Finite visible/selection region. Does not truncate workbook data or calculation. */
+  viewport?: ViewportOptions;
+  /** Compose, replace, or disable the right-click menu. */
+  contextMenu?: ContextMenuOptions;
+  /** Place floating UI inside the host's modal or fullscreen boundary. */
+  overlays?: OverlayOptions;
   ui?: SpreadsheetUiOptions;
   theme?: ThemeName;
   /** Mount the ribbon toolbar inside `host`, above the formula bar, in one
@@ -93,6 +110,18 @@ export interface SpreadsheetInstance {
   readonly workbook: WorkbookHandle;
   readonly store: SpreadsheetStore;
   readonly history: History;
+  readonly commands: InteractionController;
+  setPolicy(next?: InteractionPolicy): void;
+  setViewportOptions(next?: ViewportOptions): void;
+  setContextMenu(next?: ContextMenuOptions): void;
+  setOverlayOptions(next?: OverlayOptions): void;
+  setUi(next?: SpreadsheetUiOptions): void;
+  setToolbar(next: boolean | MountToolbarOptions): void;
+  /** Trusted host update; defaults to resetting user history after success. */
+  applyChanges(
+    changes: readonly CellChangeInput[],
+    options?: { history?: 'reset' | 'record'; origin?: string },
+  ): ChangeBatchResult;
   readonly i18n: I18nController;
   readonly features: Readonly<Record<string, ExtensionHandle | undefined>>;
   /** Clipboard handle the engine binding produced. `null` when the

@@ -186,13 +186,13 @@ export function attachPasteSpecial(deps: PasteSpecialDeps): PasteSpecialHandle {
       history.begin();
       try {
         recordFormatChange(history, store, () => {
-          result = pasteSpecial(store.getState(), store, wb, snap, opts);
+          result = pasteSpecial(store.getState(), store, wb, snap, opts, history);
         });
       } finally {
         history.end();
       }
     } else {
-      result = pasteSpecial(store.getState(), store, wb, snap, opts);
+      result = pasteSpecial(store.getState(), store, wb, snap, opts, history);
     }
     if (result) deps.onAfterCommit();
     return !!result;

@@ -57,9 +57,7 @@ import {
   addConditionalRule,
   addPrintArea,
   applyAdvancedFilter,
-  applyMerge,
   applyTextScriptToRange,
-  applyUnmerge,
   autoSum,
   buildRibbonAddInReport,
   type ConditionalRule,
@@ -102,7 +100,6 @@ import {
   insertManualPageBreak,
   listComments,
   listDefinedNames,
-  mergeWillLoseData,
   mutators,
   type PasteAction,
   parseA1Range,
@@ -125,7 +122,6 @@ import {
   resolveRibbonPdfAction,
   type SessionChartKind,
   type SpreadsheetInstance,
-  setAlign,
   setNumFmt,
   setPrintArea,
   setRotation,
@@ -151,7 +147,6 @@ import { showDefinedNamePickerDialog } from '../toolbar/dialogs/defined-name-pic
 import { showDimensionDialog } from '../toolbar/dialogs/dimension.js';
 import { showFormatAsTableDialog } from '../toolbar/dialogs/format-as-table.js';
 import { pickImageFileDataUrl } from '../toolbar/dialogs/image-file.js';
-import { confirmMergeLoseData } from '../toolbar/dialogs/merge-confirm.js';
 import { showMessage } from '../toolbar/dialogs/prompt.js';
 import {
   showAllowEditRangeDialog,
@@ -167,6 +162,7 @@ import { showSymbolDialog } from '../toolbar/dialogs/symbol.js';
 import { showTableStyleDialog } from '../toolbar/dialogs/table-style.js';
 import { showTextToColumnsDialog } from '../toolbar/dialogs/text-to-columns.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
+import { applyMergeAction } from '../toolbar/merge-action.js';
 import { applyCellFormatAction } from '../toolbar/ribbon/cell-format-action.js';
 import { applyConditionalMenuAction } from '../toolbar/ribbon/conditional-menu-action.js';
 import type { DynamicDropdownsCtx } from '../toolbar/ribbon/dynamic-dropdowns.js';
@@ -216,8 +212,6 @@ const addrInRange = (addr: { sheet: number; row: number; col: number }, range: R
   addr.row <= range.r1 &&
   addr.col >= range.c0 &&
   addr.col <= range.c1;
-
-const MAX_MERGE_ACROSS_ROWS = 100_000;
 
 const buildFillDirection =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyFillDirection'] =>
@@ -586,49 +580,26 @@ const buildTextOrientation =
 
 const buildMergeAction =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyMergeAction'] =>
-  async (action) => {
-    const range = instance.store.getState().selection.range;
-    if (action === 'unmergeCells') {
-      applyUnmerge(instance.store, instance.workbook, instance.history, range);
-    } else if (action === 'mergeAcross') {
-      if (range.c0 === range.c1 || range.r1 - range.r0 + 1 > MAX_MERGE_ACROSS_ROWS) return;
-      const state = instance.store.getState();
-      if (
-        mergeWillLoseData(state, range) &&
-        !(await confirmMergeLoseData(instance.i18n.strings, state, range))
-      ) {
-        return;
-      }
-      instance.history.begin();
-      try {
-        for (let row = range.r0; row <= range.r1; row += 1) {
-          applyMerge(instance.store, instance.workbook, instance.history, {
-            sheet: range.sheet,
-            r0: row,
-            c0: range.c0,
-            r1: row,
-            c1: range.c1,
-          });
-        }
-      } finally {
-        instance.history.end();
-      }
-    } else {
-      const state = instance.store.getState();
-      if (
-        mergeWillLoseData(state, range) &&
-        !(await confirmMergeLoseData(instance.i18n.strings, state, range))
-      ) {
-        return;
-      }
-      const merged = applyMerge(instance.store, instance.workbook, instance.history, range);
-      if (merged && action === 'mergeCenter') {
-        recordFormatChange(instance.history, instance.store, () => {
-          setAlign(instance.store.getState(), instance.store, 'center');
-        });
-      }
+  (action) => {
+    if (
+      action !== 'unmergeCells' &&
+      action !== 'mergeAcross' &&
+      action !== 'mergeCenter' &&
+      action !== 'mergeCells'
+    ) {
+      return;
     }
-    instance.host.focus();
+    void applyMergeAction(
+      {
+        store: instance.store,
+        workbook: instance.workbook,
+        history: instance.history,
+        strings: instance.i18n.strings,
+      },
+      action,
+    ).then((applied) => {
+      if (applied) instance.host.focus();
+    });
   };
 
 const updateTextOrientationMenu =

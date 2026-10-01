@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const sourceRoots = ['src/interact', 'src/mount', 'src/toolbar'];
-const buttonCreatePattern = /document\.createElement\((['"])button\1\)/g;
+const buttonCreatePattern = /\b\w+\.createElement\((['"])button\1\)/g;
 
 const allowedDirectButtonCreation: Record<string, number> = {
   'src/interact/chip-button.ts': 1,

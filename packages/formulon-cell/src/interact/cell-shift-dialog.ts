@@ -4,6 +4,7 @@ import { appendDialogActions } from './dialog-shell.js';
 import { overlayPortalFor } from './overlay-portal.js';
 
 export interface CellShiftDialogDeps {
+  host: HTMLElement;
   strings: Strings;
   kind: 'insert' | 'delete';
   onSubmit(direction: InsertCellsDirection | DeleteCellsDirection): void;
@@ -13,19 +14,21 @@ export interface CellShiftDialogDeps {
 export function openCellShiftDialog(deps: CellShiftDialogDeps): void {
   const { strings, kind } = deps;
   const t = strings.ribbonMenu;
-  document.querySelector('.fc-cellshift')?.remove();
+  const ownerDocument = deps.host.ownerDocument;
+  const portal = overlayPortalFor(deps.host);
+  portal.querySelector('.fc-cellshift')?.remove();
 
-  const root = document.createElement('div');
+  const root = ownerDocument.createElement('div');
   root.className = 'fc-cellshift';
   root.setAttribute('role', 'dialog');
   root.setAttribute('aria-modal', 'true');
   root.setAttribute('aria-label', kind === 'insert' ? t.insertCells : t.deleteCells);
-  const panel = document.createElement('div');
+  const panel = ownerDocument.createElement('div');
   panel.className = 'fc-cellshift__panel';
-  const title = document.createElement('div');
+  const title = ownerDocument.createElement('div');
   title.className = 'fc-cellshift__title';
   title.textContent = kind === 'insert' ? t.insertCells : t.deleteCells;
-  const choices = document.createElement('div');
+  const choices = ownerDocument.createElement('div');
   choices.className = 'fc-cellshift__choices';
   const name = `fc-cellshift-${Math.random().toString(36).slice(2)}`;
   const options =
@@ -39,9 +42,9 @@ export function openCellShiftDialog(deps: CellShiftDialogDeps): void {
           ['up', t.deleteShiftUp],
         ] as const);
   for (const [value, label] of options)
-    choices.appendChild(radio(name, value, label, value === options[1][0]));
+    choices.appendChild(radio(ownerDocument, name, value, label, value === options[1][0]));
 
-  const footer = document.createElement('div');
+  const footer = ownerDocument.createElement('div');
   footer.className = 'fc-cellshift__footer';
   const { cancelBtn, okBtn } = appendDialogActions(footer, {
     cancelLabel: strings.hyperlinkDialog.cancel,
@@ -70,21 +73,27 @@ export function openCellShiftDialog(deps: CellShiftDialogDeps): void {
   });
   panel.append(title, choices, footer);
   root.appendChild(panel);
-  overlayPortalFor(document.querySelector('.fc-host')).appendChild(root);
+  portal.appendChild(root);
   okBtn.focus({ preventScroll: true });
 }
 
-function radio(name: string, value: string, label: string, checked: boolean): HTMLLabelElement {
-  const row = document.createElement('label');
+function radio(
+  ownerDocument: Document,
+  name: string,
+  value: string,
+  label: string,
+  checked: boolean,
+): HTMLLabelElement {
+  const row = ownerDocument.createElement('label');
   row.className = 'fc-cellshift__choice';
-  const input = document.createElement('input');
+  const input = ownerDocument.createElement('input');
   input.type = 'radio';
   input.name = name;
   input.value = value;
   input.checked = checked;
-  const mark = document.createElement('span');
+  const mark = ownerDocument.createElement('span');
   mark.className = 'fc-cellshift__radio';
-  const text = document.createElement('span');
+  const text = ownerDocument.createElement('span');
   text.textContent = label;
   row.append(input, mark, text);
   return row;

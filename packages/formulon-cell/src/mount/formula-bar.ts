@@ -1,7 +1,9 @@
 import { writeInputValidated } from '../commands/coerce-input.js';
+import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { extractRefs, rotateRefAt } from '../commands/refs.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
+import { nextTabStop } from '../interact/navigation-policy.js';
 import { formatWithPending, sameAddr } from '../store/pending-format.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
@@ -38,6 +40,9 @@ interface AttachFormulaBarInput {
   updateChrome: () => void;
   wb: () => WorkbookHandle;
 }
+
+const inputOperation = (raw: string, forceText = false): 'valueEdit' | 'formulaEdit' =>
+  !forceText && raw.trimStart().startsWith('=') ? 'formulaEdit' : 'valueEdit';
 
 export interface FormulaBarController {
   acceptFx(): void;
@@ -105,6 +110,48 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
     const currentWb = wb();
     const s = store.getState();
     const a = s.selection.active;
+    const controller = interactionControllerFor(store);
+    if (controller && controller.policy !== undefined) {
+      const operation = inputOperation(
+        fxInput.value,
+        formatWithPending(s, a)?.numFmt?.kind === 'text',
+      );
+      let result: ReturnType<typeof controller.execute>;
+      try {
+        result = controller.execute({
+          type: 'cellBatch',
+          operation,
+          origin: 'formulaBar',
+          changes: [{ addr: a, input: fxInput.value }],
+          denied: 'reject',
+        });
+      } catch (err) {
+        console.warn('formulon-cell: restricted formula-bar write failed', err);
+        result = { status: 'rejected', applied: [], rejected: [], revision: 0 };
+      }
+      if (result.status === 'rejected') {
+        fxInput.focus();
+        onValidation?.({
+          severity: 'stop',
+          message: `The ${operation} operation is not permitted for this cell.`,
+        });
+        return;
+      }
+      mutators.setPendingFormat(store, null);
+      mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex));
+      fxEditing = false;
+      fxBaseline = fxInput.value;
+      refreshActions();
+      clearFxRefs();
+      const selectionDisabled = controller.policy?.selection === false;
+      if (!selectionDisabled && advance === 'down') {
+        mutators.setActive(store, { ...a, row: a.row + 1 });
+      } else if (!selectionDisabled && advance === 'right') {
+        mutators.setActive(store, { ...a, col: a.col + 1 });
+      }
+      host.focus();
+      return;
+    }
     try {
       const fmt = formatWithPending(s, a);
       const outcome = writeInputValidated(currentWb, a, fxInput.value, fmt?.validation, store);
@@ -219,9 +266,23 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       e.stopPropagation();
       commitFx('down');
     } else if (e.key === 'Tab') {
-      e.preventDefault();
       e.stopPropagation();
-      commitFx(e.shiftKey ? 'none' : 'right');
+      const controller = interactionControllerFor(store);
+      const restricted = controller?.policy !== undefined;
+      const selectionDisabled = controller?.policy?.selection === false;
+      if (selectionDisabled) {
+        commitFx('none');
+        return;
+      }
+      const active = store.getState().selection.active;
+      const next = restricted ? nextTabStop(store, active, e.shiftKey) : null;
+      if (restricted && next === null) {
+        commitFx('none');
+        return;
+      }
+      e.preventDefault();
+      commitFx(restricted ? 'none' : e.shiftKey ? 'none' : 'right');
+      if (restricted && next && !fxEditing) mutators.setActive(store, next);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();

@@ -52,6 +52,7 @@ function makeSetup(): Setup {
   } as unknown as WorkbookHandle;
   const store = createSpreadsheetStore();
   const history = new History();
+  const host = document.createElement('div');
   const hostTag = document.createElement('input');
 
   const feature = {
@@ -72,6 +73,7 @@ function makeSetup(): Setup {
     formatPainter: () => feature.formatPainter,
     goToDialog: () => feature.goToDialog,
     history,
+    host,
     hostTag,
     hyperlinkDialog: () => feature.hyperlinkDialog,
     invalidate,

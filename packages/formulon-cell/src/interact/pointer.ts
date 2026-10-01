@@ -6,6 +6,7 @@ import {
   type History,
   type LayoutSnapshot,
 } from '../commands/history.js';
+import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { applyUnmerge, expandRangeWithMerges, mergeAnchorOf } from '../commands/merge.js';
 import {
   collapseColGroup,
@@ -17,8 +18,9 @@ import {
 } from '../commands/outline.js';
 import { movePageBreak, resizePrintArea, setPageSetup } from '../commands/page-setup.js';
 import { paginationFor } from '../commands/pagination.js';
+import { shiftFormulaRefs } from '../commands/refs.js';
 import { syncLayoutSizesToEngine } from '../engine/layout-sync.js';
-import type { Range } from '../engine/types.js';
+import type { Addr, CellValue, Range } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import {
@@ -41,6 +43,7 @@ import {
 } from '../render/grid/page-view.js';
 import { getFillHandleRect, getOutlineToggleHits } from '../render/grid.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import { isNavigationAddrAllowed, navigationBoundsFor } from './navigation-policy.js';
 
 type StoreCellEntry = State['data']['cells'] extends Map<string, infer Cell> ? Cell : never;
 
@@ -109,6 +112,106 @@ const MAX_COL = 16383;
 const FILTER_DROPDOWN_RESERVED_WIDTH = 20;
 
 const geometryLayout = (state: State): ViewLayout => layoutForView(state);
+
+const isNavigationRangeAllowed = (store: SpreadsheetStore, range: Range): boolean => {
+  const bounds = navigationBoundsFor(store);
+  if (!bounds) return true;
+  return (
+    range.sheet === bounds.sheet &&
+    range.r0 >= bounds.r0 &&
+    range.c0 >= bounds.c0 &&
+    range.r1 <= bounds.r1 &&
+    range.c1 <= bounds.c1
+  );
+};
+
+type RestrictedCellChange = {
+  addr: Addr;
+  value: CellValue;
+  formula?: string | null;
+};
+
+const cellAt = (state: State, addr: Addr): { value: CellValue; formula: string | null } => {
+  const cell = state.data.cells.get(`${addr.sheet}:${addr.row}:${addr.col}`);
+  return { value: cell?.value ?? { kind: 'blank' }, formula: cell?.formula ?? null };
+};
+
+/** Build a value/formula-only fill plan before touching the workbook. The
+ * restricted path must authorize the complete destination as one batch; the
+ * legacy fill command is intentionally left untouched for unrestricted mounts. */
+const restrictedFillChanges = (
+  state: State,
+  src: Range,
+  dest: Range,
+  copyOnly: boolean,
+): RestrictedCellChange[] => {
+  const srcRows = src.r1 - src.r0 + 1;
+  const srcCols = src.c1 - src.c0 + 1;
+  const down = dest.r1 !== src.r1 || dest.r0 !== src.r0;
+  const right = !down && (dest.c1 !== src.c1 || dest.c0 !== src.c0);
+  const changes: RestrictedCellChange[] = [];
+  const sourceAt = (
+    row: number,
+    col: number,
+  ): { addr: Addr; value: CellValue; formula: string | null } => {
+    const addr = { sheet: src.sheet, row, col };
+    const cell = cellAt(state, addr);
+    return { addr, ...cell };
+  };
+  const projectedNumber = (
+    target: Addr,
+    source: { addr: Addr; value: CellValue },
+  ): CellValue | null => {
+    if (copyOnly || source.value.kind !== 'number') return null;
+    if (down && srcRows >= 2) {
+      const first = sourceAt(src.r0, target.col).value;
+      const second = sourceAt(src.r0 + 1, target.col).value;
+      if (first.kind === 'number' && second.kind === 'number') {
+        const step = second.value - first.value;
+        const offset = target.row - src.r1;
+        const last = sourceAt(src.r1, target.col).value;
+        return last.kind === 'number'
+          ? { kind: 'number', value: last.value + step * offset }
+          : null;
+      }
+    }
+    if (right && srcCols >= 2) {
+      const first = sourceAt(target.row, src.c0).value;
+      const second = sourceAt(target.row, src.c0 + 1).value;
+      if (first.kind === 'number' && second.kind === 'number') {
+        const step = second.value - first.value;
+        const offset = target.col - src.c1;
+        const last = sourceAt(target.row, src.c1).value;
+        return last.kind === 'number'
+          ? { kind: 'number', value: last.value + step * offset }
+          : null;
+      }
+    }
+    return null;
+  };
+  for (let row = dest.r0; row <= dest.r1; row += 1) {
+    for (let col = dest.c0; col <= dest.c1; col += 1) {
+      if (row >= src.r0 && row <= src.r1 && col >= src.c0 && col <= src.c1) continue;
+      const sr = src.r0 + ((((row - src.r0) % srcRows) + srcRows) % srcRows);
+      const sc = src.c0 + ((((col - src.c0) % srcCols) + srcCols) % srcCols);
+      const source = sourceAt(sr, sc);
+      const addr = { sheet: dest.sheet, row, col };
+      const projected = projectedNumber(addr, source);
+      if (projected) {
+        changes.push({ addr, value: projected, formula: null });
+      } else if (source.formula) {
+        changes.push({
+          addr,
+          value: source.value,
+          formula: shiftFormulaRefs(source.formula, row - source.addr.row, col - source.addr.col),
+        });
+      } else {
+        changes.push({ addr, value: source.value, formula: null });
+      }
+    }
+  }
+  return changes;
+};
 
 export interface PointerDeps {
   store: SpreadsheetStore;
@@ -230,12 +333,25 @@ export function attachPointer(
     if (e.target instanceof Element && e.target.closest('.fc-host__editor')) return;
     const { x, y } = localXY(e);
     const s = store.getState();
+    const controller = interactionControllerFor(store);
+    const restricted = controller?.policy !== undefined;
+    const selectionDisabled = controller?.policy?.selection === false;
 
     // Capture editor intent BEFORE we touch focus — host.focus() blurs the
     //  textarea, which triggers commit + cancel and tears down the editor
     //  before our cell-zone branch could query it.
     const editor = getEditor();
     const inFormula = editor?.isFormulaEdit();
+
+    // A selection-disabled mount may still use cell clicks while a formula
+    // editor is open to insert references. All other pointer entry points
+    // must leave the host's fixed active selection untouched.
+    if (selectionDisabled && !inFormula) {
+      e.preventDefault();
+      if (s.ui.editor.kind !== 'idle') host.focus({ preventScroll: true });
+      drag = { kind: 'none' };
+      return;
+    }
 
     // setPointerCapture throws on synthetic events / certain pointer-id mismatches.
     // Wrap to avoid crashing the handler; the worst-case fallback is that move
@@ -254,6 +370,11 @@ export function attachPointer(
     for (const t of getOutlineToggleHits()) {
       if (x < t.rect.x || x > t.rect.x + t.rect.w) continue;
       if (y < t.rect.y || y > t.rect.y + t.rect.h) continue;
+      if (restricted) {
+        e.preventDefault();
+        drag = { kind: 'none' };
+        return;
+      }
       e.preventDefault();
       if (t.axis === 'row') {
         const collapsed = isRowGroupCollapsed(s.layout, t.i0, t.i1);
@@ -273,6 +394,10 @@ export function attachPointer(
     // same affordance the desktop app puts on its rulers.
     const ruler = rulerHandleAt(s, x, y);
     if (ruler) {
+      if (restricted) {
+        e.preventDefault();
+        return;
+      }
       e.preventDefault();
       host.focus();
       tryCapture();
@@ -286,6 +411,10 @@ export function attachPointer(
     // no cell occupies, so a click there can only mean "edit that slot".
     const band = pageBandAt(s, x, y);
     if (band) {
+      if (restricted) {
+        e.preventDefault();
+        return;
+      }
       e.preventDefault();
       host.dispatchEvent(
         new CustomEvent('fc:editpageband', { bubbles: true, detail: { ...band } }),
@@ -298,6 +427,10 @@ export function attachPointer(
     // the only thing in that view a drag from this position could mean.
     const breakHandle = pageBreakHandleAt(s, x, y);
     if (breakHandle) {
+      if (restricted) {
+        e.preventDefault();
+        return;
+      }
       e.preventDefault();
       host.focus();
       tryCapture();
@@ -312,6 +445,23 @@ export function attachPointer(
 
     // Fill handle takes precedence over normal cell hit-testing.
     if (isFillHandleHit(x, y)) {
+      if (selectionDisabled) {
+        e.preventDefault();
+        drag = { kind: 'none' };
+        return;
+      }
+      if (restricted) {
+        if (!controller) return;
+        const permission = controller.canExecute({
+          operation: 'fill',
+          origin: 'fillHandle',
+          effects: [{ kind: 'range', range: s.selection.range }],
+        });
+        if (!permission.allowed) {
+          e.preventDefault();
+          return;
+        }
+      }
       host.focus();
       tryCapture();
       drag = { kind: 'fill', src: { ...s.selection.range } };
@@ -424,6 +574,11 @@ export function attachPointer(
       }
 
       case 'col-resize': {
+        if (restricted) {
+          e.preventDefault();
+          drag = { kind: 'none' };
+          return;
+        }
         drag = {
           kind: 'col-resize',
           col: zone.col,
@@ -438,6 +593,11 @@ export function attachPointer(
       }
 
       case 'row-resize': {
+        if (restricted) {
+          e.preventDefault();
+          drag = { kind: 'none' };
+          return;
+        }
         const topEdge =
           gridOriginY(geometryLayout(s)) +
           rowYFromState(
@@ -459,6 +619,10 @@ export function attachPointer(
         const rawAddr = { sheet: s.data.sheetIndex, row: zone.row, col: zone.col };
         // Click on a merged cell body — promote to the merge anchor (spreadsheet parity).
         const addr = mergeAnchorOf(s, rawAddr);
+        if (!isNavigationAddrAllowed(store, addr)) {
+          drag = { kind: 'none' };
+          return;
+        }
         const meta = (e.ctrlKey || e.metaKey) && !e.shiftKey;
         // Ctrl/Cmd+click on a hyperlinked cell follows the link (spreadsheet parity).
         // Falls through to multi-range selection when the cell has no link so
@@ -499,6 +663,16 @@ export function attachPointer(
 
   const onMove = (e: PointerEvent): void => {
     const { x, y } = localXY(e);
+
+    if (
+      interactionControllerFor(store)?.policy?.selection === false &&
+      drag.kind !== 'none' &&
+      drag.kind !== 'range-insert'
+    ) {
+      drag = { kind: 'none' };
+      mutators.setFillPreview(store, null);
+      return;
+    }
 
     if (drag.kind === 'none') {
       updateCursor(host, store, x, y);
@@ -562,6 +736,10 @@ export function attachPointer(
         const cell = hitTest(geometryLayout(s), s.viewport, x, y);
         if (!cell) return;
         const dest = fillDestFor(drag.src, { row: cell.row, col: cell.col });
+        if (!isNavigationRangeAllowed(store, dest)) {
+          mutators.setFillPreview(store, null);
+          return;
+        }
         mutators.setFillPreview(store, dest);
         host.style.cursor = 'crosshair';
         return;
@@ -621,6 +799,30 @@ export function attachPointer(
 
   const onUp = (e: PointerEvent): void => {
     if (host.hasPointerCapture(e.pointerId)) host.releasePointerCapture(e.pointerId);
+    if (
+      interactionControllerFor(store)?.policy?.selection === false &&
+      drag.kind !== 'none' &&
+      drag.kind !== 'range-insert'
+    ) {
+      drag = { kind: 'none' };
+      host.style.cursor = '';
+      mutators.setPageBreakDrag(store, null);
+      mutators.setFillPreview(store, null);
+      return;
+    }
+    if (
+      interactionControllerFor(store)?.policy !== undefined &&
+      (drag.kind === 'col-resize' ||
+        drag.kind === 'row-resize' ||
+        drag.kind === 'ruler-margin' ||
+        drag.kind === 'page-break')
+    ) {
+      drag = { kind: 'none' };
+      host.style.cursor = '';
+      mutators.setPageBreakDrag(store, null);
+      mutators.setFillPreview(store, null);
+      return;
+    }
     if (drag.kind === 'col-resize' || drag.kind === 'row-resize') {
       // One undo entry per drag, not per pixel: capture pre at drag-start and
       // post here, push the closure pair. Engine-side sync rides on the same
@@ -665,8 +867,34 @@ export function attachPointer(
       const dest = s.ui.fillPreview;
       mutators.setFillPreview(store, null);
       if (dest) {
+        if (!isNavigationRangeAllowed(store, dest)) {
+          drag = { kind: 'none' };
+          const { x, y } = localXY(e);
+          updateCursor(host, store, x, y);
+          return;
+        }
         // Spreadsheet parity: holding Ctrl/⌘ on release toggles series → tile copy.
         const copyOnly = e.ctrlKey || e.metaKey;
+        const controller = interactionControllerFor(store);
+        if (controller && controller.policy !== undefined) {
+          const changes = restrictedFillChanges(s, drag.src, dest, copyOnly);
+          const result = controller.execute({
+            type: 'cellBatch',
+            operation: 'fill',
+            origin: 'fillHandle',
+            changes,
+            denied: controller.policy.batchDenied,
+          });
+          if (result.status === 'applied') {
+            onAfterCommit?.();
+            mutators.setActive(store, { sheet: dest.sheet, row: dest.r0, col: dest.c0 });
+            mutators.extendRangeTo(store, { sheet: dest.sheet, row: dest.r1, col: dest.c1 });
+          }
+          drag = { kind: 'none' };
+          const { x, y } = localXY(e);
+          updateCursor(host, store, x, y);
+          return;
+        }
         // Bundle every per-cell write into a single undoable transaction.
         if (history) history.begin();
         let wrote = false;
@@ -710,6 +938,11 @@ export function attachPointer(
   const onDblClick = (e: MouseEvent): void => {
     const { x, y } = localXY(e);
     const s = store.getState();
+    if (interactionControllerFor(store)?.policy?.selection === false) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
 
     // Fill-handle takes precedence — spreadsheet-style "double-click to flash-fill
     // down to match the neighbour column's contiguous run."
@@ -719,6 +952,23 @@ export function attachPointer(
       const src = { ...s.selection.range };
       const dest = autoFillDownExtent(s, src);
       if (!dest) return;
+      if (!isNavigationRangeAllowed(store, dest)) return;
+      const controller = interactionControllerFor(store);
+      if (controller && controller.policy !== undefined) {
+        const result = controller.execute({
+          type: 'cellBatch',
+          operation: 'fill',
+          origin: 'fillHandle',
+          changes: restrictedFillChanges(s, src, dest, false),
+          denied: controller.policy.batchDenied,
+        });
+        if (result.status === 'applied') {
+          onAfterCommit?.();
+          mutators.setActive(store, { sheet: dest.sheet, row: dest.r0, col: dest.c0 });
+          mutators.extendRangeTo(store, { sheet: dest.sheet, row: dest.r1, col: dest.c1 });
+        }
+        return;
+      }
       if (history) history.begin();
       let wrote = false;
       try {
@@ -740,6 +990,7 @@ export function attachPointer(
     if (zone.kind === 'col-resize') {
       e.preventDefault();
       e.stopPropagation();
+      if (interactionControllerFor(store)?.policy !== undefined) return;
       const before = captureLayoutSnapshot(s);
       const w = autofitColWidth(store, zone.col, measureCtx);
       mutators.setColWidth(store, zone.col, w);
@@ -749,6 +1000,7 @@ export function attachPointer(
     if (zone.kind === 'row-resize') {
       e.preventDefault();
       e.stopPropagation();
+      if (interactionControllerFor(store)?.policy !== undefined) return;
       const before = captureLayoutSnapshot(s);
       const h = autofitRowHeight(store, zone.row, measureCtx);
       mutators.setRowHeight(store, zone.row, h);

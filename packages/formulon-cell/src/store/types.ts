@@ -239,6 +239,10 @@ export interface ViewportSlice {
   colStart: number;
   colCount: number;
   zoom: number;
+  /** Active navigation policy's fixed view rectangle, when an embedded host
+   *  has installed one. This is session state only; workbook data and
+   *  calculation remain unrestricted. */
+  navigationRange?: Range;
   /** Grid canvas width in CSS pixels. Published by the renderer because it is
    *  the axis a right-to-left sheet mirrors about — geometry cannot place a
    *  column from the right edge without knowing where that edge is. Zero

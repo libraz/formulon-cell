@@ -1,3 +1,6 @@
+import { registerOverlayOwner } from '../interact/overlay-portal.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
+
 // `Spreadsheet.mountToolbar` — public entry that wires the ribbon into a host
 // element on top of an existing `SpreadsheetInstance`.
 //
@@ -18,6 +21,8 @@
 // projection runs in the hot path. Tab switches and similar topology changes
 // go through `renderRibbon()` once.
 
+import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
+import { interactionControllerFor } from '../commands/interaction-controller.js';
 import type { CellBorderStyle } from '../store/types.js';
 import { cancelOpenAppDialogs } from '../toolbar/dialogs/shell.js';
 import { ribbonDisplayText, type ToolbarMenuText, toolbarMenuText } from '../toolbar/menu-text.js';
@@ -292,6 +297,7 @@ export function mountToolbar(
   // The toolbar continues to work if the probe returns null (deferred mount);
   // in that case lang falls back to opts.lang or 'ja' and the store subscription
   // is attached lazily on the first call to `attachStoreSubscription`.
+  const unregisterOverlayOwner = registerOverlayOwner(host, () => getInstance()?.host ?? null);
   const initialInstance = getInstance();
 
   const lang: ToolbarLang = opts.lang ?? (initialInstance?.i18n.locale === 'en' ? 'en' : 'ja');
@@ -432,6 +438,8 @@ export function mountToolbar(
     );
     dropdownsApi = createDynamicDropdowns(dropdownsCtx);
     dynamicDropdownClickHandler = (event: MouseEvent): void => {
+      const current = getInstance();
+      if (current && interactionControllerFor(current.store)?.policy !== undefined) return;
       dropdownsApi?.dynamicRibbonDropdownClick(event);
     };
     dynamicDropdownPointerDownHandler = (event: MouseEvent): void => {
@@ -444,6 +452,8 @@ export function mountToolbar(
       dropdownsApi?.dynamicRibbonDropdownHover(event);
     };
     dynamicDropdownKeyHandler = (event: KeyboardEvent): void => {
+      const current = getInstance();
+      if (current && interactionControllerFor(current.store)?.policy !== undefined) return;
       dropdownsApi?.dynamicRibbonDropdownKeydown(event);
     };
     document.addEventListener('click', dynamicDropdownClickHandler);
@@ -482,6 +492,7 @@ export function mountToolbar(
     if (!host.querySelector(`#${RIBBON_BORDERS_MENU_ID}`)) return;
     const current = getInstance();
     if (!current) return;
+    if (interactionControllerFor(current.store)?.policy !== undefined) return;
     borderMenuApi = createBorderMenu({
       getInst: getInstance as unknown as BorderMenuCtx['getInst'],
       sheetEl: current.host,
@@ -500,7 +511,54 @@ export function mountToolbar(
     borderMenuApi = null;
     renderApi.renderRibbon();
     wireBorderMenu();
+    projectInteractionPolicy();
   };
+
+  const projectInteractionPolicy = (): void => {
+    const current = getInstance();
+    if (!current || interactionControllerFor(current.store)?.policy === undefined) return;
+    dropdownsApi?.closeAllDynamicRibbonDropdowns();
+    for (const button of host.querySelectorAll<HTMLButtonElement>('[data-ribbon-command]')) {
+      const decision = canExecuteBuiltIn(
+        current.store,
+        button.dataset.ribbonCommand ?? '',
+        'ribbon',
+      );
+      if (decision.allowed) continue;
+      projectDisabledState(button, true, decision.reason ?? decision.code);
+    }
+    for (const input of host.querySelectorAll<HTMLInputElement | HTMLSelectElement>(
+      'input, select',
+    )) {
+      projectDisabledState(input, true, 'Unavailable in restricted embedding');
+    }
+  };
+
+  // Capture before directly-bound control/dropdown handlers, including hosts
+  // using a separately mounted toolbar. Unknown restricted routes fail closed.
+  const guardInteraction = (event: Event): void => {
+    const current = getInstance();
+    if (!current || interactionControllerFor(current.store)?.policy === undefined) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const command = target.closest<HTMLElement>('[data-ribbon-command]');
+    const inMenu = target.closest('.fc-tb__menu');
+    const isInput = target.closest('input, select, textarea');
+    if (
+      command &&
+      canExecuteBuiltIn(current.store, command.dataset.ribbonCommand ?? '', 'ribbon').allowed &&
+      !inMenu &&
+      !isInput
+    )
+      return;
+    if (!command && !inMenu && !isInput) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  };
+
+  host.addEventListener('click', guardInteraction, true);
+  host.addEventListener('change', guardInteraction, true);
+  host.addEventListener('input', guardInteraction, true);
 
   const applyCommand = (id: string): boolean => {
     const applied = applyRibbonCommand(id, {
@@ -825,13 +883,22 @@ export function mountToolbar(
   // `tb.rerender()` after `getInstance()` becomes non-null so the binding
   // attaches; in practice playground does this in its boot path.
   let unsubStore: (() => void) | null = null;
+  let unsubPolicy: (() => void) | null = null;
   let subscribedInstance: SpreadsheetInstance | null = null;
   const ensureStoreSubscription = (): void => {
     const current = getInstance();
     if (current === subscribedInstance) return;
     unsubStore?.();
+    unsubPolicy?.();
     subscribedInstance = current;
-    unsubStore = current?.store.subscribe(() => projectFormatToolbar()) ?? null;
+    unsubStore =
+      current?.store.subscribe(() => {
+        projectFormatToolbar();
+        projectInteractionPolicy();
+      }) ?? null;
+    unsubPolicy = current
+      ? (interactionControllerFor(current.store)?.subscribe(() => renderToolbar()) ?? null)
+      : null;
   };
   ensureStoreSubscription();
 
@@ -899,6 +966,10 @@ export function mountToolbar(
       return dropdownsApi;
     },
     dispose: () => {
+      unregisterOverlayOwner();
+      host.removeEventListener('click', guardInteraction, true);
+      host.removeEventListener('change', guardInteraction, true);
+      host.removeEventListener('input', guardInteraction, true);
       host.removeEventListener('click', onClick);
       host.removeEventListener('dblclick', onDoubleClick);
       host.removeEventListener('keydown', onKey);
@@ -929,6 +1000,8 @@ export function mountToolbar(
       borderMenuApi = null;
       dropdownsApi = null;
       unsubStore?.();
+      unsubPolicy?.();
+      unsubPolicy = null;
       unsubStore = null;
       subscribedInstance = null;
       cancelOpenAppDialogs();

@@ -4,6 +4,7 @@
 // localized `Strings` dictionary into the cell/row/col entry lists.
 
 import type { Strings } from '../i18n/strings.js';
+import type { ContextMenuItem } from './context-menu-options.js';
 
 export type ItemId =
   | 'copy'
@@ -59,6 +60,12 @@ export type ItemId =
   | 'editPhonetic'
   | 'toggleWatch';
 
+/** Menu-level IDs are also stable composition targets. They are not commands
+ * themselves; selecting one selects the corresponding nested item tree. */
+export type MenuContainerId = 'pasteSpecialMenu' | 'filterMenu' | 'sortMenu';
+
+export type ContextMenuItemId = ItemId | MenuContainerId;
+
 export type MenuKind = 'cell' | 'row' | 'col';
 
 /** Plain insert entries. While a copy is pending the desktop menus replace
@@ -75,6 +82,85 @@ export type MenuEntry =
   | { kind: 'item'; id: ItemId; label: string; hint?: string }
   | { kind: 'submenu'; id: string; label: string; children: MenuEntry[] }
   | { kind: 'sep'; id: string };
+
+/** Every registered executable built-in ID. Custom IDs must stay outside this
+ * set so a host cannot accidentally turn a callback item into a built-in. */
+export const BUILTIN_ITEM_IDS: readonly ItemId[] = [
+  'copy',
+  'cut',
+  'paste',
+  'pasteSpecial',
+  'pasteAll',
+  'pasteFormulas',
+  'pasteFormulasNumFmt',
+  'pasteValues',
+  'pasteValuesNumFmt',
+  'pasteFormatsOnly',
+  'pasteTranspose',
+  'insertCopiedCells',
+  'insertCells',
+  'deleteCells',
+  'clear',
+  'bold',
+  'italic',
+  'underline',
+  'alignLeft',
+  'alignCenter',
+  'alignRight',
+  'borders',
+  'formatCells',
+  'defineName',
+  'filterClear',
+  'filterReapply',
+  'filterByValue',
+  'sortAsc',
+  'sortDesc',
+  'selectAll',
+  'rowHeight',
+  'colWidth',
+  'rowInsertAbove',
+  'rowInsertBelow',
+  'rowDelete',
+  'rowHide',
+  'rowUnhide',
+  'colInsertLeft',
+  'colInsertRight',
+  'colDelete',
+  'colHide',
+  'colUnhide',
+  'rowGroup',
+  'rowUngroup',
+  'colGroup',
+  'colUngroup',
+  'insertComment',
+  'deleteComment',
+  'insertHyperlink',
+  'openHyperlink',
+  'editPhonetic',
+  'toggleWatch',
+];
+
+const BUILTIN_ITEM_ID_SET: ReadonlySet<string> = new Set(BUILTIN_ITEM_IDS);
+
+export const isBuiltinItemId = (id: string): id is ItemId => BUILTIN_ITEM_ID_SET.has(id);
+
+/** Convert the legacy rendering tree to the public stable-ID shape. */
+export function menuEntryToContextItem(entry: MenuEntry): ContextMenuItem {
+  if (entry.kind === 'sep') return { id: entry.id, separator: true };
+  if (entry.kind === 'submenu') {
+    return {
+      id: entry.id,
+      label: entry.label,
+      children: entry.children.map(menuEntryToContextItem),
+    };
+  }
+  return {
+    id: entry.id,
+    label: entry.label,
+    ...(entry.hint === undefined ? {} : { hint: entry.hint }),
+    builtIn: entry.id,
+  };
+}
 
 /** Quick-paste entries inside the Paste Special submenu — disabled when no
  *  structured clipboard snapshot is available. */

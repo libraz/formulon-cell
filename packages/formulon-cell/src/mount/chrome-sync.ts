@@ -129,7 +129,20 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     const s = store.getState();
     host.dataset.fcWorkbookView = s.ui.workbookView;
     const a = s.selection.active;
-    const ref = formatSelectionRef(s.selection.range, a, s.ui.r1c1 === true);
+    const range = s.selection.range;
+    const merge = s.merges.byAnchor.get(`${a.sheet}:${a.row}:${a.col}`);
+    const logicalCell =
+      merge &&
+      merge.sheet === range.sheet &&
+      merge.r0 === range.r0 &&
+      merge.c0 === range.c0 &&
+      merge.r1 === range.r1 &&
+      merge.c1 === range.c1;
+    const ref = formatSelectionRef(
+      logicalCell ? { sheet: a.sheet, r0: a.row, c0: a.col, r1: a.row, c1: a.col } : range,
+      a,
+      s.ui.r1c1 === true,
+    );
     if (document.activeElement !== tag) tag.value = ref;
     const display = cellDisplayText(s, wb, a);
     if (!getFormulaEditing()) fxInput.value = display;

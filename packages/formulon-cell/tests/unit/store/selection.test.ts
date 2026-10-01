@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { copy } from '../../../src/commands/clipboard/copy.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 describe('store/selection — mutators', () => {
@@ -9,6 +10,31 @@ describe('store/selection — mutators', () => {
     const s = store.getState();
     expect(s.selection.active).toEqual({ sheet: 0, row: 4, col: 3 });
     expect(s.selection.range).toEqual({ sheet: 0, r0: 4, c0: 3, r1: 4, c1: 3 });
+  });
+
+  it('setActive selects the complete merge when the click lands on its body', () => {
+    const store = createSpreadsheetStore();
+    mutators.mergeRange(store, { sheet: 0, r0: 2, c0: 2, r1: 3, c1: 4 });
+
+    mutators.setActive(store, { sheet: 0, row: 3, col: 4 });
+
+    expect(store.getState().selection).toMatchObject({
+      active: { sheet: 0, row: 2, col: 2 },
+      anchor: { sheet: 0, row: 2, col: 2 },
+      range: { sheet: 0, r0: 2, c0: 2, r1: 3, c1: 4 },
+    });
+  });
+
+  it('copy uses the full merged selection dimensions after a body click', () => {
+    const store = createSpreadsheetStore();
+    mutators.setCell(store, { sheet: 0, row: 1, col: 1 }, { kind: 'text', value: 'title' });
+    mutators.mergeRange(store, { sheet: 0, r0: 1, c0: 1, r1: 2, c1: 2 });
+    mutators.setActive(store, { sheet: 0, row: 2, col: 2 });
+
+    const result = copy(store.getState());
+
+    expect(result?.range).toEqual({ sheet: 0, r0: 1, c0: 1, r1: 2, c1: 2 });
+    expect(result?.tsv).toBe('title\t\r\n\t');
   });
 
   it('extendRangeTo grows the range from anchor toward the target', () => {
@@ -94,6 +120,25 @@ describe('store/selection — mutators', () => {
     expect(s.selection.active).toEqual({ sheet: 0, row: 5, col: 5 });
     expect(s.selection.extraRanges?.length).toBe(1);
     expect(s.selection.extraRanges?.[0]).toEqual({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+  });
+
+  it('addExtraCell promotes the complete merge when Ctrl-click lands on its body', () => {
+    const store = createSpreadsheetStore();
+    mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+    mutators.mergeRange(store, { sheet: 0, r0: 4, c0: 3, r1: 5, c1: 5 });
+
+    mutators.addExtraCell(store, { sheet: 0, row: 5, col: 5 });
+
+    expect(store.getState().selection.range).toEqual({
+      sheet: 0,
+      r0: 4,
+      c0: 3,
+      r1: 5,
+      c1: 5,
+    });
+    expect(store.getState().selection.extraRanges).toEqual([
+      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+    ]);
   });
 
   it('addExtraCell is a no-op when called on the current active cell', () => {

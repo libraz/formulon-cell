@@ -1,3 +1,4 @@
+import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { expandRangeWithMerges, mergeAnchorOf, stepWithMerge } from '../commands/merge.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
 import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
@@ -6,6 +7,12 @@ import { formatCellForEdit } from '../engine/edit-seed.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import {
+  clampNavigationAddr,
+  isNavigationAddrAllowed,
+  navigationPolicyFor,
+  nextTabStop,
+} from './navigation-policy.js';
 
 const MAX_ROW = 1_048_575; // spreadsheet limit; clamp navigation.
 const MAX_COL = 16_383;
@@ -227,6 +234,32 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     const meta = e.ctrlKey || e.metaKey;
     const shift = e.shiftKey;
     const a = s.selection.active;
+    const controller = interactionControllerFor(store);
+    const restrictedController = controller?.policy !== undefined ? controller : undefined;
+    const restricted = restrictedController !== undefined;
+    const selectionDisabled = controller?.policy?.selection === false;
+    const navigation = navigationPolicyFor(store);
+    const navigationOptions = navigation?.options;
+    const hasNavigationPolicy = navigationOptions !== undefined;
+
+    // A host may expose one fixed active cell while suppressing all user
+    // navigation. Keep the keyboard route from changing the selection before
+    // any of the legacy end-mode or movement bookkeeping runs.
+    if (
+      selectionDisabled &&
+      (k === 'ArrowUp' ||
+        k === 'ArrowDown' ||
+        k === 'ArrowLeft' ||
+        k === 'ArrowRight' ||
+        k === 'Home' ||
+        k === 'End' ||
+        k === 'PageUp' ||
+        k === 'PageDown' ||
+        k === 'Tab')
+    ) {
+      e.preventDefault();
+      return;
+    }
 
     if (k === 'End' && !meta) {
       e.preventDefault();
@@ -240,12 +273,14 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     // Special-case F5 / Ctrl+G — Go To.
     if (k === 'F5' || (meta && (k === 'g' || k === 'G'))) {
       e.preventDefault();
+      if (selectionDisabled) return;
       deps.onGoTo?.();
       return;
     }
 
     if (meta && (k === 'PageUp' || k === 'PageDown')) {
       e.preventDefault();
+      if (selectionDisabled) return;
       deps.onSwitchSheet?.(k === 'PageDown' ? 1 : -1);
       return;
     }
@@ -258,6 +293,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
 
     if (meta && (k === 'a' || k === 'A')) {
       e.preventDefault();
+      if (selectionDisabled) return;
       const region = currentRegion(s, a);
       const selected = s.selection.range;
       if (
@@ -299,18 +335,21 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
 
     if (meta && shift && k === ' ') {
       e.preventDefault();
+      if (selectionDisabled) return;
       mutators.selectAll(store);
       return;
     }
 
     if (meta && k === ' ') {
       e.preventDefault();
+      if (selectionDisabled) return;
       mutators.selectCol(store, a.col);
       return;
     }
 
     if (shift && k === ' ' && !meta && !e.altKey) {
       e.preventDefault();
+      if (selectionDisabled) return;
       mutators.selectRow(store, a.row);
       return;
     }
@@ -320,6 +359,7 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     // otherwise group columns. Spreadsheets prompt for this; we infer from shape.
     if (e.altKey && shift && (k === 'ArrowRight' || k === 'ArrowLeft')) {
       e.preventDefault();
+      if (restricted) return;
       const range = s.selection.range;
       const rowSpan = range.r1 - range.r0;
       const colSpan = range.c1 - range.c0;
@@ -426,6 +466,22 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     } else if (k === 'Backspace') {
       // Backspace clears only the active cell, then enters edit mode. Delete
       // below deliberately retains its range-clear behavior.
+      if (restricted) {
+        if (!restrictedController) return;
+        e.preventDefault();
+        const result = restrictedController.execute({
+          type: 'cellBatch',
+          operation: 'clear',
+          origin: 'keyboard',
+          changes: [{ addr: a, value: { kind: 'blank' } }],
+          denied: 'reject',
+        });
+        if (result.status !== 'rejected') {
+          deps.onClearActive();
+          deps.onBeginEdit('');
+        }
+        return;
+      }
       deps.wb.setBlank(a);
       deps.onClearActive();
       deps.onBeginEdit('');
@@ -435,6 +491,29 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
       // Delete clears the entire selection range — spreadsheet parity.
       const range = s.selection.range;
       const sheet = range.sheet;
+      if (restricted) {
+        if (!restrictedController) return;
+        e.preventDefault();
+        const cells: Addr[] = [];
+        for (const key of s.data.cells.keys()) {
+          const parts = key.split(':');
+          if (parts.length !== 3) continue;
+          if (Number(parts[0]) !== sheet) continue;
+          const row = Number(parts[1]);
+          const col = Number(parts[2]);
+          if (row < range.r0 || row > range.r1 || col < range.c0 || col > range.c1) continue;
+          cells.push({ sheet, row, col });
+        }
+        const result = restrictedController.execute({
+          type: 'cellBatch',
+          operation: 'clear',
+          origin: 'keyboard',
+          changes: cells.map((addr) => ({ addr, value: { kind: 'blank' as const } })),
+          denied: 'reject',
+        });
+        if (result.status !== 'rejected') deps.onClearActive();
+        return;
+      }
       // Iterate populated cells only; full-sheet selection would otherwise loop 17B times.
       for (const key of s.data.cells.keys()) {
         const parts = key.split(':');
@@ -480,6 +559,24 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
     }
 
     if (target == null) return;
+    if (selectionDisabled) {
+      e.preventDefault();
+      return;
+    }
+    if ((restricted || hasNavigationPolicy) && k === 'Tab') {
+      target = nextTabStop(store, a, shift);
+      if (!target) {
+        if (hasNavigationPolicy && navigationOptions?.tabBoundary !== 'leave') {
+          e.preventDefault();
+        }
+        return;
+      }
+    }
+    if (restricted || hasNavigationPolicy) {
+      if (!isNavigationAddrAllowed(store, target)) return;
+      target = clampNavigationAddr(store, target);
+      if (!target) return;
+    }
     e.preventDefault();
     // Merge-aware: snap the active cell to the anchor and grow shift-extends so
     //  the selection always covers full merge rectangles.

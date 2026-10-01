@@ -1,4 +1,4 @@
-import { mergeWillLoseData } from '../../commands/merge.js';
+import { mergeAcrossWillLoseData, mergeWillLoseData } from '../../commands/merge.js';
 import type { Range } from '../../engine/types.js';
 import type { Strings } from '../../i18n/strings.js';
 import type { State } from '../../store/store.js';
@@ -13,8 +13,10 @@ export async function confirmMergeLoseData(
   strings: Strings,
   state: State,
   range: Range,
+  across = false,
 ): Promise<boolean> {
-  if (!mergeWillLoseData(state, range)) return true;
+  if (!(across ? mergeAcrossWillLoseData(state, range) : mergeWillLoseData(state, range)))
+    return true;
   const t = strings.ribbon;
   return showConfirm({
     title: t.mergeLoseDataTitle,

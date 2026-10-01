@@ -1,10 +1,12 @@
+import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
 import { deleteCells, insertCells } from '../commands/cell-shift.js';
 import { copy } from '../commands/clipboard/copy.js';
 import { cut } from '../commands/clipboard/cut.js';
 import { insertCopiedCellsFromTSV } from '../commands/clipboard/insert-copied-cells.js';
 import { pasteTSV } from '../commands/clipboard/paste.js';
 import { type PasteWhat, pasteSpecial } from '../commands/clipboard/paste-special.js';
-import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
+import { type ClipboardSnapshot, captureSnapshot } from '../commands/clipboard/snapshot.js';
+import { parseTSV } from '../commands/clipboard/tsv.js';
 import { clearComment } from '../commands/comment.js';
 import {
   applyValueFilter,
@@ -24,6 +26,16 @@ import {
 } from '../commands/format.js';
 import { type History, recordRepeatableFormatChange } from '../commands/history.js';
 import { hyperlinkAt } from '../commands/hyperlinks.js';
+import { interactionControllerFor } from '../commands/interaction-controller.js';
+import type {
+  CellBatchCommand,
+  CellChangeInput,
+  InteractionOperation,
+  OperationEffect,
+  OperationIntent,
+  PermissionCode,
+  PermissionDecision,
+} from '../commands/interaction-policy.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
 import { phoneticReading, setPhoneticReading } from '../commands/phonetic.js';
 import { inferSortHasHeader, sortRange } from '../commands/sort.js';
@@ -43,24 +55,32 @@ import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { hitZone, layoutForView } from '../render/geometry.js';
-import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { showPrompt } from '../toolbar/dialogs/prompt.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { openCellShiftDialog } from './cell-shift-dialog.js';
 import { createInteractionButton } from './chip-button.js';
+import type {
+  ContextMenuContext,
+  ContextMenuInteractionController,
+  ContextMenuItem,
+  ContextMenuOptions,
+} from './context-menu-options.js';
 import {
   buildCellEntries,
   buildColEntries,
   buildRowEntries,
   compactMenuEntries,
   type ItemId,
-  type MenuEntry,
+  isBuiltinItemId,
   type MenuKind,
+  menuEntryToContextItem,
   PASTE_QUICK_IDS,
   PLAIN_INSERT_IDS,
   SUBMENU_ICON_ACTION,
 } from './context-menu-spec.js';
 import { openInsertCopiedCellsDialog } from './insert-copied-cells-dialog.js';
+import { navigationBoundsFor } from './navigation-policy.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport, panelSize, viewportSize } from './overlay-position.js';
 
@@ -107,21 +127,144 @@ export interface ContextMenuDeps {
   onToggleWatch?: (addr: Addr) => void;
   /** Returns true when the active cell is currently watched. */
   isWatched?: (addr: Addr) => boolean;
+  /** Optional composed menu contract. Omitted preserves the legacy menu. */
+  options?: ContextMenuOptions;
+  /** Shared authorization/execution service for restricted embeds. */
+  interactionController?: ContextMenuInteractionController;
 }
 
 const VIEWPORT_PAD = 4;
+
+/** Rendering entries deliberately carry a string ID. Built-ins are narrowed
+ * at execution time; host-defined IDs must never fall through that switch. */
+type RenderMenuEntry =
+  | {
+      kind: 'item';
+      id: string;
+      label: string;
+      hint?: string;
+      source?: ContextMenuItem;
+    }
+  | {
+      kind: 'submenu';
+      id: string;
+      label: string;
+      children: RenderMenuEntry[];
+      source?: ContextMenuItem;
+    }
+  | { kind: 'sep'; id: string; source?: ContextMenuItem };
+
+type MenuTarget = { kind: MenuKind; cell: Addr };
+
+const itemIdSet = new Set<ItemId>([
+  'bold',
+  'italic',
+  'underline',
+  'alignLeft',
+  'alignCenter',
+  'alignRight',
+  'borders',
+  'formatCells',
+]);
+
+const isMenuSeparator = (item: ContextMenuItem): boolean => item.separator === true;
+
+const contextItemToRenderEntry = (item: ContextMenuItem): RenderMenuEntry => {
+  if (isMenuSeparator(item)) return { kind: 'sep', id: item.id, source: item };
+  if (item.children && item.children.length > 0) {
+    return {
+      kind: 'submenu',
+      id: item.id,
+      label: item.label ?? item.id,
+      children: item.children.map(contextItemToRenderEntry),
+      source: item,
+    };
+  }
+  return {
+    kind: 'item',
+    id: item.id,
+    label: item.label ?? item.id,
+    ...(item.hint === undefined ? {} : { hint: item.hint }),
+    source: item,
+  };
+};
+
+const contextItemIds = (items: readonly ContextMenuItem[]): Set<string> => {
+  const ids = new Set<string>();
+  const visit = (item: ContextMenuItem): void => {
+    ids.add(item.id);
+    if (item.builtIn) ids.add(item.builtIn);
+    item.children?.forEach(visit);
+  };
+  items.forEach(visit);
+  return ids;
+};
+
+const compactContextItems = (items: readonly ContextMenuItem[]): ContextMenuItem[] => {
+  const out: ContextMenuItem[] = [];
+  for (const item of items) {
+    if (item.separator) {
+      if (out.length === 0 || out[out.length - 1]?.separator) continue;
+      out.push(item);
+      continue;
+    }
+    const children = item.children ? compactContextItems(item.children) : undefined;
+    if (item.children && children && children.length === 0) continue;
+    out.push(children ? { ...item, children } : item);
+  }
+  while (out[out.length - 1]?.separator) out.pop();
+  return out;
+};
+
+/** Drop duplicate IDs and reserved built-in spoofs while preserving order. */
+const sanitizeContextItems = (items: readonly ContextMenuItem[]): ContextMenuItem[] => {
+  const seen = new Set<string>();
+  const visit = (item: ContextMenuItem): ContextMenuItem | null => {
+    if (seen.has(item.id)) return null;
+    if (isBuiltinItemId(item.id) && item.builtIn !== item.id) return null;
+    if (item.builtIn !== undefined && !isBuiltinItemId(item.builtIn)) return null;
+    seen.add(item.id);
+    const children = item.children
+      ?.map(visit)
+      .filter((child): child is ContextMenuItem => child !== null);
+    if (item.children && (!children || children.length === 0)) return null;
+    return children ? { ...item, children } : item;
+  };
+  return items.map(visit).filter((item): item is ContextMenuItem => item !== null);
+};
+
+const selectBuiltInItems = (
+  items: readonly ContextMenuItem[],
+  selected: ReadonlySet<string>,
+): ContextMenuItem[] => {
+  const visit = (item: ContextMenuItem): ContextMenuItem | null => {
+    if (item.separator) return item;
+    if (item.builtIn && selected.has(item.builtIn)) return item;
+    if (selected.has(item.id)) return item;
+    if (item.children) {
+      const children = item.children
+        .map(visit)
+        .filter((child): child is ContextMenuItem => child !== null);
+      return children.length > 0 ? { ...item, children } : null;
+    }
+    return null;
+  };
+  return compactContextItems(
+    items.map(visit).filter((item): item is ContextMenuItem => item !== null),
+  );
+};
 
 const appendContextMenuLabel = (
   button: HTMLButtonElement,
   labelText: string,
   hintText?: string,
 ): void => {
-  const label = document.createElement('span');
+  const label = button.ownerDocument.createElement('span');
   label.className = 'fc-ctxmenu__label';
   label.textContent = labelText;
   button.appendChild(label);
   if (hintText !== undefined) {
-    const hint = document.createElement('span');
+    const hint = button.ownerDocument.createElement('span');
     hint.className = 'fc-ctxmenu__hint';
     hint.textContent = hintText;
     button.appendChild(hint);
@@ -129,7 +272,7 @@ const appendContextMenuLabel = (
 };
 
 const createContextMenuItemButton = (
-  entry: Extract<MenuEntry, { kind: 'item' }>,
+  entry: Extract<RenderMenuEntry, { kind: 'item' }>,
 ): HTMLButtonElement => {
   const button = createInteractionButton({
     className: 'fc-ctxmenu__item',
@@ -142,7 +285,7 @@ const createContextMenuItemButton = (
 };
 
 const createContextSubmenuButton = (
-  entry: Extract<MenuEntry, { kind: 'submenu' }>,
+  entry: Extract<RenderMenuEntry, { kind: 'submenu' }>,
 ): HTMLButtonElement => {
   const button = createInteractionButton({
     className: 'fc-ctxmenu__item fc-ctxmenu__item--parent',
@@ -156,7 +299,7 @@ const createContextSubmenuButton = (
   button.setAttribute('aria-haspopup', 'menu');
   button.setAttribute('aria-expanded', 'false');
   appendContextMenuLabel(button, entry.label);
-  const arrow = document.createElement('span');
+  const arrow = button.ownerDocument.createElement('span');
   arrow.className = 'fc-ctxmenu__arrow';
   arrow.setAttribute('aria-hidden', 'true');
   button.appendChild(arrow);
@@ -178,17 +321,64 @@ export interface ContextMenuHandle {
   (): void;
   /** Swap the active dictionary; takes effect on next open. */
   setStrings(next: Strings): void;
+  /** Replace the menu composition at runtime; takes effect on next open. */
+  setOptions(next?: ContextMenuOptions): void;
 }
 
 export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   const { host, store, wb } = deps;
+  const ownerDocument = host.ownerDocument;
+  const ownerWindow = ownerDocument.defaultView;
+  const OwnerElement = ownerWindow?.Element ?? Element;
+  const OwnerNode = ownerWindow?.Node ?? Node;
+  const OwnerHTMLElement = ownerWindow?.HTMLElement ?? HTMLElement;
+  const OwnerHTMLButtonElement = ownerWindow?.HTMLButtonElement ?? HTMLButtonElement;
   const hitHost = deps.grid ?? host;
   const history = deps.history ?? null;
+  let localSnapshot: ClipboardSnapshot | null = null;
+  let localSnapshotText: string | null = null;
+  let localCopyRevision: number | null = null;
+  const clipboardSnapshot = (): ClipboardSnapshot | null => {
+    if (deps.getClipboardSnapshot) return deps.getClipboardSnapshot();
+    const state = store.getState();
+    const ui = state.ui;
+    if (
+      !localSnapshot ||
+      localCopyRevision !== (ui.copyRevision ?? 0) ||
+      ui.copyMode !== localSnapshot.mode ||
+      !(ui.copyRange || ui.copyRanges?.length)
+    )
+      return null;
+    if (localSnapshot.mode === 'copy' && ui.copyRange) {
+      const sourceState: State = {
+        ...state,
+        data: {
+          ...state.data,
+          sheetIndex: ui.copyRange.sheet,
+          cells: new Map(
+            Array.from(wb.cells(ui.copyRange.sheet), (cell) => [
+              addrKey(cell.addr),
+              { value: cell.value, formula: cell.formula },
+            ]),
+          ),
+        },
+        selection: { ...state.selection, range: ui.copyRange, extraRanges: [] },
+      };
+      const materialized = copy(sourceState);
+      const ranges = materialized?.payloadRanges ?? (materialized ? [materialized.range] : []);
+      localSnapshot =
+        ranges.length === 1 && ranges[0] ? captureSnapshot(sourceState, ranges[0]) : null;
+    }
+    return localSnapshot;
+  };
+  let options = deps.options;
+  const interactionController: ContextMenuInteractionController | undefined =
+    deps.interactionController ?? interactionControllerFor(store);
   if (history) wb.attachHistory(history);
   let strings = deps.strings ?? defaultStrings;
   const wrapFmt = (fn: () => void): void => recordRepeatableFormatChange(history, store, fn);
 
-  const root = document.createElement('div');
+  const root = ownerDocument.createElement('div');
   root.className = 'fc-ctxmenu';
   root.setAttribute('role', 'menu');
   root.setAttribute('aria-label', strings.contextMenu.title);
@@ -198,7 +388,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   portal.appendChild(root);
 
   // Single reusable child panel — the context menu is one level deep.
-  const sub = document.createElement('div');
+  const sub = ownerDocument.createElement('div');
   sub.className = 'fc-ctxmenu fc-ctxmenu__sub';
   sub.setAttribute('role', 'menu');
   sub.style.display = 'none';
@@ -211,9 +401,15 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   let activeIndex = -1;
   let focusPanel: 'root' | 'sub' = 'root';
   let restoreFocusEl: HTMLElement | null = null;
-  const submenuChildren = new Map<string, MenuEntry[]>();
+  const submenuChildren = new Map<string, RenderMenuEntry[]>();
   let openSub: { id: string; parentBtn: HTMLButtonElement } | null = null;
   let subCloseTimer: ReturnType<typeof setTimeout> | null = null;
+  let activeContext: ContextMenuContext | null = null;
+  let activeTarget: MenuTarget | null = null;
+  let activeEvent: MouseEvent | KeyboardEvent | null = null;
+  const activeItemSources = new Map<string, ContextMenuItem>();
+  let explicitDisabledSources = new WeakSet<ContextMenuItem>();
+  let policyDisabledSources = new WeakSet<ContextMenuItem>();
 
   const cancelSubClose = (): void => {
     if (subCloseTimer != null) {
@@ -265,6 +461,247 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       (btn) => !btn.disabled && btn.getAttribute('aria-disabled') !== 'true',
     );
 
+  const restrictedMenuSafeIds = new Set<ItemId>(['copy', 'paste', 'clear']);
+  const navigationUnsupportedIds = new Set<ItemId>([
+    'insertCopiedCells',
+    'insertCells',
+    'deleteCells',
+    'rowInsertAbove',
+    'rowInsertBelow',
+    'rowDelete',
+    'colInsertLeft',
+    'colInsertRight',
+    'colDelete',
+  ]);
+
+  const navigationBounded = (): boolean => navigationBoundsFor(store) !== undefined;
+
+  const pasteDestinationRange = (origin: Addr, rows: number, cols: number): Range | null => {
+    if (rows <= 0 || cols <= 0) return null;
+    const r1 = origin.row + rows - 1;
+    const c1 = origin.col + cols - 1;
+    if (r1 > 1_048_575 || c1 > 16_383) return null;
+    return {
+      sheet: origin.sheet,
+      r0: origin.row,
+      c0: origin.col,
+      r1,
+      c1,
+    };
+  };
+
+  const canPasteToRange = (range: Range | null): boolean => {
+    const bounds = navigationBoundsFor(store);
+    if (!bounds) return true;
+    if (
+      !range ||
+      range.sheet !== bounds.sheet ||
+      range.r0 < bounds.r0 ||
+      range.c0 < bounds.c0 ||
+      range.r1 > bounds.r1 ||
+      range.c1 > bounds.c1
+    ) {
+      return false;
+    }
+    if (!interactionController) return true;
+    return interactionController.canExecute({
+      operation: 'paste',
+      origin: 'contextMenu',
+      commandId: 'paste',
+      effects: [{ kind: 'range', range }],
+    }).allowed;
+  };
+
+  const hasExplicitPolicy = (): boolean => {
+    const policy = interactionController?.policy;
+    return (
+      interactionController?.restricted === true ||
+      (policy !== undefined && Object.keys(policy).length > 0)
+    );
+  };
+
+  const operationForItem = (id: string): InteractionOperation | null => {
+    if (id === 'copy' || id === 'selectAll' || id === 'rowHeight' || id === 'colWidth') {
+      return null;
+    }
+    if (
+      id === 'paste' ||
+      id === 'pasteSpecial' ||
+      id === 'pasteAll' ||
+      id === 'pasteFormulas' ||
+      id === 'pasteFormulasNumFmt' ||
+      id === 'pasteValues' ||
+      id === 'pasteValuesNumFmt' ||
+      id === 'pasteFormatsOnly' ||
+      id === 'pasteTranspose'
+    ) {
+      return 'paste';
+    }
+    if (id === 'clear') return 'clear';
+    if (
+      id === 'cut' ||
+      id === 'insertCopiedCells' ||
+      id === 'insertCells' ||
+      id === 'deleteCells'
+    ) {
+      return 'moveCells';
+    }
+    if (id === 'rowInsertAbove' || id === 'rowInsertBelow') return 'insertRows';
+    if (id === 'rowDelete') return 'deleteRows';
+    if (id === 'colInsertLeft' || id === 'colInsertRight') return 'insertColumns';
+    if (id === 'colDelete') return 'deleteColumns';
+    if (
+      id === 'bold' ||
+      id === 'italic' ||
+      id === 'underline' ||
+      id === 'alignLeft' ||
+      id === 'alignCenter' ||
+      id === 'alignRight' ||
+      id === 'borders' ||
+      id === 'formatCells' ||
+      id === 'editPhonetic'
+    ) {
+      return 'format';
+    }
+    if (id === 'filterClear' || id === 'filterReapply' || id === 'filterByValue') {
+      return 'filter';
+    }
+    if (id === 'sortAsc' || id === 'sortDesc') return 'sort';
+    if (id === 'rowHide' || id === 'rowUnhide') return 'resizeRows';
+    if (id === 'colHide' || id === 'colUnhide') return 'resizeColumns';
+    if (id === 'rowGroup' || id === 'rowUngroup') return 'insertRows';
+    if (id === 'colGroup' || id === 'colUngroup') return 'insertColumns';
+    if (id === 'insertComment' || id === 'deleteComment') return 'comment';
+    if (id === 'insertHyperlink' || id === 'openHyperlink') return 'hyperlink';
+    if (id === 'defineName') return 'namedRange';
+    if (id === 'toggleWatch') return 'object';
+    return 'object';
+  };
+
+  const operationEffect = (): OperationEffect => ({
+    kind: 'range',
+    range: { ...store.getState().selection.range },
+  });
+
+  const intentForBuiltIn = (id: string): OperationIntent | null => {
+    const operation = operationForItem(id);
+    if (!operation) return null;
+    return {
+      operation,
+      origin: 'contextMenu',
+      commandId: id,
+      effects: [operationEffect()],
+    };
+  };
+
+  const deniedDecision = (code: PermissionCode, reason?: string): PermissionDecision => ({
+    allowed: false,
+    code,
+    ...(reason ? { reason } : {}),
+  });
+
+  const decisionForIntent = (intent: OperationIntent): PermissionDecision => {
+    if (!interactionController) return { allowed: true };
+    return interactionController.canExecute(intent);
+  };
+
+  const decisionReason = (decision: PermissionDecision): string | null =>
+    decision.allowed ? null : (decision.reason ?? null);
+
+  const decisionForItem = (
+    item: ItemId | ContextMenuItem | OperationIntent,
+  ): PermissionDecision => {
+    if (typeof item === 'object' && 'operation' in item && 'origin' in item) {
+      return decisionForIntent(item);
+    }
+    const itemId = typeof item === 'string' ? item : item.builtIn;
+    if (!itemId) {
+      const command = typeof item === 'string' ? undefined : item.command;
+      if (!command) return { allowed: true };
+      return decisionForIntent({
+        operation: command.operation,
+        origin: 'contextMenu',
+        commandId: command.commandId ?? command.type,
+        effects: [
+          {
+            kind: 'cells',
+            cells: command.changes.map((change) => change.addr),
+            includesFormula: command.changes.some(
+              (change) => 'formula' in change && change.formula != null,
+            ),
+          },
+        ],
+      });
+    }
+    if (itemId === 'copy' && interactionController?.policy?.copy === false) {
+      return deniedDecision('operationDenied', 'Copy is disabled by the host policy.');
+    }
+    if (navigationBounded() && navigationUnsupportedIds.has(itemId)) {
+      return deniedDecision(
+        'unsupported',
+        'This structural operation is unavailable with a bounded viewport.',
+      );
+    }
+    if (hasExplicitPolicy() && !restrictedMenuSafeIds.has(itemId)) {
+      return deniedDecision(
+        'unsupported',
+        'This context-menu operation is unavailable in restricted mode.',
+      );
+    }
+    if (hasExplicitPolicy()) return canExecuteBuiltIn(store, itemId, 'contextMenu');
+    const intent = intentForBuiltIn(itemId);
+    return intent ? decisionForIntent(intent) : { allowed: true };
+  };
+
+  const createContext = (
+    target: MenuTarget,
+    event: MouseEvent | KeyboardEvent,
+    defaultItems: readonly ContextMenuItem[],
+  ): ContextMenuContext => {
+    const selection = { ...store.getState().selection.range };
+    const canExecute = (item: ItemId | ContextMenuItem | OperationIntent): PermissionDecision =>
+      decisionForItem(item);
+    return {
+      kind: target.kind,
+      cell: { ...target.cell },
+      selection,
+      defaultItems,
+      event,
+      canExecute,
+      permission: canExecute,
+    };
+  };
+
+  const decorateContextItems = (items: readonly ContextMenuItem[]): ContextMenuItem[] =>
+    items.map((item) => {
+      const children = item.children ? decorateContextItems(item.children) : undefined;
+      if (item.disabled) {
+        const decorated = children ? { ...item, children } : item;
+        if (explicitDisabledSources.has(item)) explicitDisabledSources.add(decorated);
+        return decorated;
+      }
+      const decision = item.builtIn || item.command ? decisionForItem(item) : null;
+      if (decision && !decision.allowed) {
+        const decorated = {
+          ...item,
+          ...(children ? { children } : {}),
+          disabled: true,
+          disabledReason: decisionReason(decision) ?? undefined,
+        };
+        policyDisabledSources.add(decorated);
+        if (explicitDisabledSources.has(item)) explicitDisabledSources.add(decorated);
+        return decorated;
+      }
+      return children ? { ...item, children } : item;
+    });
+
+  const markExplicitDisabledSources = (items: readonly ContextMenuItem[]): void => {
+    for (const item of items) {
+      if (item.disabled && !policyDisabledSources.has(item)) explicitDisabledSources.add(item);
+      if (item.children) markExplicitDisabledSources(item.children);
+    }
+  };
+
   const focusMenuItem = (idx: number): void => {
     const items = panelItems(activePanel());
     if (items.length === 0) return;
@@ -278,8 +715,8 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     closeSubmenu();
     const children = submenuChildren.get(id);
     if (!children) return;
-    const disabled = new Set<ItemId>();
-    if (id === 'pasteSpecialMenu' && !deps.getClipboardSnapshot?.()) {
+    const disabled = new Set<string>();
+    if (id === 'pasteSpecialMenu' && !clipboardSnapshot()) {
       for (const d of PASTE_QUICK_IDS) disabled.add(d);
     }
     sub.replaceChildren();
@@ -303,24 +740,35 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   const appendEntry = (
     panel: 'root' | 'sub',
     container: HTMLElement,
-    entry: MenuEntry,
-    disabledIds: Set<ItemId>,
+    entry: RenderMenuEntry,
+    disabledIds: Set<string>,
   ): void => {
     if (entry.kind === 'sep') {
-      const sep = document.createElement('hr');
+      const sep = container.ownerDocument.createElement('hr');
       sep.className = 'fc-ctxmenu__sep';
       container.appendChild(sep);
       return;
     }
     if (entry.kind === 'submenu') {
       submenuChildren.set(entry.id, entry.children);
+      const source = entry.source;
+      if (source) activeItemSources.set(entry.id, source);
       const btn = createContextSubmenuButton(entry);
+      if (source && explicitDisabledSources.has(source)) {
+        setContextMenuItemDisabled(btn, true, source.disabledReason ?? null);
+      } else if ((source?.builtIn || source?.command) && !decisionForItem(source).allowed) {
+        const decision = decisionForItem(source);
+        btn.dataset.policyDisabled = 'true';
+        setContextMenuItemDisabled(btn, true, decisionReason(decision));
+      }
       btn.addEventListener('mouseenter', () => {
+        if (btn.disabled) return;
         openSubmenu(entry.id, btn);
       });
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
+        if (btn.disabled) return;
         openSubmenu(entry.id, btn);
         focusPanel = 'sub';
         focusMenuItem(0);
@@ -329,14 +777,29 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       return;
     }
     const btn = createContextMenuItemButton(entry);
+    const source = entry.source;
+    if (source) activeItemSources.set(entry.id, source);
     if (disabledIds.has(entry.id)) {
       setContextMenuItemDisabled(btn, true, strings.contextMenu.pasteSpecialRequiresCopiedCells);
+    } else if (source && explicitDisabledSources.has(source)) {
+      if ((source.builtIn || source.command) && !decisionForItem(source).allowed) {
+        btn.dataset.policyDisabled = 'true';
+      }
+      setContextMenuItemDisabled(btn, true, source.disabledReason ?? null);
+    } else if (source?.builtIn && !decisionForItem(source).allowed) {
+      const decision = decisionForItem(source);
+      btn.dataset.policyDisabled = 'true';
+      setContextMenuItemDisabled(btn, true, decisionReason(decision));
+    } else if (source?.command && !decisionForItem(source).allowed) {
+      const decision = decisionForItem(source);
+      btn.dataset.policyDisabled = 'true';
+      setContextMenuItemDisabled(btn, true, decisionReason(decision));
     }
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
       if (btn.disabled) return;
-      run(entry.id);
+      runEntry(entry);
       hide(false);
     });
     btn.addEventListener('mouseenter', () => {
@@ -350,8 +813,11 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     if (panel === 'root' && entry.id === 'paste') pasteBtnRef = btn;
   };
 
-  const buildMiniToolbar = (): HTMLElement => {
-    const toolbar = document.createElement('div');
+  const buildMiniToolbar = (
+    allowedIds?: ReadonlySet<string>,
+    hiddenIds?: ReadonlySet<string>,
+  ): HTMLElement => {
+    const toolbar = ownerDocument.createElement('div');
     toolbar.className = 'fc-ctxmenu__mini';
     toolbar.setAttribute('role', 'toolbar');
     toolbar.setAttribute('aria-label', strings.contextMenu.title);
@@ -368,7 +834,14 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     ];
 
     for (const item of buttons) {
+      if (allowedIds && !allowedIds.has(item.id)) continue;
+      if (hiddenIds?.has(item.id)) continue;
       const btn = createContextMiniToolbarButton(item);
+      const decision = decisionForItem(item.id);
+      if (!decision.allowed) {
+        btn.dataset.policyDisabled = 'true';
+        setContextMenuItemDisabled(btn, true, decisionReason(decision));
+      }
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -385,8 +858,10 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     menuKind = kind;
     root.replaceChildren();
     submenuChildren.clear();
+    activeItemSources.clear();
+    explicitDisabledSources = new WeakSet<ContextMenuItem>();
+    policyDisabledSources = new WeakSet<ContextMenuItem>();
     pasteBtnRef = null;
-    if (kind === 'cell') root.appendChild(buildMiniToolbar());
     const raw =
       kind === 'row'
         ? buildRowEntries(strings)
@@ -419,8 +894,41 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           return e;
         }),
     );
-    const noDisabled = new Set<ItemId>();
-    for (const entry of entries) appendEntry('root', root, entry, noDisabled);
+    const defaultItems = entries.map(menuEntryToContextItem);
+    let visibleItems = decorateContextItems(defaultItems);
+    const builtInOptions = options?.mode === 'builtIn' ? options : undefined;
+    if (builtInOptions?.items) {
+      visibleItems = selectBuiltInItems(visibleItems, new Set(builtInOptions.items));
+    }
+    let composedContext = activeContext;
+    if (builtInOptions?.transform) {
+      if (activeTarget && activeEvent) {
+        composedContext = createContext(activeTarget, activeEvent, visibleItems);
+      }
+      if (composedContext) {
+        try {
+          visibleItems = sanitizeContextItems(builtInOptions.transform(composedContext));
+        } catch (err) {
+          console.warn('formulon-cell: context-menu transform failed', err);
+        }
+      }
+    } else {
+      visibleItems = sanitizeContextItems(visibleItems);
+    }
+    markExplicitDisabledSources(visibleItems);
+    if (composedContext) activeContext = composedContext;
+    const renderEntries = visibleItems.map(contextItemToRenderEntry);
+    const visibleRootIds = contextItemIds(visibleItems);
+    if (kind === 'cell') {
+      const allowedMini = builtInOptions?.items
+        ? new Set<string>(builtInOptions.items)
+        : builtInOptions
+          ? itemIdSet
+          : undefined;
+      root.appendChild(buildMiniToolbar(allowedMini, options ? visibleRootIds : undefined));
+    }
+    const noDisabled = new Set<string>();
+    for (const entry of renderEntries) appendEntry('root', root, entry, noDisabled);
 
     const s = store.getState();
     const rowHidden =
@@ -448,14 +956,47 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     }
   };
 
-  const show = (clientX: number, clientY: number, kind: MenuKind): void => {
-    restoreFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : host;
+  const show = (
+    clientX: number,
+    clientY: number,
+    target: MenuTarget,
+    event: MouseEvent | KeyboardEvent,
+  ): void => {
+    if (options?.mode === 'disabled') return;
+    // A fullscreen/dialog resolver can change between the browser's
+    // fullscreenchange notification and this key/mouse event. Refresh the
+    // owned portal synchronously so the menu is born inside the current focus
+    // boundary instead of one event behind.
+    overlayPortalFor(host);
+    activeTarget = target;
+    activeEvent = event;
+    activeContext = options ? createContext(target, event, []) : null;
+    restoreFocusEl =
+      ownerDocument.activeElement instanceof OwnerHTMLElement ? ownerDocument.activeElement : host;
     root.setAttribute('aria-label', strings.contextMenu.title);
     focusPanel = 'root';
-    buildMenu(kind);
+    buildMenu(target.kind);
+    if (options?.mode === 'host') {
+      const context = activeContext;
+      root.style.display = 'none';
+      activeContext = null;
+      if (context) options.onOpen(context);
+      return;
+    }
     if (pasteBtnRef) {
       const canPaste = canReadClipboard();
-      setContextMenuItemDisabled(pasteBtnRef, !canPaste, strings.contextMenu.clipboardUnavailable);
+      if (!canPaste) {
+        setContextMenuItemDisabled(pasteBtnRef, true, strings.contextMenu.clipboardUnavailable);
+      } else {
+        const decision = decisionForItem('paste');
+        if (!decision.allowed) {
+          setContextMenuItemDisabled(pasteBtnRef, true, decisionReason(decision));
+        } else if (!hasExplicitPolicy()) {
+          // Preserve the legacy accessibility state: old callers observed an
+          // explicit aria-disabled="false" on an available paste action.
+          setContextMenuItemDisabled(pasteBtnRef, false, null);
+        }
+      }
     }
     root.style.display = 'block';
     root.style.left = '-9999px';
@@ -470,52 +1011,101 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   /** Resolve which menu flavour to show based on the click target. Header
    *  clicks promote the selection to the whole row/column so the action
    *  inherits a sensible band. */
-  const resolveMenuKind = (e: MouseEvent): MenuKind => {
+  const resolveMenuTarget = (e: MouseEvent, updateCellSelection: boolean): MenuTarget => {
     const rect = hitHost.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const s = store.getState();
     const zone = hitZone(layoutForView(s), s.viewport, x, y, null, { resizeHandles: false });
-    if (!zone) return 'cell';
+    const fallback = { kind: 'cell' as const, cell: { ...s.selection.active } };
+    if (!zone) return fallback;
     const selectedRanges = [s.selection.range, ...(s.selection.extraRanges ?? [])];
     if (zone.kind === 'row-header' || zone.kind === 'row-resize') {
       const inSel = selectedRanges.some(
         (sel) => zone.row >= sel.r0 && zone.row <= sel.r1 && sel.c0 === 0 && sel.c1 >= 16383,
       );
-      if (!inSel) mutators.selectRow(store, zone.row);
-      return 'row';
+      if (!inSel && canChangeSelection()) mutators.selectRow(store, zone.row);
+      return {
+        kind: 'row',
+        cell: { ...store.getState().selection.active },
+      };
     }
     if (zone.kind === 'col-header' || zone.kind === 'col-resize') {
       const inSel = selectedRanges.some(
         (sel) => zone.col >= sel.c0 && zone.col <= sel.c1 && sel.r0 === 0 && sel.r1 >= 1048575,
       );
-      if (!inSel) mutators.selectCol(store, zone.col);
-      return 'col';
+      if (!inSel && canChangeSelection()) mutators.selectCol(store, zone.col);
+      return {
+        kind: 'col',
+        cell: { ...store.getState().selection.active },
+      };
     }
     if (zone.kind === 'cell') {
       const selected = selectedRanges.find(
         (sel) =>
           zone.row >= sel.r0 && zone.row <= sel.r1 && zone.col >= sel.c0 && zone.col <= sel.c1,
       );
-      if (selected?.c0 === 0 && selected.c1 >= 16383) return 'row';
-      if (selected?.r0 === 0 && selected.r1 >= 1048575) return 'col';
+      if (selected?.c0 === 0 && selected.c1 >= 16383) {
+        return {
+          kind: 'row',
+          cell: { sheet: s.selection.active.sheet, row: zone.row, col: zone.col },
+        };
+      }
+      if (selected?.r0 === 0 && selected.r1 >= 1048575) {
+        return {
+          kind: 'col',
+          cell: { sheet: s.selection.active.sheet, row: zone.row, col: zone.col },
+        };
+      }
+      if (!selected && updateCellSelection && canChangeSelection()) {
+        const cell = { sheet: s.selection.active.sheet, row: zone.row, col: zone.col };
+        mutators.setActive(store, cell);
+        return { kind: 'cell', cell };
+      }
+      return {
+        kind: 'cell',
+        cell: { sheet: s.selection.active.sheet, row: zone.row, col: zone.col },
+      };
     }
-    return 'cell';
+    return fallback;
   };
 
   const isOwnChromeContextTarget = (target: EventTarget | null): boolean =>
-    target instanceof Element &&
+    target instanceof OwnerElement &&
     !!target.closest('.fc-host__formulabar, .fc-host__sheetbar, .fc-sheetmenu');
+
+  const canChangeSelection = (): boolean => {
+    if (interactionController?.canSelect) return interactionController.canSelect().allowed;
+    return interactionController?.policy?.selection !== false;
+  };
 
   const onContextMenu = (e: MouseEvent): void => {
     if (isOwnChromeContextTarget(e.target)) return;
+    if (options?.mode === 'disabled') return;
     e.preventDefault();
-    const kind = resolveMenuKind(e);
-    show(e.clientX, e.clientY, kind);
+    const target = resolveMenuTarget(e, options !== undefined);
+    show(e.clientX, e.clientY, target, e);
+  };
+
+  const onHostKey = (e: KeyboardEvent): void => {
+    if (options?.mode === 'disabled') return;
+    if (e.key !== 'ContextMenu' && !(e.key === 'F10' && e.shiftKey)) return;
+    e.preventDefault();
+    const active = store.getState().selection.active;
+    const rect = host.getBoundingClientRect();
+    show(
+      rect.left + Math.min(rect.width || 1, 24),
+      rect.top + Math.min(rect.height || 1, 24),
+      {
+        kind: 'cell',
+        cell: { ...active },
+      },
+      e,
+    );
   };
 
   const insideMenu = (target: EventTarget | null): boolean =>
-    target instanceof Node && (root.contains(target) || sub.contains(target));
+    target instanceof OwnerNode && (root.contains(target) || sub.contains(target));
 
   const onDocPointerDown = (e: MouseEvent): void => {
     if (!visible) return;
@@ -555,8 +1145,8 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       e.preventDefault();
       focusMenuItem(panelItems(activePanel()).length - 1);
     } else if (e.key === 'ArrowRight') {
-      const el = document.activeElement;
-      if (el instanceof HTMLButtonElement && el.dataset.fcSubmenu) {
+      const el = ownerDocument.activeElement;
+      if (el instanceof OwnerHTMLButtonElement && el.dataset.fcSubmenu) {
         e.preventDefault();
         openSubmenu(el.dataset.fcSubmenu, el);
         focusPanel = 'sub';
@@ -572,8 +1162,8 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         activeIndex = panelItems(root).indexOf(parent);
       }
     } else if (e.key === 'Enter' || e.key === ' ') {
-      const target = document.activeElement;
-      if (target instanceof HTMLButtonElement && insideMenu(target)) {
+      const target = ownerDocument.activeElement;
+      if (target instanceof OwnerHTMLButtonElement && insideMenu(target)) {
         e.preventDefault();
         target.click();
       }
@@ -581,6 +1171,32 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   };
 
   const onScroll = (): void => hide(false);
+
+  const refreshOpenPermissions = (): void => {
+    if (!visible || !interactionController) return;
+    const panels = [root, sub];
+    for (const panel of panels) {
+      for (const button of panel.querySelectorAll<HTMLButtonElement>(
+        '.fc-ctxmenu__item, .fc-ctxmenu__mini-btn',
+      )) {
+        const id = button.dataset.fcAction;
+        const source = id ? activeItemSources.get(id) : undefined;
+        if (!id || (!source && !isBuiltinItemId(id))) continue;
+        const decision = source ? decisionForItem(source) : decisionForItem(id as ItemId);
+        if (!decision.allowed) {
+          button.dataset.policyDisabled = 'true';
+          setContextMenuItemDisabled(button, true, decisionReason(decision));
+        } else if (button.dataset.policyDisabled === 'true') {
+          delete button.dataset.policyDisabled;
+          if (source && explicitDisabledSources.has(source)) {
+            setContextMenuItemDisabled(button, true, source.disabledReason ?? null);
+          } else {
+            projectDisabledState(button, false, null, { datasetKey: 'disabledReason' });
+          }
+        }
+      }
+    }
+  };
 
   sub.addEventListener('mouseenter', cancelSubClose);
   sub.addEventListener('mouseleave', scheduleSubClose);
@@ -611,16 +1227,31 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   };
 
   function runPasteSpecial(what: PasteWhat, transpose: boolean): void {
-    const snap = deps.getClipboardSnapshot?.();
+    if (hasExplicitPolicy()) {
+      void readClipboard().then((text) => {
+        if (text) executeClipboardText(text);
+      });
+      return;
+    }
+    const snap = clipboardSnapshot();
     if (!snap) return;
+    const state = store.getState();
+    const destination = pasteDestinationRange(
+      state.selection.active,
+      transpose ? snap.cols : snap.rows,
+      transpose ? snap.rows : snap.cols,
+    );
+    if (!canPasteToRange(destination)) return;
     if (history) history.begin();
     try {
-      pasteSpecial(store.getState(), store, wb, snap, {
-        what,
-        operation: 'none',
-        skipBlanks: false,
-        transpose,
-      });
+      pasteSpecial(
+        store.getState(),
+        store,
+        wb,
+        snap,
+        { what, operation: 'none', skipBlanks: false, transpose },
+        history,
+      );
     } catch (err) {
       console.warn('formulon-cell: paste special failed', err);
     } finally {
@@ -677,12 +1308,14 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         }
         const next = store.getState();
         if (snap) {
-          pasteSpecial(next, store, wb, snap, {
-            what: 'all',
-            operation: 'none',
-            skipBlanks: false,
-            transpose: false,
-          });
+          pasteSpecial(
+            next,
+            store,
+            wb,
+            snap,
+            { what: 'all', operation: 'none', skipBlanks: false, transpose: false },
+            history,
+          );
         } else {
           pasteTSV(next, wb, text);
         }
@@ -698,7 +1331,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     // The internal snapshot wins over the TSV text so formats ride along, and
     // taking it first keeps the action synchronous — no clipboard-permission
     // round trip for a copy that came from this grid.
-    const snap = deps.getClipboardSnapshot?.() ?? null;
+    const snap = clipboardSnapshot();
     if (snap) {
       insertBand(snap, '');
       return;
@@ -708,7 +1341,107 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     });
   }
 
-  function run(id: ItemId): void {
+  function runEntry(entry: RenderMenuEntry): void {
+    const source = entry.source;
+    if (source?.disabled) return;
+    if (source && !decisionForItem(source).allowed) return;
+    if (source?.builtIn) {
+      run(source.builtIn);
+      return;
+    }
+    if (source?.command) {
+      if (!interactionController) return;
+      try {
+        // Commands supplied by a host are still dispatched through the
+        // context-menu route. Never trust a caller-provided origin here: an
+        // arbitrary origin could bypass the route's policy decision between
+        // rendering and activation.
+        const command: CellBatchCommand = { ...source.command, origin: 'contextMenu' };
+        const result = interactionController.execute(command);
+        if (result && typeof result === 'object' && 'then' in result) {
+          void Promise.resolve(result).then(() => deps.onAfterCommit?.());
+        } else {
+          deps.onAfterCommit?.();
+        }
+      } catch (err) {
+        console.warn('formulon-cell: context-menu command failed', err);
+      }
+      return;
+    }
+    if (source?.action) {
+      if (activeContext) source.action(activeContext);
+      return;
+    }
+    // A source-less entry is legacy only. Unknown IDs must never fall through
+    // the built-in action switch.
+    if (!source && isBuiltinItemId(entry.id)) run(entry.id);
+  }
+
+  const selectedCellChanges = (input: (addr: Addr) => CellChangeInput): CellChangeInput[] => {
+    const state = store.getState();
+    const range = state.selection.range;
+    const changes: CellChangeInput[] = [];
+    for (const key of state.data.cells.keys()) {
+      const [sheetRaw, rowRaw, colRaw] = key.split(':');
+      const addr = { sheet: Number(sheetRaw), row: Number(rowRaw), col: Number(colRaw) };
+      if (
+        addr.sheet === range.sheet &&
+        addr.row >= range.r0 &&
+        addr.row <= range.r1 &&
+        addr.col >= range.c0 &&
+        addr.col <= range.c1
+      ) {
+        changes.push(input(addr));
+      }
+    }
+    return changes;
+  };
+
+  const executeBatch = (command: CellBatchCommand): void => {
+    if (!interactionController) return;
+    try {
+      const result = interactionController.execute(command);
+      if (result && typeof result === 'object' && 'then' in result) {
+        void Promise.resolve(result).then(() => deps.onAfterCommit?.());
+      } else {
+        deps.onAfterCommit?.();
+      }
+    } catch (err) {
+      console.warn('formulon-cell: context-menu batch failed', err);
+    }
+  };
+
+  const executeClipboardText = (text: string): void => {
+    const state = store.getState();
+    const start = state.selection.range;
+    const rows = parseTSV(text);
+    const changes: CellChangeInput[] = [];
+    rows.forEach((row, rowOffset) => {
+      row.forEach((input, colOffset) => {
+        changes.push({
+          addr: {
+            sheet: start.sheet,
+            row: start.r0 + rowOffset,
+            col: start.c0 + colOffset,
+          },
+          input,
+        });
+      });
+    });
+    if (changes.length === 0) return;
+    executeBatch({
+      type: 'cellBatch',
+      operation: 'paste',
+      origin: 'contextMenu',
+      changes,
+      denied: interactionController?.policy?.batchDenied,
+    });
+  };
+
+  function run(id: string): void {
+    if (!isBuiltinItemId(id)) return;
+    if (!decisionForItem(id).allowed) return;
+    if (navigationBounded() && navigationUnsupportedIds.has(id)) return;
     const state = store.getState();
     switch (id) {
       case 'copy': {
@@ -718,10 +1451,16 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         }
         const r = copy(state);
         if (r) {
+          const ranges = r.payloadRanges ?? r.ranges ?? [r.range];
+          localSnapshot =
+            ranges.length === 1 && ranges[0] ? captureSnapshot(state, ranges[0]) : null;
+          localSnapshotText = r.tsv;
           if (r.ranges) mutators.setCopyRanges(store, r.ranges);
           else mutators.setCopyRange(store, r.range);
+          localCopyRevision = store.getState().ui.copyRevision ?? 0;
           void writeClipboard(r.tsv);
         } else {
+          localSnapshot = null;
           mutators.setCopyRange(store, null);
         }
         return;
@@ -731,18 +1470,17 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           deps.onClipboardShortcut('cut');
           return;
         }
-        if (history) history.begin();
-        let r: ReturnType<typeof cut> = null;
-        try {
-          r = cut(state, wb);
-        } finally {
-          if (history) history.end();
-        }
+        const r = cut(state, wb);
         if (r) {
+          const ranges = r.payloadRanges ?? r.ranges ?? [r.range];
+          if (ranges.length !== 1 || !ranges[0]) return;
+          localSnapshot = captureSnapshot(state, ranges[0], 'cut');
+          if (!localSnapshot) return;
+          localSnapshotText = r.tsv;
           mutators.setCopyRange(store, r.range, 'cut');
+          localCopyRevision = store.getState().ui.copyRevision ?? 0;
           void writeClipboard(r.tsv);
         }
-        deps.onAfterCommit?.();
         return;
       }
       case 'paste': {
@@ -751,20 +1489,41 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           return;
         }
         void readClipboard().then((text) => {
-          const snap = deps.getClipboardSnapshot?.();
+          const available = clipboardSnapshot();
+          const snap =
+            available && (!text || deps.getClipboardSnapshot || text === localSnapshotText)
+              ? available
+              : null;
           if (!hasPastePayload(text, snap)) return;
+          if (hasExplicitPolicy()) {
+            if (text) {
+              executeClipboardText(text);
+            }
+            return;
+          }
+          const pasteState = store.getState();
+          const tsvRows = snap ? [] : parseTSV(text);
+          const rows = snap ? snap.rows : tsvRows.length;
+          const cols = snap
+            ? snap.cols
+            : tsvRows.reduce((max, row) => Math.max(max, row.length), 0);
+          if (!canPasteToRange(pasteDestinationRange(pasteState.selection.active, rows, cols))) {
+            return;
+          }
           if (history) history.begin();
           let r: ReturnType<typeof pasteTSV> | ReturnType<typeof pasteSpecial> = null;
           try {
-            r = text
-              ? pasteTSV(store.getState(), wb, text)
-              : snap
-                ? pasteSpecial(store.getState(), store, wb, snap, {
-                    what: 'all',
-                    operation: 'none',
-                    skipBlanks: false,
-                    transpose: false,
-                  })
+            r = snap
+              ? pasteSpecial(
+                  store.getState(),
+                  store,
+                  wb,
+                  snap,
+                  { what: 'all', operation: 'none', skipBlanks: false, transpose: false },
+                  history,
+                )
+              : text
+                ? pasteTSV(store.getState(), wb, text)
                 : null;
           } finally {
             if (history) history.end();
@@ -808,10 +1567,11 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           return;
         }
         openInsertCopiedCellsDialog({
+          host,
           strings,
           onSubmit: (direction) => {
             void readClipboard().then((text) => {
-              const snap = deps.getClipboardSnapshot?.();
+              const snap = clipboardSnapshot();
               if (!hasPastePayload(text, snap)) return;
               const r = insertCopiedCellsFromTSV(store, wb, history, text, direction, snap);
               if (r) {
@@ -826,6 +1586,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       }
       case 'insertCells': {
         openCellShiftDialog({
+          host,
           strings,
           kind: 'insert',
           onSubmit: (direction) => {
@@ -839,6 +1600,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       }
       case 'deleteCells': {
         openCellShiftDialog({
+          host,
           strings,
           kind: 'delete',
           onSubmit: (direction) => {
@@ -853,6 +1615,19 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       case 'clear': {
         const range = state.selection.range;
         const sheet = range.sheet;
+        if (hasExplicitPolicy()) {
+          const changes = selectedCellChanges((addr) => ({ addr, input: '' }));
+          if (changes.length > 0) {
+            executeBatch({
+              type: 'cellBatch',
+              operation: 'clear',
+              origin: 'contextMenu',
+              changes,
+              denied: interactionController?.policy?.batchDenied,
+            });
+          }
+          return;
+        }
         // Each setBlank journals its own inverse, so the whole range has to be
         // one transaction for a single undo to restore it.
         if (history) history.begin();
@@ -1085,23 +1860,32 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   }
 
   host.addEventListener('contextmenu', onContextMenu);
-  document.addEventListener('contextmenu', onDocContextMenu, true);
-  document.addEventListener('mousedown', onDocPointerDown, true);
-  document.addEventListener('keydown', onDocKey, true);
-  window.addEventListener('scroll', onScroll, true);
+  host.addEventListener('keydown', onHostKey);
+  ownerDocument.addEventListener('contextmenu', onDocContextMenu, true);
+  ownerDocument.addEventListener('mousedown', onDocPointerDown, true);
+  ownerDocument.addEventListener('keydown', onDocKey, true);
+  ownerWindow?.addEventListener('scroll', onScroll, true);
+  const unsubscribePolicy = interactionController?.subscribe?.(refreshOpenPermissions) ?? null;
 
   const detach = ((): void => {
     host.removeEventListener('contextmenu', onContextMenu);
-    document.removeEventListener('contextmenu', onDocContextMenu, true);
-    document.removeEventListener('mousedown', onDocPointerDown, true);
-    document.removeEventListener('keydown', onDocKey, true);
-    window.removeEventListener('scroll', onScroll, true);
+    host.removeEventListener('keydown', onHostKey);
+    ownerDocument.removeEventListener('contextmenu', onDocContextMenu, true);
+    ownerDocument.removeEventListener('mousedown', onDocPointerDown, true);
+    ownerDocument.removeEventListener('keydown', onDocKey, true);
+    ownerWindow?.removeEventListener('scroll', onScroll, true);
+    unsubscribePolicy?.();
     cancelSubClose();
     root.remove();
     sub.remove();
   }) as ContextMenuHandle;
   detach.setStrings = (next: Strings): void => {
     strings = next;
+    hide();
+  };
+  detach.setOptions = (next?: ContextMenuOptions): void => {
+    options = next;
+    activeContext = null;
     hide();
   };
   return detach;

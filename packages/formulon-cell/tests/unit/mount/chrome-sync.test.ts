@@ -117,6 +117,20 @@ describe('mount/chrome-sync — name box and formula bar reflect store state', (
     expect(tag.value).toBe('A1:B3');
   });
 
+  it('shows a merged logical cell by its anchor while retaining the complete selection', () => {
+    const store = sheet.instance.store;
+    const range = { sheet: 0, r0: 1, c0: 1, r1: 2, c1: 3 };
+    mutators.mergeRange(store, range);
+    mutators.setActive(store, { sheet: 0, row: 2, col: 3 });
+    expect(tag.value).toBe('B2');
+    expect(store.getState().selection.range).toEqual(range);
+    mutators.setR1C1(store, true);
+    expect(tag.value).toBe('R2C2');
+    mutators.setR1C1(store, false);
+    mutators.setRange(store, { ...range, r1: 3 });
+    expect(tag.value).toBe('B2:D4');
+  });
+
   it('R1C1 mode swaps the name box format', () => {
     mutators.setR1C1(sheet.instance.store, true);
     mutators.setActive(sheet.instance.store, { sheet: 0, row: 4, col: 1 });

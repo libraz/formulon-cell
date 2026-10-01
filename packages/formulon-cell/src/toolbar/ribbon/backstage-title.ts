@@ -11,7 +11,7 @@ import {
   type RibbonTab,
   type SpreadsheetInstance,
 } from '../../index.js';
-
+import { overlayPortalFor } from '../../interact/overlay-portal.js';
 import { focusMenuItem, handleMenuKeydown } from '../menu-a11y.js';
 import { createMenu, menuIconButton, menuSeparator } from './menus/general.js';
 
@@ -100,6 +100,10 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
     setAutosaveEnabled,
   } = ctx;
 
+  const overlayHost = (): HTMLElement | null =>
+    getInst()?.host ?? ribbonRoot?.closest<HTMLElement>('.fc-host') ?? ribbonRoot;
+  const ownerDocument = overlayHost()?.ownerDocument ?? document;
+
   const selectRibbonTab = (tabId: RibbonTab, focusTab = false): void => {
     if (!ribbonRoot) return;
     if (tabId === 'file') {
@@ -173,7 +177,9 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
   };
 
   const titleActionButton = (label: string): HTMLButtonElement | null =>
-    document.querySelector<HTMLButtonElement>(`.fc-tb__title [data-shell-i18n-label="${label}"]`);
+    ribbonRoot?.querySelector<HTMLButtonElement>(
+      `.fc-tb__title [data-shell-i18n-label="${label}"]`,
+    ) ?? null;
 
   titleActionButton('home')?.addEventListener('click', () => {
     closeBackstage();
@@ -209,8 +215,13 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
   });
 
   const seedFindDialogQuery = (query: string): void => {
-    requestAnimationFrame(() => {
-      const input = document.querySelector<HTMLInputElement>('.fc-find input[type="text"]');
+    const frame = ownerDocument.defaultView
+      ? ownerDocument.defaultView.requestAnimationFrame.bind(ownerDocument.defaultView)
+      : requestAnimationFrame;
+    frame(() => {
+      const input = overlayPortalFor(overlayHost()).querySelector<HTMLInputElement>(
+        '.fc-find input[type="text"]',
+      );
       if (!input) return;
       input.value = query;
       input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -246,7 +257,7 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
     runTitleSearch();
   });
 
-  document.addEventListener('keydown', (event) => {
+  ownerDocument.addEventListener('keydown', (event) => {
     const key = event.key.toLowerCase();
     const excelSearchShortcut = key === 'q' && event.altKey && !event.ctrlKey && !event.metaKey;
     const legacySearchShortcut = key === 'u' && event.metaKey && event.ctrlKey;
@@ -278,7 +289,7 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
     menuIconButton(shellText.comments, 'titleMoreAction', 'comments', 'title-comments'),
     menuIconButton(shellText.share, 'titleMoreAction', 'share', 'title-share'),
   );
-  document.body.appendChild(titleMoreMenu);
+  overlayPortalFor(overlayHost()).appendChild(titleMoreMenu);
 
   const closeTitleMoreMenu = (restoreFocus = false): void => {
     titleMoreMenu.hidden = true;
@@ -327,7 +338,7 @@ export const createBackstageTitle = (ctx: BackstageTitleCtx): BackstageTitleApi 
     });
   });
 
-  document.addEventListener('pointerdown', (event) => {
+  ownerDocument.addEventListener('pointerdown', (event) => {
     if (titleMoreMenu.hidden) return;
     const target = event.target as Element | null;
     if (titleMoreMenu.contains(target)) return;

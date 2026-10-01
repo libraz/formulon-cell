@@ -7,6 +7,14 @@ import type {
 import type { SheetView, SheetViewPatch } from '../commands/sheet-views.js';
 import { addrKey } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
+import {
+  clampNavigationAddr,
+  clampNavigationRange,
+  navigationBoundsFor,
+  navigationPolicyFor,
+  navigationSelectionBoundsFor,
+  syncNavigationViewport,
+} from '../interact/navigation-policy.js';
 import { sameAddr } from './pending-format.js';
 import type {
   CellFormat,
@@ -145,47 +153,141 @@ const clearPendingFormatOnMove = (s: State, nextActive: Addr): State['ui'] =>
     ? { ...s.ui, pendingFormat: null }
     : s.ui;
 
+/** Navigation is optional. Keep legacy mutator behavior until a policy is
+ * registered for the store. */
+const permittedAddr = (store: SpreadsheetStore, addr: Addr): Addr | null =>
+  navigationPolicyFor(store) ? clampNavigationAddr(store, addr) : addr;
+
+const permittedRange = (store: SpreadsheetStore, range: Range): Range | null =>
+  navigationPolicyFor(store) ? clampNavigationRange(store, range) : { ...range };
+
+const mergeRangeAt = (state: State, addr: Addr): Range | null => {
+  const key = addrKey(addr);
+  const anchorKey = state.merges.byCell.get(key) ?? key;
+  return state.merges.byAnchor.get(anchorKey) ?? null;
+};
+
+const selectionForAddr = (state: State, addr: Addr): { active: Addr; range: Range } => {
+  const merge = mergeRangeAt(state, addr);
+  if (!merge) {
+    return {
+      active: addr,
+      range: { sheet: addr.sheet, r0: addr.row, c0: addr.col, r1: addr.row, c1: addr.col },
+    };
+  }
+  return {
+    active: { sheet: merge.sheet, row: merge.r0, col: merge.c0 },
+    range: { ...merge },
+  };
+};
+
+const fullSheetRange = (sheet: number): Range => ({
+  sheet,
+  r0: 0,
+  c0: 0,
+  r1: 1_048_575,
+  c1: 16_383,
+});
+
+const boundedAxisRange = (
+  store: SpreadsheetStore,
+  axis: 'row' | 'col',
+  first: number,
+  last: number,
+): Range | null => {
+  const sheet = store.getState().data.sheetIndex;
+  if (!navigationPolicyFor(store)) {
+    return axis === 'row'
+      ? { sheet, r0: first, c0: 0, r1: last, c1: 16_383 }
+      : { sheet, r0: 0, c0: first, r1: 1_048_575, c1: last };
+  }
+  const bound = navigationSelectionBoundsFor(store);
+  const axisMin =
+    axis === 'row'
+      ? bound?.sheet === sheet
+        ? bound.r0
+        : 0
+      : bound?.sheet === sheet
+        ? bound.c0
+        : 0;
+  const axisMax =
+    axis === 'row'
+      ? bound?.sheet === sheet
+        ? bound.r1
+        : 1_048_575
+      : bound?.sheet === sheet
+        ? bound.c1
+        : 16_383;
+  const boundedFirst = Math.max(axisMin, Math.min(axisMax, first));
+  const boundedLast = Math.max(axisMin, Math.min(axisMax, last));
+  const range: Range =
+    axis === 'row'
+      ? {
+          sheet,
+          r0: Math.min(boundedFirst, boundedLast),
+          c0: bound?.sheet === sheet ? bound.c0 : 0,
+          r1: Math.max(boundedFirst, boundedLast),
+          c1: bound?.sheet === sheet ? bound.c1 : 16_383,
+        }
+      : {
+          sheet,
+          r0: bound?.sheet === sheet ? bound.r0 : 0,
+          c0: Math.min(boundedFirst, boundedLast),
+          r1: bound?.sheet === sheet ? bound.r1 : 1_048_575,
+          c1: Math.max(boundedFirst, boundedLast),
+        };
+  return permittedRange(store, range);
+};
+
 // Tiny mutation helpers — single source of truth for state shape changes.
 export const mutators = {
   setActive(store: SpreadsheetStore, addr: Addr): void {
-    store.setState((s) => ({
-      ...s,
-      ui: clearPendingFormatOnMove(s, addr),
-      selection: {
-        active: addr,
-        anchor: addr,
-        range: { sheet: addr.sheet, r0: addr.row, c0: addr.col, r1: addr.row, c1: addr.col },
-        extraRanges: [],
-      },
-    }));
+    const clicked = permittedAddr(store, addr);
+    if (!clicked) return;
+    store.setState((s) => {
+      const resolved = selectionForAddr(s, clicked);
+      const active = permittedAddr(store, resolved.active);
+      const range = permittedRange(store, resolved.range);
+      if (!active || !range) return s;
+      return {
+        ...s,
+        ui: clearPendingFormatOnMove(s, active),
+        selection: {
+          active,
+          anchor: active,
+          range,
+          extraRanges: [],
+        },
+      };
+    });
   },
 
   /** Append a single-cell range to the current multi-selection. The cell
    *  becomes the new active/anchor so a follow-up shift-click extends from it.
    *  No-op if `addr` is the same sheet/row/col as the current active cell. */
   addExtraCell(store: SpreadsheetStore, addr: Addr): void {
+    const clicked = permittedAddr(store, addr);
+    if (!clicked) return;
     store.setState((s) => {
+      const resolved = selectionForAddr(s, clicked);
+      const next = permittedAddr(store, resolved.active);
+      const nextRange = permittedRange(store, resolved.range);
+      if (!next || !nextRange) return s;
       const sameAsActive =
-        s.selection.active.sheet === addr.sheet &&
-        s.selection.active.row === addr.row &&
-        s.selection.active.col === addr.col;
+        s.selection.active.sheet === next.sheet &&
+        s.selection.active.row === next.row &&
+        s.selection.active.col === next.col;
       if (sameAsActive) return s;
       const prevPrimary = s.selection.range;
       // Demote the current primary range into extraRanges, promote the new
       // cell to primary so future shift-extends widen the new band.
       return {
         ...s,
-        ui: clearPendingFormatOnMove(s, addr),
+        ui: clearPendingFormatOnMove(s, next),
         selection: {
-          active: addr,
-          anchor: addr,
-          range: {
-            sheet: addr.sheet,
-            r0: addr.row,
-            c0: addr.col,
-            r1: addr.row,
-            c1: addr.col,
-          },
+          active: next,
+          anchor: next,
+          range: nextRange,
           extraRanges: [...(s.selection.extraRanges ?? []), prevPrimary],
         },
       };
@@ -196,23 +298,29 @@ export const mutators = {
    *  the previous primary into `extraRanges`. Used by Ctrl/Cmd row/column
    *  header selection. */
   addExtraRange(store: SpreadsheetStore, range: Range, active?: Addr): void {
+    const nextRange = permittedRange(store, range);
+    if (!nextRange) return;
+    const nextActive = permittedAddr(
+      store,
+      active ?? { sheet: nextRange.sheet, row: nextRange.r0, col: nextRange.c0 },
+    );
+    if (!nextActive) return;
     store.setState((s) => {
       const prevPrimary = s.selection.range;
       const sameAsPrimary =
-        prevPrimary.sheet === range.sheet &&
-        prevPrimary.r0 === range.r0 &&
-        prevPrimary.c0 === range.c0 &&
-        prevPrimary.r1 === range.r1 &&
-        prevPrimary.c1 === range.c1;
+        prevPrimary.sheet === nextRange.sheet &&
+        prevPrimary.r0 === nextRange.r0 &&
+        prevPrimary.c0 === nextRange.c0 &&
+        prevPrimary.r1 === nextRange.r1 &&
+        prevPrimary.c1 === nextRange.c1;
       if (sameAsPrimary) return s;
-      const nextActive = active ?? { sheet: range.sheet, row: range.r0, col: range.c0 };
       return {
         ...s,
         ui: clearPendingFormatOnMove(s, nextActive),
         selection: {
           active: nextActive,
           anchor: nextActive,
-          range: { ...range },
+          range: { ...nextRange },
           extraRanges: [...(s.selection.extraRanges ?? []), prevPrimary],
         },
       };
@@ -220,21 +328,28 @@ export const mutators = {
   },
 
   extendRangeTo(store: SpreadsheetStore, to: Addr): void {
+    const next = permittedAddr(store, to);
+    if (!next) return;
     store.setState((s) => {
-      const a = s.selection.anchor;
+      const a = permittedAddr(store, s.selection.anchor);
+      if (!a) return s;
+      const requested: Range = {
+        sheet: next.sheet,
+        r0: Math.min(a.row, next.row),
+        c0: Math.min(a.col, next.col),
+        r1: Math.max(a.row, next.row),
+        c1: Math.max(a.col, next.col),
+      };
+      const bounded = permittedRange(store, requested);
+      if (!bounded) return s;
       return {
         ...s,
-        ui: clearPendingFormatOnMove(s, to),
+        ui: clearPendingFormatOnMove(s, next),
         selection: {
           ...s.selection,
-          active: to,
-          range: {
-            sheet: to.sheet,
-            r0: Math.min(a.row, to.row),
-            c0: Math.min(a.col, to.col),
-            r1: Math.max(a.row, to.row),
-            c1: Math.max(a.col, to.col),
-          },
+          active: next,
+          anchor: a,
+          range: bounded,
         },
       };
     });
@@ -376,8 +491,15 @@ export const mutators = {
       ) {
         return s;
       }
-      const maxRowStart = Math.max(s.layout.freezeRows, MAX_ROW + 1 - rows);
-      const maxColStart = Math.max(s.layout.freezeCols, MAX_COL + 1 - cols);
+      const bounds = navigationBoundsFor(store);
+      const minRowStart = Math.max(s.layout.freezeRows, bounds?.r0 ?? 0);
+      const minColStart = Math.max(s.layout.freezeCols, bounds?.c0 ?? 0);
+      const maxRowStart = bounds
+        ? Math.max(minRowStart, bounds.r1 + 1 - rows)
+        : Math.max(minRowStart, MAX_ROW + 1 - rows);
+      const maxColStart = bounds
+        ? Math.max(minColStart, bounds.c1 + 1 - cols)
+        : Math.max(minColStart, MAX_COL + 1 - cols);
       return {
         ...s,
         viewport: {
@@ -385,8 +507,9 @@ export const mutators = {
           rowCount: rows,
           colCount: cols,
           widthPx: width,
-          rowStart: Math.min(maxRowStart, Math.max(s.layout.freezeRows, s.viewport.rowStart)),
-          colStart: Math.min(maxColStart, Math.max(s.layout.freezeCols, s.viewport.colStart)),
+          rowStart: Math.min(maxRowStart, Math.max(minRowStart, s.viewport.rowStart)),
+          colStart: Math.min(maxColStart, Math.max(minColStart, s.viewport.colStart)),
+          ...(bounds ? { navigationRange: { ...bounds } } : { navigationRange: undefined }),
         },
       };
     });
@@ -449,6 +572,8 @@ export const mutators = {
    *  via `replaceCells` after calling this. Resets selection to A1 on the
    *  new sheet. */
   setSheetIndex(store: SpreadsheetStore, idx: number): void {
+    const fixedRange = navigationBoundsFor(store);
+    if (fixedRange && fixedRange.sheet !== idx) return;
     store.setState((s) => ({
       ...s,
       data: { ...s.data, sheetIndex: idx, cells: new Map() },
@@ -459,6 +584,7 @@ export const mutators = {
         range: { sheet: idx, r0: 0, c0: 0, r1: 0, c1: 0 },
       },
     }));
+    syncNavigationViewport(store);
   },
 
   setColWidth(store: SpreadsheetStore, col: number, px: number): void {
@@ -480,13 +606,15 @@ export const mutators = {
   /** Set entire row/col selection without an active-cell address change.
    *  Used when the user clicks a row/col header. */
   selectRow(store: SpreadsheetStore, row: number): void {
+    const range = boundedAxisRange(store, 'row', row, row);
+    if (!range) return;
     store.setState((s) => ({
       ...s,
       ui: { ...s.ui, pendingFormat: null },
       selection: {
-        active: { sheet: s.data.sheetIndex, row, col: 0 },
-        anchor: { sheet: s.data.sheetIndex, row, col: 0 },
-        range: { sheet: s.data.sheetIndex, r0: row, c0: 0, r1: row, c1: 16383 },
+        active: { sheet: range.sheet, row: range.r0, col: range.c0 },
+        anchor: { sheet: range.sheet, row: range.r0, col: range.c0 },
+        range,
         extraRanges: [],
       },
     }));
@@ -495,26 +623,38 @@ export const mutators = {
   selectRows(store: SpreadsheetStore, anchorRow: number, activeRow: number): void {
     const r0 = Math.min(anchorRow, activeRow);
     const r1 = Math.max(anchorRow, activeRow);
+    const range = boundedAxisRange(store, 'row', r0, r1);
+    if (!range) return;
     store.setState((s) => ({
       ...s,
       ui: { ...s.ui, pendingFormat: null },
       selection: {
-        active: { sheet: s.data.sheetIndex, row: activeRow, col: 0 },
-        anchor: { sheet: s.data.sheetIndex, row: anchorRow, col: 0 },
-        range: { sheet: s.data.sheetIndex, r0, c0: 0, r1, c1: 16383 },
+        active: {
+          sheet: range.sheet,
+          row: Math.max(range.r0, Math.min(range.r1, activeRow)),
+          col: range.c0,
+        },
+        anchor: {
+          sheet: range.sheet,
+          row: Math.max(range.r0, Math.min(range.r1, anchorRow)),
+          col: range.c0,
+        },
+        range,
         extraRanges: [],
       },
     }));
   },
 
   selectCol(store: SpreadsheetStore, col: number): void {
+    const range = boundedAxisRange(store, 'col', col, col);
+    if (!range) return;
     store.setState((s) => ({
       ...s,
       ui: { ...s.ui, pendingFormat: null },
       selection: {
-        active: { sheet: s.data.sheetIndex, row: 0, col },
-        anchor: { sheet: s.data.sheetIndex, row: 0, col },
-        range: { sheet: s.data.sheetIndex, r0: 0, c0: col, r1: 1048575, c1: col },
+        active: { sheet: range.sheet, row: range.r0, col: range.c0 },
+        anchor: { sheet: range.sheet, row: range.r0, col: range.c0 },
+        range,
         extraRanges: [],
       },
     }));
@@ -523,26 +663,40 @@ export const mutators = {
   selectCols(store: SpreadsheetStore, anchorCol: number, activeCol: number): void {
     const c0 = Math.min(anchorCol, activeCol);
     const c1 = Math.max(anchorCol, activeCol);
+    const range = boundedAxisRange(store, 'col', c0, c1);
+    if (!range) return;
     store.setState((s) => ({
       ...s,
       ui: { ...s.ui, pendingFormat: null },
       selection: {
-        active: { sheet: s.data.sheetIndex, row: 0, col: activeCol },
-        anchor: { sheet: s.data.sheetIndex, row: 0, col: anchorCol },
-        range: { sheet: s.data.sheetIndex, r0: 0, c0, r1: 1048575, c1 },
+        active: {
+          sheet: range.sheet,
+          row: range.r0,
+          col: Math.max(range.c0, Math.min(range.c1, activeCol)),
+        },
+        anchor: {
+          sheet: range.sheet,
+          row: range.r0,
+          col: Math.max(range.c0, Math.min(range.c1, anchorCol)),
+        },
+        range,
         extraRanges: [],
       },
     }));
   },
 
   selectAll(store: SpreadsheetStore): void {
+    const requested =
+      navigationSelectionBoundsFor(store) ?? fullSheetRange(store.getState().data.sheetIndex);
+    const range = permittedRange(store, requested);
+    if (!range) return;
     store.setState((s) => ({
       ...s,
       ui: { ...s.ui, pendingFormat: null },
       selection: {
-        active: { sheet: s.data.sheetIndex, row: 0, col: 0 },
-        anchor: { sheet: s.data.sheetIndex, row: 0, col: 0 },
-        range: { sheet: s.data.sheetIndex, r0: 0, c0: 0, r1: 1048575, c1: 16383 },
+        active: { sheet: range.sheet, row: range.r0, col: range.c0 },
+        anchor: { sheet: range.sheet, row: range.r0, col: range.c0 },
+        range,
         extraRanges: [],
       },
     }));
@@ -552,10 +706,12 @@ export const mutators = {
    *  by merge-aware navigation to grow a shift-extend so it covers an entire
    *  merge rectangle. */
   setRange(store: SpreadsheetStore, range: Range): void {
+    const next = permittedRange(store, range);
+    if (!next) return;
     store.setState((s) => ({
       ...s,
       ui: { ...s.ui, pendingFormat: null },
-      selection: { ...s.selection, range: { ...range } },
+      selection: { ...s.selection, range: { ...next } },
     }));
   },
 
@@ -609,20 +765,21 @@ export const mutators = {
     const MAX_ROW = 1_048_575;
     const MAX_COL = 16_383;
     store.setState((s) => {
-      const maxRowStart = Math.max(s.layout.freezeRows, MAX_ROW + 1 - s.viewport.rowCount);
-      const maxColStart = Math.max(s.layout.freezeCols, MAX_COL + 1 - s.viewport.colCount);
+      const bounds = navigationBoundsFor(store);
+      const minRowStart = Math.max(s.layout.freezeRows, bounds?.r0 ?? 0);
+      const minColStart = Math.max(s.layout.freezeCols, bounds?.c0 ?? 0);
+      const maxRowStart = bounds
+        ? Math.max(minRowStart, bounds.r1 + 1 - s.viewport.rowCount)
+        : Math.max(minRowStart, MAX_ROW + 1 - s.viewport.rowCount);
+      const maxColStart = bounds
+        ? Math.max(minColStart, bounds.c1 + 1 - s.viewport.colCount)
+        : Math.max(minColStart, MAX_COL + 1 - s.viewport.colCount);
       return {
         ...s,
         viewport: {
           ...s.viewport,
-          rowStart: Math.min(
-            maxRowStart,
-            Math.max(s.layout.freezeRows, s.viewport.rowStart + dRow),
-          ),
-          colStart: Math.min(
-            maxColStart,
-            Math.max(s.layout.freezeCols, s.viewport.colStart + dCol),
-          ),
+          rowStart: Math.min(maxRowStart, Math.max(minRowStart, s.viewport.rowStart + dRow)),
+          colStart: Math.min(maxColStart, Math.max(minColStart, s.viewport.colStart + dCol)),
         },
       };
     });
@@ -642,6 +799,7 @@ export const mutators = {
         colStart: Math.max(fc, s.viewport.colStart),
       },
     }));
+    syncNavigationViewport(store);
   },
 
   /** Merge a range into a single cell. The top-left becomes the anchor;

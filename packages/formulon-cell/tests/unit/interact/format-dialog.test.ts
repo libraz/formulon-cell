@@ -52,6 +52,19 @@ const flushRaf = (): Promise<void> =>
     requestAnimationFrame(() => resolve());
   });
 
+const mergeWorkbook = (): WorkbookHandle =>
+  ({
+    capabilities: { merges: true },
+    engineClearMerges: () => true,
+    engineAddMerge: () => true,
+    setBlank: () => undefined,
+    setText: () => undefined,
+  }) as unknown as WorkbookHandle;
+
+const seedText = (store: SpreadsheetStore, row: number, col: number, value: string): void => {
+  mutators.setCell(store, { sheet: 0, row, col }, { kind: 'text', value });
+};
+
 describe('attachFormatDialog', () => {
   let host: HTMLElement;
   let store: SpreadsheetStore;
@@ -1720,6 +1733,51 @@ describe('attachFormatDialog', () => {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(store.getState().merges.byAnchor.size).toBe(0);
+    handle.detach();
+  });
+
+  it('warns before format or merge mutations and keeps the dialog open on cancel', () => {
+    setRange(store, 0, 0, 0, 1);
+    seedText(store, 0, 0, 'anchor');
+    seedText(store, 0, 1, 'other');
+    const handle = attachFormatDialog({ host, store, getWb: () => mergeWorkbook() });
+    handle.open('align');
+
+    const merge = document.querySelector<HTMLInputElement>('input[data-fc-check="mergeCells"]');
+    if (!merge) throw new Error('merge checkbox missing');
+    merge.checked = true;
+    merge.dispatchEvent(new Event('change', { bubbles: true }));
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+
+    expect(document.querySelector<HTMLElement>('.fc-fmtdlg')?.hidden).toBe(false);
+    expect(store.getState().merges.byAnchor.size).toBe(0);
+    expect(store.getState().format.formats.size).toBe(0);
+
+    const cancel = [
+      ...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button'),
+    ].find((button) => button.textContent === 'キャンセル');
+    cancel?.click();
+    expect(document.querySelector<HTMLElement>('.fc-fmtdlg')?.hidden).toBe(false);
+    expect(store.getState().merges.byAnchor.size).toBe(0);
+    expect(store.getState().format.formats.size).toBe(0);
+
+    handle.detach();
+  });
+
+  it('leaves mixed merges untouched when the checkbox is unchanged', () => {
+    setRange(store, 0, 0, 0, 3);
+    mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
+    mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 3 });
+    const handle = attachFormatDialog({ host, store });
+    handle.open('align');
+
+    const merge = document.querySelector<HTMLInputElement>('input[data-fc-check="mergeCells"]');
+    if (!merge) throw new Error('merge checkbox missing');
+    expect(merge.checked).toBe(false);
+    expect(merge.indeterminate).toBe(true);
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+
+    expect(store.getState().merges.byAnchor.size).toBe(2);
     handle.detach();
   });
 

@@ -7,6 +7,8 @@
 // stable, event-named API. That is what this emitter provides.
 //
 // Adapter packages (`-react`, `-vue`) consume this through `inst.on()`.
+
+import type { ChangeBatchResult } from './commands/interaction-policy.js';
 import type { Addr, CellValue, Range } from './engine/types.js';
 import type { ChangeEvent, WorkbookHandle } from './engine/workbook-handle.js';
 import type { Strings } from './i18n/strings.js';
@@ -48,6 +50,7 @@ export interface RecalcEvent {
 
 /** Map of event name → payload. Used as the lookup table for `inst.on()`. */
 export interface SpreadsheetEvents {
+  changeBatch: ChangeBatchResult;
   cellChange: CellChangeEvent;
   selectionChange: SelectionChangeEvent;
   workbookChange: WorkbookChangeEvent;

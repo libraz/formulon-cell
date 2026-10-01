@@ -1,8 +1,8 @@
-import type { FeatureFlags } from './features.js';
+import { ALL_FEATURE_IDS, type FeatureFlags } from './features.js';
 import { full, minimal, standard } from './presets.js';
 import type { ThemeName } from './types.js';
 
-export type SpreadsheetUiProfile = 'minimal' | 'standard' | 'excel365' | 'full';
+export type SpreadsheetUiProfile = 'embedded' | 'minimal' | 'standard' | 'excel365' | 'full';
 
 export interface SpreadsheetFeatureSwitches {
   ribbon?: boolean;
@@ -53,6 +53,8 @@ export interface ResolvedSpreadsheetUiOptions {
 
 const profileFlags = (profile: SpreadsheetUiProfile): FeatureFlags => {
   switch (profile) {
+    case 'embedded':
+      return Object.fromEntries(ALL_FEATURE_IDS.map((id) => [id, false])) as FeatureFlags;
     case 'minimal':
       return minimal();
     case 'standard':
@@ -111,8 +113,8 @@ export function resolveSpreadsheetUiOptions(
     profile,
     theme: opts.theme ?? 'paper',
     lockTheme: opts.lockTheme ?? false,
-    ribbon: switches.ribbon ?? true,
-    print: switches.print ?? true,
+    ribbon: switches.ribbon ?? profile !== 'embedded',
+    print: switches.print ?? profile !== 'embedded',
     features,
   };
 }

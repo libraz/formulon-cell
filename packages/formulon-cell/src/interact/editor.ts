@@ -1,5 +1,6 @@
 import { coerceInput, writeCoerced, writeInputValidated } from '../commands/coerce-input.js';
 import { replaceFormulaSelectionWithF9Preview } from '../commands/f9-preview.js';
+import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { stepWithMerge } from '../commands/merge.js';
 import { dblClickRange, extractRefs, rotateRefAt, shiftFormulaRefs } from '../commands/refs.js';
 import { addrKey } from '../engine/address.js';
@@ -14,6 +15,7 @@ import {
   type AutocompleteLabels,
   attachAutocomplete,
 } from './autocomplete.js';
+import { nextTabStop } from './navigation-policy.js';
 
 const MAX_ROW = 1_048_575;
 const MAX_COL = 16_383;
@@ -31,6 +33,14 @@ const syncEditorRefs = (store: SpreadsheetStore, text: string): void => {
   }));
   mutators.setEditorRefs(store, refs);
 };
+
+const inputOperation = (raw: string, forceText = false): 'valueEdit' | 'formulaEdit' =>
+  !forceText && raw.trimStart().startsWith('=') ? 'formulaEdit' : 'valueEdit';
+
+const policyRejection = (operation: string): { severity: 'stop'; message: string } => ({
+  severity: 'stop',
+  message: `The ${operation} operation is not permitted for this cell.`,
+});
 
 export interface EditorDeps {
   host: HTMLElement;
@@ -116,6 +126,19 @@ export class InlineEditor {
   begin(seed: string): void {
     const s = this.deps.store.getState();
     const a = s.selection.active;
+    const controller = interactionControllerFor(this.deps.store);
+    if (controller && controller.policy !== undefined) {
+      const operation = inputOperation(seed);
+      const permission = controller.canExecute({
+        operation,
+        origin: 'editor',
+        effects: [{ kind: 'cells', cells: [a] }],
+      });
+      if (!permission.allowed) {
+        this.deps.onValidation?.(policyRejection(operation));
+        return;
+      }
+    }
     this.editingAddr = a;
     // Putting a cell into edit mode cancels copy mode — the marquee only
     // survives navigation and paste-family commands.
@@ -219,6 +242,46 @@ export class InlineEditor {
     const raw = this.input.value;
     const a = this.editingAddr;
     const fmt = formatWithPending(this.deps.store.getState(), a);
+    const controller = interactionControllerFor(this.deps.store);
+    if (controller && controller.policy !== undefined) {
+      const operation = inputOperation(raw, fmt?.numFmt?.kind === 'text');
+      let result: ReturnType<typeof controller.execute>;
+      try {
+        result = controller.execute({
+          type: 'cellBatch',
+          operation,
+          origin: 'editor',
+          changes: [{ addr: a, input: raw }],
+          denied: 'reject',
+        });
+      } catch (err) {
+        console.warn('formulon-cell: restricted editor write failed', err);
+        result = { status: 'rejected', applied: [], rejected: [], revision: 0 };
+      }
+      if (result.status === 'rejected') {
+        this.input.focus();
+        this.input.select();
+        this.deps.onValidation?.(policyRejection(operation));
+        return;
+      }
+      mutators.setPendingFormat(this.deps.store, null);
+      this.deps.onAfterCommit();
+      this.cancel();
+      const s = this.deps.store.getState();
+      const selectionDisabled = controller.policy?.selection === false;
+      if (!selectionDisabled && advance === 'down') {
+        mutators.setActive(
+          this.deps.store,
+          stepWithMerge(s, s.selection.active, 1, 0, MAX_ROW, MAX_COL),
+        );
+      } else if (!selectionDisabled && advance === 'right') {
+        mutators.setActive(
+          this.deps.store,
+          stepWithMerge(s, s.selection.active, 0, 1, MAX_ROW, MAX_COL),
+        );
+      }
+      return;
+    }
     let rejected = false;
     let rejectedOutcome: { severity: 'stop'; title?: string; message: string } | null = null;
     try {
@@ -287,6 +350,55 @@ export class InlineEditor {
     if (totalCells > MAX_MULTI_COMMIT_CELLS) return;
     const sheet = s.data.sheetIndex;
     const isFormula = raw.startsWith('=');
+    const controller = interactionControllerFor(this.deps.store);
+    if (controller && controller.policy !== undefined) {
+      const changes: { addr: Addr; input: string }[] = [];
+      let hasFormula = false;
+      for (const r of ranges) {
+        for (let row = r.r0; row <= r.r1; row += 1) {
+          for (let col = r.c0; col <= r.c1; col += 1) {
+            const target = { sheet, row, col };
+            const fmt =
+              target.sheet === anchor.sheet &&
+              target.row === anchor.row &&
+              target.col === anchor.col
+                ? formatWithPending(this.deps.store.getState(), target)
+                : s.format.formats.get(addrKey(target));
+            const forceText = fmt?.numFmt?.kind === 'text';
+            const input =
+              isFormula && !forceText
+                ? shiftFormulaRefs(raw, row - anchor.row, col - anchor.col)
+                : raw;
+            hasFormula ||= isFormula && !forceText;
+            changes.push({ addr: target, input });
+          }
+        }
+      }
+      const operation = hasFormula ? 'formulaEdit' : 'valueEdit';
+      let result: ReturnType<typeof controller.execute>;
+      try {
+        result = controller.execute({
+          type: 'cellBatch',
+          operation,
+          origin: 'editor',
+          changes,
+          denied: 'reject',
+        });
+      } catch (err) {
+        console.warn('formulon-cell: restricted editor fill failed', err);
+        result = { status: 'rejected', applied: [], rejected: [], revision: 0 };
+      }
+      if (result.status === 'rejected') {
+        input.focus();
+        input.select();
+        this.deps.onValidation?.(policyRejection(operation));
+        return;
+      }
+      mutators.setPendingFormat(this.deps.store, null);
+      this.deps.onAfterCommit();
+      this.cancel();
+      return;
+    }
     // Validated write that mirrors the anchor's stop-rejection handling. Returns
     // true when a `stop` rule blocked the entry (the whole fill aborts) so DV
     // bites on every filled cell, not just the anchor.
@@ -421,9 +533,27 @@ export class InlineEditor {
       e.stopPropagation();
       this.cancel();
     } else if (e.key === 'Tab') {
-      e.preventDefault();
       e.stopPropagation();
-      this.commit(e.shiftKey ? 'none' : 'right');
+      const controller = interactionControllerFor(this.deps.store);
+      const restricted = controller?.policy !== undefined;
+      const selectionDisabled = controller?.policy?.selection === false;
+      if (selectionDisabled) {
+        this.commit('none');
+        return;
+      }
+      const next =
+        restricted && this.editingAddr
+          ? nextTabStop(this.deps.store, this.editingAddr, e.shiftKey)
+          : null;
+      // At the configured boundary, commit the current cell and let the
+      // browser continue focus traversal. A component must not trap Tab.
+      if (restricted && next === null) {
+        this.commit('none');
+        return;
+      }
+      e.preventDefault();
+      this.commit(restricted ? 'none' : e.shiftKey ? 'none' : 'right');
+      if (restricted && next && !this.isActive()) mutators.setActive(this.deps.store, next);
     } else if (e.key === 'F4' && this.input) {
       // Rotate the cell ref under the cursor: A1 → $A$1 → A$1 → $A1 → A1
       e.preventDefault();

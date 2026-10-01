@@ -17,6 +17,8 @@ import { clampPanelToViewport } from './overlay-position.js';
 
 export interface FilterDropdownDeps {
   store: SpreadsheetStore;
+  /** Host whose themed overlay portal owns the dropdown. */
+  host?: HTMLElement;
   history?: History | null;
   strings?: Strings;
   /** Locale used to format the checklist labels (dates, currency). Defaults to
@@ -62,6 +64,10 @@ const findColumnCriteria = (
 export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHandle {
   const strings = deps.strings ?? defaultStrings;
   const t = strings.filterDropdown;
+  const ownerDocument = deps.host?.ownerDocument ?? document;
+  const frame = ownerDocument.defaultView
+    ? ownerDocument.defaultView.requestAnimationFrame.bind(ownerDocument.defaultView)
+    : requestAnimationFrame;
   let root: HTMLDivElement | null = null;
   let activeRange: Range | null = null;
   let activeCol = 0;
@@ -74,8 +80,8 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     root = null;
     activeRange = null;
     activeHidden = new Set();
-    document.removeEventListener('mousedown', onDocMouseDown, true);
-    document.removeEventListener('keydown', onDocKey, true);
+    ownerDocument.removeEventListener('mousedown', onDocMouseDown, true);
+    ownerDocument.removeEventListener('keydown', onDocKey, true);
     restoreFocus?.focus({ preventScroll: true });
     restoreFocus = null;
   };
@@ -122,9 +128,10 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
 
   const open = (range: Range, col: number, anchor: { x: number; y: number; h: number }): void => {
     close();
+    const activeElement = ownerDocument.activeElement;
     restoreFocus =
-      document.activeElement instanceof HTMLElement && document.activeElement !== document.body
-        ? document.activeElement
+      activeElement?.nodeType === 1 && activeElement !== ownerDocument.body
+        ? (activeElement as HTMLElement)
         : null;
     activeRange = range;
     activeCol = col;
@@ -139,7 +146,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     );
     activeHidden = hidden;
 
-    const r = document.createElement('div');
+    const r = ownerDocument.createElement('div');
     r.className = 'fc-filter-dropdown';
     r.style.position = 'fixed';
     r.style.left = `${anchor.x}px`;
@@ -148,16 +155,16 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     r.setAttribute('aria-modal', 'false');
     r.setAttribute('aria-label', t.title);
 
-    const search = document.createElement('input');
+    const search = ownerDocument.createElement('input');
     search.className = 'fc-filter-dropdown__search';
     search.type = 'search';
     search.placeholder = t.searchPlaceholder;
     search.setAttribute('aria-label', t.searchPlaceholder);
     search.spellcheck = false;
 
-    const conditionPanel = document.createElement('div');
+    const conditionPanel = ownerDocument.createElement('div');
     conditionPanel.className = 'fc-filter-dropdown__condition';
-    const conditionLabel = document.createElement('label');
+    const conditionLabel = ownerDocument.createElement('label');
     conditionLabel.className = 'fc-filter-dropdown__condition-label';
     conditionLabel.textContent = t.condition;
     const conditionOptions: Array<{ value: '' | ConditionFilterOp; label: string }> = [
@@ -176,7 +183,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       className: 'fc-filter-dropdown__condition-op',
     });
     if (activeCriteria?.condition) conditionSelect.value = activeCriteria.condition.op;
-    const conditionInput = document.createElement('input');
+    const conditionInput = ownerDocument.createElement('input');
     conditionInput.type = 'text';
     conditionInput.className = 'fc-filter-dropdown__condition-value';
     conditionInput.placeholder = t.conditionValue;
@@ -185,7 +192,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     conditionLabel.appendChild(conditionSelect);
     conditionPanel.append(conditionLabel, conditionInput);
 
-    const list = document.createElement('div');
+    const list = ownerDocument.createElement('div');
     list.className = 'fc-filter-dropdown__list';
     list.setAttribute('role', 'group');
     list.setAttribute('aria-label', t.title);
@@ -222,9 +229,9 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       list.innerHTML = '';
       const f = filter.toLowerCase();
       // (Select All) header
-      const allRow = document.createElement('label');
+      const allRow = ownerDocument.createElement('label');
       allRow.className = 'fc-filter-dropdown__row fc-filter-dropdown__row--all';
-      const allCb = document.createElement('input');
+      const allCb = ownerDocument.createElement('input');
       allCb.type = 'checkbox';
       allCb.checked = distinct.every((v) => !hidden.has(v.key));
       allCb.indeterminate = !allCb.checked && distinct.some((v) => !hidden.has(v.key));
@@ -236,9 +243,9 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
           for (const v of distinct) hidden.add(v.key);
         }
         renderRows(search.value);
-        requestAnimationFrame(() => focusCheckbox(0));
+        frame(() => focusCheckbox(0));
       });
-      const allLabel = document.createElement('span');
+      const allLabel = ownerDocument.createElement('span');
       allLabel.textContent = t.selectAll;
       allRow.append(allCb, allLabel);
       list.appendChild(allRow);
@@ -246,9 +253,9 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       for (const item of distinct) {
         const display = item.key === '' ? t.blanks : item.label;
         if (f && !display.toLowerCase().includes(f)) continue;
-        const row = document.createElement('label');
+        const row = ownerDocument.createElement('label');
         row.className = 'fc-filter-dropdown__row';
-        const cb = document.createElement('input');
+        const cb = ownerDocument.createElement('input');
         cb.type = 'checkbox';
         cb.value = item.key;
         cb.checked = !hidden.has(item.key);
@@ -260,7 +267,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
           allCb.checked = distinct.every((vv) => !hidden.has(vv.key));
           allCb.indeterminate = !allCb.checked && distinct.some((vv) => !hidden.has(vv.key));
         });
-        const text = document.createElement('span');
+        const text = ownerDocument.createElement('span');
         text.textContent = display;
         row.append(cb, text);
         list.appendChild(row);
@@ -278,7 +285,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
       }
     });
 
-    const actions = document.createElement('div');
+    const actions = ownerDocument.createElement('div');
     actions.className = 'fc-filter-dropdown__actions';
     const apply = createFilterDropdownActionButton('fc-filter-dropdown__apply', t.apply);
     apply.addEventListener('click', () => applyActiveFilter());
@@ -293,10 +300,7 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     actions.append(clear, apply);
 
     r.append(conditionPanel, search, list, actions);
-    // Attach to the first .fc-host's portal — the dropdown deps carry no host
-    // element, so this mirrors the previous first-host token borrowing.
-    const host = document.querySelector('.fc-host');
-    overlayPortalFor(host).appendChild(r);
+    overlayPortalFor(deps.host).appendChild(r);
     root = r;
     const position = clampPanelToViewport(r, anchor.x, anchor.y + anchor.h, {
       pad: 4,
@@ -306,10 +310,10 @@ export function attachFilterDropdown(deps: FilterDropdownDeps): FilterDropdownHa
     r.style.left = `${position.x}px`;
     r.style.top = `${position.y}px`;
 
-    requestAnimationFrame(() => search.focus());
+    frame(() => search.focus());
 
-    document.addEventListener('mousedown', onDocMouseDown, true);
-    document.addEventListener('keydown', onDocKey, true);
+    ownerDocument.addEventListener('mousedown', onDocMouseDown, true);
+    ownerDocument.addEventListener('keydown', onDocKey, true);
   };
 
   return {

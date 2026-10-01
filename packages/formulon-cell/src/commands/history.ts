@@ -20,6 +20,7 @@ import type {
   PivotTableStyleAssignment,
   TableOverlay,
 } from './format-as-table.js';
+import type { OperationIntent } from './interaction-policy.js';
 
 const LIMIT = 200;
 
@@ -31,7 +32,15 @@ export interface HistoryEntry {
   /** Reapply this logical command to the *current* selection. Unlike `redo`,
    *  this must not restore the original before/after snapshot. */
   repeat?: () => void;
+  /** The logical command that produced this entry. Restricted instances use
+   * this metadata to re-authorize undo and redo against the current policy. */
+  intent?: OperationIntent;
+  /** The logical command represented by the inverse replay. */
+  inverseIntent?: OperationIntent;
 }
+
+export type HistoryDirection = 'undo' | 'redo';
+export type HistoryGuard = (entry: HistoryEntry, direction: HistoryDirection) => boolean;
 
 /**
  * Single source of truth for undoable mutations. Cell writes (workbook),
@@ -49,6 +58,7 @@ export class History {
   private txnEntries: HistoryEntry[] = [];
   private listeners = new Set<() => void>();
   private lastRepeat: (() => void) | null = null;
+  private guard: HistoryGuard | null = null;
 
   push(entry: HistoryEntry): void {
     if (this.replaying) return;
@@ -99,28 +109,32 @@ export class History {
   }
 
   undo(): boolean {
-    const e = this.undoStack.pop();
+    const e = this.undoStack.at(-1);
     if (!e) return false;
+    if (this.guard && !this.guard(e, 'undo')) return false;
     this.replaying = true;
     try {
       e.undo();
     } finally {
       this.replaying = false;
     }
+    this.undoStack.pop();
     this.redoStack.push(e);
     this.notify();
     return true;
   }
 
   redo(): boolean {
-    const e = this.redoStack.pop();
+    const e = this.redoStack.at(-1);
     if (!e) return false;
+    if (this.guard && !this.guard(e, 'redo')) return false;
     this.replaying = true;
     try {
       e.redo();
     } finally {
       this.replaying = false;
     }
+    this.redoStack.pop();
     this.undoStack.push(e);
     this.notify();
     return true;
@@ -138,6 +152,12 @@ export class History {
    *  material undo snapshot (for example a pending format on a blank cell). */
   setRepeat(repeat: (() => void) | null): void {
     this.lastRepeat = repeat;
+  }
+
+  /** Install an authorization guard for undo/redo. The stack is moved only
+   * after the guard and replay both succeed. */
+  setGuard(guard: HistoryGuard | null): void {
+    this.guard = guard;
   }
 
   /** Repeat the latest command only when it explicitly supplied a
@@ -165,7 +185,17 @@ export class History {
   }
 
   private notify(): void {
-    for (const l of this.listeners) l();
+    // History mutations are already committed when observers run. A stale
+    // renderer must not make push/undo/redo throw after the stack moved, and
+    // one bad observer must not prevent the remaining observers from seeing
+    // the same transition.
+    for (const l of [...this.listeners]) {
+      try {
+        l();
+      } catch {
+        // Observers are advisory; the history state is authoritative.
+      }
+    }
   }
 }
 

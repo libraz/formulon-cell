@@ -9,8 +9,6 @@ import type { ConditionalPresetAction } from '../commands/conditional-format.js'
 import {
   addSheet,
   applyConditionalPresetAction,
-  applyMerge,
-  applyUnmerge,
   autoSum,
   deleteCells,
   deleteCols,
@@ -21,22 +19,19 @@ import {
   insertCells,
   insertCols,
   insertRows,
-  mergeWillLoseData,
   mutators,
   recordConditionalRulesChange,
-  recordFormatChange,
   removeSheet,
-  setAlign,
   setFreezePanes,
   showColsAroundSelection,
   showRowsAroundSelection,
 } from '../index.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
-import { confirmMergeLoseData } from '../toolbar/dialogs/merge-confirm.js';
+import { applyMergeAction, type MergeAction } from '../toolbar/merge-action.js';
 
 export type AutoSumAction = AutoSumFunction | 'MORE';
 
-export type MergeAction = 'mergeCenter' | 'mergeAcross' | 'mergeCells' | 'unmergeCells';
+export type { MergeAction };
 
 export type FreezeAction = 'none' | 'topRow' | 'firstColumn' | 'panes';
 
@@ -145,37 +140,15 @@ export const handleMergeAction = async (
   action: MergeAction,
 ): Promise<void> => {
   if (!instance) return;
-  const r = instance.store.getState().selection.range;
-  if (action === 'unmergeCells') {
-    applyUnmerge(instance.store, instance.workbook, instance.history, r);
-    return;
-  }
-  const state = instance.store.getState();
-  if (mergeWillLoseData(state, r) && !(await confirmMergeLoseData(instance.i18n.strings, state, r)))
-    return;
-  if (action === 'mergeAcross') {
-    instance.history.begin();
-    try {
-      for (let row = r.r0; row <= r.r1; row += 1) {
-        applyMerge(instance.store, instance.workbook, instance.history, {
-          sheet: r.sheet,
-          r0: row,
-          c0: r.c0,
-          r1: row,
-          c1: r.c1,
-        });
-      }
-    } finally {
-      instance.history.end();
-    }
-    return;
-  }
-  applyMerge(instance.store, instance.workbook, instance.history, r);
-  if (action === 'mergeCenter') {
-    recordFormatChange(instance.history, instance.store, () =>
-      setAlign(instance.store.getState(), instance.store, 'center'),
-    );
-  }
+  await applyMergeAction(
+    {
+      store: instance.store,
+      workbook: instance.workbook,
+      history: instance.history,
+      strings: instance.i18n.strings,
+    },
+    action,
+  );
 };
 
 export const handleFreezeAction = (

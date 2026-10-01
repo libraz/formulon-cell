@@ -4,33 +4,39 @@ import { appendDialogActions } from './dialog-shell.js';
 import { overlayPortalFor } from './overlay-portal.js';
 
 export interface InsertCopiedCellsDialogDeps {
+  host: HTMLElement;
   strings: Strings;
   onSubmit(direction: InsertCopiedCellsDirection): void;
 }
 
 export function openInsertCopiedCellsDialog(deps: InsertCopiedCellsDialogDeps): void {
   const t = deps.strings.insertCopiedCellsDialog;
-  document.querySelector('.fc-insertcopied')?.remove();
+  const ownerDocument = deps.host.ownerDocument;
+  const portal = overlayPortalFor(deps.host);
+  portal.querySelector('.fc-insertcopied')?.remove();
 
-  const root = document.createElement('div');
+  const root = ownerDocument.createElement('div');
   root.className = 'fc-insertcopied';
   root.setAttribute('role', 'dialog');
   root.setAttribute('aria-modal', 'true');
   root.setAttribute('aria-label', t.title);
 
-  const panel = document.createElement('div');
+  const panel = ownerDocument.createElement('div');
   panel.className = 'fc-insertcopied__panel';
 
-  const title = document.createElement('div');
+  const title = ownerDocument.createElement('div');
   title.className = 'fc-insertcopied__title';
   title.textContent = t.title;
 
-  const choices = document.createElement('div');
+  const choices = ownerDocument.createElement('div');
   choices.className = 'fc-insertcopied__choices';
   const name = `fc-insertcopied-${Math.random().toString(36).slice(2)}`;
-  choices.append(radio(name, 'right', t.shiftRight, false), radio(name, 'down', t.shiftDown, true));
+  choices.append(
+    radio(ownerDocument, name, 'right', t.shiftRight, false),
+    radio(ownerDocument, name, 'down', t.shiftDown, true),
+  );
 
-  const footer = document.createElement('div');
+  const footer = ownerDocument.createElement('div');
   footer.className = 'fc-insertcopied__footer';
   const { cancelBtn: cancel, okBtn: ok } = appendDialogActions(footer, {
     cancelLabel: t.cancel,
@@ -60,27 +66,27 @@ export function openInsertCopiedCellsDialog(deps: InsertCopiedCellsDialogDeps): 
 
   panel.append(title, choices, footer);
   root.append(panel);
-  // The deps carry no host element, so anchor on the first .fc-host.
-  overlayPortalFor(document.querySelector('.fc-host')).appendChild(root);
+  portal.appendChild(root);
   ok.focus({ preventScroll: true });
 }
 
 function radio(
+  ownerDocument: Document,
   name: string,
   value: InsertCopiedCellsDirection,
   label: string,
   checked: boolean,
 ): HTMLLabelElement {
-  const row = document.createElement('label');
+  const row = ownerDocument.createElement('label');
   row.className = 'fc-insertcopied__choice';
-  const input = document.createElement('input');
+  const input = ownerDocument.createElement('input');
   input.type = 'radio';
   input.name = name;
   input.value = value;
   input.checked = checked;
-  const mark = document.createElement('span');
+  const mark = ownerDocument.createElement('span');
   mark.className = 'fc-insertcopied__radio';
-  const text = document.createElement('span');
+  const text = ownerDocument.createElement('span');
   text.textContent = label;
   row.append(input, mark, text);
   return row;

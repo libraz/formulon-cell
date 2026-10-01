@@ -1,4 +1,5 @@
 import type { History } from '../commands/history.js';
+import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
 import { formatCellForEdit } from '../engine/edit-seed.js';
 import type { ChangeEvent, WorkbookHandle } from '../engine/workbook-handle.js';
@@ -9,6 +10,10 @@ import type { Strings } from '../i18n/strings.js';
 import { attachAutoFillOptions } from '../interact/auto-fill-options.js';
 import { attachClipboard } from '../interact/clipboard.js';
 import { attachContextMenu } from '../interact/context-menu.js';
+import type {
+  ContextMenuInteractionController,
+  ContextMenuOptions,
+} from '../interact/context-menu-options.js';
 import { InlineEditor } from '../interact/editor.js';
 import { attachFindReplace } from '../interact/find-replace.js';
 import { attachKeyboard } from '../interact/keyboard.js';
@@ -43,6 +48,7 @@ export interface EngineBinding {
 }
 
 interface AttachEngineBindingInput {
+  contextMenuOptions?: ContextMenuOptions;
   emitter: SpreadsheetEmitter;
   flags: FeatureFlags;
   formulaRegistry: FormulaRegistry;
@@ -77,6 +83,7 @@ export const WB_REGISTRY_IDS = [
 
 export function attachEngineBinding(input: AttachEngineBindingInput): EngineBinding {
   const {
+    contextMenuOptions,
     emitter,
     flags,
     formulaRegistry,
@@ -215,6 +222,8 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         store,
         wb,
         strings,
+        options: contextMenuOptions,
+        interactionController: interactionControllerFor(store) as ContextMenuInteractionController,
         history,
         onAfterCommit: refreshCells,
         onClipboardShortcut: clipboardH ? (kind) => clipboardH.runShortcut(kind) : undefined,
