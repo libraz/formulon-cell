@@ -4,6 +4,24 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
+## Unreleased
+
+### Changed
+
+- Update the engine dependency to `@libraz/formulon` 0.12.0 and adapt status-bearing accessor results. The default single-threaded WASM loads without COOP/COEP headers.
+- Use Days grouping with a configurable interval for pivots, register pivot number formats as engine format IDs, and align pivot data fields and filters with the engine API.
+- Split conditional-format formula types, parsing, and evaluation from rule rendering.
+
+### Fixed
+
+- Retry WASM initialization after a failed load.
+- Render React children after asynchronous spreadsheet mount and support object or array selectors in `useSpreadsheet`.
+- Reset Vue selection and locale state and release subscriptions when the spreadsheet instance is cleared.
+- Preserve conditional-format icon floors, data-bar direction, and gradient settings across workbook load and save. Align bar geometry and gradients with the sheet and rule direction.
+- Keep engine result status properties out of public array results and suppress late mount error callbacks after React unmounts.
+- Preserve strict icon comparisons and scale signed data bars within each side of the zero axis.
+- Preserve pivot decimal formats during hydration, update row and column field order during creation and editing, and name all supported aggregations consistently.
+
 ## 0.6.0 — 2026-08-23
 
 ### Added
