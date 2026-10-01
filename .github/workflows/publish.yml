@@ -20,9 +20,9 @@ jobs:
           node-version: '22'
           package-manager-cache: false
 
-      - run: npm install -g npm@11.5.1
+      - run: npm install -g npm@12.2.0
       - run: corepack enable
-      - run: corepack prepare yarn@4.18.0 --activate
+      - run: corepack prepare yarn@4.18.1 --activate
 
       - uses: actions/cache@v6
         with:

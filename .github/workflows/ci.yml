@@ -43,7 +43,7 @@ jobs:
           package-manager-cache: false
 
       - run: corepack enable
-      - run: corepack prepare yarn@4.18.0 --activate
+      - run: corepack prepare yarn@4.18.1 --activate
 
       - uses: actions/cache@v6
         with:
