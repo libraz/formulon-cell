@@ -326,6 +326,7 @@ export async function runTableOrganizationScenario(page: Page): Promise<void> {
   await test.step('insert cells downward and restore the marker', async () => {
     await sp.goTo('C3');
     await sp.insertRowsOrColumns('cells');
+    await page.locator('.fc-cellshift__button--primary').click();
     await expectValue(sp, 'C3', { kind: 'blank' });
     await expectValue(sp, 'C4', { kind: 'text', value: 'keep' });
   });

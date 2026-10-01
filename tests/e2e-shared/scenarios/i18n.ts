@@ -431,8 +431,9 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
   await findSelectMenu.locator('[data-find-select="go-to-special"]').click();
   const goToDialog = page.getByRole('dialog', { name: '選択オプション' });
   await expect(goToDialog).toBeVisible();
+  // The direct-reference row belongs to plain Go To; special mode hides it.
+  await expect(goToDialog.getByText('参照先', { exact: true }).first()).toBeHidden();
   for (const label of [
-    '参照先',
     '範囲',
     'アクティブなシート',
     '現在の選択範囲',
@@ -873,7 +874,8 @@ export async function runLocaleBootScenario(page: Page): Promise<void> {
 
   const lang = await page.evaluate(() => document.documentElement.lang);
   expect(lang === 'ja' || lang === '').toBe(true);
-  expect(await sp.isCrossOriginIsolated()).toBe(true);
+  // These demos serve no COOP/COEP headers; the default serial engine needs none.
+  expect(await sp.isCrossOriginIsolated()).toBe(false);
 
   const enToggle = page.getByRole('button', { name: 'EN', exact: true });
   if ((await enToggle.count()) > 0) {
