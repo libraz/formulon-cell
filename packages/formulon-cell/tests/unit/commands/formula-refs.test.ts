@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  type AxisBandMoveContext,
+  adjustFormulaForAxisBandMove,
   adjustFormulaForCellBandShift,
   adjustFormulaForCutPasteMove,
   adjustFormulaForRowColEdit,
@@ -270,6 +272,232 @@ describe('adjustFormulaForCellBandShift — insert/delete cells', () => {
     const affected = { r0: 2, c0: 0, r1: 1048575, c1: 0 };
     expect(adjustFormulaForCellBandShift('=SUM(A3:A20)', affected, 'up', -1)).toBe('=SUM(A3:A19)');
     expect(adjustFormulaForCellBandShift('=SUM(A1:A3)', affected, 'up', -1)).toBe('=SUM(A1:A2)');
+  });
+});
+
+describe('adjustFormulaForAxisBandMove — stable row/column permutations', () => {
+  const moveDToB = {
+    axis: 'col',
+    sheet: 0,
+    sourceStart: 3,
+    count: 1,
+    insertionAt: 1,
+    formulaSheet: 0,
+    sheetNames: ['Source'],
+  } as const;
+
+  it('rewrites scalar, mixed absolute, and whole-column references', () => {
+    expect(adjustFormulaForAxisBandMove('=D1+$D$1+D:D+$D:$D', moveDToB)).toBe('=B1+$B$1+B:B+$B:$B');
+    expect(adjustFormulaForAxisBandMove('=B1+C1+E1+B:B+C:C+E:E', moveDToB)).toBe(
+      '=C1+D1+E1+C:C+D:D+E:E',
+    );
+  });
+
+  it('matches Excel range boundary behavior for a moved column', () => {
+    const input = [
+      '=SUM(B1:D1)+SUM(C1:E1)+SUM(A1:C1)+SUM(B:D)+SUM(C:E)+SUM(A:C)+',
+      'SUM(B1:B3)+SUM(A1:F1)+SUM(D1:F1)+SUM(C1:D1)',
+    ].join('');
+    const expected = [
+      '=SUM(C1:D1)+SUM(D1:E1)+SUM(A1:D1)+SUM(C:D)+SUM(D:E)+SUM(A:D)+',
+      'SUM(C1:C3)+SUM(A1:F1)+SUM(B1:F1)+SUM(D1:D1)',
+    ].join('');
+    expect(adjustFormulaForAxisBandMove(input, moveDToB)).toBe(expected);
+  });
+
+  it.each([
+    [
+      'move B:B to insert E',
+      {
+        axis: 'col',
+        sheet: 0,
+        sourceStart: 1,
+        count: 1,
+        insertionAt: 4,
+        formulaSheet: 0,
+        sheetNames: ['Source'],
+      },
+      [
+        'SUM(B1:C1)',
+        'SUM(B1:E1)',
+        'SUM(A1:B1)',
+        'SUM(B:C)',
+        'SUM(B:E)',
+        'SUM(A:B)',
+        'SUM(D1:D3)',
+        'SUM(A1:F1)',
+        'SUM(C1:F1)',
+        'SUM(B1:C1)',
+      ],
+    ],
+    [
+      'move B:C to insert F',
+      {
+        axis: 'col',
+        sheet: 0,
+        sourceStart: 1,
+        count: 2,
+        insertionAt: 5,
+        formulaSheet: 0,
+        sheetNames: ['Source'],
+      },
+      [
+        'SUM(B1:B1)',
+        'SUM(B1:C1)',
+        'SUM(A1:E1)',
+        'SUM(B:B)',
+        'SUM(B:C)',
+        'SUM(A:E)',
+        'SUM(D1:D3)',
+        'SUM(A1:F1)',
+        'SUM(B1:F1)',
+        'SUM(B1:B1)',
+      ],
+    ],
+  ])('matches Excel range oracle: %s', (_name, context, expectedParts) => {
+    const inputParts = [
+      'SUM(B1:D1)',
+      'SUM(C1:E1)',
+      'SUM(A1:C1)',
+      'SUM(B:D)',
+      'SUM(C:E)',
+      'SUM(A:C)',
+      'SUM(B1:B3)',
+      'SUM(A1:F1)',
+      'SUM(D1:F1)',
+      'SUM(C1:D1)',
+    ];
+    const input = `=${inputParts.join('+')}`;
+    const expected = `=${(expectedParts as string[]).join('+')}`;
+    expect(adjustFormulaForAxisBandMove(input, context as AxisBandMoveContext)).toBe(expected);
+  });
+
+  it('expands a range whose upper endpoint is before or in the moved band', () => {
+    const input = '=SUM(A1:B1)+SUM(A:B)';
+    const moves = [
+      [
+        {
+          axis: 'col',
+          sheet: 0,
+          sourceStart: 3,
+          count: 1,
+          insertionAt: 1,
+          formulaSheet: 0,
+          sheetNames: ['Source'],
+        },
+        '=SUM(A1:C1)+SUM(A:C)',
+      ],
+      [
+        {
+          axis: 'col',
+          sheet: 0,
+          sourceStart: 1,
+          count: 1,
+          insertionAt: 4,
+          formulaSheet: 0,
+          sheetNames: ['Source'],
+        },
+        '=SUM(A1:D1)+SUM(A:D)',
+      ],
+      [
+        {
+          axis: 'col',
+          sheet: 0,
+          sourceStart: 1,
+          count: 2,
+          insertionAt: 5,
+          formulaSheet: 0,
+          sheetNames: ['Source'],
+        },
+        '=SUM(A1:D1)+SUM(A:D)',
+      ],
+    ] as const;
+    for (const [context, expected] of moves) {
+      expect(adjustFormulaForAxisBandMove(input, context)).toBe(expected);
+    }
+  });
+
+  it('resolves all-sheet qualified refs while leaving other sheets untouched', () => {
+    const context = {
+      ...moveDToB,
+      formulaSheet: 1,
+      sheetNames: ['Source', 'Target'],
+    } as const;
+    expect(adjustFormulaForAxisBandMove('=Source!$D$1+Source!D:D+Target!D1+D1', context)).toBe(
+      '=Source!$B$1+Source!B:B+Target!D1+D1',
+    );
+  });
+
+  it('moves rows with the same stable mapping and preserves whole-column refs', () => {
+    const context = {
+      axis: 'row',
+      sheet: 0,
+      sourceStart: 3,
+      count: 1,
+      insertionAt: 1,
+      formulaSheet: 0,
+      sheetNames: ['Source'],
+    } as const;
+    expect(adjustFormulaForAxisBandMove('=A4+$A$4+4:4+A:A', context)).toBe('=A2+$A$2+2:2+A:A');
+  });
+
+  it('keeps terminal references valid and shifts multi-row bands', () => {
+    const columnContext = {
+      axis: 'col',
+      sheet: 0,
+      sourceStart: 1,
+      count: 2,
+      insertionAt: 5,
+      formulaSheet: 0,
+      sheetNames: ['Source'],
+    } as const;
+    expect(adjustFormulaForAxisBandMove('=B1+C1+D1+E1+F1', columnContext)).toBe('=D1+E1+B1+C1+F1');
+    expect(adjustFormulaForAxisBandMove('=XFD1+SUM(XFC:XFD)', columnContext)).toBe(
+      '=XFD1+SUM(XFC:XFD)',
+    );
+    const rowContext = {
+      axis: 'row',
+      sheet: 0,
+      sourceStart: 1,
+      count: 2,
+      insertionAt: 5,
+      formulaSheet: 0,
+      sheetNames: ['Source'],
+    } as const;
+    expect(adjustFormulaForAxisBandMove('=A2+A3+A4+A5+A6', rowContext)).toBe('=A4+A5+A2+A3+A6');
+    expect(adjustFormulaForAxisBandMove('=A1048576+SUM(A1048575:A1048576)', rowContext)).toBe(
+      '=A1048576+SUM(A1048575:A1048576)',
+    );
+  });
+
+  it('moves whole-axis cut references and leaves the other axis alone', () => {
+    const fullRow = { r0: 0, c0: 0, r1: 0, c1: 16383 };
+    expect(adjustFormulaForCutPasteMove('=1:1+$1:$1+A:A', fullRow, { r0: 4, c0: 0 })).toBe(
+      '=5:5+$5:$5+A:A',
+    );
+    const fullCol = { r0: 0, c0: 1, r1: 1048575, c1: 1 };
+    expect(adjustFormulaForCutPasteMove('=B:B+$B:$B+1:1', fullCol, { r0: 0, c0: 4 })).toBe(
+      '=E:E+$E:$E+1:1',
+    );
+  });
+
+  it('qualifies moved whole-axis refs when a full band crosses sheets', () => {
+    const context = {
+      sourceSheet: 0,
+      destinationSheet: 1,
+      formulaSheet: 0,
+      outputSheet: 1,
+      sheetNames: ['Source', 'Target'],
+    } as const;
+    const fullRow = { r0: 0, c0: 0, r1: 0, c1: 16383 };
+    expect(
+      adjustFormulaForCutPasteMove(
+        '=1:1+Source!1:1+Source!A:A',
+        fullRow,
+        { r0: 4, c0: 0 },
+        context,
+      ),
+    ).toBe('=5:5+5:5+Source!A:A');
   });
 });
 

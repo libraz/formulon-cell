@@ -5,7 +5,11 @@ import { type CellFormat, mutators, type SpreadsheetStore, type State } from '..
 import { recordCommentChange } from '../comment.js';
 import { adjustFormulaForCutPasteMove } from '../formula-refs.js';
 import type { History } from '../history.js';
-import { recordFormatChange, recordMergesChangeWithEngine } from '../history.js';
+import {
+  recordFormatChange,
+  recordLayoutChangeWithEngine,
+  recordMergesChangeWithEngine,
+} from '../history.js';
 import { isCellWritable } from '../protection.js';
 import { shiftFormulaRefs } from '../refs.js';
 import type { ClipboardCell, ClipboardSnapshot } from './snapshot.js';
@@ -98,6 +102,17 @@ const MAX_ROW = 1_048_575;
 const MAX_COL = 16_383;
 const MAX_PASTE_CELLS = 1_000_000;
 
+type BandAxis = 'row' | 'column';
+
+export interface MaterializedPasteCell {
+  row: number;
+  col: number;
+  sourceRow: number;
+  sourceCol: number;
+  sourceRowIndex: number;
+  sourceColIndex: number;
+}
+
 const rangesIntersect = (a: Range, b: Range): boolean =>
   a.sheet === b.sheet && !(a.r1 < b.r0 || a.r0 > b.r1 || a.c1 < b.c0 || a.c0 > b.c1);
 
@@ -114,6 +129,175 @@ const sameRange = (left: Range, right: Range): boolean =>
   left.c0 === right.c0 &&
   left.r1 === right.r1 &&
   left.c1 === right.c1;
+
+const logicalRangeFor = (snap: ClipboardSnapshot): Range => snap.logicalRange ?? snap.range;
+
+const bandAxisFor = (range: Range): BandAxis | null => {
+  if (range.r0 === 0 && range.r1 >= MAX_ROW) return 'column';
+  if (range.c0 === 0 && range.c1 >= MAX_COL) return 'row';
+  return null;
+};
+
+const normalizedSelection = (state: State): Range => {
+  const selected = state.selection.range;
+  return {
+    sheet: selected.sheet,
+    r0: Math.min(selected.r0, selected.r1),
+    c0: Math.min(selected.c0, selected.c1),
+    r1: Math.max(selected.r0, selected.r1),
+    c1: Math.max(selected.c0, selected.c1),
+  };
+};
+
+/** Expand a whole-row/-column source to the logical destination band. Excel
+ * accepts a single anchor cell only on the first row/column of the sheet;
+ * another row/column is outside the band and is rejected. */
+const destinationBandFor = (
+  state: State,
+  snap: ClipboardSnapshot,
+  transpose: boolean,
+): { range: Range; axis: BandAxis } | null => {
+  if (transpose) return null;
+  const logical = logicalRangeFor(snap);
+  const axis = bandAxisFor(logical);
+  if (!axis) return null;
+  const selected = normalizedSelection(state);
+  if (selected.sheet !== state.selection.active.sheet) return null;
+  if (axis === 'column') {
+    const firstRowOnly = selected.r0 === 0 && selected.r1 === 0;
+    const fullRows = selected.r0 === 0 && selected.r1 >= MAX_ROW;
+    if (!firstRowOnly && !fullRows) return null;
+    const selectedWidth = selected.c1 - selected.c0 + 1;
+    const logicalWidth = logical.c1 - logical.c0 + 1;
+    const width =
+      snap.mode === 'copy' && selectedWidth >= logicalWidth && selectedWidth % logicalWidth === 0
+        ? selectedWidth
+        : logicalWidth;
+    if (selected.c0 + width - 1 > MAX_COL) return null;
+    return {
+      axis,
+      range: {
+        sheet: selected.sheet,
+        r0: 0,
+        c0: selected.c0,
+        r1: MAX_ROW,
+        c1: selected.c0 + width - 1,
+      },
+    };
+  }
+  const firstColOnly = selected.c0 === 0 && selected.c1 === 0;
+  const fullCols = selected.c0 === 0 && selected.c1 >= MAX_COL;
+  if (!firstColOnly && !fullCols) return null;
+  const selectedHeight = selected.r1 - selected.r0 + 1;
+  const logicalHeight = logical.r1 - logical.r0 + 1;
+  const height =
+    snap.mode === 'copy' && selectedHeight >= logicalHeight && selectedHeight % logicalHeight === 0
+      ? selectedHeight
+      : logicalHeight;
+  if (selected.r0 + height - 1 > MAX_ROW) return null;
+  return {
+    axis,
+    range: {
+      sheet: selected.sheet,
+      r0: selected.r0,
+      c0: 0,
+      r1: selected.r0 + height - 1,
+      c1: MAX_COL,
+    },
+  };
+};
+
+const bandMaterializedCellCount = (
+  snap: ClipboardSnapshot,
+  destination: Range,
+  axis: BandAxis,
+): number =>
+  snap.rows *
+  snap.cols *
+  Math.ceil(
+    (axis === 'column'
+      ? destination.c1 - destination.c0 + 1
+      : destination.r1 - destination.r0 + 1) /
+      (axis === 'column'
+        ? logicalRangeFor(snap).c1 - logicalRangeFor(snap).c0 + 1
+        : logicalRangeFor(snap).r1 - logicalRangeFor(snap).r0 + 1),
+  );
+
+/** Enumerate only the bounded source payload projected onto a whole-band
+ * destination. The full logical axis is intentionally never materialized. */
+export function materializedPasteCells(
+  snap: ClipboardSnapshot,
+  destination: Range,
+  transpose = false,
+): MaterializedPasteCell[] | null {
+  if (transpose) return null;
+  const logical = logicalRangeFor(snap);
+  const axis = bandAxisFor(logical);
+  if (!axis || bandAxisFor(destination) !== axis) return null;
+  if (bandMaterializedCellCount(snap, destination, axis) > MAX_PASTE_CELLS) return null;
+  const out: MaterializedPasteCell[] = [];
+  const seen = new Set<string>();
+  const add = (row: number, col: number, sourceRowIndex: number, sourceColIndex: number): void => {
+    if (
+      row < destination.r0 ||
+      row > destination.r1 ||
+      col < destination.c0 ||
+      col > destination.c1
+    ) {
+      return;
+    }
+    const key = `${row}:${col}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({
+      row,
+      col,
+      sourceRow: snap.range.r0 + sourceRowIndex,
+      sourceCol: snap.range.c0 + sourceColIndex,
+      sourceRowIndex,
+      sourceColIndex,
+    });
+  };
+  if (axis === 'column') {
+    const logicalWidth = logical.c1 - logical.c0 + 1;
+    for (let baseCol = destination.c0; baseCol <= destination.c1; baseCol += logicalWidth) {
+      for (let sr = 0; sr < snap.rows; sr += 1) {
+        for (let sc = 0; sc < snap.cols; sc += 1) {
+          add(
+            destination.r0 + snap.range.r0 + sr - logical.r0,
+            baseCol + snap.range.c0 + sc - logical.c0,
+            sr,
+            sc,
+          );
+        }
+      }
+    }
+  } else {
+    const logicalHeight = logical.r1 - logical.r0 + 1;
+    for (let baseRow = destination.r0; baseRow <= destination.r1; baseRow += logicalHeight) {
+      for (let sr = 0; sr < snap.rows; sr += 1) {
+        for (let sc = 0; sc < snap.cols; sc += 1) {
+          add(
+            baseRow + snap.range.r0 + sr - logical.r0,
+            destination.c0 + snap.range.c0 + sc - logical.c0,
+            sr,
+            sc,
+          );
+        }
+      }
+    }
+  }
+  return out;
+}
+
+const bandProtectionAllows = (state: State, range: Range): boolean => {
+  if (!state.protection.protectedSheets.has(range.sheet)) return true;
+  // A whole-band operation is atomic. For a protected sheet an explicit
+  // allowed-edit interval must cover the complete band; sparse unlocked cells
+  // cannot prove that the omitted cells are writable without enumerating the
+  // million-cell axis.
+  return state.protection.allowedEditRanges.some((entry) => rangeContains(entry.range, range));
+};
 
 const removeIntersectingMerges = (
   byAnchor: Map<string, Range>,
@@ -152,6 +336,60 @@ const translateMerges = (
   transpose: boolean,
 ): Range[] | null => {
   const out: Range[] = [];
+  const logical = logicalRangeFor(snap);
+  const bandAxis = !transpose ? bandAxisFor(logical) : null;
+  if (bandAxis && bandAxisFor(destination) === bandAxis) {
+    const addTranslated = (
+      baseRow: number,
+      baseCol: number,
+      merge: NonNullable<ClipboardSnapshot['merges']>[number],
+    ): boolean => {
+      if (
+        !Number.isInteger(merge.r0) ||
+        !Number.isInteger(merge.c0) ||
+        !Number.isInteger(merge.r1) ||
+        !Number.isInteger(merge.c1) ||
+        merge.r0 < 0 ||
+        merge.c0 < 0 ||
+        merge.r1 < merge.r0 ||
+        merge.c1 < merge.c0 ||
+        merge.r1 >= snap.rows ||
+        merge.c1 >= snap.cols ||
+        (merge.sheet !== undefined && merge.sheet !== snap.range.sheet)
+      ) {
+        return false;
+      }
+      const sourceRow0 = snap.range.r0 + merge.r0;
+      const sourceCol0 = snap.range.c0 + merge.c0;
+      const sourceRow1 = snap.range.r0 + merge.r1;
+      const sourceCol1 = snap.range.c0 + merge.c1;
+      const translated: Range = {
+        sheet: destination.sheet,
+        r0: baseRow + sourceRow0 - logical.r0,
+        c0: baseCol + sourceCol0 - logical.c0,
+        r1: baseRow + sourceRow1 - logical.r0,
+        c1: baseCol + sourceCol1 - logical.c0,
+      };
+      if (rangeContains(destination, translated)) out.push(translated);
+      return true;
+    };
+    if (bandAxis === 'column') {
+      const logicalWidth = logical.c1 - logical.c0 + 1;
+      for (let baseCol = destination.c0; baseCol <= destination.c1; baseCol += logicalWidth) {
+        for (const merge of snap.merges ?? []) {
+          if (!addTranslated(destination.r0, baseCol, merge)) return null;
+        }
+      }
+    } else {
+      const logicalHeight = logical.r1 - logical.r0 + 1;
+      for (let baseRow = destination.r0; baseRow <= destination.r1; baseRow += logicalHeight) {
+        for (const merge of snap.merges ?? []) {
+          if (!addTranslated(baseRow, destination.c0, merge)) return null;
+        }
+      }
+    }
+    return out;
+  }
   const tileRows = transpose ? snap.cols : snap.rows;
   const tileCols = transpose ? snap.rows : snap.cols;
   for (let tileRow = destination.r0; tileRow <= destination.r1; tileRow += tileRows) {
@@ -221,6 +459,13 @@ export function resolvePasteDestination(
   if (!Number.isInteger(tileRows) || !Number.isInteger(tileCols)) return null;
   if (tileRows <= 0 || tileCols <= 0) return null;
 
+  const band = destinationBandFor(state, snap, transpose);
+  if (bandAxisFor(logicalRangeFor(snap)) && !band) return null;
+  if (band) {
+    if (bandMaterializedCellCount(snap, band.range, band.axis) > MAX_PASTE_CELLS) return null;
+    return band.range;
+  }
+
   const active = state.selection.active;
   let origin = { row: active.row, col: active.col };
   let rows = tileRows;
@@ -266,9 +511,18 @@ const preflight = (
   what: PasteWhat,
   transpose: boolean,
 ): { destination: Range; translatedMerges: Range[]; preservedMerges: Range[] } | null => {
-  for (let row = destination.r0; row <= destination.r1; row += 1) {
-    for (let col = destination.c0; col <= destination.c1; col += 1) {
-      if (!isCellWritable(state, { sheet: destination.sheet, row, col })) return null;
+  const band = bandAxisFor(logicalRangeFor(snap));
+  const bandDestination = band && bandAxisFor(destination) === band;
+  if (bandDestination) {
+    // Do not enumerate a million-cell whole-band range. The operation is
+    // atomic on a protected sheet and therefore requires one allowed-edit
+    // interval covering the complete band.
+    if (!bandProtectionAllows(state, destination)) return null;
+  } else {
+    for (let row = destination.r0; row <= destination.r1; row += 1) {
+      for (let col = destination.c0; col <= destination.c1; col += 1) {
+        if (!isCellWritable(state, { sheet: destination.sheet, row, col })) return null;
+      }
     }
   }
 
@@ -277,9 +531,14 @@ const preflight = (
     return null;
   }
   if (snap.mode === 'cut') {
-    for (let row = source.r0; row <= source.r1; row += 1) {
-      for (let col = source.c0; col <= source.c1; col += 1) {
-        if (!isCellWritable(state, { sheet: source.sheet, row, col })) return null;
+    const sourceLogical = logicalRangeFor(snap);
+    if (bandAxisFor(sourceLogical)) {
+      if (!bandProtectionAllows(state, sourceLogical)) return null;
+    } else {
+      for (let row = source.r0; row <= source.r1; row += 1) {
+        for (let col = source.c0; col <= source.c1; col += 1) {
+          if (!isCellWritable(state, { sheet: source.sheet, row, col })) return null;
+        }
       }
     }
   }
@@ -320,6 +579,50 @@ const commentText = (format: CellFormat | undefined): string | null =>
 const commentAuthor = (format: CellFormat | undefined): string | null =>
   commentText(format) && typeof format?.commentAuthor === 'string' ? format.commentAuthor : null;
 
+/** Bring engine-only notes into the store before a format/comment history
+ * snapshot is captured. The engine is authoritative for persisted comments,
+ * while the store remains the source used by the history helpers. */
+const hydrateEngineComments = (
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  ranges: readonly Range[],
+): void => {
+  if (!wb.capabilities.commentsEnumerable || ranges.length === 0) return;
+  const sheets = new Set(ranges.map((range) => range.sheet));
+  const comments: Array<{ sheet: number; row: number; col: number; author: string; text: string }> =
+    [];
+  for (const sheet of sheets) {
+    for (const comment of wb.getComments(sheet)) {
+      if (!comment.text) continue;
+      if (
+        ranges.some(
+          (range) =>
+            range.sheet === sheet &&
+            comment.row >= range.r0 &&
+            comment.row <= range.r1 &&
+            comment.col >= range.c0 &&
+            comment.col <= range.c1,
+        )
+      ) {
+        comments.push({ sheet, ...comment });
+      }
+    }
+  }
+  if (comments.length === 0) return;
+  store.setState((s) => {
+    const formats = new Map(s.format.formats);
+    for (const comment of comments) {
+      const key = addrKey({ sheet: comment.sheet, row: comment.row, col: comment.col });
+      formats.set(key, {
+        ...formats.get(key),
+        comment: comment.text,
+        commentAuthor: comment.author || undefined,
+      });
+    }
+    return { ...s, format: { ...s.format, formats } };
+  });
+};
+
 const formatWithoutComment = (format: CellFormat | undefined): CellFormat | null => {
   if (!format) return null;
   const next = { ...format };
@@ -338,12 +641,33 @@ const formatCommentsOnly = (format: CellFormat | undefined): CellFormat | null =
 const clearSourceFormats = (store: SpreadsheetStore, source: Range): void => {
   store.setState((s) => {
     const formats = new Map(s.format.formats);
-    for (let row = source.r0; row <= source.r1; row += 1) {
-      for (let col = source.c0; col <= source.c1; col += 1) {
-        const key = addrKey({ sheet: source.sheet, row, col });
-        const comments = formatCommentsOnly(formats.get(key));
-        if (comments) formats.set(key, comments);
-        else formats.delete(key);
+    const area = (source.r1 - source.r0 + 1) * (source.c1 - source.c0 + 1);
+    const clear = (key: string): void => {
+      const comments = formatCommentsOnly(formats.get(key));
+      if (comments) formats.set(key, comments);
+      else formats.delete(key);
+    };
+    if (area > MAX_PASTE_CELLS) {
+      for (const key of formats.keys()) {
+        const [sheetRaw, rowRaw, colRaw] = key.split(':');
+        const sheet = Number(sheetRaw);
+        const row = Number(rowRaw);
+        const col = Number(colRaw);
+        if (
+          sheet === source.sheet &&
+          row >= source.r0 &&
+          row <= source.r1 &&
+          col >= source.c0 &&
+          col <= source.c1
+        ) {
+          clear(key);
+        }
+      }
+    } else {
+      for (let row = source.r0; row <= source.r1; row += 1) {
+        for (let col = source.c0; col <= source.c1; col += 1) {
+          clear(addrKey({ sheet: source.sheet, row, col }));
+        }
       }
     }
     return { ...s, format: { ...s.format, formats } };
@@ -418,24 +742,22 @@ export function pasteSpecial(
     return null;
   }
 
-  const current = store.getState();
-  const resolvedDestination = resolvePasteDestination(current, snap, opt.transpose);
+  const beforeHydration = store.getState();
+  const resolvedDestination = resolvePasteDestination(beforeHydration, snap, opt.transpose);
   if (!resolvedDestination) return null;
+  const sourceLogical = logicalRangeFor(snap);
+  hydrateEngineComments(store, wb, [
+    resolvedDestination,
+    ...(snap.mode === 'cut' ? [sourceLogical] : []),
+  ]);
+  const current = store.getState();
   const checked = preflight(current, snap, resolvedDestination, opt.what, opt.transpose);
   if (!checked) return null;
 
   // Excel treats cutting and pasting back onto the exact source rectangle as a
   // no-op while consuming the cut marquee. In particular, do not clear and
   // rewrite the source, which would manufacture an unnecessary undo entry.
-  if (
-    snap.mode === 'cut' &&
-    !opt.transpose &&
-    snap.range.sheet === checked.destination.sheet &&
-    snap.range.r0 === checked.destination.r0 &&
-    snap.range.c0 === checked.destination.c0 &&
-    snap.range.r1 === checked.destination.r1 &&
-    snap.range.c1 === checked.destination.c1
-  ) {
+  if (snap.mode === 'cut' && !opt.transpose && sameRange(sourceLogical, checked.destination)) {
     consumeCutMarquee(store);
     return { writtenRange: checked.destination, skippedNonFiniteOperations: 0 };
   }
@@ -453,6 +775,79 @@ export function pasteSpecial(
   const source = snap.range;
   const sourceCut = snap.mode === 'cut';
   const sheetNames = sourceCut ? sheetNamesFor(wb) : [];
+  const bandAxis = bandAxisFor(sourceLogical);
+  const bandDestination = bandAxis !== null && bandAxisFor(destination) === bandAxis;
+  const bandCells = bandDestination
+    ? materializedPasteCells(snap, destination, opt.transpose)
+    : null;
+  if (bandDestination && !bandCells) return null;
+  const bandTargetKeys = bandCells
+    ? new Set(bandCells.map((cell) => addrKey({ sheet, row: cell.row, col: cell.col })))
+    : null;
+
+  // Whole-band copies overwrite the sparse tail of the destination even
+  // though the logical range is too large to enumerate. Blank-source and
+  // operation variants preserve that tail, matching Paste Special semantics.
+  if (bandCells && bandTargetKeys) {
+    const clearValues =
+      !opt.skipBlanks &&
+      opt.operation === 'none' &&
+      (wantsValues(opt.what) || wantsFormulas(opt.what));
+    if (clearValues) {
+      const stale = Array.from(wb.physicalCells(sheet)).filter(
+        (cell) =>
+          cell.addr.row >= destination.r0 &&
+          cell.addr.row <= destination.r1 &&
+          cell.addr.col >= destination.c0 &&
+          cell.addr.col <= destination.c1 &&
+          !bandTargetKeys.has(addrKey(cell.addr)) &&
+          (cell.formula !== null || cell.value.kind !== 'blank') &&
+          isCellWritable(current, cell.addr),
+      );
+      wb.withBatchedRecalc(() => {
+        for (const cell of stale) wb.setBlank(cell.addr);
+      });
+    }
+    if (!opt.skipBlanks && wantsFormats(opt.what)) {
+      for (const [key, format] of current.format.formats) {
+        const [formatSheetRaw, rowRaw, colRaw] = key.split(':');
+        const formatSheet = Number(formatSheetRaw);
+        const row = Number(rowRaw);
+        const col = Number(colRaw);
+        if (
+          formatSheet === sheet &&
+          row >= destination.r0 &&
+          row <= destination.r1 &&
+          col >= destination.c0 &&
+          col <= destination.c1 &&
+          !bandTargetKeys.has(key) &&
+          Object.keys(format).length > 0
+        ) {
+          formatWrites.push({ key, format: null });
+          if (opt.what === 'all' && commentText(format) !== null) {
+            commentWrites.push({
+              addr: { sheet, row, col },
+              text: null,
+              author: null,
+            });
+          }
+        }
+      }
+    }
+    if (!opt.skipBlanks && opt.what === 'all') {
+      for (const comment of wb.getComments(sheet)) {
+        const addr = { sheet, row: comment.row, col: comment.col };
+        if (
+          comment.row >= destination.r0 &&
+          comment.row <= destination.r1 &&
+          comment.col >= destination.c0 &&
+          comment.col <= destination.c1
+        ) {
+          commentWrites.push({ addr, text: null, author: null });
+        }
+      }
+    }
+  }
 
   // Remove source/destination merges before writing cells. This is especially
   // important for overlapping cuts: the captured snapshot remains available
@@ -464,7 +859,7 @@ export function pasteSpecial(
     list.push(range);
     removalsBySheet.set(range.sheet, list);
   };
-  if (sourceCut) addRemoval(source);
+  if (sourceCut) addRemoval(sourceLogical);
   if (applyTopology && checked.preservedMerges.length === 0) addRemoval(destination);
   for (const [mergeSheet, removals] of removalsBySheet) {
     recordMergesChangeWithEngine(history, store, wb, mergeSheet, () => {
@@ -473,114 +868,124 @@ export function pasteSpecial(
   }
 
   if (sourceCut) {
-    clearSourceValues(wb, source);
-    recordFormatChange(history, store, () => clearSourceFormats(store, source));
+    clearSourceValues(wb, sourceLogical);
+    recordFormatChange(history, store, () => clearSourceFormats(store, sourceLogical));
   }
 
   wb.withBatchedRecalc(() => {
-    for (let dr = 0; dr < destRows; dr += 1) {
-      for (let dc = 0; dc < destCols; dc += 1) {
-        const row = destination.r0 + dr;
-        const col = destination.c0 + dc;
-        const preservedBody = checked.preservedMerges.some(
-          (merge) =>
-            row >= merge.r0 &&
-            row <= merge.r1 &&
-            col >= merge.c0 &&
-            col <= merge.c1 &&
-            (row !== merge.r0 || col !== merge.c0),
-        );
-        if (preservedBody) continue;
-        const sr = opt.transpose ? dc % snap.rows : dr % snap.rows;
-        const sc = opt.transpose ? dr % snap.cols : dc % snap.cols;
-        const src = snap.cells[sr]?.[sc];
-        if (!src) continue;
-        const isBlankSrc = src.value.kind === 'blank' && !src.formula && !src.format;
-        if (opt.skipBlanks && isBlankSrc) continue;
+    const applyCell = (row: number, col: number, sr: number, sc: number): void => {
+      const preservedBody = checked.preservedMerges.some(
+        (merge) =>
+          row >= merge.r0 &&
+          row <= merge.r1 &&
+          col >= merge.c0 &&
+          col <= merge.c1 &&
+          (row !== merge.r0 || col !== merge.c0),
+      );
+      if (preservedBody) return;
+      const src = snap.cells[sr]?.[sc];
+      if (!src) return;
+      const isBlankSrc = src.value.kind === 'blank' && !src.formula && !src.format;
+      if (opt.skipBlanks && isBlankSrc) return;
 
-        const addr: Addr = { sheet, row, col };
-        // Sheet protection — silently skip locked destinations (spreadsheet parity).
-        if (!isCellWritable(state, addr)) continue;
+      const addr: Addr = { sheet, row, col };
+      // Sheet protection — silently skip locked destinations (spreadsheet parity).
+      if (!isCellWritable(state, addr)) return;
 
-        if (opt.what === 'all') {
-          const text = commentText(src.format);
-          const existing = commentText(state.format.formats.get(addrKey(addr)));
-          if (text !== null || existing !== null) {
-            commentWrites.push({ addr, text, author: commentAuthor(src.format) });
-          }
+      if (opt.what === 'all') {
+        const text = commentText(src.format);
+        const existing = commentText(state.format.formats.get(addrKey(addr)));
+        if (text !== null || existing !== null) {
+          commentWrites.push({ addr, text, author: commentAuthor(src.format) });
         }
+      }
 
-        // Layer 1: values / formulas.
-        // A Paste Special arithmetic operation always combines by VALUE. When one
-        // is active it takes precedence over formula-pasting, using the source's
-        // computed number even if the source cell is a formula — otherwise an
-        // "Add" over a formula source silently pastes the formula and drops the
-        // operation. Formats-only pastes carry no value, so they never
-        // operate.
-        const operating =
-          opt.operation !== 'none' && (wantsValues(opt.what) || wantsFormulas(opt.what));
-        const shouldPasteFormula = Boolean(src.formula && wantsFormulas(opt.what) && !operating);
-        if (operating) {
-          const srcNum = numericValue(src);
-          if (srcNum !== null) {
-            const dest = existingNumeric(state, sheet, row, col);
-            const result = combine(opt.operation, dest, srcNum);
-            if (Number.isFinite(result)) {
-              wb.setNumber(addr, result);
-            } else {
-              wb.setError(addr, errorCodeForNonFiniteOperation(opt.operation));
-              skippedNonFiniteOperations += 1;
-            }
-          }
-          // Non-numeric source cells leave the destination unchanged (parity).
-        } else if (shouldPasteFormula && src.formula) {
-          // Cut moves cells and keeps references bound to the cells' original
-          // sheets. The contextual transform also follows references that are
-          // inside the moved block to their new destination coordinates. Copy
-          // re-anchors relative refs by the paste offset.
-          if (snap.mode === 'cut') {
-            wb.setFormula(
-              addr,
-              adjustFormulaForCutPasteMove(
-                src.formula,
-                {
-                  r0: source.r0,
-                  c0: source.c0,
-                  r1: source.r1,
-                  c1: source.c1,
-                },
-                { r0: destination.r0, c0: destination.c0 },
-                {
-                  sourceSheet: source.sheet,
-                  destinationSheet: destination.sheet,
-                  formulaSheet: source.sheet,
-                  outputSheet: destination.sheet,
-                  sheetNames,
-                },
-              ),
-            );
+      // Layer 1: values / formulas.
+      // A Paste Special arithmetic operation always combines by VALUE. When one
+      // is active it takes precedence over formula-pasting, using the source's
+      // computed number even if the source cell is a formula — otherwise an
+      // "Add" over a formula source silently pastes the formula and drops the
+      // operation. Formats-only pastes carry no value, so they never
+      // operate.
+      const operating =
+        opt.operation !== 'none' && (wantsValues(opt.what) || wantsFormulas(opt.what));
+      const shouldPasteFormula = Boolean(src.formula && wantsFormulas(opt.what) && !operating);
+      if (operating) {
+        const srcNum = numericValue(src);
+        if (srcNum !== null) {
+          const dest = existingNumeric(state, sheet, row, col);
+          const result = combine(opt.operation, dest, srcNum);
+          if (Number.isFinite(result)) {
+            wb.setNumber(addr, result);
           } else {
-            const sourceRow = snap.range.r0 + sr;
-            const sourceCol = snap.range.c0 + sc;
-            wb.setFormula(addr, shiftFormulaRefs(src.formula, row - sourceRow, col - sourceCol));
+            wb.setError(addr, errorCodeForNonFiniteOperation(opt.operation));
+            skippedNonFiniteOperations += 1;
           }
-        } else if (wantsValues(opt.what) || wantsFormulas(opt.what)) {
-          writeClipboardValue(wb, addr, src);
         }
+        // Non-numeric source cells leave the destination unchanged (parity).
+      } else if (shouldPasteFormula && src.formula) {
+        // Cut moves cells and keeps references bound to the cells' original
+        // sheets. The contextual transform also follows references that are
+        // inside the moved block to their new destination coordinates. Copy
+        // re-anchors relative refs by the paste offset.
+        if (snap.mode === 'cut') {
+          wb.setFormula(
+            addr,
+            adjustFormulaForCutPasteMove(
+              src.formula,
+              {
+                r0: sourceLogical.r0,
+                c0: sourceLogical.c0,
+                r1: sourceLogical.r1,
+                c1: sourceLogical.c1,
+              },
+              { r0: destination.r0, c0: destination.c0 },
+              {
+                sourceSheet: source.sheet,
+                destinationSheet: destination.sheet,
+                formulaSheet: source.sheet,
+                outputSheet: destination.sheet,
+                sheetNames,
+              },
+            ),
+          );
+        } else {
+          const sourceRow = snap.range.r0 + sr;
+          const sourceCol = snap.range.c0 + sc;
+          wb.setFormula(addr, shiftFormulaRefs(src.formula, row - sourceRow, col - sourceCol));
+        }
+      } else if (wantsValues(opt.what) || wantsFormulas(opt.what)) {
+        writeClipboardValue(wb, addr, src);
+      }
 
-        // Layer 2: formats
-        const fmt = src.format;
-        if (wantsFormats(opt.what)) {
-          // A full "Formats" paste copies the source's *absence* of formatting
-          // too: an unformatted source cell clears the destination format rather
-          // than leaving a stale one behind (spreadsheet parity).
-          formatWrites.push({
-            key: addrKey(addr),
-            format: formatWithoutComment(fmt),
-          });
-        } else if (wantsNumFmt(opt.what) && fmt?.numFmt) {
-          // Number format only — cherry-pick.
-          formatWrites.push({ key: addrKey(addr), format: { numFmt: fmt.numFmt } });
+      // Layer 2: formats
+      const fmt = src.format;
+      if (wantsFormats(opt.what)) {
+        // A full "Formats" paste copies the source's *absence* of formatting
+        // too: an unformatted source cell clears the destination format rather
+        // than leaving a stale one behind (spreadsheet parity).
+        formatWrites.push({
+          key: addrKey(addr),
+          format: formatWithoutComment(fmt),
+        });
+      } else if (wantsNumFmt(opt.what) && fmt?.numFmt) {
+        // Number format only — cherry-pick.
+        formatWrites.push({ key: addrKey(addr), format: { numFmt: fmt.numFmt } });
+      }
+    };
+    if (bandCells) {
+      for (const cell of bandCells) {
+        applyCell(cell.row, cell.col, cell.sourceRowIndex, cell.sourceColIndex);
+      }
+    } else {
+      for (let dr = 0; dr < destRows; dr += 1) {
+        for (let dc = 0; dc < destCols; dc += 1) {
+          applyCell(
+            destination.r0 + dr,
+            destination.c0 + dc,
+            opt.transpose ? dc % snap.rows : dr % snap.rows,
+            opt.transpose ? dr % snap.cols : dc % snap.cols,
+          );
         }
       }
     }
@@ -629,13 +1034,52 @@ export function pasteSpecial(
     const sourceCommentsToClear: Addr[] = [];
     const tracked = new Map<string, Addr>();
     if (sourceCut) {
-      for (let row = 0; row < snap.rows; row += 1) {
-        for (let col = 0; col < snap.cols; col += 1) {
-          const src = snap.cells[row]?.[col];
-          if (!src || commentText(src.format) === null) continue;
-          const addr = { sheet: source.sheet, row: source.r0 + row, col: source.c0 + col };
+      if (bandAxisFor(sourceLogical)) {
+        for (const [key, format] of current.format.formats) {
+          const [commentSheetRaw, rowRaw, colRaw] = key.split(':');
+          const commentSheet = Number(commentSheetRaw);
+          const row = Number(rowRaw);
+          const col = Number(colRaw);
+          if (
+            commentSheet !== sourceLogical.sheet ||
+            row < sourceLogical.r0 ||
+            row > sourceLogical.r1 ||
+            col < sourceLogical.c0 ||
+            col > sourceLogical.c1 ||
+            commentText(format) === null
+          ) {
+            continue;
+          }
+          const addr = { sheet: commentSheet, row, col };
           sourceCommentsToClear.push(addr);
           tracked.set(addrKey(addr), addr);
+        }
+        for (const comment of wb.getComments(sourceLogical.sheet)) {
+          if (
+            comment.row < sourceLogical.r0 ||
+            comment.row > sourceLogical.r1 ||
+            comment.col < sourceLogical.c0 ||
+            comment.col > sourceLogical.c1
+          ) {
+            continue;
+          }
+          const addr = {
+            sheet: sourceLogical.sheet,
+            row: comment.row,
+            col: comment.col,
+          };
+          sourceCommentsToClear.push(addr);
+          tracked.set(addrKey(addr), addr);
+        }
+      } else {
+        for (let row = 0; row < snap.rows; row += 1) {
+          for (let col = 0; col < snap.cols; col += 1) {
+            const src = snap.cells[row]?.[col];
+            if (!src || commentText(src.format) === null) continue;
+            const addr = { sheet: source.sheet, row: source.r0 + row, col: source.c0 + col };
+            sourceCommentsToClear.push(addr);
+            tracked.set(addrKey(addr), addr);
+          }
         }
       }
     }
@@ -665,6 +1109,46 @@ export function pasteSpecial(
       });
     }
   }
+  if ((opt.what === 'all' || opt.what === 'formats') && bandDestination) {
+    const rowHeights = snap.rowHeights;
+    const colWidths = snap.colWidths;
+    const logicalRows = sourceLogical.r1 - sourceLogical.r0 + 1;
+    const logicalCols = sourceLogical.c1 - sourceLogical.c0 + 1;
+    if (bandAxis === 'row' && rowHeights) {
+      recordLayoutChangeWithEngine(history, store, wb, () => {
+        store.setState((s) => {
+          const next = new Map(s.layout.rowHeights);
+          for (const row of [...next.keys()]) {
+            if (row >= destination.r0 && row <= destination.r1) next.delete(row);
+          }
+          for (const [offset, height] of rowHeights) {
+            if (!Number.isInteger(offset) || offset < 0 || !Number.isFinite(height)) continue;
+            for (let row = destination.r0 + offset; row <= destination.r1; row += logicalRows) {
+              if (height !== s.layout.defaultRowHeight) next.set(row, height);
+            }
+          }
+          return { ...s, layout: { ...s.layout, rowHeights: next } };
+        });
+      });
+    }
+    if (bandAxis === 'column' && colWidths) {
+      recordLayoutChangeWithEngine(history, store, wb, () => {
+        store.setState((s) => {
+          const next = new Map(s.layout.colWidths);
+          for (const col of [...next.keys()]) {
+            if (col >= destination.c0 && col <= destination.c1) next.delete(col);
+          }
+          for (const [offset, width] of colWidths) {
+            if (!Number.isInteger(offset) || offset < 0 || !Number.isFinite(width)) continue;
+            for (let col = destination.c0 + offset; col <= destination.c1; col += logicalCols) {
+              if (width !== s.layout.defaultColWidth) next.set(col, width);
+            }
+          }
+          return { ...s, layout: { ...s.layout, colWidths: next } };
+        });
+      });
+    }
+  }
   if (skippedNonFiniteOperations > 0) {
     console.warn(
       `formulon-cell: paste special wrote ${skippedNonFiniteOperations} non-finite arithmetic result(s) as static error value(s)`,
@@ -674,11 +1158,13 @@ export function pasteSpecial(
   // Move active selection to the written range.
   const writtenRange: Range = { ...destination };
   mutators.setActive(store, { sheet, row: writtenRange.r0, col: writtenRange.c0 });
-  if (writtenRange.r0 !== writtenRange.r1 || writtenRange.c0 !== writtenRange.c1) {
+  if (bandDestination) {
+    mutators.setRange(store, writtenRange);
+  } else if (writtenRange.r0 !== writtenRange.r1 || writtenRange.c0 !== writtenRange.c1) {
     mutators.extendRangeTo(store, { sheet, row: writtenRange.r1, col: writtenRange.c1 });
   }
   if (snap.mode === 'cut') {
-    updateExternalRefsForCutPaste(wb, snap.range, writtenRange);
+    updateExternalRefsForCutPaste(wb, sourceLogical, writtenRange);
     consumeCutMarquee(store);
   }
   return { writtenRange, skippedNonFiniteOperations };

@@ -41,6 +41,13 @@ export interface HistoryEntry {
 
 export type HistoryDirection = 'undo' | 'redo';
 export type HistoryGuard = (entry: HistoryEntry, direction: HistoryDirection) => boolean;
+/** Opaque handle for a transaction frame returned by `History.begin()`. */
+export type HistoryTransaction = symbol;
+
+interface TransactionFrame {
+  id: HistoryTransaction;
+  startIndex: number;
+}
 
 /**
  * Single source of truth for undoable mutations. Cell writes (workbook),
@@ -54,30 +61,42 @@ export class History {
   private undoStack: HistoryEntry[] = [];
   private redoStack: HistoryEntry[] = [];
   private replaying = false;
-  private txnDepth = 0;
+  private txnFrames: TransactionFrame[] = [];
   private txnEntries: HistoryEntry[] = [];
   private listeners = new Set<() => void>();
   private lastRepeat: (() => void) | null = null;
   private guard: HistoryGuard | null = null;
+  private notificationSuppressionDepth = 0;
 
   push(entry: HistoryEntry): void {
     if (this.replaying) return;
-    if (this.txnDepth > 0) {
+    if (this.txnFrames.length > 0) {
       this.txnEntries.push(entry);
       return;
     }
     this.commit(entry);
   }
 
-  begin(): void {
-    this.txnDepth += 1;
-    if (this.txnDepth === 1) this.txnEntries = [];
+  begin(): HistoryTransaction {
+    const frame: TransactionFrame = {
+      id: Symbol('history-transaction'),
+      startIndex: this.txnEntries.length,
+    };
+    this.txnFrames.push(frame);
+    return frame.id;
   }
 
-  end(): void {
-    if (this.txnDepth === 0) return;
-    this.txnDepth -= 1;
-    if (this.txnDepth > 0) return;
+  end(token?: HistoryTransaction): void {
+    const frame = this.txnFrames.at(-1);
+    if (!frame) {
+      if (token !== undefined) throw new Error('History transaction token is not current');
+      return;
+    }
+    if (token !== undefined && token !== frame.id) {
+      throw new Error('History transaction token is not current');
+    }
+    this.txnFrames.pop();
+    if (this.txnFrames.length > 0) return;
     const entries = this.txnEntries;
     this.txnEntries = [];
     if (entries.length === 0) return;
@@ -94,6 +113,56 @@ export class History {
         for (const e of entries) e.redo();
       },
     });
+  }
+
+  /** Roll back the current transaction frame without touching committed history. */
+  abort(token: HistoryTransaction): void {
+    const frame = this.txnFrames.at(-1);
+    if (!frame || frame.id !== token) {
+      throw new Error('History transaction token is not current');
+    }
+
+    const pending = this.txnEntries.splice(frame.startIndex);
+    this.txnFrames.pop();
+
+    // Undo callbacks are user supplied and can themselves mutate history. Keep
+    // every bookkeeping field stable while replaying the discarded entries;
+    // pushes are suppressed by `replaying`, and the snapshots cover stronger
+    // callbacks such as clear(), undo(), or setRepeat().
+    const undoStack = [...this.undoStack];
+    const redoStack = [...this.redoStack];
+    const txnEntries = [...this.txnEntries];
+    const txnFrames = [...this.txnFrames];
+    const lastRepeat = this.lastRepeat;
+    const guard = this.guard;
+    const wasReplaying = this.replaying;
+    const notificationSuppressionDepth = this.notificationSuppressionDepth;
+    let firstError: unknown;
+    let failed = false;
+    this.replaying = true;
+    this.notificationSuppressionDepth += 1;
+    try {
+      for (let i = pending.length - 1; i >= 0; i -= 1) {
+        try {
+          pending[i]?.undo();
+        } catch (error) {
+          if (!failed) {
+            firstError = error;
+            failed = true;
+          }
+        }
+      }
+    } finally {
+      this.undoStack = undoStack;
+      this.redoStack = redoStack;
+      this.txnEntries = txnEntries;
+      this.txnFrames = txnFrames;
+      this.lastRepeat = lastRepeat;
+      this.guard = guard;
+      this.replaying = wasReplaying;
+      this.notificationSuppressionDepth = notificationSuppressionDepth;
+    }
+    if (failed) throw firstError;
   }
 
   private commit(entry: HistoryEntry): void {
@@ -174,7 +243,7 @@ export class History {
     this.undoStack.length = 0;
     this.redoStack.length = 0;
     this.txnEntries.length = 0;
-    this.txnDepth = 0;
+    this.txnFrames.length = 0;
     this.lastRepeat = null;
     this.notify();
   }
@@ -185,6 +254,7 @@ export class History {
   }
 
   private notify(): void {
+    if (this.notificationSuppressionDepth > 0) return;
     // History mutations are already committed when observers run. A stale
     // renderer must not make push/undo/redo throw after the stack moved, and
     // one bad observer must not prevent the remaining observers from seeing

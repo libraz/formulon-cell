@@ -9,6 +9,11 @@ export interface CopyResult {
   tsv: string;
   /** The range that was copied. */
   range: Range;
+  /** The original logical selection. For a single selection this is the same
+   *  range as `range`; whole-row/column copies keep it while `range` is the
+   *  logical full band and `payloadRanges` carries the bounded materialized
+   *  cells. */
+  logicalRange?: Range;
   /** All copied ranges when copying a disjoint selection. */
   ranges?: Range[];
   /** Materialized ranges used for the TSV payload. Whole-row/-column copies
@@ -50,6 +55,7 @@ export function copy(state: State): CopyResult | null {
   return {
     tsv: encodeTSV(grid),
     range: r,
+    logicalRange: { ...r },
     ...(ranges.length > 1 ? { ranges } : {}),
     ...(payloadRanges.length > 1 || !sameRange(payloadRanges[0], r) ? { payloadRanges } : {}),
   };
@@ -103,6 +109,29 @@ function trimWholeBandsToUsedSpan(state: State, ranges: Range[]): Range[] {
   for (const [key, fmt] of state.format.formats) {
     if (Object.keys(fmt).length === 0) continue;
     visitKey(key);
+  }
+  // A merge is meaningful even when its anchor has no value or direct
+  // formatting. Keep its complete perpendicular span in the compact payload
+  // so the structured snapshot can reproduce the topology on paste.
+  for (const merge of state.merges.byAnchor.values()) {
+    if (merge.sheet !== state.data.sheetIndex) continue;
+    if (
+      wholeRows &&
+      ranges.some(
+        (r) => merge.r0 >= r.r0 && merge.r1 <= r.r1 && merge.c1 >= r.c0 && merge.c0 <= r.c1,
+      )
+    ) {
+      min = Math.min(min, merge.c0);
+      max = Math.max(max, merge.c1);
+    } else if (
+      wholeCols &&
+      ranges.some(
+        (r) => merge.c0 >= r.c0 && merge.c1 <= r.c1 && merge.r1 >= r.r0 && merge.r0 <= r.r1,
+      )
+    ) {
+      min = Math.min(min, merge.r0);
+      max = Math.max(max, merge.r1);
+    }
   }
   if (max < 0) {
     min = 0;

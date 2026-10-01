@@ -610,6 +610,73 @@ export function adjustFormulaForCellBandShift(
 }
 
 /**
+ * Context for moving a contiguous row or column band to an insertion point.
+ * `insertionAt` is expressed in the pre-move coordinate space: when the
+ * target lies after the source band, removing the source first makes the
+ * destination `insertionAt - count`.
+ */
+export interface AxisBandMoveContext {
+  axis: 'row' | 'col';
+  sheet: number;
+  sourceStart: number;
+  count: number;
+  insertionAt: number;
+  formulaSheet: number;
+  sheetNames: readonly string[];
+}
+
+/**
+ * Rewrite references after a stable row/column band permutation. Structural
+ * movement ignores `$` pinning: the marker remains in the rendered formula,
+ * while the referenced row/column follows the moved band. References are
+ * resolved against the formula's owning sheet, so a qualified reference to
+ * the edited sheet is rewritten even when its formula lives elsewhere.
+ */
+export function adjustFormulaForAxisBandMove(
+  formula: string,
+  context: AxisBandMoveContext,
+): string {
+  if (!formula.startsWith('=') || !isValidAxisBandMove(context)) return formula;
+  return rewriteRefs(formula, (tok) => {
+    const targetSheet = tok.sheetQual
+      ? resolveQualifiedSheet(tok.sheetQual, context.sheetNames)
+      : context.formulaSheet;
+    if (targetSheet === null || targetSheet !== context.sheet) return renderToken(tok);
+
+    if (tok.kind === 'whole-col') {
+      if (context.axis !== 'col') return renderToken(tok);
+      const range = transformAxisMoveRange(
+        colLabelToIndex(tok.a.label),
+        colLabelToIndex(tok.b.label),
+        context,
+      );
+      if (range === null) return null;
+      const a = renderWholeColAtom(tok.a.abs, range.a);
+      const b = renderWholeColAtom(tok.b.abs, range.b);
+      return a === null || b === null ? null : `${tok.sheetQual}${a}:${b}`;
+    }
+    if (tok.kind === 'whole-row') {
+      if (context.axis !== 'row') return renderToken(tok);
+      const range = transformAxisMoveRange(
+        Number.parseInt(tok.a.rowStr, 10) - 1,
+        Number.parseInt(tok.b.rowStr, 10) - 1,
+        context,
+      );
+      if (range === null) return null;
+      const a = renderWholeRowAtom(tok.a.abs, range.a);
+      const b = renderWholeRowAtom(tok.b.abs, range.b);
+      return a === null || b === null ? null : `${tok.sheetQual}${a}:${b}`;
+    }
+
+    const a = transformAxisMoveAtom(tok.a, context);
+    if (a === null) return null;
+    if (!tok.b) return `${tok.sheetQual}${a}`;
+    const range = transformAxisMoveCellRange(tok, context);
+    return range === null ? null : `${tok.sheetQual}${range.a}:${range.b}`;
+  });
+}
+
+/**
  * Update formulas outside a cut/paste payload so references that pointed at
  * the moved cells follow them to the destination. Unlike copy/fill shifting,
  * absolute markers do not pin a moved-cell reference: `$A$1` should become
@@ -648,7 +715,11 @@ export function adjustFormulaForCutPasteMove(
   };
   return rewriteRefs(formula, (tok) => {
     if (tok.sheetQual) return renderToken(tok);
-    if (tok.kind !== 'cell') return renderToken(tok);
+    if (tok.kind !== 'cell') {
+      const cutAxis = fullAxisForCut(source);
+      const transformed = transformWholeAxisCutToken(tok, cutAxis, source, dRow, dCol);
+      return transformed ?? renderToken(tok);
+    }
     const aTxt = moveAtom(tok.a);
     if (!tok.b) return aTxt;
 
@@ -674,13 +745,20 @@ function adjustFormulaForCutPasteWithContext(
   const dCol = dest.c0 - source.c0;
   return rewriteRefs(formula, (tok) => {
     if (tok.kind !== 'cell') {
-      // Partial cell cuts do not move whole-axis references, but a moved
-      // formula still needs to retain the sheet binding of an unqualified
-      // whole-axis ref when its output sheet changes.
-      if (!tok.sheetQual) {
-        return `${qualifierForOutputSheet(context.formulaSheet, context)}${renderToken(tok)}`;
+      const targetSheet = resolveReferenceSheet(tok.sheetQual, context);
+      if (targetSheet === null) return renderToken(tok);
+      const originalQualifier = tok.sheetQual || qualifierForOutputSheet(targetSheet, context);
+      const cutAxis = fullAxisForCut(source);
+      if (targetSheet !== context.sourceSheet || cutAxis === null) {
+        return `${originalQualifier}${renderTokenBody(tok)}`;
       }
-      return renderToken(tok);
+      const transformed = transformWholeAxisCutToken(tok, cutAxis, source, dRow, dCol);
+      if (transformed === null) return `${originalQualifier}${renderTokenBody(tok)}`;
+      const wasMoved = wholeAxisCutContainsToken(tok, cutAxis, source);
+      const qualifier = wasMoved
+        ? qualifierForOutputSheet(context.destinationSheet, context)
+        : originalQualifier;
+      return `${qualifier}${transformed}`;
     }
     const targetSheet = resolveReferenceSheet(tok.sheetQual, context);
     if (targetSheet === null) return renderToken(tok);
@@ -918,6 +996,182 @@ function rewriteCutPasteEndpoint(
   return { atom: renderAtomRaw(at), qualifier, moved: false };
 }
 
+function axisBandLimit(axis: 'row' | 'col'): number {
+  return axis === 'row' ? MAX_ROW_INDEX + 1 : MAX_COL_INDEX + 1;
+}
+
+function isValidAxisBandMove(context: AxisBandMoveContext): boolean {
+  if (
+    !Number.isInteger(context.sourceStart) ||
+    !Number.isInteger(context.count) ||
+    !Number.isInteger(context.insertionAt)
+  ) {
+    return false;
+  }
+  if (context.count <= 0 || context.sourceStart < 0 || context.insertionAt < 0) return false;
+  const limit = axisBandLimit(context.axis);
+  const sourceEnd = context.sourceStart + context.count;
+  if (sourceEnd > limit || context.insertionAt > limit) return false;
+  // The core rejects an insertion point inside the source band. Moving to
+  // either edge is a no-op and is deliberately handled as such.
+  if (context.insertionAt > context.sourceStart && context.insertionAt < sourceEnd) return false;
+  return context.insertionAt !== context.sourceStart && context.insertionAt !== sourceEnd;
+}
+
+function mapAxisIndexForMove(index: number, context: AxisBandMoveContext): number {
+  const sourceEnd = context.sourceStart + context.count;
+  const finalStart =
+    context.insertionAt < context.sourceStart
+      ? context.insertionAt
+      : context.insertionAt - context.count;
+  if (index >= context.sourceStart && index < sourceEnd) {
+    return finalStart + (index - context.sourceStart);
+  }
+  if (context.insertionAt < context.sourceStart) {
+    if (index >= context.insertionAt && index < context.sourceStart) return index + context.count;
+    return index;
+  }
+  if (index >= sourceEnd && index < context.insertionAt) return index - context.count;
+  return index;
+}
+
+interface AxisMoveRange {
+  a: number;
+  b: number;
+}
+
+/**
+ * Apply the range boundary rules used by a structural band move. The move is
+ * modelled as insertion at the destination followed by removal of the source;
+ * source endpoints that move with the band are restored after that interval
+ * calculation so a scalar source reference and a range beginning at it keep
+ * their moved destination.
+ */
+function transformAxisMoveRange(
+  first: number,
+  last: number,
+  context: AxisBandMoveContext,
+): AxisMoveRange | null {
+  const sourceEnd = context.sourceStart + context.count;
+
+  const mappedFirst = mapAxisIndexForMove(first, context);
+  const mappedLast = mapAxisIndexForMove(last, context);
+  const mappedOrderIsValid = first <= last ? mappedFirst <= mappedLast : mappedFirst >= mappedLast;
+  if (mappedOrderIsValid) {
+    return {
+      a: mappedFirst,
+      b: mappedLast,
+    };
+  }
+
+  const insertIndex = context.insertionAt;
+  const insertedFirst = first >= insertIndex ? first + context.count : first;
+  const insertedLast = last >= insertIndex ? last + context.count : last;
+  const deleteStart = insertIndex < context.sourceStart ? sourceEnd : context.sourceStart;
+  const deleteEnd = deleteStart + context.count;
+  const firstDeleted = insertedFirst >= deleteStart && insertedFirst < deleteEnd;
+  const lastDeleted = insertedLast >= deleteStart && insertedLast < deleteEnd;
+  const survivor = (value: number): number => (value >= deleteEnd ? value - context.count : value);
+  const boundaryFor = (other: number): number =>
+    other < deleteStart ? deleteStart - 1 : deleteStart;
+
+  const outFirst = firstDeleted ? boundaryFor(insertedLast) : survivor(insertedFirst);
+  const outLast = lastDeleted ? boundaryFor(insertedFirst) : survivor(insertedLast);
+
+  // A range can straddle the moved band while neither endpoint is inside it.
+  // Keep the endpoint orientation from the source formula; callers render the
+  // returned pair directly rather than normalising the range.
+  return { a: outFirst, b: outLast };
+}
+
+function transformAxisMoveAtom(at: Atom, context: AxisBandMoveContext): string | null {
+  const col = colLabelToIndex(at.label);
+  const row = Number.parseInt(at.rowStr, 10) - 1;
+  if (context.axis === 'row') {
+    return renderAtom(at.absCol, col, at.absRow, mapAxisIndexForMove(row, context));
+  }
+  return renderAtom(at.absCol, mapAxisIndexForMove(col, context), at.absRow, row);
+}
+
+function transformAxisMoveCellRange(
+  tok: CellRefToken,
+  context: AxisBandMoveContext,
+): { a: string; b: string } | null {
+  const b = tok.b as Atom;
+  const first =
+    context.axis === 'row' ? Number.parseInt(tok.a.rowStr, 10) - 1 : colLabelToIndex(tok.a.label);
+  const last =
+    context.axis === 'row' ? Number.parseInt(b.rowStr, 10) - 1 : colLabelToIndex(b.label);
+  const range = transformAxisMoveRange(first, last, context);
+  if (range === null) return null;
+  const aCol = colLabelToIndex(tok.a.label);
+  const aRow = Number.parseInt(tok.a.rowStr, 10) - 1;
+  const bCol = colLabelToIndex(b.label);
+  const bRow = Number.parseInt(b.rowStr, 10) - 1;
+  const a =
+    context.axis === 'row'
+      ? renderAtom(tok.a.absCol, aCol, tok.a.absRow, range.a)
+      : renderAtom(tok.a.absCol, range.a, tok.a.absRow, aRow);
+  const renderedB =
+    context.axis === 'row'
+      ? renderAtom(b.absCol, bCol, b.absRow, range.b)
+      : renderAtom(b.absCol, range.b, b.absRow, bRow);
+  return a === null || renderedB === null ? null : { a, b: renderedB };
+}
+
+type FullAxis = 'row' | 'col' | null;
+
+function fullAxisForCut(source: { r0: number; c0: number; r1: number; c1: number }): FullAxis {
+  const r0 = Math.min(source.r0, source.r1);
+  const r1 = Math.max(source.r0, source.r1);
+  const c0 = Math.min(source.c0, source.c1);
+  const c1 = Math.max(source.c0, source.c1);
+  if (c0 === 0 && c1 === MAX_COL_INDEX) return 'row';
+  if (r0 === 0 && r1 === MAX_ROW_INDEX) return 'col';
+  return null;
+}
+
+function wholeAxisCutContainsToken(
+  tok: WholeColRefToken | WholeRowRefToken,
+  axis: FullAxis,
+  source: { r0: number; c0: number; r1: number; c1: number },
+): boolean {
+  const first =
+    tok.kind === 'whole-row' ? Number.parseInt(tok.a.rowStr, 10) - 1 : colLabelToIndex(tok.a.label);
+  const last =
+    tok.kind === 'whole-row' ? Number.parseInt(tok.b.rowStr, 10) - 1 : colLabelToIndex(tok.b.label);
+  const low = Math.min(first, last);
+  const high = Math.max(first, last);
+  if (axis === 'row' && tok.kind === 'whole-row') {
+    return low >= Math.min(source.r0, source.r1) && high <= Math.max(source.r0, source.r1);
+  }
+  if (axis === 'col' && tok.kind === 'whole-col') {
+    return low >= Math.min(source.c0, source.c1) && high <= Math.max(source.c0, source.c1);
+  }
+  return false;
+}
+
+function transformWholeAxisCutToken(
+  tok: WholeColRefToken | WholeRowRefToken,
+  axis: FullAxis,
+  source: { r0: number; c0: number; r1: number; c1: number },
+  dRow: number,
+  dCol: number,
+): string | null {
+  if (axis === null || !wholeAxisCutContainsToken(tok, axis, source)) return renderTokenBody(tok);
+  if (axis === 'row' && tok.kind === 'whole-row') {
+    const a = renderWholeRowAtom(tok.a.abs, Number.parseInt(tok.a.rowStr, 10) - 1 + dRow);
+    const b = renderWholeRowAtom(tok.b.abs, Number.parseInt(tok.b.rowStr, 10) - 1 + dRow);
+    return a === null || b === null ? null : `${a}:${b}`;
+  }
+  if (axis === 'col' && tok.kind === 'whole-col') {
+    const a = renderWholeColAtom(tok.a.abs, colLabelToIndex(tok.a.label) + dCol);
+    const b = renderWholeColAtom(tok.b.abs, colLabelToIndex(tok.b.label) + dCol);
+    return a === null || b === null ? null : `${a}:${b}`;
+  }
+  return renderTokenBody(tok);
+}
+
 function resolveReferenceSheet(sheetQual: string, context: CutPasteSheetContext): number | null {
   if (!sheetQual) return context.formulaSheet;
   return resolveQualifiedSheet(sheetQual, context.sheetNames);
@@ -946,15 +1200,19 @@ function qualifierForOutputSheet(sheet: number, context: CutPasteSheetContext): 
 /** Re-render a token verbatim from its parsed parts (used to pass through
  *  cross-sheet refs unchanged while keeping normalization consistent). */
 function renderToken(tok: RefToken): string {
+  return `${tok.sheetQual}${renderTokenBody(tok)}`;
+}
+
+function renderTokenBody(tok: RefToken): string {
   if (tok.kind === 'whole-col') {
-    return `${tok.sheetQual}${renderWholeColRaw(tok.a)}:${renderWholeColRaw(tok.b)}`;
+    return `${renderWholeColRaw(tok.a)}:${renderWholeColRaw(tok.b)}`;
   }
   if (tok.kind === 'whole-row') {
-    return `${tok.sheetQual}${renderWholeRowRaw(tok.a)}:${renderWholeRowRaw(tok.b)}`;
+    return `${renderWholeRowRaw(tok.a)}:${renderWholeRowRaw(tok.b)}`;
   }
   const a = renderAtomRaw(tok.a);
-  if (!tok.b) return `${tok.sheetQual}${a}`;
-  return `${tok.sheetQual}${a}:${renderAtomRaw(tok.b)}`;
+  if (!tok.b) return a;
+  return `${a}:${renderAtomRaw(tok.b)}`;
 }
 
 function renderAtomRaw(at: Atom): string {

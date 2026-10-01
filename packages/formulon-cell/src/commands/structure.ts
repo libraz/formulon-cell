@@ -729,21 +729,21 @@ export function insertRows(
   history: History | null,
   atRow: number,
   count = 1,
-): void {
+): boolean {
   const edit = normalizeAxisEdit(atRow, count, MAX_ROW, 'insert');
-  if (!edit) return;
+  if (!edit) return false;
   const row = edit.at;
   const n = edit.count;
   const sheet = store.getState().data.sheetIndex;
-  if (blockedByProtection(store, sheet, 'insertRows')) return;
-  if (insertionWouldOverflow(store, wb, sheet, 'row', row, n)) return;
+  if (blockedByProtection(store, sheet, 'insertRows')) return false;
+  if (insertionWouldOverflow(store, wb, sheet, 'row', row, n)) return false;
   const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;
 
   if (history) history.begin();
   try {
     // 1. shift cells & rewrite formula refs.
     if (nativeAxisOp) {
-      if (!applyAxisShiftViaEngine(wb, history, sheet, 'row', row, n)) return;
+      if (!applyAxisShiftViaEngine(wb, history, sheet, 'row', row, n)) return false;
     } else {
       applyAxisShiftToCells(wb, sheet, 'row', row, n);
     }
@@ -779,6 +779,7 @@ export function insertRows(
 
     // 4. re-point merges, conditional formats, and the autofilter region.
     shiftAnchoredRanges(store, wb, history, sheet, 'row', row, n, nativeAxisOp);
+    return true;
   } finally {
     if (history) history.end();
   }
@@ -790,19 +791,19 @@ export function deleteRows(
   history: History | null,
   atRow: number,
   count = 1,
-): void {
+): boolean {
   const edit = normalizeAxisEdit(atRow, count, MAX_ROW, 'delete');
-  if (!edit) return;
+  if (!edit) return false;
   const row = edit.at;
   const n = edit.count;
   const sheet = store.getState().data.sheetIndex;
-  if (blockedByProtection(store, sheet, 'deleteRows')) return;
+  if (blockedByProtection(store, sheet, 'deleteRows')) return false;
   const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;
 
   if (history) history.begin();
   try {
     if (nativeAxisOp) {
-      if (!applyAxisShiftViaEngine(wb, history, sheet, 'row', row, -n)) return;
+      if (!applyAxisShiftViaEngine(wb, history, sheet, 'row', row, -n)) return false;
     } else {
       applyAxisShiftToCells(wb, sheet, 'row', row, -n);
     }
@@ -827,6 +828,7 @@ export function deleteRows(
     });
 
     shiftAnchoredRanges(store, wb, history, sheet, 'row', row, -n, nativeAxisOp);
+    return true;
   } finally {
     if (history) history.end();
   }
@@ -838,20 +840,20 @@ export function insertCols(
   history: History | null,
   atCol: number,
   count = 1,
-): void {
+): boolean {
   const edit = normalizeAxisEdit(atCol, count, MAX_COL, 'insert');
-  if (!edit) return;
+  if (!edit) return false;
   const col = edit.at;
   const n = edit.count;
   const sheet = store.getState().data.sheetIndex;
-  if (blockedByProtection(store, sheet, 'insertCols')) return;
-  if (insertionWouldOverflow(store, wb, sheet, 'col', col, n)) return;
+  if (blockedByProtection(store, sheet, 'insertCols')) return false;
+  if (insertionWouldOverflow(store, wb, sheet, 'col', col, n)) return false;
   const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;
 
   if (history) history.begin();
   try {
     if (nativeAxisOp) {
-      if (!applyAxisShiftViaEngine(wb, history, sheet, 'col', col, n)) return;
+      if (!applyAxisShiftViaEngine(wb, history, sheet, 'col', col, n)) return false;
     } else {
       applyAxisShiftToCells(wb, sheet, 'col', col, n);
     }
@@ -884,6 +886,7 @@ export function insertCols(
     });
 
     shiftAnchoredRanges(store, wb, history, sheet, 'col', col, n, nativeAxisOp);
+    return true;
   } finally {
     if (history) history.end();
   }
@@ -895,19 +898,19 @@ export function deleteCols(
   history: History | null,
   atCol: number,
   count = 1,
-): void {
+): boolean {
   const edit = normalizeAxisEdit(atCol, count, MAX_COL, 'delete');
-  if (!edit) return;
+  if (!edit) return false;
   const col = edit.at;
   const n = edit.count;
   const sheet = store.getState().data.sheetIndex;
-  if (blockedByProtection(store, sheet, 'deleteCols')) return;
+  if (blockedByProtection(store, sheet, 'deleteCols')) return false;
   const nativeAxisOp = wb.capabilities.insertDeleteRowsCols;
 
   if (history) history.begin();
   try {
     if (nativeAxisOp) {
-      if (!applyAxisShiftViaEngine(wb, history, sheet, 'col', col, -n)) return;
+      if (!applyAxisShiftViaEngine(wb, history, sheet, 'col', col, -n)) return false;
     } else {
       applyAxisShiftToCells(wb, sheet, 'col', col, -n);
     }
@@ -932,6 +935,7 @@ export function deleteCols(
     });
 
     shiftAnchoredRanges(store, wb, history, sheet, 'col', col, -n, nativeAxisOp);
+    return true;
   } finally {
     if (history) history.end();
   }
