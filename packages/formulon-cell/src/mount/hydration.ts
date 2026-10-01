@@ -13,16 +13,20 @@ import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 
 export function hydrateActiveSheetFromEngine(wb: WorkbookHandle, store: SpreadsheetStore): void {
-  const sheet = store.getState().data.sheetIndex;
-  mutators.replaceCells(store, wb.cells(sheet));
-  hydrateLayoutFromEngine(wb, store, sheet);
-  hydrateCommentsAndHyperlinksFromEngine(wb, store, sheet);
-  hydrateMergesFromEngine(wb, store, sheet);
-  hydrateValidationsFromEngine(wb, store, sheet);
-  hydrateCellFormatsFromEngine(wb, store, sheet);
-  hydrateConditionalRulesFromEngine(wb, store, sheet);
-  hydrateAutoFilterFromEngine(wb, store, sheet);
-  hydratePageSetupFromEngine(wb, store, sheet);
+  const hydrate = (): void => {
+    const sheet = store.getState().data.sheetIndex;
+    mutators.replaceCells(store, wb.cells(sheet));
+    hydrateLayoutFromEngine(wb, store, sheet);
+    hydrateCommentsAndHyperlinksFromEngine(wb, store, sheet);
+    hydrateMergesFromEngine(wb, store, sheet);
+    hydrateValidationsFromEngine(wb, store, sheet);
+    hydrateCellFormatsFromEngine(wb, store, sheet);
+    hydrateConditionalRulesFromEngine(wb, store, sheet);
+    hydrateAutoFilterFromEngine(wb, store, sheet);
+    hydratePageSetupFromEngine(wb, store, sheet);
+  };
+  if (typeof wb.withEngineSyncMuted === 'function') wb.withEngineSyncMuted(hydrate);
+  else hydrate();
 }
 
 export function hydrateWorkbookMetadataFromEngine(

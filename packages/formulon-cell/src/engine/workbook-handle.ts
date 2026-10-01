@@ -1,8 +1,9 @@
 import type { History } from '../commands/history.js';
-import type { PageSetup, SpreadsheetStore, State } from '../store/store.js';
+import type { CellFormat, PageSetup, SpreadsheetStore, State } from '../store/store.js';
 import { addrKey } from './address.js';
 import { syncAutoFilterToEngine } from './auto-filter-sync.js';
 import { detectCapabilities } from './capabilities.js';
+import { flushFormatToEngine } from './cell-format-sync.js';
 import { type ExternalLinkKind, externalLinkKindLabel } from './external-links.js';
 import type { LoadOptions } from './loader.js';
 import { isUsingStub, loadFormulon } from './loader.js';
@@ -68,6 +69,50 @@ const autoFilterSignature = (state: State): string =>
     })),
   });
 
+const formatSheetFromKey = (key: string): number | null => {
+  const [sheetPart] = key.split(':');
+  if (sheetPart === undefined || sheetPart === '') return null;
+  const sheet = Number(sheetPart);
+  return Number.isInteger(sheet) && sheet >= 0 ? sheet : null;
+};
+
+const changedFormatSheets = (
+  previous: ReadonlyMap<string, CellFormat> | null,
+  next: ReadonlyMap<string, CellFormat>,
+): Set<number> => {
+  const changed = new Set<number>();
+  if (previous === next) return changed;
+  if (previous === null) {
+    for (const key of next.keys()) {
+      const sheet = formatSheetFromKey(key);
+      if (sheet !== null) changed.add(sheet);
+    }
+    return changed;
+  }
+  for (const [key, format] of next) {
+    if (previous.get(key) === format) continue;
+    const sheet = formatSheetFromKey(key);
+    if (sheet !== null) changed.add(sheet);
+  }
+  for (const key of previous.keys()) {
+    if (next.has(key)) continue;
+    const sheet = formatSheetFromKey(key);
+    if (sheet !== null) changed.add(sheet);
+  }
+  return changed;
+};
+
+const sheetsWithCellStyles = (formats: ReadonlyMap<string, CellFormat>): Set<number> => {
+  const sheets = new Set<number>();
+  for (const [key, format] of formats) {
+    if (!format.cellStyle) continue;
+    const sheet = formatSheetFromKey(key);
+    if (sheet !== null) sheets.add(sheet);
+  }
+  if (sheets.size === 0) sheets.add(0);
+  return sheets;
+};
+
 /**
  * Boundary between the WASM Workbook and the rest of the UI. Nothing else
  * in the codebase touches the raw engine. Keeps the dispose contract honest.
@@ -115,6 +160,15 @@ export class WorkbookHandle {
    *  make up almost all of them. A same-content map with a fresh identity only
    *  costs one redundant flush, and the flush is idempotent. */
   private lastPageSetupMap: ReadonlyMap<number, PageSetup> | null = null;
+
+  /** Format entries are compared by key and value identity. Format mutators
+   *  replace a changed entry object, so this catches edits and removals without
+   *  deep-comparing every CellFormat on every store notification. */
+  private lastFormatEntries: ReadonlyMap<string, CellFormat> | null = null;
+
+  /** Named styles are session metadata; changing the array can affect every
+   *  cell that references one, so its identity is tracked independently. */
+  private lastCustomCellStyles: State['format']['customCellStyles'] | null = null;
 
   private storeSyncMuted = 0;
 
@@ -278,7 +332,7 @@ export class WorkbookHandle {
     this.redoStack.length = 0;
   }
 
-  /** Attach the owning spreadsheet store so changes to AutoFilter and
+  /** Attach the owning spreadsheet store so changes to formats, AutoFilter and
    * page-setup state are immediately mirrored to the engine before an `.xlsx`
    * can be saved. */
   attachStore(store: SpreadsheetStore | null): void {
@@ -288,6 +342,16 @@ export class WorkbookHandle {
     this.rebaseStoreSignatures();
     if (!store) return;
     this.unsubscribeBoundStore = store.subscribe((state) => {
+      const nextFormats = state.format.formats;
+      const formatSheets = changedFormatSheets(this.lastFormatEntries, nextFormats);
+      const stylesChanged = (state.format.customCellStyles ?? null) !== this.lastCustomCellStyles;
+      if (stylesChanged) {
+        for (const sheet of sheetsWithCellStyles(nextFormats)) formatSheets.add(sheet);
+      }
+      // Advance all baselines even while hydration is muted. The state that
+      // hydration imports is the new engine baseline, not a pending UI edit.
+      this.lastFormatEntries = nextFormats;
+      this.lastCustomCellStyles = state.format.customCellStyles ?? null;
       const nextFilter = autoFilterSignature(state);
       const filterChanged = nextFilter !== this.lastAutoFilterSignature;
       if (filterChanged) this.lastAutoFilterSignature = nextFilter;
@@ -295,9 +359,19 @@ export class WorkbookHandle {
       const pageSetupChanged = nextPageSetup !== this.lastPageSetupMap;
       if (pageSetupChanged) this.lastPageSetupMap = nextPageSetup;
       if (this.storeSyncMuted > 0) return;
+      for (const sheet of formatSheets) {
+        if (sheet < this.sheetCount) flushFormatToEngine(this, store, sheet);
+      }
       if (filterChanged) syncAutoFilterToEngine(this, state, state.data.sheetIndex);
       if (pageSetupChanged) syncPageSetupToEngine(this, store, state.data.sheetIndex);
     });
+  }
+
+  /** Detach only the expected owner. A stale asynchronous mount must not
+   *  unsubscribe a newer spreadsheet using the same external workbook. */
+  detachStore(expectedStore: SpreadsheetStore): void {
+    if (this.boundStore !== expectedStore) return;
+    this.attachStore(null);
   }
 
   /** Runs hydration without turning imported filter XML or print settings
@@ -317,6 +391,8 @@ export class WorkbookHandle {
    *  compared against what the engine already carries. */
   private rebaseStoreSignatures(): void {
     const state = this.boundStore?.getState();
+    this.lastFormatEntries = state?.format.formats ?? null;
+    this.lastCustomCellStyles = state?.format.customCellStyles ?? null;
     this.lastAutoFilterSignature = state ? autoFilterSignature(state) : '';
     this.lastPageSetupMap = state?.pageSetup.setupBySheet ?? null;
   }

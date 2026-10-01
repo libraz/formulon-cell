@@ -1104,6 +1104,7 @@ export const Spreadsheet = {
       },
       async setWorkbook(next) {
         if (next === wb) return;
+        wb.detachStore(store);
         binding.unbind();
         if (ownsWb) wb.dispose();
         wb = next;
@@ -1117,6 +1118,12 @@ export const Spreadsheet = {
         );
         mutators.setSheetIndex(store, nextSheet);
         mutators.clearIllustrations(store);
+        store.setState((state) => ({
+          ...state,
+          format: { formats: new Map(), customCellStyles: [] },
+          conditional: { rules: [] },
+          ui: { ...state.ui, pendingFormat: null },
+        }));
         hydrateActiveSheet();
         hydrateWorkbookMetadataFromEngine(wb, store);
         wb.attachStore(store);
@@ -1141,6 +1148,7 @@ export const Spreadsheet = {
       dispose() {
         if (disposed) return;
         disposed = true;
+        wb.detachStore(store);
         toolbarHandle?.dispose();
         toolbarHandle = null;
         ribbonHost?.remove();
