@@ -2,11 +2,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { executeRibbonFillAction, fillDestFor, fillRange } from '../../../src/commands/fill.js';
 import { History } from '../../../src/commands/history.js';
 import { addrKey } from '../../../src/engine/address.js';
-import type { Range } from '../../../src/engine/types.js';
+import type { CellValue, Range } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
   type CellFormat,
   createSpreadsheetStore,
+  mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
 
@@ -61,6 +62,28 @@ const seedAndMirror = (
     return { ...s, data: { ...s.data, cells: map } };
   });
   wb.recalc();
+};
+
+const mirrorCell = (
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  row: number,
+  col: number,
+  value: CellValue,
+  formula: string | null = null,
+): void => {
+  const addr = { sheet: 0, row, col };
+  if (formula !== null) wb.setFormula(addr, formula);
+  else if (value.kind === 'number') wb.setNumber(addr, value.value);
+  else if (value.kind === 'text') wb.setText(addr, value.value);
+  else if (value.kind === 'bool') wb.setBool(addr, value.value);
+  else if (value.kind === 'error') wb.setError(addr, value.code);
+  else wb.setBlank(addr);
+  store.setState((s) => {
+    const cells = new Map(s.data.cells);
+    cells.set(addrKey(addr), { value: wb.getValue(addr), formula });
+    return { ...s, data: { ...s.data, cells } };
+  });
 };
 
 describe('fillDestFor', () => {
@@ -123,18 +146,18 @@ describe('fillRange', () => {
     expect(num(wb, 0, 4, 0)).toBe(50);
   });
 
-  it('extrapolates a numeric growth series downward when the source has a stable ratio', () => {
+  it('projects irregular numeric samples with Excel linear regression', () => {
     seedAndMirror(store, wb, [
-      { row: 0, col: 0, value: 2 },
-      { row: 1, col: 0, value: 4 },
-      { row: 2, col: 0, value: 8 },
+      { row: 0, col: 0, value: 1 },
+      { row: 1, col: 0, value: 2 },
+      { row: 2, col: 0, value: 4 },
     ]);
     const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 };
     const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 0 };
     expect(fillRange(store.getState(), wb, src, dest)).toBe(true);
     wb.recalc();
-    expect(num(wb, 0, 3, 0)).toBe(16);
-    expect(num(wb, 0, 4, 0)).toBe(32);
+    expect(num(wb, 0, 3, 0)).toBeCloseTo(5.333333333333333);
+    expect(num(wb, 0, 4, 0)).toBeCloseTo(6.833333333333333);
   });
 
   it('copies a single numeric source cell', () => {
@@ -156,6 +179,63 @@ describe('fillRange', () => {
     wb.recalc();
     expect(text(wb, 0, 1, 0)).toBe('Item 2');
     expect(text(wb, 0, 2, 0)).toBe('Item 3');
+  });
+
+  it('retains boolean and static error cell types through AutoFill', () => {
+    mirrorCell(store, wb, 0, 0, { kind: 'bool', value: true });
+    mirrorCell(store, wb, 0, 1, { kind: 'error', code: 1, text: '#DIV/0!' });
+
+    expect(
+      fillRange(
+        store.getState(),
+        wb,
+        { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 },
+      ),
+    ).toBe(true);
+    expect(
+      fillRange(
+        store.getState(),
+        wb,
+        { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+        { sheet: 0, r0: 0, c0: 1, r1: 2, c1: 1 },
+      ),
+    ).toBe(true);
+    wb.recalc();
+
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'bool', value: true });
+    expect(wb.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'bool', value: true });
+    expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toMatchObject({ kind: 'error', code: 1 });
+    expect(wb.getValue({ sheet: 0, row: 2, col: 1 })).toMatchObject({ kind: 'error', code: 1 });
+  });
+
+  it('keeps formula text when a formula evaluates to an error', () => {
+    mirrorCell(store, wb, 0, 2, { kind: 'error', code: 1, text: '#DIV/0!' }, '=1/0');
+    const src: Range = { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 2, r1: 2, c1: 2 };
+
+    expect(fillRange(store.getState(), wb, src, dest)).toBe(true);
+    expect(wb.cellFormula({ sheet: 0, row: 1, col: 2 })).toBe('=1/0');
+    expect(wb.cellFormula({ sheet: 0, row: 2, col: 2 })).toBe('=1/0');
+    expect(wb.getValue({ sheet: 0, row: 1, col: 2 })).toMatchObject({ kind: 'error' });
+    expect(wb.getValue({ sheet: 0, row: 2, col: 2 })).toMatchObject({ kind: 'error' });
+  });
+
+  it('tiles mixed formula slots while incrementing numeric slots per cycle', () => {
+    mirrorCell(store, wb, 0, 3, { kind: 'number', value: 10 });
+    mirrorCell(store, wb, 1, 3, { kind: 'number', value: 0 }, '=A1');
+    mirrorCell(store, wb, 2, 3, { kind: 'number', value: 20 });
+    mirrorCell(store, wb, 3, 3, { kind: 'number', value: 0 }, '=A3');
+
+    const src: Range = { sheet: 0, r0: 0, c0: 3, r1: 3, c1: 3 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 3, r1: 7, c1: 3 };
+    expect(fillRange(store.getState(), wb, src, dest)).toBe(true);
+    wb.recalc();
+
+    expect(num(wb, 0, 4, 3)).toBe(11);
+    expect(wb.cellFormula({ sheet: 0, row: 5, col: 3 })).toBe('=A5');
+    expect(num(wb, 0, 6, 3)).toBe(21);
+    expect(wb.cellFormula({ sheet: 0, row: 7, col: 3 })).toBe('=A7');
   });
 
   it('increments full-width trailing digits in text labels', () => {
@@ -374,6 +454,40 @@ describe('fillRange', () => {
     expect(num(wb, 0, 5, 0)).toBe(2);
   });
 
+  it('ribbon Fill Down copies a single label and batches value plus format history', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 'Item 1' }]);
+    setFormat(store, 0, 0, { bold: true });
+    store.setState((s) => ({
+      ...s,
+      selection: {
+        ...s.selection,
+        range: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 },
+        active: { sheet: 0, row: 0, col: 0 },
+        anchor: { sheet: 0, row: 0, col: 0 },
+      },
+    }));
+
+    const history = new History();
+    wb.attachHistory(history);
+    expect(executeRibbonFillAction({ store, workbook: wb, history, action: 'down' })).toBe(true);
+    expect(text(wb, 0, 1, 0)).toBe('Item 1');
+    expect(text(wb, 0, 2, 0)).toBe('Item 1');
+    expect(getFormat(store, 1, 0)).toEqual({ bold: true });
+    expect(getFormat(store, 2, 0)).toEqual({ bold: true });
+
+    expect(history.undo()).toBe(true);
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'blank' });
+    expect(wb.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'blank' });
+    expect(getFormat(store, 1, 0)).toBeUndefined();
+    expect(getFormat(store, 2, 0)).toBeUndefined();
+
+    expect(history.redo()).toBe(true);
+    expect(text(wb, 0, 1, 0)).toBe('Item 1');
+    expect(text(wb, 0, 2, 0)).toBe('Item 1');
+    expect(getFormat(store, 1, 0)).toEqual({ bold: true });
+    expect(getFormat(store, 2, 0)).toEqual({ bold: true });
+  });
+
   it('flash fill can infer from the nearest populated column on the right', () => {
     seedAndMirror(store, wb, [
       { row: 0, col: 0, value: 'John' },
@@ -466,14 +580,19 @@ describe('fillRange', () => {
       { row: 0, col: 0, value: 1 },
       { row: 1, col: 0, value: 2 },
     ]);
-    setFormat(store, 0, 0, { fill: '#ff0000', bold: true });
+    setFormat(store, 0, 0, { fill: '#ff0000', bold: true, comment: 'source note' });
     setFormat(store, 1, 0, { fill: '#00ff00', italic: true });
+    setFormat(store, 2, 0, { comment: 'keep destination note' });
     const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 };
     const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 };
 
     fillRange(store.getState(), wb, src, dest, { formatting: 'with', store });
 
-    expect(getFormat(store, 2, 0)).toEqual({ fill: '#ff0000', bold: true });
+    expect(getFormat(store, 2, 0)).toEqual({
+      fill: '#ff0000',
+      bold: true,
+      comment: 'keep destination note',
+    });
     expect(getFormat(store, 3, 0)).toEqual({ fill: '#00ff00', italic: true });
   });
 
@@ -488,6 +607,27 @@ describe('fillRange', () => {
 
     expect(wb.getValue({ sheet: 0, row: 100_000, col: 0 }).kind).toBe('blank');
     expect(getFormat(store, 100_000, 0)).toBeUndefined();
+  });
+
+  it('refuses a protected destination before writing any cells', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
+    mutators.setSheetProtected(store, 0, true);
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 };
+
+    expect(fillRange(store.getState(), wb, src, dest)).toBe(false);
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'blank' });
+    expect(wb.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'blank' });
+  });
+
+  it('refuses a destination that intersects a merge without partial writes', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
+    mutators.mergeRange(store, { sheet: 0, r0: 2, c0: 0, r1: 3, c1: 0 });
+    const src: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+    const dest: Range = { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 };
+
+    expect(fillRange(store.getState(), wb, src, dest)).toBe(false);
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'blank' });
   });
 
   it('can fill values without overwriting destination formatting', () => {

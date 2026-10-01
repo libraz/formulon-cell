@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { History } from '../../../src/commands/history.js';
 import { setCellLocked, setProtectedSheet } from '../../../src/commands/protection.js';
 import { inferSortHasHeader, removeDuplicates, sortRange } from '../../../src/commands/sort.js';
+import type { CellValue } from '../../../src/engine/types.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
   createSpreadsheetStore,
@@ -42,6 +44,43 @@ const seedText = (
       value: { kind: 'text', value },
       formula: null,
     });
+    return { ...s, data: { ...s.data, cells: map } };
+  });
+};
+
+const seedCell = (
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  row: number,
+  col: number,
+  value: CellValue,
+  formula: string | null = null,
+): void => {
+  const addr = { sheet: 0, row, col };
+  if (formula) {
+    wb.setFormula(addr, formula);
+  } else {
+    switch (value.kind) {
+      case 'number':
+        wb.setNumber(addr, value.value);
+        break;
+      case 'text':
+        wb.setText(addr, value.value);
+        break;
+      case 'bool':
+        wb.setBool(addr, value.value);
+        break;
+      case 'error':
+        wb.setError(addr, value.code);
+        break;
+      default:
+        wb.setBlank(addr);
+    }
+  }
+  store.setState((s) => {
+    const map = new Map(s.data.cells);
+    if (value.kind === 'blank' && !formula) map.delete(addrKey(addr));
+    else map.set(addrKey(addr), { value, formula });
     return { ...s, data: { ...s.data, cells: map } };
   });
 };
@@ -311,7 +350,116 @@ describe('sortRange', () => {
     expect(wb.getValue({ sheet: 0, row: 3, col: 0 })).toEqual({ kind: 'text', value: 'banana' });
   });
 
-  it('sorts text case-insensitively with numeric collation', () => {
+  it('orders typed values as number, text, bool, error, then blank', () => {
+    seedCell(store, wb, 0, 0, { kind: 'bool', value: true });
+    seedText(store, wb, 1, 0, 'Item2');
+    seedNumber(store, wb, 2, 0, 9);
+    seedCell(store, wb, 3, 0, { kind: 'bool', value: false });
+    wb.setFormula({ sheet: 0, row: 4, col: 0 }, '=NA()');
+    wb.recalc();
+    const errorValue = wb.getValue({ sheet: 0, row: 4, col: 0 });
+    expect(errorValue.kind).toBe('error');
+    seedCell(store, wb, 4, 0, errorValue, '=NA()');
+    seedText(store, wb, 5, 0, 'Item10');
+
+    sortRange(
+      store.getState(),
+      store,
+      wb,
+      { sheet: 0, r0: 0, c0: 0, r1: 6, c1: 0 },
+      { byCol: 0, direction: 'asc' },
+    );
+
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 9 });
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'Item10' });
+    expect(wb.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'text', value: 'Item2' });
+    expect(wb.getValue({ sheet: 0, row: 3, col: 0 })).toEqual({ kind: 'bool', value: false });
+    expect(wb.getValue({ sheet: 0, row: 4, col: 0 })).toEqual({ kind: 'bool', value: true });
+    expect(wb.getValue({ sheet: 0, row: 5, col: 0 })).toMatchObject({ kind: 'error' });
+    expect(wb.getValue({ sheet: 0, row: 6, col: 0 })).toEqual({ kind: 'blank' });
+  });
+
+  it('moves formulas by row and keeps outside references unchanged in one undo step', () => {
+    const gValues = [3, 1, 2];
+    const jValues = [100, 200, 300];
+    for (let row = 0; row < gValues.length; row += 1) {
+      seedNumber(store, wb, row, 6, gValues[row] ?? 0);
+      seedNumber(store, wb, row, 9, jValues[row] ?? 0);
+      wb.setFormula({ sheet: 0, row, col: 7 }, `=G${row + 1}+$J$1+J${row + 1}`);
+      wb.recalc();
+      seedCell(
+        store,
+        wb,
+        row,
+        7,
+        wb.getValue({ sheet: 0, row, col: 7 }),
+        `=G${row + 1}+$J$1+J${row + 1}`,
+      );
+    }
+    wb.setFormula({ sheet: 0, row: 0, col: 10 }, '=G1');
+    wb.recalc();
+    seedCell(store, wb, 0, 10, wb.getValue({ sheet: 0, row: 0, col: 10 }), '=G1');
+    mutators.setCellFormat(
+      store,
+      { sheet: 0, row: 1, col: 7 },
+      {
+        bold: true,
+        comment: 'moved note',
+        commentAuthor: 'Alice',
+      },
+    );
+
+    const history = new History();
+    wb.attachHistory(history);
+    history.begin();
+    const ok = sortRange(
+      store.getState(),
+      store,
+      wb,
+      { sheet: 0, r0: 0, c0: 6, r1: 2, c1: 7 },
+      { byCol: 6, direction: 'asc' },
+      history,
+    );
+    history.end();
+
+    expect(ok).toBe(true);
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 7 })).toBe('=G1+$J$1+J1');
+    expect(wb.cellFormula({ sheet: 0, row: 1, col: 7 })).toBe('=G2+$J$1+J2');
+    expect(wb.cellFormula({ sheet: 0, row: 2, col: 7 })).toBe('=G3+$J$1+J3');
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 10 })).toBe('=G1');
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 7 })),
+    ).toMatchObject({
+      bold: true,
+      comment: 'moved note',
+      commentAuthor: 'Alice',
+    });
+
+    expect(history.undo()).toBe(true);
+    expect(history.canUndo()).toBe(false);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 6 })).toEqual({ kind: 'number', value: 3 });
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 7 })).toBe('=G1+$J$1+J1');
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 1, col: 7 })),
+    ).toMatchObject({
+      bold: true,
+      comment: 'moved note',
+      commentAuthor: 'Alice',
+    });
+
+    expect(history.redo()).toBe(true);
+    expect(wb.getValue({ sheet: 0, row: 0, col: 6 })).toEqual({ kind: 'number', value: 1 });
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 7 })).toBe('=G1+$J$1+J1');
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 7 })),
+    ).toMatchObject({
+      bold: true,
+      comment: 'moved note',
+      commentAuthor: 'Alice',
+    });
+  });
+
+  it('sorts text case-insensitively without numeric collation', () => {
     seedText(store, wb, 0, 0, 'item10');
     seedText(store, wb, 1, 0, 'Item2');
     seedText(store, wb, 2, 0, 'item1');
@@ -325,8 +473,8 @@ describe('sortRange', () => {
     );
 
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'text', value: 'item1' });
-    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'Item2' });
-    expect(wb.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'text', value: 'item10' });
+    expect(wb.getValue({ sheet: 0, row: 1, col: 0 })).toEqual({ kind: 'text', value: 'item10' });
+    expect(wb.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'text', value: 'Item2' });
   });
 
   it('header-only range (single row, hasHeader: true) is a no-op (returns false)', () => {
@@ -512,6 +660,32 @@ describe('removeDuplicates', () => {
       fill: '#c6efce',
     });
     expect(store.getState().format.formats.has(addrKey({ sheet: 0, row: 2, col: 0 }))).toBe(false);
+  });
+
+  it('preserves static errors when kept rows are compacted', () => {
+    seedText(store, wb, 0, 0, 'alpha');
+    seedCell(store, wb, 0, 1, { kind: 'error', code: 7, text: '#ERR!' });
+    seedText(store, wb, 1, 0, 'alpha');
+    seedNumber(store, wb, 1, 1, 1);
+    seedText(store, wb, 2, 0, 'beta');
+    seedCell(store, wb, 2, 1, { kind: 'error', code: 15, text: '#VALUE!' });
+    mutators.setCellFormat(store, { sheet: 0, row: 2, col: 1 }, { bold: true });
+
+    const removed = removeDuplicates(
+      store.getState(),
+      store,
+      wb,
+      { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 },
+      { columns: [0] },
+    );
+
+    expect(removed).toBe(1);
+    expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toMatchObject({
+      kind: 'error',
+      code: 15,
+    });
+    expect(wb.getValue({ sheet: 0, row: 2, col: 1 })).toEqual({ kind: 'blank' });
+    expect(store.getState().format.formats.has(addrKey({ sheet: 0, row: 2, col: 1 }))).toBe(false);
   });
 
   it('compares only the selected columns when removing duplicates', () => {

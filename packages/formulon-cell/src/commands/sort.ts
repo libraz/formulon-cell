@@ -1,10 +1,12 @@
 import { addrKey } from '../engine/address.js';
-import type { Range } from '../engine/types.js';
+import type { Addr, CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import { recordCommentChange } from './comment.js';
 import { CUSTOM_LISTS } from './fill.js';
 import { inferAutoFilterRange } from './filter.js';
-import type { History } from './history.js';
+import { shiftFormulaRefs } from './formula-refs.js';
+import { type History, recordFormatChange } from './history.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
 /** Spreadsheet parity: refuse to sort when the range intersects any merge —
@@ -34,22 +36,34 @@ const ensureWritableRange = (state: State, range: Range): boolean => {
 
 const writeCellSnapshot = (
   wb: WorkbookHandle,
-  addr: { sheet: number; row: number; col: number },
-  cell: { value: unknown; formula: string | null } | null,
+  addr: Addr,
+  cell: { value: CellValue; formula: string | null } | null,
+  sourceRow = addr.row,
 ): void => {
   if (!cell) {
     wb.setBlank(addr);
     return;
   }
   if (cell.formula) {
-    wb.setFormula(addr, cell.formula);
+    wb.setFormula(addr, shiftFormulaRefs(cell.formula, addr.row - sourceRow, 0));
     return;
   }
-  const v = cell.value as { kind: string; value?: unknown };
-  if (v.kind === 'number') wb.setNumber(addr, v.value as number);
-  else if (v.kind === 'text') wb.setText(addr, v.value as string);
-  else if (v.kind === 'bool') wb.setBool(addr, v.value as boolean);
-  else wb.setBlank(addr);
+  switch (cell.value.kind) {
+    case 'number':
+      wb.setNumber(addr, cell.value.value);
+      return;
+    case 'text':
+      wb.setText(addr, cell.value.value);
+      return;
+    case 'bool':
+      wb.setBool(addr, cell.value.value);
+      return;
+    case 'error':
+      wb.setError(addr, cell.value.code);
+      return;
+    default:
+      wb.setBlank(addr);
+  }
 };
 
 export type SortDirection = 'asc' | 'desc';
@@ -87,6 +101,54 @@ export interface RemoveDuplicatesOptions {
 const cloneFormat = (fmt: CellFormat | undefined): CellFormat | undefined =>
   fmt ? { ...fmt } : undefined;
 
+/** Bring native-only notes into the format snapshot before sorting. A workbook
+ * can be edited through the engine API before the UI store is hydrated; those
+ * notes still have to move with their rows and participate in history. */
+const hydrateSortComments = (
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  range: Range,
+  startRow: number,
+): State => {
+  if (!wb.capabilities.comments) return store.getState();
+  const comments = wb.capabilities.commentsEnumerable
+    ? wb.getComments(range.sheet)
+    : Array.from(wb.cells(range.sheet)).flatMap((entry) => {
+        const comment = wb.getComment(range.sheet, entry.addr.row, entry.addr.col);
+        return comment
+          ? [
+              {
+                row: entry.addr.row,
+                col: entry.addr.col,
+                author: comment.author,
+                text: comment.text,
+              },
+            ]
+          : [];
+      });
+  const inRange = comments.filter(
+    (comment) =>
+      comment.row >= startRow &&
+      comment.row <= range.r1 &&
+      comment.col >= range.c0 &&
+      comment.col <= range.c1,
+  );
+  if (inRange.length === 0) return store.getState();
+  const current = store.getState();
+  const formats = new Map(current.format.formats);
+  let changed = false;
+  for (const comment of inRange) {
+    const key = addrKey({ sheet: range.sheet, row: comment.row, col: comment.col });
+    const previous = formats.get(key) ?? {};
+    if (previous.comment === comment.text && previous.commentAuthor === comment.author) continue;
+    formats.set(key, { ...previous, comment: comment.text, commentAuthor: comment.author });
+    changed = true;
+  }
+  if (!changed) return current;
+  store.setState((s) => ({ ...s, format: { ...s.format, formats } }));
+  return store.getState();
+};
+
 const MAX_SORT_CELLS = 100_000;
 
 const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
@@ -118,6 +180,8 @@ const normalizedSortKeys = (opts: SortOptions): SortKey[] => {
 const normalizeColorKey = (color: string): string => color.trim().toLocaleLowerCase();
 const normalizeListKey = (value: string): string => value.trim().toLocaleLowerCase();
 
+type SortValueKind = 'number' | 'text' | 'bool' | 'error' | 'blank' | 'color' | 'custom';
+
 const customListIndex = (value: string, list?: readonly string[]): number | null => {
   const lists = list ? [list] : CUSTOM_LISTS;
   const key = normalizeListKey(value);
@@ -134,7 +198,7 @@ const sortKeyForCell = (
   row: number,
   key: SortKey,
 ): {
-  kind: 'number' | 'text' | 'blank' | 'color' | 'custom';
+  kind: SortValueKind;
   n?: number;
   s?: string;
   match?: boolean;
@@ -159,20 +223,21 @@ const sortKeyForCell = (
   }
   if (v.kind === 'number') return { kind: 'number', n: v.value };
   if (v.kind === 'text') return { kind: 'text', s: v.value };
-  if (v.kind === 'bool') return { kind: 'number', n: v.value ? 1 : 0 };
+  if (v.kind === 'bool') return { kind: 'bool', n: v.value ? 1 : 0 };
+  if (v.kind === 'error') return { kind: 'error' };
   return { kind: 'blank' };
 };
 
 const compareSortKeys = (
   a: {
-    kind: 'number' | 'text' | 'blank' | 'color' | 'custom';
+    kind: SortValueKind;
     n?: number;
     s?: string;
     match?: boolean;
     customIndex?: number | null;
   },
   b: {
-    kind: 'number' | 'text' | 'blank' | 'color' | 'custom';
+    kind: SortValueKind;
     n?: number;
     s?: string;
     match?: boolean;
@@ -197,14 +262,28 @@ const compareSortKeys = (
   if (a.kind === 'blank' && b.kind === 'blank') return 0;
   if (a.kind === 'blank') return 1;
   if (b.kind === 'blank') return -1;
-  if (a.kind === 'number' && b.kind === 'number') return dir * ((a.n ?? 0) - (b.n ?? 0));
-  if (a.kind === 'text' && b.kind === 'text') {
-    return (
-      dir * (a.s ?? '').localeCompare(b.s ?? '', undefined, { numeric: true, sensitivity: 'base' })
-    );
+  const rank: Record<'number' | 'text' | 'bool' | 'error', number> = {
+    number: 0,
+    text: 1,
+    bool: 2,
+    error: 3,
+  };
+  if (a.kind !== b.kind) return dir * (rank[a.kind] - rank[b.kind]);
+  switch (a.kind) {
+    case 'number':
+    case 'bool':
+      return dir * ((a.n ?? 0) - (b.n ?? 0));
+    case 'text':
+      return (
+        dir *
+        (a.s ?? '').localeCompare(b.s ?? '', undefined, { numeric: false, sensitivity: 'base' })
+      );
+    case 'error':
+      // Errors retain their source order, matching Excel's stable sort.
+      return 0;
+    default:
+      return 0;
   }
-  // Mixed types: numbers before text in ascending order.
-  return a.kind === 'number' ? -1 * dir : 1 * dir;
 };
 
 const cellKindAt = (state: State, sheet: number, row: number, col: number): string => {
@@ -271,14 +350,15 @@ export function inferSortHasHeader(state: State, range: Range): boolean {
 }
 
 /** Sort the rows of `range` in place by the values in `byCol`. Writes the
- *  resulting cells back through `wb`. Numbers come first (ascending) then
- *  text, then blanks — same as the spreadsheet's default. */
+ *  resulting cells back through `wb`. Ascending value order is number, text,
+ *  bool, error, blank; blanks stay last for either direction. */
 export function sortRange(
   state: State,
   store: SpreadsheetStore,
   wb: WorkbookHandle,
   range: Range,
   opts: SortOptions,
+  history: History | null = null,
 ): boolean {
   const start = opts.hasHeader ? range.r0 + 1 : range.r0;
   if (start > range.r1) return false;
@@ -288,17 +368,18 @@ export function sortRange(
   if (!canRewriteExactRange(range, start)) return false;
   if (rangeIntersectsMerges(state, range)) return false;
   if (!ensureWritableRange(state, { ...range, r0: start })) return false;
+  state = hydrateSortComments(store, wb, range, start);
 
   // Snapshot the rows we'll move, including formula text so we can write it back.
   interface RowSnap {
     cells: Array<{
-      value: unknown;
+      value: CellValue;
       formula: string | null;
       col: number;
       format?: CellFormat;
     }>;
     sortKeys: Array<{
-      kind: 'number' | 'text' | 'blank' | 'color' | 'custom';
+      kind: SortValueKind;
       n?: number;
       s?: string;
       match?: boolean;
@@ -347,27 +428,60 @@ export function sortRange(
       if (!snap) continue;
       for (const cell of snap.cells) {
         const addr = { sheet: range.sheet, row: dstRow, col: cell.col };
-        writeCellSnapshot(wb, addr, cell);
+        writeCellSnapshot(wb, addr, cell, snaps[i]?.row ?? dstRow);
       }
     }
   });
-  store.setState((s) => {
-    const formats = new Map(s.format.formats);
-    for (let r = start; r <= range.r1; r += 1) {
-      for (let c = range.c0; c <= range.c1; c += 1) {
-        formats.delete(addrKey({ sheet: range.sheet, row: r, col: c }));
-      }
+  const affected: Addr[] = [];
+  for (let r = start; r <= range.r1; r += 1) {
+    for (let c = range.c0; c <= range.c1; c += 1) {
+      affected.push({ sheet: range.sheet, row: r, col: c });
     }
-    for (let i = 0; i < snaps.length; i += 1) {
-      const dstRow = start + i;
-      const snap = snaps[i]?.snap;
-      if (!snap) continue;
-      for (const cell of snap.cells) {
-        if (!cell.format) continue;
-        formats.set(addrKey({ sheet: range.sheet, row: dstRow, col: cell.col }), cell.format);
-      }
+  }
+  const commentTargets = new Map<string, Addr>();
+  const rememberComment = (addr: Addr, format: CellFormat | undefined): void => {
+    if (typeof format?.comment !== 'string' || format.comment.length === 0) return;
+    commentTargets.set(addrKey(addr), addr);
+  };
+  for (const addr of affected) {
+    rememberComment(addr, state.format.formats.get(addrKey(addr)));
+  }
+  for (let i = 0; i < snaps.length; i += 1) {
+    const dstRow = start + i;
+    const snap = snaps[i]?.snap;
+    if (!snap) continue;
+    for (const cell of snap.cells) {
+      rememberComment({ sheet: range.sheet, row: dstRow, col: cell.col }, cell.format);
     }
-    return { ...s, format: { ...s.format, formats } };
+  }
+  const applyFormats = (): void => {
+    store.setState((s) => {
+      const formats = new Map(s.format.formats);
+      for (const addr of affected) formats.delete(addrKey(addr));
+      for (let i = 0; i < snaps.length; i += 1) {
+        const dstRow = start + i;
+        const snap = snaps[i]?.snap;
+        if (!snap) continue;
+        for (const cell of snap.cells) {
+          if (!cell.format) continue;
+          formats.set(addrKey({ sheet: range.sheet, row: dstRow, col: cell.col }), cell.format);
+        }
+      }
+      return { ...s, format: { ...s.format, formats } };
+    });
+    for (const addr of commentTargets.values()) {
+      const format = store.getState().format.formats.get(addrKey(addr));
+      wb.setCommentEntry(
+        addr.sheet,
+        addr.row,
+        addr.col,
+        format?.commentAuthor ?? '',
+        format?.comment ?? '',
+      );
+    }
+  };
+  recordFormatChange(history, store, () => {
+    recordCommentChange(history, store, wb, [...commentTargets.values()], applyFormats);
   });
   wb.recalcAuto();
   return true;
@@ -418,7 +532,7 @@ export function removeDuplicates(
   // Snapshot kept rows then rewrite from r0.
   interface RowSnap {
     cells: Array<{
-      value: unknown;
+      value: CellValue;
       formula: string | null;
       col: number;
       format?: CellFormat;
@@ -506,7 +620,7 @@ export const sortRangeWithHistory = (deps: SortRangeWithHistoryDeps): boolean =>
   history.begin();
   let ok = false;
   try {
-    ok = sortRange(state, store, workbook, range, options);
+    ok = sortRange(state, store, workbook, range, options, history);
   } finally {
     history.end();
   }

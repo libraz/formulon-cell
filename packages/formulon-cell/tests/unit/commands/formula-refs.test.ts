@@ -177,6 +177,46 @@ describe('adjustFormulaForRowColEdit — insert/delete rows/cols', () => {
       "=シート1!A3+'シート 2'!A3",
     );
   });
+
+  it('adjusts cell-band refs by their resolved sheet binding', () => {
+    const affected = { r0: 1, c0: 0, r1: 1048575, c1: 0 };
+    const sourceFormula = {
+      editedSheet: 0,
+      formulaSheet: 0,
+      sheetNames: ['Source', 'Target'],
+    } as const;
+    const targetFormula = { ...sourceFormula, formulaSheet: 1 };
+    expect(
+      adjustFormulaForCellBandShift(
+        '=Source!$A$2+Source!A1:A3+A2',
+        affected,
+        'down',
+        1,
+        sourceFormula,
+      ),
+    ).toBe('=Source!$A$3+Source!A1:A4+A3');
+    expect(
+      adjustFormulaForCellBandShift(
+        '=Source!$A$2+Source!A1:A3+A2',
+        affected,
+        'down',
+        1,
+        targetFormula,
+      ),
+    ).toBe('=Source!$A$3+Source!A1:A4+A2');
+    expect(
+      adjustFormulaForCellBandShift('=Source!A:A+Source!1:3', affected, 'down', 1, targetFormula),
+    ).toBe('=Source!A:A+Source!1:3');
+    expect(
+      adjustFormulaForCellBandShift(
+        '=Source!$A$3+Source!A1:A3',
+        { ...affected, r0: 2 },
+        'down',
+        -1,
+        targetFormula,
+      ),
+    ).toBe('=Source!#REF!+Source!A1:A2');
+  });
 });
 
 describe('adjustFormulaForCellBandShift — insert/delete cells', () => {

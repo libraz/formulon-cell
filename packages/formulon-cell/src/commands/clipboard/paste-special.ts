@@ -96,6 +96,7 @@ const wantsNumFmt = (what: PasteWhat): boolean =>
 
 const MAX_ROW = 1_048_575;
 const MAX_COL = 16_383;
+const MAX_PASTE_CELLS = 1_000_000;
 
 const rangesIntersect = (a: Range, b: Range): boolean =>
   a.sheet === b.sheet && !(a.r1 < b.r0 || a.r0 > b.r1 || a.c1 < b.c0 || a.c0 > b.c1);
@@ -106,6 +107,13 @@ const rangeContains = (outer: Range, inner: Range): boolean =>
   inner.c0 >= outer.c0 &&
   inner.r1 <= outer.r1 &&
   inner.c1 <= outer.c1;
+
+const sameRange = (left: Range, right: Range): boolean =>
+  left.sheet === right.sheet &&
+  left.r0 === right.r0 &&
+  left.c0 === right.c0 &&
+  left.r1 === right.r1 &&
+  left.c1 === right.c1;
 
 const removeIntersectingMerges = (
   byAnchor: Map<string, Range>,
@@ -140,43 +148,49 @@ const addMerge = (
 
 const translateMerges = (
   snap: ClipboardSnapshot,
-  origin: Addr,
+  destination: Range,
   transpose: boolean,
 ): Range[] | null => {
   const out: Range[] = [];
-  for (const merge of snap.merges ?? []) {
-    if (
-      !Number.isInteger(merge.r0) ||
-      !Number.isInteger(merge.c0) ||
-      !Number.isInteger(merge.r1) ||
-      !Number.isInteger(merge.c1) ||
-      merge.r0 < 0 ||
-      merge.c0 < 0 ||
-      merge.r1 < merge.r0 ||
-      merge.c1 < merge.c0 ||
-      merge.r1 >= snap.rows ||
-      merge.c1 >= snap.cols ||
-      (merge.sheet !== undefined && merge.sheet !== snap.range.sheet)
-    ) {
-      return null;
+  const tileRows = transpose ? snap.cols : snap.rows;
+  const tileCols = transpose ? snap.rows : snap.cols;
+  for (let tileRow = destination.r0; tileRow <= destination.r1; tileRow += tileRows) {
+    for (let tileCol = destination.c0; tileCol <= destination.c1; tileCol += tileCols) {
+      for (const merge of snap.merges ?? []) {
+        if (
+          !Number.isInteger(merge.r0) ||
+          !Number.isInteger(merge.c0) ||
+          !Number.isInteger(merge.r1) ||
+          !Number.isInteger(merge.c1) ||
+          merge.r0 < 0 ||
+          merge.c0 < 0 ||
+          merge.r1 < merge.r0 ||
+          merge.c1 < merge.c0 ||
+          merge.r1 >= snap.rows ||
+          merge.c1 >= snap.cols ||
+          (merge.sheet !== undefined && merge.sheet !== snap.range.sheet)
+        ) {
+          return null;
+        }
+        out.push(
+          transpose
+            ? {
+                sheet: destination.sheet,
+                r0: tileRow + merge.c0,
+                c0: tileCol + merge.r0,
+                r1: tileRow + merge.c1,
+                c1: tileCol + merge.r1,
+              }
+            : {
+                sheet: destination.sheet,
+                r0: tileRow + merge.r0,
+                c0: tileCol + merge.c0,
+                r1: tileRow + merge.r1,
+                c1: tileCol + merge.c1,
+              },
+        );
+      }
     }
-    out.push(
-      transpose
-        ? {
-            sheet: origin.sheet,
-            r0: origin.row + merge.c0,
-            c0: origin.col + merge.r0,
-            r1: origin.row + merge.c1,
-            c1: origin.col + merge.r1,
-          }
-        : {
-            sheet: origin.sheet,
-            r0: origin.row + merge.r0,
-            c0: origin.col + merge.c0,
-            r1: origin.row + merge.r1,
-            c1: origin.col + merge.c1,
-          },
-    );
   }
   return out;
 };
@@ -190,6 +204,57 @@ const destinationRangeFor = (origin: Addr, rows: number, cols: number): Range | 
 };
 
 /**
+ * Resolve the destination footprint for an internal clipboard paste.
+ *
+ * A copied matrix repeats only when the current primary selection is a
+ * normalized, exact multiple of the (possibly transposed) source tile. This
+ * includes the full logical footprint selected by a merged-cell click; the
+ * paste path preserves that merge for a scalar source.
+ */
+export function resolvePasteDestination(
+  state: State,
+  snap: ClipboardSnapshot,
+  transpose = false,
+): Range | null {
+  const tileRows = transpose ? snap.cols : snap.rows;
+  const tileCols = transpose ? snap.rows : snap.cols;
+  if (!Number.isInteger(tileRows) || !Number.isInteger(tileCols)) return null;
+  if (tileRows <= 0 || tileCols <= 0) return null;
+
+  const active = state.selection.active;
+  let origin = { row: active.row, col: active.col };
+  let rows = tileRows;
+  let cols = tileCols;
+  const selected = state.selection.range;
+  const normalized = {
+    sheet: selected.sheet,
+    r0: Math.min(selected.r0, selected.r1),
+    c0: Math.min(selected.c0, selected.c1),
+    r1: Math.max(selected.r0, selected.r1),
+    c1: Math.max(selected.c0, selected.c1),
+  };
+  const selectedRows = normalized.r1 - normalized.r0 + 1;
+  const selectedCols = normalized.c1 - normalized.c0 + 1;
+  const canRepeat =
+    snap.mode === 'copy' &&
+    normalized.sheet === active.sheet &&
+    normalized.r0 >= 0 &&
+    normalized.c0 >= 0 &&
+    selectedRows >= tileRows &&
+    selectedCols >= tileCols &&
+    selectedRows % tileRows === 0 &&
+    selectedCols % tileCols === 0;
+  if (canRepeat) {
+    origin = { row: normalized.r0, col: normalized.c0 };
+    rows = selectedRows;
+    cols = selectedCols;
+  }
+  const destination = destinationRangeFor({ sheet: active.sheet, ...origin }, rows, cols);
+  if (!destination || rows * cols > MAX_PASTE_CELLS) return null;
+  return destination;
+}
+
+/**
  * Validate every cell and merge touched by a paste before the first mutation.
  * Excel rejects a matrix that would split a destination merge; allowing the
  * write and repairing the merge afterward loses data and makes undo partial.
@@ -197,15 +262,10 @@ const destinationRangeFor = (origin: Addr, rows: number, cols: number): Range | 
 const preflight = (
   state: State,
   snap: ClipboardSnapshot,
-  origin: Addr,
-  destRows: number,
-  destCols: number,
+  destination: Range,
   what: PasteWhat,
   transpose: boolean,
-): { destination: Range; translatedMerges: Range[] } | null => {
-  const destination = destinationRangeFor(origin, destRows, destCols);
-  if (!destination) return null;
-
+): { destination: Range; translatedMerges: Range[]; preservedMerges: Range[] } | null => {
   for (let row = destination.r0; row <= destination.r1; row += 1) {
     for (let col = destination.c0; col <= destination.c1; col += 1) {
       if (!isCellWritable(state, { sheet: destination.sheet, row, col })) return null;
@@ -238,12 +298,20 @@ const preflight = (
     }
   }
 
-  const translatedMerges = wantsFormats(what) ? translateMerges(snap, origin, transpose) : [];
+  const translatedMerges = wantsFormats(what) ? translateMerges(snap, destination, transpose) : [];
   if (translatedMerges === null) return null;
   for (const merge of translatedMerges) {
     if (!rangeContains(destination, merge)) return null;
   }
-  return { destination, translatedMerges };
+  // A scalar paste into the exact logical footprint of a merged cell updates
+  // its anchor and keeps the merge. Non-scalar tiles intentionally continue
+  // through the normal topology replacement path (Excel unmerges those
+  // covered cells unless the source carries a matching merge).
+  const preservedMerges =
+    snap.rows === 1 && snap.cols === 1
+      ? [...state.merges.byAnchor.values()].filter((merge) => sameRange(merge, destination))
+      : [];
+  return { destination, translatedMerges, preservedMerges };
 };
 
 const commentText = (format: CellFormat | undefined): string | null =>
@@ -339,12 +407,6 @@ export function pasteSpecial(
   opt: PasteSpecialOptions,
   history: History | null = null,
 ): PasteSpecialResult | null {
-  const origin: Addr = state.selection.active;
-  const sheet = origin.sheet;
-
-  const destRows = opt.transpose ? snap.cols : snap.rows;
-  const destCols = opt.transpose ? snap.rows : snap.cols;
-
   // A cut owns the source payload and clears it only after a legal move has
   // passed preflight. Paste Special variants would omit part of that payload
   // (or change its geometry), so accepting them would destroy source data.
@@ -357,7 +419,9 @@ export function pasteSpecial(
   }
 
   const current = store.getState();
-  const checked = preflight(current, snap, origin, destRows, destCols, opt.what, opt.transpose);
+  const resolvedDestination = resolvePasteDestination(current, snap, opt.transpose);
+  if (!resolvedDestination) return null;
+  const checked = preflight(current, snap, resolvedDestination, opt.what, opt.transpose);
   if (!checked) return null;
 
   // Excel treats cutting and pasting back onto the exact source rectangle as a
@@ -383,6 +447,9 @@ export function pasteSpecial(
 
   const applyTopology = wantsFormats(opt.what);
   const destination = checked.destination;
+  const sheet = destination.sheet;
+  const destRows = destination.r1 - destination.r0 + 1;
+  const destCols = destination.c1 - destination.c0 + 1;
   const source = snap.range;
   const sourceCut = snap.mode === 'cut';
   const sheetNames = sourceCut ? sheetNamesFor(wb) : [];
@@ -398,7 +465,7 @@ export function pasteSpecial(
     removalsBySheet.set(range.sheet, list);
   };
   if (sourceCut) addRemoval(source);
-  if (applyTopology) addRemoval(destination);
+  if (applyTopology && checked.preservedMerges.length === 0) addRemoval(destination);
   for (const [mergeSheet, removals] of removalsBySheet) {
     recordMergesChangeWithEngine(history, store, wb, mergeSheet, () => {
       mutateMergeSlice(store, mergeSheet, removals, []);
@@ -413,15 +480,24 @@ export function pasteSpecial(
   wb.withBatchedRecalc(() => {
     for (let dr = 0; dr < destRows; dr += 1) {
       for (let dc = 0; dc < destCols; dc += 1) {
-        const sr = opt.transpose ? dc : dr;
-        const sc = opt.transpose ? dr : dc;
+        const row = destination.r0 + dr;
+        const col = destination.c0 + dc;
+        const preservedBody = checked.preservedMerges.some(
+          (merge) =>
+            row >= merge.r0 &&
+            row <= merge.r1 &&
+            col >= merge.c0 &&
+            col <= merge.c1 &&
+            (row !== merge.r0 || col !== merge.c0),
+        );
+        if (preservedBody) continue;
+        const sr = opt.transpose ? dc % snap.rows : dr % snap.rows;
+        const sc = opt.transpose ? dr % snap.cols : dc % snap.cols;
         const src = snap.cells[sr]?.[sc];
         if (!src) continue;
         const isBlankSrc = src.value.kind === 'blank' && !src.formula && !src.format;
         if (opt.skipBlanks && isBlankSrc) continue;
 
-        const row = origin.row + dr;
-        const col = origin.col + dc;
         const addr: Addr = { sheet, row, col };
         // Sheet protection — silently skip locked destinations (spreadsheet parity).
         if (!isCellWritable(state, addr)) continue;
@@ -596,13 +672,7 @@ export function pasteSpecial(
   }
 
   // Move active selection to the written range.
-  const writtenRange: Range = {
-    sheet,
-    r0: origin.row,
-    c0: origin.col,
-    r1: origin.row + destRows - 1,
-    c1: origin.col + destCols - 1,
-  };
+  const writtenRange: Range = { ...destination };
   mutators.setActive(store, { sheet, row: writtenRange.r0, col: writtenRange.c0 });
   if (writtenRange.r0 !== writtenRange.r1 || writtenRange.c0 !== writtenRange.c1) {
     mutators.extendRangeTo(store, { sheet, row: writtenRange.r1, col: writtenRange.c1 });

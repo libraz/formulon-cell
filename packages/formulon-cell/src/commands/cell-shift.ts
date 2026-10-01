@@ -1,7 +1,8 @@
 import { addrKey } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
+import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import { listComments, recordCommentChange } from './comment.js';
 import { adjustFormulaForCellBandShift } from './formula-refs.js';
 import { type History, recordFormatChange, recordMergesChangeWithEngine } from './history.js';
 import { isSheetProtected } from './protection.js';
@@ -13,6 +14,12 @@ interface CellRecord {
   addr: Addr;
   value: CellValue;
   formula: string | null;
+}
+
+interface EngineCommentRecord {
+  addr: Addr;
+  author: string;
+  text: string;
 }
 
 const MAX_ROW = 1048575;
@@ -36,6 +43,7 @@ export function insertCells(
       ? { sheet, r0: range.r0, c0: range.c0, r1: MAX_ROW, c1: range.c1 }
       : { sheet, r0: range.r0, c0: range.c0, r1: range.r1, c1: MAX_COL };
   const delta = direction === 'down' ? range.r1 - range.r0 + 1 : range.c1 - range.c0 + 1;
+  if (delta > 0 && shiftWouldOverflow(store, wb, affected, direction, delta)) return false;
   return shiftCellBand(store, wb, history, affected, direction, delta);
 }
 
@@ -75,15 +83,43 @@ function shiftCellBand(
   try {
     const beforeCells =
       history && !history.isReplaying() ? collectSheetCells(wb, affected.sheet) : null;
+    const beforeExternalFormulas =
+      history && !history.isReplaying() ? collectExternalFormulaCells(wb, affected.sheet) : null;
     shiftCells(wb, affected, axis, delta);
-    if (history && beforeCells) {
+    if (history && beforeCells && beforeExternalFormulas) {
       const afterCells = collectSheetCells(wb, affected.sheet);
+      const afterExternalFormulas = collectExternalFormulaCells(wb, affected.sheet);
       history.push({
-        undo: () => restoreSheetCells(wb, affected.sheet, beforeCells),
-        redo: () => restoreSheetCells(wb, affected.sheet, afterCells),
+        undo: () => {
+          restoreSheetCells(wb, affected.sheet, beforeCells);
+          restoreFormulaCells(wb, beforeExternalFormulas);
+        },
+        redo: () => {
+          restoreSheetCells(wb, affected.sheet, afterCells);
+          restoreFormulaCells(wb, afterExternalFormulas);
+        },
       });
     }
-    shiftFormats(store, history, affected, axis, delta);
+    const initialStoreCommentAddresses = listComments(store.getState(), affected.sheet)
+      .filter((comment) => inRange(comment.addr, affected))
+      .map((comment) => comment.addr);
+    const initialStoreCommentKeys = new Set(initialStoreCommentAddresses.map(addrKey));
+    const engineComments = collectEngineComments(wb, affected, initialStoreCommentAddresses);
+    hydrateEngineOnlyComments(store, engineComments, initialStoreCommentKeys);
+    const storeCommentAddresses = listComments(store.getState(), affected.sheet)
+      .filter((comment) => inRange(comment.addr, affected))
+      .map((comment) => comment.addr);
+    const commentAddresses = collectShiftCommentAddresses(
+      storeCommentAddresses,
+      engineComments,
+      affected,
+      axis,
+      delta,
+    );
+    recordCommentChange(history, store, wb, commentAddresses, () => {
+      shiftFormats(store, history, affected, axis, delta);
+      shiftEngineComments(wb, affected, axis, delta, engineComments);
+    });
     shiftMerges(store, wb, history, affected, axis, delta);
     wb.recalcAuto();
   } finally {
@@ -93,20 +129,127 @@ function shiftCellBand(
 }
 
 function collectSheetCells(wb: WorkbookHandle, sheet: number): CellRecord[] {
-  return Array.from(wb.cells(sheet)).map<CellRecord>((c) => ({
+  return Array.from(wb.physicalCells(sheet)).map<CellRecord>((c) => ({
     addr: c.addr,
     value: c.value,
     formula: c.formula,
   }));
 }
 
+function collectExternalFormulaCells(wb: WorkbookHandle, editedSheet: number): CellRecord[] {
+  const formulas: CellRecord[] = [];
+  for (let sheet = 0; sheet < wb.sheetCount; sheet += 1) {
+    if (sheet === editedSheet) continue;
+    for (const cell of wb.physicalCells(sheet)) {
+      if (!cell.formula) continue;
+      formulas.push({ addr: cell.addr, value: cell.value, formula: cell.formula });
+    }
+  }
+  return formulas;
+}
+
 function restoreSheetCells(wb: WorkbookHandle, sheet: number, cells: readonly CellRecord[]): void {
-  const existing = Array.from(wb.cells(sheet));
+  const existing = Array.from(wb.physicalCells(sheet));
   wb.withBatchedRecalc(() => {
     for (const cell of existing) wb.setBlank(cell.addr);
     for (const cell of cells) writeCell(wb, cell.addr, cell.value, cell.formula);
   });
   wb.recalcAuto();
+}
+
+function restoreFormulaCells(wb: WorkbookHandle, cells: readonly CellRecord[]): void {
+  wb.withBatchedRecalc(() => {
+    for (const cell of cells) {
+      if (cell.formula) wb.setFormula(cell.addr, cell.formula);
+    }
+  });
+  wb.recalcAuto();
+}
+
+function collectShiftCommentAddresses(
+  storeCommentAddresses: readonly Addr[],
+  engineComments: readonly EngineCommentRecord[],
+  affected: Range,
+  axis: InsertCellsDirection,
+  delta: number,
+): Addr[] {
+  const tracked = new Map<string, Addr>();
+  const add = (addr: Addr): void => {
+    tracked.set(addrKey(addr), addr);
+  };
+  for (const addr of storeCommentAddresses) {
+    add(addr);
+    const shifted = shiftedCommentAddr(addr, axis, delta);
+    if (inShiftTarget(shifted, affected, axis)) add(shifted);
+  }
+  for (const comment of engineComments) {
+    add(comment.addr);
+    const shifted = shiftedCommentAddr(comment.addr, axis, delta);
+    if (inShiftTarget(shifted, affected, axis)) add(shifted);
+  }
+  return [...tracked.values()];
+}
+
+function shiftedCommentAddr(addr: Addr, axis: InsertCellsDirection, delta: number): Addr {
+  return axis === 'down' ? { ...addr, row: addr.row + delta } : { ...addr, col: addr.col + delta };
+}
+
+function shiftEngineComments(
+  wb: WorkbookHandle,
+  affected: Range,
+  axis: InsertCellsDirection,
+  delta: number,
+  entries: readonly EngineCommentRecord[],
+): void {
+  if (!wb.capabilities.comments) return;
+  if (entries.length === 0) return;
+
+  wb.withBatchedRecalc(() => {
+    for (const entry of entries) {
+      wb.setCommentEntry(entry.addr.sheet, entry.addr.row, entry.addr.col, '', '');
+    }
+    for (const entry of entries) {
+      const shifted = shiftedCommentAddr(entry.addr, axis, delta);
+      if (!inShiftTarget(shifted, affected, axis)) continue;
+      wb.setCommentEntry(shifted.sheet, shifted.row, shifted.col, entry.author, entry.text);
+    }
+  });
+}
+
+function collectEngineComments(
+  wb: WorkbookHandle,
+  affected: Range,
+  storeCommentAddresses: readonly Addr[],
+): EngineCommentRecord[] {
+  const entries = wb.capabilities.commentsEnumerable
+    ? wb.getComments(affected.sheet).map((comment) => ({
+        addr: { sheet: affected.sheet, row: comment.row, col: comment.col },
+        author: comment.author,
+        text: comment.text,
+      }))
+    : storeCommentAddresses.flatMap((addr) => {
+        const comment = wb.getComment(addr.sheet, addr.row, addr.col);
+        return comment ? [{ addr, author: comment.author, text: comment.text }] : [];
+      });
+  const unique = new Map<string, EngineCommentRecord>();
+  for (const entry of entries) {
+    if (inRange(entry.addr, affected)) unique.set(addrKey(entry.addr), entry);
+  }
+  return [...unique.values()];
+}
+
+function hydrateEngineOnlyComments(
+  store: SpreadsheetStore,
+  entries: readonly EngineCommentRecord[],
+  storeCommentKeys: ReadonlySet<string>,
+): void {
+  for (const entry of entries) {
+    if (storeCommentKeys.has(addrKey(entry.addr))) continue;
+    mutators.setCellFormat(store, entry.addr, {
+      comment: entry.text,
+      commentAuthor: entry.author || undefined,
+    });
+  }
 }
 
 function shiftCells(
@@ -124,11 +267,15 @@ function writeShiftedCells(
   axis: InsertCellsDirection,
   delta: number,
 ): void {
-  const all = Array.from(wb.cells(affected.sheet)).map<CellRecord>((c) => ({
-    addr: c.addr,
-    value: c.value,
-    formula: c.formula,
-  }));
+  const allSheets = Array.from({ length: wb.sheetCount }, (_, sheet) =>
+    Array.from(wb.physicalCells(sheet)).map<CellRecord>((c) => ({
+      addr: c.addr,
+      value: c.value,
+      formula: c.formula,
+    })),
+  );
+  const all = allSheets[affected.sheet] ?? [];
+  const sheetNames = Array.from({ length: wb.sheetCount }, (_, sheet) => wb.sheetName(sheet));
   const moving = all.filter((cell) => inRange(cell.addr, affected));
   for (const cell of moving) wb.setBlank(cell.addr);
 
@@ -144,14 +291,24 @@ function writeShiftedCells(
         : { ...cell.addr, col: cell.addr.col + delta };
     if (!inShiftTarget(next, affected, axis)) continue;
     const formula = cell.formula
-      ? adjustFormulaForCellBandShift(cell.formula, affected, axis, delta)
+      ? adjustFormulaForCellBandShift(cell.formula, affected, axis, delta, {
+          editedSheet: affected.sheet,
+          formulaSheet: affected.sheet,
+          sheetNames,
+        })
       : null;
     writeCell(wb, next, cell.value, formula);
   }
 
-  for (const cell of all) {
-    if (cell.formula && !inRange(cell.addr, affected)) {
-      const nextFormula = adjustFormulaForCellBandShift(cell.formula, affected, axis, delta);
+  for (let sheet = 0; sheet < allSheets.length; sheet += 1) {
+    const formulaSheet = allSheets[sheet] ?? [];
+    for (const cell of formulaSheet) {
+      if (!cell.formula || (sheet === affected.sheet && inRange(cell.addr, affected))) continue;
+      const nextFormula = adjustFormulaForCellBandShift(cell.formula, affected, axis, delta, {
+        editedSheet: affected.sheet,
+        formulaSheet: sheet,
+        sheetNames,
+      });
       if (nextFormula !== cell.formula) wb.setFormula(cell.addr, nextFormula);
     }
   }
@@ -215,6 +372,57 @@ function canShiftMerges(state: State, affected: Range, axis: InsertCellsDirectio
     }
   }
   return true;
+}
+
+function shiftWouldOverflow(
+  store: SpreadsheetStore,
+  wb: WorkbookHandle,
+  affected: Range,
+  axis: InsertCellsDirection,
+  delta: number,
+): boolean {
+  const overflows = (addr: Addr): boolean => {
+    if (!inRange(addr, affected)) return false;
+    return axis === 'down' ? addr.row + delta > MAX_ROW : addr.col + delta > MAX_COL;
+  };
+  for (const cell of wb.physicalCells(affected.sheet)) {
+    if (overflows(cell.addr)) {
+      // eslint-disable-next-line no-console
+      console.warn('formulon-cell: cell shift blocked — content would leave the worksheet');
+      return true;
+    }
+  }
+  for (const key of store.getState().format.formats.keys()) {
+    const parts = key.split(':');
+    if (parts.length !== 3) continue;
+    const addr: Addr = { sheet: Number(parts[0]), row: Number(parts[1]), col: Number(parts[2]) };
+    if (overflows(addr)) {
+      // eslint-disable-next-line no-console
+      console.warn('formulon-cell: cell shift blocked — format would leave the worksheet');
+      return true;
+    }
+  }
+  if (wb.capabilities.commentsEnumerable) {
+    for (const comment of wb.getComments(affected.sheet)) {
+      if (overflows({ sheet: affected.sheet, row: comment.row, col: comment.col })) {
+        // eslint-disable-next-line no-console
+        console.warn('formulon-cell: cell shift blocked — comment would leave the worksheet');
+        return true;
+      }
+    }
+  }
+  for (const merge of store.getState().merges.byAnchor.values()) {
+    if (merge.sheet !== affected.sheet || !mergeIntersectsShiftBand(merge, affected, axis)) {
+      continue;
+    }
+    const shifted = shiftRange(merge, axis, delta);
+    if (shifted.r1 > MAX_ROW || shifted.c1 > MAX_COL) {
+      // eslint-disable-next-line no-console
+      console.warn('formulon-cell: cell shift blocked — merge would leave the worksheet');
+      return true;
+    }
+  }
+  return false;
 }
 
 function shiftFormatMap(

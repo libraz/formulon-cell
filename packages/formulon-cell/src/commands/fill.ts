@@ -21,6 +21,7 @@ interface SourceCell {
   numeric: number | null;
   text: string | null;
   bool: boolean | null;
+  errorCode: number | null;
   blank: boolean;
 }
 
@@ -170,6 +171,7 @@ function readSource(state: State, src: Range): SourceCell[][] {
           numeric: null,
           text: null,
           bool: null,
+          errorCode: null,
           blank: true,
         });
         continue;
@@ -182,6 +184,7 @@ function readSource(state: State, src: Range): SourceCell[][] {
         numeric: v.kind === 'number' ? v.value : null,
         text: v.kind === 'text' ? v.value : null,
         bool: v.kind === 'bool' ? v.value : null,
+        errorCode: v.kind === 'error' ? v.code : null,
         blank: v.kind === 'blank' && !cell.formula,
       });
     }
@@ -210,19 +213,23 @@ function detectDirection(src: Range, dest: Range): FillDir {
 interface SeriesProjection {
   /** Project the value at extension index `i` (1-based; 1 = first cell beyond
    *  source in the fill direction). Returns null when no value should be written. */
-  at(
-    i: number,
-  ): { kind: 'number'; value: number } | { kind: 'text'; value: string } | { kind: 'blank' } | null;
+  at(i: number): ProjectedCell | null;
 }
 
+type ProjectedCell =
+  | { kind: 'number'; value: number }
+  | { kind: 'text'; value: string }
+  | { kind: 'bool'; value: boolean }
+  | { kind: 'error'; code: number }
+  | { kind: 'formula'; formula: string; source: SourceCell }
+  | { kind: 'blank' };
+
 /**
- * Inspect a 1D source line and produce a series projector. the spreadsheet heuristic:
- *  - all-numeric, length >= 3 and constant non-zero ratio → growth extrapolation
- *  - all-numeric, length >= 2 → linear extrapolation (step = avg consecutive diff)
- *  - all-numeric, length 1   → copy
- *  - "Item 1", "Item 2"      → increment trailing integer
- *  - "Item 1"                → copy
- *  - mixed                   → cycle
+ * Inspect a 1D source line and produce a series projector. Excel's default
+ * AutoFill uses a least-squares linear trend for a numeric source, rather than
+ * interpreting a stable ratio as a growth series. Formula slots in a mixed
+ * source are tiled with shifted references; numeric slots advance by one per
+ * repeated cycle and all other typed slots are copied as-is.
  */
 type DateFillUnit = 'days' | 'weekdays' | 'months' | 'years';
 
@@ -281,7 +288,11 @@ function buildDateProjection(line: SourceCell[], unit: DateFillUnit): SeriesProj
   };
 }
 
-function buildProjection(line: SourceCell[], dateUnit?: DateFillUnit): SeriesProjection {
+function buildProjection(
+  line: SourceCell[],
+  dateUnit?: DateFillUnit,
+  numericCycleSign: 1 | -1 = 1,
+): SeriesProjection {
   if (line.length === 0) {
     return { at: () => null };
   }
@@ -293,29 +304,23 @@ function buildProjection(line: SourceCell[], dateUnit?: DateFillUnit): SeriesPro
       const v = line[0]?.numeric ?? 0;
       return { at: () => ({ kind: 'number', value: v }) };
     }
-    if (line.length >= 3 && line.every((c) => c.numeric !== 0)) {
-      const first = line[0]?.numeric ?? 0;
-      const second = line[1]?.numeric ?? 0;
-      const ratio = second / first;
-      const isGrowth =
-        Number.isFinite(ratio) &&
-        line.slice(1).every((c, i) => {
-          const prev = line[i]?.numeric ?? 0;
-          const current = c.numeric ?? 0;
-          return Math.abs(current / prev - ratio) <= 1e-10;
-        });
-      if (isGrowth) {
-        const last = line[line.length - 1]?.numeric ?? 0;
-        return { at: (i) => ({ kind: 'number', value: last * ratio ** i }) };
-      }
+    // Fit y = intercept + slope*x for x = 0, …, n-1. This gives Excel's
+    // default linear-trend projection for irregular samples such as 1, 2, 4.
+    const n = line.length;
+    const meanX = (n - 1) / 2;
+    const meanY = line.reduce((sum, cell) => sum + (cell.numeric ?? 0), 0) / n;
+    let covariance = 0;
+    let variance = 0;
+    for (let x = 0; x < n; x += 1) {
+      const dx = x - meanX;
+      covariance += dx * ((line[x]?.numeric ?? 0) - meanY);
+      variance += dx * dx;
     }
-    let stepSum = 0;
-    for (let i = 1; i < line.length; i += 1) {
-      stepSum += (line[i]?.numeric ?? 0) - (line[i - 1]?.numeric ?? 0);
-    }
-    const step = stepSum / (line.length - 1);
-    const last = line[line.length - 1]?.numeric ?? 0;
-    return { at: (i) => ({ kind: 'number', value: last + step * i }) };
+    const slope = variance === 0 ? 0 : covariance / variance;
+    const intercept = meanY - slope * meanX;
+    return {
+      at: (i) => ({ kind: 'number', value: intercept + slope * (n - 1 + i) }),
+    };
   }
 
   // Custom list match (e.g. Mon/Tue/Wed, Jan/Feb...) — preserves the casing
@@ -384,7 +389,29 @@ function buildProjection(line: SourceCell[], dateUnit?: DateFillUnit): SeriesPro
     }
   }
 
-  // Cycle/copy.
+  // A mixed formula/value source repeats its slots. Formula refs shift from
+  // their original source address, while numeric slots advance one per cycle.
+  // This branch also handles formula-only lines, preserving formula errors as
+  // formulas rather than converting their current error result to a literal.
+  if (line.some((c) => c.formula !== null)) {
+    return {
+      at: (i) => {
+        const cycle = Math.floor((i - 1) / line.length) + 1;
+        const idx = (((i - 1) % line.length) + line.length) % line.length;
+        const c = line[idx];
+        if (!c) return null;
+        if (c.formula !== null) return { kind: 'formula', formula: c.formula, source: c };
+        if (c.numeric !== null)
+          return { kind: 'number', value: c.numeric + numericCycleSign * cycle };
+        if (c.text !== null) return { kind: 'text', value: c.text };
+        if (c.bool !== null) return { kind: 'bool', value: c.bool };
+        if (c.errorCode !== null) return { kind: 'error', code: c.errorCode };
+        return { kind: 'blank' };
+      },
+    };
+  }
+
+  // Cycle/copy for non-formula typed values.
   return {
     at: (i) => {
       const idx = (((i - 1) % line.length) + line.length) % line.length;
@@ -392,7 +419,8 @@ function buildProjection(line: SourceCell[], dateUnit?: DateFillUnit): SeriesPro
       if (!c) return null;
       if (c.numeric !== null) return { kind: 'number', value: c.numeric };
       if (c.text !== null) return { kind: 'text', value: c.text };
-      if (c.bool !== null) return { kind: 'text', value: c.bool ? 'TRUE' : 'FALSE' };
+      if (c.bool !== null) return { kind: 'bool', value: c.bool };
+      if (c.errorCode !== null) return { kind: 'error', code: c.errorCode };
       return { kind: 'blank' };
     },
   };
@@ -404,17 +432,47 @@ const writeProjected = (
   row: number,
   col: number,
   projected: ReturnType<SeriesProjection['at']>,
-): void => {
-  if (!projected) return;
+): boolean => {
+  if (!projected) return false;
   if (projected.kind === 'number') wb.setNumber({ sheet, row, col }, projected.value);
   else if (projected.kind === 'text') wb.setText({ sheet, row, col }, projected.value);
-  else wb.setBlank({ sheet, row, col });
+  else if (projected.kind === 'bool') wb.setBool({ sheet, row, col }, projected.value);
+  else if (projected.kind === 'error') wb.setError({ sheet, row, col }, projected.code);
+  else if (projected.kind === 'formula') {
+    wb.setFormula(
+      { sheet, row, col },
+      shiftFormulaRefs(projected.formula, row - projected.source.row, col - projected.source.col),
+    );
+  } else wb.setBlank({ sheet, row, col });
+  return true;
 };
 
-const cloneFormat = (format: CellFormat): CellFormat => ({
-  ...format,
-  borders: format.borders ? { ...format.borders } : undefined,
-});
+const projectedCell = (cell: SourceCell | undefined): ProjectedCell => {
+  if (!cell || cell.blank) return { kind: 'blank' };
+  if (cell.formula !== null) return { kind: 'formula', formula: cell.formula, source: cell };
+  if (cell.numeric !== null) return { kind: 'number', value: cell.numeric };
+  if (cell.text !== null) return { kind: 'text', value: cell.text };
+  if (cell.bool !== null) return { kind: 'bool', value: cell.bool };
+  if (cell.errorCode !== null) return { kind: 'error', code: cell.errorCode };
+  return { kind: 'blank' };
+};
+
+const cloneFormat = (format: CellFormat): CellFormat => {
+  const clone: CellFormat = {
+    ...format,
+    borders: format.borders ? { ...format.borders } : undefined,
+  };
+  delete clone.comment;
+  delete clone.commentAuthor;
+  return clone;
+};
+
+const preserveDestinationComments = (source: CellFormat, destination?: CellFormat): CellFormat => {
+  const next = cloneFormat(source);
+  if (destination?.comment !== undefined) next.comment = destination.comment;
+  if (destination?.commentAuthor !== undefined) next.commentAuthor = destination.commentAuthor;
+  return next;
+};
 
 const sourceCoordFor = (value: number, start: number, size: number): number =>
   start + ((((value - start) % size) + size) % size);
@@ -435,10 +493,20 @@ function applyFillFormats(state: State, store: SpreadsheetStore, src: Range, des
         };
         const targetKey = addrKey({ sheet: dest.sheet, row: r, col: c });
         const sourceFormat = state.format.formats.get(addrKey(source));
+        const destinationFormat = formats.get(targetKey);
         if (sourceFormat) {
-          formats.set(targetKey, cloneFormat(sourceFormat));
+          formats.set(targetKey, preserveDestinationComments(sourceFormat, destinationFormat));
         } else {
-          formats.delete(targetKey);
+          const preservedComments = destinationFormat
+            ? preserveDestinationComments({}, destinationFormat)
+            : null;
+          if (
+            preservedComments &&
+            (preservedComments.comment !== undefined ||
+              preservedComments.commentAuthor !== undefined)
+          )
+            formats.set(targetKey, preservedComments);
+          else formats.delete(targetKey);
         }
         changed = true;
       }
@@ -465,9 +533,9 @@ export interface FillOptions {
  * Fill the cells in `dest` (which contains `src` as a sub-rect) by projecting
  * the source range outward. Returns true if the fill produced any writes.
  *
- * Formula handling: when the source contains formulas we currently copy them
- * verbatim (no relative-reference translation yet). For pure values, the
- * series detector picks linear / increment / copy as desktop spreadsheets would.
+ * Formula references are shifted from each source cell to its destination. For
+ * pure values, the series detector follows Excel's linear / increment / copy
+ * behavior.
  */
 export function fillRange(
   state: State,
@@ -478,6 +546,29 @@ export function fillRange(
 ): boolean {
   return wb.withBatchedRecalc(() => applyFillRange(state, wb, src, dest, opts));
 }
+
+const rangesIntersect = (a: Range, b: Range): boolean =>
+  a.sheet === b.sheet && a.r0 <= b.r1 && b.r0 <= a.r1 && a.c0 <= b.c1 && b.c0 <= a.c1;
+
+/** Fill is an all-or-nothing cell operation when a protected destination or a
+ * merged destination is involved. Do this check before the first engine write
+ * so an invalid selection cannot leave a partially filled range behind. The
+ * pointer interaction explicitly unmerges its drag destination first; direct
+ * command/ribbon callers preserve the merge and refuse the operation. */
+const fillDestinationWritable = (state: State, src: Range, dest: Range): boolean => {
+  if (src.sheet !== dest.sheet) return false;
+  for (let row = dest.r0; row <= dest.r1; row += 1) {
+    for (let col = dest.c0; col <= dest.c1; col += 1) {
+      if (row >= src.r0 && row <= src.r1 && col >= src.c0 && col <= src.c1) continue;
+      const addr = { sheet: dest.sheet, row, col };
+      if (!isCellWritable(state, addr)) return false;
+      const mergeAnchor = state.merges.byCell.get(addrKey(addr)) ?? addrKey(addr);
+      const merge = mergeAnchor ? state.merges.byAnchor.get(mergeAnchor) : undefined;
+      if (merge && rangesIntersect(merge, dest)) return false;
+    }
+  }
+  return true;
+};
 
 function applyFillRange(
   state: State,
@@ -492,6 +583,7 @@ function applyFillRange(
   if (rangeArea(src) > MAX_FILL_RANGE_CELLS || rangeArea(dest) > MAX_FILL_RANGE_CELLS) {
     return false;
   }
+  if (!fillDestinationWritable(state, src, dest)) return false;
   const dir = opts?.copyOnly ? 'copy' : detectDirection(src, dest);
   const sheet = src.sheet;
   const source = readSource(state, src);
@@ -499,50 +591,30 @@ function applyFillRange(
   const writeFormats = opts?.store && opts.formatting !== 'without';
   let wroteValues = false;
 
-  // Per-cell formula tile with relative-ref shifting. Returns true when used.
-  const tileFormula = (destRow: number, destCol: number, srcCell: SourceCell): boolean => {
-    if (!writeValues) return false;
-    if (!srcCell.formula) return false;
-    const shifted = shiftFormulaRefs(srcCell.formula, destRow - srcCell.row, destCol - srcCell.col);
-    wb.setFormula({ sheet, row: destRow, col: destCol }, shifted);
-    return true;
-  };
-
   if (dir === 'down' || dir === 'up') {
     // Fill column-by-column. Each column gets its own projection.
     const cols = src.c1 - src.c0 + 1;
     for (let c = 0; c < cols; c += 1) {
       const line: SourceCell[] = source.map((row) => row[c] as SourceCell);
-      const allFormula = line.length > 0 && line.every((cc) => cc.formula !== null);
-      const proj = allFormula ? null : buildProjection(line, opts?.dateUnit);
+      const proj = buildProjection(line, opts?.dateUnit);
       if (dir === 'down') {
         const ext = dest.r1 - src.r1;
         for (let i = 1; i <= ext; i += 1) {
           const destRow = src.r1 + i;
           const destCol = src.c0 + c;
-          if (allFormula) {
-            const srcCell = line[(i - 1) % line.length] as SourceCell;
-            if (tileFormula(destRow, destCol, srcCell)) wroteValues = true;
-          } else if (writeValues) {
-            writeProjected(wb, sheet, destRow, destCol, proj?.at(i) ?? null);
+          if (writeValues && writeProjected(wb, sheet, destRow, destCol, proj.at(i)))
             wroteValues = true;
-          }
         }
       } else {
         // Up: extension index 1 is the row just above src.r0.
         const ext = src.r0 - dest.r0;
         const reversed = [...line].reverse();
-        const projUp = allFormula ? null : buildProjection(reversed, opts?.dateUnit);
+        const projUp = buildProjection(reversed, opts?.dateUnit, -1);
         for (let i = 1; i <= ext; i += 1) {
           const destRow = src.r0 - i;
           const destCol = src.c0 + c;
-          if (allFormula) {
-            const srcCell = reversed[(i - 1) % reversed.length] as SourceCell;
-            if (tileFormula(destRow, destCol, srcCell)) wroteValues = true;
-          } else if (writeValues) {
-            writeProjected(wb, sheet, destRow, destCol, projUp?.at(i) ?? null);
+          if (writeValues && writeProjected(wb, sheet, destRow, destCol, projUp.at(i)))
             wroteValues = true;
-          }
         }
       }
     }
@@ -556,35 +628,24 @@ function applyFillRange(
     const rows = src.r1 - src.r0 + 1;
     for (let r = 0; r < rows; r += 1) {
       const line: SourceCell[] = source[r] ?? [];
-      const allFormula = line.length > 0 && line.every((cc) => cc.formula !== null);
-      const proj = allFormula ? null : buildProjection(line, opts?.dateUnit);
+      const proj = buildProjection(line, opts?.dateUnit);
       if (dir === 'right') {
         const ext = dest.c1 - src.c1;
         for (let i = 1; i <= ext; i += 1) {
           const destRow = src.r0 + r;
           const destCol = src.c1 + i;
-          if (allFormula) {
-            const srcCell = line[(i - 1) % line.length] as SourceCell;
-            if (tileFormula(destRow, destCol, srcCell)) wroteValues = true;
-          } else if (writeValues) {
-            writeProjected(wb, sheet, destRow, destCol, proj?.at(i) ?? null);
+          if (writeValues && writeProjected(wb, sheet, destRow, destCol, proj.at(i)))
             wroteValues = true;
-          }
         }
       } else {
         const ext = src.c0 - dest.c0;
         const reversed = [...line].reverse();
-        const projLeft = allFormula ? null : buildProjection(reversed, opts?.dateUnit);
+        const projLeft = buildProjection(reversed, opts?.dateUnit, -1);
         for (let i = 1; i <= ext; i += 1) {
           const destRow = src.r0 + r;
           const destCol = src.c0 - i;
-          if (allFormula) {
-            const srcCell = reversed[(i - 1) % reversed.length] as SourceCell;
-            if (tileFormula(destRow, destCol, srcCell)) wroteValues = true;
-          } else if (writeValues) {
-            writeProjected(wb, sheet, destRow, destCol, projLeft?.at(i) ?? null);
+          if (writeValues && writeProjected(wb, sheet, destRow, destCol, projLeft.at(i)))
             wroteValues = true;
-          }
         }
       }
     }
@@ -604,25 +665,7 @@ function applyFillRange(
       const sc = (((c - src.c0) % sC) + sC) % sC;
       const cell = source[sr]?.[sc];
       if (!writeValues) continue;
-      if (!cell || cell.blank) {
-        wb.setBlank({ sheet, row: r, col: c });
-        wroteValues = true;
-        continue;
-      }
-      if (cell.formula) {
-        const shifted = shiftFormulaRefs(cell.formula, r - cell.row, c - cell.col);
-        wb.setFormula({ sheet, row: r, col: c }, shifted);
-        wroteValues = true;
-      } else if (cell.numeric !== null) {
-        wb.setNumber({ sheet, row: r, col: c }, cell.numeric);
-        wroteValues = true;
-      } else if (cell.text !== null) {
-        wb.setText({ sheet, row: r, col: c }, cell.text);
-        wroteValues = true;
-      } else if (cell.bool !== null) {
-        wb.setBool({ sheet, row: r, col: c }, cell.bool);
-        wroteValues = true;
-      }
+      if (writeProjected(wb, sheet, r, c, projectedCell(cell))) wroteValues = true;
     }
   }
   const wroteFormats = writeFormats
@@ -761,7 +804,14 @@ const DATE_SERIES_ACTIONS = new Set(['days', 'weekdays', 'months', 'years']);
  *  closure or status updates. */
 export const executeRibbonFillAction = (deps: ExecuteRibbonFillActionDeps): boolean => {
   const { store, workbook, history, action } = deps;
-  const range = store.getState().selection.range;
+  const selected = store.getState().selection.range;
+  const range: Range = {
+    sheet: selected.sheet,
+    r0: Math.min(selected.r0, selected.r1),
+    c0: Math.min(selected.c0, selected.c1),
+    r1: Math.max(selected.r0, selected.r1),
+    c1: Math.max(selected.c0, selected.c1),
+  };
   if (action === 'flash') return executeRibbonFlashFill(store, workbook, history, range);
 
   const direction: 'down' | 'right' | 'up' | 'left' =
@@ -777,11 +827,12 @@ export const executeRibbonFillAction = (deps: ExecuteRibbonFillActionDeps): bool
     return false;
 
   const isDateSeries = DATE_SERIES_ACTIONS.has(action);
+  let changed = false;
   history.begin();
   try {
     recordFormatChange(history, store, () => {
-      fillRange(store.getState(), workbook, src, range, {
-        copyOnly: action === 'series' || isDateSeries ? false : undefined,
+      changed = fillRange(store.getState(), workbook, src, range, {
+        copyOnly: action === 'down' || action === 'right' || action === 'up' || action === 'left',
         dateUnit: isDateSeries ? (action as 'days' | 'weekdays' | 'months' | 'years') : undefined,
         formatting: 'with',
         store,
@@ -790,6 +841,6 @@ export const executeRibbonFillAction = (deps: ExecuteRibbonFillActionDeps): bool
   } finally {
     history.end();
   }
-  mutators.replaceCells(store, workbook.cells(range.sheet));
-  return true;
+  if (changed) mutators.replaceCells(store, workbook.cells(range.sheet));
+  return changed;
 };

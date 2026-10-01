@@ -540,18 +540,36 @@ export function adjustFormulaForRowColEdit(
 /**
  * Adjust references for a partial-row/column cell-band shift (Insert/Delete
  * Cells, Shift Down/Right). Only references inside the affected band on the
- * shifted axis move. Cross-sheet refs are left untouched.
+ * shifted axis move. Cross-sheet refs are left untouched unless `context`
+ * resolves them to the edited sheet.
  */
+export interface CellBandShiftSheetContext {
+  /** Sheet whose cells were inserted or deleted. */
+  editedSheet: number;
+  /** Sheet where the formula lived. Unqualified refs bind here. */
+  formulaSheet: number;
+  /** Workbook sheet names indexed by sheet number. */
+  sheetNames: readonly string[];
+}
+
 export function adjustFormulaForCellBandShift(
   formula: string,
   affected: { r0: number; c0: number; r1: number; c1: number },
   axis: 'down' | 'right' | 'up' | 'left',
   delta: number,
+  context?: CellBandShiftSheetContext,
 ): string {
   if (delta === 0) return formula;
   const vertical = axis === 'down' || axis === 'up';
   return rewriteRefs(formula, (tok) => {
-    if (tok.sheetQual) return renderToken(tok);
+    if (context) {
+      const targetSheet = tok.sheetQual
+        ? resolveQualifiedSheet(tok.sheetQual, context.sheetNames)
+        : context.formulaSheet;
+      if (targetSheet === null || targetSheet !== context.editedSheet) return renderToken(tok);
+    } else if (tok.sheetQual) {
+      return renderToken(tok);
+    }
     if (tok.kind !== 'cell') return renderToken(tok);
     const shiftAtom = (at: Atom): EndpointResult => {
       const col = colLabelToIndex(at.label);
@@ -572,16 +590,22 @@ export function adjustFormulaForCellBandShift(
     };
     const aResult = shiftAtom(tok.a);
     if (!tok.b) {
-      if (aResult.kind === 'ref') return null;
-      return renderAtom(tok.a.absCol, aResult.col, tok.a.absRow, aResult.row);
+      if (aResult.kind === 'ref') return tok.sheetQual ? `${tok.sheetQual}#REF!` : null;
+      const atom = renderAtom(tok.a.absCol, aResult.col, tok.a.absRow, aResult.row);
+      return atom === null ? null : `${tok.sheetQual}${atom}`;
     }
-    return clampRange(
+    const range = clampRange(
       tok,
       shiftAtom,
       vertical ? 'row' : 'col',
       vertical ? affected.r0 : affected.c0,
       delta < 0,
     );
+    return range === null
+      ? tok.sheetQual
+        ? `${tok.sheetQual}#REF!`
+        : null
+      : `${tok.sheetQual}${range}`;
   });
 }
 
@@ -896,6 +920,10 @@ function rewriteCutPasteEndpoint(
 
 function resolveReferenceSheet(sheetQual: string, context: CutPasteSheetContext): number | null {
   if (!sheetQual) return context.formulaSheet;
+  return resolveQualifiedSheet(sheetQual, context.sheetNames);
+}
+
+function resolveQualifiedSheet(sheetQual: string, sheetNames: readonly string[]): number | null {
   const body = sheetQual.slice(0, -1);
   // 3-D references and external workbook qualifiers are deliberately kept
   // verbatim until their own workbook-aware transform exists.
@@ -903,9 +931,7 @@ function resolveReferenceSheet(sheetQual: string, context: CutPasteSheetContext)
   const name =
     body.startsWith("'") && body.endsWith("'") ? body.slice(1, -1).replace(/''/g, "'") : body;
   const folded = name.toLocaleLowerCase();
-  const index = context.sheetNames.findIndex(
-    (sheetName) => sheetName.toLocaleLowerCase() === folded,
-  );
+  const index = sheetNames.findIndex((sheetName) => sheetName.toLocaleLowerCase() === folded);
   return index >= 0 ? index : null;
 }
 

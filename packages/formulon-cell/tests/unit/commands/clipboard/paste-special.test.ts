@@ -53,6 +53,25 @@ const setActive = (store: SpreadsheetStore, row: number, col: number, sheet = 0)
   }));
 };
 
+const setSelection = (
+  store: SpreadsheetStore,
+  r0: number,
+  c0: number,
+  r1: number,
+  c1: number,
+  sheet = 0,
+): void => {
+  store.setState((s) => ({
+    ...s,
+    selection: {
+      active: { sheet, row: r0, col: c0 },
+      anchor: { sheet, row: r0, col: c0 },
+      range: { sheet, r0, c0, r1, c1 },
+      extraRanges: [],
+    },
+  }));
+};
+
 const num = (wb: WorkbookHandle, row: number, col: number): number => {
   const v = wb.getValue({ sheet: 0, row, col });
   return v.kind === 'number' ? v.value : Number.NaN;
@@ -612,6 +631,113 @@ describe('pasteSpecial', () => {
     expect(sel.range).toEqual({ sheet: 0, r0: 7, c0: 8, r1: 7, c1: 9 });
   });
 
+  it('fills an exact multiple selection with a scalar copy', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { bold: true });
+    const snap = captureSnapshot(store.getState(), {
+      sheet: 0,
+      r0: 0,
+      c0: 0,
+      r1: 0,
+      c1: 0,
+    });
+    setSelection(store, 3, 4, 5, 6);
+    assertSnap(snap);
+
+    const result = pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'all',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+
+    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 3, c0: 4, r1: 5, c1: 6 });
+    for (let row = 3; row <= 5; row += 1) {
+      for (let col = 4; col <= 6; col += 1) {
+        expect(num(wb, row, col)).toBe(7);
+        expect(store.getState().format.formats.get(addrKey({ sheet: 0, row, col }))).toEqual({
+          bold: true,
+        });
+      }
+    }
+  });
+
+  it('keeps a nonmultiple selection at the active tile footprint', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 1 },
+      { row: 0, col: 1, value: 2 },
+      { row: 1, col: 0, value: 3 },
+      { row: 1, col: 1, value: 4 },
+      { row: 5, col: 5, value: 99 },
+    ]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+    setSelection(store, 3, 3, 5, 5);
+    assertSnap(snap);
+
+    const result = pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'values',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+
+    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 3, c0: 3, r1: 4, c1: 4 });
+    expect(num(wb, 3, 3)).toBe(1);
+    expect(num(wb, 4, 4)).toBe(4);
+    expect(num(wb, 5, 5)).toBe(99);
+  });
+
+  it('repeats a transposed tile across an exact multiple selection', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 1 },
+      { row: 0, col: 1, value: 2 },
+    ]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
+    setSelection(store, 3, 3, 6, 4);
+    assertSnap(snap);
+
+    const result = pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'values',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: true,
+    });
+
+    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 3, c0: 3, r1: 6, c1: 4 });
+    for (let col = 3; col <= 4; col += 1) {
+      expect(num(wb, 3, col)).toBe(1);
+      expect(num(wb, 4, col)).toBe(2);
+      expect(num(wb, 5, col)).toBe(1);
+      expect(num(wb, 6, col)).toBe(2);
+    }
+  });
+
+  it('never repeats a cut into a larger selected footprint', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 1 },
+      { row: 0, col: 1, value: 2 },
+      { row: 1, col: 0, value: 3 },
+      { row: 1, col: 1, value: 4 },
+    ]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 }, 'cut');
+    setSelection(store, 3, 3, 6, 6);
+    assertSnap(snap);
+
+    const result = pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'all',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+
+    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 3, c0: 3, r1: 4, c1: 4 });
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'blank' });
+    expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'blank' });
+    expect(wb.getValue({ sheet: 0, row: 3, col: 3 })).toEqual({ kind: 'number', value: 1 });
+    expect(wb.getValue({ sheet: 0, row: 4, col: 4 })).toEqual({ kind: 'number', value: 4 });
+    expect(wb.getValue({ sheet: 0, row: 5, col: 5 })).toEqual({ kind: 'blank' });
+  });
+
   it('pastes All with source merge topology and preserves the anchor value', () => {
     seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
     const sourceMerge = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
@@ -640,6 +766,35 @@ describe('pasteSpecial', () => {
     expect(wb.getValue({ sheet: 0, row: 3, col: 3 })).toEqual({ kind: 'number', value: 7 });
   });
 
+  it('pastes a scalar into a selected merge anchor without tearing the merge', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 9 }]);
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { bold: true });
+    const destinationMerge = { sheet: 0, r0: 3, c0: 3, r1: 4, c1: 4 };
+    mutators.mergeRange(store, destinationMerge);
+    wb.engineAddMerge(0, destinationMerge);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+    mutators.setActive(store, { sheet: 0, row: 3, col: 3 });
+    assertSnap(snap);
+
+    const result = pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'all',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+
+    expect(result?.writtenRange).toEqual(destinationMerge);
+    expect(store.getState().merges.byAnchor.get(addrKey({ sheet: 0, row: 3, col: 3 }))).toEqual(
+      destinationMerge,
+    );
+    expect(wb.getValue({ sheet: 0, row: 3, col: 3 })).toEqual({ kind: 'number', value: 9 });
+    expect(wb.getValue({ sheet: 0, row: 4, col: 4 })).toEqual({ kind: 'blank' });
+    expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 3, col: 3 }))).toEqual({
+      bold: true,
+    });
+    expect(store.getState().format.formats.has(addrKey({ sheet: 0, row: 4, col: 4 }))).toBe(false);
+  });
+
   it('Formats pastes merge topology without values', () => {
     seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
     const sourceMerge = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
@@ -665,6 +820,41 @@ describe('pasteSpecial', () => {
       c1: 4,
     });
     expect(wb.getValue({ sheet: 0, row: 3, col: 3 }).kind).toBe('blank');
+  });
+
+  it('repeats every source merge into each tile of the destination', () => {
+    seedAndMirror(store, wb, [{ row: 0, col: 0, value: 7 }]);
+    const sourceMerge = { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 };
+    mutators.mergeRange(store, sourceMerge);
+    wb.engineAddMerge(0, sourceMerge);
+    const snap = captureSnapshot(store.getState(), sourceMerge);
+    setSelection(store, 0, 3, 3, 6);
+    assertSnap(snap);
+
+    const result = pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'all',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+
+    expect(result?.writtenRange).toEqual({ sheet: 0, r0: 0, c0: 3, r1: 3, c1: 6 });
+    expect([...store.getState().merges.byAnchor.values()]).toEqual([
+      sourceMerge,
+      { sheet: 0, r0: 0, c0: 3, r1: 1, c1: 4 },
+      { sheet: 0, r0: 0, c0: 5, r1: 1, c1: 6 },
+      { sheet: 0, r0: 2, c0: 3, r1: 3, c1: 4 },
+      { sheet: 0, r0: 2, c0: 5, r1: 3, c1: 6 },
+    ]);
+    const anchors: [number, number][] = [
+      [0, 3],
+      [0, 5],
+      [2, 3],
+      [2, 5],
+    ];
+    for (const [row, col] of anchors) {
+      expect(num(wb, row, col)).toBe(7);
+    }
   });
 
   it('Values does not import source merge topology', () => {
@@ -711,6 +901,35 @@ describe('pasteSpecial', () => {
       destinationMerge,
     );
     expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 7 });
+  });
+
+  it('rejects a merge crossing the boundary of a repeated destination', () => {
+    seedAndMirror(store, wb, [
+      { row: 0, col: 0, value: 1 },
+      { row: 0, col: 1, value: 2 },
+      { row: 1, col: 0, value: 3 },
+      { row: 1, col: 1, value: 4 },
+    ]);
+    const snap = captureSnapshot(store.getState(), { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+    const crossingMerge = { sheet: 0, r0: 3, c0: 6, r1: 4, c1: 7 };
+    mutators.mergeRange(store, crossingMerge);
+    wb.engineAddMerge(0, crossingMerge);
+    setSelection(store, 0, 3, 3, 6);
+    assertSnap(snap);
+
+    const result = pasteSpecial(store.getState(), store, wb, snap, {
+      what: 'all',
+      operation: 'none',
+      skipBlanks: false,
+      transpose: false,
+    });
+
+    expect(result).toBeNull();
+    expect(store.getState().merges.byAnchor.get(addrKey({ sheet: 0, row: 3, col: 6 }))).toEqual(
+      crossingMerge,
+    );
+    expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 1 });
+    expect(wb.getValue({ sheet: 0, row: 3, col: 3 })).toEqual({ kind: 'blank' });
   });
 
   it('removes a fully-contained destination merge for an unmerged All paste', () => {
