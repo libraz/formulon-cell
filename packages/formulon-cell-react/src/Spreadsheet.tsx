@@ -1,5 +1,6 @@
 import {
   type CellChangeEvent,
+  type ChangeBatchResult,
   type ExtensionInput,
   type FeatureFlags,
   type LocaleChangeEvent,
@@ -22,9 +23,20 @@ export interface SpreadsheetProps {
   /** Optional pre-loaded workbook (e.g. from xlsx bytes). When omitted, a
    *  fresh default workbook is created on mount. */
   workbook?: WorkbookHandle;
+  /** Host interaction restrictions for embedded forms and viewers. */
+  policy?: MountOptions['policy'];
+  /** Visible/selectable bounds and keyboard-navigation behavior. */
+  viewport?: MountOptions['viewport'];
+  /** Built-in, transformed, or host-owned context menu. */
+  contextMenu?: MountOptions['contextMenu'];
+  /** Overlay root inside a host modal or fullscreen boundary. */
+  overlays?: MountOptions['overlays'];
   /** Simplified Excel-365-style UI preset and feature switches. `theme` and
    *  `features` props override the matching values when both are supplied. */
   ui?: SpreadsheetUiOptions;
+  /** Mount or hide the core ribbon. Omitted follows the selected `ui` profile;
+   *  with no `ui`, the wrapper keeps its legacy ribbonless default. */
+  toolbar?: MountOptions['toolbar'];
   /** Theme. When the prop changes after mount, the component calls
    *  `instance.setTheme()` to keep the spreadsheet in sync. */
   theme?: MountOptions['theme'];
@@ -64,6 +76,8 @@ export interface SpreadsheetProps {
   /** Fires every time a cell value changes (engine-side). Use this to
    *  mirror the spreadsheet into outer state (Redux, Zustand, server). */
   onCellChange?: (e: CellChangeEvent) => void;
+  /** Fires after a policy-aware cell batch is applied or rejected. */
+  onChangeBatch?: (e: ChangeBatchResult) => void;
   /** Fires when the active cell / range moves. */
   onSelectionChange?: (e: SelectionChangeEvent) => void;
   /** Fires after `instance.setWorkbook(next)` swaps the engine. */
@@ -90,10 +104,16 @@ const applyRuntimeProps = async (
   props: SpreadsheetProps,
   baseline: SpreadsheetProps = {},
 ): Promise<void> => {
-  const ui = props.ui ? resolveSpreadsheetUiOptions(props.ui) : null;
+  const resolvedUi = resolveSpreadsheetUiOptions(props.ui);
+  const ui = props.ui ? resolvedUi : null;
   if (props.workbook && props.workbook !== baseline.workbook && props.workbook !== inst.workbook) {
     await inst.setWorkbook(props.workbook);
   }
+  if (props.policy !== baseline.policy) inst.setPolicy(props.policy);
+  if (props.viewport !== baseline.viewport) inst.setViewportOptions(props.viewport);
+  if (props.contextMenu !== baseline.contextMenu) inst.setContextMenu(props.contextMenu);
+  if (props.overlays !== baseline.overlays) inst.setOverlayOptions(props.overlays);
+  if (props.ui !== baseline.ui) inst.setUi(props.ui);
   const nextTheme = props.theme ?? ui?.theme;
   const baselineTheme =
     baseline.theme ?? (baseline.ui ? resolveSpreadsheetUiOptions(baseline.ui).theme : undefined);
@@ -103,7 +123,10 @@ const applyRuntimeProps = async (
     inst.i18n.extend(inst.i18n.locale, props.strings);
   }
   if (props.features !== baseline.features || props.ui !== baseline.ui) {
-    inst.setFeatures({ ...(ui?.features ?? {}), ...(props.features ?? {}) });
+    inst.setFeatures({ ...resolvedUi.features, ...(props.features ?? {}) });
+  }
+  if (props.toolbar !== baseline.toolbar || props.ui !== baseline.ui) {
+    inst.setToolbar(props.toolbar ?? (props.ui ? resolvedUi.ribbon : false));
   }
   if (props.extensions !== baseline.extensions) inst.setExtensions(props.extensions);
   if (props.printerProfiles !== baseline.printerProfiles) {
@@ -133,6 +156,7 @@ const SpreadsheetComponent = (
   // wb + canvas + listeners) so we only re-mount on workbook identity.
   const propsRef = useRef(props);
   propsRef.current = props;
+  const previousUiRef = useRef(props.ui);
 
   useImperativeHandle(
     ref,
@@ -153,7 +177,12 @@ const SpreadsheetComponent = (
       const cur = propsRef.current;
       const inst = await SpreadsheetCore.mount(host, {
         ...(cur.workbook ? { workbook: cur.workbook } : {}),
+        ...(cur.policy !== undefined ? { policy: cur.policy } : {}),
+        ...(cur.viewport !== undefined ? { viewport: cur.viewport } : {}),
+        ...(cur.contextMenu !== undefined ? { contextMenu: cur.contextMenu } : {}),
+        ...(cur.overlays !== undefined ? { overlays: cur.overlays } : {}),
         ...(cur.ui ? { ui: cur.ui } : {}),
+        ...(cur.toolbar !== undefined ? { toolbar: cur.toolbar } : {}),
         ...(cur.theme ? { theme: cur.theme } : {}),
         ...(cur.locale ? { locale: cur.locale } : {}),
         ...(cur.strings ? { strings: cur.strings } : {}),
@@ -183,6 +212,7 @@ const SpreadsheetComponent = (
       // Wire event props through `inst.on(...)`. Each handler reads from
       // propsRef, so callers can swap callbacks without re-mounting.
       eventDisposers.push(
+        inst.on('changeBatch', (e) => propsRef.current.onChangeBatch?.(e)),
         inst.on('cellChange', (e) => propsRef.current.onCellChange?.(e)),
         inst.on('selectionChange', (e) => propsRef.current.onSelectionChange?.(e)),
         inst.on('workbookChange', (e) => propsRef.current.onWorkbookChange?.(e)),
@@ -222,14 +252,6 @@ const SpreadsheetComponent = (
 
   useEffect(() => {
     const inst = instanceRef.current;
-    if (!inst) return;
-    const ui = props.ui ? resolveSpreadsheetUiOptions(props.ui) : null;
-    const nextTheme = props.theme ?? ui?.theme;
-    if (nextTheme) inst.setTheme(nextTheme);
-  }, [props.theme, props.ui]);
-
-  useEffect(() => {
-    const inst = instanceRef.current;
     if (!inst || !props.locale) return;
     inst.i18n.setLocale(props.locale);
   }, [props.locale]);
@@ -242,10 +264,42 @@ const SpreadsheetComponent = (
 
   useEffect(() => {
     const inst = instanceRef.current;
+    const uiChanged = previousUiRef.current !== props.ui;
+    previousUiRef.current = props.ui;
+    if (!inst) return;
+    const resolvedUi = resolveSpreadsheetUiOptions(props.ui);
+    if (uiChanged) inst.setUi(props.ui);
+    inst.setFeatures({ ...resolvedUi.features, ...(props.features ?? {}) });
+    inst.setToolbar(props.toolbar ?? (props.ui ? resolvedUi.ribbon : false));
+  }, [props.features, props.ui, props.toolbar]);
+
+  useEffect(() => {
+    const inst = instanceRef.current;
     if (!inst) return;
     const ui = props.ui ? resolveSpreadsheetUiOptions(props.ui) : null;
-    inst.setFeatures({ ...(ui?.features ?? {}), ...(props.features ?? {}) });
-  }, [props.features, props.ui]);
+    const nextTheme = props.theme ?? ui?.theme;
+    if (nextTheme) inst.setTheme(nextTheme);
+  }, [props.theme, props.ui]);
+
+  useEffect(() => {
+    const inst = instanceRef.current;
+    if (inst) inst.setPolicy(props.policy);
+  }, [props.policy]);
+
+  useEffect(() => {
+    const inst = instanceRef.current;
+    if (inst) inst.setViewportOptions(props.viewport);
+  }, [props.viewport]);
+
+  useEffect(() => {
+    const inst = instanceRef.current;
+    if (inst) inst.setContextMenu(props.contextMenu);
+  }, [props.contextMenu]);
+
+  useEffect(() => {
+    const inst = instanceRef.current;
+    if (inst) inst.setOverlayOptions(props.overlays);
+  }, [props.overlays]);
 
   useEffect(() => {
     const inst = instanceRef.current;

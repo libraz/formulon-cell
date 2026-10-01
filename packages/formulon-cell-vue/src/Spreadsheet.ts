@@ -1,5 +1,6 @@
 import {
   type CellChangeEvent,
+  type ChangeBatchResult,
   type ExtensionInput,
   type FeatureFlags,
   type LocaleChangeEvent,
@@ -39,6 +40,11 @@ const applyRuntimeProps = async (
   props: {
     ui?: SpreadsheetUiOptions;
     workbook?: WorkbookHandle;
+    policy?: MountOptions['policy'];
+    viewport?: MountOptions['viewport'];
+    contextMenu?: MountOptions['contextMenu'];
+    overlays?: MountOptions['overlays'];
+    toolbar?: MountOptions['toolbar'];
     theme?: MountOptions['theme'];
     locale?: MountOptions['locale'];
     strings?: MountOptions['strings'];
@@ -54,6 +60,11 @@ const applyRuntimeProps = async (
   baseline: {
     ui?: SpreadsheetUiOptions;
     workbook?: WorkbookHandle;
+    policy?: MountOptions['policy'];
+    viewport?: MountOptions['viewport'];
+    contextMenu?: MountOptions['contextMenu'];
+    overlays?: MountOptions['overlays'];
+    toolbar?: MountOptions['toolbar'];
     theme?: MountOptions['theme'];
     locale?: MountOptions['locale'];
     strings?: MountOptions['strings'];
@@ -67,10 +78,16 @@ const applyRuntimeProps = async (
     macroRecording?: MountOptions['macroRecording'];
   } = {},
 ): Promise<void> => {
-  const ui = props.ui ? resolveSpreadsheetUiOptions(props.ui) : null;
+  const resolvedUi = resolveSpreadsheetUiOptions(props.ui);
+  const ui = props.ui ? resolvedUi : null;
   if (props.workbook && props.workbook !== baseline.workbook && props.workbook !== inst.workbook) {
     await inst.setWorkbook(props.workbook);
   }
+  if (props.policy !== baseline.policy) inst.setPolicy(props.policy);
+  if (props.viewport !== baseline.viewport) inst.setViewportOptions(props.viewport);
+  if (props.contextMenu !== baseline.contextMenu) inst.setContextMenu(props.contextMenu);
+  if (props.overlays !== baseline.overlays) inst.setOverlayOptions(props.overlays);
+  if (props.ui !== baseline.ui) inst.setUi(props.ui);
   const nextTheme = props.theme ?? ui?.theme;
   const baselineTheme =
     baseline.theme ?? (baseline.ui ? resolveSpreadsheetUiOptions(baseline.ui).theme : undefined);
@@ -80,7 +97,10 @@ const applyRuntimeProps = async (
     inst.i18n.extend(inst.i18n.locale, props.strings);
   }
   if (props.features !== baseline.features || props.ui !== baseline.ui) {
-    inst.setFeatures({ ...(ui?.features ?? {}), ...(props.features ?? {}) });
+    inst.setFeatures({ ...resolvedUi.features, ...(props.features ?? {}) });
+  }
+  if (props.toolbar !== baseline.toolbar || props.ui !== baseline.ui) {
+    inst.setToolbar(props.toolbar ?? (props.ui ? resolvedUi.ribbon : false));
   }
   if (props.extensions !== baseline.extensions) inst.setExtensions(props.extensions);
   if (props.printerProfiles !== baseline.printerProfiles) {
@@ -102,6 +122,14 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
   props: {
     ui: { type: Object as PropType<SpreadsheetUiOptions>, default: undefined },
     workbook: { type: Object as PropType<WorkbookHandle>, default: undefined },
+    policy: { type: Object as PropType<MountOptions['policy']>, default: undefined },
+    viewport: { type: Object as PropType<MountOptions['viewport']>, default: undefined },
+    contextMenu: { type: Object as PropType<MountOptions['contextMenu']>, default: undefined },
+    overlays: { type: Object as PropType<MountOptions['overlays']>, default: undefined },
+    toolbar: {
+      type: [Boolean, Object] as PropType<MountOptions['toolbar']>,
+      default: undefined,
+    },
     theme: { type: String as PropType<MountOptions['theme']>, default: undefined },
     locale: { type: String as PropType<MountOptions['locale']>, default: undefined },
     strings: { type: Object as PropType<MountOptions['strings']>, default: undefined },
@@ -133,6 +161,7 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
   },
   emits: {
     ready: (_inst: SpreadsheetInstance) => true,
+    'change-batch': (_e: ChangeBatchResult) => true,
     cellChange: (_e: CellChangeEvent) => true,
     selectionChange: (_e: SelectionChangeEvent) => true,
     workbookChange: (_e: WorkbookChangeEvent) => true,
@@ -155,6 +184,11 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
       const opts: MountOptions = {};
       if (props.ui) opts.ui = props.ui;
       if (props.workbook) opts.workbook = props.workbook;
+      if (props.policy !== undefined) opts.policy = props.policy;
+      if (props.viewport !== undefined) opts.viewport = props.viewport;
+      if (props.contextMenu !== undefined) opts.contextMenu = props.contextMenu;
+      if (props.overlays !== undefined) opts.overlays = props.overlays;
+      if (props.toolbar !== undefined) opts.toolbar = props.toolbar;
       if (props.theme) opts.theme = props.theme;
       if (props.locale) opts.locale = props.locale;
       if (props.strings) opts.strings = props.strings;
@@ -175,6 +209,11 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
       };
       const mountedWith = {
         workbook: opts.workbook,
+        policy: opts.policy,
+        viewport: opts.viewport,
+        contextMenu: opts.contextMenu,
+        overlays: opts.overlays,
+        toolbar: opts.toolbar,
         ui: opts.ui,
         theme: opts.theme,
         locale: opts.locale,
@@ -201,6 +240,7 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
       mountError.value = null;
       instance.value = inst;
       eventDisposers.push(
+        inst.on('changeBatch', (e) => emit('change-batch', e)),
         inst.on('cellChange', (e) => emit('cellChange', e)),
         inst.on('selectionChange', (e) => emit('selectionChange', e)),
         inst.on('workbookChange', (e) => emit('workbookChange', e)),
@@ -216,9 +256,9 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
     // Theme / locale / workbook are all cheap to swap via the imperative
     // API — react to prop changes without re-mounting.
     watch(
-      () => [props.theme, props.ui] as const,
-      ([nextTheme, nextUi]) => {
-        const resolved = nextUi ? resolveSpreadsheetUiOptions(nextUi) : null;
+      () => props.theme,
+      (nextTheme) => {
+        const resolved = props.ui ? resolveSpreadsheetUiOptions(props.ui) : null;
         const theme = nextTheme ?? resolved?.theme;
         if (theme && instance.value) instance.value.setTheme(theme);
       },
@@ -246,13 +286,57 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
     );
     watch(
       () => [props.features, props.ui] as const,
-      ([nextFeatures, nextUi]) => {
-        const resolved = nextUi ? resolveSpreadsheetUiOptions(nextUi) : null;
+      ([nextFeatures, nextUi], previous) => {
+        const resolved = resolveSpreadsheetUiOptions(nextUi);
         if (instance.value) {
-          instance.value.setFeatures({ ...(resolved?.features ?? {}), ...(nextFeatures ?? {}) });
+          const uiChanged = nextUi !== previous?.[1];
+          if (uiChanged) instance.value.setUi(nextUi);
+          instance.value.setFeatures({ ...resolved.features, ...(nextFeatures ?? {}) });
+          instance.value.setToolbar(props.toolbar ?? (nextUi ? resolved.ribbon : false));
+          if (uiChanged) {
+            const theme = props.theme ?? (nextUi ? resolved.theme : undefined);
+            if (theme) instance.value.setTheme(theme);
+          }
         }
       },
       { deep: true },
+    );
+    watch(
+      () => props.policy,
+      (next) => {
+        if (instance.value) instance.value.setPolicy(next);
+      },
+      { deep: true },
+    );
+    watch(
+      () => props.viewport,
+      (next) => {
+        if (instance.value) instance.value.setViewportOptions(next);
+      },
+      { deep: true },
+    );
+    watch(
+      () => props.contextMenu,
+      (next) => {
+        if (instance.value) instance.value.setContextMenu(next);
+      },
+      { deep: true },
+    );
+    watch(
+      () => props.overlays,
+      (next) => {
+        if (instance.value) instance.value.setOverlayOptions(next);
+      },
+      { deep: true },
+    );
+    watch(
+      () => props.toolbar,
+      (next) => {
+        if (instance.value) {
+          const resolved = resolveSpreadsheetUiOptions(props.ui);
+          instance.value.setToolbar(next ?? (props.ui ? resolved.ribbon : false));
+        }
+      },
     );
     watch(
       () => props.extensions,
