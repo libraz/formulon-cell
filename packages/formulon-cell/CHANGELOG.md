@@ -4,16 +4,38 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
-## Unreleased
+## 0.7.0 — 2026-10-01
+
+### Added
+
+- Restricted embedding. `MountOptions.policy` authorizes every user mutation (edit, clear, paste, fill, structure, sheet, export) through one command service shared by the editor, formula bar, clipboard, keyboard, pointer, context menu, and ribbon; undo and redo re-check the current policy. `fixedFormPolicy(ranges)` and `viewerPolicy()` cover the common cases, and `policy.restrict(context)` adds host-specific denials. Omitting `policy` keeps the previous behaviour.
+- The `embedded` UI profile mounts only the grid, with features, ribbon, and print off until enabled. `viewport` keeps navigation, selection, and rendering inside a fixed range; `contextMenu` selects built-in items, transforms them, or hands the menu to the host.
+- Runtime setters `setPolicy`, `setViewportOptions`, `setContextMenu`, `setOverlayOptions`, `setUi`, and `setToolbar`, plus `applyChanges` for trusted host updates and a `changeBatch` event for policy-aware batches.
+- `OverlayOptions.root` places menus and dialogs inside a host modal or fullscreen element. Without it, overlays follow the nearest open dialog or fullscreen element that contains the sheet.
+- The React and Vue components accept `ui`, `policy`, `viewport`, `contextMenu`, `overlays`, and `toolbar` props and apply changes without re-mounting. React reports batches through `onChangeBatch`; Vue emits `change-batch`.
+- `WorkbookHandle.applyCellPatchAtomic` writes a batch of cell patches with one recalc and restores the touched cells if the engine fails.
+- Whole-row and whole-column copy and cut can be inserted as bands (`insertCopiedBand`), keeping formulas, formats, merges, notes, and row/column sizes, including across sheets, as a single undo step. `HistoryTransaction` and `captureSnapshotFromCopyResult` are exported for hosts that drive the same path.
+- Data bars gain min/max scale points, axis position and colour, negative fill, borders, and solid fill; icon sets gain a per-threshold comparison operator.
 
 ### Changed
 
+- **Breaking:** `PivotDateGrouping.Week` is replaced by `Days`. Use `Days` with `intervalDays: 7` for weekly buckets.
 - Update the engine dependency to `@libraz/formulon` 0.12.0 and adapt status-bearing accessor results. The default single-threaded WASM loads without COOP/COEP headers.
-- Use Days grouping with a configurable interval for pivots, register pivot number formats as engine format IDs, and align pivot data fields and filters with the engine API.
+- Register pivot number formats as engine format IDs and align pivot data fields and filters with the engine API.
+- Formula references follow structural edits: inserting or deleting rows, columns, and cell bands, sorting, filling, cut-and-paste, and band moves rewrite references (including cross-sheet, whole-row/column, and structured references) instead of leaving them pointing at the old cells. Edits that would push content past the sheet edge are rejected before anything is written.
+- Fill uses a least-squares linear trend for numeric series and tiles mixed formula/value sources with shifted references.
+- Merging validates the range, carries visual formatting and perimeter borders, and refuses ranges that overlap a table.
+- Repeated and transposed pastes fill the selected destination range, and oversized pastes are refused.
 - Split conditional-format formula types, parsing, and evaluation from rule rendering.
 
 ### Fixed
 
+- Paste falls back to the internal clipboard payload when the system clipboard cannot be read, and ignores a payload from an older copy.
+- Cell format changes made through a bound store are mirrored to the engine, and loading a workbook no longer writes back what it just read.
+- The format dialog previews the active cell's actual value with the real number format.
+- Split buttons open their menu from the chevron, and disabled ribbon buttons ignore clicks.
+- AutoSum treats the non-anchor cells of a merge as occupied.
+- Sorting and context-menu sorts are undoable and carry comments and error values with their rows.
 - Retry WASM initialization after a failed load.
 - Render React children after asynchronous spreadsheet mount and support object or array selectors in `useSpreadsheet`.
 - Reset Vue selection and locale state and release subscriptions when the spreadsheet instance is cleared.
@@ -572,6 +594,7 @@ Initial public release.
   so the package works under any modern bundler. Falls back to an
   in-memory stub when `crossOriginIsolated` is unavailable.
 
+[0.7.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.7.0
 [0.6.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.6.0
 [0.5.1]: https://github.com/libraz/formulon-cell/releases/tag/v0.5.1
 [0.5.0]: https://github.com/libraz/formulon-cell/releases/tag/v0.5.0
