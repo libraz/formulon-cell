@@ -2,6 +2,8 @@
 // Each `showX(...)` wires up its own widgets but reuses this scaffold so
 // keyboard handling, focus restoration, and aria wiring stay consistent.
 
+import { overlayPortalFor } from '../../interact/overlay-portal.js';
+
 const FOCUSABLE_DIALOG_SELECTOR = [
   'button',
   'input',
@@ -20,6 +22,7 @@ const focusableDialogItems = (root: HTMLElement): HTMLElement[] =>
 
 export const trapDialogTab = (root: HTMLElement, event: KeyboardEvent): boolean => {
   if (event.key !== 'Tab') return false;
+  const ownerDocument = root.ownerDocument;
   const items = focusableDialogItems(root);
   if (items.length === 0) {
     event.preventDefault();
@@ -28,12 +31,12 @@ export const trapDialogTab = (root: HTMLElement, event: KeyboardEvent): boolean 
   }
   const first = items[0];
   const last = items[items.length - 1];
-  if (event.shiftKey && document.activeElement === first) {
+  if (event.shiftKey && ownerDocument.activeElement === first) {
     event.preventDefault();
     last?.focus({ preventScroll: true });
     return true;
   }
-  if (!event.shiftKey && document.activeElement === last) {
+  if (!event.shiftKey && ownerDocument.activeElement === last) {
     event.preventDefault();
     first?.focus({ preventScroll: true });
     return true;
@@ -43,13 +46,20 @@ export const trapDialogTab = (root: HTMLElement, event: KeyboardEvent): boolean 
 
 export const restoreDialogFocus = (overlay: HTMLElement, opener: HTMLElement | null): void => {
   if (!opener) return;
-  if (overlay.contains(document.activeElement) || document.activeElement === document.body) {
+  const ownerDocument = overlay.ownerDocument;
+  if (
+    overlay.contains(ownerDocument.activeElement) ||
+    ownerDocument.activeElement === ownerDocument.body
+  ) {
     opener.focus({ preventScroll: true });
   }
 };
 
 export interface DialogShellOptions {
   title: string;
+  /** Optional host used to select the themed overlay portal. When omitted the
+   *  currently focused control's containing `.fc-host` is used. */
+  host?: HTMLElement;
   /** Defaults to `dialog`; pass `alertdialog` for confirm/message dialogs. */
   role?: 'dialog' | 'alertdialog';
   /** Override aria-label when the visible title differs from the accessible name. */
@@ -72,33 +82,37 @@ export interface DialogShell {
 /** Builds the overlay → panel → header/body/footer skeleton shared by every
  *  app dialog and records the previously-focused element so focus can be
  *  restored on close. The caller is responsible for appending widgets to
- *  `body`/`footer` and calling `document.body.appendChild(overlay)`. */
+ *  `body`/`footer`; the overlay is mounted in the focused host's portal. */
 export const createDialogShell = (opts: DialogShellOptions): DialogShell => {
-  const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  const overlay = document.createElement('div');
+  const ownerDocument = opts.host?.ownerDocument ?? document;
+  const activeElement = ownerDocument.activeElement;
+  const opener = activeElement?.nodeType === 1 ? (activeElement as HTMLElement) : null;
+  const overlay = ownerDocument.createElement('div');
   overlay.className = 'fc-fmtdlg fc-tb__dlg';
   overlay.setAttribute('role', opts.role ?? 'dialog');
   overlay.setAttribute('aria-modal', 'true');
   overlay.setAttribute('aria-label', opts.ariaLabel ?? opts.title);
 
-  const panel = document.createElement('div');
+  const panel = ownerDocument.createElement('div');
   panel.className = 'fc-fmtdlg__panel fc-tb__dlg__panel';
   overlay.appendChild(panel);
 
-  const header = document.createElement('div');
+  const header = ownerDocument.createElement('div');
   header.className = 'fc-fmtdlg__header';
   header.textContent = opts.title;
   panel.appendChild(header);
 
-  const body = document.createElement('div');
+  const body = ownerDocument.createElement('div');
   body.className =
     opts.bodyVariant === 'app' ? 'fc-fmtdlg__body fc-tb__dlg__body' : 'fc-fmtdlg__body';
   panel.appendChild(body);
 
-  const footer = document.createElement('div');
+  const footer = ownerDocument.createElement('div');
   footer.className = 'fc-fmtdlg__footer';
   panel.appendChild(footer);
 
+  const overlayHost = opts.host ?? opener?.closest<HTMLElement>('.fc-host') ?? opener;
+  overlayPortalFor(overlayHost).appendChild(overlay);
   return { overlay, panel, header, body, footer, opener };
 };
 
@@ -112,7 +126,7 @@ export const appendDialogButton = (
   footer: HTMLElement,
   opts: DialogButtonOptions,
 ): HTMLButtonElement => {
-  const button = document.createElement('button');
+  const button = footer.ownerDocument.createElement('button');
   button.type = 'button';
   const classes = ['fc-fmtdlg__btn'];
   if (opts.variant === 'primary') classes.push('fc-fmtdlg__btn--primary');
@@ -216,9 +230,16 @@ export const mountDialog = (
   shell: DialogShell,
   focusInit: HTMLElement | (() => void) | null,
 ): void => {
-  document.body.appendChild(shell.overlay);
+  // `createDialogShell` mounts into the containing host's portal. Keep this
+  // idempotent for callers that detached the shell before mounting again.
+  if (!shell.overlay.isConnected) overlayPortalFor(shell.overlay).appendChild(shell.overlay);
   if (!focusInit) return;
-  requestAnimationFrame(() => {
+  const frame = shell.overlay.ownerDocument.defaultView
+    ? shell.overlay.ownerDocument.defaultView.requestAnimationFrame.bind(
+        shell.overlay.ownerDocument.defaultView,
+      )
+    : requestAnimationFrame;
+  frame(() => {
     if (typeof focusInit === 'function') focusInit();
     else focusInit.focus({ preventScroll: true });
   });
@@ -237,12 +258,13 @@ export const appendInputRow = (
     step?: number;
   } = {},
 ): HTMLInputElement => {
-  const row = document.createElement('div');
+  const ownerDocument = body.ownerDocument;
+  const row = ownerDocument.createElement('div');
   row.className = 'fc-fmtdlg__row fc-fmtdlg__row--block';
-  const label = document.createElement('label');
+  const label = ownerDocument.createElement('label');
   label.className = 'fc-tb__dlg__label';
   label.textContent = labelText;
-  const input = document.createElement('input');
+  const input = ownerDocument.createElement('input');
   input.type = config.type ?? 'text';
   input.className = 'fc-tb__dlg__input';
   if (config.initial !== undefined) input.value = config.initial;
@@ -257,7 +279,7 @@ export const appendInputRow = (
 };
 
 export const appendErrorRow = (body: HTMLElement): HTMLDivElement => {
-  const errorRow = document.createElement('div');
+  const errorRow = body.ownerDocument.createElement('div');
   errorRow.className = 'fc-tb__dlg__error';
   errorRow.setAttribute('role', 'alert');
   errorRow.hidden = true;
