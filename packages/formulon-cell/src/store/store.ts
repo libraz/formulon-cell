@@ -94,6 +94,7 @@ export const createSpreadsheetStore = () =>
       copyRange: null,
       copyRanges: null,
       copyMode: null,
+      copyRevision: 0,
       showGridLines: true,
       showHeaders: true,
       showZeros: true,
@@ -400,6 +401,7 @@ export const mutators = {
       ...s,
       ui: {
         ...s.ui,
+        copyRevision: (s.ui.copyRevision ?? 0) + 1,
         copyRange: range ? { ...range } : null,
         copyRanges: null,
         copyMode: range ? mode : null,
@@ -412,6 +414,7 @@ export const mutators = {
       ...s,
       ui: {
         ...s.ui,
+        copyRevision: (s.ui.copyRevision ?? 0) + 1,
         copyRange: ranges?.[0] ? { ...ranges[0] } : null,
         copyRanges: ranges && ranges.length > 0 ? ranges.map((r) => ({ ...r })) : null,
         copyMode: ranges?.[0] ? mode : null,

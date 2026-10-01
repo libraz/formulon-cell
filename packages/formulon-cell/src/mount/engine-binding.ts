@@ -193,7 +193,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         },
         onSwitchSheet: (delta) => getSheetTabs()?.switchRelative(delta),
         onEditComment: () => getCommentDialog()?.open(),
-        onClipboardShortcut: clipboardH ? (kind) => void clipboardH.runShortcut(kind) : undefined,
+        onClipboardShortcut: clipboardH ? (kind) => clipboardH.runShortcut(kind) : undefined,
       })
     : (): void => {};
   const pasteSpecialDialog =
@@ -217,7 +217,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
         strings,
         history,
         onAfterCommit: refreshCells,
-        onClipboardShortcut: clipboardH ? (kind) => void clipboardH.runShortcut(kind) : undefined,
+        onClipboardShortcut: clipboardH ? (kind) => clipboardH.runShortcut(kind) : undefined,
         onFormatDialog: () => getFormatDialog()?.open(),
         onPasteSpecial: () => pasteSpecialDialog?.open(),
         onInsertHyperlink: () => getHyperlinkDialog()?.open(),

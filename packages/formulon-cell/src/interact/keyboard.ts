@@ -205,11 +205,18 @@ export interface KeyboardDeps {
    *  selection — neither holds for our canvas-backed grid (host is a div with
    *  `user-select: none`). The host wires this to the clipboard module so the
    *  shortcuts still work without an invisible focus-sink. */
-  onClipboardShortcut?: (kind: 'copy' | 'cut' | 'paste') => void;
+  onClipboardShortcut?: (kind: 'copy' | 'cut' | 'paste') => void | Promise<void>;
 }
 
 export function attachKeyboard(deps: KeyboardDeps): () => void {
   const { host, store } = deps;
+  let pendingEnterPaste: { revision: number; promise: Promise<void> } | null = null;
+
+  const clearCopySessionIfUnchanged = (revision: number): void => {
+    if ((store.getState().ui.copyRevision ?? 0) !== revision) return;
+    mutators.setCopyRange(store, null);
+    mutators.setCopyRanges(store, null);
+  };
 
   const onKey = (e: KeyboardEvent): void => {
     if (e.isComposing || e.key === 'Process') return;
@@ -372,14 +379,38 @@ export function attachKeyboard(deps: KeyboardDeps): () => void {
         ? move(a, 0, -colDir * Math.max(1, s.viewport.colCount - 1))
         : move(a, -Math.max(1, s.viewport.rowCount - 1), 0);
     else if (k === 'Tab') target = stepWithMerge(s, a, 0, shift ? -1 : 1, MAX_ROW, MAX_COL);
-    else if (k === 'Enter' && !meta && !shift && s.ui.copyRange && deps.onClipboardShortcut) {
+    else if (
+      k === 'Enter' &&
+      !meta &&
+      !shift &&
+      (s.ui.copyRange || s.ui.copyRanges?.length) &&
+      deps.onClipboardShortcut
+    ) {
       // Enter is the one-shot paste while a marquee is up: it pastes at the
       // selection and always ends copy mode, unlike Ctrl+V which leaves a copy
       // marquee standing for repeat pastes.
-      mutators.setCopyRange(store, null);
-      mutators.setCopyRanges(store, null);
-      deps.onClipboardShortcut('paste');
       e.preventDefault();
+      const revision = s.ui.copyRevision ?? 0;
+      if (pendingEnterPaste?.revision === revision) return;
+      let result: void | Promise<void>;
+      try {
+        result = deps.onClipboardShortcut('paste');
+      } catch {
+        clearCopySessionIfUnchanged(revision);
+        return;
+      }
+      if (!result || typeof result.then !== 'function') {
+        clearCopySessionIfUnchanged(revision);
+        return;
+      }
+      const pending = result.then(
+        () => clearCopySessionIfUnchanged(revision),
+        () => clearCopySessionIfUnchanged(revision),
+      );
+      pendingEnterPaste = { revision, promise: pending };
+      void pending.then(() => {
+        if (pendingEnterPaste?.promise === pending) pendingEnterPaste = null;
+      });
       return;
     } else if (k === 'Enter' && !meta) {
       target = stepWithMerge(s, a, shift ? -1 : 1, 0, MAX_ROW, MAX_COL);

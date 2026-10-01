@@ -48,6 +48,26 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
 
   let snapshot: ClipboardSnapshot | null = null;
   let snapshotText: string | null = null;
+  let payloadRevision: number | null = null;
+
+  const hasLiveInternalPayload = (state: State): boolean => {
+    const ui = state.ui;
+    if (
+      snapshotText === null ||
+      payloadRevision === null ||
+      payloadRevision !== (ui.copyRevision ?? 0) ||
+      !ui.copyMode ||
+      (!ui.copyRange && !ui.copyRanges?.length)
+    ) {
+      return false;
+    }
+    return snapshot === null || snapshot.mode === ui.copyMode;
+  };
+
+  const activeInternalText = (): string | null => {
+    const state = store.getState();
+    return hasLiveInternalPayload(state) ? snapshotText : null;
+  };
 
   const snapshotDestRange = (state: State, snap: ClipboardSnapshot): Range => ({
     sheet: state.selection.active.sheet,
@@ -87,7 +107,8 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       .map((range) => encodeHtml(state, range))
       .join('');
   const hasPastePayload = (text: string): boolean =>
-    text.length > 0 || (snapshot !== null && snapshotText === text);
+    text.length > 0 ||
+    (snapshot !== null && snapshotText === text && hasLiveInternalPayload(store.getState()));
 
   /** A cut can only be pasted once, so its marquee is consumed by the paste.
    *  A copy marquee stays up for repeat pastes, exactly like the desktop app. */
@@ -95,13 +116,16 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     if (store.getState().ui.copyMode !== 'cut') return;
     mutators.setCopyRange(store, null);
     mutators.setCopyRanges(store, null);
+    snapshot = null;
+    snapshotText = null;
+    payloadRevision = null;
   };
 
   const pasteFromClipboardText = (
     state: State,
     text: string,
   ): { result: { writtenRange: Range } | null; activation: PasteOptionsActivation | null } => {
-    if (snapshot && snapshotText === text) {
+    if (snapshot && snapshotText === text && hasLiveInternalPayload(state)) {
       const source = snapshot;
       const before = captureSnapshot(state, snapshotDestRange(state, source));
       let result: { writtenRange: Range } | null = null;
@@ -122,6 +146,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     }
     snapshot = null;
     snapshotText = null;
+    payloadRevision = null;
     return { result: pasteTSV(state, wb, text), activation: null };
   };
 
@@ -132,6 +157,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     if (!r || !e.clipboardData) {
       snapshot = null;
       snapshotText = null;
+      payloadRevision = null;
       mutators.setCopyRange(store, null);
       return;
     }
@@ -141,6 +167,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     snapshotText = r.tsv;
     if (r.ranges) mutators.setCopyRanges(store, r.ranges);
     else mutators.setCopyRange(store, r.range);
+    payloadRevision = store.getState().ui.copyRevision ?? 0;
     e.preventDefault();
   };
 
@@ -161,6 +188,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     if (!r || !e.clipboardData) {
       snapshot = null;
       snapshotText = null;
+      payloadRevision = null;
       return;
     }
     e.clipboardData.setData('text/plain', r.tsv);
@@ -168,6 +196,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     snapshot = captureMaterializedSnapshot(s, r, 'cut');
     snapshotText = r.tsv;
     mutators.setCopyRange(store, r.range, 'cut');
+    payloadRevision = store.getState().ui.copyRevision ?? 0;
     e.preventDefault();
     deps.onAfterCommit();
   };
@@ -229,6 +258,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       if (!r) {
         snapshot = null;
         snapshotText = null;
+        payloadRevision = null;
         mutators.setCopyRange(store, null);
         return;
       }
@@ -236,6 +266,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       snapshotText = r.tsv;
       if (r.ranges) mutators.setCopyRanges(store, r.ranges);
       else mutators.setCopyRange(store, r.range);
+      payloadRevision = store.getState().ui.copyRevision ?? 0;
       await writeClipboardText(r.tsv);
       return;
     }
@@ -254,23 +285,42 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
       if (!r) {
         snapshot = null;
         snapshotText = null;
+        payloadRevision = null;
         return;
       }
       snapshot = captureMaterializedSnapshot(s, r, 'cut');
       snapshotText = r.tsv;
       mutators.setCopyRange(store, r.range, 'cut');
+      payloadRevision = store.getState().ui.copyRevision ?? 0;
       await writeClipboardText(r.tsv);
       deps.onAfterCommit();
       return;
     }
     // paste
+    const requestedRevision = s.ui.copyRevision ?? 0;
     let text = '';
     try {
-      text = (await navigator.clipboard?.readText()) ?? '';
+      if (!navigator.clipboard?.readText) {
+        const internal = activeInternalText();
+        if (internal === null) return;
+        text = internal;
+      } else {
+        text = (await navigator.clipboard.readText()) ?? '';
+      }
     } catch (err) {
-      console.warn('formulon-cell: clipboard read failed', err);
-      return;
+      if ((store.getState().ui.copyRevision ?? 0) !== requestedRevision) return;
+      const internal = activeInternalText();
+      if (internal === null) {
+        console.warn('formulon-cell: clipboard read failed', err);
+        return;
+      }
+      // Browsers may deny system clipboard reads even for a copy made in
+      // this workbook. Its live marquee identifies the available local copy.
+      text = internal;
     }
+    if ((store.getState().ui.copyRevision ?? 0) !== requestedRevision) return;
+    const pasteState = store.getState();
+    if (pasteState.ui.editor.kind !== 'idle') return;
     if (!hasPastePayload(text)) return;
     if (history) history.begin();
     let r: { writtenRange: Range } | null = null;
@@ -278,7 +328,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
     try {
       const rows = text ? parseTSV(text) : [];
       if (rows.length > 0) {
-        const origin = s.selection.active;
+        const origin = pasteState.selection.active;
         let maxCols = 0;
         for (const row of rows) if (row.length > maxCols) maxCols = row.length;
         applyUnmerge(store, wb, history, {
@@ -289,7 +339,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
           c1: origin.col + Math.max(0, maxCols - 1),
         });
       }
-      ({ result: r, activation } = pasteFromClipboardText(s, text));
+      ({ result: r, activation } = pasteFromClipboardText(pasteState, text));
     } finally {
       if (history) history.end();
     }
@@ -302,7 +352,7 @@ export function attachClipboard(deps: ClipboardDeps): ClipboardHandle {
   };
 
   return {
-    getSnapshot: () => snapshot,
+    getSnapshot: () => (snapshot && hasLiveInternalPayload(store.getState()) ? snapshot : null),
     runShortcut,
     detach() {
       host.removeEventListener('copy', onCopy);
