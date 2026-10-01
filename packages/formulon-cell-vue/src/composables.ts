@@ -5,27 +5,41 @@ import type {
 } from '@libraz/formulon-cell';
 import { onScopeDispose, type Ref, ref, watchEffect } from 'vue';
 
+type Selection = ReturnType<SpreadsheetInstance['store']['getState']>['selection'];
+
+const createFallbackSelection = (): Selection => ({
+  active: { sheet: 0, row: 0, col: 0 },
+  anchor: { sheet: 0, row: 0, col: 0 },
+  range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+});
+
+const createFallbackStrings = (): SpreadsheetInstance['i18n']['strings'] =>
+  ({}) as unknown as SpreadsheetInstance['i18n']['strings'];
+
 /** Composable: track the live selection from a `ref<SpreadsheetInstance | null>`. */
-export const useSelection = (
-  instance: Ref<SpreadsheetInstance | null>,
-): Ref<ReturnType<SpreadsheetInstance['store']['getState']>['selection']> => {
-  const sel = ref({
-    active: { sheet: 0, row: 0, col: 0 },
-    anchor: { sheet: 0, row: 0, col: 0 },
-    range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
-  }) as Ref<ReturnType<SpreadsheetInstance['store']['getState']>['selection']>;
+export const useSelection = (instance: Ref<SpreadsheetInstance | null>): Ref<Selection> => {
+  const sel = ref(createFallbackSelection()) as Ref<Selection>;
 
   let off: (() => void) | null = null;
   watchEffect(() => {
-    off?.();
+    const previousOff = off;
+    off = null;
+    previousOff?.();
     const inst = instance.value;
-    if (!inst) return;
+    if (!inst) {
+      sel.value = createFallbackSelection();
+      return;
+    }
     sel.value = inst.store.getState().selection;
     off = inst.store.subscribe(() => {
       sel.value = inst.store.getState().selection;
     });
   });
-  onScopeDispose(() => off?.());
+  onScopeDispose(() => {
+    const currentOff = off;
+    off = null;
+    currentOff?.();
+  });
   return sel;
 };
 
@@ -40,7 +54,9 @@ export const useSpreadsheet = <T>(
   const out = ref(fallback) as Ref<T>;
   let off: (() => void) | null = null;
   watchEffect(() => {
-    off?.();
+    const previousOff = off;
+    off = null;
+    previousOff?.();
     const inst = instance.value;
     if (!inst) {
       out.value = fallback;
@@ -51,7 +67,11 @@ export const useSpreadsheet = <T>(
       out.value = selector(inst.store.getState());
     });
   });
-  onScopeDispose(() => off?.());
+  onScopeDispose(() => {
+    const currentOff = off;
+    off = null;
+    currentOff?.();
+  });
   return out;
 };
 
@@ -63,13 +83,19 @@ export const useI18n = (
   strings: Ref<SpreadsheetInstance['i18n']['strings']>;
 } => {
   const locale = ref<string>('ja');
-  const strings = ref({}) as Ref<SpreadsheetInstance['i18n']['strings']>;
+  const strings = ref(createFallbackStrings()) as Ref<SpreadsheetInstance['i18n']['strings']>;
 
   let off: (() => void) | null = null;
   watchEffect(() => {
-    off?.();
+    const previousOff = off;
+    off = null;
+    previousOff?.();
     const inst = instance.value;
-    if (!inst) return;
+    if (!inst) {
+      locale.value = 'ja';
+      strings.value = createFallbackStrings();
+      return;
+    }
     locale.value = inst.i18n.locale;
     strings.value = inst.i18n.strings;
     off = inst.i18n.subscribe((next) => {
@@ -77,7 +103,11 @@ export const useI18n = (
       strings.value = next;
     });
   });
-  onScopeDispose(() => off?.());
+  onScopeDispose(() => {
+    const currentOff = off;
+    off = null;
+    currentOff?.();
+  });
   return { locale, strings };
 };
 

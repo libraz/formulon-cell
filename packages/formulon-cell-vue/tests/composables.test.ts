@@ -1,4 +1,4 @@
-import { mutators, type SpreadsheetInstance } from '@libraz/formulon-cell';
+import { createSpreadsheetStore, mutators, type SpreadsheetInstance } from '@libraz/formulon-cell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   type App,
@@ -115,6 +115,49 @@ describe('useSelection', () => {
     // subscription was severed (otherwise it'd track the mutation).
     expect(refValue.value.active).toEqual(before);
   });
+
+  it('resets on null, follows a new instance, and ignores the old instance', async () => {
+    mounted = await mountVueSpreadsheet();
+    const first = mounted.instance;
+    const otherStore = createSpreadsheetStore();
+    const other = { store: otherStore } as unknown as SpreadsheetInstance;
+    const harness = renderComposable((r) => useSelection(r), first);
+    await flush();
+
+    mutators.setActive(first.store, { sheet: 0, row: 2, col: 3 });
+    await flush();
+    await harness.setInstance(null);
+    expect(harness.value().value.active).toEqual({ sheet: 0, row: 0, col: 0 });
+
+    await harness.setInstance(other);
+    mutators.setActive(otherStore, { sheet: 0, row: 4, col: 5 });
+    await flush();
+    expect(harness.value().value.active).toEqual({ sheet: 0, row: 4, col: 5 });
+
+    mutators.setActive(first.store, { sheet: 0, row: 8, col: 9 });
+    await flush();
+    expect(harness.value().value.active).toEqual({ sheet: 0, row: 4, col: 5 });
+
+    await harness.unmount();
+  });
+
+  it('does not invoke a detached store unsubscribe again on scope dispose', async () => {
+    const store = createSpreadsheetStore();
+    const off = vi.fn();
+    const fake = {
+      store: {
+        getState: () => store.getState(),
+        subscribe: () => off,
+      },
+    } as unknown as SpreadsheetInstance;
+    const harness = renderComposable((r) => useSelection(r), fake);
+    await flush();
+
+    await harness.setInstance(null);
+    await harness.unmount();
+
+    expect(off).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('useSpreadsheet', () => {
@@ -210,6 +253,68 @@ describe('useI18n', () => {
     inst.i18n.setLocale('en');
     await flush();
     expect(localeRef.value).toBe('ja');
+  });
+
+  it('resets on null, follows a new instance, and ignores the old instance', async () => {
+    mounted = await mountVueSpreadsheet({ props: { locale: 'ja' } });
+    const first = mounted.instance;
+    let otherLocale = 'en';
+    const otherStrings = first.i18n.strings;
+    const listeners = new Set<(strings: typeof otherStrings) => void>();
+    const other = {
+      i18n: {
+        get locale() {
+          return otherLocale;
+        },
+        get strings() {
+          return otherStrings;
+        },
+        subscribe(listener: (strings: typeof otherStrings) => void) {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+      },
+    } as unknown as SpreadsheetInstance;
+    const harness = renderComposable((r) => useI18n(r), first);
+    await flush();
+
+    first.i18n.setLocale('en');
+    await flush();
+    await harness.setInstance(null);
+    expect(harness.value().locale.value).toBe('ja');
+    expect(harness.value().strings.value).toEqual({});
+
+    await harness.setInstance(other);
+    expect(harness.value().locale.value).toBe('en');
+    otherLocale = 'fr';
+    for (const listener of listeners) listener(otherStrings);
+    await flush();
+    expect(harness.value().locale.value).toBe('fr');
+
+    first.i18n.setLocale('ja');
+    await flush();
+    expect(harness.value().locale.value).toBe('fr');
+
+    await harness.unmount();
+  });
+
+  it('does not invoke a detached i18n unsubscribe again on scope dispose', async () => {
+    const strings = {} as SpreadsheetInstance['i18n']['strings'];
+    const off = vi.fn();
+    const fake = {
+      i18n: {
+        locale: 'ja',
+        strings,
+        subscribe: () => off,
+      },
+    } as unknown as SpreadsheetInstance;
+    const harness = renderComposable((r) => useI18n(r), fake);
+    await flush();
+
+    await harness.setInstance(null);
+    await harness.unmount();
+
+    expect(off).toHaveBeenCalledTimes(1);
   });
 });
 
