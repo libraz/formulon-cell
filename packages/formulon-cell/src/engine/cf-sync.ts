@@ -59,6 +59,9 @@ const VALUE_OBJECT_TYPE = {
   max: 4,
 } as const;
 
+const ENGINE_DATA_BAR_DIRECTIONS = ['context', 'left-to-right', 'right-to-left'] as const;
+type DataBarDirection = (typeof ENGINE_DATA_BAR_DIRECTIONS)[number];
+
 const ENGINE_CELL_IS_OP: Record<number, Extract<ConditionalRule, { kind: 'cell-value' }>['op']> = {
   0: '<',
   1: '<=',
@@ -82,17 +85,26 @@ const engineIconSet = (ordinal: number): ConditionalIconSet | null =>
     ? (ENGINE_ICON_SETS[ordinal] ?? null)
     : null;
 
+const engineDataBarDirection = (ordinal: number): DataBarDirection | undefined =>
+  Number.isInteger(ordinal) && ordinal >= 0 && ordinal < ENGINE_DATA_BAR_DIRECTIONS.length
+    ? ENGINE_DATA_BAR_DIRECTIONS[ordinal]
+    : undefined;
+
 function engineScalePoint(
   valueObject: NonNullable<ConditionalFormatEntry['colorScale']>['thresholds'][number] | undefined,
 ): ConditionalScalePoint {
   if (!valueObject) return { kind: 'min' };
-  if (valueObject.type === VALUE_OBJECT_TYPE.min) return { kind: 'min' };
-  if (valueObject.type === VALUE_OBJECT_TYPE.max) return { kind: 'max' };
+  const comparison = valueObject.gte === undefined ? {} : { gte: valueObject.gte };
+  if (valueObject.type === VALUE_OBJECT_TYPE.min) return { kind: 'min', ...comparison };
+  if (valueObject.type === VALUE_OBJECT_TYPE.max) return { kind: 'max', ...comparison };
   const raw = Number(valueObject.value ?? '0');
   const value = Number.isFinite(raw) ? raw : 0;
-  if (valueObject.type === VALUE_OBJECT_TYPE.percent) return { kind: 'percent', value };
-  if (valueObject.type === VALUE_OBJECT_TYPE.percentile) return { kind: 'percentile', value };
-  return { kind: 'number', value };
+  if (valueObject.type === VALUE_OBJECT_TYPE.percent)
+    return { kind: 'percent', value, ...comparison };
+  if (valueObject.type === VALUE_OBJECT_TYPE.percentile) {
+    return { kind: 'percentile', value, ...comparison };
+  }
+  return { kind: 'number', value, ...comparison };
 }
 
 const maybeNumber = (raw: string | undefined): number | string => {
@@ -251,12 +263,15 @@ function engineConditionalFormatToRules(
       });
     } else if (entry.type === ENGINE_RULE_TYPE.dataBar) {
       if (!entry.dataBar) continue;
+      const direction = engineDataBarDirection(entry.dataBar.direction);
       out.push({
         ...common,
         kind: 'data-bar',
         range,
         color: rgba(entry.dataBar.fill),
         showValue: entry.dataBar.showValue !== false,
+        ...(direction ? { direction } : {}),
+        ...(entry.dataBar.gradient !== undefined ? { gradient: entry.dataBar.gradient } : {}),
       });
     } else if (entry.type === ENGINE_RULE_TYPE.iconSet) {
       if (!entry.iconSet) continue;
@@ -264,10 +279,10 @@ function engineConditionalFormatToRules(
       if (!icons) continue;
       const slots = iconSetSlotCount(icons);
       const engineThresholds = entry.iconSet.thresholds.map(engineScalePoint);
-      const thresholds =
-        engineThresholds.length >= slots
-          ? engineThresholds.slice(1, slots)
-          : engineThresholds.slice(0, slots - 1);
+      // formulon 0.12 stores the floor separately; `thresholds` contains
+      // only the N-1 boundaries between an N-icon set's buckets.
+      const thresholds = engineThresholds.slice(0, slots - 1);
+      const floor = entry.iconSet.floor ? engineScalePoint(entry.iconSet.floor) : undefined;
       out.push({
         ...common,
         kind: 'icon-set',
@@ -276,6 +291,7 @@ function engineConditionalFormatToRules(
         showValue: entry.iconSet.showValue !== false,
         ...(entry.iconSet.reverse ? { reverseOrder: true } : {}),
         ...(thresholds.length > 0 ? { thresholds } : {}),
+        ...(floor ? { floor } : {}),
       });
     }
   }
@@ -327,6 +343,8 @@ export function evaluateCfFromEngine(
 ): Map<string, ConditionalCellOverlay> {
   const out = new Map<string, ConditionalCellOverlay>();
   if (!wb.capabilities.conditionalFormat) return out;
+  const sheetRtl =
+    typeof wb.getSheetView === 'function' && wb.getSheetView(sheet)?.rightToLeft === true;
   const cells = wb.evaluateCfRange(sheet, firstRow, firstCol, lastRow, lastCol, todaySerial);
   for (const cell of cells) {
     const key = addrKey({ sheet, row: cell.row, col: cell.col });
@@ -338,9 +356,22 @@ export function evaluateCfFromEngine(
       if (m.kind === KIND_COLOR_SCALE) {
         overlay.fill = rgba(m.color);
       } else if (m.kind === KIND_DATA_BAR) {
-        overlay.bar = Math.max(0, Math.min(1, m.barLengthPct / 100));
-        overlay.barAxis = Math.max(0, Math.min(1, m.barAxisPositionPct / 100));
-        overlay.barDirection = m.barIsNegative ? 'left' : 'right';
+        // The engine reports length as a fraction of the axis's signed side;
+        // the canvas overlay stores a fraction of the full cell width.
+        const rawLength = Math.max(0, Math.min(1, m.barLengthPct / 100));
+        const axis = Math.max(0, Math.min(1, m.barAxisPositionPct / 100));
+        const negative = m.barIsNegative === true;
+        overlay.bar = rawLength * (negative ? axis : 1 - axis);
+        const direction =
+          'barDirection' in m && typeof m.barDirection === 'number' ? m.barDirection : 0;
+        const mirror = direction === 2 || (direction === 0 && sheetRtl);
+        overlay.barAxis = mirror ? 1 - axis : axis;
+        const baseDirection = negative ? 'left' : 'right';
+        overlay.barDirection = mirror
+          ? baseDirection === 'left'
+            ? 'right'
+            : 'left'
+          : baseDirection;
         overlay.barColor = rgba(m.barFill);
         overlay.barGradient = m.barGradient;
       } else if (m.kind === KIND_ICON_SET) {

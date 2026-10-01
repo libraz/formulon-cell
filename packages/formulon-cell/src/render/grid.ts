@@ -33,6 +33,7 @@ import {
   type ViewState,
 } from './geometry.js';
 import type { ChromePaintContext } from './grid/chrome-context.js';
+import { paintDataBar } from './grid/data-bar.js';
 import { paintHeaders } from './grid/headers.js';
 import {
   detectErrorKind,
@@ -674,23 +675,7 @@ export class GridRenderer {
         // overlay over static, so a single call yields the right result.
         if (effectiveFmt?.fill) paintCellFill(paintCtx);
         if (isActive && !effectiveFmt?.fill) paintCellBackground(paintCtx);
-        if (overlay?.bar !== undefined && overlay.barColor) {
-          ctx.save();
-          if (overlay.barGradient) {
-            const gradient = ctx.createLinearGradient(bounds.x, 0, bounds.x + bounds.w, 0);
-            gradient.addColorStop(0, overlay.barColor);
-            gradient.addColorStop(1, 'rgba(255,255,255,0.25)');
-            ctx.fillStyle = gradient;
-          } else {
-            ctx.fillStyle = overlay.barColor;
-          }
-          ctx.globalAlpha = 0.45;
-          const w = bounds.w * overlay.bar;
-          const axisX = bounds.x + bounds.w * (overlay.barAxis ?? 0);
-          const x = overlay.barDirection === 'left' ? axisX - w : axisX;
-          ctx.fillRect(x, bounds.y + 1, w, bounds.h - 2);
-          ctx.restore();
-        }
+        if (overlay) paintDataBar(ctx, bounds, overlay);
         const hideConditionalValue =
           overlay?.showValue === false &&
           (overlay.bar !== undefined || (overlay.iconKind && overlay.iconSlot !== undefined));

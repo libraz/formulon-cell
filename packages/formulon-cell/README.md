@@ -35,11 +35,7 @@ both are thin adapters over the same mount call.
 npm install @libraz/formulon-cell zustand
 ```
 
-`zustand` is a peer dependency. The WASM engine requires a
-[crossOriginIsolated](https://developer.mozilla.org/docs/Web/API/crossOriginIsolated)
-context (`COOP: same-origin` + `COEP: require-corp`); without it,
-`WorkbookHandle.createDefault()` rejects before mounting. The in-memory stub
-engine is opt-in via `preferStub: true` for tests and explicit demos.
+`zustand` is a peer dependency. The default WASM in formulon 0.12.0 is single-threaded and needs no COOP/COEP headers. `WorkbookHandle.createDefault()` rejects if initialization fails. The in-memory stub engine is opt-in via `preferStub: true` for tests and explicit demos.
 
 See [bundler integration](https://github.com/libraz/formulon-cell#bundler-integration)
 for Vite / webpack / esbuild setup notes.

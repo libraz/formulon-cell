@@ -11,6 +11,7 @@ import {
   WORKBOOK_OBJECT_KINDS,
   workbookObjectKindCounts,
 } from '../engine/passthrough-sync.js';
+import { pivotAggregationName } from '../engine/pivot-aggregation.js';
 import {
   PivotAggregation,
   PivotAxis,
@@ -641,14 +642,26 @@ export function attachWorkbookObjectsPanel(
           Number(select.value) as PivotAxis,
         ),
       );
+      const rowFieldOrder = fieldAreaSelects
+        .filter((select) => Number(select.value) === PivotAxis.Row)
+        .map((select) => Number(select.dataset.pivotFieldIndex));
+      const colFieldOrder = fieldAreaSelects
+        .filter((select) => Number(select.value) === PivotAxis.Col)
+        .map((select) => Number(select.dataset.pivotFieldIndex));
+      const axisOrdersUpdated =
+        fieldsUpdated &&
+        wb.setPivotRowFieldOrder(pivot.sheetIndex, pivot.pivotIndex, rowFieldOrder) &&
+        wb.setPivotColFieldOrder(pivot.sheetIndex, pivot.pivotIndex, colFieldOrder);
       const dataFieldCount = wb.pivotDataFieldCount(pivot.sheetIndex, pivot.pivotIndex);
       let nextDataFieldIndex = 0;
       const valueFieldsUpdated = valueFieldSettings.every((field) => {
         if (field.axisSelect.value !== String(PivotAxis.Value)) return true;
         const format = field.numberFormatInput.value.trim();
+        const aggregation = Number(field.aggregationSelect.value) as PivotAggregation;
         const spec: PivotDataFieldSpec = {
+          name: `${pivotAggregationName(aggregation)} of ${pivot.fields[field.fieldIndex] ?? `field ${field.fieldIndex}`}`,
           fieldIndex: field.fieldIndex,
-          aggregation: Number(field.aggregationSelect.value) as PivotAggregation,
+          aggregation,
           ...(format.length > 0 ? { numberFormat: format } : {}),
         };
         const dataFieldIndex = nextDataFieldIndex;
@@ -731,6 +744,7 @@ export function attachWorkbookObjectsPanel(
         !totaled ||
         !layoutUpdated ||
         !fieldsUpdated ||
+        !axisOrdersUpdated ||
         !valueFieldsUpdated ||
         !filterItemsUpdated ||
         !pivotFiltersUpdated

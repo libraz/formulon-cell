@@ -184,8 +184,6 @@ describe('detectCapabilities', () => {
       'pivotFieldSetAxis',
       'pivotFieldSetSort',
       'pivotFieldSetSubtotalTop',
-      'pivotFieldAddAggregation',
-      'pivotFieldClearAggregations',
       'pivotFieldAddItem',
       'pivotFieldClearItems',
       'pivotFieldSetItemVisible',
@@ -201,11 +199,15 @@ describe('detectCapabilities', () => {
       'pivotDataFieldClear',
       'pivotDataFieldSet',
       'pivotFilterCount',
+      'pivotFilterAt',
       'pivotFilterAdd',
       'pivotFilterClear',
       'pivotFilterRemoveAt',
     ]);
     expect(detectCapabilities(full).pivotTableMutate).toBe(true);
+    const withoutReadback = { ...full } as unknown as Record<string, unknown>;
+    delete withoutReadback.pivotFilterAt;
+    expect(detectCapabilities(withoutReadback as unknown as Workbook).pivotTableMutate).toBe(false);
   });
 
   it('spreadsheetProfile requires get + set profile ids', () => {

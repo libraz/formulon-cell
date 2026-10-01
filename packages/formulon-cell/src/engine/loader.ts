@@ -3,11 +3,9 @@
 // explicit wasm URL here — Emscripten finds the file next to formulon.js
 // at the consumer's resolved path.
 //
-// formulon's WASM uses pthread/SharedArrayBuffer. Browsers without a
-// crossOriginIsolated context (missing COOP+COEP, ad-hoc demos, SSR shells)
-// will fail at instantiation. Treat that as a host configuration error by
-// default: the in-memory stub is intentionally opt-in for tests and demos,
-// because silently pretending to calculate can corrupt user expectations.
+// The default formulon entry is single-threaded and needs no cross-origin
+// isolation. Initialization errors still reject: the in-memory stub is
+// intentionally opt-in for tests and demos.
 import createFormulon from '@libraz/formulon';
 import { createStubModule } from './stub-engine.js';
 import type { FormulonModule } from './types.js';
@@ -43,6 +41,7 @@ export function loadFormulon(opts: LoadOptions = {}): Promise<FormulonModule> {
   }
 
   const promise: Promise<FormulonModule> = createFormulon().catch((reason: unknown) => {
+    cachedWasm = null;
     throw new Error(`formulon WASM init failed: ${String(reason)}`);
   });
   cachedWasm = promise;
@@ -58,12 +57,6 @@ export function isUsingStub(module?: FormulonModule): boolean {
 function wasmUnavailableReason(): string | null {
   if (typeof WebAssembly === 'undefined') {
     return 'formulon WASM unavailable: WebAssembly is not supported in this environment';
-  }
-  // pthreaded WASM needs SAB. If we're in a browser context that doesn't
-  // expose it, fail before invoking the Emscripten loader so callers see the
-  // missing COOP/COEP setup instead of a partial spreadsheet.
-  if (typeof SharedArrayBuffer === 'undefined') {
-    return 'formulon WASM unavailable: SharedArrayBuffer is missing; serve the page with COOP: same-origin and COEP: require-corp, or pass preferStub: true explicitly for tests/demos';
   }
   return null;
 }

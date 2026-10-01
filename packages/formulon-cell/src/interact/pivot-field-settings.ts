@@ -33,6 +33,8 @@ export const createPivotAreaSettingsButton = (
   return button;
 };
 
+/** Legacy unsupported kinds remain accepted as input for compatibility;
+ * conversion returns null and the dialog only offers formulon 0.12 kinds. */
 export type PivotFilterConditionKind =
   | 'none'
   | 'label-equals'
@@ -195,27 +197,15 @@ export const appendFilterConditionOptions = (
   ];
   if (category === 'label') {
     options.push(
-      { value: 'label-equals', label: strings.filterConditionLabelEquals },
-      { value: 'label-does-not-equal', label: strings.filterConditionLabelDoesNotEqual },
       { value: 'label-contains', label: strings.filterConditionLabelContains },
-      { value: 'label-does-not-contain', label: strings.filterConditionLabelDoesNotContain },
       { value: 'label-begins-with', label: strings.filterConditionLabelBeginsWith },
-      { value: 'label-ends-with', label: strings.filterConditionLabelEndsWith },
     );
   } else if (category === 'date') {
-    options.push(
-      { value: 'label-date', label: strings.filterConditionLabelDate },
-      { value: 'date-before', label: strings.filterConditionDateBefore },
-      { value: 'date-after', label: strings.filterConditionDateAfter },
-      { value: 'date-between', label: strings.filterConditionDateBetween },
-    );
+    options.push({ value: 'label-date', label: strings.filterConditionLabelDate });
   } else {
     options.push(
       { value: 'value-greater-than', label: strings.filterConditionValueGreaterThan },
-      { value: 'value-less-than', label: strings.filterConditionValueLessThan },
-      { value: 'value-equals', label: strings.filterConditionValueEquals },
       { value: 'value-between', label: strings.filterConditionValueBetween },
-      { value: 'value-not-between', label: strings.filterConditionValueNotBetween },
       { value: 'value-top-10', label: strings.filterConditionValueTop10 },
     );
   }
@@ -244,29 +234,10 @@ export const pivotFilterConditionToSpec = (
   if (!condition || condition.kind === 'none') return null;
   const valueText = condition.value.trim();
   if (!valueText) return null;
-  if (
-    condition.kind === 'label-equals' ||
-    condition.kind === 'label-does-not-equal' ||
-    condition.kind === 'label-contains' ||
-    condition.kind === 'label-does-not-contain' ||
-    condition.kind === 'label-begins-with' ||
-    condition.kind === 'label-ends-with'
-  ) {
-    const typeByKind: Record<
-      | 'label-equals'
-      | 'label-does-not-equal'
-      | 'label-contains'
-      | 'label-does-not-contain'
-      | 'label-begins-with'
-      | 'label-ends-with',
-      PivotFilterType
-    > = {
-      'label-equals': PivotFilterType.LabelEquals,
-      'label-does-not-equal': PivotFilterType.LabelDoesNotEqual,
+  if (condition.kind === 'label-contains' || condition.kind === 'label-begins-with') {
+    const typeByKind: Record<'label-contains' | 'label-begins-with', PivotFilterType> = {
       'label-contains': PivotFilterType.LabelContains,
-      'label-does-not-contain': PivotFilterType.LabelDoesNotContain,
       'label-begins-with': PivotFilterType.LabelBeginsWith,
-      'label-ends-with': PivotFilterType.LabelEndsWith,
     };
     return {
       axis,
@@ -276,48 +247,22 @@ export const pivotFilterConditionToSpec = (
       valueText,
     };
   }
-  if (
-    condition.kind === 'label-date' ||
-    condition.kind === 'date-before' ||
-    condition.kind === 'date-after'
-  ) {
-    const type =
-      condition.kind === 'date-before'
-        ? PivotFilterType.DateBefore
-        : condition.kind === 'date-after'
-          ? PivotFilterType.DateAfter
-          : PivotFilterType.LabelDate;
+  if (condition.kind === 'label-date') {
     return {
       axis,
       fieldName,
-      type,
+      type: PivotFilterType.LabelDate,
       valueKind: PivotFilterValueKind.Text,
       valueText,
     };
   }
-  if (condition.kind === 'date-between') {
-    const [lowText, highText] = splitFilterDateRange(valueText);
-    if (!lowText || !highText) return null;
-    return {
-      axis,
-      fieldName,
-      type: PivotFilterType.DateBetween,
-      valueKind: PivotFilterValueKind.Text,
-      valueText: lowText,
-      valueHighKind: PivotFilterValueKind.Text,
-      valueHighText: highText,
-    };
-  }
-  if (condition.kind === 'value-between' || condition.kind === 'value-not-between') {
+  if (condition.kind === 'value-between') {
     const range = parseFilterNumberRange(valueText);
     if (!range) return null;
     return {
       axis,
       fieldName,
-      type:
-        condition.kind === 'value-between'
-          ? PivotFilterType.ValueBetween
-          : PivotFilterType.ValueNotBetween,
+      type: PivotFilterType.ValueBetween,
       valueKind: PivotFilterValueKind.Double,
       valueDouble: range[0],
       valueHighKind: PivotFilterValueKind.Double,
@@ -336,16 +281,11 @@ export const pivotFilterConditionToSpec = (
   }
   const value = Number(valueText);
   if (!Number.isFinite(value)) return null;
-  const singleValueType =
-    condition.kind === 'value-less-than'
-      ? PivotFilterType.ValueLessThan
-      : condition.kind === 'value-equals'
-        ? PivotFilterType.ValueEquals
-        : PivotFilterType.ValueGreaterThan;
+  if (condition.kind !== 'value-greater-than') return null;
   return {
     axis,
     fieldName,
-    type: singleValueType,
+    type: PivotFilterType.ValueGreaterThan,
     valueKind: PivotFilterValueKind.Double,
     valueDouble: value,
   };
@@ -361,32 +301,10 @@ export const pivotFilterSpecToCondition = (
   if (spec.type === PivotFilterType.LabelBeginsWith && spec.valueText) {
     return { kind: 'label-begins-with', value: spec.valueText };
   }
-  if (spec.type === PivotFilterType.LabelEquals && spec.valueText) {
-    return { kind: 'label-equals', value: spec.valueText };
-  }
-  if (spec.type === PivotFilterType.LabelDoesNotEqual && spec.valueText) {
-    return { kind: 'label-does-not-equal', value: spec.valueText };
-  }
-  if (spec.type === PivotFilterType.LabelDoesNotContain && spec.valueText) {
-    return { kind: 'label-does-not-contain', value: spec.valueText };
-  }
-  if (spec.type === PivotFilterType.LabelEndsWith && spec.valueText) {
-    return { kind: 'label-ends-with', value: spec.valueText };
-  }
   if (spec.type === PivotFilterType.LabelDate && spec.valueText) {
     return { kind: 'label-date', value: spec.valueText };
   }
-  if (spec.type === PivotFilterType.DateBefore && spec.valueText) {
-    return { kind: 'date-before', value: spec.valueText };
-  }
-  if (spec.type === PivotFilterType.DateAfter && spec.valueText) {
-    return { kind: 'date-after', value: spec.valueText };
-  }
-  if (spec.type === PivotFilterType.DateBetween) {
-    if (!spec.valueText || !spec.valueHighText) return null;
-    return { kind: 'date-between', value: `${spec.valueText}..${spec.valueHighText}` };
-  }
-  if (spec.type === PivotFilterType.ValueBetween || spec.type === PivotFilterType.ValueNotBetween) {
+  if (spec.type === PivotFilterType.ValueBetween) {
     if (
       typeof spec.valueDouble !== 'number' ||
       typeof spec.valueHighDouble !== 'number' ||
@@ -395,7 +313,7 @@ export const pivotFilterSpecToCondition = (
     )
       return null;
     return {
-      kind: spec.type === PivotFilterType.ValueBetween ? 'value-between' : 'value-not-between',
+      kind: 'value-between',
       value: `${spec.valueDouble}..${spec.valueHighDouble}`,
     };
   }
@@ -409,14 +327,6 @@ export const pivotFilterSpecToCondition = (
   if (spec.type === PivotFilterType.ValueGreaterThan) {
     if (typeof spec.valueDouble !== 'number' || !Number.isFinite(spec.valueDouble)) return null;
     return { kind: 'value-greater-than', value: String(spec.valueDouble) };
-  }
-  if (spec.type === PivotFilterType.ValueLessThan) {
-    if (typeof spec.valueDouble !== 'number' || !Number.isFinite(spec.valueDouble)) return null;
-    return { kind: 'value-less-than', value: String(spec.valueDouble) };
-  }
-  if (spec.type === PivotFilterType.ValueEquals) {
-    if (typeof spec.valueDouble !== 'number' || !Number.isFinite(spec.valueDouble)) return null;
-    return { kind: 'value-equals', value: String(spec.valueDouble) };
   }
   return null;
 };

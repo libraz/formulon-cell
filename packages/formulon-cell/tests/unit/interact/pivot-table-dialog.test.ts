@@ -122,6 +122,8 @@ const makeWb = () => {
       return true;
     },
     setPivotFieldSort: () => true,
+    setPivotRowFieldOrder: () => true,
+    setPivotColFieldOrder: () => true,
     addPivotDataField: (
       _sheet: number,
       _pivot: number,

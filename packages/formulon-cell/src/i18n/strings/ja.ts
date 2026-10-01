@@ -1346,7 +1346,7 @@ export const ja: Strings = {
   mountError: {
     title: 'スプレッドシート エンジンを利用できません',
     engineHelp:
-      'formulon WASM エンジンを起動できませんでした。SharedArrayBuffer を利用できるように、COOP: same-origin と COEP: require-corp を付けてページを配信してください。',
+      'formulon WASM エンジンを起動できませんでした。WebAssemblyの対応状況と、エンジンのWASMアセットを読み込めるかを確認してください。',
   },
   ribbon: {
     workbook: 'ブック',

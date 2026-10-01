@@ -50,13 +50,7 @@ npm install @libraz/formulon-cell zustand
 `zustand` はピア依存として公開しています。UI 表層が購読しているストアに、
 利用者側からも同じインスタンスでアクセスできるようにするためです。
 
-WASM エンジンは pthread 有効版を同梱しており、
-[crossOriginIsolated コンテキスト](https://developer.mozilla.org/docs/Web/API/crossOriginIsolated)
-（`Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy:
-require-corp`）を必要とします。これが満たされない環境では formulon-cell は
-マウント前に `WorkbookHandle.createDefault()` が失敗します。インメモリの
-スタブエンジンは、テストや明示的なデモ向けに `preferStub: true` を渡した
-場合だけ使います。
+formulon 0.12.0 の標準WASMは単一スレッド版で、COOP/COEPヘッダや `SharedArrayBuffer` を必要としません。起動に失敗した場合、`WorkbookHandle.createDefault()` はエラーを返します。インメモリのスタブエンジンは、テストや明示的なデモ向けに `preferStub: true` を渡した場合だけ使います。
 
 ## クイックスタート
 
@@ -78,25 +72,9 @@ sheet.setTheme('ink');           // ダークテーマへ切り替え
 
 ## バンドラ統合
 
-formulon-cell は `@libraz/formulon` の pthread 有効 WASM モジュールを
-再利用するため、エンジンパッケージと同じバンドラ設定がそのまま必要です。
-押さえておくべきポイントは 4 点です。
+formulon-cell は `@libraz/formulon` の標準の単一スレッドWASMを利用します。以下の設定でWASMアセットを解決してください。
 
-**1. ワーカーは ES モジュール形式で出力する。** 再計算スケジューラは
-Emscripten が生成する Web Worker 上で動作し、
-`new Worker(new URL(...), { type: 'module' })` で起動します。多くのバンドラは
-既定でクラシック (IIFE) 形式のワーカーを生成するため、明示的に切り替える
-必要があります。
-
-```ts
-// vite.config.ts
-export default defineConfig({
-  worker: { format: 'es' },
-});
-```
-
-webpack 5 は `output.module: true` のとき `{ type: 'module' }` を自動的に
-認識します。esbuild ではワーカーチャンクに `--format=esm` を指定してください。
+**1. ワーカー設定はスレッド版を直接使う場合に必要。** アプリで `@libraz/formulon/threads` を直接使う場合、Viteでは `worker: { format: 'es' }` を指定してください。formulon-cell の標準ロードではワーカーを起動しません。
 
 **2. トップレベル await と動的な Node モジュール読み込みには es2022
 ターゲットが必要。** エンジンファクトリはトップレベル await と条件付きの
@@ -112,7 +90,7 @@ export default defineConfig({
 
 **3. 依存関係の事前バンドル対象からエンジンを除外する。** formulon-cell は
 `@libraz/formulon` を経由してロードし、その Emscripten ラッパーが
-ワーカーと WASM アセットの解決を担当します。両パッケージを事前バンドルの
+WASM アセットの解決を担当します。両パッケージを事前バンドルの
 対象から外し、アセット解決はアプリ側のバンドラに委ねてください。
 
 ```ts
@@ -122,14 +100,7 @@ export default defineConfig({
 });
 ```
 
-**4. SharedArrayBuffer はクロスオリジン分離を要求する。** ページに
-`Cross-Origin-Opener-Policy: same-origin` と
-`Cross-Origin-Embedder-Policy: require-corp` ヘッダを付与してください。
-これらのヘッダが無い環境では `SharedArrayBuffer` が未定義となり、
-`WorkbookHandle.createDefault()` はインメモリの **スタブエンジン** に静かに
-フォールバックせず、失敗します。スタブは `preferStub: true` を渡した
-テストや明示的なデモ専用です。数式評価・再計算・xlsx の読み書きが不完全な
-ため、通常の実行パスでは使わないでください。
+**4. 標準WASMはクロスオリジン分離を必要としない。** `@libraz/formulon/threads` を直接使う場合だけ、`Cross-Origin-Opener-Policy: same-origin` と `Cross-Origin-Embedder-Policy: require-corp` ヘッダが必要です。スタブは `preferStub: true` を渡したテストや明示的なデモ専用です。数式評価・再計算・xlsxの読み書きが不完全なため、通常の実行には実WASMを使ってください。
 
 ```ts
 import { WorkbookHandle, isUsingStub } from '@libraz/formulon-cell';

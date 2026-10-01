@@ -6,10 +6,13 @@ const makeHandle = (supportsProfile: boolean): { wb: WorkbookHandle; setCalls: s
   const setCalls: string[] = [];
   const raw = supportsProfile
     ? {
-        excelProfileId: () => 'win-365-ja_JP',
+        excelProfileId: () => ({
+          status: { ok: true, status: 0, message: '', context: '' },
+          value: 'win-365-ja_JP',
+        }),
         setExcelProfileId: (profileId: string) => {
           setCalls.push(profileId);
-          return { ok: true, code: 0, message: '' };
+          return { ok: true, status: 0, message: '', context: '' };
         },
       }
     : {};

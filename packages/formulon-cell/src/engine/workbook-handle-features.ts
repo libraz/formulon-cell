@@ -212,7 +212,9 @@ type WorkbookHandleInternals = {
 };
 type EngineCommentEntry = { row: number; col: number; author: string; text: string };
 type CommentEnumerableWorkbook = Workbook & {
-  getComments?: (sheet: number) => EngineCommentEntry[];
+  getComments?: (
+    sheet: number,
+  ) => readonly EngineCommentEntry[] & { readonly status: { ok: boolean } };
 };
 type TableAuthoringWorkbook = Workbook & {
   createTable?: (input: TableInput) => { status: { ok: boolean }; index: number };
@@ -964,6 +966,7 @@ export abstract class WorkbookHandleFeatureMethods {
     assertAlive(this);
     if (!this.capabilities.merges) return [];
     const arr = wb(this).getMerges(sheet);
+    if (!arr.status.ok) return [];
     return arr.map((m) => ({
       sheet,
       r0: m.firstRow,
@@ -989,7 +992,9 @@ export abstract class WorkbookHandleFeatureMethods {
     if (!this.capabilities.commentsEnumerable) return [];
     const engineWb = wb(this) as CommentEnumerableWorkbook;
     if (typeof engineWb.getComments !== 'function') return [];
-    return engineWb.getComments(sheet).map((e) => ({
+    const entries = engineWb.getComments(sheet);
+    if (!entries.status.ok) return [];
+    return entries.map((e) => ({
       row: e.row,
       col: e.col,
       author: e.author,
@@ -1082,6 +1087,7 @@ export abstract class WorkbookHandleFeatureMethods {
       barBorderEngaged: boolean;
       barBorder: { r: number; g: number; b: number; a: number };
       barGradient: boolean;
+      barDirection: number;
       iconSetName: number;
       iconIndex: number;
     }[];
@@ -1112,6 +1118,7 @@ export abstract class WorkbookHandleFeatureMethods {
             a: m.barBorder.a,
           },
           barGradient: m.barGradient !== 0,
+          barDirection: m.barDirection,
           iconSetName: m.iconSetName,
           iconIndex: m.iconIndex,
         });
@@ -1133,7 +1140,7 @@ export abstract class WorkbookHandleFeatureMethods {
     assertAlive(this);
     if (!this.capabilities.spillInfo) return null;
     const r = wb(this).spillInfo(sheet, row, col);
-    if (!r.engaged) return null;
+    if (!r.status.ok || !r.engaged) return null;
     return {
       anchorRow: r.anchorRow,
       anchorCol: r.anchorCol,
@@ -1161,6 +1168,7 @@ export abstract class WorkbookHandleFeatureMethods {
     assertAlive(this);
     if (!this.capabilities.traceArrows) return null;
     const arr = wb(this).precedents(addr.sheet, addr.row, addr.col, depth);
+    if (!arr.status.ok) return null;
     return arr.map((n) => ({ sheet: n.sheet, row: n.row, col: n.col }));
   }
 
@@ -1171,6 +1179,7 @@ export abstract class WorkbookHandleFeatureMethods {
     assertAlive(this);
     if (!this.capabilities.traceArrows) return null;
     const arr = wb(this).dependents(addr.sheet, addr.row, addr.col, depth);
+    if (!arr.status.ok) return null;
     return arr.map((n) => ({ sheet: n.sheet, row: n.row, col: n.col }));
   }
 
@@ -1181,7 +1190,8 @@ export abstract class WorkbookHandleFeatureMethods {
   functionNames(): readonly string[] | null {
     assertAlive(this);
     if (!this.capabilities.functionMetadata) return null;
-    return wb(this).functionNames();
+    const names = wb(this).functionNames();
+    return names.status.ok ? [...names] : null;
   }
 
   /** Register a host-supplied function-metadata provider — a map of canonical
@@ -1235,12 +1245,14 @@ export abstract class WorkbookHandleFeatureMethods {
   /** Canonical → localized function-name lookup. `locale`: 0 = en-US,
    *  1 = ja-JP. Returns the canonical name unchanged when no alias is
    *  registered for `locale` (currently the case for every locale except
-   *  en-US). Returns `null` when the engine doesn't expose
+   *  en-US). Returns the empty string for an unsuccessful lookup.
+   *  Returns `null` when the engine doesn't expose
    *  `localizeFunctionName`. */
   localizeFunctionName(canonicalName: string, locale = 0): string | null {
     assertAlive(this);
     if (!this.capabilities.functionLocale) return null;
-    return wb(this).localizeFunctionName(canonicalName, locale);
+    const result = wb(this).localizeFunctionName(canonicalName, locale);
+    return result.status.ok ? result.value : '';
   }
 
   /** Localized → canonical function-name lookup. Falls through to a
@@ -1251,7 +1263,8 @@ export abstract class WorkbookHandleFeatureMethods {
   canonicalizeFunctionName(localizedName: string, locale = 0): string | null {
     assertAlive(this);
     if (!this.capabilities.functionLocale) return null;
-    return wb(this).canonicalizeFunctionName(localizedName, locale);
+    const result = wb(this).canonicalizeFunctionName(localizedName, locale);
+    return result.status.ok ? result.value : '';
   }
 
   /** Workbook calc-mode metadata mirroring `<calcPr calcMode>`. The engine
@@ -1266,7 +1279,7 @@ export abstract class WorkbookHandleFeatureMethods {
     assertAlive(this);
     if (!this.capabilities.calcMode) return null;
     const mode = wb(this).calcMode();
-    return (mode as 0 | 1 | 2) ?? null;
+    return mode.status.ok ? mode.value : null;
   }
 
   /** Sets the calc-mode metadata. Returns `false` (no-op) under stub or
@@ -1291,10 +1304,15 @@ export abstract class WorkbookHandleFeatureMethods {
     assertAlive(this);
     if (!this.capabilities.spreadsheetProfile) return null;
     const getProfile = (
-      wb(this) as unknown as Record<string, ((this: Workbook) => string) | undefined>
+      wb(this) as unknown as Record<
+        string,
+        ((this: Workbook) => { status: { ok: boolean }; value: string }) | undefined
+      >
     )[ENGINE_SPREADSHEET_PROFILE_GETTER];
     if (!getProfile) return null;
-    return engineProfileToPublic(getProfile.call(wb(this)) as EngineSpreadsheetProfileId);
+    const result = getProfile.call(wb(this));
+    if (!result.status.ok) return null;
+    return engineProfileToPublic(result.value as EngineSpreadsheetProfileId);
   }
 
   /** Sets the formula-behaviour profile. Returns `false` when unsupported. */
@@ -1316,7 +1334,8 @@ export abstract class WorkbookHandleFeatureMethods {
   cellStyleCount(): number {
     assertAlive(this);
     if (!this.capabilities.cellStyles) return 0;
-    return wb(this).cellStyleCount();
+    const count = wb(this).cellStyleCount();
+    return count.status.ok ? count.value : 0;
   }
 
   /** Number of `<cellStyleXfs>` records — the named-style xf table that
@@ -1325,7 +1344,8 @@ export abstract class WorkbookHandleFeatureMethods {
   cellStyleXfCount(): number {
     assertAlive(this);
     if (!this.capabilities.cellStyles) return 0;
-    return wb(this).cellStyleXfCount();
+    const count = wb(this).cellStyleXfCount();
+    return count.status.ok ? count.value : 0;
   }
 
   /** Snapshot of the named cell style at `index`. Returns `null` when the
@@ -1398,7 +1418,8 @@ export abstract class WorkbookHandleFeatureMethods {
   getConditionalFormats(sheet: number): readonly ConditionalFormatEntry[] {
     assertAlive(this);
     if (!this.capabilities.conditionalFormatMutate) return [];
-    return wb(this).getConditionalFormats(sheet);
+    const entries = wb(this).getConditionalFormats(sheet);
+    return entries.status.ok ? [...entries] : [];
   }
 
   /** Removes the CF rule at `index` (flattened priority order). When the
@@ -1450,7 +1471,8 @@ export abstract class WorkbookHandleFeatureMethods {
   dxfCount(): number {
     assertAlive(this);
     if (!this.capabilities.conditionalFormatDxf) return 0;
-    return wb(this).dxfCount();
+    const count = wb(this).dxfCount();
+    return count.status.ok ? count.value : 0;
   }
 
   /** Reads the round-trip `<sheetProtection>` flags. Returns `null` when

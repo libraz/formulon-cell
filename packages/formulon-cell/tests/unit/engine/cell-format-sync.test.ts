@@ -377,6 +377,20 @@ describe('hydrateCellFormatsFromEngine', () => {
     });
   });
 
+  it('preserves numeric format codes already decoded by WorkbookHandle', () => {
+    const { wb } = makeFake({
+      numFmts: new Map([[0, 'General']]),
+      pivotCells: [{ addr: { sheet: 0, row: 3, col: 1 }, kind: 3, numberFormat: '0.00' }],
+    });
+    const store = createSpreadsheetStore();
+
+    hydrateCellFormatsFromEngine(wb, store, 0);
+
+    expect(
+      store.getState().format.formats.get(addrKey({ sheet: 0, row: 3, col: 1 }))?.numFmt,
+    ).toEqual({ kind: 'fixed', decimals: 2 });
+  });
+
   it('hydrates PivotTable projection formats from assigned session pivot styles', () => {
     const { wb } = makeFake({
       pivotCells: [

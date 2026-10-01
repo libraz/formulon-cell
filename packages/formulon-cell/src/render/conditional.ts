@@ -52,6 +52,7 @@ export interface ConditionalCellOverlay {
 let cachedRulesRef: State['conditional']['rules'] | null = null;
 let cachedCellsRef: State['data']['cells'] | null = null;
 let cachedSheet: number | null = null;
+let cachedRtl: boolean | null = null;
 let cachedOverlay: Map<string, ConditionalCellOverlay> | null = null;
 
 /** Test hook — drop the cached overlay so the next call recomputes. */
@@ -59,6 +60,7 @@ export function _resetConditionalCache(): void {
   cachedRulesRef = null;
   cachedCellsRef = null;
   cachedSheet = null;
+  cachedRtl = null;
   cachedOverlay = null;
 }
 
@@ -141,7 +143,8 @@ export function evaluateConditional(state: State): Map<string, ConditionalCellOv
     cachedOverlay !== null &&
     cachedRulesRef === state.conditional.rules &&
     cachedCellsRef === state.data.cells &&
-    cachedSheet === state.data.sheetIndex
+    cachedSheet === state.data.sheetIndex &&
+    cachedRtl === state.ui.rightToLeft
   ) {
     return cachedOverlay;
   }
@@ -151,6 +154,7 @@ export function evaluateConditional(state: State): Map<string, ConditionalCellOv
     cachedRulesRef = rules;
     cachedCellsRef = state.data.cells;
     cachedSheet = state.data.sheetIndex;
+    cachedRtl = state.ui.rightToLeft;
     cachedOverlay = out;
     return out;
   }
@@ -204,6 +208,7 @@ export function evaluateConditional(state: State): Map<string, ConditionalCellOv
   cachedRulesRef = state.conditional.rules;
   cachedCellsRef = state.data.cells;
   cachedSheet = state.data.sheetIndex;
+  cachedRtl = state.ui.rightToLeft;
   cachedOverlay = out;
   return out;
 }
@@ -355,11 +360,15 @@ function paintDataBar(
       const v = cell.value.value;
       const overlay = out.get(key) ?? {};
       const negative = v < 0;
+      const mirror =
+        rule.direction === 'right-to-left' ||
+        ((rule.direction === undefined || rule.direction === 'context') &&
+          state.ui.rightToLeft === true);
       overlay.bar = negative
         ? Math.max(0, Math.min(axis, (Math.abs(v) / negativeDenom) * axis))
         : Math.max(0, Math.min(1 - axis, (v / positiveDenom) * (1 - axis)));
-      overlay.barAxis = axis;
-      overlay.barDirection = negative ? 'left' : 'right';
+      overlay.barAxis = mirror ? 1 - axis : axis;
+      overlay.barDirection = negative !== mirror ? 'left' : 'right';
       overlay.barColor = rule.color;
       overlay.barGradient = rule.gradient === true;
       overlay.showValue = rule.showValue !== false;
@@ -391,17 +400,27 @@ function paintIconSet(
   const max = sorted[sorted.length - 1] ?? min;
   const slots = iconSetSlotCount(rule.icons);
   const thresholds = iconSetThresholdValues(rule, sorted);
+  const floor = rule.floor
+    ? { value: resolveScalePoint(rule.floor, sorted), gte: rule.floor.gte !== false }
+    : undefined;
   for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
     for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
       const key = addrKey({ sheet, row: r, col: c });
       const cell = state.data.cells.get(key);
       if (cell?.value.kind !== 'number') continue;
       const v = cell.value.value;
+      // `floor` is separate from the N-1 bucket boundaries. A value below
+      // it does not match the icon-set rule and should leave the cell alone.
+      if (floor !== undefined && (floor.gte ? v < floor.value : v <= floor.value)) continue;
       const t = max === min ? 0.5 : (v - min) / (max - min);
       let slot =
         thresholds === null
           ? iconSetSlotFor(rule.icons, t)
-          : thresholds.reduce((count, threshold) => (v >= threshold ? count + 1 : count), 0);
+          : thresholds.reduce(
+              (count, threshold) =>
+                (threshold.gte ? v >= threshold.value : v > threshold.value) ? count + 1 : count,
+              0,
+            );
       slot = Math.max(0, Math.min(slots - 1, slot));
       if (rule.reverseOrder) slot = slots - 1 - slot;
       const overlay = out.get(key) ?? {};
@@ -413,16 +432,24 @@ function paintIconSet(
   }
 }
 
+interface IconSetThreshold {
+  value: number;
+  gte: boolean;
+}
+
 function iconSetThresholdValues(
   rule: Extract<ConditionalRule, { kind: 'icon-set' }>,
   sorted: readonly number[],
-): number[] | null {
+): IconSetThreshold[] | null {
   const slots = iconSetSlotCount(rule.icons);
   if (!rule.thresholds || rule.thresholds.length === 0) return null;
   return rule.thresholds
     .slice(0, slots - 1)
-    .map((point) => resolveScalePoint(point, sorted))
-    .sort((a, b) => a - b);
+    .map((point) => ({
+      value: resolveScalePoint(point, sorted),
+      gte: point.gte !== false,
+    }))
+    .sort((a, b) => a.value - b.value);
 }
 
 function paintTopBottom(

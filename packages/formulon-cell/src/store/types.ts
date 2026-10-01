@@ -489,8 +489,8 @@ export type ConditionalIconSet =
   | 'boxes5';
 
 export type ConditionalScalePoint =
-  | { kind: 'min' | 'max' }
-  | { kind: 'number' | 'percent' | 'percentile'; value: number };
+  | { kind: 'min' | 'max'; gte?: boolean }
+  | { kind: 'number' | 'percent' | 'percentile'; value: number; gte?: boolean };
 
 /** Conditional formatting rule. Evaluated by the renderer against cell
  *  values; the predicate kinds (cell-value, top-bottom, formula, blanks,
@@ -536,6 +536,9 @@ export type ConditionalRule = ConditionalRulePriorityOptions &
         kind: 'data-bar';
         range: Range;
         color: string;
+        /** Edge from which the bar grows. Context follows the sheet's
+         *  reading direction. Omitted rules use the engine default. */
+        direction?: 'context' | 'left-to-right' | 'right-to-left';
         /** True for Excel's gradient-fill data bars, false for solid-fill bars.
          *  Omitted legacy rules render as solid bars. */
         gradient?: boolean;
@@ -550,6 +553,9 @@ export type ConditionalRule = ConditionalRulePriorityOptions &
         icons: ConditionalIconSet;
         /** When false, render only the icon and suppress the cell value text. */
         showValue?: boolean;
+        /** Lower bound of the lowest icon bucket. Numeric values below this
+         *  threshold render without an icon. */
+        floor?: ConditionalScalePoint;
         /** Boundaries between icon slots, ordered from low to high. Omitted
          *  rules use Excel's default percent thresholds. */
         thresholds?: ConditionalScalePoint[];

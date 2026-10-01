@@ -158,6 +158,42 @@ describe('evaluateConditional', () => {
     expect(overlay.get('0:0:2')?.bar).toBeCloseTo(2 / 3);
   });
 
+  it('mirrors explicit data-bar direction and invalidates on sheet RTL changes', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, -10);
+    s = seedNumber(s, 0, 1, 20);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'data-bar',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+            color: '#70ad47',
+            direction: 'right-to-left',
+          },
+        ],
+      },
+    };
+
+    const ltrOverlay = evaluateConditional(s);
+    expect(ltrOverlay.get('0:0:0')?.barAxis).toBeCloseTo(2 / 3);
+    expect(ltrOverlay.get('0:0:0')?.barDirection).toBe('right');
+    expect(ltrOverlay.get('0:0:1')?.barAxis).toBeCloseTo(2 / 3);
+    expect(ltrOverlay.get('0:0:1')?.barDirection).toBe('left');
+
+    const rtlState: State = { ...s, ui: { ...s.ui, rightToLeft: true } };
+    const rtlOverlay = evaluateConditional(rtlState);
+    // Explicit right-to-left is independent of the sheet context, so it
+    // remains mirrored after the sheet itself switches direction.
+    expect(rtlOverlay.get('0:0:0')?.barAxis).toBeCloseTo(2 / 3);
+    expect(rtlOverlay.get('0:0:0')?.barDirection).toBe('right');
+    expect(rtlOverlay.get('0:0:1')?.barAxis).toBeCloseTo(2 / 3);
+    expect(rtlOverlay.get('0:0:1')?.barDirection).toBe('left');
+  });
+
   it('returns the same Map reference when called twice with identical state', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
@@ -476,6 +512,66 @@ describe('evaluateConditional', () => {
     expect(overlay.get('0:0:0')?.iconSlot).toBe(0);
     expect(overlay.get('0:0:1')?.iconSlot).toBe(1);
     expect(overlay.get('0:0:2')?.iconSlot).toBe(2);
+  });
+
+  it('suppresses icon-set output below an independent floor', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 5);
+    s = seedNumber(s, 0, 1, 10);
+    s = seedNumber(s, 0, 2, 20);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'icon-set',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+            icons: 'traffic3',
+            floor: { kind: 'number', value: 10 },
+            thresholds: [
+              { kind: 'number', value: 15 },
+              { kind: 'number', value: 25 },
+            ],
+          },
+        ],
+      },
+    };
+    const overlay = evaluateConditional(s);
+    expect(overlay.get('0:0:0')).toBeUndefined();
+    expect(overlay.get('0:0:1')?.iconSlot).toBe(0);
+    expect(overlay.get('0:0:2')?.iconSlot).toBe(1);
+  });
+
+  it('honors strict floor and threshold comparisons for icon sets', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    s = seedNumber(s, 0, 0, 14);
+    s = seedNumber(s, 0, 1, 15);
+    s = seedNumber(s, 0, 2, 20);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'icon-set',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+            icons: 'traffic3',
+            floor: { kind: 'number', value: 15, gte: false },
+            thresholds: [
+              { kind: 'number', value: 20, gte: false },
+              { kind: 'number', value: 40, gte: false },
+            ],
+          },
+        ],
+      },
+    };
+    const overlay = evaluateConditional(s);
+    expect(overlay.get('0:0:0')).toBeUndefined();
+    expect(overlay.get('0:0:1')).toBeUndefined();
+    expect(overlay.get('0:0:2')?.iconSlot).toBe(0);
   });
 
   it('classifies expanded Excel-style icon families with 3-slot and 5-slot thresholds', () => {

@@ -70,8 +70,8 @@ export interface MountOptions {
   uploadStatus?: StatusBarUploadStatus;
   /** Optional host-driven status bar Macro Recording indicator. */
   macroRecording?: boolean | null;
-  /** Called when mount fails before an instance exists, most commonly when
-   *  the WASM engine cannot start because SharedArrayBuffer is unavailable. */
+  /** Called when mount fails before an instance exists, for example when
+   *  WebAssembly is unavailable or the engine asset cannot be loaded. */
   onError?: (error: unknown) => void;
   /** Whether core should render its built-in mount error panel into `host`
    *  before rejecting. Defaults to true. Wrappers can disable this and render

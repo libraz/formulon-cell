@@ -1157,8 +1157,7 @@ export function createDemoStrings(_framework: DemoFramework): DemoStrings {
       noCommands: 'No commands found',
       loadingEngine: 'Loading engine...',
       engineUnavailable: 'Spreadsheet engine unavailable',
-      engineSetup:
-        'Serve this demo with COOP: same-origin and COEP: require-corp so SharedArrayBuffer is available.',
+      engineSetup: 'Check WebAssembly support and that the engine WASM asset can be loaded.',
     },
     ja: {
       saved: 'このデバイスに保存済み',
@@ -1288,7 +1287,7 @@ export function createDemoStrings(_framework: DemoFramework): DemoStrings {
       loadingEngine: 'エンジンを読み込んでいます...',
       engineUnavailable: 'スプレッドシートエンジンを起動できません',
       engineSetup:
-        'SharedArrayBuffer を有効にするため、COOP: same-origin と COEP: require-corp 付きで配信してください。',
+        'WebAssemblyの対応状況と、エンジンのWASMアセットを読み込めるかを確認してください。',
     },
   };
 }

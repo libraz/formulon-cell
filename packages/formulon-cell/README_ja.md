@@ -34,12 +34,7 @@
 npm install @libraz/formulon-cell zustand
 ```
 
-`zustand` はピア依存として公開しています。WASM エンジンは
-[crossOriginIsolated](https://developer.mozilla.org/docs/Web/API/crossOriginIsolated)
-コンテキスト (`COOP: same-origin` + `COEP: require-corp`) を必要とします。
-ヘッダが無い環境では `WorkbookHandle.createDefault()` がマウント前に失敗
-します。インメモリのスタブエンジンは、テストや明示的なデモ向けに
-`preferStub: true` を渡した場合だけ使います。
+`zustand` はピア依存です。formulon 0.12.0の標準WASMは単一スレッド版で、COOP/COEPヘッダを必要としません。起動に失敗すると `WorkbookHandle.createDefault()` はエラーを返します。スタブエンジンは、テストや明示的なデモ向けに `preferStub: true` を渡した場合だけ使います。
 
 Vite / webpack / esbuild の設定は
 [バンドラ統合](https://github.com/libraz/formulon-cell/blob/main/README_ja.md#バンドラ統合)

@@ -22,6 +22,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const wbWithObjects = () => {
   const calls: string[] = [];
+  const dataSpecs: PivotDataFieldSpec[] = [];
   const wb = {
     capabilities: {
       cellFormatting: true,
@@ -112,12 +113,12 @@ const wbWithObjects = () => {
       calls.push(`field-axis:${sheet}:${pivot}:${field}:${axis}`);
       return true;
     },
-    clearPivotFieldAggregations: (sheet: number, pivot: number, field: number) => {
-      calls.push(`clear-agg:${sheet}:${pivot}:${field}`);
+    setPivotRowFieldOrder: (sheet: number, pivot: number, indices: readonly number[]) => {
+      calls.push(`row-order:${sheet}:${pivot}:${indices.join(',')}`);
       return true;
     },
-    addPivotFieldAggregation: (sheet: number, pivot: number, field: number, agg: number) => {
-      calls.push(`add-agg:${sheet}:${pivot}:${field}:${agg}`);
+    setPivotColFieldOrder: (sheet: number, pivot: number, indices: readonly number[]) => {
+      calls.push(`col-order:${sheet}:${pivot}:${indices.join(',')}`);
       return true;
     },
     pivotDataFieldCount: (sheet: number, pivot: number) => {
@@ -125,6 +126,7 @@ const wbWithObjects = () => {
       return 1;
     },
     addPivotDataField: (sheet: number, pivot: number, spec: PivotDataFieldSpec) => {
+      dataSpecs.push(spec);
       calls.push(
         `data-add:${sheet}:${pivot}:${spec.fieldIndex}:${spec.aggregation}:${spec.numberFormat ?? ''}`,
       );
@@ -136,6 +138,7 @@ const wbWithObjects = () => {
       dataField: number,
       spec: PivotDataFieldSpec,
     ) => {
+      dataSpecs.push(spec);
       calls.push(
         `data-set:${sheet}:${pivot}:${dataField}:${spec.fieldIndex}:${spec.aggregation}:${spec.numberFormat ?? ''}`,
       );
@@ -201,7 +204,7 @@ const wbWithObjects = () => {
       return true;
     },
   } as unknown as WorkbookHandle;
-  return { wb, calls };
+  return { wb, calls, dataSpecs };
 };
 
 const emptyWb = () =>
@@ -540,9 +543,33 @@ describe('attachWorkbookObjectsPanel', () => {
 
     expect(calls).toContain('field-axis:0:0:0:3');
     expect(calls).toContain('field-axis:0:0:1:1');
+    expect(calls).toContain('row-order:0:0:');
+    expect(calls).toContain('col-order:0:0:1');
     expect(calls).toContain('clear-items:0:0:0');
-    expect(calls).not.toContain('add-agg:0:0:0:0');
-    expect(calls).not.toContain('add-agg:0:0:1:0');
+    handle.detach();
+  });
+
+  it('updates row and column field order when editing axes', () => {
+    const { wb, calls } = wbWithObjects();
+    const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
+    handle.open();
+    const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
+      el.textContent?.includes('Edit'),
+    );
+    edit?.click();
+    const form = host.querySelector<HTMLFormElement>('.fc-objects__pivot-edit');
+    const regionField = form?.querySelector<HTMLSelectElement>('[data-pivot-field-index="0"]');
+    const salesField = form?.querySelector<HTMLSelectElement>('[data-pivot-field-index="1"]');
+    if (!form || !regionField || !salesField) throw new Error('missing pivot field axes');
+
+    regionField.value = String(PivotAxis.Value);
+    salesField.value = String(PivotAxis.Row);
+    form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+
+    expect(calls).toContain(`field-axis:0:0:0:${PivotAxis.Value}`);
+    expect(calls).toContain(`field-axis:0:0:1:${PivotAxis.Row}`);
+    expect(calls).toContain('row-order:0:0:1');
+    expect(calls).toContain('col-order:0:0:');
     handle.detach();
   });
 
@@ -624,7 +651,7 @@ describe('attachWorkbookObjectsPanel', () => {
   });
 
   it('edits existing PivotTable value aggregation and number format', () => {
-    const { wb, calls } = wbWithObjects();
+    const { wb, calls, dataSpecs } = wbWithObjects();
     const handle = attachWorkbookObjectsPanel({ host, wb, strings: en });
     handle.open();
     const edit = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((el) =>
@@ -646,8 +673,7 @@ describe('attachWorkbookObjectsPanel', () => {
     form?.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
 
     expect(calls).toContain(`data-set:0:0:0:1:${PivotAggregation.Average}:#,##0.00`);
-    expect(calls).not.toContain('clear-agg:0:0:1');
-    expect(calls).not.toContain('add-agg:0:0:1:2');
+    expect(dataSpecs[0]?.name).toBe('Average of Sales');
     expect(calls).not.toContain('format:0:0:1:#,##0.00');
     handle.detach();
   });

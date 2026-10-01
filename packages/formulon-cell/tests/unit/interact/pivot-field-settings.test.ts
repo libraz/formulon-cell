@@ -41,22 +41,12 @@ describe('pivot-field-settings shared filter condition model', () => {
         valueText: 'East',
       },
     );
-    expect(pivotFilterConditionToSpec('Region', { kind: 'label-equals', value: 'East' })).toEqual({
-      axis: PivotAxis.Page,
-      fieldName: 'Region',
-      type: PivotFilterType.LabelEquals,
-      valueKind: PivotFilterValueKind.Text,
-      valueText: 'East',
-    });
+    expect(
+      pivotFilterConditionToSpec('Region', { kind: 'label-equals', value: 'East' }),
+    ).toBeNull();
     expect(
       pivotFilterConditionToSpec('Region', { kind: 'label-does-not-contain', value: 'East' }),
-    ).toEqual({
-      axis: PivotAxis.Page,
-      fieldName: 'Region',
-      type: PivotFilterType.LabelDoesNotContain,
-      valueKind: PivotFilterValueKind.Text,
-      valueText: 'East',
-    });
+    ).toBeNull();
   });
 
   it('converts value-between filter conditions into low/high numeric payloads', () => {
@@ -98,15 +88,7 @@ describe('pivot-field-settings shared filter condition model', () => {
     });
     expect(
       pivotFilterConditionToSpec('Sales', { kind: 'value-not-between', value: '10..20' }),
-    ).toEqual({
-      axis: PivotAxis.Page,
-      fieldName: 'Sales',
-      type: PivotFilterType.ValueNotBetween,
-      valueKind: PivotFilterValueKind.Double,
-      valueDouble: 10,
-      valueHighKind: PivotFilterValueKind.Double,
-      valueHighDouble: 20,
-    });
+    ).toBeNull();
   });
 
   it('drops empty and invalid numeric filter conditions', () => {
@@ -120,20 +102,10 @@ describe('pivot-field-settings shared filter condition model', () => {
   });
 
   it('converts single-value numeric filter operators into typed payloads', () => {
-    expect(pivotFilterConditionToSpec('Sales', { kind: 'value-less-than', value: '100' })).toEqual({
-      axis: PivotAxis.Page,
-      fieldName: 'Sales',
-      type: PivotFilterType.ValueLessThan,
-      valueKind: PivotFilterValueKind.Double,
-      valueDouble: 100,
-    });
-    expect(pivotFilterConditionToSpec('Sales', { kind: 'value-equals', value: '100' })).toEqual({
-      axis: PivotAxis.Page,
-      fieldName: 'Sales',
-      type: PivotFilterType.ValueEquals,
-      valueKind: PivotFilterValueKind.Double,
-      valueDouble: 100,
-    });
+    expect(
+      pivotFilterConditionToSpec('Sales', { kind: 'value-less-than', value: '100' }),
+    ).toBeNull();
+    expect(pivotFilterConditionToSpec('Sales', { kind: 'value-equals', value: '100' })).toBeNull();
   });
 
   it('converts top-count and date filter conditions into typed payloads', () => {
@@ -155,24 +127,10 @@ describe('pivot-field-settings shared filter condition model', () => {
     );
     expect(
       pivotFilterConditionToSpec('Date', { kind: 'date-before', value: '2026-05-19' }),
-    ).toEqual({
-      axis: PivotAxis.Page,
-      fieldName: 'Date',
-      type: PivotFilterType.DateBefore,
-      valueKind: PivotFilterValueKind.Text,
-      valueText: '2026-05-19',
-    });
+    ).toBeNull();
     expect(
       pivotFilterConditionToSpec('Date', { kind: 'date-between', value: '2026-05-01..2026-05-31' }),
-    ).toEqual({
-      axis: PivotAxis.Page,
-      fieldName: 'Date',
-      type: PivotFilterType.DateBetween,
-      valueKind: PivotFilterValueKind.Text,
-      valueText: '2026-05-01',
-      valueHighKind: PivotFilterValueKind.Text,
-      valueHighText: '2026-05-31',
-    });
+    ).toBeNull();
   });
 
   it('converts PivotFilterSpec payloads back into shared condition state', () => {
@@ -204,7 +162,7 @@ describe('pivot-field-settings shared filter condition model', () => {
         valueKind: PivotFilterValueKind.Text,
         valueText: 'st',
       }),
-    ).toEqual({ kind: 'label-ends-with', value: 'st' });
+    ).toBeNull();
     expect(
       pivotFilterSpecToCondition({
         axis: PivotAxis.Page,
@@ -215,7 +173,7 @@ describe('pivot-field-settings shared filter condition model', () => {
         valueHighKind: PivotFilterValueKind.Double,
         valueHighDouble: 20,
       }),
-    ).toEqual({ kind: 'value-not-between', value: '10..20' });
+    ).toBeNull();
     expect(
       pivotFilterSpecToCondition({
         axis: PivotAxis.Page,
@@ -224,7 +182,7 @@ describe('pivot-field-settings shared filter condition model', () => {
         valueKind: PivotFilterValueKind.Double,
         valueDouble: 100,
       }),
-    ).toEqual({ kind: 'value-less-than', value: '100' });
+    ).toBeNull();
     expect(
       pivotFilterSpecToCondition({
         axis: PivotAxis.Page,
@@ -233,7 +191,7 @@ describe('pivot-field-settings shared filter condition model', () => {
         valueKind: PivotFilterValueKind.Text,
         valueText: '2026-05-19',
       }),
-    ).toEqual({ kind: 'date-after', value: '2026-05-19' });
+    ).toBeNull();
     expect(
       pivotFilterSpecToCondition({
         axis: PivotAxis.Page,
@@ -244,7 +202,7 @@ describe('pivot-field-settings shared filter condition model', () => {
         valueHighKind: PivotFilterValueKind.Text,
         valueHighText: '2026-05-31',
       }),
-    ).toEqual({ kind: 'date-between', value: '2026-05-01..2026-05-31' });
+    ).toBeNull();
     expect(
       pivotFilterSpecToCondition({
         axis: PivotAxis.Page,
@@ -255,14 +213,7 @@ describe('pivot-field-settings shared filter condition model', () => {
   });
 
   it('keeps restored value and date operators in their Excel filter categories', () => {
-    for (const kind of [
-      'value-greater-than',
-      'value-less-than',
-      'value-equals',
-      'value-between',
-      'value-not-between',
-      'value-top-10',
-    ] as const) {
+    for (const kind of ['value-greater-than', 'value-between', 'value-top-10'] as const) {
       const controls = createPivotFilterConditionControls({
         strings: en.pivotTableDialog,
         condition: { kind, value: kind === 'value-top-10' ? '5' : '10..20' },
@@ -290,12 +241,12 @@ describe('pivot-field-settings shared filter condition model', () => {
       ).toBe(kind);
     }
 
-    for (const kind of ['label-date', 'date-before', 'date-after', 'date-between'] as const) {
+    for (const kind of ['label-date'] as const) {
       const controls = createPivotFilterConditionControls({
         strings: en.pivotTableDialog,
         condition: {
           kind,
-          value: kind === 'date-between' ? '2026-05-01..2026-05-31' : '2026-05-19',
+          value: '2026-05-19',
         },
         selectClassName: 'select',
         valueClassName: 'input',
@@ -369,15 +320,7 @@ describe('pivot-field-settings shared filter condition model', () => {
       Array.from(condition.options)
         .filter((option) => !option.disabled)
         .map((option) => option.value),
-    ).toEqual([
-      'none',
-      'value-greater-than',
-      'value-less-than',
-      'value-equals',
-      'value-between',
-      'value-not-between',
-      'value-top-10',
-    ]);
+    ).toEqual(['none', 'value-greater-than', 'value-between', 'value-top-10']);
     expect(
       Array.from(condition.options)
         .filter((option) => option.disabled)
@@ -416,15 +359,7 @@ describe('pivot-field-settings shared filter condition model', () => {
       Array.from(condition.options)
         .filter((option) => !option.disabled)
         .map((option) => option.value),
-    ).toEqual([
-      'none',
-      'label-equals',
-      'label-does-not-equal',
-      'label-contains',
-      'label-does-not-contain',
-      'label-begins-with',
-      'label-ends-with',
-    ]);
+    ).toEqual(['none', 'label-contains', 'label-begins-with']);
     expect(Array.from(condition.options).filter((option) => option.disabled)).toEqual([]);
 
     category.value = 'date';
@@ -433,7 +368,7 @@ describe('pivot-field-settings shared filter condition model', () => {
       Array.from(condition.options)
         .filter((option) => !option.disabled)
         .map((option) => option.value),
-    ).toEqual(['none', 'label-date', 'date-before', 'date-after', 'date-between']);
+    ).toEqual(['none', 'label-date']);
     expect(Array.from(condition.options).filter((option) => option.disabled)).toEqual([]);
   });
 

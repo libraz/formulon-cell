@@ -97,7 +97,10 @@ describe('stub-engine defensive *At() handlers', () => {
   it('definedNameAt returns ok=false instead of throwing', () => {
     const wb = newWorkbook();
     try {
-      expect(wb.definedNameCount()).toBe(0);
+      expect(wb.definedNameCount()).toEqual({
+        status: { ok: true, status: 0, message: '', context: '' },
+        value: 0,
+      });
       const e = wb.definedNameAt(0);
       expect(e.status.ok).toBe(false);
       expect(e.name).toBe('');
@@ -110,7 +113,10 @@ describe('stub-engine defensive *At() handlers', () => {
   it('tableAt returns ok=false instead of throwing', () => {
     const wb = newWorkbook();
     try {
-      expect(wb.tableCount()).toBe(0);
+      expect(wb.tableCount()).toEqual({
+        status: { ok: true, status: 0, message: '', context: '' },
+        value: 0,
+      });
       const e = wb.tableAt(0);
       expect(e.status.ok).toBe(false);
       expect(e.name).toBe('');
@@ -125,7 +131,10 @@ describe('stub-engine defensive *At() handlers', () => {
   it('passthroughAt returns ok=false instead of throwing', () => {
     const wb = newWorkbook();
     try {
-      expect(wb.passthroughCount()).toBe(0);
+      expect(wb.passthroughCount()).toEqual({
+        status: { ok: true, status: 0, message: '', context: '' },
+        value: 0,
+      });
       const e = wb.passthroughAt(0);
       expect(e.status.ok).toBe(false);
       expect(e.path).toBe('');
@@ -151,6 +160,19 @@ describe('stub-engine defensive *At() handlers', () => {
         crashed = true;
       }
       expect(crashed).toBe(false);
+    } finally {
+      wb.delete();
+    }
+  });
+});
+
+describe('stub-engine 0.12 scalar result envelopes', () => {
+  it('returns status-bearing sheet and cell counts', () => {
+    const wb = newWorkbook();
+    try {
+      expect(wb.sheetCount()).toMatchObject({ value: 1, status: { ok: true } });
+      expect(wb.cellCount(0)).toMatchObject({ value: 0, status: { ok: true } });
+      expect(wb.cellCount(9)).toMatchObject({ value: 0, status: { ok: false } });
     } finally {
       wb.delete();
     }

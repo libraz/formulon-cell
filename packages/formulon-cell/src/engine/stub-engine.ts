@@ -1,16 +1,14 @@
 /**
- * In-memory fallback "engine" that satisfies the subset of FormulonModule /
- * Workbook surface used by WorkbookHandle. Activated when the WASM load
- * fails — typically because the host page is not crossOriginIsolated and
- * the pthreaded WASM cannot allocate SharedArrayBuffer.
+ * In-memory test engine that satisfies the subset of FormulonModule /
+ * Workbook surface used by WorkbookHandle. Activated only by preferStub;
+ * WASM initialization failures are reported to the caller.
  *
  * It stores values literally and evaluates a tiny spreadsheet-formula subset:
  *   numbers, +, -, *, /, parens, references (A1), ranges (A1:B3),
  *   SUM, AVERAGE, MIN, MAX, COUNT, IF, AND, OR, NOT.
  *
  * Anything outside that surface returns `#NEEDS_ENGINE!`. This is enough
- * for demo / SSR / non-isolated playgrounds; production sites should
- * configure COOP+COEP and load the real WASM.
+ * for explicit tests and demos; production sites should load the real WASM.
  */
 
 import type {
@@ -96,8 +94,8 @@ class StubWorkbook {
     return ok;
   }
 
-  sheetCount(): number {
-    return this.sheets.length;
+  sheetCount(): { status: Status; value: number } {
+    return { status: ok, value: this.sheets.length };
   }
 
   sheetName(idx: number): StringResult {
@@ -172,8 +170,9 @@ class StubWorkbook {
     return ok;
   }
 
-  cellCount(sheet: number): number {
-    return this.sheets[sheet]?.cells.size ?? 0;
+  cellCount(sheet: number): { status: Status; value: number } {
+    const s = this.sheets[sheet];
+    return s ? { status: ok, value: s.cells.size } : { status: err('sheet'), value: 0 };
   }
 
   cellAt(sheet: number, idx: number): CellEntry {
@@ -196,8 +195,8 @@ class StubWorkbook {
     return { status: err('idx'), row: 0, col: 0, formula: null, value: blankValue() };
   }
 
-  definedNameCount(): number {
-    return 0;
+  definedNameCount(): { status: Status; value: number } {
+    return { status: ok, value: 0 };
   }
 
   // Stub returns an `ok=false` entry rather than throwing. The callers in
@@ -208,8 +207,8 @@ class StubWorkbook {
     return { status: err('not impl'), name: '', formula: '' };
   }
 
-  tableCount(): number {
-    return 0;
+  tableCount(): { status: Status; value: number } {
+    return { status: ok, value: 0 };
   }
 
   tableAt(): {
@@ -222,8 +221,8 @@ class StubWorkbook {
     return { status: err('not impl'), name: '', displayName: '', ref: '', sheetIndex: 0 };
   }
 
-  passthroughCount(): number {
-    return 0;
+  passthroughCount(): { status: Status; value: number } {
+    return { status: ok, value: 0 };
   }
 
   passthroughAt(): { status: Status; path: string } {

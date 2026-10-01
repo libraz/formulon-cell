@@ -50,9 +50,7 @@ export class SpreadsheetPage {
       const host = document.querySelector('.fc-host') as HTMLElement | null;
       return host?.dataset.fcEngineState ?? null;
     });
-    expect(state, 'engine fell back to stub — check the demo app served COOP/COEP headers').toBe(
-      'ready',
-    );
+    expect(state, 'engine fell back to stub — expected the real WASM engine').toBe('ready');
   }
 
   /** crossOriginIsolated probe — useful for diagnostics on CI. */

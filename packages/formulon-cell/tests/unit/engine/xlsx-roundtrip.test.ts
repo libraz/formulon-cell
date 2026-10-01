@@ -12,7 +12,14 @@ import {
   hydrateCellFormatsFromEngine,
   syncCellFormatsToEngine,
 } from '../../../src/engine/cell-format-sync.js';
-import { syncConditionalRulesToEngine } from '../../../src/engine/cf-writeback.js';
+import {
+  evaluateCfFromEngine,
+  hydrateConditionalRulesFromEngine,
+} from '../../../src/engine/cf-sync.js';
+import {
+  conditionalRuleToEngineInput,
+  syncConditionalRulesToEngine,
+} from '../../../src/engine/cf-writeback.js';
 import { hydrateLayoutFromEngine } from '../../../src/engine/layout-sync.js';
 import {
   hydratePageSetupFromEngine,
@@ -35,8 +42,7 @@ import {
   type UnderlineStyle,
 } from '../../../src/store/store.js';
 
-const canLoadWasm = (): boolean =>
-  typeof WebAssembly !== 'undefined' && typeof SharedArrayBuffer !== 'undefined';
+const canLoadWasm = (): boolean => typeof WebAssembly !== 'undefined';
 
 /** A two-column header plus two data rows — the smallest grid `formatAsTable`
  * can name every column of. */
@@ -58,6 +64,21 @@ const seedStoreText = (store: SpreadsheetStore, row: number, col: number, value:
 };
 
 describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
+  it('exposes the 0.12.0 function catalog and recalculates USDOLLAR through the adapter', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      expect(wb.sheetCount).toBe(1);
+      expect(wb.functionNames()).toContain('USDOLLAR');
+      wb.setFormula({ sheet: 0, row: 0, col: 0 }, '=USDOLLAR(-1234.5)');
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({
+        kind: 'text',
+        value: '($1,234.50)',
+      });
+    } finally {
+      wb.dispose();
+    }
+  });
+
   it('saves and reloads values and formulas through the real engine', async () => {
     const first = await WorkbookHandle.createDefault();
 
@@ -679,6 +700,214 @@ describe.skipIf(!canLoadWasm())('real xlsx round-trip', () => {
         }
       } finally {
         reloaded.dispose();
+      }
+    } finally {
+      first.dispose();
+    }
+  });
+
+  it('preserves 0.12 data-bar and icon-set metadata through store hydration and writeback', async () => {
+    const first = await WorkbookHandle.createDefault();
+    try {
+      expect(first.isStub).toBe(false);
+      expect(first.capabilities.conditionalFormatVisualMutate).toBe(true);
+
+      expect(
+        first.addConditionalFormat(0, {
+          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 2, lastCol: 0 }],
+          type: 3,
+          dataBar: {
+            min: { type: 3 },
+            max: { type: 4 },
+            fill: { a: 255, r: 0, g: 120, b: 212 },
+            showValue: true,
+            minLengthPct: 0,
+            maxLengthPct: 100,
+            gradient: false,
+            direction: 2,
+          },
+        }),
+      ).toBeGreaterThanOrEqual(0);
+      first.setNumber({ sheet: 0, row: 0, col: 0 }, -50);
+      first.setNumber({ sheet: 0, row: 1, col: 0 }, 100);
+      const rawBars = first
+        .evaluateCfRange(0, 0, 0, 1, 0)
+        .flatMap((cell) =>
+          cell.matches
+            .filter((match) => match.kind === 2)
+            .map((match) => ({ col: cell.col, match })),
+        );
+      expect(rawBars).toHaveLength(2);
+      for (const { match } of rawBars) {
+        expect(match.barLengthPct).toBeCloseTo(100);
+        expect(match.barAxisPositionPct).toBeCloseTo(33.333333, 3);
+      }
+      const engineOverlay = evaluateCfFromEngine(first, 0, 0, 0, 1, 0);
+      expect(engineOverlay.get('0:0:0')?.bar).toBeCloseTo(1 / 3);
+      expect(engineOverlay.get('0:0:0')?.barAxis).toBeCloseTo(2 / 3);
+      expect(engineOverlay.get('0:0:0')?.barDirection).toBe('right');
+      expect(engineOverlay.get('0:1:0')?.bar).toBeCloseTo(2 / 3);
+      expect(engineOverlay.get('0:1:0')?.barAxis).toBeCloseTo(2 / 3);
+      expect(engineOverlay.get('0:1:0')?.barDirection).toBe('left');
+      expect(
+        first.addConditionalFormat(0, {
+          sqref: [{ firstRow: 0, firstCol: 1, lastRow: 2, lastCol: 1 }],
+          type: 4,
+          iconSet: {
+            name: 3,
+            thresholds: [
+              { type: 1, value: '33' },
+              { type: 1, value: '67' },
+            ],
+            reverse: false,
+            showValue: true,
+            percent: true,
+            floor: { type: 1, value: '10' },
+          },
+        }),
+      ).toBeGreaterThanOrEqual(0);
+
+      const loaded = await WorkbookHandle.loadBytes(first.save());
+      try {
+        const store = createSpreadsheetStore();
+        hydrateConditionalRulesFromEngine(loaded, store, 0);
+        const imported = store
+          .getState()
+          .conditional.rules.filter(
+            (rule): rule is Extract<ConditionalRule, { kind: 'data-bar' | 'icon-set' }> =>
+              rule.kind === 'data-bar' || rule.kind === 'icon-set',
+          );
+        expect(imported).toEqual([
+          expect.objectContaining({
+            kind: 'data-bar',
+            gradient: false,
+            direction: 'right-to-left',
+          }),
+          expect.objectContaining({
+            kind: 'icon-set',
+            floor: { kind: 'percent', value: 10, gte: true },
+            thresholds: [
+              { kind: 'percent', value: 33, gte: true },
+              { kind: 'percent', value: 67, gte: true },
+            ],
+          }),
+        ]);
+
+        const written = await WorkbookHandle.createDefault();
+        try {
+          for (const rule of imported) {
+            const input = conditionalRuleToEngineInput({ ...rule, engineId: undefined });
+            if (!input) throw new Error(`Expected a writable ${rule.kind} rule.`);
+            expect(written.addConditionalFormat(0, input)).toBeGreaterThanOrEqual(0);
+          }
+          const formats = written.getConditionalFormats(0);
+          expect(formats.find((entry) => entry.type === 3)?.dataBar).toMatchObject({
+            gradient: false,
+            direction: 2,
+          });
+          expect(formats.find((entry) => entry.type === 4)?.iconSet).toMatchObject({
+            thresholds: [
+              { type: 1, value: '33' },
+              { type: 1, value: '67' },
+            ],
+            floor: { type: 1, value: '10' },
+          });
+        } finally {
+          written.dispose();
+        }
+      } finally {
+        loaded.dispose();
+      }
+    } finally {
+      first.dispose();
+    }
+  });
+
+  it('preserves strict icon-set floor and threshold comparisons through the real engine', async () => {
+    const first = await WorkbookHandle.createDefault();
+    const iconCells = (wb: WorkbookHandle) =>
+      wb
+        .evaluateCfRange(0, 0, 0, 0, 2)
+        .flatMap((cell) =>
+          cell.matches
+            .filter((match) => match.kind === 3)
+            .map((match) => ({ col: cell.col, iconIndex: match.iconIndex })),
+        );
+    try {
+      expect(first.isStub).toBe(false);
+      expect(first.capabilities.conditionalFormatVisualMutate).toBe(true);
+      first.setNumber({ sheet: 0, row: 0, col: 0 }, 14);
+      first.setNumber({ sheet: 0, row: 0, col: 1 }, 15);
+      first.setNumber({ sheet: 0, row: 0, col: 2 }, 20);
+      expect(
+        first.addConditionalFormat(0, {
+          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 2 }],
+          type: 4,
+          iconSet: {
+            name: 3,
+            thresholds: [
+              { type: 0, value: '20', gte: false },
+              { type: 0, value: '40', gte: false },
+            ],
+            reverse: false,
+            showValue: true,
+            percent: true,
+            floor: { type: 0, value: '15', gte: false },
+          },
+        }),
+      ).toBeGreaterThanOrEqual(0);
+      expect(iconCells(first)).toEqual([{ col: 2, iconIndex: 0 }]);
+
+      const loaded = await WorkbookHandle.loadBytes(first.save());
+      try {
+        expect(iconCells(loaded)).toEqual([{ col: 2, iconIndex: 0 }]);
+        const store = createSpreadsheetStore();
+        hydrateConditionalRulesFromEngine(loaded, store, 0);
+        const imported = store
+          .getState()
+          .conditional.rules.find(
+            (rule): rule is Extract<ConditionalRule, { kind: 'icon-set' }> =>
+              rule.kind === 'icon-set',
+          );
+        expect(imported).toMatchObject({
+          floor: { kind: 'number', value: 15, gte: false },
+          thresholds: [
+            { kind: 'number', value: 20, gte: false },
+            { kind: 'number', value: 40, gte: false },
+          ],
+        });
+        if (!imported) throw new Error('Expected an imported icon-set rule.');
+        const input = conditionalRuleToEngineInput({ ...imported, engineId: undefined });
+        expect(input?.iconSet).toMatchObject({
+          thresholds: [
+            { type: 0, value: '20', gte: false },
+            { type: 0, value: '40', gte: false },
+          ],
+          floor: { type: 0, value: '15', gte: false },
+        });
+
+        const written = await WorkbookHandle.createDefault();
+        try {
+          written.setNumber({ sheet: 0, row: 0, col: 0 }, 14);
+          written.setNumber({ sheet: 0, row: 0, col: 1 }, 15);
+          written.setNumber({ sheet: 0, row: 0, col: 2 }, 20);
+          if (!input) throw new Error('Expected a writable icon-set rule.');
+          expect(written.addConditionalFormat(0, input)).toBeGreaterThanOrEqual(0);
+          expect(
+            written.getConditionalFormats(0).find((entry) => entry.type === 4)?.iconSet,
+          ).toMatchObject({
+            thresholds: [
+              { type: 0, value: '20', gte: false },
+              { type: 0, value: '40', gte: false },
+            ],
+            floor: { type: 0, value: '15', gte: false },
+          });
+          expect(iconCells(written)).toEqual([{ col: 2, iconIndex: 0 }]);
+        } finally {
+          written.dispose();
+        }
+      } finally {
+        loaded.dispose();
       }
     } finally {
       first.dispose();

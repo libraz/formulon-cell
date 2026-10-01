@@ -52,6 +52,7 @@ const makeCfWb = (cellLookup: CellMap): WorkbookHandle => {
         barBorderEngaged: boolean;
         barBorder: { r: number; g: number; b: number; a: number };
         barGradient: boolean;
+        barDirection: number;
         iconSetName: number;
         iconIndex: number;
       }[];
@@ -79,6 +80,7 @@ const makeCfWb = (cellLookup: CellMap): WorkbookHandle => {
                 barBorderEngaged: false,
                 barBorder: { r: 0, g: 0, b: 0, a: 0 },
                 barGradient: false,
+                barDirection: 0,
                 iconSetName: 0,
                 iconIndex: 0,
               },
@@ -202,6 +204,7 @@ describe('engine/spill × conditional-format intersection', () => {
                 barBorderEngaged: false,
                 barBorder: { r: 0, g: 0, b: 0, a: 0 },
                 barGradient: false,
+                barDirection: 0,
                 iconSetName: 0,
                 iconIndex: 0,
               },
@@ -218,6 +221,7 @@ describe('engine/spill × conditional-format intersection', () => {
                 barBorderEngaged: false,
                 barBorder: { r: 0, g: 0, b: 0, a: 0 },
                 barGradient: false,
+                barDirection: 0,
                 iconSetName: 0,
                 iconIndex: 0,
               },

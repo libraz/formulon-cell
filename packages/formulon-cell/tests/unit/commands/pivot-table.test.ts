@@ -16,7 +16,7 @@ import {
   PivotFilterValueKind,
   PivotShowValuesAs,
 } from '../../../src/engine/types.js';
-import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
+import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const blank: CellValue = { kind: 'blank' };
@@ -145,6 +145,14 @@ const makeWb = () => {
       calls.push(`sort:${fieldIdx}:${ascending}:${byField}`);
       return true;
     },
+    setPivotRowFieldOrder: (_sheet: number, _pivot: number, indices: readonly number[]) => {
+      calls.push(`row-order:${indices.join(',')}`);
+      return true;
+    },
+    setPivotColFieldOrder: (_sheet: number, _pivot: number, indices: readonly number[]) => {
+      calls.push(`col-order:${indices.join(',')}`);
+      return true;
+    },
     addPivotDataField: (
       _sheet: number,
       _pivot: number,
@@ -230,6 +238,97 @@ describe('pivot-table command helpers', () => {
     expect(calls).toContain('pivot-field:Product:1');
     expect(calls).toContain('pivot-field:Sales:2');
     expect(calls).toContain('data-field:Sum of Sales:2:0:#,##0:');
+  });
+
+  it('sets source fields on the row and column axis order', () => {
+    const { wb, calls } = makeWb();
+    const result = createPivotTableFromRange(wb, {
+      source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
+      destination: { sheet: 0, row: 5, col: 0 },
+      rowField: 'Region',
+      columnField: 'Product',
+      valueField: 'Sales',
+    });
+
+    expect(result).toMatchObject({ ok: true });
+    expect(calls).toContain('row-order:0');
+    expect(calls).toContain('col-order:1');
+  });
+
+  it('projects source row and column labels through the real WASM engine', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      expect(wb.isStub).toBe(false);
+      expect(wb.capabilities.pivotTableMutate).toBe(true);
+      wb.setText({ sheet: 0, row: 0, col: 0 }, 'Region');
+      wb.setText({ sheet: 0, row: 0, col: 1 }, 'Product');
+      wb.setText({ sheet: 0, row: 0, col: 2 }, 'Sales');
+      wb.setText({ sheet: 0, row: 1, col: 0 }, 'East');
+      wb.setText({ sheet: 0, row: 1, col: 1 }, 'Desk');
+      wb.setNumber({ sheet: 0, row: 1, col: 2 }, 12);
+      wb.setText({ sheet: 0, row: 2, col: 0 }, 'West');
+      wb.setText({ sheet: 0, row: 2, col: 1 }, 'Chair');
+      wb.setNumber({ sheet: 0, row: 2, col: 2 }, 8);
+
+      const result = createPivotTableFromRange(wb, {
+        source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 2 },
+        destination: { sheet: 0, row: 5, col: 0 },
+        rowField: 'Region',
+        columnField: 'Product',
+        valueField: 'Sales',
+        aggregation: PivotAggregation.Sum,
+      });
+      expect(result).toMatchObject({ ok: true });
+      if (!result.ok) return;
+
+      const projected = [...wb.pivotCells(0)];
+      const labels = projected
+        .filter((cell) => cell.value.kind === 'text')
+        .map((cell) => (cell.value.kind === 'text' ? cell.value.value : ''));
+      const numbers = projected
+        .filter((cell) => cell.value.kind === 'number')
+        .map((cell) => (cell.value.kind === 'number' ? cell.value.value : NaN));
+      expect(labels).toEqual(expect.arrayContaining(['East', 'West', 'Desk', 'Chair']));
+      expect(numbers).toEqual(expect.arrayContaining([12, 8, 20]));
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('uses the selected aggregation in the real data-field name', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      expect(wb.isStub).toBe(false);
+      expect(wb.capabilities.pivotTableMutate).toBe(true);
+      wb.setText({ sheet: 0, row: 0, col: 0 }, 'Region');
+      wb.setText({ sheet: 0, row: 0, col: 1 }, 'Sales');
+      wb.setText({ sheet: 0, row: 1, col: 0 }, 'East');
+      wb.setNumber({ sheet: 0, row: 1, col: 1 }, 2);
+      wb.setText({ sheet: 0, row: 2, col: 0 }, 'East');
+      wb.setNumber({ sheet: 0, row: 2, col: 1 }, 3);
+
+      const result = createPivotTableFromRange(wb, {
+        source: { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 1 },
+        destination: { sheet: 0, row: 5, col: 0 },
+        rowField: 'Region',
+        valueField: 'Sales',
+        aggregation: PivotAggregation.Product,
+      });
+      expect(result).toMatchObject({ ok: true });
+      if (!result.ok) return;
+
+      const projected = [...wb.pivotCells(0)];
+      const labels = projected
+        .filter((cell) => cell.value.kind === 'text')
+        .map((cell) => (cell.value.kind === 'text' ? cell.value.value : ''));
+      const numbers = projected
+        .filter((cell) => cell.value.kind === 'number')
+        .map((cell) => (cell.value.kind === 'number' ? cell.value.value : NaN));
+      expect(labels).toContain('Product of Sales');
+      expect(numbers).toContain(6);
+    } finally {
+      wb.dispose();
+    }
   });
 
   it('refuses huge pivot creation before creating a cache', () => {

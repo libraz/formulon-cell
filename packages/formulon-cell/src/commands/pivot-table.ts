@@ -1,4 +1,5 @@
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
+import { pivotAggregationName } from '../engine/pivot-aggregation.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { CellValue, PivotFilterSpec, PivotShowValuesAs, Range } from '../engine/types.js';
 import { PivotAggregation, PivotAxis } from '../engine/types.js';
@@ -112,14 +113,6 @@ const pivotCacheRecordValue = (
   if (value.kind !== 'number') return value;
   const index = sharedItemIndexes.get(valueKey(value));
   return index === undefined ? value : { kind: 'number', value: index };
-};
-
-const pivotAggregationName = (aggregation: PivotAggregation): string => {
-  if (aggregation === PivotAggregation.Count) return 'Count';
-  if (aggregation === PivotAggregation.Average) return 'Average';
-  if (aggregation === PivotAggregation.Max) return 'Max';
-  if (aggregation === PivotAggregation.Min) return 'Min';
-  return 'Sum';
 };
 
 const MAX_PIVOT_SOURCE_CELLS = 100_000;
@@ -383,8 +376,9 @@ export function createPivotTableFromRange(
     if (!ok) return failAfterPivot('row-sort');
   }
 
+  let colPivotField = -1;
   if (columnField) {
-    const colPivotField = wb.addPivotField(opts.destination.sheet, pivotIndex, {
+    colPivotField = wb.addPivotField(opts.destination.sheet, pivotIndex, {
       sourceName: columnField.name,
       axis: PivotAxis.Col,
       subtotalTop: opts.columnSubtotalTop ?? true,
@@ -399,6 +393,18 @@ export function createPivotTableFromRange(
         '',
       );
       if (!ok) return failAfterPivot('col-sort');
+    }
+  }
+
+  // Adding a field assigns its axis but leaves the axis order empty in a new
+  // PivotTable. Set the source fields explicitly so the evaluator can build
+  // the row/column hierarchies from the cache records.
+  if (!wb.setPivotRowFieldOrder(opts.destination.sheet, pivotIndex, [rowPivotField])) {
+    return failAfterPivot('row-field-order');
+  }
+  if (colPivotField >= 0) {
+    if (!wb.setPivotColFieldOrder(opts.destination.sheet, pivotIndex, [colPivotField])) {
+      return failAfterPivot('col-field-order');
     }
   }
 

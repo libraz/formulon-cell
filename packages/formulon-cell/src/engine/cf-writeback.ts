@@ -1,6 +1,6 @@
 import { iconSetSlotCount } from '../render/conditional.js';
 import type { CellFormat } from '../store/store.js';
-import type { ConditionalRule } from '../store/types.js';
+import type { ConditionalRule, ConditionalScalePoint } from '../store/types.js';
 import {
   borderRecordFromFormat,
   cssColorToArgb,
@@ -54,6 +54,12 @@ const ENGINE_ICON_SETS = [
   'bars5',
   'boxes5',
 ] as const;
+
+const ENGINE_DATA_BAR_DIRECTIONS = {
+  context: 0,
+  'left-to-right': 1,
+  'right-to-left': 2,
+} as const;
 
 /** `formulon::cf::CellIsOperator` ordinals. */
 const CELL_IS_OP: Record<string, number> = {
@@ -176,11 +182,10 @@ function cssColorToCfColor(color: string): CfColor | null {
   };
 }
 
-function scalePointToCfValueObject(
-  point: NonNullable<Extract<ConditionalRule, { kind: 'color-scale' }>['thresholds']>[number],
-): CfValueObjectInput {
-  if (!('value' in point)) return { type: VALUE_OBJECT_TYPE[point.kind] };
-  return { type: VALUE_OBJECT_TYPE[point.kind], value: String(point.value) };
+function scalePointToCfValueObject(point: ConditionalScalePoint): CfValueObjectInput {
+  const comparison = point.gte === undefined ? {} : { gte: point.gte };
+  if (!('value' in point)) return { type: VALUE_OBJECT_TYPE[point.kind], ...comparison };
+  return { type: VALUE_OBJECT_TYPE[point.kind], value: String(point.value), ...comparison };
 }
 
 function defaultColorScaleThresholds(
@@ -196,9 +201,12 @@ function defaultColorScaleThresholds(
 }
 
 function defaultIconThresholds(slots: number): CfValueObjectInput[] {
-  return Array.from({ length: slots }, (_, index) => ({
+  // formulon 0.12 stores the floor separately from the N-1 bucket
+  // boundaries. The defaults are 33/67 for three icons and 20/40/60/80
+  // for five icons.
+  return Array.from({ length: Math.max(0, slots - 1) }, (_, index) => ({
     type: VALUE_OBJECT_TYPE.percent,
-    value: String(Math.round((index * 100) / slots)),
+    value: String(Math.round(((index + 1) * 100) / slots)),
   }));
 }
 
@@ -352,6 +360,8 @@ export function conditionalRuleToEngineInput(rule: ConditionalRule): Conditional
     case 'data-bar': {
       const fill = cssColorToCfColor(rule.color);
       if (!fill) return null;
+      const direction =
+        rule.direction === undefined ? undefined : ENGINE_DATA_BAR_DIRECTIONS[rule.direction];
       return {
         sqref,
         type: RULE_TYPE.dataBar,
@@ -360,6 +370,8 @@ export function conditionalRuleToEngineInput(rule: ConditionalRule): Conditional
           max: { type: VALUE_OBJECT_TYPE.max },
           fill,
           showValue: rule.showValue !== false,
+          ...(rule.gradient !== undefined ? { gradient: rule.gradient } : {}),
+          ...(direction !== undefined ? { direction } : {}),
         },
       };
     }
@@ -368,20 +380,18 @@ export function conditionalRuleToEngineInput(rule: ConditionalRule): Conditional
       if (name < 0) return null;
       const slots = iconSetSlotCount(rule.icons);
       const thresholds = rule.thresholds
-        ? [
-            { type: VALUE_OBJECT_TYPE.percent, value: '0' },
-            ...rule.thresholds.map(scalePointToCfValueObject),
-          ]
+        ? rule.thresholds.slice(0, slots - 1).map(scalePointToCfValueObject)
         : defaultIconThresholds(slots);
       return {
         sqref,
         type: RULE_TYPE.iconSet,
         iconSet: {
           name,
-          thresholds: thresholds.slice(0, slots),
+          thresholds,
           reverse: rule.reverseOrder === true,
           showValue: rule.showValue !== false,
           percent: true,
+          ...(rule.floor ? { floor: scalePointToCfValueObject(rule.floor) } : {}),
         },
       };
     }

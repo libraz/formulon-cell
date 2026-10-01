@@ -7,16 +7,46 @@ describe('engine/loader', () => {
     vi.resetModules();
   });
 
-  it('fails loudly when SharedArrayBuffer is unavailable', async () => {
-    const createFormulon = vi.fn();
+  it('loads the serial WASM without SharedArrayBuffer or cross-origin isolation', async () => {
+    const realModule = { versionString: () => 'wasm' };
+    const createFormulon = vi.fn(() => Promise.resolve(realModule));
     vi.doMock('@libraz/formulon', () => ({ default: createFormulon }));
     vi.stubGlobal('SharedArrayBuffer', undefined);
+    vi.stubGlobal('crossOriginIsolated', false);
     vi.resetModules();
 
     const { loadFormulon } = await import('../../../src/engine/loader.js');
 
-    await expect(loadFormulon()).rejects.toThrow(/SharedArrayBuffer is missing/);
+    await expect(loadFormulon()).resolves.toBe(realModule);
+    expect(createFormulon).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails before initialization when WebAssembly is unavailable', async () => {
+    const createFormulon = vi.fn();
+    vi.doMock('@libraz/formulon', () => ({ default: createFormulon }));
+    vi.stubGlobal('WebAssembly', undefined);
+    vi.resetModules();
+    const { loadFormulon } = await import('../../../src/engine/loader.js');
+    await expect(loadFormulon()).rejects.toThrow(/WebAssembly is not supported/);
     expect(createFormulon).not.toHaveBeenCalled();
+  });
+
+  it('shares initialization and retries after a rejected attempt', async () => {
+    const realModule = { versionString: () => 'wasm' };
+    const createFormulon = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('temporary failure'))
+      .mockResolvedValue(realModule);
+    vi.doMock('@libraz/formulon', () => ({ default: createFormulon }));
+    vi.resetModules();
+    const { loadFormulon } = await import('../../../src/engine/loader.js');
+    const first = loadFormulon();
+    expect(loadFormulon()).toBe(first);
+    await expect(first).rejects.toThrow(/temporary failure/);
+    const retry = loadFormulon();
+    expect(loadFormulon()).toBe(retry);
+    await expect(retry).resolves.toBe(realModule);
+    expect(createFormulon).toHaveBeenCalledTimes(2);
   });
 
   it('propagates WASM initialization failures instead of falling back to stub', async () => {

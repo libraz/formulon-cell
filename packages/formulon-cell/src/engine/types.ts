@@ -18,6 +18,7 @@ export type {
   FunctionMetadataProvider,
   FunctionMetadataResult,
   MergedFunctionMetadataResult,
+  NumberResult,
   PivotCell,
   PivotLayoutResult,
   PivotReportLayoutResult,
@@ -87,8 +88,12 @@ export type PivotAxis = (typeof PivotAxis)[keyof typeof PivotAxis];
 
 export interface PivotFieldSpec {
   readonly sourceName: string;
+  readonly customName?: string;
   readonly axis: PivotAxis;
   readonly subtotalTop?: boolean;
+  /** Number format code as authored by the cell layer. The engine adapter
+   * registers it and passes the resulting decimal `numFmtId`. */
+  readonly numberFormat?: string;
 }
 
 /** Aggregation function ordinals for value-axis fields. */
@@ -129,16 +134,20 @@ export const PIVOT_SHOW_AS_BASE_PREVIOUS = 1048828;
 export const PIVOT_SHOW_AS_BASE_NEXT = 1048829;
 
 export interface PivotDataFieldSpec {
+  /** Deterministic display name, normally `<aggregation> of <field>`. The
+   * adapter supplies a stable fallback when an older caller omits it. */
   readonly name?: string;
   readonly fieldIndex: number;
   readonly aggregation: PivotAggregation;
+  /** Number format code as authored by the cell layer. */
   readonly numberFormat?: string;
   readonly showValuesAs?: PivotShowValuesAs;
   readonly showAsBaseField?: number;
   readonly showAsBaseItem?: number;
 }
 
-/** PivotTable filter type ordinals. */
+/** PivotTable filter type ordinals. Only 0–5 are supported by formulon 0.12.
+ * Legacy ordinals are retained for source compatibility and rejected by the adapter. */
 export const PivotFilterType = {
   ValueTop10: 0,
   ValueGreaterThan: 1,
@@ -146,26 +155,37 @@ export const PivotFilterType = {
   LabelContains: 3,
   LabelBeginsWith: 4,
   LabelDate: 5,
+  /** @deprecated Unsupported by formulon 0.12. */
   LabelEquals: 6,
+  /** @deprecated Unsupported by formulon 0.12. */
   LabelDoesNotEqual: 7,
+  /** @deprecated Unsupported by formulon 0.12. */
   LabelDoesNotContain: 8,
+  /** @deprecated Unsupported by formulon 0.12. */
   LabelEndsWith: 9,
+  /** @deprecated Unsupported by formulon 0.12. */
   ValueLessThan: 10,
+  /** @deprecated Unsupported by formulon 0.12. */
   ValueEquals: 11,
+  /** @deprecated Unsupported by formulon 0.12. */
   ValueNotBetween: 12,
+  /** @deprecated Unsupported by formulon 0.12. */
   DateBefore: 13,
+  /** @deprecated Unsupported by formulon 0.12. */
   DateAfter: 14,
+  /** @deprecated Unsupported by formulon 0.12. */
   DateBetween: 15,
 } as const;
 export type PivotFilterType = (typeof PivotFilterType)[keyof typeof PivotFilterType];
 
-/** PivotTable date grouping ordinals. */
+/** PivotTable date grouping ordinals. `Days` replaces the old `Week` entry;
+ * use `intervalDays: 7` when a weekly bucket is wanted. */
 export const PivotDateGrouping = {
   Day: 0,
   Month: 1,
   Quarter: 2,
   Year: 3,
-  Week: 4,
+  Days: 4,
   Hour: 5,
   Minute: 6,
   Second: 7,
@@ -297,6 +317,7 @@ export interface PivotFilterSpec {
   readonly axis: PivotAxis;
   readonly fieldName: string;
   readonly type: PivotFilterType;
+  readonly dataFieldIndex?: number;
   readonly valueKind?: PivotFilterValueKind;
   readonly valueInt?: number;
   readonly valueDouble?: number;

@@ -51,13 +51,7 @@ npm install @libraz/formulon-cell zustand
 `zustand` is a peer dependency — exposed because consumers can read from
 the same store the chrome subscribes to.
 
-The WASM engine ships pthread-enabled and requires a
-[crossOriginIsolated context](https://developer.mozilla.org/docs/Web/API/crossOriginIsolated)
-(`Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy:
-require-corp`). Without it, `WorkbookHandle.createDefault()` rejects before
-mounting so a host configuration issue cannot masquerade as a working
-spreadsheet. The in-memory stub engine is opt-in via `preferStub: true` for
-tests and explicit demos.
+The default WASM engine in formulon 0.12.0 is single-threaded and loads without COOP/COEP headers or `SharedArrayBuffer`. `WorkbookHandle.createDefault()` rejects if initialization fails. The in-memory stub engine is opt-in via `preferStub: true` for tests and explicit demos.
 
 ## Quick start
 
@@ -79,24 +73,9 @@ sheet.setTheme('ink');           // dark mode
 
 ## Bundler integration
 
-formulon-cell re-uses `@libraz/formulon`'s pthread-enabled WASM module, so
-the bundler hygiene rules from the engine package apply here too. Four
-things matter:
+formulon-cell uses the default single-threaded WASM from `@libraz/formulon`. Configure the bundler to resolve its WASM assets.
 
-**1. Workers must ship as ES modules.** The recalc scheduler runs on Web
-Workers spawned by Emscripten with
-`new Worker(new URL(...), { type: 'module' })`. Bundlers default to
-classic (IIFE) workers and must be told otherwise:
-
-```ts
-// vite.config.ts
-export default defineConfig({
-  worker: { format: 'es' },
-});
-```
-
-webpack 5 picks up `{ type: 'module' }` automatically when
-`output.module: true`. esbuild needs `--format=esm` for the worker chunk.
+**1. Worker settings apply to the threaded entry.** If your app imports `@libraz/formulon/threads` directly, set `worker: { format: 'es' }` in Vite. The default formulon-cell loader starts no workers.
 
 **2. Top-level await + dynamic node imports need an es2022 target.** The
 engine factory uses TLA and conditional `await import('node:...')`. Lift
@@ -110,7 +89,7 @@ export default defineConfig({
 ```
 
 **3. Keep the engine out of dependency pre-bundling.** formulon-cell imports
-`@libraz/formulon`, whose Emscripten wrapper owns the worker/WASM asset
+`@libraz/formulon`, whose Emscripten wrapper owns the WASM asset
 resolution. Keep both packages out of dependency pre-bundling so those
 assets stay under the app bundler's control:
 
@@ -121,13 +100,7 @@ export default defineConfig({
 });
 ```
 
-**4. SharedArrayBuffer requires cross-origin isolation.** Serve your page
-with `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy:
-require-corp`. Without these headers, `SharedArrayBuffer` is undefined and
-`WorkbookHandle.createDefault()` rejects instead of silently falling back to
-the in-memory **stub engine**. The stub is reserved for tests and explicit
-demos via `preferStub: true`, because formula evaluation, recalc, and xlsx
-round-trip are intentionally incomplete there.
+**4. The default WASM needs no cross-origin isolation.** Only a direct import of `@libraz/formulon/threads` requires `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`. The stub is reserved for tests and explicit demos via `preferStub: true`; formula evaluation, recalc, and xlsx round-trip are incomplete there.
 
 ```ts
 import { WorkbookHandle, isUsingStub } from '@libraz/formulon-cell';

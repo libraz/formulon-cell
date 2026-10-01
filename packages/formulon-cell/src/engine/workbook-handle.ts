@@ -8,6 +8,7 @@ import type { LoadOptions } from './loader.js';
 import { isUsingStub, loadFormulon } from './loader.js';
 import { syncPageSetupToEngine } from './print-sync.js';
 import { parseRangeRef as parseTableRef } from './range-resolver.js';
+import { numberValue } from './result.js';
 import type {
   Addr,
   CellValue,
@@ -194,7 +195,7 @@ export class WorkbookHandle {
 
   get sheetCount(): number {
     this.assertAlive();
-    return this.wb.sheetCount();
+    return numberValue(this.wb.sheetCount(), 'sheetCount');
   }
 
   sheetName(idx: number): string {
@@ -210,7 +211,7 @@ export class WorkbookHandle {
     const proposed = name ?? this.uniqueSheetName();
     const s = this.wb.addSheet(proposed);
     if (!s.ok) return -1;
-    const idx = this.wb.sheetCount() - 1;
+    const idx = numberValue(this.wb.sheetCount(), 'sheetCount') - 1;
     this.emit({ kind: 'sheet-add', index: idx, name: proposed });
     return idx;
   }
@@ -251,7 +252,7 @@ export class WorkbookHandle {
 
   private uniqueSheetName(): string {
     const existing = new Set<string>();
-    const n = this.wb.sheetCount();
+    const n = numberValue(this.wb.sheetCount(), 'sheetCount');
     for (let i = 0; i < n; i += 1) {
       const r = this.wb.sheetName(i);
       if (r.status.ok) existing.add(r.value);
@@ -413,7 +414,7 @@ export class WorkbookHandle {
    *  as engine-side dirty cells until someone asks for a recalc. */
   private isManualCalcMode(): boolean {
     if (!this.capabilities.calcMode) return false;
-    return this.wb.calcMode() === CALC_MODE_MANUAL;
+    return numberValue(this.wb.calcMode(), 'calcMode') === CALC_MODE_MANUAL;
   }
 
   /** Recalc triggered by an edit rather than by the user. Skipped in Manual
@@ -551,7 +552,7 @@ export class WorkbookHandle {
     sheet: number,
   ): Generator<{ addr: Addr; value: CellValue; formula: string | null }> {
     this.assertAlive();
-    const n = this.wb.cellCount(sheet);
+    const n = numberValue(this.wb.cellCount(sheet), `cellCount(${sheet})`);
     for (let i = 0; i < n; i += 1) {
       const e = this.wb.cellAt(sheet, i);
       if (!e.status.ok || e.row === undefined || e.col === undefined || e.value === undefined)
@@ -566,7 +567,7 @@ export class WorkbookHandle {
 
   cellFormula(a: Addr): string | null {
     this.assertAlive();
-    const n = this.wb.cellCount(a.sheet);
+    const n = numberValue(this.wb.cellCount(a.sheet), `cellCount(${a.sheet})`);
     for (let i = 0; i < n; i += 1) {
       const e = this.wb.cellAt(a.sheet, i);
       if (e.status.ok && e.row === a.row && e.col === a.col) return e.formula ?? null;
@@ -578,7 +579,7 @@ export class WorkbookHandle {
    *  otherwise it is the 0-based sheet index for a sheet-scoped name. */
   *definedNames(): Generator<{ name: string; formula: string; localSheetId: number }> {
     this.assertAlive();
-    const n = this.wb.definedNameCount();
+    const n = numberValue(this.wb.definedNameCount(), 'definedNameCount');
     for (let i = 0; i < n; i += 1) {
       const e = this.wb.definedNameAt(i);
       if (!e.status.ok || !e.name || e.formula === undefined || e.localSheetId === undefined)
@@ -632,6 +633,7 @@ export class WorkbookHandle {
     this.assertAlive();
     if (!this.capabilities.externalLinks) return [];
     const arr = this.wb.getExternalLinks();
+    if (!arr.status.ok) return [];
     return arr.map((r) => ({
       index: r.index,
       relId: r.relId,
@@ -668,6 +670,7 @@ export class WorkbookHandle {
     this.assertAlive();
     if (!this.capabilities.dataValidation) return [];
     const arr = this.wb.getValidations(sheet);
+    if (!arr.status.ok) return [];
     return arr.map((v) => ({
       ranges: v.ranges.map((m) => ({
         sheet,
@@ -765,6 +768,7 @@ export class WorkbookHandle {
     this.assertAlive();
     if (!this.capabilities.hyperlinks) return [];
     const arr = this.wb.getHyperlinks(sheet);
+    if (!arr.status.ok) return [];
     return arr.map((h) => ({
       row: h.row,
       col: h.col,
@@ -847,7 +851,9 @@ export class WorkbookHandle {
   }[] {
     this.assertAlive();
     if (!this.wb.tableCount) return [];
-    const n = this.wb.tableCount();
+    const count = this.wb.tableCount();
+    if (!count.status.ok) return [];
+    const n = count.value;
     const out: {
       name: string;
       displayName: string;
@@ -892,7 +898,9 @@ export class WorkbookHandle {
   getPassthroughs(): { path: string }[] {
     this.assertAlive();
     if (!this.wb.passthroughCount) return [];
-    const n = this.wb.passthroughCount();
+    const count = this.wb.passthroughCount();
+    if (!count.status.ok) return [];
+    const n = count.value;
     const out: { path: string }[] = [];
     for (let i = 0; i < n; i += 1) {
       const e = this.wb.passthroughAt(i);

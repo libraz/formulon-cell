@@ -18,13 +18,11 @@ const portFromEnv = (app: DemoApp): number => {
  * config surface — only the dev-server port and workspace name change.
  *
  * Browsers: Chromium + WebKit. Firefox is skipped (cf. tidy-seeking-whisper
- * plan §1.3); the engine's pthread WASM doesn't require it, and the
+ * plan §1.3); the engine's WASM doesn't require it, and the
  * grant-permissions calls for the clipboard scenarios don't cleanly apply.
  *
- * COOP/COEP: each demo app's `vite.config.ts` already injects the headers
- * required for crossOriginIsolated, so the engine boots into WASM (not the
- * JS stub). Specs that need real recalc rely on this; see `expectNoStub`
- * in `pages/SpreadsheetPage.ts`.
+ * The default serial WASM loads without COOP/COEP headers. Specs that need
+ * real recalc verify WASM mode via `expectNoStub` in pages/SpreadsheetPage.ts.
  */
 export function defineDemoAppConfig(app: DemoApp) {
   const port = portFromEnv(app);

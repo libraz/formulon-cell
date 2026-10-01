@@ -32,6 +32,7 @@ const baseMatch = {
   barBorderEngaged: false,
   barBorder: c(0, 0, 0, 255),
   barGradient: false,
+  barDirection: 0,
   iconSetName: 0,
   iconIndex: 0,
 };
@@ -96,11 +97,131 @@ describe('evaluateCfFromEngine', () => {
     ]);
     const out = evaluateCfFromEngine(wb, 0, 0, 0, 9, 9);
     const overlay = out.get(addrKey({ sheet: 0, row: 0, col: 0 }));
-    expect(overlay?.bar).toBeCloseTo(0.75);
+    expect(overlay?.bar).toBeCloseTo(0.3);
     expect(overlay?.barAxis).toBeCloseTo(0.4);
     expect(overlay?.barDirection).toBe('left');
     expect(overlay?.barColor).toBe('rgb(50, 100, 200)');
     expect(overlay?.barGradient).toBe(true);
+  });
+
+  it('mirrors data-bar axis and signed side for explicit and context directions', () => {
+    const wb = {
+      ...fakeWb(true, [
+        {
+          row: 0,
+          col: 0,
+          matches: [
+            {
+              kind: KIND_DATA_BAR,
+              barLengthPct: 20,
+              barAxisPositionPct: 40,
+              barIsNegative: false,
+              barDirection: 0,
+            },
+          ],
+        },
+        {
+          row: 0,
+          col: 1,
+          matches: [
+            {
+              kind: KIND_DATA_BAR,
+              barLengthPct: 20,
+              barAxisPositionPct: 40,
+              barIsNegative: true,
+              barDirection: 1,
+            },
+          ],
+        },
+        {
+          row: 0,
+          col: 2,
+          matches: [
+            {
+              kind: KIND_DATA_BAR,
+              barLengthPct: 20,
+              barAxisPositionPct: 40,
+              barIsNegative: true,
+              barDirection: 2,
+            },
+          ],
+        },
+      ]),
+      getSheetView: () => ({ rightToLeft: true }),
+    } as unknown as WorkbookHandle;
+    const out = evaluateCfFromEngine(wb, 0, 0, 0, 9, 9);
+    expect(out.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toMatchObject({
+      barAxis: 0.6,
+      barDirection: 'left',
+    });
+    expect(out.get(addrKey({ sheet: 0, row: 0, col: 1 }))).toMatchObject({
+      barAxis: 0.4,
+      barDirection: 'left',
+    });
+    expect(out.get(addrKey({ sheet: 0, row: 0, col: 2 }))).toMatchObject({
+      barAxis: 0.6,
+      barDirection: 'right',
+    });
+  });
+
+  it('projects the signed engine bar length into the cell-width fraction', () => {
+    const wb = {
+      ...fakeWb(true, [
+        {
+          row: 0,
+          col: 0,
+          matches: [
+            {
+              kind: KIND_DATA_BAR,
+              barLengthPct: 100,
+              barAxisPositionPct: 33.333333,
+              barIsNegative: true,
+              barDirection: 1,
+            },
+          ],
+        },
+        {
+          row: 0,
+          col: 1,
+          matches: [
+            {
+              kind: KIND_DATA_BAR,
+              barLengthPct: 100,
+              barAxisPositionPct: 33.333333,
+              barIsNegative: false,
+              barDirection: 1,
+            },
+          ],
+        },
+        {
+          row: 0,
+          col: 2,
+          matches: [
+            {
+              kind: KIND_DATA_BAR,
+              barLengthPct: 100,
+              barAxisPositionPct: 33.333333,
+              barIsNegative: true,
+              barDirection: 2,
+            },
+          ],
+        },
+      ]),
+      getSheetView: () => ({ rightToLeft: false }),
+    } as unknown as WorkbookHandle;
+    const out = evaluateCfFromEngine(wb, 0, 0, 0, 9, 9);
+    const negativeLtr = out.get(addrKey({ sheet: 0, row: 0, col: 0 }));
+    expect(negativeLtr?.bar).toBeCloseTo(1 / 3);
+    expect(negativeLtr?.barAxis).toBeCloseTo(1 / 3);
+    expect(negativeLtr?.barDirection).toBe('left');
+    const positiveLtr = out.get(addrKey({ sheet: 0, row: 0, col: 1 }));
+    expect(positiveLtr?.bar).toBeCloseTo(2 / 3);
+    expect(positiveLtr?.barAxis).toBeCloseTo(1 / 3);
+    expect(positiveLtr?.barDirection).toBe('right');
+    const negativeRtl = out.get(addrKey({ sheet: 0, row: 0, col: 2 }));
+    expect(negativeRtl?.bar).toBeCloseTo(1 / 3);
+    expect(negativeRtl?.barAxis).toBeCloseTo(2 / 3);
+    expect(negativeRtl?.barDirection).toBe('right');
   });
 
   it('clamps bar length to [0, 1]', () => {
@@ -276,6 +397,8 @@ describe('hydrateConditionalRulesFromEngine', () => {
             showValue: false,
             minLengthPct: 0,
             maxLengthPct: 100,
+            gradient: false,
+            direction: 2,
           },
         },
         {
@@ -287,13 +410,13 @@ describe('hydrateConditionalRulesFromEngine', () => {
           iconSet: {
             name: 3,
             thresholds: [
-              { type: 1, value: '0' },
-              { type: 1, value: '33' },
-              { type: 1, value: '67' },
+              { type: 1, value: '33', gte: false },
+              { type: 1, value: '67', gte: false },
             ],
             reverse: true,
             showValue: false,
             percent: true,
+            floor: { type: 1, value: '10', gte: false },
           },
         },
       ]),
@@ -362,6 +485,8 @@ describe('hydrateConditionalRulesFromEngine', () => {
         range: { sheet: 0, r0: 10, c0: 1, r1: 10, c1: 3 },
         color: 'rgb(0, 120, 212)',
         showValue: false,
+        gradient: false,
+        direction: 'right-to-left',
       },
       {
         engineId: 'cf-icons',
@@ -371,9 +496,10 @@ describe('hydrateConditionalRulesFromEngine', () => {
         showValue: false,
         reverseOrder: true,
         thresholds: [
-          { kind: 'percent', value: 33 },
-          { kind: 'percent', value: 67 },
+          { kind: 'percent', value: 33, gte: false },
+          { kind: 'percent', value: 67, gte: false },
         ],
+        floor: { kind: 'percent', value: 10, gte: false },
       },
     ]);
   });

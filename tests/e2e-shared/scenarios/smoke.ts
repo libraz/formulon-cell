@@ -10,11 +10,11 @@ export async function runSmokeScenario(page: Page): Promise<void> {
 
   await sp.mount();
 
-  // Engine must be in real WASM mode — the demo apps inject COOP/COEP.
+  // The default serial engine must mount without isolation or stub fallback.
   await sp.expectNoStub();
 
-  // crossOriginIsolated must hold or pthread WASM would have fallen back.
-  expect(await sp.isCrossOriginIsolated()).toBe(true);
+  // These demos serve no COOP/COEP headers.
+  expect(await sp.isCrossOriginIsolated()).toBe(false);
 
   // Allow async paint / observer chains to settle before assertion.
   await page.waitForTimeout(250);

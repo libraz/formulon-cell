@@ -1343,7 +1343,7 @@ export const en: Strings = {
   mountError: {
     title: 'Spreadsheet engine unavailable',
     engineHelp:
-      'The formulon WASM engine could not start. Serve the page with COOP: same-origin and COEP: require-corp so SharedArrayBuffer is available.',
+      'The formulon WASM engine could not start. Check WebAssembly support and that the engine WASM asset can be loaded.',
   },
   ribbon: {
     workbook: 'Workbook',

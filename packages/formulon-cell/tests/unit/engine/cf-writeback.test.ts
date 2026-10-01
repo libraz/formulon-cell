@@ -202,13 +202,69 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
       iconSet: {
         name: 3,
         thresholds: [
-          { type: 1, value: '0' },
           { type: 1, value: '33' },
           { type: 1, value: '67' },
         ],
         reverse: true,
         showValue: false,
         percent: true,
+      },
+    });
+  });
+
+  it('writes data-bar direction and gradient plus an independent icon floor', () => {
+    expect(
+      conditionalRuleToEngineInput({
+        kind: 'data-bar',
+        range,
+        color: '#0078d4',
+        gradient: false,
+        direction: 'right-to-left',
+      }),
+    ).toMatchObject({
+      type: 3,
+      dataBar: {
+        gradient: false,
+        direction: 2,
+      },
+    });
+    expect(
+      conditionalRuleToEngineInput({
+        kind: 'icon-set',
+        range,
+        icons: 'traffic3',
+        thresholds: [{ kind: 'percent', value: 67 }],
+        floor: { kind: 'number', value: 10 },
+      }),
+    ).toMatchObject({
+      type: 4,
+      iconSet: {
+        thresholds: [{ type: 1, value: '67' }],
+        floor: { type: 0, value: '10' },
+      },
+    });
+  });
+
+  it('preserves strict icon floor and threshold comparisons', () => {
+    expect(
+      conditionalRuleToEngineInput({
+        kind: 'icon-set',
+        range,
+        icons: 'traffic3',
+        thresholds: [
+          { kind: 'number', value: 20, gte: false },
+          { kind: 'number', value: 40, gte: false },
+        ],
+        floor: { kind: 'number', value: 15, gte: false },
+      }),
+    ).toMatchObject({
+      type: 4,
+      iconSet: {
+        thresholds: [
+          { type: 0, value: '20', gte: false },
+          { type: 0, value: '40', gte: false },
+        ],
+        floor: { type: 0, value: '15', gte: false },
       },
     });
   });

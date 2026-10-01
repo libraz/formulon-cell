@@ -13,6 +13,7 @@ import {
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 
 const ok = { ok: true, code: 0, message: '' };
+const numberResult = (value: number) => ({ status: ok, value });
 
 const textValue = (text: string): Value => ({
   kind: ValueKind.Text,
@@ -40,8 +41,8 @@ const blankValue = (): Value => ({
 
 const makeHandle = (overrides: Record<string, unknown> = {}): WorkbookHandle => {
   const wb = {
-    sheetCount: () => 1,
-    cellCount: (_sheet: number) => 1,
+    sheetCount: () => numberResult(1),
+    cellCount: (_sheet: number) => numberResult(1),
     cellAt: (_sheet: number, _idx: number) => ({
       status: ok,
       row: 0,
@@ -49,7 +50,7 @@ const makeHandle = (overrides: Record<string, unknown> = {}): WorkbookHandle => 
       value: textValue('cached'),
       formula: null,
     }),
-    pivotCount: (_sheet: number) => 1,
+    pivotCount: (_sheet: number) => numberResult(1),
     pivotLayout: (_sheet: number, _pivotIndex: number) => ({
       status: ok,
       top: 0,
@@ -82,11 +83,11 @@ const makeHandle = (overrides: Record<string, unknown> = {}): WorkbookHandle => 
           kind: 3,
           depth: 0,
           fieldName: 'Sales',
-          numberFormat: '#,##0',
+          numberFormat: '4',
         },
       ],
     }),
-    pivotCacheCount: () => 2,
+    pivotCacheCount: () => numberResult(2),
     pivotCacheIdAt: (idx: number) => ({ status: ok, index: idx === 0 ? 7 : 9 }),
     pivotCacheCreate: (requestedId: number) => {
       return { status: ok, index: requestedId || 8 };
@@ -100,7 +101,33 @@ const makeHandle = (overrides: Record<string, unknown> = {}): WorkbookHandle => 
       name: '',
     }),
     pivotCacheSetWorksheetSource: () => ok,
-    pivotCacheFieldCount: (_cacheId: number) => 2,
+    getNumFmt: (numFmtId: number) => ({
+      status: ok,
+      numFmtId,
+      formatCode: numFmtId === 4 ? '#,##0' : 'General',
+    }),
+    addNumFmt: (_formatCode: string) => ({ status: ok, numFmtId: 164 }),
+    getCellXfIndex: () => ({ status: ok, index: 0 }),
+    setCellXfIndex: () => ok,
+    getCellXf: () => ({
+      status: ok,
+      fontIndex: 0,
+      fillIndex: 0,
+      borderIndex: 0,
+      numFmtId: 0,
+      horizontalAlign: 0,
+      verticalAlign: 2,
+      wrapText: false,
+      justifyLastLine: false,
+    }),
+    addFont: () => ({ status: ok, index: 0 }),
+    addFill: () => ({ status: ok, index: 0 }),
+    addBorder: () => ({ status: ok, index: 0 }),
+    addXf: () => ({ status: ok, index: 0 }),
+    getFont: () => ({ status: ok, name: 'Calibri', size: 11 }),
+    getFill: () => ({ status: ok, pattern: 0 }),
+    getBorder: () => ({ status: ok }),
+    pivotCacheFieldCount: (_cacheId: number) => numberResult(2),
     pivotCacheFieldName: (_cacheId: number, fieldIdx: number) => ({
       status: ok,
       value: fieldIdx === 0 ? 'Region' : 'Sales',
@@ -111,7 +138,7 @@ const makeHandle = (overrides: Record<string, unknown> = {}): WorkbookHandle => 
     },
     pivotCacheFieldClear: (_cacheId: number) => ok,
     pivotCacheFieldSharedItemCount: (_cacheId: number, fieldIdx: number) =>
-      fieldIdx === 0 ? 2 : 0,
+      numberResult(fieldIdx === 0 ? 2 : 0),
     pivotCacheFieldSharedItemValue: (cacheId: number, _fieldIdx: number, itemIdx: number) => ({
       status: ok,
       value: textValue(cacheId === 7 ? (itemIdx === 0 ? 'East' : 'West') : 'Wrong cache'),
@@ -121,7 +148,7 @@ const makeHandle = (overrides: Record<string, unknown> = {}): WorkbookHandle => 
     pivotCacheFieldAddSharedItemBool: () => ok,
     pivotCacheFieldAddSharedItemBlank: () => ok,
     pivotCacheFieldClearSharedItems: () => ok,
-    pivotCacheRecordCount: () => 0,
+    pivotCacheRecordCount: () => numberResult(0),
     pivotCacheRecordAdd: () => ({ status: ok, index: 0 }),
     pivotCacheRecordClear: () => ok,
     pivotCacheRecordSetNumber: () => ok,
@@ -143,14 +170,12 @@ const makeHandle = (overrides: Record<string, unknown> = {}): WorkbookHandle => 
     pivotSetGrandTotals: () => ok,
     pivotGetLayout: () => ({ status: ok, layout: PivotReportLayout.Tabular }),
     pivotSetLayout: () => ok,
-    pivotFieldCount: () => 0,
+    pivotFieldCount: () => numberResult(0),
     pivotFieldAdd: () => ({ status: ok, index: 0 }),
     pivotFieldClear: () => ok,
     pivotFieldSetAxis: () => ok,
     pivotFieldSetSort: () => ok,
     pivotFieldSetSubtotalTop: () => ok,
-    pivotFieldAddAggregation: () => ok,
-    pivotFieldClearAggregations: () => ok,
     pivotFieldAddItem: () => ok,
     pivotFieldClearItems: () => ok,
     pivotFieldSetItemVisible: () => ok,
@@ -161,11 +186,25 @@ const makeHandle = (overrides: Record<string, unknown> = {}): WorkbookHandle => 
     pivotFieldSetNumberFormat: () => ok,
     pivotSetRowFieldOrder: () => ok,
     pivotSetColFieldOrder: () => ok,
-    pivotDataFieldCount: () => 0,
+    pivotDataFieldCount: () => numberResult(0),
     pivotDataFieldAdd: () => ({ status: ok, index: 0 }),
     pivotDataFieldClear: () => ok,
     pivotDataFieldSet: () => ok,
-    pivotFilterCount: () => 0,
+    pivotFilterCount: () => numberResult(0),
+    pivotFilterAt: () => ({
+      status: { ok: false, code: 1, message: 'no filter' },
+      axis: PivotAxis.Page,
+      fieldName: '',
+      type: PivotFilterType.ValueTop10,
+      dataFieldIndex: 0,
+      valueKind: PivotFilterValueKind.None,
+      valueInt: 0,
+      valueDouble: 0,
+      valueText: '',
+      valueHighKind: PivotFilterValueKind.None,
+      valueHighInt: 0,
+      valueHighDouble: 0,
+    }),
     pivotFilterAdd: () => ok,
     pivotFilterClear: () => ok,
     pivotFilterRemoveAt: () => ok,
@@ -260,50 +299,55 @@ describe('WorkbookHandle PivotTable projection', () => {
 
   it('includes readable PivotTable filter specs in object summaries when engine hooks exist', () => {
     const wb = makeHandle({
-      pivotFilterCount: () => 3,
-      pivotFilterSpec: (_sheet: number, _pivot: number, filterIdx: number) => {
+      pivotFilterCount: () => numberResult(3),
+      pivotFilterAt: (_sheet: number, _pivot: number, filterIdx: number) => {
         if (filterIdx === 0) {
           return {
             status: ok,
-            spec: {
-              axis: PivotAxis.Page,
-              fieldName: ' Region ',
-              type: PivotFilterType.LabelContains,
-              valueKind: PivotFilterValueKind.Text,
-              valueText: 'East',
-            },
+            axis: PivotAxis.Page,
+            fieldName: ' Region ',
+            type: PivotFilterType.LabelContains,
+            dataFieldIndex: 0,
+            valueKind: PivotFilterValueKind.Text,
+            valueInt: 0,
+            valueDouble: 0,
+            valueText: 'East',
+            valueHighKind: PivotFilterValueKind.None,
+            valueHighInt: 0,
+            valueHighDouble: 0,
           };
         }
         if (filterIdx === 1) {
           return {
             status: ok,
-            spec: {
-              axis: PivotAxis.Page,
-              fieldName: 'Date',
-              type: PivotFilterType.DateBetween,
-              valueKind: PivotFilterValueKind.Text,
-              valueText: '2026-05-01',
-              valueHighKind: PivotFilterValueKind.Text,
-              valueHighText: '2026-05-31',
-            },
+            axis: PivotAxis.Page,
+            fieldName: 'Date',
+            type: PivotFilterType.LabelDate,
+            dataFieldIndex: 0,
+            valueKind: PivotFilterValueKind.Text,
+            valueInt: 0,
+            valueDouble: 0,
+            valueText: '2026-05-01',
+            valueHighKind: PivotFilterValueKind.None,
+            valueHighInt: 0,
+            valueHighDouble: 0,
           };
         }
         return {
           status: { ok: false, code: 1, message: 'fallback' },
-          spec: {
-            axis: PivotAxis.Page,
-            fieldName: 'Ignored',
-            type: PivotFilterType.LabelBeginsWith,
-          },
+          axis: PivotAxis.Page,
+          fieldName: 'Ignored',
+          type: PivotFilterType.LabelBeginsWith,
+          dataFieldIndex: 0,
+          valueKind: PivotFilterValueKind.None,
+          valueInt: 0,
+          valueDouble: 0,
+          valueText: '',
+          valueHighKind: PivotFilterValueKind.None,
+          valueHighInt: 0,
+          valueHighDouble: 0,
         };
       },
-      pivotFilterAxis: () => ({ status: ok, value: PivotAxis.Value }),
-      pivotFilterFieldName: () => ({ status: ok, value: 'Sales' }),
-      pivotFilterType: () => ({ status: ok, value: PivotFilterType.DateBetween }),
-      pivotFilterValueKind: () => ({ status: ok, value: PivotFilterValueKind.Text }),
-      pivotFilterValueText: () => ({ status: ok, value: '2026-06-01' }),
-      pivotFilterValueHighKind: () => ({ status: ok, value: PivotFilterValueKind.Text }),
-      pivotFilterValueHighText: () => ({ status: ok, value: '2026-06-30' }),
     });
 
     expect(wb.getPivotTables()[0]?.pivotFilters).toEqual([
@@ -317,20 +361,9 @@ describe('WorkbookHandle PivotTable projection', () => {
       {
         axis: PivotAxis.Page,
         fieldName: 'Date',
-        type: PivotFilterType.DateBetween,
+        type: PivotFilterType.LabelDate,
         valueKind: PivotFilterValueKind.Text,
         valueText: '2026-05-01',
-        valueHighKind: PivotFilterValueKind.Text,
-        valueHighText: '2026-05-31',
-      },
-      {
-        axis: PivotAxis.Value,
-        fieldName: 'Sales',
-        type: PivotFilterType.DateBetween,
-        valueKind: PivotFilterValueKind.Text,
-        valueText: '2026-06-01',
-        valueHighKind: PivotFilterValueKind.Text,
-        valueHighText: '2026-06-30',
       },
     ]);
   });
@@ -385,5 +418,56 @@ describe('WorkbookHandle PivotTable projection', () => {
     ).toBe(true);
     expect(wb.clearPivotFieldDateGroup(0, 3, 0)).toBe(true);
     expect(wb.setPivotFieldNumberFormat(0, 3, 0, '#,##0')).toBe(true);
+  });
+
+  it('keeps failed pivot counts neutral instead of treating the value as valid', () => {
+    const failed = { ok: false, code: 1, message: 'invalid pivot' };
+    const wb = makeHandle({
+      pivotCount: () => ({ status: failed, value: 99 }),
+      pivotCacheCount: () => ({ status: failed, value: 99 }),
+    });
+
+    expect([...wb.pivotCells(0)]).toEqual([]);
+    expect(wb.pivotCacheCount()).toBe(0);
+    expect(wb.pivotCacheIds()).toEqual([]);
+  });
+
+  it('passes 0.12 date-group and data-field payloads through the adapter', () => {
+    let dateArgs: unknown[] = [];
+    let dataSpec: Record<string, unknown> | undefined;
+    const wb = makeHandle({
+      pivotFieldSetDateGroup: (...args: unknown[]) => {
+        dateArgs = args;
+        return ok;
+      },
+      pivotDataFieldAdd: (_sheet: number, _pivot: number, spec: Record<string, unknown>) => {
+        dataSpec = spec;
+        return { status: ok, index: 0 };
+      },
+    });
+
+    expect(
+      wb.setPivotFieldDateGroup(0, 3, 0, PivotDateGrouping.Days, PivotCalendar.Gregorian, {
+        intervalDays: 7,
+        startSerial: 45000,
+        endSerial: 46000,
+      }),
+    ).toBe(true);
+    expect(dateArgs.slice(-3)).toEqual([7, 45000, 46000]);
+
+    expect(
+      wb.addPivotDataField(0, 3, {
+        fieldIndex: 1,
+        aggregation: PivotAggregation.Average,
+        numberFormat: '#,##0.00',
+        showValuesAs: 3,
+      }),
+    ).toBe(0);
+    expect(dataSpec).toMatchObject({
+      name: 'Average of field 1',
+      numberFormat: '164',
+      showAs: 3,
+    });
+    expect(dataSpec).not.toHaveProperty('showValuesAs');
   });
 });
