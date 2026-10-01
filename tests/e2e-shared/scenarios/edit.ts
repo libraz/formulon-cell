@@ -50,13 +50,23 @@ export async function runFormulaScenario(page: Page): Promise<void> {
   await sp.mount();
   await sp.expectNoStub();
 
-  await sp.typeIntoActiveCell('1');
-  await sp.typeIntoActiveCell('2');
-  await sp.typeIntoActiveCell('3');
-  // Cursor is now in row 4. Type the formula and commit.
-  await sp.typeIntoActiveCell('=SUM(A1:A3)');
+  await sp.focusHost();
+  // Focus once: typeIntoActiveCell jumps back to A1 on every call.
+  for (const value of ['1', '2', '3', '=SUM(A1:A3)']) {
+    await page.keyboard.type(value);
+    await page.keyboard.press('Enter');
+  }
 
   // Re-select the formula cell (A4) and check the formula bar.
   await page.keyboard.press('ArrowUp');
   expect(await sp.formulaBarValue()).toBe('=SUM(A1:A3)');
+  const total = await page.evaluate(() => {
+    const inst = (window as Window & { __fcInst?: unknown }).__fcInst as {
+      workbook: {
+        getValue(addr: { sheet: number; row: number; col: number }): unknown;
+      };
+    };
+    return inst.workbook.getValue({ sheet: 0, row: 3, col: 0 });
+  });
+  expect(total).toEqual({ kind: 'number', value: 6 });
 }

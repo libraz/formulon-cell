@@ -19,6 +19,7 @@ export default defineConfig({
       'tests/**/*.test.mjs',
       '../formulon-cell-react/tests/**/*.test.tsx',
       '../formulon-cell-vue/tests/**/*.test.ts',
+      '../../tests/e2e-shared/unit/**/*.test.ts',
     ],
     globals: false,
     coverage: {
