@@ -120,6 +120,14 @@ props として渡せます。
 担い、プリンタープロファイル系の props はページ設定と印刷プレビューの
 最小余白の扱いに使われます。
 
+## 制限付きの埋め込み
+
+コンポーネントは `policy`・`viewport`・`contextMenu`・`overlays`・`toolbar` props を受け取り、実行中の変更を再マウントせずに反映します。React では `ui={{ profile: 'embedded' }}`、Vue では `:ui="{ profile: 'embedded' }"` でグリッドだけを表示できます。`toolbar={false}` / `:toolbar="false"` は UI プロファイルより優先します。`fixedFormPolicy` と `viewerPolicy` はこのパッケージからも import できます。
+
+更新成功後の hook は、React の `onChangeBatch`、Vue の `@change-batch` で受け取れます。その他の hook には instance のイベント API を使えます。
+
+編集可能範囲、ホストからの更新、独自メニュー、対応する操作の制限は [core の埋め込み例](https://github.com/libraz/formulon-cell#restricted-embedding)を参照してください。
+
 ## コアヘルパー
 
 このパッケージは、コア側のコマンドヘルパーと型（`createSessionChart`・

@@ -71,6 +71,42 @@ sheet.i18n.setLocale('ja');     // runtime locale swap
 sheet.setTheme('ink');           // dark mode
 ```
 
+## Restricted embedding
+
+The `embedded` UI profile starts with only the grid. Enable individual features as needed. UI visibility is separate from interaction permissions: hiding a ribbon does not make a cell readonly.
+
+```ts
+import { Spreadsheet, fixedFormPolicy } from '@libraz/formulon-cell';
+
+const editable = [{ sheet: 0, r0: 1, c0: 1, r1: 9, c1: 2 }];
+const sheet = await Spreadsheet.mount(host, {
+  ui: { profile: 'embedded', features: { clipboard: true, shortcuts: true } },
+  policy: fixedFormPolicy(editable),
+  viewport: {
+    range: { sheet: 0, r0: 0, c0: 0, r1: 9, c1: 3 },
+    tabNavigation: 'editable',
+    tabBoundary: 'leave',
+  },
+  contextMenu: { mode: 'builtIn', items: ['copy', 'paste', 'clear'] },
+  // overlays: { root: modalElement },
+});
+
+// Host updates can prefill cells that users cannot edit.
+sheet.applyChanges([{ addr: { sheet: 0, row: 0, col: 0 }, input: 'Amount' }]);
+```
+
+`fixedFormPolicy` permits value editing, clearing, pasting, and filling in the supplied cells; formulas, formatting, and structural changes are denied. `viewerPolicy()` makes user mutations readonly while allowing selection and copying. An explicit policy denies omitted operations; omitting `policy` preserves legacy behavior.
+
+The shared command service checks editor, formula bar, clipboard, keyboard, pointer, context-menu, and ribbon actions. Mixed eligible/ineligible batches are rejected before writing by default. `batchDenied: 'skipIneligible'` skips only ineligible or protected cells without shifting paste positions. Undo and redo recheck the current policy.
+
+`contextMenu` supports selected built-ins, a `transform(context)` callback, or `{ mode: 'host', onOpen }`. Custom menu `command` items use `sheet.commands.execute`; custom `action` callbacks are trusted host code. `overlays.root` accepts an element or resolver for host modals/fullscreen. Without a root, overlays follow a containing open dialog or fullscreen element. The visible range leaves workbook dependencies intact.
+
+Use `setPolicy`, `setViewportOptions`, `setContextMenu`, `setOverlayOptions`, `setUi`, and `setToolbar` to change or remove settings at runtime. `applyChanges` is the trusted host update API and resets history by default; `{ history: 'record' }` requires both forward and inverse changes to be user-permitted. Raw workbook/store calls and custom extensions remain trusted APIs outside user-policy enforcement.
+
+`policy.restrict(context)` is a synchronous hook for additional denials; it cannot grant an operation rejected by built-in checks. Keep it free of side effects because planning and history replay may invoke it more than once. Subscribe with `sheet.on('changeBatch', handler)` for successful batch updates, or use existing `cellChange`, `recalc`, and `selectionChange` events for host integration. Host callbacks run outside permission enforcement.
+
+This first restricted mode supports cell-content operations. Advanced mutation features (formatting, structural edits, tables, objects, and protection changes) are disabled while a policy is active, even if requested through feature flags or operation permissions. Request-mode editing is not implemented yet.
+
 ## Bundler integration
 
 formulon-cell uses the default single-threaded WASM from `@libraz/formulon`. Configure the bundler to resolve its WASM assets.

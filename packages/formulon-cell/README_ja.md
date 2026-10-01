@@ -59,6 +59,44 @@ sheet.i18n.setLocale('en');     // 実行時にロケールを切り替え
 sheet.setTheme('ink');           // ダークテーマ — グリッドとツールバーが同時に切り替わる
 ```
 
+## 制限付きの埋め込み
+
+`embedded` UI プロファイルはグリッドだけを表示します。必要な機能を個別に有効にしてください。UI の表示と操作権限は別の設定です。リボンを隠してもセルは readonly になりません。
+
+```ts
+import { Spreadsheet, fixedFormPolicy } from '@libraz/formulon-cell';
+
+const editable = [{ sheet: 0, r0: 1, c0: 1, r1: 9, c1: 2 }];
+const sheet = await Spreadsheet.mount(host, {
+  ui: { profile: 'embedded', features: { clipboard: true, shortcuts: true } },
+  policy: fixedFormPolicy(editable),
+  viewport: {
+    range: { sheet: 0, r0: 0, c0: 0, r1: 9, c1: 3 },
+    tabNavigation: 'editable',
+    tabBoundary: 'leave',
+  },
+  contextMenu: { mode: 'builtIn', items: ['copy', 'paste', 'clear'] },
+  // overlays: { root: modalElement },
+});
+
+// ホストからは、ユーザーが編集できないセルにも初期値を設定できます。
+sheet.applyChanges([{ addr: { sheet: 0, row: 0, col: 0 }, input: 'Amount' }]);
+```
+
+`fixedFormPolicy` は指定したセルへの値入力・クリア・貼り付け・フィルを許可し、数式入力・書式変更・行列の追加削除などを禁止します。`viewerPolicy()` は選択とコピーを許可したまま、ユーザーによる変更を禁止します。明示した policy では未指定の操作を拒否します。`policy` を省略すると従来の動作を維持します。
+
+共通のコマンドサービスが、セルエディター・数式バー・クリップボード・キーボード・ポインター・右クリックメニュー・リボンからの操作を判定します。編集できないセルを含む一括操作は、既定では書き込む前に全体を拒否します。`batchDenied: 'skipIneligible'` を指定すると、編集対象外または保護されたセルだけをスキップし、貼り付け位置をずらしません。Undo / Redo でも現在の policy を再判定します。
+
+エンジンの再計算に失敗した場合、一括更新前のセルに戻して依存先を再計算します。この復旧にも失敗した WorkbookHandle は、それ以降の読み書きを拒否します。新しい Workbook に置き換えてください。
+
+`contextMenu` は組み込み項目の選択、`transform(context)` による拡張、`{ mode: 'host', onOpen }` による独自メニューに対応します。独自項目の `command` は `sheet.commands.execute` を通り、`action` は信頼されたホストの処理として実行します。`overlays.root` に要素または resolver を渡すと、ホストのモーダルやフルスクリーン内にメニューを配置できます。省略時は、ホストを含む開いた dialog またはフルスクリーン要素を追従します。表示範囲を限定しても、範囲外の数式依存データは維持します。
+
+`setPolicy`、`setViewportOptions`、`setContextMenu`、`setOverlayOptions`、`setUi`、`setToolbar` で実行中に設定を変更・解除できます。`applyChanges` は信頼されたホストの更新 API で、既定では履歴をクリアします。`{ history: 'record' }` では、更新と取り消しの両方がユーザーに許可された操作である必要があります。Workbook・store の直接操作と独自 extension は、ユーザー向け policy の制御対象外です。
+
+`policy.restrict(context)` は追加の拒否条件を入れる同期 hook です。組み込み判定で拒否された操作を許可することはできません。操作計画や履歴再生時に複数回呼ばれることがあるため、副作用を持たせないでください。更新後の処理には `sheet.on('changeBatch', handler)` を使えます。既存の `cellChange`・`recalc`・`selectionChange` イベントも購読できます。ホストの callback 自体は権限制御の外で実行します。
+
+今回の制限付きモードはセル内容の操作に対応します。書式・行列構造・テーブル・オブジェクト・保護設定を変更する機能は、policy 有効時には feature flags や操作権限で指定しても無効になります。ホストに編集要求を渡す request mode は未実装です。
+
 ## ホスト統合
 
 ブラウザの API だけでは、デスクトップ表計算ソフトの統合ポイントをすべて

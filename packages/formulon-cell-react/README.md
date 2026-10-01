@@ -117,6 +117,14 @@ behavior in React:
 `captureScreenClip` backs Insert > Screenshot > Screen Clipping. Printer
 profile props feed Page Setup / print preview minimum-margin handling.
 
+## Restricted embedding
+
+The component accepts `policy`, `viewport`, `contextMenu`, `overlays`, and `toolbar` props and applies runtime changes without remounting. Use `ui={{ profile: 'embedded' }}` in React or `:ui="{ profile: 'embedded' }"` in Vue for a grid-only view. `toolbar={false}` / `:toolbar="false"` overrides the UI profile. `fixedFormPolicy` and `viewerPolicy` are re-exported by this package.
+
+React forwards successful batch updates through `onChangeBatch`; Vue emits `change-batch`. Use the instance event API for additional hooks.
+
+See the [core embedding example](https://github.com/libraz/formulon-cell#restricted-embedding) for editable ranges, trusted host updates, menu composition, and supported operation limits.
+
 ## Core helpers
 
 This package re-exports core command helpers and types — `createSessionChart`,
