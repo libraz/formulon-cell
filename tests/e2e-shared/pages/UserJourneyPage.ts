@@ -50,6 +50,7 @@ type WorkbookProbe = {
   };
   store: {
     getState(): {
+      data: { sheetIndex: number };
       format: { formats: Map<string, CellFormat> };
       merges: { byAnchor: Map<string, MergeRange> };
     };
@@ -76,7 +77,27 @@ export class UserJourneyPage extends SpreadsheetPage {
     await nameBox.fill(ref);
     await nameBox.press('Enter');
     await expect(this.page.locator('.fc-host').first()).toBeFocused();
-    await expect.poll(() => nameBox.inputValue(), { timeout: 2_000 }).toBe(ref);
+    let displayedRef = ref;
+    const range = /^([A-Z]+\d+):([A-Z]+\d+)$/i.exec(ref);
+    if (range?.[1] && range[2]) {
+      const sheetIndex = await this.page.evaluate(() => {
+        const instance = (window as Window & { __fcInst?: WorkbookProbe }).__fcInst;
+        if (!instance) throw new Error('window.__fcInst is not available');
+        return instance.store.getState().data.sheetIndex;
+      });
+      const merge = await this.readMerge(range[1], sheetIndex);
+      const first = a1Address(range[1]);
+      const last = a1Address(range[2]);
+      if (
+        merge &&
+        merge.r0 === first.row &&
+        merge.c0 === first.col &&
+        merge.r1 === last.row &&
+        merge.c1 === last.col
+      )
+        displayedRef = range[1];
+    }
+    await expect.poll(() => nameBox.inputValue(), { timeout: 2_000 }).toBe(displayedRef);
   }
 
   async enter(ref: string, value: string): Promise<void> {
