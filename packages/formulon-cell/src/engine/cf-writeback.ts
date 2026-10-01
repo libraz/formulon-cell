@@ -61,6 +61,12 @@ const ENGINE_DATA_BAR_DIRECTIONS = {
   'right-to-left': 2,
 } as const;
 
+const ENGINE_DATA_BAR_AXIS_POSITIONS = {
+  automatic: 0,
+  middle: 1,
+  none: 2,
+} as const;
+
 /** `formulon::cf::CellIsOperator` ordinals. */
 const CELL_IS_OP: Record<string, number> = {
   '<': 0,
@@ -149,15 +155,14 @@ function trackedEntryIndex(
   tracked: SyncedConditionalRule,
 ): number {
   const indexed = currentFormats[tracked.index];
-  if (tracked.id && indexed?.id === tracked.id && entryMatchesInput(indexed, tracked.input)) {
-    return tracked.index;
-  }
   if (tracked.id) {
-    const byId = currentFormats.findIndex(
-      (entry) => entry.id === tracked.id && entryMatchesInput(entry, tracked.input),
-    );
-    if (byId >= 0) return byId;
+    if (indexed?.id === tracked.id) return tracked.index;
+    return currentFormats.findIndex((entry) => entry.id === tracked.id);
   }
+  // A missing id is only safe to resolve against an entry authored by this
+  // session. Imported engine entries have ids even when the tracked snapshot
+  // predates id support; matching their payload could delete user content.
+  if (indexed?.id) return -1;
   return entryMatchesInput(indexed, tracked.input) ? tracked.index : -1;
 }
 
@@ -360,18 +365,49 @@ export function conditionalRuleToEngineInput(rule: ConditionalRule): Conditional
     case 'data-bar': {
       const fill = cssColorToCfColor(rule.color);
       if (!fill) return null;
+      const negativeFill =
+        rule.negativeColor === undefined ? undefined : cssColorToCfColor(rule.negativeColor);
+      const border =
+        rule.borderColor === undefined ? undefined : cssColorToCfColor(rule.borderColor);
+      const negativeBorder =
+        rule.negativeBorderColor === undefined
+          ? undefined
+          : cssColorToCfColor(rule.negativeBorderColor);
+      const axisColor =
+        rule.axisColor === undefined ? undefined : cssColorToCfColor(rule.axisColor);
+      if (
+        (rule.negativeColor !== undefined && negativeFill === null) ||
+        (rule.borderColor !== undefined && border === null) ||
+        (rule.negativeBorderColor !== undefined && negativeBorder === null) ||
+        (rule.axisColor !== undefined && axisColor === null)
+      ) {
+        return null;
+      }
+      const safeNegativeFill = negativeFill ?? undefined;
+      const safeBorder = border ?? undefined;
+      const safeNegativeBorder = negativeBorder ?? undefined;
+      const safeAxisColor = axisColor ?? undefined;
       const direction =
         rule.direction === undefined ? undefined : ENGINE_DATA_BAR_DIRECTIONS[rule.direction];
+      const axisPosition =
+        rule.axisPosition === undefined
+          ? undefined
+          : ENGINE_DATA_BAR_AXIS_POSITIONS[rule.axisPosition];
       return {
         sqref,
         type: RULE_TYPE.dataBar,
         dataBar: {
-          min: { type: VALUE_OBJECT_TYPE.min },
-          max: { type: VALUE_OBJECT_TYPE.max },
+          min: rule.min ? scalePointToCfValueObject(rule.min) : { type: VALUE_OBJECT_TYPE.min },
+          max: rule.max ? scalePointToCfValueObject(rule.max) : { type: VALUE_OBJECT_TYPE.max },
           fill,
           showValue: rule.showValue !== false,
           ...(rule.gradient !== undefined ? { gradient: rule.gradient } : {}),
           ...(direction !== undefined ? { direction } : {}),
+          ...(axisPosition !== undefined ? { axisPosition } : {}),
+          ...(safeNegativeFill !== undefined ? { negativeFill: safeNegativeFill } : {}),
+          ...(safeBorder !== undefined ? { border: safeBorder } : {}),
+          ...(safeNegativeBorder !== undefined ? { negativeBorder: safeNegativeBorder } : {}),
+          ...(safeAxisColor !== undefined ? { axisColor: safeAxisColor } : {}),
         },
       };
     }
@@ -422,7 +458,7 @@ export function syncConditionalRulesToEngine(
   let skipped = 0;
   for (const rule of rules) {
     if (rule.range.sheet !== sheet) continue;
-    if (rule.engineId) continue;
+    if (rule.engineId !== undefined) continue;
     const input = conditionalRuleToEngineInput(rule);
     if (!input) {
       skipped += 1;
@@ -462,7 +498,7 @@ export function syncTrackedConditionalRulesToEngine(
 
   for (const rule of rules) {
     if (rule.range.sheet !== sheet) continue;
-    if (rule.engineId) continue;
+    if (rule.engineId !== undefined) continue;
     const input = conditionalRuleToEngineInput(rule);
     if (!input) {
       skipped += 1;
@@ -504,12 +540,16 @@ export function syncTrackedConditionalRulesToEngine(
     const afterFormats = wb.getConditionalFormats(sheet);
     const index = Math.min(addedIndex, Math.max(0, afterFormats.length - 1));
     const id = afterFormats[index]?.id;
+    const readBack = afterFormats[index];
     written += 1;
     opts.tracked.set(key, {
       sheet,
       index,
       ...(id ? { id } : {}),
-      input,
+      // The engine fills defaults (gte, min/max lengths, icon floors, etc.)
+      // while adding a rule. Keep that normalized snapshot for the no-id
+      // fallback; stable non-empty ids remain authoritative on later edits.
+      input: readBack ? (readBack as unknown as ConditionalFormatInput) : input,
     });
   }
 

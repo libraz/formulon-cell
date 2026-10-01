@@ -281,11 +281,11 @@ describe('attachCfRulesDialog', () => {
     handle.detach();
   });
 
-  it('does not duplicate engine-hydrated store rules in the rules table', () => {
-    const { wb } = fakeWb([rule({ id: 'engine', priority: 1, type: 1 })]);
+  it.each(['engine', ''])('does not duplicate engine-hydrated store rules with id %j', (id) => {
+    const { wb } = fakeWb([rule({ id, priority: 1, type: 1 })]);
     const store = createSpreadsheetStore();
     mutators.addConditionalRule(store, {
-      engineId: 'engine',
+      engineId: id,
       kind: 'cell-value',
       range: { sheet: 0, r0: 0, c0: 0, r1: 4, c1: 0 },
       op: '>',

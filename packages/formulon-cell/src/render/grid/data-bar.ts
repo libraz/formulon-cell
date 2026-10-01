@@ -20,8 +20,19 @@ export function paintDataBar(
   } else {
     ctx.fillStyle = overlay.barColor;
   }
-  ctx.globalAlpha = 0.45;
+  ctx.globalAlpha = 1;
   const x = growsLeft ? endX : axisX;
   ctx.fillRect(x, bounds.y + 1, w, bounds.h - 2);
+  if (overlay.barBorderColor && w > 0) {
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = overlay.barBorderColor;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, bounds.y + 1, w, bounds.h - 2);
+  }
+  if (overlay.barAxisVisible) {
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = overlay.barAxisColor ?? '#000000';
+    ctx.fillRect(axisX - 0.5, bounds.y + 1, 1, bounds.h - 2);
+  }
   ctx.restore();
 }

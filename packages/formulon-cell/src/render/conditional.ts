@@ -35,6 +35,12 @@ export interface ConditionalCellOverlay {
   /** Direction from the zero-axis. Defaults to right. */
   barDirection?: 'left' | 'right';
   barColor?: string;
+  /** Optional sign-specific border colour for the bar rectangle. */
+  barBorderColor?: string;
+  /** Colour of the zero / middle axis when it is visible. */
+  barAxisColor?: string;
+  /** Whether the bar axis should be painted. Explicit false clears lower rules. */
+  barAxisVisible?: boolean;
   barGradient?: boolean;
   /** Icon-set artwork + slot index. When set, the painter draws a small
    *  glyph in a left gutter inside the cell. `slot` is 0-based and
@@ -332,44 +338,92 @@ function paintDataBar(
   out: Map<string, ConditionalCellOverlay>,
 ): void {
   const sheet = state.data.sheetIndex;
-  let min = Number.POSITIVE_INFINITY;
-  let max = Number.NEGATIVE_INFINITY;
+  const values: number[] = [];
   for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
     for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
       const cell = state.data.cells.get(addrKey({ sheet, row: r, col: c }));
       if (cell?.value.kind !== 'number') continue;
-      const v = cell.value.value;
-      if (v < min) min = v;
-      if (v > max) max = v;
+      if (Number.isFinite(cell.value.value)) values.push(cell.value.value);
     }
   }
-  if (!Number.isFinite(min)) return;
-  const positiveDenom = Math.max(max, 1e-9);
-  const negativeDenom = Math.max(Math.abs(min), 1e-9);
+  const sorted = values.slice().sort((a, b) => a - b);
+  if (sorted.length === 0) return;
+  const resolvedMin = resolveScalePoint(rule.min ?? { kind: 'min' }, sorted);
+  const resolvedMax = resolveScalePoint(rule.max ?? { kind: 'max' }, sorted);
+  const min = Number.isFinite(resolvedMin) ? resolvedMin : (sorted[0] ?? 0);
+  const max = Number.isFinite(resolvedMax) ? resolvedMax : (sorted[sorted.length - 1] ?? min);
+  // Automatic endpoints retain the legacy data-bar zero baseline: positive
+  // ranges start at zero and negative ranges end at zero. Explicit endpoints
+  // replace that side of the baseline with the resolved scale point.
+  const hasExplicitMin = rule.min !== undefined && rule.min.kind !== 'min';
+  const hasExplicitMax = rule.max !== undefined && rule.max.kind !== 'max';
+  const axisPosition = rule.axisPosition ?? 'automatic';
+  const lowerBound = axisPosition === 'automatic' && !hasExplicitMin ? Math.min(min, 0) : min;
+  const upperBound = axisPosition === 'automatic' && !hasExplicitMax ? Math.max(max, 0) : max;
+  const low = Math.min(lowerBound, upperBound);
+  const high = Math.max(lowerBound, upperBound);
+  const span = high - low;
+  const hasNegativePopulation = sorted[0] !== undefined && sorted[0] < 0;
+  const lastValue = sorted[sorted.length - 1];
+  const hasPositivePopulation = lastValue !== undefined && lastValue > 0;
   const axis =
-    min < 0 && max > 0
-      ? Math.max(0, Math.min(1, Math.abs(min) / (Math.abs(min) + max)))
-      : max <= 0
-        ? 1
-        : 0;
+    axisPosition === 'middle'
+      ? 0.5
+      : axisPosition === 'none'
+        ? 0
+        : low < 0 && high > 0
+          ? Math.max(0, Math.min(1, Math.abs(low) / (Math.abs(low) + high)))
+          : high <= 0
+            ? 1
+            : 0;
+  const clampToBounds = (value: number): number => Math.max(low, Math.min(high, value));
   for (let r = rule.range.r0; r <= rule.range.r1; r += 1) {
     for (let c = rule.range.c0; c <= rule.range.c1; c += 1) {
       const key = addrKey({ sheet, row: r, col: c });
       const cell = state.data.cells.get(key);
-      if (cell?.value.kind !== 'number') continue;
-      const v = cell.value.value;
+      if (cell?.value.kind !== 'number' || !Number.isFinite(cell.value.value)) continue;
+      const originalValue = cell.value.value;
+      const v = clampToBounds(originalValue);
       const overlay = out.get(key) ?? {};
-      const negative = v < 0;
+      const negative = originalValue < 0;
       const mirror =
         rule.direction === 'right-to-left' ||
         ((rule.direction === undefined || rule.direction === 'context') &&
           state.ui.rightToLeft === true);
-      overlay.bar = negative
-        ? Math.max(0, Math.min(axis, (Math.abs(v) / negativeDenom) * axis))
-        : Math.max(0, Math.min(1 - axis, (v / positiveDenom) * (1 - axis)));
+      const length =
+        axisPosition === 'automatic'
+          ? negative && low < 0 && high > 0
+            ? Math.abs(v) / Math.max(Math.abs(low), 1e-9)
+            : negative
+              ? span === 0
+                ? 0
+                : (high - v) / span
+              : low < 0 && high > 0
+                ? v / Math.max(high, 1e-9)
+                : span === 0
+                  ? 0
+                  : (v - low) / span
+          : span === 0
+            ? 1
+            : Math.max(0, Math.min(1, (v - low) / span));
+      const noneNegative = axisPosition === 'none' && negative;
+      const barSide = noneNegative ? false : negative;
+      overlay.bar = barSide
+        ? Math.max(0, Math.min(axis, length * axis))
+        : Math.max(0, Math.min(1 - axis, length * (1 - axis)));
       overlay.barAxis = mirror ? 1 - axis : axis;
-      overlay.barDirection = negative !== mirror ? 'left' : 'right';
-      overlay.barColor = rule.color;
+      overlay.barDirection = barSide !== mirror ? 'left' : 'right';
+      overlay.barColor =
+        negative && rule.negativeColor !== undefined ? rule.negativeColor : rule.color;
+      overlay.barBorderColor = negative ? rule.negativeBorderColor : rule.borderColor;
+      overlay.barAxisColor = rule.axisColor ?? '#000000';
+      overlay.barAxisVisible =
+        axisPosition === 'middle' ||
+        (axisPosition === 'automatic' &&
+          hasNegativePopulation &&
+          hasPositivePopulation &&
+          axis > 0 &&
+          axis < 1);
       overlay.barGradient = rule.gradient === true;
       overlay.showValue = rule.showValue !== false;
       out.set(key, overlay);
@@ -801,6 +855,9 @@ function mergeOverlayByPriority(
     target.barAxis = source.barAxis;
     target.barDirection = source.barDirection;
     target.barColor = source.barColor;
+    target.barBorderColor = source.barBorderColor;
+    target.barAxisColor = source.barAxisColor;
+    target.barAxisVisible = source.barAxisVisible;
     target.barGradient = source.barGradient;
   }
   if (target.iconKind === undefined && source.iconKind !== undefined) {

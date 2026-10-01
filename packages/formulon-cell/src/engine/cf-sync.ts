@@ -62,6 +62,9 @@ const VALUE_OBJECT_TYPE = {
 const ENGINE_DATA_BAR_DIRECTIONS = ['context', 'left-to-right', 'right-to-left'] as const;
 type DataBarDirection = (typeof ENGINE_DATA_BAR_DIRECTIONS)[number];
 
+const ENGINE_DATA_BAR_AXIS_POSITIONS = ['automatic', 'middle', 'none'] as const;
+type DataBarAxisPosition = (typeof ENGINE_DATA_BAR_AXIS_POSITIONS)[number];
+
 const ENGINE_CELL_IS_OP: Record<number, Extract<ConditionalRule, { kind: 'cell-value' }>['op']> = {
   0: '<',
   1: '<=',
@@ -80,6 +83,14 @@ const rgba = (c: { r: number; g: number; b: number; a: number }): string =>
     ? `rgb(${c.r}, ${c.g}, ${c.b})`
     : `rgba(${c.r}, ${c.g}, ${c.b}, ${(c.a / 255).toFixed(3)})`;
 
+const sameColor = (
+  a: { r: number; g: number; b: number; a: number },
+  b: { r: number; g: number; b: number; a: number },
+): boolean => a.r === b.r && a.g === b.g && a.b === b.b && a.a === b.a;
+
+const isOpaqueBlack = (c: { r: number; g: number; b: number; a: number }): boolean =>
+  c.r === 0 && c.g === 0 && c.b === 0 && c.a === 255;
+
 const engineIconSet = (ordinal: number): ConditionalIconSet | null =>
   Number.isInteger(ordinal) && ordinal >= 0 && ordinal < ENGINE_ICON_SETS.length
     ? (ENGINE_ICON_SETS[ordinal] ?? null)
@@ -88,6 +99,11 @@ const engineIconSet = (ordinal: number): ConditionalIconSet | null =>
 const engineDataBarDirection = (ordinal: number): DataBarDirection | undefined =>
   Number.isInteger(ordinal) && ordinal >= 0 && ordinal < ENGINE_DATA_BAR_DIRECTIONS.length
     ? ENGINE_DATA_BAR_DIRECTIONS[ordinal]
+    : undefined;
+
+const engineDataBarAxisPosition = (ordinal: number): DataBarAxisPosition | undefined =>
+  Number.isInteger(ordinal) && ordinal >= 0 && ordinal < ENGINE_DATA_BAR_AXIS_POSITIONS.length
+    ? ENGINE_DATA_BAR_AXIS_POSITIONS[ordinal]
     : undefined;
 
 function engineScalePoint(
@@ -123,6 +139,98 @@ const rangesOf = (sheet: number, entry: ConditionalFormatEntry): ConditionalRule
     r1: range.lastRow,
     c1: range.lastCol,
   }));
+
+type EngineRange = { firstRow: number; firstCol: number; lastRow: number; lastCol: number };
+
+const validEngineRange = (range: unknown): EngineRange | null => {
+  if (range === null || typeof range !== 'object') return null;
+  const candidate = range as {
+    firstRow?: unknown;
+    firstCol?: unknown;
+    lastRow?: unknown;
+    lastCol?: unknown;
+  };
+  if (
+    !Number.isInteger(candidate.firstRow) ||
+    !Number.isInteger(candidate.firstCol) ||
+    !Number.isInteger(candidate.lastRow) ||
+    !Number.isInteger(candidate.lastCol)
+  ) {
+    return null;
+  }
+  const firstRow = candidate.firstRow as number;
+  const firstCol = candidate.firstCol as number;
+  const lastRow = candidate.lastRow as number;
+  const lastCol = candidate.lastCol as number;
+  return firstRow <= lastRow && firstCol <= lastCol
+    ? { firstRow, firstCol, lastRow, lastCol }
+    : null;
+};
+
+const rangeContainsCell = (range: unknown, row: number, col: number): boolean => {
+  const candidate = validEngineRange(range);
+  return (
+    candidate !== null &&
+    row >= candidate.firstRow &&
+    row <= candidate.lastRow &&
+    col >= candidate.firstCol &&
+    col <= candidate.lastCol
+  );
+};
+
+const entryContainsCell = (entry: ConditionalFormatEntry, row: number, col: number): boolean =>
+  Array.isArray(entry.sqref) && entry.sqref.some((range) => rangeContainsCell(range, row, col));
+
+/** Resolve one engine data-bar payload for a match. A priority is preferred,
+ * but the containing range is a safe fallback for older match projections
+ * that omit or renumber priority. Ambiguous or malformed metadata is ignored
+ * so it cannot override authoritative per-cell match colours. */
+function dataBarMetadataForCell(
+  entries: readonly ConditionalFormatEntry[],
+  priority: number,
+  row: number,
+  col: number,
+): ConditionalFormatEntry['dataBar'] | undefined {
+  const candidates = entries.filter(
+    (entry) => entry.type === ENGINE_RULE_TYPE.dataBar && entry.dataBar,
+  );
+  const containing = candidates.filter((entry) => entryContainsCell(entry, row, col));
+  if (containing.length === 0) return undefined;
+  const byPriority = Number.isFinite(priority)
+    ? containing.filter((entry) => entry.priority === priority)
+    : [];
+  if (byPriority.length === 1) return byPriority[0]?.dataBar;
+  if (byPriority.length > 1) return undefined;
+  return containing.length === 1 ? containing[0]?.dataBar : undefined;
+}
+
+function dataBarHasMixedPopulation(
+  wb: WorkbookHandle,
+  sheet: number,
+  entry: ConditionalFormatEntry | undefined,
+): boolean | undefined {
+  if (!entry || !Array.isArray(entry.sqref)) return undefined;
+  const ranges = entry.sqref.map(validEngineRange);
+  if (ranges.some((range) => range === null)) return undefined;
+  const validRanges = ranges as EngineRange[];
+  if (typeof wb.physicalCells === 'function') {
+    let hasNegative = false;
+    let hasPositive = false;
+    for (const cell of wb.physicalCells(sheet)) {
+      if (
+        cell.value.kind !== 'number' ||
+        !Number.isFinite(cell.value.value) ||
+        !validRanges.some((range) => rangeContainsCell(range, cell.addr.row, cell.addr.col))
+      )
+        continue;
+      hasNegative ||= cell.value.value < 0;
+      hasPositive ||= cell.value.value > 0;
+      if (hasNegative && hasPositive) return true;
+    }
+    return false;
+  }
+  return undefined;
+}
 
 function dxfToApply(wb: WorkbookHandle, dxfId: number | undefined): Partial<CellFormat> {
   if (dxfId === undefined || !wb.capabilities.conditionalFormatDxf) return {};
@@ -264,12 +372,34 @@ function engineConditionalFormatToRules(
     } else if (entry.type === ENGINE_RULE_TYPE.dataBar) {
       if (!entry.dataBar) continue;
       const direction = engineDataBarDirection(entry.dataBar.direction);
+      const min = entry.dataBar.min
+        ? engineScalePoint(entry.dataBar.min)
+        : { kind: 'min' as const };
+      const max = entry.dataBar.max
+        ? engineScalePoint(entry.dataBar.max)
+        : { kind: 'max' as const };
+      const fillColor = entry.dataBar.fill;
+      const negativeFill = entry.dataBar.negativeFill;
+      const border = entry.dataBar.border;
+      const negativeBorder = entry.dataBar.negativeBorder;
+      const axisPosition = engineDataBarAxisPosition(entry.dataBar.axisPosition ?? 0);
       out.push({
         ...common,
         kind: 'data-bar',
         range,
-        color: rgba(entry.dataBar.fill),
+        color: rgba(fillColor),
         showValue: entry.dataBar.showValue !== false,
+        ...(min.kind !== 'min' || min.gte === false ? { min } : {}),
+        ...(max.kind !== 'max' || max.gte === false ? { max } : {}),
+        ...(axisPosition && axisPosition !== 'automatic' ? { axisPosition } : {}),
+        ...(negativeFill && !sameColor(negativeFill, fillColor)
+          ? { negativeColor: rgba(negativeFill) }
+          : {}),
+        ...(border ? { borderColor: rgba(border) } : {}),
+        ...(negativeBorder ? { negativeBorderColor: rgba(negativeBorder) } : {}),
+        ...(entry.dataBar.axisColor && !isOpaqueBlack(entry.dataBar.axisColor)
+          ? { axisColor: rgba(entry.dataBar.axisColor) }
+          : {}),
         ...(direction ? { direction } : {}),
         ...(entry.dataBar.gradient !== undefined ? { gradient: entry.dataBar.gradient } : {}),
       });
@@ -316,7 +446,7 @@ export function hydrateConditionalRulesFromEngine(
     .flatMap((entry) => engineConditionalFormatToRules(wb, sheet, entry));
   store.setState((state) => {
     const rules = state.conditional.rules.filter(
-      (rule) => rule.range.sheet !== sheet || !rule.engineId,
+      (rule) => rule.range.sheet !== sheet || rule.engineId === undefined,
     );
     return { ...state, conditional: { rules: [...rules, ...importedRules] } };
   });
@@ -345,43 +475,97 @@ export function evaluateCfFromEngine(
   if (!wb.capabilities.conditionalFormat) return out;
   const sheetRtl =
     typeof wb.getSheetView === 'function' && wb.getSheetView(sheet)?.rightToLeft === true;
+  const metadataEntries =
+    typeof wb.getConditionalFormats === 'function' ? wb.getConditionalFormats(sheet) : [];
+  const negativePopulationCache = new Map<ConditionalFormatEntry, boolean | undefined>();
   const cells = wb.evaluateCfRange(sheet, firstRow, firstCol, lastRow, lastCol, todaySerial);
   for (const cell of cells) {
     const key = addrKey({ sheet, row: cell.row, col: cell.col });
     const overlay: ConditionalCellOverlay = out.get(key) ?? {};
+    let dataBarDefined = false;
     // Iterate matches in priority order — engine returns them sorted by
-    // priority, so later writes win for fields like `fill` (regular CF
-    // semantics: highest priority match overrides).
+    // priority. The C API uses first-defined semantics: a lower-priority
+    // match may fill a visual property the higher-priority match omitted, but
+    // it cannot overwrite one that was already set.
     for (const m of cell.matches) {
       if (m.kind === KIND_COLOR_SCALE) {
-        overlay.fill = rgba(m.color);
+        if (overlay.fill === undefined) overlay.fill = rgba(m.color);
       } else if (m.kind === KIND_DATA_BAR) {
+        // A data bar is one atomic visual property. In particular, an
+        // omitted border on the first bar is authoritative and must clear a
+        // lower-priority bar's border rather than inherit it.
+        if (dataBarDefined) continue;
+        dataBarDefined = true;
         // The engine reports length as a fraction of the axis's signed side;
         // the canvas overlay stores a fraction of the full cell width.
         const rawLength = Math.max(0, Math.min(1, m.barLengthPct / 100));
         const axis = Math.max(0, Math.min(1, m.barAxisPositionPct / 100));
         const negative = m.barIsNegative === true;
-        overlay.bar = rawLength * (negative ? axis : 1 - axis);
+        const metadata = dataBarMetadataForCell(metadataEntries, m.priority, cell.row, cell.col);
+        const axisPosition = metadata
+          ? (engineDataBarAxisPosition(metadata.axisPosition ?? 0) ?? 'automatic')
+          : undefined;
+        const matchingEntry = metadata
+          ? metadataEntries.find(
+              (entry) => entry.type === ENGINE_RULE_TYPE.dataBar && entry.dataBar === metadata,
+            )
+          : undefined;
+        const noneNegative = axisPosition === 'none' && negative;
+        overlay.bar = rawLength * (noneNegative || !negative ? 1 - axis : axis);
         const direction =
           'barDirection' in m && typeof m.barDirection === 'number' ? m.barDirection : 0;
         const mirror = direction === 2 || (direction === 0 && sheetRtl);
         overlay.barAxis = mirror ? 1 - axis : axis;
-        const baseDirection = negative ? 'left' : 'right';
+        const baseDirection = noneNegative || !negative ? 'right' : 'left';
         overlay.barDirection = mirror
           ? baseDirection === 'left'
             ? 'right'
             : 'left'
           : baseDirection;
         overlay.barColor = rgba(m.barFill);
+        overlay.barBorderColor = m.barBorderEngaged ? rgba(m.barBorder) : undefined;
+        if (metadata) {
+          overlay.barAxisColor = metadata.axisColor ? rgba(metadata.axisColor) : '#000000';
+          if (axisPosition === 'none') {
+            overlay.barAxisVisible = false;
+          } else if (axisPosition === 'middle') {
+            overlay.barAxisVisible = true;
+          } else if (matchingEntry) {
+            if (axis > 0 && axis < 1) {
+              if (!negativePopulationCache.has(matchingEntry)) {
+                negativePopulationCache.set(
+                  matchingEntry,
+                  dataBarHasMixedPopulation(wb, sheet, matchingEntry),
+                );
+              }
+              const hasMixedPopulation = negativePopulationCache.get(matchingEntry);
+              // Keep the local overlay's population-aware flag when the
+              // engine cannot inspect the rule's full population.
+              if (hasMixedPopulation !== undefined) {
+                overlay.barAxisVisible = hasMixedPopulation;
+              }
+            } else {
+              overlay.barAxisVisible = false;
+            }
+          }
+        }
         overlay.barGradient = m.barGradient;
       } else if (m.kind === KIND_ICON_SET) {
         const iconKind = engineIconSet(m.iconSetName);
-        if (iconKind) {
+        if (iconKind && overlay.iconKind === undefined) {
           overlay.iconKind = iconKind;
           overlay.iconSlot = Math.max(0, Math.min(iconSetSlotCount(iconKind) - 1, m.iconIndex));
         }
       } else if (m.dxfIdEngaged) {
-        Object.assign(overlay, dxfToOverlay(wb, m.dxfId));
+        const dxf = dxfToOverlay(wb, m.dxfId);
+        if (overlay.fill === undefined && dxf.fill !== undefined) overlay.fill = dxf.fill;
+        if (overlay.color === undefined && dxf.color !== undefined) overlay.color = dxf.color;
+        if (overlay.bold === undefined && dxf.bold !== undefined) overlay.bold = dxf.bold;
+        if (overlay.italic === undefined && dxf.italic !== undefined) overlay.italic = dxf.italic;
+        if (overlay.underline === undefined && dxf.underline !== undefined) {
+          overlay.underline = dxf.underline;
+        }
+        if (overlay.strike === undefined && dxf.strike !== undefined) overlay.strike = dxf.strike;
       }
     }
     if (Object.keys(overlay).length > 0) out.set(key, overlay);

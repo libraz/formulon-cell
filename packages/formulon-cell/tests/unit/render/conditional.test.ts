@@ -158,6 +158,209 @@ describe('evaluateConditional', () => {
     expect(overlay.get('0:0:2')?.bar).toBeCloseTo(2 / 3);
   });
 
+  it('exposes data-bar appearance metadata and clears omitted borders', () => {
+    const store = createSpreadsheetStore();
+    let s = seedNumber(store.getState(), 0, 0, -10);
+    s = seedNumber(s, 0, 1, 20);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'data-bar',
+            range: { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 },
+            color: '#70ad47',
+          },
+          {
+            kind: 'data-bar',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+            color: '#0078d4',
+            negativeColor: '#c00000',
+            borderColor: '#1f1f1f',
+            negativeBorderColor: '#7f0000',
+            axisColor: '#404040',
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+    expect(overlay.get('0:0:0')).toMatchObject({
+      barColor: '#c00000',
+      barBorderColor: '#7f0000',
+      barAxisColor: '#404040',
+      barAxisVisible: true,
+    });
+    // The higher-priority first rule has no border, so its explicit
+    // undefined metadata must not inherit the lower rule's border.
+    expect(overlay.get('0:0:1')).toMatchObject({
+      barColor: '#70ad47',
+      barBorderColor: undefined,
+    });
+  });
+
+  it('uses whole-range engine lengths for middle and none axes', () => {
+    const store = createSpreadsheetStore();
+    let s = seedNumber(store.getState(), 0, 0, -10);
+    s = seedNumber(s, 0, 1, -5);
+    s = seedNumber(s, 0, 2, 20);
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'data-bar',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+            color: '#0078d4',
+            axisPosition: 'middle',
+          },
+        ],
+      },
+    };
+
+    const middle = evaluateConditional(s);
+    expect(middle.get('0:0:0')).toMatchObject({
+      bar: 0,
+      barAxis: 0.5,
+      barDirection: 'left',
+      barAxisVisible: true,
+    });
+    expect(middle.get('0:0:1')?.bar).toBeCloseTo(1 / 12);
+    expect(middle.get('0:0:2')).toMatchObject({
+      bar: 0.5,
+      barAxis: 0.5,
+      barDirection: 'right',
+    });
+
+    let positiveOnly = seedNumber(store.getState(), 0, 0, 10);
+    positiveOnly = seedNumber(positiveOnly, 0, 1, 20);
+    const positiveMiddle = evaluateConditional({
+      ...positiveOnly,
+      conditional: {
+        rules: [
+          {
+            kind: 'data-bar',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+            color: '#0078d4',
+            axisPosition: 'middle',
+          },
+        ],
+      },
+    });
+    expect(positiveMiddle.get('0:0:1')?.barAxisVisible).toBe(true);
+
+    let negativeOnly = seedNumber(store.getState(), 0, 0, -20);
+    negativeOnly = seedNumber(negativeOnly, 0, 1, -10);
+    const negativeMiddle = evaluateConditional({
+      ...negativeOnly,
+      conditional: {
+        rules: [
+          {
+            kind: 'data-bar',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+            color: '#0078d4',
+            axisPosition: 'middle',
+          },
+        ],
+      },
+    });
+    expect(negativeMiddle.get('0:0:1')?.barAxisVisible).toBe(true);
+
+    const none = evaluateConditional({
+      ...s,
+      conditional: {
+        rules: [
+          {
+            kind: 'data-bar',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+            color: '#0078d4',
+            axisPosition: 'none',
+          },
+        ],
+      },
+    });
+    expect(none.get('0:0:0')).toMatchObject({
+      bar: 0,
+      barAxis: 0,
+      barDirection: 'right',
+      barAxisVisible: false,
+    });
+    expect(none.get('0:0:1')).toMatchObject({
+      bar: 1 / 6,
+      barAxis: 0,
+      barDirection: 'right',
+    });
+    expect(none.get('0:0:2')).toMatchObject({
+      bar: 1,
+      barAxis: 0,
+      barDirection: 'right',
+    });
+  });
+
+  it('hides automatic axes without a mixed-sign population and mirrors none bars in RTL', () => {
+    const store = createSpreadsheetStore();
+    let s = seedNumber(store.getState(), 0, 0, -20);
+    s = seedNumber(s, 0, 1, -10);
+    const automatic = evaluateConditional({
+      ...s,
+      conditional: {
+        rules: [
+          {
+            kind: 'data-bar',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+            color: '#0078d4',
+          },
+        ],
+      },
+    });
+    expect(automatic.get('0:0:0')?.barAxisVisible).toBe(false);
+    expect(automatic.get('0:0:1')?.barAxisVisible).toBe(false);
+
+    const rtl = evaluateConditional({
+      ...s,
+      ui: { ...s.ui, rightToLeft: true },
+      conditional: {
+        rules: [
+          {
+            kind: 'data-bar',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+            color: '#0078d4',
+            axisPosition: 'none',
+          },
+        ],
+      },
+    });
+    expect(rtl.get('0:0:1')).toMatchObject({ barAxis: 1, barDirection: 'left' });
+    expect(rtl.get('0:0:0')).toMatchObject({ barAxis: 1, barDirection: 'left' });
+  });
+
+  it('hides an automatic axis when explicit bounds cross zero without mixed-sign values', () => {
+    const store = createSpreadsheetStore();
+    let s = seedNumber(store.getState(), 0, 0, 10);
+    s = seedNumber(s, 0, 1, 20);
+    const overlay = evaluateConditional({
+      ...s,
+      conditional: {
+        rules: [
+          {
+            kind: 'data-bar',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+            color: '#0078d4',
+            min: { kind: 'number', value: -10 },
+            max: { kind: 'number', value: 30 },
+          },
+        ],
+      },
+    });
+    expect(overlay.get('0:0:0')).toMatchObject({
+      barAxis: 0.25,
+      barAxisVisible: false,
+    });
+    expect(overlay.get('0:0:1')?.barAxisVisible).toBe(false);
+  });
+
   it('mirrors explicit data-bar direction and invalidates on sheet RTL changes', () => {
     const store = createSpreadsheetStore();
     let s = store.getState();
@@ -192,6 +395,200 @@ describe('evaluateConditional', () => {
     expect(rtlOverlay.get('0:0:0')?.barDirection).toBe('right');
     expect(rtlOverlay.get('0:0:1')?.barAxis).toBeCloseTo(2 / 3);
     expect(rtlOverlay.get('0:0:1')?.barDirection).toBe('left');
+  });
+
+  it('resolves and clamps numeric data-bar endpoints while honoring RTL direction', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    [0, 20, 50, 80, 100].forEach((value, col) => {
+      s = seedNumber(s, 0, col, value);
+    });
+    s = {
+      ...s,
+      ui: { ...s.ui, rightToLeft: false },
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'data-bar',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 4 },
+            color: '#70ad47',
+            min: { kind: 'number', value: 20 },
+            max: { kind: 'number', value: 80 },
+            direction: 'right-to-left',
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:0')).toMatchObject({
+      bar: 0,
+      barAxis: 1,
+      barDirection: 'left',
+    });
+    expect(overlay.get('0:0:1')?.bar).toBe(0);
+    expect(overlay.get('0:0:2')?.bar).toBeCloseTo(0.5);
+    expect(overlay.get('0:0:3')?.bar).toBe(1);
+    expect(overlay.get('0:0:4')?.bar).toBe(1);
+  });
+
+  it('resolves percentile data-bar endpoints against the sorted range', () => {
+    const store = createSpreadsheetStore();
+    let s = store.getState();
+    [0, 20, 40, 60, 80].forEach((value, col) => {
+      s = seedNumber(s, 0, col, value);
+    });
+    s = {
+      ...s,
+      conditional: {
+        ...s.conditional,
+        rules: [
+          {
+            kind: 'data-bar',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 4 },
+            color: '#70ad47',
+            min: { kind: 'percentile', value: 25 },
+            max: { kind: 'percentile', value: 75 },
+          },
+        ],
+      },
+    };
+
+    const overlay = evaluateConditional(s);
+
+    expect(overlay.get('0:0:0')?.bar).toBe(0);
+    expect(overlay.get('0:0:1')?.bar).toBe(0);
+    expect(overlay.get('0:0:2')?.bar).toBeCloseTo(0.5);
+    expect(overlay.get('0:0:3')?.bar).toBe(1);
+    expect(overlay.get('0:0:4')?.bar).toBe(1);
+  });
+
+  it.each([
+    ['percent', 'percent', 'left-to-right', 0],
+    ['percentile', 'percent', 'right-to-left', 0.2461538462],
+    ['percent', 'percentile', 'right-to-left', 0],
+    ['number', 'percent', 'context', 0.2032520325],
+    ['number', 'number', 'right-to-left', 1 / 6],
+    ['number', 'percentile', 'right-to-left', 0.3424657534],
+    ['percent', 'number', 'context', 0],
+    ['percentile', 'number', 'left-to-right', 0.2038216561],
+    ['number', 'percentile', 'left-to-right', 0.3424657534],
+    ['percentile', 'percent', 'context', 0.2461538462],
+    ['percentile', 'percentile', 'context', 0.4],
+  ] as const)(
+    'covers data-bar endpoint kind and direction combinations (%s/%s/%s)',
+    (minKind, maxKind, direction, expectedBar) => {
+      const endpointValues = {
+        number: { min: 20, max: 80 },
+        percent: { min: 26, max: 74 },
+        percentile: { min: 18, max: 66 },
+      } as const;
+      const store = createSpreadsheetStore();
+      let s = store.getState();
+      [10, 30, 90].forEach((value, col) => {
+        s = seedNumber(s, 0, col, value);
+      });
+      s = {
+        ...s,
+        ui: { ...s.ui, rightToLeft: false },
+        conditional: {
+          ...s.conditional,
+          rules: [
+            {
+              kind: 'data-bar',
+              range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 2 },
+              color: '#70ad47',
+              min: { kind: minKind, value: endpointValues[minKind].min },
+              max: { kind: maxKind, value: endpointValues[maxKind].max },
+              direction,
+            },
+          ],
+        },
+      };
+
+      const overlay = evaluateConditional(s);
+      const mirrored = direction === 'right-to-left';
+      expect(overlay.get('0:0:1')).toMatchObject({
+        barAxis: mirrored ? 1 : 0,
+        barDirection: mirrored ? 'left' : 'right',
+      });
+      expect(overlay.get('0:0:1')?.bar).toBeCloseTo(expectedBar, 8);
+    },
+  );
+
+  it('keeps automatic data-bar zero baselines when endpoints are omitted', () => {
+    const store = createSpreadsheetStore();
+    let positive = store.getState();
+    [10, 20].forEach((value, col) => {
+      positive = seedNumber(positive, 0, col, value);
+    });
+    positive = {
+      ...positive,
+      conditional: {
+        ...positive.conditional,
+        rules: [
+          {
+            kind: 'data-bar',
+            range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+            color: '#70ad47',
+          },
+        ],
+      },
+    };
+    const positiveOverlay = evaluateConditional(positive);
+    expect(positiveOverlay.get('0:0:0')?.bar).toBeCloseTo(0.5);
+    expect(positiveOverlay.get('0:0:1')?.bar).toBe(1);
+
+    let negative = seedNumber(positive, 0, 0, -20);
+    negative = seedNumber(negative, 0, 1, -10);
+    const negativeOverlay = evaluateConditional(negative);
+    expect(negativeOverlay.get('0:0:0')?.bar).toBe(1);
+    expect(negativeOverlay.get('0:0:1')?.bar).toBeCloseTo(0.5);
+  });
+
+  it.each([10, -10, 0])('preserves automatic endpoints for equal-valued ranges (%s)', (value) => {
+    let s = createSpreadsheetStore().getState();
+    s = seedNumber(s, 0, 0, value);
+    s = seedNumber(s, 0, 1, value);
+    const rule: Extract<ConditionalRule, { kind: 'data-bar' }> = {
+      kind: 'data-bar',
+      range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+      color: '#70ad47',
+    };
+    const implicit = evaluateConditional({ ...s, conditional: { rules: [rule] } });
+    const explicit = evaluateConditional({
+      ...s,
+      conditional: { rules: [{ ...rule, min: { kind: 'min' }, max: { kind: 'max' } }] },
+    });
+    for (const overlay of [implicit, explicit]) {
+      expect(overlay.get('0:0:0')?.bar).toBe(value === 0 ? 0 : 1);
+      expect(overlay.get('0:0:1')?.bar).toBe(value === 0 ? 0 : 1);
+    }
+    expect(explicit).toEqual(implicit);
+  });
+
+  it('excludes non-finite values from data-bar bounds and overlays', () => {
+    let s = createSpreadsheetStore().getState();
+    [10, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 20].forEach(
+      (value, col) => {
+        s = seedNumber(s, 0, col, value);
+      },
+    );
+    const overlay = evaluateConditional({
+      ...s,
+      conditional: {
+        rules: [
+          { kind: 'data-bar', range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 4 }, color: '#70ad47' },
+        ],
+      },
+    });
+    expect(overlay.get('0:0:0')?.bar).toBe(0.5);
+    expect(overlay.get('0:0:4')?.bar).toBe(1);
+    expect(overlay.has('0:0:1')).toBe(false);
+    expect(overlay.has('0:0:2')).toBe(false);
+    expect(overlay.has('0:0:3')).toBe(false);
   });
 
   it('returns the same Map reference when called twice with identical state', () => {

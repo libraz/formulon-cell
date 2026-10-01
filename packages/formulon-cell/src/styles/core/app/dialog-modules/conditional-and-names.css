@@ -306,6 +306,21 @@
   .fc-conddlg__form .fc-fmtdlg__row {
     grid-template-columns: 128px minmax(0, 1fr);
   }
+  .fc-conddlg__form .fc-fmtdlg__row.fc-conddlg__icon-threshold-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 54px minmax(0, 1fr) 50px;
+    gap: 8px;
+  }
+  .fc-conddlg__icon-threshold-row > span:first-child {
+    min-width: 0;
+  }
+  .fc-conddlg__icon-threshold-row > input,
+  .fc-conddlg__icon-threshold-row > select,
+  .fc-conddlg__icon-threshold-row > .fc-select {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
   .fc-conddlg__style-row {
     padding-bottom: 8px;
     border-bottom: 1px solid var(--fc-rule-subtle);
@@ -334,6 +349,25 @@
   }
   .fc-conddlg__sub[hidden] {
     display: none;
+  }
+  /* The mobile format-dialog rules are imported before this module. Repeat
+     the edit layout here so the conditional dialog's desktop grid does not
+     leave a blank first column or push controls past the viewport. */
+  @media (max-width: 560px) {
+    .fc-conddlg__body--edit {
+      display: flex;
+      flex-direction: column;
+    }
+    .fc-conddlg__body--edit .fc-conddlg__form-legend,
+    .fc-conddlg__body--edit .fc-conddlg__list,
+    .fc-conddlg__body--edit .fc-conddlg__clear,
+    .fc-conddlg__body--edit .fc-conddlg__form {
+      grid-column: auto;
+      grid-row: auto;
+    }
+    .fc-conddlg__body--edit .fc-conddlg__form .fc-fmtdlg__row {
+      grid-template-columns: 1fr;
+    }
   }
   .fc-conddlg__addrow {
     justify-content: flex-end;

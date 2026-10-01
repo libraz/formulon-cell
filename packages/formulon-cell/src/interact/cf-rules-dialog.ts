@@ -474,7 +474,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       .filter(
         ({ rule }) =>
           rule.range.sheet === sheet &&
-          !rule.engineId &&
+          rule.engineId === undefined &&
           (!scopeSelection ||
             rangesIntersect(scopeSelection, {
               firstRow: rule.range.r0,

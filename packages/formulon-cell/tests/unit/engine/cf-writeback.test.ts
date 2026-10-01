@@ -245,6 +245,51 @@ describe('conditionalRuleToEngineInput (H-13)', () => {
     });
   });
 
+  it('writes data-bar axis and sign-specific appearance fields', () => {
+    expect(
+      conditionalRuleToEngineInput({
+        kind: 'data-bar',
+        range,
+        color: '#0078d4',
+        axisPosition: 'middle',
+        negativeColor: '#c00000',
+        borderColor: '#1f1f1f',
+        negativeBorderColor: '#7f0000',
+        axisColor: '#404040',
+      }),
+    ).toMatchObject({
+      type: 3,
+      dataBar: {
+        axisPosition: 1,
+        fill: { a: 255, r: 0, g: 120, b: 212 },
+        negativeFill: { a: 255, r: 192, g: 0, b: 0 },
+        border: { a: 255, r: 31, g: 31, b: 31 },
+        negativeBorder: { a: 255, r: 127, g: 0, b: 0 },
+        axisColor: { a: 255, r: 64, g: 64, b: 64 },
+      },
+    });
+  });
+
+  it('writes custom data-bar endpoints with their scale-point kinds', () => {
+    expect(
+      conditionalRuleToEngineInput({
+        kind: 'data-bar',
+        range,
+        color: '#0078d4',
+        min: { kind: 'number', value: 20, gte: false },
+        max: { kind: 'percentile', value: 80, gte: true },
+        direction: 'right-to-left',
+      }),
+    ).toMatchObject({
+      type: 3,
+      dataBar: {
+        min: { type: 0, value: '20', gte: false },
+        max: { type: 2, value: '80', gte: true },
+        direction: 2,
+      },
+    });
+  });
+
   it('preserves strict icon floor and threshold comparisons', () => {
     expect(
       conditionalRuleToEngineInput({
@@ -353,6 +398,17 @@ describe('syncConditionalRulesToEngine (H-13)', () => {
     expect(added).toEqual([{ sheet: 0, type: 7 }]);
   });
 
+  it('does not add imported rules whose engine id is the empty sentinel', () => {
+    const { wb, added } = fakeWb(true);
+    const rules: ConditionalRule[] = [
+      { engineId: '', kind: 'cell-value', range, op: '>', a: 10, apply: {} },
+      { kind: 'text-contains', range, text: 'x', apply: {} },
+    ];
+
+    expect(syncConditionalRulesToEngine(wb, rules, 0)).toEqual({ written: 1, skipped: 0 });
+    expect(added).toEqual([{ sheet: 0, type: 7 }]);
+  });
+
   it('persists apply formatting through a dxfId when the engine supports dxfs', () => {
     const addedDxf: unknown[] = [];
     const addedRules: unknown[] = [];
@@ -447,6 +503,99 @@ describe('syncTrackedConditionalRulesToEngine (H-13)', () => {
     return { wb, formats };
   };
 
+  it('removes stale tracked rules by stable id after engine payload normalization', () => {
+    const rule: ConditionalRule = {
+      kind: 'data-bar',
+      range,
+      color: '#0078d4',
+      min: { kind: 'number', value: 20 },
+      max: { kind: 'number', value: 80 },
+      direction: 'right-to-left',
+    };
+    const input = conditionalRuleToEngineInput(rule);
+    if (!input) throw new Error('Expected data-bar input');
+    const formats = [
+      {
+        id: 'session-data-bar',
+        type: 3,
+        priority: 1,
+        stopIfTrue: false,
+        sqref,
+        dataBar: {
+          min: { type: 0, value: '20', gte: true },
+          max: { type: 0, value: '80', gte: true },
+          fill: { a: 255, r: 0, g: 120, b: 212 },
+          showValue: true,
+          minLengthPct: 10,
+          maxLengthPct: 90,
+          gradient: true,
+          direction: 2,
+        },
+      },
+    ];
+    const removeConditionalFormatAt = vi.fn((_: number, index: number) => {
+      if (index < 0 || index >= formats.length) return false;
+      formats.splice(index, 1);
+      return true;
+    });
+    const wb = {
+      capabilities: { conditionalFormatMutate: true },
+      getConditionalFormats: vi.fn(() => formats.slice()),
+      removeConditionalFormatAt,
+    } as unknown as WorkbookHandle;
+    const tracked: SyncedConditionalRuleMap = new Map([
+      ['stale-key', { sheet: 0, index: 0, id: 'session-data-bar', input }],
+    ]);
+
+    expect(syncTrackedConditionalRulesToEngine(wb, [], 0, { tracked })).toEqual({
+      written: 0,
+      skipped: 0,
+      removed: 1,
+    });
+    expect(removeConditionalFormatAt).toHaveBeenCalledWith(0, 0);
+    expect(formats).toHaveLength(0);
+  });
+
+  it('does not remove an untracked rule when a tracked entry has no stable id', () => {
+    const rule: ConditionalRule = {
+      kind: 'cell-value',
+      range,
+      op: '>',
+      a: 10,
+      apply: {},
+    };
+    const input = conditionalRuleToEngineInput(rule);
+    if (!input) throw new Error('Expected cell-value input');
+    const formats = [
+      {
+        id: 'untracked',
+        type: 1,
+        priority: 1,
+        stopIfTrue: false,
+        sqref,
+        op: 5,
+        formula1: '10',
+      },
+    ];
+    const removeConditionalFormatAt = vi.fn(() => true);
+    const wb = {
+      capabilities: { conditionalFormatMutate: true },
+      getConditionalFormats: vi.fn(() => formats.slice()),
+      removeConditionalFormatAt,
+    } as unknown as WorkbookHandle;
+    const tracked: SyncedConditionalRuleMap = new Map([
+      ['stale-key', { sheet: 0, index: 0, input }],
+    ]);
+
+    expect(syncTrackedConditionalRulesToEngine(wb, [], 0, { tracked })).toEqual({
+      written: 0,
+      skipped: 1,
+      removed: 0,
+    });
+    expect(removeConditionalFormatAt).not.toHaveBeenCalled();
+    expect(formats).toHaveLength(1);
+  });
+
   it('removes only session-tracked engine rules that disappeared from the store', () => {
     const { wb, formats } = trackedWb();
     const tracked: SyncedConditionalRuleMap = new Map();
@@ -523,7 +672,7 @@ describe('syncTrackedConditionalRulesToEngine (H-13)', () => {
     const { wb, formats } = trackedWb();
     const tracked: SyncedConditionalRuleMap = new Map();
     const rules: ConditionalRule[] = [
-      { engineId: 'imported', kind: 'cell-value', range, op: '<', a: 0, apply: {} },
+      { engineId: '', kind: 'cell-value', range, op: '<', a: 0, apply: {} },
       { kind: 'text-contains', range, text: 'x', apply: {} },
     ];
 

@@ -345,6 +345,11 @@ export interface UiSlice {
    *  the same source can be pasted repeatedly; a cut is consumed by its first
    *  paste. Null whenever there is no marquee. */
   copyMode?: CopyMode | null;
+  /** Monotonic generation for the internal clipboard marquee. Unlike the
+   *  marquee coordinates themselves, this changes whenever a public copy
+   *  mutator replaces or clears the session, so async clipboard fallbacks can
+   *  tell a stale payload from the live one. */
+  copyRevision?: number;
   /** When false, the renderer skips drawing inter-cell hairline gridlines. */
   showGridLines: boolean;
   /** When false, the renderer hides the row-number / column-letter strips. */
@@ -536,6 +541,23 @@ export type ConditionalRule = ConditionalRulePriorityOptions &
         kind: 'data-bar';
         range: Range;
         color: string;
+        /** Position of the data-bar axis. Omitted rules use Excel automatic
+         *  signed-axis behaviour. */
+        axisPosition?: 'automatic' | 'middle' | 'none';
+        /** Fill used for negative values. Omitted rules inherit `color`. */
+        negativeColor?: string;
+        /** Border used for positive values. Omitted rules have no border. */
+        borderColor?: string;
+        /** Border used for negative values. Omitted rules have no negative border. */
+        negativeBorderColor?: string;
+        /** Axis line colour. Omitted rules use black. */
+        axisColor?: string;
+        /** Lower endpoint used to scale the bar. Omitted rules use the
+         *  existing automatic minimum derived from the range. */
+        min?: ConditionalScalePoint;
+        /** Upper endpoint used to scale the bar. Omitted rules use the
+         *  existing automatic maximum derived from the range. */
+        max?: ConditionalScalePoint;
         /** Edge from which the bar grows. Context follows the sheet's
          *  reading direction. Omitted rules use the engine default. */
         direction?: 'context' | 'left-to-right' | 'right-to-left';

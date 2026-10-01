@@ -196,7 +196,7 @@ describe('engine/spill × conditional-format intersection', () => {
                 priority: 1,
                 dxfIdEngaged: false,
                 dxfId: 0,
-                color: { r: 100, g: 100, b: 100, a: 255 }, // first
+                color: { r: 100, g: 100, b: 100, a: 255 }, // highest priority
                 barLengthPct: 0,
                 barAxisPositionPct: 0,
                 barIsNegative: false,
@@ -213,7 +213,7 @@ describe('engine/spill × conditional-format intersection', () => {
                 priority: 2,
                 dxfIdEngaged: false,
                 dxfId: 0,
-                color: { r: 200, g: 0, b: 0, a: 255 }, // second — overrides
+                color: { r: 200, g: 0, b: 0, a: 255 }, // lower priority cannot overwrite
                 barLengthPct: 0,
                 barAxisPositionPct: 0,
                 barIsNegative: false,
@@ -232,7 +232,9 @@ describe('engine/spill × conditional-format intersection', () => {
     } as unknown as WorkbookHandle;
 
     const overlay = evaluateCfFromEngine(wb, 0, 0, 0, 0, 0);
-    expect(overlay.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.fill).toBe('rgb(200, 0, 0)');
+    // Engine matches arrive in priority-ascending order; the first defined
+    // fill wins, including on a cell produced by a spilled formula.
+    expect(overlay.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.fill).toBe('rgb(100, 100, 100)');
     // Avoid unused-cells lint.
     expect(cells.size).toBe(1);
   });

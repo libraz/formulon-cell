@@ -9,6 +9,7 @@ import {
   type SpreadsheetStore,
 } from '../store/store.js';
 import { createDialogSelect, type DialogSelectOption } from '../toolbar/dialogs/form-controls.js';
+import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import {
   appendConditionalApplyFormatControls,
   applyPatchToConditionalApplyControls,
@@ -54,6 +55,63 @@ export interface ConditionalDialogHandle {
   close(): void;
   detach(): void;
 }
+
+type DataBarRule = Extract<ConditionalRule, { kind: 'data-bar' }>;
+type DataBarAxisPosition = NonNullable<DataBarRule['axisPosition']>;
+
+interface DataBarColorDraft {
+  original: string | undefined;
+  changed: boolean;
+}
+
+const DATA_BAR_COLOR_DEFAULTS = {
+  positive: '#638ec6',
+  negative: '#ff0000',
+  border: '#638ec6',
+  negativeBorder: '#ff0000',
+  axis: '#000000',
+} as const;
+
+const cssColorComponentToByte = (raw: string): number | null => {
+  const trimmed = raw.trim();
+  const percent = trimmed.endsWith('%');
+  const number = Number.parseFloat(percent ? trimmed.slice(0, -1) : trimmed);
+  if (!Number.isFinite(number)) return null;
+  const byte = percent ? (number * 255) / 100 : number;
+  return Math.round(Math.max(0, Math.min(255, byte)));
+};
+
+/** Native color inputs accept opaque hex only. Keep alpha in the draft's
+ * original CSS string and use this conversion only for the visible value. */
+const cssColorToHex = (color: string | undefined, fallback: string): string => {
+  const value = color?.trim() ?? '';
+  const hex = value.match(/^#([0-9a-f]{3,8})$/i)?.[1];
+  if (hex && (hex.length === 3 || hex.length === 4 || hex.length === 6 || hex.length === 8)) {
+    const rgb = hex.length <= 4 ? hex.slice(0, 3) : hex.slice(0, 6);
+    const expanded =
+      rgb.length === 3
+        ? rgb
+            .split('')
+            .map((part) => `${part}${part}`)
+            .join('')
+        : rgb;
+    return `#${expanded.toLowerCase()}`;
+  }
+  const functionBody = value.match(/^rgba?\((.*)\)$/i)?.[1];
+  if (functionBody) {
+    const channels = functionBody
+      .replaceAll('/', ' ')
+      .split(/[\s,]+/)
+      .filter(Boolean);
+    const red = cssColorComponentToByte(channels[0] ?? '');
+    const green = cssColorComponentToByte(channels[1] ?? '');
+    const blue = cssColorComponentToByte(channels[2] ?? '');
+    if (red !== null && green !== null && blue !== null) {
+      return `#${[red, green, blue].map((part) => part.toString(16).padStart(2, '0')).join('')}`;
+    }
+  }
+  return fallback;
+};
 
 /**
  * Manage conditional formatting rules: list / add / remove.
@@ -303,18 +361,23 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     { id: 'percentile', label: t.scaleTypePercentile },
   ] as const;
   const makeScalePointRow = (
+    parent: HTMLElement,
     label: string,
     defaultType: ConditionalScalePoint['kind'],
     defaultValue: string,
+    excludedKinds: readonly ConditionalScalePoint['kind'][] = [],
   ): { row: HTMLLabelElement; type: HTMLSelectElement; value: HTMLInputElement } => {
     const row = document.createElement('label');
     row.className = 'fc-fmtdlg__row';
     const span = document.createElement('span');
     span.textContent = `${label} ${t.scaleType}`;
     const type = makeSelect(
-      scaleTypeOptions.map((option) => ({ value: option.id, label: option.label })),
+      scaleTypeOptions
+        .filter((option) => !excludedKinds.includes(option.id))
+        .map((option) => ({ value: option.id, label: option.label })),
       defaultType,
     );
+    type.setAttribute('aria-label', `${label} ${t.scaleType}`);
     const value = document.createElement('input');
     value.type = 'number';
     value.value = defaultValue;
@@ -325,18 +388,39 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
     type.addEventListener('change', syncValue);
     syncValue();
     row.append(span, type, value);
-    colorScaleGroup.appendChild(row);
+    parent.appendChild(row);
     return { row, type, value };
   };
-  const scaleMin = makeScalePointRow(t.stopMin, 'min', '0');
-  const scaleMid = makeScalePointRow(t.stopMid, 'percentile', '50');
+  const scaleMin = makeScalePointRow(colorScaleGroup, t.stopMin, 'min', '0');
+  const scaleMid = makeScalePointRow(colorScaleGroup, t.stopMid, 'percentile', '50');
   scaleMid.row.hidden = true;
-  const scaleMax = makeScalePointRow(t.stopMax, 'max', '100');
+  const scaleMax = makeScalePointRow(colorScaleGroup, t.stopMax, 'max', '100');
 
   // ── Data bar subform ───────────────────────────────────────────────────
   const dataBarGroup = document.createElement('div');
   dataBarGroup.className = 'fc-conddlg__sub';
   form.appendChild(dataBarGroup);
+
+  const dataBarMin = makeScalePointRow(dataBarGroup, t.barMin, 'min', '0', ['max']);
+  dataBarMin.type.setAttribute('data-cf-bar-min-type', '');
+  dataBarMin.value.setAttribute('data-cf-bar-min-value', '');
+  const dataBarMax = makeScalePointRow(dataBarGroup, t.barMax, 'max', '100', ['min']);
+  dataBarMax.type.setAttribute('data-cf-bar-max-type', '');
+  dataBarMax.value.setAttribute('data-cf-bar-max-value', '');
+
+  const barDirectionRow = document.createElement('label');
+  barDirectionRow.className = 'fc-fmtdlg__row';
+  const barDirectionLabel = document.createElement('span');
+  barDirectionLabel.textContent = t.barDirection;
+  const barDirectionSelect = makeSelect([
+    { value: 'context', label: t.barDirectionContext },
+    { value: 'left-to-right', label: t.barDirectionLeftToRight },
+    { value: 'right-to-left', label: t.barDirectionRightToLeft },
+  ]);
+  barDirectionSelect.setAttribute('aria-label', t.barDirection);
+  barDirectionSelect.setAttribute('data-cf-bar-direction', '');
+  barDirectionRow.append(barDirectionLabel, barDirectionSelect);
+  dataBarGroup.appendChild(barDirectionRow);
 
   const barFillStyleRow = document.createElement('label');
   barFillStyleRow.className = 'fc-fmtdlg__row';
@@ -355,10 +439,86 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   barColorLabel.textContent = t.barColor;
   const barColorInput = document.createElement('input');
   barColorInput.type = 'color';
-  barColorInput.value = '#638ec6';
+  barColorInput.value = DATA_BAR_COLOR_DEFAULTS.positive;
   barColorInput.setAttribute('aria-label', t.barColor);
+  barColorInput.setAttribute('data-cf-bar-positive-color', '');
   barColorRow.append(barColorLabel, barColorInput);
   dataBarGroup.appendChild(barColorRow);
+
+  const barNegativeColorRow = document.createElement('label');
+  barNegativeColorRow.className = 'fc-fmtdlg__row';
+  const barNegativeColorLabel = document.createElement('span');
+  barNegativeColorLabel.textContent = t.barNegativeColor;
+  const barNegativeColorInput = document.createElement('input');
+  barNegativeColorInput.type = 'color';
+  barNegativeColorInput.value = DATA_BAR_COLOR_DEFAULTS.negative;
+  barNegativeColorInput.setAttribute('aria-label', t.barNegativeColor);
+  barNegativeColorInput.setAttribute('data-cf-bar-negative-color', '');
+  barNegativeColorRow.append(barNegativeColorLabel, barNegativeColorInput);
+  dataBarGroup.appendChild(barNegativeColorRow);
+
+  const barBorderStyleRow = document.createElement('label');
+  barBorderStyleRow.className = 'fc-fmtdlg__row';
+  const barBorderStyleLabel = document.createElement('span');
+  barBorderStyleLabel.textContent = t.barBorderStyle;
+  const barBorderStyleSelect = makeSelect([
+    { value: 'none', label: t.barBorderNone },
+    { value: 'solid', label: t.barBorderSolid },
+  ]);
+  barBorderStyleSelect.setAttribute('aria-label', t.barBorderStyle);
+  barBorderStyleSelect.setAttribute('data-cf-bar-border-style', '');
+  barBorderStyleRow.append(barBorderStyleLabel, barBorderStyleSelect);
+  dataBarGroup.appendChild(barBorderStyleRow);
+
+  const barBorderColorRow = document.createElement('label');
+  barBorderColorRow.className = 'fc-fmtdlg__row';
+  const barBorderColorLabel = document.createElement('span');
+  barBorderColorLabel.textContent = t.barBorderColor;
+  const barBorderColorInput = document.createElement('input');
+  barBorderColorInput.type = 'color';
+  barBorderColorInput.value = DATA_BAR_COLOR_DEFAULTS.border;
+  barBorderColorInput.setAttribute('aria-label', t.barBorderColor);
+  barBorderColorInput.setAttribute('data-cf-bar-border-color', '');
+  barBorderColorRow.append(barBorderColorLabel, barBorderColorInput);
+  dataBarGroup.appendChild(barBorderColorRow);
+
+  const barNegativeBorderColorRow = document.createElement('label');
+  barNegativeBorderColorRow.className = 'fc-fmtdlg__row';
+  const barNegativeBorderColorLabel = document.createElement('span');
+  barNegativeBorderColorLabel.textContent = t.barNegativeBorderColor;
+  const barNegativeBorderColorInput = document.createElement('input');
+  barNegativeBorderColorInput.type = 'color';
+  barNegativeBorderColorInput.value = DATA_BAR_COLOR_DEFAULTS.negativeBorder;
+  barNegativeBorderColorInput.setAttribute('aria-label', t.barNegativeBorderColor);
+  barNegativeBorderColorInput.setAttribute('data-cf-bar-negative-border-color', '');
+  barNegativeBorderColorRow.append(barNegativeBorderColorLabel, barNegativeBorderColorInput);
+  dataBarGroup.appendChild(barNegativeBorderColorRow);
+
+  const barAxisPositionRow = document.createElement('label');
+  barAxisPositionRow.className = 'fc-fmtdlg__row';
+  const barAxisPositionLabel = document.createElement('span');
+  barAxisPositionLabel.textContent = t.barAxisPosition;
+  const barAxisPositionSelect = makeSelect([
+    { value: 'automatic', label: t.barAxisAutomatic },
+    { value: 'middle', label: t.barAxisMiddle },
+    { value: 'none', label: t.barAxisNone },
+  ]);
+  barAxisPositionSelect.setAttribute('aria-label', t.barAxisPosition);
+  barAxisPositionSelect.setAttribute('data-cf-bar-axis-position', '');
+  barAxisPositionRow.append(barAxisPositionLabel, barAxisPositionSelect);
+  dataBarGroup.appendChild(barAxisPositionRow);
+
+  const barAxisColorRow = document.createElement('label');
+  barAxisColorRow.className = 'fc-fmtdlg__row';
+  const barAxisColorLabel = document.createElement('span');
+  barAxisColorLabel.textContent = t.barAxisColor;
+  const barAxisColorInput = document.createElement('input');
+  barAxisColorInput.type = 'color';
+  barAxisColorInput.value = DATA_BAR_COLOR_DEFAULTS.axis;
+  barAxisColorInput.setAttribute('aria-label', t.barAxisColor);
+  barAxisColorInput.setAttribute('data-cf-bar-axis-color', '');
+  barAxisColorRow.append(barAxisColorLabel, barAxisColorInput);
+  dataBarGroup.appendChild(barAxisColorRow);
 
   const showValueRow = document.createElement('label');
   showValueRow.className = 'fc-fmtdlg__check';
@@ -369,6 +529,53 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   showValueText.textContent = t.showValue;
   showValueRow.append(showValueCk, showValueText);
   dataBarGroup.appendChild(showValueRow);
+
+  const dataBarColorDrafts = {
+    positive: { original: undefined, changed: false } as DataBarColorDraft,
+    negative: { original: undefined, changed: false } as DataBarColorDraft,
+    border: { original: undefined, changed: false } as DataBarColorDraft,
+    negativeBorder: { original: undefined, changed: false } as DataBarColorDraft,
+    axis: { original: undefined, changed: false } as DataBarColorDraft,
+  };
+  let dataBarAxisPositionOriginal: DataBarAxisPosition | undefined;
+  let dataBarAxisPositionChanged = false;
+  let dataBarBorderStyleChanged = false;
+  const syncDataBarAppearance = (): void => {
+    const borderVisible = barBorderStyleSelect.value === 'solid';
+    projectDisabledState(barBorderColorInput, !borderVisible, null);
+    projectDisabledState(barNegativeBorderColorInput, !borderVisible, null);
+    projectDisabledState(barAxisColorInput, barAxisPositionSelect.value === 'none', null);
+  };
+  const markColorChanged = (draft: DataBarColorDraft): void => {
+    draft.changed = true;
+  };
+  barColorInput.addEventListener('input', () => markColorChanged(dataBarColorDrafts.positive));
+  barColorInput.addEventListener('change', () => markColorChanged(dataBarColorDrafts.positive));
+  barNegativeColorInput.addEventListener('input', () =>
+    markColorChanged(dataBarColorDrafts.negative),
+  );
+  barNegativeColorInput.addEventListener('change', () =>
+    markColorChanged(dataBarColorDrafts.negative),
+  );
+  barBorderColorInput.addEventListener('input', () => markColorChanged(dataBarColorDrafts.border));
+  barBorderColorInput.addEventListener('change', () => markColorChanged(dataBarColorDrafts.border));
+  barNegativeBorderColorInput.addEventListener('input', () =>
+    markColorChanged(dataBarColorDrafts.negativeBorder),
+  );
+  barNegativeBorderColorInput.addEventListener('change', () =>
+    markColorChanged(dataBarColorDrafts.negativeBorder),
+  );
+  barAxisColorInput.addEventListener('input', () => markColorChanged(dataBarColorDrafts.axis));
+  barAxisColorInput.addEventListener('change', () => markColorChanged(dataBarColorDrafts.axis));
+  barBorderStyleSelect.addEventListener('change', () => {
+    dataBarBorderStyleChanged = true;
+    syncDataBarAppearance();
+  });
+  barAxisPositionSelect.addEventListener('change', () => {
+    dataBarAxisPositionChanged = true;
+    syncDataBarAppearance();
+  });
+  syncDataBarAppearance();
 
   // ── Icon-set subform ───────────────────────────────────────────────────
   const iconSetGroup = document.createElement('div');
@@ -417,28 +624,44 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   iconOnlyRow.append(iconOnlyCk, iconOnlyText);
   iconSetGroup.appendChild(iconOnlyRow);
 
+  const iconOperatorOptions: DialogSelectOption[] = [
+    { value: '>=', label: '>=' },
+    { value: '>', label: '>' },
+  ];
+
   const makeIconThresholdRow = (
     index: number,
-  ): { row: HTMLLabelElement; type: HTMLSelectElement; value: HTMLInputElement } => {
+  ): {
+    row: HTMLLabelElement;
+    operator: HTMLSelectElement;
+    type: HTMLSelectElement;
+    value: HTMLInputElement;
+  } => {
     const row = document.createElement('label');
-    row.className = 'fc-fmtdlg__row';
+    row.className = 'fc-fmtdlg__row fc-conddlg__icon-threshold-row';
     const span = document.createElement('span');
     span.textContent = `${t.iconThreshold} ${index + 1}`;
+    const operator = makeSelect(iconOperatorOptions, '>=');
+    operator.setAttribute('aria-label', `${t.iconThreshold} ${index + 1} ${t.iconOperator}`);
+    operator.setAttribute('data-cf-icon-operator', String(index));
     const type = makeSelect(
       scaleTypeOptions.map((option) => ({ value: option.id, label: option.label })),
       'percent',
     );
+    type.setAttribute('aria-label', `${t.iconThreshold} ${index + 1} ${t.scaleType}`);
+    type.setAttribute('data-cf-icon-type', String(index));
     const value = document.createElement('input');
     value.type = 'number';
     value.setAttribute('aria-label', `${t.iconThreshold} ${index + 1} ${t.scaleValue}`);
+    value.setAttribute('data-cf-icon-value', String(index));
     const syncValue = (): void => {
       value.hidden = type.value === 'min' || type.value === 'max';
     };
     type.addEventListener('change', syncValue);
     syncValue();
-    row.append(span, type, value);
+    row.append(span, operator, type, value);
     iconSetGroup.appendChild(row);
-    return { row, type, value };
+    return { row, operator, type, value };
   };
   const iconThresholdControls = [0, 1, 2, 3].map((index) => makeIconThresholdRow(index));
 
@@ -850,12 +1073,89 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   const collectScalePoint = (input: {
     type: HTMLSelectElement;
     value: HTMLInputElement;
+    operator?: HTMLSelectElement;
   }): ConditionalScalePoint | null => {
     const kind = input.type.value as ConditionalScalePoint['kind'];
-    if (kind === 'min' || kind === 'max') return { kind };
+    const comparison = input.operator?.value === '>' ? { gte: false } : {};
+    if (kind === 'min' || kind === 'max') return { kind, ...comparison };
     const value = Number.parseFloat(input.value.value);
     if (!Number.isFinite(value)) return null;
-    return { kind, value };
+    return { kind, value, ...comparison };
+  };
+
+  const applyScalePoint = (
+    control: { type: HTMLSelectElement; value: HTMLInputElement; operator?: HTMLSelectElement },
+    point: ConditionalScalePoint | undefined,
+    fallback: ConditionalScalePoint,
+    fallbackValue = '0',
+  ): void => {
+    const next = point ?? fallback;
+    control.type.value = next.kind;
+    control.value.value = 'value' in next ? String(next.value) : fallbackValue;
+    if (control.operator) control.operator.value = next.gte === false ? '>' : '>=';
+    control.type.dispatchEvent(new Event('change'));
+  };
+
+  let preservedIconFloor: ConditionalScalePoint | undefined;
+
+  const setDataBarColorInput = (
+    input: HTMLInputElement,
+    draft: DataBarColorDraft,
+    value: string | undefined,
+    fallback: string,
+  ): void => {
+    draft.original = value;
+    draft.changed = false;
+    input.value = cssColorToHex(value, fallback);
+  };
+  const resetDataBarAppearance = (): void => {
+    setDataBarColorInput(
+      barColorInput,
+      dataBarColorDrafts.positive,
+      undefined,
+      DATA_BAR_COLOR_DEFAULTS.positive,
+    );
+    setDataBarColorInput(
+      barNegativeColorInput,
+      dataBarColorDrafts.negative,
+      undefined,
+      DATA_BAR_COLOR_DEFAULTS.negative,
+    );
+    setDataBarColorInput(
+      barBorderColorInput,
+      dataBarColorDrafts.border,
+      undefined,
+      DATA_BAR_COLOR_DEFAULTS.border,
+    );
+    setDataBarColorInput(
+      barNegativeBorderColorInput,
+      dataBarColorDrafts.negativeBorder,
+      undefined,
+      DATA_BAR_COLOR_DEFAULTS.negativeBorder,
+    );
+    setDataBarColorInput(
+      barAxisColorInput,
+      dataBarColorDrafts.axis,
+      undefined,
+      DATA_BAR_COLOR_DEFAULTS.axis,
+    );
+    dataBarAxisPositionOriginal = undefined;
+    dataBarAxisPositionChanged = false;
+    barAxisPositionSelect.value = 'automatic';
+    dataBarBorderStyleChanged = false;
+    barBorderStyleSelect.value = 'none';
+    syncDataBarAppearance();
+  };
+  const collectDataBarColor = (
+    input: HTMLInputElement,
+    draft: DataBarColorDraft,
+    fallback: string,
+    required: boolean,
+  ): string | undefined => {
+    if (draft.changed) return input.value || fallback;
+    if (draft.original !== undefined) return draft.original;
+    if (!required && currentMode === 'edit') return undefined;
+    return input.value || fallback;
   };
 
   const populateRuleForm = (rule: ConditionalRule): void => {
@@ -896,16 +1196,60 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
         scaleMax.value.value = 'value' in max ? String(max.value) : '100';
       }
     } else if (rule.kind === 'data-bar') {
+      const dataBarRule = rule as DataBarRule;
       barFillStyleSelect.value = rule.gradient === false ? 'solid' : 'gradient';
-      barColorInput.value = rule.color;
+      setDataBarColorInput(
+        barColorInput,
+        dataBarColorDrafts.positive,
+        rule.color,
+        DATA_BAR_COLOR_DEFAULTS.positive,
+      );
+      setDataBarColorInput(
+        barNegativeColorInput,
+        dataBarColorDrafts.negative,
+        dataBarRule.negativeColor,
+        DATA_BAR_COLOR_DEFAULTS.negative,
+      );
+      setDataBarColorInput(
+        barBorderColorInput,
+        dataBarColorDrafts.border,
+        dataBarRule.borderColor,
+        DATA_BAR_COLOR_DEFAULTS.border,
+      );
+      setDataBarColorInput(
+        barNegativeBorderColorInput,
+        dataBarColorDrafts.negativeBorder,
+        dataBarRule.negativeBorderColor,
+        DATA_BAR_COLOR_DEFAULTS.negativeBorder,
+      );
+      setDataBarColorInput(
+        barAxisColorInput,
+        dataBarColorDrafts.axis,
+        dataBarRule.axisColor,
+        DATA_BAR_COLOR_DEFAULTS.axis,
+      );
+      dataBarAxisPositionOriginal = dataBarRule.axisPosition;
+      dataBarAxisPositionChanged = false;
+      barAxisPositionSelect.value = dataBarRule.axisPosition ?? 'automatic';
+      dataBarBorderStyleChanged = false;
+      barBorderStyleSelect.value =
+        dataBarRule.borderColor !== undefined || dataBarRule.negativeBorderColor !== undefined
+          ? 'solid'
+          : 'none';
       showValueCk.checked = rule.showValue !== false;
+      applyScalePoint(dataBarMin, dataBarRule.min, { kind: 'min' }, '0');
+      applyScalePoint(dataBarMax, dataBarRule.max, { kind: 'max' }, '100');
+      barDirectionSelect.value = dataBarRule.direction ?? 'context';
+      syncDataBarAppearance();
     } else if (rule.kind === 'icon-set') {
+      preservedIconFloor = rule.floor;
       iconSetSelect.value = rule.icons;
       iconReverseCk.checked = rule.reverseOrder === true;
       iconOnlyCk.checked = rule.showValue === false;
       for (const [index, point] of (rule.thresholds ?? []).entries()) {
         const control = iconThresholdControls[index];
         if (!control) continue;
+        control.operator.value = point.gte === false ? '>' : '>=';
         control.type.value = point.kind;
         control.value.value = 'value' in point ? String(point.value) : '';
       }
@@ -989,13 +1333,69 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
         rule = { kind: 'color-scale', range, stops, thresholds: [minPoint, maxPoint] };
       }
     } else if (kind === 'data-bar') {
-      rule = {
+      const min = collectScalePoint(dataBarMin);
+      const max = collectScalePoint(dataBarMax);
+      if (!min || !max) return;
+      const axisPosition = barAxisPositionSelect.value as DataBarAxisPosition;
+      const dataBarRule: DataBarRule = {
         kind: 'data-bar',
         range,
-        color: barColorInput.value,
+        color:
+          collectDataBarColor(
+            barColorInput,
+            dataBarColorDrafts.positive,
+            DATA_BAR_COLOR_DEFAULTS.positive,
+            true,
+          ) ?? DATA_BAR_COLOR_DEFAULTS.positive,
+        min,
+        max,
+        direction: barDirectionSelect.value as Extract<
+          ConditionalRule,
+          { kind: 'data-bar' }
+        >['direction'],
         gradient: barFillStyleSelect.value === 'gradient',
         showValue: showValueCk.checked,
       };
+      if (
+        dataBarAxisPositionChanged ||
+        dataBarAxisPositionOriginal !== undefined ||
+        currentMode !== 'edit'
+      ) {
+        dataBarRule.axisPosition = axisPosition;
+      }
+      const negativeColor = collectDataBarColor(
+        barNegativeColorInput,
+        dataBarColorDrafts.negative,
+        DATA_BAR_COLOR_DEFAULTS.negative,
+        false,
+      );
+      if (negativeColor !== undefined) dataBarRule.negativeColor = negativeColor;
+      if (barBorderStyleSelect.value === 'solid') {
+        const writeBothBorderColors = dataBarBorderStyleChanged || currentMode !== 'edit';
+        const borderColor = collectDataBarColor(
+          barBorderColorInput,
+          dataBarColorDrafts.border,
+          DATA_BAR_COLOR_DEFAULTS.border,
+          writeBothBorderColors,
+        );
+        const negativeBorderColor = collectDataBarColor(
+          barNegativeBorderColorInput,
+          dataBarColorDrafts.negativeBorder,
+          DATA_BAR_COLOR_DEFAULTS.negativeBorder,
+          writeBothBorderColors,
+        );
+        if (borderColor !== undefined) dataBarRule.borderColor = borderColor;
+        if (negativeBorderColor !== undefined)
+          dataBarRule.negativeBorderColor = negativeBorderColor;
+      }
+      const axisColor = collectDataBarColor(
+        barAxisColorInput,
+        dataBarColorDrafts.axis,
+        DATA_BAR_COLOR_DEFAULTS.axis,
+        false,
+      );
+      if (axisColor !== undefined) dataBarRule.axisColor = axisColor;
+      rule = dataBarRule;
     } else if (kind === 'icon-set') {
       const iconThresholds = iconThresholdControls
         .filter((control) => !control.row.hidden)
@@ -1008,6 +1408,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
         showValue: !iconOnlyCk.checked,
         thresholds: iconThresholds as ConditionalScalePoint[],
         reverseOrder: iconReverseCk.checked,
+        ...(currentMode === 'edit' && preservedIconFloor ? { floor: preservedIconFloor } : {}),
       };
     } else if (kind === 'top-bottom') {
       const n = Number.parseInt(tbNInput.value, 10);
@@ -1159,6 +1560,12 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       const sel = store.getState().selection.range;
       rangeInput.value = formatRange(sel);
       kindSelect.value = options.kind ?? 'cell-value';
+      styleSelect.value =
+        kindSelect.value === 'color-scale'
+          ? 'two-color-scale'
+          : kindSelect.value === 'data-bar' || kindSelect.value === 'icon-set'
+            ? kindSelect.value
+            : 'classic';
       opSelect.value = options.cellValueOp ?? '>';
       valueAInput.value = '0';
       valueBInput.value = '0';
@@ -1169,10 +1576,18 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       scaleMax.value.value = '100';
       scaleMid.type.value = 'percentile';
       scaleMid.value.value = '50';
+      applyScalePoint(dataBarMin, undefined, { kind: 'min' }, '0');
+      applyScalePoint(dataBarMax, undefined, { kind: 'max' }, '100');
+      barFillStyleSelect.value = 'gradient';
+      resetDataBarAppearance();
+      showValueCk.checked = true;
+      barDirectionSelect.value = 'context';
+      preservedIconFloor = undefined;
       iconSetSelect.value = 'arrows3';
       iconReverseCk.checked = false;
       iconOnlyCk.checked = false;
       for (const control of iconThresholdControls) {
+        control.operator.value = '>=';
         control.type.value = 'percent';
         control.value.value = '';
         control.type.dispatchEvent(new Event('change'));

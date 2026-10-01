@@ -104,6 +104,173 @@ describe('evaluateCfFromEngine', () => {
     expect(overlay?.barGradient).toBe(true);
   });
 
+  it('uses the matching rule metadata for axis appearance while trusting match colors', () => {
+    const wb = {
+      ...fakeWb(true, [
+        {
+          row: 0,
+          col: 0,
+          matches: [
+            {
+              kind: KIND_DATA_BAR,
+              priority: 7,
+              barLengthPct: 50,
+              barAxisPositionPct: 50,
+              barIsNegative: true,
+              barFill: c(192, 0, 0),
+              barBorderEngaged: true,
+              barBorder: c(127, 0, 0),
+              barDirection: 1,
+            },
+          ],
+        },
+      ]),
+      getConditionalFormats: () => [
+        {
+          id: 'bar-appearance',
+          type: 3,
+          priority: 7,
+          stopIfTrue: false,
+          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
+          dataBar: {
+            min: { type: 3 },
+            max: { type: 4 },
+            fill: c(0, 120, 212),
+            showValue: true,
+            minLengthPct: 0,
+            maxLengthPct: 100,
+            gradient: false,
+            axisPosition: 1,
+            border: c(31, 31, 31),
+            axisColor: c(64, 64, 64),
+            direction: 1,
+          },
+        },
+      ],
+      physicalCells: function* () {
+        yield {
+          addr: { sheet: 0, row: 0, col: 0 },
+          value: { kind: 'number', value: -1 },
+          formula: null,
+        };
+      },
+    } as unknown as WorkbookHandle;
+
+    const overlay = evaluateCfFromEngine(wb, 0, 0, 0, 9, 9).get(
+      addrKey({ sheet: 0, row: 0, col: 0 }),
+    );
+    expect(overlay).toMatchObject({
+      barColor: 'rgb(192, 0, 0)',
+      barBorderColor: 'rgb(127, 0, 0)',
+      barAxisColor: 'rgb(64, 64, 64)',
+      barAxisVisible: true,
+    });
+  });
+
+  it('draws a none-axis negative bar on the positive side with the same direction', () => {
+    const wb = {
+      ...fakeWb(true, [
+        {
+          row: 0,
+          col: 0,
+          matches: [
+            {
+              kind: KIND_DATA_BAR,
+              priority: 99,
+              barLengthPct: 60,
+              barAxisPositionPct: 0,
+              barIsNegative: true,
+              barFill: c(192, 0, 0),
+              barBorderEngaged: false,
+              barDirection: 2,
+            },
+          ],
+        },
+      ]),
+      getConditionalFormats: () => [
+        {
+          id: 'bar-none',
+          type: 3,
+          priority: 7,
+          stopIfTrue: false,
+          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
+          dataBar: {
+            min: { type: 3 },
+            max: { type: 4 },
+            fill: c(0, 120, 212),
+            showValue: true,
+            minLengthPct: 0,
+            maxLengthPct: 100,
+            axisPosition: 2,
+            direction: 2,
+          },
+        },
+      ],
+    } as unknown as WorkbookHandle;
+
+    const overlay = evaluateCfFromEngine(wb, 0, 0, 0, 9, 9).get(
+      addrKey({ sheet: 0, row: 0, col: 0 }),
+    );
+    expect(overlay).toMatchObject({
+      bar: 0.6,
+      barAxis: 1,
+      barDirection: 'left',
+      barAxisVisible: false,
+    });
+  });
+
+  it('hides an automatic metadata axis when the rule population has no negatives', () => {
+    const wb = {
+      ...fakeWb(true, [
+        {
+          row: 0,
+          col: 0,
+          matches: [
+            {
+              kind: KIND_DATA_BAR,
+              priority: 3,
+              barLengthPct: 50,
+              barAxisPositionPct: 40,
+              barIsNegative: false,
+              barDirection: 1,
+            },
+          ],
+        },
+      ]),
+      getConditionalFormats: () => [
+        {
+          id: 'bar-auto',
+          type: 3,
+          priority: 3,
+          stopIfTrue: false,
+          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
+          dataBar: {
+            min: { type: 0, value: '0' },
+            max: { type: 0, value: '100' },
+            fill: c(0, 120, 212),
+            showValue: true,
+            minLengthPct: 0,
+            maxLengthPct: 100,
+            axisPosition: 0,
+            direction: 1,
+          },
+        },
+      ],
+      physicalCells: function* () {
+        yield {
+          addr: { sheet: 0, row: 0, col: 0 },
+          value: { kind: 'number', value: 10 },
+          formula: null,
+        };
+      },
+    } as unknown as WorkbookHandle;
+
+    const overlay = evaluateCfFromEngine(wb, 0, 0, 0, 9, 9).get(
+      addrKey({ sheet: 0, row: 0, col: 0 }),
+    );
+    expect(overlay?.barAxisVisible).toBe(false);
+  });
+
   it('mirrors data-bar axis and signed side for explicit and context directions', () => {
     const wb = {
       ...fakeWb(true, [
@@ -286,19 +453,108 @@ describe('evaluateCfFromEngine', () => {
     expect(evaluateCfFromEngine(wb, 0, 0, 0, 9, 9).size).toBe(0);
   });
 
-  it('later matches in the same cell win for fill (priority order)', () => {
+  it('uses first-defined visual properties in priority order', () => {
     const wb = fakeWb(true, [
       {
         row: 0,
         col: 0,
         matches: [
-          { kind: KIND_COLOR_SCALE, color: c(255, 0, 0) }, // low priority
-          { kind: KIND_COLOR_SCALE, color: c(0, 255, 0) }, // higher
+          { kind: KIND_COLOR_SCALE, color: c(255, 0, 0) }, // highest priority
+          { kind: KIND_COLOR_SCALE, color: c(0, 255, 0) }, // lower priority
         ],
       },
     ]);
     const out = evaluateCfFromEngine(wb, 0, 0, 0, 9, 9);
-    expect(out.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.fill).toBe('rgb(0, 255, 0)');
+    // The C API documents priority-ascending matches and first-defined
+    // folding: lower-priority matches may fill omitted properties, but do
+    // not overwrite a higher-priority property that is already defined.
+    expect(out.get(addrKey({ sheet: 0, row: 0, col: 0 }))?.fill).toBe('rgb(255, 0, 0)');
+  });
+
+  it('keeps the first overlapping data bar atomic, including an omitted border', () => {
+    const wb = {
+      ...fakeWb(true, [
+        {
+          row: 0,
+          col: 0,
+          matches: [
+            {
+              kind: KIND_DATA_BAR,
+              priority: 1,
+              barLengthPct: 25,
+              barAxisPositionPct: 30,
+              barIsNegative: false,
+              barFill: c(255, 0, 0),
+              barBorderEngaged: false,
+              barDirection: 1,
+            },
+            {
+              kind: KIND_DATA_BAR,
+              priority: 2,
+              barLengthPct: 80,
+              barAxisPositionPct: 70,
+              barIsNegative: false,
+              barFill: c(0, 255, 0),
+              barBorderEngaged: true,
+              barBorder: c(0, 0, 255),
+              barDirection: 2,
+            },
+          ],
+        },
+      ]),
+      getConditionalFormats: () => [
+        {
+          id: 'bar-high',
+          type: 3,
+          priority: 1,
+          stopIfTrue: false,
+          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
+          dataBar: {
+            min: { type: 3 },
+            max: { type: 4 },
+            fill: c(255, 0, 0),
+            showValue: true,
+            minLengthPct: 0,
+            maxLengthPct: 100,
+            gradient: false,
+            axisPosition: 1,
+            direction: 1,
+          },
+        },
+        {
+          id: 'bar-low',
+          type: 3,
+          priority: 2,
+          stopIfTrue: false,
+          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
+          dataBar: {
+            min: { type: 3 },
+            max: { type: 4 },
+            fill: c(0, 255, 0),
+            showValue: true,
+            minLengthPct: 0,
+            maxLengthPct: 100,
+            gradient: true,
+            axisPosition: 2,
+            direction: 2,
+            border: c(0, 0, 255),
+          },
+        },
+      ],
+    } as unknown as WorkbookHandle;
+
+    const overlay = evaluateCfFromEngine(wb, 0, 0, 0, 9, 9).get(
+      addrKey({ sheet: 0, row: 0, col: 0 }),
+    );
+    expect(overlay).toMatchObject({
+      bar: 0.175,
+      barAxis: 0.3,
+      barDirection: 'right',
+      barColor: 'rgb(255, 0, 0)',
+      barAxisVisible: true,
+      barGradient: false,
+    });
+    expect(overlay?.barBorderColor).toBeUndefined();
   });
 });
 
@@ -391,8 +647,8 @@ describe('hydrateConditionalRulesFromEngine', () => {
           stopIfTrue: false,
           sqref: [{ firstRow: 10, firstCol: 1, lastRow: 10, lastCol: 3 }],
           dataBar: {
-            min: { type: 3 },
-            max: { type: 4 },
+            min: { type: 3, gte: true },
+            max: { type: 4, gte: true },
             fill: { r: 0, g: 120, b: 212, a: 255 },
             showValue: false,
             minLengthPct: 0,
@@ -502,6 +758,104 @@ describe('hydrateConditionalRulesFromEngine', () => {
         floor: { kind: 'percent', value: 10, gte: false },
       },
     ]);
+  });
+
+  it('hydrates custom data-bar endpoints and direction metadata', () => {
+    const store = createSpreadsheetStore();
+    hydrateConditionalRulesFromEngine(
+      importedWb([
+        {
+          id: 'cf-bar-custom',
+          type: 3,
+          priority: 1,
+          stopIfTrue: false,
+          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 2 }],
+          dataBar: {
+            min: { type: 0, value: '20', gte: false },
+            max: { type: 2, value: '80', gte: true },
+            fill: { r: 0, g: 120, b: 212, a: 255 },
+            showValue: true,
+            minLengthPct: 0,
+            maxLengthPct: 100,
+            direction: 2,
+          },
+        },
+      ]),
+      store,
+      0,
+    );
+
+    expect(store.getState().conditional.rules[0]).toMatchObject({
+      kind: 'data-bar',
+      min: { kind: 'number', value: 20, gte: false },
+      max: { kind: 'percentile', value: 80, gte: true },
+      direction: 'right-to-left',
+    });
+  });
+
+  it('hydrates data-bar axis and sign-specific appearance metadata', () => {
+    const store = createSpreadsheetStore();
+    hydrateConditionalRulesFromEngine(
+      importedWb([
+        {
+          id: 'cf-bar-appearance',
+          type: 3,
+          priority: 1,
+          stopIfTrue: false,
+          sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 2 }],
+          dataBar: {
+            min: { type: 3, gte: true },
+            max: { type: 4, gte: true },
+            fill: c(0, 120, 212),
+            showValue: true,
+            minLengthPct: 0,
+            maxLengthPct: 100,
+            gradient: true,
+            axisPosition: 1,
+            negativeFill: c(192, 0, 0),
+            border: c(31, 31, 31),
+            negativeBorder: c(127, 0, 0),
+            axisColor: c(64, 64, 64),
+            direction: 1,
+          },
+        },
+      ]),
+      store,
+      0,
+    );
+
+    expect(store.getState().conditional.rules[0]).toMatchObject({
+      kind: 'data-bar',
+      axisPosition: 'middle',
+      negativeColor: 'rgb(192, 0, 0)',
+      borderColor: 'rgb(31, 31, 31)',
+      negativeBorderColor: 'rgb(127, 0, 0)',
+      axisColor: 'rgb(64, 64, 64)',
+    });
+  });
+
+  it('treats an empty engine id as imported and does not duplicate on rehydrate', () => {
+    const store = createSpreadsheetStore();
+    const formats = [
+      {
+        id: '',
+        type: 1,
+        priority: 1,
+        stopIfTrue: false,
+        sqref: [{ firstRow: 0, firstCol: 0, lastRow: 0, lastCol: 0 }],
+        op: 5,
+        formula1: '10',
+      },
+    ] satisfies ReturnType<WorkbookHandle['getConditionalFormats']>;
+
+    hydrateConditionalRulesFromEngine(importedWb(formats), store, 0);
+    hydrateConditionalRulesFromEngine(importedWb(formats), store, 0);
+
+    expect(store.getState().conditional.rules).toHaveLength(1);
+    expect(store.getState().conditional.rules[0]).toMatchObject({
+      engineId: '',
+      kind: 'cell-value',
+    });
   });
 
   it('replaces stale engine-hydrated rules for the sheet and preserves session rules', () => {
