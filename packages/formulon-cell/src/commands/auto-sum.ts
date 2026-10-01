@@ -1,6 +1,7 @@
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { State } from '../store/store.js';
+import { mergeAt } from './merge.js';
 import { isCellWritable, warnProtected } from './protection.js';
 
 const colLetter = (n: number): string => {
@@ -28,6 +29,8 @@ const isNum = (state: State, sheet: number, row: number, col: number): boolean =
 
 const isEmpty = (state: State, sheet: number, row: number, col: number): boolean => {
   if (row < 0 || col < 0) return false;
+  const merge = mergeAt(state, { sheet, row, col });
+  if (merge && (merge.r0 !== row || merge.c0 !== col)) return false;
   const cell = state.data.cells.get(`${sheet}:${row}:${col}`);
   return !cell || cell.value.kind === 'blank';
 };
