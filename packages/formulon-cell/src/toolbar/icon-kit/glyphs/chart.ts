@@ -1,7 +1,7 @@
 /** Chart-type icons, all sharing one plot frame. */
 
-import { circle, join, poly, rect } from '../path.js';
-import { badge, filled, outlined, stroked } from '../primitives.js';
+import { circle, join, line, poly, rect, sector } from '../path.js';
+import { badge, filled, stroked } from '../primitives.js';
 import { PALETTE } from '../tokens.js';
 import type { IconDefinition } from '../types.js';
 
@@ -19,6 +19,13 @@ const axes = () =>
 /** A column rising from the baseline. */
 const column = (x: number, width: number, height: number, fill: string) =>
   filled(rect(x, PLOT.bottom - height, width, height), fill);
+
+const PIE_CENTER = 12;
+const PIE_RADIUS = 8.8;
+const piePoint = (radians: number): [number, number] => [
+  PIE_CENTER + PIE_RADIUS * Math.cos(radians),
+  PIE_CENTER + PIE_RADIUS * Math.sin(radians),
+];
 
 export const CHART_ICONS = {
   chart: [
@@ -78,30 +85,23 @@ export const CHART_ICONS = {
     stroked('M3.6 14.6 9.4 8.6 14 12.4 20.4 4.6', PALETTE.accent, 'bold'),
   ],
   chartPie: [
-    outlined(circle(12, 12, 8.8), PALETTE.accent, PALETTE.accentDeep, 'thin'),
     filled(
-      poly(
-        [
-          [12, 12],
-          [12, 3.2],
-          [20.8, 12],
-        ],
-        true,
-      ),
-      PALETTE.info,
+      sector(PIE_CENTER, PIE_CENTER, PIE_RADIUS, Math.PI / 4, (3 * Math.PI) / 2),
+      PALETTE.accent,
     ),
-    filled(
-      poly(
-        [
-          [12, 12],
-          [20.8, 12],
-          [18.2, 18.2],
-        ],
-        true,
+    filled(sector(PIE_CENTER, PIE_CENTER, PIE_RADIUS, -Math.PI / 2, 0), PALETTE.info),
+    filled(sector(PIE_CENTER, PIE_CENTER, PIE_RADIUS, 0, Math.PI / 4), PALETTE.alt),
+    stroked(
+      join(
+        line([PIE_CENTER, PIE_CENTER], piePoint(-Math.PI / 2)),
+        line([PIE_CENTER, PIE_CENTER], piePoint(0)),
+        line([PIE_CENTER, PIE_CENTER], piePoint(Math.PI / 4)),
       ),
-      PALETTE.alt,
+      PALETTE.paper,
+      'thin',
+      { cap: 'butt' },
     ),
-    stroked('M12 3.2v8.8h8.8', PALETTE.paper, 'thin'),
+    stroked(circle(PIE_CENTER, PIE_CENTER, PIE_RADIUS), PALETTE.accentDeep, 'thin'),
   ],
   chartScatter: [
     axes(),

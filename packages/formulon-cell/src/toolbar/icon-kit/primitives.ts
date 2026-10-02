@@ -267,8 +267,9 @@ export type BadgeOptions = {
 };
 
 /** Badge plate size and its inset from the canvas edge. */
-const BADGE_SIZE = 9;
+const BADGE_SIZE = 8;
 const BADGE_INSET = 1;
+const BADGE_GLYPH_SCALE = BADGE_SIZE / 9;
 
 const DEFAULT_BADGE_TONE: Record<BadgeGlyph, string> = {
   plus: PALETTE.accent,
@@ -314,62 +315,103 @@ export const badge = (options: BadgeOptions): IconSegment[] => {
       ? filled(circle(cx, cy, BADGE_SIZE / 2), tone)
       : filled(roundRect(x, y, BADGE_SIZE, BADGE_SIZE, 1.6), tone);
 
-  const arm = 2.1;
-  const glyph = ((): IconSegment => {
+  const arm = 2.1 * BADGE_GLYPH_SCALE;
+  const glyph = ((): IconSegment[] => {
     switch (options.glyph) {
       case 'plus':
-        return stroked(
-          join(`M${n(cx - arm)} ${n(cy)}h${n(arm * 2)}`, `M${n(cx)} ${n(cy - arm)}v${n(arm * 2)}`),
-          onTone,
-          'heavy',
-        );
+        return [
+          stroked(
+            join(
+              `M${n(cx - arm)} ${n(cy)}h${n(arm * 2)}`,
+              `M${n(cx)} ${n(cy - arm)}v${n(arm * 2)}`,
+            ),
+            onTone,
+            'heavy',
+          ),
+        ];
       case 'minus':
-        return stroked(`M${n(cx - arm)} ${n(cy)}h${n(arm * 2)}`, onTone, 'heavy');
+        return [stroked(`M${n(cx - arm)} ${n(cy)}h${n(arm * 2)}`, onTone, 'heavy')];
       case 'cross':
-        return stroked(
-          join(
-            line([cx - arm * 0.8, cy - arm * 0.8], [cx + arm * 0.8, cy + arm * 0.8]),
-            line([cx + arm * 0.8, cy - arm * 0.8], [cx - arm * 0.8, cy + arm * 0.8]),
+        return [
+          stroked(
+            join(
+              line([cx - arm * 0.8, cy - arm * 0.8], [cx + arm * 0.8, cy + arm * 0.8]),
+              line([cx + arm * 0.8, cy - arm * 0.8], [cx - arm * 0.8, cy + arm * 0.8]),
+            ),
+            onTone,
+            'heavy',
           ),
-          onTone,
-          'heavy',
-        );
+        ];
       case 'check':
-        return stroked(
-          poly([
-            [cx - 2, cy],
-            [cx - 0.6, cy + 1.5],
-            [cx + 2.1, cy - 1.7],
-          ]),
-          onTone,
-          'heavy',
-        );
-      case 'star':
-        return filled(star(cx, cy, 3.1, 1.4), onTone);
-      case 'pencil':
-        return stroked(
-          join(
-            line([cx - 1.8, cy + 1.8], [cx + 1.8, cy - 1.8]),
-            line([cx - 1.8, cy + 1.8], [cx - 1.9, cy + 1.9]),
+        return [
+          stroked(
+            poly([
+              [cx - 2 * BADGE_GLYPH_SCALE, cy],
+              [cx - 0.6 * BADGE_GLYPH_SCALE, cy + 1.5 * BADGE_GLYPH_SCALE],
+              [cx + 2.1 * BADGE_GLYPH_SCALE, cy - 1.7 * BADGE_GLYPH_SCALE],
+            ]),
+            onTone,
+            'heavy',
           ),
-          onTone,
-          'heavy',
+        ];
+      case 'star':
+        return [filled(star(cx, cy, 3.1 * BADGE_GLYPH_SCALE, 1.4 * BADGE_GLYPH_SCALE), onTone)];
+      case 'pencil': {
+        const scale = BADGE_GLYPH_SCALE;
+        const tip: Point = [cx - 3.25 * scale, cy + 3.25 * scale];
+        const nibBase: Point = [cx - 2.25 * scale, cy + 2.25 * scale];
+        const bodyEnd: Point = [cx + 2.75 * scale, cy - 2.75 * scale];
+        const capEnd: Point = [cx + 3.75 * scale, cy - 3.75 * scale];
+        const side: Point = [0.7 * scale, 0.7 * scale];
+        const silhouette = poly(
+          [
+            tip,
+            [nibBase[0] + side[0], nibBase[1] + side[1]],
+            [capEnd[0] + side[0], capEnd[1] + side[1]],
+            [capEnd[0] - side[0], capEnd[1] - side[1]],
+            [nibBase[0] - side[0], nibBase[1] - side[1]],
+          ],
+          true,
         );
+        return [
+          filled(silhouette, onTone),
+          stroked(
+            line(
+              [bodyEnd[0] + side[0], bodyEnd[1] + side[1]],
+              [bodyEnd[0] - side[0], bodyEnd[1] - side[1]],
+            ),
+            tone,
+            'hairline',
+            { cap: 'butt' },
+          ),
+        ];
+      }
       case 'bang':
-        return stroked(
-          join(`M${n(cx)} ${n(cy - 2.4)}v2.6`, `M${n(cx)} ${n(cy + 2.2)}v.1`),
-          onTone,
-          'heavy',
-        );
+        return [
+          stroked(
+            join(
+              `M${n(cx)} ${n(cy - 2.4 * BADGE_GLYPH_SCALE)}v${n(2.6 * BADGE_GLYPH_SCALE)}`,
+              `M${n(cx)} ${n(cy + 2.2 * BADGE_GLYPH_SCALE)}v${n(0.1 * BADGE_GLYPH_SCALE)}`,
+            ),
+            onTone,
+            'heavy',
+          ),
+        ];
       case 'dots':
-        return filled(
-          join(circle(cx - 2.3, cy, 0.75), circle(cx, cy, 0.75), circle(cx + 2.3, cy, 0.75)),
-          onTone,
-        );
+        return [
+          filled(
+            join(
+              circle(cx - 2.3 * BADGE_GLYPH_SCALE, cy, 0.75 * BADGE_GLYPH_SCALE),
+              circle(cx, cy, 0.75 * BADGE_GLYPH_SCALE),
+              circle(cx + 2.3 * BADGE_GLYPH_SCALE, cy, 0.75 * BADGE_GLYPH_SCALE),
+            ),
+            onTone,
+          ),
+        ];
     }
   })();
 
-  return [plate, glyph];
+  return [plate, ...glyph];
 };
 
 /** Five-pointed star path. */

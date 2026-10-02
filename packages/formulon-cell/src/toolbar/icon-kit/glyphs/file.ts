@@ -1,40 +1,77 @@
 /** Save, export, share and extension icons. */
 
 import { circle, join, line, poly, rect, roundRect } from '../path.js';
-import { arrow, badge, bars, filled, outlined, stroked } from '../primitives.js';
+import { arrow, badge, bars, doc, filled, outlined, stroked } from '../primitives.js';
 import { PALETTE } from '../tokens.js';
 import type { IconDefinition } from '../types.js';
 
 /** The save body: a diskette with its shutter and label. */
 const diskette = (box: { x: number; y: number; w: number; h: number }) => {
   const notch = box.w * 0.22;
+  const body = poly(
+    [
+      [box.x, box.y],
+      [box.x + box.w - notch, box.y],
+      [box.x + box.w, box.y + notch],
+      [box.x + box.w, box.y + box.h],
+      [box.x, box.y + box.h],
+    ],
+    true,
+  );
+  const shutter = {
+    x: box.x + box.w * 0.25,
+    y: box.y + box.h * 0.08,
+    w: box.w * 0.42,
+    h: box.h * 0.28,
+  };
+  const label = {
+    x: box.x + box.w * 0.18,
+    y: box.y + box.h * 0.51,
+    w: box.w * 0.64,
+    h: box.h * 0.35,
+  };
+  const slot = roundRect(
+    shutter.x + shutter.w * 0.18,
+    shutter.y + shutter.h * 0.6,
+    shutter.w * 0.64,
+    0.7,
+    0.35,
+  );
+
   return [
-    outlined(
-      poly(
-        [
-          [box.x, box.y],
-          [box.x + box.w - notch, box.y],
-          [box.x + box.w, box.y + notch],
-          [box.x + box.w, box.y + box.h],
-          [box.x, box.y + box.h],
-        ],
-        true,
-      ),
-      PALETTE.paper,
-      PALETTE.ink,
-      'regular',
+    filled(body, PALETTE.paper),
+    filled(roundRect(shutter.x, shutter.y, shutter.w, shutter.h, 0.55), PALETTE.info),
+    stroked(
+      roundRect(shutter.x, shutter.y, shutter.w, shutter.h, 0.55),
+      PALETTE.infoDeep,
+      'hairline',
+      { cap: 'butt' },
     ),
-    filled(rect(box.x + box.w * 0.24, box.y, box.w * 0.44, box.h * 0.34), PALETTE.info),
-    outlined(
-      rect(box.x + box.w * 0.18, box.y + box.h * 0.52, box.w * 0.64, box.h * 0.48),
-      PALETTE.mute,
-      PALETTE.grid,
-      'thin',
-    ),
+    filled(slot, PALETTE.infoDeep),
+    filled(roundRect(label.x, label.y, label.w, label.h, 0.7), PALETTE.mute),
+    stroked(roundRect(label.x, label.y, label.w, label.h, 0.7), PALETTE.grid, 'hairline', {
+      cap: 'butt',
+    }),
+    ...bars({
+      x: label.x + label.w * 0.16,
+      y: label.y + label.h * 0.3,
+      width: label.w * 0.68,
+      widths: [0.9, 0.62],
+      gap: label.h * 0.28,
+      color: PALETTE.grid,
+      weight: 'hairline',
+    }),
+    // Paint the outer edge after every inset detail so the silhouette stays crisp.
+    stroked(body, PALETTE.ink, 'regular', { cap: 'butt', join: 'miter' }),
   ];
 };
 
 export const FILE_ICONS = {
+  manage: [
+    ...doc({ x: 3, y: 2.4, w: 15, h: 18, fold: 3, lines: 2 }),
+    ...badge({ glyph: 'plus', corner: 'br', shape: 'circle' }),
+  ],
+
   save: diskette({ x: 2.6, y: 3.4, w: 18.8, h: 17.2 }),
   saveAs: [
     ...diskette({ x: 2.6, y: 4.4, w: 16, h: 15.2 }),

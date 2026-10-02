@@ -7,6 +7,7 @@ import { FILL_ICONS } from './fill.js';
 import { FIND_ICONS } from './find.js';
 import { FORMAT_ICONS } from './format.js';
 import { FORMULA_ICONS } from './formulas.js';
+import { MAC_ICONS } from './mac.js';
 import { MEDIA_ICONS } from './media.js';
 import { REVIEW_ICONS } from './review.js';
 import { SORT_FILTER_ICONS } from './sort-filter.js';
@@ -28,6 +29,7 @@ export const RIBBON_GLYPHS = {
   ...FORMULA_ICONS,
   ...CHART_ICONS,
   ...MEDIA_ICONS,
+  ...MAC_ICONS,
   ...REVIEW_ICONS,
   ...VIEW_ICONS,
   ...FILE_ICONS,

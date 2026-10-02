@@ -21,7 +21,7 @@ import type { IconDefinition } from '../types.js';
  * size across every variant so the set reads as one family, and the subject
  * changes underneath it.
  */
-const LENS = { cx: 15.4, cy: 8.6, r: 5.4, handle: 5.6 } as const;
+const LENS = { cx: 15.4, cy: 8.6, r: 5.4, handle: 3.9 } as const;
 
 const overLens = (subject: readonly IconDefinition[number][]) => [
   ...subject,

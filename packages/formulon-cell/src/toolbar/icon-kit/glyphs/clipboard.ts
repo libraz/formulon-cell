@@ -96,13 +96,26 @@ export const CLIPBOARD_ICONS = {
 
   cut: [
     stroked(
-      join(line([5.4, 3.6], [13.4, 14.4]), line([18.6, 3.6], [10.6, 14.4])),
+      poly([
+        [5.4, 3.6],
+        [12, 12.4],
+        [8.32, 15.88],
+      ]),
+      PALETTE.ink,
+      'bold',
+    ),
+    stroked(
+      poly([
+        [18.6, 3.6],
+        [12, 12.4],
+        [15.68, 15.88],
+      ]),
       PALETTE.ink,
       'bold',
     ),
     outlined(roundRect(3.2, 15, 6, 6, 3), PALETTE.paper, PALETTE.info, 'bold'),
     outlined(roundRect(14.8, 15, 6, 6, 3), PALETTE.paper, PALETTE.info, 'bold'),
-    outlined(roundRect(10.4, 11.2, 3.2, 3.2, 1.6), PALETTE.paper, PALETTE.ink, 'thin'),
+    outlined(roundRect(10.4, 10.8, 3.2, 3.2, 1.6), PALETTE.paper, PALETTE.ink, 'thin'),
   ],
   copy: [
     outlined(roundRect(2.5, 2.5, 13, 15, 1.4), PALETTE.mute, PALETTE.grid, 'thin'),

@@ -126,7 +126,8 @@ export const FORMULA_ICONS = {
           'regular',
         ),
       ],
-      { box: [6.9, 6.4, 9.4, 10.8], size: 18.4 },
+      // Include the italic descender and round stroke caps in the source box.
+      { box: [6.6, 5.3, 10.5, 13.9], size: 20 },
     ),
   ],
 

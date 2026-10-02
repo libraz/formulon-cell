@@ -46,6 +46,44 @@ export const circle = (cx: number, cy: number, r: number): string =>
 export const ellipse = (cx: number, cy: number, rx: number, ry: number): string =>
   `M${n(cx - rx)} ${n(cy)}a${n(rx)} ${n(ry)} 0 1 0 ${n(rx * 2)} 0a${n(rx)} ${n(ry)} 0 1 0 ${n(-rx * 2)} 0z`;
 
+/**
+ * A circular sector, with angles expressed in radians.
+ *
+ * Angles use the SVG coordinate system: zero points right and increasing
+ * angles sweep clockwise. Keeping the centre in the path makes a sector a
+ * filled shape rather than an open arc, and lets the arc flags describe the
+ * actual angular span instead of approximating it with straight edges.
+ */
+export const sector = (
+  cx: number,
+  cy: number,
+  radius: number,
+  startRadians: number,
+  endRadians: number,
+): string => {
+  if (![cx, cy, radius, startRadians, endRadians].every(Number.isFinite)) {
+    throw new RangeError('sector arguments must be finite');
+  }
+  if (radius <= 0) {
+    throw new RangeError('sector radius must be positive');
+  }
+
+  const span = endRadians - startRadians;
+  const absoluteSpan = Math.abs(span);
+  const fullTurn = Math.PI * 2;
+  if (absoluteSpan > fullTurn) {
+    throw new RangeError('sector span cannot exceed one full turn');
+  }
+  if (span === 0) return '';
+  if (absoluteSpan === fullTurn) return circle(cx, cy, radius);
+
+  const start: Point = [cx + radius * Math.cos(startRadians), cy + radius * Math.sin(startRadians)];
+  const end: Point = [cx + radius * Math.cos(endRadians), cy + radius * Math.sin(endRadians)];
+  const largeArc = absoluteSpan > Math.PI ? 1 : 0;
+  const sweep = span > 0 ? 1 : 0;
+  return `M${n(cx)} ${n(cy)}L${n(start[0])} ${n(start[1])}A${n(radius)} ${n(radius)} 0 ${largeArc} ${sweep} ${n(end[0])} ${n(end[1])}z`;
+};
+
 /** Polyline through `points`, optionally closed. */
 export const poly = (points: readonly Point[], close = false): string => {
   const head = points[0];

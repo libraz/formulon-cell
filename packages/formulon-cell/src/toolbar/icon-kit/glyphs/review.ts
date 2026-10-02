@@ -2,7 +2,16 @@
 
 import { letter } from '../letters.js';
 import { circle, join, line, poly, rect, roundRect } from '../path.js';
-import { badge, bars, chainLink, filled, outlined, stroked } from '../primitives.js';
+import {
+  badge,
+  bars,
+  chainLink,
+  doc,
+  filled,
+  magnifier,
+  outlined,
+  stroked,
+} from '../primitives.js';
 import { PALETTE } from '../tokens.js';
 import type { IconDefinition } from '../types.js';
 
@@ -22,6 +31,11 @@ const bubble = (box: { x: number; y: number; w: number; h: number }) =>
   );
 
 export const REVIEW_ICONS = {
+  inspect: [
+    ...doc({ x: 3, y: 2.4, w: 13, h: 18, fold: 3, lines: 2 }),
+    ...magnifier({ cx: 15, cy: 14.8, r: 4.8, handle: 4.3, handleColor: PALETTE.info }),
+  ],
+
   spelling: [
     letter('A', { height: 13.4, cx: 9.2, cy: 9.6 }),
     stroked(
