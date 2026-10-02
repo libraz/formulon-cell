@@ -1220,6 +1220,8 @@ export abstract class WorkbookHandleFeatureMethods {
     name: string;
     minArity: number;
     maxArity: number | null;
+    /** Native availability class; absent when an older engine omits it. */
+    availability?: number;
     signatureTemplate?: string;
     description?: string;
     localizedName?: string;
@@ -1236,6 +1238,7 @@ export abstract class WorkbookHandleFeatureMethods {
       name: canonical,
       minArity: merged.minArity ?? 0,
       maxArity: merged.maxArity ?? null,
+      ...(m.availability !== undefined ? { availability: m.availability } : {}),
       ...(merged.signatureTemplate ? { signatureTemplate: merged.signatureTemplate } : {}),
       ...(merged.description ? { description: merged.description } : {}),
       ...(merged.localizedName ? { localizedName: merged.localizedName } : {}),

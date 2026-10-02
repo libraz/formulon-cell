@@ -18,6 +18,58 @@ const makeHandle = (raw: Record<string, unknown>): WorkbookHandle => {
 };
 
 describe('WorkbookHandle 0.12 result envelopes', () => {
+  it.each([0, 2, 3, 99])('preserves raw function availability %i', (availability) => {
+    const wb = makeHandle({
+      functionNames: () => Object.assign(['SUM'], { status: good }),
+      functionMetadata: () => ({
+        ok: true,
+        name: 'SUM',
+        minArity: 1,
+        maxArity: null,
+        availability,
+      }),
+    });
+    expect(wb.functionMetadata('SUM')?.availability).toBe(availability);
+  });
+
+  it('keeps availability absent for a legacy engine and prevents provider overrides', () => {
+    const legacy = makeHandle({
+      functionNames: () => Object.assign(['SUM'], { status: good }),
+      functionMetadata: () => ({ ok: true, name: 'SUM', minArity: 1, maxArity: null }),
+    });
+    expect(Object.hasOwn(legacy.functionMetadata('SUM') ?? {}, 'availability')).toBe(false);
+    const wb = makeHandle({
+      functionNames: () => Object.assign(['CUBEVALUE'], { status: good }),
+      functionMetadata: () => ({
+        ok: true,
+        name: 'CUBEVALUE',
+        minArity: 1,
+        maxArity: null,
+        availability: 3,
+      }),
+    });
+    const override = { description: 'Host description', availability: 0 };
+    wb.setFunctionMetadataProvider({ CUBEVALUE: override });
+    expect(wb.functionMetadata('CUBEVALUE')).toMatchObject({
+      availability: 3,
+      description: 'Host description',
+    });
+  });
+
+  it('exposes native implemented, environment-bound, and unavailable function states', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      expect(wb.isStub).toBe(false);
+      expect(wb.functionMetadata('ACOS')?.availability).toBe(0);
+      expect(wb.functionMetadata('INFO')?.availability).toBe(2);
+      expect(wb.functionMetadata('CUBEVALUE')?.availability).toBe(3);
+      expect(wb.functionMetadata('WEBSERVICE')?.availability).toBe(3);
+      expect(wb.functionMetadata('UNKNOWN_FUNCTION')).toBeNull();
+    } finally {
+      wb.dispose();
+    }
+  });
+
   it('keeps the empty-string lookup fallback when a function name does not match', () => {
     const wb = makeHandle({
       localizeFunctionName: () => ({ status: failed('unknown function'), value: '' }),
