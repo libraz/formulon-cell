@@ -388,6 +388,8 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           host: input.host,
           store: input.store,
           strings,
+          getWb: input.wb,
+          getLocale: input.i18nLocale,
           getInitialArguments: (functionName) => {
             if (!shouldSeedFunctionWithSelection(functionName)) return null;
             const range = input.store.getState().selection.range;
@@ -397,7 +399,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           onInsert: (formula) => {
             input.fxInput.value = formula;
             input.fxInput.focus();
-            input.getFormulaBar().commitFx('none');
+            return input.getFormulaBar().commitFx('none');
           },
         });
         s.fxClickHandler = (): void => s.fxDialog?.open();

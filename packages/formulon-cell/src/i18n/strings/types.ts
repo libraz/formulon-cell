@@ -1206,6 +1206,14 @@ export interface Strings {
     empty: string;
     /** Hint shown when the function signature includes a `...` repeat marker. */
     variadicHint: string;
+    /** Generic label for an argument without a host-provided friendly name. */
+    argumentLabel?: string;
+    /** Prefix for rows beyond the function's required arity. */
+    optionalArgumentLabel?: string;
+    /** Button label for appending an argument row. */
+    addArgument?: string;
+    /** Button label for removing the trailing optional argument row. */
+    removeArgument?: string;
     /** "Back" button — returns to the picker from the args step. */
     back: string;
     cancel: string;

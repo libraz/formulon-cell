@@ -2,11 +2,31 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { getRecentFunctions } from '../../../src/commands/function-history.js';
 import { en, ja } from '../../../src/i18n/strings.js';
 import { attachFxDialog, FUNCTION_DESCRIPTIONS } from '../../../src/interact/fx-dialog.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+
+const liveFunctionReader = (names: readonly string[]) => ({
+  functionNames: () => names,
+  functionMetadata: (name: string, locale: number) => {
+    if (name === 'ACOS') {
+      return {
+        name,
+        minArity: 1,
+        maxArity: 1,
+        localizedName: locale === 1 ? '逆余弦' : 'Arccosine',
+        signatureTemplate: locale === 1 ? '逆余弦(number)' : 'ACOS(number)',
+        description: locale === 1 ? '逆余弦を返します。' : 'Returns the arccosine.',
+      };
+    }
+    if (name === 'ACCRINT') return { name, minArity: 0, maxArity: null };
+    if (name === 'ZERO') return { name, minArity: 0, maxArity: 0 };
+    return { name, minArity: 1, maxArity: null };
+  },
+});
 
 describe('attachFxDialog', () => {
   let host: HTMLElement;
@@ -100,7 +120,9 @@ describe('attachFxDialog', () => {
       host,
       store: createSpreadsheetStore(),
       getInitialArguments: (name) => (name === 'SUM' ? ['A1:A5'] : null),
-      onInsert: (formula) => inserted.push(formula),
+      onInsert: (formula) => {
+        inserted.push(formula);
+      },
     });
     handle.open('SUM');
 
@@ -147,12 +169,13 @@ describe('attachFxDialog', () => {
     expect(Array.from(category.options, (option) => option.value)).toEqual([
       'all',
       'recent',
+      'financial',
       'logical',
-      'lookup',
       'text',
       'datetime',
+      'lookup',
       'math',
-      'financial',
+      'statistical',
       'dynamicArray',
     ]);
 
@@ -168,28 +191,130 @@ describe('attachFxDialog', () => {
     handle.detach();
   });
 
-  it('lists recently used functions alphabetically', () => {
+  it('opens the statistical function family when requested', () => {
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      onInsert: () => {},
+    });
+    handle.open(undefined, { category: 'statistical' });
+    const names = Array.from(document.querySelectorAll<HTMLElement>('.fc-fxdialog__item-name')).map(
+      (item) => item.textContent ?? '',
+    );
+    expect(names).toContain('AVERAGE');
+    expect(names).toContain('COUNTIFS');
+    expect(names).not.toContain('IF');
+    handle.detach();
+  });
+
+  it('records a function after insertion and lists shared recents in MRU order', () => {
+    const store = createSpreadsheetStore();
+    const handle = attachFxDialog({
+      host,
+      store,
+      onInsert: () => {},
+    });
+
+    handle.open('VLOOKUP');
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    handle.open('IF');
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    expect(getRecentFunctions(store)).toEqual(['IF', 'VLOOKUP']);
+
+    handle.open(undefined, { category: 'recent' });
+    const category = document.querySelector<HTMLSelectElement>('.fc-fxdialog__category');
+    expect(category).toBeTruthy();
+    if (!category) return;
+
+    const names = Array.from(document.querySelectorAll<HTMLElement>('.fc-fxdialog__item-name')).map(
+      (item) => item.textContent ?? '',
+    );
+    expect(names).toEqual(['IF', 'VLOOKUP']);
+    handle.detach();
+  });
+
+  it('does not record a chosen function when the dialog is canceled before insertion', () => {
+    const store = createSpreadsheetStore();
+    const handle = attachFxDialog({
+      host,
+      store,
+      onInsert: () => {},
+    });
+
+    handle.open();
+    const lookup = Array.from(document.querySelectorAll<HTMLElement>('.fc-fxdialog__item')).find(
+      (item) => item.dataset.fxName === 'VLOOKUP',
+    );
+    expect(lookup).toBeTruthy();
+    lookup?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    handle.close();
+
+    handle.open(undefined, { category: 'recent' });
+    expect(getRecentFunctions(store)).toEqual([]);
+    expect(document.querySelector('.fc-fxdialog__empty')?.textContent).toBeTruthy();
+    handle.detach();
+  });
+
+  it('keeps the dialog open and does not record when insertion is rejected', () => {
+    const store = createSpreadsheetStore();
+    const handle = attachFxDialog({
+      host,
+      store,
+      onInsert: () => false,
+    });
+    handle.open('SUM');
+    const argInput = document.querySelector<HTMLInputElement>('.fc-fxdialog__arg-input');
+    if (!argInput) throw new Error('expected SUM argument input');
+    argInput.value = 'A1:A3';
+    argInput.dispatchEvent(new Event('input'));
+    const insertBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+
+    insertBtn?.click();
+
+    expect(document.querySelector<HTMLElement>('.fc-fxdialog')?.hidden).toBe(false);
+    expect(document.querySelector<HTMLElement>('.fc-fxdialog__args')?.hidden).toBe(false);
+    expect(argInput.value).toBe('A1:A3');
+    expect(document.activeElement).toBe(insertBtn);
+    expect(getRecentFunctions(store)).toEqual([]);
+    handle.detach();
+  });
+
+  it('focuses seeded arguments immediately without stealing a later field focus', async () => {
     const handle = attachFxDialog({
       host,
       store: createSpreadsheetStore(),
       onInsert: () => {},
     });
 
-    handle.open('VLOOKUP');
-    handle.close();
     handle.open('IF');
-    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn')?.click();
+    const inputs = document.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input');
+    const first = inputs[0];
+    const second = inputs[1];
+    if (!first || !second) throw new Error('expected IF argument inputs');
+    expect(document.activeElement).toBe(first);
+    second.focus();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
-    const category = document.querySelector<HTMLSelectElement>('.fc-fxdialog__category');
-    expect(category).toBeTruthy();
-    if (!category) return;
-    category.value = 'recent';
-    category.dispatchEvent(new Event('change'));
+    expect(document.activeElement).toBe(second);
+    handle.detach();
+  });
 
-    const names = Array.from(document.querySelectorAll<HTMLElement>('.fc-fxdialog__item-name')).map(
-      (item) => item.textContent ?? '',
-    );
-    expect(names).toEqual(['IF', 'VLOOKUP']);
+  it('keeps the dialog open and does not record when insertion throws', () => {
+    const store = createSpreadsheetStore();
+    const handle = attachFxDialog({
+      host,
+      store,
+      onInsert: () => {
+        throw new Error('write failed');
+      },
+    });
+    handle.open('SUM');
+    const insertBtn = document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary');
+
+    expect(() => insertBtn?.click()).not.toThrow();
+    expect(document.querySelector<HTMLElement>('.fc-fxdialog')?.hidden).toBe(false);
+    expect(document.activeElement).toBe(insertBtn);
+    expect(getRecentFunctions(store)).toEqual([]);
     handle.detach();
   });
 
@@ -240,7 +365,9 @@ describe('attachFxDialog', () => {
     const handle = attachFxDialog({
       host,
       store: createSpreadsheetStore(),
-      onInsert: (f) => inserted.push(f),
+      onInsert: (f) => {
+        inserted.push(f);
+      },
     });
     handle.open('SUM');
     const inputs = document.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input');
@@ -263,7 +390,9 @@ describe('attachFxDialog', () => {
     const handle = attachFxDialog({
       host,
       store: createSpreadsheetStore(),
-      onInsert: (f) => inserted.push(f),
+      onInsert: (f) => {
+        inserted.push(f);
+      },
     });
 
     handle.open('IF');
@@ -298,6 +427,158 @@ describe('attachFxDialog', () => {
     document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
     expect(inserted.at(-1)).toBe('=TODAY()');
 
+    handle.detach();
+  });
+
+  it('uses the live catalog for engine-only names, metadata display, and canonical insertion', () => {
+    const store = createSpreadsheetStore();
+    const inserted: string[] = [];
+    const liveNames = ['ACOS', 'SUM'] as const;
+    const handle = attachFxDialog({
+      host,
+      store,
+      getWb: () => liveFunctionReader(liveNames),
+      getLocale: () => 'en-US',
+      onInsert: (formula) => {
+        inserted.push(formula);
+      },
+    });
+
+    handle.open();
+    const search = document.querySelector<HTMLInputElement>('.fc-fxdialog__search');
+    if (!search) throw new Error('expected function search');
+    search.value = 'arccos';
+    search.dispatchEvent(new Event('input'));
+    const item = document.querySelector<HTMLElement>('[data-fx-name="ACOS"]');
+    expect(item?.textContent).toContain('Arccosine');
+    item?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(document.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input')).toHaveLength(1);
+    const input = document.querySelector<HTMLInputElement>('.fc-fxdialog__arg-input');
+    if (!input) throw new Error('expected ACOS argument input');
+    input.value = '0';
+    input.dispatchEvent(new Event('input'));
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+
+    expect(inserted).toEqual(['=ACOS(0)']);
+    expect(getRecentFunctions(store, new Set(liveNames))).toEqual(['ACOS']);
+    handle.detach();
+  });
+
+  it('uses structural arity for exact zero and unbounded progressive arguments', () => {
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      getWb: () => liveFunctionReader(['ACCRINT', 'ZERO']),
+      onInsert: () => {},
+    });
+
+    handle.open('ACCRINT');
+    expect(document.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input')).toHaveLength(1);
+    expect(
+      document.querySelector<HTMLButtonElement>('[data-fx-action="add-argument"]'),
+    ).toBeTruthy();
+    expect(
+      document.querySelector<HTMLButtonElement>('[data-fx-action="remove-argument"]'),
+    ).toBeTruthy();
+    for (let i = 0; i < 2; i += 1) {
+      document.querySelector<HTMLButtonElement>('[data-fx-action="add-argument"]')?.click();
+    }
+    expect(document.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input')).toHaveLength(3);
+    for (let i = 0; i < 3; i += 1) {
+      document.querySelector<HTMLButtonElement>('[data-fx-action="remove-argument"]')?.click();
+    }
+    expect(document.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input')).toHaveLength(0);
+
+    handle.open('ZERO');
+    expect(document.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input')).toHaveLength(0);
+    handle.detach();
+  });
+
+  it('adds and removes finite optional arguments within the live arity bounds', () => {
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      getWb: () => ({
+        functionNames: () => ['FINITE'],
+        functionMetadata: () => ({ name: 'FINITE', minArity: 1, maxArity: 3 }),
+      }),
+      onInsert: () => {},
+    });
+    const inputs = () => document.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input');
+    const action = (name: string) =>
+      document.querySelector<HTMLButtonElement>(`[data-fx-action="${name}-argument"]`);
+
+    handle.open('FINITE');
+    expect(inputs()).toHaveLength(1);
+    expect(action('remove')).toBeNull();
+    const requiredInput = inputs()[0];
+    if (!requiredInput) throw new Error('expected the required argument');
+    requiredInput.value = 'A1';
+    action('add')?.click();
+    expect(inputs()).toHaveLength(2);
+    expect(inputs()[0]?.value).toBe('A1');
+    action('add')?.click();
+    expect(inputs()).toHaveLength(3);
+    expect(action('add')).toBeNull();
+    action('remove')?.click();
+    expect(inputs()).toHaveLength(2);
+    action('remove')?.click();
+    expect(inputs()).toHaveLength(1);
+    expect(action('remove')).toBeNull();
+    expect(inputs()[0]?.value).toBe('A1');
+    handle.detach();
+  });
+
+  it('preserves interior argument blanks while omitting trailing blanks', () => {
+    const inserted: string[] = [];
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      getWb: () => liveFunctionReader(['ACCRINT']),
+      onInsert: (formula) => {
+        inserted.push(formula);
+      },
+    });
+    handle.open('ACCRINT');
+    for (let index = 0; index < 3; index += 1) {
+      document.querySelector<HTMLButtonElement>('[data-fx-action="add-argument"]')?.click();
+    }
+    const inputs = document.querySelectorAll<HTMLInputElement>('.fc-fxdialog__arg-input');
+    expect(inputs).toHaveLength(4);
+    const [first, , third, trailing] = Array.from(inputs);
+    if (!first || !third || !trailing) throw new Error('expected four argument fields');
+    first.value = '7';
+    third.value = '3';
+    trailing.value = '';
+    third.dispatchEvent(new Event('input'));
+    expect(document.querySelector('.fc-fxdialog__preview')?.textContent).toBe('=ACCRINT(7, , 3)');
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    expect(inserted).toEqual(['=ACCRINT(7, , 3)']);
+    handle.detach();
+  });
+
+  it('rebuilds the live catalog on every open and restores stale Recent entries by workbook', () => {
+    const store = createSpreadsheetStore();
+    let reader = liveFunctionReader(['ACOS', 'SUM']);
+    const handle = attachFxDialog({
+      host,
+      store,
+      getWb: () => reader,
+      onInsert: () => {},
+    });
+
+    handle.open('ACOS');
+    document.querySelector<HTMLButtonElement>('.fc-fmtdlg__btn--primary')?.click();
+    reader = liveFunctionReader(['SUM']);
+    handle.open('ACOS');
+    expect(document.querySelector<HTMLElement>('.fc-fxdialog__picker')?.hidden).toBe(false);
+    expect(document.querySelector<HTMLElement>('[data-fx-name="ACOS"]')).toBeNull();
+    handle.open(undefined, { category: 'recent' });
+    expect(document.querySelector<HTMLElement>('[data-fx-name="ACOS"]')).toBeNull();
+
+    reader = liveFunctionReader(['ACOS', 'SUM']);
+    handle.open(undefined, { category: 'recent' });
+    expect(document.querySelector<HTMLElement>('[data-fx-name="ACOS"]')).toBeTruthy();
     handle.detach();
   });
 

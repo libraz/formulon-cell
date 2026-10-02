@@ -1,3 +1,16 @@
+import {
+  buildFunctionCatalog,
+  type FunctionCatalogEntry,
+  type FunctionCatalogReader,
+  type FunctionCatalogSnapshot,
+  type FunctionCategory,
+  supportedFunctionNames,
+} from '../commands/function-categories.js';
+import {
+  getRecentFunctions,
+  recordRecentFunction,
+  subscribeRecentFunctions,
+} from '../commands/function-history.js';
 import { FUNCTION_SIGNATURES } from '../commands/refs.js';
 import { defaultStrings, en as enStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
@@ -7,6 +20,7 @@ import {
   appendDialogActions,
   appendDialogButton,
   appendDialogFrame,
+  createDialogButton,
   createDialogShell,
 } from './dialog-shell.js';
 
@@ -18,139 +32,14 @@ import {
 const detectLocale = (s: Strings): 'en' | 'ja' =>
   s.fxDialog.title === enStrings.fxDialog.title ? 'en' : 'ja';
 
-type FunctionCategory =
-  | 'all'
-  | 'recent'
-  | 'logical'
-  | 'lookup'
-  | 'text'
-  | 'datetime'
-  | 'math'
-  | 'financial'
-  | 'dynamicArray';
+/** Keep the picker-facing type exported from its historic module for hosts
+ * that import it from `interact/fx-dialog`. */
+export type { FunctionCategory } from '../commands/function-categories.js';
 
-const FUNCTION_CATEGORY_NAMES: Record<
-  Exclude<FunctionCategory, 'all' | 'recent'>,
-  readonly string[]
-> = {
-  logical: ['IF', 'IFS', 'IFERROR', 'IFNA', 'AND', 'OR', 'NOT', 'XOR', 'TRUE', 'FALSE'],
-  lookup: [
-    'VLOOKUP',
-    'HLOOKUP',
-    'XLOOKUP',
-    'INDEX',
-    'MATCH',
-    'XMATCH',
-    'OFFSET',
-    'INDIRECT',
-    'CHOOSE',
-    'ROW',
-    'COLUMN',
-    'ROWS',
-    'COLUMNS',
-  ],
-  text: [
-    'CONCATENATE',
-    'CONCAT',
-    'TEXTJOIN',
-    'TEXTSPLIT',
-    'TEXTBEFORE',
-    'TEXTAFTER',
-    'LEFT',
-    'RIGHT',
-    'MID',
-    'LEN',
-    'UPPER',
-    'LOWER',
-    'PROPER',
-    'TRIM',
-    'SUBSTITUTE',
-    'REPLACE',
-    'FIND',
-    'SEARCH',
-    'TEXT',
-    'VALUE',
-    'NUMBERVALUE',
-  ],
-  datetime: [
-    'TODAY',
-    'NOW',
-    'DATE',
-    'YEAR',
-    'MONTH',
-    'DAY',
-    'HOUR',
-    'MINUTE',
-    'SECOND',
-    'WEEKDAY',
-    'EOMONTH',
-    'DATEDIF',
-    'NETWORKDAYS',
-    'WORKDAY',
-  ],
-  math: [
-    'SUM',
-    'AVERAGE',
-    'COUNT',
-    'COUNTA',
-    'COUNTIF',
-    'COUNTIFS',
-    'SUMIF',
-    'SUMIFS',
-    'AVERAGEIF',
-    'AVERAGEIFS',
-    'MIN',
-    'MAX',
-    'MEDIAN',
-    'ROUND',
-    'ROUNDUP',
-    'ROUNDDOWN',
-    'CEILING',
-    'FLOOR',
-    'INT',
-    'MOD',
-    'ABS',
-    'POWER',
-    'SQRT',
-    'EXP',
-    'LN',
-    'LOG',
-    'LOG10',
-  ],
-  financial: ['PMT', 'PV', 'FV', 'NPV', 'IRR', 'RATE', 'NPER'],
-  dynamicArray: [
-    'TRANSPOSE',
-    'UNIQUE',
-    'SORT',
-    'SORTBY',
-    'FILTER',
-    'SEQUENCE',
-    'RANDARRAY',
-    'VSTACK',
-    'HSTACK',
-    'TOROW',
-    'TOCOL',
-    'WRAPROWS',
-    'WRAPCOLS',
-    'CHOOSEROWS',
-    'CHOOSECOLS',
-    'TAKE',
-    'DROP',
-    'EXPAND',
-    'LAMBDA',
-    'LET',
-    'MAP',
-    'REDUCE',
-    'SCAN',
-    'BYROW',
-    'BYCOL',
-    'MAKEARRAY',
-    'GROUPBY',
-    'PIVOTBY',
-    'PERCENTOF',
-    'IMAGE',
-  ],
-};
+export interface FxDialogOpenOptions {
+  /** Start on a picker category. Ignored when `seedName` names a function. */
+  category?: FunctionCategory;
+}
 
 export interface FxDialogDeps {
   host: HTMLElement;
@@ -159,14 +48,18 @@ export interface FxDialogDeps {
   /** Optional spreadsheet-context seed for function arguments, e.g. the
    *  currently selected range when a seeded ribbon function opens. */
   getInitialArguments?: (functionName: string) => readonly string[] | null;
+  /** Read the live recognized function catalog at each open/refresh. */
+  getWb?: () => FunctionCatalogReader | null;
+  /** Current host locale, used for engine-provided function metadata. */
+  getLocale?: () => string;
   /** Called with the assembled formula text (including leading '='). */
-  onInsert: (formula: string) => void;
+  onInsert: (formula: string) => void | boolean;
 }
 
 export interface FxDialogHandle {
   /** Open the dialog. Optional `seedName` pre-selects a function and jumps
    *  straight to the argument-input step. */
-  open(seedName?: string): void;
+  open(seedName?: string, options?: FxDialogOpenOptions): void;
   close(): void;
   /** Re-read i18n strings (e.g. after a locale switch). */
   refresh(): void;
@@ -259,6 +152,8 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   let strings = deps.strings ?? defaultStrings;
   let t = strings.fxDialog;
   let locale: 'en' | 'ja' = detectLocale(strings);
+  const localeOrdinal = (): 0 | 1 =>
+    (deps.getLocale?.().toLowerCase().startsWith('ja') ?? locale === 'ja') ? 1 : 0;
 
   // ── Overlay + panel ─────────────────────────────────────────────────────
   const shell = createDialogShell({
@@ -370,13 +265,23 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   });
 
   // ── State ───────────────────────────────────────────────────────────────
-  // Sorted catalog of all known function names; rebuilt once and reused.
-  const allNames: readonly string[] = Object.keys(FUNCTION_SIGNATURES).slice().sort();
+  // The workbook catalog is intentionally lazy: a workbook can be swapped
+  // after attachment, and locale metadata can change between opens.
+  let catalog: FunctionCatalogSnapshot = buildFunctionCatalog(
+    deps.getWb?.() ?? null,
+    localeOrdinal(),
+  );
   let selectedCategory: FunctionCategory = 'all';
-  let recentNames: string[] = [];
   let selectedName: string | null = null;
   let highlightIndex = 0;
   let argInputs: HTMLInputElement[] = [];
+  let argCount = 0;
+  let selectedEntry: FunctionCatalogEntry | null = null;
+
+  const refreshCatalog = (): void => {
+    locale = deps.getLocale?.().toLowerCase().startsWith('ja') ? 'ja' : detectLocale(strings);
+    catalog = buildFunctionCatalog(deps.getWb?.() ?? null, localeOrdinal());
+  };
 
   const setInsertDisabled = (disabled: boolean, reason: string | null): void => {
     projectDisabledState(insertBtn, disabled, reason, {
@@ -385,14 +290,23 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     });
   };
 
+  const catalogEntry = (name: string): FunctionCatalogEntry | null =>
+    catalog.entries.get(name) ?? null;
+
   const localizedDescription = (name: string): string => {
+    const metadataDescription = catalogEntry(name)?.description;
+    if (metadataDescription !== undefined) return metadataDescription;
     const entry = FUNCTION_DESCRIPTIONS[name];
     if (!entry) return '';
     return locale === 'ja' ? entry.ja : entry.en;
   };
 
-  const functionSyntax = (name: string): string =>
-    `${name}(${(FUNCTION_SIGNATURES[name] ?? []).join(', ')})`;
+  const functionSyntax = (name: string): string => {
+    const entry = catalogEntry(name);
+    if (entry?.signatureTemplate) return entry.signatureTemplate;
+    const displayName = entry?.displayName ?? name;
+    return `${displayName}(${(entry?.argumentLabels ?? FUNCTION_SIGNATURES[name] ?? []).join(', ')})`;
+  };
 
   const updateFunctionSummary = (name: string | null): void => {
     if (!name) {
@@ -406,17 +320,51 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     functionSummaryDesc.textContent = localizedDescription(name);
   };
 
-  const categoryOptions = (): Array<{ value: FunctionCategory; label: string }> => [
-    { value: 'all', label: t.categoryAll },
-    { value: 'recent', label: t.categoryRecent },
-    { value: 'logical', label: t.categoryLogical },
-    { value: 'lookup', label: t.categoryLookup },
-    { value: 'text', label: t.categoryText },
-    { value: 'datetime', label: t.categoryDateTime },
-    { value: 'math', label: t.categoryMath },
-    { value: 'financial', label: t.categoryFinancial },
-    { value: 'dynamicArray', label: t.categoryDynamicArray },
-  ];
+  const categoryOptions = (): Array<{ value: FunctionCategory; label: string }> => {
+    // The base dictionaries predate the native Excel family expansion. Keep
+    // those dictionaries source-compatible and use stable labels until a
+    // host supplies localized overrides for the newer families.
+    const extended = t as typeof t &
+      Partial<
+        Record<
+          | 'categoryStatistical'
+          | 'categoryEngineering'
+          | 'categoryInformation'
+          | 'categoryDatabase'
+          | 'categoryCompatibility'
+          | 'categoryCube'
+          | 'categoryWeb',
+          string
+        >
+      >;
+    const label = (key: keyof typeof extended, fallback: string): string =>
+      extended[key] ?? fallback;
+    const options: Array<{ value: FunctionCategory; label: string }> = [
+      { value: 'all', label: t.categoryAll },
+      { value: 'recent', label: t.categoryRecent },
+      { value: 'financial', label: t.categoryFinancial },
+      { value: 'logical', label: t.categoryLogical },
+      { value: 'text', label: t.categoryText },
+      { value: 'datetime', label: t.categoryDateTime },
+      { value: 'lookup', label: t.categoryLookup },
+      { value: 'math', label: t.categoryMath },
+      {
+        value: 'statistical',
+        label: label('categoryStatistical', locale === 'ja' ? '統計' : 'Statistical'),
+      },
+      { value: 'engineering', label: label('categoryEngineering', 'Engineering') },
+      { value: 'information', label: label('categoryInformation', 'Information') },
+      { value: 'database', label: label('categoryDatabase', 'Database') },
+      { value: 'compatibility', label: label('categoryCompatibility', 'Compatibility') },
+      { value: 'cube', label: label('categoryCube', 'Cube') },
+      { value: 'web', label: label('categoryWeb', 'Web') },
+      { value: 'dynamicArray', label: t.categoryDynamicArray },
+    ];
+    return options.filter((option) => {
+      if (option.value === 'all' || option.value === 'recent') return true;
+      return supportedFunctionNames(option.value, catalog.knownNames).length > 0;
+    });
+  };
 
   const renderCategoryOptions = (): void => {
     categorySelect.replaceChildren();
@@ -425,23 +373,22 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   };
 
   const categoryNames = (): string[] => {
-    if (selectedCategory === 'all') return [...allNames];
+    if (selectedCategory === 'all') return [...catalog.names];
     if (selectedCategory === 'recent')
-      return recentNames
-        .filter((name) => name in FUNCTION_SIGNATURES)
-        .slice()
-        .sort();
-    return FUNCTION_CATEGORY_NAMES[selectedCategory]
-      .filter((name) => name in FUNCTION_SIGNATURES)
-      .slice()
-      .sort();
+      return [...getRecentFunctions(deps.store, catalog.knownNames)];
+    return supportedFunctionNames(selectedCategory, catalog.knownNames);
   };
 
   const filteredNames = (): string[] => {
     const q = searchInput.value.trim().toUpperCase();
     const source = categoryNames();
     if (!q) return source;
-    return source.filter((n) => n.includes(q));
+    return source.filter((name) => {
+      const entry = catalogEntry(name);
+      return [name, entry?.displayName, entry?.signatureTemplate, entry?.description]
+        .filter((value): value is string => value !== undefined)
+        .some((value) => value.toUpperCase().includes(q));
+    });
   };
 
   const renderList = (): void => {
@@ -473,7 +420,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       }
       const nameEl = document.createElement('span');
       nameEl.className = 'fc-fxdialog__item-name';
-      nameEl.textContent = name;
+      nameEl.textContent = catalogEntry(name)?.displayName ?? name;
       item.appendChild(nameEl);
       const desc = localizedDescription(name);
       if (desc) {
@@ -491,6 +438,12 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     updateFunctionSummary(names[highlightIndex] ?? null);
   };
 
+  const unsubscribeRecentFunctions = subscribeRecentFunctions(deps.store, () => {
+    if (selectedCategory !== 'recent') return;
+    highlightIndex = 0;
+    renderList();
+  });
+
   const assembleFormula = (): string => {
     if (!selectedName) return '';
     const args = argInputs.map((i) => i.value);
@@ -506,9 +459,75 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     setInsertDisabled(!selectedName, selectedName ? null : t.insertRequiresFunction);
   };
 
+  const argumentCountFor = (entry: FunctionCatalogEntry | null, initialCount: number): number => {
+    const labels = entry?.argumentLabels ?? [];
+    const minArity = entry?.minArity ?? labels.length;
+    const maxArity = entry?.maxArity ?? null;
+    const optionalSeed = minArity === 0 && maxArity !== 0 ? 1 : 0;
+    const requested = Math.max(labels.length, minArity, optionalSeed, initialCount);
+    return maxArity === null ? requested : Math.min(requested, maxArity);
+  };
+
+  const argumentLabelFor = (entry: FunctionCatalogEntry | null, index: number): string => {
+    const label = entry?.argumentLabels[index];
+    if (label) return label;
+    const minArity = entry?.minArity ?? 0;
+    const prefix =
+      index < minArity
+        ? (t.argumentLabel ?? 'Argument')
+        : (t.optionalArgumentLabel ?? 'Optional argument');
+    return `${prefix} ${index + 1}`;
+  };
+
+  const renderArgumentFields = (initialArgs: readonly string[] = []): void => {
+    const previousValues = argInputs.map((input) => input.value);
+    argsFields.replaceChildren();
+    argInputs = [];
+    const entry = selectedEntry;
+    const minArity = entry?.minArity ?? 0;
+    const maxArity = entry?.maxArity ?? null;
+    for (let index = 0; index < argCount; index += 1) {
+      const row = document.createElement('label');
+      row.className = 'fc-fmtdlg__row fc-fxdialog__arg-row';
+      const labelEl = document.createElement('span');
+      labelEl.textContent = argumentLabelFor(entry, index);
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'fc-fxdialog__arg-input';
+      input.autocomplete = 'off';
+      input.spellcheck = false;
+      row.append(labelEl, input);
+      argsFields.appendChild(row);
+      input.value = initialArgs[index] ?? previousValues[index] ?? '';
+      argInputs.push(input);
+    }
+    if (maxArity === null) {
+      const note = document.createElement('div');
+      note.className = 'fc-fxdialog__variadic-note';
+      note.textContent = t.variadicHint;
+      argsFields.appendChild(note);
+    }
+    if (maxArity === null || argCount < maxArity) {
+      const add = createDialogButton({
+        label: t.addArgument ?? 'Add argument',
+        baseClass: 'fc-fxdialog__arg-action',
+      });
+      add.dataset.fxAction = 'add-argument';
+      argsFields.appendChild(add);
+    }
+    if (argCount > minArity) {
+      const remove = createDialogButton({
+        label: t.removeArgument ?? 'Remove argument',
+        baseClass: 'fc-fxdialog__arg-action',
+      });
+      remove.dataset.fxAction = 'remove-argument';
+      argsFields.appendChild(remove);
+    }
+  };
+
   const choose = (name: string, initialArgs: readonly string[] = []): void => {
     selectedName = name;
-    recentNames = [name, ...recentNames.filter((entry) => entry !== name)].slice(0, 12);
+    selectedEntry = catalogEntry(name);
     pickerWrap.hidden = true;
     argsWrap.hidden = false;
     backBtn.hidden = false;
@@ -517,40 +536,10 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     argsName.textContent = functionSyntax(name);
     argsDesc.textContent = localizedDescription(name);
 
-    argsFields.replaceChildren();
-    argInputs = [];
-    const sig = FUNCTION_SIGNATURES[name] ?? [];
-    // The trailing "..." marker in signatures is a hint — surface it as a
-    // disabled label rather than a real input slot.
-    const inputArgs = sig.filter((a) => a !== '...');
-    inputArgs.forEach((arg) => {
-      const row = document.createElement('label');
-      row.className = 'fc-fmtdlg__row fc-fxdialog__arg-row';
-      const labelEl = document.createElement('span');
-      labelEl.textContent = arg;
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.className = 'fc-fxdialog__arg-input';
-      input.autocomplete = 'off';
-      input.spellcheck = false;
-      // Tracked via shell.on so dispose() removes it; required because
-      // step-2 inputs are dynamically rebuilt every choose() call.
-      shell.on(input, 'input', updatePreview);
-      row.append(labelEl, input);
-      argsFields.appendChild(row);
-      input.value = initialArgs[argInputs.length] ?? '';
-      argInputs.push(input);
-    });
-    if (sig.includes('...')) {
-      const note = document.createElement('div');
-      note.className = 'fc-fxdialog__variadic-note';
-      note.textContent = t.variadicHint;
-      argsFields.appendChild(note);
-    }
+    argCount = argumentCountFor(selectedEntry, initialArgs.length);
+    renderArgumentFields(initialArgs);
     updatePreview();
-    requestAnimationFrame(() => {
-      argInputs[0]?.focus();
-    });
+    if (shell.isOpen()) argInputs[0]?.focus();
   };
 
   const goBackToPicker = (): void => {
@@ -560,7 +549,9 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     backBtn.hidden = true;
     setInsertDisabled(true, t.insertRequiresFunction);
     argInputs = [];
-    requestAnimationFrame(() => searchInput.focus());
+    argCount = 0;
+    selectedEntry = null;
+    if (shell.isOpen()) searchInput.focus();
   };
 
   // ── Event handlers ──────────────────────────────────────────────────────
@@ -609,7 +600,18 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   const onInsertClick = (): void => {
     if (!selectedName) return;
     const formula = assembleFormula();
-    onInsert(formula);
+    let accepted: void | boolean;
+    try {
+      accepted = onInsert(formula);
+    } catch {
+      insertBtn.focus();
+      return;
+    }
+    if (accepted === false) {
+      insertBtn.focus();
+      return;
+    }
+    recordRecentFunction(deps.store, selectedName, catalog.knownNames);
     api.close();
   };
 
@@ -643,7 +645,32 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     choose(target.dataset.fxName);
   };
 
+  const onArgsInput = (): void => updatePreview();
+
+  const onArgsClick = (e: Event): void => {
+    const target = (e.target as HTMLElement | null)?.closest<HTMLButtonElement>('[data-fx-action]');
+    if (!target) return;
+    const entry = selectedEntry;
+    const minArity = entry?.minArity ?? 0;
+    const maxArity = entry?.maxArity ?? null;
+    if (target.dataset.fxAction === 'add-argument') {
+      if (maxArity !== null && argCount >= maxArity) return;
+      argCount += 1;
+      renderArgumentFields();
+      argInputs.at(-1)?.focus();
+      updatePreview();
+    } else if (target.dataset.fxAction === 'remove-argument') {
+      if (argCount <= minArity) return;
+      argCount -= 1;
+      renderArgumentFields();
+      argInputs.at(-1)?.focus();
+      updatePreview();
+    }
+  };
+
   shell.on(list, 'click', onListClick);
+  shell.on(argsFields, 'input', onArgsInput as EventListener, true);
+  shell.on(argsFields, 'click', onArgsClick);
   shell.on(categorySelect, 'change', onCategoryChange);
   shell.on(searchInput, 'input', onSearchInput);
   shell.on(searchInput, 'keydown', onSearchKey as EventListener);
@@ -657,6 +684,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     shell.setAriaLabel(t.title);
     header.textContent = t.title;
     categoryLabel.textContent = t.categoryLabel;
+    refreshCatalog();
     renderCategoryOptions();
     searchInput.placeholder = t.searchPlaceholder;
     searchInput.setAttribute('aria-label', t.searchPlaceholder);
@@ -667,36 +695,41 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     insertBtn.textContent = t.insert;
     setInsertDisabled(insertBtn.disabled, insertBtn.disabled ? t.insertRequiresFunction : null);
     if (selectedName) {
+      selectedEntry = catalogEntry(selectedName);
+      argsName.textContent = functionSyntax(selectedName);
       argsDesc.textContent = localizedDescription(selectedName);
-      const noteEl = argsFields.querySelector<HTMLElement>('.fc-fxdialog__variadic-note');
-      if (noteEl) noteEl.textContent = t.variadicHint;
+      renderArgumentFields();
     }
     renderList();
   };
 
   const api: FxDialogHandle = {
-    open(seedName?: string): void {
+    open(seedName?: string, options?: FxDialogOpenOptions): void {
+      refreshCatalog();
       searchInput.value = '';
       highlightIndex = 0;
       argInputs = [];
+      selectedCategory = options?.category ?? 'all';
       renderCategoryOptions();
+      // Repaint the hidden picker too. Seeded opens skip directly to the
+      // argument step, but the picker remains mounted and must reflect a
+      // workbook or locale change before the next back/open cycle.
+      renderList();
       const seed = seedName ? seedName.toUpperCase() : null;
-      if (seed && FUNCTION_SIGNATURES[seed]) {
+      if (seed && catalog.knownNames.has(seed)) {
         // Skip the picker — jump straight to argument entry.
         choose(seed, deps.getInitialArguments?.(seed) ?? []);
       } else {
         selectedName = null;
+        selectedEntry = null;
         pickerWrap.hidden = false;
         argsWrap.hidden = true;
         backBtn.hidden = true;
         setInsertDisabled(true, t.insertRequiresFunction);
-        renderList();
       }
       shell.open();
-      requestAnimationFrame(() => {
-        if (argsWrap.hidden) searchInput.focus();
-        else argInputs[0]?.focus();
-      });
+      if (argsWrap.hidden) searchInput.focus();
+      else argInputs[0]?.focus();
     },
     close(): void {
       shell.close();
@@ -710,6 +743,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       refreshLabels();
     },
     detach(): void {
+      unsubscribeRecentFunctions();
       shell.dispose();
     },
   };

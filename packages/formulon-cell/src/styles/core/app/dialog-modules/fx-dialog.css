@@ -160,6 +160,19 @@
   .fc-fxdialog__arg-input {
     flex: 1;
   }
+  .fc-fxdialog__arg-action {
+    align-self: flex-start;
+    border: 0;
+    padding: 2px 0;
+    background: transparent;
+    color: var(--fc-accent, currentColor);
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+  }
+  .fc-fxdialog__arg-action:hover {
+    text-decoration: underline;
+  }
   .fc-fxdialog__variadic-note {
     font-size: 11px;
     color: var(--fc-fg-mute, color-mix(in srgb, CanvasText 60%, transparent));
