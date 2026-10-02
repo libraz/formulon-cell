@@ -88,6 +88,38 @@ describe('attachCellStylesGallery', () => {
     handle.detach();
   });
 
+  it('uses the owner platform for live 40% accent previews and application', () => {
+    host.dataset.fcPlatform = 'mac';
+    const handle = attachCellStylesGallery({ host, store });
+    handle.open();
+    const macChip = chips().find((chip) => chip.dataset.fcStyle === 'accent1_40');
+    expect(macChip).toBeTruthy();
+    expect(macChip?.style.background).toBe('#83cceb');
+    expect(chips().find((chip) => chip.dataset.fcStyle === 'accent1')?.style.background).toBe(
+      '#156082',
+    );
+    expect(chips().find((chip) => chip.dataset.fcStyle === 'accent1_20')?.style.background).toBe(
+      '#c0e6f5',
+    );
+    expect(chips().find((chip) => chip.dataset.fcStyle === 'accent1_60')?.style.background).toBe(
+      '#44b3e1',
+    );
+    macChip?.click();
+    expect(store.getState().format.formats.get('0:0:0')).toMatchObject({
+      cellStyle: 'accent1_40',
+      fill: '#83cceb',
+    });
+    host.dataset.fcPlatform = 'default';
+    handle.open();
+    expect(chips().find((chip) => chip.dataset.fcStyle === 'accent1_40')?.style.background).toBe(
+      '#b4c7e7',
+    );
+    expect(chips().find((chip) => chip.dataset.fcStyle === 'accent1_60')?.style.background).toBe(
+      '#8eaadb',
+    );
+    handle.detach();
+  });
+
   it('uses localized style labels and updates them on locale changes', () => {
     const handle = attachCellStylesGallery({ host, store, strings: ja });
     handle.open();
@@ -98,7 +130,10 @@ describe('attachCellStylesGallery', () => {
       'チェック セル',
     );
     expect(chips().find((c) => c.dataset.fcStyle === 'accent1_20')?.textContent).toBe(
-      '20% - アクセント1',
+      '20% - アクセント 1',
+    );
+    expect(chips().find((c) => c.dataset.fcStyle === 'accent1_40')?.textContent).toBe(
+      '40% - アクセント 1',
     );
 
     handle.setStrings(en);

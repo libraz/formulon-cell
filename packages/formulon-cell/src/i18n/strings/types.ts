@@ -122,6 +122,18 @@ export interface Strings {
       accent4_20: string;
       accent5_20: string;
       accent6_20: string;
+      accent1_40: string;
+      accent2_40: string;
+      accent3_40: string;
+      accent4_40: string;
+      accent5_40: string;
+      accent6_40: string;
+      accent1_60: string;
+      accent2_60: string;
+      accent3_60: string;
+      accent4_60: string;
+      accent5_60: string;
+      accent6_60: string;
       currency: string;
       currency0: string;
       percent: string;

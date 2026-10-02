@@ -1,9 +1,13 @@
 import {
   CELL_STYLES,
+  type CellStyleFallbackProfile,
   type CellStyleFormatGroup,
   type CellStyleId,
+  cellStyleFallbackFormat,
   cellStyleGroups,
+  formatForCellStyleGroups,
   getCellStyle,
+  stylePayloadMatches,
   stylePayloadMatchesNative,
 } from '../commands/cell-styles.js';
 import type { CellFormat, State } from '../store/store.js';
@@ -68,23 +72,41 @@ export function cellStyleKeyForOoxmlName(name: string): string {
 
 /** Every named style referenced by at least one cell on the sheet set, in a
  *  stable order. Styles nothing references are not written — Excel keeps the
- *  full built-in gallery in every file, but emitting 35 unused entries would
+ *  full built-in gallery in every file, but emitting every unused entry would
  *  bloat a workbook the user never styled. */
 export function collectNamedStyles(state: State): NamedStyleRegistration[] {
   const keys = new Set<string>();
+  const materialized = new Map<string, Partial<CellFormat>[]>();
   for (const fmt of state.format.formats.values()) {
-    if (fmt.cellStyle) keys.add(fmt.cellStyle);
+    if (!fmt.cellStyle) continue;
+    keys.add(fmt.cellStyle);
+    const values = materialized.get(fmt.cellStyle) ?? [];
+    values.push(fmt);
+    materialized.set(fmt.cellStyle, values);
   }
   const out: NamedStyleRegistration[] = [];
   for (const key of keys) {
     const builtin = getCellStyle(key as CellStyleId);
     if (builtin) {
+      const groups = cellStyleGroups(builtin);
+      const candidates = materialized.get(key) ?? [];
+      const projected = candidates.map((candidate) => formatForCellStyleGroups(candidate, groups));
+      const profiles: readonly CellStyleFallbackProfile[] = ['default', 'excel365Mac'];
+      const profile = profiles.find((candidateProfile) => {
+        const fallback = cellStyleFallbackFormat(builtin.id, candidateProfile);
+        return (
+          projected.length > 0 &&
+          projected.every((candidate) => stylePayloadMatches(candidate, fallback, groups))
+        );
+      });
       out.push({
         key,
         name: ooxmlNameFor(builtin.id, builtin.label),
         builtinId: builtin.builtinId ?? null,
-        format: builtin.format,
-        groups: cellStyleGroups(builtin),
+        format: profile
+          ? cellStyleFallbackFormat(builtin.id, profile)
+          : cellStyleFallbackFormat(builtin.id, 'default'),
+        groups,
       });
       continue;
     }

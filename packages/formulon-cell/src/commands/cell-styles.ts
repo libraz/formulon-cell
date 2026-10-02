@@ -50,6 +50,18 @@ export type CellStyleId =
   | 'accent4_20'
   | 'accent5_20'
   | 'accent6_20'
+  | 'accent1_40'
+  | 'accent2_40'
+  | 'accent3_40'
+  | 'accent4_40'
+  | 'accent5_40'
+  | 'accent6_40'
+  | 'accent1_60'
+  | 'accent2_60'
+  | 'accent3_60'
+  | 'accent4_60'
+  | 'accent5_60'
+  | 'accent6_60'
   | 'currency'
   | 'currency0'
   | 'percent'
@@ -264,6 +276,66 @@ const CELL_STYLE_DEFS: readonly CellStyleDef[] = [
     format: { color: '#375623', fill: '#e2f0d9' },
   },
   {
+    id: 'accent1_40',
+    label: '40% - Accent1',
+    format: { color: '#000000', fill: '#b4c7e7' },
+  },
+  {
+    id: 'accent2_40',
+    label: '40% - Accent2',
+    format: { color: '#000000', fill: '#f8cbad' },
+  },
+  {
+    id: 'accent3_40',
+    label: '40% - Accent3',
+    format: { color: '#000000', fill: '#dbdbdb' },
+  },
+  {
+    id: 'accent4_40',
+    label: '40% - Accent4',
+    format: { color: '#000000', fill: '#ffe599' },
+  },
+  {
+    id: 'accent5_40',
+    label: '40% - Accent5',
+    format: { color: '#000000', fill: '#bdd7ee' },
+  },
+  {
+    id: 'accent6_40',
+    label: '40% - Accent6',
+    format: { color: '#000000', fill: '#c5e0b3' },
+  },
+  {
+    id: 'accent1_60',
+    label: '60% - Accent1',
+    format: { color: '#000000', fill: '#8eaadb' },
+  },
+  {
+    id: 'accent2_60',
+    label: '60% - Accent2',
+    format: { color: '#000000', fill: '#f4b183' },
+  },
+  {
+    id: 'accent3_60',
+    label: '60% - Accent3',
+    format: { color: '#000000', fill: '#c9c9c9' },
+  },
+  {
+    id: 'accent4_60',
+    label: '60% - Accent4',
+    format: { color: '#000000', fill: '#ffd966' },
+  },
+  {
+    id: 'accent5_60',
+    label: '60% - Accent5',
+    format: { color: '#000000', fill: '#9dc3e6' },
+  },
+  {
+    id: 'accent6_60',
+    label: '60% - Accent6',
+    format: { color: '#000000', fill: '#a8d08d' },
+  },
+  {
     id: 'currency',
     label: 'Currency',
     format: { numFmt: { kind: 'currency', decimals: 2, symbol: '$' } },
@@ -331,6 +403,18 @@ const CELL_STYLE_METADATA: Partial<
   accent5_20: { builtinId: 46, includedGroups: ['font', 'fill'] },
   accent6: { builtinId: 49, includedGroups: ['font', 'fill'] },
   accent6_20: { builtinId: 50, includedGroups: ['font', 'fill'] },
+  accent1_40: { builtinId: 31, includedGroups: ['font', 'fill'] },
+  accent1_60: { builtinId: 32, includedGroups: ['font', 'fill'] },
+  accent2_40: { builtinId: 35, includedGroups: ['font', 'fill'] },
+  accent2_60: { builtinId: 36, includedGroups: ['font', 'fill'] },
+  accent3_40: { builtinId: 39, includedGroups: ['font', 'fill'] },
+  accent3_60: { builtinId: 40, includedGroups: ['font', 'fill'] },
+  accent4_40: { builtinId: 43, includedGroups: ['font', 'fill'] },
+  accent4_60: { builtinId: 44, includedGroups: ['font', 'fill'] },
+  accent5_40: { builtinId: 47, includedGroups: ['font', 'fill'] },
+  accent5_60: { builtinId: 48, includedGroups: ['font', 'fill'] },
+  accent6_40: { builtinId: 51, includedGroups: ['font', 'fill'] },
+  accent6_60: { builtinId: 52, includedGroups: ['font', 'fill'] },
 };
 
 export const CELL_STYLES: readonly CellStyleDef[] = CELL_STYLE_DEFS.map((style) => ({
@@ -376,6 +460,18 @@ export const CELL_STYLE_GROUPS: readonly CellStyleGroupDef[] = [
       'accent4_20',
       'accent5_20',
       'accent6_20',
+      'accent1_40',
+      'accent2_40',
+      'accent3_40',
+      'accent4_40',
+      'accent5_40',
+      'accent6_40',
+      'accent1_60',
+      'accent2_60',
+      'accent3_60',
+      'accent4_60',
+      'accent5_60',
+      'accent6_60',
     ],
   },
   {
@@ -389,6 +485,52 @@ const CUSTOM_STYLE_PREFIX = 'custom:';
 const BUILT_IN_STYLE_NAMES = new Set(
   CELL_STYLES.flatMap((style) => [style.id.toLowerCase(), style.label.toLowerCase()]),
 );
+
+export type CellStyleFallbackProfile = 'default' | 'excel365Mac';
+
+const MAC_ACCENT_FORMATS: Partial<
+  Record<CellStyleId, Pick<Partial<CellFormat>, 'color' | 'fill'>>
+> = {
+  accent1: { color: '#ffffff', fill: '#156082' },
+  accent1_20: { color: '#000000', fill: '#c0e6f5' },
+  accent1_40: { color: '#000000', fill: '#83cceb' },
+  accent1_60: { color: '#000000', fill: '#44b3e1' },
+  accent2: { color: '#ffffff', fill: '#e97132' },
+  accent2_20: { color: '#000000', fill: '#fbe2d5' },
+  accent2_40: { color: '#000000', fill: '#f7c7ac' },
+  accent2_60: { color: '#000000', fill: '#f1a983' },
+  accent3: { color: '#ffffff', fill: '#196b24' },
+  accent3_20: { color: '#000000', fill: '#c1f0c8' },
+  accent3_40: { color: '#000000', fill: '#83e28e' },
+  accent3_60: { color: '#000000', fill: '#47d359' },
+  accent4: { color: '#ffffff', fill: '#0f9ed5' },
+  accent4_20: { color: '#000000', fill: '#caedfb' },
+  accent4_40: { color: '#000000', fill: '#94dcf8' },
+  accent4_60: { color: '#000000', fill: '#61cbf3' },
+  accent5: { color: '#ffffff', fill: '#a02b93' },
+  accent5_20: { color: '#000000', fill: '#f2ceef' },
+  accent5_40: { color: '#000000', fill: '#e49edd' },
+  accent5_60: { color: '#000000', fill: '#d86dcd' },
+  accent6: { color: '#ffffff', fill: '#4ea72e' },
+  accent6_20: { color: '#000000', fill: '#daf2d0' },
+  accent6_40: { color: '#000000', fill: '#b5e6a2' },
+  accent6_60: { color: '#000000', fill: '#8ed973' },
+};
+
+export const cellStyleFallbackProfileForPlatform = (
+  platform: string | undefined,
+): CellStyleFallbackProfile => (platform?.toLowerCase() === 'mac' ? 'excel365Mac' : 'default');
+
+/** Return a fresh portable/profile-aware format for a built-in style. */
+export function cellStyleFallbackFormat(
+  id: CellStyleId,
+  profile: CellStyleFallbackProfile = 'default',
+): Partial<CellFormat> {
+  const style = STYLE_BY_ID.get(id);
+  const format = { ...(style?.format ?? {}) };
+  if (profile === 'excel365Mac') Object.assign(format, MAC_ACCENT_FORMATS[id] ?? {});
+  return format;
+}
 
 const CELL_STYLE_GROUP_FIELDS: Record<CellStyleFormatGroup, readonly (keyof CellFormat)[]> = {
   number: ['numFmt'],
@@ -445,7 +587,7 @@ export function cellStyleGroups(
     : inferCellStyleGroups(style.format);
 }
 
-const formatForGroups = (
+export const formatForCellStyleGroups = (
   format: Partial<CellFormat>,
   groups: readonly CellStyleFormatGroup[],
 ): Partial<CellFormat> => {
@@ -481,6 +623,8 @@ const formatForGroups = (
   }
   return patch;
 };
+
+const formatForGroups = formatForCellStyleGroups;
 
 export function getCellStyle(id: CellStyleId): CellStyleDef | undefined {
   return STYLE_BY_ID.get(id);
@@ -536,6 +680,7 @@ export interface CellStyleCommandContext {
   origin?: InteractionOrigin;
   commandId?: string;
   getWorkbook?: () => WorkbookHandle | null;
+  getFallbackProfile?: () => CellStyleFallbackProfile;
 }
 
 const sameStyleValue = (left: unknown, right: unknown): boolean => {
@@ -692,25 +837,53 @@ export const stylePayloadMatchesNative = (
 const resolveWorkbookStyleFormat = (
   workbook: WorkbookHandle | null,
   style: ReturnType<typeof resolvedCellStyle>,
+  profile: CellStyleFallbackProfile = 'default',
 ): Partial<CellFormat> => {
-  if (!workbook || !style || !workbook.capabilities.cellStyles) return style?.format ?? {};
+  if (!style) return {};
+  const fallback =
+    style.builtinId === undefined
+      ? { ...style.format }
+      : cellStyleFallbackFormat(style.id as CellStyleId, profile);
+  if (!workbook?.capabilities.cellStyles) return fallback;
   const named = workbook.getNamedCellStyles();
   const native =
     style.builtinId === undefined
       ? named.find((entry) => entry.name.trim().toLowerCase() === style.label.trim().toLowerCase())
       : named.find((entry) => entry.builtinId === style.builtinId);
-  if (!native) return style.format;
+  if (!native) return fallback;
   const xf = workbook.getCellStyleXf(native.xfId);
-  if (!xf) return style.format;
+  if (!xf) return fallback;
   const nativeFormat = cellFormatFromXf(workbook, xf, workbook.workbookDefaultFont);
   if (
     style.builtinId === undefined &&
     !stylePayloadMatchesNative(workbook, xf, nativeFormat, style.format, style.groups)
   ) {
-    return style.format;
+    return fallback;
   }
   return nativeFormat;
 };
+
+/** Resolve a built-in style for previews and application, preferring the
+ * workbook's raw named-style XF over the selected portable fallback. */
+export function resolveCellStyleFormat(
+  id: CellStyleId,
+  workbook: WorkbookHandle | null,
+  profile: CellStyleFallbackProfile = 'default',
+): Partial<CellFormat> {
+  const style = getCellStyle(id);
+  if (!style) return {};
+  return resolveWorkbookStyleFormat(
+    workbook,
+    {
+      id: style.id,
+      label: style.label,
+      format: style.format,
+      groups: cellStyleGroups(style),
+      ...(style.builtinId === undefined ? {} : { builtinId: style.builtinId }),
+    },
+    profile,
+  );
+}
 
 const applyCellStyleToRange = (
   store: SpreadsheetStore,
@@ -765,7 +938,8 @@ export function applyCellStyleToSelection(
   const plan = planSelectionFormat(state);
   if (!plan || plan.ranges.length === 0) return false;
   const workbook = context.getWorkbook?.() ?? null;
-  const payload = resolveWorkbookStyleFormat(workbook, style);
+  const profile = context.getFallbackProfile?.() ?? 'default';
+  const payload = resolveWorkbookStyleFormat(workbook, style, profile);
   const patch = formatForGroups(payload, style.groups);
   patch.cellStyle =
     style.id === 'normal' ? undefined : style.builtinId !== undefined ? style.id : style.label;

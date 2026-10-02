@@ -5,7 +5,9 @@ import {
   CELL_STYLES,
   type CellStyleGroupId,
   type CellStyleId,
+  cellStyleFallbackProfileForPlatform,
   listCustomCellStyles,
+  resolveCellStyleFormat,
 } from '../commands/cell-styles.js';
 import type { History } from '../commands/history.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -47,6 +49,7 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
   const { host, store } = deps;
   const history = deps.history ?? null;
   const getWb = deps.getWb ?? ((): WorkbookHandle | null => null);
+  const getFallbackProfile = () => cellStyleFallbackProfileForPlatform(host.dataset.fcPlatform);
   let strings = deps.strings ?? defaultStrings;
   const labelFor =
     deps.labelFor ??
@@ -119,7 +122,11 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
   const createChip = (id: CellStyleId): HTMLButtonElement | null => {
     const style = styleById.get(id);
     if (!style) return null;
-    return createChipFromDef({ id: style.id, label: labelFor(style.id), format: style.format });
+    return createChipFromDef({
+      id: style.id,
+      label: labelFor(style.id),
+      format: resolveCellStyleFormat(style.id, getWb(), getFallbackProfile()),
+    });
   };
 
   const renderGroups = (): void => {
@@ -183,6 +190,7 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
       origin: 'instanceApi',
       commandId: 'cellStyles',
       getWorkbook: getWb,
+      getFallbackProfile,
     });
     if (applied) close();
   };
