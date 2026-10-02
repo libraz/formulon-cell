@@ -234,5 +234,5 @@ export const showSortDialog = (opts: SortDialogOptions): Promise<SortDialogResul
     okBtn.addEventListener('click', () => lifecycle.finish(buildResult()));
     cancelBtn.addEventListener('click', () => lifecycle.finish(null));
 
-    mountDialog(shell, () => levels[0]?.column.focus({ preventScroll: true }));
+    mountDialog(shell, () => levels[0]?.column.focus({ preventScroll: true }), { immediate: true });
   });

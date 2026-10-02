@@ -78,6 +78,33 @@ describe('showSortDialog', () => {
     });
   });
 
+  it('focuses the first sort column before the opener command returns', () => {
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    opener.focus();
+
+    const resultPromise = showSortDialog({
+      ...labels,
+      columns: [{ value: '0', label: 'Column A' }],
+      initialColumn: '0',
+      initialDirection: 'asc',
+      initialHasHeader: false,
+    });
+
+    const dialog = document.querySelector<HTMLElement>('.fc-tb__dlg');
+    const firstColumn = dialog?.querySelector<HTMLSelectElement>(
+      '.fc-sortdlg__level select[aria-label="Sort by"]',
+    );
+    expect(document.activeElement).toBe(firstColumn);
+
+    dialog?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(document.querySelector('.fc-tb__dlg')).toBeNull();
+    expect(document.activeElement).toBe(opener);
+    return expect(resultPromise)
+      .resolves.toBeNull()
+      .finally(() => opener.remove());
+  });
+
   it('keeps Custom Sort levels on compact desktop grid geometry', () => {
     const css = readFileSync(join(root, 'src/styles/core/app/dialog-modules/sort.css'), 'utf8');
 

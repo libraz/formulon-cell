@@ -226,23 +226,43 @@ export const installDialogLifecycle = <T>(
   return { finish, onKey };
 };
 
+export interface MountDialogOptions {
+  /**
+   * Focus immediately while the command that opened the dialog is still
+   * running. This is useful for controls such as Custom Sort where the user
+   * can press Escape immediately after the ribbon command returns. The
+   * historical frame-delayed behaviour remains the default for the other
+   * dialogs.
+   */
+  immediate?: boolean;
+}
+
 export const mountDialog = (
   shell: DialogShell,
   focusInit: HTMLElement | (() => void) | null,
+  options: MountDialogOptions = {},
 ): void => {
   // `createDialogShell` mounts into the containing host's portal. Keep this
   // idempotent for callers that detached the shell before mounting again.
   if (!shell.overlay.isConnected) overlayPortalFor(shell.overlay).appendChild(shell.overlay);
   if (!focusInit) return;
+  const focus = (): void => {
+    // A dialog can be cancelled before its deferred focus callback runs. Do
+    // not move focus into a detached overlay in that case.
+    if (!shell.overlay.isConnected) return;
+    if (typeof focusInit === 'function') focusInit();
+    else focusInit.focus({ preventScroll: true });
+  };
+  if (options.immediate) {
+    focus();
+    return;
+  }
   const frame = shell.overlay.ownerDocument.defaultView
     ? shell.overlay.ownerDocument.defaultView.requestAnimationFrame.bind(
         shell.overlay.ownerDocument.defaultView,
       )
     : requestAnimationFrame;
-  frame(() => {
-    if (typeof focusInit === 'function') focusInit();
-    else focusInit.focus({ preventScroll: true });
-  });
+  frame(focus);
 };
 
 /** Adds a labelled text input row in the standard dialog body. */
