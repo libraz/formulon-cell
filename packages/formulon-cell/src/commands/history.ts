@@ -37,17 +37,31 @@ export interface HistoryEntry {
   intent?: OperationIntent;
   /** The logical command represented by the inverse replay. */
   inverseIntent?: OperationIntent;
+  /** The complete logical authorization for a composite replay. */
+  replayAuthorization?: {
+    readonly undo: readonly OperationIntent[];
+    readonly redo: readonly OperationIntent[];
+  };
 }
+
+/* Keep these fields in one interface so transaction metadata can be overlaid
+ * onto a single child entry without changing the existing entry contract. */
+type HistoryBeginMetadata = Pick<HistoryEntry, 'replayAuthorization'>;
+
+interface TransactionFrame {
+  id: HistoryTransaction;
+  startIndex: number;
+  metadata?: HistoryBeginMetadata;
+}
+
+/* The logical command represented by a transaction is known only by its
+ * caller. Child entries may be low-level structural callbacks with no policy
+ * meaning, so History deliberately does not infer or union their intents. */
 
 export type HistoryDirection = 'undo' | 'redo';
 export type HistoryGuard = (entry: HistoryEntry, direction: HistoryDirection) => boolean;
 /** Opaque handle for a transaction frame returned by `History.begin()`. */
 export type HistoryTransaction = symbol;
-
-interface TransactionFrame {
-  id: HistoryTransaction;
-  startIndex: number;
-}
 
 /**
  * Single source of truth for undoable mutations. Cell writes (workbook),
@@ -77,10 +91,14 @@ export class History {
     this.commit(entry);
   }
 
-  begin(): HistoryTransaction {
+  begin(metadata?: HistoryBeginMetadata): HistoryTransaction {
+    if (this.txnFrames.length > 0 && metadata !== undefined) {
+      throw new Error('History transaction metadata is only valid on an outer transaction');
+    }
     const frame: TransactionFrame = {
       id: Symbol('history-transaction'),
       startIndex: this.txnEntries.length,
+      metadata,
     };
     this.txnFrames.push(frame);
     return frame.id;
@@ -102,7 +120,7 @@ export class History {
     if (entries.length === 0) return;
     if (entries.length === 1) {
       const only = entries[0];
-      if (only) this.commit(only);
+      if (only) this.commit(this.withMetadata(only, frame.metadata));
       return;
     }
     this.commit({
@@ -112,7 +130,12 @@ export class History {
       redo: () => {
         for (const e of entries) e.redo();
       },
+      ...frame.metadata,
     });
+  }
+
+  private withMetadata(entry: HistoryEntry, metadata?: HistoryBeginMetadata): HistoryEntry {
+    return metadata ? { ...entry, ...metadata } : entry;
   }
 
   /** Roll back the current transaction frame without touching committed history. */

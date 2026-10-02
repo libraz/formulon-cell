@@ -835,6 +835,17 @@ export class InteractionController {
   }
 
   private guardHistory(entry: HistoryEntry, direction: HistoryDirection): boolean {
+    const replayAuthorization = entry.replayAuthorization;
+    if (replayAuthorization) {
+      const intents = direction === 'undo' ? replayAuthorization.undo : replayAuthorization.redo;
+      if (intents.length === 0) return false;
+      if (!this.policyValue) return true;
+      let allowed = true;
+      for (const intent of intents) {
+        if (!this.preflightIntent(intent).allowed) allowed = false;
+      }
+      return allowed;
+    }
     if (!this.policyValue) return true;
     const intent = direction === 'undo' ? entry.inverseIntent : entry.intent;
     if (!intent) return false;

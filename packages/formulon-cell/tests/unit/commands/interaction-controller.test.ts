@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { History } from '../../../src/commands/history.js';
 import { InteractionController } from '../../../src/commands/interaction-controller.js';
+import type { OperationIntent } from '../../../src/commands/interaction-policy.js';
 import {
   fixedFormPolicy,
   type InteractionPolicy,
@@ -110,6 +111,68 @@ describe('InteractionController', () => {
     expect(history.undo()).toBe(false);
     expect(history.canUndo()).toBe(true);
     expect(wb.getValue(A1)).toEqual({ kind: 'number', value: 7 });
+  });
+
+  it('denies a composite replay atomically when any authorization intent fails', async () => {
+    const { controller: service, history } = await createController();
+    const callbackLog: string[] = [];
+    const valueIntent: OperationIntent = {
+      operation: 'valueEdit',
+      origin: 'redo',
+      commandId: 'composite-value',
+      effects: [{ kind: 'workbook' }],
+    };
+    const formatIntent: OperationIntent = {
+      operation: 'format',
+      origin: 'undo',
+      commandId: 'composite-format',
+      effects: [{ kind: 'workbook' }],
+    };
+    history.begin({
+      replayAuthorization: {
+        undo: [valueIntent, formatIntent],
+        redo: [valueIntent, formatIntent],
+      },
+    });
+    history.push({
+      undo: () => callbackLog.push('first-undo'),
+      redo: () => callbackLog.push('first-redo'),
+    });
+    history.push({
+      undo: () => callbackLog.push('second-undo'),
+      redo: () => callbackLog.push('second-redo'),
+    });
+    history.end();
+
+    service.setPolicy({ operations: { valueEdit: true, format: false } });
+
+    expect(history.undo()).toBe(false);
+    expect(callbackLog).toEqual([]);
+    expect(history.canUndo()).toBe(true);
+    expect(history.canRedo()).toBe(false);
+
+    service.setPolicy({ operations: { valueEdit: true, format: true } });
+    expect(history.undo()).toBe(true);
+    expect(callbackLog).toEqual(['second-undo', 'first-undo']);
+  });
+
+  it('rejects an empty composite replay authorization bundle', async () => {
+    const { history } = await createController();
+    let callbacks = 0;
+    history.begin({ replayAuthorization: { undo: [], redo: [] } });
+    history.push({
+      undo: () => {
+        callbacks += 1;
+      },
+      redo: () => {
+        callbacks += 1;
+      },
+    });
+    history.end();
+
+    expect(history.undo()).toBe(false);
+    expect(callbacks).toBe(0);
+    expect(history.canUndo()).toBe(true);
   });
 
   it('authorizes format intents against editable cells and protection', async () => {

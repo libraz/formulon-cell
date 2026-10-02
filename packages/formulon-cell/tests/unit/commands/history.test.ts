@@ -11,6 +11,7 @@ import {
   captureLayoutSnapshot,
   captureTableOverlaysSnapshot,
   History,
+  type HistoryEntry,
   type HistoryTransaction,
   recordChartsChange,
   recordConditionalRulesChange,
@@ -20,6 +21,7 @@ import {
   recordRepeatableFormatChange,
   recordTablesChange,
 } from '../../../src/commands/history.js';
+import type { OperationIntent } from '../../../src/commands/interaction-policy.js';
 import {
   type ConditionalRule,
   createSpreadsheetStore,
@@ -128,6 +130,70 @@ describe('History stack', () => {
   });
 
   describe('transactions', () => {
+    it('retains outer replay authorization and callback order for a composite entry', () => {
+      const callbackLog: string[] = [];
+      const guardCalls: Array<{
+        direction: 'undo' | 'redo';
+        entry: HistoryEntry;
+      }> = [];
+      const intent = (commandId: string): OperationIntent => ({
+        operation: 'valueEdit',
+        origin: 'ribbon',
+        commandId,
+        effects: [{ kind: 'workbook' }],
+      });
+      const undoIntent = intent('composite-undo');
+      const redoIntent = intent('composite-redo');
+      h.setGuard((entry, direction) => {
+        guardCalls.push({ direction, entry });
+        return true;
+      });
+
+      const tx = h.begin({
+        replayAuthorization: {
+          undo: [undoIntent],
+          redo: [redoIntent],
+        },
+      });
+      h.push({
+        undo: () => callbackLog.push('undo-first'),
+        redo: () => callbackLog.push('redo-first'),
+      });
+      h.push({
+        undo: () => callbackLog.push('undo-second'),
+        redo: () => callbackLog.push('redo-second'),
+      });
+      h.end(tx);
+
+      expect(h.undo()).toBe(true);
+      expect(callbackLog).toEqual(['undo-second', 'undo-first']);
+      expect(guardCalls[0]).toMatchObject({
+        direction: 'undo',
+        entry: { replayAuthorization: { undo: [undoIntent], redo: [redoIntent] } },
+      });
+      callbackLog.length = 0;
+
+      expect(h.redo()).toBe(true);
+      expect(callbackLog).toEqual(['redo-first', 'redo-second']);
+      expect(guardCalls[1]).toMatchObject({
+        direction: 'redo',
+        entry: { replayAuthorization: { undo: [undoIntent], redo: [redoIntent] } },
+      });
+    });
+
+    it('rejects metadata on nested begin before changing the outer frame', () => {
+      const outer = h.begin();
+      expect(() =>
+        h.begin({
+          replayAuthorization: { undo: [], redo: [] },
+        }),
+      ).toThrow('History transaction metadata is only valid on an outer transaction');
+
+      h.push({ undo: () => {}, redo: () => {} });
+      h.end(outer);
+      expect(h.canUndo()).toBe(true);
+    });
+
     it('commits a single combined entry on end()', () => {
       const log: string[] = [];
       h.begin();
