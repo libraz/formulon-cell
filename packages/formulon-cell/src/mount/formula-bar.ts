@@ -47,7 +47,7 @@ const inputOperation = (raw: string, forceText = false): 'valueEdit' | 'formulaE
 export interface FormulaBarController {
   acceptFx(): void;
   cancelFx(): void;
-  commitFx(advance: 'down' | 'right' | 'none'): void;
+  commitFx(advance: 'down' | 'right' | 'none'): boolean;
   detach(): void;
   isEditing(): boolean;
   refreshActions(): void;
@@ -106,12 +106,12 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
 
   const clearFxRefs = (): void => mutators.setEditorRefs(store, []);
 
-  const commitFx = (advance: 'down' | 'right' | 'none'): void => {
+  const commitFx = (advance: 'down' | 'right' | 'none'): boolean => {
     const currentWb = wb();
     const s = store.getState();
     const a = s.selection.active;
     const controller = interactionControllerFor(store);
-    if (controller && controller.policy !== undefined) {
+    if (controller) {
       const operation = inputOperation(
         fxInput.value,
         formatWithPending(s, a)?.numFmt?.kind === 'text',
@@ -135,7 +135,11 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
           severity: 'stop',
           message: `The ${operation} operation is not permitted for this cell.`,
         });
-        return;
+        return false;
+      }
+      const pending = store.getState().ui.pendingFormat;
+      if (pending && sameAddr(pending.addr, a)) {
+        mutators.setCellFormat(store, a, pending.format);
       }
       mutators.setPendingFormat(store, null);
       mutators.replaceCells(store, currentWb.cells(store.getState().data.sheetIndex));
@@ -150,7 +154,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
         mutators.setActive(store, { ...a, col: a.col + 1 });
       }
       host.focus();
-      return;
+      return true;
     }
     try {
       const fmt = formatWithPending(s, a);
@@ -163,7 +167,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
             title: fmt?.validation?.errorTitle,
             message: outcome.message,
           });
-          return;
+          return false;
         }
         if (onValidation) {
           onValidation({
@@ -177,6 +181,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       }
     } catch (err) {
       console.warn('formulon-cell: writeInput failed', err);
+      return false;
     }
     const pending = store.getState().ui.pendingFormat;
     if (pending && sameAddr(pending.addr, a)) {
@@ -194,6 +199,7 @@ export function attachFormulaBarController(input: AttachFormulaBarInput): Formul
       mutators.setActive(store, { ...a, col: a.col + 1 });
     }
     host.focus();
+    return true;
   };
 
   const cancelFx = (): void => {
