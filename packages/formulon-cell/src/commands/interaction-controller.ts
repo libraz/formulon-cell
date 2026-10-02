@@ -33,6 +33,7 @@ const IMPLEMENTED_OPERATIONS: ReadonlySet<InteractionOperation> = new Set([
   'valueEdit',
   'formulaEdit',
   'clear',
+  'format',
   'paste',
   'fill',
   'moveCells',
@@ -55,6 +56,12 @@ export interface InteractionControllerOptions {
   readonly store: SpreadsheetStore;
   readonly getWb: () => WorkbookHandle;
   readonly history: History;
+  /**
+   * Keep the controller's history authorization guard attached to the shared
+   * stack. Ephemeral command adapters leave an existing mounted controller's
+   * guard alone while still using the same history callbacks.
+   */
+  readonly manageHistoryGuard?: boolean;
   readonly getBounds?: () => Range | undefined;
   readonly onChanged?: (result: ChangeBatchResult) => void;
 }
@@ -175,6 +182,7 @@ export class InteractionController {
   private readonly store: SpreadsheetStore;
   private readonly getWb: () => WorkbookHandle;
   private readonly history: History;
+  private readonly manageHistoryGuard: boolean;
   private readonly getBounds?: () => Range | undefined;
   private readonly onChanged?: (result: ChangeBatchResult) => void;
   private readonly listeners = new Set<(result: ChangeBatchResult) => void>();
@@ -185,9 +193,12 @@ export class InteractionController {
     this.store = options.store;
     this.getWb = options.getWb;
     this.history = options.history;
+    this.manageHistoryGuard = options.manageHistoryGuard !== false;
     this.getBounds = options.getBounds;
     this.onChanged = options.onChanged;
-    this.history.setGuard((entry, direction) => this.guardHistory(entry, direction));
+    if (this.manageHistoryGuard) {
+      this.history.setGuard((entry, direction) => this.guardHistory(entry, direction));
+    }
   }
 
   get policy(): InteractionPolicy | undefined {
@@ -204,7 +215,11 @@ export class InteractionController {
 
   setPolicy(next?: InteractionPolicy): void {
     this.policyValue = next;
-    this.history.setGuard(next ? (entry, direction) => this.guardHistory(entry, direction) : null);
+    if (this.manageHistoryGuard) {
+      this.history.setGuard(
+        next ? (entry, direction) => this.guardHistory(entry, direction) : null,
+      );
+    }
     // Policy changes invalidate any host-held plan/request that was based on
     // the previous authorization. Notify renderer subscribers without sending
     // a mutation result through the host's onChanged callback.
@@ -283,7 +298,9 @@ export class InteractionController {
     }
     const state = this.store.getState();
     const authorizedCells: Addr[] = [];
+    const authorizedKeys = new Set<string>();
     for (const requestedAddr of cells) {
+      if (authorizedKeys.has(addrKey(requestedAddr))) continue;
       const merged = mergeCellsFor(state, requestedAddr);
       if (merged === null) {
         return {
@@ -293,7 +310,12 @@ export class InteractionController {
           reason: 'merged cell range exceeds the authorization bound',
         };
       }
-      authorizedCells.push(...merged);
+      for (const expandedAddr of merged) {
+        const key = addrKey(expandedAddr);
+        if (authorizedKeys.has(key)) continue;
+        authorizedKeys.add(key);
+        authorizedCells.push(expandedAddr);
+      }
     }
     for (const addr of authorizedCells) {
       const bounds = this.getBounds?.();
@@ -433,7 +455,13 @@ export class InteractionController {
           .map((change) => change.patch.addr),
       ),
     };
-    const historyPlan = this.planHistory(committedIntent, eligible, wb, false);
+    const historyPlan = this.planHistory(
+      committedIntent,
+      eligible,
+      wb,
+      false,
+      this.policyValue === undefined && command.operation === 'clear',
+    );
     if ('decision' in historyPlan)
       return this.rejectResult([this.asRejection(historyPlan.decision)]);
     return this.commitPrepared(eligible, rejected, true, historyPlan.plan);
@@ -503,7 +531,7 @@ export class InteractionController {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.history.setGuard(null);
+    if (this.manageHistoryGuard) this.history.setGuard(null);
     this.listeners.clear();
   }
 
@@ -640,12 +668,14 @@ export class InteractionController {
     prepared: readonly PreparedChange[],
     wb: WorkbookHandle,
     requireInverseAuthorization: boolean,
+    forwardAlreadyAuthorized = false,
   ): HistoryPlanResult {
     let hadFormula = false;
     let beforeFormulaCells: readonly Addr[] = [];
     try {
+      const formulas = wb.cellFormulas(prepared.map((change) => change.patch.addr));
       beforeFormulaCells = prepared
-        .filter((change) => wb.cellFormula(change.patch.addr) !== null)
+        .filter((change) => formulas.get(addrKey(change.patch.addr)) !== null)
         .map((change) => change.patch.addr);
       hadFormula = beforeFormulaCells.length > 0;
     } catch (error) {
@@ -672,8 +702,10 @@ export class InteractionController {
       origin: 'undo',
       effects: cellEffects(cells, beforeFormulaCells),
     };
-    const forward = this.preflightIntent(requireInverseAuthorization ? redo : intent);
-    if (!forward.allowed) return { decision: forward };
+    if (!forwardAlreadyAuthorized) {
+      const forward = this.preflightIntent(requireInverseAuthorization ? redo : intent);
+      if (!forward.allowed) return { decision: forward };
+    }
     if (requireInverseAuthorization) {
       const inverse = this.preflightIntent(undo);
       if (!inverse.allowed) return { decision: inverse };

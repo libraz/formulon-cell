@@ -7,8 +7,11 @@ import {
   type InteractionPolicy,
   viewerPolicy,
 } from '../../../src/commands/interaction-policy.js';
+import { setProtectedSheet } from '../../../src/commands/protection.js';
+import { addrKey } from '../../../src/engine/address.js';
+import type { Addr, CellValue } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
-import { createSpreadsheetStore } from '../../../src/store/store.js';
+import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
 const A1 = { sheet: 0, row: 0, col: 0 } as const;
 const B1 = { sheet: 0, row: 0, col: 1 } as const;
@@ -107,6 +110,85 @@ describe('InteractionController', () => {
     expect(history.undo()).toBe(false);
     expect(history.canUndo()).toBe(true);
     expect(wb.getValue(A1)).toEqual({ kind: 'number', value: 7 });
+  });
+
+  it('authorizes format intents against editable cells and protection', async () => {
+    const { store, controller: service } = await createController();
+    const policy = fixedFormPolicy({ ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }] });
+    service.setPolicy({ ...policy, operations: { ...policy.operations, format: true } });
+    const intent = (addr: Addr) => ({
+      operation: 'format' as const,
+      origin: 'ribbon' as const,
+      commandId: 'bold',
+      effects: [{ kind: 'cells' as const, cells: [addr] }],
+    });
+
+    expect(service.canExecute(intent(A1))).toEqual({ allowed: true });
+    expect(service.canExecute(intent(B1))).toMatchObject({
+      allowed: false,
+      code: 'cellIneligible',
+      addr: B1,
+    });
+
+    setProtectedSheet(store, 0, true);
+    expect(service.canExecute(intent(A1))).toMatchObject({
+      allowed: false,
+      code: 'protected',
+      addr: A1,
+    });
+  });
+
+  it('deduplicates every coordinate in a merged format authorization effect', async () => {
+    const { store, controller: service } = await createController();
+    mutators.mergeRange(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 1 });
+    const requested = [A1, B1, { sheet: 0, row: 1, col: 0 }, { sheet: 0, row: 1, col: 1 }];
+    let checks = 0;
+    service.setPolicy({
+      operations: { format: true },
+      editable: {
+        predicate: ({ operation }) => {
+          if (operation === 'format') checks += 1;
+          return true;
+        },
+      },
+    });
+
+    expect(
+      service.canExecute({
+        operation: 'format',
+        origin: 'ribbon',
+        commandId: 'bold',
+        effects: [{ kind: 'cells', cells: requested }],
+      }),
+    ).toEqual({ allowed: true });
+    expect(checks).toBe(4);
+  });
+
+  it('applies navigation bounds to format authorization', async () => {
+    const store = createSpreadsheetStore();
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    workbook = wb;
+    const history = new History();
+    const service = new InteractionController({
+      store,
+      getWb: () => wb,
+      history,
+      getBounds: () => ({ sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }),
+    });
+    controller = service;
+    const policy = fixedFormPolicy({
+      ranges: [{ sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 }],
+    });
+    service.setPolicy({ ...policy, operations: { ...policy.operations, format: true } });
+
+    expect(
+      service.canExecute({
+        operation: 'format',
+        origin: 'ribbon',
+        commandId: 'bold',
+        effects: [{ kind: 'cells', cells: [{ sheet: 0, row: 1, col: 0 }] }],
+      }),
+    ).toMatchObject({ allowed: false, code: 'outOfBounds' });
   });
 
   it('checks formula permission on each formula cell in a mixed batch', async () => {
@@ -292,6 +374,161 @@ describe('InteractionController', () => {
     expect(result.rejected[0]?.reason).toBe('restriction hook must be synchronous');
     expect(wb.getValue(A1).kind).toBe('blank');
   });
+
+  it('leaves an existing history guard installed for ephemeral controllers', async () => {
+    const store = createSpreadsheetStore();
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    const history = new History();
+    history.setGuard(() => false);
+    const ephemeral = new InteractionController({
+      store,
+      getWb: () => wb,
+      history,
+      manageHistoryGuard: false,
+    });
+
+    ephemeral.setPolicy(viewerPolicy());
+    history.push({ undo: () => undefined, redo: () => undefined });
+    expect(history.undo()).toBe(false);
+    ephemeral.dispose();
+    expect(history.undo()).toBe(false);
+    wb.dispose();
+  });
+
+  it('keeps unrestricted clear batches above the authorization cap atomic', () => {
+    const count = 100_001;
+    const changes = Array.from({ length: count }, (_, row) => ({
+      addr: { sheet: 0, row, col: 0 },
+      value: { kind: 'blank' as const },
+    }));
+
+    const makeAtomicWorkbook = (): {
+      workbook: WorkbookHandle;
+      valueAt: (addr: Addr) => CellValue;
+      atomicCalls: () => number;
+      formulaScanCalls: () => number;
+    } => {
+      const values = new Map<string, { value: CellValue; formula: string | null }>();
+      for (let row = 0; row < count; row += 1) {
+        values.set(`0:${row}:0`, { value: { kind: 'number', value: row }, formula: null });
+      }
+      let atomicCalls = 0;
+      let formulaScanCalls = 0;
+      const snapshot = (a: Addr): { addr: Addr; value: CellValue; formula: string | null } => {
+        const current = values.get(`0:${a.row}:0`);
+        return {
+          addr: { ...a },
+          value: current?.value ?? { kind: 'blank' },
+          formula: current?.formula ?? null,
+        };
+      };
+      const workbook = {
+        sheetCount: 1,
+        cellFormula: (_a: Addr): string | null => {
+          throw new Error('scalar formula lookup is not supported by this workbook');
+        },
+        cellFormulas: (addrs: readonly Addr[]): ReadonlyMap<string, string | null> => {
+          formulaScanCalls += 1;
+          return new Map(
+            addrs.map((addr) => [addrKey(addr), values.get(`0:${addr.row}:0`)?.formula ?? null]),
+          );
+        },
+        applyCellPatchAtomic: (
+          patches: readonly {
+            addr: Addr;
+            value: CellValue;
+            formula?: string | null;
+          }[],
+        ) => {
+          atomicCalls += 1;
+          const before = patches.map((patch) => snapshot(patch.addr));
+          const changed: Addr[] = [];
+          for (const patch of patches) {
+            const key = `0:${patch.addr.row}:0`;
+            const next = { value: patch.value, formula: patch.formula ?? null };
+            const current = values.get(key);
+            if (current?.value.kind !== next.value.kind || current?.formula !== next.formula) {
+              changed.push({ ...patch.addr });
+            }
+            values.set(key, next);
+          }
+          const after = patches.map((patch) => snapshot(patch.addr));
+          return { before, after, changed };
+        },
+      } as unknown as WorkbookHandle;
+      return {
+        workbook,
+        valueAt: (a) => snapshot(a).value,
+        atomicCalls: () => atomicCalls,
+        formulaScanCalls: () => formulaScanCalls,
+      };
+    };
+
+    const unrestricted = makeAtomicWorkbook();
+    const unrestrictedStore = createSpreadsheetStore();
+    const unrestrictedHistory = new History();
+    const unrestrictedController = new InteractionController({
+      store: unrestrictedStore,
+      getWb: () => unrestricted.workbook,
+      history: unrestrictedHistory,
+    });
+    const command = {
+      type: 'cellBatch' as const,
+      operation: 'clear' as const,
+      origin: 'keyboard' as const,
+      changes,
+    };
+    const applied = unrestrictedController.execute(command);
+    expect(applied.status).toBe('applied');
+    expect(applied.applied).toHaveLength(count);
+    expect(unrestricted.atomicCalls()).toBe(1);
+    expect(unrestricted.formulaScanCalls()).toBe(1);
+    expect(unrestricted.valueAt({ sheet: 0, row: count - 1, col: 0 })).toEqual({ kind: 'blank' });
+    expect(unrestrictedHistory.undo()).toBe(true);
+    expect(unrestricted.atomicCalls()).toBe(2);
+    expect(unrestricted.formulaScanCalls()).toBe(1);
+    expect(unrestricted.valueAt({ sheet: 0, row: count - 1, col: 0 })).toEqual({
+      kind: 'number',
+      value: count - 1,
+    });
+    expect(unrestrictedHistory.redo()).toBe(true);
+    expect(unrestricted.atomicCalls()).toBe(3);
+    expect(unrestricted.formulaScanCalls()).toBe(1);
+    expect(unrestricted.valueAt({ sheet: 0, row: count - 1, col: 0 })).toEqual({ kind: 'blank' });
+    unrestrictedController.dispose();
+
+    const restricted = makeAtomicWorkbook();
+    const restrictedStore = createSpreadsheetStore();
+    const restrictedHistory = new History();
+    const restrictedController = new InteractionController({
+      store: restrictedStore,
+      getWb: () => restricted.workbook,
+      history: restrictedHistory,
+    });
+    restrictedController.setPolicy({ defaultOperation: 'allow' });
+    const rejected = restrictedController.execute(command);
+    expect(rejected.status).toBe('rejected');
+    expect(rejected.rejected[0]?.code).toBe('unsupported');
+    expect(restricted.atomicCalls()).toBe(0);
+    expect(restricted.formulaScanCalls()).toBe(1);
+    expect(restrictedHistory.canUndo()).toBe(false);
+    restrictedController.dispose();
+
+    const denied = makeAtomicWorkbook();
+    const deniedController = new InteractionController({
+      store: createSpreadsheetStore(),
+      getWb: () => denied.workbook,
+      history: new History(),
+    });
+    deniedController.setPolicy(viewerPolicy());
+    const policyRejected = deniedController.execute(command);
+    expect(policyRejected.status).toBe('rejected');
+    expect(policyRejected.rejected[0]?.code).toBe('readOnly');
+    expect(denied.atomicCalls()).toBe(0);
+    expect(denied.formulaScanCalls()).toBe(0);
+    deniedController.dispose();
+  });
+
   it('stops exposing a workbook whose rollback recalculation also fails', async () => {
     const wb = await WorkbookHandle.createDefault({ preferStub: true });
     wb.setNumber(A1, 1);
