@@ -24,7 +24,7 @@ import {
   type PermissionDecision,
   rangeContainsAddr,
 } from './interaction-policy.js';
-import { isCellWritable } from './protection.js';
+import { isCellWritable, isSheetProtected } from './protection.js';
 import { normalizeR1C1Formula } from './refs.js';
 import { cellValueViolatesValidation, validateAgainst } from './validate.js';
 
@@ -51,6 +51,32 @@ const CELL_OPERATIONS: ReadonlySet<CellBatchOperation> = new Set([
 
 const MAX_XLSX_ROW = 1_048_575;
 const MAX_XLSX_COL = 16_383;
+const MAC_SUBTOTAL_COMMAND_ID = 'mac.data.subtotal';
+
+const macSubtotalStructuralOperation = (
+  intent: OperationIntent,
+): 'insertRows' | 'deleteRows' | null => {
+  if (intent.commandId !== MAC_SUBTOTAL_COMMAND_ID) return null;
+  if (intent.operation === 'insertRows' && (intent.origin === 'ribbon' || intent.origin === 'redo'))
+    return 'insertRows';
+  if (intent.operation === 'deleteRows' && intent.origin === 'undo') return 'deleteRows';
+  return null;
+};
+
+const macSubtotalStructuralRange = (intent: OperationIntent): Range | null => {
+  if (macSubtotalStructuralOperation(intent) === null || intent.effects.length !== 2) return null;
+  let workbookEffects = 0;
+  let range: Range | undefined;
+  for (const effect of intent.effects) {
+    if (effect.kind === 'workbook') {
+      workbookEffects += 1;
+      continue;
+    }
+    if (effect.kind !== 'range' || effect.includesFormula !== undefined || range) return null;
+    range = effect.range;
+  }
+  return workbookEffects === 1 && range ? range : null;
+};
 
 export interface InteractionControllerOptions {
   readonly store: SpreadsheetStore;
@@ -216,9 +242,7 @@ export class InteractionController {
   setPolicy(next?: InteractionPolicy): void {
     this.policyValue = next;
     if (this.manageHistoryGuard) {
-      this.history.setGuard(
-        next ? (entry, direction) => this.guardHistory(entry, direction) : null,
-      );
+      this.history.setGuard((entry, direction) => this.guardHistory(entry, direction));
     }
     // Policy changes invalidate any host-held plan/request that was based on
     // the previous authorization. Notify renderer subscribers without sending
@@ -249,11 +273,107 @@ export class InteractionController {
     try {
       const wb = this.getWb();
       if (!wb) return { allowed: false, code: 'invalid', reason: 'workbook is unavailable' };
+      if (macSubtotalStructuralOperation(intent) !== null)
+        return this.macSubtotalStructuralDecision(intent, policy, wb);
       if (!policy) return this.legacyDecision(intent, wb);
       return this.policyDecision(intent, policy, wb);
     } catch {
       return { allowed: false, code: 'invalid', reason: 'workbook is unavailable' };
     }
+  }
+
+  private macSubtotalStructuralDecision(
+    intent: OperationIntent,
+    policy: InteractionPolicy | undefined,
+    wb: WorkbookHandle,
+  ): PermissionDecision {
+    const range = macSubtotalStructuralRange(intent);
+    if (!range) {
+      return {
+        allowed: false,
+        code: 'invalid',
+        reason: 'Subtotal structural authorization needs one workbook and one range effect',
+      };
+    }
+    const state = this.store.getState();
+    if (range.sheet !== state.data.sheetIndex) {
+      return {
+        allowed: false,
+        code: 'outOfBounds',
+        reason: 'Subtotal structural authorization must target the active sheet',
+      };
+    }
+    if (
+      !Number.isInteger(range.sheet) ||
+      !Number.isInteger(range.r0) ||
+      !Number.isInteger(range.c0) ||
+      !Number.isInteger(range.r1) ||
+      !Number.isInteger(range.c1) ||
+      range.r0 < 0 ||
+      range.c0 < 0 ||
+      range.r1 < range.r0 ||
+      range.c1 < range.c0 ||
+      !this.isValidAddress(wb, { sheet: range.sheet, row: range.r0, col: range.c0 }) ||
+      !this.isValidAddress(wb, { sheet: range.sheet, row: range.r1, col: range.c1 })
+    ) {
+      return {
+        allowed: false,
+        code: 'outOfBounds',
+        reason: 'Subtotal structural authorization range is outside the worksheet',
+      };
+    }
+    if (isSheetProtected(state, range.sheet)) {
+      return {
+        allowed: false,
+        code: 'protected',
+        reason: 'Subtotal structural authorization targets a protected sheet',
+      };
+    }
+
+    if (!policy) return { allowed: true };
+    if (!operationPermission(policy, intent.operation)) {
+      return {
+        allowed: false,
+        code:
+          policy.readOnly && isMutatingInteraction(intent.operation)
+            ? 'readOnly'
+            : 'operationDenied',
+        reason:
+          policy.readOnly && isMutatingInteraction(intent.operation)
+            ? 'instance policy is read-only'
+            : `operation ${intent.operation} is denied`,
+      };
+    }
+    if (policy.operations?.[intent.operation] !== true) {
+      return {
+        allowed: false,
+        code: 'operationDenied',
+        reason: `operation ${intent.operation} needs explicit structural permission`,
+      };
+    }
+    if (policy.editable !== undefined) {
+      return {
+        allowed: false,
+        code: 'operationDenied',
+        reason: 'editable cell policy cannot authorize workbook row structure',
+      };
+    }
+    const bounds = this.getBounds?.();
+    if (
+      bounds &&
+      (bounds.sheet !== range.sheet ||
+        bounds.r0 !== 0 ||
+        bounds.c0 !== 0 ||
+        bounds.r1 !== MAX_XLSX_ROW ||
+        bounds.c1 !== MAX_XLSX_COL)
+    ) {
+      return {
+        allowed: false,
+        code: 'outOfBounds',
+        reason: 'Subtotal structural authorization needs the full target worksheet bound',
+      };
+    }
+    return this.applyRestriction(policy, intent, { allowed: true });
   }
 
   private policyDecision(
@@ -716,6 +836,7 @@ export class InteractionController {
   /** Authorize a complete intent, including every cell effect and any formula
    * capability implied by a value/paste/fill command. */
   private preflightIntent(intent: OperationIntent): PermissionDecision {
+    if (macSubtotalStructuralOperation(intent) !== null) return this.canExecute(intent);
     const global = this.canExecute({ ...intent, effects: [{ kind: 'workbook' }] });
     if (!global.allowed) return global;
     const cells: Addr[] = [];
@@ -839,15 +960,21 @@ export class InteractionController {
     if (replayAuthorization) {
       const intents = direction === 'undo' ? replayAuthorization.undo : replayAuthorization.redo;
       if (intents.length === 0) return false;
-      if (!this.policyValue) return true;
       let allowed = true;
       for (const intent of intents) {
-        if (!this.preflightIntent(intent).allowed) allowed = false;
+        if (macSubtotalStructuralOperation(intent) !== null) {
+          if (!this.canExecute(intent).allowed) allowed = false;
+        } else if (this.policyValue && !this.preflightIntent(intent).allowed) {
+          allowed = false;
+        }
       }
       return allowed;
     }
-    if (!this.policyValue) return true;
     const intent = direction === 'undo' ? entry.inverseIntent : entry.intent;
+    if (!this.policyValue)
+      return intent
+        ? macSubtotalStructuralOperation(intent) === null || this.canExecute(intent).allowed
+        : true;
     if (!intent) return false;
     return this.preflightIntent(intent).allowed;
   }
