@@ -401,11 +401,12 @@ export function suggestFunctions(
 ): { token: string; tokenStart: number; matches: string[] } | null {
   // Only suggest when we're inside a formula (text starts with '=').
   if (!text.startsWith('=')) return null;
-  // Token = trailing run of letters or digits, must start with a letter.
+  // Dotted names such as BETA.DIST are one token; decimal literals still fail
+  // the leading-letter check below.
   let i = caret - 1;
   while (i >= 0) {
     const ch = text[i] ?? '';
-    if (/[A-Za-z0-9_]/.test(ch)) i -= 1;
+    if (/[A-Za-z0-9_.]/.test(ch)) i -= 1;
     else break;
   }
   const tokenStart = i + 1;

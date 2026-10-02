@@ -230,6 +230,21 @@ describe('suggestFunctions', () => {
   it('does not fall back to built-ins when opts.names is empty', () => {
     expect(suggestFunctions('=SU', 3, 8, { names: [] })).toBeNull();
   });
+
+  it('keeps the dotted function prefix and replacement start from the engine catalog', () => {
+    const names = ['BETA.DIST', 'BETA.INV', 'NORM.DIST', 'NORM.INV'];
+    expect(suggestFunctions('=BETA.D', 7, 8, { names })).toEqual({
+      token: 'BETA.D',
+      tokenStart: 1,
+      matches: ['BETA.DIST'],
+    });
+    expect(suggestFunctions('=SUM(A1,norm.', 13, 8, { names })).toEqual({
+      token: 'norm.',
+      tokenStart: 8,
+      matches: ['NORM.DIST', 'NORM.INV'],
+    });
+    expect(suggestFunctions('=1.5', 4, 8, { names })).toBeNull();
+  });
 });
 
 describe('365 dynamic-array function catalog', () => {
