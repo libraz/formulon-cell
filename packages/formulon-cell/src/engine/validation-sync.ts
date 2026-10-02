@@ -7,6 +7,7 @@ import type {
   ValidationOp,
 } from '../store/store.js';
 import { addrKey } from './address.js';
+import type { EngineSyncOptions } from './cell-format-sync.js';
 import { parseRangeRef } from './range-resolver.js';
 import type { Range } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -57,6 +58,9 @@ const ERROR_STYLE_FROM_ORDINAL: Record<number, ValidationErrorStyle> = {
   2: 'information',
 };
 
+const strictSyncError = (operation: string, address: string): Error =>
+  new Error(`Strict engine sync failed: validations ${operation} at ${address}`);
+
 /**
  * Hydrate FormatSlice `validation` fields from engine entries on `sheet`.
  * Every supported `type` ordinal is surfaced — `list` parses inline literals,
@@ -105,8 +109,10 @@ export function syncValidationsToEngine(
   wb: WorkbookHandle,
   store: SpreadsheetStore,
   sheet: number,
+  options?: EngineSyncOptions,
 ): void {
   if (!wb.capabilities.dataValidation) return;
+  const strict = options?.strict === true;
   const buckets = new Map<string, { validation: CellValidation; ranges: Range[] }>();
   const formats = store.getState().format.formats;
   for (const [key, fmt] of formats) {
@@ -125,12 +131,24 @@ export function syncValidationsToEngine(
     }
     bucket.ranges.push({ sheet, r0: row, c0: col, r1: row, c1: col });
   }
-  wb.clearValidations(sheet);
+  const clearSucceeded = wb.clearValidations(sheet);
+  if (strict && !clearSucceeded) {
+    throw strictSyncError('clearValidations', `sheet:${sheet}`);
+  }
   for (const { validation, ranges } of buckets.values()) {
     if (ranges.length === 0) continue;
     const encoded = encodeValidation(validation, ranges);
-    if (!encoded) continue;
-    wb.addValidationEntry(sheet, encoded);
+    const address = ranges[0]
+      ? `${ranges[0].sheet}:${ranges[0].r0}:${ranges[0].c0}`
+      : `sheet:${sheet}`;
+    if (!encoded) {
+      if (strict) throw strictSyncError('encodeValidation', address);
+      continue;
+    }
+    const addSucceeded = wb.addValidationEntry(sheet, encoded);
+    if (strict && !addSucceeded) {
+      throw strictSyncError('addValidationEntry', address);
+    }
   }
 }
 

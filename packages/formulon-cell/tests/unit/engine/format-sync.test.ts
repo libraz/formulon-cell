@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { hydrateCommentsAndHyperlinksFromEngine } from '../../../src/engine/format-sync.js';
+import {
+  hydrateCommentsAndHyperlinksFromEngine,
+  syncHyperlinksToEngine,
+} from '../../../src/engine/format-sync.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { addrKey } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore } from '../../../src/store/store.js';
@@ -49,6 +52,100 @@ const makeFake = (opts: {
   }
   return fake as unknown as WorkbookHandle;
 };
+
+const makeHyperlinkEngine = (opts: { clearResults?: boolean[]; addResults?: boolean[] } = {}) => {
+  const clearCalls: number[] = [];
+  const addCalls: { row: number; col: number; target: string; succeeded: boolean }[] = [];
+  let clearIndex = 0;
+  let addIndex = 0;
+  const wb = {
+    capabilities: { hyperlinks: true },
+    clearHyperlinks(sheet: number): boolean {
+      clearCalls.push(sheet);
+      const result = opts.clearResults?.[clearIndex] ?? true;
+      clearIndex += 1;
+      return result;
+    },
+    addHyperlink(
+      _sheet: number,
+      row: number,
+      col: number,
+      target: string,
+      _display: string,
+      _tooltip: string,
+    ): boolean {
+      const succeeded = opts.addResults?.[addIndex] ?? true;
+      addIndex += 1;
+      addCalls.push({ row, col, target, succeeded });
+      return succeeded;
+    },
+  };
+  return { wb: wb as unknown as WorkbookHandle, clearCalls, addCalls };
+};
+
+const setHyperlinks = (
+  store: ReturnType<typeof createSpreadsheetStore>,
+  links: { row: number; col: number; target: string }[],
+) => {
+  store.setState((s) => ({
+    ...s,
+    format: {
+      formats: new Map(
+        links.map((link) => [
+          addrKey({ sheet: 0, row: link.row, col: link.col }),
+          { hyperlink: link.target },
+        ]),
+      ),
+    },
+  }));
+};
+
+describe('syncHyperlinksToEngine', () => {
+  it('strict mode rejects clear failure while legacy mode remains best-effort', () => {
+    const { wb } = makeHyperlinkEngine({ clearResults: [false, false] });
+    const store = createSpreadsheetStore();
+    setHyperlinks(store, [{ row: 0, col: 0, target: 'https://example.com' }]);
+
+    expect(() => syncHyperlinksToEngine(wb, store, 0, { strict: true })).toThrow(
+      /hyperlinks clearHyperlinks at sheet:0/,
+    );
+    expect(() => syncHyperlinksToEngine(wb, store, 0)).not.toThrow();
+  });
+
+  it('strict mode retries the complete hyperlink set after a partial add failure', () => {
+    const { wb, clearCalls, addCalls } = makeHyperlinkEngine({
+      addResults: [true, false, true, true],
+    });
+    const store = createSpreadsheetStore();
+    setHyperlinks(store, [
+      { row: 0, col: 0, target: 'https://one.example' },
+      { row: 0, col: 1, target: 'https://two.example' },
+    ]);
+
+    expect(() => syncHyperlinksToEngine(wb, store, 0, { strict: true })).toThrow(
+      /hyperlinks addHyperlink at 0:0:1/,
+    );
+    expect(() => syncHyperlinksToEngine(wb, store, 0, { strict: true })).not.toThrow();
+    expect(clearCalls).toEqual([0, 0]);
+    expect(addCalls).toHaveLength(4);
+    expect(
+      addCalls
+        .slice(-2)
+        .filter((call) => call.succeeded)
+        .map((call) => call.target),
+    ).toEqual(['https://one.example', 'https://two.example']);
+  });
+
+  it('strict mode is a no-op when hyperlink capability is unavailable', () => {
+    const store = createSpreadsheetStore();
+    const wb = {
+      capabilities: { hyperlinks: false },
+      clearHyperlinks: () => false,
+      addHyperlink: () => false,
+    } as unknown as WorkbookHandle;
+    expect(() => syncHyperlinksToEngine(wb, store, 0, { strict: true })).not.toThrow();
+  });
+});
 
 describe('hydrateCommentsAndHyperlinksFromEngine', () => {
   it('no-op when neither capability is supported', () => {

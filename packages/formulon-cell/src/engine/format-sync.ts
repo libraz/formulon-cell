@@ -1,11 +1,15 @@
 import type { CellFormat, SpreadsheetStore } from '../store/store.js';
 import { addrKey } from './address.js';
+import type { EngineSyncOptions } from './cell-format-sync.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 type EngineCommentEntry = { row: number; col: number; author: string; text: string };
 type CommentEnumerableWorkbook = WorkbookHandle & {
   getComments?: (sheet: number) => EngineCommentEntry[];
 };
+
+const strictSyncError = (operation: string, address: string): Error =>
+  new Error(`Strict engine sync failed: hyperlinks ${operation} at ${address}`);
 
 /**
  * Seed cell-level comment and hyperlink fields from engine state for `sheet`.
@@ -91,9 +95,14 @@ export function syncHyperlinksToEngine(
   wb: WorkbookHandle,
   store: SpreadsheetStore,
   sheet: number,
+  options?: EngineSyncOptions,
 ): void {
   if (!wb.capabilities.hyperlinks) return;
-  wb.clearHyperlinks(sheet);
+  const strict = options?.strict === true;
+  const clearSucceeded = wb.clearHyperlinks(sheet);
+  if (strict && !clearSucceeded) {
+    throw strictSyncError('clearHyperlinks', `sheet:${sheet}`);
+  }
   const formats = store.getState().format.formats;
   for (const [key, fmt] of formats) {
     if (!fmt.hyperlink) continue;
@@ -102,7 +111,7 @@ export function syncHyperlinksToEngine(
     if (Number.parseInt(sStr, 10) !== sheet) continue;
     const row = Number.parseInt(rStr, 10);
     const col = Number.parseInt(cStr, 10);
-    wb.addHyperlink(
+    const addSucceeded = wb.addHyperlink(
       sheet,
       row,
       col,
@@ -110,5 +119,8 @@ export function syncHyperlinksToEngine(
       fmt.hyperlinkDisplay ?? '',
       fmt.hyperlinkTooltip ?? '',
     );
+    if (strict && !addSucceeded) {
+      throw strictSyncError('addHyperlink', key);
+    }
   }
 }

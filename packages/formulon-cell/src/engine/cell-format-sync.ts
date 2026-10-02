@@ -41,6 +41,13 @@ const PIVOT_KIND = {
  */
 const syncedFormatKeys = new WeakMap<WorkbookHandle, Map<number, Set<string>>>();
 
+export interface EngineSyncOptions {
+  readonly strict?: boolean;
+}
+
+const strictSyncError = (operation: string, address: string): Error =>
+  new Error(`Strict engine sync failed: cell-format ${operation} at ${address}`);
+
 function formattedKeySet(wb: WorkbookHandle, sheet: number): Set<string> {
   let perSheet = syncedFormatKeys.get(wb);
   if (!perSheet) {
@@ -133,11 +140,21 @@ export function syncCellFormatsToEngine(
   wb: WorkbookHandle,
   store: SpreadsheetStore,
   sheet: number,
+  options?: EngineSyncOptions,
 ): void {
   if (!wb.capabilities.cellFormatting) return;
+  const strict = options?.strict === true;
   const state = store.getState();
   const formats = state.format.formats;
-  const styleXfIds = syncNamedCellStylesToEngine(wb, state, (format) => resolveStyleXf(wb, format));
+  let styleXfConstructionFailed = false;
+  const styleXfIds = syncNamedCellStylesToEngine(wb, state, (format) => {
+    const xfIndex = resolveStyleXf(wb, format);
+    if (strict && xfIndex < 0) styleXfConstructionFailed = true;
+    return xfIndex;
+  });
+  if (strict && styleXfConstructionFailed) {
+    throw strictSyncError('resolveStyleXf', `sheet:${sheet}`);
+  }
   const previous = formattedKeySet(wb, sheet);
   const current = new Set<string>();
   for (const [key, fmt] of formats) {
@@ -147,19 +164,37 @@ export function syncCellFormatsToEngine(
     const row = Number.parseInt(rStr, 10);
     const col = Number.parseInt(cStr, 10);
     const xfIndex = resolveXfForFormat(wb, fmt, styleXfIds);
-    if (xfIndex < 0) continue;
-    wb.setCellXfIndex(sheet, row, col, xfIndex);
+    if (xfIndex < 0) {
+      if (strict) throw strictSyncError('resolveXf', key);
+      continue;
+    }
+    const setXfSucceeded = wb.setCellXfIndex(sheet, row, col, xfIndex);
+    if (strict && !setXfSucceeded) {
+      throw strictSyncError('setCellXfIndex', key);
+    }
+    if (strict) previous.add(key);
     // Per-run first: `setCellPhonetic` spans the whole cell, so on a partially
     // annotated cell it would flatten every span into one reading.
     if (wb.capabilities.phoneticRuns && typeof wb.setCellPhoneticRuns === 'function') {
-      wb.setCellPhoneticRuns(
+      const setPhoneticSucceeded = wb.setCellPhoneticRuns(
         sheet,
         row,
         col,
         boundPhoneticRuns(wb, { sheet, row, col }, fmt.phonetic),
       );
+      if (strict && !setPhoneticSucceeded) {
+        throw strictSyncError('setCellPhoneticRuns', key);
+      }
     } else if (wb.capabilities.phonetic && typeof wb.setCellPhonetic === 'function') {
-      wb.setCellPhonetic(sheet, row, col, flattenPhoneticRuns(fmt.phonetic));
+      const setPhoneticSucceeded = wb.setCellPhonetic(
+        sheet,
+        row,
+        col,
+        flattenPhoneticRuns(fmt.phonetic),
+      );
+      if (strict && !setPhoneticSucceeded) {
+        throw strictSyncError('setCellPhonetic', key);
+      }
     }
     current.add(key);
   }
@@ -169,7 +204,15 @@ export function syncCellFormatsToEngine(
     if (current.has(key)) continue;
     const [, rStr, cStr] = key.split(':');
     if (rStr === undefined || cStr === undefined) continue;
-    wb.setCellXfIndex(sheet, Number.parseInt(rStr, 10), Number.parseInt(cStr, 10), 0);
+    const resetSucceeded = wb.setCellXfIndex(
+      sheet,
+      Number.parseInt(rStr, 10),
+      Number.parseInt(cStr, 10),
+      0,
+    );
+    if (strict && !resetSucceeded) {
+      throw strictSyncError('resetCellXfIndex', key);
+    }
   }
   previous.clear();
   for (const key of current) previous.add(key);
@@ -367,8 +410,9 @@ export function flushFormatToEngine(
   wb: WorkbookHandle,
   store: SpreadsheetStore,
   sheet: number,
+  options?: EngineSyncOptions,
 ): void {
-  syncCellFormatsToEngine(wb, store, sheet);
-  syncValidationsToEngine(wb, store, sheet);
-  syncHyperlinksToEngine(wb, store, sheet);
+  syncCellFormatsToEngine(wb, store, sheet, options);
+  syncValidationsToEngine(wb, store, sheet, options);
+  syncHyperlinksToEngine(wb, store, sheet, options);
 }

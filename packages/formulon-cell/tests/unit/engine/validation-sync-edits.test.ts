@@ -10,13 +10,17 @@ interface AddedEntry {
   payload: Record<string, unknown>;
 }
 
-const makeEngine = (): {
+const makeEngine = (
+  opts: { clearResults?: boolean[]; addResults?: boolean[] } = {},
+): {
   wb: WorkbookHandle;
   added: AddedEntry[];
   cleared: number[];
 } => {
   const added: AddedEntry[] = [];
   const cleared: number[] = [];
+  let clearIndex = 0;
+  let addIndex = 0;
   return {
     added,
     cleared,
@@ -24,11 +28,15 @@ const makeEngine = (): {
       capabilities: { dataValidation: true } as never,
       clearValidations(sheet: number): boolean {
         cleared.push(sheet);
-        return true;
+        const result = opts.clearResults?.[clearIndex] ?? true;
+        clearIndex += 1;
+        return result;
       },
       addValidationEntry(sheet: number, payload: unknown): boolean {
         added.push({ sheet, payload: payload as Record<string, unknown> });
-        return true;
+        const result = opts.addResults?.[addIndex] ?? true;
+        addIndex += 1;
+        return result;
       },
     } as unknown as WorkbookHandle,
   };
@@ -68,6 +76,48 @@ const clearValidation = (
 };
 
 describe('engine/validation-sync — edits', () => {
+  it('strict mode rejects clear failure while legacy mode remains best-effort', () => {
+    const { wb } = makeEngine({ clearResults: [false, false] });
+    const store = createSpreadsheetStore();
+    setValidation(store, [
+      { sheet: 0, row: 0, col: 0, validation: { kind: 'list', source: ['A'] } },
+    ]);
+
+    expect(() => syncValidationsToEngine(wb, store, 0, { strict: true })).toThrow(
+      /validations clearValidations at sheet:0/,
+    );
+    expect(() => syncValidationsToEngine(wb, store, 0)).not.toThrow();
+  });
+
+  it('strict mode rejects unencodable entries after clear', () => {
+    const { wb, added } = makeEngine();
+    const store = createSpreadsheetStore();
+    setValidation(store, [
+      { sheet: 0, row: 0, col: 0, validation: { kind: 'custom', formula: '   ' } },
+    ]);
+
+    expect(() => syncValidationsToEngine(wb, store, 0, { strict: true })).toThrow(
+      /validations encodeValidation at 0:0:0/,
+    );
+    expect(added).toHaveLength(0);
+  });
+
+  it('strict mode retries the complete validation set after a partial add failure', () => {
+    const { wb, added, cleared } = makeEngine({ addResults: [true, false, true, true] });
+    const store = createSpreadsheetStore();
+    setValidation(store, [
+      { sheet: 0, row: 0, col: 0, validation: { kind: 'list', source: ['A'] } },
+      { sheet: 0, row: 0, col: 1, validation: { kind: 'list', source: ['B'] } },
+    ]);
+
+    expect(() => syncValidationsToEngine(wb, store, 0, { strict: true })).toThrow(
+      /validations addValidationEntry at 0:0:1/,
+    );
+    expect(() => syncValidationsToEngine(wb, store, 0, { strict: true })).not.toThrow();
+    expect(cleared).toEqual([0, 0]);
+    expect(added).toHaveLength(4);
+  });
+
   it('adding a rule on a new cell pushes one entry to the engine', () => {
     const { wb, added, cleared } = makeEngine();
     const store = createSpreadsheetStore();
@@ -80,7 +130,7 @@ describe('engine/validation-sync — edits', () => {
       },
     ]);
 
-    syncValidationsToEngine(wb, store, 0);
+    syncValidationsToEngine(wb, store, 0, { strict: true });
     expect(cleared).toEqual([0]);
     expect(added).toHaveLength(1);
     expect(added[0]?.payload).toMatchObject({
@@ -99,7 +149,7 @@ describe('engine/validation-sync — edits', () => {
       { sheet: 0, row: 1, col: 1, validation: { kind: 'list', source: ['A', 'B'] } },
     ]);
 
-    syncValidationsToEngine(wb, store, 0);
+    syncValidationsToEngine(wb, store, 0, { strict: true });
     expect(added).toHaveLength(1);
     const ranges = (added[0]?.payload.ranges as unknown[]) ?? [];
     expect(ranges).toHaveLength(3);
@@ -217,21 +267,28 @@ describe('engine/validation-sync — edits', () => {
   });
 
   it('capability off: no engine calls regardless of store mutations', () => {
-    const { added, cleared } = makeEngine();
+    let clearCalls = 0;
+    let addCalls = 0;
     const wb = {
       capabilities: { dataValidation: false } as never,
-      clearValidations: () => true,
-      addValidationEntry: () => true,
+      clearValidations: () => {
+        clearCalls += 1;
+        return true;
+      },
+      addValidationEntry: () => {
+        addCalls += 1;
+        return true;
+      },
     } as unknown as WorkbookHandle;
 
     const store = createSpreadsheetStore();
     setValidation(store, [
       { sheet: 0, row: 0, col: 0, validation: { kind: 'list', source: ['A'] } },
     ]);
-    syncValidationsToEngine(wb, store, 0);
+    syncValidationsToEngine(wb, store, 0, { strict: true });
 
-    expect(added).toEqual([]);
-    expect(cleared).toEqual([]);
+    expect(clearCalls).toBe(0);
+    expect(addCalls).toBe(0);
   });
 
   it('error message / errorStyle changes round through encodeMeta on each sync', () => {

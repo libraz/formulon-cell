@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  flushFormatToEngine,
   hydrateCellFormatsFromEngine,
   syncCellFormatsToEngine,
 } from '../../../src/engine/cell-format-sync.js';
@@ -16,6 +17,12 @@ import { type CellFormat, createSpreadsheetStore } from '../../../src/store/stor
 
 interface FakeOpts {
   cellFormatting?: boolean;
+  phonetic?: boolean;
+  phoneticRuns?: boolean;
+  setCellXfResults?: boolean[];
+  setCellPhoneticResult?: boolean;
+  setCellPhoneticRunsResult?: boolean;
+  negativeRecord?: 'font' | 'fill' | 'border' | 'numFmt' | 'xf';
   /** Pre-populated cells the engine reports via cells(). */
   cells?: Addr[];
   /** Projected PivotTable cells reported separately from physical cells. */
@@ -48,7 +55,11 @@ const makeFake = (opts: FakeOpts = {}): { wb: WorkbookHandle; log: FakeLog } => 
     addNumFmt: [],
     addXf: [],
   };
-  const caps = { cellFormatting: opts.cellFormatting ?? true };
+  const caps = {
+    cellFormatting: opts.cellFormatting ?? true,
+    ...(opts.phonetic ? { phonetic: true } : {}),
+    ...(opts.phoneticRuns ? { phoneticRuns: true } : {}),
+  };
   const xfIndices = opts.xfIndices ?? new Map<string, number>();
   const xfTable = opts.xfTable ?? new Map<number, CellXf>();
   const fonts = opts.fonts ?? new Map<number, FontRecord>();
@@ -62,6 +73,7 @@ const makeFake = (opts: FakeOpts = {}): { wb: WorkbookHandle; log: FakeLog } => 
   let nextBorderIdx = 100;
   let nextXfIdx = 100;
   let nextNumFmtId = 200;
+  let setCellXfCalls = 0;
 
   const fake = {
     capabilities: caps,
@@ -82,6 +94,9 @@ const makeFake = (opts: FakeOpts = {}): { wb: WorkbookHandle; log: FakeLog } => 
         };
       }
     },
+    getValue(_addr: Addr) {
+      return { kind: 'text' as const, value: 'かな' };
+    },
     getCellXfIndex(_sheet: number, row: number, col: number): number | null {
       if (!caps.cellFormatting) return null;
       return xfIndices.get(`${_sheet}:${row}:${col}`) ?? null;
@@ -89,7 +104,9 @@ const makeFake = (opts: FakeOpts = {}): { wb: WorkbookHandle; log: FakeLog } => 
     setCellXfIndex(sheet: number, row: number, col: number, xfIndex: number): boolean {
       if (!caps.cellFormatting) return false;
       log.setCellXf.push({ sheet, row, col, xfIndex });
-      return true;
+      const result = opts.setCellXfResults?.[setCellXfCalls] ?? true;
+      setCellXfCalls += 1;
+      return result;
     },
     getCellXf(xfIndex: number) {
       if (!caps.cellFormatting) return null;
@@ -112,42 +129,94 @@ const makeFake = (opts: FakeOpts = {}): { wb: WorkbookHandle; log: FakeLog } => 
       return numFmts.get(numFmtId) ?? null;
     },
     addFontRecord(record: FontRecord): number {
-      if (!caps.cellFormatting) return -1;
+      if (!caps.cellFormatting || opts.negativeRecord === 'font') return -1;
       log.addFont.push(record);
       const idx = nextFontIdx++;
       fonts.set(idx, record);
       return idx;
     },
     addFillRecord(record: FillRecord): number {
-      if (!caps.cellFormatting) return -1;
+      if (!caps.cellFormatting || opts.negativeRecord === 'fill') return -1;
       log.addFill.push(record);
       const idx = nextFillIdx++;
       fills.set(idx, record);
       return idx;
     },
     addBorderRecord(record: BorderRecord): number {
-      if (!caps.cellFormatting) return -1;
+      if (!caps.cellFormatting || opts.negativeRecord === 'border') return -1;
       log.addBorder.push(record);
       const idx = nextBorderIdx++;
       borders.set(idx, record);
       return idx;
     },
     addNumFmtCode(code: string): number {
-      if (!caps.cellFormatting) return -1;
+      if (!caps.cellFormatting || opts.negativeRecord === 'numFmt') return -1;
       log.addNumFmt.push(code);
       const id = nextNumFmtId++;
       numFmts.set(id, code);
       return id;
     },
     addXfRecord(record: CellXf): number {
-      if (!caps.cellFormatting) return -1;
+      if (!caps.cellFormatting || opts.negativeRecord === 'xf') return -1;
       log.addXf.push(record);
       const idx = nextXfIdx++;
       xfTable.set(idx, record);
       return idx;
     },
+    ...(opts.phonetic
+      ? {
+          setCellPhonetic(_sheet: number, _row: number, _col: number, _phonetic: string): boolean {
+            return opts.setCellPhoneticResult ?? true;
+          },
+        }
+      : {}),
+    ...(opts.phoneticRuns
+      ? {
+          setCellPhoneticRuns(): boolean {
+            return opts.setCellPhoneticRunsResult ?? true;
+          },
+        }
+      : {}),
   };
   return { wb: fake as unknown as WorkbookHandle, log };
+};
+
+const makeFlushFake = (opts: {
+  cellFormatting: boolean;
+  dataValidation: boolean;
+  hyperlinks: boolean;
+  clearValidationResult?: boolean;
+}) => {
+  const calls = {
+    clearValidations: 0,
+    addValidationEntry: 0,
+    clearHyperlinks: 0,
+    addHyperlink: 0,
+  };
+  const wb = {
+    capabilities: {
+      cellFormatting: opts.cellFormatting,
+      dataValidation: opts.dataValidation,
+      hyperlinks: opts.hyperlinks,
+    },
+    clearValidations(): boolean {
+      calls.clearValidations += 1;
+      return opts.clearValidationResult ?? true;
+    },
+    addValidationEntry(): boolean {
+      calls.addValidationEntry += 1;
+      return true;
+    },
+    clearHyperlinks(): boolean {
+      calls.clearHyperlinks += 1;
+      return true;
+    },
+    addHyperlink(): boolean {
+      calls.addHyperlink += 1;
+      return true;
+    },
+  };
+  return { wb: wb as unknown as WorkbookHandle, calls };
 };
 
 describe('syncCellFormatsToEngine', () => {
@@ -192,6 +261,119 @@ describe('syncCellFormatsToEngine', () => {
     expect(log.setCellXf[1]).toMatchObject({ sheet: 0, row: 0, col: 0, xfIndex: 0 });
   });
 
+  it('strict mode keeps successful XF assignments in the high-water set after a later failure', () => {
+    const { wb, log } = makeFake({ setCellXfResults: [true, false, true] });
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      format: {
+        formats: new Map([
+          [addrKey({ sheet: 0, row: 0, col: 0 }), { bold: true } as CellFormat],
+          [addrKey({ sheet: 0, row: 0, col: 1 }), { italic: true } as CellFormat],
+        ]),
+      },
+    }));
+
+    expect(() => syncCellFormatsToEngine(wb, store, 0, { strict: true })).toThrow(
+      /cell-format setCellXfIndex at 0:0:1/,
+    );
+
+    store.setState((s) => ({ ...s, format: { formats: new Map() } }));
+    expect(() => syncCellFormatsToEngine(wb, store, 0, { strict: true })).not.toThrow();
+    expect(log.setCellXf).toHaveLength(3);
+    expect(log.setCellXf[0]?.xfIndex).toBeGreaterThan(0);
+    expect(log.setCellXf[1]?.xfIndex).toBeGreaterThan(0);
+    expect(log.setCellXf[2]).toMatchObject({ row: 0, col: 0, xfIndex: 0 });
+
+    expect(() => syncCellFormatsToEngine(wb, store, 0, { strict: true })).not.toThrow();
+    expect(log.setCellXf).toHaveLength(3);
+  });
+
+  it('strict mode rejects failed XF resets and retries the retained high-water key', () => {
+    const { wb, log } = makeFake({ setCellXfResults: [true, false, true] });
+    const store = createSpreadsheetStore();
+    const key = addrKey({ sheet: 0, row: 0, col: 0 });
+    store.setState((s) => ({
+      ...s,
+      format: { formats: new Map([[key, { bold: true } as CellFormat]]) },
+    }));
+    syncCellFormatsToEngine(wb, store, 0);
+
+    store.setState((s) => ({ ...s, format: { formats: new Map() } }));
+    expect(() => syncCellFormatsToEngine(wb, store, 0, { strict: true })).toThrow(
+      /cell-format resetCellXfIndex at 0:0:0/,
+    );
+    expect(() => syncCellFormatsToEngine(wb, store, 0, { strict: true })).not.toThrow();
+    expect(log.setCellXf.at(-1)).toMatchObject({ row: 0, col: 0, xfIndex: 0 });
+  });
+
+  it('strict mode rejects negative component and XF construction results', () => {
+    const negativeRecords = ['font', 'fill', 'border', 'numFmt', 'xf'] as const;
+    for (const negativeRecord of negativeRecords) {
+      const { wb } = makeFake({ negativeRecord });
+      const store = createSpreadsheetStore();
+      const format: CellFormat =
+        negativeRecord === 'numFmt' ? { numFmt: { kind: 'percent', decimals: 2 } } : { bold: true };
+      store.setState((s) => ({
+        ...s,
+        format: {
+          formats: new Map([[addrKey({ sheet: 0, row: 0, col: 0 }), format]]),
+        },
+      }));
+      expect(() => syncCellFormatsToEngine(wb, store, 0, { strict: true })).toThrow(
+        /cell-format resolveXf at 0:0:0/,
+      );
+    }
+  });
+
+  it('legacy mode keeps negative construction and setter failures best-effort', () => {
+    const negative = makeFake({ negativeRecord: 'font' });
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      format: {
+        formats: new Map([[addrKey({ sheet: 0, row: 0, col: 0 }), { bold: true } as CellFormat]]),
+      },
+    }));
+    expect(() => syncCellFormatsToEngine(negative.wb, store, 0)).not.toThrow();
+
+    const failedSetter = makeFake({ setCellXfResults: [false] });
+    expect(() => syncCellFormatsToEngine(failedSetter.wb, store, 0)).not.toThrow();
+  });
+
+  it('strict mode rejects a failed phonetic setter', () => {
+    const { wb } = makeFake({ phonetic: true, setCellPhoneticResult: false });
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      format: {
+        formats: new Map([[addrKey({ sheet: 0, row: 0, col: 0 }), {} as CellFormat]]),
+      },
+    }));
+    expect(() => syncCellFormatsToEngine(wb, store, 0, { strict: true })).toThrow(
+      /cell-format setCellPhonetic at 0:0:0/,
+    );
+  });
+
+  it('strict mode rejects a failed phonetic-runs setter', () => {
+    const { wb } = makeFake({ phoneticRuns: true, setCellPhoneticRunsResult: false });
+    const store = createSpreadsheetStore();
+    store.setState((s) => ({
+      ...s,
+      format: {
+        formats: new Map([
+          [
+            addrKey({ sheet: 0, row: 0, col: 0 }),
+            { phonetic: [{ start: 0, end: 2, text: 'カナ' }] } as CellFormat,
+          ],
+        ]),
+      },
+    }));
+    expect(() => syncCellFormatsToEngine(wb, store, 0, { strict: true })).toThrow(
+      /cell-format setCellPhoneticRuns at 0:0:0/,
+    );
+  });
+
   it('skips cells on other sheets', () => {
     const { wb, log } = makeFake();
     const store = createSpreadsheetStore();
@@ -214,7 +396,7 @@ describe('syncCellFormatsToEngine', () => {
         formats: new Map([[addrKey({ sheet: 0, row: 0, col: 0 }), { bold: true } as CellFormat]]),
       },
     }));
-    syncCellFormatsToEngine(wb, store, 0);
+    syncCellFormatsToEngine(wb, store, 0, { strict: true });
     expect(log.setCellXf).toHaveLength(0);
     expect(log.addFont).toHaveLength(0);
   });
@@ -253,6 +435,45 @@ describe('syncCellFormatsToEngine', () => {
     }));
     syncCellFormatsToEngine(wb, store, 0);
     expect(log.addNumFmt).toEqual([]);
+  });
+});
+
+describe('flushFormatToEngine', () => {
+  it('forwards strict mode and stops after the first validation failure', () => {
+    const { wb, calls } = makeFlushFake({
+      cellFormatting: false,
+      dataValidation: true,
+      hyperlinks: true,
+      clearValidationResult: false,
+    });
+    const store = createSpreadsheetStore();
+
+    expect(() => flushFormatToEngine(wb, store, 0, { strict: true })).toThrow(
+      /validations clearValidations at sheet:0/,
+    );
+    expect(calls).toEqual({
+      clearValidations: 1,
+      addValidationEntry: 0,
+      clearHyperlinks: 0,
+      addHyperlink: 0,
+    });
+  });
+
+  it('is a no-op in strict mode when all dimensions are unsupported', () => {
+    const { wb, calls } = makeFlushFake({
+      cellFormatting: false,
+      dataValidation: false,
+      hyperlinks: false,
+    });
+    const store = createSpreadsheetStore();
+
+    expect(() => flushFormatToEngine(wb, store, 0, { strict: true })).not.toThrow();
+    expect(calls).toEqual({
+      clearValidations: 0,
+      addValidationEntry: 0,
+      clearHyperlinks: 0,
+      addHyperlink: 0,
+    });
   });
 });
 
