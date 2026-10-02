@@ -209,6 +209,41 @@ describe('CELL_STYLES', () => {
         fill,
       });
     }
+    const nonAccentObserved: readonly (readonly [CellStyleId, string, string?])[] = [
+      ['title', '#0e2841'],
+      ['heading1', '#0e2841'],
+      ['heading2', '#0e2841'],
+      ['heading3', '#0e2841'],
+      ['heading4', '#0e2841'],
+      ['checkCell', '#ffffff', '#a5a5a5'],
+    ];
+    for (const [id, color, fill] of nonAccentObserved) {
+      expect(cellStyleCommands.cellStyleFallbackFormat?.(id, 'excel365Mac')).toMatchObject({
+        color,
+        ...(fill === undefined ? {} : { fill }),
+      });
+    }
+    const portableDefaults: readonly (readonly [CellStyleId, string, string?])[] = [
+      ['title', '#1f4e79'],
+      ['heading1', '#1f4e79'],
+      ['heading2', '#1f4e79'],
+      ['heading3', '#1f4e79'],
+      ['heading4', '#1f4e79'],
+      ['checkCell', '#375623', '#a9d08e'],
+    ];
+    for (const [id, color, fill] of portableDefaults) {
+      expect(cellStyleCommands.cellStyleFallbackFormat?.(id, 'default')).toMatchObject({
+        color,
+        ...(fill === undefined ? {} : { fill }),
+      });
+    }
+    expect(cellStyleCommands.cellStyleFallbackFormat?.('note', 'excel365Mac')).toMatchObject({
+      color: '#333333',
+      fill: '#ffffcc',
+    });
+    expect(
+      cellStyleCommands.cellStyleFallbackFormat?.('heading1', 'excel365Mac').borders,
+    ).toMatchObject({ bottom: { style: 'medium', color: '#1f4e79' } });
   });
 
   it('keeps a single canonical profile when materialized cells disagree', () => {
@@ -312,6 +347,124 @@ describe('CELL_STYLES', () => {
     }
   });
 
+  it('keeps the Mac Check Cell palette across first, second, F4, and save/load', async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    let loaded: WorkbookHandle | null = null;
+    try {
+      expect(workbook.isStub).toBe(false);
+      expect(workbook.getNamedCellStyles().find((style) => style.builtinId === 23)).toBeUndefined();
+      const store = createSpreadsheetStore();
+      const history = new History();
+      const context = {
+        getWorkbook: () => workbook,
+        getFallbackProfile: () => 'excel365Mac' as const,
+      };
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 });
+      mutators.setCellFormat(
+        store,
+        { sheet: 0, row: 0, col: 0 },
+        {
+          fontFamily: 'Aptos Display',
+          fontSize: 22,
+          italic: true,
+          strike: true,
+          underline: true,
+          align: 'center',
+          vAlign: 'bottom',
+          wrap: true,
+        },
+      );
+      expect(applyCellStyleToSelection(store, history, 'checkCell', context)).toBe(true);
+      expect(store.getState().format.formats.get('0:0:0')).toMatchObject({
+        cellStyle: 'checkCell',
+        bold: true,
+        color: '#ffffff',
+        fill: '#a5a5a5',
+        align: 'center',
+        vAlign: 'bottom',
+        wrap: true,
+      });
+      const firstFormat = store.getState().format.formats.get('0:0:0');
+      expect(firstFormat?.fontFamily).toBeUndefined();
+      expect(firstFormat?.fontSize).toBeUndefined();
+      expect(firstFormat?.italic).toBeUndefined();
+      expect(firstFormat?.strike).toBeUndefined();
+      expect(firstFormat?.underline).toBeUndefined();
+
+      const expectNativeCheckCell = (columns: readonly number[], expectedStyleXfId?: number) => {
+        const published = workbook.getNamedCellStyles().find((style) => style.builtinId === 23);
+        expect(published).toBeDefined();
+        if (!published) throw new Error('Check Cell named style was not published');
+        if (expectedStyleXfId !== undefined) expect(published.xfId).toBe(expectedStyleXfId);
+        const styleXf = workbook.getCellStyleXf(published.xfId);
+        expect(styleXf).toBeDefined();
+        if (!styleXf) throw new Error('Check Cell style XF was not published');
+        expect(workbook.getFontRecord(styleXf.fontIndex)?.colorArgb).toBe(0xffffffff);
+        expect(workbook.getFillRecord(styleXf.fillIndex)?.fgArgb).toBe(0xffa5a5a5);
+        for (const col of columns) {
+          const cellXf = workbook.getCellXf(workbook.getCellXfIndex(0, 0, col) ?? -1);
+          expect(cellXf).toMatchObject({
+            xfId: published.xfId,
+            fontIndex: styleXf.fontIndex,
+            fillIndex: styleXf.fillIndex,
+            borderIndex: styleXf.borderIndex,
+          });
+        }
+        return {
+          styleXfId: published.xfId,
+          fontIndex: styleXf.fontIndex,
+          fillIndex: styleXf.fillIndex,
+          borderIndex: styleXf.borderIndex,
+        };
+      };
+
+      syncCellFormatsToEngine(workbook, store, 0, { strict: true });
+      const firstNative = expectNativeCheckCell([0]);
+
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 });
+      expect(applyCellStyleToSelection(store, history, 'checkCell', context)).toBe(true);
+      expect(store.getState().format.formats.get('0:0:1')).toMatchObject({
+        cellStyle: 'checkCell',
+        color: '#ffffff',
+        fill: '#a5a5a5',
+      });
+      syncCellFormatsToEngine(workbook, store, 0, { strict: true });
+      expectNativeCheckCell([0, 1], firstNative.styleXfId);
+
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 });
+      expect(history.repeatLast()).toBe(true);
+      expect(store.getState().format.formats.get('0:0:2')).toMatchObject({
+        cellStyle: 'checkCell',
+        color: '#ffffff',
+        fill: '#a5a5a5',
+      });
+      syncCellFormatsToEngine(workbook, store, 0, { strict: true });
+      expectNativeCheckCell([0, 1, 2], firstNative.styleXfId);
+
+      loaded = await WorkbookHandle.loadBytes(workbook.save());
+      const loadedStyle = loaded.getNamedCellStyles().find((style) => style.builtinId === 23);
+      expect(loadedStyle).toBeDefined();
+      if (!loadedStyle) return;
+      const loadedXf = loaded.getCellStyleXf(loadedStyle.xfId);
+      expect(loadedXf).toBeDefined();
+      if (!loadedXf) return;
+      expect(loaded.getFontRecord(loadedXf.fontIndex)?.colorArgb).toBe(0xffffffff);
+      expect(loaded.getFillRecord(loadedXf.fillIndex)?.fgArgb).toBe(0xffa5a5a5);
+      expect(cellStyleKeysByXfId(loaded).get(loadedStyle.xfId)).toBe('checkCell');
+      for (const col of [0, 1, 2]) {
+        expect(loaded.getCellXf(loaded.getCellXfIndex(0, 0, col) ?? -1)).toMatchObject({
+          xfId: loadedStyle.xfId,
+          fontIndex: loadedXf.fontIndex,
+          fillIndex: loadedXf.fillIndex,
+          borderIndex: loadedXf.borderIndex,
+        });
+      }
+    } finally {
+      loaded?.dispose();
+      workbook.dispose();
+    }
+  });
+
   it('samples the current owner profile again for F4', () => {
     const store = createSpreadsheetStore();
     const history = new History();
@@ -324,6 +477,152 @@ describe('CELL_STYLES', () => {
     mutators.setRange(store, { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 1 });
     expect(history.repeatLast()).toBe(true);
     expect(store.getState().format.formats.get('0:0:1')?.fill).toBe('#b4c7e7');
+  });
+
+  it('prefers raw builtin-23 selectors over Mac Check Cell fallback colors', async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    let loaded: WorkbookHandle | null = null;
+    try {
+      expect(workbook.isStub).toBe(false);
+      const normal = workbook.getCellStyleXf(0);
+      const defaultFont = workbook.getFontRecord(0);
+      const defaultFill = workbook.getFillRecord(0);
+      expect(normal).toBeDefined();
+      expect(defaultFont).toBeDefined();
+      expect(defaultFill).toBeDefined();
+      if (!normal || !defaultFont || !defaultFill) return;
+      const themedFont = workbook.addFontRecord({
+        ...defaultFont,
+        colorArgb: 0xff123456,
+        color: {
+          kind: 2,
+          rgb: defaultFont.color?.rgb ?? 0,
+          theme: 4,
+          tint: 0.2,
+          indexed: defaultFont.color?.indexed ?? 0,
+        },
+      });
+      const themedFill = workbook.addFillRecord({
+        ...defaultFill,
+        pattern: 1,
+        fgArgb: 0xff654321,
+        fg: {
+          kind: 2,
+          rgb: defaultFill.fg?.rgb ?? 0,
+          theme: 5,
+          tint: 0.4,
+          indexed: defaultFill.fg?.indexed ?? 0,
+        },
+      });
+      const styleXfId = workbook.addCellStyleXfRecord({
+        ...normal,
+        fontIndex: themedFont,
+        fillIndex: themedFill,
+      });
+      expect(workbook.setNamedCellStyle('Check Cell', styleXfId, 23)).toBe(true);
+      expect(
+        cellStyleCommands.resolveCellStyleFormat('checkCell', workbook, 'excel365Mac'),
+      ).toMatchObject({
+        color: '#123456',
+        fill: '#654321',
+      });
+
+      const store = createSpreadsheetStore();
+      const history = new History();
+      const context = {
+        getWorkbook: () => workbook,
+        getFallbackProfile: () => 'excel365Mac' as const,
+      };
+      for (const col of [0, 1]) {
+        mutators.setRange(store, { sheet: 0, r0: 0, c0: col, r1: 0, c1: col });
+        expect(applyCellStyleToSelection(store, history, 'checkCell', context)).toBe(true);
+        expect(store.getState().format.formats.get(`0:0:${col}`)).toMatchObject({
+          cellStyle: 'checkCell',
+          color: '#123456',
+          fill: '#654321',
+        });
+      }
+      syncCellFormatsToEngine(workbook, store, 0, { strict: true });
+      const published = workbook.getNamedCellStyles().find((style) => style.builtinId === 23);
+      expect(published?.xfId).toBe(styleXfId);
+      const publishedXf = workbook.getCellStyleXf(published?.xfId ?? -1);
+      expect(publishedXf).toBeDefined();
+      if (!publishedXf) return;
+      const firstStyleXfComponents = {
+        fontIndex: publishedXf.fontIndex,
+        fillIndex: publishedXf.fillIndex,
+        borderIndex: publishedXf.borderIndex,
+      };
+      expect(workbook.getFontRecord(publishedXf.fontIndex)?.color).toMatchObject({
+        kind: 2,
+        theme: 4,
+        tint: 0.2,
+      });
+      expect(workbook.getFillRecord(publishedXf.fillIndex)?.fg).toMatchObject({
+        kind: 2,
+        theme: 5,
+        tint: 0.4,
+      });
+      const captureCellXf = (col: number) => {
+        const cellXf = workbook.getCellXf(workbook.getCellXfIndex(0, 0, col) ?? -1);
+        expect(cellXf).toBeDefined();
+        if (!cellXf) throw new Error(`raw Check Cell cell XF missing for column ${col}`);
+        return {
+          xfId: cellXf.xfId,
+          fontIndex: cellXf.fontIndex,
+          fillIndex: cellXf.fillIndex,
+          borderIndex: cellXf.borderIndex,
+        };
+      };
+      const firstCellXfs = [captureCellXf(0), captureCellXf(1)];
+      expect(firstCellXfs[0]).toMatchObject({ xfId: styleXfId });
+      expect(firstCellXfs[1]).toMatchObject({ xfId: styleXfId });
+
+      mutators.setRange(store, { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 });
+      expect(history.repeatLast()).toBe(true);
+      expect(store.getState().format.formats.get('0:0:2')).toMatchObject({
+        cellStyle: 'checkCell',
+        color: '#123456',
+        fill: '#654321',
+      });
+      syncCellFormatsToEngine(workbook, store, 0, { strict: true });
+      const afterRepeat = workbook.getNamedCellStyles().find((style) => style.builtinId === 23);
+      expect(afterRepeat?.xfId).toBe(styleXfId);
+      const afterRepeatXf = workbook.getCellStyleXf(afterRepeat?.xfId ?? -1);
+      expect(afterRepeatXf).toMatchObject(firstStyleXfComponents);
+      expect(captureCellXf(0)).toEqual(firstCellXfs[0]);
+      expect(captureCellXf(1)).toEqual(firstCellXfs[1]);
+      expect(captureCellXf(2)).toMatchObject({
+        xfId: styleXfId,
+        ...firstStyleXfComponents,
+      });
+
+      loaded = await WorkbookHandle.loadBytes(workbook.save());
+      const loadedStyle = loaded.getNamedCellStyles().find((style) => style.builtinId === 23);
+      expect(loadedStyle?.xfId).toBe(styleXfId);
+      expect(cellStyleKeysByXfId(loaded).get(loadedStyle?.xfId ?? -1)).toBe('checkCell');
+      const loadedXf = loaded.getCellStyleXf(loadedStyle?.xfId ?? -1);
+      expect(loadedXf).toMatchObject(firstStyleXfComponents);
+      expect(loaded.getFontRecord(loadedXf?.fontIndex ?? -1)?.color).toMatchObject({
+        kind: 2,
+        theme: 4,
+        tint: 0.2,
+      });
+      expect(loaded.getFillRecord(loadedXf?.fillIndex ?? -1)?.fg).toMatchObject({
+        kind: 2,
+        theme: 5,
+        tint: 0.4,
+      });
+      for (const col of [0, 1, 2]) {
+        expect(loaded.getCellXf(loaded.getCellXfIndex(0, 0, col) ?? -1)).toMatchObject({
+          xfId: loadedStyle?.xfId,
+          ...firstStyleXfComponents,
+        });
+      }
+    } finally {
+      loaded?.dispose();
+      workbook.dispose();
+    }
   });
 
   it('replaces the Mac accent font and fill groups without inventing font defaults', () => {

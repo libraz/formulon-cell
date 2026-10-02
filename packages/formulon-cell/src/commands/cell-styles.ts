@@ -488,9 +488,13 @@ const BUILT_IN_STYLE_NAMES = new Set(
 
 export type CellStyleFallbackProfile = 'default' | 'excel365Mac';
 
-const MAC_ACCENT_FORMATS: Partial<
-  Record<CellStyleId, Pick<Partial<CellFormat>, 'color' | 'fill'>>
-> = {
+const EXCEL365_MAC_STYLE_OVERRIDES: Partial<Record<CellStyleId, Partial<CellFormat>>> = {
+  title: { color: '#0e2841' },
+  heading1: { color: '#0e2841' },
+  heading2: { color: '#0e2841' },
+  heading3: { color: '#0e2841' },
+  heading4: { color: '#0e2841' },
+  checkCell: { color: '#ffffff', fill: '#a5a5a5' },
   accent1: { color: '#ffffff', fill: '#156082' },
   accent1_20: { color: '#000000', fill: '#c0e6f5' },
   accent1_40: { color: '#000000', fill: '#83cceb' },
@@ -528,7 +532,7 @@ export function cellStyleFallbackFormat(
 ): Partial<CellFormat> {
   const style = STYLE_BY_ID.get(id);
   const format = { ...(style?.format ?? {}) };
-  if (profile === 'excel365Mac') Object.assign(format, MAC_ACCENT_FORMATS[id] ?? {});
+  if (profile === 'excel365Mac') Object.assign(format, EXCEL365_MAC_STYLE_OVERRIDES[id] ?? {});
   return format;
 }
 

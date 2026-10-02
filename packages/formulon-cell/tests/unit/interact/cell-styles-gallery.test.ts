@@ -120,6 +120,27 @@ describe('attachCellStylesGallery', () => {
     handle.detach();
   });
 
+  it('uses Mac non-accent fallback colors for modal previews and restores defaults', () => {
+    host.dataset.fcPlatform = 'mac';
+    const handle = attachCellStylesGallery({ host, store });
+    handle.open();
+    expect(chips().find((chip) => chip.dataset.fcStyle === 'title')?.style.color).toBe('#0e2841');
+    expect(chips().find((chip) => chip.dataset.fcStyle === 'heading1')?.style.color).toBe(
+      '#0e2841',
+    );
+    expect(chips().find((chip) => chip.dataset.fcStyle === 'checkCell')).toMatchObject({
+      style: { color: '#ffffff', background: '#a5a5a5' },
+    });
+    host.dataset.fcPlatform = 'default';
+    handle.close();
+    handle.open();
+    expect(chips().find((chip) => chip.dataset.fcStyle === 'title')?.style.color).toBe('#1f4e79');
+    expect(chips().find((chip) => chip.dataset.fcStyle === 'checkCell')).toMatchObject({
+      style: { color: '#375623', background: '#a9d08e' },
+    });
+    handle.detach();
+  });
+
   it('uses localized style labels and updates them on locale changes', () => {
     const handle = attachCellStylesGallery({ host, store, strings: ja });
     handle.open();
