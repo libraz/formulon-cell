@@ -14,6 +14,7 @@ import type {
 } from '../../../src/commands/interaction-policy.js';
 import { fixedFormPolicy, viewerPolicy } from '../../../src/commands/interaction-policy.js';
 import { insertRows } from '../../../src/commands/structure.js';
+import type { Range } from '../../../src/engine/types.js';
 import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { en } from '../../../src/i18n/strings/en.js';
 import { attachContextMenu, type ContextMenuHandle } from '../../../src/interact/context-menu.js';
@@ -75,6 +76,19 @@ const setRange = (
       active: { sheet: 0, row: r0, col: c0 },
       anchor: { sheet: 0, row: r0, col: c0 },
       range: { sheet: 0, r0, c0, r1, c1 },
+    },
+  }));
+};
+
+const setSelectionRanges = (store: SpreadsheetStore, range: Range, extraRanges: Range[]): void => {
+  store.setState((s) => ({
+    ...s,
+    selection: {
+      ...s.selection,
+      active: { sheet: range.sheet, row: range.r0, col: range.c0 },
+      anchor: { sheet: range.sheet, row: range.r0, col: range.c0 },
+      range,
+      extraRanges,
     },
   }));
 };
@@ -1284,6 +1298,228 @@ describe('attachContextMenu', () => {
       expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 2 });
       expect(wb.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({ kind: 'number', value: 3 });
     });
+
+    it('clears the complete primary and extra selection union in one undo and redo', () => {
+      const history = new History();
+      seed(store, wb, [
+        { row: 0, col: 0, value: 11 },
+        { row: 0, col: 1, value: 12 },
+        { row: 0, col: 2, value: 13 },
+        { row: 1, col: 0, value: 21 },
+        { row: 1, col: 1, value: 99 }, // the B2 hole
+        { row: 2, col: 0, value: 31 },
+        { row: 2, col: 1, value: 32 },
+        { row: 2, col: 2, value: 33 },
+        { row: 4, col: 4, value: 55 },
+        { row: 6, col: 6, value: 77 }, // outside every selected fragment
+      ]);
+      setSelectionRanges(store, { sheet: 0, r0: 0, c0: 0, r1: 2, c1: 0 }, [
+        { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 2 },
+        { sheet: 0, r0: 2, c0: 1, r1: 2, c1: 2 },
+        { sheet: 0, r0: 4, c0: 4, r1: 4, c1: 4 },
+      ]);
+      detach = attachContextMenu({ host, store, wb, history, onAfterCommit });
+
+      fireContextMenu(host, 200, 70);
+      item('clear')?.click();
+      wb.recalc();
+
+      for (const [row, col] of [
+        [0, 0],
+        [0, 1],
+        [0, 2],
+        [1, 0],
+        [2, 0],
+        [2, 1],
+        [2, 2],
+        [4, 4],
+      ] as const) {
+        expect(wb.getValue({ sheet: 0, row, col })).toEqual({ kind: 'blank' });
+      }
+      expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'number', value: 99 });
+      expect(wb.getValue({ sheet: 0, row: 6, col: 6 })).toEqual({ kind: 'number', value: 77 });
+      expect(history.undo()).toBe(true);
+      wb.recalc();
+      expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'number', value: 12 });
+      expect(wb.getValue({ sheet: 0, row: 4, col: 4 })).toEqual({ kind: 'number', value: 55 });
+      expect(history.redo()).toBe(true);
+      wb.recalc();
+      expect(wb.getValue({ sheet: 0, row: 0, col: 1 })).toEqual({ kind: 'blank' });
+      expect(wb.getValue({ sheet: 0, row: 1, col: 1 })).toEqual({ kind: 'number', value: 99 });
+      expect(onAfterCommit).toHaveBeenCalledTimes(1);
+    });
+
+    it('clears sparse physical formulas and values from a whole-column selection', () => {
+      const history = new History();
+      const formula = { sheet: 0, row: 250, col: 0 };
+      const sparse = { sheet: 0, row: 900, col: 0 };
+      const outside = { sheet: 0, row: 900, col: 1 };
+      wb.setFormula(formula, '=""');
+      wb.setNumber(sparse, 42);
+      wb.setNumber(outside, 88);
+      wb.recalc();
+      expect(wb.cellFormula(formula)).toBe('=""');
+      setRange(store, 0, 0, 1_048_575, 0);
+      detach = attachContextMenu({ host, store, wb, history, onAfterCommit });
+
+      fireContextMenu(host, 200, 70);
+      item('clear')?.click();
+      wb.recalc();
+
+      expect(wb.getValue(formula)).toEqual({ kind: 'blank' });
+      expect(wb.cellFormula(formula)).toBeNull();
+      expect(wb.getValue(sparse)).toEqual({ kind: 'blank' });
+      expect(wb.getValue(outside)).toEqual({ kind: 'number', value: 88 });
+      expect(history.undo()).toBe(true);
+      wb.recalc();
+      expect(wb.cellFormula(formula)).toBe('=""');
+      expect(wb.getValue(sparse)).toEqual({ kind: 'number', value: 42 });
+      expect(history.redo()).toBe(true);
+      wb.recalc();
+      expect(wb.cellFormula(formula)).toBeNull();
+    });
+
+    it('clears fully covered merge anchors while preserving a merge with a selection hole', () => {
+      const history = new History();
+      const fullMerge: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 };
+      const partialMerge: Range = { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 3 };
+      mutators.mergeRange(store, fullMerge);
+      mutators.mergeRange(store, partialMerge);
+      seed(store, wb, [
+        { row: 0, col: 0, value: 10 },
+        { row: 0, col: 2, value: 20 },
+        { row: 0, col: 4, value: 30 },
+      ]);
+      setSelectionRanges(store, fullMerge, [
+        { sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 },
+        { sheet: 0, r0: 0, c0: 4, r1: 0, c1: 4 },
+      ]);
+      detach = attachContextMenu({ host, store, wb, history, onAfterCommit });
+
+      fireContextMenu(host, 200, 70);
+      item('clear')?.click();
+      wb.recalc();
+
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'blank' });
+      expect(wb.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({ kind: 'number', value: 20 });
+      expect(wb.getValue({ sheet: 0, row: 0, col: 4 })).toEqual({ kind: 'blank' });
+      expect(store.getState().merges.byAnchor.has('0:0:0')).toBe(true);
+      expect(store.getState().merges.byAnchor.has('0:0:2')).toBe(true);
+      expect(history.undo()).toBe(true);
+      wb.recalc();
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 10 });
+      expect(wb.getValue({ sheet: 0, row: 0, col: 4 })).toEqual({ kind: 'number', value: 30 });
+      expect(history.redo()).toBe(true);
+      wb.recalc();
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'blank' });
+      expect(wb.getValue({ sheet: 0, row: 0, col: 2 })).toEqual({ kind: 'number', value: 20 });
+    });
+
+    it('waits for an asynchronous restricted clear before refreshing', async () => {
+      let resolve: (() => void) | undefined;
+      const pending = new Promise<void>((done) => {
+        resolve = done;
+      });
+      const policy = { batchDenied: 'skipIneligible' as const };
+      const execute = vi.fn((_command: CellBatchCommand) => pending);
+      const controller: ContextMenuInteractionController = {
+        policy,
+        canExecute: () => ({ allowed: true }),
+        execute,
+      };
+      seed(store, wb, [
+        { row: 0, col: 0, value: 11 },
+        { row: 4, col: 4, value: 55 },
+      ]);
+      setSelectionRanges(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, [
+        { sheet: 0, r0: 4, c0: 4, r1: 4, c1: 4 },
+      ]);
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        interactionController: controller,
+        onAfterCommit,
+      });
+
+      fireContextMenu(host, 200, 70);
+      item('clear')?.click();
+
+      expect(execute).toHaveBeenCalledTimes(1);
+      const command = execute.mock.calls[0]?.[0];
+      expect(command).toMatchObject({
+        operation: 'clear',
+        origin: 'contextMenu',
+        commandId: 'clear',
+        denied: policy.batchDenied,
+      });
+      expect(command?.changes.map((change) => change.addr)).toEqual([
+        { sheet: 0, row: 0, col: 0 },
+        { sheet: 0, row: 4, col: 4 },
+      ]);
+      expect(
+        command?.changes.every((change) => 'value' in change && change.value.kind === 'blank'),
+      ).toBe(true);
+      expect(onAfterCommit).not.toHaveBeenCalled();
+      resolve?.();
+      await pending;
+      await Promise.resolve();
+      expect(onAfterCommit).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects a registered policy atomically and skips empty unions without dispatch', async () => {
+      const history = new History();
+      const primary: Range = { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 };
+      seed(store, wb, [
+        { row: 0, col: 0, value: 11 },
+        { row: 4, col: 4, value: 55 },
+      ]);
+      const controller = new InteractionController({
+        store,
+        history,
+        getWb: () => wb,
+      });
+      const formPolicy = fixedFormPolicy({ ranges: [primary] });
+      controller.setPolicy({ ...formPolicy, batchDenied: 'reject' });
+      unregisterController = registerInteractionController(store, controller);
+      setSelectionRanges(store, primary, [{ sheet: 0, r0: 4, c0: 4, r1: 4, c1: 4 }]);
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+
+      fireContextMenu(host, 200, 70);
+      item('clear')?.click();
+
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 11 });
+      expect(wb.getValue({ sheet: 0, row: 4, col: 4 })).toEqual({ kind: 'number', value: 55 });
+      expect(history.canUndo()).toBe(false);
+
+      detach?.();
+      detach = null;
+      unregisterController?.();
+      unregisterController = null;
+      controller.dispose();
+      onAfterCommit.mockClear();
+
+      store = createSpreadsheetStore();
+      wb = await newWb();
+      const emptyHistory = new History();
+      const emptyController = new InteractionController({
+        store,
+        history: emptyHistory,
+        getWb: () => wb,
+      });
+      const execute = vi.spyOn(emptyController, 'execute');
+      unregisterController = registerInteractionController(store, emptyController);
+      setRange(store, 0, 0, 0, 0);
+      detach = attachContextMenu({ host, store, wb, history: emptyHistory, onAfterCommit });
+
+      fireContextMenu(host, 200, 70);
+      item('clear')?.click();
+
+      expect(execute).not.toHaveBeenCalled();
+      expect(onAfterCommit).not.toHaveBeenCalled();
+      expect(emptyHistory.canUndo()).toBe(false);
+      emptyController.dispose();
+    });
   });
 
   describe('format items', () => {
@@ -1336,6 +1572,31 @@ describe('attachContextMenu', () => {
       expect(
         store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 })),
       ).toBeUndefined();
+    });
+
+    it('repeats Borders on the selection active when F4 runs', () => {
+      const history = new History();
+      seed(store, wb, [
+        { row: 0, col: 0, value: 1 },
+        { row: 2, col: 2, value: 3 },
+      ]);
+      setRange(store, 0, 0, 0, 0);
+      detach = attachContextMenu({ host, store, wb, history });
+
+      fireContextMenu(host, 200, 70);
+      miniItem('borders')?.click();
+      const a1 = store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }));
+      expect(a1?.borders).toBeDefined();
+
+      setRange(store, 2, 2, 2, 2);
+      expect(history.repeatLast()).toBe(true);
+
+      expect(store.getState().format.formats.get(addrKey({ sheet: 0, row: 0, col: 0 }))).toEqual(
+        a1,
+      );
+      expect(
+        store.getState().format.formats.get(addrKey({ sheet: 0, row: 2, col: 2 }))?.borders,
+      ).toEqual(a1?.borders);
     });
 
     it('Format Cells… triggers the onFormatDialog callback', () => {

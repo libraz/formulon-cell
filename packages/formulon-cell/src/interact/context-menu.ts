@@ -1,5 +1,9 @@
 import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
 import { deleteCells, insertCells } from '../commands/cell-shift.js';
+import {
+  clearSelectedContents,
+  collectSelectedContentAddresses,
+} from '../commands/clear-contents.js';
 import { copy } from '../commands/clipboard/copy.js';
 import { cut } from '../commands/clipboard/cut.js';
 import {
@@ -33,6 +37,7 @@ import {
   toggleBold,
   toggleItalic,
   toggleUnderline,
+  withSelectionFormatOrigin,
 } from '../commands/format.js';
 import { type History, recordRepeatableFormatChange } from '../commands/history.js';
 import { hyperlinkAt } from '../commands/hyperlinks.js';
@@ -399,7 +404,10 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     deps.interactionController ?? interactionControllerFor(store);
   if (history) wb.attachHistory(history);
   let strings = deps.strings ?? defaultStrings;
-  const wrapFmt = (fn: () => void): void => recordRepeatableFormatChange(history, store, fn);
+  const wrapFmt = (commandId: string, fn: () => void): void =>
+    recordRepeatableFormatChange(history, store, () =>
+      withSelectionFormatOrigin(store, 'contextMenu', fn, commandId),
+    );
 
   const root = ownerDocument.createElement('div');
   root.className = 'fc-ctxmenu';
@@ -1443,26 +1451,6 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     if (!source && isBuiltinItemId(entry.id)) run(entry.id);
   }
 
-  const selectedCellChanges = (input: (addr: Addr) => CellChangeInput): CellChangeInput[] => {
-    const state = store.getState();
-    const range = state.selection.range;
-    const changes: CellChangeInput[] = [];
-    for (const key of state.data.cells.keys()) {
-      const [sheetRaw, rowRaw, colRaw] = key.split(':');
-      const addr = { sheet: Number(sheetRaw), row: Number(rowRaw), col: Number(colRaw) };
-      if (
-        addr.sheet === range.sheet &&
-        addr.row >= range.r0 &&
-        addr.row <= range.r1 &&
-        addr.col >= range.c0 &&
-        addr.col <= range.c1
-      ) {
-        changes.push(input(addr));
-      }
-    }
-    return changes;
-  };
-
   const executeBatch = (command: CellBatchCommand): void => {
     if (!interactionController) return;
     try {
@@ -1678,67 +1666,59 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         return;
       }
       case 'clear': {
-        const range = state.selection.range;
-        const sheet = range.sheet;
         if (hasExplicitPolicy()) {
-          const changes = selectedCellChanges((addr) => ({ addr, input: '' }));
-          if (changes.length > 0) {
-            executeBatch({
-              type: 'cellBatch',
-              operation: 'clear',
-              origin: 'contextMenu',
-              changes,
-              denied: interactionController?.policy?.batchDenied,
-            });
-          }
+          const addresses = collectSelectedContentAddresses(store, wb);
+          if (addresses.length === 0) return;
+          executeBatch({
+            type: 'cellBatch',
+            operation: 'clear',
+            origin: 'contextMenu',
+            commandId: 'clear',
+            changes: addresses.map((addr) => ({ addr, value: { kind: 'blank' as const } })),
+            denied: interactionController?.policy?.batchDenied,
+          });
           return;
         }
-        // Each setBlank journals its own inverse, so the whole range has to be
-        // one transaction for a single undo to restore it.
-        if (history) history.begin();
         try {
-          for (const key of state.data.cells.keys()) {
-            const parts = key.split(':');
-            if (parts.length !== 3) continue;
-            if (Number(parts[0]) !== sheet) continue;
-            const row = Number(parts[1]);
-            const col = Number(parts[2]);
-            if (row < range.r0 || row > range.r1) continue;
-            if (col < range.c0 || col > range.c1) continue;
-            wb.setBlank({ sheet, row, col });
-          }
-        } finally {
-          if (history) history.end();
+          const result = clearSelectedContents({
+            store,
+            workbook: wb,
+            history,
+            origin: 'contextMenu',
+            commandId: 'clear',
+          });
+          if (result.status === 'applied') deps.onAfterCommit?.();
+        } catch (err) {
+          console.warn('formulon-cell: context-menu clear failed', err);
         }
-        deps.onAfterCommit?.();
         return;
       }
       case 'bold': {
-        wrapFmt(() => toggleBold(state, store));
+        wrapFmt('bold', () => toggleBold(store.getState(), store));
         return;
       }
       case 'italic': {
-        wrapFmt(() => toggleItalic(state, store));
+        wrapFmt('italic', () => toggleItalic(store.getState(), store));
         return;
       }
       case 'underline': {
-        wrapFmt(() => toggleUnderline(state, store));
+        wrapFmt('underline', () => toggleUnderline(store.getState(), store));
         return;
       }
       case 'alignLeft': {
-        wrapFmt(() => setAlign(state, store, 'left'));
+        wrapFmt('alignLeft', () => setAlign(store.getState(), store, 'left'));
         return;
       }
       case 'alignCenter': {
-        wrapFmt(() => setAlign(state, store, 'center'));
+        wrapFmt('alignCenter', () => setAlign(store.getState(), store, 'center'));
         return;
       }
       case 'alignRight': {
-        wrapFmt(() => setAlign(state, store, 'right'));
+        wrapFmt('alignRight', () => setAlign(store.getState(), store, 'right'));
         return;
       }
       case 'borders': {
-        wrapFmt(() => cycleBorders(state, store));
+        wrapFmt('borders', () => cycleBorders(store.getState(), store));
         return;
       }
       case 'formatCells': {
@@ -1911,7 +1891,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       }
       case 'deleteComment': {
         const addr = state.selection.active;
-        wrapFmt(() => clearComment(store, addr, wb));
+        wrapFmt('deleteComment', () => clearComment(store, addr, wb));
         return;
       }
       case 'insertHyperlink': {
