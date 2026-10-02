@@ -8,6 +8,55 @@ import {
 import { FUNCTION_SIGNATURES } from '../../../src/commands/refs.js';
 
 describe('function category catalog', () => {
+  it('matches the verified Excel family map without duplicate official membership', () => {
+    const expectedCounts = {
+      compatibility: 38,
+      cube: 7,
+      database: 12,
+      datetime: 25,
+      engineering: 54,
+      financial: 55,
+      information: 22,
+      logical: 19,
+      lookup: 40,
+      math: 80,
+      statistical: 110,
+      text: 50,
+      web: 3,
+    } as const;
+    const officialNames = Object.entries(expectedCounts).flatMap(([category]) => {
+      const names = FUNCTION_CATEGORY_NAMES[category as keyof typeof FUNCTION_CATEGORY_NAMES];
+      expect(names).toHaveLength(expectedCounts[category as keyof typeof expectedCounts]);
+      expect(names).toEqual([...names].sort());
+      expect(new Set(names).size).toBe(names.length);
+      return names;
+    });
+    expect(officialNames).toHaveLength(515);
+    expect(new Set(officialNames).size).toBe(515);
+    expect(FUNCTION_CATEGORY_NAMES.math).toContain('ACOS');
+    expect(FUNCTION_CATEGORY_NAMES.statistical).toEqual(
+      expect.arrayContaining(['COUNT', 'COUNTIF']),
+    );
+    expect(FUNCTION_CATEGORY_NAMES.math).not.toContain('COUNT');
+    expect(FUNCTION_CATEGORY_NAMES.math).not.toContain('COUNTIF');
+    expect(FUNCTION_CATEGORY_NAMES.dynamicArray).toHaveLength(30);
+    expect(FUNCTION_CATEGORY_NAMES.dynamicArray).toEqual(
+      expect.arrayContaining(['FILTER', 'UNIQUE', 'SORT', 'LAMBDA', 'PERCENTOF']),
+    );
+    for (const unresolved of [
+      'ANCHORARRAY',
+      'CEILING',
+      'COPILOT',
+      'NORM.INV',
+      'NORMINV',
+      'PY',
+      'SINGLE',
+      'USDOLLAR',
+    ]) {
+      expect(officialNames).not.toContain(unresolved);
+    }
+  });
+
   it('only exposes names backed by a function signature', () => {
     for (const category of Object.keys(FUNCTION_CATEGORY_NAMES) as Array<
       keyof typeof FUNCTION_CATEGORY_NAMES
@@ -81,9 +130,36 @@ describe('function category catalog', () => {
 
   it('intersects live names with explicit family membership only', () => {
     const liveNames = new Set(['SUM', 'ACOS', 'NOT_A_FAMILY_MEMBER']);
-    expect(supportedFunctionNames('math', liveNames)).toContain('SUM');
-    expect(supportedFunctionNames('math', liveNames)).not.toContain('ACOS');
+    expect(supportedFunctionNames('math', liveNames)).toEqual(['ACOS', 'SUM']);
     expect(supportedFunctionNames('logical', liveNames)).toEqual([]);
     expect(allFunctionNames(liveNames)).toEqual(['ACOS', 'NOT_A_FAMILY_MEMBER', 'SUM']);
+  });
+
+  it('keeps unresolved names available through All without assigning them to a family', () => {
+    const liveNames = new Set([
+      'ANCHORARRAY',
+      'CEILING',
+      'COPILOT',
+      'NORM.INV',
+      'NORMINV',
+      'PY',
+      'SINGLE',
+      'USDOLLAR',
+    ]);
+    expect(allFunctionNames(liveNames)).toEqual([
+      'ANCHORARRAY',
+      'CEILING',
+      'COPILOT',
+      'NORM.INV',
+      'NORMINV',
+      'PY',
+      'SINGLE',
+      'USDOLLAR',
+    ]);
+    for (const category of Object.keys(FUNCTION_CATEGORY_NAMES) as Array<
+      keyof typeof FUNCTION_CATEGORY_NAMES
+    >) {
+      expect(supportedFunctionNames(category, liveNames)).toEqual([]);
+    }
   });
 });

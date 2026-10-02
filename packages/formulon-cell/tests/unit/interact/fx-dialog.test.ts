@@ -176,6 +176,7 @@ describe('attachFxDialog', () => {
       'lookup',
       'math',
       'statistical',
+      'compatibility',
       'dynamicArray',
     ]);
 
