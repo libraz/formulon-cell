@@ -1,20 +1,84 @@
 /** Formula auditing, named ranges, validation and calculation icons. */
 
-import { circle, join, line, poly, rect } from '../path.js';
+import { letter } from '../letters.js';
+import { circle, ellipse, join, line, poly, rect, roundRect } from '../path.js';
 import {
   arrow,
   badge,
   bars,
   filled,
   headed,
+  magnifier,
   outlined,
   place,
   ring,
   sheet,
+  star,
   stroked,
 } from '../primitives.js';
 import { PALETTE } from '../tokens.js';
-import type { IconDefinition } from '../types.js';
+import type { IconDefinition, IconSegment } from '../types.js';
+
+/** Shared Office-style book frame used by the Function Library families. */
+const functionFamilyBook = (tone: string, mark: readonly IconSegment[]): IconDefinition => [
+  outlined(roundRect(3, 2.8, 18, 18.4, 1.5), PALETTE.paper, tone, 'regular'),
+  stroked(line([6.8, 4.2], [6.8, 19.8]), tone, 'thin'),
+  ...mark,
+];
+
+const functionFamilyIcons = {
+  functionRecent: functionFamilyBook(PALETTE.info, [
+    filled(star(14.3, 11.8, 4.4, 2), PALETTE.info),
+  ]),
+  functionFinancial: functionFamilyBook(PALETTE.accent, [
+    filled(ellipse(13.5, 8.7, 3.2, 1.5), PALETTE.accent),
+    filled(ellipse(14.5, 12, 3.2, 1.5), PALETTE.accent),
+    filled(ellipse(15.5, 15.3, 3.2, 1.5), PALETTE.accent),
+    stroked(
+      join(line([10.3, 8.7], [10.3, 15.3]), line([18.7, 8.7], [18.7, 15.3])),
+      PALETTE.accent,
+      'thin',
+    ),
+  ]),
+  functionLogical: functionFamilyBook(PALETTE.violet, [
+    stroked(
+      'M11.1 10.2c0-2 1.5-3.4 3.5-3.4 2 0 3.4 1.2 3.4 3 0 2.2-2.8 2.6-3.2 4.4',
+      PALETTE.violet,
+      'regular',
+    ),
+    filled(ellipse(14.7, 17.1, 1, 1), PALETTE.violet),
+  ]),
+  functionText: functionFamilyBook(PALETTE.info, [
+    letter('A', { height: 9, cx: 14.4, cy: 12, color: PALETTE.info }),
+  ]),
+  functionDateTime: functionFamilyBook(PALETTE.danger, [
+    outlined(circle(14.4, 11.5, 4.5), PALETTE.paper, PALETTE.danger, 'regular'),
+    stroked(
+      join(line([14.4, 11.5], [14.4, 8.6]), line([14.4, 11.5], [17, 13])),
+      PALETTE.danger,
+      'thin',
+    ),
+  ]),
+  functionLookup: functionFamilyBook(PALETTE.info, [
+    ...magnifier({
+      cx: 13.5,
+      cy: 10.8,
+      r: 4.1,
+      handle: 3.8,
+      frame: PALETTE.info,
+      handleColor: PALETTE.info,
+    }),
+  ]),
+  functionMath: functionFamilyBook(PALETTE.accent, [
+    stroked(ellipse(14.2, 11.8, 4.1, 4.8), PALETTE.accent, 'regular'),
+    stroked(line([10.1, 11.8], [18.3, 11.8]), PALETTE.accent, 'thin'),
+  ]),
+  functionMore: functionFamilyBook(PALETTE.danger, [
+    filled(ellipse(11.5, 12, 1, 1), PALETTE.danger),
+    filled(ellipse(14.5, 12, 1, 1), PALETTE.danger),
+    filled(ellipse(17.5, 12, 1, 1), PALETTE.danger),
+  ]),
+} satisfies Record<string, IconDefinition>;
 
 /** The card the validation icons annotate. */
 const card = (fill = PALETTE.paper) => [
@@ -29,6 +93,7 @@ const traceCells = () => [
 ];
 
 export const FORMULA_ICONS = {
+  ...functionFamilyIcons,
   // Precedents flow into the active cell; dependents flow out of it.
   trace: [
     ...traceCells(),
