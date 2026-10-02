@@ -178,3 +178,61 @@ describe('stub-engine 0.12 scalar result envelopes', () => {
     }
   });
 });
+
+describe('stub-engine physical-cell index', () => {
+  class CountingMap extends Map<string, unknown> {
+    keyEntries = 0;
+
+    override keys(): MapIterator<string> {
+      const iterator = super.keys();
+      return {
+        next: () => {
+          const result = iterator.next();
+          if (!result.done) this.keyEntries += 1;
+          return result;
+        },
+        [Symbol.iterator]() {
+          return this;
+        },
+        [Symbol.dispose]() {
+          iterator.return?.();
+        },
+      } as MapIterator<string>;
+    }
+  }
+
+  it('caches enumeration and invalidates only membership changes', () => {
+    const wb = newWorkbook();
+    try {
+      for (let row = 0; row < 4; row += 1) wb.setNumber(0, row, 0, row + 1);
+      const internals = wb as unknown as {
+        sheets: Array<{ cells: Map<string, unknown>; cellIndex: unknown }>;
+      };
+      const sheet = internals.sheets[0];
+      if (!sheet) throw new Error('missing stub sheet');
+      const counted = new CountingMap(sheet.cells);
+      sheet.cells = counted;
+
+      for (let index = 0; index < 4; index += 1) expect(wb.cellAt(0, index).status.ok).toBe(true);
+      expect(counted.keyEntries).toBe(4);
+
+      counted.keyEntries = 0;
+      wb.setNumber(0, 0, 0, 99);
+      expect(wb.cellAt(0, 0).value?.number).toBe(99);
+      expect(counted.keyEntries).toBe(0);
+
+      wb.setNumber(0, 4, 0, 5);
+      counted.keyEntries = 0;
+      expect(wb.cellAt(0, 4).value?.number).toBe(5);
+      expect(counted.keyEntries).toBe(5);
+
+      wb.setBlank(0, 1, 0);
+      counted.keyEntries = 0;
+      expect(wb.cellAt(0, 0).row).toBe(0);
+      expect(wb.cellAt(0, 1).row).toBe(2);
+      expect(counted.keyEntries).toBe(4);
+    } finally {
+      wb.delete();
+    }
+  });
+});

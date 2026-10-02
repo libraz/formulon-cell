@@ -27,8 +27,15 @@ import { installPivotMethods } from './workbook-handle-pivot.js';
 
 export type ChangeListener = (e: ChangeEvent) => void;
 
+interface AtomicValueBatchMeta {
+  readonly id: number;
+  readonly index: number;
+  readonly size: number;
+  readonly formula: string | null;
+}
+
 export type ChangeEvent =
-  | { kind: 'value'; addr: Addr; next: CellValue }
+  | { kind: 'value'; addr: Addr; next: CellValue; atomicBatch?: AtomicValueBatchMeta }
   | { kind: 'recalc'; dirty: ReadonlySet<string> }
   | { kind: 'sheet-add'; index: number; name: string }
   | { kind: 'sheet-rename'; index: number; name: string }
@@ -165,6 +172,7 @@ export class WorkbookHandle {
 
   private disposed = false;
   private recoveryFailure: Error | null = null;
+  private nextAtomicBatchId = 1;
 
   /** Per-cell inverse history. Each setX pushes one entry; undo replays
    *  it back. Used as a fallback when no `History` is attached. When a
@@ -502,7 +510,7 @@ export class WorkbookHandle {
    * the handle rejects subsequent reads/writes until it is replaced. */
   applyCellPatchAtomic(patches: readonly CellPatch[]): CellPatchAtomicResult {
     this.assertAlive();
-    const unique = new Map<string, { patch: CellPatch; before: CellSnapshot }>();
+    const unique = new Map<string, { patch: CellPatch }>();
     for (const patch of patches) {
       const addr = patch.addr;
       if (
@@ -516,15 +524,15 @@ export class WorkbookHandle {
         throw new Error('applyCellPatchAtomic: invalid address');
       }
       const key = addrKey(addr);
-      const current = unique.get(key);
-      if (current) {
-        unique.set(key, { patch, before: current.before });
-      } else {
-        unique.set(key, { patch, before: this.captureSnapshot(addr) });
-      }
+      unique.set(key, { patch });
     }
 
-    const entries = [...unique.values()];
+    const requested = [...unique.values()];
+    const beforeSnapshots = this.captureCellSnapshots(requested.map((entry) => entry.patch.addr));
+    const entries = requested.map((entry, index) => ({
+      ...entry,
+      before: beforeSnapshots[index] as CellSnapshot,
+    }));
     const before = entries.map((entry) => entry.before);
     const changedEntries = entries.filter((entry) => {
       const formula = entry.patch.formula ?? null;
@@ -541,6 +549,7 @@ export class WorkbookHandle {
     const pendingBefore = this.pendingRecalc;
     const dirtyBefore = new Set(this.dirtySinceRecalc);
     const manual = this.isManualCalcMode();
+    let after: CellSnapshot[] = [];
     try {
       for (const entry of changedEntries) {
         this.writeRawCell(entry.patch.addr, entry.patch.value, entry.patch.formula ?? null);
@@ -555,6 +564,7 @@ export class WorkbookHandle {
         // remain pending, but no automatic recalc event is emitted.
         this.pendingRecalc = false;
       }
+      after = this.captureCellSnapshots(entries.map((entry) => entry.patch.addr));
     } catch (error) {
       // Restore in reverse order. Direct engine calls intentionally bypass the
       // journal and event paths, so rollback cannot create observable events.
@@ -590,10 +600,28 @@ export class WorkbookHandle {
       throw error;
     }
 
-    const after = entries.map((entry) => this.captureSnapshot(entry.patch.addr));
     const changed = changedEntries.map((entry) => entry.patch.addr);
-    for (const entry of changedEntries) {
-      this.emit({ kind: 'value', addr: entry.patch.addr, next: this.getValue(entry.patch.addr) });
+    const changedSet = new Set(changedEntries);
+    const atomicBatchId = this.nextAtomicBatchId;
+    this.nextAtomicBatchId += 1;
+    const atomicBatchSize = changedEntries.length;
+    let atomicBatchIndex = 0;
+    for (let i = 0; i < entries.length; i += 1) {
+      const entry = entries[i];
+      const snapshot = after[i];
+      if (!entry || !snapshot || !changedSet.has(entry)) continue;
+      this.emit({
+        kind: 'value',
+        addr: entry.patch.addr,
+        next: { ...snapshot.value },
+        atomicBatch: {
+          id: atomicBatchId,
+          index: atomicBatchIndex,
+          size: atomicBatchSize,
+          formula: snapshot.formula,
+        },
+      });
+      atomicBatchIndex += 1;
     }
     if (!manual) this.emitRecalc();
     return { before, after, changed };
@@ -791,6 +819,76 @@ export class WorkbookHandle {
       if (e.status.ok && e.row === a.row && e.col === a.col) return e.formula ?? null;
     }
     return null;
+  }
+
+  /** Read formulas for a batch of physical cells with one engine enumeration
+   * per touched sheet. Missing cells and physical literals are represented by
+   * null, while the returned map keeps the first occurrence order of the
+   * requested addresses. */
+  cellFormulas(addrs: readonly Addr[]): ReadonlyMap<string, string | null> {
+    this.assertAlive();
+    return this.readFormulaMap(addrs, false);
+  }
+
+  /** Strict formula enumeration used only by the atomic snapshot boundary.
+   * Unlike the public best-effort reader, a failed physical entry cannot be
+   * mistaken for a literal cell while a transaction is in flight. */
+  private readAtomicFormulas(addrs: readonly Addr[]): ReadonlyMap<string, string | null> {
+    return this.readFormulaMap(addrs, true);
+  }
+
+  private readFormulaMap(
+    addrs: readonly Addr[],
+    strict: boolean,
+  ): ReadonlyMap<string, string | null> {
+    const requested = new Map<string, Addr>();
+    for (const a of addrs) requested.set(addrKey(a), a);
+    const formulas = new Map<string, string | null>();
+    if (requested.size === 0) return formulas;
+
+    const bySheet = new Map<number, Map<string, string>>();
+    for (const [key, a] of requested) {
+      formulas.set(key, null);
+      let sheet = bySheet.get(a.sheet);
+      if (!sheet) {
+        sheet = new Map();
+        bySheet.set(a.sheet, sheet);
+      }
+      sheet.set(`${a.row}:${a.col}`, key);
+    }
+
+    for (const [sheet, targets] of bySheet) {
+      let n: number;
+      try {
+        n = numberValue(this.wb.cellCount(sheet), `cellCount(${sheet})`);
+      } catch (error) {
+        if (!strict) throw error;
+        const message = error instanceof Error ? error.message : 'cell count read failed';
+        throw new Error(`atomic formula read at sheet:${sheet}: ${message}`);
+      }
+      for (let i = 0; i < n; i += 1) {
+        const e = this.wb.cellAt(sheet, i);
+        if (!e.status.ok) {
+          if (strict) {
+            throw new Error(`atomic formula read at ${sheet}:${i}: ${e.status.message}`);
+          }
+          continue;
+        }
+        if (e.row === undefined || e.col === undefined || (strict && e.formula === undefined)) {
+          if (strict) {
+            throw new Error(`atomic formula read at ${sheet}:${i}: malformed cell entry`);
+          }
+          continue;
+        }
+        const coordinateKey = `${e.row}:${e.col}`;
+        const key = targets.get(coordinateKey);
+        if (key === undefined) continue;
+        formulas.set(key, e.formula ?? null);
+        targets.delete(coordinateKey);
+        if (targets.size === 0) break;
+      }
+    }
+    return formulas;
   }
 
   /** Iterate over defined names. `localSheetId === -1` means workbook scope;
@@ -1167,6 +1265,22 @@ export class WorkbookHandle {
 
   private captureSnapshot(a: Addr): CellSnapshot {
     return { addr: a, value: this.getValue(a), formula: this.cellFormula(a) };
+  }
+
+  private readAtomicValue(a: Addr): CellValue {
+    const r = this.wb.getValue(a.sheet, a.row, a.col);
+    if (!r.status.ok) throw new Error(`atomic value read at ${addrKey(a)}: ${r.status.message}`);
+    if (r.value === undefined) throw new Error(`atomic value read at ${addrKey(a)}: missing value`);
+    return fromEngineValue(r.value);
+  }
+
+  private captureCellSnapshots(addrs: readonly Addr[]): CellSnapshot[] {
+    const formulas = this.readAtomicFormulas(addrs);
+    return addrs.map((a) => ({
+      addr: a,
+      value: this.readAtomicValue(a),
+      formula: formulas.get(addrKey(a)) ?? null,
+    }));
   }
 
   private writeRawCell(a: Addr, value: CellValue, formula: string | null): void {

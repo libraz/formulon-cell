@@ -56,6 +56,12 @@ interface CellStore {
   cached?: Value;
 }
 
+interface CellIndexEntry {
+  key: string;
+  row: number;
+  col: number;
+}
+
 const NEEDS_ENGINE = errorValue(99); // local sentinel — UI will render "#ERR!"
 
 /**
@@ -68,12 +74,18 @@ const NEEDS_ENGINE = errorValue(99); // local sentinel — UI will render "#ERR!
  * behaviour the UI expects when running without the real engine.
  */
 class StubWorkbook {
-  private readonly sheets: { name: string; cells: Map<string, CellStore> }[] = [];
+  private readonly sheets: {
+    name: string;
+    cells: Map<string, CellStore>;
+    cellIndex: CellIndexEntry[] | null;
+  }[] = [];
 
   private alive = true;
 
   constructor(initialSheets: string[] = ['Sheet1']) {
-    for (const name of initialSheets) this.sheets.push({ name, cells: new Map() });
+    for (const name of initialSheets) {
+      this.sheets.push({ name, cells: new Map(), cellIndex: null });
+    }
   }
 
   isValid(): boolean {
@@ -90,7 +102,7 @@ class StubWorkbook {
   }
 
   addSheet(name: string): Status {
-    this.sheets.push({ name, cells: new Map() });
+    this.sheets.push({ name, cells: new Map(), cellIndex: null });
     return ok;
   }
 
@@ -122,7 +134,7 @@ class StubWorkbook {
   setBlank(sheet: number, row: number, col: number): Status {
     const s = this.sheets[sheet];
     if (!s) return err('sheet');
-    s.cells.delete(`${row}:${col}`);
+    if (s.cells.delete(`${row}:${col}`)) s.cellIndex = null;
     return ok;
   }
 
@@ -178,21 +190,24 @@ class StubWorkbook {
   cellAt(sheet: number, idx: number): CellEntry {
     const s = this.sheets[sheet];
     if (!s) return { status: err('sheet'), row: 0, col: 0, formula: null, value: blankValue() };
-    let i = 0;
-    for (const [key, cell] of s.cells) {
-      if (i === idx) {
-        const [r, c] = key.split(':').map(Number);
-        return {
-          status: ok,
-          row: r ?? 0,
-          col: c ?? 0,
-          formula: cell.formula ?? null,
-          value: cell.cached ?? cell.literal ?? blankValue(),
-        };
+    if (s.cellIndex === null) {
+      s.cellIndex = [];
+      for (const key of s.cells.keys()) {
+        const [row, col] = key.split(':').map(Number);
+        s.cellIndex.push({ key, row: row ?? 0, col: col ?? 0 });
       }
-      i += 1;
     }
-    return { status: err('idx'), row: 0, col: 0, formula: null, value: blankValue() };
+    const indexed = s.cellIndex[idx];
+    if (!indexed) return { status: err('idx'), row: 0, col: 0, formula: null, value: blankValue() };
+    const cell = s.cells.get(indexed.key);
+    if (!cell) return { status: err('idx'), row: 0, col: 0, formula: null, value: blankValue() };
+    return {
+      status: ok,
+      row: indexed.row,
+      col: indexed.col,
+      formula: cell.formula ?? null,
+      value: cell.cached ?? cell.literal ?? blankValue(),
+    };
   }
 
   definedNameCount(): { status: Status; value: number } {
@@ -234,7 +249,10 @@ class StubWorkbook {
   private put(sheet: number, row: number, col: number, store: CellStore): Status {
     const s = this.sheets[sheet];
     if (!s) return err('sheet');
-    s.cells.set(`${row}:${col}`, store);
+    const key = `${row}:${col}`;
+    const existed = s.cells.has(key);
+    s.cells.set(key, store);
+    if (!existed) s.cellIndex = null;
     return ok;
   }
 
