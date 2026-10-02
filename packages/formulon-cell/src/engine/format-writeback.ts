@@ -5,6 +5,7 @@ import type {
   FillPattern,
   NegativeStyle,
   NumFmt,
+  TextDirection,
 } from '../store/store.js';
 import type { BorderRecord, BorderSide, CellXf, FillRecord, FontRecord } from './types.js';
 
@@ -326,6 +327,50 @@ export function valignOrdinal(vAlign: CellFormat['vAlign']): number {
   }
 }
 
+/** Translate the CellFormat's signed rotation into OOXML's unsigned angle.
+ * OOXML represents negative angles as the lower-half turn (90 - degrees). */
+export function cellRotationToTextRotation(degrees: number | undefined): number | undefined {
+  if (degrees === undefined || !Number.isFinite(degrees)) return undefined;
+  const clamped = Math.max(-90, Math.min(90, degrees));
+  const rounded = Math.round(clamped);
+  if (rounded === 0) return 0;
+  return rounded < 0 ? 90 - rounded : rounded;
+}
+
+/** Translate an ordinary OOXML rotation back to the CellFormat's signed range.
+ * The 255 Vertical Text sentinel deliberately remains outside that model. */
+export function textRotationToCellRotation(raw: number | undefined): number | undefined {
+  if (raw === undefined || !Number.isFinite(raw) || raw === 255 || raw < 0 || raw > 180) {
+    return undefined;
+  }
+  const rounded = Math.round(raw);
+  return rounded <= 90 ? rounded : 90 - rounded;
+}
+
+/** Translate a CellFormat text direction into the OOXML readingOrder ordinal. */
+export function textDirectionToReadingOrder(
+  value: TextDirection | undefined,
+): 0 | 1 | 2 | undefined {
+  if (value === undefined) return undefined;
+  if (value === 'context') return 0;
+  if (value === 'ltr') return 1;
+  if (value === 'rtl') return 2;
+  return undefined;
+}
+
+/** Translate an OOXML readingOrder ordinal into the CellFormat direction. */
+export function readingOrderToTextDirection(raw: number | undefined): TextDirection | undefined {
+  if (raw === 0) return 'context';
+  if (raw === 1) return 'ltr';
+  if (raw === 2) return 'rtl';
+  return undefined;
+}
+
+function authoredIndent(indent: number | undefined): number | undefined {
+  if (indent === undefined || !Number.isFinite(indent)) return undefined;
+  return Math.max(0, Math.min(255, Math.round(indent)));
+}
+
 /** Build a complete CellXf record from a CellFormat by resolving every
  *  sub-record. The caller passes pre-resolved indices for each sub-record. */
 export function buildXfRecord(
@@ -335,6 +380,22 @@ export function buildXfRecord(
   numFmtId: number,
   fmt: CellFormat,
 ): CellXf {
+  const textRotation = cellRotationToTextRotation(fmt.rotation);
+  const indent = authoredIndent(fmt.indent);
+  const readingOrder = textDirectionToReadingOrder(fmt.textDirection);
+  const hasHorizontalAlign = fmt.align !== undefined;
+  const hasVerticalAlign = fmt.vAlign !== undefined;
+  const hasWrapText = fmt.wrap !== undefined;
+  const hasJustifyLastLine = fmt.justifyLastLine !== undefined;
+  const hasAlignment =
+    hasHorizontalAlign ||
+    hasVerticalAlign ||
+    hasWrapText ||
+    hasJustifyLastLine ||
+    textRotation !== undefined ||
+    indent !== undefined ||
+    fmt.shrinkToFit !== undefined ||
+    readingOrder !== undefined;
   return {
     fontIndex,
     fillIndex,
@@ -344,6 +405,15 @@ export function buildXfRecord(
     verticalAlign: valignOrdinal(fmt.vAlign),
     wrapText: fmt.wrap === true,
     justifyLastLine: fmt.align === 'distributed' && fmt.justifyLastLine === true,
+    hasAlignment,
+    hasHorizontalAlign,
+    hasVerticalAlign,
+    hasWrapText,
+    hasJustifyLastLine,
+    ...(textRotation === undefined ? {} : { textRotation }),
+    ...(indent === undefined ? {} : { indent }),
+    ...(fmt.shrinkToFit === undefined ? {} : { shrinkToFit: fmt.shrinkToFit }),
+    ...(readingOrder === undefined ? {} : { readingOrder }),
   };
 }
 

@@ -1,3 +1,4 @@
+import { type CellStyleFormatGroup, cellStyleGroupMatches } from '../commands/cell-styles.js';
 import {
   customPivotTableStyleById,
   pivotTableStyleAssignment,
@@ -5,7 +6,13 @@ import {
 } from '../commands/format-as-table.js';
 import type { CellFormat, SpreadsheetStore } from '../store/store.js';
 import { addrKey } from './address.js';
-import { cellStyleKeysByXfId, syncNamedCellStylesToEngine } from './cell-style-writeback.js';
+import {
+  cellStyleKeysByXfId,
+  type NamedStyleXfResolution,
+  planNamedCellStylesToEngine,
+  resolveNamedStyleXfs,
+  syncNamedCellStylesToEngine,
+} from './cell-style-writeback.js';
 import { syncHyperlinksToEngine } from './format-sync.js';
 import {
   BUILTIN_NUM_FMT_GENERAL,
@@ -18,10 +25,15 @@ import {
   fontRecordToFormat,
   formatCodeToNumFmt,
   numFmtToFormatCode,
+  readingOrderToTextDirection,
+  textRotationToCellRotation,
 } from './format-writeback.js';
 import type { Addr, CellValue, CellXf, FontRecord, PhoneticRun } from './types.js';
 import { syncValidationsToEngine } from './validation-sync.js';
 import type { WorkbookHandle } from './workbook-handle.js';
+
+const HALIGN_GENERAL = 0;
+const VALIGN_BOTTOM = 2;
 
 const PIVOT_KIND = {
   Header: 0,
@@ -147,11 +159,18 @@ export function syncCellFormatsToEngine(
   const state = store.getState();
   const formats = state.format.formats;
   let styleXfConstructionFailed = false;
-  const styleXfIds = syncNamedCellStylesToEngine(wb, state, (format) => {
+  const resolveStyleXfForSync = (format: Partial<CellFormat>): number => {
     const xfIndex = resolveStyleXf(wb, format);
     if (strict && xfIndex < 0) styleXfConstructionFailed = true;
     return xfIndex;
-  });
+  };
+  const strictStylePlan = strict
+    ? planNamedCellStylesToEngine(wb, state, resolveStyleXfForSync)
+    : null;
+  const styleXfIds = strictStylePlan
+    ? strictStylePlan.styleXfIds
+    : syncNamedCellStylesToEngine(wb, state, resolveStyleXfForSync);
+  const namedStyleXfs = resolveNamedStyleXfs(wb, state, styleXfIds);
   if (strict && styleXfConstructionFailed) {
     throw strictSyncError('resolveStyleXf', `sheet:${sheet}`);
   }
@@ -163,7 +182,14 @@ export function syncCellFormatsToEngine(
     if (Number.parseInt(sStr, 10) !== sheet) continue;
     const row = Number.parseInt(rStr, 10);
     const col = Number.parseInt(cStr, 10);
-    const xfIndex = resolveXfForFormat(wb, fmt, styleXfIds);
+    const xfIndex = resolveXfForFormat(
+      wb,
+      fmt,
+      styleXfIds,
+      { sheet, row, col },
+      namedStyleXfs,
+      strict,
+    );
     if (xfIndex < 0) {
       if (strict) throw strictSyncError('resolveXf', key);
       continue;
@@ -214,6 +240,7 @@ export function syncCellFormatsToEngine(
       throw strictSyncError('resetCellXfIndex', key);
     }
   }
+  strictStylePlan?.commit();
   previous.clear();
   for (const key of current) previous.add(key);
 }
@@ -344,21 +371,81 @@ export function cellFormatFromXf(
       if (numFmt) patch.numFmt = numFmt;
     }
   }
-  if (xf.horizontalAlign === 1) patch.align = 'left';
-  else if (xf.horizontalAlign === 2) patch.align = 'center';
-  else if (xf.horizontalAlign === 3) patch.align = 'right';
-  else if (xf.horizontalAlign === 4) patch.align = 'fill';
-  else if (xf.horizontalAlign === 5) patch.align = 'justify';
-  else if (xf.horizontalAlign === 6) patch.align = 'centerContinuous';
-  else if (xf.horizontalAlign === 7) patch.align = 'distributed';
-  if (xf.verticalAlign === 0) patch.vAlign = 'top';
-  else if (xf.verticalAlign === 1) patch.vAlign = 'middle';
-  else if (xf.verticalAlign === 3) patch.vAlign = 'justify';
-  else if (xf.verticalAlign === 4) patch.vAlign = 'distributed';
-  // the desktop default vertical alignment is bottom; do not surface it.
-  if (xf.wrapText) patch.wrap = true;
-  if (xf.justifyLastLine) patch.justifyLastLine = true;
+  const hasAlignmentChild = xf.hasAlignment !== false;
+  const hasHorizontalAlign =
+    hasAlignmentChild &&
+    (xf.hasHorizontalAlign === true ||
+      (xf.hasHorizontalAlign === undefined && xf.horizontalAlign !== HALIGN_GENERAL));
+  const hasVerticalAlign =
+    hasAlignmentChild &&
+    (xf.hasVerticalAlign === true ||
+      (xf.hasVerticalAlign === undefined && xf.verticalAlign !== VALIGN_BOTTOM));
+  const hasWrapText =
+    hasAlignmentChild && (xf.hasWrapText === true || (xf.hasWrapText === undefined && xf.wrapText));
+  const hasJustifyLastLine =
+    hasAlignmentChild &&
+    (xf.hasJustifyLastLine === true ||
+      (xf.hasJustifyLastLine === undefined && xf.justifyLastLine === true));
+  if (hasHorizontalAlign && xf.horizontalAlign === 1) patch.align = 'left';
+  else if (hasHorizontalAlign && xf.horizontalAlign === 2) patch.align = 'center';
+  else if (hasHorizontalAlign && xf.horizontalAlign === 3) patch.align = 'right';
+  else if (hasHorizontalAlign && xf.horizontalAlign === 4) patch.align = 'fill';
+  else if (hasHorizontalAlign && xf.horizontalAlign === 5) patch.align = 'justify';
+  else if (hasHorizontalAlign && xf.horizontalAlign === 6) patch.align = 'centerContinuous';
+  else if (hasHorizontalAlign && xf.horizontalAlign === 7) patch.align = 'distributed';
+  if (hasVerticalAlign && xf.verticalAlign === 0) patch.vAlign = 'top';
+  else if (hasVerticalAlign && xf.verticalAlign === 1) patch.vAlign = 'middle';
+  else if (hasVerticalAlign && xf.verticalAlign === 2) patch.vAlign = 'bottom';
+  else if (hasVerticalAlign && xf.verticalAlign === 3) patch.vAlign = 'justify';
+  else if (hasVerticalAlign && xf.verticalAlign === 4) patch.vAlign = 'distributed';
+  if (hasWrapText) patch.wrap = xf.wrapText;
+  if (hasJustifyLastLine) patch.justifyLastLine = xf.justifyLastLine === true;
+  if (hasAlignmentChild) {
+    const rotation = textRotationToCellRotation(xf.textRotation);
+    if (rotation !== undefined) patch.rotation = rotation;
+    if (xf.indent !== undefined) patch.indent = xf.indent;
+    if (xf.shrinkToFit !== undefined) patch.shrinkToFit = xf.shrinkToFit;
+    const direction = readingOrderToTextDirection(xf.readingOrder);
+    if (direction !== undefined) patch.textDirection = direction;
+  }
   return patch;
+}
+
+/** A raw alignment group can only be reused when every authored extended
+ *  field has a representable source value. Without this guard the normalised
+ *  style matcher would treat absent/255/explicit-default values as equal and
+ *  copy stale raw metadata over a deliberate reset. */
+function rawAlignmentHasAuthoredDifference(fmt: CellFormat, raw: CellXf): boolean {
+  if (raw.hasAlignment === false) {
+    return (
+      fmt.align !== undefined ||
+      fmt.vAlign !== undefined ||
+      fmt.wrap !== undefined ||
+      fmt.justifyLastLine !== undefined ||
+      fmt.rotation !== undefined ||
+      fmt.indent !== undefined ||
+      fmt.shrinkToFit !== undefined ||
+      fmt.textDirection !== undefined
+    );
+  }
+  if (fmt.align !== undefined && raw.hasHorizontalAlign !== true) return true;
+  if (fmt.vAlign !== undefined && raw.hasVerticalAlign !== true) return true;
+  if (fmt.wrap !== undefined && raw.hasWrapText !== true) return true;
+  if (fmt.justifyLastLine !== undefined && raw.hasJustifyLastLine !== true) return true;
+  if (fmt.rotation !== undefined) {
+    if (raw.textRotation === undefined) return true;
+    if (raw.textRotation === 255) return true;
+    if (textRotationToCellRotation(raw.textRotation) !== fmt.rotation) return true;
+  }
+  if (fmt.indent !== undefined) {
+    if (raw.indent === undefined || Math.round(fmt.indent) !== raw.indent) return true;
+  }
+  if (fmt.shrinkToFit !== undefined && raw.shrinkToFit !== fmt.shrinkToFit) return true;
+  if (fmt.textDirection !== undefined) {
+    if (raw.readingOrder === undefined) return true;
+    if (readingOrderToTextDirection(raw.readingOrder) !== fmt.textDirection) return true;
+  }
+  return false;
 }
 
 /** Assemble the XF record for a CellFormat, ensuring every component record
@@ -380,6 +467,41 @@ function buildXfForFormat(wb: WorkbookHandle, fmt: CellFormat): CellXf | null {
   return buildXfRecord(fontIndex, fillIndex, borderIndex, numFmtId, fmt);
 }
 
+const RAW_ALIGNMENT_OPTIONAL_FIELDS = [
+  'justifyLastLine',
+  'hasAlignment',
+  'hasHorizontalAlign',
+  'hasVerticalAlign',
+  'hasWrapText',
+  'hasJustifyLastLine',
+  'textRotation',
+  'indent',
+  'relativeIndent',
+  'shrinkToFit',
+  'readingOrder',
+] as const;
+
+const copyRawGroup = (target: CellXf, source: CellXf, group: CellStyleFormatGroup): void => {
+  if (group === 'font') target.fontIndex = source.fontIndex;
+  else if (group === 'fill') target.fillIndex = source.fillIndex;
+  else if (group === 'border') target.borderIndex = source.borderIndex;
+  else if (group === 'number') target.numFmtId = source.numFmtId;
+  else if (group === 'alignment') {
+    target.horizontalAlign = source.horizontalAlign;
+    target.verticalAlign = source.verticalAlign;
+    target.wrapText = source.wrapText;
+    const targetRecord = target as unknown as Record<string, unknown>;
+    const sourceRecord = source as unknown as Record<string, unknown>;
+    for (const field of RAW_ALIGNMENT_OPTIONAL_FIELDS) {
+      if (Object.hasOwn(source, field)) {
+        targetRecord[field] = sourceRecord[field];
+      } else {
+        delete targetRecord[field];
+      }
+    }
+  }
+};
+
 /** Resolve a CellFormat to an engine xfIndex. `styleXfIds` maps a named style
  *  to its `<cellStyleXfs>` row, so a styled cell records which style it came
  *  from instead of collapsing into anonymous direct formatting. Returns -1 on
@@ -388,10 +510,45 @@ function resolveXfForFormat(
   wb: WorkbookHandle,
   fmt: CellFormat,
   styleXfIds: ReadonlyMap<string, number>,
+  addr: Addr,
+  namedStyleXfs: ReadonlyMap<string, NamedStyleXfResolution>,
+  strict: boolean,
 ): number {
   const record = buildXfForFormat(wb, fmt);
   if (!record) return -1;
-  const xfId = fmt.cellStyle === undefined ? undefined : styleXfIds.get(fmt.cellStyle);
+  const namedKey = fmt.cellStyle ?? 'normal';
+  const namedXf = namedStyleXfs.get(namedKey);
+  const mappedXfId =
+    fmt.cellStyle === undefined ? styleXfIds.get('normal') : styleXfIds.get(fmt.cellStyle);
+  if (strict && mappedXfId !== undefined && !namedXf) return -1;
+
+  const currentXfIndex = wb.getCellXfIndex(addr.sheet, addr.row, addr.col);
+  const currentRaw = currentXfIndex === null ? null : wb.getCellXf(currentXfIndex);
+  const currentProjected = currentRaw
+    ? cellFormatFromXf(wb, currentRaw, wb.workbookDefaultFont)
+    : null;
+  const groups: readonly CellStyleFormatGroup[] = [
+    'number',
+    'alignment',
+    'font',
+    'border',
+    'fill',
+    'protection',
+  ];
+  for (const group of groups) {
+    const namedMatch =
+      namedXf?.groups.includes(group) === true &&
+      !(group === 'alignment' && rawAlignmentHasAuthoredDifference(fmt, namedXf.raw)) &&
+      cellStyleGroupMatches(fmt, namedXf.projected, group);
+    const currentMatch =
+      currentRaw !== null &&
+      currentProjected !== null &&
+      !(group === 'alignment' && rawAlignmentHasAuthoredDifference(fmt, currentRaw)) &&
+      cellStyleGroupMatches(fmt, currentProjected, group);
+    if (namedMatch) copyRawGroup(record, namedXf.raw, group);
+    else if (currentMatch) copyRawGroup(record, currentRaw, group);
+  }
+  const xfId = mappedXfId;
   return wb.addXfRecord(xfId === undefined ? record : { ...record, xfId });
 }
 

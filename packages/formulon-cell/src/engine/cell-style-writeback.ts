@@ -1,52 +1,15 @@
-import { CELL_STYLES, type CellStyleId, getCellStyle } from '../commands/cell-styles.js';
+import {
+  CELL_STYLES,
+  type CellStyleFormatGroup,
+  type CellStyleId,
+  cellStyleGroups,
+  getCellStyle,
+  stylePayloadMatchesNative,
+} from '../commands/cell-styles.js';
 import type { CellFormat, State } from '../store/store.js';
+import { cellFormatFromXf } from './cell-format-sync.js';
+import type { CellXf } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
-
-/**
- * OOXML `<cellStyle>` metadata for the gallery's built-in styles. The gallery
- * labels already match Excel's style names everywhere except "Warning", which
- * OOXML spells "Warning Text".
- *
- * `builtinId` is the ordinal from the OOXML built-in cell-style table. The
- * engine validates it as 0..47, so "Explanatory Text" (53) has no usable
- * ordinal and is written as a named style without a built-in counterpart.
- */
-const BUILTIN_STYLE_IDS: Partial<Record<CellStyleId, number>> = {
-  normal: 0,
-  comma: 3,
-  currency: 4,
-  percent: 5,
-  comma0: 6,
-  currency0: 7,
-  note: 10,
-  warning: 11,
-  title: 15,
-  heading1: 16,
-  heading2: 17,
-  heading3: 18,
-  heading4: 19,
-  inputCell: 20,
-  outputCell: 21,
-  calculation: 22,
-  checkCell: 23,
-  linkedCell: 24,
-  totalCell: 25,
-  good: 26,
-  bad: 27,
-  neutral: 28,
-  accent1: 29,
-  accent1_20: 30,
-  accent2: 33,
-  accent2_20: 34,
-  accent3: 37,
-  accent3_20: 38,
-  accent4: 41,
-  accent4_20: 42,
-  accent5: 45,
-  accent5_20: 46,
-  accent6: 49,
-  accent6_20: 50,
-};
 
 const OOXML_STYLE_NAMES: Partial<Record<CellStyleId, string>> = {
   warning: 'Warning Text',
@@ -64,6 +27,30 @@ export interface NamedStyleRegistration {
   name: string;
   builtinId: number | null;
   format: Partial<CellFormat>;
+  groups: readonly CellStyleFormatGroup[];
+}
+
+export interface NamedStyleSyncPlan {
+  readonly styleXfIds: ReadonlyMap<string, number>;
+  commit(): void;
+}
+
+interface PendingNamedStyleRegistration {
+  readonly name: string;
+  readonly xfId: number;
+  readonly builtinId: number | null;
+  readonly previous?: {
+    readonly name: string;
+    readonly xfId: number;
+    readonly builtinId: number | null;
+  };
+}
+
+export interface NamedStyleXfResolution {
+  readonly xfId: number;
+  readonly raw: CellXf;
+  readonly groups: readonly CellStyleFormatGroup[];
+  readonly projected: Partial<CellFormat>;
 }
 
 const ooxmlNameFor = (id: CellStyleId, label: string): string => OOXML_STYLE_NAMES[id] ?? label;
@@ -95,15 +82,214 @@ export function collectNamedStyles(state: State): NamedStyleRegistration[] {
       out.push({
         key,
         name: ooxmlNameFor(builtin.id, builtin.label),
-        builtinId: BUILTIN_STYLE_IDS[builtin.id] ?? null,
+        builtinId: builtin.builtinId ?? null,
         format: builtin.format,
+        groups: cellStyleGroups(builtin),
       });
       continue;
     }
     const custom = state.format.customCellStyles?.find((s) => s.label === key);
-    if (custom) out.push({ key, name: custom.label, builtinId: null, format: custom.format });
+    if (custom) {
+      out.push({
+        key,
+        name: custom.label,
+        builtinId: null,
+        format: custom.format,
+        groups: cellStyleGroups(custom),
+      });
+    }
   }
   return out;
+}
+
+/** Resolve the raw catalog XFs used by named styles. Component selectors and
+ * presence bits are retained alongside the UI projection so cell writeback
+ * can reuse them without flattening theme/indexed colors into RGB. */
+export function resolveNamedStyleXfs(
+  wb: WorkbookHandle,
+  state: State,
+  ids: ReadonlyMap<string, number>,
+): ReadonlyMap<string, NamedStyleXfResolution> {
+  const registrations = new Map(
+    collectNamedStyles(state).map((registration) => [registration.key, registration]),
+  );
+  const resolved = new Map<string, NamedStyleXfResolution>();
+  if (!wb.capabilities.cellStyles || typeof wb.getNamedCellStyles !== 'function') return resolved;
+  const add = (key: string, xfId: number, groups: readonly CellStyleFormatGroup[]): void => {
+    const raw = wb.getCellStyleXf(xfId);
+    if (!raw) return;
+    resolved.set(key, {
+      xfId,
+      raw,
+      groups,
+      projected: cellFormatFromXf(wb, raw, wb.workbookDefaultFont),
+    });
+  };
+  for (const [key, xfId] of ids) {
+    const registration = registrations.get(key);
+    const style = registration ? undefined : getCellStyle(key as CellStyleId);
+    const groups = registration?.groups ?? (style ? cellStyleGroups(style) : []);
+    add(key, xfId, groups);
+  }
+  const normal = wb.getNamedCellStyles().find((style) => style.builtinId === 0);
+  if (normal && !resolved.has('normal')) {
+    const style = getCellStyle('normal');
+    add('normal', normal.xfId, style ? cellStyleGroups(style) : []);
+  }
+  return resolved;
+}
+
+const sameNamedStyleFormat = (
+  wb: WorkbookHandle,
+  format: Partial<CellFormat>,
+  xfId: number,
+): boolean => {
+  const xf = wb.getCellStyleXf(xfId);
+  if (!xf) return false;
+  const native = cellFormatFromXf(wb, xf, wb.workbookDefaultFont);
+  return stylePayloadMatchesNative(wb, xf, native, format, cellStyleGroups({ format }));
+};
+
+/** Built-in ordinals above 47 are useful when reading an OOXML catalog, but
+ *  the current engine rejects them when authoring a cellStyle record. */
+const writableBuiltinId = (builtinId: number | null): number | null =>
+  builtinId !== null && builtinId >= 0 && builtinId <= 47 ? builtinId : null;
+
+/** Stage named-style catalog changes until all cell XF and metadata writes have
+ *  succeeded. The plan intentionally has no rollback claim for catalog rows:
+ *  the current engine can replace a row but cannot delete a newly registered
+ *  one. A later failed registration is surfaced as an AggregateError. */
+export function planNamedCellStylesToEngine(
+  wb: WorkbookHandle,
+  state: State,
+  resolveStyleXf: (format: Partial<CellFormat>) => number,
+): NamedStyleSyncPlan {
+  const styleXfIds = new Map<string, number>();
+  const pending: PendingNamedStyleRegistration[] = [];
+  if (!wb.capabilities.cellStyleMutate) {
+    return { styleXfIds, commit: () => undefined };
+  }
+
+  const registrations = collectNamedStyles(state);
+  const named = wb.getNamedCellStyles();
+  const byBuiltin = new Map<number, (typeof named)[number]>();
+  const byName = new Map<string, (typeof named)[number]>();
+  for (const entry of named) {
+    byName.set(entry.name.trim().toLowerCase(), entry);
+    if (entry.builtinId >= 0) byBuiltin.set(entry.builtinId, entry);
+  }
+
+  const existingNormal = byBuiltin.get(getCellStyle('normal')?.builtinId ?? 0);
+  if (existingNormal) {
+    styleXfIds.set('normal', existingNormal.xfId);
+  } else if (wb.cellStyleXfCount() === 0) {
+    const normalXf = resolveStyleXf({});
+    if (normalXf < 0) {
+      throw new Error('Strict engine sync failed: resolve Normal cell-style XF');
+    }
+    if (normalXf !== NORMAL_STYLE_XF_ID) {
+      throw new Error('Strict engine sync failed: Normal cell-style XF is not index 0');
+    }
+    styleXfIds.set('normal', NORMAL_STYLE_XF_ID);
+    pending.push({
+      name: 'Normal',
+      xfId: NORMAL_STYLE_XF_ID,
+      builtinId: writableBuiltinId(getCellStyle('normal')?.builtinId ?? null),
+    });
+  }
+
+  if (registrations.length === 0) {
+    return { styleXfIds, commit: () => undefined };
+  }
+
+  for (const reg of registrations) {
+    const builtin = reg.builtinId === null ? undefined : byBuiltin.get(reg.builtinId);
+    const exact = byName.get(reg.name.trim().toLowerCase());
+    // Built-in identity comes from its ordinal, never from a same-name
+    // custom/imported row. Keep an exact row only as the replacement target so
+    // a failed strict publication can restore it.
+    const existing = reg.builtinId === null ? exact : builtin;
+    const replacement = builtin ?? exact;
+    if (
+      existing &&
+      (reg.builtinId !== null || sameNamedStyleFormat(wb, reg.format, existing.xfId))
+    ) {
+      styleXfIds.set(reg.key, existing.xfId);
+      continue;
+    }
+    const xfId = resolveStyleXf(reg.format);
+    if (xfId < 0) {
+      throw new Error(`Strict engine sync failed: resolve named style XF ${reg.name}`);
+    }
+    styleXfIds.set(reg.key, xfId);
+    pending.push({
+      name: reg.name,
+      xfId,
+      builtinId: writableBuiltinId(reg.builtinId),
+      ...(replacement
+        ? {
+            previous: {
+              name: replacement.name,
+              xfId: replacement.xfId,
+              builtinId: writableBuiltinId(replacement.builtinId),
+            },
+          }
+        : {}),
+    });
+  }
+
+  return {
+    styleXfIds,
+    commit(): void {
+      let committed = 0;
+      const applied: PendingNamedStyleRegistration[] = [];
+      for (const registration of pending) {
+        if (wb.setNamedCellStyle(registration.name, registration.xfId, registration.builtinId)) {
+          committed += 1;
+          applied.push(registration);
+          continue;
+        }
+        const failure = new Error(
+          `Strict engine sync failed: setNamedCellStyle ${registration.name}`,
+        );
+        if (committed > 0) {
+          const rollbackErrors: unknown[] = [];
+          let unrestorable = false;
+          for (const appliedRegistration of applied.reverse()) {
+            if (!appliedRegistration.previous) {
+              unrestorable = true;
+              continue;
+            }
+            if (
+              !wb.setNamedCellStyle(
+                appliedRegistration.previous.name,
+                appliedRegistration.previous.xfId,
+                appliedRegistration.previous.builtinId,
+              )
+            ) {
+              rollbackErrors.push(
+                new Error(
+                  `Named-style catalog rollback failed: ${appliedRegistration.previous.name}`,
+                ),
+              );
+            }
+          }
+          throw new AggregateError(
+            [
+              failure,
+              ...rollbackErrors,
+              ...(unrestorable
+                ? [new Error('Named-style catalog rollback is unavailable for new entries')]
+                : []),
+            ],
+            'Strict named-style publication failed after a partial catalog commit',
+            { cause: failure },
+          );
+        }
+        throw failure;
+      }
+    },
+  };
 }
 
 /**
@@ -124,21 +310,46 @@ export function syncNamedCellStylesToEngine(
   const resolved = new Map<string, number>();
   if (!wb.capabilities.cellStyleMutate) return resolved;
   const registrations = collectNamedStyles(state);
-  if (registrations.length === 0) return resolved;
+  const named = wb.getNamedCellStyles();
+  const byBuiltin = new Map<number, (typeof named)[number]>();
+  const byName = new Map<string, (typeof named)[number]>();
+  for (const entry of named) {
+    byName.set(entry.name.trim().toLowerCase(), entry);
+    if (entry.builtinId >= 0) byBuiltin.set(entry.builtinId, entry);
+  }
 
   // A workbook that has never carried a named style has an empty
   // `<cellStyleXfs>` table, so the first row added would land at index 0 —
   // the row every unstyled cell inherits. Seed Normal there first.
-  if (wb.cellStyleXfCount() === 0) {
+  const existingNormal = byBuiltin.get(getCellStyle('normal')?.builtinId ?? 0);
+  if (existingNormal) {
+    resolved.set('normal', existingNormal.xfId);
+  } else if (wb.cellStyleXfCount() === 0) {
     const normalXf = resolveStyleXf({});
     if (normalXf !== NORMAL_STYLE_XF_ID) return resolved;
-    wb.setNamedCellStyle('Normal', NORMAL_STYLE_XF_ID, BUILTIN_STYLE_IDS.normal ?? null);
+    if (
+      wb.setNamedCellStyle('Normal', NORMAL_STYLE_XF_ID, getCellStyle('normal')?.builtinId ?? null)
+    ) {
+      resolved.set('normal', NORMAL_STYLE_XF_ID);
+    }
   }
 
   for (const reg of registrations) {
+    const builtin = reg.builtinId === null ? undefined : byBuiltin.get(reg.builtinId);
+    const exact = byName.get(reg.name.trim().toLowerCase());
+    // A same-name custom row is not the built-in row when the ordinal is
+    // absent; publish the desired built-in identity instead of reusing it.
+    const existing = reg.builtinId === null ? exact : builtin;
+    if (
+      existing &&
+      (reg.builtinId !== null || sameNamedStyleFormat(wb, reg.format, existing.xfId))
+    ) {
+      resolved.set(reg.key, existing.xfId);
+      continue;
+    }
     const xfId = resolveStyleXf(reg.format);
     if (xfId < 0) continue;
-    if (!wb.setNamedCellStyle(reg.name, xfId, reg.builtinId)) continue;
+    if (!wb.setNamedCellStyle(reg.name, xfId, writableBuiltinId(reg.builtinId))) continue;
     resolved.set(reg.key, xfId);
   }
   return resolved;
@@ -151,8 +362,16 @@ export function cellStyleKeysByXfId(wb: WorkbookHandle): Map<number, string> {
   const out = new Map<number, string>();
   if (!wb.capabilities.cellStyles) return out;
   for (const style of wb.getNamedCellStyles()) {
-    if (style.xfId === NORMAL_STYLE_XF_ID) continue;
-    if (!out.has(style.xfId)) out.set(style.xfId, cellStyleKeyForOoxmlName(style.name));
+    const builtin = CELL_STYLES.find((entry) => entry.builtinId === style.builtinId);
+    if (
+      style.xfId === NORMAL_STYLE_XF_ID ||
+      style.builtinId === getCellStyle('normal')?.builtinId
+    ) {
+      continue;
+    }
+    if (!out.has(style.xfId)) {
+      out.set(style.xfId, builtin?.id ?? cellStyleKeyForOoxmlName(style.name));
+    }
   }
   return out;
 }

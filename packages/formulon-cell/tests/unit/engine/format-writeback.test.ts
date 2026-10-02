@@ -4,6 +4,7 @@ import {
   borderRecordFromFormat,
   borderRecordToFormat,
   buildXfRecord,
+  cellRotationToTextRotation,
   cssColorToArgb,
   fillRecordFromFormat,
   fillRecordToFormat,
@@ -11,6 +12,9 @@ import {
   fontRecordToFormat,
   formatCodeToNumFmt,
   numFmtToFormatCode,
+  readingOrderToTextDirection,
+  textDirectionToReadingOrder,
+  textRotationToCellRotation,
 } from '../../../src/engine/format-writeback.js';
 
 describe('cssColorToArgb / argbToCssColor', () => {
@@ -405,6 +409,11 @@ describe('buildXfRecord', () => {
       verticalAlign: 1,
       wrapText: true,
       justifyLastLine: false,
+      hasAlignment: true,
+      hasHorizontalAlign: true,
+      hasVerticalAlign: true,
+      hasWrapText: true,
+      hasJustifyLastLine: false,
     });
   });
 
@@ -428,6 +437,44 @@ describe('buildXfRecord', () => {
     ).toBe(false);
   });
 
+  it('serializes authored alignment defaults with explicit presence', () => {
+    expect(
+      buildXfRecord(0, 0, 0, 0, {
+        align: 'left',
+        vAlign: 'bottom',
+        wrap: false,
+        justifyLastLine: false,
+        rotation: 0,
+        indent: 0,
+        shrinkToFit: false,
+        textDirection: 'context',
+      }),
+    ).toMatchObject({
+      hasAlignment: true,
+      hasHorizontalAlign: true,
+      hasVerticalAlign: true,
+      hasWrapText: true,
+      hasJustifyLastLine: true,
+      textRotation: 0,
+      indent: 0,
+      shrinkToFit: false,
+      readingOrder: 0,
+    });
+  });
+
+  it('keeps alignment absent for an otherwise empty format', () => {
+    const xf = buildXfRecord(0, 0, 0, 0, {});
+    expect(xf.hasAlignment).toBe(false);
+    expect(xf.hasHorizontalAlign).toBe(false);
+    expect(xf.hasVerticalAlign).toBe(false);
+    expect(xf.hasWrapText).toBe(false);
+    expect(xf.hasJustifyLastLine).toBe(false);
+    expect(xf).not.toHaveProperty('textRotation');
+    expect(xf).not.toHaveProperty('indent');
+    expect(xf).not.toHaveProperty('shrinkToFit');
+    expect(xf).not.toHaveProperty('readingOrder');
+  });
+
   it.each([
     ['left', 1],
     ['center', 2],
@@ -448,5 +495,53 @@ describe('buildXfRecord', () => {
     ['distributed', 4],
   ] as const)('maps vertical alignment %s to ordinal %i', (vAlign, ordinal) => {
     expect(buildXfRecord(0, 0, 0, 0, { vAlign }).verticalAlign).toBe(ordinal);
+  });
+});
+
+describe('alignment XF translators', () => {
+  it.each([
+    [-90, 180],
+    [-45, 135],
+    [-0.6, 91],
+    [-0.1, 0],
+    [0, 0],
+    [45, 45],
+    [90, 90],
+    [45.6, 46],
+    [999, 90],
+    [-999, 180],
+  ] as const)('maps cell rotation %i to OOXML %i', (degrees, raw) => {
+    expect(cellRotationToTextRotation(degrees)).toBe(raw);
+  });
+
+  it.each([
+    [0, 0],
+    [45, 45],
+    [90, 90],
+    [91, -1],
+    [135, -45],
+    [180, -90],
+  ] as const)('maps OOXML rotation %i back to cell degrees %i', (raw, degrees) => {
+    expect(textRotationToCellRotation(raw)).toBe(degrees);
+  });
+
+  it('leaves the vertical-text sentinel outside the degree model', () => {
+    expect(textRotationToCellRotation(255)).toBeUndefined();
+    expect(textRotationToCellRotation(undefined)).toBeUndefined();
+    expect(cellRotationToTextRotation(undefined)).toBeUndefined();
+  });
+
+  it.each([
+    ['context', 0],
+    ['ltr', 1],
+    ['rtl', 2],
+  ] as const)('maps %s text direction to readingOrder %i', (direction, raw) => {
+    expect(textDirectionToReadingOrder(direction)).toBe(raw);
+    expect(readingOrderToTextDirection(raw)).toBe(direction);
+  });
+
+  it('rejects unknown readingOrder values while preserving absent direction', () => {
+    expect(readingOrderToTextDirection(3)).toBeUndefined();
+    expect(textDirectionToReadingOrder(undefined)).toBeUndefined();
   });
 });

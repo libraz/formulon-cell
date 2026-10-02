@@ -82,7 +82,7 @@ describe('toolbar/ribbon-active-state', () => {
     expect(fresh.mergeCenter).toBe(EMPTY_ACTIVE_STATE.mergeCenter);
     expect(fresh.conditionalFormatting).toBe(EMPTY_ACTIVE_STATE.conditionalFormatting);
     expect(fresh.formatAsTable).toBe(EMPTY_ACTIVE_STATE.formatAsTable);
-    expect(fresh.cellStyle).toBe(EMPTY_ACTIVE_STATE.cellStyle);
+    expect(fresh.cellStyle).toBe('normal');
     expect(fresh.textOrientation).toBe(EMPTY_ACTIVE_STATE.textOrientation);
     expect(fresh.commaStyle).toBe(EMPTY_ACTIVE_STATE.commaStyle);
     expect(fresh.marginPreset).toBe(EMPTY_ACTIVE_STATE.marginPreset);
@@ -263,7 +263,20 @@ describe('toolbar/ribbon-active-state', () => {
     expect(projectActiveState(instance).cellStyle).toBe('good');
 
     applyCellStyle(instance.store, null, { sheet: 0, r0: 1, c0: 1, r1: 1, c1: 1 }, 'normal');
-    expect(projectActiveState(instance).cellStyle).toBeNull();
+    expect(projectActiveState(instance).cellStyle).toBe('normal');
+  });
+
+  it('projects Normal for an unstyled cell and preserves an unresolved nonempty style key', () => {
+    const { instance } = sheet;
+    mutators.setActive(instance.store, { sheet: 0, row: 0, col: 0 });
+    expect(projectActiveState(instance).cellStyle).toBe('normal');
+
+    mutators.setCellFormat(
+      instance.store,
+      { sheet: 0, row: 0, col: 0 },
+      { cellStyle: 'Imported Review' },
+    );
+    expect(projectActiveState(instance).cellStyle).toBe('Imported Review');
   });
 
   it('reports frozen=true when freezeRows or freezeCols are set', () => {

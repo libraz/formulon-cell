@@ -145,6 +145,33 @@ describe('attachCellStylesGallery', () => {
     handle.detach();
   });
 
+  it('applies a style once across the primary and extra selection ranges and projects active state', () => {
+    store.setState((state) => ({
+      ...state,
+      selection: {
+        ...state.selection,
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        extraRanges: [{ sheet: 0, r0: 0, c0: 2, r1: 0, c1: 2 }],
+      },
+    }));
+    const handle = attachCellStylesGallery({ host, store });
+    handle.open();
+    const goodChip = chips().find((c) => c.dataset.fcStyle === 'good');
+    expect(goodChip?.getAttribute('aria-pressed')).toBe('false');
+    goodChip?.click();
+
+    expect(store.getState().format.formats.get('0:0:0')).toMatchObject({
+      cellStyle: 'good',
+      fill: '#c6efce',
+    });
+    expect(store.getState().format.formats.get('0:0:2')).toMatchObject({
+      cellStyle: 'good',
+      fill: '#c6efce',
+    });
+    expect(overlay()?.hidden).toBe(true);
+    handle.detach();
+  });
+
   it('renders session custom cell styles and reapplies them from the gallery', () => {
     setRange(store, 3, 4, 3, 4);
     mutators.setCell(store, { sheet: 0, row: 3, col: 4 }, { kind: 'text', value: 'ready' });

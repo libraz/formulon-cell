@@ -1,0 +1,714 @@
+{
+  "application": "Microsoft Excel",
+  "version": "16.113.3",
+  "displayLanguage": "ja",
+  "capturedAt": "2026-10-02",
+  "observation": "Include flags and font properties read from styles of an isolated newly created workbook. No exported workbook is implied.",
+  "styles": [
+    {
+      "name": "20% - アクセント 1",
+      "galleryId": "accent1_20",
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "20% - アクセント 2",
+      "galleryId": "accent2_20",
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "20% - アクセント 3",
+      "galleryId": "accent3_20",
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "20% - アクセント 4",
+      "galleryId": "accent4_20",
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "20% - アクセント 5",
+      "galleryId": "accent5_20",
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "20% - アクセント 6",
+      "galleryId": "accent6_20",
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "40% - アクセント 1",
+      "galleryId": null,
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "40% - アクセント 2",
+      "galleryId": null,
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "40% - アクセント 3",
+      "galleryId": null,
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "40% - アクセント 4",
+      "galleryId": null,
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "40% - アクセント 5",
+      "galleryId": null,
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "40% - アクセント 6",
+      "galleryId": null,
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "60% - アクセント 1",
+      "galleryId": null,
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "60% - アクセント 2",
+      "galleryId": null,
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "60% - アクセント 3",
+      "galleryId": null,
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "60% - アクセント 4",
+      "galleryId": null,
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "60% - アクセント 5",
+      "galleryId": null,
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "60% - アクセント 6",
+      "galleryId": null,
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "アクセント 1",
+      "galleryId": "accent1",
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "アクセント 2",
+      "galleryId": "accent2",
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "アクセント 3",
+      "galleryId": "accent3",
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "アクセント 4",
+      "galleryId": "accent4",
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "アクセント 5",
+      "galleryId": "accent5",
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "アクセント 6",
+      "galleryId": "accent6",
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "タイトル",
+      "galleryId": "title",
+      "includedGroups": ["font"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 18.0,
+        "family": "游ゴシック Light"
+      }
+    },
+    {
+      "name": "チェック セル",
+      "galleryId": "checkCell",
+      "includedGroups": ["font", "border", "fill"],
+      "font": {
+        "bold": true,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "どちらでもない",
+      "galleryId": "neutral",
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "Percent",
+      "galleryId": "percent",
+      "includedGroups": ["number"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "メモ",
+      "galleryId": "note",
+      "includedGroups": ["border", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "リンク セル",
+      "galleryId": "linkedCell",
+      "includedGroups": ["font", "border"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "悪い",
+      "galleryId": "bad",
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "計算",
+      "galleryId": "calculation",
+      "includedGroups": ["font", "border", "fill"],
+      "font": {
+        "bold": true,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "警告文",
+      "galleryId": "warning",
+      "includedGroups": ["font"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "Comma [0]",
+      "galleryId": "comma0",
+      "includedGroups": ["number"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "Comma",
+      "galleryId": "comma",
+      "includedGroups": ["number"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "見出し 1",
+      "galleryId": "heading1",
+      "includedGroups": ["font", "border"],
+      "font": {
+        "bold": true,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 15.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "見出し 2",
+      "galleryId": "heading2",
+      "includedGroups": ["font", "border"],
+      "font": {
+        "bold": true,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 13.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "見出し 3",
+      "galleryId": "heading3",
+      "includedGroups": ["font", "border"],
+      "font": {
+        "bold": true,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 11.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "見出し 4",
+      "galleryId": "heading4",
+      "includedGroups": ["font"],
+      "font": {
+        "bold": true,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 11.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "集計",
+      "galleryId": "totalCell",
+      "includedGroups": ["font", "border"],
+      "font": {
+        "bold": true,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "出力",
+      "galleryId": "outputCell",
+      "includedGroups": ["font", "border", "fill"],
+      "font": {
+        "bold": true,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "説明文",
+      "galleryId": "explanatoryText",
+      "includedGroups": ["font"],
+      "font": {
+        "bold": false,
+        "italic": true,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "Currency [0]",
+      "galleryId": "currency0",
+      "includedGroups": ["number"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "Currency",
+      "galleryId": "currency",
+      "includedGroups": ["number"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "入力",
+      "galleryId": "inputCell",
+      "includedGroups": ["font", "border", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "Normal",
+      "galleryId": "normal",
+      "includedGroups": ["number", "alignment", "font", "border", "fill", "protection"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    },
+    {
+      "name": "良い",
+      "galleryId": "good",
+      "includedGroups": ["font", "fill"],
+      "font": {
+        "bold": false,
+        "italic": false,
+        "strike": false,
+        "subscript": false,
+        "superscript": false,
+        "underline": "underline style none",
+        "size": 12.0,
+        "family": "游ゴシック"
+      }
+    }
+  ]
+}

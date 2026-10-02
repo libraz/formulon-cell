@@ -1,3 +1,4 @@
+import { activeCellStyleId } from '../commands/cell-styles.js';
 import { commentAt } from '../commands/comment.js';
 import type { BorderPreset as CommandBorderPreset } from '../commands/format.js';
 import { tableForCell } from '../commands/format-as-table.js';
@@ -337,7 +338,7 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
     mergeCenter: activeMerge != null && f?.align === 'center',
     conditionalFormatting: hasConditionalFormatting,
     formatAsTable: activeTable != null,
-    cellStyle: f?.cellStyle ?? null,
+    cellStyle: activeCellStyleId(s),
     textOrientation:
       f?.rotation === 45
         ? 'angleCounterclockwise'

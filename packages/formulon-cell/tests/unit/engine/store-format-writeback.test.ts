@@ -199,4 +199,260 @@ describe('WorkbookHandle store format writeback', () => {
       wb.dispose();
     }
   });
+
+  it('writes authored alignment defaults over stale raw XF fields and keeps selectors', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    let reloaded: WorkbookHandle | null = null;
+    try {
+      expect(wb.isStub).toBe(false);
+      const normal = wb.getCellStyleXf(0);
+      const defaultFont = wb.getFontRecord(0);
+      const defaultFill = wb.getFillRecord(0);
+      expect(normal).toBeDefined();
+      expect(defaultFont).toBeDefined();
+      expect(defaultFill).toBeDefined();
+      if (!normal || !defaultFont || !defaultFill) return;
+
+      const fontIndex = wb.addFontRecord({ ...defaultFont, name: 'Alignment Font', bold: true });
+      const fillIndex = wb.addFillRecord({
+        ...defaultFill,
+        pattern: 1,
+        fgArgb: 0xffd9ead3,
+        bgArgb: 0,
+      });
+      expect(fontIndex).toBeGreaterThanOrEqual(0);
+      expect(fillIndex).toBeGreaterThanOrEqual(0);
+      wb.setNumber({ sheet: 0, row: 0, col: 0 }, 12);
+      const sourceXf = wb.addXfRecord({
+        ...normal,
+        fontIndex,
+        fillIndex,
+        horizontalAlign: 1,
+        verticalAlign: 1,
+        wrapText: true,
+        justifyLastLine: false,
+        hasAlignment: true,
+        hasHorizontalAlign: true,
+        hasVerticalAlign: true,
+        hasWrapText: true,
+        hasJustifyLastLine: true,
+        textRotation: 37,
+        indent: 2,
+        relativeIndent: -1,
+        shrinkToFit: true,
+        readingOrder: 2,
+      });
+      expect(wb.setCellXfIndex(0, 0, 0, sourceXf)).toBe(true);
+
+      const store = createSpreadsheetStore();
+      hydrateCellFormatsFromEngine(wb, store, 0);
+      const key = formatAt(0);
+      expect(store.getState().format.formats.get(key)).toMatchObject({
+        bold: true,
+        fill: '#d9ead3',
+      });
+      mutators.setCellFormat(
+        store,
+        { sheet: 0, row: 0, col: 0 },
+        {
+          rotation: 0,
+          indent: 0,
+          shrinkToFit: false,
+          textDirection: 'context',
+        },
+      );
+      syncCellFormatsToEngine(wb, store, 0, { strict: true });
+
+      const reset = wb.getCellXf(wb.getCellXfIndex(0, 0, 0) ?? -1);
+      expect(reset).toMatchObject({
+        fontIndex,
+        fillIndex,
+        textRotation: 0,
+        indent: 0,
+        shrinkToFit: false,
+        readingOrder: 0,
+      });
+      expect(reset?.hasAlignment).toBe(true);
+
+      reloaded = await WorkbookHandle.loadBytes(wb.save());
+      const loaded = reloaded.getCellXf(reloaded.getCellXfIndex(0, 0, 0) ?? -1);
+      expect(loaded).toMatchObject({
+        textRotation: 0,
+        indent: 0,
+        shrinkToFit: false,
+        readingOrder: 0,
+      });
+      expect(reloaded.getFontRecord(loaded?.fontIndex ?? -1)?.name).toBe('Alignment Font');
+      expect(reloaded.getFillRecord(loaded?.fillIndex ?? -1)?.fgArgb).toBe(0xffd9ead3);
+    } finally {
+      reloaded?.dispose();
+      wb.dispose();
+    }
+  });
+
+  it('preserves raw vertical-text rotation through unrelated edits but not an explicit degree reset', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    try {
+      expect(wb.isStub).toBe(false);
+      const normal = wb.getCellStyleXf(0);
+      expect(normal).toBeDefined();
+      if (!normal) return;
+      wb.setNumber({ sheet: 0, row: 0, col: 0 }, 7);
+      const sourceXf = wb.addXfRecord({
+        ...normal,
+        hasAlignment: true,
+        hasHorizontalAlign: true,
+        hasVerticalAlign: true,
+        hasWrapText: true,
+        hasJustifyLastLine: true,
+        textRotation: 255,
+        indent: 0,
+        shrinkToFit: false,
+        readingOrder: 0,
+      });
+      expect(wb.setCellXfIndex(0, 0, 0, sourceXf)).toBe(true);
+
+      const store = createSpreadsheetStore();
+      hydrateCellFormatsFromEngine(wb, store, 0);
+      const key = formatAt(0);
+      expect(store.getState().format.formats.get(key)?.rotation).toBeUndefined();
+      mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { bold: true });
+      syncCellFormatsToEngine(wb, store, 0, { strict: true });
+      const preserved = wb.getCellXf(wb.getCellXfIndex(0, 0, 0) ?? -1);
+      expect(preserved?.textRotation).toBe(255);
+
+      mutators.setCellFormat(store, { sheet: 0, row: 0, col: 0 }, { rotation: 0 });
+      syncCellFormatsToEngine(wb, store, 0, { strict: true });
+      const reset = wb.getCellXf(wb.getCellXfIndex(0, 0, 0) ?? -1);
+      expect(reset?.textRotation).toBe(0);
+      expect(reset?.textRotation).not.toBe(255);
+    } finally {
+      wb.dispose();
+    }
+  });
+
+  it('round-trips authored rotations, indent, shrink and reading direction through the real engine', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    let reloaded: WorkbookHandle | null = null;
+    try {
+      expect(wb.isStub).toBe(false);
+      wb.setNumber({ sheet: 0, row: 0, col: 0 }, 45);
+      wb.setNumber({ sheet: 0, row: 1, col: 0 }, -45);
+      wb.setNumber({ sheet: 0, row: 2, col: 0 }, -90);
+      const store = createSpreadsheetStore();
+      setFormats(
+        store,
+        new Map([
+          [formatAt(0, 0), { rotation: 45, indent: 8, shrinkToFit: true, textDirection: 'rtl' }],
+          [formatAt(0, 1), { rotation: -45, indent: 0, shrinkToFit: false, textDirection: 'ltr' }],
+          [formatAt(0, 2), { rotation: -90, textDirection: 'context' }],
+        ]),
+      );
+      syncCellFormatsToEngine(wb, store, 0, { strict: true });
+
+      expect(wb.getCellXf(wb.getCellXfIndex(0, 0, 0) ?? -1)).toMatchObject({
+        textRotation: 45,
+        indent: 8,
+        shrinkToFit: true,
+        readingOrder: 2,
+      });
+      expect(wb.getCellXf(wb.getCellXfIndex(0, 1, 0) ?? -1)).toMatchObject({
+        textRotation: 135,
+        indent: 0,
+        shrinkToFit: false,
+        readingOrder: 1,
+      });
+      expect(wb.getCellXf(wb.getCellXfIndex(0, 2, 0) ?? -1)).toMatchObject({
+        textRotation: 180,
+        readingOrder: 0,
+      });
+
+      reloaded = await WorkbookHandle.loadBytes(wb.save());
+      const loaded = createSpreadsheetStore();
+      hydrateCellFormatsFromEngine(reloaded, loaded, 0);
+      expect(loaded.getState().format.formats.get(formatAt(0, 0))).toMatchObject({
+        rotation: 45,
+        indent: 8,
+        shrinkToFit: true,
+        textDirection: 'rtl',
+      });
+      expect(loaded.getState().format.formats.get(formatAt(0, 1))).toMatchObject({
+        rotation: -45,
+        indent: 0,
+        shrinkToFit: false,
+        textDirection: 'ltr',
+      });
+      expect(loaded.getState().format.formats.get(formatAt(0, 2))).toMatchObject({
+        rotation: -90,
+        textDirection: 'context',
+      });
+    } finally {
+      reloaded?.dispose();
+      wb.dispose();
+    }
+  });
+
+  it('retains explicit zero and false alignment attributes while compact records stay absent', async () => {
+    const wb = await WorkbookHandle.createDefault();
+    let reloaded: WorkbookHandle | null = null;
+    try {
+      expect(wb.isStub).toBe(false);
+      const normal = wb.getCellStyleXf(0);
+      expect(normal).toBeDefined();
+      if (!normal) return;
+      wb.setNumber({ sheet: 0, row: 0, col: 0 }, 1);
+      wb.setNumber({ sheet: 0, row: 0, col: 1 }, 2);
+      const explicit = wb.addXfRecord({
+        ...normal,
+        hasAlignment: true,
+        hasHorizontalAlign: false,
+        hasVerticalAlign: false,
+        hasWrapText: false,
+        hasJustifyLastLine: false,
+        textRotation: 0,
+        indent: 0,
+        shrinkToFit: false,
+        readingOrder: 0,
+      });
+      const compact = wb.addXfRecord({
+        ...normal,
+        hasAlignment: false,
+        hasHorizontalAlign: false,
+        hasVerticalAlign: false,
+        hasWrapText: false,
+        hasJustifyLastLine: false,
+      });
+      expect(wb.setCellXfIndex(0, 0, 0, explicit)).toBe(true);
+      expect(wb.setCellXfIndex(0, 0, 1, compact)).toBe(true);
+
+      reloaded = await WorkbookHandle.loadBytes(wb.save());
+      const explicitLoaded = reloaded.getCellXf(reloaded.getCellXfIndex(0, 0, 0) ?? -1);
+      expect(explicitLoaded).toMatchObject({
+        hasAlignment: true,
+        hasHorizontalAlign: false,
+        hasVerticalAlign: false,
+        hasWrapText: false,
+        hasJustifyLastLine: false,
+        textRotation: 0,
+        indent: 0,
+        shrinkToFit: false,
+        readingOrder: 0,
+      });
+      const compactLoaded = reloaded.getCellXf(reloaded.getCellXfIndex(0, 0, 1) ?? -1);
+      expect(compactLoaded).toMatchObject({
+        hasAlignment: false,
+        hasHorizontalAlign: false,
+        hasVerticalAlign: false,
+        hasWrapText: false,
+        hasJustifyLastLine: false,
+      });
+      expect(compactLoaded).not.toHaveProperty('textRotation');
+      expect(compactLoaded).not.toHaveProperty('indent');
+      expect(compactLoaded).not.toHaveProperty('shrinkToFit');
+      expect(compactLoaded).not.toHaveProperty('readingOrder');
+    } finally {
+      reloaded?.dispose();
+      wb.dispose();
+    }
+  });
 });

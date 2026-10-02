@@ -1,16 +1,20 @@
 import { addrKey } from '../engine/address.js';
 import { cellFormatFromXf } from '../engine/cell-format-sync.js';
-import type { Range } from '../engine/types.js';
+import type { CellXf, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import {
   type CellFormat,
   type CustomCellStyle,
   mutators,
   type SpreadsheetStore,
+  type State,
 } from '../store/store.js';
-import { applyFormatPatch } from './format.js';
+import { recordDialogFormatChange } from './dialog-format-history.js';
+import { applyFormatPatch, applySelectionFormatAction, planSelectionFormat } from './format.js';
 import type { History } from './history.js';
 import { recordFormatChange, recordFormatChangeWithRepeat } from './history.js';
+import type { InteractionOrigin } from './interaction-policy.js';
+import { mergeAnchorOf } from './merge.js';
 
 /** Built-in named cell styles. Each style is a partial CellFormat that
  *  `applyCellStyle` merges into the active range via `setRangeFormat`. The
@@ -58,7 +62,17 @@ export interface CellStyleDef {
    *  passes the id back to `applyCellStyle`. */
   label: string;
   format: Partial<CellFormat>;
+  builtinId?: number;
+  includedGroups?: readonly CellStyleFormatGroup[];
 }
+
+export type CellStyleFormatGroup =
+  | 'number'
+  | 'alignment'
+  | 'font'
+  | 'border'
+  | 'fill'
+  | 'protection';
 
 export type CellStyleGroupId =
   | 'goodBadNeutral'
@@ -94,12 +108,12 @@ export interface CreateCellStyleOptions {
  *  desktop defaults so a workbook hopping between this UI and desktop spreadsheets feels
  *  consistent. Borders use the basic `'thin'`/`'medium'` styles; consumers
  *  can extend with their own gallery via `applyCellFormat` directly. */
-export const CELL_STYLES: readonly CellStyleDef[] = [
+const CELL_STYLE_DEFS: readonly CellStyleDef[] = [
   { id: 'normal', label: 'Normal', format: {} },
   {
     id: 'title',
     label: 'Title',
-    format: { bold: true, fontSize: 18, color: '#1f4e79' },
+    format: { bold: false, fontSize: 18, color: '#1f4e79' },
   },
   {
     id: 'heading1',
@@ -124,12 +138,12 @@ export const CELL_STYLES: readonly CellStyleDef[] = [
   {
     id: 'heading3',
     label: 'Heading 3',
-    format: { bold: true, color: '#1f4e79' },
+    format: { bold: true, fontSize: 11, color: '#1f4e79' },
   },
   {
     id: 'heading4',
     label: 'Heading 4',
-    format: { italic: true, color: '#1f4e79' },
+    format: { bold: true, italic: false, fontSize: 11, color: '#1f4e79' },
   },
   { id: 'good', label: 'Good', format: { color: '#006100', fill: '#c6efce' } },
   { id: 'bad', label: 'Bad', format: { color: '#9c0006', fill: '#ffc7ce' } },
@@ -146,7 +160,7 @@ export const CELL_STYLES: readonly CellStyleDef[] = [
   {
     id: 'warning',
     label: 'Warning',
-    format: { color: '#ff0000', italic: true },
+    format: { color: '#ff0000', italic: false },
   },
   {
     id: 'checkCell',
@@ -171,12 +185,12 @@ export const CELL_STYLES: readonly CellStyleDef[] = [
   {
     id: 'calculation',
     label: 'Calculation',
-    format: { bold: true, italic: true, fill: '#f2f2f2', color: '#fa7d00' },
+    format: { bold: true, italic: false, fill: '#f2f2f2', color: '#fa7d00' },
   },
   {
     id: 'linkedCell',
     label: 'Linked Cell',
-    format: { color: '#fa7d00', italic: true },
+    format: { color: '#fa7d00', italic: false },
   },
   {
     id: 'totalCell',
@@ -276,6 +290,54 @@ export const CELL_STYLES: readonly CellStyleDef[] = [
   },
 ];
 
+const CELL_STYLE_METADATA: Partial<
+  Record<CellStyleId, Pick<CellStyleDef, 'builtinId' | 'includedGroups'>>
+> = {
+  normal: {
+    builtinId: 0,
+    includedGroups: ['number', 'alignment', 'font', 'border', 'fill', 'protection'],
+  },
+  comma: { builtinId: 3, includedGroups: ['number'] },
+  currency: { builtinId: 4, includedGroups: ['number'] },
+  percent: { builtinId: 5, includedGroups: ['number'] },
+  comma0: { builtinId: 6, includedGroups: ['number'] },
+  currency0: { builtinId: 7, includedGroups: ['number'] },
+  note: { builtinId: 10, includedGroups: ['border', 'fill'] },
+  warning: { builtinId: 11, includedGroups: ['font'] },
+  explanatoryText: { builtinId: 53, includedGroups: ['font'] },
+  title: { builtinId: 15, includedGroups: ['font'] },
+  heading1: { builtinId: 16, includedGroups: ['font', 'border'] },
+  heading2: { builtinId: 17, includedGroups: ['font', 'border'] },
+  heading3: { builtinId: 18, includedGroups: ['font', 'border'] },
+  heading4: { builtinId: 19, includedGroups: ['font'] },
+  inputCell: { builtinId: 20, includedGroups: ['font', 'border', 'fill'] },
+  outputCell: { builtinId: 21, includedGroups: ['font', 'border', 'fill'] },
+  calculation: { builtinId: 22, includedGroups: ['font', 'border', 'fill'] },
+  checkCell: { builtinId: 23, includedGroups: ['font', 'border', 'fill'] },
+  linkedCell: { builtinId: 24, includedGroups: ['font', 'border'] },
+  totalCell: { builtinId: 25, includedGroups: ['font', 'border'] },
+  good: { builtinId: 26, includedGroups: ['font', 'fill'] },
+  bad: { builtinId: 27, includedGroups: ['font', 'fill'] },
+  neutral: { builtinId: 28, includedGroups: ['font', 'fill'] },
+  accent1: { builtinId: 29, includedGroups: ['font', 'fill'] },
+  accent1_20: { builtinId: 30, includedGroups: ['font', 'fill'] },
+  accent2: { builtinId: 33, includedGroups: ['font', 'fill'] },
+  accent2_20: { builtinId: 34, includedGroups: ['font', 'fill'] },
+  accent3: { builtinId: 37, includedGroups: ['font', 'fill'] },
+  accent3_20: { builtinId: 38, includedGroups: ['font', 'fill'] },
+  accent4: { builtinId: 41, includedGroups: ['font', 'fill'] },
+  accent4_20: { builtinId: 42, includedGroups: ['font', 'fill'] },
+  accent5: { builtinId: 45, includedGroups: ['font', 'fill'] },
+  accent5_20: { builtinId: 46, includedGroups: ['font', 'fill'] },
+  accent6: { builtinId: 49, includedGroups: ['font', 'fill'] },
+  accent6_20: { builtinId: 50, includedGroups: ['font', 'fill'] },
+};
+
+export const CELL_STYLES: readonly CellStyleDef[] = CELL_STYLE_DEFS.map((style) => ({
+  ...style,
+  ...CELL_STYLE_METADATA[style.id],
+}));
+
 export const CELL_STYLE_GROUPS: readonly CellStyleGroupDef[] = [
   {
     id: 'goodBadNeutral',
@@ -328,8 +390,407 @@ const BUILT_IN_STYLE_NAMES = new Set(
   CELL_STYLES.flatMap((style) => [style.id.toLowerCase(), style.label.toLowerCase()]),
 );
 
+const CELL_STYLE_GROUP_FIELDS: Record<CellStyleFormatGroup, readonly (keyof CellFormat)[]> = {
+  number: ['numFmt'],
+  alignment: [
+    'align',
+    'vAlign',
+    'wrap',
+    'justifyLastLine',
+    'shrinkToFit',
+    'indent',
+    'rotation',
+    'textDirection',
+  ],
+  font: [
+    'bold',
+    'italic',
+    'underline',
+    'strike',
+    'fontVertAlign',
+    'color',
+    'fontFamily',
+    'fontSize',
+  ],
+  border: ['borders'],
+  fill: ['fill', 'fillPattern', 'fillPatternColor'],
+  protection: ['locked', 'formulaHidden'],
+};
+
+const ALL_BORDER_SIDES: readonly (keyof NonNullable<CellFormat['borders']>)[] = [
+  'top',
+  'right',
+  'bottom',
+  'left',
+  'diagonalDown',
+  'diagonalUp',
+];
+
+const inferCellStyleGroups = (format: Partial<CellFormat>): readonly CellStyleFormatGroup[] => {
+  const groups: CellStyleFormatGroup[] = [];
+  for (const [group, fields] of Object.entries(CELL_STYLE_GROUP_FIELDS) as [
+    CellStyleFormatGroup,
+    readonly (keyof CellFormat)[],
+  ][]) {
+    if (fields.some((field) => Object.hasOwn(format, field))) groups.push(group);
+  }
+  return groups;
+};
+
+export function cellStyleGroups(
+  style: Pick<CellStyleDef, 'format' | 'includedGroups'> | Pick<CustomCellStyle, 'format'>,
+): readonly CellStyleFormatGroup[] {
+  return 'includedGroups' in style && style.includedGroups
+    ? style.includedGroups
+    : inferCellStyleGroups(style.format);
+}
+
+const formatForGroups = (
+  format: Partial<CellFormat>,
+  groups: readonly CellStyleFormatGroup[],
+): Partial<CellFormat> => {
+  const included = new Set(groups);
+  const patch: Partial<CellFormat> = {};
+  for (const group of groups) {
+    for (const field of CELL_STYLE_GROUP_FIELDS[group]) {
+      if (field === 'borders') {
+        patch.borders = Object.fromEntries(
+          ALL_BORDER_SIDES.map((side) => [side, undefined]),
+        ) as CellFormat['borders'];
+      } else {
+        patch[field] = undefined;
+      }
+    }
+  }
+  for (const [key, value] of Object.entries(format) as [keyof CellFormat, unknown][]) {
+    const group = (
+      Object.entries(CELL_STYLE_GROUP_FIELDS) as [
+        CellStyleFormatGroup,
+        readonly (keyof CellFormat)[],
+      ][]
+    ).find(([, fields]) => fields.includes(key));
+    if (!group || !included.has(group[0])) continue;
+    if (key === 'borders') {
+      patch.borders = {
+        ...(patch.borders ?? {}),
+        ...(value as CellFormat['borders']),
+      };
+    } else {
+      (patch as Record<string, unknown>)[key] = value;
+    }
+  }
+  return patch;
+};
+
 export function getCellStyle(id: CellStyleId): CellStyleDef | undefined {
   return STYLE_BY_ID.get(id);
+}
+
+const resolvedCellStyle = (
+  state: { format: { customCellStyles?: readonly CustomCellStyle[] } },
+  id: string,
+): {
+  id: string;
+  label: string;
+  format: Partial<CellFormat>;
+  groups: readonly CellStyleFormatGroup[];
+  builtinId?: number;
+} | null => {
+  const builtin =
+    STYLE_BY_ID.get(id as CellStyleId) ?? CELL_STYLES.find((style) => style.label === id);
+  if (builtin) {
+    return {
+      id: builtin.id,
+      label: builtin.label,
+      format: builtin.format,
+      groups: cellStyleGroups(builtin),
+      ...(builtin.builtinId === undefined ? {} : { builtinId: builtin.builtinId }),
+    };
+  }
+  const custom =
+    state.format.customCellStyles?.find((style) => style.id === id) ??
+    state.format.customCellStyles?.find((style) => style.label === id);
+  if (!custom) return null;
+  return {
+    id: custom.id,
+    label: custom.label,
+    format: custom.format,
+    groups: cellStyleGroups(custom),
+  };
+};
+
+/** Resolve the style represented by the active cell, following a merge to its anchor. */
+export function activeCellStyleId(state: {
+  selection: State['selection'];
+  merges: State['merges'];
+  format: State['format'];
+}): string {
+  const active = mergeAnchorOf(state as State, state.selection.active);
+  const raw = state.format.formats.get(addrKey(active))?.cellStyle;
+  if (!raw) return 'normal';
+  const resolved = resolvedCellStyle(state, raw);
+  return resolved?.id ?? raw;
+}
+
+export interface CellStyleCommandContext {
+  origin?: InteractionOrigin;
+  commandId?: string;
+  getWorkbook?: () => WorkbookHandle | null;
+}
+
+const sameStyleValue = (left: unknown, right: unknown): boolean => {
+  if (Object.is(left, right)) return true;
+  if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object') {
+    return false;
+  }
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((item, index) => sameStyleValue(item, right[index]))
+    );
+  }
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const keys = Object.keys(leftRecord);
+  return (
+    keys.length === Object.keys(rightRecord).length &&
+    keys.every(
+      (key) => Object.hasOwn(rightRecord, key) && sameStyleValue(leftRecord[key], rightRecord[key]),
+    )
+  );
+};
+
+const normalizedBorderSide = (
+  side: CellFormat['borders'] extends infer B ? (B extends object ? B[keyof B] : never) : never,
+): unknown => {
+  // The store accepts both omitted and explicit false for an absent border.
+  // Treat them as the same semantic default while retaining real styles and
+  // their color selectors below.
+  if (side === undefined || side === false) return undefined;
+  if (side === true) return { style: 'thin' };
+  if (typeof side !== 'object' || side === null) return side;
+  const record = side as { style?: unknown; color?: unknown };
+  return { style: record.style, ...(record.color === undefined ? {} : { color: record.color }) };
+};
+
+const normalizedStyleField = (field: keyof CellFormat, value: unknown): unknown => {
+  switch (field) {
+    case 'bold':
+    case 'italic':
+    case 'strike':
+    case 'wrap':
+    case 'justifyLastLine':
+    case 'shrinkToFit':
+    case 'formulaHidden':
+      return value === true;
+    case 'underline':
+      return value === true ? 'single' : value === false ? undefined : value;
+    case 'align':
+      return value ?? 'general';
+    case 'vAlign':
+      return value ?? 'bottom';
+    case 'indent':
+    case 'rotation':
+      return value ?? 0;
+    case 'textDirection':
+      return value ?? 'context';
+    case 'locked':
+      return value === undefined ? true : value === true;
+    case 'numFmt':
+      return (value as CellFormat['numFmt'] | undefined)?.kind === 'general' ? undefined : value;
+    default:
+      return value;
+  }
+};
+
+export const stylePayloadMatches = (
+  native: Partial<CellFormat>,
+  stored: Partial<CellFormat>,
+  groups: readonly CellStyleFormatGroup[],
+): boolean => {
+  const expected = formatForGroups(stored, groups);
+  const actual = formatForGroups(native, groups);
+  for (const group of groups) {
+    for (const field of CELL_STYLE_GROUP_FIELDS[group]) {
+      if (field === 'borders') {
+        for (const side of ALL_BORDER_SIDES) {
+          if (
+            !sameStyleValue(
+              normalizedBorderSide(actual.borders?.[side]),
+              normalizedBorderSide(expected.borders?.[side]),
+            )
+          ) {
+            return false;
+          }
+        }
+      } else if (
+        !sameStyleValue(
+          normalizedStyleField(field, actual[field]),
+          normalizedStyleField(field, expected[field]),
+        )
+      ) {
+        return false;
+      }
+    }
+  }
+  return true;
+};
+
+export const cellStyleGroupMatches = (
+  left: Partial<CellFormat>,
+  right: Partial<CellFormat>,
+  group: CellStyleFormatGroup,
+): boolean => stylePayloadMatches(left, right, [group]);
+
+/** A literal store color must not reuse a native theme/indexed/auto selector
+ * merely because the engine exposes the same fallback RGB. */
+export const stylePayloadMatchesNative = (
+  workbook: WorkbookHandle,
+  nativeXf: CellXf,
+  native: Partial<CellFormat>,
+  stored: Partial<CellFormat>,
+  groups: readonly CellStyleFormatGroup[],
+): boolean => {
+  if (!stylePayloadMatches(native, stored, groups)) return false;
+  const literalOrFallback = (kind: number): boolean => kind === 0 || kind === 1;
+  if (groups.includes('font') && Object.hasOwn(stored, 'color')) {
+    const font = workbook.getFontRecord(nativeXf.fontIndex);
+    if (font?.color && !literalOrFallback(font.color.kind)) return false;
+  }
+  if (groups.includes('fill')) {
+    const fill = workbook.getFillRecord(nativeXf.fillIndex);
+    if (fill?.fg && Object.hasOwn(stored, 'fill') && !literalOrFallback(fill.fg.kind)) return false;
+    if (fill?.fg && Object.hasOwn(stored, 'fillPatternColor') && !literalOrFallback(fill.fg.kind)) {
+      return false;
+    }
+  }
+  if (groups.includes('border') && stored.borders) {
+    const border = workbook.getBorderRecord(nativeXf.borderIndex);
+    if (border) {
+      const nativeSides = {
+        top: border.top,
+        right: border.right,
+        bottom: border.bottom,
+        left: border.left,
+        diagonalDown: border.diagonal,
+        diagonalUp: border.diagonal,
+      };
+      for (const side of ALL_BORDER_SIDES) {
+        const value = stored.borders[side];
+        const nativeSide = nativeSides[side];
+        if (value && typeof value === 'object' && Object.hasOwn(value, 'color') && nativeSide) {
+          if (nativeSide.color && !literalOrFallback(nativeSide.color.kind)) return false;
+        }
+      }
+    }
+  }
+  return true;
+};
+
+const resolveWorkbookStyleFormat = (
+  workbook: WorkbookHandle | null,
+  style: ReturnType<typeof resolvedCellStyle>,
+): Partial<CellFormat> => {
+  if (!workbook || !style || !workbook.capabilities.cellStyles) return style?.format ?? {};
+  const named = workbook.getNamedCellStyles();
+  const native =
+    style.builtinId === undefined
+      ? named.find((entry) => entry.name.trim().toLowerCase() === style.label.trim().toLowerCase())
+      : named.find((entry) => entry.builtinId === style.builtinId);
+  if (!native) return style.format;
+  const xf = workbook.getCellStyleXf(native.xfId);
+  if (!xf) return style.format;
+  const nativeFormat = cellFormatFromXf(workbook, xf, workbook.workbookDefaultFont);
+  if (
+    style.builtinId === undefined &&
+    !stylePayloadMatchesNative(workbook, xf, nativeFormat, style.format, style.groups)
+  ) {
+    return style.format;
+  }
+  return nativeFormat;
+};
+
+const applyCellStyleToRange = (
+  store: SpreadsheetStore,
+  history: History | null,
+  range: Range,
+  patch: Partial<CellFormat>,
+  repeat: () => void,
+): boolean => {
+  const state = store.getState();
+  const scopedState: State = {
+    ...state,
+    selection: {
+      ...state.selection,
+      range: { ...range },
+      extraRanges: [],
+    },
+  };
+  const plan = planSelectionFormat(scopedState);
+  if (!plan || plan.ranges.length === 0) return false;
+  return recordDialogFormatChange({
+    history,
+    store,
+    workbook: null,
+    sheet: range.sheet,
+    targets: plan.cells,
+    pendingBefore: state.ui.pendingFormat,
+    mutate: () =>
+      applySelectionFormatAction(
+        scopedState,
+        store,
+        { patch },
+        {
+          allowPending: false,
+          origin: 'instanceApi',
+          commandId: 'cellStyles',
+        },
+      ),
+    repeat,
+  });
+};
+
+/** Apply an existing built-in or registered custom style to the full selection union. */
+export function applyCellStyleToSelection(
+  store: SpreadsheetStore,
+  history: History | null,
+  id: string,
+  context: CellStyleCommandContext = {},
+): boolean {
+  const state = store.getState();
+  const style = resolvedCellStyle(state, id);
+  if (!style) return false;
+  const plan = planSelectionFormat(state);
+  if (!plan || plan.ranges.length === 0) return false;
+  const workbook = context.getWorkbook?.() ?? null;
+  const payload = resolveWorkbookStyleFormat(workbook, style);
+  const patch = formatForGroups(payload, style.groups);
+  patch.cellStyle =
+    style.id === 'normal' ? undefined : style.builtinId !== undefined ? style.id : style.label;
+  const commandId = context.commandId ?? 'cellStyles';
+  const origin = context.origin ?? 'instanceApi';
+  return recordDialogFormatChange({
+    history,
+    store,
+    workbook,
+    sheet: plan.ranges[0]?.sheet ?? state.selection.range.sheet,
+    targets: plan.cells,
+    pendingBefore: state.ui.pendingFormat,
+    mutate: () =>
+      applySelectionFormatAction(
+        store.getState(),
+        store,
+        { patch },
+        {
+          allowPending: false,
+          origin,
+          commandId,
+        },
+      ),
+    repeat: () => applyCellStyleToSelection(store, history, style.id, context),
+  });
 }
 
 export function customCellStyleId(name: string): string {
@@ -376,6 +837,7 @@ export function filterCellStyleFormat(
     copy('align');
     copy('vAlign');
     copy('wrap');
+    copy('justifyLastLine');
     copy('shrinkToFit');
     copy('indent');
     copy('rotation');
@@ -386,6 +848,7 @@ export function filterCellStyleFormat(
     copy('italic');
     copy('underline');
     copy('strike');
+    copy('fontVertAlign');
     copy('color');
     copy('fontFamily');
     copy('fontSize');
@@ -416,35 +879,11 @@ export function applyCellStyle(
 ): void {
   const def = STYLE_BY_ID.get(id);
   if (!def) return;
-  const repeat = (): void => applyCellStyle(store, history, store.getState().selection.range, id);
-  const mutate = (): void => {
-    if (id === 'normal') {
-      // Clear by overwriting every format field with undefined. setRangeFormat
-      //  merges with `Object.assign`, so explicit `undefined`s win — matching
-      //  the spreadsheet's "Normal" reset behavior.
-      mutators.setRangeFormat(store, range, {
-        bold: undefined,
-        italic: undefined,
-        underline: undefined,
-        strike: undefined,
-        align: undefined,
-        vAlign: undefined,
-        wrap: undefined,
-        indent: undefined,
-        rotation: undefined,
-        borders: undefined,
-        color: undefined,
-        fill: undefined,
-        fontFamily: undefined,
-        fontSize: undefined,
-        numFmt: undefined,
-        cellStyle: undefined,
-      });
-      return;
-    }
-    mutators.setRangeFormat(store, range, { ...def.format, cellStyle: id });
-  };
-  recordFormatChangeWithRepeat(history, store, mutate, repeat);
+  const patch = formatForGroups(def.format, cellStyleGroups(def));
+  patch.cellStyle = id === 'normal' ? undefined : id;
+  applyCellStyleToRange(store, history, range, patch, () => {
+    applyCellStyle(store, history, store.getState().selection.range, id);
+  });
 }
 
 export function applyCellStyleByName(
@@ -454,26 +893,21 @@ export function applyCellStyleByName(
   id: string,
 ): boolean {
   if (STYLE_BY_ID.has(id as CellStyleId)) {
-    applyCellStyle(store, history, range, id as CellStyleId);
-    return true;
+    const builtin = STYLE_BY_ID.get(id as CellStyleId);
+    if (!builtin) return false;
+    const patch = formatForGroups(builtin.format, cellStyleGroups(builtin));
+    patch.cellStyle = builtin.id === 'normal' ? undefined : builtin.id;
+    return applyCellStyleToRange(store, history, range, patch, () => {
+      applyCellStyle(store, history, store.getState().selection.range, builtin.id);
+    });
   }
   const custom = customCellStyleById(store.getState(), id);
   if (!custom) return false;
-  let applied = false;
-  recordFormatChangeWithRepeat(
-    history,
-    store,
-    () => {
-      applied = applyFormatPatch(store.getState(), store, range, {
-        ...custom.format,
-        cellStyle: custom.label,
-      });
-    },
-    () => {
-      applyCellStyleByName(store, history, store.getState().selection.range, id);
-    },
-  );
-  return applied;
+  const patch = formatForGroups(custom.format, cellStyleGroups(custom));
+  patch.cellStyle = custom.label;
+  return applyCellStyleToRange(store, history, range, patch, () => {
+    applyCellStyleByName(store, history, store.getState().selection.range, id);
+  });
 }
 
 /** Create an ad-hoc named style from the active cell's current formatting and
@@ -534,7 +968,10 @@ export function mergeCellStylesFromWorkbook(
       skipped += 1;
       continue;
     }
-    if (BUILT_IN_STYLE_NAMES.has(label.toLowerCase())) {
+    if (
+      BUILT_IN_STYLE_NAMES.has(label.toLowerCase()) ||
+      CELL_STYLES.some((builtin) => builtin.builtinId === style.builtinId)
+    ) {
       skipped += 1;
       continue;
     }

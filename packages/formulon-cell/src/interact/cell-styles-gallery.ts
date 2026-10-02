@@ -1,5 +1,6 @@
 import {
-  applyCellStyleByName,
+  activeCellStyleId,
+  applyCellStyleToSelection,
   CELL_STYLE_GROUPS,
   CELL_STYLES,
   type CellStyleGroupId,
@@ -7,7 +8,6 @@ import {
   listCustomCellStyles,
 } from '../commands/cell-styles.js';
 import type { History } from '../commands/history.js';
-import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
@@ -102,6 +102,7 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
       className: 'fc-stylegallery__chip',
       label: style.label,
       dataset: { fcStyle: style.id },
+      pressed: false,
       tabIndex: chips.length === 0 ? 0 : -1,
     });
     if (style.format.bold) chip.style.fontWeight = '700';
@@ -163,6 +164,12 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
       section.appendChild(groupGrid);
       grid.appendChild(section);
     }
+    const activeId = activeCellStyleId(store.getState());
+    for (const chip of chips) {
+      const active = chip.dataset.fcStyle === activeId;
+      chip.setAttribute('aria-pressed', String(active));
+      chip.classList.toggle('fc-tb__menu-item--active', active);
+    }
   };
 
   renderGroups();
@@ -172,11 +179,12 @@ export function attachCellStylesGallery(deps: CellStylesGalleryDeps): CellStyles
   };
 
   const apply = (id: string): void => {
-    const range = store.getState().selection.range;
-    applyCellStyleByName(store, history, range, id);
-    const wb = getWb();
-    if (wb) flushFormatToEngine(wb, store, range.sheet);
-    close();
+    const applied = applyCellStyleToSelection(store, history, id, {
+      origin: 'instanceApi',
+      commandId: 'cellStyles',
+      getWorkbook: getWb,
+    });
+    if (applied) close();
   };
 
   const onClick = (e: MouseEvent): void => {
