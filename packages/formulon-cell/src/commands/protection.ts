@@ -2,6 +2,7 @@ import { addrKey } from '../engine/address.js';
 import { flushProtectionToEngine } from '../engine/protection-sync.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { rangeArea, rangeContainsAddr } from '../store/selection-geometry.js';
 import {
   type AllowedEditRange,
   type CellFormat,
@@ -43,16 +44,7 @@ interface ProtectionSnapshot {
   allowedEditRanges: AllowedEditRange[];
 }
 
-const rangeContainsAddr = (range: Range, addr: Addr): boolean =>
-  range.sheet === addr.sheet &&
-  addr.row >= range.r0 &&
-  addr.row <= range.r1 &&
-  addr.col >= range.c0 &&
-  addr.col <= range.c1;
-
 const MAX_MATERIALIZED_LOCK_CELLS = 100_000;
-
-const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
 
 const addrFromKey = (key: string): Addr | null => {
   const parts = key.split(':').map(Number);

@@ -1,6 +1,8 @@
-import { addrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
+import { writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { addMergeToMaps } from '../store/merge-maps.js';
 import {
   type CellFormat,
   type ConditionalRule,
@@ -47,8 +49,6 @@ interface CellRecord {
   formula: string | null;
 }
 
-const MAX_ROW = 1048575;
-const MAX_COL = 16383;
 const MAX_MATERIALIZED_LAYOUT_ROWS = 100_000;
 
 interface AxisEdit {
@@ -223,29 +223,6 @@ function writeAxisShiftedCells(
       // (writeCell would also work but `setFormula` is direct.)
       wb.setFormula(c.addr, newFormula);
     }
-  }
-}
-
-function writeCell(wb: WorkbookHandle, addr: Addr, value: CellValue, formula: string | null): void {
-  if (formula) {
-    wb.setFormula(addr, formula);
-    return;
-  }
-  switch (value.kind) {
-    case 'number':
-      wb.setNumber(addr, value.value);
-      return;
-    case 'text':
-      wb.setText(addr, value.value);
-      return;
-    case 'bool':
-      wb.setBool(addr, value.value);
-      return;
-    case 'error':
-      wb.setError(addr, value.code);
-      return;
-    default:
-      wb.setBlank(addr);
   }
 }
 
@@ -524,14 +501,7 @@ function shiftAnchoredRanges(
         const shifted = merge.sheet === sheet ? shiftRangeAxis(merge, axis, split, delta) : merge;
         if (!shifted) continue;
         if (shifted.r0 === shifted.r1 && shifted.c0 === shifted.c1) continue;
-        const ak = addrKey({ sheet: shifted.sheet, row: shifted.r0, col: shifted.c0 });
-        byAnchor.set(ak, shifted);
-        for (let row = shifted.r0; row <= shifted.r1; row += 1) {
-          for (let col = shifted.c0; col <= shifted.c1; col += 1) {
-            if (row === shifted.r0 && col === shifted.c0) continue;
-            byCell.set(addrKey({ sheet: shifted.sheet, row, col }), ak);
-          }
-        }
+        addMergeToMaps(byAnchor, byCell, shifted);
       }
       return { ...s, merges: { byAnchor, byCell } };
     });

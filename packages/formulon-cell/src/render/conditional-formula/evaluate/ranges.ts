@@ -1,4 +1,4 @@
-import { addrKey } from '../../../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../../../engine/address.js';
 import type { CellValue } from '../../../engine/types.js';
 import { aggregateResult, aggregateValueA } from '../aggregation.js';
 import { readLogical, readNumber, textValue } from '../coercion.js';
@@ -152,8 +152,8 @@ export function createRangeReader(ctx: FormulaReaderContext) {
       const bounds = { r0, r1: r0 + height - 1, c0, c1: c0 + width - 1, width, height };
       return bounds.r0 < 0 ||
         bounds.c0 < 0 ||
-        bounds.r1 > 1048575 ||
-        bounds.c1 > 16383 ||
+        bounds.r1 > MAX_ROW ||
+        bounds.c1 > MAX_COL ||
         !validRangeBounds(bounds)
         ? null
         : bounds;
@@ -168,8 +168,8 @@ export function createRangeReader(ctx: FormulaReaderContext) {
     const bounds = fixedRangeBounds(parsed);
     return bounds.r0 < 0 ||
       bounds.c0 < 0 ||
-      bounds.r1 > 1048575 ||
-      bounds.c1 > 16383 ||
+      bounds.r1 > MAX_ROW ||
+      bounds.c1 > MAX_COL ||
       !validRangeBounds(bounds)
       ? null
       : bounds;

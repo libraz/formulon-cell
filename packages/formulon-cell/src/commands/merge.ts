@@ -1,6 +1,8 @@
-import { addrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
+import { writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { rangeArea, rangeContainsAddr, rangesIntersect } from '../store/selection-geometry.js';
 import {
   type CellBorderSide,
   type CellBorders,
@@ -35,8 +37,6 @@ export function mergeAnchorOf(state: State, addr: Addr): Addr {
 }
 
 const MAX_MERGE_CELLS = 100_000;
-const MAX_SHEET_ROW = 1_048_575;
-const MAX_SHEET_COL = 16_383;
 
 const isValidRangeCoordinates = (range: Range): boolean =>
   Number.isInteger(range.sheet) &&
@@ -53,10 +53,10 @@ const isValidRangeCoordinates = (range: Range): boolean =>
   range.r1 >= 0 &&
   range.c0 >= 0 &&
   range.c1 >= 0 &&
-  range.r0 <= MAX_SHEET_ROW &&
-  range.r1 <= MAX_SHEET_ROW &&
-  range.c0 <= MAX_SHEET_COL &&
-  range.c1 <= MAX_SHEET_COL &&
+  range.r0 <= MAX_ROW &&
+  range.r1 <= MAX_ROW &&
+  range.c0 <= MAX_COL &&
+  range.c1 <= MAX_COL &&
   range.r0 <= range.r1 &&
   range.c0 <= range.c1;
 
@@ -139,8 +139,6 @@ const rangeWidth = (range: Range): number => range.c1 - range.c0 + 1;
 
 const rangeHeight = (range: Range): number => range.r1 - range.r0 + 1;
 
-const rangeArea = (range: Range): number => rangeWidth(range) * rangeHeight(range);
-
 const canMaterializeMergeRange = (range: Range): boolean =>
   isValidRangeCoordinates(range) && rangeArea(range) <= MAX_MERGE_CELLS;
 
@@ -152,16 +150,6 @@ const addrFromKey = (key: string): Addr | null => {
   if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
   return { sheet, row, col };
 };
-
-const addrInRange = (addr: Addr, range: Range): boolean =>
-  addr.sheet === range.sheet &&
-  addr.row >= range.r0 &&
-  addr.row <= range.r1 &&
-  addr.col >= range.c0 &&
-  addr.col <= range.c1;
-
-const rangesIntersect = (a: Range, b: Range): boolean =>
-  a.sheet === b.sheet && !(a.r1 < b.r0 || a.r0 > b.r1 || a.c1 < b.c0 || a.c0 > b.c1);
 
 const intersectingMerges = (state: State, range: Range): Range[] =>
   [...state.merges.byAnchor.values()].filter((merge) => rangesIntersect(merge, range));
@@ -178,7 +166,7 @@ const contentCellsInRange = (
   const cells: Array<{ addr: Addr; cell: StoredCell }> = [];
   for (const [key, cell] of state.data.cells) {
     const addr = addrFromKey(key);
-    if (!addr || !addrInRange(addr, range) || !hasContent(cell)) continue;
+    if (!addr || !rangeContainsAddr(range, addr) || !hasContent(cell)) continue;
     cells.push({ addr, cell });
   }
   cells.sort((a, b) => a.addr.row - b.addr.row || a.addr.col - b.addr.col);
@@ -187,32 +175,6 @@ const contentCellsInRange = (
 
 const sameAddr = (a: Addr, b: Addr): boolean =>
   a.sheet === b.sheet && a.row === b.row && a.col === b.col;
-
-/** Write a stored cell through the typed WorkbookHandle API. Formula text is
- *  deliberately copied verbatim; Excel does not adjust relative references
- *  when it promotes a non-anchor cell into a merge anchor. */
-const writeTypedCell = (wb: WorkbookHandle, addr: Addr, cell: StoredCell): void => {
-  if (cell.formula) {
-    wb.setFormula(addr, cell.formula);
-    return;
-  }
-  switch (cell.value.kind) {
-    case 'number':
-      wb.setNumber(addr, cell.value.value);
-      return;
-    case 'bool':
-      wb.setBool(addr, cell.value.value);
-      return;
-    case 'text':
-      wb.setText(addr, cell.value.value);
-      return;
-    case 'error':
-      wb.setError(addr, cell.value.code);
-      return;
-    default:
-      wb.setBlank(addr);
-  }
-};
 
 /** Visual fields that Excel carries from the upper-left cell to every cell
  *  covered by a merge. Perimeter and uniform diagonal borders are normalized
@@ -466,7 +428,11 @@ export function applyMerge(
     const content = contentCellsInRange(stateBefore, effective);
     const anchor = { sheet, row: effective.r0, col: effective.c0 };
     const first = content[0];
-    if (first && !sameAddr(first.addr, anchor)) writeTypedCell(wb, anchor, first.cell);
+    // Formula text is copied verbatim: promoting a cell to the merge anchor does
+    // not re-anchor its relative references.
+    if (first && !sameAddr(first.addr, anchor)) {
+      writeCell(wb, anchor, first.cell.value, first.cell.formula);
+    }
 
     recordFormatChange(history, store, () => copyMergeVisualFormats(store, effective));
 

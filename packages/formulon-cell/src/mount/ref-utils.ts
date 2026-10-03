@@ -1,17 +1,8 @@
+import { colFromLetters, colLetter, MAX_COL, MAX_ROW, parseA1Atom } from '../engine/address.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 
-export function colName(col: number): string {
-  let n = col;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (n % 26)) + out;
-    n = Math.floor(n / 26) - 1;
-  } while (n >= 0);
-  return out;
-}
-
 function cellRef(row: number, col: number, r1c1: boolean): string {
-  return r1c1 ? `R${row + 1}C${col + 1}` : `${colName(col)}${row + 1}`;
+  return r1c1 ? `R${row + 1}C${col + 1}` : `${colLetter(col)}${row + 1}`;
 }
 
 export function formatSelectionRef(
@@ -23,12 +14,12 @@ export function formatSelectionRef(
     return cellRef(active.row, active.col, r1c1);
   }
   if (!r1c1) {
-    if (range.r0 === 0 && range.r1 === 1048575) {
+    if (range.r0 === 0 && range.r1 === MAX_ROW) {
       return range.c0 === range.c1
-        ? colName(range.c0)
-        : `${colName(range.c0)}:${colName(range.c1)}`;
+        ? colLetter(range.c0)
+        : `${colLetter(range.c0)}:${colLetter(range.c1)}`;
     }
-    if (range.c0 === 0 && range.c1 === 16383) {
+    if (range.c0 === 0 && range.c1 === MAX_COL) {
       return range.r0 === range.r1 ? `${range.r0 + 1}` : `${range.r0 + 1}:${range.r1 + 1}`;
     }
   }
@@ -66,22 +57,10 @@ export function parseCellRef(raw: string): { row: number; col: number } | null {
     const row = Number.parseInt(r1c1[1] ?? '', 10) - 1;
     const col = Number.parseInt(r1c1[2] ?? '', 10) - 1;
     if (row < 0 || col < 0) return null;
-    if (col > 16383 || row > 1048575) return null;
+    if (col > MAX_COL || row > MAX_ROW) return null;
     return { row, col };
   }
-  const m = trimmed.match(/^\$?([A-Z]+)\$?([1-9][0-9]*)$/);
-  if (!m) return null;
-  const letters = m[1] ?? '';
-  const rowStr = m[2] ?? '';
-  let col = 0;
-  for (let i = 0; i < letters.length; i += 1) {
-    col = col * 26 + (letters.charCodeAt(i) - 64);
-  }
-  col -= 1;
-  const row = Number.parseInt(rowStr, 10) - 1;
-  if (col < 0 || row < 0) return null;
-  if (col > 16383 || row > 1048575) return null;
-  return { row, col };
+  return parseA1Atom(trimmed);
 }
 
 /** Parse A1:B5 style range. Returns null when the input doesn't match. */
@@ -94,14 +73,14 @@ export function parseRangeRef(
     const c0 = parseColRef(wholeCol[1] ?? '');
     const c1 = parseColRef(wholeCol[2] ?? wholeCol[1] ?? '');
     if (c0 == null || c1 == null) return null;
-    return { r0: 0, c0: Math.min(c0, c1), r1: 1048575, c1: Math.max(c0, c1) };
+    return { r0: 0, c0: Math.min(c0, c1), r1: MAX_ROW, c1: Math.max(c0, c1) };
   }
   const wholeRow = trimmed.match(/^\$?([1-9][0-9]*)(?::\$?([1-9][0-9]*))?$/);
   if (wholeRow) {
     const r0 = Number.parseInt(wholeRow[1] ?? '', 10) - 1;
     const r1 = Number.parseInt(wholeRow[2] ?? wholeRow[1] ?? '', 10) - 1;
-    if (r0 < 0 || r1 < 0 || r0 > 1048575 || r1 > 1048575) return null;
-    return { r0: Math.min(r0, r1), c0: 0, r1: Math.max(r0, r1), c1: 16383 };
+    if (r0 < 0 || r1 < 0 || r0 > MAX_ROW || r1 > MAX_ROW) return null;
+    return { r0: Math.min(r0, r1), c0: 0, r1: Math.max(r0, r1), c1: MAX_COL };
   }
   const parts = trimmed.split(':');
   if (parts.length !== 2) return null;
@@ -117,12 +96,6 @@ export function parseRangeRef(
 }
 
 function parseColRef(raw: string): number | null {
-  const letters = raw.trim().toUpperCase();
-  if (!/^[A-Z]+$/.test(letters)) return null;
-  let col = 0;
-  for (let i = 0; i < letters.length; i += 1) {
-    col = col * 26 + (letters.charCodeAt(i) - 64);
-  }
-  col -= 1;
-  return col >= 0 && col <= 16383 ? col : null;
+  const col = colFromLetters(raw.trim());
+  return col >= 0 && col <= MAX_COL ? col : null;
 }

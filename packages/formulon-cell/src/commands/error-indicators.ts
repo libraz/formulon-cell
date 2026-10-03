@@ -1,6 +1,7 @@
 import { addrKey } from '../engine/address.js';
 import type { RangeResolver } from '../engine/range-resolver.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
+import { rangeContainsAddr } from '../store/selection-geometry.js';
 import { type CellValidation, mutators, type SpreadsheetStore } from '../store/store.js';
 import type { History } from './history.js';
 import { cellValueViolatesValidation } from './validate.js';
@@ -82,13 +83,6 @@ export function toggleCellErrorIgnored(store: SpreadsheetStore, addr: Addr): boo
 export function clearIgnoredCellErrors(store: SpreadsheetStore): void {
   mutators.clearIgnoredErrors(store);
 }
-
-const rangeContainsAddr = (range: Range, addr: Addr): boolean =>
-  addr.sheet === range.sheet &&
-  addr.row >= range.r0 &&
-  addr.row <= range.r1 &&
-  addr.col >= range.c0 &&
-  addr.col <= range.c1;
 
 const addrFromKey = (key: string): Addr | null => {
   const parts = key.split(':').map(Number);

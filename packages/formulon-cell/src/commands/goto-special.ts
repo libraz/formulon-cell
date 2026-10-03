@@ -1,6 +1,7 @@
 import { addrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { rangeArea, rangeContainsAddr } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { SelectionSlice } from '../store/types.js';
 import { listComments } from './comment.js';
@@ -50,17 +51,7 @@ const ERROR_SENTINELS: ReadonlySet<string> = new Set([
   '#CALC!',
 ]);
 
-const inRange = (addr: Addr, range: Range): boolean =>
-  addr.sheet === range.sheet &&
-  addr.row >= range.r0 &&
-  addr.row <= range.r1 &&
-  addr.col >= range.c0 &&
-  addr.col <= range.c1;
-
 const MAX_MATERIALIZED_BLANK_CELLS = 100_000;
-
-const rangeArea = (r0: number, c0: number, r1: number, c1: number): number =>
-  (r1 - r0 + 1) * (c1 - c0 + 1);
 
 /** Walk every populated cell on the sheet (or only those inside the current
  *  selection) and return matches for the given kind. Output is row-major
@@ -96,7 +87,7 @@ export function findMatchingCells(
 
   const matches: Addr[] = [];
   for (const entry of wb.cells(sheet)) {
-    if (useSelection && !inRange(entry.addr, selection)) continue;
+    if (useSelection && !rangeContainsAddr(selection, entry.addr)) continue;
     if (matchesKind(entry.addr, entry.value, entry.formula, kind, store, filters)) {
       matches.push(entry.addr);
     }
@@ -144,7 +135,7 @@ const matchesKind = (
     }
     case 'conditional-format': {
       const rules = store.getState().conditional.rules;
-      for (const rule of rules) if (inRange(addr, rule.range)) return true;
+      for (const rule of rules) if (rangeContainsAddr(rule.range, addr)) return true;
       return false;
     }
     case 'blanks':
@@ -204,7 +195,7 @@ const findBlanks = (wb: WorkbookHandle, selection: Range | null, sheet: number):
   const c0 = selection ? selection.c0 : Number.isFinite(minCol) ? minCol : 0;
   const c1 = selection ? selection.c1 : Number.isFinite(maxCol) ? maxCol : -1;
   if (r1 < r0 || c1 < c0) return [];
-  if (rangeArea(r0, c0, r1, c1) > MAX_MATERIALIZED_BLANK_CELLS) return [];
+  if (rangeArea({ sheet, r0, c0, r1, c1 }) > MAX_MATERIALIZED_BLANK_CELLS) return [];
 
   const matches: Addr[] = [];
   for (let r = r0; r <= r1; r += 1) {

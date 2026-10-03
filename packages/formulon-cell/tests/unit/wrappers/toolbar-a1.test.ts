@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   formatA1Range,
   formatSheetAbsoluteRange,
+  parseA1Atom,
   parseA1Range,
 } from '../../../src/wrappers/toolbar-a1.js';
 
@@ -58,5 +59,25 @@ describe('formatSheetAbsoluteRange', () => {
     );
     // Cross-sheet references stay rejected.
     expect(parseA1Range(formatSheetAbsoluteRange('Sheet2', selection), 0, 'Sheet1')).toBeNull();
+  });
+});
+
+describe('parseA1Atom / parseA1Range', () => {
+  it('parses unqualified, same-sheet, and case-mismatched sheet references', () => {
+    expect(parseA1Atom('$b$3')).toEqual({ row: 2, col: 1 });
+    expect(parseA1Range('=b3:A1', 2, 'Data')).toEqual({ sheet: 2, r0: 0, c0: 0, r1: 2, c1: 1 });
+    expect(parseA1Range("'data'!C4", 2, 'Data')).toEqual({ sheet: 2, r0: 3, c0: 2, r1: 3, c1: 2 });
+  });
+
+  it('rejects references past the last row or column', () => {
+    expect(parseA1Atom('XFE1')).toBeNull();
+    expect(parseA1Atom('A1048577')).toBeNull();
+    expect(parseA1Range('A1:XFE2', 0, 'Sheet1')).toBeNull();
+  });
+
+  it('rejects malformed input', () => {
+    expect(parseA1Range('', 0, 'Sheet1')).toBeNull();
+    expect(parseA1Range('A1:B2:C3', 0, 'Sheet1')).toBeNull();
+    expect(parseA1Range('!A1', 0, 'Sheet1')).toBeNull();
   });
 });

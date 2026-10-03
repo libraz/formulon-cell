@@ -1,13 +1,14 @@
 import { isHeaderRow, tableForCell } from '../commands/format-as-table.js';
 import { paginationFor, type SheetPagination } from '../commands/pagination.js';
 import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
-import { addrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { evaluateCfFromEngine } from '../engine/cf-sync.js';
 import { makeRangeResolver, type RangeResolver } from '../engine/range-resolver.js';
 import { findSpillBlockers, findSpillRanges, looksLikeArrayFormula } from '../engine/spill.js';
-import type { Addr, CellValue, Range } from '../engine/types.js';
+import type { CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
+import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { CellFormat, State } from '../store/store.js';
 import { getPageSetup } from '../store/store.js';
 import type { ResolvedTheme } from '../theme/resolve.js';
@@ -82,9 +83,6 @@ import {
   paintValidationTriangle,
 } from './painters.js';
 import { paintCellSparkline } from './sparkline.js';
-
-const inRange = (a: Addr, r: Range): boolean =>
-  a.row >= r.r0 && a.row <= r.r1 && a.col >= r.c0 && a.col <= r.c1;
 
 const visibleCount = (
   pixels: number,
@@ -223,8 +221,8 @@ export class GridRenderer {
       layout.freezeCols,
       viewport.navigationRange?.c0 ?? 0,
     );
-    const lastRow = (viewport.navigationRange?.r1 ?? 1_048_575) + 1;
-    const lastCol = (viewport.navigationRange?.c1 ?? 16_383) + 1;
+    const lastRow = (viewport.navigationRange?.r1 ?? MAX_ROW) + 1;
+    const lastCol = (viewport.navigationRange?.c1 ?? MAX_COL) + 1;
     // Page gutters take screen space without holding a cell, so they count
     // against the viewport budget too — otherwise Page Layout view would
     // under-fill the canvas by a page margin per page.
@@ -645,7 +643,8 @@ export class GridRenderer {
       if (rects.length === 0 || anchorVisible) continue;
       const anchor = { sheet: merge.sheet, row: merge.r0, col: merge.c0 };
       const selected =
-        inRange(anchor, rng) || extras?.some((extra) => inRange(anchor, extra)) === true;
+        rangeContainsAddr(rng, anchor) ||
+        extras?.some((extra) => rangeContainsAddr(extra, anchor)) === true;
       const isActive =
         active.sheet === merge.sheet && active.row === merge.r0 && active.col === merge.c0;
       const anchorFormat = format.formats.get(anchorKey);
@@ -704,9 +703,9 @@ export class GridRenderer {
         )
           continue;
         const bounds = mergeBounds(r, c) ?? cellRectIn(layout, cols, rows, r, c);
-        const isInRange = inRange({ sheet: data.sheetIndex, row: r, col: c }, rng);
+        const isInRange = rangeContainsAddr(rng, { sheet: data.sheetIndex, row: r, col: c });
         const isInExtraRange = extras?.some((extra) =>
-          inRange({ sheet: data.sheetIndex, row: r, col: c }, extra),
+          rangeContainsAddr(extra, { sheet: data.sheetIndex, row: r, col: c }),
         );
 
         const overlay = conditional.get(key);

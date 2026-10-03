@@ -1,6 +1,9 @@
-import { addrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
+import { writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { addMergeToMaps } from '../store/merge-maps.js';
+import { rangeContainsAddr, rangesIntersect } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { listComments, recordCommentChange } from './comment.js';
 import { adjustFormulaForCellBandShift } from './formula-refs.js';
@@ -10,7 +13,7 @@ import { isSheetProtected } from './protection.js';
 export type InsertCellsDirection = 'down' | 'right';
 export type DeleteCellsDirection = 'up' | 'left';
 
-interface CellRecord {
+export interface CellRecord {
   addr: Addr;
   value: CellValue;
   formula: string | null;
@@ -21,9 +24,6 @@ interface EngineCommentRecord {
   author: string;
   text: string;
 }
-
-const MAX_ROW = 1048575;
-const MAX_COL = 16383;
 
 export function insertCells(
   store: SpreadsheetStore,
@@ -77,7 +77,11 @@ function shiftCellBand(
   delta: number,
 ): boolean {
   if (delta === 0) return true;
-  if (!canShiftMerges(store.getState(), affected, axis)) return false;
+  if (!canShiftMerges(store.getState(), affected, axis)) {
+    // eslint-disable-next-line no-console
+    console.warn('formulon-cell: cell shift blocked — merge would be split');
+    return false;
+  }
 
   if (history) history.begin();
   try {
@@ -101,13 +105,13 @@ function shiftCellBand(
       });
     }
     const initialStoreCommentAddresses = listComments(store.getState(), affected.sheet)
-      .filter((comment) => inRange(comment.addr, affected))
+      .filter((comment) => rangeContainsAddr(affected, comment.addr))
       .map((comment) => comment.addr);
     const initialStoreCommentKeys = new Set(initialStoreCommentAddresses.map(addrKey));
     const engineComments = collectEngineComments(wb, affected, initialStoreCommentAddresses);
     hydrateEngineOnlyComments(store, engineComments, initialStoreCommentKeys);
     const storeCommentAddresses = listComments(store.getState(), affected.sheet)
-      .filter((comment) => inRange(comment.addr, affected))
+      .filter((comment) => rangeContainsAddr(affected, comment.addr))
       .map((comment) => comment.addr);
     const commentAddresses = collectShiftCommentAddresses(
       storeCommentAddresses,
@@ -233,7 +237,7 @@ function collectEngineComments(
       });
   const unique = new Map<string, EngineCommentRecord>();
   for (const entry of entries) {
-    if (inRange(entry.addr, affected)) unique.set(addrKey(entry.addr), entry);
+    if (rangeContainsAddr(affected, entry.addr)) unique.set(addrKey(entry.addr), entry);
   }
   return [...unique.values()];
 }
@@ -252,7 +256,9 @@ function hydrateEngineOnlyComments(
   }
 }
 
-function shiftCells(
+/** Move the cells inside `affected` by `delta` along `axis` and rewrite every
+ *  formula on every sheet that references the moved band. */
+export function shiftCells(
   wb: WorkbookHandle,
   affected: Range,
   axis: InsertCellsDirection,
@@ -276,7 +282,7 @@ function writeShiftedCells(
   );
   const all = allSheets[affected.sheet] ?? [];
   const sheetNames = Array.from({ length: wb.sheetCount }, (_, sheet) => wb.sheetName(sheet));
-  const moving = all.filter((cell) => inRange(cell.addr, affected));
+  const moving = all.filter((cell) => rangeContainsAddr(affected, cell.addr));
   for (const cell of moving) wb.setBlank(cell.addr);
 
   const sorted =
@@ -303,7 +309,8 @@ function writeShiftedCells(
   for (let sheet = 0; sheet < allSheets.length; sheet += 1) {
     const formulaSheet = allSheets[sheet] ?? [];
     for (const cell of formulaSheet) {
-      if (!cell.formula || (sheet === affected.sheet && inRange(cell.addr, affected))) continue;
+      if (!cell.formula || (sheet === affected.sheet && rangeContainsAddr(affected, cell.addr)))
+        continue;
       const nextFormula = adjustFormulaForCellBandShift(cell.formula, affected, axis, delta, {
         editedSheet: affected.sheet,
         formulaSheet: sheet,
@@ -314,7 +321,7 @@ function writeShiftedCells(
   }
 }
 
-function shiftFormats(
+export function shiftFormats(
   store: SpreadsheetStore,
   history: History | null,
   affected: Range,
@@ -329,7 +336,7 @@ function shiftFormats(
   });
 }
 
-function shiftMerges(
+export function shiftMerges(
   store: SpreadsheetStore,
   wb: WorkbookHandle,
   history: History | null,
@@ -356,7 +363,9 @@ function shiftMerges(
   });
 }
 
-function canShiftMerges(state: State, affected: Range, axis: InsertCellsDirection): boolean {
+/** Whether every merge touching the shift band moves whole; false when a
+ *  merge straddles the band edge and would be split. */
+export function canShiftMerges(state: State, affected: Range, axis: InsertCellsDirection): boolean {
   for (const merge of state.merges.byAnchor.values()) {
     if (merge.sheet !== affected.sheet) continue;
     if (!rangesIntersect(merge, affected)) continue;
@@ -365,11 +374,7 @@ function canShiftMerges(state: State, affected: Range, axis: InsertCellsDirectio
       axis === 'down'
         ? merge.c0 >= affected.c0 && merge.c1 <= affected.c1 && merge.r0 >= affected.r0
         : merge.r0 >= affected.r0 && merge.r1 <= affected.r1 && merge.c0 >= affected.c0;
-    if (!fullyInsideBand) {
-      // eslint-disable-next-line no-console
-      console.warn('formulon-cell: cell shift blocked — merge would be split');
-      return false;
-    }
+    if (!fullyInsideBand) return false;
   }
   return true;
 }
@@ -382,7 +387,7 @@ function shiftWouldOverflow(
   delta: number,
 ): boolean {
   const overflows = (addr: Addr): boolean => {
-    if (!inRange(addr, affected)) return false;
+    if (!rangeContainsAddr(affected, addr)) return false;
     return axis === 'down' ? addr.row + delta > MAX_ROW : addr.col + delta > MAX_COL;
   };
   for (const cell of wb.physicalCells(affected.sheet)) {
@@ -439,7 +444,7 @@ function shiftFormatMap(
       continue;
     }
     const addr: Addr = { sheet: Number(parts[0]), row: Number(parts[1]), col: Number(parts[2]) };
-    if (!inRange(addr, affected)) {
+    if (!rangeContainsAddr(affected, addr)) {
       next.set(key, fmt);
       continue;
     }
@@ -450,49 +455,12 @@ function shiftFormatMap(
   return next;
 }
 
-function writeCell(wb: WorkbookHandle, addr: Addr, value: CellValue, formula: string | null): void {
-  if (formula) {
-    wb.setFormula(addr, formula);
-    return;
-  }
-  switch (value.kind) {
-    case 'number':
-      wb.setNumber(addr, value.value);
-      return;
-    case 'text':
-      wb.setText(addr, value.value);
-      return;
-    case 'bool':
-      wb.setBool(addr, value.value);
-      return;
-    case 'error':
-      wb.setError(addr, value.code);
-      return;
-    default:
-      wb.setBlank(addr);
-  }
-}
-
-function inRange(addr: Addr, range: Range): boolean {
-  return (
-    addr.sheet === range.sheet &&
-    addr.row >= range.r0 &&
-    addr.row <= range.r1 &&
-    addr.col >= range.c0 &&
-    addr.col <= range.c1
-  );
-}
-
 function inShiftTarget(addr: Addr, affected: Range, axis: InsertCellsDirection): boolean {
   if (addr.sheet !== affected.sheet || addr.row < 0 || addr.col < 0) return false;
   if (addr.row > MAX_ROW || addr.col > MAX_COL) return false;
   return axis === 'down'
     ? addr.row >= affected.r0 && addr.col >= affected.c0 && addr.col <= affected.c1
     : addr.col >= affected.c0 && addr.row >= affected.r0 && addr.row <= affected.r1;
-}
-
-function rangesIntersect(a: Range, b: Range): boolean {
-  return a.sheet === b.sheet && !(a.r1 < b.r0 || a.r0 > b.r1 || a.c1 < b.c0 || a.c0 > b.c1);
 }
 
 function mergeIntersectsShiftBand(
@@ -509,17 +477,6 @@ function shiftRange(range: Range, axis: InsertCellsDirection, delta: number): Ra
   return axis === 'down'
     ? { ...range, r0: range.r0 + delta, r1: range.r1 + delta }
     : { ...range, c0: range.c0 + delta, c1: range.c1 + delta };
-}
-
-function addMergeToMaps(byAnchor: Map<string, Range>, byCell: Map<string, string>, range: Range) {
-  const ak = addrKey({ sheet: range.sheet, row: range.r0, col: range.c0 });
-  byAnchor.set(ak, range);
-  for (let row = range.r0; row <= range.r1; row += 1) {
-    for (let col = range.c0; col <= range.c1; col += 1) {
-      if (row === range.r0 && col === range.c0) continue;
-      byCell.set(addrKey({ sheet: range.sheet, row, col }), ak);
-    }
-  }
 }
 
 // Reference shifting for cell-band inserts/deletes is delegated to the shared

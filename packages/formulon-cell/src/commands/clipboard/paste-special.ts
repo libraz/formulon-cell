@@ -1,6 +1,9 @@
-import { addrKey } from '../../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../../engine/address.js';
 import type { Addr, Range } from '../../engine/types.js';
+import { writeCell } from '../../engine/value.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
+import { addMergeToMaps, removeIntersectingMerges } from '../../store/merge-maps.js';
+import { rangeContainsRange, rangesIntersect, sameRange } from '../../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../../store/store.js';
 import { recordCommentChange } from '../comment.js';
 import { adjustFormulaForCutPasteMove } from '../formula-refs.js';
@@ -15,9 +18,7 @@ import { shiftFormulaRefs } from '../refs.js';
 import {
   bandAxisFor,
   logicalRangeFor,
-  MAX_COL,
   MAX_PASTE_CELLS,
-  MAX_ROW,
   materializedPasteCells,
   resolvePasteDestination,
 } from './paste-destination.js';
@@ -55,26 +56,6 @@ const numericValue = (cell: ClipboardCell | undefined): number | null => {
   return cell.value.kind === 'number' ? cell.value.value : null;
 };
 
-const writeClipboardValue = (wb: WorkbookHandle, addr: Addr, src: ClipboardCell): void => {
-  switch (src.value.kind) {
-    case 'number':
-      wb.setNumber(addr, src.value.value);
-      break;
-    case 'text':
-      wb.setText(addr, src.value.value);
-      break;
-    case 'bool':
-      wb.setBool(addr, src.value.value);
-      break;
-    case 'blank':
-      wb.setBlank(addr);
-      break;
-    case 'error':
-      wb.setError(addr, src.value.code);
-      break;
-  }
-};
-
 const existingNumeric = (state: State, sheet: number, row: number, col: number): number => {
   const cell = state.data.cells.get(addrKey({ sheet, row, col }));
   if (!cell) return 0;
@@ -110,61 +91,13 @@ const wantsNumFmt = (what: PasteWhat): boolean =>
   what === 'values-and-numfmt' ||
   what === 'formulas-and-numfmt';
 
-const rangesIntersect = (a: Range, b: Range): boolean =>
-  a.sheet === b.sheet && !(a.r1 < b.r0 || a.r0 > b.r1 || a.c1 < b.c0 || a.c0 > b.c1);
-
-const rangeContains = (outer: Range, inner: Range): boolean =>
-  outer.sheet === inner.sheet &&
-  inner.r0 >= outer.r0 &&
-  inner.c0 >= outer.c0 &&
-  inner.r1 <= outer.r1 &&
-  inner.c1 <= outer.c1;
-
-const sameRange = (left: Range, right: Range): boolean =>
-  left.sheet === right.sheet &&
-  left.r0 === right.r0 &&
-  left.c0 === right.c0 &&
-  left.r1 === right.r1 &&
-  left.c1 === right.c1;
-
 const bandProtectionAllows = (state: State, range: Range): boolean => {
   if (!state.protection.protectedSheets.has(range.sheet)) return true;
   // A whole-band operation is atomic. For a protected sheet an explicit
   // allowed-edit interval must cover the complete band; sparse unlocked cells
   // cannot prove that the omitted cells are writable without enumerating the
   // million-cell axis.
-  return state.protection.allowedEditRanges.some((entry) => rangeContains(entry.range, range));
-};
-
-const removeIntersectingMerges = (
-  byAnchor: Map<string, Range>,
-  byCell: Map<string, string>,
-  range: Range,
-): void => {
-  for (const [anchorKey, merge] of byAnchor) {
-    if (!rangesIntersect(merge, range)) continue;
-    byAnchor.delete(anchorKey);
-    for (let row = merge.r0; row <= merge.r1; row += 1) {
-      for (let col = merge.c0; col <= merge.c1; col += 1) {
-        byCell.delete(addrKey({ sheet: merge.sheet, row, col }));
-      }
-    }
-  }
-};
-
-const addMerge = (
-  byAnchor: Map<string, Range>,
-  byCell: Map<string, string>,
-  range: Range,
-): void => {
-  const anchorKey = addrKey({ sheet: range.sheet, row: range.r0, col: range.c0 });
-  byAnchor.set(anchorKey, range);
-  for (let row = range.r0; row <= range.r1; row += 1) {
-    for (let col = range.c0; col <= range.c1; col += 1) {
-      if (row === range.r0 && col === range.c0) continue;
-      byCell.set(addrKey({ sheet: range.sheet, row, col }), anchorKey);
-    }
-  }
+  return state.protection.allowedEditRanges.some((entry) => rangeContainsRange(entry.range, range));
 };
 
 const translateMerges = (
@@ -207,7 +140,7 @@ const translateMerges = (
         r1: baseRow + sourceRow1 - logical.r0,
         c1: baseCol + sourceCol1 - logical.c0,
       };
-      if (rangeContains(destination, translated)) out.push(translated);
+      if (rangeContainsRange(destination, translated)) out.push(translated);
       return true;
     };
     if (bandAxis === 'column') {
@@ -319,19 +252,19 @@ const preflight = (
   // topology (or removed for an unmerged All/Formats paste).
   for (const merge of state.merges.byAnchor.values()) {
     if (merge.sheet !== destination.sheet || !rangesIntersect(merge, destination)) continue;
-    if (!rangeContains(destination, merge)) return null;
+    if (!rangeContainsRange(destination, merge)) return null;
   }
   if (snap.mode === 'cut') {
     for (const merge of state.merges.byAnchor.values()) {
       if (merge.sheet !== source.sheet || !rangesIntersect(merge, source)) continue;
-      if (!rangeContains(source, merge)) return null;
+      if (!rangeContainsRange(source, merge)) return null;
     }
   }
 
   const translatedMerges = wantsFormats(what) ? translateMerges(snap, destination, transpose) : [];
   if (translatedMerges === null) return null;
   for (const merge of translatedMerges) {
-    if (!rangeContains(destination, merge)) return null;
+    if (!rangeContainsRange(destination, merge)) return null;
   }
   // A scalar paste into the exact logical footprint of a merged cell updates
   // its anchor and keeps the merge. Non-scalar tiles intentionally continue
@@ -477,7 +410,7 @@ const mutateMergeSlice = (
     for (const range of additions) {
       if (range.sheet === sheet) {
         removeIntersectingMerges(byAnchor, byCell, range);
-        addMerge(byAnchor, byCell, range);
+        addMergeToMaps(byAnchor, byCell, range);
       }
     }
     return { ...s, merges: { byAnchor, byCell } };
@@ -726,7 +659,7 @@ export function pasteSpecial(
           wb.setFormula(addr, shiftFormulaRefs(src.formula, row - sourceRow, col - sourceCol));
         }
       } else if (wantsValues(opt.what) || wantsFormulas(opt.what)) {
-        writeClipboardValue(wb, addr, src);
+        writeCell(wb, addr, src.value, null);
       }
 
       // Layer 2: formats

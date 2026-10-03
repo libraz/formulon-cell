@@ -1,7 +1,8 @@
-import { addrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
-import { formatCell } from '../engine/value.js';
+import { formatCell, writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { sameRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State, ValueFilterCriteria } from '../store/store.js';
 import { formatNumber } from './format.js';
 import type { History } from './history.js';
@@ -90,14 +91,12 @@ function applyFilterSnapshot(store: SpreadsheetStore, snap: FilterSnapshot): voi
   }));
 }
 
-function sameRange(a: Range | null, b: Range | null): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  return a.sheet === b.sheet && a.r0 === b.r0 && a.r1 === b.r1 && a.c0 === b.c0 && a.c1 === b.c1;
+function sameOptionalRange(a: Range | null, b: Range | null): boolean {
+  return a === b || (!!a && !!b && sameRange(a, b));
 }
 
 function sameFilterSnapshot(a: FilterSnapshot, b: FilterSnapshot): boolean {
-  if (!sameRange(a.filterRange, b.filterRange)) return false;
+  if (!sameOptionalRange(a.filterRange, b.filterRange)) return false;
   if (a.hiddenRows.size !== b.hiddenRows.size) return false;
   if (!sameCriteriaList(a.filterCriteria, b.filterCriteria)) return false;
   for (const row of a.hiddenRows) {
@@ -408,7 +407,7 @@ export function inferAutoFilterRange(state: State, range: Range = state.selectio
       r0 -= 1;
       changed = true;
     }
-    if (r1 < 1048575 && hasNonBlankInRow(state, sheet, r1 + 1, c0, c1)) {
+    if (r1 < MAX_ROW && hasNonBlankInRow(state, sheet, r1 + 1, c0, c1)) {
       r1 += 1;
       changed = true;
     }
@@ -416,7 +415,7 @@ export function inferAutoFilterRange(state: State, range: Range = state.selectio
       c0 -= 1;
       changed = true;
     }
-    if (c1 < 16383 && hasNonBlankInCol(state, sheet, c1 + 1, r0, r1)) {
+    if (c1 < MAX_COL && hasNonBlankInCol(state, sheet, c1 + 1, r0, r1)) {
       c1 += 1;
       changed = true;
     }
@@ -606,18 +605,7 @@ function writeCellRecord(
   addr: Addr,
   cell: { value: CellValue; formula: string | null } | undefined,
 ): void {
-  if (!cell) {
-    wb.setBlank(addr);
-    return;
-  }
-  if (cell.formula) {
-    wb.setFormula(addr, cell.formula);
-    return;
-  }
-  const value = cell.value;
-  if (value.kind === 'number') wb.setNumber(addr, value.value);
-  else if (value.kind === 'text') wb.setText(addr, value.value);
-  else if (value.kind === 'bool') wb.setBool(addr, value.value);
+  if (cell) writeCell(wb, addr, cell.value, cell.formula);
   else wb.setBlank(addr);
 }
 

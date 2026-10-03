@@ -2,6 +2,7 @@ import { type History, recordFormatChange } from '../commands/history.js';
 import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import { hitTest, layoutForView } from '../render/geometry.js';
+import { rangeArea } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore } from '../store/store.js';
 
 export interface FormatPainterDeps {
@@ -30,11 +31,6 @@ interface Snapshot {
 }
 
 const MAX_FORMAT_PAINTER_CELLS = 100_000;
-
-const rangeArea = (range: Range): number =>
-  range.r1 < range.r0 || range.c1 < range.c0
-    ? 0
-    : (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
 
 /**
  * Spreadsheet-style "Format Painter" interaction.

@@ -1,11 +1,11 @@
 // Row + column header bar, autofilter chevron, and outline gutters. Drawn in
 // a single pass after cell painting so headers sit above the gridlines.
 
+import { colLetter } from '../../engine/address.js';
 import type { ResolvedTheme } from '../../theme/resolve.js';
 import {
   type AxisLayout,
   cellRectIn,
-  colLabel,
   gridOriginX,
   gridOriginY,
   rulerLeft,
@@ -107,7 +107,7 @@ export function paintHeaders(
         ? theme.headerFgActive
         : theme.headerFg;
     ctx.font = `${isActiveCol || isSelectedCol ? 600 : 400} ${theme.textHeader}px ${theme.fontUi}`;
-    const label = r1c1 ? `C${c + 1}` : colLabel(c);
+    const label = r1c1 ? `C${c + 1}` : colLetter(c);
     ctx.fillText(label, rect.x + w / 2, labelTopY + layout.headerRowHeight / 2 + 0.5);
     if (isActiveCol) {
       ctx.fillStyle = theme.accent;

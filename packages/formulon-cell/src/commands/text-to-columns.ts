@@ -1,6 +1,7 @@
 import { addrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
 import { coerceInputForCell, writeCoerced } from './coerce-input.js';
 import { isCellWritable, warnProtected } from './protection.js';
@@ -25,13 +26,6 @@ const addrFromKey = (key: string): Addr | null => {
   }
   return { sheet, row, col };
 };
-
-const inRange = (addr: Addr, range: Range): boolean =>
-  addr.sheet === range.sheet &&
-  addr.row >= range.r0 &&
-  addr.row <= range.r1 &&
-  addr.col >= range.c0 &&
-  addr.col <= range.c1;
 
 export interface TextToColumnsOptions {
   collapseConsecutiveDelimiters?: boolean;
@@ -72,7 +66,7 @@ export function textToColumns(
   const candidates = [...state.data.cells.entries()]
     .map(([key, cell]) => ({ key, cell, addr: addrFromKey(key) }))
     .filter((entry): entry is typeof entry & { addr: Addr } => !!entry.addr)
-    .filter((entry) => inRange(entry.addr, range))
+    .filter((entry) => rangeContainsAddr(range, entry.addr))
     .sort((left, right) => left.addr.col - right.addr.col || left.addr.row - right.addr.row);
   // Operate column by column so consecutive runs land in the same target columns.
   wb.withBatchedRecalc(() => {

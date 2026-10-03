@@ -1,5 +1,6 @@
 import type { History } from '../commands/history.js';
 import { recordWatchesChange } from '../commands/watch.js';
+import { colLetter } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -36,17 +37,6 @@ export interface WatchPanelHandle {
   refresh(): void;
   detach(): void;
 }
-
-/** Spreadsheet column-letter conversion (0-indexed). */
-const colLetter = (col: number): string => {
-  let n = col;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (n % 26)) + out;
-    n = Math.floor(n / 26) - 1;
-  } while (n >= 0);
-  return out;
-};
 
 const a1 = (addr: Addr): string => `${colLetter(addr.col)}${addr.row + 1}`;
 

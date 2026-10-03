@@ -9,6 +9,7 @@ import {
   parseMacRange,
   solveMacGoalSeek,
 } from '../commands/mac-data-tools.js';
+import { MAX_COL } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -141,7 +142,7 @@ function attachGoalSeekDialog(instance: SpreadsheetInstance): GoalSeekDialogHand
 
   const currentDefaults = (): void => {
     const active = instance.store.getState().selection.active;
-    const next: Addr = { ...active, col: Math.min(16_383, active.col + 1) };
+    const next: Addr = { ...active, col: Math.min(MAX_COL, active.col + 1) };
     formulaInput.value = formatMacCellAddress(instance.workbook, active);
     changingInput.value = formatMacCellAddress(instance.workbook, next);
     const current = instance.workbook.getValue(active);

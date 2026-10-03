@@ -1,5 +1,7 @@
+import { colLetter } from '../engine/address.js';
 import type { CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { rangeArea } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { type History, recordTablesChange } from './history.js';
 import { isSheetProtected } from './protection.js';
@@ -148,26 +150,13 @@ const CUSTOM_TABLE_STYLE_PREFIX = 'custom-table:';
 const CUSTOM_PIVOT_TABLE_STYLE_PREFIX = 'custom-pivot-table:';
 const MAX_TABLE_HEADER_INFERENCE_CELLS = 100_000;
 
-const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
-
 const isNonEmptyTextValue = (value: CellValue): boolean =>
   value.kind === 'text' && value.value.trim().length > 0;
 
 const isNonBlankValue = (value: CellValue): boolean => value.kind !== 'blank';
 
-const a1Column = (column: number): string => {
-  let n = column + 1;
-  let result = '';
-  while (n > 0) {
-    n -= 1;
-    result = String.fromCharCode(65 + (n % 26)) + result;
-    n = Math.floor(n / 26);
-  }
-  return result;
-};
-
 const tableRef = (range: Range): string =>
-  `${a1Column(range.c0)}${range.r0 + 1}:${a1Column(range.c1)}${range.r1 + 1}`;
+  `${colLetter(range.c0)}${range.r0 + 1}:${colLetter(range.c1)}${range.r1 + 1}`;
 
 const tableStyleName = (style: TableStyle): string =>
   style === 'light'

@@ -1,3 +1,4 @@
+import { parseA1Atom } from './address.js';
 import { formatCell } from './value.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
@@ -46,8 +47,6 @@ interface ParsedRangeRef {
   c1: number;
 }
 
-const ATOM_RE = /^\$?([A-Za-z]+)\$?(\d+)$/;
-
 /** Parse `Sheet1!$A$1:$B$5`, `'Sheet 1'!A1:B5`, `A1:B5`, `A1`, `$A$1`. */
 export function parseRangeRef(raw: string): ParsedRangeRef | null {
   const trimmed = raw.trim().replace(/^=/, '');
@@ -66,9 +65,9 @@ export function parseRangeRef(raw: string): ParsedRangeRef | null {
   }
   const parts = body.split(':');
   if (parts.length === 0 || parts.length > 2) return null;
-  const head = parseAtom(parts[0] ?? '');
+  const head = parseA1Atom(parts[0] ?? '');
   if (!head) return null;
-  const tail = parts.length === 2 ? parseAtom(parts[1] ?? '') : head;
+  const tail = parts.length === 2 ? parseA1Atom(parts[1] ?? '') : head;
   if (!tail) return null;
   return {
     sheetName,
@@ -77,21 +76,6 @@ export function parseRangeRef(raw: string): ParsedRangeRef | null {
     r1: Math.max(head.row, tail.row),
     c1: Math.max(head.col, tail.col),
   };
-}
-
-function parseAtom(raw: string): { row: number; col: number } | null {
-  const m = ATOM_RE.exec(raw.trim());
-  if (!m) return null;
-  const letters = m[1] ?? '';
-  const digits = m[2] ?? '';
-  let col = 0;
-  for (let i = 0; i < letters.length; i += 1) {
-    col = col * 26 + (letters.toUpperCase().charCodeAt(i) - 64);
-  }
-  col -= 1;
-  const row = Number.parseInt(digits, 10) - 1;
-  if (col < 0 || row < 0 || col > 16383 || row > 1048575) return null;
-  return { row, col };
 }
 
 function sheetIndexByName(wb: WorkbookHandle, name: string): number {

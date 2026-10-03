@@ -1,8 +1,9 @@
-import { addrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { makeRangeResolver } from '../engine/range-resolver.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { CellPatch, CellSnapshot, WorkbookHandle } from '../engine/workbook-handle.js';
 import { formatWithPending } from '../store/pending-format.js';
+import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { CellFormat, State } from '../store/types.js';
 import { type CoercedInput, coerceInputForCell } from './coerce-input.js';
@@ -22,7 +23,6 @@ import {
   type OperationIntent,
   operationPermission,
   type PermissionDecision,
-  rangeContainsAddr,
 } from './interaction-policy.js';
 import { isCellWritable, isSheetProtected } from './protection.js';
 import { normalizeR1C1Formula } from './refs.js';
@@ -49,8 +49,6 @@ const CELL_OPERATIONS: ReadonlySet<CellBatchOperation> = new Set([
   'moveCells',
 ]);
 
-const MAX_XLSX_ROW = 1_048_575;
-const MAX_XLSX_COL = 16_383;
 const MAC_SUBTOTAL_COMMAND_ID = 'mac.data.subtotal';
 const MAC_REMOVE_HYPERLINK_COMMAND_ID = 'mac.automate.removeHyperlinks';
 
@@ -503,8 +501,8 @@ export class InteractionController {
       (bounds.sheet !== range.sheet ||
         bounds.r0 !== 0 ||
         bounds.c0 !== 0 ||
-        bounds.r1 !== MAX_XLSX_ROW ||
-        bounds.c1 !== MAX_XLSX_COL)
+        bounds.r1 !== MAX_ROW ||
+        bounds.c1 !== MAX_COL)
     ) {
       return {
         allowed: false,
@@ -1242,8 +1240,8 @@ export class InteractionController {
         addr.sheet >= 0 &&
         addr.row >= 0 &&
         addr.col >= 0 &&
-        addr.row <= MAX_XLSX_ROW &&
-        addr.col <= MAX_XLSX_COL &&
+        addr.row <= MAX_ROW &&
+        addr.col <= MAX_COL &&
         addr.sheet < wb.sheetCount
       );
     } catch {

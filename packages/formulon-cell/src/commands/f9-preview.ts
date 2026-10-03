@@ -1,4 +1,4 @@
-import { addrKey } from '../engine/address.js';
+import { addrKey, colFromLetters, parseA1Atom } from '../engine/address.js';
 import type { CellValue, EvalArrayResult, EvalResult } from '../engine/types.js';
 import { fromEngineValue } from '../engine/value.js';
 
@@ -72,14 +72,6 @@ function renderArrayForF9(result: EvalArrayResult): string | null {
   return `{${rowLiterals.join(';')}}`;
 }
 
-const lettersToCol = (letters: string): number => {
-  let col = 0;
-  for (let i = 0; i < letters.length; i += 1) {
-    col = col * 26 + (letters.toUpperCase().charCodeAt(i) - 64);
-  }
-  return col - 1;
-};
-
 /** Render a CellValue the way the formula bar would substitute it after F9. */
 export function renderCellValueForF9(v: CellValue | undefined): string {
   if (!v || v.kind === 'blank') return '0';
@@ -132,7 +124,7 @@ export function computeF9Preview(
     const sheetName = ref[1] ?? ref[2];
     const letters = ref[4] ?? '';
     const digits = ref[6] ?? '';
-    const col = lettersToCol(letters);
+    const col = colFromLetters(letters);
     const row = Number.parseInt(digits, 10) - 1;
     if (row < 0 || col < 0) {
       return { display: '#REF!', substitutable: false };
@@ -253,7 +245,7 @@ function extractF9Refs(formula: string): ExtractedF9Ref[] | null {
     const quoteCount = (before.match(/"/g) ?? []).length;
     if (quoteCount % 2 === 1) continue;
     if (formula[m.index + m[0].length] === '(') continue;
-    const parsed = parseCellRef(m[3] ?? '');
+    const parsed = parseA1Atom(m[3] ?? '');
     if (!parsed) return null;
     const end = m.index + m[0].length;
     const base = {
@@ -267,7 +259,7 @@ function extractF9Refs(formula: string): ExtractedF9Ref[] | null {
       refs.push({ kind: 'cell', ...base });
       continue;
     }
-    const parsedEnd = parseCellRef(m[4]);
+    const parsedEnd = parseA1Atom(m[4]);
     if (!parsedEnd) return null;
     refs.push({
       kind: 'range',
@@ -277,15 +269,6 @@ function extractF9Refs(formula: string): ExtractedF9Ref[] | null {
     });
   }
   return refs;
-}
-
-function parseCellRef(raw: string): { row: number; col: number } | null {
-  const m = raw.match(/^\$?([A-Za-z]+)\$?(\d+)$/);
-  if (!m) return null;
-  const col = lettersToCol(m[1] ?? '');
-  const row = Number.parseInt(m[2] ?? '', 10) - 1;
-  if (row < 0 || col < 0 || row > 1048575 || col > 16383) return null;
-  return { row, col };
 }
 
 export function replaceFormulaSelectionWithF9Preview(

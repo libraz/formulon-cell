@@ -1,5 +1,7 @@
+import { colLetter, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { rangeArea, rangeContainsAddr, rangeContainsRange } from '../store/selection-geometry.js';
 import { mutators, type SparklineKind, type SpreadsheetStore } from '../store/store.js';
 import type { SelectionStats } from './aggregate.js';
 import { formatAsTable as applyFormatAsTable } from './format-as-table.js';
@@ -96,32 +98,11 @@ export type QuickAnalysisExecuteResult =
     }
   | { ok: false; reason: 'disabled' | 'unsupported' | 'out-of-bounds' | 'protected' };
 
-const MAX_COL = 16383;
-const MAX_ROW = 1048575;
 const MAX_QUICK_ANALYSIS_FORMULA_WRITES = 100_000;
 const MAX_EXACT_PROTECTION_SCAN_CELLS = 100_000;
 
-const colLetter = (n: number): string => {
-  let v = n;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (v % 26)) + out;
-    v = Math.floor(v / 26) - 1;
-  } while (v >= 0);
-  return out;
-};
-
 const rangeRef = (r: Range): string =>
   `${colLetter(r.c0)}${r.r0 + 1}:${colLetter(r.c1)}${r.r1 + 1}`;
-
-const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
-
-const rangeContainsRange = (outer: Range, inner: Range): boolean =>
-  outer.sheet === inner.sheet &&
-  outer.r0 <= inner.r0 &&
-  outer.r1 >= inner.r1 &&
-  outer.c0 <= inner.c0 &&
-  outer.c1 >= inner.c1;
 
 const addrFromKey = (key: string): { sheet: number; row: number; col: number } | null => {
   const parts = key.split(':').map(Number);
@@ -130,16 +111,6 @@ const addrFromKey = (key: string): { sheet: number; row: number; col: number } |
   if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
   return { sheet, row, col };
 };
-
-const rangeContainsAddr = (
-  range: Range,
-  addr: { sheet: number; row: number; col: number },
-): boolean =>
-  addr.sheet === range.sheet &&
-  addr.row >= range.r0 &&
-  addr.row <= range.r1 &&
-  addr.col >= range.c0 &&
-  addr.col <= range.c1;
 
 /** True when the range covers more than a single cell. */
 function isMulti(range: Range): boolean {

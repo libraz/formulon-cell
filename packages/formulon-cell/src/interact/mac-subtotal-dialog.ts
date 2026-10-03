@@ -1,4 +1,3 @@
-import { colLabelToIndex } from '../commands/formula-refs.js';
 import {
   commitMacSubtotal,
   describeMacDataError,
@@ -8,8 +7,8 @@ import {
   planMacSubtotal,
   type SubtotalRequest,
 } from '../commands/mac-data-tools.js';
+import { colFromLetters, colLetter } from '../engine/address.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
-import { colLabel } from '../render/geometry.js';
 import { appendDialogSelectOptions } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import { syncCustomSelects } from './custom-select.js';
@@ -53,7 +52,7 @@ const columnIndex = (token: string): number | null => {
     const n = Number(trimmed);
     return Number.isInteger(n) && n > 0 ? n - 1 : null;
   }
-  return /^[A-Za-z]+$/.test(trimmed) ? colLabelToIndex(trimmed.toUpperCase()) : null;
+  return /^[A-Za-z]+$/.test(trimmed) ? colFromLetters(trimmed) : null;
 };
 
 function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHandle {
@@ -158,9 +157,9 @@ function attachSubtotalDialog(instance: SpreadsheetInstance): SubtotalDialogHand
   const defaults = (): void => {
     const selection = instance.store.getState().selection.range;
     rangeInput.value = formatMacRangeAddress(instance.workbook, selection);
-    groupByInput.value = colLabel(selection.c0);
+    groupByInput.value = colLetter(selection.c0);
     columnsInput.value = Array.from({ length: Math.max(0, selection.c1 - selection.c0) }, (_, i) =>
-      colLabel(selection.c0 + i + 1),
+      colLetter(selection.c0 + i + 1),
     ).join(',');
     functionSelect.value = 'sum';
   };

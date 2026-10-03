@@ -1,4 +1,4 @@
-import { addrKey } from '../../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../../engine/address.js';
 import type { CellValue, Range } from '../../engine/types.js';
 import type { CellFormat, State } from '../../store/store.js';
 import type { CopyResult } from './copy.js';
@@ -130,9 +130,6 @@ export function captureSnapshot(
     colWidths: new Map(),
   };
 }
-
-const MAX_ROW = 1_048_575;
-const MAX_COL = 16_383;
 
 const isWholeRowRange = (range: Range): boolean => range.c0 === 0 && range.c1 >= MAX_COL;
 const isWholeColumnRange = (range: Range): boolean => range.r0 === 0 && range.r1 >= MAX_ROW;

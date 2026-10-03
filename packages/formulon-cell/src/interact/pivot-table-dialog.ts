@@ -4,6 +4,7 @@ import {
   inferPivotSourceFields,
   type PivotSourceField,
 } from '../commands/pivot-table.js';
+import { colLetter, parseA1Atom } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import { PivotAggregation, type PivotFilterSpec, type PivotShowValuesAs } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -45,30 +46,6 @@ export interface PivotTableDialogHandle {
   bindWorkbook(next: WorkbookHandle): void;
   detach(): void;
 }
-
-const colLetter = (n: number): string => {
-  let v = n;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (v % 26)) + out;
-    v = Math.floor(v / 26) - 1;
-  } while (v >= 0);
-  return out;
-};
-
-const parseCellRef = (input: string): { row: number; col: number } | null => {
-  const m = input
-    .trim()
-    .replace(/\$/g, '')
-    .match(/^([A-Za-z]+)([1-9][0-9]*)$/);
-  if (!m) return null;
-  const letters = m[1];
-  const rows = m[2];
-  if (!letters || !rows) return null;
-  let col = 0;
-  for (const ch of letters.toUpperCase()) col = col * 26 + (ch.charCodeAt(0) - 64);
-  return { row: Number(rows) - 1, col: col - 1 };
-};
 
 export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDialogHandle {
   const { host, store } = deps;
@@ -926,7 +903,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
       return;
     }
     const useNewWorksheet = newWorksheetInput.checked;
-    const dest = useNewWorksheet ? { row: 0, col: 0 } : parseCellRef(destInput.value);
+    const dest = useNewWorksheet ? { row: 0, col: 0 } : parseA1Atom(destInput.value);
     if (!dest) {
       showError(strings.pivotTableDialog.invalidDestination);
       destInput.focus();

@@ -24,7 +24,6 @@ import {
 } from '../commands/cell-styles.js';
 import { listComments } from '../commands/comment.js';
 import { listCustomPivotTableStyles, listCustomTableStyles } from '../commands/format-as-table.js';
-import { MAX_COL_INDEX } from '../commands/formula-refs.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import {
   collapseColGroup,
@@ -38,6 +37,7 @@ import {
 } from '../commands/outline.js';
 import { deleteSheetView, saveSheetView } from '../commands/sheet-views.js';
 import { setSheetZoom } from '../commands/structure.js';
+import { MAX_COL } from '../engine/address.js';
 import { dictionaries } from '../i18n/strings.js';
 import { isNavigationAddrAllowed } from '../interact/navigation-policy.js';
 import { mutators } from '../store/store.js';
@@ -265,8 +265,7 @@ const selectAdjacentComment = (instance: SpreadsheetInstance, direction: 1 | -1)
     isNavigationAddrAllowed(instance.store, note.addr),
   );
   const active = state.selection.active;
-  const rank = (addr: { row: number; col: number }): number =>
-    addr.row * (MAX_COL_INDEX + 1) + addr.col;
+  const rank = (addr: { row: number; col: number }): number => addr.row * (MAX_COL + 1) + addr.col;
   const next =
     direction === 1
       ? (notes.find((note) => rank(note.addr) > rank(active)) ?? notes[0])

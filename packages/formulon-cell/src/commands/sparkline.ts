@@ -1,5 +1,6 @@
 import { addrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
+import { rangeContainsAddr } from '../store/selection-geometry.js';
 import { mutators, type Sparkline, type SpreadsheetStore } from '../store/store.js';
 import { type History, recordSparklineChange } from './history.js';
 import { isCellWritable, warnProtected } from './protection.js';
@@ -68,7 +69,7 @@ export function clearSparklinesInRange(
 ): number {
   const state = store.getState();
   const targets = listSparklines(state)
-    .filter(({ addr }) => addrInRange(addr, range))
+    .filter(({ addr }) => rangeContainsAddr(range, addr))
     .map(({ addr }) => addr);
   if (targets.length === 0) return 0;
   const writable = targets.filter((addr) => {
@@ -82,13 +83,6 @@ export function clearSparklinesInRange(
   });
   return writable.length;
 }
-
-const addrInRange = (addr: Addr, range: Range): boolean =>
-  addr.sheet === range.sheet &&
-  addr.row >= range.r0 &&
-  addr.row <= range.r1 &&
-  addr.col >= range.c0 &&
-  addr.col <= range.c1;
 
 const parseAddrKey = (key: string): Addr | null => {
   const parts = key.split(':');

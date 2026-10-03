@@ -3,7 +3,7 @@ import { interactionControllerFor } from '../commands/interaction-controller.js'
 import { expandRangeWithMerges, mergeAnchorOf, stepWithMerge } from '../commands/merge.js';
 import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
 import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
-import { addrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { formatCellForEdit } from '../engine/edit-seed.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -15,9 +15,6 @@ import {
   nextTabStop,
 } from './navigation-policy.js';
 import { nextAdvanceTarget } from './selection-navigation.js';
-
-const MAX_ROW = 1_048_575; // spreadsheet limit; clamp navigation.
-const MAX_COL = 16_383;
 
 const move = (a: Addr, dRow: number, dCol: number): Addr => ({
   sheet: a.sheet,

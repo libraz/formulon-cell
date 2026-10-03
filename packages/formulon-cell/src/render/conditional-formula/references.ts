@@ -1,23 +1,5 @@
+import { colFromLetters, MAX_COL, MAX_ROW } from '../../engine/address.js';
 import type { ParsedA1Range, ParsedRef } from './types.js';
-
-const lettersToCol = (letters: string): number => {
-  let col = 0;
-  for (let i = 0; i < letters.length; i += 1) {
-    col = col * 26 + (letters.toUpperCase().charCodeAt(i) - 64);
-  }
-  return col - 1;
-};
-
-const colToLetters = (col: number): string => {
-  let value = col + 1;
-  let letters = '';
-  while (value > 0) {
-    const rem = (value - 1) % 26;
-    letters = String.fromCharCode(65 + rem) + letters;
-    value = Math.floor((value - 1) / 26);
-  }
-  return letters;
-};
 
 function sheetNameMatchesIndex(name: string, sheetIndex: number): boolean {
   return name.trim().toLowerCase() === `sheet${sheetIndex + 1}`.toLowerCase();
@@ -54,9 +36,9 @@ function parseA1Ref(raw: string, sheetIndex: number): ParsedRef | null {
   if (body === null) return null;
   const m = body.match(/^(\$?)([A-Za-z]+)(\$?)(\d+)$/);
   if (!m) return null;
-  const col = lettersToCol(m[2] ?? '');
+  const col = colFromLetters(m[2] ?? '');
   const row = Number.parseInt(m[4] ?? '', 10) - 1;
-  if (row < 0 || col < 0 || row > 1048575 || col > 16383) return null;
+  if (row < 0 || col < 0 || row > MAX_ROW || col > MAX_COL) return null;
   return { row, col, absCol: m[1] === '$', absRow: m[3] === '$' };
 }
 
@@ -74,7 +56,7 @@ function parseR1C1Ref(
     m[1] !== undefined ? Number.parseInt(m[1], 10) - 1 : baseRow + Number.parseInt(m[2] ?? '0', 10);
   const col =
     m[3] !== undefined ? Number.parseInt(m[3], 10) - 1 : baseCol + Number.parseInt(m[4] ?? '0', 10);
-  if (row < 0 || col < 0 || row > 1048575 || col > 16383) return null;
+  if (row < 0 || col < 0 || row > MAX_ROW || col > MAX_COL) return null;
   return {
     row,
     col,
@@ -116,4 +98,4 @@ function parseA1Range(raw: string, sheetIndex: number): ParsedA1Range | null {
   return start && end ? { start, end } : null;
 }
 
-export { colToLetters, parseA1Range, parseA1Ref, parseR1C1Range, parseR1C1Ref };
+export { parseA1Range, parseA1Ref, parseR1C1Range, parseR1C1Ref };

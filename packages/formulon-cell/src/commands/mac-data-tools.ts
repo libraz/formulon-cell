@@ -1,8 +1,10 @@
+import { colLetter, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { type CellSnapshot, WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetInstance } from '../mount/types.js';
+import { rangeArea, rangesIntersect, sameRange } from '../store/selection-geometry.js';
 import type { OperationIntent, PermissionDecision } from './interaction-policy.js';
 import { groupRows } from './outline.js';
 import { isSheetProtected } from './protection.js';
@@ -107,9 +109,6 @@ export interface ParsedMacRange {
   readonly explicitSheet: boolean;
 }
 
-const MAX_ROW = 1_048_575;
-const MAX_COL = 16_383;
-
 const failure = (
   status: MacDataError['status'],
   code: MacDataErrorCode,
@@ -130,9 +129,6 @@ const isFiniteNumber = (value: CellValue): value is { kind: 'number'; value: num
 
 const sameAddr = (a: Addr, b: Addr): boolean =>
   a.sheet === b.sheet && a.row === b.row && a.col === b.col;
-
-const sameRange = (a: Range, b: Range): boolean =>
-  a.sheet === b.sheet && a.r0 === b.r0 && a.c0 === b.c0 && a.r1 === b.r1 && a.c1 === b.c1;
 
 const sameBytes = (a: Uint8Array, b: Uint8Array): boolean =>
   a.length === b.length && a.every((byte, index) => byte === b[index]);
@@ -188,13 +184,6 @@ export function parseMacRange(
     },
   };
 }
-
-export function rangeArea(range: Range): number {
-  return (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
-}
-
-const rangesOverlap = (a: Range, b: Range): boolean =>
-  a.sheet === b.sheet && a.r0 <= b.r1 && a.r1 >= b.r0 && a.c0 <= b.c1 && a.c1 >= b.c0;
 
 const addrRange = (addr: Addr): Range => ({
   sheet: addr.sheet,
@@ -369,10 +358,10 @@ const numericAggregate = (values: readonly CellValue[], fn: MacDataFunction): Ce
  * insertion can otherwise corrupt the object's definition. */
 export function hasUnsupportedSubtotalObject(instance: SpreadsheetInstance, range: Range): boolean {
   const state = instance.store.getState();
-  if (state.tables.tables.some((table) => rangesOverlap(table.range, range))) return true;
+  if (state.tables.tables.some((table) => rangesIntersect(table.range, range))) return true;
   for (const table of instance.workbook.getTables()) {
     const parsed = parseMacRange(instance.workbook, table.ref, table.sheetIndex);
-    if (parsed && rangesOverlap(parsed.range, range)) return true;
+    if (parsed && rangesIntersect(parsed.range, range)) return true;
   }
   for (const pivot of instance.workbook.getPivotTables()) {
     const pivotRange: Range = {
@@ -382,15 +371,15 @@ export function hasUnsupportedSubtotalObject(instance: SpreadsheetInstance, rang
       r1: pivot.top + Math.max(0, pivot.rows - 1),
       c1: pivot.left + Math.max(0, pivot.cols - 1),
     };
-    if (rangesOverlap(pivotRange, range)) return true;
+    if (rangesIntersect(pivotRange, range)) return true;
   }
   if (
     state.merges.byAnchor &&
-    [...state.merges.byAnchor.values()].some((merge) => rangesOverlap(merge, range))
+    [...state.merges.byAnchor.values()].some((merge) => rangesIntersect(merge, range))
   ) {
     return true;
   }
-  return instance.workbook.getMerges(range.sheet).some((merge) => rangesOverlap(merge, range));
+  return instance.workbook.getMerges(range.sheet).some((merge) => rangesIntersect(merge, range));
 }
 
 export function supportsSubtotal(wb: WorkbookHandle): boolean {
@@ -674,7 +663,7 @@ export function planMacConsolidate(
   }
   const destination = parseDestination(wb, request.destination, fallbackSheet, rows, cols);
   if (!destination) return failure('invalid', 'invalidDestination');
-  if (parsedSources.some((source) => rangesOverlap(source, destination))) {
+  if (parsedSources.some((source) => rangesIntersect(source, destination))) {
     return failure('invalid', 'destinationOverlapsSource');
   }
   const sourceValues = parsedSources.map((range) => {
@@ -747,19 +736,8 @@ const subtotalLabel = (value: CellValue): string => {
   return value.text;
 };
 
-const columnName = (col: number): string => {
-  let n = col + 1;
-  let text = '';
-  while (n > 0) {
-    const digit = (n - 1) % 26;
-    text = String.fromCharCode(65 + digit) + text;
-    n = Math.floor((n - 1) / 26);
-  }
-  return text;
-};
-
 export function formatMacCellAddress(_wb: WorkbookHandle, addr: Addr): string {
-  return `${columnName(addr.col)}${addr.row + 1}`;
+  return `${colLetter(addr.col)}${addr.row + 1}`;
 }
 
 export function formatMacRangeAddress(wb: WorkbookHandle, range: Range): string {
@@ -772,7 +750,7 @@ export function formatMacRangeAddress(wb: WorkbookHandle, range: Range): string 
 
 const formulaRange = (sheet: string, col: number, row0: number, row1: number): string => {
   const quoted = /[^A-Za-z0-9_]/.test(sheet) ? `'${sheet.replaceAll("'", "''")}'` : sheet;
-  return `${quoted}!$${columnName(col)}$${row0 + 1}:$${columnName(col)}$${row1 + 1}`;
+  return `${quoted}!$${colLetter(col)}$${row0 + 1}:$${colLetter(col)}$${row1 + 1}`;
 };
 
 const subtotalOutputCells = (

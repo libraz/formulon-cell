@@ -8,6 +8,7 @@ import {
   type QuickAnalysisActionId,
   type QuickAnalysisGroup,
 } from '../commands/quick-analysis.js';
+import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { layoutForView, rangeRects, trailingEdgeX } from '../render/geometry.js';
@@ -160,7 +161,7 @@ export function attachQuickAnalysis(deps: QuickAnalysisDeps): QuickAnalysisHandl
 
   const isWholeBandSelection = (): boolean => {
     const r = store.getState().selection.range;
-    return (r.c0 === 0 && r.c1 === 16_383) || (r.r0 === 0 && r.r1 === 1_048_575);
+    return (r.c0 === 0 && r.c1 === MAX_COL) || (r.r0 === 0 && r.r1 === MAX_ROW);
   };
 
   const positionButton = (): void => {

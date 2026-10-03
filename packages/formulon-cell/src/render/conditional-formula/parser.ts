@@ -7,13 +7,7 @@ import { createNumericCallParser } from './parse/numeric.js';
 import { createReferenceCallParser } from './parse/reference.js';
 import { createStatisticsCallParser } from './parse/statistics.js';
 import { createTextCallParser } from './parse/text.js';
-import {
-  colToLetters,
-  parseA1Range,
-  parseA1Ref,
-  parseR1C1Range,
-  parseR1C1Ref,
-} from './references.js';
+import { parseA1Range, parseA1Ref, parseR1C1Range, parseR1C1Ref } from './references.js';
 import {
   splitFormulaArgs,
   splitFormulaArgsAllowEmpty,
@@ -200,7 +194,6 @@ function parseFormulaCondition(raw: string, sheetIndex: number): FormulaConditio
 }
 
 export {
-  colToLetters,
   FORMULA_NUMBER_LITERAL,
   FORMULA_VALUE_NUMBER_LITERAL,
   MAX_FORMULA_AGGREGATE_CELLS,

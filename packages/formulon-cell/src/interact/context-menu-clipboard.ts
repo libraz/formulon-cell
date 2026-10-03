@@ -12,7 +12,7 @@ import {
 } from '../commands/clipboard/snapshot.js';
 import { parseTSV } from '../commands/clipboard/tsv.js';
 import type { History } from '../commands/history.js';
-import { addrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
@@ -48,7 +48,7 @@ const pasteDestinationRange = (origin: Addr, rows: number, cols: number): Range 
   if (rows <= 0 || cols <= 0) return null;
   const r1 = origin.row + rows - 1;
   const c1 = origin.col + cols - 1;
-  if (r1 > 1_048_575 || c1 > 16_383) return null;
+  if (r1 > MAX_ROW || c1 > MAX_COL) return null;
   return {
     sheet: origin.sheet,
     r0: origin.row,

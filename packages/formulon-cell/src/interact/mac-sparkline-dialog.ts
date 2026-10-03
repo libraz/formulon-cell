@@ -1,10 +1,10 @@
 import type { History } from '../commands/history.js';
 import { setSparkline } from '../commands/sparkline.js';
+import { colLetter, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
-import { colLabel } from '../render/geometry.js';
 import type { SparklineKind, SpreadsheetStore } from '../store/store.js';
 import { appendDialogSelectOptions } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -36,12 +36,9 @@ interface ResolvedRange extends Range {
   explicitSheet: boolean;
 }
 
-const MAX_ROW = 1_048_575;
-const MAX_COL = 16_383;
-
 const formatRange = (range: Range): string => {
-  const start = `${colLabel(range.c0)}${range.r0 + 1}`;
-  const end = `${colLabel(range.c1)}${range.r1 + 1}`;
+  const start = `${colLetter(range.c0)}${range.r0 + 1}`;
+  const end = `${colLetter(range.c1)}${range.r1 + 1}`;
   return start === end ? start : `${start}:${end}`;
 };
 
@@ -285,7 +282,7 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
       const range = store.getState().selection.range;
       sourceInput.value = formatRange(range);
       const destinationCol = range.c1 < MAX_COL ? range.c1 + 1 : range.c0;
-      destinationInput.value = `${colLabel(destinationCol)}${range.r0 + 1}`;
+      destinationInput.value = `${colLetter(destinationCol)}${range.r0 + 1}`;
       kindSelect.value = 'line';
       lastSource = null;
       lastDestination = null;

@@ -3,7 +3,11 @@ import { describe, expect, it } from 'vitest';
 import type { Range } from '../../../src/engine/types.js';
 import {
   applySelectionRectangle,
+  rangeArea,
   rangeContainsAddr,
+  rangeContainsRange,
+  rangesIntersect,
+  sameRange,
   selectionContainsAddr,
   selectionCoversRange,
   subtractRange,
@@ -165,5 +169,32 @@ describe('store/selection-geometry', () => {
     expect(selectionContainsAddr(selected, { sheet: 0, row: 0, col: 3 })).toBe(true);
     expect(selectionCoversRange(selected, range(0, 0, 0, 3))).toBe(true);
     expect(selectionCoversRange(selected, range(0, 0, 1, 3))).toBe(false);
+  });
+
+  describe('range primitives', () => {
+    it('intersects only ranges on the same sheet that share a cell', () => {
+      expect(rangesIntersect(range(0, 0, 2, 2), range(2, 2, 4, 4))).toBe(true);
+      expect(rangesIntersect(range(0, 0, 2, 2), range(3, 0, 4, 2))).toBe(false);
+      expect(rangesIntersect(range(0, 0, 2, 2), range(0, 0, 2, 2, 1))).toBe(false);
+    });
+
+    it('contains a range only when every edge lies inside, on the same sheet', () => {
+      expect(rangeContainsRange(range(0, 0, 4, 4), range(1, 1, 4, 4))).toBe(true);
+      expect(rangeContainsRange(range(0, 0, 4, 4), range(1, 1, 5, 4))).toBe(false);
+      expect(rangeContainsRange(range(0, 0, 4, 4), range(1, 1, 2, 2, 1))).toBe(false);
+    });
+
+    it('compares every coordinate and the sheet for equality', () => {
+      expect(sameRange(range(1, 2, 3, 4), range(1, 2, 3, 4))).toBe(true);
+      expect(sameRange(range(1, 2, 3, 4), range(1, 2, 3, 5))).toBe(false);
+      expect(sameRange(range(1, 2, 3, 4), range(1, 2, 3, 4, 1))).toBe(false);
+    });
+
+    it('counts cells and treats an inverted axis as empty', () => {
+      expect(rangeArea(range(0, 0))).toBe(1);
+      expect(rangeArea(range(0, 0, 2, 3))).toBe(12);
+      expect(rangeArea(range(2, 0, 1, 3))).toBe(0);
+      expect(rangeArea(range(5, 5, 0, 0))).toBe(0);
+    });
   });
 });

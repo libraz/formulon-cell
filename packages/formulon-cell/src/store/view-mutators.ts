@@ -1,3 +1,4 @@
+import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { navigationBoundsFor, syncNavigationViewport } from '../interact/navigation-policy.js';
 import type { SpreadsheetStore } from './store.js';
@@ -138,8 +139,6 @@ export const viewMutators = {
     const rows = Math.max(1, Math.floor(rowCount));
     const cols = Math.max(1, Math.floor(colCount));
     const width = Math.max(0, widthPx);
-    const MAX_ROW = 1_048_575;
-    const MAX_COL = 16_383;
     store.setState((s) => {
       if (
         s.viewport.rowCount === rows &&
@@ -219,10 +218,8 @@ export const viewMutators = {
   },
 
   scrollBy(store: SpreadsheetStore, dRow: number, dCol: number): void {
-    // Desktop spreadsheets sheet bounds — keep at least one body row/col visible past the
-    // freeze zone, otherwise the viewport disappears off the right/bottom.
-    const MAX_ROW = 1_048_575;
-    const MAX_COL = 16_383;
+    // Keep at least one body row/col visible past the freeze zone, otherwise the
+    // viewport disappears off the right/bottom.
     store.setState((s) => {
       const bounds = navigationBoundsFor(store);
       const minRowStart = Math.max(s.layout.freezeRows, bounds?.r0 ?? 0);

@@ -1,4 +1,5 @@
 /** A1 print-range grammar: print areas, print-title rows/columns, and page-order sorting of print regions. */
+import { colFromLetters, parseA1Atom } from '../engine/address.js';
 import type { PageSetup } from '../store/store.js';
 
 export interface PrintAreaBounds {
@@ -6,30 +7,6 @@ export interface PrintAreaBounds {
   col0: number;
   row1: number;
   col1: number;
-}
-
-/** Convert a 0-indexed column number to A1 letter form ("A", "B", … "Z",
- *  "AA", …). Used for column-letter headings and print-title parsing. */
-export function colLetter(col: number): string {
-  let n = col;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (n % 26)) + out;
-    n = Math.floor(n / 26) - 1;
-  } while (n >= 0);
-  return out;
-}
-
-/** Reverse of `colLetter`. Returns -1 on parse failure. */
-function colFromLetters(letters: string): number {
-  let col = 0;
-  const upper = letters.toUpperCase();
-  for (let i = 0; i < upper.length; i += 1) {
-    const code = upper.charCodeAt(i);
-    if (code < 65 || code > 90) return -1;
-    col = col * 26 + (code - 64);
-  }
-  return col - 1;
 }
 
 /** Parse an A1-style row range like "1:3" / "$1:$3" / "2" → `[r0, r1]`
@@ -68,18 +45,10 @@ export function parsePrintArea(raw?: string): PrintAreaBounds | null {
   if (!raw) return null;
   const trimmed = raw.trim().replace(/\$/g, '');
   if (!trimmed || trimmed.includes(',')) return null;
-  const parseCell = (cell: string): { row: number; col: number } | null => {
-    const match = /^([A-Za-z]+)([1-9][0-9]*)$/.exec(cell.trim());
-    if (!match) return null;
-    const col = colFromLetters(match[1] ?? '');
-    const row = Number.parseInt(match[2] ?? '', 10) - 1;
-    if (col < 0 || row < 0) return null;
-    return { row, col };
-  };
   const parts = trimmed.split(':');
   if (parts.length > 2) return null;
-  const a = parseCell(parts[0] ?? '');
-  const b = parseCell(parts[1] ?? parts[0] ?? '');
+  const a = parseA1Atom(parts[0] ?? '');
+  const b = parseA1Atom(parts[1] ?? parts[0] ?? '');
   if (!a || !b) return null;
   return {
     row0: Math.min(a.row, b.row),

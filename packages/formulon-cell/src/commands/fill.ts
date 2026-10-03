@@ -1,6 +1,7 @@
 import { addrKey } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { rangeArea, rangesIntersect } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { applyFlashFill, inferFlashFillPattern } from './flash-fill.js';
 import { type History, recordFormatChange } from './history.js';
@@ -26,8 +27,6 @@ interface SourceCell {
 }
 
 const MAX_FILL_RANGE_CELLS = 100_000;
-
-const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
 
 const FULLWIDTH_ZERO = '０'.codePointAt(0) ?? 0xff10;
 
@@ -546,9 +545,6 @@ export function fillRange(
 ): boolean {
   return wb.withBatchedRecalc(() => applyFillRange(state, wb, src, dest, opts));
 }
-
-const rangesIntersect = (a: Range, b: Range): boolean =>
-  a.sheet === b.sheet && a.r0 <= b.r1 && b.r0 <= a.r1 && a.c0 <= b.c1 && b.c0 <= a.c1;
 
 /** Fill is an all-or-nothing cell operation when a protected destination or a
  * merged destination is involved. Do this check before the first engine write

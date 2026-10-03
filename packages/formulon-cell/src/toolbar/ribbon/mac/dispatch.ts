@@ -1,15 +1,14 @@
 import { canExecuteBuiltIn } from '../../../commands/built-in-command-policy.js';
 import { listComments } from '../../../commands/comment.js';
 import { selectNextFormulaError } from '../../../commands/error-indicators.js';
-import { MAX_COL_INDEX, MAX_ROW_INDEX } from '../../../commands/formula-refs.js';
 import { interactionControllerFor } from '../../../commands/interaction-controller.js';
 import { setMarginPreset, setPageOrientation, setPaperSize } from '../../../commands/page-setup.js';
 import { FUNCTION_SIGNATURES } from '../../../commands/refs.js';
+import { colLetter, MAX_COL, MAX_ROW } from '../../../engine/address.js';
 import { ensureMacInk } from '../../../interact/mac-ink.js';
 import { isNavigationAddrAllowed } from '../../../interact/navigation-policy.js';
 import { createDefaultDynamicDropdownsCtx } from '../../../mount/dynamic-dropdowns-defaults.js';
 import type { SpreadsheetInstance } from '../../../mount/types.js';
-import { colLabel } from '../../../render/geometry.js';
 import { reportDialogLabels, showReport } from '../../dialogs/report.js';
 import type { ApplyRibbonCommandDeps } from '../apply-ribbon-command.js';
 import { createMacRibbonActions, MAC_RIBBON_ACTION_IDS } from './actions.js';
@@ -209,8 +208,8 @@ const runMacErrorCheck = (instance: SpreadsheetInstance): Promise<void> | void =
     sheet: state.data.sheetIndex,
     r0: 0,
     c0: 0,
-    r1: MAX_ROW_INDEX,
-    c1: MAX_COL_INDEX,
+    r1: MAX_ROW,
+    c1: MAX_COL,
   };
   const next = selectNextFormulaError(instance.store, range, (addr) =>
     isNavigationAddrAllowed(instance.store, addr),
@@ -380,7 +379,7 @@ export function dispatchMacRibbonCommand(
             .filter((note) => isNavigationAddrAllowed(instance.store, note.addr))
             .map((note) => ({
               severity: 'info',
-              label: `${colLabel(note.addr.col)}${note.addr.row + 1}`,
+              label: `${colLetter(note.addr.col)}${note.addr.row + 1}`,
               detail: note.text,
             })),
           ...reportDialogLabels(instance.i18n.strings),

@@ -1,5 +1,7 @@
 import { distinctValues } from '../commands/filter.js';
+import { sameRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State, ValueFilterCriteria } from '../store/store.js';
+import { colLetter } from './address.js';
 import { parseRangeRef } from './range-resolver.js';
 import type { Range } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
@@ -7,25 +9,8 @@ import type { WorkbookHandle } from './workbook-handle.js';
 const escapeXml = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-const columnLabel = (col: number): string => {
-  let n = col;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (n % 26)) + out;
-    n = Math.floor(n / 26) - 1;
-  } while (n >= 0);
-  return out;
-};
-
 export const autoFilterRangeRef = (range: Range): string =>
-  `${columnLabel(range.c0)}${range.r0 + 1}:${columnLabel(range.c1)}${range.r1 + 1}`;
-
-const sameRange = (left: Range, right: Range): boolean =>
-  left.sheet === right.sheet &&
-  left.r0 === right.r0 &&
-  left.r1 === right.r1 &&
-  left.c0 === right.c0 &&
-  left.c1 === right.c1;
+  `${colLetter(range.c0)}${range.r0 + 1}:${colLetter(range.c1)}${range.r1 + 1}`;
 
 const conditionOperator: Record<NonNullable<ValueFilterCriteria['condition']>['op'], string> = {
   equals: 'equal',

@@ -1,29 +1,9 @@
+import { colFromLetters, colLetter, MAX_COL, MAX_ROW } from '../engine/address.js';
 /**
  * A1 reference tokenizer behind every transform in `formula-refs.ts`: token
  * shapes, the formula scanner that visits each reference, and the renderers
  * that turn transformed endpoints back into A1 text.
  */
-
-export const MAX_COL_INDEX = 16383;
-export const MAX_ROW_INDEX = 1048575;
-
-/** Convert an uppercase A1 column label to a 0-indexed column. */
-export function colLabelToIndex(label: string): number {
-  let n = 0;
-  for (let i = 0; i < label.length; i += 1) n = n * 26 + (label.charCodeAt(i) - 64);
-  return n - 1;
-}
-
-/** Convert a 0-indexed column to its A1 label. */
-export function colIndexToLabel(col: number): string {
-  let n = col;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (n % 26)) + out;
-    n = Math.floor(n / 26) - 1;
-  } while (n >= 0);
-  return out;
-}
 
 /** A single A1 endpoint (`$A$1` → absCol,label,absRow,row). */
 export interface Atom {
@@ -268,19 +248,19 @@ function matchRefToken(src: string, start: number): RefToken | null {
 /** True when an atom addresses a cell inside the grid (a real ref, not a name
  *  like `Year2024` whose "column" exceeds the last column). */
 function atomInGrid(at: Atom): boolean {
-  const col = colLabelToIndex(at.label);
+  const col = colFromLetters(at.label);
   const row = Number.parseInt(at.rowStr, 10) - 1;
-  return col >= 0 && col <= MAX_COL_INDEX && row >= 0 && row <= MAX_ROW_INDEX;
+  return col >= 0 && col <= MAX_COL && row >= 0 && row <= MAX_ROW;
 }
 
 function wholeColInGrid(at: WholeColAtom): boolean {
-  const col = colLabelToIndex(at.label);
-  return col >= 0 && col <= MAX_COL_INDEX;
+  const col = colFromLetters(at.label);
+  return col >= 0 && col <= MAX_COL;
 }
 
 function wholeRowInGrid(at: WholeRowAtom): boolean {
   const row = Number.parseInt(at.rowStr, 10) - 1;
-  return row >= 0 && row <= MAX_ROW_INDEX;
+  return row >= 0 && row <= MAX_ROW;
 }
 
 /** Consume a `"..."` string literal (with `""` escape) starting at `start`. */
@@ -337,17 +317,17 @@ export function renderAtom(
   absRow: boolean,
   row: number,
 ): string | null {
-  if (col < 0 || row < 0 || col > MAX_COL_INDEX || row > MAX_ROW_INDEX) return null;
-  return `${absCol ? '$' : ''}${colIndexToLabel(col)}${absRow ? '$' : ''}${row + 1}`;
+  if (col < 0 || row < 0 || col > MAX_COL || row > MAX_ROW) return null;
+  return `${absCol ? '$' : ''}${colLetter(col)}${absRow ? '$' : ''}${row + 1}`;
 }
 
 export function renderWholeColAtom(abs: boolean, col: number): string | null {
-  if (col < 0 || col > MAX_COL_INDEX) return null;
-  return `${abs ? '$' : ''}${colIndexToLabel(col)}`;
+  if (col < 0 || col > MAX_COL) return null;
+  return `${abs ? '$' : ''}${colLetter(col)}`;
 }
 
 export function renderWholeRowAtom(abs: boolean, row: number): string | null {
-  if (row < 0 || row > MAX_ROW_INDEX) return null;
+  if (row < 0 || row > MAX_ROW) return null;
   return `${abs ? '$' : ''}${row + 1}`;
 }
 

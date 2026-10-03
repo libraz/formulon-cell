@@ -10,6 +10,7 @@ import { addrKey } from '../engine/address.js';
 import type { CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
+import { sameRange } from '../store/selection-geometry.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
 import { confirmMergeLoseData } from '../toolbar/dialogs/merge-confirm.js';
 import { formatA1Range } from '../wrappers/toolbar-a1.js';
@@ -77,9 +78,6 @@ export interface FormatDialogHandle {
   close(): void;
   detach(): void;
 }
-
-const sameRange = (a: Range, b: Range): boolean =>
-  a.sheet === b.sheet && a.r0 === b.r0 && a.c0 === b.c0 && a.r1 === b.r1 && a.c1 === b.c1;
 
 const mergeSelectionState = (state: State, range: Range): MergeSelectionState => {
   const touching = [...state.merges.byAnchor.values()].filter(

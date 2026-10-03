@@ -1,4 +1,4 @@
-import { addrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import {
   clampNavigationAddr,
@@ -11,6 +11,7 @@ import { sameAddr } from './pending-format.js';
 import {
   applySelectionRectangle,
   rangeContainsAddr,
+  rangeContainsRange,
   rangesIntersect,
   type SelectionGestureMode,
   sameRange,
@@ -60,17 +61,10 @@ const validSelectionRange = (range: Range): boolean =>
   Number.isSafeInteger(range.c1) &&
   range.r0 >= 0 &&
   range.c0 >= 0 &&
-  range.r1 <= 1_048_575 &&
-  range.c1 <= 16_383 &&
+  range.r1 <= MAX_ROW &&
+  range.c1 <= MAX_COL &&
   range.r0 <= range.r1 &&
   range.c0 <= range.c1;
-
-const rangeContainsRange = (outer: Range, inner: Range): boolean =>
-  outer.sheet === inner.sheet &&
-  outer.r0 <= inner.r0 &&
-  outer.c0 <= inner.c0 &&
-  outer.r1 >= inner.r1 &&
-  outer.c1 >= inner.c1;
 
 const hasPartialMerge = (state: State, range: Range): boolean =>
   [...state.merges.byAnchor.values()].some(
@@ -97,8 +91,8 @@ const fullSheetRange = (sheet: number): Range => ({
   sheet,
   r0: 0,
   c0: 0,
-  r1: 1_048_575,
-  c1: 16_383,
+  r1: MAX_ROW,
+  c1: MAX_COL,
 });
 
 const boundedAxisRange = (
@@ -110,8 +104,8 @@ const boundedAxisRange = (
   const sheet = store.getState().data.sheetIndex;
   if (!navigationPolicyFor(store)) {
     return axis === 'row'
-      ? { sheet, r0: first, c0: 0, r1: last, c1: 16_383 }
-      : { sheet, r0: 0, c0: first, r1: 1_048_575, c1: last };
+      ? { sheet, r0: first, c0: 0, r1: last, c1: MAX_COL }
+      : { sheet, r0: 0, c0: first, r1: MAX_ROW, c1: last };
   }
   const bound = navigationSelectionBoundsFor(store);
   const axisMin =
@@ -126,10 +120,10 @@ const boundedAxisRange = (
     axis === 'row'
       ? bound?.sheet === sheet
         ? bound.r1
-        : 1_048_575
+        : MAX_ROW
       : bound?.sheet === sheet
         ? bound.c1
-        : 16_383;
+        : MAX_COL;
   const boundedFirst = Math.max(axisMin, Math.min(axisMax, first));
   const boundedLast = Math.max(axisMin, Math.min(axisMax, last));
   const range: Range =
@@ -139,13 +133,13 @@ const boundedAxisRange = (
           r0: Math.min(boundedFirst, boundedLast),
           c0: bound?.sheet === sheet ? bound.c0 : 0,
           r1: Math.max(boundedFirst, boundedLast),
-          c1: bound?.sheet === sheet ? bound.c1 : 16_383,
+          c1: bound?.sheet === sheet ? bound.c1 : MAX_COL,
         }
       : {
           sheet,
           r0: bound?.sheet === sheet ? bound.r0 : 0,
           c0: Math.min(boundedFirst, boundedLast),
-          r1: bound?.sheet === sheet ? bound.r1 : 1_048_575,
+          r1: bound?.sheet === sheet ? bound.r1 : MAX_ROW,
           c1: Math.max(boundedFirst, boundedLast),
         };
   return permittedRange(store, range);

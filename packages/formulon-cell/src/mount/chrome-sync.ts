@@ -1,5 +1,6 @@
 import { isValidDefinedName, upsertDefinedName } from '../commands/named-ranges.js';
 import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
+import { colLetter, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { type SpreadsheetEmitter, selectionEquals } from '../events.js';
 import type { Strings } from '../i18n/strings.js';
@@ -7,13 +8,7 @@ import { overlayPortalFor } from '../interact/overlay-portal.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import { createHostButton } from './chrome-buttons.js';
-import {
-  colName,
-  formatSelectionRef,
-  lookupDefinedName,
-  parseCellRef,
-  parseRangeRef,
-} from './ref-utils.js';
+import { formatSelectionRef, lookupDefinedName, parseCellRef, parseRangeRef } from './ref-utils.js';
 import type { SheetTabsController } from './sheet-tabs-controller.js';
 
 interface AttachChromeSyncInput {
@@ -42,7 +37,7 @@ const quoteSheetName = (name: string): string => {
   return `'${name.replace(/'/g, "''")}'`;
 };
 
-const absoluteCellRef = (row: number, col: number): string => `$${colName(col)}$${row + 1}`;
+const absoluteCellRef = (row: number, col: number): string => `$${colLetter(col)}$${row + 1}`;
 const MAX_A11Y_VIEWPORT_ROWS = 20;
 const MAX_A11Y_VIEWPORT_COLS = 10;
 
@@ -120,8 +115,8 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     return rowMirror;
   };
   grid.setAttribute('aria-activedescendant', activeCellMirror.id);
-  grid.setAttribute('aria-rowcount', String(1_048_576));
-  grid.setAttribute('aria-colcount', String(16_384));
+  grid.setAttribute('aria-rowcount', String(MAX_ROW + 1));
+  grid.setAttribute('aria-colcount', String(MAX_COL + 1));
   grid.setAttribute('aria-multiselectable', 'true');
 
   const updateChrome = (): void => {
@@ -154,11 +149,11 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
     const rowMirrors: HTMLElement[] = [];
     let activePlaced = false;
     const rowEnd = Math.min(
-      1_048_575,
+      MAX_ROW,
       s.viewport.rowStart + Math.max(1, Math.min(s.viewport.rowCount, MAX_A11Y_VIEWPORT_ROWS)) - 1,
     );
     const colEnd = Math.min(
-      16_383,
+      MAX_COL,
       s.viewport.colStart + Math.max(1, Math.min(s.viewport.colCount, MAX_A11Y_VIEWPORT_COLS)) - 1,
     );
     for (let row = s.viewport.rowStart; row <= rowEnd; row += 1) {
@@ -170,7 +165,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
           continue;
         }
         const cellMirror = document.createElement('div');
-        const cellRef = `${colName(col)}${row + 1}`;
+        const cellRef = `${colLetter(col)}${row + 1}`;
         const cellDisplay = cellDisplayText(s, wb, { sheet: s.data.sheetIndex, row, col });
         cellMirror.id = `${mirrorId}-cell-${row}-${col}`;
         cellMirror.setAttribute('role', 'gridcell');

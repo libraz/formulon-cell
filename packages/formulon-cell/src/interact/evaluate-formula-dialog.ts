@@ -1,4 +1,5 @@
 import { extractRefs, type FormulaRef } from '../commands/refs.js';
+import { colLetter } from '../engine/address.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -19,16 +20,7 @@ export interface EvaluateFormulaDialogHandle {
   detach(): void;
 }
 
-const cellRef = (row: number, col: number): string => {
-  let n = col + 1;
-  let letters = '';
-  while (n > 0) {
-    const rem = (n - 1) % 26;
-    letters = String.fromCharCode(65 + rem) + letters;
-    n = Math.floor((n - 1) / 26);
-  }
-  return `${letters}${row + 1}`;
-};
+const cellRef = (row: number, col: number): string => `${colLetter(col)}${row + 1}`;
 
 const formulaRefKey = (ref: FormulaRef): string => `${ref.r0}:${ref.c0}:${ref.r1}:${ref.c1}`;
 

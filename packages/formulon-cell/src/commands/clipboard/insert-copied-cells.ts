@@ -1,7 +1,17 @@
-import { addrKey } from '../../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../../engine/address.js';
 import type { Addr, Range } from '../../engine/types.js';
+import { writeCell } from '../../engine/value.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
+import { addMergeToMaps, removeIntersectingMerges } from '../../store/merge-maps.js';
+import { rangeContainsRange, rangesIntersect, sameRange } from '../../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../../store/store.js';
+import {
+  type CellRecord,
+  canShiftMerges,
+  shiftCells,
+  shiftFormats,
+  shiftMerges,
+} from '../cell-shift.js';
 import { coerceInputForCell, writeCoerced } from '../coerce-input.js';
 import { type AxisBandMoveContext, adjustFormulaForAxisBandMove } from '../formula-refs.js';
 import { type History, recordMergesChangeWithEngine } from '../history.js';
@@ -23,21 +33,7 @@ import {
   resetCrossSheetSourceDimensions,
   restoreCutTransientSnapshot,
 } from './cut-band-snapshots.js';
-import {
-  addMergeToMaps,
-  type CellRecord,
-  canShiftMerges,
-  copySnapshotMerges,
-  MAX_COL,
-  MAX_ROW,
-  rangesIntersect,
-  removeIntersectingMerges,
-  shiftCells,
-  shiftFormats,
-  shiftMerges,
-  writeCell,
-  writeSnapshotIntoInsertedRange,
-} from './insert-shift.js';
+import { copySnapshotMerges, writeSnapshotIntoInsertedRange } from './insert-shift.js';
 import { pasteSpecial, resolvePasteDestination } from './paste-special.js';
 import { type ClipboardSnapshot, captureSnapshotFromCopyResult } from './snapshot.js';
 import { parseTSV } from './tsv.js';
@@ -95,11 +91,15 @@ export function insertCopiedCellsFromTSV(
           r1: Math.min(MAX_ROW, origin.row + height - 1),
           c1: MAX_COL,
         };
-  if (!canShiftMerges(state, affected, direction)) return null;
+  if (!canShiftMerges(state, affected, direction)) {
+    // eslint-disable-next-line no-console
+    console.warn('formulon-cell: insert copied cells blocked — merge would be split');
+    return null;
+  }
 
   if (history) history.begin();
   try {
-    shiftCells(store.getState(), wb, affected, direction, direction === 'down' ? height : width);
+    shiftCells(wb, affected, direction, direction === 'down' ? height : width);
     shiftFormats(store, history, affected, direction, direction === 'down' ? height : width);
     shiftMerges(store, wb, history, affected, direction, direction === 'down' ? height : width);
 
@@ -133,9 +133,6 @@ export function insertCopiedCellsFromTSV(
     },
   };
 }
-
-const WHOLE_ROW_END = 1_048_575;
-const WHOLE_COLUMN_END = 16_383;
 
 /**
  * Insert a copied whole-row or whole-column band at the active target. The
@@ -172,7 +169,7 @@ export function insertCopiedBand(
 
   const count = wholeRows ? logical.r1 - logical.r0 + 1 : logical.c1 - logical.c0 + 1;
   if (!Number.isInteger(count) || count <= 0) return null;
-  const max = wholeRows ? WHOLE_ROW_END : WHOLE_COLUMN_END;
+  const max = wholeRows ? MAX_ROW : MAX_COL;
   const insertionAt = wholeRows ? targetAddr.row : targetAddr.col;
   const targetSheet = targetAddr.sheet;
   if (!sourceAxisMatchesTarget(snapshot, wholeRows, targetSheet)) return null;
@@ -244,13 +241,13 @@ export function insertCopiedBand(
         r0: insertionAt,
         c0: 0,
         r1: insertionAt + count - 1,
-        c1: WHOLE_COLUMN_END,
+        c1: MAX_COL,
       }
     : {
         sheet: targetSheet,
         r0: 0,
         c0: insertionAt,
-        r1: WHOLE_ROW_END,
+        r1: MAX_ROW,
         c1: insertionAt + count - 1,
       };
   const payloadDestination: Range = wholeRows
@@ -271,8 +268,8 @@ export function insertCopiedBand(
   if (
     payloadDestination.r0 < 0 ||
     payloadDestination.c0 < 0 ||
-    payloadDestination.r1 > WHOLE_ROW_END ||
-    payloadDestination.c1 > WHOLE_COLUMN_END
+    payloadDestination.r1 > MAX_ROW ||
+    payloadDestination.c1 > MAX_COL
   ) {
     return null;
   }
@@ -355,11 +352,11 @@ export function insertCopiedBand(
 }
 
 function isWholeRowRange(range: Range): boolean {
-  return range.c0 === 0 && range.c1 >= WHOLE_COLUMN_END;
+  return range.c0 === 0 && range.c1 >= MAX_COL;
 }
 
 function isWholeColumnRange(range: Range): boolean {
-  return range.r0 === 0 && range.r1 >= WHOLE_ROW_END;
+  return range.r0 === 0 && range.r1 >= MAX_ROW;
 }
 
 function sourceAxisMatchesTarget(
@@ -370,8 +367,8 @@ function sourceAxisMatchesTarget(
   if (snapshot.range.sheet !== targetSheet) return true;
   const logical = snapshot.logicalRange ?? snapshot.range;
   return wholeRows
-    ? logical.c0 === 0 && logical.c1 >= WHOLE_COLUMN_END
-    : logical.r0 === 0 && logical.r1 >= WHOLE_ROW_END;
+    ? logical.c0 === 0 && logical.c1 >= MAX_COL
+    : logical.r0 === 0 && logical.r1 >= MAX_ROW;
 }
 
 /**
@@ -522,13 +519,13 @@ function makeBand(
         r0: insertionAt,
         c0: 0,
         r1: insertionAt + count - 1,
-        c1: WHOLE_COLUMN_END,
+        c1: MAX_COL,
       }
     : {
         sheet: targetSheet,
         r0: 0,
         c0: insertionAt,
-        r1: WHOLE_ROW_END,
+        r1: MAX_ROW,
         c1: insertionAt + count - 1,
       };
 }
@@ -697,7 +694,7 @@ function cutSourceMergesAreWhole(state: State, wb: WorkbookHandle, source: Range
     merges.set(addrKey({ sheet: merge.sheet, row: merge.r0, col: merge.c0 }), merge);
   }
   for (const merge of merges.values()) {
-    if (rangesIntersect(merge, source) && !rangeContains(source, merge)) return false;
+    if (rangesIntersect(merge, source) && !rangeContainsRange(source, merge)) return false;
   }
   return true;
 }
@@ -733,7 +730,7 @@ function cutBandFitsAfterReorder(
 ): boolean {
   const sourceStart = wholeRows ? source.r0 : source.c0;
   const axis = axisOfBand(wholeRows);
-  const max = wholeRows ? WHOLE_ROW_END : WHOLE_COLUMN_END;
+  const max = wholeRows ? MAX_ROW : MAX_COL;
   const finalStart = finalStartForCut(sourceStart, count, insertionAt);
   if (finalStart < 0 || finalStart + count > max) return false;
   const mappedIndex = (index: number): number =>
@@ -1182,10 +1179,10 @@ function validCopiedBandSnapshot(snapshot: ClipboardSnapshot, logical: Range): b
     range.c0 >= 0 &&
     range.r1 >= range.r0 &&
     range.c1 >= range.c0 &&
-    range.r1 <= WHOLE_ROW_END &&
-    range.c1 <= WHOLE_COLUMN_END;
+    range.r1 <= MAX_ROW &&
+    range.c1 <= MAX_COL;
   if (!validRange(source) || !validRange(logical) || source.sheet !== logical.sheet) return false;
-  if (!rangeContains(logical, source)) return false;
+  if (!rangeContainsRange(logical, source)) return false;
   if (snapshot.rows !== source.r1 - source.r0 + 1) return false;
   if (snapshot.cols !== source.c1 - source.c0 + 1) return false;
   if (snapshot.rows <= 0 || snapshot.cols <= 0) return false;
@@ -1241,29 +1238,9 @@ function preflightCopiedBand(
   for (const merge of state.merges.byAnchor.values()) {
     const shifted = shiftedRangeForInsert(merge, targetSheet, axis, insertionAt, count);
     if (!rangesIntersect(shifted, band)) continue;
-    if (!rangeContains(band, shifted)) return false;
+    if (!rangeContainsRange(band, shifted)) return false;
   }
   return true;
-}
-
-function sameRange(left: Range, right: Range): boolean {
-  return (
-    left.sheet === right.sheet &&
-    left.r0 === right.r0 &&
-    left.c0 === right.c0 &&
-    left.r1 === right.r1 &&
-    left.c1 === right.c1
-  );
-}
-
-function rangeContains(outer: Range, inner: Range): boolean {
-  return (
-    outer.sheet === inner.sheet &&
-    inner.r0 >= outer.r0 &&
-    inner.c0 >= outer.c0 &&
-    inner.r1 <= outer.r1 &&
-    inner.c1 <= outer.c1
-  );
 }
 
 function commentsFitAfterInsert(
@@ -1273,7 +1250,7 @@ function commentsFitAfterInsert(
   insertionAt: number,
   count: number,
 ): boolean {
-  const max = wholeRows ? WHOLE_ROW_END : WHOLE_COLUMN_END;
+  const max = wholeRows ? MAX_ROW : MAX_COL;
   const lastMovable = max - count;
   for (const comment of wb.getComments(sheet)) {
     const axis = wholeRows ? comment.row : comment.col;

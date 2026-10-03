@@ -4,6 +4,7 @@ import type { History } from '../commands/history.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
+import { rangeContainsAddr } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import {
   createFloatingOptionsButton,
@@ -55,13 +56,6 @@ const addrFromKey = (key: string): { sheet: number; row: number; col: number } |
   }
   return { sheet, row, col };
 };
-
-const addrInRange = (addr: { sheet: number; row: number; col: number }, range: Range): boolean =>
-  addr.sheet === range.sheet &&
-  addr.row >= range.r0 &&
-  addr.row <= range.r1 &&
-  addr.col >= range.c0 &&
-  addr.col <= range.c1;
 
 export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOptionsHandle {
   const { host, store, wb } = deps;
@@ -115,7 +109,7 @@ export function attachAutoFillOptions(deps: AutoFillOptionsDeps): AutoFillOption
       const fmt = format.numFmt;
       if (fmt?.kind !== 'date' && fmt?.kind !== 'datetime') continue;
       const addr = addrFromKey(key);
-      if (!addr || !addrInRange(addr, detail.src)) continue;
+      if (!addr || !rangeContainsAddr(detail.src, addr)) continue;
       if (state.data.cells.get(key)?.value.kind === 'number') return true;
     }
     return false;

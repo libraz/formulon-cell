@@ -1,3 +1,4 @@
+import { colFromLetters, colLetter, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
@@ -33,24 +34,6 @@ type DefinedNamesSnapshot = Map<string, DefinedNameEntry>;
 
 const MAX_CREATE_DEFINED_NAMES = 10_000;
 
-const colLetter = (n: number): string => {
-  let v = n;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (v % 26)) + out;
-    v = Math.floor(v / 26) - 1;
-  } while (v >= 0);
-  return out;
-};
-
-const colIndexFromLetters = (letters: string): number => {
-  let col = 0;
-  for (let i = 0; i < letters.length; i += 1) {
-    col = col * 26 + (letters.charCodeAt(i) - 64);
-  }
-  return col;
-};
-
 /**
  * Whether `name` collides with a cell reference and so may not be used as a
  * defined name. Covers A1-style addresses within the sheet grid (up to column
@@ -60,9 +43,9 @@ const looksLikeCellRef = (name: string): boolean => {
   const up = name.toUpperCase();
   const a1 = up.match(/^([A-Z]{1,3})([0-9]{1,7})$/);
   if (a1) {
-    const col = colIndexFromLetters(a1[1] ?? '');
-    const row = Number.parseInt(a1[2] ?? '', 10);
-    if (col >= 1 && col <= 16384 && row >= 1 && row <= 1048576) return true;
+    const col = colFromLetters(a1[1] ?? '');
+    const row = Number.parseInt(a1[2] ?? '', 10) - 1;
+    if (col >= 0 && col <= MAX_COL && row >= 0 && row <= MAX_ROW) return true;
   }
   if (/^R[0-9]*C[0-9]*$/.test(up)) return true;
   return false;

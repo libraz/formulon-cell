@@ -1,8 +1,13 @@
-import { addrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { normalizeFormatLocale } from '../format/locale.js';
 import { formatWithPending, sameAddr } from '../store/pending-format.js';
-import { selectionCoversRange, subtractRange } from '../store/selection-geometry.js';
+import {
+  rangeContainsAddr,
+  rangesIntersect,
+  selectionCoversRange,
+  subtractRange,
+} from '../store/selection-geometry.js';
 import {
   type CellAlign,
   type CellBorderSide,
@@ -24,8 +29,6 @@ export { formatNumber } from '../format/number-format.js';
 type ToggleKey = 'bold' | 'italic' | 'underline' | 'strike';
 
 const MAX_MATERIALIZED_FORMAT_CELLS = 100_000;
-const MAX_XLSX_ROW = 1_048_575;
-const MAX_XLSX_COL = 16_383;
 
 export interface SelectionFormatOptions {
   allowPending?: boolean;
@@ -60,20 +63,6 @@ export function withSelectionFormatOrigin<T>(
   }
 }
 
-const rangeContainsAddr = (range: Range, addr: Addr): boolean =>
-  addr.sheet === range.sheet &&
-  addr.row >= range.r0 &&
-  addr.row <= range.r1 &&
-  addr.col >= range.c0 &&
-  addr.col <= range.c1;
-
-const rangesIntersect = (left: Range, right: Range): boolean =>
-  left.sheet === right.sheet &&
-  left.r0 <= right.r1 &&
-  left.r1 >= right.r0 &&
-  left.c0 <= right.c1 &&
-  left.c1 >= right.c0;
-
 const validSelectionRange = (range: Range, sheet: number): boolean =>
   range.sheet === sheet &&
   Number.isInteger(range.sheet) &&
@@ -86,8 +75,8 @@ const validSelectionRange = (range: Range, sheet: number): boolean =>
   range.c0 >= 0 &&
   range.r0 <= range.r1 &&
   range.c0 <= range.c1 &&
-  range.r1 <= MAX_XLSX_ROW &&
-  range.c1 <= MAX_XLSX_COL;
+  range.r1 <= MAX_ROW &&
+  range.c1 <= MAX_COL;
 
 const selectionRanges = (state: State): Range[] | null => {
   const ranges = [state.selection.range, ...(state.selection.extraRanges ?? [])];

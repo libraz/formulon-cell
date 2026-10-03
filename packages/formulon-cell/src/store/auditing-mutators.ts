@@ -1,11 +1,10 @@
 import { addrKey } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
+import { rangeArea } from './selection-geometry.js';
 import type { SpreadsheetStore } from './store.js';
 import type { TraceArrow } from './types.js';
 
 const MAX_WATCH_RANGE_CELLS = 10_000;
-
-const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
 
 /** Formula-auditing state: watch window, trace arrows, ignored errors and
  *  invalid-data circles. `addWatchRange` stays in `store.ts` because it

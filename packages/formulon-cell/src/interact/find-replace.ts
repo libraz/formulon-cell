@@ -8,7 +8,7 @@ import {
   replaceOne,
 } from '../commands/find.js';
 import type { History } from '../commands/history.js';
-import { addrKey } from '../engine/address.js';
+import { addrKey, colLetter } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -612,16 +612,5 @@ function td(text: string): HTMLTableCellElement {
 }
 
 function addrLabel(addr: Addr): string {
-  return `${colLabel(addr.col)}${addr.row + 1}`;
-}
-
-function colLabel(col: number): string {
-  let n = col + 1;
-  let label = '';
-  while (n > 0) {
-    const r = (n - 1) % 26;
-    label = String.fromCharCode(65 + r) + label;
-    n = Math.floor((n - 1) / 26);
-  }
-  return label;
+  return `${colLetter(addr.col)}${addr.row + 1}`;
 }

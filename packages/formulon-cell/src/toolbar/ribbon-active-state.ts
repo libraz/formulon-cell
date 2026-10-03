@@ -6,13 +6,12 @@ import { mergeAt } from '../commands/merge.js';
 import type { MarginPreset } from '../commands/page-setup.js';
 import { marginPresetOf, pageSetupForSheet } from '../commands/page-setup.js';
 import { hiddenInSelection } from '../commands/structure.js';
-import type { Range } from '../engine/types.js';
 import type { Strings } from '../i18n/strings/types.js';
 import type { SpreadsheetInstance } from '../mount.js';
 import { formatWithPending } from '../store/pending-format.js';
+import { rangesIntersect } from '../store/selection-geometry.js';
 import type {
   CellBorderStyle,
-  ConditionalRule,
   NumFmt,
   PageOrientation,
   PaperSize,
@@ -202,9 +201,6 @@ const numberFormatOf = (fmt: NumFmt | undefined): string => {
       return 'general';
   }
 };
-
-const rangesIntersect = (a: Range, b: ConditionalRule['range']): boolean =>
-  a.sheet === b.sheet && !(a.r1 < b.r0 || a.r0 > b.r1 || a.c1 < b.c0 || a.c0 > b.c1);
 
 type BorderPresetLabelKey =
   | 'noBorder'

@@ -1,4 +1,5 @@
 import { pageLayoutGaps } from '../commands/pagination.js';
+import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { LayoutSlice, State, UiSlice, ViewportSlice } from '../store/store.js';
 
@@ -28,9 +29,6 @@ function viewportZoom(viewport?: ViewportSlice): number {
   return viewport?.zoom && Number.isFinite(viewport.zoom) ? viewport.zoom : 1;
 }
 
-const MAX_LAYOUT_ROW = 1_048_575;
-const MAX_LAYOUT_COL = 16_383;
-
 function viewportRowStart(layout: LayoutSlice, viewport: ViewportSlice): number {
   return Math.max(layout.freezeRows, viewport.rowStart, viewport.navigationRange?.r0 ?? 0);
 }
@@ -41,29 +39,18 @@ function viewportColStart(layout: LayoutSlice, viewport: ViewportSlice): number 
 
 function viewportRowEnd(viewport: ViewportSlice): number {
   return Math.min(
-    MAX_LAYOUT_ROW,
+    MAX_ROW,
     viewport.rowStart + viewport.rowCount - 1,
-    viewport.navigationRange?.r1 ?? MAX_LAYOUT_ROW,
+    viewport.navigationRange?.r1 ?? MAX_ROW,
   );
 }
 
 function viewportColEnd(viewport: ViewportSlice): number {
   return Math.min(
-    MAX_LAYOUT_COL,
+    MAX_COL,
     viewport.colStart + viewport.colCount - 1,
-    viewport.navigationRange?.c1 ?? MAX_LAYOUT_COL,
+    viewport.navigationRange?.c1 ?? MAX_COL,
   );
-}
-
-/** Spreadsheet-style column letter ("A", "Z", "AA", "AB", ...). */
-export function colLabel(idx: number): string {
-  let n = idx;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (n % 26)) + out;
-    n = Math.floor(n / 26) - 1;
-  } while (n >= 0);
-  return out;
 }
 
 export function colWidth(layout: LayoutSlice, col: number, viewport?: ViewportSlice): number {
@@ -351,7 +338,7 @@ export function hitTest(
   let cx = ox;
   if (fc > 0 && x < ox + fcw) {
     col = Math.max(0, viewport.navigationRange?.c0 ?? 0);
-    const end = Math.min(fc, (viewport.navigationRange?.c1 ?? MAX_LAYOUT_COL) + 1);
+    const end = Math.min(fc, (viewport.navigationRange?.c1 ?? MAX_COL) + 1);
     while (col < end) {
       cx += colGap(layout, col);
       if (x < cx) return null;
@@ -380,7 +367,7 @@ export function hitTest(
   let cy = oy;
   if (fr > 0 && y < oy + frh) {
     row = Math.max(0, viewport.navigationRange?.r0 ?? 0);
-    const end = Math.min(fr, (viewport.navigationRange?.r1 ?? MAX_LAYOUT_ROW) + 1);
+    const end = Math.min(fr, (viewport.navigationRange?.r1 ?? MAX_ROW) + 1);
     while (row < end) {
       cy += rowGap(layout, row);
       if (y < cy) return null;
@@ -422,7 +409,7 @@ function colAtX(
   if (fc > 0 && x < ox + fcw) {
     let cx = ox;
     const start = Math.max(0, viewport.navigationRange?.c0 ?? 0);
-    const end = Math.min(fc, (viewport.navigationRange?.c1 ?? MAX_LAYOUT_COL) + 1);
+    const end = Math.min(fc, (viewport.navigationRange?.c1 ?? MAX_COL) + 1);
     for (let col = start; col < end; col += 1) {
       cx += colGap(layout, col);
       const w = colWidth(layout, col, viewport);
@@ -455,7 +442,7 @@ function rowAtY(
   if (fr > 0 && y < oy + frh) {
     let cy = oy;
     const start = Math.max(0, viewport.navigationRange?.r0 ?? 0);
-    const end = Math.min(fr, (viewport.navigationRange?.r1 ?? MAX_LAYOUT_ROW) + 1);
+    const end = Math.min(fr, (viewport.navigationRange?.r1 ?? MAX_ROW) + 1);
     for (let row = start; row < end; row += 1) {
       cy += rowGap(layout, row);
       const h = rowHeight(layout, row, viewport);
@@ -746,9 +733,9 @@ export function rangeRects(
 ): Rect[] {
   const bounded = viewport.navigationRange;
   const r0 = Math.max(range.r0, bounded?.r0 ?? 0);
-  const r1 = Math.min(range.r1, bounded?.r1 ?? MAX_LAYOUT_ROW);
+  const r1 = Math.min(range.r1, bounded?.r1 ?? MAX_ROW);
   const c0 = Math.max(range.c0, bounded?.c0 ?? 0);
-  const c1 = Math.min(range.c1, bounded?.c1 ?? MAX_LAYOUT_COL);
+  const c1 = Math.min(range.c1, bounded?.c1 ?? MAX_COL);
   if (r0 > r1 || c0 > c1) return [];
   const fr = layout.freezeRows;
   const fc = layout.freezeCols;

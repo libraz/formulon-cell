@@ -1,9 +1,11 @@
+import { colLetter } from '../engine/address.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import { pivotAggregationName } from '../engine/pivot-aggregation.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { CellValue, PivotFilterSpec, PivotShowValuesAs, Range } from '../engine/types.js';
 import { PivotAggregation, PivotAxis } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { rangeArea } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import type { History } from './history.js';
 import { addSheet } from './sheet-mutate.js';
@@ -117,24 +119,11 @@ const pivotCacheRecordValue = (
 
 const MAX_PIVOT_SOURCE_CELLS = 100_000;
 
-const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
-
 const canMaterializePivotSource = (range: Range): boolean =>
   rangeArea(range) <= MAX_PIVOT_SOURCE_CELLS;
 
-const columnName = (col: number): string => {
-  let n = col + 1;
-  let out = '';
-  while (n > 0) {
-    const rem = (n - 1) % 26;
-    out = String.fromCharCode(65 + rem) + out;
-    n = Math.floor((n - 1) / 26);
-  }
-  return out;
-};
-
 const rangeRef = (range: Range): string =>
-  `${columnName(range.c0)}${range.r0 + 1}:${columnName(range.c1)}${range.r1 + 1}`;
+  `${colLetter(range.c0)}${range.r0 + 1}:${colLetter(range.c1)}${range.r1 + 1}`;
 
 const writePivotCacheWorksheetSource = (
   wb: WorkbookHandle,

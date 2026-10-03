@@ -1,7 +1,9 @@
 import { type History, recordConditionalRulesChange } from '../commands/history.js';
+import { colLetter } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
+import { rangesIntersect } from '../store/selection-geometry.js';
 import { type ConditionalRule, mutators, type SpreadsheetStore } from '../store/store.js';
 import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
@@ -69,16 +71,6 @@ const ruleTypeLabel = (type: number, t: Strings['cfRulesDialog']): string => {
     17: t.ruleUniqueValues,
   };
   return labels[type] ?? `type=${type}`;
-};
-
-const colLetter = (col: number): string => {
-  let n = col;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (n % 26)) + out;
-    n = Math.floor(n / 26) - 1;
-  } while (n >= 0);
-  return out;
 };
 
 const formatSqref = (
@@ -165,11 +157,6 @@ type ManagedRule =
       range: string;
       stopIfTrue: boolean;
     };
-
-const rangesIntersect = (
-  a: Range,
-  b: { firstRow: number; firstCol: number; lastRow: number; lastCol: number },
-): boolean => a.r0 <= b.lastRow && a.r1 >= b.firstRow && a.c0 <= b.lastCol && a.c1 >= b.firstCol;
 
 /**
  * Engine-driven CF rule manager. Lists every rule on the active sheet via
@@ -467,7 +454,16 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
       .map((rule, index) => ({ rule, index }))
       .filter(
         ({ rule }) =>
-          !scopeSelection || rule.sqref.some((range) => rangesIntersect(scopeSelection, range)),
+          !scopeSelection ||
+          rule.sqref.some((range) =>
+            rangesIntersect(scopeSelection, {
+              sheet: scopeSelection.sheet,
+              r0: range.firstRow,
+              c0: range.firstCol,
+              r1: range.lastRow,
+              c1: range.lastCol,
+            }),
+          ),
       );
     const sessionRules = (deps.store?.getState().conditional.rules ?? [])
       .map((rule, index) => ({ rule, index }))
@@ -475,13 +471,7 @@ export function attachCfRulesDialog(deps: CfRulesDialogDeps): CfRulesDialogHandl
         ({ rule }) =>
           rule.range.sheet === sheet &&
           rule.engineId === undefined &&
-          (!scopeSelection ||
-            rangesIntersect(scopeSelection, {
-              firstRow: rule.range.r0,
-              firstCol: rule.range.c0,
-              lastRow: rule.range.r1,
-              lastCol: rule.range.c1,
-            })),
+          (!scopeSelection || rangesIntersect(scopeSelection, rule.range)),
       );
     const rules: ManagedRule[] = [
       ...engineRules.map<ManagedRule>(({ rule, index }) => ({

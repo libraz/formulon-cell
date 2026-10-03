@@ -1,25 +1,15 @@
+import { colLetter } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { rangeArea } from '../store/selection-geometry.js';
 import type { State } from '../store/store.js';
 import { mergeAt } from './merge.js';
 import { isCellWritable, warnProtected } from './protection.js';
-
-const colLetter = (n: number): string => {
-  let v = n;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (v % 26)) + out;
-    v = Math.floor(v / 26) - 1;
-  } while (v >= 0);
-  return out;
-};
 
 const rangeRef = (r: Range): string =>
   `${colLetter(r.c0)}${r.r0 + 1}:${colLetter(r.c1)}${r.r1 + 1}`;
 
 const MAX_AUTOSUM_SELECTION_CELLS = 100_000;
-
-const rangeArea = (r: Range): number => (r.r1 - r.r0 + 1) * (r.c1 - r.c0 + 1);
 
 const isNum = (state: State, sheet: number, row: number, col: number): boolean => {
   if (row < 0 || col < 0) return false;

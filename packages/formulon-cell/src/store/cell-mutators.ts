@@ -1,6 +1,7 @@
 import { addrKey } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { navigationBoundsFor, syncNavigationViewport } from '../interact/navigation-policy.js';
+import { addMergeToMaps, removeIntersectingMerges } from './merge-maps.js';
 import type { SpreadsheetStore } from './store.js';
 import type { CellFormat, CustomCellStyle } from './types.js';
 
@@ -101,28 +102,8 @@ export const cellMutators = {
       const byAnchor = new Map(s.merges.byAnchor);
       const byCell = new Map(s.merges.byCell);
       // Strip any existing merges that touch the range.
-      for (const [anchorKey, r] of byAnchor) {
-        if (
-          r.sheet === range.sheet &&
-          !(r.r1 < range.r0 || r.r0 > range.r1 || r.c1 < range.c0 || r.c0 > range.c1)
-        ) {
-          byAnchor.delete(anchorKey);
-          for (let row = r.r0; row <= r.r1; row += 1) {
-            for (let col = r.c0; col <= r.c1; col += 1) {
-              byCell.delete(addrKey({ sheet: r.sheet, row, col }));
-            }
-          }
-        }
-      }
-      const anchor = { sheet: range.sheet, row: range.r0, col: range.c0 };
-      const ak = addrKey(anchor);
-      byAnchor.set(ak, range);
-      for (let row = range.r0; row <= range.r1; row += 1) {
-        for (let col = range.c0; col <= range.c1; col += 1) {
-          if (row === range.r0 && col === range.c0) continue;
-          byCell.set(addrKey({ sheet: range.sheet, row, col }), ak);
-        }
-      }
+      removeIntersectingMerges(byAnchor, byCell, range);
+      addMergeToMaps(byAnchor, byCell, range);
       return { ...s, merges: { byAnchor, byCell } };
     });
   },
@@ -145,19 +126,7 @@ export const cellMutators = {
     store.setState((s) => {
       const byAnchor = new Map(s.merges.byAnchor);
       const byCell = new Map(s.merges.byCell);
-      for (const [anchorKey, r] of byAnchor) {
-        if (
-          r.sheet === range.sheet &&
-          !(r.r1 < range.r0 || r.r0 > range.r1 || r.c1 < range.c0 || r.c0 > range.c1)
-        ) {
-          byAnchor.delete(anchorKey);
-          for (let row = r.r0; row <= r.r1; row += 1) {
-            for (let col = r.c0; col <= r.c1; col += 1) {
-              byCell.delete(addrKey({ sheet: r.sheet, row, col }));
-            }
-          }
-        }
-      }
+      removeIntersectingMerges(byAnchor, byCell, range);
       return { ...s, merges: { byAnchor, byCell } };
     });
   },

@@ -1,4 +1,6 @@
+import type { Addr } from './types.js';
 import { type CellValue, type Value, ValueKind } from './types.js';
+import type { WorkbookHandle } from './workbook-handle.js';
 
 const ERROR_NAME: Readonly<Record<number, string>> = {
   0: '#NULL!',
@@ -43,6 +45,36 @@ export function fromEngineValue(v: Value): CellValue {
       return { kind: 'error', code: v.errorCode, text: ERROR_NAME[v.errorCode] ?? '#ERR!' };
     default:
       return BLANK;
+  }
+}
+
+/** Write a stored cell through the typed `WorkbookHandle` API: the formula
+ *  when present, otherwise the value (blank for anything else). */
+export function writeCell(
+  wb: WorkbookHandle,
+  addr: Addr,
+  value: CellValue,
+  formula: string | null,
+): void {
+  if (formula) {
+    wb.setFormula(addr, formula);
+    return;
+  }
+  switch (value.kind) {
+    case 'number':
+      wb.setNumber(addr, value.value);
+      return;
+    case 'text':
+      wb.setText(addr, value.value);
+      return;
+    case 'bool':
+      wb.setBool(addr, value.value);
+      return;
+    case 'error':
+      wb.setError(addr, value.code);
+      return;
+    default:
+      wb.setBlank(addr);
   }
 }
 

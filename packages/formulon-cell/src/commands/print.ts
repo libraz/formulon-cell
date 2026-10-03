@@ -1,3 +1,4 @@
+import { colLetter } from '../engine/address.js';
 import type { CellValue } from '../engine/types.js';
 // Print / PDF export.
 //
@@ -31,7 +32,6 @@ import {
   splitPrintRegionIntoTiles,
 } from './page-geometry.js';
 import {
-  colLetter,
   orderPrintRegionsForPageOrder,
   type PrintAreaBounds,
   parsePrintAreas,
@@ -41,6 +41,7 @@ import {
 import { type PrinterProfile, resolvePrinterProfileBounds } from './printer-profile.js';
 import { formatA1FormulaAsR1C1 } from './refs.js';
 
+export { colLetter } from '../engine/address.js';
 export type { AxisBand, PrintableMarginAdjustment, SplitAxisOptions } from './page-geometry.js';
 export {
   computeFitToPagesScale,
@@ -53,7 +54,6 @@ export {
 } from './page-geometry.js';
 export type { PrintAreaBounds } from './print-ranges.js';
 export {
-  colLetter,
   orderPrintRegionsForPageOrder,
   parsePrintArea,
   parsePrintAreas,

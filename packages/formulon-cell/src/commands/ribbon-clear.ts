@@ -3,11 +3,15 @@
 // mutation, and the history boundary so all ribbon hosts have the same
 // behavior for disjoint selections.
 
-import { addrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { selectionContainsAddr, selectionCoversRange } from '../store/selection-geometry.js';
+import {
+  rangesIntersect,
+  selectionContainsAddr,
+  selectionCoversRange,
+} from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import {
   type ClearContentsCommands,
@@ -42,8 +46,6 @@ export interface ExecuteRibbonClearActionDeps {
   commands?: Pick<InteractionController, 'execute' | 'policy'>;
 }
 
-const MAX_XLSX_ROW = 1_048_575;
-const MAX_XLSX_COL = 16_383;
 const MAX_MATERIALIZED_LOCK_CELLS = 100_000;
 
 const visualFormatKeys: readonly (keyof CellFormat)[] = [
@@ -93,13 +95,6 @@ const cloneValue = <T>(value: T): T => {
 
 const cloneAddr = (addr: Addr): Addr => ({ sheet: addr.sheet, row: addr.row, col: addr.col });
 
-const rangesIntersect = (left: Range, right: Range): boolean =>
-  left.sheet === right.sheet &&
-  left.r0 <= right.r1 &&
-  left.r1 >= right.r0 &&
-  left.c0 <= right.c1 &&
-  left.c1 >= right.c0;
-
 const validRange = (range: Range, sheet: number): boolean =>
   range.sheet === sheet &&
   Number.isInteger(range.sheet) &&
@@ -112,8 +107,8 @@ const validRange = (range: Range, sheet: number): boolean =>
   range.c0 >= 0 &&
   range.r0 <= range.r1 &&
   range.c0 <= range.c1 &&
-  range.r1 <= MAX_XLSX_ROW &&
-  range.c1 <= MAX_XLSX_COL;
+  range.r1 <= MAX_ROW &&
+  range.c1 <= MAX_COL;
 
 const addrFromKey = (key: string): Addr | null => {
   const parts = key.split(':').map(Number);

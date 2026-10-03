@@ -44,7 +44,7 @@ import {
   verifySheetProtectionPasswordHash,
 } from '../commands/protection.js';
 import { cellValueViolatesValidation } from '../commands/validate.js';
-import { addrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 // Imports use the `@libraz/formulon-cell` self-alias instead of relative
 // paths because `dynamic-dropdowns.ts` and other ribbon modules already do.
@@ -136,7 +136,7 @@ import {
 import { openCellShiftDialog } from '../interact/cell-shift-dialog.js';
 import { sheetTabColorActionForColor, sheetTabColorByAction } from '../sheet-tab-colors.js';
 import { formatWithPending } from '../store/pending-format.js';
-import { selectionContainsAddr } from '../store/selection-geometry.js';
+import { rangeContainsAddr, selectionContainsAddr } from '../store/selection-geometry.js';
 import { showAdvancedFilterDialog } from '../toolbar/dialogs/advanced-filter.js';
 import { showCellStyleDialog } from '../toolbar/dialogs/cell-style.js';
 import { showChoiceDialog } from '../toolbar/dialogs/choice.js';
@@ -199,9 +199,6 @@ const normalizedSelectionRange = (instance: SpreadsheetInstance): Range => {
   };
 };
 
-const MAX_ROW = 1_048_575;
-const MAX_COL = 16_383;
-
 const isWholeRowSelection = (range: Range): boolean => range.c0 === 0 && range.c1 >= MAX_COL;
 
 const isWholeColumnSelection = (range: Range): boolean => range.r0 === 0 && range.r1 >= MAX_ROW;
@@ -219,13 +216,6 @@ const addrFromKey = (key: string): { sheet: number; row: number; col: number } |
   if (!Number.isInteger(sheet) || !Number.isInteger(row) || !Number.isInteger(col)) return null;
   return { sheet, row, col };
 };
-
-const addrInRange = (addr: { sheet: number; row: number; col: number }, range: Range): boolean =>
-  addr.sheet === range.sheet &&
-  addr.row >= range.r0 &&
-  addr.row <= range.r1 &&
-  addr.col >= range.c0 &&
-  addr.col <= range.c1;
 
 const buildFillDirection =
   (instance: SpreadsheetInstance): DynamicDropdownsCtx['applyFillDirection'] =>
@@ -1703,7 +1693,7 @@ const buildDataValidationAction =
     for (const [key, format] of state.format.formats) {
       if (!format.validation) continue;
       const addr = addrFromKey(key);
-      if (!addr || !addrInRange(addr, range)) continue;
+      if (!addr || !rangeContainsAddr(range, addr)) continue;
       const value = instance.workbook.getValue(addr);
       if (cellValueViolatesValidation(value, format.validation)) invalid.add(key);
     }
@@ -1720,7 +1710,7 @@ const updateDataValidationMenu =
     for (const [key, format] of state.format.formats) {
       if (!format.validation) continue;
       const addr = addrFromKey(key);
-      if (addr && addrInRange(addr, range)) {
+      if (addr && rangeContainsAddr(range, addr)) {
         hasValidation = true;
         break;
       }

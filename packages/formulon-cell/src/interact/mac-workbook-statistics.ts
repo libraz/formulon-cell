@@ -1,8 +1,8 @@
+import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { appendDialogButton, appendDialogFrame, createDialogShell } from './dialog-shell.js';
-import { MAX_NAVIGATION_COL, MAX_NAVIGATION_ROW } from './navigation-policy.js';
 
 export interface WorkbookStatistics {
   sheets: number;
@@ -73,8 +73,8 @@ export function collectWorkbookStatistics(
       sheet < 0 ||
       row < 0 ||
       col < 0 ||
-      row > MAX_NAVIGATION_ROW ||
-      col > MAX_NAVIGATION_COL ||
+      row > MAX_ROW ||
+      col > MAX_COL ||
       sheet >= workbook.sheetCount
     ) {
       return false;

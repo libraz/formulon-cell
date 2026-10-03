@@ -1,4 +1,4 @@
-import { addrKey } from '../../../engine/address.js';
+import { addrKey, colLetter, MAX_COL, MAX_ROW } from '../../../engine/address.js';
 import type { CellValue } from '../../../engine/types.js';
 import { readLogical, readNumber, textValue } from '../coercion.js';
 import {
@@ -8,7 +8,7 @@ import {
   isApproximateLookupMode,
   isExactLookupMode,
 } from '../matching.js';
-import { colToLetters, parseA1Ref, parseR1C1Ref } from '../parser.js';
+import { parseA1Ref, parseR1C1Ref } from '../parser.js';
 import type { FormulaRangeArg, ParsedA1Range } from '../types.js';
 import type { FormulaReaderContext } from './context.js';
 import type { RangeReader } from './ranges.js';
@@ -203,7 +203,7 @@ export function createLookupEvaluator(ctx: LookupEvaluatorContext) {
     if (height !== 1 || width !== 1) return { kind: 'error', code: 15, text: '#VALUE!' };
     const targetRow = bounds.r0 + Math.trunc(rows);
     const targetCol = bounds.c0 + Math.trunc(cols);
-    if (targetRow < 0 || targetRow > 1048575 || targetCol < 0 || targetCol > 16383) {
+    if (targetRow < 0 || targetRow > MAX_ROW || targetCol < 0 || targetCol > MAX_COL) {
       return { kind: 'error', code: 15, text: '#VALUE!' };
     }
     return (
@@ -229,7 +229,7 @@ export function createLookupEvaluator(ctx: LookupEvaluatorContext) {
     if (!ref) return { kind: 'error', code: 15, text: '#VALUE!' };
     const row = ref.row;
     const col = ref.col;
-    if (row < 0 || row > 1048575 || col < 0 || col > 16383) {
+    if (row < 0 || row > MAX_ROW || col < 0 || col > MAX_COL) {
       return { kind: 'error', code: 15, text: '#VALUE!' };
     }
     return (
@@ -429,14 +429,14 @@ export function createLookupEvaluator(ctx: LookupEvaluatorContext) {
     const [row, col] = position
       ? [position.row, position.col]
       : [anchorRow + rowOffset, anchorCol + colOffset];
-    if (row < 0 || row > 1048575 || col < 0 || col > 16383) {
+    if (row < 0 || row > MAX_ROW || col < 0 || col > MAX_COL) {
       return { kind: 'error', code: 15, text: '#VALUE!' };
     }
     const value = state.data.cells.get(addrKey({ sheet, row, col }))?.value ?? {
       kind: 'blank' as const,
     };
     if (type === 'address') {
-      return { kind: 'text', value: `$${colToLetters(col)}$${row + 1}` };
+      return { kind: 'text', value: `$${colLetter(col)}$${row + 1}` };
     }
     if (type === 'row') return { kind: 'number', value: row + 1 };
     if (type === 'col') return { kind: 'number', value: col + 1 };

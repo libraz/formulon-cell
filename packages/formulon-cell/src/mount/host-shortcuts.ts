@@ -25,6 +25,7 @@ import {
   showColsAroundSelection,
   showRowsAroundSelection,
 } from '../commands/structure.js';
+import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
@@ -54,9 +55,6 @@ const DIRECT_NUMBER_FORMAT_BY_KEY: Readonly<Record<string, NumberFormatAction>> 
   '%': 'percent',
   '^': 'scientific',
 };
-
-const MAX_ROW = 1_048_575;
-const MAX_COL = 16_383;
 
 const isWholeRowSelection = (range: { c0: number; c1: number }): boolean =>
   range.c0 === 0 && range.c1 >= MAX_COL;

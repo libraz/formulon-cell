@@ -23,9 +23,22 @@ export const rangeContainsAddr = (range: Range, addr: Addr): boolean =>
   addr.col >= range.c0 &&
   addr.col <= range.c1;
 
+export const rangeContainsRange = (outer: Range, inner: Range): boolean =>
+  outer.sheet === inner.sheet &&
+  outer.r0 <= inner.r0 &&
+  outer.c0 <= inner.c0 &&
+  outer.r1 >= inner.r1 &&
+  outer.c1 >= inner.c1;
+
 export function rangesIntersect(a: Range, b: Range): boolean {
   return a.sheet === b.sheet && !(a.r1 < b.r0 || a.r0 > b.r1 || a.c1 < b.c0 || a.c0 > b.c1);
 }
+
+/** Cell count of `range`; 0 when either axis is inverted. */
+export const rangeArea = (range: Range): number =>
+  range.r1 < range.r0 || range.c1 < range.c0
+    ? 0
+    : (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
 
 export const selectionContainsAddr = (
   selection: Pick<SelectionSlice, 'range' | 'extraRanges'>,

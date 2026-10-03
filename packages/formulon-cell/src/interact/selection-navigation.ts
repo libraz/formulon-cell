@@ -1,12 +1,11 @@
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { mergeAt, stepWithMerge } from '../commands/merge.js';
+import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import {
   clampNavigationAddr,
   isNavigationAddrAllowed,
-  MAX_NAVIGATION_COL,
-  MAX_NAVIGATION_ROW,
   navigationBoundsFor,
   navigationPolicyFor,
 } from './navigation-policy.js';
@@ -201,8 +200,8 @@ export function nextAdvanceTarget(
       state.selection.active,
       dRow,
       dCol,
-      bounds?.r1 ?? MAX_NAVIGATION_ROW,
-      bounds?.c1 ?? MAX_NAVIGATION_COL,
+      bounds?.r1 ?? MAX_ROW,
+      bounds?.c1 ?? MAX_COL,
     ),
     preserveSelection: false,
   };

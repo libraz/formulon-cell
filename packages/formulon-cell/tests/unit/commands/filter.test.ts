@@ -16,7 +16,7 @@ import {
   setAutoFilter,
 } from '../../../src/commands/filter.js';
 import { History } from '../../../src/commands/history.js';
-import { addrKey } from '../../../src/engine/workbook-handle.js';
+import { addrKey, WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
   createSpreadsheetStore,
   mutators,
@@ -642,5 +642,35 @@ describe('filter commands', () => {
       value: 24,
     });
     expect(cells.get(addrKey({ sheet: 0, row: 10, col: 0 }))).toBeUndefined();
+  });
+
+  it('writes copied error values to the engine instead of blanking them', async () => {
+    const wb = await WorkbookHandle.createDefault({ preferStub: true });
+    try {
+      seedText(store, 0, 0, 'Result');
+      store.setState((s) => {
+        const cells = new Map(s.data.cells);
+        cells.set(addrKey({ sheet: 0, row: 1, col: 0 }), {
+          value: { kind: 'error', code: 1, text: '#DIV/0!' },
+          formula: null,
+        });
+        return { ...s, data: { ...s.data, cells } };
+      });
+
+      const copied = copyAdvancedFilterResult(
+        store.getState(),
+        store,
+        { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 },
+        { sheet: 0, r0: 5, c0: 0, r1: 5, c1: 0 },
+        { sheet: 0, row: 8, col: 0 },
+        {},
+        wb,
+      );
+
+      expect(copied).toBe(2);
+      expect(wb.getValue({ sheet: 0, row: 9, col: 0 })).toMatchObject({ kind: 'error', code: 1 });
+    } finally {
+      wb.dispose();
+    }
   });
 });

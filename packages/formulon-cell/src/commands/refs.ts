@@ -1,3 +1,5 @@
+import { colFromLetters, colLetter, MAX_COL, MAX_ROW, parseA1Atom } from '../engine/address.js';
+
 /**
  * F4 reference rotation: cycles between A1, $A$1, A$1, $A1, then back to A1.
  * Operates on the cell reference at `caret` in `text`. Returns the new text
@@ -19,14 +21,6 @@ export interface FormulaRef {
   colorIndex: number;
 }
 
-const lettersToCol = (letters: string): number => {
-  let col = 0;
-  for (let i = 0; i < letters.length; i += 1) {
-    col = col * 26 + (letters.toUpperCase().charCodeAt(i) - 64);
-  }
-  return col - 1;
-};
-
 /** Extract every cell or range reference from a formula text. The returned
  *  list is in source order with a stable per-target color index so callers
  *  can paint distinct highlights for each ref, the same way spreadsheets do
@@ -42,8 +36,8 @@ export function extractRefs(text: string): FormulaRef[] {
   for (let m = re.exec(text); m !== null; m = re.exec(text)) {
     const headM = m[3] ?? '';
     const tailM = m[4];
-    const head = parseAtomRef(headM);
-    const tail = tailM ? parseAtomRef(tailM) : head;
+    const head = parseA1Atom(headM);
+    const tail = tailM ? parseA1Atom(tailM) : head;
     if (!head || !tail) continue;
     // Skip false positives — function names like SIN1 don't have a digit-letter
     //  shape in the head capture, so the regex naturally rejects them. But
@@ -72,16 +66,6 @@ export function extractRefs(text: string): FormulaRef[] {
     });
   }
   return out;
-}
-
-function parseAtomRef(raw: string): { row: number; col: number } | null {
-  const m = raw.match(/^\$?([A-Za-z]+)\$?(\d+)$/);
-  if (!m) return null;
-  const col = lettersToCol(m[1] ?? '');
-  const row = Number.parseInt(m[2] ?? '', 10) - 1;
-  if (col < 0 || row < 0) return null;
-  if (col > 16383 || row > 1048575) return null;
-  return { row, col };
 }
 
 /** Distinct accent colors used for formula-edit reference highlighting. They
@@ -139,17 +123,6 @@ function nextStep(absCol: boolean, absRow: boolean): { col: boolean; row: boolea
   return { col: false, row: false };
 }
 
-const colToLetters = (col: number): string => {
-  let n = col + 1;
-  let s = '';
-  while (n > 0) {
-    const r = (n - 1) % 26;
-    s = String.fromCharCode(65 + r) + s;
-    n = Math.floor((n - 1) / 26);
-  }
-  return s;
-};
-
 const R1C1_REF_RE = /R(?:\[(-?\d+)\]|([1-9]\d*))?C(?:\[(-?\d+)\]|([1-9]\d*))?/iy;
 
 const r1c1AtomToA1 = (raw: string, base: { row: number; col: number }): string => {
@@ -163,8 +136,8 @@ const r1c1AtomToA1 = (raw: string, base: { row: number; col: number }): string =
     m[4] !== undefined
       ? Number.parseInt(m[4], 10) - 1
       : base.col + (m[3] !== undefined ? Number.parseInt(m[3], 10) : 0);
-  if (row < 0 || col < 0 || row > 1048575 || col > 16383) return '#REF!';
-  return `${colToLetters(col)}${row + 1}`;
+  if (row < 0 || col < 0 || row > MAX_ROW || col > MAX_COL) return '#REF!';
+  return `${colLetter(col)}${row + 1}`;
 };
 
 /** Convert R1C1 references in a user-authored formula into A1 references for
@@ -211,9 +184,9 @@ const a1AtomToR1C1 = (raw: string, base: { row: number; col: number }): string =
   if (!m) return raw;
   const colAbs = m[1] === '$';
   const rowAbs = m[3] === '$';
-  const col = lettersToCol(m[2] ?? '');
+  const col = colFromLetters(m[2] ?? '');
   const row = Number.parseInt(m[4] ?? '', 10) - 1;
-  if (row < 0 || col < 0 || row > 1048575 || col > 16383) return raw;
+  if (row < 0 || col < 0 || row > MAX_ROW || col > MAX_COL) return raw;
   const r = rowAbs ? `R${row + 1}` : row === base.row ? 'R' : `R[${row - base.row}]`;
   const c = colAbs ? `C${col + 1}` : col === base.col ? 'C' : `C[${col - base.col}]`;
   return `${r}${c}`;

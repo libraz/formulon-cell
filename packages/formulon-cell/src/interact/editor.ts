@@ -3,10 +3,11 @@ import { replaceFormulaSelectionWithF9Preview } from '../commands/f9-preview.js'
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { dblClickRange, extractRefs, rotateRefAt, shiftFormulaRefs } from '../commands/refs.js';
 import { addrKey } from '../engine/address.js';
-import type { Addr, Range } from '../engine/types.js';
+import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { bodyBandOrigin, cellRectUnclamped, layoutForView } from '../render/geometry.js';
 import { formatWithPending, sameAddr } from '../store/pending-format.js';
+import { rangeArea } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore } from '../store/store.js';
 import { type ArgHelperHandle, type ArgHelperLabels, attachArgHelper } from './arg-helper.js';
 import {
@@ -25,8 +26,6 @@ import { buildSelectionInputBatch, SELECTION_INPUT_LIMIT_MESSAGE } from './selec
 import { advanceAfterCommit } from './selection-navigation.js';
 
 const MAX_MULTI_COMMIT_CELLS = 100_000;
-
-const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
 
 const syncEditorRefs = (store: SpreadsheetStore, text: string): void => {
   const refs = extractRefs(text).map((r) => ({

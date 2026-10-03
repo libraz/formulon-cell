@@ -1,5 +1,6 @@
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { State } from '../store/types.js';
 import { applyTextScript, type ScriptCommand } from '../toolbar/review-tools.js';
 import { isCellWritable } from './protection.js';
@@ -22,13 +23,6 @@ const addrFromKey = (key: string): Addr | null => {
   return { sheet, row, col };
 };
 
-const inRange = (addr: Addr, range: Range): boolean =>
-  addr.sheet === range.sheet &&
-  addr.row >= range.r0 &&
-  addr.row <= range.r1 &&
-  addr.col >= range.c0 &&
-  addr.col <= range.c1;
-
 export function applyTextScriptToRange(
   state: State,
   workbook: WorkbookHandle,
@@ -38,7 +32,7 @@ export function applyTextScriptToRange(
   let changed = 0;
   for (const [key, cell] of state.data.cells) {
     const addr = addrFromKey(key);
-    if (!addr || !inRange(addr, range)) continue;
+    if (!addr || !rangeContainsAddr(range, addr)) continue;
     if (!isCellWritable(state, addr)) continue;
     if (command === 'clear') {
       if (cell.value.kind === 'blank' && !cell.formula) continue;

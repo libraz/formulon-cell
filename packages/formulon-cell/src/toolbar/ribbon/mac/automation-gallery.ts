@@ -1,12 +1,11 @@
 import { formatAsTable, inferTableHasHeaders } from '../../../commands/format-as-table.js';
-import { MAX_COL_INDEX, MAX_ROW_INDEX } from '../../../commands/formula-refs.js';
 import { recordTablesChange } from '../../../commands/history.js';
 import type {
   InteractionOperation,
   OperationIntent,
 } from '../../../commands/interaction-policy.js';
 import { setFreezePanes, showCols, showRows } from '../../../commands/structure.js';
-import { addrKey } from '../../../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../../../engine/address.js';
 import { parseRangeRef } from '../../../engine/range-resolver.js';
 import type { Addr, Range } from '../../../engine/types.js';
 import type { EngineHyperlinkRecord } from '../../../engine/workbook-handle.js';
@@ -139,8 +138,8 @@ const normalizedRange = (range: Range): Range => ({
   sheet: range.sheet,
   r0: Math.max(0, Math.min(range.r0, range.r1)),
   c0: Math.max(0, Math.min(range.c0, range.c1)),
-  r1: Math.min(MAX_ROW_INDEX, Math.max(range.r0, range.r1)),
-  c1: Math.min(MAX_COL_INDEX, Math.max(range.c0, range.c1)),
+  r1: Math.min(MAX_ROW, Math.max(range.r0, range.r1)),
+  c1: Math.min(MAX_COL, Math.max(range.c0, range.c1)),
 });
 
 const isMeaningful = (cell: { value: { kind: string }; formula: string | null }): boolean =>
@@ -158,8 +157,8 @@ const storeAddress = (key: string): Addr | null => {
 export function usedRangeForMacAutomation(instance: SpreadsheetInstance): Range {
   const state = instance.store.getState();
   const sheet = state.data.sheetIndex;
-  let r0 = MAX_ROW_INDEX;
-  let c0 = MAX_COL_INDEX;
+  let r0 = MAX_ROW;
+  let c0 = MAX_COL;
   let r1 = 0;
   let c1 = 0;
   let found = false;
@@ -410,8 +409,8 @@ const hyperlinkCellInGrid = (addr: Addr): boolean =>
   addr.sheet >= 0 &&
   addr.row >= 0 &&
   addr.col >= 0 &&
-  addr.row <= MAX_ROW_INDEX &&
-  addr.col <= MAX_COL_INDEX;
+  addr.row <= MAX_ROW &&
+  addr.col <= MAX_COL;
 
 const hyperlinkAnchorKey = (sheet: number, row: number, col: number): string =>
   `${sheet}:${row}:${col}`;
@@ -540,8 +539,8 @@ const planHyperlinkRemoval = (instance: SpreadsheetInstance): HyperlinkRemovalPl
       record.col < 0 ||
       record.lastRow < record.row ||
       record.lastCol < record.col ||
-      record.lastRow > MAX_ROW_INDEX ||
-      record.lastCol > MAX_COL_INDEX
+      record.lastRow > MAX_ROW ||
+      record.lastCol > MAX_COL
     )
       return null;
     nativeAnchorKeys.add(hyperlinkAnchorKey(sheet, record.row, record.col));
@@ -715,8 +714,8 @@ const safeRangeArea = (range: Range): number | null => {
     range.c0 < 0 ||
     range.r1 < range.r0 ||
     range.c1 < range.c0 ||
-    range.r1 > MAX_ROW_INDEX ||
-    range.c1 > MAX_COL_INDEX
+    range.r1 > MAX_ROW ||
+    range.c1 > MAX_COL
   )
     return null;
   const rows = range.r1 - range.r0 + 1;

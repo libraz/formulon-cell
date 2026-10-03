@@ -6,7 +6,6 @@ import {
   cellRect,
   cellRectIn,
   cellRectUnclamped,
-  colLabel,
   colLeadingEdge,
   colWidth,
   frozenColsWidth,
@@ -61,27 +60,6 @@ function makeViewport(over: Partial<ViewportSlice> = {}): ViewportSlice {
     ...over,
   };
 }
-
-describe('colLabel', () => {
-  it('maps single-letter columns', () => {
-    expect(colLabel(0)).toBe('A');
-    expect(colLabel(1)).toBe('B');
-    expect(colLabel(25)).toBe('Z');
-  });
-
-  it('maps two-letter columns', () => {
-    expect(colLabel(26)).toBe('AA');
-    expect(colLabel(27)).toBe('AB');
-    expect(colLabel(51)).toBe('AZ');
-    expect(colLabel(52)).toBe('BA');
-    expect(colLabel(701)).toBe('ZZ');
-  });
-
-  it('maps three-letter columns', () => {
-    expect(colLabel(702)).toBe('AAA');
-    expect(colLabel(16383)).toBe('XFD'); // the spreadsheet last column
-  });
-});
 
 describe('colWidth / rowHeight', () => {
   it('returns default when no override', () => {

@@ -1,10 +1,9 @@
 /** Where an internal paste lands: tile repetition, whole-row/-column band destinations, and the bounded cells a band paste materializes. */
+import { MAX_COL, MAX_ROW } from '../../engine/address.js';
 import type { Addr, Range } from '../../engine/types.js';
 import type { State } from '../../store/store.js';
 import type { ClipboardSnapshot } from './snapshot.js';
 
-export const MAX_ROW = 1_048_575;
-export const MAX_COL = 16_383;
 export const MAX_PASTE_CELLS = 1_000_000;
 
 type BandAxis = 'row' | 'column';

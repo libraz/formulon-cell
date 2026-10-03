@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import {
-  colName,
   formatSelectionRef,
   lookupDefinedName,
   parseCellRef,
@@ -10,27 +9,6 @@ import {
 } from '../../../src/mount/ref-utils.js';
 
 describe('mount/ref-utils', () => {
-  describe('colName', () => {
-    it('maps single-letter columns', () => {
-      expect(colName(0)).toBe('A');
-      expect(colName(1)).toBe('B');
-      expect(colName(25)).toBe('Z');
-    });
-
-    it('maps two-letter columns at the boundary', () => {
-      expect(colName(26)).toBe('AA');
-      expect(colName(27)).toBe('AB');
-      expect(colName(51)).toBe('AZ');
-      expect(colName(52)).toBe('BA');
-    });
-
-    it('maps three-letter columns up to XFD (16383)', () => {
-      expect(colName(701)).toBe('ZZ');
-      expect(colName(702)).toBe('AAA');
-      expect(colName(16383)).toBe('XFD');
-    });
-  });
-
   describe('formatSelectionRef', () => {
     const active = { row: 0, col: 0 };
 
@@ -96,6 +74,10 @@ describe('mount/ref-utils', () => {
       expect(parseCellRef('R0C1')).toBeNull();
       expect(parseCellRef('NOTAREF')).toBeNull();
       expect(parseCellRef('')).toBeNull();
+    });
+
+    it('reads a leading-zero row as its numeric value', () => {
+      expect(parseCellRef('A01')).toEqual({ row: 0, col: 0 });
     });
   });
 

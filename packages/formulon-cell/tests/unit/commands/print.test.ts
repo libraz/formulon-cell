@@ -112,6 +112,17 @@ describe('parsePrintArea', () => {
     expect(parsePrintArea('')).toBeNull();
   });
 
+  it('rejects areas that reach past the last row or column', () => {
+    expect(parsePrintArea('A1:XFE2')).toBeNull();
+    expect(parsePrintArea('A1:B1048577')).toBeNull();
+    expect(parsePrintArea('A1:XFD1048576')).toEqual({
+      row0: 0,
+      col0: 0,
+      row1: 1048575,
+      col1: 16383,
+    });
+  });
+
   it('parses comma-separated print areas', () => {
     expect(parsePrintAreas('A1:B2, D4:E5')).toEqual([
       { row0: 0, col0: 0, row1: 1, col1: 1 },

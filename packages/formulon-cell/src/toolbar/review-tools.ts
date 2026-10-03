@@ -1,3 +1,4 @@
+import { colLetter } from '../engine/address.js';
 import { dictionaries, type Strings } from '../i18n/strings.js';
 import type { State } from '../store/types.js';
 
@@ -65,16 +66,6 @@ export function applyTextScript(value: string, command: Exclude<ScriptCommand, '
   }
 }
 
-const colLabel = (col: number): string => {
-  let n = col;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (n % 26)) + out;
-    n = Math.floor(n / 26) - 1;
-  } while (n >= 0);
-  return out;
-};
-
 const parseAddrKey = (key: string): { sheet: number; row: number; col: number } | null => {
   const parts = key.split(':').map((part) => Number.parseInt(part, 10));
   if (parts.length !== 3) return null;
@@ -101,7 +92,7 @@ export function reviewCellsFromState(
         addr.col > range.c1)
     )
       continue;
-    const label = `${colLabel(addr.col)}${addr.row + 1}`;
+    const label = `${colLetter(addr.col)}${addr.row + 1}`;
     const value: ReviewCellValue =
       cell.value.kind === 'text'
         ? { kind: 'text', value: cell.value.value }
@@ -127,7 +118,7 @@ export function reviewCellsFromState(
         addr.col > range.c1)
     )
       continue;
-    const label = `${colLabel(addr.col)}${addr.row + 1} comment`;
+    const label = `${colLetter(addr.col)}${addr.row + 1} comment`;
     cells.push({ label, value: { kind: 'text', value: fmt.comment }, source: 'comment' });
   }
   return cells.sort((a, b) => a.label.localeCompare(b.label, 'en', { numeric: true }));

@@ -19,6 +19,7 @@ import { movePageBreak, resizePrintArea, setPageSetup } from '../commands/page-s
 import { paginationFor } from '../commands/pagination.js';
 import { shiftFormulaRefs } from '../commands/refs.js';
 import { autofitColsWidth, autofitRowsHeight } from '../commands/structure.js';
+import { colLetter, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { syncLayoutSizesToEngine } from '../engine/layout-sync.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -98,18 +99,7 @@ type DragMode =
       r1c1: boolean;
     };
 
-const colLetters = (col: number): string => {
-  let n = col + 1;
-  let s = '';
-  while (n > 0) {
-    const r = (n - 1) % 26;
-    s = String.fromCharCode(65 + r) + s;
-    n = Math.floor((n - 1) / 26);
-  }
-  return s;
-};
-
-const a1RefOf = (row: number, col: number): string => `${colLetters(col)}${row + 1}`;
+const a1RefOf = (row: number, col: number): string => `${colLetter(col)}${row + 1}`;
 const r1c1Axis = (prefix: 'R' | 'C', target: number, base: number): string => {
   const delta = target - base;
   return delta === 0 ? prefix : `${prefix}[${delta}]`;
@@ -133,9 +123,6 @@ const rangeRefOf = (
   const c1 = Math.max(a.col, b.col);
   return `${refOf(r0, c0, mode)}:${refOf(r1, c1, mode)}`;
 };
-
-const MAX_ROW = 1048575;
-const MAX_COL = 16383;
 
 const fullSheetRange = (sheet: number): Range => ({
   sheet,

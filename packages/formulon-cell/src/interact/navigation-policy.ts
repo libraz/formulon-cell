@@ -1,11 +1,16 @@
 import { interactionControllerFor } from '../commands/interaction-controller.js';
+import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import {
+  rangeContainsAddr,
+  rangeContainsRange,
+  rangesIntersect,
+  sameRange,
+} from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
 
 /** The spreadsheet's physical coordinate limits (zero based, inclusive). */
-export const MAX_NAVIGATION_ROW = 1_048_575;
-export const MAX_NAVIGATION_COL = 16_383;
 
 /**
  * View and keyboard-navigation restrictions for an embedded grid.
@@ -60,32 +65,15 @@ const cloneRange = (range: Range): Range => ({
   c1: range.c1,
 });
 
-const rangeContains = (outer: Range, inner: Range): boolean =>
-  outer.sheet === inner.sheet &&
-  outer.r0 <= inner.r0 &&
-  outer.c0 <= inner.c0 &&
-  outer.r1 >= inner.r1 &&
-  outer.c1 >= inner.c1;
-
-const rangesIntersect = (a: Range, b: Range): boolean =>
-  a.sheet === b.sheet && !(a.r1 < b.r0 || a.r0 > b.r1 || a.c1 < b.c0 || a.c0 > b.c1);
-
-const addrInRange = (addr: Addr, range: Range): boolean =>
-  addr.sheet === range.sheet &&
-  addr.row >= range.r0 &&
-  addr.row <= range.r1 &&
-  addr.col >= range.c0 &&
-  addr.col <= range.c1;
-
 const addressInSheet = (addr: Addr): boolean =>
   validInteger(addr.sheet) &&
   addr.sheet >= 0 &&
   validInteger(addr.row) &&
   addr.row >= 0 &&
-  addr.row <= MAX_NAVIGATION_ROW &&
+  addr.row <= MAX_ROW &&
   validInteger(addr.col) &&
   addr.col >= 0 &&
-  addr.col <= MAX_NAVIGATION_COL;
+  addr.col <= MAX_COL;
 
 function validateRange(range: Range, sheetCount: number, label: string): void {
   if (!validInteger(range.sheet) || range.sheet < 0 || range.sheet >= sheetCount) {
@@ -98,8 +86,8 @@ function validateRange(range: Range, sheetCount: number, label: string): void {
     !validInteger(range.c1) ||
     range.r0 < 0 ||
     range.c0 < 0 ||
-    range.r1 > MAX_NAVIGATION_ROW ||
-    range.c1 > MAX_NAVIGATION_COL ||
+    range.r1 > MAX_ROW ||
+    range.c1 > MAX_COL ||
     range.r0 > range.r1 ||
     range.c0 > range.c1
   ) {
@@ -111,7 +99,7 @@ function assertNoPartialMerge(state: State | undefined, range: Range, label: str
   if (!state) return;
   for (const merge of state.merges.byAnchor.values()) {
     if (!rangesIntersect(merge, range)) continue;
-    if (!rangeContains(range, merge)) {
+    if (!rangeContainsRange(range, merge)) {
       throw new Error(
         `ViewportOptions.${label} partially exposes merged range ` +
           `${merge.sheet}:${merge.r0}:${merge.c0}-${merge.r1}:${merge.c1}`,
@@ -297,7 +285,7 @@ function selectorAllows(addr: Addr, options: NavigationOptions): boolean {
     // A selectable list only constrains the sheet(s) it mentions. This lets a
     // host configure one embedded sheet without making other sheets unusable.
     const sameSheet = options.selectable.some((range) => range.sheet === addr.sheet);
-    return !sameSheet || options.selectable.some((range) => addrInRange(addr, range));
+    return !sameSheet || options.selectable.some((range) => rangeContainsAddr(range, addr));
   }
   const predicate = options.selectable;
   return typeof predicate === 'function' ? predicate(addr) : true;
@@ -315,7 +303,7 @@ function firstAllowedAddress(store: SpreadsheetStore, preferred: Addr): Addr | n
   if (sheet === undefined) return null;
   const search: Range = bound
     ? { ...bound, sheet }
-    : { sheet, r0: 0, c0: 0, r1: MAX_NAVIGATION_ROW, c1: MAX_NAVIGATION_COL };
+    : { sheet, r0: 0, c0: 0, r1: MAX_ROW, c1: MAX_COL };
   let scanned = 0;
   for (let row = search.r0; row <= search.r1 && scanned < MAX_TAB_SCAN; row += 1) {
     for (let col = search.c0; col <= search.c1 && scanned < MAX_TAB_SCAN; col += 1) {
@@ -335,7 +323,7 @@ function syncNavigationSelection(store: SpreadsheetStore): void {
   const anchor = firstAllowedAddress(store, state.selection.anchor) ?? active;
   const currentRange = clampNavigationRange(store, state.selection.range);
   const range =
-    currentRange && addrInRange(active, currentRange)
+    currentRange && rangeContainsAddr(currentRange, active)
       ? currentRange
       : { sheet: active.sheet, r0: active.row, c0: active.col, r1: active.row, c1: active.col };
   const extraRanges = (state.selection.extraRanges ?? [])
@@ -343,8 +331,6 @@ function syncNavigationSelection(store: SpreadsheetStore): void {
     .filter((extra): extra is Range => extra !== null);
   const sameAddr = (a: Addr, b: Addr): boolean =>
     a.sheet === b.sheet && a.row === b.row && a.col === b.col;
-  const sameRange = (a: Range, b: Range): boolean =>
-    a.sheet === b.sheet && a.r0 === b.r0 && a.c0 === b.c0 && a.r1 === b.r1 && a.c1 === b.c1;
   const oldExtras = state.selection.extraRanges ?? [];
   const extrasChanged =
     oldExtras.length !== extraRanges.length ||
@@ -370,7 +356,7 @@ export function isNavigationAddrAllowed(store: SpreadsheetStore, addr: Addr): bo
   const options = recordFor(store)?.options;
   if (!options) return true;
   if (options.range) {
-    if (addr.sheet !== options.range.sheet || !addrInRange(addr, options.range)) return false;
+    if (addr.sheet !== options.range.sheet || !rangeContainsAddr(options.range, addr)) return false;
   }
   return selectorAllows(addr, options);
 }
@@ -414,7 +400,7 @@ export function clampNavigationRange(store: SpreadsheetStore, input: Range): Ran
   // disjoint entries remains ambiguous, so only accept a fully covered entry.
   if (Array.isArray(options.selectable)) {
     const sameSheet = options.selectable.some((r) => r.sheet === range.sheet);
-    if (sameSheet && !options.selectable.some((r) => rangeContains(r, range))) return null;
+    if (sameSheet && !options.selectable.some((r) => rangeContainsRange(r, range))) return null;
   }
   if (typeof options.selectable === 'function') {
     const area = (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
@@ -444,10 +430,10 @@ export function syncNavigationViewport(store: SpreadsheetStore): void {
     const minCol = Math.max(state.layout.freezeCols, bounds?.c0 ?? 0);
     const maxRow = bounds
       ? Math.max(minRow, bounds.r1 + 1 - state.viewport.rowCount)
-      : Math.max(minRow, MAX_NAVIGATION_ROW + 1 - state.viewport.rowCount);
+      : Math.max(minRow, MAX_ROW + 1 - state.viewport.rowCount);
     const maxCol = bounds
       ? Math.max(minCol, bounds.c1 + 1 - state.viewport.colCount)
-      : Math.max(minCol, MAX_NAVIGATION_COL + 1 - state.viewport.colCount);
+      : Math.max(minCol, MAX_COL + 1 - state.viewport.colCount);
     const rowStart = Math.min(maxRow, Math.max(minRow, state.viewport.rowStart));
     const colStart = Math.min(maxCol, Math.max(minCol, state.viewport.colStart));
     if (
@@ -507,8 +493,8 @@ export function nextTabStop(store: SpreadsheetStore, addr: Addr, reverse: boolea
   if (!options) return null;
   const bound = activeRange(options) ?? navigationSelectionBoundsFor(store);
   if (!bound) return null;
-  let candidate: Addr | null = addrInRange(addr, bound) ? addr : firstAddress(bound, reverse);
-  if (addrInRange(addr, bound)) {
+  let candidate: Addr | null = rangeContainsAddr(bound, addr) ? addr : firstAddress(bound, reverse);
+  if (rangeContainsAddr(bound, addr)) {
     candidate = nextAddressInRange(bound, addr, reverse) ?? null;
   }
   for (let i = 0; candidate && i < MAX_TAB_SCAN; i += 1) {

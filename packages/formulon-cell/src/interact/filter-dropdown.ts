@@ -9,6 +9,7 @@ import {
 import type { History } from '../commands/history.js';
 import type { Range } from '../engine/types.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
+import { sameRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, ValueFilterCriteria } from '../store/store.js';
 import { createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { createInteractionButton } from './chip-button.js';
@@ -43,9 +44,6 @@ const createFilterDropdownActionButton = (className: string, label: string): HTM
     text: label,
   });
 };
-
-const sameRange = (a: Range, b: Range): boolean =>
-  a.sheet === b.sheet && a.r0 === b.r0 && a.r1 === b.r1 && a.c0 === b.c0 && a.c1 === b.c1;
 
 const findColumnCriteria = (
   criteria: readonly ValueFilterCriteria[],

@@ -5,6 +5,7 @@
 
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { rangeArea } from '../store/selection-geometry.js';
 import type { State } from '../store/store.js';
 import { type CSVEncodeOptions, encodeCSV, parseCSV } from './clipboard/csv.js';
 import { coerceInputForCell, writeCoerced } from './coerce-input.js';
@@ -109,11 +110,6 @@ export function exportCSV(state: State, opts: ExportOptions = {}): string {
     grid.push(line);
   }
   return encodeCSV(grid, { eol: opts.eol, bom: opts.bom });
-}
-
-function rangeArea(range: Range): number {
-  if (range.r1 < range.r0 || range.c1 < range.c0) return 0;
-  return (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
 }
 
 function selectionOrUsed(state: State): Range | null {

@@ -1,3 +1,4 @@
+import { colLetter, MAX_COL, MAX_ROW } from '../../../engine/address.js';
 import type { CellValue } from '../../../engine/types.js';
 import { numericResult, readLogical, readNumber, textValue } from '../coercion.js';
 import {
@@ -19,7 +20,6 @@ import {
   romanText,
   romanValue,
 } from '../numerals.js';
-import { colToLetters } from '../parser.js';
 import type { FormulaOperand } from '../types.js';
 import type { FormulaReaderContext, NumericFunctionName } from './context.js';
 
@@ -75,13 +75,13 @@ export function createMathEvaluator(ctx: MathEvaluatorContext) {
       const row = Math.trunc(rowValue);
       const col = Math.trunc(colValue);
       const abs = Math.trunc(absValue);
-      if (row < 1 || row > 1048576 || col < 1 || col > 16384 || abs < 1 || abs > 4) {
+      if (row < 1 || row > MAX_ROW + 1 || col < 1 || col > MAX_COL + 1 || abs < 1 || abs > 4) {
         return { kind: 'error', code: 15, text: '#VALUE!' };
       }
       const absoluteCol = abs === 1 || abs === 3;
       const absoluteRow = abs === 1 || abs === 2;
       const ref = a1Value
-        ? `${absoluteCol ? '$' : ''}${colToLetters(col - 1)}${absoluteRow ? '$' : ''}${row}`
+        ? `${absoluteCol ? '$' : ''}${colLetter(col - 1)}${absoluteRow ? '$' : ''}${row}`
         : `${absoluteRow ? `R${row}` : `R[${row}]`}${absoluteCol ? `C${col}` : `C[${col}]`}`;
       return {
         kind: 'text',

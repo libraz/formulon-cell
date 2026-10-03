@@ -1,6 +1,8 @@
 import { addrKey } from '../engine/address.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
+import { writeCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { rangeArea } from '../store/selection-geometry.js';
 import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
 import { recordCommentChange } from './comment.js';
 import { CUSTOM_LISTS } from './fill.js';
@@ -44,26 +46,8 @@ const writeCellSnapshot = (
     wb.setBlank(addr);
     return;
   }
-  if (cell.formula) {
-    wb.setFormula(addr, shiftFormulaRefs(cell.formula, addr.row - sourceRow, 0));
-    return;
-  }
-  switch (cell.value.kind) {
-    case 'number':
-      wb.setNumber(addr, cell.value.value);
-      return;
-    case 'text':
-      wb.setText(addr, cell.value.value);
-      return;
-    case 'bool':
-      wb.setBool(addr, cell.value.value);
-      return;
-    case 'error':
-      wb.setError(addr, cell.value.code);
-      return;
-    default:
-      wb.setBlank(addr);
-  }
+  const formula = cell.formula ? shiftFormulaRefs(cell.formula, addr.row - sourceRow, 0) : null;
+  writeCell(wb, addr, cell.value, formula);
 };
 
 export type SortDirection = 'asc' | 'desc';
@@ -150,8 +134,6 @@ const hydrateSortComments = (
 };
 
 const MAX_SORT_CELLS = 100_000;
-
-const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
 
 const sortArea = (range: Range, startRow: number): number =>
   Math.max(0, range.r1 - startRow + 1) * (range.c1 - range.c0 + 1);

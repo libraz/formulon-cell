@@ -1,4 +1,6 @@
+import { colLetter } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
+import { rangeArea, rangesIntersect } from '../store/selection-geometry.js';
 import {
   mutators,
   type SessionChart,
@@ -29,11 +31,6 @@ export interface SessionChartSeriesPoint {
 }
 
 const MAX_SESSION_CHART_SERIES_CELLS = 10_000;
-
-const rangeArea = (range: Range): number =>
-  range.r1 < range.r0 || range.c1 < range.c0
-    ? 0
-    : (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
 
 function defaultChartId(range: Range, kind: SessionChartKind): string {
   return `chart-${range.sheet}-${range.r0}-${range.c0}-${range.r1}-${range.c1}-${kind}`;
@@ -205,7 +202,7 @@ export function sessionChartSeries(
   if (range.r0 === range.r1) {
     for (let col = range.c0; col <= range.c1; col += 1) {
       out.push({
-        label: columnLabel(col),
+        label: colLetter(col),
         value: cellNumber(state, range.sheet, range.r0, col) ?? 0,
       });
     }
@@ -225,23 +222,10 @@ export function sessionChartSeries(
     for (let row = range.r0; row <= range.r1; row += 1) {
       sum += cellNumber(state, range.sheet, row, col) ?? 0;
     }
-    out.push({ label: columnLabel(col), value: sum });
+    out.push({ label: colLetter(col), value: sum });
   }
   return out;
 }
-
-const rangesIntersect = (a: Range, b: Range): boolean =>
-  a.sheet === b.sheet && !(a.r1 < b.r0 || a.r0 > b.r1 || a.c1 < b.c0 || a.c0 > b.c1);
-
-const columnLabel = (n: number): string => {
-  let v = n;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (v % 26)) + out;
-    v = Math.floor(v / 26) - 1;
-  } while (v >= 0);
-  return out;
-};
 
 const cellNumber = (state: State, sheet: number, row: number, col: number): number | null => {
   const cell = state.data.cells.get(`${sheet}:${row}:${col}`);

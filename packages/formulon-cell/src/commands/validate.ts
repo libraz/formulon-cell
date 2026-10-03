@@ -2,6 +2,7 @@ import type { RangeResolver } from '../engine/range-resolver.js';
 import type { CellValue, Range } from '../engine/types.js';
 import { syncValidationsToEngine } from '../engine/validation-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
+import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { CellValidation, SpreadsheetStore, ValidationOp } from '../store/store.js';
 import type { CoercedInput } from './coerce-input.js';
 import { applyFormatSnapshot, captureFormatSnapshot, type History } from './history.js';
@@ -15,9 +16,6 @@ type BoundedKind = 'whole' | 'decimal' | 'date' | 'time' | 'textLength';
 type BoundedValidation = Extract<CellValidation, { kind: BoundedKind }>;
 type ListValidation = Extract<CellValidation, { kind: 'list' }>;
 
-const rangeContains = (range: Range, row: number, col: number): boolean =>
-  row >= range.r0 && row <= range.r1 && col >= range.c0 && col <= range.c1;
-
 export function clearValidationInRange(store: SpreadsheetStore, range: Range): number {
   let cleared = 0;
   store.setState((s) => {
@@ -26,8 +24,8 @@ export function clearValidationInRange(store: SpreadsheetStore, range: Range): n
       if (!current.validation) continue;
       const [sheet, row, col] = key.split(':').map(Number);
       if (sheet !== range.sheet || row === undefined || col === undefined) continue;
-      if (!rangeContains(range, row, col)) continue;
       const addr = { sheet, row, col };
+      if (!rangeContainsAddr(range, addr)) continue;
       if (!isCellWritable(s, addr)) continue;
       const { validation: _validation, ...next } = current;
       if (Object.keys(next).length === 0) formats.delete(key);

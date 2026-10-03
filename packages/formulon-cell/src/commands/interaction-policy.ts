@@ -1,4 +1,5 @@
 import type { Addr, CellValue, Range } from '../engine/types.js';
+import { rangeContainsAddr } from '../store/selection-geometry.js';
 
 /** Operations that can be authorized by an embedded instance. Keep this list
  * finite: a new command must be classified before a restricted profile can
@@ -180,13 +181,6 @@ const MUTATING_OPERATIONS: ReadonlySet<InteractionOperation> = new Set([
 
 export const isMutatingInteraction = (operation: InteractionOperation): boolean =>
   MUTATING_OPERATIONS.has(operation);
-
-export const rangeContainsAddr = (range: Range, addr: Addr): boolean =>
-  range.sheet === addr.sheet &&
-  addr.row >= range.r0 &&
-  addr.row <= range.r1 &&
-  addr.col >= range.c0 &&
-  addr.col <= range.c1;
 
 type NormalizedEditable =
   | { readonly ranges: readonly Range[] }

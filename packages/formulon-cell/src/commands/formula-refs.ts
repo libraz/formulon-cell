@@ -15,12 +15,10 @@
  *    clamps to the band boundary instead of injecting `#REF!` mid-range.
  */
 
+import { colFromLetters, MAX_COL, MAX_ROW } from '../engine/address.js';
 import {
   type Atom,
   type CellRefToken,
-  colLabelToIndex,
-  MAX_COL_INDEX,
-  MAX_ROW_INDEX,
   renderAtom,
   renderAtomRaw,
   renderToken,
@@ -32,13 +30,6 @@ import {
   type WholeColRefToken,
   type WholeRowAtom,
   type WholeRowRefToken,
-} from './formula-ref-lexer.js';
-
-export {
-  colIndexToLabel,
-  colLabelToIndex,
-  MAX_COL_INDEX,
-  MAX_ROW_INDEX,
 } from './formula-ref-lexer.js';
 
 /** The outcome of transforming one endpoint against a structural edit. */
@@ -61,7 +52,7 @@ export function shiftFormulaRefs(formula: string, dRow: number, dCol: number): s
     if (tok.sheetQual.includes('[') || tok.sheetQual.includes(']')) return renderToken(tok);
     if (tok.kind === 'whole-col') {
       const shiftCol = (at: WholeColAtom): string | null => {
-        const col = colLabelToIndex(at.label);
+        const col = colFromLetters(at.label);
         return renderWholeColAtom(at.abs, at.abs ? col : col + dCol);
       };
       const aTxt = shiftCol(tok.a);
@@ -80,7 +71,7 @@ export function shiftFormulaRefs(formula: string, dRow: number, dCol: number): s
       return `${tok.sheetQual}${aTxt}:${bTxt}`;
     }
     const shiftAtom = (at: Atom): string | null => {
-      const col = colLabelToIndex(at.label);
+      const col = colFromLetters(at.label);
       const row = Number.parseInt(at.rowStr, 10) - 1;
       const nc = at.absCol ? col : col + dCol;
       const nr = at.absRow ? row : row + dRow;
@@ -123,8 +114,8 @@ export function adjustFormulaForRowColEdit(
         return { kind: 'keep', index: col + delta };
       };
       return clampAxisRange(
-        { abs: tok.a.abs, index: colLabelToIndex(tok.a.label) },
-        { abs: tok.b.abs, index: colLabelToIndex(tok.b.label) },
+        { abs: tok.a.abs, index: colFromLetters(tok.a.label) },
+        { abs: tok.b.abs, index: colFromLetters(tok.b.label) },
         adjust,
         split,
         delta < 0,
@@ -149,7 +140,7 @@ export function adjustFormulaForRowColEdit(
       );
     }
     const adjust = (at: Atom): EndpointResult => {
-      const col = colLabelToIndex(at.label);
+      const col = colFromLetters(at.label);
       const row = Number.parseInt(at.rowStr, 10) - 1;
       if (axis === 'row') {
         if (row < split) return { kind: 'keep', col, row };
@@ -206,7 +197,7 @@ export function adjustFormulaForCellBandShift(
     }
     if (tok.kind !== 'cell') return renderToken(tok);
     const shiftAtom = (at: Atom): EndpointResult => {
-      const col = colLabelToIndex(at.label);
+      const col = colFromLetters(at.label);
       const row = Number.parseInt(at.rowStr, 10) - 1;
       const inAffectedBand = vertical
         ? row >= affected.r0 && row <= affected.r1 && col >= affected.c0 && col <= affected.c1
@@ -280,8 +271,8 @@ export function adjustFormulaForAxisBandMove(
     if (tok.kind === 'whole-col') {
       if (context.axis !== 'col') return renderToken(tok);
       const range = transformAxisMoveRange(
-        colLabelToIndex(tok.a.label),
-        colLabelToIndex(tok.b.label),
+        colFromLetters(tok.a.label),
+        colFromLetters(tok.b.label),
         context,
       );
       if (range === null) return null;
@@ -340,7 +331,7 @@ export function adjustFormulaForCutPasteMove(
   const dCol = dest.c0 - source.c0;
   if (dRow === 0 && dCol === 0) return formula;
   const moveAtom = (at: Atom): string | null => {
-    const col = colLabelToIndex(at.label);
+    const col = colFromLetters(at.label);
     const row = Number.parseInt(at.rowStr, 10) - 1;
     if (row < source.r0 || row > source.r1 || col < source.c0 || col > source.c1) {
       return renderAtomRaw(at);
@@ -468,9 +459,9 @@ type CutRangeDisposition =
 
 function atomBounds(a: Atom, b: Atom): CellRangeBounds {
   const aRow = Number.parseInt(a.rowStr, 10) - 1;
-  const aCol = colLabelToIndex(a.label);
+  const aCol = colFromLetters(a.label);
   const bRow = Number.parseInt(b.rowStr, 10) - 1;
-  const bCol = colLabelToIndex(b.label);
+  const bCol = colFromLetters(b.label);
   return {
     r0: Math.min(aRow, bRow),
     c0: Math.min(aCol, bCol),
@@ -505,13 +496,13 @@ function classifyCutRange(
   const aInside =
     Number.parseInt(a.rowStr, 10) - 1 >= cut.r0 &&
     Number.parseInt(a.rowStr, 10) - 1 <= cut.r1 &&
-    colLabelToIndex(a.label) >= cut.c0 &&
-    colLabelToIndex(a.label) <= cut.c1;
+    colFromLetters(a.label) >= cut.c0 &&
+    colFromLetters(a.label) <= cut.c1;
   const bInside =
     Number.parseInt(b.rowStr, 10) - 1 >= cut.r0 &&
     Number.parseInt(b.rowStr, 10) - 1 <= cut.r1 &&
-    colLabelToIndex(b.label) >= cut.c0 &&
-    colLabelToIndex(b.label) <= cut.c1;
+    colFromLetters(b.label) >= cut.c0 &&
+    colFromLetters(b.label) <= cut.c1;
   if (aInside && bInside) return { kind: 'move' };
   if (!allowEdgeTrim) return { kind: 'keep' };
 
@@ -569,9 +560,9 @@ function trimCutRange(
   b: Atom,
   disposition: Extract<CutRangeDisposition, { kind: 'trim' }>,
 ): { a: string; b: string } | null {
-  let aCol = colLabelToIndex(a.label);
+  let aCol = colFromLetters(a.label);
   let aRow = Number.parseInt(a.rowStr, 10) - 1;
-  let bCol = colLabelToIndex(b.label);
+  let bCol = colFromLetters(b.label);
   let bRow = Number.parseInt(b.rowStr, 10) - 1;
   const { intersection } = disposition;
   if (disposition.side === 'top') {
@@ -606,7 +597,7 @@ function rewriteCutPasteEndpoint(
   dCol: number,
   context: CutPasteSheetContext,
 ): { atom: string | null; qualifier: string; moved: boolean } {
-  const col = colLabelToIndex(at.label);
+  const col = colFromLetters(at.label);
   const row = Number.parseInt(at.rowStr, 10) - 1;
   const moved =
     targetSheet === context.sourceSheet &&
@@ -631,7 +622,7 @@ function rewriteCutPasteEndpoint(
 }
 
 function axisBandLimit(axis: 'row' | 'col'): number {
-  return axis === 'row' ? MAX_ROW_INDEX + 1 : MAX_COL_INDEX + 1;
+  return axis === 'row' ? MAX_ROW + 1 : MAX_COL + 1;
 }
 
 function isValidAxisBandMove(context: AxisBandMoveContext): boolean {
@@ -719,7 +710,7 @@ function transformAxisMoveRange(
 }
 
 function transformAxisMoveAtom(at: Atom, context: AxisBandMoveContext): string | null {
-  const col = colLabelToIndex(at.label);
+  const col = colFromLetters(at.label);
   const row = Number.parseInt(at.rowStr, 10) - 1;
   if (context.axis === 'row') {
     return renderAtom(at.absCol, col, at.absRow, mapAxisIndexForMove(row, context));
@@ -733,14 +724,13 @@ function transformAxisMoveCellRange(
 ): { a: string; b: string } | null {
   const b = tok.b as Atom;
   const first =
-    context.axis === 'row' ? Number.parseInt(tok.a.rowStr, 10) - 1 : colLabelToIndex(tok.a.label);
-  const last =
-    context.axis === 'row' ? Number.parseInt(b.rowStr, 10) - 1 : colLabelToIndex(b.label);
+    context.axis === 'row' ? Number.parseInt(tok.a.rowStr, 10) - 1 : colFromLetters(tok.a.label);
+  const last = context.axis === 'row' ? Number.parseInt(b.rowStr, 10) - 1 : colFromLetters(b.label);
   const range = transformAxisMoveRange(first, last, context);
   if (range === null) return null;
-  const aCol = colLabelToIndex(tok.a.label);
+  const aCol = colFromLetters(tok.a.label);
   const aRow = Number.parseInt(tok.a.rowStr, 10) - 1;
-  const bCol = colLabelToIndex(b.label);
+  const bCol = colFromLetters(b.label);
   const bRow = Number.parseInt(b.rowStr, 10) - 1;
   const a =
     context.axis === 'row'
@@ -760,8 +750,8 @@ function fullAxisForCut(source: { r0: number; c0: number; r1: number; c1: number
   const r1 = Math.max(source.r0, source.r1);
   const c0 = Math.min(source.c0, source.c1);
   const c1 = Math.max(source.c0, source.c1);
-  if (c0 === 0 && c1 === MAX_COL_INDEX) return 'row';
-  if (r0 === 0 && r1 === MAX_ROW_INDEX) return 'col';
+  if (c0 === 0 && c1 === MAX_COL) return 'row';
+  if (r0 === 0 && r1 === MAX_ROW) return 'col';
   return null;
 }
 
@@ -771,9 +761,9 @@ function wholeAxisCutContainsToken(
   source: { r0: number; c0: number; r1: number; c1: number },
 ): boolean {
   const first =
-    tok.kind === 'whole-row' ? Number.parseInt(tok.a.rowStr, 10) - 1 : colLabelToIndex(tok.a.label);
+    tok.kind === 'whole-row' ? Number.parseInt(tok.a.rowStr, 10) - 1 : colFromLetters(tok.a.label);
   const last =
-    tok.kind === 'whole-row' ? Number.parseInt(tok.b.rowStr, 10) - 1 : colLabelToIndex(tok.b.label);
+    tok.kind === 'whole-row' ? Number.parseInt(tok.b.rowStr, 10) - 1 : colFromLetters(tok.b.label);
   const low = Math.min(first, last);
   const high = Math.max(first, last);
   if (axis === 'row' && tok.kind === 'whole-row') {
@@ -799,8 +789,8 @@ function transformWholeAxisCutToken(
     return a === null || b === null ? null : `${a}:${b}`;
   }
   if (axis === 'col' && tok.kind === 'whole-col') {
-    const a = renderWholeColAtom(tok.a.abs, colLabelToIndex(tok.a.label) + dCol);
-    const b = renderWholeColAtom(tok.b.abs, colLabelToIndex(tok.b.label) + dCol);
+    const a = renderWholeColAtom(tok.a.abs, colFromLetters(tok.a.label) + dCol);
+    const b = renderWholeColAtom(tok.b.abs, colFromLetters(tok.b.label) + dCol);
     return a === null || b === null ? null : `${a}:${b}`;
   }
   return renderTokenBody(tok);
@@ -853,10 +843,10 @@ function clampRange(
     // An endpoint at the upper edge of a range clamps to the first surviving
     // line after the deleted band. An endpoint at the lower edge clamps to
     // the last surviving line before it.
-    const col = colLabelToIndex(at.label);
+    const col = colFromLetters(at.label);
     const row = Number.parseInt(at.rowStr, 10) - 1;
     const otherAxis =
-      axis === 'row' ? Number.parseInt(other.rowStr, 10) - 1 : colLabelToIndex(other.label);
+      axis === 'row' ? Number.parseInt(other.rowStr, 10) - 1 : colFromLetters(other.label);
     const boundary = otherAxis < split ? split - 1 : split;
     if (axis === 'row') return { col, row: boundary };
     return { col: boundary, row };

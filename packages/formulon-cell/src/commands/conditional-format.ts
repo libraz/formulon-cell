@@ -1,3 +1,5 @@
+import { MAX_COL, MAX_ROW } from '../engine/address.js';
+import { rangesIntersect } from '../store/selection-geometry.js';
 import type {
   ConditionalIconSet,
   ConditionalRule,
@@ -6,9 +8,6 @@ import type {
   State,
 } from '../store/store.js';
 import { mutators } from '../store/store.js';
-
-const MAX_SHEET_ROW = 1048575;
-const MAX_SHEET_COL = 16383;
 
 export type ConditionalPresetAction =
   | 'clear-selection'
@@ -86,8 +85,8 @@ export function clearConditionalRulesOnSheet(store: SpreadsheetStore, sheet: num
     sheet,
     r0: 0,
     c0: 0,
-    r1: MAX_SHEET_ROW,
-    c1: MAX_SHEET_COL,
+    r1: MAX_ROW,
+    c1: MAX_COL,
   });
 }
 
@@ -97,9 +96,6 @@ export function conditionalRulesForRange(
 ): readonly ConditionalRule[] {
   return state.conditional.rules.filter((rule) => rangesIntersect(rule.range, range));
 }
-
-const rangesIntersect = (a: ConditionalRule['range'], b: ConditionalRule['range']): boolean =>
-  a.sheet === b.sheet && !(a.r1 < b.r0 || a.r0 > b.r1 || a.c1 < b.c0 || a.c0 > b.c1);
 
 const highlightFill = { fill: '#ffc7ce', color: '#9c0006' } as const;
 const topBottomFill = { fill: '#c6efce', color: '#006100' } as const;

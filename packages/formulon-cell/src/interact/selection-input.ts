@@ -1,10 +1,10 @@
 import type { CellBatchOperation } from '../commands/interaction-policy.js';
 import { mergeAt } from '../commands/merge.js';
 import { shiftFormulaRefs } from '../commands/refs.js';
-import { addrKey } from '../engine/address.js';
+import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import { formatWithPending } from '../store/pending-format.js';
-import { subtractRange } from '../store/selection-geometry.js';
+import { rangeArea, subtractRange } from '../store/selection-geometry.js';
 import type { State } from '../store/store.js';
 
 export interface SelectionInputChange {
@@ -22,10 +22,6 @@ const MAX_SELECTION_INPUT_CELLS = 100_000;
 /** Shown when {@link buildSelectionInputBatch} refuses a selection. */
 export const SELECTION_INPUT_LIMIT_MESSAGE =
   'The selection cannot be filled together. A fill can include at most 100,000 unique cells.';
-const MAX_ROW = 1_048_575;
-const MAX_COL = 16_383;
-
-const rangeArea = (range: Range): number => (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
 
 const validRange = (range: Range): boolean =>
   Number.isSafeInteger(range.sheet) &&

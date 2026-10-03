@@ -1,4 +1,6 @@
+import { MAX_COL, MAX_ROW } from '../../engine/address.js';
 import type { Range } from '../../engine/types.js';
+import { sameRange } from '../../store/selection-geometry.js';
 import type { State } from '../../store/store.js';
 import { encodeTSV } from './tsv.js';
 
@@ -57,7 +59,9 @@ export function copy(state: State): CopyResult | null {
     range: r,
     logicalRange: { ...r },
     ...(ranges.length > 1 ? { ranges } : {}),
-    ...(payloadRanges.length > 1 || !sameRange(payloadRanges[0], r) ? { payloadRanges } : {}),
+    ...(payloadRanges.length > 1 || !payloadRanges[0] || !sameRange(payloadRanges[0], r)
+      ? { payloadRanges }
+      : {}),
   };
 }
 
@@ -85,8 +89,8 @@ function normalizedCopyRanges(
 }
 
 function trimWholeBandsToUsedSpan(state: State, ranges: Range[]): Range[] {
-  const wholeRows = ranges.every((r) => r.c0 === 0 && r.c1 >= 16383);
-  const wholeCols = ranges.every((r) => r.r0 === 0 && r.r1 >= 1048575);
+  const wholeRows = ranges.every((r) => r.c0 === 0 && r.c1 >= MAX_COL);
+  const wholeCols = ranges.every((r) => r.r0 === 0 && r.r1 >= MAX_ROW);
   if (!wholeRows && !wholeCols) return ranges;
 
   let min = Number.POSITIVE_INFINITY;
@@ -138,18 +142,6 @@ function trimWholeBandsToUsedSpan(state: State, ranges: Range[]): Range[] {
     max = 0;
   }
   return ranges.map((r) => (wholeRows ? { ...r, c0: min, c1: max } : { ...r, r0: min, r1: max }));
-}
-
-function sameRange(a: Range | undefined, b: Range | undefined): boolean {
-  return (
-    !!a &&
-    !!b &&
-    a.sheet === b.sheet &&
-    a.r0 === b.r0 &&
-    a.c0 === b.c0 &&
-    a.r1 === b.r1 &&
-    a.c1 === b.c1
-  );
 }
 
 function displayValue(state: State, sheet: number, row: number, col: number): string {

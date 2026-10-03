@@ -1,4 +1,4 @@
-import { addrKey } from './address.js';
+import { addrKey, MAX_COL, MAX_ROW } from './address.js';
 import type { Addr, CellValue, Range } from './types.js';
 
 /** Functions whose result is expected to spill. Anchor-cell formulas starting
@@ -57,13 +57,13 @@ export function detectSpillRange(
   col: number,
 ): Range {
   let lastCol = col;
-  for (let c = col + 1; c < col + 16384; c += 1) {
+  for (let c = col + 1; c < col + MAX_COL + 1; c += 1) {
     const cell = cells.get(addrKey({ sheet, row, col: c }));
     if (!cell || cell.formula !== null || cell.value.kind === 'blank') break;
     lastCol = c;
   }
   let lastRow = row;
-  for (let r = row + 1; r < row + 1_048_576; r += 1) {
+  for (let r = row + 1; r < row + MAX_ROW + 1; r += 1) {
     const cell = cells.get(addrKey({ sheet, row: r, col }));
     if (!cell || cell.formula !== null || cell.value.kind === 'blank') break;
     lastRow = r;

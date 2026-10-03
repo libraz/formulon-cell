@@ -69,6 +69,26 @@ describe('insertCopiedCellsFromTSV', () => {
     expect(wb.getValue({ sheet: 0, row: 1, col: 3 })).toEqual({ kind: 'text', value: 'D2' });
   });
 
+  it('updates sheet-qualified references on every sheet when cells shift', async () => {
+    const store = createSpreadsheetStore();
+    const wb = await newWb();
+    expect(wb.addSheet('Target')).toBe(1);
+    wb.setNumber({ sheet: 0, row: 1, col: 0 }, 2);
+    wb.setFormula({ sheet: 0, row: 0, col: 2 }, '=Sheet1!$A$2');
+    wb.setFormula({ sheet: 0, row: 0, col: 3 }, '=Target!$A$2');
+    wb.setFormula({ sheet: 1, row: 0, col: 3 }, '=Sheet1!$A$2');
+    wb.setFormula({ sheet: 1, row: 1, col: 3 }, '=A2');
+    setActive(store, 1, 0);
+
+    insertCopiedCellsFromTSV(store, wb, null, 'x', 'down');
+
+    expect(wb.getValue({ sheet: 0, row: 2, col: 0 })).toEqual({ kind: 'number', value: 2 });
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 2 })).toBe('=Sheet1!$A$3');
+    expect(wb.cellFormula({ sheet: 0, row: 0, col: 3 })).toBe('=Target!$A$2');
+    expect(wb.cellFormula({ sheet: 1, row: 0, col: 3 })).toBe('=Sheet1!$A$3');
+    expect(wb.cellFormula({ sheet: 1, row: 1, col: 3 })).toBe('=A2');
+  });
+
   it('shifts formats and whole merges with the moved cells', async () => {
     const store = createSpreadsheetStore();
     const wb = await newWb();

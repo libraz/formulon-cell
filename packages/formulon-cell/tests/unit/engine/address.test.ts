@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { addrKey } from '../../../src/engine/address.js';
+import {
+  addrKey,
+  colFromLetters,
+  colLetter,
+  MAX_COL,
+  MAX_ROW,
+  parseA1Atom,
+} from '../../../src/engine/address.js';
 
 describe('engine/address', () => {
   it('emits a sheet:row:col string key', () => {
@@ -15,6 +22,82 @@ describe('engine/address', () => {
   });
 
   it('handles the worksheet upper bound', () => {
-    expect(addrKey({ sheet: 0, row: 1048575, col: 16383 })).toBe('0:1048575:16383');
+    expect(addrKey({ sheet: 0, row: MAX_ROW, col: MAX_COL })).toBe('0:1048575:16383');
+  });
+
+  it('pins the zero-based worksheet bounds', () => {
+    expect(MAX_ROW).toBe(1_048_575);
+    expect(MAX_COL).toBe(16_383);
+  });
+
+  describe('colLetter', () => {
+    it('maps single-letter columns', () => {
+      expect(colLetter(0)).toBe('A');
+      expect(colLetter(1)).toBe('B');
+      expect(colLetter(25)).toBe('Z');
+    });
+
+    it('maps two-letter columns at the boundary', () => {
+      expect(colLetter(26)).toBe('AA');
+      expect(colLetter(27)).toBe('AB');
+      expect(colLetter(51)).toBe('AZ');
+      expect(colLetter(52)).toBe('BA');
+      expect(colLetter(701)).toBe('ZZ');
+    });
+
+    it('maps three-letter columns up to the last column', () => {
+      expect(colLetter(702)).toBe('AAA');
+      expect(colLetter(MAX_COL)).toBe('XFD');
+    });
+  });
+
+  describe('colFromLetters', () => {
+    it('inverts colLetter across the sheet width', () => {
+      for (const col of [0, 25, 26, 51, 52, 701, 702, MAX_COL]) {
+        expect(colFromLetters(colLetter(col))).toBe(col);
+      }
+    });
+
+    it('is case-insensitive', () => {
+      expect(colFromLetters('xfd')).toBe(MAX_COL);
+      expect(colFromLetters('aB')).toBe(27);
+    });
+
+    it('rejects empty input and non-letters', () => {
+      expect(colFromLetters('')).toBe(-1);
+      expect(colFromLetters('A1')).toBe(-1);
+      expect(colFromLetters('$A')).toBe(-1);
+    });
+
+    it('does not clamp past the last column', () => {
+      expect(colFromLetters('XFE')).toBe(MAX_COL + 1);
+    });
+  });
+
+  describe('parseA1Atom', () => {
+    it('parses relative, absolute, and mixed atoms case-insensitively', () => {
+      expect(parseA1Atom('B2')).toEqual({ row: 1, col: 1 });
+      expect(parseA1Atom('$A$1')).toEqual({ row: 0, col: 0 });
+      expect(parseA1Atom('c$3')).toEqual({ row: 2, col: 2 });
+      expect(parseA1Atom('  $d4 ')).toEqual({ row: 3, col: 3 });
+    });
+
+    it('accepts the last cell and rejects anything beyond it', () => {
+      expect(parseA1Atom('XFD1048576')).toEqual({ row: MAX_ROW, col: MAX_COL });
+      expect(parseA1Atom('XFE1')).toBeNull();
+      expect(parseA1Atom('A1048577')).toBeNull();
+    });
+
+    it('rejects row 0, malformed input, and sheet prefixes', () => {
+      expect(parseA1Atom('A0')).toBeNull();
+      expect(parseA1Atom('1A')).toBeNull();
+      expect(parseA1Atom('A$$1')).toBeNull();
+      expect(parseA1Atom('Sheet1!A1')).toBeNull();
+      expect(parseA1Atom('')).toBeNull();
+    });
+
+    it('reads leading-zero rows as their numeric value', () => {
+      expect(parseA1Atom('A01')).toEqual({ row: 0, col: 0 });
+    });
   });
 });

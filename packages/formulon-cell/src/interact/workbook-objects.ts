@@ -1,3 +1,4 @@
+import { colLetter, parseA1Atom } from '../engine/address.js';
 import { summarizeSpreadsheetCompatibility } from '../engine/compatibility.js';
 import {
   listWorkbookObjects,
@@ -80,31 +81,7 @@ function createWorkbookObjectsActionButton(
   return button;
 }
 
-const colLetter = (n: number): string => {
-  let v = n;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (v % 26)) + out;
-    v = Math.floor(v / 26) - 1;
-  } while (v >= 0);
-  return out;
-};
-
 const cellRef = (row: number, col: number): string => `${colLetter(col)}${row + 1}`;
-
-const parseCellRef = (input: string): { row: number; col: number } | null => {
-  const m = input
-    .trim()
-    .replace(/\$/g, '')
-    .match(/^([A-Za-z]+)([1-9][0-9]*)$/);
-  if (!m) return null;
-  const letters = m[1];
-  const rows = m[2];
-  if (!letters || !rows) return null;
-  let col = 0;
-  for (const ch of letters.toUpperCase()) col = col * 26 + (ch.charCodeAt(0) - 64);
-  return { row: Number(rows) - 1, col: col - 1 };
-};
 
 export function attachWorkbookObjectsPanel(
   deps: WorkbookObjectsPanelDeps,
@@ -516,7 +493,7 @@ export function attachWorkbookObjectsPanel(
       pivotEditError = '';
       const nextAnchor = fieldListOnly
         ? { row: pivot.top, col: pivot.left }
-        : parseCellRef(anchor.value);
+        : parseA1Atom(anchor.value);
       if (!nextAnchor) {
         pivotEditError = t.invalidPivotAnchor;
         render();

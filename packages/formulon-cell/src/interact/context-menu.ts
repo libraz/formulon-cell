@@ -20,6 +20,7 @@ import type {
   PermissionDecision,
 } from '../commands/interaction-policy.js';
 import { hiddenInSelection } from '../commands/structure.js';
+import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -844,7 +845,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     const selectedRanges = [s.selection.range, ...(s.selection.extraRanges ?? [])];
     if (zone.kind === 'row-header' || zone.kind === 'row-resize') {
       const inSel = selectedRanges.some(
-        (sel) => zone.row >= sel.r0 && zone.row <= sel.r1 && sel.c0 === 0 && sel.c1 >= 16383,
+        (sel) => zone.row >= sel.r0 && zone.row <= sel.r1 && sel.c0 === 0 && sel.c1 >= MAX_COL,
       );
       if (!inSel && canChangeSelection()) mutators.selectRow(store, zone.row);
       return {
@@ -854,7 +855,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     }
     if (zone.kind === 'col-header' || zone.kind === 'col-resize') {
       const inSel = selectedRanges.some(
-        (sel) => zone.col >= sel.c0 && zone.col <= sel.c1 && sel.r0 === 0 && sel.r1 >= 1048575,
+        (sel) => zone.col >= sel.c0 && zone.col <= sel.c1 && sel.r0 === 0 && sel.r1 >= MAX_ROW,
       );
       if (!inSel && canChangeSelection()) mutators.selectCol(store, zone.col);
       return {
@@ -867,13 +868,13 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         (sel) =>
           zone.row >= sel.r0 && zone.row <= sel.r1 && zone.col >= sel.c0 && zone.col <= sel.c1,
       );
-      if (selected?.c0 === 0 && selected.c1 >= 16383) {
+      if (selected?.c0 === 0 && selected.c1 >= MAX_COL) {
         return {
           kind: 'row',
           cell: { sheet: s.selection.active.sheet, row: zone.row, col: zone.col },
         };
       }
-      if (selected?.r0 === 0 && selected.r1 >= 1048575) {
+      if (selected?.r0 === 0 && selected.r1 >= MAX_ROW) {
         return {
           kind: 'col',
           cell: { sheet: s.selection.active.sheet, row: zone.row, col: zone.col },

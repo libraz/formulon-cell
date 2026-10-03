@@ -7,6 +7,7 @@ import { pasteSpecial } from '../commands/clipboard/paste-special.js';
 import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import type { History } from '../commands/history.js';
 import { insertCols, insertRows } from '../commands/structure.js';
+import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
@@ -34,8 +35,8 @@ export interface ContextMenuInsertCopiedContext {
 
 export const wholeBandAxisFor = (snapshot: ClipboardSnapshot): 'row' | 'col' | null => {
   const logical = snapshot.logicalRange ?? snapshot.range;
-  const wholeRow = logical.c0 === 0 && logical.c1 >= 16_383;
-  const wholeCol = logical.r0 === 0 && logical.r1 >= 1_048_575;
+  const wholeRow = logical.c0 === 0 && logical.c1 >= MAX_COL;
+  const wholeCol = logical.r0 === 0 && logical.r1 >= MAX_ROW;
   // A full-sheet selection satisfies both predicates but has no single header
   // axis. Leave it on the ordinary path rather than presenting a misleading
   // row/column-specific insert action.
