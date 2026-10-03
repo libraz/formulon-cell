@@ -41,7 +41,6 @@ import {
 import { type PrinterProfile, resolvePrinterProfileBounds } from './printer-profile.js';
 import { formatA1FormulaAsR1C1 } from './refs.js';
 
-export { colLetter } from '../engine/address.js';
 export type { AxisBand, PrintableMarginAdjustment, SplitAxisOptions } from './page-geometry.js';
 export {
   computeFitToPagesScale,

@@ -2,7 +2,7 @@
 // The dialog DOM wiring lives in `conditional-dialog.ts`; this module
 // exposes only the shape data so the parent file can focus on layout.
 
-import { colLetter } from '../commands/print.js';
+import { colLetter } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Range } from '../engine/types.js';
 import type { CellFormat, ConditionalRule } from '../store/store.js';

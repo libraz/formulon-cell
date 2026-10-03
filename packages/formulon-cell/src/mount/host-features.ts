@@ -8,6 +8,7 @@ import {
 } from '../commands/session-illustration.js';
 import { setSheetZoom } from '../commands/structure.js';
 import { tracePrecedents as tracePrecedentArrows } from '../commands/traces.js';
+import { colLetter } from '../engine/address.js';
 import { formatCellForEdit } from '../engine/edit-seed.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -58,16 +59,6 @@ import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import type { ChromeSlot } from './chrome.js';
 import type { FormulaBarController } from './formula-bar.js';
 import type { SheetTabsController } from './sheet-tabs-controller.js';
-
-const colLetter = (col: number): string => {
-  let value = col;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (value % 26)) + out;
-    value = Math.floor(value / 26) - 1;
-  } while (value >= 0);
-  return out;
-};
 
 const a1Range = (range: Range): string => {
   const start = `${colLetter(range.c0)}${range.r0 + 1}`;

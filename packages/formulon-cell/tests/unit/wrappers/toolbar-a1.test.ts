@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { parseA1Atom } from '../../../src/engine/address.js';
 import {
   formatA1Range,
   formatSheetAbsoluteRange,
-  parseA1Atom,
   parseA1Range,
 } from '../../../src/wrappers/toolbar-a1.js';
 

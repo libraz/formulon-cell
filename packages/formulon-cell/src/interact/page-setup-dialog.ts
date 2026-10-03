@@ -5,7 +5,6 @@
 // reverts the whole apply atomically.
 import { type History, recordPageSetupChange } from '../commands/history.js';
 import {
-  colLetter,
   parsePrintAreas,
   parsePrintTitleCols,
   parsePrintTitleRows,
@@ -17,6 +16,7 @@ import {
   normalizePrinterProfiles,
   type PrinterProfile,
 } from '../commands/printer-profile.js';
+import { colLetter } from '../engine/address.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
   defaultPageSetup,

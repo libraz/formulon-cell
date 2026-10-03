@@ -448,7 +448,6 @@ export type {
 } from './commands/print.js';
 export {
   buildPrintDocument,
-  colLetter,
   computeFitToPagesScale,
   parsePrintArea,
   parsePrintAreas,
@@ -704,6 +703,7 @@ export {
   STANDARD_COLORS,
   THEME_COLOR_COLUMNS,
 } from './components/color-palette.js';
+export { colLetter, parseA1Atom } from './engine/address.js';
 export type { NamedCellStyle } from './engine/cell-styles-meta.js';
 export { computeNamedCellStyles } from './engine/cell-styles-meta.js';
 export type {
@@ -1481,7 +1481,6 @@ export {
   cellLabel,
   formatA1Range,
   formatSheetAbsoluteRange,
-  parseA1Atom,
   parseA1Range,
 } from './wrappers/toolbar-a1.js';
 export type {

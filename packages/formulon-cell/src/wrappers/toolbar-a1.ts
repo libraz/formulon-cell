@@ -6,8 +6,6 @@ import { colLetter } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { SheetCell, SheetRange } from './toolbar-types.js';
 
-export { parseA1Atom } from '../engine/address.js';
-
 /** Render a `SheetRange` as A1 ("A1:B3" or "A1" when start === end). */
 export const formatA1Range = (range: SheetRange): string => {
   const start = `${colLetter(range.c0)}${range.r0 + 1}`;

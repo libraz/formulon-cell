@@ -1,3 +1,4 @@
+import { colLetter } from '../engine/address.js';
 import {
   defaultPageSetup,
   getPageSetup,
@@ -10,7 +11,7 @@ import {
   type State,
 } from '../store/store.js';
 import { type History, recordPageSetupChange } from './history.js';
-import { colLetter, parsePrintAreas, parsePrintTitleCols, parsePrintTitleRows } from './print.js';
+import { parsePrintAreas, parsePrintTitleCols, parsePrintTitleRows } from './print.js';
 import {
   normalizePrintableBounds,
   type PrinterProfile,
