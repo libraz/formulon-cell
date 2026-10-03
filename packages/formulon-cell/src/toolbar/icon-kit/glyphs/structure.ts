@@ -138,4 +138,10 @@ export const STRUCTURE_ICONS = {
     }),
     stroked('M8.8 2.4v19.2M2.4 8.8h19.2', PALETTE.info, 'bold'),
   ],
+  // Unfreeze: the same split, released — plain grid, faded rules, cross badge.
+  unfreeze: [
+    ...sheet({ x: 2.4, y: 2.4, w: 19.2, h: 19.2, cols: 3, rows: 3 }),
+    stroked('M8.8 2.4v19.2M2.4 8.8h19.2', PALETTE.grid, 'bold', { dash: '2.4 2' }),
+    ...badge({ glyph: 'cross', corner: 'br' }),
+  ],
 } satisfies Record<string, IconDefinition>;

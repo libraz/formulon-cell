@@ -15,6 +15,7 @@ import {
   colorSwatchGrid,
   createMenu,
   createSubmenu,
+  type MenuIconSlug,
   menuIconButton,
   menuIconSpacer,
   menuIdForCommand,
@@ -64,7 +65,7 @@ const formatSubmenuId = (key: 'visibility' | 'tabColor'): string => `menu-format
 const formatSubmenuTrigger = (
   label: string,
   key: 'visibility' | 'tabColor',
-  icon: string,
+  icon: MenuIconSlug,
 ): HTMLButtonElement =>
   menuSubmenuTrigger(menuIconButton(label, 'formatSubmenu', key, icon), undefined, {
     controlsId: formatSubmenuId(key),

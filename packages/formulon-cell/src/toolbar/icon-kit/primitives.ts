@@ -249,12 +249,52 @@ export const arcArrow = (options: {
   return segments;
 };
 
+/**
+ * A nearly closed clockwise loop with a solid head, for "keeps recalculating".
+ * The gap sits at the top-left so the head reads at small sizes.
+ */
+export const loopArrow = (options: {
+  cx: number;
+  cy: number;
+  r: number;
+  color: string;
+  weight?: StrokeWeight;
+}): IconSegment[] => {
+  const { cx, cy, r } = options;
+  const at = (deg: number): Point => {
+    const rad = (deg * Math.PI) / 180;
+    return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+  };
+  const end = 165;
+  const rad = (end * Math.PI) / 180;
+  return arcArrow({
+    from: at(-135),
+    to: at(end),
+    radius: r,
+    sweep: 1,
+    largeArc: 1,
+    headDir: [-Math.sin(rad), Math.cos(rad)],
+    color: options.color,
+    weight: options.weight ?? 'regular',
+    head: 'solid',
+  });
+};
+
 // ---------------------------------------------------------------------------
 // Corner badge
 // ---------------------------------------------------------------------------
 
 export type BadgeCorner = 'tr' | 'br' | 'tl' | 'bl';
-export type BadgeGlyph = 'plus' | 'minus' | 'cross' | 'check' | 'star' | 'pencil' | 'dots' | 'bang';
+export type BadgeGlyph =
+  | 'plus'
+  | 'minus'
+  | 'cross'
+  | 'check'
+  | 'star'
+  | 'pencil'
+  | 'dots'
+  | 'bang'
+  | 'pause';
 
 export type BadgeOptions = {
   glyph: BadgeGlyph;
@@ -280,6 +320,7 @@ const DEFAULT_BADGE_TONE: Record<BadgeGlyph, string> = {
   pencil: PALETTE.info,
   dots: PALETTE.grid,
   bang: PALETTE.warn,
+  pause: PALETTE.info,
 };
 
 const badgeOrigin = (corner: BadgeCorner): Point => {
@@ -395,6 +436,18 @@ export const badge = (options: BadgeOptions): IconSegment[] => {
             ),
             onTone,
             'heavy',
+          ),
+        ];
+      case 'pause':
+        return [
+          stroked(
+            join(
+              `M${n(cx - 1.2 * BADGE_GLYPH_SCALE)} ${n(cy - arm)}v${n(arm * 2)}`,
+              `M${n(cx + 1.2 * BADGE_GLYPH_SCALE)} ${n(cy - arm)}v${n(arm * 2)}`,
+            ),
+            onTone,
+            'thin',
+            { cap: 'butt' },
           ),
         ];
       case 'dots':

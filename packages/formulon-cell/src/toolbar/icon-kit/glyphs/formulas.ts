@@ -8,10 +8,12 @@ import {
   bars,
   filled,
   headed,
+  loopArrow,
   magnifier,
   outlined,
   place,
   ring,
+  type SheetOptions,
   sheet,
   star,
   stroked,
@@ -83,6 +85,33 @@ const functionFamilyIcons = {
 /** The card the validation icons annotate. */
 const card = (fill = PALETTE.paper) => [
   outlined(rect(3.4, 3.4, 15.2, 17.2), fill, PALETTE.ink, 'regular'),
+];
+
+/** A pocket calculator: display over a 3x3 key pad with an accent equals key. */
+const calculator = (): IconSegment[] => {
+  const keys: string[] = [];
+  for (let row = 0; row < 3; row += 1) {
+    for (let col = 0; col < 3; col += 1) {
+      if (row === 2 && col === 2) continue;
+      keys.push(rect(7.6 + col * 3.4, 11 + row * 3.4, 2, 2));
+    }
+  }
+  return [
+    outlined(roundRect(5, 2.4, 14, 19.2, 1.5), PALETTE.paper, PALETTE.ink, 'regular'),
+    outlined(rect(7.4, 4.8, 9.2, 3.8), PALETTE.accentSoft, PALETTE.accent, 'thin'),
+    filled(join(...keys), PALETTE.grid),
+    filled(rect(14.4, 17.8, 2, 2), PALETTE.accent),
+  ];
+};
+
+/** The sheet the calculation-mode icons act on, leaving the bottom-right for a mark. */
+const calcSheet = (options: Pick<SheetOptions, 'bands'> = {}) =>
+  sheet({ x: 2.4, y: 2.4, w: 16.2, h: 16.2, cols: 2, rows: 3, ...options });
+
+/** Loop mark in the bottom-right corner, on a paper disc so grid rules stop short of it. */
+const cornerLoop = (color: string): IconSegment[] => [
+  filled(circle(17.2, 17.2, 5.6), PALETTE.paper),
+  ...loopArrow({ cx: 17.2, cy: 17.2, r: 3.8, color, weight: 'bold' }),
 ];
 
 /** Cell boxes wired together, for the precedent/dependent tracers. */
@@ -164,6 +193,24 @@ export const FORMULA_ICONS = {
   calcOptions: [
     ...sheet({ x: 2.4, y: 4.4, w: 16.2, h: 16.2, cols: 2, rows: 3 }),
     ...badge({ glyph: 'dots', corner: 'br', tone: PALETTE.info }),
+  ],
+  // Calculation modes: a loop that recalculates by itself, or a paused sheet.
+  calcAuto: [...calcSheet(), ...cornerLoop(PALETTE.accent)],
+  calcAutoNoTable: [
+    ...calcSheet({ bands: [{ axis: 'row', index: 0, fill: PALETTE.infoSoft }] }),
+    ...cornerLoop(PALETTE.accent),
+    ...badge({ glyph: 'minus', corner: 'tr' }),
+  ],
+  calcManual: [...calcSheet(), ...badge({ glyph: 'pause', corner: 'br' })],
+  calcNow: calculator(),
+  calcSheet: [
+    ...calcSheet(),
+    ...place(calculator(), { box: [5, 2.4, 14, 19.2], size: 12.4, cx: 17.4, cy: 16 }),
+  ],
+  // Iteration: the loop around the count it repeats to.
+  calcIterative: [
+    ...loopArrow({ cx: 12, cy: 12, r: 8.4, color: PALETTE.accent, weight: 'bold' }),
+    letter('digits', { height: 7.4, cy: 12, color: PALETTE.ink }),
   ],
   // Watch window: an eye over the value being tracked.
   watch: [

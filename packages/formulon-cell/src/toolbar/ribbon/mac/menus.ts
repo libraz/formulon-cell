@@ -12,6 +12,7 @@ import { createRibbonButton } from '../button.js';
 import {
   createSubmenu,
   menuSubmenuTrigger,
+  type VisualTileIconSlug,
   visualMenuGrid,
   visualMenuTile,
 } from '../menus/general.js';
@@ -155,7 +156,7 @@ const liveNameSignature = (names: ReadonlySet<string> | undefined): string =>
 const menuLabel = (commandId: string, lang: 'ja' | 'en'): string =>
   macRibbonLabelForCommand(commandId, lang);
 
-const CHART_ICONS: Readonly<Record<string, string>> = {
+const CHART_ICONS: Readonly<Record<string, VisualTileIconSlug>> = {
   'mac.insert.chartColumn': 'chart-column',
   'mac.insert.chartBar': 'chart-bar',
   'mac.insert.chartLine': 'chart-line',
@@ -163,7 +164,7 @@ const CHART_ICONS: Readonly<Record<string, string>> = {
   'mac.insert.chartPie': 'chart-pie',
   'mac.insert.chartScatter': 'chart-scatter',
 };
-const SHAPE_ICONS: Readonly<Record<string, string>> = {
+const SHAPE_ICONS: Readonly<Record<string, VisualTileIconSlug>> = {
   shapeLine: 'shape-line',
   shapeArrow: 'shape-arrow',
   shapeRectangle: 'shape-rectangle',

@@ -728,7 +728,7 @@ describe('Spreadsheet.mountToolbar', () => {
       currencyButton,
     );
     expect(host.querySelectorAll('#menu-currency-home [data-currency-preset]').length).toBe(5);
-    expect(host.querySelector('#menu-currency-home .fc-tb__menu-icon--svg')).toBeFalsy();
+    expect(host.querySelector('#menu-currency-home .fc-tb__menu-icon-svg')).toBeFalsy();
     expect(host.querySelectorAll('#menu-currency-home .fc-tb__menu-item__icon-spacer').length).toBe(
       6,
     );

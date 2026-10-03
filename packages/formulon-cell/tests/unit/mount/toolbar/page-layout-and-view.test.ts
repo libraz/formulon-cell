@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Spreadsheet } from '../../../../src/mount.js';
 import { getPageSetup, mutators } from '../../../../src/store/store.js';
+import { EXCEL_RIBBON_ICON_PATHS } from '../../../../src/toolbar/excel-ribbon-icons.js';
 import {
   HOME_MIXED_LAYOUT_GROUP_VARIANTS,
   HOME_STACKED_LAYOUT_GROUP_VARIANTS,
@@ -10,6 +11,14 @@ import { type MountedStubSheet, mountStubSheet } from '../../../test-utils/mount
 import { stubHelpers, waitFor } from './fixtures.js';
 
 vi.setConfig({ testTimeout: 20_000 });
+
+const glyphPaths = (glyph: string): (string | null)[] =>
+  (EXCEL_RIBBON_ICON_PATHS[glyph] ?? []).map((segment) => segment.d);
+
+const menuGlyphPaths = (item: Element | null | undefined): (string | null)[] =>
+  Array.from(item?.querySelectorAll('.fc-tb__menu-icon-svg path') ?? []).map((path) =>
+    path.getAttribute('d'),
+  );
 
 describe('Spreadsheet.mountToolbar', () => {
   let sheet: MountedStubSheet;
@@ -576,6 +585,7 @@ describe('Spreadsheet.mountToolbar', () => {
       '#menu-freeze [data-freeze="selection"]',
     );
     expect(selectionFreeze).toBeTruthy();
+    expect(menuGlyphPaths(selectionFreeze)).toEqual(glyphPaths('freeze'));
     const freezeEvent = new MouseEvent('click', { bubbles: true });
     Object.defineProperty(freezeEvent, 'target', { value: selectionFreeze });
     expect(tb.dropdownsApi?.dynamicRibbonDropdownClick(freezeEvent)).toBe(true);
@@ -587,6 +597,12 @@ describe('Spreadsheet.mountToolbar', () => {
     expect(unfreeze).toBeTruthy();
     expect(host.querySelectorAll('#menu-freeze .fc-tb__menu-item--iconic').length).toBe(3);
     expect(unfreeze?.textContent).toBe('Unfreeze Panes');
+    expect(
+      unfreeze
+        ?.querySelector('.fc-tb__menu-icon')
+        ?.classList.contains('fc-tb__menu-icon--freeze-off'),
+    ).toBe(true);
+    expect(menuGlyphPaths(unfreeze)).toEqual(glyphPaths('unfreeze'));
     expect(unfreeze?.disabled).toBe(false);
     expect(unfreeze?.getAttribute('aria-disabled')).toBe('false');
     const unfreezeEvent = new MouseEvent('click', { bubbles: true });

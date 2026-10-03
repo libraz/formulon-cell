@@ -27,7 +27,7 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(menu.id).toBe('menu-underline');
     expect(items.map((item) => item.dataset.underlineAction)).toEqual(['single', 'double']);
     expect(items.map((item) => item.textContent)).toEqual(['下線', '二重下線']);
-    expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(2);
+    expect(menu.querySelectorAll('.fc-tb__menu-icon .fc-tb__menu-icon-svg')).toHaveLength(2);
 
     expect(menusCss).toMatch(/#menu-underline\s*\{[\s\S]*?min-width: 118px;/);
     expect(menusCss).toMatch(
@@ -54,7 +54,7 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(menu.id).toBe('menu-copy');
     expect(items.map((item) => item.dataset.copyAction)).toEqual(['copy', 'picture']);
     expect(items.map((item) => item.textContent)).toEqual(['コピー', '図としてコピー...']);
-    expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(2);
+    expect(menu.querySelectorAll('.fc-tb__menu-icon .fc-tb__menu-icon-svg')).toHaveLength(2);
 
     expect(menusCss).toMatch(/#menu-copy\s*\{[\s\S]*?min-width: 144px;/);
     expect(menusCss).toMatch(
@@ -109,7 +109,7 @@ describe('toolbar/ribbon menu primitives', () => {
       'ハイパーリンクの削除',
       '条件付き書式のクリア',
     ]);
-    expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(7);
+    expect(menu.querySelectorAll('.fc-tb__menu-icon .fc-tb__menu-icon-svg')).toHaveLength(7);
     expect(menu.querySelector('path[fill="#f7e1ff"]')).toBeTruthy();
     expect(menu.querySelector('path[stroke="#2f75b5"]')).toBeTruthy();
     // The destructive mark is a filled badge plate, not a stroked cross.
@@ -161,7 +161,7 @@ describe('toolbar/ribbon menu primitives', () => {
       '再適用',
       '詳細設定...',
     ]);
-    expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(11);
+    expect(menu.querySelectorAll('.fc-tb__menu-icon .fc-tb__menu-icon-svg')).toHaveLength(11);
     expect(menu.querySelector('path[stroke="#c00000"]')).toBeTruthy();
     expect(menu.querySelector('path[stroke="#107c41"]')).toBeTruthy();
     expect(menu.querySelector('path[stroke="#2f75b5"]')).toBeTruthy();
@@ -215,7 +215,7 @@ describe('toolbar/ribbon menu primitives', () => {
       'オブジェクトの選択',
       '選択ウィンドウ...',
     ]);
-    expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(11);
+    expect(menu.querySelectorAll('.fc-tb__menu-icon .fc-tb__menu-icon-svg')).toHaveLength(11);
     expect(menu.querySelector('path[stroke="#8a4fb7"]')).toBeTruthy();
     expect(menu.querySelector('path[stroke="#107c41"]')).toBeTruthy();
     expect(menu.querySelector('path[fill="#fdf3bf"]')).toBeTruthy();
@@ -263,7 +263,7 @@ describe('toolbar/ribbon menu primitives', () => {
       '文字の割付',
       'フラッシュ フィル',
     ]);
-    expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(8);
+    expect(menu.querySelectorAll('.fc-tb__menu-icon .fc-tb__menu-icon-svg')).toHaveLength(8);
     expect(menu.querySelector('path[stroke="#2f75b5"]')).toBeTruthy();
     expect(menu.querySelector('path[stroke="#107c41"]')).toBeTruthy();
     expect(menu.querySelector('path[fill="#ed7d31"]')).toBeTruthy();
@@ -275,24 +275,6 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(menusCss).toMatch(
       /#menu-fill \.fc-tb__menu-icon,[\s\S]*?#menu-fill \.fc-tb__menu-icon-svg\s*\{[\s\S]*?width: 18px;[\s\S]*?height: 18px;/,
     );
-    for (const selector of [
-      '.fc-tb__menu-icon--fill-days::after',
-      '.fc-tb__menu-icon--fill-weekdays::after',
-      '.fc-tb__menu-icon--fill-months::after',
-      '.fc-tb__menu-icon--fill-years::after',
-    ]) {
-      const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      expect(menusCss).toMatch(
-        new RegExp(`${escaped}[\\s\\S]*?border: 1px solid #107c41;[\\s\\S]*?content: "";`),
-      );
-    }
-    const fillDateCss = menusCss.slice(
-      menusCss.indexOf('.fc-tb__menu-icon--fill-days::before'),
-      menusCss.indexOf('.fc-tb__menu-icon--freeze-col::before'),
-    );
-    for (const glyph of ['"D"', '"W"', '"M"', '"Y"']) {
-      expect(fillDateCss).not.toContain(`content: ${glyph}`);
-    }
   });
 
   it('keeps AutoSum dropdown compact and close to Japanese Excel 365 desktop', () => {
@@ -321,10 +303,8 @@ describe('toolbar/ribbon menu primitives', () => {
       '最小値',
       'その他の関数...',
     ]);
-    expect(homeMenu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(
-      1,
-    );
-    expect(homeMenu.querySelector('[data-autosum-fn="SUM"] .fc-tb__menu-icon--svg')).toBeTruthy();
+    expect(homeMenu.querySelectorAll('.fc-tb__menu-icon .fc-tb__menu-icon-svg')).toHaveLength(1);
+    expect(homeMenu.querySelector('[data-autosum-fn="SUM"] .fc-tb__menu-icon-svg')).toBeTruthy();
     expect(homeMenu.querySelectorAll('.fc-tb__menu-item__icon-spacer')).toHaveLength(5);
 
     expect(menusCss).toMatch(
@@ -366,7 +346,7 @@ describe('toolbar/ribbon menu primitives', () => {
       'CHF フランス語 (スイス)',
     ]);
     expect(footer?.textContent).toBe('その他の通貨表示形式…');
-    expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(0);
+    expect(menu.querySelectorAll('.fc-tb__menu-icon .fc-tb__menu-icon-svg')).toHaveLength(0);
     expect(menu.querySelectorAll('.fc-tb__menu-item__icon-spacer')).toHaveLength(6);
 
     expect(menusCss).toMatch(/\.fc-tb__currency-menu\s*\{[\s\S]*?min-width: 190px;/);
@@ -514,12 +494,8 @@ describe('toolbar/ribbon menu primitives', () => {
       '列の削除',
       'シートの削除',
     ]);
-    expect(
-      insertMenu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg'),
-    ).toHaveLength(4);
-    expect(
-      deleteMenu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg'),
-    ).toHaveLength(6);
+    expect(insertMenu.querySelectorAll('.fc-tb__menu-icon .fc-tb__menu-icon-svg')).toHaveLength(4);
+    expect(deleteMenu.querySelectorAll('.fc-tb__menu-icon .fc-tb__menu-icon-svg')).toHaveLength(6);
     expect(insertMenu.querySelector('path[fill="#107c41"]')).toBeTruthy();
     expect(deleteMenu.querySelector('path[fill="#c00000"]')).toBeTruthy();
 
@@ -606,9 +582,9 @@ describe('toolbar/ribbon menu primitives', () => {
     expect(items.at(-1)?.dataset.cellFormat).toBe('dialog');
     expect(items.at(-1)?.textContent).toBe('セルの書式設定...');
     expect(items.map((item) => item.dataset.cellFormat)).toContain('lock-cell');
-    expect(
-      menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg').length,
-    ).toBeGreaterThan(10);
+    expect(menu.querySelectorAll('.fc-tb__menu-icon .fc-tb__menu-icon-svg').length).toBeGreaterThan(
+      10,
+    );
 
     expect(menusCss).toMatch(/#menu-format-cells\s*\{[\s\S]*?min-width: 208px;/);
     expect(menusCss).toMatch(
@@ -657,7 +633,7 @@ describe('toolbar/ribbon menu primitives', () => {
       'セルの結合',
       'セル結合の解除',
     ]);
-    expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(4);
+    expect(menu.querySelectorAll('.fc-tb__menu-icon .fc-tb__menu-icon-svg')).toHaveLength(4);
 
     expect(menusCss).toMatch(/#menu-merge\s*\{[\s\S]*?min-width: 206px;/);
     expect(menusCss).toMatch(
@@ -687,7 +663,7 @@ describe('toolbar/ribbon menu primitives', () => {
       '折り返して全体を表示',
       '縮小して全体を表示する',
     ]);
-    expect(menu.querySelectorAll('.fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')).toHaveLength(1);
+    expect(menu.querySelectorAll('.fc-tb__menu-icon .fc-tb__menu-icon-svg')).toHaveLength(1);
     expect(menu.querySelectorAll('.fc-tb__menu-item__icon-spacer')).toHaveLength(1);
 
     expect(menusCss).toMatch(/#menu-wrap\s*\{[\s\S]*?min-width: 220px;/);

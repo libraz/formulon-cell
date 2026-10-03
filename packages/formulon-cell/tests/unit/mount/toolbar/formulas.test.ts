@@ -38,8 +38,7 @@ describe('Spreadsheet.mountToolbar', () => {
     );
     expect(host.querySelectorAll('#menu-autosum-home [data-autosum-fn]').length).toBe(6);
     expect(
-      host.querySelectorAll('#menu-autosum-home .fc-tb__menu-icon--svg .fc-tb__menu-icon-svg')
-        .length,
+      host.querySelectorAll('#menu-autosum-home .fc-tb__menu-icon .fc-tb__menu-icon-svg').length,
     ).toBe(1);
     const averageButton = host.querySelector<HTMLButtonElement>('[data-autosum-fn="AVERAGE"]');
     expect(averageButton).toBeTruthy();

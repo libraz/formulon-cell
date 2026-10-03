@@ -15,7 +15,7 @@ describe('toolbar/ribbon menu primitives', () => {
       .filter(
         ({ source }) =>
           source.includes('fc-tb__menu-item fc-tb__menu-item--iconic') ||
-          source.includes('fc-tb__menu-icon fc-tb__menu-icon--'),
+          source.includes("'fc-tb__menu-icon'"),
       )
       .map(({ name }) => name);
 

@@ -7,6 +7,7 @@ import type { ToolbarLang, ToolbarMenuText } from '../../../index.js';
 
 import {
   createMenu,
+  type MenuIconSlug,
   menuIconButton,
   menuIconSpacer,
   menuIdForCommand,
@@ -32,7 +33,7 @@ type FormulasMenuText = ToolbarMenuText & {
   calcIterative: string;
 };
 
-const calcOptionButton = (label: string, value: string, icon: string): HTMLButtonElement => {
+const calcOptionButton = (label: string, value: string, icon: MenuIconSlug): HTMLButtonElement => {
   const button = menuIconButton(label, 'calcOption', value, icon);
   if (value === 'auto' || value === 'manual' || value === 'auto-no-table') {
     button.setAttribute('role', 'menuitemradio');

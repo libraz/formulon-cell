@@ -1,5 +1,6 @@
 import { type FreezeAction, handleFreezeAction, type SpreadsheetInstance } from '../../index.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
+import { setMenuIcon } from '../../toolbar/ribbon/menus/general.js';
 import { setMenuControlDisabled } from './menu-feedback.js';
 
 const freezeActionFromMenu = (action: string): FreezeAction | null => {
@@ -39,8 +40,7 @@ const updateFreezeMenu =
           : strings.viewToolbar.freezePanes;
       }
       const icon = primary.querySelector<HTMLElement>('.fc-tb__menu-icon');
-      icon?.classList.toggle('fc-tb__menu-icon--freeze-panes', !hasFreeze);
-      icon?.classList.toggle('fc-tb__menu-icon--freeze-off', hasFreeze);
+      if (icon) setMenuIcon(icon, hasFreeze ? 'freeze-off' : 'freeze-panes');
     }
     for (const button of menu.querySelectorAll<HTMLButtonElement>('[data-freeze]')) {
       if (button === primary) continue;

@@ -2,12 +2,13 @@
 // Extracted from main.ts so the per-tab menu modules can build off the same
 // building blocks without dragging the whole playground entry along with them.
 
-import { createExcelRibbonSvg } from '../../excel-ribbon-icons.js';
+import { createExcelRibbonSvg, type ExcelRibbonIconName } from '../../excel-ribbon-icons.js';
 import { prepareMenu } from '../../menu-a11y.js';
 import { createRibbonButton } from '../button.js';
 import { ribbonDropdownMenuIdForCommand } from '../dynamic-dropdowns.js';
 
-const MENU_EXCEL_ICON_OVERRIDES: Readonly<Record<string, string>> = {
+/** Icon slug used by a menu row -> the icon-kit glyph it renders. Every slug must resolve. */
+export const MENU_ICON_GLYPHS = {
   'addin-get': 'addIn',
   'addin-manage': 'addIn',
   'addin-my': 'addIn',
@@ -24,6 +25,12 @@ const MENU_EXCEL_ICON_OVERRIDES: Readonly<Record<string, string>> = {
   'break-remove': 'pageBreaks',
   'bring-forward': 'shapes',
   'bring-front': 'shapes',
+  'calc-auto': 'calcAuto',
+  'calc-auto-no-table': 'calcAutoNoTable',
+  'calc-iterative': 'calcIterative',
+  'calc-manual': 'calcManual',
+  'calc-now': 'calcNow',
+  'calc-sheet': 'calcSheet',
   clear: 'clear',
   'cell-style-merge': 'cellStyles',
   'cell-style-new': 'cellStyles',
@@ -99,6 +106,7 @@ const MENU_EXCEL_ICON_OVERRIDES: Readonly<Record<string, string>> = {
   'find-formulas': 'findFormulas',
   'find-validation': 'findValidation',
   'freeze-col': 'freeze',
+  'freeze-off': 'unfreeze',
   'freeze-panes': 'freeze',
   'freeze-row': 'freeze',
   'go-to': 'goTo',
@@ -186,9 +194,12 @@ const MENU_EXCEL_ICON_OVERRIDES: Readonly<Record<string, string>> = {
   'watch-delete': 'watch',
   'watch-delete-all': 'watch',
   'watch-open': 'watch',
-};
+} as const satisfies Record<string, ExcelRibbonIconName>;
 
-const VISUAL_TILE_EXCEL_ICON_OVERRIDES: Readonly<Record<string, string>> = {
+export type MenuIconSlug = keyof typeof MENU_ICON_GLYPHS;
+
+/** Icon slug used by a visual gallery tile -> the icon-kit glyph it renders. */
+export const VISUAL_TILE_GLYPHS = {
   'chart-area': 'chartArea',
   'chart-bar': 'chartBar',
   'chart-column': 'chartColumn',
@@ -211,6 +222,14 @@ const VISUAL_TILE_EXCEL_ICON_OVERRIDES: Readonly<Record<string, string>> = {
   'theme-contrast': 'themeContrast',
   'theme-dark': 'themeDark',
   'theme-light': 'themeLight',
+} as const satisfies Record<string, ExcelRibbonIconName>;
+
+export type VisualTileIconSlug = keyof typeof VISUAL_TILE_GLYPHS;
+
+const glyphSvg = (glyph: ExcelRibbonIconName, className: string): SVGSVGElement => {
+  const svg = createExcelRibbonSvg(glyph, className);
+  if (!svg) throw new Error(`ribbon glyph "${glyph}" is not registered`);
+  return svg;
 };
 
 const menuDiv = (
@@ -272,7 +291,7 @@ export const menuIconButton = (
   label: string,
   attr: string,
   value: string,
-  icon: string,
+  icon: MenuIconSlug,
 ): HTMLButtonElement => {
   const button = createMenuButton({
     className: 'fc-tb__menu-item fc-tb__menu-item--iconic',
@@ -280,15 +299,19 @@ export const menuIconButton = (
     value,
   });
 
-  const iconSpan = menuSpan(`fc-tb__menu-icon fc-tb__menu-icon--${icon}`, { ariaHidden: true });
-  const svg = createExcelRibbonSvg(MENU_EXCEL_ICON_OVERRIDES[icon] ?? '', 'fc-tb__menu-icon-svg');
-  if (svg) {
-    iconSpan.classList.add('fc-tb__menu-icon--svg');
-    iconSpan.append(svg);
-  }
-
+  const iconSpan = menuSpan('fc-tb__menu-icon', { ariaHidden: true });
+  setMenuIcon(iconSpan, icon);
   button.append(iconSpan, menuSpan('fc-tb__menu-item__text', { text: label }));
   return button;
+};
+
+/** Point a menu row's icon span at `icon`, replacing its slug class and glyph. */
+export const setMenuIcon = (iconSpan: HTMLElement, icon: MenuIconSlug): void => {
+  for (const cls of [...iconSpan.classList]) {
+    if (cls.startsWith('fc-tb__menu-icon--')) iconSpan.classList.remove(cls);
+  }
+  iconSpan.classList.add(`fc-tb__menu-icon--${icon}`);
+  iconSpan.replaceChildren(glyphSvg(MENU_ICON_GLYPHS[icon], 'fc-tb__menu-icon-svg'));
 };
 
 export const menuPresetButton = (
@@ -400,7 +423,7 @@ export type VisualMenuTileOptions = {
   label: string;
   attr: string;
   value: string;
-  icon: string;
+  icon: VisualTileIconSlug;
   className?: string;
 };
 
@@ -415,14 +438,7 @@ export const visualMenuTile = (opts: VisualMenuTileOptions): HTMLButtonElement =
   const iconSpan = menuSpan(`fc-tb__visual-tile__icon fc-tb__visual-tile__icon--${opts.icon}`, {
     ariaHidden: true,
   });
-  const svg = createExcelRibbonSvg(
-    VISUAL_TILE_EXCEL_ICON_OVERRIDES[opts.icon] ?? '',
-    'fc-tb__visual-tile__icon-svg',
-  );
-  if (svg) {
-    iconSpan.classList.add('fc-tb__visual-tile__icon--svg');
-    iconSpan.append(svg);
-  }
+  iconSpan.append(glyphSvg(VISUAL_TILE_GLYPHS[opts.icon], 'fc-tb__visual-tile__icon-svg'));
 
   button.append(iconSpan, menuSpan('fc-tb__visual-tile__label', { text: opts.label }));
   return button;

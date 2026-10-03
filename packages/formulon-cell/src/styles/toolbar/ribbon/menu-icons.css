@@ -1,0 +1,40 @@
+.fc-tb__menu-icon {
+  position: relative;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  color: #185abd;
+}
+
+.fc-tb__menu-icon-svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.fc-tb__menu-item[role="menuitemradio"][aria-checked="true"] .fc-tb__menu-icon {
+  color: #107c41;
+}
+
+#menu-format-cells .fc-tb__menu-item--checked .fc-tb__menu-icon::before,
+#menu-format-cells .fc-tb__menu-item--checked .fc-tb__menu-item__text::before {
+  width: 9px;
+  height: 5px;
+  border: 0;
+  border-bottom: 2px solid #107c41;
+  border-left: 2px solid #107c41;
+  background: transparent;
+  color: transparent;
+  content: "";
+  transform: rotate(-45deg);
+}
+
+#menu-format-cells .fc-tb__menu-item--checked .fc-tb__menu-icon::before {
+  position: absolute;
+  top: 5px;
+  left: -15px;
+}
+
+#menu-format-cells .fc-tb__menu-item--checked .fc-tb__menu-item__text::before {
+  vertical-align: 2px;
+}
