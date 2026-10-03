@@ -29,8 +29,25 @@ const clearPendingFormatOnMove = (s: State, nextActive: Addr): State['ui'] =>
 const permittedAddr = (store: SpreadsheetStore, addr: Addr): Addr | null =>
   navigationPolicyFor(store) ? clampNavigationAddr(store, addr) : addr;
 
-const permittedRange = (store: SpreadsheetStore, range: Range): Range | null =>
-  navigationPolicyFor(store) ? clampNavigationRange(store, range) : { ...range };
+const validSelectionRange = (range: Range): boolean =>
+  Number.isSafeInteger(range.sheet) &&
+  range.sheet >= 0 &&
+  Number.isSafeInteger(range.r0) &&
+  Number.isSafeInteger(range.c0) &&
+  Number.isSafeInteger(range.r1) &&
+  Number.isSafeInteger(range.c1) &&
+  range.r0 >= 0 &&
+  range.c0 >= 0 &&
+  range.r1 <= MAX_ROW &&
+  range.c1 <= MAX_COL &&
+  range.r0 <= range.r1 &&
+  range.c0 <= range.c1;
+
+/** Off-sheet or inverted ranges are rejected before any navigation clamp. */
+const permittedRange = (store: SpreadsheetStore, range: Range): Range | null => {
+  if (!validSelectionRange(range)) return null;
+  return navigationPolicyFor(store) ? clampNavigationRange(store, range) : { ...range };
+};
 
 const mergeRangeAt = (state: State, addr: Addr): Range | null => {
   const key = addrKey(addr);
@@ -51,20 +68,6 @@ const selectionForAddr = (state: State, addr: Addr): { active: Addr; range: Rang
     range: { ...merge },
   };
 };
-
-const validSelectionRange = (range: Range): boolean =>
-  Number.isSafeInteger(range.sheet) &&
-  range.sheet >= 0 &&
-  Number.isSafeInteger(range.r0) &&
-  Number.isSafeInteger(range.c0) &&
-  Number.isSafeInteger(range.r1) &&
-  Number.isSafeInteger(range.c1) &&
-  range.r0 >= 0 &&
-  range.c0 >= 0 &&
-  range.r1 <= MAX_ROW &&
-  range.c1 <= MAX_COL &&
-  range.r0 <= range.r1 &&
-  range.c0 <= range.c1;
 
 const hasPartialMerge = (state: State, range: Range): boolean =>
   [...state.merges.byAnchor.values()].some(
