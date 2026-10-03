@@ -4,6 +4,41 @@ All notable changes to `@libraz/formulon-cell` are documented here. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning is [SemVer](https://semver.org/).
 
+## 0.8.0 — 2026-10-04
+
+### Added
+
+- Opt-in Mac platform profile. `ui.platform` accepts `'default'` (the default), `'mac'`, or `'auto'` to detect it from the browser; `resolveSpreadsheetPlatform` exposes the same resolution. The Mac profile mounts its own ribbon tab set, Mac keyboard shortcuts, and a Draw tab with an ink layer. `RibbonProfile` and `BuildRibbonModelOptions` select the tab set for hosts that build the ribbon model themselves.
+- A nonmodal formula argument palette for the Mac profile. It suspends an in-progress cell or formula-bar edit and restores it on Cancel, edits the function call under the caret of a compound formula without rewriting the text around it, and records insertions in Recent.
+- `MountOptions.getFunctionArgumentHelp` supplies per-argument hints and reference links to the palette. The React and Vue components accept it as a prop and export `FunctionArgumentHelp` and `FunctionArgumentHelpProvider`.
+- Goal Seek, Consolidate, Subtotal, Insert Sparkline, Insert Slicer, and Workbook Statistics dialogs. Subtotal's structural changes go through the interaction policy and are undoable.
+- Function Arguments and the function picker read the live workbook catalog, group functions into family categories (`FunctionCategory`), and keep a Recent list. `FxDialogOpenOptions` opens the dialog on a category.
+- Multi-range selections: modifier-drag adds ranges, navigation moves within them, Ctrl/Cmd+Enter fills every selected cell, and ribbon formatting and Clear apply to every area after authorizing each one.
+- Named styles apply across the selected areas using their included format groups. Format Cells gains an underline style selector.
+- `AutofitOptions` for `autofitColWidth` / `autofitRowHeight`, and `formatA1Cell`.
+
+### Changed
+
+- Dialog format changes undo and redo against the engine as well as the store, and restore both if replay fails.
+- Ribbon state updates index buttons by command once per update instead of querying each command.
+
+### Fixed
+
+- Input on a merged cell is validated and written at the merge anchor, and protection is checked across every cell of the merge.
+- The inline editor stays open with the typed text when a workbook write fails, and reports the failure.
+- Editor, formula bar, Backspace, and ribbon Clear commit through the registered interaction controller, so the policy and validation rules apply to each of them. Selection fill validates every target before writing.
+- Inverted selection ranges are normalized instead of rejected, and whole-row and whole-column checks agree across selection mutators.
+- Ctrl+Enter in the formula bar fills the selection when no controller is registered.
+- Composite undo and redo are re-authorized against the current policy.
+- Double-click fill unmerges the destination, and text scripts applied to a range recalculate once.
+- Autofit measures in the rendered cell font and reserves room for the table header button.
+- Manual calculation mode is read through the engine's `calcMode()`.
+- Function syntax renders from one formatter, autocomplete accepts dotted function names, and engine and built-in descriptions use the same catalog locale.
+- The conditional-format formula splitter tracks nested parentheses, braces, and brackets.
+- The context menu keeps the format intent and clears range unions.
+- Host features resolve the workbook lazily after `setWorkbook`.
+- The ribbon display menu stays above a peeking ribbon, and Custom Sort takes focus synchronously.
+
 ## 0.7.0 — 2026-10-01
 
 ### Added
