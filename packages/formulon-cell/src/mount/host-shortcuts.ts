@@ -23,12 +23,12 @@ import {
 } from '../commands/row-col-layout.js';
 import { recordFormatChange, recordTablesChange } from '../commands/slice-history.js';
 import { deleteCols, deleteRows, insertCols, insertRows } from '../commands/structure.js';
-import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import { flushFormatToEngine } from '../engine/cell-format-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { Strings } from '../i18n/strings.js';
 import { openCellShiftDialog } from '../interact/cell-shift-dialog.js';
 import { formatWithPending } from '../store/pending-format.js';
+import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
 import { type NumberFormatAction, numberFormatForAction } from '../toolbar/number-format.js';
@@ -53,12 +53,6 @@ const DIRECT_NUMBER_FORMAT_BY_KEY: Readonly<Record<string, NumberFormatAction>> 
   '%': 'percent',
   '^': 'scientific',
 };
-
-const isWholeRowSelection = (range: { c0: number; c1: number }): boolean =>
-  range.c0 === 0 && range.c1 >= MAX_COL;
-
-const isWholeColumnSelection = (range: { r0: number; r1: number }): boolean =>
-  range.r0 === 0 && range.r1 >= MAX_ROW;
 
 const hasActiveCopy = (state: ReturnType<SpreadsheetStore['getState']>): boolean =>
   Boolean(state.ui.copyRange || state.ui.copyRanges?.length);
@@ -258,7 +252,7 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
         const sourceRange = snapshot?.logicalRange ?? snapshot?.range;
         const sourceIsWholeBand =
           sourceRange !== undefined &&
-          (isWholeRowSelection(sourceRange) || isWholeColumnSelection(sourceRange));
+          (isWholeRowRange(sourceRange) || isWholeColumnRange(sourceRange));
         if (snapshot && sourceIsWholeBand) {
           const inserted = insertCopiedBand(input.store, currentWb, input.history, snapshot, range);
           if (inserted) {
@@ -274,9 +268,9 @@ export function createHostShortcutHandler(input: HostShortcutInput): (e: Keyboar
       }
       if (
         (kind === 'delete' || !hasActiveCopy(state)) &&
-        (isWholeRowSelection(range) || isWholeColumnSelection(range))
+        (isWholeRowRange(range) || isWholeColumnRange(range))
       ) {
-        if (isWholeRowSelection(range)) {
+        if (isWholeRowRange(range)) {
           const count = range.r1 - range.r0 + 1;
           if (kind === 'insert') insertRows(input.store, currentWb, input.history, range.r0, count);
           else deleteRows(input.store, currentWb, input.history, range.r0, count);

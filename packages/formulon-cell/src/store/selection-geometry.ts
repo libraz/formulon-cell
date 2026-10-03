@@ -1,3 +1,4 @@
+import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { SelectionSlice } from './types.js';
 
@@ -12,6 +13,14 @@ const cloneRange = (range: Range): Range => ({
   r1: range.r1,
   c1: range.c1,
 });
+
+/** True when `range` spans every column, i.e. it selects whole rows. */
+export const isWholeRowRange = (range: Pick<Range, 'c0' | 'c1'>): boolean =>
+  range.c0 === 0 && range.c1 >= MAX_COL;
+
+/** True when `range` spans every row, i.e. it selects whole columns. */
+export const isWholeColumnRange = (range: Pick<Range, 'r0' | 'r1'>): boolean =>
+  range.r0 === 0 && range.r1 >= MAX_ROW;
 
 export const sameRange = (a: Range, b: Range): boolean =>
   a.sheet === b.sheet && a.r0 === b.r0 && a.c0 === b.c0 && a.r1 === b.r1 && a.c1 === b.c1;

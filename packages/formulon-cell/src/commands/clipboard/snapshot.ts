@@ -1,5 +1,6 @@
-import { addrKey, MAX_COL, MAX_ROW } from '../../engine/address.js';
+import { addrKey } from '../../engine/address.js';
 import type { CellValue, Range } from '../../engine/types.js';
+import { isWholeColumnRange, isWholeRowRange } from '../../store/selection-geometry.js';
 import type { CellFormat, State } from '../../store/store.js';
 import type { CopyResult } from './copy.js';
 
@@ -131,9 +132,6 @@ export function captureSnapshot(
   };
 }
 
-const isWholeRowRange = (range: Range): boolean => range.c0 === 0 && range.c1 >= MAX_COL;
-const isWholeColumnRange = (range: Range): boolean => range.r0 === 0 && range.r1 >= MAX_ROW;
-
 /**
  * Capture the bounded, structured payload represented by `copy` while
  * retaining the original logical selection. This is the single entry point
@@ -149,9 +147,7 @@ export function captureSnapshotFromCopyResult(
   if (ranges.length !== 1 || !ranges[0]) return null;
   const payloadRange = ranges[0];
   const logicalRange = result.logicalRange ?? result.range;
-  const logicalIsBand =
-    (logicalRange.r0 === 0 && logicalRange.r1 >= MAX_ROW) ||
-    (logicalRange.c0 === 0 && logicalRange.c1 >= MAX_COL);
+  const logicalIsBand = isWholeColumnRange(logicalRange) || isWholeRowRange(logicalRange);
   const snapshot = captureSnapshot(state, payloadRange, mode, {
     // Whole-band copies intentionally omit a merge crossing the selected
     // axis boundary. Excel copies the anchor/value but does not carry the
