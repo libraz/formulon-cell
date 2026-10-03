@@ -40,12 +40,14 @@ import {
   createDemoStrings,
   DEMO_FUNCTIONS,
   DEMO_ICONS,
+  DEMO_MAC_RIBBON_TABS,
   DEMO_PRINT_PREVIEW_LINES,
   DEMO_PRINTER_PROFILE_ID,
   DEMO_PRINTER_PROFILES,
   DEMO_RIBBON_TABS,
   type DemoBackstageAction,
   type DemoIconName,
+  type DemoPlatform,
   type DemoSearchItem,
   type DemoSearchUsagePrior,
   demoColLabel,
@@ -67,6 +69,7 @@ import {
   recordDemoSearchUsage,
   refreshDemoPrinterProfiles,
   resolveInitialLocale,
+  resolveInitialPlatform,
   reviewCellsForInstance,
   runDemoBackstageAction,
   saveDemoSearchUsagePrior,
@@ -134,6 +137,7 @@ const DemoIcon = ({ name }: { name: DemoIconName }): ReactElement => (
 export const App = (): ReactElement => {
   const [theme, setTheme] = useState<ThemeName>('paper');
   const [locale, setLocale] = useState<string>(() => resolveInitialLocale());
+  const [platform] = useState<DemoPlatform>(() => resolveInitialPlatform());
   const [workbook, setWorkbook] = useState<WorkbookHandle | null>(null);
   const [instance, setInstance] = useState<SpreadsheetInstance | null>(null);
   const [log, setLog] = useState<ChangeLogEntry[]>([]);
@@ -170,9 +174,10 @@ export const App = (): ReactElement => {
   const scriptModalRef = useRef<HTMLDivElement | null>(null);
 
   const resolvedUi = useMemo(
-    () => composeDemoUiOptions({ preset, overrides, showRibbon, theme }),
-    [overrides, preset, showRibbon, theme],
+    () => composeDemoUiOptions({ preset, overrides, showRibbon, theme, platform }),
+    [overrides, platform, preset, showRibbon, theme],
   );
+  const ribbonTabs = platform === 'mac' ? DEMO_MAC_RIBBON_TABS : DEMO_RIBBON_TABS;
   const features = resolvedUi.features;
   const ui = UI[locale === 'ja' ? 'ja' : 'en'];
   const commandText = useMemo(() => demoCommandText(locale), [locale]);
@@ -223,7 +228,7 @@ export const App = (): ReactElement => {
     document.documentElement.lang = locale === 'ja' ? 'ja' : 'en';
   }, [instance, locale]);
 
-  useEffect(() => installDemoSearchShortcut(() => searchInputRef.current), []);
+  useEffect(() => installDemoSearchShortcut(() => searchInputRef.current, platform), [platform]);
 
   useEffect(() => saveDemoSearchUsagePrior(searchUsagePrior), [searchUsagePrior]);
   useEffect(
@@ -452,6 +457,7 @@ export const App = (): ReactElement => {
         showNotice: showRibbonNotice,
         toggleOptions: () => setShowPanel((v) => !v),
         closeBackstage: () => {
+          toolbarRef.current?.setBackstageOpen(false);
           setBackstageAction('info');
           setRibbonTab('home');
         },
@@ -510,9 +516,9 @@ export const App = (): ReactElement => {
         locale,
         setRibbonTab,
         (commandId) => toolbarRef.current?.applyCommand(commandId) ?? false,
-        DEMO_RIBBON_TABS,
+        ribbonTabs,
       ),
-    [commands, locale],
+    [commands, locale, ribbonTabs],
   );
 
   const filteredCommands = useMemo(() => {
@@ -526,6 +532,11 @@ export const App = (): ReactElement => {
     setSearchQuery('');
     setSearchOpen(false);
     setSearchActiveIndex(-1);
+  }, []);
+
+  const openBackstage = useCallback(() => {
+    setRibbonTab('file');
+    toolbarRef.current?.setBackstageOpen(true);
   }, []);
 
   if (!workbook) {
@@ -545,7 +556,7 @@ export const App = (): ReactElement => {
   }
 
   return (
-    <div className="demo" data-fc-theme={theme}>
+    <div className="demo" data-fc-theme={theme} data-fc-platform={platform}>
       <header className="demo__head">
         <div className="fc-tb__titlebar">
           <div
@@ -554,9 +565,21 @@ export const App = (): ReactElement => {
             role="toolbar"
             aria-label={ui.quickAccessToolbar}
           >
-            <span className="demo__brand-mark" aria-hidden="true">
-              <DemoIcon name="app" />
-            </span>
+            {platform === 'mac' ? (
+              <button
+                type="button"
+                className="demo__brand-mark"
+                aria-label={ui.file}
+                title={ui.file}
+                onClick={openBackstage}
+              >
+                <DemoIcon name="app" />
+              </button>
+            ) : (
+              <span className="demo__brand-mark" aria-hidden="true">
+                <DemoIcon name="app" />
+              </span>
+            )}
             <button
               type="button"
               className="demo__title-icon"
@@ -593,7 +616,9 @@ export const App = (): ReactElement => {
               type="search"
               role="combobox"
               placeholder={ui.search}
-              aria-label={ui.searchCommands}
+              aria-label={
+                platform === 'mac' ? (locale === 'ja' ? '検索' : 'Search') : ui.searchCommands
+              }
               aria-controls="demo-search-results"
               aria-expanded={searchOpen}
               aria-activedescendant={
@@ -712,7 +737,7 @@ export const App = (): ReactElement => {
               activeTab={ribbonTab}
               onTabChange={setRibbonTab}
               locale={locale}
-              ribbonTabs={DEMO_RIBBON_TABS}
+              ribbonTabs={ribbonTabs}
               onSpellingReview={onSpellingReview}
               onAccessibilityCheck={onAccessibilityCheck}
               onRunScript={onRunScript}
@@ -723,6 +748,7 @@ export const App = (): ReactElement => {
               }
               onAddIn={() => showRibbonNotice(commandText.addIns, commandText.addInsHostCallbacks)}
               onToolbarReady={(toolbar) => {
+                if (toolbar) toolbar.host.dataset.fcPlatform = platform;
                 toolbarRef.current = toolbar;
                 (window as unknown as { __fcToolbar?: ToolbarInstance | null }).__fcToolbar =
                   toolbar;
@@ -731,6 +757,8 @@ export const App = (): ReactElement => {
           ) : null}
           <Spreadsheet
             className="demo__sheet"
+            ui={resolvedUi}
+            toolbar={false}
             workbook={workbook}
             theme={theme}
             locale={locale}

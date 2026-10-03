@@ -33,14 +33,19 @@ import type {
 import {
   buildPrintDocument,
   buildRibbonSearchIndex,
+  EXCEL365_MAC_RIBBON_TABS,
   EXCEL365_STANDARD_RIBBON_TABS,
   getPageSetup,
   queryRibbonSearchIndex,
   resolvePrinterProfileBounds,
+  resolveSpreadsheetPlatform,
   resolveSpreadsheetUiOptions,
 } from '@libraz/formulon-cell';
 
 export type DemoFramework = 'React' | 'Vue';
+
+export type DemoPlatform = 'mac' | 'default';
+export type DemoPlatformInput = 'auto' | DemoPlatform;
 
 export const THEMES: { value: ThemeName; label: string }[] = [
   { value: 'paper', label: 'Light' },
@@ -59,6 +64,20 @@ export const DEMO_RIBBON_TABS: readonly RibbonTab[] = [
   ...EXCEL365_STANDARD_RIBBON_TABS,
   'automate',
 ];
+
+/** The Mac tab strip follows the desktop Microsoft 365 surface.  The title
+ * bar owns the backstage entry, so the ribbon deliberately has no File tab. */
+export const DEMO_MAC_RIBBON_TABS: readonly RibbonTab[] = EXCEL365_MAC_RIBBON_TABS;
+
+const isDemoPlatformInput = (value: string | null | undefined): value is DemoPlatformInput =>
+  value === 'auto' || value === 'mac' || value === 'default';
+
+export const resolveInitialPlatform = (
+  search = globalThis.location?.search ?? '',
+): DemoPlatform => {
+  const requested = new URLSearchParams(search).get('platform');
+  return resolveSpreadsheetPlatform(isDemoPlatformInput(requested) ? requested : 'auto');
+};
 
 export const DEMO_PRINTER_PROFILES: readonly PrinterProfile[] = [
   {
@@ -191,10 +210,23 @@ export const resolveInitialLocale = (
 
 export const installDemoSearchShortcut = (
   getInput: () => HTMLInputElement | null | undefined,
+  platform: DemoPlatform = 'default',
 ): (() => void) => {
   const onKeydown = (event: KeyboardEvent): void => {
-    if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-    if (event.key.toLowerCase() !== 'q') return;
+    const isMacSearchShortcut =
+      platform === 'mac' &&
+      event.metaKey &&
+      event.ctrlKey &&
+      !event.altKey &&
+      !event.shiftKey &&
+      event.key.toLowerCase() === 'u';
+    const isGenericSearchShortcut =
+      event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey &&
+      event.key.toLowerCase() === 'q';
+    if (!isMacSearchShortcut && !isGenericSearchShortcut) return;
     const input = getInput();
     if (!input || input.disabled || input.hidden) return;
     event.preventDefault();
@@ -308,12 +340,14 @@ export const composeDemoUiOptions = (input: {
   overrides: FeatureFlags;
   showRibbon: boolean;
   theme: ThemeName;
+  platform?: DemoPlatformInput;
 }): ReturnType<typeof resolveSpreadsheetUiOptions> => {
   const profile: SpreadsheetUiOptions['profile'] =
     input.preset === 'full' ? 'excel365' : input.preset;
   return resolveSpreadsheetUiOptions({
     profile,
     theme: input.theme,
+    platform: input.platform,
     features: { ribbon: input.showRibbon },
     advancedFeatures: input.overrides,
   });

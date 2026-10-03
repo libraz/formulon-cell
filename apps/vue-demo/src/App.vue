@@ -40,6 +40,7 @@ import {
   demoSearchOptionId,
   DEMO_ICONS,
   DEMO_FUNCTIONS,
+  DEMO_MAC_RIBBON_TABS,
   DEMO_PRINT_PREVIEW_LINES,
   DEMO_PRINTER_PROFILE_ID,
   DEMO_PRINTER_PROFILES,
@@ -65,6 +66,8 @@ import {
   recordDemoSearchUsage,
   refreshDemoPrinterProfiles,
   resolveInitialLocale,
+  resolveInitialPlatform,
+  type DemoPlatform,
   reviewCellsForInstance,
   runDemoBackstageAction,
   saveDemoSearchUsagePrior,
@@ -104,6 +107,7 @@ const seed = seedDemoWorkbook;
 
 const theme = ref<ThemeName>('paper');
 const locale = ref<string>(resolveInitialLocale());
+const platform = ref<DemoPlatform>(resolveInitialPlatform());
 const workbook = shallowRef<WorkbookHandle | null>(null);
 // Vue's reactive proxy walks deeply by default; the spreadsheet instance
 // holds a canvas + many internal refs that should not be reactivified.
@@ -141,7 +145,11 @@ const resolvedUi = computed(() =>
     overrides: overrides.value,
     showRibbon: showRibbon.value,
     theme: theme.value,
+    platform: platform.value,
   }),
+);
+const ribbonTabs = computed(() =>
+  platform.value === 'mac' ? DEMO_MAC_RIBBON_TABS : DEMO_RIBBON_TABS,
 );
 const features = computed<FeatureFlags>(() => resolvedUi.value.features);
 const ui = computed(() => UI[locale.value === 'ja' ? 'ja' : 'en']);
@@ -410,6 +418,7 @@ const runBackstageAction = (action: DemoBackstageAction): void => {
       showPanel.value = !showPanel.value;
     },
     closeBackstage: () => {
+      toolbar.value?.setBackstageOpen(false);
       backstageAction.value = 'info';
       ribbonTab.value = 'home';
     },
@@ -490,7 +499,7 @@ const searchItems = computed(() =>
       ribbonTab.value = tab;
     },
     (commandId) => toolbar.value?.applyCommand(commandId) ?? false,
-    DEMO_RIBBON_TABS,
+    ribbonTabs.value,
   ),
 );
 
@@ -507,7 +516,13 @@ const runCommand = (cmd: DemoSearchItem): void => {
   searchActiveIndex.value = -1;
 };
 
+const openBackstage = (): void => {
+  ribbonTab.value = 'file';
+  toolbar.value?.setBackstageOpen(true);
+};
+
 const onToolbarReady = (next: ToolbarInstance | null): void => {
+  if (next) next.host.dataset.fcPlatform = platform.value;
   toolbar.value = next;
   (window as unknown as { __fcToolbar?: ToolbarInstance | null }).__fcToolbar = next;
 };
@@ -551,7 +566,7 @@ onUnmounted(() => {
 });
 
 onMounted(() => {
-  disposeSearchShortcut = installDemoSearchShortcut(() => searchInput.value);
+  disposeSearchShortcut = installDemoSearchShortcut(() => searchInput.value, platform.value);
   disposeF6Navigation = installDemoF6Navigation({
     getQuickAccess: () => quickAccess.value,
     getToolbar: () => toolbar.value,
@@ -576,7 +591,7 @@ onBeforeUnmount(() => {
     </div>
     <template v-else>{{ ui.loadingEngine }}</template>
   </div>
-  <div v-else class="demo" :data-fc-theme="theme">
+  <div v-else class="demo" :data-fc-theme="theme" :data-fc-platform="platform">
     <header class="demo__head">
       <div class="fc-tb__titlebar">
         <div
@@ -585,7 +600,19 @@ onBeforeUnmount(() => {
           role="toolbar"
           :aria-label="ui.quickAccessToolbar"
         >
-          <span class="demo__brand-mark" aria-hidden="true">
+          <button
+            v-if="platform === 'mac'"
+            type="button"
+            class="demo__brand-mark"
+            :aria-label="ui.file"
+            :title="ui.file"
+            @click="openBackstage"
+          >
+            <svg class="fc-tb__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path v-for="segment in DEMO_ICONS.app" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
+            </svg>
+          </button>
+          <span v-else class="demo__brand-mark" aria-hidden="true">
             <svg class="fc-tb__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path v-for="segment in DEMO_ICONS.app" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
             </svg>
@@ -620,7 +647,7 @@ onBeforeUnmount(() => {
             type="search"
             role="combobox"
             :placeholder="ui.search"
-            :aria-label="ui.searchCommands"
+            :aria-label="platform === 'mac' ? (locale === 'ja' ? '検索' : 'Search') : ui.searchCommands"
             aria-controls="demo-search-results"
             :aria-expanded="searchOpen"
             :aria-activedescendant="searchOpen && searchActiveIndex >= 0 ? demoSearchOptionId(searchActiveIndex) : undefined"
@@ -684,7 +711,7 @@ onBeforeUnmount(() => {
           :instance="instance"
           :active-tab="ribbonTab"
           :locale="locale"
-          :ribbon-tabs="DEMO_RIBBON_TABS"
+          :ribbon-tabs="ribbonTabs"
           :on-spelling-review="onSpellingReview"
           :on-accessibility-check="onAccessibilityCheck"
           :on-run-script="onRunScript"
@@ -705,6 +732,8 @@ onBeforeUnmount(() => {
         />
         <Spreadsheet
           class="demo__sheet"
+          :ui="resolvedUi"
+          :toolbar="false"
           :workbook="workbook"
           :theme="theme"
           :locale="locale"
