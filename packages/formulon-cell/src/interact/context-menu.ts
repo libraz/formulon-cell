@@ -1,44 +1,12 @@
 import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
-import { deleteCells, insertCells } from '../commands/cell-shift.js';
 import {
   clearSelectedContents,
   collectSelectedContentAddresses,
 } from '../commands/clear-contents.js';
-import { copy } from '../commands/clipboard/copy.js';
-import { cut } from '../commands/clipboard/cut.js';
-import {
-  insertCopiedBand,
-  insertCopiedCellsFromTSV,
-} from '../commands/clipboard/insert-copied-cells.js';
-import { pasteTSV } from '../commands/clipboard/paste.js';
-import {
-  type PasteWhat,
-  pasteSpecial,
-  resolvePasteDestination,
-} from '../commands/clipboard/paste-special.js';
-import {
-  type ClipboardSnapshot,
-  captureSnapshotFromCopyResult,
-} from '../commands/clipboard/snapshot.js';
+import type { ClipboardSnapshot } from '../commands/clipboard/snapshot.js';
 import { parseTSV } from '../commands/clipboard/tsv.js';
 import { clearComment } from '../commands/comment.js';
-import {
-  applyValueFilter,
-  clearFilter,
-  distinctValues,
-  filterValueKey,
-  inferAutoFilterRange,
-  reapplyFilters,
-  recordFilterChange,
-} from '../commands/filter.js';
-import {
-  cycleBorders,
-  setAlign,
-  toggleBold,
-  toggleItalic,
-  toggleUnderline,
-  withSelectionFormatOrigin,
-} from '../commands/format.js';
+import { withSelectionFormatOrigin } from '../commands/format.js';
 import { type History, recordRepeatableFormatChange } from '../commands/history.js';
 import { hyperlinkAt } from '../commands/hyperlinks.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
@@ -51,29 +19,14 @@ import type {
   PermissionCode,
   PermissionDecision,
 } from '../commands/interaction-policy.js';
-import { groupCols, groupRows, ungroupCols, ungroupRows } from '../commands/outline.js';
-import { phoneticReading, setPhoneticReading } from '../commands/phonetic.js';
-import { inferSortHasHeader, sortRange } from '../commands/sort.js';
-import {
-  deleteCols,
-  deleteRows,
-  hiddenInSelection,
-  hideCols,
-  hideRows,
-  insertCols,
-  insertRows,
-  showCols,
-  showRows,
-} from '../commands/structure.js';
-import { addrKey } from '../engine/address.js';
+import { hiddenInSelection } from '../commands/structure.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { hitZone, layoutForView } from '../render/geometry.js';
-import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
-import { showPrompt } from '../toolbar/dialogs/prompt.js';
+import { mutators, type SpreadsheetStore } from '../store/store.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import { openCellShiftDialog } from './cell-shift-dialog.js';
+import { canReadClipboard, createContextMenuClipboard } from './context-menu-clipboard.js';
 import {
   contextItemIds,
   contextItemToRenderEntry,
@@ -84,6 +37,15 @@ import {
   sanitizeContextItems,
   selectBuiltInItems,
 } from './context-menu-entries.js';
+import {
+  type ContextMenuFormatSortContext,
+  runContextMenuFormatSortItem,
+} from './context-menu-format-sort.js';
+import {
+  type ContextMenuInsertCopiedContext,
+  runContextMenuInsertCopiedCells,
+  wholeBandAxisFor,
+} from './context-menu-insert-copied.js';
 import type {
   ContextMenuContext,
   ContextMenuInteractionController,
@@ -102,7 +64,10 @@ import {
   PASTE_QUICK_IDS,
   PLAIN_INSERT_IDS,
 } from './context-menu-spec.js';
-import { openInsertCopiedCellsDialog } from './insert-copied-cells-dialog.js';
+import {
+  type ContextMenuStructureContext,
+  runContextMenuStructureItem,
+} from './context-menu-structure.js';
 import { navigationBoundsFor } from './navigation-policy.js';
 import { overlayPortalFor } from './overlay-portal.js';
 import { clampPanelToViewport, panelSize, viewportSize } from './overlay-position.js';
@@ -160,19 +125,6 @@ const VIEWPORT_PAD = 4;
 
 type MenuTarget = { kind: MenuKind; cell: Addr };
 
-const wholeBandAxisFor = (snapshot: ClipboardSnapshot): 'row' | 'col' | null => {
-  const logical = snapshot.logicalRange ?? snapshot.range;
-  const wholeRow = logical.c0 === 0 && logical.c1 >= 16_383;
-  const wholeCol = logical.r0 === 0 && logical.r1 >= 1_048_575;
-  // A full-sheet selection satisfies both predicates but has no single header
-  // axis. Leave it on the ordinary path rather than presenting a misleading
-  // row/column-specific insert action.
-  if (wholeRow === wholeCol) return null;
-  if (wholeRow) return 'row';
-  if (wholeCol) return 'col';
-  return null;
-};
-
 const itemIdSet = new Set<ItemId>([
   'bold',
   'italic',
@@ -204,42 +156,6 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   const OwnerHTMLButtonElement = ownerWindow?.HTMLButtonElement ?? HTMLButtonElement;
   const hitHost = deps.grid ?? host;
   const history = deps.history ?? null;
-  let localSnapshot: ClipboardSnapshot | null = null;
-  let localSnapshotText: string | null = null;
-  let localCopyRevision: number | null = null;
-  const clipboardSnapshot = (): ClipboardSnapshot | null => {
-    if (deps.getClipboardSnapshot) return deps.getClipboardSnapshot();
-    const state = store.getState();
-    const ui = state.ui;
-    if (
-      !localSnapshot ||
-      localCopyRevision !== (ui.copyRevision ?? 0) ||
-      ui.copyMode !== localSnapshot.mode ||
-      !(ui.copyRange || ui.copyRanges?.length)
-    )
-      return null;
-    if (localSnapshot.mode === 'copy' && ui.copyRange) {
-      const sourceState: State = {
-        ...state,
-        data: {
-          ...state.data,
-          sheetIndex: ui.copyRange.sheet,
-          cells: new Map(
-            Array.from(wb.cells(ui.copyRange.sheet), (cell) => [
-              addrKey(cell.addr),
-              { value: cell.value, formula: cell.formula },
-            ]),
-          ),
-        },
-        selection: { ...state.selection, range: ui.copyRange, extraRanges: [] },
-      };
-      const materialized = copy(sourceState);
-      localSnapshot = materialized
-        ? captureSnapshotFromCopyResult(sourceState, materialized, 'copy')
-        : null;
-    }
-    return localSnapshot;
-  };
   let options = deps.options;
   const interactionController: ContextMenuInteractionController | undefined =
     deps.interactionController ?? interactionControllerFor(store);
@@ -249,6 +165,23 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     recordRepeatableFormatChange(history, store, () =>
       withSelectionFormatOrigin(store, 'contextMenu', fn, commandId),
     );
+  const afterCommit = (): void => deps.onAfterCommit?.();
+  const structureContext: ContextMenuStructureContext = {
+    host,
+    store,
+    wb,
+    history,
+    strings: () => strings,
+    afterCommit,
+  };
+  const formatSortContext: ContextMenuFormatSortContext = {
+    store,
+    wb,
+    history,
+    strings: () => strings,
+    afterCommit,
+    formatChange: wrapFmt,
+  };
 
   const root = ownerDocument.createElement('div');
   root.className = 'fc-ctxmenu';
@@ -347,20 +280,6 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   ]);
 
   const navigationBounded = (): boolean => navigationBoundsFor(store) !== undefined;
-
-  const pasteDestinationRange = (origin: Addr, rows: number, cols: number): Range | null => {
-    if (rows <= 0 || cols <= 0) return null;
-    const r1 = origin.row + rows - 1;
-    const c1 = origin.col + cols - 1;
-    if (r1 > 1_048_575 || c1 > 16_383) return null;
-    return {
-      sheet: origin.sheet,
-      r0: origin.row,
-      c0: origin.col,
-      r1,
-      c1,
-    };
-  };
 
   const canPasteToRange = (range: Range | null): boolean => {
     const bounds = navigationBoundsFor(store);
@@ -602,7 +521,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     const children = submenuChildren.get(id);
     if (!children) return;
     const disabled = new Set<string>();
-    if (id === 'pasteSpecialMenu' && !clipboardSnapshot()) {
+    if (id === 'pasteSpecialMenu' && !clipboard.snapshot()) {
       for (const d of PASTE_QUICK_IDS) disabled.add(d);
     }
     sub.replaceChildren();
@@ -767,7 +686,7 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
           : buildCellEntries(strings);
     const activeAddr = store.getState().selection.active;
     const hasCopiedCells = !!store.getState().ui.copyRange;
-    const pendingSnapshot = hasCopiedCells ? clipboardSnapshot() : null;
+    const pendingSnapshot = hasCopiedCells ? clipboard.snapshot() : null;
     const pendingCutBand =
       pendingSnapshot?.mode === 'cut' && wholeBandAxisFor(pendingSnapshot) === kind;
     const watched = !!deps.isWatched?.(activeAddr);
@@ -1104,158 +1023,6 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   sub.addEventListener('mouseenter', cancelSubClose);
   sub.addEventListener('mouseleave', scheduleSubClose);
 
-  /** Clamp a selection's row span to the populated region. A whole-row /
-   *  whole-column band selection spans ~1M rows; sorting or filtering that
-   *  raw range would iterate (and rewrite) the entire sheet and freeze the
-   *  UI, so bound it to the last populated row in the relevant columns. */
-  const boundRowsToData = (range: Range): Range => {
-    if (range.r1 - range.r0 < 50_000) return range;
-    let maxRow = range.r0;
-    const state = store.getState();
-    const visitKey = (key: string): void => {
-      const parts = key.split(':');
-      if (parts.length !== 3 || Number(parts[0]) !== range.sheet) return;
-      const row = Number(parts[1]);
-      const col = Number(parts[2]);
-      if (row < range.r0 || row > range.r1) return;
-      if (col < range.c0 || col > range.c1) return;
-      if (row > maxRow) maxRow = row;
-    };
-    for (const key of state.data.cells.keys()) visitKey(key);
-    for (const [key, format] of state.format.formats) {
-      if (Object.keys(format).length === 0) continue;
-      visitKey(key);
-    }
-    return { ...range, r1: maxRow };
-  };
-
-  function runPasteSpecial(what: PasteWhat, transpose: boolean): void {
-    if (hasExplicitPolicy()) {
-      void readClipboard().then((text) => {
-        if (text) executeClipboardText(text);
-      });
-      return;
-    }
-    const snap = clipboardSnapshot();
-    if (!snap) return;
-    const state = store.getState();
-    const destination = resolvePasteDestination(state, snap, transpose);
-    if (!canPasteToRange(destination)) return;
-    if (history) history.begin();
-    try {
-      pasteSpecial(
-        store.getState(),
-        store,
-        wb,
-        snap,
-        { what, operation: 'none', skipBlanks: false, transpose },
-        history,
-      );
-    } catch (err) {
-      console.warn('formulon-cell: paste special failed', err);
-    } finally {
-      if (history) history.end();
-    }
-    deps.onAfterCommit?.();
-  }
-
-  const hasPastePayload = (text: string, snap: ClipboardSnapshot | null | undefined): boolean =>
-    text.length > 0 || snap != null;
-
-  /** A cut can only be pasted once, so its marquee is consumed by the paste.
-   *  A copy marquee stays up for repeat pastes, exactly like the desktop app. */
-  const consumeCutMarquee = (): void => {
-    if (store.getState().ui.copyMode !== 'cut') return;
-    mutators.setCopyRange(store, null);
-    mutators.setCopyRanges(store, null);
-  };
-
-  /** "Insert Copied Cells" from a row or column header. The header already
-   *  fixes the shift direction, so instead of asking which way to push cells
-   *  it opens as many whole rows/columns as the copied band is deep/wide and
-   *  drops the copy into them. */
-  function runInsertCopiedBand(kind: 'row' | 'col'): void {
-    const source = store.getState().ui.copyRange;
-    if (!source) return;
-
-    const sourceAxisMatchesHeader = (snap: ClipboardSnapshot): boolean => {
-      return wholeBandAxisFor(snap) === kind;
-    };
-
-    const insertBand = (snap: ClipboardSnapshot | null, text: string): void => {
-      if (snap && wholeBandAxisFor(snap) !== null) {
-        if (!sourceAxisMatchesHeader(snap)) return;
-        // The shared path performs the structural edit, dimension copy, and
-        // full-band paste as one transaction. A failed preflight must not
-        // fall through to the legacy direction-based inserter because that
-        // would leave a different shape behind.
-        const result = insertCopiedBand(store, wb, history, snap, store.getState().selection.range);
-        if (result) {
-          if (snap.mode === 'cut') consumeCutMarquee();
-          mutators.setRange(store, result.writtenRange);
-          deps.onAfterCommit?.();
-        }
-        return;
-      }
-
-      // The header band the user right-clicked. It stays selected afterwards:
-      // the inserted rows/columns occupy exactly those indices, and the copy
-      // marquee stays up so the same source can be inserted again.
-      const target = store.getState().selection.range;
-      const count = kind === 'col' ? source.c1 - source.c0 + 1 : source.r1 - source.r0 + 1;
-      const band: Range =
-        kind === 'col'
-          ? { ...target, c1: target.c0 + count - 1 }
-          : { ...target, r1: target.r0 + count - 1 };
-      if (history) history.begin();
-      try {
-        let inserted = false;
-        if (kind === 'col') {
-          inserted = insertCols(store, wb, history, target.c0, count);
-        } else {
-          inserted = insertRows(store, wb, history, target.r0, count);
-        }
-        if (!inserted) return;
-        mutators.setActive(store, {
-          sheet: target.sheet,
-          row: kind === 'row' ? target.r0 : (snap?.range.r0 ?? 0),
-          col: kind === 'col' ? target.c0 : (snap?.range.c0 ?? 0),
-        });
-        const next = store.getState();
-        if (snap) {
-          pasteSpecial(
-            next,
-            store,
-            wb,
-            snap,
-            { what: 'all', operation: 'none', skipBlanks: false, transpose: false },
-            history,
-          );
-        } else {
-          pasteTSV(next, wb, text);
-        }
-      } catch (err) {
-        console.warn('formulon-cell: insert copied cells failed', err);
-      } finally {
-        if (history) history.end();
-      }
-      mutators.setRange(store, band);
-      deps.onAfterCommit?.();
-    };
-
-    // The internal snapshot wins over the TSV text so formats ride along, and
-    // taking it first keeps the action synchronous — no clipboard-permission
-    // round trip for a copy that came from this grid.
-    const snap = clipboardSnapshot();
-    if (snap) {
-      insertBand(snap, '');
-      return;
-    }
-    void readClipboard().then((text) => {
-      if (text.length > 0) insertBand(null, text);
-    });
-  }
-
   function runEntry(entry: RenderMenuEntry): void {
     const source = entry.source;
     if (source?.disabled) return;
@@ -1333,177 +1100,42 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
     });
   };
 
+  const clipboard = createContextMenuClipboard({
+    store,
+    wb,
+    history,
+    deps,
+    afterCommit,
+    hasExplicitPolicy,
+    canPasteToRange,
+    executeClipboardText,
+  });
+
+  const insertCopiedContext: ContextMenuInsertCopiedContext = {
+    host,
+    store,
+    wb,
+    history,
+    strings: () => strings,
+    afterCommit,
+    clipboard,
+  };
+
   function run(id: string): void {
     if (!isBuiltinItemId(id)) return;
     if (!decisionForItem(id).allowed) return;
     if (navigationBounded() && navigationUnsupportedIds.has(id)) return;
     const state = store.getState();
+    if (clipboard.run(id, state)) return;
+    if (runContextMenuStructureItem(structureContext, id, state)) return;
+    if (runContextMenuFormatSortItem(formatSortContext, id, state)) return;
     switch (id) {
-      case 'copy': {
-        if (deps.onClipboardShortcut) {
-          deps.onClipboardShortcut('copy');
-          return;
-        }
-        const r = copy(state);
-        if (r) {
-          localSnapshot = captureSnapshotFromCopyResult(state, r, 'copy');
-          localSnapshotText = r.tsv;
-          if (r.ranges) mutators.setCopyRanges(store, r.ranges);
-          else mutators.setCopyRange(store, r.range);
-          localCopyRevision = store.getState().ui.copyRevision ?? 0;
-          void writeClipboard(r.tsv);
-        } else {
-          localSnapshot = null;
-          mutators.setCopyRange(store, null);
-        }
-        return;
-      }
-      case 'cut': {
-        if (deps.onClipboardShortcut) {
-          deps.onClipboardShortcut('cut');
-          return;
-        }
-        const r = cut(state, wb);
-        if (r) {
-          localSnapshot = captureSnapshotFromCopyResult(state, r, 'cut');
-          if (!localSnapshot) return;
-          localSnapshotText = r.tsv;
-          mutators.setCopyRange(store, r.range, 'cut');
-          localCopyRevision = store.getState().ui.copyRevision ?? 0;
-          void writeClipboard(r.tsv);
-        }
-        return;
-      }
-      case 'paste': {
-        if (deps.onClipboardShortcut) {
-          deps.onClipboardShortcut('paste');
-          return;
-        }
-        void readClipboard().then((text) => {
-          const available = clipboardSnapshot();
-          const snap =
-            available && (!text || deps.getClipboardSnapshot || text === localSnapshotText)
-              ? available
-              : null;
-          if (!hasPastePayload(text, snap)) return;
-          if (hasExplicitPolicy()) {
-            if (text) {
-              executeClipboardText(text);
-            }
-            return;
-          }
-          const pasteState = store.getState();
-          const tsvRows = snap ? [] : parseTSV(text);
-          const rows = snap ? snap.rows : tsvRows.length;
-          const cols = snap
-            ? snap.cols
-            : tsvRows.reduce((max, row) => Math.max(max, row.length), 0);
-          const destination = snap
-            ? resolvePasteDestination(pasteState, snap)
-            : pasteDestinationRange(pasteState.selection.active, rows, cols);
-          if (!canPasteToRange(destination)) {
-            return;
-          }
-          if (history) history.begin();
-          let r: ReturnType<typeof pasteTSV> | ReturnType<typeof pasteSpecial> = null;
-          try {
-            r = snap
-              ? pasteSpecial(
-                  store.getState(),
-                  store,
-                  wb,
-                  snap,
-                  { what: 'all', operation: 'none', skipBlanks: false, transpose: false },
-                  history,
-                )
-              : text
-                ? pasteTSV(store.getState(), wb, text)
-                : null;
-          } finally {
-            if (history) history.end();
-          }
-          if (r) {
-            consumeCutMarquee();
-            mutators.setRange(store, r.writtenRange);
-          }
-          deps.onAfterCommit?.();
-        });
-        return;
-      }
       case 'pasteSpecial': {
         deps.onPasteSpecial?.();
         return;
       }
-      case 'pasteAll':
-        runPasteSpecial('all', false);
-        return;
-      case 'pasteFormulas':
-        runPasteSpecial('formulas', false);
-        return;
-      case 'pasteFormulasNumFmt':
-        runPasteSpecial('formulas-and-numfmt', false);
-        return;
-      case 'pasteValues':
-        runPasteSpecial('values', false);
-        return;
-      case 'pasteValuesNumFmt':
-        runPasteSpecial('values-and-numfmt', false);
-        return;
-      case 'pasteFormatsOnly':
-        runPasteSpecial('formats', false);
-        return;
-      case 'pasteTranspose':
-        runPasteSpecial('all', true);
-        return;
       case 'insertCopiedCells': {
-        if (menuKind !== 'cell') {
-          runInsertCopiedBand(menuKind);
-          return;
-        }
-        openInsertCopiedCellsDialog({
-          host,
-          strings,
-          onSubmit: (direction) => {
-            void readClipboard().then((text) => {
-              const snap = clipboardSnapshot();
-              if (!hasPastePayload(text, snap)) return;
-              const r = insertCopiedCellsFromTSV(store, wb, history, text, direction, snap);
-              if (r) {
-                // Marquee stays up, same as the row/column header variant.
-                mutators.setRange(store, r.writtenRange);
-                deps.onAfterCommit?.();
-              }
-            });
-          },
-        });
-        return;
-      }
-      case 'insertCells': {
-        openCellShiftDialog({
-          host,
-          strings,
-          kind: 'insert',
-          onSubmit: (direction) => {
-            if (direction !== 'down' && direction !== 'right') return;
-            if (insertCells(store, wb, history, state.selection.range, direction)) {
-              deps.onAfterCommit?.();
-            }
-          },
-        });
-        return;
-      }
-      case 'deleteCells': {
-        openCellShiftDialog({
-          host,
-          strings,
-          kind: 'delete',
-          onSubmit: (direction) => {
-            if (direction !== 'up' && direction !== 'left') return;
-            if (deleteCells(store, wb, history, state.selection.range, direction)) {
-              deps.onAfterCommit?.();
-            }
-          },
-        });
+        runContextMenuInsertCopiedCells(insertCopiedContext, menuKind);
         return;
       }
       case 'clear': {
@@ -1534,104 +1166,12 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
         }
         return;
       }
-      case 'bold': {
-        wrapFmt('bold', () => toggleBold(store.getState(), store));
-        return;
-      }
-      case 'italic': {
-        wrapFmt('italic', () => toggleItalic(store.getState(), store));
-        return;
-      }
-      case 'underline': {
-        wrapFmt('underline', () => toggleUnderline(store.getState(), store));
-        return;
-      }
-      case 'alignLeft': {
-        wrapFmt('alignLeft', () => setAlign(store.getState(), store, 'left'));
-        return;
-      }
-      case 'alignCenter': {
-        wrapFmt('alignCenter', () => setAlign(store.getState(), store, 'center'));
-        return;
-      }
-      case 'alignRight': {
-        wrapFmt('alignRight', () => setAlign(store.getState(), store, 'right'));
-        return;
-      }
-      case 'borders': {
-        wrapFmt('borders', () => cycleBorders(store.getState(), store));
-        return;
-      }
       case 'formatCells': {
         deps.onFormatDialog?.();
         return;
       }
-      case 'editPhonetic': {
-        const addr = state.selection.active;
-        if (!wb.capabilities.phonetic) return;
-        const initial = phoneticReading(state.format.formats.get(addrKey(addr))?.phonetic);
-        void showPrompt({
-          title: strings.contextMenu.phoneticDialogTitle,
-          label: strings.contextMenu.phoneticDialogLabel,
-          initial,
-          okLabel: strings.formatDialog.ok,
-          cancelLabel: strings.formatDialog.cancel,
-        }).then((phonetic) => {
-          if (phonetic === null) return;
-          if (!setPhoneticReading(store, wb, addr, phonetic, initial)) return;
-          deps.onAfterCommit?.();
-        });
-        return;
-      }
       case 'defineName': {
         deps.onDefineName?.();
-        return;
-      }
-      case 'filterClear': {
-        const range = boundRowsToData(state.ui.filterRange ?? inferAutoFilterRange(state));
-        recordFilterChange(history, store, () => clearFilter(store.getState(), store, range));
-        deps.onAfterCommit?.();
-        return;
-      }
-      case 'filterReapply': {
-        recordFilterChange(history, store, () => reapplyFilters(store.getState(), store));
-        deps.onAfterCommit?.();
-        return;
-      }
-      case 'filterByValue': {
-        const range = boundRowsToData(state.ui.filterRange ?? inferAutoFilterRange(state));
-        const byCol = state.selection.active.col;
-        const keep = filterValueKey(state.data.cells.get(addrKey(state.selection.active))?.value);
-        const hidden = distinctValues(state, range, byCol).filter((k) => k !== keep);
-        recordFilterChange(history, store, () =>
-          applyValueFilter(store.getState(), store, range, byCol, hidden),
-        );
-        deps.onAfterCommit?.();
-        return;
-      }
-      case 'sortAsc':
-      case 'sortDesc': {
-        const range = boundRowsToData(inferAutoFilterRange(state, state.selection.range));
-        // A sort rewrites every cell in the range; group them so one undo
-        // restores the original order.
-        if (history) history.begin();
-        try {
-          sortRange(
-            state,
-            store,
-            wb,
-            range,
-            {
-              byCol: state.selection.active.col,
-              direction: id === 'sortAsc' ? 'asc' : 'desc',
-              hasHeader: inferSortHasHeader(state, range),
-            },
-            history,
-          );
-        } finally {
-          if (history) history.end();
-        }
-        deps.onAfterCommit?.();
         return;
       }
       case 'rowHeight':
@@ -1640,90 +1180,6 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
       }
       case 'selectAll': {
         mutators.selectAll(store);
-        return;
-      }
-      case 'rowInsertAbove': {
-        const r = state.selection.range;
-        insertRows(store, wb, history, r.r0, r.r1 - r.r0 + 1);
-        deps.onAfterCommit?.();
-        return;
-      }
-      case 'rowInsertBelow': {
-        const r = state.selection.range;
-        insertRows(store, wb, history, r.r1 + 1, r.r1 - r.r0 + 1);
-        deps.onAfterCommit?.();
-        return;
-      }
-      case 'rowDelete': {
-        const r = state.selection.range;
-        deleteRows(store, wb, history, r.r0, r.r1 - r.r0 + 1);
-        deps.onAfterCommit?.();
-        return;
-      }
-      case 'rowHide': {
-        const r = state.selection.range;
-        hideRows(store, history, r.r0, r.r1);
-        return;
-      }
-      case 'rowUnhide': {
-        const r = state.selection.range;
-        const targets = hiddenInSelection(state.layout, 'row', r.r0, r.r1);
-        const first = targets[0];
-        const last = targets[targets.length - 1];
-        if (first === undefined || last === undefined) return;
-        showRows(store, history, first, last);
-        return;
-      }
-      case 'rowGroup': {
-        const r = state.selection.range;
-        groupRows(store, history, r.r0, r.r1);
-        return;
-      }
-      case 'rowUngroup': {
-        const r = state.selection.range;
-        ungroupRows(store, history, r.r0, r.r1);
-        return;
-      }
-      case 'colInsertLeft': {
-        const r = state.selection.range;
-        insertCols(store, wb, history, r.c0, r.c1 - r.c0 + 1);
-        deps.onAfterCommit?.();
-        return;
-      }
-      case 'colInsertRight': {
-        const r = state.selection.range;
-        insertCols(store, wb, history, r.c1 + 1, r.c1 - r.c0 + 1);
-        deps.onAfterCommit?.();
-        return;
-      }
-      case 'colDelete': {
-        const r = state.selection.range;
-        deleteCols(store, wb, history, r.c0, r.c1 - r.c0 + 1);
-        deps.onAfterCommit?.();
-        return;
-      }
-      case 'colHide': {
-        const r = state.selection.range;
-        hideCols(store, history, r.c0, r.c1);
-        return;
-      }
-      case 'colUnhide': {
-        const r = state.selection.range;
-        const targets = hiddenInSelection(state.layout, 'col', r.c0, r.c1);
-        const first = targets[0];
-        const last = targets[targets.length - 1];
-        if (first === undefined || last === undefined) return;
-        showCols(store, history, first, last);
-        return;
-      }
-      case 'colGroup': {
-        const r = state.selection.range;
-        groupCols(store, history, r.c0, r.c1);
-        return;
-      }
-      case 'colUngroup': {
-        const r = state.selection.range;
-        ungroupCols(store, history, r.c0, r.c1);
         return;
       }
       case 'insertComment': {
@@ -1784,10 +1240,6 @@ export function attachContextMenu(deps: ContextMenuDeps): ContextMenuHandle {
   return detach;
 }
 
-function canReadClipboard(): boolean {
-  return typeof navigator !== 'undefined' && typeof navigator.clipboard?.readText === 'function';
-}
-
 function isSafeHyperlink(url: string): boolean {
   const lower = url.trim().toLowerCase();
   return (
@@ -1806,25 +1258,4 @@ function setContextMenuItemDisabled(
   projectDisabledState(button, disabled, reason, {
     datasetKey: 'disabledReason',
   });
-}
-
-async function writeClipboard(text: string): Promise<void> {
-  if (typeof navigator === 'undefined' || typeof navigator.clipboard?.writeText !== 'function') {
-    return;
-  }
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch (err) {
-    console.warn('formulon-cell: clipboard write failed', err);
-  }
-}
-
-async function readClipboard(): Promise<string> {
-  if (!canReadClipboard()) return '';
-  try {
-    return await navigator.clipboard.readText();
-  } catch (err) {
-    console.warn('formulon-cell: clipboard read failed', err);
-    return '';
-  }
 }
