@@ -816,9 +816,9 @@ export type {
   CellSnapshot,
   ChangeEvent,
   ChangeListener,
+  WorkbookHandleFeatureMethods,
 } from './engine/workbook-handle.js';
 export { WorkbookHandle } from './engine/workbook-handle.js';
-export type { WorkbookHandleFeatureMethods } from './engine/workbook-handle-features.js';
 export type { WorkbookHandlePivotMethods } from './engine/workbook-handle-pivot.js';
 export type {
   EngineHeaderFooterInput,

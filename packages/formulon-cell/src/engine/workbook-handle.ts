@@ -17,16 +17,36 @@ import type {
   Workbook,
 } from './types.js';
 import { fromEngineValue } from './value.js';
-import { installAnnotationsMethods } from './workbook-handle-annotations.js';
-import { installConditionalFormatMethods } from './workbook-handle-conditional-format.js';
-import { installWorkbookFeatureMethods } from './workbook-handle-features.js';
-import { installFormulasMethods } from './workbook-handle-formulas.js';
-import { installLayoutMethods } from './workbook-handle-layout.js';
+import {
+  installAnnotationsMethods,
+  type WorkbookHandleAnnotationsMethods,
+} from './workbook-handle-annotations.js';
+import {
+  installConditionalFormatMethods,
+  type WorkbookHandleConditionalFormatMethods,
+} from './workbook-handle-conditional-format.js';
+import {
+  installFormulasMethods,
+  type WorkbookHandleFormulasMethods,
+} from './workbook-handle-formulas.js';
+import {
+  installLayoutMethods,
+  type WorkbookHandleLayoutMethods,
+} from './workbook-handle-layout.js';
 import { installPivotMethods } from './workbook-handle-pivot.js';
-import { installPrintMethods } from './workbook-handle-print.js';
-import { installProtectionMethods } from './workbook-handle-protection.js';
-import { installStylesMethods } from './workbook-handle-styles.js';
-import { installTablesMethods } from './workbook-handle-tables.js';
+import { installPrintMethods, type WorkbookHandlePrintMethods } from './workbook-handle-print.js';
+import {
+  installProtectionMethods,
+  type WorkbookHandleProtectionMethods,
+} from './workbook-handle-protection.js';
+import {
+  installStylesMethods,
+  type WorkbookHandleStylesMethods,
+} from './workbook-handle-styles.js';
+import {
+  installTablesMethods,
+  type WorkbookHandleTablesMethods,
+} from './workbook-handle-tables.js';
 import { installValidationMethods } from './workbook-handle-validation.js';
 
 export type ChangeListener = (e: ChangeEvent) => void;
@@ -905,16 +925,26 @@ export class WorkbookHandle {
   }
 }
 
-installPivotMethods(WorkbookHandle);
-installValidationMethods(WorkbookHandle);
-installTablesMethods(WorkbookHandle);
-installProtectionMethods(WorkbookHandle);
+/** Aggregate of the feature mixins installed on `WorkbookHandle`. */
+export interface WorkbookHandleFeatureMethods
+  extends WorkbookHandleAnnotationsMethods,
+    WorkbookHandleConditionalFormatMethods,
+    WorkbookHandleFormulasMethods,
+    WorkbookHandleLayoutMethods,
+    WorkbookHandlePrintMethods,
+    WorkbookHandleProtectionMethods,
+    WorkbookHandleStylesMethods,
+    WorkbookHandleTablesMethods {}
+
 installAnnotationsMethods(WorkbookHandle);
-installFormulasMethods(WorkbookHandle);
 installConditionalFormatMethods(WorkbookHandle);
-installStylesMethods(WorkbookHandle);
+installFormulasMethods(WorkbookHandle);
 installLayoutMethods(WorkbookHandle);
+installPivotMethods(WorkbookHandle);
 installPrintMethods(WorkbookHandle);
-installWorkbookFeatureMethods(WorkbookHandle);
+installProtectionMethods(WorkbookHandle);
+installStylesMethods(WorkbookHandle);
+installTablesMethods(WorkbookHandle);
+installValidationMethods(WorkbookHandle);
 
 export { addrKey };
