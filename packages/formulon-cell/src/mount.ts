@@ -396,6 +396,11 @@ export const Spreadsheet = {
 
     let binding = bindEngine(wb);
     syncBindingFeatures(binding);
+    const rebindEngine = (): void => {
+      binding.unbind();
+      binding = bindEngine(wb);
+      syncBindingFeatures(binding);
+    };
 
     const onHostKey = createHostShortcutHandler({
       addSheet: () => sheetTabsController?.addSheet(),
@@ -566,9 +571,7 @@ export const Spreadsheet = {
 
       // Engine-bound attaches (clipboard, paste-special, context-menu,
       // find-replace, validation) live inside `binding`. Rebuild it.
-      binding.unbind();
-      binding = bindEngine(wb);
-      syncBindingFeatures(binding);
+      rebindEngine();
       featureState.viewToolbar?.bindWorkbook(wb);
       featureState.workbookObjects?.bindWorkbook(wb);
       featureState.pivotTableDialog?.bindWorkbook(wb);
@@ -655,9 +658,7 @@ export const Spreadsheet = {
         contextMenuOptions = next;
         instance.setFeatures(requestedFeatures);
         // Menu data may change without changing its feature flag.
-        binding.unbind();
-        binding = bindEngine(wb);
-        syncBindingFeatures(binding);
+        rebindEngine();
         refreshFeaturesView();
       },
       setOverlayOptions(next) {
@@ -740,9 +741,7 @@ export const Spreadsheet = {
           attachHostFeature('viewToolbar');
         }
         if (wbChanged) {
-          binding.unbind();
-          binding = bindEngine(wb);
-          syncBindingFeatures(binding);
+          rebindEngine();
           featureState.viewToolbar?.bindWorkbook(wb);
           featureState.workbookObjects?.bindWorkbook(wb);
         }
