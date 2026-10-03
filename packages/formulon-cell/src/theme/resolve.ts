@@ -42,6 +42,13 @@ export interface ResolvedTheme {
   textHeader: number;
 }
 
+/** Cell font defaults used when the host sets no theme custom properties. */
+export const DEFAULT_CELL_FONT_THEME = {
+  textCell: 13,
+  fontUi: 'system-ui, sans-serif',
+  fontMono: 'ui-monospace, monospace',
+} as const;
+
 const num = (s: string, fallback: number): number => {
   const n = Number.parseFloat(s);
   return Number.isFinite(n) ? n : fallback;
@@ -86,10 +93,13 @@ export function resolveTheme(host: HTMLElement): ResolvedTheme {
     pageNumberFg: v('--fc-page-number-fg', 'rgba(47,111,208,0.16)'),
     pageOutside: v('--fc-page-outside', 'rgba(120,120,120,0.28)'),
 
-    fontUi: v('--fc-font-ui', 'system-ui, sans-serif'),
-    fontMono: v('--fc-font-mono', 'ui-monospace, monospace'),
+    fontUi: v('--fc-font-ui', DEFAULT_CELL_FONT_THEME.fontUi),
+    fontMono: v('--fc-font-mono', DEFAULT_CELL_FONT_THEME.fontMono),
 
-    textCell: num(v('--fc-text-cell', '13px'), 13),
+    textCell: num(
+      v('--fc-text-cell', `${DEFAULT_CELL_FONT_THEME.textCell}px`),
+      DEFAULT_CELL_FONT_THEME.textCell,
+    ),
     textHeader: num(v('--fc-text-header', '11.5px'), 11.5),
   };
 }

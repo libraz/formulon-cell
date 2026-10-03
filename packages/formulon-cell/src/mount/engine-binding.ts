@@ -31,6 +31,7 @@ import {
 import type { GridRenderer } from '../render/grid.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { mutators } from '../store/store.js';
+import { resolveTheme } from '../theme/resolve.js';
 import type { SheetTabsController } from './sheet-tabs-controller.js';
 
 type FeatureFlags = ReturnType<typeof resolveFlags>;
@@ -57,6 +58,8 @@ interface AttachEngineBindingInput {
   getFormatDialog: () => { open(): void } | null;
   getFormatPainter: () => { isActive(): boolean } | null;
   getFormulaBarEditor?: () => RangeInsertTarget | null;
+  /** UI/data-format locale, the same one the renderer formats cells with. */
+  getLocale: () => string;
   getGoToDialog: () => { open(mode?: 'go-to' | 'special'): void } | null;
   getHyperlinkDialog: () => { open(): void } | null;
   getNamedRangeDialog: () => { open(): void } | null;
@@ -108,6 +111,7 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     getFormulaBarEditor,
     getGoToDialog,
     getHyperlinkDialog,
+    getLocale,
     getNamedRangeDialog,
     getPivotTableDialog,
     getSessionCharts,
@@ -154,13 +158,20 @@ export function attachEngineBinding(input: AttachEngineBindingInput): EngineBind
     onValidation: (outcome) => validationAlert?.show(outcome),
     onAfterCommit: refreshCells,
   });
-  const detachPtr = attachPointer(grid, store, wb, refreshCells, history, () =>
-    editor.isActive() && editor.isFormulaEdit()
-      ? {
-          isFormulaEdit: () => editor.isFormulaEdit(),
-          insertRefAtCaret: (ref) => editor.insertRefAtCaret(ref),
-        }
-      : (getFormulaBarEditor?.() ?? null),
+  const detachPtr = attachPointer(
+    grid,
+    store,
+    wb,
+    refreshCells,
+    history,
+    () =>
+      editor.isActive() && editor.isFormulaEdit()
+        ? {
+            isFormulaEdit: () => editor.isFormulaEdit(),
+            insertRefAtCaret: (ref) => editor.insertRefAtCaret(ref),
+          }
+        : (getFormulaBarEditor?.() ?? null),
+    () => ({ locale: getLocale(), theme: resolveTheme(host) }),
   );
   // Header / footer slots are only reachable in Page Layout view, but the
   // listener is cheap and stateless until one is clicked.

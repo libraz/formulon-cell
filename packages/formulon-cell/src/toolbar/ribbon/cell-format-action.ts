@@ -14,6 +14,7 @@ import {
   recordFormatChange,
   recordLayoutChange,
   renameSheet,
+  resolveTheme,
   type SpreadsheetInstance,
   setCellLocked,
   setSheetHidden,
@@ -176,6 +177,7 @@ export const applyCellFormatAction = async (
     autofitRowsHeight(i.store, i.history, range.r0, range.r1, i.workbook, {
       span: { from: range.c0, to: range.c1 },
       locale: ribbonLang,
+      theme: resolveTheme(i.host),
     });
     return;
   }
@@ -200,6 +202,7 @@ export const applyCellFormatAction = async (
     autofitColsWidth(i.store, i.history, range.c0, range.c1, i.workbook, {
       span: { from: range.r0, to: range.r1 },
       locale: ribbonLang,
+      theme: resolveTheme(i.host),
     });
   }
 };

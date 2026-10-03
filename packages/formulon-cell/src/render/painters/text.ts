@@ -1,6 +1,7 @@
 import { formatNumber } from '../../commands/format.js';
 import { formatCell } from '../../engine/value.js';
 import type { CellFormat } from '../../store/store.js';
+import type { ResolvedTheme } from '../../theme/resolve.js';
 import type { Rect } from '../geometry.js';
 import type { CellPaintCtx, TextMetricsBox, TextVAlign } from './types.js';
 
@@ -111,6 +112,33 @@ const fontCss = (family: string): string =>
     .filter(Boolean)
     .join(', ');
 
+/** Theme fields that decide a cell's default font. */
+export type CellFontTheme = Pick<ResolvedTheme, 'textCell' | 'fontUi' | 'fontMono'>;
+
+export interface CellFont {
+  slant: string;
+  weight: number;
+  size: number;
+  family: string;
+}
+
+/** Font a cell's text paints in; autofit measures with the same font. */
+export const cellFont = (
+  format:
+    | Pick<CellFormat, 'bold' | 'italic' | 'fontSize' | 'fontFamily' | 'fontVertAlign'>
+    | undefined,
+  theme: CellFontTheme,
+  formulaDisplay: boolean,
+): CellFont => ({
+  slant: format?.italic ? 'italic ' : '',
+  weight: format?.bold ? 700 : 400,
+  size: (format?.fontSize ?? theme.textCell) * (format?.fontVertAlign ? 0.7 : 1),
+  family: format?.fontFamily ?? (formulaDisplay ? theme.fontMono : theme.fontUi),
+});
+
+export const cellFontCss = (font: CellFont, size = font.size): string =>
+  `${font.slant}${font.weight} ${size}px ${fontCss(font.family)}`;
+
 const isDoubleUnderline = (underline: CellFormat['underline']): boolean =>
   underline === 'double' || underline === 'doubleAccounting';
 
@@ -188,12 +216,10 @@ export function paintCellText({
     value.value < 0 &&
     (format?.numFmt?.kind === 'fixed' || format?.numFmt?.kind === 'currency') &&
     (format.numFmt.negativeStyle === 'red' || format.numFmt.negativeStyle === 'red-parens');
-  const weight = format?.bold ? 700 : 400;
-  const styleSlant = format?.italic ? 'italic ' : '';
   const fontVertAlign = format?.fontVertAlign;
-  const fontSize = (format?.fontSize ?? theme.textCell) * (fontVertAlign ? 0.7 : 1);
-  const fontFamily = format?.fontFamily ?? (isFormulaDisplay ? theme.fontMono : theme.fontUi);
-  ctx.font = `${styleSlant}${weight} ${fontSize}px ${fontCss(fontFamily)}`;
+  const font = cellFont(format, theme, isFormulaDisplay === true);
+  const fontSize = font.size;
+  ctx.font = cellFontCss(font);
   const isHyperlink = !!format?.hyperlink;
   ctx.fillStyle = format?.color
     ? format.color
@@ -293,7 +319,7 @@ export function paintCellText({
     const measuredWidth = ctx.measureText(text).width;
     if (measuredWidth > availableTextWidth && availableTextWidth > 0) {
       drawFontSize = Math.max(8, Math.floor(fontSize * (availableTextWidth / measuredWidth)));
-      ctx.font = `${styleSlant}${weight} ${drawFontSize}px ${fontCss(fontFamily)}`;
+      ctx.font = cellFontCss(font, drawFontSize);
     }
   }
   if (isNumeric && ctx.measureText(text).width > availableTextWidth) {
@@ -340,7 +366,7 @@ export function paintCellText({
     });
     const phoneticSize = Math.max(6, Math.round(drawFontSize * 0.52));
     ctx.save();
-    ctx.font = `${styleSlant}${weight} ${phoneticSize}px ${fontCss(fontFamily)}`;
+    ctx.font = cellFontCss(font, phoneticSize);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
     for (const [i, run] of format.phonetic.entries()) {

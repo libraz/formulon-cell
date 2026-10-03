@@ -1,3 +1,4 @@
+import type { AutofitOptions } from '../commands/autofit-measurement.js';
 import { fillDestFor, fillRange } from '../commands/fill.js';
 import {
   applyLayoutSnapshot,
@@ -289,6 +290,8 @@ export function attachPointer(
   onAfterCommit?: () => void,
   history: History | null = null,
   getEditor: () => RangeInsertTarget | null = () => null,
+  /** Locale and theme font that header double-click autofit measures with. */
+  getAutofitOptions: () => AutofitOptions = () => ({}),
 ): () => void {
   let drag: DragMode = { kind: 'none' };
   const unsubscribeSheetChange = store.subscribe((state) => {
@@ -1170,14 +1173,14 @@ export function attachPointer(
       e.preventDefault();
       e.stopPropagation();
       if (interactionControllerFor(store)?.policy !== undefined) return;
-      autofitColsWidth(store, history, zone.col, zone.col, wb);
+      autofitColsWidth(store, history, zone.col, zone.col, wb, getAutofitOptions());
       return;
     }
     if (zone.kind === 'row-resize') {
       e.preventDefault();
       e.stopPropagation();
       if (interactionControllerFor(store)?.policy !== undefined) return;
-      autofitRowsHeight(store, history, zone.row, zone.row, wb);
+      autofitRowsHeight(store, history, zone.row, zone.row, wb, getAutofitOptions());
       return;
     }
   };

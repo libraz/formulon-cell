@@ -5,7 +5,9 @@ import {
   computeAutofitColWidth,
   computeAutofitRowHeight,
   FILTER_DROPDOWN_RESERVED_WIDTH,
+  TABLE_HEADER_RESERVED_WIDTH,
 } from '../../../src/commands/autofit-measurement.js';
+import { formatAsTable } from '../../../src/commands/format-as-table.js';
 import { History } from '../../../src/commands/history.js';
 import { autofitColsWidth, autofitRowsHeight } from '../../../src/commands/structure.js';
 import type { CellValue } from '../../../src/engine/types.js';
@@ -19,6 +21,7 @@ import {
   layoutForView,
 } from '../../../src/render/geometry.js';
 import { paintHeaders } from '../../../src/render/grid/headers.js';
+import { paintTableHeaderChevron } from '../../../src/render/painters/markers.js';
 import {
   createSpreadsheetStore,
   mutators,
@@ -95,6 +98,38 @@ describe('computeAutofitColWidth', () => {
     );
   });
 
+  it('reserves the table header chevron on table header cells only', () => {
+    const store = storeWith([
+      [0, 0, 'HeaderName'],
+      [1, 0, 'HeaderName'],
+    ]);
+    const plain = computeAutofitColWidth(store.getState(), 0, null);
+    formatAsTable(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 }, { showHeader: false });
+    expect(computeAutofitColWidth(store.getState(), 0, null)).toBe(plain);
+    formatAsTable(store, { sheet: 0, r0: 0, c0: 0, r1: 1, c1: 0 }, { showHeader: true });
+    expect(computeAutofitColWidth(store.getState(), 0, null) - plain).toBe(
+      TABLE_HEADER_RESERVED_WIDTH,
+    );
+    withFilter(store);
+    expect(computeAutofitColWidth(store.getState(), 0, null) - plain).toBe(
+      Math.max(TABLE_HEADER_RESERVED_WIDTH, FILTER_DROPDOWN_RESERVED_WIDTH),
+    );
+  });
+
+  it('measures in the theme font, monospace while formulas are shown', () => {
+    const store = storeWith([[0, 0, 'v', '=A2']]);
+    const theme = { textCell: 15, fontUi: 'Body Font, sans-serif', fontMono: 'Code Mono' };
+    const { ctx } = fakeMeasureCtx();
+    computeAutofitColWidth(store.getState(), 0, ctx, { theme });
+    expect(ctx.font).toBe('400 15px "Body Font", sans-serif');
+    store.setState((s) => ({ ...s, ui: { ...s.ui, showFormulas: true } }));
+    computeAutofitColWidth(store.getState(), 0, ctx, { theme });
+    expect(ctx.font).toBe('400 15px "Code Mono"');
+    expect(
+      computeAutofitRowHeight(store.getState(), 0, null, { theme: { ...theme, textCell: 30 } }),
+    ).toBe(46);
+  });
+
   it('measures formula text when formulas are shown', () => {
     const store = storeWith([[0, 0, 'v', '=REPT("abcdefgh",3)']]);
     expect(computeAutofitColWidth(store.getState(), 0, null)).toBe(48);
@@ -152,9 +187,19 @@ describe('public autofitColWidth / autofitRowHeight', () => {
       [5, 0, 'x'.repeat(40)],
     ]);
     withFilter(store);
-    expect(autofitColWidth({ store }, 0, 0, 2, 'en')).toBe(105);
-    expect(autofitColWidth({ store }, 0, 0, 10, 'en')).toBe(297);
-    expect(autofitRowHeight({ store }, 0, 0, 0, 'ja')).toBe(25);
+    const host = document.createElement('div');
+    expect(autofitColWidth({ store, host }, 0, 0, 2, 'en')).toBe(105);
+    expect(autofitColWidth({ store, host }, 0, 0, 10, 'en')).toBe(297);
+    expect(autofitRowHeight({ store, host }, 0, 0, 0, 'ja')).toBe(25);
+  });
+
+  it('measure in the font the host theme sets', () => {
+    const store = storeWith([[0, 0, 'HeaderName']]);
+    const host = document.createElement('div');
+    host.style.cssText = '--fc-text-cell: 26px;';
+    document.body.appendChild(host);
+    expect(autofitColWidth({ store, host }, 0, 0, 0, 'en')).toBe(157);
+    host.remove();
   });
 });
 
@@ -166,7 +211,8 @@ describe('ribbon Format > AutoFit', () => {
   ): Promise<{ wb: WorkbookHandle; history: History }> => {
     const wb = await WorkbookHandle.createDefault({ preferStub: true });
     const history = new History();
-    const inst = { store, history, workbook: wb } as unknown as SpreadsheetInstance;
+    const host = document.createElement('div');
+    const inst = { store, history, workbook: wb, host } as unknown as SpreadsheetInstance;
     await applyCellFormatAction(action, {
       inst,
       range: { sheet: 0, ...range },
@@ -202,6 +248,21 @@ describe('ribbon Format > AutoFit', () => {
     await run('row-autofit', store, { r0: 0, c0: 0, r1: 1, c1: 2 });
     expect(store.getState().layout.rowHeights.get(0)).toBe(400);
     expect(store.getState().layout.rowHeights.get(1)).toBe(20);
+  });
+});
+
+describe('TABLE_HEADER_RESERVED_WIDTH', () => {
+  it('matches the painted table header chevron', () => {
+    const ctx = new Proxy({} as Record<string | symbol, unknown>, {
+      get: () => () => {},
+      set: () => true,
+    }) as unknown as CanvasRenderingContext2D;
+    const bounds = { x: 0, y: 0, w: 100, h: 20 };
+    const chevron = paintTableHeaderChevron(ctx, bounds, {
+      rule: '#000',
+      fg: '#000',
+    } as ResolvedTheme);
+    expect(bounds.x + bounds.w - chevron.x).toBe(TABLE_HEADER_RESERVED_WIDTH);
   });
 });
 

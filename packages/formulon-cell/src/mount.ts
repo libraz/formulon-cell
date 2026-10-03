@@ -560,6 +560,7 @@ export const Spreadsheet = {
         },
         getGoToDialog: () => featureState.goToDialog,
         getHyperlinkDialog: () => featureState.hyperlinkDialog,
+        getLocale: () => i18n.locale,
         getNamedRangeDialog: () => featureState.namedRangeDialog,
         getPivotTableDialog: () => featureState.pivotTableDialog,
         getSessionCharts: () => featureState.sessionCharts,

@@ -32,6 +32,9 @@ export function paintValidationChevron(
   return { x, y, w, h };
 }
 
+export const TABLE_HEADER_CHEVRON_SIZE = 14;
+export const TABLE_HEADER_CHEVRON_INSET = 3;
+
 /** Paint the spreadsheet Table header filter/dropdown affordance. This is visual
  *  only today; table filtering still routes through the normal filter model. */
 export function paintTableHeaderChevron(
@@ -40,8 +43,13 @@ export function paintTableHeaderChevron(
   theme: ResolvedTheme,
   rtl = false,
 ): Rect {
-  const size = 14;
-  const x = mirrorInRect(bounds, bounds.x + bounds.w - size - 3, size, rtl);
+  const size = TABLE_HEADER_CHEVRON_SIZE;
+  const x = mirrorInRect(
+    bounds,
+    bounds.x + bounds.w - size - TABLE_HEADER_CHEVRON_INSET,
+    size,
+    rtl,
+  );
   const y = bounds.y + Math.max(2, (bounds.h - size) / 2);
   ctx.save();
   ctx.fillStyle = 'rgba(255,255,255,0.72)';
