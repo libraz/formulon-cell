@@ -33,7 +33,6 @@ import {
   formulaWithArgumentCount,
   parseOuterCall,
 } from './mac-formula-call.js';
-import { makeButton, makeIconButton } from './mac-formula-palette-buttons.js';
 import {
   argumentFieldCount,
   type FunctionArgumentHelp,
@@ -44,6 +43,13 @@ import {
   resolveArgumentHelp,
   sameAvailability,
 } from './mac-formula-palette-catalog.js';
+import {
+  type ArgumentsRefs,
+  type ArgumentsViewState,
+  createMacFormulaPaletteView,
+  type PickerRefs,
+  type PickerViewState,
+} from './mac-formula-palette-view.js';
 import type { RangeInsertTarget } from './range-insert.js';
 
 export type {
@@ -86,18 +92,6 @@ interface DraftBinding {
   handle: ExternalFormulaDraftHandle;
   unsubscribe: () => void;
   leased: boolean;
-}
-
-interface PickerRefs {
-  search: HTMLInputElement;
-  sections: HTMLElement;
-  insert: HTMLButtonElement;
-}
-
-interface ArgumentsRefs {
-  fields: HTMLElement;
-  preview: HTMLElement;
-  done: HTMLButtonElement;
 }
 
 const connectedElement = (value: Element | null): HTMLElement | null =>
@@ -144,6 +138,27 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   let closing = false;
   let guarding = false;
   let committing = false;
+
+  const view = createMacFormulaPaletteView(root, {
+    labels: () => labels,
+    pickerState: () => pickerViewState(),
+    argumentsState: () => argumentsViewState(),
+    close: () => api.close(),
+    showAll: () => returnToPicker(),
+    search: (query) => {
+      searchQuery = query;
+      updatePickerList();
+    },
+    pick: (name) => pickEntry(name),
+    insert: () =>
+      insertSelected(pickerSelectionName ?? selectedName, pickerSelectionEntry ?? selectedEntry),
+    argumentFocus: (index) => {
+      focusedArgument = index;
+    },
+    argumentInput: (index, value) => onArgumentInput(index, value),
+    addArgument: () => addArgument(),
+    done: () => commitSelected(),
+  });
 
   const leaseContext: FormulaEditLeaseContext = {
     getLocale: () => deps.getLocale(),
@@ -290,107 +305,77 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     }
   };
 
-  const updatePickerList = (): void => {
-    const sections = pickerRefs?.sections;
-    if (!sections) return;
-    sections.replaceChildren();
-    const appendSection = (key: string, title: string, names: readonly string[]): void => {
-      const section = document.createElement('section');
-      section.className = 'fc-mac-formula-palette__section';
-      section.dataset.section = key;
-      const heading = document.createElement('h3');
-      heading.textContent = title;
-      section.appendChild(heading);
-      const list = document.createElement('div');
-      list.className = 'fc-mac-formula-palette__function-list';
-      list.setAttribute('role', 'listbox');
-      for (const name of names) {
-        const entry = catalog.entries.get(name);
-        if (!entry) continue;
-        const row = document.createElement('div');
-        row.className = 'fc-mac-formula-palette__function';
-        row.dataset.functionName = entry.canonicalName;
-        row.setAttribute('role', 'option');
-        row.tabIndex = 0;
-        row.setAttribute(
-          'aria-selected',
-          String((pickerSelectionName ?? selectedName) === entry.canonicalName),
-        );
-        const unavailable = isFunctionUnavailableForInsertion(entry.availability);
-        if (unavailable) {
-          row.classList.add('is-unavailable');
-        }
-        projectDisabledState(row, unavailable, unavailable ? labels.unavailable : null);
-        const nameSpan = document.createElement('span');
-        nameSpan.className = 'fc-mac-formula-palette__function-name';
-        nameSpan.textContent = entry.displayName;
-        row.appendChild(nameSpan);
-        const description = textForEntry(entry);
-        if (description) {
-          const descriptionSpan = document.createElement('span');
-          descriptionSpan.className = 'fc-mac-formula-palette__function-description';
-          descriptionSpan.textContent = description;
-          row.appendChild(descriptionSpan);
-        }
-        row.addEventListener('click', () => {
-          if (detached || mode !== 'picker' || !row.isConnected) return;
-          const currentEntry = insertableEntry(catalog, entry.canonicalName);
-          if (!currentEntry) {
-            reconcilePickerSelection();
-            render();
-            return;
-          }
-          pickerSelectionName = currentEntry.canonicalName;
-          pickerSelectionEntry = currentEntry;
-          guardMessage = '';
-          render();
-        });
-        row.addEventListener('keydown', (event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            row.click();
-          }
-        });
-        list.appendChild(row);
-      }
-      if (!list.childElementCount) {
-        const empty = document.createElement('p');
-        empty.className = 'fc-mac-formula-palette__empty';
-        empty.textContent = labels.empty;
-        list.appendChild(empty);
-      }
-      section.appendChild(list);
-      sections.appendChild(section);
-    };
+  const sectionTitle = (key: string): string =>
+    key === 'recent'
+      ? labels.recent
+      : key === 'all'
+        ? labels.all
+        : categoryTitle(key as CatalogFunctionCategory);
 
-    const titleFor = (key: string): string =>
-      key === 'recent'
-        ? labels.recent
-        : key === 'all'
-          ? labels.all
-          : categoryTitle(key as CatalogFunctionCategory);
+  const pickerViewState = (): PickerViewState => {
     const recent = getRecentFunctions(deps.store, catalog.knownNames);
-    for (const section of pickerSections(pickerCategory, catalog, recent, searchQuery)) {
-      appendSection(section.key, titleFor(section.key), section.names);
-    }
+    const sections = pickerSections(pickerCategory, catalog, recent, searchQuery).map(
+      (section) => ({
+        key: section.key,
+        title: sectionTitle(section.key),
+        rows: section.names.flatMap((name) => {
+          const entry = catalog.entries.get(name);
+          if (!entry) return [];
+          return [
+            {
+              name: entry.canonicalName,
+              displayName: entry.displayName,
+              description: textForEntry(entry),
+              unavailable: isFunctionUnavailableForInsertion(entry.availability),
+            },
+          ];
+        }),
+      }),
+    );
+    const entry = pickerSelectionEntry ?? selectedEntry;
+    return {
+      searchQuery,
+      guardMessage,
+      activeName: pickerSelectionName ?? selectedName,
+      sections,
+      summary: entry
+        ? {
+            displayName: entry.displayName,
+            description: textForEntry(entry),
+            syntax: functionSyntax(entry),
+          }
+        : null,
+      insertDisabled:
+        (pickerSelectionName ?? selectedName) === null ||
+        entry === null ||
+        isFunctionUnavailableForInsertion(entry.availability),
+    };
   };
 
-  const updatePickerSummary = (summary: HTMLElement): void => {
-    summary.replaceChildren();
-    const entry = pickerSelectionEntry ?? selectedEntry;
-    if (!entry) return;
-    const name = document.createElement('strong');
-    name.textContent = entry.displayName;
-    summary.appendChild(name);
-    const description = textForEntry(entry);
-    if (description) {
-      const text = document.createElement('span');
-      text.textContent = description;
-      summary.appendChild(text);
+  const argumentsViewState = (): ArgumentsViewState => {
+    const entry = selectedEntry;
+    const count = entry ? argumentFieldCount(entry, args.length) : args.length;
+    const fields: ArgumentsViewState['fields'] = [];
+    for (let index = 0; index < count; index += 1) {
+      const help = entry
+        ? argumentHelp(entry, index)
+        : { label: `${labels.argument} ${index + 1}`, description: undefined };
+      fields.push({
+        label: help.label ?? `${labels.argument} ${index + 1}`,
+        description: help.description,
+        value: args[index] ?? '',
+      });
     }
-    const syntax = document.createElement('code');
-    syntax.textContent = functionSyntax(entry);
-    summary.appendChild(syntax);
+    return {
+      title: entry?.displayName ?? selectedName ?? '',
+      fields,
+      canAddArgument: entry?.maxArity === null,
+      doneDisabled: selectedUnavailable() || mode === 'arguments-committed',
+      guardMessage,
+      description: selectedDescription(),
+      syntax: selectedSyntax(),
+      helpUrl: (entry ? argumentHelp(entry, 0) : null)?.url,
+    };
   };
 
   const selectedUnavailable = (): boolean =>
@@ -601,126 +586,39 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     renderPreview();
   };
 
+  const updatePickerList = (): void => {
+    if (pickerRefs) view.renderPickerList();
+  };
+
+  const pickEntry = (name: string): void => {
+    if (detached || mode !== 'picker') return;
+    const currentEntry = insertableEntry(catalog, name);
+    if (!currentEntry) {
+      reconcilePickerSelection();
+      render();
+      return;
+    }
+    pickerSelectionName = currentEntry.canonicalName;
+    pickerSelectionEntry = currentEntry;
+    guardMessage = '';
+    render();
+  };
+
+  const addArgument = (): void => {
+    if (mode === 'arguments-committed' && !ensurePostCommitDraft()) return;
+    if (!synchronized || !activeDraft || !selectedName) return;
+    args.push('');
+    preserveExplicitArgumentCount = true;
+    explicitArgumentCount = Math.max(explicitArgumentCount ?? 0, args.length);
+    const raw = assembledCurrentFormula(selectedName);
+    setDraftRaw(raw, true);
+    renderArguments();
+  };
+
   const renderArguments = (): void => {
     clearRoot();
     updateDataset();
-    const header = document.createElement('header');
-    header.className = 'fc-mac-formula-palette__header';
-    const title = document.createElement('h2');
-    title.textContent = labels.title;
-    header.appendChild(title);
-    header.appendChild(makeIconButton(labels.close, 'close', 'close', () => api.close()));
-    root.appendChild(header);
-
-    const content = document.createElement('div');
-    content.className = 'fc-mac-formula-palette__content';
-    const back = makeButton(labels.showAll, 'show-all', returnToPicker);
-    back.className = 'fc-mac-formula-palette__back';
-    content.appendChild(back);
-
-    const name = document.createElement('h3');
-    name.className = 'fc-mac-formula-palette__args-name';
-    name.textContent = selectedEntry?.displayName ?? selectedName ?? '';
-    content.appendChild(name);
-    const fields = document.createElement('div');
-    fields.className = 'fc-mac-formula-palette__fields';
-    const count = selectedEntry ? argumentFieldCount(selectedEntry, args.length) : args.length;
-    for (let index = 0; index < count; index += 1) {
-      const row = document.createElement('label');
-      row.className = 'fc-mac-formula-palette__argument';
-      const help = selectedEntry
-        ? argumentHelp(selectedEntry, index)
-        : { label: `${labels.argument} ${index + 1}` };
-      const label = document.createElement('span');
-      label.textContent = help.label ?? `${labels.argument} ${index + 1}`;
-      row.appendChild(label);
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.dataset.argumentIndex = String(index);
-      input.value = args[index] ?? '';
-      input.addEventListener('focus', () => {
-        focusedArgument = index;
-      });
-      input.addEventListener('input', () => onArgumentInput(index, input.value));
-      row.appendChild(input);
-      const range = makeIconButton(labels.rangePicker, 'range-picker', 'range', () => {
-        focusedArgument = index;
-        input.focus();
-      });
-      range.className = 'fc-range-picker__btn fc-mac-formula-palette__range';
-      row.appendChild(range);
-      if (help.description) {
-        const hint = document.createElement('small');
-        hint.textContent = help.description;
-        row.appendChild(hint);
-      }
-      fields.appendChild(row);
-    }
-    content.appendChild(fields);
-    if (selectedEntry?.maxArity === null) {
-      const add = makeButton(labels.argument, 'add-argument', () => {
-        if (mode === 'arguments-committed' && !ensurePostCommitDraft()) return;
-        if (!synchronized || !activeDraft || !selectedName) return;
-        args.push('');
-        preserveExplicitArgumentCount = true;
-        explicitArgumentCount = Math.max(explicitArgumentCount ?? 0, args.length);
-        const raw = assembledCurrentFormula(selectedName);
-        setDraftRaw(raw, true);
-        renderArguments();
-      });
-      add.className = 'fc-mac-formula-palette__add-argument';
-      content.appendChild(add);
-    }
-
-    const resultRow = document.createElement('div');
-    resultRow.className = 'fc-mac-formula-palette__result-row';
-    const resultLabel = document.createElement('h4');
-    resultLabel.textContent = labels.result;
-    resultRow.appendChild(resultLabel);
-    const preview = document.createElement('output');
-    preview.className = 'fc-mac-formula-palette__preview';
-    preview.dataset.role = 'preview-value';
-    resultRow.appendChild(preview);
-    const done = makeButton(labels.done, 'done', commitSelected);
-    done.className = 'fc-mac-formula-palette__done';
-    projectDisabledState(
-      done,
-      selectedUnavailable() || mode === 'arguments-committed',
-      selectedUnavailable() || mode === 'arguments-committed' ? labels.unavailable : null,
-    );
-    resultRow.appendChild(done);
-    content.appendChild(resultRow);
-    if (guardMessage) {
-      const guard = document.createElement('p');
-      guard.className = 'fc-mac-formula-palette__guard';
-      guard.dataset.role = 'draft-conflict';
-      guard.textContent = guardMessage;
-      content.appendChild(guard);
-    }
-
-    const help = document.createElement('section');
-    help.className = 'fc-mac-formula-palette__help';
-    const helpHeading = document.createElement('h4');
-    helpHeading.textContent = labels.help;
-    help.appendChild(helpHeading);
-    const helpText = document.createElement('p');
-    helpText.textContent = `${labels.description}: ${selectedDescription()}`;
-    help.appendChild(helpText);
-    const syntaxText = document.createElement('p');
-    syntaxText.textContent = `${labels.syntax}: ${selectedSyntax()}`;
-    help.appendChild(syntaxText);
-    const firstArgumentHelp = selectedEntry ? argumentHelp(selectedEntry, 0) : null;
-    if (firstArgumentHelp?.url) {
-      const link = document.createElement('a');
-      link.href = firstArgumentHelp.url;
-      link.target = '_blank';
-      link.rel = 'noreferrer';
-      link.textContent = labels.help;
-      help.appendChild(link);
-    }
-    content.appendChild(help);
-    root.appendChild(content);
-    argumentsRefs = { fields, preview, done };
+    argumentsRefs = view.renderArguments();
     updateDataset();
     updateFieldValues();
     renderPreview();
@@ -729,55 +627,8 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   const renderPicker = (): void => {
     clearRoot();
     updateDataset();
-    const header = document.createElement('header');
-    header.className = 'fc-mac-formula-palette__header';
-    const title = document.createElement('h2');
-    title.textContent = labels.title;
-    header.appendChild(title);
-    header.appendChild(makeIconButton(labels.close, 'close', 'close', () => api.close()));
-    root.appendChild(header);
-
-    const content = document.createElement('div');
-    content.className = 'fc-mac-formula-palette__content';
-    const search = document.createElement('input');
-    search.type = 'search';
-    search.className = 'fc-mac-formula-palette__search';
-    search.placeholder = labels.searchPlaceholder;
-    search.setAttribute('aria-label', labels.searchPlaceholder);
-    search.value = searchQuery;
-    search.addEventListener('input', () => {
-      searchQuery = search.value;
-      updatePickerList();
-    });
-    content.appendChild(search);
-    const sections = document.createElement('div');
-    sections.className = 'fc-mac-formula-palette__sections';
-    content.appendChild(sections);
-    const summary = document.createElement('div');
-    summary.className = 'fc-mac-formula-palette__summary';
-    content.appendChild(summary);
-    const insert = makeButton(labels.insertFunction, 'insert-function', () =>
-      insertSelected(pickerSelectionName ?? selectedName, pickerSelectionEntry ?? selectedEntry),
-    );
-    insert.className = 'fc-mac-formula-palette__insert';
-    const pickerEntry = pickerSelectionEntry ?? selectedEntry;
-    const insertDisabled =
-      (pickerSelectionName ?? selectedName) === null ||
-      pickerEntry === null ||
-      isFunctionUnavailableForInsertion(pickerEntry.availability);
-    projectDisabledState(insert, insertDisabled, insertDisabled ? labels.unavailable : null);
-    content.appendChild(insert);
-    if (guardMessage) {
-      const guard = document.createElement('p');
-      guard.className = 'fc-mac-formula-palette__guard';
-      guard.textContent = guardMessage;
-      content.appendChild(guard);
-    }
-    root.appendChild(content);
-    pickerRefs = { search, sections, insert };
+    pickerRefs = view.renderPicker();
     argumentsRefs = null;
-    updatePickerSummary(summary);
-    updatePickerList();
     updateDataset();
   };
 
