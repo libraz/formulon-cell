@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {
   type CellChangeEvent,
-  type CellValue,
   type FeatureFlags,
   type FeatureId,
   parseScriptCommand,
@@ -11,7 +10,7 @@ import {
   type ToolbarInstance,
   WorkbookHandle,
 } from '@libraz/formulon-cell';
-import { type RibbonTab, Spreadsheet, useSelection } from '@libraz/formulon-cell-vue';
+import { type RibbonTab, Spreadsheet } from '@libraz/formulon-cell-vue';
 import SpreadsheetToolbar from '@libraz/formulon-cell-vue/toolbar.vue';
 import {
   computed,
@@ -36,28 +35,22 @@ import {
   DEMO_PRINTER_PROFILE_ID,
   DEMO_PRINTER_PROFILES,
   DEMO_RIBBON_TABS,
-  demoSelectionLabel,
-  evaluateDemoProbe,
   pushDemoChangeLog,
   resolveDemoSearchKey,
   nextDemoFeatureOverrides,
   openDemoWorkbookFile,
   installDemoScriptMenu,
-  isDemoFeatureOn,
   type ChangeLogEntry,
   type DemoReviewDialogState,
   demoCommandText,
   type DemoBackstageAction,
   type DemoSearchItem,
   type DemoSearchUsagePrior,
-  FEATURE_GROUPS,
   formatLoadError,
   FORMATTERS,
   installDemoF6Navigation,
   loadDemoSearchUsagePrior,
-  LOCALES,
   type PresetKey,
-  PRESETS,
   installDemoSearchShortcut,
   queryDemoSearchItems,
   recordDemoSearchUsage,
@@ -69,10 +62,10 @@ import {
   runDemoBackstageAction,
   saveDemoSearchUsagePrior,
   saveDemoWorkbookToDownload,
-  THEMES,
 } from '../../demo-shared/index.js';
 import DemoBackstage from './DemoBackstage.vue';
 import DemoIcon from './DemoIcon.vue';
+import DemoOptionsPanel from './DemoOptionsPanel.vue';
 import DemoReviewDialog from './DemoReviewDialog.vue';
 import DemoScriptDialog from './DemoScriptDialog.vue';
 
@@ -93,7 +86,6 @@ const instance = shallowRef<SpreadsheetInstance | null>(null);
 const toolbar = shallowRef<ToolbarInstance | null>(null);
 const log = ref<ChangeLogEntry[]>([]);
 const formatters = ref({ uppercase: true, arrows: true });
-const probe = ref<{ name: string; result: string } | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const searchInput = ref<HTMLInputElement | null>(null);
 const quickAccess = ref<HTMLElement | null>(null);
@@ -174,15 +166,6 @@ const onReady = (inst: SpreadsheetInstance): void => {
   // Expose the live instance on `window.__fcInst` so cross-demo E2E scenarios
   // can drive imperative paths without depending on demo-specific UI.
   (window as unknown as { __fcInst?: SpreadsheetInstance | null }).__fcInst = inst;
-};
-
-const selection = useSelection(instance);
-const selectionLabel = computed(() => demoSelectionLabel(selection.value));
-
-const runProbe = (name: string, args: CellValue[]): void => {
-  const inst = instance.value;
-  if (!inst) return;
-  probe.value = evaluateDemoProbe(inst, name, args);
 };
 
 const onSpellingReview = (): void => {
@@ -303,6 +286,10 @@ const onOpenFiles = async (ev: Event): Promise<void> => {
   }
 };
 
+const onFormatterChange = (key: 'uppercase' | 'arrows', checked: boolean): void => {
+  formatters.value[key] = checked;
+};
+
 const onPresetChange = (next: PresetKey): void => {
   if (next === preset.value) return;
   preset.value = next;
@@ -317,8 +304,6 @@ const onFeatureToggle = (id: FeatureId): void => {
     id,
   });
 };
-
-const isFeatureOn = (id: FeatureId): boolean => isDemoFeatureOn(features.value, id);
 
 const commands = computed(() =>
   buildDemoCommands({
@@ -579,143 +564,26 @@ onBeforeUnmount(() => {
           @action="runBackstageAction"
         />
       </div>
-      <aside class="demo__panel" :aria-label="ui.optionsPanel" :hidden="!showPanel">
-        <section class="demo__card">
-          <h2>{{ ui.demoChrome }}</h2>
-          <div class="demo__controls demo__controls--panel">
-            <div class="demo__seg" role="group" :aria-label="ui.theme">
-              <button
-                v-for="t in THEMES"
-                :key="t.value"
-                type="button"
-                :class="['demo__seg-btn', { 'demo__seg-btn--active': theme === t.value }]"
-                :aria-pressed="theme === t.value"
-                @click="theme = t.value"
-              >
-                {{ ui.themeLabels[t.value] ?? t.label }}
-              </button>
-            </div>
-            <div class="demo__seg" role="group" :aria-label="ui.locale">
-              <button
-                v-for="l in LOCALES"
-                :key="l.value"
-                type="button"
-                :class="['demo__seg-btn', { 'demo__seg-btn--active': locale === l.value }]"
-                :aria-pressed="locale === l.value"
-                @click="locale = l.value"
-              >
-                {{ l.label }}
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section class="demo__card">
-          <h2>{{ ui.preset }}</h2>
-          <p class="demo__hint">{{ ui.presetHint }}</p>
-          <div class="demo__preset">
-            <button
-              v-for="p in PRESETS"
-              :key="p.value"
-              type="button"
-              :class="['demo__preset-btn', { 'demo__preset-btn--active': preset === p.value }]"
-              :aria-pressed="preset === p.value"
-              @click="onPresetChange(p.value)"
-            >
-              <span class="demo__preset-name">{{ ui.presets[p.value]?.label ?? p.label }}</span>
-              <span class="demo__preset-hint">{{ ui.presets[p.value]?.hint ?? p.hint }}</span>
-            </button>
-          </div>
-        </section>
-
-        <section class="demo__card">
-          <h2>{{ ui.features }}</h2>
-          <p class="demo__hint">{{ ui.featuresHint }}</p>
-          <div v-for="group in FEATURE_GROUPS" :key="group.title" class="demo__feat-group">
-            <h3 class="demo__feat-title">{{ ui.featureGroupLabels[group.title] ?? group.title }}</h3>
-            <div class="demo__feat-grid">
-              <label
-                v-for="f in group.features"
-                :key="f.id"
-                :class="['demo__feat', { 'demo__feat--on': isFeatureOn(f.id) }]"
-              >
-                <input
-                  type="checkbox"
-                  :checked="isFeatureOn(f.id)"
-                  @change="onFeatureToggle(f.id)"
-                />
-                <span>{{ ui.featureLabels[f.id] ?? f.label }}</span>
-              </label>
-              <label
-                v-if="group.title === 'Chrome'"
-                :class="['demo__feat', { 'demo__feat--on': resolvedUi.ribbon }]"
-              >
-                <input type="checkbox" v-model="showRibbon" />
-                <span>{{ ui.spreadsheetRibbon }}</span>
-              </label>
-            </div>
-          </div>
-        </section>
-
-        <section class="demo__card">
-          <h2>{{ commandText.selection }}</h2>
-          <p class="demo__mono">{{ selectionLabel }}</p>
-        </section>
-
-        <section class="demo__card">
-          <h2>{{ ui.cellRenderers }}</h2>
-          <p class="demo__hint">{{ ui.cellRenderersHint }}</p>
-          <label class="fc-tb__check">
-            <input type="checkbox" v-model="formatters.uppercase" />
-            {{ ui.uppercaseColumnA }}
-          </label>
-          <label class="fc-tb__check">
-            <input type="checkbox" v-model="formatters.arrows" />
-            {{ ui.arrowPrefixNegatives }}
-          </label>
-        </section>
-
-        <section class="demo__card">
-          <h2>{{ ui.customFunctions }}</h2>
-          <p class="demo__hint">{{ ui.customFunctionsHint }}</p>
-          <div class="demo__probe">
-            <button
-              type="button"
-              class="fc-tb__btn fc-tb__btn--ghost"
-              :disabled="!instance"
-              @click="runProbe('GREET', [{ kind: 'text', value: 'Workbook' }])"
-            >
-              GREET("Workbook")
-            </button>
-            <button
-              type="button"
-              class="fc-tb__btn fc-tb__btn--ghost"
-              :disabled="!instance"
-              @click="runProbe('FAHRENHEIT', [{ kind: 'number', value: 100 }])"
-            >
-              FAHRENHEIT(100)
-            </button>
-            <p v-if="probe" class="demo__probe-out">
-              → <code>{{ probe.result }}</code>
-            </p>
-          </div>
-        </section>
-
-        <section class="demo__card demo__card--log">
-          <h2>{{ ui.cellChangeLog }}</h2>
-          <p class="demo__hint">{{ ui.cellChangeLogHint }}</p>
-          <p v-if="log.length === 0" class="fc-tb__empty">
-            {{ ui.editCellToSeeEvents }}
-          </p>
-          <ul v-else class="demo__log">
-            <li v-for="entry in log" :key="entry.id">
-              <span class="demo__log-cell">{{ entry.cell }}</span>
-              <span class="demo__log-arrow">→</span>
-              <span class="demo__mono">{{ entry.preview }}</span>
-            </li>
-          </ul>
-        </section>
-      </aside>
+      <DemoOptionsPanel
+        :ui="ui"
+        :command-text="commandText"
+        :instance="instance"
+        :hidden="!showPanel"
+        :theme="theme"
+        :locale="locale"
+        :preset="preset"
+        :features="features"
+        :ribbon="resolvedUi.ribbon"
+        :show-ribbon="showRibbon"
+        :formatters="formatters"
+        :log="log"
+        @theme-change="theme = $event"
+        @locale-change="locale = $event"
+        @preset-change="onPresetChange"
+        @feature-toggle="onFeatureToggle"
+        @ribbon-change="showRibbon = $event"
+        @formatter-change="onFormatterChange"
+      />
     </main>
     <DemoReviewDialog
       v-if="reviewDialog"

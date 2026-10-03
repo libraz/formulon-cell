@@ -1,6 +1,5 @@
 import {
   type CellChangeEvent,
-  type CellValue,
   type FeatureFlags,
   type FeatureId,
   type parseScriptCommand,
@@ -10,12 +9,7 @@ import {
   type ToolbarInstance,
   WorkbookHandle,
 } from '@libraz/formulon-cell';
-import {
-  type RibbonTab,
-  Spreadsheet,
-  SpreadsheetToolbar,
-  useSelection,
-} from '@libraz/formulon-cell-react';
+import { type RibbonTab, Spreadsheet, SpreadsheetToolbar } from '@libraz/formulon-cell-react';
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildDemoCommands,
@@ -39,20 +33,14 @@ import {
   demoCommandText,
   demoFunctionArgumentHelp,
   demoSearchOptionId,
-  demoSelectionLabel,
-  evaluateDemoProbe,
-  FEATURE_GROUPS,
   FORMATTERS,
   formatLoadError,
   installDemoF6Navigation,
   installDemoScriptMenu,
   installDemoSearchShortcut,
-  isDemoFeatureOn,
-  LOCALES,
   loadDemoSearchUsagePrior,
   nextDemoFeatureOverrides,
   openDemoWorkbookFile,
-  PRESETS,
   type PresetKey,
   pushDemoChangeLog,
   queryDemoSearchItems,
@@ -65,10 +53,10 @@ import {
   runDemoBackstageAction,
   saveDemoSearchUsagePrior,
   saveDemoWorkbookToDownload,
-  THEMES,
 } from '../../demo-shared/index.js';
 import { DemoBackstage } from './DemoBackstage.js';
 import { DemoIcon } from './DemoIcon.js';
+import { DemoOptionsPanel } from './DemoOptionsPanel.js';
 import { DemoReviewDialog } from './DemoReviewDialog.js';
 import { DemoScriptDialog } from './DemoScriptDialog.js';
 
@@ -82,7 +70,6 @@ export const App = (): ReactElement => {
   const [instance, setInstance] = useState<SpreadsheetInstance | null>(null);
   const [log, setLog] = useState<ChangeLogEntry[]>([]);
   const [formatters, setFormatters] = useState({ uppercase: true, arrows: true });
-  const [probe, setProbe] = useState<{ name: string; result: string } | null>(null);
   const [preset, setPreset] = useState<PresetKey>('full');
   const [overrides, setOverrides] = useState<FeatureFlags>({});
   const [showRibbon, setShowRibbon] = useState(true);
@@ -183,17 +170,6 @@ export const App = (): ReactElement => {
     setLog((prev) => pushDemoChangeLog(prev, e));
   }, []);
 
-  const selection = useSelection(instance);
-  const selectionLabel = useMemo(() => demoSelectionLabel(selection), [selection]);
-
-  const runProbe = useCallback(
-    (name: string, args: CellValue[]) => {
-      if (!instance) return;
-      setProbe(evaluateDemoProbe(instance, name, args));
-    },
-    [instance],
-  );
-
   const onSpellingReview = useCallback(() => {
     if (!instance) return;
     setReviewDialog(buildDemoReviewFindings('spelling', instance, locale, commandText));
@@ -291,6 +267,10 @@ export const App = (): ReactElement => {
     },
     [instance, onNewWorkbook, onSave, showRibbonNotice, ui],
   );
+
+  const onFormatterChange = useCallback((key: 'uppercase' | 'arrows', checked: boolean) => {
+    setFormatters((f) => ({ ...f, [key]: checked }));
+  }, []);
 
   const onPresetChange = useCallback(
     (next: PresetKey) => {
@@ -588,169 +568,25 @@ export const App = (): ReactElement => {
             />
           ) : null}
         </div>
-        <aside className="demo__panel" aria-label={ui.optionsPanel} hidden={!showPanel}>
-          <section className="demo__card">
-            <h2>{ui.demoChrome}</h2>
-            <div className="demo__controls demo__controls--panel">
-              <div className="demo__seg" role="group" aria-label={ui.theme}>
-                {THEMES.map((t) => (
-                  <button
-                    key={t.value}
-                    type="button"
-                    className={`demo__seg-btn${t.value === theme ? ' demo__seg-btn--active' : ''}`}
-                    onClick={() => setTheme(t.value)}
-                    aria-pressed={t.value === theme}
-                  >
-                    {ui.themeLabels[t.value] ?? t.label}
-                  </button>
-                ))}
-              </div>
-              <div className="demo__seg" role="group" aria-label={ui.locale}>
-                {LOCALES.map((l) => (
-                  <button
-                    key={l.value}
-                    type="button"
-                    className={`demo__seg-btn${l.value === locale ? ' demo__seg-btn--active' : ''}`}
-                    onClick={() => setLocale(l.value)}
-                    aria-pressed={l.value === locale}
-                  >
-                    {l.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section className="demo__card">
-            <h2>{ui.preset}</h2>
-            <p className="demo__hint">{ui.presetHint}</p>
-            <div className="demo__preset">
-              {PRESETS.map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  className={`demo__preset-btn${
-                    p.value === preset ? ' demo__preset-btn--active' : ''
-                  }`}
-                  onClick={() => onPresetChange(p.value)}
-                  aria-pressed={p.value === preset}
-                >
-                  <span className="demo__preset-name">{ui.presets[p.value]?.label ?? p.label}</span>
-                  <span className="demo__preset-hint">{ui.presets[p.value]?.hint ?? p.hint}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="demo__card">
-            <h2>{ui.features}</h2>
-            <p className="demo__hint">{ui.featuresHint}</p>
-            {FEATURE_GROUPS.map((group) => (
-              <div key={group.title} className="demo__feat-group">
-                <h3 className="demo__feat-title">
-                  {ui.featureGroupLabels[group.title] ?? group.title}
-                </h3>
-                <div className="demo__feat-grid">
-                  {group.features.map((f) => {
-                    const enabled = isDemoFeatureOn(features, f.id);
-                    return (
-                      <label key={f.id} className={`demo__feat${enabled ? ' demo__feat--on' : ''}`}>
-                        <input
-                          type="checkbox"
-                          checked={enabled}
-                          onChange={() => onFeatureToggle(f.id)}
-                        />
-                        <span>{ui.featureLabels[f.id] ?? f.label}</span>
-                      </label>
-                    );
-                  })}
-                  {group.title === 'Chrome' ? (
-                    <label className={`demo__feat${resolvedUi.ribbon ? ' demo__feat--on' : ''}`}>
-                      <input
-                        type="checkbox"
-                        checked={resolvedUi.ribbon}
-                        onChange={(e) => setShowRibbon(e.target.checked)}
-                      />
-                      <span>{ui.spreadsheetRibbon}</span>
-                    </label>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </section>
-
-          <section className="demo__card">
-            <h2>{commandText.selection}</h2>
-            <p className="demo__mono">{selectionLabel}</p>
-          </section>
-
-          <section className="demo__card">
-            <h2>{ui.cellRenderers}</h2>
-            <p className="demo__hint">{ui.cellRenderersHint}</p>
-            <label className="fc-tb__check">
-              <input
-                type="checkbox"
-                checked={formatters.uppercase}
-                onChange={(e) => setFormatters((f) => ({ ...f, uppercase: e.target.checked }))}
-              />
-              {ui.uppercaseColumnA}
-            </label>
-            <label className="fc-tb__check">
-              <input
-                type="checkbox"
-                checked={formatters.arrows}
-                onChange={(e) => setFormatters((f) => ({ ...f, arrows: e.target.checked }))}
-              />
-              {ui.arrowPrefixNegatives}
-            </label>
-          </section>
-
-          <section className="demo__card">
-            <h2>{ui.customFunctions}</h2>
-            <p className="demo__hint">{ui.customFunctionsHint}</p>
-            <div className="demo__probe">
-              <button
-                type="button"
-                className="fc-tb__btn fc-tb__btn--ghost"
-                onClick={() => runProbe('GREET', [{ kind: 'text', value: 'Workbook' }])}
-                disabled={!instance}
-              >
-                GREET("Workbook")
-              </button>
-              <button
-                type="button"
-                className="fc-tb__btn fc-tb__btn--ghost"
-                onClick={() => runProbe('FAHRENHEIT', [{ kind: 'number', value: 100 }])}
-                disabled={!instance}
-              >
-                FAHRENHEIT(100)
-              </button>
-              {probe ? (
-                <p className="demo__probe-out">
-                  → <code>{probe.result}</code>
-                </p>
-              ) : null}
-            </div>
-          </section>
-
-          <section className="demo__card demo__card--log">
-            <h2>{ui.cellChangeLog}</h2>
-            <p className="demo__hint">{ui.cellChangeLogHint}</p>
-            {log.length === 0 ? (
-              <p className="fc-tb__empty">{ui.editCellToSeeEvents}</p>
-            ) : (
-              <ul className="demo__log">
-                {log.map((entry) => (
-                  <li key={entry.id}>
-                    <span className="demo__log-cell">{entry.cell}</span>
-                    <span className="demo__log-arrow">→</span>
-                    <span className="demo__mono">{entry.preview}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </aside>
+        <DemoOptionsPanel
+          ui={ui}
+          commandText={commandText}
+          instance={instance}
+          hidden={!showPanel}
+          theme={theme}
+          locale={locale}
+          preset={preset}
+          features={features}
+          ribbon={resolvedUi.ribbon}
+          formatters={formatters}
+          log={log}
+          onThemeChange={setTheme}
+          onLocaleChange={setLocale}
+          onPresetChange={onPresetChange}
+          onFeatureToggle={onFeatureToggle}
+          onRibbonChange={setShowRibbon}
+          onFormatterChange={onFormatterChange}
+        />
       </main>
       {reviewDialog ? (
         <DemoReviewDialog dialog={reviewDialog} ui={ui} onClose={closeReviewDialog} />
