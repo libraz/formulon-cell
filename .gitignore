@@ -67,3 +67,6 @@ backup
 # Claude Code configuration
 .claude/
 CLAUDE.md
+
+# Serena MCP project state
+.serena/
