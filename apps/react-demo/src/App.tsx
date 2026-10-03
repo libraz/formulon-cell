@@ -38,14 +38,12 @@ import {
   createDemoStrings,
   createInitialDemoWorkbook,
   DEMO_FUNCTIONS,
-  DEMO_ICONS,
   DEMO_MAC_RIBBON_TABS,
   DEMO_PRINT_PREVIEW_LINES,
   DEMO_PRINTER_PROFILE_ID,
   DEMO_PRINTER_PROFILES,
   DEMO_RIBBON_TABS,
   type DemoBackstageAction,
-  type DemoIconName,
   type DemoPlatform,
   type DemoReviewDialogState,
   type DemoSearchItem,
@@ -82,6 +80,7 @@ import {
   saveDemoWorkbookToDownload,
   THEMES,
 } from '../../demo-shared/index.js';
+import { DemoIcon } from './DemoIcon.js';
 
 const UI = createDemoStrings('React');
 
@@ -100,26 +99,6 @@ const useDemoModalFocus = (
     return activateDemoModal(root, onClose);
   }, [rootRef, open, onClose]);
 };
-
-const DemoIcon = ({ name }: { name: DemoIconName }): ReactElement => (
-  <svg
-    className="fc-tb__rb-icon"
-    viewBox="0 0 20 20"
-    strokeWidth="1.45"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    {DEMO_ICONS[name].map((segment) => (
-      <path
-        key={segment.d}
-        d={segment.d}
-        fill={segment.fill ?? 'none'}
-        stroke={segment.stroke ?? 'currentColor'}
-      />
-    ))}
-  </svg>
-);
 
 export const App = (): ReactElement => {
   const [theme, setTheme] = useState<ThemeName>('paper');

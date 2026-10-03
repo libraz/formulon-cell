@@ -93,8 +93,8 @@ describe('demo-shared Search/Tell me items', () => {
     expect(DEMO_ICONS.save.some((segment) => segment.fill === '#2f75b5')).toBe(true);
     expect(DEMO_ICONS.search.some((segment) => segment.stroke === '#107c41')).toBe(true);
 
-    const reactSource = readFileSync(join(repoRoot, 'apps/react-demo/src/App.tsx'), 'utf8');
-    const vueSource = readFileSync(join(repoRoot, 'apps/vue-demo/src/App.vue'), 'utf8');
+    const reactSource = readFileSync(join(repoRoot, 'apps/react-demo/src/DemoIcon.tsx'), 'utf8');
+    const vueSource = readFileSync(join(repoRoot, 'apps/vue-demo/src/DemoIcon.vue'), 'utf8');
 
     expect(reactSource).toContain("fill={segment.fill ?? 'none'}");
     expect(reactSource).toContain("stroke={segment.stroke ?? 'currentColor'}");

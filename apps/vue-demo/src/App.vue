@@ -35,7 +35,6 @@ import {
   createDemoStrings,
   createInitialDemoWorkbook,
   demoSearchOptionId,
-  DEMO_ICONS,
   DEMO_FUNCTIONS,
   demoFunctionArgumentHelp,
   DEMO_MAC_RIBBON_TABS,
@@ -79,6 +78,7 @@ import {
   saveDemoWorkbookToDownload,
   THEMES,
 } from '../../demo-shared/index.js';
+import DemoIcon from './DemoIcon.vue';
 
 const UI = createDemoStrings('Vue');
 
@@ -489,29 +489,19 @@ onBeforeUnmount(() => {
             :title="ui.file"
             @click="openBackstage"
           >
-            <svg class="fc-tb__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path v-for="segment in DEMO_ICONS.app" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
-            </svg>
+            <DemoIcon name="app" />
           </button>
           <span v-else class="demo__brand-mark" aria-hidden="true">
-            <svg class="fc-tb__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path v-for="segment in DEMO_ICONS.app" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
-            </svg>
+            <DemoIcon name="app" />
           </span>
           <button type="button" class="demo__title-icon" :aria-label="ui.save" @click="onSave">
-            <svg class="fc-tb__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path v-for="segment in DEMO_ICONS.save" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
-            </svg>
+            <DemoIcon name="save" />
           </button>
           <button type="button" class="demo__title-icon" :aria-label="ui.undo" @click="instance?.undo()">
-            <svg class="fc-tb__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path v-for="segment in DEMO_ICONS.undo" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
-            </svg>
+            <DemoIcon name="undo" />
           </button>
           <button type="button" class="demo__title-icon" :aria-label="ui.redo" @click="instance?.redo()">
-            <svg class="fc-tb__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path v-for="segment in DEMO_ICONS.redo" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
-            </svg>
+            <DemoIcon name="redo" />
           </button>
         </div>
         <div class="fc-tb__title">
@@ -519,9 +509,7 @@ onBeforeUnmount(() => {
           <span>{{ ui.saved }}</span>
         </div>
         <div class="fc-tb__search">
-          <svg class="fc-tb__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path v-for="segment in DEMO_ICONS.search" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
-          </svg>
+          <DemoIcon name="search" />
           <input
             ref="searchInput"
             v-model="searchQuery"
@@ -649,9 +637,7 @@ onBeforeUnmount(() => {
           <div class="fc-tb__backstage-main">
             <div class="fc-tb__backstage-title">
               <span class="fc-tb__backstage-xl" aria-hidden="true">
-                <svg class="fc-tb__rb-icon" viewBox="0 0 20 20" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path v-for="segment in DEMO_ICONS.app" :key="segment.d" :d="segment.d" :fill="segment.fill ?? 'none'" :stroke="segment.stroke ?? 'currentColor'" />
-                </svg>
+                <DemoIcon name="app" />
               </span>
               <div>
                 <h1>{{ bookName }}</h1>
