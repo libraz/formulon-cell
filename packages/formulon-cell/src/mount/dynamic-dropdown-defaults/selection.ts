@@ -1,4 +1,3 @@
-import { MAX_COL, MAX_ROW } from '../../engine/address.js';
 import type { Range, SpreadsheetInstance } from '../../index.js';
 
 export const normalizedSelectionRange = (instance: SpreadsheetInstance): Range => {
@@ -11,11 +10,6 @@ export const normalizedSelectionRange = (instance: SpreadsheetInstance): Range =
     c1: Math.max(r.c0, r.c1),
   };
 };
-
-export const isWholeRowSelection = (range: Range): boolean => range.c0 === 0 && range.c1 >= MAX_COL;
-
-export const isWholeColumnSelection = (range: Range): boolean =>
-  range.r0 === 0 && range.r1 >= MAX_ROW;
 
 export const hasActiveCopy = (instance: SpreadsheetInstance): boolean => {
   const { copyRange, copyRanges } = instance.store.getState().ui;

@@ -1,7 +1,13 @@
 import { addrKey, MAX_COL, MAX_ROW } from '../../engine/address.js';
 import type { Addr, Range } from '../../engine/types.js';
 import type { WorkbookHandle } from '../../engine/workbook-handle.js';
-import { rangeContainsRange, rangesIntersect, sameRange } from '../../store/selection-geometry.js';
+import {
+  isWholeColumnRange,
+  isWholeRowRange,
+  rangeContainsRange,
+  rangesIntersect,
+  sameRange,
+} from '../../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore, type State } from '../../store/store.js';
 import { canShiftMerges, shiftCells, shiftFormats, shiftMerges } from '../cell-shift.js';
 import { coerceInputForCell, writeCoerced } from '../coerce-input.js';
@@ -11,8 +17,6 @@ import { insertCols, insertRows } from '../structure.js';
 import {
   cloneCellFormat,
   commentsFitAfterInsert,
-  isWholeColumnRange,
-  isWholeRowRange,
   makeBand,
   materializedStateForSheet,
   refreshCopiedBandSnapshot,
@@ -344,9 +348,7 @@ function sourceAxisMatchesTarget(
 ): boolean {
   if (snapshot.range.sheet !== targetSheet) return true;
   const logical = snapshot.logicalRange ?? snapshot.range;
-  return wholeRows
-    ? logical.c0 === 0 && logical.c1 >= MAX_COL
-    : logical.r0 === 0 && logical.r1 >= MAX_ROW;
+  return wholeRows ? isWholeRowRange(logical) : isWholeColumnRange(logical);
 }
 
 /**

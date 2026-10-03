@@ -6,14 +6,6 @@ import type { CellFormat, SpreadsheetStore, State } from '../../store/store.js';
 import { copy } from './copy.js';
 import { type ClipboardSnapshot, captureSnapshotFromCopyResult } from './snapshot.js';
 
-export function isWholeRowRange(range: Range): boolean {
-  return range.c0 === 0 && range.c1 >= MAX_COL;
-}
-
-export function isWholeColumnRange(range: Range): boolean {
-  return range.r0 === 0 && range.r1 >= MAX_ROW;
-}
-
 export function cloneCellFormat(format: CellFormat): CellFormat {
   return {
     ...format,

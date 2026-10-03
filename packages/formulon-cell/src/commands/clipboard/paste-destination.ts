@@ -1,6 +1,7 @@
 /** Where an internal paste lands: tile repetition, whole-row/-column band destinations, and the bounded cells a band paste materializes. */
 import { MAX_COL, MAX_ROW } from '../../engine/address.js';
 import type { Addr, Range } from '../../engine/types.js';
+import { isWholeColumnRange, isWholeRowRange } from '../../store/selection-geometry.js';
 import type { State } from '../../store/store.js';
 import type { ClipboardSnapshot } from './snapshot.js';
 
@@ -20,8 +21,8 @@ export interface MaterializedPasteCell {
 export const logicalRangeFor = (snap: ClipboardSnapshot): Range => snap.logicalRange ?? snap.range;
 
 export const bandAxisFor = (range: Range): BandAxis | null => {
-  if (range.r0 === 0 && range.r1 >= MAX_ROW) return 'column';
-  if (range.c0 === 0 && range.c1 >= MAX_COL) return 'row';
+  if (isWholeColumnRange(range)) return 'column';
+  if (isWholeRowRange(range)) return 'row';
   return null;
 };
 
@@ -52,7 +53,7 @@ const destinationBandFor = (
   if (selected.sheet !== state.selection.active.sheet) return null;
   if (axis === 'column') {
     const firstRowOnly = selected.r0 === 0 && selected.r1 === 0;
-    const fullRows = selected.r0 === 0 && selected.r1 >= MAX_ROW;
+    const fullRows = isWholeColumnRange(selected);
     if (!firstRowOnly && !fullRows) return null;
     const selectedWidth = selected.c1 - selected.c0 + 1;
     const logicalWidth = logical.c1 - logical.c0 + 1;
@@ -73,7 +74,7 @@ const destinationBandFor = (
     };
   }
   const firstColOnly = selected.c0 === 0 && selected.c1 === 0;
-  const fullCols = selected.c0 === 0 && selected.c1 >= MAX_COL;
+  const fullCols = isWholeRowRange(selected);
   if (!firstColOnly && !fullCols) return null;
   const selectedHeight = selected.r1 - selected.r0 + 1;
   const logicalHeight = logical.r1 - logical.r0 + 1;

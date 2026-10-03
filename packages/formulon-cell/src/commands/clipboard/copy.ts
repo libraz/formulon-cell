@@ -1,6 +1,5 @@
-import { MAX_COL, MAX_ROW } from '../../engine/address.js';
 import type { Range } from '../../engine/types.js';
-import { sameRange } from '../../store/selection-geometry.js';
+import { isWholeColumnRange, isWholeRowRange, sameRange } from '../../store/selection-geometry.js';
 import type { State } from '../../store/store.js';
 import { encodeTSV } from './tsv.js';
 
@@ -89,8 +88,8 @@ function normalizedCopyRanges(
 }
 
 function trimWholeBandsToUsedSpan(state: State, ranges: Range[]): Range[] {
-  const wholeRows = ranges.every((r) => r.c0 === 0 && r.c1 >= MAX_COL);
-  const wholeCols = ranges.every((r) => r.r0 === 0 && r.r1 >= MAX_ROW);
+  const wholeRows = ranges.every(isWholeRowRange);
+  const wholeCols = ranges.every(isWholeColumnRange);
   if (!wholeRows && !wholeCols) return ranges;
 
   let min = Number.POSITIVE_INFINITY;

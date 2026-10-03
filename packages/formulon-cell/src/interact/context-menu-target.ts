@@ -1,6 +1,6 @@
-import { MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import { hitZone, layoutForView } from '../render/geometry.js';
+import { isWholeColumnRange, isWholeRowRange } from '../store/selection-geometry.js';
 import { mutators, type SpreadsheetStore } from '../store/store.js';
 import type { MenuKind } from './context-menu-spec.js';
 
@@ -26,7 +26,7 @@ export const resolveContextMenuTarget = (
   const selectedRanges = [s.selection.range, ...(s.selection.extraRanges ?? [])];
   if (zone.kind === 'row-header' || zone.kind === 'row-resize') {
     const inSel = selectedRanges.some(
-      (sel) => zone.row >= sel.r0 && zone.row <= sel.r1 && sel.c0 === 0 && sel.c1 >= MAX_COL,
+      (sel) => zone.row >= sel.r0 && zone.row <= sel.r1 && isWholeRowRange(sel),
     );
     if (!inSel && canChangeSelection()) mutators.selectRow(store, zone.row);
     return {
@@ -36,7 +36,7 @@ export const resolveContextMenuTarget = (
   }
   if (zone.kind === 'col-header' || zone.kind === 'col-resize') {
     const inSel = selectedRanges.some(
-      (sel) => zone.col >= sel.c0 && zone.col <= sel.c1 && sel.r0 === 0 && sel.r1 >= MAX_ROW,
+      (sel) => zone.col >= sel.c0 && zone.col <= sel.c1 && isWholeColumnRange(sel),
     );
     if (!inSel && canChangeSelection()) mutators.selectCol(store, zone.col);
     return {
@@ -48,13 +48,13 @@ export const resolveContextMenuTarget = (
     const selected = selectedRanges.find(
       (sel) => zone.row >= sel.r0 && zone.row <= sel.r1 && zone.col >= sel.c0 && zone.col <= sel.c1,
     );
-    if (selected?.c0 === 0 && selected.c1 >= MAX_COL) {
+    if (selected && isWholeRowRange(selected)) {
       return {
         kind: 'row',
         cell: { sheet: s.selection.active.sheet, row: zone.row, col: zone.col },
       };
     }
-    if (selected?.r0 === 0 && selected.r1 >= MAX_ROW) {
+    if (selected && isWholeColumnRange(selected)) {
       return {
         kind: 'col',
         cell: { sheet: s.selection.active.sheet, row: zone.row, col: zone.col },

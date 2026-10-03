@@ -10,18 +10,14 @@ import {
 } from '../../index.js';
 import { openCellShiftDialog } from '../../interact/cell-shift-dialog.js';
 import { sheetTabColorActionForColor, sheetTabColorByAction } from '../../sheet-tab-colors.js';
+import { isWholeColumnRange, isWholeRowRange } from '../../store/selection-geometry.js';
 import { showDimensionDialog } from '../../toolbar/dialogs/dimension.js';
 import { showRenameSheetDialog } from '../../toolbar/dialogs/rename-sheet.js';
 import { applyCellFormatAction } from '../../toolbar/ribbon/cell-format-action.js';
 import type { DynamicDropdownsCtx } from '../../toolbar/ribbon/dynamic-dropdowns.js';
 import type { DefaultDynamicDropdownsOptions } from '../dynamic-dropdowns-defaults.js';
 import { setMenuControlDisabled } from './menu-feedback.js';
-import {
-  hasActiveCopy,
-  isWholeColumnSelection,
-  isWholeRowSelection,
-  normalizedSelectionRange,
-} from './selection.js';
+import { hasActiveCopy, normalizedSelectionRange } from './selection.js';
 
 const noop = (): void => undefined;
 
@@ -35,7 +31,7 @@ const buildCellInsertAction =
         const sourceRange = snapshot?.logicalRange ?? snapshot?.range;
         const sourceIsWholeBand =
           sourceRange !== undefined &&
-          (isWholeRowSelection(sourceRange) || isWholeColumnSelection(sourceRange));
+          (isWholeRowRange(sourceRange) || isWholeColumnRange(sourceRange));
         if (snapshot && sourceIsWholeBand) {
           const inserted = insertCopiedBand(
             instance.store,
@@ -55,11 +51,8 @@ const buildCellInsertAction =
           return;
         }
       }
-      if (
-        !hasActiveCopy(instance) &&
-        (isWholeRowSelection(range) || isWholeColumnSelection(range))
-      ) {
-        handleInsertCellsAction(instance, isWholeRowSelection(range) ? 'rows' : 'cols');
+      if (!hasActiveCopy(instance) && (isWholeRowRange(range) || isWholeColumnRange(range))) {
+        handleInsertCellsAction(instance, isWholeRowRange(range) ? 'rows' : 'cols');
         mutators.replaceCells(
           instance.store,
           instance.workbook.cells(instance.store.getState().data.sheetIndex),
@@ -101,8 +94,8 @@ const buildCellDeleteAction =
   (action) => {
     if (action === 'cells') {
       const range = normalizedSelectionRange(instance);
-      if (isWholeRowSelection(range) || isWholeColumnSelection(range)) {
-        handleDeleteCellsAction(instance, isWholeRowSelection(range) ? 'rows' : 'cols');
+      if (isWholeRowRange(range) || isWholeColumnRange(range)) {
+        handleDeleteCellsAction(instance, isWholeRowRange(range) ? 'rows' : 'cols');
         mutators.replaceCells(
           instance.store,
           instance.workbook.cells(instance.store.getState().data.sheetIndex),
