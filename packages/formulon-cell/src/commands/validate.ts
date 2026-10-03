@@ -197,7 +197,8 @@ function listValueMatches(values: readonly string[], text: string): boolean {
 
 const NUMERIC = /^[+-]?(?:(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
 
-function coerceCellValue(value: Exclude<CellValue, { kind: 'error' }>): CoercedInput {
+/** Coerce a stored cell value into the shape typed input would produce. */
+export function coerceCellValue(value: Exclude<CellValue, { kind: 'error' }>): CoercedInput {
   switch (value.kind) {
     case 'blank':
       return { kind: 'blank' };

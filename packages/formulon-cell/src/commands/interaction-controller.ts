@@ -1,12 +1,11 @@
 import { addrKey } from '../engine/address.js';
-import { makeRangeResolver } from '../engine/range-resolver.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { formatWithPending } from '../store/pending-format.js';
 import { rangeContainsAddr } from '../store/selection-geometry.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import type { CellFormat, State } from '../store/types.js';
-import { type CoercedInput, coerceInputForCell } from './coerce-input.js';
+import { type CoercedInput, coerceInputForCell, validateCoercedInput } from './coerce-input.js';
 import type { History } from './history.js';
 import { InteractionAuthorizer } from './interaction-authorizer.js';
 import {
@@ -36,7 +35,7 @@ import {
   unionAddresses,
 } from './prepared-change.js';
 import { normalizeR1C1Formula } from './refs.js';
-import { cellValueViolatesValidation, validateAgainst } from './validate.js';
+import { coerceCellValue } from './validate.js';
 
 const CELL_OPERATIONS: ReadonlySet<CellBatchOperation> = new Set([
   'valueEdit',
@@ -424,8 +423,8 @@ export class InteractionController {
       const prepared = this.patchFromCoerced(target, input);
       const validation = formatWithPending(state, target)?.validation;
       if (validation) {
-        const outcome = validateAgainst(validation, input, makeRangeResolver(wb, target.sheet));
-        if (!outcome.ok && outcome.severity === 'stop' && validation.showErrorMessage !== false) {
+        const outcome = validateCoercedInput(wb, target, input, validation);
+        if (!outcome.ok && outcome.severity === 'stop') {
           return { rejection: { addr, code: 'invalid', reason: outcome.message } };
         }
       }
@@ -439,16 +438,10 @@ export class InteractionController {
       return { rejection: { addr, code: 'invalid', reason: 'number value must be finite' } };
     }
     const validation = formatWithPending(state, target)?.validation;
-    if (formula === null && validation) {
-      const resolveRange = makeRangeResolver(wb, target.sheet);
-      if (cellValueViolatesValidation(change.value, validation, resolveRange)) {
-        return {
-          rejection: {
-            addr,
-            code: 'invalid',
-            reason: validation.errorMessage || 'value violates validation',
-          },
-        };
+    if (formula === null && validation && change.value.kind !== 'error') {
+      const outcome = validateCoercedInput(wb, target, coerceCellValue(change.value), validation);
+      if (!outcome.ok && outcome.severity === 'stop') {
+        return { rejection: { addr, code: 'invalid', reason: outcome.message } };
       }
     }
     return {

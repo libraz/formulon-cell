@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { History } from '../../../src/commands/history.js';
 import { InteractionController } from '../../../src/commands/interaction-controller.js';
@@ -10,7 +10,7 @@ import {
 } from '../../../src/commands/interaction-policy.js';
 import { setProtectedSheet } from '../../../src/commands/protection.js';
 import { addrKey } from '../../../src/engine/address.js';
-import type { Addr, CellValue, Range } from '../../../src/engine/types.js';
+import { type Addr, type CellValue, type Range, ValueKind } from '../../../src/engine/types.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
 import { createSpreadsheetStore, mutators } from '../../../src/store/store.js';
 
@@ -850,5 +850,69 @@ describe('InteractionController', () => {
       engine.recalc = original;
       wb.dispose();
     }
+  });
+
+  describe('data-validation parity with the direct write path', () => {
+    const valueChange = (value: CellValue) => ({
+      type: 'cellBatch' as const,
+      operation: 'valueEdit' as const,
+      origin: 'editor' as const,
+      changes: [{ addr: A1, value }],
+    });
+
+    it('rejects an input change that fails a custom rule', async () => {
+      const { store, controller: service, workbook: wb } = await createController();
+      mutators.setCellFormat(store, A1, {
+        validation: { kind: 'custom', formula: '=A1>0', allowBlank: true, errorStyle: 'stop' },
+      });
+      vi.spyOn(wb, 'evalFormula').mockReturnValue({
+        status: { status: 0 },
+        value: { kind: ValueKind.Number, number: 0 },
+      } as unknown as ReturnType<typeof wb.evalFormula>);
+
+      const result = service.execute(edit(A1, '-5'));
+      expect(result.status).toBe('rejected');
+      expect(result.rejected[0]?.code).toBe('invalid');
+    });
+
+    it('lets a warning-severity rule through on a value change', async () => {
+      const { store, controller: service, workbook: wb } = await createController();
+      mutators.setCellFormat(store, A1, {
+        validation: { kind: 'whole', op: 'between', a: 1, b: 10, errorStyle: 'warning' },
+      });
+
+      const result = service.execute(valueChange({ kind: 'number', value: 99 }));
+      expect(result.status).not.toBe('rejected');
+      expect(wb.getValue(A1)).toEqual({ kind: 'number', value: 99 });
+    });
+
+    it('records a stop rule silently when its error alert is off', async () => {
+      const { store, controller: service, workbook: wb } = await createController();
+      mutators.setCellFormat(store, A1, {
+        validation: {
+          kind: 'whole',
+          op: 'between',
+          a: 1,
+          b: 10,
+          errorStyle: 'stop',
+          showErrorMessage: false,
+        },
+      });
+
+      const result = service.execute(valueChange({ kind: 'number', value: 99 }));
+      expect(result.status).not.toBe('rejected');
+      expect(wb.getValue(A1)).toEqual({ kind: 'number', value: 99 });
+    });
+
+    it('still rejects a stop-severity value change', async () => {
+      const { store, controller: service } = await createController();
+      mutators.setCellFormat(store, A1, {
+        validation: { kind: 'whole', op: 'between', a: 1, b: 10, errorStyle: 'stop' },
+      });
+
+      const result = service.execute(valueChange({ kind: 'number', value: 99 }));
+      expect(result.status).toBe('rejected');
+      expect(result.rejected[0]?.code).toBe('invalid');
+    });
   });
 });
