@@ -29,22 +29,24 @@ export function applyTextScriptToRange(
   range: Range,
   command: ScriptCommand,
 ): number {
-  let changed = 0;
-  for (const [key, cell] of state.data.cells) {
-    const addr = addrFromKey(key);
-    if (!addr || !rangeContainsAddr(range, addr)) continue;
-    if (!isCellWritable(state, addr)) continue;
-    if (command === 'clear') {
-      if (cell.value.kind === 'blank' && !cell.formula) continue;
-      workbook.setBlank(addr);
+  return workbook.withBatchedRecalc(() => {
+    let changed = 0;
+    for (const [key, cell] of state.data.cells) {
+      const addr = addrFromKey(key);
+      if (!addr || !rangeContainsAddr(range, addr)) continue;
+      if (!isCellWritable(state, addr)) continue;
+      if (command === 'clear') {
+        if (cell.value.kind === 'blank' && !cell.formula) continue;
+        workbook.setBlank(addr);
+        changed += 1;
+        continue;
+      }
+      if (cell.value.kind !== 'text') continue;
+      const next = applyTextScript(cell.value.value, command);
+      if (next === cell.value.value) continue;
+      workbook.setText(addr, next);
       changed += 1;
-      continue;
     }
-    if (cell.value.kind !== 'text') continue;
-    const next = applyTextScript(cell.value.value, command);
-    if (next === cell.value.value) continue;
-    workbook.setText(addr, next);
-    changed += 1;
-  }
-  return changed;
+    return changed;
+  });
 }

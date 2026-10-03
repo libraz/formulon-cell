@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { applyTextScriptToRange } from '../../../src/commands/text-script.js';
 import type { Addr } from '../../../src/engine/types.js';
 import type { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -8,6 +8,7 @@ const key = (addr: Addr): string => `${addr.sheet}:${addr.row}:${addr.col}`;
 
 const fakeWorkbook = (writes: Map<string, string | null>): WorkbookHandle =>
   ({
+    withBatchedRecalc: <T>(fn: () => T): T => fn(),
     setText: (addr: Addr, value: string) => writes.set(key(addr), value),
     setBlank: (addr: Addr) => writes.set(key(addr), null),
   }) as unknown as WorkbookHandle;
@@ -98,5 +99,28 @@ describe('commands/text-script', () => {
 
     expect(count).toBe(1);
     expect(writes).toEqual(new Map([['0:8:2', 'Mixed']]));
+  });
+
+  it('wraps every write in one batched recalc', () => {
+    const store = createSpreadsheetStore();
+    mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'text', value: 'a' }, null);
+    mutators.setCell(store, { sheet: 0, row: 0, col: 1 }, { kind: 'text', value: 'b' }, null);
+    const writes = new Map<string, string | null>();
+    const wb = fakeWorkbook(writes);
+    const batched = vi.fn(<T>(fn: () => T): T => {
+      expect(writes.size).toBe(0);
+      return fn();
+    });
+    (wb as unknown as { withBatchedRecalc: typeof batched }).withBatchedRecalc = batched;
+
+    applyTextScriptToRange(
+      store.getState(),
+      wb,
+      { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+      'uppercase',
+    );
+
+    expect(batched).toHaveBeenCalledTimes(1);
+    expect(writes.size).toBe(2);
   });
 });
