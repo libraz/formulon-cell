@@ -17,9 +17,9 @@ const portFromEnv = (app: DemoApp): number => {
  * Builds a Playwright config for a demo app. Both framework demos share the same
  * config surface — only the dev-server port and workspace name change.
  *
- * Browsers: Chromium + WebKit. Firefox is skipped (cf. tidy-seeking-whisper
- * plan §1.3); the engine's WASM doesn't require it, and the
- * grant-permissions calls for the clipboard scenarios don't cleanly apply.
+ * Browsers: Chromium + WebKit. Firefox is skipped: the engine's WASM doesn't
+ * require it, and the grant-permissions calls for the clipboard scenarios
+ * don't cleanly apply.
  *
  * The default serial WASM loads without COOP/COEP headers. Specs that need
  * real recalc verify WASM mode via `expectNoStub` in pages/SpreadsheetPage.ts.
