@@ -12,6 +12,7 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../../../src/store/store.js';
+import { trackConnectedListenerLeaks } from './connected-listener-leaks.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -814,6 +815,16 @@ describe('attachPageSetupDialog', () => {
     const handle = attachPageSetupDialog({ host, store });
     handle.detach();
     expect(dialog()).toBeNull();
+  });
+
+  it('detach() removes every listener left on still-connected targets', () => {
+    const { registered, leaked } = trackConnectedListenerLeaks(() => {
+      const handle = attachPageSetupDialog({ host, store });
+      handle.open('headerFooter');
+      handle.detach();
+    });
+    expect(registered).toBeGreaterThan(10);
+    expect(leaked).toBe(0);
   });
 
   it('keeps Page Setup controls on compact desktop dialog geometry', () => {
