@@ -2061,7 +2061,9 @@ describe('attachContextMenu', () => {
 
   describe('DOM primitives', () => {
     it('keeps context menu button DOM on the shared interaction primitive', () => {
-      const source = readFileSync(join(root, 'src/interact/context-menu.ts'), 'utf8');
+      const source = ['src/interact/context-menu.ts', 'src/interact/context-menu-entries.ts']
+        .map((path) => readFileSync(join(root, path), 'utf8'))
+        .join('\n');
 
       expect(source).toContain("import { createInteractionButton } from './chip-button.js'");
       expect(source).toContain('const createContextMenuItemButton');
