@@ -1,0 +1,132 @@
+.fc-tb__menu-icon--filter-advanced::before,
+.fc-tb__menu-icon--filter-by-value::before,
+.fc-tb__menu-icon--filter-clear::before,
+.fc-tb__menu-icon--filter-reapply::before,
+.fc-tb__menu-icon--filter-toggle::before {
+  top: 2px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  background: #185abd;
+  clip-path: polygon(0 0, 100% 0, 62% 45%, 62% 100%, 38% 100%, 38% 45%);
+}
+
+.fc-tb__menu-icon--filter-by-value::after {
+  right: 0;
+  bottom: 0;
+  width: 10px;
+  height: 8px;
+  background:
+    linear-gradient(#107c41 0 0) 1px 2px / 8px 2px no-repeat,
+    linear-gradient(#107c41 0 0) 1px 6px / 8px 2px no-repeat;
+  color: transparent;
+  content: "";
+}
+
+.fc-tb__menu-icon--filter-clear::after {
+  top: 1px;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  background:
+    linear-gradient(45deg, transparent 0 43%, #a4262c 44% 56%, transparent 57%),
+    linear-gradient(135deg, transparent 0 43%, #a4262c 44% 56%, transparent 57%);
+  content: "";
+}
+
+.fc-tb__menu-icon--filter-reapply::after {
+  right: -1px;
+  bottom: 0;
+  color: transparent;
+  content: "";
+}
+
+.fc-tb__menu-icon--filter-advanced::after {
+  right: 0;
+  bottom: 0;
+  width: 11px;
+  height: 5px;
+  background:
+    radial-gradient(circle at 2px 50%, #605e5c 0 1.4px, transparent 1.6px),
+    radial-gradient(circle at 5.5px 50%, #605e5c 0 1.4px, transparent 1.6px),
+    radial-gradient(circle at 9px 50%, #605e5c 0 1.4px, transparent 1.6px);
+  color: transparent;
+  content: "";
+}
+
+.fc-tb__menu-icon--conditional::before,
+.fc-tb__menu-icon--name-manager::before,
+.fc-tb__menu-icon--remove-duplicates::before,
+.fc-tb__menu-icon--sort-asc::before,
+.fc-tb__menu-icon--sort-custom::before,
+.fc-tb__menu-icon--sort-desc::before {
+  inset: 2px;
+  border: 1px solid #8a8886;
+  background:
+    linear-gradient(#e1dfdd 0 0) 0 33% / 100% 1px no-repeat,
+    linear-gradient(#e1dfdd 0 0) 0 66% / 100% 1px no-repeat,
+    #ffffff;
+}
+
+.fc-tb__menu-icon--sort-asc::after,
+.fc-tb__menu-icon--sort-desc::after {
+  right: 0;
+  bottom: 0;
+  width: 13px;
+  height: 13px;
+  background-repeat: no-repeat;
+  background-size: 13px 13px;
+  color: transparent;
+  content: "";
+}
+
+.fc-tb__menu-icon--sort-asc::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 13'%3E%3Cpath d='M2 10.8 4.4 2.2h1.8l2.4 8.6H7.2l-.4-1.5H3.8l-.4 1.5H2Zm2.1-2.7h2.4L5.3 3.8 4.1 8.1Z' fill='%23185abd'/%3E%3Cpath d='M10.7 2.2v8.1M10.7 10.3 8.9 8.5M10.7 10.3l1.8-1.8' fill='none' stroke='%23107c41' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.fc-tb__menu-icon--sort-desc::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 13'%3E%3Cpath d='M2.3 2.2h5.8v1.2L4.2 9.5h4v1.3H2.1V9.6L6 3.5H2.3V2.2Z' fill='%23185abd'/%3E%3Cpath d='M10.7 10.8V2.7M10.7 2.7 8.9 4.5M10.7 2.7l1.8 1.8' fill='none' stroke='%23107c41' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.fc-tb__menu-icon--sort-custom::after {
+  right: 0;
+  bottom: 0;
+  width: 13px;
+  height: 13px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 13'%3E%3Cpath d='M3.5 1.5v9M3.5 1.5 1.7 3.3M3.5 1.5l1.8 1.8M9.5 11.5v-9M9.5 11.5l-1.8-1.8M9.5 11.5l1.8-1.8' fill='none' stroke='%23185abd' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: 13px 13px;
+  color: #185abd;
+  content: "";
+}
+
+.fc-tb__menu-icon--remove-duplicates::after {
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+  background:
+    linear-gradient(#ffffff 0 0) 3px 1px / 7px 7px no-repeat,
+    linear-gradient(#ffffff 0 0) 1px 3px / 7px 7px no-repeat,
+    linear-gradient(45deg, transparent 0 43%, #a4262c 44% 56%, transparent 57%);
+  border: 1px solid #a4262c;
+  color: transparent;
+  content: "";
+}
+
+.fc-tb__menu-icon--conditional::after {
+  inset: 4px;
+  background: linear-gradient(90deg, #f8696b 0 33%, #ffeb84 33% 66%, #63be7b 66% 100%);
+}
+
+.fc-tb__menu-icon--name-manager::after {
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  height: 10px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 10'%3E%3Cpath d='M1.2 2.2h5.6L10.8 5 6.8 7.8H1.2z' fill='%23ffffff' stroke='%23107c41' stroke-width='1.2' stroke-linejoin='round'/%3E%3Ccircle cx='3.4' cy='5' r='1' fill='%23107c41'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: 12px 10px;
+  color: transparent;
+  content: "";
+}

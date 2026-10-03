@@ -1,0 +1,150 @@
+.fc-tb__menu-icon--fill-down::before,
+.fc-tb__menu-icon--fill-left::before,
+.fc-tb__menu-icon--fill-right::before,
+.fc-tb__menu-icon--fill-up::before {
+  inset: 2px;
+  border: 1px solid #8a8886;
+  background:
+    linear-gradient(#e1dfdd 0 0) 0 33% / 100% 1px no-repeat,
+    linear-gradient(#e1dfdd 0 0) 0 66% / 100% 1px no-repeat,
+    linear-gradient(90deg, #e1dfdd 0 0) 33% 0 / 1px 100% no-repeat,
+    linear-gradient(90deg, #e1dfdd 0 0) 66% 0 / 1px 100% no-repeat,
+    #ffffff;
+}
+
+.fc-tb__menu-icon--fill-down::after,
+.fc-tb__menu-icon--fill-left::after,
+.fc-tb__menu-icon--fill-right::after,
+.fc-tb__menu-icon--fill-up::after {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background-repeat: no-repeat;
+  background-size: 12px 12px;
+  color: #107c41;
+  content: "";
+}
+
+.fc-tb__menu-icon--fill-down::after {
+  right: 1px;
+  bottom: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M6 1.5v8M6 9.5 2.8 6.3M6 9.5l3.2-3.2' fill='none' stroke='%23107c41' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.fc-tb__menu-icon--fill-up::after {
+  top: 0;
+  right: 1px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M6 10.5v-8M6 2.5 2.8 5.7M6 2.5l3.2 3.2' fill='none' stroke='%23107c41' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.fc-tb__menu-icon--fill-right::after {
+  right: -1px;
+  bottom: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M1.5 6h8M9.5 6 6.3 2.8M9.5 6 6.3 9.2' fill='none' stroke='%23107c41' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.fc-tb__menu-icon--fill-left::after {
+  bottom: 0;
+  left: -1px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M10.5 6h-8M2.5 6l3.2-3.2M2.5 6l3.2 3.2' fill='none' stroke='%23107c41' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.fc-tb__menu-icon--fill-series::before {
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: 12px;
+  border-left: 2px solid #185abd;
+  background:
+    linear-gradient(#185abd 0 0) 0 0 / 10px 2px no-repeat,
+    linear-gradient(#185abd 0 0) 0 6px / 10px 2px no-repeat,
+    linear-gradient(#185abd 0 0) 0 12px / 10px 2px no-repeat;
+}
+
+.fc-tb__menu-icon--fill-series::after {
+  right: -1px;
+  bottom: 1px;
+  color: transparent;
+  content: "";
+}
+
+.fc-tb__menu-icon--fill-days::before,
+.fc-tb__menu-icon--fill-months::before,
+.fc-tb__menu-icon--fill-weekdays::before,
+.fc-tb__menu-icon--fill-years::before {
+  inset: 2px;
+  border: 1px solid #8a8886;
+  background:
+    linear-gradient(#185abd 0 0) 0 0 / 100% 4px no-repeat,
+    linear-gradient(#e1dfdd 0 0) 0 8px / 100% 1px no-repeat,
+    linear-gradient(90deg, #e1dfdd 0 0) 33% 4px / 1px 12px no-repeat,
+    linear-gradient(90deg, #e1dfdd 0 0) 66% 4px / 1px 12px no-repeat,
+    #ffffff;
+}
+
+.fc-tb__menu-icon--fill-days::after {
+  right: 0;
+  bottom: 0;
+  width: 11px;
+  height: 11px;
+  border: 1px solid #107c41;
+  background:
+    linear-gradient(#107c41 0 0) 0 0 / 100% 3px no-repeat,
+    radial-gradient(circle at 50% 70%, #107c41 0 1.8px, transparent 2px),
+    #ffffff;
+  color: transparent;
+  content: "";
+}
+
+.fc-tb__menu-icon--fill-weekdays::after {
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  height: 10px;
+  border: 1px solid #107c41;
+  background:
+    linear-gradient(#107c41 0 0) 1px 2px / 1.5px 5px no-repeat,
+    linear-gradient(#107c41 0 0) 3.5px 2px / 1.5px 5px no-repeat,
+    linear-gradient(#107c41 0 0) 6px 2px / 1.5px 5px no-repeat,
+    linear-gradient(#107c41 0 0) 8.5px 2px / 1.5px 5px no-repeat,
+    linear-gradient(#107c41 0 0) 11px 2px / 1px 5px no-repeat,
+    #ffffff;
+  color: transparent;
+  content: "";
+}
+
+.fc-tb__menu-icon--fill-months::after {
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  height: 11px;
+  border: 1px solid #107c41;
+  background:
+    linear-gradient(#107c41 0 0) 0 0 / 100% 3px no-repeat,
+    radial-gradient(circle at 3px 5px, #107c41 0 1px, transparent 1.2px),
+    radial-gradient(circle at 6px 5px, #107c41 0 1px, transparent 1.2px),
+    radial-gradient(circle at 9px 5px, #107c41 0 1px, transparent 1.2px),
+    radial-gradient(circle at 3px 8px, #107c41 0 1px, transparent 1.2px),
+    radial-gradient(circle at 6px 8px, #107c41 0 1px, transparent 1.2px),
+    radial-gradient(circle at 9px 8px, #107c41 0 1px, transparent 1.2px),
+    #ffffff;
+  color: transparent;
+  content: "";
+}
+
+.fc-tb__menu-icon--fill-years::after {
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  height: 11px;
+  background:
+    linear-gradient(#ffffff 0 0) 2px 0 / 9px 8px no-repeat,
+    linear-gradient(#ffffff 0 0) 0 3px / 9px 8px no-repeat,
+    linear-gradient(#107c41 0 0) 0 3px / 9px 2px no-repeat;
+  border: 1px solid #107c41;
+  box-shadow:
+    2px -2px 0 -1px #ffffff,
+    2px -2px 0 0 #107c41;
+  color: transparent;
+  content: "";
+}

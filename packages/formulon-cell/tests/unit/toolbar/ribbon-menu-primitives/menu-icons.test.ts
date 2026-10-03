@@ -23,12 +23,41 @@ describe('toolbar/ribbon menu primitives', () => {
     const menuStylesDir = join(root, 'src/styles/toolbar/ribbon');
     const barrelPath = join(menuStylesDir, 'menus.css');
     const expected = menuCssFiles
-      .map((file) => readFileSync(join(menuStylesDir, file), 'utf8'))
+      .map((file) => readCssWithImports(join(menuStylesDir, file)))
       .join('');
 
     expect(readCssWithImports(barrelPath)).toBe(expected);
     expect(readFileSync(barrelPath, 'utf8')).toBe(
       menuCssFiles.map((file) => `@import "./${file}";\n`).join(''),
+    );
+  });
+
+  it('expands menu command icon CSS parts in their declared order', () => {
+    const iconPartFiles = [
+      'icon-box.css',
+      'page-layout-and-clear.css',
+      'fill.css',
+      'freeze-panes.css',
+      'cells.css',
+      'sort-filter.css',
+      'find-select.css',
+      'formulas.css',
+      'data-tools.css',
+      'links-pivot.css',
+      'text-script.css',
+      'add-ins-pdf.css',
+      'title-bar-and-symbol.css',
+    ];
+    const menuStylesDir = join(root, 'src/styles/toolbar/ribbon');
+    const barrelPath = join(menuStylesDir, 'menu-command-icons.css');
+    const partsDir = join(menuStylesDir, 'menu-command-icons');
+    const expected = iconPartFiles
+      .map((file) => readFileSync(join(partsDir, file), 'utf8'))
+      .join('');
+
+    expect(readCssWithImports(barrelPath)).toBe(expected);
+    expect(readFileSync(barrelPath, 'utf8')).toBe(
+      iconPartFiles.map((file) => `@import "./menu-command-icons/${file}";\n`).join(''),
     );
   });
 

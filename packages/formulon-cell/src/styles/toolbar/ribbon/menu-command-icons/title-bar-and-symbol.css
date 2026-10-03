@@ -1,0 +1,84 @@
+.fc-tb__menu-icon--title-autosave::before,
+.fc-tb__menu-icon--title-comments::before,
+.fc-tb__menu-icon--title-save-as::before,
+.fc-tb__menu-icon--title-save::before,
+.fc-tb__menu-icon--title-share::before {
+  inset: 2px;
+  border: 1px solid #8a8886;
+  background: #ffffff;
+}
+
+.fc-tb__menu-icon--title-save::before,
+.fc-tb__menu-icon--title-save-as::before {
+  background:
+    linear-gradient(#185abd 0 0) 3px 3px / 10px 4px no-repeat,
+    linear-gradient(#e1dfdd 0 0) 4px 10px / 8px 3px no-repeat,
+    #ffffff;
+}
+
+.fc-tb__menu-icon--title-save-as::after {
+  right: 0;
+  bottom: 0;
+  width: 8px;
+  height: 3px;
+  border: 1px solid #ffffff;
+  background: #185abd;
+  box-shadow: -2px 0 0 #f4b183;
+  content: "";
+  transform: rotate(-35deg);
+}
+
+.fc-tb__menu-icon--title-autosave::before {
+  inset: 5px 2px;
+  border-radius: 8px;
+  background: #107c41;
+}
+
+.fc-tb__menu-icon--title-autosave::after {
+  top: 6px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.fc-tb__menu-icon--title-comments::before {
+  inset: 3px 2px 5px;
+  border-color: #d6a100;
+  border-radius: 2px;
+  background: #fff8cc;
+}
+
+.fc-tb__menu-icon--title-share::before {
+  border-color: #185abd;
+  border-radius: 50%;
+}
+
+.fc-tb__menu-icon--title-share::after {
+  right: 0;
+  bottom: 0;
+  color: transparent;
+  content: "";
+}
+
+.fc-tb__menu-icon--symbol-more::before {
+  inset: 2px;
+  border: 1px solid #8a8886;
+  background:
+    radial-gradient(circle at 35% 35%, #185abd 0 2px, transparent 3px),
+    radial-gradient(circle at 65% 35%, #107c41 0 2px, transparent 3px),
+    radial-gradient(circle at 50% 68%, #d83b01 0 2px, transparent 3px), #ffffff;
+}
+
+.fc-tb__menu-icon--symbol-more::after {
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 10.4h2.2V8.8C3.9 8.3 3 7 3 5.2c0-2.1 1.3-3.6 3-3.6s3 1.5 3 3.6c0 1.8-.9 3.1-2.2 3.6v1.6H9' fill='none' stroke='%23185abd' stroke-width='1.55' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: 12px 12px;
+  color: transparent;
+  content: "";
+}
