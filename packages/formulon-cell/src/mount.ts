@@ -10,12 +10,6 @@ import {
 } from './commands/interaction-controller.js';
 import { printSheet } from './commands/print.js';
 import {
-  normalizePrinterProfileId,
-  normalizePrinterProfiles,
-  type PrinterProfile,
-  resolvePrinterProfileBounds,
-} from './commands/printer-profile.js';
-import {
   isSheetProtected,
   setProtectedSheet,
   toggleProtectedSheet,
@@ -89,6 +83,7 @@ import {
   validateViewportAgainstWorkbook,
 } from './mount/hydration.js';
 import { attachPivotFieldListFollow } from './mount/pivot-field-list-follow.js';
+import { createPrinterProfiles } from './mount/printer-profiles.js';
 import {
   attachSheetTabsController,
   type SheetTabsController,
@@ -156,9 +151,11 @@ export const Spreadsheet = {
     // wire setStrings hooks for live label updates.
     const i18n = createI18nController({ locale: opts.locale, overlay: opts.strings });
     let strings: Strings = i18n.strings;
-    let printerProfiles = normalizePrinterProfiles(opts.printerProfiles);
-    let printerProfileId = normalizePrinterProfileId(opts.printerProfileId);
-    const refreshPrinterProfilesHook = opts.refreshPrinterProfiles;
+    const printers = createPrinterProfiles({
+      profiles: opts.printerProfiles,
+      profileId: opts.printerProfileId,
+      refreshHook: opts.refreshPrinterProfiles,
+    });
     const captureScreenClipHook = opts.captureScreenClip;
     const getFunctionArgumentHelp = opts.getFunctionArgumentHelp;
     let uploadStatus = opts.uploadStatus ?? null;
@@ -374,11 +371,6 @@ export const Spreadsheet = {
 
     const autocompleteStub = createAutocompleteStub();
     const featureState = createHostFeatureState(autocompleteStub);
-    const refreshPrinterProfiles = async (): Promise<readonly PrinterProfile[] | undefined> => {
-      const next = await refreshPrinterProfilesHook?.();
-      if (next !== undefined) printerProfiles = normalizePrinterProfiles(next);
-      return printerProfiles;
-    };
     const captureScreenClip = async (): Promise<ScreenClipResult | null> =>
       normalizeScreenClipResult(await captureScreenClipHook?.());
     const pivotFieldListFollow = attachPivotFieldListFollow({
@@ -602,19 +594,11 @@ export const Spreadsheet = {
       getOnCanvasClick: () => onCanvasClick,
       getOnHostKey: () => onHostKey,
       getPrintableBoundsForPageSetup: (setup, _sheet, _previous, selectedPrinterProfileId) =>
-        printerProfiles
-          ? (resolvePrinterProfileBounds(
-              setup,
-              printerProfiles,
-              selectedPrinterProfileId ?? printerProfileId,
-            ) ?? null)
-          : undefined,
-      getPrinterProfiles: () => printerProfiles,
-      getPrinterProfileId: () => printerProfileId,
-      setPrinterProfileId: (next) => {
-        printerProfileId = normalizePrinterProfileId(next);
-      },
-      refreshPrinterProfiles,
+        printers.printableBounds(setup, selectedPrinterProfileId),
+      getPrinterProfiles: printers.getProfiles,
+      getPrinterProfileId: printers.getProfileId,
+      setPrinterProfileId: printers.setProfileId,
+      refreshPrinterProfiles: printers.refresh,
       getFunctionArgumentHelp,
       getUploadStatus: () => uploadStatus,
       getMacroRecording: () => macroRecording,
@@ -1007,16 +991,12 @@ export const Spreadsheet = {
           host,
           mode === 'pdf' ? strings.ribbon.pdf : strings.ribbon.print,
           mode,
-          { printerProfiles, printerProfileId },
+          { printerProfiles: printers.getProfiles(), printerProfileId: printers.getProfileId() },
         );
       },
-      setPrinterProfiles(next) {
-        printerProfiles = normalizePrinterProfiles(next);
-      },
-      setPrinterProfileId(next) {
-        printerProfileId = normalizePrinterProfileId(next);
-      },
-      refreshPrinterProfiles,
+      setPrinterProfiles: printers.setProfiles,
+      setPrinterProfileId: printers.setProfileId,
+      refreshPrinterProfiles: printers.refresh,
       captureScreenClip,
       setUploadStatus(next) {
         uploadStatus = next;
