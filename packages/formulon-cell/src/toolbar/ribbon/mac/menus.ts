@@ -6,6 +6,7 @@ import {
   supportedFunctionNames,
 } from '../../../commands/function-categories.js';
 import { getRecentFunctions } from '../../../commands/function-history.js';
+import type { SpreadsheetInstance } from '../../../mount/types.js';
 import type { SpreadsheetStore } from '../../../store/store.js';
 import { focusMenuItem, prepareMenu, projectDisabledState } from '../../menu-a11y.js';
 import { createRibbonButton } from '../button.js';
@@ -426,4 +427,25 @@ export const projectMacFunctionCategoryMenus = (
         availabilityContext,
       );
   }
+};
+
+/** Projects the Mac recent and function-category menus from the instance's live function names. */
+export const projectMacFunctionMenus = (
+  host: HTMLElement,
+  instance: SpreadsheetInstance,
+  lang: 'en' | 'ja',
+): void => {
+  const reportedNames =
+    typeof instance.workbook.functionNames === 'function'
+      ? instance.workbook.functionNames()
+      : null;
+  const liveNames = reportedNames === null ? null : new Set(reportedNames);
+  const availabilityContext = {
+    reader:
+      reportedNames === null ? undefined : (instance.workbook as unknown as FunctionCatalogReader),
+    unavailableReason:
+      instance.i18n.strings.fxDialog.functionUnavailable ?? defaultFunctionUnavailableReason(lang),
+  };
+  projectMacRecentMenu(host, instance.store, lang, liveNames, availabilityContext);
+  projectMacFunctionCategoryMenus(host, instance.store, lang, liveNames, availabilityContext);
 };

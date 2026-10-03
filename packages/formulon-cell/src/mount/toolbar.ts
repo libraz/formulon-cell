@@ -1,11 +1,7 @@
 import { subscribeRecentFunctions } from '../commands/function-history.js';
 import { registerOverlayOwner } from '../interact/overlay-portal.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import {
-  defaultFunctionUnavailableReason,
-  projectMacFunctionCategoryMenus,
-  projectMacRecentMenu,
-} from '../toolbar/ribbon/mac/menus.js';
+import { projectMacFunctionMenus } from '../toolbar/ribbon/mac/menus.js';
 
 // `Spreadsheet.mountToolbar` — public entry that wires the ribbon into a host
 // element on top of an existing `SpreadsheetInstance`.
@@ -29,7 +25,6 @@ import {
 
 import { canExecuteBuiltIn } from '../commands/built-in-command-policy.js';
 import { withSelectionFormatOrigin } from '../commands/format.js';
-import type { FunctionCatalogReader } from '../commands/function-categories.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { recordRepeatableFormatChange } from '../commands/slice-history.js';
 import { resolveSpreadsheetPlatform, type SpreadsheetPlatform } from '../extensions/ui-options.js';
@@ -334,22 +329,7 @@ export function mountToolbar(
     projectRibbonActiveState(host, getInstance());
     const instance = getInstance();
     if (instance && platform === 'mac') {
-      const reportedNames =
-        typeof instance.workbook.functionNames === 'function'
-          ? instance.workbook.functionNames()
-          : null;
-      const liveNames = reportedNames === null ? null : new Set(reportedNames);
-      const availabilityContext = {
-        reader:
-          reportedNames === null
-            ? undefined
-            : (instance.workbook as unknown as FunctionCatalogReader),
-        unavailableReason:
-          instance.i18n.strings.fxDialog.functionUnavailable ??
-          defaultFunctionUnavailableReason(lang),
-      };
-      projectMacRecentMenu(host, instance.store, lang, liveNames, availabilityContext);
-      projectMacFunctionCategoryMenus(host, instance.store, lang, liveNames, availabilityContext);
+      projectMacFunctionMenus(host, instance, lang);
       projectMacRibbonState(host, instance);
     }
     opts.projectFormatToolbar?.();
