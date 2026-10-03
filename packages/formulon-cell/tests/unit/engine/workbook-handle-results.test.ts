@@ -184,7 +184,7 @@ describe('WorkbookHandle 0.12 result envelopes', () => {
     expect(wb.dxfCount()).toBe(0);
   });
 
-  it('suppresses automatic recalc in manual mode while preserving failure status', () => {
+  it('suppresses automatic recalc in manual mode and recalcs when the mode read fails', () => {
     let recalcCalls = 0;
     let mode: { status: Status; value: 0 | 1 | 2 } = { status: good, value: 1 };
     const wb = makeHandle({
@@ -200,6 +200,8 @@ describe('WorkbookHandle 0.12 result envelopes', () => {
     expect(recalcCalls).toBe(0);
 
     mode = { status: failed('calc mode failed'), value: 0 };
-    expect(() => wb.recalcAuto()).toThrow('calcMode: calc mode failed');
+    expect(wb.calcMode()).toBeNull();
+    wb.recalcAuto();
+    expect(recalcCalls).toBe(1);
   });
 });

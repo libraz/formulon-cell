@@ -535,8 +535,7 @@ export class WorkbookHandle {
   /** True while the workbook sits in Manual calc mode, where edits accumulate
    *  as engine-side dirty cells until someone asks for a recalc. */
   private isManualCalcMode(): boolean {
-    if (!this.capabilities.calcMode) return false;
-    return numberValue(this.wb.calcMode(), 'calcMode') === CALC_MODE_MANUAL;
+    return this.calcMode() === CALC_MODE_MANUAL;
   }
 
   /** Recalc triggered by an edit rather than by the user. Skipped in Manual
