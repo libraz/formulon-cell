@@ -8,7 +8,7 @@ import { recordTablesChange } from '../../../commands/slice-history.js';
 import { addrKey, MAX_COL, MAX_ROW, parseAddrKey } from '../../../engine/address.js';
 import { parseRangeRef } from '../../../engine/range-resolver.js';
 import type { Addr, Range } from '../../../engine/types.js';
-import type { EngineHyperlinkRecord } from '../../../engine/workbook-handle.js';
+import type { EngineHyperlinkRecord } from '../../../engine/workbook-handle-annotations.js';
 import {
   appendDialogFrame,
   createDialogButton,

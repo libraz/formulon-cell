@@ -4,7 +4,6 @@ import type {
   EngineCapabilities,
   FormulonModule,
   FunctionMetadataProvider,
-  PhoneticRun,
   TableInput,
   Workbook,
 } from './types.js';
@@ -17,12 +16,6 @@ type WorkbookHandleInternals = {
   capabilities: EngineCapabilities;
   functionMetadataProvider: FunctionMetadataProvider | null;
   assertAlive(): void;
-};
-type EngineCommentEntry = { row: number; col: number; author: string; text: string };
-type CommentEnumerableWorkbook = Workbook & {
-  getComments?: (
-    sheet: number,
-  ) => readonly EngineCommentEntry[] & { readonly status: { ok: boolean } };
 };
 type TableAuthoringWorkbook = Workbook & {
   createTable?: (input: TableInput) => { status: { ok: boolean }; index: number };
@@ -75,52 +68,6 @@ export abstract class WorkbookHandleFeatureMethods {
     return (wb(this) as AutoFilterWorkbook).setSheetAutoFilterXml?.(sheet, xml)?.ok === true;
   }
 
-  /** Read the cell's OOXML phonetic guide, if the current engine exposes it. */
-  getCellPhonetic(sheet: number, row: number, col: number): string | null {
-    assertAlive(this);
-    if (!this.capabilities.phonetic) return null;
-    const r = wb(this).getCellPhonetic(sheet, row, col);
-    return r.status.ok && r.value ? r.value : null;
-  }
-
-  /** Set (or, with an empty string, clear) the cell's phonetic guide. The
-   *  engine spans the whole cell text, so this replaces any per-run guide the
-   *  cell carried — use `setCellPhoneticRuns` to preserve the spans. */
-  setCellPhonetic(sheet: number, row: number, col: number, phonetic: string): boolean {
-    assertAlive(this);
-    if (!this.capabilities.phonetic) return false;
-    return wb(this).setCellPhonetic(sheet, row, col, phonetic).ok;
-  }
-
-  /** Read the cell's phonetic guide span by span. Returns null when the engine
-   *  has no per-run surface, which is distinct from the empty array an
-   *  unannotated cell reports. */
-  getCellPhoneticRuns(sheet: number, row: number, col: number): PhoneticRun[] | null {
-    assertAlive(this);
-    if (!this.capabilities.phoneticRuns) return null;
-    const r = wb(this).getCellPhoneticRuns(sheet, row, col);
-    if (!r.status.ok) return null;
-    return r.runs.map((run) => ({ start: run.sb, end: run.eb, text: run.text }));
-  }
-
-  /** Replace the cell's phonetic guide with `runs`, an ordered partition of the
-   *  cell text. An empty array clears the guide. */
-  setCellPhoneticRuns(
-    sheet: number,
-    row: number,
-    col: number,
-    runs: readonly PhoneticRun[],
-  ): boolean {
-    assertAlive(this);
-    if (!this.capabilities.phoneticRuns) return false;
-    return wb(this).setCellPhoneticRuns(
-      sheet,
-      row,
-      col,
-      runs.map((run) => ({ sb: run.start, eb: run.end, text: run.text })),
-    ).ok;
-  }
-
   /** Creates an OOXML worksheet table and returns its index, or -1 when the
    * loaded engine predates table authoring support. */
   createTable(input: TableInput): number {
@@ -147,41 +94,6 @@ export abstract class WorkbookHandleFeatureMethods {
       this.capabilities.tableMutate === true &&
       (wb(this) as TableAuthoringWorkbook).removeTable?.(index).ok === true
     );
-  }
-
-  /** Read the cell comment at `(sheet, row, col)`. Returns null when the
-   *  cell has no comment or when the engine doesn't expose `getComment`. */
-  getComment(sheet: number, row: number, col: number): { author: string; text: string } | null {
-    assertAlive(this);
-    if (!this.capabilities.comments) return null;
-    const e = wb(this).getComment(sheet, row, col);
-    return e ? { author: e.author, text: e.text } : null;
-  }
-
-  /** Snapshot every comment on `sheet` when the engine exposes a sheet-wide
-   *  enumerator. Empty under stub or older engines. */
-  getComments(sheet: number): { row: number; col: number; author: string; text: string }[] {
-    assertAlive(this);
-    if (!this.capabilities.commentsEnumerable) return [];
-    const engineWb = wb(this) as CommentEnumerableWorkbook;
-    if (typeof engineWb.getComments !== 'function') return [];
-    const entries = engineWb.getComments(sheet);
-    if (!entries.status.ok) return [];
-    return entries.map((e) => ({
-      row: e.row,
-      col: e.col,
-      author: e.author,
-      text: e.text,
-    }));
-  }
-
-  /** Persist a cell comment. Empty `text` removes it. No-op (returns false)
-   *  under the stub. */
-  setCommentEntry(sheet: number, row: number, col: number, author: string, text: string): boolean {
-    assertAlive(this);
-    if (!this.capabilities.comments) return false;
-    const s = wb(this).setComment(sheet, row, col, author, text);
-    return s.ok;
   }
 
   /** Reads the round-trip `<sheetProtection>` flags. Returns `null` when
