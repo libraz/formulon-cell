@@ -1,13 +1,19 @@
-import { writeCoerced, writeInputValidated } from '../commands/coerce-input.js';
+import {
+  coerceInputForCell,
+  validateCoercedInput,
+  writeCoerced,
+  writeInputValidated,
+} from '../commands/coerce-input.js';
 import type { CellBatchOperation } from '../commands/interaction-policy.js';
 import { mergeAt } from '../commands/merge.js';
+import { isCellWritable } from '../commands/protection.js';
 import { shiftFormulaRefs } from '../commands/refs.js';
 import { addrKey, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { formatWithPending, sameAddr } from '../store/pending-format.js';
 import { rangeArea, subtractRange } from '../store/selection-geometry.js';
-import { type CellFormat, mutators, type SpreadsheetStore, type State } from '../store/store.js';
+import { mutators, type SpreadsheetStore, type State } from '../store/store.js';
 
 export interface SelectionInputChange {
   readonly addr: Addr;
@@ -118,9 +124,9 @@ export type SelectionInputWriteResult =
 
 /**
  * Write `raw` to every selected cell without an interaction controller,
- * shifting relative formula refs from `anchor`. A `stop` validation on any
- * value cell aborts the remaining writes; on success the anchor's pending
- * format is applied.
+ * shifting relative formula refs from `anchor`. Atomic: a `stop` validation on
+ * any writable value cell rejects the fill with nothing written. Protected
+ * cells are skipped. On success the anchor's pending format is applied.
  */
 export function writeSelectionInput(
   wb: WorkbookHandle,
@@ -134,57 +140,58 @@ export function writeSelectionInput(
   if (totalCells > MAX_SELECTION_INPUT_CELLS) return { status: 'limitExceeded' };
   const sheet = state.data.sheetIndex;
   const isFormula = raw.startsWith('=');
-  // Validated write that mirrors the anchor's stop-rejection handling. Returns
-  // the alert when a `stop` rule blocked the entry (the whole fill aborts) so DV
-  // bites on every filled cell, not just the anchor.
-  const writeValidatedOrAbort = (
-    target: Addr,
-    text: string,
-    fmt: CellFormat | undefined,
-  ): SelectionInputRejection | null => {
-    const outcome = writeInputValidated(wb, target, text, fmt?.validation, store);
-    if (!outcome.ok && outcome.severity === 'stop') {
-      return {
-        severity: outcome.severity,
-        title: fmt?.validation?.errorTitle,
-        message: outcome.message,
-      };
-    }
-    return null;
-  };
-  // One recalc for the whole fill instead of one per written cell.
-  const rejection = wb.withBatchedRecalc((): SelectionInputRejection | null => {
-    for (const r of ranges) {
-      for (let row = r.r0; row <= r.r1; row += 1) {
-        for (let col = r.c0; col <= r.c1; col += 1) {
-          const target = { sheet, row, col };
-          const fmt =
-            target.sheet === anchor.sheet && target.row === anchor.row && target.col === anchor.col
-              ? formatWithPending(store.getState(), target)
-              : state.format.formats.get(addrKey(target));
-          const forceText = fmt?.numFmt?.kind === 'text';
-          if (isFormula && !forceText) {
-            // Formula fill: relative refs shift by the paste offset. Formula
-            // results aren't run through DV here (Excel validates the typed
-            // entry, not the recomputed result).
-            const shifted = shiftFormulaRefs(raw, row - anchor.row, col - anchor.col);
-            try {
-              writeCoerced(wb, target, { kind: 'formula', text: shifted });
-            } catch (err) {
-              console.warn('formulon-cell: writeCoerced failed', err);
-            }
-          } else {
-            // Value fill (including text-formatted cells): every target validates
-            // against its own rule via the store-aware coercion path.
-            const rejected = writeValidatedOrAbort(target, raw, fmt);
-            if (rejected) return rejected;
-          }
+
+  // Preflight: plan every write and validate value targets before touching the workbook.
+  const plan: { target: Addr; formula?: string }[] = [];
+  for (const r of ranges) {
+    for (let row = r.r0; row <= r.r1; row += 1) {
+      for (let col = r.c0; col <= r.c1; col += 1) {
+        const target = { sheet, row, col };
+        const fmt = sameAddr(target, anchor)
+          ? formatWithPending(store.getState(), target)
+          : state.format.formats.get(addrKey(target));
+        if (isFormula && fmt?.numFmt?.kind !== 'text') {
+          // Formula results aren't run through DV (Excel validates the typed entry).
+          plan.push({ target, formula: shiftFormulaRefs(raw, row - anchor.row, col - anchor.col) });
+          continue;
+        }
+        plan.push({ target });
+        if (!fmt?.validation || !isCellWritable(state, target)) continue;
+        const outcome = validateCoercedInput(
+          wb,
+          target,
+          coerceInputForCell(state, target, raw),
+          fmt.validation,
+        );
+        if (!outcome.ok && outcome.severity === 'stop') {
+          return {
+            status: 'rejected',
+            outcome: {
+              severity: 'stop',
+              title: fmt.validation.errorTitle,
+              message: outcome.message,
+            },
+          };
         }
       }
     }
-    return null;
+  }
+
+  // One recalc for the whole fill instead of one per written cell.
+  wb.withBatchedRecalc(() => {
+    for (const { target, formula } of plan) {
+      if (formula === undefined) {
+        // Already validated; this applies protection, coercion and implicit formats.
+        writeInputValidated(wb, target, raw, undefined, store);
+        continue;
+      }
+      try {
+        writeCoerced(wb, target, { kind: 'formula', text: formula });
+      } catch (err) {
+        console.warn('formulon-cell: writeCoerced failed', err);
+      }
+    }
   });
-  if (rejection) return { status: 'rejected', outcome: rejection };
   const pending = store.getState().ui.pendingFormat;
   if (pending && sameAddr(pending.addr, anchor)) {
     mutators.setCellFormat(store, anchor, pending.format);
