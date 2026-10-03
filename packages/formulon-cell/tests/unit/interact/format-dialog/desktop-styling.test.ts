@@ -207,7 +207,7 @@ describe('attachFormatDialog', () => {
       join(root, 'src/styles/core/app/format-dialog/tabs-content.css'),
       'utf8',
     );
-    const jaStrings = readFileSync(join(root, 'src/i18n/strings/ja.ts'), 'utf8');
+    const jaStrings = readFileSync(join(root, 'src/i18n/strings/edit-dialogs/ja.ts'), 'utf8');
 
     expect(tabsCss).toMatch(
       /\.fc-fmtdlg__panel-tab\[data-fc-tab="protection"\]\s*\{[\s\S]*?padding: 26px 18px 0;/,
