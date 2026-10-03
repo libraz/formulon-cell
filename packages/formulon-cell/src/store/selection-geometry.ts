@@ -23,6 +23,10 @@ export const rangeContainsAddr = (range: Range, addr: Addr): boolean =>
   addr.col >= range.c0 &&
   addr.col <= range.c1;
 
+export function rangesIntersect(a: Range, b: Range): boolean {
+  return a.sheet === b.sheet && !(a.r1 < b.r0 || a.r0 > b.r1 || a.c1 < b.c0 || a.c0 > b.c1);
+}
+
 export const selectionContainsAddr = (
   selection: Pick<SelectionSlice, 'range' | 'extraRanges'>,
   addr: Addr,
