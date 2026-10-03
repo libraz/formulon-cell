@@ -22,8 +22,6 @@ export class SpreadsheetPage {
   ): Promise<void> {
     const fixture = opts.fixture === undefined ? 'empty' : opts.fixture;
     // Default to `?locale=en` so cross-app scenarios start consistently.
-    // Tests that need ja go through `page.goto('/?locale=ja')` directly
-    // (see I01).
     const params = new URLSearchParams();
     params.set('locale', opts.locale ?? 'en');
     // Keep existing cross-app scenarios on the default Windows-style chrome;

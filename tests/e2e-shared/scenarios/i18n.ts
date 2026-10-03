@@ -7,8 +7,7 @@ import { SpreadsheetPage } from '../pages/SpreadsheetPage.js';
  *  aligned with the Japanese Excel desktop baseline. */
 export async function runLocaleBootScenario(page: Page): Promise<void> {
   const sp = new SpreadsheetPage(page);
-  await page.goto('/?locale=ja');
-  await sp.waitForReady();
+  await sp.mount({ locale: 'ja', fixture: null });
   await sp.expectNoStub();
   const jaToggle = page.getByRole('button', { name: 'JA', exact: true });
   if ((await jaToggle.count()) > 0) await jaToggle.first().click();
