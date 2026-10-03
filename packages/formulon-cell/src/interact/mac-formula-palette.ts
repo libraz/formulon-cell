@@ -7,7 +7,6 @@ import {
   type FunctionCategory,
   functionSyntax,
   isFunctionUnavailableForInsertion,
-  supportedFunctionNames,
 } from '../commands/function-categories.js';
 import {
   getRecentFunctions,
@@ -35,26 +34,22 @@ import {
   parseOuterCall,
 } from './mac-formula-call.js';
 import { makeButton, makeIconButton } from './mac-formula-palette-buttons.js';
+import {
+  argumentFieldCount,
+  type FunctionArgumentHelp,
+  type FunctionArgumentHelpProvider,
+  insertableEntry,
+  paletteStrings,
+  pickerSections,
+  resolveArgumentHelp,
+  sameAvailability,
+} from './mac-formula-palette-catalog.js';
 import type { RangeInsertTarget } from './range-insert.js';
 
-type MacPaletteStrings = Strings['fxDialog']['macPalette'];
-
-/** Host-supplied help for one function argument. Omitted fields fall back to catalog data. */
-export interface FunctionArgumentHelp {
-  /** Replaces the catalog argument label. */
-  label?: string;
-  /** One-line hint rendered under the argument field. */
-  description?: string;
-  /** Reference page linked from the help section (read from the first argument). */
-  url?: string;
-}
-
-/** Resolves help for `functionName`'s zero-based argument in the active UI locale. */
-export type FunctionArgumentHelpProvider = (
-  functionName: string,
-  argumentIndex: number,
-  locale: string,
-) => FunctionArgumentHelp | null | undefined;
+export type {
+  FunctionArgumentHelp,
+  FunctionArgumentHelpProvider,
+} from './mac-formula-palette-catalog.js';
 
 export interface MacFormulaPaletteDeps {
   host: HTMLElement;
@@ -104,11 +99,6 @@ interface ArgumentsRefs {
   preview: HTMLElement;
   done: HTMLButtonElement;
 }
-
-const paletteStrings = (strings: Strings): MacPaletteStrings => strings.fxDialog.macPalette;
-
-const sameAvailability = (a: FunctionCatalogEntry, b: FunctionCatalogEntry): boolean =>
-  Object.is(a.availability, b.availability);
 
 const connectedElement = (value: Element | null): HTMLElement | null =>
   value instanceof HTMLElement && value.isConnected ? value : null;
@@ -183,15 +173,14 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   const textForEntry = (entry: FunctionCatalogEntry): string =>
     functionDescription(entry, catalogLocaleOrdinal(deps.getLocale()));
 
-  const argumentHelp = (entry: FunctionCatalogEntry, index: number): FunctionArgumentHelp => {
-    const provided = deps.getFunctionArgumentHelp?.(entry.canonicalName, index, deps.getLocale());
-    const fallbackLabel = entry.argumentLabels[index] ?? `${labels.argument} ${index + 1}`;
-    return {
-      label: provided?.label ?? fallbackLabel.replace(/^\[|\]$/g, ''),
-      description: provided?.description,
-      url: provided?.url,
-    };
-  };
+  const argumentHelp = (entry: FunctionCatalogEntry, index: number): FunctionArgumentHelp =>
+    resolveArgumentHelp(
+      deps.getFunctionArgumentHelp,
+      entry,
+      index,
+      deps.getLocale(),
+      labels.argument,
+    );
 
   const notifyMirror = (raw: string | null): void => {
     if (!anchor) return;
@@ -239,12 +228,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
   /** True when the selected function left the catalog or became unavailable. */
   const selectedEntryWithdrawn = (): boolean => {
     if (!selectedName) return false;
-    const entry = catalog.entries.get(selectedName);
-    return (
-      !catalog.knownNames.has(selectedName) ||
-      !entry ||
-      isFunctionUnavailableForInsertion(entry.availability)
-    );
+    return insertableEntry(catalog, selectedName) === null;
   };
 
   const reconcilePickerSelection = (): void => {
@@ -252,12 +236,8 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       pickerSelectionEntry = null;
       return;
     }
-    const entry = catalog.entries.get(pickerSelectionName) ?? null;
-    if (
-      !catalog.knownNames.has(pickerSelectionName) ||
-      !entry ||
-      isFunctionUnavailableForInsertion(entry.availability)
-    ) {
+    const entry = insertableEntry(catalog, pickerSelectionName);
+    if (!entry) {
       pickerSelectionName = null;
       pickerSelectionEntry = null;
       return;
@@ -314,10 +294,6 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     const sections = pickerRefs?.sections;
     if (!sections) return;
     sections.replaceChildren();
-    const query = searchQuery.trim().toUpperCase();
-    const namesFor = (names: readonly string[]): string[] =>
-      names.filter((name) => !query || name.includes(query));
-
     const appendSection = (key: string, title: string, names: readonly string[]): void => {
       const section = document.createElement('section');
       section.className = 'fc-mac-formula-palette__section';
@@ -328,7 +304,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       const list = document.createElement('div');
       list.className = 'fc-mac-formula-palette__function-list';
       list.setAttribute('role', 'listbox');
-      for (const name of namesFor(names)) {
+      for (const name of names) {
         const entry = catalog.entries.get(name);
         if (!entry) continue;
         const row = document.createElement('div');
@@ -358,12 +334,8 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
         }
         row.addEventListener('click', () => {
           if (detached || mode !== 'picker' || !row.isConnected) return;
-          const currentEntry = catalog.entries.get(entry.canonicalName) ?? null;
-          if (
-            !catalog.knownNames.has(entry.canonicalName) ||
-            !currentEntry ||
-            isFunctionUnavailableForInsertion(currentEntry.availability)
-          ) {
+          const currentEntry = insertableEntry(catalog, entry.canonicalName);
+          if (!currentEntry) {
             reconcilePickerSelection();
             render();
             return;
@@ -391,17 +363,15 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       sections.appendChild(section);
     };
 
-    if (pickerCategory === 'all') {
-      appendSection('recent', labels.recent, getRecentFunctions(deps.store, catalog.knownNames));
-      appendSection('all', labels.all, catalog.names);
-    } else if (pickerCategory === 'recent') {
-      appendSection('recent', labels.recent, getRecentFunctions(deps.store, catalog.knownNames));
-    } else {
-      appendSection(
-        pickerCategory,
-        categoryTitle(pickerCategory),
-        supportedFunctionNames(pickerCategory, catalog.knownNames),
-      );
+    const titleFor = (key: string): string =>
+      key === 'recent'
+        ? labels.recent
+        : key === 'all'
+          ? labels.all
+          : categoryTitle(key as CatalogFunctionCategory);
+    const recent = getRecentFunctions(deps.store, catalog.knownNames);
+    for (const section of pickerSections(pickerCategory, catalog, recent, searchQuery)) {
+      appendSection(section.key, titleFor(section.key), section.names);
     }
   };
 
@@ -631,9 +601,6 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     renderPreview();
   };
 
-  const argumentCount = (entry: FunctionCatalogEntry): number =>
-    Math.max(entry.minArity, args.length, entry.argumentLabels.length);
-
   const renderArguments = (): void => {
     clearRoot();
     updateDataset();
@@ -657,7 +624,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     content.appendChild(name);
     const fields = document.createElement('div');
     fields.className = 'fc-mac-formula-palette__fields';
-    const count = selectedEntry ? argumentCount(selectedEntry) : args.length;
+    const count = selectedEntry ? argumentFieldCount(selectedEntry, args.length) : args.length;
     for (let index = 0; index < count; index += 1) {
       const row = document.createElement('label');
       row.className = 'fc-mac-formula-palette__argument';
