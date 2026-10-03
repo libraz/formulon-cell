@@ -29,6 +29,7 @@ describe('toolbar/ribbon menu primitives', () => {
       'src/interact/view-toolbar.ts',
       'src/interact/pivot-field-settings.ts',
       'src/interact/pivot-table-dialog.ts',
+      'src/interact/pivot-table-field-areas.ts',
       'src/interact/workbook-objects-pivot-editor.ts',
       'src/interact/page-setup-dialog.ts',
       'src/interact/page-setup-dialog-tabs/page.ts',

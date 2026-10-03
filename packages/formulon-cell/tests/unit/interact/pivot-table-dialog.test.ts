@@ -152,7 +152,7 @@ describe('attachPivotTableDialog', () => {
   });
 
   it('keeps Pivot area settings buttons on the shared helper', () => {
-    const source = readFileSync(join(root, 'src/interact/pivot-table-dialog.ts'), 'utf8');
+    const source = readFileSync(join(root, 'src/interact/pivot-table-field-list.ts'), 'utf8');
     expect(source).toContain('createPivotAreaSettingsButton(');
     expect(source).not.toContain("const settings = document.createElement('button')");
   });

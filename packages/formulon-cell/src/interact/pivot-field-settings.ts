@@ -24,6 +24,12 @@ export interface PivotFieldSettingsActive {
   fieldName: string;
 }
 
+export type PivotValueFieldSetting = {
+  aggregation?: PivotAggregation;
+  numberFormat?: string;
+  showValuesAs?: PivotShowValuesAsValue;
+};
+
 export const createPivotAreaSettingsButton = (
   label: string,
   ariaLabel = label,
@@ -83,19 +89,8 @@ export interface PivotFieldSettingsPanelOptions {
   controls: PivotFieldSettingsControls;
   selectedValueFields: readonly string[];
   selectedFilterFields: readonly string[];
-  selectedValueSetting(fieldName: string): {
-    aggregation?: PivotAggregation;
-    numberFormat?: string;
-    showValuesAs?: PivotShowValuesAsValue;
-  };
-  setValueFieldSetting(
-    fieldName: string,
-    setting: {
-      aggregation?: PivotAggregation;
-      numberFormat?: string;
-      showValuesAs?: PivotShowValuesAsValue;
-    },
-  ): void;
+  selectedValueSetting(fieldName: string): PivotValueFieldSetting;
+  setValueFieldSetting(fieldName: string, setting: PivotValueFieldSetting): void;
   fieldCanBeValue(fieldName: string): boolean;
   replaceFilterField(previous: string, next: string): void;
   normalizeSelectedFilters(): void;
@@ -119,7 +114,10 @@ const cloneSelectOptions = (source: HTMLSelectElement, target: HTMLSelectElement
   target.value = source.value;
 };
 
-const fieldSelect = (select: HTMLSelectElement, fields: readonly PivotSourceField[]): void => {
+export const fillPivotFieldSelect = (
+  select: HTMLSelectElement,
+  fields: readonly PivotSourceField[],
+): void => {
   select.replaceChildren();
   appendDialogSelectOptions(
     select,
@@ -638,7 +636,7 @@ export const renderPivotFieldSettingsPanel = (options: PivotFieldSettingsPanelOp
     );
   } else {
     const filter = createDialogSelect([], '', { className: 'fc-fmtdlg__select' });
-    fieldSelect(
+    fillPivotFieldSelect(
       filter,
       fields.filter(
         (field) =>
