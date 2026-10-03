@@ -33,11 +33,22 @@ import type { RangeInsertTarget } from './pointer.js';
 
 type MacPaletteStrings = Strings['fxDialog']['macPalette'];
 
-export interface MacFormulaArgumentHelp {
+/** Host-supplied help for one function argument. Omitted fields fall back to catalog data. */
+export interface FunctionArgumentHelp {
+  /** Replaces the catalog argument label. */
   label?: string;
+  /** One-line hint rendered under the argument field. */
   description?: string;
+  /** Reference page linked from the help section (read from the first argument). */
   url?: string;
 }
+
+/** Resolves help for `functionName`'s zero-based argument in the active UI locale. */
+export type FunctionArgumentHelpProvider = (
+  functionName: string,
+  argumentIndex: number,
+  locale: string,
+) => FunctionArgumentHelp | null | undefined;
 
 export interface MacFormulaPaletteDeps {
   host: HTMLElement;
@@ -52,12 +63,7 @@ export interface MacFormulaPaletteDeps {
   /** Suspend an in-progress cell or formula-bar edit so the palette can take it over. */
   suspendActiveEdit?: (context: FormulaEditLeaseContext) => FormulaEditLease | null;
   projectMirror: (anchor: Addr, raw: string | null) => void;
-  getArgumentHelp?: (name: string, index: number, locale: string) => MacFormulaArgumentHelp | null;
-  getLocalizedArgumentHelp?: (
-    name: string,
-    index: number,
-    locale: string,
-  ) => MacFormulaArgumentHelp | null;
+  getFunctionArgumentHelp?: FunctionArgumentHelpProvider;
 }
 
 export interface MacFormulaPaletteHandle extends FxDialogHandle {
@@ -194,9 +200,8 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       : FUNCTION_DESCRIPTIONS[entry.canonicalName]?.en) ??
     '';
 
-  const argumentHelp = (entry: FunctionCatalogEntry, index: number): MacFormulaArgumentHelp => {
-    const provider = deps.getArgumentHelp ?? deps.getLocalizedArgumentHelp;
-    const provided = provider?.(entry.canonicalName, index, deps.getLocale()) ?? null;
+  const argumentHelp = (entry: FunctionCatalogEntry, index: number): FunctionArgumentHelp => {
+    const provided = deps.getFunctionArgumentHelp?.(entry.canonicalName, index, deps.getLocale());
     const fallbackLabel = entry.argumentLabels[index] ?? `${labels.argument} ${index + 1}`;
     return {
       label: provided?.label ?? fallbackLabel.replace(/^\[|\]$/g, ''),

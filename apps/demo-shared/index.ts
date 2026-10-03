@@ -35,6 +35,7 @@ import {
 } from '@libraz/formulon-cell';
 
 export * from './demo-backstage.js';
+export * from './demo-function-help.js';
 export * from './demo-search.js';
 export * from './demo-strings.js';
 

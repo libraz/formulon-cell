@@ -7,7 +7,7 @@ import type {
 } from '../../../../src/interact/formula-edit-lease.js';
 import {
   attachMacFormulaPalette,
-  type MacFormulaArgumentHelp,
+  type FunctionArgumentHelpProvider,
 } from '../../../../src/interact/mac-formula-palette.js';
 import {
   attachFormulaBarController,
@@ -58,7 +58,7 @@ export type PaletteSetupArgs = [
   getWorkbook?: () => WorkbookHandle,
   getPaletteStrings?: () => typeof defaultStrings,
   getPaletteLocale?: () => string,
-  getArgumentHelp?: (name: string, index: number, locale: string) => MacFormulaArgumentHelp | null,
+  getFunctionArgumentHelp?: FunctionArgumentHelpProvider,
   suspend?: (
     formulaBar: FormulaBarController,
     context: FormulaEditLeaseContext,
@@ -72,7 +72,7 @@ export const setupPalette = (
     getWorkbook = () => sheet.workbook,
     getPaletteStrings = () => defaultStrings,
     getPaletteLocale = () => 'en-US',
-    getArgumentHelp,
+    getFunctionArgumentHelp,
     suspend,
   ]: PaletteSetupArgs
 ) => {
@@ -99,7 +99,7 @@ export const setupPalette = (
     getAnchor: () => anchor,
     beginDraft,
     projectMirror: mirror,
-    ...(getArgumentHelp ? { getArgumentHelp } : {}),
+    ...(getFunctionArgumentHelp ? { getFunctionArgumentHelp } : {}),
     ...(suspend ? { suspendActiveEdit: (context) => suspend(formulaBar.controller, context) } : {}),
   });
   return { anchor, beginDraft, dock, formulaBar, mirror, opener, palette };

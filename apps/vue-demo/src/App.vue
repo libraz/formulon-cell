@@ -40,6 +40,7 @@ import {
   demoSearchOptionId,
   DEMO_ICONS,
   DEMO_FUNCTIONS,
+  demoFunctionArgumentHelp,
   DEMO_MAC_RIBBON_TABS,
   DEMO_PRINT_PREVIEW_LINES,
   DEMO_PRINTER_PROFILE_ID,
@@ -742,6 +743,7 @@ onBeforeUnmount(() => {
           :printer-profiles="DEMO_PRINTER_PROFILES"
           :printer-profile-id="DEMO_PRINTER_PROFILE_ID"
           :refresh-printer-profiles="refreshDemoPrinterProfiles"
+          :get-function-argument-help="demoFunctionArgumentHelp"
           :upload-status="uploadStatus"
           :macro-recording="scriptOpen"
           @ready="onReady"

@@ -1082,6 +1082,8 @@ export {
 export type { DefaultDynamicDropdownsOptions } from './mount/dynamic-dropdowns-defaults.js';
 export { createDefaultDynamicDropdownsCtx } from './mount/dynamic-dropdowns-defaults.js';
 export type {
+  FunctionArgumentHelp,
+  FunctionArgumentHelpProvider,
   MountOptions,
   MountToolbarOptions,
   RibbonDisplayMode,

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { getRecentFunctions } from '../../../src/commands/function-history.js';
 import { WorkbookHandle } from '../../../src/engine/workbook-handle.js';
@@ -199,6 +199,58 @@ describe('mount/host-features — individual feature flags', () => {
     expect(root?.isConnected).toBe(false);
     expect(workbook.cellFormula(anchor)).toBeNull();
     expect(sheet.instance.history.canUndo()).toBe(false);
+  });
+
+  it('threads getFunctionArgumentHelp into the Mac palette with the active locale', async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    const getFunctionArgumentHelp = vi.fn((name: string, index: number, locale: string) =>
+      name === 'ACOS' && index === 0
+        ? {
+            description: locale.startsWith('ja') ? '-1 から 1 の数値' : 'Number from -1 to 1.',
+            url: 'https://example.com/acos',
+          }
+        : null,
+    );
+    sheet = await mountStubSheet({
+      workbook,
+      ui: { platform: 'mac' },
+      features: { fxDialog: true },
+      locale: 'en',
+      getFunctionArgumentHelp,
+    });
+
+    sheet.instance.openFunctionArguments('ACOS');
+    const root = sheet.host.querySelector<HTMLElement>('.fc-mac-formula-palette');
+    const argument = root?.querySelector('.fc-mac-formula-palette__argument');
+    expect(argument?.querySelector('small')?.textContent).toBe('Number from -1 to 1.');
+    expect(root?.querySelector('.fc-mac-formula-palette__help a')?.getAttribute('href')).toBe(
+      'https://example.com/acos',
+    );
+    expect(getFunctionArgumentHelp).toHaveBeenCalledWith('ACOS', 0, 'en');
+    root?.querySelector<HTMLButtonElement>('[data-action="close"]')?.click();
+
+    sheet.instance.i18n.setLocale('ja');
+    sheet.instance.openFunctionArguments('ACOS');
+    expect(getFunctionArgumentHelp).toHaveBeenCalledWith('ACOS', 0, 'ja');
+    expect(root?.querySelector('.fc-mac-formula-palette__argument small')?.textContent).toBe(
+      '-1 から 1 の数値',
+    );
+  });
+
+  it('shows no argument hint or help link when getFunctionArgumentHelp is absent', async () => {
+    const workbook = await WorkbookHandle.createDefault();
+    sheet = await mountStubSheet({
+      workbook,
+      ui: { platform: 'mac' },
+      features: { fxDialog: true },
+      locale: 'en',
+    });
+
+    sheet.instance.openFunctionArguments('ACOS');
+    const root = sheet.host.querySelector<HTMLElement>('.fc-mac-formula-palette');
+    expect(root?.dataset.state).toBe('arguments-editing');
+    expect(root?.querySelector('.fc-mac-formula-palette__argument small')).toBeNull();
+    expect(root?.querySelector('.fc-mac-formula-palette__help a')).toBeNull();
   });
 
   it('passes the mounted live workbook catalog to Function Arguments', async () => {

@@ -48,6 +48,8 @@ export type {
   FeatureId,
   FormatAsTableOptions,
   FormulaRegistry,
+  FunctionArgumentHelp,
+  FunctionArgumentHelpProvider,
   HyperlinkEntry,
   I18nController,
   InteractionControllerOptions,

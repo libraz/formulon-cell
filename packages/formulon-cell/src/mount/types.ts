@@ -26,6 +26,7 @@ import type { ConditionalDialogOpenOptions } from '../interact/conditional-dialo
 import type { ContextMenuOptions } from '../interact/context-menu-options.js';
 import type { FormatPainterHandle } from '../interact/format-painter.js';
 import type { FxDialogOpenOptions } from '../interact/fx-dialog.js';
+import type { FunctionArgumentHelpProvider } from '../interact/mac-formula-palette.js';
 import type { ViewportOptions } from '../interact/navigation-policy.js';
 import type { OverlayOptions } from '../interact/overlay-portal.js';
 import type { PasteSpecialOpenOptions } from '../interact/paste-special.js';
@@ -35,6 +36,10 @@ import type { SheetProtectionPermissions } from '../store/types.js';
 import type { MountToolbarOptions, ToolbarInstance } from './toolbar.js';
 
 export type { FunctionCategory, FxDialogOpenOptions } from '../interact/fx-dialog.js';
+export type {
+  FunctionArgumentHelp,
+  FunctionArgumentHelpProvider,
+} from '../interact/mac-formula-palette.js';
 
 export interface MountOptions {
   workbook?: WorkbookHandle;
@@ -86,6 +91,11 @@ export interface MountOptions {
    *  Browsers cannot invoke Excel-style OS region capture directly, so native
    *  shells can return an image source here. */
   captureScreenClip?: ScreenClipCapture;
+  /** Optional host lookup for per-argument help in the Mac formula palette.
+   *  The engine ships no argument descriptions, so hosts supply the field hint
+   *  and reference URL here; called with the active UI locale on each render.
+   *  When omitted, the palette shows catalog labels with no hint or link. */
+  getFunctionArgumentHelp?: FunctionArgumentHelpProvider;
   /** Optional host-driven status bar Upload Status indicator. */
   uploadStatus?: StatusBarUploadStatus;
   /** Optional host-driven status bar Macro Recording indicator. */

@@ -31,6 +31,7 @@ import { attachHyperlinkDialog } from '../interact/hyperlink-dialog.js';
 import { attachIterativeDialog } from '../interact/iterative-dialog.js';
 import {
   attachMacFormulaPalette,
+  type FunctionArgumentHelpProvider,
   type MacFormulaPaletteHandle,
 } from '../interact/mac-formula-palette.js';
 import { attachNamedRangeDialog } from '../interact/named-range-dialog.js';
@@ -232,6 +233,7 @@ interface HostFeatureControllerInput {
   getPrinterProfileId: () => string | undefined;
   setPrinterProfileId: (next: string | undefined) => void;
   refreshPrinterProfiles: () => Promise<readonly PrinterProfile[] | undefined>;
+  getFunctionArgumentHelp?: FunctionArgumentHelpProvider;
   getUploadStatus: StatusBarDeps['getUploadStatus'];
   getMacroRecording: StatusBarDeps['getMacroRecording'];
   onConditionalRulesChanged?: () => void;
@@ -427,6 +429,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
               input.getInlineEditor().suspendForFormulaPalette(context) ??
               input.getFormulaBar().suspendForFormulaPalette(context),
             projectMirror: input.projectFormulaDraftMirror,
+            getFunctionArgumentHelp: input.getFunctionArgumentHelp,
           });
           // Keep focus in the active edit so pressing fx suspends it instead of blur-committing it.
           s.fxMouseDownHandler = (e: MouseEvent): void => e.preventDefault();

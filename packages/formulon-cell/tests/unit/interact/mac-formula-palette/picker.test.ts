@@ -150,7 +150,7 @@ describe('interact/mac-formula-palette picker', () => {
     sheet.workbook.setFunctionMetadataProvider({
       ACOS: { signature: 'ACOS(workbookNumber)', description: 'Workbook arccosine help.' },
     });
-    const getArgumentHelp = vi.fn((name: string, index: number) =>
+    const getFunctionArgumentHelp = vi.fn((name: string, index: number) =>
       name === 'ACOS' && index === 0
         ? {
             label: 'Provided number',
@@ -163,7 +163,7 @@ describe('interact/mac-formula-palette picker', () => {
       () => sheet.workbook,
       () => en,
       () => 'en-US',
-      getArgumentHelp,
+      getFunctionArgumentHelp,
     );
     palette.open('ACOS');
 
@@ -175,7 +175,7 @@ describe('interact/mac-formula-palette picker', () => {
     expect(help?.textContent).toContain('Workbook arccosine help.');
     expect(help?.textContent).toContain('Syntax: ACOS(workbookNumber)');
     expect(help?.querySelector('a')?.getAttribute('href')).toBe('https://example.com/acos-help');
-    expect(getArgumentHelp).toHaveBeenCalledWith('ACOS', 0, 'en-US');
+    expect(getFunctionArgumentHelp).toHaveBeenCalledWith('ACOS', 0, 'en-US');
     palette.close();
   });
 

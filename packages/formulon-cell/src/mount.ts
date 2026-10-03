@@ -25,6 +25,7 @@ import {
   traceDependents as traceDependentArrows,
   tracePrecedents as tracePrecedentArrows,
 } from './commands/traces.js';
+import { MAX_COL, MAX_ROW } from './engine/address.js';
 import {
   type SyncedConditionalRuleMap,
   syncTrackedConditionalRulesToEngine,
@@ -124,6 +125,8 @@ export {
   RIBBON_HOST_MENU_FIRST_COMMANDS,
 } from './mount/toolbar.js';
 export type {
+  FunctionArgumentHelp,
+  FunctionArgumentHelpProvider,
   FunctionCategory,
   FxDialogOpenOptions,
   MountOptions,
@@ -224,6 +227,7 @@ export const Spreadsheet = {
     let printerProfileId = normalizePrinterProfileId(opts.printerProfileId);
     const refreshPrinterProfilesHook = opts.refreshPrinterProfiles;
     const captureScreenClipHook = opts.captureScreenClip;
+    const getFunctionArgumentHelp = opts.getFunctionArgumentHelp;
     let uploadStatus = opts.uploadStatus ?? null;
     let macroRecording = opts.macroRecording ?? null;
     let ui = resolveSpreadsheetUiOptions(opts.ui);
@@ -811,6 +815,7 @@ export const Spreadsheet = {
         printerProfileId = normalizePrinterProfileId(next);
       },
       refreshPrinterProfiles,
+      getFunctionArgumentHelp,
       getUploadStatus: () => uploadStatus,
       getMacroRecording: () => macroRecording,
       onConditionalRulesChanged: syncSessionConditionalRules,
@@ -1171,8 +1176,8 @@ export const Spreadsheet = {
         const copiedLogical = copied?.logicalRange ?? copied?.range;
         const copiedWholeBand =
           copiedLogical !== undefined &&
-          ((copiedLogical.c0 === 0 && copiedLogical.c1 >= 16_383) ||
-            (copiedLogical.r0 === 0 && copiedLogical.r1 >= 1_048_575));
+          ((copiedLogical.c0 === 0 && copiedLogical.c1 >= MAX_COL) ||
+            (copiedLogical.r0 === 0 && copiedLogical.r1 >= MAX_ROW));
         if (copiedWholeBand && copied) {
           const target = store.getState().selection.range;
           const result = insertCopiedBand(store, wb, history, copied, target);

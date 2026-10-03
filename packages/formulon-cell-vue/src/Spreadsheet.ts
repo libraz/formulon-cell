@@ -54,6 +54,7 @@ const applyRuntimeProps = async (
     printerProfileId?: string;
     refreshPrinterProfiles?: MountOptions['refreshPrinterProfiles'];
     captureScreenClip?: MountOptions['captureScreenClip'];
+    getFunctionArgumentHelp?: MountOptions['getFunctionArgumentHelp'];
     uploadStatus?: MountOptions['uploadStatus'];
     macroRecording?: MountOptions['macroRecording'];
   },
@@ -74,6 +75,7 @@ const applyRuntimeProps = async (
     printerProfileId?: string;
     refreshPrinterProfiles?: MountOptions['refreshPrinterProfiles'];
     captureScreenClip?: MountOptions['captureScreenClip'];
+    getFunctionArgumentHelp?: MountOptions['getFunctionArgumentHelp'];
     uploadStatus?: MountOptions['uploadStatus'];
     macroRecording?: MountOptions['macroRecording'];
   } = {},
@@ -145,6 +147,10 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
       type: Function as PropType<MountOptions['captureScreenClip']>,
       default: undefined,
     },
+    getFunctionArgumentHelp: {
+      type: Function as PropType<MountOptions['getFunctionArgumentHelp']>,
+      default: undefined,
+    },
     uploadStatus: { type: String as PropType<MountOptions['uploadStatus']>, default: undefined },
     macroRecording: {
       type: Boolean as PropType<MountOptions['macroRecording']>,
@@ -198,6 +204,8 @@ export const Spreadsheet: ReturnType<typeof defineComponent> = defineComponent({
       if (props.printerProfileId) opts.printerProfileId = props.printerProfileId;
       opts.refreshPrinterProfiles = () => props.refreshPrinterProfiles?.();
       opts.captureScreenClip = () => props.captureScreenClip?.();
+      opts.getFunctionArgumentHelp = (name, index, locale) =>
+        props.getFunctionArgumentHelp?.(name, index, locale);
       if (props.uploadStatus !== undefined) opts.uploadStatus = props.uploadStatus;
       if (props.macroRecording !== undefined) opts.macroRecording = props.macroRecording;
       if (props.functions) opts.functions = props.functions;

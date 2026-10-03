@@ -150,6 +150,37 @@ describe('Vue <Spreadsheet>', () => {
     expect(secondCapture).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the function argument help provider current without remounting', async () => {
+    const firstHelp = vi.fn(() => ({ description: 'Vue first hint.' }));
+    const secondHelp = vi.fn((_name: string, _index: number, locale: string) => ({
+      description: `Vue second hint (${locale}).`,
+    }));
+    mounted = await mountVueSpreadsheet({
+      props: {
+        ui: { platform: 'mac' },
+        features: { fxDialog: true },
+        locale: 'en',
+        getFunctionArgumentHelp: firstHelp,
+      },
+    });
+    const original = mounted.instance;
+    const hint = (): string | null | undefined =>
+      document.querySelector('.fc-mac-formula-palette__argument small')?.textContent;
+
+    mounted.instance.openFunctionArguments('ACOS');
+    expect(hint()).toBe('Vue first hint.');
+    document
+      .querySelector<HTMLButtonElement>('.fc-mac-formula-palette [data-action="close"]')
+      ?.click();
+
+    await mounted.setProp('getFunctionArgumentHelp', secondHelp);
+    mounted.instance.openFunctionArguments('ACOS');
+
+    expect(mounted.exposed.instance.value).toBe(original);
+    expect(hint()).toBe('Vue second hint (en).');
+    expect(secondHelp).toHaveBeenCalledWith('ACOS', 0, 'en');
+  });
+
   it('keeps the printer profile refresh hook current without remounting', async () => {
     const firstProfile = {
       id: 'vue-first',

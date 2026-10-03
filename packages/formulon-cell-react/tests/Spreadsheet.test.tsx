@@ -147,6 +147,40 @@ describe('React <Spreadsheet>', () => {
     expect(secondCapture).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the function argument help provider current without remounting', async () => {
+    const firstHelp = vi.fn(() => ({ description: 'React first hint.' }));
+    const secondHelp = vi.fn((_name: string, _index: number, locale: string) => ({
+      description: `React second hint (${locale}).`,
+    }));
+    mounted = await mountReactSpreadsheet({
+      ui: { platform: 'mac' },
+      features: { fxDialog: true },
+      locale: 'en',
+      getFunctionArgumentHelp: firstHelp,
+    });
+    const original = mounted.instance;
+    const hint = (): string | null | undefined =>
+      document.querySelector('.fc-mac-formula-palette__argument small')?.textContent;
+
+    mounted.instance.openFunctionArguments('ACOS');
+    expect(hint()).toBe('React first hint.');
+    document
+      .querySelector<HTMLButtonElement>('.fc-mac-formula-palette [data-action="close"]')
+      ?.click();
+
+    await mounted.rerender({
+      ui: { platform: 'mac' },
+      features: { fxDialog: true },
+      locale: 'en',
+      getFunctionArgumentHelp: secondHelp,
+    });
+    mounted.instance.openFunctionArguments('ACOS');
+
+    expect(mounted.instance).toBe(original);
+    expect(hint()).toBe('React second hint (en).');
+    expect(secondHelp).toHaveBeenCalledWith('ACOS', 0, 'en');
+  });
+
   it('keeps the printer profile refresh hook current without remounting', async () => {
     const firstProfile = {
       id: 'react-first',

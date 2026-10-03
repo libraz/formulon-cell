@@ -52,6 +52,7 @@ import {
   type DemoSearchUsagePrior,
   demoColLabel,
   demoCommandText,
+  demoFunctionArgumentHelp,
   demoSearchOptionId,
   FEATURE_GROUPS,
   FORMATTERS,
@@ -767,6 +768,7 @@ export const App = (): ReactElement => {
             printerProfiles={DEMO_PRINTER_PROFILES}
             printerProfileId={DEMO_PRINTER_PROFILE_ID}
             refreshPrinterProfiles={refreshDemoPrinterProfiles}
+            getFunctionArgumentHelp={demoFunctionArgumentHelp}
             uploadStatus={uploadStatus}
             macroRecording={scriptOpen}
             onReady={setInstance}

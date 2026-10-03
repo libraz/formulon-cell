@@ -62,6 +62,8 @@ export interface SpreadsheetProps {
   refreshPrinterProfiles?: MountOptions['refreshPrinterProfiles'];
   /** Host capture hook for Insert > Screenshot > Screen Clipping. */
   captureScreenClip?: MountOptions['captureScreenClip'];
+  /** Host lookup for per-argument help in the Mac formula palette. */
+  getFunctionArgumentHelp?: MountOptions['getFunctionArgumentHelp'];
   /** Host-driven status bar Upload Status indicator. */
   uploadStatus?: MountOptions['uploadStatus'];
   /** Host-driven status bar Macro Recording indicator. */
@@ -194,6 +196,8 @@ const SpreadsheetComponent = (
         ...(cur.printerProfileId ? { printerProfileId: cur.printerProfileId } : {}),
         refreshPrinterProfiles: () => propsRef.current.refreshPrinterProfiles?.(),
         captureScreenClip: () => propsRef.current.captureScreenClip?.(),
+        getFunctionArgumentHelp: (name, index, locale) =>
+          propsRef.current.getFunctionArgumentHelp?.(name, index, locale),
         ...(cur.uploadStatus !== undefined ? { uploadStatus: cur.uploadStatus } : {}),
         ...(cur.macroRecording !== undefined ? { macroRecording: cur.macroRecording } : {}),
         renderError: !cur.errorFallback,
