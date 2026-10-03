@@ -19,14 +19,12 @@ import {
   type SyncedConditionalRuleMap,
   syncTrackedConditionalRulesToEngine,
 } from './engine/cf-writeback.js';
-import { findPivotTableAtCell } from './engine/passthrough-sync.js';
 import { WorkbookHandle } from './engine/workbook-handle.js';
 import { SpreadsheetEmitter } from './events.js';
-import { type ExtensionHandle, resolveSpreadsheetUiOptions } from './extensions/index.js';
+import { resolveSpreadsheetUiOptions } from './extensions/index.js';
 import { FormulaRegistry } from './formula.js';
 import { createI18nController } from './i18n/controller.js';
 import type { Strings } from './i18n/strings.js';
-import type { FxDialogOpenOptions } from './interact/fx-dialog.js';
 import { deactivateMacInk, disposeMacInk } from './interact/mac-ink.js';
 import { attachNavigationPolicy, navigationBoundsFor } from './interact/navigation-policy.js';
 import {
@@ -66,6 +64,7 @@ import {
   validateViewportAgainstWorkbook,
 } from './mount/hydration.js';
 import { createInsertCopiedCellsOpener } from './mount/insert-copied-cells.js';
+import { createInstanceDialogApi } from './mount/instance-dialog-api.js';
 import { attachPivotFieldListFollow } from './mount/pivot-field-list-follow.js';
 import { createPrinterProfiles } from './mount/printer-profiles.js';
 import { createRibbonHost } from './mount/ribbon-host.js';
@@ -605,6 +604,18 @@ export const Spreadsheet = {
       invalidate: () => renderer.invalidate(),
     });
 
+    const instanceDialogApi = createInstanceDialogApi({
+      featureState,
+      alwaysOnDialogs,
+      store,
+      getWb: () => wb,
+      getBinding: () => binding,
+      getUserHandle: extensionRegistry.getUserHandle,
+      isRestricted: () => commands.policy !== undefined,
+      ensureWatchWindow,
+      refreshFeaturesView,
+    });
+
     const instance: SpreadsheetInstance = {
       host,
       get workbook() {
@@ -748,57 +759,11 @@ export const Spreadsheet = {
         refreshFeaturesView();
       },
       setExtensions: extensionRegistry.setExtensions,
-      openConditionalDialog(options) {
-        featureState.conditionalDialog?.open(options);
-      },
-      openIterativeDialog() {
-        featureState.iterativeDialog?.open();
-      },
-      openExternalLinksDialog() {
-        alwaysOnDialogs.openExternalLinks();
-      },
-      openCfRulesDialog() {
-        if (commands.policy !== undefined) return;
-        alwaysOnDialogs.openCfRules();
-      },
-      openCellStylesGallery() {
-        if (commands.policy !== undefined) return;
-        alwaysOnDialogs.openCellStyles();
-      },
-      openEvaluateFormulaDialog() {
-        alwaysOnDialogs.openEvaluateFormula();
-      },
-      openFunctionArguments(seedName?: string, options?: FxDialogOpenOptions) {
-        featureState.fxDialog?.open(seedName, options);
-      },
-      openHyperlinkDialog() {
-        featureState.hyperlinkDialog?.open();
-      },
-      openCommentDialog() {
-        featureState.commentDialog?.open();
-      },
-      openFindReplace(tab?: 'find' | 'replace') {
-        binding.findReplace?.open(tab);
-      },
-      closeFindReplace() {
-        binding.findReplace?.close();
-      },
-      openPasteSpecial(opts) {
-        binding.pasteSpecialDialog?.open(opts);
-      },
+      ...instanceDialogApi,
       pasteSpecial(options, opts) {
         return binding.pasteSpecialDialog?.apply(options, opts) ?? false;
       },
       openInsertCopiedCells,
-      openNamedRangeDialog() {
-        featureState.namedRangeDialog?.open();
-      },
-      openDefineNameDialog() {
-        featureState.namedRangeDialog?.openNew();
-      },
-      openPageSetup(tab) {
-        featureState.pageSetupDialog?.open(tab);
-      },
       print(mode = 'print') {
         if (!ui.print) return;
         if (
@@ -841,106 +806,6 @@ export const Spreadsheet = {
         wb.recalc();
         mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
         renderer.invalidate();
-      },
-      openFormatDialog(tab) {
-        featureState.formatDialog?.open(tab);
-      },
-      openDataValidationDialog() {
-        featureState.formatDialog?.open('more', { mode: 'dataValidation', focus: 'validation' });
-      },
-      openGoTo() {
-        featureState.goToDialog?.open('go-to');
-      },
-      openGoToSpecial() {
-        featureState.goToDialog?.open('special');
-      },
-      openFilterDropdown(range, col) {
-        if (commands.policy !== undefined) return;
-        alwaysOnDialogs.openFilterAtHeader(range, col);
-      },
-      openWatchWindow() {
-        if (commands.policy !== undefined) return;
-        ensureWatchWindow();
-        featureState.watchPanel?.open();
-        refreshFeaturesView();
-      },
-      closeWatchWindow() {
-        featureState.watchPanel?.close();
-      },
-      toggleWatchWindow() {
-        if (commands.policy !== undefined) return;
-        ensureWatchWindow();
-        featureState.watchPanel?.toggle();
-        refreshFeaturesView();
-      },
-      openQuickAnalysis() {
-        const userQuick = extensionRegistry.getUserHandle('quickAnalysis') as
-          | (ExtensionHandle & { open?: () => void })
-          | undefined;
-        if (userQuick?.open) {
-          userQuick.open();
-          return;
-        }
-        binding.quickAnalysis?.open();
-      },
-      openWorkbookObjects() {
-        const userObjects = extensionRegistry.getUserHandle('workbookObjects') as
-          | (ExtensionHandle & { open?: () => void })
-          | undefined;
-        if (userObjects?.open) {
-          userObjects.open();
-          return;
-        }
-        featureState.workbookObjects?.open();
-      },
-      openPivotFieldList(sheetIndex, pivotIndex) {
-        if (commands.policy !== undefined) return false;
-        const userObjects = extensionRegistry.getUserHandle('workbookObjects') as
-          | (ExtensionHandle & {
-              openPivotFieldList?: (sheetIndex: number, pivotIndex: number) => boolean;
-            })
-          | undefined;
-        if (userObjects?.openPivotFieldList) {
-          return userObjects.openPivotFieldList(sheetIndex, pivotIndex);
-        }
-        return featureState.workbookObjects?.openPivotFieldList(sheetIndex, pivotIndex) ?? false;
-      },
-      openActivePivotFieldList() {
-        if (commands.policy !== undefined) return false;
-        const pivot = findPivotTableAtCell(wb, store.getState().selection.active);
-        if (!pivot) return false;
-        const userObjects = extensionRegistry.getUserHandle('workbookObjects') as
-          | (ExtensionHandle & {
-              openPivotFieldList?: (sheetIndex: number, pivotIndex: number) => boolean;
-            })
-          | undefined;
-        if (userObjects?.openPivotFieldList) {
-          return userObjects.openPivotFieldList(pivot.sheetIndex, pivot.pivotIndex);
-        }
-        return (
-          featureState.workbookObjects?.openPivotFieldList(pivot.sheetIndex, pivot.pivotIndex) ??
-          false
-        );
-      },
-      openPivotTableDialog(opts) {
-        if (commands.policy !== undefined) return;
-        const userPivot = extensionRegistry.getUserHandle('pivotTableDialog') as
-          | (ExtensionHandle & { open?: (opts?: { placement?: 'new' | 'existing' }) => void })
-          | undefined;
-        if (userPivot?.open) {
-          userPivot.open(opts);
-          return;
-        }
-        featureState.pivotTableDialog?.open(opts);
-      },
-      addSlicer(input) {
-        if (!featureState.slicer) {
-          throw new Error('addSlicer: features.slicer is disabled');
-        }
-        return featureState.slicer.addSlicer(input);
-      },
-      removeSlicer(id) {
-        featureState.slicer?.removeSlicer(id);
       },
       toggleSheetProtection() {
         if (commands.policy !== undefined) return;
