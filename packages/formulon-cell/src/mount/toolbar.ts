@@ -32,7 +32,11 @@ import { ensureMacInk, getMacInk, type MacInkController } from '../interact/mac-
 import type { CellBorderStyle } from '../store/types.js';
 import { cancelOpenAppDialogs } from '../toolbar/dialogs/shell.js';
 import { ribbonDisplayText, type ToolbarMenuText, toolbarMenuText } from '../toolbar/menu-text.js';
-import { isRibbonMenuFirstCommand, RIBBON_BORDERS_MENU_ID } from '../toolbar/ribbon/activation.js';
+import {
+  isRibbonMenuFirstCommand,
+  RIBBON_BORDERS_MENU_ID,
+  RIBBON_HOST_MENU_FIRST_COMMANDS,
+} from '../toolbar/ribbon/activation.js';
 import {
   applyRibbonCommand,
   type RibbonHooks,
@@ -225,12 +229,7 @@ export interface ToolbarInstance {
   dispose(): void;
 }
 
-/** Split buttons whose menu is the entry point for hosts that own the actions
- *  behind it (`applyScriptAction` / `applyAddInAction`). Core classifies them
- *  as primary-action splits so a standalone ribbon fires its built-in dialog;
- *  a host that supplies the menu actions wants the face click to open the
- *  menu instead. */
-export const RIBBON_HOST_MENU_FIRST_COMMANDS: ReadonlySet<string> = new Set(['script', 'addIn']);
+export { RIBBON_HOST_MENU_FIRST_COMMANDS } from '../toolbar/ribbon/activation.js';
 
 /** `interceptCommand` implementation for the menu-first contract above. Pass
  *  it straight through from a host's `mountToolbar` options; it returns false

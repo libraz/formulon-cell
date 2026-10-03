@@ -15,6 +15,7 @@ import {
   RIBBON_EXTERNAL_MENU_FIRST_COMMANDS,
   RIBBON_EXTERNAL_MENU_FOR_COMMAND,
   RIBBON_GALLERY_COMMANDS,
+  RIBBON_HOST_MENU_FIRST_COMMANDS,
   RIBBON_INTENTIONAL_NON_RENDERED_COMMANDS,
   RIBBON_MENU_FACTORY_FOR_COMMAND,
   RIBBON_MENU_FACTORY_KEYS,
@@ -279,6 +280,14 @@ describe('toolbar/ribbon shared data', () => {
       .sort();
 
     expect(missing).toEqual([]);
+  });
+
+  it('keeps host menu-first commands inside the primary-action split set', () => {
+    const outside = Array.from(RIBBON_HOST_MENU_FIRST_COMMANDS)
+      .filter((command) => !RIBBON_PRIMARY_ACTION_SPLIT_COMMANDS.has(command))
+      .sort();
+
+    expect(outside).toEqual([]);
   });
 
   it('keeps mount toolbar using the shared active-state projection', () => {
