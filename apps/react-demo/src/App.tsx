@@ -1,14 +1,11 @@
 import {
   analyzeAccessibilityCells,
   analyzeSpellingCells,
-  applyTextScript,
   type CellChangeEvent,
+  type CellValue,
   type FeatureFlags,
   type FeatureId,
-  isFeatureDefaultOff,
-  mutators,
   parseScriptCommand,
-  presets,
   type SpreadsheetInstance,
   type ThemeName,
   type ToolbarInstance,
@@ -35,9 +32,12 @@ import {
   buildDemoBackstageNav,
   buildDemoCommands,
   buildDemoPrintPreviewModel,
+  buildDemoReviewDialog,
   buildDemoSearchItems,
+  type ChangeLogEntry,
   composeDemoUiOptions,
   createDemoStrings,
+  createInitialDemoWorkbook,
   DEMO_FUNCTIONS,
   DEMO_ICONS,
   DEMO_MAC_RIBBON_TABS,
@@ -48,53 +48,44 @@ import {
   type DemoBackstageAction,
   type DemoIconName,
   type DemoPlatform,
+  type DemoReviewDialogState,
   type DemoSearchItem,
   type DemoSearchUsagePrior,
-  demoColLabel,
   demoCommandText,
   demoFunctionArgumentHelp,
   demoSearchOptionId,
+  demoSelectionLabel,
+  evaluateDemoProbe,
   FEATURE_GROUPS,
   FORMATTERS,
   formatLoadError,
   installDemoF6Navigation,
+  installDemoScriptMenu,
   installDemoSearchShortcut,
   isDemoBackstageActionDisabled,
+  isDemoFeatureOn,
   LOCALES,
   loadDemoSearchUsagePrior,
-  nextDemoSearchIndex,
+  nextDemoFeatureOverrides,
+  openDemoWorkbookFile,
   PRESETS,
   type PresetKey,
-  previewCellChange,
+  pushDemoChangeLog,
   queryDemoSearchItems,
   recordDemoSearchUsage,
   refreshDemoPrinterProfiles,
+  resolveDemoSearchKey,
   resolveInitialLocale,
   resolveInitialPlatform,
   reviewCellsForInstance,
   runDemoBackstageAction,
+  runDemoScript,
   saveDemoSearchUsagePrior,
   saveDemoWorkbookToDownload,
-  seedDemoWorkbook,
   THEMES,
 } from '../../demo-shared/index.js';
 
 const UI = createDemoStrings('React');
-
-const colLabel = demoColLabel;
-
-interface ChangeLogEntry {
-  readonly id: number;
-  readonly cell: string;
-  readonly preview: string;
-}
-
-interface ReviewDialogState {
-  readonly title: string;
-  readonly items: readonly { label: string; detail: string }[];
-}
-
-let changeId = 0;
 
 // Modal focus trap + Esc-to-close. `activateDemoModal` lives in demo-shared
 // and is shared with the Vue demo; this hook adapts it to React's effect
@@ -111,9 +102,6 @@ const useDemoModalFocus = (
     return activateDemoModal(root, onClose);
   }, [rootRef, open, onClose]);
 };
-
-const previewValue = previewCellChange;
-const seed = seedDemoWorkbook;
 
 const DemoIcon = ({ name }: { name: DemoIconName }): ReactElement => (
   <svg
@@ -157,7 +145,7 @@ export const App = (): ReactElement => {
     loadDemoSearchUsagePrior(),
   );
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [reviewDialog, setReviewDialog] = useState<ReviewDialogState | null>(null);
+  const [reviewDialog, setReviewDialog] = useState<DemoReviewDialogState | null>(null);
   const [scriptOpen, setScriptOpen] = useState(false);
   const [scriptCommand, setScriptCommand] = useState('uppercase');
   const [scriptError, setScriptError] = useState<string | null>(null);
@@ -190,14 +178,9 @@ export const App = (): ReactElement => {
 
   useEffect(() => {
     let alive = true;
-    void WorkbookHandle.createDefault()
+    void createInitialDemoWorkbook()
       .then((wb) => {
         if (!alive) return;
-        // Core only auto-seeds when it owns the workbook (no `workbook` prop).
-        // The demo passes a pre-built handle, so seed by hand here. `?fixture=empty`
-        // (used by E2E specs that need a deterministic blank workbook) skips this.
-        const fx = new URLSearchParams(window.location.search).get('fixture');
-        if (fx !== 'empty') seed(wb);
         setLoadError(null);
         setWorkbook(wb);
       })
@@ -253,37 +236,16 @@ export const App = (): ReactElement => {
   }, [instance]);
 
   const onCellChange = useCallback((e: CellChangeEvent) => {
-    const cell = `${colLabel(e.addr.col)}${e.addr.row + 1}`;
-    setLog((prev) => [{ id: ++changeId, cell, preview: previewValue(e) }, ...prev].slice(0, 8));
+    setLog((prev) => pushDemoChangeLog(prev, e));
   }, []);
 
   const selection = useSelection(instance);
-  const selectionLabel = useMemo(() => {
-    const { active, range } = selection;
-    if (range.r0 === range.r1 && range.c0 === range.c1) {
-      return `${colLabel(active.col)}${active.row + 1}`;
-    }
-    const tl = `${colLabel(range.c0)}${range.r0 + 1}`;
-    const br = `${colLabel(range.c1)}${range.r1 + 1}`;
-    const cells = (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
-    return `${tl}:${br} · ${cells}`;
-  }, [selection]);
+  const selectionLabel = useMemo(() => demoSelectionLabel(selection), [selection]);
 
   const runProbe = useCallback(
-    (name: string, args: unknown[]) => {
+    (name: string, args: CellValue[]) => {
       if (!instance) return;
-      try {
-        const out = instance.formula.evaluate(name, args as never);
-        const display =
-          out.kind === 'number'
-            ? out.value.toString()
-            : out.kind === 'text'
-              ? out.value
-              : JSON.stringify(out);
-        setProbe({ name, result: display });
-      } catch (err) {
-        setProbe({ name, result: err instanceof Error ? err.message : String(err) });
-      }
+      setProbe(evaluateDemoProbe(instance, name, args));
     },
     [instance],
   );
@@ -316,7 +278,7 @@ export const App = (): ReactElement => {
 
   const showRibbonNotice = useCallback(
     (title: string, detail: string) => {
-      setReviewDialog({ title, items: [{ label: commandText.ribbonCommand, detail }] });
+      setReviewDialog(buildDemoReviewDialog(title, commandText.ribbonCommand, detail));
     },
     [commandText.ribbonCommand],
   );
@@ -324,43 +286,14 @@ export const App = (): ReactElement => {
   const applyParsedScript = useCallback(
     (command: ReturnType<typeof parseScriptCommand>) => {
       if (!instance || !command) return;
-      const range = instance.store.getState().selection.range;
-      let changed = 0;
-      instance.history.begin();
-      try {
-        for (let row = range.r0; row <= range.r1; row += 1) {
-          for (let col = range.c0; col <= range.c1; col += 1) {
-            const addr = { sheet: range.sheet, row, col };
-            const value = instance.workbook.getValue(addr);
-            if (command === 'clear') {
-              if (value.kind !== 'blank' || instance.workbook.cellFormula(addr)) {
-                instance.workbook.setBlank(addr);
-                changed += 1;
-              }
-              continue;
-            }
-            if (value.kind === 'text') {
-              const next = applyTextScript(value.value, command);
-              if (next !== value.value) {
-                instance.workbook.setText(addr, next);
-                changed += 1;
-              }
-            }
-          }
-        }
-      } finally {
-        instance.history.end();
-      }
-      mutators.replaceCells(instance.store, instance.workbook.cells(range.sheet));
-      setReviewDialog({
-        title: commandText.script,
-        items: [
-          {
-            label: commandText.selection,
-            detail: commandText.cellsUpdated.replace('{count}', String(changed)),
-          },
-        ],
-      });
+      const changed = runDemoScript(instance, command);
+      setReviewDialog(
+        buildDemoReviewDialog(
+          commandText.script,
+          commandText.selection,
+          commandText.cellsUpdated.replace('{count}', String(changed)),
+        ),
+      );
     },
     [commandText.cellsUpdated, commandText.script, commandText.selection, instance],
   );
@@ -380,22 +313,7 @@ export const App = (): ReactElement => {
   // command, and routes `custom` to the `onRunScript` prop — so this handler
   // neither reopens that dialog nor touches focus, which would pull focus back
   // out of the dialog the action just opened.
-  useEffect(() => {
-    const onMenuClick = (e: MouseEvent): void => {
-      const target = e.target;
-      if (!(target instanceof Element)) return;
-      const btn = target.closest<HTMLButtonElement>('[data-script-action]');
-      if (!btn) return;
-      const menu = btn.closest<HTMLDivElement>('#menu-script');
-      if (!menu) return;
-      const action = btn.dataset.scriptAction ?? '';
-      if (action === 'custom') return;
-      const command = parseScriptCommand(action);
-      if (command) applyParsedScript(command);
-    };
-    document.addEventListener('click', onMenuClick);
-    return () => document.removeEventListener('click', onMenuClick);
-  }, [applyParsedScript]);
+  useEffect(() => installDemoScriptMenu(applyParsedScript), [applyParsedScript]);
 
   const onSave = useCallback(() => {
     saveDemoWorkbookToDownload({ instance, bookName, setUploadStatus });
@@ -414,16 +332,12 @@ export const App = (): ReactElement => {
     async (file: File) => {
       if (!instance) return;
       try {
-        const buf = await file.arrayBuffer();
-        const next = await WorkbookHandle.loadBytes(new Uint8Array(buf));
-        await instance.setWorkbook(next);
+        setBookName(await openDemoWorkbookFile(instance, file));
         setLoadError(null);
-        setBookName(file.name.replace(/\.(xlsx|xlsm)$/i, ''));
       } catch (err) {
-        setReviewDialog({
-          title: commandText.openFailed,
-          items: [{ label: commandText.workbook, detail: formatLoadError(err) }],
-        });
+        setReviewDialog(
+          buildDemoReviewDialog(commandText.openFailed, commandText.workbook, formatLoadError(err)),
+        );
       }
     },
     [commandText.openFailed, commandText.workbook, instance],
@@ -478,20 +392,7 @@ export const App = (): ReactElement => {
 
   const onFeatureToggle = useCallback(
     (id: FeatureId) => {
-      // Compute the next override map. If toggling back to the preset's
-      // default, drop the override so the preset's value wins.
-      const presetFlags = presets[preset]();
-      const defaultOff = isFeatureDefaultOff(id);
-      const presetDefault = defaultOff ? presetFlags[id] === true : presetFlags[id] !== false;
-      const currentVal = defaultOff ? features[id] === true : features[id] !== false;
-      const nextVal = !currentVal;
-      const nextOverrides = { ...overrides };
-      if (nextVal === presetDefault) {
-        delete nextOverrides[id];
-      } else {
-        nextOverrides[id] = nextVal;
-      }
-      setOverrides(nextOverrides);
+      setOverrides(nextDemoFeatureOverrides({ preset, overrides, features, id }));
     },
     [features, overrides, preset],
   );
@@ -642,30 +543,22 @@ export const App = (): ReactElement => {
                 setSearchActiveIndex(-1);
               }}
               onKeyDown={(e) => {
-                if (e.key === 'Escape') {
+                const action = resolveDemoSearchKey(
+                  e.key,
+                  searchActiveIndex,
+                  filteredCommands.length,
+                );
+                if (action?.kind === 'close') {
                   setSearchOpen(false);
                   setSearchActiveIndex(-1);
                   e.currentTarget.blur();
-                }
-                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                } else if (action?.kind === 'move') {
                   e.preventDefault();
                   setSearchOpen(true);
-                  setSearchActiveIndex((current) =>
-                    nextDemoSearchIndex(
-                      current,
-                      filteredCommands.length,
-                      e.key === 'ArrowDown' ? 'next' : 'previous',
-                    ),
-                  );
-                }
-                if (e.key === 'Enter' && filteredCommands.length > 0) {
+                  setSearchActiveIndex(action.index);
+                } else if (action?.kind === 'run') {
                   e.preventDefault();
-                  const index = nextDemoSearchIndex(
-                    searchActiveIndex,
-                    filteredCommands.length,
-                    'first',
-                  );
-                  const command = filteredCommands[index];
+                  const command = filteredCommands[action.index];
                   if (command) runCommand(command);
                 }
               }}
@@ -945,9 +838,7 @@ export const App = (): ReactElement => {
                 </h3>
                 <div className="demo__feat-grid">
                   {group.features.map((f) => {
-                    // A few features ship default-off; everything else is opt-out.
-                    const defaultOff = isFeatureDefaultOff(f.id);
-                    const enabled = defaultOff ? features[f.id] === true : features[f.id] !== false;
+                    const enabled = isDemoFeatureOn(features, f.id);
                     return (
                       <label key={f.id} className={`demo__feat${enabled ? ' demo__feat--on' : ''}`}>
                         <input

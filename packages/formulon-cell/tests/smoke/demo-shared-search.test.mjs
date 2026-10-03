@@ -9,9 +9,17 @@ import {
   DEMO_ICONS,
   DEMO_PRINTER_PROFILE_ID,
   DEMO_PRINTER_PROFILES,
+  demoChangeLogEntry,
   demoCommandText,
+  demoSelectionLabel,
+  evaluateDemoProbe,
+  isDemoFeatureOn,
+  nextDemoFeatureOverrides,
+  pushDemoChangeLog,
   queryDemoSearchItems,
   refreshDemoPrinterProfiles,
+  resolveDemoSearchKey,
+  runDemoScript,
   saveDemoWorkbookToDownload,
 } from '../../../../apps/demo-shared/index.ts';
 import { createSpreadsheetStore, mutators, WorkbookHandle } from '../../src/index.ts';
@@ -392,5 +400,109 @@ describe('demo-shared Search/Tell me items', () => {
     });
 
     expect(statuses.slice(-2)).toEqual(['saving', 'error']);
+  });
+
+  it('toggles feature overrides relative to the preset default', () => {
+    // `charts` is on by default in the full preset, so turning it off adds an override.
+    const off = nextDemoFeatureOverrides({
+      preset: 'full',
+      overrides: {},
+      features: {},
+      id: 'charts',
+    });
+    expect(off).toEqual({ charts: false });
+    expect(isDemoFeatureOn({ charts: false }, 'charts')).toBe(false);
+
+    // Toggling back to the preset default drops the override.
+    expect(
+      nextDemoFeatureOverrides({
+        preset: 'full',
+        overrides: off,
+        features: off,
+        id: 'charts',
+      }),
+    ).toEqual({});
+  });
+
+  it('labels single cells and ranges for the selection readout', () => {
+    expect(
+      demoSelectionLabel({
+        active: { row: 2, col: 1 },
+        range: { r0: 2, c0: 1, r1: 2, c1: 1 },
+      }),
+    ).toBe('B3');
+    expect(
+      demoSelectionLabel({
+        active: { row: 2, col: 1 },
+        range: { r0: 2, c0: 1, r1: 4, c1: 3 },
+      }),
+    ).toBe('B3:D5 · 9');
+  });
+
+  it('maps search input keys to close, move and run actions', () => {
+    expect(resolveDemoSearchKey('Escape', 1, 3)).toEqual({ kind: 'close' });
+    expect(resolveDemoSearchKey('ArrowDown', -1, 3)).toEqual({ kind: 'move', index: 0 });
+    expect(resolveDemoSearchKey('ArrowUp', -1, 3)).toEqual({ kind: 'move', index: 2 });
+    expect(resolveDemoSearchKey('Enter', -1, 3)).toEqual({ kind: 'run', index: 0 });
+    expect(resolveDemoSearchKey('Enter', 2, 3)).toEqual({ kind: 'run', index: 2 });
+    expect(resolveDemoSearchKey('Enter', -1, 0)).toBeNull();
+    expect(resolveDemoSearchKey('a', 0, 3)).toBeNull();
+  });
+
+  it('evaluates probes and reports evaluation errors as text', () => {
+    const inst = {
+      formula: {
+        evaluate: (name) => {
+          if (name === 'BOOM') throw new Error('boom');
+          return name === 'NUM' ? { kind: 'number', value: 212 } : { kind: 'bool', value: true };
+        },
+      },
+    };
+    expect(evaluateDemoProbe(inst, 'NUM', [])).toEqual({ name: 'NUM', result: '212' });
+    expect(evaluateDemoProbe(inst, 'B', [])).toEqual({
+      name: 'B',
+      result: '{"kind":"bool","value":true}',
+    });
+    expect(evaluateDemoProbe(inst, 'BOOM', [])).toEqual({ name: 'BOOM', result: 'boom' });
+  });
+
+  it('keeps the change log newest-first and capped', () => {
+    const event = (row) => ({
+      addr: { sheet: 0, row, col: 0 },
+      value: { kind: 'number', value: row },
+      formula: null,
+    });
+    expect(demoChangeLogEntry(event(0))).toMatchObject({ cell: 'A1', preview: '0' });
+    let log = [];
+    for (let row = 0; row < 12; row += 1) log = pushDemoChangeLog(log, event(row));
+    expect(log).toHaveLength(8);
+    expect(log[0]?.cell).toBe('A12');
+  });
+
+  it('runs demo scripts through the core writer, skipping protected cells', () => {
+    const store = createSpreadsheetStore();
+    mutators.setCell(store, { sheet: 0, row: 0, col: 0 }, { kind: 'text', value: 'locked' }, null);
+    mutators.setCell(store, { sheet: 0, row: 0, col: 1 }, { kind: 'text', value: 'open' }, null);
+    mutators.setCellFormat(store, { sheet: 0, row: 0, col: 1 }, { locked: false });
+    mutators.setSheetProtected(store, 0, true);
+    // Reversed drag: the range must be normalized before it is applied.
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 1, r1: 0, c1: 0 });
+    const writes = [];
+    const history = { begin: vi.fn(), end: vi.fn() };
+    const inst = {
+      store,
+      history,
+      workbook: {
+        withBatchedRecalc: (fn) => fn(),
+        setText: (addr, value) => writes.push([addr.col, value]),
+        setBlank: () => {},
+        cells: () => [],
+      },
+    };
+
+    expect(runDemoScript(inst, 'uppercase')).toBe(1);
+    expect(writes).toEqual([[1, 'OPEN']]);
+    expect(history.begin).toHaveBeenCalledTimes(1);
+    expect(history.end).toHaveBeenCalledTimes(1);
   });
 });

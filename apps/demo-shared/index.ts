@@ -21,18 +21,25 @@ import type {
   FeatureId,
   ReviewCell,
   RibbonTab,
+  ScriptCommand,
   SpreadsheetInstance,
   SpreadsheetUiOptions,
   ThemeName,
   ToolbarInstance,
-  WorkbookHandle,
 } from '@libraz/formulon-cell';
 import {
+  applyTextScriptToRange,
   EXCEL365_MAC_RIBBON_TABS,
   EXCEL365_STANDARD_RIBBON_TABS,
+  isFeatureDefaultOff,
+  mutators,
+  parseScriptCommand,
+  presets,
   resolveSpreadsheetPlatform,
   resolveSpreadsheetUiOptions,
+  WorkbookHandle,
 } from '@libraz/formulon-cell';
+import { nextDemoSearchIndex } from './demo-search.js';
 
 export * from './demo-backstage.js';
 export * from './demo-function-help.js';
@@ -556,4 +563,192 @@ export const reviewCellsForInstance = (inst: SpreadsheetInstance): ReviewCell[] 
               : { kind: 'blank' as const },
     formula: entry.formula,
   }));
+};
+
+/** Creates the demo's initial workbook. Core only auto-seeds when it owns the
+ *  workbook, so the demo seeds by hand; `?fixture=empty` (deterministic blank
+ *  workbook for E2E specs) skips the seed. */
+export const createInitialDemoWorkbook = async (
+  search = globalThis.location?.search ?? '',
+): Promise<WorkbookHandle> => {
+  const wb = await WorkbookHandle.createDefault();
+  if (new URLSearchParams(search).get('fixture') !== 'empty') seedDemoWorkbook(wb);
+  return wb;
+};
+
+/** Loads an xlsx/xlsm file into the instance and returns the workbook's
+ *  display name (the filename without its extension). Rejects on load failure. */
+export const openDemoWorkbookFile = async (
+  inst: SpreadsheetInstance,
+  file: File,
+): Promise<string> => {
+  const buf = await file.arrayBuffer();
+  const next = await WorkbookHandle.loadBytes(new Uint8Array(buf));
+  await inst.setWorkbook(next);
+  return file.name.replace(/\.(xlsx|xlsm)$/i, '');
+};
+
+/** Routes clicks on the built-in `#menu-script` items to `onCommand`. The
+ *  toolbar owns the rest of the click (closing the menu, restoring focus and
+ *  routing `custom` to its own dialog), so `custom` is ignored here. */
+export const installDemoScriptMenu = (
+  onCommand: (command: ScriptCommand) => void,
+): (() => void) => {
+  const onMenuClick = (e: MouseEvent): void => {
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    const btn = target.closest<HTMLButtonElement>('[data-script-action]');
+    if (!btn) return;
+    if (!btn.closest<HTMLDivElement>('#menu-script')) return;
+    const action = btn.dataset.scriptAction ?? '';
+    if (action === 'custom') return;
+    const command = parseScriptCommand(action);
+    if (command) onCommand(command);
+  };
+  document.addEventListener('click', onMenuClick);
+  return () => document.removeEventListener('click', onMenuClick);
+};
+
+/** Applies a text-script command to the normalized selection as one undo
+ *  step (protected cells are skipped) and returns the number of changed cells. */
+export const runDemoScript = (inst: SpreadsheetInstance, command: ScriptCommand): number => {
+  const r = inst.store.getState().selection.range;
+  const range = {
+    sheet: r.sheet,
+    r0: Math.min(r.r0, r.r1),
+    c0: Math.min(r.c0, r.c1),
+    r1: Math.max(r.r0, r.r1),
+    c1: Math.max(r.c0, r.c1),
+  };
+  let changed = 0;
+  inst.history.begin();
+  try {
+    changed = applyTextScriptToRange(inst.store.getState(), inst.workbook, range, command);
+  } finally {
+    inst.history.end();
+  }
+  mutators.replaceCells(inst.store, inst.workbook.cells(range.sheet));
+  return changed;
+};
+
+/** A few features ship default-off; everything else is opt-out. */
+export const isDemoFeatureOn = (features: FeatureFlags, id: FeatureId): boolean =>
+  isFeatureDefaultOff(id) ? features[id] === true : features[id] !== false;
+
+/** Next override map after toggling `id`. Toggling back to the preset's
+ *  default drops the override so the preset's value wins. */
+export const nextDemoFeatureOverrides = (input: {
+  preset: PresetKey;
+  overrides: FeatureFlags;
+  features: FeatureFlags;
+  id: FeatureId;
+}): FeatureFlags => {
+  const { id } = input;
+  const presetFlags = presets[input.preset]();
+  const presetDefault = isFeatureDefaultOff(id)
+    ? presetFlags[id] === true
+    : presetFlags[id] !== false;
+  const nextVal = !isDemoFeatureOn(input.features, id);
+  const next = { ...input.overrides };
+  if (nextVal === presetDefault) {
+    delete next[id];
+  } else {
+    next[id] = nextVal;
+  }
+  return next;
+};
+
+/** Status label for the selection: `B3`, or `B3:D5 · 9` for a range. */
+export const demoSelectionLabel = (selection: {
+  active: { row: number; col: number };
+  range: { r0: number; c0: number; r1: number; c1: number };
+}): string => {
+  const { active, range } = selection;
+  if (range.r0 === range.r1 && range.c0 === range.c1) {
+    return `${demoColLabel(active.col)}${active.row + 1}`;
+  }
+  const tl = `${demoColLabel(range.c0)}${range.r0 + 1}`;
+  const br = `${demoColLabel(range.c1)}${range.r1 + 1}`;
+  const cells = (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
+  return `${tl}:${br} · ${cells}`;
+};
+
+/** Evaluates a registered function for the demo probe buttons; evaluation
+ *  errors are reported as the result text. */
+export const evaluateDemoProbe = (
+  inst: Pick<SpreadsheetInstance, 'formula'>,
+  name: string,
+  args: CellValue[],
+): { name: string; result: string } => {
+  try {
+    const out = inst.formula.evaluate(name, args);
+    const result =
+      out.kind === 'number'
+        ? out.value.toString()
+        : out.kind === 'text'
+          ? out.value
+          : JSON.stringify(out);
+    return { name, result };
+  } catch (err) {
+    return { name, result: err instanceof Error ? err.message : String(err) };
+  }
+};
+
+export interface DemoReviewDialogState {
+  readonly title: string;
+  readonly items: readonly { label: string; detail: string }[];
+}
+
+export const buildDemoReviewDialog = (
+  title: string,
+  label: string,
+  detail: string,
+): DemoReviewDialogState => ({ title, items: [{ label, detail }] });
+
+export interface ChangeLogEntry {
+  readonly id: number;
+  readonly cell: string;
+  readonly preview: string;
+}
+
+export const DEMO_CHANGE_LOG_LIMIT = 8;
+
+let demoChangeId = 0;
+
+export const demoChangeLogEntry = (e: CellChangeEvent): ChangeLogEntry => ({
+  id: ++demoChangeId,
+  cell: `${demoColLabel(e.addr.col)}${e.addr.row + 1}`,
+  preview: previewCellChange(e),
+});
+
+/** Prepends the change to the log, keeping the newest `DEMO_CHANGE_LOG_LIMIT`. */
+export const pushDemoChangeLog = (
+  log: readonly ChangeLogEntry[],
+  e: CellChangeEvent,
+): ChangeLogEntry[] => [demoChangeLogEntry(e), ...log].slice(0, DEMO_CHANGE_LOG_LIMIT);
+
+export type DemoSearchKeyAction =
+  | { kind: 'close' }
+  | { kind: 'move'; index: number }
+  | { kind: 'run'; index: number }
+  | null;
+
+/** Maps a keydown on the demo search input to an action. `move` and `run`
+ *  keys also need `preventDefault()` from the caller. */
+export const resolveDemoSearchKey = (
+  key: string,
+  activeIndex: number,
+  count: number,
+): DemoSearchKeyAction => {
+  if (key === 'Escape') return { kind: 'close' };
+  if (key === 'ArrowDown' || key === 'ArrowUp') {
+    return {
+      kind: 'move',
+      index: nextDemoSearchIndex(activeIndex, count, key === 'ArrowDown' ? 'next' : 'previous'),
+    };
+  }
+  if (key === 'Enter' && count > 0) {
+    return { kind: 'run', index: nextDemoSearchIndex(activeIndex, count, 'first') };
+  }
+  return null;
 };

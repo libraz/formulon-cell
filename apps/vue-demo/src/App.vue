@@ -6,11 +6,7 @@ import {
   type FeatureId,
   analyzeAccessibilityCells,
   analyzeSpellingCells,
-  applyTextScript,
-  isFeatureDefaultOff,
-  mutators,
   parseScriptCommand,
-  presets,
   type SpreadsheetInstance,
   type ThemeName,
   type ToolbarInstance,
@@ -34,9 +30,11 @@ import {
   buildDemoBackstageNav,
   buildDemoCommands,
   buildDemoPrintPreviewModel,
+  buildDemoReviewDialog,
   buildDemoSearchItems,
   composeDemoUiOptions,
   createDemoStrings,
+  createInitialDemoWorkbook,
   demoSearchOptionId,
   DEMO_ICONS,
   DEMO_FUNCTIONS,
@@ -46,7 +44,17 @@ import {
   DEMO_PRINTER_PROFILE_ID,
   DEMO_PRINTER_PROFILES,
   DEMO_RIBBON_TABS,
-  demoColLabel,
+  demoSelectionLabel,
+  evaluateDemoProbe,
+  pushDemoChangeLog,
+  resolveDemoSearchKey,
+  nextDemoFeatureOverrides,
+  openDemoWorkbookFile,
+  installDemoScriptMenu,
+  runDemoScript,
+  isDemoFeatureOn,
+  type ChangeLogEntry,
+  type DemoReviewDialogState,
   demoCommandText,
   type DemoBackstageAction,
   type DemoSearchItem,
@@ -58,10 +66,8 @@ import {
   isDemoBackstageActionDisabled,
   loadDemoSearchUsagePrior,
   LOCALES,
-  nextDemoSearchIndex,
   type PresetKey,
   PRESETS,
-  previewCellChange,
   installDemoSearchShortcut,
   queryDemoSearchItems,
   recordDemoSearchUsage,
@@ -73,7 +79,6 @@ import {
   runDemoBackstageAction,
   saveDemoSearchUsagePrior,
   saveDemoWorkbookToDownload,
-  seedDemoWorkbook,
   THEMES,
 } from '../../demo-shared/index.js';
 
@@ -81,30 +86,8 @@ const UI = createDemoStrings('Vue');
 
 
 
-const colLabel = demoColLabel;
-
-
-
-interface ChangeLogEntry {
-  readonly id: number;
-  readonly cell: string;
-  readonly preview: string;
-}
-
-interface ReviewDialogState {
-  readonly title: string;
-  readonly items: readonly { label: string; detail: string }[];
-}
-
-let changeId = 0;
 let disposeSearchShortcut: (() => void) | undefined;
 let disposeF6Navigation: (() => void) | undefined;
-
-// Modal focus trap + Esc-to-close + change-log preview + seed +
-// review-cell projection all live in demo-shared/index.ts so the React
-// and Vue demos stay aligned.
-const previewValue = previewCellChange;
-const seed = seedDemoWorkbook;
 
 const theme = ref<ThemeName>('paper');
 const locale = ref<string>(resolveInitialLocale());
@@ -132,7 +115,7 @@ const searchActiveIndex = ref(-1);
 const searchUsagePrior = ref<DemoSearchUsagePrior>(loadDemoSearchUsagePrior());
 const bookName = ref('Book1');
 const loadError = ref<string | null>(null);
-const reviewDialog = ref<ReviewDialogState | null>(null);
+const reviewDialog = ref<DemoReviewDialogState | null>(null);
 const scriptOpen = ref(false);
 const scriptCommand = ref('uppercase');
 const scriptError = ref<string | null>(null);
@@ -170,13 +153,8 @@ watch(
   { immediate: true },
 );
 
-void WorkbookHandle.createDefault()
+void createInitialDemoWorkbook()
   .then((wb) => {
-    // Core only auto-seeds when it owns the workbook (no `workbook` prop).
-    // The demo passes a pre-built handle, so seed by hand here. `?fixture=empty`
-    // (used by E2E specs that need a deterministic blank workbook) skips this.
-    const fx = new URLSearchParams(window.location.search).get('fixture');
-    if (fx !== 'empty') seed(wb);
     loadError.value = null;
     workbook.value = wb;
   })
@@ -204,8 +182,7 @@ watch(
 );
 
 const onCellChange = (e: CellChangeEvent): void => {
-  const cell = `${colLabel(e.addr.col)}${e.addr.row + 1}`;
-  log.value = [{ id: ++changeId, cell, preview: previewValue(e) }, ...log.value].slice(0, 8);
+  log.value = pushDemoChangeLog(log.value, e);
 };
 
 const onReady = (inst: SpreadsheetInstance): void => {
@@ -216,32 +193,12 @@ const onReady = (inst: SpreadsheetInstance): void => {
 };
 
 const selection = useSelection(instance);
-const selectionLabel = computed(() => {
-  const { active, range } = selection.value;
-  if (range.r0 === range.r1 && range.c0 === range.c1) {
-    return `${colLabel(active.col)}${active.row + 1}`;
-  }
-  const tl = `${colLabel(range.c0)}${range.r0 + 1}`;
-  const br = `${colLabel(range.c1)}${range.r1 + 1}`;
-  const cells = (range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1);
-  return `${tl}:${br} · ${cells}`;
-});
+const selectionLabel = computed(() => demoSelectionLabel(selection.value));
 
 const runProbe = (name: string, args: CellValue[]): void => {
   const inst = instance.value;
   if (!inst) return;
-  try {
-    const out = inst.formula.evaluate(name, args);
-    const display =
-      out.kind === 'number'
-        ? out.value.toString()
-        : out.kind === 'text'
-          ? out.value
-          : JSON.stringify(out);
-    probe.value = { name, result: display };
-  } catch (err) {
-    probe.value = { name, result: err instanceof Error ? err.message : String(err) };
-  }
+  probe.value = evaluateDemoProbe(inst, name, args);
 };
 
 const onSpellingReview = (): void => {
@@ -300,49 +257,18 @@ watch(
 );
 
 const showRibbonNotice = (title: string, detail: string): void => {
-  reviewDialog.value = { title, items: [{ label: commandText.value.ribbonCommand, detail }] };
+  reviewDialog.value = buildDemoReviewDialog(title, commandText.value.ribbonCommand, detail);
 };
 
 const applyParsedScript = (command: ReturnType<typeof parseScriptCommand>): void => {
   const inst = instance.value;
   if (!inst || !command) return;
-  const range = inst.store.getState().selection.range;
-  let changed = 0;
-  inst.history.begin();
-  try {
-    for (let row = range.r0; row <= range.r1; row += 1) {
-      for (let col = range.c0; col <= range.c1; col += 1) {
-        const addr = { sheet: range.sheet, row, col };
-        const value = inst.workbook.getValue(addr);
-        if (command === 'clear') {
-          if (value.kind !== 'blank' || inst.workbook.cellFormula(addr)) {
-            inst.workbook.setBlank(addr);
-            changed += 1;
-          }
-          continue;
-        }
-        if (value.kind === 'text') {
-          const next = applyTextScript(value.value, command);
-          if (next !== value.value) {
-            inst.workbook.setText(addr, next);
-            changed += 1;
-          }
-        }
-      }
-    }
-  } finally {
-    inst.history.end();
-  }
-  mutators.replaceCells(inst.store, inst.workbook.cells(range.sheet));
-  reviewDialog.value = {
-    title: commandText.value.script,
-    items: [
-      {
-        label: commandText.value.selection,
-        detail: commandText.value.cellsUpdated.replace('{count}', String(changed)),
-      },
-    ],
-  };
+  const changed = runDemoScript(inst, command);
+  reviewDialog.value = buildDemoReviewDialog(
+    commandText.value.script,
+    commandText.value.selection,
+    commandText.value.cellsUpdated.replace('{count}', String(changed)),
+  );
 };
 
 const applyScriptCommand = (): void => {
@@ -355,29 +281,14 @@ const applyScriptCommand = (): void => {
   applyParsedScript(command);
 };
 
-// Runs the built-in script commands from `#menu-script`. The toolbar owns the
-// rest of that click: it closes the menu, moves focus back to the Script
-// command, and routes `custom` to the `onRunScript` prop — so this handler
-// neither reopens that dialog nor touches focus, which would pull focus back
-// out of the dialog the action just opened.
-const onScriptMenuClick = (e: MouseEvent): void => {
-  const target = e.target;
-  if (!(target instanceof Element)) return;
-  const btn = target.closest<HTMLButtonElement>('[data-script-action]');
-  if (!btn) return;
-  const menu = btn.closest<HTMLDivElement>('#menu-script');
-  if (!menu) return;
-  const action = btn.dataset.scriptAction ?? '';
-  if (action === 'custom') return;
-  const command = parseScriptCommand(action);
-  if (command) applyParsedScript(command);
-};
+let disposeScriptMenu: (() => void) | undefined;
 
 onMounted(() => {
-  document.addEventListener('click', onScriptMenuClick);
+  disposeScriptMenu = installDemoScriptMenu(applyParsedScript);
 });
 onBeforeUnmount(() => {
-  document.removeEventListener('click', onScriptMenuClick);
+  disposeScriptMenu?.();
+  disposeScriptMenu = undefined;
 });
 
 const onSave = (): void => {
@@ -434,16 +345,14 @@ const onOpenFiles = async (ev: Event): Promise<void> => {
   const inst = instance.value;
   if (!inst) return;
   try {
-    const buf = await file.arrayBuffer();
-    const next = await WorkbookHandle.loadBytes(new Uint8Array(buf));
-    await inst.setWorkbook(next);
+    bookName.value = await openDemoWorkbookFile(inst, file);
     loadError.value = null;
-    bookName.value = file.name.replace(/\.(xlsx|xlsm)$/i, '');
   } catch (err) {
-    reviewDialog.value = {
-      title: commandText.value.openFailed,
-      items: [{ label: commandText.value.workbook, detail: formatLoadError(err) }],
-    };
+    reviewDialog.value = buildDemoReviewDialog(
+      commandText.value.openFailed,
+      commandText.value.workbook,
+      formatLoadError(err),
+    );
   }
 };
 
@@ -454,23 +363,15 @@ const onPresetChange = (next: PresetKey): void => {
 };
 
 const onFeatureToggle = (id: FeatureId): void => {
-  const presetFlags = presets[preset.value]();
-  const defaultOff = isFeatureDefaultOff(id);
-  const presetDefault = defaultOff ? presetFlags[id] === true : presetFlags[id] !== false;
-  const currentVal = isFeatureOn(id);
-  const nextVal = !currentVal;
-  const nextOverrides: FeatureFlags = { ...overrides.value };
-  if (nextVal === presetDefault) {
-    delete nextOverrides[id];
-  } else {
-    nextOverrides[id] = nextVal;
-  }
-  overrides.value = nextOverrides;
+  overrides.value = nextDemoFeatureOverrides({
+    preset: preset.value,
+    overrides: overrides.value,
+    features: features.value,
+    id,
+  });
 };
 
-// A few features ship default-off; everything else is opt-out.
-const isFeatureOn = (id: FeatureId): boolean =>
-  isFeatureDefaultOff(id) ? features.value[id] === true : features.value[id] !== false;
+const isFeatureOn = (id: FeatureId): boolean => isDemoFeatureOn(features.value, id);
 
 const commands = computed(() =>
   buildDemoCommands({
@@ -529,28 +430,18 @@ const onToolbarReady = (next: ToolbarInstance | null): void => {
 };
 
 const onSearchKeydown = (ev: KeyboardEvent): void => {
-  if (ev.key === 'Escape') {
+  const action = resolveDemoSearchKey(ev.key, searchActiveIndex.value, filteredCommands.value.length);
+  if (action?.kind === 'close') {
     searchOpen.value = false;
     searchActiveIndex.value = -1;
     (ev.currentTarget as HTMLInputElement).blur();
-  }
-  if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+  } else if (action?.kind === 'move') {
     ev.preventDefault();
     searchOpen.value = true;
-    searchActiveIndex.value = nextDemoSearchIndex(
-      searchActiveIndex.value,
-      filteredCommands.value.length,
-      ev.key === 'ArrowDown' ? 'next' : 'previous',
-    );
-  }
-  if (ev.key === 'Enter' && filteredCommands.value.length > 0) {
+    searchActiveIndex.value = action.index;
+  } else if (action?.kind === 'run') {
     ev.preventDefault();
-    const index = nextDemoSearchIndex(
-      searchActiveIndex.value,
-      filteredCommands.value.length,
-      'first',
-    );
-    const command = filteredCommands.value[index];
+    const command = filteredCommands.value[action.index];
     if (command) runCommand(command);
   }
 };
