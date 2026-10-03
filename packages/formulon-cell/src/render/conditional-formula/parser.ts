@@ -1,3 +1,17 @@
+import {
+  colToLetters,
+  parseA1Range,
+  parseA1Ref,
+  parseR1C1Range,
+  parseR1C1Ref,
+} from './references.js';
+import {
+  splitFormulaArgs,
+  splitFormulaArgsAllowEmpty,
+  splitFormulaArithmetic,
+  splitFormulaComparison,
+  stripOuterParens,
+} from './splitter.js';
 import type {
   FormulaAggregateArg,
   FormulaCondition,
@@ -5,130 +19,12 @@ import type {
   FormulaOperand,
   FormulaRangeArg,
   FormulaRangeOperand,
-  ParsedA1Range,
-  ParsedRef,
 } from './types.js';
 
 const MAX_FORMULA_AGGREGATE_CELLS = 10000;
 const FORMULA_NUMBER_LITERAL = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
 const FORMULA_VALUE_NUMBER_LITERAL =
   /^[+-]?(?:(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?%?$/;
-
-const lettersToCol = (letters: string): number => {
-  let col = 0;
-  for (let i = 0; i < letters.length; i += 1) {
-    col = col * 26 + (letters.toUpperCase().charCodeAt(i) - 64);
-  }
-  return col - 1;
-};
-
-const colToLetters = (col: number): string => {
-  let value = col + 1;
-  let letters = '';
-  while (value > 0) {
-    const rem = (value - 1) % 26;
-    letters = String.fromCharCode(65 + rem) + letters;
-    value = Math.floor((value - 1) / 26);
-  }
-  return letters;
-};
-
-function sheetNameMatchesIndex(name: string, sheetIndex: number): boolean {
-  return name.trim().toLowerCase() === `sheet${sheetIndex + 1}`.toLowerCase();
-}
-
-function stripSupportedSheetQualifier(raw: string, sheetIndex: number): string | null {
-  const body = raw.trim();
-  if (!body.includes('!')) return body;
-  if (body.startsWith("'")) {
-    let name = '';
-    for (let i = 1; i < body.length; i += 1) {
-      const ch = body[i];
-      if (ch === "'") {
-        if (body[i + 1] === "'") {
-          name += "'";
-          i += 1;
-          continue;
-        }
-        if (body[i + 1] !== '!') return null;
-        return sheetNameMatchesIndex(name, sheetIndex) ? body.slice(i + 2).trim() : null;
-      }
-      name += ch;
-    }
-    return null;
-  }
-  const bang = body.indexOf('!');
-  const sheetName = body.slice(0, bang);
-  if (!/^[A-Za-z_][A-Za-z0-9_. ]*$/.test(sheetName)) return null;
-  return sheetNameMatchesIndex(sheetName, sheetIndex) ? body.slice(bang + 1).trim() : null;
-}
-
-function parseA1Ref(raw: string, sheetIndex: number): ParsedRef | null {
-  const body = stripSupportedSheetQualifier(raw, sheetIndex);
-  if (body === null) return null;
-  const m = body.match(/^(\$?)([A-Za-z]+)(\$?)(\d+)$/);
-  if (!m) return null;
-  const col = lettersToCol(m[2] ?? '');
-  const row = Number.parseInt(m[4] ?? '', 10) - 1;
-  if (row < 0 || col < 0 || row > 1048575 || col > 16383) return null;
-  return { row, col, absCol: m[1] === '$', absRow: m[3] === '$' };
-}
-
-function parseR1C1Ref(
-  raw: string,
-  sheetIndex: number,
-  baseRow: number,
-  baseCol: number,
-): ParsedRef | null {
-  const body = stripSupportedSheetQualifier(raw, sheetIndex);
-  if (body === null) return null;
-  const m = body.match(/^R(?:(\d+)|\[([+-]?\d+)\])?C(?:(\d+)|\[([+-]?\d+)\])?$/i);
-  if (!m) return null;
-  const row =
-    m[1] !== undefined ? Number.parseInt(m[1], 10) - 1 : baseRow + Number.parseInt(m[2] ?? '0', 10);
-  const col =
-    m[3] !== undefined ? Number.parseInt(m[3], 10) - 1 : baseCol + Number.parseInt(m[4] ?? '0', 10);
-  if (row < 0 || col < 0 || row > 1048575 || col > 16383) return null;
-  return {
-    row,
-    col,
-    absRow: m[2] === undefined,
-    absCol: m[4] === undefined,
-  };
-}
-
-function parseR1C1Range(
-  raw: string,
-  sheetIndex: number,
-  baseRow: number,
-  baseCol: number,
-): ParsedA1Range | null {
-  const body = stripSupportedSheetQualifier(raw, sheetIndex);
-  if (body === null) return null;
-  const parts = body.split(':');
-  if (parts.length === 1) {
-    const ref = parseR1C1Ref(parts[0] ?? '', sheetIndex, baseRow, baseCol);
-    return ref ? { start: ref, end: ref } : null;
-  }
-  if (parts.length !== 2) return null;
-  const start = parseR1C1Ref(parts[0] ?? '', sheetIndex, baseRow, baseCol);
-  const end = parseR1C1Ref(parts[1] ?? '', sheetIndex, baseRow, baseCol);
-  return start && end ? { start, end } : null;
-}
-
-function parseA1Range(raw: string, sheetIndex: number): ParsedA1Range | null {
-  const body = stripSupportedSheetQualifier(raw, sheetIndex);
-  if (body === null) return null;
-  const parts = body.split(':');
-  if (parts.length === 1) {
-    const ref = parseA1Ref(parts[0] ?? '', sheetIndex);
-    return ref ? { start: ref, end: ref } : null;
-  }
-  if (parts.length !== 2) return null;
-  const start = parseA1Ref(parts[0] ?? '', sheetIndex);
-  const end = parseA1Ref(parts[1] ?? '', sheetIndex);
-  return start && end ? { start, end } : null;
-}
 
 function parseFormulaRangeOperand(raw: string, sheetIndex: number): FormulaRangeOperand | null {
   const body = stripOuterParens(raw.trim());
@@ -1964,180 +1860,6 @@ function parseFormulaCondition(raw: string, sheetIndex: number): FormulaConditio
   }
   const operand = parseFormulaOperand(body, sheetIndex);
   return operand ? { kind: 'operand', value: operand } : null;
-}
-
-function stripOuterParens(body: string): string {
-  let out = body;
-  for (;;) {
-    if (!out.startsWith('(') || !out.endsWith(')')) return out;
-    const inner = out.slice(1, -1);
-    if (splitFormulaArgs(inner) === null) return out;
-    out = inner.trim();
-  }
-}
-
-function splitFormulaArgs(raw: string): string[] | null {
-  const args = splitFormulaArgsAllowEmpty(raw);
-  return args?.every((arg) => arg.length > 0) ? args : null;
-}
-
-function splitFormulaArgsAllowEmpty(raw: string): string[] | null {
-  const args: string[] = [];
-  const stack: Array<')' | '}' | ']'> = [];
-  let quote: '"' | "'" | null = null;
-  let start = 0;
-  for (let i = 0; i < raw.length; i += 1) {
-    const ch = raw[i];
-    if (quote) {
-      if (ch === quote) {
-        if (raw[i + 1] === quote) {
-          i += 1;
-          continue;
-        }
-        quote = null;
-      }
-      continue;
-    }
-
-    const top = stack[stack.length - 1];
-    if (top === ']') {
-      if (ch === '[') {
-        stack.push(']');
-        continue;
-      }
-      if (ch === ']') {
-        stack.pop();
-        continue;
-      }
-      if (ch === "'" && "[]#'@".includes(raw[i + 1] ?? '')) {
-        i += 1;
-      }
-      continue;
-    }
-
-    if (ch === '"' || ch === "'") {
-      quote = ch;
-      continue;
-    }
-    if (ch === '(') {
-      stack.push(')');
-      continue;
-    }
-    if (ch === '{') {
-      stack.push('}');
-      continue;
-    }
-    if (ch === '[') {
-      stack.push(']');
-      continue;
-    }
-    if (ch === ')' || ch === '}' || ch === ']') {
-      if (top !== ch) return null;
-      stack.pop();
-      continue;
-    }
-    if (ch === ',' && stack.length === 0) {
-      args.push(raw.slice(start, i).trim());
-      start = i + 1;
-    }
-  }
-  if (quote || stack.length !== 0) return null;
-  args.push(raw.slice(start).trim());
-  return args;
-}
-
-type FormulaArithmeticOp = '+' | '-' | '*' | '/' | '^' | '&';
-
-function splitFormulaArithmetic(body: string): {
-  left: string;
-  op: FormulaArithmeticOp;
-  right: string;
-} | null {
-  const operatorsByPrecedence: FormulaArithmeticOp[][] = [['&'], ['+', '-'], ['*', '/'], ['^']];
-  for (const ops of operatorsByPrecedence) {
-    let depth = 0;
-    let quote: '"' | "'" | null = null;
-    const start = ops.includes('^') ? 0 : body.length - 1;
-    const end = ops.includes('^') ? body.length : -1;
-    const step = ops.includes('^') ? 1 : -1;
-    for (let i = start; i !== end; i += step) {
-      const ch = body[i];
-      if (quote) {
-        if (ch === quote) quote = null;
-        continue;
-      }
-      if (ch === '"' || ch === "'") {
-        quote = ch;
-        continue;
-      }
-      if (ch === ')') {
-        depth += step < 0 ? 1 : -1;
-        if (depth < 0) return null;
-        continue;
-      }
-      if (ch === '(') {
-        depth += step < 0 ? -1 : 1;
-        if (depth < 0) return null;
-        continue;
-      }
-      if (depth !== 0 || !ops.includes(ch as FormulaArithmeticOp)) continue;
-      if ((ch === '+' || ch === '-') && isUnaryArithmeticSign(body, i)) continue;
-      const left = body.slice(0, i).trim();
-      const right = body.slice(i + 1).trim();
-      if (left.length === 0 || right.length === 0) continue;
-      return { left, op: ch as FormulaArithmeticOp, right };
-    }
-  }
-  return null;
-}
-
-function isUnaryArithmeticSign(body: string, index: number): boolean {
-  for (let i = index - 1; i >= 0; i -= 1) {
-    const ch = body[i];
-    if (ch === ' ') continue;
-    return ch === '(' || ch === '+' || ch === '-' || ch === '*' || ch === '/';
-  }
-  return true;
-}
-
-function splitFormulaComparison(
-  body: string,
-): { left: string; op: '>' | '<' | '>=' | '<=' | '=' | '<>'; right: string } | null {
-  let depth = 0;
-  let quote: '"' | "'" | null = null;
-  for (let i = 0; i < body.length; i += 1) {
-    const ch = body[i];
-    if (quote) {
-      if (ch === quote) quote = null;
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      quote = ch;
-      continue;
-    }
-    if (ch === '(') {
-      depth += 1;
-      continue;
-    }
-    if (ch === ')') {
-      depth -= 1;
-      if (depth < 0) return null;
-      continue;
-    }
-    if (depth !== 0) continue;
-    const two = body.slice(i, i + 2);
-    const op =
-      two === '>=' || two === '<=' || two === '<>'
-        ? two
-        : ch === '>' || ch === '<' || ch === '='
-          ? ch
-          : null;
-    if (!op) continue;
-    const left = body.slice(0, i).trim();
-    const right = body.slice(i + op.length).trim();
-    return left && right ? { left, op, right } : null;
-  }
-  return null;
 }
 
 export {

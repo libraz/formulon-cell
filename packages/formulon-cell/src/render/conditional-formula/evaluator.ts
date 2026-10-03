@@ -1,11 +1,76 @@
-import { formatNumber } from '../../commands/format.js';
 import { addrKey } from '../../engine/address.js';
 import type { CellValue } from '../../engine/types.js';
 import type { ConditionalRule, State } from '../../store/store.js';
 import {
+  aggregateFunction,
+  aggregateResult,
+  aggregateValueA,
+  percentileExcValue,
+  percentileIncValue,
+  subtotalFunction,
+} from './aggregation.js';
+import {
+  datedif,
+  dateFromSerial,
+  dateSerialFromParts,
+  dateValueText,
+  dayOfYear,
+  days360,
+  defaultWeekendDays,
+  isoWeekNumber,
+  networkDays,
+  serialTimeFraction,
+  timeValueText,
+  todaySerial,
+  weekdayValue,
+  weekendDaysFromValue,
+  weekStartForReturnType,
+  workday,
+  yearFrac,
+} from './calendar.js';
+import { booleanValue, positiveInteger, readLogical, readNumber, textValue } from './coercion.js';
+import {
+  binomialProbability,
+  combination,
+  doubleFactorial,
+  erf,
+  factorial,
+  gamma,
+  hypergeometricProbability,
+  inverseRegularizedBeta,
+  inverseRegularizedGammaP,
+  inverseStandardNormal,
+  inverseStudentTCdf,
+  logGamma,
+  negativeBinomialProbability,
+  poissonProbability,
+  regularizedBeta,
+  regularizedGammaP,
+  standardNormalCdf,
+  standardNormalPdf,
+  studentTCdf,
+  studentTPdf,
+} from './distributions.js';
+import {
+  approximateMatchIndex,
+  approximateXmatchIndex,
+  compareValues,
+  exactMatchValues,
+  isApproximateLookupMode,
+  isExactLookupMode,
+  matchesCountIfCriteria,
+} from './matching.js';
+import {
+  baseDigits,
+  bitOperand,
+  engineeringBaseText,
+  engineeringBaseValue,
+  maxBitValue,
+  romanText,
+  romanValue,
+} from './numerals.js';
+import {
   colToLetters,
-  FORMULA_NUMBER_LITERAL,
-  FORMULA_VALUE_NUMBER_LITERAL,
   MAX_FORMULA_AGGREGATE_CELLS,
   parseA1Range,
   parseA1Ref,
@@ -18,6 +83,23 @@ import {
   splitFormulaComparison,
   stripOuterParens,
 } from './parser.js';
+import {
+  beforeAfterText,
+  coerceScalar,
+  concatTextValue,
+  exactText,
+  fixedFormatText,
+  formatText,
+  numberValueText,
+  repeatText,
+  replaceText,
+  searchText,
+  sliceText,
+  substituteText,
+  transformText,
+  valueText,
+  valueToText,
+} from './text-functions.js';
 import type {
   FormulaAggregateArg,
   FormulaAggregateName,
@@ -93,52 +175,6 @@ export function parseFormulaPredicate(raw: string): FormulaPredicate | null {
       }
     },
   };
-}
-
-function compareValues(
-  left: CellValue,
-  op: '>' | '<' | '>=' | '<=' | '=' | '<>',
-  right: CellValue,
-): boolean {
-  if (left.kind === 'number' && right.kind === 'number') {
-    switch (op) {
-      case '>':
-        return left.value > right.value;
-      case '<':
-        return left.value < right.value;
-      case '>=':
-        return left.value >= right.value;
-      case '<=':
-        return left.value <= right.value;
-      case '=':
-        return left.value === right.value;
-      case '<>':
-        return left.value !== right.value;
-    }
-  }
-  if (left.kind === 'error' && right.kind === 'error') {
-    return op === '=' ? left.text === right.text : op === '<>' ? left.text !== right.text : false;
-  }
-  const leftText =
-    left.kind === 'text'
-      ? left.value
-      : left.kind === 'bool'
-        ? String(left.value).toUpperCase()
-        : null;
-  const rightText =
-    right.kind === 'text'
-      ? right.value
-      : right.kind === 'bool'
-        ? String(right.value).toUpperCase()
-        : null;
-  if (leftText === null || rightText === null) return false;
-  const leftComparable = leftText.toLocaleLowerCase();
-  const rightComparable = rightText.toLocaleLowerCase();
-  return op === '='
-    ? leftComparable === rightComparable
-    : op === '<>'
-      ? leftComparable !== rightComparable
-      : false;
 }
 
 export function compileFormulaCellPredicate(
@@ -286,41 +322,6 @@ function parseFormulaBooleanExpression(
   return null;
 }
 
-function countIfWildcardPattern(criteria: string): RegExp | null {
-  let pattern = '^';
-  let hasWildcard = false;
-  for (let i = 0; i < criteria.length; i += 1) {
-    const ch = criteria[i] ?? '';
-    if (ch === '~') {
-      const next = criteria[i + 1];
-      if (next === '*' || next === '?' || next === '~') {
-        pattern += escapeRegExp(next);
-        hasWildcard = true;
-        i += 1;
-      } else {
-        pattern += escapeRegExp(ch);
-      }
-      continue;
-    }
-    if (ch === '*') {
-      pattern += '.*';
-      hasWildcard = true;
-      continue;
-    }
-    if (ch === '?') {
-      pattern += '.';
-      hasWildcard = true;
-      continue;
-    }
-    pattern += escapeRegExp(ch);
-  }
-  return hasWildcard ? new RegExp(`${pattern}$`, 'iu') : null;
-}
-
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 function parseFormulaComparisonPredicate(
   state: State,
   rule: Extract<ConditionalRule, { kind: 'formula' }>,
@@ -354,178 +355,6 @@ function makeFormulaOperandReader(
     ref.absRow ? ref.row : ref.row + rowOffset,
     ref.absCol ? ref.col : ref.col + colOffset,
   ];
-  const aggregateValueA = (value: CellValue): number | null => {
-    if (value.kind === 'number' && Number.isFinite(value.value)) return value.value;
-    if (value.kind === 'bool') return value.value ? 1 : 0;
-    if (value.kind === 'text') return 0;
-    return null;
-  };
-  const aggregateResult = (
-    fn: FormulaAggregateName,
-    values: number[],
-    valuesA: number[],
-    countA: number,
-    countBlank: number,
-  ): CellValue => {
-    if (fn === 'COUNT') return { kind: 'number', value: values.length };
-    if (fn === 'COUNTA') return { kind: 'number', value: countA };
-    if (fn === 'COUNTBLANK') return { kind: 'number', value: countBlank };
-    if (fn === 'SUM') {
-      return { kind: 'number', value: values.reduce((sum, value) => sum + value, 0) };
-    }
-    if (fn === 'AVERAGEA' || fn === 'MINA' || fn === 'MAXA') {
-      if (valuesA.length === 0) return { kind: 'error', code: 15, text: '#VALUE!' };
-      if (fn === 'AVERAGEA') {
-        return {
-          kind: 'number',
-          value: valuesA.reduce((sum, value) => sum + value, 0) / valuesA.length,
-        };
-      }
-      return {
-        kind: 'number',
-        value: fn === 'MINA' ? Math.min(...valuesA) : Math.max(...valuesA),
-      };
-    }
-    if (fn === 'PRODUCT') {
-      return {
-        kind: 'number',
-        value: values.length === 0 ? 0 : values.reduce((product, value) => product * value, 1),
-      };
-    }
-    if (values.length === 0) return { kind: 'error', code: 15, text: '#VALUE!' };
-    if (fn === 'AVERAGE') {
-      return {
-        kind: 'number',
-        value: values.reduce((sum, value) => sum + value, 0) / values.length,
-      };
-    }
-    if (fn === 'MEDIAN') {
-      const sorted = [...values].sort((a, b) => a - b);
-      const mid = Math.floor(sorted.length / 2);
-      return {
-        kind: 'number',
-        value:
-          sorted.length % 2 === 1
-            ? (sorted[mid] as number)
-            : ((sorted[mid - 1] as number) + (sorted[mid] as number)) / 2,
-      };
-    }
-    if (fn === 'MODE' || fn === 'MODE.SNGL') {
-      const counts = new Map<number, number>();
-      let mode: number | null = null;
-      let bestCount = 1;
-      for (const value of values) {
-        const count = (counts.get(value) ?? 0) + 1;
-        counts.set(value, count);
-        if (count > bestCount) {
-          bestCount = count;
-          mode = value;
-        }
-      }
-      return mode === null
-        ? { kind: 'error', code: 6, text: '#N/A' }
-        : { kind: 'number', value: mode };
-    }
-    if (fn === 'DEVSQ') {
-      const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-      return {
-        kind: 'number',
-        value: values.reduce((sum, value) => sum + (value - mean) ** 2, 0),
-      };
-    }
-    if (fn === 'AVEDEV') {
-      const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-      return {
-        kind: 'number',
-        value: values.reduce((sum, value) => sum + Math.abs(value - mean), 0) / values.length,
-      };
-    }
-    if (fn === 'SKEW') {
-      if (values.length < 3) return { kind: 'error', code: 1, text: '#DIV/0!' };
-      const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-      const sampleVariance =
-        values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (values.length - 1);
-      const sampleDeviation = Math.sqrt(sampleVariance);
-      if (sampleDeviation === 0) return { kind: 'error', code: 1, text: '#DIV/0!' };
-      const skew =
-        (values.length / ((values.length - 1) * (values.length - 2))) *
-        values.reduce((sum, value) => sum + ((value - mean) / sampleDeviation) ** 3, 0);
-      return { kind: 'number', value: skew };
-    }
-    if (fn === 'SKEW.P') {
-      if (values.length < 3) return { kind: 'error', code: 1, text: '#DIV/0!' };
-      const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-      const populationVariance =
-        values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length;
-      const populationDeviation = Math.sqrt(populationVariance);
-      if (populationDeviation === 0) return { kind: 'error', code: 1, text: '#DIV/0!' };
-      return {
-        kind: 'number',
-        value:
-          values.reduce((sum, value) => sum + ((value - mean) / populationDeviation) ** 3, 0) /
-          values.length,
-      };
-    }
-    if (fn === 'KURT') {
-      if (values.length < 4) return { kind: 'error', code: 1, text: '#DIV/0!' };
-      const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-      const sampleVariance =
-        values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (values.length - 1);
-      const sampleDeviation = Math.sqrt(sampleVariance);
-      if (sampleDeviation === 0) return { kind: 'error', code: 1, text: '#DIV/0!' };
-      const n = values.length;
-      const sumFourthPowers = values.reduce(
-        (sum, value) => sum + ((value - mean) / sampleDeviation) ** 4,
-        0,
-      );
-      const kurtosis =
-        (n * (n + 1) * sumFourthPowers) / ((n - 1) * (n - 2) * (n - 3)) -
-        (3 * (n - 1) ** 2) / ((n - 2) * (n - 3));
-      return { kind: 'number', value: kurtosis };
-    }
-    if (fn === 'GEOMEAN' || fn === 'HARMEAN') {
-      if (values.some((value) => value <= 0)) {
-        return { kind: 'error', code: 6, text: '#NUM!' };
-      }
-      if (fn === 'GEOMEAN') {
-        return {
-          kind: 'number',
-          value: Math.exp(values.reduce((sum, value) => sum + Math.log(value), 0) / values.length),
-        };
-      }
-      return {
-        kind: 'number',
-        value: values.length / values.reduce((sum, value) => sum + 1 / value, 0),
-      };
-    }
-    if (
-      fn === 'VAR' ||
-      fn === 'VARP' ||
-      fn === 'VAR.S' ||
-      fn === 'VAR.P' ||
-      fn === 'STDEV' ||
-      fn === 'STDEVP' ||
-      fn === 'STDEV.S' ||
-      fn === 'STDEV.P'
-    ) {
-      const sample = fn === 'VAR' || fn === 'STDEV' || fn.endsWith('.S');
-      if (values.length < (sample ? 2 : 1)) {
-        return { kind: 'error', code: 1, text: '#DIV/0!' };
-      }
-      const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-      const variance =
-        values.reduce((sum, value) => sum + (value - mean) ** 2, 0) /
-        (sample ? values.length - 1 : values.length);
-      return {
-        kind: 'number',
-        value: fn.startsWith('STDEV') ? Math.sqrt(variance) : variance,
-      };
-    }
-    return {
-      kind: 'number',
-      value: fn === 'MIN' ? Math.min(...values) : Math.max(...values),
-    };
-  };
   const rangeAggregateStats = (
     range: FormulaRangeArg,
     rowOffset: number,
@@ -592,89 +421,6 @@ function makeFormulaOperandReader(
       if (valueA !== null) valuesA.push(valueA);
     }
     return aggregateResult(fn, values, valuesA, countA, countBlank);
-  };
-  const subtotalFunction = (functionNum: number): FormulaAggregateName | null => {
-    const code = Math.trunc(functionNum);
-    const normalized = code >= 101 && code <= 111 ? code - 100 : code;
-    switch (normalized) {
-      case 1:
-        return 'AVERAGE';
-      case 2:
-        return 'COUNT';
-      case 3:
-        return 'COUNTA';
-      case 4:
-        return 'MAX';
-      case 5:
-        return 'MIN';
-      case 6:
-        return 'PRODUCT';
-      case 7:
-        return 'STDEV';
-      case 8:
-        return 'STDEVP';
-      case 9:
-        return 'SUM';
-      case 10:
-        return 'VAR';
-      case 11:
-        return 'VARP';
-      default:
-        return null;
-    }
-  };
-  const aggregateFunction = (
-    functionNum: number,
-  ):
-    | { kind: 'aggregate'; fn: FormulaAggregateName }
-    | { kind: 'ranked'; fn: 'LARGE' | 'SMALL' }
-    | {
-        kind: 'percentile';
-        fn: 'PERCENTILE.INC' | 'QUARTILE.INC' | 'PERCENTILE.EXC' | 'QUARTILE.EXC';
-      }
-    | null => {
-    switch (Math.trunc(functionNum)) {
-      case 1:
-        return { kind: 'aggregate', fn: 'AVERAGE' };
-      case 2:
-        return { kind: 'aggregate', fn: 'COUNT' };
-      case 3:
-        return { kind: 'aggregate', fn: 'COUNTA' };
-      case 4:
-        return { kind: 'aggregate', fn: 'MAX' };
-      case 5:
-        return { kind: 'aggregate', fn: 'MIN' };
-      case 6:
-        return { kind: 'aggregate', fn: 'PRODUCT' };
-      case 7:
-        return { kind: 'aggregate', fn: 'STDEV.S' };
-      case 8:
-        return { kind: 'aggregate', fn: 'STDEV.P' };
-      case 9:
-        return { kind: 'aggregate', fn: 'SUM' };
-      case 10:
-        return { kind: 'aggregate', fn: 'VAR.S' };
-      case 11:
-        return { kind: 'aggregate', fn: 'VAR.P' };
-      case 12:
-        return { kind: 'aggregate', fn: 'MEDIAN' };
-      case 13:
-        return { kind: 'aggregate', fn: 'MODE.SNGL' };
-      case 14:
-        return { kind: 'ranked', fn: 'LARGE' };
-      case 15:
-        return { kind: 'ranked', fn: 'SMALL' };
-      case 16:
-        return { kind: 'percentile', fn: 'PERCENTILE.INC' };
-      case 17:
-        return { kind: 'percentile', fn: 'QUARTILE.INC' };
-      case 18:
-        return { kind: 'percentile', fn: 'PERCENTILE.EXC' };
-      case 19:
-        return { kind: 'percentile', fn: 'QUARTILE.EXC' };
-      default:
-        return null;
-    }
   };
   const rangeBounds = (
     range: ParsedA1Range,
@@ -925,30 +671,6 @@ function makeFormulaOperandReader(
     }
     values.sort((a, b) => (fn === 'LARGE' ? b - a : a - b));
     return { kind: 'number', value: values[rank - 1] as number };
-  };
-  const percentileIncValue = (values: number[], k: number): number => {
-    if (values.length === 1) return values[0] as number;
-    const sorted = values.slice().sort((a, b) => a - b);
-    const position = k * (sorted.length - 1);
-    const lower = Math.floor(position);
-    const upper = Math.ceil(position);
-    if (lower === upper) return sorted[lower] as number;
-    const fraction = position - lower;
-    return (
-      (sorted[lower] as number) + ((sorted[upper] as number) - (sorted[lower] as number)) * fraction
-    );
-  };
-  const percentileExcValue = (values: number[], k: number): number | null => {
-    if (k <= 0 || k >= 1) return null;
-    const sorted = values.slice().sort((a, b) => a - b);
-    const position = k * (sorted.length + 1);
-    if (position < 1 || position > sorted.length) return null;
-    const lower = Math.floor(position);
-    const upper = Math.ceil(position);
-    if (lower === upper) return sorted[lower - 1] as number;
-    const lowerValue = sorted[lower - 1] as number;
-    const upperValue = sorted[upper - 1] as number;
-    return lowerValue + (upperValue - lowerValue) * (position - lower);
   };
   const percentileRangeValue = (
     fn:
@@ -1412,66 +1134,6 @@ function makeFormulaOperandReader(
     }
     return { kind: 'number', value: total };
   };
-  const matchesCountIfCriteria = (value: CellValue, criteria: CellValue): boolean => {
-    if (criteria.kind === 'text') {
-      const raw = criteria.value.trim();
-      const m = raw.match(/^(>=|<=|<>|>|<|=)?\s*(.*)$/);
-      const op = (m?.[1] ?? '=') as '>' | '<' | '>=' | '<=' | '=' | '<>';
-      const rhs = m?.[2] ?? raw;
-      if (FORMULA_NUMBER_LITERAL.test(rhs)) {
-        return value.kind === 'number'
-          ? compareValues(value, op, { kind: 'number', value: Number(rhs) })
-          : false;
-      }
-      if (/^true$/i.test(rhs) || /^false$/i.test(rhs)) {
-        return compareValues(value, op, { kind: 'bool', value: /^true$/i.test(rhs) });
-      }
-      if (rhs === '') {
-        const blankLike = value.kind === 'blank' || (value.kind === 'text' && value.value === '');
-        return op === '=' ? blankLike : op === '<>' ? !blankLike : false;
-      }
-      const leftText =
-        value.kind === 'text'
-          ? value.value
-          : value.kind === 'bool'
-            ? String(value.value).toUpperCase()
-            : value.kind === 'error'
-              ? value.text
-              : null;
-      if (leftText === null) return false;
-      const wildcard = op === '=' || op === '<>' ? countIfWildcardPattern(rhs) : null;
-      if (wildcard) {
-        const matched = wildcard.test(leftText);
-        return op === '<>' ? !matched : matched;
-      }
-      const left = leftText.toLocaleLowerCase();
-      const right = rhs.toLocaleLowerCase();
-      switch (op) {
-        case '=':
-          return left === right;
-        case '<>':
-          return left !== right;
-        case '>':
-          return left > right;
-        case '<':
-          return left < right;
-        case '>=':
-          return left >= right;
-        case '<=':
-          return left <= right;
-      }
-    }
-    if (criteria.kind === 'number') {
-      return value.kind === 'number' && value.value === criteria.value;
-    }
-    if (criteria.kind === 'bool') {
-      return value.kind === 'bool' && value.value === criteria.value;
-    }
-    if (criteria.kind === 'blank') {
-      return value.kind === 'blank' || (value.kind === 'text' && value.value === '');
-    }
-    return value.kind === 'error' && value.text === criteria.text;
-  };
   const countMatchingRange = (
     range: FormulaRangeArg,
     criteria: CellValue,
@@ -1751,274 +1413,6 @@ function makeFormulaOperandReader(
       ? { kind: 'error', code: 1, text: '#DIV/0!' }
       : { kind: 'number', value: result };
   };
-  const textValue = (value: CellValue): string | null => {
-    if (value.kind === 'text') return value.value;
-    if (value.kind === 'number') return String(value.value);
-    if (value.kind === 'bool') return value.value ? 'TRUE' : 'FALSE';
-    if (value.kind === 'blank') return '';
-    return null;
-  };
-  const concatTextValue = (value: CellValue): string =>
-    value.kind === 'error' ? value.text : (textValue(value) ?? '');
-  const booleanValue = (value: CellValue): boolean | null => {
-    if (value.kind === 'bool') return value.value;
-    if (value.kind === 'number' && Number.isFinite(value.value)) return value.value !== 0;
-    return null;
-  };
-  const searchText = (
-    fn: 'SEARCH' | 'FIND',
-    needleValue: CellValue,
-    haystackValue: CellValue,
-    startValue: CellValue | null,
-  ): CellValue => {
-    const needle = textValue(needleValue);
-    const haystack = textValue(haystackValue);
-    if (needle === null || haystack === null) return { kind: 'error', code: 15, text: '#VALUE!' };
-    let start = 0;
-    if (startValue !== null) {
-      if (
-        startValue.kind !== 'number' ||
-        !Number.isFinite(startValue.value) ||
-        startValue.value < 1
-      ) {
-        return { kind: 'error', code: 15, text: '#VALUE!' };
-      }
-      start = Math.floor(startValue.value) - 1;
-    }
-    if (start > haystack.length) return { kind: 'error', code: 15, text: '#VALUE!' };
-    const searchNeedle = fn === 'SEARCH' ? needle.toLocaleLowerCase() : needle;
-    const searchHaystack = fn === 'SEARCH' ? haystack.toLocaleLowerCase() : haystack;
-    const literalNeedle = fn === 'SEARCH' ? searchLiteralPattern(searchNeedle) : null;
-    if (literalNeedle !== null) {
-      const index = searchHaystack.indexOf(literalNeedle, start);
-      return index >= 0
-        ? { kind: 'number', value: index + 1 }
-        : { kind: 'error', code: 15, text: '#VALUE!' };
-    }
-    const wildcard = fn === 'SEARCH' ? searchWildcardPattern(searchNeedle) : null;
-    if (wildcard) {
-      for (let index = start; index <= searchHaystack.length; index += 1) {
-        if (wildcard.test(searchHaystack.slice(index))) return { kind: 'number', value: index + 1 };
-      }
-      return { kind: 'error', code: 15, text: '#VALUE!' };
-    }
-    const index = searchHaystack.indexOf(searchNeedle, start);
-    return index >= 0
-      ? { kind: 'number', value: index + 1 }
-      : { kind: 'error', code: 15, text: '#VALUE!' };
-  };
-  const searchLiteralPattern = (criteria: string): string | null => {
-    let out = '';
-    let hasEscape = false;
-    for (let i = 0; i < criteria.length; i += 1) {
-      const ch = criteria[i] ?? '';
-      if (ch === '~') {
-        const next = criteria[i + 1];
-        if (next === '*' || next === '?' || next === '~') {
-          out += next;
-          hasEscape = true;
-          i += 1;
-          continue;
-        }
-      }
-      if (ch === '*' || ch === '?') return null;
-      out += ch;
-    }
-    return hasEscape ? out : null;
-  };
-  const searchWildcardPattern = (criteria: string): RegExp | null => {
-    let pattern = '^';
-    let hasWildcard = false;
-    for (let i = 0; i < criteria.length; i += 1) {
-      const ch = criteria[i] ?? '';
-      if (ch === '~') {
-        const next = criteria[i + 1];
-        if (next === '*' || next === '?' || next === '~') {
-          pattern += escapeRegExp(next);
-          i += 1;
-        } else {
-          pattern += escapeRegExp(ch);
-        }
-        continue;
-      }
-      if (ch === '*') {
-        pattern += '.*';
-        hasWildcard = true;
-        continue;
-      }
-      if (ch === '?') {
-        pattern += '.';
-        hasWildcard = true;
-        continue;
-      }
-      pattern += escapeRegExp(ch);
-    }
-    return hasWildcard ? new RegExp(pattern, 'u') : null;
-  };
-  const nonNegativeInteger = (value: CellValue): number | null => {
-    if (value.kind !== 'number' || !Number.isFinite(value.value) || value.value < 0) return null;
-    return Math.floor(value.value);
-  };
-  const positiveInteger = (value: CellValue): number | null => {
-    if (value.kind !== 'number' || !Number.isFinite(value.value) || value.value < 1) return null;
-    return Math.floor(value.value);
-  };
-  const sliceText = (
-    fn: 'LEFT' | 'RIGHT' | 'MID',
-    textValueCell: CellValue,
-    startValue: CellValue | null,
-    countValue: CellValue,
-  ): CellValue => {
-    const text = textValue(textValueCell);
-    const count = nonNegativeInteger(countValue);
-    if (text === null || count === null) return { kind: 'error', code: 15, text: '#VALUE!' };
-    if (fn === 'LEFT') return { kind: 'text', value: text.slice(0, count) };
-    if (fn === 'RIGHT') return { kind: 'text', value: count === 0 ? '' : text.slice(-count) };
-    if (startValue === null) return { kind: 'error', code: 15, text: '#VALUE!' };
-    const start = positiveInteger(startValue);
-    if (start === null) return { kind: 'error', code: 15, text: '#VALUE!' };
-    return { kind: 'text', value: text.slice(start - 1, start - 1 + count) };
-  };
-  const transformText = (
-    fn: 'LOWER' | 'UPPER' | 'TRIM' | 'CLEAN' | 'PROPER' | 'ENCODEURL',
-    textValueCell: CellValue,
-  ): CellValue => {
-    const text = textValue(textValueCell);
-    if (text === null) return { kind: 'error', code: 15, text: '#VALUE!' };
-    if (fn === 'LOWER') return { kind: 'text', value: text.toLocaleLowerCase() };
-    if (fn === 'UPPER') return { kind: 'text', value: text.toLocaleUpperCase() };
-    if (fn === 'TRIM') return { kind: 'text', value: text.trim().replace(/ +/g, ' ') };
-    if (fn === 'ENCODEURL') return { kind: 'text', value: encodeURIComponent(text) };
-    if (fn === 'CLEAN') {
-      return {
-        kind: 'text',
-        value: [...text].filter((char) => char.charCodeAt(0) > 31).join(''),
-      };
-    }
-    return {
-      kind: 'text',
-      value: text
-        .toLocaleLowerCase()
-        .replace(
-          /(^|[^A-Za-z0-9])([A-Za-z])/g,
-          (_match, prefix: string, letter: string) => `${prefix}${letter.toLocaleUpperCase()}`,
-        ),
-    };
-  };
-  const substituteText = (
-    textValueCell: CellValue,
-    oldTextValue: CellValue,
-    newTextValue: CellValue,
-    instanceValue: CellValue | null,
-  ): CellValue => {
-    const text = textValue(textValueCell);
-    const oldText = textValue(oldTextValue);
-    const newText = textValue(newTextValue);
-    if (text === null || oldText === null || newText === null) {
-      return { kind: 'error', code: 15, text: '#VALUE!' };
-    }
-    if (oldText === '') return { kind: 'text', value: text };
-    if (instanceValue === null) return { kind: 'text', value: text.split(oldText).join(newText) };
-    const instance = positiveInteger(instanceValue);
-    if (instance === null) return { kind: 'error', code: 15, text: '#VALUE!' };
-    let seen = 0;
-    let offset = 0;
-    for (;;) {
-      const index = text.indexOf(oldText, offset);
-      if (index < 0) return { kind: 'text', value: text };
-      seen += 1;
-      if (seen === instance) {
-        return {
-          kind: 'text',
-          value: `${text.slice(0, index)}${newText}${text.slice(index + oldText.length)}`,
-        };
-      }
-      offset = index + oldText.length;
-    }
-  };
-  const replaceText = (
-    textValueCell: CellValue,
-    startValue: CellValue,
-    countValue: CellValue,
-    newTextValue: CellValue,
-  ): CellValue => {
-    const text = textValue(textValueCell);
-    const newText = textValue(newTextValue);
-    const start = positiveInteger(startValue);
-    const count = nonNegativeInteger(countValue);
-    if (text === null || newText === null || start === null || count === null) {
-      return { kind: 'error', code: 15, text: '#VALUE!' };
-    }
-    const index = start - 1;
-    return { kind: 'text', value: `${text.slice(0, index)}${newText}${text.slice(index + count)}` };
-  };
-  const repeatText = (textValueCell: CellValue, countValue: CellValue): CellValue => {
-    const text = textValue(textValueCell);
-    const count = nonNegativeInteger(countValue);
-    if (text === null || count === null || text.length * count > 32767) {
-      return { kind: 'error', code: 15, text: '#VALUE!' };
-    }
-    return { kind: 'text', value: text.repeat(count) };
-  };
-  const beforeAfterText = (
-    fn: 'TEXTBEFORE' | 'TEXTAFTER',
-    textValueCell: CellValue,
-    delimiterValue: CellValue,
-    instanceValue: CellValue | null,
-    matchModeValue: CellValue | null,
-    matchEndValue: CellValue | null,
-    ifNotFoundValue: CellValue | null,
-  ): CellValue => {
-    const text = textValue(textValueCell);
-    const delimiter = textValue(delimiterValue);
-    if (text === null || delimiter === null || delimiter === '') {
-      return { kind: 'error', code: 15, text: '#VALUE!' };
-    }
-    const instance = instanceValue === null ? 1 : readNumber(instanceValue);
-    const matchMode = matchModeValue === null ? 0 : readNumber(matchModeValue);
-    const matchEnd = matchEndValue === null ? 0 : readNumber(matchEndValue);
-    if (
-      instance === null ||
-      matchMode === null ||
-      matchEnd === null ||
-      Math.trunc(instance) === 0
-    ) {
-      return { kind: 'error', code: 15, text: '#VALUE!' };
-    }
-    const nth = Math.trunc(instance);
-    const ignoreCase = Math.trunc(matchMode) === 1;
-    if (Math.trunc(matchMode) !== 0 && !ignoreCase) {
-      return { kind: 'error', code: 15, text: '#VALUE!' };
-    }
-    if (Math.trunc(matchEnd) !== 0 && Math.trunc(matchEnd) !== 1) {
-      return { kind: 'error', code: 15, text: '#VALUE!' };
-    }
-    const haystack = ignoreCase ? text.toLocaleLowerCase() : text;
-    const needle = ignoreCase ? delimiter.toLocaleLowerCase() : delimiter;
-    const matches: number[] = [];
-    let offset = 0;
-    for (;;) {
-      const index = haystack.indexOf(needle, offset);
-      if (index < 0) break;
-      matches.push(index);
-      offset = index + needle.length;
-    }
-    if (Math.trunc(matchEnd) === 1) {
-      if (fn === 'TEXTBEFORE' && nth > 0) matches.push(text.length);
-      if (fn === 'TEXTAFTER' && nth < 0) matches.unshift(-delimiter.length);
-    }
-    const index = nth > 0 ? matches[nth - 1] : matches[matches.length + nth];
-    if (index === undefined) {
-      return ifNotFoundValue ?? { kind: 'error', code: 6, text: '#N/A' };
-    }
-    return {
-      kind: 'text',
-      value:
-        fn === 'TEXTBEFORE'
-          ? text.slice(0, index)
-          : text.slice(Math.max(0, index + delimiter.length)),
-    };
-  };
   const joinText = (
     delimiterValue: CellValue,
     ignoreEmptyValue: CellValue,
@@ -2040,494 +1434,6 @@ function makeFormulaOperandReader(
     return joined.length > 32767
       ? { kind: 'error', code: 15, text: '#VALUE!' }
       : { kind: 'text', value: joined };
-  };
-  const exactText = (leftValue: CellValue, rightValue: CellValue): CellValue => {
-    const left = textValue(leftValue);
-    const right = textValue(rightValue);
-    if (left === null || right === null) return { kind: 'error', code: 15, text: '#VALUE!' };
-    return { kind: 'bool', value: left === right };
-  };
-  const formatText = (valueCell: CellValue, patternCell: CellValue): CellValue => {
-    const value = readNumber(valueCell);
-    const pattern = textValue(patternCell);
-    if (value === null || pattern === null || pattern === '') {
-      return { kind: 'error', code: 15, text: '#VALUE!' };
-    }
-    return { kind: 'text', value: formatNumber(value, { kind: 'custom', pattern }) };
-  };
-  const fixedFormatText = (
-    fn: 'DOLLAR' | 'FIXED',
-    valueCell: CellValue,
-    decimalsCell: CellValue | null,
-    noCommasCell: CellValue | null,
-  ): CellValue => {
-    const value = readNumber(valueCell);
-    const decimalsValue = decimalsCell === null ? 2 : readNumber(decimalsCell);
-    const noCommas = noCommasCell === null ? false : booleanValue(noCommasCell);
-    if (value === null || decimalsValue === null || noCommas === null) {
-      return { kind: 'error', code: 15, text: '#VALUE!' };
-    }
-    const decimals = Math.trunc(decimalsValue);
-    const visibleDecimals = Math.max(0, decimals);
-    const roundedValue =
-      decimals >= 0 ? value : Math.round(value / 10 ** -decimals) * 10 ** -decimals;
-    return {
-      kind: 'text',
-      value: formatNumber(
-        roundedValue,
-        fn === 'DOLLAR'
-          ? { kind: 'currency', decimals: visibleDecimals, symbol: '$' }
-          : { kind: 'fixed', decimals: visibleDecimals, thousands: !noCommas },
-      ),
-    };
-  };
-  const parseNumberText = (
-    text: string,
-    decimalSeparator = '.',
-    groupSeparator = ',',
-  ): CellValue => {
-    if (
-      decimalSeparator.length !== 1 ||
-      groupSeparator.length !== 1 ||
-      decimalSeparator === groupSeparator
-    ) {
-      return { kind: 'error', code: 15, text: '#VALUE!' };
-    }
-    const isPercent = text.endsWith('%');
-    const body = isPercent ? text.slice(0, -1) : text;
-    const decimal = escapeRegExp(decimalSeparator);
-    const group = escapeRegExp(groupSeparator);
-    const pattern = new RegExp(
-      `^[+-]?(?:(?:\\d{1,3}(?:${group}\\d{3})+|\\d+)(?:${decimal}\\d*)?|${decimal}\\d+)(?:[eE][+-]?\\d+)?$`,
-      'u',
-    );
-    if (!pattern.test(body)) return { kind: 'error', code: 15, text: '#VALUE!' };
-    const normalized = body.split(groupSeparator).join('').replace(decimalSeparator, '.');
-    const number = Number(normalized);
-    if (!Number.isFinite(number)) return { kind: 'error', code: 15, text: '#VALUE!' };
-    return { kind: 'number', value: isPercent ? number / 100 : number };
-  };
-  const valueText = (value: CellValue): CellValue => {
-    if (value.kind === 'number') return value;
-    const text = value.kind === 'text' ? value.value.trim() : value.kind === 'blank' ? '' : null;
-    if (text === null || text === '') return { kind: 'error', code: 15, text: '#VALUE!' };
-    if (!FORMULA_VALUE_NUMBER_LITERAL.test(text)) {
-      return { kind: 'error', code: 15, text: '#VALUE!' };
-    }
-    return parseNumberText(text);
-  };
-  const numberValueText = (
-    value: CellValue,
-    decimalSeparatorValue: CellValue | null,
-    groupSeparatorValue: CellValue | null,
-  ): CellValue => {
-    const text = value.kind === 'number' ? String(value.value) : (textValue(value)?.trim() ?? null);
-    const decimalSeparator =
-      decimalSeparatorValue === null ? '.' : textValue(decimalSeparatorValue);
-    const groupSeparator = groupSeparatorValue === null ? ',' : textValue(groupSeparatorValue);
-    if (text === null || text === '' || !decimalSeparator || !groupSeparator) {
-      return { kind: 'error', code: 15, text: '#VALUE!' };
-    }
-    return parseNumberText(text, decimalSeparator, groupSeparator);
-  };
-  const valueToText = (value: CellValue, formatValue: CellValue | null): CellValue => {
-    const format = formatValue === null ? 0 : readNumber(formatValue);
-    if (format === null) return { kind: 'error', code: 15, text: '#VALUE!' };
-    const mode = Math.trunc(format);
-    if (mode !== 0 && mode !== 1) return { kind: 'error', code: 15, text: '#VALUE!' };
-    if (value.kind === 'error') return { kind: 'text', value: value.text };
-    if (value.kind === 'blank') return { kind: 'text', value: '' };
-    const text = textValue(value);
-    if (text === null) return { kind: 'error', code: 15, text: '#VALUE!' };
-    return {
-      kind: 'text',
-      value: mode === 1 && value.kind === 'text' ? `"${text.replace(/"/g, '""')}"` : text,
-    };
-  };
-  const coerceScalar = (fn: 'N' | 'T', value: CellValue): CellValue => {
-    if (value.kind === 'error') return value;
-    if (fn === 'N') {
-      if (value.kind === 'number') return value;
-      if (value.kind === 'bool') return { kind: 'number', value: value.value ? 1 : 0 };
-      return { kind: 'number', value: 0 };
-    }
-    return value.kind === 'text' ? value : { kind: 'text', value: '' };
-  };
-  const readNumber = (value: CellValue): number | null =>
-    value.kind === 'number' && Number.isFinite(value.value) ? value.value : null;
-  const readLogical = (value: CellValue): boolean | null => {
-    if (value.kind === 'bool') return value.value;
-    if (value.kind === 'number' && Number.isFinite(value.value)) return value.value !== 0;
-    return null;
-  };
-  const erf = (value: number): number => {
-    const sign = value < 0 ? -1 : 1;
-    const x = Math.abs(value);
-    const t = 1 / (1 + 0.5 * x);
-    let polynomial = 0.17087277;
-    polynomial = -0.82215223 + t * polynomial;
-    polynomial = 1.48851587 + t * polynomial;
-    polynomial = -1.13520398 + t * polynomial;
-    polynomial = 0.27886807 + t * polynomial;
-    polynomial = -0.18628806 + t * polynomial;
-    polynomial = 0.09678418 + t * polynomial;
-    polynomial = 0.37409196 + t * polynomial;
-    polynomial = 1.00002368 + t * polynomial;
-    const tau = t * Math.exp(-x * x - 1.26551223 + t * polynomial);
-    return sign * (1 - tau);
-  };
-  const standardNormalCdf = (z: number): number => 0.5 * (1 + erf(z / Math.SQRT2));
-  const standardNormalPdf = (z: number): number => Math.exp(-0.5 * z * z) / Math.sqrt(2 * Math.PI);
-  const inverseStandardNormal = (probability: number): number => {
-    const pick = (values: number[], index: number): number => values[index] ?? 0;
-    const a = [
-      -39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269,
-      -30.66479806614716, 2.506628277459239,
-    ];
-    const b = [
-      -54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972,
-      -13.28068155288572,
-    ];
-    const c = [
-      -0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734,
-      4.374664141464968, 2.938163982698783,
-    ];
-    const d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416];
-    const low = 0.02425;
-    const high = 1 - low;
-    if (probability < low) {
-      const q = Math.sqrt(-2 * Math.log(probability));
-      const numerator =
-        ((((pick(c, 0) * q + pick(c, 1)) * q + pick(c, 2)) * q + pick(c, 3)) * q + pick(c, 4)) * q +
-        pick(c, 5);
-      const denominator =
-        (((pick(d, 0) * q + pick(d, 1)) * q + pick(d, 2)) * q + pick(d, 3)) * q + 1;
-      return numerator / denominator;
-    }
-    if (probability > high) {
-      const q = Math.sqrt(-2 * Math.log(1 - probability));
-      const numerator =
-        ((((pick(c, 0) * q + pick(c, 1)) * q + pick(c, 2)) * q + pick(c, 3)) * q + pick(c, 4)) * q +
-        pick(c, 5);
-      const denominator =
-        (((pick(d, 0) * q + pick(d, 1)) * q + pick(d, 2)) * q + pick(d, 3)) * q + 1;
-      return -(numerator / denominator);
-    }
-    const q = probability - 0.5;
-    const r = q * q;
-    const numerator =
-      (((((pick(a, 0) * r + pick(a, 1)) * r + pick(a, 2)) * r + pick(a, 3)) * r + pick(a, 4)) * r +
-        pick(a, 5)) *
-      q;
-    const denominator =
-      ((((pick(b, 0) * r + pick(b, 1)) * r + pick(b, 2)) * r + pick(b, 3)) * r + pick(b, 4)) * r +
-      1;
-    return numerator / denominator;
-  };
-  const binomialProbability = (successes: number, trials: number, probability: number): number => {
-    if (probability === 0) return successes === 0 ? 1 : 0;
-    if (probability === 1) return successes === trials ? 1 : 0;
-    let coefficient = 1;
-    const choose = Math.min(successes, trials - successes);
-    for (let i = 1; i <= choose; i += 1) {
-      coefficient *= (trials - choose + i) / i;
-    }
-    return coefficient * probability ** successes * (1 - probability) ** (trials - successes);
-  };
-  const poissonProbability = (x: number, mean: number): number => {
-    if (mean === 0) return x === 0 ? 1 : 0;
-    let factorial = 1;
-    for (let i = 2; i <= x; i += 1) factorial *= i;
-    return (Math.exp(-mean) * mean ** x) / factorial;
-  };
-  const factorial = (value: number): number => {
-    let result = 1;
-    for (let i = 2; i <= value; i += 1) result *= i;
-    return result;
-  };
-  const doubleFactorial = (value: number): number => {
-    let result = 1;
-    for (let i = value; i > 1; i -= 2) result *= i;
-    return result;
-  };
-  const logGamma = (value: number): number => {
-    const coefficients = [
-      676.5203681218851, -1259.1392167224028, 771.3234287776531, -176.6150291621406,
-      12.507343278686905, -0.13857109526572012, 0.000009984369578019572, 0.00000015056327351493116,
-    ];
-    if (value < 0.5) {
-      return Math.log(Math.PI) - Math.log(Math.sin(Math.PI * value)) - logGamma(1 - value);
-    }
-    const z = value - 1;
-    let x = 0.9999999999998099;
-    for (let i = 0; i < coefficients.length; i += 1) {
-      x += (coefficients[i] as number) / (z + i + 1);
-    }
-    const t = z + coefficients.length - 0.5;
-    return Math.log(Math.sqrt(2 * Math.PI)) + (z + 0.5) * Math.log(t) - t + Math.log(x);
-  };
-  const gamma = (value: number): number | null => {
-    if (value === 0 || (value < 0 && Number.isInteger(value))) return null;
-    if (value < 0.5) {
-      return Math.PI / (Math.sin(Math.PI * value) * Math.exp(logGamma(1 - value)));
-    }
-    return Math.exp(logGamma(value));
-  };
-  const regularizedGammaP = (alpha: number, x: number): number | null => {
-    if (x <= 0) return 0;
-    const epsilon = 1e-12;
-    const maxIterations = 100;
-    const tiny = 1e-300;
-    const logTerm = alpha * Math.log(x) - x - logGamma(alpha);
-    if (x < alpha + 1) {
-      let sum = 1 / alpha;
-      let term = sum;
-      for (let n = 1; n <= maxIterations; n += 1) {
-        term *= x / (alpha + n);
-        sum += term;
-        if (Math.abs(term) < Math.abs(sum) * epsilon) {
-          return Math.exp(logTerm) * sum;
-        }
-      }
-      return null;
-    }
-    let b = x + 1 - alpha;
-    let c = 1 / tiny;
-    let d = 1 / Math.max(b, tiny);
-    let h = d;
-    for (let i = 1; i <= maxIterations; i += 1) {
-      const an = -i * (i - alpha);
-      b += 2;
-      d = an * d + b;
-      if (Math.abs(d) < tiny) d = tiny;
-      c = b + an / c;
-      if (Math.abs(c) < tiny) c = tiny;
-      d = 1 / d;
-      const delta = d * c;
-      h *= delta;
-      if (Math.abs(delta - 1) < epsilon) {
-        return 1 - Math.exp(logTerm) * h;
-      }
-    }
-    return null;
-  };
-  const inverseRegularizedGammaP = (alpha: number, probability: number): number | null => {
-    let low = 0;
-    let high = Math.max(1, alpha);
-    for (let i = 0; i < 100; i += 1) {
-      const value = regularizedGammaP(alpha, high);
-      if (value === null) return null;
-      if (value >= probability) break;
-      high *= 2;
-      if (!Number.isFinite(high)) return null;
-    }
-    for (let i = 0; i < 100; i += 1) {
-      const mid = (low + high) / 2;
-      const value = regularizedGammaP(alpha, mid);
-      if (value === null) return null;
-      if (value < probability) low = mid;
-      else high = mid;
-    }
-    return (low + high) / 2;
-  };
-  const betaContinuedFraction = (x: number, alpha: number, beta: number): number | null => {
-    const maxIterations = 100;
-    const epsilon = 3e-14;
-    const tiny = 1e-300;
-    const qab = alpha + beta;
-    const qap = alpha + 1;
-    const qam = alpha - 1;
-    let c = 1;
-    let d = 1 - (qab * x) / qap;
-    if (Math.abs(d) < tiny) d = tiny;
-    d = 1 / d;
-    let h = d;
-    for (let m = 1; m <= maxIterations; m += 1) {
-      const m2 = 2 * m;
-      let aa = (m * (beta - m) * x) / ((qam + m2) * (alpha + m2));
-      d = 1 + aa * d;
-      if (Math.abs(d) < tiny) d = tiny;
-      c = 1 + aa / c;
-      if (Math.abs(c) < tiny) c = tiny;
-      d = 1 / d;
-      h *= d * c;
-      aa = (-(alpha + m) * (qab + m) * x) / ((alpha + m2) * (qap + m2));
-      d = 1 + aa * d;
-      if (Math.abs(d) < tiny) d = tiny;
-      c = 1 + aa / c;
-      if (Math.abs(c) < tiny) c = tiny;
-      d = 1 / d;
-      const delta = d * c;
-      h *= delta;
-      if (Math.abs(delta - 1) < epsilon) return h;
-    }
-    return null;
-  };
-  const regularizedBeta = (x: number, alpha: number, beta: number): number | null => {
-    if (x <= 0) return 0;
-    if (x >= 1) return 1;
-    const logBt =
-      logGamma(alpha + beta) -
-      logGamma(alpha) -
-      logGamma(beta) +
-      alpha * Math.log(x) +
-      beta * Math.log(1 - x);
-    if (x < (alpha + 1) / (alpha + beta + 2)) {
-      const fraction = betaContinuedFraction(x, alpha, beta);
-      return fraction === null ? null : (Math.exp(logBt) * fraction) / alpha;
-    }
-    const fraction = betaContinuedFraction(1 - x, beta, alpha);
-    return fraction === null ? null : 1 - (Math.exp(logBt) * fraction) / beta;
-  };
-  const inverseRegularizedBeta = (
-    probability: number,
-    alpha: number,
-    beta: number,
-  ): number | null => {
-    let low = 0;
-    let high = 1;
-    for (let i = 0; i < 100; i += 1) {
-      const mid = (low + high) / 2;
-      const value = regularizedBeta(mid, alpha, beta);
-      if (value === null) return null;
-      if (value < probability) low = mid;
-      else high = mid;
-    }
-    return (low + high) / 2;
-  };
-  const studentTCdf = (x: number, degrees: number): number | null => {
-    if (x === 0) return 0.5;
-    const betaInput = degrees / (degrees + x * x);
-    const betaValue = regularizedBeta(betaInput, degrees / 2, 0.5);
-    if (betaValue === null) return null;
-    return x > 0 ? 1 - betaValue / 2 : betaValue / 2;
-  };
-  const studentTPdf = (x: number, degrees: number): number =>
-    Math.exp(
-      logGamma((degrees + 1) / 2) -
-        logGamma(degrees / 2) -
-        0.5 * Math.log(degrees * Math.PI) -
-        ((degrees + 1) / 2) * Math.log(1 + (x * x) / degrees),
-    );
-  const inverseStudentTCdf = (probability: number, degrees: number): number | null => {
-    let low = -1;
-    let high = 1;
-    for (let i = 0; i < 100; i += 1) {
-      const lowValue = studentTCdf(low, degrees);
-      const highValue = studentTCdf(high, degrees);
-      if (lowValue === null || highValue === null) return null;
-      if (lowValue <= probability && highValue >= probability) break;
-      low *= 2;
-      high *= 2;
-      if (!Number.isFinite(low) || !Number.isFinite(high)) return null;
-    }
-    for (let i = 0; i < 100; i += 1) {
-      const mid = (low + high) / 2;
-      const value = studentTCdf(mid, degrees);
-      if (value === null) return null;
-      if (value < probability) low = mid;
-      else high = mid;
-    }
-    return (low + high) / 2;
-  };
-  const combination = (n: number, k: number): number => {
-    const choose = Math.min(k, n - k);
-    let result = 1;
-    for (let i = 1; i <= choose; i += 1) result *= (n - choose + i) / i;
-    return result;
-  };
-  const negativeBinomialProbability = (
-    failures: number,
-    successes: number,
-    probability: number,
-  ): number =>
-    combination(failures + successes - 1, failures) *
-    probability ** successes *
-    (1 - probability) ** failures;
-  const hypergeometricProbability = (
-    sampleSuccesses: number,
-    sampleSize: number,
-    populationSuccesses: number,
-    populationSize: number,
-  ): number =>
-    (combination(populationSuccesses, sampleSuccesses) *
-      combination(populationSize - populationSuccesses, sampleSize - sampleSuccesses)) /
-    combination(populationSize, sampleSize);
-  const baseDigits = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const engineeringBaseValue = (text: string, base: 2 | 8 | 16): number | null => {
-    const normalized = text.trim().toUpperCase();
-    if (normalized === '' || normalized.length > 10) return null;
-    let unsigned = 0;
-    for (const char of normalized) {
-      const digit = baseDigits.indexOf(char);
-      if (digit < 0 || digit >= base) return null;
-      unsigned = unsigned * base + digit;
-    }
-    const signThreshold = base ** 9;
-    const modulus = base ** 10;
-    return normalized.length === 10 && unsigned >= signThreshold ? unsigned - modulus : unsigned;
-  };
-  const engineeringBaseText = (
-    value: number,
-    base: 2 | 8 | 16,
-    places: number | null,
-  ): string | null => {
-    const negativeLimit = -(base ** 9);
-    const positiveLimit = base ** 9 - 1;
-    if (value < negativeLimit || value > positiveLimit || (places !== null && places < 0)) {
-      return null;
-    }
-    if (value < 0)
-      return Math.trunc(value + base ** 10)
-        .toString(base)
-        .toUpperCase();
-    const text = Math.trunc(value).toString(base).toUpperCase();
-    if (places !== null && text.length > places) return null;
-    return places === null ? text : text.padStart(places, '0');
-  };
-  const romanNumerals: [number, string][] = [
-    [1000, 'M'],
-    [900, 'CM'],
-    [500, 'D'],
-    [400, 'CD'],
-    [100, 'C'],
-    [90, 'XC'],
-    [50, 'L'],
-    [40, 'XL'],
-    [10, 'X'],
-    [9, 'IX'],
-    [5, 'V'],
-    [4, 'IV'],
-    [1, 'I'],
-  ];
-  const romanText = (value: number): string => {
-    let remaining = value;
-    let result = '';
-    for (const [amount, symbol] of romanNumerals) {
-      while (remaining >= amount) {
-        result += symbol;
-        remaining -= amount;
-      }
-    }
-    return result;
-  };
-  const romanValue = (value: string): number | null => {
-    const normalized = value.trim().toUpperCase();
-    if (normalized === '') return null;
-    let index = 0;
-    let result = 0;
-    while (index < normalized.length) {
-      const match = romanNumerals.find(([, symbol]) => normalized.startsWith(symbol, index));
-      if (!match) return null;
-      result += match[0];
-      index += match[1].length;
-    }
-    return romanText(result) === normalized ? result : null;
-  };
-  const maxBitValue = 281_474_976_710_655;
-  const bitOperand = (value: number): bigint | null => {
-    const integer = Math.trunc(value);
-    return integer < 0 || integer > maxBitValue ? null : BigInt(integer);
   };
   const roundAwayFromZero = (value: number): number =>
     Math.sign(value) * Math.round(Math.abs(value));
@@ -4367,292 +3273,6 @@ function makeFormulaOperandReader(
     const even = Math.abs(Math.trunc(number)) % 2 === 0;
     return { kind: 'bool', value: fn === 'ISEVEN' ? even : !even };
   };
-  const dateSerialFromParts = (year: number, month: number, day: number): number => {
-    const normalizedYear = year >= 0 && year < 1900 ? year + 1900 : year;
-    const date = new Date(Date.UTC(normalizedYear, month - 1, day));
-    if (normalizedYear >= 0 && normalizedYear < 100) date.setUTCFullYear(normalizedYear);
-    return date.getTime() / 86_400_000 + 25569;
-  };
-  const validatedDateSerial = (year: number, month: number, day: number): number | null => {
-    const normalizedYear = year >= 0 && year < 1900 ? year + 1900 : year;
-    const date = new Date(Date.UTC(normalizedYear, month - 1, day));
-    if (normalizedYear >= 0 && normalizedYear < 100) date.setUTCFullYear(normalizedYear);
-    if (
-      date.getUTCFullYear() !== normalizedYear ||
-      date.getUTCMonth() !== month - 1 ||
-      date.getUTCDate() !== day
-    ) {
-      return null;
-    }
-    return dateSerialFromParts(year, month, day);
-  };
-  const dateValueText = (value: CellValue): CellValue => {
-    const text = textValue(value)?.trim();
-    if (!text) return { kind: 'error', code: 15, text: '#VALUE!' };
-    let match = /^(\d{4})-(\d{1,2})-(\d{1,2})$/u.exec(text);
-    if (match) {
-      const serial = validatedDateSerial(Number(match[1]), Number(match[2]), Number(match[3]));
-      return serial === null
-        ? { kind: 'error', code: 15, text: '#VALUE!' }
-        : { kind: 'number', value: serial };
-    }
-    match = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/u.exec(text);
-    if (match) {
-      const rawYear = Number(match[3]);
-      const year = rawYear < 100 ? (rawYear < 30 ? rawYear + 2000 : rawYear + 1900) : rawYear;
-      const serial = validatedDateSerial(year, Number(match[1]), Number(match[2]));
-      return serial === null
-        ? { kind: 'error', code: 15, text: '#VALUE!' }
-        : { kind: 'number', value: serial };
-    }
-    return { kind: 'error', code: 15, text: '#VALUE!' };
-  };
-  const timeValueText = (value: CellValue): CellValue => {
-    const text = textValue(value)?.trim();
-    if (!text) return { kind: 'error', code: 15, text: '#VALUE!' };
-    const match = /^(\d{1,2})(?::(\d{1,2}))(?::(\d{1,2}))?\s*(AM|PM)?$/iu.exec(text);
-    if (!match) return { kind: 'error', code: 15, text: '#VALUE!' };
-    let hour = Number(match[1]);
-    const minute = Number(match[2]);
-    const second = match[3] === undefined ? 0 : Number(match[3]);
-    const meridiem = match[4]?.toUpperCase();
-    if (meridiem) {
-      if (hour < 1 || hour > 12) return { kind: 'error', code: 15, text: '#VALUE!' };
-      hour = (hour % 12) + (meridiem === 'PM' ? 12 : 0);
-    }
-    if (hour > 23 || minute > 59 || second > 59) {
-      return { kind: 'error', code: 15, text: '#VALUE!' };
-    }
-    return { kind: 'number', value: (hour * 3600 + minute * 60 + second) / 86_400 };
-  };
-  const todaySerial = (): number => {
-    const now = new Date(Date.now());
-    return dateSerialFromParts(now.getUTCFullYear(), now.getUTCMonth() + 1, now.getUTCDate());
-  };
-  const serialTimeFraction = (serial: number): number => ((serial % 1) + 1) % 1;
-  const dateFromSerial = (serial: number): Date | null => {
-    if (!Number.isFinite(serial)) return null;
-    return new Date(Math.trunc(serial) * 86_400_000 - 25569 * 86_400_000);
-  };
-  const serialDateParts = (serial: number): { year: number; month: number; day: number } | null => {
-    const date = dateFromSerial(serial);
-    if (date === null) return null;
-    return {
-      year: date.getUTCFullYear(),
-      month: date.getUTCMonth() + 1,
-      day: date.getUTCDate(),
-    };
-  };
-  const isLastDayOfFebruary = (year: number, month: number, day: number): boolean =>
-    month === 2 && day === new Date(Date.UTC(year, 2, 0)).getUTCDate();
-  const nextMonthStart = (year: number, month: number): { year: number; month: number; day: 1 } =>
-    month === 12 ? { year: year + 1, month: 1, day: 1 } : { year, month: month + 1, day: 1 };
-  const previousMonthParts = (year: number, month: number): { year: number; month: number } =>
-    month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
-  const daysInMonth = (year: number, month: number): number =>
-    new Date(Date.UTC(year, month, 0)).getUTCDate();
-  const clampedDateSerial = (year: number, month: number, day: number): number =>
-    dateSerialFromParts(year, month, Math.min(day, daysInMonth(year, month)));
-  const defaultWeekendDays = new Set<number>([0, 6]);
-  const isWeekendSerial = (serial: number, weekends = defaultWeekendDays): boolean => {
-    const date = dateFromSerial(serial);
-    if (date === null) return false;
-    return weekends.has(date.getUTCDay());
-  };
-  const weekendDaysFromCode = (code: number): Set<number> | null => {
-    const normalized = Math.trunc(code);
-    if (normalized >= 1 && normalized <= 7) {
-      const first = (normalized + 5) % 7;
-      return new Set<number>([first, (first + 1) % 7]);
-    }
-    if (normalized >= 11 && normalized <= 17) {
-      return new Set<number>([normalized - 11]);
-    }
-    return null;
-  };
-  const weekendDaysFromValue = (value: CellValue): Set<number> | null => {
-    if (value.kind === 'number') return weekendDaysFromCode(value.value);
-    const text = textValue(value)?.trim();
-    if (!text) return null;
-    if (/^[01]{7}$/.test(text)) {
-      const days = new Set<number>();
-      for (let index = 0; index < text.length; index += 1) {
-        if (text[index] === '1') days.add((index + 1) % 7);
-      }
-      return days.size === 7 ? null : days;
-    }
-    if (FORMULA_NUMBER_LITERAL.test(text)) return weekendDaysFromCode(Number(text));
-    return null;
-  };
-  const isBusinessDay = (
-    serial: number,
-    holidays: Set<number>,
-    weekends = defaultWeekendDays,
-  ): boolean => !isWeekendSerial(serial, weekends) && !holidays.has(Math.trunc(serial));
-  const networkDays = (
-    start: number,
-    end: number,
-    holidays = new Set<number>(),
-    weekends = defaultWeekendDays,
-  ): number => {
-    const first = Math.trunc(start);
-    const last = Math.trunc(end);
-    const direction = first <= last ? 1 : -1;
-    let count = 0;
-    for (let serial = first; direction > 0 ? serial <= last : serial >= last; serial += direction) {
-      if (isBusinessDay(serial, holidays, weekends)) count += direction;
-    }
-    return count;
-  };
-  const workday = (
-    start: number,
-    days: number,
-    holidays = new Set<number>(),
-    weekends = defaultWeekendDays,
-  ): number => {
-    let remaining = Math.trunc(days);
-    let serial = Math.trunc(start);
-    const direction = remaining >= 0 ? 1 : -1;
-    while (remaining !== 0) {
-      serial += direction;
-      if (!isBusinessDay(serial, holidays, weekends)) continue;
-      remaining -= direction;
-    }
-    return serial;
-  };
-  const days360 = (start: number, end: number, european: boolean): CellValue => {
-    const startParts = serialDateParts(start);
-    const endParts = serialDateParts(end);
-    if (startParts === null || endParts === null) {
-      return { kind: 'error', code: 15, text: '#VALUE!' };
-    }
-    let { year: y1, month: m1, day: d1 } = startParts;
-    let { year: y2, month: m2, day: d2 } = endParts;
-    if (european) {
-      if (d1 === 31) d1 = 30;
-      if (d2 === 31) d2 = 30;
-    } else {
-      if (d1 === 31 || isLastDayOfFebruary(y1, m1, d1)) d1 = 30;
-      if (isLastDayOfFebruary(y2, m2, d2)) {
-        if (d1 < 30) {
-          ({ year: y2, month: m2, day: d2 } = nextMonthStart(y2, m2));
-        } else {
-          d2 = 30;
-        }
-      } else if (d2 === 31) {
-        if (d1 < 30) {
-          ({ year: y2, month: m2, day: d2 } = nextMonthStart(y2, m2));
-        } else {
-          d2 = 30;
-        }
-      }
-    }
-    return { kind: 'number', value: (y2 - y1) * 360 + (m2 - m1) * 30 + (d2 - d1) };
-  };
-  const isLeapYear = (year: number): boolean =>
-    (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
-  const daysInYear = (year: number): number => (isLeapYear(year) ? 366 : 365);
-  const actualActualYearFrac = (start: number, end: number): CellValue => {
-    const startDate = dateFromSerial(start);
-    const endDate = dateFromSerial(end);
-    if (startDate === null || endDate === null) {
-      return { kind: 'error', code: 15, text: '#VALUE!' };
-    }
-    const first = Math.trunc(start);
-    const last = Math.trunc(end);
-    if (first === last) return { kind: 'number', value: 0 };
-    if (first > last) {
-      const value = actualActualYearFrac(end, start);
-      return value.kind === 'number' ? { kind: 'number', value: -value.value } : value;
-    }
-    const startYear = startDate.getUTCFullYear();
-    const endYear = endDate.getUTCFullYear();
-    if (startYear === endYear) {
-      return { kind: 'number', value: (last - first) / daysInYear(startYear) };
-    }
-    const nextYearStart = dateSerialFromParts(startYear + 1, 1, 1);
-    const endYearStart = dateSerialFromParts(endYear, 1, 1);
-    let value = (nextYearStart - first) / daysInYear(startYear);
-    for (let year = startYear + 1; year < endYear; year += 1) {
-      value += 1;
-    }
-    value += (last - endYearStart) / daysInYear(endYear);
-    return { kind: 'number', value };
-  };
-  const yearFrac = (start: number, end: number, basis: number): CellValue => {
-    const normalizedBasis = Math.trunc(basis);
-    if (normalizedBasis < 0 || normalizedBasis > 4) {
-      return { kind: 'error', code: 6, text: '#NUM!' };
-    }
-    if (normalizedBasis === 0 || normalizedBasis === 4) {
-      const value = days360(start, end, normalizedBasis === 4);
-      return value.kind === 'number' ? { kind: 'number', value: value.value / 360 } : value;
-    }
-    const days = Math.trunc(end) - Math.trunc(start);
-    if (normalizedBasis === 1) return actualActualYearFrac(start, end);
-    return { kind: 'number', value: days / (normalizedBasis === 2 ? 360 : 365) };
-  };
-  const datedif = (start: number, end: number, unitValue: CellValue): CellValue => {
-    const startParts = serialDateParts(start);
-    const endParts = serialDateParts(end);
-    const unit = textValue(unitValue)?.trim().toUpperCase();
-    if (startParts === null || endParts === null || !unit) {
-      return { kind: 'error', code: 15, text: '#VALUE!' };
-    }
-    const first = Math.trunc(start);
-    const last = Math.trunc(end);
-    if (first > last) return { kind: 'error', code: 6, text: '#NUM!' };
-    const { year: y1, month: m1, day: d1 } = startParts;
-    const { year: y2, month: m2, day: d2 } = endParts;
-    const anniversaryThisYear = clampedDateSerial(y2, m1, d1);
-    const fullYears = y2 - y1 - (anniversaryThisYear > last ? 1 : 0);
-    const fullMonths = (y2 - y1) * 12 + (m2 - m1) - (d2 < d1 ? 1 : 0);
-    if (unit === 'D') return { kind: 'number', value: last - first };
-    if (unit === 'Y') return { kind: 'number', value: fullYears };
-    if (unit === 'M') return { kind: 'number', value: fullMonths };
-    if (unit === 'YM') return { kind: 'number', value: ((fullMonths % 12) + 12) % 12 };
-    if (unit === 'YD') {
-      const anniversary =
-        anniversaryThisYear <= last ? anniversaryThisYear : clampedDateSerial(y2 - 1, m1, d1);
-      return { kind: 'number', value: last - anniversary };
-    }
-    if (unit === 'MD') {
-      if (d2 >= d1) return { kind: 'number', value: d2 - d1 };
-      const previous = previousMonthParts(y2, m2);
-      return { kind: 'number', value: last - clampedDateSerial(previous.year, previous.month, d1) };
-    }
-    return { kind: 'error', code: 6, text: '#NUM!' };
-  };
-  const dayOfYear = (date: Date): number => {
-    const start = Date.UTC(date.getUTCFullYear(), 0, 1);
-    return Math.floor((date.getTime() - start) / 86_400_000) + 1;
-  };
-  const isoWeekNumber = (date: Date): number => {
-    const normalized = new Date(
-      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
-    );
-    const day = normalized.getUTCDay() || 7;
-    normalized.setUTCDate(normalized.getUTCDate() + 4 - day);
-    const yearStart = new Date(Date.UTC(normalized.getUTCFullYear(), 0, 1));
-    return Math.ceil(((normalized.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
-  };
-  const weekStartForReturnType = (returnType: number): number | null => {
-    if (returnType === 1 || returnType === 17) return 0;
-    if (returnType === 2 || returnType === 11) return 1;
-    if (returnType >= 12 && returnType <= 16) return returnType - 10;
-    return null;
-  };
-  const weekdayValue = (date: Date, returnType: number): number | null => {
-    const day = date.getUTCDay();
-    if (returnType === 1) return day + 1;
-    if (returnType === 2) return ((day + 6) % 7) + 1;
-    if (returnType === 3) return (day + 6) % 7;
-    if (returnType >= 11 && returnType <= 17) {
-      const firstDay = returnType === 17 ? 0 : returnType - 10;
-      return ((day - firstDay + 7) % 7) + 1;
-    }
-    return null;
-  };
   const dateFunction = (
     fn:
       | 'DATE'
@@ -4850,30 +3470,6 @@ function makeFormulaOperandReader(
       ? { kind: 'error', code: 15, text: '#VALUE!' }
       : { kind: 'number', value: weekday };
   };
-  const exactMatchValues = (left: CellValue, right: CellValue, allowWildcard = true): boolean => {
-    if (left.kind === 'blank' && right.kind === 'blank') return true;
-    if (left.kind === 'number' && right.kind === 'number') return left.value === right.value;
-    if (left.kind === 'bool' && right.kind === 'bool') return left.value === right.value;
-    if (left.kind === 'text' && right.kind === 'text') {
-      const wildcard = allowWildcard ? countIfWildcardPattern(left.value) : null;
-      if (wildcard) return wildcard.test(right.value);
-      return left.value.toLocaleLowerCase() === right.value.toLocaleLowerCase();
-    }
-    if (left.kind === 'error' && right.kind === 'error') return left.text === right.text;
-    return false;
-  };
-  const compareApproxValues = (lookup: CellValue, candidate: CellValue): number | null => {
-    if (lookup.kind === 'number' && candidate.kind === 'number') {
-      if (!Number.isFinite(lookup.value) || !Number.isFinite(candidate.value)) return null;
-      return candidate.value === lookup.value ? 0 : candidate.value < lookup.value ? -1 : 1;
-    }
-    if (lookup.kind === 'text' && candidate.kind === 'text') {
-      const left = candidate.value.toLocaleLowerCase();
-      const right = lookup.value.toLocaleLowerCase();
-      return left === right ? 0 : left < right ? -1 : 1;
-    }
-    return null;
-  };
   const oneDimensionalValues = (
     range: FormulaRangeArg | ParsedA1Range,
     rowOffset: number,
@@ -4891,52 +3487,6 @@ function makeFormulaOperandReader(
       values.push(state.data.cells.get(addrKey({ sheet, row, col }))?.value ?? { kind: 'blank' });
     }
     return values;
-  };
-  const approximateMatchIndex = (
-    lookup: CellValue,
-    values: CellValue[],
-    mode: -1 | 1,
-  ): number | null => {
-    let bestIndex: number | null = null;
-    let previous: CellValue | null = null;
-    for (let i = 0; i < values.length; i += 1) {
-      const candidate = values[i] as CellValue;
-      const comparison = compareApproxValues(lookup, candidate);
-      if (comparison === null) return null;
-      if (previous) {
-        const order = compareApproxValues(previous, candidate);
-        if (order === null || (mode === 1 ? order < 0 : order > 0)) return null;
-      }
-      previous = candidate;
-      if (mode === 1 ? comparison <= 0 : comparison >= 0) {
-        bestIndex = i;
-      }
-    }
-    return bestIndex;
-  };
-  const approximateXmatchIndex = (
-    lookup: CellValue,
-    values: CellValue[],
-    mode: -1 | 1,
-  ): number | null => {
-    for (let i = 0; i < values.length; i += 1) {
-      const candidate = values[i] as CellValue;
-      if (compareApproxValues(lookup, candidate) === null) return null;
-      if (i > 0) {
-        const previous = values[i - 1] as CellValue;
-        const order = compareApproxValues(previous, candidate);
-        if (order === null || order < 0) return null;
-      }
-    }
-    let nextSmaller: number | null = null;
-    for (let i = 0; i < values.length; i += 1) {
-      const candidate = values[i] as CellValue;
-      const comparison = compareApproxValues(lookup, candidate) as number;
-      if (comparison === 0) return i;
-      if (mode === -1 && comparison < 0) nextSmaller = i;
-      if (mode === 1 && comparison > 0) return i;
-    }
-    return mode === -1 ? nextSmaller : null;
   };
   const matchExactRange = (
     lookup: CellValue,
@@ -5126,10 +3676,6 @@ function makeFormulaOperandReader(
       }
     );
   };
-  const isExactLookupMode = (value: CellValue): boolean =>
-    (value.kind === 'bool' && !value.value) || (value.kind === 'number' && value.value === 0);
-  const isApproximateLookupMode = (value: CellValue): boolean =>
-    (value.kind === 'bool' && value.value) || (value.kind === 'number' && value.value !== 0);
   const tableLookup = (
     fn: 'VLOOKUP' | 'HLOOKUP',
     lookup: CellValue,
