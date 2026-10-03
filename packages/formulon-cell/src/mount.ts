@@ -25,13 +25,11 @@ import {
   traceDependents as traceDependentArrows,
   tracePrecedents as tracePrecedentArrows,
 } from './commands/traces.js';
-import { MAX_COL, MAX_ROW } from './engine/address.js';
 import {
   type SyncedConditionalRuleMap,
   syncTrackedConditionalRulesToEngine,
 } from './engine/cf-writeback.js';
 import { findPivotTableAtCell } from './engine/passthrough-sync.js';
-import type { Addr } from './engine/types.js';
 import { WorkbookHandle } from './engine/workbook-handle.js';
 import { SpreadsheetEmitter } from './events.js';
 import { ALL_FEATURE_IDS } from './extensions/features.js';
@@ -48,11 +46,7 @@ import {
 import { FormulaRegistry } from './formula.js';
 import { createI18nController } from './i18n/controller.js';
 import type { Strings } from './i18n/strings.js';
-import { attachCellStylesGallery } from './interact/cell-styles-gallery.js';
-import { attachCfRulesDialog } from './interact/cf-rules-dialog.js';
-import { attachEvaluateFormulaDialog } from './interact/evaluate-formula-dialog.js';
-import { attachExternalLinksDialog } from './interact/external-links-dialog.js';
-import { attachFilterDropdown, type FilterDropdownHandle } from './interact/filter-dropdown.js';
+import { readClipboard } from './interact/context-menu-clipboard.js';
 import type { FxDialogOpenOptions } from './interact/fx-dialog.js';
 import { openInsertCopiedCellsDialog } from './interact/insert-copied-cells-dialog.js';
 import { deactivateMacInk, disposeMacInk } from './interact/mac-ink.js';
@@ -67,6 +61,7 @@ import {
   setOverlayOptions,
   syncOverlayPortalTheme,
 } from './interact/overlay-portal.js';
+import { attachAlwaysOnDialogs } from './mount/always-on-dialogs.js';
 import { createMountChrome } from './mount/chrome.js';
 import { attachChromeSync, type ChromeSyncController } from './mount/chrome-sync.js';
 import {
@@ -75,6 +70,7 @@ import {
   WB_REGISTRY_IDS,
 } from './mount/engine-binding.js';
 import { attachFormulaBarController } from './mount/formula-bar.js';
+import { attachFormulaDraftMirror } from './mount/formula-draft-mirror.js';
 import { prepareMountHost, releaseMountHost } from './mount/host.js';
 import {
   createAutocompleteStub,
@@ -101,15 +97,8 @@ import {
   type ToolbarInstanceRef,
 } from './mount/toolbar.js';
 import type { MountOptions, ScreenClipResult, SpreadsheetInstance } from './mount/types.js';
-import {
-  bodyBandOrigin,
-  cellRect,
-  cellRectUnclamped,
-  gridOriginY,
-  layoutForView,
-} from './render/geometry.js';
 import { GridRenderer, getErrorTriangleHits } from './render/grid.js';
-import { formatWithPending } from './store/pending-format.js';
+import { isWholeColumnRange, isWholeRowRange } from './store/selection-geometry.js';
 import { createSpreadsheetStore, mutators } from './store/store.js';
 import { resolveTheme } from './theme/resolve.js';
 import { disposeMacRibbonActions } from './toolbar/ribbon/mac/actions.js';
@@ -401,52 +390,21 @@ export const Spreadsheet = {
     sheetTabsController.update();
 
     // Always-on host features — not toggleable via `MountOptions.features`.
-    // Held in `let` so the locale-change subscription can rebuild them with
-    // fresh strings; detach+reattach is the v0.2 fallback for dialogs that
-    // don't expose a `setStrings` hook.
-    let externalLinksDialog = attachExternalLinksDialog({
+    const alwaysOnDialogs = attachAlwaysOnDialogs({
       host,
+      store,
+      history,
       getWb: () => wb,
-      strings,
-    });
-    let cfRulesDialog = attachCfRulesDialog({
-      host,
-      getWb: () => wb,
-      getActiveSheet: () => store.getState().data.sheetIndex,
-      getSelectionRange: () => store.getState().selection.range,
-      onChanged: () => {
+      getStrings: () => strings,
+      getLocale: () => i18n.locale,
+      onConditionalRulesChanged: () => {
         syncSessionConditionalRules();
         renderer.invalidate();
       },
-      onNewRule: () => featureState.conditionalDialog?.open({ mode: 'new' }),
-      onEditRule: (editIndex) => featureState.conditionalDialog?.open({ mode: 'edit', editIndex }),
-      store,
-      history,
-      strings,
-    });
-    let evaluateFormulaDialog = attachEvaluateFormulaDialog({
-      host,
-      store,
-      getWb: () => wb,
-      strings,
-    });
-    const cellStylesGallery = attachCellStylesGallery({
-      host,
-      store,
-      history,
-      getWb: () => wb,
-      strings,
+      openConditionalDialog: (options) => featureState.conditionalDialog?.open(options),
     });
     // Filter dropdown — opens when the pointer dispatches `fc:openfilter`
-    // from a clicked column-filter chevron. Rebuilt on locale change so its
-    // captured strings stay fresh; no public toggle.
-    let filterDropdown: FilterDropdownHandle = attachFilterDropdown({
-      host,
-      store,
-      history,
-      strings,
-      locale: i18n.locale,
-    });
+    // from a clicked column-filter chevron; no public toggle.
     interface OpenFilterDetail {
       range: import('./engine/types.js').Range;
       col: number;
@@ -459,7 +417,7 @@ export const Spreadsheet = {
       // The dropdown is positioned with `position: fixed`, so it expects
       // viewport-relative coords. The pointer payload's `x/y` are host-relative;
       // use `clientX/clientY` instead. `- 4` matches the chevron offset.
-      filterDropdown.open(detail.range, detail.col, {
+      alwaysOnDialogs.openFilter(detail.range, detail.col, {
         x: detail.anchor.clientX,
         y: detail.anchor.clientY - 4,
         h: detail.anchor.h,
@@ -660,75 +618,12 @@ export const Spreadsheet = {
       tag,
     });
 
-    const formulaDraftMirror = document.createElement('div');
-    formulaDraftMirror.className = 'fc-host__formula-draft-mirror';
-    formulaDraftMirror.setAttribute('aria-hidden', 'true');
-    formulaDraftMirror.hidden = true;
-    grid.appendChild(formulaDraftMirror);
-    let formulaDraftMirrorState: { anchor: Addr; raw: string } | null = null;
-    const hideFormulaDraftMirror = (): void => {
-      formulaDraftMirror.hidden = true;
-    };
-    const refreshFormulaDraftMirror = (): void => {
-      const mirrorState = formulaDraftMirrorState;
-      if (!mirrorState) {
-        hideFormulaDraftMirror();
-        return;
-      }
-      const state = store.getState();
-      if (mirrorState.anchor.sheet !== state.data.sheetIndex) {
-        hideFormulaDraftMirror();
-        return;
-      }
-      const layout = layoutForView(state);
-      const rect = cellRectUnclamped(
-        layout,
-        state.viewport,
-        mirrorState.anchor.row,
-        mirrorState.anchor.col,
-      );
-      const band = bodyBandOrigin(layout, state.viewport);
-      const behindFrozenBand =
-        (mirrorState.anchor.row >= state.layout.freezeRows && rect.y < band.y) ||
-        (mirrorState.anchor.col >= state.layout.freezeCols &&
-          (layout.rtl ? rect.x + rect.w > band.x : rect.x < band.x));
-      const gridRect = grid.getBoundingClientRect();
-      const width = grid.clientWidth || gridRect.width;
-      const height = grid.clientHeight || gridRect.height;
-      const outsideGrid =
-        (width > 0 && (rect.x + rect.w <= 0 || rect.x >= width)) ||
-        (height > 0 && (rect.y + rect.h <= 0 || rect.y >= height));
-      if (behindFrozenBand || outsideGrid || rect.w <= 0 || rect.h <= 0) {
-        hideFormulaDraftMirror();
-        return;
-      }
-      const format = formatWithPending(state, mirrorState.anchor);
-      formulaDraftMirror.textContent = mirrorState.raw;
-      formulaDraftMirror.style.left = `${rect.x}px`;
-      formulaDraftMirror.style.top = `${rect.y}px`;
-      formulaDraftMirror.style.width = `${rect.w}px`;
-      formulaDraftMirror.style.height = `${rect.h}px`;
-      formulaDraftMirror.style.background = format?.fill ?? '';
-      formulaDraftMirror.style.color = format?.color ?? '';
-      formulaDraftMirror.style.fontFamily = format?.fontFamily ?? '';
-      formulaDraftMirror.style.fontSize = format?.fontSize ? `${format.fontSize}px` : '';
-      formulaDraftMirror.style.fontWeight = format?.bold ? 'bold' : '';
-      formulaDraftMirror.style.fontStyle = format?.italic ? 'italic' : '';
-      formulaDraftMirror.style.textDecoration = format?.underline ? 'underline' : '';
-      formulaDraftMirror.style.textAlign = format?.align ?? '';
-      formulaDraftMirror.style.direction = layout.rtl ? 'rtl' : 'ltr';
-      formulaDraftMirror.hidden = false;
-    };
-    const projectFormulaDraftMirror = (anchor: Addr, raw: string | null): void => {
-      formulaDraftMirrorState = raw === null ? null : { anchor: { ...anchor }, raw };
-      refreshFormulaDraftMirror();
-    };
-    const unsubFormulaDraftMirror = store.subscribe(() => refreshFormulaDraftMirror());
+    const formulaDraftMirror = attachFormulaDraftMirror({ grid, store });
 
     // Resize observer — we follow the host, not the window.
     const ro = new ResizeObserver(() => {
       renderer.resize();
-      refreshFormulaDraftMirror();
+      formulaDraftMirror.refresh();
     });
     ro.observe(grid);
 
@@ -827,7 +722,7 @@ export const Spreadsheet = {
       host,
       i18nLocale: () => i18n.locale,
       isMacPlatform: () => host.dataset.fcPlatform === 'mac',
-      projectFormulaDraftMirror,
+      projectFormulaDraftMirror: formulaDraftMirror.project,
       refreshFeaturesView,
       renderer,
       setChromeAttached,
@@ -873,38 +768,8 @@ export const Spreadsheet = {
       featureState.fxAutocomplete.setLabels(next.autocomplete);
       featureState.fxArgHelper?.setLabels(next.argHelper);
       sheetTabsController?.update();
-      cellStylesGallery.setStrings(next);
       renderer.invalidate();
-
-      // Always-on dialogs: rebuild — none of these expose setStrings yet.
-      externalLinksDialog.detach();
-      externalLinksDialog = attachExternalLinksDialog({ host, getWb: () => wb, strings });
-      cfRulesDialog.detach();
-      cfRulesDialog = attachCfRulesDialog({
-        host,
-        getWb: () => wb,
-        getActiveSheet: () => store.getState().data.sheetIndex,
-        getSelectionRange: () => store.getState().selection.range,
-        onChanged: () => {
-          syncSessionConditionalRules();
-          renderer.invalidate();
-        },
-        onNewRule: () => featureState.conditionalDialog?.open({ mode: 'new' }),
-        onEditRule: (editIndex) =>
-          featureState.conditionalDialog?.open({ mode: 'edit', editIndex }),
-        store,
-        history,
-        strings,
-      });
-      evaluateFormulaDialog.detach();
-      evaluateFormulaDialog = attachEvaluateFormulaDialog({
-        host,
-        store,
-        getWb: () => wb,
-        strings,
-      });
-      filterDropdown.detach();
-      filterDropdown = attachFilterDropdown({ host, store, history, strings, locale: i18n.locale });
+      alwaysOnDialogs.setStrings(next);
 
       // Toggleable host features: prefer setStrings when the handle exposes
       // it, otherwise fall back to detach+reattach.
@@ -1132,18 +997,18 @@ export const Spreadsheet = {
         featureState.iterativeDialog?.open();
       },
       openExternalLinksDialog() {
-        externalLinksDialog.open();
+        alwaysOnDialogs.openExternalLinks();
       },
       openCfRulesDialog() {
         if (commands.policy !== undefined) return;
-        cfRulesDialog.open();
+        alwaysOnDialogs.openCfRules();
       },
       openCellStylesGallery() {
         if (commands.policy !== undefined) return;
-        cellStylesGallery.open();
+        alwaysOnDialogs.openCellStyles();
       },
       openEvaluateFormulaDialog() {
-        evaluateFormulaDialog.open();
+        alwaysOnDialogs.openEvaluateFormula();
       },
       openFunctionArguments(seedName?: string, options?: FxDialogOpenOptions) {
         featureState.fxDialog?.open(seedName, options);
@@ -1177,8 +1042,7 @@ export const Spreadsheet = {
         const copiedLogical = copied?.logicalRange ?? copied?.range;
         const copiedWholeBand =
           copiedLogical !== undefined &&
-          ((copiedLogical.c0 === 0 && copiedLogical.c1 >= MAX_COL) ||
-            (copiedLogical.r0 === 0 && copiedLogical.r1 >= MAX_ROW));
+          (isWholeRowRange(copiedLogical) || isWholeColumnRange(copiedLogical));
         if (copiedWholeBand && copied) {
           const target = store.getState().selection.range;
           const result = insertCopiedBand(store, wb, history, copied, target);
@@ -1198,7 +1062,7 @@ export const Spreadsheet = {
           host,
           strings: i18n.strings,
           onSubmit: (direction) => {
-            void readClipboardText().then((text) => {
+            void readClipboard().then((text) => {
               const snap = binding.clipboardH?.getSnapshot() ?? null;
               if (!text && !snap) return;
               const result = insertCopiedCellsFromTSV(store, wb, history, text, direction, snap);
@@ -1282,24 +1146,7 @@ export const Spreadsheet = {
       },
       openFilterDropdown(range, col) {
         if (commands.policy !== undefined) return;
-        const s = store.getState();
-        const layout = layoutForView(s);
-        const targetRange = range ?? s.ui.filterRange ?? s.selection.range;
-        const targetCol = Math.min(
-          Math.max(col ?? s.selection.active.col, targetRange.c0),
-          targetRange.c1,
-        );
-        const hostRect = host.getBoundingClientRect();
-        // The chevron hangs off the header cell's trailing edge, which the
-        // mirror puts on the left of the cell for a right-to-left sheet.
-        const cell = cellRect(layout, s.viewport, targetRange.r0, targetCol);
-        const x = hostRect.left + (layout.rtl ? cell.x + 4 : cell.x + cell.w - 4);
-        const y = hostRect.top + gridOriginY(layout) - 4;
-        filterDropdown.open(targetRange, targetCol, {
-          x,
-          y,
-          h: layout.headerRowHeight,
-        });
+        alwaysOnDialogs.openFilterAtHeader(range, col);
       },
       openWatchWindow() {
         if (commands.policy !== undefined) return;
@@ -1537,14 +1384,9 @@ export const Spreadsheet = {
         sheetTabsController?.detach();
         chromeSync?.detach();
         host.removeEventListener('fc:openfilter', onOpenFilter);
-        evaluateFormulaDialog.detach();
-        externalLinksDialog.detach();
-        cfRulesDialog.detach();
-        cellStylesGallery.detach();
-        filterDropdown.detach();
+        alwaysOnDialogs.detach();
         unsubCellRegistry();
-        unsubFormulaDraftMirror();
-        formulaDraftMirror.remove();
+        formulaDraftMirror.detach();
         unsubPivotFieldListSelection();
         unsubI18n();
         i18n.dispose();
@@ -1564,13 +1406,3 @@ export const Spreadsheet = {
     return instance;
   },
 };
-
-async function readClipboardText(): Promise<string> {
-  if (typeof navigator === 'undefined' || !navigator.clipboard?.readText) return '';
-  try {
-    return await navigator.clipboard.readText();
-  } catch (err) {
-    console.warn('formulon-cell: clipboard read failed', err);
-    return '';
-  }
-}
