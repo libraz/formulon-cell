@@ -10,7 +10,8 @@ import { hydrateProtectionFromEngine } from '../engine/protection-sync.js';
 import { hydrateTableOverlaysFromEngine } from '../engine/table-sync.js';
 import { hydrateValidationsFromEngine } from '../engine/validation-sync.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
-import { mutators, type SpreadsheetStore } from '../store/store.js';
+import { type ViewportOptions, validateViewportOptions } from '../interact/navigation-policy.js';
+import { createSpreadsheetStore, mutators, type SpreadsheetStore } from '../store/store.js';
 
 export function hydrateActiveSheetFromEngine(wb: WorkbookHandle, store: SpreadsheetStore): void {
   const hydrate = (): void => {
@@ -27,6 +28,19 @@ export function hydrateActiveSheetFromEngine(wb: WorkbookHandle, store: Spreadsh
   };
   if (typeof wb.withEngineSyncMuted === 'function') wb.withEngineSyncMuted(hydrate);
   else hydrate();
+}
+
+/** Validate viewport options against `wb`, including its merges on the target sheet. */
+export function validateViewportAgainstWorkbook(
+  options: ViewportOptions | undefined,
+  wb: WorkbookHandle,
+  sheet?: number,
+): void {
+  validateViewportOptions(options, wb);
+  const preview = createSpreadsheetStore();
+  if (sheet !== undefined) mutators.setSheetIndex(preview, sheet);
+  hydrateActiveSheetFromEngine(wb, preview);
+  validateViewportOptions(options, wb, preview.getState());
 }
 
 export function hydrateWorkbookMetadataFromEngine(

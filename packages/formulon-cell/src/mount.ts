@@ -48,11 +48,7 @@ import { readClipboard } from './interact/context-menu-clipboard.js';
 import type { FxDialogOpenOptions } from './interact/fx-dialog.js';
 import { openInsertCopiedCellsDialog } from './interact/insert-copied-cells-dialog.js';
 import { deactivateMacInk, disposeMacInk } from './interact/mac-ink.js';
-import {
-  attachNavigationPolicy,
-  navigationBoundsFor,
-  validateViewportOptions,
-} from './interact/navigation-policy.js';
+import { attachNavigationPolicy, navigationBoundsFor } from './interact/navigation-policy.js';
 import {
   disposeOverlayPortal,
   ensureOverlayPortal,
@@ -89,6 +85,7 @@ import {
   dispatchWorkbookObjectSummaries,
   hydrateActiveSheetFromEngine,
   hydrateWorkbookMetadataFromEngine,
+  validateViewportAgainstWorkbook,
 } from './mount/hydration.js';
 import {
   attachSheetTabsController,
@@ -193,11 +190,7 @@ export const Spreadsheet = {
       if (opts.seed && ownsWb) opts.seed(wb);
       if (opts.viewport) {
         try {
-          validateViewportOptions(opts.viewport, wb);
-          const preview = createSpreadsheetStore();
-          if (opts.viewport.range) mutators.setSheetIndex(preview, opts.viewport.range.sheet);
-          hydrateActiveSheetFromEngine(wb, preview);
-          validateViewportOptions(opts.viewport, wb, preview.getState());
+          validateViewportAgainstWorkbook(opts.viewport, wb, opts.viewport.range?.sheet);
         } catch (err) {
           if (ownsWb) wb.dispose();
           throw err;
@@ -771,11 +764,7 @@ export const Spreadsheet = {
         closeMacPalette();
         const targetSheet = next?.range?.sheet;
         if (targetSheet !== undefined && targetSheet !== store.getState().data.sheetIndex) {
-          validateViewportOptions(next, wb);
-          const preview = createSpreadsheetStore();
-          mutators.setSheetIndex(preview, targetSheet);
-          hydrateActiveSheetFromEngine(wb, preview);
-          validateViewportOptions(next, wb, preview.getState());
+          validateViewportAgainstWorkbook(next, wb, targetSheet);
           const previousState = store.getState();
           const previousOptions = navigation.options;
           binding.editor.cancel();
@@ -1234,15 +1223,12 @@ export const Spreadsheet = {
         if (next === wb) return;
         // Validate before detaching the current workbook or clearing its history.
         if (navigation.options) {
-          validateViewportOptions(navigation.options, next);
-          const preview = createSpreadsheetStore();
-          mutators.setSheetIndex(
-            preview,
+          validateViewportAgainstWorkbook(
+            navigation.options,
+            next,
             navigation.options.range?.sheet ??
               Math.min(store.getState().data.sheetIndex, Math.max(0, next.sheetCount - 1)),
           );
-          hydrateActiveSheetFromEngine(next, preview);
-          validateViewportOptions(navigation.options, next, preview.getState());
         }
         // A Draw stroke belongs to the current workbook. Cancel it before
         // detaching the old engine so a late pointerup cannot commit points
