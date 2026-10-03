@@ -347,6 +347,76 @@ describe('attachContextMenu', () => {
       expect(onAfterCommit).not.toHaveBeenCalled();
     });
 
+    it('quick Paste Values writes snapshot values without formulas as one undo step', () => {
+      const history = new History();
+      const snap: ClipboardSnapshot = {
+        mode: 'copy',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 },
+        rows: 1,
+        cols: 1,
+        cells: [[{ value: { kind: 'number', value: 2 }, formula: '=1+1', format: undefined }]],
+      };
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        history,
+        onAfterCommit,
+        getClipboardSnapshot: () => snap,
+      });
+
+      fireContextMenu(host, 200, 70);
+      const at = store.getState().selection.active;
+      document
+        .querySelector<HTMLButtonElement>('[data-fc-submenu="pasteSpecialMenu"]')
+        ?.dispatchEvent(new MouseEvent('mouseenter'));
+      document
+        .querySelector<HTMLButtonElement>('.fc-ctxmenu__sub [data-fc-action="pasteValues"]')
+        ?.click();
+
+      expect(wb.getValue(at)).toEqual({ kind: 'number', value: 2 });
+      expect(wb.cellFormula(at)).toBeNull();
+      expect(onAfterCommit).toHaveBeenCalledTimes(1);
+      expect(history.undo()).toBe(true);
+      expect(wb.getValue(at)).toEqual({ kind: 'blank' });
+    });
+
+    it('quick Paste Transpose turns a copied row into a column', () => {
+      const snap: ClipboardSnapshot = {
+        mode: 'copy',
+        range: { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 },
+        rows: 1,
+        cols: 2,
+        cells: [
+          [
+            { value: { kind: 'text', value: 'a' }, formula: null, format: undefined },
+            { value: { kind: 'text', value: 'b' }, formula: null, format: undefined },
+          ],
+        ],
+      };
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        onAfterCommit,
+        getClipboardSnapshot: () => snap,
+      });
+
+      fireContextMenu(host, 200, 70);
+      const at = store.getState().selection.active;
+      document
+        .querySelector<HTMLButtonElement>('[data-fc-submenu="pasteSpecialMenu"]')
+        ?.dispatchEvent(new MouseEvent('mouseenter'));
+      document
+        .querySelector<HTMLButtonElement>('.fc-ctxmenu__sub [data-fc-action="pasteTranspose"]')
+        ?.click();
+
+      expect(wb.getValue(at)).toEqual({ kind: 'text', value: 'a' });
+      expect(wb.getValue({ ...at, row: at.row + 1 })).toEqual({ kind: 'text', value: 'b' });
+      expect(wb.getValue({ ...at, col: at.col + 1 })).toEqual({ kind: 'blank' });
+      expect(onAfterCommit).toHaveBeenCalledTimes(1);
+    });
+
     it('Paste Special triggers the onPasteSpecial callback', () => {
       detach = attachContextMenu({ host, store, wb, onPasteSpecial });
       fireContextMenu(host, 200, 70);

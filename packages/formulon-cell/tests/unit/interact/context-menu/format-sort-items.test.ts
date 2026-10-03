@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { History } from '../../../../src/commands/history.js';
 import { addrKey, type WorkbookHandle } from '../../../../src/engine/workbook-handle.js';
+import { en } from '../../../../src/i18n/strings/en.js';
 import {
   attachContextMenu,
   type ContextMenuHandle,
@@ -119,6 +120,52 @@ describe('attachContextMenu', () => {
       ).toEqual(a1?.borders);
     });
 
+    it('built-in Underline item toggles underline on the active cell', () => {
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        options: {
+          mode: 'builtIn',
+          transform: (context) => [
+            ...context.defaultItems,
+            { id: 'underline', label: 'Underline', builtIn: 'underline' },
+          ],
+        },
+      });
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      fireContextMenu(host, 200, 70);
+      item('underline')?.click();
+      expect(store.getState().ui.pendingFormat?.format.underline).toBe(true);
+    });
+
+    it('Edit Phonetic writes the prompted reading through the engine', async () => {
+      Object.defineProperty(wb, 'capabilities', {
+        value: { ...wb.capabilities, phonetic: true },
+      });
+      const setCellPhonetic = vi.spyOn(wb, 'setCellPhonetic').mockReturnValue(true);
+      vi.spyOn(wb, 'getCellPhoneticRuns').mockReturnValue(null);
+      seed(store, wb, [{ row: 0, col: 0, value: '漢字' }]);
+      detach = attachContextMenu({ host, store, wb, strings: en, onAfterCommit });
+      mutators.setActive(store, { sheet: 0, row: 0, col: 0 });
+      fireContextMenu(host, 200, 70);
+      const at = store.getState().selection.active;
+      item('editPhonetic')?.click();
+
+      const input = document.querySelector<HTMLInputElement>('input');
+      expect(input).not.toBeNull();
+      if (input) input.value = 'かんじ';
+      const ok = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
+        (b) => b.textContent === en.formatDialog.ok,
+      );
+      ok?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(setCellPhonetic).toHaveBeenCalledWith(at.sheet, at.row, at.col, 'かんじ');
+      expect(onAfterCommit).toHaveBeenCalledTimes(1);
+    });
+
     it('Format Cells… triggers the onFormatDialog callback', () => {
       detach = attachContextMenu({ host, store, wb, onFormatDialog });
       fireContextMenu(host, 200, 70);
@@ -169,6 +216,65 @@ describe('attachContextMenu', () => {
 
       expect(setBlank).toHaveBeenCalledWith({ sheet: 0, row: 50000, col: 0 });
       expect(onAfterCommit).toHaveBeenCalled();
+    });
+
+    it('Sort Descending orders the selected column high to low as one undo step', () => {
+      const history = new History();
+      seed(store, wb, [
+        { row: 0, col: 0, value: 1 },
+        { row: 1, col: 0, value: 3 },
+        { row: 2, col: 0, value: 2 },
+      ]);
+      setRange(store, 0, 0, 2, 0);
+      detach = attachContextMenu({ host, store, wb, history, onAfterCommit });
+
+      fireContextMenu(host, 60, 30);
+      document
+        .querySelector<HTMLButtonElement>('[data-fc-submenu="sortMenu"]')
+        ?.dispatchEvent(new MouseEvent('mouseenter'));
+      item('sortDesc')?.click();
+
+      const col = [0, 1, 2].map((row) => wb.getValue({ sheet: 0, row, col: 0 }));
+      expect(col).toEqual([
+        { kind: 'number', value: 3 },
+        { kind: 'number', value: 2 },
+        { kind: 'number', value: 1 },
+      ]);
+      expect(onAfterCommit).toHaveBeenCalledTimes(1);
+      expect(history.undo()).toBe(true);
+      expect(wb.getValue({ sheet: 0, row: 0, col: 0 })).toEqual({ kind: 'number', value: 1 });
+    });
+
+    it('Filter by Value hides other values; Reapply keeps them hidden; Clear shows them', () => {
+      seed(store, wb, [
+        { row: 0, col: 0, value: 'key' },
+        { row: 1, col: 0, value: 'a' },
+        { row: 2, col: 0, value: 'b' },
+        { row: 3, col: 0, value: 'a' },
+      ]);
+      setRange(store, 1, 0, 1, 0);
+      mutators.setFilterRange(store, { sheet: 0, r0: 0, c0: 0, r1: 3, c1: 0 });
+      detach = attachContextMenu({ host, store, wb, onAfterCommit });
+      const openFilterMenu = (): void => {
+        fireContextMenu(host, 60, 50);
+        document
+          .querySelector<HTMLButtonElement>('[data-fc-submenu="filterMenu"]')
+          ?.dispatchEvent(new MouseEvent('mouseenter'));
+      };
+
+      openFilterMenu();
+      expect(store.getState().selection.active).toEqual({ sheet: 0, row: 1, col: 0 });
+      item('filterByValue')?.click();
+      expect([...store.getState().layout.hiddenRows]).toEqual([2]);
+
+      openFilterMenu();
+      item('filterReapply')?.click();
+      expect([...store.getState().layout.hiddenRows]).toEqual([2]);
+
+      openFilterMenu();
+      item('filterClear')?.click();
+      expect(store.getState().layout.hiddenRows.size).toBe(0);
+      expect(onAfterCommit).toHaveBeenCalledTimes(3);
     });
   });
 });

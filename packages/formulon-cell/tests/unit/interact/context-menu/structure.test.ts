@@ -226,6 +226,29 @@ describe('attachContextMenu', () => {
       item('rowUnhide')?.click();
       expect(store.getState().layout.hiddenRows.size).toBe(0);
     });
+    it('built-in Group / Ungroup Row items set and clear the row outline', () => {
+      setRange(store, 0, 0, 1, 16383);
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        options: {
+          mode: 'builtIn',
+          transform: (context) => [
+            ...context.defaultItems,
+            { id: 'rowGroup', label: 'Group', builtIn: 'rowGroup' },
+            { id: 'rowUngroup', label: 'Ungroup', builtIn: 'rowUngroup' },
+          ],
+        },
+      });
+      fireContextMenu(host, 10, 30);
+      item('rowGroup')?.click();
+      expect(store.getState().layout.outlineRows.get(0)).toBe(1);
+      expect(store.getState().layout.outlineRows.get(1)).toBe(1);
+      fireContextMenu(host, 10, 30);
+      item('rowUngroup')?.click();
+      expect(store.getState().layout.outlineRows.size).toBe(0);
+    });
   });
 
   describe('col structure', () => {
@@ -399,6 +422,30 @@ describe('attachContextMenu', () => {
       fireContextMenu(host, 60, 10);
       item('colUnhide')?.click();
       expect(store.getState().layout.hiddenCols.has(0)).toBe(false);
+    });
+
+    it('built-in Group / Ungroup Col items set and clear the column outline', () => {
+      setRange(store, 0, 0, 1048575, 1);
+      detach = attachContextMenu({
+        host,
+        store,
+        wb,
+        options: {
+          mode: 'builtIn',
+          transform: (context) => [
+            ...context.defaultItems,
+            { id: 'colGroup', label: 'Group', builtIn: 'colGroup' },
+            { id: 'colUngroup', label: 'Ungroup', builtIn: 'colUngroup' },
+          ],
+        },
+      });
+      fireContextMenu(host, 60, 10);
+      item('colGroup')?.click();
+      expect(store.getState().layout.outlineCols.get(0)).toBe(1);
+      expect(store.getState().layout.outlineCols.get(1)).toBe(1);
+      fireContextMenu(host, 60, 10);
+      item('colUngroup')?.click();
+      expect(store.getState().layout.outlineCols.size).toBe(0);
     });
   });
 });
