@@ -419,13 +419,15 @@ describe('toolbar/ribbon shared data', () => {
     const ownedLiteral = /export const RIBBON_BORDERS_MENU_ID = 'menu-borders';/;
     const exactMenuLiteral = /['"]menu-borders['"]/;
     const exactMenuSelectorLiteral = /['"]#menu-borders['"]/;
+    const toolbarTestFiles = sourceFilesUnder('tests/unit/mount/toolbar');
     const consumers = [
       'src/toolbar/ribbon/menus/borders.ts',
       'src/toolbar/ribbon/border-menu.ts',
       'src/mount/toolbar.ts',
-      'tests/unit/mount/toolbar.test.ts',
+      ...toolbarTestFiles,
     ];
 
+    expect(toolbarTestFiles).not.toHaveLength(0);
     expect(activationSource).toMatch(ownedLiteral);
     expect(RIBBON_BORDERS_MENU_ID).toBe('menu-borders');
     for (const path of consumers) {
