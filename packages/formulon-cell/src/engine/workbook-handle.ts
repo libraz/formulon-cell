@@ -22,6 +22,7 @@ import type {
 import { formatCell, fromEngineValue } from './value.js';
 import { installConditionalFormatMethods } from './workbook-handle-conditional-format.js';
 import { installWorkbookFeatureMethods } from './workbook-handle-features.js';
+import { installFormulasMethods } from './workbook-handle-formulas.js';
 import { installLayoutMethods } from './workbook-handle-layout.js';
 import { installPivotMethods } from './workbook-handle-pivot.js';
 import { installPrintMethods } from './workbook-handle-print.js';
@@ -150,7 +151,7 @@ export class WorkbookHandle {
   /** Host-injected localized function documentation, merged over the
    *  engine's structural `functionMetadata()` result. `null` until a host
    *  calls `setFunctionMetadataProvider`. */
-  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: read/written via the internals() cast in workbook-handle-features.ts
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: read/written via the internals() cast in workbook-handle-formulas.ts
   private functionMetadataProvider: FunctionMetadataProvider | null = null;
 
   /** Depth of the enclosing `withBatchedRecalc` scopes. While above zero,
@@ -624,45 +625,6 @@ export class WorkbookHandle {
     return r.recomputed;
   }
 
-  /** Toggle the iterative-formula solver. `maxIterations` and `maxChange`
-   *  cap the Gauss-Seidel loop; matches "File → Options → Formulas"
-   *  knobs. No-op (returns false) on engines without the iterative surface. */
-  setIterative(enabled: boolean, maxIterations: number, maxChange: number): boolean {
-    this.assertAlive();
-    if (!this.capabilities.iterativeProgress) return false;
-    const s = this.wb.setIterative(enabled, maxIterations, maxChange);
-    return s.ok;
-  }
-
-  /** Read back the workbook's stored iterative-calculation settings. The cap
-   *  and threshold are meaningful even while `enabled` is false, so a dialog
-   *  can open on what the workbook carries rather than on its own defaults.
-   *
-   *  Returns null when the engine has no readback, in which case the caller
-   *  keeps whatever it last wrote. Note the engine clamps `maxIterations` to
-   *  32767 on the way in, so a larger request reads back clamped. */
-  getIterative(): { enabled: boolean; maxIterations: number; maxChange: number } | null {
-    this.assertAlive();
-    if (!this.capabilities.iterativeSettings) return null;
-    const r = this.wb.getIterative();
-    if (!r.status.ok) return null;
-    return { enabled: r.enabled, maxIterations: r.maxIterations, maxChange: r.maxChange };
-  }
-
-  /** Install (or clear) a progress callback invoked after each iterative-solve
-   *  sweep. Returning `false` from the callback aborts the solve. Pass `null`
-   *  to detach. No-op on engines without `setIterativeProgress`. */
-  setIterativeProgress(
-    callback:
-      | ((iteration: number, maxResidual: number, maxIterations: number) => boolean | void)
-      | null,
-  ): boolean {
-    this.assertAlive();
-    if (!this.capabilities.iterativeProgress) return false;
-    const s = this.wb.setIterativeProgress(callback);
-    return s.ok;
-  }
-
   /** Iterate over every populated cell on a sheet. Used for initial paint.
    *  Loaded PivotTables are projected after physical cells so the evaluated
    *  layout is what the grid displays when a pivot overlaps cached values. */
@@ -770,47 +732,11 @@ export class WorkbookHandle {
     return formulas;
   }
 
-  /** Iterate over defined names. `localSheetId === -1` means workbook scope;
-   *  otherwise it is the 0-based sheet index for a sheet-scoped name. */
-  *definedNames(): Generator<{ name: string; formula: string; localSheetId: number }> {
-    this.assertAlive();
-    const n = numberValue(this.wb.definedNameCount(), 'definedNameCount');
-    for (let i = 0; i < n; i += 1) {
-      const e = this.wb.definedNameAt(i);
-      if (!e.status.ok || !e.name || e.formula === undefined || e.localSheetId === undefined)
-        continue;
-      yield { name: e.name, formula: e.formula, localSheetId: e.localSheetId };
-    }
-  }
-
-  /** Add or replace a workbook/sheet-scoped defined name. Pass an empty `formula`
-   *  to remove the name (engine convention). Returns false on engine failure
-   *  or when the engine doesn't expose scoped names. */
-  setDefinedNameEntry(name: string, formula: string, localSheetId = -1): boolean {
-    this.assertAlive();
-    if (!this.capabilities.definedNameMutate) return false;
-    const s = this.wb.setDefinedNameScoped(name, formula, localSheetId);
-    return s.ok;
-  }
-
   save(): Uint8Array {
     this.assertAlive();
     const r = this.wb.save();
     if (!r.status.ok || !r.bytes) throw new Error(`save: ${r.status.message}`);
     return r.bytes;
-  }
-
-  /** Renders the lambda value stored at `addr` as spreadsheet formula text. The
-   *  returned string never carries a leading `=` — callers prepending it
-   *  for the formula-bar edit seed should add the prefix themselves.
-   *  Returns `null` when the engine doesn't expose `getLambdaText` or
-   *  when the cell is absent / its cached value is not a lambda. */
-  getLambdaText(addr: Addr): string | null {
-    this.assertAlive();
-    if (!this.capabilities.lambdaText) return null;
-    const r = this.wb.getLambdaText(addr.sheet, addr.row, addr.col);
-    if (!r.status.ok) return null;
-    return r.text || null;
   }
 
   /** External-link records carried by the workbook in `<externalReferences>`
@@ -1304,6 +1230,7 @@ export class WorkbookHandle {
 }
 
 installPivotMethods(WorkbookHandle);
+installFormulasMethods(WorkbookHandle);
 installConditionalFormatMethods(WorkbookHandle);
 installStylesMethods(WorkbookHandle);
 installLayoutMethods(WorkbookHandle);
