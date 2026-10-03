@@ -32,14 +32,12 @@ import {
 import { findPivotTableAtCell } from './engine/passthrough-sync.js';
 import { WorkbookHandle } from './engine/workbook-handle.js';
 import { SpreadsheetEmitter } from './events.js';
-import { ALL_FEATURE_IDS } from './extensions/features.js';
 import {
   dedupeById,
   type Extension,
   type ExtensionContext,
   type ExtensionHandle,
   flattenExtensions,
-  resolveFlags,
   resolveSpreadsheetUiOptions,
   sortByPriority,
 } from './extensions/index.js';
@@ -69,9 +67,15 @@ import {
   type EngineBinding,
   WB_REGISTRY_IDS,
 } from './mount/engine-binding.js';
+import { resolveMountFlags } from './mount/feature-flags.js';
 import { attachFormulaBarController } from './mount/formula-bar.js';
 import { attachFormulaDraftMirror } from './mount/formula-draft-mirror.js';
-import { prepareMountHost, releaseMountHost } from './mount/host.js';
+import {
+  applyPlatformLayoutDefaults,
+  prepareMountHost,
+  releaseMountHost,
+  renderMountError,
+} from './mount/host.js';
 import {
   createAutocompleteStub,
   createHostFeatureController,
@@ -125,69 +129,10 @@ export type {
   SpreadsheetInstance,
 } from './mount/types.js';
 
-function mountErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function renderMountError(host: HTMLElement, error: unknown, strings: Strings['mountError']): void {
-  const panel = document.createElement('div');
-  panel.className = 'fc-mount-error';
-  panel.setAttribute('role', 'alert');
-
-  const title = document.createElement('strong');
-  title.textContent = strings.title;
-
-  const help = document.createElement('p');
-  help.textContent = strings.engineHelp;
-
-  const detail = document.createElement('code');
-  detail.textContent = mountErrorMessage(error);
-
-  panel.append(title, help, detail);
-  host.replaceChildren(panel);
-}
-
 function normalizeScreenClipResult(result: string | ScreenClipResult | null | undefined) {
   if (!result) return null;
   if (typeof result === 'string') return result ? { src: result } : null;
   return result.src ? result : null;
-}
-
-// These are the routes integrated with the cell command controller. Other
-// mutation surfaces remain unavailable while an interaction policy is active.
-const RESTRICTED_FEATURES = new Set([
-  'formulaBar',
-  'clipboard',
-  'shortcuts',
-  'wheel',
-  'contextMenu',
-]);
-
-function restrictedFlags(
-  flags: ReturnType<typeof resolveFlags>,
-  restricted: boolean,
-): ReturnType<typeof resolveFlags> {
-  if (!restricted) return flags;
-  return Object.fromEntries(
-    ALL_FEATURE_IDS.map((id) => [id, RESTRICTED_FEATURES.has(id) && flags[id]]),
-  ) as ReturnType<typeof resolveFlags>;
-}
-
-function applyPlatformLayoutDefaults(
-  store: ReturnType<typeof createSpreadsheetStore>,
-  platform: ReturnType<typeof resolveSpreadsheetUiOptions>['platform'],
-): void {
-  const defaults =
-    platform === 'mac'
-      ? { defaultColWidth: 75, headerColWidth: 26 }
-      : {
-          defaultColWidth: 64,
-          headerColWidth: 32,
-        };
-  store.setState((state) => ({
-    ...state,
-    layout: { ...state.layout, ...defaults },
-  }));
 }
 
 /**
@@ -223,9 +168,7 @@ export const Spreadsheet = {
     let requestedFeatures = { ...ui.features, ...opts.features };
     let contextMenuOptions = opts.contextMenu;
     const initialTheme = opts.theme ?? ui.theme;
-    let flags = restrictedFlags(resolveFlags(requestedFeatures), opts.policy !== undefined);
-    if (contextMenuOptions && contextMenuOptions.mode !== 'disabled') flags.contextMenu = true;
-    if (contextMenuOptions?.mode === 'disabled') flags.contextMenu = false;
+    let flags = resolveMountFlags(requestedFeatures, opts.policy !== undefined, contextMenuOptions);
     const emitter = new SpreadsheetEmitter();
     const formulaRegistry = new FormulaRegistry();
     if (opts.functions) {
@@ -941,10 +884,11 @@ export const Spreadsheet = {
       setFeatures(next) {
         requestedFeatures = { ...next };
         const prevFlags = flags;
-        const nextFlags = restrictedFlags(resolveFlags(next), commands.policy !== undefined);
-        if (contextMenuOptions && contextMenuOptions.mode !== 'disabled')
-          nextFlags.contextMenu = true;
-        if (contextMenuOptions?.mode === 'disabled') nextFlags.contextMenu = false;
+        const nextFlags = resolveMountFlags(
+          next,
+          commands.policy !== undefined,
+          contextMenuOptions,
+        );
         const shouldRebuildViewToolbarObjects =
           prevFlags.viewToolbar &&
           nextFlags.viewToolbar &&
