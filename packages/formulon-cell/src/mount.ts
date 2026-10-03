@@ -22,15 +22,7 @@ import {
 import { findPivotTableAtCell } from './engine/passthrough-sync.js';
 import { WorkbookHandle } from './engine/workbook-handle.js';
 import { SpreadsheetEmitter } from './events.js';
-import {
-  dedupeById,
-  type Extension,
-  type ExtensionContext,
-  type ExtensionHandle,
-  flattenExtensions,
-  resolveSpreadsheetUiOptions,
-  sortByPriority,
-} from './extensions/index.js';
+import { type ExtensionHandle, resolveSpreadsheetUiOptions } from './extensions/index.js';
 import { FormulaRegistry } from './formula.js';
 import { createI18nController } from './i18n/controller.js';
 import type { Strings } from './i18n/strings.js';
@@ -46,12 +38,9 @@ import {
 import { attachAlwaysOnDialogs } from './mount/always-on-dialogs.js';
 import { createMountChrome } from './mount/chrome.js';
 import { attachChromeSync, type ChromeSyncController } from './mount/chrome-sync.js';
-import {
-  attachEngineBinding,
-  type EngineBinding,
-  WB_REGISTRY_IDS,
-} from './mount/engine-binding.js';
+import { attachEngineBinding, type EngineBinding } from './mount/engine-binding.js';
 import { createErrorIndicatorClickHandler } from './mount/error-indicator-click.js';
+import { createExtensionRegistry } from './mount/extension-registry.js';
 import { resolveMountFlags } from './mount/feature-flags.js';
 import { attachFormulaBarController } from './mount/formula-bar.js';
 import { attachFormulaDraftMirror } from './mount/formula-draft-mirror.js';
@@ -334,14 +323,28 @@ export const Spreadsheet = {
       isRestricted: () => commands.policy !== undefined,
     });
 
-    const featureRegistry = new Map<string, ExtensionHandle>();
-    const wrapHandle = (raw: unknown, detach: () => void): ExtensionHandle => {
-      const h = (
-        raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
-      ) as ExtensionHandle;
-      h.dispose = detach;
-      return h;
+    const refreshCells = (): void => {
+      mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
     };
+    const extensionRegistry = createExtensionRegistry({
+      context: {
+        host,
+        formulabar,
+        viewbar,
+        grid,
+        statusbar,
+        canvas,
+        a11y: a11yLive,
+        store,
+        history,
+        i18n,
+        getWb: () => wb,
+        refreshCells,
+        invalidate: () => renderer.invalidate(),
+      },
+    });
+    const { featureRegistry, featuresView, wrapHandle, syncBindingFeatures, refreshFeaturesView } =
+      extensionRegistry;
 
     const autocompleteStub = createAutocompleteStub();
     const featureState = createHostFeatureState(autocompleteStub);
@@ -352,41 +355,6 @@ export const Spreadsheet = {
       getWb: () => wb,
       getWorkbookObjects: () => featureState.workbookObjects,
     });
-
-    const syncBindingFeatures = (current: EngineBinding): void => {
-      for (const id of WB_REGISTRY_IDS) featureRegistry.delete(id);
-      if (current.clipboardH) {
-        featureRegistry.set(
-          'clipboard',
-          wrapHandle(current.clipboardH, () => current.clipboardH?.detach()),
-        );
-      }
-      if (current.pasteSpecialDialog) {
-        featureRegistry.set(
-          'pasteSpecial',
-          wrapHandle(current.pasteSpecialDialog, () => current.pasteSpecialDialog?.detach()),
-        );
-      }
-      if (current.quickAnalysis) {
-        featureRegistry.set(
-          'quickAnalysis',
-          wrapHandle(current.quickAnalysis, () => current.quickAnalysis?.detach()),
-        );
-      }
-      if (current.contextMenu) featureRegistry.set('contextMenu', current.contextMenu);
-      if (current.findReplace) {
-        featureRegistry.set(
-          'findReplace',
-          wrapHandle(current.findReplace, () => current.findReplace?.detach()),
-        );
-      }
-      if (current.validation) {
-        featureRegistry.set(
-          'validation',
-          wrapHandle(current.validation, () => current.validation?.detach()),
-        );
-      }
-    };
 
     let chromeSync: ChromeSyncController | null = null;
     const updateChrome = (): void => chromeSync?.updateChrome();
@@ -499,54 +467,6 @@ export const Spreadsheet = {
 
     let disposed = false;
 
-    // User extensions — additive on top of built-ins. Run after built-ins
-    // and the engine binding so they can read other features via
-    // `ctx.resolve()`.
-    const userHandles = new Map<string, ExtensionHandle>();
-    const refreshCells = (): void => {
-      mutators.replaceCells(store, wb.cells(store.getState().data.sheetIndex));
-    };
-    const wbListeners = new Set<(next: WorkbookHandle) => void>();
-    const ctx: ExtensionContext = {
-      host,
-      formulabar,
-      viewbar,
-      grid,
-      statusbar,
-      canvas,
-      a11y: a11yLive,
-      store,
-      history,
-      i18n,
-      getWb: () => wb,
-      refreshCells,
-      invalidate: () => renderer.invalidate(),
-      resolve: <T extends ExtensionHandle = ExtensionHandle>(id: string): T | undefined =>
-        (featureRegistry.get(id) ?? userHandles.get(id)) as T | undefined,
-      onWorkbookChange: (fn) => {
-        wbListeners.add(fn);
-        return () => {
-          wbListeners.delete(fn);
-        };
-      },
-    };
-
-    const mountExtension = (ext: Extension): void => {
-      if (userHandles.has(ext.id) || featureRegistry.has(ext.id)) {
-        // last-wins via remove + re-add; users explicitly opt in
-        userHandles.get(ext.id)?.dispose();
-        userHandles.delete(ext.id);
-      }
-      const handle = ext.setup(ctx);
-      if (handle) userHandles.set(ext.id, handle);
-    };
-    // Combined view exposed on `instance.features` — built-ins + user.
-    const featuresView: Record<string, ExtensionHandle | undefined> = {};
-    const refreshFeaturesView = (): void => {
-      for (const k of Object.keys(featuresView)) delete featuresView[k];
-      for (const [k, v] of featureRegistry) featuresView[k] = v;
-      for (const [k, v] of userHandles) featuresView[k] = v;
-    };
     let syncedSessionCfRules: SyncedConditionalRuleMap = new Map();
     const syncSessionConditionalRules = (): void => {
       const rules = store.getState().conditional.rules;
@@ -613,10 +533,7 @@ export const Spreadsheet = {
       if (flags[id as keyof typeof flags]) attachHostFeature(id);
     }
 
-    if (opts.extensions) {
-      const sorted = sortByPriority(dedupeById(flattenExtensions(opts.extensions)));
-      for (const ext of sorted) mountExtension(ext);
-    }
+    if (opts.extensions) extensionRegistry.mountAll(opts.extensions);
     refreshFeaturesView();
 
     // Locale change → push fresh strings everywhere. Built-ins that ship a
@@ -656,7 +573,7 @@ export const Spreadsheet = {
       featureState.pivotTableDialog?.bindWorkbook(wb);
 
       // User extensions opt-in via setStrings.
-      for (const handle of userHandles.values()) handle.setStrings?.(next);
+      extensionRegistry.setUserStrings(next);
 
       emitter.emit('localeChange', { locale: i18n.locale, strings: next });
     });
@@ -796,19 +713,8 @@ export const Spreadsheet = {
       },
       formula: formulaRegistry,
       cells: cellRegistry,
-      use(input) {
-        const sorted = sortByPriority(dedupeById(flattenExtensions([input])));
-        for (const ext of sorted) mountExtension(ext);
-        refreshFeaturesView();
-      },
-      remove(id) {
-        const handle = userHandles.get(id);
-        if (!handle) return false;
-        handle.dispose();
-        userHandles.delete(id);
-        refreshFeaturesView();
-        return true;
-      },
+      use: extensionRegistry.use,
+      remove: extensionRegistry.remove,
       setFeatures(next) {
         requestedFeatures = { ...next };
         const prevFlags = flags;
@@ -851,17 +757,7 @@ export const Spreadsheet = {
         }
         refreshFeaturesView();
       },
-      setExtensions(next) {
-        // Dispose all currently-mounted user extensions, then re-mount the
-        // new list. Built-ins are untouched — use `setFeatures` for those.
-        for (const handle of userHandles.values()) handle.dispose();
-        userHandles.clear();
-        if (next?.length) {
-          const sorted = sortByPriority(dedupeById(flattenExtensions(next)));
-          for (const ext of sorted) mountExtension(ext);
-        }
-        refreshFeaturesView();
-      },
+      setExtensions: extensionRegistry.setExtensions,
       openConditionalDialog(options) {
         featureState.conditionalDialog?.open(options);
       },
@@ -988,7 +884,7 @@ export const Spreadsheet = {
         refreshFeaturesView();
       },
       openQuickAnalysis() {
-        const userQuick = userHandles.get('quickAnalysis') as
+        const userQuick = extensionRegistry.getUserHandle('quickAnalysis') as
           | (ExtensionHandle & { open?: () => void })
           | undefined;
         if (userQuick?.open) {
@@ -998,7 +894,7 @@ export const Spreadsheet = {
         binding.quickAnalysis?.open();
       },
       openWorkbookObjects() {
-        const userObjects = userHandles.get('workbookObjects') as
+        const userObjects = extensionRegistry.getUserHandle('workbookObjects') as
           | (ExtensionHandle & { open?: () => void })
           | undefined;
         if (userObjects?.open) {
@@ -1009,7 +905,7 @@ export const Spreadsheet = {
       },
       openPivotFieldList(sheetIndex, pivotIndex) {
         if (commands.policy !== undefined) return false;
-        const userObjects = userHandles.get('workbookObjects') as
+        const userObjects = extensionRegistry.getUserHandle('workbookObjects') as
           | (ExtensionHandle & {
               openPivotFieldList?: (sheetIndex: number, pivotIndex: number) => boolean;
             })
@@ -1023,7 +919,7 @@ export const Spreadsheet = {
         if (commands.policy !== undefined) return false;
         const pivot = findPivotTableAtCell(wb, store.getState().selection.active);
         if (!pivot) return false;
-        const userObjects = userHandles.get('workbookObjects') as
+        const userObjects = extensionRegistry.getUserHandle('workbookObjects') as
           | (ExtensionHandle & {
               openPivotFieldList?: (sheetIndex: number, pivotIndex: number) => boolean;
             })
@@ -1038,7 +934,7 @@ export const Spreadsheet = {
       },
       openPivotTableDialog(opts) {
         if (commands.policy !== undefined) return;
-        const userPivot = userHandles.get('pivotTableDialog') as
+        const userPivot = extensionRegistry.getUserHandle('pivotTableDialog') as
           | (ExtensionHandle & { open?: (opts?: { placement?: 'new' | 'existing' }) => void })
           | undefined;
         if (userPivot?.open) {
@@ -1160,21 +1056,7 @@ export const Spreadsheet = {
         featureState.pivotTableDialog?.bindWorkbook(wb);
         featureState.statusBar?.refresh();
         sheetTabsController?.update();
-        // Notify user extensions so they can rebind their wb references.
-        for (const handle of [...userHandles.values()]) {
-          try {
-            handle.rebindWorkbook?.(wb);
-          } catch (error) {
-            console.warn('formulon-cell: extension workbook hook failed', error);
-          }
-        }
-        for (const fn of [...wbListeners]) {
-          try {
-            fn(wb);
-          } catch (error) {
-            console.warn('formulon-cell: workbook hook failed', error);
-          }
-        }
+        extensionRegistry.notifyWorkbookChange(wb);
         updateChrome();
         renderer.invalidate();
         emitter.emit('workbookChange', { workbook: wb });
@@ -1198,8 +1080,7 @@ export const Spreadsheet = {
         emitter.dispose();
         ro.disconnect();
         binding.unbind();
-        for (const handle of userHandles.values()) handle.dispose();
-        userHandles.clear();
+        extensionRegistry.dispose();
         for (const id of HOST_TOGGLEABLE_IDS) detachHostFeature(id);
         formulaBar.detach();
         sheetTabsController?.detach();
