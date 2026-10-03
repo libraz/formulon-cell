@@ -5,6 +5,7 @@ import {
   type FunctionCatalogReader,
   type FunctionCatalogSnapshot,
   type FunctionCategory,
+  functionSyntax,
   isFunctionUnavailableForInsertion,
   supportedFunctionNames,
 } from '../commands/function-categories.js';
@@ -222,16 +223,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
     return textForEntry(selectedEntry) ?? '';
   };
 
-  const selectedSyntax = (): string => {
-    if (!selectedEntry) return '';
-    if (selectedEntry.signatureTemplate) return selectedEntry.signatureTemplate;
-    const labelsText = selectedEntry.argumentLabels.length
-      ? selectedEntry.argumentLabels.join(', ')
-      : selectedEntry.maxArity === null
-        ? '...'
-        : '';
-    return `${selectedEntry.displayName}(${labelsText}${selectedEntry.maxArity === null && labelsText ? ', ...' : ''})`;
-  };
+  const selectedSyntax = (): string => (selectedEntry ? functionSyntax(selectedEntry) : '');
 
   const categoryTitle = (category: CatalogFunctionCategory): string => {
     const fx = strings.fxDialog;
@@ -427,9 +419,7 @@ export function attachMacFormulaPalette(deps: MacFormulaPaletteDeps): MacFormula
       summary.appendChild(text);
     }
     const syntax = document.createElement('code');
-    syntax.textContent = entry.signatureTemplate
-      ? entry.signatureTemplate
-      : `${entry.displayName}(${entry.argumentLabels.length ? entry.argumentLabels.join(', ') : entry.maxArity === null ? '...' : ''}${entry.maxArity === null && entry.argumentLabels.length ? ', ...' : ''})`;
+    syntax.textContent = functionSyntax(entry);
     summary.appendChild(syntax);
   };
 

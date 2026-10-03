@@ -54,6 +54,16 @@ export interface FunctionCatalogEntry {
   availability?: number;
 }
 
+/** Display syntax for a catalog entry: the metadata template when present,
+ * otherwise `NAME(labels)` with a trailing `...` for unbounded variadics —
+ * `NAME(a, [b], ...)` when labelled, `NAME(...)` when not. */
+export const functionSyntax = (entry: FunctionCatalogEntry): string => {
+  if (entry.signatureTemplate) return entry.signatureTemplate;
+  const parts = [...entry.argumentLabels];
+  if (entry.maxArity === null) parts.push('...');
+  return `${entry.displayName}(${parts.join(', ')})`;
+};
+
 /** Whether an engine function is a visible-but-non-insertable stub. */
 export const isFunctionUnavailableForInsertion = (
   availability: number | null | undefined,

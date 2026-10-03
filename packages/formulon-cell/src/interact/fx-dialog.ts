@@ -4,6 +4,7 @@ import {
   type FunctionCatalogReader,
   type FunctionCatalogSnapshot,
   type FunctionCategory,
+  functionSyntax,
   isFunctionUnavailableForInsertion,
   supportedFunctionNames,
 } from '../commands/function-categories.js';
@@ -311,11 +312,10 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
   const functionUnavailable = (name: string): boolean =>
     isFunctionUnavailableForInsertion(catalogEntry(name)?.availability);
 
-  const functionSyntax = (name: string): string => {
+  const syntaxFor = (name: string): string => {
     const entry = catalogEntry(name);
-    if (entry?.signatureTemplate) return entry.signatureTemplate;
-    const displayName = entry?.displayName ?? name;
-    return `${displayName}(${(entry?.argumentLabels ?? FUNCTION_SIGNATURES[name] ?? []).join(', ')})`;
+    if (entry) return functionSyntax(entry);
+    return `${name}(${(FUNCTION_SIGNATURES[name] ?? []).join(', ')})`;
   };
 
   const updateFunctionSummary = (name: string | null): void => {
@@ -326,7 +326,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       return;
     }
     functionSummary.hidden = false;
-    functionSummaryName.textContent = functionSyntax(name);
+    functionSummaryName.textContent = syntaxFor(name);
     const description = localizedDescription(name);
     functionSummaryDesc.textContent = functionUnavailable(name)
       ? [description, unavailableReason()].filter(Boolean).join(' ')
@@ -559,7 +559,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
     backBtn.hidden = false;
     setInsertDisabled(false, null);
 
-    argsName.textContent = functionSyntax(name);
+    argsName.textContent = syntaxFor(name);
     argsDesc.textContent = localizedDescription(name);
 
     argCount = argumentCountFor(selectedEntry, initialArgs.length);
@@ -742,7 +742,7 @@ export function attachFxDialog(deps: FxDialogDeps): FxDialogHandle {
       } else if (functionUnavailable(currentName)) {
         keepUnavailableInPicker(currentName);
       } else {
-        argsName.textContent = functionSyntax(currentName);
+        argsName.textContent = syntaxFor(currentName);
         argsDesc.textContent = localizedDescription(currentName);
         renderArgumentFields();
       }

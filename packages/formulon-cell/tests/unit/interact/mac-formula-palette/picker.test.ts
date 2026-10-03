@@ -222,6 +222,33 @@ describe('interact/mac-formula-palette picker', () => {
     palette.detach();
   });
 
+  it.each([
+    { name: 'NOW', minArity: 0, maxArity: 0, syntax: 'NOW()' },
+    { name: 'ACOS', minArity: 1, maxArity: 1, syntax: 'ACOS(number)' },
+    { name: 'SUM', minArity: 1, maxArity: null, syntax: 'SUM(number1, [number2], ...)' },
+    { name: 'VARFN', minArity: 0, maxArity: null, syntax: 'VARFN(...)' },
+  ])('renders $syntax identically in the picker summary and argument help', (fn) => {
+    const workbook = {
+      functionNames: () => [fn.name],
+      functionMetadata: () => ({ ...fn, availability: 0 }),
+    } as unknown as WorkbookHandle;
+    const { palette } = setup(
+      () => workbook,
+      () => en,
+    );
+    palette.open();
+    const root = paletteRoot(palette);
+    root.querySelector<HTMLElement>(`[data-function-name="${fn.name}"]`)?.click();
+    expect(root.querySelector('.fc-mac-formula-palette__summary code')?.textContent).toBe(
+      fn.syntax,
+    );
+
+    root.querySelector<HTMLButtonElement>('[data-action="insert-function"]')?.click();
+    const help = paletteRoot(palette).querySelector('.fc-mac-formula-palette__help');
+    expect(help?.querySelectorAll('p')[1]?.textContent).toBe(`Syntax: ${fn.syntax}`);
+    palette.detach();
+  });
+
   it('uses localized date-time and statistical family titles', () => {
     const { palette } = setup(
       () => sheet.workbook,

@@ -781,6 +781,26 @@ describe('attachFxDialog', () => {
     handle.detach();
   });
 
+  it.each([
+    { name: 'NOW', minArity: 0, maxArity: 0, syntax: 'NOW()' },
+    { name: 'ACOS', minArity: 1, maxArity: 1, syntax: 'ACOS(number)' },
+    { name: 'SUM', minArity: 1, maxArity: null, syntax: 'SUM(number1, [number2], ...)' },
+    { name: 'VARFN', minArity: 0, maxArity: null, syntax: 'VARFN(...)' },
+  ])('renders $syntax in the function summary', (fn) => {
+    const handle = attachFxDialog({
+      host,
+      store: createSpreadsheetStore(),
+      getWb: () => ({
+        functionNames: () => [fn.name],
+        functionMetadata: () => ({ ...fn, availability: 0 }),
+      }),
+      onInsert: () => {},
+    });
+    handle.open();
+    expect(document.querySelector('.fc-fxdialog__summary-name')?.textContent).toBe(fn.syntax);
+    handle.detach();
+  });
+
   it('preserves interior argument blanks while omitting trailing blanks', () => {
     const inserted: string[] = [];
     const handle = attachFxDialog({
