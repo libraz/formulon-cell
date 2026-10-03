@@ -23,8 +23,43 @@ import {
   type PrintCellErrorsMode,
   type SpreadsheetStore,
 } from '../store/store.js';
+import {
+  computeFitToPagesScale,
+  effectivePrintMargins,
+  PAPER_DIMENSIONS,
+  printColumnsForRegion,
+  splitPrintRegionIntoTiles,
+} from './page-geometry.js';
+import {
+  colLetter,
+  orderPrintRegionsForPageOrder,
+  type PrintAreaBounds,
+  parsePrintAreas,
+  parsePrintTitleCols,
+  parsePrintTitleRows,
+} from './print-ranges.js';
 import { type PrinterProfile, resolvePrinterProfileBounds } from './printer-profile.js';
 import { formatA1FormulaAsR1C1 } from './refs.js';
+
+export type { AxisBand, PrintableMarginAdjustment, SplitAxisOptions } from './page-geometry.js';
+export {
+  computeFitToPagesScale,
+  effectivePrintMargins,
+  PRINT_PX_PER_INCH,
+  paperInches,
+  printableMarginAdjustments,
+  printablePagePixels,
+  splitAxisIntoBands,
+} from './page-geometry.js';
+export type { PrintAreaBounds } from './print-ranges.js';
+export {
+  colLetter,
+  orderPrintRegionsForPageOrder,
+  parsePrintArea,
+  parsePrintAreas,
+  parsePrintTitleCols,
+  parsePrintTitleRows,
+} from './print-ranges.js';
 
 /** Output of `buildPrintDocument`. `html` is a complete HTML document string
  *  ready to feed into an iframe via `document.write`. `cssVars` carries
@@ -42,137 +77,6 @@ export interface BuildPrintDocumentOptions {
 export interface PrintSheetOptions {
   printerProfiles?: readonly PrinterProfile[];
   printerProfileId?: string;
-}
-
-export interface PrintAreaBounds {
-  row0: number;
-  col0: number;
-  row1: number;
-  col1: number;
-}
-
-/** Convert a 0-indexed column number to A1 letter form ("A", "B", … "Z",
- *  "AA", …). Used for column-letter headings and print-title parsing. */
-export function colLetter(col: number): string {
-  let n = col;
-  let out = '';
-  do {
-    out = String.fromCharCode(65 + (n % 26)) + out;
-    n = Math.floor(n / 26) - 1;
-  } while (n >= 0);
-  return out;
-}
-
-/** Reverse of `colLetter`. Returns -1 on parse failure. */
-function colFromLetters(letters: string): number {
-  let col = 0;
-  const upper = letters.toUpperCase();
-  for (let i = 0; i < upper.length; i += 1) {
-    const code = upper.charCodeAt(i);
-    if (code < 65 || code > 90) return -1;
-    col = col * 26 + (code - 64);
-  }
-  return col - 1;
-}
-
-/** Parse an A1-style row range like "1:3" / "$1:$3" / "2" → `[r0, r1]`
- *  inclusive, 0-indexed. Returns null on bad input. */
-export function parsePrintTitleRows(raw?: string): [number, number] | null {
-  if (!raw) return null;
-  const trimmed = raw.trim().replace(/\$/g, '');
-  if (!trimmed) return null;
-  const parts = trimmed.split(':');
-  const a = Number.parseInt(parts[0] ?? '', 10);
-  if (!Number.isFinite(a) || a < 1) return null;
-  if (parts.length === 1) return [a - 1, a - 1];
-  const b = Number.parseInt(parts[1] ?? '', 10);
-  if (!Number.isFinite(b) || b < 1) return null;
-  return [Math.min(a, b) - 1, Math.max(a, b) - 1];
-}
-
-/** Parse an A1-style col range like "A:B" / "$A:$B" / "C" → `[c0, c1]`
- *  inclusive, 0-indexed. Returns null on bad input. */
-export function parsePrintTitleCols(raw?: string): [number, number] | null {
-  if (!raw) return null;
-  const trimmed = raw.trim().replace(/\$/g, '');
-  if (!trimmed) return null;
-  const parts = trimmed.split(':');
-  const a = colFromLetters(parts[0] ?? '');
-  if (a < 0) return null;
-  if (parts.length === 1) return [a, a];
-  const b = colFromLetters(parts[1] ?? '');
-  if (b < 0) return null;
-  return [Math.min(a, b), Math.max(a, b)];
-}
-
-/** Parse an A1-style rectangular print area like "A1:D20" / "$A$1:$D$20"
- *  / "B2" → zero-indexed bounds. Returns null on bad input. */
-export function parsePrintArea(raw?: string): PrintAreaBounds | null {
-  if (!raw) return null;
-  const trimmed = raw.trim().replace(/\$/g, '');
-  if (!trimmed || trimmed.includes(',')) return null;
-  const parseCell = (cell: string): { row: number; col: number } | null => {
-    const match = /^([A-Za-z]+)([1-9][0-9]*)$/.exec(cell.trim());
-    if (!match) return null;
-    const col = colFromLetters(match[1] ?? '');
-    const row = Number.parseInt(match[2] ?? '', 10) - 1;
-    if (col < 0 || row < 0) return null;
-    return { row, col };
-  };
-  const parts = trimmed.split(':');
-  if (parts.length > 2) return null;
-  const a = parseCell(parts[0] ?? '');
-  const b = parseCell(parts[1] ?? parts[0] ?? '');
-  if (!a || !b) return null;
-  return {
-    row0: Math.min(a.row, b.row),
-    col0: Math.min(a.col, b.col),
-    row1: Math.max(a.row, b.row),
-    col1: Math.max(a.col, b.col),
-  };
-}
-
-export function parsePrintAreas(raw?: string): PrintAreaBounds[] | null {
-  if (!raw) return null;
-  const parts = raw
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean);
-  if (parts.length === 0) return null;
-  const areas = parts.map((part) => parsePrintArea(part));
-  if (areas.some((area) => area === null)) return null;
-  return areas as PrintAreaBounds[];
-}
-
-export function orderPrintRegionsForPageOrder(
-  regions: readonly PrintAreaBounds[],
-  pageOrder: PageSetup['pageOrder'] = 'downThenOver',
-): PrintAreaBounds[] {
-  const ordered = [...regions];
-  ordered.sort((a, b) =>
-    pageOrder === 'overThenDown'
-      ? a.row0 - b.row0 || a.col0 - b.col0 || a.row1 - b.row1 || a.col1 - b.col1
-      : a.col0 - b.col0 || a.row0 - b.row0 || a.col1 - b.col1 || a.row1 - b.row1,
-  );
-  return ordered;
-}
-
-function printColumnsForRegion(
-  region: PrintAreaBounds,
-  titleColRange: [number, number] | null,
-): number[] {
-  const cols: number[] = [];
-  const seen = new Set<number>();
-  const add = (col: number): void => {
-    if (seen.has(col)) return;
-    seen.add(col);
-    cols.push(col);
-  };
-  if (titleColRange) {
-    for (let c = titleColRange[0]; c <= titleColRange[1]; c += 1) add(c);
-  }
-  for (let c = region.col0; c <= region.col1; c += 1) add(c);
-  return cols;
 }
 
 const escapeHtml = (s: string): string =>
@@ -343,120 +247,6 @@ function inlineCellStyle(
   return parts.join(';');
 }
 
-const PAPER_DIMENSIONS: Record<string, string> = {
-  A3: 'A3',
-  A4: 'A4',
-  A5: 'A5',
-  letter: 'letter',
-  legal: 'legal',
-  tabloid: 'tabloid',
-};
-
-/** Physical paper dimensions in inches (portrait). Used to derive a
- *  fit-to-pages scale — the `@page size` keyword tells the browser the sheet
- *  but gives us no numbers to scale content against. */
-const PAPER_INCHES: Record<string, { w: number; h: number }> = {
-  A3: { w: 11.69, h: 16.54 },
-  A4: { w: 8.27, h: 11.69 },
-  A5: { w: 5.83, h: 8.27 },
-  letter: { w: 8.5, h: 11 },
-  legal: { w: 8.5, h: 14 },
-  tabloid: { w: 11, h: 17 },
-};
-
-/** CSS reference pixel density — column widths / row heights are stored in px. */
-export const PRINT_PX_PER_INCH = 96;
-
-/** One page's worth of a single axis, as produced by {@link splitAxisIntoBands}. */
-export interface AxisBand {
-  /** First index on the page. */
-  start: number;
-  /** Last index on the page, inclusive. */
-  end: number;
-  /** The band opens at a user-inserted break rather than an automatic one.
-   *  False for the first band, which starts because the content does. */
-  manual: boolean;
-}
-
-export interface SplitAxisOptions {
-  /** Inclusive index range to paginate. */
-  from: number;
-  to: number;
-  /** Size of one index in unscaled sheet pixels; 0 for hidden. */
-  sizeOf: (index: number) => number;
-  /** Pixels of content one page can hold. */
-  budget: number;
-  /** Indices a page must start at. Values outside `[from, to]` are ignored. */
-  manualBreaks?: readonly number[];
-}
-
-/**
- * Split one axis into per-page bands. A band closes when the next index would
- * overflow the page budget, or when a manual break forces a new page. A single
- * index wider than a whole page still gets its own band rather than looping
- * forever — the print CSS lets it overflow, matching the desktop app.
- */
-export function splitAxisIntoBands(opts: SplitAxisOptions): AxisBand[] {
-  const { from, to, sizeOf, budget } = opts;
-  const breaks = new Set((opts.manualBreaks ?? []).filter((i) => i > from && i <= to));
-  const bands: AxisBand[] = [];
-  let index = from;
-  while (index <= to) {
-    const start = index;
-    let used = 0;
-    let end = index;
-    while (end <= to) {
-      if (end > start && breaks.has(end)) break;
-      const next = sizeOf(end);
-      if (end > start && used + next > budget) break;
-      used += next;
-      end += 1;
-    }
-    bands.push({ start, end: Math.max(start, end - 1), manual: breaks.has(start) });
-    index = Math.max(start + 1, end);
-  }
-  return bands;
-}
-
-interface PrintLayoutMetrics {
-  colWidths: Map<number, number>;
-  rowHeights: Map<number, number>;
-  defaultColWidth: number;
-  defaultRowHeight: number;
-}
-
-export function effectivePrintMargins(setup: PageSetup): PageMargins {
-  const printable = setup.printableBounds;
-  if (!printable) return { ...setup.margins };
-  return {
-    top: Math.max(setup.margins.top, printable.top),
-    right: Math.max(setup.margins.right, printable.right),
-    bottom: Math.max(setup.margins.bottom, printable.bottom),
-    left: Math.max(setup.margins.left, printable.left),
-  };
-}
-
-export interface PrintableMarginAdjustment {
-  side: keyof PageMargins;
-  margin: number;
-  minimum: number;
-  effective: number;
-}
-
-export function printableMarginAdjustments(setup: PageSetup): PrintableMarginAdjustment[] {
-  const printable = setup.printableBounds;
-  if (!printable) return [];
-  const sides: (keyof PageMargins)[] = ['top', 'right', 'bottom', 'left'];
-  return sides
-    .map((side) => ({
-      side,
-      margin: setup.margins[side],
-      minimum: printable[side],
-      effective: Math.max(setup.margins[side], printable[side]),
-    }))
-    .filter((item) => item.minimum > item.margin);
-}
-
 /** Build the @page CSS string for a given setup. Browsers honour orientation
  *  and (for print preview / PDF) the size keyword. */
 /** Context used to expand header/footer field codes into concrete text. */
@@ -556,194 +346,6 @@ function buildPageRule(setup: PageSetup, ctx: HeaderFooterContext): string {
     .join(' ');
   const base = `@page { size: ${size}; margin: ${m.top}in ${m.right}in ${m.bottom}in ${m.left}in;`;
   return marginBoxes ? `${base} ${marginBoxes} }` : `${base} }`;
-}
-
-/** Natural size of the print regions in inches, from column widths / row
- *  heights. Width is the widest single region (regions break onto their own
- *  page); height is the stacked total. */
-function printContentInches(
-  regions: readonly PrintAreaBounds[],
-  layout: PrintLayoutMetrics,
-  hiddenRows: ReadonlySet<number>,
-  hiddenCols: ReadonlySet<number>,
-  titleColRange: [number, number] | null = null,
-): { width: number; height: number } {
-  let width = 0;
-  let height = 0;
-  for (const region of regions) {
-    let regionW = 0;
-    for (const c of printColumnsForRegion(region, titleColRange)) {
-      if (hiddenCols.has(c)) continue;
-      regionW += layout.colWidths.get(c) ?? layout.defaultColWidth;
-    }
-    let regionH = 0;
-    for (let r = region.row0; r <= region.row1; r += 1) {
-      if (hiddenRows.has(r)) continue;
-      regionH += layout.rowHeights.get(r) ?? layout.defaultRowHeight;
-    }
-    width = Math.max(width, regionW);
-    height += regionH;
-  }
-  return { width: width / PRINT_PX_PER_INCH, height: height / PRINT_PX_PER_INCH };
-}
-
-/** Physical page box in inches, orientation applied. */
-export function paperInches(setup: PageSetup): { w: number; h: number } {
-  const portrait = PAPER_INCHES[setup.paperSize] ?? { w: 8.27, h: 11.69 };
-  return setup.orientation === 'landscape'
-    ? { w: portrait.h, h: portrait.w }
-    : { w: portrait.w, h: portrait.h };
-}
-
-/** Printable area of one page expressed in layout pixels — the budget a page
- *  of content has to fit into. Dividing by `scale` converts the physical area
- *  into unscaled sheet pixels, which is the space the splitter measures
- *  column widths and row heights against. */
-export function printablePagePixels(
-  setup: PageSetup,
-  scale: number,
-): { width: number; height: number } {
-  const page = paperInches(setup);
-  const m = effectivePrintMargins(setup);
-  const factor = Math.max(scale, 0.1);
-  return {
-    width: (Math.max(0.1, page.w - m.left - m.right) * PRINT_PX_PER_INCH) / factor,
-    height: (Math.max(0.1, page.h - m.top - m.bottom) * PRINT_PX_PER_INCH) / factor,
-  };
-}
-
-function measuredColumnWidth(
-  col: number,
-  layout: PrintLayoutMetrics,
-  hiddenCols: ReadonlySet<number>,
-): number {
-  return hiddenCols.has(col) ? 0 : (layout.colWidths.get(col) ?? layout.defaultColWidth);
-}
-
-function measuredRowHeight(
-  row: number,
-  layout: PrintLayoutMetrics,
-  hiddenRows: ReadonlySet<number>,
-): number {
-  return hiddenRows.has(row) ? 0 : (layout.rowHeights.get(row) ?? layout.defaultRowHeight);
-}
-
-function splitPrintRegionIntoTiles(
-  region: PrintAreaBounds,
-  setup: PageSetup,
-  layout: PrintLayoutMetrics,
-  hiddenRows: ReadonlySet<number>,
-  hiddenCols: ReadonlySet<number>,
-  titleRowRange: [number, number] | null,
-  titleColRange: [number, number] | null,
-  scale: number,
-): PrintAreaBounds[] {
-  const page = printablePagePixels(setup, scale);
-  const titleWidth = titleColRange
-    ? printColumnsForRegion(
-        { row0: region.row0, row1: region.row0, col0: region.col0, col1: region.col0 - 1 },
-        titleColRange,
-      ).reduce((sum, col) => sum + measuredColumnWidth(col, layout, hiddenCols), 0)
-    : 0;
-  const titleHeight = titleRowRange
-    ? Array.from(
-        { length: titleRowRange[1] - titleRowRange[0] + 1 },
-        (_, i) => titleRowRange[0] + i,
-      )
-        .filter((row) => row < region.row0 || row > region.row1)
-        .reduce((sum, row) => sum + measuredRowHeight(row, layout, hiddenRows), 0)
-    : 0;
-  const colBudget = Math.max(layout.defaultColWidth, page.width - titleWidth);
-  const rowBudget = Math.max(layout.defaultRowHeight, page.height - titleHeight);
-
-  const colChunks = splitAxisIntoBands({
-    from: region.col0,
-    to: region.col1,
-    budget: colBudget,
-    manualBreaks: setup.manualPageBreakCols,
-    sizeOf: (col) => measuredColumnWidth(col, layout, hiddenCols),
-  });
-  const rowChunks = splitAxisIntoBands({
-    from: region.row0,
-    to: region.row1,
-    budget: rowBudget,
-    manualBreaks: setup.manualPageBreakRows,
-    // Print titles repeat on every page, so they cost nothing against the
-    // budget of the band they happen to fall inside.
-    sizeOf: (row) =>
-      titleRowRange && row >= titleRowRange[0] && row <= titleRowRange[1]
-        ? 0
-        : measuredRowHeight(row, layout, hiddenRows),
-  });
-
-  const tiles: PrintAreaBounds[] = [];
-  if (setup.pageOrder === 'overThenDown') {
-    for (const rowBand of rowChunks) {
-      for (const colBand of colChunks) {
-        tiles.push({
-          row0: rowBand.start,
-          row1: rowBand.end,
-          col0: colBand.start,
-          col1: colBand.end,
-        });
-      }
-    }
-  } else {
-    for (const colBand of colChunks) {
-      for (const rowBand of rowChunks) {
-        tiles.push({
-          row0: rowBand.start,
-          row1: rowBand.end,
-          col0: colBand.start,
-          col1: colBand.end,
-        });
-      }
-    }
-  }
-  return tiles;
-}
-
-/**
- * Resolve the document scale. When Fit-to-pages is set (`fitWidth`/`fitHeight`)
- * the requested page count is honoured by estimating the content's natural size
- * against the printable page area and deriving the largest scale that fits —
- * Excel never scales *up*, so the result is capped at 100% and floored to whole
- * percent. With no fit constraint the explicit `scale` (default 100%) is used.
- */
-export function computeFitToPagesScale(
-  setup: PageSetup,
-  regions: readonly PrintAreaBounds[],
-  layout: PrintLayoutMetrics,
-  hiddenRows: ReadonlySet<number>,
-  hiddenCols: ReadonlySet<number>,
-): number {
-  const fitWidth = setup.fitWidth ?? 0;
-  const fitHeight = setup.fitHeight ?? 0;
-  if (fitWidth <= 0 && fitHeight <= 0) {
-    return setup.scale && setup.scale > 0 ? setup.scale : 1;
-  }
-  const page = paperInches(setup);
-  const m = effectivePrintMargins(setup);
-  const printableW = Math.max(0.1, page.w - m.left - m.right);
-  const printableH = Math.max(0.1, page.h - m.top - m.bottom);
-  const content = printContentInches(
-    regions,
-    layout,
-    hiddenRows,
-    hiddenCols,
-    parsePrintTitleCols(setup.printTitleCols),
-  );
-
-  const candidates: number[] = [];
-  if (fitWidth > 0 && content.width > 0) candidates.push((fitWidth * printableW) / content.width);
-  if (fitHeight > 0 && content.height > 0) {
-    candidates.push((fitHeight * printableH) / content.height);
-  }
-  if (candidates.length === 0) return 1;
-  const raw = Math.min(1, ...candidates);
-  // Excel's minimum print scale is 10%; floor to whole percent so the content
-  // never overflows the requested page count by a rounding sliver.
-  return Math.max(0.1, Math.floor(raw * 100) / 100);
 }
 
 /** Snapshot of one cell ready to render. We collect into an intermediate map
