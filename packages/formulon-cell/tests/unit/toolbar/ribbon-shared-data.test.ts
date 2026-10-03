@@ -281,13 +281,16 @@ describe('toolbar/ribbon shared data', () => {
     expect(missing).toEqual([]);
   });
 
-  it('keeps mount toolbar using the shared active-state command map', () => {
+  it('keeps mount toolbar using the shared active-state projection', () => {
     const toolbarSource = source('src/mount/toolbar.ts');
 
-    expect(toolbarSource).toContain(
-      "RIBBON_ACTIVE_COMMANDS,\n} from '../toolbar/ribbon-active-state.js'",
+    expect(toolbarSource).toMatch(
+      /import \{[^}]*\bprojectRibbonActiveState\b[^}]*\} from '\.\.\/toolbar\/ribbon-active-state\.js'/,
     );
-    expect(toolbarSource).not.toContain('const RIBBON_ACTIVE_COMMANDS');
+    const definers = sourceFilesUnder('src').filter((file) =>
+      source(file).includes('const RIBBON_ACTIVE_COMMANDS'),
+    );
+    expect(definers).toEqual(['src/toolbar/ribbon-active-state.ts']);
   });
 
   it('keeps rendered format mutator commands in executable activation categories', () => {

@@ -62,11 +62,7 @@ import {
   type RibbonMenus,
   type RibbonRenderHelpers,
 } from '../toolbar/ribbon/render-ribbon.js';
-import {
-  indexRibbonButtons,
-  projectActiveState,
-  RIBBON_ACTIVE_COMMANDS,
-} from '../toolbar/ribbon-active-state.js';
+import { projectRibbonActiveState } from '../toolbar/ribbon-active-state.js';
 import {
   EXCEL365_MAC_RIBBON_TABS,
   RIBBON_TABS,
@@ -92,41 +88,6 @@ export type { RibbonDisplayMode } from '../toolbar/ribbon/render-ribbon.js';
 
 const DEFAULT_BORDER_STYLE: CellBorderStyle = 'thin';
 const DEFAULT_BORDER_COLOR = '#000000';
-
-const projectDefaultRibbonActiveState = (
-  host: HTMLElement,
-  instance: SpreadsheetInstance | null,
-): void => {
-  if (!instance) return;
-  const active = projectActiveState(instance);
-  const buttons = indexRibbonButtons(host);
-  for (const [command, key] of RIBBON_ACTIVE_COMMANDS) {
-    const button = buttons.get(command)?.[0];
-    if (!button) continue;
-    let pressed = Boolean(active[key]);
-    if (command === 'viewNormal') pressed = active.workbookView === 'normal';
-    else if (command === 'viewPageLayout') pressed = active.workbookView === 'pageLayout';
-    else if (command === 'viewPageBreakPreview')
-      pressed = active.workbookView === 'pageBreakPreview';
-    button.classList.toggle('fc-tb__rb--active', pressed);
-    button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
-  }
-
-  const sheetBackground = host.querySelector<HTMLButtonElement>(
-    '[data-ribbon-command="sheetBackground"]',
-  );
-  if (sheetBackground) {
-    const state = instance.store.getState();
-    const hasBackground = state.ui.sheetBackgroundImages.has(state.data.sheetIndex);
-    const label = hasBackground
-      ? instance.i18n.strings.ribbonMenu.sheetBackgroundClear
-      : instance.i18n.strings.ribbon.background;
-    sheetBackground.title = label;
-    sheetBackground.setAttribute('aria-label', label);
-    const labelEl = sheetBackground.querySelector('span');
-    if (labelEl) labelEl.textContent = label;
-  }
-};
 
 export interface MountToolbarOptions {
   /** Platform used for platform-specific ribbon defaults. Inherited from the
@@ -370,7 +331,7 @@ export function mountToolbar(
   const refreshCells = opts.refreshCells ?? ((): void => undefined);
   const refreshZoom = opts.refreshZoom ?? ((): void => undefined);
   const projectFormatToolbar = (): void => {
-    projectDefaultRibbonActiveState(host, getInstance());
+    projectRibbonActiveState(host, getInstance());
     const instance = getInstance();
     if (instance && platform === 'mac') {
       const reportedNames =

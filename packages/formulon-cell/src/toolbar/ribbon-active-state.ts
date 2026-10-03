@@ -394,3 +394,39 @@ export const projectActiveState = (inst: SpreadsheetInstance): ActiveState => {
     marginPreset: marginPresetOf(setup.margins),
   };
 };
+
+/** Projects the active state onto the ribbon buttons under `host`. */
+export const projectRibbonActiveState = (
+  host: HTMLElement,
+  instance: SpreadsheetInstance | null,
+): void => {
+  if (!instance) return;
+  const active = projectActiveState(instance);
+  const buttons = indexRibbonButtons(host);
+  for (const [command, key] of RIBBON_ACTIVE_COMMANDS) {
+    const button = buttons.get(command)?.[0];
+    if (!button) continue;
+    let pressed = Boolean(active[key]);
+    if (command === 'viewNormal') pressed = active.workbookView === 'normal';
+    else if (command === 'viewPageLayout') pressed = active.workbookView === 'pageLayout';
+    else if (command === 'viewPageBreakPreview')
+      pressed = active.workbookView === 'pageBreakPreview';
+    button.classList.toggle('fc-tb__rb--active', pressed);
+    button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+  }
+
+  const sheetBackground = host.querySelector<HTMLButtonElement>(
+    '[data-ribbon-command="sheetBackground"]',
+  );
+  if (sheetBackground) {
+    const state = instance.store.getState();
+    const hasBackground = state.ui.sheetBackgroundImages.has(state.data.sheetIndex);
+    const label = hasBackground
+      ? instance.i18n.strings.ribbonMenu.sheetBackgroundClear
+      : instance.i18n.strings.ribbon.background;
+    sheetBackground.title = label;
+    sheetBackground.setAttribute('aria-label', label);
+    const labelEl = sheetBackground.querySelector('span');
+    if (labelEl) labelEl.textContent = label;
+  }
+};
