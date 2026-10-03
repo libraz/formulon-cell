@@ -1,4 +1,4 @@
-import { colLetter } from '../engine/address.js';
+import { formatA1Range } from '../engine/address.js';
 import { findPivotTableAtCell } from '../engine/passthrough-sync.js';
 import { pivotAggregationName } from '../engine/pivot-aggregation.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
@@ -122,9 +122,6 @@ const MAX_PIVOT_SOURCE_CELLS = 100_000;
 const canMaterializePivotSource = (range: Range): boolean =>
   rangeArea(range) <= MAX_PIVOT_SOURCE_CELLS;
 
-const rangeRef = (range: Range): string =>
-  `${colLetter(range.c0)}${range.r0 + 1}:${colLetter(range.c1)}${range.r1 + 1}`;
-
 const writePivotCacheWorksheetSource = (
   wb: WorkbookHandle,
   cacheId: number,
@@ -135,7 +132,7 @@ const writePivotCacheWorksheetSource = (
   }
   return wb.setPivotCacheWorksheetSource(cacheId, {
     present: true,
-    ref: rangeRef(source),
+    ref: formatA1Range(source, { collapse: false }),
     sheet: wb.sheetName(source.sheet),
   });
 };

@@ -1,4 +1,4 @@
-import { colLetter } from '../engine/address.js';
+import { formatA1Range } from '../engine/address.js';
 import {
   defaultPageSetup,
   getPageSetup,
@@ -409,7 +409,10 @@ export function resizePrintArea(
   // the drag did not touch keeps that extent rather than collapsing to A1.
   const row1 = axis === 'row' ? Math.trunc(last) : (area?.row1 ?? fallback.row);
   const col1 = axis === 'col' ? Math.trunc(last) : (area?.col1 ?? fallback.col);
-  const ref = `${colLetter(col0)}${row0 + 1}:${colLetter(Math.max(col0, col1))}${Math.max(row0, row1) + 1}`;
+  const ref = formatA1Range(
+    { r0: row0, c0: col0, r1: Math.max(row0, row1), c1: Math.max(col0, col1) },
+    { collapse: false },
+  );
   return setPrintArea(store, sheet, ref, history);
 }
 

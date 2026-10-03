@@ -5,12 +5,12 @@ import {
   type GoToSpecialValueFilters,
   selectionFromMatches,
 } from '../commands/goto-special.js';
+import { formatA1Range } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
 import { projectDisabledReason, projectDisabledState } from '../toolbar/menu-a11y.js';
-import { formatA1Range } from '../wrappers/toolbar-a1.js';
 import { appendDialogActions, appendDialogFrame, createDialogShell } from './dialog-shell.js';
 import {
   clampNavigationAddr,

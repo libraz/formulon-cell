@@ -4,7 +4,7 @@ import {
   inferPivotSourceFields,
   type PivotSourceField,
 } from '../commands/pivot-table.js';
-import { colLetter, parseA1Atom } from '../engine/address.js';
+import { formatA1Cell, parseA1Atom } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import { PivotAggregation, type PivotFilterSpec, type PivotShowValuesAs } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -195,7 +195,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
 
   const activeCellLabel = (): string => {
     const active = store.getState().selection.active;
-    return `${colLetter(active.col)}${active.row + 1}`;
+    return formatA1Cell(active.row, active.col);
   };
 
   const fieldSelect = (select: HTMLSelectElement, fields: readonly PivotSourceField[]): void => {
@@ -813,7 +813,7 @@ export function attachPivotTableDialog(deps: PivotTableDialogDeps): PivotTableDi
 
     sourceInput.value = sourceInput.value || sourceRangeLabel(range);
     nameInput.value = nameInput.value || `PivotTable${wb.getPivotTables().length + 1}`;
-    const dest = `${colLetter(range.c0)}${range.r1 + 3}`;
+    const dest = formatA1Cell(range.r1 + 2, range.c0);
     destInput.value = destInput.value || dest;
     aggSelect.replaceChildren();
     appendDialogSelectOptions(aggSelect, [

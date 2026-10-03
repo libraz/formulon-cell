@@ -703,7 +703,7 @@ export {
   STANDARD_COLORS,
   THEME_COLOR_COLUMNS,
 } from './components/color-palette.js';
-export { colLetter, parseA1Atom } from './engine/address.js';
+export { colLetter, formatA1Cell, formatA1Range, parseA1Atom } from './engine/address.js';
 export type { NamedCellStyle } from './engine/cell-styles-meta.js';
 export { computeNamedCellStyles } from './engine/cell-styles-meta.js';
 export type {
@@ -1479,7 +1479,6 @@ export {
 } from './wrappers/conditional-menu-labels.js';
 export {
   cellLabel,
-  formatA1Range,
   formatSheetAbsoluteRange,
   parseA1Range,
 } from './wrappers/toolbar-a1.js';

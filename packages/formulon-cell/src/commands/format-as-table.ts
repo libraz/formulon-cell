@@ -1,4 +1,4 @@
-import { colLetter } from '../engine/address.js';
+import { formatA1Range } from '../engine/address.js';
 import type { CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea } from '../store/selection-geometry.js';
@@ -154,9 +154,6 @@ const isNonEmptyTextValue = (value: CellValue): boolean =>
   value.kind === 'text' && value.value.trim().length > 0;
 
 const isNonBlankValue = (value: CellValue): boolean => value.kind !== 'blank';
-
-const tableRef = (range: Range): string =>
-  `${colLetter(range.c0)}${range.r0 + 1}:${colLetter(range.c1)}${range.r1 + 1}`;
 
 const tableStyleName = (style: TableStyle): string =>
   style === 'light'
@@ -340,7 +337,7 @@ export function formatAsTable(
     const name = nextTableName(workbook);
     workbook.createTable({
       sheetIndex: range.sheet,
-      ref: tableRef(range),
+      ref: formatA1Range(range, { collapse: false }),
       name,
       displayName: name,
       columns: tableColumns(workbook, range, overlay.showHeader),

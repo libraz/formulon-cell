@@ -16,7 +16,7 @@ import {
   normalizePrinterProfiles,
   type PrinterProfile,
 } from '../commands/printer-profile.js';
-import { colLetter } from '../engine/address.js';
+import { colLetter, formatA1Range } from '../engine/address.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
   defaultPageSetup,
@@ -34,7 +34,6 @@ import {
 } from '../store/store.js';
 import { appendDialogSelectOptions, createDialogSelect } from '../toolbar/dialogs/form-controls.js';
 import { projectDisabledState } from '../toolbar/menu-a11y.js';
-import { formatA1Range } from '../wrappers/toolbar-a1.js';
 import {
   appendDialogActions,
   appendDialogButton,

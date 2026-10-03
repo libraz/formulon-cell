@@ -1,4 +1,4 @@
-import { colLetter } from '../engine/address.js';
+import { formatA1Cell } from '../engine/address.js';
 import { dictionaries, type Strings } from '../i18n/strings.js';
 import type { State } from '../store/types.js';
 
@@ -92,7 +92,7 @@ export function reviewCellsFromState(
         addr.col > range.c1)
     )
       continue;
-    const label = `${colLetter(addr.col)}${addr.row + 1}`;
+    const label = formatA1Cell(addr.row, addr.col);
     const value: ReviewCellValue =
       cell.value.kind === 'text'
         ? { kind: 'text', value: cell.value.value }
@@ -118,7 +118,7 @@ export function reviewCellsFromState(
         addr.col > range.c1)
     )
       continue;
-    const label = `${colLetter(addr.col)}${addr.row + 1} comment`;
+    const label = `${formatA1Cell(addr.row, addr.col)} comment`;
     cells.push({ label, value: { kind: 'text', value: fmt.comment }, source: 'comment' });
   }
   return cells.sort((a, b) => a.label.localeCompare(b.label, 'en', { numeric: true }));

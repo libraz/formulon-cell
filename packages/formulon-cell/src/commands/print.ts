@@ -1,4 +1,4 @@
-import { colLetter } from '../engine/address.js';
+import { colLetter, formatA1Cell } from '../engine/address.js';
 import type { CellValue } from '../engine/types.js';
 // Print / PDF export.
 //
@@ -644,7 +644,7 @@ export function buildPrintDocument(
       ? `<section class="fc-print__comments"><h2>Comments and Notes</h2><table><tbody>${commentEntries
           .map(
             (entry) =>
-              `<tr><th>${colLetter(entry.col)}${entry.row + 1}</th><td>${escapeHtml(
+              `<tr><th>${formatA1Cell(entry.row, entry.col)}</th><td>${escapeHtml(
                 entry.text,
               )}</td></tr>`,
           )

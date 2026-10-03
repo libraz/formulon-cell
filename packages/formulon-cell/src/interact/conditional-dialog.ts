@@ -1,4 +1,5 @@
 import { type History, recordConditionalRulesChange } from '../commands/history.js';
+import { formatA1Range } from '../engine/address.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import {
   type CellFormat,
@@ -20,7 +21,6 @@ import {
   type DatePeriod,
   type FormatPreset,
   formatPresetPatch,
-  formatRange,
   parseRange,
   type RuleKind,
 } from './conditional-dialog-spec.js';
@@ -140,7 +140,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   rangeRow.append(rangeLabel, rangeInput);
   attachRangePickerButton(rangeInput, {
     label: strings.pivotTableDialog.rangePickerSelect,
-    getValue: () => formatRange(store.getState().selection.range),
+    getValue: () => formatA1Range(store.getState().selection.range, { collapse: false }),
     subscribeToRangeChanges: (listener) => store.subscribe(listener),
     kind: 'conditional-format-range',
   });
@@ -591,7 +591,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   };
 
   const describeRule = (rule: ConditionalRule): string => {
-    const range = formatRange(rule.range);
+    const range = formatA1Range(rule.range, { collapse: false });
     switch (rule.kind) {
       case 'cell-value': {
         const opLabel = opOptions.find((o) => o.id === rule.op)?.label ?? rule.op;
@@ -638,7 +638,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
   };
 
   const populateRuleForm = (rule: ConditionalRule): void => {
-    rangeInput.value = formatRange(rule.range);
+    rangeInput.value = formatA1Range(rule.range, { collapse: false });
     styleSelect.value =
       rule.kind === 'color-scale'
         ? rule.stops.length === 3
@@ -877,7 +877,7 @@ export function attachConditionalDialog(deps: ConditionalDialogDeps): Conditiona
       currentMode = options.mode ?? 'manage';
       currentEditIndex = currentMode === 'edit' ? (options.editIndex ?? null) : null;
       const sel = store.getState().selection.range;
-      rangeInput.value = formatRange(sel);
+      rangeInput.value = formatA1Range(sel, { collapse: false });
       kindSelect.value = options.kind ?? 'cell-value';
       styleSelect.value =
         kindSelect.value === 'color-scale'

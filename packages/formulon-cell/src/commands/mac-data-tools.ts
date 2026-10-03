@@ -1,4 +1,4 @@
-import { colLetter, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { colLetter, formatA1Cell, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import { type CellSnapshot, WorkbookHandle } from '../engine/workbook-handle.js';
@@ -737,7 +737,7 @@ const subtotalLabel = (value: CellValue): string => {
 };
 
 export function formatMacCellAddress(_wb: WorkbookHandle, addr: Addr): string {
-  return `${colLetter(addr.col)}${addr.row + 1}`;
+  return formatA1Cell(addr.row, addr.col);
 }
 
 export function formatMacRangeAddress(wb: WorkbookHandle, range: Range): string {

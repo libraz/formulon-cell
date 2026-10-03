@@ -1,16 +1,13 @@
 import { distinctValues } from '../commands/filter.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type { SpreadsheetStore, State, ValueFilterCriteria } from '../store/store.js';
-import { colLetter } from './address.js';
+import { formatA1Range } from './address.js';
 import { parseRangeRef } from './range-resolver.js';
 import type { Range } from './types.js';
 import type { WorkbookHandle } from './workbook-handle.js';
 
 const escapeXml = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-export const autoFilterRangeRef = (range: Range): string =>
-  `${colLetter(range.c0)}${range.r0 + 1}:${colLetter(range.c1)}${range.r1 + 1}`;
 
 const conditionOperator: Record<NonNullable<ValueFilterCriteria['condition']>['op'], string> = {
   equals: 'equal',
@@ -33,7 +30,8 @@ export function autoFilterXmlFromState(state: State, sheet: number): string {
   const criteria = state.ui.filterCriteria
     .filter((entry) => sameRange(entry.range, range))
     .sort((a, b) => a.byCol - b.byCol);
-  if (criteria.length === 0) return `<autoFilter ref="${autoFilterRangeRef(range)}"/>`;
+  if (criteria.length === 0)
+    return `<autoFilter ref="${formatA1Range(range, { collapse: false })}"/>`;
 
   const columns = criteria.flatMap((entry) => {
     const colId = entry.byCol - range.c0;
@@ -57,7 +55,7 @@ export function autoFilterXmlFromState(state: State, sheet: number): string {
       `<filterColumn colId="${colId}"><filters${blankAttr}>${filters}</filters></filterColumn>`,
     ];
   });
-  return `<autoFilter ref="${autoFilterRangeRef(range)}">${columns.join('')}</autoFilter>`;
+  return `<autoFilter ref="${formatA1Range(range, { collapse: false })}">${columns.join('')}</autoFilter>`;
 }
 
 /** Parses only the range, which is enough to restore header affordances while

@@ -1,4 +1,4 @@
-import { colFromLetters, colLetter, MAX_COL, MAX_ROW, parseA1Atom } from '../engine/address.js';
+import { colFromLetters, formatA1Cell, MAX_COL, MAX_ROW, parseA1Atom } from '../engine/address.js';
 
 /**
  * F4 reference rotation: cycles between A1, $A$1, A$1, $A1, then back to A1.
@@ -137,7 +137,7 @@ const r1c1AtomToA1 = (raw: string, base: { row: number; col: number }): string =
       ? Number.parseInt(m[4], 10) - 1
       : base.col + (m[3] !== undefined ? Number.parseInt(m[3], 10) : 0);
   if (row < 0 || col < 0 || row > MAX_ROW || col > MAX_COL) return '#REF!';
-  return `${colLetter(col)}${row + 1}`;
+  return formatA1Cell(row, col);
 };
 
 /** Convert R1C1 references in a user-authored formula into A1 references for

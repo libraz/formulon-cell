@@ -1,5 +1,5 @@
 import { extractRefs, type FormulaRef } from '../commands/refs.js';
-import { colLetter } from '../engine/address.js';
+import { formatA1Cell } from '../engine/address.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -19,8 +19,6 @@ export interface EvaluateFormulaDialogHandle {
   close(): void;
   detach(): void;
 }
-
-const cellRef = (row: number, col: number): string => `${colLetter(col)}${row + 1}`;
 
 const formulaRefKey = (ref: FormulaRef): string => `${ref.r0}:${ref.c0}:${ref.r1}:${ref.c1}`;
 
@@ -158,7 +156,7 @@ export function attachEvaluateFormulaDialog(
   const refresh = (): void => {
     const wb = getWb();
     const active = store.getState().selection.active;
-    target.textContent = cellRef(active.row, active.col);
+    target.textContent = formatA1Cell(active.row, active.col);
     const formula =
       wb?.cellFormula(active) ??
       store.getState().data.cells.get(`${active.sheet}:${active.row}:${active.col}`)?.formula ??

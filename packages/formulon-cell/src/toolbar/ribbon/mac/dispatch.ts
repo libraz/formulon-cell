@@ -4,7 +4,7 @@ import { selectNextFormulaError } from '../../../commands/error-indicators.js';
 import { interactionControllerFor } from '../../../commands/interaction-controller.js';
 import { setMarginPreset, setPageOrientation, setPaperSize } from '../../../commands/page-setup.js';
 import { FUNCTION_SIGNATURES } from '../../../commands/refs.js';
-import { colLetter, MAX_COL, MAX_ROW } from '../../../engine/address.js';
+import { formatA1Cell, MAX_COL, MAX_ROW } from '../../../engine/address.js';
 import { ensureMacInk } from '../../../interact/mac-ink.js';
 import { isNavigationAddrAllowed } from '../../../interact/navigation-policy.js';
 import { createDefaultDynamicDropdownsCtx } from '../../../mount/dynamic-dropdowns-defaults.js';
@@ -379,7 +379,7 @@ export function dispatchMacRibbonCommand(
             .filter((note) => isNavigationAddrAllowed(instance.store, note.addr))
             .map((note) => ({
               severity: 'info',
-              label: `${colLetter(note.addr.col)}${note.addr.row + 1}`,
+              label: formatA1Cell(note.addr.row, note.addr.col),
               detail: note.text,
             })),
           ...reportDialogLabels(instance.i18n.strings),

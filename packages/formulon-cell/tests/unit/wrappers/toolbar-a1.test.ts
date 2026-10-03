@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { parseA1Atom } from '../../../src/engine/address.js';
-import {
-  formatA1Range,
-  formatSheetAbsoluteRange,
-  parseA1Range,
-} from '../../../src/wrappers/toolbar-a1.js';
+import { formatA1Range, parseA1Atom } from '../../../src/engine/address.js';
+import { formatSheetAbsoluteRange, parseA1Range } from '../../../src/wrappers/toolbar-a1.js';
 
 const range = (r0: number, c0: number, r1: number, c1: number) => ({ sheet: 0, r0, c0, r1, c1 });
 

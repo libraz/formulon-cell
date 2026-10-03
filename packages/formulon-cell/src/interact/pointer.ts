@@ -20,7 +20,7 @@ import { movePageBreak, resizePrintArea, setPageSetup } from '../commands/page-s
 import { paginationFor } from '../commands/pagination.js';
 import { shiftFormulaRefs } from '../commands/refs.js';
 import { autofitColsWidth, autofitRowsHeight } from '../commands/structure.js';
-import { colLetter, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { formatA1Cell, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { syncLayoutSizesToEngine } from '../engine/layout-sync.js';
 import type { Addr, CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -100,7 +100,6 @@ type DragMode =
       r1c1: boolean;
     };
 
-const a1RefOf = (row: number, col: number): string => `${colLetter(col)}${row + 1}`;
 const r1c1Axis = (prefix: 'R' | 'C', target: number, base: number): string => {
   const delta = target - base;
   return delta === 0 ? prefix : `${prefix}[${delta}]`;
@@ -111,7 +110,7 @@ const refOf = (
   row: number,
   col: number,
   mode: { r1c1: boolean; base: { row: number; col: number } },
-): string => (mode.r1c1 ? r1c1RefOf(row, col, mode.base) : a1RefOf(row, col));
+): string => (mode.r1c1 ? r1c1RefOf(row, col, mode.base) : formatA1Cell(row, col));
 const rangeRefOf = (
   a: { row: number; col: number },
   b: { row: number; col: number },

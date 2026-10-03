@@ -2,16 +2,9 @@
 // formatting and parsing for inline reference inputs in dialogs and the
 // cell-label rendering used by report summaries).
 
-import { colLetter } from '../engine/address.js';
+import { formatA1Range } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { SheetCell, SheetRange } from './toolbar-types.js';
-
-/** Render a `SheetRange` as A1 ("A1:B3" or "A1" when start === end). */
-export const formatA1Range = (range: SheetRange): string => {
-  const start = `${colLetter(range.c0)}${range.r0 + 1}`;
-  const end = `${colLetter(range.c1)}${range.r1 + 1}`;
-  return start === end ? start : `${start}:${end}`;
-};
 
 /** Whether a sheet name can precede `!` without quotes. Being a plain
  *  identifier is not enough: a name shaped like a reference (`A1`, `R1C1`) or
@@ -27,9 +20,7 @@ const isBareSheetName = (name: string): boolean =>
  *  (`Sheet1!$A$1:$B$3`). Sheet names that cannot stand unquoted are
  *  single-quoted, matching what `parseA1Range` accepts back. */
 export const formatSheetAbsoluteRange = (sheetName: string, range: SheetRange): string => {
-  const start = `$${colLetter(range.c0)}$${range.r0 + 1}`;
-  const end = `$${colLetter(range.c1)}$${range.r1 + 1}`;
-  const body = start === end ? start : `${start}:${end}`;
+  const body = formatA1Range(range, { absolute: true });
   if (!sheetName) return body;
   const prefix = isBareSheetName(sheetName) ? sheetName : `'${sheetName.replace(/'/g, "''")}'`;
   return `${prefix}!${body}`;

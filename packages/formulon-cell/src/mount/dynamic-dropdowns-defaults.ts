@@ -84,6 +84,7 @@ import {
   executeRibbonProtectionAction,
   type FreezeAction,
   fillRange,
+  formatA1Cell,
   formatA1Range,
   formatSheetAbsoluteRange,
   getPageSetup,
@@ -2172,13 +2173,7 @@ const buildSortMenuAction =
         pickRange: () => formatA1Range(normalizedSelectionRange(instance)),
         pickAddress: () => {
           const active = instance.store.getState().selection.active;
-          return formatA1Range({
-            sheet: active.sheet,
-            r0: active.row,
-            c0: active.col,
-            r1: active.row,
-            c1: active.col,
-          });
+          return formatA1Cell(active.row, active.col);
         },
         subscribeToRangeChanges: (listener) => instance.store.subscribe(listener),
         validateRange,

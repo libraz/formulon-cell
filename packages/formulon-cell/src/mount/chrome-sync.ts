@@ -1,6 +1,6 @@
 import { isValidDefinedName, upsertDefinedName } from '../commands/named-ranges.js';
 import { formatA1FormulaAsR1C1 } from '../commands/refs.js';
-import { colLetter, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { formatA1Cell, formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { type SpreadsheetEmitter, selectionEquals } from '../events.js';
 import type { Strings } from '../i18n/strings.js';
@@ -37,7 +37,6 @@ const quoteSheetName = (name: string): string => {
   return `'${name.replace(/'/g, "''")}'`;
 };
 
-const absoluteCellRef = (row: number, col: number): string => `$${colLetter(col)}$${row + 1}`;
 const MAX_A11Y_VIEWPORT_ROWS = 20;
 const MAX_A11Y_VIEWPORT_COLS = 10;
 
@@ -45,9 +44,7 @@ const selectionFormula = (
   sheetName: string,
   range: { r0: number; c0: number; r1: number; c1: number },
 ): string => {
-  const start = absoluteCellRef(range.r0, range.c0);
-  const end = absoluteCellRef(range.r1, range.c1);
-  const ref = start === end ? start : `${start}:${end}`;
+  const ref = formatA1Range(range, { absolute: true });
   return `=${quoteSheetName(sheetName)}!${ref}`;
 };
 
@@ -165,7 +162,7 @@ export function attachChromeSync(input: AttachChromeSyncInput): ChromeSyncContro
           continue;
         }
         const cellMirror = document.createElement('div');
-        const cellRef = `${colLetter(col)}${row + 1}`;
+        const cellRef = formatA1Cell(row, col);
         const cellDisplay = cellDisplayText(s, wb, { sheet: s.data.sheetIndex, row, col });
         cellMirror.id = `${mirrorId}-cell-${row}-${col}`;
         cellMirror.setAttribute('role', 'gridcell');

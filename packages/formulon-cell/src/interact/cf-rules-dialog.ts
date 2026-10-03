@@ -1,5 +1,5 @@
 import { type History, recordConditionalRulesChange } from '../commands/history.js';
-import { colLetter } from '../engine/address.js';
+import { formatA1Range } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
@@ -84,9 +84,7 @@ const formatSqref = (
   if (sqref.length === 0) return '';
   return sqref
     .map((r) => {
-      const a = `${colLetter(r.firstCol)}${r.firstRow + 1}`;
-      const b = `${colLetter(r.lastCol)}${r.lastRow + 1}`;
-      return a === b ? a : `${a}:${b}`;
+      return formatA1Range({ r0: r.firstRow, c0: r.firstCol, r1: r.lastRow, c1: r.lastCol });
     })
     .join(' ');
 };

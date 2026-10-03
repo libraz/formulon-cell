@@ -1,6 +1,6 @@
 import type { History } from '../commands/history.js';
 import { setSparkline } from '../commands/sparkline.js';
-import { colLetter, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { formatA1Cell, formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Addr, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -36,14 +36,8 @@ interface ResolvedRange extends Range {
   explicitSheet: boolean;
 }
 
-const formatRange = (range: Range): string => {
-  const start = `${colLetter(range.c0)}${range.r0 + 1}`;
-  const end = `${colLetter(range.c1)}${range.r1 + 1}`;
-  return start === end ? start : `${start}:${end}`;
-};
-
 const formatSheetRange = (sheetName: string, range: Range): string => {
-  const body = formatRange(range);
+  const body = formatA1Range(range);
   if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(sheetName)) return `${sheetName}!${body}`;
   return `'${sheetName.replace(/'/g, "''")}'!${body}`;
 };
@@ -213,7 +207,7 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
       const name = wb?.sheetName(source.sheet) ?? `Sheet${source.sheet + 1}`;
       return formatSheetRange(name, source);
     }
-    return raw || formatRange(source);
+    return raw || formatA1Range(source);
   };
 
   const onChange = (): void => {
@@ -280,9 +274,9 @@ export function attachMacSparklineDialog(deps: MacSparklineDialogDeps): MacSpark
   const api: MacSparklineDialogHandle = {
     open(): void {
       const range = store.getState().selection.range;
-      sourceInput.value = formatRange(range);
+      sourceInput.value = formatA1Range(range);
       const destinationCol = range.c1 < MAX_COL ? range.c1 + 1 : range.c0;
-      destinationInput.value = `${colLetter(destinationCol)}${range.r0 + 1}`;
+      destinationInput.value = formatA1Cell(range.r0, destinationCol);
       kindSelect.value = 'line';
       lastSource = null;
       lastDestination = null;

@@ -1,8 +1,15 @@
-import { colFromLetters, colLetter, MAX_COL, MAX_ROW, parseA1Atom } from '../engine/address.js';
+import {
+  colFromLetters,
+  colLetter,
+  formatA1Cell,
+  MAX_COL,
+  MAX_ROW,
+  parseA1Atom,
+} from '../engine/address.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 
 function cellRef(row: number, col: number, r1c1: boolean): string {
-  return r1c1 ? `R${row + 1}C${col + 1}` : `${colLetter(col)}${row + 1}`;
+  return r1c1 ? `R${row + 1}C${col + 1}` : formatA1Cell(row, col);
 }
 
 export function formatSelectionRef(

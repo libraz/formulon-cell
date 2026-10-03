@@ -4,9 +4,9 @@
 // hosts actually care about, so we hand it back as a [[RibbonProtectionReport]]
 // they can drop straight onto their ribbon-report shell.
 
+import { formatA1Range } from '../engine/address.js';
 import type { Strings } from '../i18n/strings.js';
 import type { SpreadsheetStore } from '../store/store.js';
-import { formatA1Range } from '../wrappers/toolbar-a1.js';
 import { addAllowedEditRange, clearAllowedEditRanges } from './protection.js';
 
 type ProtectionStrings = Pick<

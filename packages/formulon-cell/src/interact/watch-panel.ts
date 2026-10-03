@@ -1,6 +1,6 @@
 import type { History } from '../commands/history.js';
 import { recordWatchesChange } from '../commands/watch.js';
-import { colLetter } from '../engine/address.js';
+import { formatA1Cell } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import { formatCell } from '../engine/value.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
@@ -37,8 +37,6 @@ export interface WatchPanelHandle {
   refresh(): void;
   detach(): void;
 }
-
-const a1 = (addr: Addr): string => `${colLetter(addr.col)}${addr.row + 1}`;
 
 /**
  * Spreadsheet-style Watch Window. Lists pinned cells with live values; updates on
@@ -143,7 +141,7 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
   const nameOf = (addr: Addr): string => {
     try {
       const wb = getWb();
-      const target = a1(addr).toUpperCase();
+      const target = formatA1Cell(addr.row, addr.col).toUpperCase();
       for (const dn of wb.definedNames()) {
         const eq = dn.formula.replace(/^=/, '').replace(/\$/g, '').toUpperCase();
         const bang = eq.lastIndexOf('!');
@@ -212,7 +210,7 @@ export function attachWatchPanel(deps: WatchPanelDeps): WatchPanelHandle {
       const tdName = document.createElement('td');
       tdName.textContent = nameOf(addr);
       const tdCell = document.createElement('td');
-      tdCell.textContent = a1(addr);
+      tdCell.textContent = formatA1Cell(addr.row, addr.col);
       const tdValue = document.createElement('td');
       tdValue.className = 'fc-watch__value';
       tdValue.textContent = readValue(addr);

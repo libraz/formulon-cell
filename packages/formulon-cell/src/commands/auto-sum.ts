@@ -1,13 +1,10 @@
-import { colLetter } from '../engine/address.js';
-import type { Addr, Range } from '../engine/types.js';
+import { formatA1Range } from '../engine/address.js';
+import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea } from '../store/selection-geometry.js';
 import type { State } from '../store/store.js';
 import { mergeAt } from './merge.js';
 import { isCellWritable, warnProtected } from './protection.js';
-
-const rangeRef = (r: Range): string =>
-  `${colLetter(r.c0)}${r.r0 + 1}:${colLetter(r.c1)}${r.r1 + 1}`;
 
 const MAX_AUTOSUM_SELECTION_CELLS = 100_000;
 
@@ -75,7 +72,7 @@ export function autoSum(
       let r0 = r1;
       while (r0 - 1 >= 0 && isNum(state, sheet, r0 - 1, a.col)) r0 -= 1;
       if (r1 >= 0 && isNum(state, sheet, r1, a.col)) {
-        const formula = `=${fn}(${colLetter(a.col)}${r0 + 1}:${colLetter(a.col)}${r1 + 1})`;
+        const formula = `=${fn}(${formatA1Range({ r0, c0: a.col, r1, c1: a.col }, { collapse: false })})`;
         if (!canWriteFormula(state, a)) return null;
         wb.setFormula(a, formula);
         return { addr: a, formula };
@@ -85,7 +82,7 @@ export function autoSum(
       let c0 = c1;
       while (c0 - 1 >= 0 && isNum(state, sheet, a.row, c0 - 1)) c0 -= 1;
       if (c1 >= 0 && isNum(state, sheet, a.row, c1)) {
-        const formula = `=${fn}(${colLetter(c0)}${a.row + 1}:${colLetter(c1)}${a.row + 1})`;
+        const formula = `=${fn}(${formatA1Range({ r0: a.row, c0, r1: a.row, c1 }, { collapse: false })})`;
         if (!canWriteFormula(state, a)) return null;
         wb.setFormula(a, formula);
         return { addr: a, formula };
@@ -102,7 +99,7 @@ export function autoSum(
       while (isNum(state, sheet, bottom + 1, a.col)) bottom += 1;
       const colTarget: Addr = { sheet, row: bottom + 1, col: a.col };
       if (isEmpty(state, sheet, colTarget.row, colTarget.col)) {
-        const formula = `=${fn}(${colLetter(a.col)}${top + 1}:${colLetter(a.col)}${bottom + 1})`;
+        const formula = `=${fn}(${formatA1Range({ r0: top, c0: a.col, r1: bottom, c1: a.col }, { collapse: false })})`;
         if (canWriteFormula(state, colTarget)) {
           wb.setFormula(colTarget, formula);
           return { addr: colTarget, formula };
@@ -115,7 +112,7 @@ export function autoSum(
       while (isNum(state, sheet, a.row, right + 1)) right += 1;
       const rowTarget: Addr = { sheet, row: a.row, col: right + 1 };
       if (isEmpty(state, sheet, rowTarget.row, rowTarget.col)) {
-        const formula = `=${fn}(${colLetter(left)}${a.row + 1}:${colLetter(right)}${a.row + 1})`;
+        const formula = `=${fn}(${formatA1Range({ r0: a.row, c0: left, r1: a.row, c1: right }, { collapse: false })})`;
         if (canWriteFormula(state, rowTarget)) {
           wb.setFormula(rowTarget, formula);
           return { addr: rowTarget, formula };
@@ -144,7 +141,7 @@ export function autoSum(
     if (!canWriteFormula(state, target)) continue;
     let top = lastNumRow;
     while (top - 1 >= r.r0 && isNum(state, sheet, top - 1, col)) top -= 1;
-    const formula = `=${fn}(${colLetter(col)}${top + 1}:${colLetter(col)}${lastNumRow + 1})`;
+    const formula = `=${fn}(${formatA1Range({ r0: top, c0: col, r1: lastNumRow, c1: col }, { collapse: false })})`;
     colWrites.push({ addr: target, formula });
   }
   if (colWrites.length > 0) {
@@ -169,7 +166,7 @@ export function autoSum(
     if (!canWriteFormula(state, target)) continue;
     let left = lastNumCol;
     while (left - 1 >= r.c0 && isNum(state, sheet, row, left - 1)) left -= 1;
-    const formula = `=${fn}(${colLetter(left)}${row + 1}:${colLetter(lastNumCol)}${row + 1})`;
+    const formula = `=${fn}(${formatA1Range({ r0: row, c0: left, r1: row, c1: lastNumCol }, { collapse: false })})`;
     rowWrites.push({ addr: target, formula });
   }
   if (rowWrites.length > 0) {
@@ -177,7 +174,7 @@ export function autoSum(
     return rowWrites[0] ?? null;
   }
 
-  const ref = rangeRef(r);
+  const ref = formatA1Range(r, { collapse: false });
   const candidates: Addr[] = [
     { sheet, row: r.r1 + 1, col: r.c0 }, // directly below
     { sheet, row: r.r0, col: r.c1 + 1 }, // directly to the right

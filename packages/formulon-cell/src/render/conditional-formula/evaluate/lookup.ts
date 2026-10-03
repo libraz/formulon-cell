@@ -1,4 +1,4 @@
-import { addrKey, colLetter, MAX_COL, MAX_ROW } from '../../../engine/address.js';
+import { addrKey, formatA1Cell, MAX_COL, MAX_ROW } from '../../../engine/address.js';
 import type { CellValue } from '../../../engine/types.js';
 import { readLogical, readNumber, textValue } from '../coercion.js';
 import {
@@ -436,7 +436,7 @@ export function createLookupEvaluator(ctx: LookupEvaluatorContext) {
       kind: 'blank' as const,
     };
     if (type === 'address') {
-      return { kind: 'text', value: `$${colLetter(col)}$${row + 1}` };
+      return { kind: 'text', value: formatA1Cell(row, col, true) };
     }
     if (type === 'row') return { kind: 'number', value: row + 1 };
     if (type === 'col') return { kind: 'number', value: col + 1 };

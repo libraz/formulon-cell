@@ -1,4 +1,4 @@
-import { colFromLetters, colLetter, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { colFromLetters, colLetter, formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetStore, State } from '../store/store.js';
@@ -68,10 +68,8 @@ export function isValidDefinedName(raw: string): boolean {
   return true;
 }
 
-const absRef = (row: number, col: number): string => `$${colLetter(col)}$${row + 1}`;
-
 const absRangeRef = (r0: number, c0: number, r1: number, c1: number): string =>
-  `${absRef(r0, c0)}:${absRef(r1, c1)}`;
+  formatA1Range({ r0, c0, r1, c1 }, { absolute: true, collapse: false });
 
 const cellText = (state: State, sheet: number, row: number, col: number): string => {
   const cell = state.data.cells.get(`${sheet}:${row}:${col}`);

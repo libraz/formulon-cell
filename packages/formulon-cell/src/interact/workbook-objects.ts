@@ -1,4 +1,4 @@
-import { colLetter, parseA1Atom } from '../engine/address.js';
+import { formatA1Cell, parseA1Atom } from '../engine/address.js';
 import { summarizeSpreadsheetCompatibility } from '../engine/compatibility.js';
 import {
   listWorkbookObjects,
@@ -80,8 +80,6 @@ function createWorkbookObjectsActionButton(
   button.type = opts.type ?? 'button';
   return button;
 }
-
-const cellRef = (row: number, col: number): string => `${colLetter(col)}${row + 1}`;
 
 export function attachWorkbookObjectsPanel(
   deps: WorkbookObjectsPanelDeps,
@@ -275,7 +273,7 @@ export function attachWorkbookObjectsPanel(
     const anchor = document.createElement('input');
     anchor.className = 'fc-objects__input';
     anchor.type = 'text';
-    anchor.value = cellRef(pivot.top, pivot.left);
+    anchor.value = formatA1Cell(pivot.top, pivot.left);
     const rowTotals = document.createElement('input');
     rowTotals.type = 'checkbox';
     rowTotals.checked = true;

@@ -2,7 +2,6 @@
 // The dialog DOM wiring lives in `conditional-dialog.ts`; this module
 // exposes only the shape data so the parent file can focus on layout.
 
-import { colLetter } from '../engine/address.js';
 import { parseRangeRef } from '../engine/range-resolver.js';
 import type { Range } from '../engine/types.js';
 import type { CellFormat, ConditionalRule } from '../store/store.js';
@@ -45,10 +44,6 @@ export const formatPresetPatch = (preset: FormatPreset): Partial<CellFormat> => 
       return {};
   }
 };
-
-/** Render a sheet-local `Range` as A1 ("A1:B3"). */
-export const formatRange = (r: Range): string =>
-  `${colLetter(r.c0)}${r.r0 + 1}:${colLetter(r.c1)}${r.r1 + 1}`;
 
 /** Parse a single-sheet A1 range. Cross-sheet refs are rejected so the dialog
  *  always operates on the active sheet. Returns `fallback` on bad input. */

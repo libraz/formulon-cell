@@ -4,6 +4,8 @@ import {
   addrKey,
   colFromLetters,
   colLetter,
+  formatA1Cell,
+  formatA1Range,
   MAX_COL,
   MAX_ROW,
   parseA1Atom,
@@ -98,6 +100,38 @@ describe('engine/address', () => {
 
     it('reads leading-zero rows as their numeric value', () => {
       expect(parseA1Atom('A01')).toEqual({ row: 0, col: 0 });
+    });
+  });
+
+  describe('formatA1Cell', () => {
+    it('formats relative and absolute cells', () => {
+      expect(formatA1Cell(2, 1)).toBe('B3');
+      expect(formatA1Cell(2, 1, true)).toBe('$B$3');
+    });
+
+    it('uses multi-letter columns', () => {
+      expect(formatA1Cell(0, 27)).toBe('AB1');
+    });
+  });
+
+  describe('formatA1Range', () => {
+    const r = { r0: 0, c0: 0, r1: 2, c1: 27 };
+
+    it('formats relative and absolute ranges', () => {
+      expect(formatA1Range(r)).toBe('A1:AB3');
+      expect(formatA1Range(r, { absolute: true })).toBe('$A$1:$AB$3');
+    });
+
+    it('collapses a single cell by default', () => {
+      const one = { r0: 4, c0: 2, r1: 4, c1: 2 };
+      expect(formatA1Range(one)).toBe('C5');
+      expect(formatA1Range(one, { absolute: true })).toBe('$C$5');
+    });
+
+    it('keeps the colon when collapse is false', () => {
+      const one = { r0: 4, c0: 2, r1: 4, c1: 2 };
+      expect(formatA1Range(one, { collapse: false })).toBe('C5:C5');
+      expect(formatA1Range(one, { absolute: true, collapse: false })).toBe('$C$5:$C$5');
     });
   });
 });

@@ -37,7 +37,7 @@ import {
 } from '../commands/outline.js';
 import { deleteSheetView, saveSheetView } from '../commands/sheet-views.js';
 import { setSheetZoom } from '../commands/structure.js';
-import { MAX_COL } from '../engine/address.js';
+import { formatA1Range, MAX_COL } from '../engine/address.js';
 import { dictionaries } from '../i18n/strings.js';
 import { isNavigationAddrAllowed } from '../interact/navigation-policy.js';
 import { mutators } from '../store/store.js';
@@ -68,7 +68,6 @@ import { createTextOrientationMenu } from '../toolbar/ribbon/menus/text-orientat
 import type { RibbonMenus, RibbonRenderHelpers } from '../toolbar/ribbon/render-ribbon.js';
 import { createSelectColorRibbon } from '../toolbar/ribbon/select-color.js';
 import { toolbarText } from '../toolbar/ribbon-model.js';
-import { formatA1Range } from '../wrappers/toolbar-a1.js';
 import { dispatchHostClipboard, handleAutoSum } from '../wrappers/toolbar-actions.js';
 import {
   createDefaultDynamicDropdownsCtx,

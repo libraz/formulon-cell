@@ -1,4 +1,4 @@
-import { colLetter, MAX_COL, MAX_ROW } from '../engine/address.js';
+import { formatA1Range, MAX_COL, MAX_ROW } from '../engine/address.js';
 import type { Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { rangeArea, rangeContainsAddr, rangeContainsRange } from '../store/selection-geometry.js';
@@ -100,9 +100,6 @@ export type QuickAnalysisExecuteResult =
 
 const MAX_QUICK_ANALYSIS_FORMULA_WRITES = 100_000;
 const MAX_EXACT_PROTECTION_SCAN_CELLS = 100_000;
-
-const rangeRef = (r: Range): string =>
-  `${colLetter(r.c0)}${r.r0 + 1}:${colLetter(r.c1)}${r.r1 + 1}`;
 
 const addrFromKey = (key: string): { sheet: number; row: number; col: number } | null => {
   const parts = key.split(':').map(Number);
@@ -416,7 +413,7 @@ function writeTotalFormulas(input: QuickAnalysisExecuteInput): QuickAnalysisExec
         warnProtected(addr);
         continue;
       }
-      const formula = `=${fn}(${colLetter(col)}${range.r0 + 1}:${colLetter(col)}${range.r1 + 1})`;
+      const formula = `=${fn}(${formatA1Range({ r0: range.r0, c0: col, r1: range.r1, c1: col }, { collapse: false })})`;
       writes.push({ addr, formula });
     }
     if (writes.length === 0) return { ok: false, reason: 'protected' };
@@ -446,7 +443,7 @@ function writeTotalFormulas(input: QuickAnalysisExecuteInput): QuickAnalysisExec
         warnProtected(addr);
         continue;
       }
-      const formula = `=SUM(${colLetter(range.c0)}${row + 1}:${colLetter(range.c1)}${row + 1})`;
+      const formula = `=SUM(${formatA1Range({ r0: row, c0: range.c0, r1: row, c1: range.c1 }, { collapse: false })})`;
       writes.push({ addr, formula });
     }
     if (writes.length === 0) return { ok: false, reason: 'protected' };
@@ -483,7 +480,7 @@ function addSparkline(input: QuickAnalysisExecuteInput): QuickAnalysisExecuteRes
   recordSparklineChange(input.history ?? null, store, () => {
     mutators.setSparkline(store, addr, {
       kind,
-      source: rangeRef(range),
+      source: formatA1Range(range, { collapse: false }),
       showNegative: kind !== 'line',
     });
   });

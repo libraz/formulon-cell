@@ -6,14 +6,13 @@ import {
 import type { History } from '../commands/history.js';
 import { interactionControllerFor } from '../commands/interaction-controller.js';
 import { expandRangeWithMerges, mergeAt, mergeWillLoseData } from '../commands/merge.js';
-import { addrKey } from '../engine/address.js';
+import { addrKey, formatA1Range } from '../engine/address.js';
 import type { CellValue, Range } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import { defaultStrings, type Strings } from '../i18n/strings.js';
 import { sameRange } from '../store/selection-geometry.js';
 import type { CellFormat, SpreadsheetStore, State } from '../store/store.js';
 import { confirmMergeLoseData } from '../toolbar/dialogs/merge-confirm.js';
-import { formatA1Range } from '../wrappers/toolbar-a1.js';
 import { syncCustomSelects } from './custom-select.js';
 import {
   type DraftState,

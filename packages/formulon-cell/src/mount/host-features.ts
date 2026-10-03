@@ -8,9 +8,9 @@ import {
 } from '../commands/session-illustration.js';
 import { setSheetZoom } from '../commands/structure.js';
 import { tracePrecedents as tracePrecedentArrows } from '../commands/traces.js';
-import { colLetter } from '../engine/address.js';
+import { formatA1Range } from '../engine/address.js';
 import { formatCellForEdit } from '../engine/edit-seed.js';
-import type { Addr, Range } from '../engine/types.js';
+import type { Addr } from '../engine/types.js';
 import type { WorkbookHandle } from '../engine/workbook-handle.js';
 import type { SpreadsheetEmitter } from '../events.js';
 import type { ExtensionHandle, resolveFlags } from '../extensions/index.js';
@@ -59,12 +59,6 @@ import { projectDisabledState } from '../toolbar/menu-a11y.js';
 import type { ChromeSlot } from './chrome.js';
 import type { FormulaBarController } from './formula-bar.js';
 import type { SheetTabsController } from './sheet-tabs-controller.js';
-
-const a1Range = (range: Range): string => {
-  const start = `${colLetter(range.c0)}${range.r0 + 1}`;
-  const end = `${colLetter(range.c1)}${range.r1 + 1}`;
-  return start === end ? start : `${start}:${end}`;
-};
 
 const SELECTION_SEEDED_FUNCTIONS = new Set([
   'SUM',
@@ -398,7 +392,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           if (!shouldSeedFunctionWithSelection(functionName)) return null;
           const range = input.store.getState().selection.range;
           if (range.r0 === range.r1 && range.c0 === range.c1) return null;
-          return [a1Range(range)];
+          return [formatA1Range(range)];
         };
         if (input.isMacPlatform()) {
           s.macFormulaPaletteAnchor = null;
@@ -472,7 +466,8 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           wb,
           history: input.history,
           strings,
-          getSelectedRangeFormula: () => `=${a1Range(input.store.getState().selection.range)}`,
+          getSelectedRangeFormula: () =>
+            `=${formatA1Range(input.store.getState().selection.range)}`,
           subscribeToRangeChanges: (listener) => input.store.subscribe(listener),
           onAfterMutate: () =>
             mutators.replaceCells(input.store, wb.cells(input.store.getState().data.sheetIndex)),

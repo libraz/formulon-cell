@@ -42,3 +42,20 @@ export function parseA1Atom(raw: string): { row: number; col: number } | null {
   if (col < 0 || row < 0 || col > MAX_COL || row > MAX_ROW) return null;
   return { row, col };
 }
+
+/** A1 text of a cell (`B3`), or `$B$3` when `absolute`. */
+export function formatA1Cell(row: number, col: number, absolute = false): string {
+  const pin = absolute ? '$' : '';
+  return `${pin}${colLetter(col)}${pin}${row + 1}`;
+}
+
+/** A1 text of a range (`A1:B3`). A single cell collapses to `A1` unless
+ *  `collapse` is false; `absolute` pins every coordinate (`$A$1:$B$3`). */
+export function formatA1Range(
+  range: { r0: number; c0: number; r1: number; c1: number },
+  opts: { absolute?: boolean; collapse?: boolean } = {},
+): string {
+  const start = formatA1Cell(range.r0, range.c0, opts.absolute);
+  const end = formatA1Cell(range.r1, range.c1, opts.absolute);
+  return start === end && opts.collapse !== false ? start : `${start}:${end}`;
+}
