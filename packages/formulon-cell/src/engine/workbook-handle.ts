@@ -5,7 +5,6 @@ import { detectCapabilities } from './capabilities.js';
 import { type ExternalLinkKind, externalLinkKindLabel } from './external-links.js';
 import type { LoadOptions } from './loader.js';
 import { isUsingStub, loadFormulon } from './loader.js';
-import { parseRangeRef as parseTableRef } from './range-resolver.js';
 import { numberValue } from './result.js';
 import { StoreMirror } from './store-mirror.js';
 import type {
@@ -19,7 +18,7 @@ import type {
   Range,
   Workbook,
 } from './types.js';
-import { formatCell, fromEngineValue } from './value.js';
+import { fromEngineValue } from './value.js';
 import { installAnnotationsMethods } from './workbook-handle-annotations.js';
 import { installConditionalFormatMethods } from './workbook-handle-conditional-format.js';
 import { installWorkbookFeatureMethods } from './workbook-handle-features.js';
@@ -29,6 +28,7 @@ import { installPivotMethods } from './workbook-handle-pivot.js';
 import { installPrintMethods } from './workbook-handle-print.js';
 import { installProtectionMethods } from './workbook-handle-protection.js';
 import { installStylesMethods } from './workbook-handle-styles.js';
+import { installTablesMethods } from './workbook-handle-tables.js';
 
 export type ChangeListener = (e: ChangeEvent) => void;
 
@@ -879,59 +879,6 @@ export class WorkbookHandle {
     return s.ok;
   }
 
-  /** Snapshot of every spreadsheet Table on the workbook. Read-only in the engine —
-   *  we surface it as a badge count + listing for the status bar. Empty array
-   *  on the stub. */
-  getTables(): {
-    name: string;
-    displayName: string;
-    ref: string;
-    sheetIndex: number;
-    columns: string[];
-  }[] {
-    this.assertAlive();
-    if (!this.wb.tableCount) return [];
-    const count = this.wb.tableCount();
-    if (!count.status.ok) return [];
-    const n = count.value;
-    const out: {
-      name: string;
-      displayName: string;
-      ref: string;
-      sheetIndex: number;
-      columns: string[];
-    }[] = [];
-    for (let i = 0; i < n; i += 1) {
-      const e = this.wb.tableAt(i);
-      if (!e.status.ok || !e.name || !e.displayName || !e.ref || e.sheetIndex === undefined)
-        continue;
-      out.push({
-        name: e.name,
-        displayName: e.displayName,
-        ref: e.ref,
-        sheetIndex: e.sheetIndex,
-        columns: this.tableColumnNames(e.sheetIndex, e.ref),
-      });
-    }
-    return out;
-  }
-
-  /** Derive column display names from the header row of a table's `ref`.
-   *  Returns labels in source order; cells that read blank fall back to the
-   *  Spreadsheet-style `Column1` / `Column2` placeholder so the structured-ref
-   *  autocomplete still has something to insert. */
-  private tableColumnNames(sheet: number, ref: string): string[] {
-    const parsed = parseTableRef(ref);
-    if (!parsed) return [];
-    const out: string[] = [];
-    for (let col = parsed.c0; col <= parsed.c1; col += 1) {
-      const v = this.getValue({ sheet, row: parsed.r0, col });
-      const text = formatCell(v);
-      out.push(text || `Column${out.length + 1}`);
-    }
-    return out;
-  }
-
   /** Snapshot of OOXML "passthrough" parts (charts, drawings, pivots, etc.)
    *  preserved verbatim by the engine. Surfaced as a badge so users know
    *  these objects exist even though the UI doesn't render them. */
@@ -1077,6 +1024,7 @@ export class WorkbookHandle {
 }
 
 installPivotMethods(WorkbookHandle);
+installTablesMethods(WorkbookHandle);
 installProtectionMethods(WorkbookHandle);
 installAnnotationsMethods(WorkbookHandle);
 installFormulasMethods(WorkbookHandle);
