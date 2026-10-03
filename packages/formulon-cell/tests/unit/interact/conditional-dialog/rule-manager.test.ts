@@ -16,6 +16,7 @@ import {
   mutators,
   type SpreadsheetStore,
 } from '../../../../src/store/store.js';
+import { trackConnectedListenerLeaks } from '../connected-listener-leaks.js';
 import { root, setRange } from './fixtures.js';
 
 describe('attachConditionalDialog', () => {
@@ -614,6 +615,22 @@ describe('attachConditionalDialog', () => {
       ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     expect(store.getState().conditional.rules).toHaveLength(1);
     handle.detach();
+  });
+
+  it('detach() removes every listener left on still-connected targets', () => {
+    const { registered, leaked } = trackConnectedListenerLeaks(() => {
+      const handle = attachConditionalDialog({ host, store });
+      handle.open({ mode: 'new', kind: 'formula' });
+      const preset = document.querySelectorAll<HTMLSelectElement>(
+        '.fc-conddlg__format-picker select',
+      )[1];
+      if (!preset) throw new Error('shared preset select missing');
+      preset.value = 'custom';
+      preset.dispatchEvent(new Event('change', { bubbles: true }));
+      handle.detach();
+    });
+    expect(registered).toBeGreaterThan(50);
+    expect(leaked).toBe(0);
   });
 
   it('Escape closes the overlay', () => {

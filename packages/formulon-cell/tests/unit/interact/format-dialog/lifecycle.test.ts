@@ -7,6 +7,7 @@ import {
   createSpreadsheetStore,
   type SpreadsheetStore,
 } from '../../../../src/store/store.js';
+import { trackConnectedListenerLeaks } from '../connected-listener-leaks.js';
 import { flushRaf, setActive } from './fixtures.js';
 
 describe('attachFormatDialog', () => {
@@ -372,5 +373,15 @@ describe('attachFormatDialog', () => {
     handle.open();
     handle.detach();
     expect(document.querySelector('.fc-fmtdlg')).toBeNull();
+  });
+
+  it('detach() removes every listener left on still-connected targets', () => {
+    const { registered, leaked } = trackConnectedListenerLeaks(() => {
+      const handle = attachFormatDialog({ host, store });
+      handle.open('font');
+      handle.detach();
+    });
+    expect(registered).toBeGreaterThan(50);
+    expect(leaked).toBe(0);
   });
 });
