@@ -298,10 +298,11 @@ export function createHostFeatureState(autocompleteStub: AutocompleteHandle): Ho
 export function createHostFeatureController(input: HostFeatureControllerInput): {
   attach: (id: string) => void;
   detach: (id: string) => void;
+  /** Repoint the features that hold a workbook reference after a replacement. */
+  bindWorkbook: (wb: WorkbookHandle) => void;
 } {
   const s = input.state;
   const attach = (id: string): void => {
-    const wb = input.wb();
     const strings = input.strings();
     switch (id) {
       case 'formatDialog':
@@ -463,14 +464,17 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         if (s.namedRangeDialog) return;
         s.namedRangeDialog = attachNamedRangeDialog({
           host: input.host,
-          wb,
+          wb: input.wb(),
           history: input.history,
           strings,
           getSelectedRangeFormula: () =>
             `=${formatA1Range(input.store.getState().selection.range)}`,
           subscribeToRangeChanges: (listener) => input.store.subscribe(listener),
           onAfterMutate: () =>
-            mutators.replaceCells(input.store, wb.cells(input.store.getState().data.sheetIndex)),
+            mutators.replaceCells(
+              input.store,
+              input.wb().cells(input.store.getState().data.sheetIndex),
+            ),
         });
         input.featureRegistry.set(
           'namedRanges',
@@ -500,10 +504,13 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         s.pivotTableDialog = attachPivotTableDialog({
           host: input.host,
           store: input.store,
-          wb,
+          wb: input.wb(),
           strings,
           onAfterCreate: () => {
-            mutators.replaceCells(input.store, wb.cells(input.store.getState().data.sheetIndex));
+            mutators.replaceCells(
+              input.store,
+              input.wb().cells(input.store.getState().data.sheetIndex),
+            );
           },
           invalidate: () => input.renderer.invalidate(),
         });
@@ -547,25 +554,28 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           statusbar: input.statusbar,
           store: input.store,
           strings,
-          getEngineLabel: () => (wb.isStub ? 'stub' : `formulon ${wb.version}`),
+          getEngineLabel: () => (input.wb().isStub ? 'stub' : `formulon ${input.wb().version}`),
           getFormulaEditing: () => input.getFormulaBar().isEditing(),
           getUploadStatus: input.getUploadStatus,
           getMacroRecording: input.getMacroRecording,
-          getCalcMode: () => wb.calcMode(),
+          getCalcMode: () => input.wb().calcMode(),
           onCycleCalcMode: () => {
-            const cur = wb.calcMode();
+            const cur = input.wb().calcMode();
             if (cur === null) return;
             const next = ((cur + 1) % 3) as 0 | 1 | 2;
-            wb.setCalcMode(next);
+            input.wb().setCalcMode(next);
             s.statusBar?.refresh();
           },
           onRecalc: () => {
-            wb.recalc();
-            mutators.replaceCells(input.store, wb.cells(input.store.getState().data.sheetIndex));
+            input.wb().recalc();
+            mutators.replaceCells(
+              input.store,
+              input.wb().cells(input.store.getState().data.sheetIndex),
+            );
             input.renderer.invalidate();
           },
           onZoomChange: (zoom) => {
-            setSheetZoom(input.store, zoom, wb);
+            setSheetZoom(input.store, zoom, input.wb());
             input.renderer.invalidate();
           },
         });
@@ -578,7 +588,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         if (s.workbookObjects) return;
         s.workbookObjects = attachWorkbookObjectsPanel({
           host: input.host,
-          wb,
+          wb: input.wb(),
           strings,
           listSessionIllustrations: () => input.store.getState().illustrations.illustrations,
           onSelectSessionIllustration: (id) => {
@@ -596,7 +606,10 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           subscribeSessionObjects: (listener) => input.store.subscribe(listener),
           onOpenPivotTableDialog: () => s.pivotTableDialog?.open(),
           onAfterPivotEdit: () => {
-            mutators.replaceCells(input.store, wb.cells(input.store.getState().data.sheetIndex));
+            mutators.replaceCells(
+              input.store,
+              input.wb().cells(input.store.getState().data.sheetIndex),
+            );
             input.renderer.invalidate();
           },
         });
@@ -611,7 +624,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         s.viewToolbar = attachViewToolbar({
           toolbar: input.viewbar,
           store: input.store,
-          wb,
+          wb: input.wb(),
           history: input.history,
           strings,
           onOpenObjects: input.flags().workbookObjects
@@ -696,8 +709,8 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
             const key = `${addr.sheet}:${addr.row}:${addr.col}`;
             const cell = state.data.cells.get(key);
             const fmt = state.format.formats.get(key);
-            input.fxInput.value = formatCellForEdit(cell, wb, addr, {
-              formulaOverride: wb.cellFormula(addr),
+            input.fxInput.value = formatCellForEdit(cell, input.wb(), addr, {
+              formulaOverride: input.wb().cellFormula(addr),
               formulaHidden: fmt?.formulaHidden === true,
               sheetProtected: state.protection.protectedSheets.has(addr.sheet),
               formatFormula: state.ui.r1c1
@@ -709,7 +722,7 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
           },
           onTraceError: (addr) => {
             mutators.setActive(input.store, addr);
-            tracePrecedentArrows(input.store, wb, addr);
+            tracePrecedentArrows(input.store, input.wb(), addr);
             input.renderer.invalidate();
           },
         });
@@ -727,16 +740,16 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
         s.fxAutocomplete = attachAutocomplete({
           input: input.fxInput,
           onAfterInsert: () => input.getFormulaBar().syncFxRefs(),
-          getTables: () => wb.getTables(),
+          getTables: () => input.wb().getTables(),
           getCustomFunctions: () => input.formulaRegistry.list(),
-          getFunctionNames: () => wb.functionNames(),
+          getFunctionNames: () => input.wb().functionNames(),
           labels: strings.autocomplete,
         });
         s.fxArgHelper = attachArgHelper({ input: input.fxInput, labels: strings.argHelper });
         break;
       case 'wheel':
         s.detachWheel();
-        s.detachWheel = attachWheel({ grid: input.grid, store: input.store, wb });
+        s.detachWheel = attachWheel({ grid: input.grid, store: input.store, getWb: input.wb });
         break;
       case 'shortcuts':
         if (s.hostShortcutsAttached) return;
@@ -912,5 +925,12 @@ export function createHostFeatureController(input: HostFeatureControllerInput): 
     input.refreshFeaturesView();
   };
 
-  return { attach, detach };
+  const bindWorkbook = (wb: WorkbookHandle): void => {
+    s.viewToolbar?.bindWorkbook(wb);
+    s.workbookObjects?.bindWorkbook(wb);
+    s.namedRangeDialog?.bindWorkbook(wb);
+    s.pivotTableDialog?.bindWorkbook(wb);
+  };
+
+  return { attach, detach, bindWorkbook };
 }

@@ -571,9 +571,6 @@ export const Spreadsheet = {
       // Engine-bound attaches (clipboard, paste-special, context-menu,
       // find-replace, validation) live inside `binding`. Rebuild it.
       rebindEngine();
-      featureState.viewToolbar?.bindWorkbook(wb);
-      featureState.workbookObjects?.bindWorkbook(wb);
-      featureState.pivotTableDialog?.bindWorkbook(wb);
 
       // User extensions opt-in via setStrings.
       extensionRegistry.setUserStrings(next);
@@ -751,11 +748,7 @@ export const Spreadsheet = {
           detachHostFeature('viewToolbar');
           attachHostFeature('viewToolbar');
         }
-        if (wbChanged) {
-          rebindEngine();
-          featureState.viewToolbar?.bindWorkbook(wb);
-          featureState.workbookObjects?.bindWorkbook(wb);
-        }
+        if (wbChanged) rebindEngine();
         refreshFeaturesView();
       },
       setExtensions: extensionRegistry.setExtensions,
@@ -905,10 +898,7 @@ export const Spreadsheet = {
         dispatchPassthroughSummary();
         binding = bindEngine(wb);
         syncBindingFeatures(binding);
-        featureState.viewToolbar?.bindWorkbook(wb);
-        featureState.workbookObjects?.bindWorkbook(wb);
-        featureState.namedRangeDialog?.bindWorkbook(wb);
-        featureState.pivotTableDialog?.bindWorkbook(wb);
+        hostFeatures.bindWorkbook(wb);
         featureState.statusBar?.refresh();
         sheetTabsController?.update();
         extensionRegistry.notifyWorkbookChange(wb);

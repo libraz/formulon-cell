@@ -6,9 +6,9 @@ export interface WheelDeps {
   /** Element to listen on — typically the grid canvas wrapper. */
   grid: HTMLElement;
   store: SpreadsheetStore;
-  /** When provided, Ctrl/Cmd+wheel zoom changes are also pushed to the engine
-   *  (`setSheetZoom`) so the active-sheet zoom round-trips through .xlsx. */
-  wb?: WorkbookHandle;
+  /** When provided, Ctrl/Cmd+wheel zoom changes are also pushed to the current
+   *  engine (`setSheetZoom`) so the active-sheet zoom round-trips through .xlsx. */
+  getWb?: () => WorkbookHandle | null;
 }
 
 /**
@@ -23,7 +23,7 @@ export interface WheelDeps {
  * scroll still advances by one row once enough pixels have accumulated.
  */
 export function attachWheel(deps: WheelDeps): () => void {
-  const { grid, store, wb } = deps;
+  const { grid, store, getWb } = deps;
 
   let accY = 0;
   let accX = 0;
@@ -40,6 +40,7 @@ export function attachWheel(deps: WheelDeps): () => void {
       // from becoming an unexpected workbook mutation.
       const navOptions = navigationPolicyFor(store)?.options;
       const restricted = !!(navOptions?.range || navOptions?.selectable);
+      const wb = getWb?.();
       if (wb && !restricted) {
         const sheet = store.getState().data.sheetIndex;
         const pct = Math.round(store.getState().viewport.zoom * 100);

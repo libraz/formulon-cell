@@ -788,14 +788,8 @@ export const wheel = (): Extension => ({
   id: 'wheel',
   priority: 50,
   setup(ctx) {
-    let detach = attachWheel({ grid: ctx.grid, store: ctx.store, wb: ctx.getWb() });
-    return {
-      rebindWorkbook: (wb) => {
-        detach();
-        detach = attachWheel({ grid: ctx.grid, store: ctx.store, wb });
-      },
-      dispose: () => detach(),
-    };
+    const detach = attachWheel({ grid: ctx.grid, store: ctx.store, getWb: () => ctx.getWb() });
+    return { dispose: () => detach() };
   },
 });
 
