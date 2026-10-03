@@ -437,7 +437,10 @@ const resolveTransactionController = (
   ) {
     return { mismatch: true, ephemeral: false };
   }
-  const policy = registered?.policy ?? deps.commands?.policy;
+  // A registered controller always owns the mounted write; the ephemeral
+  // transaction controller serves only hosts without one.
+  if (registered) return { controller: registered, mismatch: false, ephemeral: false };
+  const policy = deps.commands?.policy;
   if (!alwaysCreate && !policy) return { mismatch: false, ephemeral: false };
   const controller = new FullInteractionController({
     store: deps.store,
@@ -489,8 +492,8 @@ const refreshCells = (store: SpreadsheetStore, workbook: WorkbookHandle, sheet: 
 export const executeRibbonClearAction = (deps: ExecuteRibbonClearActionDeps): void => {
   const { store, workbook, history, action } = deps;
 
-  // Contents keeps its public command adapter behavior. Clear All uses the
-  // transaction controller below so the content child shares this History.
+  // Contents keeps its public command adapter behavior. Clear All runs its
+  // content child through the resolved controller inside one History step.
   if (action === 'contents') {
     const range = store.getState().selection.range;
     const result = clearSelectedContents({

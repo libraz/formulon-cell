@@ -383,6 +383,44 @@ describe('executeRibbonClearAction', () => {
     }
   });
 
+  it('clears All contents through a registered controller even without a policy', async () => {
+    const store = createSpreadsheetStore();
+    const workbook = await WorkbookHandle.createDefault({ preferStub: true });
+    const history = new History();
+    const addr = { sheet: 0, row: 0, col: 0 };
+    const locked = { sheet: 0, row: 0, col: 1 };
+    workbook.setNumber(addr, 7);
+    workbook.setNumber(locked, 8);
+    mutators.replaceCells(store, workbook.cells(0));
+    mutators.setRange(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 1 });
+    mutators.setCellFormat(store, addr, { bold: true });
+    setCellLocked(store, { sheet: 0, r0: 0, c0: 0, r1: 0, c1: 0 }, false);
+    setProtectedSheet(store, 0, true);
+    const onChanged = vi.fn();
+    const controller = new InteractionController({
+      store,
+      getWb: () => workbook,
+      history,
+      onChanged,
+    });
+    const unregister = registerInteractionController(store, controller);
+    try {
+      executeRibbonClearAction({ store, workbook, history, action: 'all' });
+      expect(onChanged).toHaveBeenCalledWith(expect.objectContaining({ status: 'applied' }));
+      expect(workbook.getValue(addr)).toEqual({ kind: 'blank' });
+      expect(workbook.getValue(locked)).toEqual({ kind: 'number', value: 8 });
+      expect(store.getState().format.formats.get(key(addr))?.bold).toBeUndefined();
+      expect(history.undo()).toBe(true);
+      expect(workbook.getValue(addr)).toEqual({ kind: 'number', value: 7 });
+      expect(store.getState().format.formats.get(key(addr))?.bold).toBe(true);
+      expect(history.undo()).toBe(false);
+    } finally {
+      unregister();
+      controller.dispose();
+      workbook.dispose();
+    }
+  });
+
   it('rejects a malformed foreign-sheet extra range before any clear', () => {
     const store = createSpreadsheetStore();
     const workbook = makeWorkbook([
