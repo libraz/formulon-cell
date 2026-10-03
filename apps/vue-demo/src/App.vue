@@ -28,7 +28,6 @@ import {
   composeDemoUiOptions,
   createDemoStrings,
   createInitialDemoWorkbook,
-  demoSearchOptionId,
   DEMO_FUNCTIONS,
   demoFunctionArgumentHelp,
   DEMO_MAC_RIBBON_TABS,
@@ -36,7 +35,6 @@ import {
   DEMO_PRINTER_PROFILES,
   DEMO_RIBBON_TABS,
   pushDemoChangeLog,
-  resolveDemoSearchKey,
   nextDemoFeatureOverrides,
   openDemoWorkbookFile,
   installDemoScriptMenu,
@@ -44,36 +42,28 @@ import {
   type DemoReviewDialogState,
   demoCommandText,
   type DemoBackstageAction,
-  type DemoSearchItem,
-  type DemoSearchUsagePrior,
   formatLoadError,
   FORMATTERS,
   installDemoF6Navigation,
-  loadDemoSearchUsagePrior,
   type PresetKey,
-  installDemoSearchShortcut,
-  queryDemoSearchItems,
-  recordDemoSearchUsage,
   refreshDemoPrinterProfiles,
   resolveInitialLocale,
   resolveInitialPlatform,
   type DemoPlatform,
   reportDemoScriptRun,
   runDemoBackstageAction,
-  saveDemoSearchUsagePrior,
   saveDemoWorkbookToDownload,
 } from '../../demo-shared/index.js';
 import DemoBackstage from './DemoBackstage.vue';
-import DemoIcon from './DemoIcon.vue';
 import DemoOptionsPanel from './DemoOptionsPanel.vue';
 import DemoReviewDialog from './DemoReviewDialog.vue';
 import DemoScriptDialog from './DemoScriptDialog.vue';
+import DemoTitleBar from './DemoTitleBar.vue';
 
 const UI = createDemoStrings('Vue');
 
 
 
-let disposeSearchShortcut: (() => void) | undefined;
 let disposeF6Navigation: (() => void) | undefined;
 
 const theme = ref<ThemeName>('paper');
@@ -87,18 +77,13 @@ const toolbar = shallowRef<ToolbarInstance | null>(null);
 const log = ref<ChangeLogEntry[]>([]);
 const formatters = ref({ uppercase: true, arrows: true });
 const fileInput = ref<HTMLInputElement | null>(null);
-const searchInput = ref<HTMLInputElement | null>(null);
-const quickAccess = ref<HTMLElement | null>(null);
+const titleBar = ref<InstanceType<typeof DemoTitleBar> | null>(null);
 const preset = ref<PresetKey>('full');
 const overrides = ref<FeatureFlags>({});
 const showRibbon = ref(true);
 const showPanel = ref(false);
 const ribbonTab = ref<RibbonTab>('home');
 const backstageAction = ref<DemoBackstageAction>('info');
-const searchQuery = ref('');
-const searchOpen = ref(false);
-const searchActiveIndex = ref(-1);
-const searchUsagePrior = ref<DemoSearchUsagePrior>(loadDemoSearchUsagePrior());
 const bookName = ref('Book1');
 const loadError = ref<string | null>(null);
 const reviewDialog = ref<DemoReviewDialogState | null>(null);
@@ -337,19 +322,6 @@ const searchItems = computed(() =>
   ),
 );
 
-const filteredCommands = computed(() => {
-  return queryDemoSearchItems(searchItems.value, searchQuery.value, 8, searchUsagePrior.value);
-});
-
-const runCommand = (cmd: DemoSearchItem): void => {
-  searchUsagePrior.value = recordDemoSearchUsage(searchUsagePrior.value, cmd);
-  if (cmd.tab) ribbonTab.value = cmd.tab;
-  cmd.run();
-  searchQuery.value = '';
-  searchOpen.value = false;
-  searchActiveIndex.value = -1;
-};
-
 const openBackstage = (): void => {
   ribbonTab.value = 'file';
   toolbar.value?.setBackstageOpen(true);
@@ -361,41 +333,15 @@ const onToolbarReady = (next: ToolbarInstance | null): void => {
   (window as unknown as { __fcToolbar?: ToolbarInstance | null }).__fcToolbar = next;
 };
 
-const onSearchKeydown = (ev: KeyboardEvent): void => {
-  const action = resolveDemoSearchKey(ev.key, searchActiveIndex.value, filteredCommands.value.length);
-  if (action?.kind === 'close') {
-    searchOpen.value = false;
-    searchActiveIndex.value = -1;
-    (ev.currentTarget as HTMLInputElement).blur();
-  } else if (action?.kind === 'move') {
-    ev.preventDefault();
-    searchOpen.value = true;
-    searchActiveIndex.value = action.index;
-  } else if (action?.kind === 'run') {
-    ev.preventDefault();
-    const command = filteredCommands.value[action.index];
-    if (command) runCommand(command);
-  }
-};
-
-watch([searchQuery, searchOpen], () => {
-  searchActiveIndex.value = -1;
-});
-
-watch(searchUsagePrior, (prior) => saveDemoSearchUsagePrior(prior));
-
 onMounted(() => {
-  disposeSearchShortcut = installDemoSearchShortcut(() => searchInput.value, platform.value);
   disposeF6Navigation = installDemoF6Navigation({
-    getQuickAccess: () => quickAccess.value,
+    getQuickAccess: () => titleBar.value?.quickAccess ?? null,
     getToolbar: () => toolbar.value,
     getInstance: () => instance.value,
   });
 });
 
 onBeforeUnmount(() => {
-  disposeSearchShortcut?.();
-  disposeSearchShortcut = undefined;
   disposeF6Navigation?.();
   disposeF6Navigation = undefined;
 });
@@ -411,104 +357,20 @@ onBeforeUnmount(() => {
     <template v-else>{{ ui.loadingEngine }}</template>
   </div>
   <div v-else class="demo" :data-fc-theme="theme" :data-fc-platform="platform">
-    <header class="demo__head">
-      <div class="fc-tb__titlebar">
-        <div
-          ref="quickAccess"
-          class="demo__quick"
-          role="toolbar"
-          :aria-label="ui.quickAccessToolbar"
-        >
-          <button
-            v-if="platform === 'mac'"
-            type="button"
-            class="demo__brand-mark"
-            :aria-label="ui.file"
-            :title="ui.file"
-            @click="openBackstage"
-          >
-            <DemoIcon name="app" />
-          </button>
-          <span v-else class="demo__brand-mark" aria-hidden="true">
-            <DemoIcon name="app" />
-          </span>
-          <button type="button" class="demo__title-icon" :aria-label="ui.save" @click="onSave">
-            <DemoIcon name="save" />
-          </button>
-          <button type="button" class="demo__title-icon" :aria-label="ui.undo" @click="instance?.undo()">
-            <DemoIcon name="undo" />
-          </button>
-          <button type="button" class="demo__title-icon" :aria-label="ui.redo" @click="instance?.redo()">
-            <DemoIcon name="redo" />
-          </button>
-        </div>
-        <div class="fc-tb__title">
-          <strong>{{ bookName }}</strong>
-          <span>{{ ui.saved }}</span>
-        </div>
-        <div class="fc-tb__search">
-          <DemoIcon name="search" />
-          <input
-            ref="searchInput"
-            v-model="searchQuery"
-            type="search"
-            role="combobox"
-            :placeholder="ui.search"
-            :aria-label="platform === 'mac' ? (locale === 'ja' ? '検索' : 'Search') : ui.searchCommands"
-            aria-controls="demo-search-results"
-            :aria-expanded="searchOpen"
-            :aria-activedescendant="searchOpen && searchActiveIndex >= 0 ? demoSearchOptionId(searchActiveIndex) : undefined"
-            @focus="searchOpen = true; searchActiveIndex = -1"
-            @input="searchOpen = true; searchActiveIndex = -1"
-            @keydown="onSearchKeydown"
-            @blur="searchOpen = false"
-          />
-          <div v-if="searchOpen" id="demo-search-results" class="fc-tb__command-menu" role="listbox">
-            <div v-if="filteredCommands.length === 0" class="fc-tb__command-empty">
-              {{ ui.noCommands }}
-            </div>
-            <button
-              v-for="(cmd, index) in filteredCommands"
-              v-else
-              :key="cmd.id"
-              :id="demoSearchOptionId(index)"
-              type="button"
-              role="option"
-              :aria-selected="index === searchActiveIndex"
-              :aria-disabled="cmd.disabled ? 'true' : undefined"
-              :data-disabled-reason="cmd.disabledReason"
-              :class="[
-                'fc-tb__command-item',
-                {
-                  'fc-tb__command-item--active': index === searchActiveIndex,
-                  'fc-tb__command-item--disabled': cmd.disabled,
-                },
-              ]"
-              @mousedown.prevent
-              @mouseenter="searchActiveIndex = index"
-              @click="runCommand(cmd)"
-            >
-              <strong>{{ cmd.label }}</strong>
-              <span>{{ cmd.hint }}</span>
-            </button>
-          </div>
-        </div>
-        <div class="demo__account">
-          <button type="button" class="demo__share">
-            {{ ui.share }}
-          </button>
-          <button
-            type="button"
-            :class="['demo__share', { 'demo__share--active': showPanel }]"
-            :aria-pressed="showPanel"
-            @click="showPanel = !showPanel"
-          >
-            {{ ui.demoPane }}
-          </button>
-          <span class="demo__avatar" role="img" :aria-label="ui.signedInUser">FC</span>
-        </div>
-      </div>
-    </header>
+    <DemoTitleBar
+      ref="titleBar"
+      :ui="ui"
+      :platform="platform"
+      :locale="locale"
+      :book-name="bookName"
+      :instance="instance"
+      :show-panel="showPanel"
+      :search-items="searchItems"
+      @save="onSave"
+      @open-backstage="openBackstage"
+      @toggle-panel="showPanel = !showPanel"
+      @tab-change="ribbonTab = $event"
+    />
     <input ref="fileInput" type="file" accept=".xlsx,.xlsm" hidden @change="onOpenFiles" />
 
     <main :class="['demo__body', { 'demo__body--panel': showPanel }]">

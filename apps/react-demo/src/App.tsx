@@ -28,37 +28,28 @@ import {
   type DemoBackstageAction,
   type DemoPlatform,
   type DemoReviewDialogState,
-  type DemoSearchItem,
-  type DemoSearchUsagePrior,
   demoCommandText,
   demoFunctionArgumentHelp,
-  demoSearchOptionId,
   FORMATTERS,
   formatLoadError,
   installDemoF6Navigation,
   installDemoScriptMenu,
-  installDemoSearchShortcut,
-  loadDemoSearchUsagePrior,
   nextDemoFeatureOverrides,
   openDemoWorkbookFile,
   type PresetKey,
   pushDemoChangeLog,
-  queryDemoSearchItems,
-  recordDemoSearchUsage,
   refreshDemoPrinterProfiles,
   reportDemoScriptRun,
-  resolveDemoSearchKey,
   resolveInitialLocale,
   resolveInitialPlatform,
   runDemoBackstageAction,
-  saveDemoSearchUsagePrior,
   saveDemoWorkbookToDownload,
 } from '../../demo-shared/index.js';
 import { DemoBackstage } from './DemoBackstage.js';
-import { DemoIcon } from './DemoIcon.js';
 import { DemoOptionsPanel } from './DemoOptionsPanel.js';
 import { DemoReviewDialog } from './DemoReviewDialog.js';
 import { DemoScriptDialog } from './DemoScriptDialog.js';
+import { DemoTitleBar } from './DemoTitleBar.js';
 
 const UI = createDemoStrings('React');
 
@@ -76,12 +67,6 @@ export const App = (): ReactElement => {
   const [showPanel, setShowPanel] = useState(false);
   const [ribbonTab, setRibbonTab] = useState<RibbonTab>('home');
   const [backstageAction, setBackstageAction] = useState<DemoBackstageAction>('info');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchActiveIndex, setSearchActiveIndex] = useState(-1);
-  const [searchUsagePrior, setSearchUsagePrior] = useState<DemoSearchUsagePrior>(() =>
-    loadDemoSearchUsagePrior(),
-  );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reviewDialog, setReviewDialog] = useState<DemoReviewDialogState | null>(null);
   const [scriptOpen, setScriptOpen] = useState(false);
@@ -92,7 +77,6 @@ export const App = (): ReactElement => {
   // re-saves.
   const [bookName, setBookName] = useState('Book1');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const quickAccessRef = useRef<HTMLDivElement | null>(null);
   const toolbarRef = useRef<ToolbarInstance | null>(null);
 
@@ -143,9 +127,6 @@ export const App = (): ReactElement => {
     document.documentElement.lang = locale === 'ja' ? 'ja' : 'en';
   }, [instance, locale]);
 
-  useEffect(() => installDemoSearchShortcut(() => searchInputRef.current, platform), [platform]);
-
-  useEffect(() => saveDemoSearchUsagePrior(searchUsagePrior), [searchUsagePrior]);
   useEffect(
     () =>
       installDemoF6Navigation({
@@ -314,19 +295,6 @@ export const App = (): ReactElement => {
     [commands, locale, ribbonTabs],
   );
 
-  const filteredCommands = useMemo(() => {
-    return queryDemoSearchItems(searchItems, searchQuery, 8, searchUsagePrior);
-  }, [searchItems, searchQuery, searchUsagePrior]);
-
-  const runCommand = useCallback((cmd: DemoSearchItem) => {
-    setSearchUsagePrior((prior) => recordDemoSearchUsage(prior, cmd));
-    if (cmd.tab) setRibbonTab(cmd.tab);
-    cmd.run();
-    setSearchQuery('');
-    setSearchOpen(false);
-    setSearchActiveIndex(-1);
-  }, []);
-
   const openBackstage = useCallback(() => {
     setRibbonTab('file');
     toolbarRef.current?.setBackstageOpen(true);
@@ -350,158 +318,20 @@ export const App = (): ReactElement => {
 
   return (
     <div className="demo" data-fc-theme={theme} data-fc-platform={platform}>
-      <header className="demo__head">
-        <div className="fc-tb__titlebar">
-          <div
-            ref={quickAccessRef}
-            className="demo__quick"
-            role="toolbar"
-            aria-label={ui.quickAccessToolbar}
-          >
-            {platform === 'mac' ? (
-              <button
-                type="button"
-                className="demo__brand-mark"
-                aria-label={ui.file}
-                title={ui.file}
-                onClick={openBackstage}
-              >
-                <DemoIcon name="app" />
-              </button>
-            ) : (
-              <span className="demo__brand-mark" aria-hidden="true">
-                <DemoIcon name="app" />
-              </span>
-            )}
-            <button
-              type="button"
-              className="demo__title-icon"
-              aria-label={ui.save}
-              onClick={onSave}
-            >
-              <DemoIcon name="save" />
-            </button>
-            <button
-              type="button"
-              className="demo__title-icon"
-              aria-label={ui.undo}
-              onClick={() => instance?.undo()}
-            >
-              <DemoIcon name="undo" />
-            </button>
-            <button
-              type="button"
-              className="demo__title-icon"
-              aria-label={ui.redo}
-              onClick={() => instance?.redo()}
-            >
-              <DemoIcon name="redo" />
-            </button>
-          </div>
-          <div className="fc-tb__title">
-            <strong>{bookName}</strong>
-            <span>{ui.saved}</span>
-          </div>
-          <div className="fc-tb__search">
-            <DemoIcon name="search" />
-            <input
-              ref={searchInputRef}
-              type="search"
-              role="combobox"
-              placeholder={ui.search}
-              aria-label={
-                platform === 'mac' ? (locale === 'ja' ? '検索' : 'Search') : ui.searchCommands
-              }
-              aria-controls="demo-search-results"
-              aria-expanded={searchOpen}
-              aria-activedescendant={
-                searchOpen && searchActiveIndex >= 0
-                  ? demoSearchOptionId(searchActiveIndex)
-                  : undefined
-              }
-              value={searchQuery}
-              onFocus={() => {
-                setSearchOpen(true);
-                setSearchActiveIndex(-1);
-              }}
-              onChange={(e) => {
-                const input = e.currentTarget;
-                setSearchQuery(input.value);
-                // Escape clears a search input natively, and that clear lands
-                // as a change on an input we just blurred. Only a change the
-                // user typed reopens the list.
-                setSearchOpen(document.activeElement === input);
-                setSearchActiveIndex(-1);
-              }}
-              onKeyDown={(e) => {
-                const action = resolveDemoSearchKey(
-                  e.key,
-                  searchActiveIndex,
-                  filteredCommands.length,
-                );
-                if (action?.kind === 'close') {
-                  setSearchOpen(false);
-                  setSearchActiveIndex(-1);
-                  e.currentTarget.blur();
-                } else if (action?.kind === 'move') {
-                  e.preventDefault();
-                  setSearchOpen(true);
-                  setSearchActiveIndex(action.index);
-                } else if (action?.kind === 'run') {
-                  e.preventDefault();
-                  const command = filteredCommands[action.index];
-                  if (command) runCommand(command);
-                }
-              }}
-              onBlur={() => setSearchOpen(false)}
-            />
-            {searchOpen ? (
-              <div id="demo-search-results" className="fc-tb__command-menu" role="listbox">
-                {filteredCommands.length === 0 ? (
-                  <div className="fc-tb__command-empty">{ui.noCommands}</div>
-                ) : (
-                  filteredCommands.map((cmd, index) => (
-                    <button
-                      key={cmd.id}
-                      id={demoSearchOptionId(index)}
-                      type="button"
-                      role="option"
-                      aria-selected={index === searchActiveIndex}
-                      aria-disabled={cmd.disabled ? 'true' : undefined}
-                      data-disabled-reason={cmd.disabledReason}
-                      className={`fc-tb__command-item${
-                        index === searchActiveIndex ? ' fc-tb__command-item--active' : ''
-                      }${cmd.disabled ? ' fc-tb__command-item--disabled' : ''}`}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onMouseEnter={() => setSearchActiveIndex(index)}
-                      onClick={() => runCommand(cmd)}
-                    >
-                      <strong>{cmd.label}</strong>
-                      <span>{cmd.hint}</span>
-                    </button>
-                  ))
-                )}
-              </div>
-            ) : null}
-          </div>
-          <div className="demo__account">
-            <button type="button" className="demo__share">
-              {ui.share}
-            </button>
-            <button
-              type="button"
-              className={`demo__share${showPanel ? ' demo__share--active' : ''}`}
-              onClick={() => setShowPanel((v) => !v)}
-              aria-pressed={showPanel}
-            >
-              {ui.demoPane}
-            </button>
-            <span className="demo__avatar" role="img" aria-label={ui.signedInUser}>
-              FC
-            </span>
-          </div>
-        </div>
-      </header>
+      <DemoTitleBar
+        ui={ui}
+        platform={platform}
+        locale={locale}
+        bookName={bookName}
+        instance={instance}
+        showPanel={showPanel}
+        searchItems={searchItems}
+        quickAccessRef={quickAccessRef}
+        onSave={onSave}
+        onOpenBackstage={openBackstage}
+        onTogglePanel={() => setShowPanel((v) => !v)}
+        onTabChange={setRibbonTab}
+      />
       <input
         ref={fileInputRef}
         type="file"
